@@ -7,9 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:guardias": "vitest run guard",
+    "test:rapido": "tsx scripts/test-rapido.ts",
+    "db:migrate:create": "prisma migrate dev --create-only",
+    "db:migrate": "prisma migrate deploy",
+    "db:rollback": "tsx scripts/db-rollback.ts"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -17,12 +24,20 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
+    "pg": "^8.22.0",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.9",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@10.10.0"
+  "packageManager": "pnpm@10.10.0",
+  "prisma": {
+    "schema": "db/schema.prisma"
+  }
 }
