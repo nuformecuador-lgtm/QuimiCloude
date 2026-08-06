@@ -1,0 +1,112 @@
+{
+  "features": [
+    {
+      "id": 1,
+      "name": "modelo-usuarios-y-roles",
+      "description": "Necesitamos persistir usuarios y roles. Cada usuario tiene nombres, apellidos, fecha de nacimiento, correo electronico, telefono de contacto, un tipo de documento de identidad con su numero, un nombre de usuario unico con el que inicia sesion, y una contrasena que nunca se guarda en claro. El correo es unico entre usuarios, y la combinacion de tipo y numero de documento tampoco se repite. El tipo de documento sale de un conjunto cerrado de valores, no es texto libre: por ahora el unico valor admitido es CC (cedula de ciudadania), y el conjunto debe poder crecer despues sin migrar los datos ya guardados. Un rol tiene nombre unico y descripcion, y es un catalogo cerrado y corto sin pantalla de administracion. Cada usuario tiene exactamente un rol y ese rol es obligatorio: no puede existir un usuario sin rol; un mismo rol lo pueden tener muchos usuarios, y borrar un rol que todavia tiene usuarios asignados no debe ser posible. El alta de usuarios y el login van aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": null,
+      "spec_path": "specs/1-modelo-usuarios-y-roles"
+    },
+    {
+      "id": 2,
+      "name": "hash-y-verificacion-de-contrasena",
+      "description": "Las contrasenas se guardan siempre transformadas de forma que no se puedan revertir, y hay que poder comprobar si una contrasena escrita corresponde a la guardada. Dos usuarios con la misma contrasena no deben quedar con el mismo valor almacenado. Esto es la pieza que despues usaran el seed y el login.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 1,
+      "spec_path": "specs/2-hash-y-verificacion-de-contrasena"
+    },
+    {
+      "id": 3,
+      "name": "seed-roles-y-usuario-inicial",
+      "description": "Para poder entrar por primera vez hace falta que la base arranque con los roles base y con un usuario inicial ya creado y utilizable. El seed debe poder correrse mas de una vez sin duplicar ni romper nada.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 2,
+      "spec_path": "specs/3-seed-roles-y-usuario-inicial"
+    },
+    {
+      "id": 4,
+      "name": "login-usuario-y-contrasena",
+      "description": "Un usuario entra al sistema escribiendo su nombre de usuario y su contrasena. Si ambos son correctos queda autenticado; si alguno no lo es, el sistema responde con un error que no revela cual de los dos fallo. La sesion queda guardada en una cookie que el navegador no puede leer desde JavaScript y que caduca.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 2,
+      "spec_path": "specs/4-login-usuario-y-contrasena"
+    },
+    {
+      "id": 5,
+      "name": "sesion-actual-y-logout",
+      "description": "Desde cualquier punto de la aplicacion hay que poder saber quien es el usuario de la sesion en curso y cual es su rol, o que no hay sesion. Tambien hace falta cerrar sesion: despues de cerrarla, la cookie deja de servir.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 4,
+      "spec_path": "specs/5-sesion-actual-y-logout"
+    },
+    {
+      "id": 6,
+      "name": "proteccion-de-rutas-privadas",
+      "description": "Las pantallas privadas no se ven sin sesion: quien entre sin estar autenticado termina en la pantalla de login. Y al reves, quien ya tiene sesion y abre el login no se queda ahi. La pantalla de login es publica.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 5,
+      "spec_path": "specs/6-proteccion-de-rutas-privadas"
+    },
+    {
+      "id": 7,
+      "name": "pantalla-de-login",
+      "description": "Pantalla publica con un formulario de usuario y contrasena y un boton para entrar. Mientras se envia, el boton no permite reenviar. Si las credenciales fallan se muestra el mensaje de error junto al formulario y los campos no se pierden. Si funcionan, el usuario acaba en el dashboard.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 4,
+      "spec_path": "specs/7-pantalla-de-login"
+    },
+    {
+      "id": 8,
+      "name": "layout-privado-con-sidebar",
+      "description": "Las pantallas privadas comparten un armazon: una barra lateral fija a la izquierda con el nombre del producto, un espacio para los enlaces de navegacion y, abajo, el usuario de la sesion con la opcion de cerrar sesion. El contenido de cada pantalla ocupa el resto. En pantallas angostas la barra lateral se puede ocultar y mostrar.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 5,
+      "spec_path": "specs/8-layout-privado-con-sidebar"
+    },
+    {
+      "id": 9,
+      "name": "dashboard-en-blanco",
+      "description": "Pantalla de dashboard dentro del layout privado, deliberadamente vacia: solo el titulo y el area de contenido lista para llenarse mas adelante. Es el destino al que llega el usuario recien autenticado.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": null,
+      "depends_on": 8,
+      "spec_path": "specs/9-dashboard-en-blanco"
+    }
+  ]
+}

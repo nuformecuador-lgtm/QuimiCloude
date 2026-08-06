@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Worktrees del arnes: cada uno es una copia completa del arbol. Sin esto, `pnpm
+    // lint` recorre N copias de cada archivo y reporta los mismos errores N veces.
+    ".worktrees/**",
   ]),
 ]);
 

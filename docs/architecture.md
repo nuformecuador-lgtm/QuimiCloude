@@ -1,0 +1,276 @@
+# docs/architecture.md — Que significa "buen trabajo" aqui
+
+Referencia de arquitectura. El reviewer usa esto para decidir si una implementacion
+esta bien hecha, no solo si "funciona".
+
+## Dominio
+
+**QuimiCloude es un ERP para una empresa de productos quimicos.** De ahi salen tres
+consecuencias de arquitectura que no son opinables:
+
+1. **Un solo tenant.** Es el ERP *de una* empresa, no un SaaS multi-empresa. No hay
+   `empresa_id` ni aislamiento por tenant: la RLS de Supabase existe para separar **roles
+   y permisos**, no clientes. Si algun dia hubiera que multiplicar empresas, es una
+   migracion grande y consciente, no algo que se prepara "por si acaso" (eso seria
+   sobre-ingenieria y el reviewer lo rechaza).
+2. **Modulos, no pantallas sueltas.** Un ERP crece por areas funcionales (inventario,
+   compras, ventas, produccion, contabilidad...) que comparten entidades. La separacion
+   de capas de mas abajo es lo que evita que un modulo nuevo tenga que tocar las tripas
+   de otro: se comparten **servicios via interfaz**, nunca repositorios ni tablas
+   directamente entre modulos.
+3. **Los datos son el producto.** En un ERP el registro *es* la operacion de la empresa:
+   un movimiento mal escrito o borrado sin rastro es dinero o inventario perdido. Nada de
+   borrado fisico en tablas transaccionales, y toda operacion que mueva existencias o
+   dinero es **idempotente y auditable** (quien, cuando, sobre que).
+
+Estado actual: las features 1-9 del backlog son el esqueleto (usuarios, roles, hash de
+contrasena, seed, login, sesion, proteccion de rutas, layout y dashboard). **Todavia no
+hay ninguna feature de dominio quimico implementada.**
+
+### Preguntas abiertas del dominio
+
+No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Estan aqui porque **las cuatro son
+caras de meter despues**: cambiarlas con datos ya cargados obliga a migrar historico.
+Conviene cerrarlas antes de la primera feature de inventario o de producto, no despues.
+
+1. **Unidades de medida.** ¿Se maneja mas de una unidad por producto (kg / L / bidon /
+   tambor) con conversiones? Si la respuesta es si, la unidad tiene que estar en el modelo
+   desde la primera tabla de producto y **toda cantidad se guarda con su unidad**, nunca
+   como numero suelto.
+2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
+   suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
+   guarda totales es de las migraciones mas dolorosas que existen.
+3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
+   clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
+   Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
+4. **Contabilidad e impuestos.** ¿El ERP factura y liquida impuestos, o solo opera y
+   exporta a un contable externo? Define si entra dinero al modelo y con que precision
+   decimal (nunca `float` para importes).
+
+## Stack
+- **Frontend/servidor:** Next.js (App Router) + TypeScript en modo strict.
+- **Estilos:** Tailwind CSS v4.
+- **Componentes:** shadcn/ui (Radix UI base). Primero revisar si existe en shadcn/ui
+  antes de crear uno propio. `npx shadcn add <component>`.
+- **Datos:** Supabase (Postgres). **Prisma es el unico camino de lectura/escritura de la
+  aplicacion**; el cliente de Supabase (PostgREST) no se usa para datos. Ver
+  `## Acceso a datos y autorizacion`, que explica por que eso cambia donde vive la
+  seguridad.
+- **ORM:** Prisma. Migraciones versionadas, con `down.sql` **de convencion propia** (ver
+  `## Migraciones up/down`).
+- **Validacion:** zod en el borde de toda entrada externa.
+- **Data fetching cliente:** SWR para queries publicas/no sensibles.
+- **Mutaciones internas:** Server Actions (`'use server'`) para crear/editar/eliminar
+  dentro del mismo proyecto. No usar `fetch` a rutas API internas para mutaciones.
+- **API externa/webhooks:** Route handlers en `app/api/` con zod + firma/idempotencia.
+- **Deploy:** Vercel. Secretos en variables de entorno, nunca en repo.
+- **Integraciones externas:** ninguna definida todavia. Cuando entre la primera, se
+  documenta aqui con su cliente en `lib/interfaces/external/`.
+
+## Principios
+1. **Separacion de capas.** Controller, Service, Repository con interfaces. La logica
+   de negocio vive en servicios testeables, separada de HTTP y de la DB.
+2. **Borde tipado.** Toda entrada externa (request, webhook, respuesta de API) se
+   valida y se tipa en el borde con zod. Nada de `any` cruzando la frontera.
+3. **Idempotencia en webhooks.** Un mismo evento entrante no debe producir efectos
+   duplicados. Validar firma/token siempre.
+4. **Sin hardcode de contexto.** Credenciales, endpoints y cualquier parametro que
+   cambie entre entornos se resuelven por configuracion, nunca incrustados en el codigo.
+5. **Migraciones versionadas y reversibles.** Toda migracion Prisma tiene su
+   `migration.sql` (UP) y `down.sql` (DOWN). Ver `scripts/db-rollback.ts`.
+6. **La autorizacion vive en el service, no en la base.** Un permiso que solo existe
+   como policy de RLS no protege a esta aplicacion (ver la seccion siguiente).
+
+## Patron de capas: Controller → Service → Repository
+
+```
+app/api/<recurso>/route.ts           ← Controller (capa HTTP)
+  ↓ llama a (via interfaz)
+lib/services/<Recurso>Service.ts     ← Service (logica de negocio)
+  ↓ llama a (via interfaz)
+lib/repositories/<Recurso>Repo.ts    ← Repository (acceso a datos, Prisma)
+  ↓
+Supabase (Postgres)
+```
+
+### Controller (route handler o Server Action)
+- **Route handler** (`app/api/<feature>/route.ts`): recibe Request, parsea/valida con
+  zod, llama al service, devuelve `NextResponse`. No contiene logica de negocio ni
+  queries de DB.
+- **Server Action** (`lib/actions/<feature>.ts`): `'use server'`, recibe datos,
+  lee cookies para permisos, instancia el service, ejecuta, devuelve resultado.
+  Para mutaciones internas, NO crear ruta API y fetchearla desde el cliente.
+
+### Service (`lib/services/`)
+- Logica de negocio pura. Sin dependencia de HTTP (Request/Response/headers) ni
+  de DB directamente. Recibe repositorios y clientes externos por constructor
+  (inyeccion de dependencias via interfaces).
+- Testeable sin DB ni HTTP.
+
+### Repository (`lib/repositories/`)
+- Acceso a datos. Solo Prisma queries. Sin logica de negocio ni validacion de
+  permisos (eso va en el service o controller). Implementa `IRepository`.
+
+### Interfaces (`lib/interfaces/`)
+- Un archivo por interfaz. Centralizadas y separadas por categoria:
+  `interfaces/services/`, `interfaces/repositories/`, `interfaces/external/`.
+- Permiten mockear en tests y cambiar implementaciones sin tocar servicios.
+
+## Estructura de carpetas
+
+```
+app/                            # Rutas y paginas (App Router)
+  api/                          # Route handlers (controladores)
+  (marketing)/                  # Paginas publicas
+  (dashboard)/                  # Paginas autenticadas
+lib/
+  interfaces/                   # Contratos centralizados
+    services/                   # IService.ts
+    repositories/               # IRepository.ts
+    external/                   # Clientes de terceros: IEmailProvider.ts, IStorageClient.ts...
+  services/                     # Logica de negocio
+  repositories/                 # Acceso a datos (Prisma)
+  actions/                      # Server Actions ('use server')
+  supabase/                     # Cliente y helpers de Supabase
+  types/                        # Tipos de dominio + schemas zod
+  utils/                        # Helpers puros (sin side effects)
+components/
+  ui/                           # Primitivas shadcn/ui (Button, Input, Card...)
+  shared/                       # Compuestos reutilizables (DataTable, FormField...)
+  private/                      # Componentes con datos sensibles (datos via props)
+hooks/                          # React hooks reutilizables
+providers/                      # Context providers
+db/
+  schema.prisma                 # Esquema de Prisma
+  migrations/                   # Migraciones versionadas, cada una con:
+    20250101000000_init/
+      migration.sql             # UP
+      down.sql                  # DOWN (OBLIGATORIO)
+tests/
+  unit/                         # Services y repositories (mockeando DB)
+  integration/                  # Controllers + DB de test
+e2e/                            # Playwright (flujos criticos)
+scripts/
+  db-rollback.ts                # Script de rollback (aplica down.sql)
+```
+
+## Acceso a datos y autorizacion
+
+**Esta seccion existe porque el par Prisma + RLS engaña.** Si no se entiende, se escriben
+policies que dan una sensacion de seguridad que no es real.
+
+### El hecho
+
+Prisma se conecta por Postgres directo con el rol de `DATABASE_URL`, que en Supabase es el
+**dueño de las tablas**. Postgres **no aplica RLS al dueño** salvo que la tabla declare
+`FORCE ROW LEVEL SECURITY`. Y aunque se fuerce, Prisma no setea `request.jwt.claims`, asi
+que `auth.uid()` es NULL y toda policy que dependa de el deniega o devuelve vacio.
+
+Conclusion: **las policies de RLS no filtran ninguna query de esta aplicacion.** Solo
+protegen lo que entre por PostgREST con la anon key, via que aqui no se usa.
+
+### La regla
+
+1. **La autorizacion se valida en el service**, antes de tocar el repositorio. El service
+   recibe quien es el usuario y su rol; decide y, si no procede, lanza. No es "ademas de
+   RLS": es **la** frontera.
+2. **RLS se activa igual en toda tabla con datos de usuario u operacion**, y con
+   `ALTER TABLE ... FORCE ROW LEVEL SECURITY`. Es defensa en profundidad para el dia que
+   alguien entre por otra via (un cliente nuevo, una consola, un job mal configurado). No
+   sustituye al punto 1.
+3. **Un permiso que solo existe como policy no cuenta como implementado.** El reviewer
+   pide el test de autorizacion en el service; el test de RLS es adicional, no el que
+   cierra el requisito.
+4. **No se usa `createServerClient()` de Supabase para leer o escribir datos de negocio.**
+   Un solo camino de datos: repositorio → Prisma. Dos APIs de datos conviviendo es como se
+   acaba con la mitad de las tablas protegidas y la otra mitad no.
+
+### Variables de entorno de la base
+
+Supabase expone dos cadenas y **Prisma necesita las dos**:
+
+```
+DATABASE_URL   # pooler (pgbouncer, puerto 6543) — lo que usa la app en runtime
+DIRECT_URL     # conexion directa (puerto 5432)  — lo que usa Prisma Migrate
+```
+
+En el `datasource` van declaradas ambas (`url` y `directUrl`). **Prisma Migrate no
+funciona a traves del pooler en transaction mode**: sin `directUrl`, las migraciones
+fallan con errores que no apuntan a la causa. Es el error mas comun al montar Prisma sobre
+Supabase.
+
+## Permisos y autenticacion
+- Las paginas (Server Components) validan permisos via `cookies()` de `next/headers`.
+- `middleware.ts` intercepta rutas protegidas, verifica existencia de cookie de sesion.
+- Componentes `private/` reciben datos por props desde el Server Component padre.
+- Datos publicos: el cliente fetchea con SWR desde el navegador.
+- Datos privados (balances, PII): pre-fetch en Server Component, stream al cliente.
+
+## Server Actions vs Route Handlers
+| Caso | Usar |
+| --- | --- |
+| Mutacion desde un componente propio | Server Action (`lib/actions/`) |
+| Webhook de un tercero | Route Handler (`app/api/`) |
+| API publica para terceros | Route Handler (`app/api/`) |
+| Cron interno | Route Handler (`app/api/`) |
+
+## Migraciones up/down
+
+> **`down.sql` no es de Prisma.** Prisma Migrate **no tiene down migrations**: genera solo
+> el `migration.sql` (UP). El DOWN es una convencion de este repo, y `db:rollback` un
+> script propio. Se documenta asi para que nadie busque el comando de Prisma que lo hace,
+> porque no existe.
+
+Cada migracion tiene esta estructura:
+```
+db/migrations/<timestamp>_<nombre>/
+  migration.sql    ← UP: lo genera Prisma
+  down.sql         ← DOWN: manual, revierte exactamente migration.sql
+```
+
+El schema vive en `db/schema.prisma`, **no** en la ruta por defecto `prisma/schema.prisma`.
+Eso hay que declararlo (campo `prisma.schema` en `package.json` o `prisma.config.ts`) o
+cada comando necesita `--schema=db/schema.prisma`. La carpeta `migrations/` siempre cuelga
+de donde este el schema.
+
+Proceso:
+1. `pnpm run db:migrate:create` → envuelve `prisma migrate dev --create-only`: crea el
+   `migration.sql` y **no** lo aplica.
+2. Escribir `down.sql` a mano, revirtiendo exactamente lo que hace `migration.sql`.
+3. `pnpm run db:migrate` → `prisma migrate deploy` aplica la migracion.
+4. `pnpm run db:rollback` → `scripts/db-rollback.ts` aplica el `down.sql` de la ultima y
+   despues corre `prisma migrate resolve --rolled-back <migracion>`. **Ese segundo paso no
+   es opcional**: Prisma lleva su propio registro en la tabla `_prisma_migrations`, y
+   deshacer el SQL sin avisarle deja el historial mintiendo — la siguiente migracion se
+   aplica sobre un estado que Prisma cree que es otro.
+
+## Componentes
+- `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**
+  Agregas con: `npx shadcn add <component>`.
+- `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre features.
+- `components/private/`: contienen datos sensibles. El padre (Server Component) valida permisos y
+  pasa datos por props. No fetchean datos por si mismos.
+
+### Regla: sin sobre-ingenieria
+Si un componente se usa en UN SOLO lugar y no tiene logica reutilizable, vive junto
+a la pagina que lo usa. Solo se promueve a `shared/` cuando al menos DOS features
+lo necesitan con la misma API.
+
+## Anti-patrones que el reviewer rechaza
+- Logica de negocio dentro de componentes o handlers de ruta.
+- Queries sin indice en rutas calientes o crons frecuentes.
+- Tablas nuevas sin RLS, o con RLS pero sin `FORCE ROW LEVEL SECURITY` (sin el `FORCE`,
+  el dueño de la tabla —que es con quien se conecta Prisma— la ignora entera).
+- **Un permiso implementado solo como policy de RLS**, sin su validacion en el service.
+- Leer o escribir datos de negocio con el cliente de Supabase en vez del repositorio.
+- Un webhook sin validacion de firma o sin idempotencia.
+- Cualquier `console.log` de secretos o PII.
+- Migracion nueva sin `down.sql`.
+- **Borrado fisico (`DELETE`) en una tabla transaccional.** Se anula o se marca, dejando
+  rastro de quien y cuando; el registro es la operacion de la empresa (ver `## Dominio`).
+- **`float`/`double` para importes o cantidades.** Se usa decimal con precision explicita:
+  en un ERP el redondeo binario se acumula y descuadra.
+- **Cantidad sin unidad de medida** en cualquier tabla de producto o existencias, mientras
+  la pregunta abierta 1 del dominio no este cerrada en `null`.
+- Server component fetcheando datos publicos del cliente (usa SWR en el cliente).
+- Componente privado haciendo fetch de datos sensibles (recibe por props).

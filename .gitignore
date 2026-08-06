@@ -9,6 +9,10 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+/harnessConfig
+
+# worktrees del arnes (./scripts/wt.sh) — un checkout por feature, ver docs/worktrees.md
+/.worktrees/
 
 # testing
 /coverage
