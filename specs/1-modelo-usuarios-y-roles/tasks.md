@@ -74,14 +74,14 @@ el 2026-08-06: el repo ya tiene `.env` con `DATABASE_URL`.
 
 ## Bloque C — Tests estaticos (no necesitan base)
 
-### T8. [P] `tests/unit/schema/identity-schema.test.ts`
+### [x] T8. [P] `tests/unit/schema/identity-schema.test.ts`
 - Dep: T3, T4.
 - Lee `db/schema.prisma` como texto y afirma: modelos y campos, obligatoriedad, `deletedAt`
   opcional en `User` y **ausente** en `Role`, `onDelete: Restrict` en las dos relaciones,
   ausencia de `enum`, ausencia de longitud declarada en `passwordHash`.
 - **Hecho cuando:** pasa y cubre R1, R2, R3, R8, R10(parcial), R12, R13, R15, R16, R17(parcial), R21, R24.
 
-### T9. [P] `tests/unit/schema/identity-migration.test.ts`
+### [x] T9. [P] `tests/unit/schema/identity-migration.test.ts`
 - Dep: T3, T5, T6.
 - Lee `migration.sql` y `down.sql` como texto: los tres indices unicos **con `lower(...)` y
   con `WHERE deleted_at IS NULL`** (si alguien quita el `lower` o el `WHERE`, este test cae),
@@ -89,7 +89,7 @@ el 2026-08-06: el repo ya tiene `.env` con `DATABASE_URL`.
   sin longitud, las FK con `RESTRICT`, y que `down.sql` dropea exactamente las tres tablas del UP.
 - **Hecho cuando:** pasa y cubre R4, R5, R6, R7, R9, R12, R14, R20, R22, R23.
 
-### T10. [P] Guardias
+### [x] T10. [P] Guardias
 - Dep: T3, T5.
 - `tests/guards/guard-password-never-plaintext.test.ts`: barre `db/`, `lib/`, `app/`, `scripts/` y falla si aparece una columna/campo `password`, `pass`, `plain_password`, `clear_password` o `contrasena` sin sufijo `_hash`.
 - `tests/guards/guard-rls-force.test.ts`: por cada `CREATE TABLE` en cualquier `db/migrations/**/migration.sql`, exige su `ENABLE ROW LEVEL SECURITY` **y** su `FORCE ROW LEVEL SECURITY`.
@@ -106,14 +106,14 @@ el 2026-08-06: el repo ya tiene `.env` con `DATABASE_URL`.
   el formato esperado. No se copia nada del `.env` real.
 - **Hecho cuando:** existe `.env.example`, no contiene ninguna credencial, y `./init.sh` reporta `.env` presente.
 
-### T12. Aplicar y revertir la migracion de verdad
+### [ ] T12. Aplicar y revertir la migracion de verdad — **BLOQUEADA** (ver `progress/impl_1-modelo-usuarios-y-roles.md` seccion 5: `prisma migrate resolve --rolled-back` devuelve P3012 sobre una migracion aplicada con exito; apply verificado, rollback deja `_prisma_migrations` incoherente)
 - Dep: T5, T6, T0.
 - `pnpm run db:migrate` → comprobar el esquema (incluidos los tres indices parciales, con
   `\d users` o `pg_indexes`) → `pnpm run db:rollback` → comprobar que las tres tablas
   desaparecen y que `_prisma_migrations` queda coherente → volver a aplicar.
 - **Hecho cuando:** el ciclo apply → rollback → apply termina limpio y la salida queda pegada en `progress/impl_1-modelo-usuarios-y-roles.md`. Cierra R20 en su forma real.
 
-### T13. `tests/integration/identity-constraints.int.test.ts`
+### [x] T13. `tests/integration/identity-constraints.int.test.ts`
 - Dep: T3, T12.
 - Cada caso en transaccion con rollback. Casos: alta valida; falta de campo obligatorio
   (incluye telefono y fecha de nacimiento); correo duplicado exacto; **correo duplicado
@@ -132,12 +132,12 @@ el 2026-08-06: el repo ya tiene `.env` con `DATABASE_URL`.
 
 ## Bloque E — Cierre
 
-### T14. Sincronizar con `dev` y correr el gate completo
+### [ ] T14. Sincronizar con `dev` y correr el gate completo — pendiente: la corre el leader tras el reviewer (AGENTS.md, Regla del gate)
 - Dep: T0-T13.
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` sin flags.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==` en verde.
 
-### T15. Documentar el mapa `R<n> → test`
+### [x] T15. Documentar el mapa `R<n> → test`
 - Dep: T14.
 - Copiar la tabla de trazabilidad de abajo a `progress/impl_1-modelo-usuarios-y-roles.md` con la salida real de los tests.
 - **Hecho cuando:** el archivo existe, cada `R1`-`R24` tiene al menos un test **ejecutado** (no solo escrito) y el reviewer lo valida.
