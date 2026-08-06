@@ -235,7 +235,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Nota**: los asserts van sobre roles ARIA, `data-testid` y constantes exportadas, **nunca**
   sobre literales de copy.
 
-### T16 — `tests/unit/sidebar-desktop.test.tsx` (mecanismo A) y
+### [x] T16 — `tests/unit/sidebar-desktop.test.tsx` (mecanismo A) y
 `tests/unit/sidebar-mobile.test.tsx` (mecanismo B)
 - **Depende de**: T11, T12.
 - **Qué**: **dos archivos separados**, porque son dos mecanismos distintos (D5) y mezclarlos en
@@ -254,14 +254,14 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
   - Interacciones con `@testing-library/user-event`, no con `fireEvent`.
 - **Hecho cuando**: cubre R23–R34 y ambos archivos pasan en verde.
 
-### T17 — `tests/unit/private-layout.test.tsx`
+### [x] T17 — `tests/unit/private-layout.test.tsx`
 - **Depende de**: T11, T12.
 - **Qué**: render del layout con un `children` de prueba; mock de `lib/services/session-stub`
   (R16). Incluye el test **negativo** de R36: el layout **no** monta ninguna región de
   notificaciones.
 - **Hecho cuando**: cubre R1, R5, R16, R35, R36 y pasa en verde.
 
-### T18 — E2E: **diferido** (decisión cerrada, no opción)
+### [x] T18 — E2E: **diferido** (decisión cerrada, no opción)
 - **Depende de**: T11.
 - **Qué**: `CHECKPOINTS.md` pide E2E para flujos críticos. **Decisión humana del 2026-08-06:
   se difiere** — la zona privada no expone ninguna URL (D11) y no hay sesión real (R35), así
