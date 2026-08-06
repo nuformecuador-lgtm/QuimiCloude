@@ -50,8 +50,12 @@ function isPowerOfTwo(value: number): boolean {
   return value > 0 && (value & (value - 1)) === 0
 }
 
-/** Rangos de design.md > 6, incluido el techo de memoria que cierra R11. */
-export function areUsableCostParams(params: ScryptCostParams): boolean {
+/**
+ * Rangos de design.md > 6, incluido el techo de memoria que cierra R11.
+ * PRIVADA a proposito: no forma parte del contrato publico (design.md > 9) y nadie fuera de
+ * este archivo la usa. Exportarla "por si acaso" seria API sin consumidor.
+ */
+function areUsableCostParams(params: ScryptCostParams): boolean {
   const { n, r, p } = params
   if (!Number.isSafeInteger(n) || !Number.isSafeInteger(r) || !Number.isSafeInteger(p)) return false
   if (n < MIN_N || n > MAX_N || !isPowerOfTwo(n)) return false

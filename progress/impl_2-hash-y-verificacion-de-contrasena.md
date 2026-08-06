@@ -287,3 +287,92 @@ casos nuevos sobre su allowlist). **Los 18 requisitos siguen verdes contra la gu
 la config unificada**; el merge no rompio nada mio y no hubo que tocar ni una linea del modulo.
 Antes del merge hizo falta `pnpm install --frozen-lockfile` por las dependencias que trae la
 feature 7 (`@vitejs/plugin-react`, jsdom, shadcn/ui); el lockfile no cambio.
+
+## 12. Menores del reviewer, cerrados (2026-08-06, tras la aprobacion)
+
+El reviewer aprobo sin bloqueantes y repitio las 10 mutaciones por su cuenta (las 10 mueren y
+coinciden caso por caso con la seccion 6). Se cierran 3 de sus 4 menores; el cuarto
+(`feature_list.json` desactualizado) es del leader, no de esta rama.
+
+### 12.1 `areUsableCostParams` deja de estar exportada
+
+**Decision: se quita el `export`, la funcion queda privada al modulo. `design.md` NO se toca.**
+Barrido previo, que es lo que sostiene la decision:
+
+```
+$ grep -rn "areUsableCostParams" . --include="*.ts" --include="*.tsx" --include="*.md" | grep -v node_modules
+./lib/utils/password-hash.ts:54:export function areUsableCostParams(...)
+./lib/utils/password-hash.ts:111:  if (!areUsableCostParams(params)) {
+./lib/utils/password-hash.ts:155:  if (!areUsableCostParams(params)) return null
+./progress/impl_2-...md:150:| M5 | En `areUsableCostParams`: ...      <- prosa, no un import
+```
+
+Cero importadores: ni produccion, ni tests, ni las features 3/4 (que aun no existen). Y no figura en
+el contrato publico de `design.md > 9`. La otra salida —anadirla al design— seria documentar API sin
+consumidor, que es justo la sobre-ingenieria que `docs/architecture.md` rechaza; el dia que la
+feature 4 quiera detectar parametros viejos, se exporta entonces y con su test. Un `export` "por si
+acaso" es superficie publica que hay que sostener a cambio de nada.
+
+### 12.2 R3: la sal ahora prueba su FUENTE, no solo unicidad y longitud
+
+Hueco real: 200 sales distintas de 16 bytes las satisface igual un contador o `Math.random()`. Caso
+nuevo en `tests/unit/password/password-hash.test.ts`:
+
+`la sal sale de crypto.randomBytes: una llamada de 16 bytes por transformacion, y esos mismos bytes acaban en el segmento de sal (R3)`
+
+Espia sobre `randomBytes` con `vi.hoisted` + `vi.mock('node:crypto', ...)` que **delega en el
+original** (el hash sigue siendo real, no un stub) y afirma tres cosas: exactamente **una** llamada
+por transformacion, pedida con **16**, y que **los bytes devueltos son hex-identicos al segmento de
+sal decodificado**. El tercero es el que impide llamar a `randomBytes` de adorno y salar con otra cosa.
+
+### 12.3 R17: los mensajes de error ya no pueden filtrar la entrada
+
+Hueco real: el reviewer comprobo a mano que no hay fuga, pero nada la impedia manana. Casos nuevos:
+
+- `un error de parametros de coste no filtra la entrada en claro por ningun canal del error (R17)` —
+  hashea `'zorro-canela-9137-SECRETO'` con parametros invalidos y comprueba que **ninguna** de las
+  cuatro superficies del error (`message`, `stack`, `String(error)`, `JSON.stringify` con
+  `getOwnPropertyNames`) contiene el plaintext en texto plano, base64, base64url ni hex —las mismas
+  codificaciones que R1, extraidas a un helper compartido— ni en comparacion case-insensitive.
+- `verifyPasswordHash no produce ningun error del que filtrar nada ante valores almacenados invalidos (R17)`.
+
+**Limitacion declarada, no disimulada:** no hay assert sobre el mensaje de un throw de
+`verifyPasswordHash` porque **no existe camino que lance** (el error de `scrypt` se captura y se
+vuelve `false`, el `plaintext` no-string se corta antes de `normalize`, y `timingSafeEqual` va
+precedido de la comparacion de longitudes). Fabricar uno exigiria retorcer el codigo de produccion.
+
+### 12.4 Mutaciones que respaldan los asserts nuevos
+
+| # | Mutacion | Veredicto | Test caido |
+| --- | --- | --- | --- |
+| M11 | Sal desde `Math.random()` (16 bytes, siguen siendo unicos: fuente no criptografica) | ROJO (1 failed) | R3 nuevo — `AssertionError: expected [] to have a length of 1 but got +0` |
+| M11b | Igual, pero **llamando a `randomBytes(16)` de adorno** y descartando el resultado | ROJO (1 failed) | R3 nuevo — `AssertionError: expected '8b681935...' to be 'ea6d71d7...'` (cae en el assert de igualdad de bytes) |
+| M12 | `+ (entrada: ${plaintext})` en el mensaje del `RangeError` | ROJO (1 failed) | R17 nuevo — `AssertionError: expected 'parametros de coste fuera de rango: n…' not to contain 'zorro-canela-9137-SECRETO'` |
+
+Dato que hace que M11 signifique algo: **los asserts viejos de R3 siguieron en verde** con la
+mutacion puesta, o sea que la mutacion prueba lo nuevo y no lo que ya estaba. M11b la anadio el
+`backend_dev` por su cuenta y esta bien tirada: sin ella, el assert de igualdad de bytes se quedaba
+sin mutacion propia, porque M11 ya moria en el conteo de llamadas. Reversion confirmada por
+`sha256sum` identico contra la copia intacta.
+
+### 12.5 Gate tras los tres menores
+
+```
+> tsc --noEmit          (sin errores)
+> eslint                (sin hallazgos)
+
+$ pnpm exec vitest related --run lib/utils/password-hash.ts tests/support/password-test-params.ts
+ Test Files  3 passed (3)
+      Tests  45 passed (45)
+   Duration  2.18s
+
+$ pnpm exec vitest run tests/unit/password tests/guards
+ Test Files  6 passed (6)
+      Tests  63 passed (63)
+   Duration  2.42s
+```
+
+63 tests (eran 60): +3 casos nuevos. Presupuesto **2.42 s < 3 s**, se sigue cumpliendo. Las tres
+guardias verdes y ninguna modificada. En el mapa de la seccion 5, **R3** suma el caso de fuente
+criptografica (respaldado por M11 y M11b) y **R17** suma los dos casos de mensajes de error
+(respaldado por M12), ademas de las guardias estaticas que ya tenian.

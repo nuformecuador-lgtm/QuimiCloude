@@ -4,13 +4,36 @@
 // `TEST_SCRYPT_PARAMS` (1 MiB). El unico archivo autorizado a pagar el coste real es
 // `password-cost.test.ts` (design.md > 11, tasks.md > presupuesto).
 
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
   ALTERNATE_TEST_SCRYPT_PARAMS,
   TEST_SCRYPT_PARAMS,
 } from '@/tests/support/password-test-params'
 import { DEFAULT_SCRYPT_PARAMS, createPasswordHash, verifyPasswordHash } from '@/lib/utils/password-hash'
+
+/**
+ * Registro de las llamadas reales a `crypto.randomBytes`, con la misma tecnica de espia que
+ * `password-verify-fail-closed.test.ts` usa sobre `scrypt`: se DELEGA en el original, no se
+ * sustituye, para que la sal y el hash sigan siendo los de verdad.
+ * Sin esto, R3 solo podria mirar el resultado (unicidad y longitud), que es exactamente lo que
+ * una fuente predecible tambien satisface.
+ */
+const randomBytesSpy = vi.hoisted(() => ({
+  calls: [] as Array<{ readonly size: number; readonly bytes: Buffer }>,
+}))
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>()
+  return {
+    ...actual,
+    randomBytes: (size: number): Buffer => {
+      const bytes = actual.randomBytes(size)
+      randomBytesSpy.calls.push({ size, bytes })
+      return bytes
+    },
+  }
+})
 
 const SECRET = 'la-frase-secreta-de-ana'
 const BATCH_SIZE = 200
@@ -29,17 +52,26 @@ function keySegmentOf(storedHash: string): string {
   return segments[segments.length - 1] as string
 }
 
+/** Codificaciones reversibles en las que una entrada en claro podria colarse disfrazada. */
+function reversibleEncodingsOf(plaintext: string): readonly string[] {
+  const bytes = Buffer.from(plaintext, 'utf8')
+  return [
+    plaintext,
+    bytes.toString('base64'),
+    bytes.toString('base64').replace(/=+$/, ''),
+    bytes.toString('base64url'),
+    bytes.toString('hex'),
+  ]
+}
+
 describe('createPasswordHash / verifyPasswordHash — comportamiento', () => {
   it('el valor almacenado no contiene la entrada en ninguna codificacion reversible', async () => {
     const plaintext = 'clave-en-claro-reconocible'
     const storedHash = await createPasswordHash(plaintext, TEST_SCRYPT_PARAMS)
-    const bytes = Buffer.from(plaintext, 'utf8')
 
-    expect(storedHash).not.toContain(plaintext)
-    expect(storedHash).not.toContain(bytes.toString('base64'))
-    expect(storedHash).not.toContain(bytes.toString('base64').replace(/=+$/, ''))
-    expect(storedHash).not.toContain(bytes.toString('base64url'))
-    expect(storedHash).not.toContain(bytes.toString('hex'))
+    for (const encoded of reversibleEncodingsOf(plaintext)) {
+      expect(storedHash, encoded).not.toContain(encoded)
+    }
     expect(storedHash.toLowerCase()).not.toContain(plaintext.toLowerCase())
   })
 
@@ -78,6 +110,75 @@ describe('createPasswordHash / verifyPasswordHash — comportamiento', () => {
       expect(results).toHaveLength(BATCH_SIZE)
       expect(results.every((result) => result === true)).toBe(true)
     })
+  })
+
+  it('la sal sale de crypto.randomBytes: una llamada de 16 bytes por transformacion, y esos mismos bytes acaban en el segmento de sal (R3)', async () => {
+    // Unicidad y longitud NO BASTAN para R3: un contador o `Math.random()` produciria igual 200
+    // sales distintas de 16 bytes y dejaria los dos casos de la tanda en verde. Lo que ata la
+    // sal a una fuente CRIPTOGRAFICA es observar la llamada a `crypto.randomBytes` y, sobre
+    // todo, que los bytes que devolvio son literalmente los que quedaron almacenados: sin ese
+    // ultimo assert, bastaria invocar `randomBytes` de adorno y salar con otra cosa.
+    const callsBefore = randomBytesSpy.calls.length
+    const storedHash = await createPasswordHash('entrada-para-observar-la-sal', TEST_SCRYPT_PARAMS)
+    const calls = randomBytesSpy.calls.slice(callsBefore)
+
+    expect(calls).toHaveLength(1)
+    const call = calls[0] as { readonly size: number; readonly bytes: Buffer }
+    expect(call.size).toBe(16)
+
+    const storedSalt = Buffer.from(saltSegmentOf(storedHash), 'base64url')
+    expect(storedSalt).toHaveLength(16)
+    expect(storedSalt.toString('hex')).toBe(call.bytes.toString('hex'))
+  })
+
+  it('un error de parametros de coste no filtra la entrada en claro por ningun canal del error (R17)', async () => {
+    // El unico `throw` del modulo es este `RangeError`. Hoy solo interpola n, r y p; el caso
+    // existe para que manana nadie meta la entrada en el mensaje "para depurar mejor".
+    const plaintext = 'zorro-canela-9137-SECRETO'
+    const encodings = reversibleEncodingsOf(plaintext)
+
+    let caught: unknown = null
+    try {
+      await createPasswordHash(plaintext, { n: 3, r: 8, p: 1 })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(RangeError)
+    const error = caught as RangeError
+    const surfaces: readonly string[] = [
+      error.message,
+      error.stack ?? '',
+      String(error),
+      JSON.stringify(error, Object.getOwnPropertyNames(error)),
+    ]
+    for (const surface of surfaces) {
+      for (const encoded of encodings) {
+        expect(surface, encoded).not.toContain(encoded)
+        expect(surface.toLowerCase(), encoded).not.toContain(encoded.toLowerCase())
+      }
+    }
+  })
+
+  it('verifyPasswordHash no produce ningun error del que filtrar nada ante valores almacenados invalidos (R17)', async () => {
+    // No hay assert sobre el mensaje de un throw de `verifyPasswordHash` porque NO existe
+    // ningun camino que lance: el unico error posible (el de `scrypt`) se captura dentro y se
+    // convierte en `false`, y `timingSafeEqual` va precedido de la comparacion de longitudes.
+    // Fabricar un throw exigiria retorcer el codigo de produccion, asi que el assert se limita
+    // a lo observable: nada escapa de la funcion, ni con la entrada mas distintiva.
+    const plaintext = 'zorro-canela-9137-SECRETO'
+
+    for (const storedHash of ['', '$scrypt$', `$scrypt$n=3,r=8,p=1$${'A'.repeat(22)}$${'B'.repeat(43)}`]) {
+      let caught: unknown = null
+      let result: unknown = null
+      try {
+        result = await verifyPasswordHash(plaintext, storedHash)
+      } catch (error) {
+        caught = error
+      }
+      expect(caught, JSON.stringify(storedHash)).toBe(null)
+      expect(result, JSON.stringify(storedHash)).toBe(false)
+    }
   })
 
   it('verifica correctamente la entrada correcta, con espacios, emoji y acentos', async () => {
