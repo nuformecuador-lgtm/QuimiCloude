@@ -347,3 +347,53 @@ c9a0fe5 chore(7-pantalla-de-login): anadir zod como dependencia de produccion
 - Revision visual humana de `/` y `/login` tras la reescritura de `app/globals.css` (5.4).
 - Abrir el PR contra `dev` con titulo `feat(7-pantalla-de-login): ...`.
 - Decidir sobre 5.1 (Base UI vs Radix) y sobre las deudas 1, 2 y 6.
+
+## 12. Bugfix posterior: aviso de `FieldControl` no controlado (2026-08-06)
+
+**Warning.** En el navegador, al usar `/login`:
+`Base UI: A component is changing the default value state of an uncontrolled FieldControl
+after being initialized. To suppress this warning opt to use a controlled FieldControl.`
+
+**Causa.** `components/ui/input.tsx` envuelve el `Input` de Base UI, que resuelve a
+`Field.Control` y usa `useControlled` de `@base-ui/utils`. Ese hook guarda el `defaultValue`
+del primer render en un `useRef` y avisa por `console.error` si el `defaultValue` recibido
+despues difiere. En `login-form.tsx` el campo de usuario es no controlado con
+`defaultValue={username}`, y `username` vale `''` en `idle` y pasa a lo escrito tras un
+intento fallido: el `defaultValue` cambia despues del montaje. No era un descuido, es la
+solucion de `design.md > 5.3` para R13/R14.
+
+**Arreglo.** `key` en el `<Input>` de usuario, derivada del propio `username`
+(`const usernameFieldKey = username`). Al cambiar el valor, React remonta el input, asi que
+cada instancia ve un unico `defaultValue` durante toda su vida: es un valor inicial, no una
+mutacion. El campo sigue **no controlado**, sin `useState` (la alternativa B de
+`design.md > 8` sigue descartada) y R13/R14 no cambian de comportamiento.
+
+Se descarto derivar la clave del `attemptId` (que tambien silencia el aviso) porque cambia en
+**cada** intento fallido y remontaria tambien cuando el usuario reintenta con el mismo nombre,
+que es el caso comun. Cuantos menos remontajes, menos foco perdido. El campo de contrasena no
+lleva clave: sin `defaultValue` no dispara el aviso, y remontarlo robaria el foco al enviar
+con Enter desde ese campo.
+
+**Efecto sobre el foco** (medido, no supuesto):
+
+| Como se envia | Antes | Despues |
+| --- | --- | --- |
+| Clic en el boton | boton de envio | boton de envio |
+| Enter desde contrasena | campo contrasena | campo contrasena |
+| Enter desde usuario, **primer** fallo | campo usuario | `<body>` |
+| Enter desde usuario, reintento con el mismo usuario | campo usuario | campo usuario |
+
+Queda **una** regresion de foco: el primer fallo enviado con Enter desde el campo de usuario
+pierde el foco al `<body>`, porque es justo la transicion en la que el `defaultValue` cambia
+y el remontaje es inevitable. Los reintentos posteriores con el mismo usuario ya no remontan y
+conservan el foco. No se anade restauracion imperativa de foco: exigiria envolver la action o
+un `onSubmit` propio, que `design.md > 5.2` prohibe. **Queda abierto para decision humana.**
+
+**Test de regresion.** `tests/ui/login-form-uncontrolled-warning.test.tsx` (archivo propio a
+proposito: el helper `error()` de `@base-ui/utils` deduplica los avisos en un `Set` de modulo,
+asi que dentro de un mismo archivo solo el primer test que lo dispare puede observarlo; Vitest
+aisla el registro de modulos por archivo). Verificado que el test falla quitando la `key` y
+pasa con ella. Ningun test existente cambio.
+
+**Archivos tocados.** `app/(public)/login/components/login-form.tsx`,
+`tests/ui/login-form-uncontrolled-warning.test.tsx`, este archivo.
