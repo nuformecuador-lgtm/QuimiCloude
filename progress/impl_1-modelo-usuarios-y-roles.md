@@ -10,6 +10,11 @@
 > `_prisma_migrations`) y T12 se cerro ejecutando el ciclo de verdad — salida en la seccion 5.
 > Menores m2, m3 y m4 corregidos; m1 y m5 quedan anotados como deuda en la seccion 6, que es lo
 > que el reviewer pidio para ellos.
+>
+> **Ronda 3 (2026-08-06, feature APROBADA por el reviewer).** Se cierra su hallazgo menor nuevo
+> **n1: un assert que era vacuo por construccion** — ver seccion 7 — y se ejecuta F2.3
+> (sincronizacion con `dev` y push). Gate tras el merge: typecheck y lint en verde, **58 tests
+> en verde**.
 
 ## 1. Estado de las tasks
 
@@ -323,3 +328,74 @@ toco lo minimo y solo lo autorizado:
 - `docs/architecture.md > Migraciones up/down`: **solo la viñeta 4**, la que mandaba un comando que
   no puede funcionar. El resto del documento, intacto (verificado con `git diff`).
 - `progress/impl_modelo-usuarios-y-roles.md`: **borrado** (m2). El nombre canonico es este archivo.
+
+## 7. Ronda 3 — n1 (assert vacuo) y sincronizacion con `dev`
+
+### n1: un test que no verificaba lo que decia verificar
+
+El reviewer aprobo la feature y dejo un menor nuevo. En el test "el rollback ya no depende de
+prisma migrate resolve --rolled-back, que devuelve P3012" habia esto:
+
+```ts
+const codigo = stripSqlComments(rollbackScript.replace(/^\s*\*.*$/gm, ''))
+expect(codigo).not.toMatch(/--rolled-back/)
+```
+
+`stripSqlComments` borra **todo lo que sigue a `--`** en cada linea: es un filtro pensado para SQL
+y se estaba aplicando a un archivo TypeScript. La cadena `--rolled-back` no puede sobrevivir a ese
+filtro, asi que el assert **pasaba siempre**, incluso con el comando reintroducido. La guardia
+protegia de verdad solo por su assert hermano (`migrate...resolve`).
+
+**Arreglo:** un `stripTsComments` propio (bloques `/* */` y comentarios de linea `//`) y el
+predicado extraido a `dependeDeMigrateResolve(script)`, que mira **solo el codigo**: la mencion en
+prosa de la cabecera del script sigue siendo legitima (documenta por que se descarto el comando),
+pero un uso ejecutable ya no se escapa. `stripSqlComments` se deja intacto: donde se aplica a SQL
+es correcto. Test de mutacion nuevo: *"la guardia del rollback cae si alguien reintroduce migrate
+resolve --rolled-back como codigo"*, que inyecta el comando **en memoria** (nunca en disco) y
+comprueba las dos mitades por separado (solo el `resolve`, solo la bandera).
+
+Comprobado por el implementer de forma independiente, no solo por quien escribio el test:
+
+```
+mutacion inyectada: true
+predicado NUEVO sobre script real  : false (esperado false)
+predicado NUEVO sobre script mutado: true  (esperado true)
+assert VIEJO sobre script mutado pasaria?: true  (true = era vacuo)
+```
+
+La ultima linea es la que importa: sobre el **mismo** texto mutado, el assert viejo pasaba. Era
+vacuo, y ahora no lo es.
+
+### F2.3 — sincronizacion con `dev`
+
+```
+> git fetch origin dev            → From github.com/nuformecuador-lgtm/QuimiCloude
+                                    * branch dev -> FETCH_HEAD          EXIT 0
+> git log --oneline HEAD..origin/dev   → (vacio: origin/dev no trae nada nuevo)
+> git merge origin/dev           → Already up to date.                  EXIT 0
+> git push -u origin feature/1-modelo-usuarios-y-roles
+                                 → * [new branch] feature/1-modelo-usuarios-y-roles  EXIT 0
+```
+
+**Cero conflictos, y no por suerte:** `origin/dev` esta contenido en `HEAD` (comprobado con
+`git merge-base --is-ancestor`), asi que el merge fue no-op. Es lo esperable siendo la primera
+feature del repo. No hubo ninguna decision ambigua que consultar.
+
+### Gate tras el merge
+
+```
+> pnpm run typecheck   === EXIT: 0 ===
+> pnpm run lint        === EXIT: 0 ===
+> pnpm exec vitest related --run <los 10 archivos de la feature>
+
+ Test Files  5 passed (5)
+      Tests  58 passed (58)
+   Duration  1.06s
+
+=== EXIT: 0 ===
+```
+
+58 tests: los 57 de la ronda 2 mas el de mutacion de n1.
+
+**PR no abierto a proposito.** El `./init.sh` completo es del leader (`AGENTS.md > Regla del gate`)
+y el PR se abre cuando el leader lo diga.
