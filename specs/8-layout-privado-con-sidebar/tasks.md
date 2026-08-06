@@ -29,15 +29,17 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 
 ## Bloque 0 — Precondiciones y primitivas
 
-### T0 — Verificar la base heredada de la feature 7 (BLOQUEA TODO)
+### [x] T0 — Verificar la base heredada de la feature 7 (BLOQUEA TODO)
 - **Depende de**: que la feature 7 esté `done` y mergeada en `dev`.
 - **Qué**: comprobar, uno por uno, que existen en el worktree de la 8 (tras
   `git merge origin/dev`):
   1. `components.json` (shadcn inicializado)
   2. `lib/utils.ts` exportando `cn`
   3. `components/ui/button.tsx`
-  4. `vitest.config.ts` con `include: ['tests/**/*.test.{ts,tsx}']` y el script `test` en
-     `package.json`, y que `pnpm test` arranca en verde
+  4. `vitest.config.mts` (**el nombre real en `dev` es `.mts`, no `.ts`**; corregido el
+     2026-08-06 contra el repo) con sus dos `projects` (`ui` en jsdom para `tests/**/*.test.tsx`
+     y `tests/ui/**`, `node` para el resto) y el script `test` en `package.json`, y que
+     `pnpm test` arranca en verde
   5. `lib/types/auth.ts` exportando `DASHBOARD_ROUTE`
 - **Si falta cualquiera de los cinco: PARAR y avisar al leader.** No se «arregla» corriendo
   `shadcn init` ni montando Vitest: eso duplicaría el trabajo de la feature 7 y garantizaría
@@ -46,7 +48,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Hecho cuando**: los cinco puntos están verificados y anotados con su evidencia en
   `progress/impl_8-layout-privado-con-sidebar.md`.
 
-### T1 — Añadir el bloque `sidebar` de shadcn/ui
+### [x] T1 — Añadir el bloque `sidebar` de shadcn/ui
 - **Depende de**: T0.
 - **Qué**: `pnpm dlx shadcn@latest add sidebar`. Genera `components/ui/sidebar.tsx`, arrastra
   `sheet` / `separator` / `tooltip` / `skeleton` y el hook `hooks/use-mobile.ts`, y añade los
@@ -67,7 +69,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
   de `app/globals.css` está revisado (riesgo 6) y los **seis** puntos de verificación están
   anotados en `progress/impl_8-layout-privado-con-sidebar.md`.
 
-### T2 — [P] Añadir `avatar`, `dropdown-menu` y `collapsible`
+### [x] T2 — [P] Añadir `avatar`, `dropdown-menu` y `collapsible`
 - **Depende de**: T0.
 - **Qué**: `pnpm dlx shadcn@latest add avatar dropdown-menu collapsible`.
   - `avatar` → iniciales del pie (D3, R15).
@@ -82,7 +84,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 
 ## Bloque 1 — Contrato congelado (lo que la feature 10 no volverá a tocar)
 
-### T3 — [P] `lib/types/session.ts`
+### [x] T3 — [P] `lib/types/session.ts`
 - **Depende de**: T0.
 - **Qué**: el tipo `SessionUser` exactamente como está en `design.md > 4.1`: `id`, `username`,
   `displayName`, `roleName: string | null`, todos `readonly`. **Sin `avatarUrl`** (D3, K de
@@ -90,7 +92,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Hecho cuando**: `pnpm run typecheck` pasa y **ningún campo del tipo es una credencial**
   (`password`, hash, token) — verificación visual explícita del reviewer.
 
-### T4 — `lib/services/session-stub.ts`
+### [x] T4 — `lib/services/session-stub.ts`
 - **Depende de**: T3.
 - **Qué**: `getSessionUser(): Promise<SessionUser>` con valor de relleno fijo y
   `endSession(): Promise<void>` no-op. Comentario de cabecera diciendo que **la feature 10
@@ -98,7 +100,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Hecho cuando**: el módulo no importa `next/headers`, `next/navigation`, Prisma ni Supabase
   (grep explícito antes de commitear) y `pnpm run typecheck` pasa.
 
-### T5 — [P] `lib/navigation/private-nav.ts` (navegación con submenús)
+### [x] T5 — [P] `lib/navigation/private-nav.ts` (navegación con submenús)
 - **Depende de**: T0.
 - **Qué**: implementar `design.md > 4.3`: constantes de ruta exportadas, unión discriminada
   `NavLink | NavGroup` (**`NavGroup.items` es `readonly NavLink[]`**, un solo nivel garantizado
@@ -112,14 +114,14 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
   (verificación deliberada, se descarta después) y **no hay literales de ruta fuera de las
   constantes** (R13).
 
-### T6 — [P] `lib/utils/initials.ts`
+### [x] T6 — [P] `lib/utils/initials.ts`
 - **Depende de**: T0.
 - **Qué**: helper puro que deriva las iniciales de un nombre visible (R15). Sin efectos, sin
   dependencias de React.
 - **Hecho cuando**: typecheck limpio y tiene test propio en T11 (nombre vacío, un solo nombre,
   nombre con varias palabras).
 
-### T7 — `lib/actions/logout.ts`
+### [x] T7 — `lib/actions/logout.ts`
 - **Depende de**: T4.
 - **Qué**: `'use server'` + `logoutAction(): Promise<void>` que llama a `endSession()`. Sin
   `redirect`, sin cookies, sin `try/catch` vacío.
@@ -205,8 +207,8 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
   B (angosto).
 - **Hecho cuando**: un test de humo renderiza el layout en ancho y en angosto y ambos montan sin
   excepción.
-- **Aviso de superficie**: si el helper toca el `setupFiles` de `vitest.config.ts` (archivo de
-  la feature 7), avisar al leader antes.
+- **Aviso de superficie**: si el helper toca el `setupFiles` de `vitest.config.mts` o
+  `tests/setup.ts` (archivos de las features 1 y 7), avisar al leader antes.
 
 ### T13 — [P] `tests/unit/initials.test.ts` y `tests/unit/logout-action.test.ts`
 - **Depende de**: T6, T7. No necesita T12 (no renderiza DOM).
