@@ -132,7 +132,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 
 ## Bloque 2 — UI
 
-### T8 — `components/private/logout-menu-item.tsx`
+### [x] T8 — `components/private/logout-menu-item.tsx`
 - **Depende de**: T1, T2, T7.
 - **Qué**: componente cliente que usa `useFormStatus()` de `react-dom` y renderiza el control
   de cierre de sesión con `disabled={pending}` y `aria-busy={pending}` (R21). **Componente
@@ -140,7 +140,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
   `<form>` ancestro (lección documentada en `specs/7-pantalla-de-login/design.md > 5.2`).
 - **Hecho cuando**: typecheck/lint limpios y el componente **no declara ningún `useState`**.
 
-### T9 — `components/private/nav-user.tsx`
+### [x] T9 — `components/private/nav-user.tsx`
 - **Depende de**: T2, T3, T6, T7, T8.
 - **Qué**: componente cliente que recibe `user: SessionUser` **por props** y renderiza en
   `SidebarFooter`:
@@ -157,7 +157,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Hecho cuando**: typecheck/lint limpios y el archivo **no contiene** `fetch`, `cookies`,
   `onClick` de logout ni ninguna lectura de datos (grep explícito antes de commitear) — R16.
 
-### T10 — `components/private/app-sidebar.tsx`
+### [x] T10 — `components/private/app-sidebar.tsx`
 - **Depende de**: T1, T2, T3, T5, T9.
 - **Qué**: componente cliente `AppSidebar({ user, navItems })` que compone:
   - `SidebarHeader` con la marca como **enlace** a `DASHBOARD_ROUTE`, versión larga en modo
@@ -177,7 +177,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Hecho cuando**: typecheck/lint limpios, no hay ningún literal de ruta en el archivo (R13) y
   el componente **no importa `session-stub`** (los datos entran sólo por props, R16).
 
-### T11 — `app/(private)/sidebar-toggle.tsx` + `app/(private)/layout.tsx`
+### [x] T11 — `app/(private)/sidebar-toggle.tsx` + `app/(private)/layout.tsx`
 - **Depende de**: T1, T4, T5, T10.
 - **Qué**:
   - `sidebar-toggle.tsx` (client): envuelve `SidebarTrigger` añadiendo `aria-expanded` (estado
@@ -199,7 +199,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 
 ## Bloque 3 — Tests y trazabilidad
 
-### T12 — Stub de `matchMedia` para los tests (BLOQUEA T14–T17)
+### [x] T12 — Stub de `matchMedia` para los tests (BLOQUEA T14–T17)
 - **Depende de**: T1.
 - **Qué**: jsdom **no implementa `window.matchMedia`** y el hook de viewport lo usa: sin stub,
   todo test que renderice el layout revienta (`design.md > 10.3`). Añadir un helper de test que
