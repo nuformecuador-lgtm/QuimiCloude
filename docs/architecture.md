@@ -123,6 +123,10 @@ app/                            # Rutas y paginas (App Router)
   api/                          # Route handlers (controladores)
   (marketing)/                  # Paginas publicas
   (dashboard)/                  # Paginas autenticadas
+  <ruta>/
+    page.tsx                    # solo archivos del App Router en la raiz de la ruta
+    components/                 # componentes propios de esa ruta
+      index.ts                  # barrel: reexporta TODOS (ver ## Componentes)
 lib/
   interfaces/                   # Contratos centralizados
     services/                   # IService.ts
@@ -238,12 +242,9 @@ Proceso:
    `migration.sql` y **no** lo aplica.
 2. Escribir `down.sql` a mano, revirtiendo exactamente lo que hace `migration.sql`.
 3. `pnpm run db:migrate` → `prisma migrate deploy` aplica la migracion.
-4. `pnpm run db:rollback` → `scripts/db-rollback.ts` aplica el `down.sql` de la ultima y,
-   en la misma transaccion, borra su fila de `_prisma_migrations` (`DELETE ... WHERE
-   migration_name = <migracion>`, parametrizado). No sirve `prisma migrate resolve
-   --rolled-back`: solo admite migraciones en estado **fallido** y devuelve `P3012` sobre
-   una aplicada con exito. **Ese segundo paso no es opcional**: Prisma lleva su propio
-   registro en la tabla `_prisma_migrations`, y
+4. `pnpm run db:rollback` → `scripts/db-rollback.ts` aplica el `down.sql` de la ultima y
+   despues corre `prisma migrate resolve --rolled-back <migracion>`. **Ese segundo paso no
+   es opcional**: Prisma lleva su propio registro en la tabla `_prisma_migrations`, y
    deshacer el SQL sin avisarle deja el historial mintiendo — la siguiente migracion se
    aplica sobre un estado que Prisma cree que es otro.
 
@@ -258,6 +259,55 @@ Proceso:
 Si un componente se usa en UN SOLO lugar y no tiene logica reutilizable, vive junto
 a la pagina que lo usa. Solo se promueve a `shared/` cuando al menos DOS features
 lo necesitan con la misma API.
+
+### Regla: componentes de ruta en `components/` con barrel `index.ts`
+
+"Junto a la pagina" **no** significa sueltos al lado de `page.tsx`. Cada ruta que necesite
+componentes propios agrupa **todos** bajo una carpeta `components/` dentro de la ruta, con
+un `index.ts` que los reexporta. En la carpeta de la ruta solo quedan los archivos que el
+App Router reconoce (`page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`…).
+
+```
+app/(public)/login/
+  page.tsx                      # solo la pagina; importa desde ./components
+  components/
+    index.ts                    # barrel: reexporta TODOS los componentes de la ruta
+    login-form.tsx
+    submit-button.tsx
+```
+
+```ts
+// app/(public)/login/components/index.ts
+export { LoginForm } from './login-form';
+export { SubmitButton } from './submit-button';
+```
+
+```tsx
+// app/(public)/login/page.tsx
+import { LoginForm } from './components';        // SI
+// import { LoginForm } from './components/login-form';   NO: salta el barrel
+// import { LoginForm } from './login-form';              NO: componente suelto
+```
+
+Por que:
+
+- **`page.tsx` se lee de un vistazo.** La carpeta de la ruta deja de mezclar archivos del
+  framework con detalles de implementacion.
+- **El barrel es la superficie publica de la ruta.** Lo que no esta en `index.ts` es interno;
+  un componente que solo usa otro componente de la misma ruta no tiene por que exportarse.
+- **Mover un componente a `components/shared/` cuesta una linea**, porque nadie importa por
+  ruta profunda.
+
+Notas que evitan sorpresas:
+
+- Una carpeta dentro de `app/` **no crea una ruta** mientras no contenga `page.tsx` o
+  `route.ts`, asi que `components/` es seguro. No hace falta el prefijo `_` de Next.js.
+- El barrel **no borra la frontera cliente/servidor**: `'use client'` sigue declarandose en
+  cada archivo de componente que lo necesite, nunca en el `index.ts`.
+- Si la ruta necesita **un solo** componente, tambien va en `components/` con su `index.ts`.
+  La consistencia vale mas que ahorrar una carpeta: asi nadie decide caso por caso.
+- Esto aplica a componentes **de ruta**. `components/ui/`, `components/shared/` y
+  `components/private/` mantienen su estructura y se importan por su ruta de siempre.
 
 ## Anti-patrones que el reviewer rechaza
 - Logica de negocio dentro de componentes o handlers de ruta.
@@ -277,3 +327,6 @@ lo necesitan con la misma API.
   la pregunta abierta 1 del dominio no este cerrada en `null`.
 - Server component fetcheando datos publicos del cliente (usa SWR en el cliente).
 - Componente privado haciendo fetch de datos sensibles (recibe por props).
+- **Componentes de ruta sueltos junto a `page.tsx`**, o importados por ruta profunda
+  (`./components/login-form`) saltandose el barrel `index.ts` de la ruta
+  (ver `## Componentes > Regla: componentes de ruta en components/ con barrel index.ts`).

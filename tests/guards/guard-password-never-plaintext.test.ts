@@ -59,6 +59,71 @@ function listFiles(dir: string): readonly string[] {
 /** Palabras que no pueden nombrar una columna ni un campo si no acaban en `_hash`. */
 const FORBIDDEN_SEGMENTS = ['password', 'pass', 'contrasena', 'contraseña'] as const
 
+/**
+ * Sufijos que hacen que un identificador NO nombre un valor almacenado, sino el
+ * artefacto que lo rodea. El criterio para admitir uno es estrecho: el ultimo
+ * segmento tiene que denotar por si solo una CATEGORIA de cosa que no es un dato
+ * persistido, de forma que `<lo_que_sea>_<sufijo>` no pueda leerse nunca como
+ * "columna que guarda <lo que sea>".
+ *
+ *  - `route`, `path`, `url`, `href`  -> destino de navegacion (p. ej. `FORGOT_PASSWORD_ROUTE`).
+ *  - `id`, `ids`                     -> identificador de nodo DOM / referencia (p. ej. `PASSWORD_ERROR_ID`).
+ *  - `error`, `errors`, `message`    -> texto o estado de validacion (p. ej. `passwordError`).
+ *  - `label`, `placeholder`          -> copy de formulario.
+ *  - `field`, `input`                -> el control, no su contenido.
+ *
+ * Deliberadamente FUERA: `name`, `key`, `type`, `value`, `data`, `text` y similares,
+ * porque cualquiera de ellos si puede ser el nombre de una columna real.
+ *
+ * `hash` NO vive aqui: es un caso distinto (si es un valor almacenado, solo que uno
+ * legitimo) y se sigue tratando aparte, exactamente igual que antes.
+ */
+const NON_COLUMN_SUFFIXES = new Set([
+  'route',
+  'path',
+  'url',
+  'href',
+  'id',
+  'ids',
+  'error',
+  'errors',
+  'message',
+  'label',
+  'placeholder',
+  'field',
+  'input',
+])
+
+/**
+ * Contrasena EN TRANSITO permitida, acotada por ruta de archivo. Una pantalla de login
+ * tiene que recibir y validar una contrasena en claro; lo que no puede es persistirla.
+ * Cada entrada es un archivo concreto y la lista exacta de identificadores tolerados en
+ * el: el mismo nombre en `db/`, en `scripts/` o en cualquier otro archivo de `lib/`
+ * sigue siendo un hallazgo.
+ */
+const IN_TRANSIT_ALLOWLIST: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  // Campo del `FormData` que llega del formulario de login y se pasa a zod. No se
+  // escribe en ninguna tabla: la action solo lo valida y delega la verificacion.
+  ['lib/actions/login.ts', new Set(['password'])],
+  // Clave del schema zod que valida esa entrada (y del mapa de errores de campo).
+  // Es el contrato del formulario, no un modelo de datos.
+  ['lib/types/auth.ts', new Set(['password'])],
+])
+
+/** Ruta comparable: separadores POSIX, para casar la allowlist venga la ruta como venga. */
+function toPosixPath(file: string): string {
+  return file.split(sep).join('/').split('\\').join('/')
+}
+
+/** Identificadores tolerados en ESTE archivo por estar en transito, no almacenados. */
+function allowlistFor(file: string): ReadonlySet<string> {
+  const posix = toPosixPath(file)
+  for (const [allowedPath, identifiers] of IN_TRANSIT_ALLOWLIST) {
+    if (posix === allowedPath || posix.endsWith(`/${allowedPath}`)) return identifiers
+  }
+  return new Set()
+}
+
 /** `passwordHash` -> `password_hash`; `"PASSWORD"` -> `password`. */
 function toSnake(identifier: string): string {
   return identifier
@@ -76,7 +141,11 @@ export function isPlaintextPasswordIdentifier(identifier: string): boolean {
     (FORBIDDEN_SEGMENTS as readonly string[]).includes(segment),
   )
   if (!nombraLaContrasena) return false
-  return segments[segments.length - 1] !== 'hash'
+  const ultimo = segments[segments.length - 1] as string
+  if (ultimo === 'hash') return false
+  // Supresion POR FORMA del identificador, no por lista de nombres: lo que decide es el
+  // ultimo segmento, asi que `password` a secas sigue siendo un hallazgo.
+  return !NON_COLUMN_SUFFIXES.has(ultimo)
 }
 
 function stripSqlComments(source: string): string {
@@ -131,7 +200,14 @@ export function findPlaintextPasswordDeclarations(
   file: string,
   content: string,
 ): readonly string[] {
-  return [...new Set(declaredIdentifiers(file, content).filter(isPlaintextPasswordIdentifier))]
+  const permitidos = allowlistFor(file)
+  return [
+    ...new Set(
+      declaredIdentifiers(file, content)
+        .filter(isPlaintextPasswordIdentifier)
+        .filter((identifier) => !permitidos.has(identifier)),
+    ),
+  ]
 }
 
 const scannedFiles = SCANNED_DIRS.flatMap((dir) => listFiles(join(repoRoot, dir)))
@@ -184,5 +260,64 @@ describe('guardia — contrasena nunca en claro', () => {
 
     const comentario = '-- la contrasena se guarda solo como hash\nCREATE TABLE "roles" ("id" UUID);'
     expect(findPlaintextPasswordDeclarations('migration.sql', comentario)).toEqual([])
+  })
+
+  it('la supresion de rutas, ids y errores es por FORMA del identificador, no por lista de nombres', () => {
+    // Cualquier nombre con uno de esos ultimos segmentos queda fuera, sin estar listado.
+    for (const permitido of [
+      'password_route',
+      'passwordId',
+      'passwordError',
+      'PASSWORD_ERROR_ID',
+      'FORGOT_PASSWORD_ROUTE',
+      'contrasenaPlaceholder',
+      'plain_password_label',
+      'passField',
+    ]) {
+      expect(isPlaintextPasswordIdentifier(permitido), permitido).toBe(false)
+    }
+    // Y el nombre pelado, o con un sufijo que si puede ser columna, sigue en rojo.
+    for (const prohibido of [
+      'password',
+      'pass',
+      'password_value',
+      'passwordText',
+      'route_password',
+      'error_password',
+      'id_password',
+    ]) {
+      expect(isPlaintextPasswordIdentifier(prohibido), prohibido).toBe(true)
+    }
+  })
+
+  it('la allowlist de contrasena en transito esta acotada por ruta de archivo', () => {
+    const actionDeLogin = 'const password = readField(formData, "password")'
+    expect(findPlaintextPasswordDeclarations('lib/actions/login.ts', actionDeLogin)).toEqual([])
+
+    const schemaZod = 'export const loginInputSchema = z.object({ password: z.string().min(1) })'
+    expect(findPlaintextPasswordDeclarations('lib/types/auth.ts', schemaZod)).toEqual([])
+
+    // El MISMO identificador fuera de esos dos archivos sigue siendo un hallazgo.
+    const prismaMalo = 'model User {\n  id       String @id\n  password String\n}'
+    expect(findPlaintextPasswordDeclarations('db/schema.prisma', prismaMalo)).toContain('password')
+
+    const seedMalo = 'export const seed = { username: "ana", password: "1234" }'
+    expect(findPlaintextPasswordDeclarations('scripts/seed.ts', seedMalo)).toContain('password')
+
+    const otroServicio = 'const password = req.body.password'
+    expect(findPlaintextPasswordDeclarations('lib/services/otro.ts', otroServicio)).toContain(
+      'password',
+    )
+
+    const sqlMalo = 'CREATE TABLE "users" ("password" TEXT NOT NULL);'
+    expect(findPlaintextPasswordDeclarations('db/migrations/1_init/migration.sql', sqlMalo)).toContain(
+      'password',
+    )
+
+    // La allowlist tampoco abre la mano dentro de sus propios archivos: solo `password`.
+    const persistenciaEnLaAction = 'const plain_password = readField(formData, "password")'
+    expect(
+      findPlaintextPasswordDeclarations('lib/actions/login.ts', persistenciaEnLaAction),
+    ).toContain('plain_password')
   })
 })
