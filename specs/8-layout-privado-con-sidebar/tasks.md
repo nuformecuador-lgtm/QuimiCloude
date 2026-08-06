@@ -272,7 +272,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
   `progress/current.md > Deudas y cosas abiertas`. **No hay nada que implementar en esta task**;
   existe para que la ausencia de E2E quede registrada y no se lea como olvido.
 
-### T19 — Mapa de trazabilidad `R<n> → test`
+### [x] T19 — Mapa de trazabilidad `R<n> → test`
 - **Depende de**: T13, T14, T15, T16, T17, T18.
 - **Qué**: volcar la tabla de abajo, ya con los nombres reales de los tests, en
   `progress/impl_8-layout-privado-con-sidebar.md`, junto con los archivos tocados y la salida
@@ -331,7 +331,7 @@ sin poner nada en rojo (`design.md > 5.5`).
 
 ## Cierre
 
-### T20 — Gate completo y PR
+### [x] T20 — Gate completo y PR
 - **Depende de**: T19.
 - **Hecho cuando**: `./init.sh` (completo, sin flags) termina en verde — **lo corre el
   leader**, no el `frontend_dev` —, `progress/impl_8-layout-privado-con-sidebar.md` tiene el
