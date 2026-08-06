@@ -2,8 +2,14 @@
 
 > Feature 1 · zona `backend` · complexity `medium` · rama `feature/1-modelo-usuarios-y-roles`
 > Worktree: `.worktrees/1-modelo-usuarios-y-roles/`. Implementer coordinando `backend_dev` (4 tandas).
-> Fecha: 2026-08-06. **Veredicto: implementacion completa salvo T12, que esta BLOQUEADA por una
-> contradiccion real entre `design.md > 8` y el comportamiento de Prisma. Ver seccion 5.**
+> Fecha: 2026-08-06. **Veredicto: implementacion completa. Todas las tasks cerradas salvo T14,
+> que es del leader.**
+>
+> **Ronda 2 (2026-08-06, tras `progress/review_1-modelo-usuarios-y-roles.md`, veredicto RECHAZADO).**
+> El bloqueante B1 esta **RESUELTO**: el humano decidio la opcion 2 (el `DELETE` sobre
+> `_prisma_migrations`) y T12 se cerro ejecutando el ciclo de verdad — salida en la seccion 5.
+> Menores m2, m3 y m4 corregidos; m1 y m5 quedan anotados como deuda en la seccion 6, que es lo
+> que el reviewer pidio para ellos.
 
 ## 1. Estado de las tasks
 
@@ -11,7 +17,7 @@
 | --- | --- | --- |
 | T0 `.env` en el worktree | [x] | `.env` presente y git-ignorado. Solo traia `DATABASE_URL`; se anadio `DIRECT_URL` con la conexion directa del mismo Postgres local (5432). Ningun valor se copio a un archivo versionado. |
 | T1 Prisma | [x] | **Fijado a `^6` a proposito**, ver seccion 6.1. |
-| T2 scripts de migracion + rollback | [x] | Escritos segun spec. El `db:rollback` no cierra el ciclo por la seccion 5. |
+| T2 scripts de migracion + rollback | [x] | `db:rollback` cierra el ciclo: `down.sql` + `DELETE` de la fila en `_prisma_migrations`, **en la misma transaccion**. Ver seccion 5. |
 | T3 Vitest | [x] | vitest 4.1.10, `vitest.config.mts`, scripts `test` / `test:rapido` / `test:guardias`. |
 | T4 `db/schema.prisma` | [x] | |
 | T5 `migration.sql` | [x] | Drift comprobado contra shadow DB: **cero drift**. |
@@ -21,8 +27,8 @@
 | T9 test estatico de migracion | [x] | 12 tests. |
 | T10 guardias | [x] | 8 tests (G1 4 + G2 4). |
 | T11 `.env.example` | [x] | Sin credenciales. `!.env.example` anadido al `.gitignore`. |
-| T12 aplicar y revertir de verdad | **[ ] BLOQUEADA** | Apply OK y verificado. El rollback dropea las tres tablas (R20 a nivel de esquema, OK) pero deja `_prisma_migrations` incoherente. **Ver seccion 5.** |
-| T13 tests de integracion | [x] | 22 casos contra la base real. |
+| T12 aplicar y revertir de verdad | [x] | Ciclo apply -> rollback -> apply ejecutado limpio, con `_prisma_migrations` coherente en cada paso. **Salida real en la seccion 5.** Cierra R20 en su forma real. |
+| T13 tests de integracion | [x] | 23 casos contra la base real (22 + el assert explicito de R3 anadido en la ronda 2). |
 | T14 merge con `dev` + `./init.sh` completo | [ ] | **No es del implementer en esta ronda**: el leader corre `./init.sh` (AGENTS.md, Regla del gate) y el merge/PR van despues del reviewer. |
 | T15 mapa `R<n> -> test` | [x] | Este archivo. |
 
@@ -46,9 +52,12 @@
 - `package.json` (mod) — deps `prisma@^6`, `@prisma/client@^6`, `vitest@^4`, `tsx`, `pg`, `@types/pg`;
   bloque `"prisma": {"schema": "db/schema.prisma"}`; scripts `db:migrate:create`, `db:migrate`,
   `db:rollback`, `test`, `test:rapido`, `test:guardias`.
-- `scripts/db-rollback.ts` (nuevo) — aplica el `down.sql` de la ultima migracion y despues
-  `prisma migrate resolve --rolled-back`. Falla con mensaje claro (no stacktrace) si falta
-  `DATABASE_URL` o si no hay migraciones.
+- `scripts/db-rollback.ts` (nuevo, corregido en la ronda 2) — aplica el `down.sql` de la ultima
+  migracion y, **en la misma transaccion**, `DELETE FROM "_prisma_migrations" WHERE
+  migration_name = $1` (parametrizado). Atomico a proposito: el DDL de Postgres es transaccional,
+  asi que o se revierte todo o no se revierte nada; en dos pasos separados es como se llega a un
+  `_prisma_migrations` mintiendo. Falla con mensaje claro (no stacktrace) si falta `DATABASE_URL`
+  o si no hay migraciones; si el DELETE afecta 0 filas avisa y sigue.
 - `scripts/test-rapido.ts`, `scripts/run-pnpm.ts` (nuevos) — `test:rapido` como script de Node
   porque los scripts npm corren en `cmd.exe` en Windows y la sustitucion de comandos no existe alli.
 - `vitest.config.mts` (nuevo) — alias `@/*`, `passWithNoTests`.
@@ -67,13 +76,15 @@
 
 **S** = `tests/unit/schema/identity-schema.test.ts` · **M** = `tests/unit/schema/identity-migration.test.ts` ·
 **G1** = `tests/guards/guard-password-never-plaintext.test.ts` · **G2** = `tests/guards/guard-rls-force.test.ts` ·
-**I** = `tests/integration/identity-constraints.int.test.ts`. Los 54 tests estan **ejecutados y en verde** (seccion 4).
+**I** = `tests/integration/identity-constraints.int.test.ts`. Los 57 tests estan **ejecutados y en
+verde** (seccion 4). Tres de ellos son de la ronda 2: el assert explicito de R3 (m3) y los dos
+estaticos que vigilan la convencion de rollback.
 
 | R | Test estatico | Test de integracion |
 | --- | --- | --- |
 | R1 | S · "el modelo User declara los nueve datos del usuario" | I · "crea un usuario con todos sus datos" |
 | R2 | S · "todo campo de negocio de User es obligatorio, incluidos telefono y fecha de nacimiento" | I · "rechaza el alta si falta un campo obligatorio" (una vuelta por cada una de las 9 columnas) |
-| R3 | S · "User y Role tienen id uuid con default generado" | — |
+| R3 | S · "User y Role tienen id uuid con default generado" | I · "cambiar los datos de negocio del usuario no cambia su identificador" (anadido en la ronda 2 por m3: cambia `email` y `phone` y relee **por `document_number`, no por el id**, que seria tautologico) |
 | R4 | M · "el indice unico de correo es sobre lower(email)" | I · "rechaza un correo repetido exacto" · I · "rechaza un correo repetido aunque cambie el uso de mayusculas" |
 | R5 | M · "el indice unico de username es sobre lower(username)" | I · "rechaza un nombre de usuario repetido exacto" · I · "rechaza un nombre de usuario repetido aunque cambie el uso de mayusculas" |
 | R6 | M · "el indice unico de documento es compuesto por tipo y numero" | I · "rechaza el mismo tipo y numero de documento repetidos" |
@@ -82,7 +93,7 @@
 | R9 | M · "la migracion inserta CC como unico tipo de documento" | I · "el catalogo arranca solo con CC" |
 | R10 | S · "el tipo de documento no es enum ni check, es tabla" | I · "anadir un tipo nuevo deja intactos los usuarios ya guardados" |
 | R11 | G1 · "ninguna columna ni campo guarda la contrasena en claro" | — (guardia estatica; design 9) |
-| R12 | S · "passwordHash es String sin longitud declarada" · M · "password_hash es TEXT sin longitud" | — |
+| R12 | S · "passwordHash es String sin longitud declarada" · M · "password_hash es TEXT sin longitud" | I · el caso que guarda un `password_hash` de **10.000 caracteres** y lo relee entero (corregido en la ronda 2 por m4: la tabla ponia "—" e infravaloraba la cobertura real) |
 | R13 | S · "Role declara name y description obligatorios" | I · "crea un rol con nombre y descripcion" |
 | R14 | M · "roles tiene un indice unico sobre name" | I · "rechaza un segundo rol con el mismo nombre" |
 | R15 | S · "roleId es obligatorio y FK a Role" | I · "rechaza un usuario sin rol o con rol inexistente" |
@@ -90,15 +101,15 @@
 | R17 | S · "la relacion User-Role declara onDelete Restrict" · S · "Role no tiene deletedAt" | I · "rechaza borrar un rol con usuarios asignados" · I · "rechaza borrar un rol cuyo unico usuario esta borrado logicamente" |
 | R18 | — | I · "permite borrar un rol sin usuarios asignados" |
 | R19 | G2 · "toda tabla creada tiene RLS activado y forzado" | — (design 9: un test de RLS con Prisma sale verde pase lo que pase) |
-| R20 | M · "down.sql revierte exactamente lo que crea migration.sql" | T12 · ciclo apply -> rollback -> apply. **Esquema OK; el registro `_prisma_migrations` NO. Ver seccion 5.** |
+| R20 | M · "down.sql revierte exactamente lo que crea migration.sql" · M · "el rollback aplica el down.sql y ademas deja `_prisma_migrations` sin la fila de la migracion" · M · "el rollback ya no depende de prisma migrate resolve --rolled-back, que devuelve P3012" | T12 · ciclo apply -> rollback -> apply **ejecutado y limpio**, esquema y `_prisma_migrations` coherentes. Salida en la seccion 5. |
 | R21 | S · "User declara deletedAt opcional" | I · "el borrado logico conserva la fila y marca deleted_at" |
 | R22 | M · "los tres indices unicos son parciales con WHERE deleted_at IS NULL" | I · "permite re-alta con el correo, username y documento de un usuario borrado" |
 | R23 | M · "los tres indices unicos son parciales con WHERE deleted_at IS NULL" | I · "admite dos usuarios borrados que comparten correo y documento" |
 | R24 | S · "User y Role declaran createdAt y updatedAt" | I · "created_at y updated_at se rellenan solos y updated_at cambia al modificar" |
 
-**Ningun R1-R24 se quedo sin test ejecutado.** R20 tiene su test estatico en verde; su mitad
-"contra base real" esta verificada a nivel de esquema y bloqueada a nivel de `_prisma_migrations`
-(seccion 5).
+**Ningun R1-R24 se quedo sin test ejecutado, y R20 ya no esta a medias:** sus tres tests estaticos
+estan en verde y su mitad "contra base real" (T12) se ejecuto entera, con `_prisma_migrations`
+coherente en cada paso del ciclo.
 
 Tests de sensibilidad anadidos sobre lo que pedia `tasks.md`, para que la trazabilidad no sea
 decorativa: M comprueba que sus propios asserts caen si alguien quita el `lower(...)` o el
@@ -107,7 +118,8 @@ proposito y una tabla sin `FORCE`, y que no se conforman con un RLS puesto en un
 
 ## 4. Salida real del gate
 
-Regla de `AGENTS.md > Regla del gate`: el implementer NO corre la suite completa. Corrido:
+Regla de `AGENTS.md > Regla del gate`: el implementer NO corre la suite completa. Corrido **tras
+las correcciones de la ronda 2**:
 
 ```
 > pnpm run typecheck
@@ -121,22 +133,27 @@ Regla de `AGENTS.md > Regla del gate`: el implementer NO corre la suite completa
 
 ```
 > pnpm exec vitest related --run db/schema.prisma db/migrations/20260806122638_users_and_roles/migration.sql
-    lib/prisma.ts lib/types/identity.ts tests/unit/schema/identity-schema.test.ts
+    lib/prisma.ts lib/types/identity.ts scripts/db-rollback.ts tests/unit/schema/identity-schema.test.ts
     tests/unit/schema/identity-migration.test.ts tests/guards/guard-password-never-plaintext.test.ts
     tests/guards/guard-rls-force.test.ts tests/integration/identity-constraints.int.test.ts
 
  RUN  v4.1.10 C:/Users/Cristian/Documents/trabajo/arc/labs/.worktrees/1-modelo-usuarios-y-roles
 
  Test Files  5 passed (5)
-      Tests  54 passed (54)
-   Start at  07:43:02
-   Duration  2.51s (transform 78ms, setup 0ms, import 774ms, tests 1.14s, environment 1ms)
+      Tests  57 passed (57)
+   Start at  08:10:59
+   Duration  956ms (transform 51ms, setup 0ms, import 527ms, tests 456ms, environment 1ms)
 
 === EXIT: 0 ===
 ```
 
-Detalle por test (`--reporter=verbose`): los 54 en verde uno a uno, con los nombres de la tabla de
-la seccion 3. Los 22 de integracion, literal:
+`scripts/db-rollback.ts` no lo selecciona el grafo de imports (ningun test lo importa: se vigila
+estaticamente como texto, que es justo lo que `docs/verification.md` avisa que `--rapido` no cubre).
+
+Detalle por test (`--reporter=verbose`) de la corrida anterior a la ronda 2, cuando eran 54: en
+verde uno a uno, con los nombres de la tabla de la seccion 3. Los 22 de integracion de entonces,
+literal (en la ronda 2 se les sumo el caso de R3, que va el primero del bloque "estructura del
+usuario"):
 
 ```
  ✓ estructura del usuario > crea un usuario con todos sus datos 50ms
@@ -178,63 +195,79 @@ sigue intacta, el `count()` no cambia), no sobre el texto del error: el Postgres
 responde en espanol y Prisma no propaga el nombre del indice. Los nombres de los indices los vigila
 M (T9), que es donde existen.
 
-## 5. BLOQUEO — T12: `db:rollback` deja `_prisma_migrations` incoherente
+## 5. T12 cerrada — el ciclo apply -> rollback -> apply, ejecutado de verdad
 
-**Lo que pasa.** `prisma migrate resolve --rolled-back` **solo admite migraciones en estado
-fallido**. Sobre una migracion aplicada con exito devuelve `P3012`. Resultado: el `down.sql` se
-aplica (las tablas se van, R20 se cumple a nivel de esquema) pero el registro de Prisma sigue
-diciendo "aplicada, no revertida", y a partir de ahi `db:migrate` no reaplica nada.
+**Historia corta.** En la ronda 1 esto era un bloqueo de spec: `design.md > 8`, `tasks.md > T2` y
+`docs/architecture.md > Migraciones up/down` mandaban `prisma migrate resolve --rolled-back`, que
+**solo admite migraciones en estado fallido** y devuelve `P3012` sobre una aplicada con exito. El
+`down.sql` se aplicaba, pero `_prisma_migrations` quedaba diciendo "aplicada, no revertida" y
+`db:migrate` ya no reaplicaba nada. Se escalo en vez de parchearlo, porque era cambio de spec.
 
-Salida literal (sin la cadena de conexion):
+**Decision del humano (2026-08-06): opcion 2, el `DELETE`.** Tras aplicar el `down.sql`,
+`scripts/db-rollback.ts` hace `DELETE FROM "_prisma_migrations" WHERE migration_name = $1`. Se
+descartaron explicitamente la opcion 1 (`UPDATE` de `rolled_back_at`) y la opcion 3 (intentar el
+comando de Prisma y caer al fallback ante `P3012`), esta ultima pese a ser la que recomendaba el
+reviewer. **Coste aceptado por el humano: se pierde el rastro historico de que esa migracion llego
+a aplicarse.** Queda escrito aqui para que nadie lo lea despues como un descuido.
+
+Decision de implementacion, no de spec: el `DELETE` va **en la misma transaccion** que el
+`down.sql`. El DDL de Postgres es transaccional, asi que o se revierte todo o no se revierte nada;
+en dos pasos separados es exactamente como se llega a la incoherencia que causo el rechazo.
+
+Spec y docs actualizados para que digan lo que el codigo hace de verdad: `design.md > 8`,
+`tasks.md > T2` y **solo** la viñeta 4 de `docs/architecture.md > Migraciones up/down`.
+
+### Salida real del ciclo (sin la cadena de conexion)
 
 ```
-> pnpm run db:migrate
-Applying migration `20260806122638_users_and_roles`
-All migrations have been successfully applied.
+> pnpm run db:migrate            # estado de partida: YA APLICADA
+1 migration found in prisma/migrations
+No pending migrations to apply.                                   === EXIT: 0 ===
 
 > pnpm run db:rollback
-db:rollback: aplicando down.sql de 20260806122638_users_and_roles
-db:rollback: marcando 20260806122638_users_and_roles como rolled-back en _prisma_migrations
-Error: P3012  Migration `20260806122638_users_and_roles` cannot be rolled back because it is not
-in a failed state.
-db:rollback: el down.sql se aplico pero "prisma migrate resolve --rolled-back ..." fallo.
-_prisma_migrations ha quedado incoherente...   (exit 1)
+db:rollback: aplicando down.sql de 20260806122638_users_and_roles y borrando su fila de _prisma_migrations
+db:rollback: 20260806122638_users_and_roles revertida.            === EXIT: 0 ===
 
-  -> tablas tras el rollback: [_prisma_migrations]   (users, roles y document_types desaparecen)
-  -> _prisma_migrations: finished=true, rolled_back=false   <-- INCOHERENTE
+> comprobacion del estado tras el rollback
+tablas en public: _prisma_migrations
+_prisma_migrations: (0 filas)                                     === EXIT: 0 ===
+   (users, roles y document_types NO existen)
 
-> (reparacion manual: borrada esa fila) + pnpm run db:migrate
-All migrations have been successfully applied.
+> pnpm exec prisma migrate status
+1 migration found in prisma/migrations
+Following migration have not yet been applied:
+20260806122638_users_and_roles
+To apply migrations in development run prisma migrate dev.        === EXIT: 1 ===  (pendiente, correcto)
+
+> pnpm run db:migrate
+Applying migration `20260806122638_users_and_roles`
+The following migration(s) have been applied:
+migrations/
+  └─ 20260806122638_users_and_roles/
+    └─ migration.sql
+All migrations have been successfully applied.                    === EXIT: 0 ===
+
+> comprobacion del esquema reaplicado
+tablas en public: _prisma_migrations, document_types, roles, users
+_prisma_migrations: [{"migration_name":"20260806122638_users_and_roles","finished":true,"rolled_back":false}]
+indice: CREATE UNIQUE INDEX users_document_unique ON public.users USING btree (document_type_code, document_number) WHERE (deleted_at IS NULL)
+indice: CREATE UNIQUE INDEX users_email_unique ON public.users USING btree (lower(email)) WHERE (deleted_at IS NULL)
+indice: CREATE UNIQUE INDEX users_username_unique ON public.users USING btree (lower(username)) WHERE (deleted_at IS NULL)
+document_types: [{"code":"CC","name":"Cedula de ciudadania","is_active":true}]
+rls document_types: enable=true force=true
+rls roles: enable=true force=true
+rls users: enable=true force=true                                 === EXIT: 0 ===
 ```
 
-**Por que es un bloqueo de spec y no una decision del implementer.** El comando exacto lo mandan
-`design.md > 8`, `tasks.md > T2` y `docs/architecture.md > Migraciones up/down`, que ademas dice
-que ese segundo paso "no es opcional". Y `CHECKPOINTS.md` exige que `db:rollback` revierta y deje
-`_prisma_migrations` coherente. Cumplir la letra de la spec y cumplir su intencion son aqui cosas
-distintas, asi que **no se ha improvisado un arreglo**: `scripts/db-rollback.ts` se queda tal como
-lo pide la spec y la decision es del leader.
+El script de comprobacion fue temporal y esta borrado: no queda en el arbol.
 
-**Salidas posibles, para que la decision sea rapida** (ninguna aplicada):
-1. Tras el `down.sql`, `UPDATE _prisma_migrations SET rolled_back_at = now() WHERE migration_name = ...`
-   — es exactamente lo que escribe el comando de Prisma, conserva el rastro historico y hace que
-   `migrate deploy` reaplique. Es la que mas se parece a la intencion de `architecture.md`.
-2. `DELETE FROM _prisma_migrations WHERE migration_name = ...` — funciona, pero pierde el rastro.
-3. Dejar el comando de Prisma como primer intento y caer al fallback 1 solo cuando devuelve `P3012`.
+**Esto cierra T12 y con ella R20 en su forma real**, no solo a nivel de esquema: las tres tablas
+se van y vuelven, y `_prisma_migrations` queda coherente en los dos extremos del ciclo.
 
-Cualquiera de las tres implica retocar `design.md > 8`, `tasks.md > T2` y la frase de
-`docs/architecture.md`, que es justo lo que un implementer no debe decidir solo.
-
-**Estado actual de la base:** coherente y con la migracion aplicada. Reparada a mano borrando la
-fila huerfana y reaplicando. `pnpm exec prisma migrate status` responde `Database schema is up to date!`.
-
-Verificacion del esquema realmente aplicado (la parte de T12 que si cerro):
-- Las tres tablas existen.
-- `pg_indexes`: `users_email_unique` y `users_username_unique` con `lower(...)` y
-  `WHERE (deleted_at IS NULL)`; `users_document_unique` sobre
-  `(document_type_code, document_number) WHERE (deleted_at IS NULL)`.
-- `users_document_type_code_fkey` y `users_role_id_fkey` con `ON DELETE RESTRICT`.
-- `document_types` = 1 fila: `CC / Cedula de ciudadania / true`.
-- `pg_class`: `relrowsecurity` y `relforcerowsecurity` **true** en las tres tablas.
+Para que no vuelva a depender de que alguien lo corra a mano (punto 4 opcional del reviewer), hay
+dos tests estaticos nuevos en `tests/unit/schema/identity-migration.test.ts` que leen
+`scripts/db-rollback.ts` como texto y exigen que borre la fila de `_prisma_migrations` y que ya no
+dependa de `prisma migrate resolve --rolled-back`.
 
 ## 6. Desviaciones y deuda que el reviewer debe mirar
 
@@ -260,3 +293,33 @@ Verificacion del esquema realmente aplicado (la parte de T12 que si cerro):
    `./init.sh` corre en CI sin build previo.
 6. **T14 no ejecutada a proposito.** El merge con `dev`, el `./init.sh` completo y el PR van
    despues del reviewer, y el `init.sh` lo corre el leader (`AGENTS.md > Regla del gate`).
+
+### Deuda de la ronda 2 (el reviewer pidio documentarla, no arreglarla)
+
+7. **m1 — el `FORCE ROW LEVEL SECURITY` es inerte en esta maquina, y de que depende en produccion
+   no esta escrito en ningun sitio.** El rol local de conexion es `postgres`, superusuario con
+   BYPASSRLS: RLS no se le aplica aunque este forzado, y por eso los tests de integracion pueden
+   escribir. R19 se cumple tal como esta redactado (el `FORCE` esta en el SQL y en la base) y esto
+   **no** invalida ningun test, pero hay una consecuencia real que hay que verificar antes del
+   primer deploy: con `FORCE` y **cero policies**, que la aplicacion funcione en produccion depende
+   de que el rol con el que Prisma se conecte tenga BYPASSRLS. **Si no lo tiene, toda query de la
+   app devuelve vacio o falla.** `design.md > 9` describe el `FORCE` como deny-by-default para las
+   vias que no son Prisma, pero no deja escrito de que privilegio depende que Prisma si pase.
+   **Accion pendiente, de otra feature o del despliegue:** comprobarlo en el proyecto de Supabase y
+   anotarlo en `docs/architecture.md > Acceso a datos y autorizacion`. No se toco nada por esto.
+8. **m5 — deuda ya conocida, confirmada por el reviewer:** Prisma fijado a la mayor 6 (punto 1) y
+   `typecheck` fragil en maquina limpia por `LayoutProps` (punto 5). Sin cambios.
+
+### Archivos de spec y docs modificados en la ronda 2
+
+Cambiar la spec no es cosa del implementer salvo cuando el codigo ya no dice lo mismo que ella. Se
+toco lo minimo y solo lo autorizado:
+
+- `specs/1-modelo-usuarios-y-roles/design.md` §8 y `tasks.md > T2`: el paso 2 del rollback pasa a
+  ser el `DELETE`, con el porque del descarte de `prisma migrate resolve --rolled-back` (`P3012`) y
+  el coste aceptado.
+- `specs/1-modelo-usuarios-y-roles/tasks.md`: T12 marcada `[x]`; tabla de trazabilidad corregida en
+  R12 (m4) y R3 (m3).
+- `docs/architecture.md > Migraciones up/down`: **solo la viñeta 4**, la que mandaba un comando que
+  no puede funcionar. El resto del documento, intacto (verificado con `git diff`).
+- `progress/impl_modelo-usuarios-y-roles.md`: **borrado** (m2). El nombre canonico es este archivo.

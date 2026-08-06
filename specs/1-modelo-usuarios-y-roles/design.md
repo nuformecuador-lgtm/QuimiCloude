@@ -314,8 +314,17 @@ exclusiva); `CREATE EXTENSION IF NOT EXISTS` la hace idempotente. **R20**.
 
 Scripts a anadir en `package.json` (los pide `docs/architecture.md > Migraciones up/down` y
 hoy no existen): `db:migrate:create`, `db:migrate`, `db:rollback` (→ `scripts/db-rollback.ts`,
-que aplica `down.sql` **y despues** `prisma migrate resolve --rolled-back <migracion>`; ese
-segundo paso no es opcional o `_prisma_migrations` queda mintiendo).
+que aplica `down.sql` **y, en la misma transaccion**, `DELETE FROM _prisma_migrations WHERE
+migration_name = <migracion>` (parametrizado); ese segundo paso no es opcional o
+`_prisma_migrations` queda mintiendo).
+
+**Por que un DELETE y no `prisma migrate resolve --rolled-back`** (que es lo que decia este
+design antes y resulto no poder funcionar): ese comando **solo admite migraciones en estado
+fallido** y devuelve `P3012` sobre una aplicada con exito, que es exactamente el caso de un
+rollback. **Coste aceptado** (decision humana, 2026-08-06): se pierde el rastro historico de
+que la migracion llego a aplicarse; a cambio el ciclo cierra y `migrate deploy` la reaplica
+limpia. Los dos pasos van en una sola transaccion (el DDL de Postgres es transaccional): o se
+revierte todo o no se revierte nada.
 
 ## 9. RLS y autorizacion
 

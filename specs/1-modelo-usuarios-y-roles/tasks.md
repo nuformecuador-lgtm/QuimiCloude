@@ -27,7 +27,7 @@ el 2026-08-06: el repo ya tiene `.env` con `DATABASE_URL`.
 
 ### [x] T2. [P] Anadir scripts de migracion y el rollback
 - Dep: T1.
-- Scripts en `package.json`: `db:migrate:create` (`prisma migrate dev --create-only`), `db:migrate` (`prisma migrate deploy`), `db:rollback` (`tsx scripts/db-rollback.ts`). Crear `scripts/db-rollback.ts`: aplica el `down.sql` de la ultima migracion **y despues** `prisma migrate resolve --rolled-back <migracion>`.
+- Scripts en `package.json`: `db:migrate:create` (`prisma migrate dev --create-only`), `db:migrate` (`prisma migrate deploy`), `db:rollback` (`tsx scripts/db-rollback.ts`). Crear `scripts/db-rollback.ts`: aplica el `down.sql` de la ultima migracion **y, en la misma transaccion**, `DELETE FROM _prisma_migrations WHERE migration_name = <migracion>` (parametrizado). **No** se usa `prisma migrate resolve --rolled-back`: solo admite migraciones en estado fallido y devuelve `P3012` sobre una aplicada con exito, asi que no cierra el ciclo. Coste aceptado (decision humana, 2026-08-06): se pierde el rastro historico de que la migracion llego a aplicarse.
 - **Hecho cuando:** los tres scripts aparecen en `pnpm run`, `scripts/db-rollback.ts` typechequea, y el script falla con un mensaje claro (no un stacktrace) si falta `DATABASE_URL`.
 
 ### [x] T3. [P] Montar Vitest (no existe suite en el repo)
@@ -106,7 +106,7 @@ el 2026-08-06: el repo ya tiene `.env` con `DATABASE_URL`.
   el formato esperado. No se copia nada del `.env` real.
 - **Hecho cuando:** existe `.env.example`, no contiene ninguna credencial, y `./init.sh` reporta `.env` presente.
 
-### [ ] T12. Aplicar y revertir la migracion de verdad — **BLOQUEADA** (ver `progress/impl_1-modelo-usuarios-y-roles.md` seccion 5: `prisma migrate resolve --rolled-back` devuelve P3012 sobre una migracion aplicada con exito; apply verificado, rollback deja `_prisma_migrations` incoherente)
+### [x] T12. Aplicar y revertir la migracion de verdad — ciclo apply → rollback → apply ejecutado limpio el 2026-08-06 con el `db:rollback` corregido (DELETE sobre `_prisma_migrations` en la misma transaccion que el `down.sql`)
 - Dep: T5, T6, T0.
 - `pnpm run db:migrate` → comprobar el esquema (incluidos los tres indices parciales, con
   `\d users` o `pg_indexes`) → `pnpm run db:rollback` → comprobar que las tres tablas
@@ -156,7 +156,7 @@ Abreviaturas: **S** = `tests/unit/schema/identity-schema.test.ts` · **M** =
 | --- | --- | --- |
 | R1 | S · "el modelo User declara los nueve datos del usuario" | I · "crea un usuario con todos sus datos" |
 | R2 | S · "todo campo de negocio de User es obligatorio, incluidos telefono y fecha de nacimiento" | I · "rechaza el alta si falta un campo obligatorio" |
-| R3 | S · "User y Role tienen id uuid con default generado" | — |
+| R3 | S · "User y Role tienen id uuid con default generado" | I · "cambiar los datos de negocio del usuario no cambia su identificador" |
 | R4 | M · "el indice unico de correo es sobre lower(email)" | I · "rechaza un correo repetido aunque cambie el uso de mayusculas" |
 | R5 | M · "el indice unico de username es sobre lower(username)" | I · "rechaza un nombre de usuario repetido aunque cambie el uso de mayusculas" |
 | R6 | M · "el indice unico de documento es compuesto por tipo y numero" | I · "rechaza el mismo tipo y numero de documento repetidos" |
@@ -165,7 +165,7 @@ Abreviaturas: **S** = `tests/unit/schema/identity-schema.test.ts` · **M** =
 | R9 | M · "la migracion inserta CC como unico tipo de documento" | I · "el catalogo arranca solo con CC" |
 | R10 | S · "el tipo de documento no es enum ni check, es tabla" | I · "anadir un tipo nuevo deja intactos los usuarios ya guardados" |
 | R11 | G1 · "ninguna columna ni campo guarda la contrasena en claro" | — (guardia estatica, no necesita base) |
-| R12 | S · "passwordHash es String sin longitud declarada" · M · "password_hash es TEXT sin longitud" | — |
+| R12 | S · "passwordHash es String sin longitud declarada" · M · "password_hash es TEXT sin longitud" | I · "crea un usuario con todos sus datos" (guarda un `password_hash` de 10.000 caracteres y lo relee entero) |
 | R13 | S · "Role declara name y description obligatorios" | I · "crea un rol con nombre y descripcion" |
 | R14 | M · "roles tiene un indice unico sobre name" | I · "rechaza un segundo rol con el mismo nombre" |
 | R15 | S · "roleId es obligatorio y FK a Role" | I · "rechaza un usuario sin rol o con rol inexistente" |

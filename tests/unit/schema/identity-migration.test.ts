@@ -168,6 +168,29 @@ describe('migration.sql — catalogo, contrasena, claves foraneas y roles', () =
   })
 })
 
+describe('scripts/db-rollback.ts — convencion de rollback', () => {
+  const rollbackScript = readFileSync(join(repoRoot, 'scripts', 'db-rollback.ts'), 'utf8')
+
+  it('el rollback aplica el down.sql y ademas deja _prisma_migrations sin la fila de la migracion', () => {
+    // Sin esto, el esquema vuelve atras pero el registro de Prisma sigue diciendo
+    // "aplicada", y la siguiente migracion corre sobre un estado que Prisma cree que
+    // es otro. Es el bloqueo que rechazo esta feature la primera vez.
+    expect(rollbackScript).toMatch(/down\.sql/)
+    expect(rollbackScript).toMatch(
+      /DELETE\s+FROM\s+"?_prisma_migrations"?\s+WHERE\s+migration_name\s*=\s*\$1/i,
+    )
+  })
+
+  it('el rollback ya no depende de prisma migrate resolve --rolled-back, que devuelve P3012', () => {
+    // Ese comando solo admite migraciones en estado fallido: sobre una aplicada con
+    // exito no escribe nada. Si alguien lo reintroduce como paso ejecutable, este
+    // test cae. (Se ignoran los comentarios: la cabecera explica por que se descarto.)
+    const codigo = stripSqlComments(rollbackScript.replace(/^\s*\*.*$/gm, ''))
+    expect(codigo).not.toMatch(/migrate['",\s]+['"]?resolve/i)
+    expect(codigo).not.toMatch(/--rolled-back/)
+  })
+})
+
 describe('down.sql — reversion exacta', () => {
   it('down.sql revierte exactamente lo que crea migration.sql', () => {
     const creadas = createdTables(up)

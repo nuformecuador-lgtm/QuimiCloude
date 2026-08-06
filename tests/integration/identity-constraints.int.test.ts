@@ -295,6 +295,35 @@ describe('estructura del usuario', () => {
     })
   })
 
+  it('cambiar los datos de negocio del usuario no cambia su identificador', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const { id: originalId } = await createUser(tx, roleId, {
+        email: 'ana.perez@example.com',
+        username: 'anaperez',
+        documentNumber: '77000111222',
+      })
+
+      await tx.user.update({
+        where: { id: originalId },
+        data: { email: 'otro.correo@example.com', phone: '+57 301 000 0000' },
+      })
+
+      // Se busca por un dato que NO se toco (el documento), no por el id: si el
+      // identificador se derivase del correo o del telefono, esta fila traeria otro.
+      // R3.
+      const rows = await tx.user.findMany({
+        where: { documentNumber: '77000111222' },
+        select: { id: true, email: true, phone: true },
+      })
+      expect(rows).toHaveLength(1)
+      const [found] = rows
+      expect(found?.email).toBe('otro.correo@example.com')
+      expect(found?.phone).toBe('+57 301 000 0000')
+      expect(found?.id).toBe(originalId)
+    })
+  })
+
   it('rechaza el alta si falta un campo obligatorio', async () => {
     await inRolledBackTransaction(async (tx) => {
       const roleId = await createRole(tx)
