@@ -228,3 +228,62 @@ T1-T12 completadas. Typecheck, lint, las tres guardias y los 50 tests de la feat
 requisitos con test ejecutado; 10 mutaciones probadas de verdad, 9 rojas a la primera y M5 corregida
 con su hallazgo documentado; delta de suite 2.17 s contra un objetivo de 3 s. **No me autoapruebo:**
 faltan el `./init.sh` completo (del leader) y la revision del reviewer.
+
+## 11. Sincronizacion con `dev` (2026-08-06, antes del reviewer)
+
+Merge de `origin/dev` (que ya incluye la feature 7, `pantalla-de-login`) en la rama de la feature 2.
+
+**Conflictos: ninguno, y esta vez se verifico en vez de suponerlo.** El aviso del leader era que la
+colision entre las features 1 y 7 paso desapercibida porque git auto-mergeo en silencio dos archivos
+con nombres distintos (`vitest.config.mts` vs `.ts`). Los dos puntos de riesgo se comprobaron uno a
+uno tras el merge:
+
+1. **Config de vitest: quedo la unificada de `dev`, sin duplicar.** Existe un solo archivo,
+   `vitest.config.mts`, y `git diff origin/dev -- vitest.config.mts` sale **vacio**: es literalmente
+   la version de `dev`, con los dos `projects` (`ui` en jsdom, `node` en node) repartidos por
+   convencion de nombre y carpeta. Mis tests son `tests/unit/password/*.test.ts` y
+   `tests/guards/*.test.ts`, o sea `.test.ts` fuera de `tests/ui/`: caen en el proyecto `node`, que
+   es donde tienen que caer. Se confirma ejecutandolos, no leyendo la config.
+   Igual de vacio el diff contra `dev` en `scripts/` (un solo `test-rapido.mjs`, el `.ts` viejo
+   borrado) y en `package.json`.
+2. **La guardia que corre es la afinada, y no me exime.** `git diff origin/dev --
+   tests/guards/guard-password-never-plaintext.test.ts` tambien sale vacio. Su `IN_TRANSIT_ALLOWLIST`
+   acota por ruta y solo cubre `lib/actions/login.ts` y `lib/types/auth.ts` (el `password` en transito
+   del formulario de login), asi que `lib/utils/password-hash.ts` **no esta exento**: pasa por sus
+   propios meritos, gracias a los nombres `createPasswordHash` / `verifyPasswordHash` / `plaintext`
+   de `design.md > 9.1`.
+
+**Comprobacion empirica de que la guardia nueva de verdad barre mi modulo** (una allowlist silenciosa
+habria dejado el verde sin significado). Mutacion efimera: se anadio `const password = 'x'` al final
+de `lib/utils/password-hash.ts`.
+```
+AssertionError: expected [ Array(1) ] to deeply equal []
++   "lib/utils/password-hash.ts: password",
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+```
+Revertida y confirmada byte-identica contra la copia intacta; guardias de nuevo verdes.
+
+### Gate tras el merge (salida real)
+
+```
+> tsc --noEmit          (sin errores)
+> eslint                (sin hallazgos)
+
+$ pnpm exec vitest related --run lib/utils/password-hash.ts tests/support/password-test-params.ts
+ Test Files  3 passed (3)
+      Tests  42 passed (42)
+   Duration  1.86s
+
+$ pnpm exec vitest run tests/unit/password tests/guards
+ Test Files  6 passed (6)
+      Tests  60 passed (60)
+   Duration  2.35s
+real    0m4.001s
+```
+
+Los 60 son mis 50 mas los 10 tests de las otras dos guardias (la de RLS y la afinada, que trae dos
+casos nuevos sobre su allowlist). **Los 18 requisitos siguen verdes contra la guardia afinada y con
+la config unificada**; el merge no rompio nada mio y no hubo que tocar ni una linea del modulo.
+Antes del merge hizo falta `pnpm install --frozen-lockfile` por las dependencias que trae la
+feature 7 (`@vitejs/plugin-react`, jsdom, shadcn/ui); el lockfile no cambio.
