@@ -29,6 +29,17 @@ components/shared/    ← compuestos reutilizables (DataTable, FormField, Status
 components/private/   ← componentes con datos sensibles (solo render si permisos OK)
 ```
 
+Y los componentes propios de UNA ruta van dentro de la ruta, agrupados y con barrel:
+
+```
+app/(public)/login/
+  page.tsx            ← solo archivos del App Router en la raiz de la ruta
+  components/
+    index.ts          ← reexporta TODOS los componentes de la ruta
+    login-form.tsx
+    submit-button.tsx
+```
+
 ## Reglas
 1. NUNCA inventes componentes si los tiene shadcn/ui. Usa `npx shadcn add <component>`.
 2. Usa `kebab-case.tsx` para componentes UI, `PascalCase.tsx` para shared/private.
@@ -38,5 +49,11 @@ components/private/   ← componentes con datos sensibles (solo render si permis
 6. La carga de datos publicos del cliente usa SWR con revalidacion automatica.
 7. Si un componente es privado (datos de usuario especifico), vive en `components/private/`
    y recibe los datos por props desde un Server Component padre.
+8. Los componentes propios de una ruta **nunca quedan sueltos junto a `page.tsx`**: van en
+   `<ruta>/components/` con un `index.ts` que los reexporta, y `page.tsx` importa **desde el
+   barrel** (`from './components'`), nunca por ruta profunda. Aplica aunque el componente
+   sea uno solo. `'use client'` se declara en cada componente, **nunca en el `index.ts`**:
+   el barrel no debe convertirse en frontera cliente/servidor. Detalle y motivos en
+   `docs/architecture.md > Componentes`; el reviewer lo rechaza como anti-patron.
 
 Al terminar, devuelve SOLO: archivos creados/modificados y un veredicto de una linea.
