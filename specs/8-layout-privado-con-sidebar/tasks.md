@@ -210,7 +210,7 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Aviso de superficie**: si el helper toca el `setupFiles` de `vitest.config.mts` o
   `tests/setup.ts` (archivos de las features 1 y 7), avisar al leader antes.
 
-### T13 — [P] `tests/unit/initials.test.ts` y `tests/unit/logout-action.test.ts`
+### [x] T13 — [P] `tests/unit/initials.test.ts` y `tests/unit/logout-action.test.ts`
 - **Depende de**: T6, T7. No necesita T12 (no renderiza DOM).
 - **Qué**: helper de iniciales (casos borde) y tests de la Server Action mockeando
   `lib/services/session-stub`. Nombres que describen comportamiento
@@ -218,14 +218,14 @@ contiene** tasks de `shadcn init` ni de montar Vitest: los hereda.
 - **Hecho cuando**: cubre R22 y R35 y `pnpm exec vitest related --run lib/actions/logout.ts
   lib/utils/initials.ts` sale verde.
 
-### T14 — [P] `tests/unit/nav-user.test.tsx`
+### [x] T14 — [P] `tests/unit/nav-user.test.tsx`
 - **Depende de**: T9, T12.
 - **Qué**: render con un `SessionUser` construido en el test; mock de `lib/actions/logout` para
   contar invocaciones (R20) y para mantener la promesa pendiente y observar el estado
   deshabilitado (R21). Caso `roleName: null` (R14).
 - **Hecho cuando**: cubre R14, R15, R17, R18, R19, R20, R21 y pasa en verde.
 
-### T15 — [P] `tests/unit/app-sidebar.test.tsx`
+### [x] T15 — [P] `tests/unit/app-sidebar.test.tsx`
 - **Depende de**: T10, T12.
 - **Qué**: render de `AppSidebar` con props del test; mock de `next/navigation`
   (`usePathname`) para R8 y R12; iteración de `PRIVATE_NAV_ITEMS` **importada** para R6/R13;
