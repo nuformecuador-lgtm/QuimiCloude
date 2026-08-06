@@ -2,10 +2,17 @@
 
 > Feature 1 - zona `backend` - complexity `medium` - rama `feature/1-modelo-usuarios-y-roles`
 > Worktree: `.worktrees/1-modelo-usuarios-y-roles/` - commits `ffabc3a`, `44e934d`
-> Revisado: 2026-08-06 - **VEREDICTO: RECHAZADO** (1 bloqueante, 5 menores)
+> **VEREDICTO VIGENTE (ronda 2, commit `37f1d53`, 2026-08-06): APROBADO / OK.**
+> Cero bloqueantes. 1 menor nuevo (n1), sin consecuencias. La parte viva de este documento
+> es la **seccion 8**.
+>
+> Ronda 1 (commits `ffabc3a`, `44e934d`): **RECHAZADO**, 1 bloqueante y 5 menores. Las
+> secciones 1 a 7 son ese informe y se conservan **como registro historico**: su checklist
+> y su veredicto estan **superados** por la seccion 8. No los leas como el estado actual.
 
-El rechazo es por **un solo punto** (T12 / `db:rollback`) y no por el modelo, la migracion,
-los indices ni los tests, que estan bien hechos y verificados de primera mano. Ver seccion 6.
+_(Texto de la ronda 1, conservado tal cual:)_ El rechazo es por **un solo punto**
+(T12 / `db:rollback`) y no por el modelo, la migracion, los indices ni los tests, que estan
+bien hechos y verificados de primera mano.
 
 ---
 
@@ -288,3 +295,207 @@ de hashing, alcance limpio sin seed ni login ni UI, identificadores en ingles, `
 54 tests. La calidad de los tests (sensibilidad en las guardias y en los estaticos, asserts
 sobre SQLSTATE mas efecto observable, aislamiento por transaccion con savepoints) esta por
 encima de lo que exige el arnes.
+
+---
+---
+
+# 8. RONDA 2 - re-revision del commit `37f1d53` (2026-08-06)
+
+> **VEREDICTO: APROBADO (OK).** Cero bloqueantes. B1 resuelto y verificado ejecutando yo el
+> ciclo completo, incluida la atomicidad. m2, m3 y m4 cerrados. m1 y m5 documentados con
+> accion concreta, que es lo que se pidio para ellos. Un menor nuevo (n1) sin consecuencias.
+
+Alcance de esta ronda: verificar los arreglos y que no hayan roto nada de lo ya aprobado.
+No se re-audita lo que la ronda 1 dio por bueno salvo para confirmar que sigue en pie.
+
+## 8.1. B1 - RESUELTO. Esta vez si pude ejecutar el rollback
+
+En la ronda 1 el sandbox me bloqueo `pnpm run db:rollback` y lo hice constar. **Esta vez no
+me lo bloqueo y lo corri yo, tres veces, contra la base real.** Nada de lo que sigue viene
+de la salida pegada por el implementer.
+
+### (b) El ciclo migrate, rollback y migrate, ejecutado por mi
+
+```
+> pnpm run db:rollback
+db:rollback: aplicando down.sql de 20260806122638_users_and_roles y borrando su fila de _prisma_migrations
+db:rollback: 20260806122638_users_and_roles revertida.                       EXIT=0
+
+> estado tras el rollback (consulta directa a la base, hecha por mi)
+tablas en public: _prisma_migrations          <- users, roles y document_types NO existen
+_prisma_migrations: 0 filas
+indices sobre users: 0                        <- ningun indice residual
+
+> pnpm exec prisma migrate status
+Following migration have not yet been applied: 20260806122638_users_and_roles   EXIT=1
+                                              <- Prisma la ve PENDIENTE: registro coherente
+
+> pnpm run db:migrate
+Applying migration `20260806122638_users_and_roles`
+All migrations have been successfully applied.                               EXIT=0
+
+> pnpm exec prisma migrate status
+Database schema is up to date!                                               EXIT=0
+```
+
+**El registro ya no miente en ningun punto del ciclo.** Tras el rollback Prisma considera la
+migracion pendiente (que es la definicion operativa de coherente aqui) y `migrate deploy` la
+reaplica sin intervencion manual. La incoherencia que motivo el rechazo de la ronda 1
+(terminada y sin marca de rollback, con las tablas ya caidas) **no se reproduce**.
+
+### (d) R20 en su forma real, no solo a nivel de esquema
+
+Este era mi hallazgo y ahora esta cerrado con la mejor evidencia posible: **el esquema se
+destruyo y se reconstruyo desde cero y quedo identico** al que valide en la ronda 1.
+Comprobado por mi sobre la base reaplicada:
+
+- `users_email_unique` sobre `lower(email)` con `WHERE (deleted_at IS NULL)`
+- `users_username_unique` sobre `lower(username)` con `WHERE (deleted_at IS NULL)`
+- `users_document_unique` sobre `(document_type_code, document_number)` con `WHERE (deleted_at IS NULL)`
+- `roles_name_key` unico total sobre `name`
+- RLS `enable=true force=true` en las tres tablas
+- `document_types` con 1 fila: CC, Cedula de ciudadania, activo
+- las dos FK de `users` con accion de borrado RESTRICT
+- `_prisma_migrations` con 1 fila, terminada y sin marca de rollback
+
+Los tres indices escritos a mano **sobreviven el ciclo completo**, que era justo el riesgo de
+tenerlos fuera de `schema.prisma`. R20 pasa de PARCIAL a **OK**.
+
+Ademas, la suite entera vuelve a pasar contra la base reconstruida: **57 de 57**, y
+`./init.sh` completo termina en `== init OK ==`.
+
+### (a) La atomicidad es REAL, no aparente: lo probe forzando el fallo
+
+Leer el codigo solo demuestra que hay un BEGIN y un COMMIT alrededor de los dos pasos sobre
+el mismo cliente. Eso es condicion necesaria, no prueba. Asi que **provoque el fallo exacto
+que importa**: instale temporalmente un trigger BEFORE DELETE sobre `_prisma_migrations` que
+lanza una excepcion, de modo que el `down.sql` (los tres DROP TABLE) tuviera exito y el
+DELETE posterior reventara. Es literalmente el escenario de la ronda 1.
+
+```
+> pnpm run db:rollback   (con el DELETE saboteado)
+db:rollback: la reversion de 20260806122638_users_and_roles fallo y no se aplico nada
+             (transaccion deshecha): bloqueo de prueba del reviewer                 EXIT=1
+
+> estado tras el intento fallido
+tablas: _prisma_migrations, document_types, roles, users     <- las tres SIGUEN ahi
+_prisma_migrations: 1 fila                                   <- el registro SIGUE ahi
+indices sobre users: 6                                       <- intactos
+```
+
+**Los DROP TABLE se deshicieron.** No hay estado a medias: o se revierte todo o no se
+revierte nada, y el mensaje de error lo dice sin stacktrace. El modo de fallo que causo el
+rechazo de la ronda 1 **ya no es alcanzable**, y la decision del implementer de meter el
+DELETE en la misma transaccion (que era suya, no del humano) esta bien fundada.
+
+Limpieza verificada: trigger y funcion de prueba eliminados, `pg_trigger` sin residuos, base
+final en `Database schema is up to date!`. No dejo nada instalado.
+
+### (c) Ni rastro de `prisma migrate resolve --rolled-back`
+
+- En `scripts/db-rollback.ts` la unica aparicion es la **cabecera de comentario** que explica
+  por que se descarto (linea 12). Como codigo ejecutable: cero.
+- El import de `runPnpmExec` **desaparecio** del script. `run-pnpm.ts` no queda huerfano: lo
+  sigue usando `scripts/test-rapido.ts`.
+- El DELETE esta **parametrizado** (`WHERE migration_name = $1`): el nombre de la migracion
+  no se concatena nunca en el SQL. Correcto.
+- Detalle bien resuelto y no pedido: si el DELETE afecta 0 filas el script **avisa y sigue**
+  en vez de fallar, que es lo razonable cuando la migracion no estaba registrada.
+
+## 8.2. Los dos tests estaticos nuevos: comprobada su no-vacuidad por mutacion
+
+Los verifique como verifique el resto en la ronda 1: mutando el archivo que vigilan y
+comprobando que el assert cae. Resultado, assert por assert:
+
+| Assert | Mutante aplicado | Cae? |
+| --- | --- | --- |
+| el DELETE sobre `_prisma_migrations` parametrizado esta presente | se elimina el DELETE del script | **si, cae** |
+| el codigo no contiene `migrate ... resolve` | se reintroduce la llamada al comando de Prisma con su bandera | **si, cae** |
+| el codigo no contiene la bandera de rolled-back | el mismo mutante anterior | **NO cae** (ver n1) |
+
+Conclusion: **los dos tests cumplen su funcion.** La regresion que existen para atrapar, o
+sea reintroducir el comando de Prisma que no puede funcionar, **se atrapa de verdad** por el
+segundo assert; y la desaparicion del DELETE tambien. No pasan por vacuidad.
+
+## 8.3. Estado de los menores de la ronda 1
+
+| # | Estado | Comprobacion |
+| --- | --- | --- |
+| **m1** (FORCE RLS inerte en local) | **Documentado con accion concreta, correcto** | Punto 7 de la seccion 6 de la bitacora. No es una nota vaga: dice **que** comprobar (si el rol de conexion de Prisma tiene BYPASSRLS), **cual es la consecuencia si no** (toda query de la app devuelve vacio o falla), **cuando** (antes del primer deploy) y **donde escribirlo** (`docs/architecture.md > Acceso a datos y autorizacion`). En la ronda 1 se quedaba corto; ahora no. |
+| **m2** (archivo huerfano) | **CERRADO** | `progress/impl_modelo-usuarios-y-roles.md` borrado en el commit. `progress/` solo tiene los cuatro archivos que le tocan. |
+| **m3** (assert explicito de R3) | **CERRADO, y bien resuelto** | Test nuevo "cambiar los datos de negocio del usuario no cambia su identificador": modifica `email` y `phone` y **relee por `document_number`, no por el id**. Es exactamente lo que pedi: releer por el id habria sido tautologico. Ejecutado y en verde. |
+| **m4** (el mapa infravalora R12) | **CERRADO** | Corregido en `tasks.md` y en la bitacora, y ademas en R3, que tenia el mismo hueco. Los dos apuntan ya al test real. |
+| **m5** (Prisma 6, typecheck fragil) | **Documentado, correcto** | Puntos 1 y 5 de la seccion 6, con el porque verificado (Prisma 7 rompe la config del schema en `package.json` y la propiedad `url` del datasource) y el remedio concreto del typecheck (`pnpm exec next typegen`). |
+
+## 8.4. Auditoria de alcance del commit `37f1d53`
+
+`git show --stat`: **9 archivos, todos dentro de lo autorizado.**
+
+- `docs/architecture.md`: **un solo hunk**, la vineta 4 de "Migraciones up/down". El resto del
+  documento, intacto. **Tenia permiso para esa frase y no toco nada mas.** Confirmado.
+- `specs/.../design.md`: solo el parrafo 8 de scripts, mas el bloque nuevo que explica por que
+  un DELETE y no el comando de Prisma, con el **coste aceptado escrito** (se pierde el rastro
+  historico de que la migracion llego a aplicarse). Que la spec diga lo que el codigo hace es
+  exactamente lo que debia pasar.
+- `specs/.../tasks.md`: T2 reescrita, T12 marcada, filas R3 y R12 corregidas. Nada mas.
+- `scripts/db-rollback.ts`, los dos archivos de tests, la bitacora, el huerfano borrado y mi
+  propio informe de la ronda 1, que el implementer commiteo (correcto).
+- **Cero cambios en `db/schema.prisma`, en `migration.sql`, en `down.sql`, en `lib/` y en
+  `app/`.** Lo aprobado en la ronda 1 no se toco, y lo he vuelto a verificar contra la base
+  igualmente (8.1).
+
+## 8.5. Hallazgo nuevo
+
+**n1 (menor). Uno de los tres asserts de los tests de rollback es vacuo por construccion.**
+En `tests/unit/schema/identity-migration.test.ts`, el test "el rollback ya no depende de
+prisma migrate resolve --rolled-back" pasa el fuente por `stripSqlComments()` antes de
+afirmar. Esa funcion borra todo lo que sigue a un doble guion en cada linea, tratandolo como
+comentario SQL, y la cadena que se quiere prohibir **empieza precisamente por un doble
+guion**. Resultado: esa bandera no sobrevive nunca al filtro y su assert **pasa siempre**,
+tambien sobre un mutante que reintroduce el comando entero. Verificado por mutacion (8.2).
+
+**No es bloqueante y no deja ningun hueco**: el assert hermano de ese mismo test, el que
+busca `migrate ... resolve`, si sobrevive al filtro y **si atrapa la regresion**, como
+demostre. O sea que la guardia protege; lo que sobra es un assert que da una sensacion de
+cobertura que no aporta. Lo mismo, en menor grado, con el assert que exige la mencion de
+`down.sql` en el primer test: se evalua sobre el fuente **sin** filtrar, asi que lo satisface
+la propia cabecera de comentarios del script.
+
+Arreglo, cuando alguien pase por ahi: filtrar comentarios de **TypeScript** (`//` y bloques)
+en vez de reutilizar el filtro de SQL, que en un `.ts` confunde un operador de linea con un
+comentario. Es la clase de detalle que este mismo informe exigio al resto de la suite, por
+eso queda escrito y no se calla; pero no cambia el veredicto.
+
+## 8.6. Checklist de CHECKPOINTS.md, estado tras la ronda 2
+
+Solo los puntos que estaban en rojo o que el arreglo podia mover:
+
+- [x] **Todas las tasks de `tasks.md` marcadas** - T12 cerrada y **verificada por mi**, no
+      solo declarada. Queda T14, que es del leader por definicion.
+- [x] **Cada `R<n>` mapea a un test que lo verifica** - los 24. R20 pasa de PARCIAL a **OK**.
+      R3 y R12 ganan ademas su test de integracion explicito.
+- [x] **Migraciones versionadas y reversibles**; `pnpm run db:rollback` revierte **y deja
+      `_prisma_migrations` coherente**. Ejecutado por mi. Era el punto del rechazo.
+- [x] `pnpm run typecheck`, `pnpm run lint`, `pnpm test` (**57 de 57**) y `./init.sh`
+      completo: todo en verde, corrido por mi.
+- [x] Sin secretos versionados; alcance sin seed, login ni UI; capas y RLS como en la ronda 1.
+- [ ] Entrada en `progress/history.md` y desmontaje del worktree: **pendientes del leader**,
+      no del implementer.
+
+## 8.7. Veredicto de la ronda 2
+
+**APROBADO (OK).**
+
+El bloqueante B1 esta resuelto de verdad y no de palabra: corri el ciclo completo yo mismo,
+verifique el estado de la base en cada paso y ademas **sabotee el segundo paso a proposito
+para comprobar que la atomicidad no era decorativa**, y no lo era. R20 queda cubierto en su
+forma real, que era mi objecion de fondo. Los menores m2, m3 y m4 estan cerrados; m1 y m5
+quedan documentados con accion concreta, que es lo que correspondia. El alcance del commit se
+ajusta a lo autorizado, incluida la unica vineta de `docs/architecture.md`. Nada de lo
+aprobado en la ronda 1 se rompio: lo he vuelto a comprobar contra una base reconstruida desde
+cero.
+
+Queda un unico menor nuevo (n1): un assert muerto en un test cuyo assert hermano si hace el
+trabajo. No condiciona la aprobacion.
+
+La feature puede pasar a `done` una vez el leader ejecute T14 (merge con `dev` y `./init.sh`).

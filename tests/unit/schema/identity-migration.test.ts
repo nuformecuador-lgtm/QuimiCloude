@@ -40,6 +40,26 @@ function stripSqlComments(sql: string): string {
     .join('\n')
 }
 
+/**
+ * Quita comentarios de TypeScript: bloques y comentarios de linea `//`.
+ *
+ * No sirve `stripSqlComments` para un archivo `.ts`: ese borra todo lo que sigue a un
+ * `--`, con lo que la bandera `--rolled-back` que se vigila mas abajo jamas podria
+ * sobrevivir al filtro y el assert seria vacuo.
+ *
+ * Caso ambiguo asumido a proposito: un `//` dentro de una cadena (p. ej. una URL)
+ * se comeria el resto de esa linea. `scripts/db-rollback.ts` no tiene ninguno, y el
+ * efecto solo puede hacer la guardia mas laxa en esa linea, nunca inventar una
+ * deteccion. Un parser de TypeScript aqui seria desproporcionado.
+ */
+function stripTsComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+}
+
 /** Sentencias ejecutables, con los espacios normalizados para poder afirmar sobre ellas. */
 function statements(sql: string): readonly string[] {
   return stripSqlComments(sql)
@@ -83,6 +103,16 @@ function isCaseInsensitiveIndex(statement: string, column: string): boolean {
 /** ¿El indice es parcial, acotado a las filas vivas? (R22, R23) */
 function isPartialOnLiveRows(statement: string): boolean {
   return /WHERE\s+"?deleted_at"?\s+IS\s+NULL\s*$/i.test(statement)
+}
+
+/**
+ * ¿El script de rollback invoca `prisma migrate resolve --rolled-back` como codigo
+ * ejecutable? Se mira solo el codigo: la cabecera del script menciona el comando en
+ * prosa para documentar por que se descarto, y esa mencion es legitima.
+ */
+function dependeDeMigrateResolve(script: string): boolean {
+  const codigo = stripTsComments(script)
+  return /migrate['",\s]+['"]?resolve/i.test(codigo) || /--rolled-back/.test(codigo)
 }
 
 function uniqueIndexOnUsers(name: string): string {
@@ -185,9 +215,28 @@ describe('scripts/db-rollback.ts — convencion de rollback', () => {
     // Ese comando solo admite migraciones en estado fallido: sobre una aplicada con
     // exito no escribe nada. Si alguien lo reintroduce como paso ejecutable, este
     // test cae. (Se ignoran los comentarios: la cabecera explica por que se descarto.)
-    const codigo = stripSqlComments(rollbackScript.replace(/^\s*\*.*$/gm, ''))
-    expect(codigo).not.toMatch(/migrate['",\s]+['"]?resolve/i)
-    expect(codigo).not.toMatch(/--rolled-back/)
+    expect(dependeDeMigrateResolve(rollbackScript)).toBe(false)
+  })
+
+  it('la guardia del rollback cae si alguien reintroduce migrate resolve --rolled-back como codigo', () => {
+    // Mutacion en memoria: el archivo en disco no se toca.
+    const mutado = rollbackScript.replace(
+      "    await client.query('COMMIT')",
+      "    runPnpmExec(['prisma', 'migrate', 'resolve', '--rolled-back', migration])\n" +
+        "    await client.query('COMMIT')",
+    )
+    expect(mutado, 'la mutacion no se aplico: cambio el texto del script').not.toBe(rollbackScript)
+    expect(dependeDeMigrateResolve(mutado)).toBe(true)
+
+    // Las dos mitades del predicado, cada una por separado. Se comprueba sobre el
+    // codigo sin comentarios: la cabecera del script nombra las dos cosas en prosa.
+    const soloResolve = mutado.replace("'--rolled-back', ", '')
+    expect(stripTsComments(soloResolve)).not.toMatch(/--rolled-back/)
+    expect(dependeDeMigrateResolve(soloResolve)).toBe(true)
+
+    const soloBandera = mutado.replace("'migrate', 'resolve', ", '')
+    expect(stripTsComments(soloBandera)).not.toMatch(/migrate['",\s]+['"]?resolve/i)
+    expect(dependeDeMigrateResolve(soloBandera)).toBe(true)
   })
 })
 
