@@ -9,11 +9,15 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:guardias": "vitest run guard --passWithNoTests",
     "test:rapido": "node scripts/test-rapido.mjs",
-    "test:guardias": "vitest run guard --passWithNoTests"
+    "db:migrate:create": "prisma migrate dev --create-only",
+    "db:migrate": "prisma migrate deploy",
+    "db:rollback": "tsx scripts/db-rollback.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
+    "@prisma/client": "^6.19.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.29.0",
@@ -33,15 +37,22 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.3",
     "@types/node": "^20",
+    "@types/pg": "^8.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "jsdom": "^30.0.1",
+    "pg": "^8.22.0",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.9",
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@10.10.0"
+  "packageManager": "pnpm@10.10.0",
+  "prisma": {
+    "schema": "db/schema.prisma"
+  }
 }

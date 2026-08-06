@@ -1,0 +1,82 @@
+// Esquema de QuimiCloude. Vive en `db/schema.prisma`, no en `prisma/` (la ruta se
+// declara en `package.json > prisma.schema`). Ver `docs/architecture.md > Migraciones
+// up/down`.
+//
+// Convencion: identificadores de base en INGLES y `snake_case` (via `@@map`/`@map`);
+// los campos del cliente Prisma en `camelCase`. Todo texto es `text`: no se usan
+// `varchar(n)` arbitrarios.
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooler, runtime de la app
+  directUrl = env("DIRECT_URL") // conexion directa, la que usa Prisma Migrate
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// Catalogo del conjunto cerrado de tipos de documento de identidad (design.md > 3).
+/// No lleva `deletedAt` a proposito: un tipo no se borra, se desactiva con `isActive`.
+model DocumentType {
+  code      String   @id
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users User[]
+
+  @@map("document_types")
+}
+
+/// Catalogo de roles. NO lleva `deletedAt` deliberadamente (design.md > 2.2): el
+/// borrado logico es un UPDATE y una FK no puede bloquear un UPDATE, asi que anadir
+/// la columna neutralizaria en silencio la unica garantia real de R17.
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique
+  description String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users User[]
+
+  @@map("roles")
+}
+
+/// Usuario del ERP. Borrado logico: `deletedAt` NULL = usuario vivo.
+///
+/// OJO — las tres unicidades de esta tabla (correo, nombre de usuario y la pareja
+/// tipo+numero de documento) NO estan aqui como `@unique`/`@@unique` y eso es
+/// deliberado: son indices unicos FUNCIONALES (`lower(...)`) y PARCIALES
+/// (`WHERE deleted_at IS NULL`), y Prisma no modela ninguna de las dos cosas.
+/// Viven escritos a mano en `db/migrations/<ts>_users_and_roles/migration.sql`
+/// (`users_email_unique`, `users_username_unique`, `users_document_unique`) y ese es
+/// el unico sitio donde existen. El porque esta en `design.md > 4` y `> 5`; el test
+/// `tests/unit/schema/identity-migration.test.ts` los vigila. Si alguien anade aqui
+/// un `@unique`, la unicidad deja de respetar mayusculas/minusculas y el borrado
+/// logico quema el correo y el documento para siempre.
+model User {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstNames       String    @map("first_names")
+  lastNames        String    @map("last_names")
+  birthDate        DateTime  @map("birth_date") @db.Date
+  email            String
+  phone            String
+  documentTypeCode String    @map("document_type_code")
+  documentNumber   String    @map("document_number")
+  username         String
+  passwordHash     String    @map("password_hash")
+  roleId           String    @map("role_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([roleId], map: "users_role_id_idx")
+  @@index([documentTypeCode], map: "users_document_type_code_idx")
+  @@map("users")
+}

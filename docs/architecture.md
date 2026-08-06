@@ -238,9 +238,12 @@ Proceso:
    `migration.sql` y **no** lo aplica.
 2. Escribir `down.sql` a mano, revirtiendo exactamente lo que hace `migration.sql`.
 3. `pnpm run db:migrate` → `prisma migrate deploy` aplica la migracion.
-4. `pnpm run db:rollback` → `scripts/db-rollback.ts` aplica el `down.sql` de la ultima y
-   despues corre `prisma migrate resolve --rolled-back <migracion>`. **Ese segundo paso no
-   es opcional**: Prisma lleva su propio registro en la tabla `_prisma_migrations`, y
+4. `pnpm run db:rollback` → `scripts/db-rollback.ts` aplica el `down.sql` de la ultima y,
+   en la misma transaccion, borra su fila de `_prisma_migrations` (`DELETE ... WHERE
+   migration_name = <migracion>`, parametrizado). No sirve `prisma migrate resolve
+   --rolled-back`: solo admite migraciones en estado **fallido** y devuelve `P3012` sobre
+   una aplicada con exito. **Ese segundo paso no es opcional**: Prisma lleva su propio
+   registro en la tabla `_prisma_migrations`, y
    deshacer el SQL sin avisarle deja el historial mintiendo — la siguiente migracion se
    aplica sobre un estado que Prisma cree que es otro.
 
