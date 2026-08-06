@@ -17,7 +17,7 @@ feature y antes del PR.
 
 ## Bloque 0 — Infraestructura (bloquea todo lo demás)
 
-### T1 — Montar el runner de tests (Vitest + Testing Library) y el script `test`
+### [x] T1 — Montar el runner de tests (Vitest + Testing Library) y el script `test`
 - **Depende de**: nada. **Alcance aprobado por el humano el 2026-08-06.**
 - **Qué**:
   - `pnpm add -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom @testing-library/user-event @testing-library/jest-dom`
@@ -33,7 +33,7 @@ feature y antes del PR.
 - **Aviso de superficie** (`design.md > 9.2`): toca archivos raíz compartidos. Si hay otra
   feature `frontend` en curso, avisar al leader antes de empezar.
 
-### T2 — [P] Inicializar shadcn/ui
+### [x] T2 — [P] Inicializar shadcn/ui
 - **Depende de**: nada.
 - **Qué**: `pnpm dlx shadcn@latest init` (Tailwind v4, alias `@/*`). Genera
   `components.json`, `lib/utils.ts` (`cn`) y las dependencias `clsx` / `tailwind-merge` /
@@ -42,14 +42,14 @@ feature y antes del PR.
   `pnpm run build` pasa, y se ha revisado el diff de `app/globals.css` (el init lo reescribe)
   confirmando que `app/page.tsx` sigue renderizando sin romperse.
 
-### T3 — Añadir las primitivas de formulario de shadcn/ui
+### [x] T3 — Añadir las primitivas de formulario de shadcn/ui
 - **Depende de**: T2.
 - **Qué**: `pnpm dlx shadcn@latest add button input label card`
 - **Hecho cuando**: existen `components/ui/button.tsx`, `input.tsx`, `label.tsx`,
   `card.tsx`; `pnpm run typecheck` limpio. **Ningún archivo de `components/ui/` se edita a
   mano en esta feature.** (Ya **no** se añade `alert`: el error genérico va por toast.)
 
-### T3b — Añadir el toast de shadcn/ui (`sonner`) y montar el `<Toaster />`
+### [x] T3b — Añadir el toast de shadcn/ui (`sonner`) y montar el `<Toaster />`
 - **Depende de**: T2.
 - **Qué**:
   - `pnpm dlx shadcn@latest add sonner` → genera `components/ui/sonner.tsx` e instala el
@@ -65,7 +65,7 @@ feature y antes del PR.
 - **Hecho cuando**: `pnpm run build` pasa, `/login` renderiza con el `<Toaster />` montado,
   y una llamada manual de prueba a `toast.error()` pinta la notificación.
 
-### T4 — [P] Añadir zod
+### [x] T4 — [P] Añadir zod
 - **Depende de**: nada.
 - **Qué**: `pnpm add zod`.
 - **Hecho cuando**: zod figura en `dependencies` (no en dev) y `pnpm run typecheck` pasa.
@@ -74,7 +74,7 @@ feature y antes del PR.
 
 ## Bloque 1 — Contrato (lo que la feature 10 no volverá a tocar)
 
-### T5 — `lib/types/auth.ts`: schema, tipos y constantes
+### [x] T5 — `lib/types/auth.ts`: schema, tipos y constantes
 - **Depende de**: T4.
 - **Qué**: implementar exactamente lo de `design.md > 4`: `loginInputSchema`, `LoginInput`,
   `LoginFormState` (unión discriminada **con `attemptId` en los dos estados de fallo y no en
@@ -84,7 +84,7 @@ feature y antes del PR.
   campo `password`** (verificación visual explícita del reviewer; es la garantía de tipo de
   R15).
 
-### T6 — `lib/services/login-stub.ts`: el punto de costura
+### [x] T6 — `lib/services/login-stub.ts`: el punto de costura
 - **Depende de**: T5.
 - **Qué**: exportar `verifyCredentials(input: LoginInput): Promise<{ ok: boolean }>` que
   devuelve siempre `{ ok: false }`. Sin DB, sin red, sin cookies. Comentario en cabecera
@@ -93,7 +93,7 @@ feature y antes del PR.
 - **Hecho cuando**: el módulo no importa nada de `next/*`, Prisma ni Supabase, y
   `pnpm run typecheck` pasa.
 
-### T7 — `lib/actions/login.ts`: la Server Action
+### [x] T7 — `lib/actions/login.ts`: la Server Action
 - **Depende de**: T5, T6.
 - **Qué**: `'use server'`; `loginAction(prevState: LoginFormState, formData: FormData):
   Promise<LoginFormState>` siguiendo el flujo de `design.md > 4`. Genera un `attemptId` con
@@ -106,14 +106,14 @@ feature y antes del PR.
 
 ## Bloque 2 — UI
 
-### T8 — `app/(public)/login/submit-button.tsx`
+### [x] T8 — `app/(public)/login/submit-button.tsx`
 - **Depende de**: T3. `[P]` con T9 hasta que T9 lo importe.
 - **Qué**: componente cliente que usa `useFormStatus()` de `react-dom` y renderiza el
   `Button` de shadcn con `disabled={pending}`, `aria-busy={pending}` y texto de estado. Sin
   props de pending: el hook es la única fuente.
 - **Hecho cuando**: typecheck/lint limpios y el componente **no** declara ningún `useState`.
 
-### T9 — `app/(public)/login/login-form.tsx`
+### [x] T9 — `app/(public)/login/login-form.tsx`
 - **Depende de**: T3, T3b, T7, T8.
 - **Qué**: componente cliente con `useActionState(loginAction, LOGIN_INITIAL_STATE)` y
   `<form action={formAction}>`. Campos `name="username"` / `name="password"` no controlados,
@@ -125,7 +125,7 @@ feature y antes del PR.
   ni `useState` (grep explícito antes de commitear). El único `useRef` admitido es el de
   `lastToastedId`.
 
-### T10 — `app/(public)/login/page.tsx`
+### [x] T10 — `app/(public)/login/page.tsx`
 - **Depende de**: T3, T9.
 - **Qué**: Server Component (sin `'use client'`) que compone `Card` + marca «QuimiCloude»
   como `CardTitle` (R23) + `<LoginForm />` + el enlace `<Link href={FORGOT_PASSWORD_ROUTE}>`
@@ -139,7 +139,7 @@ feature y antes del PR.
 
 ## Bloque 3 — Tests y trazabilidad
 
-### T11 — `tests/unit/login-action.test.ts`
+### [x] T11 — `tests/unit/login-action.test.ts`
 - **Depende de**: T1, T7.
 - **Qué**: tests de la Server Action, mockeando `lib/services/login-stub` y
   `next/navigation`. Nombres de test que describen comportamiento
@@ -147,7 +147,7 @@ feature y antes del PR.
 - **Hecho cuando**: cubre R5, R9, R12, R13, R15, R17, R18, R19 y el `attemptId` de R21, y
   `pnpm exec vitest related --run lib/actions/login.ts` sale verde.
 
-### T12 — `tests/unit/login-form.test.tsx`
+### [x] T12 — `tests/unit/login-form.test.tsx`
 - **Depende de**: T1, T3, T3b, T9, T10.
 - **Qué**: tests de render e interacción con Testing Library + `user-event`, mockeando
   `lib/actions/login.ts` para controlar el estado devuelto (y poder mantener la promesa
@@ -158,7 +158,7 @@ feature y antes del PR.
 - **Nota**: los asserts van sobre roles ARIA, `data-testid` y constantes exportadas,
   **nunca** sobre el literal de copy (S4/D3).
 
-### T13 — Decisión sobre E2E (Playwright)
+### [x] T13 — Decisión sobre E2E (Playwright)
 - **Depende de**: T10.
 - **Qué**: `CHECKPOINTS.md` pide E2E para flujos críticos como autenticación. Aquí no hay
   autenticación real y ni `/dashboard` ni la ruta de recuperación existen (S1, S6), así que
@@ -173,7 +173,7 @@ feature y antes del PR.
 - **Hecho cuando**: la opción elegida está ejecutada y escrita en
   `progress/impl_7-pantalla-de-login.md`. Lo que no vale es dejarlo sin decidir.
 
-### T14 — Mapa de trazabilidad `R<n> → test`
+### [x] T14 — Mapa de trazabilidad `R<n> → test`
 - **Depende de**: T11, T12, T13.
 - **Qué**: volcar la tabla de abajo, ya con los nombres reales de los tests, en
   `progress/impl_7-pantalla-de-login.md`, junto con los archivos tocados y la salida real de
