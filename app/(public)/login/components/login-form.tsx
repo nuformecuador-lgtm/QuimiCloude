@@ -22,6 +22,18 @@ const PASSWORD_ERROR_ID = 'password-error';
  * Rehidratacion (R13, R14): React 19 resetea los campos no controlados de un `<form action>`
  * al completarse la Server Action; el `defaultValue` del campo de usuario vuelve a poner lo
  * escrito y la contrasena, sin `defaultValue`, queda vacia.
+ *
+ * `key={usernameFieldKey}` en el campo de usuario: su `defaultValue` pasa de `''` (idle) a lo
+ * escrito (fallo), y Base UI avisa por consola cuando el `defaultValue` de un `FieldControl`
+ * no controlado cambia despues de montarse. La clave fuerza un remontaje justo en ese salto,
+ * asi que cada valor de `defaultValue` es el INICIAL de una instancia nueva y no una mutacion.
+ * El campo sigue NO controlado (`design.md > 8.B` descarta `useState`) y R13/R14 no cambian.
+ *
+ * La clave es el propio `username` y no el `attemptId`: ambos arreglan el aviso, pero el
+ * `attemptId` cambia en CADA intento fallido y remontaria tambien cuando el usuario reintenta
+ * con el mismo nombre, que es el caso comun. Un remontaje tira el foco del input, asi que
+ * conviene el minimo posible. La contrasena no lleva clave: sin `defaultValue` no dispara el
+ * aviso, y remontarla robaria el foco al enviar con Enter desde ese campo.
  */
 export function LoginForm() {
   const [state, formAction] = useActionState(loginAction, LOGIN_INITIAL_STATE);
@@ -36,9 +48,13 @@ export function LoginForm() {
     toast.error(state.message);
   }, [state]);
 
-  // La union discriminada obliga a estrechar: `username` y `fieldErrors` solo existen en
-  // los estados de fallo.
+  // La union discriminada obliga a estrechar: `username`, `attemptId` y `fieldErrors` solo
+  // existen en los estados de fallo.
   const username = state.status === 'idle' ? '' : state.username;
+  // Clave de montaje del campo de usuario. Es el propio `username` a proposito: asi cambia
+  // exactamente cuando cambia su `defaultValue` y ni una vez mas, de modo que cada instancia
+  // del input ve un unico `defaultValue` durante toda su vida (ver comentario del componente).
+  const usernameFieldKey = username;
   const fieldErrors = state.status === 'invalid' ? state.fieldErrors : undefined;
   const usernameError = fieldErrors?.username;
   const passwordError = fieldErrors?.password;
@@ -48,6 +64,7 @@ export function LoginForm() {
       <div className="flex flex-col gap-2">
         <Label htmlFor="username">Usuario</Label>
         <Input
+          key={usernameFieldKey}
           id="username"
           name="username"
           type="text"
