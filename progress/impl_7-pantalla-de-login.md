@@ -28,9 +28,15 @@ T11, T12 (tests) · T13 (decision E2E) · T14 (este documento).
 | Archivo | Estado | Que es |
 | --- | --- | --- |
 | `app/(public)/layout.tsx` | nuevo | Layout publico; monta el `<Toaster />` con `richColors` y `duration: 8000` (design.md > 5.3: **no** en el root layout) |
-| `app/(public)/login/page.tsx` | nuevo | Server Component: `Card` + marca QuimiCloude como `CardTitle` (R23) + `<LoginForm />` + enlace de recuperacion fuera del `<form>` (R22). Export de `metadata` |
-| `app/(public)/login/login-form.tsx` | nuevo | Cliente: `useActionState` + `<form action={formAction}>`, campos no controlados, errores de campo inline, efecto de toast con guarda de `attemptId` |
-| `app/(public)/login/submit-button.tsx` | nuevo | Cliente: `useFormStatus()` -> `disabled` + `aria-busy` (R6, R7, R8). Archivo separado por necesidad tecnica del hook |
+| `app/(public)/login/page.tsx` | nuevo | Server Component: `Card` + marca QuimiCloude como `CardTitle` (R23) + `<LoginForm />` + enlace de recuperacion fuera del `<form>` (R22). Export de `metadata`. Importa desde el barrel `./components` |
+| `app/(public)/login/components/index.ts` | nuevo | Barrel de la ruta: reexporta `LoginForm` y `SubmitButton`. **Sin `'use client'`** (la frontera se declara en cada componente) |
+| `app/(public)/login/components/login-form.tsx` | nuevo | Cliente: `useActionState` + `<form action={formAction}>`, campos no controlados, errores de campo inline, efecto de toast con guarda de `attemptId` |
+| `app/(public)/login/components/submit-button.tsx` | nuevo | Cliente: `useFormStatus()` -> `disabled` + `aria-busy` (R6, R7, R8). Archivo separado por necesidad tecnica del hook |
+
+Estructura segun `docs/architecture.md > Componentes > Regla: componentes de ruta en
+components/ con barrel index.ts` (decision humana 2026-08-06): los componentes propios de la
+ruta viven bajo `components/` y se importan por el barrel. El `<Toaster />` del layout
+publico es una primitiva de `components/ui/sonner`, asi que no se mueve.
 
 ### Primitivas shadcn/ui (generadas por el CLI, no escritas a mano)
 

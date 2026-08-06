@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import { FORGOT_PASSWORD_ROUTE } from '@/lib/types/auth';
 
-import { LoginForm } from './login-form';
+import { LoginForm } from './components';
 
 export const metadata: Metadata = {
   title: 'Iniciar sesión · QuimiCloude',
