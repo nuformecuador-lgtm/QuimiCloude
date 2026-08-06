@@ -17,6 +17,13 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+
+// Se invoca el CLI de vitest con `node <bin>` y SIN shell a proposito: con `shell: true`,
+// cmd.exe parte las rutas con parentesis (`app/(public)/layout.tsx`) y el comando revienta.
+const require = createRequire(import.meta.url);
+const VITEST_BIN = path.join(path.dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
 
 const BASE_REF = process.env.TEST_RAPIDO_BASE ?? 'origin/dev';
 
@@ -49,7 +56,7 @@ function changedFiles() {
 function runVitest(args, label) {
   console.log(`\n[test:rapido] ${label}`);
   console.log(`[test:rapido] -> vitest ${args.join(' ')}`);
-  const result = spawnSync('vitest', args, { stdio: 'inherit', shell: true });
+  const result = spawnSync(process.execPath, [VITEST_BIN, ...args], { stdio: 'inherit' });
   return result.status ?? 1;
 }
 
