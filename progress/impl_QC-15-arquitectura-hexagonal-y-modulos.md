@@ -619,5 +619,44 @@ unico rojo en todo el repo es `guard-dependencias-aprobadas.test.ts` por `bcrypt
 **Hecho cuando (tasks.md > T5):** cumplido. `lib/actions/` y `lib/types/` ya no existen;
 typecheck, lint y `pnpm test` en verde con el mismo conjunto de archivos que T0.
 
-Commit: `refactor(QC-15): adaptadores driving de identity y reconexion via composicion`.
+Commit: `refactor(QC-15): adaptadores driving de identity y reconexion via composicion` (`a738202`).
+
+---
+
+## T6 — Cerrar las carpetas horizontales (2026-09-01)
+
+Verificado, nada que mover: T2/T3/T5 ya dejaron el arbol asi al vaciar cada carpeta en su
+propia task.
+
+```
+$ ls lib
+composition  modules  shared  utils.ts
+```
+
+Ninguna de `lib/actions/`, `lib/services/`, `lib/repositories/`, `lib/interfaces/`,
+`lib/types/`, `lib/navigation/` ni el directorio `lib/utils/` existe:
+
+```
+$ for d in lib/actions lib/services lib/repositories lib/interfaces lib/types lib/navigation lib/utils; do
+    [ -e "$d" ] && echo "EXISTS: $d" || echo "absent: $d"
+  done
+absent: lib/actions
+absent: lib/services
+absent: lib/repositories
+absent: lib/interfaces
+absent: lib/types
+absent: lib/navigation
+absent: lib/utils
+```
+
+Tampoco quedan directorios vacios sueltos bajo `lib/`:
+
+```
+$ find lib -type d -empty
+(sin salida)
+```
+
+**Hecho cuando (tasks.md > T6):** cumplido sin cambios de archivos — `ls lib` devuelve
+exactamente `composition modules shared utils.ts` y el gate sigue verde (typecheck/lint
+ya verificados en el cierre de T5, sin tocar nada desde entonces).
 
