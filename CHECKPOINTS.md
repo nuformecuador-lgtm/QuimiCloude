@@ -39,11 +39,18 @@ esta lista.
 - [ ] Ningun secreto quedo hardcodeado; todo va por variables de entorno.
 - [ ] Webhooks nuevos validan firma/token y son idempotentes.
 
-## Patron de capas
-- [ ] Controller no contiene queries de DB ni logica de negocio.
-- [ ] Service no conoce HTTP (Request/Response/headers).
-- [ ] Repository solo ejecuta queries Prisma, sin logica de negocio.
-- [ ] Las interfaces estan en `lib/interfaces/`, separadas por categoria.
+## Modulos hexagonales
+- [ ] `domain/` y `ports/` no importan framework, base de datos, `shared` ni adaptadores.
+- [ ] De otro modulo se importa solo su contrato (`@/lib/modules/<otro>`), nunca ruta profunda.
+- [ ] Ningun adaptador `driving` instancia su `driven`: lo pide a `lib/composition`.
+- [ ] `lib/shared/**` no importa modulos ni `composition` (es hoja del grafo).
+- [ ] Ningun `'use server'` sale reexportado desde el barrel del modulo.
+- [ ] Todo modelo de `db/schema.prisma` tiene `/// @module`, y ningun modulo consulta un
+      modelo ajeno.
+- [ ] No reaparecen `lib/services/`, `lib/repositories/` ni `lib/interfaces/`.
+- [ ] La logica de negocio esta en `domain/`, no en la Server Action. **Esto la guardia no
+      lo comprueba**: un caso de uso que solo llama al adaptador y devuelve pasa en verde y
+      esta mal.
 
 ## Permisos
 - [ ] Paginas protegidas validan permisos en el servidor via `cookies()`.
