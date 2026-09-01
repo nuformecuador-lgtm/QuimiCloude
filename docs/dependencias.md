@@ -29,6 +29,7 @@ La regla y su porqué viven en `docs/architecture.md > Dependencias de terceros`
 | --- | --- | --- | --- | --- |
 | `@base-ui/react` | Primitivas headless sobre las que monta shadcn/ui | heredada | 2026-09-01 | Pendiente de auditoría |
 | `@prisma/client` | Cliente del ORM | heredada | 2026-09-01 | Pendiente de auditoría |
+| `bcryptjs` | Hash y verificacion de contrasena (QC-5) | heredada | 2026-09-01 | Entro con QC-5, que se mergeo en `origin/dev` DESPUES de escribirse este registro; el humano aprobo la libreria al ordenar rehacer la feature con ella. Pendiente de auditoria como el resto |
 | `class-variance-authority` | Variantes de clases en componentes ui/ | heredada | 2026-09-01 | Pendiente de auditoría |
 | `clsx` | Composición condicional de clases | heredada | 2026-09-01 | Pendiente de auditoría |
 | `lucide-react` | Iconos | heredada | 2026-09-01 | Pendiente de auditoría |
