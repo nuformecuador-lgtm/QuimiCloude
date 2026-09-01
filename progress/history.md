@@ -119,3 +119,75 @@
   válido), a resolver en la feature 7 (login); `bcryptjs` sin fila en registro de
   dependencias; y `CREDENTIAL_MAX_LENGTH` es más ancho que lo que restringe —solo acota la
   contraseña, `username` no tiene máximo—, `SECRET_MAX_LENGTH` sería más preciso.
+
+## QC-11 — layout-privado-con-sidebar (2026-09-01)
+
+- Cerrada con el PR #6 (merge `02883f8` en `dev`). Épica `QC-16 Plataforma`.
+- Maquetación del armazón privado: sidebar con tres regiones, colapso en modo icono y
+  responsive, pie con menú de usuario. Los datos de sesión entran por props y el cierre de
+  sesión es un disparador vacío: la costura real la hace QC-13.
+- Deudas que sobreviven al cierre y siguen en `current.md`: el modo icono no muestra iconos
+  (`NavItem` no tiene campo de icono, y el hueco es del spec, no de la implementación); los 5
+  ítems de navegación son placeholder con rutas que dan 404; la zona privada se queda sin
+  `<Toaster />` por decisión humana; y `design.md > 5.5` contiene una afirmación falsa sobre
+  que el `SidebarProvider` lee la cookie `sidebar_state` al montar — no la lee nunca.
+- Su worktree quedó retenido por árbol sucio; ver `current.md > Deudas`.
+
+## QC-15 — arquitectura-hexagonal-y-modulos (2026-09-01)
+
+- Cerrada con el PR #8 (merge `f79ba5d` en `dev`, sin squash). Épica `QC-16 Plataforma`.
+  17 commits, 90 archivos, +7856/−314.
+- Reestructuración a módulos hexagonales **sin cambio de comportamiento**: de carpetas por
+  rol técnico (`lib/services/`, `lib/actions/`, `lib/types/`) a `lib/modules/<modulo>/` con
+  `domain/`, `ports/` y `adapters/{driven,driving}/`, punto único de composición en
+  `lib/composition/` y núcleo compartido en `lib/shared/`.
+- **La prueba de que no se rompió nada**: los mismos 20 archivos de test verdes de antes,
+  cada uno con idéntico número de tests (contado con `--reporter=json`), y ninguna aserción
+  cambiada en el diff. De 170 a 220 tests; los 50 nuevos son de la guardia.
+- Las cuatro decisiones estructurales, con su porqué, en
+  `specs/QC-15-arquitectura-hexagonal-y-modulos/design.md > 1`. La que más condiciona: la
+  raíz es `lib/modules/`, **no** un `src/`, porque un `src/` obligaría a tocar `SCANNED_DIRS`
+  de `guard-password-never-plaintext`, que si nadie lo actualiza se queda verde barriendo nada.
+
+### La lección: la guardia costó tres rondas, la reestructuración ninguna
+
+El `reviewer` **rechazó la guardia dos veces**, las dos por el mismo defecto — el que hace que
+una guardia pase siempre sin mirar nada:
+
+- **Ronda 1 (mayor).** Cinco bloques comparaban el especificador del import **como texto**,
+  exigiendo el prefijo `@/`. Cualquier import **relativo** los atravesaba. Con tres
+  violaciones reales metidas a la vez, daba 39/39 verde.
+- **Ronda 2 (menor subido a bloqueante por el leader).** Quedaba una última comparación de
+  cadena en la comprobación del contrato: `'./domain/../../../shared/routes'` reexportaba
+  desde fuera del dominio y pasaba en verde.
+
+Las dos las encontró **ejecutando**, no leyendo: introdujo la violación, miró el resultado y
+revirtió. Es el mismo defecto que ya había mordido en este repo con `SCANNED_DIRS`. De ahí
+salen las dos reglas que quedan escritas para la siguiente guardia que alguien escriba:
+**resolver el destino a una ruta real antes de aplicar la regla**, y **afirmar que el barrido
+no está vacío** en todo bloque que itera archivos.
+
+Sin eso, la feature se habría mergeado con su garantía principal desactivada y nadie se
+habría enterado hasta que alguien escribiera un import relativo — que es lo natural dentro de
+un mismo módulo.
+
+### Efectos colaterales que salieron por el camino
+
+- `.claude/agents/backend_dev.md` mandaba crear `lib/services/`, `lib/repositories/` y
+  `lib/interfaces/`: las tres carpetas que la guardia nueva prohíbe. El próximo `backend_dev`
+  habría seguido su prompt y puesto el gate en rojo sin entender por qué. Corregido junto con
+  `CHECKPOINTS.md`, que es contra lo que revisa el `reviewer`.
+- `bcryptjs` entró en `docs/dependencias.md` como `heredada`. No era una dependencia nueva:
+  el registro se escribió antes de que QC-5 mergeara bcryptjs y el hueco apareció al unir las
+  ramas. Se resolvió con la fila en vez de baselinizar el rojo, que dejaría deuda permanente
+  por un problema de contabilidad.
+- La guardia **no** comprueba que la lógica de negocio esté en `domain/` y no en la Server
+  Action. Un caso de uso que sólo delega pasa en verde y está mal. Queda en `CHECKPOINTS.md`
+  para el revisor humano.
+
+### Deuda que hereda
+
+Tres preguntas abiertas del spec, ninguna bloqueante: el idioma de los nombres de módulo
+(hoy conviven `identity` e `inventario`), si un módulo puede leer modelos ajenos dentro de un
+`include` de Prisma o debe pedirlos al contrato (se eligió lo estricto, a revisar en QC-14), y
+dónde vivirán los componentes propios de un módulo cuando aparezca el primer caso.

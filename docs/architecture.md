@@ -29,14 +29,17 @@ hay ninguna feature de dominio quimico implementada.**
 
 ### Preguntas abiertas del dominio
 
-No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Estan aqui porque **las cuatro son
-caras de meter despues**: cambiarlas con datos ya cargados obliga a migrar historico.
-Conviene cerrarlas antes de la primera feature de inventario o de producto, no despues.
+No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Estan aqui porque **son caras de meter
+despues**: cambiarlas con datos ya cargados obliga a migrar historico. Conviene cerrarlas
+antes de la primera feature de inventario o de producto, no despues. De las cuatro
+originales, **la 1 esta cerrada** desde el 2026-09-01; siguen abiertas la 2, la 3 y la 4.
 
-1. **Unidades de medida.** ¿Se maneja mas de una unidad por producto (kg / L / bidon /
-   tambor) con conversiones? Si la respuesta es si, la unidad tiene que estar en el modelo
-   desde la primera tabla de producto y **toda cantidad se guarda con su unidad**, nunca
-   como numero suelto.
+1. ~~**Unidades de medida.**~~ **CERRADA el 2026-09-01 (QC-14).** Una sola unidad por
+   producto y **sin conversiones**. La unidad se guarda en la columna `unit` del producto,
+   como **texto libre y opcional**, y es puramente anotativa: nadie convierte con ella. La
+   existencia se interpreta segun la presentacion del producto. Queda como riesgo asumido
+   que normalizarla a un conjunto cerrado mas adelante costara una limpieza de datos
+   (`specs/QC-14-modelo-producto/requirements.md > Preguntas abiertas`).
 2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
    suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
    guarda totales es de las migraciones mas dolorosas que existen.

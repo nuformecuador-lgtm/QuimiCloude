@@ -10,7 +10,9 @@ Mejora en bruto: **$ARGUMENTS**
 Alcance: **solo el arnes** — `.claude/agents/*.md`, `docs/*.md`, `CLAUDE.md`, `AGENTS.md`,
 `CHECKPOINTS.md`, `.claude/settings.json`. Si lo que te pidieron es un requisito de producto
 (una pantalla, un endpoint, un flujo de negocio), **no uses este comando**: eso entra por el
-board de Jira → F0 → `spec_author` (`docs/specs.md`). Dilo y para.
+board de Jira → F0 → `spec_author` (`docs/specs.md`). Dilo y para — y di a donde: si la ficha ya
+esta en el board, se acota con **`/afinar-feature`** antes del spec; si todavia no existe, se crea
+primero en Jira.
 
 ## Paso 1 — Encuadre
 

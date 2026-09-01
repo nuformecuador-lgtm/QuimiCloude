@@ -19,6 +19,18 @@ EARS para que sean testeables y sin ambigüedad:
 Cada requisito debe poder verificarse con un test. Si no se puede testear, está
 mal escrito.
 
+**El archivo puede venir sembrado.** El comando `/afinar-feature` cierra el alcance y las
+decisiones con el humano *antes* de F1.2 y deja escrito el bloque de Alcance, la tabla
+`## Decisiones cerradas (no reabrir)` y las `## Preguntas abiertas` que queden. En ese caso
+`spec_author` **completa** el archivo —rellena los requisitos EARS— y no reabre la tabla ni
+reescribe el alcance. Cada fila de la tabla debe acabar cubierta por al menos un `R<n>`, o esa
+decisión nunca llega a tener test.
+
+Es el mismo checkpoint de siempre, solo que la conversación ocurre antes de escribir en vez de
+después. No es opcional por comodidad: los tres specs escritos hasta hoy necesitaron una o dos
+revisiones completas —con renumeración de requisitos incluida— para incorporar respuestas que el
+humano ya tenía desde el principio.
+
 ### 2. design.md — el CÓMO técnico
 Decisiones antes de escribir código: modelo de datos (tablas, RLS, migraciones),
 endpoints/rutas Next, contratos de entrada/salida, integraciones externas si las hay,
