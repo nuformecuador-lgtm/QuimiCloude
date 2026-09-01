@@ -660,3 +660,33 @@ $ find lib -type d -empty
 exactamente `composition modules shared utils.ts` y el gate sigue verde (typecheck/lint
 ya verificados en el cierre de T5, sin tocar nada desde entonces).
 
+---
+
+## T7 — Slot del modulo `inventario` (2026-09-01)
+
+Creados, literales de `design.md > 2`:
+
+```
+lib/modules/inventario/index.ts
+lib/modules/inventario/domain/.gitkeep
+lib/modules/inventario/ports/.gitkeep
+lib/modules/inventario/adapters/driven/.gitkeep
+lib/modules/inventario/adapters/driving/.gitkeep
+```
+
+`index.ts` es `export {}` mas un comentario que dice que es el slot de QC-14, que las
+subcarpetas usan `.gitkeep` porque git no versiona carpetas vacias, y que QC-14 los borra
+al poner el primer archivo real; remite a `docs/architecture.md > Modulos y arquitectura
+hexagonal`.
+
+```
+$ pnpm run typecheck   -> OK, cero errores
+$ pnpm run lint        -> OK, cero errores
+```
+
+El arbol coincide con `design.md > 2`: `lib/modules/` tiene ahora `identity/` e
+`inventario/`, y `inventario/` solo contiene `index.ts` y las cuatro subcarpetas vacias
+(marcadas con `.gitkeep`).
+
+**Hecho cuando (tasks.md > T7):** cumplido.
+
