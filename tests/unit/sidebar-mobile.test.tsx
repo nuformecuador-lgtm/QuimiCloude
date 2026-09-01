@@ -45,7 +45,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
   usePathname: usePathnameMock,
 }));
 
-vi.mock('@/lib/actions/logout', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
   logoutAction: logoutActionMock,
 }));
 

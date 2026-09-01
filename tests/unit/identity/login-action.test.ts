@@ -3,20 +3,20 @@ import { resolve } from 'node:path';
 
 import { redirect } from 'next/navigation';
 
-import { loginAction } from '@/lib/actions/login';
+import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
   LOGIN_INITIAL_STATE,
   type LoginFormState,
-} from '@/lib/types/auth';
+} from '@/lib/modules/identity/adapters/driving/login-form-state';
 
 const { verifyCredentialsMock } = vi.hoisted(() => ({
   verifyCredentialsMock: vi.fn<(input: { username: string; password: string }) => Promise<{ ok: boolean }>>(),
 }));
 
-vi.mock('@/lib/modules/identity/domain/verify-credentials', () => ({
-  verifyCredentials: verifyCredentialsMock,
+vi.mock('@/lib/composition', () => ({
+  identity: { verifyCredentials: verifyCredentialsMock },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -160,7 +160,10 @@ describe('loginAction', () => {
   });
 
   it('no accede a base de datos ni emite cookie', () => {
-    const modulos = ['lib/actions/login.ts', 'lib/modules/identity/domain/verify-credentials.ts'];
+    const modulos = [
+      'lib/modules/identity/adapters/driving/login-action.ts',
+      'lib/modules/identity/domain/verify-credentials.ts',
+    ];
     const prohibidos = [
       /(^|\/)next\/headers$/,
       /^@prisma\/client$/,

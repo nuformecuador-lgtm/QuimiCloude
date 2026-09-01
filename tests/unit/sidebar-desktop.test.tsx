@@ -45,7 +45,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 }));
 
 // Sin este mock el `<form>` del pie intentaria ejecutar la Server Action real.
-vi.mock('@/lib/actions/logout', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
   logoutAction: logoutActionMock,
 }));
 

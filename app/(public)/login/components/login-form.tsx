@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { loginAction } from '@/lib/actions/login';
-import { LOGIN_INITIAL_STATE } from '@/lib/types/auth';
+import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
+import { LOGIN_INITIAL_STATE } from '@/lib/modules/identity/adapters/driving/login-form-state';
 
 import { SubmitButton } from './submit-button';
 

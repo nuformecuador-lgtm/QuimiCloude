@@ -61,7 +61,7 @@ type AppSidebarProps = {
  * props desde el Server Component padre.
  *
  * Ningun destino se escribe como literal (R13): salen de las constantes de
- * `lib/navigation/private-nav.ts` y de `lib/types/auth.ts`.
+ * `lib/shared/navigation/private-nav.ts` y de `lib/shared/routes.ts`.
  *
  * Nota de API: estas primitivas son **Base UI**, no Radix. La composicion no se hace con
  * `asChild` sino con la prop `render`.

@@ -1,21 +1,21 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { logoutAction } from '@/lib/actions/logout';
+import { logoutAction } from '@/lib/modules/identity/adapters/driving/logout-action';
 
 const { endSessionMock } = vi.hoisted(() => ({
   endSessionMock: vi.fn<() => Promise<void>>(),
 }));
 
-// Se mockea el proveedor de sesion para contar invocaciones sin depender del no-op real:
+// Se mockea el punto de composicion para contar invocaciones sin depender del no-op real:
 // cuando la feature 10 rellene el stub, este test sigue midiendo el contrato de la action.
-vi.mock('@/lib/modules/identity/adapters/driven/session/session-stub', () => ({
-  endSession: endSessionMock,
+vi.mock('@/lib/composition', () => ({
+  identity: { endSession: endSessionMock },
 }));
 
 /** Modulos cuyo fuente se inspecciona para R22/R35. */
 const MODULOS_INSPECCIONADOS = [
-  'lib/actions/logout.ts',
+  'lib/modules/identity/adapters/driving/logout-action.ts',
   'lib/modules/identity/adapters/driven/session/session-stub.ts',
 ] as const;
 

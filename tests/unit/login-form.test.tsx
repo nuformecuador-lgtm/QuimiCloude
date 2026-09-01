@@ -10,7 +10,7 @@ import {
   GENERIC_CREDENTIALS_ERROR,
   REQUIRED_FIELD_ERROR,
   type LoginFormState,
-} from '@/lib/types/auth';
+} from '@/lib/modules/identity/adapters/driving/login-form-state';
 
 const { loginActionMock } = vi.hoisted(() => ({
   loginActionMock:
@@ -19,7 +19,7 @@ const { loginActionMock } = vi.hoisted(() => ({
 
 // Se mockea la action para controlar el estado devuelto y, sobre todo, para poder dejar la
 // promesa PENDIENTE: es la unica forma de observar el estado «enviando» (R6, R7).
-vi.mock('@/lib/actions/login', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/login-action', () => ({
   loginAction: loginActionMock,
 }));
 

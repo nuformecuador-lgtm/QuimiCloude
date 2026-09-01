@@ -1,21 +1,21 @@
 // T8 — El login rechaza una contrasena mas larga que el maximo, con su mensaje de campo y
 // sin intentar autenticar (R10).
 
-import { loginAction } from '@/lib/actions/login';
+import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
 import { CREDENTIAL_MAX_LENGTH } from '@/lib/modules/identity';
 import {
   LOGIN_INITIAL_STATE,
   PASSWORD_TOO_LONG_ERROR,
   REQUIRED_FIELD_ERROR,
-} from '@/lib/types/auth';
+} from '@/lib/modules/identity/adapters/driving/login-form-state';
 
 const { verifyCredentialsMock } = vi.hoisted(() => ({
   verifyCredentialsMock:
     vi.fn<(input: { username: string; password: string }) => Promise<{ ok: boolean }>>(),
 }));
 
-vi.mock('@/lib/modules/identity/domain/verify-credentials', () => ({
-  verifyCredentials: verifyCredentialsMock,
+vi.mock('@/lib/composition', () => ({
+  identity: { verifyCredentials: verifyCredentialsMock },
 }));
 
 vi.mock('next/navigation', () => ({

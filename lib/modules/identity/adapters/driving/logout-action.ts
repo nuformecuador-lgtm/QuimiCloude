@@ -1,6 +1,6 @@
 'use server';
 
-import { endSession } from '@/lib/modules/identity/adapters/driven/session/session-stub';
+import { identity } from '@/lib/composition';
 
 /**
  * Server Action de cierre de sesion. **Contrato congelado** (`design.md > 3`): la
@@ -11,5 +11,5 @@ import { endSession } from '@/lib/modules/identity/adapters/driven/session/sessi
  * muerto (R22).
  */
 export async function logoutAction(): Promise<void> {
-  await endSession();
+  await identity.endSession();
 }

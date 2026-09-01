@@ -2,14 +2,15 @@
 
 import { redirect } from 'next/navigation';
 
-import { loginInputSchema, verifyCredentials } from '@/lib/modules/identity';
+import { identity } from '@/lib/composition';
+import { loginInputSchema } from '@/lib/modules/identity';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
   PASSWORD_TOO_LONG_ERROR,
   REQUIRED_FIELD_ERROR,
   type LoginFormState,
-} from '@/lib/types/auth';
+} from './login-form-state';
 
 function readField(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -65,7 +66,7 @@ export async function loginAction(
     };
   }
 
-  const result = await verifyCredentials(parsed.data);
+  const result = await identity.verifyCredentials(parsed.data);
 
   if (!result.ok) {
     return {

@@ -3,7 +3,10 @@ import userEvent from '@testing-library/user-event';
 import type { MockInstance } from 'vitest';
 
 import { LoginForm } from '@/app/(public)/login/components';
-import { GENERIC_CREDENTIALS_ERROR, type LoginFormState } from '@/lib/types/auth';
+import {
+  GENERIC_CREDENTIALS_ERROR,
+  type LoginFormState,
+} from '@/lib/modules/identity/adapters/driving/login-form-state';
 
 /**
  * Regresion del aviso de Base UI:
@@ -23,7 +26,7 @@ const { loginActionMock } = vi.hoisted(() => ({
     vi.fn<(prevState: LoginFormState, formData: FormData) => Promise<LoginFormState>>(),
 }));
 
-vi.mock('@/lib/actions/login', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/login-action', () => ({
   loginAction: loginActionMock,
 }));
 

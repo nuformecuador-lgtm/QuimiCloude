@@ -51,7 +51,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
   usePathname: usePathnameMock,
 }));
 
-vi.mock('@/lib/actions/logout', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
   logoutAction: logoutActionMock,
 }));
 
@@ -61,9 +61,11 @@ vi.mock('next/headers', () => ({
 
 // R16: el proveedor de sesion se sustituye por completo para poder afirmar que el layout
 // pinta **lo que el proveedor devuelve**, y no un valor cualquiera.
-vi.mock('@/lib/modules/identity/adapters/driven/session/session-stub', () => ({
-  getSessionUser: getSessionUserMock,
-  endSession: vi.fn<() => Promise<void>>(),
+vi.mock('@/lib/composition', () => ({
+  identity: {
+    getSessionUser: getSessionUserMock,
+    endSession: vi.fn<() => Promise<void>>(),
+  },
 }));
 
 const RUTA_SIN_COINCIDENCIA = '/ruta-que-no-esta-en-la-navegacion';

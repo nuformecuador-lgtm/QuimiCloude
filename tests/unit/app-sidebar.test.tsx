@@ -32,7 +32,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 // El pie de usuario se monta dentro de la barra: sin este mock, el `<form>` del logout
 // intentaria ejecutar la Server Action real.
-vi.mock('@/lib/actions/logout', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
   logoutAction: logoutActionMock,
 }));
 
