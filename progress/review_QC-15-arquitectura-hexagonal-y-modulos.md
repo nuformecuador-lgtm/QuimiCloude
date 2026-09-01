@@ -272,3 +272,186 @@ lo correcto. Se anota porque el encargo pedia juzgarlo explicitamente.
 Los menores 2 y 3 no son suyos: son del leader.
 
 **Veredicto final: RECHAZADO** (2 bloqueantes).
+
+---
+
+# RONDA 2 (2026-09-01) — verificacion de la correccion
+
+Commits nuevos desde la ronda 1: `7e2b160` (implementer: los dos mayores mas los menores
+1, 4 y 5), `54a460e` (leader: menores 2 y 3). `f642e6f` ya estaba revisado.
+
+**Veredicto de la ronda 2: APROBADO.** 0 mayores nuevos, 3 menores nuevos. Los dos
+bloqueantes de la ronda 1 estan cerrados y el arreglo es **general, no puntual**.
+
+## Mayor 1 — CERRADO. El arreglo es estructural, no un parche a mis seis casos
+
+No me limite a repetir mis violaciones. Primero lei como quedo el mecanismo y despues
+invente formas que el implementer no podia anticipar.
+
+**Lo que cambio, y es lo correcto:** ya no existe una funcion de regla que reciba el texto
+del especificador y decida. Todas reciben ahora un `ImportTarget`
+(`guard-arquitectura-modulos.test.ts:227`), que es el destino **ya resuelto**, y la
+resolucion se hace una sola vez por (archivo, especificador) al construir `allSourceFiles`
+(`resolvedTargets`, lineas 699-705). Las firmas de `findCrossModuleDeepImportFinding`,
+`findDrivenImportOutsideComposition`, `findDrivingImportInsideComposition`,
+`findUiLayerImportFinding`, `findClientForbiddenImportFinding`, `findSharedImportFinding` y
+`findPrismaClientImportFinding` cambiaron para exigirlo: no es que se hayan anadido casos,
+es que **ya no se puede escribir la regla mirando el texto**. `findPrismaClientImportFinding`
+pasa del regex sobre el especificador a `target.relPath === 'lib/shared/db/prisma.ts'`, que
+es la forma canonica.
+
+**Barrido de comparaciones de cadena que quedan** (pregunta 1 del encargo). Grep de
+`startsWith('@/`, `startsWith('../`, `test(specifier)` y `specifier ===` en todo el
+archivo: solo aparecen en las lineas 246-249, 348-349 y 372, que son **los resolvedores**
+(`classifyImportTarget`, `resolveInternalSpecifier`, `collectTransitiveClosure`) — ahi
+mirar el texto es su trabajo. Queda **una** fuera de ellos: linea 399,
+`if (!spec.startsWith('./domain'))` en `findContractLeakage` (bloque 6, R10). Es real y la
+detallo en el menor 7: es el unico sitio donde el defecto de la ronda 1 sobrevive.
+
+**Violaciones nuevas, inventadas por mi, ejecutadas contra el repo real** (todas
+revertidas, `git status` limpio al terminar):
+
+| # | Forma | Regla | Resultado |
+| --- | --- | --- | --- |
+| 1 | `logout-action.ts` (driving) -> `'./../driven/session/session-stub'` (relativa con `./` redundante) | R11 | ROJO |
+| 2 | `nav-user.tsx` (`'use client'`) -> `'@/lib/composition/index'` (segmento `index` explicito) | R14 | ROJO |
+| 3 | `app/(private)/layout.tsx` -> `'../../lib/modules/identity/domain/session-user'` (relativa desde `app/`) | R13 | ROJO |
+| 4 | `lib/shared/routes.ts` -> `'../composition'` (relativa corta, distinta de la de la ronda 1) | R15 | ROJO |
+| 5 | `password-hash.ts` (driven) -> `'../../../../../composition'` (relativa de cinco saltos) | 5.1 fila driven | ROJO |
+| 6 | `lib/composition/index.ts` -> `'@/components/private/nav-user'` | 5.1 fila composicion | ROJO |
+| 7 | `app/(private)/layout.tsx` -> `'@/lib/shared/db/prisma.ts'` (extension `.ts` explicita) | R17 | ROJO |
+| 8 | `nav-user.tsx` -> `import('@/lib/composition')` **dinamico**, no estatico | R14 | ROJO |
+
+Ocho de ocho. Los mensajes citan el especificador tal como se escribio, asi que siguen
+siendo utiles para localizar la linea.
+
+**Un noveno caso, el de mayusculas** (`'@/lib/Modules/identity/adapters/driven/...'` desde
+`app/`): la guardia **no lo ve** —`moduleOfPath` exige `lib/modules/` en minusculas y en
+Windows el `statSync` resuelve la ruta con la casing equivocada—, pero **`pnpm run typecheck`
+si**: `error TS1149: File name '...lib/Modules/...' differs from already included file name
+'...lib/modules/...' only in casing`. Lo comprobe ejecutandolo. Como typecheck es parte del
+gate y en Linux el sistema de archivos es sensible a mayusculas, no lo cuento como
+hallazgo; queda anotado por si algun dia el import con casing rara es el unico del archivo
+(entonces TS calla y la guardia tambien).
+
+## Mayor 2 — CERRADO. Bloque 13 cubre las tres filas enteras, no solo mis tres celdas
+
+El implementer no toco `docs/architecture.md`: lo que hizo fue **hacer verdadera la frase**
+del documento anadiendo el bloque 13 (`findDrivenForbiddenImportFinding`,
+`findDrivingForbiddenImportFinding`, `findCompositionForbiddenImportFinding`, lineas
+596-672). Verificada la tabla de `design.md > 5.1` celda por celda:
+
+| Fila | Celdas "NO PUEDE" | Quien las cubre hoy |
+| --- | --- | --- |
+| `domain/**`, `ports/**` | todas | bloque 4 |
+| `adapters/driven/**` | `lib/composition` / `../driving/**` propio / `app/**` / `components/**` / otro modulo profundo | bloque 13 (las cuatro primeras) + bloque 5 |
+| `adapters/driving/**` | `@prisma/client` / cliente Prisma compartido / `../driven/**` / `domain`-`ports` propios profundos / otro modulo profundo | bloque 13 + bloque 11 + bloque 7 + bloque 5 |
+| `lib/composition/**` | `*/adapters/driving/**` / `app/**` / `components/**` | bloque 7 (R12) + bloque 13 |
+| `lib/shared/**` | todas | bloque 9 |
+| `app/**` | todas | bloque 8 |
+| `components/**`, `hooks/**`, `'use client'` | todas | bloque 8 + bloque 11 |
+
+No queda ninguna celda en el papel. Ademas el bloque 13 trae su propio test de lo que la
+fila **SI permite** (lineas 1416-1524: driven -> su domain, `@prisma/client`, cliente
+compartido, barrel de otro modulo; driving -> composicion, su barrel, su carpeta,
+`next/*`, `lib/shared`; composicion -> barrel, ports, driven, shared), que es justo la
+comprobacion de falsos positivos que pedia el encargo.
+
+**Falsos positivos nuevos: ninguno.** Ademas de esos casos simetricos, la suite completa
+esta verde con el repo real (43 tests de la guardia, y el `./init.sh` del leader con 214),
+y el codigo real ejercita las rutas legitimas: `session-stub.ts` importa
+`../../../domain/session-user` (relativa, misma capa hacia adentro) y no dispara nada;
+`login-action.ts` importa `./login-form-state` y `@/lib/composition` y tampoco.
+
+## Menores de la ronda 1: estado
+
+| # | Menor | Estado |
+| --- | --- | --- |
+| 1 | sentinel de barrido no vacio | **parcial** — ver menor 8 |
+| 2 | `.claude/agents/backend_dev.md` | **cerrado** (`54a460e`): la seccion pasa a "Modulos hexagonales (OBLIGATORIO)", dice explicitamente que `lib/services|repositories|interfaces` ya no existen y que crearlas pone el gate en rojo, y remite a la tabla de dependencias antes de escribir el primer archivo |
+| 3 | `CHECKPOINTS.md` | **cerrado** (`54a460e`): ver abajo |
+| 4 | driven consumiendo su propio barrel | **cerrado**: `session-stub.ts:1` pasa a `import type { SessionUser } from '../../../domain/session-user'` |
+| 5 | mensaje del bloque 12 | **cerrado**: el mensaje y el comentario dicen ahora "menciona 'x' (R19)", sin "como vigente" — la regla y el mensaje coinciden |
+| 6 | `hasher` en `NON_COLUMN_SUFFIXES` | **intacto**: `git diff 32d1f52..HEAD -- tests/guards/guard-password-never-plaintext.test.ts` vacio. La entrada, su linea de documentacion y los casos `passwordHasher`/`password_hasher` permitidos y `hasher_password` prohibido siguen igual. Sigue pareciendome legitimo |
+
+### Sobre `CHECKPOINTS.md` (pregunta del leader): me sirve, con una sugerencia
+
+La seccion "Modulos hexagonales" es revisable tal cual: cada punto es una propiedad que
+puedo comprobar leyendo el diff, y el ultimo punto —"la logica de negocio esta en
+`domain/`, no en la Server Action. **Esto la guardia no lo comprueba**"— es exactamente lo
+que necesita un reviewer: le dice donde la maquina no llega y tiene que mirar una persona.
+
+Lo unico que anadiria: un punto para la **forma positiva de R5**, que hoy solo esta en
+negativo ("no reaparecen `lib/services/`..."). Algo como: *en la raiz de `lib/` solo hay
+`modules/`, `shared/`, `composition/` y `utils.ts`; codigo de negocio nuevo cuelga de un
+modulo, no de `lib/`*. Sin eso, un `lib/helpers/` o un `lib/dominio/` nuevo pasa el
+checklist (la guardia tampoco lo ve: `FORBIDDEN_LIB_DIRS` es una lista negra de siete
+nombres, no una lista blanca de cuatro). No es de esta feature; es el sitio natural donde
+lo veria el proximo reviewer.
+
+## Hallazgos nuevos de la ronda 2
+
+### menor 7 — El bloque 6 (R10) es el unico que sigue decidiendo sobre el texto del especificador
+
+`guard-arquitectura-modulos.test.ts:399`, en `findContractLeakage`:
+`if (!spec.startsWith('./domain')) { ...fuera de ./domain (R10) }`. Es la ultima
+comparacion de cadena que queda fuera de los resolvedores, y tiene los dos sintomas del
+defecto de la ronda 1:
+
+- **Falso negativo, demostrado.** Anadido a `lib/modules/identity/index.ts`:
+  `export { DASHBOARD_ROUTE } from './domain/../../../shared/routes';`. El contrato pasa a
+  reexportar un simbolo que **no es de su dominio**, que es literalmente lo que R10
+  prohibe. Resultado: **43/43 verde**. El especificador empieza por `./domain`, asi que la
+  comprobacion lo da por bueno; el cierre transitivo tampoco dice nada porque
+  `lib/shared/routes.ts` no arrastra `next/*`, Prisma ni `'use server'`.
+- **Falso positivo.** `export type { SessionUser } from '@/lib/modules/identity/domain/session-user'`
+  dentro del propio `index.ts` es un reexport de su **propio** `domain/` —cumple R10— y la
+  guardia lo marca: `reexporta '@/lib/modules/identity/domain/session-user', fuera de
+  ./domain (R10)`. Comprobado ejecutandolo.
+
+Por que no lo subo a mayor: la version *natural* de la violacion si se detecta
+(`export ... from '@/lib/shared/routes'` o `'../../shared/routes'` no empiezan por
+`./domain` y disparan), y el camuflaje requiere escribir `./domain/../..` a proposito.
+Ademas hay defensa en profundidad: probe tambien
+`export { createPasswordHash } from './domain/../adapters/driven/security/password-hash'` y
+**si sale rojo**, aunque no por el bloque 6 sino por el 7 (R11), que ya resuelve la ruta.
+El arreglo es el mismo que se aplico a los demas: resolver el especificador y comprobar que
+el destino cae en `lib/modules/<mismo modulo>/domain/`.
+
+### menor 8 — El sentinel de barrido no vacio llego a seis bloques de siete
+
+`expect(allSourceFiles.length).toBeGreaterThan(0)` esta en los bloques 5, 7, 8, 9, 11 y 13.
+**Falta en el bloque 4** (linea 819, `ningun archivo real de domain/ports importa algo
+prohibido`), que itera `allSourceFiles` igual que los demas. Es el bloque que cubre R7 y
+R8, o sea la pureza del dominio: si el barrido quedara vacio, saldria verde sin mirar nada.
+Una linea.
+
+### menor 9 — Dos reglas independientes en un mismo `it`: la primera que falla tapa a la segunda
+
+Bloques 7 (`findingsR11` y `findingsR12`), 8 (`findingsR13` y `findingsR14`) y 13 (tres
+arrays). Al ser `expect` consecutivos en el mismo `it`, el primero que falla aborta y el
+resto no se evalua. Lo vi en vivo: en mi primera tanda de seis violaciones, la de R13 tapo
+la de R14 y tuve que volver a correrla aislada para saber si R14 disparaba (dispara). No
+afecta a la deteccion —el archivo se pone rojo igual—, pero al que arregla el rojo le
+oculta la mitad del diagnostico. Un `it` por regla, o acumular los hallazgos en un solo
+array antes de afirmar.
+
+## Verificacion ejecutada en esta ronda
+
+- `pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts` sobre el arbol
+  limpio: **43/43 verde** (39 -> 43 tests; el archivo pasa de 1084 a 1527 lineas).
+- Once experimentos de violacion introducidos y revertidos uno a uno; `git status --short`
+  vacio al terminar cada uno y al cerrar la ronda.
+- `pnpm run typecheck` una vez, para el caso de las mayusculas.
+- No repeti `./init.sh`: lo corrio el leader (22 archivos / 214 tests, verde) y ningun
+  hallazgo de esta ronda toca produccion. Los 4 tests nuevos de la guardia explican
+  exactamente el salto de 210 a 214.
+
+## Veredicto ronda 2
+
+**APROBADO.** Los dos bloqueantes estan cerrados con un arreglo estructural que resiste
+formas de escribir el import que nadie le habia ensenado. Quedan tres menores (7, 8 y 9),
+ninguno bloqueante: el 7 es el mismo tratamiento aplicado al ultimo bloque que se quedo
+fuera, y el 8 y el 9 son una linea cada uno. Recomiendo cerrarlos en esta feature si el
+leader los ve baratos, o anotarlos como deuda con nombre en `progress/current.md`; no
+justifican otra ronda de revision.

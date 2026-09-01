@@ -48,6 +48,10 @@ esta lista.
 - [ ] Todo modelo de `db/schema.prisma` tiene `/// @module`, y ningun modulo consulta un
       modelo ajeno.
 - [ ] No reaparecen `lib/services/`, `lib/repositories/` ni `lib/interfaces/`.
+- [ ] En la raiz de `lib/` solo hay `modules/`, `shared/`, `composition/` y `utils.ts`. Todo
+      codigo de negocio nuevo cuelga de un modulo, no de `lib/`. **La guardia tampoco lo
+      comprueba**: prohibe siete nombres concretos, no todo lo que no sea esos cuatro, asi
+      que un `lib/helpers/` o un `lib/dominio/` nuevo pasa en verde.
 - [ ] La logica de negocio esta en `domain/`, no en la Server Action. **Esto la guardia no
       lo comprueba**: un caso de uso que solo llama al adaptador y devuelve pasa en verde y
       esta mal.
