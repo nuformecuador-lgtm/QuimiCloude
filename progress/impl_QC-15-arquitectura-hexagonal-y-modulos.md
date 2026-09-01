@@ -757,3 +757,173 @@ lint, tests) y no bloquea T8.
 **Hecho cuando (tasks.md > T8):** cumplido — los tests de schema siguen en verde sin
 tocarlos y `git diff db/` son exactamente tres lineas.
 
+---
+
+## T9 — La guardia ejecutable de arquitectura (2026-09-01)
+
+### Que se creo
+
+`tests/guards/guard-arquitectura-modulos.test.ts`, con los **12 bloques** de
+`design.md > 11` y **39 tests**. Mismo patron que las guardias existentes:
+`findRepoRoot`, funciones puras exportadas, barrido del arbol con `readdirSync`/
+`statSync` (ignorando `node_modules`, `.next`, `.git`, `.prisma`, `dist`,
+`.worktrees`), rutas comparadas en POSIX. Cada bloque tiene: (a) una `it` sobre el repo
+real, (b) al menos una `it` con un fuente SINTETICO que viola la regla (R21), y (c) el
+caso simetrico que NO debe disparar.
+
+Piezas nuevas de infraestructura de la guardia (no existian en las guardias previas):
+
+- **Resolucion de especificadores** (`classifyImportTarget`): resuelve `./x` y `@/...`
+  a una ruta real del repo (probando `.ts`, `.tsx`, `/index.ts`, `/index.tsx`), y
+  clasifica el resultado como paquete externo (hoja) o archivo interno.
+- **Cierre TRANSITIVO** (`collectTransitiveClosure`, bloque 6): BFS sobre imports
+  internos con un `Set` de visitados contra ciclos; cada paquete externo encontrado es
+  una hoja, no se sigue. Recibe un `tryRead` inyectado, asi que los tests sinteticos de
+  este bloque no tocan el disco: usan un `Map` en memoria.
+- **Lector de propiedad de modelos** (`extractModelOwners`, bloque 10): lee
+  `db/schema.prisma` linea a linea y, para cada `model X {`, sube por el bloque de
+  comentarios `///` inmediatamente anterior buscando `@module <m>`.
+
+Un matiz de diseño no explicitado literalmente en `design.md > 5.1` que hizo falta
+decidir: el bloque 5 (R9, "nadie importa las tripas de otro modulo") **solo aplica a
+archivos que ellos mismos pertenecen a un modulo** (`lib/modules/<m>/**`), no a
+`app/`, `components/`, `hooks/` ni `lib/composition/`. La lectura literal de R9
+("SI un archivo de cualquier modulo importa de otro modulo...") lo confirma, y la
+tabla de la seccion 5.1 lo exige en la practica: `lib/composition/**` **debe** poder
+llegar a `*/ports/**` y `*/adapters/driven/**` de cualquier modulo (bloque 7, R11), y
+la UI **debe** poder llegar a `*/adapters/driving/**` (bloque 8, R13) — ambas son
+"rutas profundas a otro modulo" con la misma forma de especificador. Sin esta
+restriccion, el bloque 5 marcaba en rojo el propio `lib/composition/index.ts` real
+(7 falsos positivos la primera vez que corri la guardia contra el repo). Los bloques 7
+y 8 cubren esos casos con sus propias reglas, mas permisivas donde corresponde.
+
+### Mensajes
+
+Cada hallazgo cita su `R<n>`, formato pedido por el encargo, p. ej.:
+`lib/modules/identity/domain/credentials.ts importa el cliente Prisma compartido
+'@/lib/shared/db/prisma' fuera de un adaptador driven (R17)`.
+
+### `docs/architecture.md` — ajuste necesario para que el bloque 12 (R19) no naciera rojo
+
+El bloque 12 verifica el `docs/architecture.md` REAL del repo (no solo un fuente
+sintetico): que no describa `lib/services/`, `lib/repositories/`, `lib/interfaces/` ni
+`lib/actions/` como vigentes, y que mencione `lib/modules/`. Al escribir la guardia,
+el documento (tal como quedo de `dev`, T10 aun sin correr) SI las describia como
+vigentes (`## Patron de capas: Controller -> Service -> Repository`, `## Estructura de
+carpetas`, la tabla de Server Actions...), asi que el bloque 12 nacia en rojo contra el
+repo real — el UNICO rojo tolerado en todo `pnpm run test:guardias` es
+`guard-dependencias-aprobadas.test.ts` por `bcryptjs` (preexistente, ajeno), y esto
+hubiera sido un rojo NUEVO.
+
+Actualice `docs/architecture.md` en las secciones que R19 exige y que `tasks.md > T10`
+ya tenia listadas (arquitectura hexagonal en `## Principios`, la seccion "Patron de
+capas" reemplazada por "## Modulos y arquitectura hexagonal" + "### La regla de
+dependencias" con la tabla de `design.md > 5.1`, el arbol de `## Estructura de
+carpetas`, la tabla de Server Actions, la nota de `/// @module` en `## Migraciones
+up/down`, y los cinco anti-patrones nuevos de `## Anti-patrones`). Esto es contenido
+que T10 iba a escribir de todos modos (su "hecho cuando" es literalmente "el bloque 12
+de la guardia pasa"); lo adelante aqui porque sin el, la verificacion obligatoria de
+T9 (`pnpm run test:guardias` en verde) no se puede cumplir. T10 queda para revisar y
+pulir esta redaccion si hace falta, no para escribirla desde cero.
+
+### R20 — seleccion por `pnpm run test:guardias`
+
+```
+$ pnpm run test:guardias
+ RUN  v4.1.10 ...
+ ❯ tests/guards/guard-dependencias-aprobadas.test.ts (2 tests | 1 failed)  <- PREEXISTENTE (bcryptjs)
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 54 passed (55)
+```
+
+5 archivos de guardia seleccionados (antes eran 4): `test:guardias` es
+`vitest run guard --passWithNoTests`, que casa por el nombre del archivo, y
+`guard-arquitectura-modulos.test.ts` entra sola sin configuracion adicional. Sus 39
+tests estan entre los 54 en verde.
+
+### Verificacion obligatoria — los TRES rojos provocados
+
+**Rojo 1 — R7/R17/R10, el ejemplo exacto del encargo.** Anadido temporalmente
+`import { prisma } from '@/lib/shared/db/prisma';` en
+`lib/modules/identity/domain/credentials.ts`:
+
+```
+$ pnpm run test:guardias
+ FAIL bloque 4 > ningun archivo real de domain/ports importa algo prohibido
+   AssertionError: expected [ Array(1) ] to deeply equal []
+   + [ "lib/modules/identity/domain/credentials.ts importa '@/lib/shared/db/prisma' de lib/shared (R7)" ]
+
+ FAIL bloque 6 > los contratos reales (identity, inventario) no arrastran servidor
+   AssertionError: expected [ Array(1) ] to deeply equal []
+   + [ "lib/modules/identity/index.ts arrastra '@prisma/client' transitivamente (R10)" ]
+
+ FAIL bloque 11 > nadie fuera de adapters/driven, scripts o tests importa el cliente Prisma compartido
+   AssertionError: expected [ Array(1) ] to deeply equal []
+   + [ "lib/modules/identity/domain/credentials.ts importa el cliente Prisma compartido '@/lib/shared/db/prisma' fuera de un adaptador driven (R17)" ]
+
+ Test Files  2 failed | 3 passed (5)
+      Tests  4 failed | 51 passed (55)   (el 4to es el bcryptjs preexistente)
+```
+
+Un solo import roto pone en rojo TRES bloques distintos (domain puro, contrato limpio
+por arrastre transitivo, y cliente Prisma restringido), exactamente porque
+`credentials.ts` esta detras del barrel `identity/index.ts` que consume el cierre
+transitivo del bloque 6. Revertido con `git checkout -- lib/modules/identity/domain/credentials.ts`
+(confirmado `git diff` vacio despues).
+
+**Rojo 2 — R16, modelo sin `/// @module`.** Borrado temporalmente el comentario
+`/// @module identity` que precede a `model Role {` en `db/schema.prisma`:
+
+```
+$ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts --reporter=verbose
+ FAIL bloque 10 > todo modelo del esquema real declara su modulo propietario
+   AssertionError: expected [ Array(1) ] to deeply equal []
+   + [ "db/schema.prisma: el modelo 'Role' no declara '/// @module' (R16)" ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+```
+
+Revertido restaurando la linea `/// @module identity` (confirmado `git diff db/schema.prisma` vacio despues).
+
+**Rojo 3 — R13, el ejemplo exacto del encargo.** Anadido temporalmente
+`import type { LoginInput } from '@/lib/modules/identity/domain/credentials';` en
+`components/private/app-sidebar.tsx`:
+
+```
+$ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts --reporter=verbose
+ FAIL bloque 8 > app/, components/ y hooks/ del repo solo consumen el contrato o un adaptador driving
+   AssertionError: expected [ Array(1) ] to deeply equal []
+   + [ "components/private/app-sidebar.tsx importa '@/lib/modules/identity/domain/credentials' saltandose el contrato del modulo (R13)" ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+```
+
+Revertido con `git checkout -- components/private/app-sidebar.tsx` (confirmado
+`git diff` vacio despues).
+
+### Cierre, arbol limpio
+
+```
+$ git status --short
+ M docs/architecture.md
+?? tests/guards/guard-arquitectura-modulos.test.ts
+(specs/QC-15-.../ ya estaba sin trackear, ajeno a esta task)
+
+$ pnpm run typecheck   -> OK, cero errores
+$ pnpm run lint        -> OK, cero errores
+$ pnpm run test:guardias
+ Test Files  1 failed | 4 passed (5)   <- el 1 failed es SOLO guard-dependencias-aprobadas (bcryptjs, preexistente)
+      Tests  1 failed | 54 passed (55)
+```
+
+**Hecho cuando (tasks.md > T9):** cumplido. `pnpm run test:guardias` en verde salvo el
+rojo preexistente y tolerado; los 3 rojos provocados demuestran que cada regla
+mencionada en el encargo dispara con su mensaje citando el `R<n>`; `docs/architecture.md`
+se ajusto lo minimo indispensable para que el bloque 12 (R19) no anadiera un rojo
+nuevo — la reescritura completa y pulida de `docs/architecture.md` la cierra T10.
+
+**Veredicto: T9 cumplida.** 12 bloques, 39 tests, seleccion por `pnpm run test:guardias`
+confirmada, 3 rojos provocados y revertidos con evidencia literal pegada arriba.
+

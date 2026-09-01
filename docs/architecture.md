@@ -65,7 +65,7 @@ Conviene cerrarlas antes de la primera feature de inventario o de producto, no d
 - **API externa/webhooks:** Route handlers en `app/api/` con zod + firma/idempotencia.
 - **Deploy:** Vercel. Secretos en variables de entorno, nunca en repo.
 - **Integraciones externas:** ninguna definida todavia. Cuando entre la primera, se
-  documenta aqui con su cliente en `lib/interfaces/external/`.
+  documenta aqui con su cliente en `lib/modules/<modulo>/adapters/driven/`.
 
 ## Dependencias de terceros
 
@@ -110,8 +110,11 @@ sitio, por qué está cada cosa. La regla es preventiva: la fijó el humano el 2
 ningún incidente previo que la motive.
 
 ## Principios
-1. **Separacion de capas.** Controller, Service, Repository con interfaces. La logica
-   de negocio vive en servicios testeables, separada de HTTP y de la DB.
+1. **Arquitectura hexagonal por modulos.** El codigo de negocio vive en
+   `lib/modules/<modulo>/`, separado en dominio, puertos y adaptadores. La dependencia
+   va siempre hacia adentro (`app/components -> composicion -> adaptadores driven ->
+   puertos -> dominio`); el dominio no conoce framework, DB ni composicion. Ver
+   `## Modulos y arquitectura hexagonal`.
 2. **Borde tipado.** Toda entrada externa (request, webhook, respuesta de API) se
    valida y se tipa en el borde con zod. Nada de `any` cruzando la frontera.
 3. **Idempotencia en webhooks.** Un mismo evento entrante no debe producir efectos
@@ -123,78 +126,125 @@ ningún incidente previo que la motive.
 6. **La autorizacion vive en el service, no en la base.** Un permiso que solo existe
    como policy de RLS no protege a esta aplicacion (ver la seccion siguiente).
 
-## Patron de capas: Controller → Service → Repository
+## Modulos y arquitectura hexagonal
+
+El codigo de negocio vive en `lib/modules/<modulo>/`, no en carpetas horizontales por
+tipo tecnico. Cada modulo tiene exactamente tres piezas mas un contrato:
 
 ```
-app/api/<recurso>/route.ts           ← Controller (capa HTTP)
-  ↓ llama a (via interfaz)
-lib/services/<Recurso>Service.ts     ← Service (logica de negocio)
-  ↓ llama a (via interfaz)
-lib/repositories/<Recurso>Repo.ts    ← Repository (acceso a datos, Prisma)
-  ↓
-Supabase (Postgres)
+lib/modules/<modulo>/
+  index.ts                      # CONTRATO PUBLICO: solo reexporta de ./domain
+  domain/                       # logica de negocio pura. No conoce framework ni DB.
+  ports/                        # interfaces que el dominio necesita (PasswordHasher...)
+  adapters/
+    driven/                     # implementan un puerto: Prisma, bcrypt, SDKs externos
+    driving/                    # Server Actions, route handlers: llaman AL modulo
 ```
 
-### Controller (route handler o Server Action)
-- **Route handler** (`app/api/<feature>/route.ts`): recibe Request, parsea/valida con
-  zod, llama al service, devuelve `NextResponse`. No contiene logica de negocio ni
-  queries de DB.
-- **Server Action** (`lib/actions/<feature>.ts`): `'use server'`, recibe datos,
-  lee cookies para permisos, instancia el service, ejecuta, devuelve resultado.
-  Para mutaciones internas, NO crear ruta API y fetchearla desde el cliente.
+- **Dominio** (`domain/`): casos de uso y tipos. Solo puede importar de su propio
+  `domain/`/`ports/`, el contrato (`index.ts`) de otro modulo, y paquetes puros (hoy:
+  `zod`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
+  `app/`, `components/` ni las tripas de otro modulo.
+- **Puertos** (`ports/`): la superficie hacia adentro. Los implementa el adaptador
+  driven correspondiente y los cablea el punto de composicion. Nadie mas los importa.
+- **Adaptador driven**: detalle tecnico detras de un puerto (Prisma, bcrypt, un SDK).
+  Es el unico lugar del modulo que puede tocar `@prisma/client` o el cliente Prisma
+  compartido.
+- **Adaptador driving**: lo que consume la UI (`'use server'` en Server Actions, o un
+  route handler). Llama al modulo ya cableado via `lib/composition`.
+- **Contrato** (`index.ts`): la unica puerta de entrada al modulo desde fuera. Solo
+  reexporta simbolos de `./domain`, nunca de `adapters/` ni `ports/`. Debe poder
+  importarse desde un componente de cliente sin arrastrar servidor: nada de
+  `'use server'`, `@prisma/client` ni `next/*` en su cierre transitivo de imports.
+  **Excepcion:** los adaptadores driving (`'use server'`) NO pasan por el barrel; la UI
+  los importa por su ruta exacta (`@/lib/modules/<m>/adapters/driving/...`), porque un
+  barrel mezclaria ese codigo de servidor con el contrato puro y lo arrastraria al
+  cliente.
 
-### Service (`lib/services/`)
-- Logica de negocio pura. Sin dependencia de HTTP (Request/Response/headers) ni
-  de DB directamente. Recibe repositorios y clientes externos por constructor
-  (inyeccion de dependencias via interfaces).
-- Testeable sin DB ni HTTP.
+### Punto unico de composicion (`lib/composition/`)
 
-### Repository (`lib/repositories/`)
-- Acceso a datos. Solo Prisma queries. Sin logica de negocio ni validacion de
-  permisos (eso va en el service o controller). Implementa `IRepository`.
+`lib/composition/index.ts` es el **unico** archivo del repositorio (fuera de `tests/` y
+`scripts/`) que puede importar un adaptador driven de cualquier modulo. Aqui, y solo
+aqui, se elige que implementacion concreta cumple cada puerto. Prohibido en sentido
+contrario: `lib/composition/` nunca importa un adaptador driving (la flecha va
+driving -> composicion, nunca al reves, para que no haya ciclo).
 
-### Interfaces (`lib/interfaces/`)
-- Un archivo por interfaz. Centralizadas y separadas por categoria:
-  `interfaces/services/`, `interfaces/repositories/`, `interfaces/external/`.
-- Permiten mockear en tests y cambiar implementaciones sin tocar servicios.
+```ts
+// lib/composition/index.ts
+import { verifyCredentials } from '@/lib/modules/identity';
+import { createPasswordHash, verifyPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import type { PasswordHasher } from '@/lib/modules/identity/ports/password-hasher';
+
+const passwordHasher: PasswordHasher = { hash: createPasswordHash, verify: verifyPasswordHash };
+export const identity = { verifyCredentials, passwordHasher /* ... */ } as const;
+```
+
+Una Server Action, una ruta o un layout consumen el modulo asi: `import { identity }
+from '@/lib/composition'`. Un componente de cliente **nunca** importa la composicion ni
+un adaptador driven: recibe datos por props y llama a la Server Action por su ruta.
+
+### La regla de dependencias
+
+`M` y `N` son modulos distintos. La hace cumplir
+`tests/guards/guard-arquitectura-modulos.test.ts`.
+
+| Origen | PUEDE importar | NO PUEDE importar |
+| --- | --- | --- |
+| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
+| `lib/modules/M/adapters/driven/**` | `../../domain`, `../../ports`, `lib/shared/**`, `@prisma/client`, SDKs externos, `@/lib/modules/N` (barrel) | `lib/composition`, `../driving/**`, `app/**`, `components/**`, `lib/modules/N/**` (profundo) |
+| `lib/modules/M/adapters/driving/**` | `lib/composition`, `@/lib/modules/M` (barrel), su propia carpeta, `next/*`, `react*`, `lib/shared/**` | `@prisma/client`, el cliente Prisma compartido, `../driven/**`, `../../domain`/`../../ports` por ruta profunda |
+| `lib/composition/**` | `@/lib/modules/*` (barrel), `*/ports/**`, `*/adapters/driven/**`, `lib/shared/**` | `*/adapters/driving/**`, `app/**`, `components/**` |
+| `lib/shared/**` | paquetes npm, otros `lib/shared/**` | `lib/modules/**`, `lib/composition` |
+| `app/**` (servidor) | `lib/composition`, `@/lib/modules/M` (barrel), `.../adapters/driving/**`, `lib/shared/**`, `components/**`, `hooks/**` | `.../domain/**`, `.../ports/**`, `.../adapters/driven/**` |
+| `components/**`, `hooks/**`, archivos `'use client'` | `@/lib/modules/M` (barrel), `.../adapters/driving/**`, `lib/shared/ui/**`, `lib/shared/routes`, `@/lib/utils` | ademas de lo anterior: `lib/composition`, `lib/shared/db/**` |
+| `tests/**`, `scripts/**` | todo | — (exentos) |
+
+**Direccion, en una frase:** hacia adentro. `app/components -> composicion -> adaptadores
+driven -> puertos -> dominio`, y el dominio no mira a nadie.
 
 ## Estructura de carpetas
 
 ```
-app/                            # Rutas y paginas (App Router)
-  api/                          # Route handlers (controladores)
-  (marketing)/                  # Paginas publicas
-  (dashboard)/                  # Paginas autenticadas
+app/                            # Rutas y paginas (App Router). SIN CAMBIOS de ubicacion.
+  api/                          # Route handlers (webhooks, API publica)
+  (public)/                     # Paginas publicas (login...)
+  (private)/                    # Paginas autenticadas
   <ruta>/
     page.tsx                    # solo archivos del App Router en la raiz de la ruta
     components/                 # componentes propios de esa ruta
       index.ts                  # barrel: reexporta TODOS (ver ## Componentes)
 lib/
-  interfaces/                   # Contratos centralizados
-    services/                   # IService.ts
-    repositories/               # IRepository.ts
-    external/                   # Clientes de terceros: IEmailProvider.ts, IStorageClient.ts...
-  services/                     # Logica de negocio
-  repositories/                 # Acceso a datos (Prisma)
-  actions/                      # Server Actions ('use server')
-  supabase/                     # Cliente y helpers de Supabase
-  types/                        # Tipos de dominio + schemas zod
-  utils/                        # Helpers puros (sin side effects)
+  utils.ts                      # `cn`. Fijado por components.json: NO se mueve.
+  modules/
+    <modulo>/
+      index.ts                  # CONTRATO: solo reexporta de ./domain
+      domain/                   # casos de uso y tipos, puros
+      ports/                    # interfaces que implementan los adaptadores driven
+      adapters/
+        driven/                 # Prisma, bcrypt, SDKs externos
+        driving/                # Server Actions ('use server'), route handlers
+  composition/
+    index.ts                    # PUNTO UNICO DE COMPOSICION
+  shared/                       # nucleo compartido: HOJA del grafo, no conoce modulos
+    routes.ts
+    db/prisma.ts                # instancia unica de PrismaClient
+    navigation/
+    ui/
 components/
   ui/                           # Primitivas shadcn/ui (Button, Input, Card...)
   shared/                       # Compuestos reutilizables (DataTable, FormField...)
   private/                      # Componentes con datos sensibles (datos via props)
 hooks/                          # React hooks reutilizables
-providers/                      # Context providers
 db/
-  schema.prisma                 # Esquema de Prisma
+  schema.prisma                 # Esquema de Prisma. Cada modelo declara `/// @module <m>`
   migrations/                   # Migraciones versionadas, cada una con:
     20250101000000_init/
       migration.sql             # UP
       down.sql                  # DOWN (OBLIGATORIO)
 tests/
-  unit/                         # Services y repositories (mockeando DB)
-  integration/                  # Controllers + DB de test
+  guards/                       # Guardias ejecutables (arquitectura, RLS, contrasenas...)
+  unit/                         # Dominio, adaptadores y componentes (mockeando DB)
+  integration/                  # Constraints de DB de test
 e2e/                            # Playwright (flujos criticos)
 scripts/
   db-rollback.ts                # Script de rollback (aplica down.sql)
@@ -255,7 +305,7 @@ Supabase.
 ## Server Actions vs Route Handlers
 | Caso | Usar |
 | --- | --- |
-| Mutacion desde un componente propio | Server Action (`lib/actions/`) |
+| Mutacion desde un componente propio | Server Action (`lib/modules/<m>/adapters/driving/`) |
 | Webhook de un tercero | Route Handler (`app/api/`) |
 | API publica para terceros | Route Handler (`app/api/`) |
 | Cron interno | Route Handler (`app/api/`) |
@@ -273,6 +323,14 @@ db/migrations/<timestamp>_<nombre>/
   migration.sql    ← UP: lo genera Prisma
   down.sql         ← DOWN: manual, revierte exactamente migration.sql
 ```
+
+Cada modelo lleva encima un comentario de documentacion `/// @module <modulo>` que
+declara su modulo propietario (arquitectura hexagonal por modulos, ver
+`## Modulos y arquitectura hexagonal`). Un modelo sin ese comentario es un
+incumplimiento: es lo que evita que un modulo nuevo anada tablas sin dueño. Solo los
+adaptadores driven del modulo propietario pueden consultar ese modelo con Prisma; la
+guardia `tests/guards/guard-arquitectura-modulos.test.ts` lo hace cumplir leyendo el
+esquema y buscando `prisma.<modelo>` fuera de su modulo.
 
 El schema vive en `db/schema.prisma`, **no** en la ruta por defecto `prisma/schema.prisma`.
 Eso hay que declararlo (campo `prisma.schema` en `package.json` o `prisma.config.ts`) o
@@ -416,3 +474,13 @@ la regla es preventiva, no reactiva.
   aprobación humana (ver `## Dependencias de terceros`).
 - **Utilidad escrita a mano que ya resuelve una librería del stack** (fechas, validación,
   parsing, decimales) sin que el `design.md` explique por qué no se usó.
+- **Import desde el dominio hacia afuera**: `domain/` o `ports/` importando framework,
+  Prisma, `lib/shared/`, `lib/composition`, `app/` o `components/`.
+- **Import a las tripas de otro modulo** saltandose su `index.ts` (ruta profunda a
+  `domain/`, `ports/` o `adapters/` de un modulo que no es el propio).
+- **Cableado de adaptadores fuera de `lib/composition/`**: cualquier archivo que no sea
+  el punto de composicion (o `tests/`/`scripts/`) importando un adaptador driven.
+- **Acceso con Prisma a un modelo de otro modulo**: `prisma.<modelo>` en el adaptador
+  driven de un modulo que no es el propietario declarado en `db/schema.prisma`.
+- **Codigo de negocio nuevo colgando de `lib/`** en vez de vivir dentro de un modulo
+  (`lib/modules/<m>/`).
