@@ -690,3 +690,70 @@ El arbol coincide con `design.md > 2`: `lib/modules/` tiene ahora `identity/` e
 
 **Hecho cuando (tasks.md > T7):** cumplido.
 
+---
+
+## T8 — Propiedad de modelos en el esquema (2026-09-01)
+
+Anadida `/// @module identity` encima de `DocumentType`, `Role` y `User` en
+`db/schema.prisma`, despues del ultimo comentario de documentacion existente de cada
+modelo y antes de la linea `model X {`. Nada mas tocado.
+
+```
+$ git diff db/
+diff --git a/db/schema.prisma b/db/schema.prisma
+index eba77e7..c46050e 100644
+--- a/db/schema.prisma
++++ b/db/schema.prisma
+@@ -18,6 +18,7 @@ generator client {
+ 
+ /// Catalogo del conjunto cerrado de tipos de documento de identidad (design.md > 3).
+ /// No lleva `deletedAt` a proposito: un tipo no se borra, se desactiva con `isActive`.
++/// @module identity
+ model DocumentType {
+   code      String   @id
+   name      String
+@@ -33,6 +34,7 @@ model DocumentType {
+ /// Catalogo de roles. NO lleva `deletedAt` deliberadamente (design.md > 2.2): el
+ /// borrado logico es un UPDATE y una FK no puede bloquear un UPDATE, asi que anadir
+ /// la columna neutralizaria en silencio la unica garantia real de R17.
++/// @module identity
+ model Role {
+   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+   name        String   @unique
+@@ -57,6 +59,7 @@ model Role {
+ /// `tests/unit/schema/identity-migration.test.ts` los vigila. Si alguien anade aqui
+ /// un `@unique`, la unicidad deja de respetar mayusculas/minusculas y el borrado
+ /// logico quema el correo y el documento para siempre.
++/// @module identity
+ model User {
+   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+```
+
+Exactamente **tres lineas anadidas**, ninguna otra tocada: ni campo, ni indice, ni
+`db/migrations/**`.
+
+`tests/unit/identity/schema/*` sin tocar, en verde:
+
+```
+$ pnpm exec vitest run tests/unit/identity/schema --reporter=verbose
+ Test Files  2 passed (2)
+      Tests  27 passed (27)
+```
+
+Es la prueba de que `///` es comentario de documentacion de Prisma y no altera el
+contrato del esquema que esos tests verifican (`identity-schema.test.ts` los quita con
+`stripComments` antes de juzgar, tal como anticipa `design.md > 8`).
+
+```
+$ pnpm run typecheck   -> OK, cero errores
+$ pnpm run lint        -> OK, cero errores
+```
+
+`prisma validate` no se pudo correr en este entorno por falta de `DIRECT_URL` en el
+`.env` local (error `P1012`, preexistente y ajeno al cambio: el mismo fallo ocurre en
+`git stash` sin este diff aplicado). No forma parte del gate de esta task (typecheck,
+lint, tests) y no bloquea T8.
+
+**Hecho cuando (tasks.md > T8):** cumplido — los tests de schema siguen en verde sin
+tocarlos y `git diff db/` son exactamente tres lineas.
+
