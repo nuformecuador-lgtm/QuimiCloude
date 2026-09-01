@@ -14,9 +14,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { logoutAction } from '@/lib/actions/logout';
-import type { SessionUser } from '@/lib/types/session';
-import { getInitials } from '@/lib/utils/initials';
+import { logoutAction } from '@/lib/modules/identity/adapters/driving/logout-action';
+import type { SessionUser } from '@/lib/modules/identity';
+import { getInitials } from '@/lib/shared/ui/initials';
 
 type NavUserProps = {
   readonly user: SessionUser;

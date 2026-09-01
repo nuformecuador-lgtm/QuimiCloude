@@ -17,22 +17,55 @@ Lee: `specs/<feature>/requirements.md`, `design.md`, `tasks.md`,
 - **Validación:** zod en el borde de toda entrada externa (route handlers, webhooks).
 - **Tests:** Vitest para unit + integracion. Playwright para E2E (flujos criticos).
 - **Server Actions:** para mutaciones que no requieren CORS/public API.
+## Dependencias de terceros
+1. Antes de escribir una utilidad (fechas, validacion, parsing, decimales, colas, PDF),
+   comprueba si ya la resuelve una libreria del ecosistema y prefierela.
+2. Antes de proponerla, verifica los cuatro checks: no `deprecated`, release en los ultimos
+   12 meses, >= 10.000 descargas semanales, licencia MIT/Apache-2.0/BSD/ISC.
+3. **No instalas nada tu.** Propon, PARA y devuelve la propuesta con el resultado de los
+   checks. La aprueba un humano y se anota en `docs/dependencias.md`; recien ahi se instala.
+4. Una dependencia en `package.json` que no este en `docs/dependencias.md` tiñe el gate de
+   rojo (`tests/guards/guard-dependencias-aprobadas.test.ts`). Detalle en
+   `docs/architecture.md > Dependencias de terceros`.
 
-## Patron de capas (OBLIGATORIO)
+
+## Modulos hexagonales (OBLIGATORIO)
+
+**`lib/services/`, `lib/repositories/` y `lib/interfaces/` ya no existen.** Eran la
+estructura anterior; el bloque 2 de `tests/guards/guard-arquitectura-modulos.test.ts` las
+prohibe y crear una de ellas pone el gate en rojo.
+
 ```
-app/api/<feature>/route.ts          ← Controller: zod, llama al service, devuelve Response
-lib/services/<Feature>Service.ts    ← Service: logica de negocio, orquesta repos+externos
-lib/repositories/<Feature>Repo.ts   ← Repository: queries Prisma, implementa interfaz
-lib/interfaces/services/I<Feature>Service.ts    ← Contrato del service
-lib/interfaces/repositories/I<Feature>Repo.ts   ← Contrato del repository
+app/api/<feature>/route.ts                        ← borde HTTP: zod, llama al caso de uso
+lib/modules/<modulo>/
+  index.ts                                        ← CONTRATO: solo reexporta de ./domain
+  domain/<caso-de-uso>.ts                         ← logica de negocio. Sin framework, sin DB
+  ports/<Algo>.ts                                 ← interfaz por la que el dominio pide
+  adapters/driven/<algo>.ts                       ← implementacion: Prisma, cripto, SDKs
+  adapters/driving/<accion>.ts                    ← 'use server', route handlers
+lib/composition/index.ts                          ← UNICO sitio que ata puerto -> adaptador
+lib/shared/                                       ← lo que no pertenece a ningun modulo
 ```
 
 ### Reglas de capa
-1. Controller NO conoce Prisma ni la DB directamente. Solo HTTP + zod + service call.
-2. Service NO conoce Next.js (Request/Response/headers). Solo logica pura.
-3. Repository SOLO ejecuta queries Prisma. No tiene logica de negocio.
-4. Service recibe el repository por constructor (inyeccion de dependencias).
-5. Toda interfaz se define en `lib/interfaces/`, un archivo por interfaz.
+1. `domain/` y `ports/` NO importan `next/*`, `react*`, `@prisma/client`,
+   `@/lib/shared/**` ni adaptadores. Si el dominio "necesita" la base, lo que necesita es
+   un **puerto**, y la implementacion va en `adapters/driven/`.
+2. De otro modulo se importa SOLO su contrato (`@/lib/modules/<otro>`), nunca una ruta
+   profunda. Si el contrato no expone lo que hace falta, eso es una conversacion sobre el
+   contrato, no un import profundo.
+3. Un adaptador `driving` NO instancia su adaptador `driven`: lo pide a
+   `@/lib/composition`. Ese es el unico sitio donde un puerto se ata a su implementacion.
+4. `lib/shared/**` es HOJA del grafo: no importa modulos ni `composition`. Si necesita un
+   modulo, no era compartido.
+5. Modelo nuevo en `db/schema.prisma` = `/// @module <modulo>` encima. Un modelo sin dueno
+   es un hallazgo de la guardia.
+
+La tabla completa de que puede importar que esta en
+`docs/architecture.md > La regla de dependencias`. Leela **antes** de crear el primer
+archivo, no cuando la guardia se ponga roja.
+
+Antes de dar una tanda por buena: `pnpm exec vitest run guard`.
 
 ## Server Actions
 Las mutaciones del mismo proyecto van con Server Actions (`'use server'`), no con

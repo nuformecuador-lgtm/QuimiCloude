@@ -15,7 +15,7 @@
  * no se podrian distinguir en un mismo archivo de test.
  */
 
-import { SIDEBAR_STATE_COOKIE } from '@/lib/utils/sidebar-state';
+import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 /** Viewport ancho: mecanismo A, modo icono (R23–R28). Por encima del breakpoint 768. */
 export const WIDE_VIEWPORT = 1280;

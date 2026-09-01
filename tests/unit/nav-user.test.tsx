@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 
 import { NavUser } from '@/components/private/nav-user';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import type { SessionUser } from '@/lib/types/session';
-import { getInitials } from '@/lib/utils/initials';
+import type { SessionUser } from '@/lib/modules/identity';
+import { getInitials } from '@/lib/shared/ui/initials';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
 
@@ -14,7 +14,7 @@ const { logoutActionMock } = vi.hoisted(() => ({
 
 // Se mockea la action para (a) contar invocaciones (R20) y, sobre todo, (b) poder dejar la
 // promesa PENDIENTE: es la unica forma de observar el estado deshabilitado (R21).
-vi.mock('@/lib/actions/logout', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
   logoutAction: logoutActionMock,
 }));
 

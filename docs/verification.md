@@ -65,9 +65,17 @@ con `dev`, no contra el ultimo commit, o una tanda de tres commits solo mira el 
 pnpm exec vitest related --run $(git diff --name-only origin/dev...HEAD)   # tres puntos
 ```
 
-> **Estado en QuimiCloude:** todavia no hay suite ni configuracion de Vitest, asi que los dos
-> modos hacen hoy lo mismo (typecheck + lint) y el gate avisa con un `warn` de que el script de
-> tests no existe. Es una deuda abierta, no un nivel que ya te cubre.
+> **Estado en QuimiCloude (2026-08-26):** ya hay suite y configuracion, asi que los dos modos
+> **si** hacen cosas distintas. `vitest.config.mts` monta dos proyectos (`ui` en jsdom, `node`)
+> repartidos por convencion de nombre, y `tests/` tiene 10 archivos, 3 de ellos guardias
+> (`tests/guards/`). `--rapido` selecciona por grafo y corre las tres guardias; el completo corre
+> los 10.
+>
+> Lo que **no** te cubre todavia: con una suite tan pequena, `--rapido` se queda en cero tests
+> relacionados con mucha facilidad y sale verde con solo las guardias. Y la tabla de tiempos de
+> arriba es de otro proyecto — aqui la diferencia de reloj entre los dos modos es hoy
+> despreciable. El motivo para correr `./init.sh` completo antes del PR no es el tiempo, es la
+> cobertura.
 
 ## Qué cuenta como evidencia
 - Salida real de los tests pasando, pegada en `progress/impl_<feature>.md`.
@@ -90,6 +98,88 @@ pnpm exec vitest related --run $(git diff --name-only origin/dev...HEAD)   # tre
   que un test de RLS signifique algo tiene que ejercitar la via que RLS protege.
 - Verifica migraciones aplicando y revirtiendo en un entorno de prueba: `down.sql` es
   convencion propia, nadie lo prueba por ti.
+
+## Rojos heredados: la pregunta es «¿rompí algo YO?»
+
+Cuando `dev` arrastra tests rojos que no son tuyos, la suite completa termina siempre en rojo y
+el gate deja de responder lo único que importa al cerrar una feature. Comparar a mano contra un
+número que viaja por el chat no escala: en una sola feature de un proyecto anterior hubo que
+hacerlo **ocho veces** y una se concluyó mal.
+
+Por eso el modo completo no exige que la suite esté verde, sino que **no aparezca ningún archivo
+de test rojo que no estuviera ya en `tests/baseline-rojos.json`**.
+
+- **La comparación es por archivo, no por conteo.** Una suite grande tira 2–5 flakes de
+  saturación que cambian de sitio —se midieron 30, 31 y 32 rojos sobre el mismo código—, así
+  que exigir conteos exactos daría falsas alarmas constantes, y un gate que grita en falso se
+  ignora.
+- **Coste aceptado:** si un archivo ya listado gana un rojo nuevo de verdad, no lo ves. A cambio
+  la pregunta que sí responde —«¿apareció un archivo que antes no fallaba?»— aguanta el ruido.
+- **Cada entrada del baseline necesita `motivo` y `desde`**, y el comparador falla si faltan.
+  Sin eso la lista se vuelve el sitio donde cualquiera mete lo que le estorba.
+- **Un archivo del baseline que ya pasa** genera aviso, no rojo; toca borrarlo de la lista.
+  Sólo se avisa si esa corrida lo ejecutó: calcular `baseline − rojos` parece natural y está
+  **mal**, porque un archivo que no corrió no dice nada. Esa versión, con fixtures de dos
+  archivos, pedía limpiar 6 de las 7 entradas —una falsa alarma en el primer uso—.
+
+**Al sembrarlo:** mídelo en una rama que sea `dev` más archivos que no toquen producto, para
+saber que la deuda es de `dev` y no tuya. Y síémbralo con pocas entradas: si nace con cincuenta,
+nadie lo va a limpiar nunca.
+
+> **Estado en QuimiCloude (2026-08-28):** el baseline está **vacío** y no es un descuido: la
+> suite está verde (93/93, gate completo en 113 s) y no hay deuda heredada en `dev`. Con el
+> baseline vacío esto no afloja nada —cualquier archivo rojo es «nuevo» y bloquea—; la
+> maquinaria está montada para cuando la suite crezca, que es cuando dejará de ser gratis.
+
+## Cuando lo que verificas es el gate mismo
+
+Un check que no corre es peor que uno que no existe: crees que te cubre. Al tocar `init.sh`,
+`scripts/` o una guardia no basta con que el gate salga verde — hay que comprobar que
+**muerde**. Se rompe al revés que el código normal, y estas son las formas conocidas de
+equivocarse.
+
+### Probar que muerde, no que pasa
+
+Para cada validación nueva, un fixture por desenlace: el caso correcto (`exit 0`) y **uno por
+cada motivo de fallo** (`exit 1`, con el mensaje nombrando qué falla). Y después la prueba que
+de verdad convence: **rompe el archivo real** —inyecta el dato inválido en `feature_list.json`,
+renombra el script—, corre el gate completo, confirma que sale con 1 y restaura. Un check
+probado solo con su caso verde no está probado.
+
+Restaura desde una copia (`cp`), no con `git checkout`: el archivo puede tener cambios sin
+commitear que no son tuyos.
+
+### Trampas conocidas
+
+Las tres pasaron de verdad, en la sesión del 2026-08-28 que sustituyó la validación de
+`feature_list.json` basada en `jq`:
+
+- **No pipees el gate a `head` o `tail` para leer el código de salida.** El estado de una
+  tubería es el del último comando, así que verás `0` aunque el gate haya fallado. Redirige a
+  un archivo y lee `$?`.
+- **Un mensaje de fallo no debe prometer un detalle que no entrega.** `$(...)` captura solo
+  stdout; si los errores del script van a stderr, un `fail "invalido: $SALIDA"` imprime
+  `invalido:` y nada más. O capturas `2>&1`, o dejas que stderr salga por su cuenta y el
+  mensaje no promete nada.
+- **Tocar `init.sh` o `scripts/` hace que el modo rápido se niegue a cubrirte.** Es correcto:
+  son cimientos, ahí se corre el completo.
+
+### El anti-patrón: la validación opcional
+
+Una validación colgada de `if command -v <herramienta>` o `if [ -f <script> ]` con un `warn` en
+el `else` **no es una validación**: en la máquina que no tenga eso, se salta entera y el gate
+sigue en verde. Pasó aquí con `jq` —dos bloques mudos el tiempo suficiente para que nadie
+notara que sus dos `ok` no se imprimían nunca— y volvió a pasar con el propio script que vino a
+reemplazarlo, esta vez colgado de su propia existencia. Si el check importa, lo que va en el
+`else` es `fail`; si no importa, bórralo. Instalar la herramienta que falta no arregla nada:
+mueve el problema a la siguiente máquina.
+
+Corolario: **antes de escribir un check, mira si ya existe.** Dos validadores con nombres
+parecidos e `init.sh` llamando a uno solo es la misma enfermedad con mejor disfraz.
+
+Los avisos propios de `scripts/validate-features.mjs` —no ampliar la comprobación de specs a
+las fichas `done`, no cambiar el máximo por zona sin mirar `CLAUDE.md` / `AGENTS.md`— viven
+como comentarios en el script, que es donde se leen en el momento de romperlos.
 
 ## Regla del reviewer
 Si un requisito no tiene test, o un test no verifica el requisito que dice cubrir,

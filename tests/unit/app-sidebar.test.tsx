@@ -12,9 +12,9 @@ import {
   type NavGroup,
   type NavItem,
   type NavLink,
-} from '@/lib/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/types/auth';
-import type { SessionUser } from '@/lib/types/session';
+} from '@/lib/shared/navigation/private-nav';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import type { SessionUser } from '@/lib/modules/identity';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
 
@@ -32,7 +32,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 // El pie de usuario se monta dentro de la barra: sin este mock, el `<form>` del logout
 // intentaria ejecutar la Server Action real.
-vi.mock('@/lib/actions/logout', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
   logoutAction: logoutActionMock,
 }));
 

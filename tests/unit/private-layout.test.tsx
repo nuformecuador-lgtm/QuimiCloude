@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import { cleanup, render, screen, within } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
-import type { SessionUser } from '@/lib/types/session';
-import { getInitials } from '@/lib/utils/initials';
-import { SIDEBAR_STATE_COOKIE } from '@/lib/utils/sidebar-state';
+import type { SessionUser } from '@/lib/modules/identity';
+import { getInitials } from '@/lib/shared/ui/initials';
+import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
   WIDE_VIEWPORT,
@@ -51,7 +51,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
   usePathname: usePathnameMock,
 }));
 
-vi.mock('@/lib/actions/logout', () => ({
+vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
   logoutAction: logoutActionMock,
 }));
 
@@ -61,9 +61,11 @@ vi.mock('next/headers', () => ({
 
 // R16: el proveedor de sesion se sustituye por completo para poder afirmar que el layout
 // pinta **lo que el proveedor devuelve**, y no un valor cualquiera.
-vi.mock('@/lib/services/session-stub', () => ({
-  getSessionUser: getSessionUserMock,
-  endSession: vi.fn<() => Promise<void>>(),
+vi.mock('@/lib/composition', () => ({
+  identity: {
+    getSessionUser: getSessionUserMock,
+    endSession: vi.fn<() => Promise<void>>(),
+  },
 }));
 
 const RUTA_SIN_COINCIDENCIA = '/ruta-que-no-esta-en-la-navegacion';

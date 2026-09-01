@@ -34,8 +34,8 @@ usage() {
   cat <<'AYUDA'
 wt.sh — ciclo de vida de los worktrees del arnes.
 
-  wt.sh new  <id> <slug>    crea worktree + rama desde la base           (paso F1.0)
-  wt.sh done <id>-<slug>    desmonta tras el merge del PR                (paso F2.5)
+  wt.sh new  <key> <slug>   crea worktree + rama desde la base           (paso F1.0)
+  wt.sh done <key>-<slug>   desmonta tras el merge del PR                (paso F2.5)
   wt.sh list                inventario con veredicto SAFE / HOLD por worktree
   wt.sh clean [--force]     dry-run por defecto; con --force desmonta los SAFE
 
@@ -200,7 +200,7 @@ remove_wt() {
 # ------------------------------------------------------------------------ subcomandos
 
 cmd_new() {
-  local id="${1:?uso: wt.sh new <id> <slug>}" slug="${2:?uso: wt.sh new <id> <slug>}"
+  local id="${1:?uso: wt.sh new <key> <slug>}" slug="${2:?uso: wt.sh new <key> <slug>}"
   local name="$id-$slug" branch="feature/$id-$slug" path="$MAIN_WT/$WT_DIR/$id-$slug"
 
   if [ -d "$path" ]; then
@@ -224,7 +224,7 @@ cmd_new() {
 }
 
 cmd_done() {
-  local name="${1:?uso: wt.sh done <id>-<slug>}"
+  local name="${1:?uso: wt.sh done <key>-<slug>}"
   local path="$MAIN_WT/$WT_DIR/$name" branch="" flags="" p b f base found=0
 
   # Acepta `8-slug`, una ruta o un nombre de rama: se busca en el registro.

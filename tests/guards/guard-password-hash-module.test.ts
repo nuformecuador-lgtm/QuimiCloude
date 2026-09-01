@@ -30,7 +30,10 @@ function findRepoRoot(startDir: string): string {
 }
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
-const moduleSource = readFileSync(join(repoRoot, 'lib', 'utils', 'password-hash.ts'), 'utf8')
+const moduleSource = readFileSync(
+  join(repoRoot, 'lib', 'modules', 'identity', 'adapters', 'driven', 'security', 'password-hash.ts'),
+  'utf8',
+)
 
 /** Los comentarios explican; no ejecutan. Se quitan antes de juzgar el codigo. */
 function stripComments(source: string): string {

@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { FORGOT_PASSWORD_ROUTE } from '@/lib/types/auth';
+import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 
 import { LoginForm } from './components';
 

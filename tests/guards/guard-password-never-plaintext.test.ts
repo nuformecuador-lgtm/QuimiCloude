@@ -71,6 +71,7 @@ const FORBIDDEN_SEGMENTS = ['password', 'pass', 'contrasena', 'contraseña'] as 
  *  - `error`, `errors`, `message`    -> texto o estado de validacion (p. ej. `passwordError`).
  *  - `label`, `placeholder`          -> copy de formulario.
  *  - `field`, `input`                -> el control, no su contenido.
+ *  - `hasher`                        -> el objeto que calcula el hash, no el valor (p. ej. `passwordHasher`).
  *
  * Deliberadamente FUERA: `name`, `key`, `type`, `value`, `data`, `text` y similares,
  * porque cualquiera de ellos si puede ser el nombre de una columna real.
@@ -92,6 +93,7 @@ const NON_COLUMN_SUFFIXES = new Set([
   'placeholder',
   'field',
   'input',
+  'hasher',
 ])
 
 /**
@@ -104,10 +106,10 @@ const NON_COLUMN_SUFFIXES = new Set([
 const IN_TRANSIT_ALLOWLIST: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   // Campo del `FormData` que llega del formulario de login y se pasa a zod. No se
   // escribe en ninguna tabla: la action solo lo valida y delega la verificacion.
-  ['lib/actions/login.ts', new Set(['password'])],
+  ['lib/modules/identity/adapters/driving/login-action.ts', new Set(['password'])],
   // Clave del schema zod que valida esa entrada (y del mapa de errores de campo).
   // Es el contrato del formulario, no un modelo de datos.
-  ['lib/types/auth.ts', new Set(['password'])],
+  ['lib/modules/identity/domain/credentials.ts', new Set(['password'])],
 ])
 
 /** Ruta comparable: separadores POSIX, para casar la allowlist venga la ruta como venga. */
@@ -273,6 +275,8 @@ describe('guardia — contrasena nunca en claro', () => {
       'contrasenaPlaceholder',
       'plain_password_label',
       'passField',
+      'passwordHasher',
+      'password_hasher',
     ]) {
       expect(isPlaintextPasswordIdentifier(permitido), permitido).toBe(false)
     }
@@ -285,6 +289,7 @@ describe('guardia — contrasena nunca en claro', () => {
       'route_password',
       'error_password',
       'id_password',
+      'hasher_password',
     ]) {
       expect(isPlaintextPasswordIdentifier(prohibido), prohibido).toBe(true)
     }
@@ -292,10 +297,14 @@ describe('guardia — contrasena nunca en claro', () => {
 
   it('la allowlist de contrasena en transito esta acotada por ruta de archivo', () => {
     const actionDeLogin = 'const password = readField(formData, "password")'
-    expect(findPlaintextPasswordDeclarations('lib/actions/login.ts', actionDeLogin)).toEqual([])
+    expect(
+      findPlaintextPasswordDeclarations('lib/modules/identity/adapters/driving/login-action.ts', actionDeLogin),
+    ).toEqual([])
 
     const schemaZod = 'export const loginInputSchema = z.object({ password: z.string().min(1) })'
-    expect(findPlaintextPasswordDeclarations('lib/types/auth.ts', schemaZod)).toEqual([])
+    expect(
+      findPlaintextPasswordDeclarations('lib/modules/identity/domain/credentials.ts', schemaZod),
+    ).toEqual([])
 
     // El MISMO identificador fuera de esos dos archivos sigue siendo un hallazgo.
     const prismaMalo = 'model User {\n  id       String @id\n  password String\n}'
@@ -317,7 +326,10 @@ describe('guardia — contrasena nunca en claro', () => {
     // La allowlist tampoco abre la mano dentro de sus propios archivos: solo `password`.
     const persistenciaEnLaAction = 'const plain_password = readField(formData, "password")'
     expect(
-      findPlaintextPasswordDeclarations('lib/actions/login.ts', persistenciaEnLaAction),
+      findPlaintextPasswordDeclarations(
+        'lib/modules/identity/adapters/driving/login-action.ts',
+        persistenciaEnLaAction,
+      ),
     ).toContain('plain_password')
   })
 })

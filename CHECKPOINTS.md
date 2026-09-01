@@ -18,6 +18,11 @@ esta lista.
 - [ ] `pnpm test` pasa (unit/integracion).
 - [ ] Si la feature toca un flujo critico (autenticacion, permisos, movimientos de
       inventario, importes, webhooks), hay al menos un test E2E (Playwright) que lo cubre.
+- [ ] Si la feature toca UI, cumple `docs/architecture.md > Componentes > Regla:
+      multiplataforma — web, iOS y Android`, o el `design.md` declara la excepcion y su porque.
+- [ ] Si la feature añadió dependencias, cada una tiene su fila en `docs/dependencias.md`
+      con los cuatro checks y la aprobacion humana citada en el `design.md`.
+
 
 ## Datos y seguridad (Supabase)
 - [ ] **Cada permiso de la feature se valida en el SERVICE y tiene su test.** Esta es la
@@ -34,11 +39,22 @@ esta lista.
 - [ ] Ningun secreto quedo hardcodeado; todo va por variables de entorno.
 - [ ] Webhooks nuevos validan firma/token y son idempotentes.
 
-## Patron de capas
-- [ ] Controller no contiene queries de DB ni logica de negocio.
-- [ ] Service no conoce HTTP (Request/Response/headers).
-- [ ] Repository solo ejecuta queries Prisma, sin logica de negocio.
-- [ ] Las interfaces estan en `lib/interfaces/`, separadas por categoria.
+## Modulos hexagonales
+- [ ] `domain/` y `ports/` no importan framework, base de datos, `shared` ni adaptadores.
+- [ ] De otro modulo se importa solo su contrato (`@/lib/modules/<otro>`), nunca ruta profunda.
+- [ ] Ningun adaptador `driving` instancia su `driven`: lo pide a `lib/composition`.
+- [ ] `lib/shared/**` no importa modulos ni `composition` (es hoja del grafo).
+- [ ] Ningun `'use server'` sale reexportado desde el barrel del modulo.
+- [ ] Todo modelo de `db/schema.prisma` tiene `/// @module`, y ningun modulo consulta un
+      modelo ajeno.
+- [ ] No reaparecen `lib/services/`, `lib/repositories/` ni `lib/interfaces/`.
+- [ ] En la raiz de `lib/` solo hay `modules/`, `shared/`, `composition/` y `utils.ts`. Todo
+      codigo de negocio nuevo cuelga de un modulo, no de `lib/`. **La guardia tampoco lo
+      comprueba**: prohibe siete nombres concretos, no todo lo que no sea esos cuatro, asi
+      que un `lib/helpers/` o un `lib/dominio/` nuevo pasa en verde.
+- [ ] La logica de negocio esta en `domain/`, no en la Server Action. **Esto la guardia no
+      lo comprueba**: un caso de uso que solo llama al adaptador y devuelve pasa en verde y
+      esta mal.
 
 ## Permisos
 - [ ] Paginas protegidas validan permisos en el servidor via `cookies()`.

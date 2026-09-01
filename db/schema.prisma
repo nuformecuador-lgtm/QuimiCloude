@@ -18,6 +18,7 @@ generator client {
 
 /// Catalogo del conjunto cerrado de tipos de documento de identidad (design.md > 3).
 /// No lleva `deletedAt` a proposito: un tipo no se borra, se desactiva con `isActive`.
+/// @module identity
 model DocumentType {
   code      String   @id
   name      String
@@ -33,6 +34,7 @@ model DocumentType {
 /// Catalogo de roles. NO lleva `deletedAt` deliberadamente (design.md > 2.2): el
 /// borrado logico es un UPDATE y una FK no puede bloquear un UPDATE, asi que anadir
 /// la columna neutralizaria en silencio la unica garantia real de R17.
+/// @module identity
 model Role {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String   @unique
@@ -57,6 +59,7 @@ model Role {
 /// `tests/unit/schema/identity-migration.test.ts` los vigila. Si alguien anade aqui
 /// un `@unique`, la unicidad deja de respetar mayusculas/minusculas y el borrado
 /// logico quema el correo y el documento para siempre.
+/// @module identity
 model User {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   firstNames       String    @map("first_names")

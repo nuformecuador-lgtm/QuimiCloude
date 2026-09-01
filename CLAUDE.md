@@ -21,12 +21,18 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
    `fullstack`) admite hasta **2** features en `in_progress` a la vez en
    `feature_list.json`, siempre sin conflicto de archivos entre ellas (ver
    `AGENTS.md > Paralelismo`). Distintas zonas corren en paralelo sin restricción
-   entre sí. `./init.sh` lo valida.
+   entre sí. `./init.sh` lo valida (`scripts/validate-features.mjs`). La regla también se
+   puede violar arrastrando tarjetas en el board: si el board la incumple, **gana la
+   regla** — el leader deja fuera la feature sobrante al importar y lo dice.
 2. **SDD obligatorio** para toda feature con `"sdd": true`: requirements (EARS) →
    design → tasks → código. Nunca saltes directo a código.
 3. **Estado en disco, no en el chat.** Cada subagente escribe su resultado en un
    archivo bajo `specs/` o `progress/` y solo te devuelve una referencia corta.
    No hagas circular el contenido completo por el chat.
+   **Jira no es una excepción a esto.** El board es la *entrada humana* —dónde nacen las
+   features y dónde el humano aprueba—, y se importa a `feature_list.json` en el paso F0.
+   A partir de ahí el arnés lee y escribe disco: el gate corre sin red y nada del ciclo
+   depende de que Jira responda. Contrato en `docs/jira.md`.
 4. **Trazabilidad.** Cada requisito `R<n>` debe terminar mapeado a un test concreto.
    El reviewer rechaza si falta alguno.
 5. **Verificación ejecutable, en dos niveles.** Nada se da por "hecho" sin que pase el gate.
@@ -38,14 +44,19 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
    `docs/verification.md`. "Compila" no es "funciona".
 6. **No inventes.** Si un dato no está en `docs/`, `specs/` o el código, es
    desconocido: pregunta o márcalo como abierto. No lo rellenes con supuestos.
+7. **Ninguna dependencia entra sin aprobación humana.** No reinventes lo que ya resuelve una
+   librería mantenida, pero tampoco la instales por tu cuenta: los cuatro checks de salud y la
+   fila en `docs/dependencias.md` son condición, y el humano aprueba. El gate lo hace cumplir.
+   Detalle en `docs/architecture.md > Dependencias de terceros`.
 
 ## Arranque de sesión
 
-1. Corre `./init.sh`. Debe terminar en verde.
-2. Lee `progress/current.md` para ver si hay una sesión a medias.
-3. Lee `feature_list.json` y toma la primera feature en `pending` (o retoma la
+1. Importa el board de Jira a `feature_list.json` (paso F0 de `AGENTS.md`).
+2. Corre `./init.sh`. Debe terminar en verde — también valida lo que acabas de importar.
+3. Lee `progress/current.md` para ver si hay una sesión a medias.
+4. Lee `feature_list.json` y toma la primera feature en `pending` (o retoma la
    que esté en `spec_ready` / `in_progress`).
-4. Sigue el flujo de `AGENTS.md`.
+5. Sigue el flujo de `AGENTS.md`.
 
 ## Mapa rápido
 
@@ -54,5 +65,8 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
 - Estilo, nombres, manejo de errores → `docs/conventions.md`
 - Proceso SDD (EARS, 3 archivos, aprobación) → `docs/specs.md`
 - Cómo demostrar que funciona → `docs/verification.md`
+- Qué dependencias están aprobadas y cómo se aprueba una → `docs/dependencias.md`
 - Un worktree por feature: montar y desmontar → `docs/worktrees.md`
+- El board manda, el disco trabaja: contrato con Jira → `docs/jira.md`
 - Criterios de estado final correcto → `CHECKPOINTS.md`
+- Afinar una mejora al arnés antes de aplicarla → `/afinar-regla`
