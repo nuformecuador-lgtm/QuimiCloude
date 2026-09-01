@@ -122,6 +122,39 @@ leader.
 
 ---
 
+## T1 — `lib/shared/` y lo que no pertenece a ningun modulo (2026-09-01)
+
+Commit `3007954`. Movimientos mecanicos con `git mv`, para conservar el historial:
+
+| De | A |
+| --- | --- |
+| `lib/prisma.ts` | `lib/shared/db/prisma.ts` |
+| `lib/utils/initials.ts` | `lib/shared/ui/initials.ts` |
+| `lib/utils/sidebar-state.ts` | `lib/shared/ui/sidebar-state.ts` |
+| `lib/navigation/private-nav.ts` | `lib/shared/navigation/private-nav.ts` |
+| `lib/types/auth.ts` (`DASHBOARD_ROUTE`, `FORGOT_PASSWORD_ROUTE`) | `lib/shared/routes.ts` (nuevo) |
+
+`lib/utils.ts` **no se movio** (R6): lo fija `components.json`, y todo componente generado por
+shadcn/ui importa `cn` de ahi. Ojo a la ambiguedad entre el **archivo** `lib/utils.ts` y el
+**directorio** `lib/utils/`, que si desaparece (su ultima pieza se va en T3).
+
+Importadores reescritos en la misma task, para que el repo no quedara roto:
+`app/(private)/layout.tsx`, `app/(public)/login/page.tsx`,
+`components/private/{app-sidebar,nav-user}.tsx`, `lib/actions/login.ts`,
+`lib/shared/navigation/private-nav.ts` (pasa a importar `../routes`),
+`tests/helpers/viewport.ts`, `tests/integration/identity-constraints.int.test.ts` y
+`tests/unit/{initials,private-layout,nav-user,app-sidebar,sidebar-desktop,sidebar-mobile,login-action,login-form}`.
+
+**Ninguna asercion cambio de valor.** Verificacion: `pnpm run typecheck` y `pnpm run lint` en
+verde; `pnpm exec vitest related --run` sobre los archivos tocados -> **11 archivos, 104
+tests, todos verdes**.
+
+Reparto: `backend_dev` hizo `lib/` y `tests/`; `frontend_dev`, los imports de `app/` y
+`components/`. Los `TS7006 implicit any` que aparecian en `app-sidebar.tsx` eran cascada del
+import roto de `private-nav` y desaparecieron solos al arreglarlo, sin anotar ningun tipo.
+
+---
+
 ## T2 — Dominio y contrato de `identity` (2026-09-01)
 
 Movimientos y reescrituras de imports **sin cambio de comportamiento**, siguiendo
@@ -384,7 +417,7 @@ Commit: `refactor(QC-15): punto unico de composicion del modulo identity` (`ae8e
 
 ---
 
-## T5 — Adaptadores driving y reconexion de la UI (2026-09-01) — **BLOQUEADA, sin commit**
+## T5 — Adaptadores driving y reconexion de la UI (2026-09-01) — CERRADA (bloqueo resuelto, ver mas abajo)
 
 ### Hecho
 
@@ -926,4 +959,255 @@ nuevo — la reescritura completa y pulida de `docs/architecture.md` la cierra T
 
 **Veredicto: T9 cumplida.** 12 bloques, 39 tests, seleccion por `pnpm run test:guardias`
 confirmada, 3 rojos provocados y revertidos con evidencia literal pegada arriba.
+
+---
+
+## T10 — `docs/architecture.md` describe la estructura nueva (2026-09-01)
+
+**Entregado dentro del commit `b96c626` (T9)**, no en un commit propio. Motivo: el bloque 12
+de la guardia (R19) comprueba precisamente este documento, y con la version vieja nacia rojo.
+No se podia cerrar T9 en verde sin cerrar T10. Se deja constancia porque el orden real de
+entrega no es el de `tasks.md`.
+
+Los ocho puntos que pedia la task, comprobados uno a uno sobre el documento final:
+
+| # | Que pedia | Estado |
+| --- | --- | --- |
+| 1 | `## Principios` punto 1: hexagonal por modulos, dependencia hacia adentro | hecho |
+| 2 | `## Patron de capas...` -> `## Modulos y arquitectura hexagonal` (dominio, puertos, adaptadores, contrato, composicion, excepcion del barrel) | hecho |
+| 3 | `## Estructura de carpetas` con el arbol de `design.md > 2` | hecho |
+| 4 | Nueva `### La regla de dependencias` con la tabla de `design.md > 5.1` | hecho |
+| 5 | `## Stack`: integraciones externas -> `lib/modules/<m>/adapters/driven/` | hecho |
+| 6 | `## Server Actions vs Route Handlers`: la tabla ya no dice `lib/actions/` | hecho |
+| 7 | `## Migraciones up/down`: regla `/// @module`, un modelo sin dueno es hallazgo | hecho |
+| 8 | `## Anti-patrones que el reviewer rechaza`: los cinco nuevos (a-e) | hecho |
+
+`## Componentes` **no se toco** (D4): la convencion de componentes de ruta con barrel sigue
+literal; el diff sobre esa seccion son solo lineas anadidas en otras secciones.
+
+Comprobacion de R19 a mano sobre el documento final: **cero** menciones a `lib/services/`,
+`lib/repositories/`, `lib/interfaces/` o `lib/actions/` como ruta vigente; **17** menciones a
+`lib/modules/`.
+
+---
+
+# T11 — Gate completo, build y trazabilidad (2026-09-01)
+
+## 1. `pnpm run build` — riesgo 5 despejado
+
+Es lo unico que caza que el contrato de un modulo arrastre servidor al cliente; la suite no
+lo cubre.
+
+```
+Next.js 16.3.0 (Turbopack)
+Compiled successfully in 18.2s
+  Running TypeScript ...
+  Finished TypeScript in 8.8s ...
+Generating static pages using 6 workers (5/5) in 1607ms
+
+Route (app)
+  /
+  /_not-found
+  /login
+```
+
+El barrel `@/lib/modules/identity` se importa desde componentes de cliente y **no arrastra**
+servidor: ni la directiva de Server Action, ni `@prisma/client`, ni `next/*`. R10 queda
+cerrado tambien por esta via, no solo por el bloque 6 de la guardia.
+
+## 2. `./init.sh` completo — el contrato de R18
+
+```
+ Test Files  1 failed | 21 passed (22)
+      Tests  1 failed | 209 passed (210)
+   Duration  15.50s
+```
+
+Los 20 archivos verdes de T0 siguen los 20 en verde, **con el mismo numero de tests cada
+uno**; solo cambia la ruta de los que se movieron. El unico archivo nuevo es la guardia.
+
+| Archivo en T0 | Tests | Archivo ahora | Tests |
+| --- | --- | --- | --- |
+| `tests/guards/guard-password-hash-module.test.ts` | 4 | *(misma ruta)* | 4 |
+| `tests/guards/guard-password-never-plaintext.test.ts` | 6 | *(misma ruta)* | 6 |
+| `tests/guards/guard-rls-force.test.ts` | 4 | *(misma ruta)* | 4 |
+| `tests/integration/identity-constraints.int.test.ts` | 23 | `tests/integration/identity/identity-constraints.int.test.ts` | 23 |
+| `tests/ui/login-form-uncontrolled-warning.test.tsx` | 4 | *(misma ruta)* | 4 |
+| `tests/ui/smoke.test.ts` | 2 | *(misma ruta)* | 2 |
+| `tests/unit/app-sidebar.test.tsx` | 11 | *(misma ruta)* | 11 |
+| `tests/unit/initials.test.ts` | 8 | *(misma ruta)* | 8 |
+| `tests/unit/login-action.test.ts` | 9 | `tests/unit/identity/login-action.test.ts` | 9 |
+| `tests/unit/login-form.test.tsx` | 18 | *(misma ruta)* | 18 |
+| `tests/unit/logout-action.test.ts` | 2 | `tests/unit/identity/logout-action.test.ts` | 2 |
+| `tests/unit/nav-user.test.tsx` | 8 | *(misma ruta)* | 8 |
+| `tests/unit/password-max-length.test.ts` | 4 | `tests/unit/identity/password-max-length.test.ts` | 4 |
+| `tests/unit/password/password-hash.test.ts` | 8 | `tests/unit/identity/password/password-hash.test.ts` | 8 |
+| `tests/unit/password/password-verify-fail-closed.test.ts` | 12 | `tests/unit/identity/password/password-verify-fail-closed.test.ts` | 12 |
+| `tests/unit/private-layout.test.tsx` | 6 | *(misma ruta)* | 6 |
+| `tests/unit/schema/identity-migration.test.ts` | 14 | `tests/unit/identity/schema/identity-migration.test.ts` | 14 |
+| `tests/unit/schema/identity-schema.test.ts` | 13 | `tests/unit/identity/schema/identity-schema.test.ts` | 13 |
+| `tests/unit/sidebar-desktop.test.tsx` | 7 | *(misma ruta)* | 7 |
+| `tests/unit/sidebar-mobile.test.tsx` | 6 | *(misma ruta)* | 6 |
+| — | — | **`tests/guards/guard-arquitectura-modulos.test.ts` (NUEVO)** | **39** |
+
+**170 verdes en T0 + 39 de la guardia nueva = 209 verdes ahora.** Cuadra exactamente. Ninguna
+asercion cambio de valor esperado; los unicos cambios en tests fueron la ruta del archivo, sus
+rutas de import y el objetivo de un `vi.mock` — justo lo que R18 admite.
+
+## 3. El unico rojo sigue siendo el de T0, y no es de esta feature
+
+```
+FAIL tests/guards/guard-dependencias-aprobadas.test.ts
+AssertionError: Dependencias en package.json sin fila en docs/dependencias.md: bcryptjs.
+```
+
+Identico al de T0, **antes de tocar una sola linea**. `tests/baseline-rojos.json` esta vacio,
+asi que el gate lo reporta como "rojo nuevo respecto del baseline"; no lo es respecto de esta
+feature, lo es respecto de un baseline escrito en una rama donde `bcryptjs` no existia.
+
+**Sin resolver a proposito.** `package.json` es intocable en esta feature y CLAUDE.md regla 7
+reserva al humano la aprobacion de dependencias. Dos salidas, para el leader:
+
+1. **Fila `heredada` para `bcryptjs` en `docs/dependencias.md`** (recomendada). Es el estado
+   que ese registro define literalmente para "estaba en el repo antes de esta regla
+   (2026-09-01)", que es el caso exacto: `bcryptjs` entro con QC-5 en `origin/dev` antes de
+   que la regla se commiteara en `dev`. Arregla la causa y no deja deuda.
+2. Anadirlo a `tests/baseline-rojos.json` con motivo y fecha, que es lo que sugiere el propio
+   gate. Peor opcion: baseliniza para siempre un test que se arregla con una fila.
+
+---
+
+# Tabla `de -> a` — lo que realmente se movio
+
+| # | De | A |
+| --- | --- | --- |
+| 1 | `lib/prisma.ts` | `lib/shared/db/prisma.ts` |
+| 2 | `lib/utils/initials.ts` | `lib/shared/ui/initials.ts` |
+| 3 | `lib/utils/sidebar-state.ts` | `lib/shared/ui/sidebar-state.ts` |
+| 4 | `lib/navigation/private-nav.ts` | `lib/shared/navigation/private-nav.ts` |
+| 5 | `lib/types/auth.ts` (`DASHBOARD_ROUTE`, `FORGOT_PASSWORD_ROUTE`) | `lib/shared/routes.ts` |
+| 6 | `lib/types/session.ts` | `lib/modules/identity/domain/session-user.ts` |
+| 7 | `lib/types/identity.ts` | `lib/modules/identity/domain/document-type.ts` |
+| 8 | `lib/types/auth.ts` (`CREDENTIAL_MAX_LENGTH`, `loginInputSchema`, `LoginInput`) | `lib/modules/identity/domain/credentials.ts` |
+| 9 | `lib/types/auth.ts` (`LoginFormState`, `LOGIN_INITIAL_STATE`, las 3 constantes de copy) | `lib/modules/identity/adapters/driving/login-form-state.ts` |
+| 10 | `lib/services/login-stub.ts` | `lib/modules/identity/domain/verify-credentials.ts` |
+| 11 | `lib/services/session-stub.ts` | `lib/modules/identity/adapters/driven/session/session-stub.ts` |
+| 12 | `lib/utils/password-hash.ts` | `lib/modules/identity/adapters/driven/security/password-hash.ts` |
+| 13 | `lib/actions/login.ts` | `lib/modules/identity/adapters/driving/login-action.ts` |
+| 14 | `lib/actions/logout.ts` | `lib/modules/identity/adapters/driving/logout-action.ts` |
+| 15 | *(nuevo)* | `lib/composition/index.ts` |
+| 16 | *(nuevo)* | `lib/modules/identity/index.ts` |
+| 17 | *(nuevo)* | `lib/modules/identity/ports/{password-hasher,session-provider}.ts` |
+| 18 | *(nuevo)* | `lib/modules/inventario/index.ts` + 4 `.gitkeep` |
+| 19 | *(nuevo)* | `tests/guards/guard-arquitectura-modulos.test.ts` |
+| 20 | `tests/unit/{login-action,logout-action,password-max-length}.test.ts` | `tests/unit/identity/` |
+| 21 | `tests/unit/password/*`, `tests/unit/schema/*` | `tests/unit/identity/{password,schema}/` |
+| 22 | `tests/integration/identity-constraints.int.test.ts` | `tests/integration/identity/` |
+
+**Carpetas que desaparecen (R5):** `lib/actions/`, `lib/services/`, `lib/types/`,
+`lib/navigation/` y el **directorio** `lib/utils/`. `ls lib` devuelve hoy exactamente:
+`composition`, `modules`, `shared`, `utils.ts`.
+
+**Modificados sin moverse:** `app/(private)/layout.tsx`, `app/(public)/login/page.tsx`,
+`app/(public)/login/components/login-form.tsx`, `components/private/{app-sidebar,nav-user}.tsx`,
+`db/schema.prisma` (3 lineas `/// @module identity`), `docs/architecture.md`,
+`tests/guards/{guard-password-hash-module,guard-password-never-plaintext}.test.ts`,
+`tests/helpers/viewport.ts` y los tests de UI cuyos `vi.mock` cambiaron de objetivo.
+
+---
+
+# Trazabilidad `R<n> -> test`
+
+Guardia = `tests/guards/guard-arquitectura-modulos.test.ts` (12 bloques, 39 tests). **Cada
+bloque prueba su regla sobre un fuente sintetico que la viola** (R21): un
+`expect(hallazgos).toEqual([])` sobre un repo que ya cumple no demuestra nada.
+
+| Req | Test que lo cierra | Estado |
+| --- | --- | --- |
+| R1 | guardia, bloque 1 — todo modulo tiene contrato y solo las tres carpetas | verde |
+| R2 | guardia, bloque 1 — una carpeta ajena a `domain`/`ports`/`adapters` es hallazgo | verde |
+| R3 | `tests/unit/identity/**` (47 tests) + `tests/integration/identity/**` (23 tests) verdes desde sus rutas nuevas | verde |
+| R4 | guardia, bloque 1 — existen los modulos `identity` e `inventario` | verde |
+| R5 | guardia, bloque 2 — no hay carpetas horizontales en `lib/` | verde |
+| R6 | guardia, bloque 3 — `lib/utils.ts` existe y exporta `cn` | verde |
+| R7 | guardia, bloque 4 — el dominio no importa framework, DB, adaptadores ni composicion | verde |
+| R8 | guardia, bloque 4 — el dominio solo importa su modulo y la allowlist de paquetes puros (`zod`) | verde |
+| R9 | guardia, bloque 5 — nadie importa las tripas de otro modulo | verde |
+| R10 | guardia, bloque 6 (cierre **transitivo** del contrato) + `pnpm run build` en T11 | verde |
+| R11 | guardia, bloque 7 — solo la composicion importa adaptadores driven | verde |
+| R12 | guardia, bloque 7 — la composicion no importa adaptadores driving | verde |
+| R13 | guardia, bloque 8 — `app/`, `components/` y `hooks/` solo consumen contrato o driving | verde |
+| R14 | guardia, bloque 8 — un archivo de cliente no importa composicion ni driven | verde |
+| R15 | guardia, bloque 9 — `lib/shared/**` no importa modulos ni composicion | verde |
+| R16 | guardia, bloque 10 — todo modelo declara `/// @module` y solo su dueno lo consulta | verde |
+| R17 | guardia, bloque 11 — el cliente Prisma solo se importa desde `adapters/driven/`, `scripts/`, `tests/` | verde |
+| R18 | `./init.sh` completo en T11 contra la lista de T0: **los mismos 20 archivos verdes, mismo numero de tests cada uno** (tabla de arriba) | verde |
+| R19 | guardia, bloque 12 — `docs/architecture.md` describe la estructura vigente | verde |
+| R20 | `pnpm run test:guardias` (patron `guard`) selecciona **5 archivos de guardia**, incluida la nueva, sin tocar configuracion | verde |
+| R21 | los casos sinteticos de los 12 bloques + **5 rojos provocados** (3 en T9 + 2 verificados de forma independiente, abajo) | verde |
+
+---
+
+# Evidencia de que la guardia se vio en ROJO
+
+Una guardia que nunca se ha visto en rojo no esta verificada. Ademas de los tres rojos de la
+seccion T9, el implementer provoco **dos mas de forma independiente**, sobre bloques
+distintos, y comprobo que el arbol quedaba limpio despues.
+
+### Independiente 1 — R12: la composicion importando un adaptador driving
+
+Anadido a `lib/composition/index.ts` un import del adaptador driving `logout-action`:
+
+```
+FAIL tests/guards/guard-arquitectura-modulos.test.ts > bloque 7 — composicion unica (R11, R12)
+  > solo lib/composition importa adaptadores driven, y la composicion no importa driving
+AssertionError: expected [ Array(1) ] to deeply equal []
++   "lib/composition/index.ts importa el adaptador driving
++    @/lib/modules/identity/adapters/driving/logout-action desde la composicion (R12)",
+ Test Files  2 failed | 3 passed (5)
+```
+
+### Independiente 2 — R5 y R14 a la vez
+
+Resucitado `lib/services/zombie.ts`, y anadido un import del punto de composicion a
+`components/private/nav-user.tsx`, que es un componente de cliente:
+
+```
+FAIL ... > bloque 2 — carpetas horizontales (R5)
++   "lib/services/: carpeta horizontal prohibida (R5)",
+
+FAIL ... > bloque 8 — consumo desde UI (R13, R14)
++   "components/private/nav-user.tsx (use client) importa el punto de composicion
++    @/lib/composition (R14)",
+```
+
+Deshechos los dos experimentos: `ls lib` -> `composition modules shared utils.ts`,
+`git status --short` limpio, `test:guardias` de vuelta en 54/55 (el rojo tolerado de
+`bcryptjs`).
+
+**Los mensajes citan el `R<n>` que incumplen**, que es lo que necesita el reviewer.
+
+---
+
+# Desviaciones declaradas
+
+1. **T0 pedia `git merge origin/dev`**; `HEAD` ya *era* `origin/dev`. Lo que faltaba estaba en
+   la rama **`dev` local**, divergida. Se integro esa. Detalle en la seccion T0.
+2. **T0 pedia PARAR si el gate no salia verde.** Salio rojo por `bcryptjs`, artefacto de la
+   divergencia de ramas, ajeno a la feature y caracterizado antes de tocar nada. Se continuo
+   dejando anotada la lista exacta de verdes, que es lo que hace verificable R18. Queda como
+   bloqueante abierto para el leader.
+3. **La suite completa se corrio dos veces** (T0 y T11), no en cada tanda: en T0 porque la
+   lista de archivos verdes **es** el entregable de la task, y en T11 porque la task lo pide.
+   El resto de tandas se cerraron con `typecheck` + `lint` + `vitest related` + guardias.
+4. **T10 se entrego dentro del commit de T9** (`b96c626`), porque el bloque 12 de la guardia
+   comprueba `docs/architecture.md` y nacia rojo contra la version vieja.
+5. **`NON_COLUMN_SUFFIXES` de `guard-password-never-plaintext` se amplio con `hasher`.**
+   Era la unica forma de que `lib/composition/index.ts` pudiera escribirse literal como
+   `design.md > 6.1`. Es un falso positivo: `<algo>_hasher` nombra al objeto que calcula el
+   hash, nunca una columna que lo guarde, que es exactamente el criterio de admision que esa
+   lista documenta. Hay precedente: la feature 7 la amplio con `route`, `id`, `error`... por
+   la misma razon. Se anadieron casos sinteticos (`passwordHasher` y `password_hasher`
+   permitidos; `hasher_password` sigue prohibido) y se comprobo que ningun `prohibido` previo
+   se apago. **Es un cambio de regla de una guardia: el reviewer deberia mirarlo con lupa.**
 
