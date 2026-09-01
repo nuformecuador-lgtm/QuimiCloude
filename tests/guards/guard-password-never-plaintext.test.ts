@@ -104,10 +104,16 @@ const NON_COLUMN_SUFFIXES = new Set([
 const IN_TRANSIT_ALLOWLIST: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   // Campo del `FormData` que llega del formulario de login y se pasa a zod. No se
   // escribe en ninguna tabla: la action solo lo valida y delega la verificacion.
+  //
+  // QC-15/T3: se registra ya la ruta FUTURA del adaptador driving (T5 mueve el
+  // archivo ahi) sin retirar todavia la ruta actual, porque `lib/actions/login.ts`
+  // sigue existiendo en disco hasta esa task. Cuando T5 haga el `git mv`, esta
+  // entrada queda huerfana y se retira.
+  ['lib/modules/identity/adapters/driving/login-action.ts', new Set(['password'])],
   ['lib/actions/login.ts', new Set(['password'])],
   // Clave del schema zod que valida esa entrada (y del mapa de errores de campo).
   // Es el contrato del formulario, no un modelo de datos.
-  ['lib/types/auth.ts', new Set(['password'])],
+  ['lib/modules/identity/domain/credentials.ts', new Set(['password'])],
 ])
 
 /** Ruta comparable: separadores POSIX, para casar la allowlist venga la ruta como venga. */
@@ -292,10 +298,14 @@ describe('guardia — contrasena nunca en claro', () => {
 
   it('la allowlist de contrasena en transito esta acotada por ruta de archivo', () => {
     const actionDeLogin = 'const password = readField(formData, "password")'
-    expect(findPlaintextPasswordDeclarations('lib/actions/login.ts', actionDeLogin)).toEqual([])
+    expect(
+      findPlaintextPasswordDeclarations('lib/modules/identity/adapters/driving/login-action.ts', actionDeLogin),
+    ).toEqual([])
 
     const schemaZod = 'export const loginInputSchema = z.object({ password: z.string().min(1) })'
-    expect(findPlaintextPasswordDeclarations('lib/types/auth.ts', schemaZod)).toEqual([])
+    expect(
+      findPlaintextPasswordDeclarations('lib/modules/identity/domain/credentials.ts', schemaZod),
+    ).toEqual([])
 
     // El MISMO identificador fuera de esos dos archivos sigue siendo un hallazgo.
     const prismaMalo = 'model User {\n  id       String @id\n  password String\n}'
@@ -317,7 +327,10 @@ describe('guardia — contrasena nunca en claro', () => {
     // La allowlist tampoco abre la mano dentro de sus propios archivos: solo `password`.
     const persistenciaEnLaAction = 'const plain_password = readField(formData, "password")'
     expect(
-      findPlaintextPasswordDeclarations('lib/actions/login.ts', persistenciaEnLaAction),
+      findPlaintextPasswordDeclarations(
+        'lib/modules/identity/adapters/driving/login-action.ts',
+        persistenciaEnLaAction,
+      ),
     ).toContain('plain_password')
   })
 })

@@ -1,6 +1,6 @@
 'use server';
 
-import { endSession } from '@/lib/services/session-stub';
+import { endSession } from '@/lib/modules/identity/adapters/driven/session/session-stub';
 
 /**
  * Server Action de cierre de sesion. **Contrato congelado** (`design.md > 3`): la

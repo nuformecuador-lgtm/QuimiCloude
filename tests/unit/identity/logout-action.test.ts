@@ -9,12 +9,15 @@ const { endSessionMock } = vi.hoisted(() => ({
 
 // Se mockea el proveedor de sesion para contar invocaciones sin depender del no-op real:
 // cuando la feature 10 rellene el stub, este test sigue midiendo el contrato de la action.
-vi.mock('@/lib/services/session-stub', () => ({
+vi.mock('@/lib/modules/identity/adapters/driven/session/session-stub', () => ({
   endSession: endSessionMock,
 }));
 
 /** Modulos cuyo fuente se inspecciona para R22/R35. */
-const MODULOS_INSPECCIONADOS = ['lib/actions/logout.ts', 'lib/services/session-stub.ts'] as const;
+const MODULOS_INSPECCIONADOS = [
+  'lib/actions/logout.ts',
+  'lib/modules/identity/adapters/driven/session/session-stub.ts',
+] as const;
 
 /**
  * Devuelve el fuente sin lineas de comentario.

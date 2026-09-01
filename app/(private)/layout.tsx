@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
-import { getSessionUser } from '@/lib/services/session-stub';
+import { getSessionUser } from '@/lib/modules/identity/adapters/driven/session/session-stub';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import { SidebarToggle } from './components';

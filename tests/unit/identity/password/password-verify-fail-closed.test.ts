@@ -1,7 +1,7 @@
 // T6 — La verificacion falla cerrada: un valor guardado inutilizable da `false`, nunca
 // `true`, y nunca lanza (R5, `design.md > 6`).
 
-import { createPasswordHash, verifyPasswordHash } from '@/lib/utils/password-hash';
+import { createPasswordHash, verifyPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 
 const SECRETO = 'clave-de-prueba';
 

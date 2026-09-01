@@ -1,5 +1,8 @@
 import type { SessionUser } from '@/lib/modules/identity';
 
+// Implementa el puerto `SessionProvider` (`../../../ports/session-provider`):
+// `getSessionUser` cumple `getSessionUser`, `endSession` cumple `endSession`.
+
 /**
  * STUB del proveedor de sesion de la zona privada.
  *

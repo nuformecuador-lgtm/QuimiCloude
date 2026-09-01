@@ -1,5 +1,9 @@
 import { compare, hash } from 'bcryptjs';
 
+// Implementa el puerto `PasswordHasher` (`../../../ports/password-hasher`):
+// `createPasswordHash` cumple `hash`, `verifyPasswordHash` cumple `verify`.
+// El cableado nombre a nombre lo hace el punto de composicion.
+
 /** Coste de bcrypt (`design.md > 3`). Queda escrito dentro del propio valor guardado. */
 export const BCRYPT_ROUNDS = 10;
 

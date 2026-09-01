@@ -5,7 +5,7 @@ import {
   BCRYPT_ROUNDS,
   createPasswordHash,
   verifyPasswordHash,
-} from '@/lib/utils/password-hash';
+} from '@/lib/modules/identity/adapters/driven/security/password-hash';
 
 /** Formato estandar de bcrypt: `$2<letra>$<coste>$` + 53 caracteres del alfabeto de bcrypt. */
 const BCRYPT_FORMAT = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;

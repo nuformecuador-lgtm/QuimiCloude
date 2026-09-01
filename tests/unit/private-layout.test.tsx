@@ -61,7 +61,7 @@ vi.mock('next/headers', () => ({
 
 // R16: el proveedor de sesion se sustituye por completo para poder afirmar que el layout
 // pinta **lo que el proveedor devuelve**, y no un valor cualquiera.
-vi.mock('@/lib/services/session-stub', () => ({
+vi.mock('@/lib/modules/identity/adapters/driven/session/session-stub', () => ({
   getSessionUser: getSessionUserMock,
   endSession: vi.fn<() => Promise<void>>(),
 }));
