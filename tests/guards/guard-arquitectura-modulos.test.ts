@@ -394,10 +394,26 @@ export function findContractLeakage(
 ): readonly string[] {
   const findings: string[] = []
   const relIndex = relPosix(root, moduleIndexPath)
+  const ownModule = moduleOfPath(relIndex)
 
   for (const spec of extractExportFromSpecifiers(moduleIndexContent)) {
-    if (!spec.startsWith('./domain')) {
+    // Decide sobre el DESTINO resuelto, no sobre el texto del especificador (mismo defecto
+    // que el mayor 1 de la revision de QC-15, aqui en el ultimo sitio donde quedaba): un
+    // `./domain/../../../shared/routes` empieza con './domain' en el texto pero resuelve
+    // fuera del dominio, y un alias '@/lib/modules/<m>/domain/x' es legitimo aunque el
+    // texto no empiece con './domain'.
+    const resolved = resolveInternalSpecifier(moduleIndexPath, spec, root, tryRead)
+    if (!resolved) {
+      // Paquete externo, o import que no resuelve a ningun archivo real: un contrato solo
+      // reexporta de su propio dominio.
       findings.push(`${relIndex} reexporta '${spec}', fuera de ./domain (R10)`)
+      continue
+    }
+    const targetRel = relPosix(root, resolved.path)
+    const sameModule = ownModule !== null && moduleOfPath(targetRel) === ownModule
+    const isDomain = layerOfPath(targetRel) === 'domain'
+    if (!sameModule || !isDomain) {
+      findings.push(`${relIndex} reexporta '${spec}' -> '${targetRel}', fuera del domain/ de su modulo (R10)`)
     }
   }
   if (hasUseServerDirective(moduleIndexContent)) {
@@ -817,6 +833,7 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
 
   describe('bloque 4 — pureza del dominio (R7, R8, R9)', () => {
     it('ningun archivo real de domain/ports importa algo prohibido', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findings = allSourceFiles.flatMap((file) =>
         findDomainPurityFindings(file, repoRoot, (absPath) => tryReadReal(absPath) !== null),
       )
@@ -967,7 +984,7 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       const findings = findContractLeakage(indexPath, files.get(indexPath) as string, repoRoot, tryRead)
 
       expect(findings).toContainEqual(
-        "lib/modules/identity/index.ts reexporta './adapters/driving/login-action', fuera de ./domain (R10)",
+        "lib/modules/identity/index.ts reexporta './adapters/driving/login-action' -> 'lib/modules/identity/adapters/driving/login-action.ts', fuera del domain/ de su modulo (R10)",
       )
       expect(findings).toContainEqual(
         "lib/modules/identity/index.ts arrastra 'lib/modules/identity/adapters/driving/login-action.ts' con 'use server' transitivamente (R10)",
@@ -990,22 +1007,64 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       const indexPath = join(repoRoot, 'lib', 'modules', 'identity', 'index.ts')
       expect(findContractLeakage(indexPath, files.get(indexPath) as string, repoRoot, tryRead)).toEqual([])
     })
+
+    it('detecta un reexport CAMUFLADO que dice ./domain en el texto pero resuelve fuera del dominio (menor 7)', () => {
+      // El bypass exacto que el reviewer demostro: `./domain/../../../shared/routes`
+      // empieza con './domain' en el TEXTO, pero `join()` lo normaliza a
+      // `lib/shared/routes.ts`, fuera del dominio del modulo. Antes de este arreglo esto
+      // daba 43/43 verde porque la guardia decidia sobre el texto, no sobre el destino.
+      const files = new Map<string, string>([
+        [
+          join(repoRoot, 'lib', 'modules', 'identity', 'index.ts'),
+          "export { DASHBOARD_ROUTE } from './domain/../../../shared/routes';",
+        ],
+        [join(repoRoot, 'lib', 'shared', 'routes.ts'), "export const DASHBOARD_ROUTE = '/dashboard';"],
+      ])
+      const tryRead = (absPath: string) => files.get(absPath) ?? null
+      const indexPath = join(repoRoot, 'lib', 'modules', 'identity', 'index.ts')
+      const findings = findContractLeakage(indexPath, files.get(indexPath) as string, repoRoot, tryRead)
+      expect(findings).toContainEqual(
+        "lib/modules/identity/index.ts reexporta './domain/../../../shared/routes' -> 'lib/shared/routes.ts', fuera del domain/ de su modulo (R10)",
+      )
+    })
+
+    it('un reexport LEGITIMO del propio dominio escrito por alias no genera hallazgos (menor 7)', () => {
+      // El falso positivo exacto que el reviewer demostro: el alias resuelve al MISMO
+      // archivo que './domain/session-user', pero el texto no empieza con './domain'.
+      const files = new Map<string, string>([
+        [
+          join(repoRoot, 'lib', 'modules', 'identity', 'index.ts'),
+          "export type { SessionUser } from '@/lib/modules/identity/domain/session-user';",
+        ],
+        [
+          join(repoRoot, 'lib', 'modules', 'identity', 'domain', 'session-user.ts'),
+          'export type SessionUser = { id: string };',
+        ],
+      ])
+      const tryRead = (absPath: string) => files.get(absPath) ?? null
+      const indexPath = join(repoRoot, 'lib', 'modules', 'identity', 'index.ts')
+      expect(findContractLeakage(indexPath, files.get(indexPath) as string, repoRoot, tryRead)).toEqual([])
+    })
   })
 
   describe('bloque 7 — composicion unica (R11, R12)', () => {
-    it('solo lib/composition importa adaptadores driven, y la composicion no importa driving', () => {
+    it('solo lib/composition importa adaptadores driven (R11)', () => {
       expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsR11 = allSourceFiles.flatMap((file) =>
         file.resolvedTargets
           .map(({ specifier, target }) => findDrivenImportOutsideComposition(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
+      expect(findingsR11).toEqual([])
+    })
+
+    it('la composicion no importa ningun adaptador driving (R12)', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsR12 = allSourceFiles.flatMap((file) =>
         file.resolvedTargets
           .map(({ specifier, target }) => findDrivingImportInsideComposition(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
-      expect(findingsR11).toEqual([])
       expect(findingsR12).toEqual([])
     })
 
@@ -1061,20 +1120,24 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
   })
 
   describe('bloque 8 — consumo desde UI (R13, R14)', () => {
-    it('app/, components/ y hooks/ del repo solo consumen el contrato o un adaptador driving', () => {
+    it('app/, components/ y hooks/ solo consumen el contrato o un adaptador driving (R13)', () => {
       expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsR13 = allSourceFiles.flatMap((file) =>
         file.resolvedTargets
           .map(({ specifier, target }) => findUiLayerImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
+      expect(findingsR13).toEqual([])
+    })
+
+    it('ningun archivo de cliente importa la composicion ni un adaptador driven (R14)', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsR14 = allSourceFiles.flatMap((file) => {
         const isClient = hasUseClientDirective(file.content)
         return file.resolvedTargets
           .map(({ specifier, target }) => findClientForbiddenImportFinding(file.relPath, isClient, specifier, target))
           .filter((finding): finding is string => finding !== null)
       })
-      expect(findingsR13).toEqual([])
       expect(findingsR14).toEqual([])
     })
 
@@ -1323,25 +1386,33 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
   })
 
   describe('bloque 13 — regla de dependencias completa (design.md > 5.1)', () => {
-    it('ningun driven importa composicion/driving propio/UI, ningun driving importa Prisma/domain-ports propios por ruta profunda/UI, y ninguna composicion importa UI', () => {
+    it('ningun driven real importa composicion, driving propio o UI (design.md > 5.1, fila driven)', () => {
       expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsDriven = allSourceFiles.flatMap((file) =>
         file.resolvedTargets
           .map(({ specifier, target }) => findDrivenForbiddenImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
+      expect(findingsDriven).toEqual([])
+    })
+
+    it('ningun driving real importa Prisma directo, domain/ports propios por ruta profunda, ni UI (design.md > 5.1, fila driving)', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsDriving = allSourceFiles.flatMap((file) =>
         file.resolvedTargets
           .map(({ specifier, target }) => findDrivingForbiddenImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
+      expect(findingsDriving).toEqual([])
+    })
+
+    it('ninguna composicion real importa la UI (design.md > 5.1, fila composicion)', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsComposition = allSourceFiles.flatMap((file) =>
         file.resolvedTargets
           .map(({ specifier, target }) => findCompositionForbiddenImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
-      expect(findingsDriven).toEqual([])
-      expect(findingsDriving).toEqual([])
       expect(findingsComposition).toEqual([])
     })
 

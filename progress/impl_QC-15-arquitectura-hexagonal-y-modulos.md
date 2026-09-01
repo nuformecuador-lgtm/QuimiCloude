@@ -1362,3 +1362,102 @@ contrato de R18 siguen verdes, y ninguna asercion existente cambio de valor.
 `guard-dependencias-aprobadas` ya esta en verde: el leader anadio la fila `heredada` de
 `bcryptjs` (commit `f642e6f`), que era la opcion recomendada en T11.
 
+---
+
+# RONDA 3 — tres menores de la revision aprobada (2026-09-01)
+
+El reviewer **APROBO** (0 mayores) y dejo tres menores nuevos
+(`progress/review_QC-15-arquitectura-hexagonal-y-modulos.md > RONDA 2`). Los tres cerrados.
+**Solo se toco `tests/guards/guard-arquitectura-modulos.test.ts`**: cero cambios en produccion.
+
+## Menor 7 — la ultima comparacion de cadena, con bypass demostrado
+
+`findContractLeakage` decidia sobre el **texto**: `if (!spec.startsWith('./domain'))`. Es el
+mismo defecto que fue el mayor 1 de la ronda 1, en el ultimo sitio donde quedaba. El leader
+lo subio a bloqueante para el PR con el argumento correcto: cerrar cinco bloques y dejar el
+sexto comparando texto es dejar abierta la puerta que ya sabemos que se abre.
+
+Fallaba **por los dos lados**:
+
+- **Falso negativo:** `'./domain/../../../shared/routes'` empieza por `./domain` como texto,
+  pero `join()` lo resuelve a `lib/shared/routes.ts`. El contrato reexportaba un simbolo
+  ajeno a su dominio —justo lo que R10 prohibe— y la guardia daba **43/43 verde**.
+- **Falso positivo:** un reexport legitimo del propio dominio escrito por alias
+  (`'@/lib/modules/identity/domain/session-user'`) se marcaba como violacion.
+
+**Arreglo**, con el resolvedor que ya existia (`resolveInternalSpecifier`, la que ya usaba
+`collectTransitiveClosure` — no se escribio un segundo): por cada `export ... from`, se
+resuelve el especificador; si no resuelve (paquete externo o import roto) es hallazgo; si
+resuelve, es hallazgo salvo que `moduleOfPath(targetRel)` sea el **mismo modulo** del
+`index.ts` **y** `layerOfPath(targetRel) === 'domain'`. El mensaje incluye **el destino
+resuelto** ademas del especificador, que es lo que hace util el hallazgo cuando el camuflaje
+es precisamente la gracia del ataque.
+
+### Evidencia — los dos lados, reproducidos por el implementer
+
+**a) El bypass camuflado, antes 43/43 verde:**
+
+```
+FAIL tests/guards/guard-arquitectura-modulos.test.ts
+  > bloque 6 > los contratos reales (identity, inventario) no arrastran servidor
++   "lib/modules/identity/index.ts reexporta './domain/../../../shared/routes'
++    -> 'lib/shared/routes.ts', fuera del domain/ de su modulo (R10)",
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 64 passed (65)
+```
+
+**b) El reexport legitimo por alias, antes falso positivo:**
+
+```
+$ # export type { SessionUser } from '@/lib/modules/identity/domain/session-user'
+ Test Files  5 passed (5)
+      Tests  65 passed (65)
+```
+
+Los dos experimentos revertidos; `git status` limpio. `lib/modules/inventario/index.ts`
+(`export {}`, sin ningun `from`) sigue sin producir hallazgos.
+
+## Menor 8 — faltaba el sentinel en el bloque 4
+
+`expect(allSourceFiles.length).toBeGreaterThan(0)` estaba en los bloques 5, 7, 8, 9, 11 y 13
+y **faltaba justo en el 4**, el que cubre R7 y R8 (pureza del dominio), donde un falso verde
+costaria mas caro. Anadido, identico a los demas.
+
+## Menor 9 — un `it` por regla
+
+Los `it` de los bloques 7, 8 y 13 encadenaban varios `expect`, asi que el primero que fallaba
+abortaba y **tapaba** a los siguientes; al reviewer le paso en vivo con R13 ocultando R14.
+Separados en un `it` por regla, cada uno con su propio sentinel y con el `R<n>` en el nombre.
+No cambia ninguna regla: es reorganizar aserciones.
+
+### Evidencia — R13 y R14 violados a la vez, que era el caso que se tapaba
+
+```
+× app/, components/ y hooks/ solo consumen el contrato o un adaptador driving (R13)
++   "app/page.tsx importa '@/lib/modules/identity/domain/credentials' saltandose el
++    contrato del modulo (R13)",
+× ningun archivo de cliente importa la composicion ni un adaptador driven (R14)
++   "components/private/nav-user.tsx ('use client') importa el punto de composicion
++    '@/lib/composition' (R14)",
+ Tests  2 failed | 63 passed (65)
+```
+
+Los **dos** salen ahora, cada uno con su nombre. Revertido.
+
+## Estado tras la ronda 3
+
+```
+$ pnpm run typecheck        -> 0 errores
+$ pnpm run lint             -> limpio
+$ pnpm exec vitest run guard
+ Test Files  5 passed (5)
+      Tests  65 passed (65)
+$ pnpm test
+ Test Files  22 passed (22)
+      Tests  220 passed (220)
+```
+
+`guard-arquitectura-modulos.test.ts`: **43 -> 49 tests** (13 bloques). Total de guardias:
+55 -> 65. Suite: 214 -> 220. **Cero regresiones**: los 20 archivos verdes del contrato de R18
+siguen verdes y ninguna asercion existente cambio de valor.
+
