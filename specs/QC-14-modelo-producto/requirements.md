@@ -18,7 +18,134 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es la **capa de persistencia** de
+QuimiCloude: el esquema Prisma (`db/schema.prisma`) más la base Postgres con la migración de
+esta feature aplicada. No hay servicio ni interfaz de usuario en esta ficha (decisión cerrada
+n.º 2), así que ningún requisito habla de quién llama ni desde dónde.
+
+### Estructura de la presentación
+
+**R1.** El sistema DEBE persistir, para cada presentación, un identificador propio, estable y
+no derivado de sus datos de negocio, y un nombre.
+
+**R2.** SI se intenta persistir una presentación sin nombre, ENTONCES el sistema DEBE rechazar
+la operación y no crear ninguna fila.
+
+### Estructura del producto
+
+**R3.** El sistema DEBE persistir, en **una única entidad de producto**, los siguientes datos:
+nombre, presentación, existencia, costo, compra mínima, tiempo de entrega en días enteros,
+cantidad de alerta y unidad de medida; y NO DEBE mantener ninguna entidad separada de
+«elemento de inventario» con esos mismos datos.
+
+**R4.** SI se intenta persistir un producto sin nombre o sin presentación, ENTONCES el sistema
+DEBE rechazar la operación y no crear ninguna fila.
+
+**R5.** El sistema DEBE aceptar un producto en el que la existencia, el costo, el tiempo de
+entrega, la cantidad de alerta o la unidad de medida no tengan ningún valor, y DEBE
+devolverlos después como ausencia de valor y no como cero ni como cadena vacía.
+
+**R6.** SI se persiste un producto sin indicar su compra mínima, ENTONCES el sistema DEBE
+registrar `0` como su compra mínima.
+
+**R7.** El sistema DEBE almacenar la existencia, la compra mínima, la cantidad de alerta y el
+tiempo de entrega como números **enteros**, sin parte decimal.
+
+**R8.** El sistema DEBE almacenar el costo como número **decimal exacto** de 14 dígitos de
+precisión y 4 decimales, DEBE devolver sin pérdida cualquier valor con hasta 4 decimales, y NO
+DEBE usar ninguna representación de coma flotante binaria (`float`, `double`, `real`).
+
+**R9.** SI se intenta persistir un producto cuya existencia, compra mínima, cantidad de alerta
+o costo sea negativo, ENTONCES el sistema DEBE rechazar la operación **en la propia base de
+datos** y no crear ni modificar ninguna fila.
+
+**R10.** El sistema DEBE almacenar la unidad de medida como texto libre, y NO DEBE restringirla
+a un conjunto de valores admitidos, ni normalizarla, ni derivar de ella ninguna conversión
+entre unidades.
+
+**R11.** El sistema DEBE limitarse a almacenar y devolver la cantidad de alerta tal como se
+guardó, y NO DEBE compararla con la existencia, ni derivar de ella ninguna columna, estado ni
+notificación de «bajo de existencias».
+
+### Relación producto — presentación
+
+**R12.** El sistema DEBE asociar cada producto con exactamente una presentación, y SI se
+intenta persistir un producto sin presentación o con una presentación inexistente, ENTONCES
+DEBE rechazar la operación y no crear ninguna fila.
+
+**R13.** El sistema DEBE permitir que una misma presentación esté asociada a un número
+ilimitado de productos.
+
+**R14.** SI se intenta borrar una presentación que tiene al menos un producto asignado,
+**incluidos los productos borrados lógicamente**, ENTONCES el sistema DEBE rechazar el borrado
+y conservar tanto la presentación como sus productos sin modificar.
+
+**R15.** MIENTRAS una presentación no tenga ningún producto asignado, el sistema DEBE permitir
+su borrado.
+
+### Nombre del producto
+
+**R16.** El sistema DEBE aceptar dos o más productos con el mismo nombre —coincida el texto de
+forma exacta o solo salvo mayúsculas y minúsculas—, sin rechazar ninguno de ellos.
+
+### Borrado lógico y marcas de tiempo
+
+**R17.** CUANDO se borra un producto, el sistema DEBE conservar su fila completa y registrar el
+instante del borrado, sin eliminar ninguno de sus datos.
+
+**R18.** El sistema DEBE registrar, para cada producto y cada presentación, el instante de
+creación y el instante de la última modificación, y DEBE actualizar el segundo cada vez que la
+fila cambia.
+
+### Esquema, seguridad y migración
+
+**R19.** El sistema DEBE nombrar en **inglés** todas las tablas, columnas, índices y
+restricciones que cree esta feature.
+
+**R20.** El sistema DEBE declarar `inventario` como módulo propietario de los dos modelos de
+esta feature, y ningún módulo distinto de `inventario` DEBE consultarlos con el cliente Prisma.
+
+**R21.** El sistema DEBE tener `ROW LEVEL SECURITY` activado **y forzado**
+(`FORCE ROW LEVEL SECURITY`) en las dos tablas que crea esta feature.
+
+**R22.** CUANDO se revierte la migración de esta feature, el sistema DEBE quedar exactamente en
+el estado de esquema previo a aplicarla, sin dejar tablas, restricciones, índices ni columnas
+residuales.
+
+### Límite de alcance
+
+**R23.** El sistema NO DEBE incluir en esta feature ninguna operación de alta, consulta, edición
+o borrado de productos ni de presentaciones, ni adaptador driving, ruta, Server Action o
+pantalla que las exponga; por lo tanto esta feature no aporta ningún flujo navegable que un
+test E2E pueda visitar.
+
+**R24.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el
+requisito que la hace testeable. Ninguna queda sin `R<n>`.
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Producto y elemento de inventario son la misma tabla | R3 |
+| 2 | El CRUD no entra aquí (QC-20) | R23 |
+| 3 | La presentación es tabla propia `presentation (id, name)` | R1, R2, R12 |
+| 4 | Presentación obligatoria, compartida y no borrable con productos | R12, R13, R14, R15 |
+| 5 | Unidad única, texto libre, opcional y anotativa | R5, R10 |
+| 6 | El nombre del producto no es único | R16 |
+| 7 | Enteros, `cost` decimal (14,4), ninguno negativo | R7, R8, R9 |
+| 8 | Obligatoriedad de cada campo y `min_purchase` con defecto 0 | R4, R5, R6 |
+| 9 | Tiempo de entrega en días enteros | R3, R7 |
+| 10 | La cantidad de alerta solo se almacena | R11 |
+| 11 | Borrado lógico con `created_at` / `updated_at` / `deleted_at` | R17, R18 |
+| 12 | Identificadores de la base en inglés | R19 |
+| 13 | RLS activado y forzado en las dos tablas | R21 |
+| 14 | Migración con `down.sql` que revierte al esquema exacto anterior | R22 |
+| 15 | Módulo propietario `inventario` | R20 |
+| 16 | E2E diferido con motivo | R23 |
+| 17 | Ninguna librería nueva | R24 |
 
 ## Preguntas abiertas
 
