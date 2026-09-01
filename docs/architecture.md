@@ -67,6 +67,48 @@ Conviene cerrarlas antes de la primera feature de inventario o de producto, no d
 - **Integraciones externas:** ninguna definida todavia. Cuando entre la primera, se
   documenta aqui con su cliente en `lib/interfaces/external/`.
 
+## Dependencias de terceros
+
+**La regla.** Antes de escribir una utilidad, comprueba si ya la resuelve una librería del
+ecosistema y prefiérela. Reimplementar a mano lo que una librería mantenida ya hace —fechas,
+validación, parsing, decimales, drag&drop, tablas— es código nuestro que hay que mantener,
+testear y arreglar. `components/ui/` ya lo dice para shadcn/ui (`## Componentes`); esto lo
+generaliza a todo el repo, front y back.
+
+**Los cuatro checks.** Ninguna dependencia entra sin los cuatro, verificados y anotados:
+1. No marcada `deprecated` en npm.
+2. Release en los últimos 12 meses.
+3. >= 10.000 descargas semanales.
+4. Licencia MIT, Apache-2.0, BSD o ISC.
+
+Si alguno falla, no se propone. Si no puedes verificarlo (sin red, dato no público), no es un
+sí: es un desconocido, y se dice (regla 6 de `CLAUDE.md`).
+
+**La puerta.** Los cuatro checks no bastan: **una dependencia nueva la aprueba una persona.**
+Los subagentes no instalan nada por su cuenta — proponen, paran y devuelven la propuesta al
+implementer, que la sube al leader, que pregunta. Aprobada, se anota en `docs/dependencias.md`
+y ahí se instala. Cuando la librería se elige en la fase de spec, la propuesta va en el
+`design.md` y se aprueba junto con el spec (F1.4): así el gate llega antes del código.
+
+**Excepción.** Ninguna silenciosa. Una librería que falla un check puede entrar si el humano
+la aprueba explícitamente y la fila del registro dice qué check falló y por qué se aceptó.
+
+**Quién lo verifica.** `tests/guards/guard-dependencias-aprobadas.test.ts` compara
+`package.json` contra el registro y falla el gate ante cualquier dependencia no listada. El
+reviewer lo trata como BLOQUEANTE. La guardia no consulta npm —el gate corre sin red—, así que
+lo que comprueba es la aprobación, no la salud: la salud la acredita la fila del registro.
+
+**Alcance.** Rige hacia adelante. El `package.json` de hoy entra sembrado como `heredada` para
+que el gate quede verde el día uno, y se audita contra los cuatro checks en una feature propia
+del board. El código ya escrito que reimplementa algo no se reescribe hacia atrás; cuando una
+feature lo toque, se aplica a lo que toque.
+
+**Lo que cuesta.** Cada dependencia nueva cuesta una parada y una espera a un humano, y el
+umbral de 10.000 descargas descarta librerías nicho legítimas —que entran igual, pero por la
+excepción documentada. A cambio, `package.json` deja de crecer solo y el registro dice, en un
+sitio, por qué está cada cosa. La regla es preventiva: la fijó el humano el 2026-09-01, no hay
+ningún incidente previo que la motive.
+
 ## Principios
 1. **Separacion de capas.** Controller, Service, Repository con interfaces. La logica
    de negocio vive en servicios testeables, separada de HTTP y de la DB.
@@ -309,6 +351,41 @@ Notas que evitan sorpresas:
 - Esto aplica a componentes **de ruta**. `components/ui/`, `components/shared/` y
   `components/private/` mantienen su estructura y se importan por su ruta de siempre.
 
+### Regla: multiplataforma — web, iOS y Android
+
+La UI se consume desde navegador de escritorio y desde navegador movil o WebView en iOS y
+Android. Toda decision de UI se valida contra las tres plataformas, no solo contra la ventana
+en la que se escribio.
+
+**Librerias.** Antes de añadir una dependencia de UI, verifica que soporte Safari/WebKit (iOS)
+y Chrome Android. Se descartan las que dependan de APIs no soportadas en iOS o que solo
+funcionen con mouse/hover. Si no puedes verificar el soporte, no la uses y dilo: soporte sin
+verificar es un desconocido, no un si (regla 6 de `CLAUDE.md`).
+
+**Estilos.** Mobile-first con los breakpoints de Tailwind.
+- Nada de `100vh` para alto de pantalla: `100dvh` / `min-h-dvh`, por la barra de direcciones de iOS.
+- `env(safe-area-inset-*)` en headers y footers fijos, por el notch.
+- `:hover` nunca es la unica forma de descubrir o activar algo.
+- `position: fixed` y scroll anidado se comprueban en iOS antes de darlos por buenos.
+
+**Interaccion.**
+- Targets tactiles de al menos 44x44 px.
+- `font-size` >= 16px en inputs, o iOS hace zoom al enfocar.
+- Nada que dependa de eventos exclusivos de mouse: Pointer Events o los handlers de React,
+  que ya cubren touch.
+
+**Excepcion.** Una feature puede usar algo que solo funcione en escritorio si su
+`specs/<feature>/design.md` lo declara y explica por que. Sin esa declaracion el reviewer
+rechaza. La excepcion se documenta donde se decide, no en un comentario del componente.
+
+**Alcance.** Rige para codigo nuevo. Lo ya mergeado no se audita hacia atras; cuando una
+feature toque un componente existente, se aplica a lo que toque.
+
+**Lo que cuesta.** Descarta librerias de UI que solo se prueban en Chrome escritorio y añade
+una pasada de revision en cada PR con UI. El coste se acepta porque el humano fijo el soporte
+movil como requisito del producto (2026-08-28). No hay ningun incidente previo que la motive:
+la regla es preventiva, no reactiva.
+
 ## Anti-patrones que el reviewer rechaza
 - Logica de negocio dentro de componentes o handlers de ruta.
 - Queries sin indice en rutas calientes o crons frecuentes.
@@ -330,3 +407,12 @@ Notas que evitan sorpresas:
 - **Componentes de ruta sueltos junto a `page.tsx`**, o importados por ruta profunda
   (`./components/login-form`) saltandose el barrel `index.ts` de la ruta
   (ver `## Componentes > Regla: componentes de ruta en components/ con barrel index.ts`).
+- **UI que solo funciona en escritorio**: `100vh` como alto de pantalla, `:hover` como unica
+  via de activacion, targets tactiles menores de 44x44 px, `font-size` < 16px en inputs, o una
+  libreria de UI sin soporte verificado en Safari/WebKit y Chrome Android — salvo excepcion
+  declarada en el `design.md` de la feature
+  (ver `## Componentes > Regla: multiplataforma — web, iOS y Android`).
+- **Dependencia en `package.json` que no está en `docs/dependencias.md`**, o añadida sin
+  aprobación humana (ver `## Dependencias de terceros`).
+- **Utilidad escrita a mano que ya resuelve una librería del stack** (fechas, validación,
+  parsing, decimales) sin que el `design.md` explique por qué no se usó.

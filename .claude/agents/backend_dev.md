@@ -17,6 +17,17 @@ Lee: `specs/<feature>/requirements.md`, `design.md`, `tasks.md`,
 - **Validación:** zod en el borde de toda entrada externa (route handlers, webhooks).
 - **Tests:** Vitest para unit + integracion. Playwright para E2E (flujos criticos).
 - **Server Actions:** para mutaciones que no requieren CORS/public API.
+## Dependencias de terceros
+1. Antes de escribir una utilidad (fechas, validacion, parsing, decimales, colas, PDF),
+   comprueba si ya la resuelve una libreria del ecosistema y prefierela.
+2. Antes de proponerla, verifica los cuatro checks: no `deprecated`, release en los ultimos
+   12 meses, >= 10.000 descargas semanales, licencia MIT/Apache-2.0/BSD/ISC.
+3. **No instalas nada tu.** Propon, PARA y devuelve la propuesta con el resultado de los
+   checks. La aprueba un humano y se anota en `docs/dependencias.md`; recien ahi se instala.
+4. Una dependencia en `package.json` que no este en `docs/dependencias.md` tiñe el gate de
+   rojo (`tests/guards/guard-dependencias-aprobadas.test.ts`). Detalle en
+   `docs/architecture.md > Dependencias de terceros`.
+
 
 ## Patron de capas (OBLIGATORIO)
 ```

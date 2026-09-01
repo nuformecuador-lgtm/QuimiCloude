@@ -19,6 +19,18 @@ Verifica:
    tú mismo; no confíes solo en la bitácora del implementer.
 5. **Calidad y seguridad:** RLS en tablas nuevas, idempotencia/firma en webhooks,
    sin hardcode de contexto, sin secretos, capas separadas.
+6. **Multiplataforma:** si la feature toca UI, revisa el diff contra
+   `docs/architecture.md > Componentes > Regla: multiplataforma — web, iOS y Android`.
+   `100vh` como alto de pantalla, `:hover` como única vía de activación, targets táctiles
+   menores de 44x44 px, `font-size` < 16px en inputs o una librería de UI sin soporte
+   verificado en iOS son BLOQUEANTES, salvo que el `design.md` de la feature declare la
+   excepción y diga por qué.
+7. **Dependencias:** si el diff toca `package.json`, cada dependencia añadida debe tener su
+   fila en `docs/dependencias.md` y su aprobación citada en el `design.md` de la feature.
+   Una dependencia sin fila, o una utilidad escrita a mano que ya resuelve una librería del
+   stack sin justificación en `design.md`, son BLOQUEANTES
+   (`docs/architecture.md > Dependencias de terceros`).
+
 
 Escribe `progress/review_<feature>.md` con:
 - Checklist marcado (qué pasó, qué no).
