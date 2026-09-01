@@ -217,13 +217,32 @@ function candidatePaths(base: string): readonly string[] {
   return [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]
 }
 
+/**
+ * Resultado de resolver un especificador: paquete externo (por nombre) o ruta interna
+ * YA resuelta a una ruta real del repo (POSIX, relativa a `repoRoot`). Los bloques que
+ * deciden sobre el DESTINO (no sobre el texto del especificador) reciben esto, nunca el
+ * especificador crudo: asi un import relativo y uno con alias que resuelven al mismo
+ * archivo producen la misma decision (mayor 1 de la revision de QC-15).
+ */
+export type ImportTarget = { kind: 'external'; name: string } | { kind: 'internal'; relPath: string }
+
+/** Construye un `ImportTarget` interno a mano, para los casos sinteticos de los bloques que ya no miran el texto del especificador. */
+export function internalTarget(relPath: string): ImportTarget {
+  return { kind: 'internal', relPath }
+}
+
+/** Construye un `ImportTarget` externo a mano, para los casos sinteticos de los bloques que ya no miran el texto del especificador. */
+export function externalTarget(name: string): ImportTarget {
+  return { kind: 'external', name }
+}
+
 /** Clasifica un especificador visto desde `fromFileAbs`: paquete externo, o ruta interna resuelta. */
 export function classifyImportTarget(
   fromFileAbs: string,
   specifier: string,
   root: string,
   exists: (absPath: string) => boolean,
-): { kind: 'external'; name: string } | { kind: 'internal'; relPath: string } {
+): ImportTarget {
   if (!specifier.startsWith('.') && !specifier.startsWith('@/')) {
     return { kind: 'external', name: specifier }
   }
@@ -304,13 +323,14 @@ export function findDomainPurityFindings(
  * porque la composicion SI debe llegar a `ports/`/`adapters/driven/` y la UI SI debe
  * llegar a `adapters/driving/`. R9 es la frontera MODULO <-> MODULO.
  */
-export function findCrossModuleDeepImportFinding(relPath: string, specifier: string): string | null {
+export function findCrossModuleDeepImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
   const ownModule = moduleOfPath(relPath)
   if (!ownModule) return null
-  const match = /^@\/lib\/modules\/([^/]+)\/(.+)$/.exec(specifier)
-  if (!match) return null
-  const targetModule = match[1] as string
-  if (ownModule === targetModule) return null
+  if (target.kind === 'external') return null
+  const targetModule = moduleOfPath(target.relPath)
+  if (!targetModule || targetModule === ownModule) return null
+  // El barrel resuelve a `index.ts`: eso es el CONTRATO, no una ruta profunda (R9 lo permite).
+  if (layerOfPath(target.relPath) === 'index') return null
   return `${relPath} importa '${specifier}', ruta profunda a otro modulo (R9)`
 }
 
@@ -404,18 +424,20 @@ export function findContractLeakage(
 // ---------------------------------------------------------------------------
 
 /** Solo `lib/composition/**` puede importar un adaptador driven de cualquier modulo (R11). */
-export function findDrivenImportOutsideComposition(relPath: string, specifier: string): string | null {
+export function findDrivenImportOutsideComposition(relPath: string, specifier: string, target: ImportTarget): string | null {
   if (relPath.startsWith('lib/composition/')) return null
-  if (/^@\/lib\/modules\/[^/]+\/adapters\/driven\//.test(specifier)) {
+  if (target.kind === 'external') return null
+  if (layerOfPath(target.relPath) === 'driven') {
     return `${relPath} importa el adaptador driven '${specifier}' fuera de lib/composition (R11)`
   }
   return null
 }
 
 /** `lib/composition/**` no puede importar ningun adaptador driving (R12). */
-export function findDrivingImportInsideComposition(relPath: string, specifier: string): string | null {
+export function findDrivingImportInsideComposition(relPath: string, specifier: string, target: ImportTarget): string | null {
   if (!relPath.startsWith('lib/composition/')) return null
-  if (/^@\/lib\/modules\/[^/]+\/adapters\/driving\//.test(specifier)) {
+  if (target.kind === 'external') return null
+  if (layerOfPath(target.relPath) === 'driving') {
     return `${relPath} importa el adaptador driving '${specifier}' desde la composicion (R12)`
   }
   return null
@@ -428,21 +450,29 @@ export function findDrivingImportInsideComposition(relPath: string, specifier: s
 const UI_ROOTS = ['app/', 'components/', 'hooks/']
 
 /** `app/`, `components/`, `hooks/` solo consumen el contrato o un adaptador driving (R13). */
-export function findUiLayerImportFinding(relPath: string, specifier: string): string | null {
+export function findUiLayerImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
   if (!UI_ROOTS.some((root) => relPath.startsWith(root))) return null
-  if (/^@\/lib\/modules\/[^/]+\/(domain|ports|adapters\/driven)\//.test(specifier)) {
+  if (target.kind === 'external') return null
+  const layer = layerOfPath(target.relPath)
+  if (layer === 'domain' || layer === 'ports' || layer === 'driven') {
     return `${relPath} importa '${specifier}' saltandose el contrato del modulo (R13)`
   }
   return null
 }
 
 /** Un archivo `'use client'` no puede importar la composicion ni un adaptador driven (R14). */
-export function findClientForbiddenImportFinding(relPath: string, isClient: boolean, specifier: string): string | null {
+export function findClientForbiddenImportFinding(
+  relPath: string,
+  isClient: boolean,
+  specifier: string,
+  target: ImportTarget,
+): string | null {
   if (!isClient) return null
-  if (specifier === '@/lib/composition' || specifier.startsWith('@/lib/composition/')) {
+  if (target.kind === 'external') return null
+  if (target.relPath === 'lib/composition/index.ts' || target.relPath.startsWith('lib/composition/')) {
     return `${relPath} ('use client') importa el punto de composicion '${specifier}' (R14)`
   }
-  if (/^@\/lib\/modules\/[^/]+\/adapters\/driven\//.test(specifier)) {
+  if (layerOfPath(target.relPath) === 'driven') {
     return `${relPath} ('use client') importa el adaptador driven '${specifier}' (R14)`
   }
   return null
@@ -453,10 +483,11 @@ export function findClientForbiddenImportFinding(relPath: string, isClient: bool
 // ---------------------------------------------------------------------------
 
 /** `lib/shared/**` no importa modulos ni el punto de composicion: es una HOJA (R15). */
-export function findSharedImportFinding(relPath: string, specifier: string): string | null {
+export function findSharedImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
   if (!relPath.startsWith('lib/shared/')) return null
-  if (specifier.startsWith('@/lib/modules/')) return `${relPath} importa '${specifier}' de un modulo (R15)`
-  if (specifier === '@/lib/composition' || specifier.startsWith('@/lib/composition/')) {
+  if (target.kind === 'external') return null
+  if (target.relPath.startsWith('lib/modules/')) return `${relPath} importa '${specifier}' de un modulo (R15)`
+  if (target.relPath === 'lib/composition/index.ts' || target.relPath.startsWith('lib/composition/')) {
     return `${relPath} importa el punto de composicion '${specifier}' (R15)`
   }
   return null
@@ -530,8 +561,8 @@ export function findModelAccessFindings(
 // ---------------------------------------------------------------------------
 
 /** `@/lib/shared/db/prisma` solo se importa desde `adapters/driven/**`, `scripts/` o `tests/` (R17). */
-export function findPrismaClientImportFinding(relPath: string, specifier: string): string | null {
-  const isSharedPrismaImport = specifier === '@/lib/shared/db/prisma' || /(^|\/)lib\/shared\/db\/prisma$/.test(specifier)
+export function findPrismaClientImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
+  const isSharedPrismaImport = target.kind === 'internal' && target.relPath === 'lib/shared/db/prisma.ts'
   if (!isSharedPrismaImport) return null
   const allowed =
     (relPath.startsWith('lib/modules/') && relPath.includes('/adapters/driven/')) ||
@@ -547,18 +578,97 @@ export function findPrismaClientImportFinding(relPath: string, specifier: string
 
 export const LEGACY_LIB_PATHS = ['lib/services/', 'lib/repositories/', 'lib/interfaces/', 'lib/actions/'] as const
 
-/** `docs/architecture.md` no presenta como vigentes las rutas viejas, y menciona `lib/modules/` (R19). */
+/** `docs/architecture.md` no menciona las rutas viejas (ni para prohibirlas) y menciona `lib/modules/` (R19). */
 export function findArchitectureDocFindings(docSource: string): readonly string[] {
   const findings: string[] = []
   for (const legacyPath of LEGACY_LIB_PATHS) {
     if (docSource.includes(legacyPath)) {
-      findings.push(`docs/architecture.md menciona '${legacyPath}' como vigente (R19)`)
+      findings.push(`docs/architecture.md menciona '${legacyPath}' (R19)`)
     }
   }
   if (!docSource.includes('lib/modules/')) {
     findings.push(`docs/architecture.md no menciona 'lib/modules/' (R19)`)
   }
   return findings
+}
+
+// ---------------------------------------------------------------------------
+// BLOQUE 13 — regla de dependencias completa (design.md > 5.1)
+// ---------------------------------------------------------------------------
+//
+// Cierra las celdas de la tabla que ningun bloque anterior mira: lo que las filas
+// `adapters/driven`, `adapters/driving` y `lib/composition` PROHIBEN y que hoy pasa en
+// verde sin que nada lo compruebe (mayor 2 de la revision de QC-15). Lo que esas filas
+// SI permiten (domain/ports propios, lib/shared, el barrel del propio o de otro modulo,
+// SDKs externos, next/react en driving...) no se toca aqui: ya nace verde y no hace
+// falta prohibirlo dos veces.
+
+/**
+ * `adapters/driven/**` no puede importar: el punto de composicion, un adaptador driving
+ * de su PROPIO modulo, ni la UI (`app/**`, `components/**`) (design.md > 5.1, fila driven).
+ */
+export function findDrivenForbiddenImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
+  if (layerOfPath(relPath) !== 'driven') return null
+  if (target.kind === 'external') return null
+  const targetRel = target.relPath
+
+  if (targetRel === 'lib/composition/index.ts' || targetRel.startsWith('lib/composition/')) {
+    return `${relPath} importa el punto de composicion '${specifier}' (design.md > 5.1, fila driven)`
+  }
+
+  const ownModule = moduleOfPath(relPath)
+  if (ownModule && moduleOfPath(targetRel) === ownModule && layerOfPath(targetRel) === 'driving') {
+    return `${relPath} importa el adaptador driving '${specifier}' de su propio modulo (design.md > 5.1, fila driven)`
+  }
+
+  if (targetRel.startsWith('app/') || targetRel.startsWith('components/')) {
+    return `${relPath} importa '${specifier}' de la UI (design.md > 5.1, fila driven)`
+  }
+
+  return null
+}
+
+/**
+ * `adapters/driving/**` no puede importar: `@prisma/client`, ni `domain/`/`ports/` de su
+ * PROPIO modulo por ruta profunda (para eso esta el barrel), ni la UI (design.md > 5.1,
+ * fila driving). `../driven/**` ya lo cubre R11 (bloque 7): cualquier import de un
+ * adaptador driven fuera de `lib/composition/` dispara ahi, driving incluido.
+ */
+export function findDrivingForbiddenImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
+  if (layerOfPath(relPath) !== 'driving') return null
+
+  if (target.kind === 'external') {
+    if (target.name === '@prisma/client') {
+      return `${relPath} importa '@prisma/client' (design.md > 5.1, fila driving)`
+    }
+    return null
+  }
+
+  const targetRel = target.relPath
+  const ownModule = moduleOfPath(relPath)
+  if (ownModule && moduleOfPath(targetRel) === ownModule) {
+    const targetLayer = layerOfPath(targetRel)
+    if (targetLayer === 'domain' || targetLayer === 'ports') {
+      return `${relPath} importa '${specifier}', ruta profunda a domain/ports de su propio modulo en vez del barrel (design.md > 5.1, fila driving)`
+    }
+  }
+
+  if (targetRel.startsWith('app/') || targetRel.startsWith('components/')) {
+    return `${relPath} importa '${specifier}' de la UI (design.md > 5.1, fila driving)`
+  }
+
+  return null
+}
+
+/** `lib/composition/**` no puede importar la UI (`app/**`, `components/**`) (design.md > 5.1, fila composicion). */
+export function findCompositionForbiddenImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
+  if (!relPath.startsWith('lib/composition/')) return null
+  if (target.kind === 'external') return null
+  const targetRel = target.relPath
+  if (targetRel.startsWith('app/') || targetRel.startsWith('components/')) {
+    return `${relPath} importa '${specifier}' de la UI (design.md > 5.1, fila composicion)`
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -579,15 +689,20 @@ const libEntries = readDirEntries(join(repoRoot, 'lib'))
 const utilsPath = join(repoRoot, 'lib', 'utils.ts')
 const utilsSource = tryReadReal(utilsPath)
 
+const existsInRepo = (absPath: string) => tryReadReal(absPath) !== null
+
 const SCAN_ROOTS = ['app', 'components', 'hooks', 'lib'] as const
 const allSourceFiles = SCAN_ROOTS.flatMap((root) => listSourceFiles(join(repoRoot, root))).map((absPath) => {
   const content = readFileSync(absPath, 'utf8')
-  return {
-    absPath,
-    relPath: relPosix(repoRoot, absPath),
-    content,
-    specifiers: extractImportSpecifiers(content),
-  }
+  const relPath = relPosix(repoRoot, absPath)
+  const specifiers = extractImportSpecifiers(content)
+  // Un solo resolvedor por (archivo, especificador), reutilizado por todos los bloques
+  // que deciden sobre el DESTINO resuelto en vez del texto del especificador (mayor 1).
+  const resolvedTargets = specifiers.map((specifier) => ({
+    specifier,
+    target: classifyImportTarget(absPath, specifier, repoRoot, existsInRepo),
+  }))
+  return { absPath, relPath, content, specifiers, resolvedTargets }
 })
 
 const schemaSource = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8')
@@ -754,39 +869,74 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
 
   describe('bloque 5 — frontera entre modulos (R9)', () => {
     it('ningun archivo del repo importa las tripas de otro modulo', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findings = allSourceFiles.flatMap((file) =>
-        file.specifiers
-          .map((specifier) => findCrossModuleDeepImportFinding(file.relPath, specifier))
+        file.resolvedTargets
+          .map(({ specifier, target }) => findCrossModuleDeepImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
       expect(findings).toEqual([])
     })
 
-    it('detecta un archivo de inventario que importa el dominio de identity por ruta profunda', () => {
+    it('detecta un archivo de inventario que importa el dominio de identity por ruta profunda, con alias y con ruta relativa', () => {
       const finding = findCrossModuleDeepImportFinding(
         'lib/modules/inventario/adapters/driving/movimiento-action.ts',
         '@/lib/modules/identity/domain/credentials',
+        internalTarget('lib/modules/identity/domain/credentials.ts'),
       )
       expect(finding).toBe(
         "lib/modules/inventario/adapters/driving/movimiento-action.ts importa '@/lib/modules/identity/domain/credentials', ruta profunda a otro modulo (R9)",
       )
+
+      // Mismo destino, escrito con ruta relativa: la guardia decide sobre el DESTINO
+      // RESUELTO, no sobre el texto del especificador (mayor 1 de la revision de QC-15).
+      const findingRelativo = findCrossModuleDeepImportFinding(
+        'lib/modules/inventario/adapters/driving/movimiento-action.ts',
+        '../../../identity/domain/credentials',
+        internalTarget('lib/modules/identity/domain/credentials.ts'),
+      )
+      expect(findingRelativo).toBe(
+        "lib/modules/inventario/adapters/driving/movimiento-action.ts importa '../../../identity/domain/credentials', ruta profunda a otro modulo (R9)",
+      )
     })
 
-    it('importar el barrel de otro modulo, una ruta profunda al PROPIO modulo, o no ser un archivo de modulo, no dispara la regla', () => {
+    it('importar el barrel de otro modulo, una ruta profunda al PROPIO modulo, un paquete externo, o no ser un archivo de modulo, no dispara la regla', () => {
       expect(
-        findCrossModuleDeepImportFinding('lib/modules/inventario/adapters/driving/movimiento-action.ts', '@/lib/modules/identity'),
+        findCrossModuleDeepImportFinding(
+          'lib/modules/inventario/adapters/driving/movimiento-action.ts',
+          '@/lib/modules/identity',
+          internalTarget('lib/modules/identity/index.ts'),
+        ),
       ).toBeNull()
       expect(
         findCrossModuleDeepImportFinding(
           'lib/modules/identity/adapters/driving/login-action.ts',
           '@/lib/modules/identity/domain/credentials',
+          internalTarget('lib/modules/identity/domain/credentials.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findCrossModuleDeepImportFinding(
+          'lib/modules/identity/domain/credentials.ts',
+          'zod',
+          externalTarget('zod'),
         ),
       ).toBeNull()
       // app/, components/, lib/composition/ tienen sus propias reglas (bloques 7 y 8): esta
       // funcion no se les aplica, aunque el especificador tenga la misma forma "profunda".
-      expect(findCrossModuleDeepImportFinding('app/page.tsx', '@/lib/modules/identity/domain/credentials')).toBeNull()
       expect(
-        findCrossModuleDeepImportFinding('lib/composition/index.ts', '@/lib/modules/identity/adapters/driven/security/password-hash'),
+        findCrossModuleDeepImportFinding(
+          'app/page.tsx',
+          '@/lib/modules/identity/domain/credentials',
+          internalTarget('lib/modules/identity/domain/credentials.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findCrossModuleDeepImportFinding(
+          'lib/composition/index.ts',
+          '@/lib/modules/identity/adapters/driven/security/password-hash',
+          internalTarget('lib/modules/identity/adapters/driven/security/password-hash.ts'),
+        ),
       ).toBeNull()
     })
   })
@@ -844,33 +994,48 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
 
   describe('bloque 7 — composicion unica (R11, R12)', () => {
     it('solo lib/composition importa adaptadores driven, y la composicion no importa driving', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsR11 = allSourceFiles.flatMap((file) =>
-        file.specifiers
-          .map((specifier) => findDrivenImportOutsideComposition(file.relPath, specifier))
+        file.resolvedTargets
+          .map(({ specifier, target }) => findDrivenImportOutsideComposition(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
       const findingsR12 = allSourceFiles.flatMap((file) =>
-        file.specifiers
-          .map((specifier) => findDrivingImportInsideComposition(file.relPath, specifier))
+        file.resolvedTargets
+          .map(({ specifier, target }) => findDrivingImportInsideComposition(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
       expect(findingsR11).toEqual([])
       expect(findingsR12).toEqual([])
     })
 
-    it('detecta un import de driven fuera de composicion y uno de driving dentro de composicion', () => {
+    it('detecta un import de driven fuera de composicion (con alias y con ruta relativa) y uno de driving dentro de composicion', () => {
       expect(
         findDrivenImportOutsideComposition(
           'app/(private)/layout.tsx',
           '@/lib/modules/identity/adapters/driven/session/session-stub',
+          internalTarget('lib/modules/identity/adapters/driven/session/session-stub.ts'),
         ),
       ).toBe(
         "app/(private)/layout.tsx importa el adaptador driven '@/lib/modules/identity/adapters/driven/session/session-stub' fuera de lib/composition (R11)",
+      )
+      // El caso real que el reviewer metio: un adaptador driving importando OTRO driven
+      // de su mismo modulo con ruta relativa (R11 lo prohibe igual: solo la composicion
+      // puede tocar un driven).
+      expect(
+        findDrivenImportOutsideComposition(
+          'lib/modules/identity/adapters/driving/logout-action.ts',
+          '../driven/session/session-stub',
+          internalTarget('lib/modules/identity/adapters/driven/session/session-stub.ts'),
+        ),
+      ).toBe(
+        "lib/modules/identity/adapters/driving/logout-action.ts importa el adaptador driven '../driven/session/session-stub' fuera de lib/composition (R11)",
       )
       expect(
         findDrivingImportInsideComposition(
           'lib/composition/index.ts',
           '@/lib/modules/identity/adapters/driving/login-action',
+          internalTarget('lib/modules/identity/adapters/driving/login-action.ts'),
         ),
       ).toBe(
         "lib/composition/index.ts importa el adaptador driving '@/lib/modules/identity/adapters/driving/login-action' desde la composicion (R12)",
@@ -882,12 +1047,14 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
         findDrivenImportOutsideComposition(
           'lib/composition/index.ts',
           '@/lib/modules/identity/adapters/driven/security/password-hash',
+          internalTarget('lib/modules/identity/adapters/driven/security/password-hash.ts'),
         ),
       ).toBeNull()
       expect(
         findDrivingImportInsideComposition(
           'app/(public)/login/components/login-form.tsx',
           '@/lib/modules/identity/adapters/driving/login-action',
+          internalTarget('lib/modules/identity/adapters/driving/login-action.ts'),
         ),
       ).toBeNull()
     })
@@ -895,15 +1062,16 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
 
   describe('bloque 8 — consumo desde UI (R13, R14)', () => {
     it('app/, components/ y hooks/ del repo solo consumen el contrato o un adaptador driving', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findingsR13 = allSourceFiles.flatMap((file) =>
-        file.specifiers
-          .map((specifier) => findUiLayerImportFinding(file.relPath, specifier))
+        file.resolvedTargets
+          .map(({ specifier, target }) => findUiLayerImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
       const findingsR14 = allSourceFiles.flatMap((file) => {
         const isClient = hasUseClientDirective(file.content)
-        return file.specifiers
-          .map((specifier) => findClientForbiddenImportFinding(file.relPath, isClient, specifier))
+        return file.resolvedTargets
+          .map(({ specifier, target }) => findClientForbiddenImportFinding(file.relPath, isClient, specifier, target))
           .filter((finding): finding is string => finding !== null)
       })
       expect(findingsR13).toEqual([])
@@ -911,68 +1079,120 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
     })
 
     it('detecta un app/page.tsx que importa domain/ y un componente cliente que importa la composicion', () => {
-      expect(findUiLayerImportFinding('app/page.tsx', '@/lib/modules/identity/domain/credentials')).toBe(
-        "app/page.tsx importa '@/lib/modules/identity/domain/credentials' saltandose el contrato del modulo (R13)",
-      )
-      expect(findUiLayerImportFinding('app/page.tsx', '@/lib/modules/identity/adapters/driven/security/password-hash')).toBe(
+      expect(
+        findUiLayerImportFinding(
+          'app/page.tsx',
+          '@/lib/modules/identity/domain/credentials',
+          internalTarget('lib/modules/identity/domain/credentials.ts'),
+        ),
+      ).toBe("app/page.tsx importa '@/lib/modules/identity/domain/credentials' saltandose el contrato del modulo (R13)")
+      expect(
+        findUiLayerImportFinding(
+          'app/page.tsx',
+          '@/lib/modules/identity/adapters/driven/security/password-hash',
+          internalTarget('lib/modules/identity/adapters/driven/security/password-hash.ts'),
+        ),
+      ).toBe(
         "app/page.tsx importa '@/lib/modules/identity/adapters/driven/security/password-hash' saltandose el contrato del modulo (R13)",
       )
-      expect(findClientForbiddenImportFinding('components/private/nav-user.tsx', true, '@/lib/composition')).toBe(
-        "components/private/nav-user.tsx ('use client') importa el punto de composicion '@/lib/composition' (R14)",
-      )
+      expect(
+        findClientForbiddenImportFinding(
+          'components/private/nav-user.tsx',
+          true,
+          '@/lib/composition',
+          internalTarget('lib/composition/index.ts'),
+        ),
+      ).toBe("components/private/nav-user.tsx ('use client') importa el punto de composicion '@/lib/composition' (R14)")
       expect(
         findClientForbiddenImportFinding(
           'components/private/nav-user.tsx',
           true,
           '@/lib/modules/identity/adapters/driven/session/session-stub',
+          internalTarget('lib/modules/identity/adapters/driven/session/session-stub.ts'),
         ),
       ).toBe(
         "components/private/nav-user.tsx ('use client') importa el adaptador driven '@/lib/modules/identity/adapters/driven/session/session-stub' (R14)",
       )
+      // Mismos dos casos, con ruta relativa: el destino resuelve igual (mayor 1).
+      expect(
+        findClientForbiddenImportFinding(
+          'components/private/nav-user.tsx',
+          true,
+          '../../../lib/composition',
+          internalTarget('lib/composition/index.ts'),
+        ),
+      ).toBe("components/private/nav-user.tsx ('use client') importa el punto de composicion '../../../lib/composition' (R14)")
     })
 
     it('consumir el barrel o un adaptador driving desde la UI no dispara la regla, ni siendo cliente', () => {
-      expect(findUiLayerImportFinding('app/page.tsx', '@/lib/modules/identity')).toBeNull()
+      expect(findUiLayerImportFinding('app/page.tsx', '@/lib/modules/identity', internalTarget('lib/modules/identity/index.ts'))).toBeNull()
       expect(
-        findUiLayerImportFinding('app/(public)/login/components/login-form.tsx', '@/lib/modules/identity/adapters/driving/login-action'),
+        findUiLayerImportFinding(
+          'app/(public)/login/components/login-form.tsx',
+          '@/lib/modules/identity/adapters/driving/login-action',
+          internalTarget('lib/modules/identity/adapters/driving/login-action.ts'),
+        ),
       ).toBeNull()
-      expect(findClientForbiddenImportFinding('components/private/nav-user.tsx', true, '@/lib/modules/identity')).toBeNull()
+      expect(
+        findClientForbiddenImportFinding(
+          'components/private/nav-user.tsx',
+          true,
+          '@/lib/modules/identity',
+          internalTarget('lib/modules/identity/index.ts'),
+        ),
+      ).toBeNull()
       expect(
         findClientForbiddenImportFinding(
           'components/private/nav-user.tsx',
           true,
           '@/lib/modules/identity/adapters/driving/logout-action',
+          internalTarget('lib/modules/identity/adapters/driving/logout-action.ts'),
         ),
       ).toBeNull()
       // Y el mismo import de composicion en un archivo de SERVIDOR (sin 'use client') no es R14.
-      expect(findClientForbiddenImportFinding('app/(private)/layout.tsx', false, '@/lib/composition')).toBeNull()
+      expect(
+        findClientForbiddenImportFinding('app/(private)/layout.tsx', false, '@/lib/composition', internalTarget('lib/composition/index.ts')),
+      ).toBeNull()
     })
   })
 
   describe('bloque 9 — nucleo compartido (R15)', () => {
     it('lib/shared/ del repo no importa modulos ni la composicion', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findings = allSourceFiles.flatMap((file) =>
-        file.specifiers
-          .map((specifier) => findSharedImportFinding(file.relPath, specifier))
+        file.resolvedTargets
+          .map(({ specifier, target }) => findSharedImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
       expect(findings).toEqual([])
     })
 
-    it('detecta lib/shared/ importando un modulo y la composicion', () => {
-      expect(findSharedImportFinding('lib/shared/ui/initials.ts', '@/lib/modules/identity')).toBe(
-        "lib/shared/ui/initials.ts importa '@/lib/modules/identity' de un modulo (R15)",
-      )
-      expect(findSharedImportFinding('lib/shared/ui/initials.ts', '@/lib/composition')).toBe(
-        "lib/shared/ui/initials.ts importa el punto de composicion '@/lib/composition' (R15)",
-      )
+    it('detecta lib/shared/ importando un modulo (con alias y con ruta relativa) y la composicion', () => {
+      expect(
+        findSharedImportFinding('lib/shared/ui/initials.ts', '@/lib/modules/identity', internalTarget('lib/modules/identity/index.ts')),
+      ).toBe("lib/shared/ui/initials.ts importa '@/lib/modules/identity' de un modulo (R15)")
+      // El caso exacto que el reviewer metio: el mismo destino, con ruta relativa.
+      expect(
+        findSharedImportFinding(
+          'lib/shared/ui/initials.ts',
+          '../../modules/identity',
+          internalTarget('lib/modules/identity/index.ts'),
+        ),
+      ).toBe("lib/shared/ui/initials.ts importa '../../modules/identity' de un modulo (R15)")
+      expect(
+        findSharedImportFinding('lib/shared/ui/initials.ts', '@/lib/composition', internalTarget('lib/composition/index.ts')),
+      ).toBe("lib/shared/ui/initials.ts importa el punto de composicion '@/lib/composition' (R15)")
     })
 
     it('lib/shared/ importando otro archivo de lib/shared o un paquete npm no dispara la regla', () => {
-      expect(findSharedImportFinding('lib/shared/ui/initials.ts', '@/lib/shared/routes')).toBeNull()
-      expect(findSharedImportFinding('lib/shared/ui/initials.ts', '@prisma/client')).toBeNull()
+      expect(
+        findSharedImportFinding('lib/shared/ui/initials.ts', '@/lib/shared/routes', internalTarget('lib/shared/routes.ts')),
+      ).toBeNull()
+      expect(findSharedImportFinding('lib/shared/ui/initials.ts', '@prisma/client', externalTarget('@prisma/client'))).toBeNull()
       // Y fuera de lib/shared/, la funcion no aplica en absoluto.
-      expect(findSharedImportFinding('lib/modules/identity/index.ts', '@/lib/modules/identity')).toBeNull()
+      expect(
+        findSharedImportFinding('lib/modules/identity/index.ts', '@/lib/modules/identity', internalTarget('lib/modules/identity/index.ts')),
+      ).toBeNull()
     })
   })
 
@@ -1031,19 +1251,30 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
 
   describe('bloque 11 — cliente Prisma compartido (R17)', () => {
     it('nadie fuera de adapters/driven, scripts o tests importa el cliente Prisma compartido', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
       const findings = allSourceFiles.flatMap((file) =>
-        file.specifiers
-          .map((specifier) => findPrismaClientImportFinding(file.relPath, specifier))
+        file.resolvedTargets
+          .map(({ specifier, target }) => findPrismaClientImportFinding(file.relPath, specifier, target))
           .filter((finding): finding is string => finding !== null),
       )
       expect(findings).toEqual([])
     })
 
-    it('detecta el cliente Prisma compartido importado desde el dominio (el ejemplo exacto del encargo)', () => {
+    it('detecta el cliente Prisma compartido importado desde el dominio, con alias y con ruta relativa (el ejemplo exacto del encargo)', () => {
       expect(
-        findPrismaClientImportFinding('lib/modules/identity/domain/credentials.ts', '@/lib/shared/db/prisma'),
+        findPrismaClientImportFinding(
+          'lib/modules/identity/domain/credentials.ts',
+          '@/lib/shared/db/prisma',
+          internalTarget('lib/shared/db/prisma.ts'),
+        ),
       ).toBe(
         "lib/modules/identity/domain/credentials.ts importa el cliente Prisma compartido '@/lib/shared/db/prisma' fuera de un adaptador driven (R17)",
+      )
+      // El caso exacto que el reviewer metio: `lib/composition/index.ts` con ruta relativa.
+      expect(
+        findPrismaClientImportFinding('lib/composition/index.ts', '../shared/db/prisma', internalTarget('lib/shared/db/prisma.ts')),
+      ).toBe(
+        "lib/composition/index.ts importa el cliente Prisma compartido '../shared/db/prisma' fuera de un adaptador driven (R17)",
       )
     })
 
@@ -1052,10 +1283,19 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
         findPrismaClientImportFinding(
           'lib/modules/identity/adapters/driven/security/password-hash.ts',
           '@/lib/shared/db/prisma',
+          internalTarget('lib/shared/db/prisma.ts'),
         ),
       ).toBeNull()
-      expect(findPrismaClientImportFinding('scripts/seed.ts', '@/lib/shared/db/prisma')).toBeNull()
-      expect(findPrismaClientImportFinding('tests/unit/identity/user.test.ts', '@/lib/shared/db/prisma')).toBeNull()
+      expect(
+        findPrismaClientImportFinding('scripts/seed.ts', '@/lib/shared/db/prisma', internalTarget('lib/shared/db/prisma.ts')),
+      ).toBeNull()
+      expect(
+        findPrismaClientImportFinding(
+          'tests/unit/identity/user.test.ts',
+          '@/lib/shared/db/prisma',
+          internalTarget('lib/shared/db/prisma.ts'),
+        ),
+      ).toBeNull()
     })
   })
 
@@ -1071,14 +1311,216 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
         'lib/actions/<feature>.ts             <- Server Action',
       ].join('\n')
       const findings = findArchitectureDocFindings(docMalo)
-      expect(findings).toContainEqual("docs/architecture.md menciona 'lib/services/' como vigente (R19)")
-      expect(findings).toContainEqual("docs/architecture.md menciona 'lib/actions/' como vigente (R19)")
+      expect(findings).toContainEqual("docs/architecture.md menciona 'lib/services/' (R19)")
+      expect(findings).toContainEqual("docs/architecture.md menciona 'lib/actions/' (R19)")
       expect(findings).toContainEqual("docs/architecture.md no menciona 'lib/modules/' (R19)")
     })
 
     it('un documento que describe lib/modules/ sin mencionar las rutas viejas no genera hallazgos', () => {
       const docBueno = '## Modulos\nlib/modules/<modulo>/index.ts es el contrato publico.'
       expect(findArchitectureDocFindings(docBueno)).toEqual([])
+    })
+  })
+
+  describe('bloque 13 — regla de dependencias completa (design.md > 5.1)', () => {
+    it('ningun driven importa composicion/driving propio/UI, ningun driving importa Prisma/domain-ports propios por ruta profunda/UI, y ninguna composicion importa UI', () => {
+      expect(allSourceFiles.length, 'no se encontro ningun archivo fuente bajo SCAN_ROOTS').toBeGreaterThan(0)
+      const findingsDriven = allSourceFiles.flatMap((file) =>
+        file.resolvedTargets
+          .map(({ specifier, target }) => findDrivenForbiddenImportFinding(file.relPath, specifier, target))
+          .filter((finding): finding is string => finding !== null),
+      )
+      const findingsDriving = allSourceFiles.flatMap((file) =>
+        file.resolvedTargets
+          .map(({ specifier, target }) => findDrivingForbiddenImportFinding(file.relPath, specifier, target))
+          .filter((finding): finding is string => finding !== null),
+      )
+      const findingsComposition = allSourceFiles.flatMap((file) =>
+        file.resolvedTargets
+          .map(({ specifier, target }) => findCompositionForbiddenImportFinding(file.relPath, specifier, target))
+          .filter((finding): finding is string => finding !== null),
+      )
+      expect(findingsDriven).toEqual([])
+      expect(findingsDriving).toEqual([])
+      expect(findingsComposition).toEqual([])
+    })
+
+    it('detecta un driven importando lib/composition (los tres casos exactos del encargo, a la vez)', () => {
+      // 1) driven -> lib/composition (inversion de la flecha, el ciclo que 6.1 prohibe).
+      expect(
+        findDrivenForbiddenImportFinding(
+          'lib/modules/identity/adapters/driven/session/session-stub.ts',
+          '@/lib/composition',
+          internalTarget('lib/composition/index.ts'),
+        ),
+      ).toBe(
+        "lib/modules/identity/adapters/driven/session/session-stub.ts importa el punto de composicion '@/lib/composition' (design.md > 5.1, fila driven)",
+      )
+
+      // 2) driving -> @prisma/client directo.
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          '@prisma/client',
+          externalTarget('@prisma/client'),
+        ),
+      ).toBe("lib/modules/identity/adapters/driving/login-action.ts importa '@prisma/client' (design.md > 5.1, fila driving)")
+
+      // 3) driving -> su propio domain/ por ruta profunda, en vez del barrel.
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          '@/lib/modules/identity/domain/credentials',
+          internalTarget('lib/modules/identity/domain/credentials.ts'),
+        ),
+      ).toBe(
+        "lib/modules/identity/adapters/driving/login-action.ts importa '@/lib/modules/identity/domain/credentials', ruta profunda a domain/ports de su propio modulo en vez del barrel (design.md > 5.1, fila driving)",
+      )
+    })
+
+    it('detecta un driven importando driving de su propio modulo y a la UI, y una composicion importando la UI', () => {
+      expect(
+        findDrivenForbiddenImportFinding(
+          'lib/modules/identity/adapters/driven/session/session-stub.ts',
+          '../driving/login-action',
+          internalTarget('lib/modules/identity/adapters/driving/login-action.ts'),
+        ),
+      ).toBe(
+        "lib/modules/identity/adapters/driven/session/session-stub.ts importa el adaptador driving '../driving/login-action' de su propio modulo (design.md > 5.1, fila driven)",
+      )
+      expect(
+        findDrivenForbiddenImportFinding(
+          'lib/modules/identity/adapters/driven/session/session-stub.ts',
+          '@/components/private/nav-user',
+          internalTarget('components/private/nav-user.tsx'),
+        ),
+      ).toBe(
+        "lib/modules/identity/adapters/driven/session/session-stub.ts importa '@/components/private/nav-user' de la UI (design.md > 5.1, fila driven)",
+      )
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          '@/app/page',
+          internalTarget('app/page.tsx'),
+        ),
+      ).toBe("lib/modules/identity/adapters/driving/login-action.ts importa '@/app/page' de la UI (design.md > 5.1, fila driving)")
+      expect(
+        findCompositionForbiddenImportFinding(
+          'lib/composition/index.ts',
+          '@/components/private/nav-user',
+          internalTarget('components/private/nav-user.tsx'),
+        ),
+      ).toBe("lib/composition/index.ts importa '@/components/private/nav-user' de la UI (design.md > 5.1, fila composicion)")
+    })
+
+    it('lo que la fila SI permite no dispara ninguna de las tres reglas', () => {
+      // driven: su propio domain/ports, lib/shared, @prisma/client, el cliente Prisma
+      // compartido, un SDK externo, el barrel de otro modulo.
+      expect(
+        findDrivenForbiddenImportFinding(
+          'lib/modules/identity/adapters/driven/session/session-stub.ts',
+          '../../domain/session-user',
+          internalTarget('lib/modules/identity/domain/session-user.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivenForbiddenImportFinding(
+          'lib/modules/identity/adapters/driven/security/password-hash.ts',
+          '@prisma/client',
+          externalTarget('@prisma/client'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivenForbiddenImportFinding(
+          'lib/modules/identity/adapters/driven/security/password-hash.ts',
+          '@/lib/shared/db/prisma',
+          internalTarget('lib/shared/db/prisma.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivenForbiddenImportFinding(
+          'lib/modules/identity/adapters/driven/security/password-hash.ts',
+          '@/lib/modules/inventario',
+          internalTarget('lib/modules/inventario/index.ts'),
+        ),
+      ).toBeNull()
+
+      // driving: lib/composition, el barrel del propio modulo, su propia carpeta, next/*, lib/shared.
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          '@/lib/composition',
+          internalTarget('lib/composition/index.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          '@/lib/modules/identity',
+          internalTarget('lib/modules/identity/index.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          './login-form-state',
+          internalTarget('lib/modules/identity/adapters/driving/login-form-state.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          'next/navigation',
+          externalTarget('next/navigation'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivingForbiddenImportFinding(
+          'lib/modules/identity/adapters/driving/login-action.ts',
+          '@/lib/shared/routes',
+          internalTarget('lib/shared/routes.ts'),
+        ),
+      ).toBeNull()
+
+      // composicion: el barrel, ports y driven de cualquier modulo, lib/shared.
+      expect(
+        findCompositionForbiddenImportFinding(
+          'lib/composition/index.ts',
+          '@/lib/modules/identity',
+          internalTarget('lib/modules/identity/index.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findCompositionForbiddenImportFinding(
+          'lib/composition/index.ts',
+          '@/lib/modules/identity/ports/session-provider',
+          internalTarget('lib/modules/identity/ports/session-provider.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findCompositionForbiddenImportFinding(
+          'lib/composition/index.ts',
+          '@/lib/modules/identity/adapters/driven/security/password-hash',
+          internalTarget('lib/modules/identity/adapters/driven/security/password-hash.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findCompositionForbiddenImportFinding(
+          'lib/composition/index.ts',
+          '@/lib/shared/routes',
+          internalTarget('lib/shared/routes.ts'),
+        ),
+      ).toBeNull()
+      // Y fuera de driven/driving/composicion, ninguna de las tres funciones aplica.
+      expect(
+        findDrivenForbiddenImportFinding('app/page.tsx', '@/lib/composition', internalTarget('lib/composition/index.ts')),
+      ).toBeNull()
+      expect(
+        findDrivingForbiddenImportFinding('app/page.tsx', '@prisma/client', externalTarget('@prisma/client')),
+      ).toBeNull()
+      expect(
+        findCompositionForbiddenImportFinding('app/page.tsx', '@/components/private/nav-user', internalTarget('components/private/nav-user.tsx')),
+      ).toBeNull()
     })
   })
 })

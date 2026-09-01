@@ -1,4 +1,4 @@
-import type { SessionUser } from '@/lib/modules/identity';
+import type { SessionUser } from '../../../domain/session-user';
 
 // Implementa el puerto `SessionProvider` (`../../../ports/session-provider`):
 // `getSessionUser` cumple `getSessionUser`, `endSession` cumple `endSession`.

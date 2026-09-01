@@ -1211,3 +1211,154 @@ Deshechos los dos experimentos: `ls lib` -> `composition modules shared utils.ts
    permitidos; `hasher_password` sigue prohibido) y se comprobo que ningun `prohibido` previo
    se apago. **Es un cambio de regla de una guardia: el reviewer deberia mirarlo con lupa.**
 
+---
+
+# RONDA 2 — correccion de la revision (2026-09-01)
+
+El reviewer **RECHAZO** la primera entrega con 2 bloqueantes y 6 menores
+(`progress/review_QC-15-arquitectura-hexagonal-y-modulos.md`). Los dos mayores eran del mismo
+tipo y tenia razon en los dos: **la guardia no podia ponerse roja en varios de los casos que
+la feature dice impedir.** Es exactamente el modo de fallo que `design.md > D1` usa para
+descartar `src/` ("una guardia que sigue verde porque ya no mira donde hay que mirar es peor
+que no tenerla"), y se colo igualmente.
+
+Solo se toco la guardia, mas **una linea** de produccion (menor 4). Cero cambios de
+comportamiento, cero aserciones tocadas.
+
+## Mayor 1 — la guardia no veia los imports relativos
+
+Los bloques 5, 7, 8, 9 y 11 decidian sobre el **texto** del especificador y exigian el
+prefijo `@/`. Un import relativo es el mismo import y no disparaba nada. El reviewer lo
+demostro ejecutando: con tres violaciones metidas a la vez, **39/39 VERDE**.
+
+No era un caso rebuscado: dentro de un modulo el estilo natural es el import relativo, y el
+propio codigo de la feature ya lo usa (`ports/session-provider.ts` importa
+`../domain/session-user`). El dia que QC-7 escribiera
+`import { verifyPasswordHash } from '../driven/security/password-hash'` en el adaptador
+driving, la guardia habria dicho que todo bien.
+
+**Arreglo: un solo resolvedor, el que ya estaba.** `classifyImportTarget` ya resolvia
+`./x` y `@/...` a una ruta real del repo, y el bloque 4 ya la usaba — por eso el bloque 4 era
+el unico solido. Ahora **todas** las reglas que clasifican un destino reciben el
+`ImportTarget` ya resuelto y deciden sobre `targetRel`; el `specifier` se conserva solo para
+el mensaje, **nunca para decidir**. Siete funciones cambiaron de firma:
+
+`findCrossModuleDeepImportFinding` (R9), `findDrivenImportOutsideComposition` (R11),
+`findDrivingImportInsideComposition` (R12), `findUiLayerImportFinding` (R13),
+`findClientForbiddenImportFinding` (R14), `findSharedImportFinding` (R15),
+`findPrismaClientImportFinding` (R17).
+
+En los call sites, `allSourceFiles` precalcula `resolvedTargets` una sola vez por par
+(archivo, especificador). Dos detalles que habia que acertar: el barrel resuelve a
+`lib/modules/<m>/index.ts` y **no** puede contar como ruta profunda en R9 (se distingue con
+`layerOfPath(...) === 'index'`), y `@/lib/composition` resuelve a `lib/composition/index.ts`.
+
+### Evidencia — reproducida por el implementer, no leida
+
+Las **tres** violaciones exactas del reviewer, metidas a la vez. Antes: 39/39 verde. Ahora:
+
+```
+Test Files  1 failed | 4 passed (5)
+     Tests  3 failed | 56 passed (59)
+
++   "lib/modules/identity/adapters/driving/logout-action.ts importa el adaptador driven
++    '../driven/session/session-stub' fuera de lib/composition (R11)",
++   "lib/shared/ui/initials.ts importa '../../modules/identity' de un modulo (R15)",
++   "lib/composition/index.ts importa el cliente Prisma compartido '../shared/db/prisma'
++    fuera de un adaptador driven (R17)",
+```
+
+Las tres, cada una citando su `R<n>`. Revertidas despues; `git status` limpio.
+
+## Mayor 2 — el doc prometia mas de lo que la guardia cumplia
+
+`docs/architecture.md:188-189` afirma que la guardia hace cumplir **toda** la tabla de
+`design.md > 5.1`. Las filas `driven`, `driving` y `composition` estaban a medias.
+
+**Se cerro por el lado del codigo, no del texto** (la frase del doc no se toco: ahora es
+cierta). **Bloque 13 nuevo — regla de dependencias completa**, con tres funciones puras:
+
+- `findDrivenForbiddenImportFinding` — un driven no importa `lib/composition/**`, el
+  `driving/**` de su propio modulo, `app/**` ni `components/**`.
+- `findDrivingForbiddenImportFinding` — un driving no importa `@prisma/client`, ni su propio
+  `domain/`/`ports/` por ruta profunda (para eso esta el barrel), ni `app/**`/`components/**`.
+  (`../driven/**` ya lo cazaba R11: no se duplica.)
+- `findCompositionForbiddenImportFinding` — la composicion no importa `app/**` ni
+  `components/**`.
+
+**Ninguna celda quedo fuera por inverificable**: las tres filas resultaron comprobables
+estaticamente con el destino resuelto, asi que **no hizo falta marcar nada como "no
+verificado" en el doc**.
+
+### Evidencia — los tres casos del reviewer, inyectados de uno en uno
+
+De uno en uno a proposito: comparten el mismo `it`, y en bloque el primer `expect` que falla
+taparia a los otros dos.
+
+```
+A) driven -> @/lib/composition
++  "...driven/session/session-stub.ts importa el punto de composicion '@/lib/composition'
++   (design.md > 5.1, fila driven)"
+
+B) driving -> @prisma/client
++  "...driving/login-action.ts importa '@prisma/client' (design.md > 5.1, fila driving)"
+
+C) driving -> ruta profunda a su propio domain
++  "...driving/login-action.ts importa '@/lib/modules/identity/domain/credentials', ruta
++   profunda a domain/ports de su propio modulo en vez del barrel (design.md > 5.1, fila driving)"
+```
+
+**Y ademas, la leccion del mayor 1 aplicada al bloque 13**: se comprobo que las reglas nuevas
+tampoco se escapan por ruta relativa.
+
+```
+D) driving -> su propio domain, RELATIVO
++  "...login-action.ts importa '../../domain/credentials', ruta profunda a domain/ports de
++   su propio modulo en vez del barrel (design.md > 5.1, fila driving)"
+
+E) driven -> composicion, RELATIVO
++  "...session-stub.ts importa el punto de composicion '../../../../../composition'
++   (design.md > 5.1, fila driven)"
+```
+
+Nota de honestidad sobre E: el primer intento uso `../../../../composition` (un nivel de
+menos) y **no dio hallazgo**. No era un agujero de la guardia sino un error de aritmetica de
+rutas mio: ese especificador resuelve a `lib/modules/composition`, que no existe, y
+`classifyImportTarget` trata un import roto como interno con su ruta base — que no es
+`lib/composition/`, asi que no es hallazgo. Con la profundidad correcta (cinco niveles) la
+regla dispara. Se deja escrito porque un "no salto" mal interpretado es justo como se archiva
+un falso negativo.
+
+Todos los experimentos revertidos; `git status` limpio y guardia en verde.
+
+## Menores
+
+| # | Que decia | Que se hizo |
+| --- | --- | --- |
+| 1 | seis bloques podian salir verdes sin barrer nada si `SCAN_ROOTS` se desalineaba | **Aplicado.** `expect(allSourceFiles.length).toBeGreaterThan(0)` en los **6** bloques que la usan (4, 5, 7, 8, 9, 11) mas el 13 nuevo, con mensaje. Mismo patron que el bloque 1 y el 10 |
+| 2 | `.claude/agents/backend_dev.md` sigue mandando `lib/services/`, `lib/repositories/`, `lib/interfaces/` | **Descartado: no es mio.** El propio reviewer lo dice ("son del leader"). Fuera del alcance: R19 solo nombra `docs/architecture.md` y `tasks.md > T10` no lo lista. **Sigue abierto y es real**: el proximo `backend_dev` de QC-6/QC-9 seguira su prompt y pondra el bloque 2 de la guardia en rojo |
+| 3 | `CHECKPOINTS.md:42-46` conserva "Patron de capas" e "interfaces en `lib/interfaces/`" | **Descartado: no es mio**, mismo motivo. El reviewer lo marca como tarea del leader. Conviene cerrarlo antes que el menor 2, porque es el documento contra el que revisa el reviewer |
+| 4 | un driven consumia el barrel de su propio modulo | **Aplicado.** `session-stub.ts` pasa de `@/lib/modules/identity` a `../../../domain/session-user`, como manda la fila 3 de `design.md > 5.1`. Solo la ruta del import: el `PLACEHOLDER_SESSION_USER` y el no-op de `endSession` siguen intactos |
+| 5 | el bloque 12 prohibe la cadena, no la vigencia | **Aplicado (solo el mensaje).** La regla no cambia; el mensaje y el comentario ahora dicen lo que de verdad comprueba: que la cadena no aparece, ni siquiera para prohibirla |
+| 6 | ampliar `NON_COLUMN_SUFFIXES` con `hasher` | **No tocado**, por indicacion expresa: el reviewer lo juzgo legitimo |
+
+## Estado tras la ronda 2
+
+```
+$ pnpm run typecheck   -> 0 errores
+$ pnpm run lint        -> limpio
+$ pnpm exec vitest run guard
+ Test Files  5 passed (5)
+      Tests  59 passed (59)
+$ pnpm test
+ Test Files  22 passed (22)
+      Tests  214 passed (214)
+```
+
+La guardia pasa de **12 bloques / 39 tests** a **13 bloques / 43 tests**. La suite pasa de 210
+a 214: los 4 nuevos son los del bloque 13. **Cero regresiones**: los 20 archivos verdes del
+contrato de R18 siguen verdes, y ninguna asercion existente cambio de valor.
+
+`guard-dependencias-aprobadas` ya esta en verde: el leader anadio la fila `heredada` de
+`bcryptjs` (commit `f642e6f`), que era la opcion recomendada en T11.
+
