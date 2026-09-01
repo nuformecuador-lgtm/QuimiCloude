@@ -104,6 +104,17 @@ const BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['passwordHash', 'password_hash'],
 ]
 
+/**
+ * QC-7 / R30 — las tres columnas del bloqueo temporal de cuenta, con su columna en la base.
+ * Estado actual del usuario (contador, nivel de escalada y fin del bloqueo), no historico:
+ * por eso son columnas de `users` y no una tabla de intentos (`design.md > 5.6`).
+ */
+const LOCKOUT_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ['failedLoginAttempts', 'failed_login_attempts'],
+  ['lockLevel', 'lock_level'],
+  ['lockedUntil', 'locked_until'],
+]
+
 describe('db/schema.prisma — modelo de usuarios y roles', () => {
   it('el modelo User declara los nueve datos del usuario', () => {
     for (const [name] of BUSINESS_FIELDS) {
@@ -124,6 +135,7 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
         'createdAt',
         'updatedAt',
         'deletedAt',
+        ...LOCKOUT_FIELDS.map(([name]) => name),
       ].sort(),
     )
 
@@ -264,5 +276,56 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
       expect(updatedAt.attributes).toContain('@updatedAt')
       expect(updatedAt.attributes).toContain('@map("updated_at")')
     }
+  })
+})
+
+// --- QC-7 — R30: persistencia del bloqueo temporal de cuenta -------------------------
+
+describe('db/schema.prisma — bloqueo temporal de cuenta (R30)', () => {
+  it('User declara las tres columnas de bloqueo con su @map', () => {
+    for (const [name, column] of LOCKOUT_FIELDS) {
+      expect(has(user, name), `falta el campo User.${name}`).toBe(true)
+      expect(field(user, name).attributes, `User.${name} debe mapear a ${column}`).toContain(
+        `@map("${column}")`,
+      )
+    }
+    expect(LOCKOUT_FIELDS).toHaveLength(3)
+  })
+
+  it('failedLoginAttempts y lockLevel son enteros obligatorios con @default(0)', () => {
+    // El default es lo que permite aplicar la migracion sobre las filas ya existentes sin
+    // backfill: sin el, un `NOT NULL` sin valor reventaria el ALTER TABLE.
+    for (const name of ['failedLoginAttempts', 'lockLevel'] as const) {
+      const declared = field(user, name)
+      expect(declared.type, `User.${name}`).toBe('Int')
+      expect(declared.isOptional, `User.${name} no puede ser opcional`).toBe(false)
+      expect(declared.attributes, `User.${name} necesita @default(0)`).toMatch(/@default\(0\)/)
+    }
+  })
+
+  it('lockedUntil es un instante opcional en timestamptz(6)', () => {
+    const lockedUntil = field(user, 'lockedUntil')
+    expect(lockedUntil.type).toBe('DateTime')
+    // Opcional: NULL = cuenta sin bloqueo vigente. No hay valor centinela.
+    expect(lockedUntil.isOptional).toBe(true)
+    expect(lockedUntil.attributes).toContain('@map("locked_until")')
+    // `timestamptz` como el resto de instantes: comparar un bloqueo en hora local seria un
+    // error de una hora dos veces al ano (`design.md > 5.6`).
+    expect(lockedUntil.attributes).toContain('@db.Timestamptz(6)')
+    expect(lockedUntil.attributes).not.toMatch(/@db\.Timestamp\(/)
+  })
+
+  it('las columnas de bloqueo no anaden unicidad ni indice nuevo', () => {
+    // No se consulta por ellas: se leen junto a la fila que ya localiza
+    // `users_username_unique` (`design.md > 5.6`).
+    for (const [name] of LOCKOUT_FIELDS) {
+      expect(field(user, name).attributes, `User.${name} no debe ser @unique`).not.toMatch(/@unique/)
+    }
+    expect(user.body).not.toMatch(/@@index\(\[(failedLoginAttempts|lockLevel|lockedUntil)/)
+  })
+
+  it('el modelo User sigue siendo propiedad del modulo identity', () => {
+    // El dueno no cambia por anadir columnas; el bloque 10 de la guardia lo exige declarado.
+    expect(rawSchema.replace(/\r\n/g, '\n')).toContain('/// @module identity\nmodel User {')
   })
 })

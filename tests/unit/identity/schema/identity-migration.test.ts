@@ -7,7 +7,7 @@
 //
 // Cubre R4, R5, R6, R7, R9, R12, R14, R17 (parcial), R20, R22, R23.
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -255,5 +255,103 @@ describe('down.sql — reversion exacta', () => {
     expect(up.some((statement) => /CREATE EXTENSION IF NOT EXISTS pgcrypto/i.test(statement))).toBe(
       true,
     )
+  })
+})
+
+// --- QC-7 / R30 — migracion del bloqueo temporal de cuenta ---------------------------
+//
+// Tres columnas nuevas en `users` (`design.md > 5.6`). No hay tabla nueva ni indice, asi
+// que lo unico que hay que vigilar es que el UP anada exactamente esas tres y que el DOWN
+// las quite exactamente, en orden inverso: un `down.sql` que no revierte el UP es peor que
+// no tenerlo, porque da confianza falsa.
+
+const migrationsRoot = join(repoRoot, 'db', 'migrations')
+
+/** La carpeta de la migracion del bloqueo, localizada por su sufijo de nombre. */
+function findMigrationDir(suffix: string): string {
+  const matches = readdirSync(migrationsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.endsWith(suffix))
+    .map((entry) => entry.name)
+  expect(matches, `se esperaba una sola carpeta *${suffix}`).toHaveLength(1)
+  return join(migrationsRoot, matches[0] as string)
+}
+
+const lockoutDir = findMigrationDir('_user_login_lockout')
+const lockoutUp = statements(readFileSync(join(lockoutDir, 'migration.sql'), 'utf8'))
+const lockoutDown = statements(readFileSync(join(lockoutDir, 'down.sql'), 'utf8'))
+
+/** Columnas anadidas por un `ALTER TABLE ... ADD COLUMN`, en orden de aparicion. */
+function addedColumns(source: readonly string[]): readonly string[] {
+  return source.flatMap((statement) =>
+    [...statement.matchAll(/ADD COLUMN\s+"?(\w+)"?/gi)].map((match) => match[1] as string),
+  )
+}
+
+/** Columnas eliminadas por un `ALTER TABLE ... DROP COLUMN`, en orden de aparicion. */
+function droppedColumns(source: readonly string[]): readonly string[] {
+  return source.flatMap((statement) =>
+    [...statement.matchAll(/DROP COLUMN\s+(?:IF EXISTS\s+)?"?(\w+)"?/gi)].map(
+      (match) => match[1] as string,
+    ),
+  )
+}
+
+const LOCKOUT_COLUMNS = ['failed_login_attempts', 'lock_level', 'locked_until'] as const
+
+describe('user_login_lockout — migration.sql (R30)', () => {
+  it('el UP anade las tres columnas de bloqueo a users y nada mas', () => {
+    expect(addedColumns(lockoutUp)).toEqual([...LOCKOUT_COLUMNS])
+    // Todas las sentencias son ALTER TABLE sobre `users`: ni tabla nueva, ni indice, ni
+    // drift de otro modelo colado por Prisma.
+    for (const statement of lockoutUp) {
+      expect(statement, `sentencia inesperada: ${statement}`).toMatch(
+        /^ALTER TABLE "?users"? /i,
+      )
+    }
+    expect(lockoutUp.some((statement) => /CREATE (TABLE|INDEX|UNIQUE)/i.test(statement))).toBe(false)
+  })
+
+  it('los dos contadores entran NOT NULL con DEFAULT 0 y el fin de bloqueo es timestamptz nulable', () => {
+    const up = lockoutUp.join(' ')
+    // Sin DEFAULT, un NOT NULL sobre una tabla con filas no aplica: la migracion tiene que
+    // poder correr sobre datos existentes sin backfill (`design.md > 5.6`).
+    expect(up).toMatch(/"failed_login_attempts" INTEGER NOT NULL DEFAULT 0/i)
+    expect(up).toMatch(/"lock_level" INTEGER NOT NULL DEFAULT 0/i)
+    expect(up).toMatch(/"locked_until" TIMESTAMPTZ\(6\)/i)
+    // Nulable a proposito: NULL = sin bloqueo vigente.
+    expect(up).not.toMatch(/"locked_until"[^,]*NOT NULL/i)
+    // `timestamptz`, no `timestamp` a secas: un bloqueo en hora local se descuadra dos
+    // veces al ano.
+    expect(up).not.toMatch(/"locked_until" TIMESTAMP\(/i)
+  })
+})
+
+describe('user_login_lockout — down.sql (R30)', () => {
+  it('el DOWN dropea las tres columnas y nada mas', () => {
+    expect(droppedColumns(lockoutDown)).toHaveLength(3)
+    expect([...droppedColumns(lockoutDown)].sort()).toEqual([...LOCKOUT_COLUMNS].sort())
+    for (const statement of lockoutDown) {
+      expect(statement, `sentencia inesperada en el DOWN: ${statement}`).toMatch(
+        /^ALTER TABLE "?users"? DROP COLUMN /i,
+      )
+    }
+    // No toca la tabla ni el RLS: revertir columnas no es revertir QC-4.
+    expect(lockoutDown.some((statement) => /DROP TABLE|ROW LEVEL SECURITY/i.test(statement))).toBe(
+      false,
+    )
+  })
+
+  it('el DOWN revierte exactamente el UP, en orden inverso', () => {
+    const anadidas = addedColumns(lockoutUp)
+    expect(droppedColumns(lockoutDown)).toEqual([...anadidas].reverse())
+    // Simetria de tamano: ninguna sentencia de mas en el DOWN.
+    expect(lockoutDown).toHaveLength(anadidas.length)
+  })
+
+  it('la guardia de simetria cae si el DOWN se olvida de una columna', () => {
+    // Mutacion en memoria: el archivo en disco no se toca.
+    const mutado = lockoutDown.filter((statement) => !/locked_until/i.test(statement))
+    expect(mutado.length, 'la mutacion no quito nada').toBeLessThan(lockoutDown.length)
+    expect(droppedColumns(mutado)).not.toEqual([...addedColumns(lockoutUp)].reverse())
   })
 })
