@@ -6,6 +6,7 @@ import { verifyCredentials } from '@/lib/services/login-stub';
 import {
   DASHBOARD_ROUTE,
   GENERIC_CREDENTIALS_ERROR,
+  PASSWORD_TOO_LONG_ERROR,
   REQUIRED_FIELD_ERROR,
   loginInputSchema,
   type LoginFormState,
@@ -16,16 +17,22 @@ function readField(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-function toFieldErrors(paths: readonly PropertyKey[][]): {
+/**
+ * Traduce los problemas de zod a errores de campo. Distingue `too_big` del resto: sin
+ * eso, una contrasena demasiado larga se anunciaria como "campo obligatorio" (R10).
+ */
+function toFieldErrors(issues: readonly { code: string; path: readonly PropertyKey[] }[]): {
   username?: string;
   password?: string;
 } {
   const fieldErrors: { username?: string; password?: string } = {};
-  for (const path of paths) {
-    const field = path[0];
-    if (field === 'username' || field === 'password') {
-      fieldErrors[field] = REQUIRED_FIELD_ERROR;
-    }
+  for (const issue of issues) {
+    const field = issue.path[0];
+    if (field !== 'username' && field !== 'password') continue;
+    fieldErrors[field] =
+      field === 'password' && issue.code === 'too_big'
+        ? PASSWORD_TOO_LONG_ERROR
+        : REQUIRED_FIELD_ERROR;
   }
   return fieldErrors;
 }
@@ -55,7 +62,7 @@ export async function loginAction(
       status: 'invalid',
       attemptId,
       username,
-      fieldErrors: toFieldErrors(parsed.error.issues.map((issue) => issue.path)),
+      fieldErrors: toFieldErrors(parsed.error.issues),
     };
   }
 
