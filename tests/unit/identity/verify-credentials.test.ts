@@ -1,0 +1,323 @@
+// T4 — El caso de uso de autenticacion, entero y con puertos falsos (`design.md > 2` y `> 7`).
+// Sin base de datos, sin bcrypt real y sin Next: lo que se prueba aqui es la DECISION, y la
+// decision vive en el dominio. Los adaptadores reales tienen su propia tanda (T5, T8).
+
+import { nextLockState, type AccountLockState } from '@/lib/modules/identity/domain/account-lock';
+import type { SessionTicket } from '@/lib/modules/identity/domain/session';
+import {
+  DECOY_SECRET,
+  createVerifyCredentials,
+} from '@/lib/modules/identity/domain/verify-credentials';
+import type { AuthenticatableUser } from '@/lib/modules/identity/ports/user-credentials-reader';
+
+const CONTRASENA_CORRECTA = 'secreto';
+
+/** Hash de mentira, deterministico y legible: basta para distinguir un hash de otro. */
+function hashDe(texto: string): string {
+  return `hash:${texto}`;
+}
+
+const SIN_BLOQUEO: AccountLockState = { failedAttempts: 0, lockLevel: 0, lockedUntil: null };
+
+const USUARIO: AuthenticatableUser = {
+  id: 'usuario-1',
+  passwordHash: hashDe(CONTRASENA_CORRECTA),
+  ...SIN_BLOQUEO,
+};
+
+/** Un instante futuro: la cuenta esta bloqueada mientras el reloj no lo alcance. */
+function bloqueadaHasta(): Date {
+  return new Date(Date.now() + 60_000);
+}
+
+/**
+ * Puertos falsos escritos aqui mismo: el caso de uso no sabe si al otro lado hay Postgres o
+ * un `Map`, que es justo lo que se quiere demostrar (R17).
+ */
+function montar(usuarios: readonly AuthenticatableUser[] = [USUARIO], nombre = 'admin') {
+  const encontrables = new Map(usuarios.map((usuario) => [nombre, usuario]));
+
+  const users = {
+    findActiveByUsername: vi.fn(async (username: string) => encontrables.get(username) ?? null),
+  };
+  // Los dobles se tipan con la firma del puerto: sin eso, las aserciones sobre los
+  // argumentos recibidos no las vigilaria el compilador.
+  const attempts = {
+    record: vi.fn<(userId: string, state: AccountLockState) => Promise<void>>(async () => {}),
+  };
+  const hasher = {
+    hash: vi.fn(async (texto: string) => hashDe(texto)),
+    // Verificacion de mentira, pero exacta: distingue mayusculas y no recorta espacios.
+    verify: vi.fn(async (texto: string, guardado: string) => guardado === hashDe(texto)),
+  };
+  const session = {
+    startSession: vi.fn<(ticket: SessionTicket) => Promise<void>>(async () => {}),
+  };
+
+  return {
+    users,
+    attempts,
+    hasher,
+    session,
+    verifyCredentials: createVerifyCredentials({ users, attempts, hasher, session }),
+  };
+}
+
+describe('verificacion de credenciales', () => {
+  // R1
+  it('acepta usuario activo con contrasena correcta', async () => {
+    const { verifyCredentials, session } = montar();
+
+    const resultado = await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(resultado).toEqual({ ok: true });
+    expect(session.startSession).toHaveBeenCalledTimes(1);
+    expect(session.startSession.mock.calls[0]?.[0]).toMatchObject({ userId: USUARIO.id });
+  });
+
+  // R2
+  it('usuario inexistente devuelve el resultado generico', async () => {
+    const { verifyCredentials } = montar();
+
+    await expect(
+      verifyCredentials({ username: 'no.existe', password: CONTRASENA_CORRECTA }),
+    ).resolves.toEqual({ ok: false });
+  });
+
+  // R3
+  it('contrasena incorrecta devuelve un resultado indistinguible del de usuario inexistente', async () => {
+    const { verifyCredentials } = montar();
+
+    const inexistente = await verifyCredentials({ username: 'no.existe', password: 'lo-que-sea' });
+    const contrasenaMala = await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    expect(contrasenaMala).toEqual(inexistente);
+  });
+
+  // R4
+  it('el usuario no distingue mayusculas ni espacios, la contrasena si', async () => {
+    const { verifyCredentials, users } = montar();
+
+    const conRuido = await verifyCredentials({
+      username: '  ADMIN ',
+      password: CONTRASENA_CORRECTA,
+    });
+
+    expect(conRuido).toEqual({ ok: true });
+    expect(users.findActiveByUsername).toHaveBeenCalledWith('admin');
+
+    // La contrasena si es exacta: 'Secreto' no vale por 'secreto'.
+    await expect(verifyCredentials({ username: 'admin', password: 'Secreto' })).resolves.toEqual({
+      ok: false,
+    });
+  });
+
+  // R5
+  it('un usuario borrado no autentica', async () => {
+    // El puerto solo devuelve usuarios no borrados: para el dominio, un borrado es un `null`.
+    const { verifyCredentials, session } = montar([]);
+
+    await expect(
+      verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA }),
+    ).resolves.toEqual({ ok: false });
+    expect(session.startSession).not.toHaveBeenCalled();
+  });
+
+  // R6
+  it('verifica un hash señuelo cuando el usuario no existe', async () => {
+    const conUsuario = montar();
+    await conUsuario.verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+    expect(conUsuario.hasher.verify).toHaveBeenCalledTimes(1);
+
+    const sinUsuario = montar([]);
+    await sinUsuario.verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(sinUsuario.hasher.verify).toHaveBeenCalledTimes(1);
+    expect(sinUsuario.hasher.verify.mock.calls[0]?.[1]).toBe(hashDe(DECOY_SECRET));
+    expect(sinUsuario.hasher.verify.mock.calls[0]?.[1]).not.toBe(USUARIO.passwordHash);
+  });
+
+  // R7
+  it('el señuelo se produce con el hasher del sistema y se calcula una sola vez', async () => {
+    const { verifyCredentials, hasher } = montar([]);
+
+    await verifyCredentials({ username: 'no.existe', password: 'a' });
+    await verifyCredentials({ username: 'tampoco', password: 'b' });
+    await verifyCredentials({ username: 'ni.este', password: 'c' });
+
+    // Producido con el hasher del sistema (hereda su coste), no con un literal a mano...
+    expect(hasher.hash).toHaveBeenCalledWith(DECOY_SECRET);
+    // ...y cacheado en el closure: tres intentos, un solo calculo.
+    expect(hasher.hash).toHaveBeenCalledTimes(1);
+  });
+
+  // R8
+  it('entrada invalida no toca ningun puerto', async () => {
+    const { verifyCredentials, users, hasher, session } = montar();
+
+    const vacia = await verifyCredentials({ username: '', password: '' });
+    const demasiadoLarga = await verifyCredentials({
+      username: 'admin',
+      password: 'x'.repeat(65),
+    });
+
+    expect(vacia).toEqual({ ok: false });
+    expect(demasiadoLarga).toEqual({ ok: false });
+    expect(users.findActiveByUsername).not.toHaveBeenCalled();
+    expect(hasher.hash).not.toHaveBeenCalled();
+    expect(hasher.verify).not.toHaveBeenCalled();
+    expect(session.startSession).not.toHaveBeenCalled();
+  });
+
+  // R14
+  it('ningun fallo emite sesion', async () => {
+    const { verifyCredentials, session } = montar();
+    const bloqueado = montar([{ ...USUARIO, lockLevel: 1, lockedUntil: bloqueadaHasta() }]);
+
+    await verifyCredentials({ username: 'no.existe', password: CONTRASENA_CORRECTA });
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+    await verifyCredentials({ username: '', password: '' });
+    await bloqueado.verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(session.startSession).not.toHaveBeenCalled();
+    expect(bloqueado.session.startSession).not.toHaveBeenCalled();
+  });
+
+  // R17
+  it('el caso de uso se construye con puertos', async () => {
+    const { verifyCredentials, users, attempts, hasher, session } = montar();
+
+    // Detras no hay nada real, solo dobles. Si el dominio eligiera su implementacion
+    // concreta, este test no podria existir sin base de datos ni bcrypt.
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(users.findActiveByUsername).toHaveBeenCalledTimes(1);
+    expect(hasher.verify).toHaveBeenCalledTimes(1);
+    expect(attempts.record).toHaveBeenCalledTimes(1);
+    expect(session.startSession).toHaveBeenCalledTimes(1);
+  });
+
+  // R24 — el caso que se olvida: bloqueada CON la contrasena correcta.
+  it('una cuenta bloqueada no entra ni con la contrasena correcta', async () => {
+    const bloqueado: AuthenticatableUser = {
+      ...USUARIO,
+      failedAttempts: 0,
+      lockLevel: 1,
+      lockedUntil: bloqueadaHasta(),
+    };
+    const { verifyCredentials, session } = montar([bloqueado]);
+
+    await expect(
+      verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA }),
+    ).resolves.toEqual({ ok: false });
+    expect(session.startSession).not.toHaveBeenCalled();
+  });
+
+  // R25
+  it('un intento durante el bloqueo no escribe nada', async () => {
+    const bloqueado: AuthenticatableUser = {
+      ...USUARIO,
+      failedAttempts: 3,
+      lockLevel: 2,
+      lockedUntil: bloqueadaHasta(),
+    };
+    const { verifyCredentials, attempts } = montar([bloqueado]);
+
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    // Ni contador, ni nivel, ni fin de bloqueo: martillear una cuenta no la deja fuera mas
+    // tiempo del que ya decidio la politica.
+    expect(attempts.record).not.toHaveBeenCalled();
+  });
+
+  // R28
+  it('bloqueada, contrasena mala y usuario inexistente devuelven el mismo objeto', async () => {
+    const bloqueado = montar([{ ...USUARIO, lockLevel: 1, lockedUntil: bloqueadaHasta() }]);
+    const normal = montar();
+
+    const porBloqueo = await bloqueado.verifyCredentials({
+      username: 'admin',
+      password: CONTRASENA_CORRECTA,
+    });
+    const porContrasena = await normal.verifyCredentials({
+      username: 'admin',
+      password: 'incorrecta',
+    });
+    const porInexistente = await normal.verifyCredentials({
+      username: 'no.existe',
+      password: CONTRASENA_CORRECTA,
+    });
+
+    expect(porBloqueo).toEqual(porContrasena);
+    expect(porContrasena).toEqual(porInexistente);
+  });
+
+  // R29
+  it('el camino bloqueado verifica el hash una vez, igual que los otros', async () => {
+    const bloqueado = montar([{ ...USUARIO, lockLevel: 1, lockedUntil: bloqueadaHasta() }]);
+
+    await bloqueado.verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    // Si el bloqueo cortara antes de verificar, ese camino responderia en microsegundos y el
+    // tiempo de respuesta delataria que la cuenta existe y esta bloqueada.
+    expect(bloqueado.hasher.verify).toHaveBeenCalledTimes(1);
+    expect(bloqueado.hasher.verify.mock.calls[0]?.[1]).toBe(USUARIO.passwordHash);
+  });
+
+  // R27
+  it('el exito reinicia contador, nivel y bloqueo', async () => {
+    const conHistorial: AuthenticatableUser = {
+      ...USUARIO,
+      failedAttempts: 3,
+      lockLevel: 2,
+      // Bloqueo ya caducado: entra, y al entrar se limpia todo.
+      lockedUntil: new Date(Date.now() - 60_000),
+    };
+    const { verifyCredentials, attempts, session } = montar([conHistorial]);
+
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(attempts.record).toHaveBeenCalledWith(USUARIO.id, {
+      failedAttempts: 0,
+      lockLevel: 0,
+      lockedUntil: null,
+    });
+
+    // El orden importa: primero se deja la cuenta limpia y solo despues se emite la sesion.
+    const ordenRegistro = attempts.record.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY;
+    const ordenSesion = session.startSession.mock.invocationCallOrder[0] ?? 0;
+    expect(ordenRegistro).toBeLessThan(ordenSesion);
+  });
+
+  // R22 (integrado; la escalada en si vive en account-lock.test.ts)
+  it('un fallo con usuario existente registra lo que calcula nextLockState', async () => {
+    const conHistorial: AuthenticatableUser = {
+      ...USUARIO,
+      failedAttempts: 2,
+      lockLevel: 1,
+      lockedUntil: null,
+    };
+    const { verifyCredentials, attempts } = montar([conHistorial]);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    // Este fallo aun no consuma bloqueo, asi que el estado esperado no depende del instante
+    // y se puede comparar contra la politica pura sin inyectar reloj.
+    const esperado = nextLockState(conHistorial, 'failure', new Date());
+    expect(attempts.record).toHaveBeenCalledTimes(1);
+    expect(attempts.record).toHaveBeenCalledWith(USUARIO.id, esperado);
+  });
+
+  // R31
+  it('un usuario inexistente no provoca ninguna escritura', async () => {
+    const { verifyCredentials, attempts } = montar([]);
+
+    await verifyCredentials({ username: 'no.existe', password: CONTRASENA_CORRECTA });
+    await verifyCredentials({ username: 'tampoco', password: 'otra' });
+
+    // Una escritura por un usuario que no existe seria un oraculo de existencia por efecto
+    // lateral: bastaria mirar la base para saber que nombres son reales.
+    expect(attempts.record).not.toHaveBeenCalled();
+  });
+});
