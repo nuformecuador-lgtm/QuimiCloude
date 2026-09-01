@@ -243,12 +243,12 @@ Depende de: T5.
 
 Depende de: T3, T6.
 
-- [ ] `tests/integration/identity/login.int.test.ts` segun `design.md > 7`: `beforeAll` crea
+- [x] `tests/integration/identity/login.int.test.ts` segun `design.md > 7`: `beforeAll` crea
       rol y usuario propios con `username` aleatorio y hash real; `afterAll` los borra por id
       en `finally`.
-- [ ] Casos: login correcto contra fila real, contrasena incorrecta, usuario con `deleted_at`
+- [x] Casos: login correcto contra fila real, contrasena incorrecta, usuario con `deleted_at`
       puesto, y nombre de usuario con otra combinacion de mayusculas.
-- [ ] Casos del bloqueo contra columnas reales: cinco fallos seguidos dejan
+- [x] Casos del bloqueo contra columnas reales: cinco fallos seguidos dejan
       `failed_login_attempts = 0`, `lock_level = 1` y `locked_until` en el futuro; un login
       correcto despues de un par de fallos deja las tres columnas a cero/`null`; un usuario con
       `locked_until` en el futuro no entra ni con la contrasena correcta.
@@ -260,8 +260,8 @@ Depende de: T3, T6.
 
 Depende de: T6.
 
-- [ ] `pnpm exec vitest run guard` — **las cinco guardias**, no solo la de arquitectura.
-- [ ] Revisar a mano lo que la guardia **no** comprueba (`CHECKPOINTS.md`): que la logica de
+- [x] `pnpm exec vitest run guard` — **las cinco guardias**, no solo la de arquitectura.
+- [x] Revisar a mano lo que la guardia **no** comprueba (`CHECKPOINTS.md`): que la logica de
       negocio esta en `domain/` y no en la Server Action, y que ningun driving instancia su
       driven.
 - **Hecho cuando:** `vitest run guard` en verde con los archivos nuevos, y queda anotado en
@@ -294,12 +294,12 @@ Depende de: T0. Aprobado por el humano el 2026-09-01 (`design.md > 6.4`).
 
 Depende de: T6, T8, T11.
 
-- [ ] `e2e/login.spec.ts` segun `design.md > 7` nivel 4: fixture que crea su usuario de prueba
+- [x] `e2e/login.spec.ts` segun `design.md > 7` nivel 4: fixture que crea su usuario de prueba
       y lo borra al final (**no** usa el seed de QC-6).
-- [ ] Camino feliz: la URL acaba en `DASHBOARD_ROUTE` y `context.cookies()` trae `qc_session`
+- [x] Camino feliz: la URL acaba en `DASHBOARD_ROUTE` y `context.cookies()` trae `qc_session`
       con `httpOnly: true`. Que `/dashboard` sea hoy un 404 (QC-12 `pending`) **no invalida el
       test**: se afirma el destino y la cookie, no el contenido.
-- [ ] Camino de error: credenciales malas -> se sigue en `/login`, se ve
+- [x] Camino de error: credenciales malas -> se sigue en `/login`, se ve
       `GENERIC_CREDENTIALS_ERROR` y **no** hay cookie `qc_session`.
 - **Hecho cuando:** `pnpm run e2e` pasa en chromium y webkit. **Cubre R1, R2, R9 y R19 en
       navegador real**, y salda la deuda "E2E diferido" que arrastran QC-10 y QC-11 en
@@ -310,15 +310,15 @@ Depende de: T6, T8, T11.
 Depende de: T1-T9, T11, T12.
 
 - [ ] `./init.sh` completo en verde (obligatorio antes del PR, sin excepcion).
-- [ ] `progress/impl_QC-7-login-usuario-y-contrasena.md` con la salida real de los tests y el
+- [x] `progress/impl_QC-7-login-usuario-y-contrasena.md` con la salida real de los tests y el
       mapa `R<n> -> test` de la tabla de abajo.
-- [ ] Anotar en `progress/current.md > Deudas`: (a) el logout de QC-8 borra la cookie pero no
+- [x] Anotar en `progress/current.md > Deudas`: (a) el logout de QC-8 borra la cookie pero no
       revoca el token (`design.md > 6.2`); (b) bloqueo **por cuenta**, riesgo de DoS dirigido
       aceptado por el humano y sin limite por IP (`design.md > 6.5`); (c) un usuario bloqueado
       no sabe que lo esta — revisar cuando exista recuperacion de contrasena
       (`design.md > 5.5`); (d) el nivel de escalada solo baja con un login exitoso, no decae
       con el tiempo.
-- [ ] Anotar en `progress/current.md` que la complejidad real de la ficha fue **`high`** (el
+- [x] Anotar en `progress/current.md` que la complejidad real de la ficha fue **`high`** (el
       board la tiene sin complejidad asignada) y que el bloqueo entro como alcance añadido.
 - **Hecho cuando:** los tres puntos estan hechos y `CHECKPOINTS.md` se recorre entero sin
       casilla vacia (salvo el E2E, que queda con su razon escrita).

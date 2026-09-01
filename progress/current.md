@@ -22,6 +22,17 @@ la primera con scrypt a mano, parada en el PR por sobre-ingeniería y rehecha co
 La feature **7 — pantalla-de-login** se cerró el 2026-08-06 (PR #2, merge `9ac5a5c`):
 resumen en `progress/history.md`, worktree desmontado y rama local borrada.
 
+**QC-7 — login-usuario-y-contrasena: la complejidad real fue `high`, no la que trae el board.**
+La ficha llego **sin complejidad asignada**. Lo que se estimo como "verificar credenciales y
+emitir cookie" (`medium`) paso a `high` el 2026-09-01, cuando el humano respondio la pregunta
+abierta 2 con una politica concreta de bloqueo de cuenta: eso arrastro **persistencia,
+migracion con su `down.sql`, un puerto y un adaptador de escritura mas, y una tanda entera de
+tests** a una feature que no tenia ninguna. El bloqueo entro como **alcance anadido**, no
+estaba en la description original. Se decidio dejarlo dentro de QC-7 y no sacarlo a ficha
+propia (razonamiento en `specs/QC-7-.../design.md > 11`): es el mismo camino de codigo, y la
+respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — retrofitear
+uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
+
 ## Evaluaciones
 
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
@@ -246,6 +257,39 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   `pnpm typecheck`: le faltan `node_modules`, el cliente de Prisma y los tipos de Next. Hoy hay que
   correr a mano `pnpm install --frozen-lockfile`, `pnpm exec prisma generate` y `pnpm exec next
   typegen`. Candidato a que lo haga `scripts/wt.sh new`.
+- **[QC-8 — el logout borra la cookie, no revoca el token]** La sesion es un token firmado sin
+  estado, no una fila en una tabla: no hay revocacion. El logout de QC-8 borrara la cookie del
+  navegador, pero un valor ya firmado que alguien hubiera copiado sigue siendo valido hasta su
+  `exp` (8 h). Riesgo acotado y reversible: migrar a sesiones opacas toca **solo**
+  `session-cookie.ts` y el lector de QC-8; el dominio y los puertos no se enteran.
+  (`specs/QC-7-.../design.md > 6.2`.)
+- **[QC-7 — bloqueo POR CUENTA, sin limite por IP]** Cualquiera puede dejar fuera a un usuario
+  conocido hasta 60 minutos con 5 intentos fallidos. **Riesgo de DoS dirigido asumido
+  explicitamente por el humano el 2026-09-01** (D12): ERP de un solo tenant, usuarios conocidos
+  y sin registro publico. El limite por IP se ofrecio y se descarto: sobre Vercel la IP llega
+  por `x-forwarded-for`, falsificable si el borde no esta bien configurado, y daria una
+  sensacion de proteccion que no es real. (`design.md > 6.5`.)
+- **[QC-7 — un usuario bloqueado no sabe que lo esta]** El mensaje es el generico, sin
+  excepcion: un "cuenta bloqueada" delataria que el nombre de usuario existe. Coste real para
+  el usuario legitimo, hasta 60 minutos sin entender por que. **Revisar cuando exista la
+  recuperacion de contrasena** (hoy `FORGOT_PASSWORD_ROUTE` da 404, deuda de QC-10): avisar por
+  correo al dueno de la cuenta es el canal que no filtra nada a terceros. (`design.md > 5.5`.)
+- **[QC-7 — el nivel de escalada no decae con el tiempo]** Solo baja con un login exitoso. Una
+  ventana de "buen comportamiento" (bajar un nivel tras 24 h sin fallos) exigiria una cuarta
+  columna con la fecha del ultimo fallo y una regla mas que testear, para acotar algo que ya
+  esta acotado en 60 minutos. Si el humano lo quiere, es una columna y una linea.
+- **[QC-4 / arnes — un test de integracion afirma sobre el estado GLOBAL de la tabla]**
+  `identity-constraints.int.test.ts` usa `expect(await tx.user.count()).toBe(0)` en tres
+  puntos. Al aparecer el segundo archivo de integracion (QC-7) eso se convirtio en una carrera:
+  ver `progress/impl_QC-7-login-usuario-y-contrasena.md > 6.2`. **Contenido** serializando
+  `tests/integration/` en `vitest.config.mts`, no reparado: el arreglo de fondo es acotar esa
+  asercion a sus propias filas, y es de QC-4. Ojo, la serializacion vale **dentro de una
+  corrida**; dos procesos de vitest a la vez contra la misma base siguen chocando.
+- **[arnes — el `.env` del repo no tiene `DIRECT_URL`]** `db/schema.prisma` la declara y sin
+  ella `prisma migrate` falla con `P1012`. `.env.example` si la documenta: el incompleto es el
+  `.env` real. Se anadio a mano en el worktree de QC-7 (base local en `localhost:5432`, o sea
+  el mismo valor que `DATABASE_URL`). Candidato a que lo cubra `scripts/wt.sh new` junto con el
+  resto de artefactos generados.
 
 Cerradas, para que nadie las busque abiertas: la pregunta 3 de la feature 1 (columnas
 `password_algorithm` / `password_updated_at`) se responde **NO** en `specs/2-.../design.md > 8`, y la
