@@ -15,7 +15,7 @@ const { verifyCredentialsMock } = vi.hoisted(() => ({
   verifyCredentialsMock: vi.fn<(input: { username: string; password: string }) => Promise<{ ok: boolean }>>(),
 }));
 
-vi.mock('@/lib/services/login-stub', () => ({
+vi.mock('@/lib/modules/identity/domain/verify-credentials', () => ({
   verifyCredentials: verifyCredentialsMock,
 }));
 
@@ -23,10 +23,10 @@ vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
 
-type LoginStubModule = typeof import('@/lib/services/login-stub');
+type LoginStubModule = typeof import('@/lib/modules/identity/domain/verify-credentials');
 
 async function loadRealStub(): Promise<LoginStubModule> {
-  return vi.importActual<LoginStubModule>('@/lib/services/login-stub');
+  return vi.importActual<LoginStubModule>('@/lib/modules/identity/domain/verify-credentials');
 }
 
 function formDataOf(fields: Record<string, string>): FormData {
@@ -160,7 +160,7 @@ describe('loginAction', () => {
   });
 
   it('no accede a base de datos ni emite cookie', () => {
-    const modulos = ['lib/actions/login.ts', 'lib/services/login-stub.ts'];
+    const modulos = ['lib/actions/login.ts', 'lib/modules/identity/domain/verify-credentials.ts'];
     const prohibidos = [
       /(^|\/)next\/headers$/,
       /^@prisma\/client$/,

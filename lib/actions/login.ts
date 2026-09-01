@@ -2,13 +2,12 @@
 
 import { redirect } from 'next/navigation';
 
-import { verifyCredentials } from '@/lib/services/login-stub';
+import { loginInputSchema, verifyCredentials } from '@/lib/modules/identity';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
   PASSWORD_TOO_LONG_ERROR,
   REQUIRED_FIELD_ERROR,
-  loginInputSchema,
   type LoginFormState,
 } from '@/lib/types/auth';
 

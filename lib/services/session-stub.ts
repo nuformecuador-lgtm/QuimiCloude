@@ -1,4 +1,4 @@
-import type { SessionUser } from '@/lib/types/session';
+import type { SessionUser } from '@/lib/modules/identity';
 
 /**
  * STUB del proveedor de sesion de la zona privada.

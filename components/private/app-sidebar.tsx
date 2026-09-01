@@ -34,7 +34,7 @@ import {
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
-import type { SessionUser } from '@/lib/types/session';
+import type { SessionUser } from '@/lib/modules/identity';
 
 /**
  * `id` del panel de la barra lateral. Lo referencia el control de colapso con

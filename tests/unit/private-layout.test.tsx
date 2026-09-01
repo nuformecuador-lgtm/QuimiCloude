@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { cleanup, render, screen, within } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
-import type { SessionUser } from '@/lib/types/session';
+import type { SessionUser } from '@/lib/modules/identity';
 import { getInitials } from '@/lib/shared/ui/initials';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 

@@ -1,4 +1,4 @@
-import type { LoginInput } from '@/lib/types/auth';
+import type { LoginInput } from './credentials';
 
 /**
  * STUB de verificacion de credenciales.

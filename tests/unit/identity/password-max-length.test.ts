@@ -2,8 +2,8 @@
 // sin intentar autenticar (R10).
 
 import { loginAction } from '@/lib/actions/login';
+import { CREDENTIAL_MAX_LENGTH } from '@/lib/modules/identity';
 import {
-  CREDENTIAL_MAX_LENGTH,
   LOGIN_INITIAL_STATE,
   PASSWORD_TOO_LONG_ERROR,
   REQUIRED_FIELD_ERROR,
@@ -14,7 +14,7 @@ const { verifyCredentialsMock } = vi.hoisted(() => ({
     vi.fn<(input: { username: string; password: string }) => Promise<{ ok: boolean }>>(),
 }));
 
-vi.mock('@/lib/services/login-stub', () => ({
+vi.mock('@/lib/modules/identity/domain/verify-credentials', () => ({
   verifyCredentials: verifyCredentialsMock,
 }));
 

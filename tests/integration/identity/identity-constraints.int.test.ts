@@ -32,7 +32,7 @@ import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { prisma } from '@/lib/shared/db/prisma'
-import { DOCUMENT_TYPE_CC } from '@/lib/types/identity'
+import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity'
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento
