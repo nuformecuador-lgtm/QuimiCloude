@@ -17,8 +17,9 @@ bitácoras que se vayan acumulando.
 | `CHECKPOINTS.md` | raíz | copia literal |
 | `init.sh` | raíz | copia literal (el gate: `./init.sh` y `./init.sh --rapido`) |
 | `scripts/wt.sh` | `scripts/` | copia literal (ciclo de vida de los worktrees) |
+| `scripts/validate-features.mjs` | `scripts/` | copia literal (valida `feature_list.json` en el gate) |
 | `.mcp.json` | raíz | copia literal (servidores MCP) |
-| `docs/architecture.md` · `conventions.md` · `specs.md` · `verification.md` · `worktrees.md` | `docs/` | copia literal — los que los subagentes leen |
+| `docs/architecture.md` · `conventions.md` · `specs.md` · `verification.md` · `worktrees.md` · `jira.md` | `docs/` | copia literal — los que los subagentes leen |
 | `.claude/agents/*.md` | `.claude/agents/` | copia literal, los 6 subagentes |
 | `.claude/settings.json` | `.claude/` | copia literal (hooks del arnés) |
 | `.claude/settings.local.json` | `.claude/` | copia literal (permisos + MCP habilitado) |
@@ -41,7 +42,7 @@ bitácoras que se vayan acumulando.
 
 ## Si lo trasplantas a otro proyecto, revisa esto
 
-1. **`init.sh`** asume `pnpm`, `jq` y los scripts `typecheck` / `lint` / `test` / `test:rapido`
+1. **`init.sh`** asume `pnpm` y los scripts `typecheck` / `lint` / `test` / `test:rapido`
    en `package.json`, más `db/migrations/*/down.sql`. Sin esos scripts el gate **avisa y sigue**
    (`warn`), no falla: verifica que existan o el gate no mide nada.
 2. **`.claude/settings.local.json`** trae permisos de esta máquina; revísalos allá.
@@ -52,8 +53,11 @@ bitácoras que se vayan acumulando.
    `/.worktrees/` en `.gitignore`, `".worktrees/**"` en `globalIgnores` de eslint, y
    `.worktrees` en el `exclude` de `tsconfig.json`. Ver `docs/worktrees.md`.
 4. **`.mcp.json`** resuelve el proyecto de Supabase por `${SUPABASE_PROJECT_REF}` y la
-   clave de Context7 por `${CONTEXT7_API_KEY}`: ambas salen del entorno, no del repo.
-   Defínelas allá o los servidores MCP no levantan.
+   clave de Context7 por `${CONTEXT7_API_KEY}`, y la autenticación de Jira por
+   `${ATLASSIAN_MCP_AUTH}` (que es `base64(email:api_token)`): las tres salen del entorno,
+   no del repo. Defínelas allá o los servidores MCP no levantan.
+   El arnés espera además un **board de Jira** con las cinco columnas del ciclo; sin él, el
+   paso F0 no tiene de dónde importar. Montaje completo en `docs/jira.md`.
 5. **`docs/architecture.md`** describe el dominio, el stack y los principios de este
    proyecto (un ERP mono-tenant). Es el documento a reescribir en destino; los otros de
    `docs/` son genéricos.

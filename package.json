@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:json": "vitest run --reporter=default --reporter=json --outputFile.json=.vitest-rojos.json",
     "test:guardias": "vitest run guard --passWithNoTests",
     "test:rapido": "node scripts/test-rapido.mjs",
     "db:migrate:create": "prisma migrate dev --create-only",

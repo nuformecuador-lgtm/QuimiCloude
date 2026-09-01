@@ -55,5 +55,19 @@ app/(public)/login/
    sea uno solo. `'use client'` se declara en cada componente, **nunca en el `index.ts`**:
    el barrel no debe convertirse en frontera cliente/servidor. Detalle y motivos en
    `docs/architecture.md > Componentes`; el reviewer lo rechaza como anti-patron.
+9. **Multiplataforma: web, iOS y Android.** La UI se consume desde escritorio y desde navegador
+   movil / WebView. Antes de añadir una libreria de UI, verifica su soporte en Safari/WebKit y
+   Chrome Android. En estilos: mobile-first, `100dvh` en vez de `100vh`, `env(safe-area-inset-*)`
+   en elementos fijos, nunca `:hover` como unica via, targets tactiles >= 44x44 px y `font-size`
+   >= 16px en inputs. Si necesitas algo que solo funcione en escritorio, declaralo en el
+   `design.md` de la feature; sin esa declaracion el reviewer lo rechaza. Detalle y motivos en
+   `docs/architecture.md > Componentes > Regla: multiplataforma`.
+10. **No reinventes la rueda, pero no instales sin permiso.** Antes de escribir una utilidad,
+    comprueba si ya la resuelve una libreria. Antes de proponerla, verifica los cuatro checks:
+    no `deprecated`, release en los ultimos 12 meses, >= 10.000 descargas semanales, licencia
+    MIT/Apache-2.0/BSD/ISC. **Nunca instales tu**: propon, PARA y devuelve la propuesta con el
+    resultado de los checks; la aprueba un humano y se anota en `docs/dependencias.md`. Una
+    dependencia no listada ahi tiñe el gate de rojo. Detalle en `docs/architecture.md >
+    Dependencias de terceros`.
 
 Al terminar, devuelve SOLO: archivos creados/modificados y un veredicto de una linea.

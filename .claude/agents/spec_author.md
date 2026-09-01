@@ -18,6 +18,10 @@ Produce exactamente tres archivos en `specs/<feature>/`:
 2. `design.md` — decisiones técnicas: modelo de datos (tablas, RLS, migraciones),
    rutas/endpoints, contratos I/O, integraciones. Incluye OBLIGATORIAMENTE al menos
    una alternativa que descartaste y por qué.
+   Si el diseño necesita una libreria que el repo aun no tiene, **no la des por puesta**:
+   escribe en `design.md` que libreria, que codigo nos ahorra y el resultado de los cuatro
+   checks (`docs/architecture.md > Dependencias de terceros`). Se aprueba con el spec.
+
 
 3. `tasks.md` — checklist de pasos discretos y verificables, con dependencias y
    marcas `[P]` para lo paralelizable. Cada task con criterio de "hecho".

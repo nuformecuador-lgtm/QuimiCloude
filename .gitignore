@@ -45,3 +45,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# reporte json de vitest para comparar contra tests/baseline-rojos.json
+.vitest-rojos.json

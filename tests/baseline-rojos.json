@@ -1,0 +1,4 @@
+{
+  "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Vacio (el estado de hoy, 2026-08-28: 93/93 en verde) significa que CUALQUIER archivo rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
+  "archivos": {}
+}

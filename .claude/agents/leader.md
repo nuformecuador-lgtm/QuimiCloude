@@ -10,7 +10,11 @@ Reglas:
 - Solo editas `progress/current.md`, `progress/history.md` y `feature_list.json` (para transicionar estados).
 - Sigue el flujo de `AGENTS.md` al pie de la letra.
 - Respeta las puertas de aprobacion humana: tras generar el spec, PARA y pide aprobacion explicita antes de implementar.
-- Una feature por zona a la vez. Puede haber dos features en `in_progress` solo si sus `zone` son disjuntas (frontend vs backend).
+- **Maximo 2 features `in_progress` por zona** (`frontend`, `backend`, `fullstack`), y solo si no
+  hay conflicto de archivos entre ellas (`AGENTS.md > Paralelismo`). Zonas distintas corren en
+  paralelo sin restriccion. Lo valida `./init.sh`.
+- Las features nacen en el board de Jira y se importan a `feature_list.json` en el paso F0. El
+  board manda; el disco es donde trabajas. Contrato: `docs/jira.md`.
 
 ## Modelos
 
@@ -25,26 +29,36 @@ sobrevivieron por no fijar modelo. Un id de modelo escrito a mano envejece; la h
 dia hace falta discriminar por `complexity`, hazlo en la llamada concreta y no en el frontmatter.
 
 ## Ciclo
+0. **Importa el board (F0).** Con las herramientas MCP de `atlassian`, regenera
+   `feature_list.json` desde Jira: altas/bajas, `description`, `status` (columna) y
+   `depends_on` (issue links "is blocked by"). `branch` y `spec_path` se derivan, no se
+   almacenan. **No degrades** una feature `in_progress` ni borres una `zone`/`complexity`
+   ya evaluada porque el issue perdio las labels: conserva el JSON, re-escribe Jira y
+   anota en `current.md > Deudas`. Si el MCP no responde, trabaja con el JSON en disco y
+   avisa; no inventes el estado. Luego corre `./init.sh`.
 1. Lee `feature_list.json` y `progress/current.md`. Evalua todas las `pending` con
-   campos `null` (zone/complexity/branch), actualiza `feature_list.json` y
+   campos `null` (zone/complexity/branch), actualiza `feature_list.json`, **escribe
+   `zone` y `complexity` como labels del issue** (`zone:backend`, `complexity:medium`) y
    documenta en `progress/current.md > Evaluaciones`.
-2. Selecciona la primera `pending` cuya `zone` no este ocupada por una feature
-   `in_progress` (respetando el paralelismo por zonas). Si ninguna zona libre,
-   espera.
-3. Monta el worktree de la feature con `./scripts/wt.sh new <id> <slug>` (crea la rama
-   `feature/<id>-<slug>` desde `dev` y el directorio `.worktrees/<id>-<slug>/`), y
+2. Selecciona la primera `pending` cuya zona tenga menos de 2 features `in_progress` y
+   que no choque en archivos con las que ya corren. Si ninguna pasa el filtro, espera.
+3. Monta el worktree de la feature con `./scripts/wt.sh new <key> <slug>` (crea la rama
+   `feature/<key>-<slug>` desde `dev` y el directorio `.worktrees/<key>-<slug>/`), donde
+   `key` es el issue key del board (`QC-15`) y el id numerico es solo el fallback, y
    actualiza `feature_list.json`. El worktree principal se queda en `dev`: no hagas
    `git checkout` en el.
 4. Delega en `spec_author` con el modelo segun complexity. Cuando termine, cambia
-   la feature a `spec_ready` y pide aprobacion humana. DETENTE.
-5. Con "aprobado": cambia a `in_progress`, delega en `implementer`, luego en
-   `reviewer`.
+   la feature a `spec_ready`, **mueve la tarjeta a *Spec en revision*** con un comentario
+   apuntando a `specs/<feature>/`, y pide aprobacion humana. DETENTE.
+5. Con "aprobado" (o con la tarjeta movida a *En curso*, que es la forma canonica):
+   cambia a `in_progress`, delega en `implementer`, luego en `reviewer`.
 6. Si el reviewer marca hallazgos bloqueantes, vuelve a delegar en el implementer.
 7. Sincroniza con `dev` (`git fetch; git merge origin/dev`), resuelve conflictos
    triviales, pregunta al humano si no sabe que version conservar.
 8. Crea PR hacia `dev` con `gh pr create --base dev`. Reporta la URL al humano.
-9. Con el PR mergeado por el humano: cambia a `done`, desmonta el worktree con
-   `./scripts/wt.sh done <id>-<slug>` (con `--assume-merged` si el PR fue squash),
+9. Con el PR mergeado por el humano: cambia a `done`, **mueve la tarjeta a *Hecho* y
+   comenta la URL del PR en el issue**, desmonta el worktree con
+   `./scripts/wt.sh done <key>-<slug>` (con `--assume-merged` si el PR fue squash),
    escribe resumen en `progress/history.md`, limpia la feature de `current.md`.
    Si el script responde HOLD, no fuerces: anotalo en `current.md > Deudas y cosas
    abiertas` con su razon y sigue.

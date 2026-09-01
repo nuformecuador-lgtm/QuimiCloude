@@ -33,7 +33,6 @@ echo "== Arnes SDD :: init (modo: $MODO) =="
 # 1. Herramientas base
 command -v node >/dev/null 2>&1 || fail "node no esta instalado"
 command -v pnpm >/dev/null 2>&1 || fail "pnpm no esta instalado. Instalalo con: npm i -g pnpm"
-command -v jq   >/dev/null 2>&1 || warn "jq no esta instalado (recomendado para validar feature_list.json)"
 ok "node $(node -v)"
 
 # 2. Dependencias
@@ -47,49 +46,25 @@ else
   warn "no hay package.json todavia (repo recien inicializado)"
 fi
 
-# 3. Regla: maximo 2 features in_progress por zona (frontend / backend / fullstack).
-#    Antes era 1; el humano lo subio a 2 (2026-07-22) para permitir dos peticiones
-#    concurrentes por zona. Coincide con CLAUDE.md regla 1 y AGENTS.md Paralelismo.
-if command -v jq >/dev/null 2>&1 && [ -f feature_list.json ]; then
-  IN_PROGRESS_COUNT=$(jq '[.features[] | select(.status=="in_progress")] | length' feature_list.json)
-  if [ "$IN_PROGRESS_COUNT" -gt 0 ]; then
-    OVER_LIMIT=$(jq -r '
-      [.features[] | select(.status=="in_progress" and .zone != null)]
-      | group_by(.zone)
-      | map(select(length > 2))[]
-      | "\(.[0].zone): \(map(.id|tostring) | join(", ")) (\(length) in_progress, max 2)"
-    ' feature_list.json)
-    if [ -n "$OVER_LIMIT" ]; then
-      fail "mas de 2 features in_progress en la misma zona: $OVER_LIMIT"
-    fi
-  fi
-  ok "regla max-2-por-zona respetada (in_progress=$IN_PROGRESS_COUNT)"
-
-  # 4. Toda feature sdd EN VUELO (spec_ready o in_progress) debe tener su carpeta
-  #    de specs. Se acota a "en vuelo" a proposito: las `done` tempranas (1-16) son
-  #    previas a la convencion de specs y no tienen carpeta, e incluirlas dejaba el
-  #    gate permanentemente rojo; `pending`/`cancelled` no la necesitan aun/ya.
-  #    La carpeta se resuelve por `spec_path` explicito o, si no, por glob
-  #    `specs/<id>-*` (convencion real `<id>-<slug>`), NO por `.name` (el bug previo:
-  #    `.name` no matchea el slug de la carpeta, p.ej. name "login" vs specs/1-login).
-  MISSING=$(jq -r '
-    .features[]
-    | select(.sdd==true and (.status=="spec_ready" or .status=="in_progress"))
-    | "\(.id)\t\(.spec_path // "")"
-  ' feature_list.json | while IFS=$'\t' read -r id spath; do
-    if [ -n "$spath" ] && [ -f "$spath/requirements.md" ]; then
-      continue
-    fi
-    found=""
-    for d in specs/"$id"-*/; do
-      [ -f "${d}requirements.md" ] && { found=1; break; }
-    done
-    [ -n "$found" ] || echo "$id"
-  done)
-  if [ -n "$MISSING" ]; then
-    fail "faltan specs para features sdd en vuelo (por id): $MISSING"
-  fi
-  ok "specs presentes para features sdd en vuelo"
+# 3+4. Validacion de feature_list.json: max 2 in_progress por zona, specs presentes para
+#      las features sdd en vuelo, integridad de ids y de depends_on.
+#
+#      Vive en Node y no en `jq` a proposito. Antes eran dos bloques de `jq` colgando de un
+#      solo `if command -v jq ...`: en una maquina SIN jq no fallaban, se saltaban ENTEROS y
+#      el gate terminaba en verde sin validar nada. Estuvo asi lo suficiente para que nadie
+#      notara que los dos `ok` no se imprimian nunca. Node ya es obligatorio (paso 1), asi
+#      que ahora esto no puede quedarse mudo. Detalle en scripts/validate-features.mjs.
+if [ -f feature_list.json ]; then
+  # El validador es OBLIGATORIO, no opcional. Si falta, esto es `fail` y no `warn`: un
+  # `warn` aqui reintroduce exactamente el agujero que este bloque vino a cerrar -el check
+  # se salta en silencio y el gate sigue en verde-, solo que movido de `jq` al script. La
+  # plantilla (`harnessConfig/scripts/`) lo trae, asi que un repo recien clonado lo tiene.
+  [ -f scripts/validate-features.mjs ] || fail "falta scripts/validate-features.mjs: sin el, feature_list.json no se valida"
+  VALIDACION=$(node scripts/validate-features.mjs 2>&1) || fail "feature_list.json invalido:
+$VALIDACION"
+  echo "$VALIDACION" | while IFS= read -r linea; do
+    [ -n "$linea" ] && ok "$linea"
+  done
 fi
 
 # 5. Worktrees acumulados. Es `warn`, NO `fail`, a proposito: poner el gate en rojo por
@@ -140,7 +115,26 @@ if [ -f package.json ]; then
     warn "modo rapido: solo los tests relacionados con tus cambios + las guardias."
     warn "Antes de abrir el PR corre './init.sh' sin flags."
   else
-    run_if test
+    # Suite completa + comparacion contra el baseline de rojos heredados. NO es `run_if test`
+    # porque la pregunta al cerrar una feature no es "¿esta todo verde?" sino "¿rompi algo YO?":
+    # cuando `dev` arrastra deuda ajena la suite termina siempre en rojo y el gate deja de
+    # responder nada. Detalle y limites en scripts/comparar-baseline-rojos.mjs.
+    # `fail`, no `warn`: el gate depende de este script. Si un repo trasplantado desde
+    # la plantilla no lo tiene, hay que enterarse aqui y no tres pasos mas abajo con un
+    # "no existe el reporte" que no explica nada.
+    pnpm run 2>/dev/null | grep -q "^  test:json$" || fail "falta el script 'test:json' en package.json (lo necesita la comparacion contra el baseline)"
+    echo "-> pnpm run test:json"
+    # Borrar el reporte ANTES de correr. Si vitest revienta sin escribirlo, el comparador tiene
+    # que encontrarse con que no hay reporte —y fallar— en vez de leer el de la corrida
+    # anterior y dar verde sobre datos viejos.
+    rm -f .vitest-rojos.json
+    # El `|| true` es imprescindible: sin el, `set -e` corta aqui y no se llega a comparar.
+    # Que la suite acabe roja ya no decide por si solo; lo decide el comparador.
+    pnpm run test:json || true
+    # stderr sale directo a la consola a proposito: asi el detalle esta de verdad "justo
+    # arriba" y el mensaje de fallo no promete algo que no entrega.
+    COMPARACION=$(node scripts/comparar-baseline-rojos.mjs .vitest-rojos.json) || fail "hay rojos NUEVOS respecto del baseline (el detalle esta justo arriba)"
+    ok "tests: $COMPARACION"
   fi
 fi
 

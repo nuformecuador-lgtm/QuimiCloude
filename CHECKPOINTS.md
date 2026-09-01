@@ -18,6 +18,11 @@ esta lista.
 - [ ] `pnpm test` pasa (unit/integracion).
 - [ ] Si la feature toca un flujo critico (autenticacion, permisos, movimientos de
       inventario, importes, webhooks), hay al menos un test E2E (Playwright) que lo cubre.
+- [ ] Si la feature toca UI, cumple `docs/architecture.md > Componentes > Regla:
+      multiplataforma — web, iOS y Android`, o el `design.md` declara la excepcion y su porque.
+- [ ] Si la feature añadió dependencias, cada una tiene su fila en `docs/dependencias.md`
+      con los cuatro checks y la aprobacion humana citada en el `design.md`.
+
 
 ## Datos y seguridad (Supabase)
 - [ ] **Cada permiso de la feature se valida en el SERVICE y tiene su test.** Esta es la
