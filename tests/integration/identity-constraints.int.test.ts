@@ -31,7 +31,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/lib/shared/db/prisma'
 import { DOCUMENT_TYPE_CC } from '@/lib/types/identity'
 
 // ---------------------------------------------------------------------------

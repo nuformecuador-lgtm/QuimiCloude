@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sidebar';
 import { logoutAction } from '@/lib/actions/logout';
 import type { SessionUser } from '@/lib/types/session';
-import { getInitials } from '@/lib/utils/initials';
+import { getInitials } from '@/lib/shared/ui/initials';
 
 type NavUserProps = {
   readonly user: SessionUser;

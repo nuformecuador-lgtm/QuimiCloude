@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 import LoginPage from '@/app/(public)/login/page';
 import { LoginForm } from '@/app/(public)/login/components';
 import { Toaster } from '@/components/ui/sonner';
+import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 import {
-  FORGOT_PASSWORD_ROUTE,
   GENERIC_CREDENTIALS_ERROR,
   REQUIRED_FIELD_ERROR,
   type LoginFormState,

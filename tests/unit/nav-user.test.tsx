@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { NavUser } from '@/components/private/nav-user';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import type { SessionUser } from '@/lib/types/session';
-import { getInitials } from '@/lib/utils/initials';
+import { getInitials } from '@/lib/shared/ui/initials';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
 

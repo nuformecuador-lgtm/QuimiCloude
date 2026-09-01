@@ -5,8 +5,8 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
 import type { SessionUser } from '@/lib/types/session';
-import { getInitials } from '@/lib/utils/initials';
-import { SIDEBAR_STATE_COOKIE } from '@/lib/utils/sidebar-state';
+import { getInitials } from '@/lib/shared/ui/initials';
+import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
   WIDE_VIEWPORT,

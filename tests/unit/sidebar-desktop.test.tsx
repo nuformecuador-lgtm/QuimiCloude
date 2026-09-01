@@ -8,9 +8,9 @@ import {
   BRAND_SHORT_LABEL,
   PRIVATE_NAV_ITEMS,
   type NavGroup,
-} from '@/lib/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/types/auth';
-import { SIDEBAR_STATE_COOKIE } from '@/lib/utils/sidebar-state';
+} from '@/lib/shared/navigation/private-nav';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
   WIDE_VIEWPORT,

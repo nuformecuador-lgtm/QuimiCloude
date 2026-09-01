@@ -54,8 +54,3 @@ export const REQUIRED_FIELD_ERROR = 'Este campo es obligatorio.';
 
 /** Copy del error de contrasena demasiado larga (R10). Los tests afirman sobre la constante. */
 export const PASSWORD_TOO_LONG_ERROR = `La contraseña no puede superar los ${CREDENTIAL_MAX_LENGTH} caracteres.`;
-
-export const DASHBOARD_ROUTE = '/dashboard';
-
-/** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
-export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';

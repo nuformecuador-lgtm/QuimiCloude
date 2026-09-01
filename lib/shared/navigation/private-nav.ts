@@ -1,4 +1,4 @@
-import { DASHBOARD_ROUTE } from '@/lib/types/auth';
+import { DASHBOARD_ROUTE } from '../routes';
 
 /**
  * Navegacion de la zona privada (`design.md > 4.3`).
@@ -9,7 +9,7 @@ import { DASHBOARD_ROUTE } from '@/lib/types/auth';
  * feature 7. La feature que traiga cada modulo del ERP sustituye su item y su
  * constante de ruta; nadie debe leer esta tabla como definicion del dominio quimico.
  *
- * `DASHBOARD_ROUTE` se **reutiliza** de `lib/types/auth.ts` en vez de redeclararlo: dos
+ * `DASHBOARD_ROUTE` se **reutiliza** de `lib/shared/routes.ts` en vez de redeclararlo: dos
  * constantes con la misma ruta es como se acaba con `/dashboard` y `/panel` conviviendo.
  *
  * Los tests iteran `PRIVATE_NAV_ITEMS` y afirman sobre estas constantes, nunca sobre el

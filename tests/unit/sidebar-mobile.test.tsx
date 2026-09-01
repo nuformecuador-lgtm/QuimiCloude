@@ -8,8 +8,8 @@ import {
   PRIVATE_NAV_ITEMS,
   type NavGroup,
   type NavLink,
-} from '@/lib/navigation/private-nav';
-import { SIDEBAR_STATE_COOKIE } from '@/lib/utils/sidebar-state';
+} from '@/lib/shared/navigation/private-nav';
+import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
   NARROW_VIEWPORT,

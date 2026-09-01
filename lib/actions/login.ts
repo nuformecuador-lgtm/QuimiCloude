@@ -3,8 +3,8 @@
 import { redirect } from 'next/navigation';
 
 import { verifyCredentials } from '@/lib/services/login-stub';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
-  DASHBOARD_ROUTE,
   GENERIC_CREDENTIALS_ERROR,
   PASSWORD_TOO_LONG_ERROR,
   REQUIRED_FIELD_ERROR,

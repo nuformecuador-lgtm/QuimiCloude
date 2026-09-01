@@ -1,4 +1,4 @@
-import { getInitials } from '@/lib/utils/initials';
+import { getInitials } from '@/lib/shared/ui/initials';
 
 // Casos borde del helper de iniciales. Apoya R15 (`nav-user.test.tsx` cubre el render);
 // aqui se fija el contrato puro del formateo, sin DOM.

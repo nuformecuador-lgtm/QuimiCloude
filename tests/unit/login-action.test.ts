@@ -4,8 +4,8 @@ import { resolve } from 'node:path';
 import { redirect } from 'next/navigation';
 
 import { loginAction } from '@/lib/actions/login';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
-  DASHBOARD_ROUTE,
   GENERIC_CREDENTIALS_ERROR,
   LOGIN_INITIAL_STATE,
   type LoginFormState,

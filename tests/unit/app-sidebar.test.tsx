@@ -12,8 +12,8 @@ import {
   type NavGroup,
   type NavItem,
   type NavLink,
-} from '@/lib/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/types/auth';
+} from '@/lib/shared/navigation/private-nav';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/types/session';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
