@@ -123,7 +123,7 @@
   **Hecho cuando:** los cuatro escenarios se ven correctos y cualquier ajuste ha entrado **solo**
   dentro del bloque de QC-30. R7, R9, R11, R14, R21, R22.
 
-- [ ] **T11. Gate y trazabilidad.**
+- [x] **T11. Gate y trazabilidad.**
   Archivos: `progress/impl_QC-30-rediseno-login.md`.
   Depende de: T10.
   `./init.sh --rapido` durante el trabajo y **`./init.sh` completo** al cerrar (regla 5 de

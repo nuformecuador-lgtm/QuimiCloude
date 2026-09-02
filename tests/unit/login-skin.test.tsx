@@ -281,6 +281,107 @@ describe('nivel 1 · contrato de texto del CSS de la pantalla de login', () => {
       expect(bloque).toContain(duracion);
     }
   });
+
+  it('no redeclara el radio de campo y boton, ni el anillo de foco, ni la tipografia', () => {
+    // R20 — la cara complementaria de «no altera las primitivas de components/ui»: alli se
+    // afirma que `rounded-lg` y `focus-visible:ring-3` SIGUEN en el primitivo; aqui, que el
+    // bloque de QC-30 no los pisa desde la hoja. Se recorren declaraciones y no texto plano:
+    // el bloque SI declara `border-radius` sobre la tarjeta (18 px, R16) y sobre su cabecera y
+    // su pie, y una busqueda de cadena no sabria distinguir esos de un radio de campo.
+    const declaraciones = declaracionesDe(bloqueQc30());
+
+    const propiedadDe = (texto: string) => texto.split(':')[0].trim();
+    const enCampoOBoton = (selector: string) =>
+      selector.includes("[data-slot='input']") || selector.includes("[data-slot='button']");
+
+    expect(
+      declaraciones.filter(
+        (declaracion) =>
+          enCampoOBoton(declaracion.selector) && propiedadDe(declaracion.texto) === 'border-radius',
+      ),
+    ).toEqual([]);
+
+    const propiedadesDeAnillo = ['outline', 'outline-width', 'outline-color', '--ring', 'ring-width'];
+    expect(
+      declaraciones.filter((declaracion) =>
+        propiedadesDeAnillo.includes(propiedadDe(declaracion.texto)),
+      ),
+    ).toEqual([]);
+
+    expect(
+      declaraciones.filter((declaracion) => propiedadDe(declaracion.texto) === 'font-family'),
+    ).toEqual([]);
+  });
+
+  it('solo declara variables propias con prefijo --qc30-, salvo el espaciado de la tarjeta', () => {
+    // R21 — la pantalla se pinta con los tokens de QC-29; el bloque no puede redefinir ninguno
+    // (`--card`, `--background`, `--primary`, `--sidebar-*`, `--ring`, `--border`...) ni abrir
+    // paleta nueva. Unica excepcion, explicita y acotada: `--card-spacing`, que se redefine a
+    // proposito dentro del ambito `[data-login='screen']` para que los 28 px lleguen a
+    // cabecera, contenido y pie sin editar `components/ui/card.tsx` (R19).
+    const EXCEPCION = '--card-spacing';
+
+    const personalizadas = declaracionesDe(bloqueQc30())
+      .map((declaracion) => ({
+        selector: declaracion.selector,
+        propiedad: declaracion.texto.split(':')[0].trim(),
+      }))
+      .filter((declaracion) => declaracion.propiedad.startsWith('--'));
+
+    expect(personalizadas.length).toBeGreaterThan(0);
+
+    for (const declaracion of personalizadas) {
+      if (declaracion.propiedad === EXCEPCION) {
+        expect(declaracion.selector).toContain("[data-login='screen']");
+        continue;
+      }
+      expect(declaracion.propiedad.startsWith('--qc30-')).toBe(true);
+    }
+  });
+
+  it('deja los valores moviles de las burbujas en la base y los de escritorio en la media query', () => {
+    // R22 — mobile-first de verdad: si los valores de escritorio fueran la base, la media query
+    // de 640 px no tendria nada que sobrescribir hacia abajo y el telefono heredaria burbujas de
+    // escritorio. Se afirma dentro y fuera del `@media` por separado; de paso, que los valores
+    // esten en la hoja y no en un `style` en linea, que ganaria a cualquier media query.
+    // Sin comentarios antes de buscar la media query: el bloque la MENCIONA en un comentario
+    // varias reglas antes de declararla, y un `indexOf` sobre el texto crudo caeria ahi.
+    const bloque = bloqueQc30().replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    const inicioMedia = bloque.indexOf('@media (min-width: 640px)');
+    expect(inicioMedia).toBeGreaterThan(-1);
+    const finMedia = finDelBloque(bloque, inicioMedia);
+
+    const dentroDelMedia = bloque.slice(inicioMedia, finMedia);
+    const fueraDelMedia = bloque.slice(0, inicioMedia) + bloque.slice(finMedia);
+
+    const textosDe = (fragmento: string, indice: string) =>
+      declaracionesDe(fragmento)
+        .filter((declaracion) => declaracion.selector.includes(`[data-login-index='${indice}']`))
+        .map((declaracion) => declaracion.texto.replace(/\s+/g, ' '));
+
+    const escritorio = [
+      { indice: '1', posicion: 'left: 14%', tamano: '--qc30-bubble-size: 54px' },
+      { indice: '2', posicion: 'left: 52%', tamano: '--qc30-bubble-size: 44px' },
+      { indice: '3', posicion: 'left: 83%', tamano: '--qc30-bubble-size: 60px' },
+    ] as const;
+    for (const burbuja of escritorio) {
+      const textos = textosDe(dentroDelMedia, burbuja.indice);
+      expect(textos).toContain(burbuja.posicion);
+      expect(textos).toContain(burbuja.tamano);
+    }
+
+    const movil = [
+      { indice: '1', posicion: 'left: 10%', tamano: '--qc30-bubble-size: 46px' },
+      { indice: '2', posicion: 'left: 48%', tamano: '--qc30-bubble-size: 38px' },
+      { indice: '3', posicion: 'left: 78%', tamano: '--qc30-bubble-size: 52px' },
+    ] as const;
+    for (const burbuja of movil) {
+      const textos = textosDe(fueraDelMedia, burbuja.indice);
+      expect(textos).toContain(burbuja.posicion);
+      expect(textos).toContain(burbuja.tamano);
+    }
+  });
 });
 
 /** El fragmento de `app/globals.css` que va entre los dos delimitadores de QC-30, ambos incluidos. */
@@ -379,5 +480,31 @@ describe('nivel 2 · contrato del marcado de la pantalla de login', () => {
     expect(leerTexto('components', 'ui', 'button.tsx')).toContain('h-8');
     expect(leerTexto('components', 'ui', 'card.tsx')).toContain('rounded-xl');
     expect(leerTexto('components', 'ui', 'card.tsx')).toContain('[--card-spacing:--spacing(4)]');
+  });
+
+  it('conserva el radio y el anillo de foco de campo y boton en las primitivas', () => {
+    // R20 — el radio de 10 px (`rounded-lg`) y el anillo de foco de 3 px
+    // (`focus-visible:ring-3`) son de las medidas que «coinciden y no se tocan»: la piel del
+    // login pudo tentar a moverlos en el primitivo. Misma tecnica de lectura de texto que el
+    // test de arriba, y por el mismo motivo: el gate corre sin red y no puede diffear.
+    const input = leerTexto('components', 'ui', 'input.tsx');
+    const button = leerTexto('components', 'ui', 'button.tsx');
+
+    expect(input).toContain('rounded-lg');
+    expect(input).toContain('focus-visible:ring-3');
+    expect(button).toContain('rounded-lg');
+    expect(button).toContain('focus-visible:ring-3');
+  });
+
+  it('mide el alto de la pantalla con la unidad de viewport dinamica', () => {
+    // R23 — `min-h-svh` y no `min-h-screen`: `100vh` miente en movil, donde la barra del
+    // navegador se retrae y expande (`docs/architecture.md > Componentes`), y con `100vh` la
+    // tarjeta queda descentrada o empuja una barra de scroll que no deberia existir.
+    render(<LoginPage />);
+
+    const main = screen.getByRole('main');
+
+    expect(main).toHaveClass('min-h-svh');
+    expect(main.className).not.toContain('min-h-screen');
   });
 });
