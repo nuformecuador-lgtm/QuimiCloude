@@ -11,9 +11,10 @@
 
 ## Veredicto
 
-**OK** (ronda 2, commit `0e8de49`). El único bloqueante —la suite completa en rojo— está
-resuelto y **verificado ejecutando**: `47 archivos, 509 tests, 509 pasando`. Los dos menores
-también. Ver `## Ronda 2` al final, que es la parte vigente de este archivo.
+**OK** (ronda 3, commit `6b16a6d`; la ronda 2 habia cerrado `0e8de49`). El bloqueante de la ronda 1
+y el rojo nuevo que trajo el merge de QC-19 estan resueltos, y **verificados ejecutando**:
+`51 archivos, 551 tests, 551 pasando`. Los cuatro menores, atendidos o anotados. La parte
+vigente de este archivo es `# Ronda 3`, al final.
 
 > Veredicto de la ronda 1 (2026-09-02, antes de `0e8de49`): **RECHAZADO** por el bloqueante 1.
 > Se conserva abajo tal cual, sin reescribir: el resto de la revisión —las cinco trampas del
@@ -371,3 +372,150 @@ test de una feature.
       typecheck, lint y los 509 tests están en verde en este worktree.
 
 Queda **un menor abierto** (menor 3), que no bloquea el merge y no es de esta feature arreglarlo.
+
+---
+
+# Ronda 3 — rojo nuevo tras mergear `origin/dev` (QC-19), commit `6b16a6d`
+
+**Veredicto: OK.** Esta sección manda sobre las dos anteriores.
+
+## Nota sobre este archivo
+
+El commit `6b16a6d` arrastró mi propia ronda 2 con un `git add -A`. Lo comprobé: con
+`--ignore-all-space` el cambio sobre `progress/review_QC-24-modelo-recetas.md` es
+**+128 / -3**, que es exactamente mi edición de la ronda 2 (la cabecera del veredicto y la
+sección nueva); el resto del `361/236` que muestra `--numstat` es reescritura de fin de línea.
+**Nadie tocó el contenido de mi revisión.** Lo dejo escrito porque un review que aparece dentro
+del commit del implementer merece que se diga.
+
+## Lo que corrí yo
+
+```
+pnpm run typecheck   -> exit 0
+pnpm run lint        -> exit 0
+
+pnpm exec vitest run (SUITE COMPLETA)
+  Test Files  51 passed (51)
+       Tests  551 passed (551)
+  Duration  32.54s
+```
+
+Coincide con lo declarado, y sube de 509 a 551 porque el merge trajo QC-19. `identity-seed`
+tampoco salió en rojo en mi corrida, así que ni siquiera hizo falta el descuento por contención.
+
+**Nada borrado y producción intacta, comprobado con `git`:**
+
+- `tests/unit/identity/credential-policy-contract.test.ts` tiene **7 casos en `origin/dev` y 7
+  ahora**: no desapareció ninguno. El commit son +64 / -6 líneas en ese archivo, y las 6
+  borradas son las dos enumeraciones.
+- `git diff --stat origin/dev...HEAD -- lib app db package.json` devuelve **los mismos 10
+  archivos de QC-24** de las rondas anteriores. Ni `app/`, ni `package.json`, ni una línea de
+  código de QC-19.
+- `git diff --stat origin/dev...HEAD -- specs/QC-19-politica-de-contrasenas` sale **vacío**: su
+  spec y sus requisitos, intactos.
+
+## ¿Siguen protegiendo R20 y R21, o se relajaron? Medido con mutaciones
+
+Repliqué los predicados nuevos y les pasé mutaciones, igual que en la ronda 2.
+
+### R20 — «no debe existir almacenamiento de contraseñas anteriores»
+
+| Mutación | ¿Cae? |
+| --- | --- |
+| `model PasswordHistory` en **otro** módulo (`recetas`) | **sí**, por tres aserciones a la vez |
+| Columna `oldPassword @map("old_password")` en `User` | **sí** (barrido + lista de rastros) |
+| Modelo de nombre neutro con `@@map("password_history")` | **sí** |
+| Campo `previousPasswords String[]` en `User` | **sí** |
+| Desaparece o se renombra `Role` | **sí** (aserción **nueva**) |
+| Comentario en prosa con «histórico / previous / anterior» | no — **y es correcto** |
+| Modelo nuevo, neutro, de otro módulo (`Invoice`) | no — **y es correcto** |
+
+**No se relajó.** R20 prohíbe *almacenamiento*, y las cuatro formas reales de almacenarlo caen,
+cada una por varias vías redundantes. Las dos que ahora pasan no son violaciones de R20: un
+comentario no crea ninguna tabla, y una factura no es un historial de contraseñas. Además la
+aserción nueva —**ningún** modelo del esquema, de cualquier módulo presente o futuro, puede
+llamarse como un historial de contraseñas— es **más** cobertura que la que había: la lista
+cerrada solo sabía decir «el esquema no es el que yo memoricé», no «este modelo es un historial».
+
+### El punto 3, mirado con lupa: `rawSchema` a `schemaDeclarations`
+
+**Es exacto, no un hueco.** Tres razones, y una comprobación:
+
+1. `schemaDeclarations` quita el comentario de línea, y **Prisma solo tiene comentarios de
+   línea** (`//` y `///`); no hay bloques que se puedan escapar. Lo que queda es exactamente lo
+   declarado.
+2. R20 habla de que **no exista almacenamiento**, y el almacenamiento es declaración: un modelo,
+   un campo, un `@@map`. La tabla de arriba lo confirma —`@@map("password_history")` y
+   `old_password` caen igual después del cambio—. Lo único que deja de detectar es **prosa**, que
+   no persiste nada.
+3. No es un criterio inventado para salir del paso: `schemaDeclarations` **ya lo definía este
+   mismo archivo**, con el comentario «aquí se vigila lo DECLARADO, no lo explicado», y la
+   aserción de la línea siguiente —el rastro de `password\w*`, la que de verdad cierra R20— ya lo
+   usaba. Lo que había era una incoherencia entre dos líneas contiguas; ahora las dos miden lo
+   mismo.
+
+El único hueco teórico sería una barra doble **dentro de una cadena** de una anotación, que
+truncaría el resto de esa línea. Lo comprobé sobre `db/schema.prisma`: no hay ninguna cadena que
+la contenga, y para explotarlo habría que escribir un `@default` con ese texto delante justo de
+la columna que se quiere esconder. Lo anoto por honestidad, no como reserva.
+
+### R21 — «esta feature no debe añadir tablas, columnas, índices ni migraciones»
+
+| Mutación | ¿Cae? |
+| --- | --- |
+| Se borra o renombra una de las cuatro migraciones anteriores | **sí** |
+| Migración nueva llamada `..._credential_policy` | **sí** |
+| Migración nueva cuyo SQL crea `password_history` | **sí** (aserción **nueva**) |
+| Migración nueva que añade una columna `old_password` | **sí** (aserción **nueva**) |
+| Migración legítima de otra feature (`..._orders`) | no — **y es correcto** |
+| Persistencia de política con nombre **neutro** (`..._security_rules`, SQL sin palabras delatoras) | **no** — menor 4 |
+
+Y verifiqué que la aserción que de verdad cierra R21 —**la lista exacta de columnas de `User`**,
+comparada con `toEqual`— está **intacta**, carácter por carácter. Es la correcta: `User` es el
+modelo que QC-19 habría tocado si tocara alguno, y ahí «el esquema queda exactamente como
+estaba» sigue siendo una igualdad, no una heurística.
+
+## Hallazgo nuevo
+
+### menor 4 — el mismo hueco estrecho que el menor 3, ahora en las migraciones
+
+Respondiendo a la pregunta directa: **sí, se cuela una cosa que antes no**. Una migración nueva
+con nombre neutro cuyo SQL no mencione `password_history` / `old_password` / `previous_password`
+—por ejemplo `..._security_rules`— pasaría; con la lista cerrada, **cualquier** carpeta nueva era
+roja. Es real y lo dejo escrito. No es bloqueante, por las mismas razones que el menor 3, más una
+propia:
+
+1. Esa cobertura era **colateral**: se pagaba poniendo en rojo toda migración legítima posterior,
+   que es exactamente lo que acaba de pasar con QC-24 y lo que ya había pasado con QC-14. Un test
+   que solo señala al culpable poniéndose rojo con todo el mundo termina borrado por
+   conveniencia; acotarlo es lo que evita ese final.
+2. R21 dice literalmente «**Esta** feature». QC-19 está congelada y mergeada: que una feature
+   futura añada una migración no es una violación de R21, es asunto del spec y de la revisión de
+   esa feature.
+3. La aserción que sí cierra R21 sobre el modelo que QC-19 habría tocado —las columnas exactas de
+   `User`— sigue siendo una igualdad cerrada e intacta.
+4. Las formas probables de la violación —el nombre delator en la carpeta, el `password_history` o
+   el `old_password` en el SQL— **siguen detectadas**.
+5. Y hay **cobertura nueva que antes no existía**: ahora se lee el `migration.sql` de **todas**
+   las migraciones del repo buscando almacenamiento de contraseñas anteriores. La lista cerrada
+   no leía ni un byte de SQL. En la dimensión que R20 y R21 comparten, el arreglo deja el archivo
+   **más** vigilante que antes, no menos.
+
+Menores 3 y 4 son el mismo síntoma en dos archivos: **el arnés no tiene una guardia genérica que
+vigile el esquema y las migraciones a nivel de repo**, así que cada feature la improvisa dentro
+de su propio test con una lista cerrada, y la lista se rompe con la feature siguiente. Ha pasado
+ya dos veces en dos días (QC-14 y QC-19). Eso no se arregla en QC-24 —sería meterle a esta ficha
+un alcance que su spec no tiene— pero merece una ficha de arnés propia. Lo dejo como
+recomendación para el leader, no como condición de este merge.
+
+## Estado final
+
+- [x] `pnpm run typecheck` / `pnpm run lint` — exit 0, verificados por mí tras el arreglo.
+- [x] `pnpm test` — **551/551 en verde**, verificado por mí.
+- [x] Ningún caso de test borrado (7 y 7 en el archivo de QC-19).
+- [x] Producción sin tocar; spec y requisitos de QC-19 sin tocar.
+- [x] Lo que R20 y R21 garantizan sigue vigilado, y en dos puntos mejor que antes.
+- [ ] `./init.sh` — lo corre el leader. No queda nada conocido que lo impida.
+
+Quedan **dos menores abiertos** (3 y 4), ninguno bloqueante y ninguno de esta feature.
+**Veredicto: OK.**
