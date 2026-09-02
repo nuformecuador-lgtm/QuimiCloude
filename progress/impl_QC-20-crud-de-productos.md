@@ -322,3 +322,77 @@ de uso pone rojo el test**, comprobado y revertido nueve veces. Dato que lo hace
 cuando se quito `requireAdmin` de `create-product.ts`, `product-service.test.ts` **siguio
 verde (13/13)** —la autorizacion no es su alcance—, asi que `authorization.test.ts` es la
 **unica** red de R1, R2 y R3 en toda la feature.
+
+---
+
+# CORRECCION de un diagnostico causal equivocado (merge con `dev`)
+
+**Lo que esta bitacora afirmo primero, y era FALSO:** que `stripComments` de
+`tests/unit/inventario/schema/inventario-schema.test.ts` era «un no-op en todo el repo»
+porque los ficheros son CRLF, y que por tanto ese archivo «llevaba desde QC-14 afirmando
+contra texto con comentarios incluidos». Se clasifico como el cuarto falso positivo de la
+familia «el test mide comentarios en vez de codigo».
+
+**Nada de eso se sostiene.** Medido por bytes (`tr -d -c '\r' | wc -c`), no por `grep`:
+
+| Archivo | CR en disco | CR en `origin/dev` |
+| --- | --- | --- |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` | 0 | 0 |
+| `db/schema.prisma` (lo que ese `stripComments` procesa) | 0 | 0 |
+
+Los dos son **LF puro**, y `core.autocrlf` es `false` sin `.gitattributes`. Sobre LF, tras
+`.split('\n')` ninguna linea lleva `\r`, `$` ancla al final de la cadena y el regex original
+`/\/\/.*$/` **casa perfectamente**. `stripComments` funcionaba.
+
+## La causa real: la introduje yo
+
+El unico archivo CRLF del conjunto era **`lib/modules/inventario/index.ts`**, y estaba CRLF
+**porque lo escribi yo** al resolver el conflicto del merge: use `io.open(p,'w')` de Python
+sin `newline=''`, y en Windows eso traduce cada `\n` a `\r\n`. El archivo salio del merge con
+46 CR donde el repo tiene 0.
+
+Ese archivo es justo el que la asercion lee (`contract = stripComments(readFileSync(index.ts))`),
+y su cabecera documenta la prohibicion **con la cadena literal**: «Nada de `'use server'`, nada
+de Prisma». Con CRLF el comentario no se quitaba, la prosa se colaba y
+`expect(contract).not.toMatch(/['"]use server['"]/)` caia.
+
+## Prueba empirica (las dos direcciones, con el regex ORIGINAL sin tocar)
+
+| Estado | Resultado |
+| --- | --- |
+| regex original `/\/\/.*$/` + `index.ts` en **CRLF** | **ROJO** — `expected '// lib/modules/inventario/index.ts — …' not to match /['"]use server['"]/` |
+| regex original `/\/\/.*$/` + `index.ts` en **LF** | **VERDE, 20/20** |
+
+Queda demostrado que **el cambio de regex no arreglo nada**: lo que arreglaba el test era
+devolver `index.ts` a LF. El cambio de regex estaba **enmascarando un defecto propio**.
+
+## Que se hizo al final
+
+1. **`lib/modules/inventario/index.ts` devuelto a LF**, que es la convencion del repo. Esta es
+   la correccion de verdad.
+2. **Barrido de todo lo que escribi con Python sin `newline=''`**: tambien habian quedado CRLF
+   `progress/current.md` y `specs/QC-20-crud-de-productos/design.md`. Los dos devueltos a LF.
+   Los archivos que si escribi con `newline=''` (`tasks.md`, esta bitacora, el test de esquema,
+   el de integracion de recetas) nunca se contaminaron.
+3. **El cambio de regex se conserva**, pero descrito por lo que es: **endurecimiento preventivo**
+   ante saltos de linea mixtos, **no** la correccion de un fallo existente. No cambia el
+   resultado de ninguna asercion sobre los archivos LF del repo.
+
+## Recuento corregido
+
+Son **TRES** falsos positivos de la familia «el test mide comentarios en vez de codigo», no
+cuatro: el barrido estatico de R1 (Grupo B), el bloque 10 de la guardia con `prisma.user` en un
+comentario (T9), y el de `use server` aqui — que ademas **no era un defecto del test**, sino un
+defecto mio que el test detecto correctamente. Bien hecho por el test.
+
+**Leccion, y es la razon de escribir todo esto:** una explicacion causal equivocada en la
+bitacora es peor que no explicar nada, porque el siguiente que lea «esto pasaba por CRLF» va a
+buscar en el sitio equivocado. El error aqui fue medir con `grep -c $'\r'` y con
+`od -c | grep -o`, que cuentan mal, y **generalizar de un archivo a todo el repo sin comprobarlo**.
+
+## Nota de herramienta, para quien venga detras
+
+`io.open(ruta,'w',encoding='utf-8')` en Python sobre Windows **traduce `\n` a `\r\n`**. En este
+repo, que es LF, hay que escribir **siempre** con `newline=''` (o en binario). Un archivo que
+sale CRLF de una edicion automatizada ensucia el diff entero y puede romper tests que barren
+texto linea a linea.
