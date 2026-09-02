@@ -248,8 +248,8 @@
       "description": "Cuando alguien escribe una contrasena nueva tiene que ver los requisitos que debe cumplir antes de enviarla, y cuales va cumpliendo a medida que escribe, en vez de enterarse de golpe al ser rechazada. Aplica en todas las pantallas donde se fija o se cambia una contrasena. Las reglas en si las decide la ficha de politica de contrasenas; esta solo las muestra.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
-      "zone": null,
+      "complexity": "medium",
+      "zone": "frontend",
       "branch": "feature/QC-21-ayuda-visual-de-contrasena",
       "depends_on": [
         "QC-19"
@@ -372,6 +372,76 @@
       "branch": "feature/QC-30-rediseno-login",
       "depends_on": "QC-29",
       "spec_path": "specs/QC-30-rediseno-login"
+    },
+    {
+      "key": "QC-32",
+      "id": 32,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "modelo-unidades",
+      "description": "Necesitamos un catalogo propio de unidades de medida, que hoy no existe: la unidad vive como texto libre en el producto (columna opcional) y en cada linea de receta (texto obligatorio y anotativo). Solo el modelo de datos: sin pantalla y sin API. La tabla se llama Unit, en ingles como el resto del esquema. Cada unidad tiene un nombre obligatorio que no se repite: se compara sin acentos ni caracteres especiales y sin distinguir mayusculas, igual que las presentaciones. La unidad sigue siendo puramente anotativa: no hay conversion entre unidades y el catalogo no sabe de factores. Es un catalogo compartido: el producto y la linea de receta dejan de guardar texto y pasan a apuntar a una unidad del catalogo. Una unidad no se puede borrar mientras algun producto o alguna linea de receta la use. Como catalogo cerrado y corto no lleva borrado logico, igual que roles y presentaciones, y por ahora tampoco tiene pantalla de administracion. Que pasa con los textos libres que ya estan guardados -si se convierten en unidades creadas al vuelo, si se mapean a mano, o si la columna queda vacia-, si la unidad del producto sigue siendo opcional y si la de la linea de receta sigue siendo obligatoria, se decide al acotar la ficha.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-32-modelo-unidades",
+      "depends_on": [
+        "QC-24"
+      ],
+      "spec_path": "specs/QC-32-modelo-unidades"
+    },
+    {
+      "key": "QC-33",
+      "id": 33,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "modelo-pedidos",
+      "description": "Necesitamos persistir los pedidos. Solo el modelo de datos: sin pantalla y sin API. La tabla se llama Order, en ingles como el resto del esquema. Un pedido es una sola linea y no una cabecera con varias: pide una receta, en una cantidad, con un precio de venta y una unidad. La receta es obligatoria y cada pedido apunta a una sola; una misma receta puede estar en muchos pedidos. La cantidad es un numero con decimales exactos, obligatoria, y nunca negativa ni cero. El precio de venta lo escribe a mano quien crea el pedido -la receta no tiene precio-, es obligatorio, con decimales exactos y nunca negativo. La unidad sale del catalogo compartido de unidades y no es texto libre. El pedido guarda ademas una fecha de solicitud, una prioridad y un estado. La prioridad es opcional y vale baja cuando no se indica, dentro de un conjunto cerrado y ordenado: baja, media, alta, critica. El estado sale de otro conjunto cerrado -pendiente, en curso, entregado- que debe poder crecer despues sin migrar los pedidos ya guardados; que transiciones son validas entre estados no entra aqui. Cada pedido guarda quien lo creo y quien lo modifico por ultima vez, ademas de sus fechas de creacion y modificacion. Borrar un pedido es logico. Si una receta se da de baja, el pedido conserva su referencia y sigue apuntando a la misma receta. Pedidos es un modulo propio y no parte de recetas ni de inventario: conoce la receta por lo que recetas publica, nunca por su tabla. El alta, la consulta, la edicion y el borrado de pedidos van aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-33-modelo-pedidos",
+      "depends_on": [
+        "QC-32",
+        "QC-24"
+      ],
+      "spec_path": "specs/QC-33-modelo-pedidos"
+    },
+    {
+      "key": "QC-34",
+      "id": 34,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "crud-de-pedidos",
+      "description": "Los casos de uso de pedidos, sobre el modelo que crea la ficha del modelo de pedidos: alta, consulta paginada, edicion y borrado. Sin pantalla: solo los casos de uso y su superficie de servidor, como en el CRUD de productos y el de recetas. El alta recibe la receta, la cantidad, el precio de venta, la unidad, la fecha de solicitud y, si viene, la prioridad; el estado nace en pendiente y cambiarlo es parte de la edicion. Cada pedido guarda quien lo creo y quien lo modifico por ultima vez, tomados de la sesion en curso y nunca de la entrada. Borrar un pedido lo oculta y no se restaura; borrar una receta que algun pedido usa sigue estando permitido y el pedido conserva su referencia. Antes de guardar se rechaza la receta inexistente o dada de baja, la unidad inexistente, la cantidad negativa o cero, el precio de venta negativo, la fecha de solicitud ausente, y una prioridad o un estado que no esten en su conjunto cerrado. La consulta viene paginada, de diez en diez por defecto, reutilizando el calculo de paginacion que extrae el CRUD de productos en vez de duplicarlo. Que rol puede consultar, crear, editar y borrar pedidos -y si el Operador ve solo los suyos- no esta decidido y se cierra al acotar la ficha, igual que si hay filtros por estado o por prioridad en la consulta. La pantalla va aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "backend",
+      "branch": "feature/QC-34-crud-de-pedidos",
+      "depends_on": [
+        "QC-33",
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-34-crud-de-pedidos"
+    },
+    {
+      "key": "QC-35",
+      "id": 35,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "pantalla-de-pedidos",
+      "description": "La pantalla de pedidos dentro del layout privado: la lista paginada, el formulario de alta y edicion, y el borrado. Las operaciones ya existen y las expone el CRUD de pedidos como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). El formulario elige la receta y la unidad de sus catalogos, captura cantidad, precio de venta y fecha de solicitud, y deja la prioridad opcional con baja como valor por defecto visible. La lista muestra el estado y la prioridad de cada pedido. La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, como se elige la receta cuando el catalogo crece, si el estado se cambia desde la lista o solo desde el formulario, busqueda, filtros y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo. Quien la ve depende del permiso que cierre el CRUD de pedidos.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-35-pantalla-de-pedidos",
+      "depends_on": [
+        "QC-34"
+      ],
+      "spec_path": "specs/QC-35-pantalla-de-pedidos"
     }
   ]
 }
