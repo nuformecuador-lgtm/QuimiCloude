@@ -100,6 +100,11 @@ for (const f of features) {
   } else if (vistosKey.has(f.epic)) {
     errores.push(`${ref(f)} cuelga de ${f.epic}, que esta en este archivo como feature: una epica se importo como ficha`);
   }
+  // El `key` de la epica no dice nada por si solo: "QC-17" no es "Identidad y acceso". El
+  // nombre se almacena porque el gate corre SIN RED y no puede resolverlo contra Jira.
+  if (f.epic_name == null || String(f.epic_name).trim() === '') {
+    errores.push(`${ref(f)} cuelga de ${f.epic} pero no trae epic_name: F0 no importo el nombre de la epica`);
+  }
 }
 
 // --- 2. depends_on apunta a ids que existen -------------------------------------------
@@ -179,6 +184,50 @@ if (sinSpec.length > 0) {
   errores.push(`faltan specs para features sdd en vuelo: ${sinSpec.join(' ')}`);
 } else {
   notas.push('specs presentes para features sdd en vuelo');
+}
+
+// --- 5. Ninguna ficha sembrada esta esperando al board --------------------------------
+// `/afinar-feature` cierra el alcance con el humano ANTES del spec y siembra
+// `requirements.md`. Si esa conversacion invalido lo que dice la tarjeta —`description`,
+// `complexity`, `zone` o `depends_on`— el comando escribe el cambio en Jira ANTES de
+// sembrar. Cuando el MCP de `atlassian` no responde el trabajo no se tira: se siembra
+// igual, con un marcador, y este bloque deja el gate en ROJO hasta que alguien actualice
+// el issue y lo borre.
+//
+// El gate corre sin red y no puede preguntarle a Jira si la description esta al dia. Lo
+// que si puede es ver la marca. Sin esto la regla seria una nota, y en este repo lo que
+// no sale en `./init.sh` no existe (regla 5 de `CLAUDE.md`). El porque completo y el
+// incidente que lo origina, en
+// `docs/jira.md > Cuando el disco descubre que el board esta desactualizado`.
+const MARCADOR_BOARD = /<!--\s*board-pendiente:\s*([^>]*?)\s*-->/;
+
+function buscarMarcadores(base, out) {
+  if (!existsSync(base)) return;
+  for (const dir of readdirSync(base, { withFileTypes: true })) {
+    if (!dir.isDirectory()) continue;
+    const req = path.join(base, dir.name, 'requirements.md');
+    if (!existsSync(req)) continue;
+    const m = MARCADOR_BOARD.exec(readFileSync(req, 'utf8'));
+    if (m) out.push(`${req} -> ${m[1]}`);
+  }
+}
+
+// Los mismos dos sitios que el bloque 4, y por la misma razon: mientras una feature esta
+// en vuelo su spec vive en el worktree y no llega a la raiz hasta que su PR mergea.
+const boardPendiente = [];
+buscarMarcadores('specs', boardPendiente);
+if (existsSync(WT_DIR)) {
+  for (const wt of readdirSync(WT_DIR, { withFileTypes: true })) {
+    if (wt.isDirectory()) buscarMarcadores(path.join(WT_DIR, wt.name, 'specs'), boardPendiente);
+  }
+}
+
+if (boardPendiente.length > 0) {
+  for (const p of boardPendiente) {
+    errores.push(`board sin actualizar: ${p}. Escribe el cambio en el issue y borra el marcador.`);
+  }
+} else {
+  notas.push('ninguna ficha sembrada esperando al board');
 }
 
 // --- Resultado ------------------------------------------------------------------------

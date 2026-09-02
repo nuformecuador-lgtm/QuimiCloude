@@ -123,7 +123,8 @@ degenere en dos verdades peleadas.
 | `key` | el issue key tal cual: `QC-7`. **Es la identidad de la feature.** |
 | `id` | número del key (`QC-7` → `7`). **Solo fallback** para fichas que aún no tienen issue. |
 | `epic` | key de la épica padre (campo `parent` del issue). Agrupa por módulo; **no** es dependencia. |
-| `description` | campo Description del issue. **El único que escribe el humano.** |
+| `epic_name` | summary de esa épica (`QC-17` → «Identidad y acceso»). **Se almacena, no se deriva**: el gate corre sin red y no puede resolver un key contra Jira. |
+| `description` | campo Description del issue. Lo **decide** siempre el humano; lo **escribe** él en el board, o `/afinar-feature` en su nombre tras un sí explícito (ver `## Cuando el disco descubre que el board está desactualizado`). |
 | `status` | la columna del board |
 | `depends_on` | issue links **"is blocked by"**, escritos como keys (`["QC-9", "QC-12"]`) |
 | `zone` | label `zone:backend` \| `zone:frontend` \| `zone:fullstack` |
@@ -171,6 +172,10 @@ segunda copia de las credenciales.
 - **F1.3 —** mover a *Spec en revisión* y comentar la ruta de `specs/<key>-<slug>/`.
 - **F1.4 —** la aprobación humana **es** mover la tarjeta a *En curso*.
 - **F2.5 —** mover a *Hecho* y comentar la URL del PR.
+- **Al acotar (`/afinar-feature`, antes de F1.2)** — si la conversación de alcance invalidó
+  `description`, `complexity`, `zone` o `depends_on`, escribirlos en el issue **antes** de
+  sembrar el spec. Es el único empujón que nace de una conversación y no de una transición de
+  estado. Ver la sección siguiente.
 
 ## Si Jira y el disco divergen
 
@@ -183,6 +188,54 @@ segunda copia de las credenciales.
 
 Todo lo demás —altas, bajas, `description`, `status`, dependencias— se sobrescribe desde
 el board sin preguntar.
+
+## Cuando el disco descubre que el board está desactualizado (2026-09-01)
+
+La sección anterior resuelve el caso normal: el board manda. Este es el complementario —
+**el disco descubrió algo que el board todavía no sabe**.
+
+Pasa en `/afinar-feature`, que cierra el alcance con el humano antes del spec. Una respuesta
+puede invalidar lo que la tarjeta dice, y son cuatro los campos que pueden quedar mintiendo:
+
+| Campo | Cómo se invalida |
+|---|---|
+| `description` | el alcance acordado ya no es el que describe la tarjeta |
+| `complexity` | lo acordado hace la feature más grande o más chica de lo que se evaluó en F1.0 |
+| `zone` | lo acordado mueve la feature de capa |
+| `depends_on` | lo acordado introduce o elimina un bloqueante |
+
+**La regla: no se siembra hasta que el board esté al día.** El comando redacta el valor nuevo de
+cada campo afectado, lo muestra, y **con el sí explícito del humano lo escribe en Jira** vía MCP
+antes de crear `specs/<key>-<slug>/requirements.md`. Si el humano dice que no, **no se siembra**:
+un spec construido sobre un alcance que la tarjeta contradice es exactamente la divergencia que
+este documento existe para evitar.
+
+Que lo escriba el agente no contradice la fila `description` del contrato: **quien decide sigue
+siendo el humano**, a través de la pregunta. El agente solo lo persiste, y solo tras el sí.
+
+**La excepción, y su marca.** Si el MCP de `atlassian` no responde, el trabajo no se tira: se
+siembra igual, pero con un marcador en el archivo —
+
+```
+<!-- board-pendiente: QC-14 · description, complexity · el MCP no respondio -->
+```
+
+`scripts/validate-features.mjs` (bloque 5) **falla** mientras haya un marcador puesto, así que
+`./init.sh` queda en rojo hasta que alguien actualice el issue y lo borre. El gate corre sin red
+y no puede preguntarle a Jira si la description está al día; lo que sí puede es ver la marca. Sin
+ella esto sería una nota, y en este repo lo que no sale en `./init.sh` no existe (regla 5 de
+`CLAUDE.md`).
+
+**El incidente que lo origina.** El 2026-09-01, la primera corrida real de `/afinar-feature`
+sobre `QC-14` (`modelo-inventario`) preguntó por las «Preguntas abiertas del dominio» de
+`docs/architecture.md` y el humano respondió que **sí hay que rastrear lote y vencimiento**. Eso
+convierte la existencia de «un número por producto» en «un número por lote»: la `description` de
+la tarjeta —que enumera *"una descripcion, una cantidad, una presentacion y una cantidad de
+alerta"*— dejó de describir lo que se va a construir, y `complexity: medium` dejó de ser cierto.
+La primera versión del comando solo dejaba una nota en `progress/current.md > Deudas`. Era
+inútil: **la siguiente F0 sobrescribe la `description` desde el board sin preguntar** (sección
+anterior), así que la nota sobrevive pero el dato no, y el spec sembrado queda huérfano de la
+ficha que dice especificar.
 
 ## Lo que NO cambia
 

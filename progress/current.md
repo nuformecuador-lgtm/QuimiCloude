@@ -9,13 +9,28 @@
 
 ## Features en curso
 
-| id | feature | zone | status | branch | quién la tiene |
-|---|---|---|---|---|---|
-| 11 | layout-privado-con-sidebar | frontend | spec_ready | `feature/11-layout-privado-con-sidebar` | **desbloqueada**: la 7 ya está en `dev`. Revisar el spec por la convención `components/` antes de la fase 2 |
+| key | feature | épica | zone | status | branch | quién la tiene |
+|---|---|---|---|---|---|---|
+| QC-6 | seed-roles-y-usuario-inicial | QC-17 Identidad y acceso | backend | **pending** | `feature/QC-6-seed-roles-y-usuario-inicial` | evaluada y con worktree montado (F1.0/F1.1). **Parada en F1.2**: la description no dice qué roles ni con qué datos nace el usuario inicial — ver Evaluaciones |
+| QC-7 | login-usuario-y-contrasena | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-7-login-usuario-y-contrasena` | **esperando aprobación humana (F1.4)**. Spec revisado con las decisiones del humano: 31 requisitos. Decidido que **entra antes que QC-6** en fase 2 |
 
-Worktrees: `.worktrees/11-layout-privado-con-sidebar`
+Worktrees: `.worktrees/QC-6-seed-roles-y-usuario-inicial` (montado desde `origin/dev`, con
+`.env` copiado a mano), `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
+`.worktrees/fix-login-field-control-uncontrolled` (SAFE, desmontable). El de QC-15 se
+desmontó limpio. El `.worktrees/QC-7-login-usuario-y-contrasena` lo montó la
+**segunda sesión de leader** (`.env`, `pnpm install`, `prisma generate` y `next typegen`
+hechos a mano). Queda además una carpeta huérfana `.worktrees/1-modelo-usuarios-y-roles/`
+sin worktree registrado detrás, anotada en deudas.
 
-La feature **5 — hash-y-verificacion-de-contrasena** se cerró el 2026-09-01 (PR #7, merge
+La feature **QC-15 — arquitectura-hexagonal-y-modulos** se cerró el 2026-09-01 (PR #8, merge
+`f79ba5d`): resumen en `progress/history.md`, worktree desmontado y rama local borrada. El
+`reviewer` rechazó la guardia **dos veces** por bypass demostrado; la lección está en el
+historial y en `harnessConfig/hexagonal/tests/guards/README.md`.
+
+La feature **QC-11 — layout-privado-con-sidebar** se cerró el 2026-09-01 (PR #6, merge
+`02883f8`): resumen en `progress/history.md`. Su worktree **no se pudo desmontar**, ver deudas.
+
+La feature **QC-5 — hash-y-verificacion-de-contrasena** se cerró el 2026-09-01 (PR #7, merge
 `697cca7`): resumen en `progress/history.md`, worktree desmontado. Se hizo **dos veces** —
 la primera con scrypt a mano, parada en el PR por sobre-ingeniería y rehecha con bcrypt.
 
@@ -110,6 +125,25 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   de usuario **no lleva entrada de perfil**: sólo el cierre de sesión. Con esto el
   spec queda **sin preguntas abiertas**.
 
+### QC-14 — modelo-producto (antes «modelo-inventario»)
+
+- **Acotada con `/afinar-feature` el 2026-09-01.** El alcance, las 17 decisiones cerradas y
+  las 4 preguntas que quedan abiertas viven en
+  `specs/QC-14-modelo-producto/requirements.md` — esa es la fuente, aquí solo se enlaza.
+- El board se actualizó **antes** de sembrar (`docs/jira.md > Cuando el disco descubre que el
+  board está desactualizado`): QC-14 cambió `summary` a «Modelo de producto», su
+  `description` entera y el label `slug:modelo-producto`. `zone`, `complexity` y `depends_on`
+  no cambiaron. Se creó **QC-20 — CRUD de productos** (épica QC-18, `zone:fullstack`,
+  bloqueada por QC-14) para lo que esta ficha deja fuera.
+- **`feature_list.json` todavía trae la versión vieja** (`name: modelo-inventario`,
+  `spec_path: specs/QC-14-modelo-inventario`, y sin QC-20). No lo edita este comando: entra
+  en el siguiente **F0** del leader, que reimporta el board. Hasta entonces el `spec_path` de
+  la ficha y la carpeta real del spec no coinciden — el gate no se ve afectado porque QC-14
+  está en `pending`.
+- Lo de abajo es la evaluación original del 2026-08-06, cuando la ficha era
+  «modelo-inventario». Se conserva por trazabilidad; donde contradiga a la acotación del
+  2026-09-01, **manda el `requirements.md`**.
+
 ### Feature 11 — modelo-inventario
 
 - Alta de backlog del 2026-08-06 a pedido del humano, y **alcance acotado por él en la
@@ -172,6 +206,33 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   nunca repositorio, modelo de Prisma ni tabla ajena; y la migracion de lo existente es
   **sin cambio de comportamiento** — los tests que hoy pasan siguen pasando, y eso es lo que
   demuestra que la reestructuracion no rompio nada.
+- **Spec escrito el 2026-09-01** (21 requisitos R1–R21, todos con test en `tasks.md >
+  Trazabilidad`). Las cuatro preguntas que heredaba quedan **cerradas con su porqué**:
+  1. **Raíz en `lib/modules/<modulo>/`, no un `src/` nuevo.** Un `src/` obligaría a tocar
+     `tsconfig.json`, `components.json`, `vitest.config.mts`, `eslint.config.mjs` y —el
+     argumento que decide— `SCANNED_DIRS` de `guard-password-never-plaintext`, que se
+     quedaría **verde barriendo nada**. A cambio, `lib/` queda acotada por regla a
+     `modules/`, `shared/`, `composition/` y `utils.ts`.
+  2. **Un solo `db/schema.prisma`.** El multiarchivo *sí* está soportado (verificado sobre
+     la instalación real, prisma 6.19.3), y aun así se descarta: no parte la propiedad,
+     rompe los tests y guardias que leen el esquema por ruta fija, y las FK cruzan módulos
+     igual. La frontera llega a persistencia por convención `/// @module <modulo>` más la
+     regla «solo el dueño consulta sus modelos».
+  3. **La guardia es un test propio en `tests/guards/`, sin dependencia nueva.**
+     `import/no-restricted-paths` sólo expresa 4 de las 15 reglas, y meter
+     `eslint-plugin-boundaries` abriría la puerta de dependencias con los cuatro checks de
+     salud **no verificables sin red** (regla 6).
+  4. **`components/` y `hooks/` quedan fuera.** Sus rutas las fija `components.json` de
+     shadcn, la UI compartida no pertenece a un módulo, y la convención de componentes de
+     ruta con barrel queda intacta.
+- **Preguntas abiertas que deja el spec** (no bloquean la aprobación): idioma de los nombres
+  de módulo (`identity` frente a `inventario` — hoy están mezclados); si un módulo puede leer
+  modelos ajenos dentro de un `include` de Prisma o debe pedirlos al contrato (se eligió lo
+  estricto, a revisar en QC-14); y dónde vivirán los componentes propios de un módulo cuando
+  aparezca el primer caso.
+- **Fuera de alcance por ser cambio de comportamiento, y bien excluido:** hoy
+  `verifyCredentials` devuelve siempre `{ ok: false }` y `getSessionUser` devuelve relleno
+  fijo. Se migran **tal cual**; hacerlos funcionar es QC-7 y QC-8.
 - La guardia ejecutable es parte del entregable, no un extra: sin ella la regla de
   direccion de dependencias vuelve a ser una linea en un `.md` que nadie hace cumplir.
   Tiene precedente en el repo (`tests/guards/`).
@@ -183,7 +244,171 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   los de `tests/guards/`); y si `components/` y `hooks/` entran en la modularizacion o se
   quedan como estan.
 
+### QC-6 — seed-roles-y-usuario-inicial (2026-09-01)
+
+- `zone: backend`. La description es persistencia pura: "la base arranque con", roles,
+  usuario ya creado, "correrse mas de una vez sin duplicar". Cero senal de UI. **Sin
+  particion**: no hay nada que un `frontend_dev` pueda tocar aqui.
+- `complexity: medium`, no `low`. Parece un script suelto y no lo es, por tres razones que
+  ya estan en el codigo:
+  1. El usuario inicial necesita **diez columnas `NOT NULL`** (`first_names`, `last_names`,
+     `birth_date`, `email`, `phone`, `document_type_code`, `document_number`, `username`,
+     `password_hash`, `role_id`) mas la FK a `document_types`, cuyo unico valor hoy es `CC`.
+  2. La contrasena debe entrar por el puerto `PasswordHasher`
+     (`lib/modules/identity/ports/password-hasher.ts`), no llamando a bcrypt directo: la
+     guardia `guard-password-never-plaintext` y la direccion de dependencias de QC-15 lo
+     exigen.
+  3. **La idempotencia no es un `upsert`.** Las tres unicidades de `users` son indices
+     **funcionales (`lower(...)`) y parciales (`WHERE deleted_at IS NULL`)** escritos a mano
+     en la migracion; Prisma no los modela, asi que `prisma.user.upsert` no tiene un
+     `where` unico al que agarrarse. Roles si es un `upsert` por `name`. Ver el comentario
+     del modelo `User` en `db/schema.prisma`.
+- `branch: feature/QC-6-seed-roles-y-usuario-inicial`, worktree montado desde `origin/dev`.
+- Paralelismo: zona `backend` con **0 features `in_progress`** registradas. Sin conflicto de
+  archivos que validar. Salvedad: existe un worktree de QC-7 que este leader no monto (ver
+  deudas); si QC-7 esta viva, seria la segunda de la zona y habria que comprobar
+  interseccion — el seed toca `db/seed.ts` y el catalogo de roles, QC-7 toca
+  `verifyCredentials` y el adaptador de sesion, asi que a priori no se cruzan.
+- **Acotada con `/afinar-feature` el 2026-09-01.** Las decisiones cerradas y lo que queda
+  abierto viven en `specs/QC-6-seed-roles-y-usuario-inicial/requirements.md`; no se copian
+  aqui. La acotacion **cambio el alcance** y por eso se reescribio la `description` en el
+  issue QC-6 antes de sembrar (paso 5): la ficha ahora incluye una **migracion aditiva** para
+  la marca de "debe cambiar la contrasena" y el arranque automatico del seed tras cada
+  despliegue. `zone`, `complexity` y `depends_on` no cambiaron.
+- Preguntas que quedaron abiertas antes de la acotacion, ya respondidas ahi (se dejan por
+  trazabilidad): *cuales* son "los roles base" y con que descripcion; que datos concretos lleva el
+  usuario inicial y de donde salen su usuario y contrasena (¿variables de entorno? ¿valores
+  fijos? ¿obliga a cambiarla al primer login?); que rol se le asigna; si el seed tambien
+  siembra `document_types` (`CC`) o eso ya lo hizo la migracion de QC-4; y que significa
+  exactamente "sin romper nada" en la segunda corrida — si un rol o el usuario fueron
+  editados a mano despues del primer seed, ¿se respetan o se reescriben?
+
+
+### QC-19 — politica-de-contrasenas (2026-09-01, ficha creada en esta sesión)
+
+- Nació al acotar QC-6: la política de contraseñas salió de allí como pregunta abierta y se
+  creó como **issue propio** (QC-19, épica `QC-17`), porque `/afinar-feature` solo acepta
+  fichas que ya existen en el board.
+- `zone: backend`, `complexity: medium`. **No se parte**: la ayuda visual mientras se escribe
+  se separó a su propia ficha (**QC-21**), así que aquí no queda nada de UI.
+- Acotada con `/afinar-feature` el mismo día. Decisiones cerradas en
+  `specs/QC-19-politica-de-contrasenas/requirements.md`. La acotación reescribió su
+  `description` en el board antes de sembrar.
+- **Trae una dependencia nueva sin aprobar**: la lista de contraseñas filtradas viene de una
+  librería, y eso es la regla 7 de `CLAUDE.md` — cuatro checks de salud, fila en
+  `docs/dependencias.md` y aprobación humana **antes** de instalar. Si ninguna librería
+  convence, la decisión se reabre.
+- `depends_on: QC-6, QC-7`. Bloquea a QC-21.
+
+### QC-21 — ayuda-visual-de-contrasena (2026-09-01, ficha creada en esta sesión)
+
+- Salió de la acotación de QC-19: mostrar los requisitos marcándose a medida que se escribe
+  la contraseña. Épica `QC-17`, bloqueada por QC-19. `zone`/`complexity` **sin evaluar**.
+
+### QC-20 — crud-de-productos (2026-09-01, ficha del humano, importada en F0)
+
+- Apareció en el board durante esta sesión; no la creó el leader. Épica `QC-18 Inventario`,
+  `zone: fullstack` (label puesta en el board), bloqueada por QC-14. `complexity` sin evaluar.
+- **Al ser `fullstack` habrá que partirla** en backend + frontend cuando le toque F1.0
+  (`AGENTS.md > Partición de fullstack`).
+
+### QC-14 — el board la reescribió (2026-09-01)
+
+- Dejó de ser `modelo-inventario` y ahora es **`modelo-producto`**: nuevo summary, nueva
+  `slug:modelo-producto` y una `description` mucho más larga y concreta. En disco se
+  actualizaron `name`, `description`, `branch` y `spec_path`; no había spec que renombrar.
+- **Su nueva `description` cierra de hecho la pregunta abierta 1 del dominio** («unidades de
+  medida»): dice que la unidad es texto libre opcional y que **no hay conversión entre
+  unidades**. Queda pendiente trasladarlo a `docs/architecture.md > Preguntas abiertas del
+  dominio`, pero es de la acotación de QC-14, no de esta sesión.
+
+
+### QC-7 — login-usuario-y-contrasena (2026-09-01)
+
+> Esta entrada se escribió, **otra sesión de leader la sobrescribió**, y se rehízo. Ver
+> `## Conflictos pendientes > DOS SESIONES DE LEADER`.
+
+- `zone: backend`. La description es toda servidor: verificar credenciales, responder sin
+  revelar cuál falló, emitir cookie. La pantalla ya existe (QC-10, `done`). Sin partición.
+- `complexity: medium` → **`high`** tras las decisiones humanas (label actualizada en el
+  issue). Requisitos: 21 → **31**.
+- Worktree desde `origin/dev`, con `.env`, `pnpm install`, `prisma generate` y **`next
+  typegen`**. Sin ese último, `pnpm typecheck` falla con `Cannot find name 'LayoutProps'`.
+  Es la deuda de `wt.sh new`, que ya tropieza en su tercera feature.
+
+**Decisiones humanas del 2026-09-01** (respuestas a las preguntas abiertas del spec):
+
+1. **Sesión de 8 h, sin «recordarme».**
+2. **5 intentos fallidos bloquean la cuenta, con bloqueo temporal creciente** (1/5/15/60 min
+   con tope). El bloqueo permanente se descartó **porque no hay pantalla de administración**
+   en el repo ni en el backlog: dejaría al usuario fuera hasta tocar la base a mano. El riesgo
+   de abuso —cualquiera deja fuera a otro con 5 fallos— **se asume explícitamente**: ERP de un
+   solo tenant, usuarios conocidos, sin registro público. Se ofreció límite por IP y **se
+   descartó**: más trabajo del pedido y falsificable en Vercel si no se configura bien.
+3. **Playwright aprobado.** Los cuatro checks se corrieron contra el registro real, no de
+   memoria: v1.62.1, no deprecada, publicada el 2026-09-01, Apache-2.0, 58.4M descargas/semana.
+4. **El bloqueo se queda DENTRO de QC-7**, no sale a ficha aparte: el contador se lee y escribe
+   dentro de `verifyCredentials` —el mismo camino de código—, la respuesta uniforme en
+   contenido y en tiempo hay que diseñarla una sola vez para los tres caminos, y partirlo
+   dejaría un login mergeado **sin ningún freno** mientras QC-8 y QC-9 construyen encima.
+5. **QC-7 entra primero en fase 2, antes que QC-6.** Resuelve el conflicto entre las dos
+   sesiones. Razón de fondo: QC-7 añade tres columnas a `User`, que es justo lo que el seed
+   tiene que rellenar; al revés, QC-6 habría que rehacerlo.
+
+**Aprendizaje del arnés, verificado:** `guard-dependencias-aprobadas` es **bidireccional**.
+Añadir la fila de un paquete sin instalarlo da rojo igual que instalarlo sin fila. Se intentó
+registrar Playwright por adelantado, salió rojo y se revirtió: la fila y la instalación van en
+la misma task o no van.
+
+**Columnas nuevas en `User`:** `failed_login_attempts` (`Int @default(0)`), `lock_level`
+(`Int @default(0)`) y `locked_until` (`DateTime?`), con migración reversible y el
+`/// @module identity` intacto.
+
+**Sigue abierto y no bloquea**: auditoría de accesos; si `next/headers` puede vivir en
+`adapters/driven/**` —hay que anotar esa fila en `docs/architecture.md`—; y la rotación del
+`SESSION_SECRET`, que hoy es uno solo y rotarlo corta todas las sesiones.
+
+**Riesgo que hereda el implementer:** `tests/unit/identity/login-action.test.ts` afirma hoy
+literalmente «mientras no hay verificación real». Cuando la haya, ese test miente. Acotado en
+la task T6b, no suelto.
 ## Conflictos pendientes
+
+### DOS SESIONES DE LEADER EN PARALELO SOBRE EL MISMO REPO (2026-09-01) — YA HUBO PÉRDIDA
+
+**Actualización: dejó de ser hipotético.** La entrada de evaluación de QC-7 en
+`## Evaluaciones` se escribió y **desapareció**, sobrescrita por la otra sesión al reescribir
+este archivo. Se rehízo a mano. `feature_list.json` sí sobrevivió, pero por suerte: las dos
+sesiones hacen read-modify-write sin cerrojo y la última escritura gana.
+
+**Mitigación decidida el 2026-09-01: QC-7 entra primero en fase 2 y QC-6 espera.** Eso
+elimina el choque de archivos (`lib/composition/index.ts`, `lib/modules/identity/`), pero
+**no** el de `progress/current.md` ni el de `feature_list.json`, que siguen sin protección.
+
+
+Una sesión evaluó y montó **QC-6**; otra, en paralelo y sin saberlo, evaluó y montó **QC-7**
+y lanzó su `spec_author`. Las dos escriben en `feature_list.json` y en este archivo. No se ha
+perdido nada todavía —la evaluación de QC-7 sobrevivió y los dos worktrees están registrados—
+pero eso es suerte, no diseño: el arnés no tiene cerrojo y la última escritura gana.
+
+**La fase 1 no corre peligro**: cada `spec_author` escribe solo en su `specs/<key>/`. El
+choque llega en **fase 2**, y es previsible por archivo:
+
+| Archivo | QC-6 (seed) | QC-7 (login) |
+| --- | --- | --- |
+| `lib/composition/index.ts` | probable | **seguro** (cablea el puerto nuevo) |
+| `lib/modules/identity/domain/**` | probable | **seguro** (`verify-credentials` deja de ser stub) |
+| `lib/modules/identity/ports/**` | posible | **seguro** (puerto hacia la persistencia) |
+| `db/schema.prisma` | no | no |
+
+Las dos son `zone: backend`, así que la regla de máx. 2 se cumple **por número** — y es justo
+el caso que `AGENTS.md > Validación de conflicto` dice que hay que mirar aparte: cupo OK,
+conflicto de archivos SÍ. **Decisión humana pendiente**: cuál de las dos entra primero en fase
+2, o si una de las dos sesiones para.
+
+Precedente que conviene recordar: las features 1 y 7 corrieron en paralelo, ambas montaron
+Vitest desde cero, y git auto-mergeó en silencio dos configuraciones incompatibles. Aquí el
+riesgo es el mismo con `lib/composition/index.ts`.
+
 
 Conflictos de merge ambiguos que el implementer no resolvió solo y esperan
 decisión humana (paso F2.3).
@@ -401,6 +626,47 @@ pregunta 5 (pepper) la cerró el humano el 2026-08-06 con un no (`design.md > 8.
   esta regla, y la 8 ya está `spec_ready` con el spec aprobado. Sus `tasks.md` y `design.md`
   describen rutas de archivo que ya no cumplen la convención — hay que revisarlos antes de
   arrancar su fase 2, o el reviewer las rechazará por anti-patrón.
+- **`dev` local divergió de `origin/dev` (2026-09-01).** El local tiene 1 commit sin pushear
+  (`7914cd1`, «integrar Jira, guardias de dependencias y renumerar specs») y `origin/dev` tiene
+  **35** que el local no tiene. `git merge --ff-only` aborta. No se forzó ni se commiteó nada:
+  el árbol de trabajo tiene además cambios sin commitear del arnés (contrato `key`, épicas).
+  **Decisión humana pendiente**: mergear `origin/dev` en el local resolviendo a mano, o
+  rebasar ese commit. Mientras tanto no bloquea: el worktree de QC-15 se montó **desde
+  `origin/dev`**, así que trabaja sobre la base correcta y completa.
+- **Worktree `11-layout-privado-con-sidebar` retenido.** `wt.sh done` devolvió HOLD por árbol
+  sucio: 3 renombrados staged de `specs/8-…` a `specs/11-…`. No se forzó, como manda
+  `AGENTS.md > F2.5`. Ese renombrado ya está hecho en el worktree principal, así que lo de
+  dentro es trabajo duplicado y no hay nada que perder; se puede descartar y desmontar, pero
+  eso es descartar cambios y lo decide el humano.
+- **QC-15 es `fullstack` y sigue SIN partir.** La partición de `AGENTS.md > Partición de
+  fullstack` se evaluó y se decidió no aplicarla: media reestructuración mergeada deja el repo
+  con dos estructuras conviviendo, que es justo lo que la feature existe para evitar. Queda
+  registrado para que el `reviewer` no lo marque como incumplimiento.
+- **`harnessConfig/` está en `.gitignore:12`, así que `harnessConfig/hexagonal/` NO viaja por
+  git.** Descubierto el 2026-09-01 al copiar ahí la guardia. Vive solo en este disco. Si la
+  intención es que la configuración hexagonal sea reutilizable en otro proyecto o por otra
+  persona, hay que **decidir**: sacar `harnessConfig/` del `.gitignore`, versionar solo
+  `harnessConfig/hexagonal/` con una excepción (`!/harnessConfig/hexagonal`), o moverla a un
+  repo aparte. Mientras tanto, un `git clean -xdf` se la lleva por delante.
+- **`dev` local está 52 commits por detrás de `origin/dev`.** El `git merge --ff-only` aborta
+  por un solo archivo: `progress/current.md`, que tiene cambios sin commitear míos y del que
+  `dev` añade 20 líneas de deudas de features anteriores. La divergencia de commits **ya se
+  resolvió sola** (`7914cd1` llegó a `origin/dev` dentro del PR #8): queda solo el conflicto
+  de contenido. No bloquea trabajo nuevo —los worktrees se montan desde `origin/dev`— pero
+  conviene resolverlo antes de la siguiente feature.
+- **Trabajo del arnés sin commitear en el worktree principal**, independiente de QC-15 y
+  pendiente de su propio commit: el contrato `key` (identidad por issue key de Jira),
+  las épicas (`epic` en `feature_list.json` + filtro `issuetype != Epic` en F0), y las
+  guardias nuevas del validador. Conviven con ediciones tuyas en `CLAUDE.md`, `docs/specs.md`,
+  `spec_author.md` y el comando nuevo `afinar-feature`, que **no toqué**.
+- **`harnessConfig/hexagonal/` creada el 2026-09-01**, tras aprobarse el `design.md` de QC-15
+  y derivada literalmente de él: contrato estructural (`docs/architecture-hexagonal.md`),
+  fragmentos para `backend_dev` / `frontend_dev` / `reviewer`, y `plantilla-modulo/`. Es
+  **aditiva y opcional**: no toca el flujo del arnés, solo dónde vive el código.
+  **Falta la guardia**: `tests/guards/guard-arquitectura-modulos.test.ts` se copia ahí
+  **cuando QC-15 cierre**, no antes — una guardia que nadie ha visto en rojo no está
+  verificada. Mientras tanto, `hexagonal/tests/guards/README.md` documenta los cinco
+  bloques que comprueba. **Pendiente**: hacer esa copia en F2.5.
 - **Convención nueva (2026-09-01): el backlog se agrupa por épicas, y la épica es el módulo.**
   Tres épicas en el board — `QC-16` Plataforma, `QC-17` Identidad y acceso, `QC-18`
   Inventario — y las 12 features colgadas de la suya por el campo `parent`.
@@ -466,3 +732,18 @@ pregunta 5 (pepper) la cerró el humano el 2026-08-06 con un no (`design.md > 8.
   coste, comparación en tiempo constante— no respondía a ningún requisito del producto:
   reconstruía a mano lo que una librería de hashing ya trae hecho. Cuando un spec crezca a
   18 requisitos para una feature marcada `complexity: low`, esa desproporción es la señal.
+- **QC-7 la lleva otra sesión en paralelo.** Al arrancar QC-6 apareció un worktree
+  `.worktrees/QC-7-login-usuario-y-contrasena` que este leader no montó, con QC-7 marcada
+  `pending`; una hora después la ficha ya estaba en `spec_ready` con `zone: backend` sin que
+  este leader la tocara. **No es huérfano: hay otra sesión trabajándola.** Consecuencia para
+  el cupo: cuando QC-7 pase a `in_progress`, la zona `backend` tendrá dos (con QC-6) y ahí se
+  agota el máximo — QC-19 tendrá que esperar. Antes de lanzar el implementer de cualquiera de
+  las dos hay que validar intersección de archivos: el seed toca el catálogo de roles y el
+  arranque de la base, QC-7 toca `verifyCredentials` y el adaptador de sesión.
+- **Carpeta huérfana de la numeración vieja.**
+  `.worktrees/1-modelo-usuarios-y-roles/` no tiene worktree registrado detrás (`git worktree
+  list` no la lista): es borrable a mano, pero no sin que un humano lo confirme.
+- **`.worktrees/fix-login-field-control-uncontrolled` está SAFE y nadie lo desmonta.**
+  `wt.sh list` lo da como mergeado en `origin/dev` y desmontable. No pertenece a ninguna
+  feature del board, así que ningún paso F2.5 va a llegar a él: se queda hasta que alguien
+  corra `./scripts/wt.sh clean --force`.

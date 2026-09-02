@@ -70,3 +70,5 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
 - El board manda, el disco trabaja: contrato con Jira → `docs/jira.md`
 - Criterios de estado final correcto → `CHECKPOINTS.md`
 - Afinar una mejora al arnés antes de aplicarla → `/afinar-regla`
+- Afinar una feature del board antes de especificarla → `/afinar-feature`
+- Extraer un módulo ya construido a un prompt portable y su cuestionario → `/extraer-modulo`
