@@ -8,8 +8,12 @@ import type { PresentationView } from '../domain/presentation-view';
  *
  * Resultados discriminados, no excepciones de Prisma: el adaptador driven traduce el
  * SQLSTATE `23505` (indice unico) a `'duplicate'` y el `23503` (FK de producto) a
- * `'in_use'`. La garantia de unicidad de R20 sigue siendo del indice unico -esta
- * comprobacion previa por `nameNormalized` es solo una cortesia de mensaje-.
+ * `'in_use'`. La garantia de unicidad de R20 la da **solo** el indice unico
+ * `presentations_name_normalized_key`: este puerto no expone ningun metodo de busqueda
+ * (ni `findBy`, ni `search`, ni `exists`) y deliberadamente no hay comprobacion previa por
+ * `nameNormalized` -- entre un `SELECT` previo y el `INSERT` cabe otra transaccion, asi que
+ * no cerraria la carrera (`design.md > 11.4`). El mensaje al usuario sale de traducir el
+ * `'duplicate'` que devuelve el adaptador cuando Postgres rechaza el `INSERT`.
  */
 export interface PresentationRepository {
   create(name: string, nameNormalized: string): Promise<{ id: string } | 'duplicate'>;

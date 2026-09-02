@@ -106,9 +106,11 @@ model User {
 ///
 /// `nameNormalized` la calcula el dominio de `inventario` (funcion pura, sin acentos ni
 /// signos) y la persiste junto a `name` en toda escritura (R17). El `@@unique` es la
-/// garantia real de la unicidad (R18, R20, QC-20 design.md > 2.2): la comprobacion previa
-/// por igualdad es solo cortesia de mensaje, el indice es lo que cierra la carrera entre
-/// dos altas simultaneas.
+/// **unica** garantia de la unicidad (R18, R20, QC-20 design.md > 2.2): no hay comprobacion
+/// previa por igualdad -- seria una carrera, entre el `SELECT` y el `INSERT` cabe otra
+/// transaccion -- y el `PresentationRepository` no expone ningun metodo de busqueda. El
+/// mensaje al usuario sale de traducir el SQLSTATE `23505` que Postgres devuelve al chocar
+/// con este indice (`design.md > 11.4`).
 /// @module inventario
 model Presentation {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

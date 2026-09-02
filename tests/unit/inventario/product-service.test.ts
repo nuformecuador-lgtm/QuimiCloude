@@ -169,7 +169,8 @@ describe('R14 — no encontrado al editar o al borrar', () => {
 });
 
 describe('el borrado usa la operacion logica del puerto, nunca una fisica', () => {
-  it('R15, R16', async () => {
+  it('borrar llama a softDeleteAlive con el actor y el instante, no a un delete fisico', async () => {
+    // R15, R16
     const products = montarRepositorio();
     const deleteProduct = createDeleteProduct({ products, now: () => AHORA });
 
@@ -224,7 +225,8 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
 });
 
 describe('listar tambien exige Administrador y delega la paginacion en el puerto', () => {
-  it('R23, R24, R25, R26, R35, R36', async () => {
+  it('lista pasando la query tal cual al puerto y devuelve la pagina que este responde', async () => {
+    // R23, R24, R25, R26, R35, R36
     const products = montarRepositorio();
     const listProducts = createListProducts({ products });
 

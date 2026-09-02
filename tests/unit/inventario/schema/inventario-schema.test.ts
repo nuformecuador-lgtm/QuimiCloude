@@ -545,14 +545,16 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // que es el punto UNICO de cableado (`tests/guards/guard-arquitectura-modulos.test.ts`,
     // linea ~618 y bloque 8).
     //
-    // Dos exenciones deliberadas:
-    //   1. `lib/composition/**`, que es el unico sitio legitimo que necesita las factories en
-    //      runtime para atar puerto a adaptador;
-    //   2. las SUBRUTAS del modulo. El patron exige comilla de cierre justo tras
+    // Una exencion deliberada, mas un motivo estructural que no necesita exencion:
+    //   1. las SUBRUTAS del modulo. El patron exige comilla de cierre justo tras
     //      `inventario`, asi que compara el especificador EXACTO y no por prefijo: un
     //      `@/lib/modules/inventario/adapters/driving/...` es una Server Action y la UI la
     //      importa en runtime a proposito (`docs/architecture.md > Server Actions vs Route
     //      Handlers`). Marcarla seria prohibir justo el patron que el arnes prescribe.
+    //   2. `lib/composition/**` NO necesita exencion: no esta entre `raicesVigiladas` (que
+    //      son solo `lib/modules`, `app`, `components` y `hooks`), asi que el barrido nunca
+    //      llega a leer sus archivos. Es justamente por eso que ese es el unico sitio
+    //      legitimo que puede importar las factories en runtime para atar puerto a adaptador.
     //
     // Comprobado el 2026-09-02: hoy NINGUN import del barrel exacto existe fuera de
     // `lib/composition/`, y los cuatro imports que la UI hace hacia modulos son o Server
@@ -570,10 +572,10 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
     const modulesDir = join(repoRoot, 'lib', 'modules')
     const inventarioDir = join(modulesDir, 'inventario') + sep
-    const composicionDir = join(repoRoot, 'lib', 'composition') + sep
     // Especificador EXACTO del barrel: la comilla de cierre va pegada a `inventario`, asi que
     // las subrutas (`.../inventario/adapters/driving/...`) NO casan. Es deliberado.
     const INVENTARIO_IMPORT = /from\s+['"](@\/lib\/modules\/inventario|(\.\.?\/)+.*modules\/inventario)['"]/
+    // `lib/composition` NO esta aqui a proposito: no se barre, no hace falta exencion.
     const raicesVigiladas = [
       modulesDir,
       join(repoRoot, 'app'),
@@ -587,7 +589,6 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     ).toBeGreaterThan(0)
     for (const filePath of archivosVigilados) {
       if (filePath.startsWith(inventarioDir)) continue
-      if (filePath.startsWith(composicionDir)) continue
       const source = readFileSync(filePath, 'utf8')
       for (const line of source.split('\n')) {
         if (!INVENTARIO_IMPORT.test(line)) continue
