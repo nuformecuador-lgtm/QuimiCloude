@@ -23,12 +23,6 @@ vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
 
-type LoginStubModule = typeof import('@/lib/modules/identity/domain/verify-credentials');
-
-async function loadRealStub(): Promise<LoginStubModule> {
-  return vi.importActual<LoginStubModule>('@/lib/modules/identity/domain/verify-credentials');
-}
-
 function formDataOf(fields: Record<string, string>): FormData {
   const formData = new FormData();
   for (const [name, value] of Object.entries(fields)) {
@@ -41,12 +35,11 @@ function submit(fields: Record<string, string>, prevState: LoginFormState = LOGI
   return loginAction(prevState, formDataOf(fields));
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.clearAllMocks();
-  // Por defecto la action corre contra el comportamiento real del stub (R18);
-  // los tests que necesitan otro resultado lo sobreescriben explicitamente.
-  const realStub = await loadRealStub();
-  verifyCredentialsMock.mockImplementation(realStub.verifyCredentials);
+  // Doble explicito: la action se testea contra un doble, nunca contra el dominio real.
+  // Por defecto rechaza; los tests que necesitan otro resultado lo sobreescriben.
+  verifyCredentialsMock.mockResolvedValue({ ok: false });
 });
 
 describe('loginAction', () => {
@@ -142,21 +135,6 @@ describe('loginAction', () => {
     expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
     // Sin estado de error, no hay nada de lo que el cliente pueda derivar un toast (R17).
     expect(resultado).toBeUndefined();
-  });
-
-  it('rechaza todo intento valido mientras no hay verificacion real', async () => {
-    const realStub = await loadRealStub();
-
-    await expect(realStub.verifyCredentials({ username: 'ana.perez', password: 'clave' })).resolves.toEqual({
-      ok: false,
-    });
-
-    const primero = await submit({ username: 'ana.perez', password: 'clave' });
-    const segundo = await submit({ username: 'otro.usuario', password: 'otra-clave' });
-
-    expect(primero.status).toBe('error');
-    expect(segundo.status).toBe('error');
-    expect(redirect).not.toHaveBeenCalled();
   });
 
   it('no accede a base de datos ni emite cookie', () => {
