@@ -91,8 +91,9 @@ tests/integration/identity/identity-seed.int.test.ts(221,20) / (271,55) / (293,3
 Causa: **el cliente de Prisma no esta generado en este worktree** — `node_modules/.prisma` no
 existe. `mustChangeCredential` si esta en `db/schema.prisma` (columna de QC-6), asi que no es un
 problema de fuente sino de artefacto generado ausente. Se reporta y **no se toca**: la
-regeneracion del entorno no la hace el implementer, y menos con otra sesion escribiendo en este
-worktree (ver abajo).
+preparacion del entorno del worktree no la hace el implementer. **Bloquea el gate**
+`./init.sh --rapido`, que empieza por `typecheck`: hace falta un `pnpm exec prisma generate`
+en este worktree antes de que la tanda pueda darse por cerrada en verde.
 
 ## Incidente de git en el worktree: un `git stash pop` sobre un stash AJENO
 
