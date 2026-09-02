@@ -439,3 +439,56 @@ de ser aditiva.
   working tree`. Se remató con `rm -rf` + `git worktree prune`, con conocimiento de que lo único sin
   versionar eran `node_modules`, `.env` y `tsconfig.tsbuildinfo`. **Es la segunda vez el mismo día**:
   ya no es una anécdota, es el comportamiento por defecto de ese script en esta máquina.
+
+## QC-19 — politica-de-contrasenas (2026-09-02)
+
+La regla de aceptación (≥8, mayúscula, minúscula, número, símbolo) más el diccionario de
+contraseñas filtradas, aplicada **en todo punto donde alguien fija o cambia una contraseña**. El
+rechazo dice qué requisito faltó y nunca la credencial; quien ya tenga guardada una que no cumple
+sigue entrando. PR #14, merge `11664e1`. Los 24 requisitos (R1–R24) con test ejecutado. Reviewer
+APROBADO sin bloqueantes, 7 menores, los 7 cerrados. Gate completo tras integrar QC-8: 46 archivos,
+478 tests.
+
+### La lección: el diseño dio por hecho el estado de la rama, y se equivocó
+
+`design.md > 7` asumía que QC-6 no estaba en la rama. **Sí estaba**, y eso dejaba
+`seed-initial-access.ts` hasheando sin evaluar la política: R18 y R19 en falso justo en el único
+punto del repo que hoy fija una contraseña. La respuesta no fue exentar al seed de la guardia —eso
+vaciaba R18 donde más cuenta— sino meter `checkCredentialPolicy` como dependencia **obligatoria**
+del caso de uso, evaluada **antes** del hash. Coste: 25 sitios de llamada en tests de QC-6
+recibieron la dependencia; el reviewer verificó línea a línea que **ninguna aserción existente
+cambió**.
+
+El reviewer también comprobó que la guardia nueva **muerde**, en vez de darla por buena porque
+estaba verde: con el contenido real del archivo da `[]`; con ese mismo contenido sin la referencia
+a la política, da `["passwordHasher.hash("]`. Y el implementer cerró después el hueco que quedaba
+—`import { hash } from 'bcryptjs'` con llamada sin receptor— **por el import, no por la llamada**:
+no se puede llamar a esa función sin importarla, y detectar un `hash(` pelado habría vuelto la
+guardia frágil. La allowlist no creció.
+
+Medido, no estimado: el diccionario son 49 233 entradas y ~1,63 MiB de `Set` en el proceso de
+servidor, nunca en el bundle del cliente. Cierra el riesgo de tamaño que el diseño dejaba anotado.
+
+### La otra lección: dos sesiones de leader sobre el mismo repo
+
+El PR llegó `CONFLICTING` porque `origin/dev` avanzó 24 commits con el merge de QC-8 mientras esta
+feature estaba en revisión. De los tres choques, **el peligroso fue el que git no marcó**:
+auto-mergeó `feature_list.json` dejando **QC-23 duplicada**, porque las dos sesiones importaron la
+misma ficha del board en posiciones distintas del array. Los dos registros eran byte a byte
+idénticos, así que no se perdió nada, pero el archivo quedaba inválido y **lo cazó `./init.sh`, no
+el merge**. Los otros dos —`lib/composition/index.ts` y este archivo— eran uniones mecánicas.
+
+Antes de eso, tres commits de contabilidad se llevaron por delante trabajo de la otra sesión, y un
+`sed -i` volteó `progress/current.md` entero de CRLF a LF convirtiendo 8 líneas de cambio en un
+diff de 1982 — la deuda que QC-14 ya había dejado escrita y que sigue sin `.gitattributes` detrás.
+
+### Deuda que hereda
+
+- **`pnpm run build` corre el seed**, así que en un entorno nuevo una `SEED_ADMIN_PASSWORD` que no
+  cumpla la política **aborta el arranque del despliegue**. Consecuencia querida de R18 y prevista
+  en `design.md > 7.2`, pero hay que leerla antes de cargar las variables en Vercel.
+- **La guardia no comprueba el ORDEN de las llamadas**: verifica que la política se referencia
+  antes de hashear, no que se evalúe primero en tiempo de ejecución.
+- **`wt.sh done` sigue sin cerrar en Windows** cuando el worktree tiene `node_modules` de pnpm.
+  Van dos features seguidas (QC-6 y QC-19) rematadas a mano con `rmdir /s /q` + `git worktree
+  prune`. Ya no es una anécdota: es el comportamiento por defecto del script en esta máquina.
