@@ -156,3 +156,103 @@ Veredicto: solo se toco andamiaje (una columna `NOT NULL` nueva que obliga a pas
 Las tres correcciones quedaron aplicadas, con la tabla de trazabilidad de `tasks.md`
 intacta (R29 y R34 ahora tienen su test real y falsable en `scope.test.ts`), y el diff
 ajeno de QC-14 auditado sin hallazgos: solo andamiaje, cero aserciones perdidas.
+
+---
+
+# Anotaciones del implementer — cierre del Grupo A
+
+## Decision del leader: `ON DELETE RESTRICT` en las FK de auditoria
+
+**El spec NO fijaba esta accion.** `design.md > 2.4` solo nombra los constraints
+(`products_created_by_fkey`, `products_updated_by_fkey`); ni `requirements.md` ni la tabla
+`## Decisiones cerradas (no reabrir)` dicen que pasa al borrar el usuario referenciado.
+`backend_dev` la resolvio por su cuenta como `ON DELETE SET NULL`; el implementer lo paro y
+lo escalo, y **la decidio el leader**, no el humano. Razonamiento, para que el reviewer la
+juzgue y el humano pueda revocarla:
+
+1. **No es un dato ausente, es una convencion que el codigo ya fija.** Las tres FK que ya
+   existian en `db/schema.prisma` usan `onDelete: Restrict, onUpdate: Cascade` sin ninguna
+   excepcion: `users.role_id`, `users.document_type_code` y `products.presentation_id`.
+2. **El caso contra el que protegia `SET NULL` hoy no ocurre.** `users` tiene borrado
+   logico (`deleted_at`), asi que ningun camino de la aplicacion hace `DELETE` fisico de un
+   usuario. Los dos comportamientos son equivalentes en la practica; se diferencian **solo
+   en como fallan**.
+3. **R7 exige «referencia real a un usuario existente».** `SET NULL` convierte esa
+   referencia en `NULL` **en silencio**, que es exactamente lo que R7 prohibe. En una
+   columna de auditoria eso destruye la atribucion sin avisar. `RESTRICT` hace ruidoso el
+   dia que alguien escriba un script de purga, que es cuando quieres enterarte.
+
+Verificado contra la base real (`pg_constraint.confdeltype`): las tres FK de `products`
+salen `r` (RESTRICT) / `c` (CASCADE), identicas entre si.
+
+## Alcance NO previsto por `tasks.md`
+
+Dos trabajos que esta feature tuvo que hacer y que el `tasks.md` no contemplaba. Se anotan
+como tales para el reviewer.
+
+### 1. Estrechar el test de alcance de QC-14
+
+`tests/unit/inventario/schema/inventario-schema.test.ts` afirmaba el alcance de QC-14 (su
+R23: «esta ficha es esquema y migracion, sin dominio ni contrato»). QC-20 es por definicion
+la ficha que le da contenido al modulo, asi que **tres clausulas quedaron imposibles de
+cumplir**. Se quitaron esas tres y **ninguna mas**:
+
+| Clausula retirada | Que afirmaba | Por que QC-20 la invalida | A donde pasa |
+| --- | --- | --- | --- |
+| `typescriptFilesIn(adapters/driving)).toEqual([])` | el modulo no tiene Server Actions | R29 exige que QC-20 cree las Server Actions del catalogo | `tests/unit/inventario/scope.test.ts` › `las mutaciones del catalogo son Server Actions y no hay ningun route handler bajo app/api` |
+| `typescriptFilesIn(domain)).toEqual([])` | el modulo no tiene dominio | R31 exige que los casos de uso vivan en `inventario/domain/` | cubierto por la guardia `guard-arquitectura-modulos.test.ts` (bloques 4, 6 y 13), que vigila la *pureza* del dominio en vez de su *ausencia* |
+| `contract.trim()).toBe('export {};')` + el `not.toMatch` de reexports | el contrato sigue siendo el slot vacio de QC-15 | `design.md > 1` y T11: QC-20 es quien le da contenido al contrato | guardia `guard-arquitectura-modulos.test.ts` bloque 6 (contrato limpio, cierre transitivo, incluido el reexport camuflado) |
+
+**Lo que NO se toco de ese test:** el bucle que comprueba que no existen `app/api/products`,
+`app/api/presentations` ni `app/api/inventario` sigue vivo, y el resto del archivo intacto.
+
+Por que `--rapido` no lo habria cazado: ese test recorre el **arbol de archivos**, no el
+grafo de imports, asi que `vitest related` no lo selecciona nunca. Es el caso del aviso 6
+del encargo; esta vez aparecio **antes** del gate.
+
+### 2. `tests/unit/inventario/scope.test.ts` adelantado
+
+Es la task **T15 (Grupo D)**, adelantada al Grupo A porque es donde aterrizan las clausulas
+que QC-14 pierde. Dejar el hueco entre medias habria sido dejar el alcance sin vigilar
+durante tres grupos.
+
+## Bug real cazado por la comprobacion de falsabilidad
+
+La primera version de la asercion «no hay pantalla de productos bajo `app/`» miraba solo
+`entry.name` —o sea el nombre del archivo, `page.tsx`, que es generico— en vez de la ruta
+relativa completa. **No se ponia roja al crear `app/(private)/products/page.tsx`.** Era
+infalsable por accidente: exactamente el fallo que el reviewer cazo en QC-8. Se detecto
+porque se exigio provocar el rojo una por una, y se corrigio a comprobar la ruta completa.
+Sin esa comprobacion, R34 habria quedado cerrado por un test que no podia fallar.
+
+## Base de datos propia del worktree
+
+La base local `QuimiCloude` esta **compartida** y tenia ya aplicada la migracion
+`recipes_and_recipe_lines` de otra feature en vuelo (QC-24). Correr `db:migrate` encima
+habria pisado trabajo ajeno, que es lo que en su dia obligo a QC-14 a crearse
+`QuimiCloude_QC14`. Se hizo lo mismo:
+
+- Creada `QuimiCloude_QC20` en el Postgres local. Se uso el cliente `pg` de Node y no
+  `psql`, porque `psql` no esta instalado en esta maquina — misma razon por la que
+  `scripts/db-rollback.ts` usa `pg`.
+- `.env` del worktree apuntado a esa base (`DATABASE_URL` y `DIRECT_URL`). `.env` esta
+  git-ignorado (`.gitignore:38`, patron `.env*`), asi que no ensucia el repo. Se dejo copia
+  en `.env.bak-qc20`, tambien ignorada.
+- Las **cinco** migraciones aplicadas desde cero con `pnpm run db:migrate`, todas en verde.
+
+**Deuda a saldar al desmontar el worktree:** borrar la base `QuimiCloude_QC20`. Hoy el
+Postgres local tiene tres: `QuimiCloude` (compartida), `QuimiCloude_QC14` y
+`QuimiCloude_QC20`.
+
+### Estado del esquema verificado contra la base real
+
+| Objeto | Estado |
+| --- | --- |
+| `products.created_by` / `products.updated_by` | `uuid`, NULLABLE (`design.md > 2.1 b`) |
+| `presentations.name_normalized` | `text`, NOT NULL, con backfill aplicado |
+| `products_created_by_fkey` / `products_updated_by_fkey` | RESTRICT / CASCADE |
+| `presentations_name_normalized_key` | `CREATE UNIQUE INDEX ... USING btree (name_normalized)` |
+| RLS en `products` y `presentations` (R4) | `relrowsecurity = true` **y** `relforcerowsecurity = true` — la migracion no la desactivo |
+
+`pnpm exec vitest run tests/integration/inventario/` → **1 archivo, 19 tests, todos verdes**
+(estaban rojos antes de aplicar migraciones, por `column "name_normalized" does not exist`).
