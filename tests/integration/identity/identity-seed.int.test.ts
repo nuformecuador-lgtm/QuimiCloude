@@ -24,12 +24,17 @@
  * NINGUNA CREDENCIAL REAL — los valores de `FAKE_ADMIN_*` son marcadores de instalacion
  * de test, evidentemente ficticios, y solo existen en memoria durante la transaccion.
  */
+import { randomUUID } from 'node:crypto';
+
 import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { identity } from '@/lib/composition';
 import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
-import { createInitialAccessRepository } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
+import {
+  createInitialAccessRepository,
+  withInitialAccessTransaction,
+} from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -411,5 +416,50 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(documentTypesAfter).toHaveLength(documentTypesBefore.length);
       expect(documentTypesAfter).toEqual(documentTypesBefore);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `withInitialAccessTransaction` — la garantia de `design.md > 5.2` (R13, B-2)
+// ---------------------------------------------------------------------------
+//
+// OJO: estos dos casos NO pueden ir dentro de `inRolledBackTransaction`, porque
+// `prisma.$transaction` no se anida sobre un `Prisma.TransactionClient` (el `tx` de
+// `inRolledBackTransaction` ya ES una transaccion). Corren contra el cliente
+// COMPARTIDO, y cada uno se limpia solo: el caso positivo borra lo que creo con
+// exito; el caso negativo confia en que la transaccion revierte y solo verifica.
+// Nombres de rol IRREPETIBLES (`randomUUID()`) para no depender de lo que ya haya en la
+// base ni tocar `Administrador`/`Operador`.
+describe('withInitialAccessTransaction — commitea en exito y revierte en fallo (R13)', () => {
+  it('mitad positiva: si `run` termina bien, lo escrito queda commiteado de verdad', async () => {
+    const roleName = `qc6-tx-commit-${randomUUID()}`;
+    try {
+      await withInitialAccessTransaction(async (repository) => {
+        await repository.createRole({ name: roleName, description: 'rol de prueba de commit (QC-6)' });
+      });
+
+      const created = await prisma.role.findUnique({ where: { name: roleName } });
+      expect(created).not.toBeNull();
+    } finally {
+      await prisma.role.deleteMany({ where: { name: roleName } });
+    }
+  });
+
+  it('mitad negativa: si `run` lanza, lo escrito antes del fallo NO queda commiteado', async () => {
+    const roleName = `qc6-tx-rollback-${randomUUID()}`;
+    const mensajeDeError = 'fallo simulado dentro de withInitialAccessTransaction (QC-6)';
+    try {
+      await expect(
+        withInitialAccessTransaction(async (repository) => {
+          await repository.createRole({ name: roleName, description: 'rol de prueba de rollback (QC-6)' });
+          throw new Error(mensajeDeError);
+        }),
+      ).rejects.toThrow(mensajeDeError);
+
+      const found = await prisma.role.findUnique({ where: { name: roleName } });
+      expect(found).toBeNull();
+    } finally {
+      await prisma.role.deleteMany({ where: { name: roleName } });
+    }
   });
 });

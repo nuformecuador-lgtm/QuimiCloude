@@ -9,11 +9,15 @@
  * Import RELATIVO a la composicion (`../lib/composition`), no `@/lib/composition`:
  * `tsx` no resuelve los alias de `tsconfig` de forma verificada en este repo
  * (`design.md > 5`).
+ *
+ * `prisma` se carga con `import()` dinamico DENTRO de `main()`, DESPUES de
+ * `loadDotEnv()`, igual que `../lib/composition`: un import estatico se evalua antes de
+ * que `.env` este cargado, y aunque Prisma resuelve la url de conexion de forma
+ * perezosa (asi que hoy no falla), el orden es fragil y contradice a proposito a
+ * `scripts/db-rollback.ts`, que carga el entorno primero.
  */
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-
-import { prisma } from '../lib/shared/db/prisma'
 
 /** `tsx` no carga `.env` por su cuenta (mismo patron que `scripts/db-rollback.ts`). */
 function loadDotEnv(): void {
@@ -24,28 +28,28 @@ function loadDotEnv(): void {
 async function main(): Promise<void> {
   loadDotEnv()
 
-  const { identity } = await import('../lib/composition')
-  const outcome = await identity.seedInitialAccess()
+  const { prisma } = await import('../lib/shared/db/prisma')
+  try {
+    const { identity } = await import('../lib/composition')
+    const outcome = await identity.seedInitialAccess()
 
-  if (outcome.createdRoles.length > 0 || outcome.createdAdmin) {
-    const roles =
-      outcome.createdRoles.length > 0
-        ? `roles creados: ${outcome.createdRoles.length} (${outcome.createdRoles.join(', ')})`
-        : 'roles creados: 0'
-    const admin = outcome.createdAdmin ? 'usuario inicial: creado' : 'usuario inicial: ya existia'
-    console.log(`db:seed: ${roles} - ${admin}`)
-  } else {
-    console.log('db:seed: nada que crear')
+    if (outcome.createdRoles.length > 0 || outcome.createdAdmin) {
+      const roles =
+        outcome.createdRoles.length > 0
+          ? `roles creados: ${outcome.createdRoles.length} (${outcome.createdRoles.join(', ')})`
+          : 'roles creados: 0'
+      const admin = outcome.createdAdmin ? 'usuario inicial: creado' : 'usuario inicial: ya existia'
+      console.log(`db:seed: ${roles} - ${admin}`)
+    } else {
+      console.log('db:seed: nada que crear')
+    }
+  } finally {
+    await prisma.$disconnect()
   }
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect()
-  })
-  .catch(async (error: unknown) => {
-    const detail = error instanceof Error ? error.message : String(error)
-    console.error(`db:seed: fallo — ${detail}`)
-    await prisma.$disconnect()
-    process.exit(1)
-  })
+main().catch((error: unknown) => {
+  const detail = error instanceof Error ? error.message : String(error)
+  console.error(`db:seed: fallo — ${detail}`)
+  process.exit(1)
+})

@@ -126,8 +126,8 @@ describe('seedInitialAccess', () => {
     }
   });
 
-  // Caso 1 (R2, R4, R9)
-  it('sobre una base vacia crea los dos roles y el usuario inicial con rol Administrador y obligado a cambiar credencial', async () => {
+  // Caso 1 (R2, R4)
+  it('sobre una base vacia crea los dos roles y el usuario inicial con rol Administrador', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
@@ -285,6 +285,42 @@ describe('seedInitialAccess', () => {
     expect(errorCapturado).not.toBeNull();
     expect(errorCapturado?.message ?? '').not.toContain(CREDENCIAL_DE_PRUEBA);
     expect(errorCapturado?.stack ?? '').not.toContain(CREDENCIAL_DE_PRUEBA);
+  });
+
+  // Caso 7b (R13) — por que los pasos 4 y 5 tienen que ir en una transaccion.
+  it('si createInitialAdmin lanza DESPUES de crear los roles, los dos roles ya quedaron creados y el error se propaga', async () => {
+    const repository = crearRepositorioFalso();
+    const mensajeDeError = 'fallo simulado del alta del usuario inicial';
+    repository.createInitialAdmin = async () => {
+      throw new Error(mensajeDeError);
+    };
+    const passwordHasher = crearHasherFalso();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    let errorCapturado: Error | null = null;
+    try {
+      await seedInitialAccess({ repository, passwordHasher, credentials });
+    } catch (error) {
+      errorCapturado = error as Error;
+    }
+
+    // Primero: que los roles SI se crearon (los dos, exactamente). Ocurrio ANTES de
+    // afirmar cualquier otra cosa, siguiendo el orden de `design.md > 11`.
+    const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
+    expect(creacionesDeRol).toHaveLength(2);
+
+    // Luego: que el error se propaga.
+    expect(errorCapturado).not.toBeNull();
+    expect(errorCapturado?.message).toBe(mensajeDeError);
+
+    // Es justo por este camino por lo que los pasos 4 y 5 tienen que ir en una
+    // transaccion (`design.md > 5.2`): sin ella, estos dos roles quedarian comiteados
+    // en la base aunque el alta del usuario haya fallado. Este test, con un repositorio
+    // sobre dobles, no puede ver la persistencia real; lo que demuestra es que el
+    // dominio SI deja los roles creados antes de que la escritura del usuario falle, que
+    // es la condicion que hace necesaria la transaccion en el adaptador. La cobertura de
+    // que la transaccion revierte de verdad esta en el test de integracion contra base
+    // real (`identity-seed.int.test.ts`).
   });
 
   // Caso 8 (R17)

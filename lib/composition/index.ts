@@ -3,7 +3,7 @@
 // Prohibido importar adaptadores driving desde aqui: la flecha va driving -> composicion (R12).
 import { createVerifyCredentials, seedInitialAccess } from '@/lib/modules/identity';
 import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
-import { initialAccessRepository } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
+import { withInitialAccessTransaction } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import {
   compareAndSetLoginAttempt,
   findActiveByUsername,
@@ -48,10 +48,12 @@ export const identity = {
   // QC-6: siembra roles y usuario inicial. Invocable como `identity.seedInitialAccess()`,
   // sin argumentos: el repositorio, el hasher y el proveedor de credenciales ya estan
   // cableados aqui (`design.md > 5`). Solo lo consume `scripts/seed.ts`.
+  // La invocacion corre dentro de `withInitialAccessTransaction`: es lo que hace cierto
+  // R13 (`design.md > 5.2`, "los pasos 4 y 5 corren dentro de una unica
+  // `prisma.$transaction`"). Si el alta del usuario falla, los roles creados en la misma
+  // corrida tampoco quedan comiteados.
   seedInitialAccess: () =>
-    seedInitialAccess({
-      repository: initialAccessRepository,
-      passwordHasher,
-      credentials: readInitialAdminCredentialsFromEnv,
-    }),
+    withInitialAccessTransaction((repository) =>
+      seedInitialAccess({ repository, passwordHasher, credentials: readInitialAdminCredentialsFromEnv }),
+    ),
 } as const;

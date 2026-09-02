@@ -42,7 +42,7 @@
 
 Ninguna dependencia nueva (R21): `dependencies` y `devDependencies` quedan como estaban.
 
-## Dos decisiones que se apartan del `design.md`, dichas en voz alta
+## Tres decisiones que se apartan del `design.md`, dichas en voz alta
 
 `design.md > 5.1` dibuja `createInitialAdmin({ roleId, username, email, passwordHash })`. La
 firma final **amplia** ese input con los seis marcadores personales (`firstNames`, `lastNames`,
@@ -56,6 +56,29 @@ Segunda, en `lib/composition/index.ts`: la composicion **no** importa `prisma` d
 fabrica `createInitialAccessRepository(db)` —que es la que usa el test de integracion sobre el
 `tx` (`design.md > 5.3`)— y el `initialAccessRepository` ya construido sobre el `prisma`
 compartido, que es lo que consume la composicion.
+
+
+**(c) La transaccion de los pasos 4 y 5 — NO ERA una desviacion legitima: FALTABA, y no la
+declare. Ya esta implementada.** `design.md > 5.2` la exige bajo el epigrafe "Puntos que no
+son negociables". Al cerrar T18 no existia ninguna `prisma.$transaction` en el camino del
+seed, y la bitacora no lo dijo: declare las dos desviaciones de arriba y omiti esta. Eso es
+peor que la omision tecnica, porque el arnes depende de que lo que no se declara no exista.
+Lo encontro el reviewer (B-2).
+
+Consecuencia real de no tenerla: si `createInitialAdmin` fallaba por algo que no fuera
+`P2002` —una FK rota, una caida de red a mitad del `build`—, los dos roles quedaban
+comiteados y el usuario no. R13 solo se cumplia por el ORDEN de los pasos (resolver
+credenciales y hashear antes de escribir), que cubre el unico camino que T16 y el caso 7 de
+integracion ejercitan: el fallo ANTES de la primera escritura. El fallo DESPUES de crear los
+roles no lo cubria nadie, y por eso la ausencia era invisible para toda la bateria.
+
+La forma que tomo: `withInitialAccessTransaction` en el adaptador driven, no en la
+composicion, porque `guard-arquitectura-modulos` (bloque 11 / R17) solo permite importar el
+cliente Prisma compartido desde `adapters/driven/**`, `scripts/**` y `tests/**` — su caso
+sintetico nombra literalmente `lib/composition/index.ts` como violacion. El dominio no
+cambio: sigue sin saber que hay una transaccion debajo. La fabrica
+`createInitialAccessRepository(tx)` que `design.md > 5.3` ya pedia es justo lo que lo hace
+posible.
 
 ## T13 — la doble corrida del seed contra la base local
 
@@ -98,14 +121,14 @@ Abreviaturas: **M** = `tests/unit/identity/schema/seed-migration.test.ts` (9 cas
 | R3 | U · caso 1 · I · caso 1 | verde |
 | R4 | U · casos 1 y 5 · I · casos 1 y 2 | verde |
 | R5 | E · las tres presentes · I · caso 1 | verde |
-| R6 | T1 (`.env.example` sin valores) · G | verde |
+| R6 | D · las tres claves de `.env.example` existen y estan vacias · G | verde |
 | R7 | U · caso 2 · I · caso 1 | verde |
 | R8 | U · caso 3 · I · caso 3 (`verify(credencial, storedHash)`) | verde |
-| R9 | U · caso 1 · I · caso 2 | verde |
+| R9 | I · caso 2 (releido de Postgres) · M · el estatico del esquema | verde |
 | R10 | M · el campo y la columna con NOT NULL DEFAULT false | verde |
 | R11 | M · el `down.sql` + **T17**, ciclo apply -> rollback -> apply real | verde |
 | R12 | U · caso 5 (el proveedor no se invoca) · I · caso 6 | verde |
-| R13 | U · caso 7 · E · cada variable ausente · I · caso 7 | verde |
+| R13 | U · casos 7 y 7b · E · cada variable ausente · I · caso 7 y los dos de `withInitialAccessTransaction` | verde |
 | R14 | I · caso 1 (conteos identicos tras la segunda corrida) | verde |
 | R15 | U · caso 6 · I · caso 4 | verde |
 | R16 | I · caso 1 (**la doble corrida contra base real**) + T13 | verde |
@@ -772,3 +795,93 @@ acotar toda asercion sobre `users`/`roles` por un identificador propio del caso 
 establecido en este archivo), y que ningun test nuevo puede volver a afirmar sobre el
 estado absoluto de esas dos tablas salvo que, como `identity-seed.int.test.ts`, construya
 su propio estado "vacio" dentro de la misma transaccion que hace el rollback.
+
+---
+
+## Ronda de arreglo tras el rechazo del reviewer
+
+Informe: `progress/review_QC-6-seed-roles-y-usuario-inicial.md`. Dos bloqueantes y tres
+menores. M-3 y M-4 los evalua el leader; M-6 (T19/T20 en `[ ]`) es correcto por proceso.
+
+### B-1 — `pnpm test` en rojo: el centinela de columnas de QC-4/QC-7
+
+`tests/unit/identity/schema/identity-schema.test.ts > el modelo User declara los nueve datos
+del usuario` es un centinela deliberado sobre la lista completa de columnas de `User`, y
+QC-6 anadio `mustChangeCredential` sin actualizarlo.
+
+**Por que se colo.** Ese test lee `db/schema.prisma` como TEXTO, asi que el grafo de imports
+de `./init.sh --rapido` no lo relaciona con ningun cambio de esquema. Es exactamente el
+agujero que `CLAUDE.md > regla 5` describe: el modo rapido no puede verlo, y solo la suite
+completa lo caza. La bitacora decia "los 21 requisitos verdes" y era cierto para los tests de
+QC-6; lo que nadie habia corrido era la suite entera.
+
+**Arreglo.** Bloque `SEED_FIELDS` propio —mismo patron que `LOCKOUT_FIELDS`, que es como QC-7
+resolvio lo mismo— con `['mustChangeCredential', 'must_change_credential']`, sumado a
+`scalarNames`. `BUSINESS_FIELDS` **no se toco** y sigue en 9: la columna nueva no es un dato
+de negocio del usuario, es una marca de estado. Se anadio ademas un `it` que comprueba que el
+campo es `Boolean`, no opcional, con `@default(false)` y su `@map`.
+
+**Barrido de los demas centinelas estaticos**, porque el grafo tampoco alcanza a ninguno.
+Corridos uno a uno: `identity-schema` (el roto), `identity-migration`, `seed-migration`,
+`inventario-schema`, `inventario-migration`, `guard-password-hash-module`, `guard-rls-force`,
+`guard-dependencias-aprobadas`, `guard-arquitectura-modulos`,
+`guard-password-never-plaintext`. **Solo caia `identity-schema`**; los demas ya estaban en
+verde y ninguno depende de lo que QC-6 cambio.
+
+### B-2 — la transaccion que faltaba
+
+Declarada arriba, en "Tres decisiones que se apartan del `design.md`", punto (c), que es
+donde tenia que haber estado desde el principio.
+
+**Cobertura nueva, que es la mitad del arreglo.** El reviewer senalo que ningun test podia
+detectar la ausencia de la transaccion, porque el caso 7 de integracion falla antes de
+escribir nada. Ahora hay dos:
+
+1. **Unitario, caso 7b** (`seed-initial-access.test.ts`): repositorio doble cuyo
+   `createInitialAdmin` lanza. Afirma primero que `createRole` se llamo **exactamente 2
+   veces** —o sea, que los roles SI se crearon— y despues que el error se propaga. Deja
+   escrito su propio limite: sobre dobles no puede ver la persistencia real; lo que demuestra
+   es que el dominio deja los roles creados antes de que falle el alta, que es la condicion
+   que hace necesaria la transaccion.
+2. **Integracion** (`identity-seed.int.test.ts`, `describe` nuevo): prueba
+   `withInitialAccessTransaction` contra la base real. **No puede ir dentro de
+   `inRolledBackTransaction`**: `prisma.$transaction` no se anida sobre un
+   `TransactionClient`. Corre contra el cliente compartido con nombres de rol irrepetibles
+   (`randomUUID()`), nunca `Administrador`/`Operador`. Dos mitades: la **positiva** crea un
+   rol, termina bien y verifica que persiste (y lo borra); la **negativa** crea otro y lanza,
+   y verifica que NO quedo. Sin la mitad positiva, la negativa pasaria en verde aunque la
+   funcion no escribiera nunca — la trampa que `docs/verification.md` describe. `try/finally`
+   limpia en los dos casos. Verificado tras la corrida: `roles LIKE 'qc6-tx-%'` devuelve `[]`.
+
+### Menores
+
+- **M-1.** El caso 1 del unitario prometia en su titulo una marca que no afirma (no puede: la
+  fija el adaptador, por diseno). Se quito la promesa del titulo y del comentario. En el mapa,
+  R9 pasa a `I · caso 2` + el estatico de esquema, que es donde de verdad esta cubierto.
+- **M-2.** R6 se mapeaba a "T1", que es una task, no un test: nada impedia que alguien
+  rellenara `SEED_ADMIN_PASSWORD=` en `.env.example`. Nuevo bloque en `deploy-hook.test.ts`
+  que afirma primero que las tres claves **existen** y luego que las tres estan **vacias**.
+  El mapa ya apunta ahi.
+- **M-5.** `scripts/seed.ts` instanciaba `PrismaClient` por import estatico, antes de
+  `loadDotEnv()`. No fallaba (Prisma resuelve la url perezosamente), pero el orden contradecia
+  a `scripts/db-rollback.ts`. Ahora `prisma` se carga con `import()` dinamico dentro de
+  `main()`, despues de cargar el entorno, y el `$disconnect()` vive en un `try/finally` para
+  seguir corriendo en exito y en fallo, conservando el `process.exit(1)`.
+
+### Verificacion de esta ronda (corrida por el implementer)
+
+```
+$ pnpm run typecheck                                          -> exit 0
+$ pnpm run lint                                               -> exit 0
+$ pnpm run test:guardias                                      -> 65/65,  exit 0
+$ pnpm exec vitest run tests/unit/identity/schema/ tests/unit/inventario/schema/
+                                                              -> 80/80,  exit 0
+$ pnpm exec vitest run tests/unit/identity/seed/               -> 27/27,  exit 0
+$ pnpm exec vitest run .../identity-seed.int.test.ts           -> 10/10,  exit 0
+$ pnpm exec vitest run .../identity-constraints.int.test.ts    -> 23/23,  exit 0
+$ pnpm exec vitest run .../login.int.test.ts                   -> 13/13,  exit 0
+```
+
+Los centinelas estaticos van **explicitos y por carpeta** a proposito: es la leccion de B-1,
+que el grafo no los relaciona con un cambio de esquema. `pnpm test` completo y `./init.sh` los
+corre el leader.

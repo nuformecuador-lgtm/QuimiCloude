@@ -1,8 +1,9 @@
 // T15 — Test estatico del enganche al despliegue (QC-6).
 //
 // Cubre R19 (el seed corre automaticamente en cada despliegue, encadenado en el `build`),
-// R20 (si el seed falla, el despliegue falla de forma visible: `&&`, nunca `;` ni `||`) y
-// R21 (el seed no anade ninguna dependencia nueva a `package.json`).
+// R20 (si el seed falla, el despliegue falla de forma visible: `&&`, nunca `;` ni `||`),
+// R21 (el seed no anade ninguna dependencia nueva a `package.json`) y R6 (las tres
+// `SEED_ADMIN_*` estan en `.env.example` sin ningun valor).
 //
 // Lee package.json como texto/JSON y recorre el arbol de archivos del seed; no ejecuta nada
 // (eso es T16, a mano, contra una base real).
@@ -78,6 +79,30 @@ describe('package.json — el build encadena el seed (R19, R20)', () => {
     const dbSeed = packageJson.scripts?.['db:seed']
     expect(dbSeed).toBeDefined()
     expect(dbSeed).toContain('scripts/seed.ts')
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// Bloque 1b — .env.example trae las tres claves del seed, sin ningun valor (R6)
+// ---------------------------------------------------------------------------------------
+
+const SEED_ADMIN_ENV_VAR_NAMES = ['SEED_ADMIN_USERNAME', 'SEED_ADMIN_PASSWORD', 'SEED_ADMIN_EMAIL'] as const
+
+describe('.env.example — las tres SEED_ADMIN_* sin valor (R6)', () => {
+  const envExampleText = readFileSync(join(repoRoot, '.env.example'), 'utf8')
+
+  it('las tres claves estan presentes', () => {
+    for (const name of SEED_ADMIN_ENV_VAR_NAMES) {
+      expect(envExampleText, `falta la clave ${name} en .env.example`).toMatch(new RegExp(`^${name}=`, 'm'))
+    }
+  })
+
+  it('las tres claves tienen valor vacio', () => {
+    for (const name of SEED_ADMIN_ENV_VAR_NAMES) {
+      const match = new RegExp(`^${name}=(.*)$`, 'm').exec(envExampleText)
+      expect(match, `no se encontro ${name}= en .env.example`).not.toBeNull()
+      expect((match?.[1] ?? '').trim(), `${name} no deberia traer un valor en .env.example`).toBe('')
+    }
   })
 })
 

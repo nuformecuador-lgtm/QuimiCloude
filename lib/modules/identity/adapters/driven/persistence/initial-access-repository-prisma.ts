@@ -87,10 +87,24 @@ export function createInitialAccessRepository(
 }
 
 /**
- * Instancia ya cableada con el `prisma` compartido (`lib/shared/db/prisma.ts`, la unica
- * instancia). Es lo que consume `lib/composition/index.ts`: la composicion NO puede
- * importar el cliente Prisma compartido directamente (solo un adaptador driven puede,
- * `tests/guards/guard-arquitectura-modulos.test.ts > R17`), asi que el cableado con la
- * instancia real vive aqui, dentro del propio adaptador driven.
+ * Corre `run` dentro de UNA transaccion, con un repositorio construido sobre el `tx`.
+ * Es la garantia que `design.md > 5.2` declara innegociable: si el alta del usuario
+ * falla, los roles creados en la misma corrida tampoco quedan (R13).
+ *
+ * Vive aqui y no en `lib/composition` porque el cliente Prisma compartido solo puede
+ * importarse desde un adaptador driven (guard-arquitectura-modulos, bloque 11 / R17),
+ * y no en `domain/` porque el dominio no conoce la persistencia: recibe un puerto ya
+ * construido y no sabe si hay transaccion debajo.
+ *
+ * Timeouts explicitos: el paso 3 del algoritmo hashea con bcrypt (coste 10) dentro del
+ * alcance de la llamada, y el default de 5 s de Prisma es innecesariamente justo para un
+ * `build` de despliegue en una maquina cargada.
  */
-export const initialAccessRepository: InitialAccessRepository = createInitialAccessRepository(prisma);
+export async function withInitialAccessTransaction<T>(
+  run: (repository: InitialAccessRepository) => Promise<T>,
+): Promise<T> {
+  return prisma.$transaction(
+    async (tx) => run(createInitialAccessRepository(tx)),
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+}
