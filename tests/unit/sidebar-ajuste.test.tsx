@@ -69,7 +69,13 @@ describe('barra lateral: ajuste al diseno', () => {
     renderSidebar();
 
     for (const item of PRIVATE_NAV_ITEMS) {
-      if (item.icon === undefined) continue;
+      // Se EXIGE el icono, no se salta si falta. Medido: con un `continue` cuando
+      // `item.icon === undefined`, quitar un icono del array dejaba el test en verde — el
+      // test se adaptaba al dato en vez de comprobarlo.
+      expect(
+        item.icon,
+        `el item ${item.testId} es de nivel superior y no declara icono en el array`,
+      ).toBeDefined();
 
       const entrada = screen.getByTestId(item.testId);
       expect(
@@ -195,13 +201,23 @@ describe('acento del elemento activo', () => {
     // el CSS correcto. Se ancla a principio de linea.
     const declaracionCapa = css.match(/^@layer\s+base\s*\{/m);
     const inicioCapa = declaracionCapa?.index ?? -1;
-    const posicionRegla = css.indexOf("[data-slot='sidebar-menu-button'][data-active]");
 
-    expect(posicionRegla).toBeGreaterThan(-1);
+    // TODAS las apariciones, no la primera: son tres reglas —el fondo, el `::before` y el
+    // color del icono— y con `indexOf` bastaba con que una siguiera fuera para pasar. Medido:
+    // moviendo el bloque del fondo dentro de `@layer base`, la version anterior de este test
+    // seguia en verde porque el `::before` empieza por el mismo selector.
+    const posiciones = [
+      ...css.matchAll(/\[data-slot='sidebar-menu-button'\]\[data-active\]/g),
+    ].map((coincidencia) => coincidencia.index);
+
+    expect(posiciones.length).toBeGreaterThanOrEqual(3);
     expect(inicioCapa).toBeGreaterThan(-1);
-    expect(
-      posicionRegla,
-      'la regla del acento cayo dentro de `@layer base` y perdera contra las utilidades',
-    ).toBeLessThan(inicioCapa);
+
+    for (const posicion of posiciones) {
+      expect(
+        posicion,
+        'una regla del acento cayo dentro de `@layer base` y perdera contra las utilidades',
+      ).toBeLessThan(inicioCapa);
+    }
   });
 });
