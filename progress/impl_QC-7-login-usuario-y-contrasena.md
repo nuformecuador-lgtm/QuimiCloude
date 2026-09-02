@@ -241,6 +241,22 @@ $ pnpm exec vitest run tests/integration/   (x3 seguidas)
 
 Base limpia al terminar: 0 usuarios, 0 roles (comprobado con una consulta directa, no asumido).
 
+### 4.5 E2E en navegador real, chromium y webkit
+
+```
+$ pnpm run e2e
+Running 4 tests using 4 workers
+  OK  2 [chromium] login en navegador real > con credenciales incorrectas se queda en el login, avisa y no emite sesion (9.0s)
+  OK  4 [webkit]   login en navegador real > con credenciales incorrectas se queda en el login, avisa y no emite sesion (12.1s)
+  OK  1 [chromium] login en navegador real > entra con credenciales correctas y recibe la cookie de sesion httpOnly (10.3s)
+  OK  3 [webkit]   login en navegador real > entra con credenciales correctas y recibe la cookie de sesion httpOnly (12.7s)
+  4 passed (1.6m)
+```
+
+WebKit no es decoracion: es el motor de iOS, y `context.cookies()` es la unica forma honesta de
+comprobar `httpOnly` desde fuera del navegador. Base limpia al terminar (0 usuarios, 0 roles):
+el fixture del E2E borra lo suyo.
+
 ---
 
 ## 5. Lo que la guardia NO comprueba, revisado a mano
