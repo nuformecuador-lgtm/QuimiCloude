@@ -706,6 +706,25 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[QC-19 — `P4ssw0rd!` pasa la politica]** No hay des-leetificacion ni recorte de sufijos: una
+  variante de una contrasena filtrada cuela aunque su forma base este en la lista
+  (`design.md > 4` y `> 11`). Puntuar fuerza esta fuera del alcance de la ficha; si algun dia
+  hace falta, es ficha nueva, no un parche al adaptador.
+- **[QC-19 — la lista de filtradas envejece y nadie la refresca]** Las 49 233 entradas vienen de
+  `@zxcvbn-ts/language-common@4.1.3` y solo se actualizan cuando se actualice la dependencia. No
+  hay refresco automatico y esta ficha no lo trae.
+- **[QC-19 — la guardia de R19 no comprueba el ORDEN de las llamadas]**
+  `guard-politica-de-contrasenas` es un barrido de texto: ve que un archivo que hashea referencia
+  tambien la politica, no que la llame **antes** ni que respete su resultado. Para el unico punto
+  que hoy fija una contrasena —el seed— ese hueco esta tapado por un test de comportamiento
+  (`seed-initial-access.test.ts`, "si la politica rechaza la credencial de instalacion, no se
+  hashea ni se escribe nada"). **Todo punto nuevo que fije contrasenas necesita el suyo**: la
+  guardia atrapa el olvido completo, no el orden.
+- **[QC-19 — QC-21 hereda pintar los mensajes]** El modulo exporta `CREDENTIAL_RULES` (siete
+  codigos estables, independientes del idioma) y `evaluateCredentialRules`, sincrona y usable en
+  el navegador. QC-21 pinta los requisitos a partir de ese catalogo y **no vuelve a declarar las
+  reglas**: una segunda copia es exactamente lo que la fila "la regla vive en el dominio" vino a
+  impedir.
 - **[QC-12 — E2E diferido a QC-13]** El dashboard no tiene prueba de extremo a extremo, y se
   difirió **con motivo escrito en el spec**: hoy no hay sesión real ni flujo navegable que
   visitar. Lo recoge QC-13, que es la que conecta la guardia de sesión.

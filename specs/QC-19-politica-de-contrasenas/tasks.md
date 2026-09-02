@@ -46,10 +46,10 @@ cualquier archivo que QC-6 vaya a traer.
 
 ## T0 — Preparar el worktree
 
-- [ ] `pnpm install --frozen-lockfile`, `pnpm exec prisma generate --schema db/schema.prisma`,
+- [x] `pnpm install --frozen-lockfile`, `pnpm exec prisma generate --schema db/schema.prisma`,
       `pnpm exec next typegen`, copiar `.env` (los worktrees no lo heredan; deuda conocida) con
       `DATABASE_URL` y `DIRECT_URL`.
-- [ ] Confirmar que **QC-6 está en `dev`**. Si no lo está, se para y se dice: esta ficha depende
+- [x] Confirmar que **QC-6 está en `dev`**. Si no lo está, se para y se dice: esta ficha depende
       de él y el contrato de `design.md > 7` no se puede cerrar sin su punto de llamada.
 - **Hecho cuando:** `./init.sh --rapido` sale verde **antes** de cambiar nada. Si está rojo de
   entrada, se para: no se construye sobre un gate roto.
@@ -58,13 +58,13 @@ cualquier archivo que QC-6 vaya a traer.
 
 Depende de: T0.
 
-- [ ] `CREDENTIAL_MIN_LENGTH = 8`, `CREDENTIAL_RULES`, `CredentialRule`,
+- [x] `CREDENTIAL_MIN_LENGTH = 8`, `CREDENTIAL_RULES`, `CredentialRule`,
       `CredentialPolicyResult` y `evaluateCredentialRules(candidate)` según `design.md > 2.1`.
-- [ ] Regex por **categoría Unicode** (`design.md > 3`), no listas ASCII. `max_length` reutiliza
+- [x] Regex por **categoría Unicode** (`design.md > 3`), no listas ASCII. `max_length` reutiliza
       `CREDENTIAL_MAX_LENGTH` de `domain/credentials.ts`; **no** declara un máximo nuevo.
-- [ ] Sin `trim()`, sin `normalize()`, sin `Date`, sin `Math.random`, sin imports fuera del
+- [x] Sin `trim()`, sin `normalize()`, sin `Date`, sin `Math.random`, sin imports fuera del
       propio `domain/`.
-- [ ] El resultado se ensambla recorriendo `CREDENTIAL_RULES` en orden declarado (R8).
+- [x] El resultado se ensambla recorriendo `CREDENTIAL_RULES` en orden declarado (R8).
 - **Hecho cuando:** `tests/unit/identity/credential-policy.test.ts` pasa con los casos de la
   tabla de trazabilidad para **R2–R6, R8–R13**.
 
@@ -72,9 +72,9 @@ Depende de: T0.
 
 Depende de: T0.
 
-- [ ] `BreachedCredentialList` con `includes(candidate: string): Promise<boolean>`. Parámetro
+- [x] `BreachedCredentialList` con `includes(candidate: string): Promise<boolean>`. Parámetro
       `candidate`, no `password` (`design.md > 6`).
-- [ ] Solo importa de su propio `domain/`. Nada de framework, Prisma ni la librería.
+- [x] Solo importa de su propio `domain/`. Nada de framework, Prisma ni la librería.
 - **Hecho cuando:** `pnpm run typecheck` pasa y `pnpm exec vitest run guard` sigue verde.
   **Cubre R14 (parte).**
 
@@ -82,10 +82,10 @@ Depende de: T0.
 
 Depende de: T1, T2.
 
-- [ ] `createCredentialPolicy({ breached })` en el mismo archivo del dominio: llama a
+- [x] `createCredentialPolicy({ breached })` en el mismo archivo del dominio: llama a
       `evaluateCredentialRules` y le suma `breached`. **No reimplementa ninguna regla.**
-- [ ] Comparación de la lista en minúsculas (`design.md > 4`).
-- [ ] Si el puerto lanza, el error se propaga con contexto y **sin incluir la candidata**.
+- [x] Comparación de la lista en minúsculas (`design.md > 4`).
+- [x] Si el puerto lanza, el error se propaga con contexto y **sin incluir la candidata**.
 - **Hecho cuando:** los casos de **R1, R7, R15 y R24** de la tabla pasan con un **doble** del
   puerto (sin librería y sin red).
 
@@ -93,9 +93,9 @@ Depende de: T1, T2.
 
 Depende de: T3.
 
-- [ ] `lib/modules/identity/index.ts` reexporta `CREDENTIAL_MIN_LENGTH`, `CREDENTIAL_RULES`,
+- [x] `lib/modules/identity/index.ts` reexporta `CREDENTIAL_MIN_LENGTH`, `CREDENTIAL_RULES`,
       `evaluateCredentialRules`, `createCredentialPolicy` y los tipos. **Solo de `./domain`.**
-- [ ] `lib/composition/index.ts` cablea `breachedCredentialList` y añade
+- [x] `lib/composition/index.ts` cablea `breachedCredentialList` y añade
       `checkCredentialPolicy` a la fachada (`design.md > 2.3`). Ninguna clave existente cambia
       de nombre ni de firma.
 - **Hecho cuando:** `tests/unit/identity/credential-policy-contract.test.ts` pasa (**R16, R20,
@@ -111,12 +111,12 @@ Depende de: T2. **BLOQUEANTE para T6, y solo para T6.**
 > spec se escribió sin red. Esto no es un trámite: la feature 5 llegó al PR con un algoritmo
 > escrito a mano y hubo que rehacerla entera.
 
-- [ ] Con red: `npm view @zxcvbn-ts/language-common deprecated time.modified license version` y
+- [x] Con red: `npm view @zxcvbn-ts/language-common deprecated time.modified license version` y
       las descargas semanales. Anotar los **cuatro resultados reales**.
-- [ ] Llevar el resultado al humano y esperar respuesta. Si falla algún check o el humano prefiere
+- [x] Llevar el resultado al humano y esperar respuesta. Si falla algún check o el humano prefiere
       otra cosa, **se para y se pregunta** — no se elige alternativa por cuenta propia
       (`requirements.md > Preguntas abiertas 2 y 3`).
-- [ ] Aprobada: `pnpm add <pkg>@<version>` **y** la fila en `docs/dependencias.md` con los cuatro
+- [x] Aprobada: `pnpm add <pkg>@<version>` **y** la fila en `docs/dependencias.md` con los cuatro
       checks y quién aprobó, **en el mismo cambio**. `guard-dependencias-aprobadas` es
       bidireccional: fila sin paquete es tan rojo como paquete sin fila (lección de QC-7 T11).
 - **Hecho cuando:** `pnpm exec vitest run guard` pasa entero, o queda escrito en
@@ -126,9 +126,9 @@ Depende de: T2. **BLOQUEANTE para T6, y solo para T6.**
 
 Depende de: T5 (aprobada).
 
-- [ ] `adapters/driven/security/breached-credential-list.ts`: expone `isBreachedCredential` sobre
+- [x] `adapters/driven/security/breached-credential-list.ts`: expone `isBreachedCredential` sobre
       el diccionario de la librería, cargado una sola vez (`Set` en el módulo, no por llamada).
-- [ ] Ni `console.*`, ni `process.stdout/stderr`. Único archivo del módulo que toca la librería.
+- [x] Ni `console.*`, ni `process.stdout/stderr`. Único archivo del módulo que toca la librería.
 - **Hecho cuando:** `tests/unit/identity/breached-credential-list.test.ts` pasa (**R7** contra la
   lista real) y se anota en `progress/impl_*.md` el **tamaño real** del diccionario en memoria,
   medido, no estimado (`design.md > 5.2`).
@@ -137,13 +137,13 @@ Depende de: T5 (aprobada).
 
 Depende de: T4.
 
-- [ ] `tests/guards/guard-politica-de-contrasenas.test.ts` según `design.md > 7`: barre el árbol
+- [x] `tests/guards/guard-politica-de-contrasenas.test.ts` según `design.md > 7`: barre el árbol
       de `lib/`, `app/` y `scripts/` y exige que todo archivo que produzca un hash referencie
       también la política. Exenciones por ruta exacta (`password-hash.ts`, `lib/composition/
       index.ts`, `verify-credentials.ts`), como la allowlist de `guard-password-never-plaintext`.
-- [ ] Añade la comprobación de canales de salida sobre `domain/credential-policy.ts` y el
+- [x] Añade la comprobación de canales de salida sobre `domain/credential-policy.ts` y el
       adaptador (**R24**), al estilo de `guard-password-hash-module`.
-- [ ] **Cada regla se autocomprueba sobre un fuente sintético que la viola.** Un
+- [x] **Cada regla se autocomprueba sobre un fuente sintético que la viola.** Un
       `expect(...).toEqual([])` sobre archivos que ya cumplen no demuestra que la guardia muerda
       (`docs/verification.md > Probar que muerde, no que pasa`).
 - **Hecho cuando:** la guardia pasa, y **falla de verdad** al inyectar a mano un archivo que
@@ -154,22 +154,22 @@ Depende de: T4.
 
 Depende de: T4.
 
-- [ ] Añadir a `tests/unit/identity/verify-credentials.test.ts` **un** caso: un usuario cuyo hash
+- [x] Añadir a `tests/unit/identity/verify-credentials.test.ts` **un** caso: un usuario cuyo hash
       corresponde a una contraseña que incumple la política autentica igual.
-- [ ] Afirmar que `createVerifyCredentials` **no** recibe ni llama a la política (sus deps siguen
+- [x] Afirmar que `createVerifyCredentials` **no** recibe ni llama a la política (sus deps siguen
       siendo `users`, `attempts`, `hasher`, `session`).
-- [ ] No se toca ninguna otra aserción del archivo ni el código de `verify-credentials.ts`.
+- [x] No se toca ninguna otra aserción del archivo ni el código de `verify-credentials.ts`.
 - **Hecho cuando:** el archivo pasa entero y el diff se limita a ese caso. **Cubre R17.**
 
 ## T9 — Gate completo y trazabilidad (última)
 
 Depende de: T1–T8.
 
-- [ ] `./init.sh` completo en verde, sobre el estado final (una casilla marcada con una corrida
+- [x] `./init.sh` completo en verde, sobre el estado final (una casilla marcada con una corrida
       vieja es una casilla mentirosa).
-- [ ] `progress/impl_QC-19-politica-de-contrasenas.md` con la salida real y el mapa `R<n> → test`
+- [x] `progress/impl_QC-19-politica-de-contrasenas.md` con la salida real y el mapa `R<n> → test`
       de la tabla de abajo.
-- [ ] Anotar en `progress/current.md > Deudas`: (a) `P4ssw0rd!` pasa, no hay des-leetificación;
+- [x] Anotar en `progress/current.md > Deudas`: (a) `P4ssw0rd!` pasa, no hay des-leetificación;
       (b) la lista envejece con la librería y nadie la refresca; (c) la guardia de R19 no
       comprueba el **orden** de las llamadas — el reviewer de QC-6 lo mira a mano; (d) QC-21
       hereda pintar los mensajes a partir de `CREDENTIAL_RULES`.

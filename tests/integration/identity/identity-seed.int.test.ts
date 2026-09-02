@@ -73,7 +73,10 @@ async function inRolledBackTransaction(
 // ---------------------------------------------------------------------------
 
 const FAKE_ADMIN_USERNAME = 'qc6.instalacion.test';
-const FAKE_ADMIN_CREDENTIAL = 'qc6-credencial-de-instalacion-de-prueba-no-real';
+// QC-19 R18: el marcador de instalacion de estos tests cumple la politica real
+// (mayuscula, minuscula, digito, simbolo, 8..64 y fuera de la lista de filtradas),
+// porque el seed la evalua antes de hashear. Sigue siendo evidentemente ficticio.
+const FAKE_ADMIN_CREDENTIAL = 'QC6-credencial-de-instalacion-de-prueba-no-real';
 const FAKE_ADMIN_EMAIL = 'qc6.instalacion.test@example.test';
 
 const fakeCredentialsProvider: InitialAdminCredentialsProvider = () => ({
@@ -153,6 +156,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const first = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
 
@@ -177,6 +184,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const second = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([]);
@@ -211,6 +222,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const outcome = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(outcome.createdAdmin).toBe(true);
@@ -232,6 +247,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const outcome = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(outcome.createdAdmin).toBe(true);
@@ -256,6 +275,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const first = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(first.createdAdmin).toBe(true);
@@ -280,6 +303,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const second = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([]);
@@ -305,6 +332,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const first = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(first.createdRoles.length).toBe(2);
@@ -319,6 +350,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const second = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([ROLE_OPERADOR]);
@@ -341,6 +376,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const bootstrap = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(bootstrap.createdRoles.length).toBe(2);
@@ -350,6 +389,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         seedInitialAccess({
           repository,
           passwordHasher: identity.passwordHasher,
+          checkCredentialPolicy: identity.checkCredentialPolicy,
           credentials: readInitialAdminCredentialsFromEnv,
         }),
       );
@@ -375,6 +415,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
           seedInitialAccess({
             repository,
             passwordHasher: identity.passwordHasher,
+          checkCredentialPolicy: identity.checkCredentialPolicy,
             credentials: readInitialAdminCredentialsFromEnv,
           }),
         ),
@@ -399,6 +440,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const first = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(first.createdRoles.length).toBe(2);
@@ -407,6 +452,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const second = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
+        // QC-19 R18: el seed evalua la politica antes de hashear. Aqui se le da la REAL,
+        // la misma que expone la fachada: si el marcador de instalacion de estos tests
+        // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
+        checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([]);
