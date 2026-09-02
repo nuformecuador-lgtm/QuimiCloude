@@ -631,6 +631,20 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[QC-9, ANTES de escribir `middleware.ts`] Las guardias no barren los `.ts` de la raíz del
+  repo.** `tests/guards/guard-firma-sesion-unica.test.ts` (QC-8) usa
+  `PRODUCTION_DIRS = ['lib','app','components','hooks']` y
+  `tests/guards/guard-arquitectura-modulos.test.ts` (QC-15) usa el mismo
+  `SCAN_ROOTS = ['app','components','hooks','lib']`. **Ninguna de las dos mira los archivos de
+  primer nivel**, así que un `middleware.ts` en la raíz con su propio `createHmac` pasaría en
+  verde: lo verificó el `reviewer` de QC-8 creando el archivo (2 passed) y borrándolo después.
+  R5 dice «en el repositorio», no «en `lib/`». No es una regresión de QC-8 —es la misma
+  limitación ya aceptada en la revisión de QC-15—, pero **`middleware.ts` es justo el archivo
+  que QC-9 va a crear para verificar la firma de sesión en el runtime Edge**, o sea el candidato
+  número uno a segunda implementación del HMAC, que es exactamente lo que R5 prohíbe.
+  **QC-9 debe ampliar los dos barridos a los `.ts` de primer nivel antes de escribir ese
+  archivo.** Menor 4 de `progress/review_QC-8-sesion-actual-y-logout.md`.
+
 - **El repo no tiene `.gitattributes` y eso fabrica conflictos falsos.** `core.autocrlf`
   está en `false` y los archivos conviven con fines de línea mezclados: `progress/current.md`
   está guardado en **CRLF** y `history.md`, `db/schema.prisma`, `package.json` y
