@@ -11,8 +11,27 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
+| QC-9 | proteccion-de-rutas-privadas | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-9-proteccion-de-rutas-privadas` | **esperando aprobación humana (F1.4)**. Spec congelado en `74a87d3`: 25 requisitos EARS, todos trazados; tarjeta en *En revisión*. 2 preguntas abiertas. Acotada y sembrada el mismo día: 14 decisiones cerradas, 0 preguntas abiertas. **No ocupa slot**: sigue `pending` hasta F1.3. Desbloquea a **QC-13**, que es la que hace navegable el ERP. **Toca código de QC-8, ya mergeada** — la firma migra a WebCrypto sin cambiar el formato del token |
 | QC-20 | crud-de-productos | QC-18 Inventario | backend | **spec_ready** | `feature/QC-20-crud-de-productos` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Tercera sesión de leader. **F2.0 no se ejecuta**: `depends_on` incluye QC-8, que está `pending` y sin spec, y `AGENTS.md` dice que una feature con `depends_on` no arranca hasta que su dependencia esté `done`. Por eso la ficha se queda en `spec_ready` y **la tarjeta NO se mueve a *En curso***: moverla dejaría board y disco divergentes por una fase que no ha empezado (mismo criterio que se aplicó a QC-14 el 2026-09-01). Arranca cuando QC-8 cierre. Acotada, sembrada y especificada el 2026-09-02: **23 decisiones cerradas + 37 requisitos EARS**, congelados en `21d6695` (las 5 preguntas que abrió el diseño las cerró el humano tras F1.2 y entraron como D19–D23; una cambió la posición del diseño: el tope de página pasó de 100 a 25). Sin preguntas abiertas. Tarjeta en *En revisión*. Fase 2 **bloqueada por QC-8**, que está `pending` y sin spec |
-| QC-19 | politica-de-contrasenas | QC-17 Identidad y acceso | backend | **in_progress (F2.1)** | `feature/QC-19-politica-de-contrasenas` | **F2.0 ejecutado el 2026-09-02**, cuarta sesión de leader: sus dos dependencias (QC-6, QC-7) están `done` y la zona `backend` quedó a **0** al cerrar QC-6, así que toma el primer slot. Tarjeta movida a *En curso*. Worktree resincronizado (`git merge dev` limpio, 29 commits detrás, ahora a 0), `.env` copiado, `pnpm install`, `prisma generate`, `next typegen` e `init.sh --rapido` en verde (65 guardias). **Dependencia instalada**: `@zxcvbn-ts/language-common` 4.1.3 en `03412f8` — la versión exacta que el leader verificó en los cuatro checks. `implementer` lanzado. **SPEC APROBADO por el humano el 2026-09-02** («aprueba 19»), y con él **la dependencia**: su fila ya está `aprobada` en `docs/dependencias.md`. Las dos preguntas abiertas que quedaban eran sobre esa librería y las cierra la aprobación: la ficha queda **sin preguntas abiertas**. Congelado en `f09e06b`. **F2.0 no se ejecuta y la tarjeta NO se mueve a *En curso***: espera a QC-6, mismo criterio que QC-14 y QC-20. Spec escrito el 2026-09-02 y congelado antes en `4fb8294`: 24 requisitos EARS, todos trazados; tarjeta en *En revisión*. **Aprobar el spec aprueba también una dependencia nueva** — `@zxcvbn-ts/language-common` (solo el diccionario, sin `@zxcvbn-ts/core`). El `spec_author` dejó los cuatro checks como DESCONOCIDO por no tener red; **los verificó el leader el 2026-09-02 y pasan los cuatro** (sin `deprecated`; 4.1.3 del 2026-07-16; 1.260.688 descargas/semana; MIT), anotados en `design.md > 5.2`. Al aprobar hay que añadir su fila a `docs/dependencias.md`. Quedan 2 preguntas abiertas, las dos sobre esa dependencia. **Solo fase 1**: la fase 2 espera a QC-6, que está `in_progress` en otra sesión. Escribir el spec ahora **no consume slot** (queda en `spec_ready`) y la deja lista para arrancar el día que QC-6 cierre. Ya venía sembrada por `/afinar-feature` el 2026-09-01 |
+| QC-29 | tema-claro-oscuro | QC-16 Plataforma | frontend | **pending → F1.2** | `feature/QC-29-tema-claro-oscuro` | **Ficha creada en esta sesión (2026-09-02, quinta de leader)** a partir de un diseño que el humano aprobó en canvas antes de pedir la feature. Issue `QC-29` creado en Jira bajo la épica **QC-16 Plataforma** (no es módulo de dominio: es el armazón), con labels `sdd`, `slug:tema-claro-oscuro`, `zone:frontend`, `complexity:medium`. Worktree montado con `wt.sh new` desde `origin/dev` (`dc090e0`). **`frontend` estaba a 0 `in_progress`**, así que toma slot sin competir con QC-19/QC-20/QC-24, que son todas `backend`. **No se sembró con `/afinar-feature`**: el alcance ya venía cerrado por el humano en 7 decisiones, que el leader dejó escritas en `specs/QC-29-tema-claro-oscuro/design-input-tokens.md` junto con los tokens del diseño ya convertidos a oklch. **Aprobar el spec aprueba también una dependencia nueva** — `next-themes`, elegida por el humano: tres de los cuatro checks limpios y **el cuarto no** (última publicación 2025-03-11, hace ~18 meses). `spec_author` lanzado, spec escrito el 2026-09-02 (27 requisitos, 9 decisiones, 17 tareas). **F1.4 ejecutada y la aprobación vino CON CAMBIOS: el humano rechazó `next-themes`** («No: implementación propia»), así que la ficha **vuelve a F1.2** y NO pasa a `in_progress`: el spec asumía la librería en D9, en varios requisitos y en el anti-parpadeo, y arrancar el implementer sobre eso sería implementar otra cosa. Revisión encargada al mismo `spec_author` — mecanismo propio con cookie de UI, patrón `SIDEBAR_STATE_COOKIE`. **La tarjeta NO se mueve a *En curso***. El humano sí cerró la otra pregunta abierta: el contraste 3,75:1 de `--primary-foreground` sobre `--primary` en claro **se queda** (cumple el 3:1 de AA para componentes, que es lo que es un botón) y no se añade requisito que exija AA para texto |
+| QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **pending — BLOQUEADA** | `feature/QC-30-rediseno-login` | **Ficha creada en esta sesión (2026-09-02)** a partir del canvas de login aprobado por el humano. Issue `QC-30` bajo la épica **QC-17 Identidad y acceso** (el módulo manda sobre la naturaleza del trabajo: es la pantalla de `identity`, aunque el cambio sea de presentación), labels `sdd`, `slug:rediseno-login`, `zone:frontend`, `complexity:medium`. **`depends_on: QC-29`**, con el issue link «is blocked by» ya creado en el board: se pinta con los tokens que QC-29 define, y especificarla antes sería escribir sobre tokens que no existen. **No se monta worktree ni se lanza `spec_author`** hasta que QC-29 esté `done` (`AGENTS.md`: una feature con `depends_on` no arranca). El material de diseño está sembrado en `specs/QC-30-rediseno-login/design-input-login.md`: vidrio, burbujas y las cinco medidas que difieren de `components/ui/` |
+
+La feature **QC-8 — sesion-actual-y-logout** se cerró el 2026-09-02 (PR #13, merge `dc090e0`):
+la llevó **otra sesión de leader**. Su tarjeta ya estaba en *Finalizado* y el PR mergeado, pero la
+ficha seguía `pending` en `feature_list.json` y eso **bloqueaba a QC-20** por `depends_on`. Se pasa
+a `done` aquí, por decisión humana del 2026-09-02. Su worktree ya no está montado. El resumen en
+`history.md` le corresponde a la sesión que la implementó.
+
+La feature **QC-19 — politica-de-contrasenas** se cerró el 2026-09-02 (PR #14, merge
+`11664e1`): resumen en `progress/history.md`, worktree desmontado y rama borrada. `wt.sh done`
+volvió a fallar a medias en Windows, igual que en QC-6 —desregistra el worktree pero no borra
+`node_modules`—; rematado con `rmdir /s /q` + `git worktree prune`. El PR llegó **CONFLICTING**
+porque `origin/dev` había avanzado 24 commits con el merge de QC-8: conflictos en
+`lib/composition/index.ts` (unión mecánica, el cuerpo ya mergeado determinaba los imports) y en
+este archivo (unión de deudas). El tercero **no vino marcado**: git auto-mergeó `feature_list.json`
+dejando **QC-23 duplicada** —las dos sesiones importaron la misma ficha en sitios distintos del
+array— y eso lo cazó `./init.sh`, no el merge. Gate completo con las dos features juntas:
+46 archivos, 478 tests.
 
 La feature **QC-12 — dashboard-en-blanco** se cerró el 2026-09-02 (PR #12, merge `b154fa9`):
 resumen en `progress/history.md`. Ciclo completo en una sesión y **la primera feature puramente
@@ -21,6 +40,14 @@ desmontar con `wt.sh done`** (el mismo fallo de Windows que quedó documentado a
 vez el mismo día): se desregistró pero dejó el árbol en disco, y se remató a mano con `rm -rf` +
 `git worktree prune`, sabiendo que lo único sin versionar eran `node_modules`, `.env` y
 `tsconfig.tsbuildinfo`. Rama local borrada.
+
+La feature **QC-24 — modelo-recetas** se cerró el 2026-09-02 (PR #15, merge `81e3ffc`):
+resumen en `progress/history.md`, worktree desmontado y rama borrada. Primera feature de la
+épica **QC-27 Recetas** y primer módulo hexagonal creado desde cero. El `reviewer` **rechazó dos
+veces** antes del OK, y las tres rondas las resolvió midiendo por mutación. De paso acotó **cinco
+aserciones de QC-14 y QC-19** que afirmaban el censo global del repo, más un sexto fallo escondido
+(un barrido que leía los comentarios del esquema). `wt.sh done` volvió a fallar en Windows —
+tercera vez el mismo día— y se remató con `rm -rf` + `git worktree prune`.
 
 Worktrees: `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
 `.worktrees/fix-login-field-control-uncontrolled` (SAFE, desmontable). Los de QC-15 y QC-14 se
@@ -77,6 +104,125 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
 
+### QC-21 — ayuda-visual-de-contrasena (2026-09-02)
+
+- `zone: frontend`, `complexity: medium`. La description es UI pura («ver los requisitos», «a
+  medida que escribe») y las reglas ya existen probadas en QC-19: aquí no hay nada de backend.
+  No es `low` porque son varios archivos con estado vivo y siete reglas que pintar. Labels
+  `zone:frontend` y `complexity:medium` escritos en el issue.
+- **Acotada con `/afinar-feature` el 2026-09-02.** Las decisiones cerradas y lo que queda abierto
+  viven en `specs/QC-21-ayuda-visual-de-contrasena/requirements.md`; no se copian aquí.
+- **La acotación descubrió que la ficha no tenía dónde vivir**: hoy **ninguna pantalla fija o
+  cambia una contraseña** —el login solo verifica—, así que el componente nacía sin consumidor.
+  Decisión humana: se construye igual, y se creó en el board **QC-36 — cambiar-mi-contrasena**
+  (épica QC-17, `zone: fullstack`, *is blocked by* QC-21) como su primer consumidor. QC-36 cierra
+  además un agujero abierto: `must_change_credential` lo escribe el seed de QC-6 y **no lo lee
+  nadie**, o sea que el usuario inicial nace obligado a cambiar su contraseña y no tiene por dónde.
+- La acotación **cambió el alcance**, así que se reescribió la `description` en el issue QC-21
+  antes de sembrar, y se le añadieron los labels `sdd` y `slug:` que le faltaban del contrato.
+  `zone` y `complexity` no cambiaron.
+
+### Épica nueva: QC-31 — Pedidos, y sus fichas (2026-09-02, decisión humana)
+
+- El humano pidió la épica de pedidos con «el modelo, el crud y el front». Se creó **QC-31 —
+  Pedidos** y salieron **cuatro** fichas, no tres: **QC-33** modelo-pedidos (`backend`,
+  `medium`), **QC-34** crud-de-pedidos (`backend`, `high`), **QC-35** pantalla-de-pedidos
+  (`frontend`, `complexity` sin evaluar hasta acotarla, igual que QC-26), y **QC-32**
+  modelo-unidades.
+- **QC-32 no cuelga de QC-31** (nació bajo QC-18 Inventario y el 2026-09-02, al acotarla, se movió a la épica nueva QC-37 — Catálogos), y es la ficha que la conversación
+  descubrió: el humano decidió que la unidad separada es un **catálogo compartido**, así que
+  reemplaza el texto libre `Product.unit` y la unidad anotativa de la línea de receta. Eso la
+  saca del alcance de pedidos — toca inventario y recetas — y la convierte en dependencia de
+  QC-33. Bloqueada por **QC-24**, que hoy está `in_progress` y está creando esas líneas de
+  receta: tocar su columna antes de que cierre es colisión segura.
+- Las otras tres decisiones humanas, tomadas antes de escribir las fichas: **un pedido es una
+  sola línea** (receta, cantidad, precio, unidad) y no cabecera con ítems; **el precio de venta
+  se escribe a mano** en el pedido, así que la receta *no* gana columna de precio y QC-24 no se
+  toca por esto; y el pedido lleva además **fecha de solicitud**, **prioridad** (opcional, baja
+  por defecto, conjunto cerrado y ordenado: baja/media/alta/crítica), **estado** (pendiente, en
+  curso, entregado) y **autoría** creó/modificó.
+- **Modelos en inglés** (`Unit`, `Order`), como manda la convención de `db/schema.prisma`.
+- Lo que queda abierto y se cierra con `/afinar-feature`, no aquí: qué se hace con los textos
+  libres de unidad ya guardados (QC-32), la forma técnica de los dos conjuntos cerrados —
+  catálogo tipo `DocumentType` o enum — y las transiciones válidas de estado (QC-33), y **qué
+  rol puede qué** sobre pedidos (QC-34), que es lo que decide también quién ve la pantalla.
+- `depends_on` por issue links «is blocked by»: QC-32 ← QC-24; QC-33 ← QC-32, QC-24;
+  QC-34 ← QC-33, QC-8; QC-35 ← QC-34. Ninguna arranca todavía: las cuatro nacen `pending` en
+  Backlog y el cupo de `in_progress` no se mueve.
+
+### QC-32 — modelo-unidades (acotada el 2026-09-02)
+
+- El alcance y las **19 decisiones cerradas** viven en
+  `specs/QC-32-modelo-unidades/requirements.md` — esa es la fuente, aquí solo se enlaza.
+  Quedan **3 preguntas abiertas**.
+- **La decisión que cambia el mapa: `unidades` es un módulo hexagonal propio**, no parte de
+  `inventario`. Inventario, recetas y pedidos lo consumen por su contrato público. Como la
+  frontera de la épica es la del módulo (`docs/jira.md`), se creó la épica **QC-37 —
+  Catálogos** y la ficha se movió allí desde QC-18.
+- **Reabre la pregunta abierta n.º 1 del dominio**, que QC-14 cerró el 2026-09-01 como texto
+  libre asumiendo a conciencia el coste de normalizar después. `docs/architecture.md` queda
+  actualizado: ya no es «texto libre», es este catálogo.
+- Board actualizado **antes** de sembrar: `parent` → QC-37, `complexity: medium → high` (ya no
+  es una tabla: es un módulo nuevo, su seed, y alterar dos tablas ajenas) y `description`
+  reescrita con lo acordado.
+- **Dos fichas nuevas** que descubrió el «Lo que NO entra»: **QC-38 — CRUD de unidades**
+  (`backend`, *is blocked by* QC-32) y **QC-39 — Pantalla de unidades** (`frontend`, *is blocked
+  by* QC-38). El humano pidió una sola ficha «CRUD + pantalla»; se partió en dos porque una
+  evaluaría como `fullstack` y `AGENTS.md` obliga al leader a partirla igual en F1.0. Nacen
+  `pending` en Backlog y **no se siembran**.
+- Sin esas dos fichas el catálogo era **inadministrable**: sin pantalla, la única forma de crear
+  una unidad sería el seed. Por eso el seed arrancador (kg, g, L, mL, unidad) entra en QC-32 y no
+  se difiere.
+
+### QC-30 — rediseno-login (ficha creada en esta sesión, 2026-09-02)
+
+- **`zone: frontend`, `complexity: medium`.** Es una pantalla y su hoja de estilo: sin
+  migración, sin endpoint, sin tocar la Server Action. Medium y no low porque toca cuatro
+  archivos, dos efectos nuevos (vidrio y animación) y una decisión de alcance sobre
+  `components/ui/`.
+- **`epic: QC-17` y no `QC-16`.** La épica agrupa por **módulo**, no por naturaleza del
+  trabajo (`docs/jira.md`): el login es la pantalla de `identity`, aunque lo que cambia sea
+  presentación. QC-29 fue a Plataforma porque el tema es armazón transversal; esta no.
+- **`depends_on: QC-29`, y es una dependencia real, no de cortesía.** Los dos rediseños
+  escriben `app/globals.css`. Si corrieran en paralelo serían dos features de la misma zona
+  con intersección de archivos, que es justo lo que bloquea
+  `AGENTS.md > Paralelismo`. Además el login se pinta **con** los tokens de QC-29: sin ellos
+  no hay nada que aplicar.
+- **La decisión que hereda, no que toma:** subir campos y botón a 44 px sin editar
+  `components/ui/`. QC-29 ya resolvió el mismo problema para la barra lateral (reglas en
+  `globals.css` **fuera** de `@layer`, porque dentro de `@layer base` pierden contra las
+  utilidades y el test sale verde en falso). El spec de QC-30 sigue ese precedente o lo
+  contradice por escrito.
+- **Aviso que el spec debe recoger:** subir el input a 44 px por regla global cambia **todos**
+  los inputs de la aplicación, no solo los del login.
+- **No se sembró `requirements.md`.** Lo sembrado es material de diseño
+  (`design-input-login.md`); la ficha se acota cuando le toque, no ahora.
+
+### QC-29 — tema-claro-oscuro (ficha creada en esta sesión, 2026-09-02)
+
+- **`zone: frontend`.** La description dice «esquema de color», «barra lateral», «control en el
+  encabezado»: señales de frontend según la tabla de `AGENTS.md`. No hay migración, ni endpoint,
+  ni RLS. **No es `fullstack` aunque toque `app/layout.tsx`**: ese archivo es el armazón de UI,
+  no una capa de datos, y partirla en dos features solo crearía dos fichas peleándose por
+  `globals.css`.
+- **`complexity: medium`.** Varios archivos (`globals.css`, layout raíz, provider, control del
+  encabezado, tests) y una dependencia nueva, pero sin lógica condicional profunda ni integración
+  externa. No es `low` (no es un archivo) ni `high` (no hay webhooks ni multi-feature).
+- **Una sola ficha y no dos** (decisión humana del 2026-09-02): los tokens de color y el
+  conmutador tocan los mismos archivos. Partirlos daría intersección de archivos entre dos
+  features de la misma zona, que es exactamente lo que la validación de conflicto de
+  `AGENTS.md > Paralelismo` bloquea.
+- **El origen no es el board, es un diseño.** El humano aprobó el canvas primero y pidió la
+  feature después; la ficha se creó en Jira **antes** de tocar el JSON, para no invertir el orden
+  que exige `docs/jira.md`. La description del issue la redactó el leader en nombre del humano
+  con su sí explícito, como hace `/afinar-feature`.
+- **Pregunta que el spec debe dejar abierta, no resolver:** los `--chart-*` siguen siendo cinco
+  grises y no hay ninguna gráfica en el repo. Re-colorearlos sin consumidor es inventar (regla 6
+  de `CLAUDE.md`).
+- **Decisión que el spec sí debe tomar explícitamente:** si las medidas del diseño (item de 44 px,
+  panel de 272 px, degradado) entran en esta ficha, porque tocan `components/ui/sidebar.tsx`, que
+  es shadcn sin editar.
+
 ### QC-24 — modelo-recetas (acotada el 2026-09-02)
 
 - El alcance y las **18 decisiones cerradas** viven en `specs/QC-24-modelo-recetas/requirements.md`
@@ -90,6 +236,28 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   módulo nuevo con su cableado) y `description` ampliada con las columnas de auditoría, que
   **las crea esta ficha** y no el CRUD — a diferencia de QC-14/QC-20, donde la auditoría se decidió
   cuando el modelo ya estaba mergeado.
+
+### QC-9 — proteccion-de-rutas-privadas (evaluada y acotada el 2026-09-02)
+
+- **F1.0:** `zone: backend` —crea `middleware.ts`, no toca ni una pantalla— y `complexity: high`,
+  **no por tamaño sino por el runtime**: el middleware corre en el borde, donde no existe
+  `node:crypto`, y la sesión de QC-8 se firma justo con eso. Labels escritas en el board.
+- El alcance y las **14 decisiones cerradas** viven en
+  `specs/QC-9-proteccion-de-rutas-privadas/requirements.md`. **Sin preguntas abiertas.**
+- **La decisión que agranda la ficha: la firma migra a WebCrypto**, para que siga habiendo **una
+  sola** implementación del HMAC (R5 de QC-8) y el middleware pueda validar de verdad. Eso
+  significa **tocar código de QC-8, que ya está mergeada**. La restricción que lo hace seguro la
+  puso el humano: **el formato del token no cambia**, así que las sesiones emitidas siguen
+  valiendo y los tests de QC-8 deben seguir verdes byte a byte.
+- **Dos encargos que esta ficha arrastra y que el spec no puede olvidar:** ampliar
+  `PRODUCTION_DIRS` y `SCAN_ROOTS` a los `.ts` de primer nivel **antes** de escribir
+  `middleware.ts` (hoy un `createHmac` en la raíz pasa el gate en verde), y **actualizar
+  `docs/architecture.md > Permisos y autenticacion`**, que dice que el middleware «verifica
+  existencia de cookie» — lo que esta ficha deja de ser cierto, y es el documento con el que el
+  reviewer juzga.
+- Board actualizado **antes** de sembrar: `description` reescrita con la migración de la firma, la
+  protección por convención, la vuelta a la ruta pedida y el desvío a dashboard por falta de
+  permiso.
 
 ### Épica nueva: QC-27 — Recetas (2026-09-02, decisión humana)
 
@@ -720,6 +888,45 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[arnés — tests de feature que afirman el censo GLOBAL del repo. Encargo del humano el
+  2026-09-02: proponer la regla por `/afinar-regla` al cerrar QC-24.]** Tres features distintas
+  han escrito aserciones del tipo «mi feature añade exactamente N modelos / N migraciones»
+  comprobando **todo** el esquema o **todo** `db/migrations/`. Pasan el día que se escriben y
+  ponen en rojo a la feature siguiente, que no tiene culpa. **Cuatro casos reales, todos del
+  2026-09-02**, y los cuatro los tuvo que acotar QC-24:
+  - `tests/unit/inventario/schema/inventario-schema.test.ts` (QC-14): enumeraba todos los modelos
+    del esquema, y exigía `inventario/domain/` vacía con el barrel literal `export {};` — que es
+    justo lo que QC-24 cambia por diseño.
+  - `tests/unit/identity/credential-policy-contract.test.ts` (QC-19): `expected [Array(7)] to
+    deeply equal [Array(5)]` (modelos) y `expected […(5)] to deeply equal […(4)]` (migraciones).
+  **Lo que agrava el patrón:** esos tests leen las fuentes **del disco** en vez de importarlas, así
+  que `vitest related` no los engancha y **`./init.sh --rapido` no los corre**. El fallo aparece
+  tarde, en el gate completo de otra persona, y parece un problema de quien llega.
+  **Forma de la regla, a afinar:** un test de feature mide lo que **su** feature garantiza sobre sí
+  misma; si su aserción se rompe cuando llega la feature siguiente, estaba midiendo el repo. El
+  criterio que ya funcionó dos veces: contar por `/// @module`, o afirmar sobre el **diff de la
+  feature**, en vez de sobre el censo global. Ambas acotaciones las validó el reviewer por
+  mutación y quedaron **más** estrictas que el original, no más laxas.
+
+- **[board — QC-29 entró sin F0 completo (2026-09-02)]** La ficha se creó en Jira y se añadió a
+  `feature_list.json` **de forma incremental**, sin regenerar el archivo entero desde el board como
+  manda F0. Fue deliberado: el árbol tenía cambios sin commitear (`feature_list.json`,
+  `progress/current.md`, `specs/QC-24-modelo-recetas/` sin trackear) y una regeneración completa a
+  media sesión los habría pisado. Es el mismo alcance acotado con que `/afinar-feature` escribe en
+  el JSON («solo las fichas que acaba de tocar»). **Pendiente: correr F0 completo al abrir la
+  próxima sesión**, que reconciliará QC-29 con el resto del board.
+
+- **[board — dos empujones a Jira quedaron sin hacer por el MCP caído (2026-09-02)]** El servidor
+  `atlassian` dejó de responder a media sesión: dos llamadas abortaron por timeout (120 s y 300 s).
+  Quedan pendientes, **los dos sobre QC-24**: (1) el **comentario** de F1.3 con el detalle del spec
+  y la ruta de `specs/QC-24-modelo-recetas/`, y (2) la **transición de la tarjeta a *En curso***
+  tras la aprobación humana del 2026-09-02 (F2.0). El disco **sí** está al día: la ficha está
+  `in_progress` en `feature_list.json` y el ciclo no depende de Jira (regla 3 de `CLAUDE.md`, el
+  gate corre sin red). Pero mientras no se empujen, **el board dice *En revisión* y el disco dice
+  `in_progress`**, y el próximo F0 vería una feature `in_progress` cuya tarjeta está en otra
+  columna: eso NO se degrada (`docs/jira.md > Si Jira y el disco divergen`, excepción 1), así que
+  el disco gana y hay que mover la tarjeta a mano.
+
 - **[QC-19 — el despliegue en un entorno nuevo falla si la `SEED_ADMIN_*` no cumple la politica]**
   Consecuencia querida de R18 y prevista en `design.md > 7.2`, pero conviene leerla aqui **antes**
   de desplegar: desde esta ficha, el seed de instalacion evalua la politica antes de hashear, asi
@@ -768,36 +975,48 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   corre, así que no es un agujero de merge, pero sí del modo rápido. La salida que sugiere el
   reviewer: nombrarlas `guard-…` o moverlas a `tests/guards/`, que el modo rápido corre siempre.
   Entra por `/afinar-regla`.
-- **[arnés — CONFIRMADO Y AGRAVADO en QC-20: dos gates rápidos EN VERDE sobre una rama ROJA]**
-  Evidencia concreta del 2026-09-02, que eleva la deuda anterior de «puede no correrlo» a «no lo
-  corrió, y nadie se enteró durante dos grupos de trabajo».
-  `tests/unit/identity/credential-policy-contract.test.ts` › `esta feature no anade migraciones ni
-  columnas` (alcance de QC-19, su R21) **llevaba rojo desde la task T2 de QC-20**, porque enumeraba
-  las cuatro migraciones existentes y QC-20 añadió la quinta. Pasó por debajo de **dos
-  `./init.sh --rapido` que el leader dio por verdes**. Se descubrió por casualidad, porque al
-  implementer le exigió a un subagente correr `tests/unit/` y `tests/ui/` **enteros** en una task
-  que tocaba un contrato compartido.
-  **El mecanismo exacto, que es lo que hay que arreglar:** un test es invisible para `--rapido`
-  cuando cumple las dos condiciones a la vez —(1) **no** vive en `tests/guards/` ni se llama
-  `guard-…`, así que `pnpm run test:guardias` no lo recoge; y (2) afirma sobre el **árbol de
-  archivos** (`readdirSync`, `existsSync`, leer SQL de `db/migrations/`) en vez de importar lo que
-  vigila, así que **ningún grafo de imports lo selecciona jamás**—. No es que «pueda» fallar la
-  selección: es que **por construcción nunca lo selecciona**.
-  **Y son justo los tests que más se rompen:** los que afirman sobre el árbol son los que vigilan
-  **alcance** («esta feature no añade X»), o sea los que la *siguiente* feature invalida por
-  definición. El patrón mordió **tres veces el mismo día**: el test de alcance de QC-14 (Grupo A de
-  QC-20), éste de QC-19 (Grupo C), y `tests/unit/inventario/schema/inventario-schema.test.ts`, que
-  QC-20 y QC-24 estrecharon **a la vez, por separado y sobre las mismas líneas**.
-  **Salida probable para `/afinar-regla`:** que `scripts/test-rapido.mjs` incluya **siempre** los
-  tests que barren el árbol, igual que ya incluye todas las guardias — seleccionándolos por un
-  patrón detectable (uso de `readdirSync`/`existsSync`/lectura de `db/migrations/`) o exigiendo que
-  vivan en `tests/guards/`. Mientras no exista, **la regla de trabajo es correr `tests/unit/` y
-  `tests/ui/` enteros al cerrar cada grupo**, que es lo que destapó éste.
-  **Segunda lección, sobre cómo se escriben esos tests:** un test de alcance **no debe enumerar lo
-  que hacen las demás features**. `expect(directorios).toEqual([...las cuatro migraciones...])` es
-  un censo, y un censo es una bomba con temporizador que estalla en la siguiente feature con
-  migración. Se afirma sobre el **contenido** («ninguna migración añade columnas de historial de
-  contraseñas»), no sobre el **recuento**. Decisión del leader en QC-20, aplicada al test de QC-19.
+- **[arnés — QC-20 aporta la evidencia que faltaba: DOS gates rápidos EN VERDE sobre una rama ROJA]**
+  Complementa la entrada de arriba y la de los tests de alcance; no la repite. Lo nuevo es que aquí
+  el fallo **no apareció tarde en el gate de otro**: no apareció **en absoluto** durante dos grupos
+  de trabajo. `tests/unit/identity/credential-policy-contract.test.ts` › `esta feature no anade
+  migraciones ni columnas` llevaba rojo **desde la task T2 de QC-20**, y el leader corrió y dio por
+  buenos **dos `./init.sh --rapido`** en ese intervalo. Se descubrió por casualidad, porque el
+  implementer exigió a un subagente correr `tests/unit/` y `tests/ui/` **enteros** en una task que
+  tocaba un contrato compartido.
+  **El mecanismo, en dos condiciones que se dan a la vez:** (1) el test **no** vive en
+  `tests/guards/` ni se llama `guard-…`, así que `pnpm run test:guardias` no lo recoge; y (2)
+  afirma sobre el **árbol de archivos** en vez de importar lo que vigila, así que **ningún grafo de
+  imports lo selecciona jamás**. No es que la selección *pueda* fallar: por construcción **nunca**
+  lo selecciona. Las dos condiciones juntas lo hacen invisible para el modo rápido **entero**.
+  **Regla de trabajo mientras no se arregle**, adoptada por QC-20 a partir del Grupo C: correr
+  `tests/unit/` y `tests/ui/` **enteros** al cerrar cada grupo, además del gate del leader. Es lo
+  que destapó éste. La salida de fondo sigue siendo la de arriba: que `scripts/test-rapido.mjs`
+  incluya siempre los tests que barren el árbol, igual que ya incluye todas las guardias.
+- **[arnés — coordinación entre sesiones paralelas: hoy funcionó por suerte, no por regla]**
+  Acordada entre la sesión de QC-20 y la de QC-24, con **dos casos contrastados el 2026-09-02**
+  que salieron distinto precisamente por esto:
+  - `tests/unit/inventario/schema/inventario-schema.test.ts` — las dos features acotaron **el mismo
+    test de alcance sin hablarlo**. Acabó en conflicto de contenido resuelto por unión, y con una
+    **incompatibilidad real** de por medio: dos aserciones de la versión de QC-24 que QC-20 no
+    puede cumplir por diseño (`adapters/driving` vacía, y «todo export del contrato es
+    `export type`»), porque QC-20 es justo la ficha que añade Server Actions y publica factories.
+  - `tests/unit/identity/credential-policy-contract.test.ts` — **se habló antes**, no se tocó dos
+    veces, y salió una aserción **mejor que la que tenía cualquiera de las dos features por
+    separado**. Coste: tres mensajes.
+  **Forma propuesta:** cuando una feature vaya a acotar un test de alcance de otra, o a escribir
+  dentro de un módulo ajeno, **se avisa a quien la lleva antes de tocarlo**. No es regla de código,
+  es de coordinación, y este repo corre dos y tres sesiones a la vez **por diseño**.
+  **El matiz sin el cual la regla no sirve:** el aviso previo solo es barato **si hay a quién
+  avisar**. Hoy funcionó porque había dos sesiones hablándose. La regla escrita tiene que decir
+  **dónde se deja el aviso cuando no hay nadie escuchando**: `progress/current.md > Conflictos
+  pendientes` existe exactamente para eso y **hoy no lo usó ninguna de las dos sesiones**. Sin ese
+  destino, la regla se cumple solo cuando hay suerte.
+  **Y engancha con el punto único de composición:** `lib/composition/index.ts` ha salido como
+  conflicto en **todas las parejas backend del día** (QC-6/QC-8, QC-19/QC-20). Un punto único de
+  cableado es correcto arquitectónicamente, pero **serializa de facto la zona backend**, lo que
+  contradice la regla del arnés que permite dos features en paralelo por zona. QC-24 se libró
+  **solo** porque dejó su cableado para QC-25 — o sea, por reparto de alcance, no porque el
+  problema no exista. Va a `/afinar-regla`; no se parchea a mano.
 - **[QC-12 — la verificación visual multiplataforma no la hizo nadie con ojos]** No hay navegador
   con emulación de dispositivo en este entorno. Lo verificado es el HTML servido y jsdom a 375 y
   1280 px, más las guardias de que no hay alto de viewport fijo, ni `:hover`, ni controles. El

@@ -38,3 +38,9 @@ export { createCreatePresentation, type CreatePresentationDeps } from './domain/
 export { createUpdatePresentation, type UpdatePresentationDeps } from './domain/update-presentation';
 export { createDeletePresentation, type DeletePresentationDeps } from './domain/delete-presentation';
 export { createListPresentations, type ListPresentationsDeps } from './domain/list-presentations';
+
+// --- Costura hacia otros modulos, aportada por QC-24 ---------------------------------
+// Publica SOLO TIPOS: es por donde `recetas` apunta a un producto sin tocar la tabla
+// `products` ni el cliente Prisma. La implementacion de `ProductCatalog` es un adaptador
+// driven de ESTE modulo y su cableado vive en `lib/composition`; las trae QC-25.
+export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';

@@ -13,8 +13,8 @@
 //
 // Cubre R1, R3, R4, R5, R6, R7, R8, R10, R11, R12, R13, R14, R16, R17, R18, R19, R20, R23.
 
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
@@ -43,7 +43,7 @@ const rawSchema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8')
 function stripComments(source: string): string {
   return source
     .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
+    .map((line) => line.replace(/\/\/.*/, ''))
     .join('\n')
 }
 
@@ -149,16 +149,37 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
   it('el esquema declara exactamente dos modelos nuevos: Presentation y Product', () => {
     // R3: una sola entidad de producto. Ninguna tabla separada de «elemento de inventario».
+    //
+    // ACOTADO EL 2026-09-02 POR QC-24 (`specs/QC-24-modelo-recetas/`). Este caso enumeraba
+    // los modelos del esquema ENTERO y exigia que fueran exactamente los cinco que habia el
+    // dia que se escribio. Eso no es lo que R3 pide —R3 habla de la entidad de producto— y
+    // convertia en rojo a cualquier feature posterior que anadiera un modelo: QC-24 anadio
+    // `Recipe` y `RecipeLine`, que son de `recetas` y no tienen nada que ver con esta ficha.
+    // Un test que se rompe cuando llega la feature siguiente estaba midiendo el repo, no su
+    // feature. Se acota a lo que QC-14 garantiza SOBRE SI MISMA: cuantos modelos declara
+    // `inventario`, que los de `identity` siguen ahi sin adoptar, y que la entidad separada
+    // que la decision cerrada 1 fusiono no existe en ninguna parte del esquema. No se relaja
+    // ninguna de esas tres: se relaja el censo global, que no era un requisito.
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
       .sort()
-    expect(modelNames).toEqual(['DocumentType', 'Presentation', 'Product', 'Role', 'User'].sort())
 
-    const inventarioModels = modelNames.filter(
-      (name) => name === 'Presentation' || name === 'Product',
-    )
+    // Los modelos que declara `inventario`, leidos de su `/// @module` (mismo criterio que
+    // el caso de R20). Son DOS: la unica entidad de producto y su catalogo de presentacion.
+    const inventarioModels = [
+      ...rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g),
+    ]
+      .filter(([, moduleName]) => moduleName === 'inventario')
+      .map(([, , modelName]) => modelName)
+      .sort()
+    expect(inventarioModels).toEqual(['Presentation', 'Product'])
     expect(inventarioModels).toHaveLength(2)
+
+    // Los tres de `identity` siguen existiendo: esta feature no los toco ni los absorbio.
+    for (const owned of ['DocumentType', 'Role', 'User']) {
+      expect(modelNames, `el modelo ${owned} no debe desaparecer`).toContain(owned)
+    }
 
     // Nada que huela a la entidad separada que la decision cerrada 1 fusiono.
     for (const forbidden of ['InventoryItem', 'Inventory', 'StockItem', 'Item']) {
@@ -483,6 +504,101 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // le da contenido — Server Actions en `adapters/driving/`, logica en `domain/` y
     // re-exports en el contrato (R23... y sobre todo R31/R34 de QC-20). Esas tres
     // afirmaciones ahora viven, adaptadas, en `tests/unit/inventario/scope.test.ts`.
+    //
+    // ACOTADO EL 2026-09-02 POR QC-24 (`specs/QC-24-modelo-recetas/design.md > 5.2`). Aqui
+    // habia dos aserciones mas: que `domain/` estuviera VACIA y que el barrel fuera
+    // literalmente `export {};`. Ninguna de las dos esta en R23, que enumera «operacion de
+    // alta, consulta, edicion o borrado, adaptador driving, ruta, Server Action o pantalla»
+    // — y un contrato de SOLO TIPOS no es ninguna de esas cosas: desaparece al compilar y no
+    // ejecuta nada. Eran un retrato del repo del dia que se escribio el test, no un
+    // requisito, y QC-24 tuvo que publicar `ProductCatalog` desde `inventario/domain/` justo
+    // para que `recetas` pudiera apuntar a un producto SIN tocar su tabla (R18 de QC-24).
+    // Lo que R23 si vigila se conserva y se hace explicito: el contrato de `inventario` no
+    // expone ninguna operacion ejecutable.
+    const moduleDir = join(repoRoot, 'lib', 'modules', 'inventario')
+    const contract = stripComments(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
+    // Nada de servidor: el barrel no puede ser un Server Action ni arrastrarlo.
+    expect(contract).not.toMatch(/['"]use server['"]/)
+    // El barrel solo reexporta de `./domain`; nunca un adaptador, que es por donde entraria
+    // una operacion de alta/consulta/edicion/borrado (`docs/architecture.md > Modulos`).
+    for (const reexport of contract.matchAll(/export\s[^;]*?\sfrom\s+'([^']+)'/g)) {
+      expect(reexport[1], 'el contrato de inventario solo reexporta de ./domain').toMatch(
+        /^\.\/domain\//,
+      )
+    }
+
+    // La asercion original de QC-24 exigia que TODO export del contrato fuera `export type`.
+    // QC-20 publica nueve factories (R31/R34) desde ese mismo barrel, asi que tal cual es
+    // imposible de cumplir. Lo que QC-24 protegia no era la FORMA del contrato: era que
+    // NINGUN OTRO MODULO dependiera del runtime de `inventario` — que `recetas` pueda
+    // referirse a un producto sin arrastrarse la implementacion. Eso sigue importando, y esta
+    // version lo vigila de forma directa: **todo import del BARREL `@/lib/modules/inventario`
+    // hecho desde fuera de `lib/composition/` debe ser `import type`** -o sea desde otro
+    // modulo, desde `app/`, desde `components/` o desde `hooks/`-.
+    //
+    // Por que el ambito llega hasta la UI y no se queda en `lib/modules/**` (matiz aportado
+    // por la sesion de QC-24): la guardia hexagonal NO tapa este hueco por dos sitios a la vez.
+    // Su bloque 5 permite expresamente importar el barrel de otro modulo, runtime incluido; y
+    // su R13 impide que `app/`, `components/` y `hooks/` importen `domain`, `ports` o `driven`
+    // de un modulo, pero **les permite el contrato**. Sin esta asercion, un Server Component
+    // podria importar una factoria de `inventario` del barrel y saltarse `lib/composition`,
+    // que es el punto UNICO de cableado (`tests/guards/guard-arquitectura-modulos.test.ts`,
+    // linea ~618 y bloque 8).
+    //
+    // Dos exenciones deliberadas:
+    //   1. `lib/composition/**`, que es el unico sitio legitimo que necesita las factories en
+    //      runtime para atar puerto a adaptador;
+    //   2. las SUBRUTAS del modulo. El patron exige comilla de cierre justo tras
+    //      `inventario`, asi que compara el especificador EXACTO y no por prefijo: un
+    //      `@/lib/modules/inventario/adapters/driving/...` es una Server Action y la UI la
+    //      importa en runtime a proposito (`docs/architecture.md > Server Actions vs Route
+    //      Handlers`). Marcarla seria prohibir justo el patron que el arnes prescribe.
+    //
+    // Comprobado el 2026-09-02: hoy NINGUN import del barrel exacto existe fuera de
+    // `lib/composition/`, y los cuatro imports que la UI hace hacia modulos son o Server
+    // Actions por subruta o ya `import type`. La regla codifica la practica real.
+    function allTypeScriptFiles(dir: string): readonly string[] {
+      if (!existsSync(dir)) return []
+      const files: string[] = []
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name)
+        if (entry.isDirectory()) files.push(...allTypeScriptFiles(full))
+        else if (entry.isFile() && /\.tsx?$/.test(entry.name)) files.push(full)
+      }
+      return files
+    }
+
+    const modulesDir = join(repoRoot, 'lib', 'modules')
+    const inventarioDir = join(modulesDir, 'inventario') + sep
+    const composicionDir = join(repoRoot, 'lib', 'composition') + sep
+    // Especificador EXACTO del barrel: la comilla de cierre va pegada a `inventario`, asi que
+    // las subrutas (`.../inventario/adapters/driving/...`) NO casan. Es deliberado.
+    const INVENTARIO_IMPORT = /from\s+['"](@\/lib\/modules\/inventario|(\.\.?\/)+.*modules\/inventario)['"]/
+    const raicesVigiladas = [
+      modulesDir,
+      join(repoRoot, 'app'),
+      join(repoRoot, 'components'),
+      join(repoRoot, 'hooks'),
+    ]
+    const archivosVigilados = raicesVigiladas.flatMap((raiz) => allTypeScriptFiles(raiz))
+    expect(
+      archivosVigilados.length,
+      'el barrido quedo vacio: sin archivos, esta asercion no vigila nada',
+    ).toBeGreaterThan(0)
+    for (const filePath of archivosVigilados) {
+      if (filePath.startsWith(inventarioDir)) continue
+      if (filePath.startsWith(composicionDir)) continue
+      const source = readFileSync(filePath, 'utf8')
+      for (const line of source.split('\n')) {
+        if (!INVENTARIO_IMPORT.test(line)) continue
+        expect(
+          line,
+          `${filePath}: todo import del barrel de inventario fuera de lib/composition debe ser 'import type' (${line.trim()})`,
+        ).toMatch(/^\s*import\s+type\s/)
+      }
+    }
+
+    // Ninguna ruta HTTP ni Server Action de productos o presentaciones.
     for (const route of [
       join(repoRoot, 'app', 'api', 'products'),
       join(repoRoot, 'app', 'api', 'presentations'),
