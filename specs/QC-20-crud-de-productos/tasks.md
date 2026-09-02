@@ -128,7 +128,7 @@
       llena `domain/`. Detalle en `progress/impl_QC-20-crud-de-productos.md`. La cláusula de
       R29 la completa T12.
 
-- [ ] **T16 — Cierre.** `./init.sh` completo en verde, `progress/impl_QC-20-crud-de-productos.md`
+- [x] **T16 — Cierre.** `./init.sh` completo en verde, `progress/impl_QC-20-crud-de-productos.md`
       con la salida real de los tests y el mapa `R<n> → test` de abajo, y todas las tasks marcadas
       `[x]`.
       *Depende de:* todas. **Hecho cuando:** `CHECKPOINTS.md` se cumple entero.

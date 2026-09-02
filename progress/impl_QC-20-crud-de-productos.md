@@ -693,3 +693,215 @@ Verificado **fuera** de toda transaccion al terminar: el indice `presentations_n
 sigue presente, y las **tres** FK de `products` siguen con `confdeltype = 'r'` (RESTRICT):
 `products_created_by_fkey`, `products_updated_by_fkey`, `products_presentation_id_fkey`.
 Arbol de git limpio, ningun archivo de produccion modificado, ningun script temporal residual.
+
+---
+---
+
+# T16 — CIERRE DE LA FEATURE
+
+## 1. Salida real de los tests
+
+Corridos en el worktree, contra `QuimiCloude_QC20` (base propia, seis migraciones aplicadas):
+
+```
+pnpm exec vitest run tests/unit/ tests/ui/   ->  Test Files 49 passed (49)   Tests 482 passed (482)
+pnpm exec vitest run tests/integration/      ->  Test Files  8 passed  (8)   Tests 106 passed (106)
+pnpm run test:guardias                       ->  Test Files  7 passed  (7)   Tests  78 passed  (78)
+pnpm run typecheck                           ->  limpio
+pnpm run lint                                ->  limpio
+```
+
+Gate completo del leader sobre la rama: **666 tests en 64 archivos**, typecheck y lint limpios.
+
+**Aviso sobre `./init.sh` dentro del worktree:** aborta con
+`faltan specs para features sdd en vuelo: QC-9 QC-21`. **Es un artefacto del validador**, no un
+rojo real: `dev` paso esas dos fichas a `in_progress` y sus specs viven en `.worktrees/QC-9-*` y
+`.worktrees/QC-21-*`, invisibles desde dentro de este worktree. Ejecutado **desde la raiz del
+repo**, el validador pasa los cuatro checks. Mismo precedente que QC-14. Por eso el gate se
+acredito **por partes** (typecheck, lint y suites por separado).
+
+## 2. Mapa `R<n> -> test` (R1-R37, sin huecos sin declarar)
+
+| R | Test que lo cierra | Archivo |
+| --- | --- | --- |
+| R1 | `cada caso de uso recibe el actor por parametro y no lee ninguna sesion` (dinamica + barrido estatico de `domain/`) | `tests/unit/inventario/authorization.test.ts` |
+| R2 | `un actor con rol Operador es rechazado en los nueve casos de uso sin llamar al repositorio` | `tests/unit/inventario/authorization.test.ts` |
+| R3 | `un actor ausente, con rol nulo o con rol desconocido es rechazado igual que el Operador` | `tests/unit/inventario/authorization.test.ts` |
+| R4 | `toda tabla creada en las migraciones tiene ENABLE y FORCE ROW LEVEL SECURITY` (guardia existente) + snapshot de T13: RLS con **0 diferencias** tras el rollback | `tests/guards/guard-rls-force.test.ts` |
+| R5 | `crea el producto y devuelve su identificador cuando el actor es Administrador` | `tests/unit/inventario/product-service.test.ts` |
+| R6 | `guarda al actor como autor de creacion y de modificacion al crear, y solo como autor de modificacion al editar y al borrar` (unitario) **+** `conserva created_by al editar y al borrar, y solo actualiza updated_by` (**integracion; es el que cierra la mitad que los dobles no pueden**) | `product-service.test.ts` + `product-crud.int.test.ts` |
+| R7 | `rechaza con SQLSTATE 23503 el producto cuyo autor no es un usuario existente` | `tests/integration/inventario/product-crud.int.test.ts` |
+| R8 | `ningun modulo consulta un modelo ajeno con Prisma` + `de otro modulo solo se importa su contrato` (guardia) **+** `la lista devuelve los autores como identificadores, sin resolver ningun nombre` | `guard-arquitectura-modulos.test.ts` + `product-crud.int.test.ts` |
+| R9 | `rechaza el nombre vacio o de solo espacios y recorta los extremos del nombre valido` | `tests/unit/inventario/product-input.test.ts` |
+| R10 | `rechaza un tiempo de entrega negativo` | `tests/unit/inventario/product-input.test.ts` |
+| R11 | `rechaza el nombre de producto de mas de 120 caracteres y el de presentacion de mas de 60` | `tests/unit/inventario/product-input.test.ts` |
+| R12 | `acepta dos productos con el mismo nombre` | `tests/unit/inventario/product-service.test.ts` |
+| R13 | `guarda la existencia recibida al editar, sin recalcularla` | `tests/unit/inventario/product-service.test.ts` |
+| R14 | `devuelve no encontrado al editar o borrar un producto inexistente o ya borrado` | `tests/unit/inventario/product-service.test.ts` |
+| R15 | `al borrar conserva la fila y marca deleted_at` | `tests/integration/inventario/product-crud.int.test.ts` |
+| R16 | `la lista paginada y la ficha excluyen los productos borrados` | `tests/integration/inventario/product-crud.int.test.ts` |
+| R17 | `persiste el nombre normalizado junto al nombre al crear y al renombrar` | `tests/unit/inventario/presentation-service.test.ts` |
+| R18 | `rechaza la presentacion cuyo nombre normalizado ya existe` | `tests/unit/inventario/presentation-service.test.ts` |
+| R19 | `normaliza «Bidon 20 L», «bidon 20 l» y «BIDON-20L» al mismo valor` | `tests/unit/inventario/presentation-name.test.ts` |
+| R20 | `el indice unico rechaza con SQLSTATE 23505 la segunda insercion del mismo nombre normalizado` **+ test permanente** `sin el indice unico, la segunda insercion... deja de fallar` | `presentation-uniqueness.int.test.ts` |
+| R21 | `rechaza con SQLSTATE 23503 borrar una presentacion con productos asignados, incluidos los borrados logicamente` **+ test permanente** `sin ON DELETE RESTRICT, borrar... deja de estar bloqueado` | `presentation-uniqueness.int.test.ts` |
+| R22 | `borra fisicamente la presentacion sin productos asignados` | `presentation-uniqueness.int.test.ts` |
+| R23 | `devuelve como maximo el tamano de pagina y el total de elementos` | `tests/unit/pagination.test.ts` |
+| R24 | `usa 10 elementos por pagina cuando no se indica tamano` | `tests/unit/pagination.test.ts` |
+| R25 | `rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1` | `tests/unit/inventario/product-input.test.ts` |
+| R26 | `recorre las paginas sin repetir ni omitir productos homonimos` | `tests/integration/inventario/product-crud.int.test.ts` |
+| R27 | `lib/shared no importa modulos ni composition` (guardia) + `calcula desplazamiento y total de paginas` | `guard-arquitectura-modulos.test.ts` + `tests/unit/pagination.test.ts` |
+| R28 | `la Server Action rechaza la entrada invalida antes de llamar al caso de uso` | `tests/unit/inventario/product-actions.test.ts` |
+| R29 | `las mutaciones del catalogo son Server Actions y no hay ningun route handler bajo app/api` | `tests/unit/inventario/scope.test.ts` |
+| R30 | `nombra en ingles las columnas, la FK y el indice unico que anade la migracion` | `inventario-audit-migration.test.ts` |
+| R31 | `domain y ports no importan framework, base de datos, shared ni adaptadores` + `el contrato solo reexporta de ./domain` (guardia) | `guard-arquitectura-modulos.test.ts` |
+| R32 | `el down.sql revierte exactamente lo que anade el migration.sql y nada mas` **+ ciclo real de T13** con snapshot en cinco dimensiones y **0 diferencias A vs C** | `inventario-audit-migration.test.ts` + T13 |
+| R33 | `toda dependencia de package.json esta en docs/dependencias.md` (guardia existente) — **ver seccion 4** | `tests/guards/guard-dependencias-aprobadas.test.ts` |
+| R34 | `no existe ninguna pantalla, pagina ni componente de productos, ni spec E2E nuevo` | `tests/unit/inventario/scope.test.ts` |
+| R35 | `ordena por nombre ascendente y desempata por identificador ascendente` | `tests/integration/inventario/product-crud.int.test.ts` |
+| R36 | `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` | `tests/unit/pagination.test.ts` |
+| R37 | `rechaza como nombre invalido la presentacion cuyo nombre normalizado queda vacio` | `tests/unit/inventario/product-input.test.ts` |
+
+**Los 37 tienen test.** Las dos entradas que NO son cobertura plena estan en la seccion 4, declaradas.
+
+## 3. Archivos
+
+**Creados (41).** El modulo `inventario` completo: `domain/` (16 archivos: actor, errores, page,
+normalizacion, dos de entrada zod, dos de vista y los nueve casos de uso), `ports/` (2),
+`adapters/driven/persistence/` (2), `adapters/driving/` (2); `lib/shared/pagination.ts`; la
+migracion `20260902170759_product_audit_and_presentation_uniqueness/` con su `down.sql`; y 12
+archivos de test.
+
+**Ajenos MODIFICADOS (6).** Cada uno con que afirmaba y que lo sustituye:
+
+| Archivo | De quien | Que se hizo |
+| --- | --- | --- |
+| `db/schema.prisma` | QC-14 | Se **anaden** `createdBy`/`updatedBy` escalares (sin `@relation`, seccion 2.1a del diseno) y `nameNormalized` + `@@unique`. No se toca ningun modelo de `identity` ni de `recetas` |
+| `lib/composition/index.ts` | compartido | Se **anade** la fachada `inventario`. `git diff` de la parte de `identity`: **cero lineas eliminadas** |
+| `lib/modules/inventario/index.ts` | slot de QC-15, con `ProductCatalog` de QC-24 | De `export {}` al contrato real. Se **conserva** la linea de QC-24 |
+| `tests/integration/inventario/inventario-constraints.int.test.ts` | QC-14 | Andamiaje: `nameNormalized` en los `create`. **25 inserciones, 3 eliminaciones, 0 lineas `expect(` eliminadas** |
+| `tests/integration/recetas/recetas-constraints.int.test.ts` | QC-24 | Andamiaje: `nameNormalized` **y** nombre unico por llamada. Su helper usaba `Bidon 20 L` fijo y se invoca hasta 3 veces en la misma transaccion, asi que chocaba con nuestro indice unico. Resuelto con su propio `token()`. Ninguna asercion cambia de significado |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` | QC-14, estrechado tambien por QC-24 | Ver seccion 5 |
+
+**El septimo, INTENTADO Y REVERTIDO:** `tests/unit/identity/credential-policy-contract.test.ts`
+(QC-19). Se llego a estrechar y commitear (`f1f539e`), y el leader **revirtio el commit** al
+comprobar que QC-24 ya lo habia arreglado en `dev`, y mejor. **Esta feature no lo modifica.** Se
+anota porque el trabajo existio y porque su leccion —el aviso previo entre sesiones es barato,
+descubrirlo en el merge no— quedo en `progress/current.md`.
+
+## 4. Las dos entradas honestas: no son huecos, pero tampoco cobertura plena
+
+**(a) La composicion de los dos `down.sql` NO esta verificada.** No es que no se quisiera
+comprobar: **la herramienta no lo permite**. `scripts/db-rollback.ts` elige la migracion por el
+**disco** (`readdirSync().sort().at(-1)`) y no por `_prisma_migrations`, asi que dos ejecuciones
+seguidas revierten **la misma**. Medido en T13. Lo que **si** esta verificado: el `down.sql` de
+QC-20 revierte exactamente sus seis objetos, y el ciclo de un salto da 0 diferencias en cinco
+dimensiones. Deuda completa, con sus tres efectos y una propuesta de arreglo, en
+`progress/current.md > Deudas y cosas abiertas`.
+
+**(b) R33 lo cierra una guardia ya existente, no un test propio de la feature.** Es
+`tests/guards/guard-dependencias-aprobadas.test.ts` › `toda dependencia de package.json esta en
+docs/dependencias.md`. **Se cita para que el reviewer la abra y confirme que afirma lo que
+promete.** El criterio de R33 es que esa guardia siga verde **sin tocar `package.json`**, y asi
+es: `package.json` no aparece en el diff de la feature. Cero dependencias nuevas.
+
+## 5. Las tres decisiones que tomo el LEADER por encima del spec
+
+Ninguna la decidio el implementer por su cuenta; las tres se escalaron.
+
+**1. `ON DELETE RESTRICT` en las dos FK de auditoria.** El spec **no fijaba la accion**:
+`design.md > 2.4` solo nombra los constraints. `backend_dev` puso `SET NULL` por su cuenta; se
+paro y se escalo. Razones: las tres FK preexistentes usan `Restrict`+`Cascade` sin excepcion;
+`users` tiene borrado logico, asi que el `DELETE` fisico no ocurre por ningun camino de la app; y
+**R7 exige «referencia real a un usuario existente»**, mientras `SET NULL` la convierte en `NULL`
+**en silencio** — en una columna de auditoria eso destruye la atribucion sin avisar. Verificado
+contra la base: `confdeltype = 'r'` en las tres.
+
+**2. Estrechar los tests de alcance de QC-14 y QC-19.** Una feature no puede cumplir la
+afirmacion de alcance de otra. De QC-14 se retiraron **exactamente tres clausulas** (`domain/`
+vacia, `adapters/driving` vacia, contrato `export {};`) y ni una mas; lo que quedaba vigilado paso
+a `scope.test.ts` y a la guardia de arquitectura. El de QC-19 **no se toco al final**: lo arreglo
+QC-24 en `dev`.
+
+**3. La reformulacion acordada con la sesion de QC-24.** La asercion «todo export del contrato es
+`export type`» era imposible de cumplir para QC-20, que publica nueve factories. **No se retiro:
+se sustituyo** por la garantia real que habia detras —*todo import del barrel
+`@/lib/modules/inventario` fuera de `lib/composition/` debe ser `import type`*—, ampliada a
+`app/`, `components/` y `hooks/` por el hueco de R13 que senalo la otra sesion. **Fue un acuerdo
+entre las dos features, no una decision unilateral**: la sesion de QC-24 dio su visto bueno y
+califico su propia version de «un retrato del estado del repo, no la garantia que queriamos». La
+version nueva queda **mas** estricta que la original, no mas laxa, y se verifico falsable en
+**cuatro** sentidos, incluido que una subruta `adapters/driving/` en runtime **no** dispare —que
+es lo que evita prohibir el patron que `docs/architecture.md` prescribe—.
+
+## 6. Dos afirmaciones FALSAS del implementer, y su correccion
+
+Se dejan escritas porque el patron —conclusion correcta apoyada en premisa falsa— es el que mas
+caro sale en este repo, y porque el reviewer debe poder comprobar que estan corregidas.
+
+**(a) «`stripComments` era un no-op en todo el repo por ficheros CRLF».** Falso. Medido por
+bytes: el test de esquema y `db/schema.prisma` son **LF puro** en disco y en `origin/dev`, y
+`core.autocrlf` es `false`. **La causa real era propia:** `lib/modules/inventario/index.ts` salio
+CRLF del merge porque el implementer lo escribio con `io.open(...,'w')` de Python sin
+`newline=''`. Probado en las dos direcciones con el regex **original sin tocar**: CRLF -> rojo;
+LF -> verde 20/20. Se devolvieron a LF los tres archivos contaminados. **El test no tenia ningun
+defecto: detecto correctamente uno mio.** El cambio de regex se conservo, descrito como
+endurecimiento preventivo. Recuento corregido: **tres** falsos positivos de la familia «el test
+mide comentarios», no cuatro.
+
+**(b) «No existe `app/api/`».** Falso: existia **vacio y sin versionar**. La conclusion —ninguna
+de las tres rutas del catalogo existe, R29 y R34 se cumplen— era correcta. Lo dejo **esta misma
+feature**: la comprobacion de falsabilidad del Grupo A creo `app/api/products/route.ts` y limpio
+con `rm -rf` sobre **el hijo, no el padre**. Como git no versiona directorios vacios,
+`git status` salio limpio y no lo vio nadie. Corregido con `rmdir`. **Leccion: una comprobacion
+de falsabilidad debe deshacer toda la ruta que creo, y `git status` no prueba limpieza.**
+
+## 7. Como se verifico que los tests valen: 40 mutaciones
+
+Ningun grupo se dio por hecho leyendo codigo.
+
+| Grupo | Mutaciones |
+| --- | --- |
+| A | 3 (`requireAdmin`, cota de 25, normalizacion a vacio) + 1 (`down.sql`) + 7 de falsabilidad de `scope.test.ts` |
+| B | 26, de las cuales **9 son de autorizacion, una por caso de uso** |
+| C | 3 (validacion de entrada, traduccion de error, actor fijo) + 1 (directiva `'use server'`) |
+| D | 4, **dos de ellas de ESQUEMA** (`DROP INDEX`, `DROP CONSTRAINT`) |
+
+**El dato que justifica el test de autorizacion:** al quitar `requireAdmin` de
+`create-product.ts`, `product-service.test.ts` **siguio verde (13/13)**. `authorization.test.ts`
+es la **unica** red de R1, R2 y R3 en toda la feature, y se comprobo que cae con los nueve.
+
+**Lo mejor del grupo D:** los dos tests de mutacion de esquema quedaron **permanentes**, no como
+comprobacion de una sola vez. La diferencia importa: *una mutacion manual demuestra que el test
+servia hoy; un test permanente impide que R20 y R21 se conviertan en verdes por construccion
+manana*, el dia que alguien retire el indice o la FK. Es la respuesta **estructural** al problema
+que persiguio a esta feature entera —cinco tests infalsables o verdes por casualidad encontrados
+en una jornada—: los previene en vez de cazarlos.
+
+## 8. Correcciones aplicadas al propio `design.md`
+
+Dos, las dos **en el documento** y no solo aqui, porque un diseno que afirma algo falso es peor
+que uno incompleto: nadie busca donde el documento dice que no hay nada (leccion de QC-8).
+
+- **Seccion 11.4** decia que «la comprobacion previa se mantiene». Retirado: era
+  **inexpresable** con el puerto normativo de la seccion 7 —que no tiene metodo de busqueda— y
+  ademas **una comprobacion previa es una carrera**, asi que la garantia real es el indice unico.
+- **Seccion 5** describia `getSessionUser` cableado al **stub de QC-7**. Ya no existe tal stub,
+  QC-7 y QC-8 estan `done` y `lib/composition` cablea la sesion real. Consecuencia: **ya no es
+  cierto** que una mutacion muera en la FK por `placeholder-user`. **Lo que no cambia y se deja
+  escrito: la prediccion de fondo se cumplio** — QC-8 cambio el proveedor en `lib/composition` y
+  **no toco `inventario`**, que era exactamente lo que el diseno prometia. El diseno acerto;
+  caduco su foto del entorno.
+
+## 9. Lo que esta feature NO entrega, por diseno
+
+Sin pantalla, sin pagina, sin componente y sin E2E (**R34**, D4): la interfaz es **QC-22**. Las
+Server Actions si entran, porque son la superficie que QC-22 consumira. Tampoco entran los
+movimientos de inventario, la evaluacion de la cantidad de alerta, el historial campo a campo ni
+la restauracion de un producto ya borrado.
+
+## 10. Veredicto del implementer
+
+**Las 16 tasks de `tasks.md` estan `[x]`.** Los 37 requisitos tienen test, con dos entradas
+declaradas en la seccion 4 que no son huecos pero tampoco cobertura plena. No me autoapruebo: el
+`reviewer` decide.

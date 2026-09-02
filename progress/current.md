@@ -1051,6 +1051,29 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   **Lo que este hallazgo NO invalida:** el `down.sql` de QC-20 es correcto y su ciclo de un salto
   es reversible, verificado con snapshot del esquema en cinco dimensiones (columnas, constraints,
   índices, RLS y `_prisma_migrations`) y **cero diferencias** entre antes y después.
+- **[QC-20 — los puertos de `inventario` no aceptan `TransactionClient`, y eso condiciona sus tests
+  de integración]** Dirigida a **quien toque esos puertos**: probablemente QC-22, o quien añada
+  los movimientos de inventario.
+  **El hecho:** los adaptadores driven (`product-prisma.ts`, `presentation-prisma.ts`) usan el
+  cliente Prisma **global**, porque los puertos de `design.md > 7` no reciben
+  `Prisma.TransactionClient`. Consecuencia: una llamada al adaptador **dentro** de
+  `prisma.$transaction(...)` **no participa** de esa transacción y hace COMMIT real.
+  **Lo que obligó a hacer en T14:** los tests que verifican una restricción de la base (R7, y toda
+  `presentation-uniqueness.int.test.ts`) sí usan `tx` + `SAVEPOINT` + `ROLLBACK` como manda la
+  doctrina de `inventario-constraints.int.test.ts`; pero los que ejercitan **el adaptador de
+  verdad** usan **fixtures reales con borrado explícito por id en `finally`**. Es una desviación
+  consciente de esa doctrina, declarada en `progress/impl_QC-20-crud-de-productos.md`.
+  **Evidencia de que hoy no se fuga nada:** dos pasadas seguidas dan **106/106 idénticas**, y el
+  recuento posterior de `products`, `presentations` y `users` es **0, 0, 0**. Verificado además de
+  forma independiente por el leader contra la base, junto con el índice único y las tres FK con
+  `confdeltype='r'`.
+  **El coste honesto:** un test interrumpido entre el fixture y su `finally` puede dejar filas.
+  **Acotado**: la base es **propia de este worktree** (`QuimiCloude_QC20`), así que no alcanza a
+  ninguna otra sesión — que es exactamente para lo que se montó.
+  **Por qué no se arregló en QC-20:** la salida limpia es que los puertos acepten un
+  `TransactionClient`, y eso **cambia la firma de los cinco métodos de `ProductRepository`** (y de
+  los cuatro de `PresentationRepository`). Es rediseño, no alcance de T14, y tocar una firma de
+  puerto es justo el cambio que `vitest related` no propaga a sus llamadores.
 - **[QC-12 — la verificación visual multiplataforma no la hizo nadie con ojos]** No hay navegador
   con emulación de dispositivo en este entorno. Lo verificado es el HTML servido y jsdom a 375 y
   1280 px, más las guardias de que no hay alto de viewport fijo, ni `:hover`, ni controles. El
