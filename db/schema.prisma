@@ -140,3 +140,64 @@ model Product {
   @@index([presentationId], map: "products_presentation_id_idx")
   @@map("products")
 }
+
+/// Receta (formula) del ERP quimico. Borrado LOGICO: `deletedAt` NULL = receta viva.
+///
+/// OJO 1 — `createdBy` y `updatedBy` son FK REALES a `users`, pero se declaran como
+/// ESCALARES SIN `@relation` a proposito (decision cerrada 3, R19): la FK esta escrita a
+/// mano en `migration.sql`. Asi la base garantiza la integridad y, a la vez, el cliente
+/// Prisma NO puede atravesar de `recetas` a `users` con un `include`. La guardia de modulos
+/// NO detectaria ese cruce, porque no es un import.
+/// Son ANULABLES (decision cerrada 22, R33): NULL significa «no la creo una persona»
+/// —una importacion, un seed—, no «se perdio el dato».
+///
+/// OJO 2 — la unicidad del nombre NO esta aqui como `@unique` y es deliberado: es un indice
+/// unico PARCIAL (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela
+/// indices parciales. Vive escrito a mano en `migration.sql` (`recipes_name_unique`).
+/// @module recetas
+model Recipe {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  nameNormalized String    @map("name_normalized")
+  description    String?
+  steps          Json      @default("[]")
+  imagePath      String?   @map("image_path")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  lines RecipeLine[]
+
+  @@index([createdBy], map: "recipes_created_by_idx")
+  @@index([updatedBy], map: "recipes_updated_by_idx")
+  @@map("recipes")
+}
+
+/// Linea de una receta: la pareja receta-producto como ENTIDAD PROPIA, con su cantidad y su
+/// unidad (decision cerrada 12).
+///
+/// NO lleva `deletedAt` a proposito (decision cerrada 5, R24): la linea es parte de la
+/// receta, no un hecho historico, y corregir una formula es una edicion normal.
+///
+/// OJO — `productId` es una FK REAL a `products` declarada como ESCALAR SIN `@relation`
+/// (decision cerrada 3 aplicada a la frontera con `inventario`, R19). La FK esta escrita a
+/// mano en `migration.sql`. Lo que `recetas` sabe del producto llega por el contrato publico
+/// `@/lib/modules/inventario`, nunca por un `include` ni por `prisma.product`.
+/// @module recetas
+model RecipeLine {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipeId  String   @map("recipe_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Decimal  @db.Decimal(14, 4)
+  unit      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")
+  @@index([productId], map: "recipe_lines_product_id_idx")
+  @@map("recipe_lines")
+}
