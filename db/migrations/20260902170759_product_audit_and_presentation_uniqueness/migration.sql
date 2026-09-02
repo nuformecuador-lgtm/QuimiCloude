@@ -19,17 +19,23 @@
 ALTER TABLE "products" ADD COLUMN "created_by" UUID;
 ALTER TABLE "products" ADD COLUMN "updated_by" UUID;
 
--- AddForeignKey — escritas a mano, en ingles (R30). ON DELETE SET NULL, no RESTRICT ni
--- CASCADE: las columnas son anulables justo para este caso, y el producto NO se debe
--- perder si se borra el usuario que lo creo o lo edito por ultima vez (R7 exige una
--- referencia real mientras el usuario existe; nada exige que deba seguir existiendo para
--- siempre). Con RESTRICT, borrar cualquier usuario que alguna vez toco un producto
--- quedaria bloqueado para siempre, que es una garantia mas fuerte que la que pide esta
--- ficha. ON UPDATE CASCADE porque el id del usuario es su clave real y no cambia por
--- negocio, pero si cambiara, la referencia debe seguir el nuevo valor (mismo criterio que
--- las FK de `users` en `identity`).
-ALTER TABLE "products" ADD CONSTRAINT "products_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "products" ADD CONSTRAINT "products_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- AddForeignKey — escritas a mano, en ingles (R30). ON DELETE RESTRICT ON UPDATE CASCADE:
+-- decision del leader, el spec NO fijaba esta accion. Razones:
+-- 1) Convencion del repo: las tres FK que ya existen en el esquema (`users.role_id`,
+--    `users.document_type_code`, `products.presentation_id`) usan Restrict + Cascade sin
+--    excepcion. Esta ficha no abre una excepcion nueva.
+-- 2) `users` tiene borrado logico (`deleted_at`): el DELETE fisico de un usuario no ocurre
+--    por ningun camino de la aplicacion. Hoy, RESTRICT y SET NULL son equivalentes en la
+--    practica; se diferencian solo en COMO fallan el dia que alguien intente un DELETE
+--    fisico (p. ej. un script de purga).
+-- 3) R7 exige "referencia real a un usuario existente". SET NULL convierte esa referencia
+--    en NULL EN SILENCIO, que es justo lo que R7 prohibe: en una columna de auditoria,
+--    perder la atribucion sin avisar es peor que bloquear el DELETE. RESTRICT hace ruidoso
+--    ese dia, que es cuando conviene enterarse. ON UPDATE CASCADE porque el id del usuario
+--    es su clave real y no cambia por negocio, pero si cambiara, la referencia debe seguir
+--    el nuevo valor (mismo criterio que las FK de `users` en `identity`).
+ALTER TABLE "products" ADD CONSTRAINT "products_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "products" ADD CONSTRAINT "products_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- ---------------------------------------------------------------------------------------
 -- Unicidad normalizada en presentations (design.md > 2.2, D12, D13 -> R17, R18, R19, R20).

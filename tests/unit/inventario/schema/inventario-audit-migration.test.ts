@@ -173,19 +173,20 @@ describe('migration.sql — auditoria de products: columnas y claves foraneas (R
     expect(createdByFk).toMatch(/FOREIGN KEY\s*\(\s*"?created_by"?\s*\)/i)
     expect(updatedByFk).toMatch(/FOREIGN KEY\s*\(\s*"?updated_by"?\s*\)/i)
 
-    // Coherentes con columnas anulables: ni RESTRICT (bloquearia borrar cualquier usuario
-    // que alguna vez toco un producto) ni CASCADE (borraria el producto con el usuario).
+    // ON DELETE RESTRICT (decision del leader, el spec no fijaba esta accion): convencion
+    // del repo (mismo patron que `users.role_id`, `users.document_type_code` y
+    // `products.presentation_id`) y R7 exige referencia real, sin silencio de SET NULL.
     for (const fk of [createdByFk, updatedByFk]) {
-      expect(fk).toMatch(/ON DELETE SET NULL/i)
-      expect(fk).not.toMatch(/ON DELETE (RESTRICT|CASCADE|SET DEFAULT|NO ACTION)/i)
+      expect(fk).toMatch(/ON DELETE RESTRICT/i)
+      expect(fk).not.toMatch(/ON DELETE (SET NULL|CASCADE|SET DEFAULT|NO ACTION)/i)
     }
   })
 
   it('la sensibilidad de la FK cae si se relaja a ON DELETE CASCADE', () => {
     const createdByFk = findStatement(up, /ADD CONSTRAINT "?products_created_by_fkey"?/i)
-    const mutado = createdByFk.replace(/ON DELETE SET NULL/i, 'ON DELETE CASCADE')
+    const mutado = createdByFk.replace(/ON DELETE RESTRICT/i, 'ON DELETE CASCADE')
     expect(mutado, 'la mutacion no se aplico').not.toBe(createdByFk)
-    expect(mutado).not.toMatch(/ON DELETE SET NULL/i)
+    expect(mutado).not.toMatch(/ON DELETE RESTRICT/i)
   })
 })
 
