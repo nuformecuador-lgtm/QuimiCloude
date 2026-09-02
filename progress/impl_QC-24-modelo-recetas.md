@@ -306,3 +306,141 @@ están implementadas: índice único **parcial**, descripción **opcional**, aut
   QC-20 tocó el mismo archivo, y sobre `lib/composition/index.ts` si QC-19 lo tocó — esta
   feature no lo modifica, así que por nuestro lado no debería haber conflicto.
 - PR: **no abierto** y **nada mergeado**, según lo pedido.
+
+---
+
+# Corrección tras el review del 2026-09-02
+
+`progress/review_QC-24-modelo-recetas.md` **RECHAZÓ** la feature por un bloqueante: la suite
+completa estaba en rojo, `2 failed | 507 passed`. Los dos fallos eran de QC-24 aunque no
+estuvieran en archivos de QC-24, y con ellos `./init.sh` no podía terminar en verde (regla 5 de
+`CLAUDE.md`). Corregido. Este bloque documenta qué se cambió y por qué.
+
+## El bloqueante: dos casos de QC-14 que medían el repo, no su feature
+
+Los dos vivían en `tests/unit/inventario/schema/inventario-schema.test.ts`, **archivo que no
+está en la lista de `design.md > 1` ni en la de ninguna task** — por eso se anotó también en la
+cabecera de `tasks.md`, como esa cabecera exige. Se **acotaron, no se borraron**: las dos
+aserciones protegen requisitos reales de QC-14 y esos siguen vigilados. Lo que se quitó es la
+parte que retrataba el estado global del repo del día en que se escribió el test. En los dos
+casos el porqué queda escrito **dentro del propio test**, fechado y con referencia a QC-24, para
+que el siguiente que lo lea vea que no se relajó por conveniencia.
+
+### 1. `el esquema declara exactamente dos modelos nuevos: Presentation y Product`
+
+Enumeraba **todos** los modelos del esquema y exigía que fueran exactamente los cinco que había
+aquel día:
+
+```
+AssertionError: expected [ Array(7) ] to deeply equal [ Array(5) ]
++   "Recipe",
++   "RecipeLine",
+```
+
+Eso no es lo que **QC-14 R3** pide. R3 dice: «persistir, en **una única entidad de producto**,
+los siguientes datos […]; y NO DEBE mantener ninguna entidad separada de *elemento de
+inventario*». Habla de la entidad de producto, no del censo del esquema. Un test que se rompe
+cuando llega la feature siguiente estaba midiendo el repo.
+
+Qué **se conserva** de R3, todo lo que ya estaba y sigue estando:
+- que `inventario` declara **exactamente dos** modelos, `Presentation` y `Product` — ahora
+  leídos de su `/// @module`, que es el mismo criterio que usa el caso de R20 tres tests más
+  abajo, en vez de una lista escrita a mano;
+- que `InventoryItem`, `Inventory`, `StockItem` e `Item` **no existen** en ninguna parte del
+  esquema (esa es la entidad separada que la decisión cerrada 1 fusionó);
+- que no hay ningún `@@map("inventory"|"inventory_items"|"stock_items"|"items")`.
+
+Qué **se añade** para no perder cobertura al quitar la lista cerrada: que los tres modelos de
+`identity` (`DocumentType`, `Role`, `User`) siguen existiendo, es decir, que QC-14 no los
+absorbió ni los hizo desaparecer.
+
+Qué **se quita**: la igualdad contra el censo completo del esquema. Nada más.
+
+### 2. `la feature no anade adaptadores driving, rutas ni contrato de dominio en el modulo inventario`
+
+Exigía que `lib/modules/inventario/domain/` estuviera **vacía** y que el barrel fuese
+literalmente `export {};`:
+
+```
+AssertionError: expected [ 'product-catalog.ts' ] to deeply equal []
+```
+
+**QC-24 hace justo lo contrario por diseño** (T5, `design.md > 5.2`): `inventario` tiene que
+publicar `ProductCatalog` desde su dominio para que `recetas` pueda apuntar a un producto sin
+tocar su tabla (R18). Sin eso, la frontera de módulo de esta feature no existe.
+
+Y ninguna de las dos aserciones está en **QC-14 R23**, que enumera exactamente: «ninguna
+operación de alta, consulta, edición o borrado […] ni adaptador driving, ruta, Server Action o
+pantalla que las exponga». Un contrato de **solo tipos** no es ninguna de esas cosas: desaparece
+al compilar y no ejecuta nada.
+
+Qué **se conserva** de R23:
+- `lib/modules/inventario/adapters/driving/` sin ningún `.ts`/`.tsx`;
+- ninguna ruta `app/api/products`, `app/api/presentations` ni `app/api/inventario`.
+
+Qué **se añade**, para que R23 siga vigilado sobre el contrato en vez de sobre un retrato fijo:
+- el barrel no contiene `'use server'`;
+- el barrel **solo reexporta de `./domain/`**, nunca de `adapters/` — que es por donde entraría
+  una operación de alta/consulta/edición/borrado;
+- todo lo que el barrel reexporta son **tipos** (`export type { … }`), no valores: sin runtime
+  en el contrato no hay operación que exponer.
+
+Esas tres son más estrictas que `toBe('export {};')` en lo que importa y no se rompen cuando
+llega la feature siguiente.
+
+Qué **se quita**: que `domain/` esté vacía y la igualdad literal del barrel.
+
+**No se tocó nada más de QC-14**: ni su `requirements.md`, ni su `design.md`, ni su `tasks.md`,
+ni ningún otro caso del archivo, ni el otro test de la carpeta.
+
+## Los dos menores del review
+
+- **menor 1 — T13.** Marcada `[x]` con el sufijo **«(pendiente del leader)»** y explicada en su
+  cuerpo, exactamente como hizo QC-12 con su T9: el gate completo y el PR los corre el leader
+  (`AGENTS.md > Regla del gate`), y la task queda cerrada por el lado del implementer. La
+  ausencia queda **registrada, no silenciada**.
+- **menor 2 — el hallazgo del SQLSTATE.** Movido a donde QC-25 lo va a leer: nueva sección
+  **`design.md > 10.1`** de esta ficha, marcada como añadida después de implementar y que no
+  cambia ninguna decisión. Dice qué pasa (por el camino tipado Prisma entrega `P2002`/`P2003` y
+  el SQLSTATE de Postgres ya no está en `meta.code`) y las dos consecuencias para el CRUD de
+  QC-25. **No se afirma qué campo de `meta` identifica la restricción**: no se verificó en esta
+  ficha y no se rellena con un supuesto (regla 6 de `CLAUDE.md`); queda dicho que QC-25 lo
+  compruebe.
+
+## Archivos tocados en esta corrección
+
+| Archivo | Qué cambió |
+| --- | --- |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` | **Fuera de la lista de tasks.** Los dos casos acotados, con el porqué fechado dentro del test. |
+| `specs/QC-24-modelo-recetas/tasks.md` | T13 marcada y explicada; anotado el archivo tocado fuera de la lista, como exige su cabecera. |
+| `specs/QC-24-modelo-recetas/design.md` | Nueva § 10.1 con el hallazgo del SQLSTATE para QC-25. |
+| `progress/impl_QC-24-modelo-recetas.md` | Este bloque. |
+
+Producción: **nada**. No se tocó `db/`, ni `lib/`, ni `package.json`, ni los tests de `recetas`.
+
+## Gate tras la corrección — la suite COMPLETA, esta vez
+
+El leader autorizó explícitamente correrla, porque el fallo era de **interacción entre
+features** y `vitest related` no lo engancha: los archivos rotos no estaban en el diff de QC-24.
+
+```
+pnpm run typecheck   -> tsc --noEmit, sin salida, exit 0
+pnpm run lint        -> eslint, sin salida, exit 0
+
+pnpm exec vitest run   (SUITE COMPLETA)
+ RUN  v4.1.10 C:/Users/Cristian/Documents/trabajo/arc/labs/.worktrees/QC-24-modelo-recetas
+
+ Test Files  47 passed (47)
+      Tests  509 passed (509)
+   Duration  29.60s
+```
+
+**47 de 47 archivos y 509 de 509 tests en verde.** Antes de la corrección: `1 failed | 46
+passed` y `2 failed | 507 passed`. **Nada más salió rojo**, y el total de tests no cambió (509):
+se acotaron dos casos, no se borró ninguno.
+
+Las dos líneas `Not implemented: navigation to another Document` que imprime la corrida son
+avisos de jsdom de los tests de login, preexistentes y ajenos a esta feature: no son fallos y
+salían igual antes.
+
+`./init.sh` sigue siendo del leader.

@@ -12,6 +12,17 @@ archivo que no está listado, se anota antes de seguir.
 QC-20. Si QC-20 estuviera `in_progress` a la vez, el leader lo resuelve antes de arrancar el
 bloque C.
 
+**Archivo tocado FUERA de esta lista** (se anota aquí porque la cabecera lo exige):
+`tests/unit/inventario/schema/inventario-schema.test.ts`, de **QC-14**. Dos de sus casos medían
+el estado global del repo —el censo de **todos** los modelos del esquema, y que
+`lib/modules/inventario/domain/` estuviera vacía con el barrel en `export {};`— en vez de lo que
+QC-14 garantiza sobre sí misma, así que se ponían rojos en cuanto llegaba la feature siguiente.
+Los rompió esta ficha: T1 añade dos modelos y T5 publica el contrato de `inventario` **por
+diseño** (`design.md > 5.2`). Se **acotaron, no se borraron**, conservando lo que QC-14 R3 y R23
+vigilan, con el porqué escrito en el propio test. Detalle en
+`progress/impl_QC-24-modelo-recetas.md` y en el bloqueante 1 de
+`progress/review_QC-24-modelo-recetas.md`.
+
 ---
 
 ## Bloque A — Preparación
@@ -203,9 +214,15 @@ bloque C.
 
 ## Bloque F — Cierre
 
-### [ ] T13. Sincronizar con `dev` y correr el gate completo
+### [x] T13. Sincronizar con `dev` y correr el gate completo (pendiente del leader)
 - Dep: T0–T12.
 - Archivos: ninguno (salvo lo que traiga el merge).
+- **La corre el leader, no el implementer** (`AGENTS.md > Regla del gate`), igual que la T9
+  de QC-12. Se marca `[x]` porque la task está cerrada por el lado del implementer —no hay
+  nada más que preparar— y queda **anotada como pendiente del leader** para que la ausencia
+  quede registrada y no silenciada. El implementer corrió `typecheck`, `lint` y, tras el
+  rechazo del reviewer del 2026-09-02, **la suite completa** (ver
+  `progress/impl_QC-24-modelo-recetas.md > Salida real de los tests`).
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` **sin flags**. El modo rápido no
   vale aquí: lo que esta feature acopla es SQL, nombres de archivo y la forma del árbol de
   módulos, y el grafo de imports no lo ve (`docs/verification.md > Lo que --rapido NO cubre`).

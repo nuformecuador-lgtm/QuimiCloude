@@ -633,3 +633,37 @@ Cuatro avisos para el implementer:
   las tablas). No se escribe: R29 se cierra con la guardia estática sobre el SQL.
 - R30 se cierra de verdad con el ciclo `db:migrate` → `db:rollback` → `db:migrate` (task T8), no
   con el test estático, que solo lee texto.
+
+### 10.1 Nota para QC-25 — Prisma pierde el SQLSTATE por el camino tipado
+
+> **Añadida el 2026-09-02, después de implementar**, a petición del reviewer (menor 2 de
+> `progress/review_QC-24-modelo-recetas.md`). No cambia ninguna decisión de diseño ni ningún
+> requisito: es un hecho descubierto al escribir los tests de integración, anotado aquí porque
+> **QC-25 escribe el CRUD contra estas mismas tablas y va a tropezar con lo mismo**.
+
+Las restricciones de esta feature se comunican por SQLSTATE de Postgres —`23502` not-null,
+`23503` FK, `23505` único, `23514` check— y varios requisitos (R7, R11, R14, R16, R21, R27)
+dicen literalmente «rechazar la operación **en la propia base de datos**». Pero **por la API
+tipada del cliente, Prisma traduce el SQLSTATE a su propio código antes de que llegue a
+`meta.code`**: una violación de único llega como `P2002` y una de clave foránea como `P2003`,
+y el código de Postgres ya no está. Solo `$queryRaw` / `$executeRaw` lo propagan intacto.
+
+Dos consecuencias prácticas para QC-25:
+
+1. **Al mapear errores a mensajes de usuario** («ya existe una receta con ese nombre», «ese
+   producto ya está en la receta»), el repositorio tendrá que discriminar por `P2002` /
+   `P2003`, no por SQLSTATE: esperar un `23505` por el camino tipado no funciona. Y como una
+   misma operación sobre `recipe_lines` puede violar dos restricciones distintas, hará falta
+   además **saber cuál cayó**; QC-25 tendrá que comprobar qué expone `meta` en su versión del
+   cliente antes de decidir cómo lo distingue. Aquí no se afirma qué campo es: no se verificó
+   en esta ficha y no se rellena con un supuesto (regla 6 de `CLAUDE.md`).
+2. **Al testear que la base rechaza algo**, la operación va con `$executeRaw`, no con la API
+   tipada — es además el instrumento más fiel al enunciado «en la propia base de datos».
+   `tests/integration/recetas/recetas-constraints.int.test.ts` lo hace así en los 25 casos y lo
+   explica en su cabecera; los caminos felices y las lecturas siguen tipados.
+
+Conviene además tenerlo presente junto con § 4.1: las tres FK que cruzan de módulo son
+escalares **sin `@relation`**, así que Prisma no las conoce y no las valida — un
+`product_id` o un `created_by` inexistente no lo rechaza el cliente, lo rechaza la base. Es lo
+que se quería (R19), pero significa que el error llega siempre en tiempo de ejecución y que
+QC-25 tiene que tratarlo, no confiar en el tipo.
