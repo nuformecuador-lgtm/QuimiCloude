@@ -96,6 +96,34 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
 
+### Épica nueva: QC-31 — Pedidos, y sus fichas (2026-09-02, decisión humana)
+
+- El humano pidió la épica de pedidos con «el modelo, el crud y el front». Se creó **QC-31 —
+  Pedidos** y salieron **cuatro** fichas, no tres: **QC-33** modelo-pedidos (`backend`,
+  `medium`), **QC-34** crud-de-pedidos (`backend`, `high`), **QC-35** pantalla-de-pedidos
+  (`frontend`, `complexity` sin evaluar hasta acotarla, igual que QC-26), y **QC-32**
+  modelo-unidades.
+- **QC-32 no cuelga de QC-31 sino de QC-18 Inventario**, y es la ficha que la conversación
+  descubrió: el humano decidió que la unidad separada es un **catálogo compartido**, así que
+  reemplaza el texto libre `Product.unit` y la unidad anotativa de la línea de receta. Eso la
+  saca del alcance de pedidos — toca inventario y recetas — y la convierte en dependencia de
+  QC-33. Bloqueada por **QC-24**, que hoy está `in_progress` y está creando esas líneas de
+  receta: tocar su columna antes de que cierre es colisión segura.
+- Las otras tres decisiones humanas, tomadas antes de escribir las fichas: **un pedido es una
+  sola línea** (receta, cantidad, precio, unidad) y no cabecera con ítems; **el precio de venta
+  se escribe a mano** en el pedido, así que la receta *no* gana columna de precio y QC-24 no se
+  toca por esto; y el pedido lleva además **fecha de solicitud**, **prioridad** (opcional, baja
+  por defecto, conjunto cerrado y ordenado: baja/media/alta/crítica), **estado** (pendiente, en
+  curso, entregado) y **autoría** creó/modificó.
+- **Modelos en inglés** (`Unit`, `Order`), como manda la convención de `db/schema.prisma`.
+- Lo que queda abierto y se cierra con `/afinar-feature`, no aquí: qué se hace con los textos
+  libres de unidad ya guardados (QC-32), la forma técnica de los dos conjuntos cerrados —
+  catálogo tipo `DocumentType` o enum — y las transiciones válidas de estado (QC-33), y **qué
+  rol puede qué** sobre pedidos (QC-34), que es lo que decide también quién ve la pantalla.
+- `depends_on` por issue links «is blocked by»: QC-32 ← QC-24; QC-33 ← QC-32, QC-24;
+  QC-34 ← QC-33, QC-8; QC-35 ← QC-34. Ninguna arranca todavía: las cuatro nacen `pending` en
+  Backlog y el cupo de `in_progress` no se mueve.
+
 ### QC-30 — rediseno-login (ficha creada en esta sesión, 2026-09-02)
 
 - **`zone: frontend`, `complexity: medium`.** Es una pantalla y su hoja de estilo: sin
