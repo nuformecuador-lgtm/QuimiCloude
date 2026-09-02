@@ -245,7 +245,7 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "ayuda-visual-de-contrasena",
-      "description": "Cuando alguien escribe una contrasena nueva tiene que ver los requisitos que debe cumplir antes de enviarla, y cuales va cumpliendo a medida que escribe, en vez de enterarse de golpe al ser rechazada. Aplica en todas las pantallas donde se fija o se cambia una contrasena. Las reglas en si las decide la ficha de politica de contrasenas; esta solo las muestra.",
+      "description": "Cuando alguien escribe una contrasena nueva tiene que ver los requisitos que debe cumplir antes de enviarla, y cuales va cumpliendo a medida que escribe, en vez de enterarse de golpe al ser rechazada. Esta ficha construye SOLO el componente reutilizable, con sus tests: hoy no existe ninguna pantalla que fije o cambie una contrasena, y la primera que lo hara es QC-36. Seis de las siete reglas se marcan en vivo en el navegador; la de contrasenas filtradas se muestra en la lista pero solo se resuelve al enviar, porque su diccionario vive en el servidor. Mientras falte alguna de las seis comprobables en vivo, el formulario no se puede enviar. Las reglas en si las decide la ficha de politica de contrasenas; esta solo las muestra.",
       "status": "pending",
       "sdd": true,
       "complexity": "medium",
@@ -442,6 +442,23 @@
         "QC-34"
       ],
       "spec_path": "specs/QC-35-pantalla-de-pedidos"
+    },
+    {
+      "key": "QC-36",
+      "id": 36,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "cambiar-mi-contrasena",
+      "description": "Una persona con sesion abierta tiene que poder cambiar su propia contrasena: escribe la actual, la nueva, y a partir de ahi entra con la nueva. La nueva pasa por la politica de contrasenas ya existente y se rechaza diciendo que requisito falto, sin revelar nunca la contrasena. Mientras escribe ve la ayuda visual de QC-21, que esta ficha consume y no vuelve a implementar. Es la PRIMERA pantalla del producto donde alguien fija una contrasena. Aqui se cierra un agujero abierto: el seed marca al usuario inicial como obligado a cambiar su contrasena, esa marca se guarda y nadie la lee. La recuperacion para quien la ha olvidado y no puede entrar va aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-36-cambiar-mi-contrasena",
+      "depends_on": [
+        "QC-21"
+      ],
+      "spec_path": "specs/QC-36-cambiar-mi-contrasena"
     }
   ]
 }
