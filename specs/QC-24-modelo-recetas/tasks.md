@@ -39,6 +39,8 @@ bloque C.
   `/// @module recetas` dentro del bloque de comentarios que precede al `model`.
 - Puntos que el revisor va a mirar uno a uno: `quantity` es `Decimal @db.Decimal(14, 4)` y
   **nunca** `Float`; `productId`, `createdBy` y `updatedBy` son `@db.Uuid` **sin `@relation`**;
+  `createdBy` y `updatedBy` son **anulables** (`String?`, decisión cerrada 22) mientras que
+  `productId` y `recipeId` son obligatorios;
   la relación `recipe` declara `onDelete: Cascade`; existen `@@unique([recipeId, productId])`,
   `@@index([productId])`, `@@index([createdBy])`, `@@index([updatedBy])`; **no** hay `@unique`
   ni `@@unique` sobre `name` ni sobre `nameNormalized`; `Recipe` tiene `deletedAt` y
@@ -54,7 +56,9 @@ bloque C.
 - `pnpm run db:migrate:create` (no aplica nada) y después **completar a mano** lo que Prisma no
   modela, según `design.md > 4`: `CREATE EXTENSION IF NOT EXISTS pgcrypto`, **las tres FK que
   cruzan de módulo** (`recipe_lines_product_id_fkey`, `recipes_created_by_fkey`,
-  `recipes_updated_by_fkey`, las tres `ON DELETE RESTRICT ON UPDATE CASCADE`), el índice único
+  `recipes_updated_by_fkey`, las tres `ON DELETE RESTRICT ON UPDATE CASCADE`; las dos de
+  auditoría sobre columnas `UUID` **anulables**, y **nunca** `ON DELETE SET NULL`,
+  `design.md > 4.1`), el índice único
   **parcial** `recipes_name_unique`, el `CHECK` `recipe_lines_quantity_positive` y los cuatro
   `ALTER TABLE` de RLS (`ENABLE` **y** `FORCE`, las dos tablas).
 - Cabecera del archivo indicando qué se escribió a mano y que toda migración futura de estas
@@ -72,6 +76,9 @@ bloque C.
 - Exactamente dos sentencias, en orden inverso al UP: `DROP TABLE IF EXISTS "recipe_lines";` y
   `DROP TABLE IF EXISTS "recipes";`. Nada más: índices, FK y `CHECK` caen con sus tablas. **No**
   se toca `pgcrypto` (la crean también QC-4 y QC-14).
+- La decisión 22 (autor anulable) **no cambia el DOWN**: las FK de auditoría caen con su tabla,
+  así que sigue siendo exactamente el mismo par de `DROP TABLE`. Se anota para que nadie añada
+  un `ALTER TABLE ... DROP CONSTRAINT` de más «por simetría».
 - **Hecho cuando:** existe el archivo y `./init.sh` no reporta «migraciones sin down.sql».
 
 ---
@@ -126,7 +133,7 @@ bloque C.
   ausentes deliberados: **ningún** `@relation` desde `RecipeLine` a `Product` ni desde `Recipe`
   a `User`, y **ningún** `@unique` sobre el nombre.
 - **Hecho cuando:** pasa y cubre R1, R2, R3, R4, R5, R6, R8, R10, R13, R15, R17, R19, R21, R22,
-  R23, R24, R28.
+  R23, R24, R28, R33.
 
 ### [ ] T8. [P] Contrato estático del SQL de la migración
 - Dep: T2, T3.
@@ -139,7 +146,7 @@ bloque C.
   `DOUBLE PRECISION` y cambiar un `RESTRICT` por `CASCADE`, y comprobar que el predicado cae en
   los cuatro casos. Un test que no puede fallar no vigila nada.
 - **Hecho cuando:** pasa y cubre R3, R5, R7, R9, R11, R13, R14, R16, R19, R21, R25, R27, R28,
-  R29, R30.
+  R29, R30, R33.
 
 ### [ ] T9. [P] La normalización del nombre
 - Dep: T4.
@@ -184,12 +191,13 @@ bloque C.
   **SQLSTATE** (`23502`, `23503`, `23505`, `23514`), nunca sobre el texto del error. Copiar los
   helpers de `tests/integration/inventario/inventario-constraints.int.test.ts`.
 - **Cada caso crea sus propios usuario y producto dentro de la transacción**: las tres FK son
-  reales y no se depende del seed.
+  reales y no se depende del seed. El autor es **opcional** (R33), así que hay que cubrir los dos
+  caminos: receta con autor real y receta sin autor.
 - `beforeAll` que falle con un mensaje claro («corre `pnpm run db:migrate`») si `recipes` o
   `recipe_lines` no existen.
 - Casos exactos: los de la tabla de trazabilidad, columna **I**.
 - **Hecho cuando:** todos los casos pasan y cubren R1, R2, R3, R4, R5, R6, R7, R9, R10, R11,
-  R12, R13, R14, R15, R16, R19, R21, R22, R23, R24, R25, R26, R27.
+  R12, R13, R14, R15, R16, R19, R21, R22, R23, R24, R25, R26, R27, R33.
 
 ---
 
@@ -209,9 +217,10 @@ bloque C.
 - Dep: T13.
 - Archivos: `progress/impl_QC-24-modelo-recetas.md`.
 - Copiar la tabla de trazabilidad de abajo con la **salida real** de los tests, no con la
-  intención. Anotar también las respuestas que el humano dio a las preguntas abiertas 3, 4 y 5
-  en la puerta de aprobación, y si alguna cambió el diseño.
-- **Hecho cuando:** el archivo existe, cada R1–R32 tiene al menos un test **ejecutado** (no solo
+  intención. Las tres preguntas abiertas que añadió `spec_author` ya están cerradas (decisiones
+  20, 21 y 22 de `requirements.md`); si alguna de las cuatro de `design.md > 9` se resolviera
+  durante la implementación, se anota aquí.
+- **Hecho cuando:** el archivo existe, cada R1–R33 tiene al menos un test **ejecutado** (no solo
   escrito) y el reviewer lo valida contra `CHECKPOINTS.md > Trazabilidad`.
 
 ---
@@ -252,7 +261,7 @@ Abreviaturas:
 | R18 | C · «lib/modules/recetas no contiene prisma.product, @prisma/client ni rutas profundas a inventario» · C · «@/lib/modules/inventario publica ProductCatalog» · G2 | — |
 | R19 | S · «product_id, created_by y updated_by son escalares uuid SIN @relation» · M · «las tres FK que cruzan de modulo existen en el SQL con ON DELETE RESTRICT» | I · «la base rechaza un product_id y un created_by inexistentes con SQLSTATE 23503, aunque Prisma no declare la relacion» |
 | R20 | C · «el modulo recetas tiene index.ts, solo carpetas domain/ports/adapters y ningun 'use server' alcanzable desde el barrel» · G2 | — |
-| R21 | S · «created_by y updated_by son obligatorios» · M · «las dos FK de auditoria apuntan a users» | I · «registra autor y ultimo editor, y rechaza un autor inexistente con SQLSTATE 23503» |
+| R21 | S · «created_by y updated_by existen como escalares uuid» · M · «las dos FK de auditoria apuntan a users» | I · «registra autor y ultimo editor, y rechaza un autor inexistente con SQLSTATE 23503» |
 | R22 | S · «Recipe declara deletedAt opcional» | I · «el borrado logico conserva la fila completa de la receta y marca deleted_at» |
 | R23 | S · «Recipe y RecipeLine declaran createdAt y updatedAt» | I · «created_at y updated_at se rellenan solos y updated_at cambia al modificar, en las dos tablas» |
 | R24 | S · «RecipeLine no declara deletedAt» | I · «quitar un producto de una receta elimina la fila de la linea» |
@@ -264,8 +273,9 @@ Abreviaturas:
 | R30 | M · «down.sql revierte exactamente lo que crea migration.sql y no toca pgcrypto» | **T11** · ciclo apply → rollback → apply, con la salida pegada en `progress/impl_QC-24-modelo-recetas.md` |
 | R31 | C · «la feature no anade adaptadores driving, rutas ni Server Actions» | — (no hay flujo navegable: E2E diferido con motivo, decision cerrada 17) |
 | R32 | G3 · «toda dependencia de package.json tiene su fila en el registro» | — |
+| R33 | S · «created_by y updated_by son opcionales» · M · «created_by y updated_by son UUID anulables y sus FK no son ON DELETE SET NULL» | I · «crea una receta sin autor y la relee con autor ausente, no con cero ni cadena vacia» |
 
-Los 32 requisitos tienen al menos un test ejecutable. **R8, R17, R18, R20, R28, R29, R31 y R32 se
+Los 33 requisitos tienen al menos un test ejecutable. **R8, R17, R18, R20, R28, R29, R31 y R32 se
 cierran solo con tests estáticos, unitarios o guardias, a propósito**: son propiedades de una
 función pura, del texto del esquema o del árbol de archivos, y una base real no añadiría nada
 —en el caso de R29, añadiría un falso verde

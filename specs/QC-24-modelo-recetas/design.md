@@ -3,7 +3,9 @@
 > Zona: `backend` · Complejidad: `high` · depends_on: `QC-14` ·
 > Rama: `feature/QC-24-modelo-recetas`
 >
-> El **qué** está en `requirements.md` (R1–R32) y su alcance lo cerró el humano el 2026-09-02.
+> El **qué** está en `requirements.md` (R1–R33) y su alcance lo cerró el humano el 2026-09-02;
+> las tres preguntas que dejó abiertas F1.2 las cerró el mismo día (decisiones 20, 21 y 22) y la
+> del autor anulable está propagada aquí, en § 2.1 y § 4.1.
 > Aquí va el **cómo**: la forma exacta de los dos modelos, el SQL que hay que escribir a mano
 > porque Prisma no lo modela, **cómo nace el módulo `recetas`** —el primero que se crea desde
 > cero en este repo— y **qué contrato publica `inventario`** para que una línea pueda apuntar a
@@ -55,6 +57,8 @@ improvise.
 /// mano en `migration.sql`. Asi la base garantiza la integridad y, a la vez, el cliente
 /// Prisma NO puede atravesar de `recetas` a `users` con un `include`. La guardia de modulos
 /// NO detectaria ese cruce, porque no es un import.
+/// Son ANULABLES (decision cerrada 22, R33): NULL significa «no la creo una persona»
+/// —una importacion, un seed—, no «se perdio el dato».
 ///
 /// OJO 2 — la unicidad del nombre NO esta aqui como `@unique` y es deliberado: es un indice
 /// unico PARCIAL (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela
@@ -67,8 +71,8 @@ model Recipe {
   description    String?
   steps          Json      @default("[]")
   imagePath      String?   @map("image_path")
-  createdBy      String    @map("created_by") @db.Uuid
-  updatedBy      String    @map("updated_by") @db.Uuid
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -86,11 +90,11 @@ model Recipe {
 | `id` | `id` | `UUID DEFAULT gen_random_uuid()` | no | R1 |
 | `name` | `name` | `TEXT` | **no** | R1, R2, R3 |
 | `nameNormalized` | `name_normalized` | `TEXT` | **no** | R7, R8 |
-| `description` | `description` | `TEXT` | sí | R1, R3 · pregunta abierta 4 |
+| `description` | `description` | `TEXT` | sí (decisión 21) | R1, R3 |
 | `steps` | `steps` | `JSONB NOT NULL DEFAULT '[]'` | no | R4, R5 |
 | `imagePath` | `image_path` | `TEXT` | sí | R6 |
-| `createdBy` | `created_by` | `UUID` | no | R21 · pregunta abierta 5 |
-| `updatedBy` | `updated_by` | `UUID` | no | R21 |
+| `createdBy` | `created_by` | `UUID` | **sí** (decisión 22) | R21, R33 |
+| `updatedBy` | `updated_by` | `UUID` | **sí** (decisión 22) | R21, R33 |
 | `createdAt` | `created_at` | `TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP` | no | R23 |
 | `updatedAt` | `updated_at` | `TIMESTAMPTZ(6)` (lo rellena `@updatedAt`) | no | R23 |
 | `deletedAt` | `deleted_at` | `TIMESTAMPTZ(6)` | sí | R22 |
@@ -112,6 +116,12 @@ Lo que no es evidente:
   del esquema. Los 120/500 son de QC-25.
 - **`created_by` / `updated_by` no tienen `@relation`.** Ver § 4.1: es la decisión 3 y es lo que
   impide el `include` a `users`.
+- **`created_by` / `updated_by` son anulables** (decisión 22, R33). `NULL` **no** es «autor
+  desconocido» ni «se perdió el dato»: es «esta receta no la creó una persona», el caso de una
+  importación masiva o de un seed. Quien lo lea en QC-25 lo muestra así —«Sistema», o el sitio
+  del autor vacío—, no como un hueco. La integridad no se afloja: `NULL` está permitido, pero
+  **cualquier valor presente tiene que ser un usuario que existe**, porque una FK solo verifica
+  las filas con valor.
 - **Índices sobre `created_by` y `updated_by`.** Postgres no indexa el lado hijo de una FK, y el
   `RESTRICT` al borrar un usuario pasa por ahí. Mismo motivo que `users_role_id_idx` en QC-4.
 
@@ -255,6 +265,15 @@ la cabecera de aviso). A cambio, la única forma de que una receta muestre el no
 producto o de su autor es pasar por el contrato público del módulo dueño, que es lo que QC-15
 pide.
 
+**Las dos FK de auditoría admiten `NULL`** (decisión 22, R33) y eso **no** debilita nada: en SQL
+una clave foránea solo se verifica cuando la columna tiene valor, así que una receta sin autor
+pasa y una receta con un autor inventado se rechaza con `23503`. Es justo lo que R21 y R33 piden
+a la vez.
+
+**No se usa `ON DELETE SET NULL` en las FK de auditoría**, aunque ahora la columna lo permitiría:
+convertiría «al usuario lo borraron» en «no la creó una persona», que son cosas distintas y la
+decisión 22 las separa a propósito. `RESTRICT` mantiene esa distinción intacta.
+
 `ON DELETE RESTRICT` en las tres: el borrado de producto y el de usuario son **lógicos**
 (QC-20 D5, QC-4), así que en operación normal el `RESTRICT` nunca se dispara; existe para que un
 borrado físico por consola o por script no deje líneas apuntando al vacío. Es lo que hace
@@ -291,7 +310,7 @@ línea.
 
 ```sql
 -- Unicidad del nombre normalizado (decision cerrada 7). PARCIAL: una receta borrada
--- logicamente libera su nombre (R9, pregunta abierta 3). Prisma no modela indices parciales,
+-- logicamente libera su nombre (R9, decision cerrada 20). Prisma no modela indices parciales,
 -- asi que este indice vive SOLO aqui: si alguien anade `@unique` en el esquema, la unicidad
 -- pasa a alcanzar tambien a las recetas borradas y R9 deja de cumplirse en silencio.
 CREATE UNIQUE INDEX "recipes_name_unique" ON "recipes"("name_normalized") WHERE "deleted_at" IS NULL;
@@ -509,14 +528,14 @@ desde `recetas` sin que ninguna guardia se entere —no es un import, así que
 del producto. Coste asumido, escrito en § 4.1: Prisma no valida esas FK y hay que protegerlas del
 drift a mano en cada migración futura.
 
-### 8.2 Índice único **total** sobre `name_normalized` — **descartada (con pregunta abierta)**
+### 8.2 Índice único **total** sobre `name_normalized` — **descartada**
 
 Sería más simple y Prisma lo modelaría solo (`@unique`). Se descarta porque `recipes` tiene
 borrado lógico: con índice total, borrar una receta **quema su nombre para siempre** y nadie
 puede volver a crear una receta con ese nombre. QC-4 se topó con lo mismo en `users` y lo
-resolvió con índices parciales. La posición queda anotada como **pregunta abierta 3** del
-`requirements.md`, porque la decisión 7 heredaba de un caso (presentaciones) que no tenía
-borrado lógico y por tanto no respondió a esto.
+resolvió con índices parciales. La decisión 7 heredaba de un caso (presentaciones) que no tenía
+borrado lógico y por tanto no respondió a esto; el humano lo cerró el 2026-09-02 a favor del
+índice **parcial** (**decisión cerrada 20**), confirmando la posición de este diseño.
 
 ### 8.3 `ON DELETE RESTRICT` también entre receta y línea — **descartada**
 
@@ -559,8 +578,10 @@ Consta para no reconsiderarla: la decisión 1 fijó módulo propio, coherente co
 
 ## 9. Preguntas abiertas que deja este diseño
 
-Las cinco de `requirements.md` (dos del humano, tres añadidas en F1.2) no se repiten aquí. Estas
-son propias del diseño, ninguna bloquea la implementación y todas tienen posición por defecto:
+Las de `requirements.md` no se repiten aquí: quedan **dos**, las del humano, porque las tres que
+añadió `spec_author` en F1.2 se cerraron el 2026-09-02 y bajaron a la tabla de decisiones (filas
+20, 21 y 22) — la 22 cambió el diseño y está propagada en § 2.1 y § 4.1. Estas cuatro son propias
+del diseño, ninguna bloquea la implementación y todas tienen posición por defecto:
 
 1. **¿`recipes` necesita índice por `deleted_at`?** No se crea. Todas las consultas de QC-25
    filtrarán `deleted_at IS NULL`, pero el índice único parcial de § 4.3 ya cubre parcialmente
@@ -602,9 +623,10 @@ fórmula. Lo decide QC-26.
 
 Cuatro avisos para el implementer:
 
-- El test de integración necesita **usuarios y productos** en la base para poder insertar una
-  receta o una línea (las tres FK son reales). Crear los suyos dentro de la transacción y
-  hacerles `ROLLBACK`, sin depender del seed.
+- El test de integración necesita **productos** en la base para poder insertar una línea (la FK
+  es real), y **usuarios** para los casos con autor. El autor es opcional (R33), así que hay que
+  cubrir los dos caminos: receta con autor real y receta sin autor. Crear las filas dentro de la
+  transacción y hacerles `ROLLBACK`, sin depender del seed.
 - `beforeAll` debe fallar con un mensaje claro («corre `pnpm run db:migrate`») si `recipes` o
   `recipe_lines` no existen, no con un error de Prisma a mitad del primer caso.
 - Un test de RLS escrito con Prisma sale verde pase lo que pase (Prisma se conecta como dueño de

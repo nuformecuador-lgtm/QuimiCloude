@@ -118,8 +118,8 @@ ese contrato.
 ### Auditoría, borrado y marcas de tiempo
 
 **R21.** El sistema DEBE registrar, para cada receta, qué usuario la creó y qué usuario la
-modificó por última vez, y SI se intenta registrar como autor un usuario inexistente, ENTONCES
-DEBE rechazar la operación.
+modificó por última vez **cuando ese usuario exista**, y SI se intenta registrar como autor un
+usuario inexistente, ENTONCES DEBE rechazar la operación.
 
 **R22.** CUANDO se borra una receta, el sistema DEBE conservar su fila completa y registrar el
 instante del borrado, sin eliminar ninguno de sus datos.
@@ -162,6 +162,13 @@ navegable que un test E2E pueda visitar.
 **R32.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
 requisitos anteriores.
 
+### Añadidos tras cerrar las preguntas abiertas (2026-09-02)
+
+**R33.** El sistema DEBE aceptar una receta **sin autor de creación y sin autor de última
+modificación**, DEBE conservarlos como ausencia de valor, y NO DEBE rechazar la operación por
+ello: la ausencia significa «no la creó una persona» —una importación o una siembra—, no «se
+perdió el dato».
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el
@@ -188,6 +195,9 @@ requisito que la hace testeable. Ninguna queda sin `R<n>`.
 | 17 | E2E diferido con motivo | R31 |
 | 18 | Los permisos no se deciden aquí | R31 |
 | 19 | Ninguna librería nueva | R32 |
+| 20 | El nombre de una receta borrada queda libre (índice único parcial) | R9 |
+| 21 | La descripción es opcional | R1, R3 |
+| 22 | El autor puede quedar vacío | R33 (y R21, que ya solo exige registrarlo cuando existe) |
 
 ## Preguntas abiertas
 
@@ -204,27 +214,9 @@ son **caras de cerrar después**, no columnas que se añadan un martes.
    ampliarla con recetas ya cargadas obliga a migrar. Se asume el riesgo a conciencia, igual que
    QC-14 asumió el de la unidad como texto libre.
 
-**Añadidas por `spec_author` (F1.2).** Tres huecos que la tabla de decisiones no cubre. Ninguna
-bloquea la implementación: las tres tienen una **posición por defecto** tomada de un precedente
-del repo, escrita aquí para que el humano la confirme o la corrija en la puerta de aprobación
-del spec (F1.4). No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
-
-3. **¿El nombre de una receta borrada lógicamente queda libre?** La decisión de unicidad viene de
-   QC-20 D16, donde `presentations` **no** tiene borrado lógico, así que no tuvo que responder
-   esto; aquí `recipes` sí lo tiene. Con índice único **total**, borrar una receta quema su
-   nombre para siempre y nadie puede volver a crear «Desengrasante 5 %». Con índice único
-   **parcial** (`WHERE deleted_at IS NULL`), el nombre se libera al borrar. **Posición por
-   defecto: parcial**, que es exactamente lo que QC-4 decidió para el correo y el documento de
-   `users` por este mismo motivo. **R9 está escrito sobre esa posición**: si la respuesta fuera
-   «total», R9 se invierte y cambia una cláusula `WHERE` en la migración.
-4. **¿La descripción de la receta es obligatoria?** La tabla fija su largo máximo (500) pero no
-   su obligatoriedad. **Posición por defecto: opcional** (columna anulable). Volverla obligatoria
-   más tarde exige rellenar las filas existentes antes del `NOT NULL`.
-5. **¿Puede existir una receta sin autor?** La tabla dice que `created_by` y `updated_by` los crea
-   esta ficha, pero no si admiten ausencia de valor. **Posición por defecto: obligatorios**
-   (`NOT NULL`), que es posible precisamente porque la tabla nace vacía —QC-20 no podrá hacerlo
-   en `products`, que ya tiene filas—. Consecuencia asumida: ninguna carga automática, seed o
-   importación podrá crear recetas sin un usuario real detrás.
+Las tres que añadió `spec_author` en F1.2 —índice único parcial, obligatoriedad de la descripción
+y obligatoriedad del autor— **el humano las cerró el 2026-09-02** y bajaron a la tabla de
+decisiones cerradas (filas 20, 21 y 22). Aquí ya no quedan.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -249,3 +241,6 @@ del spec (F1.4). No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
 | 2026-09-02 | E2E | **Diferido con motivo**: no hay pantalla ni flujo navegable que visitar, es esquema y migración. Lo decide **QC-26**. Mismo criterio que QC-14 |
 | 2026-09-02 | Permisos | **Aquí no se deciden**: no hay service en esta ficha. Los fija **QC-25**, que ya dice «solo el Administrador», y allí van con su test (`CHECKPOINTS.md > Permisos`) |
 | 2026-09-02 | Librería nueva | **Ninguna.** Es esquema Prisma, migración y el armazón del módulo. La única librería del área —el cliente de Supabase para subir la imagen— es de **QC-25** y entra por la regla 7 allí |
+| 2026-09-02 | ¿El nombre de una receta borrada queda libre? | **Sí.** El índice único es **parcial**: solo alcanza a las recetas vivas (`WHERE deleted_at IS NULL`). Borrar una receta libera su nombre. Heredado de **QC-4**, que lo resolvió igual para el correo y el documento de `users`; QC-20 D16 no tuvo que responderlo porque `presentations` no tiene borrado lógico. Cierra la pregunta abierta 3 de `spec_author` |
+| 2026-09-02 | ¿La descripción es obligatoria? | **No, es opcional.** Confirma lo que dice la ficha del board. Su largo máximo (500) sigue siendo validación de aplicación en **QC-25**. Cierra la pregunta abierta 4 de `spec_author` |
+| 2026-09-02 | ¿Puede existir una receta sin autor? | **Sí: `created_by` y `updated_by` son anulables.** Algo que no es una persona —una importación masiva, un seed— tiene que poder crear recetas. Un autor vacío significa **«no la creó una persona»**, no «se perdió el dato»; quien lo lea lo muestra así (**QC-25**). Se aparta de la posición por defecto que había tomado `spec_author` (`NOT NULL`). Cierra la pregunta abierta 5 de `spec_author` |
