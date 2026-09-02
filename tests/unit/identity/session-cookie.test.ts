@@ -301,4 +301,61 @@ describe('lectura y borrado de la cookie de sesion', () => {
 
     expect(deleteMock).toHaveBeenCalledWith({ name: SESSION_COOKIE_NAME, path: '/' });
   });
+
+  // R20 — tras cerrar sesion, la peticion siguiente DESDE ESE NAVEGADOR resuelve "sin sesion".
+  //
+  // Esto cubre solo la mitad de servidor de R20: el navegador que cerro sesion ya no manda la
+  // cookie (el `delete` de `clearSession()` se lo dice), asi que `getMock` simula eso
+  // devolviendo `undefined`, igual que hace un navegador real que ya la borro. La otra mitad de
+  // R20 -- que VOLVER ATRAS en el historial no muestre contenido privado -- es una conducta del
+  // navegador (cache de pagina) que NINGUN test de servidor puede afirmar: queda diferida a
+  // QC-9 con R24 (`requirements.md` > Preguntas abiertas 3), donde ya habra una URL real que
+  // ejercitar en Playwright.
+  it('tras clearSession, una peticion sin la cookie (navegador que ya la borro) resuelve sin sesion', async () => {
+    await startSession(createSessionTicket(USER_ID, AHORA));
+    setMock.mockClear();
+
+    await clearSession();
+    getMock.mockReturnValue(undefined);
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R21 — CARACTERIZACION (riesgo asumido, QC-23 lo pondra rojo): una copia del valor sigue
+  // valiendo tras cerrar sesion.
+  //
+  // Esto NO es una garantia deseable: es la constatacion escrita de una limitacion que el
+  // humano asumio A PROPOSITO el 2026-09-02 (`requirements.md` > Decisiones cerradas).
+  // `clearSession()` retira la cookie de ESE navegador y nada mas: no existe ningun registro de
+  // sesiones activas donde invalidar el valor ya emitido, asi que una COPIA de ese valor
+  // (robada, guardada, lo que sea) presentada en otra peticion sigue resolviendo como sesion
+  // valida hasta su `exp` (8 h).
+  //
+  // El riesgo se tolero porque: (a) exige un robo previo -- la cookie es `httpOnly`, un XSS de
+  // solo lectura no basta --, (b) esta acotado a 8 h, y (c) hay salida de emergencia real: dar
+  // de baja al usuario (`deleted_at`) o cambiarle el rol surte efecto en la SIGUIENTE peticion,
+  // porque el usuario se resuelve contra la base en cada una (R10, R11), nunca a partir de la
+  // cookie.
+  //
+  // La invalidacion de verdad es QC-23, bloqueada por esta ficha. CUANDO QC-23 aterrice, este
+  // test se pondra ROJO A PROPOSITO -- y ese rojo es la SEÑAL de que la invalidacion funciona,
+  // NO una regresion. Ese dia se reescribe este test (para afirmar que la copia YA NO vale), no
+  // se "arregla" para que vuelva a pasar en verde.
+  it('CARACTERIZACION (riesgo asumido, QC-23 lo pondra rojo): una copia del valor sigue valiendo tras cerrar sesion', async () => {
+    const ticket = createSessionTicket(USER_ID, AHORA);
+    await startSession(ticket);
+    const { value: valorCapturado } = cookieEmitida();
+    setMock.mockClear();
+
+    await clearSession();
+
+    // Una peticion posterior que presenta una COPIA del valor ya emitido: el navegador que la
+    // tiene copiada no se entera de que otro navegador cerro sesion.
+    getMock.mockReturnValue({ value: valorCapturado });
+
+    const claims = await readSessionClaims();
+
+    expect(claims).not.toBeNull();
+    expect(claims?.sub).toBe(ticket.userId);
+  });
 });
