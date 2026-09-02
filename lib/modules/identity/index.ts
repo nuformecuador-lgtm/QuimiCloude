@@ -8,3 +8,6 @@ export { type SessionTicket } from './domain/session';
 export { createVerifyCredentials, type VerifyCredentialsDeps } from './domain/verify-credentials';
 export { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from './domain/roles';
 export { seedInitialAccess, type SeedOutcome } from './domain/seed-initial-access';
+export { createResolveSessionUser } from './domain/resolve-session-user';
+export { buildDisplayName } from './domain/display-name';
+export { isSessionExpired, type SessionClaims } from './domain/session-claims';
