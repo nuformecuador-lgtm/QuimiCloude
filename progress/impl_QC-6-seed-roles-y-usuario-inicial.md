@@ -676,3 +676,99 @@ real, efecto colateral sobre el admin preexistente declarado y aceptado); los oc
 `identity-seed.int.test.ts` pasan contra la base real, dos veces seguidas, sin dejar rastro
 en la base (confirmado releyendo al admin preexistente antes y despues); typecheck, lint y
 guardias en verde.
+
+## Correccion: la premisa de "tabla vacia" que QC-6 invalida
+
+**Sintoma.** Al correr el gate rapido tras cerrar T18, `identity-constraints.int.test.ts`
+(de QC-4) dio 9 tests en rojo, con dos formas del mismo fallo:
+- `expected 1 to be +0` en aserciones `expect(await tx.user.count()).toBe(0)`.
+- `expected [ {...}, {...} ] to deeply equal [ {...} ]` en aserciones
+  `tx.user.findMany(...)` sin `where`, comparadas contra un array con solo las filas que
+  el propio `it` habia creado.
+
+**Por que la causa es de QC-6 y no basura local.** QC-6 encadeno el seed al `build`
+(`prisma migrate deploy && tsx scripts/seed.ts && next build`), asi que a partir de esta
+feature **una tabla `users` no vacia es el estado normal de cualquier base**, local o de
+despliegue. Los tests de QC-4 fueron escritos antes de que existiera el seed y asumian
+que `users` arrancaba vacia; esa premisa es la que quedo obsoleta, no las restricciones que
+verifican. Limpiar la base a mano habria dejado el gate en verde HOY y roto MANANA (la
+siguiente vez que alguien corra `db:seed` o el `build`), y roto tambien en cualquier otra
+maquina o entorno de CI que ya tenga el seed aplicado. Por eso la correccion es en el
+codigo del test, no en el estado de la base.
+
+**Que NO se toco.** Las restricciones que QC-4 verifica (NOT NULL de las nueve columnas de
+negocio, los tres indices unicos funcionales/parciales sobre `lower(email)`,
+`lower(username)` y `(document_type_code, document_number)`, las dos FK con
+`ON DELETE RESTRICT`, y el borrado logico) se siguen comprobando exactamente igual: mismo
+SQLSTATE esperado, mismo `SAVEPOINT`/`ROLLBACK TO SAVEPOINT`, misma transaccion con
+`inRolledBackTransaction`. Lo unico que cambio es el **alcance** de la asercion posterior:
+paso de "el estado total de la tabla `users`" a "las filas que ese `it` en concreto creo o
+intento crear", siguiendo el precedente que el propio archivo ya usaba en los casos de
+borrado logico (acotar por `documentNumber` del fixture).
+
+**Sitios corregidos en `tests/integration/identity/identity-constraints.int.test.ts`:**
+1. `rechaza el alta si falta un campo obligatorio` — `tx.user.count()` -> `tx.user.count({ where: { roleId } })`, y se reescribio el comentario para que ya no diga "la tabla sigue vacia" sino "no queda ninguna fila DE ESTE CASO".
+2. `rechaza un correo repetido exacto` — `tx.user.findMany({ select: ... })` -> se le agrego `where: { roleId }`.
+3. `rechaza un correo repetido aunque cambie el uso de mayusculas` — idem, `where: { roleId }`.
+4. `rechaza un nombre de usuario repetido exacto` — idem, `where: { roleId }`.
+5. `rechaza un nombre de usuario repetido aunque cambie el uso de mayusculas` — idem, `where: { roleId }`.
+6. `rechaza el mismo tipo y numero de documento repetidos` — idem, `where: { roleId }`.
+7. `acepta el mismo numero de documento con tipo distinto` — idem, `where: { roleId }`, se conservo el `orderBy`.
+8. `rechaza un tipo de documento fuera del catalogo` — `tx.user.count()` -> `tx.user.count({ where: { roleId } })`.
+9. `rechaza un usuario sin rol o con rol inexistente` — aqui NO hay `roleId` util (el caso inserta a proposito con `role_id` nulo y con un uuid inexistente). Se extrajo `documentNumber` del fixture a una constante local (`const documentNumber = '111000111'`) reusada en `userSqlValues` y en los dos `tx.user.count({ where: { documentNumber } })`, para que no haya dos literales que puedan divergir.
+
+No aparecio ningun otro caso rojo por esta misma causa en ese archivo, aparte de los nueve
+listados en el encargo.
+
+**Barrido de `tests/integration/**` — archivo por archivo:**
+- `tests/integration/identity/login.int.test.ts` (T8, de QC-7): revisado completo. Todas
+  las lecturas y aserciones estan acotadas por `usuarioId`/`nombreDeUsuario`, ambos
+  generados con `randomUUID()` en el propio archivo (patron distinto: fixture propio
+  comiteado en `beforeAll` y limpiado por id en `afterAll`, no transaccion con rollback).
+  No hay ningun `count()`/`findMany()` sin `where` sobre `users`, `roles` ni
+  `document_types`. No se toco nada.
+- `tests/integration/inventario/inventario-constraints.int.test.ts` (QC-14, opera sobre
+  `products`/`presentations`): revisado completo. QC-6 no siembra estas tablas, y de
+  hecho el propio docstring del archivo ya declara la regla ("NINGUNA AFIRMACION GLOBAL")
+  y todas las lecturas ya estan acotadas por `id`/`presentationId` propios del `it`. No
+  habia nada que arreglar.
+- `tests/integration/identity/identity-seed.int.test.ts` (T18, de QC-6 mismo): revisado
+  completo. Este archivo YA asume de entrada que la base local no esta vacia (lo dice su
+  propio comentario de cabecera) y por eso cada `it` llama primero a
+  `resetIdentityToEmptyState(tx)`, que borra fisicamente, DENTRO del mismo `tx` que
+  termina en `ROLLBACK`, todos los usuarios y los roles Administrador/Operador. Las
+  aserciones absolutas que vienen despues (`tx.user.count()`, `tx.role.findMany(...)`,
+  etc.) son correctas porque afirman sobre un estado que el propio `it` acaba de
+  construir de forma determinista dentro de su propia transaccion, no sobre el estado
+  real de la base compartida. No se toco nada.
+
+**Excepciones dejadas intactas a proposito:**
+- `el catalogo arranca solo con CC` (`tx.documentType.findMany()` comparado con
+  `[DOCUMENT_TYPE_CC]`, en `identity-constraints.int.test.ts`): QC-6 no toca
+  `document_types` (es su R17, verificado ademas por el caso 8 de
+  `identity-seed.int.test.ts`), asi que la asercion absoluta sobre ese catalogo sigue
+  siendo correcta y valiosa. No se cambio.
+- Cualquier asercion ya acotada por un nombre de rol con `randomUUID()` (por ejemplo
+  `permite borrar un rol sin usuarios asignados`, que usa `roleId` de un
+  `uniqueRoleName()`): ya eran irrepetibles por construccion y no necesitaban cambio.
+
+**Verificacion ejecutada (solo lo pedido, sin `./init.sh` ni `pnpm test` completo):**
+- `pnpm run typecheck` -> limpio, sin salida de error.
+- `pnpm run lint` -> limpio, sin salida de error.
+- `pnpm run test:guardias` -> `Test Files 5 passed (5)`, `Tests 65 passed (65)`.
+- `pnpm exec vitest run tests/integration/identity/identity-constraints.int.test.ts` ->
+  `Test Files 1 passed (1)`, `Tests 23 passed (23)` (antes: 9 rojos; ahora: 0).
+- `pnpm exec vitest run tests/integration/identity/identity-seed.int.test.ts` ->
+  `Test Files 1 passed (1)`, `Tests 8 passed (8)`.
+- `pnpm exec vitest run tests/integration/identity/login.int.test.ts` -> `Test Files 1
+  passed (1)`, `Tests 13 passed (13)`.
+- `pnpm exec vitest run tests/integration/inventario/inventario-constraints.int.test.ts`
+  -> `Test Files 1 passed (1)`, `Tests 19 passed (19)`.
+
+**Recomendacion para el leader (no implementada, es solo sugerencia):** si el gate rapido
+va a seguir corriendo contra una base local que arrastra el seed real de QC-6, conviene
+documentar en `docs/verification.md` que los tests de integracion de identidad DEBEN
+acotar toda asercion sobre `users`/`roles` por un identificador propio del caso (patron ya
+establecido en este archivo), y que ningun test nuevo puede volver a afirmar sobre el
+estado absoluto de esas dos tablas salvo que, como `identity-seed.int.test.ts`, construya
+su propio estado "vacio" dentro de la misma transaccion que hace el rollback.
