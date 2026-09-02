@@ -26,7 +26,7 @@ T0–T7 y **T9** cerradas y en verde. **Los 24 requisitos (R1–R24) tienen test
 | T5 contrato estatico del SQL | `[x]` |
 | T6 ciclo apply -> rollback -> apply | `[x]` — ejecutado por el leader, repetido por el `reviewer` |
 | T7 tests de integracion contra Postgres real | `[x]` |
-| T8 merge con `dev` + `./init.sh` completo | `[ ]` — la corre el **leader** |
+| T8 merge con `dev` + `./init.sh` completo | `[x]` — la corrio el **leader**; verde por etapas, ver `## T8` |
 | T9 mapa `R<n>` -> test con salida real | `[x]` — los 24 requisitos con test ejecutado |
 
 ## La base de datos de esta feature
@@ -351,3 +351,43 @@ reaplicacion reconstruyo el esquema identico.
 
 **R22 queda cerrado con test ejecutado. Con esto los 24 requisitos (R1-R24) tienen cobertura
 ejecutada**, y el criterio de aceptacion de T9 se cumple.
+
+## T8 — gate completo (2026-09-01, lo corre el leader)
+
+**Resultado: verde en todas sus etapas.** Pero `./init.sh` **no se pudo correr como un solo
+comando desde el worktree**, por un defecto del arnes ajeno a esta feature (ver abajo). Se
+corrieron sus etapas una a una, sin rebajar ninguna:
+
+| Etapa del gate | Resultado |
+| --- | --- |
+| `pnpm typecheck` | limpio |
+| `pnpm lint` | limpio |
+| `pnpm run test:json` (suite COMPLETA) | **272/272 en 25 archivos** |
+| `comparar-baseline-rojos.mjs` | `sin rojos nuevos (25 archivos ejecutados, baseline vacio)` |
+| toda migracion con `down.sql` | las dos, si |
+| `.env` presente | si |
+| `validate-features.mjs` | verde, corrido desde el worktree PRINCIPAL (ver defecto) |
+
+Sincronizacion con `dev` (T8, primera mitad): `git fetch origin dev` + `git merge origin/dev`
+devolvio **Already up to date**. La rama va 7 commits por delante y 0 por detras, asi que no
+hubo conflictos que resolver ni decision humana que pedir.
+
+### Defecto del arnes encontrado aqui: el gate completo no corre desde dentro de un worktree
+
+`./init.sh` completo aborta con:
+
+```
+✗ feature_list.json invalido:
+faltan specs para features sdd en vuelo: QC-7
+```
+
+**No es un problema de QC-14.** `scripts/validate-features.mjs` busca los specs en tres sitios,
+y el tercero —`.worktrees/<slug>/specs/`— lo resuelve **relativo al cwd**. Desde dentro de un
+worktree ese directorio **no existe**: `.worktrees/` solo vive en el worktree principal. Asi
+que cualquier feature en vuelo cuyo spec aun no este en `dev` (aqui QC-7) se ve como spec
+faltante, y el gate cae antes de correr un solo test.
+
+Es un agujero real en el flujo, porque **F2.4 exige el gate completo antes de cada PR** y ese
+gate se corre justo desde el worktree de la feature. Lo tapa mirar `.worktrees/` relativo al
+**git common dir** en vez del cwd. No se parchea aqui: las mejoras al arnes entran por
+`/afinar-regla` (`CLAUDE.md`), no en caliente dentro de una feature.

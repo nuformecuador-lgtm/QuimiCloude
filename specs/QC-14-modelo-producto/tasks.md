@@ -123,7 +123,7 @@ archivo que no está listado, se anota antes de seguir.
 
 ## Bloque E — Cierre
 
-### [ ] T8. Sincronizar con `dev` y correr el gate completo
+### [x] T8. Sincronizar con `dev` y correr el gate completo
 - Dep: T0–T7.
 - Archivos: ninguno (salvo lo que traiga el merge).
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` **sin flags**. El modo rápido
