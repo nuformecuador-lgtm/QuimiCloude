@@ -19,7 +19,175 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es la **capa de persistencia** de
+QuimiCloude —el esquema Prisma (`db/schema.prisma`) más la base Postgres con la migración de
+esta feature aplicada— **más el armazón del módulo `recetas`** y la frontera que ese módulo
+tiene con `inventario`. No hay caso de uso, ni service, ni interfaz de usuario en esta ficha
+(decisiones cerradas de E2E y de permisos), así que ningún requisito habla de quién llama ni
+desde dónde.
+
+### Estructura de la receta
+
+**R1.** El sistema DEBE persistir, para cada receta, un identificador propio, estable y no
+derivado de sus datos de negocio, más su nombre, su descripción, sus pasos y la dirección de su
+imagen.
+
+**R2.** SI se intenta persistir una receta sin nombre, ENTONCES el sistema DEBE rechazar la
+operación y no crear ninguna fila.
+
+**R3.** El sistema NO DEBE limitar la longitud del nombre ni la de la descripción en la propia
+columna, y NO DEBE rechazar una receta por la longitud de ninguno de los dos: el límite de 120 y
+500 caracteres es validación de aplicación y pertenece a **QC-25**.
+
+**R4.** El sistema DEBE almacenar los pasos de una receta como **un único documento JSON en una
+sola columna**, conservando el orden de la lista tal como se guardó; NO DEBE mantener ninguna
+entidad ni tabla separada de «paso», NO DEBE derivar ninguna columna de orden, y NO DEBE
+rechazar un documento por su forma ni por su contenido.
+
+**R5.** SI se persiste una receta sin indicar pasos, ENTONCES el sistema DEBE registrar una
+**lista vacía**, y NO DEBE dejar los pasos como ausencia de valor.
+
+**R6.** El sistema DEBE almacenar la imagen de la receta como **una única columna de texto
+opcional** con su dirección, y NO DEBE almacenar el contenido del archivo, ni subirlo, ni
+conocer el servicio donde vive.
+
+### Unicidad del nombre de la receta
+
+**R7.** SI se intenta persistir una receta cuyo nombre coincida con el de otra receta ya
+existente **una vez normalizado** —sin acentos, sin caracteres especiales y sin distinguir
+mayúsculas de minúsculas—, ENTONCES el sistema DEBE rechazar la operación **en la propia base de
+datos** y no crear ni modificar ninguna fila.
+
+**R8.** El sistema DEBE persistir el nombre normalizado de cada receta en una columna propia
+junto al nombre original, y DEBE exponer **una única definición** de esa normalización, publicada
+por el contrato del módulo `recetas`, de modo que la columna y cualquier consumidor futuro
+normalicen igual.
+
+**R9.** MIENTRAS una receta esté borrada lógicamente, el sistema DEBE permitir que otra receta
+viva use su mismo nombre normalizado (ver pregunta abierta 3).
+
+### Estructura de la línea de receta
+
+**R10.** El sistema DEBE persistir cada pareja receta–producto como **entidad propia** con su
+propia cantidad y su propia unidad de medida, y NO DEBE modelarla como una tabla de unión sin
+datos.
+
+**R11.** SI se intenta persistir en una misma receta una segunda línea que apunte al mismo
+producto, ENTONCES el sistema DEBE rechazar la operación **en la propia base de datos** y no
+crear ninguna fila.
+
+**R12.** El sistema DEBE permitir que una receta tenga un número ilimitado de líneas y que un
+mismo producto aparezca en un número ilimitado de recetas distintas.
+
+**R13.** El sistema DEBE almacenar la cantidad de la línea como número **decimal exacto** de 14
+dígitos de precisión y 4 decimales, DEBE devolver sin pérdida cualquier valor con hasta 4
+decimales, y NO DEBE usar ninguna representación de coma flotante binaria (`float`, `double`,
+`real`).
+
+**R14.** SI se intenta persistir una línea cuya cantidad sea cero, negativa o ausente, ENTONCES
+el sistema DEBE rechazar la operación **en la propia base de datos** y no crear ni modificar
+ninguna fila.
+
+**R15.** El sistema DEBE exigir una unidad de medida en cada línea, DEBE almacenarla como texto
+libre, y NO DEBE restringirla a un conjunto de valores admitidos, NO DEBE tomarla de la unidad
+del producto ni derivar de ella ninguna conversión entre unidades.
+
+**R16.** SI se intenta persistir una línea sin receta, sin producto, o con una receta o un
+producto inexistentes, ENTONCES el sistema DEBE rechazar la operación y no crear ninguna fila.
+
+### Frontera de módulo
+
+**R17.** El sistema DEBE declarar `recetas` como módulo propietario de los dos modelos de esta
+feature, y ningún módulo distinto de `recetas` DEBE consultarlos con el cliente Prisma.
+
+**R18.** El módulo `recetas` NO DEBE consultar el modelo de producto con el cliente Prisma, ni
+importar el dominio, los puertos o los adaptadores de `inventario` por ruta profunda: todo lo que
+`recetas` sepa del producto DEBE llegarle por el contrato público de `inventario`
+(`@/lib/modules/inventario`), que DEBE publicar ese contrato.
+
+**R19.** El sistema DEBE declarar la referencia de la línea al producto y las dos referencias de
+auditoría al usuario como **campos escalares sin relación de Prisma**, de modo que ninguna
+consulta del cliente Prisma pueda atravesar desde una receta o una línea hasta un producto o un
+usuario; y DEBE mantener aun así la restricción de clave foránea **real en la base de datos**.
+
+**R20.** El módulo `recetas` DEBE nacer con la forma hexagonal del repositorio: un contrato
+público (`index.ts`) que solo reexporta símbolos de su propio `domain/`, las carpetas `domain/`,
+`ports/` y `adapters/` como únicas carpetas del módulo, y ningún `'use server'` alcanzable desde
+ese contrato.
+
+### Auditoría, borrado y marcas de tiempo
+
+**R21.** El sistema DEBE registrar, para cada receta, qué usuario la creó y qué usuario la
+modificó por última vez, y SI se intenta registrar como autor un usuario inexistente, ENTONCES
+DEBE rechazar la operación.
+
+**R22.** CUANDO se borra una receta, el sistema DEBE conservar su fila completa y registrar el
+instante del borrado, sin eliminar ninguno de sus datos.
+
+**R23.** El sistema DEBE registrar, para cada receta y cada línea, el instante de creación y el
+instante de la última modificación, y DEBE actualizar el segundo cada vez que la fila cambia.
+
+**R24.** CUANDO se quita un producto de una receta, el sistema DEBE eliminar la fila de la línea
+por completo, y NO DEBE conservar ninguna marca de borrado lógico de líneas.
+
+**R25.** SI se elimina físicamente una receta, ENTONCES el sistema DEBE eliminar también todas
+sus líneas y NO DEBE dejar ninguna línea huérfana.
+
+**R26.** CUANDO se borra lógicamente una receta, el sistema DEBE conservar sus líneas sin
+modificar y asociadas a ella.
+
+**R27.** MIENTRAS un producto usado por al menos una línea esté borrado lógicamente, el sistema
+DEBE conservar esa línea apuntando al mismo producto; y SI se intenta eliminar físicamente un
+producto referenciado por alguna línea, ENTONCES DEBE rechazar el borrado.
+
+### Esquema, seguridad y migración
+
+**R28.** El sistema DEBE nombrar en **inglés** todas las tablas, columnas, índices y
+restricciones que cree esta feature.
+
+**R29.** El sistema DEBE tener `ROW LEVEL SECURITY` activado **y forzado**
+(`FORCE ROW LEVEL SECURITY`) en las dos tablas que crea esta feature.
+
+**R30.** CUANDO se revierte la migración de esta feature, el sistema DEBE quedar exactamente en
+el estado de esquema previo a aplicarla, sin dejar tablas, restricciones, índices ni columnas
+residuales.
+
+### Límite de alcance
+
+**R31.** El sistema NO DEBE incluir en esta feature ninguna operación de alta, consulta, edición
+o borrado de recetas ni de sus líneas, ni ninguna regla de permisos, ni adaptador driving, ruta,
+Server Action o pantalla que las exponga; por lo tanto esta feature no aporta ningún flujo
+navegable que un test E2E pueda visitar.
+
+**R32.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el
+requisito que la hace testeable. Ninguna queda sin `R<n>`.
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Módulo propio `recetas`; el producto se conoce por el contrato de `inventario` | R17, R18, R20 |
+| 2 | Las columnas de auditoría las crea esta ficha | R21 |
+| 3 | Auditoría: FK real a `users`, escalares sin `@relation` | R19, R21 |
+| 4 | 120 / 500 caracteres viven en la validación de aplicación | R3 |
+| 5 | La línea se borra físicamente y se va con su receta | R24, R25 |
+| 6 | Borrado lógico de la receta con las tres marcas de tiempo | R22, R23, R26 |
+| 7 | Unicidad del nombre por columna normalizada + índice único | R7, R8, R9 |
+| 8 | Cantidad `decimal(14,4)`, obligatoria y `> 0` por `CHECK` | R13, R14 |
+| 9 | Unidad de la línea: texto libre obligatorio y anotativo | R15 |
+| 10 | Los pasos, un único documento JSON en la columna | R4, R5 |
+| 11 | La imagen, una sola columna de texto opcional | R6 |
+| 12 | La relación receta-producto es entidad propia, única por pareja | R10, R11, R12, R16 |
+| 13 | Un producto dado de baja no se lleva la línea | R27 |
+| 14 | RLS activada y forzada en las dos tablas | R29 |
+| 15 | Migración con `down.sql` que revierte al esquema exacto anterior | R30 |
+| 16 | Identificadores de la base en inglés | R28 |
+| 17 | E2E diferido con motivo | R31 |
+| 18 | Los permisos no se deciden aquí | R31 |
+| 19 | Ninguna librería nueva | R32 |
 
 ## Preguntas abiertas
 
@@ -35,6 +203,28 @@ son **caras de cerrar después**, no columnas que se añadan un martes.
    decimales. Si alguna fórmula real necesita microgramos de un catalizador, se queda corta, y
    ampliarla con recetas ya cargadas obliga a migrar. Se asume el riesgo a conciencia, igual que
    QC-14 asumió el de la unidad como texto libre.
+
+**Añadidas por `spec_author` (F1.2).** Tres huecos que la tabla de decisiones no cubre. Ninguna
+bloquea la implementación: las tres tienen una **posición por defecto** tomada de un precedente
+del repo, escrita aquí para que el humano la confirme o la corrija en la puerta de aprobación
+del spec (F1.4). No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
+
+3. **¿El nombre de una receta borrada lógicamente queda libre?** La decisión de unicidad viene de
+   QC-20 D16, donde `presentations` **no** tiene borrado lógico, así que no tuvo que responder
+   esto; aquí `recipes` sí lo tiene. Con índice único **total**, borrar una receta quema su
+   nombre para siempre y nadie puede volver a crear «Desengrasante 5 %». Con índice único
+   **parcial** (`WHERE deleted_at IS NULL`), el nombre se libera al borrar. **Posición por
+   defecto: parcial**, que es exactamente lo que QC-4 decidió para el correo y el documento de
+   `users` por este mismo motivo. **R9 está escrito sobre esa posición**: si la respuesta fuera
+   «total», R9 se invierte y cambia una cláusula `WHERE` en la migración.
+4. **¿La descripción de la receta es obligatoria?** La tabla fija su largo máximo (500) pero no
+   su obligatoriedad. **Posición por defecto: opcional** (columna anulable). Volverla obligatoria
+   más tarde exige rellenar las filas existentes antes del `NOT NULL`.
+5. **¿Puede existir una receta sin autor?** La tabla dice que `created_by` y `updated_by` los crea
+   esta ficha, pero no si admiten ausencia de valor. **Posición por defecto: obligatorios**
+   (`NOT NULL`), que es posible precisamente porque la tabla nace vacía —QC-20 no podrá hacerlo
+   en `products`, que ya tiene filas—. Consecuencia asumida: ninguna carga automática, seed o
+   importación podrá crear recetas sin un usuario real detrás.
 
 ## Decisiones cerradas (no reabrir)
 
