@@ -107,7 +107,7 @@
 
 ## Grupo D — verificación contra la base y cierre
 
-- [ ] **T13 — Ciclo real de migración.** `pnpm run db:migrate` → `pnpm run db:rollback` →
+- [x] **T13 — Ciclo real de migración.** `pnpm run db:migrate` → `pnpm run db:rollback` →
       `pnpm run db:migrate`.
       *Depende de:* T2. **Hecho cuando:** el rollback deja el esquema exactamente como estaba,
       `_prisma_migrations` coherente, y la salida queda pegada en `progress/impl_QC-20-*.md`.

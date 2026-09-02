@@ -569,3 +569,66 @@ un `app/api/` vacio es una mina para el siguiente que lo abra.
 
 **Corregido:** `rmdir app/api`. Verificado despues que `git status --short` sigue vacio y que las
 tres rutas del catalogo siguen sin existir.
+
+---
+
+# T13 — Ciclo real de migracion sobre la cadena MERGEADA (R32)
+
+Se corrio **despues** de mergear `origin/dev`, sobre las **seis** migraciones resultantes, que
+es la cadena que va a produccion. La de QC-24 (`...163256_recipes_and_recipe_lines`) tiene
+timestamp **anterior** a la nuestra (`...170759`), asi que la cadena las ordena recetas ->
+auditoria.
+
+## Metodo: snapshot del esquema en cinco dimensiones, antes y despues
+
+No basta con «el rollback no dio error». Se consulta el catalogo de Postgres y se comparan
+conjuntos: `information_schema.columns`, `pg_constraint`, `pg_indexes`, `pg_class`
+(`relrowsecurity` / `relforcerowsecurity`) y `_prisma_migrations`.
+
+| Fase | columnas | constraints | indices | RLS | migraciones |
+| --- | --- | --- | --- | --- | --- |
+| **A** — tras `db:migrate` | 73 | 22 | 21 | 8 | 6 |
+| **B** — tras `db:rollback` | 70 | 20 | 20 | 8 | 5 |
+| **C** — tras `db:migrate` | 73 | 22 | 21 | 8 | 6 |
+
+**Lo que se fue en B, y NADA mas** —los seis objetos exactos que anade la migracion—:
+
+```
+- presentations.name_normalized:text:NO
+- products.created_by:uuid:YES
+- products.updated_by:uuid:YES
+- products_created_by_fkey:f:products
+- products_updated_by_fkey:f:products
+- presentations_name_normalized_key | CREATE UNIQUE INDEX ...
+```
+
+**RLS sin cambios en B** (0 diferencias): el rollback no desactiva `ENABLE`/`FORCE` de QC-14 (R4).
+
+**A vs C — el veredicto de R32:**
+
+```
+columnas       A= 73  C= 73  diferencias=0
+constraints    A= 22  C= 22  diferencias=0
+indices        A= 21  C= 21  diferencias=0
+rls            A=  8  C=  8  diferencias=0
+migraciones    A=  6  C=  6  diferencias=0
+
+VEREDICTO: IDENTICO - el ciclo apply->rollback->apply es reversible
+```
+
+## Hallazgo del arnes, NO arreglado aqui
+
+Al intentar el rollback **en cascada** de dos migraciones para comprobar si los `down.sql` de
+QC-24 y el nuestro **componen**, se destapo que `scripts/db-rollback.ts` elige la migracion por
+el **disco** (`readdirSync().sort().at(-1)`) y no por `_prisma_migrations`. Dos ejecuciones
+seguidas revierten la misma. Anotado entero, con sus tres efectos y una propuesta de arreglo, en
+`progress/current.md > Deudas y cosas abiertas`. **No se toca desde esta ficha**: es
+infraestructura compartida y `CLAUDE.md` manda que entre por `/afinar-regla`.
+
+La composicion de los dos `down.sql` **queda sin verificar** por esa limitacion de la
+herramienta, y se declara como tal en vez de darla por buena.
+
+## Estado en que quedo la base tras el experimento
+
+6 migraciones aplicadas, **0 diferencias** contra el snapshot inicial, `tests/integration/`
+**94/94** en verde y arbol de git limpio. Deshacer el experimento es parte del experimento.

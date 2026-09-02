@@ -1017,6 +1017,40 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   contradice la regla del arnés que permite dos features en paralelo por zona. QC-24 se libró
   **solo** porque dejó su cableado para QC-25 — o sea, por reparto de alcance, no porque el
   problema no exista. Va a `/afinar-regla`; no se parchea a mano.
+- **[arnés — `scripts/db-rollback.ts` elige la migración por el DISCO, no por lo aplicado]**
+  Medido en QC-20 (T13, 2026-09-02) al comprobar si los `down.sql` de QC-24 y QC-20 componen
+  sobre la cadena de seis migraciones. **No se ha arreglado a mano a propósito**: es
+  infraestructura compartida por todas las sesiones y `CLAUDE.md` manda que las mejoras al arnés
+  entren por `/afinar-regla`.
+  **Causa, en una línea:** `findLastMigration()` hace `readdirSync(MIGRATIONS_DIR).sort().at(-1)`
+  y **nunca consulta `_prisma_migrations`** para saber cuál está realmente aplicada. Solo toca esa
+  tabla después, para borrar la fila.
+  **Tres efectos, de gravedad distinta:**
+  1. **No encadena.** Dos ejecuciones seguidas revierten **la misma** migración. Medido: el
+     primer y el segundo `db:rollback` imprimieron ambos
+     `20260902170759_product_audit_and_presentation_uniqueness revertida.`, las tablas de recetas
+     siguieron intactas y solo desapareció **una** fila de `_prisma_migrations`, no dos.
+  2. **Sale con éxito cuando no ha revertido nada.** El aviso **sí existe** —línea 145,
+     «aviso — no tenía fila en `_prisma_migrations`, no se borró ninguna», y remite a
+     `prisma migrate status`—, pero acto seguido la línea 151 imprime `<migracion> revertida.` y
+     el proceso sale con **código 0**. No es un no-op invisible: es un **aviso enterrado bajo un
+     mensaje de éxito**, que en la práctica se lee igual de mal y que **un script que encadene
+     rollbacks no puede detectar**, porque mira el código de salida.
+  3. **El peligroso, y no es hipotético: nos pasó durante horas.** Si en el disco hay una
+     migración con timestamp **posterior** que todavía **no está aplicada** —exactamente la
+     situación de QC-20 mientras QC-24 ya estaba mergeada y la nuestra no—, `db:rollback` ejecuta
+     **su** `down.sql` contra una base donde nunca se aplicó, y el operador cree haber revertido
+     la última aplicada. Con `IF EXISTS` **miente en silencio**; **sin `IF EXISTS`, revienta**. Y
+     nada obliga a que un `down.sql` lleve `IF EXISTS`: el gate solo comprueba que **el archivo
+     exista**, no su contenido.
+  **Propuesta para quien corra `/afinar-regla`,** para no partir de cero: leer la **última fila
+  aplicada** de `_prisma_migrations` (`ORDER BY finished_at DESC LIMIT 1`, con `finished_at NOT
+  NULL`) y usar **esa** como objetivo; **abortar** —no avisar— si no coincide con el último
+  directorio del disco, porque esa discrepancia significa justo el caso 3; y salir con **código
+  distinto de 0** cuando no se borra ninguna fila.
+  **Lo que este hallazgo NO invalida:** el `down.sql` de QC-20 es correcto y su ciclo de un salto
+  es reversible, verificado con snapshot del esquema en cinco dimensiones (columnas, constraints,
+  índices, RLS y `_prisma_migrations`) y **cero diferencias** entre antes y después.
 - **[QC-12 — la verificación visual multiplataforma no la hizo nadie con ojos]** No hay navegador
   con emulación de dispositivo en este entorno. Lo verificado es el HTML servido y jsdom a 375 y
   1280 px, más las guardias de que no hay alto de viewport fijo, ni `:hover`, ni controles. El
