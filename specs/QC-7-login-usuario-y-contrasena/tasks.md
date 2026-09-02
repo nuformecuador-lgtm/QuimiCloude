@@ -316,7 +316,9 @@ Depende de: T6, T8, T11.
 Depende de: T1-T9, T11, T12.
 
 - [x] `./init.sh` completo en verde (obligatorio antes del PR, sin excepcion). Corrido por
-      el leader el 2026-09-01: 27 archivos, 274 tests, sin rojos nuevos, baseline vacio.
+      el leader el 2026-09-01 **tras cerrar M-B1**: 27 archivos, 278 tests, sin rojos nuevos,
+      baseline vacio. La corrida anterior (274 tests) quedo invalidada por los cambios del
+      arreglo: una casilla marcada sobre una corrida vieja es una casilla mentirosa.
 - [x] `progress/impl_QC-7-login-usuario-y-contrasena.md` con la salida real de los tests y el
       mapa `R<n> -> test` de la tabla de abajo.
 - [x] Anotar en `progress/current.md > Deudas`: (a) el logout de QC-8 borra la cookie pero no
