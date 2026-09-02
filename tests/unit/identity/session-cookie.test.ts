@@ -57,11 +57,30 @@ function decodificarPayload(value: string): Record<string, unknown> {
   >;
 }
 
+// Doble con estado del almacen de cookies del navegador: un `Map` real donde `set` guarda,
+// `get` devuelve lo guardado (o `undefined` si no hay nada) y `delete` borra esa entrada.
+// `setMock`/`getMock`/`deleteMock` siguen siendo `vi.fn()` -- los tests que espian llamadas
+// (`toHaveBeenCalledWith`, etc.) no cambian -- pero ahora ADEMAS mutan el mismo `Map`, asi
+// que `delete` de verdad vacia lo que despues devuelve `get`: ningun test decide el
+// resultado por su cuenta, lo observa.
+let almacenDeCookies: Map<string, string>;
+
 beforeEach(() => {
+  almacenDeCookies = new Map();
   setMock.mockReset();
   getMock.mockReset();
   deleteMock.mockReset();
   cookiesMock.mockReset();
+  setMock.mockImplementation((opciones: { name: string; value: string }) => {
+    almacenDeCookies.set(opciones.name, opciones.value);
+  });
+  getMock.mockImplementation((nombre: string) => {
+    const value = almacenDeCookies.get(nombre);
+    return value === undefined ? undefined : { value };
+  });
+  deleteMock.mockImplementation((opciones: { name: string }) => {
+    almacenDeCookies.delete(opciones.name);
+  });
   cookiesMock.mockResolvedValue({ set: setMock, get: getMock, delete: deleteMock });
   secretoOriginal = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = SECRETO;
@@ -200,6 +219,12 @@ describe('lectura y borrado de la cookie de sesion', () => {
     const [, encodedPayload, firma] = valor.split('.');
     getMock.mockReturnValue({ value: `v0.${encodedPayload}.${firma}` });
 
+    // Ancla que corta ANTES de mirar el secreto: si `readSessionClaims` leyera
+    // `SESSION_SECRET` para recomputar la firma antes de comparar la version, esto
+    // lanzaria (ver el test `sin SESSION_SECRET la lectura lanza...`). Que resuelva
+    // `null` sin secreto en el entorno prueba que la version se descarta primero.
+    delete process.env.SESSION_SECRET;
+
     await expect(readSessionClaims()).resolves.toBeNull();
   });
 
@@ -315,8 +340,10 @@ describe('lectura y borrado de la cookie de sesion', () => {
     await startSession(createSessionTicket(USER_ID, AHORA));
     setMock.mockClear();
 
+    // No se fuerza `getMock` a mano: `clearSession()` borra la entrada del almacen con
+    // estado (ver `beforeEach`), y es ESE borrado -- no el test -- el que hace que la
+    // siguiente lectura no encuentre cookie.
     await clearSession();
-    getMock.mockReturnValue(undefined);
 
     await expect(readSessionClaims()).resolves.toBeNull();
   });

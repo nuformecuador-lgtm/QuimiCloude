@@ -34,7 +34,7 @@ const loginAttemptRecorder: LoginAttemptRecorder = {
   set: setLoginAttempt,
 };
 const sessionWriter: SessionWriter = { startSession };
-const sessionReader: SessionReader = { readClaims: readSessionClaims, clear: clearSession };
+const sessionReader: SessionReader = { readClaims: readSessionClaims };
 const sessionUserReader: SessionUserReader = { findActiveById: findActiveSessionUserById };
 const sessionProvider: SessionProvider = {
   getSessionUser: createResolveSessionUser({ session: sessionReader, users: sessionUserReader }),

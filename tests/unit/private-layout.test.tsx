@@ -192,13 +192,24 @@ describe('layout privado', () => {
 
   it('el sidebar no importa el proveedor de sesion', async () => {
     // R16 — guardia de codigo: los datos entran solo por props. Ningun componente de
-    // `components/private/` obtiene nada por su cuenta.
+    // `components/private/` obtiene nada por su cuenta. El stub de sesion (`session-stub`) lo
+    // borro T7 en QC-8, asi que esa cadena ya no podia dejar de aparecer: no vigilaba nada.
+    // El riesgo vivo hoy es que un componente de cliente resuelva la sesion por su cuenta
+    // llamando al punto de composicion (`@/lib/composition`) o a `getSessionUser` (R17).
     const fuentes = [
       'components/private/app-sidebar.tsx',
       'components/private/nav-user.tsx',
       'components/private/logout-menu-item.tsx',
     ];
-    const prohibidos = ['session-stub', 'next/headers', 'cookies(', 'fetch(', 'prisma', 'supabase'];
+    const prohibidos = [
+      '@/lib/composition',
+      'getsessionuser',
+      'next/headers',
+      'cookies(',
+      'fetch(',
+      'prisma',
+      'supabase',
+    ];
 
     for (const ruta of fuentes) {
       const codigo = fuenteSinComentarios(ruta).toLowerCase();
@@ -208,7 +219,7 @@ describe('layout privado', () => {
     }
   });
 
-  it('el layout no valida sesion, no accede a base de datos y no emite cookie de sesion', async () => {
+  it('el layout no accede a base de datos, no hace red y no lee ni emite cookie de sesion', async () => {
     // R35 — guardia de codigo + assert de runtime.
     const codigo = fuenteSinComentarios('app/(private)/layout.tsx');
 

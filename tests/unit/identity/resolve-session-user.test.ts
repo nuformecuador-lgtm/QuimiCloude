@@ -35,7 +35,6 @@ const RECORD: SessionUserRecord = {
 function fakeSessionReader(claims: SessionClaims | null): SessionReader {
   return {
     readClaims: vi.fn().mockResolvedValue(claims),
-    clear: vi.fn().mockResolvedValue(undefined),
   };
 }
 

@@ -120,6 +120,18 @@ describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
     expect(encontrados).toContain(UNICO_DUENO)
   })
 
+  it('la comparacion de firmas es en tiempo constante (R5): el unico dueño usa timingSafeEqual', () => {
+    const fuente = stripComments(readFileSync(join(repoRoot, UNICO_DUENO), 'utf8'))
+
+    expect(
+      /\btimingSafeEqual\s*\(/.test(fuente),
+      'R5 exige comparar la firma de sesion en tiempo constante: usa timingSafeEqual() de ' +
+        "node:crypto, no '===' ni cualquier comparacion que corte en la primera diferencia. " +
+        `Eso filtra la firma esperada por el tiempo de respuesta (side-channel timing attack). ` +
+        `El unico dueño autorizado es ${UNICO_DUENO}; ahi es donde debe vivir esa llamada.`,
+    ).toBe(true)
+  })
+
   it('la regla detecta un createHmac propio en un archivo sintetico, y no un comentario que lo menciona', () => {
     expect(mentionsCreateHmac("import { createHmac } from 'node:crypto'; createHmac('sha256', s)")).toBe(
       true,
