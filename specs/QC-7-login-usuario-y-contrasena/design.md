@@ -143,9 +143,13 @@ verde.
 ### 4.2 Escritura de la cookie (`session-cookie.ts`)
 
 ```ts
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { cookies } from 'next/headers';
 ```
+
+> Solo `createHmac`. `timingSafeEqual` **no** entra aqui: hace falta para *verificar* la firma,
+> que es QC-8 (ver 5.1). Escribir en QC-7 codigo que nadie llama para adelantar QC-8 es alcance
+> inventado. (Corregido tras la revision, menor M8.)
 
 - **Por que un adaptador driven y no la Server Action:** la cookie es un detalle de
   transporte. Si la escribiera `login-action.ts`, la decision "cuando hay sesion y hasta
@@ -155,7 +159,8 @@ import { cookies } from 'next/headers';
 - **`next/headers` en `driven/`:** la fila `adapters/driven/**` de la tabla de dependencias
   no menciona `next/*`, ni para permitirlo ni para prohibirlo, y la guardia (bloque 13) solo
   le prohibe la composicion, el driving propio y la UI — asi que esto pasa en verde. Queda
-  como **pregunta abierta 5** para que el humano lo confirme y se anote la fila; no se
+  como **pregunta abierta 2** (la numeracion es la de `requirements.md`) para que el humano
+  lo confirme y se anote la fila; no se
   inventa una regla nueva en el `.md` de arquitectura desde una feature.
 - `cookies()` solo permite escribir dentro de una Server Action o un route handler. El unico
   llamador es `loginAction`, que es `'use server'`. Correcto por construccion.
@@ -332,6 +337,59 @@ lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
 - La migracion se crea con `pnpm run db:migrate:create` y su **`down.sql` se escribe a mano**
   (`DROP COLUMN` de las tres, en orden inverso). Prisma no genera downs.
 
+
+### 5.7 El registro del intento es ATOMICO (anadido tras la revision, M-A1)
+
+La primera version tenia un agujero que **ningun test podia encontrar porque nadie escribio la
+pregunta**: el registro del fallo era **lectura-modificacion-escritura no atomica**, con ~110 ms
+de bcrypt en medio. El dominio leia `failedAttempts`, verificaba el hash, y el adaptador escribia
+un **valor absoluto** calculado sobre aquella lectura ya vieja.
+
+Consecuencia: 50 intentos en paralelo contra la misma cuenta leen todos `0` y escriben todos `1`.
+**El contador no llega nunca a 5 y R22 no se dispara jamas.** Y esto no es una carrera de manual:
+**lanzar intentos en paralelo es exactamente lo que hace un ataque de fuerza bruta**. El control
+quedaba anulado justo en el unico escenario para el que existe — un atacante secuencial se
+bloqueaba; uno concurrente, que es el que importa, no.
+
+**Decision: compare-and-set con reintento acotado.** La politica de escalada sigue viviendo
+**solo** en `domain/account-lock.ts`; lo que cambia es como se persiste.
+
+El puerto `LoginAttemptRecorder` pasa a exponer dos primitivas de persistencia, y el dominio
+sigue calculando todos los estados:
+
+```ts
+compareAndSet(userId, esperado, siguiente): Promise<boolean>  // aplica solo si nada cambio
+set(userId, estado): Promise<void>                            // incondicional
+```
+
+- **Fallo -> `compareAndSet`.** El `UPDATE` lleva el estado leido en el `WHERE`. Si otro intento
+  se adelanto, no afecta a ninguna fila, y el dominio **relee y recalcula la politica sobre el
+  estado fresco**. En cada ronda gana exactamente un CAS, asi que el contador sube de verdad y
+  tras cinco rondas ganadoras la cuenta se bloquea; los que pierden, al releer, ven el bloqueo y
+  salen sin escribir.
+- **Exito -> `set`.** El estado de exito es todo ceros: **no depende del valor previo**, es
+  idempotente y no tiene el problema de lectura-modificacion-escritura.
+- **El predicado del CAS usa solo `failed_login_attempts` y `lock_level`, no `locked_until`.**
+  `locked_until` es `timestamptz(6)` —microsegundos en Postgres— y un `Date` de JS solo tiene
+  milisegundos: meterlo en el `WHERE` es una comparacion que un dia deja de casar en silencio y
+  el CAS no volveria a aplicar nunca. Ademas no hace falta: el par de enteros ya identifica cada
+  estado de la cadena de transiciones.
+
+Lo que **no** cambia, y hay que seguir vigilando: sigue habiendo **exactamente una** verificacion
+de hash en los tres caminos (R6, R29); la rama de usuario inexistente **sigue sin tocar el puerto
+de escritura** (R31); y un intento durante el bloqueo **sigue sin escribir nada**, ahora tambien
+cuando el bloqueo aparece entre la lectura y la escritura (R25).
+
+**Alternativas descartadas.** Un `UPDATE ... SET failed_login_attempts = failed_login_attempts + 1`
+con toda la politica en SQL (`CASE WHEN ... >= umbral THEN ...`) seria atomico de una sola
+sentencia, pero **duplicaria la tabla de escalada de 5.5 dentro del adaptador**: la politica
+dejaria de vivir en un solo sitio, que es justo lo que hace que se pueda testear sin base. Y un
+`SELECT ... FOR UPDATE` dentro de una transaccion obligaria al dominio a ejecutarse **dentro** de
+una transaccion, filtrando semantica de base a traves del puerto.
+
+**Limite que queda, escrito:** si el CAS pierde la carrera 10 veces seguidas, ese intento no se
+cuenta. Es una perdida de un intento bajo contencion extrema, no una perdida del bloqueo: el
+contador es monotono y el bloqueo acaba disparandose igual.
 ---
 
 ## 6. Alternativas descartadas

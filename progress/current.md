@@ -290,6 +290,19 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   `.env` real. Se anadio a mano en el worktree de QC-7 (base local en `localhost:5432`, o sea
   el mismo valor que `DATABASE_URL`). Candidato a que lo cubra `scripts/wt.sh new` junto con el
   resto de artefactos generados.
+- **[QC-7 — el registro del fallo bajo contencion extrema puede perder un intento]** El contador
+  se escribe con compare-and-set y hasta 10 reintentos con relectura (`design.md > 5.7`). Si los
+  10 pierden la carrera, ese intento no se cuenta. **No es una perdida del bloqueo**: el contador
+  es monotono y el bloqueo acaba disparandose igual; es un intento sin contar bajo contencion
+  brutal. Se acepta frente a las alternativas —meter la tabla de escalada en SQL, o obligar al
+  dominio a correr dentro de una transaccion— que estan descartadas y razonadas en `design.md > 5.7`.
+- **[arnes — un E2E interrumpido deja basura que pone rojo el gate de otra feature]** Un
+  `pnpm run e2e` cortado a medias (al reviewer se lo corto el disco lleno) dejo 4 usuarios y 4
+  roles `qc7_e2e_*` huerfanos, y eso puso **9 tests rojos** en `identity-constraints.int.test.ts`,
+  que afirma que la tabla `users` esta vacia. Mitigado en QC-7: el `afterAll` del E2E borra por
+  prefijo y no por ids en memoria, cada borrado aislado, y hay barrido defensivo de huerfanos de
+  mas de una hora al empezar. **La causa de fondo sigue siendo la misma que obligo a serializar
+  la integracion**: un test de QC-4 que afirma sobre el estado global de la tabla.
 
 Cerradas, para que nadie las busque abiertas: la pregunta 3 de la feature 1 (columnas
 `password_algorithm` / `password_updated_at`) se responde **NO** en `specs/2-.../design.md > 8`, y la

@@ -269,6 +269,12 @@ Depende de: T6.
       `session-cookie.ts` — lo que motiva la **pregunta abierta 5**. **Cubre R18** (bloque 6:
       el contrato no arrastra servidor) **y R17.**
 
+> **No hay T10, y no es un olvido.** La numeracion se dejo con ese hueco al reordenar las
+> tasks mientras se escribia el spec; renumerar T11-T13 despues habria invalidado las
+> referencias cruzadas del `design.md` y de la tabla de trazabilidad. Se deja el hueco a
+> proposito y se dice, que es mas barato que una renumeracion silenciosa.
+> (Anotado tras la revision, menor M8.)
+
 ## T11 — Instalar Playwright Y registrarlo, EN EL MISMO PASO  `[P con T8]`
 
 Depende de: T0. Aprobado por el humano el 2026-09-01 (`design.md > 6.4`).
