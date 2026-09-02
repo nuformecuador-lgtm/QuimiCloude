@@ -570,3 +570,79 @@ cada worktree ve como faltante el spec de la otra.
 - El **MCP de `atlassian` se cayó** a media feature: dos llamadas abortaron por timeout y el
   comentario de F1.3 y la transición de F2.0 se escribieron a posteriori, recogidos en el
   comentario de cierre. El disco estuvo al día en todo momento — el ciclo no depende de Jira.
+
+## 2026-09-02 — QC-29-tema-claro-oscuro
+
+Sustituye la paleta acromática de `shadcn init` por la del diseño aprobado —base agua
+(`#cceae8` → `#539091`) con acento naranja— definida en `:root` y `.dark` sobre los mismos
+tokens y en oklch, y añade la elección de modo: claro, oscuro y seguir al sistema, con el
+sistema por defecto. La barra lateral pasa a panel flotante con degradado tenue. PR #16,
+merge `afd9054`.
+
+- **Requisitos cubiertos:** R1–R29, los 29 con evidencia ejecutada. 10 decisiones, 20 tareas.
+- **Gate:** 60 archivos / 591 tests en verde; E2E 8/8 en chromium y webkit en frío.
+- **Reviewer:** aprobado en segunda ronda, 0 mayores y 6 menores.
+
+### La feature nació de un diseño, no del board
+
+Es la primera del repo en ese orden: el humano aprobó un canvas de diseño y **después** pidió la
+feature. El issue se creó en Jira antes de tocar el JSON, para no invertir el orden que exige
+`docs/jira.md`, y los tokens del canvas se convirtieron a oklch con la transformación sRGB→OKLab
+y se sembraron en `specs/QC-29-tema-claro-oscuro/design-input-tokens.md` **antes** de lanzar al
+`spec_author`, para que no inventara colores.
+
+### La aprobación con cambios reabrió la fase 1
+
+El `spec_author` propuso `next-themes` y la dejó como fila `excepcion` porque falla el check de
+frescura (18 meses sin publicar). El humano la rechazó. Eso invalidaba D9, el anti-parpadeo y
+varios requisitos, así que **la ficha volvió a F1.2 en vez de arrancar el implementer**: un spec
+que asume una librería descartada implementa otra cosa. La revisión conservó la numeración de los
+27 requisitos que sobrevivían y añadió R28 (nada entra en `package.json`) y R29 (la cookie de tema
+es preferencia de UI, no dato de sesión).
+
+Al perder la librería, el anti-parpadeo pasó de configuración a diseño propio — y salió ganando:
+el script vive como constante de texto y **se puede ejecutar en un test**, cosa que con la
+librería no se podía.
+
+### El E2E encontró un fallo real de producto, y por poco no se corre
+
+`e2e/theme.spec.ts` se escribió pero quedó sin ejecutar (T12). El reviewer lo marcó como el único
+hallazgo mayor: «escrito no es corrido». Al correrlo: **3 de 8 en rojo**. Uno era del test —la
+sonda miraba el primerísimo frame y con HTML en streaming puede haber un frame sobre un documento
+sin nada pintado—, pero el otro **era producto**: `useThemeState` solo reaccionaba al evento
+`change` de `matchMedia` y **nunca re-sincronizaba el DOM al montar**, así que un cambio de
+`prefers-color-scheme` ocurrido entre el script inline y la hidratación se perdía hasta recargar.
+
+Habría llegado a producción con 591 tests unitarios en verde. Es el caso de libro de por qué la
+regla 5 distingue «compila» de «funciona».
+
+Las mordidas midieron que las dos piezas sostienen peso: sin el listener cae chromium, sin la
+re-sincronización de montaje cae webkit — allí el efecto pasivo corre ~15 ms después de aparecer
+la fibra.
+
+### Dos verdes falsos que no eran de la feature
+
+- **`test:rapido` premió un olvido.** El implementer no commiteó, y el modo rápido calcula qué
+  correr desde el diff **entre commits** contra `origin/dev`. Diff vacío → «no toca código con
+  tests» → verde en 3 segundos sin ejercitar una línea. Se detectó porque el mensaje no cuadraba
+  con 18 tareas de implementación.
+- **`playwright ... | tail` devolvió `exit 0` con tres tests rojos.** El código de salida era del
+  `tail`. Si eso ocurre dentro de un script encadenado, el gate canta verde con la suite roja.
+
+### Deuda que hereda
+
+- **Tres puentes de specs ajenos** entraron en `dev` con el PR #16 (QC-24, QC-9, QC-21) para que
+  el validador no bloqueara el gate. QC-24 y QC-9 ya los sustituyó la versión buena de sus
+  sesiones; **la semilla corta de QC-21 sigue siendo la única versión en `dev`** y, si su PR
+  resuelve el `add/add` a favor de `dev`, se pierde su spec. Avisado a la sesión que la lleva.
+- **Puentear la semilla en vez del estado final es el error a no repetir:** el puente de QC-9 tenía
+  47 líneas contra 189 de la versión real. La lección la aportó otra sesión: copia el estado final
+  del worktree, sale gratis y no genera conflicto.
+- La **re-sincronización de montaje no tiene test unitario**: hoy su única red es la temporización
+  de webkit en el E2E. Menor del reviewer, candidato a ficha.
+- `design.md` describe mal dónde acaba el `<script>`: **React 19 lo iza de `<body>` al `<head>`**.
+- **Cuatro preguntas abiertas** sin resolver: los `--chart-*` sin consumidor, el ancho móvil de
+  288 px que no se puede cambiar sin editar `components/ui/`, la persistencia local al navegador,
+  y si el login quiere control propio de tema — esa la recoge QC-30.
+- **`wt.sh done` falló otra vez en Windows** (cuarta el mismo día): desregistró el worktree pero
+  dejó el árbol; rematado con `rm -rf` + `git worktree prune`.
