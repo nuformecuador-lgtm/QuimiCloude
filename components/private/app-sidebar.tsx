@@ -77,7 +77,11 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
   const closeMobilePanel = () => setOpenMobile(false);
 
   return (
-    <Sidebar collapsible="icon">
+    // R18, `design.md > 6`: `variant="floating"` es prop publica del primitivo, y
+    // `className="p-[18px]"` fija el margen exterior del panel; `tailwind-merge` resuelve el
+    // conflicto con el `p-2` que trae `sidebar-container` de serie. No se toca
+    // `components/ui/sidebar.tsx` (R21).
+    <Sidebar collapsible="icon" variant="floating" className="p-[18px]">
       <div id={SIDEBAR_PANEL_ID} data-testid="private-sidebar" className="flex h-full w-full flex-col">
         <SidebarHeader data-testid="private-brand">
           <SidebarMenu>
