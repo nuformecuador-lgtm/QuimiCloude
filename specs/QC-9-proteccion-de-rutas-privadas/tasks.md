@@ -131,13 +131,13 @@ roja nombrando `/productos`; borrado, verde.
 
 ## Bloque 4 — El portero *(depende de los bloques 2 y 3)*
 
-### [ ] T12 — `lib/composition/edge.ts`
+### [x] T12 — `lib/composition/edge.ts`
 Cableado edge-safe de `SessionTokenVerifier` (`design.md > 5`). `lib/composition/index.ts` no cambia
 de comportamiento.
 **Hecho:** `guard-arquitectura-modulos` verde (el import de driven desde `lib/composition/**` esta
 autorizado por prefijo) y `edge.ts` no importa nada de `persistence/`.
 
-### [ ] T13 — `adapters/driving/route-guard-middleware.ts` *(depende de T12)*
+### [x] T13 — `adapters/driving/route-guard-middleware.ts` *(depende de T12)*
 Segun `design.md > 6`: lee la cookie de la `NextRequest`, verifica, aplica `isSessionExpired`,
 llama a `decideRouteAccess` y traduce a `NextResponse`. Fallo cerrado con `catch` que registra sin
 filtrar el secreto.
@@ -149,7 +149,7 @@ sesion -> dashboard; login sin sesion -> `next()`; `SESSION_SECRET` ausente -> r
 con una regla sintetica ruta→rol, el rol que decide es el **firmado en la cookie** y no se consulta
 ningun puerto de base (R12, R26).
 
-### [ ] T13-bis — Caracterizar el rol rancio *(depende de T13)*
+### [x] T13-bis — Caracterizar el rol rancio *(depende de T13)*
 Test de caracterizacion de R30 en `tests/unit/identity/route-guard-middleware.test.ts`: con una
 cookie firmada con rol `Operador` y una regla que exige `Administrador`, el middleware redirige al
 dashboard **aunque la base diga que esa persona ya es Administrador** — el borde no la consulta.
@@ -157,13 +157,13 @@ Cabecera del test: es el limite conocido de D17, **QC-23 lo pondra rojo a propos
 QC-8 hizo con su R21.
 **Hecho:** el test pasa y su nombre dice que caracteriza un limite, no una virtud.
 
-### [ ] T14 — `middleware.ts` en la raiz *(depende de T13)*
+### [x] T14 — `middleware.ts` en la raiz *(depende de T13)*
 Reexport del handler + `config.matcher` literal (`design.md > 2`). Sin logica.
 **Hecho:** `tests/unit/middleware-root-contract.test.ts` afirma que el archivo no contiene ninguna
 decision (ni `redirect(`, ni `/dashboard`, ni `/login`, ni `subtle`), que exporta `middleware` y
 `config`, y que el `matcher` excluye `_next/static`, `_next/image`, `favicon.ico` y los assets.
 
-### [ ] T15 — `guard-middleware-edge.test.ts` *(depende de T14)*
+### [x] T15 — `guard-middleware-edge.test.ts` *(depende de T14)*
 Recorre el cierre de imports desde `middleware.ts` y prohibe `node:crypto`, `@prisma/client`,
 `lib/shared/db/prisma` y `next/headers` (`design.md > 9`).
 **Hecho:** verde sobre el cierre real; con un import sintetico de `next/headers` en la cadena, roja.
@@ -172,7 +172,7 @@ Recorre el cierre de imports desde `middleware.ts` y prohibe `node:crypto`, `@pr
 
 ## Bloque 5 — Vuelta a la ruta pedida *(depende del bloque 4)*
 
-### [ ] T16 — `loginAction` honra el destino de vuelta
+### [x] T16 — `loginAction` honra el destino de vuelta
 Lee el campo `next` del `FormData`, lo valida con `resolveReturnPath(next, DASHBOARD_ROUTE)` y
 redirige ahi. **Sin tocar la firma congelada** ni `LoginFormState`; el `redirect` sigue fuera de
 todo `try`.
