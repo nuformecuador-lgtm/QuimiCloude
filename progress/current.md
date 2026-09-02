@@ -403,6 +403,14 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   `zone: fullstack` (label puesta en el board), bloqueada por QC-14. `complexity` sin evaluar.
 - **Al ser `fullstack` habrá que partirla** en backend + frontend cuando le toque F1.0
   (`AGENTS.md > Partición de fullstack`).
+- **Acotada con `/afinar-feature` el 2026-09-02.** El alcance y las 18 decisiones cerradas
+  viven en `specs/QC-20-crud-de-productos/requirements.md` — esa es la fuente, aquí solo se
+  enlaza. Sin preguntas abiertas. Se partió: QC-20 se queda con `zone: backend` y
+  `complexity: high`; la pantalla nació como **QC-22 — Pantalla de productos**
+  (`zone: frontend`, épica QC-18, bloqueada por QC-20, `pending` en Backlog y **sin sembrar**).
+  Se añadió **QC-8 como bloqueante** de QC-20: el service necesita saber quién está en sesión.
+  Board actualizado **antes** de sembrar (labels, `description`, los dos links y la ficha
+  nueva) y `feature_list.json` reflejado en la misma corrida.
 
 ### QC-14 — el board la reescribió (2026-09-01)
 

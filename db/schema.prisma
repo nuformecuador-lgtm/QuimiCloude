@@ -8,8 +8,11 @@
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL") // pooler, runtime de la app
-  directUrl = env("DIRECT_URL") // conexion directa, la que usa Prisma Migrate
+  // Runtime: pooler transaccional (:6543). Ver `lib/db/prisma-client.ts`.
+  url       = env("DATABASE_URL")
+  // Migraciones: conexion en modo sesion (:5432). `prisma.config.ts` la iguala a
+  // DATABASE_URL cuando no esta definida (local, sin pooler).
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
