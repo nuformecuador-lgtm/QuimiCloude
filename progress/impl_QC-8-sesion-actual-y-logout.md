@@ -446,3 +446,74 @@ $ pnpm exec vitest run --project ui --project node
 
 Los de **integracion** no los corre el implementer: son del gate (`./init.sh`), que corre el
 leader antes del PR (T16).
+
+---
+
+# Cierre de los hallazgos del `reviewer`
+
+Veredicto: **APROBADO, 0 mayores, 8 menores** (`progress/review_QC-8-sesion-actual-y-logout.md`).
+**Seis cerrados**, dos no — y los dos por decision del leader, con motivo.
+
+| Menor | Que era | Como se cerro |
+|---|---|---|
+| **1** | El test de la mitad de servidor de R20 era **verde por construccion** | El doble del almacen de cookies tiene ahora **estado** (un `Map` real): `delete` vacia de verdad lo que devuelve `get`. Commit `8b0a894` |
+| **2** | `prefijo v0.` afirmaba menos de lo que su nombre promete | Se borra `SESSION_SECRET` en ese test y se afirma que **no lanza**: prueba que corta por version **antes** de leer el secreto |
+| **3** | La clausula «tiempo constante» de R5 no la vigilaba **nada** | La guardia exige `timingSafeEqual` en el unico dueño. Verificada en rojo sustituyendolo por `===` |
+| **5** | Titulo de test que mentia (`el layout no valida sesion...`) | Renombrado a `el layout no accede a base de datos, no hace red y no lee ni emite cookie de sesion` |
+| **6** | Superficie muerta: `SessionReader.clear()` y la cadena `'session-stub'` | `clear()` **sale del puerto**; la cadena infalsificable se sustituye por `@/lib/composition` y `getsessionuser` |
+| **7** | `design.md` seguia afirmando algo falso | Corregidos 4.5 y la tabla de 3, **en el propio `design.md`**. Commit `8b9dc44` |
+| **4** | Las guardias no barren los `.ts` de la raiz | **No se cierra aqui**: es deuda del arnes heredada de QC-15, no una regresion de QC-8. Anotada en `progress/current.md > Deudas` **dirigida a QC-9** |
+| **8** | «sin valor de retorno» lo garantiza el tipo, no el assert | **Aceptado tal cual**: el typecheck cubre esa mitad |
+
+## Menor 1 — el mismo defecto que el bug de unidades, y por que importa
+
+Era **exactamente el patron** que ya habia mordido a esta feature en el bloque 1: un test verde
+por **autoconsistencia**, midiendo el andamiaje en vez de la conducta. Aqui era el propio test
+quien hacia `getMock.mockReturnValue(undefined)` despues de `clearSession()`: **nada** ataba el
+`delete` con el `get`, y el `reviewer` lo probo mutando `clearSession` a un no-op.
+
+Se arreglo dando **estado al doble**, no añadiendo un `expect(deleteMock)`: asi el test **observa**
+la conducta en lugar de fijarla, y ademas sigue siendo cierto si mañana cambia **como** se borra.
+
+**Verificado por el implementer, no solo por el subagente** (esta es la clase de afirmacion que ya
+resulto falsa una vez en esta feature): con `clearSession` mutado a no-op, el `reviewer` habia
+medido **2 fallos con este test pasando**; tras el arreglo fallan **3**, y el tercero es
+`tras clearSession, una peticion sin la cookie (navegador que ya la borro) resuelve sin sesion`.
+Mutacion revertida; `session-cookie.ts` quedo **identico a HEAD** (`git diff` vacio).
+
+## Correccion al mapa de trazabilidad de T15
+
+Dos filas cambian con estos arreglos:
+
+- **R5** — ademas de la guardia de «sin segunda implementacion», la clausula **«comparacion en
+  tiempo constante»** ya tiene vigilancia propia: `guardia-firma` >
+  `la comparacion de firmas es en tiempo constante (R5): el unico dueño usa timingSafeEqual`.
+- **R20** — su test de la mitad de servidor **ya no es verde por construccion**. La fila del mapa
+  sigue siendo la misma, pero ahora el test la sostiene de verdad. La mitad del **historial del
+  navegador** sigue sin cubrir, como estaba declarado, y la hereda QC-9 con R24.
+
+## Un apunte de proceso: casi pierdo produccion en una prueba de mutacion
+
+Tres subagentes corrieron en paralelo y **dos** mutaron `session-cookie.ts` a la vez para probar
+sus guardias (uno quitando `timingSafeEqual`, otro dejando `clearSession` en no-op). Al hacer yo
+un sondeo intermedio, me encontre el archivo **mutado** y lo restaure desde `HEAD` — sin saber
+que su dueño iba a revertirlo por su cuenta segundos despues. Acabo bien porque **ambos caminos
+llevaban al mismo contenido** (el de `HEAD`, ya que ningun cambio legitimo tocaba ese archivo en
+esta tanda), y lo comprobe antes de restaurar mirando que el **unico** diff era la mutacion.
+
+**Leccion:** una prueba de mutacion sobre un archivo de **produccion** no debe correr en paralelo
+con otros agentes que tocan ese mismo archivo. Si se repite, hay que serializarlas o hacerlas
+sobre una copia. Se deja escrito porque el riesgo real era comitear produccion rota.
+
+## Verificacion final tras cerrar los menores
+
+```
+$ pnpm run typecheck                          -> verde
+$ pnpm run lint                               -> verde
+$ pnpm exec vitest run guard                  -> 6 archivos, 68 tests, verde
+$ pnpm exec vitest run --project ui --project node
+ Test Files  35 passed (35)
+      Tests  353 passed (353)
+```
+
+Arbol limpio. Los de integracion y el gate completo, del leader.
