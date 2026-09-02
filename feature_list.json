@@ -90,11 +90,11 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "proteccion-de-rutas-privadas",
-      "description": "Las pantallas privadas no se ven sin sesion: quien entre sin estar autenticado termina en la pantalla de login. Y al reves, quien ya tiene sesion y abre el login no se queda ahi. La pantalla de login es publica.",
-      "status": "pending",
+      "description": "Las pantallas privadas no se ven sin sesion: quien entre sin estar autenticado termina en la pantalla de login. Y al reves, quien ya tiene sesion y abre el login no se queda ahi. La pantalla de login es publica. Se protege por convencion todo lo que cuelga del grupo de rutas privado, de modo que una pantalla nueva queda protegida por el hecho de nacer ahi, sin que nadie tenga que acordarse de anadirla a una lista. La sesion se comprueba de verdad en cada navegacion, no solo que la cookie exista: se valida su firma y que no haya caducado. Para poder comprobarlo tambien en el borde, la firma de la sesion pasa a usar la criptografia estandar disponible en los dos entornos en vez de la propia de Node, y lo hace SIN cambiar el formato del token: las sesiones ya emitidas siguen valiendo. Sigue habiendo una sola implementacion de la firma en todo el repositorio, nunca dos. Quien pide una pantalla concreta sin sesion vuelve a esa misma pantalla despues de entrar, siempre que la ruta de vuelta sea interna del sistema y tenga permiso para verla; si no tiene permiso acaba en el dashboard y no en el login, porque no estar autorizado no es lo mismo que no estar autenticado. Conectar la maquetacion con la sesion real -que el formulario autentique de verdad, que el layout muestre al usuario y que su cerrar sesion funcione- va aparte.",
+      "status": "spec_ready",
       "sdd": true,
-      "complexity": null,
-      "zone": null,
+      "complexity": "high",
+      "zone": "backend",
       "branch": "feature/QC-9-proteccion-de-rutas-privadas",
       "depends_on": [
         "QC-8",
@@ -246,7 +246,7 @@
       "epic_name": "Identidad y acceso",
       "name": "ayuda-visual-de-contrasena",
       "description": "Cuando alguien escribe una contrasena nueva tiene que ver los requisitos que debe cumplir antes de enviarla, y cuales va cumpliendo a medida que escribe, en vez de enterarse de golpe al ser rechazada. Esta ficha construye SOLO el componente reutilizable, con sus tests: hoy no existe ninguna pantalla que fije o cambie una contrasena, y la primera que lo hara es QC-36. Seis de las siete reglas se marcan en vivo en el navegador; la de contrasenas filtradas se muestra en la lista pero solo se resuelve al enviar, porque su diccionario vive en el servidor. Mientras falte alguna de las seis comprobables en vivo, el formulario no se puede enviar. Las reglas en si las decide la ficha de politica de contrasenas; esta solo las muestra.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
@@ -297,7 +297,7 @@
       "epic_name": "Recetas",
       "name": "modelo-recetas",
       "description": "Necesitamos persistir el catalogo de recetas. Solo el modelo de datos: sin pantalla y sin API. Cada receta tiene un nombre, una descripcion, una imagen y unos pasos, y guarda ademas quien la creo y quien la modifico por ultima vez. El nombre es obligatorio y no se repite entre recetas: se comparan sin acentos ni caracteres especiales y sin distinguir mayusculas, igual que las presentaciones. La descripcion es opcional. La imagen se guarda como la direccion del archivo, en una sola columna de texto opcional: una receta sin imagen es valida, y el modelo no sabe donde vive ese archivo ni lo sube. Los pasos son opcionales y se guardan como un unico documento JSON en la columna, no como tabla aparte: son una lista ordenada de textos, y el orden es el de la lista. La base guarda el documento tal cual; que sea una lista de textos y que ninguno venga vacio lo hace cumplir la capa de aplicacion, no la columna. Una receta se compone de productos: un mismo producto entra en muchas recetas y una receta lleva muchos productos, y cada pareja receta-producto guarda ademas una cantidad y una unidad de medida. Esa pareja es la entidad propia de la relacion, no una tabla de union sin datos. Un mismo producto no puede aparecer dos veces en la misma receta. La cantidad es un numero con decimales exactos, obligatorio, y nunca negativo ni cero. La unidad de medida de cada linea es texto libre obligatorio y puramente anotativo: no hay conversion entre unidades y no se toma de la unidad del producto, que es opcional. Si un producto se da de baja, la receta conserva su linea: el borrado de producto es logico y la linea sigue apuntando al mismo producto. Quitar un producto de una receta al editarla borra esa linea de verdad, y borrar la receta se lleva sus lineas con ella. Recetas es un modulo propio y no parte de inventario: la linea conoce al producto por lo que inventario publica, nunca por su tabla. El alta, la consulta, la edicion y el borrado de recetas van aparte.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -376,13 +376,13 @@
     {
       "key": "QC-32",
       "id": 32,
-      "epic": "QC-18",
-      "epic_name": "Inventario",
+      "epic": "QC-37",
+      "epic_name": "Catalogos",
       "name": "modelo-unidades",
-      "description": "Necesitamos un catalogo propio de unidades de medida, que hoy no existe: la unidad vive como texto libre en el producto (columna opcional) y en cada linea de receta (texto obligatorio y anotativo). Solo el modelo de datos: sin pantalla y sin API. La tabla se llama Unit, en ingles como el resto del esquema. Cada unidad tiene un nombre obligatorio que no se repite: se compara sin acentos ni caracteres especiales y sin distinguir mayusculas, igual que las presentaciones. La unidad sigue siendo puramente anotativa: no hay conversion entre unidades y el catalogo no sabe de factores. Es un catalogo compartido: el producto y la linea de receta dejan de guardar texto y pasan a apuntar a una unidad del catalogo. Una unidad no se puede borrar mientras algun producto o alguna linea de receta la use. Como catalogo cerrado y corto no lleva borrado logico, igual que roles y presentaciones, y por ahora tampoco tiene pantalla de administracion. Que pasa con los textos libres que ya estan guardados -si se convierten en unidades creadas al vuelo, si se mapean a mano, o si la columna queda vacia-, si la unidad del producto sigue siendo opcional y si la de la linea de receta sigue siendo obligatoria, se decide al acotar la ficha.",
+      "description": "Necesitamos un catalogo propio de unidades de medida, que hoy no existe: la unidad vive como texto libre en el producto (columna opcional) y en cada linea de receta (texto obligatorio y anotativo). Solo el modelo de datos: sin pantalla y sin API. El catalogo es un modulo hexagonal propio, unidades, y no parte de inventario: inventario, recetas y pedidos lo consumen por su contrato publico, nunca por su tabla. Por eso la ficha cuelga de la epica Catalogos y no de Inventario. La tabla se llama Unit, en ingles como el resto del esquema. Cada unidad tiene un nombre obligatorio que no se repite -se compara sin acentos ni caracteres especiales y sin distinguir mayusculas, con columna normalizada persistida e indice unico- y un simbolo opcional (Kilogramo / kg): sin simbolo se muestra el nombre. Si el simbolo debe ser unico cuando existe no se decidio, y esta ficha no crea indice unico sobre el. La unidad sigue siendo puramente anotativa: no hay conversion entre unidades y el catalogo no sabe de factores. El producto y la linea de receta dejan de guardar texto y pasan a apuntar al catalogo, conservando sus reglas actuales: la unidad del producto sigue siendo opcional y la de la linea de receta sigue siendo obligatoria. La base esta vacia, asi que la migracion no convierte datos: crea la tabla y cambia las columnas, y si encuentra filas con unidad escrita falla en vez de descartarlas. El catalogo nace con un conjunto arrancador cargado por el seed idempotente que ya existe (kg, g, L, mL, unidad), porque sin pantalla de administracion nadie podria crear la primera. Una unidad no se puede borrar mientras algun producto o alguna linea de receta la use. Como catalogo cerrado y corto no lleva borrado logico, igual que roles y presentaciones. El alta, la edicion y el borrado de unidades van aparte, y su pantalla tambien.",
       "status": "pending",
       "sdd": true,
-      "complexity": "medium",
+      "complexity": "high",
       "zone": "backend",
       "branch": "feature/QC-32-modelo-unidades",
       "depends_on": [
@@ -459,6 +459,40 @@
         "QC-21"
       ],
       "spec_path": "specs/QC-36-cambiar-mi-contrasena"
+    },
+    {
+      "key": "QC-38",
+      "id": 38,
+      "epic": "QC-37",
+      "epic_name": "Catalogos",
+      "name": "crud-de-unidades",
+      "description": "Los casos de uso del catalogo de unidades de medida, sobre el modelo que crea QC-32: alta, consulta, edicion y borrado. Sin pantalla: solo los casos de uso y su superficie de servidor, como en el CRUD de productos y el de recetas. Hoy el catalogo solo se puede tocar por el seed, asi que esta ficha es la que lo hace administrable. Antes de guardar se rechaza el nombre vacio, el nombre repetido comparado sin acentos ni mayusculas, y el nombre con un largo mayor al maximo. Borrar una unidad que algun producto o alguna linea de receta usa no debe ser posible. Quien puede consultar, crear, editar y borrar unidades se decide al acotar la ficha, y ese permiso se valida en el service. La pantalla va aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-38-crud-de-unidades",
+      "depends_on": [
+        "QC-32"
+      ],
+      "spec_path": "specs/QC-38-crud-de-unidades"
+    },
+    {
+      "key": "QC-39",
+      "id": 39,
+      "epic": "QC-37",
+      "epic_name": "Catalogos",
+      "name": "pantalla-de-unidades",
+      "description": "La pantalla del catalogo de unidades de medida dentro del layout privado: la lista, el formulario de alta y edicion, y el borrado. Las operaciones ya existen y las expone el CRUD de unidades como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error), incluyendo el error de no poder borrar una unidad que esta en uso. La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, si entra en la navegacion privada o vive dentro de una pantalla de configuracion, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo. Quien la ve depende del permiso que cierre el CRUD de unidades.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-39-pantalla-de-unidades",
+      "depends_on": [
+        "QC-38"
+      ],
+      "spec_path": "specs/QC-39-pantalla-de-unidades"
     }
   ]
 }

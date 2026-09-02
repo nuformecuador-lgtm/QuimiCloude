@@ -492,3 +492,81 @@ diff de 1982 — la deuda que QC-14 ya había dejado escrita y que sigue sin `.g
 - **`wt.sh done` sigue sin cerrar en Windows** cuando el worktree tiene `node_modules` de pnpm.
   Van dos features seguidas (QC-6 y QC-19) rematadas a mano con `rmdir /s /q` + `git worktree
   prune`. Ya no es una anécdota: es el comportamiento por defecto del script en esta máquina.
+
+## QC-24 — modelo-recetas (2026-09-02)
+
+PR [#15](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/15), merge `81e3ffc`. Épica
+**QC-27 Recetas** —creada el mismo día por decisión humana, separándola de Inventario—,
+`zone: backend`, `complexity: high`. 33 requisitos EARS, los 33 con su test. `./init.sh` completo
+en verde antes del PR: **51 archivos, 551 tests**.
+
+### Lo que la hace distinta
+
+**Es el primer módulo hexagonal creado desde cero.** `identity` e `inventario` los produjo la
+migración de QC-15; aquí se funda uno, con su dominio, sus puertos, sus adaptadores y su barrel.
+
+**Y obligó a que `inventario` publicara un contrato que no existía.** Su barrel era literalmente
+`export {}`. Una línea de receta apunta a un producto y QC-15 prohíbe consultar el modelo ajeno,
+así que nace `lib/modules/inventario/domain/product-catalog.ts` con `ProductId`, `ProductRef`
+(`id`, `name`, `unit` — deliberadamente sin costo ni existencia) y la interfaz `ProductCatalog`,
+reexportados **como tipos**. La interfaz vive en el dominio de `inventario` y no en
+`recetas/ports/` con un argumento que decidió el `spec_author`: implementarla exige ejecutar
+`prisma.product`, y eso solo puede hacerlo un adaptador driven del módulo dueño. La
+implementación y el cableado quedan para QC-25, y `lib/composition/index.ts` **no se toca** — hay
+una task que lo verifica.
+
+**Tres FK cruzan de módulo y ninguna guardia lo detectaría.** `product_id`, `created_by` y
+`updated_by` van como **escalares sin `@relation`**, con la FK a mano en el `migration.sql`. Con
+`@relation` el gate pasaría en verde igual y cualquiera cruzaría la frontera con un `include`.
+
+**Las FK de auditoría en `RESTRICT`, no `SET NULL`.** `created_by`/`updated_by` son anulables y
+`NULL` significa «no la creó una persona» (una importación, un seed), no «se perdió el dato». Con
+`SET NULL`, borrar un usuario convertiría sus recetas en lo primero. Lo detectó el `spec_author`
+al incorporar la decisión humana del autor anulable; nadie se lo había pedido.
+
+### El rechazo, y lo que destapó
+
+El `reviewer` **rechazó dos veces** antes del OK, las dos por rojo real, y las tres rondas las
+resolvió **midiendo por mutación** —replicando los predicados y rompiéndolos a propósito— en vez
+de leer la bitácora.
+
+Lo que destapó es un patrón, no un bug: **cinco aserciones en QC-14 y QC-19 afirmaban el censo
+global del repo** («exactamente N modelos», «exactamente estas 4 migraciones», «el barrel es
+literalmente `export {};`»). Se rompen en cuanto llega cualquier feature que añada algo, y
+**`./init.sh --rapido` no las corre** porque leen las fuentes del disco y `vitest related` no las
+engancha: el rojo aparece tarde, en el gate completo de quien llega después, y parece culpa suya.
+Las cinco se **acotaron, ninguna se borró**, y el reviewer confirmó que quedaron **más estrictas**
+—contar por `/// @module`, vigilar lo que el barrel reexporta— con dos huecos estrechos anotados.
+Hubo un sexto fallo escondido: un barrido leía el esquema **con los comentarios dentro** y lo
+rompía un comentario de QC-24 que dice que una línea de receta «no es un hecho histórico».
+
+### El falso rojo, y la lección de método
+
+El leader afirmó que `origin/dev` estaba roto porque el validador daba «faltan specs para features
+sdd en vuelo: QC-29», y **avisó a las cuatro sesiones locales antes de verificarlo en la fuente**.
+Era falso: `tieneSpec()` busca el spec en **tres** sitios y el tercero es `.worktrees/<slug>/specs/`,
+deliberadamente, para que una feature en vuelo no dé rojo. Desde la raíz pasa; desde dentro de un
+worktree esa tercera búsqueda desaparece. **El rojo lo fabricaba el cwd.** Se retractó ante las
+cuatro sesiones y nadie llegó a commitear nada, pero una sesión estuvo a punto de tocar la rama de
+otra por un diagnóstico sin verificar. La lección: leer la fuente **antes** del aviso, no después.
+
+Debajo sí hay un problema real, reproducido por dos sesiones (QC-24 y QC-21): **el gate previo al
+PR se corre desde el worktree por diseño** (F2.4 valida tu rama, no el árbol de `dev`), y es justo
+desde donde el validador miente. Con dos features en vuelo —lo normal, con tope de 2 por zona—
+cada worktree ve como faltante el spec de la otra.
+
+### Deuda que hereda
+
+- **`WT_DIR` del validador se resuelve contra el cwd**, no contra el worktree principal. `wt.sh` ya
+  aprendió esa lección y tiene el comentario que lo explica; `validate-features.mjs` no la heredó.
+  Candidato a `/afinar-regla`, encargado por el humano.
+- **Tests que afirman el censo global de un recurso compartido.** Cinco casos aquí, más los
+  precedentes de QC-6 y QC-7 que aportó otra sesión. Misma regla pendiente.
+- **QC-20 toca los mismos dos archivos** (`db/schema.prisma` y `inventario-schema.test.ts`) y
+  también estrechó ese test por su cuenta. El segundo en mergear tiene conflicto de contenido real:
+  **hay que quedarse con la unión**, no resolver a favor de una versión.
+- **`wt.sh done` volvió a fallar en Windows**, tercera vez el mismo día. Rematado con `rm -rf` +
+  `git worktree prune`.
+- El **MCP de `atlassian` se cayó** a media feature: dos llamadas abortaron por timeout y el
+  comentario de F1.3 y la transición de F2.0 se escribieron a posteriori, recogidos en el
+  comentario de cierre. El disco estuvo al día en todo momento — el ciclo no depende de Jira.

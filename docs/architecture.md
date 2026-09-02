@@ -34,12 +34,16 @@ despues**: cambiarlas con datos ya cargados obliga a migrar historico. Conviene 
 antes de la primera feature de inventario o de producto, no despues. De las cuatro
 originales, **la 1 esta cerrada** desde el 2026-09-01; siguen abiertas la 2, la 3 y la 4.
 
-1. ~~**Unidades de medida.**~~ **CERRADA el 2026-09-01 (QC-14).** Una sola unidad por
-   producto y **sin conversiones**. La unidad se guarda en la columna `unit` del producto,
-   como **texto libre y opcional**, y es puramente anotativa: nadie convierte con ella. La
-   existencia se interpreta segun la presentacion del producto. Queda como riesgo asumido
-   que normalizarla a un conjunto cerrado mas adelante costara una limpieza de datos
-   (`specs/QC-14-modelo-producto/requirements.md > Preguntas abiertas`).
+1. ~~**Unidades de medida.**~~ **CERRADA el 2026-09-01 (QC-14) y REVISADA el 2026-09-02
+   (QC-32).** Una sola unidad por elemento y **sin conversiones**: eso no ha cambiado y la
+   unidad sigue siendo puramente anotativa. Lo que cambio es la forma. QC-14 la guardo como
+   **texto libre y opcional** en la columna `unit` del producto, asumiendo a conciencia que
+   normalizarla despues costaria una limpieza de datos. El 2026-09-02, al acotar QC-32, el
+   humano decidio normalizarla: la unidad pasa a ser un **catalogo propio** (modulo `unidades`,
+   tabla `Unit`, nombre unico normalizado y simbolo opcional), y el producto y la linea de
+   receta apuntan a el en vez de guardar texto. Se paga el coste que QC-14 anticipo, con la
+   suerte de que la base todavia esta vacia. Detalle en
+   `specs/QC-32-modelo-unidades/requirements.md`.
 2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
    suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
    guarda totales es de las migraciones mas dolorosas que existen.
