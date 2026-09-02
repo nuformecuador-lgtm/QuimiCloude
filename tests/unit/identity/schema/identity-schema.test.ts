@@ -115,6 +115,16 @@ const LOCKOUT_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['lockedUntil', 'locked_until'],
 ]
 
+/**
+ * QC-6 / R9, R10 — marca de "debe cambiar la contrasena la primera vez que entre".
+ * NO es un dato de negocio del usuario (por eso no entra en BUSINESS_FIELDS): es una
+ * marca de estado que escribe el seed y que lee QC-7. El nombre evita el segmento
+ * `password` a proposito (specs/QC-6-.../design.md > 2).
+ */
+const SEED_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ['mustChangeCredential', 'must_change_credential'],
+]
+
 describe('db/schema.prisma — modelo de usuarios y roles', () => {
   it('el modelo User declara los nueve datos del usuario', () => {
     for (const [name] of BUSINESS_FIELDS) {
@@ -136,6 +146,7 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
         'updatedAt',
         'deletedAt',
         ...LOCKOUT_FIELDS.map(([name]) => name),
+        ...SEED_FIELDS.map(([name]) => name),
       ].sort(),
     )
 
@@ -327,5 +338,21 @@ describe('db/schema.prisma — bloqueo temporal de cuenta (R30)', () => {
   it('el modelo User sigue siendo propiedad del modulo identity', () => {
     // El dueno no cambia por anadir columnas; el bloque 10 de la guardia lo exige declarado.
     expect(rawSchema.replace(/\r\n/g, '\n')).toContain('/// @module identity\nmodel User {')
+  })
+})
+
+// --- QC-6 — R9, R10: marca "debe cambiar la contrasena la primera vez que entre" -----
+
+describe('db/schema.prisma — marca de cambio de credencial obligatorio (R9, R10)', () => {
+  it('User declara mustChangeCredential booleano, obligatorio, con @default(false) y su @map', () => {
+    for (const [name, column] of SEED_FIELDS) {
+      expect(has(user, name), `falta el campo User.${name}`).toBe(true)
+      const declared = field(user, name)
+      expect(declared.type, `User.${name}`).toBe('Boolean')
+      expect(declared.isOptional, `User.${name} no puede ser opcional`).toBe(false)
+      expect(declared.attributes, `User.${name} necesita @default(false)`).toMatch(/@default\(false\)/)
+      expect(declared.attributes, `User.${name} debe mapear a ${column}`).toContain(`@map("${column}")`)
+    }
+    expect(SEED_FIELDS).toHaveLength(1)
   })
 })
