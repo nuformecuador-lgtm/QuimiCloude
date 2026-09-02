@@ -80,6 +80,11 @@ model User {
   lockLevel           Int       @default(0) @map("lock_level")
   lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
 
+  /// TRUE = esta persona tiene que cambiar su contrasena la primera vez que entre.
+  /// El nombre evita el segmento `password` a proposito (design.md > 2). Quien la LEE y
+  /// bloquea el acceso es QC-7; esta ficha solo la escribe.
+  mustChangeCredential Boolean @default(false) @map("must_change_credential")
+
   documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 

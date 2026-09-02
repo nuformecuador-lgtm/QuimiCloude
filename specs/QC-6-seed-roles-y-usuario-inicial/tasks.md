@@ -11,7 +11,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 
 ## Bloque A — Preparacion
 
-### [ ] T0. Asegurar `.env` dentro del worktree
+### [x] T0. Asegurar `.env` dentro del worktree
 - Dep: ninguna. **Antes de cualquier `db:*` o de los tests de integracion.**
 - `.env` esta git-ignorado y **los worktrees no lo heredan**. Dejarlo disponible dentro de
   `.worktrees/QC-6-seed-roles-y-usuario-inicial/` con `DATABASE_URL` y `DIRECT_URL`.
@@ -19,7 +19,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 - **Hecho cuando:** `pnpm exec prisma validate` resuelve las variables sin error de
   "environment variable not found".
 
-### [ ] T1. [P] Anadir las claves del seed a `.env.example`
+### [x] T1. [P] Anadir las claves del seed a `.env.example`
 - Dep: ninguna.
 - `SEED_ADMIN_USERNAME=`, `SEED_ADMIN_PASSWORD=`, `SEED_ADMIN_EMAIL=` **sin valores**, con el
   comentario de que solo hacen falta en un entorno nuevo (`design.md > 6`).
@@ -30,7 +30,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 
 ## Bloque B — Migracion aditiva (entregable 1)
 
-### [ ] T2. Anadir `mustChangeCredential` a `db/schema.prisma`
+### [x] T2. Anadir `mustChangeCredential` a `db/schema.prisma`
 - Dep: ninguna.
 - Campo en `model User`: `mustChangeCredential Boolean @default(false) @map("must_change_credential")`,
   con el comentario que explica que significa y **por que no se llama `mustChangePassword`**
@@ -39,7 +39,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
   `pnpm run typecheck` pasa y `pnpm run test:guardias` sigue verde (si el nombre lleva
   `password`, la guardia cae aqui).
 
-### [ ] T3. Generar y **revisar** `migration.sql`
+### [x] T3. Generar y **revisar** `migration.sql`
 - Dep: T0, T2.
 - `pnpm run db:migrate:create` → `db/migrations/<ts>_user_must_change_credential/migration.sql`.
 - **Revisarlo entero antes de aplicarlo:** Prisma no conoce los tres indices
@@ -48,13 +48,13 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 - **Hecho cuando:** el archivo contiene exactamente un `ALTER TABLE "users" ADD COLUMN
   "must_change_credential" BOOLEAN NOT NULL DEFAULT false;` y ningun `DROP`.
 
-### [ ] T4. Escribir `down.sql` a mano
+### [x] T4. Escribir `down.sql` a mano
 - Dep: T3.
 - `ALTER TABLE "users" DROP COLUMN IF EXISTS "must_change_credential";` y nada mas.
 - **Hecho cuando:** existe `down.sql` en la carpeta de la migracion, no contiene ningun
   `DROP TABLE` ni `DROP INDEX`, y `./init.sh` no reporta "migraciones sin down.sql".
 
-### [ ] T5. [P] Test estatico `tests/unit/identity/schema/seed-migration.test.ts`
+### [x] T5. [P] Test estatico `tests/unit/identity/schema/seed-migration.test.ts`
 - Dep: T2, T3, T4.
 - Lee como texto `db/schema.prisma`, el `migration.sql` y el `down.sql` nuevos y afirma: el
   campo con su `@map` y su `@default(false)`; el `ADD COLUMN ... BOOLEAN NOT NULL DEFAULT
