@@ -218,3 +218,31 @@ describe('middleware de rutas privadas', () => {
     expect(destino(denegado)).toBe('/dashboard');
   });
 });
+
+// ---------------------------------------------------------------------------
+// CARACTERIZACION — el rol firmado envejece. Esto NO es una virtud (R30, D17)
+// ---------------------------------------------------------------------------
+//
+// Lo que este bloque fija es un LIMITE CONOCIDO, no un comportamiento deseable: mientras no
+// exista la revocacion de sesiones (QC-23), el rol que viaja en la cookie es una foto del
+// instante del login y vale hasta 8 h. Un ascenso no surte efecto en el borde hasta que la
+// sesion caduca, y esta ficha no lo simula: reemitir la cookie al leerla violaria R5.
+//
+// **QC-23 pondra este test rojo A PROPOSITO**, igual que QC-8 hizo con su R21. Cuando eso pase,
+// no se parchea el test: se borra y se escribe el que afirme la invalidacion inmediata.
+//
+// El corte real sigue estando en el service (R29): que el borde deje pasar —o corte— no
+// autoriza ni desautoriza nada sobre los datos.
+describe('limite conocido: el rol firmado no se entera de un cambio de rol (R30)', () => {
+  it('corta al Operador ascendido a Administrador hasta que caduque su sesion, porque el borde no consulta la base', async () => {
+    reglas.actuales = [{ prefix: '/dashboard/productos', roles: ['Administrador'] }];
+    // La base ya dice `Administrador`; la cookie, emitida antes del ascenso, dice `Operador`.
+    // El middleware decide con la cookie porque no tiene base a la que preguntar (R4).
+    const cookieDeAntesDelAscenso = await cookieFirmada('Operador');
+
+    const response = await middleware(peticion('/dashboard/productos', cookieDeAntesDelAscenso));
+
+    expect(response.status).toBe(307);
+    expect(destino(response)).toBe('/dashboard');
+  });
+});
