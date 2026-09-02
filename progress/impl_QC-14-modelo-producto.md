@@ -292,3 +292,57 @@ por esta feature**.
 El `.env` del worktree esta git-ignorado (`.gitignore:38`) y apunta a `QuimiCloude_QC14`,
 con `DATABASE_URL` y `DIRECT_URL`. No se versiono nada y no se pego ninguna cadena de
 conexion en ningun archivo del repo ni en el chat.
+
+## T6 — ciclo apply → rollback → apply: EJECUTADO (2026-09-01)
+
+**Lo corrio el leader, no el implementer**, porque `pnpm run db:rollback` estaba denegado por
+el clasificador de permisos de la sesion del subagente. Se registra aqui con esa atribucion
+explicita para que el `reviewer` sepa de donde sale la evidencia.
+
+Es inofensivo por construccion: la base `QuimiCloude_QC14` es **exclusiva de esta feature**,
+asi que revertirla no puede afectar a QC-7 ni a nadie.
+
+**1. Rollback** — `pnpm run db:rollback`:
+
+```
+> tsx scripts/db-rollback.ts
+db:rollback: aplicando down.sql de 20260902005510_products_and_presentations y borrando su fila de _prisma_migrations
+db:rollback: 20260902005510_products_and_presentations revertida.
+```
+
+**2. Esquema inmediatamente despues del rollback**, consultado contra la base real:
+
+```
+tablas:       _prisma_migrations, document_types, roles, users
+migraciones:  20260806122638_users_and_roles
+pgcrypto:     intacta
+```
+
+`products` y `presentations` desaparecieron, quedo **exactamente** el esquema que dejaba QC-4,
+la fila de `_prisma_migrations` se borro y `pgcrypto` no se toco. Eso es lo que R22 exige
+demostrar, y es la mitad que hasta ahora solo estaba verificada por el test estatico.
+
+**3. Reaplicacion** — `prisma migrate deploy`:
+
+```
+Datasource "db": PostgreSQL database "QuimiCloude_QC14", schema "public" at "localhost:5432"
+Applying migration `20260902005510_products_and_presentations`
+All migrations have been successfully applied.
+```
+
+**4. Verificacion de que el esquema volvio identico.** No se dio por bueno el mensaje de
+Prisma: se reejecutaron los tests de la feature contra la base ya reaplicada.
+
+```
+pnpm exec vitest run inventario
+Test Files  3 passed (3)
+     Tests  52 passed (52)
+```
+
+Los 19 tests de integracion de esa corrida comprueban contra la base real las dos tablas, los
+cuatro `CHECK`, la FK `ON DELETE RESTRICT`, el RLS activado y forzado, `numeric(14,4)` y
+`min_purchase integer NOT NULL DEFAULT 0`. Que pasen **despues** del ciclo demuestra que la
+reaplicacion reconstruyo el esquema identico.
+
+**R22 queda cerrado con test ejecutado. Con esto los 24 requisitos (R1-R24) tienen cobertura
+ejecutada**, y el criterio de aceptacion de T9 se cumple.

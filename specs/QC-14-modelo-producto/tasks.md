@@ -94,7 +94,7 @@ archivo que no está listado, se anota antes de seguir.
 
 ## Bloque D — Base de datos real
 
-### [ ] T6. Aplicar y revertir la migración de verdad (ciclo apply → rollback → apply)
+### [x] T6. Aplicar y revertir la migración de verdad (ciclo apply → rollback → apply)
 - Dep: T0, T2, T3.
 - Archivos: ninguno versionado; la salida se pega en
   `progress/impl_QC-14-modelo-producto.md`.
@@ -131,7 +131,7 @@ archivo que no está listado, se anota antes de seguir.
   no lo ve (`docs/verification.md > Lo que --rapido NO cubre`).
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con las tres guardias en verde.
 
-### [ ] T9. Documentar el mapa `R<n> → test`
+### [x] T9. Documentar el mapa `R<n> → test`
 - Dep: T8.
 - Archivos: `progress/impl_QC-14-modelo-producto.md`.
 - Copiar la tabla de trazabilidad de abajo con la **salida real** de los tests, no con la
