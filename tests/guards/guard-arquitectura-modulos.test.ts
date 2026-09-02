@@ -67,6 +67,18 @@ function listSourceFiles(dir: string): readonly string[] {
   })
 }
 
+/**
+ * Archivos `.ts`/`.tsx` sueltos en el PRIMER NIVEL del repositorio (no recursivo): hoy
+ * `next.config.ts`, `next-env.d.ts`, `playwright.config.ts` y `prisma.config.ts`, y manana
+ * `middleware.ts`. Las subcarpetas de la raiz no se recorren aqui: las de codigo ya entran por
+ * `SCAN_ROOTS`, y `tests/`, `e2e/`, `scripts/` y `db/` no son codigo de la aplicacion (QC-9 R19).
+ */
+function listRootLevelSourceFiles(root: string): readonly string[] {
+  return readDirEntries(root)
+    .filter((entry) => !entry.isDirectory && SOURCE_EXTENSIONS.has(extname(entry.name)))
+    .map((entry) => join(root, entry.name))
+}
+
 function tryReadReal(absPath: string): string | null {
   try {
     const stat = statSync(absPath)
@@ -465,9 +477,21 @@ export function findDrivingImportInsideComposition(relPath: string, specifier: s
 
 const UI_ROOTS = ['app/', 'components/', 'hooks/']
 
-/** `app/`, `components/`, `hooks/` solo consumen el contrato o un adaptador driving (R13). */
+/**
+ * Que rutas cuentan como capa UI: `app/`, `components/`, `hooks/` y **los archivos de primer nivel
+ * del repositorio** (QC-9 R19). Un archivo de primer nivel es exactamente eso: su ruta relativa no
+ * tiene ninguna `/`. Se juzgan con las mismas reglas que `app/**` porque son lo mismo -- codigo del
+ * borde de la aplicacion, no de un modulo --, y ahi es donde nace `middleware.ts`: sin esto, un
+ * archivo de la raiz podria importar un adaptador driven o saltarse el contrato en verde.
+ */
+export function isUiLayerPath(relPath: string): boolean {
+  if (!relPath.includes('/')) return true
+  return UI_ROOTS.some((root) => relPath.startsWith(root))
+}
+
+/** `app/`, `components/`, `hooks/` y la raiz solo consumen el contrato o un adaptador driving (R13). */
 export function findUiLayerImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
-  if (!UI_ROOTS.some((root) => relPath.startsWith(root))) return null
+  if (!isUiLayerPath(relPath)) return null
   if (target.kind === 'external') return null
   const layer = layerOfPath(target.relPath)
   if (layer === 'domain' || layer === 'ports' || layer === 'driven') {
@@ -708,7 +732,14 @@ const utilsSource = tryReadReal(utilsPath)
 const existsInRepo = (absPath: string) => tryReadReal(absPath) !== null
 
 const SCAN_ROOTS = ['app', 'components', 'hooks', 'lib'] as const
-const allSourceFiles = SCAN_ROOTS.flatMap((root) => listSourceFiles(join(repoRoot, root))).map((absPath) => {
+// Ademas de los SCAN_ROOTS en profundidad, los `.ts`/`.tsx` de primer nivel de la raiz (QC-9 R19):
+// hasta hoy quedaban fuera del barrido, asi que un archivo de la raiz que importara un adaptador
+// driven pasaba el gate en verde. `middleware.ts` va a nacer ahi, y esta ampliacion va antes.
+const scannedAbsFiles = [
+  ...SCAN_ROOTS.flatMap((root) => listSourceFiles(join(repoRoot, root))),
+  ...listRootLevelSourceFiles(repoRoot),
+]
+const allSourceFiles = scannedAbsFiles.map((absPath) => {
   const content = readFileSync(absPath, 'utf8')
   const relPath = relPosix(repoRoot, absPath)
   const specifiers = extractImportSpecifiers(content)
@@ -1216,6 +1247,60 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       expect(
         findClientForbiddenImportFinding('app/(private)/layout.tsx', false, '@/lib/composition', internalTarget('lib/composition/index.ts')),
       ).toBeNull()
+    })
+  })
+
+  // QC-9 T2 (R19, R21) — la raiz del repositorio se juzga con las reglas de app/**.
+  describe('bloque 8-bis — los archivos de primer nivel se juzgan como la UI (R19, R21)', () => {
+    it('un archivo de la raiz que importa un driven fuera de composicion genera hallazgo', () => {
+      const specifier = '@/lib/modules/identity/adapters/driven/session/session-cookie'
+      const target = internalTarget('lib/modules/identity/adapters/driven/session/session-cookie.ts')
+
+      // R11/R21: el cableado vive solo en lib/composition, tambien para middleware.ts.
+      expect(findDrivenImportOutsideComposition('middleware.ts', specifier, target)).toBe(
+        `middleware.ts importa el adaptador driven '${specifier}' fuera de lib/composition (R11)`,
+      )
+      // R13: y ademas se salta el contrato del modulo, igual que si estuviera en app/.
+      expect(findUiLayerImportFinding('middleware.ts', specifier, target)).toBe(
+        `middleware.ts importa '${specifier}' saltandose el contrato del modulo (R13)`,
+      )
+      // Un archivo de primer nivel marcado como cliente tampoco puede tocar la composicion (R14).
+      expect(
+        findClientForbiddenImportFinding('middleware.ts', true, '@/lib/composition', internalTarget('lib/composition/index.ts')),
+      ).toBe("middleware.ts ('use client') importa el punto de composicion '@/lib/composition' (R14)")
+    })
+
+    it('un archivo de la raiz que consume el contrato o un adaptador driving no dispara la regla', () => {
+      expect(findUiLayerImportFinding('middleware.ts', '@/lib/modules/identity', internalTarget('lib/modules/identity/index.ts'))).toBeNull()
+      expect(
+        findUiLayerImportFinding(
+          'middleware.ts',
+          '@/lib/modules/identity/adapters/driving/route-guard-middleware',
+          internalTarget('lib/modules/identity/adapters/driving/route-guard-middleware.ts'),
+        ),
+      ).toBeNull()
+      // Y los imports externos de los tres archivos de configuracion de la raiz no son hallazgo.
+      expect(findUiLayerImportFinding('next.config.ts', 'next', externalTarget('next'))).toBeNull()
+      expect(findUiLayerImportFinding('playwright.config.ts', '@playwright/test', externalTarget('@playwright/test'))).toBeNull()
+      expect(findUiLayerImportFinding('prisma.config.ts', 'prisma/config', externalTarget('prisma/config'))).toBeNull()
+    })
+
+    it('isUiLayerPath: primer nivel si y solo si la ruta relativa no tiene ninguna barra', () => {
+      expect(isUiLayerPath('middleware.ts')).toBe(true)
+      expect(isUiLayerPath('next.config.ts')).toBe(true)
+      expect(isUiLayerPath('app/(private)/layout.tsx')).toBe(true)
+      expect(isUiLayerPath('lib/modules/identity/domain/credentials.ts')).toBe(false)
+      expect(isUiLayerPath('lib/composition/index.ts')).toBe(false)
+    })
+
+    it('el barrido real incluye los archivos de primer nivel de la raiz', () => {
+      const relativos = allSourceFiles.map((file) => file.relPath)
+      expect(relativos).toContain('next.config.ts')
+      expect(relativos).toContain('playwright.config.ts')
+      expect(relativos).toContain('prisma.config.ts')
+      expect(relativos.some((relPath) => !relPath.includes('/'))).toBe(true)
+      // Y no arrastra lo que no es codigo de la aplicacion.
+      expect(relativos.some((relPath) => relPath.startsWith('tests/') || relPath.startsWith('e2e/'))).toBe(false)
     })
   })
 
