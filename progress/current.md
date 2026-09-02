@@ -768,6 +768,36 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   corre, así que no es un agujero de merge, pero sí del modo rápido. La salida que sugiere el
   reviewer: nombrarlas `guard-…` o moverlas a `tests/guards/`, que el modo rápido corre siempre.
   Entra por `/afinar-regla`.
+- **[arnés — CONFIRMADO Y AGRAVADO en QC-20: dos gates rápidos EN VERDE sobre una rama ROJA]**
+  Evidencia concreta del 2026-09-02, que eleva la deuda anterior de «puede no correrlo» a «no lo
+  corrió, y nadie se enteró durante dos grupos de trabajo».
+  `tests/unit/identity/credential-policy-contract.test.ts` › `esta feature no anade migraciones ni
+  columnas` (alcance de QC-19, su R21) **llevaba rojo desde la task T2 de QC-20**, porque enumeraba
+  las cuatro migraciones existentes y QC-20 añadió la quinta. Pasó por debajo de **dos
+  `./init.sh --rapido` que el leader dio por verdes**. Se descubrió por casualidad, porque al
+  implementer le exigió a un subagente correr `tests/unit/` y `tests/ui/` **enteros** en una task
+  que tocaba un contrato compartido.
+  **El mecanismo exacto, que es lo que hay que arreglar:** un test es invisible para `--rapido`
+  cuando cumple las dos condiciones a la vez —(1) **no** vive en `tests/guards/` ni se llama
+  `guard-…`, así que `pnpm run test:guardias` no lo recoge; y (2) afirma sobre el **árbol de
+  archivos** (`readdirSync`, `existsSync`, leer SQL de `db/migrations/`) en vez de importar lo que
+  vigila, así que **ningún grafo de imports lo selecciona jamás**—. No es que «pueda» fallar la
+  selección: es que **por construcción nunca lo selecciona**.
+  **Y son justo los tests que más se rompen:** los que afirman sobre el árbol son los que vigilan
+  **alcance** («esta feature no añade X»), o sea los que la *siguiente* feature invalida por
+  definición. El patrón mordió **tres veces el mismo día**: el test de alcance de QC-14 (Grupo A de
+  QC-20), éste de QC-19 (Grupo C), y `tests/unit/inventario/schema/inventario-schema.test.ts`, que
+  QC-20 y QC-24 estrecharon **a la vez, por separado y sobre las mismas líneas**.
+  **Salida probable para `/afinar-regla`:** que `scripts/test-rapido.mjs` incluya **siempre** los
+  tests que barren el árbol, igual que ya incluye todas las guardias — seleccionándolos por un
+  patrón detectable (uso de `readdirSync`/`existsSync`/lectura de `db/migrations/`) o exigiendo que
+  vivan en `tests/guards/`. Mientras no exista, **la regla de trabajo es correr `tests/unit/` y
+  `tests/ui/` enteros al cerrar cada grupo**, que es lo que destapó éste.
+  **Segunda lección, sobre cómo se escriben esos tests:** un test de alcance **no debe enumerar lo
+  que hacen las demás features**. `expect(directorios).toEqual([...las cuatro migraciones...])` es
+  un censo, y un censo es una bomba con temporizador que estalla en la siguiente feature con
+  migración. Se afirma sobre el **contenido** («ninguna migración añade columnas de historial de
+  contraseñas»), no sobre el **recuento**. Decisión del leader en QC-20, aplicada al test de QC-19.
 - **[QC-12 — la verificación visual multiplataforma no la hizo nadie con ojos]** No hay navegador
   con emulación de dispositivo en este entorno. Lo verificado es el HTML servido y jsdom a 375 y
   1280 px, más las guardias de que no hay alto de viewport fijo, ni `:hover`, ni controles. El
