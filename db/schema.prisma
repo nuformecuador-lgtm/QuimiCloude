@@ -76,10 +76,59 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
 
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockLevel           Int       @default(0) @map("lock_level")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
+
   documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([roleId], map: "users_role_id_idx")
   @@index([documentTypeCode], map: "users_document_type_code_idx")
   @@map("users")
+}
+
+/// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo
+/// compartido: una misma presentacion la usan muchos productos, y no se puede borrar
+/// mientras tenga alguno asignado (R14, via ON DELETE RESTRICT).
+///
+/// NO lleva `deletedAt`, igual que `Role` en `identity`: el borrado logico es un UPDATE y
+/// una FK no puede bloquear un UPDATE, asi que la columna neutralizaria en silencio la
+/// unica garantia real de R14. Ver `design.md > 9` (pregunta abierta 2).
+/// @module inventario
+model Presentation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  products Product[]
+
+  @@map("presentations")
+}
+
+/// Producto del catalogo quimico. Es TAMBIEN el elemento de inventario: una sola tabla
+/// (decision cerrada 1), con costo, compra minima, tiempo de entrega y unidad.
+///
+/// `name` NO tiene indice unico, y es deliberado (decision cerrada 6, R16): dos productos
+/// pueden llamarse igual. Se aparta a proposito del precedente de `users`.
+/// @module inventario
+model Product {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  presentationId String    @map("presentation_id") @db.Uuid
+  stock          Int?
+  cost           Decimal?  @db.Decimal(14, 4)
+  minPurchase    Int       @default(0) @map("min_purchase")
+  deliveryTime   Int?      @map("delivery_time")
+  qtyAlert       Int?      @map("qty_alert")
+  unit           String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([presentationId], map: "products_presentation_id_idx")
+  @@map("products")
 }

@@ -15,6 +15,15 @@ Produce exactamente tres archivos en `specs/<feature>/`:
 1. `requirements.md` — requisitos numerados `R1`, `R2`… en notación EARS estricta.
    Sin detalles de implementación. Cada requisito debe ser testeable.
 
+   **Si el archivo ya existe, lo COMPLETAS: no lo reescribes.** Viene sembrado por
+   `/afinar-feature`, o sea que el bloque de Alcance y la tabla `## Decisiones cerradas
+   (no reabrir)` los fijó el humano ANTES que tú. No los reabras, no los re-preguntes y no
+   los reordenes. Tu trabajo ahí es rellenar `## Requisitos (EARS)` y resolver lo que esté
+   en `## Preguntas abiertas`; lo que siga sin respuesta se queda escrito como tal.
+   **Cada fila de la tabla de decisiones debe quedar cubierta por al menos un `R<n>`**: una
+   decisión que no aparece en ningún requisito nunca llega a tener test, y
+   `CHECKPOINTS.md > Trazabilidad` exige el mapa `R<n> -> test`.
+
 2. `design.md` — decisiones técnicas: modelo de datos (tablas, RLS, migraciones),
    rutas/endpoints, contratos I/O, integraciones. Incluye OBLIGATORIAMENTE al menos
    una alternativa que descartaste y por qué.

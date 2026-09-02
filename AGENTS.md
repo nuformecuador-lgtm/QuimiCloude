@@ -4,7 +4,7 @@ Divulgacion progresiva: no cargues todo de golpe. Este archivo te dice **a quien
 delegar, en que orden y que leer** en cada paso. Los detalles finos viven en
 `docs/` y se leen bajo demanda.
 
-## Los seis subagentes
+## Los siete subagentes
 
 | Subagente | Hace | NO hace |
 | --- | --- | --- |
@@ -13,11 +13,22 @@ delegar, en que orden y que leer** en cada paso. Los detalles finos viven en
 | `frontend_dev` | Componentes, paginas, hooks, layouts con shadcn/ui + Tailwind + SWR | No toca backend, DB ni APIs |
 | `backend_dev` | Controllers, services, repos, migraciones Prisma, RLS, Server Actions | No toca UI ni componentes |
 | `reviewer` | Verifica trazabilidad `R<n>`->test, checklist contra `docs/` y `CHECKPOINTS.md` | No edita codigo |
+| `extractor` | Inventaria un modulo ya implementado y escribe su prompt portable + cuestionario en `extracciones/<slug>/` | No modifica el modulo ni escribe specs |
 | `leader` (tu) | Orquesta, transiciona estados, mantiene `progress/` | No edita codigo |
 
 Las **mejoras al propio arnes** (reglas, docs, archivos de agente) no se aplican en caliente:
 entran por el comando `/afinar-regla`, que interroga los ejes omitidos y propone el parche
-antes de escribir. Los requisitos de producto siguen entrando por el board (F0), no por ahi.
+antes de escribir. Los requisitos de producto siguen entrando por el board (F0), no por ahi — y
+una vez la ficha esta en el board, se acota con `/afinar-feature` antes de F1.2: ese comando
+cierra el alcance y las decisiones con el humano y **siembra** `specs/<key>-<slug>/requirements.md`
+para que `spec_author` no las descubra escribiendo. Y `/extraer-modulo` mira en la direccion
+contraria: toma un modulo **ya construido** en `dev` y saca de el un prompt portable y el
+cuestionario de las decisiones que tomo sin dejarlas escritas, en `extracciones/<slug>/`, para
+poder reimplementarlo en otro proyecto. Es solo lectura y no entra en el ciclo SDD.
+
+Son la misma herramienta sobre los tres sujetos del repo: `/afinar-regla` afina el arnes,
+`/afinar-feature` afina una feature que aun no existe, `/extraer-modulo` interroga un modulo que
+ya existe.
 
 ## Estrategia de ramas
 
@@ -150,7 +161,9 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
      (`project = QC AND issuetype != Epic`) y **regenera `feature_list.json`**: altas y
      bajas, `description`, `status` (por la columna) y `depends_on` (por los issue links
      "is blocked by").
-   - Guarda `epic` = el key de la epica padre (campo `parent` del issue). **Es agrupacion
+   - Guarda `epic` = el key de la epica padre (campo `parent` del issue) **y `epic_name` = su
+     summary** (`QC-17` → «Identidad y acceso»). El nombre se almacena y no se deriva: el gate
+     corre sin red y no puede resolver un key contra Jira. **Es agrupacion
      por modulo, no dependencia**: no altera el orden ni el cupo de paralelismo. Una epica
      NO es una feature; si alguna acaba en `feature_list.json`, el filtro de arriba fallo y
      el validador lo marca en rojo.
@@ -205,8 +218,16 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
      "is blocked by".
    - Documenta la evaluacion y particion en `progress/current.md > Evaluaciones`.
 2. (F1.1) Registra la feature en `progress/current.md > Features en curso`.
-3. (F1.2) Lanza `spec_author` con el nombre de la feature y modelo segun complexity.
-   Produce:
+3. (F1.2) **Antes de lanzar nada**: si la feature ya tiene preguntas abiertas o encargos
+   anotados en `progress/current.md > Evaluaciones` y **no** existe todavia
+   `specs/<key>-<slug>/requirements.md`, ofrece al humano correr `/afinar-feature` primero.
+   No es bloqueante —el flujo sin sembrar sigue siendo valido—, pero lanzar el spec sabiendo
+   que va a volver con preguntas ya escritas es pagar la ronda dos veces: los tres specs
+   escritos hasta hoy necesitaron una o dos revisiones completas por eso.
+   Si esa acotacion cambia el alcance, el comando **actualiza el board antes de sembrar** y no
+   al reves (`docs/jira.md > Cuando el disco descubre que el board esta desactualizado`).
+
+   Lanza `spec_author` con el nombre de la feature y modelo segun complexity. Produce:
    - `specs/<feature>/requirements.md` — requisitos en EARS, numerados `R1`, `R2`…
    - `specs/<feature>/design.md` — decisiones tecnicas + una alternativa descartada.
    - `specs/<feature>/tasks.md` — checklist de pasos discretos.
@@ -283,3 +304,13 @@ Los subagentes **no** devuelven todo su trabajo por el chat. Escriben en disco y
 te devuelven solo: que archivo escribieron y un veredicto de una linea. Tu lees
 el archivo si necesitas el detalle. Asi el contexto no se satura y todo queda
 versionado en git.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

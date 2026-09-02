@@ -4,4 +4,5 @@
 export type { SessionUser } from './domain/session-user';
 export { DOCUMENT_TYPE_CC, DOCUMENT_TYPE_CODES, type DocumentTypeCode } from './domain/document-type';
 export { CREDENTIAL_MAX_LENGTH, loginInputSchema, type LoginInput } from './domain/credentials';
-export { verifyCredentials } from './domain/verify-credentials';
+export { type SessionTicket } from './domain/session';
+export { createVerifyCredentials, type VerifyCredentialsDeps } from './domain/verify-credentials';

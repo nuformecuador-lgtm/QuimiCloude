@@ -15,6 +15,11 @@ Reglas:
   paralelo sin restriccion. Lo valida `./init.sh`.
 - Las features nacen en el board de Jira y se importan a `feature_list.json` en el paso F0. El
   board manda; el disco es donde trabajas. Contrato: `docs/jira.md`.
+- **Si una acotacion cambia el alcance, el board se actualiza ANTES de sembrar.** Cuando
+  `/afinar-feature` invalida `description`, `complexity`, `zone` o `depends_on`, esos campos se
+  escriben en el issue antes de crear el spec. Una ficha sembrada con marcador `board-pendiente`
+  deja `./init.sh` en rojo: resuelvela antes de seguir (`docs/jira.md > Cuando el disco descubre
+  que el board esta desactualizado`).
 
 ## Modelos
 
@@ -30,8 +35,9 @@ dia hace falta discriminar por `complexity`, hazlo en la llamada concreta y no e
 
 ## Ciclo
 0. **Importa el board (F0).** Con las herramientas MCP de `atlassian`, regenera
-   `feature_list.json` desde Jira: altas/bajas, `description`, `status` (columna) y
-   `depends_on` (issue links "is blocked by"). `branch` y `spec_path` se derivan, no se
+   `feature_list.json` desde Jira: altas/bajas, `description`, `status` (columna),
+   `depends_on` (issue links "is blocked by") y la epica padre — `epic` con su key **y
+   `epic_name` con su summary**, porque el gate corre sin red y un key no dice nada por si solo. `branch` y `spec_path` se derivan, no se
    almacenan. **No degrades** una feature `in_progress` ni borres una `zone`/`complexity`
    ya evaluada porque el issue perdio las labels: conserva el JSON, re-escribe Jira y
    anota en `current.md > Deudas`. Si el MCP no responde, trabaja con el JSON en disco y

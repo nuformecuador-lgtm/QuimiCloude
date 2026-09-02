@@ -119,3 +119,135 @@
   válido), a resolver en la feature 7 (login); `bcryptjs` sin fila en registro de
   dependencias; y `CREDENTIAL_MAX_LENGTH` es más ancho que lo que restringe —solo acota la
   contraseña, `username` no tiene máximo—, `SECRET_MAX_LENGTH` sería más preciso.
+
+## QC-11 — layout-privado-con-sidebar (2026-09-01)
+
+- Cerrada con el PR #6 (merge `02883f8` en `dev`). Épica `QC-16 Plataforma`.
+- Maquetación del armazón privado: sidebar con tres regiones, colapso en modo icono y
+  responsive, pie con menú de usuario. Los datos de sesión entran por props y el cierre de
+  sesión es un disparador vacío: la costura real la hace QC-13.
+- Deudas que sobreviven al cierre y siguen en `current.md`: el modo icono no muestra iconos
+  (`NavItem` no tiene campo de icono, y el hueco es del spec, no de la implementación); los 5
+  ítems de navegación son placeholder con rutas que dan 404; la zona privada se queda sin
+  `<Toaster />` por decisión humana; y `design.md > 5.5` contiene una afirmación falsa sobre
+  que el `SidebarProvider` lee la cookie `sidebar_state` al montar — no la lee nunca.
+- Su worktree quedó retenido por árbol sucio; ver `current.md > Deudas`.
+
+## QC-15 — arquitectura-hexagonal-y-modulos (2026-09-01)
+
+- Cerrada con el PR #8 (merge `f79ba5d` en `dev`, sin squash). Épica `QC-16 Plataforma`.
+  17 commits, 90 archivos, +7856/−314.
+- Reestructuración a módulos hexagonales **sin cambio de comportamiento**: de carpetas por
+  rol técnico (`lib/services/`, `lib/actions/`, `lib/types/`) a `lib/modules/<modulo>/` con
+  `domain/`, `ports/` y `adapters/{driven,driving}/`, punto único de composición en
+  `lib/composition/` y núcleo compartido en `lib/shared/`.
+- **La prueba de que no se rompió nada**: los mismos 20 archivos de test verdes de antes,
+  cada uno con idéntico número de tests (contado con `--reporter=json`), y ninguna aserción
+  cambiada en el diff. De 170 a 220 tests; los 50 nuevos son de la guardia.
+- Las cuatro decisiones estructurales, con su porqué, en
+  `specs/QC-15-arquitectura-hexagonal-y-modulos/design.md > 1`. La que más condiciona: la
+  raíz es `lib/modules/`, **no** un `src/`, porque un `src/` obligaría a tocar `SCANNED_DIRS`
+  de `guard-password-never-plaintext`, que si nadie lo actualiza se queda verde barriendo nada.
+
+### La lección: la guardia costó tres rondas, la reestructuración ninguna
+
+El `reviewer` **rechazó la guardia dos veces**, las dos por el mismo defecto — el que hace que
+una guardia pase siempre sin mirar nada:
+
+- **Ronda 1 (mayor).** Cinco bloques comparaban el especificador del import **como texto**,
+  exigiendo el prefijo `@/`. Cualquier import **relativo** los atravesaba. Con tres
+  violaciones reales metidas a la vez, daba 39/39 verde.
+- **Ronda 2 (menor subido a bloqueante por el leader).** Quedaba una última comparación de
+  cadena en la comprobación del contrato: `'./domain/../../../shared/routes'` reexportaba
+  desde fuera del dominio y pasaba en verde.
+
+Las dos las encontró **ejecutando**, no leyendo: introdujo la violación, miró el resultado y
+revirtió. Es el mismo defecto que ya había mordido en este repo con `SCANNED_DIRS`. De ahí
+salen las dos reglas que quedan escritas para la siguiente guardia que alguien escriba:
+**resolver el destino a una ruta real antes de aplicar la regla**, y **afirmar que el barrido
+no está vacío** en todo bloque que itera archivos.
+
+Sin eso, la feature se habría mergeado con su garantía principal desactivada y nadie se
+habría enterado hasta que alguien escribiera un import relativo — que es lo natural dentro de
+un mismo módulo.
+
+### Efectos colaterales que salieron por el camino
+
+- `.claude/agents/backend_dev.md` mandaba crear `lib/services/`, `lib/repositories/` y
+  `lib/interfaces/`: las tres carpetas que la guardia nueva prohíbe. El próximo `backend_dev`
+  habría seguido su prompt y puesto el gate en rojo sin entender por qué. Corregido junto con
+  `CHECKPOINTS.md`, que es contra lo que revisa el `reviewer`.
+- `bcryptjs` entró en `docs/dependencias.md` como `heredada`. No era una dependencia nueva:
+  el registro se escribió antes de que QC-5 mergeara bcryptjs y el hueco apareció al unir las
+  ramas. Se resolvió con la fila en vez de baselinizar el rojo, que dejaría deuda permanente
+  por un problema de contabilidad.
+- La guardia **no** comprueba que la lógica de negocio esté en `domain/` y no en la Server
+  Action. Un caso de uso que sólo delega pasa en verde y está mal. Queda en `CHECKPOINTS.md`
+  para el revisor humano.
+
+### Deuda que hereda
+
+Tres preguntas abiertas del spec, ninguna bloqueante: el idioma de los nombres de módulo
+(hoy conviven `identity` e `inventario`), si un módulo puede leer modelos ajenos dentro de un
+`include` de Prisma o debe pedirlos al contrato (se eligió lo estricto, a revisar en QC-14), y
+dónde vivirán los componentes propios de un módulo cuando aparezca el primer caso.
+
+## QC-14 — modelo-producto (2026-09-02)
+
+Primera tabla de dominio químico del ERP y primera feature de la épica **QC-18 Inventario**.
+Solo el modelo de datos: sin pantalla y sin API. PR #10, merge `abdef6b`.
+
+Dos tablas y su relación obligatoria: `presentations` como catálogo propio (para que crezca
+sin migrar lo ya guardado) y `products` con nombre, existencia, presentación, unidad, costo,
+compra mínima, tiempo de entrega y cantidad de alerta. FK `products.presentation_id` con
+`ON DELETE RESTRICT`, cuatro `CHECK` de no negatividad, `cost` como `numeric(14,4)` exacto,
+RLS activado y forzado en ambas, borrado lógico en `products` y `/// @module inventario` en
+los dos modelos. `migration.sql` con su `down.sql`, ejercitado de verdad.
+
+**Los 24 requisitos (R1–R24) tienen test ejecutado.** El `reviewer` los abrió uno por uno y
+repitió por su cuenta el ciclo `apply → rollback → apply` con snapshot completo del esquema:
+tras el rollback, cero apariciones de `products`/`presentations`; tras reaplicar, snapshot
+idéntico. Veredicto APROBADO, cero hallazgos mayores.
+
+### La lección: el conflicto no era de contenido, era de fin de línea
+
+El PR llegó al merge en `CONFLICTING` con `progress/current.md` chocando **entero**, de la
+línea 1 a la última. La causa no era que dos ramas hubieran escrito lo mismo: el commit de
+siembra `5708bc3` reescribió el archivo de LF a CRLF, así que **cada línea difería del
+ancestro** y git no pudo alinear nada. Debajo del ruido había una pérdida real que el
+conflicto tapaba: esa reescritura había **borrado tres deudas abiertas** que `dev` no solo
+conservaba sino que había ampliado con las diez de QC-7.
+
+Se resolvió normalizando las tres versiones a LF, mergeando ahí —donde el choque se reduce a
+**una sola tajada**— y devolviendo el resultado a CRLF. El mismo procedimiento hizo falta
+**tres veces seguidas** en la misma sesión: al mergear `dev` en la rama, al mergear `dev` en
+`dev` local, y al recuperar el `git stash` del trabajo en vuelo. Es la señal de que esto no
+es un accidente sino una trampa estructural: **falta un `.gitattributes`**.
+
+### Dos cosas que descubrió el camino, no el spec
+
+- **QC-14 usó su propia base de datos.** La compartida tenía aplicada la migración de QC-7,
+  que no estaba en `dev` ni en la rama, así que Prisma veía drift y pedía resetear el esquema
+  público — lo que habría destruido el trabajo en vuelo de QC-7. Se creó `QuimiCloude_QC14`
+  en el Postgres local, con el `.env` git-ignorado del worktree apuntando ahí. La base de QC-7
+  no se tocó. **Una base por worktree debería ser la norma cuando corren dos features backend
+  en paralelo.**
+- **`./init.sh` completo no corría desde dentro del worktree** — y dejó de fallar solo al
+  integrar `dev`. `scripts/validate-features.mjs` busca `.worktrees/<slug>/specs/` relativo al
+  cwd, y toda feature en vuelo cuyo spec no estuviera aún en `dev` (aquí QC-7) se veía como
+  spec faltante. Al mergear `dev` el spec de QC-7 entró en la rama y el gate pasó en verde.
+  El agujero sigue ahí para la siguiente feature que corra sola.
+
+### Deuda que hereda
+
+- El test de R10 prohíbe cualquier `enum` en **todo** `db/schema.prisma`, no solo en el módulo
+  `inventario`: el día que otro módulo declare un enum legítimo pondrá en rojo un test de QC-14.
+- **`delivery_time` va sin `CHECK`**, aunque las otras cuatro columnas numéricas sí lo llevan:
+  hoy un plazo de entrega negativo entra en la base. Es una línea de migración cuando alguien
+  lo quiera cerrar.
+- **El nombre de una presentación no es único** y es el más caro de revertir de los cinco
+  cierres: añadir el índice después exige limpiar duplicados primero. Revisar en QC-20 si el
+  catálogo se llena a mano.
+- Cosmética menor del `reviewer`: una aserción tautológica en R2 (cuyo fondo sí cubre el
+  requisito), un comentario desalineado en R11 y dos desajustes de numeración entre
+  `design.md` y `tasks.md`.
