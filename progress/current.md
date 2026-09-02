@@ -888,6 +888,50 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[arnés — el rescate del validador NO es simétrico entre la raíz y los worktrees. Candidata 2
+  para `/afinar-regla`.]** `tieneSpec()` de `scripts/validate-features.mjs` busca el spec en tres
+  sitios y el tercero es `.worktrees/<slug>/specs/`, **resuelto contra el cwd**. Desde la raíz
+  funciona; **desde dentro de un worktree ese tercer sitio no existe**, así que toda feature en
+  vuelo cuyo spec no esté en `dev` se ve como spec faltante. Y el gate previo al PR se corre
+  **dentro del worktree por diseño** (F2.4 valida tu rama, no el árbol de `dev`), o sea que el
+  falso rojo aparece **en el momento de menos margen** y señala a una feature ajena.
+  **Reproducido por tres sesiones el 2026-09-02**: desde QC-24 (señalando a QC-29), desde QC-21
+  (señalando a QC-24) y desde QC-29 (señalando a QC-9 y QC-21). Arreglo probable: resolver el
+  directorio de worktrees contra el worktree **principal** (`git worktree list --porcelain`), que
+  es lo que `scripts/wt.sh` ya hace por esta misma razón y con el comentario que lo explica — el
+  validador no heredó esa lección. Alternativa: que el flujo obligue a que el spec entre en `dev`
+  al pasar la ficha a `in_progress`.
+  **Coste real medido hoy:** dos sesiones se puentearon copiando specs ajenos a su rama, y eso
+  generó un `add/add` en `specs/QC-24-modelo-recetas/requirements.md` donde **resolver a favor de
+  `dev` habría borrado el spec entero** (246 líneas por 61).
+- **[arnés — dos features que acotan el mismo test de alcance deben hablarlo ANTES. Candidata 3
+  para `/afinar-regla`, aportada por la sesión de QC-20.]** Los dos casos del 2026-09-02, con
+  resultado opuesto y medido: en `inventario-schema.test.ts` QC-20 y QC-24 lo acotaron **por
+  separado y sin avisarse**, y acabó en conflicto de contenido que hay que resolver por unión —
+  resolverlo «a favor de una versión» pierde en silencio lo que la otra protegía. En
+  `credential-policy-contract.test.ts` **se habló antes**, no se tocó dos veces, y salió un test
+  **mejor que el de cualquiera de los dos**: QC-24 aportó el hueco de `app/` que la versión de
+  QC-20 dejaba abierto, y QC-20 verificó que la guardia hexagonal **no** lo cubría en vez de
+  aceptar el argumento de su implementer. Coste de hablarlo: tres mensajes. Mismo criterio para
+  **escribir dentro de un módulo ajeno**: `product-catalog.ts` estaba en el `design.md` de QC-24 y
+  en su PR, pero la sesión de QC-20 lo descubrió resolviendo un conflicto y lo leyó como intrusión.
+  **Matiz que aporta la sesión de QC-20, y que es el que hace la regla aplicable:** el aviso previo
+  solo es barato **si hay a quién avisar**. Hoy funcionó porque había dos sesiones hablando por un
+  canal directo. La regla escrita tiene que decir **dónde se deja el aviso cuando no hay nadie
+  escuchando** — el sitio natural es `progress/current.md > Conflictos pendientes`, que ya existe
+  exactamente para esto y que hoy **no usó ninguna de las dos sesiones**. Sin esa parte, la regla
+  se cumple solo cuando hay suerte.
+
+- **[arnés — `lib/composition/index.ts` serializa de facto la zona backend. Candidata 4 para
+  `/afinar-regla`, aportada por la sesión de QC-20.]** Ese archivo ha aparecido como conflicto en
+  **todas** las parejas de features backend del 2026-09-02: QC-6/QC-8 y QC-19/QC-20. El punto único
+  de composición es correcto y es una regla explícita de `docs/architecture.md`, pero al ser un
+  archivo único que toda feature con un puerto nuevo tiene que tocar, **contradice en la práctica la
+  regla 1 de `CLAUDE.md`**, que permite dos features en paralelo por zona. QC-24 se libró **solo
+  por casualidad**: su spec dejó el cableado del `ProductCatalog` para QC-25. No hay arreglo obvio
+  —partir la composición por módulo tiene su propio coste— y por eso es material de `/afinar-regla`
+  y no de una feature.
+
 - **[arnés — tests de feature que afirman el censo GLOBAL del repo. Encargo del humano el
   2026-09-02: proponer la regla por `/afinar-regla` al cerrar QC-24.]** Tres features distintas
   han escrito aserciones del tipo «mi feature añade exactamente N modelos / N migraciones»
