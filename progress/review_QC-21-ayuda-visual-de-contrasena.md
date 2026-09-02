@@ -356,3 +356,197 @@ Lo que si es fuerte de ese test es la asercion de visibilidad sin interaccion.
 
 Los cinco menores no bloquean; m-1, m-2 y m-3 deben quedar anotados en
 `progress/current.md > Deudas y cosas abiertas` en vez de desaparecer con la rama.
+
+---
+
+# Ronda 2 — re-review (2026-09-02)
+
+## VEREDICTO: **APROBADO (OK)** — 0 bloqueantes, 1 menor abierto (m-2, excepcion declarada)
+
+B1 y B2 cerrados. m-1, m-3, m-4 y m-5 cerrados. m-2 sigue abierto como excepcion correctamente
+declarada, no como defecto. **Ningun arreglo debilito nada de lo que se dio por bueno en la ronda
+1**, y lo comprobe rompiendo el codigo, no leyendolo.
+
+## Los cinco comandos, corridos otra vez por el reviewer
+
+| Comando | Resultado real |
+|---|---|
+| `pnpm run typecheck` | exit 0, sin salida |
+| `pnpm run lint` | exit 0, sin salida |
+| `pnpm test` (suite ENTERA) | `Test Files 49 passed (49)` · `Tests 513 passed (513)` |
+| `pnpm run test:guardias` | `Test Files 7 passed (7)` · **`Tests 78 passed (78)`** |
+| `node scripts/validate-features.mjs` | unica linea: `faltan specs para features sdd en vuelo: QC-29` |
+
+**Guardias en 78, identico a la ronda 1**: ninguna guardia se relajo ni se recorto para pasar. Los
++2 tests de la suite (511 -> 513) son exactamente los dos centinelas de propiedades opcionales de
+m-1, y cuadran.
+
+## Residuos de las mordidas: ninguno
+
+- `git diff --stat d261b41..HEAD -- lib/ components/ app/ db/ scripts/` -> **vacio**. Los dos
+  commits de arreglo **no tocan una sola linea de produccion**; todo el cambio vive en `tests/`,
+  `specs/` y `progress/`.
+- `git status --porcelain` limpio antes y despues de mis propias mordidas de esta ronda.
+- La bitacora declara un incidente propio: un subagente dejo en vuelo residuos (`readonly
+  password?:` y un `export default`) en `credential-requirements.tsx`, detectados y revertidos.
+  **Que se declare en vez de silenciarse es lo correcto**, y el arbol confirma que no quedo nada.
+
+## B1 — CERRADO. La bomba esta desactivada, no reubicada
+
+Verificado leyendo y ejecutando:
+
+- **Cero invocacion de procesos externos.** Los imports son solo `node:fs`, `node:path`,
+  `node:url`. No hay `child_process`, `execFileSync`, `merge-base` ni `status --porcelain`. La
+  unica aparicion de la palabra «git» en el archivo es un comentario que explica por que ya no se
+  usa. El test no puede depender del estado de la rama que lo ejecute, porque no lo consulta.
+- **Los dos asserts tautologicos y el comentario que mentia estan borrados.** No maquillados:
+  ausentes.
+- **Muerde, en dos ejes independientes** (rompi el codigo y lo revertí):
+  - import profundo: añadi `import { cn } from '@/lib/utils'` a `credential-requirements.tsx` ->
+    ROJO, `components/shared/credential-requirements.tsx importa de una ruta prohibida: expected
+    [ '@/lib/utils' ] to deeply equal []`. Nota fina: `@/lib/utils` es legitimo en el repo, pero
+    aqui el assert es deliberadamente estrecho (solo el barrel exacto `@/lib/modules/identity`), y
+    esa estrechez es lo que hace que detecte cualquier alcance dentro de `lib/`.
+  - pagina de App Router: añadi `export default function PaginaDePrueba()` -> ROJO,
+    `tiene un export default`.
+- **No depende de nada compartido.** Lee tres rutas explicitas con `readFileSync` y afirma sobre su
+  contenido. Ni recorre `components/shared/`, ni consulta git, ni cuenta nada de un registro comun.
+
+### El rechazo de mi alternativa es correcto, y me corrige con razon
+
+Propuse, entre otras opciones, afirmar que `components/shared/` contiene exactamente esos tres
+archivos. **El implementer la declino y tenia razon.** `components/shared/` no es de QC-21: QC-29
+esta añadiendo `theme-provider.tsx` ahi mismo en paralelo — lo verifique en la ronda 1 al comprobar
+que no habia solape—. Ese assert habria puesto rojo el gate de QC-29 por un archivo ajeno: **el
+mismo daño que denuncia B1, apuntando a otra carpeta**. Que el implementer detecte un censo de
+recurso compartido en la sugerencia del propio reviewer, en vez de obedecerla, es exactamente la
+conducta que el arnes quiere. El motivo quedo escrito en el comentario del test, no solo en la
+bitacora.
+
+### El limite declarado es real y esta bien dicho
+
+`NEW_FILES` esta enumerada a mano: un septimo archivo de la feature que nadie sume a esa lista no
+lo veria el bloque. Esta escrito como **limite**, no vendido como garantia — que es literalmente lo
+que pedia B1 sobre el comentario anterior. Es el precio correcto por no depender de estado
+compartido, y no lo convierto en hallazgo.
+
+## B2 — CERRADO. La spec ya no afirma algo falso, y nada se colo de contrabando
+
+`git diff` sobre `specs/` revisado **linea a linea**:
+
+- `requirements.md`: **un solo hunk, dentro de R5**, +4/-3, conservando la etiqueta `[D2]`. Ningun
+  otro requisito tocado, **el bloque de Alcance intacto**, **la tabla de decisiones cerradas
+  intacta**, las preguntas abiertas intactas.
+- `tasks.md`: tres hunks — `vitest.config.mts` en T0 (m-4), la nota de T4 que dejaba de ser cierta
+  para el caso vacio, y la fila R5 del mapa de trazabilidad.
+- `design.md`: un hunk, `vitest.config.mts` (m-4).
+
+La R5 nueva dice lo que el sistema hace y el `it(...)` se llama ahora
+`con la candidata vacia la lista es visible sin interaccion y muestra cinco incumplidas con
+max_length cumplida` — **verifique que el test comprueba exactamente eso**: mapa literal de estados,
+mas la asercion de visibilidad sin interaccion. Las dos filas de trazabilidad (`tasks.md` y la
+bitacora) dicen lo mismo. Ya no hay ningun nombre de test repitiendo una afirmacion falsa.
+
+## m-5 — CERRADO. La afirmacion de la mordida discriminante es CIERTA, reproducida por mi
+
+Es el punto de esta ronda que mas importaba, porque es justo el tipo de afirmacion comoda que un
+reviewer debe castigar. **La reproduje entera, con mis propias manos, y sale como dice.**
+
+| Mordida | Test literal de R5 | Los dos espejos |
+|---|---|---|
+| Invertir la derivacion **en el componente** (`deriveState`: `'unmet' : 'met'` -> `'met' : 'unmet'`) | ROJO | **ROJO tambien** (3 failed) |
+| Alterar el criterio **en el dominio** (`max_length: candidate.length > 0 && …`, para que deje de cumplirse con la cadena vacia) | **ROJO** (`expected 'unmet' to be 'met'`) | **VERDE** (1 failed / 12 passed) |
+
+**Confirmado, y confirmado el matiz incomodo.** La mordida obvia —la del componente— **no es
+discriminante**: los espejos llaman a `evaluateCredentialRules` **directamente**, no a traves de
+`deriveState`, asi que un error de cableado en el componente los pone rojos igual. Justificar el
+mapa literal con esa mordida habria sido sobrevender el test. Que el implementer lo detectara, lo
+dijera y **eligiera la mordida que si separa** es lo contrario de la afirmacion comoda: es el
+trabajo bien hecho. La segunda mordida si aisla el valor real del segundo oraculo — cuando lo que
+esta mal es la **funcion pura misma**, los espejos comparan el componente contra el mismo criterio
+equivocado y siguen verdes; solo el mapa literal muerde—. **El mapa literal aporta exactamente lo
+que dice aportar, ni mas ni menos.**
+
+Ambas mordidas revertidas por mi (`git checkout --`), `git status --porcelain` vacio, incluido
+`lib/modules/identity/domain/credential-policy.ts`, que es de QC-19 y quedo byte a byte igual.
+
+### La tension con R3 esta resuelta sin volver al espejo
+
+El `expect(Object.keys(estadosEsperados)).toEqual(LIVE_RULES)` cubre el hueco: el mapa a mano no
+puede quedar **silenciosamente** incompleto. Lo verifique añadiendo un septimo codigo
+(`no_espacios`) a `CREDENTIAL_RULES`: el test de R5 sale rojo junto con los de R1/R3, de forma
+ruidosa. Y el mensaje de fallo dice lo que hay que hacer —revisar **la redaccion de R5**, no solo
+el mapa—, que es la unica salida correcta, porque R5 ahora enumera un estado concreto por regla.
+**No es un censo de recurso compartido ajeno**: `CREDENTIAL_RULES` es la dependencia declarada de
+este propio requisito, no un registro comun cuyo tamaño dependa de otras features. La distincion se
+sostiene.
+
+Tambien correcto: se quito el `toBe(LIVE_RULES.length - 1)` que no afirmaba nada sobre el
+componente, y los dos espejos que se quedan llevan ahora un comentario que dice sin adornos que no
+atrapan un criterio de derivacion erroneo. **Se hizo lo que m-5 pedia: no arreglar los espejos —no
+habia nada que arreglar, R2 impide un segundo oraculo para candidatas arbitrarias— sino dejar de
+leerlos como mas fuertes de lo que son.**
+
+## m-1 — CERRADO. El centinela local no es vacio
+
+Verificado rompiendo el codigo: `readonly password?: string;` en `credential-requirements.tsx`
+—la forma exacta que en la ronda 1 pasaba VERDE— ahora sale **ROJO**:
+`ninguna propiedad opcional nueva nombra la contrasena sin acabar en hash …
+components/shared/credential-requirements.tsx: password`. El extractor encuentra props reales de
+los tres archivos, asi que no es un centinela que solo se sabe verde sobre un conjunto vacio.
+
+Decisiones correctas: **la guardia compartida no se toco** (ampliarla es `/afinar-regla`, y de paso
+arreglaria `db/`, `lib/`, `app/` y `scripts/`, hoy ciegos igual); se replica el **vocabulario**, no
+el criterio de deteccion, que se sigue heredando por import; y el punto ciego queda documentado de
+forma **ejecutable** con un assert que afirma que `findPlaintextPasswordDeclarations` **no** ve esa
+declaracion — de modo que el dia que `/afinar-regla` arregle la guardia, ese test saltara y avisara
+de que la deuda esta pagada. Eso es mejor que la prosa que yo pedia.
+
+## m-3 y m-4 — CERRADOS
+
+- **m-3**: cuenta corregida y honesta. El archivo de contrato reporta 14 tests, 8 propios + 6
+  re-ejecuciones de la guardia. Sobre el baseline 46/478, los +35 son **29 tests nuevos de verdad**
+  + 6 duplicados. El «+33» de la ronda 1 estaba inflado y se dice asi, sin rodeos.
+- **m-4**: `vitest.config.mts` corregido en `design.md` y `tasks.md`. `requirements.md` no se toco,
+  que es lo correcto: es lo que aprobo el humano y ademas no menciona el archivo.
+
+## m-2 — sigue abierto, como excepcion declarada (no bloquea)
+
+Altura del campo por debajo de 44x44 px, heredada de `components/ui/input.tsx` sin editar.
+Excepcion declarada con motivo en `design.md > 6` + pregunta abierta 4, y anotada en
+`progress/current.md > Deudas`. Es alcance de QC-29/QC-30. **Debe cerrarse antes de que QC-36 ponga
+el componente delante de un usuario.**
+
+## Comprobacion de que nada se debilito
+
+- **Produccion intacta**: los tres componentes estan byte a byte como se aprobaron en la ronda 1.
+  Ningun arreglo se hizo cambiando el codigo para que el test pasara.
+- **Guardias en 78**, identico a la ronda 1.
+- **R19 sigue teniendo assert duro** y ahora ademas cubre mas superficie (Server Actions, route
+  handlers, paginas/layouts, metadata, config de ruta, Prisma, SQL de tabla, imports prohibidos)
+  que la version anterior, que solo miraba rutas del diff.
+- **R22 conserva su mordida original** (`readonly password: string;` -> rojo) y suma la de
+  opcionales.
+- **R1, R3, R7, R8, R9, R15, R16, R20, R21 y todo `credential-field.test.tsx` sin tocar**: el diff
+  de la ronda 2 sobre `tests/` se limita al bloque de R19, al de R22 y al `it(...)` de R5.
+- Los tres estados de `breached`, el bloqueo parcial del envio y la no-redeclaracion de reglas
+  siguen exactamente como se aprobaron.
+
+## Checklist de `CHECKPOINTS.md` — estado final
+
+Todo lo de la ronda 1 sigue en pie, con estos cambios:
+
+- **Trazabilidad**: ahora **completa**. Los 22 `R<n>` mapean a un test que verifica lo que el
+  requisito dice, incluido R5.
+- **`./init.sh` en verde**: sigue abortando por la causa ajena de QC-29, con decision humana de
+  convivir. **Los cinco comandos que ejecuta despues del validador salen verdes.** El leader debe
+  correr `./init.sh` completo **desde la raiz del repo** antes del PR, donde ese validador pasa.
+- Pendientes del leader, no del implementer: entrada en `progress/history.md`, PR contra `dev` y
+  desmontaje del worktree.
+
+## Veredicto de la ronda 2
+
+**OK / APROBADO.** Sin bloqueantes. m-2 queda como deuda declarada con dueño (QC-29/QC-30) y las
+deudas de `/afinar-regla` (guardia ciega a opcionales, guardia que no barre `components/`,
+duplicacion de tests por import, `validate-features.mjs` en worktrees) estan anotadas en
+`progress/current.md`, no silenciadas.
