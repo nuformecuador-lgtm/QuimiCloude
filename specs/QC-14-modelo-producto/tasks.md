@@ -106,7 +106,7 @@ archivo que no está listado, se anota antes de seguir.
   `progress/impl_QC-14-modelo-producto.md`, y cierra **R22** en su forma real (el test estático
   solo mira el texto del SQL).
 
-### [ ] T7. Tests de integración contra Postgres real
+### [x] T7. Tests de integración contra Postgres real
 - Dep: T6, T4 (para no duplicar lo que ya cubre el estático).
 - Archivos: `tests/integration/inventario/inventario-constraints.int.test.ts`.
 - Cada caso dentro de `prisma.$transaction` que termina en `ROLLBACK`; toda operación que se

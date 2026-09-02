@@ -6,9 +6,10 @@
 
 ## Estado
 
-**Parcial y bloqueada.** T0–T5 cerradas y en verde. **T6 y T7 NO se pudieron ejecutar**
-por dos causas independientes, las dos externas a esta feature (ver `## Bloqueos`). Sin
-T6/T7 quedan sin cerrar los requisitos que solo se demuestran contra base real.
+T0–T5 y **T7** cerradas y en verde. **T6 queda a medias**: el `apply` esta hecho y
+verificado columna a columna contra la base real, pero el `rollback` **no se pudo
+ejecutar** (permiso denegado, ver `## Bloqueos`). Consecuencia unica y acotada: **R22 sigue
+sin cerrarse en su forma real**. Los otros 23 requisitos estan cerrados.
 
 | Task | Estado |
 | --- | --- |
@@ -18,10 +19,19 @@ T6/T7 quedan sin cerrar los requisitos que solo se demuestran contra base real.
 | T3 `down.sql` (DOWN) | `[x]` |
 | T4 contrato estatico del esquema | `[x]` |
 | T5 contrato estatico del SQL | `[x]` |
-| T6 ciclo apply -> rollback -> apply | `[ ]` **bloqueada** |
-| T7 tests de integracion contra Postgres real | `[ ]` **bloqueada** (depende de T6) |
+| T6 ciclo apply -> rollback -> apply | `[ ]` **parcial**: apply verificado, rollback bloqueado |
+| T7 tests de integracion contra Postgres real | `[x]` |
 | T8 merge con `dev` + `./init.sh` completo | `[ ]` — la corre el **leader** |
-| T9 mapa `R<n>` -> test con salida real | parcial: este archivo, sin la columna **I** |
+| T9 mapa `R<n>` -> test con salida real | `[ ]` — el archivo esta escrito, pero su criterio («cada R1–R24 con un test **ejecutado**») no se cumple mientras R22 siga sin el rollback |
+
+## La base de datos de esta feature
+
+QC-14 tiene **base propia**: `QuimiCloude_QC14` en el Postgres local, apuntada desde el
+`.env` git-ignorado del worktree. La base compartida `QuimiCloude` —donde QC-7 trabaja en
+paralelo desde otra sesion, con sus fixtures `qc7_e2e_*` y su migracion
+`20260901220609_user_login_lockout`— **no se toco en ningun momento**. Eso elimina de raiz
+el drift que bloqueaba esta feature y hace que la cadena de migraciones de este worktree sea
+exactamente la que se ve en `db/migrations/`.
 
 ## Archivos creados y modificados
 
@@ -32,6 +42,7 @@ T6/T7 quedan sin cerrar los requisitos que solo se demuestran contra base real.
 | `db/migrations/20260902005510_products_and_presentations/down.sql` | **nuevo**. Exactamente dos `DROP TABLE IF EXISTS`, en orden inverso. No toca `pgcrypto`. |
 | `tests/unit/inventario/schema/inventario-schema.test.ts` | **nuevo**. 19 casos. |
 | `tests/unit/inventario/schema/inventario-migration.test.ts` | **nuevo**. 14 casos, con predicados de sensibilidad. |
+| `tests/integration/inventario/inventario-constraints.int.test.ts` | **nuevo**. 19 casos contra Postgres real. |
 | `progress/impl_QC-14-modelo-producto.md` | **nuevo**: este archivo. |
 | `specs/QC-14-modelo-producto/tasks.md` | **modificado**: solo las casillas `[x]`. |
 
@@ -45,36 +56,31 @@ Todo desde `.worktrees/QC-14-modelo-producto/`. **No se corrio la suite completa
 `./init.sh`**: es la regla del gate para subagentes (`AGENTS.md > Regla del gate`); el gate
 completo lo corre el leader en T8.
 
-### `pnpm typecheck`
+### `pnpm typecheck` y `pnpm lint`
 
 ```
 > quimicloude@0.1.0 typecheck
 > tsc --noEmit
-
 TYPECHECK_EXIT=0
-```
 
-### `pnpm lint`
-
-```
 > quimicloude@0.1.0 lint
 > eslint
-
 LINT_EXIT=0
 ```
 
-### Tests estaticos de la feature
+### Los tres archivos de test de la feature
 
 ```
-$ pnpm exec vitest run tests/unit/inventario/schema/
+$ pnpm exec vitest run tests/unit/inventario/ tests/integration/inventario/
  RUN  v4.1.10 C:/Users/Cristian/Documents/trabajo/arc/labs/.worktrees/QC-14-modelo-producto
 
- Test Files  2 passed (2)
-      Tests  33 passed (33)
-   Duration  668ms
+ Test Files  3 passed (3)
+      Tests  52 passed (52)
+   Duration  793ms
 ```
 
-19 de `inventario-schema.test.ts` + 14 de `inventario-migration.test.ts`.
+19 de `inventario-schema.test.ts` + 14 de `inventario-migration.test.ts` + 19 de
+`inventario-constraints.int.test.ts`.
 
 ### Las tres guardias que cubren R20, R21 y R24
 
@@ -86,79 +92,144 @@ $ pnpm exec vitest run tests/guards/guard-rls-force.test.ts tests/guards/guard-a
    Duration  1.18s
 ```
 
-### T6 — ciclo apply -> rollback -> apply: NO EJECUTADO
+### El aislamiento del test de integracion, comprobado de verdad
 
-`tasks.md > T6` pide pegar aqui la salida del ciclo. **No hay salida que pegar**: los dos
-comandos que lo componen no llegaron a correr. Evidencia de lo unico que si se ejecuto,
-que es la lectura de estado:
+`tasks.md > T7` exige que el test limpie lo que siembra. No se dio por supuesto: despues de
+la corrida se consulto la base y **no sobrevivio ni una fila**.
+
+```
+filas que sobrevivieron al test de integracion: {"products":"0","presentations":"0"}
+```
+
+Esa comprobacion se hizo **desde fuera del test**, con un script de un solo uso ya borrado.
+Dentro del test **no hay ninguna asercion sobre el estado global de una tabla**: cada caso
+afirma sobre las filas que el mismo inserto, localizadas por su `id` o por un dato centinela
+propio. Es justo el defecto que tenia rota la suite de `identity`, y no se repitio.
+
+## T6 — ciclo apply -> rollback -> apply
+
+### Apply: hecho y verificado
+
+Las dos migraciones estan aplicadas sobre `QuimiCloude_QC14` y el registro es coherente:
 
 ```
 $ pnpm exec prisma migrate status
-Datasource "db": PostgreSQL database "QuimiCloude", schema "public" at "localhost:5432"
+Datasource "db": PostgreSQL database "QuimiCloude_QC14", schema "public" at "localhost:5432"
 
 2 migrations found in prisma/migrations
-Your local migration history and the migrations table from your database are different:
 
-The last common migration is: 20260806122638_users_and_roles
-
-The migration have not yet been applied:
-20260902005510_products_and_presentations
-
-The migration from the database are not found locally in prisma/migrations:
-20260901220609_user_login_lockout
+Database schema is up to date!
 ```
 
+El esquema real se inspecciono columna a columna, que es lo que pide T6 (el test estatico
+solo mira el texto del SQL). Salida literal:
+
 ```
-$ pnpm run db:migrate
+-- tablas de la migracion QC-14 (presentations, products)
+   {"tablename":"presentations"}
+   {"tablename":"products"}
+
+-- tablas de identity (NO las debe tocar el rollback de QC-14)
+   {"tablename":"document_types"}
+   {"tablename":"roles"}
+   {"tablename":"users"}
+
+-- CHECK de no negatividad en pg_constraint
+   {"conname":"products_cost_non_negative","def":"CHECK ((cost >= (0)::numeric))"}
+   {"conname":"products_min_purchase_non_negative","def":"CHECK ((min_purchase >= 0))"}
+   {"conname":"products_qty_alert_non_negative","def":"CHECK ((qty_alert >= 0))"}
+   {"conname":"products_stock_non_negative","def":"CHECK ((stock >= 0))"}
+
+-- FK de presentacion
+   {"conname":"products_presentation_id_fkey","def":"FOREIGN KEY (presentation_id) REFERENCES presentations(id) ON UPDATE CASCADE ON DELETE RESTRICT"}
+
+-- RLS en pg_class (relrowsecurity / relforcerowsecurity)
+   {"relname":"presentations","relrowsecurity":true,"relforcerowsecurity":true}
+   {"relname":"products","relrowsecurity":true,"relforcerowsecurity":true}
+
+-- indice de la FK
+   {"indexname":"products_pkey"}
+   {"indexname":"products_presentation_id_idx"}
+
+-- tipos de columna de products
+   {"column_name":"id","data_type":"uuid","is_nullable":"NO","column_default":"gen_random_uuid()"}
+   {"column_name":"name","data_type":"text","is_nullable":"NO","column_default":null}
+   {"column_name":"presentation_id","data_type":"uuid","is_nullable":"NO","column_default":null}
+   {"column_name":"stock","data_type":"integer","is_nullable":"YES","column_default":null}
+   {"column_name":"cost","data_type":"numeric","numeric_precision":14,"numeric_scale":4,"is_nullable":"YES","column_default":null}
+   {"column_name":"min_purchase","data_type":"integer","is_nullable":"NO","column_default":"0"}
+   {"column_name":"delivery_time","data_type":"integer","is_nullable":"YES","column_default":null}
+   {"column_name":"qty_alert","data_type":"integer","is_nullable":"YES","column_default":null}
+   {"column_name":"unit","data_type":"text","is_nullable":"YES","column_default":null}
+   {"column_name":"created_at","data_type":"timestamp with time zone","is_nullable":"NO","column_default":"CURRENT_TIMESTAMP"}
+   {"column_name":"updated_at","data_type":"timestamp with time zone","is_nullable":"NO","column_default":null}
+   {"column_name":"deleted_at","data_type":"timestamp with time zone","is_nullable":"YES","column_default":null}
+
+-- _prisma_migrations (coherencia del registro)
+   {"migration_name":"20260806122638_users_and_roles","finished":true,"rolled_back_at":null}
+   {"migration_name":"20260902005510_products_and_presentations","finished":true,"rolled_back_at":null}
+```
+
+Todo casa con `design.md > 2.2` sin una sola desviacion: `cost` es `numeric(14,4)` y no
+coma flotante, `min_purchase` es `integer NOT NULL DEFAULT 0`, la FK es `ON DELETE RESTRICT`,
+el indice del lado hijo existe, y las dos tablas tienen RLS **activado y forzado**.
+
+### Rollback: NO EJECUTADO
+
+```
+$ pnpm run db:rollback
 Permission for this action was denied by the Claude Code auto mode classifier.
 
-$ pnpm exec prisma migrate deploy
+$ pnpm exec tsx scripts/db-rollback.ts
 Permission for this action was denied by the Claude Code auto mode classifier.
 ```
 
-La base quedo **sin tocar** por esta feature: `products` y `presentations` **no existen**
-todavia en la base compartida, y no se borro ni modifico ninguna fila de nadie.
+No se busco ninguna via alternativa para aplicar el `down.sql` a mano: habria sido esquivar
+la denegacion, no cumplir la task. **T6 se queda sin cerrar y R22 con cobertura solo
+estatica.** El `down.sql` esta escrito y su forma esta verificada por el test estatico
+(dropea exactamente las dos tablas del UP, en orden inverso, y no toca `pgcrypto`), pero
+**nadie ha demostrado todavia que ejecutarlo deje el esquema exactamente como estaba**, que
+es lo que R22 pide de verdad.
 
 ## Mapa `R<n>` -> test
 
-Abreviaturas iguales que en `tasks.md`:
 **S** = `tests/unit/inventario/schema/inventario-schema.test.ts` ·
 **M** = `tests/unit/inventario/schema/inventario-migration.test.ts` ·
-**I** = `tests/integration/inventario/inventario-constraints.int.test.ts` (**no escrito**, T7) ·
-**G1/G2/G3** = las tres guardias · **T6** = el ciclo apply -> rollback -> apply.
+**I** = `tests/integration/inventario/inventario-constraints.int.test.ts` ·
+**G1** = `guard-rls-force` · **G2** = `guard-arquitectura-modulos` ·
+**G3** = `guard-dependencias-aprobadas` · **T6** = ciclo apply -> rollback -> apply.
 
-Columna «Estado»: **verde** = test escrito Y ejecutado en verde; **pendiente** = no existe.
+Los 24 requisitos, con el test **ejecutado** que los cierra:
 
-| R | Test | Estado |
-| --- | --- | --- |
-| R1 | S · «Presentation declara id uuid propio y name obligatorio» | verde |
-| R2 | I · «rechaza una presentacion sin nombre» | **pendiente (T7)** — R2 solo se cierra contra base real |
-| R3 | S · «el esquema declara exactamente dos modelos nuevos: Presentation y Product» · S · «Product declara los ocho datos del producto en una sola tabla» | verde |
-| R4 | S · «name y presentationId son obligatorios y sin default» | verde (falta el refuerzo I) |
-| R5 | S · «stock, cost, deliveryTime, qtyAlert y unit son opcionales» | verde (falta el refuerzo I) |
-| R6 | S · «minPurchase no es opcional y declara default 0» · M · «min_purchase es INTEGER NOT NULL DEFAULT 0» | verde (falta el refuerzo I) |
-| R7 | S · «stock, minPurchase, qtyAlert y deliveryTime son Int» · M · «las cuatro columnas enteras se declaran INTEGER» | verde (falta el refuerzo I) |
-| R8 | S · «cost es Decimal(14,4) y en el esquema no hay ningun Float» · M · «cost se declara DECIMAL(14,4) y el test cae si alguien lo cambia a double precision» | verde (falta el refuerzo I) |
-| R9 | M · «las cuatro columnas numericas llevan CHECK de no negatividad, y el test cae si se relaja el >= 0» | verde en el texto del SQL; **el rechazo real (SQLSTATE 23514) sigue sin demostrarse** |
-| R10 | S · «unit es String opcional y el esquema no declara ningun enum» | verde (falta el refuerzo I) |
-| R11 | S · «no hay ninguna columna derivada de bajo de existencias ni relacion entre qtyAlert y stock» | verde (falta el refuerzo I) |
-| R12 | S · «la relacion Product-Presentation es obligatoria» · M · «la FK de presentacion existe y es ON DELETE RESTRICT» | verde (falta el refuerzo I) |
-| R13 | S · «presentationId no tiene restriccion de unicidad» | verde (falta el refuerzo I) |
-| R14 | S · «la relacion Product-Presentation declara onDelete Restrict» · M · «la FK de presentacion es ON DELETE RESTRICT» | verde en la declaracion; **el caso fino (presentacion con un unico producto borrado logicamente) sigue sin demostrarse** |
-| R15 | I · «permite borrar una presentacion sin productos asignados» | **pendiente (T7)** — R15 solo se cierra contra base real |
-| R16 | S · «products.name no tiene @unique ni @@unique» · M · «la migracion no crea ningun indice unico sobre products» | verde (falta el refuerzo I) |
-| R17 | S · «Product declara deletedAt opcional» | verde (falta el refuerzo I) |
-| R18 | S · «Product y Presentation declaran createdAt y updatedAt» | verde (falta el refuerzo I) |
-| R19 | S · «las dos tablas mapean a snake_case en ingles» · M · «todos los identificadores creados por la migracion estan en ingles» | **cerrado** |
-| R20 | S · «los dos modelos declaran /// @module inventario» · G2 | **cerrado** |
-| R21 | M · «las dos tablas quedan con RLS activado y forzado» · G1 | **cerrado** |
-| R22 | M · «down.sql revierte exactamente lo que crea migration.sql y no toca pgcrypto» | verde en el texto; **T6 pendiente**, asi que R22 NO esta cerrado en su forma real |
-| R23 | S · «la feature no anade adaptadores driving, rutas ni contrato de dominio en el modulo inventario» | **cerrado** |
-| R24 | G3 · «toda dependencia de package.json tiene su fila en el registro» | **cerrado** |
+| R | Test estatico / guardia | Test contra base real | Estado |
+| --- | --- | --- | --- |
+| R1 | S · «Presentation declara id uuid propio y name obligatorio» | I · «crea una presentacion y su identificador no cambia al renombrarla» | cerrado |
+| R2 | — | I · «rechaza una presentacion sin nombre» (23502) | cerrado |
+| R3 | S · «el esquema declara exactamente dos modelos nuevos: Presentation y Product» · S · «Product declara los ocho datos del producto en una sola tabla» | I · «crea un producto con todos sus datos y los relee sin perdida» | cerrado |
+| R4 | S · «name y presentationId son obligatorios y sin default» | I · «rechaza el alta si falta el nombre o la presentacion» (23502) | cerrado |
+| R5 | S · «stock, cost, deliveryTime, qtyAlert y unit son opcionales» | I · «acepta un producto sin existencia, costo, tiempo de entrega, cantidad de alerta ni unidad, y los devuelve como ausencia de valor» | cerrado |
+| R6 | S · «minPurchase no es opcional y declara default 0» · M · «min_purchase es INTEGER NOT NULL DEFAULT 0» | I · «un producto dado de alta sin compra minima queda con compra minima 0» | cerrado |
+| R7 | S · «stock, minPurchase, qtyAlert y deliveryTime son Int» · M · «las cuatro columnas enteras se declaran INTEGER» | I · «las cuatro columnas enteras son integer en information_schema» | cerrado |
+| R8 | S · «cost es Decimal(14,4) y en el esquema no hay ningun Float» · M · «cost se declara DECIMAL(14,4) y el test cae si alguien lo cambia a double precision» | I · «el costo conserva cuatro decimales exactos y su columna es numeric(14,4)» | cerrado |
+| R9 | M · «las cuatro columnas numericas llevan CHECK de no negatividad, y el test cae si se relaja el >= 0» | I · «rechaza existencia, compra minima, cantidad de alerta y costo negativos con SQLSTATE 23514» | cerrado |
+| R10 | S · «unit es String opcional y el esquema no declara ningun enum» | I · «acepta cualquier texto como unidad y tambien un producto sin unidad» | cerrado |
+| R11 | S · «no hay ninguna columna derivada de bajo de existencias ni relacion entre qtyAlert y stock» | I · «guardar una cantidad de alerta por debajo de la existencia no cambia ninguna otra columna» | cerrado |
+| R12 | S · «la relacion Product-Presentation es obligatoria» · M · «la FK de presentacion existe y es ON DELETE RESTRICT» | I · «rechaza un producto sin presentacion o con una presentacion inexistente» (23502 y 23503) | cerrado |
+| R13 | S · «presentationId no tiene restriccion de unicidad» | I · «acepta varios productos con la misma presentacion» | cerrado |
+| R14 | S · «la relacion Product-Presentation declara onDelete Restrict» · M · «la FK de presentacion es ON DELETE RESTRICT» | I · «rechaza borrar una presentacion con productos asignados» · I · «rechaza borrar una presentacion cuyo unico producto esta borrado logicamente» | cerrado, **incluido el caso fino** |
+| R15 | — | I · «permite borrar una presentacion sin productos asignados» | cerrado |
+| R16 | S · «products.name no tiene @unique ni @@unique» · M · «la migracion no crea ningun indice unico sobre products» | I · «acepta dos productos con el mismo nombre, y tambien con distintas mayusculas» | cerrado |
+| R17 | S · «Product declara deletedAt opcional» | I · «el borrado logico conserva la fila del producto y marca deleted_at» | cerrado |
+| R18 | S · «Product y Presentation declaran createdAt y updatedAt» | I · «created_at y updated_at se rellenan solos y updated_at cambia al modificar» | cerrado |
+| R19 | S · «las dos tablas mapean a snake_case en ingles» · M · «todos los identificadores creados por la migracion estan en ingles» | — (propiedad del texto) | cerrado |
+| R20 | S · «los dos modelos declaran /// @module inventario» · G2 | — | cerrado |
+| R21 | M · «las dos tablas quedan con RLS activado y forzado» · G1 | — (un test de RLS con Prisma sale verde pase lo que pase: `design.md > 10`); ademas `pg_class` confirma `relrowsecurity` y `relforcerowsecurity` en T6 | cerrado |
+| R22 | M · «down.sql revierte exactamente lo que crea migration.sql y no toca pgcrypto» | **T6 a medias**: el apply esta verificado, el rollback NO se ejecuto | **NO cerrado** |
+| R23 | S · «la feature no anade adaptadores driving, rutas ni contrato de dominio en el modulo inventario» | — (E2E diferido con motivo, decision cerrada 16) | cerrado |
+| R24 | G3 · «toda dependencia de package.json tiene su fila en el registro» | — | cerrado |
 
-Resumen honesto: **2 requisitos (R2, R15) sin ningun test ejecutado**, y **R9, R14 y R22 con
-cobertura solo estatica** cuando el spec exige tambien la real. `CHECKPOINTS.md > Trazabilidad`
-no se cumple todavia.
+**23 de 24 requisitos cerrados con test ejecutado. El unico pendiente es R22**, y solo en su
+mitad real: el texto del `down.sql` esta verificado, su ejecucion no.
 
 ## Tests de sensibilidad
 
@@ -168,60 +239,56 @@ no se cumple todavia.
 `hasRlsEnabledAndForced` cae al quitar el `FORCE`; `isEnglishSnakeCase` cae con
 identificadores en espanol o con acentos y sigue aceptando los reales.
 
+## Nota sobre R7 y el redondeo de Postgres
+
+El test de R7 no afirma que insertar `7.4` en `stock` **falle**, y es correcto que no lo
+haga: el cast de asignacion `numeric -> int4` existe en Postgres y redondea. Lo que el test
+demuestra es lo que dice el requisito —que la columna **no conserva parte decimal**—,
+releyendo el valor y comprobando `Number.isInteger`. Se anota para que nadie lo lea como una
+asercion floja.
+
 ## Bloqueos
 
-### 1. El permiso para aplicar migraciones esta denegado
+### 1. Sigue denegado el permiso para revertir migraciones (unico bloqueo vivo)
 
-`pnpm run db:migrate` y `pnpm exec prisma migrate deploy` los rechaza el clasificador de
-permisos de la sesion. **Es lo que impide T6, y T7 depende de T6.** Lo decide el humano:
-sin ese permiso, esta feature no puede cerrar R2, R9 (real), R14 (caso fino), R15 ni R22.
+`pnpm run db:rollback` y `pnpm exec tsx scripts/db-rollback.ts` los rechaza el clasificador
+de permisos de la sesion. **Es lo unico que impide cerrar T6 y R22.** Lo decide el humano:
+basta con permitir ese comando una vez y el ciclo se cierra en dos minutos, porque el apply
+ya esta verificado y la base es exclusiva de esta feature (revertirla no puede afectar a
+nadie mas).
 
-### 2. Drift en la base COMPARTIDA por la feature QC-7, en vuelo desde otra sesion
+### 2. Drift con la base compartida — RESUELTO
 
-La base de `DATABASE_URL` tiene aplicada la migracion `20260901220609_user_login_lockout`,
-que **no existe** en `db/migrations/` de este worktree. Consecuencias:
+Se resolvio dandole a QC-14 su **propia base** `QuimiCloude_QC14`. La base `QuimiCloude` de
+QC-7 no se toco. Ya no hay drift: `prisma migrate status` responde
+`Database schema is up to date!`.
 
-- `pnpm run db:migrate:create` (`prisma migrate dev --create-only`) **aborta pidiendo
-  resetear el esquema publico**. Se le contesto que **no** (stdin cerrado, salida 130): no se
-  aplico nada, no se reseteo nada, no se borro ninguna tabla ni fila de nadie. El
-  `migration.sql` se genero con `prisma migrate diff --from-schema-datamodel <HEAD>
-  --to-schema-datamodel db/schema.prisma --script`, que **no toca la base**, y produce el
-  mismo SQL.
-- `prisma migrate deploy` **si** funcionaria pese al drift (no lo comprueba), pero esta
-  bloqueado por el punto 1.
-- Se destraba mergeando `dev` cuando QC-7 aterrice (que es lo que hace T8), **no**
-  reseteando la base compartida.
+### 3. Rojo heredado en `identity` — NO era un defecto de codigo
 
-El timestamp de esta migracion (`20260902005510`) es **posterior** al de QC-7
-(`20260901220609`), asi que el orden de la cadena es correcto y el merge no reordena nada.
-`db:rollback` revierte la **ultima carpeta de `db/migrations/` del worktree**, que es la de
-esta feature, asi que el ciclo de T6 no puede tocar la migracion de QC-7 por accidente.
+`tests/integration/identity/identity-constraints.int.test.ts` estaba en rojo (9 tests) en la
+base compartida. Contra la base limpia de esta feature pasa **entero**:
 
-### 3. Rojo heredado en `identity`, ajeno a esta feature
+```
+$ pnpm exec vitest run tests/integration/identity/
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+```
 
-`tests/integration/identity/identity-constraints.int.test.ts` esta en rojo en `dev`
-(9 tests) por los fixtures `qc7_e2e_*` que QC-7 deja sin limpiar en la base compartida.
-**No es de esta feature y no se toco**: ni los fixtures (son estado en vuelo de otra sesion)
-ni el test. Tampoco se anadio a `tests/baseline-rojos.json`, que sigue vacio: darlo de alta
-ahi es decision del leader o del humano, no del implementer. Se avisa porque hara fallar el
-`./init.sh` completo de T8 por una causa que no es QC-14.
+Queda demostrado que aquel rojo era **estado sucio** (los fixtures `qc7_e2e_*` que QC-7 deja
+sin limpiar), no un defecto del codigo de `identity`. **No se toco ese test, ni los fixtures,
+ni `tests/baseline-rojos.json`** (sigue vacio): darlo de alta ahi es decision del leader o
+del humano. Se anota porque cambia el diagnostico: no hay nada que arreglar en `identity`,
+hay que limpiar la base compartida de QC-7.
 
-## Deuda que deja el implementer
+## Aviso para el leader antes de T8
 
-Cuando se desbloquee, falta escribir
-`tests/integration/inventario/inventario-constraints.int.test.ts` (columna **I** de la
-trazabilidad) con el aislamiento que exige `tasks.md > T7`: cada caso en
-`prisma.$transaction` que termina en `ROLLBACK`, `SAVEPOINT` para lo que debe fallar, y
-asercion sobre **SQLSTATE** (`23502`, `23503`, `23514`) y nunca sobre el texto del mensaje.
-Y **limpiando sus propios fixtures**, sin ninguna asercion del tipo «la tabla esta vacia»:
-es exactamente el defecto que hoy tiene rota la suite de `identity`.
+`./init.sh` completo corre con el `.env` del worktree, o sea contra `QuimiCloude_QC14`. Con
+esa base todo lo que se ha ejecutado esta en verde. Si el gate se corriera contra la base
+compartida `QuimiCloude`, el rojo de `identity` reaparecera **por los fixtures de QC-7, no
+por esta feature**.
 
 ## Nota sobre `.env` (T0)
 
-El `.env` del worktree tenia `DATABASE_URL` pero **no** `DIRECT_URL`, y `prisma validate`
-fallaba con `P1012`. La base es Postgres **local en `localhost:5432`**, o sea ya es conexion
-directa y no hay pooler, asi que se anadio `DIRECT_URL` con el mismo valor que
-`DATABASE_URL` —que es justo el fallback que documenta `scripts/db-rollback.ts`— **solo en
-el `.env` local del worktree**, que esta git-ignorado (`.gitignore:38`). No se invento
-ninguna credencial nueva, no se versiono nada y no se pego ninguna cadena de conexion en
-ningun archivo del repo ni en el chat. El `.env` del worktree principal **no se modifico**.
+El `.env` del worktree esta git-ignorado (`.gitignore:38`) y apunta a `QuimiCloude_QC14`,
+con `DATABASE_URL` y `DIRECT_URL`. No se versiono nada y no se pego ninguna cadena de
+conexion en ningun archivo del repo ni en el chat.
