@@ -226,3 +226,65 @@ middleware esta deprecada y que hay que usar proxy. Confirmado en
 | R28 | `session-claims.test.ts` · «un role ausente, vacio o que no es texto devuelve null» |
 | R29 | `route-access.test.ts` · «solo devuelve allow o redirect, y nunca capacidades, permisos ni roles» + `guard-doc-permisos.test.ts` · «detecta el caso a medias: cuenta la firma pero calla que el rol no autoriza (R29)» |
 | R30 | `route-guard-middleware.test.ts` · **test de CARACTERIZACION** de un limite asumido: con el rol ya cambiado en la base, el borde sigue viendo el anterior hasta que la sesion caduca. **QC-23 lo pondra rojo a proposito** |
+
+## Cierre tras el review
+
+### m1 — el documento alcanza a la guardia (commit `729d218`)
+
+`docs/architecture.md > La regla de dependencias`, fila de `adapters/driven/**`:
+
+- **PUEDE** gana «**otro driven del MISMO modulo** (ver nota)».
+- **NO PUEDE** explicita «**un driven de OTRO modulo**» (antes solo estaba implicito en
+  `lib/modules/N/**` (profundo)).
+- Debajo de la tabla, una nota de siete lineas dice el porque: es la extraccion del codec
+  (`session-cookie.ts` delega en `session-token.ts`) la que permite que exista **una sola**
+  implementacion del HMAC, que es R5 de QC-8; **no cablea nada**, el cableado puerto a
+  implementacion sigue siendo exclusivo de `lib/composition/**`, asi que **no toca R11**; y remite a
+  `guard-arquitectura-modulos` como quien lo hace cumplir.
+
+La guardia **no se toco**: ya la habia validado el reviewer por mutacion. Lo que se corrigio es la
+mitad que faltaba de `design.md > 9` («se corrige el archivo, no se anade una excepcion a la
+guardia»): la excepcion estaba, la correccion del documento no.
+
+**Ninguna guardia se movio**: `pnpm exec vitest run guard` da 12 archivos y 123 tests en verde.
+
+### Colision con QC-30, descubierta al mergear `origin/dev` (commit `93b3583`)
+
+El merge trajo `tests/unit/login-skin.test.tsx` (QC-30, ya en `dev`), que renderiza
+`<LoginPage />` **sin props y de forma sincrona**. T17 habia hecho `searchParams` **obligatorio** y
+la pagina **`async`**, asi que chocaba por **dos** sitios:
+
+1. `typecheck` en rojo (3 errores TS2741, propiedad `searchParams` ausente);
+2. y, ademas, **5 tests de QC-30 en rojo** —comprobado con `git stash` que ya fallaban en HEAD antes
+   de tocar nada—: una funcion `async` devuelve una promesa, asi que RTL montaba un `<div />` vacio
+   y no encontraba el `role="main"`.
+
+Se resolvio **del lado de QC-9**, sin tocar una linea de QC-30: `searchParams` pasa a **opcional** y
+la pagina **deja de ser `async`**, ramificando antes de cualquier `await` (devuelve `ReactElement` o
+`Promise<ReactElement>`, ambas validas para un Server Component). Se descarto `use(searchParams)`
+porque rompia 8 tests propios de QC-9 que invocan la pagina fuera de un render de React.
+
+**No debilita nada**: `resolveReturnPath` ya caia al dashboard ante un candidato ausente o invalido,
+y la validacion que protege de verdad sigue siendo la que `loginAction` repite sobre el `FormData`
+(R9), porque un POST fabricado no pasa por esta pagina.
+
+### Verificacion al cierre (salida real)
+
+```
+$ pnpm run typecheck        -> sin errores
+$ pnpm run lint             -> sin errores
+$ pnpm exec vitest run guard
+ Test Files  12 passed (12)
+      Tests  123 passed (123)
+$ pnpm exec vitest run
+ Test Files  75 passed (75)
+      Tests  825 passed (825)
+$ pnpm exec playwright test e2e/session.spec.ts --project=chromium
+  1 passed (6.7s)
+```
+
+El E2E se **reejecuto despues** del arreglo de la colision: `login/page.tsx` esta en el camino
+critico de R24 y su evidencia habria quedado obsoleta si no.
+
+De paso, la salida del servidor vuelve a confirmar el hallazgo ya anotado arriba:
+`The "middleware" file convention is deprecated. Please use "proxy" instead.`
