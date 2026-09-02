@@ -76,6 +76,10 @@ model User {
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
 
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockLevel           Int       @default(0) @map("lock_level")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
+
   documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 

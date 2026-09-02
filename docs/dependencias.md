@@ -41,6 +41,7 @@ La regla y su porqué viven en `docs/architecture.md > Dependencias de terceros`
 | `tailwind-merge` | Resolución de clases Tailwind en conflicto | heredada | 2026-09-01 | Pendiente de auditoría |
 | `tw-animate-css` | Animaciones para Tailwind v4 | heredada | 2026-09-01 | Pendiente de auditoría |
 | `zod` | Validación en el borde (route handlers, webhooks) | heredada | 2026-09-01 | Pendiente de auditoría |
+| `@playwright/test` | Runner E2E del flujo de autenticacion (QC-7) | aprobada | 2026-09-01 | dev — cuatro checks OK: no deprecada; ultima publicacion 2026-09-01; 58,4M descargas/semana; Apache-2.0. Aprobada por el humano |
 | `@tailwindcss/postcss` | Plugin PostCSS de Tailwind v4 | heredada | 2026-09-01 | dev — Pendiente de auditoría |
 | `@testing-library/dom` | Base de Testing Library | heredada | 2026-09-01 | dev — Pendiente de auditoría |
 | `@testing-library/jest-dom` | Matchers de DOM para los tests de UI | heredada | 2026-09-01 | dev — Pendiente de auditoría |

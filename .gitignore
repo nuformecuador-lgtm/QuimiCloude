@@ -48,3 +48,8 @@ next-env.d.ts
 
 # reporte json de vitest para comparar contra tests/baseline-rojos.json
 .vitest-rojos.json
+
+# playwright (E2E): reportes, artefactos de las corridas y cache local
+/test-results/
+/playwright-report/
+/.playwright/

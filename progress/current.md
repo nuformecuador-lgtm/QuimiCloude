@@ -37,6 +37,17 @@ la primera con scrypt a mano, parada en el PR por sobre-ingeniería y rehecha co
 La feature **7 — pantalla-de-login** se cerró el 2026-08-06 (PR #2, merge `9ac5a5c`):
 resumen en `progress/history.md`, worktree desmontado y rama local borrada.
 
+**QC-7 — login-usuario-y-contrasena: la complejidad real fue `high`, no la que trae el board.**
+La ficha llego **sin complejidad asignada**. Lo que se estimo como "verificar credenciales y
+emitir cookie" (`medium`) paso a `high` el 2026-09-01, cuando el humano respondio la pregunta
+abierta 2 con una politica concreta de bloqueo de cuenta: eso arrastro **persistencia,
+migracion con su `down.sql`, un puerto y un adaptador de escritura mas, y una tanda entera de
+tests** a una feature que no tenia ninguna. El bloqueo entro como **alcance anadido**, no
+estaba en la description original. Se decidio dejarlo dentro de QC-7 y no sacarlo a ficha
+propia (razonamiento en `specs/QC-7-.../design.md > 11`): es el mismo camino de codigo, y la
+respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — retrofitear
+uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
+
 ## Evaluaciones
 
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
@@ -455,6 +466,81 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[feature 4 — memoria y concurrencia en Vercel]** Con los parámetros vigentes cada verificación
+  de contraseña reserva ~64 MiB y tarda ~750 ms en la máquina de referencia. No hay dato en `docs/`
+  sobre el plan de Vercel ni sobre la memoria configurada de las funciones, así que el número de
+  logins concurrentes por instancia está sin acotar. **Hay que confirmarlo antes de la feature 4.**
+  Si la memoria resultara baja, la salida es bajar al conjunto equivalente `{ n: 32768, r: 8, p: 3 }`
+  (`specs/2-.../design.md > 3.3`), no cambiar de algoritmo.
+  (Pregunta abierta 3 de `specs/2-hash-y-verificacion-de-contrasena/requirements.md`.)
+- **[feature 4 — rehash en el login]** El formato del hash permite detectar parámetros viejos, pero
+  regenerar el valor es una **escritura** en `users`, fuera del alcance de la feature 2. Falta
+  decidir si la feature 4 rehashea al vuelo en cada login exitoso o si la rotación es un script
+  puntual. El formato soporta las dos; por eso el módulo **no exporta `needsRehash`**.
+  (Pregunta abierta 4 de `specs/2-hash-y-verificacion-de-contrasena/requirements.md`.)
+- **[arnés — worktrees sin artefactos generados]** Un worktree recién montado no puede pasar
+  `pnpm typecheck`: le faltan `node_modules`, el cliente de Prisma y los tipos de Next. Hoy hay que
+  correr a mano `pnpm install --frozen-lockfile`, `pnpm exec prisma generate` y `pnpm exec next
+  typegen`. Candidato a que lo haga `scripts/wt.sh new`.
+- **[QC-8 — el logout borra la cookie, no revoca el token]** La sesion es un token firmado sin
+  estado, no una fila en una tabla: no hay revocacion. El logout de QC-8 borrara la cookie del
+  navegador, pero un valor ya firmado que alguien hubiera copiado sigue siendo valido hasta su
+  `exp` (8 h). Riesgo acotado y reversible: migrar a sesiones opacas toca **solo**
+  `session-cookie.ts` y el lector de QC-8; el dominio y los puertos no se enteran.
+  (`specs/QC-7-.../design.md > 6.2`.)
+- **[QC-7 — bloqueo POR CUENTA, sin limite por IP]** Cualquiera puede dejar fuera a un usuario
+  conocido hasta 60 minutos con 5 intentos fallidos. **Riesgo de DoS dirigido asumido
+  explicitamente por el humano el 2026-09-01** (D12): ERP de un solo tenant, usuarios conocidos
+  y sin registro publico. El limite por IP se ofrecio y se descarto: sobre Vercel la IP llega
+  por `x-forwarded-for`, falsificable si el borde no esta bien configurado, y daria una
+  sensacion de proteccion que no es real. (`design.md > 6.5`.)
+- **[QC-7 — un usuario bloqueado no sabe que lo esta]** El mensaje es el generico, sin
+  excepcion: un "cuenta bloqueada" delataria que el nombre de usuario existe. Coste real para
+  el usuario legitimo, hasta 60 minutos sin entender por que. **Revisar cuando exista la
+  recuperacion de contrasena** (hoy `FORGOT_PASSWORD_ROUTE` da 404, deuda de QC-10): avisar por
+  correo al dueno de la cuenta es el canal que no filtra nada a terceros. (`design.md > 5.5`.)
+- **[QC-7 — el nivel de escalada no decae con el tiempo]** Solo baja con un login exitoso. Una
+  ventana de "buen comportamiento" (bajar un nivel tras 24 h sin fallos) exigiria una cuarta
+  columna con la fecha del ultimo fallo y una regla mas que testear, para acotar algo que ya
+  esta acotado en 60 minutos. Si el humano lo quiere, es una columna y una linea.
+- **[QC-4 / arnes — un test de integracion afirma sobre el estado GLOBAL de la tabla]**
+  `identity-constraints.int.test.ts` usa `expect(await tx.user.count()).toBe(0)` en tres
+  puntos. Al aparecer el segundo archivo de integracion (QC-7) eso se convirtio en una carrera:
+  ver `progress/impl_QC-7-login-usuario-y-contrasena.md > 6.2`. **Contenido** serializando
+  `tests/integration/` en `vitest.config.mts`, no reparado: el arreglo de fondo es acotar esa
+  asercion a sus propias filas, y es de QC-4. Ojo, la serializacion vale **dentro de una
+  corrida**; dos procesos de vitest a la vez contra la misma base siguen chocando.
+- **[arnes — el `.env` del repo no tiene `DIRECT_URL`]** `db/schema.prisma` la declara y sin
+  ella `prisma migrate` falla con `P1012`. `.env.example` si la documenta: el incompleto es el
+  `.env` real. Se anadio a mano en el worktree de QC-7 (base local en `localhost:5432`, o sea
+  el mismo valor que `DATABASE_URL`). Candidato a que lo cubra `scripts/wt.sh new` junto con el
+  resto de artefactos generados.
+- **[QC-7 — el registro del fallo bajo contencion extrema puede perder un intento]** El contador
+  se escribe con compare-and-set y hasta 10 reintentos con relectura (`design.md > 5.7`). Si los
+  10 pierden la carrera, ese intento no se cuenta. **No es una perdida del bloqueo**: el contador
+  es monotono y el bloqueo acaba disparandose igual; es un intento sin contar bajo contencion
+  brutal. Se acepta frente a las alternativas —meter la tabla de escalada en SQL, o obligar al
+  dominio a correr dentro de una transaccion— que estan descartadas y razonadas en `design.md > 5.7`.
+- **[arnes — un E2E interrumpido deja basura que pone rojo el gate de otra feature]** Un
+  `pnpm run e2e` cortado a medias (al reviewer se lo corto el disco lleno) dejo 4 usuarios y 4
+  roles `qc7_e2e_*` huerfanos, y eso puso **9 tests rojos** en `identity-constraints.int.test.ts`,
+  que afirma que la tabla `users` esta vacia. Mitigado en QC-7: el `afterAll` del E2E borra por
+  prefijo y no por ids en memoria, cada borrado aislado, y hay barrido defensivo de huerfanos de
+  mas de una hora al empezar. **La causa de fondo sigue siendo la misma que obligo a serializar
+  la integracion**: un test de QC-4 que afirma sobre el estado global de la tabla.
+- **[QC-7 — el CAS del login no puede pisar un bloqueo vigente, y el porque]** El predicado del
+  compare-and-set compara los enteros por igualdad y el bloqueo por **rango**
+  (`locked_until IS NULL OR <= now`). No es cosmetico: sin esa condicion, el par
+  `(failed_login_attempts, lock_level)` sufre un **ABA** —`(0,1)` es a la vez bloqueo fresco y
+  bloqueo caducado— y un intento con estado obsoleto **borraba un bloqueo activo**, o sea que un
+  atacante bloqueado podia desbloquearse. Detectado por el reviewer ejecutandolo, cerrado con la
+  condicion de rango y con test discriminante. **Quien toque ese `where` en QC-8 o QC-9 tiene que
+  leer `design.md > 5.7` antes**: la version anterior de ese documento declaraba el caso imposible
+  con una premisa falsa.
+
+Cerradas, para que nadie las busque abiertas: la pregunta 3 de la feature 1 (columnas
+`password_algorithm` / `password_updated_at`) se responde **NO** en `specs/2-.../design.md > 8`, y la
+pregunta 5 (pepper) la cerró el humano el 2026-08-06 con un no (`design.md > 8.1`).
 - ~~No hay `.env` ni `DATABASE_URL`~~ → **resuelto el 2026-08-06** por el humano.
   ~~Ni `.env.example`~~ → lo añadió la feature 1, con placeholders y sin credenciales.
   Sigue sin decidirse qué Postgres usa **CI**, solo el local. Y los worktrees nuevos
