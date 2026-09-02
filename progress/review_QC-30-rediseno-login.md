@@ -264,3 +264,130 @@ Solo el BLOQUEANTE-1, y se cierra **sin tocar codigo de produccion**: anadir a
 en `:root` **y** `.dark`, y la del `box-shadow` de la tarjeta con el filo y el brillo interior.
 Recomendado —no exigido— cerrar de paso menor-2, menor-3 y menor-4 en el mismo test, y anadir a
 `design.md` un parrafo con la decision del pie de la tarjeta (menor-1). Vuelve al `implementer`.
+
+---
+
+# Ronda 2 — verificacion del arreglo (HEAD `d5ae346`)
+
+> La ronda 1 (arriba) queda como esta: es el registro de por que se rechazo. Esto es lo que se
+> comprobo despues, con el mismo metodo —mutar el codigo y ver si el test enrojece—, no leyendo la
+> bitacora.
+
+## Veredicto de la ronda 2
+
+**OK.** Cero bloqueantes, cero menores abiertos. El bloqueante esta cerrado y los cinco menores
+accionables tambien. Queda una sola observacion de entorno, ajena a la ficha (menor-6).
+
+## 1. La mutacion del bloqueante, repetida por el reviewer
+
+Aplique **exactamente la misma** de la ronda 1, las dos mitades a la vez: borrar el bloque `.dark`
+con las variables `--qc30-login-*` entero **y** recortar el `box-shadow` de la tarjeta a solo
+`var(--qc30-login-shadow)`. Salida:
+
+    × declara los valores del insumo para el vidrio y las burbujas en los dos modos
+    × conserva el filo de 1px y el brillo interior en la sombra de la tarjeta, tambien con
+      transparencia reducida
+      Tests  2 failed | 24 passed (26)
+
+**Ahora sale rojo, y el rojo es el correcto**: los dos `it` nuevos y solo esos. Coincide con lo
+transcrito en la bitacora. Revertido despues; arbol limpio.
+
+Vale la pena senalar como esta escrito el primero: compara **valor por valor contra la regla real**
+(`declaracionesDe` agrupa por selector, se normalizan solo los espacios) y falla con un mensaje que
+dice que variable y en que modo. Cambiar **un solo digito** —`rgba(255,255,255,0.82)` a `0.83`— lo
+pone en rojo (mutacion propia). Es justo la mitigacion que `design.md > 10` prometia para el riesgo
+«un valor del insumo se copia mal al CSS» y que en la ronda 1 solo existia para las burbujas.
+
+**BLOQUEANTE-1: cerrado.**
+
+## 2. Cero cambios de produccion, verificado con el diff
+
+- El diff desde `24a4555` acotado a `app/`, `components/`, `e2e/`, `lib/` y `package.json` sale
+  **vacio**.
+- El diff total desde `24a4555` son **cuatro archivos**: `tests/unit/login-skin.test.tsx` (+222),
+  `specs/QC-30-rediseno-login/design.md` (+22), `progress/impl_*.md` y `progress/review_*.md`.
+- `app/globals.css` contra `dev` sigue en **273 inserciones y 0 eliminaciones**.
+
+Nada de lo aprobado en la ronda 1 vuelve a estar en juego: el CSS, el marcado y el E2E son byte a
+byte los que revise. `login-skin.test.tsx` pasa de 20 a 26 tests.
+
+## 3. Los seis tests nuevos no son tautologias
+
+Una mutacion por test, cada una contra el codigo real, cada una con **un solo rojo y el que toca**:
+
+| Mutacion | Rojo obtenido |
+| --- | --- |
+| `rgba(255,255,255,0.82)` -> `0.83` (un digito del insumo) | «declara los valores del insumo... en los dos modos» (R9) |
+| `.dark` borrado + `box-shadow` recortado | esos dos (R9): 2 failed / 24 passed |
+| `--qc30-bubble-opacity: 0.30` -> `0.31` y `scale-to: 1.06` -> `1.10` | «transcribe opacidad, deriva, recorrido y escala...» (R12) |
+| `pointer-events: none` fuera y `z-index: 2` de la tarjeta fuera | «deja la capa de burbujas sin capturar el puntero y por debajo de la tarjeta» (R13) |
+| `min-height` del campo 44px -> 32px | «fija 44px de alto en campo y boton...» (R16) |
+| `box-shadow: 0 0 0 4px red` anadido al campo | «tampoco pisa el anillo de foco... por la via del box-shadow» (R20) |
+
+Los seis muerden. Ninguno afirma sobre si mismo ni sobre el resultado de una funcion del propio
+test: todos leen `app/globals.css` y comparan contra valores **transcritos del insumo dentro del
+test**, que es la unica forma de que una cifra mal copiada al CSS se note. La mutacion de la fila 5
+cierra la puerta que en la ronda 1 dejaba pasar una regresion de altura hasta el merge con el gate
+en verde.
+
+## 4. El acotamiento de R20 a campo y boton: **correcto, no lo deja sin fuerza**
+
+Su argumento es cierto y ademas es el unico posible: la `box-shadow` de la tarjeta **es** el filo de
+1 px, el brillo interior y la sombra del vidrio, o sea es exactamente lo que R9 obliga a conservar y
+lo que el otro test nuevo defiende. Una prohibicion global de `box-shadow` dentro del ambito habria
+salido roja contra codigo bueno —un test que hay que relajar el dia que alguien lo lee es peor que
+no tenerlo—.
+
+Y el acotamiento **no encoge el requisito**: R20 habla literalmente de «el radio de campo y boton
+(10 px), el grosor de 3 px del anillo de foco visible y la familia tipografica». El sujeto es el
+campo y el boton, no la tarjeta. La prohibicion cubre ahora todas las vias practicables de tapar el
+anillo del primitivo desde la hoja —`outline`, `outline-width`, `outline-color`, `--ring`,
+`ring-width` y `box-shadow`— sobre los dos selectores que R20 nombra. La mutacion de la fila 6 lo
+confirma: una sombra sobre el campo enrojece.
+
+## 5. El resto del gate, corrido de nuevo
+
+- `./init.sh` completo: **verde**. `Test Files 65 passed (65)` · `Tests 663 passed (663)` (los 6
+  nuevos, ni uno mas ni uno menos). Typecheck, lint, migraciones y `.env` OK.
+- `design.md > 6` recoge ya la decision del pie de la tarjeta: el disparador (`bg-muted/50` opaco
+  cortando el vidrio), que las ternas RGB salen del insumo y solo las alfas son nuevas, la vuelta a
+  `var(--muted)` y `var(--border)` bajo transparencia reducida, y el realineado del radio a 18 px.
+  Anota ademas, con criterio, que el test **no** afirma los valores del pie por ser la parte blanda
+  del bloque. **menor-1: cerrado.**
+- No hace falta repetir el E2E: `e2e/login-skin.spec.ts` no cambio (10/10 en Chromium y WebKit en la
+  ronda 1) y `e2e/login.spec.ts` sigue sin abrirse.
+- Sigue sin haber censos globales, sin dependencias nuevas y sin nada tocado en `components/ui/`,
+  `login-form.tsx` ni `submit-button.tsx`.
+
+## Estado final de los hallazgos
+
+| Hallazgo | Estado |
+| --- | --- |
+| BLOQUEANTE-1 — R9 sin test que muerda | **cerrado** (dos `it`, mutacion repetida por el reviewer) |
+| menor-1 — el pie de la tarjeta fuera de `design.md` | **cerrado** (`design.md > 6`) |
+| menor-2 — R12 a medias | **cerrado** (opacidades, derivas, recorrido y escala) |
+| menor-3 — `pointer-events` de R13 sin defender | **cerrado** (mas el apilado `z-index` 1 contra 2) |
+| menor-4 — los 44 px no defendidos en el gate | **cerrado** (asercion positiva en unitario) |
+| menor-5 — el anillo de foco por la via del `box-shadow` | **cerrado**, acotado a campo y boton con motivo |
+| menor-6 — `e2e/theme.spec.ts` fragil en frio | **abierto a proposito**: no es de esta ficha. Los seis rojos son `page.goto` agotando 30 s en la compilacion bajo demanda; el gate no corre E2E. Curarlo (fijar timeout en ese archivo) es otra ficha |
+
+## Trazabilidad final `R<n> -> test`
+
+Cambia solo lo que la ronda 2 movio; el resto de la tabla de la ronda 1 sigue vigente.
+
+| R | Test | Muerde |
+| --- | --- | --- |
+| R9 | `skin/1` > «declara los valores del insumo para el vidrio y las burbujas en los dos modos» + «conserva el filo de 1px y el brillo interior en la sombra de la tarjeta, tambien con transparencia reducida» | **si** (mutacion propia: `.dark` borrado mas sombra recortada -> 2 rojos; y un digito cambiado -> 1 rojo) |
+| R12 | los dos de la ronda 1 + `skin/1` > «transcribe opacidad, deriva, recorrido y escala de cada burbuja tal como los da el insumo» | si |
+| R13 | los dos de la ronda 1 + `skin/1` > «deja la capa de burbujas sin capturar el puntero y por debajo de la tarjeta» | si |
+| R16 | los de la ronda 1 + `skin/1` > «fija 44px de alto en campo y boton, y 400px, 18px y 28px en la tarjeta del login» | si, **ahora tambien en el gate** |
+| R20 | los dos de la ronda 1 + `skin/1` > «tampoco pisa el anillo de foco de campo y boton por la via del box-shadow» | si |
+
+**26 de 26 requisitos verificados de verdad, cada uno por un test que enrojece si el codigo se
+rompe.** `CHECKPOINTS.md > Trazabilidad` satisfecho.
+
+## VEREDICTO: OK
+
+Aprobada. Puede seguir el flujo de `AGENTS.md` (PR y merge), recordando la regla 5 de `CLAUDE.md`:
+`./init.sh` completo **antes del PR** —corrido aqui, verde, 663/663—. Al cerrar quedan la entrada en
+`progress/history.md` y el desmontaje del worktree.
