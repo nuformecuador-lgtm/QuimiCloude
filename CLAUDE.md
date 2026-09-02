@@ -30,7 +30,8 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
    archivo bajo `specs/` o `progress/` y solo te devuelve una referencia corta.
    No hagas circular el contenido completo por el chat.
    **Jira no es una excepción a esto.** El board es la *entrada humana* —dónde nacen las
-   features y dónde el humano aprueba—, y se importa a `feature_list.json` en el paso F0.
+   features y dónde el humano aprueba—, y se importa a `feature_list.json` en el paso F0
+   —y `/afinar-feature` refleja allí lo que escribe en el board al acotar—.
    A partir de ahí el arnés lee y escribe disco: el gate corre sin red y nada del ciclo
    depende de que Jira responda. Contrato en `docs/jira.md`.
 4. **Trazabilidad.** Cada requisito `R<n>` debe terminar mapeado a un test concreto.

@@ -11,8 +11,9 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-6 | seed-roles-y-usuario-inicial | QC-17 Identidad y acceso | backend | **pending** | `feature/QC-6-seed-roles-y-usuario-inicial` | evaluada y con worktree montado (F1.0/F1.1). **Parada en F1.2**: la description no dice qué roles ni con qué datos nace el usuario inicial — ver Evaluaciones |
+| QC-6 | seed-roles-y-usuario-inicial | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-6-seed-roles-y-usuario-inicial` | **spec APROBADO, slot devuelto el 2026-09-01** para que entre QC-14 (decisión humana, ver Evaluaciones). Estaba `in_progress` pero su implementer **nunca se lanzó**: no se pierde trabajo. Worktree y spec intactos. Arranca cuando haya slot |
 | QC-7 | login-usuario-y-contrasena | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-7-login-usuario-y-contrasena` | **esperando aprobación humana (F1.4)**. Spec revisado con las decisiones del humano: 31 requisitos. Decidido que **entra antes que QC-6** en fase 2 |
+| QC-14 | modelo-producto | QC-18 Inventario | backend | **in_progress (F2.1)** | `feature/QC-14-modelo-producto` | **implementer lanzado el 2026-09-01**. Spec aprobado y congelado en `c2a4f43` (24 requisitos EARS con test); las 5 preguntas abiertas cerradas siguiendo el precedente de QC-4. Worktree preparado y `typecheck` limpio. Ocupa el slot que devolvió QC-6 |
 
 Worktrees: `.worktrees/QC-6-seed-roles-y-usuario-inicial` (montado desde `origin/dev`, con
 `.env` copiado a mano), `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
@@ -132,6 +133,97 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 - Lo de abajo es la evaluación original del 2026-08-06, cuando la ficha era
   «modelo-inventario». Se conserva por trazabilidad; donde contradiga a la acotación del
   2026-09-01, **manda el `requirements.md`**.
+
+- **Arranque de fase 1 el 2026-09-01 (esta sesión).** `zone`, `complexity`, `branch` y las
+  labels de Jira ya estaban puestas; `depends_on: QC-15` está `done`, así que la dependencia
+  no bloquea. `feature_list.json` ya trae la versión nueva (`modelo-producto`), o sea que la
+  desincronización que anotaba el punto de arriba **ya se resolvió** en el F0 de esta sesión.
+- **Paralelismo — cupo NO, conflicto de archivos NO.** La zona `backend` tiene **2**
+  `in_progress` (QC-6 y QC-7), o sea el cupo lleno: por la condición (a) de `AGENTS.md > F1.0`
+  la selección automática habría salteado QC-14. Se avanza igualmente la **fase 1** por
+  decisión humana explícita («comienza con qc-14»), y eso **no viola la regla 1 de
+  `CLAUDE.md`**: escribir el spec deja la ficha en `spec_ready`, no en `in_progress`, así que
+  no consume slot. Mismo precedente que la feature 8. La **fase 2 queda bloqueada** hasta que
+  QC-6 o QC-7 pase a `done`.
+- Conflicto de archivos con las dos `in_progress`: **ninguno**. QC-6 y QC-7 viven en
+  `lib/modules/identity/**`, `lib/composition/` y el modelo `User`; QC-14 crea el módulo
+  `inventario` y dos tablas nuevas. El único archivo compartido es `db/schema.prisma` (las
+  tres añaden modelos o columnas, aditivo) y la carpeta de migraciones — el mismo riesgo de
+  `_prisma_migrations` que ya está anotado para QC-6, y es razón de más para que la fase 2
+  espere en vez de ser una tercera cadena de migración en vuelo.
+- Worktree montado desde `origin/dev` y luego **`git merge dev`**, porque la siembra de
+  `/afinar-feature` (`specs/QC-14-modelo-producto/requirements.md`) vive en el commit
+  `5708bc3`, que está **solo en `dev` local y sin pushear**. Sin ese merge el `spec_author`
+  no habría visto ni una de las 17 decisiones cerradas. `.env` copiado a mano (deuda de
+  `wt.sh new`). **`pnpm install` / `prisma generate` / `next typegen` no se corrieron**: la
+  fase 1 no ejecuta nada. Van al arrancar la fase 2.
+
+- **Spec escrito el 2026-09-01** (24 requisitos R1–R24, todos mapeados a un test en
+  `tasks.md > Trazabilidad`). Tres archivos de test nuevos —
+  `tests/unit/inventario/schema/inventario-schema.test.ts`,
+  `tests/unit/inventario/schema/inventario-migration.test.ts` y
+  `tests/integration/inventario/inventario-constraints.int.test.ts` — más R20, R21 y R24, que los
+  cierran guardias **ya existentes** y cubren la migración nueva sin tocarlas. Sin dependencias
+  nuevas y sin E2E. Ficha en `spec_ready`, tarjeta en *En revisión*.
+- **Contradicción entre decisiones cerradas, detectada por el `spec_author` y NO resuelta por él
+  (bien hecho: es del humano).** La decisión 11 pide borrado lógico con `deleted_at` en las dos
+  tablas «heredado de QC-4»; la 4 exige que una presentación con productos asignados no se pueda
+  borrar. Si `presentations` lleva `deleted_at`, «borrar» pasa a ser un `UPDATE` y **ninguna FK
+  puede bloquear un `UPDATE`**: la garantía de la 4 se evapora en silencio. QC-4 ya vivió este
+  choque y lo resolvió dejando su catálogo (`roles`) **sin** `deleted_at` — está documentado en
+  `db/schema.prisma` y en `specs/4-modelo-usuarios-y-roles/design.md > 2.2`. El diseño hereda esa
+  salida y la deja como pregunta abierta. Los requisitos están redactados para no depender de la
+  respuesta: R14 exige el rechazo del borrado sea cual sea el mecanismo, así que ninguna de las
+  dos respuestas obliga a renumerar.
+- **Cinco preguntas abiertas nuevas** que deja el diseño, todas en `design.md > 9` y ninguna
+  bloqueante del modelo: si `min_purchase` es `NOT NULL DEFAULT 0` o anulable con defecto (la
+  decisión 8 admite las dos lecturas); si `presentations` lleva `deleted_at` (la contradicción de
+  arriba); si el nombre de una presentación es único (nadie lo decidió; el diseño **no** crea el
+  índice, y añadirlo después exigirá limpiar duplicados); si `delivery_time` admite negativos (la
+  decisión 7 enumera cuatro columnas y no lo incluye, así que se queda sin `CHECK` y un plazo
+  negativo entraría); y si un `name` vacío es un nombre (sin `CHECK` de longitud, queda como
+  validación de borde en QC-20, igual que hizo QC-4).
+
+- **SPEC APROBADO por el humano el 2026-09-01** («sigue con 14», reafirmado tras plantearle
+  las preguntas). Los tres archivos quedan congelados en el commit `c2a4f43`. La tarjeta **NO**
+  se mueve a *En curso* todavía: eso es F2.0 y F2.0 está bloqueado (ver abajo), así que moverla
+  dejaría board y disco divergentes por una fase que no ha empezado.
+- **Las cinco preguntas abiertas se cierran adoptando la posición que el `design.md` ya tomó**,
+  por decisión del leader ante la reafirmación del humano. Ninguna es invención: las cinco
+  siguen el precedente documentado de QC-4, así que el `implementer` arranca sin ambigüedad y
+  **no hay que editar el spec** — el diseño ya las implementa.
+  1. **`presentations` NO lleva `deleted_at`.** Solo `created_at` / `updated_at`. Resuelve la
+     contradicción 4-vs-11 a favor de la 4, que es la que expresa una garantía de la base: con
+     `deleted_at`, «borrar» sería un `UPDATE` y la FK `ON DELETE RESTRICT` no podría impedir
+     nada. Es literalmente lo que QC-4 decidió para su catálogo `roles`
+     (`specs/4-modelo-usuarios-y-roles/design.md > 2.2`). `products` sí lleva las tres marcas.
+     **La decisión 11 queda matizada, no derogada**: el borrado lógico aplica a las tablas de
+     operación, no a los catálogos.
+  2. **`min_purchase` es `INTEGER NOT NULL DEFAULT 0`.** «No indicar» vale 0, y nunca hay
+     `NULL`: nadie pidió distinguir «sin dato» de «cero», y esa distinción se paga en cada
+     consulta futura de QC-20 en adelante.
+  3. **El nombre de una presentación NO es único.** Se mantiene la ausencia de índice que toma
+     el diseño, por coherencia con la decisión 6 (el nombre del producto tampoco lo es) y
+     porque nadie lo pidió. **Anotado como el más caro de revertir de los cinco**: añadir el
+     índice después exige limpiar duplicados primero. Si el catálogo se llena a mano, revisar
+     en QC-20.
+  4. **`delivery_time` se queda SIN `CHECK`.** La decisión cerrada 7 enumera cuatro columnas y
+     no lo incluye; añadirle la restricción sería ampliar una decisión del humano por cuenta
+     propia. **Consecuencia asumida y anotada: hoy un plazo de entrega negativo entra en la
+     base.** Es una línea de migración cuando alguien lo quiera cerrar.
+  5. **Sin `CHECK` de nombre no vacío.** `''` es un nombre válido en la base; la validación de
+     borde vive en la capa de aplicación, que es QC-20. Mismo criterio que QC-4.
+- **F2.0 BLOQUEADO, y no por criterio sino por el gate.** `scripts/validate-features.mjs` cuenta
+  las `in_progress` por zona y falla a partir de tres; `backend` ya tiene QC-6 y QC-7. Pasar
+  QC-14 a `in_progress` pondría `./init.sh` en rojo, o sea que la regla 1 de `CLAUDE.md` aquí es
+  mecánica, no interpretable. **Lo que libera el slot** es que QC-7 cierre, o que el humano
+  devuelva QC-6 a `spec_ready`: QC-6 está parada en F2.1 desde que se aprobó su spec y **su
+  implementer nunca se lanzó**, así que hoy ocupa un slot por contabilidad y no por trabajo en
+  vuelo. Esa decisión es del humano y no la toma el leader.
+- Worktree **preparado para fase 2 por adelantado** (`pnpm install`, `prisma generate`,
+  `next typegen`), que es la deuda conocida de `wt.sh new` y la que hizo fallar el typecheck de
+  QC-7 con `Cannot find name 'LayoutProps'`. Así el arranque de F2.1 no gasta la primera tanda
+  en montar el entorno.
 
 ### Feature 11 — modelo-inventario
 
@@ -362,6 +454,57 @@ literalmente «mientras no hay verificación real». Cuando la haya, ese test mi
 la task T6b, no suelto.
 ## Conflictos pendientes
 
+### ~~El gate completo está ROJO en `dev` por fixtures E2E de QC-7 sin limpiar~~ → **RESUELTO** (2026-09-01)
+
+> **Cerrado el mismo día.** Al ir a limpiar los fixtures, la base compartida ya estaba sin
+> ellos: **0 usuarios y 0 roles**. No la limpió esta sesión. Se comprobó que fue un borrado
+> **acotado a las filas**, no un reset: la migración `20260901220609_user_login_lockout` de
+> QC-7 sigue aplicada y `document_types` conserva su `CC`, así que **el trabajo de QC-7 está
+> intacto**. Verificado: `tests/integration/identity` pasa **23/23** y `./init.sh` **completo**
+> sale verde en `dev` (**220/220**, sin rojos nuevos).
+>
+> **Los dos defectos de fondo NO están resueltos y volverán**, así que lo de abajo se conserva:
+> el E2E de QC-7 sigue sin limpiar lo que siembra (cada corrida vuelve a ensuciar la base), y
+> los tests de integración de QC-4 siguen afirmando que la tabla está vacía — lo que **QC-6
+> romperá por definición**, porque es un seed cuyo trabajo es dejar filas.
+>
+> La salida estructural ya tiene precedente en el repo: **una base por worktree**, que es lo
+> que se hizo con `QuimiCloude_QC14` y lo que destrabó QC-14 en dos minutos.
+
+### El gate completo está ROJO en `dev` por fixtures E2E de QC-7 sin limpiar (2026-09-01, histórico)
+
+Descubierto al correr `./init.sh` completo desde la sesión de QC-14. **9 tests en rojo, todos
+en `tests/integration/identity/identity-constraints.int.test.ts`**, y ninguno es de QC-14: esta
+feature no ha tocado una sola línea de código.
+
+**Causa raíz, verificada contra la base real:** la base de `dev` tiene **4 usuarios y 4 roles
+con prefijo `qc7_e2e_`**, creados el 2026-09-02T00:19Z. Son fixtures del E2E de Playwright que
+introdujo QC-7 y que **no se limpian al terminar**. Los tests de integración de QC-4 afirman
+`expect(await tx.user.count()).toBe(0)` dentro de una transacción que luego revierten — con 4
+filas ajenas ya sembradas, la aserción cae. `baseline-rojos.json` está **vacío a propósito**,
+así que cualquier archivo rojo es bloqueante por diseño.
+
+**No se borró nada.** Las filas son estado en vuelo de **otra sesión de leader** que está
+implementando QC-7 ahora mismo; borrarlas a media corrida podría romperle el run. La limpieza
+la decide el humano. Es un `DELETE` sobre las filas con prefijo `qc7_e2e_` (primero usuarios,
+luego roles, por la FK).
+
+**Pero la causa raíz no es la suciedad: son dos defectos de diseño que se cruzan.**
+
+1. **El E2E de QC-7 no limpia lo que siembra.** Cada corrida deja cuatro usuarios y cuatro
+   roles más. Es deuda de QC-7 y debe cerrarse **dentro de QC-7**, antes de su PR — si no, su
+   propio `./init.sh` completo de F2.4 saldrá rojo por su propia mano.
+2. **Los tests de integración de QC-4 asumen que la tabla está vacía.** Esa suposición es
+   frágil y va a volver a romperse: **QC-6 es literalmente un seed cuyo trabajo es dejar filas**
+   en `users` y `roles`. En cuanto QC-6 corra, estos mismos 9 tests caen otra vez. Hay que
+   cambiar la aserción de «la tabla está vacía» a «no existe la fila que acabo de intentar
+   insertar», que es lo que el test de verdad quiere demostrar.
+
+Es exactamente el choque de base compartida que esta misma sección ya anticipaba para QC-6 y
+QC-7, materializado — y una razón más para que QC-14 **no** sea una tercera cadena de
+migraciones en vuelo contra la misma base.
+
+
 ### DOS SESIONES DE LEADER EN PARALELO SOBRE EL MISMO REPO (2026-09-01) — YA HUBO PÉRDIDA
 
 **Actualización: dejó de ser hipotético.** La entrada de evaluación de QC-7 en
@@ -372,6 +515,24 @@ sesiones hacen read-modify-write sin cerrojo y la última escritura gana.
 **Mitigación decidida el 2026-09-01: QC-7 entra primero en fase 2 y QC-6 espera.** Eso
 elimina el choque de archivos (`lib/composition/index.ts`, `lib/modules/identity/`), pero
 **no** el de `progress/current.md` ni el de `feature_list.json`, que siguen sin protección.
+
+**Confirmado desde la sesión de QC-6 (2026-09-01, 17:2x).** El humano aprobó el spec de QC-6
+y la ficha pasó a `in_progress` (F2.0), pero **el implementer NO se lanzó**: la validación de
+conflicto de `AGENTS.md > Paralelismo` da intersección con QC-7, que ya está a medio
+implementar (sus tasks marcadas `[x]` hasta la creación de su migración). Archivos que se
+cruzan: `db/schema.prisma` (las dos añaden columnas al modelo `User`), `db/migrations/`,
+`lib/modules/identity/index.ts`, `lib/composition/index.ts` y
+`tests/unit/identity/schema/identity-migration.test.ts`.
+
+**QC-6 queda parada en F2.1 y conserva su slot** de la zona `backend`: aprobada, con worktree
+montado en `f79ba5d` y spec completo. Arranca en cuanto QC-7 pase a `done`.
+
+Lo que más pesa no son las columnas —son aditivas y con nombres distintos, se mezclan solas—
+sino que **la verificación central de QC-6 es correr el seed dos veces contra una base real**,
+o sea aplicar migraciones, mientras QC-7 está ejercitando `db:migrate` y `db:rollback` contra
+esa misma base. Dos cadenas de migración en vuelo comparten `_prisma_migrations`, y ahí el
+historial miente en silencio: es exactamente el fallo que `docs/architecture.md > Migraciones
+up/down` advierte que no apunta a su causa.
 
 
 Una sesión evaluó y montó **QC-6**; otra, en paralelo y sin saberlo, evaluó y montó **QC-7**
@@ -454,6 +615,22 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 ## Deudas y cosas abiertas
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
+
+- **`docs/jira.md` llama *Spec en revisión* a una columna que en el board se llama *En
+  revisión*** (status id `10002`). Verificado el 2026-09-01 al mover QC-14. Es solo el nombre —
+  el mapeo a `spec_ready` es correcto y no hay otra columna que se le parezca— pero un leader
+  que busque la columna por su nombre literal no la encuentra. Corregir `docs/jira.md` o
+  renombrar la columna.
+- **Dos deudas de este archivo estaban desactualizadas y se corrigen aquí (2026-09-01).**
+  `dev` local **no** está 52 commits por detrás de `origin/dev`: está **1 adelante, 0 atrás**
+  (el commit de siembra `5708bc3`, sin pushear). El conflicto de contenido de
+  `progress/current.md` se resolvió solo al mergear el PR #8. Y `lib/modules/` de QC-15 sí está
+  en el árbol principal.
+- **La siembra de `/afinar-feature` vive en un commit sin pushear.** `5708bc3` está solo en
+  `dev` local: cualquier worktree montado desde `origin/dev` nace **sin** los `requirements.md`
+  de QC-6, QC-14 y QC-19. Al montar el de QC-14 hubo que hacerle `git merge dev` encima; sin
+  eso el `spec_author` no habría visto ninguna de las 17 decisiones cerradas. Se arregla
+  pusheando `dev`, y mientras tanto es una trampa para la próxima feature sembrada.
 
 - ~~No hay `.env` ni `DATABASE_URL`~~ → **resuelto el 2026-08-06** por el humano.
   ~~Ni `.env.example`~~ → lo añadió la feature 1, con placeholders y sin credenciales.

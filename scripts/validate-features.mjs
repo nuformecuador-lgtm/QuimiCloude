@@ -230,6 +230,51 @@ if (boardPendiente.length > 0) {
   notas.push('ninguna ficha sembrada esperando al board');
 }
 
+// --- 6. Cada spec sembrado tiene su ficha, y con el mismo slug -------------------------
+// Sale del segundo incidente de `/afinar-feature` (2026-09-01): la acotacion de QC-14
+// renombro la ficha a `modelo-producto` en el board y sembro `specs/QC-14-modelo-producto/`,
+// pero `feature_list.json` siguio diciendo `modelo-inventario` y apuntando a una carpeta que
+// no existe.
+//
+// El bloque 4 no lo caza, y la direccion es justo el motivo: aquel mira si una ficha TIENE
+// spec, y solo para las que estan en vuelo. Este recorre al reves —de la carpeta a la ficha—
+// porque el sintoma es una carpeta huerfana, no una ficha sin carpeta.
+//
+// Solo carpetas con prefijo de `key` (`QC-<n>-`). Las `<id>-<slug>` son anteriores al `key`
+// y no se renombraron (decision humana 2026-09-01): `specs/8-layout-privado-con-sidebar`
+// existe y el `id` 8 es hoy `sesion-actual-y-logout`, asi que exigirles nada daria rojo por
+// la razon equivocada.
+//
+// Solo `specs/` de la raiz, no los worktrees: el spec de una rama sin mergear puede
+// pertenecer a una ficha que el `feature_list.json` de `dev` todavia no conoce.
+const CARPETA_CON_KEY = /^([A-Z][A-Z0-9]*-\d+)-(.+)$/;
+const specsHuerfanos = [];
+
+if (existsSync('specs')) {
+  for (const dir of readdirSync('specs', { withFileTypes: true })) {
+    if (!dir.isDirectory()) continue;
+    const m = CARPETA_CON_KEY.exec(dir.name);
+    if (!m) continue;
+    if (!existsSync(path.join('specs', dir.name, 'requirements.md'))) continue;
+
+    const [, key, slug] = m;
+    const ficha = features.find((f) => f.key === key);
+    if (!ficha) {
+      specsHuerfanos.push(`specs/${dir.name}/ no tiene ficha en ${FEATURE_LIST}: falta ${key}.`);
+    } else if (ficha.name && ficha.name !== slug) {
+      specsHuerfanos.push(
+        `specs/${dir.name}/ no cuadra con ${FEATURE_LIST}: ${key} se llama "${ficha.name}".`,
+      );
+    }
+  }
+}
+
+if (specsHuerfanos.length > 0) {
+  errores.push(...specsHuerfanos);
+} else {
+  notas.push('cada spec sembrado tiene su ficha, con el mismo slug');
+}
+
 // --- Resultado ------------------------------------------------------------------------
 if (errores.length > 0) {
   for (const e of errores) console.error(e);

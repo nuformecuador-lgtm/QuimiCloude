@@ -127,17 +127,34 @@ Muestra el archivo **tal cual quedaría** y, aparte, la lista de lo que queda ab
 
 **Bloqueante. Va antes de escribir nada en disco.**
 
-Compara lo acordado con la ficha y mira si alguno de estos cuatro quedó mintiendo:
-`description`, `complexity`, `zone`, `depends_on`. Si ninguno cambió, salta al paso 6.
+La acotación puede dejar el board desactualizado de tres formas. Recórrelas en orden; si
+ninguna aplica, salta al paso 6.
 
-Si alguno cambió: redacta el valor nuevo, muéstralo, y **con un sí explícito escríbelo en el
-issue** con las herramientas MCP de `atlassian`. Recién entonces siembras.
+1. **Campos que quedaron mintiendo.** Compara lo acordado con la ficha y mira estos cuatro:
+   `description`, `complexity`, `zone`, `depends_on`.
+2. **Trabajo que quedó sin ficha.** Todo lo que el bloque «Lo que NO entra» mande a otra
+   feature necesita una ficha que exista. Si no existe, es una ficha nueva.
+3. **Fichas que quedaron huérfanas.** Si lo acordado absorbe una ficha existente o la deja sin
+   alcance, esa ficha ya no describe trabajo real.
 
+Para cualquiera de las tres: redacta el valor nuevo, muéstralo, y **con un sí explícito
+escríbelo en el issue** con las herramientas MCP de `atlassian`. Recién entonces siembras.
+
+- **Una ficha nueva se crea completa o no se crea:** tipo `Tarea`, `parent` puesto a la épica
+  del módulo, el link **«is blocked by»** hacia lo que la bloquea, y los labels del contrato
+  (`sdd`, `slug:<kebab-case>`, `zone:<...>`, más `complexity:<...>` **solo si la acotación ya
+  lo sabe**; si no, se deja fuera y lo asigna el leader en F1.0). Una ficha a medias es peor
+  que ninguna: F0 la importa igual y aterriza en el backlog sin slug ni zona.
+  **No la siembras.** Nace `pending` en Backlog y se acota cuando le toque, con su propia
+  corrida de este comando.
+- **Una ficha huérfana se mueve a *Cancelado*** (`status: cancelled`), con un comentario en el
+  issue que diga por qué y qué ficha la absorbe. **Nunca se borra.**
 - **Si el humano dice que no: no siembres.** Un spec construido sobre un alcance que la tarjeta
   contradice es la divergencia que `docs/jira.md` existe para evitar. Para y dilo.
 - **Si el MCP de `atlassian` no responde**, no tires el trabajo: siembra igual, pero mete el
   marcador como **primera línea** del archivo —
-  `<!-- board-pendiente: <key> · <campos> · <motivo> -->`. El bloque 5 de
+  `<!-- board-pendiente: <key> · <qué quedó sin escribir> · <motivo> -->`. Sirve para las tres
+  formas: campos sin editar, ficha nueva sin crear, ficha huérfana sin cancelar. El bloque 5 de
   `scripts/validate-features.mjs` deja el gate en **rojo** mientras siga puesto. Avisa al humano
   de que `./init.sh` va a fallar hasta que actualice el issue y borre la línea.
 
@@ -166,13 +183,20 @@ Crea `specs/<key>-<slug>/requirements.md` con esta estructura, que es la que ya 
 
 Después, en este orden:
 
+- **Refleja en `feature_list.json` lo que acabas de escribir en el board**, y solo eso: la ficha
+  acotada más las que el paso 5 creó o canceló. **No reimportes el board entero** — eso es F0, y
+  un comando de acotación no tiene por qué reescribir fichas `in_progress` que no está tocando.
+  Los campos se derivan como manda `docs/jira.md > El contrato de campos`: `name` del label
+  `slug:`, `branch` como `feature/<key>-<slug>`, `spec_path` como `specs/<key>-<slug>`, `epic`
+  del `parent` y `epic_name` de su summary. Una ficha nueva entra con `status: "pending"`. Si el
+  paso 5 no escribió nada en el board, aquí tampoco se escribe nada.
 - Añade **una línea** en `progress/current.md > Evaluaciones` apuntando al archivo. **No copies la
   tabla**: una es la fuente, la otra enlaza.
 - Si alguna respuesta cerró una de las cuatro preguntas abiertas del dominio, actualiza
   `docs/architecture.md > Preguntas abiertas del dominio`.
-- **No muevas la tarjeta de columna.** El único empujón a Jira de este comando es el del paso 5,
-  sobre los campos que la acotación cambió. La ficha sigue `pending` en Backlog y su `status` no
-  cambia: quien lo mueve es el leader en F1.3.
+- **No muevas de columna la ficha que estás acotando.** Sigue `pending` en Backlog y su `status`
+  no cambia: quien lo mueve es el leader en F1.3. Los únicos empujones a Jira de este comando son
+  los tres del paso 5: editar los cuatro campos, crear la ficha que falta y cancelar la huérfana.
 - Corre `./init.sh --rapido`.
 
 Termina listando el archivo escrito y una línea de veredicto. No pegues el contenido completo en

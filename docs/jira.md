@@ -165,17 +165,20 @@ segunda copia de las credenciales.
 
 - **F0 — arranque de sesión.** Antes de nada: leer el board y regenerar
   `feature_list.json` (issues nuevos, `description`, `status`, `depends_on` desde los
-  links). Después `./init.sh`.
+  links). Después `./init.sh`. **Es el único paso que regenera el archivo entero**;
+  `/afinar-feature` también escribe en él, pero solo las fichas que acaba de tocar en el board.
 - **F1.0 — evaluación.** Al asignar `zone` y `complexity`, **escribirlas también como
   labels en el issue**. Es el único empujón hacia Jira del ciclo, y sin él la siguiente
   importación borraría la evaluación.
 - **F1.3 —** mover a *Spec en revisión* y comentar la ruta de `specs/<key>-<slug>/`.
 - **F1.4 —** la aprobación humana **es** mover la tarjeta a *En curso*.
 - **F2.5 —** mover a *Hecho* y comentar la URL del PR.
-- **Al acotar (`/afinar-feature`, antes de F1.2)** — si la conversación de alcance invalidó
-  `description`, `complexity`, `zone` o `depends_on`, escribirlos en el issue **antes** de
-  sembrar el spec. Es el único empujón que nace de una conversación y no de una transición de
-  estado. Ver la sección siguiente.
+- **Al acotar (`/afinar-feature`, antes de F1.2)** — tres empujones, todos **antes** de sembrar
+  el spec y todos con un sí explícito del humano: escribir en el issue los campos que la
+  conversación invalidó (`description`, `complexity`, `zone`, `depends_on`); **crear** la ficha
+  que el alcance descubre que falta; y mover a *Cancelado* la que quedó huérfana. Son los únicos
+  empujones que nacen de una conversación y no de una transición de estado. Después, el comando
+  refleja esas mismas fichas —y solo esas— en `feature_list.json`. Ver la sección siguiente.
 
 ## Si Jira y el disco divergen
 
@@ -204,6 +207,13 @@ puede invalidar lo que la tarjeta dice, y son cuatro los campos que pueden queda
 | `zone` | lo acordado mueve la feature de capa |
 | `depends_on` | lo acordado introduce o elimina un bloqueante |
 
+Y dos formas más, que no son campos de una ficha sino fichas enteras:
+
+| Caso | Cómo se resuelve |
+|---|---|
+| el «Lo que NO entra» manda trabajo a una ficha que no existe | se **crea** el issue: tipo `Tarea`, `parent` a la épica del módulo, link «is blocked by», y los labels `sdd` / `slug:` / `zone:` / `complexity:`. Nace `pending` en Backlog y **no se siembra**: se acota cuando le toque |
+| lo acordado absorbe una ficha existente o la deja sin alcance | se mueve a **Cancelado**, con un comentario que diga qué ficha la absorbe. Nunca se borra |
+
 **La regla: no se siembra hasta que el board esté al día.** El comando redacta el valor nuevo de
 cada campo afectado, lo muestra, y **con el sí explícito del humano lo escribe en Jira** vía MCP
 antes de crear `specs/<key>-<slug>/requirements.md`. Si el humano dice que no, **no se siembra**:
@@ -212,6 +222,14 @@ este documento existe para evitar.
 
 Que lo escriba el agente no contradice la fila `description` del contrato: **quien decide sigue
 siendo el humano**, a través de la pregunta. El agente solo lo persiste, y solo tras el sí.
+
+**Y el disco se sincroniza en la misma corrida.** Escrito el board, el comando refleja en
+`feature_list.json` la ficha acotada y las que acaba de crear o cancelar —**solo esas**,
+derivando los campos como manda `## El contrato de campos`. No reimporta el board entero: eso es
+F0, y un comando de acotación no tiene por qué reescribir fichas `in_progress` que no está
+tocando. `feature_list.json` pasa así a tener **dos escritores**, y es deliberado: los dos
+escriben *desde el board*, nunca desde su cabeza, así que sigue habiendo una sola verdad. Lo que
+verifica que no diverjan es el **bloque 6** de `scripts/validate-features.mjs`.
 
 **La excepción, y su marca.** Si el MCP de `atlassian` no responde, el trabajo no se tira: se
 siembra igual, pero con un marcador en el archivo —
@@ -236,6 +254,15 @@ La primera versión del comando solo dejaba una nota en `progress/current.md > D
 inútil: **la siguiente F0 sobrescribe la `description` desde el board sin preguntar** (sección
 anterior), así que la nota sobrevive pero el dato no, y el spec sembrado queda huérfano de la
 ficha que dice especificar.
+
+**El segundo incidente (2026-09-01).** La corrida sobre `QC-14` decidió que «producto» y
+«elemento de inventario» son la misma tabla, y que el CRUD sale a una ficha aparte. El comando no
+tenía contrato para crear esa ficha: **QC-20** se creó improvisando, fuera de lo que el paso 5
+autorizaba. Y `feature_list.json` se quedó con `name: modelo-inventario` y
+`spec_path: specs/QC-14-modelo-inventario` —una carpeta que no existe— además de no conocer a
+QC-20, hasta que el siguiente F0 lo arregló. De ahí salen las dos mitades de esta regla: crear
+entra en contrato, y el disco se sincroniza en la misma corrida en vez de esperar al arranque de
+la sesión siguiente.
 
 ## Lo que NO cambia
 
