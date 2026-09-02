@@ -138,11 +138,12 @@ la política NO DEBE escribirla en ningún canal de salida (`console.*`, `proces
    pase los cuatro checks de salud. Si ninguna convence, la decisión de «librería para la lista»
    se reabre — es el único punto de esta ficha que puede volver al humano.
 
-   **SIGUE ABIERTA, y es la única que bloquea.** El spec propone un candidato en
-   `design.md > 5`, pero **los cuatro checks no se pudieron verificar**: quien escribió el spec
-   no tuvo red, y un check no verificable no es un sí (`docs/architecture.md > Dependencias de
-   terceros`). Hace falta que una persona verifique los cuatro y apruebe **antes** de escribir el
-   adaptador. Mientras tanto: R2–R6 y R10–R13 se pueden implementar y testear enteros; **R7 no**.
+   **CERRADA el 2026-09-02.** Es **`@zxcvbn-ts/language-common`**, y solo el diccionario: **no**
+   se instala `@zxcvbn-ts/core`. El leader verificó los cuatro checks contra el registro de npm y
+   **pasan los cuatro** (sin `deprecated`; `4.1.3` del 2026-07-16; 1.260.688 descargas semanales;
+   MIT), y **el humano la aprobó al aprobar este spec** (F1.4). Pesa ~1,9 MB desempaquetado —es
+   un diccionario, no código, y solo lo consume el adaptador en servidor—. Su fila ya está en
+   `docs/dependencias.md`. Detalle y comandos de reverificación en `design.md > 5.2`.
 
 3. **Qué pasa con R7 si no se aprueba ninguna librería.** Nace de la pregunta 2 y también vuelve
    al humano. Las salidas posibles son tres y ninguna es del agente: (a) aprobar la librería
@@ -150,6 +151,13 @@ la política NO DEBE escribirla en ningún canal de salida (`console.*`, `proces
    contradiría la fila «¿Librería o reglas propias?» de la tabla de decisiones y por eso solo lo
    puede decidir quien la fijó. El diseño deja `R7` detrás de un puerto justamente para que esta
    respuesta cambie una sola clase y ningún requisito (`design.md > 5.3`).
+
+   **CERRADA el 2026-09-02 por la salida (a):** el humano aprobó la librería propuesta, así que
+   la fila «¿Librería o reglas propias?» de la tabla **no se toca** y R7 se implementa contra su
+   adaptador. La pregunta queda escrita porque el puerto sigue siendo el punto donde cambiar de
+   lista costaría una sola clase.
+
+**No queda ninguna pregunta abierta en esta ficha** (2026-09-02).
 
 ## Decisiones cerradas (no reabrir)
 

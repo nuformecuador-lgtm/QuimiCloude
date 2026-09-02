@@ -29,6 +29,7 @@ La regla y su porqué viven en `docs/architecture.md > Dependencias de terceros`
 | --- | --- | --- | --- | --- |
 | `@base-ui/react` | Primitivas headless sobre las que monta shadcn/ui | heredada | 2026-09-01 | Pendiente de auditoría |
 | `@prisma/client` | Cliente del ORM | heredada | 2026-09-01 | Pendiente de auditoría |
+| `@zxcvbn-ts/language-common` | Diccionario de contrasenas filtradas conocidas, para R7 de QC-19. **Solo el diccionario**: NO se instala `@zxcvbn-ts/core` | aprobada | 2026-09-02 | **Los cuatro checks PASAN**, verificados por el leader el 2026-09-02 contra el registro de npm: sin `deprecated`; ultima release `4.1.3` del 2026-07-16; **1.260.688** descargas semanales; licencia **MIT**. Aprobada por el humano al aprobar el spec de QC-19 (F1.4), como manda `AGENTS.md`. Ocupa ~1,9 MB desempaquetado; es un diccionario, no codigo, y solo lo consume el adaptador en servidor detras de un puerto. **Todavia NO instalada**: la fase 2 de QC-19 espera a QC-6 |
 | `bcryptjs` | Hash y verificacion de contrasena (QC-5) | heredada | 2026-09-01 | Entro con QC-5, que se mergeo en `origin/dev` DESPUES de escribirse este registro; el humano aprobo la libreria al ordenar rehacer la feature con ella. Pendiente de auditoria como el resto |
 | `class-variance-authority` | Variantes de clases en componentes ui/ | heredada | 2026-09-01 | Pendiente de auditoría |
 | `clsx` | Composición condicional de clases | heredada | 2026-09-01 | Pendiente de auditoría |
