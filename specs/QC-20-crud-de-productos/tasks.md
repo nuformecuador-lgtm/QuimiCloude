@@ -112,7 +112,7 @@
       *Depende de:* T2. **Hecho cuando:** el rollback deja el esquema exactamente como estaba,
       `_prisma_migrations` coherente, y la salida queda pegada en `progress/impl_QC-20-*.md`.
 
-- [ ] **T14 [P] — Tests de integración.**
+- [x] **T14 [P] — Tests de integración.**
       `tests/integration/inventario/product-crud.int.test.ts` y
       `presentation-uniqueness.int.test.ts`, con `beforeAll` que falla claro si faltan las
       columnas, cada caso en `$transaction` con `ROLLBACK` y afirmaciones sobre **SQLSTATE**.

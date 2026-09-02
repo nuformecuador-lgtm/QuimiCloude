@@ -632,3 +632,64 @@ herramienta, y se declara como tal en vez de darla por buena.
 
 6 migraciones aplicadas, **0 diferencias** contra el snapshot inicial, `tests/integration/`
 **94/94** en verde y arbol de git limpio. Deshacer el experimento es parte del experimento.
+
+---
+
+# T14 — Tests de integracion contra Postgres real
+
+Dos archivos, **12 tests**: `tests/integration/inventario/product-crud.int.test.ts` (7) y
+`presentation-uniqueness.int.test.ts` (5). Suite de integracion: **8 archivos / 106 tests**.
+
+## Los dos huecos declarados desde el Grupo B, ahora CERRADOS
+
+**1. R6, la mitad «sin alterar el autor de la creacion».** Con dobles era indemostrable —el
+puerto ni siquiera expone `createdBy` en `updateAlive`, asi que el tipo impide el fallo que el
+test diria vigilar: verde por construccion—. Cerrado contra la base con
+`conserva created_by al editar y al borrar, y solo actualiza updated_by`: se crea con el usuario
+A, se edita y se borra con el usuario B, y se afirma que `created_by` **sigue siendo A**.
+Mutacion: anadir `createdBy: actorId` al `updateAliveProduct` del adaptador **pone el test en
+rojo** (`expected 'de9f…' to be '48a0…'`). Revertida.
+
+**2. R20, R21, R22 son garantias de POSTGRES, no del servicio.** Cerradas contra la base, y con
+**dos tests PERMANENTES de mutacion de esquema** que demuestran que es la base quien trabaja:
+
+| Test permanente | Que hace | Que demuestra |
+| --- | --- | --- |
+| `sin el indice unico, la segunda insercion del mismo nombre normalizado deja de fallar (R20)` | `DROP INDEX` dentro de una tx que hace ROLLBACK | Sin el indice hay **2 filas**: la unicidad la da el indice, no el servicio |
+| `sin ON DELETE RESTRICT, borrar una presentacion con productos asignados deja de estar bloqueado (R21)` | `DROP CONSTRAINT` dentro de una tx que hace ROLLBACK | Sin la FK el `DELETE` **afecta 1 fila**: el bloqueo lo da el `RESTRICT` |
+
+Que sean **permanentes** y no una comprobacion de una sola vez es lo que impide que R20 y R21
+se conviertan manana en tests verdes por construccion si alguien retira el indice o la FK.
+
+## Observacion arquitectonica que el reviewer debe conocer
+
+**Los adaptadores driven usan el cliente Prisma GLOBAL, no un `tx` inyectado.** Los puertos de
+`design.md > 7` no reciben `Prisma.TransactionClient`, asi que una llamada al adaptador «dentro»
+de `prisma.$transaction(...)` **no participa** de esa transaccion y hace COMMIT real.
+
+Consecuencia para el aislamiento, y por que estos tests no siguen al pie de la letra la doctrina
+de `inventario-constraints.int.test.ts`:
+
+- Lo que verifica una **restriccion de la base** (R7, y toda `presentation-uniqueness`) va con
+  `tx` + `SAVEPOINT` + `ROLLBACK`, como manda la convencion.
+- Lo que ejercita **el adaptador de verdad** (`createProduct`, `updateAliveProduct`,
+  `softDeleteAliveProduct`, `findAliveProductById`, `listAliveProducts`) usa **fixtures reales**
+  con borrado explicito por id en `finally`. **Ninguna afirmacion global**: cada test mira solo
+  las filas que sembro.
+
+**Verificado que la limpieza funciona:** dos pasadas seguidas dan **106/106** identicas, y el
+recuento posterior de `products`, `presentations` y `users` es **0, 0, 0**. Si los fixtures se
+fugaran, la segunda pasada lo habria delatado.
+
+**Coste honesto:** si un test se interrumpe entre el fixture y su `finally`, puede dejar filas.
+La base es **propia de este worktree** (`QuimiCloude_QC20`), asi que el riesgo esta contenido y
+no puede afectar a otra sesion. Que los puertos aceptaran un `TransactionClient` seria la
+solucion limpia, pero **cambia la firma de los cinco metodos del puerto** y eso es rediseno, no
+alcance de T14. Se declara aqui en vez de disimularlo.
+
+## Estado de la base tras las mutaciones de esquema
+
+Verificado **fuera** de toda transaccion al terminar: el indice `presentations_name_normalized_key`
+sigue presente, y las **tres** FK de `products` siguen con `confdeltype = 'r'` (RESTRICT):
+`products_created_by_fkey`, `products_updated_by_fkey`, `products_presentation_id_fkey`.
+Arbol de git limpio, ningun archivo de produccion modificado, ningun script temporal residual.
