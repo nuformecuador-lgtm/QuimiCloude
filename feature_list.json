@@ -177,7 +177,7 @@
       "epic_name": "Inventario",
       "name": "modelo-producto",
       "description": "Necesitamos persistir el catalogo de productos. Solo el modelo de datos: sin pantalla y sin API. Cada producto tiene un nombre, una existencia, una presentacion, una unidad de medida, un costo, una compra minima, un tiempo de entrega y una cantidad de alerta. El nombre no es unico: dos productos pueden llamarse igual. La existencia, el costo, el tiempo de entrega y la cantidad de alerta son opcionales; la compra minima es opcional y vale 0 si no se indica. La existencia, la compra minima y la cantidad de alerta son numeros enteros que nunca son negativos, y se interpretan segun la presentacion del producto. El costo es un numero con decimales exactos y nunca negativo. El tiempo de entrega son los dias que tarda el proveedor en traer el producto, en numero entero. La unidad de medida es solo una anotacion de texto libre y opcional: no hay conversion entre unidades. La presentacion no es texto libre ni un tipo cerrado en codigo: es una tabla propia con sus propias filas, que se pueden agregar sin migrar los datos ya guardados. Cada producto tiene exactamente una presentacion y es obligatoria: no puede existir un producto sin presentacion; una misma presentacion la pueden tener muchos productos, y borrar una presentacion que todavia tiene productos asignados no debe ser posible. La cantidad de alerta solo se almacena: nadie la evalua, no dispara notificacion ni marca nada, y quien quiera compararla con la existencia lo hara en una feature posterior. El alta, la consulta, la edicion y el borrado de productos van aparte.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",

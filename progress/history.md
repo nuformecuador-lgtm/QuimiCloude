@@ -191,3 +191,63 @@ Tres preguntas abiertas del spec, ninguna bloqueante: el idioma de los nombres d
 (hoy conviven `identity` e `inventario`), si un módulo puede leer modelos ajenos dentro de un
 `include` de Prisma o debe pedirlos al contrato (se eligió lo estricto, a revisar en QC-14), y
 dónde vivirán los componentes propios de un módulo cuando aparezca el primer caso.
+
+## QC-14 — modelo-producto (2026-09-02)
+
+Primera tabla de dominio químico del ERP y primera feature de la épica **QC-18 Inventario**.
+Solo el modelo de datos: sin pantalla y sin API. PR #10, merge `abdef6b`.
+
+Dos tablas y su relación obligatoria: `presentations` como catálogo propio (para que crezca
+sin migrar lo ya guardado) y `products` con nombre, existencia, presentación, unidad, costo,
+compra mínima, tiempo de entrega y cantidad de alerta. FK `products.presentation_id` con
+`ON DELETE RESTRICT`, cuatro `CHECK` de no negatividad, `cost` como `numeric(14,4)` exacto,
+RLS activado y forzado en ambas, borrado lógico en `products` y `/// @module inventario` en
+los dos modelos. `migration.sql` con su `down.sql`, ejercitado de verdad.
+
+**Los 24 requisitos (R1–R24) tienen test ejecutado.** El `reviewer` los abrió uno por uno y
+repitió por su cuenta el ciclo `apply → rollback → apply` con snapshot completo del esquema:
+tras el rollback, cero apariciones de `products`/`presentations`; tras reaplicar, snapshot
+idéntico. Veredicto APROBADO, cero hallazgos mayores.
+
+### La lección: el conflicto no era de contenido, era de fin de línea
+
+El PR llegó al merge en `CONFLICTING` con `progress/current.md` chocando **entero**, de la
+línea 1 a la última. La causa no era que dos ramas hubieran escrito lo mismo: el commit de
+siembra `5708bc3` reescribió el archivo de LF a CRLF, así que **cada línea difería del
+ancestro** y git no pudo alinear nada. Debajo del ruido había una pérdida real que el
+conflicto tapaba: esa reescritura había **borrado tres deudas abiertas** que `dev` no solo
+conservaba sino que había ampliado con las diez de QC-7.
+
+Se resolvió normalizando las tres versiones a LF, mergeando ahí —donde el choque se reduce a
+**una sola tajada**— y devolviendo el resultado a CRLF. El mismo procedimiento hizo falta
+**tres veces seguidas** en la misma sesión: al mergear `dev` en la rama, al mergear `dev` en
+`dev` local, y al recuperar el `git stash` del trabajo en vuelo. Es la señal de que esto no
+es un accidente sino una trampa estructural: **falta un `.gitattributes`**.
+
+### Dos cosas que descubrió el camino, no el spec
+
+- **QC-14 usó su propia base de datos.** La compartida tenía aplicada la migración de QC-7,
+  que no estaba en `dev` ni en la rama, así que Prisma veía drift y pedía resetear el esquema
+  público — lo que habría destruido el trabajo en vuelo de QC-7. Se creó `QuimiCloude_QC14`
+  en el Postgres local, con el `.env` git-ignorado del worktree apuntando ahí. La base de QC-7
+  no se tocó. **Una base por worktree debería ser la norma cuando corren dos features backend
+  en paralelo.**
+- **`./init.sh` completo no corría desde dentro del worktree** — y dejó de fallar solo al
+  integrar `dev`. `scripts/validate-features.mjs` busca `.worktrees/<slug>/specs/` relativo al
+  cwd, y toda feature en vuelo cuyo spec no estuviera aún en `dev` (aquí QC-7) se veía como
+  spec faltante. Al mergear `dev` el spec de QC-7 entró en la rama y el gate pasó en verde.
+  El agujero sigue ahí para la siguiente feature que corra sola.
+
+### Deuda que hereda
+
+- El test de R10 prohíbe cualquier `enum` en **todo** `db/schema.prisma`, no solo en el módulo
+  `inventario`: el día que otro módulo declare un enum legítimo pondrá en rojo un test de QC-14.
+- **`delivery_time` va sin `CHECK`**, aunque las otras cuatro columnas numéricas sí lo llevan:
+  hoy un plazo de entrega negativo entra en la base. Es una línea de migración cuando alguien
+  lo quiera cerrar.
+- **El nombre de una presentación no es único** y es el más caro de revertir de los cinco
+  cierres: añadir el índice después exige limpiar duplicados primero. Revisar en QC-20 si el
+  catálogo se llena a mano.
+- Cosmética menor del `reviewer`: una aserción tautológica en R2 (cuyo fondo sí cubre el
+  requisito), un comentario desalineado en R11 y dos desajustes de numeración entre
+  `design.md` y `tasks.md`.

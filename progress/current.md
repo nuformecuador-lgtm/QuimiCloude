@@ -13,15 +13,19 @@
 |---|---|---|---|---|---|---|
 | QC-6 | seed-roles-y-usuario-inicial | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-6-seed-roles-y-usuario-inicial` | **spec APROBADO, slot devuelto el 2026-09-01** para que entre QC-14 (decisión humana, ver Evaluaciones). Estaba `in_progress` pero su implementer **nunca se lanzó**: no se pierde trabajo. Worktree y spec intactos. Arranca cuando haya slot |
 | QC-7 | login-usuario-y-contrasena | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-7-login-usuario-y-contrasena` | **esperando aprobación humana (F1.4)**. Spec revisado con las decisiones del humano: 31 requisitos. Decidido que **entra antes que QC-6** en fase 2 |
-| QC-14 | modelo-producto | QC-18 Inventario | backend | **in_progress (F2.1)** | `feature/QC-14-modelo-producto` | **implementer lanzado el 2026-09-01**. Spec aprobado y congelado en `c2a4f43` (24 requisitos EARS con test); las 5 preguntas abiertas cerradas siguiendo el precedente de QC-4. Worktree preparado y `typecheck` limpio. Ocupa el slot que devolvió QC-6 |
 
 Worktrees: `.worktrees/QC-6-seed-roles-y-usuario-inicial` (montado desde `origin/dev`, con
 `.env` copiado a mano), `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
-`.worktrees/fix-login-field-control-uncontrolled` (SAFE, desmontable). El de QC-15 se
-desmontó limpio. El `.worktrees/QC-7-login-usuario-y-contrasena` lo montó la
+`.worktrees/fix-login-field-control-uncontrolled` (SAFE, desmontable). Los de QC-15 y QC-14 se
+desmontaron limpios. El `.worktrees/QC-7-login-usuario-y-contrasena` lo montó la
 **segunda sesión de leader** (`.env`, `pnpm install`, `prisma generate` y `next typegen`
 hechos a mano). Queda además una carpeta huérfana `.worktrees/1-modelo-usuarios-y-roles/`
 sin worktree registrado detrás, anotada en deudas.
+
+La feature **QC-14 — modelo-producto** se cerró el 2026-09-02 (PR #10, merge
+`abdef6b`): resumen en `progress/history.md`, worktree desmontado. El PR llegó en
+`CONFLICTING` con `progress/current.md` chocando entero — era **fin de línea**, no contenido,
+y tapaba el borrado accidental de tres deudas abiertas. Ver la lección en el historial.
 
 La feature **QC-15 — arquitectura-hexagonal-y-modulos** se cerró el 2026-09-01 (PR #8, merge
 `f79ba5d`): resumen en `progress/history.md`, worktree desmontado y rama local borrada. El
@@ -627,6 +631,18 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **El repo no tiene `.gitattributes` y eso fabrica conflictos falsos.** `core.autocrlf`
+  está en `false` y los archivos conviven con fines de línea mezclados: `progress/current.md`
+  está guardado en **CRLF** y `history.md`, `db/schema.prisma`, `package.json` y
+  `feature_list.json` en **LF**. Cuando una rama reescribe un archivo entero cambiando el fin
+  de línea, git no puede alinear ni una línea con el ancestro y el archivo choca **completo**,
+  tapando el cambio real — y de paso puede colar un borrado accidental sin que nadie lo vea.
+  Pasó tres veces al cerrar QC-14 (ver historial). Se resuelve con `* text=auto eol=lf` y una
+  normalización única del árbol. **Entra por `/afinar-regla`**, no a mano.
+- **`docs/jira.md` llama *Hecho* a la columna que en el board se llama *Finalizado*** (status
+  id `10003`, transición `41`). Verificado el 2026-09-02 al cerrar QC-14. Es el mismo tipo de
+  desajuste ya anotado para *Spec en revisión* / *En revisión*: el mapeo a `done` es correcto,
+  pero el nombre literal no existe en el board.
 - **`docs/jira.md` llama *Spec en revisión* a una columna que en el board se llama *En
   revisión*** (status id `10002`). Verificado el 2026-09-01 al mover QC-14. Es solo el nombre —
   el mapeo a `spec_ready` es correcto y no hay otra columna que se le parezca— pero un leader
