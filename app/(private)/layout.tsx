@@ -61,8 +61,26 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
           data-testid="private-header"
           className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4"
         >
-          <SidebarToggle />
-          <ThemeToggle />
+          {/*
+            El control de la cabecera queda **solo para movil** (decision humana del
+            2026-09-02: «existen 2 botones para contraer el sidebar, quita el de la
+            cabecera»). En escritorio el unico control es la pastilla del borde del panel.
+
+            No se elimina del todo por una razon de funcionamiento, no de gusto: la pastilla
+            vive DENTRO del panel, y en movil el panel es un `Sheet` que, cerrado, no esta en
+            pantalla. Sin este boton no habria forma de abrir el menu en el telefono, y R31 de
+            QC-11 quedaria sin cumplir. Se oculta por CSS, asi que sigue en el DOM y los tests
+            de QC-11 que lo dan por presente siguen siendo validos.
+          */}
+          <div className="md:hidden">
+            <SidebarToggle />
+          </div>
+          {/* `ml-auto` y no solo el `justify-between` del header: en escritorio el control de
+              la izquierda esta oculto y no ocupa espacio, asi que sin esto el de tema se
+              quedaria pegado al borde izquierdo. */}
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </header>
         {children}
       </SidebarInset>
