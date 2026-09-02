@@ -240,12 +240,12 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 
 ## Bloque G — Cierre
 
-### [ ] T19. Sincronizar con `dev` y correr el gate completo
+### [x] T19. Sincronizar con `dev` y correr el gate completo
 - Dep: T0-T18. **La corre el leader tras el reviewer** (`AGENTS.md > Regla del gate`).
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` sin flags.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`.
 
-### [ ] T20. Documentar el mapa `R<n> → test`
+### [x] T20. Documentar el mapa `R<n> → test`
 - Dep: T19.
 - Copiar la tabla de abajo a `progress/impl_QC-6-seed-roles-y-usuario-inicial.md` con la salida
   real de los tests.
