@@ -19,7 +19,7 @@ algo va mal: **para y avisa al leader**.
 
 ## Bloque 0 — Precondiciones
 
-### T0 — Verificar la base heredada de QC-11 y QC-15 (BLOQUEA TODO)
+### [x] T0 — Verificar la base heredada de QC-11 y QC-15 (BLOQUEA TODO)
 - **Depende de**: que QC-11 y QC-15 estén `done` y mergeadas en `dev` (lo están).
 - **Qué**: comprobar, uno por uno, que existen en el worktree (tras `git merge origin/dev`):
   1. `app/(private)/layout.tsx` (Server Component, con `SidebarProvider` + `SidebarInset`).
@@ -42,7 +42,7 @@ algo va mal: **para y avisa al leader**.
 
 ## Bloque 1 — La pantalla
 
-### T1 — `app/(private)/dashboard/components/dashboard-content.tsx` + `index.ts`
+### [x] T1 — `app/(private)/dashboard/components/dashboard-content.tsx` + `index.ts`
 - **Depende de**: T0.
 - **Qué**: el área de contenido vacía (`design.md > 4`):
   - componente de servidor (**sin `'use client'`**, sin estado, sin efectos, sin handlers — R7);
@@ -57,7 +57,7 @@ algo va mal: **para y avisa al leader**.
 - **Hecho cuando**: `pnpm run typecheck` y `pnpm run lint` pasan, y `grep` sobre el archivo no
   encuentra `use client`, `useState`, `useEffect`, `fetch(`, `cookies` ni `prisma`.
 
-### T2 — `app/(private)/dashboard/page.tsx`
+### [x] T2 — `app/(private)/dashboard/page.tsx`
 - **Depende de**: T1.
 - **Qué**: Server Component (`design.md > 4`):
   - `export const metadata` con título propio construido con **`BRAND_LABEL` importado**, no con
@@ -77,7 +77,7 @@ algo va mal: **para y avisa al leader**.
 
 ## Bloque 2 — Tests
 
-### T3 — [P] `tests/unit/dashboard-page.test.tsx` (render)
+### [x] T3 — [P] `tests/unit/dashboard-page.test.tsx` (render)
 - **Depende de**: T2.
 - **Qué**: renderizar la pantalla **dentro del layout privado** —
   `render(await PrivateLayout({ children: <DashboardPage /> }))` — reutilizando el patrón de
@@ -97,7 +97,7 @@ algo va mal: **para y avisa al leader**.
   sale en verde. Interacciones (si hicieran falta) con `@testing-library/user-event`, nunca
   `fireEvent`. Asserts sobre roles ARIA, `data-testid` y constantes exportadas.
 
-### T4 — [P] `tests/unit/dashboard-route-contract.test.ts` (guardias de código)
+### [x] T4 — [P] `tests/unit/dashboard-route-contract.test.ts` (guardias de código)
 - **Depende de**: T2. No renderiza DOM.
 - **Qué**: lo que «no hacer» exige, porque no se observa renderizando (mismo patrón de guardia
   de fuente que `tests/unit/private-layout.test.tsx`):
@@ -123,7 +123,7 @@ algo va mal: **para y avisa al leader**.
 
 ## Bloque 3 — Verificación, trazabilidad y cierre
 
-### T5 — Verificación manual en navegador (escritorio y móvil)
+### [x] T5 — Verificación manual en navegador (escritorio y móvil)
 - **Depende de**: T2.
 - **Qué**: `pnpm dev` y abrir `/dashboard`. A diferencia de QC-11 —que no exponía ninguna URL—
   **aquí sí hay algo que mirar**, y la regla multiplataforma pide validar la decisión de layout
@@ -134,7 +134,7 @@ algo va mal: **para y avisa al leader**.
   `progress/impl_QC-12-dashboard-en-blanco.md`. Si algo falla en angosto, **no se declara
   excepción de escritorio**: se arregla (`design.md > 5`).
 
-### T6 — Mapa de trazabilidad `R<n> → test`
+### [x] T6 — Mapa de trazabilidad `R<n> → test`
 - **Depende de**: T3, T4, T5.
 - **Qué**: volcar la tabla de abajo, ya con los nombres reales de los tests, en
   `progress/impl_QC-12-dashboard-en-blanco.md`, junto con los archivos tocados y la salida real
@@ -142,13 +142,13 @@ algo va mal: **para y avisa al leader**.
 - **Hecho cuando**: **los 12 requisitos (R1–R12)** tienen al menos un test nombrado. Un hueco es
   hallazgo bloqueante del reviewer (`docs/verification.md > Regla del reviewer`).
 
-### T7 — [P] Declarar los «no aplica» de `CHECKPOINTS.md`
+### [x] T7 — [P] Declarar los «no aplica» de `CHECKPOINTS.md`
 - **Depende de**: T2.
 - **Qué**: dejar por escrito en `progress/impl_QC-12-dashboard-en-blanco.md` los puntos que no
   aplican y **por qué**, para que no se lean como omisiones (lista al final de este archivo).
 - **Hecho cuando**: cada punto de la lista está copiado con su motivo.
 
-### T8 — E2E: **diferido** (decisión cerrada, no opción)
+### [x] T8 — E2E: **diferido** (decisión cerrada, no opción)
 - **Depende de**: T2.
 - **Qué**: no hay nada que implementar. `CHECKPOINTS.md` pide E2E para flujos críticos; esta
   pantalla no es un flujo: no hay sesión real (R8) ni camino navegable protegido. **El E2E de
@@ -158,7 +158,7 @@ algo va mal: **para y avisa al leader**.
   `progress/current.md > Deudas y cosas abiertas`. Existe para que la ausencia quede
   registrada, no silenciada.
 
-### T9 — Gate completo y PR
+### [ ] T9 — Gate completo y PR (pendiente del leader)
 - **Depende de**: T6, T7, T8.
 - **Hecho cuando**: `./init.sh` (completo, sin flags) termina en verde — **lo corre el
   leader**, no el `frontend_dev` —, `package.json` **no ha cambiado** (ninguna dependencia
