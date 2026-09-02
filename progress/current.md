@@ -680,6 +680,17 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   tapando el cambio real — y de paso puede colar un borrado accidental sin que nadie lo vea.
   Pasó tres veces al cerrar QC-14 (ver historial). Se resuelve con `* text=auto eol=lf` y una
   normalización única del árbol. **Entra por `/afinar-regla`**, no a mano.
+  **Y las herramientas obvias para diagnosticarlo MIENTEN** — verificado el 2026-09-02 por dos
+  sesiones por separado, cada una por su cuenta: `grep -c $'\r' archivo` **no interpreta el
+  patrón** y acaba contando **todas** las líneas, así que un archivo sin un solo CR devuelve el
+  total y parece perfecto; `file` tampoco reporta CRLF de forma fiable en archivos con líneas
+  muy largas. Lo que **sí** funciona: **`xxd`** sobre la primera y la última línea —mirar si
+  terminan en `0d0a` o en `0a`— y **`git diff --numstat`**, donde un cambio de dos líneas que
+  sale como «983 insertadas / 971 borradas» significa que se convirtió el archivo entero.
+  Además, en este repo **`awk` y `sed -i` reescriben `current.md` de CRLF a LF sin avisar**: al
+  cerrar QC-8 estuvieron a punto de colar el **cuarto** conflicto de archivo completo del día.
+  Para editarlo, herramienta que preserve los bytes, y comprobar el `--numstat` antes de
+  commitear.
 - **`docs/jira.md` llama *Hecho* a la columna que en el board se llama *Finalizado*** (status
   id `10003`, transición `41`). Verificado el 2026-09-02 al cerrar QC-14. Es el mismo tipo de
   desajuste ya anotado para *Spec en revisión* / *En revisión*: el mapeo a `done` es correcto,
