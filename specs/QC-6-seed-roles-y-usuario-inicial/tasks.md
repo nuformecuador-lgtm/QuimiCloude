@@ -196,7 +196,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 
 ## Bloque F — Verificacion contra base real
 
-### [ ] T17. Ciclo real de la migracion
+### [x] T17. Ciclo real de la migracion
 - Dep: T0, T3, T4.
 - `pnpm run db:migrate` → comprobar la columna (`\d users` o `information_schema.columns`) →
   `pnpm run db:rollback` → comprobar que la columna desaparece, que **los tres indices unicos
@@ -205,7 +205,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 - **Hecho cuando:** el ciclo apply → rollback → apply termina limpio y la salida queda pegada
   en `progress/impl_QC-6-seed-roles-y-usuario-inicial.md`. Cierra R11 en su forma real.
 
-### [ ] T18. Test de integracion `tests/integration/identity/identity-seed.int.test.ts` — **la doble corrida**
+### [x] T18. Test de integracion `tests/integration/identity/identity-seed.int.test.ts` — **la doble corrida**
 - Dep: T12, T17.
 - Patron de aislamiento de `identity-constraints.int.test.ts`: cada `it` dentro de
   `prisma.$transaction` que termina en `ROLLBACK`, con el repositorio construido sobre el `tx`
