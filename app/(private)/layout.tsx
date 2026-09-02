@@ -1,10 +1,12 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { identity } from '@/lib/composition';
 import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
+import { LOGIN_ROUTE } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import { SidebarToggle } from './components';
@@ -16,16 +18,22 @@ import { SidebarToggle } from './components';
  * reparte el resultado por props (R16). Ningun componente de `components/private/` fetchea
  * nada por su cuenta.
  *
- * Lo que este layout **no** hace (R35, y esta dicho para que no se lea como olvido):
- * no valida la sesion, no protege las rutas privadas, no lee ni emite cookie de sesion y no
- * toca base de datos. Eso es el alcance de la feature 10 (`design.md > 8`). Tampoco monta
- * ninguna region de notificaciones (R36, D9): `sonner` no entra en esta feature.
+ * Este layout SI valida que haya sesion (R16, R17): sin `SessionUser`, redirige a
+ * `LOGIN_ROUTE` antes de pintar nada de la zona privada. Lo que sigue **no** haciendo (R35,
+ * y esta dicho para que no se lea como olvido): no lee ni emite cookie de sesion y no toca
+ * base de datos ni red. La proteccion barata de ruta en `middleware.ts` es **QC-9**, anterior
+ * a este render y mas eficiente; el chequeo de aqui no la sustituye, es la ultima linea de
+ * defensa si algo llega hasta el Server Component sin sesion. Tampoco monta ninguna region
+ * de notificaciones (R36, D9): `sonner` no entra en esta feature.
  *
  * El route group no crea ninguna URL (D11): no hay `page.tsx` y la primera pantalla privada
  * la trae la feature 9. Es lo esperado, no un archivo que falte.
  */
 export default async function PrivateLayout({ children }: { children: ReactNode }) {
   const user = await identity.getSessionUser();
+  if (user === null) {
+    redirect(LOGIN_ROUTE);
+  }
 
   // R28: el `SidebarProvider` **escribe** la cookie de preferencia de UI pero nunca la lee
   // (su estado inicial es `useState(defaultOpen)`), asi que la persistencia entre recargas

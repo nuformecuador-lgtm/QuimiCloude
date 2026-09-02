@@ -1,10 +1,13 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 
 import { SESSION_DURATION_MS, type SessionTicket } from '../../../domain/session';
+import { parseSessionClaims, type SessionClaims } from '../../../domain/session-claims';
 
 // Implementa el puerto `SessionWriter` (`../../../ports/session-writer`):
-// `startSession` cumple `startSession`. El cableado lo hace el punto de composicion.
+// `startSession` cumple `startSession`. Tambien implementa `SessionReader`
+// (`../../../ports/session-reader`) via `readSessionClaims` y `clearSession`.
+// El cableado lo hace el punto de composicion.
 
 /**
  * Nombre de la cookie (`design.md > 5.2`). Lleva el prefijo del producto y no dice
@@ -12,8 +15,12 @@ import { SESSION_DURATION_MS, type SessionTicket } from '../../../domain/session
  */
 export const SESSION_COOKIE_NAME = 'qc_session';
 
-/** Version del formato del valor. QC-8 rechaza lo que no empiece por aqui, sin adivinar. */
-const SESSION_VALUE_VERSION = 'v1';
+/**
+ * Version del formato del valor. QC-8 rechaza lo que no empiece por aqui, sin adivinar.
+ * Se exporta para que el lector (`readSessionClaims`) y el escritor (`buildSessionValue`)
+ * no puedan desincronizarse: un solo dueño de esta constante (R3, `design.md > 4.1`).
+ */
+export const SESSION_VALUE_VERSION = 'v1';
 
 /** Longitud minima del secreto (`design.md > 5.3`). Por debajo, el HMAC no vale nada. */
 const MIN_SECRET_LENGTH = 32;
@@ -95,4 +102,51 @@ export async function startSession(ticket: SessionTicket): Promise<void> {
     path: '/',
     maxAge: SESSION_DURATION_MS / 1000,
   });
+}
+
+/**
+ * Lee y verifica el contenido firmado de la cookie en curso, sin reemitirla ni prolongarla
+ * (R8). Orden exacto, sin atajos (`design.md > 4.1`):
+ * 1. Sin cookie -> `null` (R2).
+ * 2. El valor no parte en exactamente tres trozos por `.` -> `null`.
+ * 3. El primer trozo no es `SESSION_VALUE_VERSION` -> `null`, sin interpretar el resto ni
+ *    leer el secreto (R3).
+ * 4. Se recomputa la firma con `signSessionValue()` — la misma funcion que la emite (R5) — y
+ *    se compara en tiempo constante. Las longitudes se comparan ANTES de `timingSafeEqual`,
+ *    que lanza si difieren (R4).
+ * 5. El payload decodificado se interpreta en el dominio (`parseSessionClaims`), que decide
+ *    si es un `SessionClaims` valido.
+ */
+export async function readSessionClaims(): Promise<SessionClaims | null> {
+  const cookieStore = await cookies();
+  const rawValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (rawValue === undefined) return null;
+
+  const parts = rawValue.split('.');
+  if (parts.length !== 3) return null;
+
+  const [version, encodedPayload, receivedSignature] = parts;
+  if (version !== SESSION_VALUE_VERSION) return null;
+
+  const signedPart = `${version}.${encodedPayload}`;
+  const expectedSignature = signSessionValue(signedPart, readSessionSecret());
+
+  const receivedBuffer = Buffer.from(receivedSignature, 'utf8');
+  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+  if (receivedBuffer.length !== expectedBuffer.length) return null;
+  if (!timingSafeEqual(receivedBuffer, expectedBuffer)) return null;
+
+  const rawJson = Buffer.from(encodedPayload, 'base64url').toString('utf8');
+  return parseSessionClaims(rawJson);
+}
+
+/**
+ * Retira la cookie de sesion desde el servidor (R18). El `path` se repite a proposito: sin
+ * el, el navegador no borraria una cookie emitida con `path: '/'`. **No lee el secreto**: el
+ * cierre de sesion tiene que seguir funcionando aunque `SESSION_SECRET` este mal configurado
+ * (R9, segunda mitad).
+ */
+export async function clearSession(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete({ name: SESSION_COOKIE_NAME, path: '/' });
 }

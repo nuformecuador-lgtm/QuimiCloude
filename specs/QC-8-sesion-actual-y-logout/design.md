@@ -30,7 +30,7 @@ la ponen a prueba. Sin este mapa, una decision puede quedarse sin test
 | 2026-09-02 · empleado dado de baja / rol cambiado | **R10**, **R11**, **R12**, **R15** |
 | 2026-09-02 · que nombre se muestra en la barra | **R13** |
 | 2026-09-02 · que hace la zona privada sin sesion valida | **R16**, **R17** |
-| 2026-09-02 · lleva prueba en navegador real | **R24** |
+| 2026-09-02 · lleva prueba en navegador real | ~~**R24**~~ — **diferida a QC-9** el 2026-09-02 (no hay URL privada). Lo verificable sin navegador queda en **R16** y **R20** |
 | 2026-09-01 · formato del valor de la cookie (`v1.`, `sub`/`iat`/`exp`, `timingSafeEqual`) | **R3**, **R4**, **R5**, **R6** |
 | 2026-09-01 · caducidad de 8 h absolutas sobre el `exp` firmado | **R7**, **R8** |
 | 2026-09-01 · atributos y manejo de la cookie (solo el servidor) | **R2**, **R18**, **R22** |
@@ -115,7 +115,7 @@ lo que hace testeable la caducidad sin reloj falso ni `sleep`.
 | `lib/modules/identity/domain/display-name.ts` | **nuevo** | `buildDisplayName(firstNames, lastNames, username)`: primer nombre + primer apellido (R13). Puro |
 | `lib/modules/identity/domain/resolve-session-user.ts` | **nuevo** | `createResolveSessionUser(deps)` con el algoritmo de 2.1. Puro |
 | `lib/modules/identity/domain/session-user.ts` | **sin cambios** | Tipo congelado por QC-11 (R14) |
-| `lib/modules/identity/ports/session-reader.ts` | **nuevo** | `interface SessionReader { readClaims(): Promise<SessionClaims \| null>; clear(): Promise<void> }` |
+| `lib/modules/identity/ports/session-reader.ts` | **nuevo** | `interface SessionReader { readClaims(): Promise<SessionClaims \| null> }`. **`clear()` se retiro durante la implementacion (2026-09-02, menor 6 del reviewer):** un puerto modela lo que el **dominio** necesita, y el dominio solo lee; el cierre no tiene caso de uso y la composicion lo cablea directo al adaptador, asi que `clear()` quedaba como superficie inalcanzable que ningun test podia ejercitar |
 | `lib/modules/identity/ports/session-user-reader.ts` | **nuevo** | `interface SessionUserReader { findActiveById(id: string): Promise<SessionUserRecord \| null> }` |
 | `lib/modules/identity/ports/session-provider.ts` | **modificado** | `getSessionUser(): Promise<SessionUser \| null>` (R1). `endSession()` sin cambios |
 | `lib/modules/identity/adapters/driven/session/session-cookie.ts` | **modificado** | Añade `readSessionClaims()` y `clearSession()` junto a `startSession()`. Reutiliza `signSessionValue`, `SESSION_COOKIE_NAME`, la version y `readSessionSecret()` que ya viven ahi (R5) |
@@ -132,7 +132,7 @@ lo que hace testeable la caducidad sin reloj falso ni `sleep`.
 | `tests/unit/identity/logout-action.test.ts` | **modificado** | Hoy afirma que `logoutAction` **no** navega y que `session-stub.ts` no toca cookies. Las dos cosas mueren aqui. Alcance exacto en `tasks.md > T9` |
 | `tests/unit/private-layout.test.tsx` | **modificado** | Hoy afirma que el layout no contiene `redirect` (R35 de QC-11). Lo revoca la decision del 2026-09-02. Alcance exacto en `tasks.md > T10` |
 | `e2e/login.spec.ts` | **sin cambios** | Se extiende con un spec propio, no se reescribe |
-| `e2e/session.spec.ts` | **nuevo** | Recorrido de R24 (ver 7) |
+| ~~`e2e/session.spec.ts`~~ | **NO SE CREA — diferido a QC-9** | Recorrido de R24 (ver 7). El humano difirio la prueba en navegador el 2026-09-02 porque `app/(private)/` no tiene ningun `page.tsx` y Next no renderiza un layout sin pagina: hoy no hay URL que visitar. **QC-9 lo hereda** |
 
 ---
 
@@ -235,7 +235,7 @@ import { createResolveSessionUser } from '@/lib/modules/identity';
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
 import { clearSession, readSessionClaims, startSession } from '@/lib/modules/identity/adapters/driven/session/session-cookie';
 
-const sessionReader: SessionReader = { readClaims: readSessionClaims, clear: clearSession };
+const sessionReader: SessionReader = { readClaims: readSessionClaims };
 const sessionUserReader: SessionUserReader = { findActiveById: findActiveSessionUserById };
 
 const sessionProvider: SessionProvider = {
@@ -261,8 +261,22 @@ No hay endpoints nuevos ni rutas nuevas.
 | `PrivateLayout` | `children` | Arbol privado, **o** redireccion al login (R16) |
 
 **Quien mas rompe el cambio de `SessionUser` a `SessionUser | null`:** solo
-`app/(private)/layout.tsx`, que es el unico llamador (lo dice la cabecera del stub y lo confirma
-el grep). TypeScript strict lo señala en el sitio exacto; no hay llamadores silenciosos.
+`app/(private)/layout.tsx`, que es el unico llamador **de produccion** (lo dice la cabecera del
+stub y lo confirma el grep). TypeScript strict lo señala en el sitio exacto.
+
+> **CORREGIDO durante la implementacion (2026-09-02).** La frase original de este parrafo decia
+> «no hay llamadores silenciosos», y **era falsa**. El `typecheck` vio **un** sitio; los tests
+> vieron **tres**: ademas del layout, `tests/unit/sidebar-desktop.test.tsx` y
+> `tests/unit/sidebar-mobile.test.tsx` renderizan `PrivateLayout` y **si** eran llamadores —
+> reventaron con `NEXT_REDIRECT` en el gate. **Un test que renderiza el layout es un llamador
+> aunque el compilador no lo cante**: no recibe el `SessionUser` como argumento tipado, lo
+> obtiene por un mock que TypeScript nunca comprueba.
+>
+> Consecuencia practica, y **QC-9 vuelve a pasar por este mismo camino**: ante un cambio de
+> **contrato compartido**, `vitest related` no basta —selecciona por grafo de imports, y esos
+> archivos no importan el puerto, importan el layout—. Hay que correr `ui`+`node` enteros y
+> dejar correr el gate antes de dar el bloque por cerrado. Detalle en
+> `progress/impl_QC-8-sesion-actual-y-logout.md`.
 
 ---
 

@@ -6,5 +6,16 @@ export { DOCUMENT_TYPE_CC, DOCUMENT_TYPE_CODES, type DocumentTypeCode } from './
 export { CREDENTIAL_MAX_LENGTH, loginInputSchema, type LoginInput } from './domain/credentials';
 export { type SessionTicket } from './domain/session';
 export { createVerifyCredentials, type VerifyCredentialsDeps } from './domain/verify-credentials';
+export {
+  CREDENTIAL_MIN_LENGTH,
+  CREDENTIAL_RULES,
+  createCredentialPolicy,
+  evaluateCredentialRules,
+  type CredentialPolicyResult,
+  type CredentialRule,
+} from './domain/credential-policy';
 export { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from './domain/roles';
 export { seedInitialAccess, type SeedOutcome } from './domain/seed-initial-access';
+export { createResolveSessionUser } from './domain/resolve-session-user';
+export { buildDisplayName } from './domain/display-name';
+export { isSessionExpired, type SessionClaims } from './domain/session-claims';

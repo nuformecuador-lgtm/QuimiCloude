@@ -807,6 +807,33 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   columna: eso NO se degrada (`docs/jira.md > Si Jira y el disco divergen`, excepción 1), así que
   el disco gana y hay que mover la tarjeta a mano.
 
+- **[QC-19 — el despliegue en un entorno nuevo falla si la `SEED_ADMIN_*` no cumple la politica]**
+  Consecuencia querida de R18 y prevista en `design.md > 7.2`, pero conviene leerla aqui **antes**
+  de desplegar: desde esta ficha, el seed de instalacion evalua la politica antes de hashear, asi
+  que una credencial de instalacion que no cumpla **aborta el arranque** (`pnpm run build` corre
+  `prisma migrate deploy && tsx scripts/seed.ts`). El fallo es ruidoso y dice que reglas incumple
+  —nunca la credencial—, que es justo lo que se queria; pero quien prepare un entorno nuevo tiene
+  que fijar una `SEED_ADMIN_*` de 8 a 64 caracteres, con mayuscula, minuscula, digito y simbolo, y
+  que no este entre las filtradas conocidas. La del entorno local ya cumple: verificado.
+- **[QC-19 — `P4ssw0rd!` pasa la politica]** No hay des-leetificacion ni recorte de sufijos: una
+  variante de una contrasena filtrada cuela aunque su forma base este en la lista
+  (`design.md > 4` y `> 11`). Puntuar fuerza esta fuera del alcance de la ficha; si algun dia
+  hace falta, es ficha nueva, no un parche al adaptador.
+- **[QC-19 — la lista de filtradas envejece y nadie la refresca]** Las 49 233 entradas vienen de
+  `@zxcvbn-ts/language-common@4.1.3` y solo se actualizan cuando se actualice la dependencia. No
+  hay refresco automatico y esta ficha no lo trae.
+- **[QC-19 — la guardia de R19 no comprueba el ORDEN de las llamadas]**
+  `guard-politica-de-contrasenas` es un barrido de texto: ve que un archivo que hashea referencia
+  tambien la politica, no que la llame **antes** ni que respete su resultado. Para el unico punto
+  que hoy fija una contrasena —el seed— ese hueco esta tapado por un test de comportamiento
+  (`seed-initial-access.test.ts`, "si la politica rechaza la credencial de instalacion, no se
+  hashea ni se escribe nada"). **Todo punto nuevo que fije contrasenas necesita el suyo**: la
+  guardia atrapa el olvido completo, no el orden.
+- **[QC-19 — QC-21 hereda pintar los mensajes]** El modulo exporta `CREDENTIAL_RULES` (siete
+  codigos estables, independientes del idioma) y `evaluateCredentialRules`, sincrona y usable en
+  el navegador. QC-21 pinta los requisitos a partir de ese catalogo y **no vuelve a declarar las
+  reglas**: una segunda copia es exactamente lo que la fila "la regla vive en el dominio" vino a
+  impedir.
 - **[QC-12 — E2E diferido a QC-13]** El dashboard no tiene prueba de extremo a extremo, y se
   difirió **con motivo escrito en el spec**: hoy no hay sesión real ni flujo navegable que
   visitar. Lo recoge QC-13, que es la que conecta la guardia de sesión.
@@ -833,6 +860,31 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   1280 px, más las guardias de que no hay alto de viewport fijo, ni `:hover`, ni controles. El
   reviewer lo dio por **aceptable con nota**, no por excepción: queda como **verificación humana
   pendiente**.
+- **Las pruebas de mutacion sobre archivos de PRODUCCION no pueden correr en paralelo.** Al
+  cerrar los menores de QC-8, tres subagentes trabajaban a la vez y **dos mutaron
+  `session-cookie.ts` simultaneamente** para probar guardias distintas: uno quitaba
+  `timingSafeEqual`, otro dejaba `clearSession` en no-op. En un sondeo intermedio el
+  implementer se encontro **produccion mutada** y la restauro desde `HEAD` sin saber que su
+  dueno iba a revertirla segundos despues. Acabo bien **solo** porque ambos caminos llevaban al
+  mismo contenido y porque se comprobo antes que el unico diff era la mutacion — pero el riesgo
+  real era **comitear produccion rota**, y ningun test lo habria cazado: el arbol estaba verde
+  entre mutacion y mutacion. Regla a fijar en `/afinar-regla`: una prueba de mutacion se
+  serializa o se hace sobre una copia, y **nunca** sobre un archivo que otro agente esta
+  tocando. Ver `progress/impl_QC-8-sesion-actual-y-logout.md > Un apunte de proceso`.
+
+- **[QC-9, ANTES de escribir `middleware.ts`] Las guardias no barren los `.ts` de la raíz del
+  repo.** `tests/guards/guard-firma-sesion-unica.test.ts` (QC-8) usa
+  `PRODUCTION_DIRS = ['lib','app','components','hooks']` y
+  `tests/guards/guard-arquitectura-modulos.test.ts` (QC-15) usa el mismo
+  `SCAN_ROOTS = ['app','components','hooks','lib']`. **Ninguna de las dos mira los archivos de
+  primer nivel**, así que un `middleware.ts` en la raíz con su propio `createHmac` pasaría en
+  verde: lo verificó el `reviewer` de QC-8 creando el archivo (2 passed) y borrándolo después.
+  R5 dice «en el repositorio», no «en `lib/`». No es una regresión de QC-8 —es la misma
+  limitación ya aceptada en la revisión de QC-15—, pero **`middleware.ts` es justo el archivo
+  que QC-9 va a crear para verificar la firma de sesión en el runtime Edge**, o sea el candidato
+  número uno a segunda implementación del HMAC, que es exactamente lo que R5 prohíbe.
+  **QC-9 debe ampliar los dos barridos a los `.ts` de primer nivel antes de escribir ese
+  archivo.** Menor 4 de `progress/review_QC-8-sesion-actual-y-logout.md`.
 
 - **El repo no tiene `.gitattributes` y eso fabrica conflictos falsos.** `core.autocrlf`
   está en `false` y los archivos conviven con fines de línea mezclados: `progress/current.md`
@@ -842,6 +894,17 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   tapando el cambio real — y de paso puede colar un borrado accidental sin que nadie lo vea.
   Pasó tres veces al cerrar QC-14 (ver historial). Se resuelve con `* text=auto eol=lf` y una
   normalización única del árbol. **Entra por `/afinar-regla`**, no a mano.
+  **Y las herramientas obvias para diagnosticarlo MIENTEN** — verificado el 2026-09-02 por dos
+  sesiones por separado, cada una por su cuenta: `grep -c $'\r' archivo` **no interpreta el
+  patrón** y acaba contando **todas** las líneas, así que un archivo sin un solo CR devuelve el
+  total y parece perfecto; `file` tampoco reporta CRLF de forma fiable en archivos con líneas
+  muy largas. Lo que **sí** funciona: **`xxd`** sobre la primera y la última línea —mirar si
+  terminan en `0d0a` o en `0a`— y **`git diff --numstat`**, donde un cambio de dos líneas que
+  sale como «983 insertadas / 971 borradas» significa que se convirtió el archivo entero.
+  Además, en este repo **`awk` y `sed -i` reescriben `current.md` de CRLF a LF sin avisar**: al
+  cerrar QC-8 estuvieron a punto de colar el **cuarto** conflicto de archivo completo del día.
+  Para editarlo, herramienta que preserve los bytes, y comprobar el `--numstat` antes de
+  commitear.
 - **`docs/jira.md` llama *Hecho* a la columna que en el board se llama *Finalizado*** (status
   id `10003`, transición `41`). Verificado el 2026-09-02 al cerrar QC-14. Es el mismo tipo de
   desajuste ya anotado para *Spec en revisión* / *En revisión*: el mapeo a `done` es correcto,

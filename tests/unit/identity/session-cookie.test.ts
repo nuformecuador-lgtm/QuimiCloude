@@ -7,13 +7,20 @@ import { createHmac } from 'node:crypto';
 
 import {
   SESSION_COOKIE_NAME,
+  clearSession,
+  readSessionClaims,
   startSession,
 } from '@/lib/modules/identity/adapters/driven/session/session-cookie';
 import { SESSION_DURATION_MS, createSessionTicket } from '@/lib/modules/identity/domain/session';
 
 // `vi.mock` se iza al principio del archivo: los dobles se crean con `vi.hoisted` para
 // que existan antes que la fabrica del mock.
-const { cookiesMock, setMock } = vi.hoisted(() => ({ cookiesMock: vi.fn(), setMock: vi.fn() }));
+const { cookiesMock, setMock, getMock, deleteMock } = vi.hoisted(() => ({
+  cookiesMock: vi.fn(),
+  setMock: vi.fn(),
+  getMock: vi.fn(),
+  deleteMock: vi.fn(),
+}));
 
 vi.mock('next/headers', () => ({
   cookies: cookiesMock,
@@ -50,10 +57,31 @@ function decodificarPayload(value: string): Record<string, unknown> {
   >;
 }
 
+// Doble con estado del almacen de cookies del navegador: un `Map` real donde `set` guarda,
+// `get` devuelve lo guardado (o `undefined` si no hay nada) y `delete` borra esa entrada.
+// `setMock`/`getMock`/`deleteMock` siguen siendo `vi.fn()` -- los tests que espian llamadas
+// (`toHaveBeenCalledWith`, etc.) no cambian -- pero ahora ADEMAS mutan el mismo `Map`, asi
+// que `delete` de verdad vacia lo que despues devuelve `get`: ningun test decide el
+// resultado por su cuenta, lo observa.
+let almacenDeCookies: Map<string, string>;
+
 beforeEach(() => {
+  almacenDeCookies = new Map();
   setMock.mockReset();
+  getMock.mockReset();
+  deleteMock.mockReset();
   cookiesMock.mockReset();
-  cookiesMock.mockResolvedValue({ set: setMock });
+  setMock.mockImplementation((opciones: { name: string; value: string }) => {
+    almacenDeCookies.set(opciones.name, opciones.value);
+  });
+  getMock.mockImplementation((nombre: string) => {
+    const value = almacenDeCookies.get(nombre);
+    return value === undefined ? undefined : { value };
+  });
+  deleteMock.mockImplementation((opciones: { name: string }) => {
+    almacenDeCookies.delete(opciones.name);
+  });
+  cookiesMock.mockResolvedValue({ set: setMock, get: getMock, delete: deleteMock });
   secretoOriginal = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = SECRETO;
 });
@@ -162,5 +190,199 @@ describe('cookie de sesion', () => {
     // inspeccionar. Se afirma lo fuerte y se deja el contenido al test que si tiene llamadas.
     for (const espia of espias) expect(espia).not.toHaveBeenCalled();
     expect(value).not.toContain(SECRETO);
+  });
+});
+
+// T5 — lectura y borrado (`design.md > 4.1`, `requirements.md` R2-R5, R8, R9, R18). El caso
+// feliz se construye llamando a `startSession` y capturando lo que escribio en `set`: es el
+// unico punto donde escritor y lector se cruzan de verdad, y evita repetir el error del
+// bloque 1 (unidades de `iat`/`exp` distintas entre quien firma y quien construye el test).
+describe('lectura y borrado de la cookie de sesion', () => {
+  async function valorValidoDeCookie(): Promise<string> {
+    const ticket = createSessionTicket(USER_ID, AHORA);
+    await startSession(ticket);
+    const { value } = cookieEmitida();
+    setMock.mockClear();
+    return value;
+  }
+
+  // R2
+  it('sin cookie devuelve null', async () => {
+    getMock.mockReturnValue(undefined);
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R3
+  it('prefijo v0. devuelve null sin interpretar el resto', async () => {
+    const valor = await valorValidoDeCookie();
+    const [, encodedPayload, firma] = valor.split('.');
+    getMock.mockReturnValue({ value: `v0.${encodedPayload}.${firma}` });
+
+    // Ancla que corta ANTES de mirar el secreto: si `readSessionClaims` leyera
+    // `SESSION_SECRET` para recomputar la firma antes de comparar la version, esto
+    // lanzaria (ver el test `sin SESSION_SECRET la lectura lanza...`). Que resuelva
+    // `null` sin secreto en el entorno prueba que la version se descarta primero.
+    delete process.env.SESSION_SECRET;
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R4
+  it('firma alterada en un byte (misma longitud) devuelve null', async () => {
+    const valor = await valorValidoDeCookie();
+    const [version, encodedPayload, firma] = valor.split('.');
+    const firmaAlterada = firma.startsWith('A') ? `B${firma.slice(1)}` : `A${firma.slice(1)}`;
+    getMock.mockReturnValue({ value: `${version}.${encodedPayload}.${firmaAlterada}` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R4
+  it('firma de longitud distinta devuelve null sin lanzar', async () => {
+    const valor = await valorValidoDeCookie();
+    const [version, encodedPayload, firma] = valor.split('.');
+    getMock.mockReturnValue({ value: `${version}.${encodedPayload}.${firma}xx` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R6
+  it('payload que no es JSON devuelve null', async () => {
+    const valor = await valorValidoDeCookie();
+    const [version] = valor.split('.');
+    const payloadNoJson = Buffer.from('esto-no-es-json', 'utf8').toString('base64url');
+    const signedPart = `${version}.${payloadNoJson}`;
+    const firma = createHmac('sha256', SECRETO).update(signedPart).digest('base64url');
+    getMock.mockReturnValue({ value: `${signedPart}.${firma}` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R6
+  it('sub que no es UUID devuelve null', async () => {
+    const version = 'v1';
+    const payload = { sub: 'no-es-un-uuid', iat: 1, exp: 2 };
+    const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    const signedPart = `${version}.${encodedPayload}`;
+    const firma = createHmac('sha256', SECRETO).update(signedPart).digest('base64url');
+    getMock.mockReturnValue({ value: `${signedPart}.${firma}` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R9
+  it('sin SESSION_SECRET la lectura lanza sin exponer el secreto, y clearSession sigue funcionando', async () => {
+    const valor = await valorValidoDeCookie();
+    getMock.mockReturnValue({ value: valor });
+    delete process.env.SESSION_SECRET;
+
+    await expect(readSessionClaims()).rejects.toThrow(/SESSION_SECRET/);
+    try {
+      await readSessionClaims();
+      throw new Error('readSessionClaims tenia que lanzar');
+    } catch (error) {
+      expect((error as Error).message).not.toContain(SECRETO);
+    }
+
+    await clearSession();
+    expect(deleteMock).toHaveBeenCalledWith({ name: SESSION_COOKIE_NAME, path: '/' });
+  });
+
+  // R8
+  it('leer una sesion valida no reemite ni prolonga la cookie', async () => {
+    const valor = await valorValidoDeCookie();
+    getMock.mockReturnValue({ value: valor });
+
+    const claims = await readSessionClaims();
+
+    expect(claims).not.toBeNull();
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  // El caso feliz: lo leido coincide con el ticket que se le paso a `startSession`.
+  it('el valor valido emitido por startSession se lee de vuelta con los mismos datos', async () => {
+    const ticket = createSessionTicket(USER_ID, AHORA);
+    await startSession(ticket);
+    const { value } = cookieEmitida();
+    setMock.mockClear();
+    getMock.mockReturnValue({ value });
+
+    const claims = await readSessionClaims();
+
+    expect(claims).not.toBeNull();
+    expect(claims?.sub).toBe(ticket.userId);
+    expect(claims?.issuedAt.getTime()).toBe(
+      Math.floor(ticket.issuedAt.getTime() / 1000) * 1000,
+    );
+    expect(claims?.expiresAt.getTime()).toBe(
+      Math.floor(ticket.expiresAt.getTime() / 1000) * 1000,
+    );
+  });
+
+  // R18
+  it('clearSession borra con el mismo nombre y path: /', async () => {
+    await clearSession();
+
+    expect(deleteMock).toHaveBeenCalledWith({ name: SESSION_COOKIE_NAME, path: '/' });
+  });
+
+  // R20 — tras cerrar sesion, la peticion siguiente DESDE ESE NAVEGADOR resuelve "sin sesion".
+  //
+  // Esto cubre solo la mitad de servidor de R20: el navegador que cerro sesion ya no manda la
+  // cookie (el `delete` de `clearSession()` se lo dice), asi que `getMock` simula eso
+  // devolviendo `undefined`, igual que hace un navegador real que ya la borro. La otra mitad de
+  // R20 -- que VOLVER ATRAS en el historial no muestre contenido privado -- es una conducta del
+  // navegador (cache de pagina) que NINGUN test de servidor puede afirmar: queda diferida a
+  // QC-9 con R24 (`requirements.md` > Preguntas abiertas 3), donde ya habra una URL real que
+  // ejercitar en Playwright.
+  it('tras clearSession, una peticion sin la cookie (navegador que ya la borro) resuelve sin sesion', async () => {
+    await startSession(createSessionTicket(USER_ID, AHORA));
+    setMock.mockClear();
+
+    // No se fuerza `getMock` a mano: `clearSession()` borra la entrada del almacen con
+    // estado (ver `beforeEach`), y es ESE borrado -- no el test -- el que hace que la
+    // siguiente lectura no encuentre cookie.
+    await clearSession();
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R21 — CARACTERIZACION (riesgo asumido, QC-23 lo pondra rojo): una copia del valor sigue
+  // valiendo tras cerrar sesion.
+  //
+  // Esto NO es una garantia deseable: es la constatacion escrita de una limitacion que el
+  // humano asumio A PROPOSITO el 2026-09-02 (`requirements.md` > Decisiones cerradas).
+  // `clearSession()` retira la cookie de ESE navegador y nada mas: no existe ningun registro de
+  // sesiones activas donde invalidar el valor ya emitido, asi que una COPIA de ese valor
+  // (robada, guardada, lo que sea) presentada en otra peticion sigue resolviendo como sesion
+  // valida hasta su `exp` (8 h).
+  //
+  // El riesgo se tolero porque: (a) exige un robo previo -- la cookie es `httpOnly`, un XSS de
+  // solo lectura no basta --, (b) esta acotado a 8 h, y (c) hay salida de emergencia real: dar
+  // de baja al usuario (`deleted_at`) o cambiarle el rol surte efecto en la SIGUIENTE peticion,
+  // porque el usuario se resuelve contra la base en cada una (R10, R11), nunca a partir de la
+  // cookie.
+  //
+  // La invalidacion de verdad es QC-23, bloqueada por esta ficha. CUANDO QC-23 aterrice, este
+  // test se pondra ROJO A PROPOSITO -- y ese rojo es la SEÑAL de que la invalidacion funciona,
+  // NO una regresion. Ese dia se reescribe este test (para afirmar que la copia YA NO vale), no
+  // se "arregla" para que vuelva a pasar en verde.
+  it('CARACTERIZACION (riesgo asumido, QC-23 lo pondra rojo): una copia del valor sigue valiendo tras cerrar sesion', async () => {
+    const ticket = createSessionTicket(USER_ID, AHORA);
+    await startSession(ticket);
+    const { value: valorCapturado } = cookieEmitida();
+    setMock.mockClear();
+
+    await clearSession();
+
+    // Una peticion posterior que presenta una COPIA del valor ya emitido: el navegador que la
+    // tiene copiada no se entera de que otro navegador cerro sesion.
+    getMock.mockReturnValue({ value: valorCapturado });
+
+    const claims = await readSessionClaims();
+
+    expect(claims).not.toBeNull();
+    expect(claims?.sub).toBe(ticket.userId);
   });
 });
