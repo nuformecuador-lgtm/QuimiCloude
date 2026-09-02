@@ -91,7 +91,7 @@
       "epic_name": "Identidad y acceso",
       "name": "proteccion-de-rutas-privadas",
       "description": "Las pantallas privadas no se ven sin sesion: quien entre sin estar autenticado termina en la pantalla de login. Y al reves, quien ya tiene sesion y abre el login no se queda ahi. La pantalla de login es publica. Se protege por convencion todo lo que cuelga del grupo de rutas privado, de modo que una pantalla nueva queda protegida por el hecho de nacer ahi, sin que nadie tenga que acordarse de anadirla a una lista. La sesion se comprueba de verdad en cada navegacion, no solo que la cookie exista: se valida su firma y que no haya caducado. Para poder comprobarlo tambien en el borde, la firma de la sesion pasa a usar la criptografia estandar disponible en los dos entornos en vez de la propia de Node, y lo hace SIN cambiar el formato del token: las sesiones ya emitidas siguen valiendo. Sigue habiendo una sola implementacion de la firma en todo el repositorio, nunca dos. Quien pide una pantalla concreta sin sesion vuelve a esa misma pantalla despues de entrar, siempre que la ruta de vuelta sea interna del sistema y tenga permiso para verla; si no tiene permiso acaba en el dashboard y no en el login, porque no estar autorizado no es lo mismo que no estar autenticado. Conectar la maquetacion con la sesion real -que el formulario autentique de verdad, que el layout muestre al usuario y que su cerrar sesion funcione- va aparte.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
