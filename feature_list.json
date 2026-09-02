@@ -37,7 +37,7 @@
       "epic_name": "Identidad y acceso",
       "name": "seed-roles-y-usuario-inicial",
       "description": "Para poder entrar por primera vez hace falta que la base arranque con los roles base y con un usuario inicial ya creado y utilizable. Los roles base son Administrador y Operador. El usuario inicial es Administrador y sus credenciales salen del entorno, nunca del codigo. El seed corre automaticamente despues de cada despliegue y debe poder correrse mas de una vez sin duplicar ni romper nada: solo crea lo que falta y nunca pisa lo que alguien haya cambiado a mano, asi que en un entorno que ya tiene el usuario creado ni siquiera mira las credenciales del entorno; en uno nuevo, si faltan, se detiene. El usuario inicial nace obligado a cambiar su contrasena la primera vez que entre, de modo que la tabla de usuarios necesita guardar esa marca; hacerla cumplir es parte del login y no de aqui.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -55,7 +55,7 @@
       "epic_name": "Identidad y acceso",
       "name": "login-usuario-y-contrasena",
       "description": "Un usuario entra al sistema escribiendo su nombre de usuario y su contrasena. Si ambos son correctos queda autenticado; si alguno no lo es, el sistema responde con un error que no revela cual de los dos fallo. La sesion queda guardada en una cookie que el navegador no puede leer desde JavaScript y que caduca.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -139,7 +139,7 @@
       "epic_name": "Plataforma",
       "name": "dashboard-en-blanco",
       "description": "Maquetacion de la pantalla de dashboard dentro del layout privado, deliberadamente vacia: solo el titulo y el area de contenido lista para llenarse mas adelante. Es el destino al que llega el usuario recien autenticado. Solo capa visual, sin datos ni backend; su unica dependencia es el layout privado con sidebar.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "low",
       "zone": "frontend",
@@ -210,7 +210,7 @@
       "epic_name": "Identidad y acceso",
       "name": "politica-de-contrasenas",
       "description": "Una contrasena es aceptable si tiene al menos 8 caracteres e incluye mayuscula, minuscula, numero y simbolo, y si no esta entre las contrasenas filtradas conocidas. Esa regla se aplica en todos los sitios donde alguien fija o cambia una contrasena, de modo que no se pueda guardar una que no cumpla, y al rechazarla dice que requisito falto y no solo que esta mal. Las contrasenas no caducan y no se guarda historial de anteriores. Quien ya tenga guardada una contrasena que no cumple sigue entrando con normalidad: la regla solo mira las nuevas. Mostrar los requisitos mientras se escribe es otra ficha.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -227,14 +227,15 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "crud-de-productos",
-      "description": "Alta, consulta, edicion y borrado de productos y de las filas del catalogo de presentaciones, sobre el modelo que crea QC-14. Incluye la pantalla dentro del layout privado y las operaciones que la respaldan. Quien puede hacer cada cosa, y si hace falta prueba de extremo a extremo, se deciden al acotar esta ficha.",
-      "status": "pending",
+      "description": "Los casos de uso del catalogo de productos, sobre el modelo que crea QC-14: alta, consulta paginada, edicion y borrado de productos, y lo mismo para las filas del catalogo de presentaciones. Solo el Administrador puede: ni el Operador ni nadie mas consulta, crea, edita o borra, y ese permiso se valida en el service. Borrar un producto lo oculta y no se restaura; borrar una presentacion que todavia tiene productos asignados sigue sin ser posible. La existencia se edita a mano como un campo mas. Cada producto guarda quien lo creo y quien lo modifico por ultima vez. Antes de guardar se rechaza el nombre vacio y el tiempo de entrega negativo, el nombre tiene un largo maximo, y dos presentaciones no pueden ser la misma escrita distinto: se comparan sin acentos ni caracteres especiales y sin distinguir mayusculas. La consulta viene paginada, de diez en diez por defecto, y el calculo de la paginacion se extrae aparte para reutilizarlo en los demas CRUD. La pantalla va aparte.",
+      "status": "spec_ready",
       "sdd": true,
-      "complexity": null,
-      "zone": "fullstack",
+      "complexity": "high",
+      "zone": "backend",
       "branch": "feature/QC-20-crud-de-productos",
       "depends_on": [
-        "QC-14"
+        "QC-14",
+        "QC-8"
       ],
       "spec_path": "specs/QC-20-crud-de-productos"
     },
@@ -254,6 +255,23 @@
         "QC-19"
       ],
       "spec_path": "specs/QC-21-ayuda-visual-de-contrasena"
+    },
+    {
+      "key": "QC-22",
+      "id": 22,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "pantalla-de-productos",
+      "description": "La pantalla del catalogo de productos dentro del layout privado: la lista paginada, el formulario de alta y edicion, el borrado, y lo mismo para el catalogo de presentaciones. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-20 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-22-pantalla-de-productos",
+      "depends_on": [
+        "QC-20"
+      ],
+      "spec_path": "specs/QC-22-pantalla-de-productos"
     }
   ]
 }
