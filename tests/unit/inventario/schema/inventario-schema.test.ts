@@ -149,16 +149,37 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
   it('el esquema declara exactamente dos modelos nuevos: Presentation y Product', () => {
     // R3: una sola entidad de producto. Ninguna tabla separada de «elemento de inventario».
+    //
+    // ACOTADO EL 2026-09-02 POR QC-24 (`specs/QC-24-modelo-recetas/`). Este caso enumeraba
+    // los modelos del esquema ENTERO y exigia que fueran exactamente los cinco que habia el
+    // dia que se escribio. Eso no es lo que R3 pide —R3 habla de la entidad de producto— y
+    // convertia en rojo a cualquier feature posterior que anadiera un modelo: QC-24 anadio
+    // `Recipe` y `RecipeLine`, que son de `recetas` y no tienen nada que ver con esta ficha.
+    // Un test que se rompe cuando llega la feature siguiente estaba midiendo el repo, no su
+    // feature. Se acota a lo que QC-14 garantiza SOBRE SI MISMA: cuantos modelos declara
+    // `inventario`, que los de `identity` siguen ahi sin adoptar, y que la entidad separada
+    // que la decision cerrada 1 fusiono no existe en ninguna parte del esquema. No se relaja
+    // ninguna de esas tres: se relaja el censo global, que no era un requisito.
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
       .sort()
-    expect(modelNames).toEqual(['DocumentType', 'Presentation', 'Product', 'Role', 'User'].sort())
 
-    const inventarioModels = modelNames.filter(
-      (name) => name === 'Presentation' || name === 'Product',
-    )
+    // Los modelos que declara `inventario`, leidos de su `/// @module` (mismo criterio que
+    // el caso de R20). Son DOS: la unica entidad de producto y su catalogo de presentacion.
+    const inventarioModels = [
+      ...rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g),
+    ]
+      .filter(([, moduleName]) => moduleName === 'inventario')
+      .map(([, , modelName]) => modelName)
+      .sort()
+    expect(inventarioModels).toEqual(['Presentation', 'Product'])
     expect(inventarioModels).toHaveLength(2)
+
+    // Los tres de `identity` siguen existiendo: esta feature no los toco ni los absorbio.
+    for (const owned of ['DocumentType', 'Role', 'User']) {
+      expect(modelNames, `el modelo ${owned} no debe desaparecer`).toContain(owned)
+    }
 
     // Nada que huela a la entidad separada que la decision cerrada 1 fusiono.
     for (const forbidden of ['InventoryItem', 'Inventory', 'StockItem', 'Item']) {
@@ -461,12 +482,35 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     }
 
     expect(typescriptFilesIn(join(moduleDir, 'adapters', 'driving'))).toEqual([])
-    expect(typescriptFilesIn(join(moduleDir, 'domain'))).toEqual([])
 
-    // El contrato del modulo sigue siendo el slot vacio que sembro QC-15.
+    // ACOTADO EL 2026-09-02 POR QC-24 (`specs/QC-24-modelo-recetas/design.md > 5.2`). Aqui
+    // habia dos aserciones mas: que `domain/` estuviera VACIA y que el barrel fuera
+    // literalmente `export {};`. Ninguna de las dos esta en R23, que enumera «operacion de
+    // alta, consulta, edicion o borrado, adaptador driving, ruta, Server Action o pantalla»
+    // — y un contrato de SOLO TIPOS no es ninguna de esas cosas: desaparece al compilar y no
+    // ejecuta nada. Eran un retrato del repo del dia que se escribio el test, no un
+    // requisito, y QC-24 tuvo que publicar `ProductCatalog` desde `inventario/domain/` justo
+    // para que `recetas` pudiera apuntar a un producto SIN tocar su tabla (R18 de QC-24).
+    // Lo que R23 si vigila se conserva y se hace explicito: el contrato de `inventario` no
+    // expone ninguna operacion ejecutable.
     const contract = stripComments(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
-    expect(contract.trim()).toBe('export {};')
-    expect(contract).not.toMatch(/export\s+(\*|\{[^}]*\S[^}]*\})\s+from/)
+    // Nada de servidor: el barrel no puede ser un Server Action ni arrastrarlo.
+    expect(contract).not.toMatch(/['"]use server['"]/)
+    // El barrel solo reexporta de `./domain`; nunca un adaptador, que es por donde entraria
+    // una operacion de alta/consulta/edicion/borrado (`docs/architecture.md > Modulos`).
+    for (const reexport of contract.matchAll(/export\s[^;]*?\sfrom\s+'([^']+)'/g)) {
+      expect(reexport[1], 'el contrato de inventario solo reexporta de ./domain').toMatch(
+        /^\.\/domain\//,
+      )
+    }
+    // Y lo que reexporta son TIPOS, no valores: `export type { ... }`. Un `export {` a secas
+    // seria runtime, y runtime en el contrato es la puerta por la que R23 no quiere que
+    // entre una operacion.
+    for (const reexport of contract.split('\n').filter((line) => /^\s*export\s/.test(line))) {
+      expect(reexport, 'el contrato de inventario solo publica tipos').toMatch(
+        /^\s*export\s+type\s/,
+      )
+    }
 
     // Ninguna ruta HTTP ni Server Action de productos o presentaciones.
     for (const route of [
