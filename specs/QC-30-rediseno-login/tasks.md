@@ -10,7 +10,7 @@
 
 ## Grupo 1 — el bloque de estilos
 
-- [ ] **T1. Abrir el bloque de QC-30 en `app/globals.css`.**
+- [x] **T1. Abrir el bloque de QC-30 en `app/globals.css`.**
   Archivos: `app/globals.css`.
   Depende de: —.
   Añade **al final del archivo**, después de `@layer base`, los delimitadores
@@ -21,7 +21,7 @@
   ni modificado (`git diff` solo muestra líneas añadidas al final) y la pantalla se ve igual que
   antes. R21, R24.
 
-- [ ] **T2. Medidas de ámbito.**
+- [x] **T2. Medidas de ámbito.**
   Archivos: `app/globals.css` (dentro del bloque).
   Depende de: T1.
   Alto mínimo de 44 px para `[data-slot='input']` y `[data-slot='button']`, ancho máximo 400 px,
@@ -31,7 +31,7 @@
   **Hecho cuando:** en `/login` campo y botón miden 44 px y la tarjeta 400 px / 18 px / 28 px; en
   el dashboard **nada** cambia de tamaño. R16, R17, R18, R20.
 
-- [ ] **T3. Vidrio esmerilado y su degradación.**
+- [x] **T3. Vidrio esmerilado y su degradación.**
   Archivos: `app/globals.css` (dentro del bloque).
   Depende de: T2 (mismo archivo).
   Base **opaca** con `var(--card)`; `@supports ((backdrop-filter: …) or (-webkit-backdrop-filter:
@@ -43,7 +43,7 @@
   en el navegador la tarjeta queda opaca y legible, nunca translúcida-sin-desenfocar. R9, R10,
   R11.
 
-- [ ] **T4. Burbujas: CSS y animación.**
+- [x] **T4. Burbujas: CSS y animación.**
   Archivos: `app/globals.css` (dentro del bloque).
   Depende de: T3 (mismo archivo).
   Capa `[data-login='bubbles']` con `pointer-events: none` y `z-index` 1 contra 2 de la tarjeta;
@@ -58,7 +58,7 @@
 
 ## Grupo 2 — el marcado
 
-- [ ] **T5. `[P]` Componente de fondo decorativo.**
+- [x] **T5. `[P]` Componente de fondo decorativo.**
   Archivos: `app/(public)/login/components/login-background.tsx` (nuevo),
   `app/(public)/login/components/index.ts`.
   Depende de: — (puede escribirse a la vez que T2–T4: archivos distintos).
@@ -68,7 +68,7 @@
   **Hecho cuando:** `pnpm run typecheck` y `lint` verdes y el componente se importa como
   `import { LoginBackground } from './components'`. R13.
 
-- [ ] **T6. Montar el fondo y el ámbito en la página.**
+- [x] **T6. Montar el fondo y el ámbito en la página.**
   Archivos: `app/(public)/login/page.tsx`.
   Depende de: T5.
   El `<main>` gana `data-login="screen"` y `position: relative`; `<LoginBackground />` entra como
@@ -82,7 +82,7 @@
 
 ## Grupo 3 — verificación
 
-- [ ] **T7. Test de contrato del CSS.**
+- [x] **T7. Test de contrato del CSS.**
   Archivos: `tests/unit/login-skin.test.tsx` (nuevo).
   Depende de: T4.
   Lee `app/globals.css` como texto (patrón de `tests/unit/theme/sidebar-panel.test.tsx`) y afirma
@@ -94,7 +94,7 @@
   `@layer base` o si una medida se escribe fuera del ámbito. R10, R11, R12, R14, R16, R17, R18,
   R24.
 
-- [ ] **T8. `[P]` Test de marcado y de no-regresión.**
+- [x] **T8. `[P]` Test de marcado y de no-regresión.**
   Archivos: `tests/unit/login-skin.test.tsx` (mismo archivo, otro `describe`).
   Depende de: T6. Paralelizable con T9 (archivos distintos).
   Nivel 2 de `design.md > 8`: un solo elemento con rol `main`; capa de burbujas presente, con
@@ -104,7 +104,7 @@
   **Hecho cuando:** el test muerde si alguien mete las medidas dentro de `components/ui/` o si
   las burbujas dejan de ser decorativas. R1, R13, R15, R19.
 
-- [ ] **T9. `[P]` E2E de la piel.**
+- [x] **T9. `[P]` E2E de la piel.**
   Archivos: `e2e/login-skin.spec.ts` (nuevo).
   Depende de: T6. Paralelizable con T8.
   Chromium + WebKit, **sin fixtures de base de datos**: navega a `/login` sin sesión y mide alto
@@ -114,7 +114,7 @@
   **Hecho cuando:** pasa en los dos proyectos y `e2e/login.spec.ts` sigue verde sin una sola
   línea modificada. R14, R16, R22, R23, R26.
 
-- [ ] **T10. Revisión visual de los cuatro escenarios.**
+- [x] **T10. Revisión visual de los cuatro escenarios.**
   Archivos: ninguno (o retoques dentro del bloque de T2–T4).
   Depende de: T7, T8, T9.
   A ojo, en navegador: modo claro y modo oscuro; ventana de teléfono; desenfoque desactivado; y
