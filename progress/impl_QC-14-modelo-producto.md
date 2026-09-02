@@ -6,10 +6,15 @@
 
 ## Estado
 
-T0–T5 y **T7** cerradas y en verde. **T6 queda a medias**: el `apply` esta hecho y
-verificado columna a columna contra la base real, pero el `rollback` **no se pudo
-ejecutar** (permiso denegado, ver `## Bloqueos`). Consecuencia unica y acotada: **R22 sigue
-sin cerrarse en su forma real**. Los otros 23 requisitos estan cerrados.
+T0–T7 y **T9** cerradas y en verde. **Los 24 requisitos (R1–R24) tienen test ejecutado.**
+
+> **Actualizado el 2026-09-01 tras cerrar T6.** Este parrafo decia antes que T6 quedaba a
+> medias y que R22 seguia sin cerrarse en su forma real, porque el `rollback` estaba
+> denegado por permisos en la sesion del subagente. **Ya no es cierto**: el leader ejecuto
+> el ciclo completo y el `reviewer` lo repitio de forma independiente con snapshot del
+> esquema antes y despues. La evidencia esta en `## T6 — ciclo apply -> rollback -> apply`,
+> al final de este archivo. Lo que sigue mas abajo en `## Bloqueos` describe el estado de
+> **entonces** y se conserva por trazabilidad, no como estado actual.
 
 | Task | Estado |
 | --- | --- |
@@ -19,10 +24,10 @@ sin cerrarse en su forma real**. Los otros 23 requisitos estan cerrados.
 | T3 `down.sql` (DOWN) | `[x]` |
 | T4 contrato estatico del esquema | `[x]` |
 | T5 contrato estatico del SQL | `[x]` |
-| T6 ciclo apply -> rollback -> apply | `[ ]` **parcial**: apply verificado, rollback bloqueado |
+| T6 ciclo apply -> rollback -> apply | `[x]` — ejecutado por el leader, repetido por el `reviewer` |
 | T7 tests de integracion contra Postgres real | `[x]` |
 | T8 merge con `dev` + `./init.sh` completo | `[ ]` — la corre el **leader** |
-| T9 mapa `R<n>` -> test con salida real | `[ ]` — el archivo esta escrito, pero su criterio («cada R1–R24 con un test **ejecutado**») no se cumple mientras R22 siga sin el rollback |
+| T9 mapa `R<n>` -> test con salida real | `[x]` — los 24 requisitos con test ejecutado |
 
 ## La base de datos de esta feature
 
