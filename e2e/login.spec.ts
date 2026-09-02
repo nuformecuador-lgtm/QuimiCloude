@@ -7,15 +7,24 @@
  * `httpOnly`/`SameSite` puede comportarse distinto sin que ningun test de Node lo note.
  *
  * DATOS (R21): este spec NO usa el seed de QC-6 —que sigue `pending`— ni ningun dato
- * preexistente. Crea su propio rol y su propio usuario con `username` aleatorio y hash real,
- * y los borra al final. Asi el camino feliz se puede demostrar sin acoplar la feature a datos
- * que otra pueda cambiar. El `documentTypeCode: 'CC'` es la unica fila ajena de la que
- * depende, y la inserta la migracion de QC-4.
+ * preexistente. Crea su propio rol y sus propios usuarios con `username` aleatorio y hash
+ * real, y los borra al final. Asi el camino feliz se puede demostrar sin acoplar la feature
+ * a datos que otra pueda cambiar. El `documentTypeCode: 'CC'` es la unica fila ajena de la
+ * que depende, y la inserta la migracion de QC-4.
  *
- * AISLAMIENTO ENTRE PROYECTOS: `playwright.config.ts` corre este archivo una vez por proyecto
- * (chromium y webkit) y con `fullyParallel` puede repartir sus tests en varios workers. El
- * sufijo aleatorio se calcula al cargar el modulo, o sea una vez por PROCESO de worker, de
- * modo que cada ejecucion tiene su propio usuario y ninguna pisa a la otra ni al borrar.
+ * UN USUARIO POR TEST: el camino de error suma uno a `failed_login_attempts` del usuario que
+ * usa. Compartir el usuario entre los dos tests significa que, con `fullyParallel` y
+ * `retries: 2` en CI, las repeticiones del camino de error pueden llegar a 5 y BLOQUEAR la
+ * cuenta, volviendo rojo el camino feliz por una razon que no es un fallo del login. Se
+ * descarto resetear los contadores en un `beforeEach` porque con `fullyParallel` los dos
+ * tests de este archivo pueden correr a la vez en workers distintos del MISMO proyecto: el
+ * reset de uno pisaria el estado del otro. Un usuario por test es lo unico que aisla de
+ * verdad.
+ *
+ * AISLAMIENTO ENTRE PROYECTOS Y WORKERS: `RUN_ID` se calcula al cargar el modulo, o sea una
+ * vez por PROCESO de worker, y va dentro del `username`, del correo, del documento y del
+ * nombre del rol —los tres indices unicos de `users` y el `name` unico de `roles` son
+ * globales—. Cada ejecucion crea y borra solo lo suyo.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
  * importarse (igual que en los tests de integracion), y `next dev` —que arranca el `webServer`
@@ -34,60 +43,102 @@ import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
 
+/** Prefijos con los que este spec marca TODO lo que crea. Nada fuera de ellos se toca. */
+const USERNAME_PREFIX = 'qc7_e2e_';
+const ROLE_NAME_PREFIX = 'qc7_e2e_rol_';
+
+/** Identificador unico de este proceso de worker. */
+const RUN_ID = randomUUID().replace(/-/g, '');
+
 /**
- * Sufijo unico de esta ejecucion. Se usa en el nombre de usuario, el correo, el documento y
- * el nombre del rol: los tres indices unicos de `users` y el `name` unico de `roles` son
- * globales, asi que sin sufijo dos ejecuciones simultaneas chocarian.
+ * Edad minima para considerar huerfana una fila con nuestros prefijos. Chromium y WebKit
+ * corren a la vez, asi que la limpieza defensiva NO puede borrar por prefijo a secas: se
+ * llevaria por delante el usuario que el otro proyecto acaba de crear. Una hora deja fuera
+ * cualquier ejecucion viva y dentro cualquier resto de una ejecucion anterior.
  */
-const suffix = randomUUID().replace(/-/g, '');
+const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
-const username = `qc7_e2e_${suffix}`;
-/** Contrasena conocida del usuario de prueba. Solo vive aqui; nunca se escribe en consola. */
-const password = `Qc7-E2E-${suffix.slice(0, 12)}`;
-
-let userId: string | null = null;
 let roleId: string | null = null;
 
-test.beforeAll(async () => {
-  const role = await prisma.role.create({
-    data: {
-      name: `qc7_e2e_rol_${suffix}`,
-      description: 'Rol efimero del E2E de login (QC-7). Se borra en afterAll.',
-    },
-    select: { id: true },
-  });
-  roleId = role.id;
+/**
+ * Crea un usuario propio del test que lo pide. `label` distingue los usuarios dentro del
+ * mismo worker; `RUN_ID` los distingue entre workers y proyectos.
+ */
+async function createTestUser(label: string): Promise<{ username: string; password: string }> {
+  if (!roleId) throw new Error('el rol del fixture no existe: fallo el beforeAll');
+
+  const suffix = `${RUN_ID}${label}`;
+  const username = `${USERNAME_PREFIX}${suffix}`;
+  /** Contrasena conocida del usuario de prueba. Solo vive aqui; nunca se escribe en consola. */
+  const password = `Qc7-E2E-${suffix.slice(0, 12)}`;
 
   // Hash REAL: el objetivo del E2E es que bcrypt, el adaptador Prisma y la Server Action se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  const user = await prisma.user.create({
+  await prisma.user.create({
     data: {
       firstNames: 'Usuario',
       lastNames: 'De Prueba E2E',
       birthDate: new Date('1990-01-01'),
-      email: `qc7_e2e_${suffix}@example.test`,
+      email: `${USERNAME_PREFIX}${suffix}@example.test`,
       phone: '+573000000000',
       documentTypeCode: 'CC',
       documentNumber: `qc7${suffix}`,
       username,
       passwordHash: await createPasswordHash(password),
-      roleId: role.id,
+      roleId,
     },
     select: { id: true },
   });
-  userId = user.id;
+
+  return { username, password };
+}
+
+test.beforeAll(async () => {
+  // LIMPIEZA DEFENSIVA DE HUERFANOS. Existe porque un `pnpm run e2e` interrumpido a media
+  // ejecucion (p. ej. por falta de disco) deja usuarios y roles `qc7_e2e_*` en la base, y esa
+  // basura pone rojo un test de OTRA feature —`identity-constraints.int.test.ts` afirma
+  // `user.count() === 0`—: media hora para entender un rojo que no es del codigo.
+  // Usuarios antes que roles por la FK `users.role_id` (`onDelete: Restrict`). El veto al
+  // borrado fisico de `docs/architecture.md > Anti-patrones` habla del codigo de produccion;
+  // esto es un fixture de test y borra solo filas propias, por prefijo y con edad minima.
+  const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
+
+  await prisma.user.deleteMany({
+    where: { username: { startsWith: USERNAME_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+  await prisma.role.deleteMany({
+    where: { name: { startsWith: ROLE_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+
+  // El rol si se comparte entre los dos tests: ningun intento de login lo muta.
+  const role = await prisma.role.create({
+    data: {
+      name: `${ROLE_NAME_PREFIX}${RUN_ID}`,
+      description: 'Rol efimero del E2E de login (QC-7). Se borra en afterAll.',
+    },
+    select: { id: true },
+  });
+  roleId = role.id;
 });
 
 test.afterAll(async () => {
-  // El usuario primero y el rol despues: la FK `users.role_id` es `onDelete: Restrict`.
-  // El `finally` garantiza que el rol se intenta borrar aunque el borrado del usuario falle,
-  // para no dejar basura que reviente la unicidad de `roles.name` en la siguiente ejecucion.
+  // Borra SIEMPRE, aunque el `beforeAll` fallara a medias o un test reventara: por eso se
+  // borra por prefijo de `RUN_ID` (no por ids acumulados en memoria) y cada paso va en su
+  // propio `try`/`catch`, para que un fallo al borrar usuarios no impida borrar el rol ni
+  // cerrar la conexion. Usuarios primero: la FK `users.role_id` es `onDelete: Restrict`.
   try {
-    if (userId) await prisma.user.deleteMany({ where: { id: userId } });
-  } finally {
-    if (roleId) await prisma.role.deleteMany({ where: { id: roleId } });
-    await prisma.$disconnect();
+    await prisma.user.deleteMany({
+      where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
+    });
+  } catch {
+    // se intenta borrar el rol igualmente
   }
+  try {
+    await prisma.role.deleteMany({ where: { name: `${ROLE_NAME_PREFIX}${RUN_ID}` } });
+  } catch {
+    // se cierra la conexion igualmente
+  }
+  await prisma.$disconnect();
 });
 
 // Timeout amplio: el primer `goto` hace que `next dev` compile la ruta bajo demanda, y bcrypt
@@ -100,6 +151,8 @@ test.describe('login en navegador real', () => {
     context,
   }) => {
     // Cubre R1 (autentica), R19 (destino) y R9 (cookie httpOnly) en navegador real.
+    const { username, password } = await createTestUser('ok');
+
     await page.goto(LOGIN_PATH);
 
     await page.getByTestId('login-username').fill(username);
@@ -124,6 +177,10 @@ test.describe('login en navegador real', () => {
     context,
   }) => {
     // Cubre R2 (mensaje generico, sin decir que campo fallo) y R14 (ningun fallo emite sesion).
+    // Usuario propio: este test gasta un intento fallido, y con reintentos en CI no debe
+    // acercar al bloqueo por 5 intentos a ningun usuario que otro test necesite sano.
+    const { username, password } = await createTestUser('ko');
+
     await page.goto(LOGIN_PATH);
 
     await page.getByTestId('login-username').fill(username);
