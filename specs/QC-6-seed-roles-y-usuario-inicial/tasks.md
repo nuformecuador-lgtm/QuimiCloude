@@ -66,14 +66,14 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 
 ## Bloque C — El seed (entregable 2): dominio y puertos
 
-### [ ] T6. `domain/roles.ts`
+### [x] T6. `domain/roles.ts`
 - Dep: ninguna.
 - `ROLE_ADMINISTRADOR`, `ROLE_OPERADOR` y `SEED_ROLES` con nombre + descripcion
   (`design.md > 5.1`). Reexportar los tres desde `lib/modules/identity/index.ts`.
 - **Hecho cuando:** `pnpm run typecheck` pasa y ningun archivo escribe los literales
   `'Administrador'` / `'Operador'` a mano fuera de este archivo.
 
-### [ ] T7. Puertos `initial-access-repository.ts` e `initial-access-credentials.ts`
+### [x] T7. Puertos `initial-access-repository.ts` e `initial-access-credentials.ts`
 - Dep: T6.
 - Interfaces de `design.md > 5.1`. El proveedor de credenciales es **una funcion**, no un
   objeto de datos: esa es la forma que hace posible R12 (no leer el entorno si no hace falta).
@@ -83,7 +83,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 - **Hecho cuando:** `pnpm run typecheck` pasa, `ports/` no importa Prisma, `next/*` ni
   `lib/shared/**`, y `pnpm run test:guardias` sigue verde.
 
-### [ ] T8. `domain/seed-initial-access.ts` — el caso de uso
+### [x] T8. `domain/seed-initial-access.ts` — el caso de uso
 - Dep: T7.
 - Implementa el algoritmo de `design.md > 5.2` en este orden: leer estado → resolver
   credenciales y hashear **antes** de escribir → crear solo lo que falta → devolver
@@ -92,7 +92,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 - **Hecho cuando:** `pnpm run typecheck` y `pnpm run lint` pasan y
   `tests/guards/guard-arquitectura-modulos.test.ts` sigue verde.
 
-### [ ] T9. Test unitario `tests/unit/identity/seed/seed-initial-access.test.ts`
+### [x] T9. Test unitario `tests/unit/identity/seed/seed-initial-access.test.ts`
 - Dep: T8.
 - Repositorio falso que **registra las llamadas recibidas**. Casos:
   1. base vacia → crea los dos roles y el usuario, con rol Administrador y
