@@ -17,6 +17,13 @@
 // la viola). `tests/`, `e2e/` y `scripts/` no son produccion y no entran en el barrido: el
 // propio archivo `session-cookie.ts` y este test SI mencionan `createHmac`, y el test que lo
 // mockea (`session-cookie.test.ts`) tambien lo hace, a proposito.
+//
+// QC-9 T1 (R19): el barrido pasa a incluir tambien los archivos `.ts`/`.tsx` de PRIMER NIVEL de la
+// raiz del repositorio. Hasta hoy solo miraba `lib`, `app`, `components` y `hooks`, asi que un
+// `createHmac` propio en un archivo de la raiz pasaba el gate en verde -- lo verifico a mano el
+// reviewer de QC-8 creando el archivo y borrandolo. Como `middleware.ts` va a nacer justo ahi y es
+// el candidato numero uno a convertirse en la segunda implementacion, la ampliacion va ANTES de que
+// ese archivo exista (QC-9 `design.md > 3.5`, punto 1).
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, join, sep } from 'node:path'
@@ -41,7 +48,7 @@ function findRepoRoot(startDir: string): string {
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 
-/** Directorios de codigo de PRODUCCION (no tests, no e2e, no scripts). */
+/** Directorios de codigo de PRODUCCION (no tests, no e2e, no scripts). Se barren en profundidad. */
 const PRODUCTION_DIRS = ['lib', 'app', 'components', 'hooks']
 
 const IGNORED_DIRS = new Set(['node_modules', '.next', '.git', '.prisma', 'dist', '.worktrees'])
@@ -90,9 +97,34 @@ export function mentionsCreateHmac(source: string): boolean {
   return /\bcreateHmac\s*\(/.test(stripComments(source))
 }
 
+/**
+ * Archivos `.ts`/`.tsx` sueltos en el PRIMER NIVEL del repositorio (no recursivo): hoy
+ * `next.config.ts`, `next-env.d.ts`, `playwright.config.ts` y `prisma.config.ts`, y manana
+ * `middleware.ts`. No se recorren las subcarpetas de la raiz aqui: las de produccion ya entran por
+ * `PRODUCTION_DIRS`, y `tests/`, `e2e/`, `scripts/` y `db/` no son produccion.
+ */
+export function listRootLevelSourceFiles(root: string): readonly string[] {
+  return readDirEntries(root)
+    .filter((entry) => !entry.isDirectory && SOURCE_EXTENSIONS.has(extname(entry.name)))
+    .map((entry) => join(root, entry.name))
+}
+
+/**
+ * Todo el codigo de produccion barrido por la guardia: los `PRODUCTION_DIRS` en profundidad **mas**
+ * los archivos de primer nivel de la raiz (QC-9 R19). Sin esa segunda mitad, un `createHmac` propio
+ * en la raiz del repo pasaba el gate en verde -- lo comprobo a mano el reviewer de QC-8, y por eso
+ * la ampliacion es bloqueante y va ANTES de que exista `middleware.ts` (QC-9 `design.md > 3.5`).
+ */
+export function listProductionFiles(root: string): readonly string[] {
+  return [
+    ...PRODUCTION_DIRS.flatMap((dirName) => listSourceFiles(join(root, dirName))),
+    ...listRootLevelSourceFiles(root),
+  ]
+}
+
 /** Archivos de produccion (rutas relativas en POSIX) que invocan `createHmac`. */
 export function findCreateHmacUsers(root: string): readonly string[] {
-  const files = PRODUCTION_DIRS.flatMap((dirName) => listSourceFiles(join(root, dirName)))
+  const files = listProductionFiles(root)
   return files
     .filter((absPath) => mentionsCreateHmac(readFileSync(absPath, 'utf8')))
     .map((absPath) => toPosix(absPath.slice(root.length + 1)))
@@ -142,5 +174,28 @@ describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
     // Un comentario que solo lo menciona no es una segunda implementacion.
     expect(mentionsCreateHmac('// antes esto llamaba a createHmac(...) directamente')).toBe(false)
     expect(mentionsCreateHmac('export function signSessionValue() { return "no-op" }')).toBe(false)
+  })
+
+  // QC-9 R19 — la raiz del repositorio tambien se barre.
+  it('un createHmac en un archivo de primer nivel se detecta: el barrido incluye la raiz del repositorio (R19)', () => {
+    const relativos = listProductionFiles(repoRoot).map((absPath) => toPosix(absPath.slice(repoRoot.length + 1)))
+
+    // Los `.ts` sueltos de la raiz entran: aqui es donde vivira `middleware.ts`.
+    expect(relativos).toContain('next.config.ts')
+    expect(relativos).toContain('playwright.config.ts')
+    expect(relativos).toContain('prisma.config.ts')
+
+    // Un archivo de primer nivel es exactamente eso: sin ninguna barra en su ruta relativa.
+    const primerNivel = relativos.filter((file) => !file.includes('/'))
+    expect(primerNivel.length).toBeGreaterThan(0)
+
+    // Y la ampliacion NO arrastra las carpetas que no son produccion: `tests/`, `e2e/` y
+    // `scripts/` mencionan `createHmac` a proposito y deben seguir fuera del barrido.
+    expect(relativos.some((file) => file.startsWith('tests/'))).toBe(false)
+    expect(relativos.some((file) => file.startsWith('e2e/'))).toBe(false)
+    expect(relativos.some((file) => file.startsWith('scripts/'))).toBe(false)
+
+    // Lo que ya barria sigue barriendose.
+    expect(relativos).toContain(UNICO_DUENO)
   })
 })
