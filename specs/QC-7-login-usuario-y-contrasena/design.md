@@ -76,6 +76,18 @@ por autenticado a nadie sin cookie.
 proposito es gastar el mismo trabajo de bcrypt. Se nombra sin el segmento `password` para no
 disparar `guard-password-never-plaintext`, igual que ya hizo `CREDENTIAL_MAX_LENGTH`.
 
+**El senuelo se calienta al CONSTRUIR el caso de uso, y eso tiene un coste de arranque que hay
+que decir** (menor M3 de la ronda 1, documentado tras el m11 de la ronda 2). Si se calculara
+perezosamente, el **primer** intento con usuario inexistente de cada proceso pagaria `hash()`
+**mas** `verify()` —~220 ms frente a ~110—, una asimetria de tiempo de una sola muestra por
+proceso. Al lanzarlo en la construccion desaparece.
+
+El precio: `lib/composition/index.ts` construye la fachada **al importarse**, asi que **todo
+proceso de servidor paga un bcrypt de coste 10 al arrancar**, tambien si nadie va a hacer login
+nunca en ese proceso. No bloquea el arranque —la promesa no se espera, solo se cachea— pero es
+un pico de CPU real en el boot y no estaba escrito en ningun sitio. Se asume: ~110 ms una vez
+por proceso, a cambio de que ningun intento sea distinguible por tiempo del resto.
+
 Lo que este diseño **no** hace: un reloj falso inyectado por puerto. El dominio recibe `now`
 como parametro opcional (`createSessionTicket(userId, now = new Date())`), que es lo que hace
 el ticket testeable sin montar un puerto de tiempo.
@@ -369,11 +381,41 @@ set(userId, estado): Promise<void>                            // incondicional
   salen sin escribir.
 - **Exito -> `set`.** El estado de exito es todo ceros: **no depende del valor previo**, es
   idempotente y no tiene el problema de lectura-modificacion-escritura.
-- **El predicado del CAS usa solo `failed_login_attempts` y `lock_level`, no `locked_until`.**
-  `locked_until` es `timestamptz(6)` —microsegundos en Postgres— y un `Date` de JS solo tiene
-  milisegundos: meterlo en el `WHERE` es una comparacion que un dia deja de casar en silencio y
-  el CAS no volveria a aplicar nunca. Ademas no hace falta: el par de enteros ya identifica cada
-  estado de la cadena de transiciones.
+- **El predicado del CAS compara los dos enteros por igualdad y el bloqueo por RANGO.**
+  De los enteros se exige que no hayan cambiado; de `locked_until`, solo que **no haya bloqueo
+  vigente** (`IS NULL OR <= now`). Las dos mitades tienen motivo distinto:
+  - **Por que el bloqueo va por rango y no por igualdad:** `locked_until` es `timestamptz(6)`
+    —microsegundos en Postgres— y un `Date` de JS solo llega al milisegundo. Una igualdad exacta
+    es una comparacion que un dia deja de casar en silencio y dejaria el CAS sin aplicar nunca.
+    Un rango es inmune a eso.
+  - **Por que el bloqueo tiene que estar en el predicado, aunque sea por rango.** Aqui hubo un
+    error, y se deja escrito porque el siguiente que lea esto se iba a fiar de la frase anterior.
+    La primera version de este documento decia que no hacia falta mirar `locked_until` porque
+    *"el par de enteros ya identifica cada estado de la cadena"*. **Es falso, y el reviewer lo
+    demostro ejecutandolo.** El par `(0, 1)` aparece con dos `locked_until` distintos:
+
+    | estado | `failed` | `level` | `locked_until` |
+    | --- | --- | --- | --- |
+    | bloqueo recien consumado | 0 | 1 | `T` (futuro) |
+    | ese mismo bloqueo ya caducado | 0 | 1 | `T` (pasado) |
+
+    y se vuelve a pasar por `(0,1)` cada vez que un login correcto reinicia a `(0,0,null)` y se
+    acumulan otros cinco fallos. Es un **ABA**: el par vuelve a su valor anterior y el CAS no
+    distingue una cosa de la otra. Consecuencia medida contra Postgres: un intento que leyo
+    `(0,1,caducado)` y llego tarde **aplicaba sobre un bloqueo activo y lo borraba**, dejando
+    `(1,1,null)`. O sea que un atacante bloqueado podia **quitarse el bloqueo** con un intento
+    fallido en el momento justo — el mismo control anulado por segunda vez, ahora por el arreglo
+    del primer fallo.
+
+    Con la condicion de rango el CAS **no puede aplicar nunca sobre un bloqueo vivo**: pierde, el
+    dominio relee, ve el bloqueo y sale sin escribir. Que es exactamente lo que ya hacia el
+    dominio y lo que la escritura se estaba saltando.
+- **Por que el camino de exito NO lleva esa condicion.** No es un olvido. `set` escribe todo
+  ceros, que es lo que R27 pide, y ese estado **no depende del valor previo**: no hay ABA que
+  pisar. Y si un bloqueo aparece entre la lectura y la escritura de un login **correcto**, borrarlo
+  es lo deseable, no un agujero: quien acaba de demostrar que sabe la contrasena es el dueno de la
+  cuenta, y R27 manda dejarsela limpia. El corte de R24 ya se evaluo sobre el estado que ese
+  intento leyo.
 
 Lo que **no** cambia, y hay que seguir vigilando: sigue habiendo **exactamente una** verificacion
 de hash en los tres caminos (R6, R29); la rama de usuario inexistente **sigue sin tocar el puerto

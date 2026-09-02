@@ -472,3 +472,288 @@ de la migracion aguanta ejecutado, la carrera de integracion la reproduje y el a
 correcto y esta bien acotado, el diff de `AGENTS.md` es ruido comprobado, Playwright entro
 por la puerta, y `login-action.test.ts` se toco exactamente en lo autorizado. El unico
 agujero es el que ningun test podia encontrar porque nadie escribio la pregunta.
+
+---
+---
+
+# Ronda 2 — tras el arreglo de M-A1
+
+**Veredicto: RECHAZADO** — 1 mayor nuevo, 3 menores nuevos.
+
+Revisado `git diff 682e2e5..HEAD` (4 commits, el ultimo del leader). No repeti el gate completo:
+el leader lo corrio en verde y repetirlo a la vez habria chocado con la carrera de la base. Si
+corri un archivo de integracion propio y temporal, ya borrado (`git status` limpio).
+
+M-A1 esta **bien arreglado en lo esencial**: el CAS aguanta la concurrencia, y lo comprobe con
+mas carga de la que el implementer probo. Lo que devuelve la feature es una **segunda ventana**,
+mas estrecha, que el propio codigo declara imposible con un argumento que **no es cierto**. Lo
+demostre ejecutandolo.
+
+## R2.1 ¿El CAS cierra la carrera o la estrecha? — la cierra, y aguanta mas de lo probado
+
+Sus tests usan 3 y 5 intentos. Los subi a 20 y 40, con adaptadores reales contra Postgres:
+
+```
+REV 20-paralelo => {"failedLoginAttempts":0,"lockLevel":1,"lockedUntil":"2026-09-02T01:21:13.888Z"}
+REV 40-paralelo => {"failedLoginAttempts":0,"lockLevel":1,"lockedUntil":"2026-09-02T01:21:15.449Z"}
+```
+
+Con 40 intentos simultaneos la cuenta **se bloquea**, en nivel 1 y con el contador a 0, que es
+exactamente el estado correcto. Con el codigo viejo el contador se habria quedado en 1.
+
+**El razonamiento de los 10 reintentos es correcto y lo confirma la maquina.** La cadena de
+transiciones tiene 5 escalones antes del bloqueo —(0,0) -> (1,0) -> ... -> (4,0) -> (0,1,T)— y en
+cada ronda gana exactamente un CAS; en cuanto la fila queda bloqueada, todo el que relee ve el
+bloqueo y sale sin escribir. Por eso subir de 5 a 40 intentos **no** aumenta las vueltas del
+bucle: las aumenta hasta el bloqueo y ahi se acaban. 10 sobra con holgura, y el caso limite
+—perder 10 veces y no contar ese intento— esta declarado en `design.md > 5.7` y en
+`progress/current.md > Deudas`, con el argumento correcto de que el contador es monotono y el
+bloqueo se dispara igual. Nada que objetar aqui.
+
+El camino de exito con `set` incondicional tambien es correcto: su estado es todo ceros, no
+depende del valor previo y es idempotente. Bien separadas las dos primitivas en el puerto.
+
+## R2.2 El predicado sin `locked_until` SI abre una ventana — MAYOR
+
+### El argumento sobre `timestamptz(6)` es defendible; la frase que lo acompana es falsa
+
+Lo primero es cierto a medias: `locked_until` es `timestamptz(6)` y un `Date` de JS solo llega al
+milisegundo. Pero **todos** los valores que se escriben en esa columna salen de un `new Date()`
+via Prisma, o sea que llegan con los microsegundos a cero y vuelven identicos: una igualdad
+exacta casaria hoy sin problema. El riesgo que describe es real solo si algun dia escribe esa
+columna algo que no sea este codigo. Es una precaucion legitima, no un hecho.
+
+Lo que **no** es cierto es la segunda mitad, la que hace de coartada — en
+`user-credentials-prisma.ts:64` y repetida en `design.md > 5.7`:
+
+> "Ademas no hace falta: el par `(failedAttempts, lockLevel)` ya identifica cada estado de la
+> cadena de transiciones."
+
+**No lo identifica.** El par `(0, 1)` aparece **dos veces** con `locked_until` distinto:
+
+- como bloqueo **recien consumado**: `(0, 1, T_futuro)`;
+- como ese mismo bloqueo ya **caducado**: `(0, 1, T_pasado)`.
+
+Y se vuelve a llegar a `(0,1)` despues de un exito, porque `nextLockState(_, 'success')` devuelve
+`(0, 0, null)` y desde ahi otros 5 fallos dan `(0, 1, T')`. El par se repite; el estado no es el
+mismo. Eso es un ABA de manual, y el predicado del CAS no lo ve.
+
+### Ejecutado, no argumentado
+
+Puse la fila en un bloqueo **activo** y lance el CAS con el estado obsoleto que otro intento
+habria leido cuando ese bloqueo aun estaba caducado:
+
+```ts
+// fila real: failed=0, level=1, lockedUntil = ahora + 60s   (bloqueo ACTIVO)
+await compareAndSetLoginAttempt(
+  usuarioId,
+  { failedAttempts: 0, lockLevel: 1, lockedUntil: pasado },   // lo que leyo el intento viejo
+  { failedAttempts: 1, lockLevel: 1, lockedUntil: null },
+);
+```
+
+```
+REV ABA aplico => true estado => {"failedLoginAttempts":1,"lockLevel":1,"lockedUntil":null}
+```
+
+**El CAS aplico sobre un bloqueo activo y lo borro.** `locked_until` paso a `null`: la cuenta
+salio del bloqueo. No es que el CAS "no proteja lo suficiente" — es que escribe encima de un
+estado que el dominio jamas habria escogido, porque el dominio corta por `isLocked` justo antes
+y aqui el `isLocked` se evaluo sobre la copia vieja.
+
+### Que hace falta para alcanzarlo desde el dominio, y por que aun asi bloquea
+
+Honestamente, la ventana es estrecha. Hace falta, dentro de los ~110 ms que un intento pasa en
+bcrypt entre su lectura y su CAS:
+
+1. que ese intento leyera `(0, 1, caducado)`;
+2. **un login con exito** por medio (sin el, `lock_level` nunca vuelve a un valor anterior y no
+   hay ABA posible: lo comprobe recorriendo la cadena entera);
+3. y otros 5 fallos ganadores que consumen un bloqueo nuevo.
+
+Con muchos intentos en vuelo a la vez —que es el escenario del que trata todo este arreglo— los
+puntos 3 caben de sobra en 110 ms, porque sus bcrypt ya venian corriendo. El punto 2 es el que lo
+hace raro. El dano tampoco es total: el bloqueo se limpia una vez y el atacante necesita otros 5
+fallos para reponerlo.
+
+Aun asi lo mantengo como **mayor**, por tres razones:
+
+1. **Es el mismo tipo de fallo que M-A1, un escalon mas abajo:** una escritura que pisa un estado
+   que no leyo. Cerrar M-A1 y dejar esta es cerrar la puerta y no la ventana.
+2. **Esta declarado imposible por escrito, y no lo es.** Un comentario que dice "no hace falta"
+   apaga la pregunta para el proximo que lea. Es exactamente lo que el propio implementer
+   diagnostico de si mismo en 9.1: "no es que se asumiera el riesgo, es que no se penso". Aqui si
+   se penso, pero se cerro con una premisa falsa, que es peor de rastrear.
+3. **El arreglo es de tres lineas y no reabre el problema de precision** que motivo dejar
+   `locked_until` fuera. No hace falta igualdad exacta de timestamps: basta con exigir que la
+   fila **no este bloqueada ahora**, que es una comparacion de **rango** y por tanto inmune al
+   micro-vs-milisegundo:
+
+```ts
+where: {
+  id: userId,
+  failedLoginAttempts: esperado.failedAttempts,
+  lockLevel: esperado.lockLevel,
+  OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
+}
+```
+
+Con eso el CAS no puede aplicar **nunca** sobre un bloqueo vivo, que es la unica propiedad que
+hacia falta. Exige pasar `now` al puerto —el dominio ya lo tiene fijado por invocacion— y deja
+intacto todo lo demas: la politica sigue en `nextLockState` y el adaptador sigue sin decidir.
+Tambien cierra el unico escenario en que los 10 reintentos podrian agotarse (un exito reinicia la
+cadena a mitad del bucle).
+
+No escribo el parche: vuelve al implementer. Si el humano prefiere asumirlo, la condicion minima
+es **borrar la frase falsa** de `user-credentials-prisma.ts` y de `design.md > 5.7` y sustituirla
+por el escenario real y su probabilidad. Lo que no puede quedarse es la coartada.
+
+## R2.3 El tercer test: la honestidad es cierta, la razon que da no
+
+Confirmado lo que declara: **"intentos en paralelo durante el bloqueo no lo alargan" pasa tambien
+con el codigo viejo**. El corte esta en `verify-credentials.ts:135` (`isLocked` antes de tocar
+ningun puerto de escritura) y no depende en absoluto de como se persista. Declararlo, en vez de
+apuntarse tres tests discriminantes cuando solo dos lo son, es lo que separa la evidencia del
+adorno. Bien.
+
+Pero la razon que da para conservarlo **no describe lo que el test hace**:
+
+> "se deja porque cubre el caso nuevo de que el bloqueo aparezca a mitad del reintento"
+
+No lo cubre. En ese test (`login.int.test.ts:301`) la fila se deja **bloqueada antes** de lanzar
+los cinco intentos, asi que el bloqueo ya esta ahi cuando cada intento hace su primera lectura:
+no aparece a mitad de nada. El caso "aparece entre la lectura y la escritura" lo cubre el
+**unitario** `verify-credentials.test.ts` — "si la cuenta se bloquea mientras tanto, el reintento
+no escribe", con `compareAndSet` devolviendo `false` y una relectura que ya viene bloqueada.
+
+Sigue aportando, pero **por otro motivo**: es el unico sitio donde R25 se afirma con los
+adaptadores **reales** y bajo cinco peticiones simultaneas, y detectaria una regresion que moviera
+el corte por bloqueo a despues de la escritura. No es ruido — pero la frase que lo justifica hay
+que cambiarla, porque manda al siguiente lector a buscar en ese test una cobertura que no tiene.
+Menor m9.
+
+## R2.4 La medicion de tiempo — M4 cerrado, y bien cerrado
+
+El metodo ahora aguanta. Lo que pedia M4 era dejar de vender un porcentaje como propiedad del
+codigo, y eso es lo que hizo: **dos** corridas independientes en vez de una, n=60, medianas, y
+—la parte que importa— el ruido **p10-p90 dentro de cada camino** publicado al lado de la
+diferencia entre caminos. 1-2 ms de diferencia contra 13-18 ms de ruido interno es un argumento
+que se sostiene solo; el 5,6 % que yo medi en una maquina peor encaja en el mismo cuadro en vez
+de contradecirlo, que es la prueba de que ahora se afirma lo correcto.
+
+Y el dato decisivo esta bien identificado: **el camino mas lento cambia de identidad entre
+corridas** (A: inexistente; B: bloqueada; la mia: bloqueada). Un sesgo real no cambia de signo.
+Es una afirmacion sobre el codigo, no sobre la maquina, y por eso vale.
+
+Bien tambien haber declarado el limite nuevo que el propio arreglo introduce —el camino de fallo
+puede dar mas de una vuelta de CAS, y eso solo pasa cuando el usuario existe— en vez de fingir
+uniformidad perfecta. Es la conducta que faltaba en la ronda 1.
+
+## R2.5 La limpieza del E2E — acotada, con un borde afilado
+
+**El barrido no puede borrar datos ajenos.** Lo comprobe contra el codigo:
+
+- `prisma.user.deleteMany` con `username startsWith 'qc7_e2e_'` **y** `createdAt < corte`
+- `prisma.role.deleteMany` con `name startsWith 'qc7_e2e_rol_'` **y** `createdAt < corte`
+
+Dos condiciones **conjuntas**, y el prefijo es propiedad exclusiva de este spec: no hay forma de
+que alcance una fila que no haya creado el E2E de QC-7. El `afterAll` va mas acotado todavia
+(`qc7_e2e_<RUN_ID>`), y borra por prefijo y no por ids en memoria, que es lo correcto justo para
+el caso que lo motivo: un `beforeAll` que murio a medias no dejo ids que borrar. El filtro de una
+hora esta bien razonado —chromium y webkit comparten prefijo y corren a la vez— y esta escrito.
+El veto al borrado fisico de `docs/architecture.md > Anti-patrones` se cita y se acota a
+produccion, correctamente.
+
+El borde: los dos `deleteMany` usan **el mismo corte de tiempo pero sobre filas con `createdAt`
+distinto**. El rol se crea unos segundos antes que su usuario, asi que hay una ventana de esos
+pocos segundos en la que el corte cae **entre** los dos: el rol huerfano califica como viejo y su
+usuario no. Entonces el borrado del rol choca con la FK `users.role_id` (`onDelete: Restrict`),
+`deleteMany` lanza dentro del `beforeAll` y **el spec entero se pone rojo** — por la limpieza, no
+por el login. Es estrecho y solo ocurre habiendo huerfanos, pero es el mismo genero de rojo
+confuso que la limpieza venia a evitar. Menor m10.
+
+## R2.6 Los menores de la ronda 1 — verificados uno a uno
+
+| # | Estado | Comprobado en el codigo |
+| --- | --- | --- |
+| M1 | **cerrado** | Test nuevo en `verify-credentials.test.ts` con `createPasswordHash`/`verifyPasswordHash` **reales**, los tres caminos, y afirma que no aparecen ni la clave, ni el hash, ni sus primeros 29 caracteres. El codigo muerto del test de la cookie eliminado y el `it` renombrado a lo que de verdad cubre. Cubre lo que M1 pedia y algo mas |
+| M2 | **cerrado por el leader** | `tasks.md` T13 en `[x]` con constancia de quien lo corrio y que salio |
+| M3 | **cerrado** | `const calentamiento = decoyHash()` al construir, con un `void ...catch(() => {})` que evita el unhandled rejection **sin** tragarse el error para quien espere la promesa cacheada. El `hasher.hash.mockClear()` del test de R8 esta bien puesto: limpia el calentamiento y sigue detectando cualquier hash **durante** la invocacion |
+| M4 | **cerrado** | Ver R2.4 |
+| M5 | **cerrado, y mas fuerte** | Puerto propio 3117 en `baseURL`, `webServer.url` y `command`, y `reuseExistingServer: false` **tambien en local**: si el puerto esta ocupado falla ruidosamente en vez de mentir. Es mas de lo que pedi |
+| M6 | **cerrado** | 4 tests verdes en chromium y webkit con disco libre. No lo reproduje: el disco de esta maquina sigue con 59 MB libres. Lo doy por bueno porque el leader corrio el gate completo en verde |
+| M7 | **cerrado, y mas fuerte** | Un usuario **por test** via `createTestUser(label)`, no un reset compartido, con la razon escrita: con `fullyParallel` los dos tests caen en workers distintos y un reset se pisaria |
+| M8 | **cerrado** | Los tres: nota del hueco de T10 en `tasks.md`, "pregunta abierta 2" en `design.md:162`, y el snippet de 4.2 ya solo importa `createHmac` con la nota de que `timingSafeEqual` es de QC-8 (`design.md:150`) |
+
+**Ninguno quedo a medias y ninguno se descarto.** M2 no era suyo y no lo marco, que es lo
+correcto.
+
+## R2.7 Casillas de `tasks.md` — ninguna miente
+
+Hubo una segunda reanudacion. El unico cambio de casilla en todo el diff es T13, y lo firma el
+leader con el resultado del gate. El resto siguen siendo las que verifique en la ronda 1. Reviso
+ademas lo que **no** aparece: el arreglo de M-A1 no se colo como task nueva marcada `[x]` —esta
+donde tiene que estar, en `design.md > 5.7` y en la seccion 9 de la bitacora—, y no hay ninguna
+casilla marcada que apunte a trabajo que no exista.
+
+## R2.8 Lo que el arreglo no rompio, comprobado
+
+- **R31** — la rama sin usuario sigue sin tocar el puerto de escritura, y el bucle sale sin
+  escribir si la relectura da `null` o un `id` distinto. Dos tests.
+- **R29/R6** — el bucle de reintento **no llama al hasher**: sigue habiendo exactamente una
+  verificacion por intento, y se afirma dentro del propio test del reintento
+  (`expect(hasher.verify).toHaveBeenCalledTimes(1)`), que es donde tenia que estar.
+- **Hexagonal** — el puerto sigue sin decidir: `compareAndSet` recibe los dos estados ya
+  calculados. La escalada sigue viviendo solo en `account-lock.ts`. `updateMany` con `id` en el
+  `where` afecta a 0 o 1 filas, y esta explicado por que no es `update`.
+- **Alternativas descartadas** — la politica en SQL y el `SELECT ... FOR UPDATE` estan descartadas
+  con el motivo correcto en `design.md > 5.7`: la primera duplicaria la tabla de escalada dentro
+  del adaptador, la segunda obligaria al dominio a correr dentro de una transaccion. De acuerdo
+  con las dos.
+
+## R2.9 Hallazgos de la ronda 2
+
+### MAYOR
+
+**M-B1 — El predicado del CAS ignora `locked_until` y puede borrar un bloqueo ACTIVO (ABA).**
+`user-credentials-prisma.ts:59-70` y `design.md > 5.7`. Demostrado ejecutandolo: el CAS aplico
+sobre una fila con `lockedUntil` en el futuro y la dejo en `null`. La justificacion escrita —"el
+par de enteros ya identifica cada estado de la cadena"— es **falsa**: `(0,1)` existe como bloqueo
+fresco y como bloqueo caducado, y se vuelve a el tras un exito. Remedio de tres lineas y sin
+igualdad de timestamps, en R2.2. Alternativa minima si el humano asume el riesgo: borrar la frase
+falsa y escribir en su lugar el escenario real y su probabilidad.
+
+### MENORES
+
+**m9 — La razon para conservar el tercer test de concurrencia no describe lo que el test hace.**
+`impl > 9.2`. Dice que cubre "el bloqueo que aparece a mitad del reintento"; en ese test la fila
+esta bloqueada **antes** de empezar. Ese caso lo cubre el unitario. El test aporta, pero por otro
+motivo (R25 con adaptadores reales y cinco peticiones a la vez): hay que reescribir la frase.
+
+**m10 — El barrido de huerfanos del E2E puede chocar con la FK y poner rojo el spec.**
+`e2e/login.spec.ts`, `beforeAll`. Rol y usuario se crean con segundos de diferencia; si el corte
+de una hora cae entre ambos, el rol califica como huerfano y su usuario no, y el `deleteMany` de
+roles choca con `onDelete: Restrict`. Se cierra borrando primero los usuarios **de los roles que
+se van a borrar**, o envolviendo ese `deleteMany` en un `try/catch` — ahi si es inofensivo,
+porque es limpieza defensiva.
+
+**m11 — El calentamiento del senuelo mete un bcrypt en la carga del modulo de composicion.**
+`verify-credentials.ts:69` mas `lib/composition/index.ts`, que construye el caso de uso al
+importarse. Todo proceso de servidor paga ahora un hash de coste 10 al arrancar, tambien si nadie
+va a hacer login. Es lo correcto para la uniformidad de tiempo y no lo discuto; solo que es un
+efecto de arranque que no esta escrito en ningun sitio, y este equipo documenta cosas mas
+pequenas.
+
+## R2.10 Veredicto de la ronda 2
+
+**RECHAZADO** — 1 mayor (M-B1), 3 menores (m9, m10, m11).
+
+M-A1 esta bien cerrado: el CAS aguanta 40 intentos simultaneos, el bucle esta acotado con un
+argumento correcto, el limite que queda esta declarado en dos sitios, los tests nuevos se
+comprobaron rojos contra el codigo viejo y los ocho menores de la ronda 1 estan aplicados —dos de
+ellos mas fuerte de lo que pedi—. La calidad de la respuesta a la revision es alta y la
+autocritica de 9.1 es la correcta.
+
+Lo que impide el OK es que el arreglo dejo una segunda escritura que pisa un estado que no leyo, y
+la apago con una premisa falsa en vez de con una condicion. Tres lineas en el `where` y una frase
+reescrita.

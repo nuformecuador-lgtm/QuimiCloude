@@ -452,11 +452,10 @@ recalcula la politica** sobre el estado fresco. La escalada la sigue decidiendo
 | dominio, camino de fallo | una escritura y a correr | `registrarFallo()`: bucle acotado con relectura y recalculo |
 | dominio, camino de exito | igual | igual: `set` incondicional, porque el estado de exito es todo ceros y **no depende del valor previo** |
 
-Detalle que no es obvio y esta comentado en el codigo: **el predicado del CAS usa solo los dos
-enteros, no `locked_until`.** La columna es `timestamptz(6)` —microsegundos en Postgres— y un
-`Date` de JS solo tiene milisegundos: meterla en el `WHERE` es una comparacion que un dia deja
-de casar en silencio y el CAS no volveria a aplicar nunca. El par
-`(failed_login_attempts, lock_level)` ya identifica cada estado de la cadena.
+Detalle que no es obvio: **el predicado del CAS compara los enteros por igualdad y el bloqueo por
+rango** (`locked_until IS NULL OR <= now`). La parte del rango **no estaba en la primera version
+de este arreglo y fue el mayor de la ronda 2**; el porque, con el escenario ABA que lo demostro,
+esta en 9.6 y en `design.md > 5.7`.
 
 **Las tres cosas que el arreglo no podia romper, comprobadas:**
 
@@ -493,8 +492,16 @@ AssertionError: expected 1 to be +0
 ```
 
 Con el codigo nuevo, los tres pasan. Precision honesta: **el tercero (R25) pasa tambien con el
-codigo viejo** —el corte por bloqueo esta en el dominio, asi que no discrimina—; se deja porque
-cubre el caso nuevo de que el bloqueo aparezca a mitad del reintento.
+codigo viejo** —el corte por bloqueo esta en `verify-credentials.ts`, antes de tocar ningun
+puerto de escritura, asi que no discrimina entre las dos formas de persistir—.
+
+**Por que se conserva igualmente** (corregido en la ronda 2, menor m9: la razon que daba antes
+—"cubre el bloqueo que aparece a mitad del reintento"— **no describia lo que el test hace**, y
+mandaba al siguiente lector a buscar ahi una cobertura que no tiene; ese caso lo cubre el
+unitario "si la cuenta se bloquea mientras tanto, el reintento no escribe"). Se conserva porque
+es **el unico sitio donde R25 se afirma con los adaptadores reales y bajo cinco peticiones
+simultaneas**: detectaria una regresion que moviera el corte por bloqueo a despues de la
+escritura, que es justo el tipo de cambio que un unitario con dobles dejaria pasar.
 
 Ademas, tres tests unitarios del bucle con dobles: que un CAS perdido se reintenta sobre el
 estado fresco, que si la cuenta se bloquea entre medias no hay segunda escritura, y que si el
@@ -550,3 +557,153 @@ $ pnpm run e2e
 bucle de reintento con dobles, 1 de R15 completo).
 
 **Sigue pendiente y sigue siendo del leader:** `./init.sh` completo, y con el la casilla de T13.
+
+---
+
+## 10. Respuesta a la ronda 2 (RECHAZADO: 1 mayor, 3 menores)
+
+### 10.1 M-B1 (bloqueante) — CERRADO CON CODIGO
+
+**El reviewer tenia razon, y lo demostro ejecutandolo. Mi justificacion escrita era falsa.**
+
+Al cerrar M-A1 saque `locked_until` del predicado del CAS y lo justifique asi:
+
+> "Ademas no hace falta: el par `(failedAttempts, lockLevel)` ya identifica cada estado de la
+> cadena de transiciones."
+
+**No lo identifica.** `(0, 1)` existe con dos `locked_until` distintos —bloqueo recien consumado
+`(0,1,T_futuro)` y ese mismo bloqueo ya caducado `(0,1,T_pasado)`— y se vuelve a pasar por `(0,1)`
+cada vez que un login correcto reinicia a `(0,0,null)` y se acumulan otros cinco fallos. Es un
+**ABA**: el par vuelve a su valor anterior y el CAS no distingue una cosa de la otra.
+
+Consecuencia medida contra Postgres: un intento que leyo `(0,1,caducado)` y llegaba tarde
+**aplicaba sobre un bloqueo vivo y lo borraba**, dejando `(1,1,null)`. O sea que **un atacante
+bloqueado podia quitarse el bloqueo** con un intento fallido en el momento justo. El mismo control
+anulado por segunda vez — ahora por el arreglo del primero.
+
+**Lo que peor me deja no es el bug, es la coartada.** En 9.1 escribi que lo grave de M-A1 era que
+"no se penso". Aqui si se penso, y se cerro con una premisa falsa, que es peor de rastrear: un
+comentario que dice "no hace falta" apaga la pregunta para el que lea despues — y el que iba a
+leer despues es QC-8.
+
+**Arreglo: comparacion de RANGO, no de igualdad.**
+
+```ts
+where: {
+  id: userId,
+  failedLoginAttempts: esperado.failedAttempts,
+  lockLevel: esperado.lockLevel,
+  OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
+}
+```
+
+El CAS **no puede aplicar nunca sobre un bloqueo vigente**: pierde, el dominio relee, ve el
+bloqueo y sale sin escribir — que es justo lo que el dominio ya hacia y lo que la escritura se
+estaba saltando. Y **conserva el argumento original** que me llevo a sacar la columna: un rango no
+exige que las marcas de tiempo casen exactamente, asi que el problema de precision
+`timestamptz(6)` frente al `Date` de JS no se reabre. `compareAndSet` recibe ahora `now`, el mismo
+reloj que el dominio fija una vez por invocacion; hay un test unitario que ata las dos cosas.
+
+Las cuatro transiciones, comprobadas contra la base:
+
+| transicion | fila en la base | ¿aplica? |
+| --- | --- | --- |
+| fallo normal `(0,0,null) -> (1,0,null)` | `locked_until` nulo | **si** |
+| quinto fallo `(4,0,null) -> (0,1,T)` | `locked_until` nulo | **si** |
+| bloqueo caducado + fallo | `(0,1,T_pasado)` | **si**, por el `lte: now` |
+| **ABA**: leido `(0,1,T_pasado)`, fila en `(0,1,T_futuro)` | bloqueo vivo | **no** |
+
+**Y la frase falsa esta borrada** de `user-credentials-prisma.ts` y de `design.md > 5.7`, y
+sustituida por el escenario real con su tabla y la constancia de que se comprobo ejecutandolo.
+
+### 10.2 La evidencia, verificada por mi y no solo por el subagente
+
+Tres tests nuevos de integracion. El discriminante es el primero, y **quite el `OR` yo mismo para
+verlo caer**:
+
+```
+$ (predicado sin el OR)
+ × un intento con estado obsoleto no puede borrar un bloqueo vigente
+ FAIL  AssertionError: expected true to be false
+       tests/integration/identity/login.int.test.ts:355  expect(aplico).toBe(false)
+ Test Files  1 failed (1)      Tests  1 failed | 12 passed (13)
+
+$ (con el OR restaurado)
+ Test Files  1 passed (1)      Tests  13 passed (13)
+```
+
+`expected true to be false`: con el predicado viejo el CAS **aplica** sobre el bloqueo vivo. Ese
+es el bug, reproducido.
+
+Los otros dos no son discriminantes y lo digo, como la vez anterior:
+`'un fallo tras un bloqueo caducado si se registra'` demuestra que el `lte: now` **no** cierra el
+camino legitimo (habria detectado un arreglo que pasara de largo y bloqueara todo), y
+`'fallos en paralelo sobre una cuenta bloqueada no la desbloquean'` ejercita el caso de uso
+completo con cinco intentos a la vez. Alcanzar el ABA desde el dominio exige una secuencia muy
+concreta —leer un bloqueo caducado, un login **exitoso** por medio y otros cinco fallos ganadores,
+todo dentro de los ~110 ms de un bcrypt—, asi que ese test cubre la propiedad, no el camino exacto.
+
+### 10.3 Uniformidad de tiempo, remedida (tercera vez)
+
+El camino de escritura cambio, asi que la medicion anterior no valia. Mismo banco, `n=60`,
+interleavado, con calentamiento:
+
+```
+--- corrida C ---
+usuario inexistente        n=60 p10=63.8 mediana=73.4 p90=79.9 min=62.1 max=84.0
+contrasena incorrecta      n=60 p10=67.0 mediana=74.6 p90=80.3 min=63.4 max=86.2
+bloqueada (contrasena OK)  n=60 p10=67.6 mediana=73.6 p90=78.3 min=62.3 max=108.9
+diferencia ENTRE medianas : 1.2 ms   |  ruido p10-p90 DENTRO de cada camino: 16 / 13 / 11 ms
+
+--- corrida D ---
+usuario inexistente        n=60 p10=68.3 mediana=75.4 p90=84.3 min=64.1 max=108.1
+contrasena incorrecta      n=60 p10=70.1 mediana=76.6 p90=82.6 min=65.7 max=87.0
+bloqueada (contrasena OK)  n=60 p10=69.5 mediana=75.6 p90=82.3 min=64.3 max=86.1
+diferencia ENTRE medianas : 1.2 ms   |  ruido p10-p90 DENTRO de cada camino: 16 / 12 / 13 ms
+```
+
+Se mantiene lo que importa: **1,2 ms de diferencia entre caminos contra 11-16 ms de ruido dentro
+de cada uno**, un orden de magnitud por debajo.
+
+**Un matiz honesto que no estaba en las corridas anteriores.** En estas dos el camino mas lento
+es el mismo —"contrasena incorrecta"— en vez de cambiar de identidad. No lo presento como sesgo
+inexistente: **es exactamente el limite que ya estaba declarado**, que el unico camino que
+escribe paga un `UPDATE` de mas del orden del milisegundo. Que ahora se vea de forma consistente
+en un banco mas silencioso, y que valga 1,2 ms, confirma la magnitud declarada en vez de
+contradecirla. Sigue sin ser un oraculo utilizable: un atacante tendria que separar 1,2 ms de
+senal de 13 ms de ruido por muestra.
+
+**Lo que este banco NO cubre, dicho para que nadie lo suponga:** usa puertos dobles, asi que el
+`OR` nuevo del `WHERE` no se ejercita. Es una condicion mas sobre una busqueda por clave primaria
+ya indexada, y solo la paga el camino que ya escribia — no introduce una diferencia **entre**
+caminos, que es la propiedad que aqui se mide.
+
+### 10.4 Los 3 menores de la ronda 2
+
+| # | Que decia | Que hice |
+| --- | --- | --- |
+| **m9** | La razon para conservar el tercer test de concurrencia no describe lo que el test hace: dice que cubre "el bloqueo que aparece a mitad del reintento", pero ahi la fila esta bloqueada **antes** de empezar | **Aplicado.** Tenia razon: mandaba al siguiente lector a buscar en ese test una cobertura que no tiene (ese caso lo cubre el unitario). Frase reescrita en 9.2 con el motivo real — es el unico sitio donde R25 se afirma con **adaptadores reales y cinco peticiones simultaneas**, y detectaria una regresion que moviera el corte por bloqueo a despues de la escritura |
+| **m10** | El barrido de huerfanos del E2E puede chocar con la FK `Restrict` y poner rojo el spec: rol y usuario se crean con segundos de diferencia y el corte de una hora puede caer entre los dos | **Aplicado.** Se borran primero los usuarios **de los roles condenados**, no solo los que cumplen el corte. Se **descarto** el `try/catch` con motivo: evita que el `beforeAll` muera, pero deja vivos el rol huerfano **y su usuario**, y un usuario huerfano es justo lo que pone rojo a `identity-constraints.int.test.ts` — seria cambiar un rojo confuso por otro. **La propiedad de no tocar filas ajenas se conserva**: el prefijo propio sigue siendo condicion en las dos ramas del `OR`. Y el borde se reprodujo sembrandolo a mano: con la logica vieja el `deleteMany` lanzaba `PrismaClientKnownRequestError`; con la nueva, el E2E pasa y la base queda a cero |
+| **m11** | El calentamiento del senuelo mete un bcrypt en la carga del modulo de composicion: todo proceso de servidor paga un hash de coste 10 al arrancar, y no esta escrito en ningun sitio | **Aplicado (documentacion).** No cambio el codigo: el reviewer da por buena la decision y yo tambien —sin ella, el primer intento con usuario inexistente de cada proceso pagaria `hash()` **mas** `verify()`, ~220 ms frente a ~110—. Lo que faltaba era decirlo, y ahora esta en `design.md > 2`: ~110 ms una vez por proceso, sin bloquear el arranque porque la promesa no se espera, a cambio de que ningun intento sea distinguible por tiempo |
+
+**Ninguno descartado.**
+
+### 10.5 Verificacion tras la ronda 2
+
+```
+$ pnpm run typecheck        -> sin errores
+$ pnpm run lint             -> sin errores
+$ pnpm exec vitest run guard
+ Test Files  5 passed (5)        Tests  65 passed (65)
+$ pnpm exec vitest run tests/integration/     (x2 seguidas)
+ Test Files  2 passed (2)        Tests  36 passed (36)
+ Test Files  2 passed (2)        Tests  36 passed (36)
+$ pnpm run e2e
+ 4 passed (33.1s)   [chromium + webkit]     base despues: 0 usuarios, 0 roles
+```
+
+36 tests de integracion frente a los 33 de la ronda anterior: +3 del ABA. Mas el unitario que ata
+el reloj del CAS al del dominio.
+
+**Sigue siendo del leader:** `./init.sh` completo. La casilla T13 la marco el leader en la ronda
+anterior con el resultado del gate; tras estos cambios hay que volver a correrlo.

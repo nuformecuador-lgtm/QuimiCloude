@@ -303,6 +303,15 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   prefijo y no por ids en memoria, cada borrado aislado, y hay barrido defensivo de huerfanos de
   mas de una hora al empezar. **La causa de fondo sigue siendo la misma que obligo a serializar
   la integracion**: un test de QC-4 que afirma sobre el estado global de la tabla.
+- **[QC-7 — el CAS del login no puede pisar un bloqueo vigente, y el porque]** El predicado del
+  compare-and-set compara los enteros por igualdad y el bloqueo por **rango**
+  (`locked_until IS NULL OR <= now`). No es cosmetico: sin esa condicion, el par
+  `(failed_login_attempts, lock_level)` sufre un **ABA** —`(0,1)` es a la vez bloqueo fresco y
+  bloqueo caducado— y un intento con estado obsoleto **borraba un bloqueo activo**, o sea que un
+  atacante bloqueado podia desbloquearse. Detectado por el reviewer ejecutandolo, cerrado con la
+  condicion de rango y con test discriminante. **Quien toque ese `where` en QC-8 o QC-9 tiene que
+  leer `design.md > 5.7` antes**: la version anterior de ese documento declaraba el caso imposible
+  con una premisa falsa.
 
 Cerradas, para que nadie las busque abiertas: la pregunta 3 de la feature 1 (columnas
 `password_algorithm` / `password_updated_at`) se responde **NO** en `specs/2-.../design.md > 8`, y la
