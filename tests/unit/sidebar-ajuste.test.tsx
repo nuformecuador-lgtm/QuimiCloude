@@ -9,6 +9,8 @@ import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewp
 
 import { AppSidebar, SIDEBAR_EDGE_TOGGLE_LABEL, SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { LayoutDashboard } from 'lucide-react';
+
 import {
   BRAND_TAGLINE,
   PRIVATE_NAV_ITEMS,
@@ -64,6 +66,36 @@ afterEach(() => {
   resetViewport();
 });
 
+/**
+ * Navegacion minima para los casos que no necesitan el menu entero.
+ *
+ * Cada montaje de la barra completa arrastra el pie de usuario con sus menus y los dos
+ * submenus, y este archivo la monta siete veces. Medido en esta maquina: con la suite
+ * completa y la concurrencia por defecto, ese peso extra bastaba para que los tests mas
+ * lentos del login se pasaran de los 5 s y salieran rojos **sin tener nada roto** — con
+ * `--maxWorkers=2` pasaban los 637. Solo los dos tests que afirman sobre TODO el menu montan
+ * `PRIVATE_NAV_ITEMS`; el resto usa esto.
+ */
+const NAV_MINIMA: readonly NavItem[] = [
+  {
+    kind: 'link',
+    href: '/uno',
+    label: 'Uno',
+    testId: 'nav-uno',
+    icon: LayoutDashboard,
+    section: 'Seccion',
+    badge: 7,
+  },
+  {
+    kind: 'link',
+    href: '/dos',
+    label: 'Dos',
+    testId: 'nav-dos',
+    icon: LayoutDashboard,
+    section: 'Seccion',
+  },
+];
+
 describe('barra lateral: ajuste al diseno', () => {
   it('cada item de nivel superior dibuja el icono que trae el array, y ninguno se queda sin el', () => {
     renderSidebar();
@@ -103,36 +135,26 @@ describe('barra lateral: ajuste al diseno', () => {
   });
 
   it('el contador sale del array, no de un literal del componente', () => {
-    const conContador = PRIVATE_NAV_ITEMS.find(
-      (item): item is Extract<NavItem, { kind: 'link' }> =>
-        item.kind === 'link' && item.badge !== undefined,
-    );
-    if (!conContador?.badge) {
-      throw new Error('ningun item del array declara contador');
-    }
+    // El menu real tambien declara uno; se comprueba con la navegacion minima para no montar
+    // la barra entera por un `textContent`.
+    renderSidebar(NAV_MINIMA);
 
-    renderSidebar();
+    expect(screen.getByTestId('nav-uno-badge')).toHaveTextContent('7');
 
-    expect(screen.getByTestId(`${conContador.testId}-badge`)).toHaveTextContent(
-      String(conContador.badge),
+    const enElMenuReal = PRIVATE_NAV_ITEMS.some(
+      (item) => item.kind === 'link' && item.badge !== undefined,
     );
+    expect(enElMenuReal, 'ningun item del menu real declara contador').toBe(true);
   });
 
   it('un item sin contador no dibuja ninguna etiqueta', () => {
-    renderSidebar();
+    renderSidebar(NAV_MINIMA);
 
-    const sinContador = PRIVATE_NAV_ITEMS.find(
-      (item) => item.kind === 'link' && item.badge === undefined,
-    );
-    if (!sinContador) {
-      throw new Error('todos los items declaran contador');
-    }
-
-    expect(screen.queryByTestId(`${sinContador.testId}-badge`)).toBeNull();
+    expect(screen.queryByTestId('nav-dos-badge')).toBeNull();
   });
 
   it('la marca lleva simbolo y bajada ademas del nombre', () => {
-    renderSidebar();
+    renderSidebar(NAV_MINIMA);
 
     expect(screen.getByTestId('private-brand-mark').querySelector('svg')).not.toBeNull();
     expect(screen.getByTestId('private-brand-tagline')).toHaveTextContent(BRAND_TAGLINE);
@@ -140,7 +162,7 @@ describe('barra lateral: ajuste al diseno', () => {
 
   it('la pastilla del borde apunta al panel y alterna su estado', async () => {
     const user = userEvent.setup();
-    renderSidebar();
+    renderSidebar(NAV_MINIMA);
 
     const pastilla = screen.getByTestId('private-sidebar-edge-toggle');
 
