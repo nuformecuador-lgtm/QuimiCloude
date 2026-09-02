@@ -96,7 +96,7 @@ export function listPrivatePageRoutes(root: string): readonly string[] {
     return [...propias, ...hijas];
   }
 
-  return walk(join(root, PRIVATE_ROOT), []).sort();
+  return [...walk(join(root, PRIVATE_ROOT), [])].sort();
 }
 
 function isCoveredBy(route: string, prefix: string): boolean {

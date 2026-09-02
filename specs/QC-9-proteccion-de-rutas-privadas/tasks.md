@@ -23,14 +23,14 @@ la nueva **T5-bis**, a T13, a la nueva **T13-bis**, a T18 y a la trazabilidad de
 > de QC-8). Si se escribe `middleware.ts` primero, la guardia nace adaptada a lo que ya hay y nadie
 > sabe si habria cazado el fallo.
 
-### [ ] T1 [P] — Ampliar `guard-firma-sesion-unica` a la raiz
+### [x] T1 [P] — Ampliar `guard-firma-sesion-unica` a la raiz
 `PRODUCTION_DIRS` pasa a incluir los archivos `.ts`/`.tsx` de **primer nivel** del repositorio
 (`design.md > 3.5`, punto 1). Solo eso: la huella y el dueño se cambian en T5.
 **Hecho:** creando a mano un `firma-pirata.ts` en la raiz con `createHmac('sha256', s)` la guardia
 se pone **roja** nombrando el archivo; borrado, vuelve a verde. Los tres archivos de configuracion
 de la raiz no generan hallazgos.
 
-### [ ] T2 [P] — Ampliar `guard-arquitectura-modulos` a la raiz
+### [x] T2 [P] — Ampliar `guard-arquitectura-modulos` a la raiz
 `SCAN_ROOTS` pasa a incluir los `.ts`/`.tsx` de primer nivel, y esos archivos se juzgan con las
 mismas reglas que `app/**` (`design.md > 9`).
 **Hecho:** un archivo sintetico en la raiz que importe
@@ -38,7 +38,7 @@ mismas reglas que `app/**` (`design.md > 9`).
 fuera de composicion); borrado, verde. `next.config.ts`, `playwright.config.ts` y
 `prisma.config.ts` no generan hallazgos.
 
-### [ ] T3 — Tanda verde *(depende de T1, T2)*
+### [x] T3 — Tanda verde *(depende de T1, T2)*
 **Hecho:** `./init.sh --rapido` en verde con las dos guardias ampliadas y **sin una sola linea de
 codigo de produccion nueva**. Este commit es la red; a partir de aqui se puede escribir.
 
@@ -46,7 +46,7 @@ codigo de produccion nueva**. Este commit es la red; a partir de aqui se puede e
 
 ## Bloque 2 — Migracion del HMAC a WebCrypto *(depende del bloque 1)*
 
-### [ ] T4 — Extraer `adapters/driven/session/session-token.ts`, **sin cambiar todavia el formato**
+### [x] T4 — Extraer `adapters/driven/session/session-token.ts`, **sin cambiar todavia el formato**
 Mover el codec entero (`SESSION_COOKIE_NAME`, `SESSION_VALUE_VERSION`, `readSessionSecret`,
 `signSessionValue`, `buildSessionValue`, `verifySessionValue`, `equalsInConstantTime`, helpers
 base64url) e implementarlo con `crypto.subtle` segun `design.md > 3.1`–`3.4`. `session-cookie.ts`
@@ -60,13 +60,13 @@ tres firmas publicas intactas**. El codec no importa `node:crypto` ni `next/*`.
 **Hecho:** `tests/unit/identity/session-cookie.test.ts` pasa **sin haberse modificado ni una linea**
 y `pnpm run typecheck` esta verde.
 
-### [ ] T5 — `tests/unit/identity/session-token.test.ts` *(depende de T4)*
+### [x] T5 — `tests/unit/identity/session-token.test.ts` *(depende de T4)*
 Paridad con `node:crypto` (varios secretos y mensajes, uno con caracteres no ASCII) y
 `equalsInConstantTime` (distinta longitud, diferencia en el primer byte, en el ultimo, e iguales).
 **Hecho:** el archivo pasa y afirma explicitamente que la firma WebCrypto **es igual** a la de
 `createHmac`, no solo que «valida».
 
-### [ ] T5-bis — El rol dentro del token y la version `v2` *(depende de T5)*
+### [x] T5-bis — El rol dentro del token y la version `v2` *(depende de T5)*
 La cadena de emision completa de `design.md > 3.6`, en un solo commit porque por separado deja el
 typecheck rojo: `AuthenticatableUser` y el `select` de Prisma ganan `roleName`; `SessionTicket` y
 `createSessionTicket` ganan el rol; `verifyCredentials` se lo pasa; `SESSION_CLAIMS_SCHEMA` gana
@@ -85,7 +85,7 @@ que recomputa la firma esperada. En `verify-credentials.test.ts`, `session-ticke
 el que la base tiene en ese instante (R26); un token `v1` se rechaza (R27); un payload `v2` sin
 `role`, con `role: ''` o con `role: 42` resuelve `null` (R28).
 
-### [ ] T6 — Cerrar la guardia sobre el dueño nuevo *(depende de T4)*
+### [x] T6 — Cerrar la guardia sobre el dueño nuevo *(depende de T4)*
 En `guard-firma-sesion-unica`: `UNICO_DUENO` -> `session-token.ts`; la huella pasa a `createHmac(`
 **o** `crypto.subtle` / `subtle.importKey(` / `subtle.sign(`; la comprobacion de tiempo constante
 busca `equalsInConstantTime` en vez de `timingSafeEqual`; assert nuevo de que el dueño **no importa
@@ -97,31 +97,31 @@ pone roja; `rg 'node:crypto' lib app components hooks *.ts` no devuelve nada.
 
 ## Bloque 3 — El dominio *(depende del bloque 1; independiente del 2)*
 
-### [ ] T7 [P] — `domain/return-path.ts`
+### [x] T7 [P] — `domain/return-path.ts`
 `RETURN_PARAM`, `isInternalPath`, `resolveReturnPath`, `buildLoginRedirect` (`design.md > 4.2`).
 **Hecho:** `tests/unit/identity/return-path.test.ts` rechaza `https://evil.example`,
 `//evil.example`, `/\evil.example`, `javascript:alert(1)`, `%2F%2Fevil.example`, la cadena vacia y
 `undefined`, y acepta `/dashboard` y `/dashboard/reportes?desde=ayer`.
 
-### [ ] T8 [P] — `domain/route-role-rules.ts`
+### [x] T8 [P] — `domain/route-role-rules.ts`
 Tipo `RouteRoleRule`, `ROUTE_ROLE_RULES = []` y `findRouteRule` (gana el prefijo mas largo).
 **Hecho:** `tests/unit/identity/route-role-rules.test.ts` ejercita `findRouteRule` con reglas
 **sinteticas** y afirma que `ROUTE_ROLE_RULES` esta vacio a proposito.
 
-### [ ] T9 — `domain/route-access.ts` *(depende de T7, T8)*
+### [x] T9 — `domain/route-access.ts` *(depende de T7, T8)*
 `decideRouteAccess` con el orden de `design.md > 4.1`. Puro: sin `next/*`, sin cookies, sin base.
 **Hecho:** `tests/unit/identity/route-access.test.ts` cubre los cinco pasos, incluido el caso «no
 autorizado en el propio dashboard -> allow» (sin bucle) y el de R29: la decision devuelve **solo**
 `allow` o `redirect`, nunca capacidades ni permisos.
 
-### [ ] T10 — Puerto, contrato y rutas compartidas *(depende de T9)*
+### [x] T10 — Puerto, contrato y rutas compartidas *(depende de T9)*
 `ports/session-token-verifier.ts`; `lib/modules/identity/index.ts` reexporta `decideRouteAccess`,
 `resolveReturnPath`, `RETURN_PARAM`, `ROUTE_ROLE_RULES` y sus tipos (**solo** de `./domain`);
 `lib/shared/routes.ts` añade `PRIVATE_ROUTE_PREFIXES = ['/dashboard']`.
 **Hecho:** `pnpm run typecheck` y `guard-arquitectura-modulos` verdes; el barrel no arrastra
 `next/*` ni Prisma.
 
-### [ ] T11 — `guard-rutas-privadas-cubiertas.test.ts` *(depende de T10)*
+### [x] T11 — `guard-rutas-privadas-cubiertas.test.ts` *(depende de T10)*
 Recorre `app/(private)/`, calcula la URL de cada carpeta con `page.tsx` (ignora `components/` y los
 route groups) y la compara con `PRIVATE_ROUTE_PREFIXES` (`design.md > 7`).
 **Hecho:** hoy verde con `/dashboard`; creando `app/(private)/productos/page.tsx` a mano se pone
