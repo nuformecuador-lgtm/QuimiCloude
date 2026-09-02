@@ -7,13 +7,20 @@ import { createHmac } from 'node:crypto';
 
 import {
   SESSION_COOKIE_NAME,
+  clearSession,
+  readSessionClaims,
   startSession,
 } from '@/lib/modules/identity/adapters/driven/session/session-cookie';
 import { SESSION_DURATION_MS, createSessionTicket } from '@/lib/modules/identity/domain/session';
 
 // `vi.mock` se iza al principio del archivo: los dobles se crean con `vi.hoisted` para
 // que existan antes que la fabrica del mock.
-const { cookiesMock, setMock } = vi.hoisted(() => ({ cookiesMock: vi.fn(), setMock: vi.fn() }));
+const { cookiesMock, setMock, getMock, deleteMock } = vi.hoisted(() => ({
+  cookiesMock: vi.fn(),
+  setMock: vi.fn(),
+  getMock: vi.fn(),
+  deleteMock: vi.fn(),
+}));
 
 vi.mock('next/headers', () => ({
   cookies: cookiesMock,
@@ -52,8 +59,10 @@ function decodificarPayload(value: string): Record<string, unknown> {
 
 beforeEach(() => {
   setMock.mockReset();
+  getMock.mockReset();
+  deleteMock.mockReset();
   cookiesMock.mockReset();
-  cookiesMock.mockResolvedValue({ set: setMock });
+  cookiesMock.mockResolvedValue({ set: setMock, get: getMock, delete: deleteMock });
   secretoOriginal = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = SECRETO;
 });
@@ -162,5 +171,134 @@ describe('cookie de sesion', () => {
     // inspeccionar. Se afirma lo fuerte y se deja el contenido al test que si tiene llamadas.
     for (const espia of espias) expect(espia).not.toHaveBeenCalled();
     expect(value).not.toContain(SECRETO);
+  });
+});
+
+// T5 — lectura y borrado (`design.md > 4.1`, `requirements.md` R2-R5, R8, R9, R18). El caso
+// feliz se construye llamando a `startSession` y capturando lo que escribio en `set`: es el
+// unico punto donde escritor y lector se cruzan de verdad, y evita repetir el error del
+// bloque 1 (unidades de `iat`/`exp` distintas entre quien firma y quien construye el test).
+describe('lectura y borrado de la cookie de sesion', () => {
+  async function valorValidoDeCookie(): Promise<string> {
+    const ticket = createSessionTicket(USER_ID, AHORA);
+    await startSession(ticket);
+    const { value } = cookieEmitida();
+    setMock.mockClear();
+    return value;
+  }
+
+  // R2
+  it('sin cookie devuelve null', async () => {
+    getMock.mockReturnValue(undefined);
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R3
+  it('prefijo v0. devuelve null sin interpretar el resto', async () => {
+    const valor = await valorValidoDeCookie();
+    const [, encodedPayload, firma] = valor.split('.');
+    getMock.mockReturnValue({ value: `v0.${encodedPayload}.${firma}` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R4
+  it('firma alterada en un byte (misma longitud) devuelve null', async () => {
+    const valor = await valorValidoDeCookie();
+    const [version, encodedPayload, firma] = valor.split('.');
+    const firmaAlterada = firma.startsWith('A') ? `B${firma.slice(1)}` : `A${firma.slice(1)}`;
+    getMock.mockReturnValue({ value: `${version}.${encodedPayload}.${firmaAlterada}` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R4
+  it('firma de longitud distinta devuelve null sin lanzar', async () => {
+    const valor = await valorValidoDeCookie();
+    const [version, encodedPayload, firma] = valor.split('.');
+    getMock.mockReturnValue({ value: `${version}.${encodedPayload}.${firma}xx` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R6
+  it('payload que no es JSON devuelve null', async () => {
+    const valor = await valorValidoDeCookie();
+    const [version] = valor.split('.');
+    const payloadNoJson = Buffer.from('esto-no-es-json', 'utf8').toString('base64url');
+    const signedPart = `${version}.${payloadNoJson}`;
+    const firma = createHmac('sha256', SECRETO).update(signedPart).digest('base64url');
+    getMock.mockReturnValue({ value: `${signedPart}.${firma}` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R6
+  it('sub que no es UUID devuelve null', async () => {
+    const version = 'v1';
+    const payload = { sub: 'no-es-un-uuid', iat: 1, exp: 2 };
+    const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    const signedPart = `${version}.${encodedPayload}`;
+    const firma = createHmac('sha256', SECRETO).update(signedPart).digest('base64url');
+    getMock.mockReturnValue({ value: `${signedPart}.${firma}` });
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // R9
+  it('sin SESSION_SECRET la lectura lanza sin exponer el secreto, y clearSession sigue funcionando', async () => {
+    const valor = await valorValidoDeCookie();
+    getMock.mockReturnValue({ value: valor });
+    delete process.env.SESSION_SECRET;
+
+    await expect(readSessionClaims()).rejects.toThrow(/SESSION_SECRET/);
+    try {
+      await readSessionClaims();
+      throw new Error('readSessionClaims tenia que lanzar');
+    } catch (error) {
+      expect((error as Error).message).not.toContain(SECRETO);
+    }
+
+    await clearSession();
+    expect(deleteMock).toHaveBeenCalledWith({ name: SESSION_COOKIE_NAME, path: '/' });
+  });
+
+  // R8
+  it('leer una sesion valida no reemite ni prolonga la cookie', async () => {
+    const valor = await valorValidoDeCookie();
+    getMock.mockReturnValue({ value: valor });
+
+    const claims = await readSessionClaims();
+
+    expect(claims).not.toBeNull();
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  // El caso feliz: lo leido coincide con el ticket que se le paso a `startSession`.
+  it('el valor valido emitido por startSession se lee de vuelta con los mismos datos', async () => {
+    const ticket = createSessionTicket(USER_ID, AHORA);
+    await startSession(ticket);
+    const { value } = cookieEmitida();
+    setMock.mockClear();
+    getMock.mockReturnValue({ value });
+
+    const claims = await readSessionClaims();
+
+    expect(claims).not.toBeNull();
+    expect(claims?.sub).toBe(ticket.userId);
+    expect(claims?.issuedAt.getTime()).toBe(
+      Math.floor(ticket.issuedAt.getTime() / 1000) * 1000,
+    );
+    expect(claims?.expiresAt.getTime()).toBe(
+      Math.floor(ticket.expiresAt.getTime() / 1000) * 1000,
+    );
+  });
+
+  // R18
+  it('clearSession borra con el mismo nombre y path: /', async () => {
+    await clearSession();
+
+    expect(deleteMock).toHaveBeenCalledWith({ name: SESSION_COOKIE_NAME, path: '/' });
   });
 });
