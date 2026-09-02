@@ -31,16 +31,29 @@ export const SESSION_COOKIE_NAME = 'qc_session';
  * Version del formato del valor. Se rechaza sin interpretar lo que no empiece por aqui, sin
  * adivinar. Un solo dueño de esta constante: el escritor (`buildSessionValue`) y el lector
  * (`verifySessionValue`) no pueden desincronizarse.
+ *
+ * QC-9 (R27) — sube a `v2` porque el contenido firmado gana el ROL (R26). **No hay
+ * compatibilidad hacia atras**: un valor `v1` se rechaza sin verificar su firma y sin
+ * interpretarlo, ni aunque su firma y su `exp` fueran correctos. Se acepto a proposito (no hay
+ * sesiones vivas que preservar); mantener dos formatos serian dos caminos de verificacion vivos,
+ * uno de ellos sin rol, para siempre.
  */
-export const SESSION_VALUE_VERSION = 'v1';
+export const SESSION_VALUE_VERSION = 'v2';
 
 /** Longitud minima del secreto (QC-7 `design.md > 5.3`). Por debajo, el HMAC no vale nada. */
 const MIN_SECRET_LENGTH = 32;
 
+/**
+ * Contenido firmado, formato `v2`: `{ sub, iat, exp, role }`. `role` es el NOMBRE del rol
+ * (`'Administrador'`, `'Operador'`), el mismo texto que `roles.name`: firmar el `role_id`
+ * obligaria al borde a traducir un identificador de base sin tener base. Sigue sin viajar nada
+ * mas —ni nombre, ni correo, ni documento— porque este valor va en cada peticion.
+ */
 type SessionPayload = {
   readonly sub: string;
   readonly iat: number;
   readonly exp: number;
+  readonly role: string;
 };
 
 /**
@@ -164,14 +177,15 @@ export function hasCurrentVersion(rawValue: string): boolean {
 
 /**
  * Construye `<version>.<payload-base64url>.<hmac-base64url>` (QC-7 `design.md > 5.1`).
- * El payload lleva **solo** `sub`, `iat` y `exp`: nada de nombre de usuario, correo ni hash,
- * porque este valor viaja en cada peticion (QC-8 R12).
+ * El payload lleva **solo** `sub`, `iat`, `exp` y `role`: nada de nombre de usuario, correo ni
+ * hash, porque este valor viaja en cada peticion (QC-8 R12, QC-9 R26).
  */
 export async function buildSessionValue(ticket: SessionTicket, secret: string): Promise<string> {
   const payload: SessionPayload = {
     sub: ticket.userId,
     iat: toEpochSeconds(ticket.issuedAt),
     exp: toEpochSeconds(ticket.expiresAt),
+    role: ticket.roleName,
   };
   const signedPart = `${SESSION_VALUE_VERSION}.${encodeBase64UrlText(JSON.stringify(payload))}`;
 
@@ -183,7 +197,8 @@ export async function buildSessionValue(ticket: SessionTicket, secret: string): 
  * atajos (QC-8 `design.md > 4.1`):
  * 1. El valor no parte en exactamente tres trozos por `.` -> `null`.
  * 2. El primer trozo no es `SESSION_VALUE_VERSION` -> `null`, **sin verificar la firma y sin
- *    interpretar el resto**.
+ *    interpretar el resto** (QC-9 R27: ahi cae `v1`, y por eso el corte va ANTES de tocar el
+ *    HMAC; verificar la firma de un formato que ya no vale seria trabajo para nada).
  * 3. Se recomputa la firma con `signSessionValue()` —la misma funcion que la emite— y se compara
  *    en tiempo constante (R17).
  * 4. El payload decodificado se interpreta en el dominio (`parseSessionClaims`), que decide si es

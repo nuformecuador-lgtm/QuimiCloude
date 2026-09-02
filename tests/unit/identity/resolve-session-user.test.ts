@@ -11,14 +11,18 @@ import type { SessionUserReader, SessionUserRecord } from '@/lib/modules/identit
 const SUB = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const AHORA = new Date('2026-09-01T10:00:00.000Z');
 
+// QC-9: `roleName` es el rol FIRMADO en la cookie. Se pone uno que no existe en la base a
+// proposito: `resolveSessionUser` debe seguir devolviendo el rol de la BASE (QC-8 R12 intacto).
 const CLAIMS_VIGENTES: SessionClaims = {
   sub: SUB,
+  roleName: 'Rol firmado que ya no vale',
   issuedAt: new Date('2026-09-01T08:00:00.000Z'),
   expiresAt: new Date('2026-09-01T16:00:00.000Z'),
 };
 
 const CLAIMS_CADUCADOS: SessionClaims = {
   sub: SUB,
+  roleName: 'Rol firmado que ya no vale',
   issuedAt: new Date('2026-09-01T00:00:00.000Z'),
   expiresAt: new Date('2026-09-01T08:00:00.000Z'),
 };

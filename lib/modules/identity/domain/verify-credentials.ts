@@ -152,7 +152,10 @@ export function createVerifyCredentials(
     await deps.attempts.set(usuario.id, nextLockState(usuario, 'success', now));
     // Verificar y LUEGO emitir. Si la emision lanza (secreto ausente, R13) la excepcion se
     // propaga y nadie queda autenticado sin sesion: `loginAction` no llega a redirigir.
-    await deps.session.startSession(createSessionTicket(usuario.id, now));
+    // El rol que se firma sale de la BASE (`usuario.roleName`, leido por el puerto en la misma
+    // consulta que autentica) y jamas de la entrada: `LoginInput` solo trae usuario y
+    // contrasena, y nada de este archivo puede meter un rol por otra via (QC-9 R26).
+    await deps.session.startSession(createSessionTicket(usuario.id, usuario.roleName, now));
 
     return { ok: true };
   };

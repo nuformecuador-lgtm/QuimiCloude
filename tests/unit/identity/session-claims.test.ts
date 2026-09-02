@@ -16,8 +16,11 @@ const SUB_VALIDO = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const IAT = Math.floor(Date.parse('2026-09-01T08:00:00.000Z') / 1000);
 const EXP = Math.floor(Date.parse('2026-09-01T16:00:00.000Z') / 1000);
 
+// QC-9 R26: desde `v2` el contenido firmado lleva tambien el NOMBRE del rol.
+const ROL = 'Administrador';
+
 function jsonValido(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP, ...overrides });
+  return JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP, role: ROL, ...overrides });
 }
 
 describe('parseSessionClaims', () => {
@@ -66,6 +69,24 @@ describe('parseSessionClaims', () => {
     expect(parseSessionClaims(jsonValido({ iat: 0 }))).toBeNull();
     expect(parseSessionClaims(jsonValido({ exp: 'ayer' }))).toBeNull();
   });
+
+  // QC-9 R26 — el rol firmado se devuelve tal cual, con el nombre `roleName` para que coincida
+  // con `SessionUser.roleName` y sea evidente en el sitio de uso que se habla de un rol.
+  it('un JSON valido con role produce claims con roleName', () => {
+    expect(parseSessionClaims(jsonValido())?.roleName).toBe(ROL);
+    expect(parseSessionClaims(jsonValido({ role: 'Operador' }))?.roleName).toBe('Operador');
+  });
+
+  // QC-9 R28 — sin rol con forma valida no hay sesion: ni se consulta la base ni se supone
+  // ningun rol por defecto. Un rol por defecto seria un rol INVENTADO, y quien lee el token no
+  // es quien lo escribe.
+  it('un role ausente, vacio o que no es texto devuelve null', () => {
+    expect(parseSessionClaims(JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ role: '' }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ role: 42 }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ role: null }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ role: ['Administrador'] }))).toBeNull();
+  });
 });
 
 describe('isSessionExpired', () => {
@@ -73,6 +94,7 @@ describe('isSessionExpired', () => {
     sub: SUB_VALIDO,
     issuedAt: new Date(IAT * 1000),
     expiresAt: new Date(EXP * 1000),
+    roleName: ROL,
   };
 
   // R7 — en el instante exacto del exp la sesion YA NO vale (>=, no >).

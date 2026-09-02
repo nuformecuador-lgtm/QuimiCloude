@@ -46,7 +46,18 @@ import {
   createPasswordHash,
   verifyPasswordHash,
 } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import {
+  buildSessionValue,
+  verifySessionValue,
+} from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { prisma } from '@/lib/shared/db/prisma';
+
+/**
+ * QC-9 R26 — secreto propio del test para firmar el ticket que emitio el login y comprobar que el
+ * rol viaja dentro. No se lee `SESSION_SECRET` del entorno: este archivo no depende de como este
+ * configurada la maquina, y el codec recibe el secreto por parametro justamente para esto.
+ */
+const SECRETO_DE_PRUEBAS = 'secreto-de-integracion-de-64-caracteres-para-firmar-la-sesion-qc9';
 
 /** Cinco verificaciones bcrypt reales de coste 10 rondan el medio segundo; se da margen. */
 const TIEMPO_HOLGADO = { timeout: 30_000 };
@@ -154,6 +165,35 @@ beforeEach(async () => {
 });
 
 describe('login contra Postgres real', () => {
+  // QC-9 R26 — el rol que acaba FIRMADO en la cookie es el que la base tiene en ese instante.
+  //
+  // Se comprueba de extremo a extremo y contra Postgres: el rol se lee de la fila con Prisma, el
+  // login corre con el adaptador real (`findActiveByUsername`, `$queryRaw` con el `JOIN roles`), y
+  // el ticket que emitio se firma con el codec de verdad y se vuelve a verificar. Si alguien
+  // quitara el `JOIN`, fijara un rol por defecto o firmara otra cosa, esto se pone rojo.
+  it('el rol firmado en la cookie es el que la base tiene en ese instante', TIEMPO_HOLGADO, async () => {
+    const { name: rolEnLaBase } = await prisma.role.findUniqueOrThrow({
+      where: { id: rolId },
+      select: { name: true },
+    });
+    const { verificar, sesion } = montarLogin();
+
+    expect(await verificar({ username: nombreDeUsuario, password: CLAVE_CORRECTA })).toEqual({
+      ok: true,
+    });
+
+    const ticket = sesion.tickets[0];
+    expect(ticket?.roleName).toBe(rolEnLaBase);
+
+    // Y lo que viaja firmado, no solo lo que lleva el ticket: se emite el valor de la cookie con
+    // el codec real y se verifica con el mismo, que es lo que leera el middleware.
+    const valor = await buildSessionValue(ticket as SessionTicket, SECRETO_DE_PRUEBAS);
+    const claims = await verifySessionValue(valor, SECRETO_DE_PRUEBAS);
+
+    expect(claims?.sub).toBe(usuarioId);
+    expect(claims?.roleName).toBe(rolEnLaBase);
+  });
+
   it('autentica contra una fila real', TIEMPO_HOLGADO, async () => {
     // R1 — usuario no borrado + contrasena que corresponde al hash guardado.
     const { verificar, sesion } = montarLogin();

@@ -28,6 +28,7 @@ import { createSessionTicket } from '@/lib/modules/identity/domain/session';
 const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc9-ok';
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const AHORA = new Date('2026-09-01T08:00:00.000Z');
+const ROL = 'Administrador';
 
 /** La referencia: exactamente lo que hacia `session-cookie.ts` antes de la migracion. */
 function firmaDeReferencia(mensaje: string, secreto: string): string {
@@ -130,7 +131,7 @@ describe('equalsInConstantTime (R17)', () => {
 
 describe('buildSessionValue / verifySessionValue', () => {
   it('lo que se firma se vuelve a leer con los mismos datos', async () => {
-    const ticket = createSessionTicket(USER_ID, AHORA);
+    const ticket = createSessionTicket(USER_ID, ROL, AHORA);
 
     const valor = await buildSessionValue(ticket, SECRETO);
     const claims = await verifySessionValue(valor, SECRETO);
@@ -140,7 +141,7 @@ describe('buildSessionValue / verifySessionValue', () => {
   });
 
   it('el valor emitido lleva la firma que produciria node:crypto (R16, de extremo a extremo)', async () => {
-    const valor = await buildSessionValue(createSessionTicket(USER_ID, AHORA), SECRETO);
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, AHORA), SECRETO);
 
     const [version, payload, firma] = valor.split('.');
     expect(version).toBe(SESSION_VALUE_VERSION);
@@ -148,7 +149,7 @@ describe('buildSessionValue / verifySessionValue', () => {
   });
 
   it('una firma alterada o de otro secreto resuelve null', async () => {
-    const valor = await buildSessionValue(createSessionTicket(USER_ID, AHORA), SECRETO);
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, AHORA), SECRETO);
     const [version, payload, firma] = valor.split('.');
     const alterada = firma.startsWith('A') ? `B${firma.slice(1)}` : `A${firma.slice(1)}`;
 
@@ -171,9 +172,88 @@ describe('buildSessionValue / verifySessionValue', () => {
   });
 });
 
+// QC-9 T5-bis — El rechazo de la version anterior (R27).
+//
+// OJO AL SENTIDO: antes de que el humano derogara D3, aqui se afirmaba lo CONTRARIO —que un token
+// emitido con el formato anterior seguia valiendo—. Ya no: `v1` se rechaza a proposito, sin
+// compatibilidad hacia atras, aunque su firma y su `exp` sean impecables. Se aceptó porque no hay
+// sesiones vivas que preservar, y porque mantener dos formatos serian dos caminos de verificacion
+// vivos —uno de ellos sin rol— para siempre. Si este bloque se pone rojo, la pregunta no es "como
+// lo hago pasar" sino "quien reabrio la compatibilidad".
+describe('rechazo del formato anterior (R27)', () => {
+  /** Un `v1` impecable, construido enteramente con `node:crypto` y con `exp` en el futuro. */
+  function tokenV1Impecable(): string {
+    const ahora = Math.floor(Date.now() / 1000);
+    const payload = { sub: USER_ID, iat: ahora, exp: ahora + 8 * 60 * 60 };
+    const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    const signedPart = `v1.${encoded}`;
+
+    return `${signedPart}.${firmaDeReferencia(signedPart, SECRETO)}`;
+  }
+
+  it('un v1 con firma correcta y exp futuro resuelve null', async () => {
+    const valor = tokenV1Impecable();
+
+    // Primero: que el token es impecable de verdad. Sin esto, el `null` de abajo podria venir de
+    // una firma mal construida por el propio test y no probaria nada.
+    const [version, payload, firma] = valor.split('.');
+    expect(version).toBe('v1');
+    expect(firma).toBe(firmaDeReferencia(`${version}.${payload}`, SECRETO));
+    const contenido = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      exp: number;
+    };
+    expect(contenido.exp * 1000).toBeGreaterThan(Date.now());
+
+    await expect(verifySessionValue(valor, SECRETO)).resolves.toBeNull();
+  });
+
+  it('y lo rechaza SIN verificar la firma: no se llama a crypto.subtle.sign', async () => {
+    const sign = vi.spyOn(crypto.subtle, 'sign');
+
+    await expect(verifySessionValue(tokenV1Impecable(), SECRETO)).resolves.toBeNull();
+
+    // El corte de version va ANTES del HMAC: verificar la firma de un formato que ya no vale
+    // seria trabajo para nada, y ademas es la forma de afirmar el "sin interpretarlo" de R27.
+    expect(sign).not.toHaveBeenCalled();
+  });
+
+  it('el formato vigente si llega a verificar la firma (el contraste que da valor al test anterior)', async () => {
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, new Date()), SECRETO);
+    const sign = vi.spyOn(crypto.subtle, 'sign');
+
+    await expect(verifySessionValue(valor, SECRETO)).resolves.not.toBeNull();
+
+    expect(sign).toHaveBeenCalledTimes(1);
+  });
+});
+
+// QC-9 T5-bis — El rol viaja firmado (R26).
+describe('el rol dentro del contenido firmado (R26)', () => {
+  it('el payload v2 lleva sub/iat/exp/role y el rol se lee de vuelta', async () => {
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, AHORA), SECRETO);
+
+    const payload = JSON.parse(
+      Buffer.from(valor.split('.')[1] ?? '', 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
+    expect(Object.keys(payload)).toEqual(['sub', 'iat', 'exp', 'role']);
+    expect(payload.role).toBe(ROL);
+
+    const claims = await verifySessionValue(valor, SECRETO);
+    expect(claims?.roleName).toBe(ROL);
+  });
+
+  it('el rol firmado es el del ticket, sea cual sea', async () => {
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, 'Operador', AHORA), SECRETO);
+
+    expect((await verifySessionValue(valor, SECRETO))?.roleName).toBe('Operador');
+  });
+});
+
 describe('hasCurrentVersion y readSessionSecret', () => {
-  it('reconoce la version vigente y descarta cualquier otra', () => {
+  it('reconoce la version vigente y descarta cualquier otra, v1 incluida', () => {
+    expect(SESSION_VALUE_VERSION).toBe('v2');
     expect(hasCurrentVersion(`${SESSION_VALUE_VERSION}.payload.firma`)).toBe(true);
+    expect(hasCurrentVersion('v1.payload.firma')).toBe(false);
     expect(hasCurrentVersion('v0.payload.firma')).toBe(false);
     expect(hasCurrentVersion('payload')).toBe(false);
     expect(hasCurrentVersion('')).toBe(false);

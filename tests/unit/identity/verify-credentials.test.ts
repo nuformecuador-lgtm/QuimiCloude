@@ -43,9 +43,13 @@ function hashDe(texto: string): string {
 
 const SIN_BLOQUEO: AccountLockState = { failedAttempts: 0, lockLevel: 0, lockedUntil: null };
 
+/** QC-9 R26: el rol lo trae el PUERTO desde la base, y termina firmado dentro de la cookie. */
+const ROL_EN_LA_BASE = 'Administrador';
+
 const USUARIO: AuthenticatableUser = {
   id: 'usuario-1',
   passwordHash: hashDe(CONTRASENA_CORRECTA),
+  roleName: ROL_EN_LA_BASE,
   ...SIN_BLOQUEO,
 };
 
@@ -107,6 +111,39 @@ describe('verificacion de credenciales', () => {
     expect(resultado).toEqual({ ok: true });
     expect(session.startSession).toHaveBeenCalledTimes(1);
     expect(session.startSession.mock.calls[0]?.[0]).toMatchObject({ userId: USUARIO.id });
+  });
+
+  // QC-9 R26 — el rol del ticket sale de la BASE (lo que devolvio el puerto), nunca de la
+  // entrada. `LoginInput` solo tiene `username` y `password`, asi que se ataca por el unico
+  // sitio por donde un cliente podria intentar colarlo: campos de mas en el `FormData` que
+  // llegan hasta aqui. El ticket tiene que seguir llevando el rol de la fila.
+  it('el ticket emitido lleva el rol leido de la base, no uno recibido del cliente', async () => {
+    const { verifyCredentials, session } = montar();
+
+    const resultado = await verifyCredentials({
+      username: 'admin',
+      password: CONTRASENA_CORRECTA,
+      // Un cliente malicioso intentando ascenderse: el caso de uso ni lo mira.
+      role: 'Superadministrador',
+      roleName: 'Superadministrador',
+    } as never);
+
+    expect(resultado).toEqual({ ok: true });
+    expect(session.startSession.mock.calls[0]?.[0]).toMatchObject({
+      userId: USUARIO.id,
+      roleName: ROL_EN_LA_BASE,
+    });
+  });
+
+  // QC-9 R26 — y si la fila dice otra cosa, el ticket dice otra cosa: el rol no esta fijado
+  // en el codigo, viene de donde tiene que venir.
+  it('si la base devuelve otro rol, el ticket lleva ese otro rol', async () => {
+    const operador: AuthenticatableUser = { ...USUARIO, roleName: 'Operador' };
+    const { verifyCredentials, session } = montar([operador]);
+
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(session.startSession.mock.calls[0]?.[0]).toMatchObject({ roleName: 'Operador' });
   });
 
   // R2
