@@ -12,8 +12,15 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-9 | proteccion-de-rutas-privadas | QC-17 Identidad y acceso | backend | **in_progress (F2.1)** | `feature/QC-9-proteccion-de-rutas-privadas` | **SPEC APROBADO por el humano el 2026-09-02** e **implementer lanzado**. Tarjeta en *En curso*. Spec congelado en `0f7d599`: **30 requisitos EARS**, todos trazados. El rol viaja dentro del token (decisión humana) y por eso **D3 quedó derogada**: el formato del token cambia y las sesiones abiertas dejan de valer. Queda 1 pregunta abierta (qué hace la raíz `/`). **Toca código de QC-8 Y de QC-7**, las dos mergeadas. Acotada y sembrada el mismo día: 14 decisiones cerradas, 0 preguntas abiertas. **No ocupa slot**: sigue `pending` hasta F1.3. Desbloquea a **QC-13**, que es la que hace navegable el ERP. **Toca código de QC-8, ya mergeada** — la firma migra a WebCrypto sin cambiar el formato del token |
-| QC-20 | crud-de-productos | QC-18 Inventario | backend | **in_progress → PR abierto** | `feature/QC-20-crud-de-productos` | **Implementada, revisada y con PR #19 abierto el 2026-09-02.** La fila anterior decía `spec_ready` y «F2.0 bloqueada por QC-8»: quedó obsoleta cuando QC-8 cerró (PR #13) y otra sesión de leader llevó la feature entera. 16/16 tasks, **37 requisitos con test**, 40 mutaciones verificadas. Gate acreditado **por partes** —typecheck, lint y las tres suites (683 tests en 65 archivos), más el validador desde la raíz— porque `./init.sh` dentro de un worktree aborta con el falso positivo de specs de QC-9/QC-21. `reviewer` en **dos rondas**: RECHAZADO (1 mayor de documento) → **APROBADO, 0 mayores**. Base propia `QuimiCloude_QC20`, **pendiente de borrar al desmontar** |
 | QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress — PR #20 ABIERTO** | `feature/QC-30-rediseno-login` | **Esperando que el humano mergee el [PR #20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20).** Sesión labs-4b. Spec aprobado el 2026-09-02 (26 requisitos, 11 tareas). **Dos rondas de revisión**: la primera rechazó por un bloqueante real —R9 sin test que mordiera: se podía borrar el modo oscuro entero y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests (20 → 26). Gate completo verde: 65 archivos, 663 tests. Al mergear: F2.5 (tarjeta a *Hecho*, `status: done`, `wt.sh done QC-30-rediseno-login`) y F2.6 (resumen en `history.md`) |
+
+La feature **QC-20 — crud-de-productos** se cerró el 2026-09-02 (PR #19, merge `1be1021`):
+resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
+`QuimiCloude_QC20` eliminada**. 37 requisitos con test y 40 mutaciones verificadas; `reviewer`
+en dos rondas (RECHAZADO por un mayor de documento → APROBADO, 0 mayores). Rompió los tests de
+alcance de **tres** features anteriores —QC-14, QC-19 y QC-24—, todos por la misma causa: una
+feature no puede cumplir la afirmación de alcance de otra, y `related` no los ve porque leen el
+árbol de archivos. Desbloquea **QC-22** y **QC-25**.
 
 La feature **QC-21 — ayuda-visual-de-contrasena** se cerró el 2026-09-02 (PR #17, merge
 `3775102`): resumen en `progress/history.md`, worktree desmontado y rama borrada — `wt.sh done`
@@ -775,7 +782,8 @@ la task T6b, no suelto.
 
 ### QUIÉN LLEVA QUÉ, AHORA MISMO (2026-09-02) — leer ANTES de tocar un worktree ajeno
 
-> **QC-20 la lleva una sesión VIVA.** Rama `feature/QC-20-crud-de-productos`, worktree
+> **~~QC-20 la lleva una sesión VIVA~~ → CERRADA el 2026-09-02 (PR #19).** Se conserva el aviso
+> porque su lección sigue vigente. Lo que decía: Rama `feature/QC-20-crud-de-productos`, worktree
 > `.worktrees/QC-20-crud-de-productos`, base propia `QuimiCloude_QC20`. T1–T11 y T15 hechas;
 > **T12 en curso**. F2.3 ya hecho (merge de `origin/dev` con QC-24, tres conflictos resueltos).
 > **No escribas en esa rama ni en ese worktree.**

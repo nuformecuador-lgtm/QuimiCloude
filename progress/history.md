@@ -728,3 +728,103 @@ la otra sesión. El reviewer aceptó la corrección.
 - **Nadie ve este componente hasta QC-36.**
 - Importar del archivo de la guardia **duplica la ejecución de sus 6 tests**, así que infla el
   recuento: de +35 sobre el baseline, 29 son nuevos de verdad.
+
+## QC-20 — crud-de-productos (2026-09-02)
+
+Los casos de uso del catálogo sobre el modelo de QC-14: alta, consulta paginada, edición y borrado
+de productos y de presentaciones, autorización en el service, validación de borde con zod, dos
+columnas de auditoría con su migración, el util de paginación y las nueve Server Actions que
+consumirá QC-22. PR #19, merge `1be1021`.
+
+**Los 37 requisitos tienen test, y ninguno se dio por hecho leyendo código: 40 mutaciones
+verificadas.** `reviewer` en dos rondas — RECHAZADO (1 mayor, 10 menores) y APROBADO (0 mayores).
+
+### La lección: los tests que vigilan alcance son invisibles para `related`, y caducan solos
+
+Esta feature rompió los tests de alcance de **tres** features anteriores, y siempre por la misma
+razón: QC-14 afirmaba que el módulo `inventario` no tiene `domain/` ni contrato, QC-19 enumeraba
+las cuatro migraciones que existían el día que se escribió, y QC-24 daba por hecho que `inventario`
+publica solo tipos. **Las tres afirmaciones eran ciertas cuando se escribieron y ninguna podía
+sobrevivir a la feature siguiente.**
+
+Peor: `vitest related` **no los selecciona nunca**, porque leen el árbol de archivos y no importan
+nada. Uno de ellos llevó **rojo desde el primer grupo de tasks y pasó por debajo de dos gates
+rápidos en verde**. Se descubrió por casualidad, al exigirle a una task que corriera `tests/unit/`
+y `tests/ui/` enteros en vez de solo lo relacionado.
+
+El criterio con el que se resolvieron los tres: **una feature no puede cumplir la afirmación de
+alcance de otra**, así que se retira exactamente la cláusula que caducó —ni una más—, se documenta
+qué afirmaba y adónde pasa lo que seguía vigilado, y se comprueba que la versión heredada **puede
+ponerse roja**.
+
+### Tres afirmaciones falsas en el propio `design.md`, las tres encontradas buscándolas
+
+Una decía que se mantenía una comprobación previa de duplicados que el puerto no permite hacer;
+otra describía un entorno con el stub de sesión de QC-7 cuando QC-7 y QC-8 llevaban horas `done`; y
+la tercera —la que bloqueó el PR— repetía la primera en la **sección normativa**, en el doc-comment
+del puerto y en `db/schema.prisma`. Esa era la peor: el doc-comment del puerto es lo primero que van
+a leer QC-22 y QC-25, y les decía que faltaba implementar algo imposible.
+
+**Un documento que afirma algo falso es peor que uno incompleto**, porque manda al siguiente a
+buscar donde no hay nada. Es el mismo patrón que costó una ronda entera de revisión en QC-7.
+
+### Cinco tests que no podían fallar
+
+Aparecieron cinco en la sesión, todos encontrados **ejecutando o mutando, ninguno leyendo**: uno
+que construía el dato con el mismo error que el código, otro donde el propio test fijaba el
+resultado que decía observar, una aserción que miraba el nombre del archivo en vez de la ruta
+completa, un barrido que encontraba una cadena prohibida **dentro de un comentario**, y un
+`it.each` de tres casos donde el valor nunca influía.
+
+La respuesta estructural está en R20 y R21: en vez de mutar a mano y confiar, quedan **dos tests
+permanentes** que tiran el índice único y la FK dentro de una transacción con `ROLLBACK` y afirman
+que la operación prohibida pasa a ser posible. Una mutación manual demuestra que el test servía
+hoy; un test permanente **impide que se vuelva verde por construcción mañana**.
+
+### Tres decisiones por encima del spec
+
+1. **`ON DELETE RESTRICT` en las FK de auditoría.** El spec no fijaba la acción. La razón principal
+   es una propiedad del dato: con `SET NULL`, un `NULL` sobrevenido sería **indistinguible de un
+   `NULL` histórico** —las filas anteriores a la migración nacen sin autor porque la columna es
+   anulable a propósito—, así que la atribución se perdería sin rastro y sin ser auditable. La
+   convención del repo (las otras tres FK ya usaban `Restrict`) es el argumento secundario: la
+   convención puede cambiar, la propiedad del dato no.
+2. **Estrechar los tests de alcance de QC-14 y QC-19**, con el criterio de arriba.
+3. **Reformular una aserción de QC-24, acordada con esa sesión**: de «todo export del contrato es
+   `export type`» a «todo import del barrel de `inventario` desde fuera de `lib/composition/` debe
+   ser `import type`». La vieja retrataba un estado transitorio; la nueva expresa la garantía real
+   y sobrevive a que `inventario` publique superficie. Se verificó que la guardia hexagonal **no**
+   cubría eso —permite importar el barrel ajeno en runtime— antes de tocarla.
+
+### Coordinación entre sesiones: lo que costó y lo que ahorró
+
+La feature convivió con hasta **cuatro sesiones de leader** sobre el mismo repo. El balance es
+medible: cuando dos acotaron el mismo test **sin hablarlo**, acabó en conflicto de contenido con
+una incompatibilidad real debajo; cuando se habló antes, **salió un test mejor que el de
+cualquiera de las dos**, por tres mensajes.
+
+Dos incidentes concretos: una sesión estuvo a punto de arrancar la fase 2 de esta feature en
+paralelo porque leyó «worktree limpio + 72 minutos sin commits» como feature huérfana —era el
+implementer esperando al leader—; y otra entró a resolver los conflictos del PR **sin esperar
+respuesta** al aviso, y su `git merge --abort` dejó un commit con **un solo padre y sin los
+archivos de la rama ajena**, con un mensaje que describía un merge que no había ocurrido. Se
+detectó con `git merge-base --is-ancestor origin/dev HEAD`.
+
+De ahí salen dos reglas que van a `/afinar-regla`: **avisar antes de tocar un test de alcance ajeno
+o de escribir en un módulo ajeno**, y **anotar en `progress/current.md > Conflictos pendientes` qué
+ficha lleva cada sesión** — esa sección existía desde el principio y nadie la había usado para eso.
+
+### Deudas que hereda
+
+- **`scripts/db-rollback.ts` no encadena y puede revertir la migración equivocada.** Elige por el
+  último directorio del disco y **nunca consulta `_prisma_migrations`**. Dos ejecuciones revierten
+  la misma; sale con éxito cuando no ha revertido nada; y si en disco hay una migración posterior
+  **aún no aplicada** —situación que se dio durante horas—, ejecuta **su** `down.sql` contra una
+  base donde nunca se aplicó. **Es la deuda que puede destruir datos.**
+- **Los puertos no aceptan `TransactionClient`**, así que los tests que ejercitan el adaptador usan
+  fixtures reales con borrado en `finally` en vez de `SAVEPOINT` + `ROLLBACK`. Arreglarlo cambia la
+  firma de nueve métodos.
+- **La composición de dos `down.sql` no está verificada** — no por dejadez, sino porque la
+  herramienta no lo permite.
+- El estado generado (cliente de Prisma, tipos de Next) y el esquema de la base **quedan por detrás
+  tras cada merge**, y el síntoma siempre señala a la feature ajena que introdujo el cambio.
