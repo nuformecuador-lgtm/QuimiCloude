@@ -19,14 +19,14 @@
 
 ## Grupo A — cimientos (sin dependencias entre sí)
 
-- [ ] **T1 [P] — Util de paginación en `lib/shared/pagination.ts`.**
+- [x] **T1 [P] — Util de paginación en `lib/shared/pagination.ts`.**
       `DEFAULT_PAGE_SIZE = 10`, `MAX_PAGE_SIZE = 25` (D21), `toOffsetLimit`, `buildPage`
       (`design.md > 8`). No importa módulos ni `composition`.
       **Hecho cuando:** `tests/unit/pagination.test.ts` pasa —defecto 10, `offset` de la página
       3, `pageSize` 500 acotado a 25 y devuelto como 25 en el `Page`, `totalPages` = 1 con lista
       vacía— y `tests/guards/guard-arquitectura-modulos.test.ts` sigue verde.
 
-- [ ] **T2 [P] — Migración de auditoría y unicidad.**
+- [x] **T2 [P] — Migración de auditoría y unicidad.**
       `db/schema.prisma`: `createdBy`/`updatedBy` escalares en `Product` (sin `@relation`),
       `nameNormalized` + `@@unique` en `Presentation`. `migration.sql` con las dos FK a `users`
       escritas a mano, el backfill y el índice único; `down.sql` que lo revierte en orden
@@ -35,7 +35,7 @@
       **Hecho cuando:** `pnpm run db:migrate:create` no reporta drift pendiente y
       `tests/unit/inventario/schema/inventario-audit-migration.test.ts` pasa.
 
-- [ ] **T3 [P] — Dominio base del módulo.**
+- [x] **T3 [P] — Dominio base del módulo.**
       `domain/actor.ts` (`Actor`, `ADMIN_ROLE_NAME`, `requireAdmin`), `domain/errors.ts`,
       `domain/page.ts` (`Page<T>`, `PageQuery`, `pageQuerySchema`),
       `domain/presentation-name.ts` (`normalizePresentationName`). `ADMIN_ROLE_NAME` es propia de
@@ -111,10 +111,15 @@
       columnas, cada caso en `$transaction` con `ROLLBACK` y afirmaciones sobre **SQLSTATE**.
       *Depende de:* T9, T10, T13. **Hecho cuando:** ambos pasan contra Postgres real.
 
-- [ ] **T15 [P] — Test de alcance.** `tests/unit/inventario/scope.test.ts`: no hay ninguna ruta,
+- [x] **T15 [P] — Test de alcance.** `tests/unit/inventario/scope.test.ts`: no hay ninguna ruta,
       página ni componente de productos bajo `app/`, ni route handler del catálogo bajo
       `app/api/`, ni spec nuevo en `e2e/` (R29, R34).
       *Depende de:* T12. **Hecho cuando:** pasa y falla si se añade cualquiera de esas tres cosas.
+      **ADELANTADA al Grupo A** (alcance no previsto por este `tasks.md`): es donde aterrizan
+      las tres cláusulas que perdió el test de alcance de QC-14 al darle QC-20 contenido al
+      módulo. Dejarlo para el Grupo D habría dejado el alcance sin vigilar justo mientras se
+      llena `domain/`. Detalle en `progress/impl_QC-20-crud-de-productos.md`. La cláusula de
+      R29 la completa T12.
 
 - [ ] **T16 — Cierre.** `./init.sh` completo en verde, `progress/impl_QC-20-crud-de-productos.md`
       con la salida real de los tests y el mapa `R<n> → test` de abajo, y todas las tasks marcadas
