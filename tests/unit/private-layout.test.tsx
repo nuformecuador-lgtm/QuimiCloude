@@ -5,6 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
 import type { SessionUser } from '@/lib/modules/identity';
+import { LOGIN_ROUTE } from '@/lib/shared/routes';
 import { getInitials } from '@/lib/shared/ui/initials';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
@@ -37,18 +38,33 @@ const USUARIO_DEL_TEST: SessionUser = {
   roleName: 'Analista de calidad',
 };
 
-const { usePathnameMock, logoutActionMock, cookiesMock, getSessionUserMock, nombresConsultados } =
-  vi.hoisted(() => ({
-    usePathnameMock: vi.fn<() => string>(),
-    logoutActionMock: vi.fn<() => Promise<void>>(),
-    cookiesMock: vi.fn<() => Promise<CookieStoreStub>>(),
-    getSessionUserMock: vi.fn(),
-    nombresConsultados: [] as string[],
-  }));
+const {
+  usePathnameMock,
+  redirectMock,
+  logoutActionMock,
+  cookiesMock,
+  getSessionUserMock,
+  nombresConsultados,
+} = vi.hoisted(() => ({
+  usePathnameMock: vi.fn<() => string>(),
+  redirectMock: vi.fn<(ruta: string) => never>(),
+  logoutActionMock: vi.fn<() => Promise<void>>(),
+  cookiesMock: vi.fn<() => Promise<CookieStoreStub>>(),
+  getSessionUserMock: vi.fn(),
+  nombresConsultados: [] as string[],
+}));
+
+/** Centinela que imita el comportamiento real de `redirect`: no retorna, lanza. */
+class RedirectCentinela extends Error {
+  constructor(public readonly ruta: string) {
+    super(`REDIRECT:${ruta}`);
+  }
+}
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   usePathname: usePathnameMock,
+  redirect: redirectMock,
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
@@ -101,6 +117,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   nombresConsultados.length = 0;
   usePathnameMock.mockReturnValue(RUTA_SIN_COINCIDENCIA);
+  redirectMock.mockImplementation((ruta: string) => {
+    throw new RedirectCentinela(ruta);
+  });
   logoutActionMock.mockResolvedValue(undefined);
   getSessionUserMock.mockResolvedValue(USUARIO_DEL_TEST);
   cookiesMock.mockResolvedValue({
@@ -159,6 +178,18 @@ describe('layout privado', () => {
     );
   });
 
+  it('sin usuario de sesion, el layout redirige al login y no pinta la zona privada', async () => {
+    // R16 — decision del humano del 2026-09-02: sin sesion valida, la zona privada redirige
+    // al login ya en QC-8 (ver revocacion de R35 mas abajo).
+    getSessionUserMock.mockResolvedValue(null);
+
+    await expect(renderLayout()).rejects.toThrow(RedirectCentinela);
+
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE);
+    expect(screen.queryByTestId(testId.sidebar)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(testId.content)).not.toBeInTheDocument();
+  });
+
   it('el sidebar no importa el proveedor de sesion', async () => {
     // R16 — guardia de codigo: los datos entran solo por props. Ningun componente de
     // `components/private/` obtiene nada por su cuenta.
@@ -198,8 +229,11 @@ describe('layout privado', () => {
     expect(codigo.toLowerCase()).not.toContain('cookiestore.set');
     expect(codigo.toLowerCase()).not.toContain('cookiestore.delete');
 
-    // Ni proteccion de ruta, ni base de datos, ni red.
-    for (const prohibido of ['redirect', 'prisma', 'PrismaClient', 'supabase', 'fetch(']) {
+    // Ni base de datos ni red. `redirect` se revoca aqui por decision del humano del
+    // 2026-09-02: sin sesion valida, la zona privada redirige al login ya en QC-8 (R16), para
+    // no dejar la ventana entre QC-8 y QC-9 en la que entrar sin sesion rompa la pagina. La
+    // proteccion barata en `middleware.ts` sigue siendo QC-9 y esto no la sustituye.
+    for (const prohibido of ['prisma', 'PrismaClient', 'supabase', 'fetch(']) {
       expect(codigo, `layout.tsx no debe contener «${prohibido}»`).not.toContain(prohibido);
     }
 
