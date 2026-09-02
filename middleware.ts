@@ -4,7 +4,7 @@
 // cosas —el reexport del handler y el `matcher`— y ninguna decision propia. Si alguna vez aparece
 // aqui un `if` sobre rutas, un destino de redireccion o una llamada a `crypto`, esta en el archivo
 // equivocado; `tests/unit/middleware-root-contract.test.ts` lo afirma sobre el texto de este
-// archivo, y las guardias lo barren con las mismas reglas que `app/**` (R19, R21).
+// archivo, y las guardias lo barren con las mismas reglas que las de `app/` (R19, R21).
 export { middleware } from '@/lib/modules/identity/adapters/driving/route-guard-middleware';
 
 /**

@@ -1,10 +1,10 @@
 // lib/composition/edge.ts — CABLEADO QUE PUEDE CORRER EN EL BORDE (`design.md > 5`).
 //
 // Sigue habiendo **un solo punto de composicion**: este archivo no es un segundo sitio donde se
-// eligen implementaciones, es la mitad de `lib/composition/**` que el runtime del borde puede
-// cargar. `guard-arquitectura-modulos` autoriza el import de adaptadores driven a todo
-// `lib/composition/**` por PREFIJO —no por archivo—, asi que la frontera no se ensancha ni hay
-// regla que tocar (R21).
+// eligen implementaciones, es la mitad de `lib/composition` que el runtime del borde puede
+// cargar. `guard-arquitectura-modulos` autoriza el import de adaptadores driven a toda la
+// carpeta `lib/composition` por PREFIJO —no por archivo—, asi que la frontera no se ensancha
+// ni hay regla que tocar (R21).
 //
 // Por que no vale `lib/composition/index.ts`: ese archivo cablea los adaptadores Prisma, y basta
 // importarlo desde `middleware.ts` para arrastrar `@prisma/client` al bundle del borde, donde no
