@@ -120,7 +120,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 
 ## Bloque D — El seed (entregable 2): adaptadores, composicion y entrada
 
-### [ ] T10. [P] Adaptador de credenciales `adapters/driven/config/initial-access-credentials-env.ts`
+### [x] T10. [P] Adaptador de credenciales `adapters/driven/config/initial-access-credentials-env.ts`
 - Dep: T7.
 - Lee las tres `SEED_ADMIN_*` **en el momento de invocarlo**, tratando vacio o solo-espacios
   como ausente, y lanza nombrando la o las variables que faltan, **sin incluir ningun valor**.
@@ -132,7 +132,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
   una en blanco → lanza; el mensaje del error **no contiene** el valor de la credencial.
   Cubre R5, R13, R18.
 
-### [ ] T11. Adaptador Prisma `adapters/driven/persistence/initial-access-repository-prisma.ts`
+### [x] T11. Adaptador Prisma `adapters/driven/persistence/initial-access-repository-prisma.ts`
 - Dep: T2, T7.
 - Fabrica `createInitialAccessRepository(db)` que acepta `PrismaClient` **o**
   `Prisma.TransactionClient` (`design.md > 5.3`): sin eso el test de integracion no puede
@@ -142,14 +142,14 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 - Solo toca `prisma.role` y `prisma.user` (modelos de `identity`); nunca `prisma.documentType`.
 - **Hecho cuando:** `pnpm run typecheck` pasa y la guardia de arquitectura sigue verde.
 
-### [ ] T12. Cablear en `lib/composition/index.ts`
+### [x] T12. Cablear en `lib/composition/index.ts`
 - Dep: T8, T10, T11.
 - Exponer `identity.seedInitialAccess` ya cableado con el repositorio Prisma, el
   `passwordHasher` existente y el proveedor de credenciales. La composicion **no** importa
   ningun adaptador driving.
 - **Hecho cuando:** `pnpm run typecheck` pasa y la guardia de arquitectura sigue verde.
 
-### [ ] T13. `scripts/seed.ts` y el script `db:seed`
+### [x] T13. `scripts/seed.ts` y el script `db:seed`
 - Dep: T12.
 - Cascara: `process.loadEnvFile()` cuando exista `.env` (`tsx` no lo carga solo, ver
   `scripts/db-rollback.ts`), llamada a la composicion por **import relativo**

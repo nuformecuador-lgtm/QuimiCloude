@@ -1,7 +1,9 @@
 // lib/composition/index.ts — PUNTO UNICO DE COMPOSICION.
 // Aqui, y solo aqui, se elige QUE implementacion concreta cumple cada puerto.
 // Prohibido importar adaptadores driving desde aqui: la flecha va driving -> composicion (R12).
-import { createVerifyCredentials } from '@/lib/modules/identity';
+import { createVerifyCredentials, seedInitialAccess } from '@/lib/modules/identity';
+import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
+import { initialAccessRepository } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import {
   compareAndSetLoginAttempt,
   findActiveByUsername,
@@ -43,4 +45,13 @@ export const identity = {
   }),
   passwordHasher,
   ...sessionProvider,
+  // QC-6: siembra roles y usuario inicial. Invocable como `identity.seedInitialAccess()`,
+  // sin argumentos: el repositorio, el hasher y el proveedor de credenciales ya estan
+  // cableados aqui (`design.md > 5`). Solo lo consume `scripts/seed.ts`.
+  seedInitialAccess: () =>
+    seedInitialAccess({
+      repository: initialAccessRepository,
+      passwordHasher,
+      credentials: readInitialAdminCredentialsFromEnv,
+    }),
 } as const;
