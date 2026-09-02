@@ -73,7 +73,7 @@
       "epic_name": "Identidad y acceso",
       "name": "sesion-actual-y-logout",
       "description": "Desde cualquier punto de la aplicacion hay que poder saber quien es el usuario de la sesion en curso y cual es su rol, o que no hay sesion. Tambien hace falta cerrar sesion: despues de cerrarla, la cookie deja de servir.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
