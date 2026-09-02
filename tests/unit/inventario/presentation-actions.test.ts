@@ -116,24 +116,24 @@ describe('createPresentationAction', () => {
     expect(result.status === 'error' && result.code).not.toBe('duplicate_name');
   });
 
-  it.each([
-    ['vacio', ''],
-    ['de solo espacios', '   '],
-    ['de mas de 60 caracteres', 'x'.repeat(61)],
-  ])(
-    'traduce ValidationError a invalid_input para un nombre %s (R9, R11, R28)',
-    async (_case, name) => {
-      createPresentationMock.mockRejectedValue(new ValidationError());
+  // La action no valida `name` por su cuenta: la validacion vive en
+  // domain/presentation-input.ts, dentro del caso de uso. Por eso este test no puede
+  // discriminar entre nombre vacio, de solo espacios o de mas de 60 caracteres -- el mock
+  // rechaza incondicionalmente y el valor de `name` no influye en el resultado. Esa
+  // discriminacion la cubre tests/unit/inventario/presentation-service.test.ts (y los
+  // esquemas en tests/unit/inventario/product-input.test.ts), donde si se ejercita el
+  // esquema zod de verdad.
+  it('traduce ValidationError a invalid_input', async () => {
+    createPresentationMock.mockRejectedValue(new ValidationError());
 
-      const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name }));
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: '' }));
 
-      expect(result).toEqual({
-        status: 'error',
-        code: 'invalid_input',
-        message: expect.any(String),
-      });
-    },
-  );
+    expect(result).toEqual({
+      status: 'error',
+      code: 'invalid_input',
+      message: expect.any(String),
+    });
+  });
 
   it('relanza un error que no es de dominio, sin traducirlo (docs/conventions.md)', async () => {
     createPresentationMock.mockRejectedValue(new Error('fallo de infraestructura'));

@@ -13,7 +13,8 @@ import type { PresentationView } from '../domain/presentation-view';
  * (ni `findBy`, ni `search`, ni `exists`) y deliberadamente no hay comprobacion previa por
  * `nameNormalized` -- entre un `SELECT` previo y el `INSERT` cabe otra transaccion, asi que
  * no cerraria la carrera (`design.md > 11.4`). El mensaje al usuario sale de traducir el
- * `'duplicate'` que devuelve el adaptador cuando Postgres rechaza el `INSERT`.
+ * `'duplicate'` que devuelve el adaptador cuando Postgres rechaza la escritura (el
+ * `INSERT` de `create` o el `UPDATE` de `rename`) por chocar contra el indice unico.
  */
 export interface PresentationRepository {
   create(name: string, nameNormalized: string): Promise<{ id: string } | 'duplicate'>;
