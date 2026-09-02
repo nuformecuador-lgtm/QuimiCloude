@@ -277,3 +277,192 @@ QC-4 acota sin debilitar. Se rechaza por dos cosas concretas: la suite completa 
 por un centinela de esquema que la feature invalido (B-1), y una tercera desviacion del
 diseno —la transaccion de los pasos 4 y 5— desaparecio sin declararse (B-2). Ambas vuelven al
 implementer.
+
+---
+
+# RONDA 2 — commit `787a141` (+ merge de `dev` `be82871`, solo documentacion)
+
+## Veredicto ronda 2
+
+**APROBADO.** Los dos bloqueantes estan cerrados de verdad, no en apariencia, y los tres
+menores encargados tambien. Ningun arreglo debilito lo que ya estaba dado por bueno en la
+ronda 1. Quedan tres observaciones menores, ninguna bloqueante.
+
+## Alcance de lo revisado
+
+`git show 787a141` completo (9 archivos: `lib/composition/index.ts`,
+`initial-access-repository-prisma.ts`, `scripts/seed.ts`, 4 archivos de test, la bitacora y mi
+propio informe de ronda 1). El merge `be82871` solo trae `progress/history.md` y ficheros de
+QC-8: no toca codigo ni tests de QC-6.
+
+## B-1 — CERRADO. La distincion SEED_FIELDS vs BUSINESS_FIELDS se sostiene
+
+No es una excusa para no tocar el centinela: es la unica colocacion correcta, y se demuestra
+leyendo el propio centinela. El bloque `BUSINESS_FIELDS` no es solo una lista de nombres; el
+segundo `it` del describe afirma sobre el, ademas de que ninguno sea opcional, que ninguno
+lleva `@default(` (comprobacion literal `not.toMatch(/@default\(/)`).
+
+`mustChangeCredential` lleva `@default(false)` por diseno (R10: "cuyo valor para cualquier
+fila que no la fije explicitamente es no obligado"). Meterlo en `BUSINESS_FIELDS` habria
+puesto ese `it` en rojo y habria afirmado algo falso: que es un dato de negocio obligatorio
+que el usuario aporta. Ademas romperia el `expect(BUSINESS_FIELDS).toHaveLength(9)`, atado al
+requisito de QC-4 sobre los nueve datos del usuario. QC-7 resolvio lo mismo con
+`LOCKOUT_FIELDS` (tres columnas de estado, tambien con default): el patron es el establecido,
+no uno inventado para esquivar el centinela.
+
+Y el centinela no se debilito: `scalarNames` sigue comparandose contra la lista COMPLETA
+—ahora con `...SEED_FIELDS`—, asi que una columna 17 futura lo seguiria rompiendo. El `it`
+nuevo anade lo que el centinela por si solo no miraba: tipo `Boolean`, `isOptional === false`,
+`@default(false)` y `@map("must_change_credential")`.
+
+**El barrido de los otros nueve centinelas: verificado.** Los diez que nombra la bitacora
+existen y son exactamente los que hay
+(`tests/unit/identity/schema/{identity-schema,identity-migration,seed-migration}`,
+`tests/unit/inventario/schema/{inventario-schema,inventario-migration}` y los cinco de
+`tests/guards/`). No hay ningun otro test estatico en el repo que el barrido se haya saltado.
+Y no me quede en la lista: **corri `pnpm test` completo**, que los incluye a todos.
+
+## B-2 — CERRADO. La transaccion existe, esta donde debe y esta probada
+
+- `withInitialAccessTransaction` envuelve `prisma.$transaction` con un repositorio construido
+  sobre el `tx`, y `lib/composition/index.ts` invoca `seedInitialAccess` DENTRO de ella. El
+  dominio no cambio ni una linea: sigue sin saber que hay una transaccion debajo, que es lo
+  que `design.md > 5` exige.
+- La colocacion en el adaptador driven es obligada, no preferencia: el bloque 11 de
+  `guard-arquitectura-modulos` prohibe importar `lib/shared/db/prisma` desde `lib/composition`
+  (comprobado en la ronda 1 y sigue vigente).
+- El export `initialAccessRepository` desaparecio y no queda ninguna referencia viva en
+  `lib/`, `scripts/` ni `tests/` (grep + typecheck limpio).
+- Timeouts explicitos (`maxWait: 10_000`, `timeout: 30_000`): razonable, porque ahora el
+  hasheo bcrypt cae dentro del alcance de la transaccion. Ver m-9.
+
+### La justificacion del no-anidamiento: CIERTA, verificada a mano
+
+No me fie del argumento. Lo ejecute contra la base real, abriendo una transaccion interactiva
+e inspeccionando el cliente que recibe el callback:
+
+```
+tx tiene $transaction? undefined
+claves $ del tx: [ $metrics, $executeRaw..., $queryRaw..., $applyPendingMigrations, $parent ]
+```
+
+El `Prisma.TransactionClient` NO expone `$transaction`. Meter esos dos casos dentro de
+`inRolledBackTransaction` obligaria a llamar a `withInitialAccessTransaction`, que usa el
+cliente compartido: seria una transaccion INDEPENDIENTE sobre otra conexion, no anidada — no
+veria las filas de la transaccion exterior y podria bloquearse contra ella. La justificacion
+se sostiene entera.
+
+### La cobertura nueva: las dos mitades son necesarias y estan en el orden correcto
+
+- **Unitario 7b:** afirma `creacionesDeRol` con `toHaveLength(2)` —que los roles SI se
+  crearon, exactamente dos— ANTES de afirmar que el error se propaga. Y deja escrito su propio
+  limite (sobre dobles no ve persistencia). Correcto: demuestra la condicion que hace
+  necesaria la transaccion, no que revierta.
+- **Integracion, mitad positiva:** crea un rol, commitea y comprueba que persiste releyendo
+  del cliente compartido. Sin ella, la mitad negativa pasaria en verde aunque `createRole` no
+  escribiera nunca. Es exactamente la trampa que `docs/verification.md` describe, y esta
+  cubierta.
+- **Integracion, mitad negativa:** crea y lanza; comprueba que el rol NO esta. Junto con la
+  positiva, prueba rollback real y no ausencia de escritura.
+
+### (a) (b) (c) del encargo sobre los dos tests que escriben en la base compartida
+
+- **(a) La justificacion tecnica es cierta.** Demostrado arriba con la ejecucion real.
+- **(b) La limpieza es fiable ante un fallo a mitad.** Los dos casos envuelven TODAS sus
+  aserciones en `try` y borran en `finally` por `name` (irrepetible, `randomUUID()`). Si un
+  `expect` falla, el `finally` corre igual. En la mitad negativa el borrado es ademas
+  redundante (la transaccion ya revirtio): red de seguridad, no dependencia. El unico hueco es
+  la muerte dura del proceso justo entre el commit y el `finally`. Ver m-8: el residuo posible
+  es un rol suelto `qc6-tx-commit-<uuid>` SIN usuarios asociados, y verifique que ningun test
+  del repo afirma sobre el estado absoluto del catalogo de roles (el unico `role.count()` sin
+  `where` es el caso 7 del propio archivo, y es una comparacion antes/despues dentro de su
+  transaccion, no un valor absoluto). No puede romper a la siguiente feature.
+- **(c) No queda residuo ahora mismo.** Consultado por mi contra la base local, dos veces:
+  antes de correr nada y despues de la suite completa.
+
+```
+roles en la base: [Administrador, Operador]     residuo qc6-tx-*: 0     users: 1
+roles tras la suite: [Administrador, Operador]  users: 1   document_types: CC
+```
+
+## Menores de la ronda 1: estado
+
+- **M-1 CERRADO.** El titulo del caso 1 ya no promete la marca que no afirma, y el mapa manda
+  R9 a `I · caso 2` (releido de Postgres) + el estatico del esquema, que es donde esta.
+- **M-2 CERRADO.** Bloque nuevo en `deploy-hook.test.ts`: primero afirma que las tres claves
+  EXISTEN (patron `^SEED_ADMIN_X=`), luego que su valor recortado es cadena vacia. El orden es
+  el correcto: sin la primera mitad, un `.env.example` sin las claves pasaria en verde.
+- **M-5 CERRADO.** `prisma` se carga con `import()` dinamico dentro de `main()`, despues de
+  `loadDotEnv()`, y el `$disconnect()` esta en `try/finally`, asi que corre en exito y en
+  fallo; el `process.exit(1)` se conserva. Verificado ejecutando `pnpm run db:seed` con
+  `DATABASE_URL` y `DIRECT_URL` borradas del entorno del proceso: nada que crear, exit 0.
+- **M-3 y M-4:** fuera de encargo (los evalua el leader). Comprobado que este commit NO las
+  empeora: no toca `resetIdentityToEmptyState` ni las aserciones de R3.
+- **M-6:** T19/T20 siguen `[ ]`, correcto por proceso.
+
+## Mapa R1..R21 revalidado
+
+Los tres cambios del mapa son correctos y mejoran la cobertura, no la maquillan:
+- **R6** deja de apuntar a una task y pasa a `D` (bloque nuevo de `.env.example`): ahora es un
+  test de verdad, con la mitad positiva primero.
+- **R9** deja de apuntar a `U · caso 1` (que no lo afirmaba) y pasa a `I · caso 2`
+  (`must_change_credential` releido de Postgres) + `M` (el estatico del esquema, reforzado con
+  el `it` nuevo). Es el unico remapeo, y va de una cita falsa a dos ciertas.
+- **R13** gana `U · caso 7b` y los dos casos de `withInitialAccessTransaction`: el camino
+  "fallo DESPUES de la primera escritura", que en la ronda 1 no cubria nadie, ya esta cubierto.
+Los otros dieciocho siguen apuntando a los mismos tests que valide en la ronda 1, todos
+ejecutados en mi corrida de `pnpm test`.
+
+## Que NO se debilito (revalidado, no asumido)
+
+El commit no toca `db/schema.prisma`, la migracion, `.env.example`, `package.json`, `domain/`,
+`ports/`, el adaptador de entorno ni `identity-constraints.int.test.ts`. Todo lo que valide en
+la ronda 1 sigue en pie por construccion. Ademas lo revalide corriendolo: los 8 casos
+originales de `identity-seed.int.test.ts` siguen usando `createInitialAccessRepository(tx)`
+dentro del rollback y pasan; los 23 de QC-4 pasan; no hay ninguna credencial nueva en el diff;
+el puerto sigue sin exponer metodos de actualizacion.
+
+## Hallazgos ronda 2 (todos menores)
+
+### menor m-7 — la bitacora arrastra una frase que ya no es cierta
+El punto (b) de "Tres decisiones que se apartan del design.md" sigue diciendo que el adaptador
+exporta el `initialAccessRepository` ya construido "que es lo que consume la composicion". Ese
+export YA NO EXISTE: lo sustituyo `withInitialAccessTransaction`. La desviacion (b) sigue
+siendo cierta en el fondo (la composicion no importa `prisma`), pero la frase describe codigo
+que se fue. Una linea.
+
+### menor m-8 — residuo posible solo ante muerte dura del proceso
+Si alguien mata vitest entre el commit y el `finally` de la mitad positiva, queda un rol
+`qc6-tx-commit-<uuid>` huerfano. Verifique que es inocuo (ningun test afirma sobre el catalogo
+de roles en absoluto; `resetIdentityToEmptyState` solo borra Administrador y Operador; no hay
+usuarios que lo referencien). Un `afterAll` que barra `name LIKE 'qc6-tx-%'` lo cerraria del
+todo y cuesta tres lineas.
+
+### menor m-9 — el hasheo bcrypt corre ahora dentro de la transaccion
+Consecuencia aceptada y documentada del arreglo de B-2: el `build` de despliegue mantiene una
+transaccion abierta durante el hash (bcrypt coste 10) en el unico caso en que crea al admin.
+Los timeouts explicitos lo cubren y solo ocurre en un entorno nuevo. Alternativa si alguna vez
+molesta: hashear fuera y entrar a la transaccion solo para escribir — pero eso obligaria a
+partir el caso de uso del dominio, y hoy no compensa.
+
+## Verificacion ejecutable de la ronda 2 (corrida por mi)
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm run typecheck` | exit 0, sin salida |
+| `pnpm run lint` | exit 0, sin salida |
+| `pnpm test` | **377 passed (377), 35 archivos** — en la ronda 1 eran 370/371 con 1 rojo |
+| transaccion anidada (script ad-hoc contra la base) | `tx.$transaction` es `undefined`: el no-anidamiento es real |
+| residuo `roles LIKE 'qc6-tx-%'` antes y despues de la suite | 0 en las dos lecturas |
+| estado de la base tras la suite | roles [Administrador, Operador], users 1, document_types CC |
+| `pnpm run db:seed` sin `DATABASE_URL`/`DIRECT_URL` en el proceso | nada que crear, exit 0 |
+
+## Veredicto final
+
+**APROBADO.** B-1 y B-2 cerrados con arreglos que resuelven la causa, no el sintoma: el
+centinela sigue siendo un centinela —y la columna quedo en el bloque que le corresponde por
+semantica, no por comodidad—, y la transaccion existe, esta en la capa correcta y tiene
+cobertura en las dos direcciones. Los dos tests que escriben en la base compartida estan
+justificados por una limitacion real de Prisma que verifique ejecutandola, se limpian en
+`finally`, no dejan residuo y no pueden romper a la siguiente feature. m-7, m-8 y m-9 son
+menores y no bloquean el PR.

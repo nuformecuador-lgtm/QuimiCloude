@@ -431,6 +431,19 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 // Nombres de rol IRREPETIBLES (`randomUUID()`) para no depender de lo que ya haya en la
 // base ni tocar `Administrador`/`Operador`.
 describe('withInitialAccessTransaction — commitea en exito y revierte en fallo (R13)', () => {
+  // DEFENSA EN PROFUNDIDAD — esto NO reemplaza al `try/finally` de cada `it`: ese
+  // `finally` sigue siendo quien limpia en la corrida normal y ante un `expect` fallido,
+  // porque corre justo despues de cada caso. Este `afterAll` solo barre lo que quedaria
+  // vivo si el proceso muriera de golpe (Ctrl-C, timeout del runner, kill) entre el
+  // commit y el `finally` de una corrida ANTERIOR: en ese escenario el `finally` nunca
+  // llega a ejecutarse y el rol `qc6-tx-*` queda huerfano en la base. Esa base de test es
+  // COMPARTIDA ahora mismo por otras sesiones (QC-8, QC-12, QC-19, QC-20 tienen worktree
+  // montado contra el mismo Postgres local), asi que ese residuo ya no seria solo
+  // problema de esta feature.
+  afterAll(async () => {
+    await prisma.role.deleteMany({ where: { name: { startsWith: 'qc6-tx-' } } });
+  });
+
   it('mitad positiva: si `run` termina bien, lo escrito queda commiteado de verdad', async () => {
     const roleName = `qc6-tx-commit-${randomUUID()}`;
     try {

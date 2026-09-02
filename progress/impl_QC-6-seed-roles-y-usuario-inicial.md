@@ -52,10 +52,17 @@ habrian acabado escritos dentro del adaptador Prisma, que es justo donde no debe
 
 Segunda, en `lib/composition/index.ts`: la composicion **no** importa `prisma` directamente.
 `tests/guards/guard-arquitectura-modulos.test.ts` reserva el cliente compartido a
-`adapters/driven/**`, `scripts/**` y `tests/**`. Por eso el adaptador exporta las dos cosas: la
-fabrica `createInitialAccessRepository(db)` —que es la que usa el test de integracion sobre el
-`tx` (`design.md > 5.3`)— y el `initialAccessRepository` ya construido sobre el `prisma`
-compartido, que es lo que consume la composicion.
+`adapters/driven/**`, `scripts/**` y `tests/**`. Por eso el cableado con la instancia real vive
+dentro del propio adaptador driven, que exporta dos cosas: la fabrica
+`createInitialAccessRepository(db)` —que es la que usa el test de integracion sobre el `tx`
+(`design.md > 5.3`)— y `withInitialAccessTransaction`, que abre la transaccion sobre el
+`prisma` compartido y es lo que consume la composicion.
+
+> Correccion (m-7): esta frase decia antes que el adaptador exportaba un
+> `initialAccessRepository` ya construido, y era cierto hasta la ronda de arreglo del
+> reviewer. Ese export **ya no existe**: lo sustituyo `withInitialAccessTransaction` al
+> implementar la transaccion que faltaba (punto (c) de abajo). Queda anotado en vez de
+> reescrito en silencio, porque la bitacora es el registro de lo que paso.
 
 
 **(c) La transaccion de los pasos 4 y 5 — NO ERA una desviacion legitima: FALTABA, y no la
@@ -885,3 +892,51 @@ $ pnpm exec vitest run .../login.int.test.ts                   -> 13/13,  exit 0
 Los centinelas estaticos van **explicitos y por carpeta** a proposito: es la leccion de B-1,
 que el grafo no los relaciona con un cambio de esquema. `pnpm test` completo y `./init.sh` los
 corre el leader.
+
+---
+
+## Ronda 3 — los dos menores que el reviewer pidio tras aprobar
+
+El reviewer APROBO QC-6 en la ronda 2 y dejo dos menores baratos para antes del PR. m-9 (el
+hasheo bcrypt cae dentro de la transaccion) se acepta como esta, por los timeouts explicitos;
+decision del reviewer y del leader, no se toca.
+
+**m-8 — el hueco del Ctrl-C.** Los dos casos de `withInitialAccessTransaction` limpian su rol
+en un `try/finally`, que cubre la corrida normal y el `expect` fallido. Lo que no cubre es que
+el proceso muera de golpe (Ctrl-C, timeout del runner, kill) entre el commit y el `finally`:
+ahi el rol `qc6-tx-*` queda huerfano. Anadido un `afterAll` **dentro de ese `describe`** que
+hace `deleteMany({ where: { name: { startsWith: 'qc6-tx-' } } })`. Acotado al prefijo a
+proposito: no toca `Administrador`/`Operador`, ni `users`, ni ninguna otra tabla.
+
+Es **defensa en profundidad, no un reemplazo**: el `finally` sigue siendo quien limpia en la
+corrida normal, y el `afterAll` solo recoge lo que hubiera dejado una muerte abrupta de una
+corrida ANTERIOR. Queda dicho en el comentario del codigo, para que nadie lo lea como que el
+`finally` sobra. Pesa mas de lo que parece porque esa base **la comparten ahora mismo otras
+cuatro sesiones** (QC-8, QC-12, QC-19 y QC-20 tienen worktree montado contra el mismo Postgres
+local): la basura de un Ctrl-C ya no seria solo un problema de esta feature.
+
+**m-7 — una frase de esta bitacora mentia.** La descripcion de los exports del adaptador
+seguia hablando de un `initialAccessRepository` ya construido, que era cierto hasta la ronda 2
+y dejo de serlo al implementar la transaccion. Corregida arriba, con una nota que dice que
+cambio y por que, en vez de reescribirla en silencio: la bitacora es el registro de lo que
+paso, no una foto del estado final.
+
+### Verificacion de la ronda 3 (corrida por el implementer)
+
+```
+$ pnpm run typecheck                                          -> exit 0
+$ pnpm run lint                                               -> exit 0
+$ pnpm run test:guardias                                      -> 65/65, exit 0
+$ pnpm exec vitest run .../identity-seed.int.test.ts           -> 10/10, exit 0
+```
+
+Estado de la base releido despues, con el mismo criterio de siempre (afirmar que algo esta
+antes de afirmar que otra cosa no):
+
+```
+residuo qc6-tx-*: []
+roles: ["Administrador","Operador"]
+usuarios vivos: 1 | document_types: 1
+```
+
+`pnpm test` completo y `./init.sh` los corre el leader (T19).
