@@ -96,6 +96,24 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
 
+### QC-21 — ayuda-visual-de-contrasena (2026-09-02)
+
+- `zone: frontend`, `complexity: medium`. La description es UI pura («ver los requisitos», «a
+  medida que escribe») y las reglas ya existen probadas en QC-19: aquí no hay nada de backend.
+  No es `low` porque son varios archivos con estado vivo y siete reglas que pintar. Labels
+  `zone:frontend` y `complexity:medium` escritos en el issue.
+- **Acotada con `/afinar-feature` el 2026-09-02.** Las decisiones cerradas y lo que queda abierto
+  viven en `specs/QC-21-ayuda-visual-de-contrasena/requirements.md`; no se copian aquí.
+- **La acotación descubrió que la ficha no tenía dónde vivir**: hoy **ninguna pantalla fija o
+  cambia una contraseña** —el login solo verifica—, así que el componente nacía sin consumidor.
+  Decisión humana: se construye igual, y se creó en el board **QC-36 — cambiar-mi-contrasena**
+  (épica QC-17, `zone: fullstack`, *is blocked by* QC-21) como su primer consumidor. QC-36 cierra
+  además un agujero abierto: `must_change_credential` lo escribe el seed de QC-6 y **no lo lee
+  nadie**, o sea que el usuario inicial nace obligado a cambiar su contraseña y no tiene por dónde.
+- La acotación **cambió el alcance**, así que se reescribió la `description` en el issue QC-21
+  antes de sembrar, y se le añadieron los labels `sdd` y `slug:` que le faltaban del contrato.
+  `zone` y `complexity` no cambiaron.
+
 ### Épica nueva: QC-31 — Pedidos, y sus fichas (2026-09-02, decisión humana)
 
 - El humano pidió la épica de pedidos con «el modelo, el crud y el front». Se creó **QC-31 —
@@ -815,6 +833,26 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 ## Deudas y cosas abiertas
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
+
+- **[arnés — tests de feature que afirman el censo GLOBAL del repo. Encargo del humano el
+  2026-09-02: proponer la regla por `/afinar-regla` al cerrar QC-24.]** Tres features distintas
+  han escrito aserciones del tipo «mi feature añade exactamente N modelos / N migraciones»
+  comprobando **todo** el esquema o **todo** `db/migrations/`. Pasan el día que se escriben y
+  ponen en rojo a la feature siguiente, que no tiene culpa. **Cuatro casos reales, todos del
+  2026-09-02**, y los cuatro los tuvo que acotar QC-24:
+  - `tests/unit/inventario/schema/inventario-schema.test.ts` (QC-14): enumeraba todos los modelos
+    del esquema, y exigía `inventario/domain/` vacía con el barrel literal `export {};` — que es
+    justo lo que QC-24 cambia por diseño.
+  - `tests/unit/identity/credential-policy-contract.test.ts` (QC-19): `expected [Array(7)] to
+    deeply equal [Array(5)]` (modelos) y `expected […(5)] to deeply equal […(4)]` (migraciones).
+  **Lo que agrava el patrón:** esos tests leen las fuentes **del disco** en vez de importarlas, así
+  que `vitest related` no los engancha y **`./init.sh --rapido` no los corre**. El fallo aparece
+  tarde, en el gate completo de otra persona, y parece un problema de quien llega.
+  **Forma de la regla, a afinar:** un test de feature mide lo que **su** feature garantiza sobre sí
+  misma; si su aserción se rompe cuando llega la feature siguiente, estaba midiendo el repo. El
+  criterio que ya funcionó dos veces: contar por `/// @module`, o afirmar sobre el **diff de la
+  feature**, en vez de sobre el censo global. Ambas acotaciones las validó el reviewer por
+  mutación y quedaron **más** estrictas que el original, no más laxas.
 
 - **[board — QC-29 entró sin F0 completo (2026-09-02)]** La ficha se creó en Jira y se añadió a
   `feature_list.json` **de forma incremental**, sin regenerar el archivo entero desde el board como
