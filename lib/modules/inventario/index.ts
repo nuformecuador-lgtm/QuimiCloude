@@ -1,13 +1,10 @@
-// lib/modules/inventario/index.ts — SLOT del modulo `inventario`.
+// lib/modules/inventario/index.ts — CONTRATO PUBLICO del modulo `inventario`.
+// Regla: solo reexporta simbolos de `./domain`. Nada de 'use server', nada de Prisma, nada
+// de next/*: tiene que poder importarse desde un componente de cliente sin arrastrar
+// servidor (`docs/architecture.md > Modulos y arquitectura hexagonal`).
 //
-// Este modulo todavia no tiene contenido: es la carpeta que QC-14 va a llenar con su
-// dominio, puertos y adaptadores siguiendo la misma arquitectura hexagonal que `identity`
-// (ver `docs/architecture.md > Modulos y arquitectura hexagonal`). Las subcarpetas vacias
-// (`domain/`, `ports/`, `adapters/driven/`, `adapters/driving/`) llevan un `.gitkeep`
-// porque git no versiona carpetas vacias; QC-14 los borra en cuanto pone el primer
-// archivo real en cada una.
-//
-// Cuando QC-14 le de contenido, este `index.ts` pasa a ser el CONTRATO publico del
-// modulo: solo reexporta simbolos de `./domain`, exactamente como
-// `lib/modules/identity/index.ts`.
-export {};
+// Hoy publica SOLO TIPOS: la costura por la que otro modulo (`recetas`, QC-24) puede
+// apuntar a un producto sin tocar la tabla `products` ni el cliente Prisma. La
+// implementacion de `ProductCatalog` es un adaptador driven de ESTE modulo y su cableado
+// vive en `lib/composition`; las trae QC-25.
+export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
