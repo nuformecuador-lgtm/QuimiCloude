@@ -91,7 +91,7 @@
       *Depende de:* T6, T7, T9, T10. **Hecho cuando:** la guardia de módulos pasa y el contrato
       no arrastra `'use server'`, Prisma ni `next/*` en su cierre transitivo.
 
-- [x] **T12 — Server Actions.** `adapters/driving/product-actions.ts` y
+- [ ] **T12 — Server Actions.** `adapters/driving/product-actions.ts` y
       `presentation-actions.ts`: `'use server'`, actor desde `identity.getSessionUser()` vía
       `@/lib/composition` (`design.md > 5`), errores traducidos a estado serializable. Comentario
       explícito de que el proveedor de sesión es el stub hasta QC-8.

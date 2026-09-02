@@ -269,6 +269,29 @@ sorpresa:
   propagan el rechazo y que llaman al caso de uso con el actor que les dio `identity`.
 - QC-8 no tendrá que tocar `inventario`: cambia el cableado en `lib/composition/index.ts` y ya.
 
+> **Corrección (F2, Grupo C, 2026-09-02).** Todo el párrafo de arriba describe el estado del
+> repo cuando se escribió el diseño, y **ese estado ya no existe**. Verificado en el árbol tras
+> mergear `origin/dev`:
+>
+> - **`session-stub.ts` no existe** en ninguna parte de `lib/` (`find lib -name "session-stub*"`
+>   no devuelve nada).
+> - **QC-8 está `done`** en `feature_list.json`, igual que QC-7.
+> - `lib/composition/index.ts` cablea la **sesión real**: `session-cookie.ts` para leer las
+>   claims y `session-user-prisma.ts` para resolver el usuario activo.
+>
+> **Lo que cambia respecto a lo escrito:** ya no es cierto que una mutación «pase la
+> autorización pero muera en la FK de R7 porque `placeholder-user` no es un usuario real». Con
+> la sesión real, `getSessionUser()` devuelve el `id` de un usuario **que existe en `users`**,
+> así que la FK de auditoría se satisface y **las Server Actions de esta ficha sí son un flujo
+> utilizable** en cuanto haya pantalla (QC-22).
+>
+> **Lo que NO cambia, y es lo importante:** la predicción de fondo del diseño se cumplió tal
+> cual. **QC-8 no tuvo que tocar `inventario`**: sustituyó el proveedor en `lib/composition` y
+> nada más. Los casos de uso siguen recibiendo el actor **por parámetro** (R1, D17) y siguen sin
+> leer sesión, cookie ni cabecera —lo vigila
+> `tests/unit/inventario/authorization.test.ts` › `cada caso de uso recibe el actor por
+> parametro y no lee ninguna sesion`—. El diseño acertó; solo caducó su foto del entorno.
+
 ---
 
 ## 6. Contratos de entrada y salida
