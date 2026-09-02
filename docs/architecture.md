@@ -304,10 +304,26 @@ Supabase.
 
 ## Permisos y autenticacion
 - Las paginas (Server Components) validan permisos via `cookies()` de `next/headers`.
-- `middleware.ts` intercepta rutas protegidas, verifica existencia de cookie de sesion.
+- `middleware.ts` intercepta las rutas privadas y **valida** la cookie de sesion: su **firma**, su
+  **caducidad** y el **rol firmado** que lleva dentro. Que la cookie exista no es sesion.
+- El corte va en **los dos sentidos**: sin sesion valida en una ruta privada, redirige al login con
+  la ruta pedida en `next`; con sesion valida en el login, redirige al dashboard.
 - Componentes `private/` reciben datos por props desde el Server Component padre.
 - Datos publicos: el cliente fetchea con SWR desde el navegador.
 - Datos privados (balances, PII): pre-fetch en Server Component, stream al cliente.
+
+**El layout privado sigue siendo la ultima linea de defensa.** El corte del middleware no lo
+sustituye ni lo relaja: el layout de la zona privada vuelve a leer la sesion en el servidor y
+redirige si no la hay. El middleware ahorra render y da la vuelta rapida; no es la unica puerta.
+
+**El middleware NO es la frontera de autorizacion.** `## Acceso a datos y autorizacion` sigue
+mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol que
+viaja firmado en la cookie **no autoriza**; su unico efecto admisible es decidir si se enseña una
+pantalla. **Un permiso implementado solo como corte de ruta no cuenta como implementado**, igual
+que no cuenta uno implementado solo como policy de RLS. Ademas ese rol es una **foto del instante
+del login** y envejece hasta 8 h: un cambio de rol no llega al borde hasta que la sesion caduca, y
+el middleware puede dejar pasar a una pantalla que el service deniega. La invalidacion inmediata
+es QC-23.
 
 ## Server Actions vs Route Handlers
 | Caso | Usar |
