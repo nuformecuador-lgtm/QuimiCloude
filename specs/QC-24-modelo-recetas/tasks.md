@@ -12,16 +12,29 @@ archivo que no está listado, se anota antes de seguir.
 QC-20. Si QC-20 estuviera `in_progress` a la vez, el leader lo resuelve antes de arrancar el
 bloque C.
 
-**Archivo tocado FUERA de esta lista** (se anota aquí porque la cabecera lo exige):
-`tests/unit/inventario/schema/inventario-schema.test.ts`, de **QC-14**. Dos de sus casos medían
+**Archivos tocados FUERA de esta lista** (se anotan aquí porque la cabecera lo exige). Son
+**dos, y por el mismo motivo**: tests de otras features que afirmaban el **censo global del
+repo** —cuántos modelos tiene el esquema, cuántas migraciones hay— en vez de lo que su propia
+feature garantiza. Un test así se pone rojo en cuanto llega la feature siguiente, y la siguiente
+fue QC-24. Los dos se **acotaron, no se borraron**, conservando lo que sus requisitos vigilan y
+con el porqué fechado dentro del propio test.
+
+1. `tests/unit/inventario/schema/inventario-schema.test.ts`, de **QC-14**. Dos de sus casos medían
 el estado global del repo —el censo de **todos** los modelos del esquema, y que
 `lib/modules/inventario/domain/` estuviera vacía con el barrel en `export {};`— en vez de lo que
 QC-14 garantiza sobre sí misma, así que se ponían rojos en cuanto llegaba la feature siguiente.
 Los rompió esta ficha: T1 añade dos modelos y T5 publica el contrato de `inventario` **por
-diseño** (`design.md > 5.2`). Se **acotaron, no se borraron**, conservando lo que QC-14 R3 y R23
-vigilan, con el porqué escrito en el propio test. Detalle en
-`progress/impl_QC-24-modelo-recetas.md` y en el bloqueante 1 de
-`progress/review_QC-24-modelo-recetas.md`.
+diseño** (`design.md > 5.2`). Se conserva lo que QC-14 R3 y R23 vigilan.
+
+2. `tests/unit/identity/credential-policy-contract.test.ts`, de **QC-19**, que entró en `dev`
+   mientras se implementaba esta ficha y salió a la luz al mergear. Tres aserciones, mismo
+   patrón: el censo de modelos del esquema (R20), la lista cerrada de las cuatro migraciones
+   que había aquel día (R21), y un barrido de palabras sobre el texto del esquema **con los
+   comentarios dentro**, que la prosa de QC-24 rompía. Se conserva lo que QC-19 R20 y R21
+   vigilan. **No se tocó nada más de QC-19**, ni su spec ni su código de producción.
+
+Detalle de los dos en `progress/impl_QC-24-modelo-recetas.md`, y del primero en el bloqueante 1
+de `progress/review_QC-24-modelo-recetas.md`.
 
 ---
 

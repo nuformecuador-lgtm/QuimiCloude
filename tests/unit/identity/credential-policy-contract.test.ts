@@ -139,9 +139,41 @@ describe('QC-19 — la politica no conoce contrasenas anteriores (R20)', () => {
   });
 
   it('no existe tabla ni columna de contrasenas anteriores en db/schema.prisma', () => {
-    const modelos = [...rawSchema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1]);
-    expect(modelos).toEqual(['DocumentType', 'Role', 'User', 'Presentation', 'Product']);
-    expect(rawSchema).not.toMatch(/histor|previous|anterior|old_password|password_history/i);
+    // ACOTADO EL 2026-09-02 POR QC-24 (`specs/QC-24-modelo-recetas/`). Este caso enumeraba
+    // los modelos del esquema ENTERO y exigia que fueran exactamente los cinco que habia el
+    // dia que se escribio. Eso no es lo que R20 pide —R20 dice que no debe existir
+    // ALMACENAMIENTO DE CONTRASENAS ANTERIORES— y convertia en rojo a cualquier feature
+    // posterior que anadiera un modelo por motivos que no tienen nada que ver con la
+    // politica de contrasenas: QC-24 anadio `Recipe` y `RecipeLine`, que son del modulo
+    // `recetas`. Un test que se rompe cuando llega la feature siguiente estaba midiendo el
+    // repo, no su feature. Se acota a lo que R20 si vigila —que ningun modelo del esquema
+    // sea un historial de contrasenas, y que los tres modelos de `identity` sigan ahi— y se
+    // conservan intactas las dos aserciones de abajo, que son las que de verdad cierran R20.
+    const modelos = [...rawSchema.matchAll(/^model\s+(\w+)\s*\{/gm)]
+      .map((match) => match[1])
+      .filter((name): name is string => name !== undefined);
+
+    // Los tres modelos de `identity` siguen existiendo: esta feature no los toco.
+    for (const modelo of ['DocumentType', 'Role', 'User']) {
+      expect(modelos, `el modelo ${modelo} no debe desaparecer`).toContain(modelo);
+    }
+    // Y ninguno de los que hay —los de `identity` o los de cualquier otro modulo— es un
+    // almacen de contrasenas anteriores.
+    for (const modelo of modelos) {
+      expect(modelo, `el modelo ${modelo} no debe ser un historial de contrasenas`).not.toMatch(
+        /histor|previous|anterior|old.?password|password.?history/i,
+      );
+    }
+
+    // Sobre lo DECLARADO, no sobre lo explicado: se usa `schemaDeclarations`, que es lo que
+    // este mismo archivo define para eso («aqui se vigila lo DECLARADO, no lo explicado»).
+    // Antes barria `rawSchema`, con los comentarios dentro, y eso hacia que la PROSA de
+    // cualquier feature pudiera romperlo: QC-24 documenta que una linea de receta «no es un
+    // hecho historico» y la palabra «historico» bastaba para el rojo. Un comentario no crea
+    // ninguna tabla ni ninguna columna, asi que ignorarlo es exacto, no permisivo — y R20
+    // habla de que no exista ALMACENAMIENTO, que es declaracion. Acotado el 2026-09-02 por
+    // QC-24 por el mismo motivo que los dos casos de arriba.
+    expect(schemaDeclarations).not.toMatch(/histor|previous|anterior|old_password|password_history/i);
     // El unico rastro de contrasena en el schema sigue siendo el hash vigente.
     expect([...schemaDeclarations.matchAll(/password\w*/gi)].map((match) => match[0].toLowerCase())).toEqual([
       'passwordhash',
@@ -159,13 +191,39 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
       .filter((entry) => statSync(join(migrationsDir, entry)).isDirectory())
       .sort();
 
-    // Las cuatro migraciones que ya existian antes de QC-19, ni una mas.
-    expect(directorios).toEqual([
+    // ACOTADO EL 2026-09-02 POR QC-24 (`specs/QC-24-modelo-recetas/`). Aqui habia una
+    // igualdad contra la lista cerrada de las cuatro migraciones que existian el dia en que
+    // se escribio el test. Eso afirma el censo del repo ENTERO y para siempre, no lo que
+    // R21 pide —«ESTA feature no debe anadir tablas, columnas, indices ni migraciones»—:
+    // se ponia en rojo en cuanto cualquier otra feature anadia una migracion legitima, que
+    // es lo que hizo QC-24 con `20260902163256_recipes_and_recipe_lines` (dos tablas del
+    // modulo `recetas`, nada que ver con la politica de credenciales). Se acota a lo que R21
+    // vigila SOBRE QC-19: que las cuatro migraciones anteriores sigan ahi sin reescribir, y
+    // que ninguna migracion del repo introduzca persistencia de politica de credenciales o
+    // de contrasenas anteriores. La asercion de abajo sobre las columnas de `User` —el
+    // modelo que QC-19 habria tocado si tocara alguno— se conserva intacta y es la que de
+    // verdad cierra R21.
+    const PREVIAS_A_QC19 = [
       '20260806122638_users_and_roles',
       '20260901220609_user_login_lockout',
       '20260902005510_products_and_presentations',
       '20260902132253_user_must_change_credential',
-    ]);
+    ];
+    for (const previa of PREVIAS_A_QC19) {
+      expect(directorios, `QC-19 no puede quitar ni renombrar ${previa}`).toContain(previa);
+    }
+
+    // Ninguna migracion, ni las de antes ni las que vengan, se llama como esta feature ni
+    // guarda contrasenas anteriores: si QC-19 hubiera anadido persistencia, aqui estaria.
+    for (const directorio of directorios) {
+      expect(directorio, `${directorio} no debe ser una migracion de la politica`).not.toMatch(
+        /credential.?polic|password.?polic|password.?history|old.?password/i,
+      );
+      const sql = readFileSync(join(migrationsDir, directorio, 'migration.sql'), 'utf8');
+      expect(sql, `${directorio} no debe crear almacenamiento de contrasenas anteriores`).not.toMatch(
+        /password_history|old_password|previous_password/i,
+      );
+    }
 
     // Y el modelo User conserva exactamente sus columnas: la politica es regla, no dato.
     const cuerpo = /^model\s+User\s*\{([\s\S]*?)^\}/m.exec(rawSchema)?.[1] ?? '';

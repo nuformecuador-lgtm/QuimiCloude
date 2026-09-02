@@ -11,9 +11,14 @@
 
 ## Veredicto
 
-**RECHAZADO** — un hallazgo bloqueante: **la suite completa está en rojo**. Todo lo demás
-—las cinco trampas del modelo, la trazabilidad R1–R33 y las dos decisiones declaradas por el
-implementer— está correcto.
+**OK** (ronda 2, commit `0e8de49`). El único bloqueante —la suite completa en rojo— está
+resuelto y **verificado ejecutando**: `47 archivos, 509 tests, 509 pasando`. Los dos menores
+también. Ver `## Ronda 2` al final, que es la parte vigente de este archivo.
+
+> Veredicto de la ronda 1 (2026-09-02, antes de `0e8de49`): **RECHAZADO** por el bloqueante 1.
+> Se conserva abajo tal cual, sin reescribir: el resto de la revisión —las cinco trampas del
+> modelo, la trazabilidad R1–R33 y el juicio de las dos decisiones declaradas por el
+> implementer— sigue siendo válido y no se repite.
 
 ---
 
@@ -246,3 +251,123 @@ Solo el **bloqueante 1**: dejar la suite completa en verde arreglando los dos ca
 vigilan** (arriba está qué conservar y qué acotar), anotar los archivos tocados fuera de la lista
 de `tasks.md` y dejarlo en la bitácora. El **menor 1** (T13) lo cierra el leader con el gate. El
 **menor 2** es una nota para QC-25 y no bloquea el merge.
+
+---
+
+# Ronda 2 — verificación del arreglo (commit `0e8de49`)
+
+**Veredicto: OK.** Esta sección manda sobre la ronda 1.
+
+## Lo que corrí yo, otra vez
+
+```
+pnpm run typecheck   -> exit 0
+pnpm run lint        -> exit 0
+
+pnpm exec vitest run (SUITE COMPLETA)
+  Test Files  47 passed (47)
+       Tests  509 passed (509)
+  Duration  27.78s
+```
+
+Coincide con lo que declara el implementer. Nada nuevo en rojo.
+
+**Producción intacta, comprobado con `git diff`, no leído.** `git diff --stat origin/dev...HEAD
+-- db lib package.json tests/unit/recetas tests/integration/recetas` devuelve exactamente los
+mismos 15 archivos y los mismos recuentos de línea que en la ronda 1: ni `db/`, ni `lib/`, ni
+`package.json` (que sigue sin aparecer en el diff), ni ninguno de los cinco archivos de test de
+`recetas`. El commit `0e8de49` toca cinco archivos y solo uno es código:
+`tests/unit/inventario/schema/inventario-schema.test.ts` (+60/-9); los otros cuatro son
+`tasks.md`, `design.md` y las dos bitácoras.
+
+## La pregunta de fondo: ¿siguen protegiendo R3 y R23, o se relajaron?
+
+La respondo **midiendo**, no leyendo: repliqué los dos predicados nuevos en un script y les pasé
+mutaciones, que es la única forma de saber si un test todavía puede fallar.
+
+### Caso 1 — el censo de modelos (QC-14 R3)
+
+| Mutación | ¿Cae el test? |
+| --- | --- |
+| Tercer modelo con `/// @module inventario`, nombre neutro (`StockLevel`) | **sí** (`['Presentation','Product','StockLevel']`) |
+| `StockItem` / `Inventory` / `InventoryItem` / `Item` en **cualquier** módulo | **sí** (lista de prohibidos, global) |
+| `@@map("inventory"\|"inventory_items"\|"stock_items"\|"items")` | **sí** (sigue siendo global) |
+| `Product` cambia de dueño a otro módulo | **sí** (`inventarioModels` pasa a `['Presentation']`) |
+| Desaparece o se renombra `User` / `Role` / `DocumentType` | **sí** (aserción **nueva**) |
+| Entidad de existencias con nombre neutro (`Existencia`) declarada en **otro** módulo | **no** — ver menor 3 |
+
+**Veredicto del caso 1: no se relajó lo que R3 exige.** R3 habla de la **entidad de producto** y
+prohíbe una entidad separada de «elemento de inventario» con esos mismos datos. Contar los
+modelos que `inventario` declara por su `/// @module` es una medida **más ajustada** al
+requisito que enumerar el esquema entero, y encima detecta algo que la lista cerrada no detectaba
+bien: que un modelo **cambie de dueño**. Lo que se quitó no era R3, era una foto del repo del día
+que se escribió el test — y la prueba de que era una foto es que se puso rojo por `Recipe` y
+`RecipeLine`, que no son de `inventario` ni tienen nada que ver con QC-14. Además el criterio no
+es inventado: es literalmente el que ya usaba el caso de R20 unas líneas más abajo en el mismo
+archivo.
+
+### Caso 2 — el contrato de `inventario` (QC-14 R23)
+
+| Mutación del barrel | ¿Cae el test? |
+| --- | --- |
+| `export { createProduct } from './adapters/driven/product-repo'` | **sí**, por dos aserciones a la vez |
+| `'use server'` en el barrel | **sí** (aserción **nueva**) |
+| `export * from './domain/product-catalog'` | **sí** |
+| `export { findProductRefs } from './domain/product-catalog'` (valor, no tipo) | **sí** (aserción **nueva**) |
+
+**Veredicto del caso 2: quedó más estricto, no más débil.** R23 enumera «operación de alta,
+consulta, edición o borrado, adaptador driving, ruta, Server Action o pantalla». Un contrato de
+**solo tipos** no es ninguna de esas cosas: desaparece al compilar y no ejecuta nada. Lo que
+sustituye a las dos aserciones retiradas cubre mejor justo lo que R23 sí prohíbe —que por el
+contrato entre algo **ejecutable**—: antes bastaba con que el barrel fuera literalmente
+`export {};`, y ahora se comprueba la propiedad («solo tipos, solo de `./domain/`, sin
+`'use server'`»), que es lo que aquel literal significaba. Siguen en pie `adapters/driving` sin
+`.ts` y la ausencia de las tres rutas de `app/api/`.
+
+### menor 3 (nuevo) — lo único que sí se pierde, y por qué no bloquea
+
+Con la lista cerrada, **cualquier** modelo nuevo rompía el test; sin ella, una entidad de
+existencias con nombre neutro declarada bajo **otro** módulo pasaría (mutación `Existencia` de la
+tabla). Es una pérdida real y la dejo escrita. No es bloqueante por tres razones:
+
+1. Esa cobertura era **colateral**, no intencional: se pagaba poniendo en rojo toda feature
+   posterior, incluida esta. Un test que solo detecta al culpable poniéndose rojo con todo el
+   mundo no es una garantía, es un ruido que acaba borrado por conveniencia — que es exactamente
+   el desenlace que este arreglo evita.
+2. QC-14 R3 restringe **lo que hace QC-14**, ficha ya congelada y mergeada. Que una feature
+   futura no cree una entidad de existencias es requisito **de esa feature**, y le toca a su
+   propio spec y a su revisión, no a un test de QC-14.
+3. La forma más probable de esa violación —el modelo bajo `@module inventario`, o con cualquiera
+   de los cuatro nombres canónicos, o con el `@@map` delator— **sigue detectada**, como muestra
+   la tabla.
+
+Lo correcto sería anotarlo donde se decida, y no es este archivo: si al equipo le importa
+vigilarlo de verdad, es una guardia genérica sobre el esquema, no una aserción escondida en el
+test de una feature.
+
+## Los dos menores de la ronda 1
+
+- **menor 1 (T13) — resuelto, y bien.** `[x] T13 ... (pendiente del leader)`, con el cuerpo
+  explicando que la corre el leader por la regla del gate y que el implementer sí corrió
+  `typecheck`, `lint` y ahora la suite completa. El patrón que cita existe de verdad: verifiqué
+  `specs/QC-12-.../tasks.md:161` → `### [x] T9 — Gate completo y PR (pendiente del leader)`. La
+  ausencia queda **registrada**, que era lo que pedía `CHECKPOINTS.md`, en vez de silenciada.
+  Además anotó el archivo tocado fuera de la lista en la cabecera de `tasks.md`, como esa misma
+  cabecera exige.
+- **menor 2 (SQLSTATE) — resuelto, y la contención es lo mejor que tiene.** `design.md > 10.1`
+  dice qué pasa (`P2002` / `P2003` por el camino tipado), qué implica para el repositorio de
+  QC-25 y por qué los tests van en raw. Y donde **no** verificó —qué campo de `meta` identifica
+  qué restricción cayó— lo dice explícitamente y manda comprobarlo a QC-25 en vez de rellenarlo
+  con un supuesto. Eso es exactamente la regla 6 de `CLAUDE.md` aplicada bien: una nota que
+  admite su límite vale más que una que suena completa y miente. **Suficiente.**
+
+## Checklist: lo que cambia respecto de la ronda 1
+
+- [x] `tasks.md` con todas las tasks `[x]` — T13 marcada y anotada como pendiente del leader.
+- [x] `pnpm test` pasa — **509/509**, verificado por mí.
+- [x] `pnpm run typecheck` / `pnpm run lint` — exit 0, verificados otra vez tras el arreglo.
+- [x] Producción sin tocar: el arreglo vive entero en un test de QC-14.
+- [ ] `./init.sh` en verde — **lo corre el leader**. Ya no hay nada conocido que lo impida:
+      typecheck, lint y los 509 tests están en verde en este worktree.
+
+Queda **un menor abierto** (menor 3), que no bloquea el merge y no es de esta feature arreglarlo.

@@ -444,3 +444,124 @@ avisos de jsdom de los tests de login, preexistentes y ajenos a esta feature: no
 salían igual antes.
 
 `./init.sh` sigue siendo del leader.
+
+---
+
+# Segunda corrección: el mismo patrón, ahora en los tests de QC-19
+
+Tras el merge de `origin/dev` (commit `e6c89c2`), que trajo **QC-19 — política de contraseñas**,
+la suite volvió a ponerse roja **por el mismo motivo exacto** que ya se corrigió en QC-14: tests
+que afirman el **censo global del repo** en vez de lo que su propia feature garantiza. `dev`
+tenía 5 modelos y 4 migraciones; esta rama tiene 7 y 5, porque QC-24 añade `Recipe`,
+`RecipeLine` y su migración.
+
+Mismo criterio que el reviewer ya validó por mutación y aprobó: **acotar, no borrar**, y dejar
+el porqué fechado y con referencia a QC-24 **dentro del propio test**. Todo en
+`tests/unit/identity/credential-policy-contract.test.ts`. **No se tocó nada más de QC-19**: ni su
+`requirements.md`, ni su `design.md`, ni ningún otro caso del archivo, y **ni una línea de su
+código de producción** — esa feature ya está mergeada y es de otra sesión.
+
+## 1. `no existe tabla ni columna de contrasenas anteriores en db/schema.prisma` (R20)
+
+```
+expected [Array(7)] to deeply equal [Array(5)]
+```
+
+Enumeraba los modelos del esquema entero y exigía que fueran los cinco de aquel día. **QC-19
+R20** dice: «NO DEBE existir **almacenamiento de contraseñas anteriores**: la evaluación no
+recibe historial y no lo consulta». Habla de almacenamiento de historial, no del censo del
+esquema; `Recipe` y `RecipeLine` son del módulo `recetas` y no tienen nada que ver.
+
+**Se conserva** (era y sigue siendo lo que cierra R20): que en las declaraciones del esquema no
+aparezca `histor|previous|anterior|old_password|password_history`, y que el único rastro de
+contraseña siga siendo exactamente `passwordHash` / `password_hash`.
+
+**Se añade** al quitar la lista cerrada: que los tres modelos de `identity` sigan existiendo, y
+que **ningún** modelo del esquema —de `identity` o de cualquier otro módulo, presente o futuro—
+tenga nombre de historial de contraseñas. Eso es más directo sobre R20 que contar modelos: si
+alguien añadiera `PasswordHistory`, antes caía por el conteo y ahora cae por lo que es.
+
+**Se quita:** la igualdad contra el censo.
+
+## 2. `esta feature no anade migraciones ni columnas` (R21)
+
+```
+expected [ …(5) ] to deeply equal [ …(4) ]
+```
+
+Igualdad contra la lista cerrada de las cuatro migraciones que existían aquel día. **QC-19 R21**
+dice: «**Esta feature** NO DEBE añadir tablas, columnas, índices ni migraciones». La palabra que
+importa es *esta*: el test afirmaba el repo entero y para siempre, así que lo rompía cualquier
+migración legítima de cualquier otra feature — la de QC-24 crea dos tablas del módulo `recetas`.
+
+**Se conserva** intacta la aserción que de verdad cierra R21: la lista **exacta** de columnas del
+modelo `User`, que es el modelo que QC-19 habría tocado si tocara alguno. Esa sí está acotada a
+su feature y es la que detectaría una columna nueva de política.
+
+**Se añade** al quitar la lista cerrada: que las cuatro migraciones anteriores a QC-19 **sigan
+ahí** (QC-19 no las quitó ni las reescribió), que ninguna carpeta de migración se llame como la
+política de credenciales, y que ningún `migration.sql` del repo cree `password_history`,
+`old_password` ni `previous_password`. Si QC-19 hubiera añadido persistencia, cae aquí.
+
+**Se quita:** la igualdad contra el censo de migraciones.
+
+## 3. Un tercer rojo que estaba escondido detrás del primero
+
+Al arreglar el caso 1 apareció una aserción que nunca había llegado a ejecutarse, porque el
+conteo de modelos fallaba antes:
+
+```
+expect(rawSchema).not.toMatch(/histor|previous|anterior|old_password|password_history/i)
+```
+
+Barría el esquema **con los comentarios dentro**, así que la **prosa** de cualquier feature podía
+romperlo. Lo rompía este comentario de QC-24 en `RecipeLine`, que explica una decisión cerrada:
+
+> «la linea es parte de la receta, no un hecho **historico**»
+
+Se cambió `rawSchema` por `schemaDeclarations`, que **este mismo archivo ya define** con el
+comentario «*el schema sin comentarios: aquí se vigila lo DECLARADO, no lo explicado*» y que usa
+en la aserción de la línea siguiente. Un comentario no crea ninguna tabla ni ninguna columna, así
+que ignorarlo es exacto y no permisivo — y R20 habla de que no exista **almacenamiento**, que es
+declaración. Es además el mismo criterio (`stripComments`) que el reviewer ya aprobó para el test
+de contrato de módulo de esta ficha.
+
+## Archivos tocados en esta segunda corrección
+
+| Archivo | Qué cambió |
+| --- | --- |
+| `tests/unit/identity/credential-policy-contract.test.ts` | **Fuera de la lista de tasks.** Tres aserciones acotadas, con el porqué fechado dentro del test. |
+| `specs/QC-24-modelo-recetas/tasks.md` | La nota de la cabecera pasa de un archivo a **dos**, con el motivo común. |
+| `progress/impl_QC-24-modelo-recetas.md` | Este bloque. |
+
+Producción: **nada**, ni de QC-24 ni de QC-19.
+
+## Gate tras la segunda corrección
+
+```
+pnpm run typecheck   -> tsc --noEmit, sin salida, exit 0
+pnpm run lint        -> eslint, sin salida, exit 0
+
+pnpm exec vitest run   (SUITE COMPLETA)
+ Test Files  51 passed (51)
+      Tests  551 passed (551)
+   Duration  32.90s
+```
+
+**51 de 51 archivos y 551 de 551 tests en verde.** El total sube de 509 a 551 porque el merge
+trajo los tests de QC-19; **ningún caso se borró** en ninguna de las dos correcciones.
+
+`tests/integration/identity/identity-seed.int.test.ts` **no salió rojo en esta corrida**. El
+leader ya lo había aislado (10/10 en verde por separado): cuando falla es por la contención
+conocida de dos sesiones corriendo tests de integración contra la misma Postgres local, deuda ya
+documentada y **ajena a QC-24**. No se tocó.
+
+## Una observación para el leader, no una acción
+
+Han sido **dos features seguidas** —QC-14 y QC-19— cuyos tests se rompieron por afirmar el censo
+global del esquema o de las migraciones. No es mala suerte: es un patrón que se copia de un
+`schema.test.ts` al siguiente. Si el arnés quisiera cortarlo de raíz, el sitio sería una línea en
+`docs/verification.md` o en `CHECKPOINTS.md` —«un test de una feature afirma lo que **su** feature
+garantiza; enumerar el esquema entero convierte a la feature siguiente en un rojo»—, pero **eso es
+una mejora del arnés y va por `/afinar-regla`**, no por la ficha de QC-24. Se deja anotado aquí y
+no se toca ningún documento del arnés.
