@@ -77,6 +77,25 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
 
+### Épica nueva: QC-27 — Recetas (2026-09-02, decisión humana)
+
+- Las tres fichas de recetas (**QC-24** modelo, **QC-25** CRUD, **QC-26** pantalla) nacieron
+  colgadas de **QC-18 Inventario**. El humano decidió el 2026-09-02 que **recetas es una épica
+  aparte**, y se creó **QC-27 — Recetas**, con las tres reasignadas por `parent` en el board y
+  `epic` / `epic_name` actualizados en `feature_list.json`.
+- **Es agrupación, no dependencia** (`docs/jira.md`): la épica no cambia el orden ni el cupo de
+  paralelismo. Lo que sigue mandando es `depends_on`, y QC-24 sigue bloqueada por QC-14 igual que
+  antes. La frontera es la misma del módulo hexagonal: Inventario responde «qué hay y cuánto»,
+  Recetas responde «cómo se compone». Comparten la entidad producto, y esa costura se cruza por el
+  contrato público del módulo, nunca por su tabla (**QC-15**).
+- **De paso se corrigió una divergencia:** `feature_list.json` **no tenía QC-23** («Registro de
+  sesiones y cierre en todos los dispositivos», épica QC-17, bloqueada por QC-8), creada en el
+  board por la sesión que acotó QC-8. Se importó completa. Sin esto, el siguiente F0 la habría
+  traído de golpe y nadie sabría de dónde salió.
+- **Divergencia que NO se toca**, porque es de otra sesión: **QC-8 está *En curso* en el board y
+  `pending` en el disco**. La sesión que la tiene montada en `.worktrees/QC-8-sesion-actual-y-logout`
+  es quien debe pasarla a `in_progress`. Anotado aquí para que no se pierda.
+
 ### Feature 1 — modelo-usuarios-y-roles
 
 - `zone: backend`. La description es toda persistencia ("persistir", tablas,
