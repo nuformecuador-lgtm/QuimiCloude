@@ -164,14 +164,14 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 
 ## Bloque E — Enganche al despliegue (entregable 3)
 
-### [ ] T14. Encadenar el seed en el `build`
+### [x] T14. Encadenar el seed en el `build`
 - Dep: T13.
 - `"build": "prisma migrate deploy && tsx scripts/seed.ts && next build"` (`design.md > 7`).
   El orden y los `&&` son el requisito: cortan la cadena y dejan la version nueva sin publicar
   si el seed falla.
 - **Hecho cuando:** `pnpm run build` funciona en local contra la base de desarrollo y T15 pasa.
 
-### [ ] T15. [P] Test estatico `tests/unit/identity/seed/deploy-hook.test.ts`
+### [x] T15. [P] Test estatico `tests/unit/identity/seed/deploy-hook.test.ts`
 - Dep: T14.
 - Lee `package.json` y afirma: existe `scripts.build`; contiene `prisma migrate deploy`,
   `scripts/seed.ts` y `next build` **en ese orden**; los tres van unidos por `&&` (no por `;`
@@ -183,7 +183,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
   cumplen: barrer una lista vacia pasaria en verde para siempre.
 - **Hecho cuando:** pasa y cubre R19, R20, R21.
 
-### [ ] T16. Comprobar a mano que el fallo del seed rompe el despliegue
+### [x] T16. Comprobar a mano que el fallo del seed rompe el despliegue
 - Dep: T14.
 - En una terminal con la base accesible pero **sin** `SEED_ADMIN_PASSWORD` y con la base
   vacia de administradores: `pnpm run build` tiene que salir con codigo distinto de 0 y sin
