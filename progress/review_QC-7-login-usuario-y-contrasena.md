@@ -757,3 +757,239 @@ autocritica de 9.1 es la correcta.
 Lo que impide el OK es que el arreglo dejo una segunda escritura que pisa un estado que no leyo, y
 la apago con una premisa falsa en vez de con una condicion. Tres lineas en el `where` y una frase
 reescrita.
+
+---
+---
+
+# Ronda 3 — tras el arreglo de M-B1
+
+**Veredicto: APROBADO** — 0 mayores, 1 menor (m12). Adelante con el PR.
+
+Revisado `git diff f5dbadf..5d3eb00`. No repeti el gate completo —lo corrio el leader tras el
+arreglo, 278 tests— pero si `typecheck`, las 5 guardias (65) y la integracion entera (36),
+verdes en esta maquina. Volvi a usar un archivo de integracion temporal, ya borrado
+(`git status` limpio, y `identity-constraints` sigue viendo la tabla a cero, o sea que no deje
+huerfanos).
+
+## R3.1 ¿El rango cerro de mas? — no, y la frontera es exacta
+
+Es la pregunta correcta, porque el riesgo simetrico de un predicado que impide el ABA es que
+tambien impida una transicion legitima y deje el contador sin subir. **Lo ejecute contra Postgres,
+transicion por transicion y en la frontera exacta:**
+
+```
+1 falloNormal      cas=true   -> (1,0,null)
+2 quintoFallo      cas=true   -> (0,1,T+60s)        [consuma el bloqueo]
+3 trasCaducado     cas=true   -> (1,1,null)         [entra por el lte: now]
+3b escala2         cas=true   -> (0,2,T+300s)       [nivel 1 -> 2]
+4 ABA              cas=false  -> (0,1,T+60s) INTACTO
+```
+
+Las cuatro legitimas aplican —incluida la escalada de nivel, que no estaba en su tabla— y el ABA
+ya no. Su afirmacion es cierta.
+
+**La frontera, que es lo que pediste:**
+
+```
+5 locked_until == now      isLocked=false   cas=true    -> aplica
+6 locked_until == now+1ms  isLocked=true    cas=false   -> no aplica
+7 locked_until == now-1ms  isLocked=false   cas=true    -> aplica
+```
+
+`isLocked` es `lockedUntil > now` y el predicado es `lockedUntil <= now`: **son complementarios
+exactos**. No hay hueco (un estado que el dominio considere libre y la base rechace) ni
+solapamiento (uno que el dominio considere bloqueado y la base acepte). En el instante justo de
+caducidad las dos mitades dicen lo mismo. Esa correspondencia es lo que hace que el rango no
+pueda cerrar de mas, y no es casual: `lte` es la negacion literal de `>`.
+
+**Y el argumento de la precision, que era lo que motivo sacar la columna, tambien lo comprobe.**
+Sembre `locked_until` con SQL crudo a un **microsegundo** de `now`, por debajo de lo que un `Date`
+de JS puede representar:
+
+```
+8 locked_until = now - 1us   cas=true    [caducado por un microsegundo: aplica]
+9 locked_until = now + 1us   cas=false   [vivo por un microsegundo: no aplica]
+```
+
+El rango discrimina correctamente incluso en la resolucion que la igualdad no podia representar.
+O sea que el arreglo **conserva** el motivo original de dejar la columna fuera en vez de
+contradecirlo, que es exactamente lo que dice la nota nueva del adaptador.
+
+## R3.2 `now` viajando al puerto — correcto, y la alternativa era peor
+
+Que el reloj lo ponga el dominio y el adaptador lo obedezca es la frontera **correcta**, no una
+concesion:
+
+- **Respecto a la tabla de dependencias**, no cambia nada: la firma del puerto sigue hablando de
+  `AccountLockState` y `Date`, tipos del dominio y de la plataforma. No entra semantica de base
+  en el dominio — que es justo lo que descarto el `SELECT ... FOR UPDATE`. El puerto sigue sin
+  decidir: recibe los dos estados ya calculados y ahora tambien el instante con el que se
+  calcularon.
+- **La alternativa —usar el `now()` de Postgres en el `WHERE`— habria sido peor.** `locked_until`
+  se **escribe** desde el reloj de la aplicacion (`nextLockState` hace `now + duracion`) y se
+  **lee** con el reloj de la aplicacion (`isLocked`). Comparar contra `now()` de la base mezclaria
+  dos relojes en un sistema que hasta ahora usaba uno solo, y cualquier desfase entre servidor de
+  aplicacion y servidor de base se convertiria en bloqueos que duran mas o menos de lo que dice la
+  politica. Pasar `now` mantiene **un unico reloj de referencia** de punta a punta. Es la decision
+  correcta y el comentario del puerto la explica.
+- **Y esta atada por test**, no solo por convencion: el unitario nuevo comprueba que
+  `siguiente.lockedUntil === now + LOCK_DURATIONS_MS[0]`, o sea que el cuarto argumento es
+  literalmente el mismo instante con el que la politica calculo el bloqueo; y el test del
+  reintento comprueba `expect(relojSegundo).toBe(relojPrimero)` — **la misma referencia**, no dos
+  lecturas del reloj separadas por la relectura. Eso es atar la propiedad, no describirla.
+
+Una consecuencia menor que mire y **no** considero hallazgo, por si alguien la encuentra despues:
+`now` se fija antes de bcrypt, o sea que llega al `WHERE` con ~110 ms de retraso. Eso hace el
+predicado **conservador**, nunca permisivo: en el peor caso un fallo que llega justo cuando el
+bloqueo acaba de caducar no se cuenta. Va en la direccion segura —jamas puede desbloquear— esta
+acotado y no puede colgar el bucle (lo recorri: la vuelta siguiente sale por `isLocked`). No
+merece parche.
+
+## R3.3 El camino de exito sin condicion — bien razonado
+
+Comprobado que `set` sigue siendo incondicional y que ahora esta **explicado por que** y no por
+omision. El argumento se sostiene: el estado de exito es todo ceros, no depende del previo, luego
+no hay ABA que pisar. Y si un bloqueo aparece entre la lectura y la escritura de un login
+**correcto**, borrarlo es lo que R27 pide: quien acaba de demostrar que sabe la contrasena es el
+dueno. El unico que puede tomar ese camino es quien ya conoce la credencial, asi que no es una via
+de escape para el atacante que el bloqueo persigue. Bien tambien haber dicho en voz alta que el
+corte de R24 se evalua sobre el estado que ese intento leyo: es una decision, esta escrita, y el
+siguiente que la lea sabra que no fue un descuido.
+
+## R3.4 El matiz sobre el tiempo: dos preguntas, dos respuestas distintas
+
+### ¿1,2 ms consistentes en signo son explotables para saber si un usuario existe?
+
+**Es senal real, no ruido** —eso hay que concederlo: cuando el signo deja de cambiar, ya no se
+puede decir "no hay diferencia"— pero **no es explotable**, y no por el margen sino por dos
+razones que se pueden calcular:
+
+1. **Relacion senal/ruido por muestra.** 1,2 ms sobre un recorrido p10-p90 de 11-16 ms es una
+   desviacion tipica de ~5 ms por muestra. Para separar dos medianas que distan 1,2 ms con
+   confianza razonable hacen falta del orden de **200-250 muestras por nombre de usuario**, y eso
+   **en la misma maquina y sin red**. A traves de internet, donde la varianza del trayecto es de
+   decenas de milisegundos, la cuenta sube a miles.
+2. **El propio bloqueo destruye la senal, y esto es lo decisivo.** La diferencia solo aparece en
+   el camino que escribe: usuario que **existe** y contrasena mala. Pero a los 5 intentos la
+   cuenta se bloquea, y el camino de cuenta bloqueada **no escribe nada** — vuelve a costar lo
+   mismo que el de usuario inexistente. O sea que el atacante obtiene **como mucho 5 muestras
+   utiles por ventana de bloqueo**, y las ventanas escalan a 1, 5, 15 y 60 minutos. Reunir 250
+   muestras de un solo nombre lleva dias.
+
+Tiene su gracia: el control que introduce la fuga de tiempo es el mismo que la vuelve
+inservible. Ademas el limite ya estaba declarado y no es nuevo. **Acepto la conclusion**, y
+recomiendo que la bitacora se quede con este argumento —el del muestreo estrangulado por el
+bloqueo— en vez de solo con "1,2 ms frente a 13 ms de ruido", que es el mas debil de los dos.
+
+### ¿El banco con dobles invalida la medicion?
+
+Aqui si hay algo que corregir, y es lo unico que anoto de esta ronda.
+
+Agradezco que declarara la limitacion en vez de callarla. Pero la limitacion es **mayor de lo que
+la nota admite, y choca con la explicacion que da del signo**. Si el `LoginAttemptRecorder` del
+banco es un doble —y lo es, por eso el `OR` no se ejercita, y lo confirman las medianas de ~73 ms,
+que son bcrypt a secas sin ida y vuelta a Postgres—, entonces **en el camino medido no hay
+`UPDATE` ninguno**. Y si no hay `UPDATE`, esos 1,2 ms **no pueden ser** "el `UPDATE` extra ya
+declarado": tienen que venir de otra cosa (la rama del CAS, el calculo del estado siguiente, o
+simple deriva de la maquina).
+
+De donde se siguen dos cosas, ninguna grave:
+
+- la **explicacion** del signo consistente es incorrecta tal como esta escrita;
+- y el banco **subestima** la asimetria real del sistema desplegado, porque el `UPDATE` de verdad
+  —una ida y vuelta a Postgres, del orden del milisegundo— se suma **por encima** de lo medido, y
+  bajo contencion se le anaden las vueltas extra de CAS y relectura.
+
+No cambia el veredicto: aunque la asimetria real fuera de varios milisegundos, el argumento del
+muestreo estrangulado de arriba sigue en pie. Pero el numero no puede presentarse como una cota de
+la uniformidad del sistema real, solo de su parte de dominio. Menor **m12**.
+
+## R3.5 m10 — el razonamiento se sostiene, y el arreglo es mejor que el que propuse
+
+Le doy la razon y retiro mi sugerencia del `try/catch`. Su argumento es correcto y mas fino que el
+mio: envolver el borrado de roles en `try/catch` **evita el rojo del E2E pero deja vivos el rol y
+su usuario**, y un usuario huerfano es precisamente lo que pone rojo `identity-constraints`.
+Cambiar un rojo confuso en mi feature por un rojo confuso en la de otro no es arreglar nada.
+
+Lo que hizo elimina el modo de fallo en vez de taparlo: decide primero **que roles** se van a
+borrar y borra sus usuarios aunque sean recientes, asi que la FK ya no puede saltar. Comprobado
+sobre el codigo:
+
+```ts
+where: {
+  username: { startsWith: USERNAME_PREFIX },          // condicion OBLIGATORIA
+  OR: [{ createdAt: { lt: orphanCutoff } }, { roleId: { in: orphanRoleIds } }],
+}
+```
+
+**La propiedad que mas me importaba se conserva**: el prefijo propio queda **fuera** del `OR`, o
+sea que se exige siempre. Ampliar el barrido a "los usuarios de los roles condenados" no abre
+ninguna puerta a filas ajenas. Y la ventana que denuncie queda cerrada por construccion: un
+usuario siempre es mas nuevo que su rol, asi que si el usuario es viejo su rol tambien lo es, y el
+caso inverso —rol viejo, usuario reciente— lo cubre ahora la segunda rama.
+
+Con el modo de fallo eliminado, el `try/catch` habria pasado a ser lo contrario de una proteccion:
+silenciar errores de base en una limpieza es como empezo este problema.
+
+## R3.6 m9 y m11 — completos
+
+- **m9.** La frase de 9.2 esta reescrita y ahora **describe lo que el test hace**: se conserva por
+  ser el unico sitio donde R25 se afirma con adaptadores reales y cinco peticiones simultaneas, y
+  se dice ademas que el caso "el bloqueo aparece a mitad del reintento" lo cubre el unitario. Se
+  mantiene la declaracion de que el test **no es discriminante**. Cerrado.
+- **m11.** No cambio codigo —correcto, yo tampoco lo pedia— y escribio lo que faltaba en
+  `design.md > 2`: ~110 ms de bcrypt una vez por proceso al importarse el modulo de composicion,
+  sin bloquear el arranque porque la promesa no se espera, a cambio de que ningun intento sea
+  distinguible por tiempo. Con el precio dicho ("un pico de CPU real en el boot"). Cerrado.
+
+## R3.7 Casillas de `tasks.md` — ninguna miente, y la corregida es la prueba
+
+Tercera reanudacion, mismo sitio donde mirar. El unico cambio es T13, y va en la direccion
+**contraria** a la que tomaria una casilla mentirosa: el leader **rehizo** el gate porque el
+arreglo invalidaba la corrida anterior, y dejo escrito el porque —"una casilla marcada sobre una
+corrida vieja es una casilla mentirosa"— con el numero nuevo (278 frente a 274). Marcar `[x]`
+apoyandose en una corrida anterior al cambio habria sido justo el fallo que este arnes persigue.
+
+Ninguna otra casilla se movio, y el arreglo de M-B1 tampoco se colo como task nueva ya marcada:
+esta donde le toca, en `design.md > 5.7` y en la seccion 10 de la bitacora.
+
+## R3.8 Comprobaciones de cierre
+
+| Que | Resultado |
+| --- | --- |
+| `pnpm run typecheck` | sin errores |
+| `pnpm exec vitest run guard` | 5 archivos / 65 tests verdes |
+| `pnpm exec vitest run tests/integration` | 2 archivos / 36 tests verdes |
+| `identity-constraints` (`user.count() === 0`) | verde: no quedan huerfanos de mis pruebas |
+| `git status` | limpio salvo este mismo archivo |
+| Gate completo | verde, corrido por el leader: 27 archivos, 278 tests, baseline vacio |
+| `package.json` | sin cambios en esta ronda: nada que revisar en `docs/dependencias.md` |
+| Trazabilidad | los 31 requisitos siguen mapeados; los tests nuevos refuerzan R22, R24, R25, R26 y R30 |
+
+## R3.9 Hallazgos de la ronda 3
+
+**MAYORES: ninguno.**
+
+**MENOR m12 — El banco de tiempos usa dobles, asi que no mide el `UPDATE` que dice medir.**
+`impl > 10.3`. Con el recorder doblado no hay escritura en el camino medido, luego los 1,2 ms
+consistentes **no** son "el `UPDATE` extra ya declarado", y el coste real del `UPDATE` queda por
+encima de lo medido y sin medir. Se cierra reescribiendo dos frases: que el banco acota la parte
+de **dominio** y no la del sistema desplegado, y que el signo consistente tiene otra causa. No
+afecta a la conclusion de fondo, que se sostiene por el argumento del muestreo estrangulado por el
+bloqueo (R3.4).
+
+## R3.10 Veredicto de la ronda 3
+
+**APROBADO.** 0 mayores, 1 menor (m12), que no bloquea y se cierra con dos frases en la bitacora.
+
+M-B1 esta cerrado de verdad y no de palabra: la frontera es el complemento exacto de `isLocked`,
+lo comprobe en el instante justo de caducidad y hasta con un microsegundo de margen, las cuatro
+transiciones legitimas siguen aplicando y el ABA ya no. La premisa falsa esta borrada de los dos
+sitios donde vivia y sustituida por el escenario real, con la constancia de que se descubrio
+ejecutandolo — que es lo que evita que QC-8 repita el error. El reloj viaja al puerto por la
+frontera correcta y esta atado por test. m9, m10 y m11 estan completos, y en m10 su solucion es
+mejor que la que yo habia sugerido.
+
+Tres rondas, dos bloqueantes encontrados y cerrados, y en las tres el implementer respondio
+midiendo en vez de argumentando —incluido quitarse el `OR` a si mismo para ver caer el test—.
+**Adelante con el PR.**
