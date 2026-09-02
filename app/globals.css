@@ -155,6 +155,33 @@
   min-height: 44px;
 }
 
+/* Modo icono: el boton tiene que ser cuadrado de 44px, no 32.
+   El primitivo fuerza `size-8!` y `p-2!` -32px con !important- cuando el panel esta
+   colapsado, contando con el rail de 3rem que trae de serie. Aqui el rail mide 4.875rem
+   (78px, `app/(private)/layout.tsx`), asi que quedaba un boton de 32px de ancho por 44 de
+   alto -el `min-height` de arriba si gana, porque `min-height` acota a `height`- y el
+   contenido salia aplastado contra el padding.
+
+   Lleva `!important` a proposito y no por pereza: es la unica forma de ganarle a un
+   `!important` de una utilidad. Estar fuera de `@layer` no basta contra eso. */
+[data-collapsible='icon'] [data-slot='sidebar-menu-button'] {
+  width: 44px !important;
+  height: 44px !important;
+  padding: 10px !important;
+}
+
+/* El simbolo de marca es mas grande que un icono de menu, asi que en modo icono necesita
+   su propio ajuste: 32px de simbolo dentro de 44 de boton dejan 6px de aire por lado. */
+[data-collapsible='icon'] [data-testid='private-brand-link'] {
+  padding: 6px !important;
+}
+
+[data-collapsible='icon'] [data-testid='private-brand-mark'] {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+}
+
 /* Elemento activo con el acento naranja.
    El primitivo lo marca con `data-active:bg-sidebar-accent`, que es el velo agua, asi que
    `--sidebar-primary` quedaba definido y sin usar: el color mas caracteristico de la paleta
@@ -206,3 +233,276 @@
     @apply font-sans;
   }
 }
+
+/* ══ QC-30 · pantalla de login — INICIO (bloque propio; no reordenar ni reindentar) ══ */
+
+/* Todo este bloque va A PROPOSITO FUERA de cualquier `@layer`, y no es una preferencia de
+   estilo: en Tailwind v4 las utilidades viven en cascade layers, y una regla sin capa gana a
+   cualquier regla en capa, sea cual sea su especificidad. Si estas reglas se metieran dentro
+   de `@layer base`, el alto minimo de 44 px perderia contra el `h-8` que el primitivo ya trae
+   (`components/ui/input.tsx`, `components/ui/button.tsx`), la pantalla de login saldria
+   exactamente igual que hoy y el test de contrato —que lee este archivo como texto— quedaria
+   verde por las razones equivocadas. Es el mismo precedente que dejo QC-29 para el panel
+   flotante de la barra lateral (`specs/QC-29-tema-claro-oscuro/design.md > 6`); aqui el
+   riesgo es identico.
+
+   Tampoco hay `@apply` ni utilidades nuevas: solo CSS plano acotado a `[data-login='screen']`
+   (`specs/QC-30-rediseno-login/design.md > 6`). El bloque se anade entero al FINAL del archivo
+   por el acuerdo con `feature/fix-ajuste-sidebar`: ninguna linea preexistente se desplaza. */
+
+/* --- 1. Variables propias del login (prefijo `--qc30-login-*`). ---------------------------
+   No se redefine ningun token de QC-29 (R21): se declaran variables nuevas dentro de este
+   bloque, igual que QC-29 hizo con `--sidebar-panel-gradient`. Valores literales de
+   `design-input-login.md > 3` y `> 4`. El `.dark` va DESPUES del `:root`, como en el bloque
+   del panel flotante, para que gane por orden de cascada a igual especificidad. */
+:root {
+  --qc30-login-card-gradient: linear-gradient(166deg, rgba(255,255,255,0.82), rgba(246,252,251,0.72) 34%, rgba(236,247,245,0.66) 68%, rgba(223,239,237,0.60));
+  --qc30-login-ring: 0 0 0 1px rgba(83,144,145,0.18);
+  --qc30-login-inner-glow: inset 0 1px 0 rgba(255,255,255,0.90);
+  --qc30-login-shadow: 0 30px 60px -26px rgba(20,60,60,0.36);
+  /* Pie de la tarjeta: el primitivo trae `bg-muted/50` y un `border-t` opacos, que cortarian
+     el vidrio en horizontal. Se re-colorean con alfas de la misma paleta del insumo. */
+  --qc30-login-footer-bg: rgba(255,255,255,0.42);
+  --qc30-login-footer-border: rgba(83,144,145,0.18);
+  --qc30-login-bubble-fill: radial-gradient(circle at 30% 27%, rgba(255,255,255,0.92), rgba(104,195,183,0.34) 46%, rgba(83,144,145,0.13) 74%);
+  --qc30-login-bubble-border: rgba(83,144,145,0.24);
+  --qc30-login-bubble-halo: rgba(83,144,145,0.12);
+}
+
+.dark {
+  --qc30-login-card-gradient: linear-gradient(166deg, rgba(27,59,57,0.74), rgba(19,48,50,0.66) 34%, rgba(15,36,38,0.62) 68%, rgba(9,26,28,0.58));
+  --qc30-login-ring: 0 0 0 1px rgba(168,220,217,0.16);
+  --qc30-login-inner-glow: inset 0 1px 0 rgba(204,234,232,0.22), inset 0 -1px 0 rgba(0,0,0,0.25);
+  --qc30-login-shadow: 0 34px 70px -24px rgba(0,0,0,0.80);
+  --qc30-login-footer-bg: rgba(9,26,28,0.28);
+  --qc30-login-footer-border: rgba(204,234,232,0.14);
+  --qc30-login-bubble-fill: radial-gradient(circle at 30% 27%, rgba(230,250,247,0.60), rgba(104,195,183,0.17) 44%, rgba(104,195,183,0.05) 72%);
+  --qc30-login-bubble-border: rgba(204,234,232,0.30);
+  --qc30-login-bubble-halo: rgba(104,195,183,0.18);
+}
+
+/* --- 2. Medidas, acotadas al login (`design.md > 3`). ------------------------------------
+   TODO cuelga de `[data-login='screen']`: fuera de esa pantalla nada cambia de tamano (R17).
+   No se toca el tamano de letra del campo, ni el radio de campo y boton (10 px), ni el
+   anillo de foco de 3 px, ni la tipografia. */
+[data-login='screen'] {
+  position: relative;
+}
+
+[data-login='screen'] [data-slot='input'] {
+  min-height: 44px;
+}
+
+[data-login='screen'] [data-slot='button'] {
+  min-height: 44px;
+}
+
+[data-login='screen'] [data-slot='card'] {
+  max-width: 400px;
+  border-radius: 18px;
+  --card-spacing: 28px;
+}
+
+/* El primitivo redondea cabecera y pie con `rounded-t-xl` / `rounded-b-xl` (14 px); dentro
+   del ambito se alinean al radio nuevo de la tarjeta. */
+[data-login='screen'] [data-slot='card-header'] {
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+
+[data-login='screen'] [data-slot='card-footer'] {
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+
+/* --- 3. Vidrio esmerilado y su degradacion (`design.md > 4`). ----------------------------
+   La BASE es opaca (`var(--card)`, el token que la tarjeta ya usa hoy): translucido sin
+   desenfoque es el peor de los tres resultados. El filo de 1 px, el brillo interior y la
+   sombra se conservan SIEMPRE, tambien en esta rama opaca. */
+[data-login='screen'] [data-slot='card'] {
+  position: relative;
+  z-index: 2;
+  background-color: var(--card);
+  background-image: none;
+  box-shadow: var(--qc30-login-ring), var(--qc30-login-inner-glow), var(--qc30-login-shadow);
+}
+
+[data-login='screen'] [data-slot='card-footer'] {
+  background-color: var(--qc30-login-footer-bg);
+  border-top-color: var(--qc30-login-footer-border);
+}
+
+/* Mejora progresiva. La condicion incluye el prefijo `-webkit-` y la declaracion tambien
+   (R10): sin el, WebKit —el motor de iOS— entraria por esta rama y NO desenfocaria, que es
+   justo el escenario translucido-y-sucio que la base opaca evita. */
+@supports ((backdrop-filter: blur(22px)) or (-webkit-backdrop-filter: blur(22px))) {
+  [data-login='screen'] [data-slot='card'] {
+    background-color: transparent;
+    background-image: var(--qc30-login-card-gradient);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    backdrop-filter: blur(22px) saturate(150%);
+  }
+}
+
+/* --- 4. Fondo decorativo: capa y burbujas (`design.md > 5`). ------------------------------
+   La capa va bajo la tarjeta (z-index 1 contra 2) y no recibe puntero. El marcado es
+   `aria-hidden` y sin nodos enfocables, asi que tampoco entra en la tabulacion. */
+[data-login='screen'] [data-login='bubbles'] {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Mobile-first: los valores de MOVIL son la base y los de escritorio entran mas abajo, en
+   `@media (min-width: 640px)`. Nada de valores en `style` en linea: una propiedad
+   personalizada escrita en el atributo `style` ganaria a cualquier hoja de estilos y la media
+   query no podria sobrescribirla (R22). Solo se animan `transform` y `opacity`: se componen
+   en GPU y no provocan layout. */
+[data-login='screen'] [data-login='bubble'] {
+  position: absolute;
+  bottom: -60px;
+  display: block;
+  width: var(--qc30-bubble-size);
+  height: var(--qc30-bubble-size);
+  border-radius: 9999px;
+  border: 1px solid var(--qc30-login-bubble-border);
+  background-image: var(--qc30-login-bubble-fill);
+  box-shadow:
+    inset -2px -3px 7px rgba(0,0,0,0.10),
+    inset 3px 4px 8px rgba(255,255,255,0.16),
+    0 0 14px var(--qc30-login-bubble-halo);
+  opacity: 0;
+  will-change: transform, opacity;
+  --qc30-bubble-travel: 900px;
+  --qc30-bubble-scale-from: 0.86;
+  --qc30-bubble-scale-to: 1.06;
+  animation-name: qc30-login-bubble-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Tres burbujas y solo tres (`data-login-index` 1, 2 y 3): no hay una cuarta. Los retardos
+   son NEGATIVOS, asi que al abrir la pantalla el movimiento ya esta repartido en toda la
+   altura. Cada indice aparece dos veces en el archivo: aqui con los valores moviles, que son
+   la base, y mas abajo —dentro de la media query— con los de escritorio. */
+[data-login='screen'] [data-login-index='1'] {
+  left: 10%;
+  --qc30-bubble-size: 46px;
+  --qc30-bubble-drift: 24px;
+  --qc30-bubble-opacity: 0.30;
+  animation-duration: 17s;
+  animation-delay: 0s;
+}
+
+[data-login='screen'] [data-login-index='2'] {
+  left: 48%;
+  --qc30-bubble-size: 38px;
+  --qc30-bubble-drift: -20px;
+  --qc30-bubble-opacity: 0.34;
+  animation-duration: 19s;
+  animation-delay: -7s;
+}
+
+[data-login='screen'] [data-login-index='3'] {
+  left: 78%;
+  --qc30-bubble-size: 52px;
+  --qc30-bubble-drift: 18px;
+  --qc30-bubble-opacity: 0.26;
+  animation-duration: 18s;
+  animation-delay: -13s;
+}
+
+/* Una sola animacion para las tres, parametrizada con propiedades personalizadas: sube desde
+   `bottom: -60px` hasta `--qc30-bubble-travel` hacia arriba, con la deriva lateral aplicada
+   al 55% de su valor a mitad de recorrido, escala de 0.86 a 1.06 y opacidad que entra al 12%
+   y sale al 82% del ciclo. El paso intermedio repite las dos funciones de `transform` porque
+   una lista de transformaciones solo interpola si coincide funcion a funcion. */
+@keyframes qc30-login-bubble-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(var(--qc30-bubble-scale-from));
+    opacity: 0;
+  }
+  12% {
+    opacity: var(--qc30-bubble-opacity);
+  }
+  50% {
+    transform: translate3d(
+        calc(var(--qc30-bubble-drift) * 0.55),
+        calc(var(--qc30-bubble-travel) * -0.5),
+        0
+      )
+      scale(
+        calc((var(--qc30-bubble-scale-from) + var(--qc30-bubble-scale-to)) / 2)
+      );
+  }
+  82% {
+    opacity: var(--qc30-bubble-opacity);
+  }
+  100% {
+    transform: translate3d(
+        var(--qc30-bubble-drift),
+        calc(var(--qc30-bubble-travel) * -1),
+        0
+      )
+      scale(var(--qc30-bubble-scale-to));
+    opacity: 0;
+  }
+}
+
+/* Escritorio: solo lo que cambia respecto a la base movil (posicion, diametro, deriva y
+   recorrido). Duracion, opacidad y retardo son los mismos en los dos tamanos. */
+@media (min-width: 640px) {
+  [data-login='screen'] [data-login='bubble'] {
+    --qc30-bubble-travel: 960px;
+  }
+
+  [data-login='screen'] [data-login-index='1'] {
+    left: 14%;
+    --qc30-bubble-size: 54px;
+    --qc30-bubble-drift: 30px;
+  }
+
+  [data-login='screen'] [data-login-index='2'] {
+    left: 52%;
+    --qc30-bubble-size: 44px;
+    --qc30-bubble-drift: -26px;
+  }
+
+  [data-login='screen'] [data-login-index='3'] {
+    left: 83%;
+    --qc30-bubble-size: 60px;
+    --qc30-bubble-drift: 22px;
+  }
+}
+
+/* --- 5. Preferencias de accesibilidad. ---------------------------------------------------
+   Movimiento reducido: las burbujas DESAPARECEN. `design-input-login.md > 4` proponia
+   dejarlas quietas al 22% de opacidad, pero la tabla de decisiones cerradas de
+   `requirements.md` —posterior, y del humano— dice que desaparecen; manda esa
+   (`design.md > 5`). */
+@media (prefers-reduced-motion: reduce) {
+  [data-login='screen'] [data-login='bubbles'] {
+    display: none;
+  }
+}
+
+/* Transparencia reducida: vuelta a la base opaca, conservando filo, brillo y sombra. Va
+   despues del `@supports` a proposito: misma especificidad, gana el ultimo. */
+@media (prefers-reduced-transparency: reduce) {
+  [data-login='screen'] [data-slot='card'] {
+    background-color: var(--card);
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--qc30-login-ring), var(--qc30-login-inner-glow), var(--qc30-login-shadow);
+  }
+
+  [data-login='screen'] [data-slot='card-footer'] {
+    background-color: var(--muted);
+    border-top-color: var(--border);
+  }
+}
+
+/* ══ QC-30 · pantalla de login — FIN ══ */

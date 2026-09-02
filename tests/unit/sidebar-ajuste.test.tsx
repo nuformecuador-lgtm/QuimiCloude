@@ -9,8 +9,6 @@ import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewp
 
 import { AppSidebar, SIDEBAR_EDGE_TOGGLE_LABEL, SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { LayoutDashboard } from 'lucide-react';
-
 import {
   BRAND_TAGLINE,
   PRIVATE_NAV_ITEMS,
@@ -82,7 +80,7 @@ const NAV_MINIMA: readonly NavItem[] = [
     href: '/uno',
     label: 'Uno',
     testId: 'nav-uno',
-    icon: LayoutDashboard,
+    icon: 'layout-dashboard',
     section: 'Seccion',
     badge: 7,
   },
@@ -91,7 +89,7 @@ const NAV_MINIMA: readonly NavItem[] = [
     href: '/dos',
     label: 'Dos',
     testId: 'nav-dos',
-    icon: LayoutDashboard,
+    icon: 'layout-dashboard',
     section: 'Seccion',
   },
 ];
@@ -181,6 +179,23 @@ describe('barra lateral: ajuste al diseno', () => {
     expect(SIDEBAR_EDGE_TOGGLE_LABEL).not.toBe(SIDEBAR_TOGGLE_LABEL);
   });
 
+  it('en modo icono la marca es el simbolo con las iniciales dentro, no dos elementos', () => {
+    render(
+      <SidebarProvider defaultOpen={false}>
+        <AppSidebar user={sessionUser()} navItems={NAV_MINIMA} />
+      </SidebarProvider>,
+    );
+
+    const simbolo = screen.getByTestId('private-brand-mark');
+    const iniciales = screen.getByTestId('private-brand-short');
+
+    // Las iniciales van DENTRO del simbolo (R24 sigue cumpliendose), y el matraz no se
+    // dibuja: el cuadro y el texto uno al lado del otro no caben en los 44px del rail y el
+    // contenido acababa aplastado contra el padding.
+    expect(simbolo).toContainElement(iniciales);
+    expect(simbolo.querySelector('svg')).toBeNull();
+  });
+
   it('un item sin seccion se dibuja igual, sin titulo, y no desaparece', () => {
     const sinSeccion: readonly NavItem[] = [
       { kind: 'link', href: '/suelto', label: 'Suelto', testId: 'nav-suelto' },
@@ -214,6 +229,27 @@ describe('acento del elemento activo', () => {
   it('la barra de acento del borde izquierdo existe', () => {
     expect(css).toMatch(
       /\[data-slot='sidebar-menu-button'\]\[data-active\]::before\s*\{[^}]*--sidebar-primary/,
+    );
+  });
+
+  it('en modo icono el boton se fuerza a 44px con !important', () => {
+    // El primitivo aplica `size-8!` y `p-2!` cuando el panel esta colapsado, contando con su
+    // rail de 3rem. Aqui el rail mide 4.875rem, asi que hay que ganarle — y a un `!important`
+    // solo se le gana con otro: estar fuera de `@layer` NO basta. Si alguien quita el
+    // `!important` de estas reglas, el boton vuelve a 32px y el icono sale aplastado.
+    const regla = css.match(
+      /\[data-collapsible='icon'\] \[data-slot='sidebar-menu-button'\]\s*\{[^}]*\}/,
+    );
+
+    expect(regla, 'no existe la regla del boton en modo icono').not.toBeNull();
+
+    // Propiedad por propiedad, no por substring: `toContain('44px !important')` pasaba aunque
+    // se le quitara el `!important` al `width`, porque el `height` seguia teniendo ese mismo
+    // texto. Medido con la mordida.
+    expect(regla?.[0], 'el width perdio el !important').toMatch(/width:\s*44px\s*!important/);
+    expect(regla?.[0], 'el height perdio el !important').toMatch(/height:\s*44px\s*!important/);
+    expect(regla?.[0], 'el padding perdio el !important').toMatch(
+      /padding:\s*10px\s*!important/,
     );
   });
 

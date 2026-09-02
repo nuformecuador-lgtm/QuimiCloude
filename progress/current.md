@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-9 | proteccion-de-rutas-privadas | QC-17 Identidad y acceso | backend | **in_progress (F2.1)** | `feature/QC-9-proteccion-de-rutas-privadas` | **SPEC APROBADO por el humano el 2026-09-02** e **implementer lanzado**. Tarjeta en *En curso*. Spec congelado en `0f7d599`: **30 requisitos EARS**, todos trazados. El rol viaja dentro del token (decisión humana) y por eso **D3 quedó derogada**: el formato del token cambia y las sesiones abiertas dejan de valer. Queda 1 pregunta abierta (qué hace la raíz `/`). **Toca código de QC-8 Y de QC-7**, las dos mergeadas. Acotada y sembrada el mismo día: 14 decisiones cerradas, 0 preguntas abiertas. **No ocupa slot**: sigue `pending` hasta F1.3. Desbloquea a **QC-13**, que es la que hace navegable el ERP. **Toca código de QC-8, ya mergeada** — la firma migra a WebCrypto sin cambiar el formato del token |
 | QC-20 | crud-de-productos | QC-18 Inventario | backend | **in_progress → PR abierto** | `feature/QC-20-crud-de-productos` | **Implementada, revisada y con PR #19 abierto el 2026-09-02.** La fila anterior decía `spec_ready` y «F2.0 bloqueada por QC-8»: quedó obsoleta cuando QC-8 cerró (PR #13) y otra sesión de leader llevó la feature entera. 16/16 tasks, **37 requisitos con test**, 40 mutaciones verificadas. Gate acreditado **por partes** —typecheck, lint y las tres suites (683 tests en 65 archivos), más el validador desde la raíz— porque `./init.sh` dentro de un worktree aborta con el falso positivo de specs de QC-9/QC-21. `reviewer` en **dos rondas**: RECHAZADO (1 mayor de documento) → **APROBADO, 0 mayores**. Base propia `QuimiCloude_QC20`, **pendiente de borrar al desmontar** |
-| QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress (F2.1)** | `feature/QC-30-rediseno-login` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Sesión labs-4b. Traspasada por labs-65, que la había reclamado sin trabajo empezado. 14 decisiones cerradas al acotar, **26 requisitos EARS y 11 tareas** congelados en `01fb7f4`. La aprobación ratifica además la **contradicción sobre movimiento reducido**: gana la decisión cerrada (las burbujas **desaparecen**), no el 22% de opacidad del insumo de diseño. **Colisión pactada**: `app/globals.css` lo toca en paralelo `feature/fix-ajuste-sidebar`, una rama **sin ficha** — bloques separados, nadie reordena, aviso antes de tocar líneas ajenas |
+| QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress — PR #20 ABIERTO** | `feature/QC-30-rediseno-login` | **Esperando que el humano mergee el [PR #20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20).** Sesión labs-4b. Spec aprobado el 2026-09-02 (26 requisitos, 11 tareas). **Dos rondas de revisión**: la primera rechazó por un bloqueante real —R9 sin test que mordiera: se podía borrar el modo oscuro entero y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests (20 → 26). Gate completo verde: 65 archivos, 663 tests. Al mergear: F2.5 (tarjeta a *Hecho*, `status: done`, `wt.sh done QC-30-rediseno-login`) y F2.6 (resumen en `history.md`) |
 
 La feature **QC-21 — ayuda-visual-de-contrasena** se cerró el 2026-09-02 (PR #17, merge
 `3775102`): resumen en `progress/history.md`, worktree desmontado y rama borrada — `wt.sh done`
@@ -114,6 +114,21 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
+
+### QC-42 / QC-43 / QC-44 — proveedores (2026-09-02)
+
+- **Fichas nuevas, nacidas en el board** a peticion del humano: epica **QC-41 «Proveedores»**
+  (modulo de dominio propio, no cuelga de Catalogos ni de Inventario — decision humana) con
+  `QC-42 modelo-proveedores` (`zone: backend`, `complexity: medium` — dos tablas y una regla
+  cruzada), `QC-43 crud-de-proveedores` (`zone: backend`, `complexity: high`, mismo patron que
+  QC-20) y `QC-44 pantalla-de-proveedores` (`zone: frontend`, `complexity` sin asignar, como sus
+  hermanas QC-22 y QC-39). Labels `sdd` / `slug:` / `zone:` / `complexity:` escritos en cada issue.
+- Links «is blocked by»: QC-42 ← QC-14 (`productId` del catalogo), QC-43 ← QC-42 y QC-8,
+  QC-44 ← QC-43. Reflejadas en `feature_list.json` — solo esas tres, como manda `docs/jira.md`.
+- **No estan acotadas.** Quedan abiertas al menos: moneda y precision de `costo`, unidad de
+  `minimo_compra` (¿la unidad del producto, QC-32?) y de `tiempo_entrega` (¿dias?), si el
+  proveedor se borra o se inactiva, y si el nombre completo es unico. Se cierran con
+  `/afinar-feature` antes de F1.2.
 
 ### QC-21 — ayuda-visual-de-contrasena (2026-09-02)
 
@@ -958,6 +973,28 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 ## Deudas y cosas abiertas
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
+
+- **[arnés — EL GATE NO CORRE E2E, y por eso `dev` pudo estar roto en runtime con todo en verde.
+  Candidata 5 para `/afinar-regla`, y la más cara de las cinco.]** El 2026-09-02, **toda la zona
+  privada devolvía 500** en `origin/dev` —`Functions cannot be passed directly to Client
+  Components`, porque `PRIVATE_NAV_ITEMS` llevaba componentes de `lucide-react` dentro de los datos
+  que el layout pasa a `<AppSidebar>` (`'use client'`)—, introducido por `05efbbe` (PR #18,
+  sidebar). Mientras tanto: `./init.sh` **completo** daba **73 archivos y 794 tests en verde** en la
+  rama de QC-9, y 642 en la de QC-29. Los dos números eran ciertos.
+  **Las tres razones por las que nadie lo vio, y ninguna es descuido:**
+  1. **El gate no ejecuta E2E.** `pnpm run e2e` va aparte y no entra en `./init.sh`.
+  2. **`e2e/login.spec.ts` pasa en verde con esos mismos 500 en el log**, porque espera por
+     **ruta** (`waitForURL`) y no por contenido — y `waitForURL` se cumple con un 500 detrás. Un
+     E2E así *parece* verificar el render y no verifica nada de él.
+  3. **En jsdom no existe la frontera servidor/cliente**: todo se renderiza en cliente y un icono
+     no serializable funciona perfectamente. La sesión del sidebar escribió **once tests con
+     mutaciones sobre esa misma barra el mismo día** y ninguno podía cazarlo. No es cobertura
+     insuficiente: es una **clase de fallo estructuralmente invisible al runner unitario**.
+  **Lo cazó el E2E de QC-9, que es el primer test del repo que renderiza de verdad una pantalla
+  privada.** Sin esa feature, el defecto podía haber vivido en `dev` indefinidamente.
+  **Defensa barata que ya existe**, escrita por la sesión del sidebar:
+  `tests/guards/guard-nav-serializable.test.ts` afirma sobre **el dato** —recorre el array y falla
+  si algo no sobrevive a `JSON`— en vez de sobre el render. Ese es el patrón a generalizar.
 
 - **[arnés — el rescate del validador NO es simétrico entre la raíz y los worktrees. Candidata 2
   para `/afinar-regla`.]** `tieneSpec()` de `scripts/validate-features.mjs` busca el spec en tres

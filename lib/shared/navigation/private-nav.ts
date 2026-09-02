@@ -1,16 +1,3 @@
-import {
-  Bell,
-  Boxes,
-  ClipboardList,
-  Factory,
-  FlaskConical,
-  LayoutDashboard,
-  Package,
-  ShoppingCart,
-  Truck,
-  type LucideIcon,
-} from 'lucide-react';
-
 import { DASHBOARD_ROUTE } from '../routes';
 
 /**
@@ -63,6 +50,29 @@ export const BRAND_TAGLINE = 'ERP Químico';
 export const NAV_SECTION_OPERATION = 'Operación';
 export const NAV_SECTION_CHAIN = 'Cadena';
 
+/**
+ * Nombre del icono de un item. **Es una cadena y no el componente a proposito.**
+ *
+ * `PRIVATE_NAV_ITEMS` lo consume `app/(private)/layout.tsx`, que es Server Component, y se lo
+ * pasa por props a `AppSidebar`, que es cliente. Todo lo que cruza esa frontera tiene que ser
+ * serializable, y un icono de `lucide-react` no lo es: es un objeto con `$$typeof` y `render`.
+ * Pasarlo entero revienta en ejecucion con «Only plain objects can be passed to Client
+ * Components from Server Components», y **ningun test unitario lo ve**, porque en jsdom no
+ * existe esa frontera y todo se renderiza en cliente.
+ *
+ * El componente lo resuelve con el mapa de `nav-icons.ts`.
+ */
+export type NavIconName =
+  | 'layout-dashboard'
+  | 'package'
+  | 'bell'
+  | 'shopping-cart'
+  | 'clipboard-list'
+  | 'truck'
+  | 'factory'
+  | 'flask-conical'
+  | 'boxes';
+
 export type NavLink = {
   readonly kind: 'link';
   readonly href: string;
@@ -72,7 +82,7 @@ export type NavLink = {
    * Icono del item. Solo lo llevan los de **nivel superior**: los hijos de un submenu se
    * dibujan sin icono, como en el diseno, y por eso es opcional en vez de obligatorio.
    */
-  readonly icon?: LucideIcon;
+  readonly icon?: NavIconName;
   /** Seccion a la que pertenece. Solo en items de nivel superior (ver `icon`). */
   readonly section?: string;
   /**
@@ -89,7 +99,7 @@ export type NavGroup = {
   readonly kind: 'group';
   readonly label: string;
   readonly testId: string;
-  readonly icon?: LucideIcon;
+  readonly icon?: NavIconName;
   readonly section?: string;
   /** Un solo nivel: los hijos son `NavLink`, nunca `NavItem`. Lo garantiza el tipo. */
   readonly items: readonly NavLink[];
@@ -103,7 +113,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     href: DASHBOARD_ROUTE,
     label: 'Dashboard',
     testId: 'nav-dashboard',
-    icon: LayoutDashboard,
+    icon: 'layout-dashboard',
     section: NAV_SECTION_OPERATION,
   },
   {
@@ -111,7 +121,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     href: INVENTORY_ROUTE,
     label: 'Inventario',
     testId: 'nav-inventario',
-    icon: Package,
+    icon: 'package',
     section: NAV_SECTION_OPERATION,
   },
   {
@@ -119,7 +129,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     href: NOTIFICATIONS_ROUTE,
     label: 'Notificaciones',
     testId: 'nav-notificaciones',
-    icon: Bell,
+    icon: 'bell',
     section: NAV_SECTION_OPERATION,
     badge: 3,
   },
@@ -127,7 +137,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     kind: 'group',
     label: 'Compras',
     testId: 'nav-compras',
-    icon: ShoppingCart,
+    icon: 'shopping-cart',
     section: NAV_SECTION_CHAIN,
     items: [
       {
@@ -135,14 +145,14 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         href: PURCHASE_ORDERS_ROUTE,
         label: 'Órdenes de compra',
         testId: 'nav-compras-ordenes',
-        icon: ClipboardList,
+        icon: 'clipboard-list',
       },
       {
         kind: 'link',
         href: SUPPLIERS_ROUTE,
         label: 'Proveedores',
         testId: 'nav-compras-proveedores',
-        icon: Truck,
+        icon: 'truck',
       },
     ],
   },
@@ -150,7 +160,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     kind: 'group',
     label: 'Producción',
     testId: 'nav-produccion',
-    icon: Factory,
+    icon: 'factory',
     section: NAV_SECTION_CHAIN,
     items: [
       {
@@ -158,14 +168,14 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         href: FORMULAS_ROUTE,
         label: 'Fórmulas',
         testId: 'nav-produccion-formulas',
-        icon: FlaskConical,
+        icon: 'flask-conical',
       },
       {
         kind: 'link',
         href: BATCHES_ROUTE,
         label: 'Lotes',
         testId: 'nav-produccion-lotes',
-        icon: Boxes,
+        icon: 'boxes',
       },
     ],
   },
