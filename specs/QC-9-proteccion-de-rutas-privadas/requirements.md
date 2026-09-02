@@ -21,11 +21,153 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Notacion EARS (`docs/specs.md`). El mapa `decision cerrada -> R<n>` esta en `design.md > 0`; el
+> mapa `R<n> -> test` esta en `tasks.md > Trazabilidad` y lo confirma el implementer en
+> `progress/impl_QC-9-proteccion-de-rutas-privadas.md` (`CHECKPOINTS.md > Trazabilidad`).
+>
+> «Sesion valida» significa, en todo este documento: cookie presente, **version del formato
+> reconocida, firma verificada y `exp` firmado aun en el futuro**. Nunca «la cookie existe».
+
+### El portero: rutas privadas
+
+**R1.** El sistema DEBE proteger **por convencion** toda ruta que cuelgue de `app/(private)/`, sin
+que ninguna pantalla tenga que registrarse a mano en el middleware; SI existe bajo `app/(private)/`
+una ruta con `page.tsx` cuyo prefijo de URL no este cubierto por el conjunto declarado de rutas
+privadas, ENTONCES la verificacion DEBE fallar señalando esa ruta.
+
+**R2.** CUANDO llega una peticion a una ruta privada sin sesion valida, el sistema DEBE responder
+una redireccion al login **antes de renderizar**, sin ejecutar el Server Component de la pantalla y
+sin que la respuesta contenga contenido privado.
+
+**R3.** CUANDO llega una peticion a una ruta privada **con** cookie de sesion, el sistema DEBE
+tratarla como «sin sesion» SI la version del formato no es la reconocida, SI la firma no coincide
+con la recomputada sobre su parte firmada, SI el contenido firmado no decodifica a un
+`sub`/`iat`/`exp` validos, o SI el instante actual es igual o posterior al `exp` **firmado**; la
+mera presencia de la cookie NUNCA DEBE bastar para dejar pasar.
+
+**R4.** El middleware NO DEBE consultar la base de datos ni resolver el `SessionUser`: decide solo
+con lo que viaja firmado en la cookie. La resolucion del usuario (rol y nombre actuales) sigue
+siendo del layout privado (QC-8 R10).
+
+**R5.** MIENTRAS una peticion atraviesa el middleware, el sistema NO DEBE emitir, reemitir,
+prolongar ni borrar la cookie de sesion: la validez sigue siendo de 8 h absolutas desde su emision
+(QC-8 R8).
+
+**R6.** El sistema DEBE conservar la comprobacion de sesion del layout privado (QC-8 R16) como
+ultima linea de defensa: el corte del middleware NO DEBE sustituirla ni relajarla, y esta ficha NO
+DEBE cambiar el comportamiento visible del layout privado, de la barra lateral ni del cierre de
+sesion (eso es QC-13).
+
+### Vuelta a la ruta pedida, y el redirector abierto
+
+**R7.** CUANDO el sistema redirige al login por falta de sesion valida, la redireccion DEBE llevar
+la **ruta pedida** (camino y cadena de consulta) como destino de vuelta.
+
+**R8.** CUANDO se entra con credenciales correctas y hay un destino de vuelta valido, el sistema
+DEBE aterrizar al usuario en **esa** pantalla, y no en el dashboard; SI no hay destino de vuelta,
+ENTONCES DEBE aterrizar en el dashboard. Esto NO DEBE cambiar la firma congelada de `loginAction`
+(`prevState`, `formData`) ni la forma de `LoginFormState`.
+
+**R9.** SI el destino de vuelta no es una **ruta interna** —no empieza por una unica `/`, empieza
+por `//` o `/\`, trae esquema o autoridad (`http:`, `https:`, `javascript:`, `data:`, `//host`), o
+no decodifica a una ruta— ENTONCES el sistema DEBE descartarlo y usar el dashboard; el sistema
+NUNCA DEBE emitir una redireccion hacia un destino fuera de este sitio.
+
+**R10.** CUANDO se pide el login con sesion valida, el sistema DEBE redirigir al dashboard, o al
+destino de vuelta SI lo hay y es valido segun R9.
+
+**R11.** MIENTRAS no haya sesion valida, las rutas publicas —el login incluido— DEBEN servirse sin
+redireccion alguna.
+
+### Reglas de ruta por rol (el gancho)
+
+**R12.** El sistema DEBE ofrecer un conjunto declarado de reglas ruta→rol que la decision de acceso
+consulta en cada peticion; ese conjunto DEBE estar **vacio** en esta ficha, y MIENTRAS este vacio
+toda sesion valida DEBE pasar a cualquier ruta privada.
+
+**R13.** SI hay sesion valida y una regla ruta→rol exige un rol que el usuario no tiene, ENTONCES el
+sistema DEBE redirigir al **dashboard**, nunca al login; y SI la ruta no autorizada fuera el propio
+dashboard, ENTONCES DEBE resolverse sin bucle de redirecciones.
+
+### Una sola firma, valida en Node y en el borde
+
+**R14.** El sistema DEBE verificar la firma de la cookie con **la misma implementacion que la
+emite**; NO DEBE existir una segunda implementacion del algoritmo de firma en el repositorio
+—**raiz incluida**—, ni con `node:crypto` ni con `crypto.subtle`.
+
+**R15.** El sistema DEBE calcular esa firma con WebCrypto (`crypto.subtle`), disponible tanto en
+Node como en el borde; ningun archivo alcanzable por imports desde `middleware.ts` DEBE importar
+`node:crypto`, `@prisma/client`, el cliente Prisma compartido ni `next/headers`.
+
+**R16.** La migracion NO DEBE cambiar el formato del valor de la cookie: mismo prefijo de version
+`v1`, mismo troceado por `.`, HMAC-SHA-256 sobre la misma parte firmada, misma clave (los bytes
+UTF-8 del secreto) y misma codificacion base64url sin relleno. Una cookie emitida **antes** de la
+migracion DEBE seguir validando hasta su `exp`, y los tests de sesion de QC-8 DEBEN seguir en verde
+**sin que se modifique ni uno de sus vectores**.
+
+**R17.** El sistema DEBE comparar la firma recibida con la esperada en **tiempo constante** —tiempo
+independiente de cuantos bytes coinciden— sin depender de `node:crypto`.
+
+**R18.** SI `SESSION_SECRET` falta o es mas corto que el minimo exigido al emitirla, ENTONCES el
+middleware DEBE fallar cerrado —tratar la peticion como «sin sesion» y redirigir al login— y NUNCA
+resolver la sesion como valida; el mensaje que registre NO DEBE incluir el valor del secreto.
+
+### Capas, guardias y documentacion
+
+**R19.** Las guardias `guard-firma-sesion-unica` y `guard-arquitectura-modulos` DEBEN barrer tambien
+los archivos `.ts`/`.tsx` de **primer nivel** del repositorio; un archivo en la raiz que reimplemente
+la firma o que importe un adaptador driven fuera de `lib/composition/**` DEBE poner el gate en rojo.
+Esta ampliacion DEBE estar verde **antes** de que exista `middleware.ts`.
+
+**R20.** La decision de acceso —que ruta es privada, si la sesion vale, a donde se redirige y si el
+destino de vuelta es interno— DEBE vivir en `domain/` del modulo `identity` y ser ejercitable sin
+Next, sin cookies y sin base de datos; `middleware.ts` en la raiz DEBE limitarse a delegar y a
+declarar su `matcher`, sin ninguna decision propia.
+
+**R21.** `middleware.ts` y el adaptador driving que lo implementa NO DEBEN importar un adaptador
+driven: el cableado DEBE seguir viviendo solo en `lib/composition/**`.
+
+**R22.** El middleware NO DEBE intervenir en los recursos estaticos (`/_next/static`, `/_next/image`,
+`favicon.ico` y assets equivalentes): no los redirige ni los inspecciona.
+
+**R23.** `docs/architecture.md > Permisos y autenticacion` DEBE describir el middleware como
+validador de **firma y caducidad** de la cookie de sesion, y NO DEBE seguir diciendo que «verifica
+existencia de cookie de sesion».
+
+**R24.** *(Heredado de QC-8, donde quedo fuera de alcance por no existir ninguna URL privada; la
+historia esta en `specs/QC-8-sesion-actual-y-logout/requirements.md > Preguntas abiertas 3` y en la
+fila revisada de su tabla.)* CUANDO se ejecute la suite E2E, DEBE existir al menos un recorrido en
+navegador real que: pida una pantalla privada **sin sesion** y termine en el login, entre con
+credenciales correctas, aterrice **en la pantalla que habia pedido**, vea en la barra lateral el
+nombre real del usuario, cierre sesion, termine en el login y compruebe que volver atras no muestra
+la zona privada; ese recorrido DEBE borrar al terminar todas las filas que haya creado.
+
+**R25.** El sistema NO DEBE añadir ninguna dependencia nueva a `package.json`: WebCrypto es API de
+plataforma. SI aun asi hiciera falta una, ENTONCES DEBE proponerse en `design.md` con los cuatro
+checks de `docs/architecture.md > Dependencias de terceros` y quedar **pendiente de aprobacion
+humana**, sin instalarse.
 
 ## Preguntas abiertas
 
-Ninguna. Las dos que abrió la acotación se cerraron el mismo día y están abajo (D9 y D10).
+Las dos que abrio la acotacion se cerraron el mismo dia y estan en la tabla (D9 y D10). El spec
+abrio estas dos, que la tabla no cubre y que **no se resuelven aqui** (`CLAUDE.md`, regla 6):
+
+1. **¿De donde saca el middleware el rol cuando exista la primera regla ruta→rol?** D8 cierra que el
+   permiso lo comprueba el middleware, y R12 construye el gancho. Pero el borde **no tiene base de
+   datos** y el token **no lleva el rol** (su formato esta congelado, D3). Con el conjunto de reglas
+   vacio la pregunta no muerde: R12/R13 se implementan y se testean enteros pasando el rol como
+   dato de entrada de la decision, y el middleware pasa hoy «rol desconocido». Cuando llegue la
+   primera regla —la pantalla de productos, solo Administrador— habra que elegir entre: (a) añadir
+   el rol al token en una version `v2` del formato, con el coste de reabrir D3 y de invalidar
+   sesiones vivas; (b) dejar que el middleware corte solo por autenticacion y que la regla de rol la
+   aplique el Server Component de esa pantalla, que si tiene base; (c) una consulta desde el borde a
+   un endpoint interno, que paga latencia en cada navegacion. **Lo decide la ficha que traiga la
+   primera regla, no esta.**
+2. **¿Que hace `/` (la raiz del sitio)?** Hoy `app/page.tsx` es la plantilla de Next: no cuelga de
+   `(private)` ni de `(public)`, asi que R1 no la protege y R10/R11 no la mencionan. Un usuario con
+   sesion que abra `/` sigue viendo esa plantilla. Redirigirla al dashboard —o al login— seria un
+   comportamiento nuevo que la tabla no cierra, y esta ficha **no lo inventa**: `/` se queda como
+   esta y se anota aqui para que se decida donde toque.
 
 ## Decisiones cerradas (no reabrir)
 
