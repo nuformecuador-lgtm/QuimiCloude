@@ -183,4 +183,44 @@ describe('loginAction', () => {
     expect(invalido.attemptId).not.toBe(primero.attemptId);
     expect(LOGIN_INITIAL_STATE).not.toHaveProperty('attemptId');
   });
+  // QC-9 T16 (R8, R9) — El destino de vuelta. El campo `next` lo trae el formulario en un input
+  // oculto, o sea que es entrada externa: se revalida aqui aunque la pantalla de login ya lo
+  // hubiera validado al pintarlo. Un POST fabricado no pasa por esa pantalla.
+  it('aterriza en la pantalla que se habia pedido cuando el destino de vuelta es interno (R8)', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+
+    await submit({ username: 'ana.perez', password: 'clave', next: '/dashboard/reportes?desde=ayer' });
+
+    expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect).toHaveBeenCalledWith('/dashboard/reportes?desde=ayer');
+  });
+
+  it('descarta un destino de vuelta externo y aterriza en el dashboard (R9)', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+
+    for (const destinoFabricado of [
+      'https://evil.example',
+      '//evil.example',
+      String.raw`/\evil.example`,
+      'javascript:alert(1)',
+      '%2F%2Fevil.example',
+    ]) {
+      vi.mocked(redirect).mockClear();
+
+      await submit({ username: 'ana.perez', password: 'clave', next: destinoFabricado });
+
+      expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
+    }
+  });
+
+  it('aterriza en el dashboard cuando el campo next viene vacio o no viene (R8)', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+
+    await submit({ username: 'ana.perez', password: 'clave', next: '' });
+    await submit({ username: 'ana.perez', password: 'clave' });
+
+    expect(redirect).toHaveBeenCalledTimes(2);
+    expect(redirect).toHaveBeenNthCalledWith(1, DASHBOARD_ROUTE);
+    expect(redirect).toHaveBeenNthCalledWith(2, DASHBOARD_ROUTE);
+  });
 });

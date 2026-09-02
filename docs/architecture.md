@@ -198,13 +198,21 @@ un adaptador driven: recibe datos por props y llama a la Server Action por su ru
 | Origen | PUEDE importar | NO PUEDE importar |
 | --- | --- | --- |
 | `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
-| `lib/modules/M/adapters/driven/**` | `../../domain`, `../../ports`, `lib/shared/**`, `@prisma/client`, SDKs externos, `@/lib/modules/N` (barrel) | `lib/composition`, `../driving/**`, `app/**`, `components/**`, `lib/modules/N/**` (profundo) |
+| `lib/modules/M/adapters/driven/**` | `../../domain`, `../../ports`, `lib/shared/**`, `@prisma/client`, SDKs externos, `@/lib/modules/N` (barrel), **otro driven del MISMO modulo** (ver nota) | `lib/composition`, `../driving/**`, `app/**`, `components/**`, `lib/modules/N/**` (profundo), **un driven de OTRO modulo** |
 | `lib/modules/M/adapters/driving/**` | `lib/composition`, `@/lib/modules/M` (barrel), su propia carpeta, `next/*`, `react*`, `lib/shared/**` | `@prisma/client`, el cliente Prisma compartido, `../driven/**`, `../../domain`/`../../ports` por ruta profunda |
 | `lib/composition/**` | `@/lib/modules/*` (barrel), `*/ports/**`, `*/adapters/driven/**`, `lib/shared/**` | `*/adapters/driving/**`, `app/**`, `components/**` |
 | `lib/shared/**` | paquetes npm, otros `lib/shared/**` | `lib/modules/**`, `lib/composition` |
 | `app/**` (servidor) | `lib/composition`, `@/lib/modules/M` (barrel), `.../adapters/driving/**`, `lib/shared/**`, `components/**`, `hooks/**` | `.../domain/**`, `.../ports/**`, `.../adapters/driven/**` |
 | `components/**`, `hooks/**`, archivos `'use client'` | `@/lib/modules/M` (barrel), `.../adapters/driving/**`, `lib/shared/ui/**`, `lib/shared/routes`, `@/lib/utils` | ademas de lo anterior: `lib/composition`, `lib/shared/db/**` |
 | `tests/**`, `scripts/**` | todo | — (exentos) |
+
+> **Nota sobre driven -> driven (QC-9).** Un adaptador driven puede apoyarse en otro driven **de su
+> mismo modulo**: es lo que permite extraer el codec de sesion (`session-cookie.ts` delega el formato
+> y la firma en `session-token.ts`) y por tanto que exista **una sola** implementacion del HMAC en el
+> repositorio, que es R5 de QC-8. No cablea nada —el cableado puerto -> implementacion sigue siendo
+> exclusivo de `lib/composition/**`—, asi que no toca R11. Un driven de **otro** modulo sigue
+> prohibido: eso si seria saltarse el contrato. Lo hace cumplir
+> `tests/guards/guard-arquitectura-modulos.test.ts`.
 
 **Direccion, en una frase:** hacia adentro. `app/components -> composicion -> adaptadores
 driven -> puertos -> dominio`, y el dominio no mira a nadie.
@@ -304,10 +312,26 @@ Supabase.
 
 ## Permisos y autenticacion
 - Las paginas (Server Components) validan permisos via `cookies()` de `next/headers`.
-- `middleware.ts` intercepta rutas protegidas, verifica existencia de cookie de sesion.
+- `middleware.ts` intercepta las rutas privadas y **valida** la cookie de sesion: su **firma**, su
+  **caducidad** y el **rol firmado** que lleva dentro. Que la cookie exista no es sesion.
+- El corte va en **los dos sentidos**: sin sesion valida en una ruta privada, redirige al login con
+  la ruta pedida en `next`; con sesion valida en el login, redirige al dashboard.
 - Componentes `private/` reciben datos por props desde el Server Component padre.
 - Datos publicos: el cliente fetchea con SWR desde el navegador.
 - Datos privados (balances, PII): pre-fetch en Server Component, stream al cliente.
+
+**El layout privado sigue siendo la ultima linea de defensa.** El corte del middleware no lo
+sustituye ni lo relaja: el layout de la zona privada vuelve a leer la sesion en el servidor y
+redirige si no la hay. El middleware ahorra render y da la vuelta rapida; no es la unica puerta.
+
+**El middleware NO es la frontera de autorizacion.** `## Acceso a datos y autorizacion` sigue
+mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol que
+viaja firmado en la cookie **no autoriza**; su unico efecto admisible es decidir si se enseña una
+pantalla. **Un permiso implementado solo como corte de ruta no cuenta como implementado**, igual
+que no cuenta uno implementado solo como policy de RLS. Ademas ese rol es una **foto del instante
+del login** y envejece hasta 8 h: un cambio de rol no llega al borde hasta que la sesion caduca, y
+el middleware puede dejar pasar a una pantalla que el service deniega. La invalidacion inmediata
+es QC-23.
 
 ## Server Actions vs Route Handlers
 | Caso | Usar |

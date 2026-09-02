@@ -16,6 +16,7 @@ type FilaCredenciales = {
   failed_login_attempts: number;
   lock_level: number;
   locked_until: Date | null;
+  role_name: string;
 };
 
 /**
@@ -27,14 +28,28 @@ type FilaCredenciales = {
  * `lower(username) WHERE deleted_at IS NULL`. `mode: 'insensitive'` genera `ILIKE`, que **no**
  * usa ese indice: el login haria un seq scan sobre `users` en la ruta mas caliente de la app.
  *
- * Devuelve solo el id, el hash y el estado de bloqueo. Ni correo, ni documento, ni nombre, ni
- * telefono: lo que no sale de la base no se puede filtrar por error en un log (R15). Por lo
- * mismo, aqui no hay ni un `console.*`.
+ * Devuelve el id, el hash, el estado de bloqueo y el NOMBRE DEL ROL. Ni correo, ni documento, ni
+ * nombre, ni telefono: lo que no sale de la base no se puede filtrar por error en un log (R15).
+ * Por lo mismo, aqui no hay ni un `console.*`.
+ *
+ * QC-9 (R26) — el rol entra por un `JOIN roles` en ESTA misma consulta, no en una segunda: el
+ * login sigue costando exactamente una lectura. `design.md > 3.6` lo describe como
+ * «el `select` añade `role: { select: { name: true } }`», que es la forma tipada; aqui no aplica
+ * porque esta consulta va con `$queryRaw` por el motivo del parrafo anterior (el indice funcional
+ * parcial), y cambiarla a la API tipada para añadir una columna reintroduciria el seq scan que
+ * ese parrafo evita. El `JOIN` es la traduccion literal de esa fila a SQL.
+ *
+ * `INNER JOIN` y no `LEFT`: `users.role_id` es NOT NULL con clave foranea `onDelete: Restrict`,
+ * asi que todo usuario vivo tiene rol. Si un dia no lo tuviera, el usuario no se encontraria —y
+ * no entraria— en vez de emitirse una sesion con un rol inventado.
  */
 export async function findActiveByUsername(username: string): Promise<AuthenticatableUser | null> {
   const filas = await prisma.$queryRaw<FilaCredenciales[]>`
-    SELECT id, password_hash, failed_login_attempts, lock_level, locked_until FROM users
-    WHERE lower(username) = lower(${username}) AND deleted_at IS NULL
+    SELECT u.id, u.password_hash, u.failed_login_attempts, u.lock_level, u.locked_until,
+           r.name AS role_name
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    WHERE lower(u.username) = lower(${username}) AND u.deleted_at IS NULL
     LIMIT 1
   `;
 
@@ -48,6 +63,7 @@ export async function findActiveByUsername(username: string): Promise<Authentica
     failedAttempts: Number(fila.failed_login_attempts),
     lockLevel: Number(fila.lock_level),
     lockedUntil: fila.locked_until === null ? null : new Date(fila.locked_until),
+    roleName: fila.role_name,
   };
 }
 

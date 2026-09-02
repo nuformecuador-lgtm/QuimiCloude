@@ -19,3 +19,20 @@ export { seedInitialAccess, type SeedOutcome } from './domain/seed-initial-acces
 export { createResolveSessionUser } from './domain/resolve-session-user';
 export { buildDisplayName } from './domain/display-name';
 export { isSessionExpired, type SessionClaims } from './domain/session-claims';
+
+// QC-9 T10 — La decision de acceso de ruta y el destino de vuelta. Solo dominio: el middleware
+// las consume desde aqui sin arrastrar `next/*` ni Prisma al bundle del borde.
+export {
+  decideRouteAccess,
+  type RedirectReason,
+  type RouteAccessDecision,
+  type RouteAccessInput,
+  type RouteAccessSession,
+} from './domain/route-access';
+export {
+  RETURN_PARAM,
+  buildLoginRedirect,
+  isInternalPath,
+  resolveReturnPath,
+} from './domain/return-path';
+export { ROUTE_ROLE_RULES, findRouteRule, type RouteRoleRule } from './domain/route-role-rules';

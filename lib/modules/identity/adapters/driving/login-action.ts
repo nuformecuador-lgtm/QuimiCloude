@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 
 import { identity } from '@/lib/composition';
-import { loginInputSchema } from '@/lib/modules/identity';
+import { RETURN_PARAM, loginInputSchema, resolveReturnPath } from '@/lib/modules/identity';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
@@ -77,7 +77,15 @@ export async function loginAction(
     };
   }
 
+  // QC-9 R8 — se aterriza en la pantalla que el usuario habia pedido, no siempre en el
+  // dashboard. El campo oculto llega del formulario, o sea que es ENTRADA EXTERNA: un POST
+  // fabricado puede traer `https://evil.example` y sacar al usuario del ERP justo despues de
+  // autenticarse. Por eso se revalida aqui con `resolveReturnPath`, aunque la pantalla de login
+  // ya lo hubiera validado al pintarlo: la validacion del cliente no cuenta, y esta es la unica
+  // que protege de verdad (R9, `design.md > 8`).
+  const destino = resolveReturnPath(readField(formData, RETURN_PARAM), DASHBOARD_ROUTE);
+
   // Fuera de todo try/catch: `redirect()` senaliza con una excepcion de control
   // (`NEXT_REDIRECT`) y tragarsela romperia R17 en silencio.
-  redirect(DASHBOARD_ROUTE);
+  redirect(destino);
 }

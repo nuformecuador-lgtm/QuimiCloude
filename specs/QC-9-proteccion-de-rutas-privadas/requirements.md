@@ -27,6 +27,11 @@
 >
 > «Sesion valida» significa, en todo este documento: cookie presente, **version del formato
 > reconocida, firma verificada y `exp` firmado aun en el futuro**. Nunca «la cookie existe».
+>
+> **Revision del 2026-09-02 (segunda tanda).** El humano cerro la pregunta abierta 1: **el rol viaja
+> dentro de la cookie**, y en consecuencia **el formato del token cambia y sube de version**. Eso
+> **deroga D3** (ver la tabla: la fila se conserva tachada, con su motivo). Los requisitos afectados
+> son R4, R12 y R16, reescritos en sitio; los nuevos son R26–R30. La numeracion R1–R25 no se mueve.
 
 ### El portero: rutas privadas
 
@@ -45,9 +50,10 @@ con la recomputada sobre su parte firmada, SI el contenido firmado no decodifica
 `sub`/`iat`/`exp` validos, o SI el instante actual es igual o posterior al `exp` **firmado**; la
 mera presencia de la cookie NUNCA DEBE bastar para dejar pasar.
 
-**R4.** El middleware NO DEBE consultar la base de datos ni resolver el `SessionUser`: decide solo
-con lo que viaja firmado en la cookie. La resolucion del usuario (rol y nombre actuales) sigue
-siendo del layout privado (QC-8 R10).
+**R4.** *(Revisado el 2026-09-02.)* El middleware NO DEBE consultar la base de datos ni resolver el
+`SessionUser`: decide **solo** con lo que viaja firmado en la cookie —identificador, caducidad y
+**rol** (R26)—. La resolucion del usuario contra la base (rol y nombre **actuales**) sigue siendo del
+layout privado (QC-8 R10, R12).
 
 **R5.** MIENTRAS una peticion atraviesa el middleware, el sistema NO DEBE emitir, reemitir,
 prolongar ni borrar la cookie de sesion: la validez sigue siendo de 8 h absolutas desde su emision
@@ -81,9 +87,10 @@ redireccion alguna.
 
 ### Reglas de ruta por rol (el gancho)
 
-**R12.** El sistema DEBE ofrecer un conjunto declarado de reglas ruta→rol que la decision de acceso
-consulta en cada peticion; ese conjunto DEBE estar **vacio** en esta ficha, y MIENTRAS este vacio
-toda sesion valida DEBE pasar a cualquier ruta privada.
+**R12.** *(Revisado el 2026-09-02.)* El sistema DEBE ofrecer un conjunto declarado de reglas ruta→rol
+que la decision de acceso consulta en cada peticion, evaluandolas contra el **rol que viaja firmado
+en la cookie** (R26) y sin consultar la base; ese conjunto DEBE estar **vacio** en esta ficha, y
+MIENTRAS este vacio toda sesion valida DEBE pasar a cualquier ruta privada.
 
 **R13.** SI hay sesion valida y una regla ruta→rol exige un rol que el usuario no tiene, ENTONCES el
 sistema DEBE redirigir al **dashboard**, nunca al login; y SI la ruta no autorizada fuera el propio
@@ -99,11 +106,15 @@ emite**; NO DEBE existir una segunda implementacion del algoritmo de firma en el
 Node como en el borde; ningun archivo alcanzable por imports desde `middleware.ts` DEBE importar
 `node:crypto`, `@prisma/client`, el cliente Prisma compartido ni `next/headers`.
 
-**R16.** La migracion NO DEBE cambiar el formato del valor de la cookie: mismo prefijo de version
-`v1`, mismo troceado por `.`, HMAC-SHA-256 sobre la misma parte firmada, misma clave (los bytes
-UTF-8 del secreto) y misma codificacion base64url sin relleno. Una cookie emitida **antes** de la
-migracion DEBE seguir validando hasta su `exp`, y los tests de sesion de QC-8 DEBEN seguir en verde
-**sin que se modifique ni uno de sus vectores**.
+**R16.** *(Reescrito el 2026-09-02: D3 derogada, ver la tabla.)* La migracion a WebCrypto NO DEBE
+cambiar el **algoritmo ni la codificacion** del valor de la cookie: mismo troceado en tres por `.`,
+HMAC-SHA-256 sobre la parte firmada completa, misma clave (los bytes UTF-8 del secreto) y misma
+codificacion base64url **sin relleno**. Lo unico que cambia es la **version** y el **contenido** del
+payload (R26, R27). En consecuencia, la firma que produzca la implementacion WebCrypto para una
+misma parte firmada DEBE ser identica byte a byte a la que producia `node:crypto`, y los tests de
+sesion de QC-8 DEBEN seguir en verde **sin que se cambie la forma en que recomputan la firma
+esperada**: sus unicas modificaciones admisibles son el literal de version y la lista de claves del
+payload.
 
 **R17.** El sistema DEBE comparar la firma recibida con la esperada en **tiempo constante** —tiempo
 independiente de cuantos bytes coinciden— sin depender de `node:crypto`.
@@ -147,22 +158,53 @@ plataforma. SI aun asi hiciera falta una, ENTONCES DEBE proponerse en `design.md
 checks de `docs/architecture.md > Dependencias de terceros` y quedar **pendiente de aprobacion
 humana**, sin instalarse.
 
+### El rol dentro de la cookie *(revision del 2026-09-02)*
+
+**R26.** CUANDO se emite una sesion, el contenido firmado DEBE llevar, ademas del identificador de
+usuario y los instantes de emision y caducidad, **el nombre del rol** que esa persona tiene en la
+base **en el instante de emitir**; ese rol DEBE tomarse de la base y NUNCA de un dato recibido del
+cliente.
+
+**R27.** El sistema DEBE subir la **version del valor de la cookie**; SI el valor recibido trae la
+version anterior (`v1`), ENTONCES DEBE rechazarse como «sin sesion» **sin verificar su firma y sin
+intentar interpretarlo**, y el usuario DEBE terminar en el login. NO DEBE existir compatibilidad
+hacia atras: un token de la version anterior no vale, ni aunque su firma y su `exp` fueran correctos.
+
+**R28.** SI el contenido firmado de la version vigente no trae un rol con forma valida —ausente,
+vacio o de un tipo que no es texto—, ENTONCES el sistema DEBE resolver «sin sesion», sin consultar la
+base y sin suponer ningun rol por defecto.
+
+**R29.** El rol firmado NO DEBE usarse como frontera de autorizacion: su unico efecto admisible es
+**mostrar, ocultar o redirigir una pantalla**. Toda autorizacion sobre datos u operaciones DEBE
+seguir validandose en el service (`docs/architecture.md > Acceso a datos y autorizacion`), y la
+decision de acceso de ruta NO DEBE devolver capacidades ni permisos, solo «pasa» o «redirige a».
+
+**R30.** MIENTRAS no exista la revocacion de sesiones (QC-23), el rol firmado DEBE entenderse como
+una **foto del instante de la emision**: CUANDO a una persona se le cambia el rol, sus sesiones ya
+emitidas DEBEN seguir llevando el rol anterior hasta que caduquen, y el sistema NO DEBE simular lo
+contrario renovando ni reemitiendo la cookie al leerla. La consecuencia visible —el middleware puede
+dejar pasar a una pantalla que el service le denegara, o cortarle una a la que ya tendria
+derecho— DEBE quedar cubierta por un test que la caracterice, no disimulada.
+
 ## Preguntas abiertas
 
-Las dos que abrio la acotacion se cerraron el mismo dia y estan en la tabla (D9 y D10). El spec
-abrio estas dos, que la tabla no cubre y que **no se resuelven aqui** (`CLAUDE.md`, regla 6):
+Las dos que abrio la acotacion se cerraron el mismo dia y estan en la tabla (D9 y D10). El spec abrio
+dos mas: **la 1 la cerro el humano el 2026-09-02** (y su respuesta derogo D3); **la 2 sigue abierta**
+y no se resuelve aqui (`CLAUDE.md`, regla 6).
 
-1. **¿De donde saca el middleware el rol cuando exista la primera regla ruta→rol?** D8 cierra que el
-   permiso lo comprueba el middleware, y R12 construye el gancho. Pero el borde **no tiene base de
-   datos** y el token **no lleva el rol** (su formato esta congelado, D3). Con el conjunto de reglas
-   vacio la pregunta no muerde: R12/R13 se implementan y se testean enteros pasando el rol como
-   dato de entrada de la decision, y el middleware pasa hoy «rol desconocido». Cuando llegue la
-   primera regla —la pantalla de productos, solo Administrador— habra que elegir entre: (a) añadir
-   el rol al token en una version `v2` del formato, con el coste de reabrir D3 y de invalidar
-   sesiones vivas; (b) dejar que el middleware corte solo por autenticacion y que la regla de rol la
-   aplique el Server Component de esa pantalla, que si tiene base; (c) una consulta desde el borde a
-   un endpoint interno, que paga latencia en cada navegacion. **Lo decide la ficha que traiga la
-   primera regla, no esta.**
+1. ~~**¿De donde saca el middleware el rol cuando exista la primera regla ruta→rol?**~~ **CERRADA
+   por el humano el 2026-09-02: el rol viaja DENTRO de la cookie.** La pregunta era: el borde no
+   tiene base de datos y el token no llevaba el rol, asi que se ofrecieron tres salidas — (a) subir
+   la version del formato para meter el rol, (b) que la regla de rol la aplicara el Server Component,
+   (c) una consulta del borde a un endpoint interno. **El humano eligio (a)** y acepto su coste:
+   *«no existen sesiones vivas y si alguna vive la borramos desde el navegador»*. Consecuencias, todas
+   con requisito: el contenido firmado gana el rol (**R26**), la version sube y la anterior se
+   **rechaza** sin compatibilidad (**R27**, **R28**), y **D3 queda derogada** — no matizada — con su
+   fila reescrita en la tabla. Se descartaron (b) por dejar el gancho de D8 sin efecto real en el
+   middleware, y (c) por pagar latencia de red en cada navegacion.
+
+   **Lo que la respuesta arrastra y no se disimula:** el rol firmado envejece (**R30**), y el
+   middleware **no** es la frontera de autorizacion (**R29**).
 2. **¿Que hace `/` (la raiz del sitio)?** Hoy `app/page.tsx` es la plantilla de Next: no cuelga de
    `(private)` ni de `(public)`, asi que R1 no la protege y R10/R11 no la mencionan. Un usuario con
    sesion que abra `/` sigue viendo esa plantilla. Redirigirla al dashboard —o al login— seria un
@@ -175,7 +217,11 @@ abrio estas dos, que la tabla no cubre y que **no se resuelven aqui** (`CLAUDE.m
 | --- | --- | --- |
 | 2026-09-02 | ¿Cómo comprueba el middleware la sesión, si el borde no tiene `node:crypto`? | **La firma migra a WebCrypto (`crypto.subtle`)**, que existe en Node y en el borde, y el middleware **valida de verdad**: firma y caducidad. Se descartan las otras dos salidas: verificar solo la existencia de la cookie (deja pasar una caducada o falsificada hasta la página) y correr el middleware en runtime Node (sale del camino por defecto y cuesta en cada navegación) |
 | 2026-09-02 | ¿Cuántas implementaciones del HMAC quedan? | **Una sola, en todo el repositorio.** Es R5 de QC-8 y la razón de ser de esta decisión: el middleware era el candidato número uno a convertirse en la segunda |
-| 2026-09-02 | ¿La migración puede cambiar el formato del token? | **No.** Mismo formato, mismo algoritmo, misma codificación: **las sesiones ya emitidas siguen valiendo**. Es además la mejor red para tocar código ajeno — los tests de QC-8 deben seguir verdes **byte a byte**, sin reescribir sus vectores |
+| 2026-09-02 · **DEROGADA el mismo día** | ¿La migración puede cambiar el formato del token? | ~~**No.** Mismo formato, mismo algoritmo, misma codificación: **las sesiones ya emitidas siguen valiendo**. Es además la mejor red para tocar código ajeno — los tests de QC-8 deben seguir verdes **byte a byte**, sin reescribir sus vectores~~ · **Derogada**, no matizada, por la decisión de meter el rol en la cookie (fila de abajo). Se conserva porque explica de dónde viene el diseño: se cerró primero al revés, y cambió cuando el humano confirmó que **no hay sesiones vivas que preservar** («y si alguna vive la borramos desde el navegador»), con lo que el único argumento a favor de congelar el formato —la compatibilidad— dejó de existir. **Lo que sí sobrevive de esta fila es la parte criptográfica** (mismo algoritmo, misma clave, misma codificación base64url) y su red de seguridad: R16 |
+| 2026-09-02 | ¿De dónde saca el middleware el rol, si el borde no tiene base? | **El rol viaja DENTRO de la cookie**, firmado junto al resto del contenido, y el middleware comprueba el permiso en el borde sin consultar la base ni llamar a ningún endpoint interno. Cierra la pregunta abierta 1 del spec. Requisitos: R26, R12 |
+| 2026-09-02 | ¿Y las sesiones ya emitidas, entonces? | **Se rompen a propósito.** La versión del valor de la cookie **sube**, y un token de la versión anterior **se rechaza** sin verificar su firma: no hay compatibilidad hacia atrás ni doble camino de verificación. Aceptado explícitamente: *«no existen sesiones vivas y si alguna vive la borramos desde el navegador»*. Requisitos: R27, R28 |
+| 2026-09-02 | ¿Un cambio de rol debe cortar las sesiones de esa persona? | **Sí, al instante — pero se implementa en QC-23** (revocación de sesiones), no aquí. **Mientras tanto**, el rol firmado es una foto del momento de la emisión y un cambio de rol no surte efecto hasta que la sesión caduca (8 h). Es un límite conocido, no un olvido, y lleva test de caracterización: R30 |
+| 2026-09-02 | ¿El rol en la cookie convierte al middleware en la frontera de seguridad? | **No.** `docs/architecture.md > Acceso a datos y autorizacion` sigue mandando: **la autorización se valida en el service**. El rol en el token es solo un atajo para no enseñar una pantalla que el usuario no va a poder usar. Un rol en una cookie invita justo al error contrario, así que queda como requisito propio: R29 |
 | 2026-09-02 | ¿Qué rutas se protegen? | **Por convención: todo lo que cuelga de `app/(private)/`.** Una pantalla nueva queda protegida **por nacer ahí**, sin tocar el middleware ni acordarse de una lista. Se descarta la lista explícita: olvidar una entrada no rompe ningún test, simplemente deja la pantalla abierta |
 | 2026-09-02 | ¿Se vuelve a la ruta pedida tras entrar? | **Sí.** Quien pide una pantalla concreta sin sesión aterriza en ella después de entrar, no en el dashboard |
 | 2026-09-02 | ¿Y el riesgo de redirector abierto? | **La ruta de vuelta se valida como interna**, siempre. Sin eso, un enlace fabricado sacaría al usuario del ERP justo después de autenticarse, que es el agujero clásico de este patrón |

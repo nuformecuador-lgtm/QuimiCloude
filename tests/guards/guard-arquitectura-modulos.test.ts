@@ -67,6 +67,18 @@ function listSourceFiles(dir: string): readonly string[] {
   })
 }
 
+/**
+ * Archivos `.ts`/`.tsx` sueltos en el PRIMER NIVEL del repositorio (no recursivo): hoy
+ * `next.config.ts`, `next-env.d.ts`, `playwright.config.ts` y `prisma.config.ts`, y manana
+ * `middleware.ts`. Las subcarpetas de la raiz no se recorren aqui: las de codigo ya entran por
+ * `SCAN_ROOTS`, y `tests/`, `e2e/`, `scripts/` y `db/` no son codigo de la aplicacion (QC-9 R19).
+ */
+function listRootLevelSourceFiles(root: string): readonly string[] {
+  return readDirEntries(root)
+    .filter((entry) => !entry.isDirectory && SOURCE_EXTENSIONS.has(extname(entry.name)))
+    .map((entry) => join(root, entry.name))
+}
+
 function tryReadReal(absPath: string): string | null {
   try {
     const stat = statSync(absPath)
@@ -77,13 +89,26 @@ function tryReadReal(absPath: string): string | null {
   }
 }
 
-/** Quita comentarios de linea y de bloque antes de buscar imports (mismo patron que las otras guardias). */
+/**
+ * Quita comentarios de linea y de bloque antes de buscar imports.
+ *
+ * **El orden importa: los de LINEA primero, los de BLOQUE despues.** Al reves --como estuvo hasta
+ * QC-9-- un comentario de linea que contenga una apertura de bloque abre un bloque FALSO que se
+ * cierra en el siguiente cierre de bloque del archivo (tipicamente el proximo JSDoc) y se traga
+ * todo lo que haya en medio, imports incluidos. El caso real, con el comodin escrito con dos
+ * asteriscos: `// se juzga con las mismas reglas que app/` + `** (R19)` dejaba `middleware.ts`
+ * reducido a su `export const config`, sin el reexport, asi que TODOS los bloques que deciden
+ * sobre imports (4, 5, 6, 7, 8, 9, 11, 13) juzgaban un archivo vacio y pasaban en VERDE sin haber
+ * mirado nada. Quitando primero la linea entera, esa apertura desaparece junto con el comentario
+ * que la contiene. No lo "simplifiques" de vuelta: el test «no se ciega...» de mas abajo vigila
+ * exactamente eso.
+ */
 function stripComments(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
 }
 
 /** Todo especificador importado/reexportado/requerido por un archivo (import, export...from, require, import()). */
@@ -439,10 +464,31 @@ export function findContractLeakage(
 // BLOQUE 7 — Composicion unica (R11, R12)
 // ---------------------------------------------------------------------------
 
-/** Solo `lib/composition/**` puede importar un adaptador driven de cualquier modulo (R11). */
+/**
+ * Solo `lib/composition/**` puede importar un adaptador driven de cualquier modulo (R11).
+ *
+ * QC-9 T4 — Excepcion unica y acotada: **un adaptador driven puede apoyarse en otro driven de su
+ * PROPIO modulo**. R11 protege el cableado puerto -> implementacion, que es lo que solo la
+ * composicion puede hacer; dos adaptadores del mismo modulo repartiendose una responsabilidad no
+ * cablean nada. La tabla de `docs/architecture.md > La regla de dependencias` (fila
+ * `adapters/driven/**`) ya lo permitia —su columna "NO PUEDE importar" lista `lib/composition`,
+ * `../driving/**`, `app/**`, `components/**` y modulos ajenos por ruta profunda, y NO a un driven
+ * hermano—, asi que esto acerca la guardia al documento en vez de relajarlo. El caso real que lo
+ * obliga: `session-cookie.ts` (transporte, `next/headers`) delega el formato y la firma en
+ * `session-token.ts` (codec WebCrypto), que es el unico dueño del HMAC (QC-9 `design.md > 3.1`).
+ * Un driven de OTRO modulo sigue prohibido: eso si seria saltarse el contrato.
+ */
 export function findDrivenImportOutsideComposition(relPath: string, specifier: string, target: ImportTarget): string | null {
   if (relPath.startsWith('lib/composition/')) return null
   if (target.kind === 'external') return null
+  if (
+    layerOfPath(relPath) === 'driven' &&
+    layerOfPath(target.relPath) === 'driven' &&
+    moduleOfPath(relPath) !== null &&
+    moduleOfPath(relPath) === moduleOfPath(target.relPath)
+  ) {
+    return null
+  }
   if (layerOfPath(target.relPath) === 'driven') {
     return `${relPath} importa el adaptador driven '${specifier}' fuera de lib/composition (R11)`
   }
@@ -465,9 +511,21 @@ export function findDrivingImportInsideComposition(relPath: string, specifier: s
 
 const UI_ROOTS = ['app/', 'components/', 'hooks/']
 
-/** `app/`, `components/`, `hooks/` solo consumen el contrato o un adaptador driving (R13). */
+/**
+ * Que rutas cuentan como capa UI: `app/`, `components/`, `hooks/` y **los archivos de primer nivel
+ * del repositorio** (QC-9 R19). Un archivo de primer nivel es exactamente eso: su ruta relativa no
+ * tiene ninguna `/`. Se juzgan con las mismas reglas que `app/**` porque son lo mismo -- codigo del
+ * borde de la aplicacion, no de un modulo --, y ahi es donde nace `middleware.ts`: sin esto, un
+ * archivo de la raiz podria importar un adaptador driven o saltarse el contrato en verde.
+ */
+export function isUiLayerPath(relPath: string): boolean {
+  if (!relPath.includes('/')) return true
+  return UI_ROOTS.some((root) => relPath.startsWith(root))
+}
+
+/** `app/`, `components/`, `hooks/` y la raiz solo consumen el contrato o un adaptador driving (R13). */
 export function findUiLayerImportFinding(relPath: string, specifier: string, target: ImportTarget): string | null {
-  if (!UI_ROOTS.some((root) => relPath.startsWith(root))) return null
+  if (!isUiLayerPath(relPath)) return null
   if (target.kind === 'external') return null
   const layer = layerOfPath(target.relPath)
   if (layer === 'domain' || layer === 'ports' || layer === 'driven') {
@@ -708,7 +766,14 @@ const utilsSource = tryReadReal(utilsPath)
 const existsInRepo = (absPath: string) => tryReadReal(absPath) !== null
 
 const SCAN_ROOTS = ['app', 'components', 'hooks', 'lib'] as const
-const allSourceFiles = SCAN_ROOTS.flatMap((root) => listSourceFiles(join(repoRoot, root))).map((absPath) => {
+// Ademas de los SCAN_ROOTS en profundidad, los `.ts`/`.tsx` de primer nivel de la raiz (QC-9 R19):
+// hasta hoy quedaban fuera del barrido, asi que un archivo de la raiz que importara un adaptador
+// driven pasaba el gate en verde. `middleware.ts` va a nacer ahi, y esta ampliacion va antes.
+const scannedAbsFiles = [
+  ...SCAN_ROOTS.flatMap((root) => listSourceFiles(join(repoRoot, root))),
+  ...listRootLevelSourceFiles(repoRoot),
+]
+const allSourceFiles = scannedAbsFiles.map((absPath) => {
   const content = readFileSync(absPath, 'utf8')
   const relPath = relPosix(repoRoot, absPath)
   const specifiers = extractImportSpecifiers(content)
@@ -1101,6 +1166,28 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       )
     })
 
+    // QC-9 T4 — la excepcion acotada: driven -> driven del MISMO modulo esta permitido (lo
+    // obliga `session-cookie.ts` delegando en el codec `session-token.ts`), pero driven ->
+    // driven de OTRO modulo sigue siendo un hallazgo.
+    it('un driven puede apoyarse en otro driven de su propio modulo, pero no en uno de otro modulo', () => {
+      expect(
+        findDrivenImportOutsideComposition(
+          'lib/modules/identity/adapters/driven/session/session-cookie.ts',
+          './session-token',
+          internalTarget('lib/modules/identity/adapters/driven/session/session-token.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivenImportOutsideComposition(
+          'lib/modules/inventario/adapters/driven/persistence/stock-prisma.ts',
+          '@/lib/modules/identity/adapters/driven/session/session-token',
+          internalTarget('lib/modules/identity/adapters/driven/session/session-token.ts'),
+        ),
+      ).toBe(
+        "lib/modules/inventario/adapters/driven/persistence/stock-prisma.ts importa el adaptador driven '@/lib/modules/identity/adapters/driven/session/session-token' fuera de lib/composition (R11)",
+      )
+    })
+
     it('composicion importando driven, y cualquier otro archivo importando driving, no disparan la regla', () => {
       expect(
         findDrivenImportOutsideComposition(
@@ -1216,6 +1303,60 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       expect(
         findClientForbiddenImportFinding('app/(private)/layout.tsx', false, '@/lib/composition', internalTarget('lib/composition/index.ts')),
       ).toBeNull()
+    })
+  })
+
+  // QC-9 T2 (R19, R21) — la raiz del repositorio se juzga con las reglas de app/**.
+  describe('bloque 8-bis — los archivos de primer nivel se juzgan como la UI (R19, R21)', () => {
+    it('un archivo de la raiz que importa un driven fuera de composicion genera hallazgo', () => {
+      const specifier = '@/lib/modules/identity/adapters/driven/session/session-cookie'
+      const target = internalTarget('lib/modules/identity/adapters/driven/session/session-cookie.ts')
+
+      // R11/R21: el cableado vive solo en lib/composition, tambien para middleware.ts.
+      expect(findDrivenImportOutsideComposition('middleware.ts', specifier, target)).toBe(
+        `middleware.ts importa el adaptador driven '${specifier}' fuera de lib/composition (R11)`,
+      )
+      // R13: y ademas se salta el contrato del modulo, igual que si estuviera en app/.
+      expect(findUiLayerImportFinding('middleware.ts', specifier, target)).toBe(
+        `middleware.ts importa '${specifier}' saltandose el contrato del modulo (R13)`,
+      )
+      // Un archivo de primer nivel marcado como cliente tampoco puede tocar la composicion (R14).
+      expect(
+        findClientForbiddenImportFinding('middleware.ts', true, '@/lib/composition', internalTarget('lib/composition/index.ts')),
+      ).toBe("middleware.ts ('use client') importa el punto de composicion '@/lib/composition' (R14)")
+    })
+
+    it('un archivo de la raiz que consume el contrato o un adaptador driving no dispara la regla', () => {
+      expect(findUiLayerImportFinding('middleware.ts', '@/lib/modules/identity', internalTarget('lib/modules/identity/index.ts'))).toBeNull()
+      expect(
+        findUiLayerImportFinding(
+          'middleware.ts',
+          '@/lib/modules/identity/adapters/driving/route-guard-middleware',
+          internalTarget('lib/modules/identity/adapters/driving/route-guard-middleware.ts'),
+        ),
+      ).toBeNull()
+      // Y los imports externos de los tres archivos de configuracion de la raiz no son hallazgo.
+      expect(findUiLayerImportFinding('next.config.ts', 'next', externalTarget('next'))).toBeNull()
+      expect(findUiLayerImportFinding('playwright.config.ts', '@playwright/test', externalTarget('@playwright/test'))).toBeNull()
+      expect(findUiLayerImportFinding('prisma.config.ts', 'prisma/config', externalTarget('prisma/config'))).toBeNull()
+    })
+
+    it('isUiLayerPath: primer nivel si y solo si la ruta relativa no tiene ninguna barra', () => {
+      expect(isUiLayerPath('middleware.ts')).toBe(true)
+      expect(isUiLayerPath('next.config.ts')).toBe(true)
+      expect(isUiLayerPath('app/(private)/layout.tsx')).toBe(true)
+      expect(isUiLayerPath('lib/modules/identity/domain/credentials.ts')).toBe(false)
+      expect(isUiLayerPath('lib/composition/index.ts')).toBe(false)
+    })
+
+    it('el barrido real incluye los archivos de primer nivel de la raiz', () => {
+      const relativos = allSourceFiles.map((file) => file.relPath)
+      expect(relativos).toContain('next.config.ts')
+      expect(relativos).toContain('playwright.config.ts')
+      expect(relativos).toContain('prisma.config.ts')
+      expect(relativos.some((relPath) => !relPath.includes('/'))).toBe(true)
+      // Y no arrastra lo que no es codigo de la aplicacion.
+      expect(relativos.some((relPath) => relPath.startsWith('tests/') || relPath.startsWith('e2e/'))).toBe(false)
     })
   })
 
@@ -1592,6 +1733,54 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       expect(
         findCompositionForbiddenImportFinding('app/page.tsx', '@/components/private/nav-user', internalTarget('components/private/nav-user.tsx')),
       ).toBeNull()
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // BLOQUE 14 — la guardia no se ciega por un comentario (QC-9, R19, R21)
+  // -------------------------------------------------------------------------
+  //
+  // Todos los bloques que deciden sobre imports parten de `extractImportSpecifiers`, y esa parte de
+  // `stripComments`. Si `stripComments` se come los imports, la guardia entera pasa en verde sobre
+  // un archivo que nunca miro: no un falso positivo ruidoso, sino un falso NEGATIVO mudo. Estos dos
+  // tests son la unica red de esa red.
+  describe('bloque 14 — no se ciega por comentarios (R19, R21)', () => {
+    it('un comentario de linea con un comodin `app/` + dos asteriscos NO esconde los imports que van debajo', () => {
+      // Fuente sintetico calcado del caso real. Con el orden viejo (bloques primero), la apertura
+      // de bloque que vive DENTRO del comentario de linea abria un bloque falso que se cerraba en
+      // el JSDoc de la penultima linea, y `extractImportSpecifiers` devolvia [].
+      const cegado = [
+        '// se juzga con las mismas reglas que app/** (R19)',
+        "import { createHmac } from 'node:crypto';",
+        "export const firma = createHmac('sha256', secreto);",
+        '/** JSDoc posterior que cierra el bloque falso. */',
+        'export const otra = 1;',
+      ].join('\n')
+
+      expect(
+        extractImportSpecifiers(cegado),
+        'stripComments quita los comentarios de LINEA antes que los de BLOQUE. Si alguien invierte ' +
+          'ese orden, un comentario de linea que mencione una ruta con comodin se traga los imports ' +
+          'que tenga debajo y TODOS los bloques de esta guardia pasan en verde sobre un archivo ' +
+          'vacio.',
+      ).toContain('node:crypto')
+
+      // Un comentario que solo MENCIONA un import sigue sin contar: lo que se arregla es el
+      // cegado, no la regla.
+      expect(extractImportSpecifiers("// import { prisma } from '@/lib/shared/db/prisma'\n")).toEqual([])
+      expect(extractImportSpecifiers("/* import { prisma } from '@/lib/shared/db/prisma' */")).toEqual([])
+    })
+
+    it('el middleware.ts REAL sigue mostrando su reexport pese al comodin `app/` + dos asteriscos de su cabecera', () => {
+      // El archivo del repo que disparo el hallazgo. Su cabecera menciona el comodin, y hasta QC-9
+      // eso dejaba el archivo reducido a `export const config = {...}`: la guardia lo barria (R19)
+      // pero no veia ni un solo import suyo.
+      const middleware = tryReadReal(join(repoRoot, 'middleware.ts'))
+      expect(middleware, 'no se encontro middleware.ts en la raiz del repo').not.toBeNull()
+
+      const specifiers = extractImportSpecifiers(middleware as string)
+
+      expect(specifiers).toContain('@/lib/modules/identity/adapters/driving/route-guard-middleware')
     })
   })
 })

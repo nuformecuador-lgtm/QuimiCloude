@@ -1,87 +1,39 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 
+import {
+  SESSION_COOKIE_NAME,
+  buildSessionValue,
+  hasCurrentVersion,
+  readSessionSecret,
+  verifySessionValue,
+} from './session-token';
+
 import { SESSION_DURATION_MS, type SessionTicket } from '../../../domain/session';
-import { parseSessionClaims, type SessionClaims } from '../../../domain/session-claims';
+import type { SessionClaims } from '../../../domain/session-claims';
 
 // Implementa el puerto `SessionWriter` (`../../../ports/session-writer`):
 // `startSession` cumple `startSession`. Tambien implementa `SessionReader`
 // (`../../../ports/session-reader`) via `readSessionClaims` y `clearSession`.
 // El cableado lo hace el punto de composicion.
+//
+// QC-9 T4: este archivo es solo TRANSPORTE. El formato y la firma —troceado, version, base64url y
+// HMAC— viven enteros en `session-token.ts`, el unico dueño del algoritmo (R14), que se
+// implementa con WebCrypto para poder correr tambien en el borde (R15). Aqui se queda lo que
+// necesita `next/headers`, que es exactamente lo que el middleware no puede cargar.
+// Las tres firmas publicas de este archivo (`startSession`, `readSessionClaims`, `clearSession`)
+// no cambiaron con la extraccion: por eso `tests/unit/identity/session-cookie.test.ts` sigue
+// verde sin tocar una linea, y es esa la red que hace segura la migracion (`design.md > 3.3`).
 
 /**
- * Nombre de la cookie (`design.md > 5.2`). Lleva el prefijo del producto y no dice
- * "auth" ni "token": no hace falta anunciar que ahi viaja la sesion.
+ * El nombre de la cookie lo DECLARA el codec (`session-token.ts`), que es quien tiene que poder
+ * leerse desde el borde; aqui solo se reexporta. No es una segunda declaracion: es el mismo
+ * simbolo. Se conserva la reexportacion porque `tests/unit/identity/session-cookie.test.ts` —el
+ * oraculo de la migracion (`design.md > 3.3`)— lo importa de aqui y no se toca ni una linea.
  */
-export const SESSION_COOKIE_NAME = 'qc_session';
+export { SESSION_COOKIE_NAME };
 
 /**
- * Version del formato del valor. QC-8 rechaza lo que no empiece por aqui, sin adivinar.
- * Se exporta para que el lector (`readSessionClaims`) y el escritor (`buildSessionValue`)
- * no puedan desincronizarse: un solo dueño de esta constante (R3, `design.md > 4.1`).
- */
-export const SESSION_VALUE_VERSION = 'v1';
-
-/** Longitud minima del secreto (`design.md > 5.3`). Por debajo, el HMAC no vale nada. */
-const MIN_SECRET_LENGTH = 32;
-
-type SessionPayload = {
-  readonly sub: string;
-  readonly iat: number;
-  readonly exp: number;
-};
-
-/**
- * Se exporta a proposito: QC-8 recompone la firma con esta misma funcion para verificarla
- * en tiempo constante. Si cada lado la escribiera por su cuenta, un cambio de formato
- * dejaria de romperse en un sitio y empezaria a fallar en silencio en el otro.
- */
-export function signSessionValue(signedPart: string, secret: string): string {
-  return createHmac('sha256', secret).update(signedPart).digest('base64url');
-}
-
-/**
- * Lee el secreto **en la llamada** y no al cargar el modulo: en el import romperia el
- * build de Vercel (donde no hay entorno de ejecucion) y haria intestable R13.
- * Falla cerrado: sin secreto valido no se emite cookie y nadie queda autenticado.
- * El mensaje describe el problema sin incluir el valor (R15).
- */
-function readSessionSecret(): string {
-  const secret = process.env.SESSION_SECRET;
-
-  if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH) {
-    throw new Error(
-      `SESSION_SECRET ausente o mas corto de ${MIN_SECRET_LENGTH} caracteres: no se emite sesion.`,
-    );
-  }
-
-  return secret;
-}
-
-/** Instantes en segundos epoch: es lo que se firma y lo que QC-8 comparara con el reloj. */
-function toEpochSeconds(date: Date): number {
-  return Math.floor(date.getTime() / 1000);
-}
-
-/**
- * Construye `v1.<payload-base64url>.<hmac-base64url>` (`design.md > 5.1`).
- * El payload lleva **solo** `sub`, `iat` y `exp`: nada de nombre de usuario, correo ni
- * hash, porque este valor viaja en cada peticion (R12).
- */
-function buildSessionValue(ticket: SessionTicket, secret: string): string {
-  const payload: SessionPayload = {
-    sub: ticket.userId,
-    iat: toEpochSeconds(ticket.issuedAt),
-    exp: toEpochSeconds(ticket.expiresAt),
-  };
-  const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
-  const signedPart = `${SESSION_VALUE_VERSION}.${encodedPayload}`;
-
-  return `${signedPart}.${signSessionValue(signedPart, secret)}`;
-}
-
-/**
- * Emite la cookie de sesion con los atributos de `design.md > 5.2`.
+ * Emite la cookie de sesion con los atributos de QC-7 `design.md > 5.2`.
  *
  * `secure` depende del entorno porque en `localhost` sobre http una cookie `Secure` no se
  * guarda y el login local no funcionaria; `domain` no se declara para no ampliar la sesion
@@ -89,8 +41,8 @@ function buildSessionValue(ticket: SessionTicket, secret: string): string {
  * donde `cookies()` permite escribir: el unico llamador es `loginAction`.
  */
 export async function startSession(ticket: SessionTicket): Promise<void> {
-  // Primero el secreto: si falta, se lanza antes de tocar la cookie (R13).
-  const value = buildSessionValue(ticket, readSessionSecret());
+  // Primero el secreto: si falta, se lanza antes de tocar la cookie (QC-7 R13).
+  const value = await buildSessionValue(ticket, readSessionSecret());
   const cookieStore = await cookies();
 
   cookieStore.set({
@@ -106,45 +58,28 @@ export async function startSession(ticket: SessionTicket): Promise<void> {
 
 /**
  * Lee y verifica el contenido firmado de la cookie en curso, sin reemitirla ni prolongarla
- * (R8). Orden exacto, sin atajos (`design.md > 4.1`):
- * 1. Sin cookie -> `null` (R2).
- * 2. El valor no parte en exactamente tres trozos por `.` -> `null`.
- * 3. El primer trozo no es `SESSION_VALUE_VERSION` -> `null`, sin interpretar el resto ni
- *    leer el secreto (R3).
- * 4. Se recomputa la firma con `signSessionValue()` — la misma funcion que la emite (R5) — y
- *    se compara en tiempo constante. Las longitudes se comparan ANTES de `timingSafeEqual`,
- *    que lanza si difieren (R4).
- * 5. El payload decodificado se interpreta en el dominio (`parseSessionClaims`), que decide
- *    si es un `SessionClaims` valido.
+ * (QC-8 R8). Solo hay dos decisiones propias aqui —hay cookie o no, y si su version es la
+ * vigente—; el resto lo hace el codec.
+ *
+ * La comprobacion de version se hace ANTES de leer el secreto a proposito: un valor de una
+ * version que ya no vale se descarta sin `SESSION_SECRET` en el entorno, y sin verificar nada.
+ * Con un valor de la version vigente, en cambio, la ausencia del secreto SI lanza: no se puede
+ * resolver la sesion y callarlo seria tratar un error de configuracion como "sin sesion".
  */
 export async function readSessionClaims(): Promise<SessionClaims | null> {
   const cookieStore = await cookies();
   const rawValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (rawValue === undefined) return null;
+  if (!hasCurrentVersion(rawValue)) return null;
 
-  const parts = rawValue.split('.');
-  if (parts.length !== 3) return null;
-
-  const [version, encodedPayload, receivedSignature] = parts;
-  if (version !== SESSION_VALUE_VERSION) return null;
-
-  const signedPart = `${version}.${encodedPayload}`;
-  const expectedSignature = signSessionValue(signedPart, readSessionSecret());
-
-  const receivedBuffer = Buffer.from(receivedSignature, 'utf8');
-  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
-  if (receivedBuffer.length !== expectedBuffer.length) return null;
-  if (!timingSafeEqual(receivedBuffer, expectedBuffer)) return null;
-
-  const rawJson = Buffer.from(encodedPayload, 'base64url').toString('utf8');
-  return parseSessionClaims(rawJson);
+  return verifySessionValue(rawValue, readSessionSecret());
 }
 
 /**
- * Retira la cookie de sesion desde el servidor (R18). El `path` se repite a proposito: sin
+ * Retira la cookie de sesion desde el servidor (QC-8 R18). El `path` se repite a proposito: sin
  * el, el navegador no borraria una cookie emitida con `path: '/'`. **No lee el secreto**: el
  * cierre de sesion tiene que seguir funcionando aunque `SESSION_SECRET` este mal configurado
- * (R9, segunda mitad).
+ * (QC-8 R9, segunda mitad).
  */
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();

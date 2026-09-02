@@ -39,15 +39,16 @@ describe('theme-state', () => {
   });
 
   it('no reutiliza el nombre de la cookie de sesion', () => {
-    // Se lee `session-cookie.ts` como texto en vez de importarlo: ese modulo importa
-    // `next/headers` y `node:crypto` (adaptador de servidor completo), y arrastrarlo a un
-    // test de un modulo puro seria acoplar `lib/shared/**` a `lib/modules/identity/` solo
-    // para leer una constante — justo lo que la regla de dependencias de
-    // `docs/architecture.md` prohibe para `lib/shared/**`. Leer el archivo como texto evita
-    // ese acoplamiento y sigue comparando contra el valor real, no contra una copia.
+    // Se lee `session-token.ts` como texto en vez de importarlo: ese modulo es un adaptador
+    // driven de `identity` (el codec del valor de la cookie, dueño de `SESSION_COOKIE_NAME`
+    // desde QC-9 T4), y arrastrarlo a un test de un modulo puro seria acoplar
+    // `lib/shared/**` a `lib/modules/identity/` solo para leer una constante — justo lo que
+    // la regla de dependencias de `docs/architecture.md` prohibe para `lib/shared/**`. Leer
+    // el archivo como texto evita ese acoplamiento y sigue comparando contra el valor real,
+    // no contra una copia.
     const sessionCookiePath = fileURLToPath(
       new URL(
-        '../../../lib/modules/identity/adapters/driven/session/session-cookie.ts',
+        '../../../lib/modules/identity/adapters/driven/session/session-token.ts',
         import.meta.url,
       ),
     );
