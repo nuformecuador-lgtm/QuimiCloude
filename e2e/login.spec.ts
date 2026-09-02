@@ -103,12 +103,32 @@ test.beforeAll(async () => {
   // esto es un fixture de test y borra solo filas propias, por prefijo y con edad minima.
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
 
-  await prisma.user.deleteMany({
-    where: { username: { startsWith: USERNAME_PREFIX }, createdAt: { lt: orphanCutoff } },
-  });
-  await prisma.role.deleteMany({
+  // El corte de edad NO se puede aplicar por igual a las dos tablas: el rol se crea unos
+  // segundos ANTES que su usuario, asi que hay una ventana de esos pocos segundos en la que el
+  // rol huerfano ya es "viejo" y su usuario todavia no. Borrar entonces el rol chocaria con la
+  // FK `users.role_id` (`onDelete: Restrict`), el `deleteMany` lanzaria DENTRO del `beforeAll`
+  // y el spec entero se pondria rojo por la limpieza y no por el login: exactamente el rojo
+  // confuso que este barrido venia a evitar.
+  // Por eso se decide primero QUE roles se van a borrar, y se borran sus usuarios aunque sean
+  // recientes. Se descarto envolver el borrado de roles en un `try`/`catch`: eso evitaria el
+  // rojo del E2E, pero dejaria vivos el rol y —peor— el usuario huerfano hasta la siguiente
+  // ejecucion, y un usuario huerfano es justo lo que pone rojo a `identity-constraints.int.test.ts`
+  // (`user.count() === 0`). Se cambiaria un rojo confuso por otro en otra feature.
+  const orphanRoles = await prisma.role.findMany({
     where: { name: { startsWith: ROLE_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
+    select: { id: true },
   });
+  const orphanRoleIds = orphanRoles.map((role) => role.id);
+
+  // El prefijo propio sigue siendo condicion en AMBAS ramas del `OR`: ampliar el barrido a los
+  // usuarios de los roles condenados no puede convertirse en una puerta para tocar filas ajenas.
+  await prisma.user.deleteMany({
+    where: {
+      username: { startsWith: USERNAME_PREFIX },
+      OR: [{ createdAt: { lt: orphanCutoff } }, { roleId: { in: orphanRoleIds } }],
+    },
+  });
+  await prisma.role.deleteMany({ where: { id: { in: orphanRoleIds } } });
 
   // El rol si se comparte entre los dos tests: ningun intento de login lo muta.
   const role = await prisma.role.create({
