@@ -223,9 +223,10 @@ OK .env presente
 Exit code **0**. Corrido el 2026-09-02 a las 11:01:40, **despues** del ultimo cambio: ninguna
 casilla de esta bitacora se marco con una corrida vieja.
 
-> Nota para el leader: el gate dice `in_progress=0` porque el `feature_list.json` de **esta rama**
-> es el que venia de `dev`. La ficha esta `in_progress` en el `feature_list.json` del worktree
-> principal, que es donde el leader lo lleva. No es un hallazgo de esta feature.
+> Nota para el leader: esa corrida decia `in_progress=0` porque el `feature_list.json` de esta
+> rama era todavia el que venia de `dev`, sin la contabilidad F2.0. **Resuelto**: tras el merge
+> `1a7875e` (menor 1 de la review) el gate dice `in_progress=1`, que es lo correcto. Nunca fue
+> un hallazgo de esta feature.
 
 ### Por niveles (corridas de las tandas, todas en verde)
 
@@ -252,3 +253,104 @@ vacia salvo esa, que queda con su razon.
 **Ninguna.** Las tres de `requirements.md` estaban cerradas antes de la fase 2 (las dos de la
 dependencia, por el humano al aprobar el spec). No aparecio ninguna nueva durante la
 implementacion. Las cuatro deudas de T9 estan en `progress/current.md > Deudas`.
+
+---
+
+# Adenda post-review (2026-09-02)
+
+El reviewer **aprobo QC-19 sin bloqueantes** (`progress/review_QC-19-politica-de-contrasenas.md`,
+veredicto OK, 0 bloqueantes y 7 menores) y verifico por su cuenta que la guardia muerde, sin
+apoyarse en esta bitacora. El menor 1 (la rama por detras de `dev`) lo cerro el leader con el
+merge `1a7875e`. Los seis restantes se cierran aqui, **ninguno pasa a Deudas**.
+
+| # | Menor | Como queda |
+| --- | --- | --- |
+| 2 | `design.md > 5` decia "PROPUESTA, no aprobada" | **Cerrado en el spec.** La seccion pasa a "Dependencia nueva: **APROBADA** el 2026-09-02" y abre citando la aprobacion (F1.4), la fila de `docs/dependencias.md`, el commit de instalacion `03412f8` y que `@zxcvbn-ts/core` no entro. Es lo que pide `CHECKPOINTS.md > Calidad de codigo` |
+| 3 | Hueco de la guardia: `import { hash } from 'bcryptjs'` | **Cerrado en codigo**, no anotado como deuda |
+| 4 | Riesgo operativo del seed en un entorno nuevo | **Anotado** en `progress/current.md > Deudas` |
+| 5 | Estilo de dos tests nuevos | **Alineado** con los vecinos de cada directorio |
+| 6 | Indentacion en `identity-seed.int.test.ts:418` | **Corregida** |
+| 7 | El design anunciaba 4 exports y son 6 | **Cuadrado**: `design.md > 2` dice 6 |
+
+## Menor 3: el hueco se cerro, y por que asi
+
+**La forma exacta que evadia la guardia:** `import { hash } from 'bcryptjs'` seguido de
+`hash(candidate, 10)`. Sin receptor, ni `<algo>.hash(` ni `createPasswordHash(` casaban, asi que
+`findHashProductions` devolvia `[]` y el archivo no quedaba obligado a referenciar la politica.
+El hueco lo heredaba la guardia del propio `design.md > 7`, que fijaba esos dos tokens.
+
+**Se cierra por el IMPORT, no por la llamada.** Detectar un `hash(` pelado habria hecho la guardia
+fragil —hay muchas cosas legitimamente llamadas `hash`—; detectar quien importa `bcryptjs` es
+exacto, porque no se puede llamar a esa funcion sin importarla. El detector nuevo
+(`findBcryptImports`) cubre `from '...'`, comillas dobles, `require('bcryptjs')`,
+`import('bcryptjs')` y el import de efecto, casa el especificador completo o un subpath suyo, y
+**no** casa `bcryptjs-suplantador`. Los comentarios los sigue quitando `stripComments`.
+
+**La allowlist NO crece: sigue teniendo exactamente 3 rutas.** Verificado por `grep` antes de
+tocar nada que el unico archivo de `lib/`, `app/` y `scripts/` que importa `bcryptjs` es
+`adapters/driven/security/password-hash.ts`, que ya estaba exento por ruta exacta.
+
+Aqui el criterio se **invierte** respecto a la desviacion 3 de mas arriba, y merece decirse: alli
+se marca la invocacion y no la declaracion, porque un puerto declara sin producir; aqui se marca
+la declaracion del import, porque importar `bcryptjs` **es** tener la capacidad de producir un
+hash. Las dos vias conviven en `findHashProductions` con su porque escrito en el JSDoc.
+
+**Prueba de mordida, dos veces y con el archivo real copiado a una ruta nueva** (`lib/tmp-prueba-guardia.ts`,
+creado y borrado; sin residuos en `git status`):
+
+```
++   "lib/tmp-prueba-guardia.ts: createPasswordHash(",
++   "lib/tmp-prueba-guardia.ts: import 'bcryptjs'",
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 74 passed (75)
+```
+
+Y reducido a **la forma exacta que evadia** (`import { hash } from 'bcryptjs'` +
+`return hash(candidate, 10)`, sin `createPasswordHash`), que antes de este cambio daba `[]`:
+
+```
++   "lib/tmp-prueba-guardia.ts: import 'bcryptjs'",
+```
+
+Borrado el archivo, verde de vuelta: **6 archivos, 75 tests**.
+
+**Lo que sigue siendo deuda y no cambia:** la guardia **no comprueba el ORDEN** de las llamadas.
+Esa linea de `progress/current.md > Deudas` se queda tal cual, porque el hueco del orden sigue
+abierto; lo que se cierra es el otro, el del import sin receptor.
+
+## Menores 5 y 6: estilo, sin tocar ni una asercion
+
+El repo esta genuinamente mixto (no hay Prettier), asi que el unico criterio disponible es "los
+vecinos del directorio", y se aplico **en los dos sentidos**: `tests/unit/**` usa punto y coma y
+los globals de vitest, y ahi se alinearon `credential-policy.test.ts` y
+`credential-policy-contract.test.ts`; `tests/guards/**` usa lo contrario —sin punto y coma e
+importando `{ describe, expect, it }`— en sus **cinco** archivos previos, y ahi se alineo
+`guard-politica-de-contrasenas.test.ts`, que era el disidente. Ningun nombre de caso y ninguna
+asercion cambiaron; el diff es cosmetico. La linea 418 de `identity-seed.int.test.ts` quedo
+realineada, y se revisaron las otras 12 llamadas del archivo: ya estaban bien.
+
+## Cero cambios de produccion
+
+`git status -- lib app scripts db` sale **vacio**: los seis menores no tocaron ni un archivo de
+produccion. Lo unico que cambio fuera de tests es documentacion (`design.md`, `current.md` y esta
+bitacora).
+
+## Gate completo tras los menores
+
+```
+== Arnes SDD :: init (modo: completo) ==
+OK typecheck paso
+OK lint paso
+
+ Test Files  41 passed (41)
+      Tests  433 passed (433)
+
+OK tests: sin rojos nuevos (41 archivos ejecutados, baseline vacio)
+OK todas las migraciones tienen down.sql
+OK .env presente
+== init OK ==
+```
+
+Exit code **0**. **433 tests, uno mas que los 432 de la review**: el caso nuevo que prueba que la
+guardia ve al que importa `hash` de `bcryptjs` y lo llama sin receptor. Corrido despues del
+ultimo cambio.

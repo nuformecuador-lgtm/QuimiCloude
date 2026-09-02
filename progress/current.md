@@ -720,6 +720,14 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[QC-19 — el despliegue en un entorno nuevo falla si la `SEED_ADMIN_*` no cumple la politica]**
+  Consecuencia querida de R18 y prevista en `design.md > 7.2`, pero conviene leerla aqui **antes**
+  de desplegar: desde esta ficha, el seed de instalacion evalua la politica antes de hashear, asi
+  que una credencial de instalacion que no cumpla **aborta el arranque** (`pnpm run build` corre
+  `prisma migrate deploy && tsx scripts/seed.ts`). El fallo es ruidoso y dice que reglas incumple
+  —nunca la credencial—, que es justo lo que se queria; pero quien prepare un entorno nuevo tiene
+  que fijar una `SEED_ADMIN_*` de 8 a 64 caracteres, con mayuscula, minuscula, digito y simbolo, y
+  que no este entre las filtradas conocidas. La del entorno local ya cumple: verificado.
 - **[QC-19 — `P4ssw0rd!` pasa la politica]** No hay des-leetificacion ni recorte de sufijos: una
   variante de una contrasena filtrada cuela aunque su forma base este en la lista
   (`design.md > 4` y `> 11`). Puntuar fuerza esta fuera del alcance de la ficha; si algun dia

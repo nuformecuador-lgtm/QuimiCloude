@@ -415,7 +415,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
           seedInitialAccess({
             repository,
             passwordHasher: identity.passwordHasher,
-          checkCredentialPolicy: identity.checkCredentialPolicy,
+            checkCredentialPolicy: identity.checkCredentialPolicy,
             credentials: readInitialAdminCredentialsFromEnv,
           }),
         ),

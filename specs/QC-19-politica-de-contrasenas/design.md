@@ -41,7 +41,7 @@ se referencia ningún archivo suyo.
 lib/modules/identity/domain/credential-policy.ts                     # NUEVO — la regla, pura
 lib/modules/identity/ports/breached-credential-list.ts               # NUEVO — puerto de la lista
 lib/modules/identity/adapters/driven/security/breached-credential-list.ts   # NUEVO — la librería
-lib/modules/identity/index.ts                                        # MODIFICADO — 4 exports
+lib/modules/identity/index.ts                                        # MODIFICADO — 6 exports
 lib/composition/index.ts                                             # MODIFICADO — 1 puerto, 1 clave
 tests/guards/guard-politica-de-contrasenas.test.ts                   # NUEVO — R19
 ```
@@ -152,10 +152,19 @@ luego no verifica.
   a quien intenta entrar; aquí quien llama es código nuestro fijando una contraseña, y merece
   enterarse.
 
-## 5. Dependencia nueva: PROPUESTA, no aprobada
+## 5. Dependencia nueva: **APROBADA** el 2026-09-02
 
-> Regla 7 de `CLAUDE.md` y `docs/architecture.md > Dependencias de terceros`. **Nada se instala
-> con este spec.** El humano aprueba junto con el spec (F1.4) o lo rechaza.
+> **Estado, y lo primero que hay que leer de esta seccion:** el humano **aprobó** esta
+> dependencia el 2026-09-02, al aprobar el spec (F1.4), con los cuatro checks ya verificados
+> (`> 5.2`). Su fila está en `docs/dependencias.md` y la aprobación queda también escrita en
+> `requirements.md > Preguntas abiertas 2 y 3`. Se instaló en `4.1.3` en el commit `03412f8`,
+> con la fila en el mismo cambio. **`@zxcvbn-ts/core` NO entró**: del paquete se usa solo el
+> diccionario.
+>
+> Lo que sigue se escribió **antes** de esa aprobación y se conserva en pasado porque es el
+> expediente de la decisión —qué se propuso, con qué números y contra qué alternativas—, no una
+> tarea pendiente. Regla 7 de `CLAUDE.md` y `docs/architecture.md > Dependencias de terceros`:
+> nada se instalaba con el spec; el humano aprobaba junto con él (F1.4) o lo rechazaba.
 >
 > **Y esta es la ficha donde más caro sale saltárselo:** la feature 5 implementó scrypt a mano,
 > llegó hasta el PR y se rehízo entera con `bcryptjs`. Una lista de contraseñas filtradas
@@ -200,8 +209,9 @@ npm view @zxcvbn-ts/language-common deprecated time.modified license version dis
 curl -s https://api.npmjs.org/downloads/point/last-week/@zxcvbn-ts/language-common
 ```
 
-**Los cuatro checks no bastan: sigue faltando la aprobación humana** (`docs/architecture.md >
-Dependencias de terceros`). Aprobada, se añade su fila a `docs/dependencias.md` y ahí se instala.
+**Los cuatro checks no bastaban: hacía falta la aprobación humana** (`docs/architecture.md >
+Dependencias de terceros`), y **llegó el 2026-09-02** junto con la aprobación del spec. Con ella
+se añadió su fila a `docs/dependencias.md` y se instaló, en el mismo cambio (`03412f8`).
 
 y escribir el resultado en la fila de `docs/dependencias.md` **en el mismo cambio que la
 instalación** — `guard-dependencias-aprobadas` es bidireccional y QC-7 ya se estrelló con eso
