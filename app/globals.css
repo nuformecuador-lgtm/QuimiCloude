@@ -52,73 +52,147 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Tokens de color: base agua + acento naranja (`design-input-tokens.md > 3`, D6/D7). Los
+   valores son los del insumo, copiados literalmente — no se recalculan aqui (R1, R2). */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.967 0.009 188.1);
+  --foreground: oklch(0.262 0.031 202.3);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.262 0.031 202.3);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.262 0.031 202.3);
+  --primary: oklch(0.623 0.137 50.5);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.967 0.012 184.1);
+  --secondary-foreground: oklch(0.286 0.036 192.4);
+  --muted: oklch(0.940 0.017 187.9);
+  --muted-foreground: oklch(0.679 0.041 198.3);
+  --accent: oklch(0.757 0.089 184.4 / 16%);
+  --accent-foreground: oklch(0.262 0.031 202.3);
+  --destructive: oklch(0.560 0.165 33.8);
+  --border: oklch(0.613 0.063 197 / 16%);
+  --input: oklch(0.613 0.063 197 / 16%);
+  --ring: oklch(0.613 0.063 197);
+  /* Los --chart-* NO se tocan (R6): sin consumidor en el repo, re-colorearlos seria inventar. */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.482 0.044 197.9);
+  --sidebar-primary: oklch(0.623 0.137 50.5);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.757 0.089 184.4 / 16%);
+  --sidebar-accent-foreground: oklch(0.262 0.031 202.3);
+  --sidebar-border: oklch(0.613 0.063 197 / 16%);
+  --sidebar-ring: oklch(0.613 0.063 197);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: oklch(0.194 0.018 209.1);
+  --foreground: oklch(0.963 0.018 188.4);
+  --card: oklch(0.288 0.032 192.3);
+  --card-foreground: oklch(0.981 0.010 189.1);
+  --popover: oklch(0.288 0.032 192.3);
+  --popover-foreground: oklch(0.981 0.010 189.1);
+  --primary: oklch(0.750 0.167 50.5);
+  --primary-foreground: oklch(0.222 0.022 205.9);
+  --secondary: oklch(0.288 0.035 201.4);
+  --secondary-foreground: oklch(0.963 0.018 188.4);
+  --muted: oklch(0.244 0.027 203.6);
+  --muted-foreground: oklch(0.644 0.045 199.9);
+  --accent: oklch(0.757 0.089 184.4 / 12%);
+  --accent-foreground: oklch(0.981 0.010 189.1);
+  --destructive: oklch(0.831 0.095 32.0);
+  --border: oklch(0.858 0.054 191.8 / 10%);
+  --input: oklch(0.858 0.054 191.8 / 10%);
+  --ring: oklch(0.757 0.089 184.4);
+  /* Los --chart-* NO se tocan (R6): sin consumidor en el repo, re-colorearlos seria inventar. */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.241 0.025 204.3);
+  --sidebar-foreground: oklch(0.817 0.036 194.3);
+  --sidebar-primary: oklch(0.750 0.167 50.5);
+  --sidebar-primary-foreground: oklch(0.222 0.022 205.9);
+  --sidebar-accent: oklch(0.757 0.089 184.4 / 9%);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.858 0.054 191.8 / 10%);
+  --sidebar-ring: oklch(0.757 0.089 184.4);
+}
+
+/* Panel flotante de la barra lateral (T13, `design.md > 6`, R18-R20).
+   Las paradas del degradado van en hex: el insumo (`design-input-tokens.md > 4`) solo da 4 de
+   las 8 con equivalente oklch publicado en su tabla de tokens, y convertir las otras 4 por
+   cuenta propia seria inventar numeros (regla 6 de CLAUDE.md). Los tokens de color de arriba
+   si van en oklch porque el insumo los da asi. */
+:root {
+  --sidebar-panel-gradient: linear-gradient(166deg, #ffffff 0%, #f6fcfb 34%, #ecf7f5 68%, #dfefed 100%);
+}
+
+.dark {
+  --sidebar-panel-gradient: linear-gradient(166deg, #1b3b39 0%, #133032 34%, #0f2426 68%, #091a1c 100%);
+}
+
+/* Reglas del panel flotante, a proposito FUERA de `@layer`.
+   En Tailwind v4 las utilidades viven en cascade layers, y una regla sin capa gana a
+   cualquier regla en capa, sea cual sea su especificidad. Si estas reglas se metieran dentro
+   de `@layer base` perderian contra las utilidades que ya trae el primitivo
+   (`rounded-lg` en `sidebar-inner`, `h-8` en `sidebarMenuButtonVariants`) y el panel saldria
+   igual que antes de esta feature, con el test de contrato en verde por las razones
+   equivocadas (`design.md > 6`). */
+[data-slot='sidebar-inner'],
+[data-slot='sidebar'][data-mobile='true'] {
+  border-radius: 22px;
+  background-image: var(--sidebar-panel-gradient);
+}
+
+[data-slot='sidebar-menu-button'] {
+  min-height: 44px;
+}
+
+/* Elemento activo con el acento naranja.
+   El primitivo lo marca con `data-active:bg-sidebar-accent`, que es el velo agua, asi que
+   `--sidebar-primary` quedaba definido y sin usar: el color mas caracteristico de la paleta
+   no aparecia en ninguna parte de la barra. Se corrige desde aqui y no editando
+   `components/ui/sidebar.tsx`, por el mismo motivo que el resto de este bloque: una regla
+   sin capa gana a las utilidades, que si viven en capa. */
+[data-slot='sidebar-menu-button'][data-active] {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--sidebar-primary) 22%, transparent),
+    color-mix(in oklch, var(--sidebar-primary) 4%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 26%, transparent);
+}
+
+/* La barra de acento del borde izquierdo. Va en un pseudoelemento y no en un `<span>` para
+   que el componente no tenga que dibujar nada que solo existe por estetica. */
+[data-slot='sidebar-menu-button'][data-active]::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sidebar-primary);
+  box-shadow: 0 0 12px var(--sidebar-primary);
+}
+
+[data-slot='sidebar-menu-button'][data-active] svg {
+  color: var(--sidebar-primary);
+}
+
+/* El submenu activo lleva el acento mas contenido: sin barra ni halo, solo el anillo. Dos
+   barras de acento a la vez -la del grupo y la del hijo- compiten por la misma lectura. */
+[data-slot='sidebar-menu-sub-button'][data-active] {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 22%, transparent);
 }
 
 @layer base {

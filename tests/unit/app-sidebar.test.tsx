@@ -85,14 +85,29 @@ function renderSidebar(navItems: readonly NavItem[] = PRIVATE_NAV_ITEMS) {
   );
 }
 
-/** Lista de `<li>` de primer nivel de la navegacion, en orden de DOM. */
+/**
+ * Lista de `<li>` de primer nivel de la navegacion, en orden de DOM.
+ *
+ * Recorre **todas** las listas de nivel superior, una por seccion, y no solo la primera: los
+ * items se agrupan por `section` y con una sola lista este helper contaria unicamente los de
+ * la primera seccion —tres de cinco— y el test pasaria por mirar de menos.
+ *
+ * Se excluyen las listas de submenu (`sidebar-menu-sub`): sus `<li>` son hijos de un item,
+ * no entradas de primer nivel, y colarlos aqui inflaria el recuento con las rutas hijas.
+ *
+ * Una navegacion **sin ninguna lista es un resultado valido** —es lo que ocurre con una
+ * coleccion vacia— y por eso ya no se lanza: devuelve vacio y el test que lo comprueba
+ * afirma sobre eso.
+ */
 function entradasDeNavegacion(): readonly HTMLLIElement[] {
-  const menu = screen.getByTestId(testId.nav).querySelector('ul');
-  if (!menu) {
-    throw new Error('la navegacion no contiene ninguna lista');
-  }
-  return Array.from(menu.children).filter(
-    (child): child is HTMLLIElement => child instanceof HTMLLIElement,
+  const menus = screen
+    .getByTestId(testId.nav)
+    .querySelectorAll('ul[data-slot="sidebar-menu"]');
+
+  return Array.from(menus).flatMap((menu) =>
+    Array.from(menu.children).filter(
+      (child): child is HTMLLIElement => child instanceof HTMLLIElement,
+    ),
   );
 }
 

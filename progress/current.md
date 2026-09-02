@@ -11,10 +11,19 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-9 | proteccion-de-rutas-privadas | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-9-proteccion-de-rutas-privadas` | **esperando aprobación humana (F1.4)**. Spec congelado en `74a87d3`: 25 requisitos EARS, todos trazados; tarjeta en *En revisión*. 2 preguntas abiertas. Acotada y sembrada el mismo día: 14 decisiones cerradas, 0 preguntas abiertas. **No ocupa slot**: sigue `pending` hasta F1.3. Desbloquea a **QC-13**, que es la que hace navegable el ERP. **Toca código de QC-8, ya mergeada** — la firma migra a WebCrypto sin cambiar el formato del token |
-| QC-20 | crud-de-productos | QC-18 Inventario | backend | **spec_ready** | `feature/QC-20-crud-de-productos` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Tercera sesión de leader. **F2.0 no se ejecuta**: `depends_on` incluye QC-8, que está `pending` y sin spec, y `AGENTS.md` dice que una feature con `depends_on` no arranca hasta que su dependencia esté `done`. Por eso la ficha se queda en `spec_ready` y **la tarjeta NO se mueve a *En curso***: moverla dejaría board y disco divergentes por una fase que no ha empezado (mismo criterio que se aplicó a QC-14 el 2026-09-01). Arranca cuando QC-8 cierre. Acotada, sembrada y especificada el 2026-09-02: **23 decisiones cerradas + 37 requisitos EARS**, congelados en `21d6695` (las 5 preguntas que abrió el diseño las cerró el humano tras F1.2 y entraron como D19–D23; una cambió la posición del diseño: el tope de página pasó de 100 a 25). Sin preguntas abiertas. Tarjeta en *En revisión*. Fase 2 **bloqueada por QC-8**, que está `pending` y sin spec |
-| QC-29 | tema-claro-oscuro | QC-16 Plataforma | frontend | **pending → F1.2** | `feature/QC-29-tema-claro-oscuro` | **Ficha creada en esta sesión (2026-09-02, quinta de leader)** a partir de un diseño que el humano aprobó en canvas antes de pedir la feature. Issue `QC-29` creado en Jira bajo la épica **QC-16 Plataforma** (no es módulo de dominio: es el armazón), con labels `sdd`, `slug:tema-claro-oscuro`, `zone:frontend`, `complexity:medium`. Worktree montado con `wt.sh new` desde `origin/dev` (`dc090e0`). **`frontend` estaba a 0 `in_progress`**, así que toma slot sin competir con QC-19/QC-20/QC-24, que son todas `backend`. **No se sembró con `/afinar-feature`**: el alcance ya venía cerrado por el humano en 7 decisiones, que el leader dejó escritas en `specs/QC-29-tema-claro-oscuro/design-input-tokens.md` junto con los tokens del diseño ya convertidos a oklch. **Aprobar el spec aprueba también una dependencia nueva** — `next-themes`, elegida por el humano: tres de los cuatro checks limpios y **el cuarto no** (última publicación 2025-03-11, hace ~18 meses). `spec_author` lanzado, spec escrito el 2026-09-02 (27 requisitos, 9 decisiones, 17 tareas). **F1.4 ejecutada y la aprobación vino CON CAMBIOS: el humano rechazó `next-themes`** («No: implementación propia»), así que la ficha **vuelve a F1.2** y NO pasa a `in_progress`: el spec asumía la librería en D9, en varios requisitos y en el anti-parpadeo, y arrancar el implementer sobre eso sería implementar otra cosa. Revisión encargada al mismo `spec_author` — mecanismo propio con cookie de UI, patrón `SIDEBAR_STATE_COOKIE`. **La tarjeta NO se mueve a *En curso***. El humano sí cerró la otra pregunta abierta: el contraste 3,75:1 de `--primary-foreground` sobre `--primary` en claro **se queda** (cumple el 3:1 de AA para componentes, que es lo que es un botón) y no se añade requisito que exija AA para texto |
-| QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **pending — BLOQUEADA** | `feature/QC-30-rediseno-login` | **Ficha creada en esta sesión (2026-09-02)** a partir del canvas de login aprobado por el humano. Issue `QC-30` bajo la épica **QC-17 Identidad y acceso** (el módulo manda sobre la naturaleza del trabajo: es la pantalla de `identity`, aunque el cambio sea de presentación), labels `sdd`, `slug:rediseno-login`, `zone:frontend`, `complexity:medium`. **`depends_on: QC-29`**, con el issue link «is blocked by» ya creado en el board: se pinta con los tokens que QC-29 define, y especificarla antes sería escribir sobre tokens que no existen. **No se monta worktree ni se lanza `spec_author`** hasta que QC-29 esté `done` (`AGENTS.md`: una feature con `depends_on` no arranca). El material de diseño está sembrado en `specs/QC-30-rediseno-login/design-input-login.md`: vidrio, burbujas y las cinco medidas que difieren de `components/ui/` |
+| QC-9 | proteccion-de-rutas-privadas | QC-17 Identidad y acceso | backend | **in_progress (F2.1)** | `feature/QC-9-proteccion-de-rutas-privadas` | **SPEC APROBADO por el humano el 2026-09-02** e **implementer lanzado**. Tarjeta en *En curso*. Spec congelado en `0f7d599`: **30 requisitos EARS**, todos trazados. El rol viaja dentro del token (decisión humana) y por eso **D3 quedó derogada**: el formato del token cambia y las sesiones abiertas dejan de valer. Queda 1 pregunta abierta (qué hace la raíz `/`). **Toca código de QC-8 Y de QC-7**, las dos mergeadas. Acotada y sembrada el mismo día: 14 decisiones cerradas, 0 preguntas abiertas. **No ocupa slot**: sigue `pending` hasta F1.3. Desbloquea a **QC-13**, que es la que hace navegable el ERP. **Toca código de QC-8, ya mergeada** — la firma migra a WebCrypto sin cambiar el formato del token |
+| QC-20 | crud-de-productos | QC-18 Inventario | backend | **in_progress → PR abierto** | `feature/QC-20-crud-de-productos` | **Implementada, revisada y con PR #19 abierto el 2026-09-02.** La fila anterior decía `spec_ready` y «F2.0 bloqueada por QC-8»: quedó obsoleta cuando QC-8 cerró (PR #13) y otra sesión de leader llevó la feature entera. 16/16 tasks, **37 requisitos con test**, 40 mutaciones verificadas. Gate acreditado **por partes** —typecheck, lint y las tres suites (683 tests en 65 archivos), más el validador desde la raíz— porque `./init.sh` dentro de un worktree aborta con el falso positivo de specs de QC-9/QC-21. `reviewer` en **dos rondas**: RECHAZADO (1 mayor de documento) → **APROBADO, 0 mayores**. Base propia `QuimiCloude_QC20`, **pendiente de borrar al desmontar** |
+| QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress (F2.1)** | `feature/QC-30-rediseno-login` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Sesión labs-4b. Traspasada por labs-65, que la había reclamado sin trabajo empezado. 14 decisiones cerradas al acotar, **26 requisitos EARS y 11 tareas** congelados en `01fb7f4`. La aprobación ratifica además la **contradicción sobre movimiento reducido**: gana la decisión cerrada (las burbujas **desaparecen**), no el 22% de opacidad del insumo de diseño. **Colisión pactada**: `app/globals.css` lo toca en paralelo `feature/fix-ajuste-sidebar`, una rama **sin ficha** — bloques separados, nadie reordena, aviso antes de tocar líneas ajenas |
+
+La feature **QC-21 — ayuda-visual-de-contrasena** se cerró el 2026-09-02 (PR #17, merge
+`3775102`): resumen en `progress/history.md`, worktree desmontado y rama borrada — `wt.sh done`
+falló a medias en Windows por tercera vez seguida, rematado con `rmdir /s /q` + `git worktree
+prune`. En F2.3 apareció el **`add/add`** que había avisado otra sesión: la versión SEMILLA de
+`requirements.md` (57 líneas) había llegado a `dev` por el PR #16 para desbloquear su gate.
+**Resuelto a favor de la rama** (177 líneas, con la R5 corregida): resolverlo al revés habría
+perdido 120 líneas de spec Y reintroducido el requisito insatisfactible que B2 acababa de
+cerrar. El conflicto de este archivo, en cambio, resultó ser **cero conflictos reales** al
+normalizar las tres versiones: todo era fin de línea, van tres veces hoy.
 
 La feature **QC-8 — sesion-actual-y-logout** se cerró el 2026-09-02 (PR #13, merge `dc090e0`):
 la llevó **otra sesión de leader**. Su tarjeta ya estaba en *Finalizado* y el PR mergeado, pero la
@@ -32,6 +41,8 @@ este archivo (unión de deudas). El tercero **no vino marcado**: git auto-merge�
 dejando **QC-23 duplicada** —las dos sesiones importaron la misma ficha en sitios distintos del
 array— y eso lo cazó `./init.sh`, no el merge. Gate completo con las dos features juntas:
 46 archivos, 478 tests.
+
+La feature **QC-29 — tema-claro-oscuro** se cerró el 2026-09-02 (PR #16, merge `afd9054`): resumen en `progress/history.md`. Worktree desmontado —`wt.sh done` volvió a fallar en Windows, cuarta vez el mismo día, rematado con `rm -rf` + `git worktree prune`—. **Deja rastro en `dev`: la semilla corta de `specs/QC-21-…/requirements.md`**, puenteada para que el validador no bloqueara el gate. La sesión que lleva QC-21 está avisada y la resuelve en su F2.3 a favor de su rama; **no se resuelve a favor de `dev`**, que perdería 120 líneas y restauraría una R5 insatisfactible. Con este cierre **QC-30 queda desbloqueada**.
 
 La feature **QC-12 — dashboard-en-blanco** se cerró el 2026-09-02 (PR #12, merge `b154fa9`):
 resumen en `progress/history.md`. Ciclo completo en una sesión y **la primera feature puramente
@@ -149,6 +160,27 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 - `depends_on` por issue links «is blocked by»: QC-32 ← QC-24; QC-33 ← QC-32, QC-24;
   QC-34 ← QC-33, QC-8; QC-35 ← QC-34. Ninguna arranca todavía: las cuatro nacen `pending` en
   Backlog y el cupo de `in_progress` no se mueve.
+
+### QC-30 — rediseno-login (acotada el 2026-09-02)
+
+- El alcance y las **14 decisiones cerradas** viven en `specs/QC-30-rediseno-login/requirements.md`
+  — esa es la fuente, aquí solo se enlaza. Quedan **2 preguntas abiertas**. Los valores exactos del
+  diseño (vidrio, burbujas, medidas) están en `design-input-login.md`, que dejó la sesión de QC-29.
+- **Traspaso entre sesiones:** `labs-65` la había reclamado sin trabajo empezado y la soltó al
+  pedírselo. No había rama, worktree, spec ni commits — distinto del caso de QC-20, donde sí los
+  había. La lección se aplicó al revés que por la mañana: preguntar antes, no deducir del silencio.
+- Las dos decisiones del humano al acotar: **los 44 px de alto aplican SOLO al login**, no a toda
+  la aplicación (regla acotada, fuera de `@layer` y sin editar `components/ui/`, precedente de
+  QC-29); y **la vista móvil entra**. El artboard móvil lo había dibujado la sesión de diseño por
+  criterio propio y el humano no lo había pedido: entra porque lo decidió hoy, no porque el canvas
+  lo trajera.
+- Board actualizado **antes** de sembrar: `description` reescrita con esas dos decisiones.
+  `zone: frontend` y `complexity: medium` no cambian. No se creó ni canceló ninguna ficha.
+- **Colisión conocida y pactada:** `app/globals.css` lo toca en paralelo la rama
+  `feature/fix-ajuste-sidebar`, **sin ficha** (QC-40 se canceló y el ajuste va como arreglo
+  directo), así que ese trabajo no figura como `in_progress` en ninguna parte. Acuerdo: bloques
+  separados, nadie reordena ni reindenta el archivo, y quien vaya a tocar líneas del otro avisa
+  antes de escribir.
 
 ### QC-32 — modelo-unidades (acotada el 2026-09-02)
 
@@ -726,6 +758,45 @@ literalmente «mientras no hay verificación real». Cuando la haya, ese test mi
 la task T6b, no suelto.
 ## Conflictos pendientes
 
+### QUIÉN LLEVA QUÉ, AHORA MISMO (2026-09-02) — leer ANTES de tocar un worktree ajeno
+
+> **QC-20 la lleva una sesión VIVA.** Rama `feature/QC-20-crud-de-productos`, worktree
+> `.worktrees/QC-20-crud-de-productos`, base propia `QuimiCloude_QC20`. T1–T11 y T15 hechas;
+> **T12 en curso**. F2.3 ya hecho (merge de `origin/dev` con QC-24, tres conflictos resueltos).
+> **No escribas en esa rama ni en ese worktree.**
+>
+> **Un worktree limpio y sin commits recientes NO significa libre.** Hoy `labs-4b` estuvo a
+> punto de arrancar T12 en paralelo porque el último commit era de hacía 72 minutos: el agente
+> estaba parado esperando instrucciones del leader, no abandonado. Preguntar antes de entrar
+> costó un mensaje; entrar a ciegas habría puesto dos implementers en la misma rama.
+>
+> **Esta sección es el sitio donde se anota qué ficha lleva cada sesión.** Existe desde el
+> principio y hasta hoy nadie la había usado para esto — por eso la coordinación dependía de
+> que hubiera alguien escuchando en el canal directo. Si tomas una ficha, anótala aquí; si la
+> sueltas, bórrala. Acordado entre las sesiones de QC-20 y QC-24, y va a `/afinar-regla` como
+> regla del arnés.
+
+
+### Quién lleva qué ahora mismo (2026-09-02) — **anótalo aquí antes de entrar en una rama ajena**
+
+Esta sección existía y **nadie la estaba usando**: hoy cuatro sesiones han trabajado en paralelo
+coordinándose por mensajes directos, que funciona solo mientras las dos partes estén vivas. El
+incidente que lo demuestra: `labs-4b` anunció que iba a continuar **QC-20 desde T12** porque el
+worktree estaba limpio y el último commit era de hacía 72 minutos — y QC-20 **la lleva `labs-60`**,
+que estaba a media revisión con trabajo posiblemente sin commitear. Se evitó porque `labs-4b`
+preguntó antes y porque había alguien despierto para contestar. **Eso es suerte, no proceso.**
+
+| Ficha | Sesión | Estado | Aviso para quien pase por aquí |
+|---|---|---|---|
+| **QC-9** | esta sesión (`labs-96`) | `spec_ready`, spec en revisión por el `spec_author` tras meter el rol en el token | Toca `session-cookie.ts` **de QC-8, ya mergeada**, y ampliará las dos guardias a los `.ts` de primer nivel. No entres sin avisar |
+| **QC-20** | `labs-60` | `spec_ready`, T1–T11 commiteadas, en fase 2 | **T12 son las Server Actions y tocan `lib/composition/index.ts`** — el archivo más disputado del repo hoy |
+| **QC-21** | `labs-6d` | en curso | Su spec **no está commiteado en `dev`**: deja rojo el gate de quien corra `./init.sh` desde su propio worktree |
+| **QC-29** | `labs-65` | reviewer OK, pendiente de gate y PR | — |
+
+**Regla de convivencia que hoy nos habría ahorrado tres sustos:** antes de entrar en una rama
+ajena, de acotar un test de alcance de otra feature, o de escribir dentro de un módulo ajeno, se
+avisa. Si no hay a quién avisar, **se anota aquí**. Va a `/afinar-regla` como candidata 3.
+
 ### ~~El gate completo está ROJO en `dev` por fixtures E2E de QC-7 sin limpiar~~ → **RESUELTO** (2026-09-01)
 
 > **Cerrado el mismo día.** Al ir a limpiar los fixtures, la base compartida ya estaba sin
@@ -887,6 +958,50 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 ## Deudas y cosas abiertas
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
+
+- **[arnés — el rescate del validador NO es simétrico entre la raíz y los worktrees. Candidata 2
+  para `/afinar-regla`.]** `tieneSpec()` de `scripts/validate-features.mjs` busca el spec en tres
+  sitios y el tercero es `.worktrees/<slug>/specs/`, **resuelto contra el cwd**. Desde la raíz
+  funciona; **desde dentro de un worktree ese tercer sitio no existe**, así que toda feature en
+  vuelo cuyo spec no esté en `dev` se ve como spec faltante. Y el gate previo al PR se corre
+  **dentro del worktree por diseño** (F2.4 valida tu rama, no el árbol de `dev`), o sea que el
+  falso rojo aparece **en el momento de menos margen** y señala a una feature ajena.
+  **Reproducido por tres sesiones el 2026-09-02**: desde QC-24 (señalando a QC-29), desde QC-21
+  (señalando a QC-24) y desde QC-29 (señalando a QC-9 y QC-21). Arreglo probable: resolver el
+  directorio de worktrees contra el worktree **principal** (`git worktree list --porcelain`), que
+  es lo que `scripts/wt.sh` ya hace por esta misma razón y con el comentario que lo explica — el
+  validador no heredó esa lección. Alternativa: que el flujo obligue a que el spec entre en `dev`
+  al pasar la ficha a `in_progress`.
+  **Coste real medido hoy:** dos sesiones se puentearon copiando specs ajenos a su rama, y eso
+  generó un `add/add` en `specs/QC-24-modelo-recetas/requirements.md` donde **resolver a favor de
+  `dev` habría borrado el spec entero** (246 líneas por 61).
+- **[arnés — dos features que acotan el mismo test de alcance deben hablarlo ANTES. Candidata 3
+  para `/afinar-regla`, aportada por la sesión de QC-20.]** Los dos casos del 2026-09-02, con
+  resultado opuesto y medido: en `inventario-schema.test.ts` QC-20 y QC-24 lo acotaron **por
+  separado y sin avisarse**, y acabó en conflicto de contenido que hay que resolver por unión —
+  resolverlo «a favor de una versión» pierde en silencio lo que la otra protegía. En
+  `credential-policy-contract.test.ts` **se habló antes**, no se tocó dos veces, y salió un test
+  **mejor que el de cualquiera de los dos**: QC-24 aportó el hueco de `app/` que la versión de
+  QC-20 dejaba abierto, y QC-20 verificó que la guardia hexagonal **no** lo cubría en vez de
+  aceptar el argumento de su implementer. Coste de hablarlo: tres mensajes. Mismo criterio para
+  **escribir dentro de un módulo ajeno**: `product-catalog.ts` estaba en el `design.md` de QC-24 y
+  en su PR, pero la sesión de QC-20 lo descubrió resolviendo un conflicto y lo leyó como intrusión.
+  **Matiz que aporta la sesión de QC-20, y que es el que hace la regla aplicable:** el aviso previo
+  solo es barato **si hay a quién avisar**. Hoy funcionó porque había dos sesiones hablando por un
+  canal directo. La regla escrita tiene que decir **dónde se deja el aviso cuando no hay nadie
+  escuchando** — el sitio natural es `progress/current.md > Conflictos pendientes`, que ya existe
+  exactamente para esto y que hoy **no usó ninguna de las dos sesiones**. Sin esa parte, la regla
+  se cumple solo cuando hay suerte.
+
+- **[arnés — `lib/composition/index.ts` serializa de facto la zona backend. Candidata 4 para
+  `/afinar-regla`, aportada por la sesión de QC-20.]** Ese archivo ha aparecido como conflicto en
+  **todas** las parejas de features backend del 2026-09-02: QC-6/QC-8 y QC-19/QC-20. El punto único
+  de composición es correcto y es una regla explícita de `docs/architecture.md`, pero al ser un
+  archivo único que toda feature con un puerto nuevo tiene que tocar, **contradice en la práctica la
+  regla 1 de `CLAUDE.md`**, que permite dos features en paralelo por zona. QC-24 se libró **solo
+  por casualidad**: su spec dejó el cableado del `ProductCatalog` para QC-25. No hay arreglo obvio
+  —partir la composición por módulo tiene su propio coste— y por eso es material de `/afinar-regla`
+  y no de una feature.
 
 - **[arnés — tests de feature que afirman el censo GLOBAL del repo. Encargo del humano el
   2026-09-02: proponer la regla por `/afinar-regla` al cerrar QC-24.]** Tres features distintas
@@ -1425,3 +1540,39 @@ pregunta 5 (pepper) la cerró el humano el 2026-08-06 con un no (`design.md > 8.
   `wt.sh list` lo da como mergeado en `origin/dev` y desmontable. No pertenece a ninguna
   feature del board, así que ningún paso F2.5 va a llegar a él: se queda hasta que alguien
   corra `./scripts/wt.sh clean --force`.
+
+### Anotadas por QC-21 — ayuda-visual-de-contrasena (2026-09-02)
+
+- **`guard-password-never-plaintext` es CIEGA a las propiedades opcionales.** Destapado por el
+  reviewer de QC-21 rompiendo el codigo a proposito: `readonly password: string;` sale ROJO, pero
+  **`readonly password?: string;` sale VERDE**. El `?` separa el identificador de los `:`/`=` que
+  exige el regex de `declaredIdentifiers`
+  (`/(?:^|[{,;(])\s*(?:readonly\s+)?['"]?([A-Za-z_$][\w$]*)['"]?\s*[:=]/gm`), asi que el
+  identificador no se captura. **La forma exacta que lo evade es `nombre?:`** — es decir, toda
+  propiedad opcional de TypeScript. No es solo cosa de QC-21: la guardia barre `db/`, `lib/`,
+  `app/` y `scripts/`, y en los cuatro es ciega a la misma forma. QC-21 lo tapo **solo para sus
+  tres archivos** con un centinela local (`ninguna propiedad opcional nueva nombra la contrasena
+  sin acabar en hash`), sin tocar ni relajar la guardia. **Ampliar la guardia es
+  `/afinar-regla`**, no una ficha de producto.
+- **`guard-password-never-plaintext` no barre `components/`.** R22 de QC-21 lo cubre solo para sus
+  tres archivos; cualquier otro componente del repo sigue fuera del barrido. Tambien
+  `/afinar-regla`.
+- **Importar el detector desde el archivo de la guardia duplica la ejecucion de sus 6 tests.**
+  `tests/unit/credential-help-contract.test.ts` importa `findPlaintextPasswordDeclarations` de
+  `tests/guards/guard-password-never-plaintext.test.ts` (lo exige `design.md > 8.3`, para heredar
+  el criterio en vez de copiarlo). Como ese archivo tiene `describe` de nivel superior, sus 6
+  `it(...)` se registran tambien bajo el importador y **se ejecutan dos veces**, inflando el conteo
+  de la suite. No rompe nada. La solucion limpia —extraer el detector a un modulo no-test que la
+  guardia reexporte— toca un archivo de guardia compartido: `/afinar-regla`.
+- **Altura del campo por debajo de 44x44 px.** `credential-field.tsx` renderiza
+  `components/ui/input.tsx` sin editar (`h-8` = 32 px) y `docs/architecture.md > Interaccion` pide
+  44x44. Excepcion declarada en `design.md > 6` + pregunta abierta 4 de QC-21. El `font-size` si
+  cumple (16 px en movil). **Subirlo es alcance de QC-29/QC-30** y debe cerrarse antes de que
+  QC-36 ponga el componente delante de un usuario.
+- **Nadie ve el componente de QC-21 hasta QC-36**, y **`components/shared/` se estrena con un
+  componente que hoy usa cero features** (`design.md > 2.1`). Deuda aceptada por escrito en la
+  fila 1 de las decisiones cerradas.
+- **`scripts/validate-features.mjs` no resuelve `.worktrees` desde dentro de un worktree.**
+  `WT_DIR = '.worktrees'` (linea 18) se resuelve contra el cwd, asi que `./init.sh` aborta dentro de
+  cualquier worktree con `faltan specs para features sdd en vuelo: <otra feature>` — QC-21 convivio
+  con ese rojo por decision humana del 2026-09-02. Desde la raiz pasa en verde. `/afinar-regla`.

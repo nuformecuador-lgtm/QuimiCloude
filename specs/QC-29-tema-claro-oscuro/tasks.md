@@ -137,7 +137,7 @@
     archivo no declara `'use client'` y sigue llamando al proveedor de sesión)
 - **Depende de:** T9.
 
-### T12 — E2E del anti-parpadeo
+### T12 [x] — E2E del anti-parpadeo
 - Nuevo `e2e/theme.spec.ts`, sobre `/login` (ruta pública, sin sesión), en chromium y webkit.
   Sonda de `requestAnimationFrame` inyectada con `addInitScript` (`design.md > 8`, nivel 4).
   - `no pinta el modo claro antes de aplicar el oscuro del sistema` → **R10**, **R7**
@@ -204,7 +204,7 @@
 - **Hecho cuando:** cero rojos nuevos respecto de `tests/baseline-rojos.json`, y **ningún
   archivo de test ajeno modificado** (verificable en el diff del PR).
 
-### T19 — Mapa de trazabilidad y evidencia
+### T19 [x] — Mapa de trazabilidad y evidencia
 - Escribir `progress/impl_QC-29-tema-claro-oscuro.md` con la salida real de los tests y el mapa
   `R<n> → test` completo (R1…R29).
 - **Depende de:** T1b, T2, T4, T7, T10, T11, T12, T15, T16, T17, T18.

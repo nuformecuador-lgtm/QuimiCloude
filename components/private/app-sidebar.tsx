@@ -1,10 +1,11 @@
 'use client';
 
-import { ChevronRightIcon } from 'lucide-react';
+import { ChevronRightIcon, FlaskConicalIcon, PanelLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { NavUser } from '@/components/private/nav-user';
+import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
@@ -16,6 +17,9 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -28,7 +32,9 @@ import {
 import {
   BRAND_LABEL,
   BRAND_SHORT_LABEL,
+  BRAND_TAGLINE,
   PRIVATE_NAV_LABEL,
+  groupNavItemsBySection,
   type NavGroup,
   type NavItem,
   type NavLink,
@@ -48,6 +54,15 @@ import type { SessionUser } from '@/lib/modules/identity';
  */
 export const SIDEBAR_PANEL_ID = 'private-sidebar-panel';
 
+/**
+ * Nombre accesible de la pastilla de colapso del borde.
+ *
+ * Es **distinto** del de `SidebarToggle` del encabezado a proposito: los dos controles hacen
+ * lo mismo y conviven en pantalla, y dos elementos interactivos con el mismo nombre accesible
+ * son indistinguibles para quien navega por lista de controles.
+ */
+export const SIDEBAR_EDGE_TOGGLE_LABEL = 'Plegar o desplegar la barra lateral';
+
 type AppSidebarProps = {
   readonly user: SessionUser;
   readonly navItems: readonly NavItem[];
@@ -63,12 +78,16 @@ type AppSidebarProps = {
  * Ningun destino se escribe como literal (R13): salen de las constantes de
  * `lib/shared/navigation/private-nav.ts` y de `lib/shared/routes.ts`.
  *
+ * **Este componente no decide nada de la navegacion**: recorre `navItems`, los agrupa con
+ * `groupNavItemsBySection` y los dibuja con el icono y el contador que trae cada uno. Anadir
+ * un item, cambiarle el icono o moverlo de seccion se hace en el array, no aqui.
+ *
  * Nota de API: estas primitivas son **Base UI**, no Radix. La composicion no se hace con
  * `asChild` sino con la prop `render`.
  */
 export function AppSidebar({ user, navItems }: AppSidebarProps) {
   const pathname = usePathname();
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile, open, toggleSidebar } = useSidebar();
 
   // R34: en viewport angosto nunca se aplica el modo icono, pase lo que pase con `state`.
   const isIconMode = state === 'collapsed' && !isMobile;
@@ -76,9 +95,19 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
   // R33: cualquier navegacion cierra el panel superpuesto. Sin excepciones.
   const closeMobilePanel = () => setOpenMobile(false);
 
+  const secciones = groupNavItemsBySection(navItems);
+
   return (
-    <Sidebar collapsible="icon">
-      <div id={SIDEBAR_PANEL_ID} data-testid="private-sidebar" className="flex h-full w-full flex-col">
+    // R18, `design.md > 6`: `variant="floating"` es prop publica del primitivo, y
+    // `className="p-[18px]"` fija el margen exterior del panel; `tailwind-merge` resuelve el
+    // conflicto con el `p-2` que trae `sidebar-container` de serie. No se toca
+    // `components/ui/sidebar.tsx` (R21).
+    <Sidebar collapsible="icon" variant="floating" className="p-[18px]">
+      <div
+        id={SIDEBAR_PANEL_ID}
+        data-testid="private-sidebar"
+        className="relative flex h-full w-full flex-col"
+      >
         <SidebarHeader data-testid="private-brand">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -87,11 +116,37 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
                 aria-label={BRAND_LABEL}
                 onClick={closeMobilePanel}
                 data-testid="private-brand-link"
+                className="h-auto gap-3 py-2"
               >
+                {/*
+                  Simbolo de marca: **quemado a proposito** (decision humana del 2026-09-02).
+                  No hay identidad visual definida; cuando la haya, el icono y el degradado
+                  salen de donde diga esa ficha.
+                */}
+                <span
+                  aria-hidden="true"
+                  data-testid="private-brand-mark"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-[13px] bg-linear-150 from-sidebar-primary to-sidebar-primary/70 text-sidebar-primary-foreground shadow-[0_8px_22px_-8px_var(--sidebar-primary)]"
+                >
+                  <FlaskConicalIcon className="size-5" />
+                </span>
                 {isIconMode ? (
                   <span data-testid="private-brand-short">{BRAND_SHORT_LABEL}</span>
                 ) : (
-                  <span data-testid="private-brand-long">{BRAND_LABEL}</span>
+                  <span className="flex min-w-0 flex-col text-left leading-tight">
+                    <span
+                      data-testid="private-brand-long"
+                      className="truncate text-base font-semibold tracking-tight"
+                    >
+                      {BRAND_LABEL}
+                    </span>
+                    <span
+                      data-testid="private-brand-tagline"
+                      className="truncate font-mono text-[9.5px] tracking-[0.16em] text-muted-foreground uppercase"
+                    >
+                      {BRAND_TAGLINE}
+                    </span>
+                  </span>
                 )}
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -100,38 +155,72 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
 
         <SidebarContent>
           <nav aria-label={PRIVATE_NAV_LABEL} data-testid="private-nav">
-            <SidebarMenu>
-              {navItems.map((item) =>
-                item.kind === 'link' ? (
-                  <NavLinkItem
-                    key={item.testId}
-                    item={item}
-                    pathname={pathname}
-                    onNavigate={closeMobilePanel}
-                  />
-                ) : isIconMode ? (
-                  <NavGroupFloating
-                    key={item.testId}
-                    group={item}
-                    pathname={pathname}
-                    onNavigate={closeMobilePanel}
-                  />
-                ) : (
-                  <NavGroupInline
-                    key={item.testId}
-                    group={item}
-                    pathname={pathname}
-                    onNavigate={closeMobilePanel}
-                  />
-                ),
-              )}
-            </SidebarMenu>
+            {secciones.map((seccion, indice) => (
+              <SidebarGroup key={seccion.label ?? `sin-seccion-${indice}`}>
+                {seccion.label === null ? null : (
+                  <SidebarGroupLabel
+                    data-testid="private-nav-section"
+                    className="font-mono text-[9.5px] tracking-[0.18em] uppercase"
+                  >
+                    {seccion.label}
+                  </SidebarGroupLabel>
+                )}
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {seccion.items.map((item) =>
+                      item.kind === 'link' ? (
+                        <NavLinkItem
+                          key={item.testId}
+                          item={item}
+                          pathname={pathname}
+                          onNavigate={closeMobilePanel}
+                        />
+                      ) : isIconMode ? (
+                        <NavGroupFloating
+                          key={item.testId}
+                          group={item}
+                          pathname={pathname}
+                          onNavigate={closeMobilePanel}
+                        />
+                      ) : (
+                        <NavGroupInline
+                          key={item.testId}
+                          group={item}
+                          pathname={pathname}
+                          onNavigate={closeMobilePanel}
+                        />
+                      ),
+                    )}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
           </nav>
         </SidebarContent>
 
         <SidebarFooter>
           <NavUser user={user} />
         </SidebarFooter>
+
+        {/*
+          Pastilla de colapso en el borde del panel (diseno aprobado 2026-09-02). **No
+          sustituye** al `SidebarToggle` del encabezado: el diseno lleva los dos, y quitar el
+          del encabezado romperia R23 y R31 de QC-11, que lo dan por presente ahi.
+
+          Solo escritorio: en movil el panel es un `Sheet` que se cierra solo al navegar (R33)
+          y una pastilla colgada de su borde no tendria donde anclarse.
+        */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={SIDEBAR_EDGE_TOGGLE_LABEL}
+          aria-expanded={open}
+          aria-controls={SIDEBAR_PANEL_ID}
+          data-testid="private-sidebar-edge-toggle"
+          className="absolute top-6 -right-[26px] hidden size-7 items-center justify-center rounded-[10px] bg-sidebar text-sidebar-foreground shadow-[0_0_0_1px_var(--sidebar-border),0_8px_18px_-8px_rgba(10,40,40,0.55)] transition-colors md:flex hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-hidden"
+        >
+          <PanelLeftIcon className="size-3.5" />
+        </button>
       </div>
     </Sidebar>
   );
@@ -146,6 +235,7 @@ type NavLinkItemProps = {
 /** Item simple: enlace directo, marcado como actual cuando coincide con la ruta (R8). */
 function NavLinkItem({ item, pathname, onNavigate }: NavLinkItemProps) {
   const isActive = pathname === item.href;
+  const Icon = item.icon;
 
   return (
     <SidebarMenuItem>
@@ -158,7 +248,18 @@ function NavLinkItem({ item, pathname, onNavigate }: NavLinkItemProps) {
         onClick={onNavigate}
         data-testid={item.testId}
       >
+        {Icon ? <Icon aria-hidden="true" /> : null}
         <span>{item.label}</span>
+        {item.badge === undefined ? null : (
+          // El contador es **un valor fijo del array**, no un dato real: no existe fuente de
+          // notificaciones en el repo (ver `private-nav.ts`).
+          <Badge
+            data-testid={`${item.testId}-badge`}
+            className="ml-auto group-data-[collapsible=icon]:hidden"
+          >
+            {item.badge}
+          </Badge>
+        )}
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
@@ -183,6 +284,7 @@ type NavGroupProps = {
  */
 function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
   const hasActiveChild = group.items.some((child) => child.href === pathname);
+  const Icon = group.icon;
 
   return (
     <SidebarMenuItem>
@@ -196,6 +298,7 @@ function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
             />
           }
         >
+          {Icon ? <Icon aria-hidden="true" /> : null}
           <span>{group.label}</span>
           <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-open/menu-button:rotate-90" />
         </CollapsibleTrigger>
@@ -229,6 +332,8 @@ function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
  * renderizar las dos a la vez duplicaria cada enlace en el arbol.
  */
 function NavGroupFloating({ group, pathname, onNavigate }: NavGroupProps) {
+  const Icon = group.icon;
+
   return (
     <SidebarMenuItem>
       <DropdownMenu>
@@ -241,6 +346,7 @@ function NavGroupFloating({ group, pathname, onNavigate }: NavGroupProps) {
             />
           }
         >
+          {Icon ? <Icon aria-hidden="true" /> : null}
           <span>{group.label}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="start" className="min-w-48">
