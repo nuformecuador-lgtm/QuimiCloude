@@ -10,7 +10,7 @@
 
 ## Bloque 0 — el módulo puro del tema
 
-### T0 — `lib/shared/ui/theme-state.ts`
+### T0 [x] — `lib/shared/ui/theme-state.ts`
 - Módulo puro con `THEME_COOKIE`, `THEME_COOKIE_MAX_AGE`, `THEME_DARK_CLASS`, el tipo
   `ThemePreference` y las funciones `readThemePreference` / `buildThemeCookie`
   (`design.md > 3.1`). Docblock que cite el precedente de `sidebar-state.ts` y diga por qué
@@ -19,7 +19,7 @@
 - **Depende de:** aprobación humana del spec (F1.4).
 - **Hecho cuando:** T1b pasa y `pnpm run typecheck` está verde.
 
-### T1b — [P] Tests del módulo de estado
+### T1b [x] — [P] Tests del módulo de estado
 - Nuevo `tests/unit/theme/theme-state.test.ts` (proyecto `node`):
   - `devuelve sistema cuando no hay cookie` → **R7**
   - `devuelve sistema ante un valor no reconocido y no lanza` → **R7**
@@ -30,13 +30,13 @@
 
 ## Bloque 1 — esquema de color (independiente de los bloques 2 y 3)
 
-### T1 — Sustituir los tokens de `:root` y `.dark` en `app/globals.css`
+### T1 [x] — Sustituir los tokens de `:root` y `.dark` en `app/globals.css`
 - Valores exactos de `design-input-tokens.md > 3`, en `oklch`. `--radius` sin tocar.
   `--chart-*` sin tocar. No se toca el bloque `@theme inline`.
 - **Depende de:** —
 - **Hecho cuando:** T2 pasa en verde y `pnpm run lint` no reporta nada.
 
-### T2 — [P] Test de contrato de los tokens
+### T2 [x] — [P] Test de contrato de los tokens
 - Nuevo `tests/unit/theme/color-tokens.test.ts` (proyecto `node`): parsea `app/globals.css`,
   extrae `:root` y `.dark` y compara contra la tabla esperada escrita en el test. Incluye la
   conversión `oklch → sRGB` y el cálculo de contraste WCAG para R25.
@@ -55,14 +55,14 @@
 
 ## Bloque 2 — elección de modo (mecanismo propio)
 
-### T3 — Script anti-parpadeo
+### T3 [x] — Script anti-parpadeo
 - Nuevo `lib/shared/ui/theme-init-script.ts` con `THEME_INIT_SCRIPT` como constante de texto:
   IIFE sin dependencias, envuelta en `try/catch`, que lee la cookie, resuelve `system` con
   `matchMedia` y aplica clase + `color-scheme` (`design.md > 3.2`).
 - **Depende de:** T0.
 - **Hecho cuando:** T4 pasa con sus cinco escenarios.
 
-### T4 — [P] Test que EJECUTA el script
+### T4 [x] — [P] Test que EJECUTA el script
 - Nuevo `tests/unit/theme/theme-init-script.test.ts` (proyecto `ui`, jsdom): evalúa
   `THEME_INIT_SCRIPT` contra `document` y `matchMedia` simulados.
   - `aplica el modo oscuro cuando la cookie dice dark` → **R10**
@@ -72,7 +72,7 @@
   - `no propaga el error si las cookies estan bloqueadas` → **R10**
 - **Depende de:** T3.
 
-### T5 — Proveedor de tema
+### T5 [x] — Proveedor de tema
 - Nuevo `components/shared/theme-provider.tsx` (`'use client'`): contexto con `preference`,
   `resolved` y `setPreference`, hook `useTheme()`, `initialPreference` por props, escritura de
   la cookie con `buildThemeCookie` y suscripción a `matchMedia` **solo mientras la preferencia
@@ -80,7 +80,7 @@
 - **Depende de:** T0, T3.
 - **Hecho cuando:** T7 pasa.
 
-### T6 — Root layout
+### T6 [x] — Root layout
 - `app/layout.tsx`: lee la cookie con `cookies()` y `readThemePreference`; `<html>` con
   `suppressHydrationWarning`, la clase `dark` cuando la preferencia es explícitamente oscura y
   el `color-scheme` correspondiente; `<script>` con `THEME_INIT_SCRIPT` como **primer hijo de
@@ -89,7 +89,7 @@
 - **Depende de:** T5.
 - **Hecho cuando:** T7 pasa.
 
-### T7 — [P] Tests del cableado
+### T7 [x] — [P] Tests del cableado
 - Nuevo `tests/unit/theme/theme-provider.test.tsx` (proyecto `ui`):
   - `marca el html con suppressHydrationWarning` → **R12**
   - `emite el script de tema antes del marcado de la aplicacion y sin defer` → **R10**
@@ -101,7 +101,7 @@
   - `deja de seguir al sistema operativo cuando la preferencia es explicita` → **R17**
 - **Depende de:** T6.
 
-### T8 — Control de tema
+### T8 [x] — Control de tema
 - Nuevo `app/(private)/components/theme-toggle.tsx` (`'use client'`) con `DropdownMenu` +
   `DropdownMenuRadioGroup`, `useTheme()` del proveedor propio y las cuatro constantes de
   etiqueta (`design.md > 5`). Reexportar componente y constantes en
@@ -110,7 +110,7 @@
 - **Depende de:** T5.
 - **Hecho cuando:** T10 pasa.
 
-### T9 — Montar el control en el encabezado privado
+### T9 [x] — Montar el control en el encabezado privado
 - `app/(private)/layout.tsx`: `<ThemeToggle />` junto a `<SidebarToggle />` en el `<header>`.
   **El archivo sigue sin `'use client'`** y sigue siendo el único que llama al proveedor de
   sesión.
@@ -118,7 +118,7 @@
 - **Hecho cuando:** T10 y T11 pasan y `tests/unit/private-layout.test.tsx` sigue verde **sin
   editarlo**.
 
-### T10 — [P] Tests del control
+### T10 [x] — [P] Tests del control
 - Nuevo `tests/unit/theme/theme-toggle.test.tsx` (proyecto `ui`):
   - `ofrece las tres opciones de modo con nombre accesible` → **R8**, **R14**
   - `marca programaticamente la opcion seleccionada` → **R14**
@@ -129,7 +129,7 @@
   - `toma su nombre accesible de la constante exportada` → **R13**
 - **Depende de:** T8.
 
-### T11 — [P] Test del encabezado privado
+### T11 [x] — [P] Test del encabezado privado
 - Nuevo `tests/unit/theme/private-header.test.tsx` (proyecto `ui`):
   - `muestra el control de tema junto al de la barra lateral` → **R13**
   - `conserva un unico landmark main y el nombre accesible del SidebarToggle` → **R24**
@@ -151,7 +151,7 @@
 
 ## Bloque 3 — panel flotante (independiente del bloque 2)
 
-### T13 — Reglas CSS del panel en `app/globals.css`
+### T13 [x] — Reglas CSS del panel en `app/globals.css`
 - Variables `--sidebar-panel-gradient` por modo (hex del insumo, con el porqué comentado) y
   reglas **sin `@layer`** para `[data-slot="sidebar-inner"]`,
   `[data-slot="sidebar"][data-mobile="true"]` (radio 22 px + degradado) y
@@ -160,7 +160,7 @@
 - **Depende de:** T1 (mismo archivo — no paralelizar con T1).
 - **Hecho cuando:** T15 pasa.
 
-### T14 — Medidas por props públicas
+### T14 [x] — Medidas por props públicas
 - `app/(private)/layout.tsx`: `style={{ '--sidebar-width': '17rem', '--sidebar-width-icon':
   '4.875rem' }}` en `<SidebarProvider>`.
 - `components/private/app-sidebar.tsx`: `variant="floating"` y `className="p-[18px]"` en
@@ -169,7 +169,7 @@
 - **Hecho cuando:** T15 y T16 pasan y `tests/unit/app-sidebar.test.tsx`,
   `sidebar-desktop.test.tsx` y `sidebar-mobile.test.tsx` siguen verdes **sin editarlos**.
 
-### T15 — [P] Test de contrato del panel
+### T15 [x] — [P] Test de contrato del panel
 - Nuevo `tests/unit/theme/sidebar-panel.test.tsx`:
   - `pinta el panel flotante con radio 22px y el degradado de 166 grados de cada modo` → **R18**
   - `usa 272px de ancho expandido y 78px en modo icono` → **R19**
@@ -178,7 +178,7 @@
     del `@layer`)
 - **Depende de:** T13, T14.
 
-### T16 — [P] Guardia de `components/ui/` intacto
+### T16 [x] — [P] Guardia de `components/ui/` intacto
 - Nuevo `tests/unit/theme/ui-primitivas-intactas.test.ts`:
   - `no mete las medidas nuevas dentro de components/ui/sidebar.tsx` → **R21** (afirma que
     siguen presentes `SIDEBAR_WIDTH = "16rem"`, `SIDEBAR_WIDTH_ICON = "3rem"` y
@@ -187,7 +187,7 @@
 
 ## Bloque 4 — regresión y cierre
 
-### T17 — [P] Test de «ninguna dependencia nueva»
+### T17 [x] — [P] Test de «ninguna dependencia nueva»
 - Nuevo `tests/unit/theme/sin-dependencias-nuevas.test.ts`:
   - `no incorpora next-themes ni ninguna libreria de tema a package.json` → **R28**
 - No congela la lista entera de dependencias (`design.md > 9`): eso sería un peaje para toda
@@ -204,7 +204,7 @@
 - **Hecho cuando:** cero rojos nuevos respecto de `tests/baseline-rojos.json`, y **ningún
   archivo de test ajeno modificado** (verificable en el diff del PR).
 
-### T19 — Mapa de trazabilidad y evidencia
+### T19 [x] — Mapa de trazabilidad y evidencia
 - Escribir `progress/impl_QC-29-tema-claro-oscuro.md` con la salida real de los tests y el mapa
   `R<n> → test` completo (R1…R29).
 - **Depende de:** T1b, T2, T4, T7, T10, T11, T12, T15, T16, T17, T18.
