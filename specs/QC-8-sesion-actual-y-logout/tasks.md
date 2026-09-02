@@ -63,7 +63,7 @@ sola implementacion de la firma fuera de `tests/`.
 Postgres real y pasa; `pnpm vitest run integration` queda verde **entero**, incluido
 `identity-constraints.int.test.ts` (`user.count() === 0`).
 
-### T7 — Borrar `adapters/driven/session/session-stub.ts` *(depende de T5, T6)*
+### [x] T7 — Borrar `adapters/driven/session/session-stub.ts` *(depende de T5, T6)*
 Se elimina el archivo: su cabecera ya declara que la feature de sesion real lo reemplaza.
 **Hecho:** no queda ninguna referencia (`rg session-stub` solo aparece en `specs/` y `progress/`
 historicos y en los casos **sinteticos** de `guard-arquitectura-modulos.test.ts`, que construyen
@@ -73,7 +73,7 @@ rutas a mano y no leen el disco); `pnpm run typecheck` pasa.
 
 ## Bloque 3 — Cableado y superficie *(depende del bloque 2)*
 
-### T8 — Puerto, contrato, composicion y ruta de login
+### [x] T8 — Puerto, contrato, composicion y ruta de login
 Cuatro cambios que van juntos porque por separado dejan el typecheck rojo:
 1. `ports/session-provider.ts`: `getSessionUser(): Promise<SessionUser | null>` (R1).
 2. `lib/modules/identity/index.ts`: reexportar `createResolveSessionUser`, `buildDisplayName`,
@@ -83,7 +83,7 @@ Cuatro cambios que van juntos porque por separado dejan el typecheck rojo:
 **Hecho:** `pnpm run typecheck` y `pnpm run lint` pasan;
 `tests/guards/guard-arquitectura-modulos.test.ts` verde (R22).
 
-### T9 — `logout-action.ts` + su test *(depende de T8)*
+### [x] T9 — `logout-action.ts` + su test *(depende de T8)*
 Añadir `redirect(LOGIN_ROUTE)` despues de `await identity.endSession()`, **sin tocar la firma**
 (R19) y fuera de cualquier `try` (el `redirect` de Next señaliza lanzando).
 En `tests/unit/identity/logout-action.test.ts`, alcance **exacto** y nada mas:
@@ -96,7 +96,7 @@ En `tests/unit/identity/logout-action.test.ts`, alcance **exacto** y nada mas:
 **Hecho:** el archivo pasa; el test de la firma congelada (sin parametros, sin retorno) sigue ahi
 y verde.
 
-### T10 — `app/(private)/layout.tsx` + su test *(depende de T8)*
+### [x] T10 — `app/(private)/layout.tsx` + su test *(depende de T8)*
 `const user = await identity.getSessionUser(); if (user === null) redirect(LOGIN_ROUTE);`. Nada
 mas cambia en el layout (la cookie de UI sigue igual).
 En `tests/unit/private-layout.test.tsx`, alcance **exacto**:

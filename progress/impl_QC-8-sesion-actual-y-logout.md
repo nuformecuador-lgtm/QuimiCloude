@@ -1,7 +1,7 @@
 # QC-8 — sesion-actual-y-logout · bitacora de implementacion
 
-> Estado: **EN CURSO**. Bloques 1 y 2 (T5, T6) cerrados y comiteados. Falta T7 —que va
-> unido a T8, ver mas abajo—, el bloque 3 y el 5.
+> Estado: **EN CURSO**. Bloques 1, 2 y 3 (T1-T10) cerrados y comiteados. Falta **T11**
+> (gate rapido, lo corre el leader) y el **bloque 5** (T15 trazabilidad, T16 gate completo y PR).
 > Alcance **R1-R23**. **R24 esta FUERA** (diferido a QC-9 por el humano el 2026-09-02):
 > el bloque 4 de `tasks.md` no se ejecuta, no hay `e2e/session.spec.ts`, no se toca
 > `playwright.config.ts` y no se crean fixtures `qc8_e2e_`.
@@ -87,6 +87,89 @@ La segunda corrida es la prueba de que el fixture **no deja huerfanos**: ese arc
 `pnpm run typecheck`: **verde, sin errores**. `pnpm run lint`: **verde**.
 (El rojo heredado de `mustChangeCredential` desaparecio al regenerar el cliente Prisma; ver la
 correccion en «Rojo heredado».)
+
+## Bloque 3 — Cableado y superficie (T7-T10)
+
+### T7 + T8 — agrupadas · commit `384a758`
+Agrupacion **aprobada por el leader**. Motivo: borrar `session-stub.ts` suelto deja el
+`typecheck` **rojo** hasta que la composicion deja de importarlo, y un commit intermedio
+deliberadamente rojo rompe la bisectabilidad. Es el mismo criterio que `tasks.md` ya aplica a
+los cuatro cambios de T8 («por separado dejan el typecheck rojo»), un paso antes. **No cambia
+el alcance ni el contenido de ninguna task.**
+
+- `lib/modules/identity/adapters/driven/session/session-stub.ts` (**BORRADO**)
+- `lib/modules/identity/ports/session-provider.ts` — `getSessionUser(): Promise<SessionUser | null>` (R1)
+- `lib/modules/identity/index.ts` — reexporta solo desde `./domain`
+- `lib/composition/index.ts` — `design.md > 4.4`; `verifyCredentials` **intacto**
+- `lib/shared/routes.ts` — `LOGIN_ROUTE = '/login'`
+
+El cambio de contrato rompio **exactamente un** sitio, `app/(private)/layout.tsx`, tal como
+anticipaba `design.md > 4.5` («no hay llamadores silenciosos»). Lo arregla T10.
+
+### T9 — el cierre de sesion vuelve al login · commit `1cd4094`
+`redirect(LOGIN_ROUTE)` despues de `endSession()` y **fuera de cualquier `try`**: Next señaliza
+la navegacion **lanzando**, y un `try` se la tragaria. Firma congelada intacta (R19).
+
+### T10 — la zona privada redirige sin sesion · commit `af8fb20`
+`if (user === null) redirect(LOGIN_ROUTE)` (R16). Nada mas cambia en el layout.
+
+**Detalle que decide si el test vale o no:** el doble de `redirect` **lanza un centinela**, como
+el real. Con un `vi.fn()` que no lanza, el layout seguiria ejecutandose con `user === null` y
+petaria al pintar la barra: el test estaria midiendo otra cosa.
+
+### Revocaciones de prohibiciones de QC-11: linea a linea
+
+Las dos tasks revocan tests que QC-11 escribio en negativo. Se revoco **exactamente** lo que
+`tasks.md` acota y **nada mas**. Cada revocacion, con lo que prohibia y que la invalida:
+
+| # | Archivo | Linea revocada | Que prohibia | Que la invalida |
+|---|---|---|---|---|
+| 1 | `logout-action.test.ts` | `'lib/modules/identity/adapters/driven/session/session-stub.ts'` en `MODULOS_INSPECCIONADOS` | Inspeccionaba el fuente del stub para exigir que no tocara cookies ni navegacion | **El archivo ya no existe** (T7). `readFileSync` reventaria |
+| 2 | `logout-action.test.ts` | `/next\/navigation/i` en `prohibidos` | Que la action importara el modulo de navegacion de Next | Decision del humano **2026-09-02**: al cerrar sesion se vuelve al login (R18) |
+| 3 | `logout-action.test.ts` | `/redirect/i` en `prohibidos` | Que la action navegara | Idem — el `redirect(LOGIN_ROUTE)` es ahora el comportamiento exigido |
+| 4 | `logout-action.test.ts` | `/next\/headers/i` en `prohibidos` | Que la action tocara el almacen de cookies del servidor | R18 exige retirar la cookie **desde el servidor**; la ruta pasa por el adaptador |
+| 5 | `logout-action.test.ts` | `/cookies/i` en `prohibidos` | Idem | Idem |
+| 6 | `private-layout.test.tsx` | `'redirect'` en la lista de la guardia de R35 | Que el layout protegiera rutas | Decision del humano **2026-09-02**: sin sesion valida la zona privada redirige **ya en QC-8** (R16), para no dejar la ventana entre QC-8 y QC-9 en la que entrar sin sesion romperia la pagina |
+
+**Lo que se CONSERVA, y es lo que hace que la revocacion no sea un cheque en blanco:**
+- En `logout-action.test.ts` siguen prohibidos `document.cookie`, `prisma`, `PrismaClient`,
+  `supabase` y `fetch`. Se retiro `/cookies/i` pero **se conserva `document.cookie`**: la
+  cookie la retira el **servidor**, y que el navegador la toque sigue prohibido.
+- En `private-layout.test.tsx` siguen intactas `prisma`, `PrismaClient`, `supabase`, `fetch(`,
+  `document.cookie`, `Set-Cookie`, `cookiestore.set`, `cookiestore.delete`, la exigencia de que
+  aparezca `SIDEBAR_STATE_COOKIE`, el bucle que comprueba que **toda** operacion
+  `cookieStore.<metodo>(...)` es un `get` de esa constante, y el assert de runtime de que la
+  unica cookie consultada al renderizar es esa.
+- Tambien intacto el test `el sidebar no importa el proveedor de sesion`: `tasks.md` no pedia
+  tocarlo y su lista conserva la cadena `'session-stub'`.
+
+**Una consecuencia no prevista en `tasks.md`, dicha por honestidad:** en `logout-action.test.ts`
+el test original *«invoca el cierre de sesion... y no devuelve valor»* **se partio en dos**. No
+es una revocacion extra: al comportarse el doble de `redirect` como el real (lanzando), la
+llamada a `logoutAction()` **rechaza**, asi que la comprobacion de la firma congelada (R19) se
+separo a un test que no invoca la action. R19 sigue cubierto y sigue verde.
+
+### Verificacion propia de la tanda (corrida por el implementer)
+
+```
+$ pnpm run typecheck        -> verde, sin errores
+$ pnpm run lint             -> verde
+
+$ pnpm exec vitest run --project node tests/unit/identity/logout-action.test.ts
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+$ pnpm exec vitest run --project ui tests/unit/private-layout.test.tsx
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+
+$ pnpm exec vitest run guard
+ Test Files  5 passed (5)
+      Tests  65 passed (65)
+
+$ grep -rn "session-stub" lib/ app/ components/
+(ninguna)
+```
 
 ## T7 va unido a T8, y no es una desviacion del spec
 
