@@ -11,8 +11,10 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-6 | seed-roles-y-usuario-inicial | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-6-seed-roles-y-usuario-inicial` | **spec APROBADO, slot devuelto el 2026-09-01** para que entre QC-14 (decisión humana, ver Evaluaciones). Estaba `in_progress` pero su implementer **nunca se lanzó**: no se pierde trabajo. Worktree y spec intactos. Arranca cuando haya slot |
-| QC-7 | login-usuario-y-contrasena | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-7-login-usuario-y-contrasena` | **esperando aprobación humana (F1.4)**. Spec revisado con las decisiones del humano: 31 requisitos. Decidido que **entra antes que QC-6** en fase 2 |
+| QC-20 | crud-de-productos | QC-18 Inventario | backend | **spec_ready** | `feature/QC-20-crud-de-productos` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Tercera sesión de leader. **F2.0 no se ejecuta**: `depends_on` incluye QC-8, que está `pending` y sin spec, y `AGENTS.md` dice que una feature con `depends_on` no arranca hasta que su dependencia esté `done`. Por eso la ficha se queda en `spec_ready` y **la tarjeta NO se mueve a *En curso***: moverla dejaría board y disco divergentes por una fase que no ha empezado (mismo criterio que se aplicó a QC-14 el 2026-09-01). Arranca cuando QC-8 cierre. Acotada, sembrada y especificada el 2026-09-02: **23 decisiones cerradas + 37 requisitos EARS**, congelados en `21d6695` (las 5 preguntas que abrió el diseño las cerró el humano tras F1.2 y entraron como D19–D23; una cambió la posición del diseño: el tope de página pasó de 100 a 25). Sin preguntas abiertas. Tarjeta en *En revisión*. Fase 2 **bloqueada por QC-8**, que está `pending` y sin spec |
+| QC-12 | dashboard-en-blanco | QC-16 Plataforma | frontend | **in_progress (F2.1)** | `feature/QC-12-dashboard-en-blanco` | **SPEC APROBADO por el humano el 2026-09-02** («continua con 12») e **implementer lanzado**. Tarjeta en *En curso*. Ocupa el primer slot de `frontend` (la zona estaba a 0), sin conflicto de archivos con QC-6, que es backend puro. Worktree preparado a mano (`.env`, `pnpm install`, `prisma generate`, `next typegen`). Spec congelado en `e2714f0`: 12 requisitos EARS, todos trazados; tarjeta en *En revisión*. Feature **puramente aditiva**, no edita ni un archivo de QC-11/QC-15. Deja **1 pregunta abierta**: la raíz `/` sigue siendo la plantilla de `create-next-app` y ninguna ficha del backlog la cubre. Tercera sesión de leader. Sus dos dependencias (QC-11, QC-15) están `done`, la zona `frontend` tiene **0** `in_progress` y no hay conflicto de archivos con QC-6 (backend puro): paralelismo real. Se eligió porque además desbloquea a QC-13, que esperaba a cuatro fichas. **Decisión humana del 2026-09-02: NO toca el ítem «Dashboard» del sidebar** —sigue dando 404— eso lo reconecta QC-13 |
+| QC-19 | politica-de-contrasenas | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-19-politica-de-contrasenas` | **SPEC APROBADO por el humano el 2026-09-02** («aprueba 19»), y con él **la dependencia**: `@zxcvbn-ts/language-common` ya tiene su fila `aprobada` en `docs/dependencias.md`, **pero no está instalada** — se instala al arrancar la fase 2. Las dos preguntas abiertas que quedaban eran sobre esa librería y las cierra la aprobación: la ficha queda **sin preguntas abiertas**. Congelado en `f09e06b`. **F2.0 no se ejecuta y la tarjeta NO se mueve a *En curso***: espera a QC-6, mismo criterio que QC-14 y QC-20. Spec escrito el 2026-09-02 y congelado antes en `4fb8294`: 24 requisitos EARS, todos trazados; tarjeta en *En revisión*. **Aprobar el spec aprueba también una dependencia nueva** — `@zxcvbn-ts/language-common` (solo el diccionario, sin `@zxcvbn-ts/core`). El `spec_author` dejó los cuatro checks como DESCONOCIDO por no tener red; **los verificó el leader el 2026-09-02 y pasan los cuatro** (sin `deprecated`; 4.1.3 del 2026-07-16; 1.260.688 descargas/semana; MIT), anotados en `design.md > 5.2`. Al aprobar hay que añadir su fila a `docs/dependencias.md`. Quedan 2 preguntas abiertas, las dos sobre esa dependencia. **Solo fase 1**: la fase 2 espera a QC-6, que está `in_progress` en otra sesión. Escribir el spec ahora **no consume slot** (queda en `spec_ready`) y la deja lista para arrancar el día que QC-6 cierre. Ya venía sembrada por `/afinar-feature` el 2026-09-01 |
+| QC-6 | seed-roles-y-usuario-inicial | QC-17 Identidad y acceso | backend | **in_progress (F2.4)** | `feature/QC-6-seed-roles-y-usuario-inicial` | **PR #11 abierto el 2026-09-02**, esperando merge humano. Reviewer APROBADO en ronda 2 tras rechazar la ronda 1 con dos bloqueantes. `./init.sh` completo en verde (377 tests / 35 archivos) sobre el arbol ya sincronizado con `dev`. Las 21 tasks cerradas y los 21 requisitos con test ejecutado. Al mergear: pasar a `done`, mover la tarjeta a *Finalizado*, comentar la URL y `./scripts/wt.sh done QC-6-seed-roles-y-usuario-inicial` |
 
 Worktrees: `.worktrees/QC-6-seed-roles-y-usuario-inicial` (montado desde `origin/dev`, con
 `.env` copiado a mano), `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
@@ -21,6 +23,11 @@ desmontaron limpios. El `.worktrees/QC-7-login-usuario-y-contrasena` lo montó l
 **segunda sesión de leader** (`.env`, `pnpm install`, `prisma generate` y `next typegen`
 hechos a mano). Queda además una carpeta huérfana `.worktrees/1-modelo-usuarios-y-roles/`
 sin worktree registrado detrás, anotada en deudas.
+
+La feature **QC-7 — login-usuario-y-contrasena** se cerró el 2026-09-02 (PR #9, merge
+`10f9a07`): la ficha estaba todavía como `in_progress` en `feature_list.json` aunque el PR ya
+estaba mergeado en `dev`; se pasa a `done` aquí. Falta desmontar su worktree y mover la
+tarjeta a *Hecho* en el board.
 
 La feature **QC-14 — modelo-producto** se cerró el 2026-09-02 (PR #10, merge
 `abdef6b`): resumen en `progress/history.md`, worktree desmontado. El PR llegó en
@@ -407,6 +414,14 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   `zone: fullstack` (label puesta en el board), bloqueada por QC-14. `complexity` sin evaluar.
 - **Al ser `fullstack` habrá que partirla** en backend + frontend cuando le toque F1.0
   (`AGENTS.md > Partición de fullstack`).
+- **Acotada con `/afinar-feature` el 2026-09-02.** El alcance y las 18 decisiones cerradas
+  viven en `specs/QC-20-crud-de-productos/requirements.md` — esa es la fuente, aquí solo se
+  enlaza. Sin preguntas abiertas. Se partió: QC-20 se queda con `zone: backend` y
+  `complexity: high`; la pantalla nació como **QC-22 — Pantalla de productos**
+  (`zone: frontend`, épica QC-18, bloqueada por QC-20, `pending` en Backlog y **sin sembrar**).
+  Se añadió **QC-8 como bloqueante** de QC-20: el service necesita saber quién está en sesión.
+  Board actualizado **antes** de sembrar (labels, `description`, los dos links y la ficha
+  nueva) y `feature_list.json` reflejado en la misma corrida.
 
 ### QC-14 — el board la reescribió (2026-09-01)
 

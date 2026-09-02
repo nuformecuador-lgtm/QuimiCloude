@@ -56,8 +56,5 @@
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@10.10.0",
-  "prisma": {
-    "schema": "db/schema.prisma"
-  }
+  "packageManager": "pnpm@10.10.0"
 }
