@@ -89,13 +89,26 @@ function tryReadReal(absPath: string): string | null {
   }
 }
 
-/** Quita comentarios de linea y de bloque antes de buscar imports (mismo patron que las otras guardias). */
+/**
+ * Quita comentarios de linea y de bloque antes de buscar imports.
+ *
+ * **El orden importa: los de LINEA primero, los de BLOQUE despues.** Al reves --como estuvo hasta
+ * QC-9-- un comentario de linea que contenga una apertura de bloque abre un bloque FALSO que se
+ * cierra en el siguiente cierre de bloque del archivo (tipicamente el proximo JSDoc) y se traga
+ * todo lo que haya en medio, imports incluidos. El caso real, con el comodin escrito con dos
+ * asteriscos: `// se juzga con las mismas reglas que app/` + `** (R19)` dejaba `middleware.ts`
+ * reducido a su `export const config`, sin el reexport, asi que TODOS los bloques que deciden
+ * sobre imports (4, 5, 6, 7, 8, 9, 11, 13) juzgaban un archivo vacio y pasaban en VERDE sin haber
+ * mirado nada. Quitando primero la linea entera, esa apertura desaparece junto con el comentario
+ * que la contiene. No lo "simplifiques" de vuelta: el test «no se ciega...» de mas abajo vigila
+ * exactamente eso.
+ */
 function stripComments(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
 }
 
 /** Todo especificador importado/reexportado/requerido por un archivo (import, export...from, require, import()). */
@@ -1720,6 +1733,54 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       expect(
         findCompositionForbiddenImportFinding('app/page.tsx', '@/components/private/nav-user', internalTarget('components/private/nav-user.tsx')),
       ).toBeNull()
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // BLOQUE 14 — la guardia no se ciega por un comentario (QC-9, R19, R21)
+  // -------------------------------------------------------------------------
+  //
+  // Todos los bloques que deciden sobre imports parten de `extractImportSpecifiers`, y esa parte de
+  // `stripComments`. Si `stripComments` se come los imports, la guardia entera pasa en verde sobre
+  // un archivo que nunca miro: no un falso positivo ruidoso, sino un falso NEGATIVO mudo. Estos dos
+  // tests son la unica red de esa red.
+  describe('bloque 14 — no se ciega por comentarios (R19, R21)', () => {
+    it('un comentario de linea con un comodin `app/` + dos asteriscos NO esconde los imports que van debajo', () => {
+      // Fuente sintetico calcado del caso real. Con el orden viejo (bloques primero), la apertura
+      // de bloque que vive DENTRO del comentario de linea abria un bloque falso que se cerraba en
+      // el JSDoc de la penultima linea, y `extractImportSpecifiers` devolvia [].
+      const cegado = [
+        '// se juzga con las mismas reglas que app/** (R19)',
+        "import { createHmac } from 'node:crypto';",
+        "export const firma = createHmac('sha256', secreto);",
+        '/** JSDoc posterior que cierra el bloque falso. */',
+        'export const otra = 1;',
+      ].join('\n')
+
+      expect(
+        extractImportSpecifiers(cegado),
+        'stripComments quita los comentarios de LINEA antes que los de BLOQUE. Si alguien invierte ' +
+          'ese orden, un comentario de linea que mencione una ruta con comodin se traga los imports ' +
+          'que tenga debajo y TODOS los bloques de esta guardia pasan en verde sobre un archivo ' +
+          'vacio.',
+      ).toContain('node:crypto')
+
+      // Un comentario que solo MENCIONA un import sigue sin contar: lo que se arregla es el
+      // cegado, no la regla.
+      expect(extractImportSpecifiers("// import { prisma } from '@/lib/shared/db/prisma'\n")).toEqual([])
+      expect(extractImportSpecifiers("/* import { prisma } from '@/lib/shared/db/prisma' */")).toEqual([])
+    })
+
+    it('el middleware.ts REAL sigue mostrando su reexport pese al comodin `app/` + dos asteriscos de su cabecera', () => {
+      // El archivo del repo que disparo el hallazgo. Su cabecera menciona el comodin, y hasta QC-9
+      // eso dejaba el archivo reducido a `export const config = {...}`: la guardia lo barria (R19)
+      // pero no veia ni un solo import suyo.
+      const middleware = tryReadReal(join(repoRoot, 'middleware.ts'))
+      expect(middleware, 'no se encontro middleware.ts en la raiz del repo').not.toBeNull()
+
+      const specifiers = extractImportSpecifiers(middleware as string)
+
+      expect(specifiers).toContain('@/lib/modules/identity/adapters/driving/route-guard-middleware')
     })
   })
 })

@@ -89,13 +89,25 @@ function listSourceFiles(dir: string): readonly string[] {
   })
 }
 
-/** Los comentarios explican; no ejecutan. Se quitan antes de juzgar el codigo. */
+/**
+ * Los comentarios explican; no ejecutan. Se quitan antes de juzgar el codigo.
+ *
+ * **El orden importa: los de LINEA primero, los de BLOQUE despues.** Al reves --como estuvo hasta
+ * QC-9-- un comentario de linea que contenga una apertura de bloque abre un bloque FALSO que se
+ * cierra en el siguiente cierre de bloque del archivo (tipicamente el proximo JSDoc) y se traga
+ * todo lo que haya en medio, imports incluidos. El caso real, con el comodin escrito con dos
+ * asteriscos: `// se juzga con las mismas reglas que app/` + `** (R19)` dejaba `middleware.ts`
+ * reducido a su `export const config`, sin el reexport, y esta guardia pasaba en VERDE sin haber
+ * mirado el archivo. Quitando primero la linea entera, esa apertura desaparece junto con el
+ * comentario que la contiene y nunca llega a abrir nada. No lo "simplifiques" de vuelta: el test
+ * «no se ciega...» de mas abajo vigila exactamente eso.
+ */
 function stripComments(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
 }
 
 /**
@@ -228,6 +240,34 @@ describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
     expect(mentionsSignatureAlgorithm('export function signSessionValue() { return "no-op" }')).toBe(false)
     // `crypto.randomUUID()` no es firmar: la huella no puede ser "menciona crypto".
     expect(mentionsSignatureAlgorithm('const id = crypto.randomUUID()')).toBe(false)
+  })
+
+  // QC-9 — regresion del CEGADO: la guardia no puede quedarse muda por un comentario.
+  it('no se ciega: un comentario de linea con un comodin `app/` + dos asteriscos NO esconde el createHmac que va debajo', () => {
+    // Fuente sintetico calcado del caso real. Con el orden viejo (bloques primero), la apertura de
+    // bloque que vive DENTRO del comentario de linea abria un bloque falso que se cerraba en el
+    // JSDoc de la penultima linea: `stripComments` devolvia solo `export const otra = 1;` y la
+    // guardia daba VERDE sobre un archivo que implementa la firma. El fallo no era un falso
+    // positivo (ruidoso y visible), sino un falso NEGATIVO: la guardia dejaba de vigilar en
+    // silencio, que es lo unico que una guardia no puede permitirse.
+    const cegado = [
+      '// se juzga con las mismas reglas que app/** (R19)',
+      "import { createHmac } from 'node:crypto';",
+      "export const firma = createHmac('sha256', secreto);",
+      '/** JSDoc posterior que cierra el bloque falso. */',
+      'export const otra = 1;',
+    ].join('\n')
+
+    expect(
+      mentionsSignatureAlgorithm(cegado),
+      'stripComments quita los comentarios de LINEA antes que los de BLOQUE. Si alguien invierte ' +
+        'ese orden, un comentario de linea que mencione una ruta con comodin se traga los imports ' +
+        'que tenga debajo y esta guardia pasa en verde sin haber mirado el archivo.',
+    ).toBe(true)
+
+    // Y el mismo fuente sin la linea de comentario tiene que dar lo mismo: lo que se afirma es que
+    // el comentario NO cambia el veredicto, no que el fuente case por casualidad.
+    expect(mentionsSignatureAlgorithm(cegado.split('\n').slice(1).join('\n'))).toBe(true)
   })
 
   // QC-9 R19 — la raiz del repositorio tambien se barre.
