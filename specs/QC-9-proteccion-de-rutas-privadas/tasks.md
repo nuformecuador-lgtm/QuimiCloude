@@ -180,7 +180,7 @@ todo `try`.
 redirige ahi; con `next=https://evil.example` redirige al **dashboard**; sin campo, al dashboard.
 Los tests existentes de la firma congelada siguen verdes.
 
-### [ ] T17 — Transporte del `next` en la pantalla de login *(depende de T16)*
+### [x] T17 — Transporte del `next` en la pantalla de login *(depende de T16)*
 `app/(public)/login/page.tsx` lee `searchParams.next`, lo pasa por `resolveReturnPath` y se lo
 entrega a `<LoginForm next={...} />`; `login-form.tsx` lo lleva en un `<input type="hidden">`.
 **Alcance exacto:** nada mas del formulario cambia (campos no controlados, toasts, claves de
@@ -192,7 +192,7 @@ recibido y que **no** hay cambio visual; los tests de QC-7/QC-10 siguen verdes.
 
 ## Bloque 6 — Documentacion y E2E
 
-### [ ] T18 [P] — Actualizar `docs/architecture.md > Permisos y autenticacion` *(depende de T14)*
+### [x] T18 [P] — Actualizar `docs/architecture.md > Permisos y autenticacion` *(depende de T14)*
 La linea del middleware pasa de «verifica existencia de cookie de sesion» a que valida **firma,
 caducidad y rol firmado** de la cookie y redirige en ambos sentidos, con dos notas: el layout privado
 sigue siendo la ultima linea de defensa (D12), y **el middleware no es la frontera de autorizacion**
@@ -202,7 +202,7 @@ pantalla (D18, R29)—.
 documento dice explicitamente que el rol de la cookie no autoriza; `guard-arquitectura-modulos`
 bloque 12 (coherencia del documento) sigue verde.
 
-### [ ] T19 — `e2e/session.spec.ts` *(depende de T17)*
+### [x] T19 — `e2e/session.spec.ts` *(depende de T17)*
 El recorrido heredado de QC-8 (R24), ampliado con la vuelta: pedir `/dashboard` sin sesion ->
 aterrizar en el login -> entrar -> **acabar en `/dashboard`** -> ver el nombre real en la barra ->
 cerrar sesion -> login -> atras no muestra la zona privada. Fixtures con prefijo `qc9_e2e_` y
