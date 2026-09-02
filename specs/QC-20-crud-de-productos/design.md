@@ -507,8 +507,27 @@ Postgres—. Con la función pura en el dominio, R19 se cierra con un test unita
 
 Consta aquí para que el implementer no la reconsidere: D13 la descarta explícitamente y QC-14
 anotó la unicidad como «lo más caro de revertir». Un `SELECT … WHERE lower(name) = …` antes del
-`INSERT` es una comprobación **no atómica**: dos altas simultáneas la pasan las dos. La
-comprobación previa se mantiene, pero solo para dar un mensaje decente; la garantía es el índice.
+`INSERT` es una comprobación **no atómica**: dos altas simultáneas la pasan las dos. La garantía
+es el índice único.
+
+> **Corrección (F2, Grupo B, 2026-09-02).** Este apartado decía además que «la comprobación previa
+> se mantiene, pero solo para dar un mensaje decente». **Eso no se sostiene y se retira**, por dos
+> razones:
+>
+> 1. **Era inexpresable con el diseño de esta misma ficha.** El `PresentationRepository` de § 7
+>    —que es normativo— expone `create`, `rename`, `deleteById` y `list`, y **ningún método de
+>    búsqueda por `nameNormalized`**. Hacer la comprobación previa habría exigido añadir un método
+>    al puerto, es decir, apartarse del diseño para cumplir una frase del diseño.
+> 2. **No aportaba el mensaje que decía aportar.** El puerto ya devuelve `'duplicate'`, y el caso
+>    de uso lo traduce a `DuplicateNameError`. El usuario recibe exactamente el mismo error con
+>    comprobación previa que sin ella; lo único que añadía era una consulta más y un camino no
+>    atómico que podía dar un falso «está libre».
+>
+> **Lo que se implementa en su lugar:** `create-presentation.ts` y `update-presentation.ts` no
+> hacen ninguna comprobación previa y **siempre** traducen el `'duplicate'` del puerto a
+> `DuplicateNameError`. Eso es lo que cierra R18 y R20, y tiene su mutación confirmada en
+> `tests/unit/inventario/presentation-service.test.ts`. Lo que **no** cambia: D13 sigue vigente
+> —la unicidad se garantiza con columna normalizada e índice único, nunca comparando al vuelo—.
 
 ### 11.5 Borrado lógico también para las presentaciones — descartada
 

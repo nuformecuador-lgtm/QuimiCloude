@@ -256,3 +256,69 @@ Postgres local tiene tres: `QuimiCloude` (compartida), `QuimiCloude_QC14` y
 
 `pnpm exec vitest run tests/integration/inventario/` → **1 archivo, 19 tests, todos verdes**
 (estaban rojos antes de aplicar migraciones, por `column "name_normalized" does not exist`).
+
+---
+
+# Cierre del Grupo B
+
+## Correccion aplicada al propio `design.md` (no solo aqui)
+
+`design.md > 11.4` afirmaba que «la comprobacion previa se mantiene, pero solo para dar un
+mensaje decente». **Era falso y se ha corregido en el propio documento**, no solo en esta
+bitacora: un diseno que afirma algo falso es peor que uno incompleto, porque nadie va a
+buscar donde el documento dice que no hay nada (leccion de QC-8, donde una correccion que se
+quedo solo en la bitacora la saco el reviewer como hallazgo).
+
+Motivo de la correccion:
+
+1. **Era inexpresable con el diseno de la propia ficha.** El `PresentationRepository` de
+   `design.md > 7` —normativo— expone `create`, `rename`, `deleteById` y `list`, y **ningun
+   metodo de busqueda por `nameNormalized`**. Hacer la comprobacion previa habria exigido
+   anadir un metodo al puerto: apartarse del diseno para cumplir una frase del diseno.
+2. **Una comprobacion previa es una carrera.** Entre el `SELECT` y el `INSERT` cabe otra
+   transaccion, asi que no garantiza nada; la garantia real es el indice unico.
+3. **No aportaba el mensaje que decia aportar.** El puerto ya devuelve `'duplicate'` y el caso
+   de uso lo traduce a `DuplicateNameError`: el usuario recibe el mismo error con o sin ella.
+
+Lo implementado: `create-presentation.ts` y `update-presentation.ts` **siempre** traducen el
+`'duplicate'` del puerto, sin comprobacion previa. Mutacion confirmada. D13 sigue intacta.
+
+## El reloj (`now`) como dependencia inyectable
+
+El puerto pide `now: Date` y **el spec no decia de donde sale**. Se resuelve con
+`now?: () => Date` en las `deps`, con `() => new Date()` por defecto.
+
+**Sigue una convencion que ya existe en el repo**, no una preferencia del implementer: es lo
+mismo que hizo **QC-7 en `lib/modules/identity/domain/account-lock.ts`**, donde el reloj entra
+como parametro con valor por defecto. Es lo que permite fijar el instante en el test sin reloj
+falso ni `sleep`.
+
+## Falsos verdes cazados en el Grupo B (cuarto y quinto de la jornada)
+
+1. **Barrido estatico de R1 que media comentarios.** La mitad estatica de
+   `authorization.test.ts` buscaba `next/headers` en el texto crudo de los archivos de
+   `domain/`, y `create-product.ts` **documenta la prohibicion en prosa**. El comentario
+   disparaba la deteccion: el test media comentarios, no codigo. Corregido a quitar comentarios
+   de linea y de bloque antes de buscar.
+2. **`it('R5')`, `it('R6')`, `it('R2')`…** `docs/conventions.md > Tests` exige que el nombre
+   describa la conducta, no la funcion. `product-service.test.ts` y `authorization.test.ts`
+   ponian la conducta en el `describe` y el numero de requisito en el `it`, que es exactamente
+   el anti-patron citado en la convencion. Se le dio la vuelta: **96 tests antes, 96 despues**,
+   diff de 18 inserciones / 18 eliminaciones, ninguna linea `expect(` perdida.
+
+Los **cinco** falsos verdes de la jornada aparecieron **ejecutando o mutando; ninguno leyendo**.
+
+## Recuento de mutaciones del Grupo B: 26
+
+| Task | Mutaciones |
+| --- | --- |
+| T4 esquemas zod | 9 (incluidas `.trim()` quitado y `z.coerce.string()` en `cost`) |
+| T6 casos de uso de producto | 4 |
+| T7 casos de uso de presentacion | 4 |
+| T8 autorizacion | **9, una por caso de uso** |
+
+La de T8 es la que sostiene la feature: **quitar `requireAdmin` de cada uno de los nueve casos
+de uso pone rojo el test**, comprobado y revertido nueve veces. Dato que lo hace necesario:
+cuando se quito `requireAdmin` de `create-product.ts`, `product-service.test.ts` **siguio
+verde (13/13)** —la autorizacion no es su alcance—, asi que `authorization.test.ts` es la
+**unica** red de R1, R2 y R3 en toda la feature.

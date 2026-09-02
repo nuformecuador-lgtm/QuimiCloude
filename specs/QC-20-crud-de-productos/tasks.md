@@ -45,27 +45,27 @@
 
 ## Grupo B — casos de uso (depende de A)
 
-- [ ] **T4 — Esquemas de entrada zod.** `domain/product-input.ts` y
+- [x] **T4 — Esquemas de entrada zod.** `domain/product-input.ts` y
       `domain/presentation-input.ts` (`design.md > 6`). Trim, mínimo 1, máximos 120/60,
       `deliveryTime >= 0`, `cost` como cadena decimal, y el `refine` que rechaza el nombre de
       presentación que normaliza a vacío (D22, R37).
       *Depende de:* T3. **Hecho cuando:** `tests/unit/inventario/product-input.test.ts` pasa.
 
-- [ ] **T5 — Puertos.** `ports/product-repository.ts` y `ports/presentation-repository.ts`, con
+- [x] **T5 — Puertos.** `ports/product-repository.ts` y `ports/presentation-repository.ts`, con
       los resultados discriminados de `design.md > 7`.
       *Depende de:* T3, T4. **Hecho cuando:** typecheck limpio y ningún import prohibido.
 
-- [ ] **T6 [P] — Los cinco casos de uso de producto.** `create`, `get`, `list`, `update`,
+- [x] **T6 [P] — Los cinco casos de uso de producto.** `create`, `get`, `list`, `update`,
       `delete`. `requireAdmin` en la **primera línea** de cada uno.
       *Depende de:* T5. **Hecho cuando:** `tests/unit/inventario/product-service.test.ts` pasa
       con dobles de los puertos.
 
-- [ ] **T7 [P] — Los cuatro casos de uso de presentación.** `create`, `list`, `update`,
+- [x] **T7 [P] — Los cuatro casos de uso de presentación.** `create`, `list`, `update`,
       `delete`.
       *Depende de:* T5. **Hecho cuando:** `tests/unit/inventario/presentation-service.test.ts`
       pasa.
 
-- [ ] **T8 — Test de autorización de los nueve casos de uso.**
+- [x] **T8 — Test de autorización de los nueve casos de uso.**
       `tests/unit/inventario/authorization.test.ts`, con dobles que **fallan si los llaman**
       (`design.md > 12`, cuarto aviso).
       *Depende de:* T6, T7. **Hecho cuando:** los nueve casos cubren Operador, rol nulo, rol
