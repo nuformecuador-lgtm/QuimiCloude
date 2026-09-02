@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import LoginPage from '@/app/(public)/login/page';
 import { LoginForm } from '@/app/(public)/login/components';
 import { Toaster } from '@/components/ui/sonner';
-import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
+import { DASHBOARD_ROUTE, FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
   REQUIRED_FIELD_ERROR,
@@ -33,7 +33,17 @@ const testId = {
   usernameError: 'login-username-error',
   passwordError: 'login-password-error',
   forgotPassword: 'login-forgot-password',
+  next: 'login-next',
 } as const;
+
+/**
+ * QC-9: la pagina es un Server Component `async` (Next 16 entrega `searchParams` como promesa),
+ * asi que no se renderiza como elemento: se invoca, se espera su arbol y se renderiza el
+ * resultado. Es la forma estandar de ejercitar un Server Component sin levantar Next.
+ */
+async function renderLoginPage(searchParams: Record<string, string | string[] | undefined> = {}) {
+  return render(await LoginPage({ searchParams: Promise.resolve(searchParams) }));
+}
 
 let errorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -94,8 +104,8 @@ afterEach(() => {
 });
 
 describe('pantalla de login', () => {
-  it('la pantalla de login se renderiza sin sesion', () => {
-    render(<LoginPage />);
+  it('la pantalla de login se renderiza sin sesion', async () => {
+    await renderLoginPage();
 
     expect(screen.getByTestId(testId.form)).toBeInTheDocument();
     expect(screen.getByTestId(testId.submit)).toBeInTheDocument();
@@ -338,7 +348,7 @@ describe('pantalla de login', () => {
 
   it('muestra el enlace de recuperacion apuntando a FORGOT_PASSWORD_ROUTE y accesible por teclado', async () => {
     const user = userEvent.setup();
-    render(<LoginPage />);
+    await renderLoginPage();
 
     const enlace = screen.getByTestId(testId.forgotPassword);
     expect(enlace).toHaveRole('link');
@@ -354,11 +364,74 @@ describe('pantalla de login', () => {
     expect(enlace).toHaveFocus();
   });
 
-  it('muestra la marca del producto como titulo de la tarjeta', () => {
-    render(<LoginPage />);
+  it('muestra la marca del producto como titulo de la tarjeta', async () => {
+    await renderLoginPage();
 
     const titulo = document.querySelector('[data-slot="card-title"]');
     expect(titulo).not.toBeNull();
     expect(titulo).toHaveTextContent('QuimiCloude');
+  });
+});
+
+describe('destino de vuelta (QC-9 R7, R8, R9)', () => {
+  it('la pagina pinta el destino pedido en un campo oculto del formulario', async () => {
+    await renderLoginPage({ next: '/dashboard/reportes?desde=ayer' });
+
+    const oculto = screen.getByTestId(testId.next);
+    expect(oculto).toHaveAttribute('name', 'next');
+    expect(oculto).toHaveValue('/dashboard/reportes?desde=ayer');
+    expect(screen.getByTestId(testId.form)).toContainElement(oculto);
+  });
+
+  it('sin parametro de vuelta el campo oculto lleva el dashboard', async () => {
+    await renderLoginPage();
+
+    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
+  });
+
+  it('descarta un destino externo y cae al dashboard', async () => {
+    await renderLoginPage({ next: 'https://evil.example/robo' });
+
+    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
+  });
+
+  it('descarta un parametro repetido, que llega como lista y no como texto', async () => {
+    await renderLoginPage({ next: ['/dashboard/reportes', 'https://evil.example'] });
+
+    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
+  });
+
+  it('el campo oculto viaja en el FormData que recibe la Server Action', async () => {
+    const user = userEvent.setup();
+    await renderLoginPage({ next: '/dashboard/reportes' });
+
+    await fillAndSubmit(user);
+
+    await waitFor(() => expect(loginActionMock).toHaveBeenCalledTimes(1));
+    expect(loginActionMock.mock.calls[0][1].get('next')).toBe('/dashboard/reportes');
+  });
+
+  it('no introduce ningun cambio visual', async () => {
+    await renderLoginPage({ next: '/dashboard/reportes' });
+
+    const form = screen.getByTestId(testId.form);
+    const oculto = screen.getByTestId(testId.next);
+
+    // Oculto de verdad: ni se ve, ni se anuncia, ni se tabula.
+    expect(oculto).toHaveAttribute('type', 'hidden');
+    expect(oculto).not.toBeVisible();
+    expect(oculto).not.toHaveAccessibleName();
+
+    // Los controles visibles del formulario siguen siendo los tres de QC-7: usuario,
+    // contrasena y boton de envio.
+    expect(within(form).getAllByRole('textbox')).toHaveLength(1);
+    expect(within(form).getAllByRole('button')).toHaveLength(1);
+    expect(within(form).getByTestId(testId.password)).toBeVisible();
+  });
+
+  it('el formulario montado sin destino de vuelta lleva el dashboard en el campo oculto', () => {
+    render(<LoginForm />);
+
+    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
   });
 });

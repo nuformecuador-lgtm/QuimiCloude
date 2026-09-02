@@ -8,12 +8,24 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
+import { RETURN_PARAM, resolveReturnPath } from '@/lib/modules/identity';
+import { DASHBOARD_ROUTE, FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 
 import { LoginForm } from './components';
 
 export const metadata: Metadata = {
   title: 'Iniciar sesión · QuimiCloude',
+};
+
+/**
+ * Props de la pagina. En Next 16 `searchParams` es una **promesa** y hay que esperarla; por eso
+ * el componente es `async`. El tipo se escribe aqui —en vez de usar el `PageProps<'/login'>`
+ * global— porque ese global lo genera Next en `.next/types/`, que esta en `.gitignore`: el
+ * typecheck del gate no debe depender de un artefacto de build. La forma es exactamente la que
+ * declara Next para una ruta sin parametros dinamicos, asi que el validador de rutas la acepta.
+ */
+type LoginPageProps = {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 /**
@@ -23,8 +35,25 @@ export const metadata: Metadata = {
  * `design.md > 5.4`): no es un control del formulario y dentro estorbaria el orden de
  * tabulacion entre la contrasena y el boton de envio. Su ruta destino no existe todavia
  * y hoy devuelve 404 (supuesto S6); esta feature no la crea.
+ *
+ * QC-9 R7/R8 (`design.md > 8`, paso 2): lee el destino de vuelta que el middleware puso en la
+ * URL (`?next=...`) y se lo entrega al formulario, que lo lleva en un campo oculto hasta la
+ * Server Action. Un valor repetido llega como array y uno ausente como `undefined`: ninguno de
+ * los dos es texto, asi que `resolveReturnPath` los descarta y cae al dashboard.
+ *
+ * **Esta validacion no protege de nada.** El campo oculto es entrada externa y un POST fabricado
+ * puede traer cualquier cosa sin pasar por esta pagina; la unica validacion que protege es la que
+ * `loginAction` vuelve a hacer al leer el campo (R9). Aqui solo sirve para no pintar basura —una
+ * URL externa— en el HTML.
  */
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const candidato = params[RETURN_PARAM];
+  const next = resolveReturnPath(
+    typeof candidato === 'string' ? candidato : undefined,
+    DASHBOARD_ROUTE,
+  );
+
   return (
     <main className="flex min-h-svh items-center justify-center p-6">
       <Card className="w-full max-w-sm">
@@ -32,7 +61,7 @@ export default function LoginPage() {
           <CardTitle>QuimiCloude</CardTitle>
         </CardHeader>
         <CardContent>
-          <LoginForm />
+          <LoginForm next={next} />
         </CardContent>
         <CardFooter>
           <Link

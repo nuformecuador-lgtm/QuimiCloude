@@ -5,13 +5,24 @@ import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RETURN_PARAM } from '@/lib/modules/identity';
 import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
 import { LOGIN_INITIAL_STATE } from '@/lib/modules/identity/adapters/driving/login-form-state';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 
 import { SubmitButton } from './submit-button';
 
 const USERNAME_ERROR_ID = 'username-error';
 const PASSWORD_ERROR_ID = 'password-error';
+
+type LoginFormProps = {
+  /**
+   * Destino de vuelta ya validado por la pagina (R7, R8). Opcional con el dashboard por defecto:
+   * el formulario tambien se monta sin el —en tests y en cualquier uso futuro— y el campo oculto
+   * nunca debe viajar vacio.
+   */
+  readonly next?: string;
+};
 
 /**
  * Formulario de login (`design.md > 5.2`).
@@ -34,8 +45,12 @@ const PASSWORD_ERROR_ID = 'password-error';
  * con el mismo nombre, que es el caso comun. Un remontaje tira el foco del input, asi que
  * conviene el minimo posible. La contrasena no lleva clave: sin `defaultValue` no dispara el
  * aviso, y remontarla robaria el foco al enviar con Enter desde ese campo.
+ *
+ * QC-9 (`design.md > 8`, paso 3): el destino de vuelta viaja en un campo OCULTO hasta la Server
+ * Action. Es lo unico que esta feature anade al formulario: sin cambio visual, sin estado nuevo y
+ * sin tocar los campos no controlados, las claves de montaje, los toasts ni `SubmitButton`.
  */
-export function LoginForm() {
+export function LoginForm({ next = DASHBOARD_ROUTE }: LoginFormProps) {
   const [state, formAction] = useActionState(loginAction, LOGIN_INITIAL_STATE);
 
   // Unico `useRef` del componente: memoriza que intento ya se notifico (R21).
@@ -61,6 +76,19 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-4" data-testid="login-form">
+      {/*
+        Campo oculto: transporta el destino de vuelta del servidor al servidor. `defaultValue`
+        y no `value`, como el resto de campos del formulario, que son NO controlados. Que sea
+        oculto no lo hace de fiar: `loginAction` lo revalida con `resolveReturnPath`, porque un
+        POST fabricado puede traer cualquier cosa.
+      */}
+      <input
+        type="hidden"
+        name={RETURN_PARAM}
+        defaultValue={next}
+        data-testid="login-next"
+      />
+
       <div className="flex flex-col gap-2">
         <Label htmlFor="username">Usuario</Label>
         <Input
