@@ -137,7 +137,7 @@
     archivo no declara `'use client'` y sigue llamando al proveedor de sesión)
 - **Depende de:** T9.
 
-### T12 — E2E del anti-parpadeo
+### T12 [x] — E2E del anti-parpadeo
 - Nuevo `e2e/theme.spec.ts`, sobre `/login` (ruta pública, sin sesión), en chromium y webkit.
   Sonda de `requestAnimationFrame` inyectada con `addInitScript` (`design.md > 8`, nivel 4).
   - `no pinta el modo claro antes de aplicar el oscuro del sistema` → **R10**, **R7**

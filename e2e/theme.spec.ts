@@ -26,6 +26,30 @@
  * escenario (`no pinta el modo claro antes de aplicar el oscuro del sistema`) debe fallar,
  * porque sin el, un `system` oscuro solo se aplicaria despues de que React hidrate — ya tarde
  * para el primer fotograma. La corre el leader en el gate, no este archivo.
+ *
+ * DOS AJUSTES POSTERIORES (hallazgo mayor del leader, rojo intermitente en frio):
+ *
+ * 1) La sonda del primer escenario (R10) guardaba solo el className del PRIMERISIMO
+ *    `requestAnimationFrame`. Con `next dev` compilando en frio, el HTML llega en streaming y
+ *    puede darse un frame antes de que el trozo con el `<script>` inline haya llegado siquiera
+ *    — sobre un documento sin ningun contenido pintado todavia (`document.readyState ===
+ *    'loading'`). Ese frame no es un parpadeo visible (no habia nada que ver), pero la sonda
+ *    original no sabia distinguirlo y fallaba igual. Ahora `armFrameLog`/`readThemeFrames`
+ *    registran TODOS los frames hasta `load` (mas uno final), cada uno con si el documento ya
+ *    tenia contenido (`readyState !== 'loading'`), y el test solo exige el modo correcto en los
+ *    frames CON contenido — que es lo que R10 pide de verdad ("no se ve el modo equivocado"),
+ *    no "el primerisimo frame absoluto sin importar si habia algo que ver". No se sustituye por
+ *    un `expect` del estado final: eso dejaria de detectar el parpadeo real.
+ *
+ * 2) El ultimo escenario (R17) cambiaba `page.emulateMedia` justo despues de `page.goto`, sin
+ *    esperar a que React hidratara. Si el cambio de `prefers-color-scheme` llegaba antes de que
+ *    el listener de `matchMedia` del proveedor existiera, el evento `change` se perdia y
+ *    `expect.poll` agotaba sus 5s. Se agrega `waitForHydration`, que espera de forma
+ *    deterministica (fibra de React presente en `<body>`) a que la app pueda reaccionar antes de
+ *    tocar la emulacion. Esto NO ablanda R17: el requisito dice "mientras la pestaña esta
+ *    abierta", y una pestaña que todavia no termino de montar la app no es el escenario que R17
+ *    describe — es, ademas, un caso que el propio proveedor (`components/shared/
+ *    theme-provider.tsx`) ahora cubre por separado re-sincronizando al montar.
  */
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
@@ -62,6 +86,74 @@ function isDarkClassName(className: string): boolean {
   return className.split(/\s+/).includes(THEME_DARK_CLASS);
 }
 
+type ThemeFrame = { className: string; hasContent: boolean };
+
+/**
+ * Arma, en `document_start`, un registro de TODOS los frames pintados hasta `load` (mas uno
+ * final tras `load`), cada uno con si el documento ya tenia contenido en ese momento
+ * (`readyState !== 'loading'`). Reemplaza la sonda de "primer frame absoluto" solo para el
+ * escenario de R10 (ver docblock de cabecera): esa sonda podia capturar un frame previo a que
+ * llegara siquiera el `<script>` inline, sobre un documento vacio, y eso no es el parpadeo que
+ * R10 prohibe.
+ */
+async function armFrameLog(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const frames: ThemeFrame[] = [];
+    (window as unknown as { __themeFrames: ThemeFrame[] }).__themeFrames = frames;
+    (window as unknown as { __themeFramesDone?: boolean }).__themeFramesDone = false;
+
+    const capture = (): void => {
+      frames.push({
+        className: document.documentElement.className,
+        hasContent: document.readyState !== 'loading',
+      });
+    };
+
+    let loaded = false;
+    window.addEventListener('load', () => {
+      loaded = true;
+    });
+
+    const loop = (): void => {
+      capture();
+      if (!loaded) {
+        requestAnimationFrame(loop);
+        return;
+      }
+      // Un frame mas tras `load`, para no perder el estado final, y se cierra el registro.
+      requestAnimationFrame(() => {
+        capture();
+        (window as unknown as { __themeFramesDone?: boolean }).__themeFramesDone = true;
+      });
+    };
+    requestAnimationFrame(loop);
+  });
+}
+
+/** Espera a que `armFrameLog` termine de registrar (hasta el frame posterior a `load`). */
+async function readThemeFrames(page: Page): Promise<ThemeFrame[]> {
+  await page.waitForFunction(
+    () => (window as unknown as { __themeFramesDone?: boolean }).__themeFramesDone === true,
+  );
+  return page.evaluate(
+    () => (window as unknown as { __themeFrames: ThemeFrame[] }).__themeFrames,
+  );
+}
+
+/**
+ * Espera de forma deterministica a que React haya hidratado la app (fibra de React presente en
+ * `<body>`). Uso exclusivo del escenario R17: cambiar `page.emulateMedia` antes de que el
+ * proveedor exista haria que el evento `change` se perdiera sin que nadie lo compensara.
+ */
+async function waitForHydration(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const body = document.body as unknown as Record<string, unknown>;
+    return Object.keys(body).some(
+      (key) => key.startsWith('__reactFiber$') || key.startsWith('__reactContainer$'),
+    );
+  });
+}
+
 async function seedThemeCookie(
   context: BrowserContext,
   baseURL: string,
@@ -80,15 +172,21 @@ async function seedThemeCookie(
 
 test.describe('anti-parpadeo del tema en /login', () => {
   test('no pinta el modo claro antes de aplicar el oscuro del sistema', async ({ page }) => {
-    // R10, R7 — sin cookie, el sistema operativo dice oscuro: el primer fotograma ya debe
-    // traer la clase oscura, sin que React tenga que hidratar primero para corregirla.
+    // R10, R7 — sin cookie, el sistema operativo dice oscuro: ningun frame con contenido ya
+    // pintado puede traer el modo claro, ni siquiera el primero (nadie tiene que ver un
+    // parpadeo mientras React hidrata). Los frames sin contenido (`hasContent: false`) no
+    // cuentan: si el documento todavia no tenia nada que pintar, no hubo parpadeo visible.
     await page.emulateMedia({ colorScheme: 'dark' });
-    await armFirstFrameProbe(page);
+    await armFrameLog(page);
 
     await page.goto(LOGIN_PATH);
 
-    const primerFotograma = await readFirstFrameThemeClass(page);
-    expect(isDarkClassName(primerFotograma)).toBe(true);
+    const frames = await readThemeFrames(page);
+    const paintedFrames = frames.filter((frame) => frame.hasContent);
+    expect(paintedFrames.length).toBeGreaterThan(0);
+    for (const frame of paintedFrames) {
+      expect(isDarkClassName(frame.className)).toBe(true);
+    }
   });
 
   test('conserva la preferencia guardada tras recargar y en una sesion nueva del navegador', async ({
@@ -154,6 +252,12 @@ test.describe('anti-parpadeo del tema en /login', () => {
     await expect
       .poll(() => page.evaluate(() => document.documentElement.classList.contains('dark')))
       .toBe(false);
+
+    // R17 dice "mientras la pestaña esta abierta": una pestaña que todavia no termino de
+    // hidratar no es ese escenario. Se espera a que el proveedor exista de verdad antes de
+    // cambiar la emulacion, para no perder el evento `change` contra un listener que aun no se
+    // suscribio (carrera real en `next dev` compilando en frio).
+    await waitForHydration(page);
 
     await page.emulateMedia({ colorScheme: 'dark' });
 

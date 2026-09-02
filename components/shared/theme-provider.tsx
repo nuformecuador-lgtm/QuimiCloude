@@ -94,6 +94,14 @@ function useThemeState(
   // R17: solo mientras la preferencia es 'system' y el estado esta activo. Se da de baja al
   // desmontar y al pasar a 'light'/'dark' (la dependencia en `preference` recrea el efecto en
   // cada cambio).
+  //
+  // `syncResolved` no solo atiende el evento `change`: tambien se llama una vez al enganchar el
+  // efecto (montaje, o reenganche tras volver a `system`). Esto cierra una carrera real: si el
+  // sistema operativo cambia de modo entre que `THEME_INIT_SCRIPT` pinto el DOM y que React
+  // hidrata y suscribe este listener, el evento `change` ya paso y nadie lo habria visto —el
+  // usuario se habria quedado en el modo viejo hasta recargar. Comparar contra la clase actual
+  // del DOM (no solo contra `resolved`) hace que la llamada de montaje sea idempotente en el
+  // caso normal (mismo valor que ya dejo el script) y por tanto no reintroduce parpadeo.
   useEffect(() => {
     if (!active) return;
     if (preference !== 'system') return;
@@ -101,14 +109,21 @@ function useThemeState(
 
     const media = window.matchMedia(DARK_MEDIA_QUERY);
 
-    const handleChange = () => {
+    const syncResolved = () => {
       const nextResolved: 'light' | 'dark' = media.matches ? 'dark' : 'light';
-      applyResolvedTheme(nextResolved);
-      setResolved(nextResolved);
+      const domIsDark = document.documentElement.classList.contains(THEME_DARK_CLASS);
+      const domResolved: 'light' | 'dark' = domIsDark ? 'dark' : 'light';
+
+      if (domResolved !== nextResolved) {
+        applyResolvedTheme(nextResolved);
+      }
+      setResolved((prev) => (prev === nextResolved ? prev : nextResolved));
     };
 
-    media.addEventListener('change', handleChange);
-    return () => media.removeEventListener('change', handleChange);
+    syncResolved();
+
+    media.addEventListener('change', syncResolved);
+    return () => media.removeEventListener('change', syncResolved);
   }, [active, preference]);
 
   return useMemo<ThemeContextValue>(

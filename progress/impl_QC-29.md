@@ -193,3 +193,80 @@ Las cinco de `requirements.md` siguen sin resolver y ninguna bloqueaba la implem
 `SIDEBAR_WIDTH_MOBILE` va en un `style` inline del primitivo y R21 prohibe editarlo—, la
 persistencia por usuario en base de datos y el control de tema en la zona publica. Ninguna se
 resolvio por la via de los hechos.
+
+---
+
+## Addendum 2026-09-02 — T12 ejecutado y en verde (hallazgo mayor F2.2 del leader)
+
+El leader corrio el E2E que esta bitacora habia dejado escrito y **sin ejecutar**, y volvio en
+rojo: 5 pasan, 3 fallan (`no pinta el modo claro…` en chromium; `sigue el cambio de
+prefers-color-scheme…` en chromium y webkit). Dejar T12 sin correr fue un error de esta
+bitacora: un test escrito y no ejecutado no es evidencia de nada, y aqui tapaba un agujero real
+de producto.
+
+### Que era cada fallo
+
+**No era una rotura estable, era una carrera.** Reejecutado con `.next` caliente salian 7 de 8
+(fallaba solo R17 en webkit); en frio fallaban tres. Instrumentando la pagina con una sonda
+temporal (`MutationObserver` sobre `<html>`, deteccion de `__reactFiber$`, registro de frames)
+salieron las dos causas:
+
+1. **R17 — `sigue el cambio de prefers-color-scheme mientras la preferencia es sistema`.** Dos
+   fallos, uno en el test y **uno de producto**:
+   - *Test*: `page.emulateMedia({ colorScheme: 'dark' })` llegaba **antes de que React hidratara**
+     (normal con `next dev` compilando `/login` por primera vez), asi que el evento `change` se
+     disparaba cuando el listener del proveedor todavia no existia.
+   - *Producto*: `useThemeState` **solo reaccionaba al evento `change` y nunca re-sincronizaba el
+     DOM al montar**. Un cambio del sistema operativo ocurrido entre que corre
+     `THEME_INIT_SCRIPT` y que React hidrata se perdia **para siempre**: el usuario real se
+     quedaba en el modo viejo hasta recargar. Ese agujero existia en el codigo, no solo en el
+     test.
+2. **R10 — `no pinta el modo claro antes de aplicar el oscuro del sistema`.** La sonda miraba el
+   className del **primerisimo** `requestAnimationFrame`. Con el HTML en streaming de `next dev`,
+   en compilacion fria puede ocurrir un frame antes de que llegue el trozo con el `<script>`
+   inline, sobre un documento **sin contenido pintado** (`readyState === 'loading'`). Eso no es
+   parpadeo visible, pero la sonda no sabia distinguirlo. Fallo del test, no del codigo.
+
+Dato colateral medido, util para quien lea el codigo: **React 19 iza el `<script>` inline de
+`<body>` al `<head>`** en el DOM final. El contrato (correr antes del marcado) se sigue
+cumpliendo y el test unitario que lo afirma sobre el HTML serializado sigue siendo valido, pero
+`document.body.firstElementChild` **no** es el script.
+
+### Que se toco
+
+| Archivo | Cambio |
+| --- | --- |
+| `components/shared/theme-provider.tsx` | el efecto de `preference === 'system'` ejecuta `syncResolved()` tambien **al engancharse**, no solo en el evento `change`. Compara contra la clase que hay en el DOM y solo aplica si difiere: idempotente en el caso normal, no reintroduce parpadeo. Respeta `options.active`. El proveedor **sigue sin leer la cookie** en ningun efecto |
+| `e2e/theme.spec.ts` | R10: la sonda registra **todos** los frames hasta `load` con su `hasContent`, y afirma que ningun frame **con contenido** llevaba el modo equivocado (mide lo que dice el requisito, no «el primer rAF absoluto»). R17: `waitForHydration` antes de cambiar la emulacion — R17 habla de la pestaña abierta, y una pestaña que aun no termino de cargar no es ese escenario |
+
+### Salida real
+
+```
+pnpm exec playwright test e2e/theme.spec.ts --reporter=list   (con .next borrado, en frio)
+
+  8 passed (22.9s)      chromium y webkit, 0 failed
+```
+
+Segunda corrida en caliente: 8 passed / 0 failed. `pnpm typecheck` y `pnpm lint` limpios.
+`pnpm exec vitest run tests/unit/theme --maxWorkers=2` → 9 archivos, 40 tests, verde.
+
+### Mordidas (las tres, restaurando despues)
+
+| Que se rompio | Que paso |
+| --- | --- |
+| se quito el `<script>` de `app/layout.tsx` | R10 **falla en los dos motores** |
+| se quito el `addEventListener('change', …)` del proveedor | R17 **falla en chromium**; en **webkit no falla** |
+| se quito solo la re-sincronizacion de montaje (dejando el listener) | R17 **falla en webkit**; en chromium sigue verde |
+
+La asimetria esta medida, no supuesta: en webkit el efecto pasivo se ejecuta ~15 ms despues de
+que la fibra de React aparece en el DOM, asi que el listener llega a registrarse **despues** de
+que `matches` ya cambio y el evento `change` nunca vuelve. Ahi quien rescata el caso es la
+re-sincronizacion de montaje; en chromium, el listener. **Las dos piezas hacen falta y cada una
+tiene un motor que la muerde** — ninguna es decorativa, y por eso ninguna se puede quitar
+«porque el test sigue verde» mirando un solo navegador.
+
+### Estado tras el addendum
+
+19 de 20 tareas cerradas (T0–T17, T19). **T18** (`pnpm test` completo contra
+`tests/baseline-rojos.json`) y **T20** (`./init.sh` antes del PR) siguen siendo del leader.
+R10, R11 y R17 pasan de «escrito» a **demostrado en chromium y webkit**.
