@@ -15,7 +15,7 @@ excepcion (`CLAUDE.md`, regla 5).
 
 ## Bloque 1 — Dominio (sin dependencias entre si)
 
-### T1 [P] — `domain/session-claims.ts`
+### [x] T1 [P] — `domain/session-claims.ts`
 Tipo `SessionClaims` (`sub`, `issuedAt`, `expiresAt`), esquema zod (`sub` con formato UUID,
 `iat`/`exp` enteros positivos), `parseSessionClaims(rawJson): SessionClaims | null` e
 `isSessionExpired(claims, now): boolean` con `>=`.
@@ -23,7 +23,7 @@ Tipo `SessionClaims` (`sub`, `issuedAt`, `expiresAt`), esquema zod (`sub` con fo
 faltan, `sub` que no es UUID, `exp` justo en el instante, `exp` un segundo despues— y pasa.
 El archivo no importa `next/*`, `@prisma/client` ni `lib/shared/**`.
 
-### T2 [P] — `domain/display-name.ts`
+### [x] T2 [P] — `domain/display-name.ts`
 `buildDisplayName(firstNames, lastNames, username)`: primer token de cada campo, tolerante a
 espacios multiples, con caida al `username` si el resultado queda vacio.
 **Hecho:** `tests/unit/identity/display-name.test.ts` cubre R13, incluido el caso literal de la
@@ -31,12 +31,12 @@ decision («Ana Maria» + «Perez Gomez» → «Ana Perez») y la comprobacion d
 `getInitials(buildDisplayName(...)) === 'AP'` importando el helper existente de
 `lib/shared/ui/initials.ts` **desde el test** (el dominio no lo importa).
 
-### T3 [P] — Puertos `SessionReader` y `SessionUserReader`
+### [x] T3 [P] — Puertos `SessionReader` y `SessionUserReader`
 `ports/session-reader.ts` y `ports/session-user-reader.ts` con las firmas de `design.md > 4.5`,
 mas el tipo `SessionUserRecord`.
 **Hecho:** `pnpm run typecheck` pasa; los dos archivos solo importan del propio `domain/`.
 
-### T4 — `domain/resolve-session-user.ts` *(depende de T1, T2, T3)*
+### [x] T4 — `domain/resolve-session-user.ts` *(depende de T1, T2, T3)*
 `createResolveSessionUser({ session, users })` con el algoritmo de `design.md > 2.1`.
 **Hecho:** `tests/unit/identity/resolve-session-user.test.ts` con puertos falsos cubre R1, R10,
 R11, R12 y R14, y afirma **explicitamente** que con `claims === null` o con sesion caducada
