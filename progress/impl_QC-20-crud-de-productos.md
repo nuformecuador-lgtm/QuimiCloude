@@ -1052,3 +1052,60 @@ Ningun test cambio de resultado y ninguna conducta se modifico. Los cambios fuer
 doc-comments** (M1), **dos filas de tabla** en `design.md` y en el mapa de esta bitacora (m6, m3),
 **una linea muerta** en un test (m4), **dos nombres de test** (m1) y **un recuento** (m8). El
 resto es documentacion de decisiones y deuda.
+
+## m7 — CERRADO en la ronda 2 (no entra como deuda)
+
+`presentation-actions.ts` ya tiene su test: `tests/unit/inventario/presentation-actions.test.ts`,
+**19 tests**. Suite unitaria: **50 archivos / 501 tests** (antes 49/482). Integracion sin cambio.
+
+**Por que se cerro en vez de anotarse** (decision del leader): **la asimetria es peor que el
+hueco**. Con `product-actions.test.ts` presente y el de presentacion ausente, quien mire el arbol
+asume que las dos estan cubiertas — y una deuda anotada no cambia lo que la gente infiere del
+arbol de archivos. Ademas es la superficie que **QC-22 consume directamente**: un fallo en
+`currentActor()` o `toErrorState()` lo habria encontrado alguien depurando una pantalla, que es el
+sitio mas caro.
+
+**No es un calco del de producto.** Afirma lo que es **propio de presentaciones**:
+
+| Conducta | Por que producto NO la tiene |
+| --- | --- |
+| `DuplicateNameError` -> `duplicate_name` al crear y al renombrar (R18) | El nombre de **producto no es unico** (D14, R12) |
+| `PresentationInUseError` -> `presentation_in_use` al borrar con productos asignados (R21) | Producto **no tiene** este error en absoluto |
+| Un nombre que normaliza a vacio da `invalid_input`, **nunca** `duplicate_name` (R37, D22) | La distincion solo existe en presentaciones |
+| `deletePresentationAction` rechaza el `id` faltante **antes** de llamar al caso de uso | Es su unica validacion propia |
+
+Y **no** repite la conversion numerica de `FormData` (`stock`, `minPurchase`...), que es propia de
+producto: presentacion solo tiene `name`. Copiarla habria sido la senal de un calco.
+
+**Matiz honesto sobre R28 en presentaciones,** verificado en el codigo: `presentation-actions.ts`
+**no valida el `name` por su cuenta** —la validacion vive en `presentation-input.ts`, dentro del
+caso de uso—, asi que los tests de nombre invalido de este archivo demuestran la **traduccion** del
+`ValidationError`, no la validacion. La validacion la cierra `presentation-service.test.ts`. Es el
+borde correcto en hexagonal, pero se deja escrito para que nadie lea de mas en estos tests.
+
+**Mutaciones (4, todas revertidas, `git diff lib/` vacio):**
+
+| Mutacion | Rojo observado |
+| --- | --- |
+| `currentActor()` devuelve un actor fijo | **5 tests** caen: se esperaba `user-admin-1`, se recibio `fixed-actor`; `getSessionUser` con 0 llamadas |
+| `toErrorState()` relanza en vez de traducir | **11 tests** caen: los errores se propagan crudos en vez de `{status:'error', code, message}` |
+| Se salta la validacion del `id` vacio | 1 test cae: el caso de uso acaba llamado con `id: ''` |
+| `'in_use'` sin traducir | **1 test, y justo el propio de presentaciones** |
+
+## Tres criterios de esta ronda, anotados para reutilizar
+
+**1. Recuentos identicos como prueba de que una ronda fue documental.** Tras cerrar M1 los tres
+recuentos eran **exactamente** los de la ronda 1 —482, 106, 78—: ningun test cambio de resultado,
+luego el codigo no cambio de comportamiento. Sirve en las dos direcciones: tambien delata un
+cambio «solo de texto» que mueve un recuento.
+
+**2. Una exencion muerta se quita comprobando LAS DOS direcciones.** En m4 no basto con ver que lo
+prohibido seguia prohibido (un import de runtime desde `lib/modules/recetas/` **en rojo**): habia
+que comprobar que **lo eximido sigue eximido** (el mismo import desde `lib/composition/` **en
+verde**). Verificar solo el rojo habria dejado pasar el caso en que la exencion se lleva por
+delante algo legitimo.
+
+**3. En una justificacion, la propiedad del dato va DELANTE de la convencion del repo.** Se
+reordeno la del `ON DELETE RESTRICT`: primero que un `NULL` sobrevenido es indistinguible de uno
+historico —propiedad del dato, no cambia—, y detras que las tres FK del esquema usan `Restrict`
+—convencion, puede cambiar—.
