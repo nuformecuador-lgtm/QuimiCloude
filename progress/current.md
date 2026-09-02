@@ -15,6 +15,16 @@
 | QC-20 | crud-de-productos | QC-18 Inventario | backend | **spec_ready** | `feature/QC-20-crud-de-productos` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Tercera sesión de leader. **F2.0 no se ejecuta**: `depends_on` incluye QC-8, que está `pending` y sin spec, y `AGENTS.md` dice que una feature con `depends_on` no arranca hasta que su dependencia esté `done`. Por eso la ficha se queda en `spec_ready` y **la tarjeta NO se mueve a *En curso***: moverla dejaría board y disco divergentes por una fase que no ha empezado (mismo criterio que se aplicó a QC-14 el 2026-09-01). Arranca cuando QC-8 cierre. Acotada, sembrada y especificada el 2026-09-02: **23 decisiones cerradas + 37 requisitos EARS**, congelados en `21d6695` (las 5 preguntas que abrió el diseño las cerró el humano tras F1.2 y entraron como D19–D23; una cambió la posición del diseño: el tope de página pasó de 100 a 25). Sin preguntas abiertas. Tarjeta en *En revisión*. Fase 2 **bloqueada por QC-8**, que está `pending` y sin spec |
 | QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **pending — BLOQUEADA** | `feature/QC-30-rediseno-login` | **Ficha creada en esta sesión (2026-09-02)** a partir del canvas de login aprobado por el humano. Issue `QC-30` bajo la épica **QC-17 Identidad y acceso** (el módulo manda sobre la naturaleza del trabajo: es la pantalla de `identity`, aunque el cambio sea de presentación), labels `sdd`, `slug:rediseno-login`, `zone:frontend`, `complexity:medium`. **`depends_on: QC-29`**, con el issue link «is blocked by» ya creado en el board: se pinta con los tokens que QC-29 define, y especificarla antes sería escribir sobre tokens que no existen. **No se monta worktree ni se lanza `spec_author`** hasta que QC-29 esté `done` (`AGENTS.md`: una feature con `depends_on` no arranca). El material de diseño está sembrado en `specs/QC-30-rediseno-login/design-input-login.md`: vidrio, burbujas y las cinco medidas que difieren de `components/ui/` |
 
+La feature **QC-21 — ayuda-visual-de-contrasena** se cerró el 2026-09-02 (PR #17, merge
+`3775102`): resumen en `progress/history.md`, worktree desmontado y rama borrada — `wt.sh done`
+falló a medias en Windows por tercera vez seguida, rematado con `rmdir /s /q` + `git worktree
+prune`. En F2.3 apareció el **`add/add`** que había avisado otra sesión: la versión SEMILLA de
+`requirements.md` (57 líneas) había llegado a `dev` por el PR #16 para desbloquear su gate.
+**Resuelto a favor de la rama** (177 líneas, con la R5 corregida): resolverlo al revés habría
+perdido 120 líneas de spec Y reintroducido el requisito insatisfactible que B2 acababa de
+cerrar. El conflicto de este archivo, en cambio, resultó ser **cero conflictos reales** al
+normalizar las tres versiones: todo era fin de línea, van tres veces hoy.
+
 La feature **QC-8 — sesion-actual-y-logout** se cerró el 2026-09-02 (PR #13, merge `dc090e0`):
 la llevó **otra sesión de leader**. Su tarjeta ya estaba en *Finalizado* y el PR mergeado, pero la
 ficha seguía `pending` en `feature_list.json` y eso **bloqueaba a QC-20** por `depends_on`. Se pasa
@@ -150,6 +160,27 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 - `depends_on` por issue links «is blocked by»: QC-32 ← QC-24; QC-33 ← QC-32, QC-24;
   QC-34 ← QC-33, QC-8; QC-35 ← QC-34. Ninguna arranca todavía: las cuatro nacen `pending` en
   Backlog y el cupo de `in_progress` no se mueve.
+
+### QC-30 — rediseno-login (acotada el 2026-09-02)
+
+- El alcance y las **14 decisiones cerradas** viven en `specs/QC-30-rediseno-login/requirements.md`
+  — esa es la fuente, aquí solo se enlaza. Quedan **2 preguntas abiertas**. Los valores exactos del
+  diseño (vidrio, burbujas, medidas) están en `design-input-login.md`, que dejó la sesión de QC-29.
+- **Traspaso entre sesiones:** `labs-65` la había reclamado sin trabajo empezado y la soltó al
+  pedírselo. No había rama, worktree, spec ni commits — distinto del caso de QC-20, donde sí los
+  había. La lección se aplicó al revés que por la mañana: preguntar antes, no deducir del silencio.
+- Las dos decisiones del humano al acotar: **los 44 px de alto aplican SOLO al login**, no a toda
+  la aplicación (regla acotada, fuera de `@layer` y sin editar `components/ui/`, precedente de
+  QC-29); y **la vista móvil entra**. El artboard móvil lo había dibujado la sesión de diseño por
+  criterio propio y el humano no lo había pedido: entra porque lo decidió hoy, no porque el canvas
+  lo trajera.
+- Board actualizado **antes** de sembrar: `description` reescrita con esas dos decisiones.
+  `zone: frontend` y `complexity: medium` no cambian. No se creó ni canceló ninguna ficha.
+- **Colisión conocida y pactada:** `app/globals.css` lo toca en paralelo la rama
+  `feature/fix-ajuste-sidebar`, **sin ficha** (QC-40 se canceló y el ajuste va como arreglo
+  directo), así que ese trabajo no figura como `in_progress` en ninguna parte. Acuerdo: bloques
+  separados, nadie reordena ni reindenta el archivo, y quien vaya a tocar líneas del otro avisa
+  antes de escribir.
 
 ### QC-32 — modelo-unidades (acotada el 2026-09-02)
 

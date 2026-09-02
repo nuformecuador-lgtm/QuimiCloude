@@ -646,3 +646,85 @@ la fibra.
   y si el login quiere control propio de tema — esa la recoge QC-30.
 - **`wt.sh done` falló otra vez en Windows** (cuarta el mismo día): desregistró el worktree pero
   dejó el árbol; rematado con `rm -rf` + `git worktree prune`.
+
+## QC-21 — ayuda-visual-de-contrasena (2026-09-02)
+
+El componente reutilizable que muestra los requisitos de una contraseña nueva y cuáles se van
+cumpliendo mientras se escribe, pintado a partir del catálogo `CREDENTIAL_RULES` que exporta QC-19
+y **sin redeclarar ninguna regla**. PR #17, merge `3775102`. Los 22 requisitos (R1–R22) con test
+ejecutado; `./init.sh` completo en verde: 63 archivos, 626 tests, 78 guardias. Seis archivos
+nuevos, cero modificados de producción ajena. Sin dependencias nuevas.
+
+**La ficha nació sin sitio donde vivir, y eso lo descubrió la acotación, no el spec.** Hoy ninguna
+pantalla del producto fija o cambia una contraseña: el login solo verifica. Tirando de ese hilo
+apareció algo peor — `must_change_credential` lo escribe el seed de QC-6 y **no lo lee nadie**, así
+que el usuario inicial nace obligado a cambiar su contraseña y no tiene por dónde. Decisión humana:
+construir el componente igual y crear **QC-36 (cambiar-mi-contrasena)** como su primer consumidor.
+La columna muerta pasó a tener ficha.
+
+### La lección: dos bloqueantes, y ninguno era un fallo de código
+
+- **B1 — un test que habría roto el gate de las features siguientes.** El centinela de R19
+  afirmaba sobre el diff de git *de la rama que lo ejecutara*. En cuanto esta rama se fusionara,
+  toda rama posterior que tocara `app/`, `db/` o `lib/` habría fallado **por archivos ajenos**. El
+  ancla añadida para compensar era una **tautología** —comparaba rutas de `components/shared/`
+  contra `app/`— y el comentario le atribuía una garantía que no daba. Cerrado borrando la
+  invocación a `git` entera: R19 se verifica sobre el **contenido** de los tres artefactos.
+  Es el cuarto incidente del mismo patrón: QC-6, QC-7, QC-14/QC-19 y este.
+- **B2 — un requisito insatisfactible en un spec aprobado.** R5 exigía que con el campo vacío se
+  mostraran *las seis* reglas incumplidas. Son **cinco**: `max_length` está cumplida con la cadena
+  vacía. El implementer tenía tres salidas malas a mano —inventar el estado en el componente,
+  tocar QC-19, o reescribir el requisito por su cuenta— y **no tomó ninguna**: lo subió como
+  pregunta abierta y el humano aprobó la redacción corregida.
+
+### Un test que se sabe fuerte porque se midió
+
+Al cerrar m-5 el implementer verificó su propia mordida y descubrió que **la obvia no era
+discriminante**: invertir la derivación en el componente pone rojos también a los dos tests
+espejo, porque llaman a la función pura directamente y no a través de `deriveState`. La que separa
+es alterar el criterio **en el dominio**: ahí los espejos siguen verdes —comparan el componente
+contra el mismo criterio equivocado— y solo el mapa literal muerde. El reviewer lo reprodujo: 3
+rojos con la mordida fácil, 1 rojo y 12 verdes con la buena. Los espejos que quedan llevan escrito
+**qué clase de fallo no atrapan**.
+
+El implementer además **rechazó dos veces sugerencias del reviewer** con razón: afirmar que
+`components/shared/` contiene exactamente tres archivos era un censo de recurso compartido, y
+QC-29 estaba escribiendo `theme-provider.tsx` en esa misma carpeta — habría puesto rojo el gate de
+la otra sesión. El reviewer aceptó la corrección.
+
+### Cuatro sesiones sobre el mismo repo, y lo que costó
+
+- **El `add/add` del spec.** La versión SEMILLA de `requirements.md` (57 líneas) llegó a `dev` por
+  el PR #16, porque el gate de esa sesión salía rojo sin ella. Al sincronizar apareció el conflicto
+  y se resolvió a favor de la rama: al revés habría perdido 120 líneas **y reintroducido el
+  requisito insatisfactible de B2**. Se supo porque esa sesión avisó, no porque el conflicto lo
+  dijera.
+- **El falso rojo del validador**, que bloqueó tres veces a cuatro sesiones: `WT_DIR = '.worktrees'`
+  (`scripts/validate-features.mjs:18`) se resuelve contra el cwd, así que **desde dentro de un
+  worktree** —que es donde el arnés manda correr el gate previo al PR— no encuentra los specs que
+  viven en otros worktrees. `scripts/wt.sh` ya resuelve contra el worktree principal y explica por
+  qué; el validador no heredó esa lección. Una sesión estuvo a punto de commitear el spec de una
+  tercera a `dev` para "arreglarlo".
+- **`docs/jira.md` dice «Manda Jira»**, no que gane el disco. Esta sesión afirmó lo contrario
+  fiándose de una frase de `progress/current.md` escrita por otra sesión, que era correcta en su
+  contexto y se generalizó mal. Mismo modo de fallo que el `design.md` de QC-7: mientras la frase
+  esté escrita, nadie va a mirar la fuente.
+- **`feature_list.json` envejece en minutos** con cuatro sesiones vivas: cuatro mutaciones bajo los
+  pies en una sola tanda. Un casi-choque en QC-20 se evitó porque la ficha decía `spec_ready`
+  mientras el board decía *En curso* y la rama tenía 28 commits. **F0 no es solo del arranque de
+  sesión**, y eso es el mejor candidato a regla que dejó el día.
+- **El fin de línea fabricó tres conflictos falsos**, uno de ellos de 2269 líneas que al normalizar
+  las tres versiones se quedó en **cero**. Sigue sin haber `.gitattributes`.
+
+### Deuda que hereda
+
+- **El input mide 32px** frente a los 44x44 recomendados como objetivo táctil. Excepción declarada
+  en `design.md > 6` con su pregunta abierta; el alcance es de QC-29/QC-30. **Cerrar antes de que
+  QC-36 lo ponga delante de una persona.**
+- **`guard-password-never-plaintext` no barre `components/`** y, además, **no ve `readonly
+  nombre?:`**: su regex exige los dos puntos pegados al identificador y el `?` los separa — justo
+  la forma que usan todas las props de esta feature. Documentado de forma **ejecutable** con un
+  centinela local; ampliar la guardia es `/afinar-regla`.
+- **Nadie ve este componente hasta QC-36.**
+- Importar del archivo de la guardia **duplica la ejecución de sus 6 tests**, así que infla el
+  recuento: de +35 sobre el baseline, 29 son nuevos de verdad.
