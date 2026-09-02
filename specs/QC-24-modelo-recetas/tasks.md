@@ -16,7 +16,7 @@ bloque C.
 
 ## Bloque A — Preparación
 
-### [ ] T0. Dejar el `.env` disponible dentro del worktree
+### [x] T0. Dejar el `.env` disponible dentro del worktree
 - Dep: ninguna. **Primera task, antes de cualquier `pnpm run db:*`.**
 - Archivos: `.env` (git-ignorado, **no versionado**).
 - Los worktrees no heredan el `.env` de la raíz. Hay que dejarlo disponible en
@@ -31,7 +31,7 @@ bloque C.
 
 ## Bloque B — Esquema y migración
 
-### [ ] T1. Añadir los modelos `Recipe` y `RecipeLine` a `db/schema.prisma`
+### [x] T1. Añadir los modelos `Recipe` y `RecipeLine` a `db/schema.prisma`
 - Dep: ninguna (T0 solo hace falta para los `db:*`).
 - Archivos: `db/schema.prisma`.
 - Los dos modelos tal como están en `design.md > 2`, **añadidos al final**, sin tocar
@@ -50,7 +50,7 @@ bloque C.
 - **Hecho cuando:** `pnpm exec prisma validate` pasa, `pnpm exec prisma generate` produce el
   cliente con `Recipe` y `RecipeLine`, y `pnpm run typecheck` pasa.
 
-### [ ] T2. Generar y completar a mano `migration.sql`
+### [x] T2. Generar y completar a mano `migration.sql`
 - Dep: T0, T1.
 - Archivos: `db/migrations/<ts>_recipes_and_recipe_lines/migration.sql`.
 - `pnpm run db:migrate:create` (no aplica nada) y después **completar a mano** lo que Prisma no
@@ -70,7 +70,7 @@ bloque C.
   mano con `RESTRICT`), los cuatro índices, el índice único parcial, el `CHECK > 0` y los cuatro
   `ALTER` de RLS.
 
-### [ ] T3. Escribir `down.sql` a mano
+### [x] T3. Escribir `down.sql` a mano
 - Dep: T2.
 - Archivos: `db/migrations/<ts>_recipes_and_recipe_lines/down.sql`.
 - Exactamente dos sentencias, en orden inverso al UP: `DROP TABLE IF EXISTS "recipe_lines";` y
@@ -85,7 +85,7 @@ bloque C.
 
 ## Bloque C — Módulo `recetas` y contrato de `inventario`
 
-### [ ] T4. Crear el armazón del módulo `recetas`
+### [x] T4. Crear el armazón del módulo `recetas`
 - Dep: ninguna.
 - Archivos: `lib/modules/recetas/index.ts`, `lib/modules/recetas/domain/recipe-name.ts`,
   `lib/modules/recetas/ports/.gitkeep`, `lib/modules/recetas/adapters/driven/.gitkeep`,
@@ -97,7 +97,7 @@ bloque C.
 - **Hecho cuando:** `pnpm run typecheck` y `pnpm run lint` pasan, y
   `tests/guards/guard-arquitectura-modulos.test.ts` sigue en verde con el módulo nuevo dentro.
 
-### [ ] T5. Publicar el contrato de `inventario` hacia otros módulos
+### [x] T5. Publicar el contrato de `inventario` hacia otros módulos
 - Dep: ninguna (independiente de T4, pero se revisa junto con él).
 - Archivos: `lib/modules/inventario/domain/product-catalog.ts`,
   `lib/modules/inventario/index.ts`.
@@ -112,7 +112,7 @@ bloque C.
 - **Hecho cuando:** `pnpm run typecheck` pasa y `@/lib/modules/inventario` exporta los tres
   símbolos de tipo.
 
-### [ ] T6. Confirmar que `lib/composition/index.ts` NO se toca
+### [x] T6. Confirmar que `lib/composition/index.ts` NO se toca
 - Dep: T4, T5.
 - Archivos: ninguno.
 - Comprobación explícita, no un olvido: en esta ficha no hay puertos ni adaptadores que
@@ -124,7 +124,7 @@ bloque C.
 
 ## Bloque D — Tests estáticos y unitarios (no necesitan base)
 
-### [ ] T7. [P] Contrato estático del esquema
+### [x] T7. [P] Contrato estático del esquema
 - Dep: T1.
 - Archivos: `tests/unit/recetas/schema/recetas-schema.test.ts`.
 - Lee `db/schema.prisma` como **texto**. Reutilizar los helpers de
@@ -135,7 +135,7 @@ bloque C.
 - **Hecho cuando:** pasa y cubre R1, R2, R3, R4, R5, R6, R8, R10, R13, R15, R17, R19, R21, R22,
   R23, R24, R28, R33.
 
-### [ ] T8. [P] Contrato estático del SQL de la migración
+### [x] T8. [P] Contrato estático del SQL de la migración
 - Dep: T2, T3.
 - Archivos: `tests/unit/recetas/schema/recetas-migration.test.ts`.
 - Lee `migration.sql` y `down.sql` como texto, con los helpers de
@@ -148,7 +148,7 @@ bloque C.
 - **Hecho cuando:** pasa y cubre R3, R5, R7, R9, R11, R13, R14, R16, R19, R21, R25, R27, R28,
   R29, R30, R33.
 
-### [ ] T9. [P] La normalización del nombre
+### [x] T9. [P] La normalización del nombre
 - Dep: T4.
 - Archivos: `tests/unit/recetas/domain/recipe-name.test.ts`.
 - Casos: acentos (`Bidón` → `bidon`), mayúsculas, signos y espacios (los tres ejemplos de
@@ -156,7 +156,7 @@ bloque C.
   hace segura la columna persistida.
 - **Hecho cuando:** pasa y cubre R8.
 
-### [ ] T10. [P] Forma del módulo nuevo y frontera con `inventario`
+### [x] T10. [P] Forma del módulo nuevo y frontera con `inventario`
 - Dep: T4, T5.
 - Archivos: `tests/unit/recetas/module-contract.test.ts`.
 - Lee el árbol de `lib/modules/recetas/**` y el texto de sus archivos. Afirma: `index.ts` existe
@@ -171,7 +171,7 @@ bloque C.
 
 ## Bloque E — Base de datos real
 
-### [ ] T11. Aplicar y revertir la migración de verdad (ciclo apply → rollback → apply)
+### [x] T11. Aplicar y revertir la migración de verdad (ciclo apply → rollback → apply)
 - Dep: T0, T2, T3.
 - Archivos: ninguno versionado; la salida se pega en `progress/impl_QC-24-modelo-recetas.md`.
 - `pnpm run db:migrate` → comprobar el esquema real (las dos tablas, las **cuatro** FK en
@@ -183,7 +183,7 @@ bloque C.
   `progress/impl_QC-24-modelo-recetas.md`, y cierra **R30** en su forma real (el test estático
   solo mira el texto del SQL).
 
-### [ ] T12. Tests de integración contra Postgres real
+### [x] T12. Tests de integración contra Postgres real
 - Dep: T11, T7 (para no duplicar lo que ya cubre el estático).
 - Archivos: `tests/integration/recetas/recetas-constraints.int.test.ts`.
 - Cada caso dentro de `prisma.$transaction` que termina en `ROLLBACK`; toda operación que se
@@ -213,7 +213,7 @@ bloque C.
   archivo.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con las cinco guardias en verde.
 
-### [ ] T14. Documentar el mapa `R<n> → test`
+### [x] T14. Documentar el mapa `R<n> → test`
 - Dep: T13.
 - Archivos: `progress/impl_QC-24-modelo-recetas.md`.
 - Copiar la tabla de trazabilidad de abajo con la **salida real** de los tests, no con la
