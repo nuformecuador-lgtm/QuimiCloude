@@ -55,8 +55,14 @@ const IGNORED_DIRS = new Set(['node_modules', '.next', '.git', '.prisma', 'dist'
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx'])
 
-/** Unico dueño autorizado del algoritmo de firma (R5, `design.md > 4.1` y `> 6.5`). */
-const UNICO_DUENO = 'lib/modules/identity/adapters/driven/session/session-cookie.ts'
+/**
+ * Unico dueño autorizado del algoritmo de firma (R5, `design.md > 4.1` y `> 6.5`).
+ *
+ * QC-9 T6: pasa a ser el CODEC. `session-cookie.ts` se quedo con el transporte —`cookies()` de
+ * `next/headers`— y el formato entero (troceado, version, base64url y HMAC) vive ahora en
+ * `session-token.ts`, que es lo unico que el middleware puede cargar en el borde.
+ */
+const UNICO_DUENO = 'lib/modules/identity/adapters/driven/session/session-token.ts'
 
 /** Ruta comparable: separadores POSIX, para que esto corra igual en Windows. */
 function toPosix(file: string): string {
@@ -92,9 +98,28 @@ function stripComments(source: string): string {
     .join('\n')
 }
 
-/** `true` si el fuente (sin comentarios) invoca `createHmac`. */
-export function mentionsCreateHmac(source: string): boolean {
-  return /\bcreateHmac\s*\(/.test(stripComments(source))
+/**
+ * `true` si el fuente (sin comentarios) IMPLEMENTA el algoritmo de firma, con la API que sea.
+ *
+ * QC-9 T6 — la huella deja de ser solo `createHmac(`. Esto es lo critico de esta task: al migrar
+ * el HMAC a WebCrypto, una guardia que solo buscara `createHmac(` se habria quedado sin nada que
+ * vigilar —ningun archivo de produccion volveria a mencionarlo— y habria seguido en VERDE mientras
+ * cualquiera escribia su propio `crypto.subtle.sign(...)` en otro sitio. Desactivarse en silencio
+ * es el peor final posible para una guardia, asi que la huella cubre las dos APIs: la que se va y
+ * la que llega (`design.md > 3.5`, punto 2).
+ *
+ * El assert `expect(encontrados).toContain(UNICO_DUENO)` es la otra mitad de la red: si el dueño
+ * dejara de casar con la huella, la guardia avisa en vez de quedarse muda.
+ */
+export function mentionsSignatureAlgorithm(source: string): boolean {
+  const codigo = stripComments(source)
+
+  return (
+    /\bcreateHmac\s*\(/.test(codigo) ||
+    /\bcrypto\.subtle\b/.test(codigo) ||
+    /\bsubtle\.importKey\s*\(/.test(codigo) ||
+    /\bsubtle\.sign\s*\(/.test(codigo)
+  )
 }
 
 /**
@@ -122,17 +147,17 @@ export function listProductionFiles(root: string): readonly string[] {
   ]
 }
 
-/** Archivos de produccion (rutas relativas en POSIX) que invocan `createHmac`. */
-export function findCreateHmacUsers(root: string): readonly string[] {
+/** Archivos de produccion (rutas relativas en POSIX) que implementan el algoritmo de firma. */
+export function findSignatureAlgorithmUsers(root: string): readonly string[] {
   const files = listProductionFiles(root)
   return files
-    .filter((absPath) => mentionsCreateHmac(readFileSync(absPath, 'utf8')))
+    .filter((absPath) => mentionsSignatureAlgorithm(readFileSync(absPath, 'utf8')))
     .map((absPath) => toPosix(absPath.slice(root.length + 1)))
 }
 
 describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
-  it('createHmac solo aparece en el adaptador que emite y verifica la cookie', () => {
-    const encontrados = findCreateHmacUsers(repoRoot)
+  it('el algoritmo de firma solo aparece en el codec que emite y verifica la cookie', () => {
+    const encontrados = findSignatureAlgorithmUsers(repoRoot)
 
     const intrusos = encontrados.filter((file) => file !== UNICO_DUENO)
 
@@ -141,39 +166,68 @@ describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
       intrusos.length === 0
         ? undefined
         : `La firma de sesion tiene un solo dueño (R5): ${UNICO_DUENO}. ` +
-            `Se encontro tambien createHmac en: ${intrusos.join(', ')}. ` +
+            `Se encontro tambien createHmac o crypto.subtle en: ${intrusos.join(', ')}. ` +
             'No reimplementes el algoritmo de firma ahi: importa y reutiliza ' +
-            "signSessionValue() desde ese adaptador. Un formato con dos dueños se " +
+            "signSessionValue() desde ese codec. Un formato con dos dueños se " +
             'desincroniza en silencio (design.md > 6.5).',
     ).toEqual([])
 
-    // Y el dueño legitimo tiene que aparecer: si algun dia deja de usar createHmac (cambio de
-    // algoritmo), esta linea avisa de que la constante UNICO_DUENO quedo obsoleta.
+    // Y el dueño legitimo tiene que aparecer: si algun dia deja de casar con la huella (otro
+    // cambio de algoritmo), esta linea avisa de que la constante UNICO_DUENO quedo obsoleta.
     expect(encontrados).toContain(UNICO_DUENO)
   })
 
-  it('la comparacion de firmas es en tiempo constante (R5): el unico dueño usa timingSafeEqual', () => {
+  // QC-9 T6 (R17) — `timingSafeEqual` es de `node:crypto` y NO sobrevive al borde; WebCrypto no
+  // ofrece equivalente. La comparacion en tiempo constante pasa a ser propia y la guardia busca
+  // esa, no la anterior.
+  it('la comparacion de firmas es en tiempo constante (R5, R17): el unico dueño usa equalsInConstantTime', () => {
     const fuente = stripComments(readFileSync(join(repoRoot, UNICO_DUENO), 'utf8'))
 
     expect(
-      /\btimingSafeEqual\s*\(/.test(fuente),
-      'R5 exige comparar la firma de sesion en tiempo constante: usa timingSafeEqual() de ' +
-        "node:crypto, no '===' ni cualquier comparacion que corte en la primera diferencia. " +
-        `Eso filtra la firma esperada por el tiempo de respuesta (side-channel timing attack). ` +
-        `El unico dueño autorizado es ${UNICO_DUENO}; ahi es donde debe vivir esa llamada.`,
+      /\bequalsInConstantTime\s*\(/.test(fuente),
+      'R5/R17 exigen comparar la firma de sesion en tiempo constante: usa ' +
+        "equalsInConstantTime(), no '===' ni cualquier comparacion que corte en la primera " +
+        'diferencia. Eso filtra la firma esperada por el tiempo de respuesta (side-channel ' +
+        `timing attack). El unico dueño autorizado es ${UNICO_DUENO}; ahi es donde debe vivir ` +
+        'esa comparacion.',
     ).toBe(true)
   })
 
-  it('la regla detecta un createHmac propio en un archivo sintetico, y no un comentario que lo menciona', () => {
-    expect(mentionsCreateHmac("import { createHmac } from 'node:crypto'; createHmac('sha256', s)")).toBe(
+  // QC-9 T6 (R15) — el dueño corre TAMBIEN en el borde: si importara `node:crypto`, el
+  // middleware no cargaria. No basta con que use WebCrypto; no puede quedar ni el import viejo.
+  it('el unico dueño no importa node:crypto (R15): tiene que cargar en el borde', () => {
+    const fuente = stripComments(readFileSync(join(repoRoot, UNICO_DUENO), 'utf8'))
+
+    expect(
+      /['"]node:crypto['"]/.test(fuente),
+      `${UNICO_DUENO} importa node:crypto. El middleware corre en el runtime del borde, donde ` +
+        'ese modulo no existe: la peticion fallaria al cargar. La firma se calcula con ' +
+        'crypto.subtle, que existe en Node y en el borde (design.md > 3.2).',
+    ).toBe(false)
+  })
+
+  it('la regla detecta una implementacion propia con cualquiera de las dos APIs, y no un comentario que las menciona', () => {
+    // La API que se va.
+    expect(
+      mentionsSignatureAlgorithm("import { createHmac } from 'node:crypto'; createHmac('sha256', s)"),
+    ).toBe(true)
+    expect(mentionsSignatureAlgorithm('const x = createHmac(\'sha256\', secret).update(y).digest()')).toBe(
       true,
     )
-    expect(mentionsCreateHmac('const x = createHmac(\'sha256\', secret).update(y).digest()')).toBe(
+    // Y la que llega: sin esto, migrar el algoritmo habria desactivado la guardia en silencio.
+    expect(
+      mentionsSignatureAlgorithm("const k = await crypto.subtle.importKey('raw', b, alg, false, ['sign'])"),
+    ).toBe(true)
+    expect(mentionsSignatureAlgorithm("await crypto.subtle.sign('HMAC', key, msg)")).toBe(true)
+    expect(mentionsSignatureAlgorithm("const { subtle } = crypto; await subtle.sign('HMAC', k, m)")).toBe(
       true,
     )
-    // Un comentario que solo lo menciona no es una segunda implementacion.
-    expect(mentionsCreateHmac('// antes esto llamaba a createHmac(...) directamente')).toBe(false)
-    expect(mentionsCreateHmac('export function signSessionValue() { return "no-op" }')).toBe(false)
+    // Un comentario que solo las menciona no es una segunda implementacion.
+    expect(mentionsSignatureAlgorithm('// antes esto llamaba a createHmac(...) directamente')).toBe(false)
+    expect(mentionsSignatureAlgorithm('/* migrado de crypto.subtle.sign a otra cosa */')).toBe(false)
+    expect(mentionsSignatureAlgorithm('export function signSessionValue() { return "no-op" }')).toBe(false)
+    // `crypto.randomUUID()` no es firmar: la huella no puede ser "menciona crypto".
+    expect(mentionsSignatureAlgorithm('const id = crypto.randomUUID()')).toBe(false)
   })
 
   // QC-9 R19 — la raiz del repositorio tambien se barre.
