@@ -155,6 +155,46 @@
   min-height: 44px;
 }
 
+/* Elemento activo con el acento naranja.
+   El primitivo lo marca con `data-active:bg-sidebar-accent`, que es el velo agua, asi que
+   `--sidebar-primary` quedaba definido y sin usar: el color mas caracteristico de la paleta
+   no aparecia en ninguna parte de la barra. Se corrige desde aqui y no editando
+   `components/ui/sidebar.tsx`, por el mismo motivo que el resto de este bloque: una regla
+   sin capa gana a las utilidades, que si viven en capa. */
+[data-slot='sidebar-menu-button'][data-active] {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--sidebar-primary) 22%, transparent),
+    color-mix(in oklch, var(--sidebar-primary) 4%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 26%, transparent);
+}
+
+/* La barra de acento del borde izquierdo. Va en un pseudoelemento y no en un `<span>` para
+   que el componente no tenga que dibujar nada que solo existe por estetica. */
+[data-slot='sidebar-menu-button'][data-active]::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sidebar-primary);
+  box-shadow: 0 0 12px var(--sidebar-primary);
+}
+
+[data-slot='sidebar-menu-button'][data-active] svg {
+  color: var(--sidebar-primary);
+}
+
+/* El submenu activo lleva el acento mas contenido: sin barra ni halo, solo el anillo. Dos
+   barras de acento a la vez -la del grupo y la del hijo- compiten por la misma lectura. */
+[data-slot='sidebar-menu-sub-button'][data-active] {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 22%, transparent);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
