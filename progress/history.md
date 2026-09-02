@@ -251,3 +251,74 @@ es un accidente sino una trampa estructural: **falta un `.gitattributes`**.
 - Cosmética menor del `reviewer`: una aserción tautológica en R2 (cuyo fondo sí cubre el
   requisito), un comentario desalineado en R11 y dos desajustes de numeración entre
   `design.md` y `tasks.md`.
+
+## QC-7 — login-usuario-y-contrasena (2026-09-02)
+
+Login real de punta a punta: verificación de credenciales contra Postgres, política de bloqueo
+de cuenta con escalada y cookie de sesión firmada. PR #9, merge `10f9a07`. Los 31 requisitos
+(R1–R31) con test ejecutado, incluido E2E en navegador real con Playwright.
+
+**La complejidad real fue `high`, no la que traía la ficha.** Llegó sin complejidad asignada y
+lo que se estimó como "verificar credenciales y emitir cookie" (`medium`) cambió de escala
+cuando el humano respondió la pregunta abierta 2 con una política concreta de bloqueo: eso
+arrastró persistencia, migración con su `down.sql`, un puerto y un adaptador de escritura más,
+y una tanda entera de tests, a una feature que no tenía ninguna. El bloqueo entró como
+**alcance añadido**, no estaba en la description original. Se decidió dejarlo dentro y no
+sacarlo a ficha propia: es el mismo camino de código, y la respuesta uniforme en contenido y en
+tiempo hay que diseñarla **una vez** — retrofitear uniformidad sobre un login ya mergeado es
+exactamente como se cuelan los oráculos.
+
+### La lección: tres rondas, dos bloqueantes, y los dos aparecieron ejecutando
+
+El `reviewer` rechazó dos veces antes de aprobar. Ninguno de los dos bloqueantes era visible
+leyendo el código:
+
+- **M-A1 — el registro del intento fallido no era atómico.** Cerrado con compare-and-set y
+  hasta 10 reintentos con relectura.
+- **M-B1 — el CAS sufría un ABA y borraba bloqueos activos.** El predicado comparaba los
+  enteros por igualdad y el bloqueo también: el par `(failed_login_attempts, lock_level)` con
+  valor `(0,1)` es **a la vez** bloqueo fresco y bloqueo caducado, así que un intento con
+  estado obsoleto **desbloqueaba una cuenta bloqueada** — un atacante podía sacarse a sí mismo
+  del bloqueo. Cerrado comparando el bloqueo por **rango** (`locked_until IS NULL OR <= now`),
+  con test discriminante.
+
+Lo más caro no fue el defecto sino su tapadera: `design.md > 5.7` **declaraba el caso imposible
+con una premisa falsa**. Mientras esa frase estuviera escrita, nadie iba a buscar ahí. Se borró
+de los dos sitios donde vivía y se sustituyó por el escenario real, con constancia de que se
+descubrió ejecutando. **Quien toque ese `where` en QC-8 o QC-9 tiene que leer esa sección
+antes.**
+
+En las tres rondas el implementer respondió **midiendo en vez de argumentando** — incluido
+quitarse el `OR` a sí mismo para ver caer el test.
+
+### Deuda que hereda
+
+- **El logout de QC-8 borrará la cookie, pero no revoca nada.** La sesión es un token firmado
+  sin estado: un valor ya firmado que alguien hubiera copiado sigue siendo válido hasta su
+  `exp` (8 h). Riesgo acotado y reversible — migrar a sesiones opacas toca **solo**
+  `session-cookie.ts` y el lector de QC-8; el dominio y los puertos no se enteran.
+- **Bloqueo POR CUENTA, sin límite por IP.** Cualquiera puede dejar fuera a un usuario conocido
+  hasta 60 minutos con 5 intentos fallidos. DoS dirigido **asumido explícitamente por el humano**
+  (D12): ERP de un solo tenant, usuarios conocidos, sin registro público. El límite por IP se
+  ofreció y se descartó: sobre Vercel la IP llega por `x-forwarded-for`, falsificable, y daría
+  una sensación de protección que no es real.
+- **Un usuario bloqueado no sabe que lo está.** El mensaje es el genérico, sin excepción: un
+  "cuenta bloqueada" delataría que el nombre de usuario existe. Coste real para el usuario
+  legítimo. **Revisar cuando exista la recuperación de contraseña** (deuda de QC-10): avisar por
+  correo al dueño de la cuenta es el canal que no filtra nada a terceros.
+- **El nivel de escalada no decae con el tiempo**, solo baja con un login exitoso. Una ventana
+  de buen comportamiento exigiría una cuarta columna y una regla más que testear, para acotar
+  algo que ya está acotado en 60 minutos.
+- **Bajo contención extrema puede perderse un intento sin contar.** Si los 10 reintentos del CAS
+  pierden la carrera, ese intento no suma. No es una pérdida del bloqueo: el contador es
+  monótono y el bloqueo acaba disparándose igual.
+- **Un test de QC-4 afirma sobre el estado GLOBAL de la tabla.** `identity-constraints.int.test.ts`
+  usa `expect(await tx.user.count()).toBe(0)`. Al aparecer el segundo archivo de integración se
+  volvió una carrera; **contenido** serializando `tests/integration/` en `vitest.config.mts`, no
+  reparado. El arreglo de fondo —acotar la aserción a sus propias filas— es de QC-4. La
+  serialización vale **dentro de una corrida**: dos procesos de vitest a la vez contra la misma
+  base siguen chocando. Es también lo que hizo que un E2E interrumpido dejara basura y pusiera 9
+  tests en rojo.
+- **El `.env` del repo no tiene `DIRECT_URL`**, que `db/schema.prisma` declara; sin ella
+  `prisma migrate` falla con `P1012`. `.env.example` sí la documenta: el incompleto es el `.env`
+  real. Candidato a que lo cubra `scripts/wt.sh new`.
