@@ -26,7 +26,98 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notacion EARS (`docs/specs.md`). Cada `R<n>` es testeable y se apoya en el bloque de Alcance
+o en una fila de «Decisiones cerradas»; la fila que lo respalda va citada al final de cada
+requisito entre parentesis. «Usuario vivo» = fila de `users` con `deleted_at IS NULL`
+(heredado de QC-4).
+
+**R1.** El sistema DEBE ofrecer un seed ejecutable de forma no interactiva que, sobre una base
+con las migraciones aplicadas, deje el acceso inicial completo: el catalogo de roles y un
+usuario con rol Administrador. (Alcance)
+
+**R2.** CUANDO el seed se ejecuta, el sistema DEBE asegurar que existe un rol llamado
+`Administrador` y un rol llamado `Operador`, cada uno con su nombre y su descripcion, creando
+el que falte. (Decision 2026-09-01 «¿Cuales son los roles base?»)
+
+**R3.** El seed NO DEBE crear ningun rol distinto de `Administrador` y `Operador`. (Alcance >
+Lo que NO entra: «cualquier rol mas alla de los dos acordados»)
+
+**R4.** SI no existe ningun usuario vivo con rol `Administrador`, ENTONCES el seed DEBE crear
+el usuario inicial y asignarle el rol `Administrador`. (Decision «¿Que rol lleva el usuario
+inicial?»)
+
+**R5.** CUANDO el sistema va a crear el usuario inicial, DEBE tomar su nombre de usuario de
+`SEED_ADMIN_USERNAME`, su contrasena de `SEED_ADMIN_PASSWORD` y su correo de
+`SEED_ADMIN_EMAIL`. (Decisiones «¿De donde salen su usuario y su contrasena?» y «¿Y los seis
+datos personales obligatorios?»)
+
+**R6.** El repositorio NO DEBE contener ninguna credencial del usuario inicial: ni nombre de
+usuario, ni contrasena, ni correo escritos como valor literal en ningun archivo versionado.
+(Decision «¿De donde salen su usuario y su contrasena?»: «Ninguna credencial queda escrita en
+el repo»)
+
+**R7.** CUANDO el sistema crea el usuario inicial, DEBE rellenar nombres, apellidos, fecha de
+nacimiento, telefono y numero de documento con marcadores fijos y reconocibles definidos en el
+propio seed, y el tipo de documento con `CC`. (Decision «¿Y los seis datos personales
+obligatorios?»)
+
+**R8.** CUANDO el sistema guarda la contrasena del usuario inicial, DEBE guardar el valor que
+devuelve el puerto `PasswordHasher`, y NO DEBE guardar en ninguna columna la contrasena en
+claro. (Decision «¿La contrasena se hashea llamando a bcrypt?»)
+
+**R9.** CUANDO el sistema crea el usuario inicial, DEBE dejarlo marcado como obligado a cambiar
+su contrasena. (Decision «¿Se obliga a cambiar la contrasena al primer ingreso?»)
+
+**R10.** El sistema DEBE guardar esa marca en una columna de `users`, con identificador en
+ingles y `snake_case`, cuyo valor para cualquier fila que no la fije explicitamente es «no
+obligado». (Decisiones «¿Se obliga a cambiar la contrasena al primer ingreso?» y «Borrado,
+marcas de tiempo, idioma del esquema»)
+
+**R11.** La migracion que anade esa columna DEBE ser aditiva —no altera ni elimina ninguna
+columna, indice, restriccion ni fila existente— y DEBE traer su `down.sql` escrito a mano, que
+elimina la columna y deja el resto de `users` como estaba. (Decision «¿Se obliga a cambiar la
+contrasena al primer ingreso?»: «migracion aditiva + down.sql»)
+
+**R12.** SI ya existe un usuario vivo con rol `Administrador`, ENTONCES el seed NO DEBE leer
+las variables `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` ni `SEED_ADMIN_EMAIL`, y DEBE
+terminar con exito. (Decision «Si corre en cada despliegue y faltan las `SEED_ADMIN_*`…»)
+
+**R13.** SI hay que crear el usuario inicial y falta o esta vacia alguna de las variables
+`SEED_ADMIN_*`, ENTONCES el seed DEBE detenerse con un error que nombre la variable ausente y
+NO DEBE dejar creada ni modificada ninguna fila. (Decision «Si corre en cada despliegue y
+faltan las `SEED_ADMIN_*`…»: «se detiene con un error claro sin crear nada a medias»)
+
+**R14.** CUANDO el seed se ejecuta sobre una base donde el rol o el usuario inicial ya existen,
+NO DEBE crear filas duplicadas: el numero de filas de `roles` y de `users` DEBE quedar igual
+que antes de la ejecucion. (Decision «En la segunda corrida, ¿que gana?»)
+
+**R15.** CUANDO el seed se ejecuta sobre una base donde el rol o el usuario inicial ya existen,
+NO DEBE modificar ningun campo de esas filas —incluidos el hash de la contrasena, la marca de
+cambio de contrasena, la descripcion del rol y `updated_at`—, aunque su valor difiera del que
+el seed habria escrito. (Decision «En la segunda corrida, ¿que gana?»: «los deja intactos,
+incluida una contrasena ya cambiada. Nunca reescribe»)
+
+**R16.** CUANDO el seed se ejecuta dos veces seguidas contra una base real, la segunda
+ejecucion DEBE terminar con exito y dejar exactamente el mismo estado que dejo la primera:
+mismos identificadores y mismos valores en todas las columnas. (Decision «¿Hace falta E2E?»:
+la verificacion de esta ficha es la doble corrida contra base real)
+
+**R17.** El seed NO DEBE crear, modificar ni borrar ninguna fila de `document_types`.
+(Decision «¿El seed siembra los tipos de documento?»)
+
+**R18.** El seed NO DEBE escribir la contrasena ni ninguna otra credencial en su salida
+estandar, en su salida de error ni en ningun mensaje de excepcion. (Decision «¿De donde salen
+su usuario y su contrasena?» + `docs/conventions.md > Manejo de errores`)
+
+**R19.** CUANDO se despliega la aplicacion, el sistema DEBE ejecutar el seed automaticamente,
+sin que ninguna persona tenga que lanzarlo a mano. (Decision «¿Cuando corre el seed?»)
+
+**R20.** SI el seed falla durante un despliegue, ENTONCES el despliegue DEBE fallar de forma
+visible y la version nueva NO DEBE quedar publicada. (Decision «Si corre en cada despliegue y
+faltan las `SEED_ADMIN_*`…»: «ahi si se detiene»)
+
+**R21.** El seed NO DEBE anadir ninguna dependencia a `package.json`. (Decision «¿Libreria
+nueva o a mano?»)
 
 ## Preguntas abiertas
 

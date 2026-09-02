@@ -346,8 +346,10 @@ describe('estructura del usuario', () => {
           `alta de usuario sin "${omitted}"`,
         )
         expect(sqlState, `omitiendo "${omitted}"`).toBe(NOT_NULL_VIOLATION)
-        // "no crear ninguna fila": tras cada rechazo la tabla sigue vacia.
-        expect(await tx.user.count()).toBe(0)
+        // "no crear ninguna fila": tras cada rechazo no queda ninguna fila DE ESTE CASO
+        // (acotado por roleId: la tabla `users` puede tener otras filas, p. ej. el
+        // usuario inicial que siembra QC-6 en el build).
+        expect(await tx.user.count({ where: { roleId } })).toBe(0)
       }
     })
   })
@@ -381,7 +383,7 @@ describe('unicidad de correo, nombre de usuario y documento', () => {
       )
       expect(sqlState).toBe(UNIQUE_VIOLATION)
 
-      const survivors = await tx.user.findMany({ select: { id: true, email: true } })
+      const survivors = await tx.user.findMany({ where: { roleId }, select: { id: true, email: true } })
       expect(survivors).toEqual([{ id, email: 'ana.perez@example.com' }])
     })
   })
@@ -414,7 +416,7 @@ describe('unicidad de correo, nombre de usuario y documento', () => {
       expect(sqlState).toBe(UNIQUE_VIOLATION)
 
       // El usuario existente se conserva SIN MODIFICAR, con su correo tal como se tecleo.
-      const survivors = await tx.user.findMany({ select: { id: true, email: true } })
+      const survivors = await tx.user.findMany({ where: { roleId }, select: { id: true, email: true } })
       expect(survivors).toEqual([{ id, email: 'Ana.Perez@Example.com' }])
     })
   })
@@ -445,7 +447,7 @@ describe('unicidad de correo, nombre de usuario y documento', () => {
       )
       expect(sqlState).toBe(UNIQUE_VIOLATION)
 
-      const survivors = await tx.user.findMany({ select: { id: true, username: true } })
+      const survivors = await tx.user.findMany({ where: { roleId }, select: { id: true, username: true } })
       expect(survivors).toEqual([{ id, username: 'anaperez' }])
     })
   })
@@ -476,7 +478,7 @@ describe('unicidad de correo, nombre de usuario y documento', () => {
       )
       expect(sqlState).toBe(UNIQUE_VIOLATION)
 
-      const survivors = await tx.user.findMany({ select: { id: true, username: true } })
+      const survivors = await tx.user.findMany({ where: { roleId }, select: { id: true, username: true } })
       expect(survivors).toEqual([{ id, username: 'AnaPerez' }])
     })
   })
@@ -508,6 +510,7 @@ describe('unicidad de correo, nombre de usuario y documento', () => {
       expect(sqlState).toBe(UNIQUE_VIOLATION)
 
       const survivors = await tx.user.findMany({
+        where: { roleId },
         select: { id: true, documentTypeCode: true, documentNumber: true },
       })
       expect(survivors).toEqual([
@@ -534,6 +537,7 @@ describe('unicidad de correo, nombre de usuario y documento', () => {
       })
 
       const users = await tx.user.findMany({
+        where: { roleId },
         select: { documentTypeCode: true, documentNumber: true },
         orderBy: { documentTypeCode: 'asc' },
       })
@@ -568,7 +572,7 @@ describe('conjunto cerrado de tipos de documento', () => {
       // 23503 = foreign_key_violation: la FK es quien cierra el conjunto (design.md > 3).
       // El rol si existe, asi que la unica FK que puede fallar es la del tipo.
       expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
-      expect(await tx.user.count()).toBe(0)
+      expect(await tx.user.count({ where: { roleId } })).toBe(0)
     })
   })
 
@@ -655,10 +659,13 @@ describe('roles', () => {
 
   it('rechaza un usuario sin rol o con rol inexistente', async () => {
     await inRolledBackTransaction(async (tx) => {
+      // No hay `roleId` util en este caso (a proposito: el rol es nulo o inexistente),
+      // asi que se acota por este documento, irrepetible dentro del test.
+      const documentNumber = '111000111'
       const values = userSqlValues({
         email: 'ana@example.com',
         username: 'anaperez',
-        documentNumber: '111000111',
+        documentNumber,
       })
 
       // Sin rol: la unica columna omitida es `role_id`.
@@ -668,7 +675,7 @@ describe('roles', () => {
         'alta de usuario sin rol',
       )
       expect(withoutRole).toBe(NOT_NULL_VIOLATION)
-      expect(await tx.user.count()).toBe(0)
+      expect(await tx.user.count({ where: { documentNumber } })).toBe(0)
 
       // Con un rol inexistente: el tipo de documento si existe, asi que la FK que falla
       // solo puede ser la del rol.
@@ -678,7 +685,7 @@ describe('roles', () => {
         'alta de usuario con un rol inexistente',
       )
       expect(missingRole).toBe(FOREIGN_KEY_VIOLATION)
-      expect(await tx.user.count()).toBe(0)
+      expect(await tx.user.count({ where: { documentNumber } })).toBe(0)
     })
   })
 
