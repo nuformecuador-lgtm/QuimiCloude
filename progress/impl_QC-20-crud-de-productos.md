@@ -1013,10 +1013,12 @@ Se declara como **excepcion explicita, con dueno y con fecha**:
 **m2 — un test que verifica el `replace` de JavaScript, no el repo.**
 `inventario-audit-migration.test.ts:185` sustituye `ON DELETE RESTRICT` por `ON DELETE CASCADE`
 **en una cadena en memoria** y afirma que ya no casa: eso es una propiedad de `String.replace`. Lo
-unico del repo que comprueba lo afirma ya el test inmediatamente anterior. **No es un agujero**
-—el reviewer verifico que el requisito no queda descubierto: quitar `take: limit` enrojece R26 en
-integracion— sino un test de poco valor. **Deuda menor:** borrarlo, o convertirlo en mutacion real
-sobre `statements()`.
+unico del repo que comprueba —que la FK lleva `ON DELETE RESTRICT`— **ya lo afirma el test
+inmediatamente anterior**, sobre el SQL real de la migracion. Esa es su evidencia: no que el
+requisito quede descubierto, sino que **esta duplicado por un test mas debil**. (Correccion n3 de
+la ronda 3: esta justificacion citaba antes la mutacion de `take: limit`, que es la evidencia de
+**m3**, no de m2.) **No es un agujero**, es un test de poco valor. **Deuda menor:** borrarlo, o
+convertirlo en mutacion real sobre `statements()`.
 
 **m5 — la reformulacion estrecha el alcance a cuatro raices.** `lib/shared/**`, `middleware.ts`,
 `scripts/` y `e2e/` quedan fuera de esa asercion concreta. `lib/shared` lo cubre el **bloque 9** de
@@ -1072,7 +1074,7 @@ sitio mas caro.
 | `DuplicateNameError` -> `duplicate_name` al crear y al renombrar (R18) | El nombre de **producto no es unico** (D14, R12) |
 | `PresentationInUseError` -> `presentation_in_use` al borrar con productos asignados (R21) | Producto **no tiene** este error en absoluto |
 | Un nombre que normaliza a vacio da `invalid_input`, **nunca** `duplicate_name` (R37, D22) | La distincion solo existe en presentaciones |
-| `deletePresentationAction` rechaza el `id` faltante **antes** de llamar al caso de uso | Es su unica validacion propia |
+| `deletePresentationAction` rechaza el `id` faltante **antes** de llamar al caso de uso | **NADA: esta fila era FALSA y se corrige aqui.** `deleteProductAction` tiene exactamente el mismo rechazo, testeado en `product-actions.test.ts:188`. Es un **calco legitimo** —la conducta es identica en las dos acciones y ambas deben tenerla— pero **no es prueba de que el archivo no sea un calco**, que es para lo que esta tabla existe |
 
 Y **no** repite la conversion numerica de `FormData` (`stock`, `minPurchase`...), que es propia de
 producto: presentacion solo tiene `name`. Copiarla habria sido la senal de un calco.
@@ -1109,3 +1111,55 @@ delante algo legitimo.
 reordeno la del `ON DELETE RESTRICT`: primero que un `NULL` sobrevenido es indistinguible de uno
 historico —propiedad del dato, no cambia—, y detras que las tres FK del esquema usan `Restrict`
 —convencion, puede cambiar—.
+
+---
+
+# RONDA 3 — cuatro deslices tras el APROBADO de la ronda 2
+
+Veredicto de la ronda 2: **APROBADO, 0 mayores**. El reviewer contrasto ademas **las cuatro
+afirmaciones nuevas** del `design.md` contra el codigo y **se sostienen**: no hay una cuarta falsa.
+Quedaron cuatro deslices, y **tres son del mismo genero que esta feature lleva todo el dia
+cazando**.
+
+**n1 — la tabla «no es un calco» contenia una fila FALSA, y en la prueba de calidad.** Su cuarta
+fila decia que el rechazo del `id` vacio es propio de presentaciones. **`deleteProductAction` lo
+tiene igual**, testeado en `product-actions.test.ts:188`. O sea: **el unico test del archivo nuevo
+que si es un calco estaba listado como prueba de que no lo era**. Misma familia que M1 —documento
+que afirma lo contrario de lo que hace el codigo— y en el peor sitio posible. Corregido diciendo la
+verdad: es un **calco legitimo**, porque la conducta debe ser identica en las dos acciones, pero
+**no vale como prueba** de lo que esa tabla pretende demostrar.
+
+**n2 — un `it.each` de tres nombres invalidos que no podia discriminar.** El mock rechazaba
+**incondicionalmente**, asi que el valor de `name` no influia en el resultado: tres copias del
+mismo test aparentando cobertura de R9 y R11. **No se podia arreglar «haciendo que el valor
+importe»**, porque `presentation-actions.ts` no valida el nombre —eso vive en el caso de uso—, asi
+que desde la action el valor **no puede** cambiar nada. Reducido a un caso, renombrado a lo que si
+demuestra (la **traduccion** del `ValidationError`) y con la discriminacion real remitida a
+`presentation-service.test.ts` y `product-input.test.ts`. **Sexto** caso de la jornada.
+
+**n3 — la justificacion de m2 citaba la evidencia de m3.** Corregido: la evidencia de m2 es que el
+test inmediatamente anterior ya afirma lo unico del repo que ese test comprueba.
+
+**n4 — el doc-comment decia «rechaza el `INSERT`» y `rename` es un `UPDATE`.** Un renombrado no
+inserta nada, y **tambien** puede chocar contra el indice unico y devolver `'duplicate'`. Corregido
+para cubrir las dos operaciones.
+
+## Lo que el reviewer aporto, y que mejora el expediente
+
+**El argumento que hace NECESARIA la asimetria de m7.** Se habia justificado que
+`product-actions.ts` valide por su cuenta y `presentation-actions.ts` no, porque producto convierte
+`FormData` de cadenas a enteros. El reviewer da la razon de fondo: **`Number('abc')` es `NaN`, y
+`NaN` pasa `z.number().int()`**. O sea que ese fallo **el dominio no puede verlo**: si la action no
+lo rechaza, se cuela. La asimetria no es estetica ni una comodidad, es **necesaria**.
+
+**m4 verificado en TRES direcciones, no en las dos que se reportaron:** runtime desde `recetas`
+**rojo**, `import type` desde `recetas` **verde**, y runtime desde `lib/composition` **verde**. El
+acuerdo con la sesion de QC-24 queda intacto.
+
+**m8 salio mas preciso que el propio hallazgo:** 18 archivos en `domain/` en disco, **17 de QC-20**,
+y el decimoctavo es `product-catalog.ts`, que trajo QC-24 en el merge.
+
+**Y el reviewer destaca m9 por encima del resto:** el waiver **admite que por la letra el checkpoint
+no se cumple** y declara lo que queda sin cubrir —que la Server Action entregue el actor de la
+sesion del navegador extremo a extremo—. **Un waiver que reconoce su propio hueco vale mas que uno
+que lo esconde.**
