@@ -646,6 +646,18 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **Las pruebas de mutacion sobre archivos de PRODUCCION no pueden correr en paralelo.** Al
+  cerrar los menores de QC-8, tres subagentes trabajaban a la vez y **dos mutaron
+  `session-cookie.ts` simultaneamente** para probar guardias distintas: uno quitaba
+  `timingSafeEqual`, otro dejaba `clearSession` en no-op. En un sondeo intermedio el
+  implementer se encontro **produccion mutada** y la restauro desde `HEAD` sin saber que su
+  dueno iba a revertirla segundos despues. Acabo bien **solo** porque ambos caminos llevaban al
+  mismo contenido y porque se comprobo antes que el unico diff era la mutacion — pero el riesgo
+  real era **comitear produccion rota**, y ningun test lo habria cazado: el arbol estaba verde
+  entre mutacion y mutacion. Regla a fijar en `/afinar-regla`: una prueba de mutacion se
+  serializa o se hace sobre una copia, y **nunca** sobre un archivo que otro agente esta
+  tocando. Ver `progress/impl_QC-8-sesion-actual-y-logout.md > Un apunte de proceso`.
+
 - **[QC-9, ANTES de escribir `middleware.ts`] Las guardias no barren los `.ts` de la raíz del
   repo.** `tests/guards/guard-firma-sesion-unica.test.ts` (QC-8) usa
   `PRODUCTION_DIRS = ['lib','app','components','hooks']` y
