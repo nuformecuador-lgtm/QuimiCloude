@@ -37,7 +37,7 @@
       "epic_name": "Identidad y acceso",
       "name": "seed-roles-y-usuario-inicial",
       "description": "Para poder entrar por primera vez hace falta que la base arranque con los roles base y con un usuario inicial ya creado y utilizable. Los roles base son Administrador y Operador. El usuario inicial es Administrador y sus credenciales salen del entorno, nunca del codigo. El seed corre automaticamente despues de cada despliegue y debe poder correrse mas de una vez sin duplicar ni romper nada: solo crea lo que falta y nunca pisa lo que alguien haya cambiado a mano, asi que en un entorno que ya tiene el usuario creado ni siquiera mira las credenciales del entorno; en uno nuevo, si faltan, se detiene. El usuario inicial nace obligado a cambiar su contrasena la primera vez que entre, de modo que la tabla de usuarios necesita guardar esa marca; hacerla cumplir es parte del login y no de aqui.",
-      "status": "spec_ready",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -55,7 +55,7 @@
       "epic_name": "Identidad y acceso",
       "name": "login-usuario-y-contrasena",
       "description": "Un usuario entra al sistema escribiendo su nombre de usuario y su contrasena. Si ambos son correctos queda autenticado; si alguno no lo es, el sistema responde con un error que no revela cual de los dos fallo. La sesion queda guardada en una cookie que el navegador no puede leer desde JavaScript y que caduca.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -139,7 +139,7 @@
       "epic_name": "Plataforma",
       "name": "dashboard-en-blanco",
       "description": "Maquetacion de la pantalla de dashboard dentro del layout privado, deliberadamente vacia: solo el titulo y el area de contenido lista para llenarse mas adelante. Es el destino al que llega el usuario recien autenticado. Solo capa visual, sin datos ni backend; su unica dependencia es el layout privado con sidebar.",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "complexity": "low",
       "zone": "frontend",
@@ -210,7 +210,7 @@
       "epic_name": "Identidad y acceso",
       "name": "politica-de-contrasenas",
       "description": "Una contrasena es aceptable si tiene al menos 8 caracteres e incluye mayuscula, minuscula, numero y simbolo, y si no esta entre las contrasenas filtradas conocidas. Esa regla se aplica en todos los sitios donde alguien fija o cambia una contrasena, de modo que no se pueda guardar una que no cumpla, y al rechazarla dice que requisito falto y no solo que esta mal. Las contrasenas no caducan y no se guarda historial de anteriores. Quien ya tenga guardada una contrasena que no cumple sigue entrando con normalidad: la regla solo mira las nuevas. Mostrar los requisitos mientras se escribe es otra ficha.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -227,14 +227,15 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "crud-de-productos",
-      "description": "Alta, consulta, edicion y borrado de productos y de las filas del catalogo de presentaciones, sobre el modelo que crea QC-14. Incluye la pantalla dentro del layout privado y las operaciones que la respaldan. Quien puede hacer cada cosa, y si hace falta prueba de extremo a extremo, se deciden al acotar esta ficha.",
-      "status": "pending",
+      "description": "Los casos de uso del catalogo de productos, sobre el modelo que crea QC-14: alta, consulta paginada, edicion y borrado de productos, y lo mismo para las filas del catalogo de presentaciones. Solo el Administrador puede: ni el Operador ni nadie mas consulta, crea, edita o borra, y ese permiso se valida en el service. Borrar un producto lo oculta y no se restaura; borrar una presentacion que todavia tiene productos asignados sigue sin ser posible. La existencia se edita a mano como un campo mas. Cada producto guarda quien lo creo y quien lo modifico por ultima vez. Antes de guardar se rechaza el nombre vacio y el tiempo de entrega negativo, el nombre tiene un largo maximo, y dos presentaciones no pueden ser la misma escrita distinto: se comparan sin acentos ni caracteres especiales y sin distinguir mayusculas. La consulta viene paginada, de diez en diez por defecto, y el calculo de la paginacion se extrae aparte para reutilizarlo en los demas CRUD. La pantalla va aparte.",
+      "status": "spec_ready",
       "sdd": true,
-      "complexity": null,
-      "zone": "fullstack",
+      "complexity": "high",
+      "zone": "backend",
       "branch": "feature/QC-20-crud-de-productos",
       "depends_on": [
-        "QC-14"
+        "QC-14",
+        "QC-8"
       ],
       "spec_path": "specs/QC-20-crud-de-productos"
     },
@@ -254,6 +255,93 @@
         "QC-19"
       ],
       "spec_path": "specs/QC-21-ayuda-visual-de-contrasena"
+    },
+    {
+      "key": "QC-22",
+      "id": 22,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "pantalla-de-productos",
+      "description": "La pantalla del catalogo de productos dentro del layout privado: la lista paginada, el formulario de alta y edicion, el borrado, y lo mismo para el catalogo de presentaciones. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-20 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-22-pantalla-de-productos",
+      "depends_on": [
+        "QC-20"
+      ],
+      "spec_path": "specs/QC-22-pantalla-de-productos"
+    },
+    {
+      "key": "QC-23",
+      "id": 23,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "registro-de-sesiones",
+      "description": "PENDIENTE DE IMPORTAR DEL BOARD",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-23-registro-de-sesiones",
+      "depends_on": [
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-23-registro-de-sesiones"
+    },
+    {
+      "key": "QC-24",
+      "id": 24,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "modelo-recetas",
+      "description": "Necesitamos persistir el catalogo de recetas. Solo el modelo de datos: sin pantalla y sin API. Cada receta tiene un nombre, una descripcion, una imagen y unos pasos. El nombre es obligatorio y no se repite entre recetas: se comparan sin acentos ni caracteres especiales y sin distinguir mayusculas, igual que las presentaciones. La descripcion es opcional. La imagen se guarda como la direccion del archivo, en una sola columna de texto opcional: una receta sin imagen es valida, y el modelo no sabe donde vive ese archivo ni lo sube. Los pasos son opcionales y se guardan como un unico documento JSON en la columna, no como tabla aparte: son una lista ordenada de textos, y el orden es el de la lista. La base guarda el documento tal cual; que sea una lista de textos y que ninguno venga vacio lo hace cumplir la capa de aplicacion, no la columna. Una receta se compone de productos: un mismo producto entra en muchas recetas y una receta lleva muchos productos, y cada pareja receta-producto guarda ademas una cantidad y una unidad de medida. Esa pareja es la entidad propia de la relacion, no una tabla de union sin datos. Un mismo producto no puede aparecer dos veces en la misma receta. La cantidad es un numero con decimales exactos, obligatorio, y nunca negativo ni cero. La unidad de medida de cada linea es texto libre obligatorio y puramente anotativo: no hay conversion entre unidades y no se toma de la unidad del producto, que es opcional. Si un producto se da de baja, la receta conserva su linea: el borrado de producto es logico y la linea sigue apuntando al mismo producto. El alta, la consulta, la edicion y el borrado de recetas van aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-24-modelo-recetas",
+      "depends_on": [
+        "QC-14"
+      ],
+      "spec_path": "specs/QC-24-modelo-recetas"
+    },
+    {
+      "key": "QC-25",
+      "id": 25,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "crud-de-recetas",
+      "description": "Los casos de uso del catalogo de recetas, sobre el modelo que crea QC-24: alta, consulta paginada, edicion y borrado de recetas, incluyendo las lineas de producto de cada receta, que se crean, cambian y quitan junto con la receta que las contiene y no por separado. Solo el Administrador puede: ni el Operador ni nadie mas consulta, crea, edita o borra, y ese permiso se valida en el service. Borrar una receta la oculta y no se restaura; borrar un producto que alguna receta usa sigue estando permitido y la receta conserva la linea. Cada receta guarda quien la creo y quien la modifico por ultima vez. Aqui entra la subida de la imagen de la receta: el archivo se sube a Supabase Storage y en la receta queda su direccion. La imagen sigue siendo opcional, asi que guardar una receta sin imagen no falla nunca. Esta ficha deja el almacenamiento configurado y utilizable, con las variables de entorno que necesita declaradas y vacias en el archivo de ejemplo, y documentadas. Subir la imagen exige una libreria de cliente de Supabase que hoy no esta aprobada ni instalada: entra por la regla 7 de CLAUDE.md, con sus cuatro checks de salud, su fila en docs/dependencias.md y aprobacion humana antes de instalarla. Antes de guardar se rechaza el nombre vacio, el nombre con un largo mayor al maximo, el nombre repetido comparado sin acentos ni mayusculas, la cantidad negativa o cero, la unidad vacia, el producto repetido dentro de la misma receta, el producto inexistente, y unos pasos que no sean una lista de textos o que traigan algun texto vacio. La consulta viene paginada, de diez en diez por defecto, reutilizando el calculo de paginacion que extrae el CRUD de productos en vez de duplicarlo. La pantalla va aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "backend",
+      "branch": "feature/QC-25-crud-de-recetas",
+      "depends_on": [
+        "QC-24",
+        "QC-20",
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-25-crud-de-recetas"
+    },
+    {
+      "key": "QC-26",
+      "id": 26,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "pantalla-de-recetas",
+      "description": "La pantalla del catalogo de recetas dentro del layout privado: la lista paginada, el formulario de alta y edicion con sus lineas de producto, sus pasos y su imagen, y el borrado. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-25 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error), incluyendo el estado de subida de la imagen y su vista previa, y el editor de pasos ordenados. La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, como se agregan, quitan y reordenan las lineas de producto y los pasos, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-26-pantalla-de-recetas",
+      "depends_on": [
+        "QC-25"
+      ],
+      "spec_path": "specs/QC-26-pantalla-de-recetas"
     }
   ]
 }

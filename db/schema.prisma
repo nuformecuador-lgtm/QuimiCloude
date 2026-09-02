@@ -8,8 +8,11 @@
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL") // pooler, runtime de la app
-  directUrl = env("DIRECT_URL") // conexion directa, la que usa Prisma Migrate
+  // Runtime: pooler transaccional (:6543). Ver `lib/db/prisma-client.ts`.
+  url       = env("DATABASE_URL")
+  // Migraciones: conexion en modo sesion (:5432). `prisma.config.ts` la iguala a
+  // DATABASE_URL cuando no esta definida (local, sin pooler).
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -79,6 +82,11 @@ model User {
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockLevel           Int       @default(0) @map("lock_level")
   lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
+
+  /// TRUE = esta persona tiene que cambiar su contrasena la primera vez que entre.
+  /// El nombre evita el segmento `password` a proposito (design.md > 2). Quien la LEE y
+  /// bloquea el acceso es QC-7; esta ficha solo la escribe.
+  mustChangeCredential Boolean @default(false) @map("must_change_credential")
 
   documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)

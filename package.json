@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma migrate deploy && tsx scripts/seed.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -15,7 +15,8 @@
     "e2e": "playwright test",
     "db:migrate:create": "prisma migrate dev --create-only",
     "db:migrate": "prisma migrate deploy",
-    "db:rollback": "tsx scripts/db-rollback.ts"
+    "db:rollback": "tsx scripts/db-rollback.ts",
+    "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -55,8 +56,5 @@
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@10.10.0",
-  "prisma": {
-    "schema": "db/schema.prisma"
-  }
+  "packageManager": "pnpm@10.10.0"
 }
