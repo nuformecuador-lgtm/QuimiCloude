@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -9,7 +9,7 @@ import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
-import { SidebarToggle } from './components';
+import { SidebarToggle, ThemeToggle } from './components';
 
 /**
  * Layout compartido por toda la zona privada (R1, `design.md > 5.2`).
@@ -43,7 +43,13 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
   const defaultOpen = readSidebarOpenState(cookieStore.get(SIDEBAR_STATE_COOKIE)?.value);
 
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
+    // R19, `design.md > 6`: el primitivo hace `{...defaults, ...style}`, asi que estas dos
+    // variables (ancho expandido 272px, ancho en modo icono 78px) ganan a las de
+    // `components/ui/sidebar.tsx` sin tocar ese archivo (R21).
+    <SidebarProvider
+      defaultOpen={defaultOpen}
+      style={{ '--sidebar-width': '17rem', '--sidebar-width-icon': '4.875rem' } as CSSProperties}
+    >
       <AppSidebar user={user} navItems={PRIVATE_NAV_ITEMS} />
       {/*
         `SidebarInset` **es** el `<main>` (lo renderiza el propio primitivo), asi que aqui no
@@ -53,9 +59,10 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
       <SidebarInset data-testid="private-content">
         <header
           data-testid="private-header"
-          className="flex h-14 shrink-0 items-center gap-2 border-b px-4"
+          className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4"
         >
           <SidebarToggle />
+          <ThemeToggle />
         </header>
         {children}
       </SidebarInset>
