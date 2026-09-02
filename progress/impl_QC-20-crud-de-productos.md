@@ -746,7 +746,7 @@ acredito **por partes** (typecheck, lint y suites por separado).
 | R20 | `el indice unico rechaza con SQLSTATE 23505 la segunda insercion del mismo nombre normalizado` **+ test permanente** `sin el indice unico, la segunda insercion... deja de fallar` | `presentation-uniqueness.int.test.ts` |
 | R21 | `rechaza con SQLSTATE 23503 borrar una presentacion con productos asignados, incluidos los borrados logicamente` **+ test permanente** `sin ON DELETE RESTRICT, borrar... deja de estar bloqueado` | `presentation-uniqueness.int.test.ts` |
 | R22 | `borra fisicamente la presentacion sin productos asignados` | `presentation-uniqueness.int.test.ts` |
-| R23 | `devuelve como maximo el tamano de pagina y el total de elementos` | `tests/unit/pagination.test.ts` |
+| R23 | `recorre las paginas sin repetir ni omitir productos homonimos` (**integracion; es donde vive la sustancia: el `take: limit` del adaptador**) **+** `devuelve como maximo el tamano de pagina y el total de elementos` (unitario, arit&#769;metica de `buildPage`) | `product-crud.int.test.ts` + `tests/unit/pagination.test.ts` |
 | R24 | `usa 10 elementos por pagina cuando no se indica tamano` | `tests/unit/pagination.test.ts` |
 | R25 | `rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1` | `tests/unit/inventario/product-input.test.ts` |
 | R26 | `recorre las paginas sin repetir ni omitir productos homonimos` | `tests/integration/inventario/product-crud.int.test.ts` |
@@ -766,7 +766,7 @@ acredito **por partes** (typecheck, lint y suites por separado).
 
 ## 3. Archivos
 
-**Creados (41).** El modulo `inventario` completo: `domain/` (16 archivos: actor, errores, page,
+**Creados (41).** El modulo `inventario` completo: `domain/` (**17** archivos: actor, errores, page,
 normalizacion, dos de entrada zod, dos de vista y los nueve casos de uso), `ports/` (2),
 `adapters/driven/persistence/` (2), `adapters/driving/` (2); `lib/shared/pagination.ts`; la
 migracion `20260902170759_product_audit_and_presentation_uniqueness/` con su `down.sql`; y 12
@@ -905,3 +905,150 @@ la restauracion de un producto ya borrado.
 **Las 16 tasks de `tasks.md` estan `[x]`.** Los 37 requisitos tienen test, con dos entradas
 declaradas en la seccion 4 que no son huecos pero tampoco cobertura plena. No me autoapruebo: el
 `reviewer` decide.
+
+---
+---
+
+# RONDA 2 — respuesta al `reviewer` (F2.2, veredicto RECHAZADO: 1 mayor, 10 menores)
+
+Revision en `progress/review_QC-20-crud-de-productos.md`. El bloqueante era **de documento, no de
+conducta**: ningun test cambio de resultado.
+
+## M1 (bloqueante) — CERRADO. La tercera afirmacion falsa, en sus tres sitios
+
+El reviewer encontro que la frase retirada de `design.md > 11.4` **seguia viva en otros tres
+sitios**, y tenia razon en que estaba **peor colocada** que las dos ya corregidas.
+
+Lo que la hace falsa, y no discutible: `PresentationRepository` expone `create`, `rename`,
+`deleteById` y `list`, y **ningun metodo de busqueda** (cero `findBy`, `search` o `exists`). La
+«comprobacion previa por `nameNormalized`» no solo no existe: **es inexpresable con el puerto
+normativo**. Y aunque lo fuera, seria **una carrera**: entre el `SELECT` y el `INSERT` cabe otra
+transaccion.
+
+| Sitio | Por que importaba |
+| --- | --- |
+| `design.md:401` (**seccion 7, NORMATIVA**) | Es la seccion que define los puertos. Justo lo corregido en 11.4, vivo aqui |
+| `lib/modules/inventario/ports/presentation-repository.ts` | **El peor de los tres.** Es el contrato que van a leer QC-22 y QC-25, y les decia que falta implementar algo que no se puede implementar |
+| `db/schema.prisma` (doc-comment de `Presentation`) | Lo lee todo el mundo |
+
+Los tres reescritos para decir lo que **de verdad ocurre**: la unicidad la garantiza **solo** el
+indice unico `presentations_name_normalized_key`; **no hay comprobacion previa y es deliberado**;
+el mensaje al usuario sale del `'duplicate'` que el adaptador devuelve al traducir el `23505`.
+
+**NO se tocaron** `requirements.md:116` ni el comentario de `migration.sql:71`: ahi la frase cita
+el enunciado hipotetico de R20 y es prosa de requisito correcta, no una afirmacion sobre lo
+implementado.
+
+**Es la tercera vez en esta feature** que el documento afirma algo que el codigo desmiente
+(la 11.4, la seccion 5 del stub de sesion, y esta). Las tres se corrigieron **en el documento**.
+
+## Menores cerrados
+
+**m3 — el mapa citaba el mas debil de los dos guardianes de R23.** El reviewer lo probo por
+mutacion: al quitar `take: limit` de `listAliveProducts`, **el que se pone rojo es
+`product-crud.int.test.ts` (R26)**, no el de paginacion. O sea que **R23 no estaba descubierto**,
+pero la fila apuntaba al test flojo. Corregida: ahora cita **primero** el de integracion —donde
+vive la sustancia, el `take: limit` del adaptador— y despues el unitario, que es aritmetica de
+`buildPage`. Un mapa que apunta al test equivocado es peor que un hueco declarado.
+
+**m6 — `design.md > 12` atribuia R21 y R22 a un test que los desmiente.** La tabla decia
+`presentation-service.test.ts | R17, R18, R21, R22`, mientras la cabecera de ese mismo archivo
+declara que R20, R21 y R22 los cierran los de integracion y que el solo demuestra la traduccion.
+El mapa de esta bitacora **ya los atribuia bien**; era el documento el desalineado. Corregido: la
+fila dice ahora explicitamente que **NO** cierra R20, R21 ni R22.
+
+**m4 — exencion muerta en la asercion reformulada.** `composicionDir` se usaba en un `continue`
+que **no podia ejecutarse nunca**, porque `lib/composition` no esta entre las raices barridas, y
+el comentario la presentaba como una «exencion deliberada» que hacia un trabajo que no hacia. Una
+asercion infalsable en miniatura, dentro justo de la asercion acordada con la sesion de QC-24.
+Corregida sin tocar el resto de su comportamiento.
+
+**m1 — dos nombres de test que eran un numero de requisito.** `docs/conventions.md > Tests` lo
+prohibe explicitamente («el nombre describe el comportamiento, no la funcion»), asi que se cierra
+en vez de dejarse: se escaparon al renombrado del Grupo B y contradecian el acta de esta misma
+bitacora. Renombrados a conducta, con los `R<n>` movidos al `describe`. Ninguna asercion cambia.
+
+**m8 — recuento equivocado.** Decia «`domain/` (16 archivos)» y enumeraba mas. **El numero real es
+17**, con un matiz que ni el reviewer ni yo habiamos precisado: en disco hay **18** archivos en
+`domain/`, pero el decimoctavo es **`product-catalog.ts`, que trajo QC-24** en el merge
+—verificado con `git cat-file -e origin/dev:...`—. QC-20 creo 17.
+
+**m10 — cierre pendiente.** Confirmado como **pendiente del LEADER**, no del implementer: la
+entrada en `progress/history.md`, el desmontaje del worktree y el borrado de la base
+`QuimiCloude_QC20` son pasos del cierre posteriores al merge.
+
+## m9 — Waiver de E2E, redactado contra la LETRA de `CHECKPOINTS.md`
+
+`CHECKPOINTS.md` lineas 19-20: *«Si la feature toca un flujo critico (autenticacion, **permisos**,
+movimientos de inventario, importes, webhooks), hay al menos un test E2E (Playwright) que lo
+cubre»*. **Esta feature toca permisos**, y ese punto **no tiene clausula de excepcion escrita**
+—la clausula «o el `design.md` declara la excepcion y su porque» existe solo en el punto
+siguiente, el de UI—. Por la letra, el checkpoint **no se cumple**.
+
+Se declara como **excepcion explicita, con dueno y con fecha**:
+
+- **Quien la decidio:** el **humano**, el 2026-09-02, **antes del spec**, escrita como **D4** en
+  `requirements.md > Decisiones cerradas (no reabrir)`: «E2E **diferido con motivo**».
+- **El motivo, y por que no es una excusa:** un E2E de Playwright **visita una pantalla**. Esta
+  ficha **no tiene ninguna** —R34 lo exige: ni pagina, ni componente, ni ruta—, asi que **no
+  existe flujo navegable que visitar**. No es que sea caro: es que no hay superficie. Escribir un
+  E2E aqui obligaria a crear la pantalla que R34 prohibe.
+- **Quien hereda la deuda, nominalmente:** **QC-22 — Pantalla de productos**, la ficha que aporta
+  la pantalla y por tanto la primera que **puede** escribirlo. Cierra tambien el diferimiento que
+  QC-14 dejo apuntando aqui.
+- **Que cubre el hueco mientras tanto:** los permisos **si** estan verificados, y por el medio que
+  `docs/architecture.md > Acceso a datos y autorizacion` considera la frontera real —**el
+  service**, no una policy de RLS—: `tests/unit/inventario/authorization.test.ts` cubre los
+  **nueve** casos de uso con cuatro clases de actor invalido, afirma `not.toHaveBeenCalled()`
+  sobre los nueve metodos de los dos puertos, y **cae al quitar `requireAdmin` de cada uno de los
+  nueve**, comprobado uno por uno. El reviewer lo repitio con dos de ellos.
+- **Lo que sigue sin cubrir, sin adornos:** que la Server Action **entregue de verdad** al caso de
+  uso el actor de la sesion **del navegador**, extremo a extremo. Eso solo lo demuestra un E2E, y
+  es **exactamente** lo que QC-22 debe escribir.
+
+**Es deuda con dueno, no un checkbox marcado a la ligera.**
+
+## Menores que el leader decidio NO tocar, anotados como deuda
+
+**m2 — un test que verifica el `replace` de JavaScript, no el repo.**
+`inventario-audit-migration.test.ts:185` sustituye `ON DELETE RESTRICT` por `ON DELETE CASCADE`
+**en una cadena en memoria** y afirma que ya no casa: eso es una propiedad de `String.replace`. Lo
+unico del repo que comprueba lo afirma ya el test inmediatamente anterior. **No es un agujero**
+—el reviewer verifico que el requisito no queda descubierto: quitar `take: limit` enrojece R26 en
+integracion— sino un test de poco valor. **Deuda menor:** borrarlo, o convertirlo en mutacion real
+sobre `statements()`.
+
+**m5 — la reformulacion estrecha el alcance a cuatro raices.** `lib/shared/**`, `middleware.ts`,
+`scripts/` y `e2e/` quedan fuera de esa asercion concreta. `lib/shared` lo cubre el **bloque 9** de
+la guardia hexagonal; los otros tres no tienen vigilancia especifica. **No se cambia
+unilateralmente**: esa asercion es un **acuerdo con la sesion de QC-24**, y modificarla por nuestra
+cuenta repetiria justo el fallo de coordinacion que documenta la deuda de `progress/current.md`.
+Queda el limite escrito para que se decida entre las dos sesiones.
+
+**m7 — `presentation-actions.ts` no tiene test unitario, y NO lo cubre la integracion.**
+Comprobado: **ningun test importa ese archivo**. Los de integracion ejercitan los **adaptadores
+driven**, no las Server Actions. Lo unico que lo vigila es `scope.test.ts`, que solo comprueba que
+declara `'use server'`. Ningun requisito se queda sin red —R28 y R29 los cierran
+`product-actions.test.ts` y `scope.test.ts`, y las cuatro acciones son estructuralmente identicas
+a las de producto—, pero **un fallo en su `currentActor()` o su `toErrorState()` hoy no lo caza
+nada**. Se reporta al leader como tal, sin disimularlo.
+
+## El argumento del reviewer que MEJORA la justificacion de `ON DELETE RESTRICT`
+
+El reviewer respaldo la decision y aporto una razon que no estaba en el expediente:
+
+> Con `SET NULL`, un `NULL` sobrevenido —el autor existia y se borro— seria **indistinguible de un
+> `NULL` historico** —las filas anteriores a esta migracion, que nacen sin autor porque la columna
+> es anulable a proposito (`design.md > 2.1b`)—. La atribucion no solo se perderia: **se perderia
+> sin dejar rastro de que alguna vez existio, y sin ser auditable**.
+
+Es **mas fuerte** que las tres razones con las que se cerro la decision, porque no depende de la
+convencion del repo ni de que `users` tenga borrado logico: es una propiedad **del dato**. Queda
+incorporado como justificacion principal.
+
+## Que NO cambio en esta ronda
+
+Ningun test cambio de resultado y ninguna conducta se modifico. Los cambios fueron: **tres
+doc-comments** (M1), **dos filas de tabla** en `design.md` y en el mapa de esta bitacora (m6, m3),
+**una linea muerta** en un test (m4), **dos nombres de test** (m1) y **un recuento** (m8). El
+resto es documentacion de decisiones y deuda.

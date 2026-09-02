@@ -397,10 +397,14 @@ Claves del diseño de los puertos:
   olvidarlo, y no hay ninguna operación de listar borrados ni de restaurar (D5).
 - **Los resultados son discriminados, no excepciones de Prisma.** El adaptador traduce los
   SQLSTATE a esas cadenas: `23505` (unique violation) → `'duplicate'`, `23503` (foreign key
-  violation) al borrar una presentación → `'in_use'`. El dominio nunca ve un código de Postgres,
-  y la garantía de R20 sigue siendo del índice: la comprobación previa por `nameNormalized` es
-  una cortesía para dar buen mensaje, **el índice es lo que cierra la carrera** entre dos altas
-  simultáneas.
+  violation) al borrar una presentación → `'in_use'`. El dominio nunca ve un código de Postgres.
+  **La unicidad de R20 la garantiza ÚNICAMENTE el índice único** `presentations_name_normalized_key`,
+  y **no existe ninguna comprobación previa por `nameNormalized`. Es deliberado**, por dos razones
+  que se refuerzan: (a) una comprobación previa sería **una carrera** —entre el `SELECT` y el
+  `INSERT` cabe otra transacción—, así que no garantizaría nada; y (b) este mismo puerto **no
+  expone ningún método de búsqueda**, así que ni siquiera es expresable. El **mensaje** al usuario
+  no lo da una comprobación previa: lo da el `'duplicate'` que el adaptador devuelve al traducir
+  el `23505`, y que el caso de uso convierte en `DuplicateNameError`. Ver § 11.4.
 - **`23503` al crear/editar un producto** (autor o presentación inexistente) se traduce a
   `NotFoundError`/`ValidationError` según la columna, y es lo que hace observable R7.
 - El adaptador driven es el **único** sitio del módulo que importa `@prisma/client` y
@@ -590,7 +594,7 @@ verificación es **unitaria y de integración**.
 | --- | --- | --- |
 | Unit (dominio) | `tests/unit/inventario/authorization.test.ts` | R1, R2, R3: los nueve casos de uso con un actor no administrador rechazan **sin tocar el puerto** (doble que lanza si lo llaman). |
 | Unit (dominio) | `tests/unit/inventario/product-service.test.ts` | R5, R6, R9, R10, R11, R12, R13, R14, R15, R16 con dobles de los puertos. |
-| Unit (dominio) | `tests/unit/inventario/presentation-service.test.ts` | R17, R18, R21, R22 con dobles de los puertos. |
+| Unit (dominio) | `tests/unit/inventario/presentation-service.test.ts` | R17 y R18 con dobles de los puertos, más la **traducción** de los resultados discriminados (`'duplicate'`, `'in_use'`, `'not_found'`, `'deleted'`) a errores de dominio. **NO cierra R20, R21 ni R22**: son garantías de Postgres —el índice único y el `ON DELETE RESTRICT`— y las cierran los tests de integración, que además las vigilan con dos tests permanentes de mutación de esquema. Corregido en F2.2 (m6): esta fila atribuía R21 y R22 a un archivo cuya propia cabecera los desmiente. |
 | Unit (dominio) | `tests/unit/inventario/presentation-name.test.ts` | R19: tabla de ejemplos de normalización. |
 | Unit (borde) | `tests/unit/inventario/product-input.test.ts` | R9, R10, R11, R25, R28, R37: los esquemas zod. |
 | Unit (shared) | `tests/unit/pagination.test.ts` | R23, R24, R27, R36: defecto 10, aritmética, cota en 25. |
