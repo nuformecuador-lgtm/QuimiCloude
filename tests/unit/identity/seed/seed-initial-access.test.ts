@@ -10,6 +10,7 @@
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
+import type { CredentialRule } from '@/lib/modules/identity/domain/credential-policy';
 import type { InitialAdminCredentials } from '@/lib/modules/identity/ports/initial-access-credentials';
 import type { InitialAccessRepository } from '@/lib/modules/identity/ports/initial-access-repository';
 
@@ -72,6 +73,15 @@ function crearRepositorioFalso(options: {
   };
 }
 
+/**
+ * Doble de la politica de credenciales (QC-19 R18). Por defecto ACEPTA: los casos de esta
+ * tanda describen el seed, no la politica, y un doble que rechazara cambiaria todos los
+ * desenlaces. El caso 10 monta el suyo, que rechaza.
+ */
+function crearPoliticaFalsa(resultado: { ok: boolean; unmet: readonly string[] } = { ok: true, unmet: [] }) {
+  return vi.fn(async () => resultado as { ok: boolean; unmet: readonly CredentialRule[] });
+}
+
 function crearHasherFalso() {
   return {
     hash: vi.fn(async (texto: string) => hashDe(texto)),
@@ -130,9 +140,10 @@ describe('seedInitialAccess', () => {
   it('sobre una base vacia crea los dos roles y el usuario inicial con rol Administrador', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
     expect(outcome.createdRoles.slice().sort()).toEqual([ROLE_ADMINISTRADOR, ROLE_OPERADOR].sort());
@@ -152,9 +163,10 @@ describe('seedInitialAccess', () => {
   it('los cinco marcadores personales y el tipo de documento CC son los del diseno, y el correo/usuario vienen del proveedor', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials });
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
     expect(creacionDeAdmin).toBeDefined();
@@ -182,9 +194,10 @@ describe('seedInitialAccess', () => {
   it('el passwordHash guardado es el que devolvio el hasher y no es la credencial en claro', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials });
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     expect(passwordHasher.hash).toHaveBeenCalledTimes(1);
     expect(passwordHasher.hash).toHaveBeenCalledWith(CREDENCIAL_DE_PRUEBA);
@@ -203,9 +216,10 @@ describe('seedInitialAccess', () => {
       usuariosVivosConAdministrador: 1,
     });
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
     expect(creacionesDeRol.length).toBeGreaterThan(0);
@@ -221,9 +235,10 @@ describe('seedInitialAccess', () => {
       usuariosVivosConAdministrador: 1,
     });
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     // Primero: la lectura si ocurrio, para que un doble mal cableado no pase en verde.
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
@@ -242,9 +257,10 @@ describe('seedInitialAccess', () => {
       usuariosVivosConAdministrador: 1,
     });
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials });
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
     expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
@@ -260,12 +276,13 @@ describe('seedInitialAccess', () => {
   it('si el proveedor lanza por variable ausente, el error se propaga y no hubo ninguna escritura', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const mensajeDeError = 'falta SEED_ADMIN_PASSWORD';
     const credentials = vi.fn(() => {
       throw new Error(mensajeDeError);
     });
 
-    await expect(seedInitialAccess({ repository, passwordHasher, credentials })).rejects.toThrow(
+    await expect(seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy })).rejects.toThrow(
       'falta SEED_ADMIN_PASSWORD',
     );
 
@@ -278,7 +295,7 @@ describe('seedInitialAccess', () => {
     // stack (caso 9 lo vuelve a comprobar sobre la salida acumulada de consola).
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials });
+      await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
@@ -295,11 +312,12 @@ describe('seedInitialAccess', () => {
       throw new Error(mensajeDeError);
     };
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials });
+      await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
@@ -327,9 +345,10 @@ describe('seedInitialAccess', () => {
   it('en ningun caso se llama a un metodo que mencione document_types, y el puerto ni siquiera lo expone', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials });
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
 
@@ -341,6 +360,42 @@ describe('seedInitialAccess', () => {
     expect(repository.llamadas.some((llamada) => /documentType|document_types/i.test(llamada.metodo))).toBe(
       false,
     );
+  });
+
+  // Caso 8b (QC-19 R18) — el test de COMPORTAMIENTO que la guardia de texto no puede dar:
+  // la politica se evalua ANTES del hash y su resultado se RESPETA. Un barrido de fuentes
+  // ve que el archivo nombra la politica; no ve el orden ni que nadie ignore su respuesta
+  // (`QC-19 design.md > 7`). Va ANTES del caso 9 a proposito, para que la revision de la
+  // salida acumulada tambien cubra el error que este caso provoca.
+  it('si la politica rechaza la credencial de instalacion, no se hashea ni se escribe nada', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa({ ok: false, unmet: ['min_length', 'no_symbol'] });
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    let errorCapturado: Error | null = null;
+    try {
+      await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    } catch (error) {
+      errorCapturado = error as Error;
+    }
+
+    // Primero: la politica SI se consulto, y con la credencial resuelta. Sin esto, un
+    // doble mal cableado que nunca se llama pasaria en verde.
+    expect(checkCredentialPolicy).toHaveBeenCalledTimes(1);
+    expect(checkCredentialPolicy).toHaveBeenCalledWith(CREDENCIAL_DE_PRUEBA);
+
+    // Luego: rechaza, nombrando las reglas incumplidas y NUNCA la credencial (R24).
+    expect(errorCapturado).not.toBeNull();
+    expect(errorCapturado?.message).toContain('min_length');
+    expect(errorCapturado?.message).toContain('no_symbol');
+    expect(errorCapturado?.message ?? '').not.toContain(CREDENCIAL_DE_PRUEBA);
+
+    // Y el orden se respeta: no se produjo hash ni se escribio el usuario.
+    expect(passwordHasher.hash).not.toHaveBeenCalled();
+    expect(
+      repository.llamadas.some((llamada) => llamada.metodo === 'createInitialAdmin'),
+    ).toBe(false);
   });
 
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos

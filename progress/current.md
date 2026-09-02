@@ -11,18 +11,49 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
+| QC-24 | modelo-recetas | QC-27 Recetas | backend | **spec_ready** | `feature/QC-24-modelo-recetas` | **esperando aprobación humana (F1.4)**. Spec escrito el 2026-09-02 y congelado en `dae3b1d`: **22 decisiones cerradas + 33 requisitos EARS**, todos trazados; tarjeta en *En revisión*. Quedan 2 preguntas abiertas, las dos del humano y ninguna bloqueante. Primera feature de la épica **QC-27 Recetas** y **primer módulo hexagonal creado desde cero** en este repo: el spec hace que `inventario` publique un contrato (`ProductCatalog`) que hoy no existe. **F2.0 no arranca al aprobar**: `backend` ya tiene a QC-19 `in_progress` en la otra sesión. Tercera sesión de leader 
 | QC-20 | crud-de-productos | QC-18 Inventario | backend | **spec_ready** | `feature/QC-20-crud-de-productos` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Tercera sesión de leader. **F2.0 no se ejecuta**: `depends_on` incluye QC-8, que está `pending` y sin spec, y `AGENTS.md` dice que una feature con `depends_on` no arranca hasta que su dependencia esté `done`. Por eso la ficha se queda en `spec_ready` y **la tarjeta NO se mueve a *En curso***: moverla dejaría board y disco divergentes por una fase que no ha empezado (mismo criterio que se aplicó a QC-14 el 2026-09-01). Arranca cuando QC-8 cierre. Acotada, sembrada y especificada el 2026-09-02: **23 decisiones cerradas + 37 requisitos EARS**, congelados en `21d6695` (las 5 preguntas que abrió el diseño las cerró el humano tras F1.2 y entraron como D19–D23; una cambió la posición del diseño: el tope de página pasó de 100 a 25). Sin preguntas abiertas. Tarjeta en *En revisión*. Fase 2 **bloqueada por QC-8**, que está `pending` y sin spec |
-| QC-12 | dashboard-en-blanco | QC-16 Plataforma | frontend | **in_progress (F2.1)** | `feature/QC-12-dashboard-en-blanco` | **SPEC APROBADO por el humano el 2026-09-02** («continua con 12») e **implementer lanzado**. Tarjeta en *En curso*. Ocupa el primer slot de `frontend` (la zona estaba a 0), sin conflicto de archivos con QC-6, que es backend puro. Worktree preparado a mano (`.env`, `pnpm install`, `prisma generate`, `next typegen`). Spec congelado en `e2714f0`: 12 requisitos EARS, todos trazados; tarjeta en *En revisión*. Feature **puramente aditiva**, no edita ni un archivo de QC-11/QC-15. Deja **1 pregunta abierta**: la raíz `/` sigue siendo la plantilla de `create-next-app` y ninguna ficha del backlog la cubre. Tercera sesión de leader. Sus dos dependencias (QC-11, QC-15) están `done`, la zona `frontend` tiene **0** `in_progress` y no hay conflicto de archivos con QC-6 (backend puro): paralelismo real. Se eligió porque además desbloquea a QC-13, que esperaba a cuatro fichas. **Decisión humana del 2026-09-02: NO toca el ítem «Dashboard» del sidebar** —sigue dando 404— eso lo reconecta QC-13 |
-| QC-19 | politica-de-contrasenas | QC-17 Identidad y acceso | backend | **spec_ready** | `feature/QC-19-politica-de-contrasenas` | **SPEC APROBADO por el humano el 2026-09-02** («aprueba 19»), y con él **la dependencia**: `@zxcvbn-ts/language-common` ya tiene su fila `aprobada` en `docs/dependencias.md`, **pero no está instalada** — se instala al arrancar la fase 2. Las dos preguntas abiertas que quedaban eran sobre esa librería y las cierra la aprobación: la ficha queda **sin preguntas abiertas**. Congelado en `f09e06b`. **F2.0 no se ejecuta y la tarjeta NO se mueve a *En curso***: espera a QC-6, mismo criterio que QC-14 y QC-20. Spec escrito el 2026-09-02 y congelado antes en `4fb8294`: 24 requisitos EARS, todos trazados; tarjeta en *En revisión*. **Aprobar el spec aprueba también una dependencia nueva** — `@zxcvbn-ts/language-common` (solo el diccionario, sin `@zxcvbn-ts/core`). El `spec_author` dejó los cuatro checks como DESCONOCIDO por no tener red; **los verificó el leader el 2026-09-02 y pasan los cuatro** (sin `deprecated`; 4.1.3 del 2026-07-16; 1.260.688 descargas/semana; MIT), anotados en `design.md > 5.2`. Al aprobar hay que añadir su fila a `docs/dependencias.md`. Quedan 2 preguntas abiertas, las dos sobre esa dependencia. **Solo fase 1**: la fase 2 espera a QC-6, que está `in_progress` en otra sesión. Escribir el spec ahora **no consume slot** (queda en `spec_ready`) y la deja lista para arrancar el día que QC-6 cierre. Ya venía sembrada por `/afinar-feature` el 2026-09-01 |
-| QC-6 | seed-roles-y-usuario-inicial | QC-17 Identidad y acceso | backend | **in_progress (F2.4)** | `feature/QC-6-seed-roles-y-usuario-inicial` | **PR #11 abierto el 2026-09-02**, esperando merge humano. Reviewer APROBADO en ronda 2 tras rechazar la ronda 1 con dos bloqueantes. `./init.sh` completo en verde (377 tests / 35 archivos) sobre el arbol ya sincronizado con `dev`. Las 21 tasks cerradas y los 21 requisitos con test ejecutado. Al mergear: pasar a `done`, mover la tarjeta a *Finalizado*, comentar la URL y `./scripts/wt.sh done QC-6-seed-roles-y-usuario-inicial` |
+| QC-29 | tema-claro-oscuro | QC-16 Plataforma | frontend | **pending → F1.2** | `feature/QC-29-tema-claro-oscuro` | **Ficha creada en esta sesión (2026-09-02, quinta de leader)** a partir de un diseño que el humano aprobó en canvas antes de pedir la feature. Issue `QC-29` creado en Jira bajo la épica **QC-16 Plataforma** (no es módulo de dominio: es el armazón), con labels `sdd`, `slug:tema-claro-oscuro`, `zone:frontend`, `complexity:medium`. Worktree montado con `wt.sh new` desde `origin/dev` (`dc090e0`). **`frontend` estaba a 0 `in_progress`**, así que toma slot sin competir con QC-19/QC-20/QC-24, que son todas `backend`. **No se sembró con `/afinar-feature`**: el alcance ya venía cerrado por el humano en 7 decisiones, que el leader dejó escritas en `specs/QC-29-tema-claro-oscuro/design-input-tokens.md` junto con los tokens del diseño ya convertidos a oklch. **Aprobar el spec aprueba también una dependencia nueva** — `next-themes`, elegida por el humano: tres de los cuatro checks limpios y **el cuarto no** (última publicación 2025-03-11, hace ~18 meses). `spec_author` lanzado, spec escrito el 2026-09-02 (27 requisitos, 9 decisiones, 17 tareas). **F1.4 ejecutada y la aprobación vino CON CAMBIOS: el humano rechazó `next-themes`** («No: implementación propia»), así que la ficha **vuelve a F1.2** y NO pasa a `in_progress`: el spec asumía la librería en D9, en varios requisitos y en el anti-parpadeo, y arrancar el implementer sobre eso sería implementar otra cosa. Revisión encargada al mismo `spec_author` — mecanismo propio con cookie de UI, patrón `SIDEBAR_STATE_COOKIE`. **La tarjeta NO se mueve a *En curso***. El humano sí cerró la otra pregunta abierta: el contraste 3,75:1 de `--primary-foreground` sobre `--primary` en claro **se queda** (cumple el 3:1 de AA para componentes, que es lo que es un botón) y no se añade requisito que exija AA para texto |
+| QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **pending — BLOQUEADA** | `feature/QC-30-rediseno-login` | **Ficha creada en esta sesión (2026-09-02)** a partir del canvas de login aprobado por el humano. Issue `QC-30` bajo la épica **QC-17 Identidad y acceso** (el módulo manda sobre la naturaleza del trabajo: es la pantalla de `identity`, aunque el cambio sea de presentación), labels `sdd`, `slug:rediseno-login`, `zone:frontend`, `complexity:medium`. **`depends_on: QC-29`**, con el issue link «is blocked by» ya creado en el board: se pinta con los tokens que QC-29 define, y especificarla antes sería escribir sobre tokens que no existen. **No se monta worktree ni se lanza `spec_author`** hasta que QC-29 esté `done` (`AGENTS.md`: una feature con `depends_on` no arranca). El material de diseño está sembrado en `specs/QC-30-rediseno-login/design-input-login.md`: vidrio, burbujas y las cinco medidas que difieren de `components/ui/` |
 
-Worktrees: `.worktrees/QC-6-seed-roles-y-usuario-inicial` (montado desde `origin/dev`, con
-`.env` copiado a mano), `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
+La feature **QC-8 — sesion-actual-y-logout** se cerró el 2026-09-02 (PR #13, merge `dc090e0`):
+la llevó **otra sesión de leader**. Su tarjeta ya estaba en *Finalizado* y el PR mergeado, pero la
+ficha seguía `pending` en `feature_list.json` y eso **bloqueaba a QC-20** por `depends_on`. Se pasa
+a `done` aquí, por decisión humana del 2026-09-02. Su worktree ya no está montado. El resumen en
+`history.md` le corresponde a la sesión que la implementó.
+
+La feature **QC-19 — politica-de-contrasenas** se cerró el 2026-09-02 (PR #14, merge
+`11664e1`): resumen en `progress/history.md`, worktree desmontado y rama borrada. `wt.sh done`
+volvió a fallar a medias en Windows, igual que en QC-6 —desregistra el worktree pero no borra
+`node_modules`—; rematado con `rmdir /s /q` + `git worktree prune`. El PR llegó **CONFLICTING**
+porque `origin/dev` había avanzado 24 commits con el merge de QC-8: conflictos en
+`lib/composition/index.ts` (unión mecánica, el cuerpo ya mergeado determinaba los imports) y en
+este archivo (unión de deudas). El tercero **no vino marcado**: git auto-mergeó `feature_list.json`
+dejando **QC-23 duplicada** —las dos sesiones importaron la misma ficha en sitios distintos del
+array— y eso lo cazó `./init.sh`, no el merge. Gate completo con las dos features juntas:
+46 archivos, 478 tests.
+
+La feature **QC-12 — dashboard-en-blanco** se cerró el 2026-09-02 (PR #12, merge `b154fa9`):
+resumen en `progress/history.md`. Ciclo completo en una sesión y **la primera feature puramente
+aditiva del repo** — 9 archivos, todos `A`, sin tocar QC-11 ni QC-15. Su worktree **no se pudo
+desmontar con `wt.sh done`** (el mismo fallo de Windows que quedó documentado al cerrar QC-6, esta
+vez el mismo día): se desregistró pero dejó el árbol en disco, y se remató a mano con `rm -rf` +
+`git worktree prune`, sabiendo que lo único sin versionar eran `node_modules`, `.env` y
+`tsconfig.tsbuildinfo`. Rama local borrada.
+
+Worktrees: `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
 `.worktrees/fix-login-field-control-uncontrolled` (SAFE, desmontable). Los de QC-15 y QC-14 se
 desmontaron limpios. El `.worktrees/QC-7-login-usuario-y-contrasena` lo montó la
 **segunda sesión de leader** (`.env`, `pnpm install`, `prisma generate` y `next typegen`
 hechos a mano). Queda además una carpeta huérfana `.worktrees/1-modelo-usuarios-y-roles/`
 sin worktree registrado detrás, anotada en deudas.
+
+La feature **QC-6 — seed-roles-y-usuario-inicial** se cerró el 2026-09-02 (PR #11, merge
+`683e6ce`): resumen en `progress/history.md`, worktree desmontado y rama borrada. El
+`git worktree remove` de `wt.sh done` **falló a medias en Windows** —desregistró el worktree
+pero no pudo borrar `node_modules` por rutas largas de pnpm—; se cerró con `rmdir /s /q` +
+`git worktree prune`. Su cierre **desbloquea a QC-19**, que estaba en `spec_ready` esperando
+precisamente a esta ficha y ahora tiene el slot de `backend` libre.
 
 La feature **QC-7 — login-usuario-y-contrasena** se cerró el 2026-09-02 (PR #9, merge
 `10f9a07`): la ficha estaba todavía como `in_progress` en `feature_list.json` aunque el PR ya
@@ -64,6 +95,88 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
+
+### QC-30 — rediseno-login (ficha creada en esta sesión, 2026-09-02)
+
+- **`zone: frontend`, `complexity: medium`.** Es una pantalla y su hoja de estilo: sin
+  migración, sin endpoint, sin tocar la Server Action. Medium y no low porque toca cuatro
+  archivos, dos efectos nuevos (vidrio y animación) y una decisión de alcance sobre
+  `components/ui/`.
+- **`epic: QC-17` y no `QC-16`.** La épica agrupa por **módulo**, no por naturaleza del
+  trabajo (`docs/jira.md`): el login es la pantalla de `identity`, aunque lo que cambia sea
+  presentación. QC-29 fue a Plataforma porque el tema es armazón transversal; esta no.
+- **`depends_on: QC-29`, y es una dependencia real, no de cortesía.** Los dos rediseños
+  escriben `app/globals.css`. Si corrieran en paralelo serían dos features de la misma zona
+  con intersección de archivos, que es justo lo que bloquea
+  `AGENTS.md > Paralelismo`. Además el login se pinta **con** los tokens de QC-29: sin ellos
+  no hay nada que aplicar.
+- **La decisión que hereda, no que toma:** subir campos y botón a 44 px sin editar
+  `components/ui/`. QC-29 ya resolvió el mismo problema para la barra lateral (reglas en
+  `globals.css` **fuera** de `@layer`, porque dentro de `@layer base` pierden contra las
+  utilidades y el test sale verde en falso). El spec de QC-30 sigue ese precedente o lo
+  contradice por escrito.
+- **Aviso que el spec debe recoger:** subir el input a 44 px por regla global cambia **todos**
+  los inputs de la aplicación, no solo los del login.
+- **No se sembró `requirements.md`.** Lo sembrado es material de diseño
+  (`design-input-login.md`); la ficha se acota cuando le toque, no ahora.
+
+### QC-29 — tema-claro-oscuro (ficha creada en esta sesión, 2026-09-02)
+
+- **`zone: frontend`.** La description dice «esquema de color», «barra lateral», «control en el
+  encabezado»: señales de frontend según la tabla de `AGENTS.md`. No hay migración, ni endpoint,
+  ni RLS. **No es `fullstack` aunque toque `app/layout.tsx`**: ese archivo es el armazón de UI,
+  no una capa de datos, y partirla en dos features solo crearía dos fichas peleándose por
+  `globals.css`.
+- **`complexity: medium`.** Varios archivos (`globals.css`, layout raíz, provider, control del
+  encabezado, tests) y una dependencia nueva, pero sin lógica condicional profunda ni integración
+  externa. No es `low` (no es un archivo) ni `high` (no hay webhooks ni multi-feature).
+- **Una sola ficha y no dos** (decisión humana del 2026-09-02): los tokens de color y el
+  conmutador tocan los mismos archivos. Partirlos daría intersección de archivos entre dos
+  features de la misma zona, que es exactamente lo que la validación de conflicto de
+  `AGENTS.md > Paralelismo` bloquea.
+- **El origen no es el board, es un diseño.** El humano aprobó el canvas primero y pidió la
+  feature después; la ficha se creó en Jira **antes** de tocar el JSON, para no invertir el orden
+  que exige `docs/jira.md`. La description del issue la redactó el leader en nombre del humano
+  con su sí explícito, como hace `/afinar-feature`.
+- **Pregunta que el spec debe dejar abierta, no resolver:** los `--chart-*` siguen siendo cinco
+  grises y no hay ninguna gráfica en el repo. Re-colorearlos sin consumidor es inventar (regla 6
+  de `CLAUDE.md`).
+- **Decisión que el spec sí debe tomar explícitamente:** si las medidas del diseño (item de 44 px,
+  panel de 272 px, degradado) entran en esta ficha, porque tocan `components/ui/sidebar.tsx`, que
+  es shadcn sin editar.
+
+### QC-24 — modelo-recetas (acotada el 2026-09-02)
+
+- El alcance y las **18 decisiones cerradas** viven en `specs/QC-24-modelo-recetas/requirements.md`
+  — esa es la fuente, aquí solo se enlaza. Quedan **2 preguntas abiertas**, las dos caras de cerrar
+  después: si hará falta historial de versiones de fórmula, y si `decimal(14,4)` basta para una
+  cantidad de receta (se hereda de `cost`, que es dinero).
+- **La decisión que cambia el mapa: `recetas` es un módulo hexagonal propio**, no parte de
+  `inventario`. La línea de receta conoce al producto por el contrato público de `inventario`,
+  nunca por su tabla. Es coherente con que la épica se separase el mismo día.
+- Board actualizado **antes** de sembrar: `complexity: medium → high` (ya no son dos tablas, es un
+  módulo nuevo con su cableado) y `description` ampliada con las columnas de auditoría, que
+  **las crea esta ficha** y no el CRUD — a diferencia de QC-14/QC-20, donde la auditoría se decidió
+  cuando el modelo ya estaba mergeado.
+
+### Épica nueva: QC-27 — Recetas (2026-09-02, decisión humana)
+
+- Las tres fichas de recetas (**QC-24** modelo, **QC-25** CRUD, **QC-26** pantalla) nacieron
+  colgadas de **QC-18 Inventario**. El humano decidió el 2026-09-02 que **recetas es una épica
+  aparte**, y se creó **QC-27 — Recetas**, con las tres reasignadas por `parent` en el board y
+  `epic` / `epic_name` actualizados en `feature_list.json`.
+- **Es agrupación, no dependencia** (`docs/jira.md`): la épica no cambia el orden ni el cupo de
+  paralelismo. Lo que sigue mandando es `depends_on`, y QC-24 sigue bloqueada por QC-14 igual que
+  antes. La frontera es la misma del módulo hexagonal: Inventario responde «qué hay y cuánto»,
+  Recetas responde «cómo se compone». Comparten la entidad producto, y esa costura se cruza por el
+  contrato público del módulo, nunca por su tabla (**QC-15**).
+- **De paso se corrigió una divergencia:** `feature_list.json` **no tenía QC-23** («Registro de
+  sesiones y cierre en todos los dispositivos», épica QC-17, bloqueada por QC-8), creada en el
+  board por la sesión que acotó QC-8. Se importó completa. Sin esto, el siguiente F0 la habría
+  traído de golpe y nadie sabría de dónde salió.
+- **Divergencia que NO se toca**, porque es de otra sesión: **QC-8 está *En curso* en el board y
+  `pending` en el disco**. La sesión que la tiene montada en `.worktrees/QC-8-sesion-actual-y-logout`
+  es quien debe pasarla a `in_progress`. Anotado aquí para que no se pierda.
 
 ### Feature 1 — modelo-usuarios-y-roles
 
@@ -437,7 +550,36 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 ### QC-7 — login-usuario-y-contrasena (2026-09-01)
 
 > Esta entrada se escribió, **otra sesión de leader la sobrescribió**, y se rehízo. Ver
-> `## Conflictos pendientes > DOS SESIONES DE LEADER`.
+> `
+### QC-24 / QC-25 / QC-26 — recetas (fichas creadas, no acotadas)
+
+- Creadas en el board el 2026-09-02 desde `/afinar-feature`, épica **QC-18 Inventario**,
+  todas `pending` en *Backlog*. **No se sembró ningún `requirements.md`**: son fichas nuevas,
+  y cada una se acota con su propia corrida del comando cuando le toque.
+- **QC-24 modelo-recetas** — `zone: backend`, `complexity: medium`. Bloqueada por QC-14.
+  Espejo de QC-14: solo esquema y migración.
+- **QC-25 crud-de-recetas** — `zone: backend`, `complexity: high`. Bloqueada por QC-24, QC-20
+  y QC-8. Es `high` porque además del CRUD trae la subida de imagen a Supabase Storage.
+- **QC-26 pantalla-de-recetas** — `zone: frontend`, sin `complexity` (la asigna F1.0, igual
+  que QC-22). Bloqueada por QC-25.
+- **Dependencia nueva sin aprobar, anotada aquí para que no aparezca a mitad del spec:**
+  QC-25 necesita un cliente de Supabase (`@supabase/supabase-js` o equivalente) que **no está
+  en `package.json` ni en `docs/dependencias.md`**. Entra por la regla 7 de `CLAUDE.md`:
+  cuatro checks de salud, fila en `docs/dependencias.md` y aprobación humana antes de instalar.
+- Decisiones que el humano ya cerró al pedir las fichas, y que su acotación hereda sin
+  reabrir: cantidad de línea **decimal exacto** (nunca `float`), unidad de línea **texto libre
+  obligatorio y anotativo** (coherente con la pregunta 1 del dominio, cerrada en QC-14), **un
+  producto no se repite** dentro de una receta, **nombre de receta único** normalizado sin
+  acentos ni mayúsculas (precedente de las presentaciones en QC-20), borrar un producto usado
+  **sí se permite** y la receta conserva la línea, **solo Administrador** validado en el
+  service (precedente de QC-20), `image_url` **opcional** con subida a Storage, y `steps`
+  como **lista ordenada de textos** en una columna `jsonb`.
+- Quedan abiertas, sin rellenar con supuestos: si una receta produce algo (rendimiento /
+  producto resultante); qué pasa con el archivo en Storage al borrar la receta; y los límites
+  de la imagen (tamaño, tipos, bucket público o privado). Las tres las decide la acotación de
+  QC-25, salvo la primera, que es de negocio y no tiene ficha.
+
+## Conflictos pendientes > DOS SESIONES DE LEADER`.
 
 - `zone: backend`. La description es toda servidor: verificar credenciales, responder sin
   revelar cuál falló, emitir cookie. La pantalla ya existe (QC-10, `done`). Sin partición.
@@ -646,6 +788,78 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[board — QC-29 entró sin F0 completo (2026-09-02)]** La ficha se creó en Jira y se añadió a
+  `feature_list.json` **de forma incremental**, sin regenerar el archivo entero desde el board como
+  manda F0. Fue deliberado: el árbol tenía cambios sin commitear (`feature_list.json`,
+  `progress/current.md`, `specs/QC-24-modelo-recetas/` sin trackear) y una regeneración completa a
+  media sesión los habría pisado. Es el mismo alcance acotado con que `/afinar-feature` escribe en
+  el JSON («solo las fichas que acaba de tocar»). **Pendiente: correr F0 completo al abrir la
+  próxima sesión**, que reconciliará QC-29 con el resto del board.
+
+- **[board — dos empujones a Jira quedaron sin hacer por el MCP caído (2026-09-02)]** El servidor
+  `atlassian` dejó de responder a media sesión: dos llamadas abortaron por timeout (120 s y 300 s).
+  Quedan pendientes, **los dos sobre QC-24**: (1) el **comentario** de F1.3 con el detalle del spec
+  y la ruta de `specs/QC-24-modelo-recetas/`, y (2) la **transición de la tarjeta a *En curso***
+  tras la aprobación humana del 2026-09-02 (F2.0). El disco **sí** está al día: la ficha está
+  `in_progress` en `feature_list.json` y el ciclo no depende de Jira (regla 3 de `CLAUDE.md`, el
+  gate corre sin red). Pero mientras no se empujen, **el board dice *En revisión* y el disco dice
+  `in_progress`**, y el próximo F0 vería una feature `in_progress` cuya tarjeta está en otra
+  columna: eso NO se degrada (`docs/jira.md > Si Jira y el disco divergen`, excepción 1), así que
+  el disco gana y hay que mover la tarjeta a mano.
+
+- **[QC-19 — el despliegue en un entorno nuevo falla si la `SEED_ADMIN_*` no cumple la politica]**
+  Consecuencia querida de R18 y prevista en `design.md > 7.2`, pero conviene leerla aqui **antes**
+  de desplegar: desde esta ficha, el seed de instalacion evalua la politica antes de hashear, asi
+  que una credencial de instalacion que no cumpla **aborta el arranque** (`pnpm run build` corre
+  `prisma migrate deploy && tsx scripts/seed.ts`). El fallo es ruidoso y dice que reglas incumple
+  —nunca la credencial—, que es justo lo que se queria; pero quien prepare un entorno nuevo tiene
+  que fijar una `SEED_ADMIN_*` de 8 a 64 caracteres, con mayuscula, minuscula, digito y simbolo, y
+  que no este entre las filtradas conocidas. La del entorno local ya cumple: verificado.
+- **[QC-19 — `P4ssw0rd!` pasa la politica]** No hay des-leetificacion ni recorte de sufijos: una
+  variante de una contrasena filtrada cuela aunque su forma base este en la lista
+  (`design.md > 4` y `> 11`). Puntuar fuerza esta fuera del alcance de la ficha; si algun dia
+  hace falta, es ficha nueva, no un parche al adaptador.
+- **[QC-19 — la lista de filtradas envejece y nadie la refresca]** Las 49 233 entradas vienen de
+  `@zxcvbn-ts/language-common@4.1.3` y solo se actualizan cuando se actualice la dependencia. No
+  hay refresco automatico y esta ficha no lo trae.
+- **[QC-19 — la guardia de R19 no comprueba el ORDEN de las llamadas]**
+  `guard-politica-de-contrasenas` es un barrido de texto: ve que un archivo que hashea referencia
+  tambien la politica, no que la llame **antes** ni que respete su resultado. Para el unico punto
+  que hoy fija una contrasena —el seed— ese hueco esta tapado por un test de comportamiento
+  (`seed-initial-access.test.ts`, "si la politica rechaza la credencial de instalacion, no se
+  hashea ni se escribe nada"). **Todo punto nuevo que fije contrasenas necesita el suyo**: la
+  guardia atrapa el olvido completo, no el orden.
+- **[QC-19 — QC-21 hereda pintar los mensajes]** El modulo exporta `CREDENTIAL_RULES` (siete
+  codigos estables, independientes del idioma) y `evaluateCredentialRules`, sincrona y usable en
+  el navegador. QC-21 pinta los requisitos a partir de ese catalogo y **no vuelve a declarar las
+  reglas**: una segunda copia es exactamente lo que la fila "la regla vive en el dominio" vino a
+  impedir.
+- **[QC-12 — E2E diferido a QC-13]** El dashboard no tiene prueba de extremo a extremo, y se
+  difirió **con motivo escrito en el spec**: hoy no hay sesión real ni flujo navegable que
+  visitar. Lo recoge QC-13, que es la que conecta la guardia de sesión.
+- **[QC-12 — `/dashboard` existe y NO está protegida]** La ruta responde 200 a cualquiera. Es
+  consecuencia esperada de que QC-13 esté `pending`, no un olvido: hasta entonces la zona
+  «privada» lo es de nombre. Igual conviene tenerlo presente si algo se despliega antes.
+- **[QC-12 — el ítem «Dashboard» del sidebar sigue dando 404]** Decisión humana del 2026-09-02:
+  QC-12 crea la ruta pero **no** reconecta el ítem del menú; lo hace QC-13. O sea que la pantalla
+  existe y el enlace del menú sigue roto hasta entonces.
+- **[QC-12 — `app/page.tsx` sigue siendo la plantilla de `create-next-app`]** La raíz `/` del ERP
+  es la página de bienvenida de Next.js. Nadie ha decidido si debe redirigir al dashboard o al
+  login, y **ninguna ficha del backlog lo cubre**. Es la pregunta abierta que dejó el spec de
+  QC-12; candidata a ficha nueva de una línea.
+- **[arnés — `vitest related` no engancha las guardias que leen las fuentes del disco]** Un test
+  que abre el archivo fuente en vez de importarlo no aparece en el grafo de `vitest related`, así
+  que **`./init.sh --rapido` puede no correrlo** aunque el cambio lo afecte. Verificado en QC-12
+  con `tests/unit/dashboard-route-contract.test.ts`, y es el mismo patrón que
+  `tests/unit/identity/login-action.test.ts` y `logout-action.test.ts`. El gate completo sí las
+  corre, así que no es un agujero de merge, pero sí del modo rápido. La salida que sugiere el
+  reviewer: nombrarlas `guard-…` o moverlas a `tests/guards/`, que el modo rápido corre siempre.
+  Entra por `/afinar-regla`.
+- **[QC-12 — la verificación visual multiplataforma no la hizo nadie con ojos]** No hay navegador
+  con emulación de dispositivo en este entorno. Lo verificado es el HTML servido y jsdom a 375 y
+  1280 px, más las guardias de que no hay alto de viewport fijo, ni `:hover`, ni controles. El
+  reviewer lo dio por **aceptable con nota**, no por excepción: queda como **verificación humana
+  pendiente**.
 - **Las pruebas de mutacion sobre archivos de PRODUCCION no pueden correr en paralelo.** Al
   cerrar los menores de QC-8, tres subagentes trabajaban a la vez y **dos mutaron
   `session-cookie.ts` simultaneamente** para probar guardias distintas: uno quitaba
