@@ -29,6 +29,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { NAV_ICONS } from '@/lib/shared/navigation/nav-icons';
 import {
   BRAND_LABEL,
   BRAND_SHORT_LABEL,
@@ -123,16 +124,24 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
                   No hay identidad visual definida; cuando la haya, el icono y el degradado
                   salen de donde diga esa ficha.
                 */}
+                {/*
+                  En modo icono el simbolo ES la marca: lleva dentro las iniciales (R24) en
+                  lugar del matraz, como en el diseno. Dibujar el cuadro y ademas el texto al
+                  lado no cabe en los 44px del rail —el contenido acababa aplastado contra el
+                  padding— y duplicaria la marca en una columna de iconos.
+                */}
                 <span
-                  aria-hidden="true"
+                  aria-hidden={isIconMode ? undefined : 'true'}
                   data-testid="private-brand-mark"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-[13px] bg-linear-150 from-sidebar-primary to-sidebar-primary/70 text-sidebar-primary-foreground shadow-[0_8px_22px_-8px_var(--sidebar-primary)]"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-[13px] bg-linear-150 from-sidebar-primary to-sidebar-primary/70 font-mono text-[12.5px] font-medium text-sidebar-primary-foreground shadow-[0_8px_22px_-8px_var(--sidebar-primary)]"
                 >
-                  <FlaskConicalIcon className="size-5" />
+                  {isIconMode ? (
+                    <span data-testid="private-brand-short">{BRAND_SHORT_LABEL}</span>
+                  ) : (
+                    <FlaskConicalIcon className="size-5" />
+                  )}
                 </span>
-                {isIconMode ? (
-                  <span data-testid="private-brand-short">{BRAND_SHORT_LABEL}</span>
-                ) : (
+                {isIconMode ? null : (
                   <span className="flex min-w-0 flex-col text-left leading-tight">
                     <span
                       data-testid="private-brand-long"
@@ -235,7 +244,7 @@ type NavLinkItemProps = {
 /** Item simple: enlace directo, marcado como actual cuando coincide con la ruta (R8). */
 function NavLinkItem({ item, pathname, onNavigate }: NavLinkItemProps) {
   const isActive = pathname === item.href;
-  const Icon = item.icon;
+  const Icon = item.icon ? NAV_ICONS[item.icon] : undefined;
 
   return (
     <SidebarMenuItem>
@@ -284,7 +293,7 @@ type NavGroupProps = {
  */
 function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
   const hasActiveChild = group.items.some((child) => child.href === pathname);
-  const Icon = group.icon;
+  const Icon = group.icon ? NAV_ICONS[group.icon] : undefined;
 
   return (
     <SidebarMenuItem>
@@ -332,7 +341,7 @@ function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
  * renderizar las dos a la vez duplicaria cada enlace en el arbol.
  */
 function NavGroupFloating({ group, pathname, onNavigate }: NavGroupProps) {
-  const Icon = group.icon;
+  const Icon = group.icon ? NAV_ICONS[group.icon] : undefined;
 
   return (
     <SidebarMenuItem>

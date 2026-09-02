@@ -155,6 +155,33 @@
   min-height: 44px;
 }
 
+/* Modo icono: el boton tiene que ser cuadrado de 44px, no 32.
+   El primitivo fuerza `size-8!` y `p-2!` -32px con !important- cuando el panel esta
+   colapsado, contando con el rail de 3rem que trae de serie. Aqui el rail mide 4.875rem
+   (78px, `app/(private)/layout.tsx`), asi que quedaba un boton de 32px de ancho por 44 de
+   alto -el `min-height` de arriba si gana, porque `min-height` acota a `height`- y el
+   contenido salia aplastado contra el padding.
+
+   Lleva `!important` a proposito y no por pereza: es la unica forma de ganarle a un
+   `!important` de una utilidad. Estar fuera de `@layer` no basta contra eso. */
+[data-collapsible='icon'] [data-slot='sidebar-menu-button'] {
+  width: 44px !important;
+  height: 44px !important;
+  padding: 10px !important;
+}
+
+/* El simbolo de marca es mas grande que un icono de menu, asi que en modo icono necesita
+   su propio ajuste: 32px de simbolo dentro de 44 de boton dejan 6px de aire por lado. */
+[data-collapsible='icon'] [data-testid='private-brand-link'] {
+  padding: 6px !important;
+}
+
+[data-collapsible='icon'] [data-testid='private-brand-mark'] {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+}
+
 /* Elemento activo con el acento naranja.
    El primitivo lo marca con `data-active:bg-sidebar-accent`, que es el velo agua, asi que
    `--sidebar-primary` quedaba definido y sin usar: el color mas caracteristico de la paleta
