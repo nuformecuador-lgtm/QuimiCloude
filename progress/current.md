@@ -1410,3 +1410,39 @@ pregunta 5 (pepper) la cerró el humano el 2026-08-06 con un no (`design.md > 8.
   `wt.sh list` lo da como mergeado en `origin/dev` y desmontable. No pertenece a ninguna
   feature del board, así que ningún paso F2.5 va a llegar a él: se queda hasta que alguien
   corra `./scripts/wt.sh clean --force`.
+
+### Anotadas por QC-21 — ayuda-visual-de-contrasena (2026-09-02)
+
+- **`guard-password-never-plaintext` es CIEGA a las propiedades opcionales.** Destapado por el
+  reviewer de QC-21 rompiendo el codigo a proposito: `readonly password: string;` sale ROJO, pero
+  **`readonly password?: string;` sale VERDE**. El `?` separa el identificador de los `:`/`=` que
+  exige el regex de `declaredIdentifiers`
+  (`/(?:^|[{,;(])\s*(?:readonly\s+)?['"]?([A-Za-z_$][\w$]*)['"]?\s*[:=]/gm`), asi que el
+  identificador no se captura. **La forma exacta que lo evade es `nombre?:`** — es decir, toda
+  propiedad opcional de TypeScript. No es solo cosa de QC-21: la guardia barre `db/`, `lib/`,
+  `app/` y `scripts/`, y en los cuatro es ciega a la misma forma. QC-21 lo tapo **solo para sus
+  tres archivos** con un centinela local (`ninguna propiedad opcional nueva nombra la contrasena
+  sin acabar en hash`), sin tocar ni relajar la guardia. **Ampliar la guardia es
+  `/afinar-regla`**, no una ficha de producto.
+- **`guard-password-never-plaintext` no barre `components/`.** R22 de QC-21 lo cubre solo para sus
+  tres archivos; cualquier otro componente del repo sigue fuera del barrido. Tambien
+  `/afinar-regla`.
+- **Importar el detector desde el archivo de la guardia duplica la ejecucion de sus 6 tests.**
+  `tests/unit/credential-help-contract.test.ts` importa `findPlaintextPasswordDeclarations` de
+  `tests/guards/guard-password-never-plaintext.test.ts` (lo exige `design.md > 8.3`, para heredar
+  el criterio en vez de copiarlo). Como ese archivo tiene `describe` de nivel superior, sus 6
+  `it(...)` se registran tambien bajo el importador y **se ejecutan dos veces**, inflando el conteo
+  de la suite. No rompe nada. La solucion limpia —extraer el detector a un modulo no-test que la
+  guardia reexporte— toca un archivo de guardia compartido: `/afinar-regla`.
+- **Altura del campo por debajo de 44x44 px.** `credential-field.tsx` renderiza
+  `components/ui/input.tsx` sin editar (`h-8` = 32 px) y `docs/architecture.md > Interaccion` pide
+  44x44. Excepcion declarada en `design.md > 6` + pregunta abierta 4 de QC-21. El `font-size` si
+  cumple (16 px en movil). **Subirlo es alcance de QC-29/QC-30** y debe cerrarse antes de que
+  QC-36 ponga el componente delante de un usuario.
+- **Nadie ve el componente de QC-21 hasta QC-36**, y **`components/shared/` se estrena con un
+  componente que hoy usa cero features** (`design.md > 2.1`). Deuda aceptada por escrito en la
+  fila 1 de las decisiones cerradas.
+- **`scripts/validate-features.mjs` no resuelve `.worktrees` desde dentro de un worktree.**
+  `WT_DIR = '.worktrees'` (linea 18) se resuelve contra el cwd, asi que `./init.sh` aborta dentro de
+  cualquier worktree con `faltan specs para features sdd en vuelo: <otra feature>` — QC-21 convivio
+  con ese rojo por decision humana del 2026-09-02. Desde la raiz pasa en verde. `/afinar-regla`.
