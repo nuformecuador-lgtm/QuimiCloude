@@ -146,8 +146,10 @@ describe('cookie de sesion', () => {
     expect(setMock).not.toHaveBeenCalled();
   });
 
-  // R15
-  it('no se registra contrasena, hash ni valor de cookie', async () => {
+  // R15 — solo el tercio del requisito que pasa por aqui: el valor de la cookie y el secreto
+  // que la firma. La contrasena y el hash no cruzan nunca esta funcion, y su clausula la
+  // ejercita `verify-credentials.test.ts` ("no se registra la contrasena ni el hash...").
+  it('no se registra el valor de la cookie ni el secreto que la firma', async () => {
     const espias = (['log', 'info', 'warn', 'error', 'debug'] as const).map((metodo) =>
       vi.spyOn(console, metodo).mockImplementation(() => {}),
     );
@@ -155,11 +157,10 @@ describe('cookie de sesion', () => {
     await startSession(createSessionTicket(USER_ID, AHORA));
     const { value } = cookieEmitida();
 
-    for (const espia of espias) {
-      expect(espia).not.toHaveBeenCalled();
-      const escrito = espia.mock.calls.flat().join(' ');
-      expect(escrito).not.toContain(value);
-      expect(escrito).not.toContain(SECRETO);
-    }
+    // Emitir la cookie no escribe en ningun registro de salida, ni siquiera algo inocuo. La
+    // asercion por contenido sobraria detras de esta: si nada se registra, no hay cadena que
+    // inspeccionar. Se afirma lo fuerte y se deja el contenido al test que si tiene llamadas.
+    for (const espia of espias) expect(espia).not.toHaveBeenCalled();
+    expect(value).not.toContain(SECRETO);
   });
 });

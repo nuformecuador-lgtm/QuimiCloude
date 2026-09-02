@@ -3,7 +3,8 @@
  *
  * QUE SE EJERCITA AQUI Y NO EN LOS UNITARIOS: el adaptador Prisma de verdad
  * (`findActiveByUsername` con su `$queryRaw` y el indice funcional parcial
- * `users_username_unique`, `recordLoginAttempt` con su `UPDATE`), el hasher bcrypt de verdad
+ * `users_username_unique`, y las dos escrituras: el `updateMany` condicional de
+ * `compareAndSetLoginAttempt` y el `update` de `setLoginAttempt`), el hasher bcrypt de verdad
  * y las tres columnas de bloqueo tal como quedan escritas en la fila. El caso de uso se
  * construye con esos adaptadores reales; el unico doble es el `SessionWriter`, porque
  * `session-cookie.ts` escribe con `cookies()` de `next/headers` y eso solo funciona dentro de
@@ -37,8 +38,9 @@ import {
   type SessionTicket,
 } from '@/lib/modules/identity';
 import {
+  compareAndSetLoginAttempt,
   findActiveByUsername,
-  recordLoginAttempt,
+  setLoginAttempt,
 } from '@/lib/modules/identity/adapters/driven/persistence/user-credentials-prisma';
 import {
   createPasswordHash,
@@ -87,7 +89,7 @@ function montarLogin(): {
   const sesion = crearEspiaDeSesion();
   const verificar = createVerifyCredentials({
     users: { findActiveByUsername },
-    attempts: { record: recordLoginAttempt },
+    attempts: { compareAndSet: compareAndSetLoginAttempt, set: setLoginAttempt },
     hasher: { hash: createPasswordHash, verify: verifyPasswordHash },
     session: sesion,
   });
@@ -264,6 +266,77 @@ describe('login contra Postgres real', () => {
     const resultado = await verificar({ username: nombreDeUsuario, password: CLAVE_CORRECTA });
 
     expect(resultado).toEqual({ ok: false });
+    expect(sesion.tickets).toHaveLength(0);
+    expect(await leerBloqueo()).toEqual({
+      failedLoginAttempts: 0,
+      lockLevel: 1,
+      lockedUntil: finDelBloqueo,
+    });
+  });
+
+  // --- Intentos CONCURRENTES ---------------------------------------------------------------
+  // Lanzar los intentos en paralelo es literalmente lo que hace un ataque de fuerza bruta:
+  // nadie espera 110 ms de bcrypt entre intento e intento. Con la escritura absoluta anterior
+  // los N intentos leian el mismo contador y lo dejaban todos en 1, asi que la cuenta no
+  // llegaba nunca a 5 y el bloqueo de R22 no se disparaba jamas. Estos tres casos son los que
+  // distinguen el registro condicional del que no lo es.
+
+  it('intentos fallidos en paralelo se cuentan todos', TIEMPO_HOLGADO, async () => {
+    // R22 — tres intentos simultaneos tienen que dejar el contador en 3, no en 1.
+    const { verificar, sesion } = montarLogin();
+
+    const resultados = await Promise.all([
+      verificar({ username: nombreDeUsuario, password: CLAVE_INCORRECTA }),
+      verificar({ username: nombreDeUsuario, password: CLAVE_INCORRECTA }),
+      verificar({ username: nombreDeUsuario, password: CLAVE_INCORRECTA }),
+    ]);
+
+    expect(resultados).toEqual([{ ok: false }, { ok: false }, { ok: false }]);
+    expect(await leerBloqueo()).toEqual({
+      failedLoginAttempts: 3,
+      lockLevel: 0,
+      lockedUntil: null,
+    });
+    expect(sesion.tickets).toHaveLength(0);
+  });
+
+  it('cinco intentos fallidos en paralelo bloquean la cuenta', TIEMPO_HOLGADO, async () => {
+    // R22, R23 — el quinto fallo consuma el bloqueo aunque los cinco salgan a la vez.
+    const { verificar } = montarLogin();
+    const antes = Date.now();
+
+    await Promise.all(
+      Array.from({ length: 5 }, () =>
+        verificar({ username: nombreDeUsuario, password: CLAVE_INCORRECTA }),
+      ),
+    );
+
+    const bloqueo = await leerBloqueo();
+
+    expect(bloqueo.failedLoginAttempts).toBe(0);
+    expect(bloqueo.lockLevel).toBe(1);
+    expect(bloqueo.lockedUntil).not.toBeNull();
+    expect(bloqueo.lockedUntil?.getTime()).toBeGreaterThan(antes);
+  });
+
+  it('intentos en paralelo durante el bloqueo no lo alargan', TIEMPO_HOLGADO, async () => {
+    // R25 — martillear una cuenta ya bloqueada, en paralelo, no mueve ninguna de las tres
+    // columnas: ni contador, ni nivel, ni fin del bloqueo.
+    const finDelBloqueo = new Date(Date.now() + 60_000);
+    await prisma.user.update({
+      where: { id: usuarioId },
+      data: { failedLoginAttempts: 0, lockLevel: 1, lockedUntil: finDelBloqueo },
+    });
+
+    const { verificar, sesion } = montarLogin();
+
+    const resultados = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        verificar({ username: nombreDeUsuario, password: CLAVE_CORRECTA }),
+      ),
+    );
+
+    expect(resultados.every((resultado) => resultado.ok === false)).toBe(true);
     expect(sesion.tickets).toHaveLength(0);
     expect(await leerBloqueo()).toEqual({
       failedLoginAttempts: 0,

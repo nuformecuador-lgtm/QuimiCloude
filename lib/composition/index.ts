@@ -3,8 +3,9 @@
 // Prohibido importar adaptadores driving desde aqui: la flecha va driving -> composicion (R12).
 import { createVerifyCredentials } from '@/lib/modules/identity';
 import {
+  compareAndSetLoginAttempt,
   findActiveByUsername,
-  recordLoginAttempt,
+  setLoginAttempt,
 } from '@/lib/modules/identity/adapters/driven/persistence/user-credentials-prisma';
 import {
   createPasswordHash,
@@ -23,7 +24,10 @@ import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-cr
 
 const passwordHasher: PasswordHasher = { hash: createPasswordHash, verify: verifyPasswordHash };
 const userCredentialsReader: UserCredentialsReader = { findActiveByUsername };
-const loginAttemptRecorder: LoginAttemptRecorder = { record: recordLoginAttempt };
+const loginAttemptRecorder: LoginAttemptRecorder = {
+  compareAndSet: compareAndSetLoginAttempt,
+  set: setLoginAttempt,
+};
 const sessionWriter: SessionWriter = { startSession };
 // Leer y cerrar sesion siguen siendo el stub de QC-8: QC-7 solo escribe la cookie (R20).
 const sessionProvider: SessionProvider = { getSessionUser, endSession };

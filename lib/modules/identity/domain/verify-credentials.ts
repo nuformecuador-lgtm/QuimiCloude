@@ -1,11 +1,14 @@
-import { isLocked, nextLockState } from './account-lock';
+import { isLocked, nextLockState, type AccountLockState } from './account-lock';
 import { loginInputSchema, type LoginInput } from './credentials';
 import { createSessionTicket } from './session';
 
 import type { LoginAttemptRecorder } from '../ports/login-attempt-recorder';
 import type { PasswordHasher } from '../ports/password-hasher';
 import type { SessionWriter } from '../ports/session-writer';
-import type { UserCredentialsReader } from '../ports/user-credentials-reader';
+import type {
+  AuthenticatableUser,
+  UserCredentialsReader,
+} from '../ports/user-credentials-reader';
 
 /**
  * Caso de uso de autenticacion (`design.md > 2`). La decision entera vive aqui, en el
@@ -38,6 +41,15 @@ export const DECOY_SECRET = 'senuelo-de-tiempo-constante-qc7';
  */
 const REJECTED: { ok: boolean } = Object.freeze({ ok: false });
 
+/**
+ * Reintentos del registro condicional de un fallo antes de rendirse.
+ *
+ * Diez sobran: en cada ronda gana **exactamente un** `compareAndSet`, asi que tras 5 rondas
+ * ganadoras la cuenta queda bloqueada y todos los demas intentos, al releer, ven el bloqueo y
+ * salen sin escribir. Un intento cualquiera necesita 5-6 rondas como mucho.
+ */
+const MAX_INTENTOS_DE_REGISTRO = 10;
+
 export function createVerifyCredentials(
   deps: VerifyCredentialsDeps,
 ): (input: LoginInput) => Promise<{ ok: boolean }> {
@@ -52,6 +64,46 @@ export function createVerifyCredentials(
     return decoyHashPromise;
   }
 
+  // Se calienta al construir para que ningun intento pague el hash del senuelo ademas de su
+  // verificacion (asimetria de tiempo, aunque sea de una sola muestra por proceso).
+  const calentamiento = decoyHash();
+  // El .catch no sustituye a la promesa cacheada: solo evita un unhandled rejection si el
+  // hasher falla antes de que nadie la espere. Quien la espere de verdad seguira viendo el error.
+  void calentamiento.catch(() => {});
+
+  /**
+   * Registra un intento fallido sin perder cuenta de los que corren en paralelo.
+   *
+   * La escritura es CONDICIONAL al estado que se leyo: entre la lectura y la escritura hay
+   * ~110 ms de bcrypt, y con una escritura absoluta N intentos simultaneos leerian el mismo
+   * contador y lo dejarian todos en el mismo valor —el bloqueo de R22 no se dispararia jamas
+   * justo frente al unico atacante que importa, el que lanza los intentos en paralelo—. Si el
+   * `compareAndSet` pierde la carrera, se relee y se **recalcula la politica** sobre el estado
+   * fresco: la escalada la sigue decidiendo `nextLockState`, nunca el adaptador.
+   *
+   * Este bucle NO llama al hasher: el numero de verificaciones por intento sigue siendo uno
+   * exacto en los tres caminos (R6, R29).
+   */
+  async function registrarFallo(
+    visto: AuthenticatableUser,
+    usuarioNormalizado: string,
+    now: Date,
+  ): Promise<void> {
+    let estado: AccountLockState = visto;
+    for (let intento = 0; intento < MAX_INTENTOS_DE_REGISTRO; intento += 1) {
+      // Si al releer la cuenta ya esta bloqueada, no se escribe NADA: martillearla no la
+      // alarga ni sube el nivel (R25).
+      if (isLocked(estado, now)) return;
+      const siguiente = nextLockState(estado, 'failure', now);
+      if (await deps.attempts.compareAndSet(visto.id, estado, siguiente)) return;
+      // Perdio la carrera: se relee y se recalcula la politica sobre el estado FRESCO.
+      const fresco = await deps.users.findActiveByUsername(usuarioNormalizado);
+      // Borrado o renombrado entre medias: no se escribe nada (R31).
+      if (fresco === null || fresco.id !== visto.id) return;
+      estado = fresco;
+    }
+  }
+
   return async function verifyCredentials(input: LoginInput): Promise<{ ok: boolean }> {
     const parsed = loginInputSchema.safeParse(input);
     // Entrada invalida se corta antes de tocar ningun puerto: ni base, ni hash, ni sesion (R8).
@@ -63,7 +115,8 @@ export function createVerifyCredentials(
 
     // El nombre de usuario se normaliza (R4); la contrasena no se toca ni se recorta, porque
     // un espacio inicial o final es parte de la credencial.
-    const usuario = await deps.users.findActiveByUsername(parsed.data.username.trim().toLowerCase());
+    const usuarioNormalizado = parsed.data.username.trim().toLowerCase();
+    const usuario = await deps.users.findActiveByUsername(usuarioNormalizado);
 
     if (usuario === null) {
       // Se verifica igualmente contra el señuelo para que un usuario inexistente cueste lo
@@ -82,11 +135,14 @@ export function createVerifyCredentials(
     if (isLocked(usuario, now)) return REJECTED;
 
     if (!correcta) {
-      await deps.attempts.record(usuario.id, nextLockState(usuario, 'failure', now));
+      await registrarFallo(usuario, usuarioNormalizado, now);
       return REJECTED;
     }
 
-    await deps.attempts.record(usuario.id, nextLockState(usuario, 'success', now));
+    // El exito si se escribe de forma incondicional: su estado es todo ceros, o sea que **no
+    // depende del valor previo**. Es idempotente y no tiene el problema de
+    // lectura-modificacion-escritura que obliga al camino de fallo a ir con `compareAndSet`.
+    await deps.attempts.set(usuario.id, nextLockState(usuario, 'success', now));
     // Verificar y LUEGO emitir. Si la emision lanza (secreto ausente, R13) la excepcion se
     // propaga y nadie queda autenticado sin sesion: `loginAction` no llega a redirigir.
     await deps.session.startSession(createSessionTicket(usuario.id, now));

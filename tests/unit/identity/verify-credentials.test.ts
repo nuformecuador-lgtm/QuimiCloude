@@ -2,6 +2,10 @@
 // Sin base de datos, sin bcrypt real y sin Next: lo que se prueba aqui es la DECISION, y la
 // decision vive en el dominio. Los adaptadores reales tienen su propia tanda (T5, T8).
 
+import {
+  createPasswordHash,
+  verifyPasswordHash,
+} from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { nextLockState, type AccountLockState } from '@/lib/modules/identity/domain/account-lock';
 import type { SessionTicket } from '@/lib/modules/identity/domain/session';
 import {
@@ -43,7 +47,16 @@ function montar(usuarios: readonly AuthenticatableUser[] = [USUARIO], nombre = '
   // Los dobles se tipan con la firma del puerto: sin eso, las aserciones sobre los
   // argumentos recibidos no las vigilaria el compilador.
   const attempts = {
-    record: vi.fn<(userId: string, state: AccountLockState) => Promise<void>>(async () => {}),
+    // Por defecto el CAS gana la carrera: el caso normal es que nadie compita.
+    compareAndSet:
+      vi.fn<
+        (
+          userId: string,
+          esperado: AccountLockState,
+          siguiente: AccountLockState,
+        ) => Promise<boolean>
+      >(async () => true),
+    set: vi.fn<(userId: string, estado: AccountLockState) => Promise<void>>(async () => {}),
   };
   const hasher = {
     hash: vi.fn(async (texto: string) => hashDe(texto)),
@@ -154,6 +167,10 @@ describe('verificacion de credenciales', () => {
   // R8
   it('entrada invalida no toca ningun puerto', async () => {
     const { verifyCredentials, users, hasher, session } = montar();
+    // El unico `hash` que ya ocurrio es el calentamiento del senuelo, que pasa al CONSTRUIR el
+    // caso de uso y no en esta invocacion. Se descuenta para que la asercion siga siendo
+    // "esta entrada no llamo a ningun puerto", que es lo que dice R8.
+    hasher.hash.mockClear();
 
     const vacia = await verifyCredentials({ username: '', password: '' });
     const demasiadoLarga = await verifyCredentials({
@@ -193,7 +210,7 @@ describe('verificacion de credenciales', () => {
 
     expect(users.findActiveByUsername).toHaveBeenCalledTimes(1);
     expect(hasher.verify).toHaveBeenCalledTimes(1);
-    expect(attempts.record).toHaveBeenCalledTimes(1);
+    expect(attempts.set).toHaveBeenCalledTimes(1);
     expect(session.startSession).toHaveBeenCalledTimes(1);
   });
 
@@ -228,7 +245,8 @@ describe('verificacion de credenciales', () => {
 
     // Ni contador, ni nivel, ni fin de bloqueo: martillear una cuenta no la deja fuera mas
     // tiempo del que ya decidio la politica.
-    expect(attempts.record).not.toHaveBeenCalled();
+    expect(attempts.compareAndSet).not.toHaveBeenCalled();
+    expect(attempts.set).not.toHaveBeenCalled();
   });
 
   // R28
@@ -278,14 +296,16 @@ describe('verificacion de credenciales', () => {
 
     await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
 
-    expect(attempts.record).toHaveBeenCalledWith(USUARIO.id, {
+    // El exito escribe INCONDICIONALMENTE: su estado es todo ceros y no depende del previo.
+    expect(attempts.set).toHaveBeenCalledWith(USUARIO.id, {
       failedAttempts: 0,
       lockLevel: 0,
       lockedUntil: null,
     });
+    expect(attempts.compareAndSet).not.toHaveBeenCalled();
 
     // El orden importa: primero se deja la cuenta limpia y solo despues se emite la sesion.
-    const ordenRegistro = attempts.record.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY;
+    const ordenRegistro = attempts.set.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY;
     const ordenSesion = session.startSession.mock.invocationCallOrder[0] ?? 0;
     expect(ordenRegistro).toBeLessThan(ordenSesion);
   });
@@ -305,8 +325,14 @@ describe('verificacion de credenciales', () => {
     // Este fallo aun no consuma bloqueo, asi que el estado esperado no depende del instante
     // y se puede comparar contra la politica pura sin inyectar reloj.
     const esperado = nextLockState(conHistorial, 'failure', new Date());
-    expect(attempts.record).toHaveBeenCalledTimes(1);
-    expect(attempts.record).toHaveBeenCalledWith(USUARIO.id, esperado);
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(1);
+    // La escritura del fallo es condicional al estado leido: `esperado` es el estado visto y
+    // `siguiente` el que calcula la politica.
+    expect(attempts.compareAndSet).toHaveBeenCalledWith(
+      USUARIO.id,
+      expect.objectContaining({ failedAttempts: 2, lockLevel: 1, lockedUntil: null }),
+      esperado,
+    );
   });
 
   // R31
@@ -318,6 +344,112 @@ describe('verificacion de credenciales', () => {
 
     // Una escritura por un usuario que no existe seria un oraculo de existencia por efecto
     // lateral: bastaria mirar la base para saber que nombres son reales.
-    expect(attempts.record).not.toHaveBeenCalled();
+    expect(attempts.compareAndSet).not.toHaveBeenCalled();
+    expect(attempts.set).not.toHaveBeenCalled();
   });
+
+  // R22 - el registro de un fallo es una lectura-modificacion-escritura con ~110 ms de bcrypt
+  // en medio. Si la escritura fuera absoluta, N intentos en paralelo dejarian el contador en 1
+  // y la cuenta no se bloquearia nunca. Estos tres casos cubren la carrera perdida.
+  it('un registro que pierde la carrera se reintenta sobre el estado fresco', async () => {
+    const visto: AuthenticatableUser = { ...USUARIO, failedAttempts: 0 };
+    const fresco: AuthenticatableUser = { ...USUARIO, failedAttempts: 3 };
+    const { verifyCredentials, users, attempts, hasher } = montar([visto]);
+
+    attempts.compareAndSet.mockResolvedValueOnce(false);
+    users.findActiveByUsername.mockResolvedValueOnce(visto).mockResolvedValueOnce(fresco);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    // Se releyo la cuenta antes de reintentar...
+    expect(users.findActiveByUsername).toHaveBeenCalledTimes(2);
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(2);
+
+    // ...y el reintento condiciona sobre el estado FRESCO, no sobre el que quedo obsoleto.
+    const [, esperado, siguiente] = attempts.compareAndSet.mock.calls[1] ?? [];
+    expect(esperado).toMatchObject({ failedAttempts: 3, lockLevel: 0 });
+    // Y la politica se recalcula sobre ese estado fresco: 3 -> 4, no 0 -> 1.
+    expect(siguiente).toEqual({ failedAttempts: 4, lockLevel: 0, lockedUntil: null });
+
+    // El reintento no vuelve a pagar el hasher: sigue habiendo una verificacion por intento (R29).
+    expect(hasher.verify).toHaveBeenCalledTimes(1);
+  });
+
+  // R25
+  it('si la cuenta se bloquea mientras tanto, el reintento no escribe', async () => {
+    const visto: AuthenticatableUser = { ...USUARIO, failedAttempts: 4 };
+    const bloqueado: AuthenticatableUser = {
+      ...USUARIO,
+      failedAttempts: 0,
+      lockLevel: 1,
+      lockedUntil: bloqueadaHasta(),
+    };
+    const { verifyCredentials, attempts, users } = montar([visto]);
+
+    attempts.compareAndSet.mockResolvedValueOnce(false);
+    users.findActiveByUsername.mockResolvedValueOnce(visto).mockResolvedValueOnce(bloqueado);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    // Otro intento consumo el bloqueo mientras tanto: martillear una cuenta ya bloqueada no la
+    // alarga ni sube su nivel, asi que el reintento sale sin escribir.
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(1);
+    expect(attempts.set).not.toHaveBeenCalled();
+  });
+
+  // R31
+  it('un usuario que desaparece entre el intento y el reintento no provoca escritura', async () => {
+    const { verifyCredentials, attempts, users } = montar();
+
+    attempts.compareAndSet.mockResolvedValueOnce(false);
+    users.findActiveByUsername.mockResolvedValueOnce(USUARIO).mockResolvedValueOnce(null);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    // Borrado (o renombrado) entre medias: escribir de todos modos dejaria rastro de una
+    // cuenta que para el login ya no existe.
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(1);
+    expect(attempts.set).not.toHaveBeenCalled();
+  });
+
+  // R15 - ni la contrasena recibida ni el hash almacenado aparecen en ningun registro de
+  // salida. Se ejercita con el hasher REAL y en los TRES caminos: el test equivalente del
+  // adaptador de cookie solo pasa por el valor de la cookie, por la que ni contrasena ni hash
+  // circulan nunca.
+  it('no se registra la contrasena ni el hash en ninguno de los caminos', async () => {
+    const espias = (['log', 'info', 'warn', 'error', 'debug'] as const).map((metodo) =>
+      vi.spyOn(console, metodo).mockImplementation(() => {}),
+    );
+
+    try {
+      const CLAVE = 'clave-que-no-debe-aparecer-QC7';
+      const hashReal = await createPasswordHash(CLAVE);
+      const usuario: AuthenticatableUser = { ...USUARIO, passwordHash: hashReal };
+      const verifyCredentials = createVerifyCredentials({
+        users: {
+          findActiveByUsername: (nombre) =>
+            Promise.resolve(nombre === 'admin' ? usuario : null),
+        },
+        attempts: {
+          compareAndSet: () => Promise.resolve(true),
+          set: () => Promise.resolve(),
+        },
+        hasher: { hash: createPasswordHash, verify: verifyPasswordHash },
+        session: { startSession: () => Promise.resolve() },
+      });
+
+      await verifyCredentials({ username: 'admin', password: CLAVE });
+      await verifyCredentials({ username: 'admin', password: 'otra-cosa' });
+      await verifyCredentials({ username: 'no.existe', password: CLAVE });
+
+      const escrito = espias.flatMap((espia) => espia.mock.calls.flat()).join(' ');
+
+      expect(escrito).not.toContain(CLAVE);
+      expect(escrito).not.toContain(hashReal);
+      // Ni un trozo: el prefijo con la sal ya identifica la fila por si solo.
+      expect(escrito).not.toContain(hashReal.slice(0, 29));
+    } finally {
+      for (const espia of espias) espia.mockRestore();
+    }
+  }, 30_000);
 });
