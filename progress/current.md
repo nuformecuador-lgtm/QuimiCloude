@@ -726,6 +726,45 @@ literalmente «mientras no hay verificación real». Cuando la haya, ese test mi
 la task T6b, no suelto.
 ## Conflictos pendientes
 
+### QUIÉN LLEVA QUÉ, AHORA MISMO (2026-09-02) — leer ANTES de tocar un worktree ajeno
+
+> **QC-20 la lleva una sesión VIVA.** Rama `feature/QC-20-crud-de-productos`, worktree
+> `.worktrees/QC-20-crud-de-productos`, base propia `QuimiCloude_QC20`. T1–T11 y T15 hechas;
+> **T12 en curso**. F2.3 ya hecho (merge de `origin/dev` con QC-24, tres conflictos resueltos).
+> **No escribas en esa rama ni en ese worktree.**
+>
+> **Un worktree limpio y sin commits recientes NO significa libre.** Hoy `labs-4b` estuvo a
+> punto de arrancar T12 en paralelo porque el último commit era de hacía 72 minutos: el agente
+> estaba parado esperando instrucciones del leader, no abandonado. Preguntar antes de entrar
+> costó un mensaje; entrar a ciegas habría puesto dos implementers en la misma rama.
+>
+> **Esta sección es el sitio donde se anota qué ficha lleva cada sesión.** Existe desde el
+> principio y hasta hoy nadie la había usado para esto — por eso la coordinación dependía de
+> que hubiera alguien escuchando en el canal directo. Si tomas una ficha, anótala aquí; si la
+> sueltas, bórrala. Acordado entre las sesiones de QC-20 y QC-24, y va a `/afinar-regla` como
+> regla del arnés.
+
+
+### Quién lleva qué ahora mismo (2026-09-02) — **anótalo aquí antes de entrar en una rama ajena**
+
+Esta sección existía y **nadie la estaba usando**: hoy cuatro sesiones han trabajado en paralelo
+coordinándose por mensajes directos, que funciona solo mientras las dos partes estén vivas. El
+incidente que lo demuestra: `labs-4b` anunció que iba a continuar **QC-20 desde T12** porque el
+worktree estaba limpio y el último commit era de hacía 72 minutos — y QC-20 **la lleva `labs-60`**,
+que estaba a media revisión con trabajo posiblemente sin commitear. Se evitó porque `labs-4b`
+preguntó antes y porque había alguien despierto para contestar. **Eso es suerte, no proceso.**
+
+| Ficha | Sesión | Estado | Aviso para quien pase por aquí |
+|---|---|---|---|
+| **QC-9** | esta sesión (`labs-96`) | `spec_ready`, spec en revisión por el `spec_author` tras meter el rol en el token | Toca `session-cookie.ts` **de QC-8, ya mergeada**, y ampliará las dos guardias a los `.ts` de primer nivel. No entres sin avisar |
+| **QC-20** | `labs-60` | `spec_ready`, T1–T11 commiteadas, en fase 2 | **T12 son las Server Actions y tocan `lib/composition/index.ts`** — el archivo más disputado del repo hoy |
+| **QC-21** | `labs-6d` | en curso | Su spec **no está commiteado en `dev`**: deja rojo el gate de quien corra `./init.sh` desde su propio worktree |
+| **QC-29** | `labs-65` | reviewer OK, pendiente de gate y PR | — |
+
+**Regla de convivencia que hoy nos habría ahorrado tres sustos:** antes de entrar en una rama
+ajena, de acotar un test de alcance de otra feature, o de escribir dentro de un módulo ajeno, se
+avisa. Si no hay a quién avisar, **se anota aquí**. Va a `/afinar-regla` como candidata 3.
+
 ### ~~El gate completo está ROJO en `dev` por fixtures E2E de QC-7 sin limpiar~~ → **RESUELTO** (2026-09-01)
 
 > **Cerrado el mismo día.** Al ir a limpiar los fixtures, la base compartida ya estaba sin
