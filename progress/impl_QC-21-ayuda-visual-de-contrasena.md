@@ -140,7 +140,13 @@ por definicion con la cadena vacia»), o se decide que la ayuda visual arranque 
 estado distinto —lo que exigiria un estado de UI nuevo y contradice `design.md > 3.1`, que solo
 admite tres—.
 
-### D3 — el test de R19 se escribio contra el diff de la rama, y se corrigio una bomba de relojeria
+### D3 — el test de R19 (**SUPERADA en la ronda 2 — leer «Ronda 2 > B1»**)
+
+> **Esta desviacion quedo obsoleta el 2026-09-02.** El reviewer tumbo el enfoque completo en **B1**:
+> lo que se describe abajo seguia leyendo el estado de git del checkout. Se conserva el texto para
+> que la traza de decisiones no desaparezca, pero **el codigo ya no hace nada de esto**: el bloque
+> de R19 no llama a `git`. La version vigente esta en «Ronda 2 > B1».
+
 
 `design.md > 8.3` pide para R19 un «diff de archivos nuevos». Dos desviaciones sobre lo obvio:
 
@@ -213,7 +219,177 @@ sin editar, es alcance de QC-29/QC-30—.
 **Y una quinta, nueva, que abre esta implementacion:** la de **D2** (R5 frente a `max_length` con la
 candidata vacia). Es la unica que pide una decision antes de que QC-36 consuma el componente.
 
+---
+
+# Ronda 2 — respuesta a la review (2026-09-02)
+
+Veredicto de `progress/review_QC-21-ayuda-visual-de-contrasena.md`: **RECHAZADO**, 2 bloqueantes y
+5 menores. El leader asigno **B1 y los menores m-1, m-3 y m-4**. **B2 y m-5 NO se tocan**: dependen
+de una decision humana sobre la redaccion de R5 en `requirements.md`, que el leader esta esperando.
+**m-2 no se toca**: la excepcion de los 32 px esta correctamente declarada en `design.md > 6` con su
+pregunta abierta.
+
+**Cero cambios en `components/shared/`.** El codigo de produccion no tenia hallazgos y sigue
+byte a byte como lo aprobo el reviewer (`git status` limpio para esa carpeta).
+
+## B1 — CERRADO. El bloque de R19 ya no lee git, y el ancla tautologica se borro
+
+**El diagnostico del reviewer era correcto y la primera correccion era insuficiente.**
+`changedFilesSinceDevDiverged()` no leia nada de QC-21: leia que archivos habia tocado **la rama que
+ejecutase el test** (`git merge-base HEAD origin/dev` + `git diff` + `git status --porcelain`). El
+reviewer lo demostro creando `lib/modules/zz_probe/probe.ts` sin commitear y viendo el test rojo. Una
+vez fusionado a `dev`, QC-32, QC-36 y toda ficha de backend habrian fallado este test por archivos
+ajenos.
+
+Que se hizo, en `tests/unit/credential-help-contract.test.ts`:
+
+1. **Borrada por completo** la funcion `changedFilesSinceDevDiverged()` y el import de
+   `execFileSync` / `node:child_process`. **El archivo ya no invoca ningun proceso externo ni lee
+   ningun estado compartido del checkout**: cero `git`, cero `merge-base`, cero `status`.
+2. **Borrados los dos asserts tautologicos** sobre `NEW_FILES`
+   (`path.startsWith('app/')` sobre literales `'components/shared/…'`, que no podian fallar jamas)
+   **y el comentario que les atribuia una garantia que no daban**. No se maquillaron: se fueron.
+3. **Reescrito el `it(...)`** —conservando su nombre exacto, que es el del mapa de trazabilidad—
+   para verificar R19 sobre el **contenido** de los tres artefactos: ninguno declara `'use server'`,
+   ni un route handler (`export [async] function GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS`), ni una
+   pagina o layout (`export default`, `export const metadata`, `generateMetadata`,
+   `generateStaticParams`, `export const dynamic|revalidate|runtime|fetchCache`), ni persistencia
+   (`@prisma/client`, `PrismaClient`, `from '@/db'`, `CREATE TABLE`, `ALTER TABLE`, `model X {`).
+   Y el assert que mas muerde: **se extraen todos los especificadores `from '…'` y se exige que
+   ninguno empiece por `@/app/`, `@/db`, `@/scripts` ni `@/lib/` salvo el barrel exacto
+   `@/lib/modules/identity`** — eso si detecta a alguien alcanzando dentro de `lib/` por ruta
+   profunda, que es lo que R19 y la regla de dependencias quieren impedir.
+
+### Por que NO se hizo lo que sugeria el reviewer, y esto es una desviacion consciente
+
+El apartado B1 de la review propone, entre otras, «sustituyendo el bloque por asserts sobre el arbol
+real (`components/shared/` contiene exactamente estos tres archivos)». **No se hizo, a proposito:
+eso seria exactamente el censo global de un recurso compartido que esta prohibido.**
+`components/shared/` **no es de QC-21**: QC-29 esta anadiendo `theme-provider.tsx` ahi mismo, en
+paralelo, ahora. Ese assert se pondria rojo en el gate de QC-29 por un archivo que no es de esta
+feature — el mismo dano que B1 denuncia, solo que apuntando a otra carpeta. La sugerencia se declina
+y el motivo queda escrito en el comentario del propio test.
+
+### El limite del enfoque nuevo, dicho en voz alta
+
+`NEW_FILES` esta **enumerada a mano**. Si alguien anadiera un septimo archivo a la feature sin
+sumarlo a esa lista, el bloque no lo veria. **Es el precio de no depender de estado compartido**, y
+esta escrito como limite en el comentario del test, no disfrazado de garantia. Es la frase que el
+reviewer pedia corregir de la version anterior.
+
+## m-1 — CERRADO. El punto ciego de las propiedades opcionales, tapado solo para esta feature
+
+El reviewer verifico que `findPlaintextPasswordDeclarations` muerde con `readonly password: string;`
+pero **NO** con `readonly password?: string;`: el regex de `declaredIdentifiers` exige `:` o `=`
+pegado al identificador y el `?` rompe esa adyacencia. **La forma exacta que lo evade es `nombre?:`**
+— y es la que usan **todas** las props de esta feature.
+
+- **La guardia compartida NO se toco, ni se relajo, ni se amplio.** Ampliarla es `/afinar-regla`
+  (arreglaria de paso `db/`, `lib/`, `app/` y `scripts/`, hoy ciegos igual). **Anotado en
+  `progress/current.md > Deudas y cosas abiertas`** con la forma exacta que lo evade, tal como pidio
+  el leader.
+- **Se anadio un centinela LOCAL** que cubre solo los tres archivos de QC-21:
+  `ninguna propiedad opcional nueva nombra la contrasena sin acabar en hash`. Extrae los
+  identificadores declarados como propiedad opcional y les aplica **el mismo vocabulario que declara
+  la guardia** (`FORBIDDEN_SEGMENTS` en `guard-password-never-plaintext.test.ts:60`, con la `ñ` de
+  `contraseña` incluida). Lo que se replica es el vocabulario, no el criterio de deteccion: el
+  criterio se sigue heredando por import.
+- **No es un test vacio.** Comprobado que el extractor encuentra props reales:
+  `credential-requirements.tsx -> [breachedState, labels, id]`,
+  `credential-field.tsx -> [id, autoComplete, breachedState, labels, onOwnRulesMetChange]`.
+  **Ninguna nombra la credencial de forma prohibida** — verificado leyendo, no de memoria.
+- **Se anadio un segundo `it(...)` de mordida**,
+  `el centinela de opcionales muerde: detecta un prop password opcional`, que ademas afirma que
+  `findPlaintextPasswordDeclarations` **NO** lo detecta: el punto ciego queda documentado de forma
+  **ejecutable**, no en prosa. El dia que `/afinar-regla` arregle la guardia, ese assert saltara y
+  avisara de que la deuda ya esta pagada.
+
+## m-3 — CORREGIDO el conteo inflado
+
+`tests/unit/credential-help-contract.test.ts` reporta mas tests de los que declara porque importar
+`findPlaintextPasswordDeclarations` del archivo de la guardia **registra tambien los 6 `it(...)` de
+esa guardia** bajo el importador (`design.md > 8.3` obliga a importar en vez de copiar el criterio).
+
+**Cuenta honesta, ronda 2:** el archivo de contrato reporta **14** tests, de los cuales **8 son
+suyos** (R2, R6/R14, R19, R21 y cuatro de R22 contando las dos mordidas) y **6 son la guardia
+ejecutandose por segunda vez**. En la ronda 1 reportaba 12 = 6 propios + 6 duplicados.
+
+Por tanto el «+33 tests» declarado en la ronda 1 **estaba inflado**: eran **27 tests nuevos de
+verdad** + 6 re-ejecuciones de tests que ya existian. La cifra vigente esta en la tabla de
+verificacion de abajo. Efecto anotado tambien en `progress/current.md > Deudas`.
+
+## m-4 — CORREGIDO en la spec
+
+`vitest.config.ts` -> **`vitest.config.mts`** en `specs/QC-21-ayuda-visual-de-contrasena/design.md:22`
+y `specs/QC-21-ayuda-visual-de-contrasena/tasks.md:25`. Cosmetico, era error de redaccion de la spec.
+**`requirements.md` no se toco** (es lo que aprobo el humano y ademas no menciona el archivo).
+
+## Incidente durante la ronda 2, declarado por si vuelve a pasar
+
+Al correr el archivo de contrato para comprobar el trabajo del subagente, salio **ROJO** nombrando
+`components/shared/credential-requirements.tsx: password`, y `git diff` mostraba inyectado un
+`export default function Page() { return null }` en ese archivo de **produccion**. Eran los residuos
+de las pruebas de mordida que se le habian encargado (`readonly password?: string;` y el
+`export default`), observados **en vuelo**: el subagente todavia estaba en esa fase y reporto despues
+haberlos revertido uno a uno. El implementer revirtio ademas por su cuenta con
+`git checkout -- components/shared/credential-requirements.tsx`.
+
+**Estado final comprobado tras terminar el subagente**: `git diff --stat -- components/shared/`
+**vacio** — los tres componentes estan byte a byte como los aprobo el reviewer—, `lib/modules/`
+contiene solo `identity` e `inventario` (el probe `zz_probe` no quedo), y el archivo de contrato no
+contiene `execFileSync`, `child_process`, `merge-base` ni `status --porcelain`.
+
+Se deja escrito, aunque acabara bien, porque el modo de fallo es el que QC-6 documento: una prueba de
+mordida que no se revierte se convierte en un defecto que nadie va a buscar. **Verificar el arbol
+despues de una prueba de mordida no es desconfianza, es parte del procedimiento.**
+
+## Verificacion de la ronda 2 — los cinco comandos, salida real
+
+Corridos a mano desde el worktree el 2026-09-02 (`./init.sh` sigue abortando en el validador por la
+causa ajena de siempre, con decision humana de convivir).
+
+| Comando | Resultado real |
+|---|---|
+| `pnpm run typecheck` | `tsc --noEmit` — **sin salida, 0 errores** |
+| `pnpm run lint` | `eslint` — **sin salida, 0 errores** |
+| `pnpm test` (suite **ENTERA**) | `Test Files 49 passed (49)` · `Tests 513 passed (513)` · 22.89s |
+| `pnpm run test:guardias` | `Test Files 7 passed (7)` · `Tests 78 passed (78)` · 931ms |
+| `node scripts/validate-features.mjs` | **unica linea: `faltan specs para features sdd en vuelo: QC-29`** — ningun otro error |
+
+### Contabilidad honesta de los tests (m-3 aplicado)
+
+| | Archivos | Tests |
+|---|---|---|
+| Baseline, antes de tocar nada | 46 | 478 |
+| Ronda 1 | 49 | 511 |
+| Ronda 2 (vigente) | 49 | **513** |
+
+Los **+35** sobre el baseline **no son 35 tests nuevos**: **6 de ellos son los `it(...)` de
+`guard-password-never-plaintext.test.ts` ejecutandose por segunda vez** al importarlo (m-3). Tests
+nuevos de verdad: **29** —21 en los dos archivos de componente y 8 propios en el de contrato—. Los
++2 de la ronda 2 sobre la ronda 1 son los dos centinelas de propiedades opcionales de m-1.
+
+Las 7 guardias siguen en 78 tests: **la guardia compartida no se toco ni se relajo**.
+
+## Que sigue abierto tras la ronda 2
+
+- **B2** — la redaccion de R5 en `requirements.md`. **Bloqueante, y no es codigo**: espera decision
+  del humano o del leader. Cuando llegue, hay que renombrar tambien el `it(...)`
+  `con la candidata vacia las seis salen incumplidas y la lista es visible sin interaccion` y sus
+  filas en los dos mapas de trazabilidad (este archivo y `tasks.md`).
+- **m-5** — queda a la espera de B2: el nucleo derivativo del test de R5 es un test espejo. El
+  reviewer lo acepta como legitimo (R2 obliga a que la unica fuente sea `evaluateCredentialRules`,
+  asi que no hay un segundo oraculo posible); solo pide no leerlo como mas fuerte de lo que es.
+- **m-2** — altura del campo por debajo de 44x44 px, excepcion declarada. Es alcance de QC-29/QC-30.
+- Las cinco preguntas abiertas siguen abiertas, incluida la que abrio D2.
+
+---
+
 ## Deudas que esta feature deja anotadas (para `progress/current.md`)
+
+> **Ya volcadas** a `progress/current.md > Deudas y cosas abiertas`, bajo el epigrafe
+> «Anotadas por QC-21 — ayuda-visual-de-contrasena (2026-09-02)», en la ronda 2.
+
 
 - **Nadie ve el componente hasta QC-36** (fila 1 de la tabla de decisiones cerradas).
 - **Sin E2E** (fila 4), diferido con motivo.

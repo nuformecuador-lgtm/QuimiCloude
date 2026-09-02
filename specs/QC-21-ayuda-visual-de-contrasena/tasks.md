@@ -22,7 +22,7 @@ está mal entendida: parar y avisar al leader.
 - **Qué**: comprobar, uno por uno, que existen en este worktree y **no re-crearlos**:
   1. `components.json` (shadcn inicializado) y `lib/utils.ts` exportando `cn`.
   2. `components/ui/input.tsx`, `label.tsx` y `button.tsx`.
-  3. `vitest.config.ts` + `tests/setup.ts` con Testing Library, y `pnpm test` arrancando en verde.
+  3. `vitest.config.mts` + `tests/setup.ts` con Testing Library, y `pnpm test` arrancando en verde.
   4. `lib/modules/identity/index.ts` exportando **`CREDENTIAL_RULES`**, **`CredentialRule`** y
      **`evaluateCredentialRules`**; `CREDENTIAL_RULES` con **siete** códigos en el orden
      `min_length, max_length, no_uppercase, no_lowercase, no_digit, no_symbol, breached`.

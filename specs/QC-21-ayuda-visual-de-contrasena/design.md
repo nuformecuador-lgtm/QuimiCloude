@@ -19,7 +19,7 @@ lib/modules/identity/index.ts                          # contrato: exporta CREDE
 lib/modules/identity/domain/credential-policy.ts       # QC-19, mergeada. Pura y sincrona.
 components/ui/{input,label,button,card}.tsx            # shadcn, sin editar
 components.json · lib/utils.ts (`cn`) · Tailwind v4    # QC-10
-vitest.config.ts · tests/setup.ts · Testing Library    # QC-10/QC-11
+vitest.config.mts · tests/setup.ts · Testing Library    # QC-10/QC-11
 tests/guards/guard-password-never-plaintext.test.ts    # exporta findPlaintextPasswordDeclarations
 ```
 
