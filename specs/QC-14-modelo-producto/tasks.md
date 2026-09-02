@@ -12,7 +12,7 @@ archivo que no está listado, se anota antes de seguir.
 
 ## Bloque A — Preparación
 
-### [ ] T0. Dejar el `.env` disponible dentro del worktree
+### [x] T0. Dejar el `.env` disponible dentro del worktree
 - Dep: ninguna. **Primera task, antes de cualquier `pnpm run db:*`.**
 - Archivos: `.env` (git-ignorado, **no versionado**).
 - `.env` vive en la raíz del worktree principal y **los worktrees no lo heredan**. Hay que
@@ -28,7 +28,7 @@ archivo que no está listado, se anota antes de seguir.
 
 ## Bloque B — Esquema y migración
 
-### [ ] T1. Añadir los modelos `Presentation` y `Product` a `db/schema.prisma`
+### [x] T1. Añadir los modelos `Presentation` y `Product` a `db/schema.prisma`
 - Dep: ninguna (T0 solo hace falta para los `db:*`).
 - Archivos: `db/schema.prisma`.
 - Los dos modelos tal como están en `design.md > 2`, **añadidos al final**, sin tocar
@@ -44,7 +44,7 @@ archivo que no está listado, se anota antes de seguir.
 - **Hecho cuando:** `pnpm exec prisma validate` pasa, `pnpm exec prisma generate` produce el
   cliente con `Product` y `Presentation`, y `pnpm run typecheck` pasa.
 
-### [ ] T2. Generar y completar a mano `migration.sql`
+### [x] T2. Generar y completar a mano `migration.sql`
 - Dep: T0, T1.
 - Archivos: `db/migrations/<ts>_products_and_presentations/migration.sql`.
 - `pnpm run db:migrate:create` (no aplica nada) y después **completar a mano** lo que Prisma no
@@ -58,7 +58,7 @@ archivo que no está listado, se anota antes de seguir.
   `products_presentation_id_idx`, los cuatro `CHECK`, los cuatro `ALTER TABLE` de RLS, y
   **ningún** `CREATE UNIQUE INDEX` sobre `products`.
 
-### [ ] T3. Escribir `down.sql` a mano
+### [x] T3. Escribir `down.sql` a mano
 - Dep: T2.
 - Archivos: `db/migrations/<ts>_products_and_presentations/down.sql`.
 - Exactamente dos sentencias, en orden inverso al UP: `DROP TABLE IF EXISTS "products";` y
@@ -70,7 +70,7 @@ archivo que no está listado, se anota antes de seguir.
 
 ## Bloque C — Tests estáticos (no necesitan base)
 
-### [ ] T4. [P] Contrato estático del esquema
+### [x] T4. [P] Contrato estático del esquema
 - Dep: T1.
 - Archivos: `tests/unit/inventario/schema/inventario-schema.test.ts`.
 - Lee `db/schema.prisma` como **texto** y afirma sobre la declaración. Reutilizar los helpers
@@ -79,7 +79,7 @@ archivo que no está listado, se anota antes de seguir.
 - **Hecho cuando:** pasa y cubre R1, R3, R4, R5, R6, R7, R8, R10, R11, R12, R13, R14, R16, R17,
   R18, R19, R20, R23.
 
-### [ ] T5. [P] Contrato estático del SQL de la migración
+### [x] T5. [P] Contrato estático del SQL de la migración
 - Dep: T2, T3.
 - Archivos: `tests/unit/inventario/schema/inventario-migration.test.ts`.
 - Lee `migration.sql` y `down.sql` como texto, con los helpers de
