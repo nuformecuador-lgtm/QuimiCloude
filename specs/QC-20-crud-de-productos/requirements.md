@@ -171,6 +171,24 @@ requisitos anteriores.
 interfaz —van a **QC-22**—; por lo tanto esta feature no aporta ningún flujo navegable que un
 test E2E pueda visitar, y su verificación es unitaria y de integración.
 
+### Añadidos al cerrarse las preguntas abiertas (2026-09-02)
+
+Numerados al final para no renumerar nada de lo anterior. **R26 no cambia**: sigue exigiendo un
+orden estable; **R35** dice cuál es.
+
+**R35.** El sistema DEBE ordenar las dos listas por **nombre ascendente**, y DEBE desempatar por
+el identificador ascendente. El desempate no es opcional: el nombre del producto **no es único**
+(D14, R12), así que sin él dos homónimos pueden intercambiarse entre consultas y R26 dejaría de
+cumplirse.
+
+**R36.** SI la consulta pide un tamaño de página mayor que **25**, ENTONCES el sistema DEBE
+devolver como máximo 25 elementos, y NO DEBE ejecutar una consulta sin límite superior. El
+tamaño por defecto sigue siendo **10** (D15, R24).
+
+**R37.** SI el nombre de una presentación queda **vacío** después de normalizarlo —porque no
+contiene ningún carácter alfanumérico—, ENTONCES el sistema DEBE rechazarlo como nombre
+inválido, y NO DEBE dejar que llegue al índice único y se anuncie como duplicado.
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el
@@ -196,6 +214,11 @@ requisito que la hace testeable. Ninguna queda sin `R<n>`.
 | 16 | El cálculo de la paginación se extrae a `lib/shared/` | R27 |
 | 17 | El actor y su rol entran por parámetro (QC-8 los resuelve) | R1 |
 | 18 | Módulo `inventario`, Server Action, zod en el borde, DB en inglés | R28, R29, R30, R31, R33 |
+| 19 | Orden por defecto `name ASC`, con `id ASC` de desempate | R26, R35 |
+| 20 | El listado devuelve solo los ids de los autores | R8 |
+| 21 | Tope superior del tamaño de página: 25 | R36 |
+| 22 | Nombre de presentación que normaliza a vacío: se rechaza | R37 |
+| 23 | `ADMIN_ROLE_NAME` vive en `inventario/domain/actor.ts` | R2, R31 |
 
 Requisitos que no salen de una fila de la tabla, y de dónde salen: **R4** de
 `docs/architecture.md > Acceso a datos y autorizacion` (RLS forzada, defensa en profundidad, ya
@@ -212,32 +235,17 @@ productos»** (pregunta abierta 4 de `specs/QC-14-modelo-producto/requirements.m
 D2, y el **E2E que QC-14 difirió** lo cierra D4. Sigue abierta, y no es de esta ficha, la
 trazabilidad por lote y vencimiento (pregunta 2 del dominio en `docs/architecture.md`).
 
-### Añadidas por `spec_author` al escribir el diseño (F1.2)
+### Las cinco que abrió `spec_author` al escribir el diseño (F1.2)
 
-**No reabren ninguna decisión cerrada**: son huecos que la tabla no cubre y que **cambian el
-diseño**, así que se escriben en vez de rellenarse con supuestos (regla 6 de `CLAUDE.md`, mismo
-precedente que QC-14). Las cinco tienen una **posición por defecto** razonada en
-`design.md > 10`, ninguna bloquea la implementación, y todas se cierran en la puerta de
-aprobación humana del spec (F1.4). Los requisitos de arriba están escritos para **no depender de
-la respuesta**.
-
-1. **¿Cuál es el orden por defecto del listado?** R26 exige un orden estable pero no dice cuál.
-   Posición por defecto: nombre ascendente, con el identificador como desempate.
-2. **¿La consulta paginada devuelve ya el nombre del autor?** Posición por defecto: **no**;
-   devuelve los identificadores de los autores y quien necesite el nombre lo pide al contrato de
-   `identity` (R8). Resolverlo aquí obligaría a que `identity` expusiera un caso de uso de
-   nombres por lote, que hoy no existe en su contrato.
-3. **¿Hay un tope superior para el tamaño de página?** R25 solo fija el mínimo. Sin tope, una
-   petición con un tamaño enorme es una consulta sin límite. Posición por defecto: **100**.
-4. **¿Qué pasa con un nombre de presentación que al normalizar queda vacío** (por ejemplo
-   `«---»`)? Colisionaría con cualquier otro igual de vacío y el usuario vería un error opaco de
-   duplicado. Posición por defecto: rechazarlo por nombre inválido.
-5. **¿Dónde vive el nombre del rol `Administrador` como constante?** Los roles son dominio de
-   `identity` (QC-6, hoy `spec_ready`), pero su contrato público todavía no exporta ninguna
-   constante. Posición por defecto: una constante propia en el dominio de `inventario`, con nota
-   para importarla del contrato de `identity` en cuanto exista.
+**Cerradas el 2026-09-02**, todas por el humano, y escritas como **D19–D23** en la tabla de
+decisiones. No queda ninguna abierta: la 3 cambió la posición que traía el diseño (el tope pasó
+de 100 a **25**) y se propagó al util de `lib/shared/`, a **R36** y a su test.
 
 ## Decisiones cerradas (no reabrir)
+
+Las **18 primeras** las fijó el humano en la acotación, antes del spec. Las **cinco últimas
+(D19–D23)** las cerró el mismo humano el mismo día, después de F1.2, respondiendo a las preguntas
+abiertas que dejó `spec_author`. Valen exactamente igual: no se reabren.
 
 | Fecha | Pregunta | Decisión |
 | --- | --- | --- |
@@ -260,3 +268,8 @@ la respuesta**.
 | 2026-09-02 | ¿De dónde sale el usuario en sesión? | De **QC-8 — sesión actual**, que pasa a ser **bloqueante** de esta ficha (link escrito en el board el 2026-09-02). El *service* recibe el actor y su rol por parámetro; quien lo resuelve es el adaptador driving |
 | 2026-09-02 | Módulo, capas y borde | Módulo **`inventario`**. Mutaciones por **Server Action** en `adapters/driving/`, no Route Handler (`docs/architecture.md > Server Actions vs Route Handlers`). Validación de entrada con **zod** en el borde (`docs/conventions.md`). Identificadores de la DB **en inglés** (**QC-4**) |
 | 2026-09-02 | Librería nueva | **Ninguna.** No hay nada aquí que delegar; la paginación es aritmética propia. Regla 7 de `CLAUDE.md` sin propuesta que abrir |
+| 2026-09-02 | Orden por defecto del listado | **`name ASC`, con `id ASC` de desempate.** El desempate no es adorno: el nombre del producto **no es único** (decisión 6 de **QC-14**, D14 aquí), así que sin él dos homónimos se intercambian entre páginas y la paginación deja de ser estable — que es justo lo que exige R26 |
+| 2026-09-02 | ¿El listado devuelve el nombre del autor? | **No: solo los ids** de `created_by` y `updated_by`. Aquí no se resuelve ningún nombre. Quien lo necesite lo pide al contrato público de `identity` (D8, R8), y eso es alcance de **QC-22**, no de esta ficha |
+| 2026-09-02 | Tope superior del tamaño de página | **25.** El defecto sigue siendo **10** (D15). Corrige la posición de 100 que traía el `design.md`: sin tope, una petición con un tamaño enorme es una consulta sin límite |
+| 2026-09-02 | Nombre de presentación que al normalizar queda vacío | **Se rechaza** como nombre inválido. Un `«---»` no puede llegar al índice único y anunciarse al usuario como «ya existe» |
+| 2026-09-02 | ¿Dónde vive la constante del rol `Administrador`? | **Propia, en `lib/modules/inventario/domain/actor.ts`**, hasta que el contrato público de `identity` la exponga (QC-6 sigue `spec_ready`). Cuando exista, se importa del barrel `@/lib/modules/identity`, nunca por ruta profunda |

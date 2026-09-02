@@ -3,10 +3,11 @@
 > Zona: `backend` · Complejidad: `high` · depends_on: `QC-14`, `QC-8` ·
 > Rama: `feature/QC-20-crud-de-productos`
 >
-> El **qué** está en `requirements.md` (R1–R34) y su alcance lo cerró el humano el 2026-09-02
-> (18 decisiones cerradas). Aquí va el **cómo**: qué archivos nacen, qué columnas añade la
+> El **qué** está en `requirements.md` (R1–R37) y su alcance lo cerró el humano el 2026-09-02:
+> 18 decisiones en la acotación, más **D19–D23**, que cerró ese mismo día las cinco preguntas
+> que abrió este diseño (§ 10). Aquí va el **cómo**: qué archivos nacen, qué columnas añade la
 > migración, cómo se resuelve la FK que cruza la frontera de módulo, qué entra y sale de cada
-> caso de uso, qué alternativas se descartaron y qué preguntas deja el diseño abiertas.
+> caso de uso y qué alternativas se descartaron. **No queda ninguna pregunta abierta.**
 >
 > **El modelo ya existe.** QC-14 está `done` y mergeado: `Product` y `Presentation` viven en
 > `db/schema.prisma` con su migración `20260902005510_products_and_presentations`. Esta ficha
@@ -86,7 +87,8 @@ desnormalizada. `inventario` no consulta `users` en ninguna forma —ni `prisma.
 QC-22, no esta ficha), la vía es **el contrato público `@/lib/modules/identity`**, importado
 como barrel; nunca `@/lib/modules/identity/adapters/...`, nunca su repositorio, nunca su tabla.
 Ese contrato **todavía no expone** un caso de uso de «nombres por identificador», y esta ficha
-**no lo añade**: ver pregunta abierta 2 (§ 10).
+**no lo añade**: D20 lo cerró —el listado devuelve solo los ids— y añadirlo es alcance de
+`identity` y de QC-22 (§ 10.2).
 
 ### 2.2 Unicidad normalizada en `presentations` (D12, D13 → R17, R18, R19, R20)
 
@@ -112,6 +114,11 @@ corriente, así que el esquema puede declararlo y el implementer no tiene que es
 4. borrado de todo lo que no sea `[a-z0-9]` → «BIDON-20L» → «bidon20l».
 
 Las tres del enunciado de D12 —«Bidón 20 L», «bidon 20 l», «BIDON-20L»— colapsan en `bidon20l`.
+
+**Si el resultado queda vacío, el nombre es inválido** (D22, R37). Un `«---»` normaliza a la
+cadena vacía; sin esta regla, dos nombres distintos de solo signos colisionarían en el índice
+único y el usuario recibiría un «ya existe» incomprensible. Se comprueba en el **esquema zod**
+(§ 6.2), o sea antes de tocar la base, y el error es de nombre inválido, no de duplicado.
 
 **Backfill de la columna en la migración.** La columna nace `NOT NULL`, así que hay que rellenar
 las filas existentes. El SQL replica los mismos cuatro pasos sin extensiones ni dependencias:
@@ -232,8 +239,10 @@ export function requireAdmin(actor: Actor | null | undefined): asserts actor is 
 - La RLS de QC-14 sigue activa y forzada, y **no autoriza nada**: Prisma se conecta como dueño
   de las tablas (`docs/architecture.md > Acceso a datos y autorizacion`). Es defensa en
   profundidad; el requisito lo cierra el test de servicio.
-- `ADMIN_ROLE_NAME` vive de momento en `inventario`. Los roles son dominio de `identity`, pero
-  su contrato aún no exporta ninguna constante (QC-6 está `spec_ready`). Pregunta abierta 5.
+- `ADMIN_ROLE_NAME` vive en `inventario/domain/actor.ts`, propia (**D23**). Los roles son dominio
+  de `identity`, pero su contrato aún no exporta ninguna constante (QC-6 está `spec_ready`).
+  Cuando la exporte, se importa del **barrel** `@/lib/modules/identity` —nunca por ruta
+  profunda— y se borra la local. Duplicar el literal hoy es deuda consciente y de una línea.
 
 ---
 
@@ -306,8 +315,11 @@ abierta 2). `presentationName` sale de un `join` dentro del **mismo** módulo, q
 ### 6.2 Presentación
 
 ```ts
-createPresentationSchema = { name: string, trim, min 1, max 60 }   // R9, R11
-updatePresentationSchema = { name: … }                             // idem
+createPresentationSchema = {
+  name: string, trim, min 1, max 60,                       // R9, R11
+         refine: normalizePresentationName(name) !== ''    // R37 (D22)
+}
+updatePresentationSchema = { name: … }                     // idem
 ```
 
 Salida: `id`, `name`, `nameNormalized`, `createdAt`, `updatedAt`.
@@ -318,6 +330,10 @@ Salida: `id`, `name`, `nameNormalized`, `createdAt`, `updatedAt`.
 pageQuerySchema = { page: int >= 1 (por defecto 1), pageSize: int >= 1 opcional }  // R25
 Page<T> = { items: readonly T[]; total: number; page: number; pageSize: number; totalPages: number }
 ```
+
+El **mínimo y la integridad** los rechaza zod aquí (R25); el **defecto de 10** (R24) y el **tope
+de 25** (R36, D21) los aplica el util de `lib/shared/` (§ 8). El `pageSize` que sale en el `Page`
+es el efectivo —ya acotado—, no el que pidió el llamante.
 
 ### 6.4 Errores
 
@@ -376,16 +392,18 @@ Claves del diseño de los puertos:
 cualquier CRUD futuro.
 
 ```ts
-export const DEFAULT_PAGE_SIZE = 10;   // D15
-export const MAX_PAGE_SIZE = 100;      // pregunta abierta 3
+export const DEFAULT_PAGE_SIZE = 10;   // D15, R24
+export const MAX_PAGE_SIZE = 25;       // D21, R36
 
 export function toOffsetLimit(page: number, pageSize?: number): { offset: number; limit: number };
 export function buildPage<T>(items: readonly T[], total: number, page: number, pageSize: number): Page<T>;
 ```
 
-- `toOffsetLimit` aplica el defecto de 10 (R24) y **acota** el tamaño a `MAX_PAGE_SIZE` en vez de
-  rechazarlo: rechazar es trabajo de zod en el dominio (R25, mínimo y entero), acotar es
-  aritmética defensiva.
+- `toOffsetLimit` aplica el defecto de 10 (R24) y **acota** el tamaño a `MAX_PAGE_SIZE = 25`
+  (D21, R36) en vez de rechazarlo: rechazar es trabajo de zod en el dominio (R25, mínimo y
+  entero), acotar es aritmética defensiva contra la consulta sin límite. El `limit` que llega a
+  Prisma es el **acotado**, y el `pageSize` que devuelve `buildPage` es ese mismo, no el que pidió
+  el llamante: si dijera 500 y devolviera 25 elementos, `totalPages` mentiría.
 - `buildPage` calcula `totalPages` con `Math.ceil(total / pageSize)` y devuelve `1` cuando no hay
   ningún elemento —una lista vacía es una página vacía, no cero páginas—.
 
@@ -396,9 +414,10 @@ puede. La decisión D16 y la regla de QC-15 encajan exactamente así y no de otr
 `Page<T>` se declara en `domain/page.ts` (es contrato de salida del módulo) y el util lo produce
 estructuralmente, sin importarlo.
 
-**Orden estable (R26):** el adaptador ordena por `name ASC, id ASC`. Sin el desempate por `id`,
-dos productos homónimos —que D14 permite explícitamente— pueden intercambiarse entre páginas y
-un elemento se pierde. Ver pregunta abierta 1.
+**Orden estable (R26, R35, D19):** el adaptador ordena por `name ASC, id ASC`. Sin el desempate
+por `id`, dos productos homónimos —que D14 permite explícitamente, porque el nombre del producto
+no es único— pueden intercambiarse entre dos consultas y un elemento aparecería dos veces o
+ninguna. El desempate es lo que convierte «ordenado» en «estable», que es lo que R26 exige.
 
 ---
 
@@ -417,29 +436,36 @@ algo, **se para y se propone**, no se instala (regla 7 de `CLAUDE.md`).
 
 ---
 
-## 10. Preguntas abiertas que deja este diseño
+## 10. Las cinco preguntas que abrió este diseño, y cómo se cerraron
 
-Están también en `requirements.md > Preguntas abiertas > Añadidas por spec_author`. **No reabren
-ninguna decisión cerrada**: son huecos que la tabla no cubre. Cada una lleva su posición por
-defecto, ninguna bloquea la implementación y las cinco se cierran en F1.4.
+**Ninguna sigue abierta.** Las abrió `spec_author` en F1.2, el humano las respondió el mismo día
+—2026-09-02— y están escritas como **D19–D23** en
+`requirements.md > Decisiones cerradas (no reabrir)`. Aquí queda lo que cada respuesta significa
+para el diseño; **la decisión manda sobre lo que decía la posición por defecto**.
 
-1. **Orden por defecto del listado.** R26 exige orden estable, no dice cuál. Posición: `name ASC,
-   id ASC` (§ 8). Cambiarlo después es una línea en el adaptador y un test.
-2. **¿La consulta devuelve el nombre del autor?** Posición: **no**; devuelve `createdBy` y
-   `updatedBy` como identificadores. Resolverlo aquí exigiría que `identity` expusiera en su
-   contrato un caso de uso de nombres por lote —hoy no existe—, y eso es alcance de `identity` y
-   de QC-22, no de esta ficha. Si la respuesta fuera «sí», cambia el diseño: nuevo caso de uso en
-   `identity`, y `inventario` componiendo dos fuentes.
-3. **Tope superior del tamaño de página.** D15 fija el defecto (10) y R25 el mínimo (1); nadie
-   fijó el máximo, y sin él una petición con `pageSize` enorme es una consulta sin límite.
-   Posición: acotar a **100** en el util (§ 8).
-4. **Nombre de presentación que al normalizar queda vacío** (`«---»`, `«###»`). Colisionaría con
-   cualquier otro igual de vacío y el usuario vería un «ya existe» incomprensible. Posición:
-   rechazarlo como nombre inválido, exigiendo al menos un carácter alfanumérico tras normalizar.
-5. **Dónde vive `ADMIN_ROLE_NAME`.** Los roles son de `identity` (QC-6), pero su contrato aún no
-   exporta la constante. Posición: constante propia en `inventario/domain/actor.ts`, con nota
-   para importarla del contrato de `identity` en cuanto exista. Duplicar el literal es deuda
-   consciente y barata de saldar.
+1. **Orden por defecto del listado → `name ASC`, con `id ASC` de desempate (D19, R35).**
+   Confirma la posición del diseño. El desempate se queda escrito con su porqué: el nombre del
+   producto **no es único** (D14, decisión 6 de QC-14), y sin desempate dos homónimos se
+   intercambian entre páginas y R26 —recorrer sin repetir ni omitir— dejaría de cumplirse. Vive
+   en el adaptador driven (§ 8).
+2. **El listado devuelve solo los ids de los autores (D20, R8).** Confirma la posición del
+   diseño: `createdBy` y `updatedBy` salen como identificadores y aquí no se resuelve ningún
+   nombre. Sigue en pie lo de § 2.1: quien necesite el nombre lo pide al contrato público
+   `@/lib/modules/identity`, y eso es alcance de QC-22. Esta ficha **no** añade ningún caso de
+   uso a `identity`.
+3. **Tope superior del tamaño de página: 25 (D21, R36).** **Cambia el diseño**: la posición por
+   defecto era 100. `MAX_PAGE_SIZE = 25` en `lib/shared/pagination.ts` (§ 8), y el defecto sigue
+   siendo 10 (D15, R24). Un `pageSize` mayor se **acota**, no se rechaza: rechazar es trabajo de
+   zod sobre el mínimo y la integridad (R25); acotar es la defensa contra la consulta sin límite.
+4. **Nombre de presentación que normaliza a vacío: se rechaza (D22, R37).** Confirma la posición
+   del diseño. El esquema de `presentation-input.ts` exige que
+   `normalizePresentationName(name)` no quede vacío, así que un `«---»` falla como **nombre
+   inválido** en el borde y nunca llega al índice único a anunciarse como duplicado (§ 2.2, §
+   6.2).
+5. **`ADMIN_ROLE_NAME` vive en `inventario/domain/actor.ts` (D23).** Confirma la posición del
+   diseño. Es deuda consciente y barata: en cuanto el contrato de `identity` exporte la
+   constante (QC-6 sigue `spec_ready`), se importa del **barrel** `@/lib/modules/identity`
+   —nunca por ruta profunda— y se borra la local (§ 4).
 
 ---
 
@@ -524,11 +550,11 @@ verificación es **unitaria y de integración**.
 | Unit (dominio) | `tests/unit/inventario/product-service.test.ts` | R5, R6, R9, R10, R11, R12, R13, R14, R15, R16 con dobles de los puertos. |
 | Unit (dominio) | `tests/unit/inventario/presentation-service.test.ts` | R17, R18, R21, R22 con dobles de los puertos. |
 | Unit (dominio) | `tests/unit/inventario/presentation-name.test.ts` | R19: tabla de ejemplos de normalización. |
-| Unit (borde) | `tests/unit/inventario/product-input.test.ts` | R9, R10, R11, R25, R28: los esquemas zod. |
-| Unit (shared) | `tests/unit/pagination.test.ts` | R23, R24, R27: defecto 10, aritmética, cota. |
+| Unit (borde) | `tests/unit/inventario/product-input.test.ts` | R9, R10, R11, R25, R28, R37: los esquemas zod. |
+| Unit (shared) | `tests/unit/pagination.test.ts` | R23, R24, R27, R36: defecto 10, aritmética, cota en 25. |
 | Unit (driving) | `tests/unit/inventario/product-actions.test.ts` | R29: la acción toma el actor de `identity` y traduce errores. |
 | Unit (estático) | `tests/unit/inventario/schema/inventario-audit-migration.test.ts` | R7, R20, R30, R32: las dos FK a `users`, el índice único, los nombres en inglés y que el `down.sql` revierte exactamente el UP. |
-| Integración | `tests/integration/inventario/product-crud.int.test.ts` | R7, R15, R16, R26 contra Postgres real. |
+| Integración | `tests/integration/inventario/product-crud.int.test.ts` | R7, R15, R16, R26, R35 contra Postgres real. |
 | Integración | `tests/integration/inventario/presentation-uniqueness.int.test.ts` | R18, R20, R21, R22: el índice único rechaza el duplicado y `RESTRICT` bloquea el borrado. |
 | Guardia (ya existe) | `tests/guards/guard-arquitectura-modulos.test.ts` | R8, R27, R31. |
 | Guardia (ya existe) | `tests/guards/guard-rls-force.test.ts` | R4. |

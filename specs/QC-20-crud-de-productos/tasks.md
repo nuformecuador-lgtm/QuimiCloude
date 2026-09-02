@@ -2,13 +2,15 @@
 
 > Zona: `backend` · Complejidad: `high` · Rama: `feature/QC-20-crud-de-productos`
 >
-> El **qué** está en `requirements.md` (R1–R34); el **cómo**, en `design.md`. Aquí está el
+> El **qué** está en `requirements.md` (R1–R37); el **cómo**, en `design.md`. Aquí está el
 > desglose ejecutable. `[P]` marca lo que puede ir en paralelo con otra task del mismo grupo.
 > Cada task tiene su criterio de «hecho»: si no se puede comprobar, no está hecha.
 >
-> **Antes de empezar:** el spec tiene que estar **aprobado** por el humano (F1.4). Cinco
-> preguntas abiertas (`design.md > 10`) se cierran en esa puerta; T3, T8 y T9 dependen de dos de
-> ellas (orden por defecto y tope de página) y de la número 4 (nombre que normaliza a vacío).
+> **Antes de empezar:** el spec tiene que estar **aprobado** por el humano (F1.4). Las cinco
+> preguntas que abrió el diseño **ya están cerradas** (D19–D23, `design.md > 10`): orden
+> `name ASC, id ASC`, listado con solo los ids de los autores, tope de página **25**, nombre que
+> normaliza a vacío rechazado, y `ADMIN_ROLE_NAME` propia de `inventario`. No queda ninguna
+> abierta.
 >
 > Cierra cada tanda con `./init.sh --rapido`. **Antes del PR, `./init.sh` completo, sin
 > excepción** (`docs/verification.md`).
@@ -18,11 +20,11 @@
 ## Grupo A — cimientos (sin dependencias entre sí)
 
 - [ ] **T1 [P] — Util de paginación en `lib/shared/pagination.ts`.**
-      `DEFAULT_PAGE_SIZE = 10`, `MAX_PAGE_SIZE`, `toOffsetLimit`, `buildPage`
+      `DEFAULT_PAGE_SIZE = 10`, `MAX_PAGE_SIZE = 25` (D21), `toOffsetLimit`, `buildPage`
       (`design.md > 8`). No importa módulos ni `composition`.
       **Hecho cuando:** `tests/unit/pagination.test.ts` pasa —defecto 10, `offset` de la página
-      3, cota superior, `totalPages` = 1 con lista vacía— y
-      `tests/guards/guard-arquitectura-modulos.test.ts` sigue verde.
+      3, `pageSize` 500 acotado a 25 y devuelto como 25 en el `Page`, `totalPages` = 1 con lista
+      vacía— y `tests/guards/guard-arquitectura-modulos.test.ts` sigue verde.
 
 - [ ] **T2 [P] — Migración de auditoría y unicidad.**
       `db/schema.prisma`: `createdBy`/`updatedBy` escalares en `Product` (sin `@relation`),
@@ -36,8 +38,8 @@
 - [ ] **T3 [P] — Dominio base del módulo.**
       `domain/actor.ts` (`Actor`, `ADMIN_ROLE_NAME`, `requireAdmin`), `domain/errors.ts`,
       `domain/page.ts` (`Page<T>`, `PageQuery`, `pageQuerySchema`),
-      `domain/presentation-name.ts` (`normalizePresentationName`). Nada de framework, Prisma,
-      `lib/shared/` ni `composition`.
+      `domain/presentation-name.ts` (`normalizePresentationName`). `ADMIN_ROLE_NAME` es propia de
+      `inventario` (D23). Nada de framework, Prisma, `lib/shared/` ni `composition`.
       **Hecho cuando:** `tests/unit/inventario/presentation-name.test.ts` pasa con la tabla de
       ejemplos de R19 y `pnpm run typecheck` está limpio.
 
@@ -45,7 +47,8 @@
 
 - [ ] **T4 — Esquemas de entrada zod.** `domain/product-input.ts` y
       `domain/presentation-input.ts` (`design.md > 6`). Trim, mínimo 1, máximos 120/60,
-      `deliveryTime >= 0`, `cost` como cadena decimal.
+      `deliveryTime >= 0`, `cost` como cadena decimal, y el `refine` que rechaza el nombre de
+      presentación que normaliza a vacío (D22, R37).
       *Depende de:* T3. **Hecho cuando:** `tests/unit/inventario/product-input.test.ts` pasa.
 
 - [ ] **T5 — Puertos.** `ports/product-repository.ts` y `ports/presentation-repository.ts`, con
@@ -72,8 +75,9 @@
 
 - [ ] **T9 [P] — Adaptador driven de producto.** `adapters/driven/persistence/product-prisma.ts`:
       filtro `deleted_at IS NULL`, escritura de `created_by`/`updated_by`, conversión
-      `string ↔ Prisma.Decimal`, orden `name ASC, id ASC`, uso de `lib/shared/pagination`,
-      traducción de SQLSTATE.
+      `string ↔ Prisma.Decimal`, orden `name ASC, id ASC` (D19, R35), salida con los autores como
+      **ids** y sin resolver ningún nombre (D20), uso de `lib/shared/pagination`, traducción de
+      SQLSTATE.
       *Depende de:* T1, T2, T5. **Hecho cuando:** typecheck limpio y es el único archivo del
       módulo que importa `@prisma/client`.
 
@@ -133,7 +137,7 @@ falta uno (`CHECKPOINTS.md > Trazabilidad`).
 | R5 | `tests/unit/inventario/product-service.test.ts` | `crea el producto y devuelve su identificador cuando el actor es Administrador` |
 | R6 | `tests/unit/inventario/product-service.test.ts` | `guarda al actor como autor de creacion y de modificacion al crear, y solo como autor de modificacion al editar y al borrar` |
 | R7 | `tests/integration/inventario/product-crud.int.test.ts` | `rechaza con SQLSTATE 23503 el producto cuyo autor no es un usuario existente` |
-| R8 | `tests/guards/guard-arquitectura-modulos.test.ts` | `ningun modulo consulta un modelo ajeno con Prisma` + `de otro modulo solo se importa su contrato` (ya existente) |
+| R8 | `tests/guards/guard-arquitectura-modulos.test.ts` | `ningun modulo consulta un modelo ajeno con Prisma` + `de otro modulo solo se importa su contrato` (ya existente), más `tests/integration/inventario/product-crud.int.test.ts` › `la lista devuelve los autores como identificadores, sin resolver ningun nombre` (D20) |
 | R9 | `tests/unit/inventario/product-input.test.ts` | `rechaza el nombre vacio o de solo espacios y recorta los extremos del nombre valido` |
 | R10 | `tests/unit/inventario/product-input.test.ts` | `rechaza un tiempo de entrega negativo` |
 | R11 | `tests/unit/inventario/product-input.test.ts` | `rechaza el nombre de producto de mas de 120 caracteres y el de presentacion de mas de 60` |
@@ -160,6 +164,9 @@ falta uno (`CHECKPOINTS.md > Trazabilidad`).
 | R32 | `tests/unit/inventario/schema/inventario-audit-migration.test.ts` | `el down.sql revierte exactamente lo que anade el migration.sql y nada mas` (más el ciclo real de T13) |
 | R33 | `tests/guards/guard-dependencias-aprobadas.test.ts` | `toda dependencia de package.json esta en docs/dependencias.md` (ya existente) |
 | R34 | `tests/unit/inventario/scope.test.ts` | `no existe ninguna pantalla, pagina ni componente de productos, ni spec E2E nuevo` |
+| R35 | `tests/integration/inventario/product-crud.int.test.ts` | `ordena por nombre ascendente y desempata por identificador ascendente` |
+| R36 | `tests/unit/pagination.test.ts` | `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` |
+| R37 | `tests/unit/inventario/product-input.test.ts` | `rechaza como nombre invalido la presentacion cuyo nombre normalizado queda vacio` |
 
 **Guardias que no hay que escribir:** R4, R8, R27 (parte), R31 y R33 los cierran guardias que ya
 existen en `tests/guards/`. Se citan porque un requisito sin test es un fallo de la feature, no
