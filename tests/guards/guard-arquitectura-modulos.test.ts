@@ -451,10 +451,31 @@ export function findContractLeakage(
 // BLOQUE 7 — Composicion unica (R11, R12)
 // ---------------------------------------------------------------------------
 
-/** Solo `lib/composition/**` puede importar un adaptador driven de cualquier modulo (R11). */
+/**
+ * Solo `lib/composition/**` puede importar un adaptador driven de cualquier modulo (R11).
+ *
+ * QC-9 T4 — Excepcion unica y acotada: **un adaptador driven puede apoyarse en otro driven de su
+ * PROPIO modulo**. R11 protege el cableado puerto -> implementacion, que es lo que solo la
+ * composicion puede hacer; dos adaptadores del mismo modulo repartiendose una responsabilidad no
+ * cablean nada. La tabla de `docs/architecture.md > La regla de dependencias` (fila
+ * `adapters/driven/**`) ya lo permitia —su columna "NO PUEDE importar" lista `lib/composition`,
+ * `../driving/**`, `app/**`, `components/**` y modulos ajenos por ruta profunda, y NO a un driven
+ * hermano—, asi que esto acerca la guardia al documento en vez de relajarlo. El caso real que lo
+ * obliga: `session-cookie.ts` (transporte, `next/headers`) delega el formato y la firma en
+ * `session-token.ts` (codec WebCrypto), que es el unico dueño del HMAC (QC-9 `design.md > 3.1`).
+ * Un driven de OTRO modulo sigue prohibido: eso si seria saltarse el contrato.
+ */
 export function findDrivenImportOutsideComposition(relPath: string, specifier: string, target: ImportTarget): string | null {
   if (relPath.startsWith('lib/composition/')) return null
   if (target.kind === 'external') return null
+  if (
+    layerOfPath(relPath) === 'driven' &&
+    layerOfPath(target.relPath) === 'driven' &&
+    moduleOfPath(relPath) !== null &&
+    moduleOfPath(relPath) === moduleOfPath(target.relPath)
+  ) {
+    return null
+  }
   if (layerOfPath(target.relPath) === 'driven') {
     return `${relPath} importa el adaptador driven '${specifier}' fuera de lib/composition (R11)`
   }
@@ -1129,6 +1150,28 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
         ),
       ).toBe(
         "lib/composition/index.ts importa el adaptador driving '@/lib/modules/identity/adapters/driving/login-action' desde la composicion (R12)",
+      )
+    })
+
+    // QC-9 T4 — la excepcion acotada: driven -> driven del MISMO modulo esta permitido (lo
+    // obliga `session-cookie.ts` delegando en el codec `session-token.ts`), pero driven ->
+    // driven de OTRO modulo sigue siendo un hallazgo.
+    it('un driven puede apoyarse en otro driven de su propio modulo, pero no en uno de otro modulo', () => {
+      expect(
+        findDrivenImportOutsideComposition(
+          'lib/modules/identity/adapters/driven/session/session-cookie.ts',
+          './session-token',
+          internalTarget('lib/modules/identity/adapters/driven/session/session-token.ts'),
+        ),
+      ).toBeNull()
+      expect(
+        findDrivenImportOutsideComposition(
+          'lib/modules/inventario/adapters/driven/persistence/stock-prisma.ts',
+          '@/lib/modules/identity/adapters/driven/session/session-token',
+          internalTarget('lib/modules/identity/adapters/driven/session/session-token.ts'),
+        ),
+      ).toBe(
+        "lib/modules/inventario/adapters/driven/persistence/stock-prisma.ts importa el adaptador driven '@/lib/modules/identity/adapters/driven/session/session-token' fuera de lib/composition (R11)",
       )
     })
 

@@ -35,7 +35,9 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-cookie';
+// El nombre de la cookie lo declara el codec del valor de sesion (QC-9 T4), no el adaptador de
+// transporte: un solo dueño por simbolo.
+import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { GENERIC_CREDENTIALS_ERROR } from '@/lib/modules/identity/adapters/driving/login-form-state';
 import { prisma } from '@/lib/shared/db/prisma';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
