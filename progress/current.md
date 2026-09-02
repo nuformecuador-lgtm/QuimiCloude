@@ -646,6 +646,32 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **Las pruebas de mutacion sobre archivos de PRODUCCION no pueden correr en paralelo.** Al
+  cerrar los menores de QC-8, tres subagentes trabajaban a la vez y **dos mutaron
+  `session-cookie.ts` simultaneamente** para probar guardias distintas: uno quitaba
+  `timingSafeEqual`, otro dejaba `clearSession` en no-op. En un sondeo intermedio el
+  implementer se encontro **produccion mutada** y la restauro desde `HEAD` sin saber que su
+  dueno iba a revertirla segundos despues. Acabo bien **solo** porque ambos caminos llevaban al
+  mismo contenido y porque se comprobo antes que el unico diff era la mutacion — pero el riesgo
+  real era **comitear produccion rota**, y ningun test lo habria cazado: el arbol estaba verde
+  entre mutacion y mutacion. Regla a fijar en `/afinar-regla`: una prueba de mutacion se
+  serializa o se hace sobre una copia, y **nunca** sobre un archivo que otro agente esta
+  tocando. Ver `progress/impl_QC-8-sesion-actual-y-logout.md > Un apunte de proceso`.
+
+- **[QC-9, ANTES de escribir `middleware.ts`] Las guardias no barren los `.ts` de la raíz del
+  repo.** `tests/guards/guard-firma-sesion-unica.test.ts` (QC-8) usa
+  `PRODUCTION_DIRS = ['lib','app','components','hooks']` y
+  `tests/guards/guard-arquitectura-modulos.test.ts` (QC-15) usa el mismo
+  `SCAN_ROOTS = ['app','components','hooks','lib']`. **Ninguna de las dos mira los archivos de
+  primer nivel**, así que un `middleware.ts` en la raíz con su propio `createHmac` pasaría en
+  verde: lo verificó el `reviewer` de QC-8 creando el archivo (2 passed) y borrándolo después.
+  R5 dice «en el repositorio», no «en `lib/`». No es una regresión de QC-8 —es la misma
+  limitación ya aceptada en la revisión de QC-15—, pero **`middleware.ts` es justo el archivo
+  que QC-9 va a crear para verificar la firma de sesión en el runtime Edge**, o sea el candidato
+  número uno a segunda implementación del HMAC, que es exactamente lo que R5 prohíbe.
+  **QC-9 debe ampliar los dos barridos a los `.ts` de primer nivel antes de escribir ese
+  archivo.** Menor 4 de `progress/review_QC-8-sesion-actual-y-logout.md`.
+
 - **El repo no tiene `.gitattributes` y eso fabrica conflictos falsos.** `core.autocrlf`
   está en `false` y los archivos conviven con fines de línea mezclados: `progress/current.md`
   está guardado en **CRLF** y `history.md`, `db/schema.prisma`, `package.json` y
@@ -654,6 +680,17 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   tapando el cambio real — y de paso puede colar un borrado accidental sin que nadie lo vea.
   Pasó tres veces al cerrar QC-14 (ver historial). Se resuelve con `* text=auto eol=lf` y una
   normalización única del árbol. **Entra por `/afinar-regla`**, no a mano.
+  **Y las herramientas obvias para diagnosticarlo MIENTEN** — verificado el 2026-09-02 por dos
+  sesiones por separado, cada una por su cuenta: `grep -c $'\r' archivo` **no interpreta el
+  patrón** y acaba contando **todas** las líneas, así que un archivo sin un solo CR devuelve el
+  total y parece perfecto; `file` tampoco reporta CRLF de forma fiable en archivos con líneas
+  muy largas. Lo que **sí** funciona: **`xxd`** sobre la primera y la última línea —mirar si
+  terminan en `0d0a` o en `0a`— y **`git diff --numstat`**, donde un cambio de dos líneas que
+  sale como «983 insertadas / 971 borradas» significa que se convirtió el archivo entero.
+  Además, en este repo **`awk` y `sed -i` reescriben `current.md` de CRLF a LF sin avisar**: al
+  cerrar QC-8 estuvieron a punto de colar el **cuarto** conflicto de archivo completo del día.
+  Para editarlo, herramienta que preserve los bytes, y comprobar el `--numstat` antes de
+  commitear.
 - **`docs/jira.md` llama *Hecho* a la columna que en el board se llama *Finalizado*** (status
   id `10003`, transición `41`). Verificado el 2026-09-02 al cerrar QC-14. Es el mismo tipo de
   desajuste ya anotado para *Spec en revisión* / *En revisión*: el mapeo a `done` es correcto,

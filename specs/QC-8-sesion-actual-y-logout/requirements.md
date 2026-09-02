@@ -118,10 +118,19 @@ cliente DEBE leer ni borrar la cookie de sesion.
 —version aceptada del formato, caducidad, exigencia de usuario activo y composicion del nombre
 mostrable—, de forma ejercitable sin cookie, sin Next y sin base de datos.
 
-**R24.** CUANDO se ejecute la suite E2E, DEBE existir al menos un recorrido en navegador real que
-entre con credenciales correctas, vea en la barra lateral el nombre real del usuario, cierre
-sesion, termine en el login y compruebe que volver atras no muestra la zona privada; ese
-recorrido DEBE borrar al terminar todas las filas que haya creado.
+**R24.** *(DIFERIDO A QC-9 por decision del humano el 2026-09-02 — ver la fila revisada en
+«Decisiones cerradas». No se implementa ni se testea en QC-8; se deja numerado para que la
+numeracion R1-R23 no se mueva y para que QC-9 lo herede con su historia.)*
+
+CUANDO se ejecute la suite E2E, DEBE existir al menos un recorrido en navegador real que entre
+con credenciales correctas, vea en la barra lateral el nombre real del usuario, cierre sesion,
+termine en el login y compruebe que volver atras no muestra la zona privada; ese recorrido DEBE
+borrar al terminar todas las filas que haya creado.
+
+> **Lo que QC-8 SI verifica de esa conducta, sin navegador:** R16 (redireccion sin sesion) y R20
+> (tras el cierre, la peticion siguiente resuelve «sin sesion») quedan cubiertos por tests de
+> integracion y del layout. Lo que se pierde al diferir es la comprobacion **en navegador real**
+> del historial hacia atras, que es justo lo que ningun test de servidor puede afirmar.
 
 ## Preguntas abiertas
 
@@ -149,22 +158,18 @@ recorrido DEBE borrar al terminar todas las filas que haya creado.
    > escribe ningún test de «rol nulo» en QC-8: sería verde por construcción. La rama `null` de
    > `nav-user.tsx` ya tiene su test en QC-11 y ahí se queda.
 
-3. **La zona privada todavía no tiene ninguna URL, y el E2E de la decisión del 2026-09-02 la
-   necesita.** *(Abierta por `spec_author` el 2026-09-02; no reabre ninguna decisión cerrada.)*
-   `app/(private)/` tiene `layout.tsx` pero **ningún `page.tsx`**: Next no renderiza un layout sin
-   una página debajo, así que hoy no existe ninguna dirección en la que se pueda «ver el nombre
-   real en la barra» ni comprobar la redirección de R16 en navegador. La pantalla es **QC-12 —
-   dashboard-en-blanco** (`pending`, `low`, zona `frontend`, con sus dos dependencias ya `done`).
-   Dos salidas, y la elige el humano:
-   - **(a) Recomendada:** hacer QC-12 antes o en paralelo (es zona `frontend`, así que no compite
-     con las dos plazas de `backend` de QC-8). QC-8 no toca `app/(private)/` salvo el `redirect`
-     del layout, y el E2E de R24 espera a que QC-12 aterrice.
-   - **(b) Alternativa:** QC-8 crea un `app/(private)/dashboard/page.tsx` mínimo de andamiaje que
-     QC-12 sustituye. Es más rápido, pero mete trabajo de UI en una ficha cuyo Alcance dice que
-     no lo hay, y deja dos features tocando el mismo archivo.
+3. **~~La zona privada todavía no tiene ninguna URL, y el E2E de la decisión del 2026-09-02 la
+   necesita.~~ CERRADA por el humano el 2026-09-02: se difiere el recorrido en navegador a QC-9.**
+   `app/(private)/` tiene `layout.tsx` pero **ningún `page.tsx`**, así que hoy no existe ninguna
+   dirección donde «ver el nombre real en la barra» ni comprobar la redirección de R16 en
+   navegador. Se ofrecieron adelantar **QC-12 — dashboard-en-blanco** o montar un andamiaje
+   provisional; el humano **descartó las dos** y difirió el recorrido a **QC-9**, que trae la
+   protección de rutas y para entonces tendrá pantalla.
 
-   Mientras no se responda, `tasks.md > T12` **para y pregunta** en vez de improvisar. El resto de
-   la feature (R1–R23) no depende de esto y se puede implementar y verificar entero.
+   **Consecuencia para esta feature:** R24 queda **fuera de alcance** (ver su nota) y el bloque 4
+   de `tasks.md` no se ejecuta. R1–R23 se implementan y verifican enteros con tests unitarios y
+   de integración. **QC-9 hereda R24 con su historia**: es la primera feature que podrá ejecutarlo.
+
 
 ## Decisiones cerradas (no reabrir)
 
@@ -174,7 +179,7 @@ recorrido DEBE borrar al terminar todas las filas que haya creado.
 | 2026-09-02 | ¿Sigue dentro un empleado dado de baja, o uno al que le cambiaron el rol? | **No.** El usuario se resuelve contra la base en cada petición; si no está activo (`deleted_at`) se trata como **sin sesión** y vuelve al login en su siguiente clic. El rol que se aplica es **siempre el actual**, nunca el que tenía al entrar. No cuesta nada: la consulta ya hace falta para el nombre y el rol. |
 | 2026-09-02 | ¿Qué nombre se muestra en la barra lateral? | **Primer nombre + primer apellido** — `first_names` «Ana María» y `last_names` «Pérez Gómez» dan **«Ana Pérez»**, iniciales **«AP»**. Cabe sin recortarse y es el trato del día a día. |
 | 2026-09-02 | ¿Qué hace la zona privada si no hay sesión válida? | **Redirige al login ya en QC-8.** Evita la ventana entre QC-8 y QC-9 en la que entrar sin sesión rompería la página. QC-9 añade después el corte en `middleware.ts`, que es anterior y más barato, sin deshacer esto. |
-| 2026-09-02 | ¿Lleva prueba en navegador real? | **Sí, en QC-8.** Entrar, comprobar el nombre real en la barra, cerrar sesión, comprobar el retorno al login y que no se vuelve atrás. Playwright ya está montado desde QC-7. |
+| 2026-09-02 · **revisada** | ¿Lleva prueba en navegador real? | **Diferida a QC-9.** Se cerró como «sí, en QC-8», y el spec descubrió que **no se puede**: `app/(private)/` no tiene ningún `page.tsx`, así que hoy no existe URL donde ejercitar el recorrido (Next no renderiza un layout sin página). Las salidas eran adelantar QC-12 o montar un andamiaje que QC-12 sustituiría; el humano descartó las dos y **difirió el recorrido a QC-9**, que es quien trae la protección de rutas y para entonces habrá pantalla. QC-8 se verifica con unitarios y de integración; lo que se pierde está anotado bajo R24. |
 | 2026-09-01 | Formato del valor de la cookie | **Heredado de QC-7 `design.md > 5.1`, congelado:** `v1.<payload-base64url>.<hmac-base64url>`, con `sub` / `iat` / `exp`. La verificación reutiliza `signSessionValue()`, que QC-7 exporta a propósito, y compara en tiempo constante (`timingSafeEqual`). QC-8 no reimplementa la firma. |
 | 2026-09-01 | Caducidad | **Heredada de QC-7 (D10):** 8 h absolutas desde la emisión, sin renovación deslizante y sin «recordarme». Se comprueba sobre el `exp` **firmado**, no sobre el `Max-Age`, que lo controla el navegador. |
 | 2026-09-01 | Atributos y manejo de la cookie | **Heredados de QC-7 `design.md > 5.2` (D3):** `qc_session`, `httpOnly`, `sameSite: lax`, `secure` en producción, `path: /`. La pone y la quita **solo el servidor**; el JavaScript del navegador no puede leerla ni borrarla. |
