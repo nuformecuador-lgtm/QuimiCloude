@@ -33,6 +33,32 @@ import type { SessionReader } from '@/lib/modules/identity/ports/session-reader'
 import type { SessionUserReader } from '@/lib/modules/identity/ports/session-user-reader';
 import type { SessionWriter } from '@/lib/modules/identity/ports/session-writer';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
+import {
+  createCreatePresentation,
+  createCreateProduct,
+  createDeletePresentation,
+  createDeleteProduct,
+  createGetProduct,
+  createListPresentations,
+  createListProducts,
+  createUpdatePresentation,
+  createUpdateProduct,
+} from '@/lib/modules/inventario';
+import {
+  createProduct,
+  findAliveProductById,
+  listAliveProducts,
+  softDeleteAliveProduct,
+  updateAliveProduct,
+} from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import {
+  createPresentation,
+  deletePresentationById,
+  listPresentations,
+  renamePresentation,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
+import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
+import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -84,4 +110,41 @@ export const identity = {
         checkCredentialPolicy,
       }),
     ),
+} as const;
+
+const productRepository: ProductRepository = {
+  create: createProduct,
+  findAliveById: findAliveProductById,
+  updateAlive: updateAliveProduct,
+  softDeleteAlive: softDeleteAliveProduct,
+  listAlive: listAliveProducts,
+};
+
+const presentationRepository: PresentationRepository = {
+  create: createPresentation,
+  rename: renamePresentation,
+  deleteById: deletePresentationById,
+  list: listPresentations,
+};
+
+/**
+ * Fachada del modulo `inventario` ya cableada (T11, `design.md > 3`, `> 7`). Es lo que
+ * consumen las Server Actions de T12.
+ *
+ * El ACTOR NO se resuelve aqui: cada caso de uso lo recibe por parametro (R1, D17). Quien
+ * lo obtiene es la Server Action, pidiendolo al contrato ya cableado de `identity`
+ * (`identity.getSessionUser()`, arriba en este mismo archivo) y construyendo
+ * `{ id, roleName }` con lo que devuelve `SessionUser`. `lib/composition` no conoce
+ * cookies ni sesion; solo ata puerto -> adaptador.
+ */
+export const inventario = {
+  createProduct: createCreateProduct({ products: productRepository }),
+  updateProduct: createUpdateProduct({ products: productRepository }),
+  deleteProduct: createDeleteProduct({ products: productRepository }),
+  getProduct: createGetProduct({ products: productRepository }),
+  listProducts: createListProducts({ products: productRepository }),
+  createPresentation: createCreatePresentation({ presentations: presentationRepository }),
+  updatePresentation: createUpdatePresentation({ presentations: presentationRepository }),
+  deletePresentation: createDeletePresentation({ presentations: presentationRepository }),
+  listPresentations: createListPresentations({ presentations: presentationRepository }),
 } as const;

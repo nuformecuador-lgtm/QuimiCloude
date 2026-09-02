@@ -12,7 +12,7 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-9 | proteccion-de-rutas-privadas | QC-17 Identidad y acceso | backend | **in_progress (F2.1)** | `feature/QC-9-proteccion-de-rutas-privadas` | **SPEC APROBADO por el humano el 2026-09-02** e **implementer lanzado**. Tarjeta en *En curso*. Spec congelado en `0f7d599`: **30 requisitos EARS**, todos trazados. El rol viaja dentro del token (decisión humana) y por eso **D3 quedó derogada**: el formato del token cambia y las sesiones abiertas dejan de valer. Queda 1 pregunta abierta (qué hace la raíz `/`). **Toca código de QC-8 Y de QC-7**, las dos mergeadas. Acotada y sembrada el mismo día: 14 decisiones cerradas, 0 preguntas abiertas. **No ocupa slot**: sigue `pending` hasta F1.3. Desbloquea a **QC-13**, que es la que hace navegable el ERP. **Toca código de QC-8, ya mergeada** — la firma migra a WebCrypto sin cambiar el formato del token |
-| QC-20 | crud-de-productos | QC-18 Inventario | backend | **spec_ready** | `feature/QC-20-crud-de-productos` | **SPEC APROBADO por el humano el 2026-09-02** («aprobado»). Tercera sesión de leader. **F2.0 no se ejecuta**: `depends_on` incluye QC-8, que está `pending` y sin spec, y `AGENTS.md` dice que una feature con `depends_on` no arranca hasta que su dependencia esté `done`. Por eso la ficha se queda en `spec_ready` y **la tarjeta NO se mueve a *En curso***: moverla dejaría board y disco divergentes por una fase que no ha empezado (mismo criterio que se aplicó a QC-14 el 2026-09-01). Arranca cuando QC-8 cierre. Acotada, sembrada y especificada el 2026-09-02: **23 decisiones cerradas + 37 requisitos EARS**, congelados en `21d6695` (las 5 preguntas que abrió el diseño las cerró el humano tras F1.2 y entraron como D19–D23; una cambió la posición del diseño: el tope de página pasó de 100 a 25). Sin preguntas abiertas. Tarjeta en *En revisión*. Fase 2 **bloqueada por QC-8**, que está `pending` y sin spec |
+| QC-20 | crud-de-productos | QC-18 Inventario | backend | **in_progress → PR abierto** | `feature/QC-20-crud-de-productos` | **Implementada, revisada y con PR #19 abierto el 2026-09-02.** La fila anterior decía `spec_ready` y «F2.0 bloqueada por QC-8»: quedó obsoleta cuando QC-8 cerró (PR #13) y otra sesión de leader llevó la feature entera. 16/16 tasks, **37 requisitos con test**, 40 mutaciones verificadas. Gate acreditado **por partes** —typecheck, lint y las tres suites (683 tests en 65 archivos), más el validador desde la raíz— porque `./init.sh` dentro de un worktree aborta con el falso positivo de specs de QC-9/QC-21. `reviewer` en **dos rondas**: RECHAZADO (1 mayor de documento) → **APROBADO, 0 mayores**. Base propia `QuimiCloude_QC20`, **pendiente de borrar al desmontar** |
 | QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress — PR #20 ABIERTO** | `feature/QC-30-rediseno-login` | **Esperando que el humano mergee el [PR #20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20).** Sesión labs-4b. Spec aprobado el 2026-09-02 (26 requisitos, 11 tareas). **Dos rondas de revisión**: la primera rechazó por un bloqueante real —R9 sin test que mordiera: se podía borrar el modo oscuro entero y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests (20 → 26). Gate completo verde: 65 archivos, 663 tests. Al mergear: F2.5 (tarjeta a *Hecho*, `status: done`, `wt.sh done QC-30-rediseno-login`) y F2.6 (resumen en `history.md`) |
 
 La feature **QC-21 — ayuda-visual-de-contrasena** se cerró el 2026-09-02 (PR #17, merge
@@ -1127,6 +1127,105 @@ Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
   corre, así que no es un agujero de merge, pero sí del modo rápido. La salida que sugiere el
   reviewer: nombrarlas `guard-…` o moverlas a `tests/guards/`, que el modo rápido corre siempre.
   Entra por `/afinar-regla`.
+- **[arnés — QC-20 aporta la evidencia que faltaba: DOS gates rápidos EN VERDE sobre una rama ROJA]**
+  Complementa la entrada de arriba y la de los tests de alcance; no la repite. Lo nuevo es que aquí
+  el fallo **no apareció tarde en el gate de otro**: no apareció **en absoluto** durante dos grupos
+  de trabajo. `tests/unit/identity/credential-policy-contract.test.ts` › `esta feature no anade
+  migraciones ni columnas` llevaba rojo **desde la task T2 de QC-20**, y el leader corrió y dio por
+  buenos **dos `./init.sh --rapido`** en ese intervalo. Se descubrió por casualidad, porque el
+  implementer exigió a un subagente correr `tests/unit/` y `tests/ui/` **enteros** en una task que
+  tocaba un contrato compartido.
+  **El mecanismo, en dos condiciones que se dan a la vez:** (1) el test **no** vive en
+  `tests/guards/` ni se llama `guard-…`, así que `pnpm run test:guardias` no lo recoge; y (2)
+  afirma sobre el **árbol de archivos** en vez de importar lo que vigila, así que **ningún grafo de
+  imports lo selecciona jamás**. No es que la selección *pueda* fallar: por construcción **nunca**
+  lo selecciona. Las dos condiciones juntas lo hacen invisible para el modo rápido **entero**.
+  **Regla de trabajo mientras no se arregle**, adoptada por QC-20 a partir del Grupo C: correr
+  `tests/unit/` y `tests/ui/` **enteros** al cerrar cada grupo, además del gate del leader. Es lo
+  que destapó éste. La salida de fondo sigue siendo la de arriba: que `scripts/test-rapido.mjs`
+  incluya siempre los tests que barren el árbol, igual que ya incluye todas las guardias.
+- **[arnés — coordinación entre sesiones paralelas: hoy funcionó por suerte, no por regla]**
+  Acordada entre la sesión de QC-20 y la de QC-24, con **dos casos contrastados el 2026-09-02**
+  que salieron distinto precisamente por esto:
+  - `tests/unit/inventario/schema/inventario-schema.test.ts` — las dos features acotaron **el mismo
+    test de alcance sin hablarlo**. Acabó en conflicto de contenido resuelto por unión, y con una
+    **incompatibilidad real** de por medio: dos aserciones de la versión de QC-24 que QC-20 no
+    puede cumplir por diseño (`adapters/driving` vacía, y «todo export del contrato es
+    `export type`»), porque QC-20 es justo la ficha que añade Server Actions y publica factories.
+  - `tests/unit/identity/credential-policy-contract.test.ts` — **se habló antes**, no se tocó dos
+    veces, y salió una aserción **mejor que la que tenía cualquiera de las dos features por
+    separado**. Coste: tres mensajes.
+  **Forma propuesta:** cuando una feature vaya a acotar un test de alcance de otra, o a escribir
+  dentro de un módulo ajeno, **se avisa a quien la lleva antes de tocarlo**. No es regla de código,
+  es de coordinación, y este repo corre dos y tres sesiones a la vez **por diseño**.
+  **El matiz sin el cual la regla no sirve:** el aviso previo solo es barato **si hay a quién
+  avisar**. Hoy funcionó porque había dos sesiones hablándose. La regla escrita tiene que decir
+  **dónde se deja el aviso cuando no hay nadie escuchando**: `progress/current.md > Conflictos
+  pendientes` existe exactamente para eso y **hoy no lo usó ninguna de las dos sesiones**. Sin ese
+  destino, la regla se cumple solo cuando hay suerte.
+  **Y engancha con el punto único de composición:** `lib/composition/index.ts` ha salido como
+  conflicto en **todas las parejas backend del día** (QC-6/QC-8, QC-19/QC-20). Un punto único de
+  cableado es correcto arquitectónicamente, pero **serializa de facto la zona backend**, lo que
+  contradice la regla del arnés que permite dos features en paralelo por zona. QC-24 se libró
+  **solo** porque dejó su cableado para QC-25 — o sea, por reparto de alcance, no porque el
+  problema no exista. Va a `/afinar-regla`; no se parchea a mano.
+- **[arnés — `scripts/db-rollback.ts` elige la migración por el DISCO, no por lo aplicado]**
+  Medido en QC-20 (T13, 2026-09-02) al comprobar si los `down.sql` de QC-24 y QC-20 componen
+  sobre la cadena de seis migraciones. **No se ha arreglado a mano a propósito**: es
+  infraestructura compartida por todas las sesiones y `CLAUDE.md` manda que las mejoras al arnés
+  entren por `/afinar-regla`.
+  **Causa, en una línea:** `findLastMigration()` hace `readdirSync(MIGRATIONS_DIR).sort().at(-1)`
+  y **nunca consulta `_prisma_migrations`** para saber cuál está realmente aplicada. Solo toca esa
+  tabla después, para borrar la fila.
+  **Tres efectos, de gravedad distinta:**
+  1. **No encadena.** Dos ejecuciones seguidas revierten **la misma** migración. Medido: el
+     primer y el segundo `db:rollback` imprimieron ambos
+     `20260902170759_product_audit_and_presentation_uniqueness revertida.`, las tablas de recetas
+     siguieron intactas y solo desapareció **una** fila de `_prisma_migrations`, no dos.
+  2. **Sale con éxito cuando no ha revertido nada.** El aviso **sí existe** —línea 145,
+     «aviso — no tenía fila en `_prisma_migrations`, no se borró ninguna», y remite a
+     `prisma migrate status`—, pero acto seguido la línea 151 imprime `<migracion> revertida.` y
+     el proceso sale con **código 0**. No es un no-op invisible: es un **aviso enterrado bajo un
+     mensaje de éxito**, que en la práctica se lee igual de mal y que **un script que encadene
+     rollbacks no puede detectar**, porque mira el código de salida.
+  3. **El peligroso, y no es hipotético: nos pasó durante horas.** Si en el disco hay una
+     migración con timestamp **posterior** que todavía **no está aplicada** —exactamente la
+     situación de QC-20 mientras QC-24 ya estaba mergeada y la nuestra no—, `db:rollback` ejecuta
+     **su** `down.sql` contra una base donde nunca se aplicó, y el operador cree haber revertido
+     la última aplicada. Con `IF EXISTS` **miente en silencio**; **sin `IF EXISTS`, revienta**. Y
+     nada obliga a que un `down.sql` lleve `IF EXISTS`: el gate solo comprueba que **el archivo
+     exista**, no su contenido.
+  **Propuesta para quien corra `/afinar-regla`,** para no partir de cero: leer la **última fila
+  aplicada** de `_prisma_migrations` (`ORDER BY finished_at DESC LIMIT 1`, con `finished_at NOT
+  NULL`) y usar **esa** como objetivo; **abortar** —no avisar— si no coincide con el último
+  directorio del disco, porque esa discrepancia significa justo el caso 3; y salir con **código
+  distinto de 0** cuando no se borra ninguna fila.
+  **Lo que este hallazgo NO invalida:** el `down.sql` de QC-20 es correcto y su ciclo de un salto
+  es reversible, verificado con snapshot del esquema en cinco dimensiones (columnas, constraints,
+  índices, RLS y `_prisma_migrations`) y **cero diferencias** entre antes y después.
+- **[QC-20 — los puertos de `inventario` no aceptan `TransactionClient`, y eso condiciona sus tests
+  de integración]** Dirigida a **quien toque esos puertos**: probablemente QC-22, o quien añada
+  los movimientos de inventario.
+  **El hecho:** los adaptadores driven (`product-prisma.ts`, `presentation-prisma.ts`) usan el
+  cliente Prisma **global**, porque los puertos de `design.md > 7` no reciben
+  `Prisma.TransactionClient`. Consecuencia: una llamada al adaptador **dentro** de
+  `prisma.$transaction(...)` **no participa** de esa transacción y hace COMMIT real.
+  **Lo que obligó a hacer en T14:** los tests que verifican una restricción de la base (R7, y toda
+  `presentation-uniqueness.int.test.ts`) sí usan `tx` + `SAVEPOINT` + `ROLLBACK` como manda la
+  doctrina de `inventario-constraints.int.test.ts`; pero los que ejercitan **el adaptador de
+  verdad** usan **fixtures reales con borrado explícito por id en `finally`**. Es una desviación
+  consciente de esa doctrina, declarada en `progress/impl_QC-20-crud-de-productos.md`.
+  **Evidencia de que hoy no se fuga nada:** dos pasadas seguidas dan **106/106 idénticas**, y el
+  recuento posterior de `products`, `presentations` y `users` es **0, 0, 0**. Verificado además de
+  forma independiente por el leader contra la base, junto con el índice único y las tres FK con
+  `confdeltype='r'`.
+  **El coste honesto:** un test interrumpido entre el fixture y su `finally` puede dejar filas.
+  **Acotado**: la base es **propia de este worktree** (`QuimiCloude_QC20`), así que no alcanza a
+  ninguna otra sesión — que es exactamente para lo que se montó.
+  **Por qué no se arregló en QC-20:** la salida limpia es que los puertos acepten un
+  `TransactionClient`, y eso **cambia la firma de los cinco métodos de `ProductRepository`** (y de
+  los cuatro de `PresentationRepository`). Es rediseño, no alcance de T14, y tocar una firma de
+  puerto es justo el cambio que `vitest related` no propaga a sus llamadores.
 - **[QC-12 — la verificación visual multiplataforma no la hizo nadie con ojos]** No hay navegador
   con emulación de dispositivo en este entorno. Lo verificado es el HTML servido y jsdom a 375 y
   1280 px, más las guardias de que no hay alto de viewport fijo, ni `:hover`, ni controles. El

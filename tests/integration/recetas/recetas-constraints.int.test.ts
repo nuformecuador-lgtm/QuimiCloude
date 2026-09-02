@@ -187,8 +187,17 @@ async function createProduct(
   tx: Prisma.TransactionClient,
   name = 'Acido citrico monohidratado',
 ): Promise<string> {
+  // QC-20 anadio `presentations.name_normalized` NOT NULL con INDICE UNICO (su R17, R20).
+  // Dos consecuencias para este helper, las dos de andamiaje y ninguna de significado:
+  //   1. hay que escribir `nameNormalized` junto a `name`, porque la columna es NOT NULL;
+  //   2. el nombre FIJO 'Bidon 20 L' ya no vale: este helper se llama VARIAS VECES en la
+  //      misma transaccion (p. ej. tres seguidas en «una receta con tres lineas»), y la
+  //      segunda chocaria contra el indice unico. Se marca con `token()`, que es
+  //      irrepetible y de solo letras y digitos, asi que sobrevive a la normalizacion.
+  // Se mantiene lo que el helper prometia: cada producto con su presentacion propia.
+  const marca = token()
   const presentation = await tx.presentation.create({
-    data: { name: 'Bidon 20 L' },
+    data: { name: `Bidon 20 L ${marca}`, nameNormalized: `bidon20l${marca}` },
     select: { id: true },
   })
   const product = await tx.product.create({

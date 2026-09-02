@@ -103,15 +103,25 @@ model User {
 /// NO lleva `deletedAt`, igual que `Role` en `identity`: el borrado logico es un UPDATE y
 /// una FK no puede bloquear un UPDATE, asi que la columna neutralizaria en silencio la
 /// unica garantia real de R14. Ver `design.md > 9` (pregunta abierta 2).
+///
+/// `nameNormalized` la calcula el dominio de `inventario` (funcion pura, sin acentos ni
+/// signos) y la persiste junto a `name` en toda escritura (R17). El `@@unique` es la
+/// **unica** garantia de la unicidad (R18, R20, QC-20 design.md > 2.2): no hay comprobacion
+/// previa por igualdad -- seria una carrera, entre el `SELECT` y el `INSERT` cabe otra
+/// transaccion -- y el `PresentationRepository` no expone ningun metodo de busqueda. El
+/// mensaje al usuario sale de traducir el SQLSTATE `23505` que Postgres devuelve al chocar
+/// con este indice (`design.md > 11.4`).
 /// @module inventario
 model Presentation {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  nameNormalized String   @map("name_normalized")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   products Product[]
 
+  @@unique([nameNormalized], map: "presentations_name_normalized_key")
   @@map("presentations")
 }
 
@@ -120,6 +130,20 @@ model Presentation {
 ///
 /// `name` NO tiene indice unico, y es deliberado (decision cerrada 6, R16): dos productos
 /// pueden llamarse igual. Se aparta a proposito del precedente de `users`.
+///
+/// `createdBy`/`updatedBy` (QC-20, design.md > 2.1) son campos ESCALARES, sin `@relation`
+/// de Prisma: es deliberado. Declarar la relacion obligaria a anadir un campo de vuelta en
+/// `User` —que es de `identity`— y habilitaria `include: { createdByUser: true }` desde el
+/// adaptador de `inventario`, una lectura de `users` desde otro modulo que la guardia de
+/// arquitectura no detecta (busca la cadena `prisma.user`). Con el campo escalar, el ORM no
+/// puede atravesar hacia `users` ni por accidente. La FK real vive escrita a mano en el SQL
+/// de la migracion de QC-20 (`products_created_by_fkey`, `products_updated_by_fkey`) y por
+/// eso es DRIFT para Prisma: toda migracion futura de `products` hay que revisarla a mano
+/// para que no la borre (mismo trato que los CHECK y el RLS de QC-14).
+///
+/// Son anulables a proposito: `products` ya tenia filas cuando se anadieron estas columnas
+/// y no existe un «usuario del sistema» al que apuntar en el backfill. La garantia de R6 —
+/// todo alta y toda edicion registran al actor— es del service, no del esquema.
 /// @module inventario
 model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -134,6 +158,8 @@ model Product {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
 
   presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
