@@ -73,10 +73,10 @@
       "epic_name": "Identidad y acceso",
       "name": "sesion-actual-y-logout",
       "description": "Desde cualquier punto de la aplicacion hay que poder saber quien es el usuario de la sesion en curso y cual es su rol, o que no hay sesion. Tambien hace falta cerrar sesion: despues de cerrarla, la cookie deja de servir.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
-      "complexity": "medium",
-      "zone": "backend",
+      "complexity": null,
+      "zone": null,
       "branch": "feature/QC-8-sesion-actual-y-logout",
       "depends_on": [
         "QC-7",
@@ -210,7 +210,7 @@
       "epic_name": "Identidad y acceso",
       "name": "politica-de-contrasenas",
       "description": "Una contrasena es aceptable si tiene al menos 8 caracteres e incluye mayuscula, minuscula, numero y simbolo, y si no esta entre las contrasenas filtradas conocidas. Esa regla se aplica en todos los sitios donde alguien fija o cambia una contrasena, de modo que no se pueda guardar una que no cumpla, y al rechazarla dice que requisito falto y no solo que esta mal. Las contrasenas no caducan y no se guarda historial de anteriores. Quien ya tenga guardada una contrasena que no cumple sigue entrando con normalidad: la regla solo mira las nuevas. Mostrar los requisitos mientras se escribe es otra ficha.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -297,7 +297,7 @@
       "epic_name": "Recetas",
       "name": "modelo-recetas",
       "description": "Necesitamos persistir el catalogo de recetas. Solo el modelo de datos: sin pantalla y sin API. Cada receta tiene un nombre, una descripcion, una imagen y unos pasos, y guarda ademas quien la creo y quien la modifico por ultima vez. El nombre es obligatorio y no se repite entre recetas: se comparan sin acentos ni caracteres especiales y sin distinguir mayusculas, igual que las presentaciones. La descripcion es opcional. La imagen se guarda como la direccion del archivo, en una sola columna de texto opcional: una receta sin imagen es valida, y el modelo no sabe donde vive ese archivo ni lo sube. Los pasos son opcionales y se guardan como un unico documento JSON en la columna, no como tabla aparte: son una lista ordenada de textos, y el orden es el de la lista. La base guarda el documento tal cual; que sea una lista de textos y que ninguno venga vacio lo hace cumplir la capa de aplicacion, no la columna. Una receta se compone de productos: un mismo producto entra en muchas recetas y una receta lleva muchos productos, y cada pareja receta-producto guarda ademas una cantidad y una unidad de medida. Esa pareja es la entidad propia de la relacion, no una tabla de union sin datos. Un mismo producto no puede aparecer dos veces en la misma receta. La cantidad es un numero con decimales exactos, obligatorio, y nunca negativo ni cero. La unidad de medida de cada linea es texto libre obligatorio y puramente anotativo: no hay conversion entre unidades y no se toma de la unidad del producto, que es opcional. Si un producto se da de baja, la receta conserva su linea: el borrado de producto es logico y la linea sigue apuntando al mismo producto. Quitar un producto de una receta al editarla borra esa linea de verdad, y borrar la receta se lleva sus lineas con ella. Recetas es un modulo propio y no parte de inventario: la linea conoce al producto por lo que inventario publica, nunca por su tabla. El alta, la consulta, la edicion y el borrado de recetas van aparte.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -342,6 +342,36 @@
         "QC-25"
       ],
       "spec_path": "specs/QC-26-pantalla-de-recetas"
+    },
+    {
+      "key": "QC-29",
+      "id": 29,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "tema-claro-oscuro",
+      "description": "La aplicacion tiene que poder verse en dos modos, claro y oscuro, y el usuario tiene que poder elegir cual quiere. Hoy el esquema de color es el gris neutro que dejo shadcn init y no hay forma de cambiar de modo: la clase dark esta declarada en globals.css pero nadie la pone nunca. Son dos cosas en la misma ficha porque tocan los mismos archivos. Primero el esquema de color: reemplazar la paleta neutra por la del diseno aprobado, base agua (blanco, #cceae8, #a8dcd9, #68c3b7, #539091) con acento naranja de contraste, definiendo los dos modos sobre los mismos tokens (--sidebar, --sidebar-foreground, --sidebar-accent, --sidebar-primary, --sidebar-border, --sidebar-ring y los del resto del tema), uno en :root y otro en .dark, en oklch como el resto del archivo; en claro el acento naranja se profundiza para conservar contraste sobre blanco, y la barra lateral pasa a panel flotante con degradado tenue. Segundo la eleccion de modo: tres opciones, claro, oscuro y seguir el sistema, con la del sistema por defecto la primera vez; la preferencia se recuerda entre recargas y entre sesiones del navegador; al cargar la pagina no debe verse un parpadeo del modo equivocado antes de que se aplique el elegido, ni en la primera carga ni al navegar; el control vive en el encabezado de la zona privada, junto al de la barra lateral, y tiene nombre accesible. No entra rediseniar pantallas, tocar el contenido del dashboard, ni anadir mas acentos que el del diseno aprobado: la barra lateral se re-colorea con los tokens, su estructura y su navegacion no cambian.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "frontend",
+      "branch": "feature/QC-29-tema-claro-oscuro",
+      "depends_on": null,
+      "spec_path": "specs/QC-29-tema-claro-oscuro"
+    },
+    {
+      "key": "QC-30",
+      "id": 30,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "rediseno-login",
+      "description": "La pantalla de login se ve como la dejo shadcn init: una tarjeta gris sobre fondo plano. Hay que vestirla con la paleta de la aplicacion (la que define QC-29) y darle el mismo lenguaje visual que el resto: tarjeta flotante de vidrio esmerilado sobre un fondo de agua con burbujas que ascienden despacio. Lo que cambia es la piel, no el comportamiento. Se conservan tal cual la anatomia (tarjeta centrada, campos Usuario y Contrasena, boton de envio, y el enlace de recuperacion en el pie de la tarjeta y fuera del formulario), el copy que sale de constantes y no de literales, los cuatro estados que el formulario ya distingue (reposo, error de campo, enviando, y credenciales incorrectas por notificacion), y que el error de credenciales siga siendo el unico mensaje generico, sin decir cual de los dos campos fallo. Lo que si cambia ademas del color: los campos y el boton suben a una altura comoda para tocar con el dedo, y la tarjeta gana el degradado tenue, el vidrio esmerilado y el fondo animado; las burbujas son tres, grandes y lentas, y deben desaparecer para quien tenga las animaciones reducidas en su sistema. No entra anadir controles que hoy no existen (mostrar contrasena, recordarme), cerrar el hueco de accesibilidad del aviso de credenciales, ni tocar la logica de autenticacion, la Server Action o el contrato de estados del formulario. Depende de QC-29: se pinta con los tokens de color que esa ficha define, en los dos modos.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "frontend",
+      "branch": "feature/QC-30-rediseno-login",
+      "depends_on": "QC-29",
+      "spec_path": "specs/QC-30-rediseno-login"
     }
   ]
 }
