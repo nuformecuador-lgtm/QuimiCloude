@@ -382,6 +382,228 @@ describe('nivel 1 · contrato de texto del CSS de la pantalla de login', () => {
       expect(textos).toContain(burbuja.tamano);
     }
   });
+
+  it('declara los valores del insumo para el vidrio y las burbujas en los dos modos', () => {
+    // R9 — este test existe porque el anterior mapeado a R9 («pinta la tarjeta opaca como
+    // base...») verificaba en realidad R11: base opaca, existencia del `@supports` y vuelta a
+    // opaco. De los VALORES de `design-input-login.md > 3` y `> 4` no afirmaba nada, y borrar el
+    // bloque `.dark` de variables `--qc30-login-*` ENTERO dejaba el archivo en verde: media
+    // feature —toda la mitad oscura— podia desaparecer sin que el gate se enterara.
+    // Se compara contra la regla real (`declaracionesDe` agrupa por el selector mas interno) y
+    // normalizando SOLO los espacios en blanco: los digitos se comparan tal cual, porque el
+    // riesgo que se mitiga es justo «un valor del insumo se copia mal al CSS».
+    const declaraciones = declaracionesDe(bloqueQc30());
+
+    const variablesDe = (selector: string) => {
+      const mapa = new Map<string, string>();
+      for (const declaracion of declaraciones) {
+        if (declaracion.selector.trim() !== selector) continue;
+        const separador = declaracion.texto.indexOf(':');
+        if (separador === -1) continue;
+        const propiedad = declaracion.texto.slice(0, separador).trim();
+        const valor = declaracion.texto.slice(separador + 1).trim().replace(/\s+/g, ' ');
+        mapa.set(propiedad, valor);
+      }
+      return mapa;
+    };
+
+    const claro = variablesDe(':root');
+    const oscuro = variablesDe('.dark');
+    expect(claro.size).toBeGreaterThan(0);
+    expect(oscuro.size).toBeGreaterThan(0);
+
+    const esperado = {
+      ':root': {
+        '--qc30-login-card-gradient':
+          'linear-gradient(166deg, rgba(255,255,255,0.82), rgba(246,252,251,0.72) 34%, rgba(236,247,245,0.66) 68%, rgba(223,239,237,0.60))',
+        '--qc30-login-ring': '0 0 0 1px rgba(83,144,145,0.18)',
+        '--qc30-login-inner-glow': 'inset 0 1px 0 rgba(255,255,255,0.90)',
+        '--qc30-login-shadow': '0 30px 60px -26px rgba(20,60,60,0.36)',
+        '--qc30-login-bubble-fill':
+          'radial-gradient(circle at 30% 27%, rgba(255,255,255,0.92), rgba(104,195,183,0.34) 46%, rgba(83,144,145,0.13) 74%)',
+        '--qc30-login-bubble-border': 'rgba(83,144,145,0.24)',
+        '--qc30-login-bubble-halo': 'rgba(83,144,145,0.12)',
+      },
+      '.dark': {
+        '--qc30-login-card-gradient':
+          'linear-gradient(166deg, rgba(27,59,57,0.74), rgba(19,48,50,0.66) 34%, rgba(15,36,38,0.62) 68%, rgba(9,26,28,0.58))',
+        '--qc30-login-ring': '0 0 0 1px rgba(168,220,217,0.16)',
+        '--qc30-login-inner-glow':
+          'inset 0 1px 0 rgba(204,234,232,0.22), inset 0 -1px 0 rgba(0,0,0,0.25)',
+        '--qc30-login-shadow': '0 34px 70px -24px rgba(0,0,0,0.80)',
+        '--qc30-login-bubble-fill':
+          'radial-gradient(circle at 30% 27%, rgba(230,250,247,0.60), rgba(104,195,183,0.17) 44%, rgba(104,195,183,0.05) 72%)',
+        '--qc30-login-bubble-border': 'rgba(204,234,232,0.30)',
+        '--qc30-login-bubble-halo': 'rgba(104,195,183,0.18)',
+      },
+    } as const;
+
+    for (const [propiedad, valor] of Object.entries(esperado[':root'])) {
+      expect(`${propiedad} en :root = ${claro.get(propiedad) ?? '(sin declarar)'}`).toBe(
+        `${propiedad} en :root = ${valor}`,
+      );
+    }
+    for (const [propiedad, valor] of Object.entries(esperado['.dark'])) {
+      expect(`${propiedad} en .dark = ${oscuro.get(propiedad) ?? '(sin declarar)'}`).toBe(
+        `${propiedad} en .dark = ${valor}`,
+      );
+    }
+
+    // Los `--qc30-login-footer-*` NO se afirman por valor: son decision propia de la
+    // implementacion (alfas nuevas sobre ternas del insumo) y estan aceptadas. Solo se exige que
+    // existan en los dos modos, para que el modo oscuro no quede a medias.
+    for (const propiedad of ['--qc30-login-footer-bg', '--qc30-login-footer-border'] as const) {
+      expect(claro.has(propiedad)).toBe(true);
+      expect(oscuro.has(propiedad)).toBe(true);
+    }
+  });
+
+  it('conserva el filo de 1px y el brillo interior en la sombra de la tarjeta, tambien con transparencia reducida', () => {
+    // R9 — `design-input-login.md > 3` lo dice tal cual: «si se recorta algo, que no sea eso».
+    // Recortar el `box-shadow` a solo `var(--qc30-login-shadow)` dejaba el archivo en verde.
+    // Se afirma en las dos ramas —la base y la de `prefers-reduced-transparency`— y ademas que
+    // NINGUNA sombra de la tarjeta dentro del bloque puede escribirse sin las tres piezas.
+    const bloque = bloqueQc30().replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    const inicioTransparencia = bloque.indexOf('@media (prefers-reduced-transparency: reduce)');
+    expect(inicioTransparencia).toBeGreaterThan(-1);
+    const finTransparencia = finDelBloque(bloque, inicioTransparencia);
+
+    const dentroDeTransparencia = bloque.slice(inicioTransparencia, finTransparencia);
+    const fueraDeTransparencia =
+      bloque.slice(0, inicioTransparencia) + bloque.slice(finTransparencia);
+
+    const sombrasDeTarjeta = (fragmento: string) =>
+      declaracionesDe(fragmento).filter(
+        (declaracion) =>
+          declaracion.selector.includes("[data-slot='card']") &&
+          declaracion.texto.trim().startsWith('box-shadow'),
+      );
+
+    for (const fragmento of [fueraDeTransparencia, dentroDeTransparencia]) {
+      const sombras = sombrasDeTarjeta(fragmento);
+      expect(sombras.length).toBeGreaterThan(0);
+      for (const sombra of sombras) {
+        const texto = sombra.texto.replace(/\s+/g, ' ');
+        expect(texto).toContain('var(--qc30-login-ring)');
+        expect(texto).toContain('var(--qc30-login-inner-glow)');
+        expect(texto).toContain('var(--qc30-login-shadow)');
+      }
+    }
+  });
+
+  it('transcribe opacidad, deriva, recorrido y escala de cada burbuja tal como los da el insumo', () => {
+    // R12 — el numero de burbujas, los retardos y las duraciones ya estan afirmados arriba, y las
+    // posiciones y diametros en el test de mobile-first; faltaban estos cuatro valores, que R12
+    // tambien cita del insumo. Mismo riesgo de siempre: una cifra mal copiada no se ve en jsdom.
+    const bloque = bloqueQc30().replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    const inicioMedia = bloque.indexOf('@media (min-width: 640px)');
+    expect(inicioMedia).toBeGreaterThan(-1);
+    const finMedia = finDelBloque(bloque, inicioMedia);
+
+    const dentroDelMedia = bloque.slice(inicioMedia, finMedia);
+    const fueraDelMedia = bloque.slice(0, inicioMedia) + bloque.slice(finMedia);
+
+    const textosDe = (fragmento: string, selector: string) =>
+      declaracionesDe(fragmento)
+        .filter((declaracion) => declaracion.selector.includes(selector))
+        .map((declaracion) => declaracion.texto.replace(/\s+/g, ' '));
+
+    const porIndice = (indice: string) => `[data-login-index='${indice}']`;
+
+    const movil = [
+      { indice: '1', opacidad: '0.30', deriva: '24px' },
+      { indice: '2', opacidad: '0.34', deriva: '-20px' },
+      { indice: '3', opacidad: '0.26', deriva: '18px' },
+    ] as const;
+    for (const burbuja of movil) {
+      const textos = textosDe(fueraDelMedia, porIndice(burbuja.indice));
+      expect(textos).toContain(`--qc30-bubble-opacity: ${burbuja.opacidad}`);
+      expect(textos).toContain(`--qc30-bubble-drift: ${burbuja.deriva}`);
+    }
+
+    const escritorio = [
+      { indice: '1', deriva: '30px' },
+      { indice: '2', deriva: '-26px' },
+      { indice: '3', deriva: '22px' },
+    ] as const;
+    for (const burbuja of escritorio) {
+      expect(textosDe(dentroDelMedia, porIndice(burbuja.indice))).toContain(
+        `--qc30-bubble-drift: ${burbuja.deriva}`,
+      );
+    }
+
+    const enLaBase = textosDe(fueraDelMedia, "[data-login='bubble']");
+    expect(enLaBase).toContain('--qc30-bubble-travel: 900px');
+    expect(enLaBase).toContain('--qc30-bubble-scale-from: 0.86');
+    expect(enLaBase).toContain('--qc30-bubble-scale-to: 1.06');
+    expect(textosDe(dentroDelMedia, "[data-login='bubble']")).toContain(
+      '--qc30-bubble-travel: 960px',
+    );
+  });
+
+  it('deja la capa de burbujas sin capturar el puntero y por debajo de la tarjeta', () => {
+    // R13 — la clausula «sin capturar eventos de puntero» no la defendia nadie: quitar
+    // `pointer-events: none` dejaba el archivo en verde y el E2E solo cuenta y mide visibilidad.
+    // El apilado va junto: la capa en 1 y la tarjeta en 2, que es lo que la deja debajo.
+    const declaraciones = declaracionesDe(bloqueQc30());
+
+    const textosDe = (selector: string) =>
+      declaraciones
+        .filter((declaracion) => declaracion.selector.includes(selector))
+        .map((declaracion) => declaracion.texto.replace(/\s+/g, ' '));
+
+    const capa = textosDe("[data-login='bubbles']");
+    expect(capa).toContain('pointer-events: none');
+    expect(capa).toContain('z-index: 1');
+
+    expect(textosDe("[data-slot='card']")).toContain('z-index: 2');
+  });
+
+  it('fija 44px de alto en campo y boton, y 400px, 18px y 28px en la tarjeta del login', () => {
+    // R16 — la cara POSITIVA que faltaba. El test de medidas de mas arriba afirma lo contrario
+    // («toda declaracion que use 44px cuelga del ambito») y hacen falta las dos: bajar el
+    // `min-height` del campo a 32px cumplia esa y dejaba el gate en verde. El numero se mide de
+    // verdad en `e2e/login-skin.spec.ts`, pero el gate no ejecuta E2E, asi que una regresion de
+    // altura llegaria al merge sin ponerse roja.
+    const declaraciones = declaracionesDe(bloqueQc30());
+
+    const declara = (selector: string, texto: string) =>
+      declaraciones.some(
+        (declaracion) =>
+          declaracion.selector.includes("[data-login='screen']") &&
+          declaracion.selector.includes(selector) &&
+          declaracion.texto.replace(/\s+/g, ' ') === texto,
+      );
+
+    expect(declara("[data-slot='input']", 'min-height: 44px')).toBe(true);
+    expect(declara("[data-slot='button']", 'min-height: 44px')).toBe(true);
+
+    for (const texto of ['max-width: 400px', 'border-radius: 18px', '--card-spacing: 28px']) {
+      expect(declara("[data-slot='card']", texto)).toBe(true);
+    }
+  });
+
+  it('tampoco pisa el anillo de foco de campo y boton por la via del box-shadow', () => {
+    // R20 — completa la lista de propiedades del test de mas arriba (`outline`, `--ring`...):
+    // una sombra sobre el campo o el boton tapa igual de bien el anillo de 3 px del primitivo.
+    // La prohibicion va ACOTADA a esos dos selectores a proposito: la tarjeta declara
+    // `box-shadow` de forma legitima —es el filo, el brillo y la sombra del vidrio, R9— y una
+    // prohibicion global saldria roja contra el codigo bueno.
+    const declaraciones = declaracionesDe(bloqueQc30());
+
+    const enCampoOBoton = (selector: string) =>
+      selector.includes("[data-slot='input']") || selector.includes("[data-slot='button']");
+
+    expect(
+      declaraciones.filter(
+        (declaracion) =>
+          enCampoOBoton(declaracion.selector) &&
+          declaracion.texto.split(':')[0].trim() === 'box-shadow',
+      ),
+    ).toEqual([]);
+  });
 });
 
 /** El fragmento de `app/globals.css` que va entre los dos delimitadores de QC-30, ambos incluidos. */

@@ -88,14 +88,14 @@ Los 26 requisitos, cada uno con el test que lo hace ejecutable. `login-skin/1` =
 | R6 | `login-form.test.tsx` > «emite un toast de error cuando las credenciales no son aceptadas», «no reemite el toast en un re-render del mismo intento», «emite un toast nuevo por cada intento rechazado, aunque la entrada sea identica» |
 | R7 | `login-form.test.tsx` > «en estado inicial no muestra errores, no emite toast y los campos estan vacios» + «muestra el error de campo inline...» + los tres del estado «enviando» + el del toast |
 | R8 | Los **18** tests de `login-form.test.tsx` siguen verdes **sin editarse** (esa es la prueba), mas `tests/integration/identity/login.int.test.ts` (13) y `e2e/login.spec.ts` (4) en verde |
-| R9 | `login-skin/1` > «pinta la tarjeta opaca como base y el vidrio solo como mejora dentro de @supports» + revision visual de T10 (escenarios 1 y 2) |
+| R9 | `login-skin/1` > «declara los valores del insumo para el vidrio y las burbujas en los dos modos» + «conserva el filo de 1px y el brillo interior en la sombra de la tarjeta, tambien con transparencia reducida» + revision visual de T10 (escenarios 1 y 2). **Reescrito tras el rechazo**: la primera version mapeaba aqui el test de R11, que no afirmaba ni un valor del insumo ni nada del modo oscuro (ver «Segunda vuelta») |
 | R10 | `login-skin/1` > «declara el desenfoque de fondo con y sin prefijo, tambien en la condicion de soporte» |
 | R11 | `login-skin/1` > «pinta la tarjeta opaca como base y el vidrio solo como mejora dentro de @supports» (incluye la vuelta a opaco con transparencia reducida) + T10 (escenario 4) |
-| R12 | `login-skin/1` > «define exactamente tres burbujas, ni una mas» + «reparte las burbujas con retardos negativos y ciclos de 17, 18 y 19 segundos» |
-| R13 | `login-skin/2` > «monta las tres burbujas como capa decorativa e inalcanzable por teclado» + «coloca la capa de burbujas como hermana de la tarjeta y antes que ella» |
+| R12 | `login-skin/1` > «define exactamente tres burbujas, ni una mas» + «reparte las burbujas con retardos negativos y ciclos de 17, 18 y 19 segundos» + «transcribe opacidad, deriva, recorrido y escala de cada burbuja tal como los da el insumo» (menor-2) |
+| R13 | `login-skin/2` > «monta las tres burbujas como capa decorativa e inalcanzable por teclado» + «coloca la capa de burbujas como hermana de la tarjeta y antes que ella» + `login-skin/1` > «deja la capa de burbujas sin capturar el puntero y por debajo de la tarjeta» (menor-3) |
 | R14 | `login-skin/1` > «hace desaparecer la capa de burbujas con movimiento reducido» + `login-skin.spec.ts` > «oculta la capa de burbujas cuando el sistema pide movimiento reducido» **y** «pinta las tres burbujas cuando no hay preferencia de movimiento reducido» (el contraste evita que el primero pase tambien si alguien borra el componente) |
 | R15 | `login-skin/2` > «expone un unico landmark main, que es el ambito del login» |
-| R16 | `login-skin/1` > «mantiene las medidas de 44px, 400px, 18px y 28px dentro del ambito del login» + `login-skin.spec.ts` > «presenta campos y boton con al menos 44 px de alto computado» y «no deja crecer la tarjeta mas alla de 400 px en escritorio» |
+| R16 | `login-skin/1` > «fija 44px de alto en campo y boton, y 400px, 18px y 28px en la tarjeta del login» (cara positiva, menor-4: **es la que defiende el numero en el gate**) + «mantiene las medidas... dentro del ambito del login» (cara negativa) + `login-skin.spec.ts` > «presenta campos y boton con al menos 44 px de alto computado» y «no deja crecer la tarjeta mas alla de 400 px en escritorio» |
 | R17 | `login-skin/1` > «no deja ninguna de esas medidas fuera del bloque de QC-30» + `login-skin/2` > «no altera las primitivas de components/ui» |
 | R18 | `login-skin/1` > «declara el bloque de QC-30 fuera de toda capa de cascada» |
 | R19 | `login-skin/2` > «no altera las primitivas de components/ui» (`h-8` en input y button, `rounded-xl` y el espaciado por defecto en card) |
@@ -219,6 +219,95 @@ Ninguno se arreglo aqui: no entran en el alcance y tocarlos habria ensuciado el 
    bajo carga en el reseteo que React 19 hace del campo no controlado, no un defecto de esta
    ficha —que no toca ese archivo ni ese componente—. Se deja anotado porque un intermitente
    silenciado es peor que uno escrito.
+
+## Segunda vuelta — respuesta al rechazo del reviewer
+
+`progress/review_QC-30-rediseno-login.md` **RECHAZO** la feature: 1 bloqueante y 6 menores. El
+bloqueante **no era un defecto de la piel** —el CSS estaba bien y el gate verde— sino un hueco
+de trazabilidad. Se cerro **sin tocar una sola linea de `app/globals.css`**, que es exactamente
+lo que el informe pedia.
+
+### BLOQUEANTE-1 — R9 no mordia
+
+El reviewer demostro que se podia **borrar el modo oscuro entero y recortar la sombra de la
+tarjeta** con el gate en verde: `Tests 20 passed (20)`. La causa era real y no un descuido de
+redaccion: el test que la tabla mapeaba a R9 («pinta la tarjeta opaca como base y el vidrio solo
+como mejora dentro de `@supports`») verifica en realidad **R11**. De los valores de
+`design-input-login.md > 3` no afirmaba nada, y del modo oscuro tampoco.
+
+Dos `it` nuevos en el nivel 1 de `tests/unit/login-skin.test.tsx`:
+
+- **«declara los valores del insumo para el vidrio y las burbujas en los dos modos» (R9)** —
+  agrupa las declaraciones por selector y exige `:root` **y** `.dark` con los **siete** valores
+  literales de cada modo (degradado, anillo, brillo interior, sombra, relleno/borde/halo de
+  burbuja), comparando con los espacios normalizados y **sin ignorar un solo digito**. Los
+  `--qc30-login-footer-*` solo se exigen presentes, no con valor: son la decision propia de la
+  implementacion —alfas nuevas sobre ternas del insumo— y son la parte deliberadamente blanda
+  del bloque.
+- **«conserva el filo de 1px y el brillo interior en la sombra de la tarjeta, tambien con
+  transparencia reducida» (R9)** — toda declaracion `box-shadow` bajo `[data-slot='card']` debe
+  incluir las tres variables, y debe haber al menos una en la rama base **y** otra dentro de
+  `@media (prefers-reduced-transparency: reduce)`. Es lo que el insumo llama «si se recorta algo,
+  que no sea eso».
+
+### La mutacion con la que se comprobo que R9 ahora SI muerde
+
+Corrida por el `implementer`, no heredada del informe. Las **dos** mitades a la vez, que es como
+las aplico el reviewer:
+
+1. borrado integro del bloque `.dark { --qc30-login-* }` (los nueve valores del modo oscuro), y
+2. `box-shadow` de `[data-slot='card']` reducido a solo `var(--qc30-login-shadow)` **en sus dos
+   apariciones** (rama base y transparencia reducida), o sea sin filo y sin brillo interior.
+
+Antes: **20 passed (20)** — verde. Ahora:
+
+```
+ × declara los valores del insumo para el vidrio y las burbujas en los dos modos
+ × conserva el filo de 1px y el brillo interior en la sombra de la tarjeta, tambien con transparencia reducida
+
+AssertionError: expected 0 to be greater than 0
+AssertionError: expected 'box-shadow: var(--qc30-login-shadow)' to contain 'var(--qc30-login-ring)'
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 24 passed (26)
+```
+
+Enrojecen **los dos `it` de R9 y solo esos**. `app/globals.css` se revirtio con
+`git checkout --` y el diff frente a `origin/dev` sigue siendo **273 inserciones y cero
+eliminaciones**.
+
+### Los seis menores
+
+| # | Que era | Como se cerro |
+| --- | --- | --- |
+| menor-1 | `design.md` no recogia la decision del pie de la tarjeta | Parrafo nuevo en `design.md > 6`: por que hizo falta (el pie opaco cortaba el vidrio), que **las ternas RGB son del insumo y solo las alfas son nuevas** (lo que R21 autoriza), la vuelta a `--muted` / `--border` con transparencia reducida, el realineado del radio a 18 px, y por que el test **no** afirma esos valores |
+| menor-2 | R12 sin opacidades, derivas, recorrido ni escala | `it` que transcribe `0.30` / `0.34` / `0.26`, derivas `24` / `-20` / `18px` en la base movil y `30` / `-26` / `22px` en escritorio, recorrido 900/960 px y escala `0.86` a `1.06` |
+| menor-3 | `pointer-events: none` de R13 no mordia | `it` que exige `pointer-events: none` y `z-index: 1` en la capa, y `z-index: 2` en la tarjeta. **Mutacion comprobada**: quitarlo enrojece con `expected [...] to include 'pointer-events: none'` |
+| menor-4 | Los 44 px solo se defendian en E2E, y el gate no corre E2E | `it` con la cara **positiva** (existen las declaraciones `min-height: 44px` de campo y boton, y 400/18/28 px de la tarjeta, todas bajo el ambito). La cara negativa que ya existia **no se toco**: hacen falta las dos. **Mutacion comprobada**: bajar el campo a 32 px enrojece |
+| menor-5 | La lista del anillo de foco de R20 no cubria `box-shadow` | Se anadio `box-shadow`, **acotado a las reglas que apuntan a `[data-slot='input']` o `[data-slot='button']`**. Prohibirlo en todo el bloque habria salido rojo contra el codigo bueno: la tarjeta declara `box-shadow` legitimamente, y es justo el filo + brillo + sombra del vidrio |
+| menor-6 | `e2e/theme.spec.ts` fragil en frio | **Nada que arreglar.** El reviewer confirmo que sus 6 rojos son todos `page.goto: Test timeout` y ninguna asercion de estilo, y que no es regresion de QC-30. Queda como observacion, ya anotada mas arriba |
+
+`tests/unit/login-skin.test.tsx` pasa de **20 a 26** tests. Ninguna asercion previa se modifico
+ni se relajo, y ninguna de las nuevas salio roja contra el codigo real: cerraban huecos de
+verificacion, no defectos.
+
+### Gate tras la segunda vuelta
+
+```
+-> pnpm run typecheck   ✓ typecheck paso
+-> pnpm run lint        ✓ lint paso
+
+ Test Files  65 passed (65)
+      Tests  663 passed (663)
+
+✓ tests: sin rojos nuevos (65 archivos ejecutados, baseline vacio)
+== init OK ==
+```
+
+Archivos tocados en esta vuelta: `tests/unit/login-skin.test.tsx` (+6 `it`),
+`specs/QC-30-rediseno-login/design.md` (menor-1) y esta bitacora. **Cero cambios en codigo de
+produccion**: `app/globals.css`, `page.tsx` y `login-background.tsx` estan byte a byte como los
+reviso el reviewer.
 
 ## Lo que este documento NO dice
 

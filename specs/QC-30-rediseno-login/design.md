@@ -215,6 +215,28 @@ motivo va anotado como comentario en el propio CSS, no solo aquí.
 tarjeta sin editar `card.tsx`), no redefine ningún token de QC-29 (R21) y no añade ninguna
 utilidad ni `@apply`.
 
+**El pie de la tarjeta, y por qué tiene valores que el insumo no dicta** (decidido durante la
+implementación, 2026-09-02; el resto de la ficha no necesita ni una cifra propia). `card.tsx`
+pinta el `CardFooter` con `bg-muted/50` y un `border-t` **opacos**. Sobre el vidrio eso no se lee
+como un pie: se lee como una banda maciza que corta la tarjeta en horizontal justo donde el
+degradado de 166° debería seguir. El insumo no publica valores para el pie —solo cubre la
+tarjeta (`> 3`) y las burbujas (`> 4`)—, así que el bloque declara dos variables propias por
+modo, `--qc30-login-footer-bg` y `--qc30-login-footer-border`:
+
+- **Las ternas RGB son las del insumo**, no colores nuevos: `255,255,255` y `83,144,145` en
+  claro; `9,26,28` y `204,234,232` en oscuro. Lo único nuevo son **tres alfas**. Eso es
+  exactamente lo que R21 autoriza —«las variables propias del login **derivan de los valores del
+  insumo**»—: no se redefine ningún token de QC-29 ni se abre una paleta nueva.
+- **Bajo `prefers-reduced-transparency` el pie vuelve a `var(--muted)` y `var(--border)`**, los
+  tokens de siempre, igual que la tarjeta vuelve a `var(--card)`. La rama opaca no inventa nada.
+- Por el mismo motivo, y también dentro del ámbito, la cabecera y el pie realinean su radio a los
+  **18 px** de la tarjeta: el primitivo los redondea a 14 px (`rounded-t-xl` / `rounded-b-xl`) y
+  el desajuste se ve en la esquina.
+
+Si algún día el artboard publica valores de pie, sustituyen a estos y el test de contrato no se
+entera: **a propósito, el nivel 1 afirma los valores del insumo (`> 3` y `> 4`) y NO los del
+pie**, que son la parte deliberadamente blanda de este bloque.
+
 ## 7. Alternativas descartadas
 
 **A1 — Editar `components/ui/input.tsx`, `button.tsx` y `card.tsx`.** Es lo directo: cambiar
