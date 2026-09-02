@@ -525,3 +525,47 @@ ningún route handler nuevo, con el actor resuelto por `identity.getSessionUser(
 errores de dominio traducidos a estado serializable; las tres mutaciones obligatorias
 confirmaron que las aserciones del test son reales, y la suite completa de `tests/unit/` +
 `tests/ui/` queda en 49/482 verde.
+
+---
+
+# `app/api/` vacio: origen, correccion de una frase mia, y la leccion
+
+## La frase imprecisa
+
+El implementer afirmo al cerrar el Grupo C: **«No existe `app/api/`. Ningun route handler»**.
+La primera mitad era **falsa**. El dato correcto:
+
+> `app/api/` **existia en disco**, vacio y **sin versionar** (git no versiona directorios
+> vacios), creado a las 12:27. **Ninguna** de las tres rutas del catalogo
+> —`app/api/products`, `app/api/presentations`, `app/api/inventario`— estaba presente, que es
+> lo que `tests/unit/inventario/scope.test.ts` comprueba. R29 y R34 se cumplian.
+
+La conclusion era correcta; **la premisa que la sostenia, no**. Se corrige con el mismo criterio
+que se aplico a `stripComments` y a `design.md > 5`: una conclusion correcta apoyada en un dato
+falso se corrige igual, porque el siguiente que lea la premisa la va a usar.
+
+## De donde salio: de nuestra propia comprobacion de falsabilidad
+
+No es rastro de otra sesion. Lo dejo **esta feature**, en el Grupo A, al verificar que
+`scope.test.ts` era falsable. Esta escrito mas arriba en esta misma bitacora:
+
+| Asercion | Archivo temporal creado | Limpieza que se hizo |
+| --- | --- | --- |
+| `app/api/products` no existe | `app/api/products/route.ts` | `rm -rf app/api/products` |
+| `app/api/presentations` no existe | `app/api/presentations/route.ts` | `rm -rf app/api/presentations` |
+| `app/api/inventario` no existe | `app/api/inventario/route.ts` | `rm -rf app/api/inventario` |
+
+Las tres limpiezas borraron **el hijo**, no **el padre**: `app/api/` quedo vacio. Y como git no
+versiona directorios vacios, **`git status` salio limpio y nadie lo vio** — ni el implementer, ni
+dos gates rapidos, ni el gate completo.
+
+## La leccion, que es general y no de esta ficha
+
+**Una comprobacion de falsabilidad tiene que deshacer TODA la ruta que creo, no solo la hoja**, y
+**`git status` no es prueba suficiente de limpieza**: es ciego a los directorios vacios. Es el
+mismo genero de punto ciego que la deuda del modo rapido —algo que ninguna herramienta del ciclo
+mira— y por eso se anota aqui: en un repo cuyo test afirma «no hay rutas HTTP de catalogo», dejar
+un `app/api/` vacio es una mina para el siguiente que lo abra.
+
+**Corregido:** `rmdir app/api`. Verificado despues que `git status --short` sigue vacio y que las
+tres rutas del catalogo siguen sin existir.

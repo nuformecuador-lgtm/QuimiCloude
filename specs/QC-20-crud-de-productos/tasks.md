@@ -73,7 +73,7 @@
 
 ## Grupo C — adaptadores y cableado (depende de B)
 
-- [ ] **T9 [P] — Adaptador driven de producto.** `adapters/driven/persistence/product-prisma.ts`:
+- [x] **T9 [P] — Adaptador driven de producto.** `adapters/driven/persistence/product-prisma.ts`:
       filtro `deleted_at IS NULL`, escritura de `created_by`/`updated_by`, conversión
       `string ↔ Prisma.Decimal`, orden `name ASC, id ASC` (D19, R35), salida con los autores como
       **ids** y sin resolver ningún nombre (D20), uso de `lib/shared/pagination`, traducción de
@@ -81,17 +81,17 @@
       *Depende de:* T1, T2, T5. **Hecho cuando:** typecheck limpio y es el único archivo del
       módulo que importa `@prisma/client`.
 
-- [ ] **T10 [P] — Adaptador driven de presentación.** Igual, más la traducción `23505 →
+- [x] **T10 [P] — Adaptador driven de presentación.** Igual, más la traducción `23505 →
       'duplicate'` y `23503 → 'in_use'`.
       *Depende de:* T1, T2, T5. **Hecho cuando:** ídem T9.
 
-- [ ] **T11 — Contrato y punto de composición.** `lib/modules/inventario/index.ts` deja de ser
+- [x] **T11 — Contrato y punto de composición.** `lib/modules/inventario/index.ts` deja de ser
       `export {}` y reexporta **solo** de `./domain`; `lib/composition/index.ts` gana la fachada
       `inventario` sin tocar la de `identity`.
       *Depende de:* T6, T7, T9, T10. **Hecho cuando:** la guardia de módulos pasa y el contrato
       no arrastra `'use server'`, Prisma ni `next/*` en su cierre transitivo.
 
-- [ ] **T12 — Server Actions.** `adapters/driving/product-actions.ts` y
+- [x] **T12 — Server Actions.** `adapters/driving/product-actions.ts` y
       `presentation-actions.ts`: `'use server'`, actor desde `identity.getSessionUser()` vía
       `@/lib/composition` (`design.md > 5`), errores traducidos a estado serializable. Comentario
       explícito de que el proveedor de sesión es el stub hasta QC-8.
