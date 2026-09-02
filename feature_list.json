@@ -493,6 +493,58 @@
         "QC-38"
       ],
       "spec_path": "specs/QC-39-pantalla-de-unidades"
+    },
+    {
+      "key": "QC-42",
+      "id": 42,
+      "epic": "QC-41",
+      "epic_name": "Proveedores",
+      "name": "modelo-proveedores",
+      "description": "Necesitamos persistir proveedores y lo que cada uno nos vende. Un proveedor tiene un nombre completo, un telefono y un correo electronico. El telefono y el correo son opcionales por separado, pero al menos uno de los dos tiene que estar: un proveedor sin ninguna forma de contacto no se puede guardar. Ademas, cada proveedor tiene un catalogo (proveedor_catalogo): por cada producto que nos vende se guarda el producto, el costo al que nos lo vende, el minimo de compra y el tiempo de entrega. Un mismo producto puede estar en el catalogo de varios proveedores, y no se repite dos veces dentro del catalogo del mismo proveedor. El CRUD y la pantalla van aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-42-modelo-proveedores",
+      "depends_on": [
+        "QC-14"
+      ],
+      "spec_path": "specs/QC-42-modelo-proveedores"
+    },
+    {
+      "key": "QC-43",
+      "id": 43,
+      "epic": "QC-41",
+      "epic_name": "Proveedores",
+      "name": "crud-de-proveedores",
+      "description": "Alta, consulta, edicion y baja de proveedores y de las lineas de su catalogo de productos, para usuarios con sesion iniciada. Valida las reglas del modelo: al menos telefono o correo, y un producto una sola vez por proveedor. La pantalla va aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "backend",
+      "branch": "feature/QC-43-crud-de-proveedores",
+      "depends_on": [
+        "QC-42",
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-43-crud-de-proveedores"
+    },
+    {
+      "key": "QC-44",
+      "id": 44,
+      "epic": "QC-41",
+      "epic_name": "Proveedores",
+      "name": "pantalla-de-proveedores",
+      "description": "Pantalla para listar, crear, editar y dar de baja proveedores, con sus datos de contacto y las lineas de su catalogo de productos (producto, costo, minimo de compra y tiempo de entrega), sobre el CRUD de proveedores.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-44-pantalla-de-proveedores",
+      "depends_on": [
+        "QC-43"
+      ],
+      "spec_path": "specs/QC-44-pantalla-de-proveedores"
     }
   ]
 }
