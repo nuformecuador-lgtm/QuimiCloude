@@ -228,7 +228,7 @@
       "epic_name": "Inventario",
       "name": "crud-de-productos",
       "description": "Los casos de uso del catalogo de productos, sobre el modelo que crea QC-14: alta, consulta paginada, edicion y borrado de productos, y lo mismo para las filas del catalogo de presentaciones. Solo el Administrador puede: ni el Operador ni nadie mas consulta, crea, edita o borra, y ese permiso se valida en el service. Borrar un producto lo oculta y no se restaura; borrar una presentacion que todavia tiene productos asignados sigue sin ser posible. La existencia se edita a mano como un campo mas. Cada producto guarda quien lo creo y quien lo modifico por ultima vez. Antes de guardar se rechaza el nombre vacio y el tiempo de entrega negativo, el nombre tiene un largo maximo, y dos presentaciones no pueden ser la misma escrita distinto: se comparan sin acentos ni caracteres especiales y sin distinguir mayusculas. La consulta viene paginada, de diez en diez por defecto, y el calculo de la paginacion se extrae aparte para reutilizarlo en los demas CRUD. La pantalla va aparte.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
