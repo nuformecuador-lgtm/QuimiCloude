@@ -13,7 +13,7 @@
 //
 // Cubre R1, R3, R4, R5, R6, R7, R8, R10, R11, R12, R13, R14, R16, R17, R18, R19, R20, R23.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -473,28 +473,16 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(owners.get('DocumentType')).toBe('identity')
   })
 
-  it('la feature no anade adaptadores driving, rutas ni contrato de dominio en el modulo inventario', () => {
+  it('la feature no anade ninguna ruta HTTP de productos ni presentaciones bajo app/api', () => {
     // R23: esta ficha es esquema y migracion. Ningun alta, consulta, edicion ni borrado, y
     // por tanto ningun flujo navegable. Se comprueba sobre el arbol de archivos.
-    const moduleDir = join(repoRoot, 'lib', 'modules', 'inventario')
-
-    /** Archivos `.ts`/`.tsx` reales (los `.gitkeep` del slot de QC-15 no cuentan). */
-    function typescriptFilesIn(dir: string): readonly string[] {
-      if (!existsSync(dir)) return []
-      return readdirSync(dir, { recursive: true, withFileTypes: true })
-        .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
-        .map((entry) => entry.name)
-    }
-
-    expect(typescriptFilesIn(join(moduleDir, 'adapters', 'driving'))).toEqual([])
-    expect(typescriptFilesIn(join(moduleDir, 'domain'))).toEqual([])
-
-    // El contrato del modulo sigue siendo el slot vacio que sembro QC-15.
-    const contract = stripComments(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
-    expect(contract.trim()).toBe('export {};')
-    expect(contract).not.toMatch(/export\s+(\*|\{[^}]*\S[^}]*\})\s+from/)
-
-    // Ninguna ruta HTTP ni Server Action de productos o presentaciones.
+    //
+    // Esta prueba PERDIO tres clausulas que tenia antes (adaptadores driving vacios, domain
+    // vacio y contrato `export {};` sin re-exports): afirmaban que el modulo `inventario`
+    // seguia siendo el slot vacio que sembro QC-15, pero QC-20 es precisamente la ficha que
+    // le da contenido — Server Actions en `adapters/driving/`, logica en `domain/` y
+    // re-exports en el contrato (R23... y sobre todo R31/R34 de QC-20). Esas tres
+    // afirmaciones ahora viven, adaptadas, en `tests/unit/inventario/scope.test.ts`.
     for (const route of [
       join(repoRoot, 'app', 'api', 'products'),
       join(repoRoot, 'app', 'api', 'presentations'),
