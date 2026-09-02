@@ -344,6 +344,23 @@
       "spec_path": "specs/QC-26-pantalla-de-recetas"
     },
     {
+      "key": "QC-28",
+      "id": 28,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "cache-de-sesion-en-redis",
+      "description": "Hoy, cada vez que se abre una pantalla privada, el sistema consulta la base de datos para saber quien es el usuario de la sesion, como se llama y cual es su rol. Es la ruta mas transitada de la aplicacion y se repite en cada peticion.\n\nHace falta guardar ese dato en una memoria rapida (Redis, servido por Upstash a traves de Vercel) para que no haya que ir a la base cada vez. El dato guardado caduca solo al minuto.\n\nEsto NO puede debilitar una garantia que ya esta decidida: cuando se da de baja a un empleado o se le cambia el rol, el efecto tiene que ser inmediato, en su siguiente clic. Asi que dar de baja a un usuario o cambiarle el rol debe borrar su dato guardado en el acto. La caducidad de un minuto es solo la red de seguridad por si ese borrado fallara, no el mecanismo principal.\n\nTambien hace falta que el sistema siga funcionando si Redis no responde: en ese caso se consulta la base como hasta ahora, mas lento pero correcto. Nunca se debe dejar a nadie fuera, ni dejar entrar a nadie, por un fallo de la memoria rapida.\n\nEn la memoria rapida no se guarda ninguna contrasena ni ningun dato de credencial.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "backend",
+      "branch": "feature/QC-28-cache-de-sesion-en-redis",
+      "depends_on": [
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-28-cache-de-sesion-en-redis"
+    },
+    {
       "key": "QC-29",
       "id": 29,
       "epic": "QC-16",
