@@ -134,15 +134,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(name.isOptional).toBe(false)
     expect(name.attributes).not.toMatch(/@default\(/)
 
-    // La forma completa del catalogo: id + name + las dos marcas de tiempo. Sin
-    // `deletedAt`, y es deliberado (design.md > 9, pregunta 2): con la columna, borrar
-    // seria un UPDATE y la FK no podria bloquearlo, con lo que R14 se quedaria sin
-    // ninguna garantia real.
+    // La forma completa del catalogo: id + name + las dos marcas de tiempo, mas
+    // `nameNormalized` que anade QC-20 (design.md > 2.2, R17). Sin `deletedAt`, y es
+    // deliberado (design.md > 9, pregunta 2): con la columna, borrar seria un UPDATE y la
+    // FK no podria bloquearlo, con lo que R14 se quedaria sin ninguna garantia real.
     const scalarNames = presentation.fields
       .filter((candidate) => !candidate.isList && candidate.type !== 'Product')
       .map((candidate) => candidate.name)
       .sort()
-    expect(scalarNames).toEqual(['createdAt', 'id', 'name', 'updatedAt'])
+    expect(scalarNames).toEqual(['createdAt', 'id', 'name', 'nameNormalized', 'updatedAt'])
     expect(has(presentation, 'deletedAt')).toBe(false)
     expect(presentation.body).not.toMatch(/deleted_at/)
   })
@@ -176,6 +176,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(8)
 
     // La lista completa de columnas: si alguien anade o quita una, este test lo dice.
+    // `createdBy`/`updatedBy` los anade QC-20 (design.md > 2.1, R6, R7): campos ESCALARES
+    // a proposito, sin `@relation`, para que el ORM no pueda atravesar hacia `users`.
     const scalarNames = product.fields
       .filter((candidate) => !candidate.isList && candidate.type !== 'Presentation')
       .map((candidate) => candidate.name)
@@ -187,9 +189,33 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         'createdAt',
         'updatedAt',
         'deletedAt',
+        'createdBy',
+        'updatedBy',
       ].sort(),
     )
     expect(product.body).toContain('@@map("products")')
+  })
+
+  it('createdBy y updatedBy (QC-20) son escalares, UUID, anulables y sin @relation', () => {
+    // design.md > 2.1 a: SIN `@relation` de Prisma. Es lo que impide
+    // `include: { createdByUser: true }` desde el adaptador de `inventario` -una lectura de
+    // `users` desde otro modulo que la guardia de arquitectura no ve, porque busca la
+    // cadena `prisma.user`-. design.md > 2.1 b: anulables, porque no hay backfill posible.
+    for (const name of ['createdBy', 'updatedBy'] as const) {
+      const candidate = field(product, name)
+      expect(candidate.type, `Product.${name} debe ser String`).toBe('String')
+      expect(candidate.isOptional, `Product.${name} debe ser anulable`).toBe(true)
+      expect(candidate.attributes).toContain('@db.Uuid')
+      expect(candidate.attributes).not.toMatch(/@default\(/)
+    }
+    expect(field(product, 'createdBy').attributes).toContain('@map("created_by")')
+    expect(field(product, 'updatedBy').attributes).toContain('@map("updated_by")')
+
+    // Ninguna relacion Prisma hacia `User` en todo el modelo: la FK real vive escrita a
+    // mano en el SQL de la migracion, no en el esquema.
+    expect(product.body).not.toMatch(/@relation\([^)]*fields:\s*\[created_by\]/i)
+    expect(product.body).not.toMatch(/@relation\([^)]*fields:\s*\[updated_by\]/i)
+    expect(product.body).not.toMatch(/\bUser\b/)
   })
 
   it('name y presentationId son obligatorios y sin default', () => {
