@@ -115,29 +115,29 @@ guardias).
 
 ---
 
-## Bloque 4 — E2E
+## Bloque 4 — E2E · **FUERA DE ALCANCE** (diferido a QC-9 el 2026-09-02)
 
-### T12 — PUERTA: ¿existe una URL privada? *(depende de T11)*
-**Esta task no escribe codigo: comprueba y, si falta, PARA.**
-Si no existe ningun `page.tsx` bajo `app/(private)/`, el recorrido de R24 no se puede ejecutar
-(Next no renderiza un layout sin pagina). Se devuelve la pregunta al leader
-(`requirements.md > Preguntas abiertas 3`): opcion **(a)** hacer QC-12 antes o en paralelo
-—recomendada—, u opcion **(b)** que QC-8 cree un andamiaje minimo que QC-12 sustituya.
-**Hecho:** o bien existe la pagina y se sigue a T13, o bien la decision del humano queda escrita
-en `progress/current.md > Deudas y cosas abiertas` y T13/T14 quedan en HOLD explicito.
+> **No se ejecuta ninguna task de este bloque.** El humano difirió el recorrido en navegador a
+> QC-9 porque `app/(private)/` no tiene ningún `page.tsx` y Next no renderiza un layout sin
+> página: hoy no hay URL que visitar. Ver `requirements.md > Preguntas abiertas 3` (cerrada) y la
+> fila revisada de la tabla de decisiones.
+>
+> **El implementer pasa de T11 directamente a T15.** No crea `e2e/session.spec.ts`, no toca
+> `playwright.config.ts` y no añade fixtures con prefijo `qc8_e2e_`.
 
-### T13 — `e2e/session.spec.ts` *(depende de T12)*
-Recorrido de `design.md > 7` nivel 5, con el fixture de datos de `e2e/login.spec.ts` como patron:
-prefijos **propios** (`qc8_e2e_`), `RUN_ID` por worker, limpieza defensiva de huerfanos con edad
-minima y borrado en `afterAll`. Usuario con `firstNames: 'Ana Maria'` y
-`lastNames: 'Perez Gomez'`. **No se toca `playwright.config.ts`**: ya existe desde QC-7.
-**Hecho:** `pnpm run e2e` verde en Chromium y WebKit; el spec afirma nombre real, iniciales,
-ausencia de `qc_session` tras el logout y que `goBack()` acaba en el login (R20, R24).
+### ~~T12 — PUERTA: ¿existe una URL privada?~~ · resuelta antes de empezar
+La puerta existía para devolver esta pregunta al humano. Ya está respondida: **no se monta la
+URL en QC-8**. Nada que comprobar.
 
-### T14 — Comprobar que el E2E no deja basura *(depende de T13)*
-**Hecho:** tras `pnpm run e2e`, `pnpm vitest run integration` sigue verde —en particular
-`identity-constraints.int.test.ts`, que afirma `user.count() === 0`—, y una consulta por los dos
-prefijos (`qc7_e2e_`, `qc8_e2e_`) no devuelve filas.
+### ~~T13 — `e2e/session.spec.ts`~~ · no se escribe en QC-8
+Lo hereda QC-9 junto con R24. El patrón de fixtures a seguir cuando llegue sigue siendo
+`e2e/login.spec.ts` de QC-7: prefijos propios, `RUN_ID` por worker, limpieza defensiva de
+huérfanos y borrado en `afterAll`.
+
+### ~~T14 — Comprobar que el E2E no deja basura~~ · sin objeto
+Sin E2E nuevo no hay basura nueva. **Sigue vigente el riesgo ajeno**: un `pnpm run e2e` de QC-7
+interrumpido deja huérfanos que ponen en rojo `identity-constraints.int.test.ts`, que afirma
+`user.count() === 0`. Si aparece ese rojo, no es de QC-8.
 
 ---
 

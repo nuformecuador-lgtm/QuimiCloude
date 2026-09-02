@@ -30,7 +30,7 @@ la ponen a prueba. Sin este mapa, una decision puede quedarse sin test
 | 2026-09-02 · empleado dado de baja / rol cambiado | **R10**, **R11**, **R12**, **R15** |
 | 2026-09-02 · que nombre se muestra en la barra | **R13** |
 | 2026-09-02 · que hace la zona privada sin sesion valida | **R16**, **R17** |
-| 2026-09-02 · lleva prueba en navegador real | **R24** |
+| 2026-09-02 · lleva prueba en navegador real | ~~**R24**~~ — **diferida a QC-9** el 2026-09-02 (no hay URL privada). Lo verificable sin navegador queda en **R16** y **R20** |
 | 2026-09-01 · formato del valor de la cookie (`v1.`, `sub`/`iat`/`exp`, `timingSafeEqual`) | **R3**, **R4**, **R5**, **R6** |
 | 2026-09-01 · caducidad de 8 h absolutas sobre el `exp` firmado | **R7**, **R8** |
 | 2026-09-01 · atributos y manejo de la cookie (solo el servidor) | **R2**, **R18**, **R22** |

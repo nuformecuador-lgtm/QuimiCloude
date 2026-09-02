@@ -1,6 +1,23 @@
 {
   "features": [
     {
+      "key": "QC-23",
+      "id": 23,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "registro-de-sesiones",
+      "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-23-registro-de-sesiones",
+      "depends_on": [
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-23-registro-de-sesiones"
+    },
+    {
       "key": "QC-4",
       "id": 4,
       "epic": "QC-17",
@@ -37,7 +54,7 @@
       "epic_name": "Identidad y acceso",
       "name": "seed-roles-y-usuario-inicial",
       "description": "Para poder entrar por primera vez hace falta que la base arranque con los roles base y con un usuario inicial ya creado y utilizable. Los roles base son Administrador y Operador. El usuario inicial es Administrador y sus credenciales salen del entorno, nunca del codigo. El seed corre automaticamente despues de cada despliegue y debe poder correrse mas de una vez sin duplicar ni romper nada: solo crea lo que falta y nunca pisa lo que alguien haya cambiado a mano, asi que en un entorno que ya tiene el usuario creado ni siquiera mira las credenciales del entorno; en uno nuevo, si faltan, se detiene. El usuario inicial nace obligado a cambiar su contrasena la primera vez que entre, de modo que la tabla de usuarios necesita guardar esa marca; hacerla cumplir es parte del login y no de aqui.",
-      "status": "spec_ready",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -55,7 +72,7 @@
       "epic_name": "Identidad y acceso",
       "name": "login-usuario-y-contrasena",
       "description": "Un usuario entra al sistema escribiendo su nombre de usuario y su contrasena. Si ambos son correctos queda autenticado; si alguno no lo es, el sistema responde con un error que no revela cual de los dos fallo. La sesion queda guardada en una cookie que el navegador no puede leer desde JavaScript y que caduca.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -73,10 +90,10 @@
       "epic_name": "Identidad y acceso",
       "name": "sesion-actual-y-logout",
       "description": "Desde cualquier punto de la aplicacion hay que poder saber quien es el usuario de la sesion en curso y cual es su rol, o que no hay sesion. Tambien hace falta cerrar sesion: despues de cerrarla, la cookie deja de servir.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
-      "zone": null,
+      "complexity": "medium",
+      "zone": "backend",
       "branch": "feature/QC-8-sesion-actual-y-logout",
       "depends_on": [
         "QC-7",
