@@ -65,8 +65,8 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
   };
 }
 
-describe('crea el producto y devuelve su identificador cuando el actor es Administrador', () => {
-  it('R5', async () => {
+describe('R5 — alta de producto', () => {
+  it('crea el producto y devuelve su identificador cuando el actor es Administrador', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -78,9 +78,9 @@ describe('crea el producto y devuelve su identificador cuando el actor es Admini
 });
 
 describe(
-  'guarda al actor como autor de creacion y de modificacion al crear, y solo como autor de modificacion al editar y al borrar',
+  'R6 — autoria de creacion y de modificacion',
   () => {
-    it('R6', async () => {
+    it('guarda al actor como autor de creacion y de modificacion al crear, y solo como autor de modificacion al editar y al borrar', async () => {
       const products = montarRepositorio();
       const createProduct = createCreateProduct({ products, now: () => AHORA });
       const updateProduct = createUpdateProduct({ products, now: () => AHORA });
@@ -121,8 +121,8 @@ describe(
   },
 );
 
-describe('acepta dos productos con el mismo nombre', () => {
-  it('R12', async () => {
+describe('R12 — nombres duplicados', () => {
+  it('acepta dos productos con el mismo nombre', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -135,8 +135,8 @@ describe('acepta dos productos con el mismo nombre', () => {
   });
 });
 
-describe('guarda la existencia recibida al editar, sin recalcularla', () => {
-  it('R13', async () => {
+describe('R13 — existencia recibida al editar', () => {
+  it('guarda la existencia recibida al editar, sin recalcularla', async () => {
     const products = montarRepositorio();
     const updateProduct = createUpdateProduct({ products, now: () => AHORA });
 
@@ -149,8 +149,8 @@ describe('guarda la existencia recibida al editar, sin recalcularla', () => {
   });
 });
 
-describe('devuelve no encontrado al editar o borrar un producto inexistente o ya borrado', () => {
-  it('R14 — editar', async () => {
+describe('R14 — no encontrado al editar o al borrar', () => {
+  it('devuelve no encontrado al editar o borrar un producto inexistente o ya borrado', async () => {
     const products = montarRepositorio({
       updateAlive: vi.fn<ProductRepository['updateAlive']>(async () => false),
     });
@@ -161,7 +161,7 @@ describe('devuelve no encontrado al editar o borrar un producto inexistente o ya
     );
   });
 
-  it('R14 — borrar', async () => {
+  it('devuelve no encontrado al borrar un producto inexistente o ya borrado', async () => {
     const products = montarRepositorio({
       softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(async () => false),
     });

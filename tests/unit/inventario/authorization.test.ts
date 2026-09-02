@@ -151,8 +151,8 @@ const CASOS_DE_USO: ReadonlyArray<{
   },
 ];
 
-describe('un actor con rol Operador es rechazado en los nueve casos de uso sin llamar al repositorio', () => {
-  it('R2', async () => {
+describe('R2 — rechazo de Operador', () => {
+  it('un actor con rol Operador es rechazado en los nueve casos de uso sin llamar al repositorio', async () => {
     // Verificacion de que la tabla cubre las nueve factories reales -si un caso de uso
     // nuevo se anade a domain/ y no se agrega aqui, este numero deja de coincidir.
     expect(CASOS_DE_USO).toHaveLength(9);
@@ -170,7 +170,7 @@ describe('un actor con rol Operador es rechazado en los nueve casos de uso sin l
   });
 });
 
-describe('un actor ausente, con rol nulo o con rol desconocido es rechazado igual que el Operador', () => {
+describe('R3 — rechazo de actores invalidos', () => {
   const actoresInvalidos: ReadonlyArray<{ readonly etiqueta: string; readonly actor: Actor | null | undefined }> = [
     { etiqueta: 'actor undefined', actor: undefined },
     { etiqueta: 'actor null', actor: null },
@@ -182,7 +182,7 @@ describe('un actor ausente, con rol nulo o con rol desconocido es rechazado igua
     },
   ];
 
-  it('R3', async () => {
+  it('un actor ausente, con rol nulo o con rol desconocido es rechazado igual que el Operador', async () => {
     for (const { etiqueta, actor } of actoresInvalidos) {
       for (const caso of CASOS_DE_USO) {
         const repos = montarRepos();
@@ -197,8 +197,8 @@ describe('un actor ausente, con rol nulo o con rol desconocido es rechazado igua
   });
 });
 
-describe('cada caso de uso recibe el actor por parametro y no lee ninguna sesion', () => {
-  it('R1 -- dinamica: el mismo doble acepta con Administrador y rechaza con Operador', async () => {
+describe('R1 — el actor entra por parametro', () => {
+  it('cada caso de uso recibe el actor por parametro y no lee ninguna sesion', async () => {
     // El doble aqui es PERMISIVO a proposito (a diferencia de los de arriba): lo que se
     // prueba en esta mitad no es "no llega al repositorio" (eso ya lo cierra R2), sino que
     // el resultado depende UNICAMENTE del actor que se pasa por parametro -mismo caso de
@@ -222,7 +222,7 @@ describe('cada caso de uso recibe el actor por parametro y no lee ninguna sesion
     await expect(createProduct(PRODUCTO_VALIDO, OPERADOR)).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
-  it('R1 -- estatica: ningun archivo de domain/ lee sesion, cookie ni cabecera por su cuenta', () => {
+  it('ningun archivo de domain/ lee sesion, cookie ni cabecera por su cuenta', () => {
     const directorioDominio = path.join(process.cwd(), 'lib', 'modules', 'inventario', 'domain');
     const archivos = readdirSync(directorioDominio).filter((archivo) => archivo.endsWith('.ts'));
 
