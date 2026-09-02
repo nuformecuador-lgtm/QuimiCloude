@@ -46,7 +46,7 @@ R11, R12 y R14, y afirma **explicitamente** que con `claims === null` o con sesi
 
 ## Bloque 2 — Adaptadores *(dependen del bloque 1)*
 
-### T5 [P] — Ampliar `adapters/driven/session/session-cookie.ts`
+### [x] T5 [P] — Ampliar `adapters/driven/session/session-cookie.ts`
 Añadir `readSessionClaims()` y `clearSession()`, exportar `SESSION_VALUE_VERSION`, reutilizar
 `signSessionValue()`, `SESSION_COOKIE_NAME` y `readSessionSecret()` **sin duplicarlos**. Comparar
 longitudes antes de `timingSafeEqual`.
@@ -55,7 +55,7 @@ R18 con los casos de `design.md > 7` nivel 2; el valor valido se obtiene **captu
 escribe `startSession`**, no de un literal. `grep -c createHmac` en el repo sigue devolviendo una
 sola implementacion de la firma fuera de `tests/`.
 
-### T6 [P] — `adapters/driven/persistence/session-user-prisma.ts`
+### [x] T6 [P] — `adapters/driven/persistence/session-user-prisma.ts`
 `findActiveSessionUserById` con `prisma.user.findFirst`, `where: { id, deletedAt: null }` y
 `select` minimo con `role: { select: { name: true } }`.
 **Hecho:** `tests/integration/identity/session-user.int.test.ts` (fixture propio con prefijo y

@@ -1,6 +1,7 @@
 # QC-8 — sesion-actual-y-logout · bitacora de implementacion
 
-> Estado: **EN CURSO**. Bloque 1 cerrado y comiteado. Bloques 2-3 y 5 pendientes.
+> Estado: **EN CURSO**. Bloques 1 y 2 (T5, T6) cerrados y comiteados. Falta T7 —que va
+> unido a T8, ver mas abajo—, el bloque 3 y el 5.
 > Alcance **R1-R23**. **R24 esta FUERA** (diferido a QC-9 por el humano el 2026-09-02):
 > el bloque 4 de `tasks.md` no se ejecuta, no hay `e2e/session.spec.ts`, no se toca
 > `playwright.config.ts` y no se crean fixtures `qc8_e2e_`.
@@ -35,6 +36,68 @@ $ pnpm exec vitest run --project node tests/unit/identity/session-claims.test.ts
 `pnpm run lint`: limpio.
 
 `pnpm run typecheck`: **ROJO, y el rojo NO es de QC-8** — ver «Rojo heredado» abajo.
+
+## Bloque 2 — Adaptadores (T5, T6)
+
+### T5 — lectura y borrado de la cookie · commit `ee326ad`
+- `lib/modules/identity/adapters/driven/session/session-cookie.ts` (**modificado**, ampliado en
+  el sitio: un solo dueño del formato del valor)
+- `tests/unit/identity/session-cookie.test.ts` (**ampliado**, no reescrito)
+
+`SESSION_VALUE_VERSION` pasa de constante privada a exportada, para que lector y escritor no
+puedan desincronizarse. **No hay segunda implementacion de la firma** (R5), comprobado:
+
+```
+$ grep -rn "createHmac" lib/
+lib/modules/identity/adapters/driven/session/session-cookie.ts:1:import { createHmac, timingSafeEqual } from 'node:crypto';
+lib/modules/identity/adapters/driven/session/session-cookie.ts:40:  return createHmac('sha256', secret).update(signedPart).digest('base64url');
+```
+
+```
+$ pnpm exec vitest run --project node tests/unit/identity/session-cookie.test.ts
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+```
+
+**El caso feliz cruza escritor y lector de verdad**: obtiene el valor llamando a `startSession`
+y capturando lo que escribe, y compara `expiresAt` contra el `Date` real del ticket. Es el test
+que habria cazado el defecto de unidades del bloque 1, y por eso el spec lo exigia asi.
+
+### T6 — adaptador Prisma del usuario · commit `08f92c0`
+- `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts` (**nuevo**)
+- `tests/integration/identity/session-user.int.test.ts` (**nuevo**)
+
+Sin migracion ni columna nueva (R15). Cada caso que muta la fila restaura el estado en
+`try`/`finally`, asi que el archivo pasa igual corrido dos veces seguidas.
+
+```
+$ pnpm exec vitest run --project integration tests/integration/identity/session-user.int.test.ts
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+$ pnpm exec vitest run --project integration tests/integration/identity/identity-constraints.int.test.ts
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+```
+
+La segunda corrida es la prueba de que el fixture **no deja huerfanos**: ese archivo afirma
+`user.count() === 0` sobre el estado global de la tabla.
+
+### Verificacion propia de la tanda (corrida por el implementer)
+`pnpm run typecheck`: **verde, sin errores**. `pnpm run lint`: **verde**.
+(El rojo heredado de `mustChangeCredential` desaparecio al regenerar el cliente Prisma; ver la
+correccion en «Rojo heredado».)
+
+## T7 va unido a T8, y no es una desviacion del spec
+
+`tasks.md > T7` pide borrar `session-stub.ts` y cerrar con **`pnpm run typecheck` en verde**.
+Las dos cosas no caben en el mismo commit por si solas: hoy el stub lo importa
+`lib/composition/index.ts` (que es **T8**) y lo inspeccionan `logout-action.test.ts` (**T9**) y
+`private-layout.test.tsx` (**T10**). Borrarlo suelto deja el typecheck **rojo** hasta T8.
+
+Se agrupa por tanto **T7 con T8** en un unico commit. Es exactamente el mismo motivo que
+`tasks.md` ya da para juntar los cuatro cambios de T8 («por separado dejan el typecheck rojo»),
+aplicado un paso antes. No cambia el alcance ni el contenido de ninguna task.
 
 ## Defecto mayor encontrado y corregido en el bloque 1: `iat`/`exp` en segundos, no en milisegundos
 
@@ -78,9 +141,10 @@ R21, R22. **R21** se escribira como test de **caracterizacion del riesgo asumido
 **QC-23 lo pondra rojo a proposito** el dia que aterrice. Ese rojo sera la señal de que la
 promesa cambio, no un fallo.
 
-## Rojo heredado, NO causado por QC-8
+## Rojo heredado, NO causado por QC-8 — **RESUELTO**
 
-`pnpm run typecheck` falla con 4 errores, **ninguno en archivos de QC-8**:
+Durante el bloque 1, `pnpm run typecheck` fallaba con 4 errores, **ninguno en archivos de
+QC-8**:
 
 ```
 lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts(69,13):
@@ -88,12 +152,16 @@ lib/modules/identity/adapters/driven/persistence/initial-access-repository-prism
 tests/integration/identity/identity-seed.int.test.ts(221,20) / (271,55) / (293,34): idem
 ```
 
-Causa: **el cliente de Prisma no esta generado en este worktree** — `node_modules/.prisma` no
-existe. `mustChangeCredential` si esta en `db/schema.prisma` (columna de QC-6), asi que no es un
-problema de fuente sino de artefacto generado ausente. Se reporta y **no se toca**: la
-preparacion del entorno del worktree no la hace el implementer. **Bloquea el gate**
-`./init.sh --rapido`, que empieza por `typecheck`: hace falta un `pnpm exec prisma generate`
-en este worktree antes de que la tanda pueda darse por cerrada en verde.
+Causa real: **el cliente de Prisma no estaba generado en este worktree**.
+`mustChangeCredential` si esta en `db/schema.prisma` (columna de QC-6), asi que no era un
+problema de fuente sino de artefacto generado ausente. Se reporto sin tocarlo, y el leader lo
+resolvio con `pnpm exec prisma generate`. Desde entonces `typecheck` esta **verde**.
+
+**Correccion de un diagnostico equivocado, para que nadie lo repita:** se dijo que faltaba
+`node_modules/.prisma`. Eso era una **pista falsa** — con pnpm el cliente generado vive en
+`node_modules/.pnpm/@prisma+client@.../node_modules/@prisma/client`, y un `.prisma` de primer
+nivel **no existe ni cuando todo esta bien**. La ausencia de ese directorio no prueba nada. Lo
+que faltaba era el `generate`, y lo que lo estorbaba era el `prisma.config.ts` ajeno.
 
 ## Incidente de git en el worktree: un `git stash pop` sobre un stash AJENO
 
@@ -126,7 +194,9 @@ leader con su dueño original):
 - `specs/QC-20-crud-de-productos/`
 
 Los commits de QC-8 se hacen con `git add` de **rutas explicitas**, nunca `git add -A`, para que
-esos dos no entren en la rama. El `origin/dev` remoto ha avanzado a `f1484ef` y trae cambios en
+esos dos no entren en la rama. **Retirados por el leader**, que comprobo byte a byte que eran
+copias identicas de lo que sigue vivo y sin comitear en el arbol principal, su sitio. El
+`stash@{0}` sigue intacto: no se perdio nada de la otra sesion. El `origin/dev` remoto ha avanzado a `f1484ef` y trae cambios en
 `package.json`, `db/schema.prisma`, `prisma.config.ts` y el spec de QC-20; **si se mergea o no
 es decision del leader**, no de esta bitacora.
 
