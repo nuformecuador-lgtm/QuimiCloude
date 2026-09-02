@@ -15,7 +15,7 @@ excepcion (`CLAUDE.md`, regla 5).
 
 ## Bloque 1 — Dominio (sin dependencias entre si)
 
-### T1 [P] — `domain/session-claims.ts`
+### [x] T1 [P] — `domain/session-claims.ts`
 Tipo `SessionClaims` (`sub`, `issuedAt`, `expiresAt`), esquema zod (`sub` con formato UUID,
 `iat`/`exp` enteros positivos), `parseSessionClaims(rawJson): SessionClaims | null` e
 `isSessionExpired(claims, now): boolean` con `>=`.
@@ -23,7 +23,7 @@ Tipo `SessionClaims` (`sub`, `issuedAt`, `expiresAt`), esquema zod (`sub` con fo
 faltan, `sub` que no es UUID, `exp` justo en el instante, `exp` un segundo despues— y pasa.
 El archivo no importa `next/*`, `@prisma/client` ni `lib/shared/**`.
 
-### T2 [P] — `domain/display-name.ts`
+### [x] T2 [P] — `domain/display-name.ts`
 `buildDisplayName(firstNames, lastNames, username)`: primer token de cada campo, tolerante a
 espacios multiples, con caida al `username` si el resultado queda vacio.
 **Hecho:** `tests/unit/identity/display-name.test.ts` cubre R13, incluido el caso literal de la
@@ -31,12 +31,12 @@ decision («Ana Maria» + «Perez Gomez» → «Ana Perez») y la comprobacion d
 `getInitials(buildDisplayName(...)) === 'AP'` importando el helper existente de
 `lib/shared/ui/initials.ts` **desde el test** (el dominio no lo importa).
 
-### T3 [P] — Puertos `SessionReader` y `SessionUserReader`
+### [x] T3 [P] — Puertos `SessionReader` y `SessionUserReader`
 `ports/session-reader.ts` y `ports/session-user-reader.ts` con las firmas de `design.md > 4.5`,
 mas el tipo `SessionUserRecord`.
 **Hecho:** `pnpm run typecheck` pasa; los dos archivos solo importan del propio `domain/`.
 
-### T4 — `domain/resolve-session-user.ts` *(depende de T1, T2, T3)*
+### [x] T4 — `domain/resolve-session-user.ts` *(depende de T1, T2, T3)*
 `createResolveSessionUser({ session, users })` con el algoritmo de `design.md > 2.1`.
 **Hecho:** `tests/unit/identity/resolve-session-user.test.ts` con puertos falsos cubre R1, R10,
 R11, R12 y R14, y afirma **explicitamente** que con `claims === null` o con sesion caducada
@@ -46,7 +46,7 @@ R11, R12 y R14, y afirma **explicitamente** que con `claims === null` o con sesi
 
 ## Bloque 2 — Adaptadores *(dependen del bloque 1)*
 
-### T5 [P] — Ampliar `adapters/driven/session/session-cookie.ts`
+### [x] T5 [P] — Ampliar `adapters/driven/session/session-cookie.ts`
 Añadir `readSessionClaims()` y `clearSession()`, exportar `SESSION_VALUE_VERSION`, reutilizar
 `signSessionValue()`, `SESSION_COOKIE_NAME` y `readSessionSecret()` **sin duplicarlos**. Comparar
 longitudes antes de `timingSafeEqual`.
@@ -55,7 +55,7 @@ R18 con los casos de `design.md > 7` nivel 2; el valor valido se obtiene **captu
 escribe `startSession`**, no de un literal. `grep -c createHmac` en el repo sigue devolviendo una
 sola implementacion de la firma fuera de `tests/`.
 
-### T6 [P] — `adapters/driven/persistence/session-user-prisma.ts`
+### [x] T6 [P] — `adapters/driven/persistence/session-user-prisma.ts`
 `findActiveSessionUserById` con `prisma.user.findFirst`, `where: { id, deletedAt: null }` y
 `select` minimo con `role: { select: { name: true } }`.
 **Hecho:** `tests/integration/identity/session-user.int.test.ts` (fixture propio con prefijo y
@@ -63,7 +63,7 @@ sola implementacion de la firma fuera de `tests/`.
 Postgres real y pasa; `pnpm vitest run integration` queda verde **entero**, incluido
 `identity-constraints.int.test.ts` (`user.count() === 0`).
 
-### T7 — Borrar `adapters/driven/session/session-stub.ts` *(depende de T5, T6)*
+### [x] T7 — Borrar `adapters/driven/session/session-stub.ts` *(depende de T5, T6)*
 Se elimina el archivo: su cabecera ya declara que la feature de sesion real lo reemplaza.
 **Hecho:** no queda ninguna referencia (`rg session-stub` solo aparece en `specs/` y `progress/`
 historicos y en los casos **sinteticos** de `guard-arquitectura-modulos.test.ts`, que construyen
@@ -73,7 +73,7 @@ rutas a mano y no leen el disco); `pnpm run typecheck` pasa.
 
 ## Bloque 3 — Cableado y superficie *(depende del bloque 2)*
 
-### T8 — Puerto, contrato, composicion y ruta de login
+### [x] T8 — Puerto, contrato, composicion y ruta de login
 Cuatro cambios que van juntos porque por separado dejan el typecheck rojo:
 1. `ports/session-provider.ts`: `getSessionUser(): Promise<SessionUser | null>` (R1).
 2. `lib/modules/identity/index.ts`: reexportar `createResolveSessionUser`, `buildDisplayName`,
@@ -83,7 +83,7 @@ Cuatro cambios que van juntos porque por separado dejan el typecheck rojo:
 **Hecho:** `pnpm run typecheck` y `pnpm run lint` pasan;
 `tests/guards/guard-arquitectura-modulos.test.ts` verde (R22).
 
-### T9 — `logout-action.ts` + su test *(depende de T8)*
+### [x] T9 — `logout-action.ts` + su test *(depende de T8)*
 Añadir `redirect(LOGIN_ROUTE)` despues de `await identity.endSession()`, **sin tocar la firma**
 (R19) y fuera de cualquier `try` (el `redirect` de Next señaliza lanzando).
 En `tests/unit/identity/logout-action.test.ts`, alcance **exacto** y nada mas:
@@ -96,7 +96,7 @@ En `tests/unit/identity/logout-action.test.ts`, alcance **exacto** y nada mas:
 **Hecho:** el archivo pasa; el test de la firma congelada (sin parametros, sin retorno) sigue ahi
 y verde.
 
-### T10 — `app/(private)/layout.tsx` + su test *(depende de T8)*
+### [x] T10 — `app/(private)/layout.tsx` + su test *(depende de T8)*
 `const user = await identity.getSessionUser(); if (user === null) redirect(LOGIN_ROUTE);`. Nada
 mas cambia en el layout (la cookie de UI sigue igual).
 En `tests/unit/private-layout.test.tsx`, alcance **exacto**:
@@ -109,41 +109,41 @@ En `tests/unit/private-layout.test.tsx`, alcance **exacto**:
 - conservar el test de «lo pide una sola vez y lo reparte por props» (R17).
 **Hecho:** el archivo pasa entero, incluidos los tests de QC-11 que no se tocan.
 
-### T11 — Tanda verde
+### [x] T11 — Tanda verde
 **Hecho:** `./init.sh --rapido` en verde (typecheck + lint + tests relacionados + **todas** las
 guardias).
 
 ---
 
-## Bloque 4 — E2E
+## Bloque 4 — E2E · **FUERA DE ALCANCE** (diferido a QC-9 el 2026-09-02)
 
-### T12 — PUERTA: ¿existe una URL privada? *(depende de T11)*
-**Esta task no escribe codigo: comprueba y, si falta, PARA.**
-Si no existe ningun `page.tsx` bajo `app/(private)/`, el recorrido de R24 no se puede ejecutar
-(Next no renderiza un layout sin pagina). Se devuelve la pregunta al leader
-(`requirements.md > Preguntas abiertas 3`): opcion **(a)** hacer QC-12 antes o en paralelo
-—recomendada—, u opcion **(b)** que QC-8 cree un andamiaje minimo que QC-12 sustituya.
-**Hecho:** o bien existe la pagina y se sigue a T13, o bien la decision del humano queda escrita
-en `progress/current.md > Deudas y cosas abiertas` y T13/T14 quedan en HOLD explicito.
+> **No se ejecuta ninguna task de este bloque.** El humano difirió el recorrido en navegador a
+> QC-9 porque `app/(private)/` no tiene ningún `page.tsx` y Next no renderiza un layout sin
+> página: hoy no hay URL que visitar. Ver `requirements.md > Preguntas abiertas 3` (cerrada) y la
+> fila revisada de la tabla de decisiones.
+>
+> **El implementer pasa de T11 directamente a T15.** No crea `e2e/session.spec.ts`, no toca
+> `playwright.config.ts` y no añade fixtures con prefijo `qc8_e2e_`.
 
-### T13 — `e2e/session.spec.ts` *(depende de T12)*
-Recorrido de `design.md > 7` nivel 5, con el fixture de datos de `e2e/login.spec.ts` como patron:
-prefijos **propios** (`qc8_e2e_`), `RUN_ID` por worker, limpieza defensiva de huerfanos con edad
-minima y borrado en `afterAll`. Usuario con `firstNames: 'Ana Maria'` y
-`lastNames: 'Perez Gomez'`. **No se toca `playwright.config.ts`**: ya existe desde QC-7.
-**Hecho:** `pnpm run e2e` verde en Chromium y WebKit; el spec afirma nombre real, iniciales,
-ausencia de `qc_session` tras el logout y que `goBack()` acaba en el login (R20, R24).
+### ~~T12 — PUERTA: ¿existe una URL privada?~~ · resuelta antes de empezar
+La puerta existía para devolver esta pregunta al humano. Ya está respondida: **no se monta la
+URL en QC-8**. Nada que comprobar.
 
-### T14 — Comprobar que el E2E no deja basura *(depende de T13)*
-**Hecho:** tras `pnpm run e2e`, `pnpm vitest run integration` sigue verde —en particular
-`identity-constraints.int.test.ts`, que afirma `user.count() === 0`—, y una consulta por los dos
-prefijos (`qc7_e2e_`, `qc8_e2e_`) no devuelve filas.
+### ~~T13 — `e2e/session.spec.ts`~~ · no se escribe en QC-8
+Lo hereda QC-9 junto con R24. El patrón de fixtures a seguir cuando llegue sigue siendo
+`e2e/login.spec.ts` de QC-7: prefijos propios, `RUN_ID` por worker, limpieza defensiva de
+huérfanos y borrado en `afterAll`.
+
+### ~~T14 — Comprobar que el E2E no deja basura~~ · sin objeto
+Sin E2E nuevo no hay basura nueva. **Sigue vigente el riesgo ajeno**: un `pnpm run e2e` de QC-7
+interrumpido deja huérfanos que ponen en rojo `identity-constraints.int.test.ts`, que afirma
+`user.count() === 0`. Si aparece ese rojo, no es de QC-8.
 
 ---
 
 ## Bloque 5 — Cierre
 
-### T15 — Trazabilidad *(depende de T14)*
+### [x] T15 — Trazabilidad *(depende de T14)*
 Escribir `progress/impl_QC-8-sesion-actual-y-logout.md` con el mapa **`R1`…`R24` -> test
 concreto**, sin huecos. R21 se marca como test de caracterizacion del riesgo asumido, con la nota
 de que **QC-23 lo pondra rojo a proposito**.

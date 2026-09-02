@@ -3,8 +3,9 @@ import { resolve } from 'node:path';
 
 import { logoutAction } from '@/lib/modules/identity/adapters/driving/logout-action';
 
-const { endSessionMock } = vi.hoisted(() => ({
+const { endSessionMock, redirectMock } = vi.hoisted(() => ({
   endSessionMock: vi.fn<() => Promise<void>>(),
+  redirectMock: vi.fn<(ruta: string) => never>(),
 }));
 
 // Se mockea el punto de composicion para contar invocaciones sin depender del no-op real:
@@ -13,18 +14,28 @@ vi.mock('@/lib/composition', () => ({
   identity: { endSession: endSessionMock },
 }));
 
+// El `redirect` real de Next senializa la navegacion LANZANDO una excepcion especial en vez
+// de retornar. El doble reproduce ese comportamiento (lanza un centinela) para que el test
+// sea fiel: si la action metiera el redirect dentro de un `try`, la excepcion se tragaria y
+// este test lo notaria.
+vi.mock('next/navigation', () => ({
+  redirect: (ruta: string): never => {
+    redirectMock(ruta);
+    throw new Error('NEXT_REDIRECT');
+  },
+}));
+
 /** Modulos cuyo fuente se inspecciona para R22/R35. */
 const MODULOS_INSPECCIONADOS = [
   'lib/modules/identity/adapters/driving/logout-action.ts',
-  'lib/modules/identity/adapters/driven/session/session-stub.ts',
 ] as const;
 
 /**
  * Devuelve el fuente sin lineas de comentario.
  *
- * Los dos archivos **mencionan a proposito** `redirect`, `cookies` y compania en sus
- * comentarios de cabecera (explican que la feature 10 los anadira), asi que un grep crudo
- * daria falso positivo. Se filtran las lineas que empiezan por `//`, `*` o `/*`.
+ * El archivo **menciona a proposito** `redirect` y `next/navigation` en su comentario de
+ * cabecera, asi que un grep crudo daria falso positivo sobre terminos que ya estan
+ * permitidos. Se filtran las lineas que empiezan por `//`, `*` o `/*`.
  */
 function fuenteSinComentarios(modulo: string): string {
   return readFileSync(resolve(process.cwd(), modulo), 'utf8')
@@ -42,28 +53,46 @@ beforeEach(() => {
 });
 
 describe('logoutAction', () => {
-  it('invoca el cierre de sesion del proveedor exactamente una vez y no devuelve valor', async () => {
-    // R20 (contrato de la action) — la firma esta congelada: sin parametros y sin retorno.
-    const resultado = await logoutAction();
+  it('la firma sigue congelada: sin parametros y sin valor de retorno', () => {
+    // R19 — el contrato de la action no cambia aunque ahora redirija por dentro.
+    expect(logoutAction).toHaveLength(0);
+  });
+
+  it('invoca el cierre de sesion del proveedor exactamente una vez antes de redirigir', async () => {
+    // R18/R20 (contrato de la action) — el `redirect` real de Next lanza para senializar
+    // la navegacion, asi que la propia invocacion rechaza; se captura para poder seguir
+    // afirmando sobre los mocks.
+    await expect(logoutAction()).rejects.toThrow('NEXT_REDIRECT');
 
     expect(endSessionMock).toHaveBeenCalledTimes(1);
     expect(endSessionMock).toHaveBeenCalledWith();
-    expect(resultado).toBeUndefined();
   });
 
-  it('la accion de cierre de sesion no navega, no toca cookies y no accede a datos', () => {
+  it('redirige a LOGIN_ROUTE DESPUES de cerrar la sesion, no antes', async () => {
+    // R18 — se afirma el ORDEN, no solo que ambas se llamaron: si la redireccion ocurriera
+    // antes de endSession, el usuario volveria al login con la cookie de sesion todavia
+    // puesta.
+    await expect(logoutAction()).rejects.toThrow('NEXT_REDIRECT');
+
+    expect(redirectMock).toHaveBeenCalledWith('/login');
+
+    const [ordenEndSession] = endSessionMock.mock.invocationCallOrder;
+    const [ordenRedirect] = redirectMock.mock.invocationCallOrder;
+
+    expect(ordenEndSession).toBeDefined();
+    expect(ordenRedirect).toBeDefined();
+    expect(ordenEndSession).toBeLessThan(ordenRedirect as number);
+  });
+
+  it('la accion de cierre de sesion no toca cookies desde el navegador ni accede a datos', () => {
     // R22 + R35.
     //
-    // El assert va sobre el CODIGO FUENTE y no sobre el comportamiento en tiempo de
-    // ejecucion a proposito: un `redirect()` anadido manana lanza una excepcion especial de
-    // Next que un test de runtime podria tragarse (o que ni siquiera se ejecutaria si la
-    // rama no se recorre). Mirar el fuente es la unica forma de que R22/R35 se pongan en
-    // rojo el dia que alguien enchufe navegacion, cookies, base de datos o red aqui.
+    // El assert va sobre el CODIGO FUENTE. `redirect`, `next/navigation` y `cookies` del
+    // lado servidor ya estan PERMITIDOS a proposito (decision del humano del 2026-09-02: al
+    // cerrar sesion se vuelve al login), asi que ya no se prohiben aqui. Lo que sigue
+    // prohibido es que el navegador manipule la cookie directamente (`document.cookie`) y
+    // cualquier acceso a datos (Prisma, Supabase, red).
     const prohibidos = [
-      /next\/navigation/i,
-      /\bredirect\b/i,
-      /next\/headers/i,
-      /\bcookies\b/i,
       /document\.cookie/i,
       /\bprisma\b/i,
       /\bPrismaClient\b/,

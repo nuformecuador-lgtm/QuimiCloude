@@ -4,11 +4,13 @@ import userEvent from '@testing-library/user-event';
 import PrivateLayout from '@/app/(private)/layout';
 import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components';
 import { SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
+import type { SessionUser } from '@/lib/modules/identity';
 import {
   PRIVATE_NAV_ITEMS,
   type NavGroup,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
+import { LOGIN_ROUTE } from '@/lib/shared/routes';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
@@ -34,15 +36,34 @@ type CookieStoreStub = {
   get: (name: string) => { name: string; value: string } | undefined;
 };
 
-const { usePathnameMock, logoutActionMock, cookiesMock } = vi.hoisted(() => ({
-  usePathnameMock: vi.fn<() => string>(),
-  logoutActionMock: vi.fn<() => Promise<void>>(),
-  cookiesMock: vi.fn<() => Promise<CookieStoreStub>>(),
-}));
+/** `SessionUser` del test: nunca el valor de relleno del stub real. */
+const USUARIO_DEL_TEST: SessionUser = {
+  id: 'u-test-42',
+  username: 'carla.duarte',
+  displayName: 'Carla Duarte Salas',
+  roleName: 'Analista de calidad',
+};
+
+const { usePathnameMock, redirectMock, logoutActionMock, cookiesMock, getSessionUserMock } =
+  vi.hoisted(() => ({
+    usePathnameMock: vi.fn<() => string>(),
+    redirectMock: vi.fn<(ruta: string) => never>(),
+    logoutActionMock: vi.fn<() => Promise<void>>(),
+    cookiesMock: vi.fn<() => Promise<CookieStoreStub>>(),
+    getSessionUserMock: vi.fn(),
+  }));
+
+/** Centinela que imita el comportamiento real de `redirect`: no retorna, lanza. */
+class RedirectCentinela extends Error {
+  constructor(public readonly ruta: string) {
+    super(`REDIRECT:${ruta}`);
+  }
+}
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   usePathname: usePathnameMock,
+  redirect: redirectMock,
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
@@ -51,6 +72,15 @@ vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
 
 vi.mock('next/headers', () => ({
   cookies: cookiesMock,
+}));
+
+// R16: el proveedor de sesion se sustituye por completo para poder darle a estos tests la
+// sesion valida que antes les regalaba el stub, sin depender del cableado real.
+vi.mock('@/lib/composition', () => ({
+  identity: {
+    getSessionUser: getSessionUserMock,
+    endSession: vi.fn<() => Promise<void>>(),
+  },
 }));
 
 /** Ruta que no coincide con ningun destino de la navegacion: nada arranca activo. */
@@ -93,7 +123,11 @@ async function abrirPanel(user: ReturnType<typeof userEvent.setup>): Promise<HTM
 beforeEach(() => {
   vi.clearAllMocks();
   usePathnameMock.mockReturnValue(RUTA_SIN_COINCIDENCIA);
+  redirectMock.mockImplementation((ruta: string) => {
+    throw new RedirectCentinela(ruta);
+  });
   logoutActionMock.mockResolvedValue(undefined);
+  getSessionUserMock.mockResolvedValue(USUARIO_DEL_TEST);
   cookiesMock.mockResolvedValue({ get: () => undefined });
   clearSidebarStateCookie();
   // El ancho se fija ANTES de renderizar: el hook de viewport se evalua al montar.
@@ -244,5 +278,15 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
       expect(enlace).toHaveAttribute('href', hijo.href);
       expect(enlace).toHaveAccessibleName(hijo.label);
     }
+  });
+
+  it('sin sesion, el layout redirige al login y no pinta la barra lateral', async () => {
+    // R16 — sin sesion valida, la zona privada redirige al login en lugar de pintarse.
+    getSessionUserMock.mockResolvedValue(null);
+
+    await expect(renderLayout()).rejects.toThrow(RedirectCentinela);
+
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE);
+    expect(screen.queryByTestId(testId.sidebar)).not.toBeInTheDocument();
   });
 });
