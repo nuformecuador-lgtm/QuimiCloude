@@ -103,8 +103,9 @@ el alcance ni el contenido de ninguna task.**
 - `lib/composition/index.ts` — `design.md > 4.4`; `verifyCredentials` **intacto**
 - `lib/shared/routes.ts` — `LOGIN_ROUTE = '/login'`
 
-El cambio de contrato rompio **exactamente un** sitio, `app/(private)/layout.tsx`, tal como
-anticipaba `design.md > 4.5` («no hay llamadores silenciosos»). Lo arregla T10.
+El cambio de contrato rompio `app/(private)/layout.tsx`, que lo arregla T10. **Pero la
+afirmacion de que rompia «exactamente un sitio» era FALSA, y la premisa de `design.md > 4.5`
+(«no hay llamadores silenciosos») estaba incompleta** — ver la seccion siguiente.
 
 ### T9 — el cierre de sesion vuelve al login · commit `1cd4094`
 `redirect(LOGIN_ROUTE)` despues de `endSession()` y **fuera de cualquier `try`**: Next señaliza
@@ -181,6 +182,63 @@ Las dos cosas no caben en el mismo commit por si solas: hoy el stub lo importa
 Se agrupa por tanto **T7 con T8** en un unico commit. Es exactamente el mismo motivo que
 `tasks.md` ya da para juntar los cuatro cambios de T8 («por separado dejan el typecheck rojo»),
 aplicado un paso antes. No cambia el alcance ni el contenido de ninguna task.
+
+## Alcance no previsto por `tasks.md`: dos archivos mas de QC-11
+
+Ademas de las seis revocaciones acotadas de T9/T10, QC-8 tuvo que tocar **otros dos** archivos
+de QC-11. **No es una revocacion** —no se levanta ninguna prohibicion— pero si es alcance que
+`tasks.md` no habia previsto, y el `reviewer` debe verlo:
+
+- `tests/unit/sidebar-desktop.test.tsx` (7 -> 8 tests)
+- `tests/unit/sidebar-mobile.test.tsx` (6 -> 7 tests)
+
+Los dos renderizan `app/(private)/layout.tsx` **sin mockear `@/lib/composition`**. Con el stub
+daba igual: `getSessionUser()` devolvia siempre un usuario de relleno. Con el contrato nuevo
+corre el cableado real, no hay cookie de sesion, `getSessionUser()` resuelve `null` y el layout
+**redirige**: los 13 tests morian con `Error: NEXT_REDIRECT` antes de pintar la barra.
+
+El arreglo es **andamiaje**: se les da la sesion que antes les regalaba el stub, con el patron de
+`private-layout.test.tsx`. **Ninguna de las 13 aserciones preexistentes cambio lo que mide** —
+se verifico contando los `it(...)` contra `HEAD` (7+6=13) y comprobando que solo se añaden dos.
+Y se añadio la cobertura que faltaba: **un test por archivo** de que, sin sesion, el layout
+redirige a `LOGIN_ROUTE` y no pinta la barra (R16).
+
+## Leccion de proceso: `vitest related` no ve a todos los llamadores
+
+**Se reporto que el cambio de contrato rompia «exactamente un sitio», y era falso.** El
+`typecheck` veia **uno** (`app/(private)/layout.tsx`); los tests veian **tres**. Un test que
+renderiza el layout **es un llamador**, aunque el compilador no lo cante: no pasa el
+`SessionUser` como argumento tipado, lo obtiene por un mock que TypeScript nunca comprueba.
+
+Por eso la premisa de `design.md > 4.5` —«no hay llamadores silenciosos», apoyada en que
+TypeScript strict lo señala en el sitio exacto— **estaba incompleta**: vale para el codigo de
+produccion y no vale para los dobles de los tests. **QC-9 va a volver a pasar por este mismo
+camino** (el `middleware.ts` toca la misma resolucion de sesion), asi que queda escrito.
+
+**Regla practica que sale de aqui:** cuando se cambia un **contrato compartido** —la firma de un
+puerto, un tipo exportado, algo que consume un layout—, `vitest related` **no basta**: selecciona
+por grafo de imports y estos dos archivos no importan el puerto, importan el layout. Hay que
+decirlo explicitamente y dejar correr el gate **antes** de dar el bloque por cerrado, no despues.
+
+### Verificacion tras el arreglo
+
+```
+$ pnpm exec vitest run --project ui tests/unit/sidebar-desktop.test.tsx tests/unit/sidebar-mobile.test.tsx
+ Test Files  2 passed (2)
+      Tests  15 passed (15)
+
+$ pnpm exec vitest run --project ui --project node
+ Test Files  34 passed (34)
+      Tests  348 passed (348)
+
+$ pnpm run typecheck   -> verde
+$ pnpm run lint        -> verde
+```
+
+Los proyectos `ui` y `node` se corrieron **enteros a proposito**, saltandose la regla de
+«solo los relacionados»: el motivo de la regla es no juzgar rojos ajenos ni morir en corridas
+largas, y aqui habia un motivo mayor —un contrato compartido cuyos llamadores `related` ya
+habia demostrado no ver—. Los de integracion **no** se corrieron: los corre el gate.
 
 ## Defecto mayor encontrado y corregido en el bloque 1: `iat`/`exp` en segundos, no en milisegundos
 
