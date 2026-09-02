@@ -45,36 +45,57 @@ describe('CredentialRequirements — catalogo y orden (R1, R3)', () => {
 });
 
 describe('CredentialRequirements — marcado en vivo de las seis (R2, R4, R5)', () => {
-  it('con la candidata vacia las seis salen incumplidas y la lista es visible sin interaccion', () => {
-    // NOTA sobre R5 tal como esta redactado en requirements.md: dice que "las seis" salen
-    // incumplidas con la candidata vacia. La politica de QC-19 (`credential-policy.ts`,
-    // `max_length: candidate.length <= CREDENTIAL_MAX_LENGTH`) hace que `max_length` este
-    // CUMPLIDA con una cadena vacia (0 caracteres no excede el maximo): es la unica de las
-    // seis que no puede salir "incumplida" en vacio sin que el componente mienta sobre lo
-    // que devuelve `evaluateCredentialRules` (R2 prohibe precisamente inventar un estado
-    // que no venga de esa funcion). Este test verifica lo que R5 SI puede garantizar sin
-    // contradecir R2: la lista completa es visible desde el primer render, sin interaccion,
-    // y el estado de cada una de las seis coincide con lo que la funcion pura devuelve
-    // (no con un valor fijo escrito a mano). Discrepancia reportada al leader, no resuelta
-    // aqui: requirements.md no se reabre desde un test.
+  it('con la candidata vacia la lista es visible sin interaccion y muestra cinco incumplidas con max_length cumplida', () => {
+    // R5 fue corregido por decision del humano el 2026-09-02: ya no dice "las seis"
+    // incumplidas, dice literalmente que con la candidata vacia hay cinco incumplidas y
+    // `max_length` cumplida (una cadena vacia no excede el maximo). Este test afirma
+    // exactamente eso.
+    //
+    // Enumeracion literal deliberada (m-5): a diferencia de los tests espejo del describe
+    // siguiente, aqui SI hay un segundo oraculo legitimo, porque R5 fija un estado concreto
+    // y conocido para este unico caso (la cadena vacia). El mapa de abajo esta escrito a
+    // mano, sin llamar a `evaluateCredentialRules`, para que el test pueda detectar tambien
+    // un criterio de derivacion erroneo en el componente, no solo entradas ausentes o
+    // `data-rule` mal puesto.
+    const estadosEsperados: Record<Exclude<CredentialRule, 'breached'>, CredentialRuleState> = {
+      min_length: 'unmet',
+      max_length: 'met',
+      no_uppercase: 'unmet',
+      no_lowercase: 'unmet',
+      no_digit: 'unmet',
+      no_symbol: 'unmet',
+    };
+
     const { container } = render(<CredentialRequirements candidate="" />);
-    const { unmet } = evaluateCredentialRules('');
 
     for (const rule of LIVE_RULES) {
       const item = container.querySelector(`li[data-rule="${rule}"]`);
       expect(item, `falta la entrada de ${rule}`).not.toBeNull();
-      const expected = unmet.includes(rule) ? 'unmet' : 'met';
-      expect(item?.getAttribute('data-state')).toBe(expected);
+      expect(item?.getAttribute('data-state')).toBe(estadosEsperados[rule]);
     }
-    // La mayoria de las seis SI salen incumplidas en vacio (todas salvo `max_length`).
-    expect(unmet.filter((rule) => (LIVE_RULES as readonly CredentialRule[]).includes(rule)).length).toBe(
-      LIVE_RULES.length - 1,
-    );
+
+    // Tension declarada: este mapa enumera a mano los codigos "en vivo" del catalogo. Si
+    // QC-19 anade una regla a `CREDENTIAL_RULES`, este assert falla de forma ruidosa en vez
+    // de quedar silenciosamente incompleto — y el fallo dice que anadir una regla al
+    // catalogo obliga a revisar tambien la redaccion de R5, no solo este mapa.
+    expect(
+      Object.keys(estadosEsperados),
+      'CREDENTIAL_RULES gano una regla: R5 enumera reglas concretas para la candidata vacia ' +
+        '("cinco incumplidas y max_length cumplida"), asi que un codigo nuevo obliga a revisar ' +
+        'la redaccion de R5 en requirements.md y a anadir su estado esperado a este mapa literal.',
+    ).toEqual(LIVE_RULES);
 
     // Visible desde el primer render: nada de foco, escritura ni ratón.
     expect(screen.getAllByRole('listitem')).toHaveLength(CREDENTIAL_RULES.length);
   });
 
+  // Test espejo (R2 obliga a que `evaluateCredentialRules` sea la unica fuente de verdad,
+  // asi que para una candidata arbitraria no hay un segundo oraculo legitimo). Recalcula el
+  // esperado con la MISMA funcion que usa el componente: por eso atrapa entradas ausentes,
+  // `data-rule` mal puesto, estados escritos a mano y que el componente ignore la candidata,
+  // pero NO un criterio de derivacion erroneo compartido por test y componente. El caso de la
+  // candidata vacia si tiene un oraculo literal e independiente, gracias a la R5 nueva: ver
+  // el `it` de arriba.
   it('el estado mostrado de las seis coincide con evaluateCredentialRules para cada candidata', () => {
     const candidatas = ['', 'a', 'aaaaaaaa', 'Abc12345', 'Abcdefg1#', 'z'.repeat(70)];
 
@@ -91,6 +112,9 @@ describe('CredentialRequirements — marcado en vivo de las seis (R2, R4, R5)', 
     }
   });
 
+  // Tambien espejo, mismo limite que el `it` anterior: recalcula con `evaluateCredentialRules`,
+  // no atrapa un criterio de derivacion erroneo, solo cableado incorrecto entre el componente
+  // y esa funcion.
   it('al cambiar la candidata cada una de las seis pasa a cumplida o incumplida', () => {
     const { container, rerender } = render(<CredentialRequirements candidate="a" />);
     for (const rule of LIVE_RULES) {

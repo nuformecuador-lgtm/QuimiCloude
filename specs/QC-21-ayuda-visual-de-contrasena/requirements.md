@@ -64,9 +64,10 @@ reflejar ese cambio sin modificar el componente. `[D5]`
 las seis: **cumplida** si `evaluateCredentialRules` no la devuelve en `unmet`, **incumplida** si
 la devuelve. `[D2]`
 
-**R5.** MIENTRAS la candidata esté vacía, el sistema DEBE mostrar las seis como incumplidas y la
-lista completa de requisitos DEBE ser visible desde el primer render, sin que haga falta escribir,
-enfocar ni apuntar con el ratón. `[D2]`
+**R5.** MIENTRAS la candidata esté vacía, la lista completa de requisitos DEBE ser visible desde el
+primer render, sin que haga falta escribir, enfocar ni apuntar con el ratón, y cada regla DEBE
+mostrar exactamente el estado que devuelve la función pura para la cadena vacía — cinco incumplidas
+y `max_length` cumplida, porque una cadena vacía no excede el máximo. `[D2]`
 
 **R6.** MIENTRAS se escribe, el sistema NO DEBE realizar ninguna petición de red, invocar ninguna
 Server Action ni arrastrar a su cierre de imports el adaptador de la lista de filtradas, el punto

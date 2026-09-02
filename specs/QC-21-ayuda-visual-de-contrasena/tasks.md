@@ -81,7 +81,9 @@ está mal entendida: parar y avisar al leader.
 - **Qué**: render directo con props. **Itera `CREDENTIAL_RULES` importado**, nunca una lista
   escrita en el test (R1, R3). Cubre: orden del catálogo; campo vacío (R5); tabla de candidatas
   cuyo estado mostrado se compara **contra `evaluateCredentialRules`** y no contra estados escritos
-  a mano (R2, R4); la séptima neutra por defecto (R7, R8) e incumplida cuando llega el veredicto
+  a mano (R2, R4) — salvo el caso de la cadena vacía, que desde la corrección de R5 del 2026-09-02
+  se afirma contra un **mapa literal** de estados esperados, que es el segundo oráculo que ese
+  requisito permite (m-5 de la review); la séptima neutra por defecto (R7, R8) e incumplida cuando llega el veredicto
   (R9); tres estados distinguibles sin color (R16); copy desde `CREDENTIAL_RULE_LABELS` y su
   sustitución por el prop `labels` (R15); negativas de fuerza (R20) y de emisión de la candidata
   (R21).
@@ -149,7 +151,7 @@ está mal entendida: parar y avisar al leader.
 | R2 | `el estado mostrado de las seis coincide con evaluateCredentialRules para cada candidata` + `no declara ninguna regla ni umbral propio` | credential-requirements.test.tsx + credential-help-contract.test.ts |
 | R3 | `la lista sale del catalogo importado, no de una copia local` | credential-requirements.test.tsx |
 | R4 | `al cambiar la candidata cada una de las seis pasa a cumplida o incumplida` | credential-requirements.test.tsx |
-| R5 | `con la candidata vacia las seis salen incumplidas y la lista es visible sin interaccion` | credential-requirements.test.tsx |
+| R5 | `con la candidata vacia la lista es visible sin interaccion y muestra cinco incumplidas con max_length cumplida` | credential-requirements.test.tsx |
 | R6 | `escribir no dispara ninguna peticion de red` + `no importa composicion, adaptadores ni servidor` | credential-field.test.tsx + credential-help-contract.test.ts |
 | R7 | `la regla de filtradas arranca en estado neutro` | credential-requirements.test.tsx |
 | R8 | `sin veredicto del servidor la regla de filtradas nunca sale cumplida ni incumplida` | credential-requirements.test.tsx |

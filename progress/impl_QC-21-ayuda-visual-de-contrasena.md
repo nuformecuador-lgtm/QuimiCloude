@@ -85,7 +85,7 @@ Los tres archivos de test son:
 | R2 | `el estado mostrado de las seis coincide con evaluateCredentialRules para cada candidata` + `no declara ninguna regla ni umbral propio` | RQ + CT |
 | R3 | `la lista sale del catalogo importado, no de una copia local` | RQ |
 | R4 | `al cambiar la candidata cada una de las seis pasa a cumplida o incumplida` | RQ |
-| R5 | `con la candidata vacia las seis salen incumplidas y la lista es visible sin interaccion` (**leer la desviacion D2**) | RQ |
+| R5 | `con la candidata vacia la lista es visible sin interaccion y muestra cinco incumplidas con max_length cumplida` (redaccion nueva, **ronda 3**) | RQ |
 | R6 | `escribir no dispara ninguna peticion de red` + `no importa composicion, adaptadores ni servidor, y no declara Server Actions` | FD + CT |
 | R7 | `la regla de filtradas arranca en estado neutro` | RQ |
 | R8 | `sin veredicto del servidor la regla de filtradas nunca sale cumplida ni incumplida` | RQ |
@@ -373,6 +373,9 @@ Las 7 guardias siguen en 78 tests: **la guardia compartida no se toco ni se rela
 
 ## Que sigue abierto tras la ronda 2
 
+> **Actualizado en la ronda 3**: los dos primeros puntos (B2 y m-5) quedaron **CERRADOS** el mismo
+> 2026-09-02, en cuanto el humano aprobo la redaccion nueva de R5. Ver «Ronda 3».
+
 - **B2** — la redaccion de R5 en `requirements.md`. **Bloqueante, y no es codigo**: espera decision
   del humano o del leader. Cuando llegue, hay que renombrar tambien el `it(...)`
   `con la candidata vacia las seis salen incumplidas y la lista es visible sin interaccion` y sus
@@ -382,6 +385,119 @@ Las 7 guardias siguen en 78 tests: **la guardia compartida no se toco ni se rela
   asi que no hay un segundo oraculo posible); solo pide no leerlo como mas fuerte de lo que es.
 - **m-2** — altura del campo por debajo de 44x44 px, excepcion declarada. Es alcance de QC-29/QC-30.
 - Las cinco preguntas abiertas siguen abiertas, incluida la que abrio D2.
+
+---
+
+# Ronda 3 — B2 y m-5 cerrados (2026-09-02)
+
+El humano aprobo la nueva redaccion de R5 y el leader la mando literal. Con eso se cierran los dos
+hallazgos que quedaban abiertos de la review. **El comportamiento del componente NO se ha tocado en
+ninguna de las tres rondas**: el reviewer confirmo que `deriveState` no tapa nada y que la respuesta
+al desfase era la correcta. Esto era cuadrar la spec y sus tests con lo que el sistema ya hacia bien.
+
+## B2 — CERRADO. R5 ya no afirma algo falso
+
+`specs/QC-21-ayuda-visual-de-contrasena/requirements.md` — **un solo requisito cambiado, R5**,
+conservando su etiqueta `[D2]`. Verificado con `git diff`: 4 inserciones, 3 borrados, todas dentro de
+R5. **No se toco ningun otro requisito, ni el bloque de Alcance, ni la tabla de decisiones cerradas.**
+
+Antes decia que con la candidata vacia el sistema debe mostrar **las seis** como incumplidas — falso
+contra el dominio de QC-19, como establecio D2 y confirmo el reviewer ejecutandolo. Ahora dice:
+
+> **R5.** MIENTRAS la candidata este vacia, la lista completa de requisitos DEBE ser visible desde el
+> primer render, sin que haga falta escribir, enfocar ni apuntar con el raton, y cada regla DEBE
+> mostrar exactamente el estado que devuelve la funcion pura para la cadena vacia — cinco incumplidas
+> y `max_length` cumplida, porque una cadena vacia no excede el maximo. `[D2]`
+
+**El `it(...)` renombrado**, porque el anterior repetia la afirmacion falsa en el mapa de
+trazabilidad:
+
+| | Nombre |
+|---|---|
+| Antes | `con la candidata vacia las seis salen incumplidas y la lista es visible sin interaccion` |
+| Ahora | `con la candidata vacia la lista es visible sin interaccion y muestra cinco incumplidas con max_length cumplida` |
+
+Actualizadas **sus dos filas de trazabilidad**: `tasks.md > Mapa de trazabilidad previsto` y la tabla
+de este archivo. Tambien se corrigio el parrafo de `tasks.md > T4` que describia el caso vacio como
+comparado «contra `evaluateCredentialRules`», que ya no es cierto para ese caso.
+
+## m-5 — CERRADO donde se podia, y DECLARADO donde no
+
+El reviewer no pedia arreglar los tests espejo: pedia no leerlos como mas fuertes de lo que son. Se
+hizo lo uno y lo otro.
+
+**Donde R5 lo permite, se sustituyo el espejo por un oraculo literal.** El caso de la cadena vacia
+ahora se afirma contra un **mapa de estados escrito a mano** —`min_length: 'unmet'`,
+`max_length: 'met'`, `no_uppercase/no_lowercase/no_digit/no_symbol: 'unmet'`— **sin llamar a
+`evaluateCredentialRules` dentro de ese test**.
+
+**Que demuestran las mordidas, con precision — y que NO demuestran.** Se corrieron dos, y la primera
+resulto **no ser discriminante**; se deja escrito porque la conclusion facil habria sido falsa:
+
+| Mordida | Test literal (R5) | Los dos espejos |
+|---|---|---|
+| Invertir la derivacion **en el componente** (`'unmet' : 'met'` -> `'met' : 'unmet'`) | ROJO | **ROJO tambien** |
+| Alterar el criterio **en el dominio** (`max_length` deja de cumplirse con la cadena vacia) | **ROJO** | **VERDE** |
+
+La primera **no separa** el oraculo literal del espejo: los espejos recalculan el esperado llamando a
+`evaluateCredentialRules` **directamente**, no pasando por `deriveState`, asi que un error en el
+cableado del componente tambien los pone rojos. Decir «el mapa literal detecta un criterio erroneo,
+cosa que el espejo no podia» apoyandose en esa mordida habria sido **sobrevender el test**, que es
+justo lo que m-5 pedia evitar.
+
+La segunda **si** separa, y es la que justifica el cambio: cuando lo que esta mal es la **funcion
+pura misma**, los espejos siguen verdes —comparan el componente contra el mismo criterio equivocado—
+y **solo el mapa literal muerde**. Ese es el valor real del segundo oraculo, y esta acotado al unico
+caso donde R5 fija un estado conocido. Ambas mordidas se revirtieron
+(`git checkout HEAD -- …`) y se comprobo `git diff --stat -- lib/ components/` **vacio** antes de
+seguir: ni `lib/modules/identity/domain/credential-policy.ts` ni `components/shared/` quedaron
+tocados.
+
+**Tension declarada dentro del propio test**: ese mapa enumera los codigos a mano, y R3 exige que el
+componente absorba un cambio de `CREDENTIAL_RULES` sin modificarse. No se resolvio volviendo al
+espejo: se anadio un assert que exige que el mapa cubra **todos** los codigos del catalogo importado,
+con un mensaje de fallo auto-explicativo que dice que anadir una regla obliga a revisar **la
+redaccion de R5**, no solo el mapa. Si llega ese dia, el fallo es ruidoso y dice que hacer, en vez de
+quedar silenciosamente incompleto. **No es un censo de recurso compartido ajeno**: es esta feature
+declarando de que catalogo depende su propio requisito.
+
+**Se quito** `expect(unmet.filter(...).length).toBe(LIVE_RULES.length - 1)`. El reviewer tenia razon:
+no afirmaba nada sobre el componente, era una asercion sobre el dominio de QC-19 que documentaba el
+«5 de 6». Ahora el «5 de 6» lo dice el requisito y lo verifica el mapa literal, asi que el assert
+sobraba.
+
+**Donde el espejo se queda, se dice que no atrapa.** Los otros dos `it(...)` que barren candidatas
+arbitrarias siguen recalculando con `evaluateCredentialRules`, y **eso es correcto**: R2 obliga a que
+esa funcion sea la unica fuente de verdad, asi que para una candidata cualquiera **no existe un
+segundo oraculo legitimo**. Llevan ahora un comentario que dice, sin adornos, que atrapan entradas
+ausentes, `data-rule` mal puesto, estados escritos a mano y que el componente ignore la candidata,
+pero **NO** un criterio de derivacion erroneo compartido por test y componente — y que el caso de la
+cadena vacia si tiene oraculo independiente gracias a la R5 nueva.
+
+## Detalle menor, declarado
+
+El mapa literal cubre las **seis** reglas en vivo, no la septima: `breached` no lo devuelve «la
+funcion pura», que es de lo que habla R5. Su estado neutro por defecto lo verifican los tests propios
+de R7 y R8 (`la regla de filtradas arranca en estado neutro` y `sin veredicto del servidor la regla
+de filtradas nunca sale cumplida ni incumplida`), y este test comprueba ademas que la lista completa
+—las siete entradas— esta presente desde el primer render.
+
+## Verificacion de la ronda 3 — los cinco comandos, salida real
+
+| Comando | Resultado real |
+|---|---|
+| `pnpm run typecheck` | `tsc --noEmit` — **sin salida, 0 errores** |
+| `pnpm run lint` | `eslint` — **sin salida, 0 errores** |
+| `pnpm test` (suite **ENTERA**) | `Test Files 49 passed (49)` · `Tests 513 passed (513)` · 61.53s |
+| `pnpm run test:guardias` | `Test Files 7 passed (7)` · `Tests 78 passed (78)` · 1.32s |
+| `node scripts/validate-features.mjs` | **unica linea: `faltan specs para features sdd en vuelo: QC-29`** — ningun otro error |
+
+**El recuento NO cambio: 513 tests, igual que en la ronda 2.** Es lo esperado y es comprobable: la
+ronda 3 **renombro** un `it(...)` (no anadio ninguno) y **quito un assert** dentro de el (el
+`toBe(LIVE_RULES.length - 1)`), que no es un test. Sigue habiendo **29 tests nuevos de verdad** sobre
+el baseline de 478; los otros 6 del delta son la guardia ejecutandose dos veces (m-3).
+
+Las 7 guardias siguen en 78: **no se toco ninguna**.
 
 ---
 
