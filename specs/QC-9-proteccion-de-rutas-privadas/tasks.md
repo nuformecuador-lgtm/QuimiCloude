@@ -215,7 +215,7 @@ entero, incluido `identity-constraints.int.test.ts` (`user.count() === 0`).
 
 ## Bloque 7 — Cierre
 
-### [ ] T20 — Trazabilidad *(depende de T19)*
+### [x] T20 — Trazabilidad *(depende de T19)*
 Escribir `progress/impl_QC-9-proteccion-de-rutas-privadas.md` con el mapa `R1`…`R30` -> test
 concreto, sin huecos, partiendo de la tabla de abajo y corrigiendo lo que la implementacion haya
 movido. R30 se marca como test de **caracterizacion** de un limite asumido, con la nota de que
