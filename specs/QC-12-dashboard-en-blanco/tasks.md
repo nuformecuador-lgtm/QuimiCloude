@@ -158,7 +158,7 @@ algo va mal: **para y avisa al leader**.
   `progress/current.md > Deudas y cosas abiertas`. Existe para que la ausencia quede
   registrada, no silenciada.
 
-### [ ] T9 — Gate completo y PR (pendiente del leader)
+### [x] T9 — Gate completo y PR (pendiente del leader)
 - **Depende de**: T6, T7, T8.
 - **Hecho cuando**: `./init.sh` (completo, sin flags) termina en verde — **lo corre el
   leader**, no el `frontend_dev` —, `package.json` **no ha cambiado** (ninguna dependencia
