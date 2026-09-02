@@ -6,7 +6,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import { NotFoundError, ValidationError } from '../../../domain/errors';
 
 import type { PageQuery, Page } from '../../../domain/page';
-import type { NewProduct, ProductView } from '../../../ports/product-repository';
+import type { NewProduct, ProductView } from '../../../domain/product-view';
 
 /**
  * Implementa `ProductRepository` (`design.md > 7`) con Prisma. Es el UNICO archivo del

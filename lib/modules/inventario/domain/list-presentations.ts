@@ -1,8 +1,9 @@
 import { requireAdmin, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { pageQuerySchema, type Page } from './page';
+import type { PresentationView } from './presentation-view';
 
-import type { PresentationRepository, PresentationView } from '../ports/presentation-repository';
+import type { PresentationRepository } from '../ports/presentation-repository';
 
 export type ListPresentationsDeps = {
   readonly presentations: PresentationRepository;

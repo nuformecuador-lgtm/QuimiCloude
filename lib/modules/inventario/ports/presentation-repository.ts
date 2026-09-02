@@ -1,16 +1,5 @@
 import type { PageQuery, Page } from '../domain/page';
-
-/**
- * Salida de una consulta de presentacion (`design.md > 6.2`). `nameNormalized` viaja
- * junto al `name` porque las dos se mantienen sincronizadas en toda escritura (R17).
- */
-export type PresentationView = {
-  readonly id: string;
-  readonly name: string;
-  readonly nameNormalized: string;
-  readonly createdAt: Date;
-  readonly updatedAt: Date;
-};
+import type { PresentationView } from '../domain/presentation-view';
 
 /**
  * Puerto de acceso a datos de presentacion (`design.md > 7`). `presentations` no lleva

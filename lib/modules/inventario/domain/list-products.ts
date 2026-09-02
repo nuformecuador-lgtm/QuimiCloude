@@ -1,8 +1,9 @@
 import { requireAdmin, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { pageQuerySchema, type Page } from './page';
+import type { ProductView } from './product-view';
 
-import type { ProductRepository, ProductView } from '../ports/product-repository';
+import type { ProductRepository } from '../ports/product-repository';
 
 export type ListProductsDeps = {
   readonly products: ProductRepository;

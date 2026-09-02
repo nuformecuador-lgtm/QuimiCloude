@@ -24,10 +24,8 @@ import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update
 
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import type { Page } from '@/lib/modules/inventario/domain/page';
-import type {
-  PresentationRepository,
-  PresentationView,
-} from '@/lib/modules/inventario/ports/presentation-repository';
+import type { PresentationView } from '@/lib/modules/inventario/domain/presentation-view';
+import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 
 const ADMIN: Actor = { id: 'actor-admin', roleName: 'Administrador' };
 const OPERADOR: Actor = { id: 'actor-operador', roleName: 'Operador' };

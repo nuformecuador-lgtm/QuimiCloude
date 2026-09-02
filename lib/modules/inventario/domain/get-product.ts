@@ -1,7 +1,8 @@
 import { requireAdmin, type Actor } from './actor';
 import { NotFoundError } from './errors';
+import type { ProductView } from './product-view';
 
-import type { ProductRepository, ProductView } from '../ports/product-repository';
+import type { ProductRepository } from '../ports/product-repository';
 
 export type GetProductDeps = {
   readonly products: ProductRepository;

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import type { Page, PageQuery } from '../../../domain/page';
-import type { PresentationView } from '../../../ports/presentation-repository';
+import type { PresentationView } from '../../../domain/presentation-view';
 
 /**
  * Implementa los cuatro metodos de `PresentationRepository` (`design.md > 7`, T10). Unico

@@ -9,11 +9,8 @@ import { NotFoundError, ValidationError } from '@/lib/modules/inventario/domain/
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
-import type {
-  NewProduct,
-  ProductRepository,
-  ProductView,
-} from '@/lib/modules/inventario/ports/product-repository';
+import type { NewProduct, ProductView } from '@/lib/modules/inventario/domain/product-view';
+import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 
