@@ -322,3 +322,120 @@ quitarse el `OR` a sí mismo para ver caer el test.
 - **El `.env` del repo no tiene `DIRECT_URL`**, que `db/schema.prisma` declara; sin ella
   `prisma migrate` falla con `P1012`. `.env.example` sí la documenta: el incompleto es el `.env`
   real. Candidato a que lo cubra `scripts/wt.sh new`.
+
+## QC-6 — seed-roles-y-usuario-inicial (2026-09-02)
+
+El seed que deja la base utilizable desde cero: catálogo de roles (`Administrador`, `Operador`),
+usuario inicial Administrador con credenciales del entorno, y una migración aditiva para la marca
+`must_change_credential`. Encadenado al despliegue (`build` = `migrate deploy && seed && next build`).
+PR #11, merge `683e6ce`. Los 21 requisitos (R1–R21) con test ejecutado; 377 tests / 35 archivos en
+verde. Sin E2E, diferido con motivo: el seed no tiene interfaz.
+
+**La idempotencia no es un `upsert`, y eso condicionó todo el diseño.** Las tres unicidades de
+`users` son índices funcionales (`lower(...)`) y parciales (`WHERE deleted_at IS NULL`) escritos a
+mano en la migración de QC-4; Prisma no los modela, así que `user.upsert` no tiene un `where` único
+al que agarrarse. El algoritmo **lee qué falta y crea exactamente eso**, sin reescribir nada: en un
+entorno que ya tiene admin vivo ni siquiera lee las `SEED_ADMIN_*`.
+
+### La lección: dos bloqueantes, y el gate rápido no podía ver ninguno de los dos
+
+- **B-1 — `pnpm test` en rojo por un centinela ajeno.** Añadir `mustChangeCredential` al modelo
+  `User` tumbó `identity-schema.test.ts`, que afirma la lista completa de columnas. Se coló porque
+  **el gate rápido selecciona por grafo de imports y ese test lee `db/schema.prisma` como TEXTO**:
+  ningún cambio de esquema lo relaciona. Es el agujero exacto que describe `CLAUDE.md > regla 5`, y
+  la razón por la que el gate completo antes del PR no es negociable.
+- **B-2 — desviación NO declarada: los pasos 4 y 5 no corrían en transacción.** `design.md > 5.2`
+  la llamaba innegociable y en el código no había ninguna `$transaction`. La bitácora afirmaba "sin
+  dejar nada creado a medias (R13)" apoyándose en un test que demuestra otra cosa: allí el fallo
+  ocurre **antes** de escribir (falta la variable), el único camino que el código sí protegía. Se
+  cerró envolviendo desde la composición —el dominio no conoce la transacción— con un test que
+  fuerza el fallo del alta y afirma que los roles no quedan.
+
+Las otras dos desviaciones del diseño **sí** estaban declaradas y el reviewer las sostuvo: ampliar
+el input de `createInitialAdmin` con los seis marcadores personales (era la única forma de que R7
+se cumpliera en `domain/` y no dentro del adaptador) e importar el repositorio ya cableado desde el
+adaptador driven (pasar `prisma` desde `lib/composition` habría puesto la guardia de módulos en
+rojo). Lo que no vale es que una desviación desaparezca en silencio.
+
+De paso se arregló el test ajeno de QC-4 que afirmaba sobre el estado **global** de la tabla
+(`user.count() === 0`), deuda anotada al cerrar QC-7 y que un seed —cuyo trabajo es literalmente
+dejar filas— iba a tumbar sí o sí. Las 9 aserciones se acotaron por `roleId` (o por `documentNumber`
+donde no había rol útil): mismos SQLSTATE, mismos valores esperados, ningún `skip`.
+
+### Deuda que hereda
+
+- **El hasheo bcrypt corre dentro de la transacción** (m-9). Consecuencia aceptada de B-2: el
+  `build` mantiene una transacción abierta durante el hash, solo en un entorno nuevo. Sacarlo
+  obligaría a partir el caso de uso del dominio.
+- **Residuo ante muerte dura del proceso** (m-8): si se mata vitest entre el commit y el `finally`,
+  queda un rol `qc6-tx-commit-<uuid>` huérfano. Inocuo y verificado; un `afterAll` que barra
+  `name LIKE 'qc6-tx-%'` lo cerraría en tres líneas.
+- **Dos tests escriben en la base compartida** en vez de aislarse en transacción, porque
+  `tx.$transaction` es `undefined` y el no-anidamiento se verificó ejecutándolo. Se limpian en
+  `finally`.
+- **El `.env` real del repo estaba incompleto** —le faltaban `DIRECT_URL`, `SESSION_SECRET` y las
+  tres `SEED_ADMIN_*`, todas documentadas en `.env.example`—. Completado el 2026-09-02 al correr el
+  seed por primera vez a mano. Sigue siendo candidato a que lo cubra `scripts/wt.sh new`.
+- **El cliente Prisma generado se desincroniza del esquema y nadie lo detecta hasta la ejecución**:
+  tras esta migración, `db:seed` fallaba con `Unknown argument mustChangeCredential` hasta correr
+  `prisma generate`. En Windows ese `generate` además choca con `EPERM` si hay un `next dev` vivo
+  sujetando `query_engine-windows.dll.node`.
+- **`wt.sh done` no cierra en Windows cuando el worktree tiene `node_modules` de pnpm**: `git
+  worktree remove` desregistra pero deja el árbol en disco por rutas largas, y el segundo intento
+  responde `is not a working tree`. Hubo que rematar con `rmdir /s /q` y `git worktree prune`.
+
+## QC-12 — dashboard-en-blanco (2026-09-02)
+
+PR [#12](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/12), merge `b154fa9`. Épica QC-16
+Plataforma, `zone: frontend`, `complexity: low`. Ciclo completo en una sola sesión: evaluación →
+spec → aprobación humana → implementación → review → gate → PR → merge.
+
+12 requisitos EARS (R1–R12), los 12 con su test. 14 tests propios; `./init.sh` completo en verde
+antes del PR: **37 archivos, 391 tests**. Ninguna dependencia nueva.
+
+### Lo que la hace distinta de las anteriores
+
+**Es la primera feature puramente aditiva del repo.** `git diff --name-status` contra el
+merge-base devuelve **9 archivos, todos `A`**: ni un `M`, ni un `D`. No toca una línea de QC-11 ni
+de QC-15, y `package.json`, `pnpm-lock.yaml`, `components.json` y `docs/dependencias.md` quedan
+fuera del diff. Era el riesgo declarado de la ficha —heredar el layout privado ya montado en vez
+de re-crearlo— y el `reviewer` lo verificó ejecutando el diff, no leyendo la bitácora.
+
+**El `<main>` que no se escribió.** `SidebarInset` de QC-11 ya es el `<main>` de la zona privada, y
+R5 de QC-11 exige que haya **uno solo**. La página no declara el suyo. Anidar dos habría roto un
+requisito de la feature anterior sin que ningún test de QC-12 se pusiera rojo: lo habría cazado el
+test de QC-11, y solo porque existía.
+
+**Se resistió la tentación de rellenarla.** Un dashboard vacío invita a meter tarjetas, métricas o
+contenido de ejemplo. El `design.md` lo descartó explícitamente antes de implementar, y
+`dashboard-content.tsx` acabó siendo un `div` vacío sin props ni hijos. Eso es lo que pedía la
+ficha.
+
+### Decisión humana que acotó el alcance
+
+**QC-12 crea la ruta pero NO reconecta el ítem «Dashboard» del sidebar**, que sigue dando 404. Se
+preguntó al humano el 2026-09-02 y decidió que lo haga QC-13, la que conecta la navegación con la
+sesión real. Sin esa pregunta, el spec habría tocado un archivo de QC-11 y la feature habría dejado
+de ser aditiva.
+
+### Deuda que hereda
+
+- **Sin E2E**, diferido con motivo a QC-13: no hay sesión real ni flujo navegable que visitar.
+- **`/dashboard` responde 200 a cualquiera.** La zona «privada» lo es de nombre hasta QC-13.
+- **La verificación visual con emulación de dispositivo no la hizo nadie con ojos.** No hay
+  navegador con emulación en este entorno; lo verificado es el HTML servido y jsdom a 375 y 1280 px,
+  más guardias de que no hay alto de viewport fijo ni `:hover` ni controles. El `reviewer` lo dio
+  por **aceptable con nota**, no por excepción: queda como verificación humana pendiente.
+- **`vitest related` no engancha las guardias que leen las fuentes del disco** en vez de importarlas,
+  así que `./init.sh --rapido` puede saltárselas. Afecta también a `login-action.test.ts` y
+  `logout-action.test.ts`, o sea que es del arnés y no de esta feature. El gate completo sí las
+  corre. Salida sugerida: nombrarlas `guard-…` o moverlas a `tests/guards/`. Entra por
+  `/afinar-regla`.
+- **`app/page.tsx` sigue siendo la plantilla de `create-next-app`.** La raíz `/` del ERP es la
+  página de bienvenida de Next.js y **ninguna ficha del backlog lo cubre**. Es la pregunta abierta
+  que dejó el spec; candidata a ficha nueva.
+- **`wt.sh done` volvió a fallar en Windows** exactamente como quedó documentado al cerrar QC-6:
+  desregistró el worktree pero dejó el árbol en disco, y el segundo intento respondió `is not a
+  working tree`. Se remató con `rm -rf` + `git worktree prune`, con conocimiento de que lo único sin
+  versionar eran `node_modules`, `.env` y `tsconfig.tsbuildinfo`. **Es la segunda vez el mismo día**:
+  ya no es una anécdota, es el comportamiento por defecto de ese script en esta máquina.

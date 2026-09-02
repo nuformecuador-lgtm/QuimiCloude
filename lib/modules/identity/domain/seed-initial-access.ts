@@ -1,6 +1,8 @@
 import { DOCUMENT_TYPE_CC } from './document-type';
 import { ROLE_ADMINISTRADOR, SEED_ROLES } from './roles';
 
+import type { CredentialPolicyResult } from './credential-policy';
+
 import type { InitialAdminCredentialsProvider } from '../ports/initial-access-credentials';
 import type { InitialAccessRepository } from '../ports/initial-access-repository';
 import type { PasswordHasher } from '../ports/password-hasher';
@@ -21,6 +23,13 @@ export type SeedInitialAccessDeps = {
   readonly repository: InitialAccessRepository;
   readonly passwordHasher: PasswordHasher;
   readonly credentials: InitialAdminCredentialsProvider;
+  /**
+   * QC-19 R18: la politica de credenciales, ya cableada con su lista de filtradas. Es
+   * OBLIGATORIA a proposito — un seed que pudiera construirse sin ella volveria a ser un
+   * punto que fija una contrasena sin evaluarla. El dominio recibe la funcion, no el
+   * adaptador: quien la ata es `lib/composition` (`design.md > 7`).
+   */
+  readonly checkCredentialPolicy: (candidate: string) => Promise<CredentialPolicyResult>;
 };
 
 /**
@@ -35,7 +44,7 @@ const INITIAL_ADMIN_PHONE = '+00 000 000 0000';
 const INITIAL_ADMIN_DOCUMENT_NUMBER = '00000000';
 
 export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<SeedOutcome> {
-  const { repository, passwordHasher, credentials } = deps;
+  const { repository, passwordHasher, credentials, checkCredentialPolicy } = deps;
 
   // 1. Leer estado: roles existentes por nombre + numero de usuarios vivos con rol Administrador.
   const roleNames = SEED_ROLES.map((role) => role.name);
@@ -50,6 +59,15 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
   let hashedAdmin: { username: string; email: string; passwordHash: string } | null = null;
   if (needsAdmin) {
     const initialAdminCredentials = credentials();
+    // QC-19 R18: la politica se evalua ANTES de producir el hash. Si el resultado no es
+    // aceptable no se hashea y no se escribe nada; el error nombra las REGLAS
+    // incumplidas y nunca la credencial ni un fragmento suyo (R24).
+    const policyResult = await checkCredentialPolicy(initialAdminCredentials.credential);
+    if (!policyResult.ok) {
+      throw new Error(
+        `la credencial de instalacion no cumple la politica: ${policyResult.unmet.join(', ')}`,
+      );
+    }
     const passwordHash = await passwordHasher.hash(initialAdminCredentials.credential);
     hashedAdmin = {
       username: initialAdminCredentials.username,

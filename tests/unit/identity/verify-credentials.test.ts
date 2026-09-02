@@ -2,6 +2,8 @@
 // Sin base de datos, sin bcrypt real y sin Next: lo que se prueba aqui es la DECISION, y la
 // decision vive en el dominio. Los adaptadores reales tienen su propia tanda (T5, T8).
 
+import { readFileSync } from 'node:fs';
+
 import {
   createPasswordHash,
   verifyPasswordHash,
@@ -12,6 +14,7 @@ import {
   type AccountLockState,
 } from '@/lib/modules/identity/domain/account-lock';
 import type { SessionTicket } from '@/lib/modules/identity/domain/session';
+import { evaluateCredentialRules } from '@/lib/modules/identity/domain/credential-policy';
 import {
   DECOY_SECRET,
   createVerifyCredentials,
@@ -19,6 +22,19 @@ import {
 import type { AuthenticatableUser } from '@/lib/modules/identity/ports/user-credentials-reader';
 
 const CONTRASENA_CORRECTA = 'secreto';
+
+/**
+ * QC-19 T8 — marcador evidentemente ficticio de una credencial GUARDADA que no cumple la
+ * politica de QC-19 (sin mayuscula, sin digito, sin simbolo). No es la credencial de
+ * nadie: existe para demostrar R17, que quien ya la tiene sigue entrando.
+ */
+const CREDENCIAL_GUARDADA_QUE_NO_CUMPLE = 'clavevieja';
+
+/** Fuente de `verify-credentials.ts` como TEXTO: R17 tambien es una propiedad del fuente. */
+const FUENTE_DE_VERIFY_CREDENTIALS = readFileSync(
+  new URL('../../../lib/modules/identity/domain/verify-credentials.ts', import.meta.url),
+  'utf8',
+);
 
 /** Hash de mentira, deterministico y legible: basta para distinguir un hash de otro. */
 function hashDe(texto: string): string {
@@ -486,4 +502,63 @@ describe('verificacion de credenciales', () => {
       for (const espia of espias) espia.mockRestore();
     }
   }, 30_000);
+  // QC-19 R17 — la regresion que se olvida: la politica NO se aplica al entrar. El impulso
+  // natural al anadir una politica es aplicarla en todas partes, y eso dejaria fuera a
+  // quien ya tiene guardada una contrasena que no cumple (`QC-19 design.md > 10`).
+  it('una contrasena guardada que no cumple la politica sigue autenticando', async () => {
+    // Primero: que la credencial guardada NO cumple de verdad. Sin esto el test podria
+    // pasar en verde con una credencial que si cumple, y no demostraria nada.
+    const veredicto = evaluateCredentialRules(CREDENCIAL_GUARDADA_QUE_NO_CUMPLE);
+    expect(veredicto.ok).toBe(false);
+    expect(veredicto.unmet.length).toBeGreaterThan(0);
+
+    const usuario: AuthenticatableUser = {
+      ...USUARIO,
+      passwordHash: hashDe(CREDENCIAL_GUARDADA_QUE_NO_CUMPLE),
+    };
+    const { verifyCredentials, session } = montar([usuario]);
+
+    const resultado = await verifyCredentials({
+      username: 'admin',
+      password: CREDENCIAL_GUARDADA_QUE_NO_CUMPLE,
+    });
+
+    // Luego: entra con normalidad, exactamente igual que cualquier otro usuario.
+    expect(resultado).toEqual({ ok: true });
+    expect(session.startSession).toHaveBeenCalledTimes(1);
+  });
+
+  // QC-19 R17 — y no es que "de la casualidad" de que pase: el caso de uso ni siquiera
+  // conoce la politica. Se afirma sobre las dependencias y sobre el fuente.
+  it('verifyCredentials no recibe ni llama a la politica', () => {
+    const { users, attempts, hasher, session } = montar();
+    const deps = { users, attempts, hasher, session };
+
+    // Se construye con EXACTAMENTE esos cuatro puertos: ni uno mas.
+    const verifyCredentials = createVerifyCredentials(deps);
+    expect(typeof verifyCredentials).toBe('function');
+    expect(Object.keys(deps).sort()).toEqual(['attempts', 'hasher', 'session', 'users']);
+
+    // Y el fuente lo confirma: el tipo de dependencias declara esas cuatro claves y el
+    // archivo entero no menciona la politica por ningun nombre.
+    expect(FUENTE_DE_VERIFY_CREDENTIALS.length).toBeGreaterThan(0);
+    const bloqueDeDeps = /export type VerifyCredentialsDeps = \{([\s\S]*?)\};/.exec(
+      FUENTE_DE_VERIFY_CREDENTIALS,
+    );
+    expect(bloqueDeDeps).not.toBeNull();
+    const claves = [...(bloqueDeDeps?.[1] ?? '').matchAll(/readonly\s+([A-Za-z_$][\w$]*)\s*:/g)]
+      .map((match) => match[1] as string)
+      .sort();
+    expect(claves).toEqual(['attempts', 'hasher', 'session', 'users']);
+
+    for (const rastro of [
+      'checkCredentialPolicy',
+      'evaluateCredentialRules',
+      'createCredentialPolicy',
+      'credential-policy',
+      'CREDENTIAL_RULES',
+    ]) {
+      expect(FUENTE_DE_VERIFY_CREDENTIALS, rastro).not.toContain(rastro);
+    }
+  });
 });

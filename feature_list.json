@@ -1,23 +1,6 @@
 {
   "features": [
     {
-      "key": "QC-23",
-      "id": 23,
-      "epic": "QC-17",
-      "epic_name": "Identidad y acceso",
-      "name": "registro-de-sesiones",
-      "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos.",
-      "status": "pending",
-      "sdd": true,
-      "complexity": null,
-      "zone": "backend",
-      "branch": "feature/QC-23-registro-de-sesiones",
-      "depends_on": [
-        "QC-8"
-      ],
-      "spec_path": "specs/QC-23-registro-de-sesiones"
-    },
-    {
       "key": "QC-4",
       "id": 4,
       "epic": "QC-17",
@@ -156,7 +139,7 @@
       "epic_name": "Plataforma",
       "name": "dashboard-en-blanco",
       "description": "Maquetacion de la pantalla de dashboard dentro del layout privado, deliberadamente vacia: solo el titulo y el area de contenido lista para llenarse mas adelante. Es el destino al que llega el usuario recien autenticado. Solo capa visual, sin datos ni backend; su unica dependencia es el layout privado con sidebar.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "low",
       "zone": "frontend",
@@ -227,7 +210,7 @@
       "epic_name": "Identidad y acceso",
       "name": "politica-de-contrasenas",
       "description": "Una contrasena es aceptable si tiene al menos 8 caracteres e incluye mayuscula, minuscula, numero y simbolo, y si no esta entre las contrasenas filtradas conocidas. Esa regla se aplica en todos los sitios donde alguien fija o cambia una contrasena, de modo que no se pueda guardar una que no cumpla, y al rechazarla dice que requisito falto y no solo que esta mal. Las contrasenas no caducan y no se guarda historial de anteriores. Quien ya tenga guardada una contrasena que no cumple sigue entrando con normalidad: la regla solo mira las nuevas. Mostrar los requisitos mientras se escribe es otra ficha.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -289,6 +272,76 @@
         "QC-20"
       ],
       "spec_path": "specs/QC-22-pantalla-de-productos"
+    },
+    {
+      "key": "QC-23",
+      "id": 23,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "registro-de-sesiones",
+      "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-23-registro-de-sesiones",
+      "depends_on": [
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-23-registro-de-sesiones"
+    },
+    {
+      "key": "QC-24",
+      "id": 24,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "modelo-recetas",
+      "description": "Necesitamos persistir el catalogo de recetas. Solo el modelo de datos: sin pantalla y sin API. Cada receta tiene un nombre, una descripcion, una imagen y unos pasos, y guarda ademas quien la creo y quien la modifico por ultima vez. El nombre es obligatorio y no se repite entre recetas: se comparan sin acentos ni caracteres especiales y sin distinguir mayusculas, igual que las presentaciones. La descripcion es opcional. La imagen se guarda como la direccion del archivo, en una sola columna de texto opcional: una receta sin imagen es valida, y el modelo no sabe donde vive ese archivo ni lo sube. Los pasos son opcionales y se guardan como un unico documento JSON en la columna, no como tabla aparte: son una lista ordenada de textos, y el orden es el de la lista. La base guarda el documento tal cual; que sea una lista de textos y que ninguno venga vacio lo hace cumplir la capa de aplicacion, no la columna. Una receta se compone de productos: un mismo producto entra en muchas recetas y una receta lleva muchos productos, y cada pareja receta-producto guarda ademas una cantidad y una unidad de medida. Esa pareja es la entidad propia de la relacion, no una tabla de union sin datos. Un mismo producto no puede aparecer dos veces en la misma receta. La cantidad es un numero con decimales exactos, obligatorio, y nunca negativo ni cero. La unidad de medida de cada linea es texto libre obligatorio y puramente anotativo: no hay conversion entre unidades y no se toma de la unidad del producto, que es opcional. Si un producto se da de baja, la receta conserva su linea: el borrado de producto es logico y la linea sigue apuntando al mismo producto. Quitar un producto de una receta al editarla borra esa linea de verdad, y borrar la receta se lleva sus lineas con ella. Recetas es un modulo propio y no parte de inventario: la linea conoce al producto por lo que inventario publica, nunca por su tabla. El alta, la consulta, la edicion y el borrado de recetas van aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "backend",
+      "branch": "feature/QC-24-modelo-recetas",
+      "depends_on": [
+        "QC-14"
+      ],
+      "spec_path": "specs/QC-24-modelo-recetas"
+    },
+    {
+      "key": "QC-25",
+      "id": 25,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "crud-de-recetas",
+      "description": "Los casos de uso del catalogo de recetas, sobre el modelo que crea QC-24: alta, consulta paginada, edicion y borrado de recetas, incluyendo las lineas de producto de cada receta, que se crean, cambian y quitan junto con la receta que las contiene y no por separado. Solo el Administrador puede: ni el Operador ni nadie mas consulta, crea, edita o borra, y ese permiso se valida en el service. Borrar una receta la oculta y no se restaura; borrar un producto que alguna receta usa sigue estando permitido y la receta conserva la linea. Cada receta guarda quien la creo y quien la modifico por ultima vez. Aqui entra la subida de la imagen de la receta: el archivo se sube a Supabase Storage y en la receta queda su direccion. La imagen sigue siendo opcional, asi que guardar una receta sin imagen no falla nunca. Esta ficha deja el almacenamiento configurado y utilizable, con las variables de entorno que necesita declaradas y vacias en el archivo de ejemplo, y documentadas. Subir la imagen exige una libreria de cliente de Supabase que hoy no esta aprobada ni instalada: entra por la regla 7 de CLAUDE.md, con sus cuatro checks de salud, su fila en docs/dependencias.md y aprobacion humana antes de instalarla. Antes de guardar se rechaza el nombre vacio, el nombre con un largo mayor al maximo, el nombre repetido comparado sin acentos ni mayusculas, la cantidad negativa o cero, la unidad vacia, el producto repetido dentro de la misma receta, el producto inexistente, y unos pasos que no sean una lista de textos o que traigan algun texto vacio. La consulta viene paginada, de diez en diez por defecto, reutilizando el calculo de paginacion que extrae el CRUD de productos en vez de duplicarlo. La pantalla va aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "backend",
+      "branch": "feature/QC-25-crud-de-recetas",
+      "depends_on": [
+        "QC-24",
+        "QC-20",
+        "QC-8"
+      ],
+      "spec_path": "specs/QC-25-crud-de-recetas"
+    },
+    {
+      "key": "QC-26",
+      "id": 26,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "pantalla-de-recetas",
+      "description": "La pantalla del catalogo de recetas dentro del layout privado: la lista paginada, el formulario de alta y edicion con sus lineas de producto, sus pasos y su imagen, y el borrado. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-25 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error), incluyendo el estado de subida de la imagen y su vista previa, y el editor de pasos ordenados. La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, como se agregan, quitan y reordenan las lineas de producto y los pasos, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-26-pantalla-de-recetas",
+      "depends_on": [
+        "QC-25"
+      ],
+      "spec_path": "specs/QC-26-pantalla-de-recetas"
     }
   ]
 }
