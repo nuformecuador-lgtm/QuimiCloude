@@ -109,7 +109,7 @@ En `tests/unit/private-layout.test.tsx`, alcance **exacto**:
 - conservar el test de «lo pide una sola vez y lo reparte por props» (R17).
 **Hecho:** el archivo pasa entero, incluidos los tests de QC-11 que no se tocan.
 
-### T11 — Tanda verde
+### [x] T11 — Tanda verde
 **Hecho:** `./init.sh --rapido` en verde (typecheck + lint + tests relacionados + **todas** las
 guardias).
 
@@ -143,7 +143,7 @@ interrumpido deja huérfanos que ponen en rojo `identity-constraints.int.test.ts
 
 ## Bloque 5 — Cierre
 
-### T15 — Trazabilidad *(depende de T14)*
+### [x] T15 — Trazabilidad *(depende de T14)*
 Escribir `progress/impl_QC-8-sesion-actual-y-logout.md` con el mapa **`R1`…`R24` -> test
 concreto**, sin huecos. R21 se marca como test de caracterizacion del riesgo asumido, con la nota
 de que **QC-23 lo pondra rojo a proposito**.

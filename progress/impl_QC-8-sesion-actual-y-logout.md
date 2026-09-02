@@ -1,7 +1,7 @@
 # QC-8 — sesion-actual-y-logout · bitacora de implementacion
 
-> Estado: **EN CURSO**. Bloques 1, 2 y 3 (T1-T10) cerrados y comiteados. Falta **T11**
-> (gate rapido, lo corre el leader) y el **bloque 5** (T15 trazabilidad, T16 gate completo y PR).
+> Estado: **T1-T11 y T15 cerrados.** Queda **T16**
+> (`./init.sh` completo, lo corre el leader) y el PR. Bloque 4 (E2E) NO se ejecuta: R24 diferido a QC-9.
 > Alcance **R1-R23**. **R24 esta FUERA** (diferido a QC-9 por el humano el 2026-09-02):
 > el bloque 4 de `tasks.md` no se ejecuta, no hay `e2e/session.spec.ts`, no se toca
 > `playwright.config.ts` y no se crean fixtures `qc8_e2e_`.
@@ -343,3 +343,106 @@ es decision del leader**, no de esta bitacora.
 
 Nota sobre el spec: `origin/dev` tiene una version **anterior** del spec de QC-8 (sin el
 diferimiento de R24). La version buena es la de esta rama, commit `9f57f01`.
+
+---
+
+# T15 — Trazabilidad `R1-R23 -> test`
+
+Un requisito por fila, con el **archivo y el nombre exacto** del test que lo afirma. Donde la
+cobertura es **parcial**, se dice: un mapa que miente es peor que un hueco declarado.
+
+| clave | archivo |
+|---|---|
+| `claims` | `tests/unit/identity/session-claims.test.ts` |
+| `nombre` | `tests/unit/identity/display-name.test.ts` |
+| `resolver` | `tests/unit/identity/resolve-session-user.test.ts` |
+| `cookie` | `tests/unit/identity/session-cookie.test.ts` |
+| `logout` | `tests/unit/identity/logout-action.test.ts` |
+| `layout` | `tests/unit/private-layout.test.tsx` |
+| `sidebar-d` / `sidebar-m` | `tests/unit/sidebar-desktop.test.tsx` / `sidebar-mobile.test.tsx` |
+| `int` | `tests/integration/identity/session-user.int.test.ts` |
+| `esquema` | `tests/unit/identity/schema/identity-schema.test.ts` (de QC-4) |
+| `guardia-firma` | `tests/guards/guard-firma-sesion-unica.test.ts` (**nuevo en T15**) |
+| `guardia-hex` | `tests/guards/guard-arquitectura-modulos.test.ts` (de QC-15) |
+
+| R | Que exige (resumido) | Test que lo afirma |
+|---|---|---|
+| **R1** | Una sola operacion de lectura que devuelve usuario **o** ausencia, sin excepcion | `resolver` > `sin claims resuelve null sin lanzar` + `con usuario activo compone el SessionUser con displayName y roleName actuales` |
+| **R2** | Sin cookie -> «sin sesion» sin tocar la base | `cookie` > `sin cookie devuelve null` + `resolver` > `con claims null no se consulta al lector de usuario` (esta segunda es la que afirma que **no** se consulta la base) |
+| **R3** | Prefijo distinto de `v1.` -> «sin sesion», sin interpretar el resto | `cookie` > `prefijo v0. devuelve null sin interpretar el resto` |
+| **R4** | Firma que no casa -> «sin sesion» | `cookie` > `firma alterada en un byte (misma longitud) devuelve null` + `firma de longitud distinta devuelve null sin lanzar` |
+| **R5** | Recomputar con **la misma funcion** que emite, en tiempo constante; **sin segunda implementacion** | `cookie` > `el valor valido emitido por startSession se lee de vuelta con los mismos datos` (el valor lo produce el emisor real) + **`guardia-firma` > `createHmac solo aparece en el adaptador que emite y verifica la cookie`** (clausula «sin segunda implementacion») |
+| **R6** | Contenido que no valida (`sub` UUID, `iat`/`exp` enteros) -> «sin sesion», sin propagar el error | `claims` > `un texto que no es JSON devuelve null sin lanzar`, `un JSON valido pero sin los campos esperados devuelve null`, `un sub que no tiene formato UUID devuelve null`, `iat o exp no enteros o no positivos devuelven null` + `cookie` > `payload que no es JSON devuelve null`, `sub que no es UUID devuelve null` |
+| **R7** | Caducidad sobre el `exp` **firmado**, con `>=` | `claims` > `en el instante exacto de expiresAt la sesion esta caducada`, `un segundo despues de expiresAt sigue caducada`, `un segundo antes de expiresAt la sesion sigue valida`, `un exp en segundos epoch produce el Date correcto (unidad fijada por el emisor de QC-7)` |
+| **R8** | Leer **no** reemite ni prolonga la cookie | `cookie` > `leer una sesion valida no reemite ni prolonga la cookie` |
+| **R9** | Sin `SESSION_SECRET`: la lectura falla ruidosa sin filtrar el secreto; **el cierre sigue funcionando** | `cookie` > `sin SESSION_SECRET la lectura lanza sin exponer el secreto, y clearSession sigue funcionando` |
+| **R10** | El usuario se resuelve **consultando la base por el `sub`** en cada peticion | `resolver` > `con claims vigentes consulta al lector de usuario por el sub` + `int` > `un usuario activo devuelve nombres, username y el rol actual` |
+| **R11** | Usuario inexistente o con `deleted_at` -> «sin sesion» | `resolver` > `sin registro de usuario activo resuelve null aunque la sesion sea valida` + `int` > `un usuario con deleted_at con valor devuelve null`, `un id inexistente devuelve null` |
+| **R12** | `roleName` es el rol **del momento de la peticion** | `int` > `el rol cambiado entre dos lecturas devuelve el nuevo` + `resolver` > `con usuario activo compone el SessionUser...` |
+| **R13** | `displayName` = primer nombre + primer apellido, con caida al `username` | `nombre` > los cinco tests del archivo, incluido el caso literal `«Ana Maria» + «Perez Gomez» da «Ana Perez» con iniciales «AP»` y `cae al username si firstNames y lastNames estan vacios` |
+| **R14** | No devolver nada fuera de `id`, `username`, `displayName`, `roleName` | `resolver` > `con usuario activo compone el SessionUser...`, que afirma que las claves son **exactamente** esas cuatro |
+| **R15** | Ninguna migracion ni columna nueva; se lee de columnas que **ya existen** | **PARCIAL — ver «Los dos huecos».** Segunda mitad: `esquema` > `el modelo User declara los nueve datos del usuario`, `User declara deletedAt opcional`, `Role declara name y description obligatorios` |
+| **R16** | Sin sesion valida, la zona privada redirige al login sin renderizar contenido | `layout` > `sin usuario de sesion, el layout redirige al login y no pinta la zona privada` + `sidebar-d` y `sidebar-m` > `sin sesion, el layout redirige al login y no pinta la barra lateral` |
+| **R17** | El usuario se obtiene **una sola vez por render** y se reparte por props | `layout` > `el layout obtiene el usuario del proveedor de sesion y lo pasa por props` (con `toHaveBeenCalledTimes(1)`) + `el sidebar no importa el proveedor de sesion` |
+| **R18** | El cierre retira la cookie **desde el servidor**, mismo nombre y `path`, y luego redirige | `cookie` > `clearSession borra con el mismo nombre y path: /` + `logout` > `redirige a LOGIN_ROUTE DESPUES de cerrar la sesion, no antes` |
+| **R19** | Firma congelada de `logoutAction()`: sin parametros, sin retorno | `logout` > `la firma sigue congelada: sin parametros y sin valor de retorno` |
+| **R20** | Tras cerrar sesion la peticion siguiente resuelve «sin sesion»; volver atras no muestra lo privado | **PARCIAL — ver «Los dos huecos».** Mitad de servidor: `cookie` > `tras clearSession, una peticion sin la cookie (navegador que ya la borro) resuelve sin sesion` |
+| **R21** | El cierre **NO** invalida un valor ya emitido: una copia sigue valiendo hasta su `exp` | `cookie` > `CARACTERIZACION (riesgo asumido, QC-23 lo pondra rojo): una copia del valor sigue valiendo tras cerrar sesion` |
+| **R22** | Adaptador driven detras del puerto, cableado **solo** en composicion; nadie de `app/`, `components/`, `hooks/` lo importa | `guardia-hex` > bloque 13 (`ningun driven real importa composicion, driving propio o UI`, `ningun driving real importa Prisma directo...`, `ninguna composicion real importa la UI`) + `layout` > `el sidebar no importa el proveedor de sesion` + `logout` > `la accion de cierre de sesion no toca cookies desde el navegador ni accede a datos` |
+| **R23** | Las decisiones de validez viven en `domain/`, ejercitables sin cookie, sin Next y sin base | `resolver` > `con claims null no se consulta al lector de usuario`, `con sesion caducada no se consulta al lector de usuario`, `con now igual a expiresAt no consulta al lector de usuario` — los tres con **puertos falsos**, sin Next ni Postgres — mas `claims` y `nombre` enteros, que son dominio puro |
+
+**R24** esta **fuera de alcance** (diferido a QC-9 el 2026-09-02): no se implementa ni se testea.
+
+## Los dos huecos, declarados en vez de rellenados
+
+### R15 — cubierto a medias, y la otra mitad no es util testearla
+
+- *«se leen de `first_names`, `last_names`, `roles.name` y `deleted_at`, que ya existen»* ->
+  **cubierta** por los tests de esquema de QC-4 citados arriba. Si alguien renombra o quita una
+  de esas columnas se ponen rojos, que es justo lo que R15 promete.
+- *«no hace falta ninguna migracion ni columna nueva»* -> **no se testea, y es deliberado.** Es
+  una afirmacion sobre el **diff de esta feature**, no sobre el sistema en ejecucion. Verificado:
+
+```
+$ git diff --stat origin/dev...HEAD -- db/ package.json
+(vacio: QC-8 no toca ni el esquema, ni las migraciones, ni las dependencias)
+```
+
+  Un test que lo afirmara tendria que fijar la lista o el numero de migraciones existentes, y
+  entonces **se pondria rojo cada vez que otra feature añadiera la suya legitimamente**: un
+  impuesto de mantenimiento que no protege nada. Se deja como comprobacion de diff.
+
+### R20 — la mitad del navegador no esta cubierta, y no puede estarlo aqui
+
+La mitad de servidor si lo esta. Pero *«volver atras en el historial NO DEBE mostrar contenido
+privado»* depende de la **cache de pagina del navegador**, y **ningun test de servidor puede
+afirmarlo**. Es exactamente lo que se pierde al diferir R24, ya anotado en `requirements.md`
+bajo esa nota. **QC-9 lo hereda** con su recorrido de Playwright.
+
+## Cobertura añadida en T15 que `tasks.md` no pedia
+
+Al construir el mapa aparecieron **dos requisitos sin ningun test que los afirmara de verdad**.
+Se escribieron, en vez de rellenar la casilla con el test mas cercano:
+
+1. **R5, clausula «no debe existir una segunda implementacion»** — solo se habia comprobado a
+   mano con un `grep`. Ahora hay guardia, y **se verifico que se pone roja de verdad**: con un
+   `createHmac` intruso en `lib/shared/routes.ts` fallo nombrando el archivo infractor. Se eligio
+   una **guardia** y no un test normal porque las guardias **no importan lo que vigilan**: ningun
+   grafo de imports las selecciona, y por eso el gate las corre siempre enteras
+   (`docs/verification.md`).
+2. **R20, mitad de servidor** — nada ataba «cerrar sesion» con «la peticion siguiente no tiene
+   sesion».
+
+## Estado de la verificacion al cerrar T15
+
+```
+$ pnpm run typecheck                          -> verde
+$ pnpm run lint                               -> verde
+$ pnpm exec vitest run guard                  -> 6 archivos, 67 tests, verde
+$ pnpm exec vitest run --project ui --project node
+ Test Files  35 passed (35)
+      Tests  352 passed (352)
+```
+
+Los de **integracion** no los corre el implementer: son del gate (`./init.sh`), que corre el
+leader antes del PR (T16).
