@@ -315,7 +315,8 @@ Depende de: T6, T8, T11.
 
 Depende de: T1-T9, T11, T12.
 
-- [ ] `./init.sh` completo en verde (obligatorio antes del PR, sin excepcion).
+- [x] `./init.sh` completo en verde (obligatorio antes del PR, sin excepcion). Corrido por
+      el leader el 2026-09-01: 27 archivos, 274 tests, sin rojos nuevos, baseline vacio.
 - [x] `progress/impl_QC-7-login-usuario-y-contrasena.md` con la salida real de los tests y el
       mapa `R<n> -> test` de la tabla de abajo.
 - [x] Anotar en `progress/current.md > Deudas`: (a) el logout de QC-8 borra la cookie pero no
