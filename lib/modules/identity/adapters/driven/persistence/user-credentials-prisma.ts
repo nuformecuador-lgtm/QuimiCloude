@@ -61,11 +61,23 @@ export async function findActiveByUsername(username: string): Promise<Authentica
  * en paralelo leerian `0` y escribirian todos `1`, y la cuenta no se bloquearia nunca. Si el
  * `UPDATE` no afecta a ninguna fila, otro intento se adelanto y el dominio relee y recalcula.
  *
- * El predicado usa SOLO los dos enteros, NO `locked_until`: la columna es `timestamptz(6)`
- * —microsegundos en Postgres— y un `Date` de JS solo tiene milisegundos, asi que meterla en el
- * `where` es una comparacion que un dia deja de casar en silencio y el CAS no volveria a
- * aplicar nunca. Ademas no hace falta: el par `(failedAttempts, lockLevel)` ya identifica cada
- * estado de la cadena de transiciones.
+ * El par `(failedAttempts, lockLevel)` NO identifica por si solo el estado de la fila, y por eso
+ * no basta como predicado. `(0, 1)` existe con dos `locked_until` distintos: como bloqueo recien
+ * consumado —`(0, 1, T_futuro)`— y como ese mismo bloqueo ya caducado —`(0, 1, T_pasado)`—; y se
+ * vuelve a `(0, 1)` despues de un login correcto, que deja `(0, 0, null)`, mas otros cinco
+ * fallos. Es un ABA de manual: un intento que leyo `(0, 1, T_pasado)` y llega tarde con su
+ * escritura casaria el predicado contra un bloqueo VIVO y lo borraria, dejando fuera al bloqueo
+ * que la politica acababa de imponer. Se comprobo ejecutandolo contra Postgres.
+ *
+ * Por eso el predicado exige ademas que **no haya bloqueo vigente en `now`**, y lo hace con un
+ * RANGO (`locked_until` nulo o `<= now`) y no con una igualdad contra `esperado.lockedUntil`.
+ * La distincion no es de estilo: `locked_until` es `timestamptz(6)` —microsegundos en Postgres—
+ * y un `Date` de JS solo llega al milisegundo, asi que una igualdad seria una comparacion que
+ * un dia deja de casar en silencio y el CAS no volveria a aplicar nunca. Un rango no necesita
+ * que las marcas de tiempo casen exactamente, solo que caigan del lado correcto.
+ *
+ * Los tres caminos legitimos siguen pasando: el fallo normal y el quinto fallo salen de filas
+ * con `locked_until` nulo, y un bloqueo ya caducado entra por el `lte: now`.
  *
  * `updateMany` y no `update` porque el `where` lleva columnas que no son clave; como `id` si es
  * la primaria, el conjunto afectado es de 0 o 1 filas.
@@ -74,12 +86,14 @@ export async function compareAndSetLoginAttempt(
   userId: string,
   esperado: AccountLockState,
   siguiente: AccountLockState,
+  now: Date,
 ): Promise<boolean> {
   const { count } = await prisma.user.updateMany({
     where: {
       id: userId,
       failedLoginAttempts: esperado.failedAttempts,
       lockLevel: esperado.lockLevel,
+      OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
     },
     data: {
       failedLoginAttempts: siguiente.failedAttempts,

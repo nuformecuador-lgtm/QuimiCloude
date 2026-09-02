@@ -319,6 +319,99 @@ describe('login contra Postgres real', () => {
     expect(bloqueo.lockedUntil?.getTime()).toBeGreaterThan(antes);
   });
 
+  // --- El CAS no puede pisar un bloqueo VIVO (ABA) ------------------------------------------
+  // El par `(failedAttempts, lockLevel)` NO identifica el estado de la fila: `(0, 1)` es tanto
+  // un bloqueo recien consumado como ese mismo bloqueo ya caducado, y se vuelve a `(0, 1)` tras
+  // un login correcto mas otros cinco fallos. Un intento que leyo la version caducada y llega
+  // tarde casaria el predicado contra el bloqueo nuevo y lo borraria. Estos dos casos son los
+  // que exigen que el `where` mire ademas `locked_until`, y por RANGO: `timestamptz(6)` guarda
+  // microsegundos y un `Date` de JS solo milisegundos, asi que una igualdad seria fragil.
+
+  it('un intento con estado obsoleto no puede borrar un bloqueo vigente', TIEMPO_HOLGADO, async () => {
+    // R25, R30 — se llama al ADAPTADOR real, no al caso de uso: es el unico modo de fabricar la
+    // carrera exacta (un intento que quedo con una copia vieja del estado durante su bcrypt).
+    const finDelBloqueo = new Date(Date.now() + 60_000);
+    await prisma.user.update({
+      where: { id: usuarioId },
+      data: { failedLoginAttempts: 0, lockLevel: 1, lockedUntil: finDelBloqueo },
+    });
+
+    // Lo que ese intento habria leido cuando el bloqueo ANTERIOR ya estaba caducado: mismos dos
+    // enteros que la fila tiene ahora, distinto `locked_until`.
+    const estadoObsoleto = {
+      failedAttempts: 0,
+      lockLevel: 1,
+      lockedUntil: new Date(Date.now() - 60_000),
+    };
+
+    const aplico = await compareAndSetLoginAttempt(
+      usuarioId,
+      estadoObsoleto,
+      // Un fallo calculado sobre esa copia vieja: anularia el bloqueo que hay ahora en la fila.
+      { failedAttempts: 1, lockLevel: 1, lockedUntil: null },
+      new Date(),
+    );
+
+    expect(aplico).toBe(false);
+    // Las tres columnas intactas: el bloqueo sigue exactamente donde lo dejo la politica.
+    expect(await leerBloqueo()).toEqual({
+      failedLoginAttempts: 0,
+      lockLevel: 1,
+      lockedUntil: finDelBloqueo,
+    });
+  });
+
+  it('un fallo tras un bloqueo caducado si se registra', TIEMPO_HOLGADO, async () => {
+    // R22, R26 — la otra cara del test anterior: exigir que no haya bloqueo VIGENTE no puede
+    // cerrar el camino legitimo. La fila queda en `(0, 1, T_pasado)` —bloqueo cumplido— y el
+    // siguiente fallo tiene que contar, empezando una cadena nueva sin perder el nivel.
+    const bloqueoCumplido = new Date(Date.now() - 60_000);
+    await prisma.user.update({
+      where: { id: usuarioId },
+      data: { failedLoginAttempts: 0, lockLevel: 1, lockedUntil: bloqueoCumplido },
+    });
+
+    const { verificar, sesion } = montarLogin();
+
+    expect(await verificar({ username: nombreDeUsuario, password: CLAVE_INCORRECTA })).toEqual({
+      ok: false,
+    });
+
+    expect(await leerBloqueo()).toEqual({
+      failedLoginAttempts: 1,
+      lockLevel: 1,
+      lockedUntil: null,
+    });
+    expect(sesion.tickets).toHaveLength(0);
+  });
+
+  it('fallos en paralelo sobre una cuenta bloqueada no la desbloquean', TIEMPO_HOLGADO, async () => {
+    // R24, R25 — el mismo ABA pero de extremo a extremo, por el caso de uso y con cinco
+    // intentos a la vez: el bloqueo tiene que sobrevivir y seguir siendo EL MISMO instante.
+    const finDelBloqueo = new Date(Date.now() + 60_000);
+    await prisma.user.update({
+      where: { id: usuarioId },
+      data: { failedLoginAttempts: 0, lockLevel: 1, lockedUntil: finDelBloqueo },
+    });
+
+    const { verificar, sesion } = montarLogin();
+
+    const resultados = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        verificar({ username: nombreDeUsuario, password: CLAVE_INCORRECTA }),
+      ),
+    );
+
+    expect(resultados.every((resultado) => resultado.ok === false)).toBe(true);
+    expect(sesion.tickets).toHaveLength(0);
+
+    const bloqueo = await leerBloqueo();
+    expect(bloqueo.lockedUntil).toEqual(finDelBloqueo);
+    expect(bloqueo.lockedUntil?.getTime()).toBeGreaterThan(Date.now());
+    expect(bloqueo.lockLevel).toBe(1);
+    expect(bloqueo.failedLoginAttempts).toBe(0);
+  });
+
   it('intentos en paralelo durante el bloqueo no lo alargan', TIEMPO_HOLGADO, async () => {
     // R25 — martillear una cuenta ya bloqueada, en paralelo, no mueve ninguna de las tres
     // columnas: ni contador, ni nivel, ni fin del bloqueo.

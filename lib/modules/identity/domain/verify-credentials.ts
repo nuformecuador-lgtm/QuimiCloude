@@ -81,6 +81,11 @@ export function createVerifyCredentials(
    * `compareAndSet` pierde la carrera, se relee y se **recalcula la politica** sobre el estado
    * fresco: la escalada la sigue decidiendo `nextLockState`, nunca el adaptador.
    *
+   * El `isLocked` de aqui se evalua sobre una copia que pudo envejecer durante esos ~110 ms, asi
+   * que no basta: al CAS se le pasa el mismo `now` para que la propia base rechace la escritura
+   * si la fila esta bloqueada. Sin eso, un intento con estado obsoleto podria borrar un bloqueo
+   * vivo (ver `compareAndSetLoginAttempt`).
+   *
    * Este bucle NO llama al hasher: el numero de verificaciones por intento sigue siendo uno
    * exacto en los tres caminos (R6, R29).
    */
@@ -95,7 +100,9 @@ export function createVerifyCredentials(
       // alarga ni sube el nivel (R25).
       if (isLocked(estado, now)) return;
       const siguiente = nextLockState(estado, 'failure', now);
-      if (await deps.attempts.compareAndSet(visto.id, estado, siguiente)) return;
+      // `now` va al puerto: la escritura tiene que rechazarla la base si la fila esta bloqueada
+      // en ese instante, porque `estado` es una copia que pudo quedar obsoleta durante bcrypt.
+      if (await deps.attempts.compareAndSet(visto.id, estado, siguiente, now)) return;
       // Perdio la carrera: se relee y se recalcula la politica sobre el estado FRESCO.
       const fresco = await deps.users.findActiveByUsername(usuarioNormalizado);
       // Borrado o renombrado entre medias: no se escribe nada (R31).

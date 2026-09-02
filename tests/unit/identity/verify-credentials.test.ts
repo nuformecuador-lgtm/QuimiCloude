@@ -6,7 +6,11 @@ import {
   createPasswordHash,
   verifyPasswordHash,
 } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { nextLockState, type AccountLockState } from '@/lib/modules/identity/domain/account-lock';
+import {
+  LOCK_DURATIONS_MS,
+  nextLockState,
+  type AccountLockState,
+} from '@/lib/modules/identity/domain/account-lock';
 import type { SessionTicket } from '@/lib/modules/identity/domain/session';
 import {
   DECOY_SECRET,
@@ -54,6 +58,7 @@ function montar(usuarios: readonly AuthenticatableUser[] = [USUARIO], nombre = '
           userId: string,
           esperado: AccountLockState,
           siguiente: AccountLockState,
+          now: Date,
         ) => Promise<boolean>
       >(async () => true),
     set: vi.fn<(userId: string, estado: AccountLockState) => Promise<void>>(async () => {}),
@@ -332,7 +337,29 @@ describe('verificacion de credenciales', () => {
       USUARIO.id,
       expect.objectContaining({ failedAttempts: 2, lockLevel: 1, lockedUntil: null }),
       esperado,
+      // El cuarto argumento es el instante del intento: sin el, la base no podria rechazar la
+      // escritura cuando la fila esta bloqueada (ver el test del reloj, mas abajo).
+      expect.any(Date),
     );
+  });
+
+  // R22, R25 - el `now` que viaja al puerto es el MISMO reloj con el que el dominio decide.
+  it('el reloj que recibe compareAndSet es el que uso la politica en esa invocacion', async () => {
+    // El quinto fallo consuma el bloqueo, y `nextLockState` calcula su fin como `now + 1 min`.
+    // Eso ata el cuarto argumento al reloj del dominio de forma comprobable: si el adaptador
+    // recibiera un instante distinto (otro `new Date()`, o el del reintento), esta igualdad
+    // exacta no se cumpliria y el `where` podria evaluar el bloqueo con un reloj que no es el
+    // que decidio la escritura.
+    const casiBloqueado: AuthenticatableUser = { ...USUARIO, failedAttempts: 4 };
+    const { verifyCredentials, attempts } = montar([casiBloqueado]);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    const [, , siguiente, now] = attempts.compareAndSet.mock.calls[0] ?? [];
+    const unMinuto = LOCK_DURATIONS_MS[0] ?? 0;
+    expect(now).toBeInstanceOf(Date);
+    expect(siguiente?.lockLevel).toBe(1);
+    expect(siguiente?.lockedUntil?.getTime()).toBe((now?.getTime() ?? 0) + unMinuto);
   });
 
   // R31
@@ -368,6 +395,13 @@ describe('verificacion de credenciales', () => {
     // ...y el reintento condiciona sobre el estado FRESCO, no sobre el que quedo obsoleto.
     const [, esperado, siguiente] = attempts.compareAndSet.mock.calls[1] ?? [];
     expect(esperado).toMatchObject({ failedAttempts: 3, lockLevel: 0 });
+
+    // El reloj es UNO por invocacion: los dos intentos de escritura reciben exactamente el
+    // mismo `Date`, no dos lecturas distintas del reloj separadas por el reintento.
+    const relojPrimero = attempts.compareAndSet.mock.calls[0]?.[3];
+    const relojSegundo = attempts.compareAndSet.mock.calls[1]?.[3];
+    expect(relojPrimero).toBeInstanceOf(Date);
+    expect(relojSegundo).toBe(relojPrimero);
     // Y la politica se recalcula sobre ese estado fresco: 3 -> 4, no 0 -> 1.
     expect(siguiente).toEqual({ failedAttempts: 4, lockLevel: 0, lockedUntil: null });
 
