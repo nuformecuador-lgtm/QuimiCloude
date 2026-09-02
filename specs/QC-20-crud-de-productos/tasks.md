@@ -91,12 +91,19 @@
       *Depende de:* T6, T7, T9, T10. **Hecho cuando:** la guardia de módulos pasa y el contrato
       no arrastra `'use server'`, Prisma ni `next/*` en su cierre transitivo.
 
-- [ ] **T12 — Server Actions.** `adapters/driving/product-actions.ts` y
+- [x] **T12 — Server Actions.** `adapters/driving/product-actions.ts` y
       `presentation-actions.ts`: `'use server'`, actor desde `identity.getSessionUser()` vía
       `@/lib/composition` (`design.md > 5`), errores traducidos a estado serializable. Comentario
       explícito de que el proveedor de sesión es el stub hasta QC-8.
       *Depende de:* T11. **Hecho cuando:** `tests/unit/inventario/product-actions.test.ts` pasa
       y no existe ningún route handler nuevo.
+      **Nota de implementación:** QC-8 ya está `done` en este árbol (mergeó antes que esta
+      tanda), así que `identity.getSessionUser()` está cableado a la sesión REAL
+      (`session-cookie.ts` + `session-user-prisma.ts`), no al stub de QC-7 que este enunciado
+      y `design.md > 5` describen. El comentario de cabecera de `product-actions.ts` documenta
+      el estado actual y aclara que el del `design.md` es el anterior a QC-8; no se reabre el
+      diseño, solo se anota la divergencia con el disco (regla 6 de `CLAUDE.md`). Detalle en
+      `progress/impl_QC-20-crud-de-productos.md`.
 
 ## Grupo D — verificación contra la base y cierre
 

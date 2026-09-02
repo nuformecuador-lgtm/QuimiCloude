@@ -396,3 +396,132 @@ buscar en el sitio equivocado. El error aqui fue medir con `grep -c $'\r'` y con
 repo, que es LF, hay que escribir **siempre** con `newline=''` (o en binario). Un archivo que
 sale CRLF de una edicion automatizada ensucia el diff entero y puede romper tests que barren
 texto linea a linea.
+
+---
+
+# Cierre del Grupo C — T12: Server Actions
+
+## Archivos
+
+- `lib/modules/inventario/adapters/driving/product-actions.ts` (nuevo)
+- `lib/modules/inventario/adapters/driving/presentation-actions.ts` (nuevo)
+- `lib/modules/inventario/adapters/driving/.gitkeep` (borrado, ya no hace falta: la carpeta
+  tiene contenido)
+- `tests/unit/inventario/product-actions.test.ts` (nuevo, 15 tests)
+- `specs/QC-20-crud-de-productos/tasks.md` (T12 marcada `[x]`, con la nota de la divergencia
+  de abajo)
+
+## Divergencia encontrada entre `design.md`/el enunciado y el estado real del arbol
+
+El enunciado de esta tanda y `design.md > 5` dicen que `identity.getSessionUser()` esta
+cableado **hoy** al stub de QC-7 (`id: 'placeholder-user'`), y que una mutacion pasaria la
+autorizacion pero moriria en la FK de R7. **Eso ya no es cierto en este arbol.** Comprobado
+en disco:
+
+- `feature_list.json` marca `QC-8` como `"status": "done"`.
+- `lib/composition/index.ts` cablea `sessionProvider.getSessionUser` a
+  `createResolveSessionUser({ session: sessionReader, users: sessionUserReader })`, con
+  `sessionReader = { readClaims: readSessionClaims }` (`session-cookie.ts`, cookie HMAC real)
+  y `sessionUserReader = { findActiveById: findActiveSessionUserById }`
+  (`session-user-prisma.ts`, consulta real a `users`). No hay ningun archivo
+  `session-stub.ts` en el arbol (`grep -r session-stub` no encuentra ninguno bajo `lib/`).
+
+No invento un dato nuevo (regla 6 de `CLAUDE.md`): el `design.md` de esta ficha describe el
+estado del arbol **anterior a que QC-8 mergeara**, y la sesion de esta tanda arranco
+**despues** de ese merge (ver preambulo de la tarea: «la rama acaba de mergear
+`origin/dev`»). No se reabre el diseno ni se reescribe `design.md` — D17 preveia exactamente
+esto («QC-8 no tendra que tocar `inventario`: cambia el cableado en
+`lib/composition/index.ts` y ya»), y es lo que paso. Lo que se corrige es el **comentario de
+cabecera** de `product-actions.ts`, que documenta el estado real (sesion real, cableada por
+QC-8) y dice explicitamente que el `design.md` describe el estado previo. Anotado tambien en
+`tasks.md > T12`.
+
+## Forma de entrada elegida por operacion, y por que
+
+| Action | Forma de entrada | Por que |
+| --- | --- | --- |
+| `createProductAction`, `updateProductAction` | `FormData` (patron `useFormState`: `(prevState, formData)`) | Mutaciones que salen de un formulario (QC-22). El esquema (`createProductSchema`) vive en el caso de uso y exige `z.number()` en cinco campos; `FormData` solo entrega cadenas, asi que la action **convierte antes de validar** con `readOptionalFormInt`, que devuelve un sentinela `INVALID_NUMBER` (no `NaN`) ante una cadena no numerica, y la action rechaza sin llamar al caso de uso. Sin esto, `Number('abc')` es `NaN`, y `NaN` pasa `z.number().int()` como valor valido -R28 se incumpliria en silencio-. |
+| `deleteProductAction` | `FormData` con un campo oculto `id` | Es una mutacion de formulario (un boton con un `<form>` de un solo campo, mismo patron de progressive enhancement que create/update). Sin campos numericos, no hay conversion que vigilar. |
+| `getProductAction` | argumento tipado `(id: string)` | Es una consulta invocada programaticamente por un Server/Client Component que ya tiene el `id` (de la URL o de una fila ya cargada), no un envio de formulario. |
+| `listProductsAction` | argumento tipado `(query: unknown)` | Es una consulta; quien llama ya tiene `{ page, pageSize }` como numeros (parseados de `searchParams`, por ejemplo). La validacion del minimo/entero la hace `pageQuerySchema` **dentro** del caso de uso (R28); la action no la repite, solo traduce. |
+| Los cuatro equivalentes de `presentation-actions.ts` | mismo criterio | `createPresentationSchema`/`updatePresentationSchema` solo tienen `name` (cadena): no hay ningun campo numerico que convertir, asi que no hay sentinela `INVALID_NUMBER` en este archivo. |
+
+**Por que no hay un archivo `*-form-state.ts` separado, a diferencia de `identity`.** Un
+archivo con `'use server'` en Next.js **solo puede exportar funciones `async`** (restriccion
+real del compilador, no una convencion del repo). `identity` resuelve esto con
+`login-form-state.ts` **sin** `'use server'`, en el mismo directorio. Eso no es una opcion
+aqui: el test de alcance de esta ficha
+(`tests/unit/inventario/scope.test.ts`) exige que **todo** archivo `.ts`/`.tsx` bajo
+`adapters/driving/` declare `'use server'` en la primera linea, y `design.md > 1` solo
+enumera dos archivos ahi (`product-actions.ts`, `presentation-actions.ts`). Se resolvio
+exportando **solo tipos** (`export type CreateProductFormState = ...`, erasable en
+compilacion, permitido en un archivo `'use server'`) y **ninguna** constante `INITIAL_STATE`:
+quien consuma la action (QC-22) construye el literal `{ status: 'idle' }` con el tipo
+exportado.
+
+## Traduccion de errores
+
+`toErrorState(error)` en cada archivo: si `error instanceof InventarioError` (importado del
+**barrel**, no por ruta profunda), devuelve `{ status: 'error', code: error.code, message:
+error.message }` con el `code` **estable** de la clase (`unauthorized`, `not_found`,
+`duplicate_name`, `presentation_in_use`, `invalid_input`), nunca el texto. Cualquier otro
+error se **relanza** (`throw error`) — nada de `catch` vacios.
+
+## Test `tests/unit/inventario/product-actions.test.ts`
+
+Mockea `@/lib/composition` (`identity.getSessionUser`, y las nueve — aqui cinco de
+producto — factories ya cableadas de `inventario`), mismo patron que
+`tests/unit/identity/login-action.test.ts`/`logout-action.test.ts`. 15 tests, cubriendo las
+cinco operaciones de producto:
+
+- `la Server Action rechaza la entrada invalida antes de llamar al caso de uso` (R28, nombre
+  EXACTO de `tasks.md > Trazabilidad`).
+- que el actor sale de `identity.getSessionUser()` y se traduce a `{ id, roleName }` antes de
+  pasarlo al caso de uso, incluido el caso sin sesion (`actor: null`, falla cerrado, R3).
+- que cada clase de `InventarioError` (`UnauthorizedError`, `NotFoundError`,
+  `ValidationError`) se traduce a su `code` estable, y que un error que NO es de dominio se
+  relanza sin traducir.
+
+No se duplico el mismo test para `presentation-actions.ts`: el patron de conversion, actor y
+traduccion de errores es identico y ya esta demostrado; `presentation-actions.ts` no tiene
+ningun camino de conversion numerica que `product-actions.ts` no cubra ya.
+
+## Mutaciones (obligatorias, todas revertidas)
+
+| # | Aserción que debía caer | Qué se mutó | Mensaje de fallo visto |
+| --- | --- | --- | --- |
+| 1 | `la Server Action rechaza la entrada invalida antes de llamar al caso de uso` (R28) | Se quitó el `if (candidate === INVALID_NUMBER) return ...` de `createProductAction`, dejando que la conversión inválida llegara igual al caso de uso mockeado | `TypeError: Cannot destructure property 'id' of '(intermediate value)' as it is undefined` — el mock por defecto de `createProductMock` no devuelve nada, y el test cayó porque `createProductMock` SÍ se llamó (rompiendo la premisa de "sin llamar al caso de uso") |
+| 2 | traducción de error a `code` estable, en las 5 operaciones que la ejercitan | `toErrorState` se cambió a `throw error;` sin comprobar `instanceof InventarioError` | 5 tests caídos: `ValidationError: La entrada recibida no es valida.` / `NotFoundError: El recurso solicitado no existe.` propagándose crudos en vez de `{status:'error', code:...}` |
+| 3 | que el actor sale de `identity.getSessionUser()` | `currentActor()` se cambió para devolver un actor fijo (`{ id: 'placeholder-user', roleName: 'Administrador' }`) sin llamar a `identity.getSessionUser()` | 6 tests caídos, todos con el mismo patrón: `expected "vi.fn()" to be called with arguments: [..., { id: 'user-admin-1', ... }] / Received: [..., { id: 'placeholder-user', ... }]` |
+
+Las tres mutaciones se revirtieron (restauradas desde una copia del archivo original) y se
+re-corrió la suite completa para confirmar que vuelve a verde.
+
+## Verificación ejecutada
+
+- `pnpm run typecheck` → limpio.
+- `pnpm run lint` → limpio.
+- `pnpm run test:guardias` → 7 archivos, 78 tests, verde (incluye `guard-arquitectura-modulos`
+  y `guard-dependencias-aprobadas`).
+- `pnpm exec vitest run tests/unit/ tests/ui/` → **49 archivos, 482 tests, verde** (baseline
+  48/467 + el archivo nuevo de 15 tests = 49/482, exacto).
+- `tests/unit/inventario/scope.test.ts` sigue verde y **ahora ejercita la cláusula positiva**
+  de R29 de verdad: con `product-actions.ts` y `presentation-actions.ts` ya en el disco, el
+  bucle `for (const file of typescriptFilesIn(drivingDir))` itera dos archivos y afirma que
+  los dos empiezan por `'use server'`. Antes de esta tanda esa cláusula no iteraba nada (T15
+  lo documentaba explícitamente como "TODAVÍA" sin archivos); ya no está infalseable.
+- `tests/unit/inventario/schema/inventario-schema.test.ts` sigue verde: los dos archivos
+  nuevos importan el barrel `@/lib/modules/inventario` en runtime (`InventarioError`, tipos)
+  desde dentro de `lib/modules/inventario/`, así que quedan exentos de la regla "import type
+  fuera de `lib/composition`" por la exención 2 (subrutas del propio módulo) — se confirmó
+  corriendo el test, no se dio por hecho.
+- No se corrió `pnpm test` completo, `./init.sh`, ni ningún test de integración: fuera del
+  encargo de esta tanda.
+
+## Veredicto
+
+T12 cerrada: nueve operaciones expuestas como Server Actions en `adapters/driving/`, sin
+ningún route handler nuevo, con el actor resuelto por `identity.getSessionUser()` y los
+errores de dominio traducidos a estado serializable; las tres mutaciones obligatorias
+confirmaron que las aserciones del test son reales, y la suite completa de `tests/unit/` +
+`tests/ui/` queda en 49/482 verde.
