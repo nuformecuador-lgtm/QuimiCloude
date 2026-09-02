@@ -94,18 +94,38 @@ problema de fuente sino de artefacto generado ausente. Se reporta y **no se toca
 regeneracion del entorno no la hace el implementer, y menos con otra sesion escribiendo en este
 worktree (ver abajo).
 
-## Interferencia externa en el worktree (no es de QC-8)
+## Incidente de git en el worktree: un `git stash pop` sobre un stash AJENO
 
-El 2026-09-02 a las 09:46 aparecio en este worktree un **merge conflictivo de `origin/dev` a
-medias** (`UU` en `db/schema.prisma`, `package.json` y `progress/current.md`), que se abortó
-solo entre dos comandos consecutivos. No lo lanzo esta sesion. Quedaron dos artefactos
-**ajenos y sin comitear**, que se han dejado intactos a proposito:
+El 2026-09-02 a las 09:46 aparecio en este worktree un arbol conflictivo (`UU` en
+`db/schema.prisma`, `package.json` y `progress/current.md`) que se deshizo solo entre dos
+comandos consecutivos. **Causa identificada, y no fue una sesion externa:** el subagente
+`backend_dev` del bloque 1 hizo `git stash` para comprobar si el rojo de typecheck era
+preexistente y luego `git stash pop`, y lo que aplico fue un **stash ajeno y preexistente**:
+
+```
+stash@{0}: On dev: WIP siembra QC-20/QC-22 + prisma.config (pre-merge QC-14)
+```
+
+El subagente lo reporto en vez de taparlo, y revirtio los archivos trackeados con
+`git checkout HEAD -- <archivos>`. **No se perdio nada**: el pop dio conflicto, asi que git
+**no descarto la entrada** y el stash sigue en la lista con sus 4 archivos
+(`db/schema.prisma`, `feature_list.json`, `package.json`, `progress/current.md`).
+Verificado con `git stash list` y `git stash show --stat stash@{0}`.
+
+**Leccion para el arnes:** `git stash`/`git stash pop` es una operacion **global del repo**, no
+del worktree, y en un repo con varias features en paralelo puede aplicar el trabajo a medias de
+otro. Ningun subagente deberia usarla; para saber si un rojo es preexistente basta con mirar si
+los errores citan archivos propios.
+
+Quedaron dos artefactos **ajenos y sin comitear**, residuo de la parte sin trackear de ese
+stash, que se han dejado intactos a proposito (que hacer con ellos y con el stash lo decide el
+leader con su dueño original):
 
 - `prisma.config.ts`
 - `specs/QC-20-crud-de-productos/`
 
 Los commits de QC-8 se hacen con `git add` de **rutas explicitas**, nunca `git add -A`, para que
-esos dos no entren en la rama. `origin/dev` ha avanzado a `f1484ef` y trae cambios en
+esos dos no entren en la rama. El `origin/dev` remoto ha avanzado a `f1484ef` y trae cambios en
 `package.json`, `db/schema.prisma`, `prisma.config.ts` y el spec de QC-20; **si se mergea o no
 es decision del leader**, no de esta bitacora.
 
