@@ -84,6 +84,32 @@ import {
 } from '@/lib/modules/recetas/adapters/driven/storage/recipe-image-supabase';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
+import {
+  createCreateCatalogLine,
+  createCreateSupplier,
+  createDeleteCatalogLine,
+  createDeleteSupplier,
+  createGetSupplier,
+  createListCatalogLines,
+  createListSuppliers,
+  createUpdateCatalogLine,
+  createUpdateSupplier,
+} from '@/lib/modules/proveedores';
+import {
+  createSupplier,
+  findAliveSupplierById,
+  listAliveSuppliers,
+  softDeleteAliveSupplier,
+  updateAliveSupplier,
+} from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-prisma';
+import {
+  createCatalogLine,
+  deleteCatalogLineById,
+  listCatalogLinesBySupplierAlive,
+  updateCatalogLineTerms,
+} from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma';
+import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
+import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -247,4 +273,59 @@ export const recetas = {
     images: recipeImageStorage,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// `proveedores` (QC-43, T13). Bloque NUEVO al final, igual criterio que el de `recetas`:
+// no reordena ni reformatea nada de lo de arriba -diff minimo, hay otras sesiones tocando
+// este archivo-. Sus imports viven al final del bloque de imports, arriba.
+//
+// `productCatalog` NO se vuelve a construir: se REUTILIZA la constante que QC-25 ya dejo
+// cableada mas arriba (`design.md > 10`). Dos instancias del mismo puerto serian dos
+// cableados que pueden divergir.
+// ---------------------------------------------------------------------------------------
+
+const supplierRepository: SupplierRepository = {
+  create: createSupplier,
+  findAliveById: findAliveSupplierById,
+  updateAlive: updateAliveSupplier,
+  softDeleteAlive: softDeleteAliveSupplier,
+  listAlive: listAliveSuppliers,
+};
+
+const supplierCatalogRepository: SupplierCatalogRepository = {
+  create: createCatalogLine,
+  updateTerms: updateCatalogLineTerms,
+  deleteById: deleteCatalogLineById,
+  listBySupplierAlive: listCatalogLinesBySupplierAlive,
+};
+
+/**
+ * Fachada del modulo `proveedores` ya cableada (T13, `design.md > 10`). Es lo que consumen
+ * las dos Server Actions de T14.
+ *
+ * El ACTOR NO se resuelve aqui, mismo criterio que `inventario` y `recetas`: cada caso de
+ * uso lo recibe por parametro y quien lo obtiene de `identity.getSessionUser()` es la
+ * Server Action (R5, decision cerrada 11).
+ *
+ * La paginacion tampoco se inyecta: a diferencia de `recetas`, el adaptador driven de
+ * `proveedores` usa `toOffsetLimit`/`buildPage` directamente (R45, `design.md > 8`), asi
+ * que el dominio no necesita recibirla.
+ */
+export const proveedores = {
+  createSupplier: createCreateSupplier({ suppliers: supplierRepository }),
+  updateSupplier: createUpdateSupplier({ suppliers: supplierRepository }),
+  deleteSupplier: createDeleteSupplier({ suppliers: supplierRepository }),
+  getSupplier: createGetSupplier({ suppliers: supplierRepository }),
+  listSuppliers: createListSuppliers({ suppliers: supplierRepository }),
+  createCatalogLine: createCreateCatalogLine({
+    catalog: supplierCatalogRepository,
+    products: productCatalog,
+  }),
+  updateCatalogLine: createUpdateCatalogLine({ catalog: supplierCatalogRepository }),
+  deleteCatalogLine: createDeleteCatalogLine({ catalog: supplierCatalogRepository }),
+  listCatalogLines: createListCatalogLines({
+    catalog: supplierCatalogRepository,
+    products: productCatalog,
+  }),
 } as const;

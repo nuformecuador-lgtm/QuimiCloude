@@ -12,8 +12,15 @@
 // escrita a mano en la migracion, para que el cliente Prisma no pueda atravesar de
 // modulo con un `include`— y NINGUN `@unique`/`@@unique` sobre el nombre —la unicidad
 // es un indice PARCIAL que Prisma no modela—. Se suman `SupplierCatalogLine` sin
-// `deletedAt`, sin `createdBy` ni `updatedBy` (decision cerrada 14, R25), y que
-// `minPurchase` no lleva `@default` (decision cerrada 4, R13).
+// `deletedAt` (decision cerrada 11, R28) y que `minPurchase` no lleva `@default`
+// (decision cerrada 4, R13).
+//
+// ACTUALIZADO POR QC-43 T3 (2026-09-03): `SupplierCatalogLine` SI declara ahora
+// `createdBy`/`updatedBy` con sus dos `@@index`. Es un cambio DECIDIDO POR EL HUMANO en
+// QC-43 (su decision cerrada 3, R31/R32), que se aparta expresamente de la decision
+// cerrada 14 de QC-42 —«subir el costo es un hecho comercial propio»—. El caso que aqui
+// afirmaba la ausencia pasa a afirmar la PRESENCIA con la misma exigencia: escalares uuid
+// anulables, SIN `@relation` y sin `@default`.
 //
 // No se afirma el censo global de modelos del esquema ni el numero de migraciones del
 // repo: rompe con features paralelas (QC-32 esta tocando el mismo `db/schema.prisma`,
@@ -137,15 +144,20 @@ const SUPPLIER_CATALOG_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = 
   ['cost', 'cost'],
   ['minPurchase', 'min_purchase'],
   ['deliveryTime', 'delivery_time'],
+  // QC-43 (su decision cerrada 3, R31/R32): la linea gana autor propio.
+  ['createdBy', 'created_by'],
+  ['updatedBy', 'updated_by'],
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
 ]
 
-/** Los tres escalares que cruzan de modulo y por eso NO llevan `@relation` (R22). */
+/** Los cinco escalares que cruzan de modulo y por eso NO llevan `@relation` (R22). */
 const CROSS_MODULE_SCALARS: ReadonlyArray<readonly [PrismaModel, string, string]> = [
   [supplierCatalogLine, 'productId', 'product_id'],
   [supplier, 'createdBy', 'created_by'],
   [supplier, 'updatedBy', 'updated_by'],
+  [supplierCatalogLine, 'createdBy', 'created_by'],
+  [supplierCatalogLine, 'updatedBy', 'updated_by'],
 ]
 
 describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
@@ -413,14 +425,41 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     expect(supplier.body).toMatch(/@@index\(\[updatedBy\],\s*map:\s*"suppliers_updated_by_idx"\)/)
   })
 
-  it('SupplierCatalogLine no declara createdBy ni updatedBy', () => {
-    // R25 y decision cerrada 14: la linea no lleva columnas de autor, igual que
-    // `recipe_lines`. Ausencia afirmada en positivo para que nadie las anada «por simetria».
-    expect(has(supplierCatalogLine, 'createdBy')).toBe(false)
-    expect(has(supplierCatalogLine, 'updatedBy')).toBe(false)
-    expect(supplierCatalogLine.body).not.toMatch(/created_by/)
-    expect(supplierCatalogLine.body).not.toMatch(/updated_by/)
-    // El proveedor si la lleva: las dos decisiones conviven a proposito.
+  it('SupplierCatalogLine declara createdBy y updatedBy como escalares uuid opcionales', () => {
+    // QC-43, decision cerrada 3 (R31, R32): subir el costo es un hecho comercial propio y
+    // tiene que dejar rastro EN LA LINEA. Deroga la decision cerrada 14 de QC-42, que
+    // heredaba de `recipe_lines` la ausencia de auditoria.
+    //
+    // Anulables y sin `@default` (R32): NULL es «no lo creo una persona» —una importacion,
+    // un seed—, no «se perdio el dato». Que toda escritura de la APLICACION lleve autor lo
+    // garantiza el service, no el esquema.
+    for (const fieldName of ['createdBy', 'updatedBy'] as const) {
+      const candidate = field(supplierCatalogLine, fieldName)
+      expect(candidate.type).toBe('String')
+      expect(candidate.attributes).toContain('@db.Uuid')
+      expect(
+        candidate.isOptional,
+        `SupplierCatalogLine.${fieldName} debe ser opcional`,
+      ).toBe(true)
+      expect(
+        candidate.attributes,
+        `SupplierCatalogLine.${fieldName} no debe tener @default`,
+      ).not.toMatch(/@default\(/)
+      // La FK real vive escrita a mano en la migracion de QC-43: aqui NO puede haber
+      // `@relation`, o el cliente Prisma podria atravesar de `proveedores` a `identity`.
+      expect(
+        candidate.attributes,
+        `SupplierCatalogLine.${fieldName} NO puede llevar @relation`,
+      ).not.toMatch(/@relation/)
+    }
+    // Con sus indices: Postgres no indexa el lado hijo de una FK y por ahi pasa el RESTRICT.
+    expect(supplierCatalogLine.body).toMatch(
+      /@@index\(\[createdBy\],\s*map:\s*"supplier_catalog_lines_created_by_idx"\)/,
+    )
+    expect(supplierCatalogLine.body).toMatch(
+      /@@index\(\[updatedBy\],\s*map:\s*"supplier_catalog_lines_updated_by_idx"\)/,
+    )
+    // El proveedor sigue llevando las suyas: son cuatro columnas de autor, no dos.
     expect(has(supplier, 'createdBy')).toBe(true)
     expect(has(supplier, 'updatedBy')).toBe(true)
   })
@@ -508,6 +547,9 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
       'suppliers_created_by_idx',
       'suppliers_updated_by_idx',
       'supplier_catalog_lines_product_id_idx',
+      // Los dos que anade QC-43 con las columnas de autor de la linea.
+      'supplier_catalog_lines_created_by_idx',
+      'supplier_catalog_lines_updated_by_idx',
     ])
     expect(supplierCatalogLine.body).toMatch(
       /map:\s*"supplier_catalog_lines_supplier_id_product_id_key"/,

@@ -3,7 +3,7 @@
  *
  * R24 viene HEREDADO de QC-8, donde quedo fuera de alcance porque entonces no existia ninguna
  * URL privada que pedir (`specs/QC-8-sesion-actual-y-logout/requirements.md > Preguntas abiertas 3`).
- * QC-9 la crea —el middleware de `/dashboard`—, asi que el recorrido ya se puede ejercitar
+ * QC-9 la crea —el middleware de `/inventario`—, asi que el recorrido ya se puede ejercitar
  * entero, y ampliado con lo que QC-9 añade: la vuelta a **la ruta que se habia pedido** (R8).
  *
  * Un solo recorrido y un solo test a proposito: lo que R24 exige es la CADENA, y partirla en
@@ -18,16 +18,19 @@
  * (el motor de iOS), donde cookie y bfcache pueden comportarse distinto sin que ningun test de
  * Node lo note.
  *
- * DATOS: este spec NO usa el seed de QC-6 —que sigue `pending`— ni ningun dato preexistente.
- * Crea su propio rol y su propio usuario con hash real y los borra al final. La unica fila
- * ajena de la que depende es `documentTypeCode: 'CC'`, que inserta la migracion de QC-4.
+ * DATOS: este spec SI depende del seed de QC-6 para el rol `Administrador` —el middleware exige
+ * ese rol literal para `/inventario` (`lib/composition/route-role-rules.ts`), asi que un rol
+ * inventado no sirve para demostrar R11-R13—. Lo efimero sigue siendo el USUARIO: se crea con
+ * hash real, colgado del rol `Administrador` real, y se borra al final. El rol nunca se crea ni
+ * se borra aqui, porque `roles.name` es unico y es un dato compartido con produccion/seed, no un
+ * fixture. La otra fila ajena de la que depende es `documentTypeCode: 'CC'`, que inserta la
+ * migracion de QC-4.
  *
  * AISLAMIENTO ENTRE PROYECTOS Y WORKERS: `RUN_ID` se calcula al cargar el modulo, o sea una vez
- * por PROCESO de worker, y va dentro del `username`, del correo, del documento, del nombre del
- * rol y del nombre de pila —los tres indices unicos de `users` y el `name` unico de `roles` son
- * globales, y el nombre de pila entra ahi para que el paso 3 pueda afirmar el nombre EXACTO sin
- * confundirse con el del otro proyecto—. Los prefijos son `qc9_e2e_` y `qc9_e2e_rol_`: propios,
- * distintos de los de `e2e/login.spec.ts`, que comparte base con este.
+ * por PROCESO de worker, y va dentro del `username`, del correo, del documento y del nombre de
+ * pila —los tres indices unicos de `users` son globales, y el nombre de pila entra ahi para que
+ * el paso 3 pueda afirmar el nombre EXACTO sin confundirse con el del otro proyecto—. El prefijo
+ * es `qc9_e2e_`: propio, distinto del de `e2e/login.spec.ts`, que comparte base con este.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
  * importarse (igual que en los tests de integracion), y `next dev` —que arranca el `webServer`
@@ -40,15 +43,17 @@ import { expect, test } from '@playwright/test';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
+// `ADMIN_ROLE_NAME` se toma del barrel de `inventario`, como VALOR (nunca `import type`, nunca
+// por ruta profunda): es la misma regla que ya sigue `lib/composition/route-role-rules.ts`.
+import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
 
-/** Prefijos con los que este spec marca TODO lo que crea. Nada fuera de ellos se toca. */
+/** Prefijo con el que este spec marca TODO usuario que crea. Nada fuera de el se toca. */
 const USERNAME_PREFIX = 'qc9_e2e_';
-const ROLE_NAME_PREFIX = 'qc9_e2e_rol_';
 
 /** Identificador unico de este proceso de worker. */
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -112,56 +117,49 @@ async function createTestUser(): Promise<{
 }
 
 test.beforeAll(async () => {
+  // El rol es el `Administrador` REAL sembrado por QC-6, no un fixture: el middleware exige ese
+  // nombre literal para `/inventario` (`lib/composition/route-role-rules.ts`), asi que no se crea
+  // aqui (`roles.name` es unico: crearlo lo convertiria en dato compartido con produccion/seed).
+  // Si no existe, el fallo tiene que decir exactamente que falta el seed, no un rojo generico de
+  // FK al crear el usuario.
+  const adminRole = await prisma.role.findUnique({
+    where: { name: ADMIN_ROLE_NAME },
+    select: { id: true },
+  });
+  if (!adminRole) {
+    throw new Error(
+      `el rol '${ADMIN_ROLE_NAME}' no existe: correr el seed de QC-6 antes de este E2E`,
+    );
+  }
+  roleId = adminRole.id;
+
   // LIMPIEZA DEFENSIVA DE HUERFANOS. Existe porque un `pnpm run e2e` interrumpido a media
-  // ejecucion deja usuarios y roles `qc9_e2e_*` en la base, y esa basura pone rojo un test de
-  // OTRA feature —`tests/integration/identity/identity-constraints.int.test.ts` afirma
+  // ejecucion deja usuarios `qc9_e2e_*` en la base, y esa basura pone rojo un test de OTRA
+  // feature —`tests/integration/identity/identity-constraints.int.test.ts` afirma
   // `user.count() === 0`—: media hora para entender un rojo que no es del codigo.
-  // El razonamiento completo (por que el corte de edad no se aplica igual a las dos tablas, y
-  // por que el borrado de roles NO va envuelto en `try`/`catch`) esta en `e2e/login.spec.ts`,
-  // que resolvio esto primero; aqui se replica sobre los prefijos propios de QC-9.
+  // Solo usuarios: el rol usado aqui es `Administrador`, un dato real, no un fixture con prefijo,
+  // asi que no hay ningun rol huerfano que barrer (nunca se crea uno con `ROLE_NAME_PREFIX`
+  // porque esa constante ya no existe). El razonamiento completo sobre el corte de edad esta en
+  // `e2e/login.spec.ts`, que resolvio esto primero; aqui se replica sobre el prefijo de usuario
+  // propio de QC-9.
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
-
-  const orphanRoles = await prisma.role.findMany({
-    where: { name: { startsWith: ROLE_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
-    select: { id: true },
-  });
-  const orphanRoleIds = orphanRoles.map((role) => role.id);
-
-  // El prefijo propio sigue siendo condicion en AMBAS ramas del `OR`: ampliar el barrido a los
-  // usuarios de los roles condenados no puede convertirse en una puerta para tocar filas ajenas.
   await prisma.user.deleteMany({
-    where: {
-      username: { startsWith: USERNAME_PREFIX },
-      OR: [{ createdAt: { lt: orphanCutoff } }, { roleId: { in: orphanRoleIds } }],
-    },
+    where: { username: { startsWith: USERNAME_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
-  await prisma.role.deleteMany({ where: { id: { in: orphanRoleIds } } });
-
-  const role = await prisma.role.create({
-    data: {
-      name: `${ROLE_NAME_PREFIX}${RUN_ID}`,
-      description: 'Rol efimero del E2E de sesion (QC-9). Se borra en afterAll.',
-    },
-    select: { id: true },
-  });
-  roleId = role.id;
 });
 
 test.afterAll(async () => {
-  // Borra SIEMPRE, aunque el `beforeAll` fallara a medias o el test reventara: por eso se borra
-  // por prefijo de `RUN_ID` (no por ids acumulados en memoria) y cada paso va en su propio
-  // `try`/`finally`, para que un fallo al borrar usuarios no impida borrar el rol ni cerrar la
-  // conexion. Usuarios primero: la FK `users.role_id` es `onDelete: Restrict`.
+  // Borra SIEMPRE, aunque el test reventara: por eso se borra por prefijo de `RUN_ID` (no por un
+  // id acumulado en memoria). Solo usuarios: el rol (`Administrador`) es un dato real sembrado
+  // por QC-6, nunca un fixture de este test, asi que este `afterAll` NO toca la tabla `roles` en
+  // absoluto —borrar por `name: ADMIN_ROLE_NAME` se llevaria por delante el rol real que usan
+  // otros tests y el propio seed—.
   try {
     await prisma.user.deleteMany({
       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
     });
   } finally {
-    try {
-      await prisma.role.deleteMany({ where: { name: `${ROLE_NAME_PREFIX}${RUN_ID}` } });
-    } finally {
-      await prisma.$disconnect();
-    }
+    await prisma.$disconnect();
   }
 });
 
@@ -177,20 +175,20 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
     const { username, password, displayName } = await createTestUser();
 
     // --- 1. Ruta privada sin sesion -> login, con la ruta pedida como destino de vuelta (R2, R7).
-    await page.goto(DASHBOARD_ROUTE);
+    await page.goto(INVENTORY_ROUTE);
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
     expect(
       new URL(page.url()).searchParams.get(RETURN_PARAM),
       'el login debe recordar la ruta que se habia pedido',
-    ).toBe(DASHBOARD_ROUTE);
+    ).toBe(INVENTORY_ROUTE);
 
     // --- 2. Credenciales correctas -> se acaba EN LA PANTALLA QUE SE HABIA PEDIDO (R8).
     await page.getByTestId('login-username').fill(username);
     await page.getByTestId('login-password').fill(password);
     await page.getByTestId('login-submit').click();
 
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
-    await expect(page.getByTestId('dashboard-title')).toBeVisible({ timeout: 60_000 });
+    await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
     // --- 3. La barra lateral muestra el nombre REAL del usuario, no un placeholder.
     await expect(page.getByTestId('private-user-name')).toHaveText(displayName);
@@ -209,13 +207,13 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
 
     // --- 5. Volver atras NO muestra la zona privada.
-    // Es el paso que solo se puede afirmar en un navegador real: la entrada de `/dashboard`
+    // Es el paso que solo se puede afirmar en un navegador real: la entrada de `/inventario`
     // sigue en el historial, y lo que se comprueba es que el navegador no la sirve desde su
     // cache. Se espera a la URL del login: si la pagina privada se restaurara, la URL se
-    // quedaria en `/dashboard` y este `waitForURL` fallaria diciendo justo eso.
+    // quedaria en `/inventario` y este `waitForURL` fallaria diciendo justo eso.
     await page.goBack();
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
     await expect(page.getByTestId('private-user-name')).toHaveCount(0);
-    await expect(page.getByTestId('dashboard-title')).toHaveCount(0);
+    await expect(page.getByTestId('inventario-title')).toHaveCount(0);
   });
 });

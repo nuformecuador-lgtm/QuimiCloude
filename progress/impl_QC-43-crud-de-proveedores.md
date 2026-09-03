@@ -1,0 +1,886 @@
+# QC-43 — crud-de-proveedores · bitácora de implementación
+
+> Rama `feature/QC-43-crud-de-proveedores`, worktree
+> `.worktrees/QC-43-crud-de-proveedores`, base de datos propia `QuimiCloude_QC43`.
+> Spec aprobado por el humano el 2026-09-03 (F1.4), con **P2 cerrada: variante B**.
+
+## Tanda 1 — T0 a T6 (Grupo A + los dos esquemas del Grupo B)
+
+Alcance de esta tanda: **T1, T2, T3, T4, T5 y T6**. T7 y posteriores **no se empezaron**.
+
+### T0 — Qué se hereda montado y NO se re-crea
+
+Verificado contra el árbol de la rama, no contra el documento:
+
+| Se hereda | Estado comprobado |
+| --- | --- |
+| `Supplier` y `SupplierCatalogLine` en `db/schema.prisma` | Presentes. `Supplier` **no se toca**; `SupplierCatalogLine` gana solo las dos columnas de autor del cambio 3 |
+| `db/migrations/20260903131417_suppliers_and_supplier_catalog_lines/` | Presente con `migration.sql` y `down.sql`. **No se modifica** |
+| `lib/modules/proveedores/domain/supplier-name.ts` + su test | Presentes. `normalizeSupplierName` se **consume** desde `supplier-input.ts`; no se reescribe ni se factoriza |
+| `lib/shared/pagination.ts` (`DEFAULT_PAGE_SIZE = 10`, `MAX_PAGE_SIZE = 25`) + `tests/unit/pagination.test.ts` | Presentes. No se tocan; `scope.test.ts` vigila que el módulo no los reimplemente |
+| Contrato de `inventario` (`ProductCatalog`, `ProductId`, `ProductRef`, `findProductRefs`) | Presente. Esta tanda todavía no lo consume (es T9) |
+| `ROLE_ADMINISTRADOR` exportado por `@/lib/modules/identity` | Presente (`index.ts` línea 17). `domain/actor.ts` lo importa **del barrel**. No se declara constante propia y **no se tocan** las copias de `inventario` ni de `recetas` |
+| `identity.getSessionUser()` cableado en `lib/composition` | Presente. Esta tanda no escribe ningún lector de sesión |
+| Las tres guardias + `tests/unit/proveedores/module-contract.test.ts` | Presentes y en verde. **Ninguna se relajó** |
+| `ports/.gitkeep`, `adapters/driven/.gitkeep`, `adapters/driving/.gitkeep` | Los tres siguen ahí: esta tanda no puso ningún archivo real en esas carpetas (es T7, T11, T12, T14). `scope.test.ts` vigila que se borren cuando llegue el primero |
+
+### Archivos creados
+
+| Archivo | Qué es |
+| --- | --- |
+| `lib/modules/proveedores/domain/actor.ts` | `Actor` y `requireAdmin`, con `ROLE_ADMINISTRADOR` del barrel de `identity` (T1) |
+| `lib/modules/proveedores/domain/errors.ts` | `ProveedoresError` y sus seis clases con `code` estable (T1) |
+| `lib/modules/proveedores/domain/page.ts` | `Page<T>`, `PageQuery`, `pageQuerySchema` (T1) |
+| `lib/modules/proveedores/domain/supplier-input.ts` | `createSupplierSchema` / `updateSupplierSchema`, `blankToNull`, los tres largos máximos (T5) |
+| `lib/modules/proveedores/domain/catalog-line-input.ts` | `createCatalogLineSchema` / `updateCatalogLineSchema` (T6) |
+| `db/migrations/20260903200343_supplier_contact_cost_and_line_audit/migration.sql` | UP de los tres cambios (T3) |
+| `db/migrations/20260903200343_supplier_contact_cost_and_line_audit/down.sql` | DOWN que **revierte** al esquema exacto de QC-42 (T3) |
+| `tests/unit/proveedores/scope.test.ts` | Test de alcance adelantado (T2) |
+| `tests/unit/proveedores/supplier-input.test.ts` | R9, R10, R11, R13, R20, R41 (T5) |
+| `tests/unit/proveedores/catalog-line-input.test.ts` | R28, R30, R33, R41 (T6) |
+
+### Archivos modificados
+
+| Archivo | Qué cambia y por qué |
+| --- | --- |
+| `db/schema.prisma` | `SupplierCatalogLine` gana `createdBy`/`updatedBy` y sus dos `@@index`, y sus comentarios `///` dejan de decir que la línea no tiene autor. **Ningún otro modelo se toca** (T3) |
+| `tests/unit/proveedores/schema/proveedores-migration.test.ts` | Se **amplía** con el bloque de QC-43 (8 casos nuevos). Nada del bloque de QC-42 se toca salvo añadir `positive` al vocabulario inglés (T4) |
+| `tests/unit/proveedores/schema/proveedores-schema.test.ts` | **Desviación necesaria**, ver abajo (T3) |
+| `specs/QC-43-crud-de-proveedores/tasks.md` | T1–T6 marcadas `[x]` |
+
+### El `CHECK` de contacto, tal como quedó escrito
+
+```sql
+ALTER TABLE "suppliers" DROP CONSTRAINT "suppliers_contact_required";
+
+ALTER TABLE "suppliers" ADD CONSTRAINT "suppliers_contact_required"
+  CHECK ("deleted_at" IS NOT NULL
+         OR COALESCE(btrim("phone"), '') <> ''
+         OR COALESCE(btrim("email"), '') <> '');
+```
+
+Tres cosas deliberadas: el **`COALESCE`** (sin él, `btrim(NULL) <> ''` evalúa a `NULL` y un
+`CHECK` que evalúa a `NULL` **se cumple**, con lo que la restricción dejaría pasar justo la fila
+que existe para bloquear); el **`deleted_at IS NOT NULL OR`** (variante B, P2 cerrada por el
+humano: un proveedor dado de baja sí puede quedarse sin contacto); y el **nombre sin cambiar**, que
+es la misma regla con distinta definición.
+
+### Mapa `R<n> → test`, con la mutación que puso rojo a cada uno
+
+Solo los requisitos que T1–T6 dicen cubrir. Cada mutación se aplicó de verdad, se vio el rojo y se
+revirtió.
+
+| R | Test | Mutación que lo puso en rojo |
+| --- | --- | --- |
+| R9 | `supplier-input.test.ts > rechaza el nombre vacio, el de solo espacios y el que queda vacio al normalizarlo, y recorta los extremos` | Quitar `.refine(normalizeSupplierName(name) !== '')` de `supplierNameSchema`; y aparte, `name: supplierNameSchema` → `z.any()` |
+| R10 | `supplier-input.test.ts > rechaza el nombre de mas de 120, el telefono de mas de 40 y el correo de mas de 160` | `SUPPLIER_NAME_MAX_LENGTH = 120` → `999` |
+| R11 | `supplier-input.test.ts > rechaza el proveedor cuyo telefono y correo llegan los dos ausentes, vacios o en blanco` | Evaluar el `refine` de contacto sobre el crudo (`!== undefined` en vez de `!== null`, que es lo que ocurriría si `blankToNull` no corriera antes) |
+| R13 | `supplier-input.test.ts > recorta los extremos del telefono y del correo y convierte en ausencia el que llega en blanco` | `blankToNull` devuelve el valor tal cual, sin recortar ni anular |
+| R20 | `supplier-input.test.ts > rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1, sin leer del repositorio` | `pageQuerySchema.page`: `z.number().int().min(1)` → `z.number().min(0)` |
+| R41 | `supplier-input.test.ts` + `catalog-line-input.test.ts > rechaza la entrada que no cumple el esquema antes de llamar al caso de uso` | `name: supplierNameSchema` → `z.any()`; y `supplierId`/`productId` → `z.any()` en el alta de la línea |
+| R28 | `catalog-line-input.test.ts > rechaza el costo cero y el costo negativo antes de llegar al repositorio` | Quitar el `refine` de `> 0` (deja la regla `>= 0` de QC-42) |
+| R30 | `catalog-line-input.test.ts > rechaza el minimo de compra y el tiempo de entrega negativos, y admite la linea sin ninguno de los dos` | `minPurchase` sin `regex(DECIMAL_PATTERN)` y `deliveryTime` sin `.int().min(0)` |
+| R33 | `catalog-line-input.test.ts > el esquema de edicion rechaza un productId o un supplierId de mas` | `updateCatalogLineSchema`: `z.strictObject` → `z.object` (pasa a ignorar el campo de más en silencio) |
+| R38 | `proveedores-migration.test.ts > la migracion solo contiene los tres cambios y no toca ninguna otra tabla` + `scope.test.ts > esta feature no anade ninguna columna, indice ni restriccion fuera de los tres cambios` | Añadir `ALTER TABLE "products" DROP CONSTRAINT ...` al UP real; añadir la columna `notes` a `SupplierCatalogLine`; crear una tercera migración que toca `suppliers` |
+| R39 | `proveedores-migration.test.ts > el down.sql recrea las dos restricciones de QC-42 con su definicion literal y borra las dos columnas de autor` (+ su caso de sensibilidad) | Dejar el `down.sql` real **solo con `DROP`**, sin los dos `ADD CONSTRAINT` |
+| R40 | `proveedores-migration.test.ts > toda columna, indice y restriccion nueva esta en ingles y en snake_case` | Cubierto por el censo exacto de identificadores creados: cualquier renombre rompe la igualdad (y el predicado `isEnglishSnakeCase` tiene su propio caso de sensibilidad heredado de QC-42) |
+| R42 | `scope.test.ts > no hay ningun route handler de proveedores bajo app/api` | Crear `app/api/proveedores/route.ts` |
+| R45 | `scope.test.ts > el modulo proveedores no reimplementa el calculo de paginacion` | Copiar `(page - 1) * pageSize` dentro de `lib/modules/proveedores/` |
+| R47 | `scope.test.ts > no existe ninguna pantalla, pagina ni componente de proveedores, ni spec E2E nuevo` | Crear `app/(private)/proveedores/page.tsx`; y aparte, `e2e/proveedores.spec.ts` |
+
+Los tres cambios de base tienen además, **en el mismo test estático**, su caso de sensibilidad
+sobre el SQL real: quitar el `COALESCE` (rojo), `>` → `>=` (rojo) y `RESTRICT` → `SET NULL` (rojo).
+La demostración de que **la base** los rechaza en ejecución es de T17 y T18, que no son de esta
+tanda.
+
+### Desviaciones
+
+1. **`tests/unit/proveedores/schema/proveedores-schema.test.ts` (de QC-42) se modificó.** Su caso
+   `SupplierCatalogLine no declara createdBy ni updatedBy` afirmaba en positivo la ausencia que el
+   **cambio 3 de esta ficha deroga** (decisión cerrada 3 de QC-43, que se aparta expresamente de la
+   14 de QC-42). Pasa a afirmar la **presencia** con la misma exigencia: escalares uuid anulables,
+   sin `@relation`, sin `@default`, con sus dos índices. También se actualizaron el censo de
+   columnas de la línea, la lista de escalares que cruzan de módulo y la lista de índices. **No se
+   relajó nada**: el test sigue cayendo si alguien añade un `@relation` o una columna de más.
+2. **`prisma migrate dev --create-only` generó diez `DROP CONSTRAINT` de drift** sobre `products`,
+   `recipes`, `recipe_lines`, `suppliers` y `supplier_catalog_lines` — todas las FK que cruzan de
+   módulo del repo, precisamente porque son escalares sin `@relation` en el esquema. **Se borraron
+   a mano** antes de escribir nada más: aplicarlas habría destruido en silencio la integridad
+   referencial de tres features ya mergeadas. Queda anotado en la cabecera del `migration.sql` y
+   vigilado por el test estático (`dropsAjenos`).
+3. **La migración NO se aplicó a la base.** Aplicarla y probar el ciclo
+   `db:migrate` → `db:rollback` → `db:migrate` es **T16**, que no es de esta tanda. La base
+   `QuimiCloude_QC43` sigue en el estado de QC-42 y la carpeta de migración está pendiente de
+   aplicar.
+
+### Salida real de la verificación
+
+```
+$ pnpm typecheck        # tsc --noEmit
+(sin salida: limpio)
+
+$ pnpm lint             # eslint
+(sin salida: limpio)
+
+$ pnpm exec vitest related --run lib/modules/proveedores/domain/{actor,errors,page,supplier-input,catalog-line-input}.ts db/schema.prisma
+ Test Files  2 passed (2)
+      Tests  11 passed (11)
+
+$ pnpm exec vitest run tests/unit/proveedores guard
+ Test Files  19 passed (19)
+      Tests  204 passed (204)
+   Duration  1.42s
+```
+
+No se corrió la suite completa ni `./init.sh`: es del leader (regla del arnés sobre corridas
+largas en subagente).
+
+### Veredicto
+
+T1–T6 cerradas y verificadas por mutación; los tres cambios de esquema escritos con su `down.sql`
+que **revierte** —no solo deshace—, y el `CHECK` de contacto con su `COALESCE` y su exención de
+las filas dadas de baja tal como el humano cerró P2.
+
+---
+
+## Tanda 2 — T7 a T12 (resto del Grupo B + los dos adaptadores driven)
+
+Alcance de esta tanda: **T7, T8, T9, T10, T11 y T12**. T13 y posteriores **no se
+empezaron**: el cableado puerto→implementación es T13, las Server Actions T14, y el ciclo
+real de la migración T16.
+
+### Archivos creados
+
+| Archivo | Qué es |
+| --- | --- |
+| `lib/modules/proveedores/domain/supplier-view.ts` | `NewSupplier` (con `nameNormalized`) y `SupplierView`, sin `deletedAt` (T7) |
+| `lib/modules/proveedores/domain/catalog-line-view.ts` | `CatalogLineTerms`, `NewCatalogLine`, `CatalogLineView` con `productName: string \| null` (T7) |
+| `lib/modules/proveedores/ports/supplier-repository.ts` | Los cinco métodos `…Alive`, sin búsqueda por nombre (T7) |
+| `lib/modules/proveedores/ports/supplier-catalog-repository.ts` | Los cuatro métodos, sin búsqueda por pareja (T7) |
+| `lib/modules/proveedores/domain/{create,update,delete,get}-supplier.ts`, `list-suppliers.ts` | Los cinco casos de uso del proveedor (T8) |
+| `lib/modules/proveedores/domain/{create,update,delete}-catalog-line.ts`, `list-catalog-lines.ts` | Los cuatro del catálogo (T9) |
+| `lib/modules/proveedores/adapters/driven/persistence/supplier-prisma.ts` | Implementación Prisma de `SupplierRepository` (T11) |
+| `lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts` | Implementación Prisma de `SupplierCatalogRepository` (T12) |
+| `tests/unit/proveedores/supplier-service.test.ts` | 7 casos con dobles del puerto (T8) |
+| `tests/unit/proveedores/catalog-service.test.ts` | 6 casos con dobles del repositorio y del contrato de `inventario` (T9) |
+| `tests/unit/proveedores/authorization.test.ts` | 5 casos: los nueve por siete actores no autorizados (T10) |
+
+### Archivos modificados
+
+| Archivo | Qué cambia y por qué |
+| --- | --- |
+| `tests/unit/proveedores/module-contract.test.ts` | El caso `la feature no anade adaptadores driving, rutas ni Server Actions` afirmaba `ports/` y `adapters/driven/` **vacías** —R35 de QC-42, la ficha de esquema, que T7/T11/T12 derogan expresamente—. Pasa de «vacías» a «exactamente estos cuatro archivos», y añade que sus `.gitkeep` ya **no** están. Y el caso del ORM pasa de prohibir `@prisma/client` en TODO el módulo a permitirlo en una **lista blanca exacta** de dos archivos. `adapters/driving/` sigue afirmada como vacía: es T14 |
+| `lib/modules/proveedores/ports/.gitkeep`, `adapters/driven/.gitkeep` | Borrados (T7, T11/T12) |
+| `specs/QC-43-crud-de-proveedores/tasks.md` | T7–T12 marcadas `[x]` |
+
+### Mapa `R<n> → test`, con la mutación que puso rojo a cada uno
+
+Solo los requisitos que T7–T12 dicen cubrir. Cada mutación se aplicó de verdad, se vio el
+rojo y se revirtió.
+
+| R | Test | Mutación que lo puso en rojo |
+| --- | --- | --- |
+| R1 | `authorization.test.ts > cada caso de uso recibe el actor por parametro y no lee ninguna sesion` | Quitar `requireAdmin` de cualquiera de los nueve (3 tests rojos cada uno); y moverlo **después** de la llamada al puerto en `get-supplier.ts` |
+| R2 | `authorization.test.ts > un actor con rol Operador es rechazado en los nueve casos de uso sin llamar a ningun puerto` | Ídem: se probaron **los nueve, uno a uno** (`requireAdmin(actor)` → `void actor;`), y los nueve pusieron en rojo 3 tests |
+| R3 | `authorization.test.ts > un actor ausente, con rol nulo, vacio o desconocido se rechaza igual que el Operador` | Ídem los nueve; el caso cubre `null`, `undefined`, rol nulo, vacío, desconocido, «Administrador**es externos**» y el mismo rol en minúsculas |
+| R4 | `authorization.test.ts > el rol autorizado sale de ROLE_ADMINISTRADOR de identity y ningun archivo del modulo incrusta el literal` | Sustituir el import del barrel por una constante propia con el literal en `actor.ts` |
+| R7 | `supplier-service.test.ts > persiste el nombre normalizado junto al nombre en el alta y en la edicion` (camino feliz; la prueba contra Postgres es T17) | Quitar `nameNormalized` del objeto que va al puerto |
+| R8 | `supplier-service.test.ts > guarda al actor como autor de creacion y de modificacion al crear, y solo de modificacion al editar y al dar de baja` | Pasar otro identificador en vez de `actor.id` a `updateAlive` |
+| R13 | `supplier-service.test.ts > la edicion reemplaza nombre, telefono y correo y no expone ninguna operacion por campo suelto` | `blankToNull` devuelve el valor tal cual, sin recortar ni anular |
+| R14 | ídem | La misma mutación de arriba, más: añadir `restoreDeleted` al puerto (cae la lista exacta de métodos) |
+| R15 | `supplier-service.test.ts > traduce el duplicado del puerto a error de nombre repetido sin crear ni modificar nada` | Neutralizar la condición del duplicado en `create-supplier.ts` |
+| R16 | `supplier-service.test.ts > persiste el nombre normalizado junto al nombre en el alta y en la edicion` | Pasar el dato validado sin `nameNormalized` al puerto |
+| R22 | `supplier-service.test.ts > no existe ninguna operacion de restaurar ni de listar dados de baja` | Añadir `restoreDeleted(id)` al puerto |
+| R24 | `supplier-service.test.ts > devuelve no encontrado al consultar, editar o dar de baja un proveedor inexistente o ya dado de baja` | Comparar contra `undefined` en vez de `null` en `get-supplier.ts` |
+| R25 | `catalog-service.test.ts > traduce el duplicado del puerto a error de linea repetida` (el camino feliz vive en el caso de R26; la prueba contra Postgres es T18) | Quitar la traducción de `supplier_not_found` a `NotFoundError` |
+| R26 | `catalog-service.test.ts > rechaza la linea cuyo producto no existe o esta dado de baja, preguntando al contrato de inventario` | Neutralizar el `if` que exige que el producto vuelva de `findRefs`; y aparte, mover `findRefs` dentro del `map` de líneas (cae `toHaveBeenCalledTimes(1)`) |
+| R27 | `catalog-service.test.ts > traduce el duplicado del puerto a error de linea repetida` | Quitar la línea que traduce el duplicado a `DuplicateCatalogLineError` |
+| R30 | `catalog-service.test.ts > la edicion cambia solo costo, minimo y plazo` (segunda mitad) | Pasar el dato crudo: `minPurchase` llega `undefined` en vez de `null` |
+| R31 | `catalog-service.test.ts > guarda al actor como autor de creacion y de modificacion de la linea, y al editarla no toca ningun dato del proveedor` | Añadir un repositorio de proveedores a `UpdateCatalogLineDeps` |
+| R33 | `catalog-service.test.ts > la edicion cambia solo costo, minimo y plazo` | Colar un `productId` en el objeto que va a `updateTerms` |
+| R34 | ídem (tercera mitad: `deleteById` y la lista exacta de métodos del puerto) | Añadir un método de más al puerto del catálogo |
+| R35 | `supplier-service.test.ts > ni la ficha ni el listado de proveedores traen las lineas del catalogo` + `catalog-service.test.ts > el catalogo se consulta con su propio listado paginado y ordenado` | Añadir el catálogo a `GetSupplierDeps`; y una llamada a `findRefs` por línea |
+| R36 | `catalog-service.test.ts > el listado no devuelve nada de un proveedor dado de baja y no pregunta por sus productos` | Hacer que el dominio ignore `supplier_not_found` y devuelva página vacía. **La otra mitad —que el ADAPTADOR compruebe de verdad que el proveedor está vivo— solo la puede morder T18**: ver «Lo que esta tanda NO puede demostrar» |
+| R37 | `catalog-service.test.ts > el catalogo se consulta con su propio listado paginado y ordenado` | Filtrar de la página las líneas cuyo producto no volvió de `findRefs` |
+| R44 | `module-contract.test.ts` (ampliado) + guardia de arquitectura | Añadir un **tercer** archivo del módulo que importe el cliente del ORM (cae la lista blanca); y hacer que el adaptador del catálogo consulte el modelo de productos (cae el bloque 10 de la guardia) |
+
+### El test de autorización de los nueve casos de uso (T10)
+
+`tests/unit/proveedores/authorization.test.ts`. Los **tres** puertos —repositorio de
+proveedores, repositorio del catálogo y `ProductCatalog`— son dobles cuyos métodos
+**lanzan si los llaman**, y cada caso afirma `not.toHaveBeenCalled()` sobre los once
+espías. Cinco casos:
+
+1. **Los nueve están en la tabla**: la lista de factories se lee del **disco**
+   (`readdirSync` de `domain/`), así que un décimo caso de uso que nadie añada pone el test
+   en rojo. Sin esto, «los nueve» sería una promesa del comentario de cabecera.
+2. **Rol `Operador`** en los nueve, con entrada **válida** —si fuera basura, un
+   `ValidationError` podría estar tapando la falta de `requireAdmin`—.
+3. **Falla cerrado** en los nueve por siete actores: `null`, `undefined`, rol nulo, vacío,
+   desconocido, un rol que *contiene* el autorizado y el autorizado en minúsculas.
+4. **El actor es argumento**: ningún archivo de `domain/` nombra sesión, cookie, cabecera
+   ni `@/lib/composition` —con los comentarios retirados del texto, para no medir
+   comentarios—; y con el rol autorizado el caso de uso **sí** llega al puerto, lo que
+   impide que el test pase por un `throw` incondicional.
+5. **R4**: ningún archivo del módulo contiene el literal del rol, y `actor.ts` lo importa
+   del **barrel** de `identity`.
+
+### Lo que esta tanda NO puede demostrar (y quién lo demuestra)
+
+- **La mitad de R8 y de R31 que vive en el adaptador** —que al editar no se pisa el autor
+  de creación— no la puede morder un doble: el dato que el dominio manda no lleva ese campo
+  (eso **sí** está afirmado), pero que el `updateMany` no lo escriba solo lo prueba
+  Postgres. **T17 y T18.**
+- **La comprobación de proveedor vivo de `listBySupplierAlive`** (R36) está escrita en
+  `supplier-catalog-line-prisma.ts` y **ningún test de esta tanda la muerde**: quitarla
+  deja todo verde. Su única prueba real es **T18**, que es donde `tasks.md` la pone.
+- **R12, R29 y R32** (las tres reglas nuevas de base) son T17/T18 por definición: aquí
+  `zod` llega antes, y un test que se quedara verde quitando el `CHECK` no contaría.
+
+### Una observación para el reviewer (no es un cambio)
+
+`createCatalogLine` acepta una línea para un proveedor **dado de baja**: la FK se satisface
+porque la fila sigue existiendo, y ni `requirements.md` ni `design.md > 7` piden
+rechazarlo —el puerto solo distingue `supplier_not_found`, que es el `23503` del proveedor
+**inexistente**—. No se ha inventado la regla (regla 6 de `CLAUDE.md`). El efecto práctico
+es acotado: R36 hace que esa línea **no aparezca** en ningún listado mientras el proveedor
+siga de baja. Si el humano quiere que el alta también se rechace, es un cambio de
+`design.md > 7` y del puerto, no un `if` en el caso de uso.
+
+### Salida real de la verificación
+
+```
+$ pnpm typecheck        # tsc --noEmit
+(sin salida: limpio)
+
+$ pnpm lint             # eslint
+(sin salida: limpio)
+
+$ pnpm exec vitest related --run lib/modules/proveedores/domain/create-supplier.ts \
+    lib/modules/proveedores/domain/list-catalog-lines.ts \
+    lib/modules/proveedores/adapters/driven/persistence/supplier-prisma.ts \
+    lib/modules/proveedores/ports/supplier-repository.ts
+ Test Files  3 passed (3)
+      Tests  18 passed (18)
+
+$ pnpm exec vitest run tests/unit/proveedores guard
+ Test Files  22 passed (22)
+      Tests  222 passed (222)
+   Duration  1.66s
+```
+
+No se corrió la suite completa ni `./init.sh`: es del leader.
+
+### Veredicto
+
+T7–T12 cerradas: los dos puertos sin ningún método de búsqueda —la comprobación previa a un
+índice único ni siquiera es expresable—, los nueve casos de uso con `requireAdmin` en la
+primera línea de los nueve (verificado quitándolo **uno a uno**) y los dos adaptadores
+driven como únicos archivos del módulo que hablan con el ORM.
+
+---
+
+## Tanda 3 — T13 a T16 (cableado, Server Actions, contrato contra `dmmf` y ciclo real de la migración)
+
+Alcance de esta tanda: **T13, T14, T15 y T16**. T17 y posteriores **no se empezaron**: los dos
+archivos de integración, el cierre de alcance y el cierre de la feature siguen abiertos.
+
+### Archivos creados
+
+| Archivo | Qué es |
+| --- | --- |
+| `lib/modules/proveedores/adapters/driving/supplier-actions.ts` | Las cinco Server Actions del proveedor (T14) |
+| `lib/modules/proveedores/adapters/driving/supplier-catalog-actions.ts` | Las cuatro Server Actions del catálogo (T14) |
+| `tests/unit/proveedores/supplier-actions.test.ts` | R5, R42, R43 con los nombres exactos de la tabla de trazabilidad (T14) |
+
+### Archivos modificados
+
+| Archivo | Qué cambia y por qué |
+| --- | --- |
+| `lib/modules/proveedores/index.ts` | El contrato pasa de exportar solo `normalizeSupplierName` a exportar tipos, esquemas, errores y las nueve factories. **Todo sigue saliendo de `./domain`**: ni un adaptador, ni un puerto (T13) |
+| `lib/composition/index.ts` | Bloque **nuevo al final** con los dos repositorios y la fachada `proveedores`; sus imports, al final del bloque de imports. **`productCatalog` se reutiliza**, no se construye una segunda vez. Nada de lo anterior se reordena ni se reformatea (T13) |
+| `tests/unit/proveedores/module-contract.test.ts` | Tres cambios, los tres **derogaciones expresas** de afirmaciones de QC-42 que T13/T14 invalidan, más el caso nuevo de T15. Detalle abajo |
+| `lib/modules/proveedores/adapters/driving/.gitkeep` | Borrado: la carpeta ya tiene archivos reales (T14) |
+| `specs/QC-43-crud-de-proveedores/tasks.md` | T13–T16 marcadas `[x]` |
+
+### Qué cambió en `module-contract.test.ts`, y por qué no es relajar nada
+
+1. **`lib/composition` ya no está prohibido**: QC-42 afirmaba que la ficha de esquema no lo tocaba.
+   La afirmación se **invierte**, no se borra: caso nuevo `el cableado puerto-implementacion de
+   proveedores vive SOLO en lib/composition y una sola vez`, que exige la fachada exactamente una
+   vez, con las **nueve claves exactas**, `productCatalog` construido una sola vez, y **nadie fuera
+   de la composición** importando `adapters/` ni `ports/` de `proveedores`.
+2. **`adapters/driving/` pasa de «vacía» a «exactamente estos dos archivos»**, y `'use server'`
+   pasa de prohibido en todo el módulo a **obligatorio en la primera línea de los dos driving y
+   prohibido en el resto**. Un tercer archivo, o una directiva colada en `domain/`, sigue cayendo.
+3. **La prohibición de importar `@/lib/composition`** se acota a `domain/`, `ports/` y
+   `adapters/driven/` —la flecha va driving → composición → driven—, y se añade la afirmación
+   **positiva** de que los dos driving **sí** la consumen.
+
+### T16 — el ciclo real de la migración, contra `QuimiCloude_QC43`
+
+**Base comprobada antes de tocar nada**, no asumida: `DATABASE_URL` y `DIRECT_URL` del `.env` del
+worktree apuntan a `localhost:5432/QuimiCloude_QC43`, y la propia conexión lo confirma
+(`SELECT current_database()` → `QuimiCloude_QC43`). La base compartida `QuimiCloude` **no se tocó**.
+
+El estado se comparó **contra la base**, no leyendo el SQL: un censo de `information_schema.columns`,
+`pg_constraint` con `pg_get_constraintdef`, `pg_indexes`, `pg_class.relrowsecurity/relforcerowsecurity`
+y `_prisma_migrations`, tomado en tres momentos.
+
+```
+$ pnpm run db:migrate      # prisma migrate deploy
+Datasource "db": PostgreSQL database "QuimiCloude_QC43", schema "public" at "localhost:5432"
+Applying migration `20260903200343_supplier_contact_cost_and_line_audit`
+All migrations have been successfully applied.
+
+$ pnpm run db:rollback
+db:rollback: aplicando down.sql de 20260903200343_supplier_contact_cost_and_line_audit
+            y borrando su fila de _prisma_migrations
+db:rollback: 20260903200343_supplier_contact_cost_and_line_audit revertida.
+
+$ pnpm run db:migrate
+Applying migration `20260903200343_supplier_contact_cost_and_line_audit`
+All migrations have been successfully applied.
+```
+
+**Lo que el UP cambió, y solo eso** (diff del censo antes → después):
+
+```
++ supplier_catalog_lines.created_by uuid nullable=YES
++ supplier_catalog_lines.updated_by uuid nullable=YES
++ supplier_catalog_lines_created_by_fkey  FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
++ supplier_catalog_lines_updated_by_fkey  FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE ON DELETE RESTRICT
++ supplier_catalog_lines_created_by_idx / _updated_by_idx
+- supplier_catalog_lines_cost_non_negative  CHECK (cost >= 0)
++ supplier_catalog_lines_cost_positive      CHECK (cost > 0)
+- suppliers_contact_required  CHECK ((phone IS NOT NULL) OR (email IS NOT NULL))
++ suppliers_contact_required  CHECK ((deleted_at IS NOT NULL) OR (COALESCE(btrim(phone), '') <> '') OR (COALESCE(btrim(email), '') <> ''))
++ _prisma_migrations: 20260903200343_... terminada=true
+```
+
+Ni una tabla ajena tocada, ni un `DROP` de drift: los diez que `migrate dev --create-only` había
+generado y que la tanda 1 borró a mano **no reaparecieron** (habrían salido en este diff como FK
+desaparecidas de `products`, `recipes`, `recipe_lines`, `suppliers` y `supplier_catalog_lines`).
+
+**Y lo que el rollback dejó: el censo posterior al `down.sql` es IDÉNTICO al de antes de aplicar la
+migración** —`diff` sin una sola línea de diferencia—. Es decir:
+
+- `suppliers_contact_required` de vuelta **con su definición literal de QC-42**
+  (`(phone IS NOT NULL) OR (email IS NOT NULL)`), no ausente;
+- `supplier_catalog_lines_cost_non_negative` de vuelta con `CHECK (cost >= 0)`, y
+  `..._cost_positive` fuera;
+- `created_by`/`updated_by`, sus dos FK y sus dos índices, fuera;
+- `relrowsecurity` y `relforcerowsecurity` en `true` en las dos tablas durante todo el ciclo (R6);
+- `_prisma_migrations` coherente: la fila desaparece con el rollback y vuelve con el segundo
+  `deploy`.
+
+El segundo `db:migrate` deja un censo **idéntico** al del primero, así que el ciclo es reproducible.
+**El `down.sql` revierte, no solo deshace** (R39), y esta vez está comprobado contra Postgres y no
+leyendo el archivo. **Ningún hallazgo**: no hizo falta corregir el `down.sql`.
+
+La base queda **con la migración aplicada**, que es lo que T17 y T18 necesitan.
+
+### Mapa `R<n> → test`, con la mutación que puso rojo a cada uno
+
+Solo los requisitos que T13–T16 dicen cubrir. Cada mutación se aplicó de verdad, se vio el rojo y se
+revirtió.
+
+| R | Test | Mutación que lo puso en rojo |
+| --- | --- | --- |
+| R5 | `supplier-actions.test.ts > la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el rol` | Sustituir `await identity.getSessionUser()` por un actor inventado en la propia action (cae el conteo de llamadas y el actor esperado); y aparte, **añadir `requireAdmin(actor)` dentro de la action** (cae por el barrido de fuente: la action volvería a decidir) |
+| R42 | `supplier-actions.test.ts > las mutaciones reciben FormData y las consultas argumentos tipados` + `scope.test.ts > no hay ningun route handler de proveedores bajo app/api` (ya existente) | Cuatro mutaciones, cuatro rojos: (1) el alta ignora el `FormData` y fija `name: 'Acme'`; (2) `getSupplierAction` pasa a recibir `FormData` en vez de un `id` tipado; (3) se quita el rechazo del `deliveryTime` no entero, que dejaría colarse `NaN`; (4) se quita el corte por `id` ausente de `deleteCatalogLineAction` |
+| R43 | `supplier-actions.test.ts > traduce cada error de dominio a status error con el code estable de la clase, nunca con el texto` | `code: error.code` → `code: error.name` (el `code` pasaría a salir del nombre de la clase); y aparte, que `toErrorState` **se trague** el error ajeno devolviendo `invalid_input` en vez de relanzarlo |
+| R44 | `module-contract.test.ts > el cableado puerto-implementacion de proveedores vive SOLO en lib/composition y una sola vez` + `> el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User` + las guardias ya existentes | Quitar `getSupplier` de la fachada (cae la lista exacta de nueve claves); construir un **segundo** `productCatalog`; reexportar un adaptador driven desde el contrato (`export { createSupplier } from './adapters/…'`); y, contra el `dmmf`, declarar `creator User? @relation(fields: [createdBy], …)` en `SupplierCatalogLine` con su reverso en `User` y **regenerar el cliente** (rojo en tres casos) |
+| R39 | `proveedores-migration.test.ts > el down.sql recrea las dos restricciones de QC-42 con su definicion literal y borra las dos columnas de autor` (ya existente, tanda 1) + **T16**, el ciclo real | La prueba de esta tanda no es una mutación de código sino la **ejecución**: el censo post-rollback contra Postgres es idéntico al pre-migración. Un `down.sql` que solo dropeara habría dejado las dos tablas sin ninguna regla de contacto ni de costo y el `diff` lo habría cantado |
+
+La afirmación de R44 sobre las columnas de autor tiene además su propia mutación de esquema:
+**quitar `createdBy`/`updatedBy` de `SupplierCatalogLine`** y regenerar el cliente pone en rojo el
+caso de T15 (afirma que existen **y** que son escalares anulables: las dos mitades importan).
+
+### Lo que esta tanda NO puede demostrar (y quién lo demuestra)
+
+- Que la base **rechace de verdad** el contacto en blanco (R12), el costo cero (R29) y el autor
+  inexistente (R32). El ciclo de T16 demuestra que las tres reglas **están instaladas** con su
+  definición exacta; que Postgres las haga cumplir con su SQLSTATE es **T17 y T18**.
+- La mitad de R8 y de R31 que vive en el adaptador —que al editar no se pise el autor de creación—
+  sigue esperando a T17/T18, tal como anotó la tanda 2.
+- Las Server Actions se prueban contra dobles de `@/lib/composition`: que la fachada **real** esté
+  bien atada lo afirma el caso de contrato de T13 (estructuralmente), y lo ejerce de punta a punta
+  QC-44.
+
+### Salida real de la verificación
+
+```
+$ pnpm typecheck        # tsc --noEmit
+(sin salida: limpio)
+
+$ pnpm lint             # eslint
+(sin salida: limpio)
+
+$ pnpm exec vitest related --run lib/modules/proveedores/index.ts lib/composition/index.ts \
+    lib/modules/proveedores/adapters/driving/supplier-actions.ts \
+    lib/modules/proveedores/adapters/driving/supplier-catalog-actions.ts db/schema.prisma
+ Test Files  24 passed (24)
+      Tests  245 passed (245)
+
+$ pnpm exec vitest run tests/unit/proveedores guard
+ Test Files  23 passed (23)
+      Tests  226 passed (226)
+```
+
+No se corrió la suite completa ni `./init.sh`: es del leader.
+
+### Veredicto
+
+T13–T16 cerradas: la fachada cableada en el único sitio donde puede estarlo, las nueve Server
+Actions que traducen y no deciden, el cruce por ORM vigilado contra el `dmmf` con las dos columnas
+de autor ya en el esquema, y el ciclo `migrate → rollback → migrate` ejecutado contra
+`QuimiCloude_QC43` con el estado post-rollback **idéntico** al previo, comprobado contra la base.
+
+---
+
+## Tanda 4 — la regla nueva (R48) y T17/T18 (integración contra Postgres)
+
+Alcance de esta tanda: **la decisión del humano del 2026-09-03** sobre las líneas de un proveedor
+dado de baja, más **T17 y T18**. **T19 y T20 no se empezaron** y T0–T16 no se reabrieron.
+
+Base `QuimiCloude_QC43`, con la migración de T16 ya aplicada. `.env` verificado antes de tocar
+nada: `DATABASE_URL` y `DIRECT_URL` apuntan a `QuimiCloude_QC43`, nunca a la base compartida.
+**Ninguna migración nueva**: esta tanda no crea, no aplica y no revierte ninguna.
+
+### (1) La regla nueva — R48
+
+**Qué se decidió y dónde vive.** Un proveedor dado de baja **no admite** líneas nuevas ni edición
+de las suyas; el **borrado sí** sigue permitido. La regla se implementa **en el adaptador driven**,
+que es quien define «proveedor vivo» en este módulo —igual que el filtro `deleted_at IS NULL` de
+`supplier-prisma.ts`—, no con un `if` en el caso de uso:
+
+| Operación | Cómo | Resultado del puerto |
+| --- | --- | --- |
+| `create` | `isSupplierAlive(...)` antes del `INSERT` | `'supplier_not_found'` → `NotFoundError` |
+| `updateTerms` | `where: { id, supplier: { deletedAt: null } }` | `'not_found'` → `NotFoundError` |
+| `deleteById` | **no se aplica** (ver abajo) | `'deleted'` |
+| `listBySupplierAlive` | ya lo hacía (R36) | `'supplier_not_found'` |
+
+**Ningún `code` de error nuevo.** R24 ya dice que lo inexistente **y** lo dado de baja se responden
+con «no encontrado», y `NotFoundError` (`code: 'not_found'`) es exactamente eso. Inventar un
+`supplier_deleted` habría obligado a QC-44 a distinguir dos códigos que el usuario lee igual.
+
+**Coherencia con las demás operaciones, mirada una a una:**
+
+- **Editar una línea: SÍ se rechaza.** Cambiar un precio que R36 no deja ver es la misma operación
+  mentirosa que crearlo. Aquí además sale gratis y **sin carrera**: el filtro por la relación se
+  traduce a un `UPDATE … WHERE EXISTS (…)`, una sola sentencia.
+- **Borrar una línea: NO se rechaza, y queda dicho con el porqué** (esto es lo que el encargo pedía
+  que no se decidiera en silencio). El motivo de la regla es «no aceptar una escritura cuyo efecto
+  nadie verá»; un borrado no crea nada que ver, **quita** una fila que ya nadie puede consultar ni
+  editar. Rechazarlo dejaría esas líneas atrapadas para siempre, sin ninguna operación capaz de
+  eliminarlas —y `supplier_catalog_lines` no tiene borrado lógico donde marcarlas—. El test de R48
+  **fija** esa decisión: si alguien la aplicara también al borrado, se pone rojo.
+- **Las cinco operaciones del proveedor** ya rechazaban por su cuenta: `findAliveById`,
+  `updateAlive` y `softDeleteAlive` llevan `deletedAt: null` en el `where` desde T11 (R22, R24), y
+  `listAlive` los excluye. No hacía falta tocar nada.
+- **`listCatalogLines`** ya lo hacía (R36). Ahora las **cuatro** operaciones del catálogo tratan al
+  proveedor dado de baja igual.
+
+**La carrera del `create`, declarada.** La comprobación previa **no es atómica**: entre el `SELECT`
+y el `INSERT` cabe una baja concurrente. Se asume a sabiendas —su único efecto sería una línea
+invisible que se puede borrar— porque hacerla atómica exigiría un `INSERT … SELECT` en SQL crudo
+que perdería la traducción del `23505` de la que depende R27. **No se confunde con R17/R27**, donde
+un `SELECT` previo sí sería un error: allí la base tiene un índice que lo resuelve atómicamente, y
+aquí no existe ninguna restricción capaz de expresar «el proveedor sigue vivo».
+
+**Documentos.** `requirements.md` gana **R48** al final de `## Requisitos (EARS)`, la fila 18 de la
+tabla de cobertura y **una** fila nueva —fecha 2026-09-03— al final de «Decisiones cerradas»; no se
+tocó ni se reordenó ninguna fila existente. `design.md > 7` deja de decir que
+`'supplier_not_found'` es solo el `23503` de la FK. Va en **su propio commit**.
+
+### (2) T17 — integración del proveedor
+
+`tests/integration/proveedores/supplier-crud.int.test.ts`, **11 casos**. Sigue la doctrina del
+repo (`inventario-constraints.int.test.ts` y `product-crud.int.test.ts`) **sin apartarse en nada**:
+dos estrategias de aislamiento —transacción con `ROLLBACK` + `SAVEPOINT` para lo que debe fallar,
+y siembra real con limpieza en `finally` para lo que ejercita el adaptador, que llama al cliente
+Prisma **global** y por eso no participa de la transacción del test—, SQLSTATE leído de `meta.code`
+y nunca del texto (el Postgres de esta máquina responde en español), y **ninguna afirmación
+global**: el `total` del listado se contrasta contra un `count` calculado en el momento, y los
+casos de paginación filtran por los ids que ellos mismos sembraron.
+
+Las tres reglas nuevas de base tienen aquí la primera: **R12** demuestra que **Postgres** rechaza
+el contacto en blanco al **insertar** y al **modificar**. Y la variante B de **P2** tiene su propio
+caso: un proveedor **dado de baja sí** puede quedarse sin teléfono y sin correo, que es justo lo que
+la restricción de QC-42 impedía.
+
+### (3) T18 — integración del catálogo
+
+`tests/integration/proveedores/catalog-line.int.test.ts`, **9 casos**, misma doctrina. Cierra
+**R29** (costo cero y negativo rechazados por el `CHECK` al insertar y al modificar) y **R32** (el
+autor inexistente rechazado con `23503`, y la línea sin autor admitida). En R32 los dos autores se
+escriben **por separado**: si se escribieran siempre juntos, quitar una de las dos FK dejaría el
+test verde y media regla sin vigilar —se comprobó, y por eso el caso está partido en dos—.
+
+### Efecto colateral que había que arreglar: dos casos de QC-42 en rojo
+
+`tests/integration/proveedores/proveedores-constraints.int.test.ts` (QC-42) tenía **dos casos en
+rojo desde T16**, cuando se aplicó la migración; la tanda 3 no los vio porque corrió
+`tests/unit/proveedores` y las guardias, no `tests/integration/`. Los dos son consecuencia
+**buscada** de esta ficha, no un fallo:
+
+1. `…y acepta el cero (R17)` afirmaba que un costo de **cero** se acepta. La decisión cerrada 4 de
+   QC-43 (R29) lo prohíbe. El caso ahora afirma que el cero se **rechaza** con `23514` y que el
+   cero sigue siendo válido en el **mínimo** y en el **plazo**.
+2. El **censo exhaustivo de FK** listaba cuatro; la decisión cerrada 3 (R31/R32) añadió dos más
+   hacia `users`. Se añaden al censo, que se mantiene exhaustivo **a propósito**: es lo que impide
+   que una FK nueva entre sin que nadie se entere.
+
+Los nombres de los dos tests **no se cambiaron**: son el contrato de trazabilidad de QC-42.
+
+### Trazabilidad `R<n> → test` de esta tanda, con la mutación que puso rojo cada uno
+
+Verificado **por mutación real**: romper, ver el rojo, revertir. Las mutaciones de esquema se
+aplicaron con `ALTER TABLE` sobre `QuimiCloude_QC43` y se revirtieron a su definición literal,
+comprobada después contra `pg_constraint` / `pg_indexes`.
+
+| R | Test | Mutación que lo puso rojo |
+| --- | --- | --- |
+| R7 | `supplier-crud > crea el proveedor con sus datos validos y devuelve su identificador` | `createSupplier` escribe `email: null` en vez de `data.email` |
+| R8 (mitad de adaptador) | `supplier-crud > la edicion y la baja no pisan created_by y sellan updated_by con el actor` | añadir `createdBy: actorId` al `data` del `updateMany` de `updateAliveSupplier` |
+| R12 | `supplier-crud > el CHECK rechaza con SQLSTATE 23514 el proveedor vivo sin contacto util, al insertar y al modificar` | devolver `suppliers_contact_required` a la definición de QC-42 (`phone IS NOT NULL OR email IS NOT NULL`) |
+| P2 (variante B) | `supplier-crud > un proveedor dado de baja si puede quedarse sin telefono ni correo (P2, variante B)` | quitar `deleted_at IS NOT NULL OR` del `CHECK` (variante A). Con esa mutación R12 **sigue verde**: los dos casos miden cosas distintas |
+| R15 | `supplier-crud > el nombre de un proveedor dado de baja queda libre para otro proveedor` | (esquema) quitar el `WHERE deleted_at IS NULL` del índice `suppliers_name_unique`; y (código) invertir la traducción del `23505` en `createSupplier` |
+| R17 | `supplier-crud > el indice unico parcial rechaza con SQLSTATE 23505 el segundo proveedor vivo con el mismo nombre normalizado` | `DROP INDEX suppliers_name_unique` |
+| R18 | `supplier-crud > devuelve como maximo el tamano de pagina pedido y el total de proveedores` | `take: limit + 3` en `listAliveSuppliers` |
+| R19 | `supplier-crud > usa 10 por defecto y devuelve 25 como maximo cuando se piden 100` | usar `query.pageSize ?? 10` en vez del `limit` acotado por `toOffsetLimit` (adiós al tope de 25) |
+| R21 | `supplier-crud > ordena por nombre ascendente y recorre las paginas sin repetir ni omitir ningun proveedor` | `orderBy: [{ name: 'desc' }, { id: 'asc' }]` |
+| R22 | `supplier-crud > la lista y la ficha excluyen los proveedores dados de baja` | quitar `deletedAt: null` del `where` de `findAliveSupplierById` |
+| R23 | `supplier-crud > al dar de baja conserva la fila completa y marca deleted_at` | cambiar el `updateMany` de `softDeleteAliveSupplier` por un `deleteMany` (borrado físico) |
+| R25 | `catalog-line > crea la linea del catalogo de un proveedor vivo y devuelve su identificador` | `minPurchase: null` en vez de `toDecimalInput(data.minPurchase)` en `createCatalogLine` |
+| R27 | `catalog-line > el indice unico (supplier_id, product_id) rechaza con SQLSTATE 23505 la segunda linea` | `DROP INDEX supplier_catalog_lines_supplier_id_product_id_key` |
+| R29 | `catalog-line > el CHECK rechaza con SQLSTATE 23514 la linea con costo cero o negativo, al insertar y al modificar` | `CHECK (cost >= 0)`, la definición de QC-42 |
+| R31 (mitad de adaptador) | `catalog-line > la edicion de la linea no pisa created_by y no toca ninguna columna del proveedor` | añadir `createdBy: actorId` al `data` de `updateCatalogLineTerms` |
+| R32 | `catalog-line > la FK rechaza con SQLSTATE 23503 el autor inexistente y admite la linea sin autor` | `DROP CONSTRAINT supplier_catalog_lines_created_by_fkey` (rojo) **y**, por separado, `…_updated_by_fkey` (rojo). Las dos mitades muerden |
+| R34 | `catalog-line > al dar de baja la linea su fila deja de existir y el proveedor queda intacto` | `deleteMany({ where: { id, cost: { lt: 0 } } })`: dice `'not_found'` y no borra |
+| R36 | `catalog-line > el listado del catalogo no devuelve ninguna linea de un proveedor dado de baja, aunque las filas sigan en la base` | **quitar la comprobación de proveedor vivo** de `listCatalogLinesBySupplierAlive` — el hueco que la tanda 2 declaró abierto |
+| R37 | `catalog-line > la linea de un producto dado de baja se conserva y sigue apareciendo en el catalogo de su proveedor` | filtrar el listado por productos vivos (`productId: { in: … }`), que es exactamente la «mejora» que R37 prohíbe |
+| R48 | `catalog-line > un proveedor dado de baja no admite lineas nuevas ni edicion de las suyas, y el borrado si sigue permitido` | dos mutaciones, **cada una** roja por su cuenta: quitar `isSupplierAlive` de `createCatalogLine`, y dejar `where: { id }` en `updateCatalogLineTerms` |
+
+### Los huecos que declaró la tanda anterior: cerrados
+
+- **La comprobación de proveedor vivo del listado (R36), «quitarla deja todo en verde»** →
+  **cerrado**: ahora quitarla pone rojo `catalog-line > el listado del catalogo no devuelve…`
+  (mutación D4, verificada).
+- **La mitad de R8 y R31 que dice que la edición no pisa `created_by`** → **cerrada** por los dos
+  casos de auditoría, con dos autores REALES distintos y la fila releída de Postgres.
+- **R12, R29 y R32, de integración por definición** → **cerradas**, cada una con su mutación de
+  esquema que devuelve la restricción a la forma que tenía en QC-42.
+- **P2 (el `CHECK` solo para las filas vivas)** → **probado**, y con la mutación que distingue la
+  variante A de la B.
+
+### Salida real de la verificación
+
+```
+$ pnpm typecheck        # tsc --noEmit
+(sin salida: limpio)
+
+$ pnpm lint             # eslint
+(sin salida: limpio)
+
+$ pnpm exec vitest run tests/integration/proveedores
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+
+$ pnpm exec vitest related --run \
+    lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts \
+    lib/modules/proveedores/ports/supplier-catalog-repository.ts \
+    lib/modules/proveedores/domain/create-catalog-line.ts \
+    lib/modules/proveedores/domain/update-catalog-line.ts \
+    tests/integration/proveedores/supplier-crud.int.test.ts \
+    tests/integration/proveedores/catalog-line.int.test.ts
+ Test Files  28 passed (28)
+      Tests  276 passed (276)
+
+$ pnpm exec vitest run guard tests/unit/proveedores tests/integration/proveedores
+ Test Files  26 passed (26)
+      Tests  273 passed (273)
+```
+
+No se corrió la suite completa ni `./init.sh`: es del leader. **Ninguna dependencia nueva.** No se
+abrió `app/` ni `components/`, y no se tocó `lib/modules/inventario/`.
+
+### Veredicto
+
+R48 implementada donde vive la definición de «proveedor vivo» —el adaptador—, con el borrado
+excluido a propósito y dicho en voz alta; T17 y T18 cerradas con 20 casos contra Postgres real, los
+cuatro huecos que declaró la tanda anterior cerrados, y **cada requisito con una mutación que lo
+puso rojo de verdad**.
+
+---
+
+## Tanda 5 — T19 y T20 (cierre del alcance y cierre documental)
+
+Tanda de **desconfianza y cierre**: no se implementa nada nuevo de negocio. Se rompe el árbol a
+propósito para comprobar que los tests muerden, se repasan una a una las afirmaciones de QC-42 que
+esta feature derogó o amplió, y se cuadra la trazabilidad.
+
+### Archivos modificados
+
+| Archivo | Qué cambió |
+| --- | --- |
+| `tests/unit/proveedores/scope.test.ts` | **Hallazgo de T19, arreglado.** El barrido de `app/api/**` buscaba en el contenido la cadena `lib/modules/proveedores`; pasa a buscar la palabra (`PATRON_PROVEEDORES`) |
+| `specs/QC-43-crud-de-proveedores/tasks.md` | T19 y T20 a `[x]`; nota del hallazgo en T19; **seis filas de la tabla de trazabilidad corregidas** al nombre literal del test heredado |
+| `progress/impl_QC-43-crud-de-proveedores.md` | Esta sección |
+
+Nada más. No se abrió `app/` ni `components/`, no se tocó `lib/modules/inventario/`, ninguna
+dependencia nueva, ninguna guardia tocada: `git diff cc17e1c..HEAD -- tests/guards scripts init.sh
+package.json` sale **vacío**.
+
+### T19 — las quince mutaciones, y cuál enrojeció
+
+Cada una se **creó de verdad**, se corrió el test, y se revirtió. No se leyó el test y se dio por
+bueno: esa es justo la forma de fallo que T19 existe para cazar (precedente de QC-22, donde la
+guardia medía por archivo y no por control).
+
+| # | Mutación introducida | Test que enrojeció |
+| --- | --- | --- |
+| 1 | `app/(private)/proveedores/page.tsx` | `scope` › `no existe ninguna pantalla, pagina ni componente…` **y** `module-contract` › `la feature no anade adaptadores driving, rutas ni Server Actions` |
+| 2 | `app/api/proveedores/route.ts` | `scope` › `no hay ningun route handler de proveedores bajo app/api` |
+| 3 | `app/api/compras/route.ts` importando el módulo por `@/lib/modules/proveedores` | `scope` › `no hay ningun route handler…` |
+| 3b | **El mismo, pero pidiendo la fachada a `@/lib/composition`** y llamando a `proveedores.listSuppliers(...)`, sin nombrar la ruta del módulo | **`scope` se quedaba VERDE.** Solo lo cazaba `module-contract`. → **hallazgo, arreglado** (ver abajo). Tras el arreglo, `scope` cae con `app/api/compras/route.ts no puede consumir el modulo proveedores: R42 prohibe la ruta API` |
+| 4 | Columna `notes` de más en `model Supplier` | `scope` › `esta feature no anade ninguna columna, indice ni restriccion…` (`model Supplier gano, perdio o renombro algo…`) |
+| 5 | Una función `offsetDe` con `(page - 1) * pageSize` en `domain/page.ts` | `scope` › `el modulo proveedores no reimplementa el calculo de paginacion` (dos patrones a la vez) |
+| 6 | Tercera migración `20260904000000_mutante` con un `ALTER TABLE suppliers` | `scope` › `esta feature no anade ninguna columna, indice ni restriccion…` (censo de migraciones que tocan las dos tablas) |
+| 7 | `ports/.gitkeep` reintroducido junto a los dos puertos reales | `scope` › `ningun .gitkeep convive con archivos reales…` |
+| 8 | `e2e/proveedores.spec.ts` y `components/proveedores/tabla.tsx` | `scope` › `no existe ninguna pantalla, pagina ni componente…, ni spec E2E nuevo` (los dos, comprobados por separado porque el caso falla al primero) |
+| 9 | `ports/clock.ts` y `adapters/driving/otra-accion.ts` de más | `module-contract` › `la feature no anade adaptadores driving…` **y** › `el cableado puerto-implementacion…` |
+| 10 | `import { Prisma } from '@prisma/client'` en `domain/page.ts` (**tercer** archivo con ORM) | `module-contract` › `lib/modules/proveedores no contiene prisma.product, prisma.user, @prisma/client…` — la lista blanca de dos archivos es **exacta** |
+| 11 | `creator User? @relation(...)` en `SupplierCatalogLine` más su reverso en `User`, con `prisma generate` de por medio | `module-contract` › **`el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User`** (T15) y otras cuatro del `dmmf`. Es la mutación que T15 declaraba y que ninguna guardia ve |
+| 12 | En `migration.sql`: quitar `COALESCE`, cambiar `> 0` por `>= 0`, cambiar `RESTRICT` por `SET NULL` | `proveedores-migration` › `el CHECK de contacto trata el blanco como ausencia…`, › `…sin COALESCE deja de vigilar…`, › `el CHECK del costo pasa a exigir mayor que cero…`, › `la linea gana las dos columnas de autor con sus dos FK…` |
+| 13 | `down.sql` sin sus dos `ADD CONSTRAINT` (solo `DROP`) | `proveedores-migration` › `el down.sql recrea las dos restricciones de QC-42…` y › `un down.sql que solo dropeara…` |
+| 14 | `SupplierCatalogLine.createdBy` a **requerido y con `@default`** | `proveedores-schema` › `SupplierCatalogLine declara createdBy y updatedBy como escalares uuid opcionales` (y otros cuatro) |
+| 15 | Quitar el `@@index([createdBy], map: "supplier_catalog_lines_created_by_idx")` | `proveedores-schema` › el mismo caso y › `las dos tablas y sus columnas mapean a snake_case en ingles` |
+
+Con el árbol restaurado, `tests/unit/proveedores` + `tests/guards` vuelven a verde (215 tests).
+
+#### El hallazgo (#3b) y su arreglo
+
+`scope.test.ts` afirmaba, sobre el contenido de `app/api/**`, que ningún archivo contuviera la
+cadena `lib/modules/proveedores`. Eso mide **el import del módulo**, no **el consumo del módulo**.
+Un route handler en una carpeta con cualquier otro nombre —`app/api/compras/route.ts`— que hiciera
+`import { proveedores } from '@/lib/composition'` y llamara a `proveedores.listSuppliers(...)` es
+exactamente lo que R42 prohíbe —una superficie HTTP pública nueva— y **no aparecía**. Es la misma
+clase de agujero que el de QC-22: la afirmación medía el vehículo, no el efecto. Pasa a medir la
+palabra (`PATRON_PROVEEDORES`, `/proveedor|supplier/i`), que es el criterio que
+`module-contract.test.ts` ya aplicaba a todo `app/`. Comprobado en rojo con la mutación puesta y en
+verde tras revertirla.
+
+#### Las afirmaciones de QC-42 que esta feature derogó o amplió: repaso una a una
+
+| Afirmación de QC-42 | Qué se hizo | ¿Sigue mordiendo? |
+| --- | --- | --- |
+| `module-contract`: **ningún** archivo del módulo importa `@prisma/client` | Lista blanca **exacta** de los dos adaptadores driven (T11, T12) | **Sí.** Mutación 10: un tercer archivo cae. La lista es un `includes` sobre dos rutas literales, no un patrón de carpeta |
+| `module-contract`: `ports/`, `adapters/driven/` y `adapters/driving/` **vacías** | Censo **exacto** de archivos por carpeta (2 + 2 + 2) | **Sí.** Mutación 9: un archivo de más en cualquiera de las tres cae. Se cambió «vacía» por «exactamente estos», que es igual de falsable |
+| `module-contract`: los tres `.gitkeep` **existen** | Invertida: los tres **no** existen | **Sí**, y además `scope` lo vigila por el otro lado (mutación 7): un `.gitkeep` conviviendo con archivos reales cae |
+| `module-contract`: ningún `'use server'` en **todo** el módulo | `'use server'` **obligatorio** en `adapters/driving/` y prohibido en el resto | **Sí, y es más fuerte:** antes era una prohibición; ahora es prohibición **más** obligación posicional (primera línea útil). Un `'use server'` colado en `domain/` sigue cayendo |
+| `module-contract`: `lib/composition` **no menciona** `proveedores` | Invertida en un caso nuevo: la fachada existe **exactamente una vez**, con las **nueve** claves, `productCatalog` construido **una** sola vez, y nadie fuera de la composición importa `adapters/` ni `ports/` | **Sí, y cubre más:** la versión de QC-42 solo podía decir «no está»; la nueva dice «está, completa y en un solo sitio». Un décimo caso de uso colado, uno que falte, o un `driven` instanciado fuera, caen |
+| `proveedores-schema`: `SupplierCatalogLine` **no declara** `createdBy` ni `updatedBy` | Invertida por **decisión humana** (QC-43, decisión cerrada 3): sí los declara | **Sí.** La ausencia se sustituyó por una presencia con **más** exigencias: `String`, `@db.Uuid`, opcional, sin `@default`, **sin `@relation`** y con sus dos `@@index` nombrados. Mutaciones 14 y 15 lo confirman |
+| `proveedores-schema`: `CROSS_MODULE_SCALARS` con tres escalares sin `@relation` | Ampliado a **cinco** | **Sí.** Es la misma regla aplicada a dos columnas más, no una excepción |
+| `proveedores-schema`: censo de índices | Ampliado con los dos nuevos, sigue siendo un `toEqual` exhaustivo | **Sí.** Mutación 15 |
+| `proveedores-constraints.int`: «cero es válido en los tres campos» | El costo cero pasa a **rechazarse** (`23514`), verificado con SQL crudo contra Postgres | **Sí, y es más fuerte:** antes se afirmaba que un insert **pasaba**; ahora se afirma que la **base** lo rechaza con un SQLSTATE concreto. El mínimo y el plazo siguen admitiendo cero, que es lo que no cambió |
+| `proveedores-constraints.int`: censo de FK de las dos tablas | Ampliado de tres a cinco filas, sigue `toEqual` exhaustivo y ordenado | **Sí.** Precisamente **porque** es exhaustivo hubo que tocarlo: una FK nueva no puede entrar sin que nadie se entere |
+
+**Conclusión de T19:** de las diez afirmaciones derogadas o ampliadas, **ninguna quedó más floja**;
+ocho quedaron igual de exigentes en forma distinta y dos —el `'use server'` posicional y el
+cableado de la composición— quedaron **más** exigentes. La única relajación real de toda la feature
+estaba en un test **nuevo** de esta ficha, no en uno heredado, y está arreglada.
+
+### T20 — mapa `R<n> → test` consolidado
+
+Cuadra **nombre a nombre** con la tabla de `specs/QC-43-crud-de-proveedores/tasks.md`. Seis filas
+de esa tabla citaban de memoria el nombre de un test **heredado** y no coincidían con el literal
+del archivo; se corrigió la tabla, no los tests: renombrar una guardia de otra feature para que
+encaje en la mía sería el mundo al revés. Son R6, R19, R26, R44, R45 y R46.
+
+| R | Archivo | Nombre literal del test |
+| --- | --- | --- |
+| R1 | `tests/unit/proveedores/authorization.test.ts` | `cada caso de uso recibe el actor por parametro y no lee ninguna sesion` |
+| R2 | `tests/unit/proveedores/authorization.test.ts` | `un actor con rol Operador es rechazado en los nueve casos de uso sin llamar a ningun puerto` |
+| R3 | `tests/unit/proveedores/authorization.test.ts` | `un actor ausente, con rol nulo, vacio o desconocido se rechaza igual que el Operador` |
+| R4 | `tests/unit/proveedores/authorization.test.ts` | `el rol autorizado sale de ROLE_ADMINISTRADOR de identity y ningun archivo del modulo incrusta el literal` |
+| R5 | `tests/unit/proveedores/supplier-actions.test.ts` | `la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el rol` |
+| R6 | `tests/guards/guard-rls-force.test.ts` (heredado) | `toda tabla creada tiene RLS activado y forzado` |
+| R7 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `crea el proveedor con sus datos validos y devuelve su identificador` |
+| R8 | `supplier-service.test.ts` + `supplier-crud.int.test.ts` | `guarda al actor como autor de creacion y de modificacion al crear, y solo de modificacion al editar y al dar de baja` + `la edicion y la baja no pisan created_by y sellan updated_by con el actor` |
+| R9 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el nombre vacio, el de solo espacios y el que queda vacio al normalizarlo, y recorta los extremos` |
+| R10 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el nombre de mas de 120, el telefono de mas de 40 y el correo de mas de 160` |
+| R11 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el proveedor cuyo telefono y correo llegan los dos ausentes, vacios o en blanco` |
+| R12 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `el CHECK rechaza con SQLSTATE 23514 el proveedor vivo sin contacto util, al insertar y al modificar` |
+| R13 | `tests/unit/proveedores/supplier-input.test.ts` | `recorta los extremos del telefono y del correo y convierte en ausencia el que llega en blanco` |
+| R14 | `tests/unit/proveedores/supplier-service.test.ts` | `la edicion reemplaza nombre, telefono y correo y no expone ninguna operacion por campo suelto` |
+| R15 | `supplier-service.test.ts` + `supplier-crud.int.test.ts` | `traduce el duplicado del puerto a error de nombre repetido sin crear ni modificar nada` + `el nombre de un proveedor dado de baja queda libre para otro proveedor` |
+| R16 | `tests/unit/proveedores/supplier-service.test.ts` | `persiste el nombre normalizado junto al nombre en el alta y en la edicion` |
+| R17 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `el indice unico parcial rechaza con SQLSTATE 23505 el segundo proveedor vivo con el mismo nombre normalizado` |
+| R18 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `devuelve como maximo el tamano de pagina pedido y el total de proveedores` |
+| R19 | `supplier-crud.int.test.ts` + `tests/unit/pagination.test.ts` (heredado) | `usa 10 por defecto y devuelve 25 como maximo cuando se piden 100` + `usa 10 elementos por pagina cuando no se indica tamano` y `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` |
+| R20 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1, sin leer del repositorio` |
+| R21 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `ordena por nombre ascendente y recorre las paginas sin repetir ni omitir ningun proveedor` |
+| R22 | `supplier-service.test.ts` + `supplier-crud.int.test.ts` | `no existe ninguna operacion de restaurar ni de listar dados de baja` + `la lista y la ficha excluyen los proveedores dados de baja` |
+| R23 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `al dar de baja conserva la fila completa y marca deleted_at` |
+| R24 | `tests/unit/proveedores/supplier-service.test.ts` | `devuelve no encontrado al consultar, editar o dar de baja un proveedor inexistente o ya dado de baja` |
+| R25 | `tests/integration/proveedores/catalog-line.int.test.ts` | `crea la linea del catalogo de un proveedor vivo y devuelve su identificador` |
+| R26 | `catalog-service.test.ts` + `tests/guards/guard-arquitectura-modulos.test.ts` (heredado) | `rechaza la linea cuyo producto no existe o esta dado de baja, preguntando al contrato de inventario` + `ningun adaptador driven real accede a un modelo de otro modulo` |
+| R27 | `catalog-service.test.ts` + `catalog-line.int.test.ts` | `traduce el duplicado del puerto a error de linea repetida` + `el indice unico (supplier_id, product_id) rechaza con SQLSTATE 23505 la segunda linea` |
+| R28 | `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza el costo cero y el costo negativo antes de llegar al repositorio` |
+| R29 | `tests/integration/proveedores/catalog-line.int.test.ts` | `el CHECK rechaza con SQLSTATE 23514 la linea con costo cero o negativo, al insertar y al modificar` |
+| R30 | `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza el minimo de compra y el tiempo de entrega negativos, y admite la linea sin ninguno de los dos` |
+| R31 | `catalog-service.test.ts` + `catalog-line.int.test.ts` | `guarda al actor como autor de creacion y de modificacion de la linea, y al editarla no toca ningun dato del proveedor` + `la edicion de la linea no pisa created_by y no toca ninguna columna del proveedor` |
+| R32 | `tests/integration/proveedores/catalog-line.int.test.ts` | `la FK rechaza con SQLSTATE 23503 el autor inexistente y admite la linea sin autor` |
+| R33 | `catalog-line-input.test.ts` + `catalog-service.test.ts` | `el esquema de edicion rechaza un productId o un supplierId de mas` + `la edicion cambia solo costo, minimo y plazo` |
+| R34 | `tests/integration/proveedores/catalog-line.int.test.ts` | `al dar de baja la linea su fila deja de existir y el proveedor queda intacto` |
+| R35 | `catalog-service.test.ts` + `supplier-service.test.ts` | `el catalogo se consulta con su propio listado paginado y ordenado` + `ni la ficha ni el listado de proveedores traen las lineas del catalogo` |
+| R36 | `tests/integration/proveedores/catalog-line.int.test.ts` | `el listado del catalogo no devuelve ninguna linea de un proveedor dado de baja, aunque las filas sigan en la base` |
+| R37 | `tests/integration/proveedores/catalog-line.int.test.ts` | `la linea de un producto dado de baja se conserva y sigue apareciendo en el catalogo de su proveedor` |
+| R38 | `schema/proveedores-migration.test.ts` + `scope.test.ts` | `la migracion solo contiene los tres cambios y no toca ninguna otra tabla` + `esta feature no anade ninguna columna, indice ni restriccion fuera de los tres cambios` |
+| R39 | `schema/proveedores-migration.test.ts` + task **T16** | `el down.sql recrea las dos restricciones de QC-42 con su definicion literal y borra las dos columnas de autor` + el ciclo real `db:migrate` → `db:rollback` → `db:migrate` de la tanda 3 |
+| R40 | `schema/proveedores-migration.test.ts` | `toda columna, indice y restriccion nueva esta en ingles y en snake_case` |
+| R41 | `supplier-input.test.ts` + `catalog-line-input.test.ts` | `rechaza la entrada que no cumple el esquema antes de llamar al caso de uso` (en los dos) |
+| R42 | `supplier-actions.test.ts` + `scope.test.ts` | `las mutaciones reciben FormData y las consultas argumentos tipados` + `no hay ningun route handler de proveedores bajo app/api` |
+| R43 | `tests/unit/proveedores/supplier-actions.test.ts` | `traduce cada error de dominio a status error con el code estable de la clase, nunca con el texto` |
+| R44 | `tests/guards/guard-arquitectura-modulos.test.ts` (heredado) + `module-contract.test.ts` | `ningun archivo real de domain/ports importa algo prohibido` · `los contratos reales (identity, inventario) no arrastran servidor` + `el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User` |
+| R45 | `scope.test.ts` + `tests/unit/pagination.test.ts` (heredado) | `el modulo proveedores no reimplementa el calculo de paginacion` + `usa 10 elementos por pagina cuando no se indica tamano` y `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` |
+| R46 | `tests/guards/guard-dependencias-aprobadas.test.ts` (heredado) | `toda dependencia de package.json tiene su fila en el registro` |
+| R47 | `tests/unit/proveedores/scope.test.ts` | `no existe ninguna pantalla, pagina ni componente de proveedores, ni spec E2E nuevo` |
+| R48 | `tests/integration/proveedores/catalog-line.int.test.ts` | `un proveedor dado de baja no admite lineas nuevas ni edicion de las suyas, y el borrado si sigue permitido` |
+
+**48 de 48 requisitos con test.** Ninguna fila huérfana, ningún nombre inventado.
+
+La lista de lo que **se hereda y no se re-crea** (T0) está en la tanda 1 de este mismo archivo,
+verificada contra el árbol de la rama. Al cierre sigue siendo cierta, con los tres `.gitkeep` ya
+borrados —T7, T11, T12 y T14 llenaron sus carpetas— y `module-contract` afirmando su ausencia.
+
+### Salida real de la verificación (tanda 5)
+
+```
+$ pnpm run typecheck
+> quimicloude@0.1.0 typecheck
+> tsc --noEmit
+(sin salida: limpio)
+
+$ pnpm run lint
+> quimicloude@0.1.0 lint
+> eslint
+(sin salida: limpio)
+
+$ set -a && . ./.env && set +a
+$ npx vitest run tests/unit/proveedores tests/integration/proveedores tests/guards tests/unit/pagination.test.ts
+ Test Files  26 passed (26)
+      Tests  265 passed (265)
+   Duration  4.57s
+
+$ npx vitest run tests/unit/proveedores tests/guards   (arbol restaurado tras las mutaciones)
+ Test Files  22 passed (22)
+      Tests  215 passed (215)
+```
+
+`./init.sh` completo **lo corrió el leader** antes de esta tanda: **125 archivos, 1325 tests,
+`== init OK ==`**. Esta tanda no volvió a correrlo a propósito y solo tocó tres archivos, dos de
+ellos documentación; el tercero es `scope.test.ts`, cuya suite (`tests/unit/proveedores` +
+`tests/guards`) queda arriba en verde. **El leader debe volver a correr `./init.sh` antes del PR**
+— regla 5 de `CLAUDE.md`, sin excepción.
+
+### `CHECKPOINTS.md` — cumplimiento punto por punto, con los «no aplica» declarados
+
+Siguiendo el precedente de `specs/QC-12-dashboard-en-blanco/requirements.md > Notas de proceso`:
+los «no aplica» se **declaran**, no se omiten.
+
+**Especificación**
+- OK · `specs/QC-43-crud-de-proveedores/requirements.md` con R1–R48 en EARS.
+- OK · `design.md` con alternativas descartadas y su porqué (2.1/P2, 5.3, 7, 9, 12).
+- OK · `tasks.md`: **T0–T20, las veinte marcadas `[x]`**. Cero `[ ]`.
+
+**Trazabilidad**
+- OK · Cada `R1`–`R48` mapea a al menos un test concreto (tabla de arriba).
+- OK · El mapa `R<n> → test` está en este archivo, consolidado y cuadrado con `tasks.md`.
+
+**Calidad de código**
+- OK · `pnpm run typecheck` limpio. `pnpm run lint` limpio. `pnpm test` en verde (gate completo del
+  leader: 1325 tests).
+- **NO APLICA, con motivo declarado — E2E.** La feature toca permisos —los nueve casos de uso
+  exigen `ROLE_ADMINISTRADOR`—, así que el checkpoint la señala. Pero **no hay flujo navegable que
+  Playwright pueda visitar**: R47 prohíbe expresamente cualquier pantalla, y la UI es **QC-44**,
+  que el board tiene bloqueada por esta ficha. Es la decisión cerrada 8 del `design.md`, aprobada
+  por el humano al aprobar el spec. El sustituto no es «nada»: son los cinco casos de
+  `authorization.test.ts` sobre los nueve casos de uso —Operador, rol nulo, rol vacío, rol
+  desconocido y actor ausente—, cada uno afirmando `not.toHaveBeenCalled()` sobre los tres puertos.
+  **El E2E de permisos de proveedores es entregable de QC-44.**
+- **NO APLICA — UI multiplataforma.** Cero archivos en `app/` y en `components/`; `scope.test.ts`
+  lo vigila (mutaciones 1 y 8).
+- **NO APLICA — dependencias.** La feature **no añadió ninguna**; `package.json` no se tocó en todo
+  el rango `cc17e1c..HEAD`. `guard-dependencias-aprobadas` sigue verde.
+
+**Datos y seguridad (Supabase)**
+- OK · Cada permiso se valida en el **dominio**, en la primera línea del caso de uso
+  (`requireAdmin`), antes de `zod` y antes de tocar ningún puerto, y tiene test
+  (`authorization.test.ts`). Las policies no filtran nada y no se usan como frontera.
+- OK · Las dos tablas tienen `ENABLE` **y** `FORCE ROW LEVEL SECURITY` (`guard-rls-force` +
+  `proveedores-migration` › `las dos tablas quedan con RLS activado y forzado`). Vienen de QC-42;
+  esta ficha no crea ninguna tabla nueva.
+- OK · Todo el acceso a datos pasa por los dos adaptadores driven con Prisma. **Ninguna lectura ni
+  escritura con el cliente de Supabase** en todo el módulo.
+- OK · La migración `20260903200343_supplier_contact_cost_and_line_audit` tiene su `down.sql`, y el
+  ciclo real `db:migrate` → `db:rollback` → `db:migrate` está pegado en la **tanda 3** (T16), con
+  `_prisma_migrations` coherente.
+- OK · Ningún secreto hardcodeado: `DATABASE_URL` y `DIRECT_URL` por entorno; ninguna URL ni key de
+  Supabase en el código de la feature.
+- **NO APLICA — webhooks.** La feature no añade ninguno, ni ningún route handler (R42; mutaciones
+  2, 3 y 3b).
+
+**Módulos hexagonales**
+- OK · `domain/` y `ports/` no importan framework, base, `shared` ni adaptadores
+  (`guard-arquitectura-modulos` + `module-contract`).
+- OK · De `inventario` y de `identity` solo se importa el **barrel**.
+- OK · Las dos Server Actions piden la fachada a `@/lib/composition`; no instancian ningún `driven`
+  (`module-contract` › `el cableado puerto-implementacion…`).
+- OK · `lib/shared/**` sigue siendo hoja: esta ficha **consume** `pagination.ts` y no lo toca.
+- OK · Ningún `'use server'` sale del barrel: `index.ts` solo reexporta de `./domain` y su cierre
+  transitivo no arrastra Prisma ni `next/*`.
+- OK · Los dos modelos llevan `/// @module proveedores`; ningún módulo consulta un modelo ajeno
+  (`prisma.product` y `prisma.user` prohibidos y comprobados en los dos adaptadores).
+- OK · No reaparecen `lib/services/`, `lib/repositories/` ni `lib/interfaces/`.
+- OK · En la raíz de `lib/` siguen solo `modules/`, `shared/`, `composition/` y `utils.ts`. Esta
+  ficha no creó ninguna carpeta ahí. *(El checkpoint avisa de que la guardia no lo comprueba;
+  verificado a mano.)*
+- OK · **La lógica de negocio está en `domain/`, no en la Server Action** —el otro punto que el
+  checkpoint marca como no cubierto por la guardia—. Verificado a mano: `requireAdmin`, el parseo
+  `zod`, la normalización del nombre, la resolución del producto contra el contrato de `inventario`
+  y la traducción de `duplicate`/`not_found` viven en los nueve casos de uso; las dos acciones solo
+  leen la sesión, arman el input desde `FormData` y traducen el error a `{ status, code, message }`.
+
+**Permisos**
+- **NO APLICA — páginas protegidas.** No hay ninguna página (R47).
+- **NO APLICA — componentes `private/`.** No hay ninguno.
+- OK · Las mutaciones son **Server Actions**, no `fetch` a API routes. R42, con su test y tres
+  mutaciones que lo confirman.
+
+**Configuración**
+- OK · Nada que cambie entre entornos quedó hardcodeado. `DEFAULT_PAGE_SIZE` y `MAX_PAGE_SIZE` no
+  son configuración de entorno: son política de producto y viven en `lib/shared/pagination.ts`, en
+  un solo sitio (R45).
+
+**Verificación final** — los cuatro puntos son **del leader**, no del implementer, y quedan
+abiertos a propósito:
+- PENDIENTE · `./init.sh` en verde: lo corrió el leader antes de esta tanda (1325 tests). **Hay que
+  repetirlo antes del PR.**
+- PENDIENTE · `progress/review_QC-43-crud-de-proveedores.md`: lo escribe el `reviewer`. **No existe
+  todavía.**
+- PENDIENTE · Entrada en `progress/history.md`: la escribe el leader al cerrar.
+- PENDIENTE · Desmontar el worktree (`./scripts/wt.sh done QC-43-crud-de-proveedores`): del leader,
+  tras el merge.
+
+### Veredicto
+
+T19 cerrada **con un hallazgo real y arreglado** —el barrido de `app/api/**` medía el import y no
+el consumo, y una ruta API con otro nombre que pidiera la fachada se le escapaba—; las diez
+afirmaciones de QC-42 que esta feature derogó o amplió se repasaron una a una y **ninguna quedó más
+floja** (dos quedaron más exigentes); T20 cerrada con las veinte tasks en `[x]`, los 48 requisitos
+mapeados nombre a nombre y `CHECKPOINTS.md` cumplido con sus siete «no aplica» declarados en voz
+alta.

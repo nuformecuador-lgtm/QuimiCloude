@@ -1017,13 +1017,29 @@ describe('estructura de la linea de catalogo', () => {
       )
       expect(plazoNegativo).toBe(CHECK_VIOLATION)
 
-      // Cero es valido en los tres campos.
-      const cero = await createLine(tx, supplierId, productoCero, '0.0000', {
+      // Cero sigue siendo valido en el MINIMO y en el PLAZO -\u00absin minimo pactado\u00bb y
+      // \u00abmismo dia\u00bb son datos legitimos-, pero YA NO en el costo: QC-43 (decision cerrada 4,
+      // su R29) cambio ese CHECK a `cost > 0` porque un cero casi siempre es un dato a medio
+      // escribir. Este caso se actualiza aqui, y no en el archivo de QC-43, porque es el
+      // censo de esta tabla el que dejaria de ser cierto.
+      const costoCero = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'supplier_catalog_lines', {
+            supplier_id: asUuid(supplierId),
+            product_id: asUuid(productoCero),
+            cost: Prisma.sql`0.0000`,
+          }),
+        'linea con costo cero (QC-43 R29)',
+      )
+      expect(costoCero).toBe(CHECK_VIOLATION)
+
+      const cero = await createLine(tx, supplierId, productoCero, '0.0001', {
         minPurchase: '0.0000',
         deliveryTime: 0,
       })
       const line = await tx.supplierCatalogLine.findUniqueOrThrow({ where: { id: cero } })
-      expect(line.cost.toString()).toBe('0')
+      expect(line.cost.toString()).toBe('0.0001')
       expect(line.minPurchase?.toString()).toBe('0')
       expect(line.deliveryTime).toBe(0)
     })
@@ -1070,9 +1086,15 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
         JOIN pg_class ft ON ft.oid = c.confrelid
         WHERE c.contype = 'f' AND t.relname IN ('suppliers', 'supplier_catalog_lines')
         ORDER BY c.conname`
+      // Las dos primeras filas las anadio QC-43 (decision cerrada 3, su R31/R32): la linea
+      // del catalogo gano columnas de autor con FK real hacia `users`, tambien escalares sin
+      // `@relation`. El censo se mantiene EXHAUSTIVO a proposito -por eso hubo que tocarlo-:
+      // es lo que hace que una FK nueva no pueda entrar sin que nadie se entere.
       expect(foreignKeys).toEqual([
+        { conname: 'supplier_catalog_lines_created_by_fkey', referencia: 'users' },
         { conname: 'supplier_catalog_lines_product_id_fkey', referencia: 'products' },
         { conname: 'supplier_catalog_lines_supplier_id_fkey', referencia: 'suppliers' },
+        { conname: 'supplier_catalog_lines_updated_by_fkey', referencia: 'users' },
         { conname: 'suppliers_created_by_fkey', referencia: 'users' },
         { conname: 'suppliers_updated_by_fkey', referencia: 'users' },
       ])

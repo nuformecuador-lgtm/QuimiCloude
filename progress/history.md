@@ -1235,7 +1235,6 @@ QC-25: **tercer caso en tres días**.
 - Dos guardias de fuente más anchas que su requisito, y el centinela de alcance que **pondrá en
   rojo a QC-45 por construcción** — que se lea como premisa caída, no como guardia que estorba.
 
-
 ## QC-33 — modelo-pedidos (cerrada el 2026-09-03, PR #26, merge `73c2fb6`)
 
 Primera ficha de la épica **QC-31 — Pedidos**. Crea `Order` como **módulo hexagonal propio

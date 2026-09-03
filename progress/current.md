@@ -13,7 +13,10 @@
 |---|---|---|---|---|---|---|
 | QC-13 | guardia-de-sesion-en-navegacion | QC-17 Identidad y acceso | frontend | **in_progress — [PR #27](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/27) ABIERTO** | `feature/QC-13-guardia-de-sesion-en-navegacion` | **Esperando que el humano mergee el PR #27.** Sesión de hoy (2026-09-03). 16 requisitos EARS con test que muerde, 6 tareas. **Reviewer APROBADO, 0 mayores**: verificó por mutación reintroduciendo las 4 constantes, el ítem de Lotes y el grupo Compras — **cayeron 5 tests**, incluida `guard-nav-serializable`. `typecheck` y `lint` limpios, **1349 tests / 1341 verdes**, **E2E verde en Chromium y WebKit** aterrizando en `/inventario`. **`./init.sh` no llega a `== init OK ==` por dos causas ajenas declaradas en el PR**: la asimetría del validador desde worktree secundario (QC-26 tiene su spec solo en su rama) y los 8 rojos del seed por el producto residual de QC-22. **El gate del leader destapó un rojo propio invisible para los subagentes** (`sidebar-ajuste.test.tsx` acoplado al `badge` de Notificaciones). **Falta comentar el PR en el issue: el MCP de Jira devolvió un captcha de WAF.** Al mergear: F2.5 y F2.6. |
 | QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | **in_progress — PR #29 ABIERTO** | `feature/QC-26-pantalla-de-recetas` | **Esperando que el humano mergee el [PR #29](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/29).** 54 requisitos con test, 30 tasks (**T25 pendiente a propósito**: comprobación manual en móvil real, que ningún agente puede cerrar). Gate: **125 archivos, 1369 tests**, tres corridas idénticas. `reviewer` en dos rondas (3 mayores → 0, **15 mutaciones**) y **cero cambios de producción** al corregir. **Base propia `QuimiCloude_QC26`, hay que borrarla al cerrar.** Al mergear: F2.5 y F2.6 |
-| QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | **in_progress — implementación por bloques (F2.1)** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. `/afinar-feature` sembró 16 decisiones y `spec_author` escribió **47 requisitos (R1-R47) y 21 tareas** con mapa `R<n> → test` completo (commit `0f5a3de`). Base propia `QuimiCloude_QC43` montada, gate verde en el worktree (116 archivos). **Spec APROBADO el 2026-09-03** (F1.4), tarjeta en *En curso*. **P2 cerrada**: la restricción de contacto se escribe **solo para filas vivas**, lo que cierra de paso la pregunta abierta 8 de QC-42 y desbloquea T3. Se implementa **por bloques**, no con un implementer monolítico: la lección de QC-22, donde el implementer murió dos veces por 529 y lo que funcionó fue repartir |
+| QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | **in_progress — implementación por bloques (F2.1)** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. `/afinar-feature` sembró 16 decisiones y `spec_author` escribió **47 requisitos (R1-R47) y 21 tareas** con mapa `R<n> → test` completo (commit `0f5a3de`). Base propia `QuimiCloude_QC43` montada, gate verde en el worktree (116 archivos). **Spec APROBADO el 2026-09-03** (F1.4), tarjeta en *En curso*. **P2 cerrada**: la restricción de contacto se escribe **solo para filas vivas**, lo que cierra de paso la pregunta abierta 8 de QC-42 y desbloquea T3. Se implementa **por bloques**, no con un implementer monolítico: la lección de QC-22, donde el implementer murió dos veces por 529 y lo que funcionó fue repartir. **PR [#28](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/28) MERGEADO a `dev` el 2026-09-03** (merge `760e3eb`): el modulo `proveedores` completo -dominio, puertos, adaptadores, composicion y la migracion `20260903200343_supplier_contact_cost_and_line_audit`- ya esta en esta rama. **Queda cerrar la ficha (F2.5, F2.6)**, que ninguna de las dos ramas habia hecho todavia. |
+
+La feature **QC-33 — modelo-pedidos** se cerró el 2026-09-03 (PR #26, merge `73c2fb6`):
+resumen en `progress/history.md`. Desbloquea **QC-34**.
 
 La feature **QC-30 — rediseno-login** se cerró el 2026-09-03, pero **su PR [#20] se había
 mergeado el 2026-09-02 a las 22:55Z**: la sesión que la implementó nunca corrió F2.5 ni F2.6, así
@@ -1100,6 +1103,40 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   de la imagen (tamaño, tipos, bucket público o privado). Las tres las decide la acotación de
   QC-25, salvo la primera, que es de negocio y no tiene ficha.
 
+
+### La base compartida tiene una fila residual que rompe el gate de TODAS las sesiones (2026-09-03)
+
+`tests/integration/identity/identity-seed.int.test.ts` sale rojo con **8 casos** en cualquier
+worktree, `dev` incluido — verificado, no deducido. **No es un defecto de código**: es estado sucio
+de la base compartida.
+
+- **La fila:** un producto `FeldesQuack` en `products`, creado el 2026-09-03 a las 19:36 UTC, con
+  `created_by`/`updated_by` apuntando al admin del seed. Encaja con una corrida de **QC-22** sin
+  limpiar.
+- **El mecanismo:** `resetIdentityToEmptyState` hace `DELETE FROM users` dentro de una transacción
+  y la FK `products_created_by_fkey` lo bloquea con `23503`.
+- **Decisión del humano (2026-09-03): no se borra la fila, no se arregla el helper y NO se mete al
+  baseline.** El baseline es para deuda ajena de `dev`; esto es transitorio, y enmascararlo ahí
+  ocultaría para siempre un test que volverá a pasar solo. Se declaró en el PR #26.
+- **La causa de fondo, que sigue viva:** `resetIdentityToEmptyState` borra usuarios sin limpiar
+  antes las tablas que los referencian, así que **cualquier feature futura con una FK a `users`
+  puede volver a provocarlo** — y QC-33 acaba de añadir dos. Candidato a ficha propia.
+
+### El gate rápido no ve los tests de alcance de otros módulos (2026-09-03, confirmado por QC-33)
+
+El implementer de QC-33 reportó **1** rojo; el gate completo destapó **6**, y **5 eran suyos**: las
+afirmaciones de QC-4, QC-14 y QC-24 de que en todo el esquema no existe ningún enum, que los dos
+enums de QC-33 dejaron viejas. `vitest related` no los relaciona porque no los une el árbol de
+archivos sino una afirmación sobre el repositorio entero. **Es el mismo agujero que ya costó caro
+en QC-20**, y es la razón por la que el gate completo antes del PR no es ceremonia.
+
+### El worktree principal quedó fuera de `dev` (2026-09-03)
+
+`AGENTS.md > Worktrees` dice que el worktree principal se queda en `dev` y **nadie hace `git
+checkout` en él**. Hoy alguien lo dejó en **`fix-ux`**, y el commit de cierre de QC-33 aterrizó allí
+en vez de en `dev`: `git push origin dev` empujaba la rama `dev` local, desactualizada, y salía
+rechazado. Se resolvió aplicando el cierre sobre `dev` desde un worktree temporal, **sin tocar
+`fix-ux`**. Si esa rama tiene trabajo vivo, merece su propio worktree.
 ## Conflictos pendientes > DOS SESIONES DE LEADER`.
 
 - `zone: backend`. La description es toda servidor: verificar credenciales, responder sin

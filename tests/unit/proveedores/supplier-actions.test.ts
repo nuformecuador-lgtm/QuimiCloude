@@ -1,0 +1,426 @@
+// T14 — Las dos Server Actions de `proveedores` (`design.md > 9`, `> 6.4`). Mockea
+// `@/lib/composition` igual que `tests/unit/inventario/product-actions.test.ts`: la action
+// se prueba contra dobles, nunca contra el dominio real ni contra la sesion real.
+//
+// Cubre R5, R42 y R43 con los nombres EXACTOS que exige `tasks.md > Trazabilidad`.
+//
+// Los tres casos miden cosas distintas a proposito:
+//  - R5  : de donde sale el actor, y que la action NO vuelve a decidir nada (ni rol, ni
+//          ninguna otra regla de negocio).
+//  - R42 : la FORMA de la entrada por operacion -mutacion con `FormData`, consulta con
+//          argumentos tipados- y que no hay route handler por ninguna parte.
+//  - R43 : que el error viaja por el `code` estable de la clase y NUNCA por el texto, y que
+//          lo que no es error de dominio se relanza en vez de tragarse.
+
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import {
+  createSupplierAction,
+  deleteSupplierAction,
+  getSupplierAction,
+  listSuppliersAction,
+  updateSupplierAction,
+  type CreateSupplierFormState,
+  type SupplierMutationFormState,
+} from '@/lib/modules/proveedores/adapters/driving/supplier-actions'
+import {
+  createCatalogLineAction,
+  deleteCatalogLineAction,
+  listCatalogLinesAction,
+  updateCatalogLineAction,
+  type CatalogLineMutationFormState,
+  type CreateCatalogLineFormState,
+} from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions'
+import {
+  DuplicateCatalogLineError,
+  DuplicateNameError,
+  NotFoundError,
+  ProductNotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/modules/proveedores'
+
+const {
+  createSupplierMock,
+  updateSupplierMock,
+  deleteSupplierMock,
+  getSupplierMock,
+  listSuppliersMock,
+  createCatalogLineMock,
+  updateCatalogLineMock,
+  deleteCatalogLineMock,
+  listCatalogLinesMock,
+  getSessionUserMock,
+} = vi.hoisted(() => ({
+  createSupplierMock: vi.fn(),
+  updateSupplierMock: vi.fn(),
+  deleteSupplierMock: vi.fn(),
+  getSupplierMock: vi.fn(),
+  listSuppliersMock: vi.fn(),
+  createCatalogLineMock: vi.fn(),
+  updateCatalogLineMock: vi.fn(),
+  deleteCatalogLineMock: vi.fn(),
+  listCatalogLinesMock: vi.fn(),
+  getSessionUserMock: vi.fn(),
+}))
+
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock },
+  proveedores: {
+    createSupplier: createSupplierMock,
+    updateSupplier: updateSupplierMock,
+    deleteSupplier: deleteSupplierMock,
+    getSupplier: getSupplierMock,
+    listSuppliers: listSuppliersMock,
+    createCatalogLine: createCatalogLineMock,
+    updateCatalogLine: updateCatalogLineMock,
+    deleteCatalogLine: deleteCatalogLineMock,
+    listCatalogLines: listCatalogLinesMock,
+  },
+}))
+
+const ADMIN_SESSION_USER = {
+  id: 'user-admin-1',
+  username: 'ana.perez',
+  displayName: 'Ana Perez',
+  roleName: 'Administrador',
+}
+
+const SUPPLIER_ID = '33333333-3333-4333-8333-333333333333'
+const PRODUCT_ID = '44444444-4444-4444-8444-444444444444'
+const LINE_ID = '55555555-5555-4555-8555-555555555555'
+
+function formDataOf(fields: Record<string, string>): FormData {
+  const formData = new FormData()
+  for (const [name, value] of Object.entries(fields)) formData.set(name, value)
+  return formData
+}
+
+const CREATE_SUPPLIER_INITIAL: CreateSupplierFormState = { status: 'idle' }
+const SUPPLIER_MUTATION_INITIAL: SupplierMutationFormState = { status: 'idle' }
+const CREATE_LINE_INITIAL: CreateCatalogLineFormState = { status: 'idle' }
+const LINE_MUTATION_INITIAL: CatalogLineMutationFormState = { status: 'idle' }
+
+const VALID_SUPPLIER_FIELDS = {
+  name: 'Quimicos del Pacifico S.A.',
+  phone: '+593 99 123 4567',
+  email: 'ventas@quimpacifico.ec',
+}
+
+const VALID_LINE_FIELDS = {
+  supplierId: SUPPLIER_ID,
+  productId: PRODUCT_ID,
+  cost: '12.5000',
+  minPurchase: '5',
+  deliveryTime: '3',
+}
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+const drivingDir = join(repoRoot, 'lib', 'modules', 'proveedores', 'adapters', 'driving')
+
+/** Fuente SIN comentarios: se vigila el codigo, no la prosa que lo explica. */
+function readSource(file: string): string {
+  return readFileSync(join(drivingDir, file), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+}
+
+const ACTION_FILES = ['supplier-actions.ts', 'supplier-catalog-actions.ts'] as const
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
+})
+
+describe('Server Actions de proveedores — actor, forma de entrada y errores', () => {
+  it('la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el rol', async () => {
+    // R5, primera mitad: el actor sale de la sesion, UNA vez por invocacion, y llega al caso
+    // de uso tal cual. Se comprueba en las NUEVE actions, no en una de muestra: una sola que
+    // se olvidara de pasarlo dejaria el caso de uso recibiendo `undefined`.
+    createSupplierMock.mockResolvedValue({ id: 'supplier-1' })
+    updateSupplierMock.mockResolvedValue(undefined)
+    deleteSupplierMock.mockResolvedValue(undefined)
+    getSupplierMock.mockResolvedValue({ id: SUPPLIER_ID })
+    listSuppliersMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 })
+    createCatalogLineMock.mockResolvedValue({ id: LINE_ID })
+    updateCatalogLineMock.mockResolvedValue(undefined)
+    deleteCatalogLineMock.mockResolvedValue(undefined)
+    listCatalogLinesMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 })
+
+    const ESPERADO = { id: 'user-admin-1', roleName: 'Administrador' }
+
+    await createSupplierAction(CREATE_SUPPLIER_INITIAL, formDataOf(VALID_SUPPLIER_FIELDS))
+    expect(createSupplierMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
+
+    await updateSupplierAction(SUPPLIER_ID, SUPPLIER_MUTATION_INITIAL, formDataOf(VALID_SUPPLIER_FIELDS))
+    expect(updateSupplierMock.mock.calls[0]?.[2]).toEqual(ESPERADO)
+
+    await deleteSupplierAction(SUPPLIER_MUTATION_INITIAL, formDataOf({ id: SUPPLIER_ID }))
+    expect(deleteSupplierMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
+
+    await getSupplierAction(SUPPLIER_ID)
+    expect(getSupplierMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
+
+    await listSuppliersAction({ page: 1 })
+    expect(listSuppliersMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
+
+    await createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(VALID_LINE_FIELDS))
+    expect(createCatalogLineMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
+
+    await updateCatalogLineAction(LINE_ID, LINE_MUTATION_INITIAL, formDataOf(VALID_LINE_FIELDS))
+    expect(updateCatalogLineMock.mock.calls[0]?.[2]).toEqual(ESPERADO)
+
+    await deleteCatalogLineAction(LINE_MUTATION_INITIAL, formDataOf({ id: LINE_ID }))
+    expect(deleteCatalogLineMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
+
+    await listCatalogLinesAction(SUPPLIER_ID, { page: 1 })
+    expect(listCatalogLinesMock.mock.calls[0]?.[2]).toEqual(ESPERADO)
+
+    expect(getSessionUserMock).toHaveBeenCalledTimes(9)
+
+    // Sin sesion, el actor que baja es `null` -no un objeto inventado, no un `throw` de la
+    // action-: quien rechaza es el caso de uso (R3, falla cerrado).
+    vi.clearAllMocks()
+    getSessionUserMock.mockResolvedValue(null)
+    createSupplierMock.mockRejectedValue(new UnauthorizedError())
+    const sinSesion = await createSupplierAction(
+      CREATE_SUPPLIER_INITIAL,
+      formDataOf(VALID_SUPPLIER_FIELDS),
+    )
+    expect(createSupplierMock.mock.calls[0]?.[1]).toBeNull()
+    expect(sinSesion).toEqual({ status: 'error', code: 'unauthorized', message: expect.any(String) })
+
+    // R5, segunda mitad: la action NO decide. Ningun archivo de `adapters/driving/` nombra
+    // `requireAdmin`, el rol, ni ninguna de las reglas de negocio del dominio -normalizacion
+    // del nombre, esquemas de entrada, paginacion-. Todo eso vive en el caso de uso.
+    for (const file of ACTION_FILES) {
+      const source = readSource(file)
+      expect(source, `${file} repite la comprobacion de rol`).not.toMatch(/requireAdmin/)
+      expect(source, `${file} incrusta el nombre del rol`).not.toMatch(/Administrador/)
+      expect(source, `${file} incrusta ROLE_ADMINISTRADOR`).not.toMatch(/ROLE_ADMINISTRADOR/)
+      expect(source, `${file} valida con el esquema del dominio`).not.toMatch(/Schema\b/)
+      expect(source, `${file} normaliza el nombre`).not.toMatch(/normalizeSupplierName/)
+      expect(source, `${file} reimplementa la paginacion`).not.toMatch(
+        /DEFAULT_PAGE_SIZE|MAX_PAGE_SIZE|pageSize\s*[-*]|Math\.(ceil|min)/,
+      )
+      // Y no toca la base ni por asomo: el driving pide todo a la composicion.
+      expect(source, `${file} habla con el ORM`).not.toMatch(/@prisma\/client|prisma\./)
+    }
+  })
+
+  it('las mutaciones reciben FormData y las consultas argumentos tipados', async () => {
+    // R42. Se mide en tres planos, porque un solo plano se puede falsear:
+    //
+    //  1. COMPORTAMIENTO: las mutaciones leen de verdad los campos del `FormData` -si la
+    //     action ignorara el formulario, el candidato que llega al caso de uso no llevaria
+    //     estos valores-.
+    //  2. FIRMA: las consultas NO admiten `FormData`; reciben argumentos ya tipados. Se
+    //     comprueba por el numero de parametros declarados y por el texto de la firma.
+    //  3. ALCANCE: no existe ningun route handler de proveedores, ni `fetch` a una ruta
+    //     propia (la otra mitad de R42, con su censo de `app/api`, la cierra `scope.test.ts`).
+    createSupplierMock.mockResolvedValue({ id: 'supplier-1' })
+    createCatalogLineMock.mockResolvedValue({ id: LINE_ID })
+    updateSupplierMock.mockResolvedValue(undefined)
+    updateCatalogLineMock.mockResolvedValue(undefined)
+    deleteSupplierMock.mockResolvedValue(undefined)
+    deleteCatalogLineMock.mockResolvedValue(undefined)
+
+    // 1. El alta del proveedor traslada los tres campos del formulario, sin tocarlos: el
+    //    recorte y la conversion del blanco en ausencia son de `zod` (R13), no del borde.
+    await createSupplierAction(
+      CREATE_SUPPLIER_INITIAL,
+      formDataOf({ name: '  Acme  ', phone: '  ', email: 'ventas@acme.ec' }),
+    )
+    expect(createSupplierMock.mock.calls[0]?.[0]).toEqual({
+      name: '  Acme  ',
+      phone: '  ',
+      email: 'ventas@acme.ec',
+    })
+
+    // El id de la edicion NO viaja en el `FormData`: es argumento, y el `FormData` solo
+    // lleva los campos de negocio (R14: reemplazo completo).
+    await updateSupplierAction(
+      SUPPLIER_ID,
+      SUPPLIER_MUTATION_INITIAL,
+      formDataOf(VALID_SUPPLIER_FIELDS),
+    )
+    expect(updateSupplierMock.mock.calls[0]?.[0]).toBe(SUPPLIER_ID)
+    expect(updateSupplierMock.mock.calls[0]?.[1]).not.toHaveProperty('id')
+
+    // La baja si lleva el id en el formulario (campo oculto de un boton), y sin el no llama
+    // al caso de uso.
+    await deleteSupplierAction(SUPPLIER_MUTATION_INITIAL, formDataOf({ id: SUPPLIER_ID }))
+    expect(deleteSupplierMock.mock.calls[0]?.[0]).toBe(SUPPLIER_ID)
+    const sinId = await deleteSupplierAction(SUPPLIER_MUTATION_INITIAL, formDataOf({}))
+    expect(sinId).toEqual({ status: 'error', code: 'invalid_input', message: expect.any(String) })
+    expect(deleteSupplierMock).toHaveBeenCalledTimes(1)
+
+    // 1.b La linea del catalogo: `cost`/`minPurchase` siguen siendo CADENA hasta el
+    //     adaptador driven, y `deliveryTime` se convierte a numero -si no, `z.number()` lo
+    //     rechazaria y R30 no se podria cumplir nunca desde un formulario-.
+    await createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(VALID_LINE_FIELDS))
+    expect(createCatalogLineMock.mock.calls[0]?.[0]).toEqual({
+      supplierId: SUPPLIER_ID,
+      productId: PRODUCT_ID,
+      cost: '12.5000',
+      minPurchase: '5',
+      deliveryTime: 3,
+    })
+
+    // Un `deliveryTime` que no es entero se rechaza EN EL BORDE, sin llamar al caso de uso:
+    // `Number('tres dias')` seria `NaN`, y `NaN` pasa `z.number().int()` como valido.
+    const conBasura = await createCatalogLineAction(
+      CREATE_LINE_INITIAL,
+      formDataOf({ ...VALID_LINE_FIELDS, deliveryTime: 'tres dias' }),
+    )
+    expect(conBasura).toEqual({
+      status: 'error',
+      code: 'invalid_input',
+      message: expect.any(String),
+    })
+    expect(createCatalogLineMock).toHaveBeenCalledTimes(1)
+
+    // Los dos opcionales vacios llegan como AUSENCIA, no como cadena vacia.
+    await createCatalogLineAction(
+      CREATE_LINE_INITIAL,
+      formDataOf({ ...VALID_LINE_FIELDS, minPurchase: '', deliveryTime: '' }),
+    )
+    expect(createCatalogLineMock.mock.calls[1]?.[0]).toMatchObject({
+      minPurchase: undefined,
+      deliveryTime: undefined,
+    })
+
+    // La baja de la linea, igual que la del proveedor, lleva el id en el formulario y sin
+    // el no llama al caso de uso.
+    await deleteCatalogLineAction(LINE_MUTATION_INITIAL, formDataOf({ id: LINE_ID }))
+    expect(deleteCatalogLineMock.mock.calls[0]?.[0]).toBe(LINE_ID)
+    const lineaSinId = await deleteCatalogLineAction(LINE_MUTATION_INITIAL, formDataOf({}))
+    expect(lineaSinId).toEqual({
+      status: 'error',
+      code: 'invalid_input',
+      message: expect.any(String),
+    })
+    expect(deleteCatalogLineMock).toHaveBeenCalledTimes(1)
+
+    // La edicion de la linea no manda proveedor ni producto (R33, `strictObject`).
+    await updateCatalogLineAction(LINE_ID, LINE_MUTATION_INITIAL, formDataOf(VALID_LINE_FIELDS))
+    expect(updateCatalogLineMock.mock.calls[0]?.[1]).toEqual({
+      cost: '12.5000',
+      minPurchase: '5',
+      deliveryTime: 3,
+    })
+
+    // 2. Firmas: las cinco mutaciones terminan en `FormData`; las cuatro consultas no lo
+    //    mencionan siquiera.
+    const MUTACIONES = [
+      createSupplierAction,
+      updateSupplierAction,
+      deleteSupplierAction,
+      createCatalogLineAction,
+      updateCatalogLineAction,
+      deleteCatalogLineAction,
+    ]
+    for (const action of MUTACIONES) {
+      expect(action.length, `${action.name} deberia recibir prevState y FormData`).toBeGreaterThanOrEqual(2)
+    }
+
+    const fuentes = ACTION_FILES.map((file) => readSource(file)).join('\n')
+    for (const consulta of [
+      'getSupplierAction(id: string)',
+      'listSuppliersAction(query: unknown)',
+    ]) {
+      expect(fuentes, `${consulta} deberia recibir argumentos tipados`).toContain(consulta)
+    }
+    expect(fuentes).toMatch(/listCatalogLinesAction\(\s*supplierId: string,\s*query: unknown,\s*\)/)
+    // Ninguna consulta declara `FormData` en su firma.
+    for (const consulta of ['getSupplierAction', 'listSuppliersAction', 'listCatalogLinesAction']) {
+      const firma = fuentes.slice(fuentes.indexOf(`export async function ${consulta}(`))
+      expect(
+        firma.slice(0, firma.indexOf('{')),
+        `${consulta} no puede recibir FormData`,
+      ).not.toMatch(/FormData/)
+    }
+
+    // 3. Ningun route handler propio, y ningun `fetch` a una ruta interna.
+    for (const ruta of ['proveedores', 'suppliers']) {
+      expect(existsSync(join(repoRoot, 'app', 'api', ruta)), `app/api/${ruta}`).toBe(false)
+    }
+    expect(fuentes, 'una action llama por fetch a una ruta propia').not.toMatch(/fetch\(/)
+  })
+
+  it('traduce cada error de dominio a status error con el code estable de la clase, nunca con el texto', async () => {
+    // R43. Los `code` se afirman como LITERALES escritos aqui: si alguien renombra
+    // `duplicate_name` a `nombre_duplicado`, este test cae aunque el codigo siga
+    // "funcionando" -que es justo lo que R43 protege, porque QC-44 decide por el `code`-.
+    const CASOS = [
+      { error: new UnauthorizedError(), code: 'unauthorized' },
+      { error: new NotFoundError(), code: 'not_found' },
+      { error: new DuplicateNameError(), code: 'duplicate_name' },
+      { error: new ValidationError(), code: 'invalid_input' },
+    ] as const
+
+    for (const caso of CASOS) {
+      createSupplierMock.mockRejectedValueOnce(caso.error)
+      const result = await createSupplierAction(
+        CREATE_SUPPLIER_INITIAL,
+        formDataOf(VALID_SUPPLIER_FIELDS),
+      )
+      expect(result).toEqual({
+        status: 'error',
+        code: caso.code,
+        message: caso.error.message,
+      })
+    }
+
+    // Los dos errores propios del catalogo, por su action.
+    for (const caso of [
+      { error: new DuplicateCatalogLineError(), code: 'duplicate_catalog_line' },
+      { error: new ProductNotFoundError(), code: 'product_not_found' },
+    ] as const) {
+      createCatalogLineMock.mockRejectedValueOnce(caso.error)
+      const result = await createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(VALID_LINE_FIELDS))
+      expect(result).toEqual({ status: 'error', code: caso.code, message: caso.error.message })
+    }
+
+    // El `code` NO sale del texto ni del nombre de la clase: un mensaje distinto -otro
+    // idioma, por ejemplo- no cambia el `code`.
+    createSupplierMock.mockRejectedValueOnce(new DuplicateNameError('Supplier name already taken.'))
+    const traducido = await createSupplierAction(
+      CREATE_SUPPLIER_INITIAL,
+      formDataOf(VALID_SUPPLIER_FIELDS),
+    )
+    expect(traducido).toEqual({
+      status: 'error',
+      code: 'duplicate_name',
+      message: 'Supplier name already taken.',
+    })
+
+    // Lo que NO es error de dominio se RELANZA, no se traga ni se disfraza de
+    // `invalid_input`: un fallo de conexion tiene que romper, no devolver un formulario en
+    // rojo que el usuario reintentaria en vano (`docs/conventions.md`, nada de `catch`
+    // vacios).
+    const ajeno = new Error('connection terminated unexpectedly')
+    createSupplierMock.mockRejectedValueOnce(ajeno)
+    await expect(
+      createSupplierAction(CREATE_SUPPLIER_INITIAL, formDataOf(VALID_SUPPLIER_FIELDS)),
+    ).rejects.toBe(ajeno)
+
+    listSuppliersMock.mockRejectedValueOnce(ajeno)
+    await expect(listSuppliersAction({ page: 1 })).rejects.toBe(ajeno)
+
+    // Y ningun `catch` de las dos actions descarta el error sin traducirlo ni propagarlo:
+    // todos pasan por `toErrorState`, que relanza lo que no reconoce.
+    for (const file of ACTION_FILES) {
+      const source = readSource(file)
+      const catches = [...source.matchAll(/catch\s*\(([^)]*)\)\s*\{([^}]*)\}/g)]
+      expect(catches.length, `${file} deberia tener un catch por operacion`).toBeGreaterThan(0)
+      for (const bloque of catches) {
+        expect(bloque[2], `${file}: catch que no traduce ni propaga`).toMatch(/toErrorState/)
+      }
+    }
+  })
+})
