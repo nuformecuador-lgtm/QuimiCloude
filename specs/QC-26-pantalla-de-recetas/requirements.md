@@ -332,10 +332,13 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bloquea la pantal
    activo. Si eso pasa, la salida ya está identificada:
    `@atlaskit/pragmatic-drag-and-drop`, que hoy pasa los cuatro checks.
 
-### Añadidas por `spec_author` en F1.2 — pendientes de respuesta humana
+### Añadidas por `spec_author` en F1.2 — CERRADAS por el humano el 2026-09-03
 
-Dos huecos que las decisiones cerradas no cubren. **Ninguna reabre nada**: son casos que no se
-preguntaron, y no se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bloquea la pantalla.
+Dos huecos que las decisiones cerradas no cubrían. **Ninguna reabría nada**: eran casos que no se
+preguntaron. **El humano las cerró el 2026-09-03 en F1.4** y sus decisiones son las **dos últimas
+filas** de `## Decisiones cerradas (no reabrir)`; ahí está lo que vale. Se conservan aquí con su
+enunciado porque explican por qué había que preguntarlas — y la 5 documenta un límite del backend
+que condicionó la respuesta.
 
 4. **¿Quién puede leer el catálogo de unidades?** La decisión del 2026-09-03 añade la lectura, pero
    no dice qué rol la puede invocar, y una Server Action es invocable directamente aunque la regla
@@ -375,3 +378,5 @@ preguntaron, y no se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bl
 | 2026-09-03 | Sesión, rutas y asserts | **Datos de sesión por props**, nunca fetcheados por el componente privado (`CHECKPOINTS.md > Permisos`). Rutas siempre en **constantes exportadas**, nunca literales (QC-11 R13). Los tests afirman sobre **roles ARIA, `data-testid` y constantes**, nunca sobre literales de copy |
 | 2026-09-03 | Multiplataforma | Se valida en **angosto y ancho** con el helper `tests/helpers/viewport.ts` de QC-11, y **no se declara ninguna excepción de escritorio**. Aplica con fuerza a dos sitios de esta ficha: el **arrastre de pasos**, que necesita su equivalente por teclado, y cualquier **scroll horizontal**, que va contenido en su tabla y **nunca en el `body`** |
 | 2026-09-03 | Base heredada | **shadcn/ui, Vitest, Playwright, el layout privado y el sidebar están montados y no se re-crean.** El choque entre las features 4 y 10 ya ocurrió una vez en este repo; la T0 de `specs/11-*/tasks.md` existe para que no se repita |
+| 2026-09-03 | ¿Quién puede invocar la lectura del catálogo de unidades? (pregunta 4) | **Solo Administrador**, confirmando el lado seguro que ya había tomado el spec. El motivo pesa más que la simetría: **una Server Action es invocable directamente aunque la regla ruta→rol proteja la pantalla**, así que el rol se comprueba en la operación, no en la ruta. Es coherente con las cinco operaciones de recetas (QC-25) y las nueve de inventario (QC-20). **Ensanchar después es barato; una fuga no se deshace**: si QC-38 o una pantalla de Operador necesitan leer unidades con otro rol, lo decide esa ficha |
+| 2026-09-03 | ¿Cómo se presenta la línea cuyo producto está dado de baja? (pregunta 5) | **Marcador identificable en la celda MÁS un aviso al pie del bloque de líneas**, y **solo en el formulario**: la lista del catálogo NO lleva marca. Se consideró marcarla también en la lista y **se descartó por una razón concreta, no por gusto**: el listado de QC-25 **no devuelve las líneas** por decisión propia, así que la marca exigiría un campo nuevo en una feature ya `done` o 25 consultas de detalle por página —que romperían R10—. El aviso vive donde el usuario puede actuar: editando. El marcador y el aviso se identifican por `data-testid`, **sin depender del copy** |
