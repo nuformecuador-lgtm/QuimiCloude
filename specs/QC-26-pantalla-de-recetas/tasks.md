@@ -196,7 +196,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 4 — El formulario
 
-### [ ] T13 — Armado del payload, puro y testeable
+### [x] T13 — Armado del payload, puro y testeable
 - **Depende de**: T1. **Archivos**: `components/recipe-form-state.ts`, barrel.
 - **Qué** (`design.md > 5`, `> 8`): tipos del estado del formulario y `buildRecipePayload(mode,
   state)`. Los **tres** estados de la imagen se representan por **presencia de la clave**
@@ -205,7 +205,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   React, sin DOM.
 - **Hecho cuando**: typecheck y lint limpios y el archivo no importa `react` ni `next/*`.
 
-### [ ] T14 — [P] Selector de producto paginado
+### [x] T14 — [P] Selector de producto paginado
 - **Depende de**: T1. **Archivos**: `product-picker.tsx`, barrel.
 - **Qué** (`design.md > 6`): páginas con `listProductsAction({ page, pageSize: MAX_PAGE_SIZE })`
   —constante **importada**—, navegación de página dentro del propio desplegable con indicador de
@@ -213,13 +213,13 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios; `grep` confirma que no hay filtrado por texto sobre la
   lista descargada.
 
-### [ ] T15 — [P] Selector de unidad
+### [x] T15 — [P] Selector de unidad
 - **Depende de**: T6. **Archivos**: `unit-picker.tsx`, barrel.
 - **Qué**: recibe las unidades **por props** (R49), muestra `symbol` o, si es `null`, `name`, y
   envía el **id** (R30). Nunca texto libre.
 - **Hecho cuando**: typecheck y lint limpios; el archivo no importa `@/lib/composition` ni `prisma`.
 
-### [ ] T16 — Campo de líneas de producto
+### [x] T16 — Campo de líneas de producto
 - **Depende de**: T13, T14, T15. **Archivos**: `recipe-lines-field.tsx`, barrel.
 - **Qué**: añadir y quitar líneas; receta sin líneas permitida (R27); cantidad `type="text"` con
   `inputMode="decimal"`, **nunca `type="number"`** (R29); error por línea con `aria-invalid` +
@@ -234,7 +234,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `Number(` ni `toFixed(` sobre la cantidad; el número del aviso sale de la lista de líneas y no de
   ningún booleano guardado al cargar.
 
-### [ ] T16b — [P] Tests del marcador y del aviso de líneas con producto de baja
+### [x] T16b — [P] Tests del marcador y del aviso de líneas con producto de baja
 - **Depende de**: T16. **Archivos**: `tests/unit/recetas-ui/recipe-lines-unavailable.test.tsx`.
 - **Qué** (`design.md > 6.1`): (a) con **cero** líneas de baja el aviso **no existe** en el DOM y
   ninguna celda lleva marcador; (b) con **dos**, existen los dos marcadores —y solo en esas dos
@@ -247,7 +247,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   número mentiroso.
 - **Hecho cuando**: cubre R53 y R54 y sale en verde.
 
-### [ ] T17 — Campo de pasos con arrastre y equivalente por teclado
+### [x] T17 — Campo de pasos con arrastre y equivalente por teclado
 - **Depende de**: T2, T13. **Archivos**: `recipe-steps-field.tsx`, barrel.
 - **Qué** (`design.md > 7`): añadir, editar y quitar pasos (R32); `DndContext` + `SortableContext`
   con `verticalListSortingStrategy` (R33); **`KeyboardSensor` con `sortableKeyboardCoordinates`**
@@ -258,7 +258,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios; `grep` confirma que ningún otro archivo importa
   `@dnd-kit`.
 
-### [ ] T18 — Campo de imagen con sus tres estados
+### [x] T18 — Campo de imagen con sus tres estados
 - **Depende de**: T13. **Archivos**: `recipe-image-field.tsx`, barrel.
 - **Qué** (`design.md > 8`): estado interno `untouched | replaced | cleared`; el control de quitar
   **no se ofrece en el alta** (R36); vista previa con `createObjectURL`/`revokeObjectURL` y, en
@@ -268,7 +268,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios. Si `Uint8Array` no cruza la frontera de la Server
   Action al probarlo en `pnpm dev`, **PARAR y avisar**: no se toca el esquema de QC-25.
 
-### [ ] T19 — El formulario y sus dos páginas
+### [x] T19 — El formulario y sus dos páginas
 - **Depende de**: T16, T17, T18. **Archivos**: `recipe-form.tsx`, `…/formulas/nueva/page.tsx`,
   `…/formulas/[id]/page.tsx`, barrel.
 - **Qué** (`design.md > 5`): componente controlado con `useTransition` —**no `useActionState`**, y
@@ -318,7 +318,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: cubre R3, R7, R9, R10, R14, R18, R22, R25, R28, R29, R43, R44, R45, R46, R47,
   R48, R49, R50, R51.
 
-### [ ] T23 — [P] Tests de protección de ruta y rol
+### [x] T23 — [P] Tests de protección de ruta y rol
 - **Depende de**: T3. **Archivos**: `tests/unit/identity/route-role-rules.test.ts` (ampliar),
   `tests/unit/identity/route-access.test.ts` (ampliar),
   `tests/unit/private-nav.test.ts` o equivalente ya existente (ampliar).

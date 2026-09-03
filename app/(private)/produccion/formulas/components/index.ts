@@ -26,3 +26,29 @@ export { RecipeListSection } from './recipe-list-section';
 export { RecipeListToolbar } from './recipe-list-toolbar';
 export { ACTIONS_COLUMN_LABEL, RecipeTable } from './recipe-table';
 export { RecipeTableSkeleton } from './recipe-table-skeleton';
+
+// --- Formulario (T13-T19, `design.md > 5`-`> 10`) ---
+export {
+  buildRecipePayload,
+  createLocalKey,
+  extractFieldError,
+  extractGeneralLinesError,
+  extractLineErrors,
+  extractStepErrors,
+  type ImageFieldState,
+  type RecipeFormMode,
+  type RecipeFormState,
+  type RecipeLineErrors,
+  type RecipeLineFieldName,
+  type RecipeLineFormValue,
+  type RecipeLinePayload,
+  type RecipePayload,
+  type RecipeStepErrors,
+  type RecipeStepFormValue,
+} from './recipe-form-state';
+export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
+export { UnitPicker, type UnitPickerProps } from './unit-picker';
+export { RecipeLinesField, type RecipeLinesFieldProps } from './recipe-lines-field';
+export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
+export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
+export { RecipeForm, type RecipeFormProps } from './recipe-form';

@@ -8,12 +8,13 @@ import {
   PRIVATE_NAV_ITEMS,
   PRIVATE_NAV_LABEL,
   INVENTORY_ROUTE,
+  RECIPES_LABEL,
   SUPPLIERS_ROUTE,
   type NavGroup,
   type NavItem,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { DASHBOARD_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/modules/identity';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
@@ -345,5 +346,44 @@ describe('barra lateral privada', () => {
     for (const href of enDom) {
       expect(esperados.has(href as string)).toBe(true);
     }
+  });
+
+  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y ya no dice Formulas (R5)', async () => {
+    // R5 — QC-26 T23. El item nace en el barrel `private-nav.ts` (T3) ya migrado; aqui se
+    // afirma sobre el DOM real: un solo item apunta a `FORMULAS_ROUTE`, con el testId nuevo, y
+    // el testId viejo (`nav-produccion-formulas`) ya no existe en ningun sitio del arbol.
+    const user = userEvent.setup();
+
+    const itemsDeRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    ).filter((item) => item.href === FORMULAS_ROUTE);
+
+    // Hay exactamente un item que apunta a la constante: ni cero, ni un duplicado.
+    expect(itemsDeRecetas).toHaveLength(1);
+    const itemRecetas = itemsDeRecetas[0] as NavLink;
+    expect(itemRecetas.testId).toBe('nav-produccion-recetas');
+    expect(itemRecetas.label).toBe(RECIPES_LABEL);
+
+    const grupo = PRIVATE_NAV_ITEMS.find(
+      (item): item is NavGroup =>
+        item.kind === 'group' && item.items.some((hijo) => hijo.href === FORMULAS_ROUTE),
+    );
+    if (!grupo) {
+      throw new Error('ningun grupo de PRIVATE_NAV_ITEMS contiene el item de recetas');
+    }
+
+    renderSidebar();
+
+    await user.click(screen.getByTestId(grupo.testId));
+    await waitFor(() =>
+      expect(screen.getByTestId(grupo.testId)).toHaveAttribute('aria-expanded', 'true'),
+    );
+
+    const enlace = screen.getByTestId('nav-produccion-recetas');
+    expect(enlace).toHaveAttribute('href', FORMULAS_ROUTE);
+    expect(enlace.textContent).not.toContain('Fórmulas');
+
+    // El testId viejo ya no aparece en ningun sitio del arbol renderizado.
+    expect(screen.queryByTestId('nav-produccion-formulas')).toBeNull();
   });
 });

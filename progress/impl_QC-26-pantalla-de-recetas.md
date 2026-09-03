@@ -274,3 +274,111 @@ Salida: typecheck limpio, lint limpio, **31/31** en los dos archivos, `test:guar
   `tests/unit/identity/route-role-rules.test.ts > declara exactamente una regla: la pantalla de
   inventario, solo Administrador (R4)`, que ahora ve **dos** filas. **Es el rojo que T23 tiene
   encargado cerrar** («ampliar `route-role-rules.test.ts`»), no una regresion.
+
+## T23 — Proteccion de ruta y rol (tests ampliados, ninguno de produccion tocado)
+
+Archivos ampliados: `tests/unit/identity/route-role-rules.test.ts`,
+`tests/unit/identity/route-access.test.ts` y `tests/unit/app-sidebar.test.tsx` —este ultimo es
+**el equivalente real** del «`private-nav.test.ts` o equivalente» que pedia la task: es el que
+itera `PRIVATE_NAV_ITEMS`.
+
+**El rojo conocido queda cerrado sin relajarse.** `declara exactamente una regla...` se **reescribio**
+como `declara exactamente dos reglas, en orden: inventario y recetas, las dos solo Administrador
+(R4, R6)`, afirmando la **lista exacta**. No se degrado a «al menos una»: una tercera fila sin test
+seguiria poniendolo rojo, que es para lo que ese test existe.
+
+| Req | Test | Archivo |
+| --- | --- | --- |
+| R4, R6 | `declara exactamente dos reglas, en orden: inventario y recetas, las dos solo Administrador` | route-role-rules.test.ts |
+| R6 | `la regla de recetas cubre la lista y sus dos subrutas de formulario, y la de inventario sigue en pie` | route-role-rules.test.ts |
+| R3 | `las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE y ADMIN_ROLE_NAME, no de literales propios` | route-role-rules.test.ts |
+| R4 | `sin sesion, pedir %s redirige al login con esa ruta como destino de vuelta` (las tres rutas) | route-access.test.ts |
+| R4 | `una ruta que solo comparte el texto del prefijo, sin limite de segmento, no queda cubierta` | route-access.test.ts |
+| R6 | `deja pasar al Administrador en las tres rutas` | route-access.test.ts |
+| R6 | `a un rol distinto de Administrador lo redirige con motivo forbidden en las tres rutas` | route-access.test.ts |
+| R4 | `la regla de inventario sigue en pie: un no Administrador tampoco entra ahi` | route-access.test.ts |
+| R5 | `el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y ya no dice Formulas` | app-sidebar.test.tsx |
+
+**Por que muerden**: la prueba de `/produccion/formulasX` es la que distingue una comparacion **por
+segmentos** de un `startsWith` ingenuo — sin ella, el test no notaria la diferencia; y el test de R5
+comprueba **en negativo** que ni la etiqueta vieja ni el `testId` viejo existen ya en el DOM.
+
+R5 en su mitad de «comparte `RECIPES_LABEL` con el encabezado» ya estaba cubierto por
+`recipe-page.test.tsx` (T20) y **no se duplico**.
+
+Salida: typecheck limpio; los tres archivos en verde (**59/59**); `test:guardias` **123/123**.
+`pnpm run lint` daba rojo en ese momento, pero **por un archivo del formulario a medio escribir**
+(`product-picker.tsx`, T14, en vuelo en otra tanda), no por nada de T23.
+
+## T13-T19 y T16b — El formulario en pagina propia
+
+Archivos creados bajo `app/(private)/produccion/formulas/`: `nueva/page.tsx`, `[id]/page.tsx` y
+`components/{recipe-form-state.ts, product-picker.tsx, unit-picker.tsx, recipe-lines-field.tsx,
+recipe-steps-field.tsx, recipe-image-field.tsx, recipe-form.tsx}`. Test:
+`tests/unit/recetas-ui/recipe-lines-unavailable.test.tsx`.
+El barrel `components/index.ts` **solo recibio un bloque nuevo al final**; los exports de la lista
+no se tocaron.
+
+### Los tres estados de la imagen, por PRESENCIA DE CLAVE (R35, R36)
+
+`buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState): RecipePayload` —**pura**, sin
+React ni DOM, en `recipe-form-state.ts`:
+
+| Estado interno | Que produce |
+| --- | --- |
+| `untouched` | devuelve `base` **sin la clave `image`** — nunca `image: undefined`, que es lo que colapsaria los dos casos |
+| `replaced` | `{ ...base, image: { bytes } }`, con `bytes = new Uint8Array(await file.arrayBuffer())` |
+| `cleared` | `{ ...base, image: null }` **explicito**, y **solo** en edicion |
+
+**R36 se cumple por interfaz y ademas por invariante**: `recipe-image-field.tsx` **no ofrece** el
+control de quitar en el alta, y `buildRecipePayload` **lanza** si le llega `create` + `cleared`.
+`Uint8Array` **si cruza** la frontera de la Server Action: no hubo que parar ni tocar el esquema de
+QC-25.
+
+### T16b — el test del marcador y del aviso, y la prueba de que MUERDE
+
+Seis tests sobre `data-testid`, `role` y `data-count`, **nunca sobre el copy**. Se rompieron **las
+tres piezas por separado** y se confirmo el rojo antes de restaurar:
+
+| Pieza rota a proposito | Tests que se pusieron rojos |
+| --- | --- |
+| el filtro que cuenta (fijado a `2`) | 3 (los casos a, c y d) |
+| el marcador de celda (`data-testid` a `undefined`) | 3 (b, e y «solo esa linea») |
+| el desmontaje del aviso (condicion fijada a `true`) | 2 (a y d) |
+
+Tras restaurar, **6/6 en verde**. Un test que solo comprobase «aparece algo» habria seguido verde
+con el numero mentiroso; este no.
+
+### Decisiones que el spec no fijaba, anotadas en vez de silenciadas
+
+1. **`ProductPicker` no reutiliza el `Select` de `components/ui`**: ese primitivo espera que el
+   valor elegido figure entre sus items, y con **paginacion** casi nunca es asi. Se compone a mano
+   con `Button` —**sin ninguna libreria nueva**, R45 intacto— y el motivo queda escrito en el
+   archivo.
+2. **El discriminante de «producto dado de baja» se protege de un falso positivo**: `productName: ''`
+   significa «linea nueva, aun sin elegir producto» y `productName: null` queda **reservado** a
+   «vino de la precarga con el producto de baja». Sin esa distincion, una linea recien anadida en
+   blanco habria inflado el `data-count` del aviso de R54.
+3. **La primera pagina de productos se precarga en las dos `page.tsx`** y baja **por props** a cada
+   `ProductPicker` (R49), evitando N peticiones al montar; cambiar de pagina si dispara
+   `listProductsAction` desde el propio desplegable, que es lo que R28 pide.
+4. **Los errores de carga de unidades/productos reutilizan `RecipeListError`** del barrel, en vez de
+   inventar un componente de error que `tasks.md` no pide.
+5. **`product-picker.tsx` mueve la peticion de pagina a un manejador de evento** (`goToPage`) en vez
+   de a un efecto, siguiendo el patron de `presentation-select.tsx` de QC-22, para no violar
+   `react-hooks/set-state-in-effect`.
+
+Salida: `pnpm run typecheck` limpio; `pnpm run lint` limpio; `vitest related` **37 tests en verde**;
+`recipe-lines-unavailable.test.tsx` **6/6**; `test:guardias` **123/123**; **`pnpm run build` verde**,
+con `/produccion/formulas`, `/produccion/formulas/nueva` y `/produccion/formulas/[id]` en la tabla
+de rutas.
+
+`grep` confirma: `@dnd-kit` **solo** en `recipe-steps-field.tsx`; sin `type="number"`; sin `fetch(`;
+sin import de `@/lib/composition` ni de `prisma` en cliente; sin `<Toaster />` propio; sin `100vh`.
+
+### Estado del gate al cerrar esta tanda (verificado por el implementer)
+
+`pnpm run typecheck` limpio, `pnpm run lint` limpio, y
+`pnpm exec vitest run tests/unit/recetas-ui tests/unit/identity tests/unit/app-sidebar.test.tsx tests/unit/unidades`
+-> **37 archivos, 448/448 en verde**. El rojo de `route-role-rules.test.ts` que dejo la tanda
+anterior **queda cerrado** por T23.

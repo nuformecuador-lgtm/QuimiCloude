@@ -10,7 +10,12 @@ import { readFileSync } from 'node:fs';
 import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
 import { findRouteRule, type RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
 import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+import {
+  FORMULAS_ROUTE,
+  INVENTORY_ROUTE,
+  NEW_RECIPE_ROUTE,
+  recipeEditRoute,
+} from '@/lib/shared/routes';
 
 const PRODUCTOS: RouteRoleRule = { prefix: '/productos', roles: ['Administrador', 'Operador'] };
 const PRODUCTOS_NUEVO: RouteRoleRule = { prefix: '/productos/nuevo', roles: ['Administrador'] };
@@ -52,21 +57,26 @@ describe('findRouteRule', () => {
 });
 
 describe('ROUTE_ROLE_RULES — la lista real', () => {
-  // CENTINELA INVERTIDO el 2026-09-03 (QC-22 T14, R4).
+  // CENTINELA INVERTIDO el 2026-09-03 (QC-22 T14, R4) y AMPLIADO el 2026-09-03 (QC-26 T23, R6).
   //
   // Hasta QC-9 este bloque afirmaba que la lista estaba «vacia a proposito (D8)», con el encargo
   // escrito de que «la primera regla sera la pantalla de productos, solo Administrador». QC-22
-  // trae exactamente esa pantalla, asi que la premisa dejo de ser cierta y el centinela se
-  // INVIERTE en vez de borrarse: donde antes exigia el vacio, ahora exige que la unica fila sea
-  // la declarada, ni una mas. Anadir una segunda regla sin ficha que la respalde sigue poniendo
-  // esto en rojo, que es para lo que el centinela existe.
+  // trajo exactamente esa pantalla y el centinela paso a exigir la UNICA fila declarada. QC-26
+  // anade la SEGUNDA fila — la pantalla de recetas — y el centinela se amplia otra vez, no se
+  // relaja: sigue exigiendo la lista EXACTA y COMPLETA, en el orden real. Anadir una tercera
+  // regla sin ficha que la respalde sigue poniendo esto en rojo, que es para lo que el centinela
+  // existe. Borrar la fila de `FORMULAS_ROUTE` de `ROUTE_ROLE_RULES` pone este test en rojo.
   //
-  // La lista vive en `lib/composition/` desde el mismo 2026-09-03: nombrar la ruta exige
-  // `INVENTORY_ROUTE` de `lib/shared/routes` —que el dominio no puede importar— y nombrar el rol
-  // exige `ADMIN_ROLE_NAME` del barrel de `inventario` **como valor**, que solo `lib/composition`
-  // tiene permitido (`tests/unit/inventario/schema/inventario-schema.test.ts`).
-  it('declara exactamente una regla: la pantalla de inventario, solo Administrador (R4)', () => {
-    expect(ROUTE_ROLE_RULES).toEqual([{ prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] }]);
+  // La lista vive en `lib/composition/` desde el 2026-09-03: nombrar las rutas exige
+  // `INVENTORY_ROUTE` y `FORMULAS_ROUTE` de `lib/shared/routes` —que el dominio no puede
+  // importar— y nombrar el rol exige `ADMIN_ROLE_NAME` del barrel de `inventario` **como
+  // valor**, que solo `lib/composition` tiene permitido
+  // (`tests/unit/inventario/schema/inventario-schema.test.ts`).
+  it('declara exactamente dos reglas, en orden: inventario y recetas, las dos solo Administrador (R4, R6)', () => {
+    expect(ROUTE_ROLE_RULES).toEqual([
+      { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
+      { prefix: FORMULAS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+    ]);
   });
 
   it('la regla se aplica a la ruta de inventario y a lo que cuelgue de ella (R4)', () => {
@@ -76,6 +86,26 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
     ]);
   });
 
+  // R6 — la regla de recetas cubre la lista Y sus dos subrutas de formulario: alta y edicion.
+  // La regla de inventario (R4) sigue existiendo: se anade, no se sustituye.
+  it('la regla de recetas cubre la lista y sus dos subrutas de formulario, y la de inventario sigue en pie (R6)', () => {
+    expect(findRouteRule(ROUTE_ROLE_RULES, FORMULAS_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, NEW_RECIPE_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(
+      findRouteRule(ROUTE_ROLE_RULES, recipeEditRoute('11111111-1111-4111-8111-111111111111'))
+        ?.roles,
+    ).toEqual([ADMIN_ROLE_NAME]);
+
+    // La regla que casa con las dos subrutas es la MISMA fila que casa con la lista: no hay
+    // una tercera fila escondida solo para el formulario.
+    expect(findRouteRule(ROUTE_ROLE_RULES, NEW_RECIPE_ROUTE)).toBe(
+      findRouteRule(ROUTE_ROLE_RULES, FORMULAS_ROUTE),
+    );
+
+    // Y la regla de inventario (R4) sigue exactamente igual: no se sustituyo.
+    expect(findRouteRule(ROUTE_ROLE_RULES, INVENTORY_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+  });
+
   // Lo que la ficha NO hace: cerrar el resto del area privada. Cada ficha anade su fila.
   it('ninguna otra ruta privada gana regla por el camino', () => {
     expect(findRouteRule(ROUTE_ROLE_RULES, '/dashboard')).toBeNull();
@@ -83,7 +113,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   });
 
   // R2 — la fila se deriva de la constante unica de ruta; el literal no se reescribe aqui.
-  it('la fila se deriva de INVENTORY_ROUTE y de ADMIN_ROLE_NAME, no de literales propios', () => {
+  it('las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE y ADMIN_ROLE_NAME, no de literales propios', () => {
     const fuente = readFileSync('lib/composition/route-role-rules.ts', 'utf8')
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -91,6 +121,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
     expect(fuente).toContain("from '@/lib/shared/routes'");
     expect(fuente).toContain("from '@/lib/modules/inventario'");
     expect(fuente).not.toContain(`'${INVENTORY_ROUTE}'`);
+    expect(fuente).not.toContain(`'${FORMULAS_ROUTE}'`);
     expect(fuente).not.toContain(`'${ADMIN_ROLE_NAME}'`);
   });
 });
