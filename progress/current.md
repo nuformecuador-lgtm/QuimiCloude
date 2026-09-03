@@ -11,9 +11,8 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-13 | guardia-de-sesion-en-navegacion | QC-17 Identidad y acceso | frontend | pending — **worktree montado, F1.2 en curso** | `feature/QC-13-guardia-de-sesion-en-navegacion` | Sesión de hoy (2026-09-03). **Acotada con `/afinar-feature`**: `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md`, 16 decisiones cerradas y 6 preguntas abiertas. **El board se corrigió antes de sembrar**: la `description` prometía trabajo que QC-9, QC-8, QC-11 y QC-12 ya entregaron —la ficha se escribió antes de que QC-9 existiera—, `zone` bajó de `fullstack` a **`frontend`** (sin partición), `complexity` de `medium` a **`low`**, y se añadió **QC-22** a `depends_on`. **La validación de conflicto de F1.0 evitó un choque real con QC-26**, que se apropia del ítem «Fórmulas»: QC-13 lo borraba. Su spec no está en `dev`, solo en su worktree. **Queda intersección de archivos viva** (`private-nav.ts`, `app-sidebar.test.tsx`): sincronizar con `dev` justo antes del PR. Worktree desde `origin/dev` (`d532662`). Siguiente: `spec_author`, luego F1.3 y **F1.4, parada de aprobación humana**. |
+| QC-13 | guardia-de-sesion-en-navegacion | QC-17 Identidad y acceso | frontend | **spec_ready — F1.4, ESPERANDO APROBACIÓN HUMANA** | `feature/QC-13-guardia-de-sesion-en-navegacion` | Sesión de hoy (2026-09-03). Acotada con `/afinar-feature` (16 decisiones, 6 preguntas abiertas) y **el board corregido antes de sembrar**: `description` reescrita, `zone` de `fullstack` a **`frontend`** sin partición, `complexity` a **`low`**, y **QC-22** añadida a `depends_on`. **Spec escrita** (`463218f`): 16 requisitos EARS, 6 tareas, **0 preguntas abiertas nuevas**. Tarjeta en *En revisión* y ruta comentada. **Alcance deliberadamente pequeño**: quitar 4 ítems del menú y sus constantes, mover el test de agrupación a fixture propia, y que el E2E del retorno pida `/inventario`. **`FORMULAS_ROUTE` intocable: es de QC-26** — el choque lo detectó la validación de conflicto de F1.0 leyendo su spec dentro de su worktree, porque **no está en `dev`**. **Terreno compartido vivo** (`private-nav.ts`, `app-sidebar.test.tsx`): T5 resincroniza con `dev` justo antes del PR. |
 | QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | **in_progress — implementer** | `feature/QC-26-pantalla-de-recetas` | **Spec aprobado el 2026-09-03** (F1.4): 52 requisitos, 29 tasks, **21 decisiones cerradas** —las dos últimas cierran las preguntas de `spec_author`: la lectura de unidades es solo de Administrador, y el producto dado de baja se avisa **solo en el formulario**, con marcador en la celda y aviso al pie del bloque de líneas—. Marcarlo en la lista se descartó porque el listado de QC-25 no trae las líneas y exigiría reabrir una feature `done` o 25 consultas por página. `dnd-kit` ya tiene su fila en `docs/dependencias.md` **como `excepcion`, con el check fallido y el porqué escritos** |
-| QC-33 | modelo-pedidos | QC-31 Pedidos | backend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-33-modelo-pedidos` | Sesión de hoy (2026-09-03), `labs-c2`. **Spec aprobado por el humano** tras dos vueltas: 42 requisitos EARS, 12 tareas, 29 decisiones cerradas, commit `a26baba`. Tarjeta en *En curso*. **El cupo se resolvió solo**: QC-25 se mergeó (PR #23) mientras se revisaba, así que `backend` entró en **1 de 2** y no hubo que forzar la regla. Worktree ya sincronizado con `origin/dev`, que trae QC-25 y QC-32. Cinco encargos al implementer: **R41** usa `timezone(text, timestamptz)` porque es `IMMUTABLE` y `EXTRACT(YEAR FROM created_at)` a secas es `STABLE` y Postgres la rechaza en un `CHECK`; el caso que muerde es el de **frontera** (`2026-12-31T20:00:00-05:00` con año 2026 → `23514`); **ningún test escribe el año literal**, se calcula con `new Date().getUTCFullYear()` o la suite se pone roja sola el 1 de enero; el índice único del correlativo es **total y no parcial**, al revés que QC-24; y `RecipeId` es aditivo sobre un `recetas` que **QC-25 acaba de tocar**. Quedan **2 preguntas abiertas** y las dos siguen abiertas a propósito |
 | QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | **in_progress — implementación por bloques (F2.1)** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. `/afinar-feature` sembró 16 decisiones y `spec_author` escribió **47 requisitos (R1-R47) y 21 tareas** con mapa `R<n> → test` completo (commit `0f5a3de`). Base propia `QuimiCloude_QC43` montada, gate verde en el worktree (116 archivos). **Spec APROBADO el 2026-09-03** (F1.4), tarjeta en *En curso*. **P2 cerrada**: la restricción de contacto se escribe **solo para filas vivas**, lo que cierra de paso la pregunta abierta 8 de QC-42 y desbloquea T3. Se implementa **por bloques**, no con un implementer monolítico: la lección de QC-22, donde el implementer murió dos veces por 529 y lo que funcionó fue repartir |
 
 La feature **QC-30 — rediseno-login** se cerró el 2026-09-03, pero **su PR [#20] se había
@@ -1294,10 +1293,59 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
+### La base compartida tiene una fila residual que rompe el gate de TODAS las sesiones (2026-09-03)
+
+`tests/integration/identity/identity-seed.int.test.ts` sale rojo con **8 casos** en cualquier
+worktree, `dev` incluido — verificado, no deducido. **No es un defecto de código**: es estado sucio
+de la base compartida.
+
+- **La fila:** un producto `FeldesQuack` en `products`, creado el 2026-09-03 a las 19:36 UTC, con
+  `created_by`/`updated_by` apuntando al admin del seed y `deleted_at` nulo. Encaja con una corrida
+  de **QC-22** sin limpiar.
+- **El mecanismo:** `resetIdentityToEmptyState` hace `DELETE FROM users` dentro de una transacción
+  y la FK `products_created_by_fkey` lo bloquea con `23503`.
+- **Estado comprobado de la base:** 1 producto, 0 recetas, 4 unidades, 1 usuario. `orders` con 0
+  filas, así que ninguna FK de QC-33 participa.
+- **Decisión del humano (2026-09-03): no se borra la fila, no se arregla el helper y NO se mete al
+  baseline.** El baseline es para deuda ajena de `dev`; esto es transitorio, y enmascararlo ahí
+  ocultaría para siempre un test que volverá a pasar solo en cuanto la fila desaparezca. Se declara
+  en el PR y se anota aquí.
+- **La causa de fondo, que sigue viva:** `resetIdentityToEmptyState` borra usuarios sin limpiar
+  antes las tablas que los referencian, así que **cualquier feature futura con una FK a `users`
+  puede volver a provocarlo**. Arreglarlo es candidato a ficha propia.
+
+### El gate rápido no ve los tests de alcance de otros módulos (2026-09-03, confirmado por QC-33)
+
+El implementer de QC-33 reportó **1** rojo; el gate completo destapó **6**, y **5 eran suyos**: las
+afirmaciones de QC-4, QC-14 y QC-24 de que en todo el esquema no existe ningún enum, que los dos
+enums de QC-33 dejaron viejas. `vitest related` no los relaciona porque no los une el árbol de
+archivos sino una afirmación sobre el repositorio entero. **Es el mismo agujero que ya costó caro
+en QC-20**, y es la razón por la que el gate completo antes del PR no es ceremonia.
+
 ### QC-32 se cerró el 2026-09-03 — lo que deja abierto
 
 Resumen completo en `progress/history.md`. Lo que sigue vivo:
 
+- **[arnés — `prisma migrate dev --create-only` propone BORRAR todas las claves foráneas que
+  cruzan de módulo, y aplicarlo destruiría en silencio la integridad de tres features ya
+  mergeadas.]** El 2026-09-03, generando la migración de QC-43, el CLI de Prisma añadió **diez
+  `DROP CONSTRAINT`** de *drift* sobre `products`, `recipes`, `recipe_lines`, `suppliers` y
+  `supplier_catalog_lines`. **Ninguno lo había pedido nadie.** La causa es una consecuencia
+  directa de una decisión deliberada del repo: esas FK son **escalares sin `@relation`**
+  —convención que QC-20, QC-24 y QC-42 tomaron a conciencia para que un módulo no arrastre el
+  modelo de otro—, así que Prisma no las ve en el `schema.prisma`, las lee como sobras de la base
+  y propone eliminarlas.
+  **Por qué es grave:** el `DROP` no falla, no avisa y no deja rastro en el diff salvo que alguien
+  lea el SQL generado línea a línea. Una migración aplicada con esos diez `DROP` deja la base sin
+  ninguna de las FK entre módulos, y **los tests de integración seguirían en verde** porque
+  comprueban el camino feliz, no que la restricción exista. El fallo aparecería mucho después, con
+  datos huérfanos que ya nadie puede reconstruir.
+  **Hoy se salvó porque el `backend_dev` los leyó y los borró a mano**, y lo dejó anotado en la
+  cabecera del `migration.sql` con un test estático que vigila que la migración contenga **solo**
+  los tres cambios de la ficha. Eso es criterio individual, no arnés: la próxima vez puede no
+  haberlo. **Candidata para `/afinar-regla`**: o el gate compara el censo de FK de la base contra
+  el esperado, o `docs/architecture.md` documenta el paso obligatorio de auditar el SQL generado
+  antes de aceptarlo, junto a la convención de FK escalares que lo provoca.
 - **[arnés — `wt.sh new` deja el worktree a medio montar, y hoy costó CINCO tropiezos seguidos
   antes de poder correr el gate. Es la candidata más concreta y más barata para `/afinar-regla`.]**
   El 2026-09-03, al montar `.worktrees/QC-43-crud-de-proveedores`, el gate no pudo correr hasta
