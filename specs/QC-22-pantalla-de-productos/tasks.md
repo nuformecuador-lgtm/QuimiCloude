@@ -22,7 +22,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 0 — Precondiciones
 
-### [ ] T0 — Verificar la base heredada (BLOQUEA TODO)
+### [x] T0 — Verificar la base heredada (BLOQUEA TODO)
 - **Depende de**: que QC-11, QC-12, QC-9 y QC-20 estén `done` y mergeadas en `dev` (lo están).
 - **Qué se HEREDA ya montado y NO se re-crea** (comprobar uno por uno tras `git merge origin/dev`;
   ésta es la T0 que existe porque el choque entre las features 4 y 10 ya ocurrió una vez en este
@@ -54,7 +54,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: los ocho puntos están verificados con su evidencia en
   `progress/impl_QC-22-pantalla-de-productos.md`.
 
-### [ ] T1 — Leer y anotar el contrato que se consume (BLOQUEA el código de datos)
+### [x] T1 — Leer y anotar el contrato que se consume (BLOQUEA el código de datos)
 - **Depende de**: T0.
 - **Qué**: anotar en `progress/impl_QC-22-pantalla-de-productos.md`: (a) la firma exacta de las
   seis actions que se usan; (b) que **no exportan `INITIAL_STATE`** y que el estado inicial se
@@ -64,7 +64,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: los cuatro puntos están anotados. Si algo difiere de `design.md > 0`, **parar y
   avisar**: cambia el diseño, no el contrato.
 
-### [ ] T2 — Añadir las primitivas que faltan por CLI
+### [x] T2 — Añadir las primitivas que faltan por CLI
 - **Depende de**: T0. **Archivos**: `components/ui/table.tsx`, `components/ui/select.tsx`,
   `components/ui/alert-dialog.tsx`.
 - **Qué**: `pnpm dlx shadcn@latest add table select alert-dialog`. **`sheet` NO** (ya existe).
@@ -80,7 +80,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 1 — Ruta, prefijo y regla de rol (va ANTES que la página)
 
-### [ ] T3 — Constante única, prefijo privado y primera regla ruta→rol
+### [x] T3 — Constante única, prefijo privado y primera regla ruta→rol
 - **Depende de**: T0. **Archivos**: `lib/shared/routes.ts`,
   `lib/shared/navigation/private-nav.ts`, `lib/modules/identity/domain/route-role-rules.ts`.
 - **Qué** (`design.md > 2`, `> 3`):
@@ -98,7 +98,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   (`pnpm run test:guardias`) pasan, y `grep` no encuentra `'/inventario'` como literal fuera de
   `routes.ts`.
 
-### [ ] T4 — Montar la región de avisos en el layout privado e **invertir** el test de QC-11
+### [x] T4 — Montar la región de avisos en el layout privado e **invertir** el test de QC-11
 - **Depende de**: T0. **Archivos**: `app/(private)/layout.tsx`,
   `tests/unit/private-layout.test.tsx`.
 - **Qué** (`design.md > 9`): montar `<Toaster richColors />` de `@/components/ui/sonner` en el

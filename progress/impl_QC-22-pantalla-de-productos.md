@@ -86,3 +86,87 @@ locales, ninguno versionado.
 pnpm run typecheck   -> tsc --noEmit ... (sin errores)
 pnpm run lint        -> eslint ... (sin hallazgos)
 ```
+
+## T3 — Constante única, prefijo privado y primera regla ruta→rol
+
+**Archivos:** `lib/shared/routes.ts`, `lib/shared/navigation/private-nav.ts`,
+`lib/modules/identity/domain/route-role-rules.ts` (los tres, autorizados por R32).
+
+- `INVENTORY_ROUTE` **se mudó** a `lib/shared/routes.ts` con el motivo escrito: el middleware y
+  `route-role-rules.ts` la necesitan y no pueden depender de la navegación (`design.md > 2`).
+- `private-nav.ts` la **importa** de `../routes` y la **reexporta** (`export { INVENTORY_ROUTE }`).
+  La reexportación no es un adorno: `tests/unit/app-sidebar.test.tsx:10` (heredado de QC-11) la
+  importa de `private-nav` y no está entre los archivos que esta ficha puede tocar. No hay dos
+  constantes: hay una sola declaración y un alias.
+- `PRIVATE_ROUTE_PREFIXES = [DASHBOARD_ROUTE, INVENTORY_ROUTE]` — el literal `'/dashboard'` que
+  quedaba suelto también pasa a la constante, así que ya no hay ninguno.
+- `ROUTE_ROLE_RULES` estrena su primera fila `{ prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] }`,
+  con `ADMIN_ROLE_NAME` del **barrel** `@/lib/modules/inventario` (nunca ruta profunda, nunca el
+  literal `'Administrador'`). El comentario de «está vacío a propósito» se reescribe: se conserva el
+  encargo de QC-9 y se deja escrito que **esta ficha es la que lo cumple**.
+- `grep` de `'/inventario'`: aparece **solo** en `lib/shared/routes.ts`.
+
+**Dos tests rojos que T3 provoca y que NO puede cerrar por sí sola** (ninguno de los dos archivos
+está autorizado por R32; se reportan al leader en vez de tocarlos):
+
+1. `tests/guards/guard-rutas-privadas-cubiertas.test.ts` → «ningun prefijo declarado sobra».
+   `INVENTORY_ROUTE` ya está en `PRIVATE_ROUTE_PREFIXES` pero `app/(private)/inventario/page.tsx`
+   todavía no existe (es **T11**). `design.md > 12.3` previó esta guardia **en la otra dirección**
+   (página sin prefijo) y por eso puso T3 antes que la página; la guardia es **bidireccional**, así
+   que el orden del spec deja necesariamente una ventana roja entre T3 y T11. **Se cierra sola con
+   T11**, sin tocar nada.
+2. `tests/unit/identity/route-role-rules.test.ts:57` → «esta vacio a proposito: QC-9 construye el
+   gancho, no declara reglas». Es el test-centinela que QC-9 dejó escrito para que nadie añadiera
+   una fila «sin ficha que la respalde»: QC-22 **es** esa ficha. Invertirlo es trabajo de **T14**,
+   que depende de T3, no de T3.
+
+## T4 — Región de avisos en el layout privado, con el test de QC-11 invertido
+
+**Archivos:** `app/(private)/layout.tsx`, `tests/unit/private-layout.test.tsx`.
+
+- El layout monta `<Toaster richColors />` de `@/components/ui/sonner`, **dentro** de
+  `SidebarProvider` y **hermano** de `SidebarInset`, para que ningún toast quede dentro del
+  `<main>`. No se promueve al root layout (`design.md > 9`).
+- **R36/D9 de QC-11 queda superada por R22 de QC-22, decisión humana del 2026-09-03.** La fecha y
+  el motivo están escritos **en los dos sitios**: en el comentario del layout y dentro del propio
+  test, para que nadie lo lea como una regresión.
+- El test `el layout privado no monta ninguna region de notificaciones` **se invierte, no se borra**:
+  pasa a afirmar que hay **exactamente una** región de avisos, que sigue habiendo **un solo**
+  `<main>`, que la región **no** está dentro del `<main>` y que no aparece ningún otro landmark
+  (`status`, `alert`, `log`). La guardia de código también se invierte: ahora exige que el layout
+  importe `@/components/ui/sonner` y renderice `<Toaster`. Verde.
+
+**Hallazgo que T4 provoca y que NO puede cerrar** (archivo no autorizado por R32; se reporta):
+
+`tests/unit/sidebar-mobile.test.tsx:171` (R30 de QC-11) se pone **rojo**, y no es un fallo de
+accesibilidad. `markOthers` de Base UI
+(`@base-ui/react/floating-ui-react/utils/markOthers.mjs`) calcula dos conjuntos distintos: el
+marcador `data-base-ui-inert` excluye solo el popup, mientras que el `aria-hidden` excluye además
+**la rama que lleva a cualquier `[aria-live]`**, justo para que los toasts se sigan anunciando con
+un modal abierto. Desde que existe la región de avisos, el `aria-hidden` deja de caer en el
+contenedor exterior y cae en sus hijos —**el `<main>` incluido**, que es lo que R30 protege—,
+mientras que el contenedor conserva solo el marcador. El test hace
+`toggle.closest('[data-base-ui-inert]')` y exige que **ese mismo nodo** tenga `aria-hidden`: la
+suposición que se rompe es la granularidad del marcado, no la inercia.
+
+**No depende de dónde se ponga el `<Toaster />`**: se comprobó dentro y fuera de `SidebarProvider`
+y falla igual; sin `<Toaster />` pasa. Cualquier región `aria-live` en el layout privado produce el
+mismo efecto, así que no hay colocación que lo evite. Arreglarlo es cambiar la aserción (afirmar la
+inercia sobre el `<main>` o sobre el ancestro que sí lleva `aria-hidden`), y ese archivo **no está
+entre los que R32 autoriza**: decisión del leader.
+
+**Salida real (T3 + T4):**
+```
+pnpm typecheck  -> tsc --noEmit ... sin errores
+pnpm lint       -> eslint ... sin hallazgos
+pnpm exec vitest related --run lib/shared/routes.ts lib/shared/navigation/private-nav.ts \
+  lib/modules/identity/domain/route-role-rules.ts "app/(private)/layout.tsx" \
+  tests/unit/private-layout.test.tsx   (proyectos ui + node)
+  -> Test Files  3 failed | 25 passed (28)
+     Tests       3 failed | 285 passed (288)
+```
+Los tres rojos son los tres descritos arriba, todos en archivos ajenos a los que R32 autoriza:
+`guard-rutas-privadas-cubiertas.test.ts` (lo cierra T11), `route-role-rules.test.ts` (lo cierra
+T14) y `sidebar-mobile.test.tsx` (**decisión pendiente del leader**). Los proyectos de integración
+quedan fuera de esta medición: fallan por no haber base de datos en el worktree, y ya fallaban
+antes de tocar nada (se comprobó con `git stash`).
