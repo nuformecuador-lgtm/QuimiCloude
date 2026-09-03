@@ -14,7 +14,8 @@ export type UnitRef = {
 /** Servicio que `unidades` ofrece a los demas modulos (`docs/architecture.md > Dominio` n.o 2:
  *  «se comparten servicios via interfaz, nunca repositorios ni tablas»). Lo implementa un
  *  adaptador driven DE UNIDADES —el unico que puede tocar `prisma.unit`— y lo cablea
- *  `lib/composition`. Esta ficha NO lo implementa: no hay consumidor todavia (QC-38/QC-33). */
+ *  `lib/composition`. Esta ficha NO lo implementa: lo consume `recetas` (`create-recipe.ts`,
+ *  `update-recipe.ts`, via `deps.units.findRefs`, QC-25/R50). */
 export interface UnitCatalog {
   /** Referencias de las unidades existentes entre los ids pedidos. Los ids que no existan
    *  simplemente no vienen en la respuesta. */
