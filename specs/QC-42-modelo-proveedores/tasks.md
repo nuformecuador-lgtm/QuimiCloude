@@ -202,7 +202,7 @@ da por hecho:**
   (`f(f(x)) === f(x)`), que es la propiedad que hace segura la columna persistida.
 - **Hecho cuando:** pasa y cubre R8.
 
-### [ ] T9. [P] Forma del módulo, frontera de imports **y cruce por ORM**
+### [x] T9. [P] Forma del módulo, frontera de imports **y cruce por ORM**
 - Dep: T4, T1 (necesita el cliente generado para `Prisma.dmmf`).
 - Archivos: `tests/unit/proveedores/module-contract.test.ts`.
 - Dos mitades, y la segunda es el encargo específico de esta feature:
