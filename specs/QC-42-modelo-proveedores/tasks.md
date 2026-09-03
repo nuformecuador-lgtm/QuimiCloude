@@ -274,7 +274,7 @@ da por hecho:**
   previsibles.
 - **Hecho cuando:** el diff está vacío y `tests/guards/guard-dependencias-aprobadas.test.ts` pasa.
 
-### [ ] T13. Sincronizar con `dev` y correr el gate completo (la corre el leader)
+### [x] T13. Sincronizar con `dev` y correr el gate completo (la corre el leader)
 - Dep: T0–T12. **Y su parte de merge se hace ANTES de dar por buena la migración** (aviso de
   terreno compartido): si al mergear cambia `db/schema.prisma`, **se repite T10**.
 - Archivos: ninguno (salvo lo que traiga el merge).
@@ -289,6 +289,17 @@ da por hecho:**
   `products` siga sin ninguna columna añadida por QC-42.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con todas las guardias en verde, y T10
   se ha vuelto a correr limpio **después** del merge.
+- **Corrida por el leader el 2026-09-03.** El merge con `origin/dev` fue **no-op**: QC-32 no
+  esta en `origin/dev` todavia, solo existe local en otro worktree, asi que `db/schema.prisma`
+  no cambio y no hubo que repetir T10. **Pero el gate cayo rojo igual**: 4 archivos de
+  integracion de `inventario` y `recetas`, porque la base fisica `QuimiCloude` esta
+  **compartida entre worktrees** y QC-32 ya le aplico su migracion (`products.unit_id` y la
+  tabla `units`). El cliente de Prisma de esta rama pide `unit`, la base tiene `unit_id`.
+  Ningun rojo era de QC-42. Se aplico el precedente de QC-14 y QC-20 —**una base por
+  worktree**—: base propia `QuimiCloude_QC42`, `.env` git-ignorado del worktree apuntando
+  ahi, cadena completa de migraciones aplicada limpia. Segunda corrida: **94 archivos,
+  1039 tests, 0 rojos, `== init OK ==`**.
+
 
 ### [x] T14. Documentar el mapa `R<n> → test`
 - Dep: T13.
