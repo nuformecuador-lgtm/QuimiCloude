@@ -66,7 +66,7 @@ verificado contra el árbol de la rama, no contra este documento.
       framework, Prisma, `lib/shared/` ni `composition`, y `guard-arquitectura-modulos` sigue verde
       con el import del barrel de `identity`.
 
-- [ ] **T2 [P] — Test de alcance, adelantado.** `tests/unit/proveedores/scope.test.ts`: no hay ruta,
+- [x] **T2 [P] — Test de alcance, adelantado.** `tests/unit/proveedores/scope.test.ts`: no hay ruta,
       página ni componente de proveedores bajo `app/`, ni route handler bajo `app/api/`, ni spec
       nuevo en `e2e/`; `proveedores` no reimplementa la aritmética de paginación; ninguna columna,
       índice ni restricción fuera de los tres cambios; ningún `.gitkeep` conviviendo con archivos
