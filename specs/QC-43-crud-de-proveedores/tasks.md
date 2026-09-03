@@ -176,7 +176,7 @@ verificado contra el árbol de la rama, no contra este documento.
       (R5, R42, R43), no existe ningún route handler nuevo y la acción **no** vuelve a comprobar el
       rol.
 
-- [ ] **T15 [P] — Ampliar el contrato de módulo contra `Prisma.dmmf`.**
+- [x] **T15 [P] — Ampliar el contrato de módulo contra `Prisma.dmmf`.**
       `tests/unit/proveedores/module-contract.test.ts` (existe desde QC-42): afirmar que
       `SupplierCatalogLine` **sigue sin ninguna relación** hacia `Product` ni hacia `User` pese a las
       dos columnas de autor nuevas, y que `User` no gana ningún campo de vuelta.

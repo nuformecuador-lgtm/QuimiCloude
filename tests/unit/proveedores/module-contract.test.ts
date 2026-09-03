@@ -419,6 +419,67 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     expect(relationTargets('Product')).not.toContain('Supplier')
   })
 
+  it('el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User', () => {
+    // T15 (QC-43), R26 y R44. QC-42 ya afirmaba que `SupplierCatalogLine` no tenia relacion
+    // hacia `Product`; lo que esta ficha CAMBIA es que la linea gana DOS columnas nuevas
+    // -`createdBy` y `updatedBy`- que apuntan a `users` con una FK real en la base. Esa es
+    // exactamente la tentacion que este caso vigila: declararlas con `@relation` "porque la
+    // FK existe" (decision cerrada 14 de QC-42, mantenida por la 3 de QC-43 y por
+    // `design.md > 12.9`).
+    //
+    // Ninguna guardia detecta ese cruce -`guard-arquitectura-modulos` busca imports y la
+    // cadena `prisma.<modelo>`, y un `include: { creator: true }` no es ninguna de las dos
+    // cosas-, y por eso este test existe. Se afirma sobre el dmmf, que es el modelo TAL COMO
+    // el cliente generado lo entiende, con el censo EXACTO de campos: cualquier `@relation`
+    // anadido aparece como un campo `object` de mas y el `toEqual` cae. Requiere el cliente
+    // regenerado (`pnpm prisma generate`), que es justo lo que hace que el test siga a la
+    // verdad y no al texto del esquema.
+    const linea = Prisma.dmmf.datamodel.models.find((m) => m.name === 'SupplierCatalogLine')
+    expect(linea, 'Prisma.dmmf no conoce SupplierCatalogLine').toBeDefined()
+
+    // Las dos columnas de autor EXISTEN, y existen como ESCALARES anulables: si estuvieran
+    // ausentes, el cambio 3 de la migracion no estaria en el esquema; si fueran `object`,
+    // serian la relacion que la decision 14 prohibe. Las dos mitades importan.
+    const autoria = linea!.fields.filter((f) => f.name === 'createdBy' || f.name === 'updatedBy')
+    expect(autoria.map((f) => `${f.name}:${f.kind}:${f.type}:${f.isRequired}`)).toEqual([
+      'createdBy:scalar:String:false',
+      'updatedBy:scalar:String:false',
+    ])
+
+    // Censo COMPLETO de campos de la linea: ni una relacion de mas, ni una columna de mas.
+    expect(linea!.fields.map((f) => f.name)).toEqual([
+      'id',
+      'supplierId',
+      'productId',
+      'cost',
+      'minPurchase',
+      'deliveryTime',
+      'createdBy',
+      'updatedBy',
+      'createdAt',
+      'updatedAt',
+      'supplier',
+    ])
+
+    // Y la unica relacion sigue siendo la intra-modulo hacia su proveedor.
+    expect(relationTargets('SupplierCatalogLine')).toEqual(['Supplier'])
+    expect(relationTargets('SupplierCatalogLine')).not.toContain('Product')
+    expect(relationTargets('SupplierCatalogLine')).not.toContain('User')
+
+    // `Supplier` tampoco cambia por esta ficha: sus columnas de autor son de QC-42 y
+    // tampoco llevan `@relation`.
+    expect(
+      Prisma.dmmf.datamodel.models
+        .find((m) => m.name === 'Supplier')!
+        .fields.filter((f) => f.name === 'createdBy' || f.name === 'updatedBy')
+        .map((f) => `${f.name}:${f.kind}`),
+    ).toEqual(['createdBy:scalar', 'updatedBy:scalar'])
+
+    // El reverso: `User` no gana ningun campo hacia la linea ni hacia el proveedor. La lista
+    // esperada es el conjunto EXACTO que QC-4 le dio.
+    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
+  })
+
   it('User NO gana ningun campo de relacion de vuelta hacia Supplier', () => {
     // Si `createdBy` o `updatedBy` llevaran `@relation`, `User` ganaria un campo reverso
     // (`createdSuppliers Supplier[]` o similar) y este `toEqual` completo caeria. La lista
