@@ -290,7 +290,7 @@ da por hecho:**
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con todas las guardias en verde, y T10
   se ha vuelto a correr limpio **después** del merge.
 
-### [ ] T14. Documentar el mapa `R<n> → test`
+### [x] T14. Documentar el mapa `R<n> → test`
 - Dep: T13.
 - Archivos: `progress/impl_QC-42-modelo-proveedores.md`.
 - Copiar la tabla de trazabilidad de abajo con la **salida real** de los tests, no con la
