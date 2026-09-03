@@ -3,7 +3,7 @@
  *
  * R24 viene HEREDADO de QC-8, donde quedo fuera de alcance porque entonces no existia ninguna
  * URL privada que pedir (`specs/QC-8-sesion-actual-y-logout/requirements.md > Preguntas abiertas 3`).
- * QC-9 la crea —el middleware de `/dashboard`—, asi que el recorrido ya se puede ejercitar
+ * QC-9 la crea —el middleware de `/inventario`—, asi que el recorrido ya se puede ejercitar
  * entero, y ampliado con lo que QC-9 añade: la vuelta a **la ruta que se habia pedido** (R8).
  *
  * Un solo recorrido y un solo test a proposito: lo que R24 exige es la CADENA, y partirla en
@@ -41,7 +41,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
@@ -177,20 +177,20 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
     const { username, password, displayName } = await createTestUser();
 
     // --- 1. Ruta privada sin sesion -> login, con la ruta pedida como destino de vuelta (R2, R7).
-    await page.goto(DASHBOARD_ROUTE);
+    await page.goto(INVENTORY_ROUTE);
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
     expect(
       new URL(page.url()).searchParams.get(RETURN_PARAM),
       'el login debe recordar la ruta que se habia pedido',
-    ).toBe(DASHBOARD_ROUTE);
+    ).toBe(INVENTORY_ROUTE);
 
     // --- 2. Credenciales correctas -> se acaba EN LA PANTALLA QUE SE HABIA PEDIDO (R8).
     await page.getByTestId('login-username').fill(username);
     await page.getByTestId('login-password').fill(password);
     await page.getByTestId('login-submit').click();
 
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
-    await expect(page.getByTestId('dashboard-title')).toBeVisible({ timeout: 60_000 });
+    await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
     // --- 3. La barra lateral muestra el nombre REAL del usuario, no un placeholder.
     await expect(page.getByTestId('private-user-name')).toHaveText(displayName);
@@ -209,13 +209,13 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
 
     // --- 5. Volver atras NO muestra la zona privada.
-    // Es el paso que solo se puede afirmar en un navegador real: la entrada de `/dashboard`
+    // Es el paso que solo se puede afirmar en un navegador real: la entrada de `/inventario`
     // sigue en el historial, y lo que se comprueba es que el navegador no la sirve desde su
     // cache. Se espera a la URL del login: si la pagina privada se restaurara, la URL se
-    // quedaria en `/dashboard` y este `waitForURL` fallaria diciendo justo eso.
+    // quedaria en `/inventario` y este `waitForURL` fallaria diciendo justo eso.
     await page.goBack();
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
     await expect(page.getByTestId('private-user-name')).toHaveCount(0);
-    await expect(page.getByTestId('dashboard-title')).toHaveCount(0);
+    await expect(page.getByTestId('inventario-title')).toHaveCount(0);
   });
 });
