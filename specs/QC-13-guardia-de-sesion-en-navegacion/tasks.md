@@ -106,7 +106,7 @@ Verificar antes de empezar T4 que `app/(private)/inventario/page.tsx` existe en 
 
 ---
 
-## T5 — Sincronizar con `dev` justo antes del PR (terreno compartido con QC-26)
+## T5 — Sincronizar con `dev` justo antes del PR (terreno compartido con QC-26) [x]
 
 **Archivos:** `lib/shared/navigation/private-nav.ts`, `tests/unit/app-sidebar.test.tsx`
 (potencialmente, si QC-26 ya mergeó).

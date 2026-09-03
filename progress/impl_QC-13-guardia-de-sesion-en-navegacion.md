@@ -1,20 +1,74 @@
 # Implementacion - QC-13 guardia-de-sesion-en-navegacion
 
-> Estado: T1-T4 completas y verificadas. T5 (sync con dev) y T6 (gate completo) BLOQUEADAS.
-> No se abrio PR (no corresponde a esta fase).
+> Estado: T1-T5 completas y verificadas. T6 (gate completo `./init.sh`) pendiente, la corre
+> el leader antes del PR. No se abrio PR (no corresponde a esta fase).
 
-## Resumen para el leader
+## Actualizacion de la ronda 2 (cierre de los dos bloqueos)
+
+Los dos bloqueos que dejo la ronda 1 (ver historial mas abajo, conservado para trazabilidad)
+quedaron resueltos:
+
+1. **T5 - sync con dev**: el leader reconcilio `dev` local con `origin/dev` (habian
+   divergido 11<->10 commits) y mergeo `origin/dev` en esta rama fuera de esta sesion de
+   implementer. El merge fue limpio, **sin conflictos** en ningun archivo, incluido
+   `private-nav.ts` (terreno compartido con QC-26). Commits de sincronizacion en esta rama:
+   `e7f8e01` (merge: reconciliar dev local con origin/dev) y `22effb5` (Merge remote-tracking
+   branch 'origin/dev' into feature/QC-13-guardia-de-sesion-en-navegacion). QC-26 seguia sin
+   mergear a `origin/dev` en el momento del merge, asi que el terreno compartido
+   (`private-nav.ts`, `tests/unit/app-sidebar.test.tsx`) no habia chocado todavia - el bloqueo
+   real que aparecia en la ronda 1 (conflicto en `feature_list.json`,
+   `progress/current.md`, `progress/history.md`) lo resolvio el leader, no forma parte del
+   alcance de este implementer. T5 marcada `[x]` en `tasks.md`.
+
+2. **Pregunta abierta 2 (rol del E2E) - resuelta por decision humana**: el diagnostico de la
+   ronda 1 era correcto (el fixture creaba un rol efimero sin permisos y `INVENTORY_ROUTE`
+   exige literalmente `ADMIN_ROLE_NAME`). El humano decidio: lo efimero es el usuario, no el
+   rol. `e2e/session.spec.ts` (commit `9612544`) ahora:
+   - Importa `ADMIN_ROLE_NAME` desde el barrel `@/lib/modules/inventario` (valor, no
+     `import type`, no ruta profunda - misma regla que sigue
+     `lib/composition/route-role-rules.ts`).
+   - En `beforeAll`, busca el rol `Administrador` real con `prisma.role.findUnique({ where:
+     { name: ADMIN_ROLE_NAME } })` (sembrado por QC-6) en vez de crearlo; si no existe, lanza
+     un error explicito pidiendo correr el seed. No lo crea el test: `roles.name` es unico y
+     crearlo desde un E2E lo volveria dato de prueba mezclado con el seed real.
+   - `afterAll` ya NO toca la tabla `roles` en ningun caso: se quito el `deleteMany` por
+     `ROLE_NAME_PREFIX` (ya no aplicaba, no borraba nada) y se quito la constante
+     `ROLE_NAME_PREFIX` por quedar sin uso. Verificado por lectura completa del archivo: no
+     queda ninguna rama de `beforeAll` ni `afterAll` que pueda borrar el rol `Administrador`
+     real (el unico borrado de `role` que existia se elimino del todo).
+   - La limpieza defensiva de huerfanos de usuarios (`USERNAME_PREFIX`) se conserva intacta,
+     sigue siendo necesaria porque el usuario del fixture sigue siendo efimero. La parte que
+     buscaba roles huerfanos por `ROLE_NAME_PREFIX` se elimino junto con la constante, con un
+     comentario explicando que ya no aplica (ningun rol se crea con ese prefijo).
+   - Corregido el comentario de cabecera: ya no es cierto que el spec "no use el seed de
+     QC-6"; ahora si depende de el para el rol.
+   - Esto **cierra en la practica la pregunta abierta 2** de `requirements.md`. No se borro
+     del archivo (le corresponde al leader bajarla a decision cerrada); queda anotado aqui
+     para que el leader lo haga.
+
+3. **E2E ejecutado por frontend_dev tras el fix**: `pnpm exec playwright test
+   e2e/session.spec.ts` -> **2 passed** (chromium 6.3s, webkit 9.7s). El recorrido completo
+   aterriza en `/inventario`: pasan `waitForURL((url) => url.pathname === INVENTORY_ROUTE)` y
+   `expect(page.getByTestId('inventario-title')).toBeVisible()` en el paso 2, ademas del resto
+   de la cadena (nombre real en la barra, cookie de sesion, logout, "atras" no restaura la
+   zona privada). R11-R13 quedan demostrados end-to-end, no solo en unit.
+   `pnpm typecheck` y `pnpm lint` limpios tras regenerar el cliente de Prisma
+   (`pnpm exec prisma generate --schema db/schema.prisma`, necesario por la entrada reciente
+   de QC-33/modelo-pedidos via merge; sin cambios de codigo propios de esta ficha).
+
+## Resumen para el leader (ronda 1, historico)
 
 - Feature 100% frontend, delegada en frontend_dev en 3 bloques: T1 (solo), T2+T3 (juntas,
   mismo archivo), T4 (en paralelo con T2+T3, archivo distinto).
 - Los tres archivos de la ficha estan completos, commiteados y pasan typecheck/lint/vitest
   propios.
-- T5 (sync con origin/dev) se intento y se aborto: cero conflicto en el terreno compartido
-  con QC-26 (QC-26 todavia no esta en origin/dev), pero el merge trae conflicto en
+- T5 (sync con origin/dev) se intento y se aborto en la ronda 1: cero conflicto en el terreno
+  compartido con QC-26 (QC-26 todavia no esta en origin/dev), pero el merge traia conflicto en
   feature_list.json, progress/current.md y progress/history.md, archivos de bookkeeping
-  cross-feature fuera del mandato de este implementer. Ver seccion "Bloqueo T5".
-- El E2E (corazon de T4) falla, y no por el codigo de esta ficha: materializa exactamente
-  la pregunta abierta 2 del spec. Ver seccion "Bloqueo E2E".
+  cross-feature fuera del mandato de este implementer. Resuelto por el leader antes de la
+  ronda 2, ver seccion "Actualizacion de la ronda 2" arriba.
+- El E2E (corazon de T4) fallaba en la ronda 1, y no por el codigo de esta ficha: materializaba
+  exactamente la pregunta abierta 2 del spec. Resuelto en la ronda 2, ver arriba.
 - Efecto colateral de entorno (no de codigo): faltaban .env y el cliente Prisma generado en
   este worktree; se resolvieron localmente para poder correr las verificaciones (ver
   "Notas de entorno").
@@ -26,6 +80,7 @@
 | lib/shared/navigation/private-nav.ts | T1 | 653eaa9 refactor(QC-13): quitar items de relleno del menu de navegacion privada |
 | tests/unit/app-sidebar.test.tsx | T2 + T3 | 587d9f1 test(QC-13): migrar fixture de SUPPLIERS_ROUTE y cubrir el borrado de items de relleno |
 | e2e/session.spec.ts | T4 | e0c23d1 test(QC-13): usar INVENTORY_ROUTE en vez de DASHBOARD_ROUTE en el E2E de sesion |
+| e2e/session.spec.ts | ronda 2 (fixture rol Administrador) | 9612544 fix(QC-13): fixture E2E usa rol Administrador real, no uno efimero |
 | specs/QC-13-guardia-de-sesion-en-navegacion/tasks.md | checklist | 1531275 docs(QC-13): marcar T1-T4 cerradas en tasks.md |
 
 Ningun otro archivo de produccion se toco. No se anadio ninguna dependencia (R16).
@@ -52,15 +107,14 @@ ya no se exportan.
 | R9 | "si la ruta activa es la de un hijo, su submenu arranca expandido y el hijo queda marcado como actual" (migrado a fixture propia) | tests/unit/app-sidebar.test.tsx:320 |
 | R10 | Mismo test; la fixture (grupo-a/grupo-a-hijo, grupo-b/grupo-b-hijo) no importa SUPPLIERS_ROUTE ni FORMULAS_ROUTE; confirmado por grep y por el import list del archivo | tests/unit/app-sidebar.test.tsx:320 |
 | R11 | Paso 1 del recorrido: page.goto(INVENTORY_ROUTE) + expect del RETURN_PARAM contra INVENTORY_ROUTE | e2e/session.spec.ts (paso 1) |
-| R12 | Paso 2 del recorrido: waitForURL contra INVENTORY_ROUTE + expect sobre getByTestId(inventario-title) | e2e/session.spec.ts (paso 2) - ejecutado, en rojo por bloqueo ajeno al codigo, ver "Bloqueo E2E" |
+| R12 | Paso 2 del recorrido: waitForURL contra INVENTORY_ROUTE + expect sobre getByTestId(inventario-title) | e2e/session.spec.ts (paso 2) - EN VERDE en chromium y webkit tras el fix del fixture (rol Administrador real), ver "Actualizacion de la ronda 2" |
 | R13 | Estructura del archivo: un unico test() dentro de un unico test.describe() (confirmado por lectura directa, sin partir el recorrido) | e2e/session.spec.ts |
 | R14 | Mismo test que R4 | tests/unit/app-sidebar.test.tsx:442 |
 | R15 | Ninguna regla ruta-rol nueva: lib/composition/route-role-rules.ts no se toco | verificado por git diff: ningun archivo de identity/composition en los commits de QC-13 |
 | R16 | Ninguna dependencia nueva: package.json / pnpm-lock.yaml no aparecen en el diff de esta ficha | verificado por git diff |
 
-Los 16 requisitos quedan cubiertos. R12 tiene test escrito y correcto segun el spec, pero el
-E2E no pasa hoy por una causa ajena al codigo de esta ficha (ver abajo); se documenta asi para
-que el reviewer decida.
+Los 16 requisitos quedan cubiertos y verificados, incluido R12: el E2E completo pasa en
+chromium y webkit tras el fix del fixture (ronda 2).
 
 ## Evidencia de que los tests de borrado muerden (T2)
 
@@ -148,7 +202,7 @@ resueltos para poder correr las verificaciones:
    Vitest/Vite, no auto-carga .env); tuve que invocar el CLI de Playwright con
    node --env-file=.env porque NODE_OPTIONS=--env-file=... esta bloqueado por Node.
 
-## Resultado real de los tests
+## Resultado real de los tests (ronda 1, historico)
 
 Comando: pnpm exec vitest run tests/unit/app-sidebar.test.tsx tests/guards/guard-nav-serializable.test.ts
 Resultado: Test Files 2 passed (2) - Tests 19 passed (19)
@@ -163,22 +217,33 @@ Comando: node --env-file=.env node_modules/.pnpm/@playwright+test@1.62.1/node_mo
 Resultado: Running 2 tests using 2 workers
   - [chromium] fallo en el paso 2 (Error: expect(locator).toBeVisible() failed, getByTestId(inventario-title))
   - [webkit] mismo fallo
-  2 failed. Causa: aterriza en /dashboard tras el rechazo por rol, ver seccion "Bloqueo E2E".
+  2 failed. Causa: aterriza en /dashboard tras el rechazo por rol, ver seccion "Bloqueo E2E" (ronda 1).
 
-No corri la suite completa: solo los archivos de esta ficha mas la guardia de serializacion,
-asi que no hay veredicto propio sobre el flake conocido de
-tests/ui/login-form-uncontrolled-warning.test.tsx.
+## Resultado real de los tests (ronda 2, tras el fix del fixture)
 
-## Que falta para cerrar T5 y T6
+Comando: pnpm typecheck
+Resultado: limpio, exit 0 (tras `pnpm exec prisma generate --schema db/schema.prisma`; el
+cliente Prisma estaba desactualizado por la entrada de QC-33/modelo-pedidos via merge, no por
+codigo de esta ficha).
 
-1. T5: el leader decide como resolver el conflicto en feature_list.json, progress/current.md,
-   progress/history.md (o delega esa resolucion con contexto cross-feature). El terreno
-   especifico de riesgo con QC-26 (los dos archivos del spec) no tuvo conflicto, eso ya esta
-   confirmado y no requiere trabajo adicional cuando se retome.
-2. E2E: el leader/humano decide como cerrar la pregunta abierta 2. Opciones no evaluadas aqui
-   porque exceden el mandato de esta sesion: (a) asignar ADMIN_ROLE_NAME al rol que crea el
-   fixture de e2e/session.spec.ts, (b) crear el rol con otro nombre y ampliar
-   ROUTE_ROLE_RULES (fuera de alcance, R15 lo prohibe expresamente en esta ficha), (c)
-   cualquier otra que decida el humano.
-3. Una vez resueltos ambos, correr ./init.sh completo (T6). No lo corri: es tarea del leader
-   segun el encargo recibido.
+Comando: pnpm lint
+Resultado: limpio, exit 0.
+
+Comando: pnpm exec vitest related --run e2e/session.spec.ts
+Resultado: no aplica, la config de vitest excluye `e2e/**` explicitamente ("No test files
+found, exiting with code 0").
+
+Comando: pnpm exec playwright test e2e/session.spec.ts
+Resultado: 2 passed (chromium 6.3s, webkit 9.7s). El recorrido aterriza en /inventario en
+ambos navegadores: waitForURL contra INVENTORY_ROUTE y
+getByTestId('inventario-title').toBeVisible() en verde, mas el resto de la cadena (nombre
+real, cookie de sesion, logout, "atras" no restaura la zona privada).
+
+No se corrio la suite completa en esta sesion de implementer: eso corresponde a `./init.sh`
+completo (T6), tarea del leader antes del PR.
+
+## Que falta para cerrar T6
+
+Solo queda T6: correr `./init.sh` completo (typecheck + lint + toda la suite unitaria y de
+integracion + todas las guardias + el E2E) y confirmar verde. Es tarea del leader, no de este
+implementer, segun el encargo recibido.
