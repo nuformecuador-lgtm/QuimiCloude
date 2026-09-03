@@ -11,8 +11,11 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-9 | proteccion-de-rutas-privadas | QC-17 Identidad y acceso | backend | **in_progress (F2.1)** | `feature/QC-9-proteccion-de-rutas-privadas` | **SPEC APROBADO por el humano el 2026-09-02** e **implementer lanzado**. Tarjeta en *En curso*. Spec congelado en `0f7d599`: **30 requisitos EARS**, todos trazados. El rol viaja dentro del token (decisión humana) y por eso **D3 quedó derogada**: el formato del token cambia y las sesiones abiertas dejan de valer. Queda 1 pregunta abierta (qué hace la raíz `/`). **Toca código de QC-8 Y de QC-7**, las dos mergeadas. Acotada y sembrada el mismo día: 14 decisiones cerradas, 0 preguntas abiertas. **No ocupa slot**: sigue `pending` hasta F1.3. Desbloquea a **QC-13**, que es la que hace navegable el ERP. **Toca código de QC-8, ya mergeada** — la firma migra a WebCrypto sin cambiar el formato del token |
 | QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress — PR #20 ABIERTO** | `feature/QC-30-rediseno-login` | **Esperando que el humano mergee el [PR #20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20).** Sesión labs-4b. Spec aprobado el 2026-09-02 (26 requisitos, 11 tareas). **Dos rondas de revisión**: la primera rechazó por un bloqueante real —R9 sin test que mordiera: se podía borrar el modo oscuro entero y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests (20 → 26). Gate completo verde: 65 archivos, 663 tests. Al mergear: F2.5 (tarjeta a *Hecho*, `status: done`, `wt.sh done QC-30-rediseno-login`) y F2.6 (resumen en `history.md`) |
+| QC-42 | modelo-proveedores | QC-41 Proveedores | backend | **pending — worktree montado (F1.0 hecho)** | `feature/QC-42-modelo-proveedores` | Sesión de esta fecha. Worktree en `.worktrees/QC-42-modelo-proveedores` (`wt.sh new`, rama desde `origin/dev` en `8f4a5ae`). Labels `zone:backend` / `complexity:medium` ya estaban en el issue, no hizo falta empujar nada a Jira. **Parada en F1.2**: la evaluación del 2026-09-02 dejó cinco decisiones abiertas (moneda y precisión de `costo`, unidad de `minimo_compra` y de `tiempo_entrega`, borrado vs. inactivación del proveedor, unicidad del nombre) y no existe `specs/QC-42-modelo-proveedores/requirements.md`. Esperando que el humano decida entre correr `/afinar-feature QC-42` o lanzar `spec_author` en crudo. |
+| QC-25 | crud-de-recetas | QC-27 Recetas | backend | pending — **worktree montado, esperando F1.2** | `feature/QC-25-crud-de-recetas` | Sesión de hoy (2026-09-03). F1.0 hecha: zona `backend` con **0 features `in_progress`**, `complexity: high` ya en el board, dependencias QC-24/QC-20/QC-8 las tres `done`. **Parada en F1.2**: la ficha tiene tres preguntas abiertas anotadas en *Evaluaciones* (qué pasa con el archivo en Storage al borrar la receta, límites de la imagen, y si la receta produce algo) **y** una dependencia nueva sin aprobar (cliente de Supabase, regla 7). No existe `specs/QC-25-crud-de-recetas/`. Se ofreció `/afinar-feature` antes de lanzar `spec_author` |
+| QC-32 | modelo-unidades | QC-37 Catálogos | backend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-32-modelo-unidades` | Sesión de hoy (2026-09-03). **Spec aprobado por el humano el 2026-09-03** (28 requisitos EARS, 16 tareas, commit `e82aa49`); tarjeta en *En curso*. Worktree en `.worktrees/QC-32-modelo-unidades` desde `origin/dev` (`8f4a5ae`). La zona `backend` pasa a **1 de 2 `in_progress`**: QC-25 y QC-42 siguen `pending` con worktree montado, y **QC-25 comparte terreno con esta ficha** (la unidad de la línea de receta), así que su validación de conflicto morderá. Tres cosas que el implementer lleva por encargo: **T0b verifica hoy que la base está vacía** (pregunta abierta n.º 2, vencía en el merge y no el día del spec) y **para si encuentra filas con unidad escrita**; acotar los 10 tests ajenos de `inventario`/`recetas` **no es aflojarlos**; y las dos guardias de datos (UP y DOWN) se prueban contra Postgres real, no se leen. Flake conocido de `dev` que no es suyo: `tests/ui/login-form-uncontrolled-warning.test.tsx` |
+| QC-22 | pantalla-de-productos | QC-18 Inventario | frontend | pending — **worktree montado, esperando F1.2** | `feature/QC-22-pantalla-de-productos` | Sesión de hoy (2026-09-03). F1.0 hecha: zona `frontend` con **1 feature `in_progress`** (QC-30, que ya no recibe más código —solo espera el merge del PR #20—), sin intersección de archivos: QC-30 toca `app/(public)/login/*`, `app/globals.css` y `components/ui/`; QC-22 vive en `app/(private)/`. Dependencia **QC-20 `done`**. `complexity: medium` evaluada aquí y **empujada al issue como label** (antes solo tenía `zone:frontend`). Worktree en `.worktrees/QC-22-pantalla-de-productos` (rama desde `origin/dev` en `8f4a5ae`). **Parada en F1.2**: la propia description delega la forma de la pantalla al acotado —una ruta o dos, formulario en modal o en página, búsqueda y orden, y si hace falta E2E— y no existe `specs/QC-22-pantalla-de-productos/`. Se ofreció `/afinar-feature QC-22` antes de lanzar `spec_author` |
 
 La feature **QC-20 — crud-de-productos** se cerró el 2026-09-02 (PR #19, merge `1be1021`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
@@ -66,6 +69,15 @@ veces** antes del OK, y las tres rondas las resolvió midiendo por mutación. De
 aserciones de QC-14 y QC-19** que afirmaban el censo global del repo, más un sexto fallo escondido
 (un barrido que leía los comentarios del esquema). `wt.sh done` volvió a fallar en Windows —
 tercera vez el mismo día— y se remató con `rm -rf` + `git worktree prune`.
+
+La feature **QC-9 — proteccion-de-rutas-privadas** se cerró el 2026-09-02 (PR #21, merge
+`864eeb7`): resumen en `progress/history.md`, worktree desmontado y rama borrada. **Desbloquea a
+QC-13, QC-22, QC-23 y QC-25** de golpe. La firma de sesión migró a WebCrypto manteniendo **una
+sola** implementación del HMAC y salida idéntica byte a byte, y el rol pasa a viajar dentro del
+token. Destapó dos cosas que valían más que la feature: **dos guardias de seguridad estaban
+ciegas** por el orden en que quitaban comentarios, y **su E2E encontró que `dev` llevaba rota la
+zona privada entera** con todo el mundo en verde, porque el gate no corre E2E. `wt.sh done` falló
+por cuarta vez el mismo día.
 
 Worktrees: `.worktrees/11-layout-privado-con-sidebar` (retenido, ver deudas) y
 `.worktrees/fix-login-field-control-uncontrolled` (SAFE, desmontable). Los de QC-15 y QC-14 se
@@ -121,6 +133,78 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
+
+### QC-22 — pantalla-de-productos: F1.0 (2026-09-03)
+
+- **Arranque de sesión: el gate estaba ROJO en `dev` antes de tocar nada.** `pnpm typecheck`
+  fallaba con 24 errores TS2353/TS2339 en `inventario` (`nameNormalized`, `createdBy`,
+  `updatedBy` «no existen» en los tipos de Prisma). No era una regresión de código: el schema
+  `db/schema.prisma` sí los declara desde el merge de QC-20 (`1be1021`) — lo que estaba viejo
+  era el **cliente generado** en `node_modules`. `pnpm prisma generate --schema db/schema.prisma`
+  lo dejó en verde. Ver *Deudas* para la grieta que esto destapa.
+- **Rojo transitorio en la primera corrida.** Tras el generate, 3 tests de `login-form` cayeron
+  por `Test timed out in 5000ms` (`tests/ui/login-form-uncontrolled-warning.test.tsx` y
+  `tests/unit/login-form.test.tsx`). Aislados pasan los 29 en 10 s; la corrida completa venía
+  con `environment 416s` contra los 63 s de la corrida sana. Es saturación de la máquina, no
+  regresión. **Gate completo verde: 89 archivos, 957 tests.**
+- **`zone: frontend`** — la description es íntegramente capa visual: «pantalla», «lista
+  paginada», «formulario», «estados (vacío, cargando, error)». Las operaciones ya existen y
+  las expone QC-20 como Server Actions, así que no hay trabajo de backend.
+- **`complexity: medium`** — dos catálogos (productos y presentaciones) con CRUD completo y
+  tres estados de carga cada uno: son varios archivos y varias capas, pero sin integración
+  externa ni webhooks que la empujen a `high`. Evaluada aquí y **empujada al issue** como
+  label `complexity:medium`; el board solo traía `zone:frontend`.
+- **Cupo y conflicto.** `frontend` tenía 1 `in_progress` (QC-30) de 2 permitidas. Validación
+  de archivos contra `progress/impl_QC-30-rediseno-login.md`: QC-30 toca
+  `app/(public)/login/*`, `app/globals.css` y `components/ui/`; QC-22 vive bajo
+  `app/(private)/`. Sin intersección, y QC-30 ya cerró su ciclo de código —solo espera el
+  merge humano del PR #20—, así que ni siquiera puede crecer hacia esos archivos.
+- **Parada en F1.2.** La description **delega explícitamente** el alcance al acotado: «la forma
+  de la pantalla —una ruta o dos, formulario en modal o en página, búsqueda y orden— se decide
+  al acotar esta ficha, y ahí también se decide si hace falta prueba de extremo a extremo». No
+  existe `specs/QC-22-pantalla-de-productos/requirements.md`. Lanzar `spec_author` en crudo
+  sería pagar la ronda dos veces. Se ofreció `/afinar-feature QC-22`.
+
+### QC-25 — crud-de-recetas: F0 + F1.0 (2026-09-03)
+
+- **F0 — importación del board.** 34 issues de tipo `Tarea` en `QC`. Comparado campo a campo
+  contra `feature_list.json`: `status`, `epic`, `zone`, `complexity`, `slug` y `depends_on`
+  **coinciden en las 33 fichas**. Única divergencia: **QC-40 `ajuste-sidebar` está en el board
+  como *Cancelado* y no está en disco** — es deliberado (se canceló y el ajuste va como arreglo
+  en `feature/fix-ajuste-sidebar`, sin ficha), así que la importación no la añade. No hizo falta
+  reescribir nada: el único cambio de esta sesión ya estaba en el árbol sucio (QC-9 → `done`).
+- **El gate falló en el primer intento y no era deuda de nadie**: `pnpm typecheck` reventó con
+  ~25 errores de `nameNormalized` / `createdBy` / `updatedBy` inexistentes en los tipos de
+  Prisma. Es **exactamente el síntoma ya documentado** en `history.md` (el cliente generado
+  queda por detrás tras cada merge): `pnpm exec prisma generate` y verde. Vale la pena que
+  `./init.sh` lo detecte solo, pero eso es material de `/afinar-regla`.
+- **Un rojo de la suite completa que NO es un rojo:** `tests/ui/login-form-uncontrolled-warning.test.tsx`
+  falló 2 de 4 por *timeout* de 5 s bajo carga, y **pasa 4/4 corriéndolo solo** (6 s). Es flake de
+  `userEvent` en jsdom, no deuda: **no se añade a `baseline-rojos.json`**, que sigue vacío.
+- **`zone: backend`, `complexity: high`** — ya evaluadas y escritas como labels en el issue; F1.0
+  las confirma, no las reasigna. Sin partición: la description es toda servidor y dice
+  explícitamente que «la pantalla va aparte» (QC-26).
+- **Cupo y conflictos:** la zona `backend` tiene **0 features `in_progress`** (QC-30, la única en
+  curso, es `frontend`), así que entra sin agotar el cupo de 2. Dependencias `QC-24`, `QC-20` y
+  `QC-8`: las tres `done`. Worktree montado con `./scripts/wt.sh new QC-25 crud-de-recetas`.
+- **Se para en F1.2 y se ofrece `/afinar-feature`**, porque se cumplen las dos condiciones que
+  lo piden: no existe `specs/QC-25-crud-de-recetas/requirements.md`, y la ficha llega con
+  **tres preguntas abiertas ya escritas** (destino del archivo en Storage al borrar la receta,
+  límites de la imagen —tamaño, tipos, bucket público o privado—, y si una receta produce algo)
+  **más una dependencia sin aprobar**: el cliente de Supabase, que entra por la regla 7 con sus
+  cuatro checks de salud y su fila en `docs/dependencias.md`. Lanzar `spec_author` sin cerrar
+  eso es pagar la ronda dos veces.
+- **Acotada y sembrada el 2026-09-03** con `/afinar-feature`: 22 decisiones cerradas y 4 preguntas
+  abiertas en **`specs/QC-25-crud-de-recetas/requirements.md`** — esa es la fuente, aquí no se
+  copia. Las tres preguntas que traía la ficha quedaron cerradas (el archivo de Storage sobrevive
+  al borrado de la receta y solo se borra al reemplazarlo; **bucket público**, con su consecuencia
+  escrita; 5 MB y JPEG/PNG/WebP), y la de negocio —si una receta produce algo— sigue abierta
+  porque no la decide un agente. Dependencia **aprobada por el humano**: `@supabase/storage-js` y
+  **solo** ese sub-paquete, no `supabase-js` entero, para que el cliente de datos que
+  `CHECKPOINTS.md` prohíbe ni exista en el repo; los cuatro checks pasan (MIT, publicado el
+  2026-09-02, 25,3M descargas/semana, no deprecada) y su fila en `docs/dependencias.md` va en F1.4.
+  **El board no se tocó**: `zone`, `complexity`, `depends_on` y la `description` siguen siendo
+  ciertos, y todo lo que sale del alcance ya tiene ficha (QC-26 la pantalla, QC-32 la unidad).
 
 ### QC-42 / QC-43 / QC-44 — proveedores (2026-09-02)
 
@@ -982,6 +1066,19 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
+- **[arnés — el gate no regenera el cliente de Prisma, y por eso `dev` amaneció en rojo sin que
+  nadie rompiera nada.]** El 2026-09-03 `./init.sh` falló en `typecheck` con 24 errores en
+  `inventario`: el cliente generado en `node_modules` era anterior al merge de QC-20, que añadió
+  `nameNormalized`, `createdBy` y `updatedBy` a `db/schema.prisma`. El arreglo fue
+  `pnpm prisma generate`, cero cambios de código. El coste no es el minuto que tarda: es que
+  **el rojo era indistinguible de una regresión real** y se fue en diagnosticarlo. Un
+  `prisma generate` al principio de `init.sh` (o un guard que compare la mtime del schema contra
+  la del cliente) lo cierra. Candidata para `/afinar-regla`.
+- **[máquina — la suite completa hace flake por timeout bajo carga.]** En la misma corrida, 3
+  tests de `login-form` cayeron con `Test timed out in 5000ms` y aislados pasaron los 29. La
+  diferencia: `environment 416s` contra 63 s. No hay nada roto, pero un leader con menos contexto
+  lo lee como regresión y devuelve la feature al implementer. O sube el `testTimeout` de los
+  tests con `userEvent`, o el gate reintenta una vez el archivo rojo antes de declararlo.
 - **[arnés — EL GATE NO CORRE E2E, y por eso `dev` pudo estar roto en runtime con todo en verde.
   Candidata 5 para `/afinar-regla`, y la más cara de las cinco.]** El 2026-09-02, **toda la zona
   privada devolvía 500** en `origin/dev` —`Functions cannot be passed directly to Client
