@@ -98,7 +98,7 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo B — casos de uso (depende de A)
 
-- [ ] **T5 — Esquemas de entrada del proveedor.** `domain/supplier-input.ts` (`design.md > 6.1`):
+- [x] **T5 — Esquemas de entrada del proveedor.** `domain/supplier-input.ts` (`design.md > 6.1`):
       trim, mínimo 1 y máximo 120 en el nombre, `refine` del nombre que normaliza a vacío, máximos
       40/160 en teléfono y correo, `blankToNull` **antes** del `refine` de contacto, y ningún
       formato de correo ni de teléfono.
@@ -106,7 +106,7 @@ verificado contra el árbol de la rama, no contra este documento.
       R10, R11, R13, R20, R41) y el caso `phone: '   ', email: null` se rechaza **en el borde**, no
       en la base.
 
-- [ ] **T6 [P] — Esquemas de entrada de la línea.** `domain/catalog-line-input.ts`
+- [x] **T6 [P] — Esquemas de entrada de la línea.** `domain/catalog-line-input.ts`
       (`design.md > 6.2`): `cost` como **cadena** decimal `> 0`, `minPurchase` cadena `>= 0`
       opcional, `deliveryTime` entero `>= 0` opcional, y el esquema de edición **sin `supplierId`
       ni `productId`** (R33, posición de P5).
