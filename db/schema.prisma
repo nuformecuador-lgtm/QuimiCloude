@@ -255,6 +255,77 @@ model RecipeLine {
   @@map("recipe_lines")
 }
 
+/// Proveedor del ERP quimico. Borrado LOGICO: `deletedAt` NULL = proveedor vivo.
+/// NO hay estado activo/inactivo aparte (decision cerrada 10, R26): un segundo estado que
+/// nadie sabe distinguir del primero es deuda, no informacion.
+///
+/// OJO 1 — `createdBy` y `updatedBy` son FK REALES a `users`, pero se declaran como
+/// ESCALARES SIN `@relation` a proposito (decision cerrada 14, R22): la FK esta escrita a
+/// mano en `migration.sql`. Asi la base garantiza la integridad y, a la vez, el cliente
+/// Prisma NO puede atravesar de `proveedores` a `users` con un `include`. La guardia de
+/// modulos NO detectaria ese cruce, porque no es un import.
+/// Son ANULABLES: NULL significa «no lo creo una persona» —una importacion, un seed—, no
+/// «se perdio el dato». Heredado de QC-24 (decision cerrada 22 de aquella ficha).
+///
+/// OJO 2 — la unicidad del nombre NO esta aqui como `@unique` y es deliberado: es un indice
+/// unico PARCIAL (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela
+/// indices parciales. Vive escrito a mano en `migration.sql` (`suppliers_name_unique`).
+///
+/// OJO 3 — la regla cruzada «al menos telefono o correo» (decision cerrada 7, R4) es un
+/// CHECK en la base (`suppliers_contact_required`) y Prisma NO modela CHECK: por eso las dos
+/// columnas se ven aqui como simplemente opcionales. Vive escrito a mano en `migration.sql`.
+/// @module proveedores
+model Supplier {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  nameNormalized String    @map("name_normalized")
+  phone          String?
+  email          String?
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  catalogLines SupplierCatalogLine[]
+
+  @@index([createdBy], map: "suppliers_created_by_idx")
+  @@index([updatedBy], map: "suppliers_updated_by_idx")
+  @@map("suppliers")
+}
+
+/// Linea del catalogo de un proveedor: la pareja proveedor-producto como ENTIDAD PROPIA, con
+/// su costo, su minimo de compra y su tiempo de entrega (decision cerrada 3).
+///
+/// NO lleva `deletedAt` a proposito (decision cerrada 11, R28): la linea es parte del
+/// catalogo, no un hecho historico. Tampoco lleva `createdBy`/`updatedBy` (decision cerrada
+/// 14, R25), igual que `recipe_lines`.
+///
+/// OJO — `productId` es una FK REAL a `products` declarada como ESCALAR SIN `@relation`
+/// (decision cerrada 13, R22). La FK esta escrita a mano en `migration.sql`. Lo que
+/// `proveedores` sabe del producto llega por el contrato publico `@/lib/modules/inventario`,
+/// nunca por un `include` ni por `prisma.product`.
+///
+/// OJO 2 — los tres CHECK de no negatividad (`cost`, `min_purchase`, `delivery_time`) son
+/// SQL escrito a mano: Prisma no modela CHECK. Ver `design.md > 4.4`.
+/// @module proveedores
+model SupplierCatalogLine {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  supplierId   String   @map("supplier_id") @db.Uuid
+  productId    String   @map("product_id") @db.Uuid
+  cost         Decimal  @db.Decimal(14, 4)
+  minPurchase  Decimal? @map("min_purchase") @db.Decimal(14, 4)
+  deliveryTime Int?     @map("delivery_time")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([supplierId, productId], map: "supplier_catalog_lines_supplier_id_product_id_key")
+  @@index([productId], map: "supplier_catalog_lines_product_id_idx")
+  @@map("supplier_catalog_lines")
+}
+
 /// Catalogo de unidades de medida (QC-32). Modulo propio `unidades`: `inventario`,
 /// `recetas` y lo que venga lo consumen por su contrato publico `@/lib/modules/unidades`,
 /// nunca por esta tabla.
