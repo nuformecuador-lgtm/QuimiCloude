@@ -12,9 +12,9 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress — PR #20 ABIERTO** | `feature/QC-30-rediseno-login` | **Esperando que el humano mergee el [PR #20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20).** Sesión labs-4b. Spec aprobado el 2026-09-02 (26 requisitos, 11 tareas). **Dos rondas de revisión**: la primera rechazó por un bloqueante real —R9 sin test que mordiera: se podía borrar el modo oscuro entero y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests (20 → 26). Gate completo verde: 65 archivos, 663 tests. Al mergear: F2.5 (tarjeta a *Hecho*, `status: done`, `wt.sh done QC-30-rediseno-login`) y F2.6 (resumen en `history.md`) |
-| QC-42 | modelo-proveedores | QC-41 Proveedores | backend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-42-modelo-proveedores` | Sesión de hoy (2026-09-03). Worktree en `.worktrees/QC-42-modelo-proveedores`. **Spec aprobado por el humano el 2026-09-03** (36 requisitos EARS, 15 tareas, commit `667ab98`); tarjeta en *En curso*. Acotada antes con `/afinar-feature` (semilla `ee47f69`, 22 decisiones cerradas). **Las preguntas abiertas 6, 7 y 8 siguen ABIERTAS**: el humano aprobó sin cerrarlas, así que el implementer las respeta como abiertas y NO las rellena con supuestos (regla 6). La zona `backend` queda en **2 de 2 `in_progress`** (QC-32 + QC-42) — en el límite, no por encima; **QC-25 queda bloqueada por cupo** aunque ya esté acotada y con worktree. El humano dio permiso explícito para pasar de 2 si hiciera falta (2026-09-03), pero de momento no hace falta. **Encargos para el implementer**: T13 sincroniza con `dev` y repite T10 **antes** de dar la migración por buena, porque **QC-32 está tocando `db/schema.prisma` y las migraciones ahora mismo**; el `down.sql` es guardia del gate; y el test del cruce por ORM (R22) tiene que morder de verdad, porque `guard-arquitectura-modulos` no ve ese cruce. Flake conocido de `dev` que no es suyo: `tests/ui/login-form-uncontrolled-warning.test.tsx`. |
+| QC-42 | modelo-proveedores | QC-41 Proveedores | backend | **in_progress — implementer corriendo (F2.1), 4.º intento** | `feature/QC-42-modelo-proveedores` | Sesión de hoy (2026-09-03). **Spec aprobado por el humano** (36 requisitos EARS, 15 tareas, `667ab98`); acotada antes con `/afinar-feature` (semilla `ee47f69`, 22 decisiones cerradas). Tarjeta en *En curso*. **Preguntas abiertas 6, 7 y 8 siguen ABIERTAS**: el humano aprobó sin cerrarlas, el implementer las respeta y NO las rellena (regla 6). **Tres implementers murieron por 5xx de la API (500, 529, 529), ninguno por fallo del trabajo**; el 4.º corre en **Sonnet 5 por decisión explícita del humano** —desvío con motivo del «todos heredan el modelo de la sesión» de `AGENTS.md`, no norma nueva— y pasa `model: sonnet` también a sus `backend_dev`. **`b60236f` es un commit `wip` SIN AUDITAR**: esquema, migración con `down.sql` y armazón del módulo que dejó el primer implementer; se commiteó solo como red de seguridad y auditarlo es la primera tarea real del siguiente. 0 de 15 tareas marcadas, sin `impl_*.md`. Zona `backend` en **2 de 2** (QC-32 + QC-42); **QC-25 bloqueada por cupo**, y el humano dio permiso explícito para pasar de 2 si hiciera falta (2026-09-03). **Riesgo vivo: QC-32 toca `db/schema.prisma` y las migraciones** — T13 sincroniza con `dev` y repite T10 antes de dar la migración por buena. Flake ajeno conocido: `tests/ui/login-form-uncontrolled-warning.test.tsx`. |
 | QC-25 | crud-de-recetas | QC-27 Recetas | backend | **in_progress — implementer corriendo** | `feature/QC-25-crud-de-recetas` | Sesión de hoy (2026-09-03). **Spec aprobado por el humano el 2026-09-03** (F1.4): 49 requisitos (R1–R49), 19 tasks (T0–T18), 26 decisiones cerradas y cero preguntas abiertas propias. Tarjeta en *En curso*. La aprobación del spec **incluyó la dependencia**: la fila de `@supabase/storage-js` ya está en `docs/dependencias.md`, y NO entra `@supabase/supabase-js`. Sin migración propia: el CRUD cabe sobre el modelo de QC-24. Ojo al cerrar la tanda: `lib/composition/index.ts` es el archivo que ha chocado en **todas** las parejas backend del repo |
-| QC-32 | modelo-unidades | QC-37 Catálogos | backend | **in_progress — [PR #22](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/22) ABIERTO, reviewer corriendo (F2.2)** | `feature/QC-32-modelo-unidades` | Sesión de hoy (2026-09-03). Spec aprobado por el humano (28 requisitos EARS, 16 tareas). **Implementación cerrada**: 16/16 tareas, gate completo verde (96 archivos, **1025 tests**), 39 archivos y +5390/−128, HEAD `57dc031`. F2.3 sin conflictos (`origin/dev` sigue en `8f4a5ae`, `Already up to date`). Parte en `progress/impl_QC-32-modelo-unidades.md` **dentro del worktree**. **La pregunta abierta n.º 2 se cerró por los hechos**: T0b corrió hoy contra la base real y encontró 0 productos con unidad escrita y 0 líneas de receta, confirmando la decisión 6; la guardia se provocó a propósito para verificarla. `reviewer` lanzado con encargo de morder los 28 requisitos, los 10 tests ajenos acotados y las dos guardias de datos |
+| QC-32 | modelo-unidades | QC-37 Catálogos | backend | **in_progress — [PR #22](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/22) APROBADO, esperando merge humano** | `feature/QC-32-modelo-unidades` | Sesión de hoy (2026-09-03). **Tres rondas.** R1: reviewer RECHAZÓ (1 mayor — R25/R26 vigilaban una *copia* del adaptador driven del seed). R2 (`536ce49`): cerrado pasando el adaptador a fábrica; **nunca llegó a firmarse** porque doce intentos de subagente murieron por 500/529 de la API. R3 (`62f321d`): **el humano decidió que el aparato del seed sobra** — las cuatro unidades (`mililitro/ml`, `litro/l`, `gramo/gr`, `kilogramo/kg`) las inserta la propia migración —, lo que **disolvió MAYOR-1 borrando su objeto**. **Reviewer APROBÓ sobre `62f321d`: 0 mayores, 4 menores** (menor-6 a menor-9, todos de documentación o cobertura opcional). HEAD `05e6119`, **gate completo verde corrido por el leader: 94 archivos, 1020 tests, `== init OK ==`**. Al mergear: **F2.5** (tarjeta a *Hecho*, `status: done`, comentar la URL del PR, `wt.sh done QC-32-modelo-unidades`) y **F2.6** (resumen en `history.md`) |
 | QC-22 | pantalla-de-productos | QC-18 Inventario | frontend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-22-pantalla-de-productos` | Sesión de hoy (2026-09-03). F1.0 hecha: zona `frontend` con **1 feature `in_progress`** (QC-30, que ya no recibe más código —solo espera el merge del PR #20—), sin intersección de archivos: QC-30 toca `app/(public)/login/*`, `app/globals.css` y `components/ui/`; QC-22 vive en `app/(private)/`. Dependencia **QC-20 `done`**. `complexity: medium` evaluada aquí y **empujada al issue como label** (antes solo tenía `zone:frontend`). Worktree en `.worktrees/QC-22-pantalla-de-productos` (rama desde `origin/dev` en `8f4a5ae`). **Parada en F1.2**: la propia description delega la forma de la pantalla al acotado —una ruta o dos, formulario en modal o en página, búsqueda y orden, y si hace falta E2E— y no existe `specs/QC-22-pantalla-de-productos/`. **F1.2 en curso**: `/afinar-feature` corrió el 2026-09-03 y sembró `specs/QC-22-pantalla-de-productos/requirements.md` con 22 decisiones cerradas y 1 pregunta abierta. Cambió el alcance —solo productos; la pantalla de presentaciones salió a **QC-45**, creada en el board— y eso se escribió en el issue ANTES de sembrar. Semilla commiteada en `dev` (`30186f3`) y mergeada al worktree. `spec_author` escribió **32 requisitos (R1-R32) y 20 tareas (T0-T19)** con mapa `R<n> → test` completo (commit `3a85ea6` en la rama). F1.3 hecha: tarjeta en *En revisión* y ruta comentada en el issue. **Spec APROBADO por el humano el 2026-09-03** (F1.4); tarjeta en *En curso*. La aprobación cerró tres cosas: (1) **P2 cerrada sin dependencias nuevas**: `shadcn add form` NO se corre, `react-hook-form` y `@hookform/resolvers` NO se instalan y `docs/dependencias.md` NO cambia — se usa `<form action>` + `useActionState`, el patrón del login (commit `0f36d60`); (2) montar `<Toaster />` **supera** el R36/D9 de QC-11 y su test en negativo (`tests/unit/private-layout.test.tsx:260`), que T4 invierte con la fecha escrita, no borra; (3) `INVENTORY_ROUTE` se muda de `private-nav.ts` a `lib/shared/routes.ts`, tocando cuatro archivos heredados que R32 declara como los únicos permitidos |
 
 La feature **QC-20 — crud-de-productos** se cerró el 2026-09-02 (PR #19, merge `1be1021`):
@@ -165,6 +165,28 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   existe `specs/QC-22-pantalla-de-productos/requirements.md`. Lanzar `spec_author` en crudo
   sería pagar la ronda dos veces. Se ofreció `/afinar-feature QC-22`.
 - **Acotada con `/afinar-feature` el 2026-09-03.** El alcance, las 22 decisiones cerradas y la unica pregunta abierta viven en `specs/QC-22-pantalla-de-productos/requirements.md`; no se copian aqui. Cambio de alcance: la ficha se queda **solo con productos** y la pantalla de presentaciones salio a **QC-45**, creada en el board ese dia (epica QC-18, `is blocked by` QC-22). La `description` de QC-22 se reescribio en el issue y las dos cosas estan reflejadas en `feature_list.json`.
+- **Dos ampliaciones de alcance aprobadas por el humano el 2026-09-03, ya en implementación.** Las
+  dos salieron del mismo sitio: montar el `<Toaster />` y declarar la primera regla ruta→rol
+  tocan supuestos que otras features dejaron escritos, y R32 del spec limita los archivos
+  heredados a cuatro. Ninguna se resolvió a ojo.
+  1. **`tests/unit/sidebar-mobile.test.tsx:171`** (R30 de QC-11) quedó obsoleta al montar la
+     región de avisos. **No es regresión**, y el leader lo verificó: neutralizando esa línea el
+     resto del test pasa, **incluida la 172** —`queryByRole('main')` sigue devolviendo `null`—,
+     que es la que protege el comportamiento de verdad. La causa es `markOthers` de Base UI, que
+     en cuanto existe un `[aria-live]` mueve el `aria-hidden` a los hijos **a propósito**, para
+     que los toasts se sigan anunciando con el modal abierto. Autorizado tocar ese archivo
+     **solo** para que la aserción afirme el resultado en vez de la granularidad del marcado, con
+     fecha y motivo dentro del test.
+  2. **`route-role-rules.ts` importaba `@/lib/shared/routes` desde `domain/`**, que
+     `docs/architecture.md > La regla de dependencias` prohíbe y
+     `tests/guards/guard-arquitectura-modulos.test.ts` detecta. Lo introdujo T3. Decisión del
+     humano: **la lista concreta de reglas se muda al adaptador driving**
+     (`route-guard-middleware.ts`), que sí puede importar `lib/shared`; el dominio conserva el
+     tipo y `findRouteRule`, que **ya recibía las reglas por parámetro** —la arquitectura estaba
+     preparada para esto y el único consumidor de la constante era ese adaptador—. Se descartó
+     declarar `/inventario` dentro de `identity`: rompería la decisión de «una sola constante por
+     ruta», que es justo el caso que `private-nav.ts` documenta («así se acaba con `/dashboard` y
+     `/panel` conviviendo»).
 
 ### QC-25 — crud-de-recetas: F0 + F1.0 (2026-09-03)
 
@@ -1085,6 +1107,44 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### QC-32: los cuatro menores que el reviewer dejó abiertos (2026-09-03)
+
+El reviewer **APROBÓ** sobre `62f321d` con **0 mayores**. Los cuatro menores no bloquean el
+merge y quedan aquí para que alguien decida, no para que se olviden:
+
+- **menor-6** — ninguna aserción automática comprueba **las cuatro filas en la base**; la única
+  evidencia real es el log de T15. Es coherente con el precedente de R22/R23/R24, pero
+  `tests/integration/unidades/unidades-constraints.int.test.ts` ya corre contra Postgres y un
+  caso acotado costaría poco. **Es el único de los cuatro que añade cobertura real.**
+- **menor-7** — `specs/QC-32-modelo-unidades/tasks.md`, filas R16 y R19 de la tabla de
+  trazabilidad, citan nombres de test que ya no existen (R16) o incompletos (R19).
+- **menor-8** — el mapa `R<n> → test` de `progress/impl_QC-32-modelo-unidades.md > T14` sigue
+  citando artefactos borrados y «unidades creadas: 5»; la ronda 3 no lo marcó como superado.
+- **menor-9** — la mitad negativa de R26 se apoya en una lista de nombres literales; lo que
+  cierra la red de verdad es el barrido. Anotado **para QC-38**.
+
+**Dos preguntas resueltas por el reviewer, que conviene no reabrir:**
+
+1. **`tests/` fuera del barrido de `module-contract.test.ts` es frontera legítima, no agujero.**
+   R15/R16 hablan de *módulos* y un fixture no lo es. Extenderlo pondría rojos a
+   `product-crud.int.test.ts`, `inventario-constraints.int.test.ts` y
+   `recetas-constraints.int.test.ts`, que crean su unidad porque `recipe_lines.unit_id` es
+   `NOT NULL` con FK: el requisito se volvería **incomprobable** contra base real.
+2. **La migración de QC-42 aplicada en la base local no invalida la evidencia.** Crea
+   `suppliers` y `supplier_catalog_lines` y no toca `units`, `products.unit(_id)` ni
+   `recipe_lines`; además `121404 < 131417`, así que en base limpia QC-32 aplica antes.
+   **Salvedad anotada:** la evidencia se obtuvo revirtiendo y reaplicando QC-32 *por debajo* de
+   una migración posterior ya aplicada, cosa que `migrate deploy` no hará en producción. No
+   invalida nada porque no hay dependencia, pero es lo único que la separa de un despliegue real.
+
+### Arranque de un worktree: falta `pnpm install` y `next typegen` (2026-09-03, hallazgo de QC-32)
+
+Montar un worktree con `wt.sh new` no deja el árbol compilable: además del `.env` hacen falta
+`pnpm install` y `pnpm exec next typegen`. Sin lo último `app/layout.tsx` no compila, porque
+`LayoutProps` vive en `.next/types`, que está git-ignorado, y **el gate sale rojo por algo ajeno a
+lo que estés haciendo**. Se reproduce en rama limpia. `docs/worktrees.md` no lo dice. Candidato a
+`/afinar-regla`, no se aplicó en caliente.
 
 Lo que condiciona trabajo futuro y no tiene ficha propia todavía.
 
