@@ -131,7 +131,7 @@ de abrir el PR, sin conflictos pendientes en `private-nav.ts` ni en `app-sidebar
 
 ---
 
-## T6 — Gate completo antes del PR
+## T6 — Gate completo antes del PR [x]
 
 - Correr `./init.sh` (completo, no `--rapido`): typecheck, lint, toda la suite unitaria y de
   integración, todas las guardias (incluida `guard-nav-serializable`) y el E2E.
@@ -139,5 +139,24 @@ de abrir el PR, sin conflictos pendientes en `private-nav.ts` ni en `app-sidebar
   que exige `CHECKPOINTS.md > Trazabilidad`.
 
 **Hecho cuando:** `./init.sh` termina en verde y el mapa de trazabilidad cubre R1–R16.
+
+- **Corrido por el leader el 2026-09-03.** `typecheck` limpio, `lint` limpio, suite completa
+  **1349 tests con 1341 en verde**, E2E **verde en Chromium y WebKit** aterrizando en
+  `/inventario`, mapa `R1–R16 -> test` completo en la bitácora.
+- **`./init.sh` NO termina en `== init OK ==`, y por dos causas ajenas a esta ficha**, las dos
+  declaradas en el PR:
+  1. **El validador de `feature_list.json` da rojo desde un worktree secundario** porque no
+     encuentra `.worktrees/QC-26/specs/`: QC-26 está `spec_ready` con su spec solo en su propia
+     rama. **Desde la raíz del repo el validador pasa** — es la asimetría ya documentada en
+     `progress/current.md` como deuda del arnés.
+  2. **8 rojos en `tests/integration/identity/identity-seed.int.test.ts`**, error `23503`: un
+     producto residual `FeldesQuack` de una corrida de QC-22 cuya FK `products_created_by_fkey`
+     bloquea el `DELETE FROM users` del helper. Verificado por otra sesión; **el humano decidió
+     el 2026-09-03 no borrar la fila, no arreglar el helper y no meterlo al baseline**. Mismo
+     trato que les dio el PR #26 de QC-33: se declaran y se sigue.
+- **El gate destapó un rojo que sí era de QC-13** y que ningún subagente podía ver, porque vive
+  en un archivo fuera de su alcance: `tests/unit/sidebar-ajuste.test.tsx` afirmaba que algún ítem
+  del menú real declara `badge`, cierto solo porque «Notificaciones» era placeholder. Resuelto en
+  `b1c412d`. Es exactamente el motivo por el que el gate lo corre el leader.
 
 **Depende de:** T5.
