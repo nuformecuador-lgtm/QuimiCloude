@@ -26,26 +26,26 @@
 
 ## Grupo A — cimientos (sin dependencias entre sí)
 
-- [ ] **T0 — Instalar la dependencia aprobada.** `pnpm add @supabase/storage-js`. **Solo** ese
+- [x] **T0 — Instalar la dependencia aprobada.** `pnpm add @supabase/storage-js`. **Solo** ese
       sub-paquete: `@supabase/supabase-js` no entra (D9, R42).
       *Depende de:* la fila en `docs/dependencias.md` que escribe el leader en F1.4.
       **Hecho cuando:** `tests/guards/guard-dependencias-aprobadas.test.ts` pasa y `package.json`
       no ganó ninguna otra dependencia.
 
-- [ ] **T1 [P] — Dominio base del módulo.** `domain/actor.ts` (`Actor`, `ADMIN_ROLE_NAME`,
+- [x] **T1 [P] — Dominio base del módulo.** `domain/actor.ts` (`Actor`, `ADMIN_ROLE_NAME`,
       `requireAdmin`), `domain/errors.ts` (`RecetasError`, `UnauthorizedError`, `NotFoundError`,
       `DuplicateNameError`, `ValidationError`), `domain/page.ts` (`Page<T>`, `PageQuery`,
       `pageQuerySchema`). `domain/recipe-name.ts` ya existe (QC-24) y **no se toca**.
       **Hecho cuando:** `pnpm run typecheck` limpio y `domain/` no importa framework, Prisma,
       `lib/shared/` ni `composition`.
 
-- [ ] **T2 [P] — Detección de formato y límites de la imagen.** `domain/recipe-image.ts`: función
+- [x] **T2 [P] — Detección de formato y límites de la imagen.** `domain/recipe-image.ts`: función
       pura que rechaza por tamaño (5 MB) y detecta JPEG/PNG/WebP **por los bytes**, devolviendo el
       `contentType` y la extensión derivados (`design.md > 9.2`).
       **Hecho cuando:** `tests/unit/recetas/recipe-image.test.ts` pasa con la tabla de firmas
       —los tres aceptados y PDF, SVG y HEIC renombrados a `.jpg` rechazados— y el corte de 5 MB.
 
-- [ ] **T3 [P] — Test de alcance, adelantado.** `tests/unit/recetas/scope.test.ts`: no hay ruta,
+- [x] **T3 [P] — Test de alcance, adelantado.** `tests/unit/recetas/scope.test.ts`: no hay ruta,
       página ni componente de recetas bajo `app/`, ni route handler bajo `app/api/`, ni spec nuevo
       en `e2e/`; `recetas` no reimplementa la aritmética de paginación; ninguna columna, índice ni
       restricción nueva en `recipes` ni en `recipe_lines`; ningún test importa
