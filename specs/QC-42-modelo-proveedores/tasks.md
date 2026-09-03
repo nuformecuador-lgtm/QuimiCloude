@@ -163,7 +163,7 @@ da por hecho:**
 
 ## Bloque D — Tests estáticos y unitarios (no necesitan base)
 
-### [ ] T6. [P] Contrato estático del esquema
+### [x] T6. [P] Contrato estático del esquema
 - Dep: T1.
 - Archivos: `tests/unit/proveedores/schema/proveedores-schema.test.ts`.
 - Lee `db/schema.prisma` como **texto**. Reutilizar los helpers de
@@ -178,7 +178,7 @@ da por hecho:**
 - **Hecho cuando:** pasa y cubre R1, R3, R5, R10, R13, R14, R15, R16, R18, R19, R20, R22, R25,
   R26, R27, R32.
 
-### [ ] T7. [P] Contrato estático del SQL de la migración
+### [x] T7. [P] Contrato estático del SQL de la migración
 - Dep: T2, T3.
 - Archivos: `tests/unit/proveedores/schema/proveedores-migration.test.ts`.
 - Lee `migration.sql` y `down.sql` como texto, con los helpers de
