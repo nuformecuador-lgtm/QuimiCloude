@@ -879,10 +879,39 @@ describe('estructura de la linea de receta', () => {
       expect(survivors).toEqual([])
 
       // Y el catalogo es una TABLA: no hay ningun tipo `enum` de Postgres de unidades.
-      const unitTypes = await tx.$queryRaw<{ typname: string }[]>`
-        SELECT t.typname FROM pg_type t
+      //
+      // ACOTADO EL 2026-09-03 POR QC-33 (`specs/QC-33-modelo-pedidos/`). Antes se traian
+      // TODOS los tipos enum de `public` y se exigia `toEqual([])`: cero enums en la base
+      // entera. Esa mitad CADUCA — no habia ninguno el dia que se escribio, pero lo que esta
+      // afirmacion vigila es que EL CATALOGO DE UNIDADES sea una tabla ampliable sin
+      // desplegar (QC-32 `design.md > 8.5`), no que la base carezca de enums. QC-33 crea
+      // `OrderStatus` y `OrderPriority` por decision cerrada 4 del humano.
+      //
+      // Lo que SIGUE VIGENTE se conserva entero, y con el mismo `toEqual([])`: lo que se
+      // filtra es el SUJETO —los enums de unidades—, no la asercion. Muere igual que antes
+      // ante un `CREATE TYPE "Unit" AS ENUM (...)`, ante cualquier nombre con pinta de
+      // unidad, y ante un enum de otro nombre cuyas etiquetas sean unidades del catalogo.
+      // NO se filtra por los nombres de QC-33: eso ataria `recetas` a `pedidos`. Y las
+      // unidades no se escriben a mano, se leen de la tabla `units`.
+      const enumTypes = await tx.$queryRaw<{ typname: string; labels: string[] }[]>`
+        SELECT t.typname,
+               array_remove(array_agg(e.enumlabel::text ORDER BY e.enumsortorder), NULL) AS labels
+        FROM pg_type t
         JOIN pg_namespace n ON n.oid = t.typnamespace
-        WHERE n.nspname = 'public' AND t.typtype = 'e'`
+        LEFT JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE n.nspname = 'public' AND t.typtype = 'e'
+        GROUP BY t.typname`
+      const unitWords = new Set(
+        (await tx.unit.findMany({ select: { name: true, symbol: true } })).flatMap((unit) =>
+          [unit.name, unit.symbol ?? ''].filter((word) => word.length > 0).map((word) => word.toUpperCase()),
+        ),
+      )
+      expect(unitWords.size, 'sin unidades en el catalogo el filtro se quedaria sin sujeto').toBeGreaterThan(0)
+      const unitTypes = enumTypes.filter(
+        (candidate) =>
+          /unit|unidad|uom|medida|measure/i.test(candidate.typname) ||
+          candidate.labels.some((label) => unitWords.has(label.toUpperCase())),
+      )
       expect(unitTypes).toEqual([])
     })
   })
