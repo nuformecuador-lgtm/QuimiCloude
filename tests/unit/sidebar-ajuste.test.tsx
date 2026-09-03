@@ -133,16 +133,16 @@ describe('barra lateral: ajuste al diseno', () => {
   });
 
   it('el contador sale del array, no de un literal del componente', () => {
-    // El menu real tambien declara uno; se comprueba con la navegacion minima para no montar
-    // la barra entera por un `textContent`.
+    // Antes esto tambien se afirmaba sobre `PRIVATE_NAV_ITEMS`: el unico item que declaraba
+    // `badge` era "Notificaciones", un placeholder de QC-11 que QC-13 retira. Ponerle un
+    // `badge` a Dashboard o Inventario solo para que este test siguiera mirando el array real
+    // seria inventar dominio no especificado — el propio comentario de `private-nav.ts` lo
+    // prohibe. La capacidad de pintar el contador desde el array sigue cubierta con la
+    // fixture `NAV_MINIMA`; cuando llegue la ficha de notificaciones reales, con su propio
+    // contador y su propio origen, ahi se podra volver a afirmar sobre el array real si aplica.
     renderSidebar(NAV_MINIMA);
 
     expect(screen.getByTestId('nav-uno-badge')).toHaveTextContent('7');
-
-    const enElMenuReal = PRIVATE_NAV_ITEMS.some(
-      (item) => item.kind === 'link' && item.badge !== undefined,
-    );
-    expect(enElMenuReal, 'ningun item del menu real declara contador').toBe(true);
   });
 
   it('un item sin contador no dibuja ninguna etiqueta', () => {
