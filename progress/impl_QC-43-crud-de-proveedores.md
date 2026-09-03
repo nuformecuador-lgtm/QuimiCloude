@@ -436,3 +436,180 @@ T13–T16 cerradas: la fachada cableada en el único sitio donde puede estarlo, 
 Actions que traducen y no deciden, el cruce por ORM vigilado contra el `dmmf` con las dos columnas
 de autor ya en el esquema, y el ciclo `migrate → rollback → migrate` ejecutado contra
 `QuimiCloude_QC43` con el estado post-rollback **idéntico** al previo, comprobado contra la base.
+
+---
+
+## Tanda 4 — la regla nueva (R48) y T17/T18 (integración contra Postgres)
+
+Alcance de esta tanda: **la decisión del humano del 2026-09-03** sobre las líneas de un proveedor
+dado de baja, más **T17 y T18**. **T19 y T20 no se empezaron** y T0–T16 no se reabrieron.
+
+Base `QuimiCloude_QC43`, con la migración de T16 ya aplicada. `.env` verificado antes de tocar
+nada: `DATABASE_URL` y `DIRECT_URL` apuntan a `QuimiCloude_QC43`, nunca a la base compartida.
+**Ninguna migración nueva**: esta tanda no crea, no aplica y no revierte ninguna.
+
+### (1) La regla nueva — R48
+
+**Qué se decidió y dónde vive.** Un proveedor dado de baja **no admite** líneas nuevas ni edición
+de las suyas; el **borrado sí** sigue permitido. La regla se implementa **en el adaptador driven**,
+que es quien define «proveedor vivo» en este módulo —igual que el filtro `deleted_at IS NULL` de
+`supplier-prisma.ts`—, no con un `if` en el caso de uso:
+
+| Operación | Cómo | Resultado del puerto |
+| --- | --- | --- |
+| `create` | `isSupplierAlive(...)` antes del `INSERT` | `'supplier_not_found'` → `NotFoundError` |
+| `updateTerms` | `where: { id, supplier: { deletedAt: null } }` | `'not_found'` → `NotFoundError` |
+| `deleteById` | **no se aplica** (ver abajo) | `'deleted'` |
+| `listBySupplierAlive` | ya lo hacía (R36) | `'supplier_not_found'` |
+
+**Ningún `code` de error nuevo.** R24 ya dice que lo inexistente **y** lo dado de baja se responden
+con «no encontrado», y `NotFoundError` (`code: 'not_found'`) es exactamente eso. Inventar un
+`supplier_deleted` habría obligado a QC-44 a distinguir dos códigos que el usuario lee igual.
+
+**Coherencia con las demás operaciones, mirada una a una:**
+
+- **Editar una línea: SÍ se rechaza.** Cambiar un precio que R36 no deja ver es la misma operación
+  mentirosa que crearlo. Aquí además sale gratis y **sin carrera**: el filtro por la relación se
+  traduce a un `UPDATE … WHERE EXISTS (…)`, una sola sentencia.
+- **Borrar una línea: NO se rechaza, y queda dicho con el porqué** (esto es lo que el encargo pedía
+  que no se decidiera en silencio). El motivo de la regla es «no aceptar una escritura cuyo efecto
+  nadie verá»; un borrado no crea nada que ver, **quita** una fila que ya nadie puede consultar ni
+  editar. Rechazarlo dejaría esas líneas atrapadas para siempre, sin ninguna operación capaz de
+  eliminarlas —y `supplier_catalog_lines` no tiene borrado lógico donde marcarlas—. El test de R48
+  **fija** esa decisión: si alguien la aplicara también al borrado, se pone rojo.
+- **Las cinco operaciones del proveedor** ya rechazaban por su cuenta: `findAliveById`,
+  `updateAlive` y `softDeleteAlive` llevan `deletedAt: null` en el `where` desde T11 (R22, R24), y
+  `listAlive` los excluye. No hacía falta tocar nada.
+- **`listCatalogLines`** ya lo hacía (R36). Ahora las **cuatro** operaciones del catálogo tratan al
+  proveedor dado de baja igual.
+
+**La carrera del `create`, declarada.** La comprobación previa **no es atómica**: entre el `SELECT`
+y el `INSERT` cabe una baja concurrente. Se asume a sabiendas —su único efecto sería una línea
+invisible que se puede borrar— porque hacerla atómica exigiría un `INSERT … SELECT` en SQL crudo
+que perdería la traducción del `23505` de la que depende R27. **No se confunde con R17/R27**, donde
+un `SELECT` previo sí sería un error: allí la base tiene un índice que lo resuelve atómicamente, y
+aquí no existe ninguna restricción capaz de expresar «el proveedor sigue vivo».
+
+**Documentos.** `requirements.md` gana **R48** al final de `## Requisitos (EARS)`, la fila 18 de la
+tabla de cobertura y **una** fila nueva —fecha 2026-09-03— al final de «Decisiones cerradas»; no se
+tocó ni se reordenó ninguna fila existente. `design.md > 7` deja de decir que
+`'supplier_not_found'` es solo el `23503` de la FK. Va en **su propio commit**.
+
+### (2) T17 — integración del proveedor
+
+`tests/integration/proveedores/supplier-crud.int.test.ts`, **11 casos**. Sigue la doctrina del
+repo (`inventario-constraints.int.test.ts` y `product-crud.int.test.ts`) **sin apartarse en nada**:
+dos estrategias de aislamiento —transacción con `ROLLBACK` + `SAVEPOINT` para lo que debe fallar,
+y siembra real con limpieza en `finally` para lo que ejercita el adaptador, que llama al cliente
+Prisma **global** y por eso no participa de la transacción del test—, SQLSTATE leído de `meta.code`
+y nunca del texto (el Postgres de esta máquina responde en español), y **ninguna afirmación
+global**: el `total` del listado se contrasta contra un `count` calculado en el momento, y los
+casos de paginación filtran por los ids que ellos mismos sembraron.
+
+Las tres reglas nuevas de base tienen aquí la primera: **R12** demuestra que **Postgres** rechaza
+el contacto en blanco al **insertar** y al **modificar**. Y la variante B de **P2** tiene su propio
+caso: un proveedor **dado de baja sí** puede quedarse sin teléfono y sin correo, que es justo lo que
+la restricción de QC-42 impedía.
+
+### (3) T18 — integración del catálogo
+
+`tests/integration/proveedores/catalog-line.int.test.ts`, **9 casos**, misma doctrina. Cierra
+**R29** (costo cero y negativo rechazados por el `CHECK` al insertar y al modificar) y **R32** (el
+autor inexistente rechazado con `23503`, y la línea sin autor admitida). En R32 los dos autores se
+escriben **por separado**: si se escribieran siempre juntos, quitar una de las dos FK dejaría el
+test verde y media regla sin vigilar —se comprobó, y por eso el caso está partido en dos—.
+
+### Efecto colateral que había que arreglar: dos casos de QC-42 en rojo
+
+`tests/integration/proveedores/proveedores-constraints.int.test.ts` (QC-42) tenía **dos casos en
+rojo desde T16**, cuando se aplicó la migración; la tanda 3 no los vio porque corrió
+`tests/unit/proveedores` y las guardias, no `tests/integration/`. Los dos son consecuencia
+**buscada** de esta ficha, no un fallo:
+
+1. `…y acepta el cero (R17)` afirmaba que un costo de **cero** se acepta. La decisión cerrada 4 de
+   QC-43 (R29) lo prohíbe. El caso ahora afirma que el cero se **rechaza** con `23514` y que el
+   cero sigue siendo válido en el **mínimo** y en el **plazo**.
+2. El **censo exhaustivo de FK** listaba cuatro; la decisión cerrada 3 (R31/R32) añadió dos más
+   hacia `users`. Se añaden al censo, que se mantiene exhaustivo **a propósito**: es lo que impide
+   que una FK nueva entre sin que nadie se entere.
+
+Los nombres de los dos tests **no se cambiaron**: son el contrato de trazabilidad de QC-42.
+
+### Trazabilidad `R<n> → test` de esta tanda, con la mutación que puso rojo cada uno
+
+Verificado **por mutación real**: romper, ver el rojo, revertir. Las mutaciones de esquema se
+aplicaron con `ALTER TABLE` sobre `QuimiCloude_QC43` y se revirtieron a su definición literal,
+comprobada después contra `pg_constraint` / `pg_indexes`.
+
+| R | Test | Mutación que lo puso rojo |
+| --- | --- | --- |
+| R7 | `supplier-crud > crea el proveedor con sus datos validos y devuelve su identificador` | `createSupplier` escribe `email: null` en vez de `data.email` |
+| R8 (mitad de adaptador) | `supplier-crud > la edicion y la baja no pisan created_by y sellan updated_by con el actor` | añadir `createdBy: actorId` al `data` del `updateMany` de `updateAliveSupplier` |
+| R12 | `supplier-crud > el CHECK rechaza con SQLSTATE 23514 el proveedor vivo sin contacto util, al insertar y al modificar` | devolver `suppliers_contact_required` a la definición de QC-42 (`phone IS NOT NULL OR email IS NOT NULL`) |
+| P2 (variante B) | `supplier-crud > un proveedor dado de baja si puede quedarse sin telefono ni correo (P2, variante B)` | quitar `deleted_at IS NOT NULL OR` del `CHECK` (variante A). Con esa mutación R12 **sigue verde**: los dos casos miden cosas distintas |
+| R15 | `supplier-crud > el nombre de un proveedor dado de baja queda libre para otro proveedor` | (esquema) quitar el `WHERE deleted_at IS NULL` del índice `suppliers_name_unique`; y (código) invertir la traducción del `23505` en `createSupplier` |
+| R17 | `supplier-crud > el indice unico parcial rechaza con SQLSTATE 23505 el segundo proveedor vivo con el mismo nombre normalizado` | `DROP INDEX suppliers_name_unique` |
+| R18 | `supplier-crud > devuelve como maximo el tamano de pagina pedido y el total de proveedores` | `take: limit + 3` en `listAliveSuppliers` |
+| R19 | `supplier-crud > usa 10 por defecto y devuelve 25 como maximo cuando se piden 100` | usar `query.pageSize ?? 10` en vez del `limit` acotado por `toOffsetLimit` (adiós al tope de 25) |
+| R21 | `supplier-crud > ordena por nombre ascendente y recorre las paginas sin repetir ni omitir ningun proveedor` | `orderBy: [{ name: 'desc' }, { id: 'asc' }]` |
+| R22 | `supplier-crud > la lista y la ficha excluyen los proveedores dados de baja` | quitar `deletedAt: null` del `where` de `findAliveSupplierById` |
+| R23 | `supplier-crud > al dar de baja conserva la fila completa y marca deleted_at` | cambiar el `updateMany` de `softDeleteAliveSupplier` por un `deleteMany` (borrado físico) |
+| R25 | `catalog-line > crea la linea del catalogo de un proveedor vivo y devuelve su identificador` | `minPurchase: null` en vez de `toDecimalInput(data.minPurchase)` en `createCatalogLine` |
+| R27 | `catalog-line > el indice unico (supplier_id, product_id) rechaza con SQLSTATE 23505 la segunda linea` | `DROP INDEX supplier_catalog_lines_supplier_id_product_id_key` |
+| R29 | `catalog-line > el CHECK rechaza con SQLSTATE 23514 la linea con costo cero o negativo, al insertar y al modificar` | `CHECK (cost >= 0)`, la definición de QC-42 |
+| R31 (mitad de adaptador) | `catalog-line > la edicion de la linea no pisa created_by y no toca ninguna columna del proveedor` | añadir `createdBy: actorId` al `data` de `updateCatalogLineTerms` |
+| R32 | `catalog-line > la FK rechaza con SQLSTATE 23503 el autor inexistente y admite la linea sin autor` | `DROP CONSTRAINT supplier_catalog_lines_created_by_fkey` (rojo) **y**, por separado, `…_updated_by_fkey` (rojo). Las dos mitades muerden |
+| R34 | `catalog-line > al dar de baja la linea su fila deja de existir y el proveedor queda intacto` | `deleteMany({ where: { id, cost: { lt: 0 } } })`: dice `'not_found'` y no borra |
+| R36 | `catalog-line > el listado del catalogo no devuelve ninguna linea de un proveedor dado de baja, aunque las filas sigan en la base` | **quitar la comprobación de proveedor vivo** de `listCatalogLinesBySupplierAlive` — el hueco que la tanda 2 declaró abierto |
+| R37 | `catalog-line > la linea de un producto dado de baja se conserva y sigue apareciendo en el catalogo de su proveedor` | filtrar el listado por productos vivos (`productId: { in: … }`), que es exactamente la «mejora» que R37 prohíbe |
+| R48 | `catalog-line > un proveedor dado de baja no admite lineas nuevas ni edicion de las suyas, y el borrado si sigue permitido` | dos mutaciones, **cada una** roja por su cuenta: quitar `isSupplierAlive` de `createCatalogLine`, y dejar `where: { id }` en `updateCatalogLineTerms` |
+
+### Los huecos que declaró la tanda anterior: cerrados
+
+- **La comprobación de proveedor vivo del listado (R36), «quitarla deja todo en verde»** →
+  **cerrado**: ahora quitarla pone rojo `catalog-line > el listado del catalogo no devuelve…`
+  (mutación D4, verificada).
+- **La mitad de R8 y R31 que dice que la edición no pisa `created_by`** → **cerrada** por los dos
+  casos de auditoría, con dos autores REALES distintos y la fila releída de Postgres.
+- **R12, R29 y R32, de integración por definición** → **cerradas**, cada una con su mutación de
+  esquema que devuelve la restricción a la forma que tenía en QC-42.
+- **P2 (el `CHECK` solo para las filas vivas)** → **probado**, y con la mutación que distingue la
+  variante A de la B.
+
+### Salida real de la verificación
+
+```
+$ pnpm typecheck        # tsc --noEmit
+(sin salida: limpio)
+
+$ pnpm lint             # eslint
+(sin salida: limpio)
+
+$ pnpm exec vitest run tests/integration/proveedores
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+
+$ pnpm exec vitest related --run \
+    lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts \
+    lib/modules/proveedores/ports/supplier-catalog-repository.ts \
+    lib/modules/proveedores/domain/create-catalog-line.ts \
+    lib/modules/proveedores/domain/update-catalog-line.ts \
+    tests/integration/proveedores/supplier-crud.int.test.ts \
+    tests/integration/proveedores/catalog-line.int.test.ts
+ Test Files  28 passed (28)
+      Tests  276 passed (276)
+
+$ pnpm exec vitest run guard tests/unit/proveedores tests/integration/proveedores
+ Test Files  26 passed (26)
+      Tests  273 passed (273)
+```
+
+No se corrió la suite completa ni `./init.sh`: es del leader. **Ninguna dependencia nueva.** No se
+abrió `app/` ni `components/`, y no se tocó `lib/modules/inventario/`.
+
+### Veredicto
+
+R48 implementada donde vive la definición de «proveedor vivo» —el adaptador—, con el borrado
+excluido a propósito y dicho en voz alta; T17 y T18 cerradas con 20 casos contra Postgres real, los
+cuatro huecos que declaró la tanda anterior cerrados, y **cada requisito con una mutación que lo
+puso rojo de verdad**.

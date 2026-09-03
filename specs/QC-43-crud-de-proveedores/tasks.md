@@ -191,16 +191,17 @@ verificado contra el árbol de la rama, no contra este documento.
       dos restricciones viejas presentes, las columnas de autor ausentes— y `_prisma_migrations`
       coherente (R39). El test estático solo lee texto; esto es la prueba.
 
-- [ ] **T17 [P] — Integración: proveedor.**
+- [x] **T17 [P] — Integración: proveedor.**
       `tests/integration/proveedores/supplier-crud.int.test.ts`, con `beforeAll` que falla claro si
       la migración no está aplicada, cada caso en `$transaction` con `ROLLBACK` y afirmaciones sobre
       **SQLSTATE**. Las operaciones que deben fallar, con `$executeRaw`.
       *Depende de:* T11, T16. **Hecho cuando:** pasa contra Postgres real y cubre R7, R12, R15, R17,
       R18, R19, R21, R22, R23. **R12 es una de las tres reglas nuevas**: su caso demuestra que la
       **base** rechaza el contacto en blanco al insertar **y** al modificar, no que `zod` lo rechazó
-      antes.
+      antes. Y como el `CHECK` es **parcial sobre las filas vivas** (P2, variante B), otro caso
+      demuestra que un proveedor **dado de baja sí** puede quedarse sin teléfono y sin correo.
 
-- [ ] **T18 [P] — Integración: catálogo.**
+- [x] **T18 [P] — Integración: catálogo.**
       `tests/integration/proveedores/catalog-line.int.test.ts`, con productos y usuarios reales
       creados dentro de la transacción.
       *Depende de:* T12, T16. **Hecho cuando:** pasa y cubre R25, R27, R29, R32, R34, R36, R37.
@@ -235,7 +236,7 @@ los cambia, cambia también aquí.
 | R5 | `tests/unit/proveedores/supplier-actions.test.ts` | `la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el rol` |
 | R6 | `tests/guards/guard-rls-force.test.ts` | `toda tabla creada en las migraciones tiene ENABLE y FORCE ROW LEVEL SECURITY` (ya existente) |
 | R7 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `crea el proveedor con sus datos validos y devuelve su identificador` |
-| R8 | `tests/unit/proveedores/supplier-service.test.ts` | `guarda al actor como autor de creacion y de modificacion al crear, y solo de modificacion al editar y al dar de baja` |
+| R8 | `tests/unit/proveedores/supplier-service.test.ts` + `tests/integration/proveedores/supplier-crud.int.test.ts` | `guarda al actor como autor de creacion y de modificacion al crear, y solo de modificacion al editar y al dar de baja` + `la edicion y la baja no pisan created_by y sellan updated_by con el actor` |
 | R9 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el nombre vacio, el de solo espacios y el que queda vacio al normalizarlo, y recorta los extremos` |
 | R10 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el nombre de mas de 120, el telefono de mas de 40 y el correo de mas de 160` |
 | R11 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el proveedor cuyo telefono y correo llegan los dos ausentes, vacios o en blanco` |
@@ -258,7 +259,7 @@ los cambia, cambia también aquí.
 | R28 | `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza el costo cero y el costo negativo antes de llegar al repositorio` |
 | R29 | `tests/integration/proveedores/catalog-line.int.test.ts` | `el CHECK rechaza con SQLSTATE 23514 la linea con costo cero o negativo, al insertar y al modificar` |
 | R30 | `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza el minimo de compra y el tiempo de entrega negativos, y admite la linea sin ninguno de los dos` |
-| R31 | `tests/unit/proveedores/catalog-service.test.ts` | `guarda al actor como autor de creacion y de modificacion de la linea, y al editarla no toca ningun dato del proveedor` |
+| R31 | `tests/unit/proveedores/catalog-service.test.ts` + `tests/integration/proveedores/catalog-line.int.test.ts` | `guarda al actor como autor de creacion y de modificacion de la linea, y al editarla no toca ningun dato del proveedor` + `la edicion de la linea no pisa created_by y no toca ninguna columna del proveedor` |
 | R32 | `tests/integration/proveedores/catalog-line.int.test.ts` | `la FK rechaza con SQLSTATE 23503 el autor inexistente y admite la linea sin autor` |
 | R33 | `tests/unit/proveedores/catalog-line-input.test.ts` + `tests/unit/proveedores/catalog-service.test.ts` | `el esquema de edicion rechaza un productId o un supplierId de mas` + `la edicion cambia solo costo, minimo y plazo` |
 | R34 | `tests/integration/proveedores/catalog-line.int.test.ts` | `al dar de baja la linea su fila deja de existir y el proveedor queda intacto` |
@@ -275,6 +276,7 @@ los cambia, cambia también aquí.
 | R45 | `tests/unit/proveedores/scope.test.ts` + `tests/unit/pagination.test.ts` | `el modulo proveedores no reimplementa el calculo de paginacion` + `usa 10 por defecto y acota a 25` (ya existente) |
 | R46 | `tests/guards/guard-dependencias-aprobadas.test.ts` | `toda dependencia de package.json esta en docs/dependencias.md` (ya existente) |
 | R47 | `tests/unit/proveedores/scope.test.ts` | `no existe ninguna pantalla, pagina ni componente de proveedores, ni spec E2E nuevo` |
+| R48 | `tests/integration/proveedores/catalog-line.int.test.ts` | `un proveedor dado de baja no admite lineas nuevas ni edicion de las suyas, y el borrado si sigue permitido` |
 
 **Guardias y tests que no hay que escribir:** R6, R19 (parte), R26 (parte), R44 (parte), R45
 (parte) y R46 los cierran guardias y tests que **ya existen**. Se citan porque un requisito sin test
