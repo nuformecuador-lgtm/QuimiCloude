@@ -237,6 +237,13 @@ requisitos anteriores.
 interfaz ni ruta bajo `app/` —van a **QC-44**—; por lo tanto esta feature no aporta ningún flujo
 navegable que un test E2E pueda visitar, y su verificación es **unitaria y de integración**.
 
+### Catálogo de un proveedor dado de baja
+
+**R48.** MIENTRAS un proveedor esté dado de baja, el sistema DEBE rechazar con un error de «no
+encontrado» tanto el alta de una línea nueva en su catálogo como la edición de cualquiera de sus
+líneas, y NO DEBE crear ni modificar ninguna fila; el **borrado** de una de esas líneas SÍ DEBE
+seguir permitido. Añadido el **2026-09-03** por decisión del humano.
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con los
@@ -261,6 +268,7 @@ requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
 | 15 | Migración con su `down.sql` que revierte al esquema exacto anterior | R39 |
 | 16 | Ninguna dependencia nueva | R46 |
 | 17 | Se llenan los puertos y adaptadores que QC-42 dejó vacíos; el cableado es exclusivo de `lib/composition` | R44 |
+| 18 | Un proveedor dado de baja no admite líneas nuevas ni edición de las suyas (2026-09-03) | R48 |
 
 Requisitos que no salen de una fila de la tabla, y de dónde salen: **R7**, **R14**, **R24**,
 **R25** y **R33** del propio alcance —los caminos felices del alta, la forma de la edición y el
@@ -344,3 +352,4 @@ reporta al leader**; no la rellena con supuestos.
 | 2026-09-03 | Migración | Con su **`down.sql` que revierte al esquema exacto anterior** (decisión 19 de QC-42), y el gate lo verifica |
 | 2026-09-03 | Dependencias nuevas | **Ninguna.** Si el diseño creyera necesitar una librería, el `backend_dev` **para y la propone**; no la instala (regla 7 de `CLAUDE.md`, y `tests/guards/guard-dependencias-aprobadas.test.ts` lo pondría en rojo) |
 | 2026-09-03 | Puertos y adaptadores | QC-42 los dejó **vacíos con `.gitkeep`** esperando a esta ficha (`design.md > 412`). Se llenan aquí, y los `.gitkeep` se borran al poner el primer archivo real. El cableado puerto→implementación es **exclusivo de `lib/composition`** |
+| 2026-09-03 | ¿Se puede añadir o editar una línea del catálogo de un proveedor **dado de baja**? | **NO: se rechaza.** La observación la dejó abierta la tanda 2 de implementación —la FK se satisface porque la fila del proveedor sigue existiendo tras la baja lógica—, y el humano la cierra el **2026-09-03**: dar de alta o cambiar un precio de un proveedor que ya no opera no significa nada, y hoy se aceptaba solo por cómo está hecha la base. El efecto era invisible (R36 ya impide que esa línea aparezca en las consultas), pero deja una operación que responde «guardado» sobre algo que nadie verá, y eso engaña a quien la use. **El borrado de esas líneas sigue permitido**: quita una fila en vez de escribir una invisible, y rechazarlo las dejaría atrapadas sin ninguna operación capaz de eliminarlas. **Sin `code` de error nuevo**: es `not_found`, el mismo que R24 da para el proveedor inexistente o dado de baja. Lo escribe **R48** |

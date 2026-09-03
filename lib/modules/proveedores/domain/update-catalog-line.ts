@@ -11,7 +11,7 @@ export type UpdateCatalogLineDeps = {
 };
 
 /**
- * Edicion de una linea del catalogo (R31, R33).
+ * Edicion de una linea del catalogo (R31, R33, R48).
  *
  * SOLO las condiciones comerciales: costo, minimo de compra y plazo de entrega. Ni el
  * proveedor ni el producto son cambiables, y no por un `if` sino porque ni el esquema de
@@ -51,6 +51,8 @@ export function createUpdateCatalogLine(
       actor.id,
       now(),
     );
+    // R48: `'not_found'` tambien llega cuando la linea existe pero su PROVEEDOR esta dado
+    // de baja. Lo decide el puerto -es quien define «proveedor vivo»-, no un `if` de aqui.
     if (result === 'not_found') throw new NotFoundError();
   };
 }

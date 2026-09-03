@@ -24,7 +24,7 @@ export type CreateCatalogLineDeps = {
 };
 
 /**
- * Alta de una linea del catalogo (R25, R26, R27, R31).
+ * Alta de una linea del catalogo (R25, R26, R27, R31, R48).
  *
  * El producto se comprueba con UNA sola llamada a `findRefs` (`design.md > 5.3`), no una
  * por linea. «No existe» y «esta dado de baja» son EL MISMO caso para este modulo:
@@ -67,8 +67,9 @@ export function createCreateCatalogLine(
     // R27: la unicidad de la pareja la garantiza el indice de la base; el adaptador
     // tradujo su 23505 a un resultado discriminado.
     if (result === 'duplicate') throw new DuplicateCatalogLineError();
-    // R25: la FK rechazo el proveedor. Para el dominio es «no encontrado», igual que un
-    // proveedor dado de baja.
+    // R25, R48: no hay proveedor VIVO con ese id -ni inexistente ni dado de baja-. Los dos
+    // casos son «no encontrado» para el dominio, exactamente como R24 los trata en el
+    // proveedor: no se inventa un `code` nuevo para algo que el usuario ya lee igual.
     if (result === 'supplier_not_found') throw new NotFoundError();
 
     return result;

@@ -121,14 +121,45 @@ export function isSupplierForeignKeyViolation(error: unknown): boolean {
 }
 
 /**
- * `create` (R25, R27, R31). Escribe `created_by` Y `updated_by` con el mismo `actorId`: al
- * nacer, el autor de la creacion y el de la ultima modificacion son la misma persona.
+ * ¿Hay un proveedor VIVO con ese id? (R48). Es la misma consulta que abre
+ * `listBySupplierAlive`, extraida para que las tres operaciones que la necesitan compartan
+ * una sola definicion de «proveedor vivo».
+ */
+async function isSupplierAlive(supplierId: string): Promise<boolean> {
+  const row = await prisma.supplier.findFirst({
+    where: { id: supplierId, deletedAt: null },
+    select: { id: true },
+  });
+  return row !== null;
+}
+
+/**
+ * `create` (R25, R27, R31, R48). Escribe `created_by` Y `updated_by` con el mismo
+ * `actorId`: al nacer, el autor de la creacion y el de la ultima modificacion son la misma
+ * persona.
+ *
+ * R48 — un proveedor DADO DE BAJA no admite lineas nuevas. La FK no basta: la fila del
+ * proveedor sigue existiendo tras la baja logica, asi que el `INSERT` pasaba y quedaba una
+ * linea que R36 no deja ver NUNCA. Decision del humano del 2026-09-03: eso es una operacion
+ * que responde «guardado» sobre algo que nadie vera, y se rechaza.
+ *
+ * La comprobacion previa es del ADAPTADOR, no del caso de uso, por el mismo motivo por el
+ * que lo es el filtro `deleted_at IS NULL`: es el puerto quien define «proveedor vivo». No
+ * es atomica -entre la lectura y el `INSERT` cabe una baja concurrente-, y esa carrera se
+ * asume a sabiendas: su unico efecto es una linea invisible que se puede borrar, mientras
+ * que hacerla atomica exigiria un `INSERT ... SELECT` en SQL crudo que perderia la
+ * traduccion del `23505` del que depende R27. No se confunde con la comprobacion de
+ * unicidad de R17/R27, que SI seria un error resolver con un `SELECT` previo: alli la base
+ * tiene un indice que lo hace atomico y aqui no hay ninguna restriccion que pueda expresar
+ * «el proveedor sigue vivo».
  */
 export async function createCatalogLine(
   data: NewCatalogLine,
   actorId: string,
   now: Date,
 ): Promise<{ id: string } | 'duplicate' | 'supplier_not_found'> {
+  if (!(await isSupplierAlive(data.supplierId))) return 'supplier_not_found';
+
   try {
     const created = await prisma.supplierCatalogLine.create({
       data: {
@@ -159,6 +190,13 @@ export async function createCatalogLine(
  * `data` no lleva `supplierId`, `productId` ni `createdBy`: la pareja es la identidad de la
  * linea y el autor de la creacion no se toca. No es que no se pasen «por ahora»; es que el
  * tipo del puerto (`CatalogLineTerms`) no los tiene.
+ *
+ * R48 — `supplier: { deletedAt: null }` en el `where`: una linea de un proveedor DADO DE
+ * BAJA tampoco se puede editar. Cambiar un precio que R36 no deja ver es la misma operacion
+ * mentirosa que crearlo. Aqui SI es atomico y sin carrera: el filtro por la relacion se
+ * traduce a un `UPDATE ... WHERE EXISTS (...)`, una sola sentencia. `count` sale 0 y el
+ * dominio recibe `'not_found'` -el mismo error que si la linea no existiera, y es correcto:
+ * R24 ya da «no encontrado» para lo inexistente Y para lo dado de baja-.
  */
 export async function updateCatalogLineTerms(
   id: string,
@@ -167,7 +205,7 @@ export async function updateCatalogLineTerms(
   now: Date,
 ): Promise<'ok' | 'not_found'> {
   const { count } = await prisma.supplierCatalogLine.updateMany({
-    where: { id },
+    where: { id, supplier: { deletedAt: null } },
     data: {
       cost: toDecimalInput(data.cost) as Prisma.Decimal,
       minPurchase: toDecimalInput(data.minPurchase),
@@ -183,6 +221,12 @@ export async function updateCatalogLineTerms(
  * `deleteById` (R34). Borrado FISICO: la fila deja de existir. `deleteMany` en vez de
  * `delete` por la misma razon de siempre -devolver `'not_found'` en vez de lanzar- y porque
  * la linea no tiene borrado logico donde marcar nada (decision 11 de QC-42).
+ *
+ * R48 NO se aplica aqui, y es deliberado: borrar la linea de un proveedor dado de baja SI
+ * significa algo -quita una fila que ya nadie puede ver ni editar-, asi que no hay ninguna
+ * respuesta mentirosa que evitar. Rechazarlo dejaria esas filas atrapadas para siempre, sin
+ * ninguna operacion capaz de eliminarlas. El motivo de la regla nueva es «no aceptar una
+ * escritura cuyo efecto nadie vera»; un borrado no crea nada que ver.
  */
 export async function deleteCatalogLineById(id: string): Promise<'deleted' | 'not_found'> {
   const { count } = await prisma.supplierCatalogLine.deleteMany({ where: { id } });
@@ -205,11 +249,7 @@ export async function listCatalogLinesBySupplierAlive(
   supplierId: string,
   query: PageQuery,
 ): Promise<Page<CatalogLineView> | 'supplier_not_found'> {
-  const proveedorVivo = await prisma.supplier.findFirst({
-    where: { id: supplierId, deletedAt: null },
-    select: { id: true },
-  });
-  if (proveedorVivo === null) return 'supplier_not_found';
+  if (!(await isSupplierAlive(supplierId))) return 'supplier_not_found';
 
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
   const where: Prisma.SupplierCatalogLineWhereInput = { supplierId };

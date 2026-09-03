@@ -18,7 +18,12 @@ import type { Page, PageQuery } from '../domain/page';
 export interface SupplierCatalogRepository {
   /**
    * `'duplicate'` = la pareja (proveedor, producto) ya tiene linea (R27);
-   * `'supplier_not_found'` = la FK a `suppliers` rechazo la escritura (R25).
+   * `'supplier_not_found'` = **no hay ningun proveedor VIVO con ese id** (R25, R48): ni
+   * porque no exista -la FK a `suppliers` rechaza la escritura- ni porque este dado de
+   * baja. Los dos casos son el mismo para el dominio, que los traduce a «no encontrado»
+   * igual que R24 hace con el proveedor. Un proveedor dado de baja **no admite lineas
+   * nuevas**: la fila sigue en la base tras la baja logica, asi que sin esta comprobacion
+   * el alta se aceptaria y crearia una linea que R36 no deja ver nunca.
    */
   create(
     data: NewCatalogLine,
@@ -26,7 +31,14 @@ export interface SupplierCatalogRepository {
     now: Date,
   ): Promise<{ id: string } | 'duplicate' | 'supplier_not_found'>;
 
-  /** Solo las condiciones comerciales (R33): ni proveedor ni producto son cambiables. */
+  /**
+   * Solo las condiciones comerciales (R33): ni proveedor ni producto son cambiables.
+   *
+   * `'not_found'` cubre tanto la linea inexistente como la de un proveedor DADO DE BAJA
+   * (R48): editar el precio de un proveedor que ya no opera es la misma escritura sin
+   * efecto visible que crearlo. El BORRADO de la linea si sigue permitido -quita una fila
+   * en vez de escribir uno que nadie vera-, y por eso `deleteById` no lo comprueba.
+   */
   updateTerms(
     id: string,
     data: CatalogLineTerms,

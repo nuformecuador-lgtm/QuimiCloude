@@ -508,6 +508,23 @@ Claves, casi todas heredadas de QC-20 § 7:
   dominio (R22, R36), y así ningún caso de uso puede olvidarlo. `listBySupplierAlive` es lo que
   hace verdadera la decisión 7: comprueba que el **proveedor** esté vivo antes de devolver sus
   líneas, aunque las líneas no tengan borrado lógico propio.
+- **Un proveedor dado de baja no admite escrituras nuevas en su catálogo (R48).** *Decisión del
+  humano del 2026-09-03, posterior a la primera redacción de este diseño.* `'supplier_not_found'`
+  del `create` significa **«no hay ningún proveedor vivo con ese id»**, no solo «la FK falló»: la
+  fila del proveedor sigue existiendo tras la baja lógica, así que la FK por sí sola aceptaba el
+  alta y dejaba una línea que R36 no deja ver **nunca** —una operación que responde «guardado»
+  sobre algo que nadie verá—. El adaptador comprueba que el proveedor esté vivo antes del
+  `INSERT`; **no es atómico** y la carrera se asume: su único efecto sería una línea invisible que
+  se puede borrar, y hacerla atómica exigiría un `INSERT … SELECT` en SQL crudo que perdería la
+  traducción del `23505` de la que depende R27. No se confunde con R17/R27, donde el `SELECT`
+  previo **sí** estaría mal: allí hay un índice que lo resuelve atómicamente y aquí no existe
+  ninguna restricción capaz de expresar «el proveedor sigue vivo».
+  **`updateTerms` aplica la misma regla** —`supplier: { deletedAt: null }` en el `where`, una sola
+  sentencia, sin carrera— y devuelve `'not_found'`: cambiar un precio que R36 no deja ver es la
+  misma escritura mentirosa. **`deleteById` NO la aplica, a propósito**: borrar quita una fila que
+  ya nadie puede ver ni editar, no crea nada invisible, y rechazarlo dejaría esas líneas atrapadas
+  sin ninguna operación capaz de eliminarlas. **Ningún `code` de error nuevo**: los tres casos son
+  `not_found`, exactamente como R24 trata al proveedor inexistente y al dado de baja.
 - **Resultados discriminados, no excepciones de Prisma.** El adaptador traduce los SQLSTATE:
   `23505` sobre `suppliers_name_unique` → `'duplicate'`; `23505` sobre
   `supplier_catalog_lines_supplier_id_product_id_key` → `'duplicate'`; `23503` → `'supplier_not_found'`
