@@ -480,22 +480,26 @@ describe('contrato de la ruta de recetas', () => {
       });
       diff = salida.split('\n').map((linea) => linea.trim()).filter((linea) => linea.length > 0);
     } catch {
-      // Si el rango de git no esta disponible en el entorno de test, se declara aqui en vez de
-      // fallar en silencio: el equipo que corra esto sin `origin/dev` alcanzable lo vera en el
-      // reporte, no en un test verde que no comprobo nada.
+      // El rango no esta disponible. NO se deja en verde: `diff` queda vacio a proposito y la
+      // asercion de abajo pone el caso ROJO diciendolo. Un entorno sin `origin/dev` alcanzable
+      // no es un entorno donde esta guardia se cumpla: es uno donde no se ha comprobado nada.
       diff = [];
     }
 
-    if (diff.length > 0) {
-      const tocaRecetas = diff.filter((ruta) => ruta.startsWith('lib/modules/recetas/'));
-      const tocaDb = diff.filter((ruta) => ruta.startsWith('db/'));
-      expect(tocaRecetas, 'ningun archivo de lib/modules/recetas/ deberia estar en el diff').toEqual(
-        [],
-      );
-      expect(tocaDb, 'ningun archivo de db/ deberia estar en el diff').toEqual([]);
-    } else {
-      expect(diff).toEqual([]);
-    }
+    // Esta rama cambia decenas de archivos: un diff vacio significa que el rango no estaba
+    // disponible, no que no haya cambios. Sin esto el caso podia acabar en verde sin haber
+    // mirado un solo archivo.
+    expect(
+      diff.length,
+      'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
+    ).toBeGreaterThan(0);
+
+    const tocaRecetas = diff.filter((ruta) => ruta.startsWith('lib/modules/recetas/'));
+    const tocaDb = diff.filter((ruta) => ruta.startsWith('db/'));
+    expect(tocaRecetas, 'ningun archivo de lib/modules/recetas/ deberia estar en el diff').toEqual(
+      [],
+    );
+    expect(tocaDb, 'ningun archivo de db/ deberia estar en el diff').toEqual([]);
   });
 
   it('package.json solo incorpora los tres paquetes de arrastre aprobados y sus filas declaran el check fallido', () => {
@@ -683,6 +687,21 @@ describe('contrato de la ruta de recetas', () => {
     expect(existsSync(join(RAIZ, LAYOUT_PRIVADO_PATH))).toBe(true);
     expect(existsSync(join(RAIZ, 'components', 'private', 'app-sidebar.tsx'))).toBe(true);
 
+    // Lo que R51 pide de ESTA feature es que la ruta de recetas no declare layout propio y
+    // herede el de la zona privada. Contar los `layout.tsx` de `app/(private)` entera seria
+    // afirmar sobre terreno de otras features: el dia que una ficha legitima anada un layout
+    // anidado en SU ruta, este test se pondria rojo sin que nada de QC-26 estuviera mal.
+    // La carpeta se DERIVA de `FORMULAS_ROUTE` (`CARPETA_RUTA`), nunca de un literal a mano.
+    expect(existsSync(join(RAIZ, CARPETA_RUTA)), `deberia existir ${CARPETA_RUTA}`).toBe(true);
+    expect(
+      FUENTES_DE_LA_RUTA.length,
+      `${CARPETA_RUTA} no tiene fuentes: el censo de layouts no comprobaria nada`,
+    ).toBeGreaterThan(0);
+    expect(
+      FUENTES_DE_LA_RUTA.filter((ruta) => ruta.endsWith('/layout.tsx')),
+      `ningun archivo bajo ${CARPETA_RUTA} puede ser un layout: la ruta hereda el de la zona privada`,
+    ).toEqual([]);
+
     for (const ruta of FUENTES_DE_LA_RUTA) {
       expect(ruta, 'la ruta no declara su propio layout').not.toContain('/layout.tsx');
       expect(ruta, 'la ruta no re-crea la barra lateral').not.toContain('sidebar');
@@ -690,9 +709,6 @@ describe('contrato de la ruta de recetas', () => {
 
     ningunArchivoContiene(['<main', 'SidebarInset', 'SidebarProvider', 'AppSidebar']);
 
-    expect(
-      fuentesBajo(join('app', '(private)')).filter((ruta) => ruta.endsWith('/layout.tsx')),
-    ).toHaveLength(1);
     expect(
       fuentesBajo('lib').filter((ruta) =>
         fuenteSinComentarios(ruta).includes('export const PRIVATE_NAV_ITEMS'),

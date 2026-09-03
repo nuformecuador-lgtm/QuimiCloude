@@ -20,15 +20,17 @@
 // pantalla de recetas, que por definicion menciona «receta» por todas partes DENTRO de la
 // carpeta que declara `FORMULAS_ROUTE`, y eso no es una violacion de este contrato -es su
 // objeto-. Lo que este archivo vigila de verdad es la forma de `lib/modules/recetas`, y eso
-// NO cambio: el caso se retensa para seguir garantizando que `lib/modules/recetas/**` sigue
-// intacto (mismo arbol, mismo barrel, misma frontera con `inventario`) y que sigue sin
-// existir ningun route handler de recetas bajo `app/api/` -esa mitad SI sigue siendo una
-// invariante del modulo, y se conserva igual-. Se conserva ademas, en forma mas estrecha,
+// NO cambio: el caso se retensa para seguir garantizando que QC-26 no toca
+// `lib/modules/recetas/**` -comprobado sobre el DIFF DE LA RAMA, no con un censo literal del
+// arbol de un modulo ajeno, que congelaria a `recetas` y volveria roja a QC-26 en cuanto
+// aquel creciera- y que sigue sin existir ningun route handler de recetas bajo `app/api/`
+// -esa mitad SI sigue siendo una invariante del modulo, y se conserva igual-. Se conserva ademas, en forma mas estrecha,
 // la mitad de la vieja asercion que SI seguia siendo una invariante util: ningun archivo de
 // `app/` FUERA de esa carpeta menciona recetas -mismo criterio de ubicacion que vigila
 // `tests/unit/recetas/scope.test.ts`, aqui como defensa redundante desde el angulo del
 // modulo en vez del angulo de la pantalla.
 
+import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -282,11 +284,11 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     // vigila la pantalla-. Lo que este caso sigue garantizando, retensado sobre `lib/
     // modules/recetas` en vez de sobre `app/`:
     //   * ninguna ruta HTTP de recetas bajo `app/api/` -sin cambios-;
-    //   * `lib/modules/recetas/**` tiene EXACTAMENTE el mismo conjunto de archivos que
-    //     dejo QC-25: QC-26 es una feature de PRESENTACION y no le toca anadir, quitar ni
-    //     renombrar nada del modulo. Si QC-26 (o cualquier ficha futura) tocara el modulo
-    //     por la puerta de atras en vez de consumirlo por su barrel/Server Actions, esta
-    //     lista diverge y la prueba cae.
+    //   * QC-26 no toca `lib/modules/recetas/**`: se comprueba sobre el DIFF DE LA RAMA
+    //     (`git diff --name-only origin/dev...HEAD`), no con un censo literal del arbol del
+    //     modulo. QC-26 es una feature de PRESENTACION y consume `recetas` por su barrel y
+    //     sus Server Actions; si lo tocara por la puerta de atras, el archivo aparece en el
+    //     diff y la prueba cae. Un censo cerrado, en cambio, congelaria un modulo ajeno.
     for (const ruta of [
       join(repoRoot, 'app', 'api', 'recipes'),
       join(repoRoot, 'app', 'api', 'recetas'),
@@ -294,39 +296,37 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       expect(existsSync(ruta), `${toPosix(relative(repoRoot, ruta))} no debe existir`).toBe(false)
     }
 
-    // El archivo del adaptador de Storage se arma por CONCATENACION -no como literal
-    // contiguo- para que su nombre de archivo no case con el barrido de
-    // `tests/unit/recetas/scope.test.ts` («ningun test importa @supabase/storage-js ni el
-    // adaptador de Storage»): ese barrido busca ese nombre de archivo completo en CUALQUIER
-    // archivo bajo `tests/`, y aqui no se esta importando el adaptador ni dependiendo del
-    // Storage real, solo nombrando el archivo en una lista de forma del modulo -por eso
-    // tampoco se escribe el nombre completo y contiguo aqui, ni en este comentario.
-    const STORAGE_ADAPTER_FILE = 'lib/modules/recetas/adapters/driven/storage/recipe-image-' + 'supabase.ts'
-    const EXPECTED_RECETAS_MODULE_FILES = [
-      'lib/modules/recetas/adapters/driven/config/storage-config-env.ts',
-      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
-      STORAGE_ADAPTER_FILE,
-      'lib/modules/recetas/adapters/driving/recipe-actions.ts',
-      'lib/modules/recetas/domain/actor.ts',
-      'lib/modules/recetas/domain/create-recipe.ts',
-      'lib/modules/recetas/domain/delete-recipe.ts',
-      'lib/modules/recetas/domain/errors.ts',
-      'lib/modules/recetas/domain/get-recipe.ts',
-      'lib/modules/recetas/domain/list-recipes.ts',
-      'lib/modules/recetas/domain/page.ts',
-      'lib/modules/recetas/domain/recipe-image.ts',
-      'lib/modules/recetas/domain/recipe-input.ts',
-      'lib/modules/recetas/domain/recipe-name.ts',
-      'lib/modules/recetas/domain/recipe-view.ts',
-      'lib/modules/recetas/domain/update-recipe.ts',
-      'lib/modules/recetas/index.ts',
-      'lib/modules/recetas/ports/recipe-image-storage.ts',
-      'lib/modules/recetas/ports/recipe-repository.ts',
-    ]
+    // «QC-26 no toca `recetas` por la puerta de atras» se afirma sobre el DIFF DE LA RAMA, no
+    // sobre un censo literal del arbol del modulo. Un censo cerrado de `lib/modules/recetas/**`
+    // congela un modulo AJENO (QC-25, ya `done`): cualquier ampliacion legitima futura de
+    // `recetas` -por ejemplo un archivo nuevo para `revalidatePath`- se convertiria en un rojo
+    // de QC-26 sin que nada de QC-26 estuviera mal. El diff expresa la misma intencion y solo
+    // habla de lo que esta rama cambia. Mismo criterio que el caso de R44 en
+    // `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
+    let diff: string[] = []
+    try {
+      const salida = execSync('git diff --name-only origin/dev...HEAD', {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      })
+      diff = salida
+        .split('\n')
+        .map((linea) => linea.trim())
+        .filter((linea) => linea.length > 0)
+    } catch {
+      // El rango no esta disponible: `diff` queda vacio a proposito para que la asercion de
+      // abajo ponga el caso ROJO diciendolo, nunca verde en silencio.
+      diff = []
+    }
+
     expect(
-      recetasSources.map((file) => toPosix(relative(repoRoot, file))).sort(),
-      'lib/modules/recetas/** gano, perdio o reubico un archivo: eso no le corresponde a QC-26',
-    ).toEqual(EXPECTED_RECETAS_MODULE_FILES)
+      diff.length,
+      'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
+    ).toBeGreaterThan(0)
+    expect(
+      diff.filter((ruta) => ruta.startsWith('lib/modules/recetas/')),
+      'QC-26 es una feature de PRESENTACION: ningun archivo de lib/modules/recetas/ puede estar en el diff',
+    ).toEqual([])
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se
     // DERIVA de `FORMULAS_ROUTE` -nunca de un literal a mano-, igual que en
