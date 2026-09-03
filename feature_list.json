@@ -536,7 +536,7 @@
       "epic_name": "Proveedores",
       "name": "crud-de-proveedores",
       "description": "Alta, consulta, edicion y baja de proveedores y de las lineas de su catalogo de productos. Solo el Administrador. Valida las reglas del modelo: al menos telefono o correo -y ni uno ni otro valen en blanco-, un producto una sola vez por proveedor, y costo mayor que cero. Trae tres cambios de esquema sobre QC-42, baratos porque las tablas estan vacias: la restriccion de contacto pasa a rechazar el texto en blanco, el costo deja de admitir cero, y la linea del catalogo gana columnas de autor para que subir un precio deje rastro. El catalogo de un proveedor se consulta con un listado propio paginado. La baja es definitiva de cara al usuario y se lleva sus lineas de las consultas. La pantalla va aparte (QC-44).",
-      "status": "spec_ready",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",

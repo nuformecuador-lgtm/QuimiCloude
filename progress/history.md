@@ -1369,3 +1369,83 @@ caso. Cierra en la práctica la pregunta abierta 2.
   tiene tarjeta**.
 - **El menú quedó con tres entradas** —Dashboard, Inventario y Producción con un solo hijo—, y
   nadie ha decidido si una sección de un elemento se justifica.
+
+---
+
+## QC-43 — crud-de-proveedores (backend · épica QC-41 Proveedores) — cerrada el 2026-09-03
+
+Mergeada por el humano en el **PR #28** (merge `760e3eb` en `dev`). Worktree desmontado, rama
+borrada y **base propia `QuimiCloude_QC43` eliminada**. **48 requisitos (R1–R48), 21 tareas,
+33 commits.** `reviewer`: **APROBADO, 0 mayores, 5 menores**, tras aplicar **catorce mutaciones
+propias** sin fiarse de la bitácora. Llena los puertos y adaptadores que QC-42 dejó vacíos con
+`.gitkeep`.
+
+### Lo que esta feature enseña
+
+**1. El acotado previo volvió a pagarse, y esta vez cambió el alcance dos veces antes de escribir
+una línea.** `/afinar-feature` cerró 16 decisiones. Dos rompían la ficha del board: los permisos
+pasaron de «usuarios con sesión iniciada» a **solo Administrador**, y aparecieron **tres cambios de
+esquema** sobre QC-42. Las dos se escribieron en el issue **antes** de sembrar.
+
+**2. Prisma propuso borrar todas las claves foráneas entre módulos.** `migrate dev --create-only`
+generó **diez `DROP CONSTRAINT`** sobre cinco tablas de tres features ya mergeadas. Nadie los
+pidió: la causa es que esas FK son **escalares sin `@relation`**, convención deliberada del repo
+para que un módulo no arrastre el modelo de otro, así que Prisma no las ve en el schema y las lee
+como sobras. Aplicarlas habría dejado la base **sin integridad referencial entre módulos y con los
+tests en verde**, porque comprueban el camino feliz, no que la restricción exista. **Se salvó
+porque un agente leyó el SQL línea a línea** y lo dejó vigilado con dos tests. Eso es criterio
+individual, no arnés: está anotado como deuda.
+
+**3. Un `CHECK` que evalúa a `NULL` se cumple.** La restricción de contacto necesita
+`COALESCE(btrim(...), '') <> ''`: sin el `COALESCE`, `btrim(NULL) <> ''` da `NULL` y la restricción
+**deja pasar justo la fila que existe para bloquear**. Un test que solo probara el caso feliz no lo
+vería nunca. Tiene su test de sensibilidad.
+
+**4. El nombre del rol `Administrador` ya tenía dueño, y llevaba dos features duplicado.**
+`identity` exporta `ROLE_ADMINISTRADOR` desde `domain/roles.ts`, cuyo comentario dice que es para
+«cualquier otro archivo que necesite nombrar uno de ellos». Aun así **`inventario` y `recetas`
+redeclararon cada uno el suyo** con el mismo literal. Tres constantes para lo mismo. QC-43 usa la
+buena; unificar las otras dos es ficha propia, propuesta. De paso: si esto se hubiera visto por la
+mañana, la regla ruta→rol de QC-22 no habría importado el barrel de `inventario` y **una de las dos
+guardias que hicieron parar aquella feature no habría saltado**.
+
+**5. Un agente se negó a extender una regla aprobada, con razón.** El humano decidió rechazar el
+alta de líneas para un proveedor dado de baja. Al preguntarle si valía también para editar y
+borrar, el agente extendió **editar** y **excluyó borrar**, argumentando que un borrado no crea
+nada invisible —**quita** una fila que ya nadie puede ver ni editar— y que rechazarlo dejaría esas
+líneas atrapadas para siempre, porque la tabla no tiene borrado lógico donde marcarlas. **Fijó la
+exclusión con un test**, y el `reviewer` verificó que extenderla al borrado lo pone rojo.
+
+**6. Repartir en bloques desde el principio funcionó.** Cinco tandas de tres a seis tareas, cada
+una leyendo solo las secciones del spec que sus tareas referencian. **Ninguna caída por `529`**,
+frente a las dos de QC-22 con un implementer monolítico. Pero tuvo un coste que conviene recordar:
+**una tanda dejó rojos dos tests de integración de QC-42 y no lo vio**, porque corrió `tests/unit` y
+guardias pero no `tests/integration/`. Lo cazó la tanda siguiente. **Al partir en bloques, un
+bloque puede dejar rojo lo que otro no mira.**
+
+**7. Una guardia que medía el vehículo y no el efecto — tercera vez en tres días.** T19 probó quince
+mutaciones; catorce enrojecieron y **una no**: una ruta bajo `app/api/` que consumiera la fachada de
+`lib/composition` se le escapaba al test de alcance, que buscaba el **import del módulo** en vez de
+su **consumo**. Mismo patrón que la guardia de QC-22 que medía por archivo y no por control.
+
+**8. El ciclo de la migración se comprobó contra la base, no leyendo el SQL.** Censo de columnas,
+restricciones con su definición, índices, RLS y `_prisma_migrations` en tres momentos: el estado
+tras el rollback es **idéntico línea por línea** al previo, con las dos restricciones de QC-42 de
+vuelta con su definición literal.
+
+### Lo que deja abierto
+
+- **El gate no pudo completarse en el PR, y no por esta feature**: el validador corta con «faltan
+  specs para features sdd en vuelo: QC-26», porque `dev` marca esa ficha `spec_ready` y su spec no
+  está en `dev` ni en ninguna rama remota. Se corrió a mano lo mismo que el gate —typecheck, lint y
+  **1411 tests en 130 archivos**, todos verdes, ya con `dev` mergeado— y se dijo así en el PR, sin
+  fingir un gate verde.
+- **QC-44** (pantalla de proveedores) queda desbloqueada, y trae el E2E que esta ficha difirió con
+  motivo.
+- **QC-52** nació de una decisión posterior del humano: el producto deja de guardar costo, mínimo de
+  compra y tiempo de entrega, que ya viven en la línea del catálogo. **Cierra la pregunta abierta 3
+  de QC-42** —hoy conviven dos costos que nadie concilia— y arrastra la pantalla de QC-22.
+- **Cuatro preguntas abiertas**, ninguna bloqueante: dónde vive a largo plazo el nombre del rol, en
+  qué se mide el mínimo de compra (la unidad es opcional desde QC-32), quién concilia los dos costos
+  —que QC-52 responde— y que **el alta de línea no es atómica**, declarado con el motivo de por qué
+  hacerlo atómico costaría perder la traducción del error de duplicado.
