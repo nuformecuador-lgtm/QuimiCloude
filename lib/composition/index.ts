@@ -59,6 +59,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import { createSeedStarterUnits } from '@/lib/modules/unidades';
+import { unitSeedRepositoryPrisma } from '@/lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -147,4 +149,17 @@ export const inventario = {
   updatePresentation: createUpdatePresentation({ presentations: presentationRepository }),
   deletePresentation: createDeletePresentation({ presentations: presentationRepository }),
   listPresentations: createListPresentations({ presentations: presentationRepository }),
+} as const;
+
+/**
+ * Fachada del modulo `unidades` ya cableada (QC-32 T5, `design.md > 5.4`). Hoy solo ata el
+ * seed arrancador: es el unico puerto con adaptador que la ficha construye — el
+ * `UnitCatalog` que publica el contrato lo implementa y cablea QC-38, cuando haya
+ * consumidor.
+ *
+ * `seedStarterUnits` es invocable sin argumentos: el repositorio ya esta atado aqui. Solo
+ * lo consume `scripts/seed.ts`.
+ */
+export const unidades = {
+  seedStarterUnits: createSeedStarterUnits({ repository: unitSeedRepositoryPrisma }),
 } as const;

@@ -125,20 +125,30 @@ const RECIPE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
 ]
 
-/** Cada campo escalar de `RecipeLine`, con su columna (R28). */
+/** Cada campo escalar de `RecipeLine`, con su columna (R28).
+ *
+ *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La linea sigue
+ *  teniendo los mismos siete escalares y uno de ellos sigue siendo la unidad; cambia su
+ *  forma: `unit`/`unit` (TEXT) pasa a `unitId`/`unit_id` (UUID con FK hacia `units`). */
 const RECIPE_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['recipeId', 'recipe_id'],
   ['productId', 'product_id'],
   ['quantity', 'quantity'],
-  ['unit', 'unit'],
+  ['unitId', 'unit_id'],
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
 ]
 
-/** Los tres escalares que cruzan de modulo y por eso NO llevan `@relation` (R19). */
+/** Los escalares que cruzan de modulo y por eso NO llevan `@relation` (R19).
+ *
+ *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Eran tres; son cuatro.
+ *  `unitId` es una frontera de modulo NUEVA -de `recetas` hacia `unidades`- y se somete
+ *  exactamente al mismo criterio que ya se aplicaba a `productId`: escalar uuid, sin
+ *  `@relation`, con la FK escrita a mano en el SQL (QC-32 R18). */
 const CROSS_MODULE_SCALARS: ReadonlyArray<readonly [PrismaModel, string, string]> = [
   [recipeLine, 'productId', 'product_id'],
+  [recipeLine, 'unitId', 'unit_id'],
   [recipe, 'createdBy', 'created_by'],
   [recipe, 'updatedBy', 'updated_by'],
 ]
@@ -190,8 +200,12 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
         /@db\.\w+/,
       )
     }
-    // Tampoco en la linea: `unit` es texto libre sin tope declarado.
-    expect(field(recipeLine, 'unit').attributes).not.toMatch(/@db\.(VarChar|Char)\s*\(/)
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La linea ya no
+    // guarda texto de unidad al que le pudiera faltar un tope: guarda un uuid. Lo que este
+    // caso vigilaba de ella -que no se declare `varchar(n)`- se conserva sobre `unitId`, y
+    // ademas se afirma que su tipo nativo es el que le toca.
+    expect(field(recipeLine, 'unitId').attributes).not.toMatch(/@db\.(VarChar|Char)\s*\(/)
+    expect(field(recipeLine, 'unitId').attributes).toContain('@db.Uuid')
   })
 
   it('steps es un unico campo Json y no existe ningun modelo de paso', () => {
@@ -279,7 +293,10 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     expect(id.attributes).toContain('@db.Uuid')
     expect(recipeLine.body).not.toMatch(/@@id\(/)
 
-    for (const fieldName of ['recipeId', 'productId', 'quantity', 'unit'] as const) {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva intacto
+    // lo que R10 vigila aqui -la linea es entidad propia con datos propios, y la unidad es
+    // uno de ellos y es OBLIGATORIA (QC-32 R11)-; solo cambia el nombre del campo.
+    for (const fieldName of ['recipeId', 'productId', 'quantity', 'unitId'] as const) {
       const candidate = field(recipeLine, fieldName)
       expect(candidate.isOptional, `RecipeLine.${fieldName} no puede ser opcional`).toBe(false)
     }
@@ -316,18 +333,35 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     }
   })
 
-  it('unit de la linea es String obligatorio y no hay enum ni catalogo de unidades', () => {
-    // R15 y decision cerrada 9: texto libre obligatorio y anotativo. No se toma del
-    // producto, no se convierte y no hay conjunto cerrado de valores admitidos.
-    const unit = field(recipeLine, 'unit')
-    expect(unit.type).toBe('String')
-    expect(unit.isOptional).toBe(false)
-    expect(unit.attributes).not.toMatch(/@default\(/)
+  it('la unidad de la linea es obligatoria, es referencia al catalogo y sigue siendo anotativa', () => {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este es el unico
+    // caso del archivo cuyo VEREDICTO cambia, y cambia POR DISENO: afirmaba «no hay enum ni
+    // catalogo de unidades», y el catalogo es justo lo que el humano decidio crear. R15 de
+    // QC-24 decia «texto libre» porque el catalogo no existia; esa mitad caduca.
+    //
+    // Lo que R15 vigilaba y SIGUE VIGENTE se conserva entero aqui:
+    //   - la unidad de la linea sigue siendo OBLIGATORIA (QC-32 R11): sin `?` y sin
+    //     `@default`, que rellenaria el hueco en silencio;
+    //   - sigue siendo ANOTATIVA (QC-32 R14): ninguna columna de factor, conversion, ratio
+    //     ni unidad base, y nada la deriva de la unidad del producto -no hay ni un campo
+    //     que relacione ambas-;
+    //   - el esquema sigue sin declarar ningun `enum`: el catalogo es una tabla, que se
+    //     puede ampliar sin desplegar (QC-32 `design.md > 8.5`);
+    //   - y no queda ninguna columna `unit` de texto en la linea (QC-32 R11).
+    const unitId = field(recipeLine, 'unitId')
+    expect(unitId.type).toBe('String')
+    expect(unitId.isOptional).toBe(false)
+    expect(unitId.attributes).not.toMatch(/@default\(/)
+    expect(unitId.attributes).toContain('@db.Uuid')
+    expect(unitId.attributes).toContain('@map("unit_id")')
+    // Escalar SIN `@relation`, igual que `productId`: la FK real vive en el SQL y `recetas`
+    // no puede leer la tabla de `unidades` con un `include` (QC-32 R18).
+    expect(unitId.attributes).not.toMatch(/@relation/)
 
     expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)
-    expect(has(recipeLine, 'unitId')).toBe(false)
-    expect(recipeLine.body).not.toMatch(/unit_id/)
-    // Ninguna columna de conversion entre unidades.
+    expect(has(recipeLine, 'unit')).toBe(false)
+    expect(recipeLine.body).not.toMatch(/^\s*unit\s+String/m)
+    // Ninguna columna de conversion entre unidades, ni en la linea ni en el catalogo.
     for (const forbidden of ['factor', 'conversion', 'ratio', 'baseUnit']) {
       expect(has(recipeLine, forbidden), `RecipeLine.${forbidden} no debe existir`).toBe(false)
     }
@@ -493,10 +527,15 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     const indexMaps = [...recipe.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g)]
       .concat([...recipeLine.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g)])
       .map((match) => match[1])
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
+    // este caso vigila -que TODO indice de los dos modelos este en ingles y que la lista sea
+    // cerrada, para que anadir uno a escondidas ponga el test rojo-; solo se suma el indice
+    // de la FK nueva `recipe_lines_unit_id_idx` (QC-32 R20).
     expect(indexMaps).toEqual([
       'recipes_created_by_idx',
       'recipes_updated_by_idx',
       'recipe_lines_product_id_idx',
+      'recipe_lines_unit_id_idx',
     ])
     expect(recipeLine.body).toMatch(/map:\s*"recipe_lines_recipe_id_product_id_key"/)
   })

@@ -138,6 +138,24 @@ async function createTestPresentation(db: Db, name = `Bidon ${token()}`): Promis
 }
 
 /**
+ * Unidad REAL de apoyo.
+ *
+ * 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. `products.unit_id`
+ * tiene FK (`products_unit_id_fkey`), asi que ya no vale escribir el texto 'kg' ni inventar
+ * un uuid -la base lo rechazaria con 23503-: la unidad se crea de verdad y se borra en el
+ * `finally`, como el resto de datos de apoyo de este archivo. El nombre lleva `token()`
+ * porque `units.name_normalized` tiene indice unico.
+ */
+async function createTestUnit(db: Db, symbol: string | null = 'kg'): Promise<string> {
+  const name = `unidad ${token()}`;
+  const unit = await db.unit.create({
+    data: { name, nameNormalized: normalizeForTest(name), symbol },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
+/**
  * Usuario REAL completo (tipo de documento + rol + usuario), necesario para R7: la FK de
  * auditoria exige una referencia que exista de verdad. Marcado con `token()` porque
  * `users` tiene indices unicos parciales sobre correo, usuario y documento (QC-4).
@@ -405,10 +423,14 @@ describe('R8 / D20: el listado no resuelve nombres de autor', () => {
 describe('R15: el borrado logico conserva la fila', () => {
   it('al borrar conserva la fila y marca deleted_at', async () => {
     const presentationId = await createTestPresentation(prisma);
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El producto de este
+    // caso nace CON unidad -igual que antes, cuando era `unit: 'kg'`- porque lo que R15
+    // vigila es que el borrado logico no pierda ningun dato de la fila, la unidad incluida.
+    const unitId = await createTestUnit(prisma);
     let productId: string | null = null;
 
     try {
-      const input: NewProduct = { ...baseProductInput({ stock: 9, unit: 'kg' }), presentationId };
+      const input: NewProduct = { ...baseProductInput({ stock: 9, unitId }), presentationId };
       const created = await createProduct(input, sharedActorId, new Date());
       productId = created.id;
 
@@ -424,7 +446,8 @@ describe('R15: el borrado logico conserva la fila', () => {
       expect(after.id).toBe(created.id);
       expect(after.name).toBe(before.name);
       expect(after.stock).toBe(before.stock);
-      expect(after.unit).toBe(before.unit);
+      expect(after.unitId).toBe(before.unitId);
+      expect(after.unitId).toBe(unitId);
       expect(after.deletedAt).not.toBeNull();
       expect(after.deletedAt).toBeInstanceOf(Date);
     } finally {
@@ -432,6 +455,9 @@ describe('R15: el borrado logico conserva la fila', () => {
         await prisma.product.deleteMany({ where: { id: productId } });
       }
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
+      // La unidad se borra DESPUES del producto: `products_unit_id_fkey` es ON DELETE
+      // RESTRICT (QC-32 R13) y al reves fallaria.
+      await prisma.unit.deleteMany({ where: { id: unitId } });
     }
   });
 });

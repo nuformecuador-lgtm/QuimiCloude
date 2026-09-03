@@ -6,7 +6,7 @@ validación de conflicto de `AGENTS.md > Paralelismo`, así que si una task acab
 que no está listado, se anota antes de seguir.
 
 `<ts>` = el timestamp que genere Prisma; la carpeta de migración es
-`db/migrations/<ts>_units_catalog/`.
+`db/migrations/20260903121404_units_catalog/`.
 
 **Aviso de conflicto.** Esta ficha toca archivos de **tres** módulos: `unidades` (nuevos),
 `inventario` (`domain/product-input.ts`, `product-view.ts`, `product-catalog.ts`,
@@ -22,7 +22,7 @@ test. Van todos en T12, no repartidos por ahí.
 
 ## Bloque A — Preparación
 
-### [ ] T0. Dejar el `.env` disponible dentro del worktree
+### [x] T0. Dejar el `.env` disponible dentro del worktree
 - Dep: ninguna. **Primera task, antes de cualquier `pnpm run db:*`.**
 - Archivos: `.env` (git-ignorado, **no versionado**).
 - Los worktrees no heredan el `.env` de la raíz. Hace falta `DATABASE_URL` y `DIRECT_URL`: Prisma
@@ -32,7 +32,7 @@ test. Van todos en T12, no repartidos por ahí.
 - **Hecho cuando:** `pnpm exec prisma validate` corre desde el worktree sin error de «environment
   variable not found».
 
-### [ ] T0b. Comprobar que la base está vacía de unidades escritas
+### [x] T0b. Comprobar que la base está vacía de unidades escritas
 - Dep: T0.
 - Archivos: ninguno; la salida se pega en `progress/impl_QC-32-modelo-unidades.md`.
 - `SELECT count(*) FROM products WHERE unit IS NOT NULL;` y `SELECT count(*) FROM recipe_lines;`.
@@ -45,7 +45,7 @@ test. Van todos en T12, no repartidos por ahí.
 
 ## Bloque B — Esquema y migración
 
-### [ ] T1. Añadir `Unit` y reapuntar las dos columnas ajenas en `db/schema.prisma`
+### [x] T1. Añadir `Unit` y reapuntar las dos columnas ajenas en `db/schema.prisma`
 - Dep: ninguna (T0 solo hace falta para los `db:*`).
 - Archivos: `db/schema.prisma`.
 - El modelo `Unit` tal como está en `design.md > 2.1`, **al final** del archivo, con su
@@ -61,7 +61,7 @@ test. Van todos en T12, no repartidos por ahí.
 - **Hecho cuando:** `pnpm exec prisma validate` pasa y `pnpm exec prisma generate` produce el
   cliente con `Unit` y con `unitId` en los otros dos modelos.
 
-### [ ] T2. Generar y completar a mano `migration.sql`
+### [x] T2. Generar y completar a mano `migration.sql`
 - Dep: T0, T1.
 - Archivos: `db/migrations/<ts>_units_catalog/migration.sql`.
 - `pnpm run db:migrate:create` (no aplica nada) y después **completar a mano** lo que Prisma no
@@ -77,7 +77,7 @@ test. Van todos en T12, no repartidos por ahí.
   `CREATE TABLE "units"`, el índice único, las dos `ADD COLUMN "unit_id"`, las dos FK, los dos
   índices de FK, los dos `DROP COLUMN "unit"` y los dos `ALTER` de RLS.
 
-### [ ] T3. Escribir `down.sql` a mano
+### [x] T3. Escribir `down.sql` a mano
 - Dep: T2.
 - Archivos: `db/migrations/<ts>_units_catalog/down.sql`.
 - Exactamente lo de `design.md > 4.6`, en orden inverso al UP, **con su guardia `DO $$` primero**
@@ -90,7 +90,7 @@ test. Van todos en T12, no repartidos por ahí.
 
 ## Bloque C — Módulo `unidades`, seed y reapuntado
 
-### [ ] T4. Crear el armazón del módulo `unidades` y su contrato
+### [x] T4. Crear el armazón del módulo `unidades` y su contrato
 - Dep: ninguna.
 - Archivos: `lib/modules/unidades/index.ts`, `lib/modules/unidades/domain/unit-name.ts`,
   `lib/modules/unidades/domain/unit-catalog.ts`, `lib/modules/unidades/domain/starter-units.ts`,
@@ -104,7 +104,7 @@ test. Van todos en T12, no repartidos por ahí.
 - **Hecho cuando:** `pnpm run typecheck` y `pnpm run lint` pasan y
   `tests/guards/guard-arquitectura-modulos.test.ts` sigue verde con el módulo nuevo dentro.
 
-### [ ] T5. El seed arrancador: caso de uso, puerto, adaptador y cableado
+### [x] T5. El seed arrancador: caso de uso, puerto, adaptador y cableado
 - Dep: T1 (necesita el cliente Prisma con `Unit`), T4.
 - Archivos: `lib/modules/unidades/domain/seed-units.ts`,
   `lib/modules/unidades/ports/unit-seed-repository.ts`,
@@ -118,7 +118,7 @@ test. Van todos en T12, no repartidos por ahí.
 - **Hecho cuando:** `pnpm run typecheck` pasa, `pnpm run db:seed` corre dos veces seguidas y la
   segunda no crea nada.
 
-### [ ] T6. Reapuntar `inventario` de `unit` texto a `unitId`
+### [x] T6. Reapuntar `inventario` de `unit` texto a `unitId`
 - Dep: T1, T4.
 - Archivos: `lib/modules/inventario/domain/product-input.ts`,
   `lib/modules/inventario/domain/product-view.ts`,
@@ -136,7 +136,7 @@ test. Van todos en T12, no repartidos por ahí.
 
 ## Bloque D — Tests estáticos y unitarios (no necesitan base)
 
-### [ ] T7. [P] Contrato estático del esquema
+### [x] T7. [P] Contrato estático del esquema
 - Dep: T1.
 - Archivos: `tests/unit/unidades/schema/unidades-schema.test.ts`.
 - Lee `db/schema.prisma` como **texto**. Reutilizar los helpers de
@@ -146,7 +146,7 @@ test. Van todos en T12, no repartidos por ahí.
   texto en las dos tablas ajenas.
 - **Hecho cuando:** pasa y cubre R1, R2, R3, R6, R7, R8, R9, R10, R11, R15, R18, R20.
 
-### [ ] T8. [P] Contrato estático del SQL de la migración
+### [x] T8. [P] Contrato estático del SQL de la migración
 - Dep: T2, T3.
 - Archivos: `tests/unit/unidades/schema/unidades-migration.test.ts`.
 - Helpers de `tests/unit/recetas/schema/recetas-migration.test.ts` (`statements`,
@@ -157,7 +157,7 @@ test. Van todos en T12, no repartidos por ahí.
   nada.
 - **Hecho cuando:** pasa y cubre R5, R12, R13, R18, R20, R21, R22, R23, R24.
 
-### [ ] T9. [P] Dominio: normalización, seed y forma del módulo
+### [x] T9. [P] Dominio: normalización, seed y forma del módulo
 - Dep: T4, T5, T6.
 - Archivos: `tests/unit/unidades/domain/unit-name.test.ts`,
   `tests/unit/unidades/domain/seed-units.test.ts`,
@@ -176,7 +176,7 @@ test. Van todos en T12, no repartidos por ahí.
 
 ## Bloque E — Base de datos real
 
-### [ ] T10. Aplicar y revertir de verdad, y probar las dos guardias de datos
+### [x] T10. Aplicar y revertir de verdad, y probar las dos guardias de datos
 - Dep: T0, T0b, T2, T3.
 - Archivos: ninguno versionado; la salida se pega en `progress/impl_QC-32-modelo-unidades.md`.
 - Tres pasos, en este orden:
@@ -197,7 +197,7 @@ test. Van todos en T12, no repartidos por ahí.
   `progress/impl_QC-32-modelo-unidades.md`, y cierran **R22, R23 y R24** en su forma real (los
   tests estáticos solo miran el texto del SQL).
 
-### [ ] T11. Tests de integración contra Postgres real
+### [x] T11. Tests de integración contra Postgres real
 - Dep: T10, T7 (para no duplicar lo que ya cubre el estático).
 - Archivos: `tests/integration/unidades/unidades-constraints.int.test.ts`,
   `tests/integration/unidades/unidades-seed.int.test.ts`.
@@ -216,7 +216,7 @@ test. Van todos en T12, no repartidos por ahí.
 
 ## Bloque F — Cierre
 
-### [ ] T12. Acotar los tests de otras features que esta ficha invalida
+### [x] T12. Acotar los tests de otras features que esta ficha invalida
 - Dep: T1, T2, T6.
 - Archivos: `tests/unit/inventario/schema/inventario-schema.test.ts`,
   `tests/unit/inventario/product-input.test.ts`, `tests/unit/inventario/product-prisma.test.ts`,
@@ -235,7 +235,7 @@ test. Van todos en T12, no repartidos por ahí.
 - **Hecho cuando:** `pnpm test` pasa entero y la lista de archivos tocados coincide **exactamente**
   con la de arriba (si aparece uno más, se anota aquí antes de seguir).
 
-### [ ] T13. Sincronizar con `dev` y correr el gate completo
+### [x] T13. Sincronizar con `dev` y correr el gate completo
 - Dep: T0–T12.
 - Archivos: ninguno (salvo lo que traiga el merge).
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` **sin flags**. El modo rápido no
@@ -244,7 +244,7 @@ test. Van todos en T12, no repartidos por ahí.
 - Atención especial al merge sobre `lib/modules/inventario/**` y sobre `db/schema.prisma`.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con todas las guardias en verde.
 
-### [ ] T14. Documentar el mapa `R<n> → test`
+### [x] T14. Documentar el mapa `R<n> → test`
 - Dep: T13.
 - Archivos: `progress/impl_QC-32-modelo-unidades.md`.
 - Copiar la tabla de trazabilidad de abajo con la **salida real** de los tests, no con la

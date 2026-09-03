@@ -23,7 +23,13 @@ const nonNegativeIntSchema = z.number().int().min(0);
 
 const costSchema = z.string().regex(COST_PATTERN);
 
-const unitSchema = z.string().trim();
+/**
+ * La unidad del producto es una REFERENCIA al catalogo de `unidades` (QC-32, R10, R19), no
+ * texto libre: aqui solo se valida la FORMA -que sea un uuid-. Que ese uuid EXISTA no lo
+ * comprueba zod: lo rechaza la base con la clave foranea `products_unit_id_fkey` (R12).
+ * Traducir ese error a un mensaje de usuario es de QC-38.
+ */
+const unitIdSchema = z.string().uuid();
 
 /**
  * `deliveryTime >= 0` se valida AQUI, en la aplicacion, porque la base no tiene `CHECK`
@@ -39,7 +45,7 @@ export const createProductSchema = z.object({
   minPurchase: nonNegativeIntSchema.default(0),
   deliveryTime: deliveryTimeSchema.nullish(),
   qtyAlert: nonNegativeIntSchema.nullish(),
-  unit: unitSchema.nullish(),
+  unitId: unitIdSchema.nullish(),
 });
 
 /**
