@@ -828,3 +828,76 @@ ficha lleva cada sesión** — esa sección existía desde el principio y nadie 
   herramienta no lo permite.
 - El estado generado (cliente de Prisma, tipos de Next) y el esquema de la base **quedan por detrás
   tras cada merge**, y el síntoma siempre señala a la feature ajena que introdujo el cambio.
+
+## QC-9 — proteccion-de-rutas-privadas (2026-09-02)
+
+PR [#21](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/21), merge `864eeb7`. Épica QC-17,
+`zone: backend`, `complexity: high`. **30 requisitos EARS**, los 30 con test. `./init.sh` completo
+en verde antes del PR: **89 archivos, 957 tests**; E2E en **chromium y webkit**.
+
+### Por qué era `high`, y no por tamaño
+
+El middleware corre en el **runtime del borde**, donde `node:crypto` no existe — y la sesión de
+QC-8 se firmaba justo con eso. Las dos salidas fáciles eran malas: no validar la firma en el borde
+(dejar pasar cookies caducadas o falsificadas hasta la página), o escribir un **segundo HMAC**, que
+es exactamente lo que prohíbe R5 de QC-8. Se eligió la tercera: **migrar la firma a WebCrypto**
+(`crypto.subtle`), que existe en los dos entornos, manteniendo **una sola implementación**.
+
+**La salida es idéntica byte a byte** a la anterior —mismo algoritmo, misma clave, mismo mensaje,
+misma codificación sin relleno—, y hay un test que lo afirma contra `node:crypto` directamente. Ese
+detalle es lo que permitió tocar código de una feature mergeada con red: `session-cookie.test.ts`
+recalcula la firma por su cuenta, así que siguió siendo un **oráculo** de la implementación vieja
+contra la nueva. Nada de `Buffer` en el codec: `btoa`/`atob`, porque `Buffer` no es API del borde.
+
+### La decisión humana que se giró a mitad
+
+El rol pasa a viajar **dentro** del token para que el middleware compruebe permisos sin base de
+datos. Eso cambia el formato, así que **D3 —«el formato no cambia»— quedó derogada el mismo día**,
+y se conservó **tachada y con el motivo del giro escrito**: no había sesiones vivas, así que su
+único argumento dejó de existir. Un token `v1` se rechaza **sin llegar a verificar su firma**.
+
+Con dos límites escritos, no disimulados: el token va **firmado, no cifrado** —cualquiera puede
+leer su payload, nadie puede falsificarlo, y por eso no viaja nada más que `sub`, `iat`, `exp` y
+`role`—; y el rol firmado es **una foto** que envejece hasta la caducidad, con test de
+caracterización que **QC-23 pondrá rojo** al implementar la revocación.
+
+### Lo que destapó, que valía más que la feature
+
+**Dos guardias de seguridad estaban ciegas.** `guard-firma-sesion-unica` y
+`guard-arquitectura-modulos` quitaban los comentarios **de bloque antes que los de línea**: un `//`
+que contuviera `app/**` abría un bloque falso y se tragaba los imports siguientes. Sobre el
+`middleware.ts` real, `stripComments` devolvía literalmente `"\n\n\n\n\n\n\nexport const config
+= {...}"` — la guardia **pasaba en verde sin haber mirado nada**. No lo introdujo QC-9; estaba
+desde antes y afectaba a la evidencia de tres requisitos. Reproducido por el reviewer revirtiendo
+el orden (caen 3 tests), arreglado y con regresión anclada sobre el archivo real.
+
+**Y su E2E encontró que `dev` llevaba rota la zona privada entera.** `PRIVATE_NAV_ITEMS` metía
+componentes de `lucide-react` en datos que cruzan a un Client Component, así que toda ruta privada
+devolvía 500 — introducido por el PR #18. Mientras tanto dos ramas daban 794 y 642 tests en verde,
+y los dos números eran ciertos: **el gate no corre E2E**, `login.spec.ts` pasa en verde con esos
+500 en el log porque espera por **ruta** y no por contenido, y **en jsdom no existe la frontera
+servidor/cliente**, así que ningún test unitario podía verlo. Lo arregló la sesión dueña del
+sidebar; su defensa —`guard-nav-serializable`, que afirma sobre **el dato** y no sobre el render—
+es el patrón a copiar.
+
+### Coordinación entre sesiones
+
+Se trabajó con **cuatro sesiones en paralelo**. De ahí salieron dos lecciones caras: **avisar no es
+coordinar si no esperas la respuesta** —este leader entró en el worktree de QC-20 tras avisar y sin
+esperar, y tuvo que abortar—, y **un falso diagnóstico anunciado antes de verificarlo casi provoca
+un commit indebido**: se afirmó que `dev` estaba roto por un spec faltante cuando el rojo lo
+fabricaba el `cwd` del validador. Se retractó ante las cuatro sesiones y nadie llegó a actuar.
+
+### Deuda que hereda
+
+- **Next 16.3 deprecó `middleware.ts`** en favor de `proxy`. Funciona hoy; no se cambió porque el
+  spec congelado ordenaba `middleware.ts`. **Ficha propia.**
+- **El E2E de R24 no distingue «el `next` funcionó» de «cayó al dashboard por defecto»**, porque
+  hoy el dashboard es a la vez destino y fallback. Quien discrimina es `login-form.test.tsx`.
+  Cuando exista la pantalla de productos, ese recorrido debe pedir **esa** ruta.
+- **Un cambio de rol tarda hasta 8 h en surtir efecto.** Decidido aquí, implementado en **QC-23**.
+- **Tras un merge, el estado generado del worktree y el esquema de la base quedan por detrás**, y
+  el síntoma **apunta siempre a la feature ajena**: aquí, un `typecheck` rojo señalando a
+  `product-prisma.test.ts` de QC-20 y cinco archivos de integración en rojo, los dos por cliente de
+  Prisma y migración sin aplicar. Ninguno era un defecto.
+- **`wt.sh done` falló otra vez en Windows.** Van cuatro veces el mismo día.
