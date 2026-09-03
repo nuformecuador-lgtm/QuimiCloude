@@ -328,3 +328,64 @@ seccion 3.
 sesion: la corrida larga dentro del implementer corto el stream dos veces hoy. El PR
 (`gh pr create --base dev --title "feat(QC-33): modelo de pedidos"`) se abre **despues** de que ese gate
 termine en `== init OK ==`.
+
+## 9. F2.3 (merge con `dev`) y un rojo AJENO que el leader tiene que ver antes del gate
+
+**Merge limpio, sin conflictos.** `git fetch origin dev` + `git merge origin/dev` trajo **QC-42
+(modelo-proveedores, PR #25)** y **QC-22 (pantalla-de-productos)**. Los dos archivos que preocupaban
+—`db/schema.prisma` y `lib/modules/recetas/index.ts`— se fusionaron solos: QC-42 anade su bloque al
+final del esquema, detras del de `Order`, y no toca `recetas`. **No hubo ninguna resolucion ambigua, o
+sea que no hay nada que preguntarle al humano por este merge.**
+
+Tras el merge, y con `pnpm install` + `prisma generate` + `next typegen` rehechos:
+
+```
+$ pnpm run typecheck   -> exit 0
+$ pnpm run lint        -> exit 0
+$ pnpm exec vitest run tests/unit/pedidos tests/integration/pedidos guard
+ Test Files  17 passed (17)
+      Tests  209 passed (209)
+```
+
+### `./init.sh --rapido` sale ROJO, y NO es por esta feature
+
+```
+✓ node v22.13.1
+✓ dependencias presentes
+✓ regla max-2-por-zona respetada (in_progress=4)
+✓ specs presentes para features sdd en vuelo
+✓ ninguna ficha sembrada esperando al board
+✓ cada spec sembrado tiene su ficha, con el mismo slug
+✓ typecheck paso
+✓ lint paso
+✗ 'pnpm run test:rapido' fallo
+
+ Test Files  1 failed | 27 passed (28)
+      Tests  8 failed | 316 passed (324)
+```
+
+**El unico archivo rojo es `tests/integration/identity/identity-seed.int.test.ts`**, en los ocho casos
+que pasan por `resetIdentityToEmptyState`, que hace `tx.user.deleteMany({})` (linea 121).
+
+**Diagnostico, hecho contra la base y no por deduccion.** Ejecutado `DELETE FROM users` dentro de una
+transaccion revertida:
+
+```
+delete from users FALLA -> SQLSTATE 23503  constraint products_created_by_fkey  tabla products
+```
+
+La restriccion que lo bloquea es **`products_created_by_fkey`**, que es de **QC-20**, no de esta ficha.
+La causa es una **fila residual en `products`** en la base de desarrollo compartida:
+`name = 'FeldesQuack'`, `created_at = 2026-09-03T19:36:02.805Z`, con `created_by` y `updated_by`
+apuntando al usuario `admin`. Encaja con una corrida de otra feature en vuelo (QC-22,
+pantalla-de-productos), que quedo sin limpiar.
+
+**Por que QC-33 no puede ser la causa:** `orders` tiene **0 filas** (todo lo que se escribio en las
+verificaciones y en los tests fue dentro de transacciones revertidas), y **una tabla hija vacia no puede
+violar una FK al borrar el padre**. Las FK `orders_created_by_fkey` / `orders_updated_by_fkey` existen,
+pero no participan: el 23503 nombra explicitamente `products_created_by_fkey`.
+
+**No se toco la base.** Borrar esa fila es una escritura destructiva sobre una base **compartida** con
+features que corren en paralelo, y podria romper la corrida de quien la creo. **Se sube al leader** en
+vez de resolverlo por cuenta propia (regla 6). El gate completo (T10) va a salir rojo por este mismo
+motivo hasta que la fila se limpie o se decida otra cosa.
