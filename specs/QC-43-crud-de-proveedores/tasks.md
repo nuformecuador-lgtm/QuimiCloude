@@ -159,7 +159,7 @@ verificado contra el árbol de la rama, no contra este documento.
       *Depende de:* T7. **Hecho cuando:** typecheck limpio y ninguna consulta menciona
       `prisma.product` ni `prisma.user`.
 
-- [ ] **T13 — Contrato y punto de composición.** `lib/modules/proveedores/index.ts` reexporta tipos,
+- [x] **T13 — Contrato y punto de composición.** `lib/modules/proveedores/index.ts` reexporta tipos,
       esquemas, errores y las nueve factories —**solo** de `./domain`, conservando
       `normalizeSupplierName`—; `lib/composition/index.ts` gana la fachada `proveedores` en un
       **bloque nuevo al final**, **reutilizando la constante `productCatalog` que ya existe** (línea

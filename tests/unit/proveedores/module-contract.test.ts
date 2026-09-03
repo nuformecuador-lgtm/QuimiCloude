@@ -297,13 +297,67 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       ).not.toMatch(/proveedores|supplier/i)
     }
 
-    // `lib/composition` NO se toca en esta ficha: sin puertos ni adaptadores no hay nada que
-    // cablear, y un `export const proveedores = {}` seria una fachada vacia (`design.md` 5.5).
-    for (const file of sourcesIn(join(repoRoot, 'lib', 'composition'))) {
+    // QC-42 afirmaba aqui que `lib/composition` NO menciona `proveedores`: sin puertos ni
+    // adaptadores no habia nada que cablear (`design.md` de QC-42, 5.5). QC-43 T13 lo
+    // DEROGA -es literalmente su encargo-, y la afirmacion se invierte: la composicion
+    // cablea la fachada, y lo hace EXACTAMENTE una vez. Ver el caso de mas abajo.
+  })
+
+  it('el cableado puerto-implementacion de proveedores vive SOLO en lib/composition y una sola vez', () => {
+    // T13, R44: `lib/composition` es el UNICO sitio del repo que puede atar un puerto de
+    // `proveedores` a su adaptador driven. Se afirma en los dos sentidos, y los dos son
+    // falsables:
+    //
+    //  a) La fachada existe y esta completa: las nueve claves, ni una mas ni una menos.
+    //     Un caso de uso sin cablear -o un decimo colado- cae aqui.
+    //  b) Nadie MAS instancia esos adaptadores: si un archivo de `app/`, de otro modulo o
+    //     un adaptador driving importara `adapters/driven/persistence/*` de `proveedores`,
+    //     el cableado habria dejado de ser exclusivo de la composicion.
+    const composicion = sourcesIn(join(repoRoot, 'lib', 'composition'))
+    const cablean = composicion.filter((file) => /export const proveedores\b/.test(read(file)))
+    expect(
+      cablean.map((f) => toPosix(relative(repoRoot, f))),
+      'la fachada `proveedores` tiene que existir exactamente una vez en lib/composition',
+    ).toEqual(['lib/composition/index.ts'])
+
+    const fuente = read(cablean[0] as string)
+    const bloque = fuente.slice(fuente.indexOf('export const proveedores'))
+    const claves = [...bloque.matchAll(/^  (\w+):/gm)].map((m) => m[1] as string).sort()
+    expect(claves).toEqual([
+      'createCatalogLine',
+      'createSupplier',
+      'deleteCatalogLine',
+      'deleteSupplier',
+      'getSupplier',
+      'listCatalogLines',
+      'listSuppliers',
+      'updateCatalogLine',
+      'updateSupplier',
+    ])
+
+    // `productCatalog` se REUTILIZA, no se vuelve a construir (`design.md > 10`): una
+    // segunda instancia serian dos cableados del mismo puerto que pueden divergir.
+    expect(
+      [...fuente.matchAll(/const productCatalog\s*:/g)].length,
+      'productCatalog se construye mas de una vez en lib/composition',
+    ).toBe(1)
+
+    // Nadie mas que la composicion instancia los adaptadores driven de `proveedores`.
+    const fuera = sourcesIn(join(repoRoot, 'lib'))
+      .concat(sourcesIn(join(repoRoot, 'app')))
+      .filter((file) => !toPosix(file).includes('/lib/composition/'))
+      .filter((file) =>
+        /@\/lib\/modules\/proveedores\/(adapters|ports)\//.test(read(file)),
+      )
+      .map((file) => toPosix(relative(repoRoot, file)))
+    expect(fuera, `cablean proveedores fuera de la composicion: ${fuera.join(', ')}`).toEqual([])
+
+    // Y el modulo NO importa la composicion en ningun sentido (la flecha va al reves).
+    for (const file of proveedoresSources) {
       expect(
         read(file),
-        `${toPosix(relative(repoRoot, file))} cablea proveedores`,
-      ).not.toMatch(/proveedores|supplier/i)
+        `${toPosix(relative(repoRoot, file))} importa @/lib/composition`,
+      ).not.toMatch(/@\/lib\/composition/)
     }
   })
 })
