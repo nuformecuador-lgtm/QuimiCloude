@@ -311,3 +311,233 @@ ningún puerto. `typecheck`, `lint` y los 225 tests (102 de `recetas` + 123 de g
 en verde. T18 queda para la tanda que traiga T9 (`ProductCatalog` real de `inventario`).
 Listo para que el Grupo C (T9-T13) construya los adaptadores y el cableado sobre esta
 base.
+
+---
+
+# Grupo C — adaptadores y cableado (T9, T18, T10, T11, T12, T13)
+
+## T9 — `ProductCatalog` en `inventario`
+
+- `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts` (nuevo):
+  `findProductRefs` (una sola consulta `prisma.product.findMany({ where: { id: { in },
+  deletedAt: null }, select: { id, name, unit } })`, con `[]` de atajo si `ids` llega
+  vacío para no ejecutar un `IN ()` sin sentido) y `toProductRef` (mapeo puro, testeable
+  sin base).
+- Test: `tests/unit/inventario/product-catalog.test.ts` — mapeo puro + contrato de
+  `findRefs([])`. Mismo criterio de honestidad que `product-prisma.test.ts`: no toca
+  Postgres; la garantía real de `deleted_at IS NULL` es de integración (T14, Grupo D, no
+  de esta tanda).
+- Guardia: `recetas` sigue sin `prisma.product` en ninguna parte (verificado con
+  `guard-arquitectura-modulos` en verde y con el ajuste de `module-contract.test.ts`
+  descrito más abajo).
+
+## T18 — Validación de producto solo para las líneas nuevas
+
+- `tests/unit/recetas/recipe-lines-catalog.test.ts` (nuevo): demuestra con
+  `expect(findRefs).toHaveBeenCalledWith(<ids exactos>)` — nunca solo `toHaveBeenCalled`
+  — que la edición NO pregunta al catálogo por la línea preexistente (R45), que
+  `findRefs` se llama con el conjunto EXACTO de ids nuevos cuando hay mezcla de líneas
+  viejas y nuevas, que una línea nueva con producto inexistente/de baja se rechaza sin
+  tocar `replaceAlive` (R46), que el alta trata todas las líneas como nuevas (R46), y que
+  el detalle (`get-recipe.ts`) sigue pidiendo `findRefs` sobre TODAS las líneas —el
+  producto de baja sale con `productName: null` (R18)—.
+- La lógica de `update-recipe.ts` escrita en Grupo B (diferencia de conjuntos
+  `idsANuevoValidar = idsEnviados \ idsYaEnLaReceta`) **no tenía ningún bug**: los cuatro
+  casos del test pasaron sin tocar ese archivo. No hubo que corregir nada de lo que dejó
+  la sesión anterior.
+
+## T10 — Adaptador driven de persistencia
+
+- `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts` (nuevo). Único
+  archivo del módulo `recetas` que importa `@prisma/client`.
+  - `toDecimalInput`/`fromDecimalQuantity`: conversión `string ↔ Prisma.Decimal` de
+    `quantity`, mismo criterio que `cost` en `inventario`.
+  - `toRecipeRow`/`toSteps`/`toLineRow`: mapeo puro de una fila de Prisma (con sus
+    líneas incluidas) al `RecipeRow` del puerto.
+  - `createRecipe`: `prisma.recipe.create` con `lines: { create: [...] }` anidado (en el
+    alta TODAS las líneas son nuevas), `nameNormalized` calculado aquí con
+    `normalizeRecipeName` (única definición, R8), `P2002`/SQLSTATE `23505` → `'duplicate'`.
+  - `findAliveRecipeById`: `findFirst` con `deletedAt: null` e `include: { lines: true }`.
+  - `listAliveRecipes(offset, limit)`: **no llama a `toOffsetLimit`** — el ajuste
+    explícito del prompt de esta tanda sobre `list-recipes.ts` (Grupo B): el dominio
+    recibe `offset`/`limit` YA calculados como dependencia inyectada
+    (`lib/composition` los inyecta con las funciones reales de `lib/shared/pagination`,
+    T12), así que el adaptador solo pasa `skip`/`take` a Prisma sin aritmética propia.
+    Orden `name ASC` sin desempate (D13).
+  - `replaceAliveRecipe`: los tres pasos de `design.md > 8` dentro de una sola
+    `prisma.$transaction`: `updateMany` con `deletedAt: null` en el `where` (`count === 0`
+    → `'not_found'`), `deleteMany` de las líneas cuyo `productId` no está en la lista
+    final (borrado físico real, sin `deletedAt` — `RecipeLine` no lo tiene), y un
+    `upsert` por línea final sobre la clave natural `recipeId_productId` (confirmado
+    contra el `.d.ts` generado de Prisma: el nombre del campo compuesto es
+    `recipeId_productId`, no el `map` del `@@unique`).
+  - `softDeleteAliveRecipe`: `updateMany` con `deletedAt: null` en el `where`,
+    `count === 0` → `'not_found'`.
+  - Traducción de SQLSTATE: `sqlStateOf` (mismo criterio que el helper homónimo de
+    `tests/integration/recetas/recetas-constraints.int.test.ts`, que lee `meta.code`) +
+    `isUniqueNameViolation` (P2002 o `23505` → `'duplicate'`) e
+    `isQuantityCheckViolation` (`23514` → `ValidationError`, nunca `'duplicate'`).
+  - **Aviso honesto para quien escriba T14 (Grupo D):** no hay forma de confirmar en esta
+    sesión, sin acceso a una base Postgres real (el worktree no tiene `.env` con
+    `DATABASE_URL`/`DIRECT_URL`), qué clase de error concreta lanza el cliente Prisma
+    TIPADO (no `$queryRaw`) para una violación del `CHECK quantity > 0`: puede llegar
+    como `PrismaClientKnownRequestError` con `meta.code` poblado, o como
+    `PrismaClientUnknownRequestError` sin `meta` en absoluto — el propio `design.md > T10`
+    lo señala como algo a investigar. `isQuantityCheckViolation` cubre el primer caso
+    (vía `sqlStateOf`); si T14 descubre contra Postgres real que el error llega sin
+    `meta.code`, `sqlStateOf`/`isQuantityCheckViolation` son las dos únicas funciones que
+    hay que ajustar, y quedan aisladas a propósito para eso.
+- Verificación de esta task: solo `pnpm run typecheck` (criterio explícito del prompt:
+  "Hecho cuando `pnpm run typecheck` limpio"), limpio. No se escribió un test de
+  integración aquí (es T14, Grupo D, fuera de esta tanda) ni uno unitario de las
+  funciones puras (no lo exigió el criterio de la task; si se quiere replicar el patrón
+  de `product-prisma.test.ts`/`presentation-prisma.test.ts`, es trabajo de refuerzo, no
+  bloqueante).
+
+## T11 — Adaptador driven de Storage y su configuración
+
+- `lib/modules/recetas/adapters/driven/config/storage-config-env.ts` (nuevo): calco
+  exacto del patrón de `initial-access-credentials-env.ts` (QC-6) — los tres nombres de
+  variable viven solo como elementos del arreglo `REQUIRED_ENV_VAR_NAMES`, se leen DENTRO
+  de una función (nunca al importar), y el error nombra las que faltan sin filtrar ningún
+  valor.
+- `lib/modules/recetas/adapters/driven/storage/recipe-image-supabase.ts` (nuevo): único
+  archivo del repo que importa `@supabase/storage-js` (confirmado leyendo el `.d.ts`
+  generado del paquete instalado, versión 2.115.0, para la firma real de `StorageClient`,
+  `.from(bucket).upload/getPublicUrl/remove`). `bucketApi()` construye el cliente Y LEE LA
+  CONFIGURACIÓN en cada llamada (nunca al importar el módulo, R43). `uploadRecipeImage`
+  genera `recetas/<uuid>.<ext>` con `randomUUID()` y devuelve la ruta. `removeRecipeImage`
+  es la ÚNICA operación de borrado — no hay `clearImage` ni equivalente (R48).
+  `recipeImagePublicUrl` compone la URL pública sin firma vía `getPublicUrl` del SDK.
+- `.env.example`: bloque nuevo "Storage de recetas (QC-25)" con las tres variables
+  `SUPABASE_STORAGE_URL`, `SUPABASE_STORAGE_BUCKET`, `SUPABASE_STORAGE_KEY`, vacías y
+  documentadas, con nota explícita de por qué NO reutiliza `SUPABASE_PROJECT_REF` (esa es
+  solo para los servidores MCP, `design.md > 9.4`).
+- Test: `tests/unit/recetas/storage-config.test.ts` (nuevo) — verifica que las tres
+  variables están declaradas y vacías en `.env.example`, que el adaptador de config falla
+  nombrando exactamente las que faltan sin incluir ningún valor presente, y que con las
+  tres presentes resuelve sin lanzar. NUNCA importa el adaptador de Storage real ni
+  `@supabase/storage-js` (R43) — verificado además por `scope.test.ts`, que barre todo
+  `tests/` buscando esos dos patrones.
+
+## T12 — Contrato y punto de composición
+
+- `lib/modules/recetas/index.ts`: reescrito para reexportar TODO lo público —tipos,
+  errores, esquemas zod, `Page`/`PageQuery`, `validateRecipeImage`, y las cinco
+  factories `createCreateRecipe`/`createGetRecipe`/`createListRecipes`/
+  `createUpdateRecipe`/`createDeleteRecipe`—, solo de `./domain`. `normalizeRecipeName`
+  se conservó igual.
+- `lib/composition/index.ts`: se AÑADIÓ un bloque nuevo al final, sin reordenar ni
+  reformatear nada de `identity` ni de `inventario` (diff mínimo, por la advertencia del
+  prompt sobre la sesión paralela de QC-22). Cablea `productCatalog: ProductCatalog =
+  { findRefs: findProductRefs }`, `recipeRepository: RecipeRepository` (las cinco
+  funciones de T10), `recipeImageStorage: RecipeImageStorage` (las tres funciones de
+  T11 — construir este objeto NO invoca ninguna de ellas, así que no lee variables de
+  entorno ni toca red, R43), y la fachada `export const recetas = {...}`, inyectando
+  `toOffsetLimit`/`buildPage` REALES de `@/lib/shared/pagination` en `createListRecipes`
+  tal como pedía el prompt.
+- **Ajuste sobre `tests/unit/recetas/module-contract.test.ts` (no es mío por task, pero
+  bloqueaba T10/T12 legítimamente):**
+  - El segundo `it` prohibía `@prisma/client` en TODO `lib/modules/recetas/**` sin
+    excepción — texto más estricto que `design.md > 1`/`> 7.3`, que nombra
+    `recipe-prisma.ts` como el ÚNICO archivo del módulo que debe importarlo. Añadí una
+    excepción nombrada exactamente a ese archivo (`prisma.product` sigue prohibido en
+    TODO el módulo sin excepción, esa parte no cambió). La guardia real de "solo un
+    archivo lo importa" la sigue vigilando `guard-arquitectura-modulos.test.ts` (bloque
+    10, propiedad de modelos).
+  - El tercer `it` ("la feature no añade adaptadores driving...") era, por su propio
+    comentario, un checkpoint de Grupo A/B que anticipaba que Grupo C llenaría
+    `adapters/`: afirmaba que `adapters/driven`/`adapters/driving` debían seguir vacías,
+    que ningún archivo del módulo declaraba `'use server'`, y que `lib/composition` no
+    mencionaba `recetas`. Las tres cosas dejan de ser ciertas por diseño en este grupo
+    (T10, T11, T13). Reescribí ese `it` para que siga vigilando lo que SÍ sigue siendo
+    requisito de esta feature (R44: ninguna pantalla ni ruta de recetas bajo `app/`) y
+    retiré las tres aserciones obsoletas, dejando explicado en el comentario por qué y
+    dónde quedan cubiertas ahora (`scope.test.ts`, `recipe-actions.test.ts`).
+  - `tests/unit/recetas/scope.test.ts` NO se tocó (T15, Grupo D, es quien la revisa
+    formalmente) — sigue en verde tal cual porque ya estaba escrita para tolerar
+    `adapters/driving` con contenido (revisa que cada archivo ahí declare `'use server'`),
+    y mi único ajuste de comentario en `storage-config.test.ts` fue para dejar de mencionar
+    literalmente el nombre del adaptador de Storage en un comentario, que su assertion de
+    R43 detectaba como falso positivo (busca el texto crudo, no distingue comentario de
+    import real).
+
+## T13 — Server Actions
+
+- `lib/modules/recetas/adapters/driving/recipe-actions.ts` (nuevo), `'use server'` en la
+  primera línea. Actor resuelto con `identity.getSessionUser()` vía `@/lib/composition`
+  (mismo patrón exacto que `product-actions.ts`). Cinco funciones:
+  `createRecipeAction(input)`, `updateRecipeAction(id, input)`, `deleteRecipeAction(id)`,
+  `getRecipeAction(id)`, `listRecipesAction(query)`.
+  - **Decisión de forma de entrada, no cerrada por el spec:** create/update reciben
+    `unknown` tipado, NO `FormData`. A diferencia de `inventario`, una receta trae listas
+    anidadas (pasos, líneas de producto) sin representación natural en campos planos de
+    formulario, y cómo las envía el formulario de QC-26 es decisión de esa ficha, no de
+    esta — documentado en el comentario de cabecera del archivo para que quien construya
+    QC-26 lo tenga presente.
+  - Create/update validan con `createRecipeSchema`/`updateRecipeSchema` (los mismos del
+    contrato, no una reimplementación) ANTES de llamar al caso de uso — cierra R38 y es
+    lo que demuestra el test con el doble del caso de uso que falla si se le llama.
+  - Errores de dominio (`RecetasError` y sus subclases) se traducen a
+    `{ status: 'error', code, message }`; cualquier otro error se relanza.
+  - Las advertencias de `updateRecipe` (`warnings`, R49) se recorren y se registran con
+    `console.error` con su contexto (operación + ruta), y la acción sigue devolviendo
+    `{ status: 'success' }` — una advertencia de borrado NUNCA convierte la edición en
+    error para el llamante.
+- Test: `tests/unit/recetas/recipe-actions.test.ts` (nuevo), mockeando
+  `@/lib/composition` igual que `product-actions.test.ts`: entrada inválida rechazada sin
+  llamar al caso de uso (R38), actor resuelto de la sesión y `null` cuando no hay sesión
+  (falla cerrado), advertencia de almacenamiento registrada con `console.error` sin
+  convertir la edición en error, traducción de errores de dominio a `code` estable,
+  relanzamiento de un error que no es de dominio, y confirmación de que
+  `app/api/recetas`/`app/api/recipes` no existen (R39).
+
+## Verificación de la tanda (Grupo C: T9, T18, T10, T11, T12, T13)
+
+- `pnpm run typecheck` → limpio (sin salida, exit 0).
+- `pnpm run lint` → limpio (sin salida, exit 0).
+- `pnpm exec vitest run tests/unit/recetas tests/unit/inventario/product-catalog.test.ts
+  tests/guards/guard-arquitectura-modulos.test.ts` → **16 test files, 182 tests, todos
+  passed** (incluye los 4 archivos nuevos de este grupo —
+  `recipe-lines-catalog.test.ts` 5, `storage-config.test.ts` 8, `recipe-actions.test.ts`
+  10, `product-catalog.test.ts` 3 — más el ajuste sin regresión de `module-contract.test.ts`
+  y de `storage-config.test.ts`/comentario, sobre los 11 ya existentes de Grupo A/B).
+- Además, para descartar regresión fuera del recorte explícito de la tanda: `pnpm exec
+  vitest run tests/unit/inventario tests/guards` → **25 test files, 263 tests, todos
+  passed**; y `pnpm exec vitest run tests/unit` (TODA la suite unitaria del repo,
+  incluidos `identity`) → **79 test files, 811 tests, todos passed**. No se corrió
+  `./init.sh` completo ni la suite de integración (`tests/integration/**`, que necesita
+  Postgres real y este worktree no tiene `.env`): eso es T16, Grupo D, antes del PR.
+
+## Qué resultó imposible de cumplir tal como está escrito, y ajustes sobre lo que dejó Grupo B
+
+- **Nada de R1-R49 resultó imposible** en este grupo tampoco.
+- **`update-recipe.ts` (Grupo B) no tenía ningún bug**: T18 lo puso a prueba
+  explícitamente (mezcla de línea vieja + línea nueva, alta con todas nuevas, línea nueva
+  de producto de baja rechazada) y los cuatro casos pasaron sin tocar ese archivo.
+- **Dos ajustes, documentados y acotados, sobre `tests/unit/recetas/module-contract.test.ts`**
+  (no producido por mí, pero que bloqueaba legítimamente T10/T12 tal como estaba escrito):
+  ver el detalle en la sección de T12 de arriba. Ninguno relaja una guardia real —la
+  guardia estática (`guard-arquitectura-modulos.test.ts`) sigue vigilando exactamente lo
+  mismo que antes—: solo se retiraron aserciones de un test ad-hoc que databan de cuando
+  `adapters/` todavía no existía y que su propio comentario anticipaba como transitorias.
+- **Incertidumbre señalada, no resuelta, sobre la traducción del SQLSTATE `23514`** en
+  `recipe-prisma.ts` (T10): sin acceso a Postgres real en esta sesión no se pudo confirmar
+  empíricamente si el cliente Prisma tipado expone `meta.code` para una violación de
+  `CHECK` (a diferencia de un `$queryRaw`, que sí lo hace de forma comprobada, según el
+  propio `tests/integration/recetas/recetas-constraints.int.test.ts` de QC-24). La
+  implementación cubre el caso documentado (`meta.code === '23514'`) y dejó aislada la
+  función que T14 (Grupo D, integración contra Postgres real) tendrá que ajustar si el
+  comportamiento real difiere.
+
+## Veredicto
+
+Grupo C (T9, T18, T10, T11, T12, T13) cerrado: `ProductCatalog` real de `inventario`
+consultado por `recetas` sin tocar `prisma.product`; persistencia de receta con
+conciliación transaccional de líneas y traducción de SQLSTATE; Storage de Supabase
+detrás del puerto con configuración diferida y `.env.example` documentado; contrato
+público completo y composición cableada sin tocar `identity`/`inventario`; Server
+Actions con validación en el borde y advertencias de almacenamiento registradas sin
+romper la edición. `typecheck`, `lint` y 811 tests de la suite unitaria completa en
+verde. Falta el Grupo D (T14 integración contra Postgres real, T15 cierre de alcance,
+T16 `./init.sh` completo) para dar la feature por terminada.

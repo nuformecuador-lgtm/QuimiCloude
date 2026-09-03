@@ -104,7 +104,7 @@
       (R47, R48, R49), incluido el caso del doble cuyo `remove` **rechaza** y la edición resuelve
       igual con su advertencia.
 
-- [ ] **T18 — Validación de producto solo para las líneas nuevas.** Diferencia de conjuntos de
+- [x] **T18 — Validación de producto solo para las líneas nuevas.** Diferencia de conjuntos de
       `design.md > 6`: `findRefs` se pide **solo** sobre los productos que no estaban ya en la
       receta; en el alta, sobre todos. La línea preexistente con producto dado de baja se admite
       (R45); añadir un producto inexistente o de baja se rechaza (R46). El `productName` del
@@ -114,13 +114,13 @@
 
 ## Grupo C — adaptadores y cableado (depende de B)
 
-- [ ] **T9 [P] — Implementación de `ProductCatalog` en `inventario`.**
+- [x] **T9 [P] — Implementación de `ProductCatalog` en `inventario`.**
       `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`: `findRefs`
       devolviendo solo productos **vivos**, en una sola consulta.
       *Depende de:* T5. **Hecho cuando:** `tests/unit/inventario/product-catalog.test.ts` pasa y la
       guardia de módulos sigue verde —`recetas` no escribe `prisma.product` en ninguna parte—.
 
-- [ ] **T10 [P] — Adaptador driven de persistencia.**
+- [x] **T10 [P] — Adaptador driven de persistencia.**
       `adapters/driven/persistence/recipe-prisma.ts`: filtro `deleted_at IS NULL`, escritura de
       `created_by`/`updated_by`, conversión `string ↔ Prisma.Decimal`, orden `name ASC` **sin
       desempate** (D13), uso de `lib/shared/pagination`, conciliación en una sola
@@ -129,7 +129,7 @@
       *Depende de:* T5. **Hecho cuando:** typecheck limpio y es el único archivo del módulo que
       importa `@prisma/client`.
 
-- [ ] **T11 [P] — Adaptador driven de Storage y su configuración.**
+- [x] **T11 [P] — Adaptador driven de Storage y su configuración.**
       `adapters/driven/storage/recipe-image-supabase.ts` (único archivo del repo que importa
       `@supabase/storage-js`) y `adapters/driven/config/storage-config-env.ts`, que lee las tres
       variables **en el momento de la invocación** y falla nombrándolas sin filtrar valores.
@@ -140,7 +140,7 @@
       (R28), la suite entera sigue verde con las tres variables vacías (R43) y el adaptador tiene
       exactamente una operación de borrado.
 
-- [ ] **T12 — Contrato y punto de composición.** `lib/modules/recetas/index.ts` reexporta tipos,
+- [x] **T12 — Contrato y punto de composición.** `lib/modules/recetas/index.ts` reexporta tipos,
       esquemas, errores y las cinco factories —**solo** de `./domain`—; `lib/composition/index.ts`
       gana la fachada `recetas` con el repositorio, el `ProductCatalog` de `inventario` y el
       almacenamiento, sin tocar el cableado de `identity` ni el de `inventario`.
@@ -148,7 +148,7 @@
       arrastra `'use server'`, Prisma, `next/*` ni `@supabase/storage-js` en su cierre transitivo
       (R40).
 
-- [ ] **T13 — Server Actions.** `adapters/driving/recipe-actions.ts`: `'use server'`, actor desde
+- [x] **T13 — Server Actions.** `adapters/driving/recipe-actions.ts`: `'use server'`, actor desde
       `identity.getSessionUser()` vía `@/lib/composition`, validación zod antes de llamar al caso
       de uso y errores traducidos a estado serializable para el formulario de QC-26. Las
       **advertencias de almacenamiento** que devuelve la edición (R49) se registran con su contexto
