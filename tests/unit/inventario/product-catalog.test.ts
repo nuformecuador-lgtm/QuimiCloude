@@ -12,14 +12,14 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 
 describe('toProductRef', () => {
-  it('mapea id, name y unit tal cual', () => {
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unit: 'litros' });
-    expect(ref).toEqual({ id: 'p-1', name: 'Acido sulfurico', unit: 'litros' });
+  it('mapea id, name y unitId tal cual', () => {
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: 'u-1' });
+    expect(ref).toEqual({ id: 'p-1', name: 'Acido sulfurico', unitId: 'u-1' });
   });
 
-  it('conserva unit null cuando el producto no la tiene', () => {
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unit: null });
-    expect(ref.unit).toBeNull();
+  it('conserva unitId null cuando el producto no la tiene', () => {
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null });
+    expect(ref.unitId).toBeNull();
   });
 });
 

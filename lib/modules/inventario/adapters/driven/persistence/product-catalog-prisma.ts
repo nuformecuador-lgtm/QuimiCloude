@@ -16,12 +16,12 @@ import type { ProductId, ProductRef } from '../../../domain/product-catalog';
 type ProductCatalogRow = {
   readonly id: string;
   readonly name: string;
-  readonly unit: string | null;
+  readonly unitId: string | null;
 };
 
 /** Fila de Prisma -> `ProductRef` del contrato publico. Funcion pura, testeable sin base. */
 export function toProductRef(row: ProductCatalogRow): ProductRef {
-  return { id: row.id, name: row.name, unit: row.unit };
+  return { id: row.id, name: row.name, unitId: row.unitId };
 }
 
 export async function findProductRefs(ids: readonly ProductId[]): Promise<readonly ProductRef[]> {
@@ -29,7 +29,7 @@ export async function findProductRefs(ids: readonly ProductId[]): Promise<readon
 
   const rows = await prisma.product.findMany({
     where: { id: { in: [...ids] }, deletedAt: null },
-    select: { id: true, name: true, unit: true },
+    select: { id: true, name: true, unitId: true },
   });
 
   return rows.map(toProductRef);
