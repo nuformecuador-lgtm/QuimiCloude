@@ -208,13 +208,21 @@ verificado contra el árbol de la rama, no contra este documento.
       **R29 y R32 son las otras dos reglas nuevas**: el costo cero se rechaza con `23514` desde la
       base al insertar y al modificar, y el autor inexistente con `23503`.
 
-- [ ] **T19 — Cierre del alcance.** Revisar que `tests/unit/proveedores/scope.test.ts` (T2) sigue
+- [x] **T19 — Cierre del alcance.** Revisar que `tests/unit/proveedores/scope.test.ts` (T2) sigue
       cubriendo sus cláusulas ahora que el módulo tiene contenido, y que ninguna guardia se relajó
       para que algo pasara.
       *Depende de:* T14, T18. **Hecho cuando:** el test falla si se añade una pantalla, un route
       handler, una columna nueva o una copia de la aritmética de paginación.
+      **Cerrada con un hallazgo, arreglado:** el caso `no hay ningun route handler de proveedores
+      bajo app/api` buscaba en el contenido de `app/api/**` la cadena `lib/modules/proveedores`, y
+      un route handler en una carpeta con otro nombre que pidiera la fachada a `@/lib/composition`
+      (`app/api/compras/route.ts` con `proveedores.listSuppliers(...)`) se le escapaba. Pasa a
+      buscar la PALABRA (`/proveedor|supplier/i`), el mismo criterio que
+      `module-contract.test.ts` ya aplicaba a todo `app/`. Mutacion comprobada en rojo y
+      revertida. Detalle de las once mutaciones en
+      `progress/impl_QC-43-crud-de-proveedores.md`.
 
-- [ ] **T20 — Cierre.** `./init.sh` completo en verde,
+- [x] **T20 — Cierre.** `./init.sh` completo en verde,
       `progress/impl_QC-43-crud-de-proveedores.md` con la salida real de los tests, la lista de T0 y
       el mapa `R<n> → test` de abajo, y todas las tasks marcadas `[x]`.
       *Depende de:* todas. **Hecho cuando:** `CHECKPOINTS.md` se cumple entero.
@@ -234,7 +242,7 @@ los cambia, cambia también aquí.
 | R3 | `tests/unit/proveedores/authorization.test.ts` | `un actor ausente, con rol nulo, vacio o desconocido se rechaza igual que el Operador` |
 | R4 | `tests/unit/proveedores/authorization.test.ts` | `el rol autorizado sale de ROLE_ADMINISTRADOR de identity y ningun archivo del modulo incrusta el literal` |
 | R5 | `tests/unit/proveedores/supplier-actions.test.ts` | `la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el rol` |
-| R6 | `tests/guards/guard-rls-force.test.ts` | `toda tabla creada en las migraciones tiene ENABLE y FORCE ROW LEVEL SECURITY` (ya existente) |
+| R6 | `tests/guards/guard-rls-force.test.ts` | `toda tabla creada tiene RLS activado y forzado` (ya existente) |
 | R7 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `crea el proveedor con sus datos validos y devuelve su identificador` |
 | R8 | `tests/unit/proveedores/supplier-service.test.ts` + `tests/integration/proveedores/supplier-crud.int.test.ts` | `guarda al actor como autor de creacion y de modificacion al crear, y solo de modificacion al editar y al dar de baja` + `la edicion y la baja no pisan created_by y sellan updated_by con el actor` |
 | R9 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el nombre vacio, el de solo espacios y el que queda vacio al normalizarlo, y recorta los extremos` |
@@ -247,14 +255,14 @@ los cambia, cambia también aquí.
 | R16 | `tests/unit/proveedores/supplier-service.test.ts` | `persiste el nombre normalizado junto al nombre en el alta y en la edicion` |
 | R17 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `el indice unico parcial rechaza con SQLSTATE 23505 el segundo proveedor vivo con el mismo nombre normalizado` |
 | R18 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `devuelve como maximo el tamano de pagina pedido y el total de proveedores` |
-| R19 | `tests/integration/proveedores/supplier-crud.int.test.ts` + `tests/unit/pagination.test.ts` | `usa 10 por defecto y devuelve 25 como maximo cuando se piden 100` + `usa 10 por defecto y acota a 25` (ya existente, QC-20) |
+| R19 | `tests/integration/proveedores/supplier-crud.int.test.ts` + `tests/unit/pagination.test.ts` | `usa 10 por defecto y devuelve 25 como maximo cuando se piden 100` + `usa 10 elementos por pagina cuando no se indica tamano` y `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` (ya existentes, QC-20) |
 | R20 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1, sin leer del repositorio` |
 | R21 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `ordena por nombre ascendente y recorre las paginas sin repetir ni omitir ningun proveedor` |
 | R22 | `tests/unit/proveedores/supplier-service.test.ts` + `tests/integration/proveedores/supplier-crud.int.test.ts` | `no existe ninguna operacion de restaurar ni de listar dados de baja` + `la lista y la ficha excluyen los proveedores dados de baja` |
 | R23 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `al dar de baja conserva la fila completa y marca deleted_at` |
 | R24 | `tests/unit/proveedores/supplier-service.test.ts` | `devuelve no encontrado al consultar, editar o dar de baja un proveedor inexistente o ya dado de baja` |
 | R25 | `tests/integration/proveedores/catalog-line.int.test.ts` | `crea la linea del catalogo de un proveedor vivo y devuelve su identificador` |
-| R26 | `tests/unit/proveedores/catalog-service.test.ts` + `tests/guards/guard-arquitectura-modulos.test.ts` | `rechaza la linea cuyo producto no existe o esta dado de baja, preguntando al contrato de inventario` + `ningun modulo consulta un modelo ajeno con Prisma` (ya existente) |
+| R26 | `tests/unit/proveedores/catalog-service.test.ts` + `tests/guards/guard-arquitectura-modulos.test.ts` | `rechaza la linea cuyo producto no existe o esta dado de baja, preguntando al contrato de inventario` + `ningun adaptador driven real accede a un modelo de otro modulo` (ya existente) |
 | R27 | `tests/unit/proveedores/catalog-service.test.ts` + `tests/integration/proveedores/catalog-line.int.test.ts` | `traduce el duplicado del puerto a error de linea repetida` + `el indice unico (supplier_id, product_id) rechaza con SQLSTATE 23505 la segunda linea` |
 | R28 | `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza el costo cero y el costo negativo antes de llegar al repositorio` |
 | R29 | `tests/integration/proveedores/catalog-line.int.test.ts` | `el CHECK rechaza con SQLSTATE 23514 la linea con costo cero o negativo, al insertar y al modificar` |
@@ -272,9 +280,9 @@ los cambia, cambia también aquí.
 | R41 | `tests/unit/proveedores/supplier-input.test.ts` + `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza la entrada que no cumple el esquema antes de llamar al caso de uso` (en ambos) |
 | R42 | `tests/unit/proveedores/supplier-actions.test.ts` + `tests/unit/proveedores/scope.test.ts` | `las mutaciones reciben FormData y las consultas argumentos tipados` + `no hay ningun route handler de proveedores bajo app/api` |
 | R43 | `tests/unit/proveedores/supplier-actions.test.ts` | `traduce cada error de dominio a status error con el code estable de la clase, nunca con el texto` |
-| R44 | `tests/guards/guard-arquitectura-modulos.test.ts` + `tests/unit/proveedores/module-contract.test.ts` | `domain y ports no importan framework, base de datos, shared ni adaptadores` · `el contrato solo reexporta de ./domain` (ya existentes) + `el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User` |
-| R45 | `tests/unit/proveedores/scope.test.ts` + `tests/unit/pagination.test.ts` | `el modulo proveedores no reimplementa el calculo de paginacion` + `usa 10 por defecto y acota a 25` (ya existente) |
-| R46 | `tests/guards/guard-dependencias-aprobadas.test.ts` | `toda dependencia de package.json esta en docs/dependencias.md` (ya existente) |
+| R44 | `tests/guards/guard-arquitectura-modulos.test.ts` + `tests/unit/proveedores/module-contract.test.ts` | `ningun archivo real de domain/ports importa algo prohibido` · `los contratos reales (identity, inventario) no arrastran servidor` (ya existentes) + `el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User` |
+| R45 | `tests/unit/proveedores/scope.test.ts` + `tests/unit/pagination.test.ts` | `el modulo proveedores no reimplementa el calculo de paginacion` + `usa 10 elementos por pagina cuando no se indica tamano` y `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` (ya existentes) |
+| R46 | `tests/guards/guard-dependencias-aprobadas.test.ts` | `toda dependencia de package.json tiene su fila en el registro` (ya existente) |
 | R47 | `tests/unit/proveedores/scope.test.ts` | `no existe ninguna pantalla, pagina ni componente de proveedores, ni spec E2E nuevo` |
 | R48 | `tests/integration/proveedores/catalog-line.int.test.ts` | `un proveedor dado de baja no admite lineas nuevas ni edicion de las suyas, y el borrado si sigue permitido` |
 

@@ -613,3 +613,274 @@ R48 implementada donde vive la definición de «proveedor vivo» —el adaptador
 excluido a propósito y dicho en voz alta; T17 y T18 cerradas con 20 casos contra Postgres real, los
 cuatro huecos que declaró la tanda anterior cerrados, y **cada requisito con una mutación que lo
 puso rojo de verdad**.
+
+---
+
+## Tanda 5 — T19 y T20 (cierre del alcance y cierre documental)
+
+Tanda de **desconfianza y cierre**: no se implementa nada nuevo de negocio. Se rompe el árbol a
+propósito para comprobar que los tests muerden, se repasan una a una las afirmaciones de QC-42 que
+esta feature derogó o amplió, y se cuadra la trazabilidad.
+
+### Archivos modificados
+
+| Archivo | Qué cambió |
+| --- | --- |
+| `tests/unit/proveedores/scope.test.ts` | **Hallazgo de T19, arreglado.** El barrido de `app/api/**` buscaba en el contenido la cadena `lib/modules/proveedores`; pasa a buscar la palabra (`PATRON_PROVEEDORES`) |
+| `specs/QC-43-crud-de-proveedores/tasks.md` | T19 y T20 a `[x]`; nota del hallazgo en T19; **seis filas de la tabla de trazabilidad corregidas** al nombre literal del test heredado |
+| `progress/impl_QC-43-crud-de-proveedores.md` | Esta sección |
+
+Nada más. No se abrió `app/` ni `components/`, no se tocó `lib/modules/inventario/`, ninguna
+dependencia nueva, ninguna guardia tocada: `git diff cc17e1c..HEAD -- tests/guards scripts init.sh
+package.json` sale **vacío**.
+
+### T19 — las quince mutaciones, y cuál enrojeció
+
+Cada una se **creó de verdad**, se corrió el test, y se revirtió. No se leyó el test y se dio por
+bueno: esa es justo la forma de fallo que T19 existe para cazar (precedente de QC-22, donde la
+guardia medía por archivo y no por control).
+
+| # | Mutación introducida | Test que enrojeció |
+| --- | --- | --- |
+| 1 | `app/(private)/proveedores/page.tsx` | `scope` › `no existe ninguna pantalla, pagina ni componente…` **y** `module-contract` › `la feature no anade adaptadores driving, rutas ni Server Actions` |
+| 2 | `app/api/proveedores/route.ts` | `scope` › `no hay ningun route handler de proveedores bajo app/api` |
+| 3 | `app/api/compras/route.ts` importando el módulo por `@/lib/modules/proveedores` | `scope` › `no hay ningun route handler…` |
+| 3b | **El mismo, pero pidiendo la fachada a `@/lib/composition`** y llamando a `proveedores.listSuppliers(...)`, sin nombrar la ruta del módulo | **`scope` se quedaba VERDE.** Solo lo cazaba `module-contract`. → **hallazgo, arreglado** (ver abajo). Tras el arreglo, `scope` cae con `app/api/compras/route.ts no puede consumir el modulo proveedores: R42 prohibe la ruta API` |
+| 4 | Columna `notes` de más en `model Supplier` | `scope` › `esta feature no anade ninguna columna, indice ni restriccion…` (`model Supplier gano, perdio o renombro algo…`) |
+| 5 | Una función `offsetDe` con `(page - 1) * pageSize` en `domain/page.ts` | `scope` › `el modulo proveedores no reimplementa el calculo de paginacion` (dos patrones a la vez) |
+| 6 | Tercera migración `20260904000000_mutante` con un `ALTER TABLE suppliers` | `scope` › `esta feature no anade ninguna columna, indice ni restriccion…` (censo de migraciones que tocan las dos tablas) |
+| 7 | `ports/.gitkeep` reintroducido junto a los dos puertos reales | `scope` › `ningun .gitkeep convive con archivos reales…` |
+| 8 | `e2e/proveedores.spec.ts` y `components/proveedores/tabla.tsx` | `scope` › `no existe ninguna pantalla, pagina ni componente…, ni spec E2E nuevo` (los dos, comprobados por separado porque el caso falla al primero) |
+| 9 | `ports/clock.ts` y `adapters/driving/otra-accion.ts` de más | `module-contract` › `la feature no anade adaptadores driving…` **y** › `el cableado puerto-implementacion…` |
+| 10 | `import { Prisma } from '@prisma/client'` en `domain/page.ts` (**tercer** archivo con ORM) | `module-contract` › `lib/modules/proveedores no contiene prisma.product, prisma.user, @prisma/client…` — la lista blanca de dos archivos es **exacta** |
+| 11 | `creator User? @relation(...)` en `SupplierCatalogLine` más su reverso en `User`, con `prisma generate` de por medio | `module-contract` › **`el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User`** (T15) y otras cuatro del `dmmf`. Es la mutación que T15 declaraba y que ninguna guardia ve |
+| 12 | En `migration.sql`: quitar `COALESCE`, cambiar `> 0` por `>= 0`, cambiar `RESTRICT` por `SET NULL` | `proveedores-migration` › `el CHECK de contacto trata el blanco como ausencia…`, › `…sin COALESCE deja de vigilar…`, › `el CHECK del costo pasa a exigir mayor que cero…`, › `la linea gana las dos columnas de autor con sus dos FK…` |
+| 13 | `down.sql` sin sus dos `ADD CONSTRAINT` (solo `DROP`) | `proveedores-migration` › `el down.sql recrea las dos restricciones de QC-42…` y › `un down.sql que solo dropeara…` |
+| 14 | `SupplierCatalogLine.createdBy` a **requerido y con `@default`** | `proveedores-schema` › `SupplierCatalogLine declara createdBy y updatedBy como escalares uuid opcionales` (y otros cuatro) |
+| 15 | Quitar el `@@index([createdBy], map: "supplier_catalog_lines_created_by_idx")` | `proveedores-schema` › el mismo caso y › `las dos tablas y sus columnas mapean a snake_case en ingles` |
+
+Con el árbol restaurado, `tests/unit/proveedores` + `tests/guards` vuelven a verde (215 tests).
+
+#### El hallazgo (#3b) y su arreglo
+
+`scope.test.ts` afirmaba, sobre el contenido de `app/api/**`, que ningún archivo contuviera la
+cadena `lib/modules/proveedores`. Eso mide **el import del módulo**, no **el consumo del módulo**.
+Un route handler en una carpeta con cualquier otro nombre —`app/api/compras/route.ts`— que hiciera
+`import { proveedores } from '@/lib/composition'` y llamara a `proveedores.listSuppliers(...)` es
+exactamente lo que R42 prohíbe —una superficie HTTP pública nueva— y **no aparecía**. Es la misma
+clase de agujero que el de QC-22: la afirmación medía el vehículo, no el efecto. Pasa a medir la
+palabra (`PATRON_PROVEEDORES`, `/proveedor|supplier/i`), que es el criterio que
+`module-contract.test.ts` ya aplicaba a todo `app/`. Comprobado en rojo con la mutación puesta y en
+verde tras revertirla.
+
+#### Las afirmaciones de QC-42 que esta feature derogó o amplió: repaso una a una
+
+| Afirmación de QC-42 | Qué se hizo | ¿Sigue mordiendo? |
+| --- | --- | --- |
+| `module-contract`: **ningún** archivo del módulo importa `@prisma/client` | Lista blanca **exacta** de los dos adaptadores driven (T11, T12) | **Sí.** Mutación 10: un tercer archivo cae. La lista es un `includes` sobre dos rutas literales, no un patrón de carpeta |
+| `module-contract`: `ports/`, `adapters/driven/` y `adapters/driving/` **vacías** | Censo **exacto** de archivos por carpeta (2 + 2 + 2) | **Sí.** Mutación 9: un archivo de más en cualquiera de las tres cae. Se cambió «vacía» por «exactamente estos», que es igual de falsable |
+| `module-contract`: los tres `.gitkeep` **existen** | Invertida: los tres **no** existen | **Sí**, y además `scope` lo vigila por el otro lado (mutación 7): un `.gitkeep` conviviendo con archivos reales cae |
+| `module-contract`: ningún `'use server'` en **todo** el módulo | `'use server'` **obligatorio** en `adapters/driving/` y prohibido en el resto | **Sí, y es más fuerte:** antes era una prohibición; ahora es prohibición **más** obligación posicional (primera línea útil). Un `'use server'` colado en `domain/` sigue cayendo |
+| `module-contract`: `lib/composition` **no menciona** `proveedores` | Invertida en un caso nuevo: la fachada existe **exactamente una vez**, con las **nueve** claves, `productCatalog` construido **una** sola vez, y nadie fuera de la composición importa `adapters/` ni `ports/` | **Sí, y cubre más:** la versión de QC-42 solo podía decir «no está»; la nueva dice «está, completa y en un solo sitio». Un décimo caso de uso colado, uno que falte, o un `driven` instanciado fuera, caen |
+| `proveedores-schema`: `SupplierCatalogLine` **no declara** `createdBy` ni `updatedBy` | Invertida por **decisión humana** (QC-43, decisión cerrada 3): sí los declara | **Sí.** La ausencia se sustituyó por una presencia con **más** exigencias: `String`, `@db.Uuid`, opcional, sin `@default`, **sin `@relation`** y con sus dos `@@index` nombrados. Mutaciones 14 y 15 lo confirman |
+| `proveedores-schema`: `CROSS_MODULE_SCALARS` con tres escalares sin `@relation` | Ampliado a **cinco** | **Sí.** Es la misma regla aplicada a dos columnas más, no una excepción |
+| `proveedores-schema`: censo de índices | Ampliado con los dos nuevos, sigue siendo un `toEqual` exhaustivo | **Sí.** Mutación 15 |
+| `proveedores-constraints.int`: «cero es válido en los tres campos» | El costo cero pasa a **rechazarse** (`23514`), verificado con SQL crudo contra Postgres | **Sí, y es más fuerte:** antes se afirmaba que un insert **pasaba**; ahora se afirma que la **base** lo rechaza con un SQLSTATE concreto. El mínimo y el plazo siguen admitiendo cero, que es lo que no cambió |
+| `proveedores-constraints.int`: censo de FK de las dos tablas | Ampliado de tres a cinco filas, sigue `toEqual` exhaustivo y ordenado | **Sí.** Precisamente **porque** es exhaustivo hubo que tocarlo: una FK nueva no puede entrar sin que nadie se entere |
+
+**Conclusión de T19:** de las diez afirmaciones derogadas o ampliadas, **ninguna quedó más floja**;
+ocho quedaron igual de exigentes en forma distinta y dos —el `'use server'` posicional y el
+cableado de la composición— quedaron **más** exigentes. La única relajación real de toda la feature
+estaba en un test **nuevo** de esta ficha, no en uno heredado, y está arreglada.
+
+### T20 — mapa `R<n> → test` consolidado
+
+Cuadra **nombre a nombre** con la tabla de `specs/QC-43-crud-de-proveedores/tasks.md`. Seis filas
+de esa tabla citaban de memoria el nombre de un test **heredado** y no coincidían con el literal
+del archivo; se corrigió la tabla, no los tests: renombrar una guardia de otra feature para que
+encaje en la mía sería el mundo al revés. Son R6, R19, R26, R44, R45 y R46.
+
+| R | Archivo | Nombre literal del test |
+| --- | --- | --- |
+| R1 | `tests/unit/proveedores/authorization.test.ts` | `cada caso de uso recibe el actor por parametro y no lee ninguna sesion` |
+| R2 | `tests/unit/proveedores/authorization.test.ts` | `un actor con rol Operador es rechazado en los nueve casos de uso sin llamar a ningun puerto` |
+| R3 | `tests/unit/proveedores/authorization.test.ts` | `un actor ausente, con rol nulo, vacio o desconocido se rechaza igual que el Operador` |
+| R4 | `tests/unit/proveedores/authorization.test.ts` | `el rol autorizado sale de ROLE_ADMINISTRADOR de identity y ningun archivo del modulo incrusta el literal` |
+| R5 | `tests/unit/proveedores/supplier-actions.test.ts` | `la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el rol` |
+| R6 | `tests/guards/guard-rls-force.test.ts` (heredado) | `toda tabla creada tiene RLS activado y forzado` |
+| R7 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `crea el proveedor con sus datos validos y devuelve su identificador` |
+| R8 | `supplier-service.test.ts` + `supplier-crud.int.test.ts` | `guarda al actor como autor de creacion y de modificacion al crear, y solo de modificacion al editar y al dar de baja` + `la edicion y la baja no pisan created_by y sellan updated_by con el actor` |
+| R9 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el nombre vacio, el de solo espacios y el que queda vacio al normalizarlo, y recorta los extremos` |
+| R10 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el nombre de mas de 120, el telefono de mas de 40 y el correo de mas de 160` |
+| R11 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza el proveedor cuyo telefono y correo llegan los dos ausentes, vacios o en blanco` |
+| R12 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `el CHECK rechaza con SQLSTATE 23514 el proveedor vivo sin contacto util, al insertar y al modificar` |
+| R13 | `tests/unit/proveedores/supplier-input.test.ts` | `recorta los extremos del telefono y del correo y convierte en ausencia el que llega en blanco` |
+| R14 | `tests/unit/proveedores/supplier-service.test.ts` | `la edicion reemplaza nombre, telefono y correo y no expone ninguna operacion por campo suelto` |
+| R15 | `supplier-service.test.ts` + `supplier-crud.int.test.ts` | `traduce el duplicado del puerto a error de nombre repetido sin crear ni modificar nada` + `el nombre de un proveedor dado de baja queda libre para otro proveedor` |
+| R16 | `tests/unit/proveedores/supplier-service.test.ts` | `persiste el nombre normalizado junto al nombre en el alta y en la edicion` |
+| R17 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `el indice unico parcial rechaza con SQLSTATE 23505 el segundo proveedor vivo con el mismo nombre normalizado` |
+| R18 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `devuelve como maximo el tamano de pagina pedido y el total de proveedores` |
+| R19 | `supplier-crud.int.test.ts` + `tests/unit/pagination.test.ts` (heredado) | `usa 10 por defecto y devuelve 25 como maximo cuando se piden 100` + `usa 10 elementos por pagina cuando no se indica tamano` y `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` |
+| R20 | `tests/unit/proveedores/supplier-input.test.ts` | `rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1, sin leer del repositorio` |
+| R21 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `ordena por nombre ascendente y recorre las paginas sin repetir ni omitir ningun proveedor` |
+| R22 | `supplier-service.test.ts` + `supplier-crud.int.test.ts` | `no existe ninguna operacion de restaurar ni de listar dados de baja` + `la lista y la ficha excluyen los proveedores dados de baja` |
+| R23 | `tests/integration/proveedores/supplier-crud.int.test.ts` | `al dar de baja conserva la fila completa y marca deleted_at` |
+| R24 | `tests/unit/proveedores/supplier-service.test.ts` | `devuelve no encontrado al consultar, editar o dar de baja un proveedor inexistente o ya dado de baja` |
+| R25 | `tests/integration/proveedores/catalog-line.int.test.ts` | `crea la linea del catalogo de un proveedor vivo y devuelve su identificador` |
+| R26 | `catalog-service.test.ts` + `tests/guards/guard-arquitectura-modulos.test.ts` (heredado) | `rechaza la linea cuyo producto no existe o esta dado de baja, preguntando al contrato de inventario` + `ningun adaptador driven real accede a un modelo de otro modulo` |
+| R27 | `catalog-service.test.ts` + `catalog-line.int.test.ts` | `traduce el duplicado del puerto a error de linea repetida` + `el indice unico (supplier_id, product_id) rechaza con SQLSTATE 23505 la segunda linea` |
+| R28 | `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza el costo cero y el costo negativo antes de llegar al repositorio` |
+| R29 | `tests/integration/proveedores/catalog-line.int.test.ts` | `el CHECK rechaza con SQLSTATE 23514 la linea con costo cero o negativo, al insertar y al modificar` |
+| R30 | `tests/unit/proveedores/catalog-line-input.test.ts` | `rechaza el minimo de compra y el tiempo de entrega negativos, y admite la linea sin ninguno de los dos` |
+| R31 | `catalog-service.test.ts` + `catalog-line.int.test.ts` | `guarda al actor como autor de creacion y de modificacion de la linea, y al editarla no toca ningun dato del proveedor` + `la edicion de la linea no pisa created_by y no toca ninguna columna del proveedor` |
+| R32 | `tests/integration/proveedores/catalog-line.int.test.ts` | `la FK rechaza con SQLSTATE 23503 el autor inexistente y admite la linea sin autor` |
+| R33 | `catalog-line-input.test.ts` + `catalog-service.test.ts` | `el esquema de edicion rechaza un productId o un supplierId de mas` + `la edicion cambia solo costo, minimo y plazo` |
+| R34 | `tests/integration/proveedores/catalog-line.int.test.ts` | `al dar de baja la linea su fila deja de existir y el proveedor queda intacto` |
+| R35 | `catalog-service.test.ts` + `supplier-service.test.ts` | `el catalogo se consulta con su propio listado paginado y ordenado` + `ni la ficha ni el listado de proveedores traen las lineas del catalogo` |
+| R36 | `tests/integration/proveedores/catalog-line.int.test.ts` | `el listado del catalogo no devuelve ninguna linea de un proveedor dado de baja, aunque las filas sigan en la base` |
+| R37 | `tests/integration/proveedores/catalog-line.int.test.ts` | `la linea de un producto dado de baja se conserva y sigue apareciendo en el catalogo de su proveedor` |
+| R38 | `schema/proveedores-migration.test.ts` + `scope.test.ts` | `la migracion solo contiene los tres cambios y no toca ninguna otra tabla` + `esta feature no anade ninguna columna, indice ni restriccion fuera de los tres cambios` |
+| R39 | `schema/proveedores-migration.test.ts` + task **T16** | `el down.sql recrea las dos restricciones de QC-42 con su definicion literal y borra las dos columnas de autor` + el ciclo real `db:migrate` → `db:rollback` → `db:migrate` de la tanda 3 |
+| R40 | `schema/proveedores-migration.test.ts` | `toda columna, indice y restriccion nueva esta en ingles y en snake_case` |
+| R41 | `supplier-input.test.ts` + `catalog-line-input.test.ts` | `rechaza la entrada que no cumple el esquema antes de llamar al caso de uso` (en los dos) |
+| R42 | `supplier-actions.test.ts` + `scope.test.ts` | `las mutaciones reciben FormData y las consultas argumentos tipados` + `no hay ningun route handler de proveedores bajo app/api` |
+| R43 | `tests/unit/proveedores/supplier-actions.test.ts` | `traduce cada error de dominio a status error con el code estable de la clase, nunca con el texto` |
+| R44 | `tests/guards/guard-arquitectura-modulos.test.ts` (heredado) + `module-contract.test.ts` | `ningun archivo real de domain/ports importa algo prohibido` · `los contratos reales (identity, inventario) no arrastran servidor` + `el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User` |
+| R45 | `scope.test.ts` + `tests/unit/pagination.test.ts` (heredado) | `el modulo proveedores no reimplementa el calculo de paginacion` + `usa 10 elementos por pagina cuando no se indica tamano` y `acota a 25 el tamano de pagina mayor que el maximo y devuelve ese mismo tamano en la pagina` |
+| R46 | `tests/guards/guard-dependencias-aprobadas.test.ts` (heredado) | `toda dependencia de package.json tiene su fila en el registro` |
+| R47 | `tests/unit/proveedores/scope.test.ts` | `no existe ninguna pantalla, pagina ni componente de proveedores, ni spec E2E nuevo` |
+| R48 | `tests/integration/proveedores/catalog-line.int.test.ts` | `un proveedor dado de baja no admite lineas nuevas ni edicion de las suyas, y el borrado si sigue permitido` |
+
+**48 de 48 requisitos con test.** Ninguna fila huérfana, ningún nombre inventado.
+
+La lista de lo que **se hereda y no se re-crea** (T0) está en la tanda 1 de este mismo archivo,
+verificada contra el árbol de la rama. Al cierre sigue siendo cierta, con los tres `.gitkeep` ya
+borrados —T7, T11, T12 y T14 llenaron sus carpetas— y `module-contract` afirmando su ausencia.
+
+### Salida real de la verificación (tanda 5)
+
+```
+$ pnpm run typecheck
+> quimicloude@0.1.0 typecheck
+> tsc --noEmit
+(sin salida: limpio)
+
+$ pnpm run lint
+> quimicloude@0.1.0 lint
+> eslint
+(sin salida: limpio)
+
+$ set -a && . ./.env && set +a
+$ npx vitest run tests/unit/proveedores tests/integration/proveedores tests/guards tests/unit/pagination.test.ts
+ Test Files  26 passed (26)
+      Tests  265 passed (265)
+   Duration  4.57s
+
+$ npx vitest run tests/unit/proveedores tests/guards   (arbol restaurado tras las mutaciones)
+ Test Files  22 passed (22)
+      Tests  215 passed (215)
+```
+
+`./init.sh` completo **lo corrió el leader** antes de esta tanda: **125 archivos, 1325 tests,
+`== init OK ==`**. Esta tanda no volvió a correrlo a propósito y solo tocó tres archivos, dos de
+ellos documentación; el tercero es `scope.test.ts`, cuya suite (`tests/unit/proveedores` +
+`tests/guards`) queda arriba en verde. **El leader debe volver a correr `./init.sh` antes del PR**
+— regla 5 de `CLAUDE.md`, sin excepción.
+
+### `CHECKPOINTS.md` — cumplimiento punto por punto, con los «no aplica» declarados
+
+Siguiendo el precedente de `specs/QC-12-dashboard-en-blanco/requirements.md > Notas de proceso`:
+los «no aplica» se **declaran**, no se omiten.
+
+**Especificación**
+- OK · `specs/QC-43-crud-de-proveedores/requirements.md` con R1–R48 en EARS.
+- OK · `design.md` con alternativas descartadas y su porqué (2.1/P2, 5.3, 7, 9, 12).
+- OK · `tasks.md`: **T0–T20, las veinte marcadas `[x]`**. Cero `[ ]`.
+
+**Trazabilidad**
+- OK · Cada `R1`–`R48` mapea a al menos un test concreto (tabla de arriba).
+- OK · El mapa `R<n> → test` está en este archivo, consolidado y cuadrado con `tasks.md`.
+
+**Calidad de código**
+- OK · `pnpm run typecheck` limpio. `pnpm run lint` limpio. `pnpm test` en verde (gate completo del
+  leader: 1325 tests).
+- **NO APLICA, con motivo declarado — E2E.** La feature toca permisos —los nueve casos de uso
+  exigen `ROLE_ADMINISTRADOR`—, así que el checkpoint la señala. Pero **no hay flujo navegable que
+  Playwright pueda visitar**: R47 prohíbe expresamente cualquier pantalla, y la UI es **QC-44**,
+  que el board tiene bloqueada por esta ficha. Es la decisión cerrada 8 del `design.md`, aprobada
+  por el humano al aprobar el spec. El sustituto no es «nada»: son los cinco casos de
+  `authorization.test.ts` sobre los nueve casos de uso —Operador, rol nulo, rol vacío, rol
+  desconocido y actor ausente—, cada uno afirmando `not.toHaveBeenCalled()` sobre los tres puertos.
+  **El E2E de permisos de proveedores es entregable de QC-44.**
+- **NO APLICA — UI multiplataforma.** Cero archivos en `app/` y en `components/`; `scope.test.ts`
+  lo vigila (mutaciones 1 y 8).
+- **NO APLICA — dependencias.** La feature **no añadió ninguna**; `package.json` no se tocó en todo
+  el rango `cc17e1c..HEAD`. `guard-dependencias-aprobadas` sigue verde.
+
+**Datos y seguridad (Supabase)**
+- OK · Cada permiso se valida en el **dominio**, en la primera línea del caso de uso
+  (`requireAdmin`), antes de `zod` y antes de tocar ningún puerto, y tiene test
+  (`authorization.test.ts`). Las policies no filtran nada y no se usan como frontera.
+- OK · Las dos tablas tienen `ENABLE` **y** `FORCE ROW LEVEL SECURITY` (`guard-rls-force` +
+  `proveedores-migration` › `las dos tablas quedan con RLS activado y forzado`). Vienen de QC-42;
+  esta ficha no crea ninguna tabla nueva.
+- OK · Todo el acceso a datos pasa por los dos adaptadores driven con Prisma. **Ninguna lectura ni
+  escritura con el cliente de Supabase** en todo el módulo.
+- OK · La migración `20260903200343_supplier_contact_cost_and_line_audit` tiene su `down.sql`, y el
+  ciclo real `db:migrate` → `db:rollback` → `db:migrate` está pegado en la **tanda 3** (T16), con
+  `_prisma_migrations` coherente.
+- OK · Ningún secreto hardcodeado: `DATABASE_URL` y `DIRECT_URL` por entorno; ninguna URL ni key de
+  Supabase en el código de la feature.
+- **NO APLICA — webhooks.** La feature no añade ninguno, ni ningún route handler (R42; mutaciones
+  2, 3 y 3b).
+
+**Módulos hexagonales**
+- OK · `domain/` y `ports/` no importan framework, base, `shared` ni adaptadores
+  (`guard-arquitectura-modulos` + `module-contract`).
+- OK · De `inventario` y de `identity` solo se importa el **barrel**.
+- OK · Las dos Server Actions piden la fachada a `@/lib/composition`; no instancian ningún `driven`
+  (`module-contract` › `el cableado puerto-implementacion…`).
+- OK · `lib/shared/**` sigue siendo hoja: esta ficha **consume** `pagination.ts` y no lo toca.
+- OK · Ningún `'use server'` sale del barrel: `index.ts` solo reexporta de `./domain` y su cierre
+  transitivo no arrastra Prisma ni `next/*`.
+- OK · Los dos modelos llevan `/// @module proveedores`; ningún módulo consulta un modelo ajeno
+  (`prisma.product` y `prisma.user` prohibidos y comprobados en los dos adaptadores).
+- OK · No reaparecen `lib/services/`, `lib/repositories/` ni `lib/interfaces/`.
+- OK · En la raíz de `lib/` siguen solo `modules/`, `shared/`, `composition/` y `utils.ts`. Esta
+  ficha no creó ninguna carpeta ahí. *(El checkpoint avisa de que la guardia no lo comprueba;
+  verificado a mano.)*
+- OK · **La lógica de negocio está en `domain/`, no en la Server Action** —el otro punto que el
+  checkpoint marca como no cubierto por la guardia—. Verificado a mano: `requireAdmin`, el parseo
+  `zod`, la normalización del nombre, la resolución del producto contra el contrato de `inventario`
+  y la traducción de `duplicate`/`not_found` viven en los nueve casos de uso; las dos acciones solo
+  leen la sesión, arman el input desde `FormData` y traducen el error a `{ status, code, message }`.
+
+**Permisos**
+- **NO APLICA — páginas protegidas.** No hay ninguna página (R47).
+- **NO APLICA — componentes `private/`.** No hay ninguno.
+- OK · Las mutaciones son **Server Actions**, no `fetch` a API routes. R42, con su test y tres
+  mutaciones que lo confirman.
+
+**Configuración**
+- OK · Nada que cambie entre entornos quedó hardcodeado. `DEFAULT_PAGE_SIZE` y `MAX_PAGE_SIZE` no
+  son configuración de entorno: son política de producto y viven en `lib/shared/pagination.ts`, en
+  un solo sitio (R45).
+
+**Verificación final** — los cuatro puntos son **del leader**, no del implementer, y quedan
+abiertos a propósito:
+- PENDIENTE · `./init.sh` en verde: lo corrió el leader antes de esta tanda (1325 tests). **Hay que
+  repetirlo antes del PR.**
+- PENDIENTE · `progress/review_QC-43-crud-de-proveedores.md`: lo escribe el `reviewer`. **No existe
+  todavía.**
+- PENDIENTE · Entrada en `progress/history.md`: la escribe el leader al cerrar.
+- PENDIENTE · Desmontar el worktree (`./scripts/wt.sh done QC-43-crud-de-proveedores`): del leader,
+  tras el merge.
+
+### Veredicto
+
+T19 cerrada **con un hallazgo real y arreglado** —el barrido de `app/api/**` medía el import y no
+el consumo, y una ruta API con otro nombre que pidiera la fachada se le escapaba—; las diez
+afirmaciones de QC-42 que esta feature derogó o amplió se repasaron una a una y **ninguna quedó más
+floja** (dos quedaron más exigentes); T20 cerrada con las veinte tasks en `[x]`, los 48 requisitos
+mapeados nombre a nombre y `CHECKPOINTS.md` cumplido con sus siete «no aplica» declarados en voz
+alta.

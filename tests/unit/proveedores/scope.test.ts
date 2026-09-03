@@ -86,12 +86,17 @@ describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handle
       )
     }
 
-    // Y no hay ningun route handler escondido en otro sitio de `app/api` que mencione al
-    // modulo: se mira el CONTENIDO, no solo el nombre de la carpeta.
+    // Y no hay ningun route handler escondido en otro sitio de `app/api` que llegue al
+    // modulo: se mira el CONTENIDO, no solo el nombre de la carpeta. Se busca la PALABRA,
+    // no el import de `lib/modules/proveedores`, porque el camino corto para saltarse esto
+    // es pedirle la fachada a `@/lib/composition` desde una carpeta con otro nombre
+    // (`app/api/compras/route.ts` con `proveedores.listSuppliers(...)`): ahi no aparece la
+    // ruta del modulo por ningun lado y el test se quedaria verde. Mismo criterio que
+    // `module-contract.test.ts` usa para todo `app/`.
     for (const archivo of filesIn(join(repoRoot, 'app', 'api'), /\.tsx?$/)) {
       const fuente = readFileSync(archivo, 'utf8')
       expect(
-        /lib\/modules\/proveedores/.test(fuente),
+        PATRON_PROVEEDORES.test(fuente),
         `${archivo} no puede consumir el modulo proveedores: R42 prohibe la ruta API`,
       ).toBe(false)
     }
