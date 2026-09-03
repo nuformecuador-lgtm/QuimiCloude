@@ -185,7 +185,7 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo D — verificación contra la base y cierre
 
-- [ ] **T16 — Ciclo real de la migración.** `pnpm run db:migrate` → `pnpm run db:rollback` →
+- [x] **T16 — Ciclo real de la migración.** `pnpm run db:migrate` → `pnpm run db:rollback` →
       `pnpm run db:migrate`, con la salida pegada en `progress/impl_QC-43-crud-de-proveedores.md`.
       *Depende de:* T3. **Hecho cuando:** el rollback deja el esquema **idéntico** al de QC-42 —las
       dos restricciones viejas presentes, las columnas de autor ausentes— y `_prisma_migrations`
