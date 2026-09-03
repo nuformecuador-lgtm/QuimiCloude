@@ -276,3 +276,234 @@ uno y conviene arreglarlos en la misma vuelta.
 Cuando MAYOR-1 este cerrado hay que **volver a correr `./init.sh` completo** —no el rapido—
 porque el cambio toca un adaptador con base real, y volver a comprobar que las tres mutaciones
 del mayor caen.
+
+---
+
+# Ronda 2 del reviewer — sobre `62f321d` (cambio de alcance del humano)
+
+> No reescribe nada de arriba. La ronda 1 y su RECHAZADO se quedan en el historial.
+> Objeto de esta ronda: el estado actual del worktree `.worktrees/QC-32-modelo-unidades`,
+> rama `feature/QC-32-modelo-unidades`, HEAD **`62f321d`**, PR #22. Auditada la seccion
+> `## Ronda 3 — el arrancador pasa a la migracion` de `progress/impl_QC-32-modelo-unidades.md`
+> y el diff `536ce49..62f321d` (20 archivos, +933/-1046).
+
+## Veredicto
+
+**APROBADO.** 0 mayores, 4 menores. Ninguno bloquea el merge.
+
+**MAYOR-1 de la ronda 1 queda DISUELTO, no perdonado.** El hallazgo era que R25/R26 estaban
+mapeados a tests que ejercitaban una **copia** del adaptador driven del seed. Ese adaptador, su
+puerto, su caso de uso, su cableado y su llamada ya no existen en el arbol: bajo
+`lib/modules/unidades` solo quedan `index.ts`, `domain/unit-name.ts`, `domain/unit-catalog.ts` y
+tres `.gitkeep`. El barrido de
+`seedStarterUnits|STARTER_UNITS|unit-seed-repository|seed-units|starter-units|unitSeedRepository`
+sobre todo el codigo no devuelve **ni una** referencia: solo prosa en `specs/`, en el barrel y en
+comentarios de test que explican que se retiro. El objeto del hallazgo desaparecio.
+
+## Checklist
+
+### Especificacion
+- [x] `requirements.md` con R1-R28 EARS. R25 y R26 **reescritos**, con el enunciado viejo citado
+      encima; decision cerrada 9 marcada como sustituida (2026-09-03); pregunta abierta 4 cerrada
+      por el humano (cuatro filas, minuscula, las cuatro con simbolo).
+- [x] `design.md` con la seccion 6 reescrita entera, la 5.4 **anulada** con su texto anterior
+      citado, y la 6.2 explicando por que ya no hay caso de uso. Las alternativas descartadas
+      siguen.
+- [x] `tasks.md` — **todas** las tasks `[x]`, incluidas T15 y T16 del bloque G nuevo. La busqueda
+      de tareas sin marcar no devuelve nada. T5 queda como `[x] ~~T5.~~ ANULADA`, con la anulacion
+      explicada en su sitio.
+
+### Trazabilidad
+- [x] Los 28 requisitos mapeados. La tabla de `tasks.md > Trazabilidad` esta actualizada para
+      R25/R26 y conserva citado el mapeo anterior.
+- [x] R25 y R26 **muerden**. Verificado por mi, mutando en disco y revirtiendo (el arbol queda
+      limpio al final): ver la tabla de mutaciones de abajo.
+- [!] El mapa `R<n> -> test` de `progress/impl_...md > T14` (ronda 1) sigue citando los tests
+      borrados para R25/R26 y el nombre viejo del caso de R16. Ver **menor-8**.
+
+### Verificacion ejecutable
+- [x] Gate completo sobre `62f321d`, corrido por el leader: 94 archivos, 1020 tests,
+      `== init OK ==`, sin el flake conocido. No lo repito, asi lo acota el encargo.
+- [x] Corrido por mi: `tests/unit/unidades` da **4 archivos, 47 tests, verde**;
+      `tests/integration/unidades` contra base real da **13 tests, verde**; `tests/guards` da
+      **11 archivos, 111 tests, verde**.
+
+### Calidad, seguridad y fronteras
+- [x] RLS `ENABLE` mas `FORCE` sobre `units`, intacto, y el `INSERT` va **antes** del `FORCE`
+      (`migration.sql:116-120` frente a `:170-171`), que es lo que evita que el catalogo nazca
+      vacio **sin que nada falle**. Hay caso dedicado y su mutacion de sensibilidad.
+- [x] Migracion reversible: `down.sql` no se toco y sigue siendo correcto. Su `DROP TABLE "units"`
+      (ultima sentencia) se lleva las cuatro filas, y su guardia mira lo que **apunta** al
+      catalogo, no el catalogo. Los dos predicados del DOWN caen con sus mutaciones.
+- [x] Sin secretos, sin hardcode de contexto, capas separadas: `lib/composition/index.ts` queda
+      sin `export const unidades` y con un comentario que dice quien lo llenara (QC-38);
+      `scripts/seed.ts` vuelve a ser el de QC-6 (roles y usuario inicial) y **no perdio nada
+      suyo** — sigue cargando `.env`, importando la composicion por ruta relativa, resumiendo sin
+      secretos y traduciendo a codigo de salida.
+- [x] `ports/` y `adapters/driven/` con `.gitkeep`: mismo precedente que `lib/modules/recetas`,
+      verificado archivo a archivo. La guardia de arquitectura sigue verde.
+- [x] El barrel es un contrato publico coherente: solo reexporta de `./domain`
+      (`normalizeUnitName` mas los tres tipos), y el cierre transitivo no alcanza `adapters/` ni
+      `ports/`. La regla paso a ser sobre la **capa**, no sobre un nombre de archivo, y sigue
+      valiendo el dia que QC-38 llene esas carpetas.
+
+### Multiplataforma
+- [x] No aplica: el diff no toca `app/`, `components/` ni ningun `.tsx`.
+
+### Dependencias (regla 7)
+- [x] `package.json` no aparece en el diff `e82aa49..62f321d`. R28 cerrado por la guardia G3.
+
+## Como verifique que los tests nuevos muerden (mutaciones mias, en disco, revertidas)
+
+| Mutacion sobre el codigo/SQL de produccion | Resultado | Que demuestra |
+| --- | --- | --- |
+| Quitar el `INSERT` entero de `migration.sql` | 4 rojos en `unidades-migration.test.ts` | R25 cae sin arrancador; `starterRows` devuelve `null`, no `[]` |
+| Desincronizar un normalizado (`'gramo', 'Gramo'`) | 4 rojos | R26 cae por el lado del literal |
+| Anadir una quinta fila (`'unidad'`), bien normalizada | 3 rojos | R25 cae por la fila de mas, y no por el normalizado |
+| **Mutar `normalizeUnitName`** (un `.concat('X')` al final) | 2 rojos, los dos del bloque del arrancador | **Lo importante: el test NO compara el SQL consigo mismo.** Importa la funcion real y cae tambien cuando la desincronizacion llega por el lado de la funcion |
+| Anadir `prisma.unit.findMany({})` a `domain/unit-catalog.ts` | 2 rojos en `module-contract.test.ts` (`expected [ Array(1) ] to deeply equal []`) | El barrido de R15/R16 **lee de verdad** los archivos reales, no solo sinteticos |
+| Reintroducir `export const unidades = { seedStarterUnits: ... }` en `lib/composition/index.ts` | 1 rojo | La mitad negativa de R26 muerde |
+
+El arbol quedo limpio despues de las seis.
+
+**El riesgo estructural que planteaba el encargo —la normalizacion duplicada, una vez en
+TypeScript y otra escrita a mano en SQL— queda atado por los dos extremos:** la mutacion del
+literal y la mutacion de la funcion caen las dos. No es un test que se compare consigo mismo.
+
+## `module-contract.test.ts`: la guardia no se quedo sin sujeto
+
+Comparado contra `536ce49`. El criterio pasa de «`prisma.unit` aparece **exactamente** en el
+adaptador driven» a «**ningun** archivo lo consulta», que es estrictamente mas fuerte. El riesgo
+real —que un `toEqual([])` salga verde porque el barrido no lee nada— esta cubierto de tres
+formas, y las tres se ejercitan en el mismo caso (`module-contract.test.ts:286-325`):
+`todoElCodigo.length > 0`, `entradasReales` con la misma longitud que la lista de archivos, y la
+**misma** funcion pura `nombresQueConsultanUnidades` aplicada a los archivos reales **mas** una
+entrada sintetica (`prisma.unit.findMany`) y otra con el receptor renombrado (`db.unit.create`),
+que tienen que salir senaladas. Mi mutacion sobre `unit-catalog.ts` lo confirma ademas sobre un
+archivo **real**, no sintetico.
+
+El predicado `consultaTablaDeUnidades` no se toco y conserva su test de sensibilidad entero:
+positivos con otro receptor, negativos de comentario, `prisma.units` y `prisma.unitConversion`, y
+el campo de dominio `candidate.unit.name`. Ademas, el trozo que leia `starter-units.ts` para R14 se
+sustituyo por la lista de columnas del `INSERT`
+(`toEqual(['name','name_normalized','symbol','updated_at'])`), que sigue siendo lista cerrada y no
+un `toContain`; y el cierre transitivo del barrel se afirma ahora sobre la **capa**, con lo que
+sigue valiendo cuando QC-38 llene `ports/` y `adapters/`.
+
+## Las dos preguntas que levanto el implementer
+
+**1. El barrido no cubre `tests/`. Frontera legitima o agujero en R16?** **Frontera legitima.**
+R15 dice «ningun **modulo** distinto de `unidades` DEBE consultarlo con el cliente Prisma» y R16
+habla de los modulos `inventario` y `recetas`. Un fixture de test no es un modulo: es el andamio
+que construye el estado que el propio requisito necesita para ser comprobable. Extender el barrido
+a `tests/` pondria rojos a `tests/integration/inventario/product-crud.int.test.ts:151,460`,
+`tests/integration/inventario/inventario-constraints.int.test.ts:164` y
+`tests/integration/recetas/recetas-constraints.int.test.ts:246`, que crean su unidad porque
+`recipe_lines.unit_id` es `NOT NULL` con FK: o sea, el requisito se volveria incomprobable contra
+base real. El limite esta escrito en el propio test (`module-contract.test.ts:180-190`) y en el
+parte. **No es hallazgo.**
+
+**2. La base local tiene aplicada `20260903131417_suppliers_and_supplier_catalog_lines` (QC-42),
+que no esta en este worktree. Invalida algo de la evidencia contra base real?** **No.** Lei ese
+SQL en `.worktrees/QC-42-modelo-proveedores`: crea `suppliers` y `supplier_catalog_lines`, y su
+unica mencion a una tabla de esta ficha es la FK
+`supplier_catalog_lines.product_id -> products(id)`. No toca `units`, ni `products.unit` /
+`products.unit_id`, ni `recipe_lines`. Por tanto no interfiere con ninguna de las cinco evidencias
+de T15: la guardia del UP cuenta `products` y `recipe_lines`; la del DOWN cuenta
+`products.unit_id` y `recipe_lines`; y el `DROP TABLE "units"` no tiene dependientes en QC-42.
+El orden de despliegue tampoco cambia: `121404` < `131417`, asi que en una base limpia QC-32
+aplica **antes** que QC-42, que es el orden que la evidencia reproduce. **Salvedad, que anoto sin
+bloquear:** la evidencia se obtuvo revirtiendo y reaplicando QC-32 **por debajo** de una migracion
+posterior ya aplicada, cosa que `prisma migrate deploy` no hara nunca en produccion. No invalida
+nada porque no hay dependencia entre las dos, pero es lo unico que separa esa corrida de un
+despliegue real.
+
+## Hallazgos de la ronda 2
+
+Ninguno es BLOQUEANTE. Se numeran a partir del 6 para no chocar con los de la ronda 1.
+
+### menor-6 · Ninguna asercion automatica comprueba que las cuatro filas esten EN LA BASE
+
+`tests/unit/unidades/schema/unidades-migration.test.ts` cierra R25 sobre el **texto** del SQL, y la
+unica evidencia contra Postgres real es el log de T15
+(`progress/impl_QC-32-modelo-unidades.md > Ronda 3 > paso 2`, «total filas: 4»). Es coherente con
+el precedente de la propia ficha —R22, R23 y R24 se cierran igual— y la migracion es atomica, asi
+que no bloquea. Se anota porque el coste de cerrarlo es bajo:
+`tests/integration/unidades/unidades-constraints.int.test.ts` ya corre contra la base real, y un
+caso acotado (leer las filas cuyo `name_normalized` este en las cuatro claves arrancadoras y
+esperar cuatro, con su simbolo) detectaria que una migracion futura se las lleve por delante, que
+es justo lo que el test estatico **no** puede ver.
+
+### menor-7 · La tabla de trazabilidad de `tasks.md` cita nombres de test que ya no existen
+
+`specs/QC-32-modelo-unidades/tasks.md`, fila **R16**, cita
+`C · «prisma.unit solo aparece en el adaptador driven de unidades»`. Ese caso se renombro en T16 y
+hoy se llama «ningun archivo del repo consulta la tabla de unidades, y el barrido lo demuestra
+sobre una consulta real». La fila **R19** cita «ProductRef, ProductView y el esquema zod...», y el
+caso real dice «ProductRef, ProductView, **NewProduct** y el esquema zod...». Las filas R25 y R26
+si se actualizaron; estas dos se quedaron atras. Es deriva de documentacion, no de cobertura: los
+dos tests existen y pasan.
+
+### menor-8 · El mapa `R<n> -> test` de `progress/impl_...md > T14` quedo obsoleto y sin marcar
+
+`CHECKPOINTS.md > Trazabilidad` pide que `progress/impl_<feature>.md` contenga el mapa. El de T14
+(ronda 1) sigue diciendo, para R25, `D · «sobre catalogo vacio crea las cinco unidades
+arrancadoras»` y `IS · «db:seed deja las cinco unidades en la base»` —dos archivos **borrados**— y
+«unidades creadas: 5». La ronda 3 escribe su propia tabla mas abajo, pero **no** anota sobre T14
+que quedo superada, como si se hizo con la decision 5 del parte («SUPERADA por la ronda 2»). Un
+lector que aterrice en T14 se lleva un mapa falso. Bastan dos lineas de nota.
+
+### menor-9 · La mitad negativa de R26 se apoya en una lista de nombres concretos
+
+`module-contract.test.ts:522-529` prohibe en `lib/composition` los literales
+`STARTER_UNITS|seedStarterUnits|unitSeedRepository|unit-seed-repository|seed-units`, mas
+`modules/unidades/(adapters|ports|domain)` y `unitCatalog|createUnit|updateUnit|deleteUnit`. Un
+seed reintroducido con un nombre distinto de todos esos escaparia **de esa asercion concreta**. Lo
+que impide que escape del todo es que, para escribir en la tabla, tendria que consultar `units`, y
+ahi lo caza el barrido (verificado con mi mutacion en `unit-catalog.ts`). O sea: la red esta
+completa, pero es la segunda malla la que la cierra, no la primera. Se anota para que quien toque
+esto en QC-38 no confunda la lista de nombres con la garantia.
+
+## Los dos menores de la ronda 1 que el implementer dice haber cerrado
+
+- **menor-2 — CONFIRMADO cerrado para las filas arrancadoras.** Lo que anote era la consecuencia:
+  «ningun test comprueba que `name_normalized` se llene con la salida de `normalizeUnitName`».
+  Hoy lo comprueba `normalizedNamesMatchTheOnlyDefinition`, que importa la funcion real, y mi
+  mutacion de la **funcion** (no del literal) lo pone rojo. Para el alta a mano sigue siendo de
+  QC-38, tal como decia la ronda 1. Los helpers de los tests de integracion siguen normalizando a
+  mano, y sigue siendo correcto por la razon que ya estaba razonada alli.
+- **menor-5 — se disuelve solo; lo anoto sin reabrir nada.** Decia que el conjunto arrancador
+  vivia en tres sitios y que la pregunta abierta 4 seguia abierta. Hoy vive en **dos** —el
+  `INSERT` de `migration.sql` y la constante `CONJUNTO_ARRANCADOR` del test, duplicada a
+  proposito— y la **pregunta abierta 4 la cerro el humano**. El coste de cambiar el conjunto ya no
+  es «cinco literales y dos archivos de test», sino cuatro filas y una constante.
+
+## Lo que la ronda 3 NO rompio (comprobado, no supuesto)
+
+- **Las dos guardias de datos siguen mordiendo con el `INSERT` dentro.** `migration.sql:50-62` y
+  el bloque `DO $$` de `down.sql` estan intactos, con sus predicados y sus mutaciones en verde. El
+  `INSERT` va **despues** de la guardia del UP, asi que un producto con unidad escrita sigue
+  abortando la migracion entera antes de insertar nada; y el DOWN sigue abortando si algo apunta
+  al catalogo, mientras que cuatro filas arrancadoras **sin** referencias no bloquean la
+  reversion, que es lo correcto.
+- **El nucleo de la ficha, intacto:** el reapuntado de `inventario` a `unitId`, la unicidad
+  normalizada persistida, RLS activada y forzada, las dos FK `ON DELETE RESTRICT` con sus indices
+  hijos, los dos `DROP COLUMN "unit"` al final, y la ausencia de los cinco `DROP CONSTRAINT` de
+  drift. Todo lo vigilan los mismos predicados de la ronda 1, todos verdes.
+- **Los diez tests ajenos acotados en T12:** el diff `536ce49..62f321d` no toca ninguno de ellos,
+  solo los cuatro archivos de `tests/unit/unidades`. Ni un `toEqual` degradado en esta ronda.
+- **Cero dependencias nuevas y sin drift de Prisma:** `db/schema.prisma` no cambio en
+  `536ce49..62f321d`.
+- **Nada importa lo borrado.** `scripts/seed.ts` sigue haciendo lo suyo de QC-6 y nada mas;
+  `lib/composition/index.ts` no deja ningun import huerfano; typecheck, lint y el gate completo en
+  verde.
+- **`tests/integration/unidades/unidades-constraints.int.test.ts` se quedo entero y sigue siendo
+  correcto** con las cuatro filas ya en la tabla: todas sus lecturas van acotadas por `where` con
+  un marcador propio, asi que ninguna cuenta el total del catalogo.
+
+## Que queda para el leader
+
+Nada bloqueante. Los cuatro menores se pueden cerrar en la misma vuelta —menor-7 y menor-8 son de
+dos lineas cada uno— o anotarse en `progress/current.md > Deudas y cosas abiertas`. menor-6 es la
+unica que merece decidirse a conciencia: es un test que hoy no existe y que manana seria la unica
+red contra una migracion futura que vacie el catalogo.
