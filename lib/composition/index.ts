@@ -44,6 +44,7 @@ import {
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
+import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import {
   createProduct,
   findAliveProductById,
@@ -59,6 +60,31 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import type { ProductCatalog } from '@/lib/modules/inventario';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import type { UnitCatalog } from '@/lib/modules/unidades';
+import {
+  createCreateRecipe,
+  createDeleteRecipe,
+  createGetRecipe,
+  createListRecipes,
+  createUpdateRecipe,
+} from '@/lib/modules/recetas';
+import {
+  createRecipe,
+  findAliveRecipeById,
+  listAliveRecipes,
+  replaceAliveRecipe,
+  softDeleteAliveRecipe,
+} from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
+import {
+  recipeImagePublicUrl,
+  removeRecipeImage,
+  uploadRecipeImage,
+} from '@/lib/modules/recetas/adapters/driven/storage/recipe-image-supabase';
+import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
+import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
+import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -149,6 +175,76 @@ export const inventario = {
   listPresentations: createListPresentations({ presentations: presentationRepository }),
 } as const;
 
-// El modulo `unidades` (QC-32) NO cablea nada aqui: su catalogo lo siembra su propia migracion
-// y el `UnitCatalog` que publica su contrato lo implementa y cablea QC-38, cuando haya
-// consumidor.
+// El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`
+// (QC-25) es el primer CONSUMIDOR de `UnitCatalog`: implementa el adaptador driven
+// (`lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts`) y lo
+// cablea aqui, mas abajo, para sus casos de uso de alta y edicion (R50).
+
+// ---------------------------------------------------------------------------------------
+// `recetas` (QC-25, T12). Bloque nuevo, separado a proposito: no reordena ni reformatea
+// nada de `identity` ni de `inventario` arriba -diff minimo, hay otra sesion (QC-22)
+// tocando este mismo archivo en paralelo-.
+// ---------------------------------------------------------------------------------------
+
+/** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
+ *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
+ *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
+const productCatalog: ProductCatalog = { findRefs: findProductRefs };
+
+/** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
+ *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. */
+const unitCatalog: UnitCatalog = { findRefs: findUnitRefs };
+
+const recipeRepository: RecipeRepository = {
+  create: createRecipe,
+  findAliveById: findAliveRecipeById,
+  listAlive: listAliveRecipes,
+  replaceAlive: replaceAliveRecipe,
+  softDeleteAlive: softDeleteAliveRecipe,
+};
+
+/** `RecipeImageStorage` cableado con el adaptador de Supabase Storage (T11). Ninguna de
+ *  sus tres funciones se INVOCA aqui -solo se referencian-, asi que construir esta
+ *  fachada no lee ninguna variable de entorno ni toca la red (R43): el adaptador solo
+ *  lee su configuracion cuando el caso de uso llama de verdad a `upload`/`remove`/
+ *  `publicUrl`. */
+const recipeImageStorage: RecipeImageStorage = {
+  upload: uploadRecipeImage,
+  remove: removeRecipeImage,
+  publicUrl: recipeImagePublicUrl,
+};
+
+/**
+ * Fachada del modulo `recetas` ya cableada (T12, `design.md > 3`, `> 11`). Es lo que
+ * consume la Server Action de T13.
+ *
+ * `toOffsetLimit`/`buildPage` se inyectan aqui, REALES, importados de
+ * `lib/shared/pagination` (R31): `list-recipes.ts` no puede importar `lib/shared/**`
+ * desde `domain/` (R40), asi que recibe la aritmetica de paginacion como dependencia, y
+ * este es el unico sitio que puede darsela.
+ *
+ * El ACTOR NO se resuelve aqui, mismo criterio que `inventario` arriba (R1, D17): cada
+ * caso de uso lo recibe por parametro, y quien lo obtiene es la Server Action.
+ */
+export const recetas = {
+  createRecipe: createCreateRecipe({
+    recipes: recipeRepository,
+    products: productCatalog,
+    units: unitCatalog,
+    images: recipeImageStorage,
+  }),
+  getRecipe: createGetRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
+  listRecipes: createListRecipes({
+    recipes: recipeRepository,
+    images: recipeImageStorage,
+    toOffsetLimit,
+    buildPage,
+  }),
+  updateRecipe: createUpdateRecipe({
+    recipes: recipeRepository,
+    products: productCatalog,
+    units: unitCatalog,
+    images: recipeImageStorage,
+  }),
+  deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
+} as const;

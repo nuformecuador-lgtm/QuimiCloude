@@ -23,6 +23,12 @@
 //   * «la composicion cablea el seed» se INVIERTE: ni `lib/composition` ni `scripts/seed.ts`
 //     pueden nombrar un seed de unidades. Es la mitad negativa de R26.
 //
+// ACTUALIZADO el 2026-09-03 (ronda 4, QC-25/R50): el primer CONSUMIDOR de `UnitCatalog`
+// -que esta ficha situaba en QC-38- llego antes, con QC-25: `recetas` necesita validar
+// `unitId` contra el catalogo en su alta y su edicion. `adapters/driven/` deja de estar
+// vacia y `lib/composition` cablea la LECTURA (`findUnitRefs`) -nunca una escritura,
+// que sigue siendo QC-38-. Donde eso cambia el criterio de un test, queda anotado ahi.
+//
 // Cubre R14, R16, R17, R19, R26 (su mitad negativa) y R27; y refuerza R4 y R15.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -229,17 +235,20 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
         .sort(),
     ).toEqual(['driven', 'driving'])
 
-    // Las tres carpetas del armazon nacen VACIAS y sembradas con `.gitkeep`, igual que
-    // `lib/modules/recetas` (`design.md > 5.1`, ronda 3): no hay puerto ni adaptador driven
-    // porque NADIE consulta `units` todavia (R26), y no hay driving porque no hay operacion
-    // que exponer (R27). `sourcesIn` filtra `.tsx?`, asi que una carpeta de solo `.gitkeep`
-    // es una lista vacia de FUENTES, no un error de lectura.
-    for (const vacia of [join(unidadesDir, 'ports'), join(unidadesDir, 'adapters', 'driven')]) {
-      expect(sourcesIn(vacia), `${etiqueta(vacia)} no deberia tener fuentes`).toEqual([])
-      expect(readdirSync(vacia), `${etiqueta(vacia)} deberia tener solo .gitkeep`).toEqual([
-        '.gitkeep',
-      ])
-    }
+    // `ports/` sigue VACIA y sembrada con `.gitkeep` (`design.md > 5.1`, ronda 3): el
+    // contrato de lectura (`UnitCatalog`) vive en `domain/`, mismo criterio que
+    // `ProductCatalog` de `inventario` -no hace falta un puerto aparte para el, es la
+    // interfaz que el propio dominio publica-.
+    //
+    // ACTUALIZADO 2026-09-03 (QC-25, R50): `adapters/driven/` YA NO esta vacia. El
+    // consumidor que esta ronda anticipaba para QC-38 llego antes, con QC-25: `recetas`
+    // necesita validar `unitId` contra el catalogo en el alta y en la edicion, asi que
+    // implementa `unit-catalog-prisma.ts` -el UNICO archivo del repo que consulta
+    // `prisma.unit`, ver el test de barrido mas abajo-.
+    expect(sourcesIn(join(unidadesDir, 'ports')), 'ports/ no deberia tener fuentes').toEqual([])
+    expect(readdirSync(join(unidadesDir, 'ports')), 'ports/ deberia tener solo .gitkeep').toEqual([
+      '.gitkeep',
+    ])
 
     // El contrato solo reexporta de `./domain`: ni puertos, ni adaptadores, ni nada de fuera.
     const contrato = read(barrel)
@@ -283,36 +292,40 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     }
   })
 
-  it('ningun archivo del repo consulta la tabla de unidades, y el barrido lo demuestra sobre una consulta real', () => {
+  it('a lo sumo el adaptador driven de unidades consulta la tabla de unidades, y el barrido lo demuestra sobre una consulta real', () => {
     // R15 y R16, leidos al dia de hoy. El criterio de las rondas 1 y 2 era «`prisma.unit`
     // aparece EXACTAMENTE en el adaptador driven de `unidades` y en ninguno mas». Ese
-    // adaptador se retiro el 2026-09-03 con el aparato del seed, asi que el criterio se
-    // endurece en vez de aflojarse: la respuesta correcta ya no es «un sitio» sino NINGUNO.
+    // adaptador se retiro el 2026-09-03 con el aparato del seed y la ronda 3 endurecio el
+    // criterio a NINGUNO -no habia consumidor todavia-.
     //
-    // POR QUE LA LISTA REAL ES VACIA: el catalogo lo siembra el `INSERT` de la propia
-    // migracion (R25), no un caso de uso; y las LECTURAS del catalogo llegaran con QC-38, que
-    // implementara el `UnitCatalog` que publica `domain/unit-catalog.ts` y lo cablea en
-    // `lib/composition`. Hasta entonces no hay un solo archivo de aplicacion con motivo para
-    // tocar `units`.
+    // ACTUALIZADO 2026-09-03 (QC-25, R50): el consumidor que esta ronda situaba en QC-38
+    // llego antes, con QC-25 -`recetas` necesita validar `unitId` en el alta y en la
+    // edicion-, asi que el criterio vuelve a ser el de las rondas 1 y 2: EXACTAMENTE
+    // `lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts`, y ningun
+    // otro archivo.
     //
     // QUE LO VOLVERIA ROJO: cualquier `prisma.unit.<metodo>` o `<receptor>.unit.<metodo>` en
-    // `lib`, `app`, `components`, `hooks`, `scripts` o `middleware.ts` —`lib/composition` y
-    // `lib/modules/unidades` incluidos—. Cuando QC-38 anada el suyo, este test se pone rojo a
-    // proposito y su spec tiene que decir cual es el archivo permitido y por que.
+    // OTRO archivo de `lib`, `app`, `components`, `hooks`, `scripts` o `middleware.ts`
+    // -`lib/composition` incluido, que solo puede REFERENCIAR `findUnitRefs`, nunca
+    // consultar la tabla por su cuenta-.
+    const ADAPTADOR_PERMITIDO = 'lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts'
     expect(todoElCodigo.length).toBeGreaterThan(0)
     expect(entradasReales).toHaveLength(todoElCodigo.length)
-    expect(nombresQueConsultanUnidades(entradasReales)).toEqual([])
+    expect(nombresQueConsultanUnidades(entradasReales)).toEqual([ADAPTADOR_PERMITIDO])
 
     // Y la MISMA funcion, sobre los MISMOS archivos reales mas una entrada sintetica con una
-    // consulta de verdad, devuelve exactamente esa. Esto es lo que sustituye al viejo «y ese
-    // archivo la consulta de verdad»: sin esta segunda pasada, el `toEqual([])` de arriba
-    // seria verde tambien si el barrido no leyera nada o si el predicado hubiera dejado de
-    // reconocer una consulta.
+    // consulta de verdad, devuelve el adaptador permitido MAS esa. Esto es lo que sustituye
+    // al viejo «y ese archivo la consulta de verdad»: sin esta segunda pasada, el `toEqual`
+    // de arriba seria verde tambien si el barrido no leyera nada o si el predicado hubiera
+    // dejado de reconocer una consulta.
     const sintetico: EntradaDeBarrido = {
       nombre: '<sintetico>',
       fuente: 'export async function x(prisma: unknown) { await prisma.unit.findMany({}) }',
     }
-    expect(nombresQueConsultanUnidades([...entradasReales, sintetico])).toEqual(['<sintetico>'])
+    expect(nombresQueConsultanUnidades([...entradasReales, sintetico])).toEqual([
+      ADAPTADOR_PERMITIDO,
+      '<sintetico>',
+    ])
     // Tambien con el receptor renombrado, que es la forma por la que se escaparia: el barrido
     // no depende de que el cliente se llame `prisma`.
     const conOtroReceptor: EntradaDeBarrido = {
@@ -320,6 +333,7 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       fuente: 'await db.unit.create({ data })',
     }
     expect(nombresQueConsultanUnidades([...entradasReales, conOtroReceptor])).toEqual([
+      ADAPTADOR_PERMITIDO,
       '<sintetico-db>',
     ])
   })
@@ -511,10 +525,15 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
 
     // MITAD NEGATIVA DE R26, y el criterio esta INVERTIDO respecto a las rondas 1 y 2: ahi se
     // exigia que `lib/composition` nombrara `seedStarterUnits`. Desde el 2026-09-03
-    // `lib/composition` vuelve a quedar SIN NADA de `unidades` (`design.md > 5.4`, anulada) y
+    // `lib/composition` no cablea ningun SEED de `unidades` (`design.md > 5.4`, anulada) y
     // `scripts/seed.ts` vuelve a hablar solo de roles y usuario inicial (QC-6): no hay seed de
     // aplicacion que cree, actualice o pise unidades del catalogo. Esta es la asercion que se
     // pone roja si alguien reintroduce ese aparato por la puerta de atras.
+    //
+    // ACTUALIZADO 2026-09-03 (QC-25, R50): esto NO incluye la LECTURA. `lib/composition`
+    // SI cablea `UnitCatalog` -con el adaptador driven de arriba- para que `recetas` pueda
+    // validar `unitId`; lo que sigue prohibido es CUALQUIER escritura (alta, edicion o
+    // borrado de unidades: eso sigue siendo QC-38) y cualquier seed.
     const composicion = sourcesIn(join(repoRoot, 'lib', 'composition'))
       .map((file) => read(file))
       .join('\n')
@@ -522,10 +541,13 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(composicion, 'la composicion volvio a cablear un seed de unidades').not.toMatch(
       /STARTER_UNITS|[sS]eedStarterUnits|[uU]nitSeedRepository|unit-seed-repository|seed-units/,
     )
-    expect(composicion, 'la composicion nombra el dominio, un puerto o un adaptador de unidades')
-      .not.toMatch(/modules\/unidades\/(adapters|ports|domain)/)
-    expect(composicion, 'la composicion cablea alguna operacion de unidades').not.toMatch(
-      /unitCatalog|createUnit|updateUnit|deleteUnit/i,
+    expect(composicion, 'la composicion cablea la LECTURA de unidades (UnitCatalog, R50)').toMatch(
+      /findUnitRefs/,
+    )
+    expect(composicion, 'la composicion nombra un puerto o adaptador de unidades fuera del de lectura')
+      .not.toMatch(/modules\/unidades\/(adapters(?!\/driven\/persistence\/unit-catalog-prisma)|ports)/)
+    expect(composicion, 'la composicion cablea una ESCRITURA de unidades (alta/edicion/borrado, QC-38)').not.toMatch(
+      /createUnit|updateUnit|deleteUnit/i,
     )
 
     // Y `db:seed` no sabe de unidades: el catalogo nace con su migracion, no con este script.
