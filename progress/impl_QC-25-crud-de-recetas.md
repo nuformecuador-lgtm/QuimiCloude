@@ -682,3 +682,217 @@ migraciones de una feature hermana aplicadas en otro worktree sobre la misma bas
 commitea esta tanda: T14 no cumple su propio "Hecho cuando" todavía. Sin instrucción
 para resolver el drift (aislar la base o coordinar el orden de migraciones), esta
 sesión se detiene aquí y lo reporta.
+
+---
+
+## Grupo D — cierre real, adaptación a QC-32 (R50)
+
+El drift que dejó bloqueada la tanda anterior se resolvió del lado del arnés: este
+worktree recibió su propia base (`QuimiCloude_QC25`, `.env` ya apuntando ahí) con las 7
+migraciones aplicadas, incluida `20260903121404_units_catalog` (QC-32, ya mergeada en
+`dev`). El schema de este worktree (`db/schema.prisma`, que esta sesión **no toca**) ya
+trae `RecipeLine.unitId: String @map("unit_id") @db.Uuid` — UUID obligatorio con FK real
+a `units` — en vez de `RecipeLine.unit: String` (texto libre). Eso deroga R15 y lo
+sustituye por **R50**: la unidad de la línea es una referencia validada contra el
+catálogo de `unidades`, a través de su contrato público (`@/lib/modules/unidades`), nunca
+contra su tabla ni su repositorio. Sigue sin haber conversión entre unidades ni derivación
+desde la unidad del producto.
+
+### Qué se hizo, en orden
+
+1. **`inventario` (prerequisito de compilación, no es la feature).**
+   `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`: el
+   `select`/`ProductCatalogRow`/`toProductRef` pasaron de `unit: string | null` a
+   `unitId: string | null` (el contrato `ProductRef` ya lo declaraba así tras el merge de
+   QC-32, esta sesión solo alineó la implementación). Test actualizado:
+   `tests/unit/inventario/product-catalog.test.ts`.
+
+2. **`unidades`: primer consumidor de `UnitCatalog`.** Creado
+   `lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts`
+   (`findUnitRefs`/`toUnitRef`), calcando el patrón de `product-catalog-prisma.ts`: sin
+   filtro de vida en el `where` (`Unit` no tiene `deletedAt`, a diferencia de `Product`).
+   Test nuevo: `tests/unit/unidades/unit-catalog.test.ts` (mapeo puro + `findRefs([])` sin
+   tocar la base).
+
+   Esto rompió `tests/unit/unidades/module-contract.test.ts` (QC-32, ronda 3), que
+   afirmaba que `adapters/driven/` seguía vacía y que ningún archivo del repo consultaba
+   `prisma.unit` — esa ronda situaba al primer consumidor en QC-38, pero el orden real del
+   merge lo trajo esta ficha. Se actualizó ese archivo (no es uno de los prohibidos:
+   `tests/guards/*`) para reflejar la realidad: `adapters/driven/` ya no está vacía,
+   EXACTAMENTE `unit-catalog-prisma.ts` consulta `prisma.unit` (el barrido lo verifica con
+   una entrada sintética, mismo criterio que el resto del archivo), y `lib/composition`
+   cablea la LECTURA (`findUnitRefs`) sin cablear ninguna escritura
+   (`createUnit`/`updateUnit`/`deleteUnit` siguen prohibidas: eso sigue siendo QC-38). La
+   prohibición de reintroducir un seed de unidades se dejó intacta.
+
+3. **`lib/composition/index.ts`.** Diff mínimo: import de `findUnitRefs` y del tipo
+   `UnitCatalog`, sustitución del comentario que decía "QC-38 lo cableará" por la
+   explicación real, `const unitCatalog: UnitCatalog = { findRefs: findUnitRefs }` cerca
+   de `productCatalog`, y `units: unitCatalog` añadido a `createCreateRecipe` y
+   `createUpdateRecipe` en la fachada `recetas`. No se tocó nada de `identity` ni de
+   `inventario`; no hubo conflicto visible con QC-22/QC-42 en este archivo.
+
+4. **Dominio de `recetas`.**
+   - `recipe-input.ts`: `recipeLineSchema.unit` (texto) → `unitId: z.string().uuid()`
+     (R50 deroga R15). Solo valida FORMA; la existencia la valida el caso de uso.
+   - `recipe-view.ts`: `RecipeLineView.unit: string` → `unitId: string`.
+   - `recipe-repository.ts`: `RecipeLineData.unit` → `unitId` (afecta `RecipeLineRow`).
+   - `create-recipe.ts`: `CreateRecipeDeps` gana `units: UnitCatalog`. Antes de persistir,
+     junta los `unitId` únicos de las líneas (`Set`) y, si hay alguno, llama
+     `deps.units.findRefs` UNA sola vez; si algún `unitId` enviado no vuelve en la
+     respuesta, `ValidationError`. Corre en paralelo conceptual con la validación de
+     `productId` ya existente (mismo bloque, sin secuenciar).
+   - `update-recipe.ts`: mismo `units: UnitCatalog`, pero a diferencia de `productId`
+     (que solo valida las líneas NUEVAS, R45/R46), aquí se valida el `unitId` de **TODAS**
+     las líneas de la lista final en cada edición — `Unit` no tiene borrado lógico y R50
+     no prevé ninguna excepción para líneas preexistentes.
+   - `get-recipe.ts`: el mapeo de `RecipeLineView` pasa `line.unitId` tal cual
+     (pass-through; no resuelve nombre/símbolo, R50 no lo exige).
+   - `list-recipes.ts`, `delete-recipe.ts`, `index.ts`: sin cambios (no citaban `unit`).
+
+5. **Adaptador Prisma de `recetas`.** `recipe-prisma.ts`: `toLineRow`, el `create` anidado
+   y los dos brazos del `upsert` de `replaceAliveRecipe` pasaron de `unit: line.unit` a
+   `unitId: line.unitId`.
+
+6. **Tests unitarios.** Actualizados con `unitId` (UUIDs válidos en vez de texto libre) y
+   un doble `montarCatalogoUnidades`/`units` (mismo patrón que `montarCatalogo` para
+   `ProductCatalog`) añadido a TODAS las llamadas a `createCreateRecipe`/
+   `createUpdateRecipe` de:
+   `recipe-input.test.ts` (sustituye el test de R15 por dos de R50: rechaza UUID
+   inválido, acepta UUID válido sin validar existencia), `recipe-service.test.ts`
+   (fixtures + **dos tests nuevos de R50**: rechaza `unitId` inexistente en el alta y en
+   la edición, sin llamar a `recipes.create`/`replaceAlive`), `recipe-lines-catalog.test.ts`,
+   `authorization.test.ts` (doble de `units` que EXPLOTA si se le llama, mismo criterio
+   que los otros dos puertos), `recipe-image-lifecycle.test.ts`, `recipe-image-url.test.ts`
+   (no estaba en la lista original de errores del encargo, pero typecheck la rompía por la
+   misma causa; se corrigió con el mismo patrón), `recipe-actions.test.ts` (fixture con
+   `unitId` UUID válido, la action valida con el mismo esquema zod) y `scope.test.ts`
+   (snapshot de `RecipeLine` actualizado al estado real que dejó QC-32 en `dev`:
+   `unitId String @map("unit_id") @db.Uuid` y el índice `recipe_lines_unit_id_idx`,
+   copiados literales del schema — no es una regresión de R41, la columna la trajo QC-32,
+   no esta ficha).
+
+7. **T14 — integración.** `recipe-crud.int.test.ts` y `recipe-lines.int.test.ts`: en
+   `beforeAll` se añadió `sharedUnitId = (await prisma.unit.findFirstOrThrow()).id` (una
+   de las 4 unidades sembradas por la migración de QC-32) y se usó en TODAS las líneas de
+   test en vez de `'kg'`/`'L'`. Los `INSERT`/`$executeRaw` crudos (verificación de SQLSTATE
+   23514/23505) cambiaron la columna `"unit"` por `"unit_id"` con `CAST(... AS uuid)`,
+   igual que ya se hacía con `recipe_id`/`product_id`. Las lecturas/comparaciones que
+   miraban `.unit` pasaron a `.unitId`. Los `finally`/`afterAll` ya limpiaban por `id`
+   exacto y siguen haciéndolo; no quedaron filas huérfanas.
+
+   De paso, correr T14 contra la base real destapó una causa **real, no de `unitId`**:
+   el test "el adaptador traduce el CHECK a ValidationError contra Postgres real" fallaba
+   porque una violación del `CHECK` de cantidad positiva **dentro de una escritura
+   anidada** (`prisma.recipe.create({ data: { lines: { create: [...] } } })`) llega como
+   `PrismaClientUnknownRequestError`, no como `PrismaClientKnownRequestError` — confirmado
+   imprimiendo el error real contra Postgres (SQLSTATE `23514` presente, pero en el campo
+   estructurado del conector, no en `meta.code`). `sqlStateOf` en `recipe-prisma.ts` no
+   reconocía ese tipo de error, así que `translateWriteError` relanzaba el error crudo en
+   vez de `ValidationError`. Se corrigió leyendo el SQLSTATE de `code: "23514"` dentro de
+   `error.message` cuando el error es `PrismaClientUnknownRequestError` — ese campo es
+   estructurado (lo incrusta el conector, no Postgres), así que sigue sin leerse "el texto
+   del mensaje" en el sentido que este archivo prohíbe (nunca la prosa traducida al
+   español).
+
+### Salida real
+
+`pnpm run typecheck`:
+```
+> quimicloude@0.1.0 typecheck
+> tsc --noEmit
+```
+(sin errores)
+
+`pnpm run lint`:
+```
+> quimicloude@0.1.0 lint
+> eslint
+```
+(sin errores)
+
+`pnpm exec vitest run tests/integration/recetas`:
+```
+ Test Files  3 passed (3)
+      Tests  38 passed (38)
+```
+(incluye `recetas-constraints.int.test.ts`, `recipe-crud.int.test.ts`,
+`recipe-lines.int.test.ts` — los tres verdes)
+
+`pnpm exec vitest run tests/integration` (todas, para descartar drift residual sobre
+`inventario`/`unidades`):
+```
+ Test Files  11 passed (11)
+      Tests  133 passed (133)
+```
+
+`pnpm exec vitest run tests/unit tests/guards`:
+```
+ Test Files  95 passed (95)
+      Tests  978 passed (978)
+```
+
+`pnpm exec vitest run tests/unit tests/integration tests/guards` (barrido final conjunto):
+```
+ Test Files  106 passed (106)
+      Tests  1111 passed (1111)
+```
+
+### Mapa `R<n> → test` (actualización)
+
+Añadida la fila **R50** a `specs/QC-25-crud-de-recetas/tasks.md` (justo debajo de R15, que
+se deja en la tabla marcada como derogada, no se borra): cubierta por
+`tests/unit/recetas/recipe-input.test.ts` (`rechaza un unitId que no es un UUID valido`),
+`tests/unit/recetas/recipe-service.test.ts` (`rechaza la linea cuyo unitId no existe en el
+catalogo de unidades, sin crear nada`, y su equivalente en edición) y, contra Postgres
+real, `tests/integration/recetas/recipe-lines.int.test.ts`. Todas las demás filas de la
+tabla (R1-R14, R16-R49) mantienen el test que ya tenían; ninguna cambió de test por este
+cierre salvo R41 (mismo test, snapshot actualizado — no cambia lo que R41 exige, solo el
+estado real que describe) y R17/R33 (mismo test, fixtures con `unitId` en vez de `unit`).
+
+**De los 50 requisitos vigentes de esta ficha (R15 derogado no cuenta), los 50 tienen al
+menos un test verde ahora**, incluido R50 contra Postgres real.
+
+### Archivos tocados en este cierre
+
+- `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`
+- `tests/unit/inventario/product-catalog.test.ts`
+- `lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts` (nuevo)
+- `tests/unit/unidades/unit-catalog.test.ts` (nuevo)
+- `tests/unit/unidades/module-contract.test.ts`
+- `lib/composition/index.ts`
+- `lib/modules/recetas/domain/recipe-input.ts`
+- `lib/modules/recetas/domain/recipe-view.ts`
+- `lib/modules/recetas/domain/create-recipe.ts`
+- `lib/modules/recetas/domain/update-recipe.ts`
+- `lib/modules/recetas/domain/get-recipe.ts`
+- `lib/modules/recetas/ports/recipe-repository.ts`
+- `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`
+- `tests/unit/recetas/recipe-input.test.ts`
+- `tests/unit/recetas/recipe-service.test.ts`
+- `tests/unit/recetas/recipe-lines-catalog.test.ts`
+- `tests/unit/recetas/authorization.test.ts`
+- `tests/unit/recetas/recipe-image-lifecycle.test.ts`
+- `tests/unit/recetas/recipe-image-url.test.ts`
+- `tests/unit/recetas/recipe-actions.test.ts`
+- `tests/unit/recetas/scope.test.ts`
+- `tests/integration/recetas/recipe-crud.int.test.ts`
+- `tests/integration/recetas/recipe-lines.int.test.ts`
+- `specs/QC-25-crud-de-recetas/tasks.md` (T14, T16 `[x]`, fila R50)
+
+### Conflictos pendientes
+
+Ninguno encontrado en `lib/composition/index.ts`: el diff fue mínimo (dos imports, un
+comentario reemplazado, una constante nueva y dos claves `units:` añadidas) y no pisó
+nada reconocible de QC-22/QC-42 al momento de editar.
+`tests/integration/inventario/*`, `tests/integration/unidades/*` y
+`tests/unit/inventario/product-prisma.test.ts` se corrieron sin tocarlos y están verdes
+(incluidos arriba en el barrido de `tests/integration` completo).
+
+### Veredicto de esta tanda (Grupo D — cierre real)
+
+Verde entero: `typecheck`, `lint`, unitarios, guardias e integración (incluida la base
+real de este worktree) pasan. T14 y T16 marcadas `[x]`. Los 50 requisitos vigentes de la
+ficha tienen test, incluido R50 (deroga R15) contra Postgres real. No queda nada
+bloqueado ni pendiente de esta sesión; el orquestador puede correr `./init.sh` completo
+antes del PR.

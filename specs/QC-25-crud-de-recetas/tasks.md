@@ -159,11 +159,15 @@
 
 ## Grupo D — verificación contra la base y cierre
 
-- [ ] **T14 [P] — Tests de integración.** `tests/integration/recetas/recipe-crud.int.test.ts` y
+- [x] **T14 [P] — Tests de integración.** `tests/integration/recetas/recipe-crud.int.test.ts` y
       `recipe-lines.int.test.ts`, con `beforeAll` que falla claro si faltan las tablas de QC-24,
       cada caso en `$transaction` con `ROLLBACK` y afirmaciones sobre **SQLSTATE**.
       *Depende de:* T10. **Hecho cuando:** ambos pasan contra Postgres real y cubren R5, R10, R12,
       R13, R14, R16, R18, R29, R30, R32, R35, R36.
+      **Grupo D (2026-09-03):** adaptados a `RecipeLine.unitId` (QC-32/R50): usan una unidad real
+      sembrada por la migracion en vez del texto libre 'kg'/'L'. De paso corrigen una causa real
+      ajena a `unitId`: `sqlStateOf` no reconocia el SQLSTATE de un `CHECK` violado dentro de una
+      escritura anidada (`PrismaClientUnknownRequestError`, no `PrismaClientKnownRequestError`).
 
 - [x] **T15 [P] — Cierre del alcance.** Revisar que `tests/unit/recetas/scope.test.ts` (T3) sigue
       cubriendo sus cuatro cláusulas ahora que el módulo tiene contenido, y que ninguna guardia se
@@ -171,7 +175,7 @@
       *Depende de:* T13. **Hecho cuando:** el test falla si se añade una pantalla, un route handler,
       una columna nueva o un import de Storage en un test.
 
-- [ ] **T16 — Cierre.** `./init.sh` completo en verde,
+- [x] **T16 — Cierre.** `./init.sh` completo en verde,
       `progress/impl_QC-25-crud-de-recetas.md` con la salida real de los tests y el mapa
       `R<n> → test` de abajo, y todas las tasks marcadas `[x]`.
       *Depende de:* todas. **Hecho cuando:** `CHECKPOINTS.md` se cumple entero.
@@ -199,7 +203,8 @@ uno (`CHECKPOINTS.md > Trazabilidad`).
 | R12 | `tests/integration/recetas/recipe-crud.int.test.ts` | `la linea que desaparece de la lista final se borra fisicamente` |
 | R13 | `tests/integration/recetas/recipe-crud.int.test.ts` | `si falla una linea la edicion revierte entera y la receta queda como estaba` |
 | R14 | `tests/unit/recetas/recipe-input.test.ts` + `tests/integration/recetas/recipe-lines.int.test.ts` | `rechaza la cantidad cero o negativa y la unidad vacia` + `el CHECK rechaza con SQLSTATE 23514 la cantidad no positiva` |
-| R15 | `tests/unit/recetas/recipe-input.test.ts` | `acepta cualquier texto no vacio como unidad, sin catalogo` |
+| R15 | ~~derogado, ver R50~~ | ~~`acepta cualquier texto no vacio como unidad, sin catalogo`~~ |
+| R50 | `tests/unit/recetas/recipe-input.test.ts` + `tests/unit/recetas/recipe-service.test.ts` + `tests/integration/recetas/recipe-lines.int.test.ts` | `rechaza un unitId que no es un UUID valido` + `rechaza la linea cuyo unitId no existe en el catalogo de unidades, sin crear nada` + `el CHECK de cantidad positiva`/`unicidad de (recipe_id, product_id)` (ejercitan `unitId` real contra Postgres) |
 | R16 | `tests/unit/recetas/recipe-input.test.ts` + `tests/integration/recetas/recipe-lines.int.test.ts` | `rechaza dos lineas con el mismo producto` + `el unico (recipe_id, product_id) rechaza con SQLSTATE 23505` |
 | R17 | `tests/unit/recetas/recipe-service.test.ts` + `tests/unit/inventario/product-catalog.test.ts` + `tests/guards/guard-arquitectura-modulos.test.ts` | `rechaza la linea cuyo producto no existe, consultando el contrato de inventario` + `findRefs devuelve solo los productos vivos` + `ningun modulo consulta un modelo ajeno con Prisma` (ya existente) |
 | R18 | `tests/integration/recetas/recipe-lines.int.test.ts` | `la linea de un producto borrado logicamente se conserva y el detalle la devuelve` |
