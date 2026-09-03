@@ -53,15 +53,24 @@ export function ProductTable({ products }: { readonly products: readonly Product
       <TableBody>
         {products.map((product) => (
           <TableRow key={product.id} data-testid="product-row">
-            {PRODUCT_COLUMNS.map((column) => (
-              <TableCell
-                key={column.key}
-                data-testid={`product-cell-${column.key}`}
-                className={column.align === 'end' ? 'text-right tabular-nums' : 'text-left'}
-              >
-                {column.value(product)}
-              </TableCell>
-            ))}
+            {PRODUCT_COLUMNS.map((column) => {
+              // La alarma es de la CELDA, no de la fila: solo se tine el valor que la dispara.
+              // `data-alert` acompana a la clase para que la condicion sea afirmable sin
+              // depender del nombre de una utilidad de Tailwind.
+              const alerted = column.alert?.(product) ?? false;
+              return (
+                <TableCell
+                  key={column.key}
+                  data-testid={`product-cell-${column.key}`}
+                  data-alert={alerted ? 'true' : undefined}
+                  className={`${
+                    column.align === 'end' ? 'text-right tabular-nums' : 'text-left'
+                  }${alerted ? ' font-semibold text-destructive' : ''}`}
+                >
+                  {column.value(product)}
+                </TableCell>
+              );
+            })}
             {/*
               Las acciones van en la ultima columna y se alcanzan con el scroll de la propia
               tabla. **Siempre visibles**: nada de revelarlas con `:hover`, que en tactil no

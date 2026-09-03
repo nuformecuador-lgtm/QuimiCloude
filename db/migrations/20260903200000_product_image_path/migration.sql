@@ -1,0 +1,24 @@
+-- Ruta de imagen del producto: una columna nueva, opcional, y nada mas.
+--
+-- ESCRITA A MANO, no generada con `prisma migrate dev`, y por el motivo que ya documenta
+-- `20260903121404_units_catalog/migration.sql`: sobre `products` hay tres cosas que Prisma NO
+-- conoce y que trata como DRIFT, de modo que un `migrate dev` las emitiria como DROP:
+--   1. las dos FK de auditoria `products_created_by_fkey` y `products_updated_by_fkey`
+--      (QC-20), escalares en el esquema y FK reales en la base;
+--   2. la FK `products_unit_id_fkey` hacia `units` (QC-32), por la misma razon;
+--   3. los CHECK de no-negatividad de `stock`, `min_purchase`, `qty_alert` y `delivery_time`
+--      (QC-14).
+-- Ninguna de las tres se toca aqui.
+--
+-- La columna va SIN CHECK, SIN DEFAULT y SIN INDICE, y las tres ausencias son deliberadas:
+--   - sin CHECK, porque la forma de la ruta -clave de Storage, ruta relativa, URL absoluta-
+--     no esta decidida en ningun sitio del repo, y un patron inventado aqui seria la
+--     definicion de facto de algo que nadie ha acordado;
+--   - sin DEFAULT, porque `NULL` significa «este producto no tiene imagen» y una cadena vacia
+--     por defecto convertiria esa ausencia en un valor;
+--   - sin indice, porque no hay ninguna consulta que filtre ni ordene por la ruta.
+--
+-- Tampoco es una FK a ninguna tabla de ficheros: no existe esa tabla.
+
+-- AlterTable
+ALTER TABLE "products" ADD COLUMN "image_path" TEXT;

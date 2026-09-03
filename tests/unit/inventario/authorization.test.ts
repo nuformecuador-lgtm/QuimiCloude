@@ -24,10 +24,14 @@ import type { ProductRepository } from '@/lib/modules/inventario/ports/product-r
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
 
+/** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
+ *  del 2026-09-03 los volvio obligatorios en `createProductSchema`. */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
   presentationId: '11111111-1111-4111-8111-111111111111',
   minPurchase: 0,
+  stock: 0,
+  qtyAlert: 0,
 };
 
 const PRESENTACION_VALIDA = { name: 'Bidon 20 L' };
