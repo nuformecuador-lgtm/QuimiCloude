@@ -1181,3 +1181,37 @@ $ pnpm exec vitest run tests/unit/inventario/ tests/guards/ tests/unit/identity/
 Los dos rojos del encargo y el tercer ofensor que destaparon quedan apagados; `typecheck`, `lint`
 y las tres suites relacionadas (641 tests) en verde, sin tocar UI ni `lib/modules/inventario/` ni
 anadir dependencias. Falta el gate completo, que corre el leader.
+
+## Ejecución del E2E — verificada por el leader (2026-09-03)
+
+T15 quedó escrito pero **sin ejecutar**, porque el worktree no tenía base de datos: así se
+declaró, y así estaba en el mapa de T17. Eso ya no aplica. Tras crear la base propia
+`QuimiCloude_QC22` (migrada y con seed: roles `Administrador` y `Operador` + usuario inicial),
+el leader corrió:
+
+```
+set -a && . ./.env && set +a
+pnpm exec playwright test e2e/inventario.spec.ts
+```
+
+**Resultado: 4 passed (38.5s)** — los dos casos en **Chromium y en WebKit**:
+
+- `el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista
+  (R4, R17, R18, R21, R24)` — chromium 13.8s, webkit 16.8s
+- `un usuario que no es Administrador acaba fuera y no ve el catalogo (R4)` — chromium 9.6s,
+  webkit 11.1s
+
+Lo que esto cierra de verdad, y no es poco: el camino **login → `/inventario` → alta con
+presentación nueva creada desde el selector → el producto aparece en la lista** funciona contra
+la aplicación real, con Server Actions, sesión real y base real; y la primera regla ruta→rol del
+repo **corta de verdad** a un rol que no es Administrador. Los seis requisitos que el mapa de T17
+marcaba como «pendientes de ejecución» pasan a verificados.
+
+**Lo que NO cierra**: T16 sigue pendiente y es del humano. El E2E corre WebKit de escritorio, que
+no es Safari de iOS: el scroll horizontal anidado de la tabla (R9) y los targets táctiles de R31
+se comprueban en un dispositivo o simulador real, no aquí. Sigue declarado como pendiente, no
+como verificado.
+
+Aviso ajeno recogido al levantar el servidor, **anterior a esta feature y no suyo**: Next avisa
+de que `middleware.ts` está deprecado en favor de `proxy`. No se toca aquí — es QC-9 y merece su
+propia ficha.
