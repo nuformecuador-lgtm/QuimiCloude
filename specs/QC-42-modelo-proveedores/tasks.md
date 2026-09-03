@@ -223,7 +223,7 @@ da por hecho:**
 
 ## Bloque E — Base de datos real
 
-### [ ] T10. Aplicar y revertir la migración de verdad (ciclo apply → rollback → apply)
+### [x] T10. Aplicar y revertir la migración de verdad (ciclo apply → rollback → apply)
 - Dep: T0, T2, T3.
 - Archivos: ninguno versionado; la salida se pega en `progress/impl_QC-42-modelo-proveedores.md`.
 - `pnpm run db:migrate` → comprobar el esquema real (las dos tablas, las **cuatro** FK en
@@ -238,7 +238,7 @@ da por hecho:**
   `progress/impl_QC-42-modelo-proveedores.md`, y cierra **R34** en su forma real (el test estático
   solo mira el texto del SQL).
 
-### [ ] T11. Tests de integración contra Postgres real
+### [x] T11. Tests de integración contra Postgres real
 - Dep: T10, T6 (para no duplicar lo que ya cubre el estático).
 - Archivos: `tests/integration/proveedores/proveedores-constraints.int.test.ts`.
 - Cada caso dentro de `prisma.$transaction` que termina en `ROLLBACK`; toda operación que se
