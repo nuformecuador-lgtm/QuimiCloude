@@ -3,6 +3,306 @@
 Worktree: `.worktrees/QC-26-pantalla-de-recetas/` · rama `feature/QC-26-pantalla-de-recetas`.
 Base propia `QuimiCloude_QC26`; todo lo ejecutado aqui lleva `set -a && . ./.env && set +a`.
 
+- **Ronda 1** (mas abajo, integra): RECHAZADO — 3 mayores, 6 menores, 10 mutaciones.
+- **Ronda 2** (esta seccion): **APROBADO** — 0 mayores, 1 menor nuevo. 5 mutaciones nuevas
+  (M11-M15) y **3 corridas completas** de la suite.
+
+---
+
+# RONDA 2 — verificacion de las correcciones
+
+Commits revisados: `cc0a547` (MAYOR 2, del leader) · `6c5e88c` (MAYOR 1) · `9738db0` (MAYOR 3,
+menor 4) · `01851eb` (menores 1, 2 y 3) · `db5b669` (bitacora).
+Base de comparacion: `abc8f3d`, el ultimo commit que vio la ronda 1.
+
+## Corridas completas de la suite — 3 de 3 identicas
+
+| # | Comando | Resultado |
+| --- | --- | --- |
+| C1 | `pnpm exec vitest run` | **125 archivos, 1369 tests, 0 rojos.** 45,31 s |
+| C2 | `pnpm exec vitest run` (repeticion inmediata) | **125 archivos, 1369 tests, 0 rojos.** 41,68 s |
+| C3 | `./init.sh` completo (el gate, no vitest a pelo) | **125 / 1369, 0 rojos.** «tests: sin rojos nuevos (125 archivos ejecutados, baseline vacio)», «todas las migraciones tienen down.sql», «.env presente», **`== init OK ==`** |
+
+Las tres, sobre el arbol limpio (`git status --short` vacio), con el entorno del worktree cargado.
+En la ronda 1 fueron **cuatro de cuatro en 1364/1366**; hoy son **tres de tres en 1369/1369**. El
+gate volvio a ser reproducible, que era el fondo de MAYOR 1. Los 3 tests de mas (1366 -> 1369) son
+exactamente los que se anadieron: dos de R40 y uno de R41.
+
+---
+
+## MAYOR 1 — CERRADO. El arreglo no debilito nada, y los tiempos bajaron de verdad
+
+**El diff, linea a linea.** `git diff abc8f3d..HEAD -- tests/unit/recetas-ui/recipe-form.test.tsx`
+filtrado de comentarios y de las sustituciones mecanicas deja **dos lineas**: el cuerpo de
+`setupUser()`. No hay ni una asercion tocada, ni un `expect` anadido, quitado o cambiado, ni un
+`waitFor` nuevo, ni un fixture distinto. Verificado ademas:
+
+- `grep` de `retry`, `.skip`, `.only`, `.todo` sobre **todo** `git diff abc8f3d..HEAD -- tests/`:
+  cero ocurrencias reales (los unicos aciertos son la palabra `retry` **dentro del comentario** que
+  explica que NO se uso un retry).
+- `tests/baseline-rojos.json` sigue con `"archivos": {}` — nada se escondio ahi.
+- 17 sitios pasaron de `userEvent.setup()` a `setupUser()`; el archivo original tenia **exactamente
+  17** llamadas a `userEvent.setup()`. (La bitacora dice «los 19 casos»: el archivo tiene 19 `it()`,
+  pero solo 17 conducen interaccion. Imprecision de redaccion, no de codigo.)
+
+**`delay: null` — que cambia y que no.** Leido en la fuente del paquete instalado
+(`@testing-library/user-event/dist/esm/utils/misc/wait.js` y `setup/setup.js`):
+
+```js
+function wait(config) {
+  const delay = config.delay;
+  if (typeof delay !== 'number') { return; }        // <- con null, wait() es un no-op
+  return Promise.all([ new Promise(r => setTimeout(r, delay)), config.advanceTimers(delay) ]);
+}
+```
+
+`delay` solo alimenta `wait()`, que se intercala **entre** eventos en `keyboard/index.js` y
+`pointer/index.js`. La **secuencia de eventos que se despacha no depende de `delay`**: se construye
+igual. Y `pointerEventsCheck` es una opcion **independiente**, que sigue en su valor por defecto
+`PointerEventsCheckLevel.EachApiCall` (`setup/setup.js:26`) porque nadie lo sobreescribe. El archivo
+no usa `vi.useFakeTimers()` en ningun caso, asi que perder la llamada a `advanceTimers` tampoco
+tiene efecto.
+
+Eso es lectura de fuente; ademas se comprobo **por mutacion**:
+
+- **M13** — puse `style={{ pointerEvents: 'none' }}` en el boton `recipe-line-add`
+  (`recipe-lines-field.tsx:107`) y corri el archivo: **ROJO, 5 tests**, con
+  `Error: Unable to perform pointer interaction as the element has 'pointer-events: none'`. La
+  comprobacion de `pointer-events` de `user-event` **sigue activa** bajo `delay: null`. Restaurado;
+  `git status --short` vacio.
+- (Intento previo con la clase Tailwind `pointer-events-none` en el `className`: verde, porque en
+  jsdom no hay hoja de estilos que la aplique. Por eso se repitio con estilo en linea, que si llega
+  al `getComputedStyle`. Se anota para que nadie repita el mismo callejon.)
+
+**El `testTimeout: 30_000` no esconde nada.** Medido con `--reporter=verbose` sobre el archivo:
+
+| Caso | Ronda 1 | Ronda 2 | Factor |
+| --- | --- | --- | --- |
+| R30 (unidad como id) | 1732 ms | **679 ms** | 2,6x mas rapido |
+| R31 (lineas duplicadas) | 1855 ms | **753 ms** | 2,5x |
+| R31 (cantidad invalida) | — | **434 ms** | — |
+| R34 (reorden por teclado) | 1957 ms | **496 ms** | 3,9x |
+| R33 (arrastre) | — | **393 ms** | — |
+| Archivo completo (19 tests) | — | **7,54 s** (`tests 4,56 s`) | — |
+
+El tiempo real **bajo**: no es que ahora quepan bajo un timeout mas grande, es que tardan menos de
+la mitad. Con los 679 ms de R30 el margen contra el *default* de 5000 ms ya seria 7,4x (era 2,7x, y
+por eso reventaba en paralelo). El `testTimeout` es cinturon y tirantes, no la tirita. Y ningun test
+de la suite se acerca a los 30 s: las tres corridas completas suman 89-102 s de `tests` sobre 125
+archivos.
+
+**Veredicto: cerrado.** Las dos causas atacadas son legitimas y ninguna toca una asercion.
+
+---
+
+## MAYOR 2 — CERRADO. Los seis archivos son hoy identicos a `dev`
+
+Verificado por mi cuenta, no por el commit:
+
+```
+git diff origin/dev...HEAD -- components/ui components/private "app/(private)/inventario"
+  -> VACIO
+```
+
+Y el diff de produccion completo contra `origin/dev` (`lib app components db public`) son **31
+archivos**: los 20 de la pantalla nueva bajo `app/(private)/produccion/formulas/`, los 7 del modulo
+`unidades` nuevo, y los **4 heredados que R51 autoriza** (`lib/shared/routes.ts`,
+`lib/shared/navigation/private-nav.ts`, `lib/composition/index.ts`,
+`lib/composition/route-role-rules.ts`). Ni uno de `components/ui/`, ni uno de `components/private/`,
+ni uno de `inventario`.
+
+Rastro de la rama ajena: `grep -rn "isForm|outline-dashed" components/ui/*.tsx` -> **cero
+resultados**. No queda nada de `fix-ux` en esta rama.
+
+---
+
+## MAYOR 3 — CERRADO. Las dos mutaciones matan cada una su propio test
+
+Archivo nuevo: `tests/integration/unidades/unit-repository.int.test.ts` (2 casos), que importa
+`listUnits` **por su ruta profunda** y lo ejercita contra Postgres real, sin doble.
+
+**Linea base:** el archivo solo, en verde, 2/2.
+
+| # | Que rompi en `unit-prisma.ts` | Que corri | Resultado |
+| --- | --- | --- | --- |
+| **M11** | borre `take: limit` (dejando `orderBy`) | el archivo nuevo | **ROJO — 1 test, el de la COTA**: `AssertionError: expected 7 to be less than or equal to 2` en la linea 108. El caso del ORDEN **sobrevive**, como debe: pide `total + 10` y la cota no le afecta |
+| — | `git checkout` del archivo | `git status --short` | **vacio**: archivo restaurado identico |
+| **M12** | borre `orderBy: { name: 'asc' }` (dejando `take`) | el archivo nuevo, **6 veces** | **1a vez VERDE**, las **5 siguientes ROJAS** — 1 test cada vez, el del ORDEN (`expected [ …(3) ] to deeply equal [ …(3) ]`). El caso de la COTA **sobrevive** siempre. Ver menor 7 |
+| — | `git checkout` del archivo | `git diff HEAD --stat` | **vacio**: archivo identico al de la rama; y el archivo nuevo vuelve a 2/2 en verde |
+
+Confirmado, pues, lo que el implementer afirmaba: **cada mutacion mata exactamente su propio test y
+no el otro**. No es un colador de dos aserciones acopladas; son dos casos con dianas distintas.
+
+**La precondicion contra la vacuidad existe y es real** (`unit-repository.int.test.ts:98-103`):
+
+```ts
+const total = await prisma.unit.count()
+expect(total, `precondicion no cumplida: ...`).toBeGreaterThan(limit)
+```
+
+Es lo correcto: no afirma sobre el contenido de la tabla (compartida y sembrada por QC-32), solo se
+niega a dar un verde que no significa nada. Y la asercion de la cota **no se conforma** con
+`<= limit`: exige ademas `toHaveLength(limit)`, que es la mitad que muere al quitar el `take`. El
+aislamiento es el de `recipe-crud.int.test.ts` —siembra propia, borrado por `id` exacto en
+`finally`— y esta justificado en cabecera: `listUnits` usa el cliente Prisma global, asi que la
+estrategia de `$transaction` + rollback de `unidades-constraints.int.test.ts` no sirve aqui.
+
+---
+
+## Los cuatro menores del implementer
+
+### menor 1 — CORREGIDO, y la correccion muerde
+
+Desaparecio el censo `fuentesBajo(join('app', '(private)')).filter(layout.tsx).toHaveLength(1)`. En
+su lugar, en `recipe-route-contract.test.ts:690-703`, la afirmacion queda acotada a **la ruta de
+esta feature**, con la carpeta **derivada de `FORMULAS_ROUTE`** (`CARPETA_RUTA`, nunca un literal), y
+con dos defensas contra la vacuidad: la carpeta debe existir y `FUENTES_DE_LA_RUTA.length > 0`.
+
+- **M15** — cree `app/(private)/produccion/formulas/layout.tsx`: **ROJO**, con el mensaje «ningun
+  archivo bajo app\(private)\produccion\formulas puede ser un layout: la ruta hereda el de la zona
+  privada». Borrado; `git status --short` vacio. No se quedo corta.
+
+### menor 2 — CORREGIDO. El censo literal de un modulo ajeno se sustituye por el diff de la rama
+
+`EXPECTED_RECETAS_MODULE_FILES` (19 rutas literales de `lib/modules/recetas/**`) ya no existe. El
+caso afirma ahora sobre `git diff --name-only origin/dev...HEAD`: **ningun archivo de
+`lib/modules/recetas/` puede estar en el diff**. Misma intencion, sin congelar un modulo de QC-25
+que ya esta `done`. Se conserva intacta la otra mitad —ningun route handler bajo `app/api/`— y la
+defensa de ubicacion derivada de `FORMULAS_ROUTE`.
+
+### menor 3 — CORREGIDO, y verificado por mutacion en los DOS archivos
+
+El `catch` ya no desemboca en `expect(diff).toEqual([])`. Ahora, en los dos sitios que usan el rango
+(`recipe-route-contract.test.ts:490-497` y `recetas/module-contract.test.ts:320-326`), se exige
+`expect(diff.length, 'el rango git origin/dev...HEAD no estaba disponible: este caso no ha
+comprobado nada').toBeGreaterThan(0)`.
+
+- **M14** — cambie el rango a `rama-inexistente-xyz...HEAD` en **los dos** archivos: **ROJO, 2
+  tests**, uno por archivo, con ese mensaje exacto. Restaurados; `git status --short` vacio. El
+  agujero «verde sin haber mirado nada» esta cerrado.
+
+### menor 4 — CORREGIDO
+
+`tests/unit/unidades/list-units.test.ts` anade `con rol nulo se rechaza sin leer del repositorio`,
+con el mismo doble que **lanza si se le llama**. R41 pasa de 4 a 5 casos de rechazo.
+
+### menores 5 y 6 — siguen abiertos, y es correcto
+
+`T25` en `[~]` (verificacion manual en movil real, declarada) y `T28` en `[ ]` (gate + PR, del
+leader); y falta la entrada en `progress/history.md` (F2.5). Ambos son del leader y van despues de
+este review. No son hallazgos.
+
+---
+
+## Comprobaciones transversales de la ronda
+
+**Cero cambios de produccion, confirmado.** `git diff --stat abc8f3d..HEAD -- lib db package.json
+pnpm-lock.yaml` -> **vacio**. Los unicos archivos de `app/` y `components/` tocados en toda la ronda
+son los **seis del revert** de MAYOR 2. Es decir: la feature que se aprobo en los seis puntos de la
+ronda 1 es **bit a bit la misma**; lo unico que cambio es la red de tests. No hay que revisar de
+nuevo el fondo.
+
+**Trazabilidad — los 54 requisitos siguen mapeados, y los tres tests nuevos estan en el mapa.**
+`progress/impl_QC-26-pantalla-de-recetas.md` lista 54 `R<n>` distintos. R40 cita ahora los dos casos
+nuevos («repositorio REAL contra Postgres», ronda 2) y R41 el quinto («anadido en la ronda 2»), con
+la sigla nueva `unitrepo` declarada en la leyenda.
+
+**Dependencias:** `package.json` y `pnpm-lock.yaml` sin tocar en la ronda 2; lo aprobado en la ronda
+1 (las tres filas de `dnd-kit`) sigue igual. **Multiplataforma:** cero cambios de UI en la ronda 2.
+**RLS / migraciones:** cero cambios en `db/`; `./init.sh` reconfirma el `down.sql` de todas.
+
+**Sobre la nota del implementer («`vitest run <dir1> <dir2>` no ejecuta los de integracion»): NO se
+reproduce.** Lo comprobe: `vitest run tests/integration/unidades tests/unit/unidades` ejecuta
+**9 archivos / 76 tests**, y con `--reporter=verbose` se ven los dos casos de
+`|integration| unit-repository.int.test.ts` corriendo. Con esta version (Vitest 4.1.10) los dos
+filtros alcanzan a los tres proyectos. La explicacion de por que en su dia una mutacion del
+adaptador se vio verde es mas simple, y es la que dio la ronda 1: **no habia ningun test que lo
+tocara**. Conviene no dejar en la bitacora un mecanismo que no existe.
+
+---
+
+## Hallazgo nuevo de esta ronda
+
+### menor 7 — el caso del ORDEN detecta la mutacion, pero su deteccion depende del orden de heap de Postgres
+
+En **M12** (borrar `orderBy`) el caso del orden salio **VERDE la primera vez** y **ROJO las cinco
+siguientes**. La razon es conocida: sin `ORDER BY`, Postgres devuelve las filas en el orden en que
+las encuentra en el heap, y como las corridas anteriores dejan tuplas muertas, las tres filas
+sembradas pueden reutilizar huecos y salir, por casualidad, ya ordenadas. Cuando eso ocurre, un
+adaptador **sin** orden pasa el test.
+
+No es bloqueante: R40 tiene test real, la asercion es la correcta (compara la secuencia devuelta
+contra la esperada) y el mutante muere 5 de 6 veces. Pero conviene saber que la potencia de este
+caso no es 1,0 — y es facil subirla: sembrando mas filas (con 3, que el heap salga ordenado por azar
+no es despreciable; con 8-10 se hunde) o sembrando en orden estrictamente descendente y afirmando
+ademas que la secuencia devuelta **no** es la de insercion. Es una mejora, no una condicion.
+
+Un apunte del mismo estilo, que **no** cuento como hallazgo porque es el mecanismo que la propia
+ronda 1 acepto para R44: las dos guardias basadas en `git diff origin/dev...HEAD` solo ven cambios
+**commiteados**. Un archivo anadido a `lib/modules/recetas/` y aun sin commitear no aparece. Como el
+gate completo se corre antes del PR, sobre estado commiteado, cumple su funcion.
+
+---
+
+## Checklist de `CHECKPOINTS.md` — estado tras la ronda 2
+
+### Especificacion
+- [x] `requirements.md` con R1-R54 EARS y las decisiones cerradas.
+- [x] `design.md` con alternativas descartadas y su porque.
+- [~] `tasks.md`: 28 `[x]`, `T25` `[~]` (declarada, verificacion manual en movil real) y `T28` `[ ]`
+      (gate + PR, del leader). Declaradas, no silenciadas.
+
+### Trazabilidad
+- [x] Los **54** requisitos con al menos un test nombrado y real; los **3 tests nuevos** de la ronda
+      2 estan en el mapa (R40 x2, R41 x1).
+- [x] `progress/impl_QC-26-pantalla-de-recetas.md` con el mapa `R<n> -> test` actualizado.
+
+### Calidad de codigo
+- [x] `pnpm run typecheck` — limpio (dentro de `./init.sh`).
+- [x] `pnpm run lint` — limpio (dentro de `./init.sh`).
+- [x] `pnpm test` — **125 archivos, 1369 tests, cero rojos, tres corridas de tres**.
+- [x] `pnpm run test:guardias` — verde dentro del gate.
+- [x] E2E de flujo critico (permisos) en Chromium y WebKit.
+- [x] Multiplataforma: sin excepcion declarada en `design.md` y guardia de R50 control a control.
+- [x] Dependencias: tres paquetes, tres filas, aprobacion citada en `design.md` seccion 10.
+
+### Datos y seguridad
+- [x] Permiso validado en el service (`domain/list-units.ts`), con test (M1, ronda 1).
+- [x] RLS / migraciones / `down.sql` — NO APLICA: cero cambios en `db/`.
+- [x] Acceso a datos solo por repositorio, y el **adaptador driven nuevo ya tiene test contra
+      Postgres real** (M11, M12).
+- [x] Sin secretos hardcodeados; sin webhooks.
+
+### Modulos hexagonales
+- [x] `domain/` y `ports/` sin framework ni Prisma; el driving no instancia su driven; el barrel no
+      reexporta `'use server'`. Sin cambios respecto a la ronda 1.
+
+### Permisos
+- [x] La regla ruta-rol es adicional; los componentes de cliente reciben datos por props; mutaciones
+      por Server Action.
+
+### Verificacion final
+- [x] `./init.sh` completo en verde — corrido por mi, `== init OK ==`.
+- [x] `progress/review_QC-26-pantalla-de-recetas.md` (este archivo).
+- [ ] Entrada en `progress/history.md` — pendiente (F2.5, del leader).
+
+---
+
+## Veredicto de la ronda 2
+
+**APROBADO.** Los tres mayores estan cerrados y verificados por mi cuenta, no de oidas: tres
+corridas completas identicas en 1369/1369, cinco mutaciones nuevas (M11-M15) con su restauracion
+comprobada, y la lectura de la fuente de `user-event` para descartar que `delay: null` relaje la
+comprobacion de `pointer-events`. Los cuatro menores del implementer estan corregidos; los dos que
+quedan (T25/T28 y `history.md`) son del leader y van despues de este review.
+
+Queda un menor nuevo, el **7**, que es una sugerencia para robustecer el caso del orden y no una
+condicion.
+
+---
+
+# RONDA 1 (historial integro) — RECHAZADO
+
 **Veredicto: RECHAZADO** — 3 mayores, 6 menores. 10 mutaciones ejecutadas.
 
 Lo que sigue no es una lectura de la bitacora: cada punto se comprobo sobre el disco y, donde
