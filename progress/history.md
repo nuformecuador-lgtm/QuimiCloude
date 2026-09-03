@@ -1052,3 +1052,110 @@ que lo automatice.** El implementer hizo lo correcto: paró y escaló en vez de 
 - **Solo `@supabase/storage-js`**, no `supabase-js` entero: sin cliente de datos en el repo, el
   anti-patrón que prohíbe `CHECKPOINTS.md` es **estructuralmente imposible** en vez de una
   prohibición que alguien tenga que recordar. Mismo criterio que QC-19 con el diccionario.
+
+
+## QC-30 — rediseno-login (2026-09-02, cerrada el 2026-09-03)
+
+PR [#20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20), mergeado el 2026-09-02 a las
+22:55Z. Épica QC-17, `zone: frontend`, `complexity: medium`. **26 requisitos**, 11 tareas. Gate
+completo verde: 65 archivos, 663 tests.
+
+> **Este resumen NO lo escribe la sesión que la implementó.** Esa sesión (labs-4b) mergeó el PR y
+> nunca corrió F2.5 ni F2.6: la ficha se quedó `in_progress` y la tarjeta en *En curso* durante un
+> día entero. Lo cierra otra sesión el 2026-09-03, por decisión humana, con lo que consta en
+> `progress/current.md` — igual que se hizo con **QC-8** el 2026-09-02, que se había quedado
+> `pending` tras mergearse y **bloqueaba a QC-20** por `depends_on`. Es la **segunda vez** que pasa
+> lo mismo: una feature que se mergea y cuya ficha nadie cierra hace mentir al board, y con la
+> regla nueva de «una feature por zona y épica» además bloquea a las demás de su pareja. Material
+> de `/afinar-regla`: el cierre debería dispararlo el merge, no la memoria de quien mergea.
+
+Lo que dejó escrito su sesión, y que vale la pena conservar: **dos rondas de revisión**. La primera
+**rechazó por un bloqueante real** —R9 sin un test que mordiera: se podía **borrar el modo oscuro
+entero** y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo
+cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests, de
+20 a 26.
+
+Ese hallazgo es el **primero** de un patrón que se repitió en **QC-25** el día siguiente, donde se
+podía borrar el `deleted_at IS NULL` del catálogo de productos con la suite verde. Dos casos en dos
+días: un test que nombra una garantía y no la comprueba no es una anécdota, es el fallo que la
+revisión existe para cazar, y por eso desde QC-25 el encargo del `reviewer` pide **repetir las
+mutaciones a mano** en vez de creerse el reporte de quien las corrigió.
+
+## QC-42 — modelo-proveedores (2026-09-03)
+
+PR [#25](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/25), merge `d532662`. Épica QC-41,
+`zone: backend`, `complexity: medium`. **36 requisitos EARS, los 36 con test que muerde.**
+`./init.sh` completo en verde con `dev` integrado: **113 archivos, 1201 tests**. Primera feature de
+la épica Proveedores; el CRUD es QC-43 y la pantalla QC-44.
+
+### Cuatro subagentes muertos por 5xx, y lo que enseñó
+
+Tres implementers cayeron seguidos —**500, 529, 529**— en Opus, ninguno por fallo del trabajo. El
+primero murió con el esqueleto escrito **y sin commitear**: esquema, migración y armazón del módulo
+colgando del árbol, sin una sola tarea marcada y sin bitácora. Se commiteó como `b60236f`, etiquetado
+`wip` y **explícitamente SIN AUDITAR**, para que un worktree perdido no se llevara el trabajo.
+
+La cuarta corrida salió en **Sonnet 5 por decisión explícita del humano** —desvío consciente del
+«todos heredan el modelo de la sesión» de `AGENTS.md`, con motivo escrito y fecha— pasando también
+`model: sonnet` a los `backend_dev`. Terminó las 15 tareas. **Dos lecciones que sí generalizan:**
+encargar **una o dos tareas por subagente** en vez de la feature entera, y **commitear al cerrar cada
+bloque**: los tres que murieron llevaban la feature completa en el cuerpo y no habían commiteado nada.
+
+### La ronda 2 de review existió por desconfianza, y acertó
+
+La ronda 1 (Sonnet) aprobó con **0 hallazgos**. Eso **no tiene precedente en este repo** —QC-20 y
+QC-30 fueron RECHAZADAS en su ronda 1 por un bloqueante real—, así que se lanzó una **ronda 2
+independiente en Opus**, con el encargo explícito de no partir del veredicto ajeno, leer el review
+previo **al final** y no inventar un menor para justificarse.
+
+Encontró uno real: el test de integración de R16 **no podía fallar**. Su comentario de nueve líneas
+afirmaba que el rechazo de un plazo fraccionario lo producía el tipo `INTEGER` de la columna; una
+sonda contra Postgres lo desmintió —una columna `NUMERIC(14,4)` devuelve **el mismo `42804`**—. Lo
+que el test verificaba era que un parámetro de **texto** no liga contra una columna numérica, nada
+sobre si la columna es entera. Y **ningún test leía el tipo real de `delivery_time`**, a diferencia
+de `cost` y `min_purchase`. Corregido en `3f091d4`: comentario reescrito y test nuevo que lee
+`information_schema`, verificado por mutación (`INTEGER`→`DECIMAL` lo pone rojo).
+
+**El patrón a copiar:** cuando un review vuelve demasiado limpio, la segunda ronda se pide
+**independiente y en otro modelo**, con el territorio ya pisado marcado para que busque en otra parte.
+
+### La base compartida entre worktrees, otra vez
+
+El gate cayó rojo con **4 archivos de integración de `inventario` y `recetas`** en rojo, ninguno de
+QC-42. Causa verificada consultando `information_schema`, no supuesta: **todos los worktrees comparten
+la base física `QuimiCloude`**, y la sesión de QC-32 ya le había aplicado `products.unit_id` y la tabla
+`units` **sin que QC-32 estuviera en `origin/dev`**. El cliente de Prisma de la rama pedía `unit`.
+
+Se aplicó lo que QC-14 y QC-20 ya habían escrito: **una base por worktree** (`QuimiCloude_QC42`, con
+el `.env` git-ignorado apuntando ahí). **La norma estaba escrita desde QC-14 y nadie la automatizó**,
+así que cada feature backend en paralelo la vuelve a descubrir y a pagar. Sigue sin automatizar.
+
+### El choque con QC-32 no era teórico, solo estaba aplazado
+
+`design.md > 10` y T13 lo anticiparon. La primera vez que se corrió T13 el merge fue **no-op** —QC-32
+vivía solo en otro worktree, no en `origin/dev`— y eso **dio una falsa sensación de seguridad**. Al
+volver del gate, QC-32 **y** QC-25 ya estaban mergeadas y el conflicto apareció entero.
+
+Resultó **aditivo por los dos lados** —`Supplier` y `SupplierCatalogLine` contra `Unit`— y se resolvió
+como T13 prescribía: conservar ambos bloques con sus comentarios `/// OJO`. El paso de `products.unit`
+a `unit_id` entró por automerge intacto, porque **QC-42 no toca `products`** (decisión cerrada 2).
+Después, T10 repetido sobre base **recreada desde cero** con la cadena completa en orden: la migración
+de QC-32 es de las 12:14 y la de QC-42 de las 13:14.
+
+Y tras el merge, el rojo de siempre: `typecheck` fallando por `@supabase/storage-js`, dependencia que
+**QC-25** añadió. El `package.json` llegó con el merge, los `node_modules` no. Un `pnpm install`.
+**Van cinco veces que el estado generado por detrás de un merge apunta a la feature ajena.**
+
+### Deuda que hereda
+
+- **Ocho preguntas abiertas**, cerradas a conciencia sin rellenar (regla 6). Las dos que se encarecen
+  con datos cargados: **el costo del catálogo no guarda historial** —al subir un precio el anterior se
+  pierde y no hay dato del que reconstruirlo, mismo problema que las versiones de fórmula de QC-24— y
+  **la línea no registra quién la editó**, heredado de `recipe_lines`, pero allí editar una línea es
+  editar la receta y aquí subir un costo no modifica nada del proveedor.
+- **El `CHECK` de contacto alcanza a los proveedores dados de baja**: no se pueden vaciar sus datos de
+  contacto sin violarlo. Relevante el día que haya que purgar datos personales.
+- **Nada concilia el costo del producto con el del catálogo** si difieren. Sin dueño hasta que exista
+  la feature de compras.
+- **Queda la base `QuimiCloude_QC42`** por borrar, y el gate reporta **7 worktrees** además del
+  principal.
