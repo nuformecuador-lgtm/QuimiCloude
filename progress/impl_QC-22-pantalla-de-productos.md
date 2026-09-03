@@ -60,3 +60,29 @@ unit, createdAt, updatedAt, createdBy, updatedBy`.
 `cost` es **cadena decimal** (`string | null`) y se pinta tal cual (R8): nada de `Number(...)` ni `parseFloat`.
 
 **Nada difiere de `design.md > 0`.** No hay que parar.
+
+## T2 — Primitivas por CLI (`table`, `select`, `alert-dialog`)
+
+Comando exacto: `pnpm dlx shadcn@latest add table select alert-dialog --yes`.
+Salida: creó `components/ui/table.tsx`, `components/ui/select.tsx`, `components/ui/alert-dialog.tsx`
+y **omitió** `components/ui/button.tsx` («files might be identical») — no se sobrescribió nada existente.
+
+**`sheet` NO se añadió** (ya existía desde QC-11). **`form` NO se añadió**: arrastra `react-hook-form` y
+`@hookform/resolvers`, y P2 quedó resuelta el 2026-09-03 en que **no entra ninguna dependencia nueva**.
+
+**Verificación obligatoria de `package.json` (regla 7):** se copió `package.json` antes de ejecutar el CLI y
+se comparó después con `diff`. Resultado: **idéntico, cero entradas nuevas**. `pnpm-lock.yaml` tampoco aparece
+en `git status`. Diff completo del CLI = los tres archivos nuevos de `components/ui/` y nada más.
+Ningún archivo de `components/ui/` se ha editado a mano (R29).
+
+**Preparación del worktree (no es cambio de código, se anota para el gate):** el worktree venía sin
+`node_modules`. Se corrió `pnpm install` (respetando `pnpm-lock.yaml`, sin cambios), `pnpm exec prisma generate`
+(el cliente Prisma no se genera solo: pnpm ignora los build scripts) y `pnpm exec next typegen` (sin él,
+`app/layout.tsx` no encuentra el tipo global `LayoutProps` que genera Next 16). Los tres son artefactos
+locales, ninguno versionado.
+
+**Salida real:**
+```
+pnpm run typecheck   -> tsc --noEmit ... (sin errores)
+pnpm run lint        -> eslint ... (sin hallazgos)
+```
