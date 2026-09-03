@@ -11,10 +11,26 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress — PR #20 ABIERTO** | `feature/QC-30-rediseno-login` | **Esperando que el humano mergee el [PR #20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20).** Sesión labs-4b. Spec aprobado el 2026-09-02 (26 requisitos, 11 tareas). **Dos rondas de revisión**: la primera rechazó por un bloqueante real —R9 sin test que mordiera: se podía borrar el modo oscuro entero y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests (20 → 26). Gate completo verde: 65 archivos, 663 tests. Al mergear: F2.5 (tarjeta a *Hecho*, `status: done`, `wt.sh done QC-30-rediseno-login`) y F2.6 (resumen en `history.md`) |
-| QC-42 | modelo-proveedores | QC-41 Proveedores | backend | **in_progress — implementer corriendo (F2.1), 4.º intento** | `feature/QC-42-modelo-proveedores` | Sesión de hoy (2026-09-03). **Spec aprobado por el humano** (36 requisitos EARS, 15 tareas, `667ab98`); acotada antes con `/afinar-feature` (semilla `ee47f69`, 22 decisiones cerradas). Tarjeta en *En curso*. **Preguntas abiertas 6, 7 y 8 siguen ABIERTAS**: el humano aprobó sin cerrarlas, el implementer las respeta y NO las rellena (regla 6). **Tres implementers murieron por 5xx de la API (500, 529, 529), ninguno por fallo del trabajo**; el 4.º corre en **Sonnet 5 por decisión explícita del humano** —desvío con motivo del «todos heredan el modelo de la sesión» de `AGENTS.md`, no norma nueva— y pasa `model: sonnet` también a sus `backend_dev`. **`b60236f` es un commit `wip` SIN AUDITAR**: esquema, migración con `down.sql` y armazón del módulo que dejó el primer implementer; se commiteó solo como red de seguridad y auditarlo es la primera tarea real del siguiente. 0 de 15 tareas marcadas, sin `impl_*.md`. Zona `backend` en **2 de 2** (QC-32 + QC-42); **QC-25 bloqueada por cupo**, y el humano dio permiso explícito para pasar de 2 si hiciera falta (2026-09-03). **Riesgo vivo: QC-32 toca `db/schema.prisma` y las migraciones** — T13 sincroniza con `dev` y repite T10 antes de dar la migración por buena. Flake ajeno conocido: `tests/ui/login-form-uncontrolled-warning.test.tsx`. |
-| QC-25 | crud-de-recetas | QC-27 Recetas | backend | **in_progress — implementer corriendo** | `feature/QC-25-crud-de-recetas` | Sesión de hoy (2026-09-03). **Spec aprobado por el humano el 2026-09-03** (F1.4): 49 requisitos (R1–R49), 19 tasks (T0–T18), 26 decisiones cerradas y cero preguntas abiertas propias. Tarjeta en *En curso*. La aprobación del spec **incluyó la dependencia**: la fila de `@supabase/storage-js` ya está en `docs/dependencias.md`, y NO entra `@supabase/supabase-js`. Sin migración propia: el CRUD cabe sobre el modelo de QC-24. Ojo al cerrar la tanda: `lib/composition/index.ts` es el archivo que ha chocado en **todas** las parejas backend del repo |
-| QC-22 | pantalla-de-productos | QC-18 Inventario | frontend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-22-pantalla-de-productos` | Sesión de hoy (2026-09-03). F1.0 hecha: zona `frontend` con **1 feature `in_progress`** (QC-30, que ya no recibe más código —solo espera el merge del PR #20—), sin intersección de archivos: QC-30 toca `app/(public)/login/*`, `app/globals.css` y `components/ui/`; QC-22 vive en `app/(private)/`. Dependencia **QC-20 `done`**. `complexity: medium` evaluada aquí y **empujada al issue como label** (antes solo tenía `zone:frontend`). Worktree en `.worktrees/QC-22-pantalla-de-productos` (rama desde `origin/dev` en `8f4a5ae`). **Parada en F1.2**: la propia description delega la forma de la pantalla al acotado —una ruta o dos, formulario en modal o en página, búsqueda y orden, y si hace falta E2E— y no existe `specs/QC-22-pantalla-de-productos/`. **F1.2 en curso**: `/afinar-feature` corrió el 2026-09-03 y sembró `specs/QC-22-pantalla-de-productos/requirements.md` con 22 decisiones cerradas y 1 pregunta abierta. Cambió el alcance —solo productos; la pantalla de presentaciones salió a **QC-45**, creada en el board— y eso se escribió en el issue ANTES de sembrar. Semilla commiteada en `dev` (`30186f3`) y mergeada al worktree. `spec_author` escribió **32 requisitos (R1-R32) y 20 tareas (T0-T19)** con mapa `R<n> → test` completo (commit `3a85ea6` en la rama). F1.3 hecha: tarjeta en *En revisión* y ruta comentada en el issue. **Spec APROBADO por el humano el 2026-09-03** (F1.4); tarjeta en *En curso*. La aprobación cerró tres cosas: (1) **P2 cerrada sin dependencias nuevas**: `shadcn add form` NO se corre, `react-hook-form` y `@hookform/resolvers` NO se instalan y `docs/dependencias.md` NO cambia — se usa `<form action>` + `useActionState`, el patrón del login (commit `0f36d60`); (2) montar `<Toaster />` **supera** el R36/D9 de QC-11 y su test en negativo (`tests/unit/private-layout.test.tsx:260`), que T4 invierte con la fecha escrita, no borra; (3) `INVENTORY_ROUTE` se muda de `private-nav.ts` a `lib/shared/routes.ts`, tocando cuatro archivos heredados que R32 declara como los únicos permitidos |
+| QC-13 | guardia-de-sesion-en-navegacion | QC-17 Identidad y acceso | frontend | pending — **worktree montado, F1.2 en curso** | `feature/QC-13-guardia-de-sesion-en-navegacion` | Sesión de hoy (2026-09-03). **Acotada con `/afinar-feature`**: `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md`, 16 decisiones cerradas y 6 preguntas abiertas. **El board se corrigió antes de sembrar**: la `description` prometía trabajo que QC-9, QC-8, QC-11 y QC-12 ya entregaron —la ficha se escribió antes de que QC-9 existiera—, `zone` bajó de `fullstack` a **`frontend`** (sin partición), `complexity` de `medium` a **`low`**, y se añadió **QC-22** a `depends_on`. **La validación de conflicto de F1.0 evitó un choque real con QC-26**, que se apropia del ítem «Fórmulas»: QC-13 lo borraba. Su spec no está en `dev`, solo en su worktree. **Queda intersección de archivos viva** (`private-nav.ts`, `app-sidebar.test.tsx`): sincronizar con `dev` justo antes del PR. Worktree desde `origin/dev` (`d532662`). Siguiente: `spec_author`, luego F1.3 y **F1.4, parada de aprobación humana**. |
+| QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | **spec_ready — ESPERANDO APROBACIÓN HUMANA (F1.4)** | `feature/QC-26-pantalla-de-recetas` | Sesión del 2026-09-03. Acotada y especificada: **52 requisitos (R1–R52), 29 tasks**, 19 decisiones cerradas y **2 preguntas abiertas** que `spec_author` no rellenó con supuestos (quién puede invocar la lectura de unidades, y qué se muestra en la línea de un producto dado de baja). Tarjeta en *En revisión*. **Al aprobar**: F2.0, escribir la fila de `dnd-kit` en `docs/dependencias.md` **como `excepcion` y diciendo qué check falló**, y lanzar `implementer`. Ojo: el worktree nació antes de que `/afinar-regla` cambiara la regla 1, así que su `CLAUDE.md` está viejo — se arregla solo al sincronizar con `dev` en F2.3 |
+| QC-33 | modelo-pedidos | QC-31 Pedidos | backend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-33-modelo-pedidos` | Sesión de hoy (2026-09-03), `labs-c2`. **Spec aprobado por el humano** tras dos vueltas: 42 requisitos EARS, 12 tareas, 29 decisiones cerradas, commit `a26baba`. Tarjeta en *En curso*. **El cupo se resolvió solo**: QC-25 se mergeó (PR #23) mientras se revisaba, así que `backend` entró en **1 de 2** y no hubo que forzar la regla. Worktree ya sincronizado con `origin/dev`, que trae QC-25 y QC-32. Cinco encargos al implementer: **R41** usa `timezone(text, timestamptz)` porque es `IMMUTABLE` y `EXTRACT(YEAR FROM created_at)` a secas es `STABLE` y Postgres la rechaza en un `CHECK`; el caso que muerde es el de **frontera** (`2026-12-31T20:00:00-05:00` con año 2026 → `23514`); **ningún test escribe el año literal**, se calcula con `new Date().getUTCFullYear()` o la suite se pone roja sola el 1 de enero; el índice único del correlativo es **total y no parcial**, al revés que QC-24; y `RecipeId` es aditivo sobre un `recetas` que **QC-25 acaba de tocar**. Quedan **2 preguntas abiertas** y las dos siguen abiertas a propósito |
+| QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | **spec_ready — PARADA EN F1.4** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. `/afinar-feature` sembró 16 decisiones y `spec_author` escribió **47 requisitos (R1-R47) y 21 tareas** con mapa `R<n> → test` completo (commit `0f5a3de`). Base propia `QuimiCloude_QC43` montada, gate verde en el worktree (116 archivos). **Esperando aprobación humana**; **P2 bloquea T3** |
+
+La feature **QC-30 — rediseno-login** se cerró el 2026-09-03, pero **su PR [#20] se había
+mergeado el 2026-09-02 a las 22:55Z**: la sesión que la implementó nunca corrió F2.5 ni F2.6, así
+que la ficha pasó un día entera en `in_progress` y la tarjeta en *En curso* con la rama ya
+integrada. La cierra otra sesión por decisión humana, igual que pasó con **QC-8**. Es la segunda
+vez: el cierre depende hoy de que quien mergea se acuerde, y eso ya falló dos veces — anotado como
+material de `/afinar-regla`. Resumen en `history.md`.
+
+La feature **QC-25 — crud-de-recetas** se cerró el 2026-09-03 (PR #23, merge `1001ec1`):
+resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
+`QuimiCloude_QC25` eliminada**. 50 requisitos vigentes con test —R15 derogado— y `reviewer` en dos
+rondas (RECHAZADO por dos mayores → APROBADO, con **12 mutaciones repetidas** por el propio
+reviewer, 11 muertas). **Desbloquea QC-26 — pantalla-de-recetas.** Tres cosas que costaron y que
+están en `history.md`: cinco cortes 529 que obligaron a implementar con Sonnet, la llegada de QC-32
+a `dev` a mitad de implementación —que derogó R15 y obligó a adaptar en caliente—, y el drift de la
+base compartida entre worktrees, resuelto **a mano por segunda vez** con una base propia.
 
 La feature **QC-20 — crud-de-productos** se cerró el 2026-09-02 (PR #19, merge `1be1021`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
@@ -130,6 +146,76 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-43 — crud-de-proveedores: F1.0 (2026-09-03)
+
+### QC-13 — guardia-de-sesion-en-navegacion (2026-09-03)
+
+- **Acotada con `/afinar-feature`**: alcance, 15 decisiones cerradas y 5 preguntas abiertas en
+  `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md`.
+- **Su `description` mentia y se reescribio en el board ANTES de sembrar.** La ficha se redacto
+  antes de que existiera QC-9, que se llevo casi todo su alcance: validar la cookie, redirigir en
+  los dos sentidos, el formulario autenticando, el layout con el usuario real y el logout ya
+  estaban entregados por QC-9, QC-8, QC-11 y QC-12. **Verificado en el codigo, no en los
+  documentos.** Y el E2E que QC-12 le difirio **ya existe** (`e2e/session.spec.ts`, QC-9 R24):
+  esa deuda se cierra por constatacion.
+- **Cuatro campos corregidos en el issue**: `zone` de `fullstack` a **`frontend`** (sin particion),
+  `complexity` de `medium` a **`low`**, `depends_on` con **QC-22** anadida (el E2E pasa a necesitar
+  `/inventario`), y la `description` nueva. Reflejado en `feature_list.json`.
+- **Lo que queda de verdad**: quitar **4** de los 5 enlaces que dan 404 y sus constantes, conservar
+  la capacidad de agrupar de `AppSidebar` moviendo su test a fixture propia, y hacer que el
+  recorrido E2E del retorno pida `/inventario` en vez de `/dashboard`.
+- **CHOQUE CON QC-26 detectado en la validacion de conflicto de F1.0, y evitado a tiempo.** El
+  quinto enlace, **Formulas, NO se toca: es de QC-26**, cuyo R5 lo convierte en el catalogo de
+  recetas («NO DEBE seguir presentando la etiqueta Formulas»). QC-13 lo borraba. Su spec **no esta
+  en `dev`**, solo dentro de `.worktrees/QC-26-pantalla-de-recetas`, asi que el cruce solo se ve
+  entrando a leerlo — y **el validador no lo automatiza**: es comprobacion del leader. Corregido en
+  el spec sembrado, en el board y en `feature_list.json` antes de montar nada.
+- **Sigue habiendo interseccion de archivos con QC-26** (`private-nav.ts`, `app-sidebar.test.tsx`):
+  el alcance ya no se solapa pero el archivo si, y **quien mergee segundo se come el conflicto**.
+  Sincronizar con `dev` justo antes del PR, no solo al empezar.
+- **La raiz `/` queda fuera y SIN ficha**, por decision explicita del humano: mas adelante habra una
+  pantalla de inicio de verdad y entonces nacera su tarjeta. Hasta entonces la primera pantalla del
+  ERP sigue siendo la plantilla de `create-next-app`, publica. Anotado como pregunta abierta 5.
+
+- **Gate de `dev` en verde** al arrancar (97 archivos), y el propio gate avisó de que la entrada
+  del baseline que dejó QC-22 **ya pasaba**: era la guardia de dependencias, roja por la fila de
+  `@supabase/storage-js` de QC-25, y QC-25 ya está mergeada. **Retirada**; el baseline vuelve a
+  estar vacío, que es como informa.
+- **`zone: backend` y `complexity: high` ya venían del board**, con las cuatro labels puestas
+  (`sdd`, `slug:crud-de-proveedores`, `zone:backend`, `complexity:high`). No hizo falta empujar
+  nada a Jira: esta vez la evaluación ya estaba hecha.
+- **Cupo, con la regla nueva de una feature por zona Y épica.** La única en vuelo es **QC-33**
+  (backend · épica QC-31 Pedidos). QC-43 es backend · **QC-41 Proveedores**: par distinto, así que
+  entra. Con la regla vieja de «2 por zona» habría entrado igual, pero por poco.
+- **Dependencias**: QC-42 y QC-8, las dos `done` y `Finalizado` en el board. Worktree en
+  `.worktrees/QC-43-crud-de-proveedores`, rama desde `origin/dev` en `d532662` (el merge del PR
+  #25, que es justo QC-42).
+- **Parada en F1.2, y aquí no es una formalidad.** QC-42 no dejó preguntas vagas: dejó **encargos
+  con destinatario**. Su `requirements.md` y su `design.md` nombran a QC-43 quince veces. Lo que
+  cae de lleno en esta ficha:
+  1. **El contacto en blanco.** La decisión 7 de QC-42 exige «al menos teléfono o correo», pero el
+     `CHECK` de la base solo mira **ausencia de valor**: `phone = ''` lo satisface igual que un
+     teléfono real. La posición por defecto escrita es que **QC-43 lo rechace con zod**. Si la
+     respuesta fuera que la base también debe impedirlo, es otro `CHECK` y cambiarlo con
+     proveedores cargados obliga a limpiar datos.
+  2. **El rastro de quién edita una línea del catálogo.** La línea no lleva columnas de autor
+     (decisión 14, heredada de `recipe_lines`), pero allí editar una línea es editar la fórmula y
+     el rastro queda en `recipes.updated_by`; aquí **subir el costo es un hecho comercial propio**.
+     Dos caminos y ninguno gratis: que QC-43 toque `suppliers.updated_by` (barato, impreciso) o
+     columnas de auditoría propias (una migración más).
+  3. **¿Un costo de 0 es válido?** Hoy la base solo prohíbe negativos. Una muestra gratis lo
+     justifica; un cero por descuido, no.
+  4. **El mínimo de compra no dice en qué se mide**: se lee según la unidad del producto, que
+     QC-32 dejó **opcional**.
+  5. **El filtro de borrado lógico en las consultas lo pone QC-43**: QC-42 no tiene ninguna.
+  Y además: los puertos, los adaptadores driven y driving del módulo `proveedores` están **vacíos
+  con `.gitkeep`** esperando a esta ficha, y la autorización en el service la fija QC-43
+  (decisión 20 de QC-42).
+  No existe `specs/QC-43-crud-de-proveedores/`. **Se ofreció `/afinar-feature QC-43`**: lanzar
+  `spec_author` sin cerrar esos cinco puntos es pagar la ronda dos veces, y aquí están escritos
+  con nombre.
+- **Acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 4 preguntas abiertas en `specs/QC-43-crud-de-proveedores/requirements.md`; no se copian aquí. **Cambió el alcance en dos cosas y las dos se escribieron en el issue ANTES de sembrar**: los permisos pasan de «usuarios con sesión iniciada» a **solo el Administrador**, y la ficha **trae tres cambios de esquema sobre QC-42** —contacto en blanco rechazado también en la base, costo estrictamente mayor que cero, y columnas de autor en la línea del catálogo—, baratos porque las tablas están vacías. Ninguna ficha nueva ni huérfana.
+
 ### QC-33 — modelo-pedidos (acotada el 2026-09-03)
 
 - El alcance y las **26 decisiones cerradas** viven en
@@ -214,6 +300,43 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
      ruta», que es justo el caso que `private-nav.ts` documenta («así se acaba con `/dashboard` y
      `/panel` conviviendo»).
 
+### QC-26 — pantalla-de-recetas: F1.0 (2026-09-03)
+
+- **Cupo, con la regla nueva.** `(frontend, QC-27)` está libre: en vuelo solo hay `(backend, QC-31)`
+  —QC-33— y `(backend, QC-41)` —QC-42—. Con la regla vieja de «2 por zona» habría dado igual; con la
+  nueva importa la épica, y ninguna otra ficha de Recetas está en curso. Su dependencia **QC-25 se
+  cerró hoy**, así que entra desbloqueada.
+- **`complexity: high`, asignada por el leader** (venía `null` del board) y **escrita como label en
+  el issue**, sin lo cual la próxima importación la borraría. No es el mismo caso que **QC-22**
+  (`medium`, la pantalla de productos): aquella es una tabla con alta y edición en un panel; esta
+  suma **sub-formulario de líneas de producto** —añadir, quitar, cantidad y unidad por línea—,
+  **editor de pasos ordenados** y **subida de imagen con vista previa y estado propio**. Son tres
+  superficies con estado que no existen en QC-22.
+- **Sin partición.** Es toda capa visual: las nueve operaciones ya existen y las expone QC-25 como
+  Server Actions. La `description` lo dice y la frontera está limpia.
+- **Se para en F1.2 y se ofrece `/afinar-feature`**, y aquí no es una recomendación de estilo: la
+  propia `description` dice que **la forma de la pantalla se decide al acotar esta ficha** —una ruta
+  o dos, formulario en modal o en página, cómo se agregan, quitan y reordenan líneas y pasos,
+  búsqueda y orden— **y que ahí también se decide si hace falta E2E**. Lanzar `spec_author` sin eso
+  es pedirle que invente el producto.
+- **Acotada y sembrada el 2026-09-03** con `/afinar-feature`: 18 decisiones cerradas y 3 preguntas
+  abiertas en **`specs/QC-26-pantalla-de-recetas/requirements.md`** (en el worktree) — esa es la
+  fuente, aquí no se copia. **El board SÍ cambió**: la `description` se reescribió antes de sembrar
+  porque la ficha decía «es la capa visual» y ahora incluye una operación de backend. Tres cosas
+  que salieron de la acotación y que nadie había visto: **el selector de unidad no tenía de dónde
+  leer** —QC-32 creó la tabla y sembró cuatro unidades pero no expuso consulta, así que la pantalla
+  habría quedado muerta—; **la URL no se inventa**, se toma el placeholder «Fórmulas»
+  (`/produccion/formulas`) y su etiqueta pasa a «Recetas»; y **`dnd-kit` falla el check 2** (sin
+  publicar desde 2024-12-05), así que entra como **`excepcion`** aprobada explícitamente, no como
+  `aprobada`. Su fila en `docs/dependencias.md` la escribe el leader en F1.4 y **debe decir qué
+  check falló y por qué se aceptó**.
+- **Contexto fresco que la acotación hereda de QC-25, y que conviene no volver a preguntar:** el
+  listado **no trae las líneas** y el detalle sí; la edición manda **la lista final completa** y el
+  servidor concilia; la imagen se guarda como **ruta** y la URL pública se compone al leer; el
+  bucket es **público**; los autores llegan como **ids**, no como nombres —resolverlos es alcance de
+  esta ficha, vía el contrato de `identity`—; y la unidad de la línea es **referencia al catálogo de
+  `unidades`**, no texto libre.
+
 ### QC-25 — crud-de-recetas: F0 + F1.0 (2026-09-03)
 
 - **F0 — importación del board.** 34 issues de tipo `Tarea` en `QC`. Comparado campo a campo
@@ -284,6 +407,25 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   que escribir en disco a medida que avanza**, no al final: marcar cada task en cuanto cierra y
   commitear al cerrar cada grupo. Con eso, un corte cuesta la tanda en curso; sin eso, cuesta todo.
   Es la regla 3 de `CLAUDE.md` aplicada al subagente y no solo al chat.
+- **[deuda de QC-25, no bloqueante — menor-10 de la review]** Se puede hacer que
+  `isUniqueNameViolation` (`lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`)
+  devuelva **siempre `false`** y los 39 tests de integración de recetas siguen verdes. **Ningún
+  test miente**: R10 prueba el índice único con SQL crudo y R8 prueba la traducción del dominio
+  con un doble; lo que queda huérfano es **la costura del adaptador**, que ningún requisito
+  nombra. El reviewer lo verificó contra Postgres real y no lo consideró bloqueante. Está dicho
+  en el PR #23, no tapado.
+- **[deuda de infraestructura — hay una base de datos HUÉRFANA]** Al borrar `QuimiCloude_QC25` en
+  el cierre de QC-25 se vio que **`QuimiCloude_QC14` sigue existiendo**, aunque QC-14 se cerró hace
+  días. Nadie la borró porque el desmontaje de un worktree **no sabe nada de la base propia**: son
+  dos pasos manuales y solo uno está en `wt.sh`. Van dos bases vivas de features cerradas si nadie
+  mira. Mismo material de `/afinar-regla` que el punto siguiente.
+- **[deuda de infraestructura — el drift de base entre worktrees]** Varios worktrees compartían
+  **una sola base física** (`localhost:5432/QuimiCloude`), y la sesión hermana aplicó ahí
+  migraciones de QC-32 y QC-42 que renombraron columnas. Eso **bloqueó los tests de integración
+  de QC-25** hasta que se le dio base propia (`QuimiCloude_QC25`), replicando lo que ya se había
+  hecho con `QuimiCloude_QC20`. Se ha resuelto **a mano dos veces**: no hay nada en `wt.sh new`
+  ni en `docs/worktrees.md` que lo automatice ni lo documente, así que la tercera feature en
+  paralelo volverá a tropezar. Material de `/afinar-regla`.
 - **[deuda del arnés] La columna del board se llama «En revisión», no «Spec en revisión»** como
   afirma `docs/jira.md > El board de este repo`. El mapeo de F0 que traduce columna → `status` está
   escrito contra el nombre que no es; hoy no rompió nada porque ninguna ficha estaba en esa columna
@@ -1156,6 +1298,28 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Resumen completo en `progress/history.md`. Lo que sigue vivo:
 
+- **[arnés — `wt.sh new` deja el worktree a medio montar, y hoy costó CINCO tropiezos seguidos
+  antes de poder correr el gate. Es la candidata más concreta y más barata para `/afinar-regla`.]**
+  El 2026-09-03, al montar `.worktrees/QC-43-crud-de-proveedores`, el gate no pudo correr hasta
+  hacer **cinco cosas a mano** que el script no hace y que ningún documento lista juntas:
+  1. **`.env`** — hay que copiarlo del worktree principal; sin él, `init.sh` avisa pero los tests
+     de integración ya han fallado.
+  2. **Exportarlo a mano** (`set -a && . ./.env && set +a`) — porque **Vitest no lo carga en un
+     worktree y en `dev` sí**, con archivos idénticos y mismo config. Causa raíz aún sin
+     identificar (deuda aparte).
+  3. **`pnpm install`** — el worktree nace sin `node_modules`; el error que da es
+     `Local package.json exists, but node_modules missing`, que no aparece hasta que fallan
+     `db:migrate` y `db:seed`.
+  4. **`pnpm prisma generate`** — sin esto, `typecheck` falla con `Module '@prisma/client' has no
+     exported member 'Prisma'`. **Cuarta vez en el día** que el cliente sin regenerar rompe algo.
+  5. **`pnpm exec next typegen`** — sin esto, `typecheck` falla con
+     `Cannot find name 'LayoutProps'` en `app/layout.tsx`, un tipo que genera Next.
+  Y para una feature con migraciones, **una sexta**: crear su base propia y apuntar el `.env` ahí
+  (ver la deuda de la base compartida). Las seis son mecánicas y ninguna requiere criterio: son
+  exactamente lo que un script debe hacer. **`wt.sh new` debería dejarlas hechas** —y `wt.sh done`
+  eliminar la base—, o como mínimo imprimirlas en orden al terminar. Hoy el leader las descubre
+  una a una, cada una tras un error distinto, y un subagente que se las encuentre las lee como
+  «algo está roto».
 - **[arnés — TRES features en paralelo comparten UNA base de datos, y dos de ellas dejaron `dev`
   roto en integración sin que nadie se enterara. Es la deuda más cara de esta sesión.]**
   El 2026-09-03, al correr el gate de QC-22, fallaron 4 archivos de integración de `inventario` y

@@ -39,12 +39,15 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
 function SheetContent({
   className,
   children,
+  footer,
   side = "right",
   showCloseButton = true,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  /** Acciones del panel. Se pintan abajo, en una fila alineada a la derecha. */
+  footer?: React.ReactNode
 }) {
   return (
     <SheetPortal>
@@ -59,6 +62,7 @@ function SheetContent({
         {...props}
       >
         {children}
+        {footer === undefined ? null : <SheetFooter>{footer}</SheetFooter>}
         {showCloseButton && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
@@ -94,7 +98,10 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+      className={cn(
+        "mt-auto flex shrink-0 flex-row flex-wrap items-center justify-end gap-2 border-t p-4",
+        className
+      )}
       {...props}
     />
   )
