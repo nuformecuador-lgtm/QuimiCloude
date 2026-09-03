@@ -3,11 +3,19 @@
 > Zona: `backend` · Complejidad: `high` · depends_on: `QC-24`, `QC-20`, `QC-8` ·
 > Rama: `feature/QC-25-crud-de-recetas`
 >
-> El **qué** está en `requirements.md` (R1–R49) y su alcance lo cerró el humano el 2026-09-03: 23
-> filas de «Decisiones cerradas» al acotar, más las **tres** que cerró en F1.4 respondiendo a las
-> preguntas 5, 6 y 7 de este diseño (§ 13) —**R45–R49**—. Aquí va el **cómo**: qué archivos nacen, qué contratos
-> entran y salen, cómo se concilia la lista de líneas, cómo se sube la imagen sin que el dominio
-> conozca Supabase, qué variables de entorno se declaran y qué alternativas se descartaron.
+> El **qué** está en `requirements.md` (**R1–R50, con R15 derogado**) y su alcance lo cerró el humano
+> el 2026-09-03: 23 filas de «Decisiones cerradas» al acotar, más las **cuatro** que cerró después
+> —las tres que responden a las preguntas 5, 6 y 7 de este diseño (§ 13) —**R45–R49**— y la de
+> «**QC-32 llegó antes de tiempo**», que deroga R15 y la sustituye por **R50** (§ 6b)—. Aquí va el
+> **cómo**: qué archivos nacen, qué contratos entran y salen, cómo se concilia la lista de líneas,
+> cómo se sube la imagen sin que el dominio conozca Supabase, qué variables de entorno se declaran y
+> qué alternativas se descartaron.
+>
+> **Aviso de lectura.** QC-32 se mergeó en `dev` a mitad de la implementación de esta ficha y la
+> unidad de la línea dejó de ser texto libre: hoy es `recipe_lines.unit_id`, una referencia al
+> catálogo del módulo `unidades`. Todo lo que este documento dice sobre la unidad está escrito ya
+> **después** de ese cambio; **R15 está derogado y no se implementa**. El porqué y el cómo están en
+> § 6b, y la alternativa que se descartó, en § 12.11.
 >
 > **El modelo ya existe y esta ficha NO lo toca.** QC-24 dejó `Recipe` y `RecipeLine` en
 > `db/schema.prisma` con su migración, su índice único **parcial**
@@ -37,7 +45,8 @@
 | `lib/modules/recetas/adapters/driving/recipe-actions.ts` | Server Actions (R39). |
 | `lib/modules/recetas/index.ts` | Contrato público: además de `normalizeRecipeName`, reexporta tipos, esquemas, errores y las cinco factories. Solo de `./domain`. |
 | `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts` | **Archivo nuevo en `inventario`**: implementa `ProductCatalog` (§ 6), el hueco que QC-24 dejó abierto en el contrato. |
-| `lib/composition/index.ts` | Se **añade** la fachada `recetas` y el cableado de `ProductCatalog`. No se toca `identity` ni `inventario`. |
+| `lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts` | **Archivo nuevo en `unidades`**: implementa `UnitCatalog` (§ 6b), el hueco que QC-32 dejó abierto para su primer consumidor. Único archivo del repo que consulta `prisma.unit`. |
+| `lib/composition/index.ts` | Se **añade** la fachada `recetas` y el cableado de `ProductCatalog` y de `UnitCatalog`. No se toca `identity` ni `inventario`. |
 | `.env.example` | Bloque nuevo con las tres variables del Storage, **declaradas y vacías** (R28). |
 | `package.json` | Una sola dependencia nueva: `@supabase/storage-js` (§ 10). |
 | `tests/…` | Ver § 14. |
@@ -51,7 +60,9 @@ QC-26 y el modelo es QC-24.
 
 De `Recipe`: `id`, `name`, `nameNormalized`, `description`, `steps` (JSON), `imagePath`,
 `createdBy`, `updatedBy`, `createdAt`, `updatedAt`, `deletedAt`. De `RecipeLine`: `id`,
-`recipeId`, `productId`, `quantity` (`Decimal(14,4)`), `unit`, marcas de tiempo.
+`recipeId`, `productId`, `quantity` (`Decimal(14,4)`), **`unitId`** (`uuid`, obligatorio, con FK al
+catálogo de `unidades` — lo trajo QC-32, ver § 6b; **ya no es la columna `unit` de texto libre**),
+marcas de tiempo.
 
 Tres cosas que el implementer tiene que tener presentes y que no son evidentes:
 
@@ -122,8 +133,9 @@ export function requireAdmin(actor: Actor | null | undefined): asserts actor is 
 ```
 
 - **Primera línea de los cinco casos de uso**, antes de zod y antes de tocar ningún puerto. El
-  test que cierra R2 llama a cada caso de uso con un actor `Operador` y con dobles de los **tres**
-  puertos —repositorio, catálogo de productos y almacenamiento— que **fallan si los llaman**: eso
+  test que cierra R2 llama a cada caso de uso con un actor `Operador` y con dobles de los **cuatro**
+  puertos —repositorio, catálogo de productos, **catálogo de unidades** (§ 6b) y almacenamiento— que
+  **fallan si los llaman**: eso
   es lo que demuestra «no llega al repositorio», que es lo que distingue una autorización real de
   un `if` decorativo.
 - **Falla cerrado** (R3): `null`, `undefined`, rol vacío o rol desconocido → mismo rechazo.
@@ -161,7 +173,8 @@ export const findProductRefs: ProductCatalog['findRefs'] = async (ids) => { /* p
   escribe `prisma.product` —lo vigila `tests/guards/guard-arquitectura-modulos.test.ts`—.
 - `recetas/domain/*` importa **solo el tipo** desde el barrel `@/lib/modules/inventario` (import
   permitido: barrel de otro módulo, `docs/architecture.md > La regla de dependencias`), y lo
-  recibe como dependencia de la factory: `createCreateRecipe({ recipes, products, images })`.
+  recibe como dependencia de la factory: `createCreateRecipe({ recipes, products, units, images })`
+  (`units` es el catálogo de unidades de § 6b).
 - `lib/composition` cablea `productCatalog = { findRefs: findProductRefs }` y se lo pasa a los
   casos de uso de `recetas`. Es el único sitio donde se juntan los dos módulos.
 - **`findRefs` devuelve solo productos vivos** (así lo documentó QC-24). De ahí salió la pregunta
@@ -190,6 +203,105 @@ findRefs(idsANuevoValidar) → los que no vuelvan se rechazan (R17, R46)
 
 ---
 
+## 6b. La frontera con `unidades`: la unidad de la línea (R50, deroga R15)
+
+**Por qué existe esta sección.** El diseño original daba la unidad por texto libre (R15), porque la
+decisión cerrada de la ficha decía que el catálogo lo traía **QC-32** y que esta ficha no lo
+adelantaba. QC-32 se mergeó en `dev` **mientras QC-25 se implementaba**, y en `dev`
+`recipe_lines.unit` ya no existe: es `unit_id`, un UUID obligatorio con FK a `units`. El humano
+cerró que **QC-25 se adapta en esta misma ficha** —cerrarla con texto libre habría dejado un PR que
+**no compila contra `dev`**, o sea un bloqueante inmediato, no una mejora futura—. De ahí **R50**,
+que deroga R15 y que este diseño recoge aquí. Lo que **no** cambió: la unidad sigue **obligatoria**,
+sigue **sin derivarse** de la del producto y **no hay conversión** entre unidades.
+
+### 6b.1 Qué se consume: el contrato, nunca la tabla
+
+QC-32 dejó publicado en el contrato de `unidades` (`domain/unit-catalog.ts`) los tipos `UnitId`,
+`UnitRef` y la interfaz `UnitCatalog`, con la implementación explícitamente pendiente del primer
+consumidor. **El primer consumidor es QC-25**, así que la escribe esta ficha.
+
+```ts
+// lib/modules/unidades/domain/unit-catalog.ts  (de QC-32, no se toca)
+export interface UnitCatalog {
+  findRefs(ids: readonly UnitId[]): Promise<readonly UnitRef[]>;   // los que no existan no vuelven
+}
+```
+
+`recetas` importa **solo el tipo**, y **solo desde el barrel** `@/lib/modules/unidades`. Nunca
+`prisma.unit`, nunca el modelo `Unit`, nunca el repositorio de unidad, nunca una ruta profunda a su
+`domain/`, sus `ports/` o sus `adapters/`. Es literalmente lo que exige R50, y es la misma regla que
+ya se aplica a `inventario` en § 6 (`docs/architecture.md > Dominio` n.º 2: «se comparten servicios
+vía interfaz, nunca repositorios ni tablas»). Lo vigilan
+`tests/guards/guard-arquitectura-modulos.test.ts` y el barrido de rutas profundas de
+`tests/unit/recetas/module-contract.test.ts`.
+
+### 6b.2 Dónde vive el adaptador, y por qué en `unidades`
+
+`lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts` (`findUnitRefs` +
+`toUnitRef`, función pura de mapeo). **Vive dentro de `unidades`, no dentro de `recetas`**, y no es
+una preferencia de gusto: `Unit` es el modelo **propietario** de `unidades`, y quien consulta la
+tabla de un módulo tiene que ser ese módulo. Si el adaptador viviera en `recetas`, `recetas` estaría
+escribiendo `prisma.unit` —exactamente lo que R50 prohíbe— y la guardia de arquitectura lo
+rechazaría. Es **el mismo patrón** con el que esta ficha resolvió `ProductCatalog` dentro de
+`inventario` (§ 6), y se copia a propósito para que no haya dos formas de cruzar una frontera.
+
+Una sola diferencia con `ProductCatalog`, y es deliberada: **`findUnitRefs` no lleva filtro de
+vida**. `Product` tiene `deleted_at` y su catálogo devuelve solo los vivos; **`Unit` no tiene
+borrado lógico**, así que no hay ninguna cláusula de vida que aplicar. Se deja escrito porque un
+`deletedAt: null` copiado por inercia no compilaría, y su ausencia se lee como olvido si nadie dice
+que es decidida.
+
+### 6b.3 Cómo se cablea
+
+Igual que `ProductCatalog`, en `lib/composition/index.ts` y en ningún otro sitio:
+
+```ts
+const unitCatalog: UnitCatalog = { findRefs: findUnitRefs };
+// … inyectado como `units:` SOLO en createCreateRecipe y createUpdateRecipe
+```
+
+Solo se cablea la **lectura**. Las escrituras del catálogo (`createUnit`, `updateUnit`,
+`deleteUnit`) siguen sin cablear: eso es **QC-38**, no esta ficha.
+
+### 6b.4 Dónde se valida, y la asimetría producto / unidad
+
+En el borde, `recipeLineSchema.unitId` es `z.string().uuid()` (§ 7.1): valida **forma**, no
+existencia —igual que `productId`—. La **existencia** la valida el caso de uso contra el catálogo,
+con **una sola llamada** a `findRefs` sobre los `unitId` **únicos** (`Set`); si alguno de los
+enviados no vuelve en la respuesta, `ValidationError` y **no se escribe ninguna fila**.
+
+**Y aquí está la asimetría que hay que leer entera antes de llamarla inconsistencia:**
+
+| | Alta | Edición |
+| --- | --- | --- |
+| `productId` | se validan **todas** las líneas (todas son nuevas, R46) | se validan **solo las nuevas** — las que no estaban ya en la receta (R45) |
+| `unitId` | se validan **todas** las líneas | se validan **todas** las líneas de la lista final |
+
+La excepción de R45 **no es una regla general de «lo preexistente no se revalida»**: nace de un
+requisito concreto, R18 — una receta **conserva** la línea de un producto dado de baja, y
+`ProductCatalog` solo devuelve vivos, así que sin la diferencia de conjuntos dar de baja un producto
+convertiría en inedibles todas las recetas que lo usan (§ 6, § 13.3).
+
+**No existe ningún requisito equivalente para la unidad.** `Unit` no tiene borrado lógico, así que
+una unidad solo puede «no volver» de `findRefs` por una razón: **no existe**. Y ninguna regla obliga
+a conservar una línea que apunta a una unidad inexistente — R50 dice justo lo contrario: si la
+unidad no existe, se rechaza. Copiar aquí la excepción de R45 sería inventar una salvedad que ningún
+requisito pide, y su efecto sería dejar sobrevivir indefinidamente referencias rotas solo por haber
+estado antes. Por eso la edición valida **todas** las unidades: es la resolución de la contradicción
+R17/R18 aplicada donde la contradicción existe, y no aplicada donde no existe.
+
+### 6b.5 Lo que la unidad sigue sin hacer
+
+- **No se deriva del producto.** `ProductRef` declara un `unitId`, pero `recetas` **no lo lee en
+  ningún sitio**: la unidad de la línea la manda el llamante. Que el producto tenga una unidad de
+  compra no significa que la fórmula lo dosifique en ella.
+- **No hay conversión.** Nadie convierte gramos a kilos: no lo pide ningún requisito.
+- **No se resuelve el nombre al leer.** `get-recipe.ts` hace *pass-through* de `line.unitId`
+  (§ 7.2). Pintar el nombre o el símbolo de la unidad es de la pantalla, **QC-26**, exactamente
+  igual que resolver el nombre del autor (R34).
+
+---
+
 ## 7. Puertos, contratos de entrada y salida
 
 ### 7.1 Entrada (zod, en `domain/recipe-input.ts`) — R38
@@ -198,7 +310,10 @@ findRefs(idsANuevoValidar) → los que no vuelvan se rechazan (R17, R46)
 recipeLineSchema = {
   productId: uuid,
   quantity:  string, patron decimal(14,4), > 0            // R14
-  unit:      string, trim, min 1                          // R14, R15 (texto libre)
+  unitId:    uuid                                         // R50: FORMA aqui; la EXISTENCIA
+                                                          // la valida el caso de uso contra
+                                                          // UnitCatalog (§ 6b.4). R15 (texto
+                                                          // libre) esta DEROGADO.
 }
 
 createRecipeSchema = {
@@ -236,7 +351,7 @@ quitar; un `null` en el alta es simplemente «sin imagen» (R21) y no dispara ni
 ```ts
 RecipeSummary  = { id, name, description, imageUrl, stepCount, createdAt, updatedAt,
                    createdBy, updatedBy }                    // SIN lines (D14 → R33)
-RecipeLineView = { id, productId, productName, quantity /* string */, unit }
+RecipeLineView = { id, productId, productName, quantity /* string */, unitId }   // R50
 RecipeDetail   = RecipeSummary & { steps: readonly string[]; lines: readonly RecipeLineView[] }
 Page<T>        = { items, total, page, pageSize, totalPages }
 ```
@@ -244,7 +359,8 @@ Page<T>        = { items, total, page, pageSize, totalPages }
 `imageUrl` es `string | null` y se compone **al leer** (R24, § 9.3). `productName` del detalle sale
 de `ProductCatalog.findRefs` sobre los ids de las líneas, **no** de un `join` —la tabla es de otro
 módulo—; un producto borrado lógicamente no vuelve de `findRefs` y su línea se devuelve igual, con
-`productName: null` (R18).
+`productName: null` (R18). **`unitId` sale tal cual, sin resolver nombre ni símbolo** (R50,
+§ 6b.5): decorar la unidad es de QC-26.
 
 ### 7.3 Puerto de persistencia
 
@@ -281,7 +397,8 @@ Toda `replaceAlive` corre dentro de **una sola `prisma.$transaction`**:
 2. `DELETE FROM recipe_lines WHERE recipe_id = $1 AND product_id NOT IN (<ids finales>)` — borrado
    **físico** (R12), que es lo que QC-24 decidió al dejar la línea sin `deleted_at`.
 3. Por cada línea final, `upsert` sobre la clave natural `(recipe_id, product_id)`, que ya tiene su
-   índice único: inserta la nueva y actualiza cantidad y unidad de la que ya estaba.
+   índice único: inserta la nueva y actualiza `quantity` y **`unit_id`** de la que ya estaba (R50:
+   la unidad que se escribe es la referencia al catálogo, ya validada por el caso de uso, § 6b.4).
 
 Por qué así y no «borrar todas e insertar todas»: el `DELETE`+`INSERT` completo cambia el `id` de
 cada línea y su `created_at` en cada edición, y esos datos son de la entidad —QC-24 los pidió
@@ -296,7 +413,9 @@ transacción empieza, el caso de uso ya decidió qué líneas son nuevas y ya la
 producto dado de baja que la receta ya tenía (R45). La FK a `products` sigue siendo real y sigue
 protegiendo del producto **inexistente**; lo que no puede distinguir la base es «vivo» de «borrado
 lógicamente», y esa distinción es justo la que R45 y R46 reparten entre líneas nuevas y
-preexistentes.
+preexistentes. Con la **unidad** no hay nada que repartir: su FK a `units` sí es una garantía
+completa —no hay unidad «medio viva»—, y el caso de uso ya validó **todas** las de la lista final
+(§ 6b.4), así que la transacción tampoco consulta el catálogo de unidades.
 
 ---
 
@@ -535,6 +654,26 @@ prohíbe: dos implementaciones del borrado son dos sitios donde equivocarse de r
 haya que añadir un reintento o un registro de auditoría hay que acordarse de los dos. Un solo
 `remove(path)` en `RecipeImageStorage`, dos puntos de llamada en el caso de uso de edición (§ 9.3).
 
+### 12.11 Dejar la unidad como texto libre y adaptar QC-25 en una ficha nueva — descartada por el humano
+
+Al mergearse QC-32 en `dev` había dos salidas. La descartada: **cerrar QC-25 con la unidad de texto
+libre** (R15 tal cual) y abrir una ficha posterior que migrara `unit` → `unit_id` en `recetas`.
+Suena a alcance limpio —una ficha, un cambio— y por eso se escribe aquí.
+
+Se descarta porque **el PR de QC-25 no compilaría contra `dev`**: allí la columna `unit` ya no
+existe y `RecipeLine.unitId` es obligatorio. Esa ficha futura no sería una mejora pendiente, sería
+un **bloqueante inmediato** con QC-25 sin poder mergear entre medias. Y el coste de adaptar aquí es
+el que se ve en § 6b: un adaptador de ~20 líneas en `unidades`, dos líneas de cableado y un `Set` en
+cada uno de los dos casos de uso de escritura. Se descartó también la variante intermedia —aceptar
+el `unitId` sin validar existencia, confiando solo en la FK— porque un `23503` traducido a error
+genérico le cuenta al usuario menos que un rechazo de validación, y porque R50 exige la comprobación
+**a través del contrato**, no a través de un fallo de la base.
+
+La otra alternativa descartada, esta de forma y no de alcance: **poner el adaptador de `UnitCatalog`
+dentro de `recetas`**, que es el módulo que lo necesita. Descartada porque obligaría a `recetas` a
+consultar `prisma.unit`, o sea la tabla de otro módulo (§ 6b.2): lo prohíbe R50, lo prohíbe
+`docs/architecture.md > Dominio` y lo rechazaría la guardia de arquitectura.
+
 ---
 
 ## 13. Las tres preguntas que abre este diseño
@@ -596,26 +735,30 @@ que visitar. Lo decide QC-26. La verificación es **unitaria y de integración**
 
 | Nivel | Archivo | Qué demuestra |
 | --- | --- | --- |
-| Unit (dominio) | `tests/unit/recetas/authorization.test.ts` | R1, R2, R3: los cinco casos de uso con actor no administrador rechazan **sin tocar ninguno de los tres puertos**. |
-| Unit (dominio) | `tests/unit/recetas/recipe-service.test.ts` | R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37 con dobles de los puertos. |
+| Unit (dominio) | `tests/unit/recetas/authorization.test.ts` | R1, R2, R3: los cinco casos de uso con actor no administrador rechazan **sin tocar ninguno de los cuatro puertos** (repositorio, `ProductCatalog`, `UnitCatalog`, almacenamiento). |
+| Unit (dominio) | `tests/unit/recetas/recipe-service.test.ts` | R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37 con dobles de los puertos. **R50 en su parte de existencia**: alta y edición con un `unitId` que `UnitCatalog.findRefs` no devuelve → se rechaza, con `findRefs` llamado con **ese** id exacto y `recipes.create`/`replaceAlive` sin llamar. |
 | Unit (dominio) | `tests/unit/recetas/recipe-image-lifecycle.test.ts` | R47, R48, R49: los tres estados de `image` (omitido / nueva / `null`), que los dos caminos de borrado llaman al **mismo** `remove` del puerto, y que un `remove` que rechaza **no** hace fallar la edición y devuelve la advertencia con contexto. |
 | Unit (dominio) | `tests/unit/recetas/recipe-lines-catalog.test.ts` | R45, R46: la edición admite la línea preexistente con producto de baja **sin consultar el catálogo por ella**, y rechaza la línea nueva cuyo producto no existe o está de baja; en el alta se validan todas. |
-| Unit (borde) | `tests/unit/recetas/recipe-input.test.ts` | R7, R9, R14, R15, R16, R19, R20, R30 (mínimo e integridad), R38: los esquemas zod. |
+| Unit (borde) | `tests/unit/recetas/recipe-input.test.ts` | R7, R9, R14, R16, R19, R20, R30 (mínimo e integridad), R38: los esquemas zod. **R50 en su parte de forma**: rechaza un `unitId` que no es UUID y acepta uno válido **sin** validar existencia (eso es del caso de uso). R15 no se prueba: está derogado. |
 | Unit (dominio) | `tests/unit/recetas/recipe-image.test.ts` | R23: tabla de firmas —JPEG, PNG, WebP aceptados; PDF, SVG y HEIC renombrados a `.jpg` rechazados— y el corte de 5 MB. |
 | Unit (dominio) | `tests/unit/recetas/recipe-image-url.test.ts` | R24, R25: la ruta que se persiste y la URL pública compuesta, sin firma ni caducidad, con un doble del puerto. |
 | Unit (driving) | `tests/unit/recetas/recipe-actions.test.ts` | R38, R39: la acción toma el actor de `identity`, valida antes de llamar y traduce errores a estado serializable. |
 | Unit (estático) | `tests/unit/recetas/scope.test.ts` | R31, R41, R43, R44: `recetas` no reimplementa la paginación, no altera el esquema, ningún test importa el adaptador de Storage ni la librería, y no hay pantalla, ruta ni spec E2E de recetas. |
 | Unit (config) | `tests/unit/recetas/storage-config.test.ts` | R28: las tres variables están **declaradas y vacías** en `.env.example`, el adaptador falla nombrándolas sin filtrar valores, y ninguna dirección, bucket ni clave aparece escrita en `lib/`. |
-| Unit (inventario) | `tests/unit/inventario/product-catalog.test.ts` | R17: `findRefs` devuelve solo los vivos y `recetas` valida la existencia por ahí. |
+| Unit (inventario) | `tests/unit/inventario/product-catalog.test.ts` | R17 **en lo que un test sin base puede cerrar**: el mapeo fila → `ProductRef` y el atajo de `findRefs([])`, que no consulta. **Aquí NO se demuestra que el catálogo excluya los productos borrados lógicamente**: eso es una cláusula del `where` y solo lo prueba Postgres (fila siguiente). |
+| Integración (inventario) | `tests/integration/recetas/recipe-lines.int.test.ts` | R17, R46 **contra Postgres real**: con dos productos, uno borrado lógicamente, `findProductRefs([vivo, borrado])` devuelve **solo el vivo**. Es la garantía que hace mordible el `deleted_at IS NULL` del adaptador —hoy se puede borrar esa cláusula y nada falla— y de la que cuelga la mitad prohibitiva de R46. |
+| Unit (unidades) | `tests/unit/unidades/unit-catalog.test.ts` | R50 (adaptador): el mapeo fila → `UnitRef` y el atajo de `findRefs([])`. No hay filtro de vida que probar: `Unit` no tiene borrado lógico (§ 6b.2). |
+| Unit (estático, unidades) | `tests/unit/unidades/module-contract.test.ts` | R50 (frontera): **exactamente un** archivo del repo consulta `prisma.unit`, y es el adaptador driven de `unidades`; `lib/composition` cablea la lectura y ninguna escritura del catálogo. |
 | Integración | `tests/integration/recetas/recipe-crud.int.test.ts` | R5, R10, R12, R13, R29, R30, R32, R35, R36 contra Postgres real: duplicado por SQLSTATE `23505`, líneas conciliadas y transacción que revierte entera, paginación estable, borrado lógico. |
-| Integración | `tests/integration/recetas/recipe-lines.int.test.ts` | R14 (`CHECK` de cantidad, `23514`), R16 (`23505` del único `(recipe_id, product_id)`), R18 (producto borrado lógicamente y la línea intacta). |
+| Integración | `tests/integration/recetas/recipe-lines.int.test.ts` | R14 (`CHECK` de cantidad, `23514`), R16 (`23505` del único `(recipe_id, product_id)`), R18 (producto borrado lógicamente y la línea intacta) y **R50 contra Postgres real**: las líneas se escriben con un `unit_id` real del catálogo sembrado por QC-32, con su FK viva. |
 | Guardia (ya existe) | `tests/guards/guard-arquitectura-modulos.test.ts` | R17 (parte), R31 (parte), R40. |
 | Guardia (ya existe) | `tests/guards/guard-rls-force.test.ts` | R4. |
 | Guardia (ya existe) | `tests/guards/guard-dependencias-aprobadas.test.ts` | R42. |
 
 El mapa completo `R<n> → test` está en `tasks.md > Trazabilidad`.
 
-Cinco avisos para el implementer, cuatro aprendidos en QC-14, QC-20 y QC-24:
+Seis avisos para el implementer, cuatro aprendidos en QC-14, QC-20 y QC-24 y el último aprendido en
+esta misma ficha:
 
 - Los tests de integración necesitan la migración de **QC-24** aplicada; el `beforeAll` debe fallar
   con un mensaje claro si `recipes` o `recipe_lines` no existen, no reventar a mitad del primer
@@ -629,5 +772,11 @@ Cinco avisos para el implementer, cuatro aprendidos en QC-14, QC-20 y QC-24:
 - **Ningún test afirma nada sobre el censo global del repo** —«hay N modelos», «hay N
   migraciones»—. Tres features lo hicieron y las tres pusieron en rojo a la siguiente
   (`progress/current.md > Deudas y cosas abiertas`). El test de alcance de R41 mira **`recipes` y
-  `recipe_lines`**, y nada más; cuando QC-32 migre la unidad a catálogo, actualizará ese test como
-  parte de su propio cambio, que es lo correcto.
+  `recipe_lines`**, y nada más.
+- **Ese test de alcance lo actualizó esta ficha, no QC-32.** El diseño daba por hecho que la
+  migración de la unidad a catálogo llegaría con QC-32 y que sería QC-32 quien ajustara el test.
+  No fue así: QC-32 se mergeó en `dev` a mitad de esta implementación y **el ajuste lo hizo QC-25**
+  (R50, § 6b), junto con las fixtures de los tests unitarios y de integración que citaban `unit`.
+  Queda escrito porque es el aviso que este diseño se dio a sí mismo y no se cumplió como estaba
+  previsto; el snapshot de `RecipeLine` que compara el test es, además, deuda conocida y anotada por
+  el reviewer: afirmar el conjunto de **nombres** de columna basta para lo que R41 exige.
