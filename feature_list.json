@@ -280,16 +280,33 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "registro-de-sesiones",
-      "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos.",
+      "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos. Solo el mecanismo y sus operaciones: sin pantalla. Las dos acciones NO son la misma y se resuelven distinto. Cerrar sesion en un dispositivo cierra SOLO ese dispositivo: quien sale en el movil sigue dentro en la oficina. En cambio cerrar todas las sesiones las cierra todas, incluida la actual. Y cuando el cierre lo ordena un administrador sobre otro usuario es SIEMPRE total, nunca una sesion suelta: el administrador no elige dispositivo. Cambiar el rol de alguien o darlo de baja tambien corta todas sus sesiones en el acto, y tiene que volver a entrar. Eso cierra la deuda que dejo escrita la ficha de proteccion de rutas privadas, donde el rol viaja firmado dentro del codigo de sesion y hasta hoy un cambio de rol tardaba en surtir efecto lo que tardara la sesion en caducar. Si el sistema no puede comprobar si una sesion fue cerrada -porque la base no responde, o porque falle la memoria rapida cuando exista- la sesion se trata como invalida y la persona vuelve al login. Ante la duda se corta: una revocacion que se puede saltar provocando un fallo no es una revocacion. El administrador puede cerrar las sesiones de otro usuario; el permiso se comprueba en el servicio y lleva su prueba. Que el usuario pueda VER la lista de sus dispositivos abiertos y cerrar uno concreto de la lista NO entra, y no habra ficha para ello: se descarto a proposito porque obliga a una lectura por peticion sin dar nada que no de el cierre total. Los botones tampoco entran aqui: el del usuario va en ficha aparte. Guardar en memoria rapida la comprobacion va en la ficha de cache de sesion.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "backend",
       "branch": "feature/QC-23-registro-de-sesiones",
       "depends_on": [
         "QC-8"
       ],
       "spec_path": "specs/QC-23-registro-de-sesiones"
+    },
+    {
+      "key": "QC-53",
+      "id": 53,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "cerrar-mis-sesiones",
+      "description": "El usuario necesita poder cerrar todas sus sesiones abiertas desde cualquiera de sus dispositivos, sin esperar a que caduquen. Es el boton que falta para que sirva el mecanismo de revocacion. Cerrar sesion normal, el de siempre, cierra solo el dispositivo desde el que se pulsa. Esta accion es la otra: cierra TODAS las sesiones de la persona, incluida la que esta usando en ese momento, asi que despues de pulsarla acaba en el login. Por eso tiene que quedar claro antes de pulsar que es lo que va a pasar, y no confundirse con el cerrar sesion de siempre. El caso real: alguien entro desde un equipo compartido de planta o desde un telefono que ya no tiene, se da cuenta al llegar a casa, y quiere cortar ese acceso sin llamar a nadie. Solo la pantalla y su conexion con el mecanismo, que ya existe: el mecanismo es la ficha de registro de sesiones. El boton del administrador para cerrar las sesiones de OTRO usuario no entra aqui, y hoy no tiene donde vivir porque no existe pantalla de administracion de usuarios.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-53-cerrar-mis-sesiones",
+      "depends_on": [
+        "QC-23"
+      ],
+      "spec_path": "specs/QC-53-cerrar-mis-sesiones"
     },
     {
       "key": "QC-24",
