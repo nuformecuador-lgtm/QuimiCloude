@@ -238,14 +238,14 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `progress/impl_QC-22-pantalla-de-productos.md`. Si el scroll anidado falla en WebKit, **no se
   declara excepción de escritorio**: se arregla o se para y se reporta.
 
-### [ ] T17 — Mapa de trazabilidad `R<n> → test`
+### [x] T17 — Mapa de trazabilidad `R<n> → test`
 - **Depende de**: T12, T13, T14, T15, T16.
 - **Qué**: volcar la tabla de abajo, ya con los nombres reales de los tests, en
   `progress/impl_QC-22-pantalla-de-productos.md`, junto a los archivos tocados y la salida real.
 - **Hecho cuando**: **los 32 requisitos (R1-R32)** tienen al menos un test nombrado. Un hueco es
   hallazgo bloqueante del reviewer.
 
-### [ ] T18 — [P] Declarar los «no aplica» de `CHECKPOINTS.md`
+### [x] T18 — [P] Declarar los «no aplica» de `CHECKPOINTS.md`
 - **Depende de**: T11.
 - **Hecho cuando**: cada punto de la lista del final de este archivo está copiado con su motivo en
   `progress/impl_QC-22-pantalla-de-productos.md`.

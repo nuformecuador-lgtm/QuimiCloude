@@ -808,3 +808,137 @@ pnpm exec vitest related --run --project node --project ui   lib/modules/identit
 Los proyectos de **integracion** siguen rojos por la misma ausencia de `DATABASE_URL`
 (`tests/integration/identity/*.int.test.ts`): es previo a esta tanda y ajeno a ella.
 `package.json` y `pnpm-lock.yaml`, sin cambios: **ninguna dependencia nueva**.
+
+---
+
+## T17 — Mapa de trazabilidad `R<n> -> test` (consolidado, R1-R32)
+
+Consolida lo que T3/T4, T5-T11, T12/T13 y T14 dejaron anotado, **con los nombres reales de los
+tests que hay hoy en la rama**. La vara de esta ficha ha sido verificar por **mutacion** -romper
+el codigo de verdad, ver el rojo y revertir-, no por razonamiento: la columna «Muerde» dice que
+mutacion se probo y en que tanda quedo registrada. Lo que no se pudo observar, se dice.
+
+Leyenda de la columna **Estado**:
+- **verificado** — hay al menos un test nombrado que se puso ROJO al romper el codigo.
+- **pendiente de ejecucion** — la evidencia adicional esta en `e2e/inventario.spec.ts`, que en
+  este worktree **no se pudo correr** (sin `DATABASE_URL`). **Ningun requisito depende SOLO del
+  E2E**: todos tienen ademas un test unitario que muerde.
+- **parcial declarado** — parte del requisito no es observable en el nivel disponible; se explica
+  debajo de la tabla en vez de darse por cubierta.
+
+| Req | Test(s) que lo muerden hoy | Archivo(s) | Mutacion que lo puso rojo | Estado |
+| --- | --- | --- | --- | --- |
+| R1 | `la pantalla de productos se renderiza dentro del armazon privado y no declara main propio` | product-page.test.tsx | la pagina declara su propio `main` (T12) | verificado |
+| R2 | `la ubicacion de la ruta se deriva de INVENTORY_ROUTE y ningun archivo incrusta el literal` · `el item Inventario del sidebar y el prefijo privado apuntan a la misma constante` · `la fila se deriva de INVENTORY_ROUTE y de ADMIN_ROLE_NAME, no de literales propios` | product-route-contract.test.ts · route-role-rules.test.ts | la barra construye la URL con el literal de la ruta; la fila se escribe con literales (T13, T14) | verificado |
+| R3 | `cada pantalla privada esta cubierta por un prefijo de PRIVATE_ROUTE_PREFIXES` · `sin sesion redirige al login con la ruta pedida como destino de vuelta (R3)` · `sin sesion tampoco se sirve lo que cuelga de la ruta (R3)` | guard-rutas-privadas-cubiertas.test.ts · route-access.test.ts | `PRIVATE_ROUTE_PREFIXES` pierde `INVENTORY_ROUTE` (T3, T14) | verificado |
+| R4 | `declara exactamente una regla: la pantalla de inventario, solo Administrador (R4)` · `la regla se aplica a la ruta de inventario y a lo que cuelgue de ella (R4)` · `deja pasar al Administrador (R4)` · `a un rol distinto de Administrador lo saca al dashboard, no al login (R4)` · `no corta al Operador en las rutas privadas que no tienen regla (R4)` · **E2E** `un usuario que no es Administrador acaba fuera y no ve el catalogo (R4)` | route-role-rules.test.ts · route-access.test.ts · **inventario.spec.ts** | la regla se queda sin fila; la regla pasa a solo Operador (T14) | verificado (+ E2E pendiente de ejecucion) |
+| R5 | `la pantalla no repite requireAdmin ni decide autorizacion` · `un error unauthorized se presenta como error y no se muestran datos del catalogo` | product-route-contract.test.ts · product-page.test.tsx | `page.tsx` importa `requireAdmin`; el estado de error deja de mostrar el `code` (T12, T13) | verificado |
+| R6 | `la tabla presenta todas las columnas de negocio declaradas` | product-page.test.tsx | se cae la columna `qtyAlert` de `PRODUCT_COLUMNS` (T12) | verificado |
+| R7 | `la tabla no muestra createdBy ni updatedBy` · `la tabla no puede pintar quien creo o modifico un producto` | product-page.test.tsx · product-route-contract.test.ts | la columna del nombre pinta ademas `createdBy` (T12, T13) | verificado |
+| R8 | `el costo se presenta tal cual lo entrega la operacion` · `el costo no se convierte a numero en ningun archivo de la ruta` | product-page.test.tsx · product-route-contract.test.ts | el costo pasa por una conversion numerica (T13) | verificado |
+| R9 | `el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro` · `el desbordamiento horizontal no lo declara ningun archivo de la ruta` | product-page.test.tsx · product-route-contract.test.ts | el `overflow-x-auto` sube al contenedor de la pagina (T12, T13) | parcial declarado |
+| R10 | `el selector de tamano de pagina ofrece 10 y 25 y usa 10 por defecto` · `las dos unicas opciones de tamano son el defecto y el tope del backend` | product-page.test.tsx · product-list-params.test.ts | el tamano por defecto pasa de 10 a 25 (T12) | verificado |
+| R11 | `permite avanzar y retroceder de pagina e indica la pagina actual y el total` · `en los extremos no ofrece avanzar ni retroceder mas alla` | product-page.test.tsx | «Siguiente» no avanza; los extremos dejan de desactivarse (T12) | verificado |
+| R12 | `los parametros invalidos o fuera de rango se acotan a valores validos` · `un tamano de pagina fuera de la lista cae al defecto, tambien si excede el tope` · `un parametro repetido toma el primer valor y sigue acotando` · `una pagina enorme no se corrompe: sigue siendo un entero seguro` | product-list-params.test.ts | el tamano por defecto pasa de 10 a 25 (los cuatro en rojo, T12) | verificado |
+| R13 | `la pantalla no ofrece busqueda ni control de orden` (render) · `la pantalla no ofrece busqueda ni control de orden` (fuente) | product-page.test.tsx · product-route-contract.test.ts | se cuela un campo de busqueda en la barra (T12, T13) | verificado |
+| R14 | `sin productos presenta el estado vacio con la accion de crear` · `una pagina que se quedo atras ofrece volver a la primera` | product-page.test.tsx | la lista vacia se pinta como tabla sin filas (T12) | verificado |
+| R15 | `mientras carga presenta el esqueleto en lugar de la tabla` | product-page.test.tsx | el limite de suspense se queda sin `fallback` (T12) | verificado |
+| R16 | `un error de la consulta presenta el estado de error con reintento y no una tabla vacia` | product-page.test.tsx | el estado de error deja de mostrar el `code` (T12) | verificado |
+| R17 | `crear abre un panel lateral sobre la lista, sin navegar ni perder la pagina` · **E2E** paso 2 del camino completo | product-page.test.tsx · **inventario.spec.ts** | abrir el panel navega con `router.push` (T12) | verificado (+ E2E pendiente de ejecucion) |
+| R18 | `el alta y la edicion salen por las Server Actions del catalogo` · **E2E** paso 5 | product-route-contract.test.ts · **inventario.spec.ts** | el formulario deja de importar las actions del catalogo (T13) | verificado (+ E2E pendiente de ejecucion) |
+| R19 | `la edicion precarga los valores actuales y envia el reemplazo completo` | product-page.test.tsx | la edicion deja de precargar la unidad (T12) | verificado |
+| R20 | `un guardado rechazado por un campo muestra el error en linea y no cierra el panel` · `un guardado rechazado por la operacion muestra el error del formulario y conserva lo escrito` | product-page.test.tsx | el estado de fallo deja de devolver lo escrito (las dos mitades, T12) | verificado |
+| R21 | `un guardado con exito cierra el panel, avisa por toast y refresca la lista` · `un borrado con exito cierra el dialogo, avisa por toast y refresca la lista` · **E2E** paso 6 | product-page.test.tsx · **inventario.spec.ts** | se quita `router.refresh()` tras el exito (T12) | verificado (+ E2E pendiente de ejecucion) |
+| R22 | `el layout privado monta exactamente una region de avisos y ningun otro landmark nuevo` · `el layout privado monta la region de avisos y la pantalla no monta otra` | private-layout.test.tsx (invertido en T4) · product-route-contract.test.ts | la pagina monta su propia region de avisos (T13); el layout se queda sin ella (T4) | verificado |
+| R23 | `la unidad se captura como texto libre` | product-page.test.tsx | la unidad pasa a campo numerico (T12) | verificado |
+| R24 | `el selector alcanza presentaciones mas alla de la primera pagina` · `permite crear una presentacion desde el formulario y la deja seleccionada sin perder lo escrito` · **E2E** paso 4 | product-page.test.tsx · **inventario.spec.ts** | la presentacion creada deja de quedar seleccionada (T12) | verificado (+ E2E pendiente de ejecucion) |
+| R25 | `la pantalla no ofrece listar, editar ni borrar presentaciones` | product-route-contract.test.ts | el selector importa la accion de borrar presentaciones (T13) | verificado |
+| R26 | `el borrado pide confirmacion nombrando el producto y sin confirmar no invoca la operacion` | product-page.test.tsx | el campo oculto del borrado pierde el identificador (T12) | verificado |
+| R27 | `los componentes de ruta se exponen por el barrel y no se importan por ruta profunda` · `la pantalla existe donde la ubica INVENTORY_ROUTE y sus componentes viven en su barrel` | product-route-contract.test.ts | la pagina importa por ruta profunda en vez de por el barrel (T13) | verificado |
+| R28 | `ningun archivo de la ruta usa fetch a rutas API propias` | product-route-contract.test.ts | el formulario llama a una ruta de API propia (T13) | verificado |
+| R29 | `ninguna primitiva se escribe a mano y no entraron dependencias nuevas` | product-route-contract.test.ts | el esqueleto escribe una tabla a mano (T13) | verificado |
+| R30 | `los componentes de cliente no importan composicion ni base de datos` · `la pantalla de productos se renderiza dentro del armazon privado…` (los datos llegan por props del Server Component) | product-route-contract.test.ts · product-page.test.tsx | un componente de cliente importa el punto de composicion (T13) | verificado |
+| R31 | `presenta lista y acciones en viewport angosto y en ancho` · `no usa 100vh, ni hover como unica via, y respeta tamanos tactiles y de fuente` | product-page.test.tsx · product-route-contract.test.ts | las acciones de fila se esconden tras el puntero (T13) | parcial declarado |
+| R32 | `la feature no duplica el armazon heredado: solo edita los cuatro archivos autorizados` | product-route-contract.test.ts | la pagina declara su propio landmark principal (T13) | verificado |
+
+### Recuento, sin maquillar
+
+- **32 de 32 requisitos (R1-R32) tienen al menos un test nombrado que muerde**, comprobado por
+  mutacion en las tandas T12, T13 y T14.
+- **0 requisitos sin test que muerda.** No hay hueco que reportar.
+- **6 requisitos tienen ademas evidencia en el E2E** (R4, R17, R18, R21, R24 y, de refilon, R22
+  por el aviso emergente en navegador real): esa evidencia esta **pendiente de ejecucion**, porque
+  `e2e/inventario.spec.ts` no se pudo correr en este worktree. **Ninguno de los seis depende solo
+  de ella**: los seis estan verificados por mutacion en unit.
+- **2 requisitos quedan como «parcial declarado»** (R9 y R31). Ver debajo: es un limite del nivel
+  de test, no un descuido, y ninguno de los dos se da por entero verificado.
+
+### Los dos «parcial declarado», con su motivo
+
+- **R31 — la mitad de «nada de `:hover` como unica via» NO se puede observar en jsdom.** Se
+  comprobo en T12: escondiendo las acciones de fila con `hidden hover:flex`, `toBeVisible()`
+  **sigue pasando**, porque jsdom no aplica las hojas de estilo de Tailwind. Esa media exigencia
+  **la muerde la guardia de fuente de T13** (`no usa 100vh, ni hover como unica via…`), que mira
+  el codigo: ninguna linea combina `hover:`/`group-hover:` con una utilidad que oculte, `min-h-11`
+  en todo archivo que renderice un control y `text-base` en todo archivo con campos. Lo que T12 si
+  cubre de R31 es que la lista y sus acciones se presentan en viewport angosto **y** ancho. El
+  tamano tactil real (44x44 px) y el de fuente (16 px) se afirman **sobre la fuente**, no sobre
+  estilos computados: la comprobacion en un navegador de verdad es **T16**, que hace el humano.
+- **R9 — el scroll anidado en WebKit es de T16.** Los tests afirman que el `overflow-x-auto` esta
+  en el envoltorio de la tabla y que **ningun ancestro** de la pantalla lo declara, que es lo
+  observable sin motor de render. Que el documento no se desplace en iOS **no lo puede afirmar
+  jsdom**; lo comprueba T16 en Safari/WebKit, y la propia T16 dice que si falla ahi **no se
+  declara excepcion de escritorio**: se arregla o se para.
+
+**T16 esta pendiente y es del humano** (verificacion manual en navegador). Nada de lo que T16
+cubre se declara aqui como verificado.
+
+## T18 — Los «no aplica» de `CHECKPOINTS.md`, declarados (no omitidos)
+
+Formato tomado del precedente `specs/QC-12-dashboard-en-blanco/requirements.md > Notas de
+proceso`: lo que no aplica **se dice y se justifica**; omitirlo es lo que el reviewer rechaza.
+
+- **`Datos y seguridad (Supabase)` — NO APLICA en bloque.** Cero tablas nuevas, cero migraciones,
+  cero `down.sql`, cero RLS, cero secretos, cero webhooks: esta ficha no toca `db/`. El esquema de
+  `products` y `presentations` y sus policies son de QC-20, ya mergeado. Lo unico que esta feature
+  lee de la base lo lee **a traves de las Server Actions de QC-20**, nunca con Prisma propio.
+- **«Cada permiso se valida en el SERVICE y tiene su test» — YA CUMPLIDO POR QC-20, no se
+  re-implementa.** Los nueve casos de uso llaman a `requireAdmin` como primera linea y tienen
+  `tests/unit/inventario/authorization.test.ts`. Lo que QC-22 anade es el **corte de ruta** (la
+  regla ruta-rol, R4), que es **adicional y NO cuenta como autorizacion**
+  (`docs/architecture.md > Permisos y autenticacion`, y R29 de QC-9 lo advierte expresamente):
+  que una regla deje pasar no autoriza nada. Por eso R5 prohibe que la pantalla repita la
+  decision.
+- **`Modulos hexagonales` — APLICA SOLO DE REFILON.** Esta feature no crea ningun modulo. Lo unico
+  que toca de uno es la lista de reglas ruta-rol de `identity`, y la correccion de esta misma
+  feature la saco del dominio: `ROUTE_ROLE_RULES` vive ahora en
+  `identity/adapters/driving/route-role-rules.ts`, que **si** puede importar `lib/shared` y el
+  **barrel** de `inventario` (`ADMIN_ROLE_NAME`), nunca una ruta profunda.
+  `tests/guards/guard-arquitectura-modulos.test.ts` lo vigila y esta verde.
+- **«Componentes privados reciben datos por props» — APLICA, con un matiz que se declara.** Los
+  componentes de esta pantalla **no viven en `components/private/`** sino en
+  `app/(private)/inventario/components/`, que es la decision cerrada de estructura por ruta
+  (heredada de QC-12). El fondo del checkpoint se cumple igual y con test: ninguno importa
+  `@/lib/composition` ni el cliente de base de datos, y los datos del catalogo bajan por props
+  desde el Server Component (`ProductListSection`) — R30.
+- **«Migraciones reversibles» / `pnpm run db:rollback` — NO APLICA**: no hay migracion nueva que
+  revertir.
+- **`Configuracion` — NO APLICA**: esta feature no introduce ninguna URL, credencial ni limite que
+  cambie entre entornos. La unica constante que declara es la ruta (`INVENTORY_ROUTE`), que es la
+  misma en todos los entornos y esta en un solo sitio (R2).
+- **`Dependencias` — NINGUNA ANADIDA**, asi que **no hay fila que anadir a `docs/dependencias.md`**
+  y el archivo no cambia. `package.json` y `pnpm-lock.yaml` estan intactos desde T0, comprobado
+  ademas por un test (`ninguna primitiva se escribe a mano y no entraron dependencias nuevas`). La
+  propuesta P2 (`react-hook-form` + `@hookform/resolvers`) quedo **RESUELTA el 2026-09-03: no
+  entra**, y el diseno usa la alternativa sin dependencias.
+
+**Lo que SI aplica y no se declara como excepcion, para que no se lea al reves:**
+
+- **«Mutaciones internas usan Server Actions»** — SI APLICA (R28, con guardia de fuente).
+- **«Paginas protegidas validan permisos en el servidor»** — SI APLICA: el corte lo hace el
+  middleware por cookie (QC-9) y la autorizacion sobre los datos, el service (QC-20).
+- **«E2E de flujo critico»** — SI APLICA: `e2e/inventario.spec.ts` (T15). **Escrito y pendiente de
+  ejecucion**, ver T15.
+- **`Multiplataforma`** — SI APLICA y **NO se declara ninguna excepcion de escritorio** (R31). La
+  parte que ningun test automatico puede afirmar es T16, del humano.
+- **`Trazabilidad`** — SI APLICA: el mapa `R<n> -> test` completo es T17, aqui arriba.
