@@ -1,16 +1,18 @@
-import { DASHBOARD_ROUTE } from '../routes';
+import { DASHBOARD_ROUTE, INVENTORY_ROUTE } from '../routes';
 
 /**
  * Navegacion de la zona privada (`design.md > 4.3`).
  *
- * **Los items y sus rutas son datos de relleno (placeholder, D2), no dominio.** Salvo
- * el dashboard —que crea la feature 9—, **ninguna de estas rutas existe**: visitarlas
- * hoy da **404, y eso es lo esperado**, mismo patron que `FORGOT_PASSWORD_ROUTE` de la
- * feature 7. La feature que traiga cada modulo del ERP sustituye su item y su
- * constante de ruta; nadie debe leer esta tabla como definicion del dominio quimico.
+ * **Los items y sus rutas nacieron como datos de relleno (placeholder, D2), no dominio.** Salvo
+ * el dashboard —que crea la feature 9— e `INVENTORY_ROUTE` —que estrena QC-22—, **ninguna de
+ * estas rutas existe**: visitarlas hoy da **404, y eso es lo esperado**, mismo patron que
+ * `FORGOT_PASSWORD_ROUTE` de la feature 7. La feature que traiga cada modulo del ERP sustituye su
+ * item y su constante de ruta; nadie debe leer esta tabla como definicion del dominio quimico.
  *
- * `DASHBOARD_ROUTE` se **reutiliza** de `lib/shared/routes.ts` en vez de redeclararlo: dos
- * constantes con la misma ruta es como se acaba con `/dashboard` y `/panel` conviviendo.
+ * `DASHBOARD_ROUTE` e `INVENTORY_ROUTE` se **reutilizan** de `lib/shared/routes.ts` en vez de
+ * redeclararlas: dos constantes con la misma ruta es como se acaba con `/dashboard` y `/panel`
+ * conviviendo. `INVENTORY_ROUTE` se mudo alli en QC-22 porque el middleware y la regla ruta->rol
+ * la necesitan y no pueden depender de este archivo de navegacion.
  *
  * Los tests iteran `PRIVATE_NAV_ITEMS` y afirman sobre estas constantes, nunca sobre el
  * literal del copy.
@@ -20,8 +22,15 @@ import { DASHBOARD_ROUTE } from '../routes';
  * aqui y en ningun otro sitio; el componente no se toca.
  */
 
-// --- Rutas de ejemplo (placeholder, D2). NINGUNA existe todavia: hoy dan 404. ---
-export const INVENTORY_ROUTE = '/inventario';
+/**
+ * Reexport por compatibilidad: `INVENTORY_ROUTE` **vive en `lib/shared/routes.ts`**, no aqui.
+ *
+ * Nacio en este archivo como placeholder y quien ya la importaba de `private-nav` sigue
+ * funcionando sin tocarse. Codigo nuevo debe importarla de `lib/shared/routes.ts`.
+ */
+export { INVENTORY_ROUTE };
+
+// --- Rutas de ejemplo (placeholder, D2). Ninguna de estas cinco existe todavia: hoy dan 404. ---
 export const NOTIFICATIONS_ROUTE = '/notificaciones';
 export const PURCHASE_ORDERS_ROUTE = '/compras/ordenes';
 export const SUPPLIERS_ROUTE = '/compras/proveedores';

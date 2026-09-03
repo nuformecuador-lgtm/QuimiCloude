@@ -1,4 +1,9 @@
 {
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Vacio (el estado de hoy, 2026-08-28: 93/93 en verde) significa que CUALQUIER archivo rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
-  "archivos": {}
+  "archivos": {
+    "tests/guards/guard-dependencias-aprobadas.test.ts": {
+      "motivo": "Deuda ajena de dev, NO de QC-22: la sesion de QC-25 (crud-de-recetas) anadio la fila de @supabase/storage-js a docs/dependencias.md al aprobar su spec -que es lo que manda F1.4-, pero el paquete no se instala hasta que QC-25 implemente. dev esta rojo en esta guardia por si solo, comprobado corriendola alli sin ningun cambio de QC-22. LO QUITA QC-25 al instalar la dependencia; si QC-25 se cancelara, lo quita quien retire la fila de docs/dependencias.md. Esta entrada NO debe sobrevivir al merge de QC-25.",
+      "desde": "2026-09-03"
+    }
+  }
 }

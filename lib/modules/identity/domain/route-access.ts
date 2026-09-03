@@ -34,7 +34,12 @@ export type RouteAccessInput = {
   readonly session: RouteAccessSession;
   /** Prefijos de URL privados declarados (`design.md > 7`). Entran como parametro (R20). */
   readonly privatePrefixes: readonly string[];
-  /** Reglas ruta→rol. Hoy `ROUTE_ROLE_RULES`, que esta vacio a proposito (R12). */
+  /**
+   * Reglas ruta→rol. Entran como parametro (R12): la decision no las declara ni sabe donde
+   * viven. Hoy las aporta `ROUTE_ROLE_RULES`, que ya NO esta vacio y ya NO vive en `domain/`:
+   * lo mudo QC-22 a `lib/composition/route-role-rules.ts` -la lista concreta es CABLEADO- y
+   * trae su primera fila, la pantalla de inventario solo para Administrador.
+   */
   readonly rules: readonly RouteRoleRule[];
   readonly routes: { readonly login: string; readonly dashboard: string };
 };

@@ -5,9 +5,23 @@
 // y no hay red. La cookie se firma con el codec de verdad, asi que lo que se ejercita es la cadena
 // completa —firma, version, caducidad y decision— y no un doble que ya diga que si.
 //
-// Lo unico que se sustituye es `ROUTE_ROLE_RULES`, que hoy esta VACIO a proposito (R12): las
-// reglas ruta→rol se ejercitan con reglas SINTETICAS, igual que en `route-access.test.ts`. Asi
-// R13 tiene test real hoy y la primera ficha que declare una regla no estrena codigo.
+// Lo unico que se sustituye es `ROUTE_ROLE_RULES`: las reglas ruta→rol se ejercitan aqui con
+// reglas SINTETICAS, igual que en `route-access.test.ts`, para que lo que se afirme sea la
+// TRADUCCION que hace el adaptador y no el contenido de la lista real. La lista real —que desde
+// QC-22 tiene su primera fila— se afirma en `route-role-rules.test.ts` y en `route-access.test.ts`.
+//
+// QC-22 (2026-09-03) movio esa lista dos veces: de `domain/route-role-rules.ts` a
+// `adapters/driving/`, y de ahi a `lib/composition/route-role-rules.ts`, donde vive hoy. Nombrar
+// la ruta exige `lib/shared/routes` —vetado al dominio— y nombrar el rol exige el barrel de
+// `inventario` **como valor** —reservado a `lib/composition`—. El doble se pone sobre ESE modulo,
+// no sobre el barrel de `identity`, que nunca exporto la lista.
+//
+// **El doble aplica de verdad**, y se comprueba sin fe: las reglas sinteticas de abajo usan el
+// prefijo `/dashboard/productos`, que la lista REAL no cubre (su unica fila es `/inventario`). Si
+// `vi.mock` dejase de interceptar —por un especificador que ya no resuelve, por ejemplo—,
+// `middleware` veria la lista real, `/dashboard/productos` no casaria con ninguna regla, el
+// Operador pasaria y los dos casos de rol insuficiente se pondrian rojos. Comprobado el
+// 2026-09-03 apuntando el `vi.mock` a una ruta inexistente: caen esos dos y solo esos dos.
 
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
@@ -27,15 +41,11 @@ import type { RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rul
 // cambiar las reglas por test sin volver a importar el modulo.
 const { reglas } = vi.hoisted(() => ({ reglas: { actuales: [] as RouteRoleRule[] } }));
 
-vi.mock('@/lib/modules/identity', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@/lib/modules/identity')>();
-  return {
-    ...real,
-    get ROUTE_ROLE_RULES() {
-      return reglas.actuales;
-    },
-  };
-});
+vi.mock('@/lib/composition/route-role-rules', () => ({
+  get ROUTE_ROLE_RULES() {
+    return reglas.actuales;
+  },
+}));
 
 const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc9-ok';
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';

@@ -2,6 +2,16 @@ export const DASHBOARD_ROUTE = '/dashboard';
 
 export const LOGIN_ROUTE = '/login';
 
+/**
+ * Pantalla de productos del catalogo (QC-22, R2).
+ *
+ * Vive aqui y no en `navigation/private-nav.ts` —donde nacio como placeholder— porque el
+ * middleware y la regla ruta->rol de `identity` la necesitan y **no pueden depender de la
+ * navegacion**, que arrastra etiquetas, iconos y agrupacion de UI. `private-nav.ts` ya importa de
+ * este archivo, asi que la flecha no se invierte ni aparece un ciclo.
+ */
+export const INVENTORY_ROUTE = '/inventario';
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
@@ -15,4 +25,4 @@ export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
  * nueva sin prefijo que la cubra pone el gate en rojo con su nombre, y un prefijo que ya no
  * corresponde a ninguna pantalla, tambien.
  */
-export const PRIVATE_ROUTE_PREFIXES = ['/dashboard'] as const;
+export const PRIVATE_ROUTE_PREFIXES = [DASHBOARD_ROUTE, INVENTORY_ROUTE] as const;
