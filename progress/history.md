@@ -969,3 +969,63 @@ primera ronda.
   y `pnpm exec next typegen`, o `app/layout.tsx` no compila por `LayoutProps`, que vive en
   `.next/types` (git-ignorado), **y el gate sale rojo por algo ajeno**. `docs/worktrees.md` no lo
   dice. Candidato a `/afinar-regla`.
+
+
+## QC-33 — modelo-pedidos (cerrada el 2026-09-03, PR #26, merge `73c2fb6`)
+
+Primera ficha de la épica **QC-31 — Pedidos**. Crea `Order` como **módulo hexagonal propio
+`pedidos`**, que conoce la receta por el contrato público de `recetas` y la unidad por el de
+`unidades`, nunca por sus tablas. **42 requisitos** y **29 decisiones cerradas**. Gate del leader:
+120 de 121 archivos verdes, **1336 tests**. Reviewer **APROBADO con 0 mayores** y once mutaciones,
+todas revertidas y sin escribir una fila en la base. Desbloquea **QC-34**.
+
+Acotada con `/afinar-feature` en dos tandas, más una tercera vuelta al revisar en F1.4. **Ningún
+rechazo**: el spec pasó a la primera, a diferencia de QC-32.
+
+### Lo que hay que recordar
+
+- **Un enum nuevo invalida las afirmaciones de alcance de todo el repo.** QC-4, QC-14 y QC-24
+  habían escrito cada uno un test que decía que en **todo** el esquema no existe ningún enum,
+  porque entonces la regla era «los conjuntos cerrados van como tabla». El humano decidió enum
+  para QC-33 y esas cuatro afirmaciones pasaron a ser falsas de golpe, más dos que contaban tipos
+  y FK contra la base. **Los tests no estaban mal: se quedaron viejos.**
+- **El gate rápido no ve esos tests, y por eso el completo antes del PR no es ceremonia.** El
+  implementer reportó **1** rojo y el gate completo destapó **6**, de los que **5 eran suyos**.
+  `vitest related` no los relaciona porque no los une el árbol de archivos sino una afirmación
+  sobre el repositorio entero. Es el mismo agujero que ya costó caro en **QC-20**. El leader los
+  atribuyó corriéndolos contra `dev` limpio antes de devolverlos, no por deducción.
+- **Acotar no es aflojar, y se mide.** El diff de la corrección son 308 inserciones y **9**
+  borrados, y lo borrado son exactamente las cuatro líneas de alcance global. `unidades-constraints`
+  mantuvo su `toEqual` y **sumó** `orders_unit_id_fkey`; `recetas-constraints` filtró por sujeto
+  propio **sin lista negra** de `OrderStatus`/`OrderPriority`, que habría atado `recetas` a
+  `pedidos` — la dependencia que la arquitectura prohíbe.
+- **Una garantía puede caber en la base solo si se escribe de una forma concreta.** El `CHECK` que
+  ata el año del correlativo a `created_at` en UTC usa `timezone(text, timestamptz)` porque es
+  `IMMUTABLE`; `EXTRACT(YEAR FROM created_at)` a secas es `STABLE` y **Postgres la rechaza dentro
+  de un `CHECK`**. La garantía existía; la primera forma de escribirla no.
+- **Un test con una fecha literal es una bomba de relojería.** Los de integración calculan el año
+  con `new Date().getUTCFullYear()`: escribir `2026` habría puesto la suite roja sola el 1 de enero.
+- **El precio se guarda unitario y el total no se guarda**, para que no pueda contradecir a sus
+  factores. Y el índice único del correlativo es **total, no parcial** —al revés que QC-24—, que es
+  lo que impide reutilizar un número tras el borrado lógico.
+- **Un spec honesto dice lo que no puede cerrar.** La asignación de la posición del correlativo es
+  una escritura, y en una ficha de modelo no hay ninguna: se subió a **QC-34** con las tres
+  estrategias comparadas y ninguna elegida, en vez de fingir que estaba resuelta.
+
+### Deuda que deja
+
+- **La base compartida tiene una fila residual que rompe el gate de todas las sesiones.** Un
+  producto `FeldesQuack` bloquea el `DELETE FROM users` de `identity-seed.int.test.ts` con `23503`
+  (8 casos rojos, **también en `dev`**). Decisión del humano: **no se borra, no se arregla el helper
+  y NO se mete al baseline** — el baseline es para deuda de código, y enmascarar esto ocultaría
+  para siempre un test que volverá a pasar solo. **La causa de fondo sigue viva**:
+  `resetIdentityToEmptyState` borra usuarios sin limpiar antes las tablas que los referencian, así
+  que cualquier feature con una FK a `users` puede repetirlo — y QC-33 acaba de añadir dos.
+  Candidato a ficha propia.
+- **Tres menores del review**, ninguno bloqueante: el cierre transitivo del barrel en
+  `module-contract.test.ts` se detiene en la frontera de módulo (hoy lo tapa un regex, no el
+  cierre); el filtro por etiqueta de `recetas-constraints` usa símbolos de una y dos letras, con
+  riesgo de falso positivo pero nunca de falso verde; y una nota de bitácora ya corregida.
+- **Dos preguntas abiertas, las dos a propósito:** quién asigna la posición del correlativo y qué
+  pasa con dos altas simultáneas (**QC-34**; si no se resuelve allí, una de las dos fallará con un
+  `23505` sin traducir), y si algún día se exporta a un contable externo.

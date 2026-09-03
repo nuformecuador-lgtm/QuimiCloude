@@ -1152,6 +1152,40 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
+### La base compartida tiene una fila residual que rompe el gate de TODAS las sesiones (2026-09-03)
+
+`tests/integration/identity/identity-seed.int.test.ts` sale rojo con **8 casos** en cualquier
+worktree, `dev` incluido — verificado, no deducido. **No es un defecto de código**: es estado sucio
+de la base compartida.
+
+- **La fila:** un producto `FeldesQuack` en `products`, creado el 2026-09-03 a las 19:36 UTC, con
+  `created_by`/`updated_by` apuntando al admin del seed. Encaja con una corrida de **QC-22** sin
+  limpiar.
+- **El mecanismo:** `resetIdentityToEmptyState` hace `DELETE FROM users` dentro de una transacción
+  y la FK `products_created_by_fkey` lo bloquea con `23503`.
+- **Decisión del humano (2026-09-03): no se borra la fila, no se arregla el helper y NO se mete al
+  baseline.** El baseline es para deuda ajena de `dev`; esto es transitorio, y enmascararlo ahí
+  ocultaría para siempre un test que volverá a pasar solo. Se declaró en el PR #26.
+- **La causa de fondo, que sigue viva:** `resetIdentityToEmptyState` borra usuarios sin limpiar
+  antes las tablas que los referencian, así que **cualquier feature futura con una FK a `users`
+  puede volver a provocarlo** — y QC-33 acaba de añadir dos. Candidato a ficha propia.
+
+### El gate rápido no ve los tests de alcance de otros módulos (2026-09-03, confirmado por QC-33)
+
+El implementer de QC-33 reportó **1** rojo; el gate completo destapó **6**, y **5 eran suyos**: las
+afirmaciones de QC-4, QC-14 y QC-24 de que en todo el esquema no existe ningún enum, que los dos
+enums de QC-33 dejaron viejas. `vitest related` no los relaciona porque no los une el árbol de
+archivos sino una afirmación sobre el repositorio entero. **Es el mismo agujero que ya costó caro
+en QC-20**, y es la razón por la que el gate completo antes del PR no es ceremonia.
+
+### El worktree principal quedó fuera de `dev` (2026-09-03)
+
+`AGENTS.md > Worktrees` dice que el worktree principal se queda en `dev` y **nadie hace `git
+checkout` en él**. Hoy alguien lo dejó en **`fix-ux`**, y el commit de cierre de QC-33 aterrizó allí
+en vez de en `dev`: `git push origin dev` empujaba la rama `dev` local, desactualizada, y salía
+rechazado. Se resolvió aplicando el cierre sobre `dev` desde un worktree temporal, **sin tocar
+`fix-ux`**. Si esa rama tiene trabajo vivo, merece su propio worktree.
+
 ### QC-32 se cerró el 2026-09-03 — lo que deja abierto
 
 Resumen completo en `progress/history.md`. Lo que sigue vivo:
