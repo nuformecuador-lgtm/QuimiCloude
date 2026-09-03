@@ -389,3 +389,62 @@ pero no participan: el 23503 nombra explicitamente `products_created_by_fkey`.
 features que corren en paralelo, y podria romper la corrida de quien la creo. **Se sube al leader** en
 vez de resolverlo por cuenta propia (regla 6). El gate completo (T10) va a salir rojo por este mismo
 motivo hasta que la fila se limpie o se decida otra cosa.
+
+## 10. Segunda tanda: cinco tests ajenos ACOTADOS (2026-09-03)
+
+El gate completo, que corrio el leader, saco **seis archivos rojos, no uno**. El fast gate se habia
+quedado corto porque `vitest related` **no alcanza a los tests de alcance de otros modulos** — el mismo
+agujero que documento QC-20 en `history.md`. **Cinco de los seis son de QC-33**; el sexto no (seccion 9).
+
+El leader verifico los cinco en el worktree principal sobre `dev` limpio: **pasan alli y fallan aqui**.
+Son de esta ficha.
+
+**La causa es la misma en los cinco: una feature no puede cumplir la afirmacion de alcance de otra.**
+Cuatro casos afirmaban `expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)` —«ningun `enum` en TODO el
+esquema»— y dos afirmaban lo equivalente contra la base. Se escribieron cuando la decision del repo era
+«los conjuntos cerrados van como tabla», y **eran ciertas hasta hoy**. El humano decidio expresamente
+que los conjuntos cerrados de QC-33 van como **enum de Prisma**, apartandose a conciencia del precedente
+de `DocumentType` de QC-4 (decision cerrada 4). **Los tests no estaban mal escritos: se quedaron
+viejos.**
+
+**Acotar no es aflojar**, y el criterio es el que fijo QC-32 con sus diez tests ajenos: **ni un `toEqual`
+degradado a `toContain`**. Lo unico que se borro en los cinco archivos son las **cuatro** lineas
+`not.toMatch(/enum/)` que afirmaban sobre el repositorio entero; todo lo demas se sumo. El diff son
+**308 inserciones y 9 borrados**.
+
+| Archivo | Que afirmaba | Contra que afirma ahora | Muere ante |
+| --- | --- | --- | --- |
+| `tests/unit/identity/schema/identity-schema.test.ts` (2 casos) | cero `enum` en todo el esquema | `expectDocumentTypeIsNotAnEnum()`: ningun bloque `enum` se llama `/documen|tipodoc/i` **ni** declara ninguno de los `DOCUMENT_TYPE_CODES`, importados de `@/lib/modules/identity` (la contrapartida en TS de la fila `'CC'` que siembra la migracion de QC-4). Ningun codigo escrito a mano | `enum DocumentType { CC }` y `enum Clasificacion { CC MILILITRO }` |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` (1 caso) | idem | `expectUnitCatalogIsNotAnEnum()`: ningun `enum` se llama `/unit|unidad|uom|medida|measure/i` ni declara una palabra del catalogo. Las palabras se leen de los `INSERT INTO "units"` de las migraciones, y si no encuentra ninguna **el helper lanza** en vez de quedarse verde sin sujeto | `enum Unit { ALGO }` y `enum Clasificacion { MILILITRO }` |
+| `tests/unit/recetas/schema/recetas-schema.test.ts` (1 caso) | idem | idem. El comentario de QC-32 que ya estaba **no se borro**: el nuevo va debajo | idem |
+| `tests/integration/recetas/recetas-constraints.int.test.ts` | `toEqual([])` sobre **todos** los enum de `public` en Postgres | se traen los enum **con sus etiquetas** y se filtra por el **sujeto propio** —nombre con pinta de unidad, o etiqueta que coincida con un nombre o simbolo leido de `tx.unit.findMany`—; **se mantiene el `toEqual([])`** sobre esa lista. **Sin lista negra de `OrderStatus`/`OrderPriority`**, que ataria `recetas` a `pedidos`. Se anadio un `toBeGreaterThan(0)` sobre el numero de unidades para que el filtro no pueda quedarse sin sujeto | `CREATE TYPE "Unit" AS ENUM ('a')` y `CREATE TYPE "Clasificacion" AS ENUM ('kilogramo')` — detecta por nombre **y** por etiqueta |
+| `tests/integration/unidades/unidades-constraints.int.test.ts` | `toEqual` con la lista **exacta** de FK hacia `units`: dos | **la lista exacta sigue siendo exacta**: se SUMA `{ conname: 'orders_unit_id_fkey', referencia: 'units', confdeltype: 'r', confupdtype: 'c' }`, primera por el `ORDER BY c.conname`. **Sigue siendo `toEqual`** | una FK de mas (`tmp_qc33_u_fkey`) y una FK de menos (`DROP CONSTRAINT orders_unit_id_fkey`) |
+
+Las mutaciones de la columna «Muere ante» **se ejecutaron de verdad** y se revirtieron; las dos de
+integracion vivieron dentro de la transaccion revertida del propio test, asi que **la base no se toco**.
+Un acotado que ya no puede fallar no es un acotado: es un borrado.
+
+En los cinco archivos queda escrito **por que** cambio y **que feature** lo cambio, con el estilo de los
+acotados previos de QC-24 y QC-32 que ya vivian en esos mismos archivos.
+
+### Salida real de esta tanda
+
+```
+$ pnpm run typecheck   -> exit 0
+$ pnpm run lint        -> exit 0
+
+$ pnpm exec vitest run <los cinco acotados> tests/unit/pedidos tests/integration/pedidos guard
+ Test Files  22 passed (22)
+      Tests  305 passed (305)
+
+$ pnpm exec vitest related --run <los cinco acotados>
+ Test Files  5 passed (5)
+      Tests  96 passed (96)
+```
+
+### El sexto rojo sigue rojo, y es deliberado
+
+`tests/integration/identity/identity-seed.int.test.ts` **no se toco, no se baseline y no se borro
+ninguna fila de la base**, por decision del humano. Sigue rojo por la fila residual `FeldesQuack` en
+`products`, que bloquea `user.deleteMany` contra `products_created_by_fkey` (QC-20). Diagnostico
+completo en la seccion 9. **Se declara en el PR.**

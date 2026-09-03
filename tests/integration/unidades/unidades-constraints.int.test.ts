@@ -762,7 +762,21 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
         JOIN pg_class ft ON ft.oid = c.confrelid
         WHERE c.contype = 'f' AND ft.relname = 'units'
         ORDER BY c.conname`
+      // ACTUALIZADO EL 2026-09-03 POR QC-33 (`specs/QC-33-modelo-pedidos/`). La lista era de
+      // DOS y sigue siendo EXACTA: se SUMA la tercera FK hacia `units`, la que nace con
+      // `orders.unit_id` (`orders_unit_id_fkey`), con las mismas dos reglas que las otras dos
+      // —RESTRICT al borrar ('r'), CASCADE al actualizar ('c')—, que es justamente lo que R13
+      // de QC-32 exige de CUALQUIER referencia al catalogo. Va la primera porque la consulta
+      // ordena por `conname`. No se convierte en `toContain`: si manana alguien anade una FK
+      // a `units` sin RESTRICT, o se pierde una de las tres en un drift de `migrate dev`,
+      // este caso tiene que seguir siendo quien lo diga.
       expect(foreignKeys).toEqual([
+        {
+          conname: 'orders_unit_id_fkey',
+          referencia: 'units',
+          confdeltype: 'r',
+          confupdtype: 'c',
+        },
         {
           conname: 'products_unit_id_fkey',
           referencia: 'units',
