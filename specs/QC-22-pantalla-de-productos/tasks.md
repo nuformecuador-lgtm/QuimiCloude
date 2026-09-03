@@ -121,7 +121,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `pageSize` sólo 10 o 25 con defecto `DEFAULT_PAGE_SIZE` **importado**. Sin DOM, sin React.
 - **Hecho cuando**: typecheck y lint limpios y el archivo no importa `react` ni `next/*`.
 
-### [ ] T6 — Columnas, tabla, esqueleto, vacío y error
+### [x] T6 — Columnas, tabla, esqueleto, vacío y error
 - **Depende de**: T2, T5. **Archivos**: `product-columns.ts`, `product-table.tsx`,
   `product-table-skeleton.tsx`, `product-list-empty.tsx`, `product-list-error.tsx`, barrel.
 - **Qué** (`design.md > 4.3`, `> 7`): columnas como datos (`key`, `label`, `testId`), **sin**

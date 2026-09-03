@@ -190,3 +190,43 @@ antes de tocar nada (se comprobó con `git stash`).
   misma forma que el parser sabe leer).
 
 **Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
+
+## T6 — Columnas, tabla, esqueleto, vacio y error
+
+**Archivos (todos nuevos, bajo `app/(private)/inventario/components/`):** `product-columns.ts`,
+`product-table.tsx`, `product-table-skeleton.tsx`, `product-list-empty.tsx`,
+`product-list-error.tsx`, y el barrel `index.ts`.
+
+- **Columnas como datos** (`PRODUCT_COLUMNS`): `key`, `label`, `testId`, `align` y `value`, una
+  funcion pura que devuelve la cadena de la celda. La tabla **no formatea nada**; el test de
+  R6/R7 puede iterar la declaracion en vez de listar diez literales.
+- **R7 gana una defensa de tipos**: `ProductColumnKey = Exclude<keyof ProductView, 'id' |
+  'presentationId' | 'createdBy' | 'updatedBy'>`. Escribir `key: 'createdBy'` **no compila**. El
+  test en negativo sigue haciendo falta y no se sustituye por esto.
+- **R8**: `cost` se pinta con `product.cost ?? EMPTY_CELL`. Ni `Number(`, ni `parseFloat(`, ni
+  aritmetica. (`grep` encuentra un unico `Number(` en toda la ruta, en
+  `product-list-params.ts:64`, y es sobre el **numero de pagina** de la URL, nunca sobre `cost`.)
+- **Fechas deterministas**: `toISOString().slice(0, 10)` y **no** `toLocaleDateString`. El Server
+  Component y el navegador tienen huso y local distintos; formatear con el del entorno produce
+  una discrepancia de hidratacion que nadie relaciona con la tabla.
+- **R9 lo cumple el primitivo**: `components/ui/table.tsx` ya envuelve el `<table>` en un
+  `div[data-slot=table-container]` con `overflow-x-auto`. No se anade otro envoltorio ni se
+  edita el primitivo (R29). Ningun archivo de la ruta declara `100vh` ni scroll horizontal en un
+  ancestro. Sin columna pegajosa (`position: sticky` horizontal se comporta distinto en WebKit).
+- **La tabla y el esqueleto NO son componentes de cliente**: no tienen estado ni manejadores y
+  reciben los datos por props (R30). Cada accion de fila sera un componente de cliente
+  independiente con su propio disparador (T9, T10), asi que la tabla no coordina nada.
+- **El estado vacio recibe la accion de crear como `children`** en vez de importar el panel
+  lateral: asi no conoce a T9 y sigue sin frontera de cliente. Cuando la pagina pedida se quedo
+  atras (`page > 1` sin elementos) muestra ademas el enlace a la primera pagina.
+- **El estado de error** es `role="alert"`, muestra mensaje **y** `code`, y reintenta con
+  `router.refresh()` -no con un enlace a la misma URL, que no vuelve a pedir nada-. Es tambien
+  donde aterriza R5: un `unauthorized` se presenta como error y no se muestra ni un dato.
+
+**Desviacion anotada (menor, de orden):** la columna de acciones de fila **no** entra en T6:
+la anaden T9 (editar) y T10 (borrar), que son quienes crean esos componentes. T6 deja la tabla
+compilando y probada sin ellos en vez de crear un archivo muerto.
+
+**Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
+`grep -rn "100vh\|parseFloat(\|hover:"` sobre `app/(private)/inventario/`: solo aparece dentro de
+un comentario que explica por que no se usan.
