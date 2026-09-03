@@ -969,3 +969,86 @@ primera ronda.
   y `pnpm exec next typegen`, o `app/layout.tsx` no compila por `LayoutProps`, que vive en
   `.next/types` (git-ignorado), **y el gate sale rojo por algo ajeno**. `docs/worktrees.md` no lo
   dice. Candidato a `/afinar-regla`.
+
+
+## QC-25 — crud-de-recetas (2026-09-03)
+
+PR [#23](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/23), merge `1001ec1`. Épica QC-27,
+`zone: backend`, `complexity: high`. **50 requisitos vigentes con test** —R15 derogado y tachado—,
+19 tasks, **27 decisiones cerradas**. `./init.sh` completo verde antes del PR: **108 archivos,
+1118 tests**. `reviewer` en **dos rondas**: RECHAZADO con 2 mayores → APROBADO con 0.
+
+### El hallazgo que justifica la revisión entera
+
+`findProductRefs` filtraba con `deletedAt: null`, y esa cláusula era **el único sitio del repo**
+donde vivía la regla «el catálogo solo devuelve productos vivos», de la que cuelga la mitad
+prohibitiva de R46. **Se podía borrar y la suite entera seguía verde.** Y el `describe` se llamaba
+«findRefs devuelve solo los productos vivos» mientras su único caso probaba la lista vacía: un
+nombre que promete una garantía que el cuerpo no comprueba. El propio implementer había dejado
+escrito en un comentario que la cobertura real la daba el test de integración; se fue a mirar y no
+estaba. **Es el segundo caso de este patrón en el repo** —el primero fue QC-30, donde se podía
+borrar el modo oscuro entero con la suite verde—, así que ya no es anécdota: es el fallo que esta
+revisión existe para cazar.
+
+En la **ronda 2** el reviewer ejecutó **12 mutaciones por su cuenta**, sin creerse ningún reporte:
+**11 murieron**, cada una revertida dejando el árbol idéntico. La superviviente se dejó escrita
+como deuda en vez de taparse.
+
+### QC-32 llegó a mitad de la implementación
+
+`QC-32 — modelo-unidades` se mergeó en `dev` **mientras QC-25 se implementaba** y cambió la unidad
+de la línea de texto libre a FK. La decisión cerrada de la mañana **había anticipado por escrito
+esa sustitución exacta** —«cuando QC-32 llegue, la validación “unidad vacía” se sustituye por “la
+unidad existe en el catálogo”»—; lo que no anticipó es que ocurriera el mismo día. R15 quedó
+**derogado y tachado con su motivo**, sustituido por **R50**, igual que se hizo con la D3 de QC-9.
+
+Y dejó una lección de proceso: **R50 recorrió requirements → tasks → código saltándose el diseño**,
+que es lo que prohíbe la regla 2. El código salió correcto, pero `design.md` quedó contradiciendo
+al código y fue el segundo hallazgo mayor. Un cambio de alcance a mitad de implementación **tiene
+que pasar por los tres artefactos**, no por dos.
+
+### Cinco cortes 529 y lo que enseñaron
+
+El `implementer` murió **cinco veces seguidas** con `529 Overloaded` antes de escribir una línea, y
+las cinco perdieron el 100 % del trabajo. Se probó esperar, reanudar el mismo subagente y lanzar
+uno nuevo con contexto limpio: los tres fallaron igual —o sea que **no era la transcripción
+acumulada**—. Se resolvió lanzándolo con **Sonnet**, con el override y su razón escritos como manda
+`AGENTS.md > Modelos`, y compensando con una revisión más dura, que es exactamente la que encontró
+los dos mayores.
+
+**Lo aprovechable, y es material de `/afinar-regla`:** `AGENTS.md` ya documentaba cinco subagentes
+muertos en corridas largas de verificación, pero solo sacó de ahí una regla sobre el gate. Faltaba
+decir que **un subagente escribe en disco a medida que avanza** —marca cada task en cuanto cierra y
+commitea al cerrar cada grupo—. Con eso un corte cuesta la tanda en curso; sin eso costó todo,
+cinco veces. Es la regla 3 aplicada al subagente y no solo al chat. En cuanto se le dijo, la tanda
+siguiente sobrevivió y dejó seis commits.
+
+### Dos bugs reales que los dobles no veían
+
+Los dos aparecieron solo al correr integración contra Postgres de verdad:
+
+- `sqlStateOf` no reconocía `PrismaClientUnknownRequestError` —la clase que esta versión de Prisma
+  lanza cuando revienta un `CHECK` dentro de un `create` anidado—, así que la traducción a
+  `ValidationError` **fallaba en silencio**.
+- Cualquier `P2002` se traducía a «ya existe una receta con ese nombre», incluido el del índice de
+  `recipe_lines`.
+
+### La base de datos compartida bloqueó la feature
+
+Varios worktrees compartían **una sola base física**, y la sesión hermana aplicó ahí migraciones de
+QC-32 y QC-42 que renombraron columnas: 24 de 38 casos de integración caían por columna inexistente,
+incluidos casos de QC-24 que ya estaban verdes. Se resolvió dando a QC-25 **base propia**
+(`QuimiCloude_QC25`, borrada al cerrar), replicando lo que ya se hizo con `QuimiCloude_QC20`.
+**Es la segunda vez que se arregla a mano y no hay nada en `wt.sh new` ni en `docs/worktrees.md`
+que lo automatice.** El implementer hizo lo correcto: paró y escaló en vez de improvisar.
+
+### Decisiones con consecuencia, aceptadas con los ojos abiertos
+
+- **Bucket público**: la imagen de una fórmula es visible para quien tenga el enlace, sin sesión, y
+  **no se revierte** cambiando el bucket después. Se mitigó guardando **la ruta** y no la URL, así
+  que migrar a privado no obligaría a reescribir filas.
+- **Al borrar una receta su imagen sobrevive**; solo se borra al reemplazarla o quitarla. Genera
+  huérfanos que hoy no limpia nadie.
+- **Solo `@supabase/storage-js`**, no `supabase-js` entero: sin cliente de datos en el repo, el
+  anti-patrón que prohíbe `CHECKPOINTS.md` es **estructuralmente imposible** en vez de una
+  prohibición que alguien tenga que recordar. Mismo criterio que QC-19 con el diccionario.
