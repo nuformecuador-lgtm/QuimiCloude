@@ -71,6 +71,16 @@ describe('createListUnits — R41', () => {
     expect(units.listAll).not.toHaveBeenCalled();
   });
 
+  it('con rol nulo se rechaza sin leer del repositorio', async () => {
+    const units = repositoryThatMustNotBeCalled();
+    const listUnits = createListUnits({ units });
+
+    await expect(listUnits({ id: 'user-1', roleName: null })).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(units.listAll).not.toHaveBeenCalled();
+  });
+
   it('con rol desconocido se rechaza sin leer del repositorio', async () => {
     const units = repositoryThatMustNotBeCalled();
     const listUnits = createListUnits({ units });
