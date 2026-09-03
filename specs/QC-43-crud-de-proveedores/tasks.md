@@ -121,7 +121,7 @@ verificado contra el árbol de la rama, no contra este documento.
       *Depende de:* T5, T6. **Hecho cuando:** typecheck limpio, ningún import prohibido en `ports/`
       y **ningún método de búsqueda por nombre ni por pareja** en los puertos (`design.md > 7`).
 
-- [ ] **T8 — Los cinco casos de uso del proveedor.** `create`, `update`, `delete`, `get`, `list`.
+- [x] **T8 — Los cinco casos de uso del proveedor.** `create`, `update`, `delete`, `get`, `list`.
       `requireAdmin` en la **primera línea** de cada uno, antes de `zod` y antes de tocar el puerto.
       *Depende de:* T7. **Hecho cuando:** `tests/unit/proveedores/supplier-service.test.ts` pasa con
       dobles del puerto (R7, R8, R13, R14, R15, R16, R22, R24, R35).
