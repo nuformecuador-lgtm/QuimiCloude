@@ -208,6 +208,9 @@ async function collectAllRecipes(
 // ---------------------------------------------------------------------------
 
 let sharedActorId: string;
+/** Unidad real, sembrada por la migracion `..._units_catalog` (QC-32, R25): `RecipeLine.unitId`
+ *  es una FK real a `units`, asi que las lineas de estos tests necesitan un id existente. */
+let sharedUnitId: string;
 
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
@@ -221,6 +224,7 @@ beforeAll(async () => {
   }
 
   sharedActorId = await createTestUser(prisma);
+  sharedUnitId = (await prisma.unit.findFirstOrThrow()).id;
 });
 
 afterAll(async () => {
@@ -241,8 +245,8 @@ describe('R5: alta de una receta con sus lineas', () => {
         description: 'Formula de prueba',
         steps: ['Pesar', 'Mezclar'],
         lines: [
-          { productId: productA, quantity: '10.0000', unit: 'kg' },
-          { productId: productB, quantity: '0.5000', unit: 'kg' },
+          { productId: productA, quantity: '10.0000', unitId: sharedUnitId },
+          { productId: productB, quantity: '0.5000', unitId: sharedUnitId },
         ],
       });
 
@@ -260,7 +264,7 @@ describe('R5: alta de una receta con sus lineas', () => {
       expect(detail?.lines).toHaveLength(2);
       const byProduct = new Map(detail?.lines.map((line) => [line.productId, line]));
       expect(byProduct.get(productA)?.quantity).toBe('10.0000');
-      expect(byProduct.get(productA)?.unit).toBe('kg');
+      expect(byProduct.get(productA)?.unitId).toBe(sharedUnitId);
       expect(byProduct.get(productB)?.quantity).toBe('0.5000');
     } finally {
       if (recipeId !== null) await prisma.recipe.delete({ where: { id: recipeId } });
@@ -308,8 +312,8 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
     try {
       const input = baseRecipeInput({
         lines: [
-          { productId: productA, quantity: '1.0000', unit: 'kg' },
-          { productId: productB, quantity: '2.0000', unit: 'kg' },
+          { productId: productA, quantity: '1.0000', unitId: sharedUnitId },
+          { productId: productB, quantity: '2.0000', unitId: sharedUnitId },
         ],
       });
       const created = await createRecipe(input, sharedActorId, new Date());
@@ -318,7 +322,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
 
       const result = await replaceAliveRecipe(
         recipeId,
-        { ...input, lines: [{ productId: productA, quantity: '1.0000', unit: 'kg' }] },
+        { ...input, lines: [{ productId: productA, quantity: '1.0000', unitId: sharedUnitId }] },
         sharedActorId,
         new Date(),
       );
@@ -348,7 +352,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
       const originalName = `Receta original ${token()}`;
       const input = baseRecipeInput({
         name: originalName,
-        lines: [{ productId: productA, quantity: '1.0000', unit: 'kg' }],
+        lines: [{ productId: productA, quantity: '1.0000', unitId: sharedUnitId }],
       });
       const created = await createRecipe(input, sharedActorId, new Date());
       expect(created).not.toBe('duplicate');
@@ -361,8 +365,8 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
           ...input,
           name: `Nombre nuevo ${token()}`,
           lines: [
-            { productId: productA, quantity: '9.0000', unit: 'L' },
-            { productId: fantomProductId, quantity: '1.0000', unit: 'kg' },
+            { productId: productA, quantity: '9.0000', unitId: sharedUnitId },
+            { productId: fantomProductId, quantity: '1.0000', unitId: sharedUnitId },
           ],
         },
         sharedActorId,
@@ -376,7 +380,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
       expect(detail?.lines).toHaveLength(1);
       expect(detail?.lines[0]?.productId).toBe(productA);
       expect(detail?.lines[0]?.quantity).toBe('1.0000');
-      expect(detail?.lines[0]?.unit).toBe('kg');
+      expect(detail?.lines[0]?.unitId).toBe(sharedUnitId);
 
       const fantomLine = await prisma.recipeLine.findFirst({
         where: { recipeId, productId: fantomProductId },

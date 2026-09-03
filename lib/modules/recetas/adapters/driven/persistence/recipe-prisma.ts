@@ -72,6 +72,14 @@ export function toRecipeRow(row: RecipeWithLines): RecipeRow {
  * `sqlStateOf` de `tests/integration/recetas/recetas-constraints.int.test.ts`: se afirma
  * sobre el codigo, nunca sobre el texto del mensaje (en esta maquina Postgres responde en
  * espanol).
+ *
+ * Un `CHECK` violado dentro de una escritura ANIDADA (p. ej. `recipe.create({ data: {
+ * lines: { create: [...] } } })`) llega como `PrismaClientUnknownRequestError`, no como
+ * `PrismaClientKnownRequestError`: el conector no le asigna un `user_facing_error`, pero
+ * SI incrusta el SQLSTATE, estructurado, en `error.message` (`code: "23514"`, nunca
+ * traducido: es el campo interno del conector, no el mensaje humano de Postgres). Se lee
+ * de ahi con una expresion regular sobre ESE campo -sigue sin leerse el texto del
+ * mensaje-, verificado empiricamente contra Postgres real en esta maquina (T14).
  */
 function sqlStateOf(error: unknown): string | null {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -81,6 +89,10 @@ function sqlStateOf(error: unknown): string | null {
       if (typeof code === 'string') return code;
     }
     return error.code;
+  }
+  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    const match = /\bcode:\s*"(\d{5})"/.exec(error.message);
+    if (match !== null) return match[1] as string;
   }
   return null;
 }
