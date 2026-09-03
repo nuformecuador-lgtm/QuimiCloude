@@ -161,7 +161,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios; `grep` no encuentra `fetch(`, `@/lib/composition`,
   `prisma` ni `react-hook-form` en los archivos de la ruta.
 
-### [ ] T10 — Diálogo de borrado
+### [x] T10 — Diálogo de borrado
 - **Depende de**: T2, T6. **Archivos**: `delete-product-dialog.tsx`, barrel.
 - **Qué**: `alert-dialog` que **nombra el producto** y advierte que no se puede deshacer; sólo al
   confirmar envía el `<form>` con el `id` oculto a `deleteProductAction`; luego R21 (R26).

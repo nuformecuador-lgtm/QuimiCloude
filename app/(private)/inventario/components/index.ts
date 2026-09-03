@@ -19,6 +19,7 @@ export {
   type ProductColumn,
   type ProductColumnKey,
 } from './product-columns';
+export { DeleteProductDialog } from './delete-product-dialog';
 export { PRESENTATION_FIELD, PresentationSelect } from './presentation-select';
 export { ProductListEmpty } from './product-list-empty';
 export { ProductListError } from './product-list-error';

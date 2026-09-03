@@ -327,3 +327,22 @@ deuda que T6 dejo anotada).
   nombre de ninguna libreria de formularios (se reescribio el comentario que la nombraba).
 
 **Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
+
+## T10 — Dialogo de borrado
+
+**Archivos:** `delete-product-dialog.tsx` (nuevo), el barrel y `product-table.tsx` (la columna de
+acciones estrena el disparador de borrado junto al de edicion).
+
+- `alert-dialog` que **nombra el producto** y advierte que la accion no se puede deshacer (R26).
+  En base el borrado es logico (`deletedAt`), pero el backend no expone ninguna restauracion: para
+  quien lo usa es irreversible y se le dice asi, en vez de prometerle una vuelta atras inexistente.
+- **Sin confirmar no se invoca nada**: la operacion sale del `submit` del `<form>` que vive dentro
+  del contenido del dialogo, con el `id` en un campo oculto -la forma que `deleteProductAction`
+  espera-. El disparador solo abre.
+- Con exito: cierra, `toast.success` y `router.refresh()` (R21). Con error, **sigue abierto** con
+  el mensaje a la vista: cerrarlo dejaria al usuario creyendo que se borro.
+- **El dialogo abierto se DERIVA** de lo que pidio el usuario y del resultado de la operacion, en
+  vez de cerrarse con un `setState` dentro de un efecto: `react-hooks/set-state-in-effect` lo
+  prohibe (regla activa en el `eslint` del repo) y de paso se ahorra un render.
+
+**Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.

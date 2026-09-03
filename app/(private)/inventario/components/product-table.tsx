@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/table';
 import type { ProductView } from '@/lib/modules/inventario';
 
+import { DeleteProductDialog } from './delete-product-dialog';
 import { PRODUCT_COLUMNS } from './product-columns';
 import { ProductSheet } from './product-sheet';
 
@@ -69,6 +70,7 @@ export function ProductTable({ products }: { readonly products: readonly Product
             <TableCell className="text-right" data-testid="product-cell-actions">
               <div className="flex justify-end gap-1">
                 <ProductSheet product={product} />
+                <DeleteProductDialog product={product} />
               </div>
             </TableCell>
           </TableRow>
