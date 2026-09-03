@@ -165,7 +165,7 @@
       *Depende de:* T10. **Hecho cuando:** ambos pasan contra Postgres real y cubren R5, R10, R12,
       R13, R14, R16, R18, R29, R30, R32, R35, R36.
 
-- [ ] **T15 [P] — Cierre del alcance.** Revisar que `tests/unit/recetas/scope.test.ts` (T3) sigue
+- [x] **T15 [P] — Cierre del alcance.** Revisar que `tests/unit/recetas/scope.test.ts` (T3) sigue
       cubriendo sus cuatro cláusulas ahora que el módulo tiene contenido, y que ninguna guardia se
       relajó para que algo pasara.
       *Depende de:* T13. **Hecho cuando:** el test falla si se añade una pantalla, un route handler,

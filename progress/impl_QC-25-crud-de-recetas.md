@@ -541,3 +541,144 @@ Actions con validación en el borde y advertencias de almacenamiento registradas
 romper la edición. `typecheck`, `lint` y 811 tests de la suite unitaria completa en
 verde. Falta el Grupo D (T14 integración contra Postgres real, T15 cierre de alcance,
 T16 `./init.sh` completo) para dar la feature por terminada.
+
+---
+
+## Grupo D — verificación contra la base (T14, T15): BLOQUEADO en T14
+
+### T15 — Cierre del alcance: hecho y verificado
+
+Revisé `tests/unit/recetas/scope.test.ts` con el módulo ya completo (adaptadores driven/
+driving y `lib/composition` cableado, todo del Grupo C). Sus cuatro cláusulas siguen
+correctas y **sensibles a regresión** con el estado actual:
+
+1. "no existe ninguna pantalla, página ni componente de recetas, ni spec E2E nuevo" —
+   sigue barriendo `app/`, `components/`, `e2e/` en busca de `recet|recipe`.
+2. "las mutaciones de recetas son Server Actions y no hay ningún route handler bajo
+   app/api" — ahora sí itera sobre contenido real: `adapters/driving/recipe-actions.ts`
+   (T13) existe y el test exige que declare `'use server'` en su primera línea. Ya no es
+   un bucle vacío como cuando se escribió en el Grupo A.
+3. "el módulo recetas no reimplementa el cálculo de paginación" — sigue barriendo
+   `lib/modules/recetas/**` (que ahora incluye `recipe-prisma.ts` con `skip`/`take`
+   reales) en busca de los patrones sospechosos; ninguno aparece porque el adaptador usa
+   `offset`/`limit` ya calculados, sin aritmética propia.
+4. "ningún test importa `@supabase/storage-js` ni el adaptador de Storage" — sigue
+   barriendo `tests/` completo; los dos archivos nuevos de T14 no importan ninguno de los
+   dos (evité `lib/composition` a propósito en los tests de integración por esta misma
+   razón, ver más abajo).
+
+No hizo falta tocar el archivo: las cuatro cláusulas ya estaban escritas para leer el
+disco real, no un estado congelado del Grupo A. También revisé el ajuste que dejó la
+sesión de Grupo C en `tests/unit/recetas/module-contract.test.ts` (comentario "AJUSTE
+T10" sobre la excepción de `@prisma/client` para `recipe-prisma.ts`): sigue siendo la
+única excepción nombrada, consistente con el árbol de archivos actual, y no quedó nada
+pendiente.
+
+`pnpm exec vitest run tests/unit/recetas/scope.test.ts tests/unit/recetas/module-contract.test.ts`
+→ **2 test files, 10 tests, todos passed.**
+
+Marqué T15 `[x]` en `tasks.md`.
+
+### T14 — Tests de integración: escritos, pero BLOQUEADOS por drift del Postgres compartido
+
+Escribí los dos archivos pedidos, siguiendo el patrón exacto de
+`tests/integration/inventario/product-crud.int.test.ts` (dos estrategias:
+`$transaction` + `ROLLBACK` + `SAVEPOINT` para lo que se espera que la base rechace con
+SQLSTATE; datos reales + `finally` con borrado por id para lo que ejercita el adaptador
+global de `recipe-prisma.ts`, que usa el cliente Prisma compartido y no un `tx`
+inyectado):
+
+- `tests/integration/recetas/recipe-crud.int.test.ts` — `beforeAll` verifica que
+  `recipes`/`recipe_lines` existan (falla con mensaje claro si no). Cubre R5 (alta con
+  líneas), R10 (23505 crudo con `SAVEPOINT`), R12/R13 (conciliación: borrado físico de la
+  línea que sale, y reversión completa si una línea falla por FK), R29/R30(parte)/R32
+  (tope de página, acotado end-to-end con `toOffsetLimit`/`MAX_PAGE_SIZE` reales de
+  `lib/shared/pagination`, y recorrido de páginas sin repetir/omitir usando un
+  `collectAllRecipes` que no asume nada sobre el total ajeno a este archivo), R35/R36
+  (borrado lógico conserva la fila; lista y detalle la excluyen).
+- `tests/integration/recetas/recipe-lines.int.test.ts` — mismo `beforeAll`. Cubre R14 en
+  dos niveles (SQLSTATE 23514 crudo con `SAVEPOINT`, y el adaptador `createRecipe`
+  traduciéndolo de verdad a `ValidationError` contra Postgres real — la incertidumbre que
+  dejó anotada la sesión de Grupo C), R16 (23505 crudo sobre `(recipe_id, product_id)`),
+  R18 (línea de un producto borrado lógicamente se conserva y `findAliveRecipeById` la
+  sigue trayendo).
+
+Ninguno de los dos importa `@/lib/composition` ni el adaptador de Storage: llaman
+directamente a las funciones exportadas de `recipe-prisma.ts` (mismo criterio que
+`product-crud.int.test.ts` con `product-prisma.ts`), así que R43/R44 (scope.test.ts) no
+se rozan.
+
+**`pnpm run typecheck` → limpio.**
+
+**Al correr `pnpm exec vitest run tests/integration/recetas` contra la base real
+(`DATABASE_URL=postgresql://postgres:***@localhost:5432/QuimiCloude`), 24 de 38 casos
+fallaron — incluidos casos de `recetas-constraints.int.test.ts` (QC-24) que ese mismo
+archivo documenta como ya verdes antes de esta sesión.** El error es siempre el mismo,
+con un mensaje de Prisma mal traducido por el idioma del servidor:
+
+`PrismaClientKnownRequestError: The column existe does not exist in the current database.`
+
+Investigué con `$queryRaw` directo (sin pasar por el cliente tipado) y confirmé la causa
+real: **la base física compartida (`localhost:5432/QuimiCloude`, la misma que usa el
+worktree principal) tiene aplicadas DOS migraciones que no existen en el árbol de
+migraciones de este worktree**:
+
+- `20260903131417_suppliers_and_supplier_catalog_lines`
+- `20260903121404_units_catalog`
+
+(`db/migrations/` de este worktree solo tiene 6, hasta
+`20260902170759_product_audit_and_presentation_uniqueness`; `prisma migrate status`
+sobre ESTE árbol de migraciones dice "up to date" porque solo compara los nombres de
+migración ya aplicados contra los que conoce, no las columnas reales.)
+
+La migración `units_catalog` (de otra feature, aparentemente una migración de la unidad a
+catálogo — el propio `scope.test.ts` de esta ficha ya citaba "QC-32 (migración de la
+unidad a catálogo)" como algo que llegaría más adelante) **renombró
+`recipe_lines.unit` → `recipe_lines.unit_id`** y `products.unit` → `products.unit_id` en
+la base física. `db/schema.prisma` de ESTE worktree sigue declarando `unit String`
+(así lo fija `scope.test.ts` como parte del alcance cerrado de esta ficha, R41): el
+cliente Prisma generado aquí pide una columna `unit` que ya no existe en esa base, y
+**cualquier** lectura sin `select` explícito de `recipe_lines` (el `include: { lines:
+true }` de `RECIPE_INCLUDE` en `recipe-prisma.ts`) o de `products` (un
+`findFirst`/`delete` sin `select` en mis helpers de test) revienta con ese error.
+
+No es un bug de `recipe-prisma.ts` ni de mis tests: es el mismo esquema que otra sesión,
+en otro worktree, migró hacia adelante sobre la ÚNICA base Postgres física que
+`DATABASE_URL`/`DIRECT_URL` señalan desde este `.env` (el mismo que el worktree
+principal). Los dos worktrees comparten la misma base de datos local, y la migración de
+la feature vecina ya corrió ahí.
+
+**Dejé T14 sin marcar `[x]`** porque su "Hecho cuando" exige que ambos archivos "pasen
+contra Postgres real", y hoy no pasan por una causa externa al código de esta ficha.
+Antes de parar:
+
+- Comprobé que ninguna fila de prueba quedó huérfana: verifiqué con `$queryRaw` crudo
+  qué filas de `products`/`presentations`/`recipes` se crearon en las últimas 2 horas y
+  las borré por `id` exacto (el `finally` con la API tipada también falla al
+  re-consultar sin `select`, así que la limpieza normal de los tests no pudo correr;
+  se hizo aparte, con SQL crudo). Verificado: 0 filas nuevas después de la limpieza.
+- No toqué la base compartida más allá de esa limpieza dirigida por id: no revertí
+  `units_catalog` ni `suppliers_and_supplier_catalog_lines` (son de otra feature, en
+  otro worktree, posiblemente con trabajo en curso; deshacerlas sin coordinar sería
+  destructivo).
+- No relajé ningún `select` de `recipe-prisma.ts` para "esquivar" la columna que falta:
+  eso ocultaría el problema real en vez de resolverlo, y además violaría el alcance
+  cerrado de R41 (`recipe_lines`/`recipes` tal como los dejó QC-24, vigilado por
+  `scope.test.ts`).
+
+Este es un bloqueo de infraestructura compartida entre worktrees, no una decisión de
+diseño para reinterpretar. Reportado al orquestador para decidir: aislar la base de
+pruebas por worktree/feature (schema Postgres separado, o una base de test dedicada), o
+coordinar el orden de migración entre features hermanas antes de reintentar T14. Los dos
+archivos de test quedan escritos y con `typecheck` limpio, listos para correr en cuanto
+la base de pruebas refleje solo las migraciones de esta rama (`db/migrations/` de este
+worktree, 6 migraciones, ninguna con `unit_id`).
+
+### Veredicto de esta tanda (Grupo D)
+
+T15 cerrado y verde. T14 escrito y con `typecheck` limpio, pero **no verificado contra
+Postgres real** por un drift de esquema en la base física compartida, causado por
+migraciones de una feature hermana aplicadas en otro worktree sobre la misma base. No se
+commitea esta tanda: T14 no cumple su propio "Hecho cuando" todavía. Sin instrucción
+para resolver el drift (aislar la base o coordinar el orden de migraciones), esta
+sesión se detiene aquí y lo reporta.
