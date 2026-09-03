@@ -130,6 +130,33 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-33 — modelo-pedidos (acotada el 2026-09-03)
+
+- El alcance y las **26 decisiones cerradas** viven en
+  `specs/QC-33-modelo-pedidos/requirements.md` — esa es la fuente, aquí solo se enlaza. Queda
+  **1 pregunta abierta**.
+- **Cierra la pregunta abierta n.º 4 del dominio**, la de contabilidad e impuestos, que llevaba
+  abierta desde el inicio del proyecto: el ERP **no factura ni liquida impuestos**, el dinero sí
+  entra al modelo con `decimal(14,4)`, y los totales son **internos y derivados**, no columnas.
+  `docs/architecture.md` queda actualizado. De las cuatro originales ya solo siguen abiertas la
+  **2** (lote y vencimiento) y la **3** (FDS/GHS).
+- **Tres decisiones se apartan de un precedente, y las tres a conciencia:** los conjuntos
+  cerrados van como **enum de Prisma** y no como tabla tipo `DocumentType` (**QC-4**), asumiendo
+  que añadir un valor será una migración del tipo; la unidad es **obligatoria**, siguiendo a
+  QC-24 y no a QC-14; y «un pedido entregado no se borra» se garantiza con **`CHECK` en la base**
+  y no solo con validación de aplicación en QC-34, por la filosofía de **QC-20 D16**.
+- **El pedido no tiene cliente, y es deliberado.** No hay catálogo de clientes ni ficha que lo
+  cree, y **no se creó ninguna**. El humano asumió el coste: añadirlo después obliga a decidir
+  qué cliente llevaban los pedidos ya cargados.
+- **Board actualizado ANTES de sembrar**, y con dos correcciones que la acotación descubrió: la
+  ficha decía que el estado «debe poder crecer sin migrar» (falso con enum) y que el pedido
+  guarda una **fecha de solicitud** propia (se elimina: la pone el sistema y no se edita, o sea
+  que es `created_at`). Se le sumaron el correlativo **por año**, que el precio es **unitario**,
+  que la unidad es obligatoria y que un pedido entregado no se borra. `zone`, `complexity` y
+  `depends_on` no cambian. No se creó ni canceló ninguna ficha.
+- **No arranca todavía**: la zona `backend` está en **2 de 2** (QC-25 y QC-42), así que F1.0
+  espera a que una pase a `done`. La ficha sigue `pending` en Backlog.
+
 Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
 `complexity` se le asignaron y por qué, y si hubo partición de una `fullstack`.
 
@@ -1129,6 +1156,40 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 Resumen completo en `progress/history.md`. Lo que sigue vivo:
 
+- **[arnés — TRES features en paralelo comparten UNA base de datos, y dos de ellas dejaron `dev`
+  roto en integración sin que nadie se enterara. Es la deuda más cara de esta sesión.]**
+  El 2026-09-03, al correr el gate de QC-22, fallaron 4 archivos de integración de `inventario` y
+  `recetas`. **No era de QC-22**: los mismos tests fallaban en `dev` sin una sola línea de la
+  feature. La causa, verificada consultando `_prisma_migrations` en la base: la base compartida
+  `QuimiCloude` tiene **dos migraciones aplicadas que `dev` no tiene en disco** —
+  `20260903121404_units_catalog` (QC-32, aplicada 15:50) y
+  `20260903131417_suppliers_and_supplier_catalog_lines` (QC-42, 14:33)—, cada una viviendo solo en
+  la rama de su feature. `units_catalog` convierte la unidad de la línea de receta de texto libre
+  a clave foránea, así que `recipeLine.create({ unit: 'kg' })` dejó de funcionar contra un esquema
+  que ningún `schema.prisma` de `dev` describe.
+  **Por qué duele:** `./init.sh` en `dev` es el contrato de «esto está sano», y lo puede romper
+  cualquier sesión paralela sin tocar `dev`. El leader que se lo encuentre gasta la sesión
+  diagnosticando algo que no es suyo — hoy costó unas cuantas corridas — y, peor, **puede leerlo
+  como una regresión de su propia feature** y devolvérsela al implementer.
+  **Lo que ya existía y se dejó de usar:** QC-20 tuvo base propia (`QuimiCloude_QC20`), creada y
+  eliminada al cerrar. QC-30, QC-32 y QC-42 copian el `.env` de `dev` tal cual y pegan contra la
+  base compartida. La regla de paralelismo de `AGENTS.md` valida **conflicto de archivos** entre
+  features de la misma zona, pero **no dice nada de la base**, que es estado compartido tanto o
+  más frágil — y las tres features en curso son de zonas distintas, así que el cupo por zona ni
+  siquiera las mira.
+  **Lo que se hizo hoy, y sirve de receta:** se creó `QuimiCloude_QC22`, se apuntó el `.env` del
+  worktree a ella y se corrieron `db:migrate` + `db:seed`. Los 4 rojos desaparecieron y el gate
+  pasó a 1012/1014. `wt.sh new` podría crear la base y `wt.sh done` eliminarla, igual que ya monta
+  y desmonta el worktree. **Candidata fuerte para `/afinar-regla`.**
+- **[arnés — en un worktree, Vitest NO carga el `.env`; en `dev` sí, y no sé por qué.]** Mismo día:
+  con `.env` presente y byte a byte idéntico al de `dev`, misma versión de Vitest (4.1.10), mismo
+  `vitest.config.mts` (comparado con `diff`: idénticos) y sin `envDir` ni `root` propios, los tests
+  de integración en `.worktrees/QC-22-*` fallaban con `Environment variable not found:
+  DATABASE_URL`, mientras el mismo archivo pasaba en `dev`. Se resuelve exportando a mano antes de
+  correr: `set -a && . ./.env && set +a`. **La causa raíz sigue sin identificar** y no se rellena
+  con un supuesto (regla 6). Mientras tanto, cualquiera que corra el gate en un worktree y no lo
+  sepa verá ~8 archivos de integración en rojo y creerá que rompió algo. Merece o un arreglo en
+  `init.sh` (que cargue el `.env` él mismo) o, como mínimo, una línea en `docs/worktrees.md`.
 - **menor-6, el único con cobertura real:** ninguna aserción automática comprueba **las cuatro
   filas en la base**; la evidencia es el log de la tarea. `unidades-constraints.int.test.ts` ya
   corre contra Postgres y un caso acotado costaría poco.
