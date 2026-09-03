@@ -1159,3 +1159,78 @@ Y tras el merge, el rojo de siempre: `typecheck` fallando por `@supabase/storage
   la feature de compras.
 - **Queda la base `QuimiCloude_QC42`** por borrar, y el gate reporta **7 worktrees** además del
   principal.
+
+---
+
+## QC-22 — pantalla-de-productos (frontend · épica QC-18 Inventario) — cerrada el 2026-09-03
+
+Mergeada por el humano en el **PR #24** (merge `d8e59eb` en `dev`). Worktree desmontado, rama
+borrada y **base propia `QuimiCloude_QC22` eliminada**. **32 requisitos (R1–R32), 20 tareas,
+33 commits.** Gate completo en verde —97 archivos, 1077 tests— y **E2E ejecutado y verde en
+Chromium y WebKit**: login → `/inventario` → alta de un producto con una presentación creada
+desde el propio selector → aparece en la lista, más el rechazo de quien no es Administrador.
+`reviewer`: **APROBADO, 0 mayores, 4 menores**, verificando la trazabilidad por mutación real y
+no leyendo la bitácora.
+
+**Estrena la primera regla ruta→rol del repo.** QC-9 dejó `ROUTE_ROLE_RULES` vacía a propósito
+con el encargo escrito de que la trajera justo esta pantalla. La regla **no sustituye** a la
+autorización: los nueve casos de uso de `inventario` siguen llamando a `requireAdmin` como
+primera línea.
+
+### Lo que esta feature enseña, y no es sobre productos
+
+**1. Acotar antes de especificar se pagó solo.** `/afinar-feature` cerró 22 decisiones con el
+humano **antes** de que `spec_author` escribiera, y de ahí salió **QC-45** llevándose la mitad
+del alcance original (listar, editar y borrar presentaciones). El spec se escribió una sola vez.
+
+**2. Cinco decisiones de features ya cerradas hubo que superarlas, y ninguna se borró.** QC-11
+(×2), QC-20 (×2) y una corrección de arquitectura. Todas invertidas o acotadas **con la fecha y
+el motivo dentro del propio test**. El caso más instructivo es el cuarto: el centinela de QC-20
+prohibía *todo* import de valor de su barrel fuera de `lib/composition`, pero **la cabecera de
+ese mismo barrel decía que un componente de cliente debía poder importarlo, «QC-22 lo hará»**.
+QC-20 se contradecía consigo mismo; se resolvió a favor de lo que el barrel prometía, acotando
+el centinela a lo que su propio comentario dice defender: las nueve factorías de caso de uso.
+
+**3. El implementer monolítico no sobrevive.** Murió **dos veces** con `529 Overloaded`: la
+primera a mitad, la segunda **en su primera petición al reanudarlo**, sin avanzar nada.
+`AGENTS.md > Regla del gate` ya decía que las corridas largas rompen el stream; lo que no decía
+es que **reponer un transcript de ~150k tokens es igual de frágil**. Lo que funcionó: tirar el
+transcript y repartir las 20 tareas en **bloques pequeños** con agentes nuevos que leen solo las
+secciones del spec que sus tareas referencian. Seis tandas, ninguna caída más.
+
+**4. Tres features en paralelo compartían UNA base de datos, y dos dejaron `dev` roto.** El gate
+de esta feature falló en 4 archivos de integración que **no eran suyos**: la base compartida
+tenía aplicadas `units_catalog` (QC-32) y `suppliers_and_supplier_catalog_lines` (QC-42), que
+solo existían en sus ramas. Se verificó consultando `_prisma_migrations`, y corriendo los mismos
+tests en `dev` sin un solo cambio de QC-22 — igual de rojos. Se resolvió creando
+`QuimiCloude_QC22`, como ya se había hecho con QC-20 y se había dejado de hacer. **La regla de
+paralelismo valida conflicto de archivos, no de base**, y la base es estado compartido más
+frágil que cualquier archivo.
+
+**5. La premisa de una decisión cerrada puede caerse en vuelo.** Una decisión aceptaba a
+conciencia el retrabajo de capturar la unidad como texto libre «hasta que llegue QC-32». QC-32
+**se mergeó mientras esta feature seguía abierta** y convirtió la unidad en clave foránea, así
+que `ProductView.unit` dejó de existir. Se quitó el campo —único camino construible: listar el
+catálogo es QC-38, aún `pending`—, **R23 quedó sin objeto y su test se invirtió en vez de
+borrarse**.
+
+**6. Un menor del reviewer que merecía arreglarse, y se arregló.** La guardia de R31 medía **por
+archivo**: bastaba una aparición de `min-h-11` en cualquier parte para dar por buenos todos los
+controles, y el reviewer demostró que se podían quitar los targets táctiles de un campo entero
+con la suite verde. Ahora recorre **cada etiqueta de apertura**, resuelve las constantes locales,
+opera sobre etiquetas multilínea y vigila **17 controles en 7 archivos**, con autocomprobación
+para no poder quedarse muda en vez de roja. Es el mismo fallo que rechazó a QC-30 y reapareció en
+QC-25: **tercer caso en tres días**.
+
+### Lo que deja abierto
+
+- **T16 sin hacer, y no lo cierra el merge**: la verificación manual en navegador con **iOS
+  real**. WebKit de escritorio no es Safari de iOS, así que el scroll horizontal anidado de la
+  tabla (R9) y los targets táctiles (R31) siguen sin comprobarse en dispositivo. Declarado como
+  pendiente en el spec, **no como verificado**.
+- **Una entrada ajena en `tests/baseline-rojos.json`** (guardia de dependencias, por la fila de
+  `@supabase/storage-js` que añadió QC-25). QC-25 ya está mergeada: **conviene comprobar si esa
+  entrada ya puede retirarse.**
+- **QC-45** nació al acotar esta ficha y está desbloqueada.
+- Dos guardias de fuente más anchas que su requisito, y el centinela de alcance que **pondrá en
+  rojo a QC-45 por construcción** — que se lea como premisa caída, no como guardia que estorba.
