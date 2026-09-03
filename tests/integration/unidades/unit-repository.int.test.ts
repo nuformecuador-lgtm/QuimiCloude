@@ -121,26 +121,36 @@ describe('listUnits — R40: el orden', () => {
     const ids: string[] = []
 
     try {
-      // Se insertan en un orden que NO es el alfabetico: si el adaptador perdiera su
-      // `orderBy`, Postgres devolveria estas filas en orden de heap -es decir, el de
-      // insercion- y la comparacion de abajo caeria.
+      // Se siembran 8 filas (suffix de dos digitos '01'..'08' para conservar el orden
+      // ASCII) en el orden EXACTAMENTE INVERSO al alfabetico esperado ('08'..'01'). Con
+      // solo 3 filas, Postgres puede devolver por azar el orden correcto sin `ORDER BY`
+      // -reutilizacion de tuplas muertas en el heap-, como se probo empiricamente (6
+      // corridas: 1 falso verde, 5 rojas). Sembrando 8 filas en orden estrictamente
+      // inverso al de insercion, el orden de heap sin `ORDER BY` coincidiria con el
+      // inverso exacto del esperado, lo que hace que la comparacion de abajo falle de
+      // forma consistente si el adaptador pierde su `orderBy`.
       const prefix = `Unidad orden ${marker} `
-      for (const suffix of ['03', '01', '02']) {
+      for (const suffix of ['08', '07', '06', '05', '04', '03', '02', '01']) {
         ids.push(await seedUnit(`${prefix}${suffix}`, marker, suffix))
       }
 
       // Limite mayor que el total de filas: este caso mira el ORDEN, no la cota, asi que
-      // las tres filas sembradas tienen que caber enteras en la pagina.
+      // las ocho filas sembradas tienen que caber enteras en la pagina.
       const total = await prisma.unit.count()
       const rows = await listUnits(total + 10)
 
       // Solo las filas de este caso, localizadas por el marcador irrepetible.
       const own = rows.filter((row) => row.name.startsWith(prefix))
-      expect(own).toHaveLength(3)
+      expect(own).toHaveLength(8)
       expect(own.map((row) => row.name)).toEqual([
         `${prefix}01`,
         `${prefix}02`,
         `${prefix}03`,
+        `${prefix}04`,
+        `${prefix}05`,
+        `${prefix}06`,
+        `${prefix}07`,
+        `${prefix}08`,
       ])
 
       // La subsecuencia viene ascendente, dicho ademas sin depender del orden esperado

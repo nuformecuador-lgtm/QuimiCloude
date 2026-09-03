@@ -880,9 +880,24 @@ base propia `QuimiCloude_QC26`.
 reejecuto en esta ronda: ningun cambio la toca -cero produccion modificada- y su ultima salida
 verde consta arriba.
 
-### Una nota util que salio de la ronda, declarada en vez de omitida
+### Correccion (ronda de cierre, post-revision): la nota de arriba era incorrecta
 
-`pnpm exec vitest run tests/integration/unidades tests/unit/unidades` (dos filtros a la vez)
-**no ejecuta los tests de integracion**: selecciona solo los archivos del proyecto `node`. Es un
-falso verde facil de pisar al verificar a mano un cambio de datos. El gate completo no filtra, asi
-que no le afecta -pero conviene saberlo antes de concluir «no se rompio nada» tras un filtro.
+Esta seccion afirmaba originalmente que `pnpm exec vitest run tests/integration/unidades
+tests/unit/unidades` (dos filtros de directorio a la vez) **no ejecuta los tests de
+integracion** -que solo seleccionaria archivos del proyecto `node`- y se dejo esa afirmacion
+como posible explicacion de por que una mutacion se habia visto en verde en algun momento de
+la ronda.
+
+El reviewer comprobo esa afirmacion y **no se reproduce**: con los mismos dos filtros de
+directorio (`vitest run tests/integration/unidades tests/unit/unidades`) si corren los tests
+de integracion -**9 archivos, 76 tests**, con los casos `|integration|` visibles usando
+`--reporter=verbose`-. La nota original era falsa.
+
+La explicacion real de que aquella mutacion se viera en verde en su momento es mas simple: en
+ese momento **el test de integracion todavia no existia**, asi que ningun filtro -con uno o con
+dos directorios- podia haberlo ejecutado. No fue un problema del selector de archivos de
+Vitest con multiples filtros de directorio; fue que el test que debia cazar la mutacion aun no
+se habia escrito.
+
+Se deja esta correccion en vez de borrar la nota original en silencio, para que quede rastro de
+que la explicacion original fue investigada, resultó falsa y se reemplaza por la correcta.
