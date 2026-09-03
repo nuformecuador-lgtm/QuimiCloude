@@ -134,7 +134,7 @@ verificado contra el árbol de la rama, no contra este documento.
       dobles del repositorio y del catálogo (R25, R26, R27, R31, R33, R34, R35, R36, R37), y el
       doble del catálogo demuestra que **no se le pregunta una vez por línea**.
 
-- [ ] **T10 — Test de autorización de los nueve casos de uso.**
+- [x] **T10 — Test de autorización de los nueve casos de uso.**
       `tests/unit/proveedores/authorization.test.ts`, con dobles del repositorio de proveedores, del
       catálogo y de `ProductCatalog` que **fallan si los llaman**.
       *Depende de:* T8, T9. **Hecho cuando:** los nueve cubren Operador, rol nulo, rol vacío, rol
