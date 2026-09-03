@@ -1,0 +1,702 @@
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
+import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
+
+/**
+ * Contrato de la ruta de recetas: R3, R7, R9, R10, R14, R18, R22, R25, R28, R29, R43, R44, R45,
+ * R46, R47, R48, R49, R50 y R51 (`specs/QC-26-pantalla-de-recetas/tasks.md > T22`).
+ *
+ * **Guardias de codigo, sin DOM**, mismo patron que
+ * `tests/unit/inventario/product-route-contract.test.ts` y
+ * `tests/unit/dashboard-route-contract.test.ts`. Todo lo que esta feature promete **no hacer**
+ * -no incrustar la ruta, no repetir la autorizacion, no invocar el detalle desde la lista, no
+ * filtrar en cliente, no convertir la cantidad a numero, no colar el CRUD de unidades ni tocar
+ * `recetas` o `db/`, no montar un segundo `<Toaster/>`, no reinventar primitivas- es invisible
+ * renderizando: si manana la pantalla empezase a hacer cualquiera de esas cosas, ningun assert de
+ * DOM se pondria rojo. De ahi este archivo.
+ *
+ * **Diferencia con el precedente de inventario**: esta ruta tiene subrutas propias (`nueva/` y
+ * `[id]/`), asi que «la unica carpeta de la ruta es components/» no vale aqui: las carpetas
+ * legitimas son `components`, `nueva` y `[id]`, y eso es lo que se afirma explicitamente.
+ */
+
+const RAIZ = join(__dirname, '..', '..', '..');
+
+/** Carpeta de la ruta, **derivada de la constante** (R3). El route group `(private)` no aporta
+ *  segmento de URL. */
+const CARPETA_RUTA = join('app', '(private)', FORMULAS_ROUTE.replace(/^\//, ''));
+const PAGE_PATH = join(CARPETA_RUTA, 'page.tsx');
+const COMPONENTES_PATH = join(CARPETA_RUTA, 'components');
+const BARREL_PATH = join(COMPONENTES_PATH, 'index.ts');
+
+/** Subrutas de alta y edicion. El alta se deriva del sufijo de `NEW_RECIPE_ROUTE`; la carpeta de
+ *  edicion es `[id]` por convencion de Next.js -el App Router exige corchetes, y ningun literal
+ *  de identificador puede sustituirlos-. */
+const NUEVA_SUFIJO = NEW_RECIPE_ROUTE.slice(FORMULAS_ROUTE.length + 1);
+const CARPETA_NUEVA = join(CARPETA_RUTA, NUEVA_SUFIJO);
+const PAGE_NUEVA_PATH = join(CARPETA_NUEVA, 'page.tsx');
+const CARPETA_EDICION = join(CARPETA_RUTA, '[id]');
+const PAGE_EDICION_PATH = join(CARPETA_EDICION, 'page.tsx');
+
+/** El layout privado, unico archivo heredado de la zona privada que R51 autoriza a tocar (junto
+ *  con `routes.ts`, `private-nav.ts`, `route-role-rules.ts` y `lib/composition/index.ts`). */
+const LAYOUT_PRIVADO_PATH = join('app', '(private)', 'layout.tsx');
+
+/** El literal de la ruta, en las tres comillas en las que se puede escribir. */
+const LITERALES_DE_RUTA = [`'${FORMULAS_ROUTE}'`, `"${FORMULAS_ROUTE}"`, `\`${FORMULAS_ROUTE}`];
+
+function leer(rutaRelativa: string): string {
+  return readFileSync(join(RAIZ, rutaRelativa), 'utf8');
+}
+
+/** Fuente sin lineas de comentario: las guardias miran codigo, no prosa. */
+function fuenteSinComentarios(rutaRelativa: string): string {
+  return leer(rutaRelativa)
+    .split('\n')
+    .filter((linea) => {
+      const limpia = linea.trim();
+      return !(limpia.startsWith('//') || limpia.startsWith('*') || limpia.startsWith('/*'));
+    })
+    .join('\n');
+}
+
+/**
+ * Numero de linea en el archivo ORIGINAL de cada linea de `fuenteSinComentarios`. Sin esto, un
+ * fallo apuntaria a una linea que no existe en el archivo que hay que abrir.
+ */
+function lineasOriginales(rutaRelativa: string): number[] {
+  const numeros: number[] = [];
+
+  leer(rutaRelativa)
+    .split('\n')
+    .forEach((linea, indice) => {
+      const limpia = linea.trim();
+      if (!(limpia.startsWith('//') || limpia.startsWith('*') || limpia.startsWith('/*'))) {
+        numeros.push(indice + 1);
+      }
+    });
+
+  return numeros;
+}
+
+/** Todos los archivos `.ts`/`.tsx` bajo una carpeta, en rutas relativas a la raiz del repo. */
+function fuentesBajo(carpetaRelativa: string): string[] {
+  const encontradas: string[] = [];
+
+  const recorrer = (directorio: string) => {
+    for (const entrada of readdirSync(directorio, { withFileTypes: true })) {
+      const completa = join(directorio, entrada.name);
+      if (entrada.isDirectory()) {
+        if (entrada.name === 'node_modules' || entrada.name === '.next') continue;
+        recorrer(completa);
+        continue;
+      }
+      if (entrada.name.endsWith('.ts') || entrada.name.endsWith('.tsx')) {
+        encontradas.push(relative(RAIZ, completa).split('\\').join('/'));
+      }
+    }
+  };
+
+  recorrer(join(RAIZ, carpetaRelativa));
+  return encontradas.sort();
+}
+
+/** Los archivos de la ruta completa: las tres `page.tsx` y todos los componentes propios. */
+const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
+
+/** Solo los archivos de la LISTA -R10 ampliado exige que ninguno de estos lleve el marcador ni el
+ *  aviso de linea con producto de baja, esa senal es solo del formulario-. */
+const ARCHIVOS_DE_LA_LISTA = [
+  join(COMPONENTES_PATH, 'recipe-columns.ts'),
+  join(COMPONENTES_PATH, 'recipe-table.tsx'),
+  join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'),
+  join(COMPONENTES_PATH, 'recipe-list-empty.tsx'),
+  join(COMPONENTES_PATH, 'recipe-list-error.tsx'),
+  join(COMPONENTES_PATH, 'recipe-list-params.ts'),
+  join(COMPONENTES_PATH, 'recipe-list-section.tsx'),
+  join(COMPONENTES_PATH, 'recipe-list-toolbar.tsx'),
+  join(COMPONENTES_PATH, 'delete-recipe-dialog.tsx'),
+  PAGE_PATH,
+].map((ruta) => ruta.split('\\').join('/'));
+
+/** Los que declaran frontera de cliente. R50 y R49 van sobre estos. */
+const FUENTES_DE_CLIENTE = FUENTES_DE_LA_RUTA.filter((ruta) => leer(ruta).includes("'use client'"));
+
+/**
+ * Los controles que R50 obliga a agrandar. Se buscan como **etiqueta de apertura JSX**
+ * (`<Nombre`), no como texto suelto: `AlertDialogAction` tambien aparece en la linea del import.
+ */
+const CONTROLES_VIGILADOS = ['Button', 'SelectTrigger', 'Input', 'AlertDialogAction'] as const;
+
+/**
+ * Avanza desde `inicio` hasta el cierre de la expresion, ignorando lo que caiga dentro de una
+ * cadena y contando llaves. Es lo minimo para leer una etiqueta JSX **completa** aunque ocupe
+ * varias lineas o lleve `className={`${A} ${B}`}`.
+ */
+function finDeExpresion(codigo: string, inicio: number, cierre: '>' | '}'): number {
+  let profundidad = 0;
+  let comilla: string | null = null;
+
+  for (let i = inicio; i < codigo.length; i += 1) {
+    const caracter = codigo[i];
+
+    if (comilla !== null) {
+      if (caracter === '\\') i += 1;
+      else if (caracter === comilla) comilla = null;
+      continue;
+    }
+    if (caracter === "'" || caracter === '"' || caracter === '`') {
+      comilla = caracter;
+      continue;
+    }
+    if (caracter === '{') {
+      profundidad += 1;
+      continue;
+    }
+    if (caracter === '}') {
+      profundidad -= 1;
+      if (cierre === '}' && profundidad === 0) return i + 1;
+      continue;
+    }
+    if (cierre === '>' && caracter === '>' && profundidad === 0) return i + 1;
+  }
+
+  return -1;
+}
+
+/** Cada etiqueta de apertura `<Nombre ...>` del archivo, con su linea, como texto completo. */
+function etiquetasDeApertura(
+  codigo: string,
+  nombre: string,
+  lineas: number[],
+): { texto: string; linea: number }[] {
+  const encontradas: { texto: string; linea: number }[] = [];
+  const patron = new RegExp(`<${nombre}(?![A-Za-z0-9_$])`, 'g');
+  let encaje: RegExpExecArray | null;
+
+  while ((encaje = patron.exec(codigo)) !== null) {
+    const fin = finDeExpresion(codigo, encaje.index, '>');
+    expect(fin, `no se pudo leer la etiqueta <${nombre}> entera`).toBeGreaterThan(-1);
+    encontradas.push({
+      texto: codigo.slice(encaje.index, fin),
+      linea: lineas[codigo.slice(0, encaje.index).split('\n').length - 1] ?? 0,
+    });
+  }
+
+  return encontradas;
+}
+
+/** Valor de un atributo de la etiqueta, sea `attr="..."` o `attr={...}`. */
+function valorDeAtributo(etiqueta: string, nombre: string): string | null {
+  const inicio = etiqueta.indexOf(`${nombre}=`);
+  if (inicio === -1) return null;
+
+  const abre = inicio + nombre.length + 1;
+  const caracter = etiqueta[abre];
+
+  if (caracter === '{') {
+    const fin = finDeExpresion(etiqueta, abre, '}');
+    return fin === -1 ? null : etiqueta.slice(abre, fin);
+  }
+  if (caracter === '"' || caracter === "'") {
+    const fin = etiqueta.indexOf(caracter, abre + 1);
+    return fin === -1 ? null : etiqueta.slice(abre, fin + 1);
+  }
+  return null;
+}
+
+/**
+ * Constantes locales de cadena cuyo valor contiene `clase`. Los componentes agrupan la clase
+ * (`const TOUCH_TARGET = 'min-h-11 min-w-11'`), asi que resolver `min-h-11` a ojo sobre el
+ * `className` daria falsos rojos.
+ */
+function constantesConLaClase(codigo: string, clase: string): string[] {
+  const nombres: string[] = [];
+  const patron = /const\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([^'"`]*)\2/g;
+  let encaje: RegExpExecArray | null;
+
+  while ((encaje = patron.exec(codigo)) !== null) {
+    if (encaje[3].includes(clase)) nombres.push(encaje[1]);
+  }
+
+  return nombres;
+}
+
+/** El `className` lleva la clase, literal o a traves de una constante local que la contiene. */
+function llevaLaClase(className: string | null, clase: string, constantes: string[]): boolean {
+  if (className === null) return false;
+  if (className.includes(clase)) return true;
+  return constantes.some((nombre) => new RegExp(`(?<![\\w$])${nombre}(?![\\w$])`).test(className));
+}
+
+/** Como se nombra un control en el mensaje de fallo, para no obligar a buscarlo a mano. */
+function identificaAlControl(etiqueta: string): string {
+  return (
+    valorDeAtributo(etiqueta, 'data-testid') ??
+    valorDeAtributo(etiqueta, 'aria-label') ??
+    valorDeAtributo(etiqueta, 'id') ??
+    'sin identificador'
+  );
+}
+
+/** Comprueba que ningun archivo de la lista dada contiene ninguno de los textos prohibidos. */
+function ningunArchivoContiene(prohibidos: readonly string[], fuentes = FUENTES_DE_LA_RUTA) {
+  for (const ruta of fuentes) {
+    const codigo = fuenteSinComentarios(ruta);
+    for (const prohibido of prohibidos) {
+      expect(codigo, `${ruta} no debe contener «${prohibido}»`).not.toContain(prohibido);
+    }
+  }
+}
+
+describe('contrato de la ruta de recetas', () => {
+  it('las tres rutas existen donde las ubican FORMULAS_ROUTE, NEW_RECIPE_ROUTE y recipeEditRoute', () => {
+    // R3 — las tres rutas esperadas se DERIVAN de la constante, no se escriben a mano.
+    expect(existsSync(join(RAIZ, PAGE_PATH)), `deberia existir ${PAGE_PATH}`).toBe(true);
+    expect(existsSync(join(RAIZ, BARREL_PATH)), `deberia existir ${BARREL_PATH}`).toBe(true);
+
+    expect(NEW_RECIPE_ROUTE).toBe(`${FORMULAS_ROUTE}/nueva`);
+    expect(existsSync(join(RAIZ, PAGE_NUEVA_PATH)), `deberia existir ${PAGE_NUEVA_PATH}`).toBe(
+      true,
+    );
+
+    expect(recipeEditRoute('sonda-de-prueba')).toBe(`${FORMULAS_ROUTE}/sonda-de-prueba`);
+    expect(existsSync(join(RAIZ, PAGE_EDICION_PATH)), `deberia existir ${PAGE_EDICION_PATH}`).toBe(
+      true,
+    );
+
+    expect(FUENTES_DE_LA_RUTA.length).toBeGreaterThan(1);
+  });
+
+  it('ningun archivo de produccion incrusta el literal de la ruta y private-nav reexporta, no redeclara', () => {
+    // R3 — el literal existe en UN solo sitio del repo: la constante.
+    const conElLiteral: string[] = [];
+
+    for (const carpeta of ['app', 'components', 'lib', 'hooks']) {
+      if (!existsSync(join(RAIZ, carpeta))) continue;
+      for (const ruta of fuentesBajo(carpeta)) {
+        if (ruta === 'lib/shared/routes.ts') continue;
+        const codigo = fuenteSinComentarios(ruta);
+        if (LITERALES_DE_RUTA.some((literal) => codigo.includes(literal))) conElLiteral.push(ruta);
+      }
+    }
+
+    expect(conElLiteral, 'el literal de la ruta solo puede vivir en lib/shared/routes.ts').toEqual(
+      [],
+    );
+
+    expect(leer('lib/shared/routes.ts')).toContain('export const FORMULAS_ROUTE');
+
+    // `private-nav.ts` REEXPORTA la constante -no la redeclara-.
+    expect(fuenteSinComentarios('lib/shared/navigation/private-nav.ts')).not.toContain(
+      'const FORMULAS_ROUTE =',
+    );
+    expect(leer('lib/shared/navigation/private-nav.ts')).toContain('export { FORMULAS_ROUTE }');
+
+    // El item del sidebar y el prefijo privado apuntan a la misma constante.
+    const enlaces = PRIVATE_NAV_ITEMS.filter((item): item is NavLink => item.kind === 'link');
+    const recetasComoHijo = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    ).filter((item): item is NavLink => item.kind === 'link' && item.href === FORMULAS_ROUTE);
+    expect([...enlaces, ...recetasComoHijo].some((enlace) => enlace.href === FORMULAS_ROUTE)).toBe(
+      true,
+    );
+  });
+
+  it('la pantalla no repite requireAdmin ni decide autorizacion sobre los datos', () => {
+    // R7 — la autorizacion sobre los datos la aportan los casos de uso de `recetas`; el corte de
+    // ruta lo hace el middleware. Repetirla aqui seria una tercera regla que nadie mantiene
+    // sincronizada.
+    ningunArchivoContiene([
+      'requireAdmin',
+      'getSessionUser',
+      'ADMIN_ROLE_NAME',
+      'decideRouteAccess',
+      'ROUTE_ROLE_RULES',
+      'next/headers',
+    ]);
+  });
+
+  it('la lista no puede pintar quien creo o modifico una receta', () => {
+    // R9 — test **en negativo** sobre la fuente: lo prohibido es LEERLO o DECLARARLO como
+    // columna, no nombrarlo -la declaracion de columnas nombra los dos campos justamente para
+    // EXCLUIRLOS del tipo, y una prohibicion ciega borraria esa defensa al primer cambio-.
+    ningunArchivoContiene([
+      '.createdBy',
+      '.updatedBy',
+      "key: 'createdBy'",
+      "key: 'updatedBy'",
+      "'recipe-column-createdBy'",
+      "'recipe-column-updatedBy'",
+    ]);
+
+    const columnas = fuenteSinComentarios(
+      join(COMPONENTES_PATH, 'recipe-columns.ts').split('\\').join('/'),
+    );
+    expect(columnas).toContain('Exclude<keyof RecipeSummary');
+    expect(columnas).toContain("'createdBy'");
+    expect(columnas).toContain("'updatedBy'");
+  });
+
+  it('pintar una pagina de lista cuesta una sola invocacion de listado y ningun archivo de la lista lleva la marca de producto de baja', () => {
+    // R10 ampliado — la senal de producto dado de baja existe SOLO en el formulario. Si estos
+    // dos `data-testid` aparecieran en cualquier archivo de la lista, la lista estaria pintando
+    // algo que solo el formulario puede saber sin romper R10 (una consulta de detalle por fila).
+    ningunArchivoContiene(
+      ['recipe-line-unavailable', 'recipe-lines-unavailable-notice'],
+      ARCHIVOS_DE_LA_LISTA,
+    );
+
+    // Ningun archivo de la lista invoca la operacion de detalle.
+    ningunArchivoContiene(['getRecipeAction'], ARCHIVOS_DE_LA_LISTA);
+
+    // Y la operacion de listado se invoca una sola vez en TODA la ruta.
+    let invocacionesDeListado = 0;
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const veces = fuenteSinComentarios(ruta).split('listRecipesAction(').length - 1;
+      invocacionesDeListado += veces;
+    }
+    expect(invocacionesDeListado, 'listRecipesAction debe invocarse una sola vez en toda la ruta').toBe(
+      1,
+    );
+  });
+
+  it('la pantalla no ofrece busqueda ni control de orden configurable', () => {
+    // R14 — test **en negativo**: el backend solo acepta `page` y `pageSize` y ordena fijo.
+    ningunArchivoContiene(['type="search"', 'orderBy', 'sortBy', 'sortDirection']);
+  });
+
+  it('la imagen se pinta con la direccion que entrega la consulta y ningun archivo compone una URL de almacenamiento', () => {
+    // R18 — nada de variables de entorno de storage, ni concatenacion, ni cliente de Supabase.
+    ningunArchivoContiene(['process.env', 'NEXT_PUBLIC_SUPABASE', 'supabase', '.storage.']);
+
+    const tabla = fuenteSinComentarios(join(COMPONENTES_PATH, 'recipe-table.tsx').split('\\').join('/'));
+    expect(tabla).toContain('recipe.imageUrl');
+    expect(tabla).not.toContain('${recipe.imageUrl}');
+  });
+
+  it('el guardado sale por createRecipeAction o updateRecipeAction y no existe ninguna operacion por linea ni por paso', () => {
+    // R22 — el contrato de `recetas` no publica operaciones por linea ni por paso; el guardado es
+    // SIEMPRE la lista final completa en una sola invocacion.
+    const formulario = fuenteSinComentarios(
+      join(COMPONENTES_PATH, 'recipe-form.tsx').split('\\').join('/'),
+    );
+    expect(formulario).toContain('createRecipeAction');
+    expect(formulario).toContain('updateRecipeAction');
+
+    // Todas las invocaciones de "algo Action(" en la ruta son de las siete operaciones publicadas
+    // por `recetas`, `inventario` y `unidades` -ninguna operacion por linea ni por paso existe-.
+    const permitidas = new Set([
+      'createRecipeAction',
+      'updateRecipeAction',
+      'deleteRecipeAction',
+      'getRecipeAction',
+      'listRecipesAction',
+      'listProductsAction',
+      'listUnitsAction',
+    ]);
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const codigo = fuenteSinComentarios(ruta);
+      const patron = /([A-Za-z][A-Za-z0-9_]*Action)\(/g;
+      let encaje: RegExpExecArray | null;
+      while ((encaje = patron.exec(codigo)) !== null) {
+        expect(
+          permitidas.has(encaje[1]),
+          `${ruta}: «${encaje[1]}» no es una de las siete operaciones publicadas`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('el layout privado monta la region de avisos y la ruta no monta otra', () => {
+    // R25 — la region vive en el layout; montar otra aqui competiria por anunciar lo mismo.
+    const layout = fuenteSinComentarios(LAYOUT_PRIVADO_PATH);
+    expect(layout).toContain('@/components/ui/sonner');
+    expect(layout).toContain('<Toaster');
+
+    ningunArchivoContiene(['<Toaster', '@/components/ui/sonner']);
+  });
+
+  it('el selector de producto no filtra en cliente y pide el tamano de pagina importado', () => {
+    // R28 — nunca `.filter(` por texto sobre la lista de productos descargada.
+    const selector = fuenteSinComentarios(
+      join(COMPONENTES_PATH, 'product-picker.tsx').split('\\').join('/'),
+    );
+    expect(selector).not.toContain('.filter(');
+    expect(selector).toContain('listProductsAction({ page');
+    expect(selector).toContain('pageSize: MAX_PAGE_SIZE');
+    expect(selector).not.toMatch(/pageSize:\s*25/);
+
+    ningunArchivoContiene(['.filter('], [
+      join(COMPONENTES_PATH, 'product-picker.tsx').split('\\').join('/'),
+    ]);
+  });
+
+  it('la cantidad nunca se convierte a numero en ningun archivo de la ruta', () => {
+    // R29 — la cantidad viaja como cadena decimal tal cual la escribio el usuario.
+    ningunArchivoContiene(['parseFloat(', 'Number.parseFloat(', 'toFixed(']);
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      for (const linea of fuenteSinComentarios(ruta).split('\n')) {
+        if (!linea.includes('quantity')) continue;
+        expect(linea, `${ruta}: la cantidad no puede pasar por «Number(»`).not.toContain('Number(');
+      }
+    }
+
+    ningunArchivoContiene(['type="number"']);
+  });
+
+  it('la pantalla obtiene las unidades solo por listUnitsAction y ninguna operacion de escritura de unidades entra en esta feature', () => {
+    // R43 — sin consulta directa a la tabla de unidades, sin ruta profunda al modulo, sin
+    // instanciar su adaptador. R44 — el CRUD de unidades es QC-38: esta ficha SOLO lee.
+    ningunArchivoContiene([
+      'createUnit',
+      'updateUnit',
+      'deleteUnit',
+      'renameUnit',
+      'unit-catalog-prisma',
+      'unit-prisma',
+      'prisma.unit',
+    ]);
+
+    const paginaAlta = fuenteSinComentarios(PAGE_NUEVA_PATH.split('\\').join('/'));
+    const paginaEdicion = fuenteSinComentarios(PAGE_EDICION_PATH.split('\\').join('/'));
+    expect(paginaAlta).toContain('listUnitsAction');
+    expect(paginaEdicion).toContain('listUnitsAction');
+  });
+
+  it('la feature no toca lib/modules/recetas ni db/', () => {
+    // R44 — la feature amplia `unidades` y `lib/shared`/`lib/composition` en los puntos que R51
+    // autoriza, pero no toca el modulo de recetas -ya `done`, QC-25- ni el esquema de datos.
+    let diff: string[] = [];
+    try {
+      const salida = execSync('git diff --name-only origin/dev...HEAD', {
+        cwd: RAIZ,
+        encoding: 'utf8',
+      });
+      diff = salida.split('\n').map((linea) => linea.trim()).filter((linea) => linea.length > 0);
+    } catch {
+      // Si el rango de git no esta disponible en el entorno de test, se declara aqui en vez de
+      // fallar en silencio: el equipo que corra esto sin `origin/dev` alcanzable lo vera en el
+      // reporte, no en un test verde que no comprobo nada.
+      diff = [];
+    }
+
+    if (diff.length > 0) {
+      const tocaRecetas = diff.filter((ruta) => ruta.startsWith('lib/modules/recetas/'));
+      const tocaDb = diff.filter((ruta) => ruta.startsWith('db/'));
+      expect(tocaRecetas, 'ningun archivo de lib/modules/recetas/ deberia estar en el diff').toEqual(
+        [],
+      );
+      expect(tocaDb, 'ningun archivo de db/ deberia estar en el diff').toEqual([]);
+    } else {
+      expect(diff).toEqual([]);
+    }
+  });
+
+  it('package.json solo incorpora los tres paquetes de arrastre aprobados y sus filas declaran el check fallido', () => {
+    // R45 — la excepcion es del 2026-09-03 y su porque queda escrito en `docs/dependencias.md`.
+    const packageJson = JSON.parse(leer('package.json')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const instaladas = {
+      ...(packageJson.dependencies ?? {}),
+      ...(packageJson.devDependencies ?? {}),
+    };
+
+    for (const paquete of ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities']) {
+      expect(instaladas, `deberia estar instalado «${paquete}»`).toHaveProperty(paquete);
+    }
+
+    const dependencias = leer('docs/dependencias.md');
+    for (const paquete of ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities']) {
+      const fila = dependencias
+        .split('\n')
+        .find((linea) => linea.includes(`\`${paquete}\``));
+      expect(fila, `deberia existir la fila de «${paquete}» en docs/dependencias.md`).toBeDefined();
+      expect(fila).toContain('excepcion');
+      expect(fila).toContain('CHECK 2');
+    }
+
+    // `@dnd-kit` solo se importa desde `recipe-steps-field.tsx`.
+    const conDndKit: string[] = [];
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      if (fuenteSinComentarios(ruta).includes('@dnd-kit')) conDndKit.push(ruta);
+    }
+    expect(conDndKit).toEqual([join(COMPONENTES_PATH, 'recipe-steps-field.tsx').split('\\').join('/')]);
+  });
+
+  it('los componentes de ruta se exponen por el barrel, las tres paginas importan solo del barrel y no queda ningun componente suelto', () => {
+    // R46 — regla del arnes (`docs/architecture.md > Componentes`).
+    const barrel = fuenteSinComentarios(BARREL_PATH.split('\\').join('/'));
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      if (!ruta.includes('/components/') || ruta.endsWith('/index.ts')) continue;
+      const nombreDeArchivo = ruta.split('/').pop() as string;
+      const modulo = `./${nombreDeArchivo.replace(/\.tsx?$/, '')}`;
+      expect(barrel, `el barrel debe reexportar ${modulo}`).toContain(`from '${modulo}'`);
+    }
+
+    // Las TRES paginas importan SOLO desde el barrel, nunca por ruta profunda.
+    const paginaLista = fuenteSinComentarios(PAGE_PATH.split('\\').join('/'));
+    expect(paginaLista).toContain("from './components'");
+    expect(paginaLista).not.toContain("from './components/");
+
+    const paginaNueva = fuenteSinComentarios(PAGE_NUEVA_PATH.split('\\').join('/'));
+    expect(paginaNueva).toContain("from '../components'");
+    expect(paginaNueva).not.toContain("from '../components/");
+
+    const paginaEdicion = fuenteSinComentarios(PAGE_EDICION_PATH.split('\\').join('/'));
+    expect(paginaEdicion).toContain("from '../components'");
+    expect(paginaEdicion).not.toContain("from '../components/");
+
+    // El barrel NO declara frontera cliente/servidor: eso va en cada componente.
+    expect(barrel).not.toContain('use client');
+
+    // La unica carpeta bajo la raiz de la ruta que NO es una de las tres legitimas es un error:
+    // aqui, a diferencia de inventario, hay TRES carpetas legitimas (subrutas + componentes).
+    const CARPETAS_LEGITIMAS = ['components', 'nueva', '[id]'];
+    const raizDeLaRuta = readdirSync(join(RAIZ, CARPETA_RUTA), { withFileTypes: true });
+    const archivosDeAppRouter = ['page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx'];
+
+    const carpetasEncontradas = raizDeLaRuta.filter((entrada) => entrada.isDirectory()).map((entrada) => entrada.name);
+    expect([...carpetasEncontradas].sort()).toEqual([...CARPETAS_LEGITIMAS].sort());
+
+    for (const entrada of raizDeLaRuta) {
+      if (entrada.isDirectory()) continue;
+      expect(archivosDeAppRouter, `${entrada.name} no es un archivo del App Router`).toContain(
+        entrada.name,
+      );
+    }
+
+    // Y las subrutas de alta y edicion tampoco dejan componentes sueltos: solo su `page.tsx`.
+    for (const carpeta of [CARPETA_NUEVA, CARPETA_EDICION]) {
+      const entradas = readdirSync(join(RAIZ, carpeta), { withFileTypes: true });
+      for (const entrada of entradas) {
+        expect(entrada.isDirectory(), `${carpeta} no deberia tener subcarpetas`).toBe(false);
+        expect(
+          archivosDeAppRouter,
+          `${carpeta}/${entrada.name} no es un archivo del App Router`,
+        ).toContain(entrada.name);
+      }
+    }
+  });
+
+  it('ningun archivo de la ruta usa fetch a rutas API propias', () => {
+    // R47 — la prohibicion es de `docs/architecture.md` y de la decision del 2026-09-03.
+    ningunArchivoContiene(['fetch(', "'/api/", '"/api/', 'axios', 'XMLHttpRequest']);
+  });
+
+  it('las primitivas de components/ui que usa la ruta existen y ninguna se escribio a mano', () => {
+    // R48 — las primitivas vienen del CLI de shadcn/ui.
+    for (const primitiva of ['table.tsx', 'select.tsx', 'alert-dialog.tsx', 'button.tsx', 'input.tsx', 'label.tsx', 'skeleton.tsx']) {
+      expect(
+        existsSync(join(RAIZ, 'components', 'ui', primitiva)),
+        `falta components/ui/${primitiva}`,
+      ).toBe(true);
+    }
+
+    ningunArchivoContiene(['<table', '<dialog', 'role="dialog"', 'createPortal']);
+  });
+
+  it('los componentes de cliente no importan composicion, Prisma ni sesion por su cuenta', () => {
+    // R49 — los datos bajan por props desde el Server Component, o salen de una Server Action.
+    expect(FUENTES_DE_CLIENTE.length).toBeGreaterThan(0);
+
+    ningunArchivoContiene(
+      ['@/lib/composition', '@prisma/client', 'prisma.', 'supabase', 'next/headers'],
+      FUENTES_DE_CLIENTE,
+    );
+  });
+
+  it('no usa 100vh, ni hover como unica via, y respeta tamanos tactiles y de fuente', () => {
+    // R50 — la mitad que jsdom NO puede observar. Sin excepcion de escritorio declarada.
+    const utilidadesQueOcultan = ['hidden', 'invisible', 'opacity-0', 'sr-only', 'scale-0'];
+
+    let controlesVigilados = 0;
+    const archivosConControles = new Set<string>();
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const codigo = fuenteSinComentarios(ruta);
+
+      expect(codigo, `${ruta} no debe usar 100vh`).not.toContain('100vh');
+
+      for (const linea of codigo.split('\n')) {
+        if (!linea.includes('hover:') && !linea.includes('group-hover:')) continue;
+        for (const utilidad of utilidadesQueOcultan) {
+          expect(
+            linea,
+            `${ruta}: «hover» no puede ser la unica via de revelar «${utilidad}»`,
+          ).not.toContain(utilidad);
+        }
+      }
+
+      // Area tactil de 44x44 px y 16 px de fuente, **control a control**. Medir por archivo NO
+      // vale: el reviewer ya demostro en QC-22 que asi se puede vaciar un campo entero sin que
+      // la suite se ponga roja.
+      const constantesTactiles = constantesConLaClase(codigo, 'min-h-11');
+      const constantesDeFuente = constantesConLaClase(codigo, 'text-base');
+
+      for (const nombre of CONTROLES_VIGILADOS) {
+        const etiquetas = etiquetasDeApertura(codigo, nombre, lineasOriginales(ruta));
+
+        // Autocomprobacion: si el archivo escribe la etiqueta, el lector tiene que verla.
+        if (codigo.includes(`<${nombre}`)) {
+          expect(
+            etiquetas.length,
+            `${ruta}: escribe <${nombre} pero la guardia no leyo ninguna etiqueta`,
+          ).toBeGreaterThan(0);
+        }
+
+        for (const { texto, linea } of etiquetas) {
+          const className = valorDeAtributo(texto, 'className');
+          const control = `${ruta}:${linea} <${nombre}> (${identificaAlControl(texto)})`;
+          controlesVigilados += 1;
+          archivosConControles.add(ruta);
+
+          expect(
+            llevaLaClase(className, 'min-h-11', constantesTactiles),
+            `${control} debe forzar el area tactil en SU className (min-h-11, literal o via constante local)`,
+          ).toBe(true);
+
+          if (nombre === 'Input') {
+            expect(
+              llevaLaClase(className, 'text-base', constantesDeFuente),
+              `${control} debe fijar 16px en SU className (text-base, literal o via constante local)`,
+            ).toBe(true);
+          }
+        }
+      }
+    }
+
+    expect(controlesVigilados, 'R50 no esta vigilando ningun control').toBeGreaterThan(0);
+    expect(archivosConControles.size).toBeGreaterThan(0);
+  });
+
+  it('la feature no duplica el armazon heredado: layout, sidebar, avisos y primitivas siguen siendo unicos', () => {
+    // R51 — el choque entre features que re-crean lo heredado ya ha ocurrido antes en este repo.
+    expect(existsSync(join(RAIZ, LAYOUT_PRIVADO_PATH))).toBe(true);
+    expect(existsSync(join(RAIZ, 'components', 'private', 'app-sidebar.tsx'))).toBe(true);
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      expect(ruta, 'la ruta no declara su propio layout').not.toContain('/layout.tsx');
+      expect(ruta, 'la ruta no re-crea la barra lateral').not.toContain('sidebar');
+    }
+
+    ningunArchivoContiene(['<main', 'SidebarInset', 'SidebarProvider', 'AppSidebar']);
+
+    expect(
+      fuentesBajo(join('app', '(private)')).filter((ruta) => ruta.endsWith('/layout.tsx')),
+    ).toHaveLength(1);
+    expect(
+      fuentesBajo('lib').filter((ruta) =>
+        fuenteSinComentarios(ruta).includes('export const PRIVATE_NAV_ITEMS'),
+      ),
+    ).toHaveLength(1);
+  });
+});

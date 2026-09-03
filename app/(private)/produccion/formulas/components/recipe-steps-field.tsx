@@ -198,7 +198,7 @@ function RecipeStepRow({ step, index, total, error, onChangeText, onRemove }: Re
           type="text"
           value={step.text}
           onChange={(event) => onChangeText(event.target.value)}
-          className="text-base"
+          className={`${TOUCH_TARGET} text-base`}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
           data-testid={`recipe-step-text-${index}`}

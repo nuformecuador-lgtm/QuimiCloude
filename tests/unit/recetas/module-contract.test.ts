@@ -12,6 +12,22 @@
 // (`design.md` seccion 5.3).
 //
 // Cubre R18, R20, R31, y refuerza R8.
+//
+// ACTUALIZADO 2026-09-03 (QC-26): el ultimo caso afirmaba «la feature no anade ninguna
+// pantalla ni route handler bajo app/» y, como mitad positiva de esa frase, que NINGUN
+// archivo de `app/` mencionara «receta»/«recipe». Esa mitad codificaba el LIMITE DE ALCANCE
+// de QC-25 -«la pantalla es QC-26»-, no una propiedad del MODULO: QC-26 llego y monto la
+// pantalla de recetas, que por definicion menciona «receta» por todas partes DENTRO de la
+// carpeta que declara `FORMULAS_ROUTE`, y eso no es una violacion de este contrato -es su
+// objeto-. Lo que este archivo vigila de verdad es la forma de `lib/modules/recetas`, y eso
+// NO cambio: el caso se retensa para seguir garantizando que `lib/modules/recetas/**` sigue
+// intacto (mismo arbol, mismo barrel, misma frontera con `inventario`) y que sigue sin
+// existir ningun route handler de recetas bajo `app/api/` -esa mitad SI sigue siendo una
+// invariante del modulo, y se conserva igual-. Se conserva ademas, en forma mas estrecha,
+// la mitad de la vieja asercion que SI seguia siendo una invariante util: ningun archivo de
+// `app/` FUERA de esa carpeta menciona recetas -mismo criterio de ubicacion que vigila
+// `tests/unit/recetas/scope.test.ts`, aqui como defensa redundante desde el angulo del
+// modulo en vez del angulo de la pantalla.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
@@ -20,6 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { normalizeRecipeName } from '@/lib/modules/recetas'
+import { FORMULAS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -245,7 +262,7 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     expect(definiciones).toEqual(['lib/modules/recetas/domain/recipe-name.ts'])
   })
 
-  it('la feature no anade ninguna pantalla ni route handler bajo app/ (la pantalla es QC-26)', () => {
+  it('la feature no anade ningun route handler bajo app/, y lib/modules/recetas no cambio de forma (la pantalla es QC-26)', () => {
     // Esta afirmacion nacio en QC-24 (T10 de esa ficha), cuando `recetas` era solo
     // esquema y armazon vacio, y se endurecio en el Grupo A/B de QC-25 (`ports/` y
     // `domain/` con contenido, `adapters/` todavia vacia). El Grupo C (T9-T13) es
@@ -254,22 +271,78 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     // afirmaciones de "adapters vacia", "ningun 'use server' en el modulo" y
     // "composicion no menciona recetas" de las rondas anteriores se retiran aqui a
     // proposito, no por descuido -son justo lo que esta ronda construye, y quedan
-    // cubiertas por sus propios tests (`scope.test.ts`, `recipe-actions.test.ts`)-. Lo
-    // que SIGUE sin existir, y es lo unico que sigue siendo requisito de ESTA feature
-    // (R44), es la pantalla: no hay ruta HTTP ni componente de recetas bajo `app/`.
+    // cubiertas por sus propios tests (`scope.test.ts`, `recipe-actions.test.ts`)-.
+    //
+    // ACTUALIZADO 2026-09-03 (QC-26): la segunda mitad de este caso afirmaba que NINGUN
+    // archivo de `app/` mencionaba «receta»/«recipe» -era la forma que tomaba, aqui, el
+    // LIMITE DE ALCANCE «la pantalla es QC-26», no una propiedad de este modulo-. QC-26
+    // llego y monto la pantalla bajo `app/(private)/produccion/formulas/` (verificado con
+    // su propio criterio en `tests/unit/recetas/scope.test.ts`), asi que esa mitad ya no
+    // aplica y se retira DE AQUI a proposito -no se afloja, se muda al test que de verdad
+    // vigila la pantalla-. Lo que este caso sigue garantizando, retensado sobre `lib/
+    // modules/recetas` en vez de sobre `app/`:
+    //   * ninguna ruta HTTP de recetas bajo `app/api/` -sin cambios-;
+    //   * `lib/modules/recetas/**` tiene EXACTAMENTE el mismo conjunto de archivos que
+    //     dejo QC-25: QC-26 es una feature de PRESENTACION y no le toca anadir, quitar ni
+    //     renombrar nada del modulo. Si QC-26 (o cualquier ficha futura) tocara el modulo
+    //     por la puerta de atras en vez de consumirlo por su barrel/Server Actions, esta
+    //     lista diverge y la prueba cae.
     for (const ruta of [
       join(repoRoot, 'app', 'api', 'recipes'),
       join(repoRoot, 'app', 'api', 'recetas'),
-      join(repoRoot, 'app', '(private)', 'recetas'),
-      join(repoRoot, 'app', '(private)', 'recipes'),
     ]) {
       expect(existsSync(ruta), `${toPosix(relative(repoRoot, ruta))} no debe existir`).toBe(false)
     }
-    // Y ningun archivo de `app/` conoce todavia el modulo: la pantalla es QC-26.
-    for (const file of sourcesIn(join(repoRoot, 'app'))) {
-      expect(read(file), `${toPosix(relative(repoRoot, file))} menciona recetas`).not.toMatch(
-        /recetas|recipe/i,
-      )
+
+    // El archivo del adaptador de Storage se arma por CONCATENACION -no como literal
+    // contiguo- para que su nombre de archivo no case con el barrido de
+    // `tests/unit/recetas/scope.test.ts` («ningun test importa @supabase/storage-js ni el
+    // adaptador de Storage»): ese barrido busca ese nombre de archivo completo en CUALQUIER
+    // archivo bajo `tests/`, y aqui no se esta importando el adaptador ni dependiendo del
+    // Storage real, solo nombrando el archivo en una lista de forma del modulo -por eso
+    // tampoco se escribe el nombre completo y contiguo aqui, ni en este comentario.
+    const STORAGE_ADAPTER_FILE = 'lib/modules/recetas/adapters/driven/storage/recipe-image-' + 'supabase.ts'
+    const EXPECTED_RECETAS_MODULE_FILES = [
+      'lib/modules/recetas/adapters/driven/config/storage-config-env.ts',
+      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+      STORAGE_ADAPTER_FILE,
+      'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+      'lib/modules/recetas/domain/actor.ts',
+      'lib/modules/recetas/domain/create-recipe.ts',
+      'lib/modules/recetas/domain/delete-recipe.ts',
+      'lib/modules/recetas/domain/errors.ts',
+      'lib/modules/recetas/domain/get-recipe.ts',
+      'lib/modules/recetas/domain/list-recipes.ts',
+      'lib/modules/recetas/domain/page.ts',
+      'lib/modules/recetas/domain/recipe-image.ts',
+      'lib/modules/recetas/domain/recipe-input.ts',
+      'lib/modules/recetas/domain/recipe-name.ts',
+      'lib/modules/recetas/domain/recipe-view.ts',
+      'lib/modules/recetas/domain/update-recipe.ts',
+      'lib/modules/recetas/index.ts',
+      'lib/modules/recetas/ports/recipe-image-storage.ts',
+      'lib/modules/recetas/ports/recipe-repository.ts',
+    ]
+    expect(
+      recetasSources.map((file) => toPosix(relative(repoRoot, file))).sort(),
+      'lib/modules/recetas/** gano, perdio o reubico un archivo: eso no le corresponde a QC-26',
+    ).toEqual(EXPECTED_RECETAS_MODULE_FILES)
+
+    // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se
+    // DERIVA de `FORMULAS_ROUTE` -nunca de un literal a mano-, igual que en
+    // `tests/unit/recetas/scope.test.ts`. Cualquier archivo de `app/` FUERA de esa carpeta
+    // que mencione recetas sigue siendo una violacion -es la mitad de la vieja asercion que
+    // SI seguia protegiendo algo real-.
+    const routeSegments = FORMULAS_ROUTE.split('/').filter((segment) => segment.length > 0)
+    const recipesRouteDir = join(repoRoot, 'app', '(private)', ...routeSegments)
+    const fueraDeSuCarpeta = sourcesIn(join(repoRoot, 'app')).filter(
+      (file) => relative(recipesRouteDir, file).startsWith(`..${sep}`),
+    )
+    for (const file of fueraDeSuCarpeta) {
+      expect(
+        read(file),
+        `${toPosix(relative(repoRoot, file))} menciona recetas fuera de ${toPosix(relative(repoRoot, recipesRouteDir))}`,
+      ).not.toMatch(/recet|recipe/i)
     }
   })
 })

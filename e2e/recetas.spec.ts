@@ -1,0 +1,327 @@
+/**
+ * E2E de la pantalla de recetas (QC-26, T24): el camino completo del Administrador y el rechazo
+ * del que no lo es (R52).
+ *
+ * Por que existe, y por que AQUI: `design.md > 12` lo pide entero -login -> la pantalla -> «nueva»
+ * -> alta con una linea de producto y un paso -> la receta aparece en la lista-, sobre el patron
+ * ya asentado de `e2e/session.spec.ts` (QC-9) y `e2e/inventario.spec.ts` (QC-22).
+ *
+ * Que aporta sobre unit e integracion, que es lo unico que justifica su coste:
+ *  - La cadena entera en un navegador de verdad: cookie firmada por el servidor, middleware,
+ *    Server Component de la lista, las Server Actions REALES de `recetas` (QC-25) y `unidades`
+ *    (QC-26) contra Postgres, y `router.refresh()`. En unit esas cinco actions son dobles.
+ *  - El selector de producto y el de unidad tal como los ve un navegador: el primero pagina
+ *    dentro de su propio desplegable (R28) y el segundo es la primitiva `Select` de base-ui, con
+ *    su propio portal -algo que jsdom no ejercita igual.
+ *  - **El corte por rol de verdad** (R6): en unit se afirma la DECISION (`decideRouteAccess`);
+ *    aqui se afirma que el usuario acaba fuera y sin ver la tabla.
+ *  - Chromium y WebKit. WebKit es el motor de iOS, y la regla multiplataforma pide ejercitarlo.
+ *
+ * SIN SUBIDA DE IMAGEN, y el motivo es de diseno, no de pereza (`design.md > 12`): exigiria
+ * bucket real y red, y el gate corre sin red a proposito (QC-25 R43) -seria una prueba de
+ * infraestructura ajena-. Los tres estados de la imagen ya se cubren en unitario sobre
+ * `buildRecipePayload` (`recipe-form-payload.test.ts`).
+ *
+ * DATOS: `recipes`, `recipe_lines`, `products` y `presentations` son tablas reales y
+ * COMPARTIDAS, y varios proyectos/worktrees pueden correr a la vez. Por eso, copiando el patron
+ * de `e2e/session.spec.ts` y `e2e/inventario.spec.ts`:
+ *  - todo lo que este spec crea lleva el prefijo `qc26_e2e_` y dentro el `RUN_ID` del worker;
+ *  - los asserts de la lista filtran por ESE nombre, nunca por «la primera fila» ni por el total
+ *    de recetas, que otro proyecto puede estar moviendo en el mismo instante;
+ *  - la limpieza defensiva de huerfanos borra por prefijo **y por edad**, para no llevarse por
+ *    delante lo que otra ejecucion viva acaba de crear;
+ *  - `afterAll` borra siempre, aunque el test reviente, respetando el orden que imponen las FK
+ *    RESTRICT: recetas (sus lineas van en cascada) -> productos -> presentaciones -> usuarios.
+ *
+ * LAS UNIDADES NO SE SIEMBRAN: las cuatro filas del catalogo las inserta la propia migracion de
+ * QC-32, asi que el selector de unidad ya tiene contenido sin fixture propio (`design.md > 12`).
+ * Este spec toma la que el selector ofrezca primero: lo unico que R52 exige es que la cantidad
+ * viaje como cadena decimal y que la unidad salga DEL selector, no de un id inventado a mano.
+ *
+ * LO QUE ESTE SPEC NO CREA: los roles. `Administrador` y `Operador` los siembra
+ * `pnpm run db:seed` (`lib/modules/identity/domain/roles.ts`), y el rol tiene que llamarse
+ * EXACTAMENTE asi porque la regla ruta->rol compara por nombre. Si falta, el `beforeAll` falla
+ * diciendo que hay que sembrar, en vez de dar un rojo incomprensible en mitad del recorrido.
+ *
+ * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
+ * importarse y `next dev` -que arranca el `webServer` de la config- carga el suyo.
+ */
+import { randomUUID } from 'node:crypto';
+
+import { expect, test, type Locator, type Page } from '@playwright/test';
+
+import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
+import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizePresentationName } from '@/lib/modules/inventario/domain/presentation-name';
+import { prisma } from '@/lib/shared/db/prisma';
+import { DASHBOARD_ROUTE, FORMULAS_ROUTE, LOGIN_ROUTE, NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
+
+/** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
+const FIXTURE_PREFIX = 'qc26_e2e_';
+
+/** Identificador unico de este proceso de worker (mismo mecanismo que `e2e/session.spec.ts`). */
+const RUN_ID = randomUUID().replace(/-/g, '');
+
+/**
+ * Edad minima para considerar huerfana una fila con nuestro prefijo. Chromium y WebKit corren a
+ * la vez, y ademas puede haber otro worktree corriendo su propio E2E contra otra base: borrar por
+ * prefijo a secas se llevaria una fila que otra ejecucion todavia esta usando. Una hora deja
+ * fuera cualquier ejecucion viva y dentro cualquier resto de una anterior.
+ */
+const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
+
+/** Tamano de pagina maximo que ofrece la pantalla: menos paginas que recorrer al buscar la fila. */
+const LIST_PAGE_SIZE = '25';
+
+type Credentials = { readonly username: string; readonly password: string };
+
+const adminUser: Credentials = {
+  username: `${FIXTURE_PREFIX}admin_${RUN_ID}`,
+  password: `Qc26-Admin-${RUN_ID.slice(0, 12)}`,
+};
+
+const operatorUser: Credentials = {
+  username: `${FIXTURE_PREFIX}oper_${RUN_ID}`,
+  password: `Qc26-Oper-${RUN_ID.slice(0, 12)}`,
+};
+
+/** Nombres de los datos de catalogo que este spec crea como fixture (no por la UI). */
+const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
+const productName = `${FIXTURE_PREFIX}producto_${RUN_ID}`;
+
+/** Nombre de la receta que el recorrido del Administrador da de alta POR LA UI. */
+const recipeName = `${FIXTURE_PREFIX}receta_${RUN_ID}`;
+
+let adminUserId: string | null = null;
+
+async function createUserWithRole(user: Credentials, roleName: string): Promise<string> {
+  const role = await prisma.role.findUnique({ where: { name: roleName }, select: { id: true } });
+  if (!role) {
+    throw new Error(
+      `falta el rol "${roleName}": este E2E no lo crea porque la regla ruta-rol compara por ` +
+        'nombre exacto. Siembra la base con `pnpm run db:seed` antes de correr `pnpm run e2e`.',
+    );
+  }
+
+  // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
+  // entiendan de verdad. Un hash inventado probaria otra cosa.
+  const created = await prisma.user.create({
+    data: {
+      firstNames: `Qc26${RUN_ID.slice(0, 8)}`,
+      lastNames: 'Recetas',
+      birthDate: new Date('1990-01-01'),
+      email: `${user.username}@example.test`,
+      phone: '+573000000000',
+      documentTypeCode: 'CC',
+      documentNumber: user.username,
+      username: user.username,
+      passwordHash: await createPasswordHash(user.password),
+      roleId: role.id,
+    },
+    select: { id: true },
+  });
+
+  return created.id;
+}
+
+/** Entra por el formulario real y aterriza en el dashboard. */
+async function login(page: Page, user: Credentials): Promise<void> {
+  await page.goto(LOGIN_ROUTE);
+  await page.getByTestId('login-username').fill(user.username);
+  await page.getByTestId('login-password').fill(user.password);
+  await page.getByTestId('login-submit').click();
+  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+}
+
+/**
+ * Elige, dentro del desplegable de producto (`ProductPicker`), la opcion cuyo nombre es
+ * EXACTAMENTE `name`. Recorre las paginas propias del desplegable (R28) con sus controles reales
+ * -de paso ejercita la paginacion en un navegador-, nunca filtra por texto: la pantalla no lo
+ * hace y este helper tampoco puede fingir que lo hace.
+ */
+async function selectProductByName(page: Page, testId: string, name: string): Promise<void> {
+  await page.getByTestId(testId).click();
+
+  const option = page.getByTestId(`${testId}-option`).filter({ hasText: name });
+  const next = page.getByTestId(`${testId}-next`);
+  const indicator = page.getByTestId(`${testId}-page-indicator`);
+
+  for (;;) {
+    if ((await option.count()) > 0) {
+      await option.first().click();
+      return;
+    }
+    if ((await next.count()) === 0 || (await next.isDisabled())) {
+      throw new Error(`producto "${name}" no aparecio en ninguna pagina del selector`);
+    }
+
+    const before = await indicator.textContent();
+    await next.click();
+    await expect(indicator).not.toHaveText(before ?? '', { timeout: 60_000 });
+  }
+}
+
+/**
+ * Recorre las paginas de la lista de recetas hasta encontrar la celda de nombre pedida. Hace
+ * falta porque la pantalla NO ofrece busqueda y el orden es fijo por nombre: una receta recien
+ * creada puede caer en cualquier pagina. El assert NUNCA mira «la primera fila» ni el total: solo
+ * si existe una celda con ESTE nombre.
+ */
+async function findRecipeCell(page: Page, name: string): Promise<Locator> {
+  const cell = page.getByTestId('recipe-cell-name').filter({ hasText: name });
+  const next = page.getByTestId('recipe-page-next');
+
+  for (;;) {
+    if ((await cell.count()) > 0) return cell;
+    if ((await next.count()) === 0 || (await next.isDisabled())) return cell;
+
+    const before = new URL(page.url()).searchParams.get('page');
+    await next.click();
+    await page.waitForFunction(
+      (previous) => new URL(window.location.href).searchParams.get('page') !== previous,
+      before,
+      { timeout: 60_000 },
+    );
+    await expect(page.getByTestId('recipe-list')).toBeVisible({ timeout: 60_000 });
+  }
+}
+
+test.beforeAll(async () => {
+  // LIMPIEZA DEFENSIVA DE HUERFANOS: un `pnpm run e2e` interrumpido deja filas `qc26_e2e_*` en la
+  // base, y esa basura pone rojo tests de OTRAS features que cuentan filas
+  // (`tests/integration/**`). Orden que imponen las FK RESTRICT: recetas (sus lineas van en
+  // cascada) -> productos -> presentaciones -> usuarios.
+  const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
+
+  await prisma.recipe.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+  await prisma.product.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+  await prisma.presentation.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+  await prisma.user.deleteMany({
+    where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+
+  adminUserId = await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
+  await createUserWithRole(operatorUser, ROLE_OPERADOR);
+
+  // Producto y presentacion de FIXTURE (no por la UI): lo que R52 pide es una linea con «producto
+  // de fixture», y crearlo aqui deja el recorrido del Administrador centrado en la pantalla de
+  // recetas, no en la de inventario -que ya tiene su propio E2E (QC-22).
+  const presentation = await prisma.presentation.create({
+    data: { name: presentationName, nameNormalized: normalizePresentationName(presentationName) },
+    select: { id: true },
+  });
+  await prisma.product.create({
+    data: { name: productName, presentationId: presentation.id, createdBy: adminUserId },
+  });
+});
+
+test.afterAll(async () => {
+  // Borra SIEMPRE, aunque el `beforeAll` fallara a medias o un test reventara: cada paso va en su
+  // propio `try`/`finally`. Recetas primero -sus `createdBy`/`updatedBy` son RESTRICT hacia
+  // `users` y sus lineas RESTRICT hacia `products`, asi que ambas tienen que quedar libres antes
+  // de tocar usuarios y productos-.
+  //
+  // **Por el nombre EXACTO de ESTE worker (`recipeName`), NUNCA por `FIXTURE_PREFIX`**:
+  // `fullyParallel` reparte los dos tests de este archivo en workers DISTINTOS, cada uno con su
+  // propio `RUN_ID` y su propia receta. Borrar por prefijo aqui se llevaria por delante la
+  // receta que el OTRO worker acaba de crear -y eso fue exactamente lo que paso la primera vez
+  // que se corrio este spec con los dos proyectos a la vez: el `afterAll` del test que NO crea
+  // receta borraba la del test que si la crea, antes de que su propio assert contra la base
+  // corriera-.
+  try {
+    await prisma.recipe.deleteMany({ where: { name: recipeName } });
+  } finally {
+    try {
+      await prisma.product.deleteMany({ where: { name: productName } });
+    } finally {
+      try {
+        await prisma.presentation.deleteMany({ where: { name: presentationName } });
+      } finally {
+        try {
+          await prisma.user.deleteMany({
+            where: { username: { in: [adminUser.username, operatorUser.username] } },
+          });
+        } finally {
+          await prisma.$disconnect();
+        }
+      }
+    }
+  }
+});
+
+// Timeout amplio: el primer `goto` hace que `next dev` compile la ruta bajo demanda y bcrypt
+// tarda a proposito. Un timeout corto produce rojos que no son del codigo.
+test.setTimeout(180_000);
+
+test.describe('catalogo de recetas', () => {
+  test('el Administrador entra, da de alta una receta con una linea y un paso, y la ve en la lista (R52)', async ({
+    page,
+  }) => {
+    await login(page, adminUser);
+
+    // --- 1. La pantalla se sirve a un Administrador (R6, la mitad que deja pasar).
+    await page.goto(`${FORMULAS_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+    await expect(page.getByTestId('recipes-title')).toBeVisible({ timeout: 60_000 });
+
+    // --- 2. «Nueva» NAVEGA a su propia pagina, sin panel ni dialogo (R20). El control aparece
+    // dos veces cuando el catalogo esta vacio (cabecera y estado vacio): vale cualquiera.
+    await page.getByTestId('recipe-create-open').first().click();
+    await page.waitForURL((url) => url.pathname === NEW_RECIPE_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('recipe-form')).toBeVisible({ timeout: 60_000 });
+
+    // --- 3. Nombre de la receta.
+    await page.getByTestId('recipe-field-name').fill(recipeName);
+
+    // --- 4. Una linea de producto: producto de FIXTURE, unidad TOMADA DEL SELECTOR, cantidad
+    // decimal escrita como texto (R27, R28, R29, R30).
+    await page.getByTestId('recipe-line-add').click();
+    await selectProductByName(page, 'recipe-line-product-0', productName);
+    await page.getByTestId('recipe-line-quantity-0').fill('12.5');
+    await page.getByTestId('recipe-line-unit-0').click();
+    await page.getByTestId('recipe-line-unit-0-option').first().click();
+
+    // --- 5. Un paso.
+    await page.getByTestId('recipe-step-add').click();
+    await page.getByTestId('recipe-step-text-0').fill(`Mezclar ${RUN_ID.slice(0, 8)}`);
+
+    // --- 6. Guardar: la Server Action REAL de `recetas` (QC-25) contra Postgres, sin `fetch` de
+    // por medio (R47).
+    await page.getByTestId('recipe-form-submit').click();
+
+    // --- 7. Con exito vuelve a la lista y avisa por toast, visible porque el layout privado YA
+    // monta la region de avisos (R24, R25). Se afirma que HAY un aviso, no cual es su texto: los
+    // asserts de este repo no miran literales de copy.
+    await page.waitForURL((url) => url.pathname === FORMULAS_ROUTE, { timeout: 60_000 });
+    await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
+
+    // --- 8. Y la receta esta en la lista sin que el usuario recargue nada.
+    const cell = await findRecipeCell(page, recipeName);
+    await expect(cell.first()).toBeVisible({ timeout: 60_000 });
+
+    // Lo guardo el backend de verdad, no solo lo pinto la pantalla.
+    expect(
+      await prisma.recipe.count({ where: { name: recipeName, deletedAt: null } }),
+      'la receta deberia existir en la base',
+    ).toBe(1);
+  });
+
+  test('un usuario que no es Administrador acaba fuera y no ve el catalogo (R6)', async ({ page }) => {
+    await login(page, operatorUser);
+
+    // Sesion valida, rol distinto: la regla ruta-rol lo saca al dashboard SIN renderizar nada de
+    // la pantalla. No es «no autenticado»: acaba en el dashboard, no en el login, y esa
+    // diferencia es justo lo que R6 pide y lo que un redirect al login enmascararia.
+    await page.goto(FORMULAS_ROUTE);
+    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+
+    await expect(page.getByTestId('recipes-title')).toHaveCount(0);
+    await expect(page.getByTestId('recipe-table')).toHaveCount(0);
+    await expect(page.getByTestId('recipe-list-empty')).toHaveCount(0);
+  });
+});

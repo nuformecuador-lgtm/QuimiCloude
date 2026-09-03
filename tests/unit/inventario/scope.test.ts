@@ -16,12 +16,28 @@
 // **2026-09-03 (QC-22, pantalla-de-productos):** el segundo caso se INVIRTIO. Afirmaba que no
 // existia pantalla de catalogo porque estaba diferida a QC-22; QC-22 la construyo, asi que la
 // premisa cayo. El motivo entero y que sigue vigilando, dentro del propio caso.
+//
+// **2026-09-03 (QC-26, pantalla-de-recetas):** el segundo caso volvio a moverse, esta vez sin
+// invertirse -es un FALSO POSITIVO de un barrido por NOMBRE, no un cambio de premisa-. QC-26
+// anadio `app/(private)/produccion/formulas/components/product-picker.tsx`: el barrido por
+// `/product|presentation|inventario/i` lo marcaba solo porque su nombre contiene «product».
+// Ese archivo no es una SEGUNDA pantalla del catalogo: es el selector de producto de una linea
+// de receta, que CONSUME `listProductsAction` -exactamente lo que QC-26/R28 y R49 mandan
+// hacer-. Lo que este caso protege de verdad -que no aparezca una segunda pantalla del
+// catalogo fuera de `app/(private)/inventario/`- no cambia; lo que cambia es el criterio para
+// distinguir «pantalla de catalogo» de «componente que solo consume la operacion de
+// productos»: se excluye por nombre y motivo la carpeta de la ruta de recetas, y ademas se
+// exige, para lo que quede fuera de esa exclusion, una senal real de pantalla de catalogo
+// (`page.tsx`, o un archivo que declare `ProductListSection`/una tabla de productos), no basta
+// con que el nombre de archivo contenga la palabra. El detalle, dentro del caso.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+
+import { FORMULAS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -131,12 +147,43 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     )
 
     // Y vive ENTERA ahi: ni una pieza de catalogo suelta en otra ruta de `app/`.
+    //
+    // ACTUALIZADO 2026-09-03 (QC-26): `appMatches` ya no se compara directo contra
+    // `CATALOG_ROUTE_DIR` -QC-26 anadio `product-picker.tsx` bajo la ruta de recetas
+    // (`FORMULAS_ROUTE`, derivada de `@/lib/shared/routes` y nunca de un literal a mano), y
+    // ese archivo casa con `screenPattern` por su nombre («product») aunque no sea una
+    // pantalla de catalogo: es el selector de producto de una linea de receta, que CONSUME
+    // `listProductsAction` (R28/R49 de QC-26), no una segunda pantalla del catalogo. Se
+    // excluye esa carpeta EXPLICITAMENTE, con el motivo escrito arriba -no se afloja el
+    // patron ni se vacia la lista de matches-, y lo que quede FUERA de las dos exclusiones
+    // (la del catalogo y la de recetas) sigue teniendo que estar vacio.
+    const RECIPES_ROUTE_DIR = join('(private)', ...FORMULAS_ROUTE.split('/').filter((s) => s.length > 0))
+      .split(sep)
+      .join('/')
     const fueraDeSuCarpeta = appMatches.filter(
-      (relPath) => !relPath.startsWith(`${CATALOG_ROUTE_DIR}/`),
+      (relPath) => !relPath.startsWith(`${CATALOG_ROUTE_DIR}/`) && !relPath.startsWith(`${RECIPES_ROUTE_DIR}/`),
     )
     expect(
       fueraDeSuCarpeta,
       `pantalla de catalogo fuera de app/${CATALOG_ROUTE_DIR}/: ${fueraDeSuCarpeta.join(', ')}`,
+    ).toEqual([])
+
+    // Defensa extra, para que la exclusion de arriba no se convierta en una puerta trasera:
+    // de lo que SI cae bajo la carpeta de recetas y casa con `screenPattern`, ninguno puede
+    // llevar una senal REAL de pantalla de catalogo -un `page.tsx`, o un archivo que declare
+    // `ProductListSection` o una tabla de productos (`product-table`)-. Si manana alguien
+    // monta una `page.tsx` de productos bajo la ruta de recetas para esquivar esta guardia,
+    // esto cae aunque la exclusion de arriba lo deje pasar.
+    const dentroDeRecetas = appMatches.filter((relPath) => relPath.startsWith(`${RECIPES_ROUTE_DIR}/`))
+    const SENAL_DE_PANTALLA_DE_CATALOGO = /\/page\.tsx$|ProductListSection|product-table/i
+    const filtracionesDeCatalogo = dentroDeRecetas.filter((relPath) => {
+      if (/\/page\.tsx$/.test(relPath)) return true
+      const source = readFileSync(join(repoRoot, 'app', relPath), 'utf8')
+      return SENAL_DE_PANTALLA_DE_CATALOGO.test(relPath) || /ProductListSection|product-table/.test(source)
+    })
+    expect(
+      filtracionesDeCatalogo,
+      `pantalla de catalogo escondida bajo la ruta de recetas: ${filtracionesDeCatalogo.join(', ')}`,
     ).toEqual([])
 
     // Esta mitad de R34 sigue INTACTA y en negativo: QC-22 monto sus piezas dentro de la

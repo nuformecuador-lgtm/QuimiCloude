@@ -294,7 +294,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   constantes exportadas; **nunca** sobre literales de copy.
 - **Hecho cuando**: cubre R1, R8-R19, R25, R39, R50 y sale en verde.
 
-### [ ] T21 — [P] Tests del formulario y del payload
+### [x] T21 — [P] Tests del formulario y del payload
 - **Depende de**: T19. **Archivos**: `tests/unit/recetas-ui/recipe-form.test.tsx`,
   `tests/unit/recetas-ui/recipe-form-payload.test.ts`.
 - **Qué**: los tres estados de la imagen por **presencia de clave**; la cantidad que llega a la
@@ -305,7 +305,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   test, preguntarse qué línea de producción se podría borrar sin que se pusiera rojo. Si la
   respuesta es «ninguna evidente», el test está mal escrito.
 
-### [ ] T22 — [P] Guardias de fuente y contrato de ruta
+### [x] T22 — [P] Guardias de fuente y contrato de ruta
 - **Depende de**: T19. **Archivos**: `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
 - **Qué**: lo que «no hacer» exige y no se observa renderizando (patrón de
   `tests/unit/dashboard-route-contract.test.ts`): las tres rutas derivadas de `FORMULAS_ROUTE`; sin
@@ -329,7 +329,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   de la ruta anterior **sigue existiendo**: no se sustituye, se añade.
 - **Hecho cuando**: cubre R4, R5, R6 y `pnpm run test:guardias` sigue verde.
 
-### [ ] T24 — E2E del camino completo y del rechazo por rol
+### [x] T24 — E2E del camino completo y del rechazo por rol
 - **Depende de**: T19, T23. **Archivos**: `e2e/recetas.spec.ts`.
 - **Qué** (`design.md > 12`): (1) login → la pantalla → «nueva» → alta con una línea de producto y
   un paso → la receta aparece en la lista; (2) sesión con rol distinto de Administrador pide la URL
@@ -344,7 +344,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 6 — Verificación, trazabilidad y cierre
 
-### [ ] T25 — Verificación manual en navegador, con iOS incluido
+### [~] T25 — Verificación manual en navegador, con iOS incluido
 - **Depende de**: T19.
 - **Qué**: `pnpm dev` con sesión de Administrador. En ancho ≥ 1280 px y en ancho ≤ 375 px
   (emulación móvil **y**, para el scroll anidado y el arrastre táctil, Safari/WebKit real o
@@ -356,14 +356,14 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `progress/impl_QC-26-pantalla-de-recetas.md`. Si algo falla en WebKit, **no se declara excepción
   de escritorio**: se arregla o se para y se reporta.
 
-### [ ] T26 — Mapa de trazabilidad `R<n> → test`
+### [x] T26 — Mapa de trazabilidad `R<n> → test`
 - **Depende de**: T7, T16b, T20, T21, T22, T23, T24, T25.
 - **Qué**: volcar la tabla de abajo, ya con los nombres reales de los tests, en
   `progress/impl_QC-26-pantalla-de-recetas.md`, junto a los archivos tocados y la salida real.
 - **Hecho cuando**: **los 54 requisitos (R1-R54)** tienen al menos un test nombrado. Un hueco es
   hallazgo bloqueante del reviewer.
 
-### [ ] T27 — [P] Declarar los «no aplica» de `CHECKPOINTS.md`
+### [x] T27 — [P] Declarar los «no aplica» de `CHECKPOINTS.md`
 - **Depende de**: T19.
 - **Hecho cuando**: cada punto de la lista del final de este archivo está copiado con su motivo en
   `progress/impl_QC-26-pantalla-de-recetas.md`.

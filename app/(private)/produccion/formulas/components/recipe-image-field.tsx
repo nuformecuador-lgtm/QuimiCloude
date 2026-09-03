@@ -120,7 +120,7 @@ export function RecipeImageField({ mode, initialImageUrl, value, onChange }: Rec
         id={inputId}
         type="file"
         accept={ACCEPTED_TYPES}
-        className="text-base"
+        className="min-h-11 text-base"
         aria-invalid={error === null ? undefined : true}
         aria-describedby={error === null ? undefined : errorId}
         data-testid="recipe-image-input"
