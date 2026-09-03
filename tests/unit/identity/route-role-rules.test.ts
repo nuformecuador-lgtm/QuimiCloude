@@ -5,6 +5,8 @@
 // que se ejercita de `findRouteRule` es la BUSQUEDA, sin depender de que la lista real diga hoy
 // una cosa u otra. El segundo bloque, en cambio, mira la lista REAL.
 
+import { readFileSync } from 'node:fs';
+
 import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import { ROUTE_ROLE_RULES } from '@/lib/modules/identity/adapters/driving/route-role-rules';
 import { findRouteRule, type RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
@@ -63,5 +65,33 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   // `INVENTORY_ROUTE` de `lib/shared/routes` y el dominio no puede importar `lib/shared`.
   it('declara exactamente una regla: la pantalla de inventario, solo Administrador (R4)', () => {
     expect(ROUTE_ROLE_RULES).toEqual([{ prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] }]);
+  });
+
+  it('la regla se aplica a la ruta de inventario y a lo que cuelgue de ella (R4)', () => {
+    expect(findRouteRule(ROUTE_ROLE_RULES, INVENTORY_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, `${INVENTORY_ROUTE}/nuevo`)?.roles).toEqual([
+      ADMIN_ROLE_NAME,
+    ]);
+  });
+
+  // Lo que la ficha NO hace: cerrar el resto del area privada. Cada ficha anade su fila.
+  it('ninguna otra ruta privada gana regla por el camino', () => {
+    expect(findRouteRule(ROUTE_ROLE_RULES, '/dashboard')).toBeNull();
+    expect(findRouteRule(ROUTE_ROLE_RULES, '/dashboard/reportes')).toBeNull();
+  });
+
+  // R2 — la fila se deriva de la constante unica de ruta; el literal no se reescribe aqui.
+  it('la fila se deriva de INVENTORY_ROUTE y de ADMIN_ROLE_NAME, no de literales propios', () => {
+    const fuente = readFileSync(
+      'lib/modules/identity/adapters/driving/route-role-rules.ts',
+      'utf8',
+    )
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+    expect(fuente).toContain("from '@/lib/shared/routes'");
+    expect(fuente).toContain("from '@/lib/modules/inventario'");
+    expect(fuente).not.toContain(`'${INVENTORY_ROUTE}'`);
+    expect(fuente).not.toContain(`'${ADMIN_ROLE_NAME}'`);
   });
 });

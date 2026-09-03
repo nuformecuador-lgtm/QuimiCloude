@@ -12,6 +12,14 @@ import {
   type RouteAccessSession,
 } from '@/lib/modules/identity/domain/route-access';
 import type { RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
+import { ROUTE_ROLE_RULES } from '@/lib/modules/identity/adapters/driving/route-role-rules';
+import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import {
+  DASHBOARD_ROUTE,
+  INVENTORY_ROUTE,
+  LOGIN_ROUTE,
+  PRIVATE_ROUTE_PREFIXES,
+} from '@/lib/shared/routes';
 
 const ROUTES = { login: '/login', dashboard: '/dashboard' } as const;
 const PREFIJOS_PRIVADOS = ['/dashboard'] as const;
@@ -217,6 +225,84 @@ describe('decideRouteAccess — R29: la decision no es una autorizacion', () => 
       expect(JSON.stringify(decision)).not.toContain('Operador');
       expect(JSON.stringify(decision)).not.toContain(SUB);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-22 T14 — La pantalla de inventario, con las constantes REALES (R3, R4)
+// ---------------------------------------------------------------------------
+//
+// Los bloques de arriba usan prefijos y reglas sinteticos a proposito: lo que ejercitan es la
+// POLITICA. Este bloque hace lo contrario y es el unico que lo hace: entra con
+// `PRIVATE_ROUTE_PREFIXES` y `ROUTE_ROLE_RULES` de verdad, mas `INVENTORY_ROUTE` y
+// `ADMIN_ROLE_NAME` de sus constantes unicas, porque lo que se afirma aqui NO es la politica sino
+// que ESTA pantalla quedo efectivamente cubierta y restringida. Con reglas sinteticas, sacar
+// `/inventario` de la lista de prefijos privados no pondria rojo ningun test.
+//
+// R29 sigue en pie: que esto deje pasar no autoriza nada sobre los datos. El corte sobre el
+// catalogo lo ponen los casos de uso de `inventario`, antes del repositorio.
+const REAL = {
+  search: '',
+  privatePrefixes: PRIVATE_ROUTE_PREFIXES,
+  rules: ROUTE_ROLE_RULES,
+  routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
+} as const;
+
+describe('la pantalla de inventario con las constantes reales (R3, R4)', () => {
+  // R3 — la ruta esta cubierta por los prefijos privados declarados: sin sesion no se renderiza,
+  // se redirige al login llevando el destino de vuelta.
+  it('sin sesion redirige al login con la ruta pedida como destino de vuelta (R3)', () => {
+    expect(decideRouteAccess({ ...REAL, pathname: INVENTORY_ROUTE, session: ANONIMO })).toEqual({
+      kind: 'redirect',
+      to: `${LOGIN_ROUTE}?next=${encodeURIComponent(INVENTORY_ROUTE)}`,
+      reason: 'unauthenticated',
+    });
+  });
+
+  it('sin sesion tampoco se sirve lo que cuelga de la ruta (R3)', () => {
+    const decision = decideRouteAccess({
+      ...REAL,
+      pathname: `${INVENTORY_ROUTE}/nuevo`,
+      session: ANONIMO,
+    });
+
+    expect(decision).toEqual({
+      kind: 'redirect',
+      to: `${LOGIN_ROUTE}?next=${encodeURIComponent(`${INVENTORY_ROUTE}/nuevo`)}`,
+      reason: 'unauthenticated',
+    });
+  });
+
+  // R4 — con sesion de Administrador entra; con cualquier otro rol, fuera y sin renderizar.
+  it('deja pasar al Administrador (R4)', () => {
+    const admin = { kind: 'authenticated', sub: SUB, roleName: ADMIN_ROLE_NAME } as const;
+
+    expect(decideRouteAccess({ ...REAL, pathname: INVENTORY_ROUTE, session: admin })).toEqual({
+      kind: 'allow',
+    });
+    expect(
+      decideRouteAccess({ ...REAL, pathname: `${INVENTORY_ROUTE}/nuevo`, session: admin }),
+    ).toEqual({ kind: 'allow' });
+  });
+
+  it('a un rol distinto de Administrador lo saca al dashboard, no al login (R4)', () => {
+    // «No autorizado» no es «no autenticado»: mandarlo al login le pediria unas credenciales
+    // que ya tiene. El motivo `forbidden` es lo que distingue un caso del otro.
+    expect(decideRouteAccess({ ...REAL, pathname: INVENTORY_ROUTE, session: OPERADOR })).toEqual({
+      kind: 'redirect',
+      to: DASHBOARD_ROUTE,
+      reason: 'forbidden',
+    });
+    expect(
+      decideRouteAccess({ ...REAL, pathname: `${INVENTORY_ROUTE}/nuevo`, session: OPERADOR }),
+    ).toEqual({ kind: 'redirect', to: DASHBOARD_ROUTE, reason: 'forbidden' });
+  });
+
+  // Y el resto del area privada NO se cierra de rebote: el Operador sigue viendo su dashboard.
+  it('no corta al Operador en las rutas privadas que no tienen regla (R4)', () => {
+    expect(decideRouteAccess({ ...REAL, pathname: DASHBOARD_ROUTE, session: OPERADOR })).toEqual({
+      kind: 'allow',
+    });
   });
 });
 

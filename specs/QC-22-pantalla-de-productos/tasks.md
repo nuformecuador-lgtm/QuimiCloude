@@ -200,7 +200,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   columnas; `package.json` sin dependencias nuevas.
 - **Hecho cuando**: cubre R2, R5, R7, R8, R9, R13, R18, R22, R25, R27, R28, R29, R30, R31, R32.
 
-### [ ] T14 — [P] Tests de protección de ruta y rol
+### [x] T14 — [P] Tests de protección de ruta y rol
 - **Depende de**: T3. **Archivos**: `tests/unit/identity/route-role-rules.test.ts` (ampliar),
   `tests/unit/identity/route-access.test.ts` (ampliar).
 - **Qué**: la regla existe para `INVENTORY_ROUTE` con `ADMIN_ROLE_NAME`; `decideRouteAccess`

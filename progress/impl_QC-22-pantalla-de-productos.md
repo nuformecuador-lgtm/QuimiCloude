@@ -647,3 +647,65 @@ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts
 `ROUTE_ROLE_RULES` «esta vacio a proposito (R12)». Ya no es cierto ni por el contenido ni por la
 ubicacion. Se reporta al leader en vez de corregirlo por cuenta propia.
 
+---
+
+## T14 — Tests de proteccion de ruta y rol (R3, R4)
+
+**Archivos:** `tests/unit/identity/route-access.test.ts` (ampliado),
+`tests/unit/identity/route-role-rules.test.ts` (centinela de QC-9 INVERTIDO).
+
+R4 era el unico requisito de la ficha sin ningun test que lo mordiera. Ahora lo muerden dos
+archivos, y por caminos distintos: uno mira la LISTA declarada, el otro mira la DECISION que sale
+de ella.
+
+- **El centinela de QC-9 se invierte, no se borra** (`route-role-rules.test.ts`). Afirmaba que la
+  lista estaba «vacia a proposito (D8)», con el encargo escrito de que «la primera regla sera la
+  pantalla de productos, solo Administrador». Esa premisa dejo de ser cierta con esta ficha, asi
+  que el bloque pasa a exigir que la unica fila sea exactamente la declarada —con la fecha
+  (2026-09-03) y el motivo escritos dentro del test—. Sigue cazando lo mismo que cazaba: una
+  segunda regla sin ficha que la respalde lo pone rojo.
+- **Un bloque con las constantes REALES** (`route-access.test.ts`). Los bloques de QC-9 usan
+  prefijos y reglas sinteticos a proposito, porque lo que ejercitan es la politica; con reglas
+  sinteticas, sacar `/inventario` de `PRIVATE_ROUTE_PREFIXES` no pondria rojo ningun test. El
+  bloque nuevo entra con `PRIVATE_ROUTE_PREFIXES` y `ROUTE_ROLE_RULES` de verdad.
+- El middleware sigue probado con reglas sinteticas: lo suyo es la TRADUCCION
+  `NextRequest` -> decision -> `NextResponse`, no el contenido de la lista.
+
+### Mapa `R<n> -> test` de esta tanda
+
+| Req | Test | Archivo |
+| --- | --- | --- |
+| R3 | `sin sesion redirige al login con la ruta pedida como destino de vuelta (R3)` + `sin sesion tampoco se sirve lo que cuelga de la ruta (R3)` | `tests/unit/identity/route-access.test.ts` |
+| R4 | `deja pasar al Administrador (R4)`, `a un rol distinto de Administrador lo saca al dashboard, no al login (R4)`, `no corta al Operador en las rutas privadas que no tienen regla (R4)` | `tests/unit/identity/route-access.test.ts` |
+| R4 | `declara exactamente una regla: la pantalla de inventario, solo Administrador (R4)` + `la regla se aplica a la ruta de inventario y a lo que cuelgue de ella (R4)` | `tests/unit/identity/route-role-rules.test.ts` |
+| R2 (refuerzo) | `la fila se deriva de INVENTORY_ROUTE y de ADMIN_ROLE_NAME, no de literales propios` | `tests/unit/identity/route-role-rules.test.ts` |
+
+### Que mordio cada test (comprobado rompiendo el codigo, no razonado)
+
+Mutaciones reales, revertidas con `git checkout` / restauracion desde copia; arbol limpio
+despues, comprobado con `git status`:
+
+| Mutacion introducida | Tests que se pusieron ROJOS |
+| --- | --- |
+| `PRIVATE_ROUTE_PREFIXES` pierde `INVENTORY_ROUTE` | los dos de R3 + `a un rol distinto de Administrador lo saca al dashboard` |
+| `ROUTE_ROLE_RULES` se queda sin su unica fila | `declara exactamente una regla`, `la regla se aplica a la ruta...`, `a un rol distinto de Administrador lo saca al dashboard` |
+| La regla pasa a `roles: [ADMIN_ROLE_NAME, 'Operador']` | los mismos tres |
+| La regla pasa a `roles: ['Operador']` | los tres anteriores **y** `deja pasar al Administrador` |
+| La fila se escribe con los literales `'/inventario'` y `'Administrador'` | `la fila se deriva de INVENTORY_ROUTE y de ADMIN_ROLE_NAME` |
+
+**Salida real (T14):**
+```
+pnpm typecheck  -> tsc --noEmit, sin errores
+pnpm lint       -> eslint, sin hallazgos
+pnpm exec vitest run tests/unit/identity/ tests/guards/guard-arquitectura-modulos.test.ts
+  -> Test Files  27 passed (27)   ·   Tests  387 passed (387)
+```
+
+Los proyectos de **integracion** siguen fallando en este worktree por no haber `DATABASE_URL`:
+es previo a esta tanda y ajeno a ella. `package.json` y `pnpm-lock.yaml`, sin cambios: ninguna
+dependencia nueva.
+
+**Sigue abierto y NO se toco:** `lib/modules/identity/domain/route-access.ts:37` dice en un
+comentario que `ROUTE_ROLE_RULES` «esta vacio a proposito»; ya no lo esta, y ademas la constante
+no vive ahi. Ese archivo no entra en los de esta tarea, asi que se reporta en vez de tocarlo.
+
