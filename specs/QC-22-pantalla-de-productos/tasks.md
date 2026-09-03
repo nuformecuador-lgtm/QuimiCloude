@@ -139,7 +139,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios; el componente no construye la URL con el literal de
   la ruta (usa `usePathname()` o la constante).
 
-### [ ] T8 — Selector de presentación con alta en línea
+### [x] T8 — Selector de presentación con alta en línea
 - **Depende de**: T2. **Archivos**: `presentation-select.tsx`, barrel.
 - **Qué** (`design.md > 5`): carga la primera página con `pageSize: MAX_PAGE_SIZE` **importado**,
   con «Cargar más» mientras `page < totalPages` (R24); alta en línea con

@@ -256,3 +256,35 @@ un comentario que explica por que no se usan.
   esa opcion, asi que un `null` se ignora en vez de navegar a un tamano invalido.
 
 **Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
+
+## T8 — Selector de presentacion con alta en linea
+
+**Archivos:** `app/(private)/inventario/components/presentation-select.tsx` (nuevo) y el barrel.
+
+- Carga la primera pagina con `pageSize: MAX_PAGE_SIZE` **importado** de `@/lib/shared/pagination`
+  y ofrece «Cargar más» mientras `page < totalPages`, anexando (R24). Sin inventar busqueda: el
+  backend no la tiene y QC-20 no se toca.
+- **El alta en linea NO es un `<form>`**. El selector vive dentro del formulario de producto y
+  anidar formularios es HTML invalido -el navegador desanida el interior y el envio de fuera se
+  rompe-. El boton invoca `createPresentationAction` directamente desde el manejador: sigue
+  siendo una Server Action, no un `fetch` a una ruta de API propia (R28). Tampoco se abre un
+  segundo `sheet` anidado: apilar capas modales es lo que se rompe en iOS.
+- Al recibir `{ status: 'success', id }` la presentacion **se anexa, queda seleccionada y el
+  sub-formulario se cierra**, sin tocar ningun otro campo del producto (R24).
+- `duplicate_name` **si identifica un campo**, asi que se pinta junto al campo del nombre con
+  `aria-invalid`/`aria-describedby`, no en la region de error del formulario.
+- **R25 verificado con `grep` sobre toda la ruta**: los nombres de la accion de renombrar y la de
+  borrar presentaciones **no aparecen en ningun archivo**, ni siquiera dentro de un comentario
+  (se reescribio el comentario que las nombraba para que una guardia de fuente no encuentre un
+  falso positivo).
+- El valor viaja al `FormData` por el `<input>` oculto que el primitivo `select` de Base UI
+  monta cuando se le da `name` — sin un campo oculto escrito a mano.
+- **R31**: disparador y campo con `min-h-11 min-w-11` y `text-base md:text-base`. Ese
+  `md:text-base` es deliberado: el primitivo `input` baja a `text-sm` (14 px) desde `md`, y R31
+  exige >= 16 px **sin distinguir por ancho**. Se corrige por clase, sin editar `components/ui/`
+  (R29).
+- La carga inicial toca el estado **despues** del `await`: `react-hooks/set-state-in-effect`
+  prohibe `setState` sincrono dentro de un efecto, y de paso un desmontaje durante la peticion no
+  intenta pintar nada.
+
+**Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
