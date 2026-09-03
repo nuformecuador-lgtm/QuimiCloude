@@ -40,8 +40,6 @@ function SheetContent({
   className,
   children,
   footer,
-  isForm = false,
-  formProps,
   side = "right",
   showCloseButton = true,
   ...props
@@ -50,21 +48,7 @@ function SheetContent({
   showCloseButton?: boolean
   /** Acciones del panel. Se pintan abajo, en una fila alineada a la derecha. */
   footer?: React.ReactNode
-  /**
-   * Envuelve TODO el contenido del panel -cabecera, cuerpo y pie- en un unico `<form>`. Asi el
-   * boton de guardar puede vivir en el pie y seguir enviando: `useFormStatus()` lo ve desde ahi
-   * porque el formulario es su ancestro.
-   */
-  isForm?: boolean
-  /** Props del `<form>` que monta `isForm` (`action`, `onSubmit`, `id`...). Se ignora sin `isForm`. */
-  formProps?: React.ComponentProps<"form"> & { [attr: `data-${string}`]: string }
 }) {
-  const body = (
-    <>
-      {children}
-      {footer === undefined ? null : <SheetFooter>{footer}</SheetFooter>}
-    </>
-  )
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -77,17 +61,8 @@ function SheetContent({
         )}
         {...props}
       >
-        {isForm ? (
-          <form
-            data-slot="sheet-form"
-            {...formProps}
-            className={cn("flex min-h-0 flex-1 flex-col", formProps?.className)}
-          >
-            {body}
-          </form>
-        ) : (
-          body
-        )}
+        {children}
+        {footer === undefined ? null : <SheetFooter>{footer}</SheetFooter>}
         {showCloseButton && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
@@ -113,7 +88,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn("flex shrink-0 flex-col gap-0.5 border-b p-4", className)}
+      className={cn("flex flex-col gap-0.5 p-4", className)}
       {...props}
     />
   )
