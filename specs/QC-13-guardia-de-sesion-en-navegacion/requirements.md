@@ -28,7 +28,106 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es `lib/shared/navigation/private-nav.ts`
+—la única fuente de la navegación privada (heredado de QC-11)— más el recorrido
+`e2e/session.spec.ts` sobre esos datos. No hay service, ni migración, ni permiso nuevo: es
+borrar datos de navegación y mover/ajustar dos tests existentes.
+
+### Los cuatro ítems de relleno desaparecen
+
+**R1.** El sistema NO DEBE exportar las constantes `NOTIFICATIONS_ROUTE`,
+`PURCHASE_ORDERS_ROUTE`, `SUPPLIERS_ROUTE` ni `BATCHES_ROUTE`.
+
+**R2.** El sistema NO DEBE incluir, en ningún ítem de `PRIVATE_NAV_ITEMS` ni en ningún hijo de
+un grupo, ninguno de los cuatro destinos `/notificaciones`, `/compras/ordenes`,
+`/compras/proveedores` ni `/produccion/lotes`.
+
+**R3.** El sistema NO DEBE incluir en `PRIVATE_NAV_ITEMS` ningún ítem de nivel superior con
+`testId` igual a `nav-notificaciones` ni `nav-compras`.
+
+### Lo que sobrevive, intacto
+
+**R4.** El sistema DEBE seguir exportando `FORMULAS_ROUTE` con el mismo valor
+(`/produccion/formulas`) y el ítem cuyo `testId` es `nav-produccion-formulas` DEBE seguir
+apuntando a esa constante, con la etiqueta `Fórmulas`.
+
+**R5.** El sistema DEBE seguir exponiendo `PRIVATE_NAV_ITEMS` como un array de nivel superior
+con exactamente tres entradas, en este orden: el enlace del dashboard, el enlace de inventario y
+el grupo cuyo `testId` es `nav-produccion`.
+
+**R6.** El sistema DEBE seguir exponiendo el grupo `nav-produccion` con exactamente un hijo: el
+ítem cuyo `testId` es `nav-produccion-formulas`.
+
+**R7.** El sistema NO DEBE modificar `DASHBOARD_ROUTE`, `INVENTORY_ROUTE`, `PRIVATE_NAV_LABEL`,
+`BRAND_LABEL`, `BRAND_SHORT_LABEL`, `BRAND_TAGLINE` ni las funciones y tipos que
+`lib/shared/navigation/private-nav.ts` ya exportaba antes de esta ficha, salvo las cuatro
+constantes y los cuatro ítems que R1–R3 retiran.
+
+### La guardia de serialización sigue mordiendo
+
+**R8.** El sistema DEBE seguir exponiendo `PRIVATE_NAV_ITEMS` como una estructura que sobrevive
+íntegra a una vuelta por `JSON.stringify`/`JSON.parse`, y en la que cada `icon` declarado —de
+nivel superior o de hijo— sigue siendo una cadena y nunca un componente, de modo que
+`tests/guards/guard-nav-serializable.test.ts` siga pasando sin ninguna modificación sobre los
+datos que quedan tras retirar los cuatro ítems.
+
+### El test de agrupación deja de depender de una constante que desaparece
+
+**R9.** El sistema DEBE cubrir, con una fixture de navegación propia y no con
+`PRIVATE_NAV_ITEMS`, el comportamiento de agrupación de `AppSidebar` que hoy afirma sobre
+`SUPPLIERS_ROUTE`: que un ítem cuya ruta activa es la de un hijo deja su grupo expandido y ese
+hijo marcado como actual, y que el grupo hermano permanece colapsado.
+
+**R10.** La fixture de R9 NO DEBE importar ni referenciar `SUPPLIERS_ROUTE` ni `FORMULAS_ROUTE`.
+
+### El E2E pide el retorno a inventario, no al dashboard
+
+**R11.** CUANDO el recorrido de `e2e/session.spec.ts` pide una ruta privada sin sesión, el
+sistema DEBE recordar `INVENTORY_ROUTE` como destino de retorno en el parámetro de la URL de
+login, en vez de `DASHBOARD_ROUTE`.
+
+**R12.** CUANDO el usuario de ese recorrido introduce credenciales correctas, el sistema DEBE
+aterrizar en `INVENTORY_ROUTE` —no en `DASHBOARD_ROUTE`— antes de continuar con el resto del
+recorrido (ver su nombre en la barra, cerrar sesión, y que "atrás" no restaure la zona privada).
+
+**R13.** El sistema NO DEBE crear un segundo archivo ni un segundo `test()` para este recorrido:
+`e2e/session.spec.ts` sigue teniendo un único test que encadena los cinco pasos.
+
+### Límite de alcance
+
+**R14.** El sistema NO DEBE tocar `FORMULAS_ROUTE`, su valor, su etiqueta ni el `testId` de su
+ítem, en ningún archivo de esta ficha.
+
+**R15.** El sistema NO DEBE añadir ninguna regla de permiso, ruta-rol ni redirección nueva: la
+única regla ruta→rol que involucra a `/inventario` es la que ya trajo QC-22.
+
+**R16.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el
+requisito que la hace testeable. Ninguna queda sin `R<n>` (regla 4 de `CLAUDE.md`).
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Qué queda de la `description` original: ya entregado por QC-7/8/9/11/12 | R14, R15 (nada de eso se reabre aquí) |
+| 2 | El E2E que QC-12 difirió: ya existe, no se re-crea | R13 |
+| 3 | Los cuatro enlaces que dan 404 se quitan | R1, R2, R3 |
+| 4 | `FORMULAS_ROUTE` y su ítem no se tocan: son de QC-26 | R4, R14 |
+| 5 | Qué queda en el menú: Dashboard, Inventario y Producción con un hijo | R5, R6 |
+| 6 | La capacidad de agrupar se conserva; el test pasa a fixture propia | R9, R10 |
+| 7 | El destino de la raíz `/`: fuera de esta ficha | — (no aplica ningún requisito; ver Preguntas abiertas 6) |
+| 8 | La deuda del E2E de QC-9: el retorno pide `/inventario` | R11, R12 |
+| 9 | Zona `frontend` | — (metadato de la ficha, no de comportamiento del sistema) |
+| 10 | Complejidad `low` | — (metadato de la ficha, no de comportamiento del sistema) |
+| 11 | `depends_on` incluye QC-22 | R11, R12 (el retorno exige que `/inventario` exista y su regla ruta-rol) |
+| 12 | `private-nav.ts` sigue siendo la única fuente de la navegación | R7 |
+| 13 | Se mantiene la guardia de serialización | R8 |
+| 14 | Las rutas que sobreviven viven en `lib/shared/routes.ts`, sin redeclarar | R7 |
+| 15 | Permisos y reglas ruta-rol: no se añade ninguna aquí | R15 |
+| 16 | E2E: sí, corazón de la ficha, se modifica el existente | R11, R12, R13 |
+| 17 | Ninguna librería nueva | R16 |
 
 ## Preguntas abiertas
 
