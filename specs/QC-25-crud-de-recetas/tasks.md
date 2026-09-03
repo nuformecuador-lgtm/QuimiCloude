@@ -76,7 +76,7 @@
       reemplazar (`design.md > 9.3`); validación de existencia del producto por `ProductCatalog`
       en una sola llamada (`design.md > 6`).
       *Depende de:* T5. **Hecho cuando:** `tests/unit/recetas/recipe-service.test.ts` pasa con
-      dobles de los tres puertos (R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37).
+      dobles de los **cuatro** puertos —repositorio, `ProductCatalog`, `UnitCatalog` y almacenamiento; el de unidades entro con R50— (R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37).
 
 - [x] **T7 [P] — Composición de la URL de lectura.** El caso de uso mapea `imagePath → imageUrl`
       a través de `publicUrl` del puerto; sin firma ni caducidad (D5, D6).
