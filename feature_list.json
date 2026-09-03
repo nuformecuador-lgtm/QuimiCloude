@@ -283,13 +283,30 @@
       "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "backend",
       "branch": "feature/QC-23-registro-de-sesiones",
       "depends_on": [
         "QC-8"
       ],
       "spec_path": "specs/QC-23-registro-de-sesiones"
+    },
+    {
+      "key": "QC-53",
+      "id": 53,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "cerrar-mis-sesiones",
+      "description": "El usuario necesita poder cerrar todas sus sesiones abiertas desde cualquiera de sus dispositivos, sin esperar a que caduquen. Es el boton que falta para que sirva el mecanismo de revocacion. Cerrar sesion normal, el de siempre, cierra solo el dispositivo desde el que se pulsa. Esta accion es la otra: cierra TODAS las sesiones de la persona, incluida la que esta usando en ese momento, asi que despues de pulsarla acaba en el login. Por eso tiene que quedar claro antes de pulsar que es lo que va a pasar, y no confundirse con el cerrar sesion de siempre. El caso real: alguien entro desde un equipo compartido de planta o desde un telefono que ya no tiene, se da cuenta al llegar a casa, y quiere cortar ese acceso sin llamar a nadie. Solo la pantalla y su conexion con el mecanismo, que ya existe: el mecanismo es la ficha de registro de sesiones. El boton del administrador para cerrar las sesiones de OTRO usuario no entra aqui, y hoy no tiene donde vivir porque no existe pantalla de administracion de usuarios.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-53-cerrar-mis-sesiones",
+      "depends_on": [
+        "QC-23"
+      ],
+      "spec_path": "specs/QC-53-cerrar-mis-sesiones"
     },
     {
       "key": "QC-24",
