@@ -84,6 +84,25 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
 }));
 
+/**
+ * Margen de tiempo (review de QC-26, MAYOR 1). Estos casos montan el formulario entero y lo
+ * conducen con decenas de interacciones reales de `user-event` sobre selectores con popup; en
+ * aislado los mas largos rondaban 1,7-1,9 s contra el `testTimeout` por defecto de 5000 ms, y
+ * ese margen de 2,7x NO aguantaba la paralelizacion de la suite completa: R30 y R31 expiraban
+ * de forma reproducible.
+ *
+ * Se corrigen las DOS causas, sin tocar ni una asercion:
+ *
+ * 1) `setupUser()` (mas abajo) elimina la espera artificial entre eventos, que era la mitad del
+ *    coste. Los eventos que se emiten son EXACTAMENTE los mismos.
+ * 2) Este `testTimeout` da margen de sobra para la carga de la suite entera. No es un parche
+ *    para un test lento: es el reconocimiento de que un test de formulario completo con popups
+ *    no se mide con el mismo cronometro que uno de funcion pura.
+ *
+ * Es un timeout mas largo, NO un `retry`: un test que solo pasa a veces seguiria siendo rojo.
+ */
+vi.setConfig({ testTimeout: 30_000 });
+
 // --- Fixtures: UUID con forma válida para `recipeLineSchema` (productId/unitId son z.string().uuid()) ---
 const PRODUCT_1_ID = '11111111-1111-4111-8111-111111111111';
 const PRODUCT_2_ID = '22222222-2222-4222-8222-222222222222';
@@ -150,6 +169,20 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     lines: [lineView()],
     ...overrides,
   };
+}
+
+/**
+ * `userEvent.setup()` con `delay: null` (review de QC-26, MAYOR 1). Por defecto `user-event`
+ * intercala un `setTimeout(0)` entre CADA evento -por cada tecla, por cada movimiento de
+ * puntero-, y en estos casos eso son cientos de saltos al event loop. `delay: null` quita solo
+ * esa espera artificial: la secuencia de eventos que recibe el DOM es identica (mismos
+ * `pointerdown`/`mousedown`/`focus`/`keydown`/`input`...), y siguen activas TODAS las
+ * comprobaciones de `user-event` -incluida la de `pointer-events`, que es la que impide
+ * "hacer clic" en un control tapado o deshabilitado-. No se relaja nada: solo se deja de
+ * esperar a nada.
+ */
+function setupUser(): UserEvent {
+  return userEvent.setup({ delay: null });
 }
 
 function renderCreateForm() {
@@ -302,7 +335,7 @@ describe('R20 — cancelar o terminar devuelve a la lista', () => {
   });
 
   it('terminar con éxito también devuelve a la lista (mismo camino que R24)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta que termina');
@@ -314,7 +347,7 @@ describe('R20 — cancelar o terminar devuelve a la lista', () => {
 
 describe('R21 — precarga de la edición y receta inexistente', () => {
   it('precarga el detalle y conserva la línea cuyo productName es null, reenviándola intacta', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const recipe = recipeDetail({
       name: 'Receta existente',
       description: 'Una descripción',
@@ -368,7 +401,7 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
 
 describe('R22 — el guardado envía la lista final completa en una sola invocación', () => {
   it('quitar una línea la saca de la lista enviada; cero llamadas por línea ni por paso', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const recipe = recipeDetail({
       lines: [
         lineView({ id: 'line-a', productId: PRODUCT_1_ID, quantity: '1.0000' }),
@@ -398,7 +431,7 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
 
 describe('R23 — un guardado rechazado no navega, no pierde lo escrito y muestra el error en línea', () => {
   it('el error se presenta en la región del formulario y el nombre editado sigue en el DOM', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     updateRecipeActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -429,7 +462,7 @@ describe('R23 — un guardado rechazado no navega, no pierde lo escrito y muestr
 
 describe('R24 — un guardado con éxito navega, avisa por toast y refresca', () => {
   it('createRecipeAction con éxito navega a la lista, avisa y refresca', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta nueva');
@@ -443,7 +476,7 @@ describe('R24 — un guardado con éxito navega, avisa por toast y refresca', ()
 
 describe('R26 — la validación previa usa los esquemas del contrato', () => {
   it('un nombre vacío -que el esquema rechaza- no invoca la operación', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     // El nombre queda vacío a propósito: `recipeNameSchema` exige `.trim().min(1)`.
@@ -458,7 +491,7 @@ describe('R26 — la validación previa usa los esquemas del contrato', () => {
 
 describe('R27 — añadir y quitar líneas; una receta sin ninguna se guarda', () => {
   it('añadir y luego quitar la única línea deja la receta sin líneas, y así se guarda', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin ingredientes');
@@ -479,7 +512,7 @@ describe('R27 — añadir y quitar líneas; una receta sin ninguna se guarda', (
 
 describe('R28 — el selector de producto alcanza la segunda página sin filtrar en cliente', () => {
   it('pide la página 2 al backend y permite elegir un producto que no estaba descargado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.click(screen.getByTestId('recipe-line-add'));
@@ -507,7 +540,7 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
 
 describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombre', () => {
   it('elige Litro (con símbolo "L") y luego Gramo (sin símbolo, mostrado por su nombre) y envía su id', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con unidades');
@@ -531,7 +564,7 @@ describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombr
 
 describe('R31 — dos líneas del mismo producto y una cantidad inválida no se envían', () => {
   it('dos líneas con el mismo producto no se envían: el error sale en el bloque de líneas', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta duplicada');
@@ -549,7 +582,7 @@ describe('R31 — dos líneas del mismo producto y una cantidad inválida no se 
   });
 
   it('una cantidad que el esquema rechaza presenta el error junto a la línea afectada', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con cantidad inválida');
@@ -569,7 +602,7 @@ describe('R31 — dos líneas del mismo producto y una cantidad inválida no se 
 
 describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orden mostrado', () => {
   it('añadir tres pasos, editar uno y quitar otro deja el orden esperado en el payload', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con pasos');
@@ -598,7 +631,7 @@ describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orde
 
 describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () => {
   it('arrastrar el primer paso hasta la tercera posición reordena el payload', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const uninstall = installStepRowRectStub();
     try {
       renderCreateForm();
@@ -641,7 +674,7 @@ describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () =
 
 describe('R34 — el equivalente por teclado reordena y el asa anuncia su posición', () => {
   it('Tab hasta el asa, Espacio para tomar, flecha para mover y Espacio para soltar cambian el payload', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const uninstall = installStepRowRectStub();
     try {
       renderCreateForm();
@@ -687,7 +720,7 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
 
 describe('R37 — vista previa de la imagen y bloqueo de un segundo envío', () => {
   it('elegir un archivo válido muestra su vista previa, y el envío en curso impide un segundo envío', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     let resolveCreate!: (value: CreateRecipeFormState) => void;
     createRecipeActionMock.mockImplementation(
       () =>
@@ -725,7 +758,7 @@ describe('R37 — vista previa de la imagen y bloqueo de un segundo envío', () 
 
 describe('R38 — un archivo rechazado no llega al payload y su error queda junto al campo', () => {
   it('un archivo demasiado grande se rechaza sin invocar la operación', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.upload(screen.getByTestId('recipe-image-input'), tooLargeFile());
@@ -744,7 +777,7 @@ describe('R38 — un archivo rechazado no llega al payload y su error queda junt
   });
 
   it('un archivo con formato no aceptado se rechaza sin invocar la operación', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderCreateForm();
 
     await user.upload(screen.getByTestId('recipe-image-input'), unsupportedFormatFile());
