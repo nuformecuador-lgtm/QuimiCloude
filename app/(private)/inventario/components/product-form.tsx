@@ -19,8 +19,12 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R31 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
 
-/** Campos de texto del producto. `presentationId` no esta aqui: lo aporta su propio selector (T8). */
-const TEXT_FIELDS = ['name', 'unit', 'cost'] as const;
+/**
+ * Campos de texto del producto. `presentationId` no esta aqui: lo aporta su propio selector (T8).
+ *
+ * **La unidad tampoco esta**, y no por descuido: ver el comentario del formulario mas abajo.
+ */
+const TEXT_FIELDS = ['name', 'cost'] as const;
 
 /** Campos enteros. `FormData` solo entrega cadenas, asi que se convierten antes de validar. */
 const INT_FIELDS = ['stock', 'minPurchase', 'deliveryTime', 'qtyAlert'] as const;
@@ -44,7 +48,6 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   name: 'Escribe un nombre de 1 a 120 caracteres.',
   presentationId: 'Elige una presentación.',
   stock: 'Debe ser un número entero de 0 o más.',
-  unit: 'La unidad no es válida.',
   cost: 'Usa hasta 10 enteros y 4 decimales, con punto (por ejemplo 12.5000).',
   minPurchase: 'Debe ser un número entero de 0 o más.',
   deliveryTime: 'Debe ser un número entero de 0 o más.',
@@ -55,7 +58,6 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
   presentationId: 'Presentación',
   stock: 'Existencia',
-  unit: 'Unidad',
   cost: 'Costo',
   minPurchase: 'Compra mínima',
   deliveryTime: 'Tiempo de entrega',
@@ -175,7 +177,6 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
       name: values.name,
       presentationId: values.presentationId,
       cost: optionalText(values.cost),
-      unit: optionalText(values.unit),
       ...numbers,
     };
 
@@ -274,16 +275,20 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
       />
 
       {/*
-        R23 — la unidad es TEXTO LIBRE, y esto es retrabajo aceptado a conciencia por el humano el
-        2026-09-03: QC-32 (`modelo-unidades`) convierte la unidad en catalogo propio, y cuando
-        aterrice este campo pasa a ser un selector. No es un descuido.
+        AQUI IBA LA UNIDAD, y su ausencia es deliberada (decision humana del 2026-09-03).
+
+        R23 la pedia como TEXTO LIBRE porque eso era lo que la columna guardaba. El merge de QC-32
+        (`modelo-unidades`) tumbo esa premisa mientras esta feature seguia en vuelo: `ProductView`
+        ya no trae `unit: string | null` sino `unitId: UnitId | null`, una clave foranea al
+        catalogo. Un campo de texto ya no vale, y un selector **no se puede construir hoy**: el
+        contrato publico de `lib/modules/unidades` solo publica `normalizeUnitName` y los tipos,
+        sin ninguna operacion para listar el catalogo.
+
+        Asi que el producto se da de alta SIN unidad -`unitId` es nulable en el esquema, la base
+        lo admite- y el selector lo montara la ficha que corresponda cuando QC-38
+        (`crud-de-unidades`) exponga como listar unidades. Poner aqui un campo que escriba un UUID
+        a mano seria peor que no tener campo.
       */}
-      <TextField
-        field="unit"
-        idPrefix={fieldId}
-        defaultValue={initialValue('unit', product?.unit ?? '')}
-        error={fieldErrors.unit}
-      />
 
       {/*
         `cost` es `type="text"` y NUNCA `type="number"`: un `number` de HTML pasa por el binario de

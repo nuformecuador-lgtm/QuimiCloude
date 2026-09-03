@@ -36,7 +36,7 @@ import {
 } from '../../helpers/viewport';
 
 /**
- * Pantalla de productos, render dentro del armazon privado: R1, R5, R6-R17, R19-R21, R23, R24,
+ * Pantalla de productos, render dentro del armazon privado: R1, R5, R6-R17, R19-R21, R24,
  * R26 y R31 (`specs/QC-22-pantalla-de-productos/tasks.md > T12`).
  *
  * La pantalla se monta **dentro del layout privado** —igual que en produccion— reutilizando el
@@ -193,6 +193,16 @@ const PRESENTACION_NUEVA = { id: crypto.randomUUID(), name: 'Garrafa 5 L' };
 const AUTOR_QUE_NO_DEBE_VERSE = 'AUTOR-CREADOR-NO-VISIBLE';
 const EDITOR_QUE_NO_DEBE_VERSE = 'AUTOR-EDITOR-NO-VISIBLE';
 
+/**
+ * Id de unidad del fixture, **tambien inconfundible y tambien invisible**. Desde el merge de
+ * QC-32 (`modelo-unidades`) el producto no guarda el texto de la unidad sino `unitId`, una clave
+ * foranea al catalogo, y esta pantalla no tiene forma de resolverla a un nombre: el contrato
+ * publico de `lib/modules/unidades` no expone ninguna operacion de listado (llega con QC-38).
+ * Por decision humana del 2026-09-03 la unidad sale de la pantalla; este centinela vigila que no
+ * vuelva por la puerta de atras pintando el UUID crudo, que seria peor que no mostrar nada.
+ */
+const UNIDAD_QUE_NO_DEBE_VERSE = 'UNIDAD-ID-NO-VISIBLE';
+
 function producto(overrides: Partial<ProductView> = {}): ProductView {
   return {
     id: crypto.randomUUID(),
@@ -204,7 +214,7 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     minPurchase: 3,
     deliveryTime: 7,
     qtyAlert: 5,
-    unit: 'kg',
+    unitId: UNIDAD_QUE_NO_DEBE_VERSE,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     createdBy: AUTOR_QUE_NO_DEBE_VERSE,
@@ -314,7 +324,6 @@ async function renderPantallaCargando(searchParams: Consulta = {}) {
 const ALTA_VALIDA: Readonly<Record<string, string>> = {
   name: 'Ácido cítrico',
   stock: '12',
-  unit: 'sacos de 25 kg',
   cost: '99.5000',
   minPurchase: '2',
   deliveryTime: '4',
@@ -395,8 +404,8 @@ describe('pantalla de productos — lista', () => {
   });
 
   it('la tabla presenta todas las columnas de negocio declaradas', async () => {
-    // R6 — se itera la DECLARACION de columnas en vez de listar diez literales: quitar una
-    // columna deja este test sin encabezado que encontrar.
+    // R6 — se itera la DECLARACION de columnas en vez de listar los literales uno a uno: quitar
+    // una columna deja este test sin encabezado que encontrar.
     const elProducto = producto();
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
@@ -412,13 +421,16 @@ describe('pantalla de productos — lista', () => {
       );
     }
 
-    // Las diez columnas de negocio que exige R6, por su clave: si alguna desaparece de la
+    // Las columnas de negocio que exige R6, por su clave: si alguna desaparece de la
     // declaracion, esto se pone rojo aunque la tabla siga pintando.
+    //
+    // Son NUEVE, no las diez de R6: la unidad salio de la pantalla el 2026-09-03 tras el merge
+    // de QC-32 (ver el test «el formulario no captura la unidad»). R6 queda modificado en ese
+    // punto, y esta lista es la que dice la verdad.
     expect(PRODUCT_COLUMNS.map((columna) => columna.key)).toEqual([
       'name',
       'presentationName',
       'stock',
-      'unit',
       'cost',
       'minPurchase',
       'deliveryTime',
@@ -428,15 +440,20 @@ describe('pantalla de productos — lista', () => {
     ]);
   });
 
-  it('la tabla no muestra createdBy ni updatedBy', async () => {
+  it('la tabla no muestra createdBy, updatedBy ni el id de la unidad', async () => {
     // R7 — test **en negativo**: los ids de autoria estan en los datos y no pueden llegar a la
     // pantalla. Anadir una columna que los pinte pone esto rojo.
+    //
+    // `unitId` se vigila igual desde el 2026-09-03: no lo pide R7, lo pide la decision de sacar
+    // la unidad de la pantalla tras el merge de QC-32. Mientras nadie sepa resolver ese id a un
+    // nombre, la unica forma de "mostrar la unidad" seria pintar el UUID, y eso no se hace.
     await renderPantalla();
 
     expect(document.body.textContent).not.toContain(AUTOR_QUE_NO_DEBE_VERSE);
     expect(document.body.textContent).not.toContain(EDITOR_QUE_NO_DEBE_VERSE);
+    expect(document.body.textContent).not.toContain(UNIDAD_QUE_NO_DEBE_VERSE);
 
-    for (const prohibida of ['createdBy', 'updatedBy', 'id', 'presentationId']) {
+    for (const prohibida of ['createdBy', 'updatedBy', 'id', 'presentationId', 'unitId']) {
       expect(
         PRODUCT_COLUMNS.some((columna) => String(columna.key) === prohibida),
         `«${prohibida}» no puede ser columna`,
@@ -709,7 +726,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
   it('la edicion precarga los valores actuales y envia el reemplazo completo', async () => {
     // R19
     const user = userEvent.setup();
-    const elProducto = producto({ name: 'Sosa cáustica', unit: 'kg', cost: '10.2500' });
+    const elProducto = producto({ name: 'Sosa cáustica', cost: '10.2500' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
@@ -718,7 +735,6 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     const precargado: Record<string, string> = {
       name: elProducto.name,
-      unit: String(elProducto.unit),
       cost: String(elProducto.cost),
       stock: String(elProducto.stock),
       minPurchase: String(elProducto.minPurchase),
@@ -728,7 +744,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     for (const [campo, valor] of Object.entries(precargado)) {
       expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(
-        campo === 'name' || campo === 'unit' || campo === 'cost' ? valor : Number(valor),
+        campo === 'name' || campo === 'cost' ? valor : Number(valor),
       );
     }
     expect(presentacionSeleccionada()).toBe(elProducto.presentationId);
@@ -808,7 +824,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(toastExito).not.toHaveBeenCalled();
     expect(routerMock.refresh).not.toHaveBeenCalled();
     expect(screen.getByTestId('product-field-name')).toHaveValue(ALTA_VALIDA.name);
-    expect(screen.getByTestId('product-field-unit')).toHaveValue(ALTA_VALIDA.unit);
+    expect(screen.getByTestId('product-field-cost')).toHaveValue(ALTA_VALIDA.cost);
   });
 
   it('un guardado con exito cierra el panel, avisa por toast y refresca la lista', async () => {
@@ -836,33 +852,45 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('la unidad se captura como texto libre', async () => {
-    // R23 — texto libre, no un conjunto cerrado: hoy es un campo de texto y QC-32 lo convertira
-    // en selector. Si alguien lo cerrara antes de tiempo, esto se pone rojo.
+  it('el formulario no captura la unidad, y el alta viaja sin ella', async () => {
+    // **R23 quedo sin objeto** el 2026-09-03, y este test es su relevo, no su borrado.
+    //
+    // R23 pedia la unidad como TEXTO LIBRE porque eso era lo que la columna guardaba. El merge de
+    // QC-32 (`modelo-unidades`) tumbo esa premisa con la feature en vuelo: el producto ya no
+    // guarda `unit: string | null` sino `unitId`, una clave foranea al catalogo de unidades. Un
+    // campo de texto pasaria a escribir un valor que la base ya no acepta, y un selector no se
+    // puede construir hoy porque `lib/modules/unidades` no expone como listar el catalogo (eso
+    // llega con QC-38). Decision humana: el campo sale de la pantalla y el producto se da de alta
+    // sin unidad, que el esquema admite por ser `unitId` nulable.
+    //
+    // Lo que se vigila aqui es que la ausencia siga siendo intencionada: ni un campo de texto que
+    // reviva la premisa caida, ni un hueco donde alguien teclee un UUID a mano.
     const user = userEvent.setup();
-    const libre = 'medio saco (a granel)';
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
-    const unidad = screen.getByTestId('product-field-unit');
-    expect(unidad.tagName).toBe('INPUT');
-    expect(unidad).toHaveAttribute('type', 'text');
-    expect(unidad).not.toHaveAttribute('list');
+    const formulario = screen.getByTestId(testId.formulario);
+    expect(screen.queryByTestId('product-field-unit')).toBeNull();
+    expect(screen.queryByTestId('product-field-unitId')).toBeNull();
+    expect(formulario.textContent).not.toContain('Unidad');
 
-    // El unico control de conjunto cerrado del formulario es la presentacion, que SI lo es por
-    // contrato (R24). La unidad no puede convertirse en otro sin que esto se ponga rojo.
-    const combos = within(screen.getByTestId(testId.formulario)).getAllByRole('combobox');
+    // El unico control de conjunto cerrado del formulario sigue siendo la presentacion (R24).
+    const combos = within(formulario).getAllByRole('combobox');
     expect(combos).toHaveLength(1);
     expect(combos[0]).toBe(screen.getByTestId(testId.selectorPresentacion));
 
     await crearPresentacionEnLinea(user);
-    await rellenarFormulario(user, { unit: libre });
+    await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));
 
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
-    expect(createProductActionMock.mock.calls[0][1].get('unit')).toBe(libre);
+
+    // Y el alta llega a la Server Action SIN unidad, ni con el nombre viejo ni con el nuevo.
+    const enviado = createProductActionMock.mock.calls[0][1];
+    expect(enviado.get('unit')).toBeNull();
+    expect(enviado.get('unitId')).toBeNull();
   });
 
   it('el selector alcanza presentaciones mas alla de la primera pagina', async () => {

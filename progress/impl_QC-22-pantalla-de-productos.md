@@ -833,8 +833,8 @@ Leyenda de la columna **Estado**:
 | R3 | `cada pantalla privada esta cubierta por un prefijo de PRIVATE_ROUTE_PREFIXES` · `sin sesion redirige al login con la ruta pedida como destino de vuelta (R3)` · `sin sesion tampoco se sirve lo que cuelga de la ruta (R3)` | guard-rutas-privadas-cubiertas.test.ts · route-access.test.ts | `PRIVATE_ROUTE_PREFIXES` pierde `INVENTORY_ROUTE` (T3, T14) | verificado |
 | R4 | `declara exactamente una regla: la pantalla de inventario, solo Administrador (R4)` · `la regla se aplica a la ruta de inventario y a lo que cuelgue de ella (R4)` · `deja pasar al Administrador (R4)` · `a un rol distinto de Administrador lo saca al dashboard, no al login (R4)` · `no corta al Operador en las rutas privadas que no tienen regla (R4)` · **E2E** `un usuario que no es Administrador acaba fuera y no ve el catalogo (R4)` | route-role-rules.test.ts · route-access.test.ts · **inventario.spec.ts** | la regla se queda sin fila; la regla pasa a solo Operador (T14) | verificado (+ E2E pendiente de ejecucion) |
 | R5 | `la pantalla no repite requireAdmin ni decide autorizacion` · `un error unauthorized se presenta como error y no se muestran datos del catalogo` | product-route-contract.test.ts · product-page.test.tsx | `page.tsx` importa `requireAdmin`; el estado de error deja de mostrar el `code` (T12, T13) | verificado |
-| R6 | `la tabla presenta todas las columnas de negocio declaradas` | product-page.test.tsx | se cae la columna `qtyAlert` de `PRODUCT_COLUMNS` (T12) | verificado |
-| R7 | `la tabla no muestra createdBy ni updatedBy` · `la tabla no puede pintar quien creo o modifico un producto` | product-page.test.tsx · product-route-contract.test.ts | la columna del nombre pinta ademas `createdBy` (T12, T13) | verificado |
+| R6 | `la tabla presenta todas las columnas de negocio declaradas` | product-page.test.tsx | se cae la columna `qtyAlert` de `PRODUCT_COLUMNS` (T12); se cuela una columna con el `unitId` crudo (2026-09-03) | **verificado, con R6 MODIFICADO**: son nueve columnas, no diez. La unidad salio de la pantalla el 2026-09-03 tras el merge de QC-32 — ver la seccion final de esta bitacora. |
+| R7 | `la tabla no muestra createdBy, updatedBy ni el id de la unidad` · `la tabla no puede pintar quien creo o modifico un producto` | product-page.test.tsx · product-route-contract.test.ts | la columna del nombre pinta ademas `createdBy` (T12, T13); `unitId` sale de `HiddenProductField` y se declara como columna (2026-09-03) | verificado (el centinela cubre ademas `unitId` desde el 2026-09-03) |
 | R8 | `el costo se presenta tal cual lo entrega la operacion` · `el costo no se convierte a numero en ningun archivo de la ruta` | product-page.test.tsx · product-route-contract.test.ts | el costo pasa por una conversion numerica (T13) | verificado |
 | R9 | `el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro` · `el desbordamiento horizontal no lo declara ningun archivo de la ruta` | product-page.test.tsx · product-route-contract.test.ts | el `overflow-x-auto` sube al contenedor de la pagina (T12, T13) | parcial declarado |
 | R10 | `el selector de tamano de pagina ofrece 10 y 25 y usa 10 por defecto` · `las dos unicas opciones de tamano son el defecto y el tope del backend` | product-page.test.tsx · product-list-params.test.ts | el tamano por defecto pasa de 10 a 25 (T12) | verificado |
@@ -846,11 +846,11 @@ Leyenda de la columna **Estado**:
 | R16 | `un error de la consulta presenta el estado de error con reintento y no una tabla vacia` | product-page.test.tsx | el estado de error deja de mostrar el `code` (T12) | verificado |
 | R17 | `crear abre un panel lateral sobre la lista, sin navegar ni perder la pagina` · **E2E** paso 2 del camino completo | product-page.test.tsx · **inventario.spec.ts** | abrir el panel navega con `router.push` (T12) | verificado (+ E2E pendiente de ejecucion) |
 | R18 | `el alta y la edicion salen por las Server Actions del catalogo` · **E2E** paso 5 | product-route-contract.test.ts · **inventario.spec.ts** | el formulario deja de importar las actions del catalogo (T13) | verificado (+ E2E pendiente de ejecucion) |
-| R19 | `la edicion precarga los valores actuales y envia el reemplazo completo` | product-page.test.tsx | la edicion deja de precargar la unidad (T12) | verificado |
+| R19 | `la edicion precarga los valores actuales y envia el reemplazo completo` | product-page.test.tsx | la edicion deja de precargar el costo (re-verificado el 2026-09-03; la mutacion original de T12 usaba la unidad, campo que ya no existe) | verificado |
 | R20 | `un guardado rechazado por un campo muestra el error en linea y no cierra el panel` · `un guardado rechazado por la operacion muestra el error del formulario y conserva lo escrito` | product-page.test.tsx | el estado de fallo deja de devolver lo escrito (las dos mitades, T12) | verificado |
 | R21 | `un guardado con exito cierra el panel, avisa por toast y refresca la lista` · `un borrado con exito cierra el dialogo, avisa por toast y refresca la lista` · **E2E** paso 6 | product-page.test.tsx · **inventario.spec.ts** | se quita `router.refresh()` tras el exito (T12) | verificado (+ E2E pendiente de ejecucion) |
 | R22 | `el layout privado monta exactamente una region de avisos y ningun otro landmark nuevo` · `el layout privado monta la region de avisos y la pantalla no monta otra` | private-layout.test.tsx (invertido en T4) · product-route-contract.test.ts | la pagina monta su propia region de avisos (T13); el layout se queda sin ella (T4) | verificado |
-| R23 | `la unidad se captura como texto libre` | product-page.test.tsx | la unidad pasa a campo numerico (T12) | verificado |
+| R23 | `el formulario no captura la unidad, y el alta viaja sin ella` (**relevo en negativo**, no el test original) | product-page.test.tsx | se revive el campo de unidad como texto libre (2026-09-03) | **SIN OBJETO desde el 2026-09-03** — su premisa (`unit` es columna de texto) cayo con el merge de QC-32. No se borro el test: se invirtio, y muerde. Motivo completo en la seccion final. |
 | R24 | `el selector alcanza presentaciones mas alla de la primera pagina` · `permite crear una presentacion desde el formulario y la deja seleccionada sin perder lo escrito` · **E2E** paso 4 | product-page.test.tsx · **inventario.spec.ts** | la presentacion creada deja de quedar seleccionada (T12) | verificado (+ E2E pendiente de ejecucion) |
 | R25 | `la pantalla no ofrece listar, editar ni borrar presentaciones` | product-route-contract.test.ts | el selector importa la accion de borrar presentaciones (T13) | verificado |
 | R26 | `el borrado pide confirmacion nombrando el producto y sin confirmar no invoca la operacion` | product-page.test.tsx | el campo oculto del borrado pierde el identificador (T12) | verificado |
@@ -865,6 +865,10 @@ Leyenda de la columna **Estado**:
 
 - **32 de 32 requisitos (R1-R32) tienen al menos un test nombrado que muerde**, comprobado por
   mutacion en las tandas T12, T13 y T14.
+- **Al dia 2026-09-03**: R23 quedo **sin objeto** y R6 **modificado** (nueve columnas) por el merge
+  de QC-32 y la decision humana de sacar la unidad de la pantalla. Ninguno de los dos se quedo sin
+  test: R23 tiene su relevo en negativo y R6 su lista de claves actualizada, ambos re-verificados
+  por mutacion ese mismo dia. Detalle en la ultima seccion de esta bitacora.
 - **0 requisitos sin test que muerda.** No hay hueco que reportar.
 - **6 requisitos tienen ademas evidencia en el E2E** (R4, R17, R18, R21, R24 y, de refilon, R22
   por el aviso emergente en navegador real): esa evidencia esta **pendiente de ejecucion**, porque
@@ -1215,3 +1219,108 @@ como verificado.
 Aviso ajeno recogido al levantar el servidor, **anterior a esta feature y no suyo**: Next avisa
 de que `middleware.ts` está deprecado en favor de `proxy`. No se toca aquí — es QC-9 y merece su
 propia ficha.
+
+---
+
+## Se quita el campo «unidad» de la pantalla (2026-09-03)
+
+**No es una tarea del `tasks.md` ni un recorte de alcance por comodidad: es una premisa caida.**
+
+### Que se cayo, y por que no fue un olvido
+
+Al acotar esta feature el humano cerro una decision explicita: *«Campo unidad: texto libre por
+ahora, que es lo que la columna guarda hoy. Retrabajo aceptado a conciencia: QC-32 convierte la
+unidad en catalogo propio, y cuando llegue este campo pasa a ser un selector»*. Sobre esa premisa
+se escribieron **R23**, el `<Input name="unit">` del formulario y la columna `unit` de la tabla.
+
+**QC-32 (`modelo-unidades`) se mergeo a `dev` mientras QC-22 seguia en vuelo.** Al sincronizar la
+rama, la premisa dejo de ser cierta: `ProductView.unit: string | null` **ya no existe**, ahora es
+`ProductView.unitId: UnitId | null`, una clave foranea al catalogo de unidades. El typecheck lo
+dijo en seis sitios. No es que el campo estuviera mal hecho: es que el dato que capturaba dejo de
+existir bajo los pies de la feature.
+
+### Por que no se sustituye por un selector, que era el plan
+
+Porque **hoy no se puede construir**. El contrato publico de `lib/modules/unidades` publica
+`normalizeUnitName` y los tipos `UnitCatalog`, `UnitId` y `UnitRef`, y **ninguna operacion para
+listar el catalogo**. Un selector necesitaria un caso de uso y un adaptador de listado, y eso es
+alcance de **QC-38 (`crud-de-unidades`)**, expresamente descartado aqui.
+
+Las dos salidas que quedaban se descartaron a conciencia:
+
+- **Un campo de texto que escriba un UUID a mano**: seria peor que no tener campo. Nadie conoce el
+  id de una unidad, y lo que no valide zod lo rechaza la base con `products_unit_id_fkey`.
+- **Pintar el `unitId` crudo en la tabla**: mostrar `a3f1…` en una columna titulada «Unidad» es
+  ruido con aspecto de dato.
+
+**Decision humana del 2026-09-03: el campo sale de la pantalla.** El producto se da de alta **sin
+unidad** —`unitId` es nulable en el esquema, la base lo admite— y el selector lo montara la ficha
+que corresponda cuando QC-38 exponga como listar el catalogo.
+
+### Requisitos que quedan sin objeto o modificados
+
+**No se ha borrado ni reescrito nada en `requirements.md`**: el spec es del humano. Se anota aqui
+lo que ha dejado de ser verdad, para que nadie lo lea como cubierto.
+
+| Requisito | Estado | Por que |
+| --- | --- | --- |
+| **R23** — «capturar la unidad como texto libre opcional, sin conjunto cerrado» | **SIN OBJETO** | Su premisa (`unit` es una columna de texto) desaparecio con el merge de QC-32. Ya no hay nada que capturar como texto libre: el dato es una FK. Su reemplazo natural es un selector, y lo trae QC-38. |
+| **R6** — «tabla con todas las columnas de negocio: nombre, presentacion, existencia, **unidad**, costo, compra minima, tiempo de entrega, alerta de cantidad, creacion y actualizacion» | **MODIFICADO** | Sigue vigente en todo menos en la unidad. Son **nueve** columnas, no diez. Vuelve a diez cuando QC-38 permita resolver `unitId` a un nombre. |
+| **R7** — «la lista no muestra el identificador ni quien creo/modifico» | **AMPLIADO de hecho** | No cambia su texto, pero `unitId` se suma a lo que la tabla no puede pintar. Se vigila igual: esta excluido del tipo `ProductColumnKey` y hay centinela en negativo. |
+| R19, R20 | intactos | La precarga en edicion y la conservacion de lo escrito se siguen comprobando; simplemente ya no incluyen la unidad (R20 se observa ahora sobre `cost`). |
+
+### Que se toco
+
+- **`app/(private)/inventario/components/product-columns.ts`** — fuera la columna `'unit'`.
+  `unitId` se anade a `HiddenProductField`, asi que **`key: 'unitId'` ni siquiera compila**: la
+  omision no queda a merced de que alguien "arregle" el hueco pintando el UUID.
+- **`app/(private)/inventario/components/product-form.tsx`** — fuera el `TextField` de `unit`, su
+  entrada en `TEXT_FIELDS`, su mensaje de error, su etiqueta y su linea en el candidato que se
+  valida. **En su lugar queda un comentario en el JSX explicando la ausencia**: un campo que
+  simplemente desaparece se vuelve a anadir por descuido, uno cuya ausencia esta escrita no.
+- **`tests/unit/inventario/product-page.test.tsx`** — el fixture pasa a
+  `unitId: UNIDAD_QUE_NO_DEBE_VERSE`; el mapa de claves de R6 pierde `'unit'`; el test en negativo
+  de R7 cubre tambien `unitId` (por clave de columna y por texto en el documento); la precarga de
+  edicion (R19) y la conservacion de lo escrito (R20) dejan de mirar la unidad.
+
+**El test de R23 no se borro: se invirtio.** `«la unidad se captura como texto libre»` pasa a ser
+`«el formulario no captura la unidad, y el alta viaja sin ella»`, que comprueba que no hay
+`product-field-unit` ni `product-field-unitId`, que el formulario no dice «Unidad», que el unico
+combobox sigue siendo el de presentacion (R24) y que el `FormData` que recibe la Server Action no
+lleva `unit` ni `unitId`. Un test borrado no avisa de nada; este se pone rojo si la premisa caida
+vuelve por la puerta de atras.
+
+### Lo que NO se hizo, a proposito
+
+No se implemento el listado de unidades, ni un caso de uso, ni un adaptador. No se abrio
+`lib/modules/inventario/` ni `lib/modules/unidades/`. No se puso ningun `unitId` a mano.
+
+### Verificacion por mutacion (rota, se ve el rojo, se revierte)
+
+Los tres tests que cambian no se dan por buenos por razonamiento:
+
+| Mutacion | Test que se puso ROJO |
+| --- | --- |
+| Se revive el campo de unidad como texto libre en el formulario | `el formulario no captura la unidad, y el alta viaja sin ella` |
+| `unitId` sale de `HiddenProductField` y se declara como columna que pinta el UUID | `la tabla presenta todas las columnas de negocio declaradas` **y** `la tabla no muestra createdBy, updatedBy ni el id de la unidad` |
+| La edicion deja de precargar el costo (releva a la mutacion de T12, que usaba la unidad) | `la edicion precarga los valores actuales y envia el reemplazo completo` |
+
+### Verificacion
+
+```
+pnpm typecheck   -> limpio (los seis errores que dispararon esto, cerrados)
+pnpm lint        -> limpio
+set -a && . ./.env && set +a
+pnpm exec vitest run tests/unit/inventario/ tests/guards/
+  -> Test Files  1 failed | 26 passed (27)   ·   Tests  1 failed | 312 passed (313)
+```
+
+El unico rojo es **ajeno a este cambio y anterior a el**:
+`tests/guards/guard-dependencias-aprobadas.test.ts` senala que `docs/dependencias.md` lista
+`@supabase/storage-js` (fila de QC-25) y el paquete no esta instalado en este worktree. No se toca
+aqui: ni `package.json` ni `docs/dependencias.md` entran en este ajuste.
+
+**`e2e/inventario.spec.ts` no se toco**: revisado, no afirma nada sobre el campo unidad (sus
+unicas apariciones de «unit» son la palabra «unit» hablando de tests unitarios). Tampoco hizo
+falta tocar `product-table.tsx` ni `product-table-skeleton.tsx`: ambos **iteran**
+`PRODUCT_COLUMNS` en vez de contar columnas a mano, que es justo para lo que se declararon asi.
