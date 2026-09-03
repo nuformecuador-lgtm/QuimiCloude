@@ -532,9 +532,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // imposible de cumplir. Lo que QC-24 protegia no era la FORMA del contrato: era que
     // NINGUN OTRO MODULO dependiera del runtime de `inventario` — que `recetas` pueda
     // referirse a un producto sin arrastrarse la implementacion. Eso sigue importando, y esta
-    // version lo vigila de forma directa: **todo import del BARREL `@/lib/modules/inventario`
-    // hecho desde fuera de `lib/composition/` debe ser `import type`** -o sea desde otro
-    // modulo, desde `app/`, desde `components/` o desde `hooks/`-.
+    // version lo vigila de forma directa: **ningun archivo fuera de `lib/composition/` puede
+    // importar del BARREL `@/lib/modules/inventario` una FACTORIA DE CASO DE USO** -o sea
+    // desde otro modulo, desde `app/`, desde `components/` o desde `hooks/`-.
     //
     // Por que el ambito llega hasta la UI y no se queda en `lib/modules/**` (matiz aportado
     // por la sesion de QC-24): la guardia hexagonal NO tapa este hueco por dos sitios a la vez.
@@ -556,9 +556,52 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     //      llega a leer sus archivos. Es justamente por eso que ese es el unico sitio
     //      legitimo que puede importar las factories en runtime para atar puerto a adaptador.
     //
-    // Comprobado el 2026-09-02: hoy NINGUN import del barrel exacto existe fuera de
-    // `lib/composition/`, y los cuatro imports que la UI hace hacia modulos son o Server
-    // Actions por subruta o ya `import type`. La regla codifica la practica real.
+    // ---------------------------------------------------------------------------------
+    // ACOTADO EL 2026-09-03 (QC-22, pantalla-de-productos), por decision humana.
+    // ---------------------------------------------------------------------------------
+    //
+    // Hasta hoy la regla era «todo import del barrel fuera de `lib/composition` debe ser
+    // `import type`», o sea acotaba por la FORMA del import. Eso prohibia de paso algo que
+    // nadie quiso prohibir: que un formulario de cliente se traiga un ESQUEMA ZOD del
+    // contrato para validar con la MISMA regla que valida el servidor. Un esquema no cablea
+    // nada, no arrastra persistencia y no se puede importar como tipo, porque se evalua.
+    //
+    // La regla pasa a acotar por LO QUE SE IMPORTA, que es lo que su propio comentario decia
+    // defender: «un Server Component podria importar una FACTORIA de `inventario` del barrel
+    // y saltarse `lib/composition`, que es el punto UNICO de cableado». Eso sigue cazandose,
+    // entero. Tipos, esquemas zod y constantes del contrato pasan.
+    //
+    // Dos apoyos que no son opinion de esta ficha:
+    //   1. La cabecera del propio barrel de QC-20 (`lib/modules/inventario/index.ts`) dice
+    //      literalmente que «debe poder importarse desde un componente de cliente sin
+    //      arrastrar servidor (R31, `design.md > 3`) —QC-22 lo hara—». QC-20 previo este
+    //      import y a la vez escribio un guard que lo prohibia: es una contradiccion interna
+    //      suya, y se resuelve a favor de lo que el barrel PROMETE.
+    //   2. `docs/architecture.md > La regla de dependencias` ya permite a `components/**`,
+    //      `hooks/**` y a los archivos `'use client'` importar `@/lib/modules/M` (el barrel),
+    //      sin exigir en ningun sitio que sea solo tipo.
+    //
+    // El caso concreto que lo destapo: `app/(private)/inventario/components/presentation-select.tsx`
+    // importa `createPresentationSchema` para prevalidar el nombre antes de llamar a la Server
+    // Action. Ese import PASA. `createCreatePresentation` —la factoria del caso de uso— desde
+    // el mismo archivo seguiria poniendo esto en rojo.
+    //
+    // Las dos exenciones anteriores se conservan intactas:
+    //   1. las SUBRUTAS del modulo. El especificador se compara EXACTO, no por prefijo: un
+    //      `@/lib/modules/inventario/adapters/driving/...` es una Server Action y la UI la
+    //      importa en runtime a proposito (`docs/architecture.md > Server Actions vs Route
+    //      Handlers`). Marcarla seria prohibir justo el patron que el arnes prescribe.
+    //   2. `lib/composition/**` NO necesita exencion: no esta entre `raicesVigiladas` (que
+    //      son solo `lib/modules`, `app`, `components` y `hooks`), asi que el barrido nunca
+    //      llega a leer sus archivos. Es justamente por eso que ese es el unico sitio
+    //      legitimo que puede importar las factories en runtime para atar puerto a adaptador.
+    //
+    // La lista de factorias NO se escribe a mano: se DERIVA del propio barrel. Cada caso de
+    // uso se exporta junto a su tipo `...Deps` en la misma sentencia
+    // (`export { createListProducts, type ListProductsDeps } from './domain/list-products'`),
+    // y esa es la firma estructural que las distingue de `createProductSchema`, que tambien
+    // empieza por «create» y no es una factoria. Asi, una decima factoria queda vigilada el
+    // dia que se publique, sin que nadie tenga que acordarse de anadirla aqui.
     function allTypeScriptFiles(dir: string): readonly string[] {
       if (!existsSync(dir)) return []
       const files: string[] = []
@@ -572,9 +615,69 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
     const modulesDir = join(repoRoot, 'lib', 'modules')
     const inventarioDir = join(modulesDir, 'inventario') + sep
-    // Especificador EXACTO del barrel: la comilla de cierre va pegada a `inventario`, asi que
-    // las subrutas (`.../inventario/adapters/driving/...`) NO casan. Es deliberado.
-    const INVENTARIO_IMPORT = /from\s+['"](@\/lib\/modules\/inventario|(\.\.?\/)+.*modules\/inventario)['"]/
+
+    // Las nueve factorias de caso de uso, derivadas del barrel por su tipo `...Deps` hermano.
+    const FACTORIAS_DE_CASO_DE_USO = new Set<string>()
+    for (const sentencia of contract.matchAll(/export\s*\{([^}]*)\}\s*from\s*'[^']+'/g)) {
+      const bindings = (sentencia[1] as string)
+        .split(',')
+        .map((binding) => binding.trim())
+        .filter((binding) => binding.length > 0)
+      // La firma: la sentencia publica ademas un tipo `...Deps`. Es lo que tiene un caso de
+      // uso y no tiene un esquema, un tipo de vista ni una constante.
+      if (!bindings.some((binding) => /^type\s+\w*Deps$/.test(binding))) continue
+      for (const binding of bindings) {
+        if (binding.startsWith('type ')) continue
+        FACTORIAS_DE_CASO_DE_USO.add(binding.split(/\s+as\s+/)[0] as string)
+      }
+    }
+    // Centinela del propio derivador: si el barrel cambia de forma y el parseo deja de
+    // encontrar nada, esta asercion no vigilaria NADA y pasaria en verde. Las nueve de
+    // `design.md > 3`; sube el numero el dia que se publique una decima, a conciencia.
+    expect(
+      [...FACTORIAS_DE_CASO_DE_USO].sort(),
+      'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
+    ).toEqual([
+      'createCreatePresentation',
+      'createCreateProduct',
+      'createDeletePresentation',
+      'createDeleteProduct',
+      'createGetProduct',
+      'createListPresentations',
+      'createListProducts',
+      'createUpdatePresentation',
+      'createUpdateProduct',
+    ])
+
+    /** Especificador EXACTO del barrel: las subrutas (`.../inventario/adapters/...`) NO casan. */
+    function esBarrelDeInventario(specifier: string): boolean {
+      return (
+        specifier === '@/lib/modules/inventario' ||
+        /^(\.\.?\/)+([\w.-]+\/)*modules\/inventario$/.test(specifier)
+      )
+    }
+
+    /**
+     * Bindings de VALOR de una clausula de import. `import type { ... }` devuelve vacio, y
+     * los `type X` sueltos dentro de las llaves se descartan uno a uno: los tipos pasan.
+     * Un `import * as X` devuelve `*`, que nunca es una factoria pero se marca aparte abajo.
+     */
+    function bindingsDeValor(clausula: string): readonly string[] {
+      const limpia = clausula.trim()
+      if (/^type\b/.test(limpia)) return []
+      const dentroDeLlaves = /\{([\s\S]*)\}/.exec(limpia)
+      const cuerpo = dentroDeLlaves === null ? limpia : (dentroDeLlaves[1] as string)
+      return cuerpo
+        .split(',')
+        .map((binding) => binding.trim())
+        .filter((binding) => binding.length > 0 && !binding.startsWith('type '))
+        .map((binding) => (binding.split(/\s+as\s+/)[0] as string).trim())
+    }
+
+    // Sentencia entera, no linea suelta: un import de varias lineas es lo normal y mirarlo
+    // linea a linea perderia justo el binding que importa.
+    const SENTENCIA_IMPORT = /import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g
+
     // `lib/composition` NO esta aqui a proposito: no se barre, no hace falta exencion.
     const raicesVigiladas = [
       modulesDir,
@@ -589,13 +692,25 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     ).toBeGreaterThan(0)
     for (const filePath of archivosVigilados) {
       if (filePath.startsWith(inventarioDir)) continue
-      const source = readFileSync(filePath, 'utf8')
-      for (const line of source.split('\n')) {
-        if (!INVENTARIO_IMPORT.test(line)) continue
+      const source = stripComments(readFileSync(filePath, 'utf8'))
+      for (const [, clausula, specifier] of source.matchAll(SENTENCIA_IMPORT)) {
+        if (!esBarrelDeInventario(specifier as string)) continue
+        const bindings = bindingsDeValor(clausula as string)
+
+        // Un import de espacio de nombres se trae el modulo ENTERO, factorias incluidas, y
+        // ningun nombre concreto que comparar: se marca por si mismo.
         expect(
-          line,
-          `${filePath}: todo import del barrel de inventario fuera de lib/composition debe ser 'import type' (${line.trim()})`,
-        ).toMatch(/^\s*import\s+type\s/)
+          bindings.includes('*'),
+          `${filePath}: no se puede importar el barrel de inventario como espacio de nombres fuera de lib/composition`,
+        ).toBe(false)
+
+        const factoriasImportadas = bindings.filter((binding) =>
+          FACTORIAS_DE_CASO_DE_USO.has(binding),
+        )
+        expect(
+          factoriasImportadas,
+          `${filePath}: importa del barrel de inventario factorias de caso de uso (${factoriasImportadas.join(', ')}); el cableado vive solo en lib/composition`,
+        ).toEqual([])
       }
     }
 
