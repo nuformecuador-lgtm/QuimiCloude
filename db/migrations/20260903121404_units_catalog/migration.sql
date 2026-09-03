@@ -25,6 +25,10 @@
 --      `recipes_created_by_fkey`, `recipes_updated_by_fkey`): son las FK escritas a mano por
 --      QC-20 y QC-24, Prisma no las conoce y por eso queria eliminarlas. Esta migracion NO las
 --      toca.
+--   7. EL CONJUNTO ARRANCADOR: el `INSERT` de las cuatro unidades (`mililitro`, `litro`,
+--      `gramo`, `kilogramo`), colocado entre el indice unico y los ALTER de RLS (seccion 6.1,
+--      R25, R26). Sustituye al seed de aplicacion que las rondas 1 y 2 habian construido y
+--      que el humano retiro el 2026-09-03: el catalogo nace donde nace su tabla.
 --
 -- Toda migracion futura sobre `products` o `recipe_lines` hay que revisarla A MANO para que el
 -- drift de `prisma migrate dev` no borre ninguna de esas FK, ni los CHECK y el RLS que dejaron
@@ -82,6 +86,38 @@ CREATE TABLE "units" (
 -- filas muertas que liberen el nombre. NO se crea ningun indice sobre `symbol`, y es
 -- deliberado (R7, pregunta abierta 1): la identidad de la unidad es su nombre.
 CREATE UNIQUE INDEX "units_name_normalized_key" ON "units"("name_normalized");
+
+-- ---------------------------------------------------------------------------------------
+-- CONJUNTO ARRANCADOR (design.md > 6.1, R25, R26). El catalogo nace CON la tabla: cuatro
+-- filas insertadas aqui, sin seed de aplicacion. La idempotencia la da `_prisma_migrations`
+-- —una migracion se aplica una vez—, no un `findMany` previo.
+--
+-- EL SITIO NO ES COSMETICO. Va DESPUES del `CREATE UNIQUE INDEX` y, sobre todo, ANTES de los
+-- dos `ALTER TABLE "units" ... ROW LEVEL SECURITY` del final: `FORCE ROW LEVEL SECURITY` sin
+-- policies deniega TAMBIEN al dueno de la tabla, que es con quien se conecta Prisma, asi que
+-- un INSERT colocado despues del FORCE no insertaria nada. Lo vigila
+-- `tests/unit/unidades/schema/unidades-migration.test.ts`.
+--
+-- `id` y `created_at` tienen DEFAULT; `updated_at` es NOT NULL SIN default (lo rellena
+-- `@updatedAt` en tiempo de ejecucion, no en SQL crudo), por eso va explicito.
+--
+-- `name_normalized` va LITERAL, y es el punto fragil de la ficha: no hay forma de llamar a
+-- `normalizeUnitName` (TypeScript, `lib/modules/unidades/domain/unit-name.ts`) desde una
+-- migracion. Es un duplicado de la unica definicion de R4 que se puede desincronizar EN
+-- SILENCIO —cambiar la funcion o un literal de aqui y que nadie se entere—. Lo unico que se
+-- da cuenta es el test `migration.sql — el conjunto arrancador` de
+-- `tests/unit/unidades/schema/unidades-migration.test.ts`, que importa la funcion REAL y la
+-- aplica a los literales extraidos de este INSERT (R26).
+--
+-- Cuatro filas y no cinco, las cuatro con simbolo, nombres en minuscula: lo cerro el humano
+-- el 2026-09-03 (requirements.md > pregunta abierta 4). «unidad» NO esta. El simbolo sigue
+-- siendo OPCIONAL en la columna (R3) aunque ninguna fila arrancadora estrene ya la ausencia.
+-- ---------------------------------------------------------------------------------------
+INSERT INTO "units" ("name", "name_normalized", "symbol", "updated_at") VALUES
+  ('mililitro', 'mililitro', 'ml', CURRENT_TIMESTAMP),
+  ('litro',     'litro',     'l',  CURRENT_TIMESTAMP),
+  ('gramo',     'gramo',     'gr', CURRENT_TIMESTAMP),
+  ('kilogramo', 'kilogramo', 'kg', CURRENT_TIMESTAMP);
 
 -- AlterTable — la unidad del producto pasa a ser una referencia al catalogo. OPCIONAL
 -- (decision cerrada 7, R10).

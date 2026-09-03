@@ -2,8 +2,8 @@
 //
 // Lo que se vigila aqui es el ARBOL DE ARCHIVOS y el TEXTO de los fuentes, no el
 // comportamiento: que el contrato publico solo reexporte dominio, que las carpetas sean las
-// tres de la guardia, que nada de servidor sea alcanzable desde el barrel, que la tabla
-// `units` la toque UN solo archivo, que `inventario` y `recetas` no sepan de `unidades` mas
+// tres de la guardia, que nada de servidor sea alcanzable desde el barrel, que NINGUN archivo
+// del repo consulte la tabla `units`, que `inventario` y `recetas` no sepan de `unidades` mas
 // que por su barrel, que el catalogo no publique ninguna conversion, y que esta ficha no
 // abra ningun flujo navegable. Mismo patron —y buena parte de los mismos ayudantes— que
 // `tests/unit/recetas/module-contract.test.ts` (QC-24) y
@@ -13,7 +13,17 @@
 // feature (`design.md > 9`, fila «Unitario») en vez de como efecto colateral de una guardia
 // que manana podria cambiar de alcance.
 //
-// Cubre R14, R16, R17, R19 y R27; y refuerza R4.
+// ACTUALIZADO el 2026-09-03 (ronda 3), cuando el humano retiro el aparato del seed y el
+// conjunto arrancador paso a ser un `INSERT` de la migracion. Dos criterios cambiaron de
+// forma —no de exigencia— y esta explicado donde cambian:
+//   * «`prisma.unit` solo aparece en el adaptador driven» ya no tiene sujeto: ese adaptador
+//     no existe. Ahora se afirma que NINGUN archivo del repo consulta la tabla, y el barrido
+//     que lo comprueba se ejercita ademas contra una entrada SINTETICA con una consulta real,
+//     para que la lista vacia no pueda ser vacia por vacuidad.
+//   * «la composicion cablea el seed» se INVIERTE: ni `lib/composition` ni `scripts/seed.ts`
+//     pueden nombrar un seed de unidades. Es la mitad negativa de R26.
+//
+// Cubre R14, R16, R17, R19, R26 (su mitad negativa) y R27; y refuerza R4 y R15.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
@@ -72,11 +82,12 @@ function sourcesIn(dir: string): readonly string[] {
 /**
  * Fuente SIN comentarios: lo que se vigila es el CODIGO, no la prosa. Es el mismo ayudante
  * que usa `tests/unit/recetas/module-contract.test.ts` y no es un detalle cosmetico en esta
- * ficha: hay al menos dos comentarios en el repo que contienen el texto `prisma.unit` para
- * explicar precisamente que solo un archivo puede escribirlo
- * (`lib/modules/unidades/domain/unit-catalog.ts` y la cabecera del propio adaptador). Un
- * barrido sobre el texto crudo leeria la ADVERTENCIA como la INFRACCION y este test no
- * vigilaria nada, molestaria.
+ * ficha: hay comentarios en el repo que contienen el texto `prisma.unit` para explicar
+ * precisamente quien puede escribirlo —`lib/modules/unidades/domain/unit-catalog.ts` dice que
+ * el `UnitCatalog` lo implementara «un adaptador driven DE UNIDADES, el unico que puede tocar
+ * `prisma.unit`»—, y este mismo archivo lo escribe varias veces en prosa. Un barrido sobre el
+ * texto crudo leeria la ADVERTENCIA como la INFRACCION y este test no vigilaria nada,
+ * molestaria.
  *
  * Se quitan los bloques `/* ... *\/` y todo lo que siga a `//` en cada linea. El unico falso
  * negativo posible seria un `prisma.unit` escondido detras de un `//` dentro de una cadena
@@ -96,8 +107,11 @@ export function leerFuente(texto: string): string {
 }
 
 /** Los metodos con los que Prisma consulta una tabla. Lista cerrada a proposito: es lo que
- *  distingue `db.unit.findMany(...)` —una consulta— de `candidate.unit.name`, que es un
- *  campo del dominio y existe hoy en `lib/modules/unidades/domain/seed-units.ts`. */
+ *  distingue `db.unit.findMany(...)` —una consulta— de `candidate.unit.name`, que es un campo
+ *  de un objeto del dominio. Ese segundo caso existio hasta el 2026-09-03 en
+ *  `lib/modules/unidades/domain/seed-units.ts`; el archivo se retiro con el seed, pero el
+ *  predicado tiene que seguir distinguiendolo: el dia que QC-38 escriba un caso de uso que
+ *  reciba `{ unit }` y lea `unit.name`, el barrido no puede ponerse rojo por eso. */
 const METODOS_DE_PRISMA =
   'findMany|findFirst|findFirstOrThrow|findUnique|findUniqueOrThrow|create|createMany|createManyAndReturn|update|updateMany|upsert|delete|deleteMany|count|aggregate|groupBy'
 
@@ -107,10 +121,10 @@ const METODOS_DE_PRISMA =
  *
  * 1. `prisma.unit...` — el cliente compartido, sobre cualquier receptor llamado `prisma`.
  * 2. `<lo que sea>.unit.<metodo de Prisma>(...)` — el delegado sobre un receptor con otro
- *    nombre. Hace falta desde que el adaptador driven se exporta como FABRICA y escribe sus
- *    consultas sobre su parametro (`db.unit.findMany`): sin esta segunda forma, R16 podria
- *    incumplirse en cualquier archivo con solo renombrar el receptor, y el barrido de abajo
- *    quedaria verde por vacio.
+ *    nombre. Hizo falta cuando el adaptador driven del seed consultaba sobre su parametro
+ *    (`db.unit.findMany`), y se queda ahora que ese adaptador no existe: sin esta segunda
+ *    forma, R15/R16 podrian incumplirse en cualquier archivo con solo renombrar el receptor,
+ *    y el barrido de abajo quedaria verde por vacio.
  *
  * NO cuenta un modelo distinto cuyo nombre EMPIECE por `unit` —`prisma.units`,
  * `prisma.unitConversion`—: serian otra tabla. Ni el acceso a un campo `unit` de un objeto
@@ -160,17 +174,12 @@ function reachableFrom(entry: string): readonly string[] {
 }
 
 const barrel = join(unidadesDir, 'index.ts')
-const adaptadorDriven = join(
-  unidadesDir,
-  'adapters',
-  'driven',
-  'persistence',
-  'unit-seed-repository-prisma.ts',
-)
 const unidadesSources = sourcesIn(unidadesDir)
+const migrationsDir = join(repoRoot, 'db', 'migrations')
 
 /** Todo el codigo de aplicacion del repo, mas los scripts: donde podria esconderse una
- *  consulta a `units` que R16 prohibe fuera del adaptador driven de `unidades`. */
+ *  consulta a `units`. Incluye `lib/modules/unidades`: desde la ronda 3 tampoco el propio
+ *  modulo tiene un sitio donde consultarla. */
 const todoElCodigo = [
   ...sourcesIn(join(repoRoot, 'lib')),
   ...sourcesIn(join(repoRoot, 'app')),
@@ -179,6 +188,31 @@ const todoElCodigo = [
   ...sourcesIn(join(repoRoot, 'scripts')),
   ...['middleware.ts'].map((f) => join(repoRoot, f)).filter((f) => existsSync(f)),
 ]
+
+/** Una entrada del barrido: el nombre con el que se reporta, y el texto del fuente. */
+export type EntradaDeBarrido = { readonly nombre: string; readonly fuente: string }
+
+/**
+ * El BARRIDO, como funcion pura: de una lista de fuentes devuelve los nombres de los que
+ * consultan la tabla de unidades, en el orden recibido.
+ *
+ * Se extrae a una funcion —en vez de filtrar la lista de archivos en el sitio— para poder
+ * aplicarla DOS veces en el mismo test: a los archivos reales del repo (donde la respuesta
+ * correcta es la lista vacia) y a esos mismos archivos MAS una entrada sintetica con una
+ * consulta de verdad. Sin la segunda pasada, la primera seria un `toEqual([])` que tambien
+ * saldria verde si el barrido no leyera nada.
+ */
+export function nombresQueConsultanUnidades(
+  entradas: readonly EntradaDeBarrido[],
+): readonly string[] {
+  return entradas.filter((entrada) => consultaTablaDeUnidades(entrada.fuente)).map((e) => e.nombre)
+}
+
+/** Los archivos reales del repo, ya leidos, como entradas del barrido. */
+const entradasReales: readonly EntradaDeBarrido[] = todoElCodigo.map((file) => ({
+  nombre: etiqueta(file),
+  fuente: readFileSync(file, 'utf8'),
+}))
 
 describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcance', () => {
   it("el modulo unidades tiene index.ts, solo carpetas domain/ports/adapters y ningun 'use server' alcanzable desde el barrel", () => {
@@ -195,6 +229,18 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
         .sort(),
     ).toEqual(['driven', 'driving'])
 
+    // Las tres carpetas del armazon nacen VACIAS y sembradas con `.gitkeep`, igual que
+    // `lib/modules/recetas` (`design.md > 5.1`, ronda 3): no hay puerto ni adaptador driven
+    // porque NADIE consulta `units` todavia (R26), y no hay driving porque no hay operacion
+    // que exponer (R27). `sourcesIn` filtra `.tsx?`, asi que una carpeta de solo `.gitkeep`
+    // es una lista vacia de FUENTES, no un error de lectura.
+    for (const vacia of [join(unidadesDir, 'ports'), join(unidadesDir, 'adapters', 'driven')]) {
+      expect(sourcesIn(vacia), `${etiqueta(vacia)} no deberia tener fuentes`).toEqual([])
+      expect(readdirSync(vacia), `${etiqueta(vacia)} deberia tener solo .gitkeep`).toEqual([
+        '.gitkeep',
+      ])
+    }
+
     // El contrato solo reexporta de `./domain`: ni puertos, ni adaptadores, ni nada de fuera.
     const contrato = read(barrel)
     const specs = importSpecifiers(contrato)
@@ -209,9 +255,16 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     // poder importar `@/lib/modules/unidades` sin arrastrar Prisma ni Next.
     const alcanzables = reachableFrom(barrel)
     expect(alcanzables.length).toBeGreaterThan(1)
-    expect(alcanzables, 'el adaptador driven es alcanzable desde el barrel').not.toContain(
-      adaptadorDriven,
-    )
+    for (const file of alcanzables) {
+      // El barrel solo alcanza DOMINIO: ni un puerto ni un adaptador. Antes esto se escribia
+      // como «el adaptador driven del seed no es alcanzable»; ese archivo ya no existe, asi
+      // que la regla se afirma sobre la CAPA y no sobre un nombre concreto, y sigue valiendo
+      // el dia que QC-38 llene esas dos carpetas.
+      expect(
+        toPosix(relative(unidadesDir, file)),
+        `${etiqueta(file)} vive en adapters/ o ports/ y es alcanzable desde el barrel`,
+      ).not.toMatch(/^(adapters|ports)\//)
+    }
     for (const file of alcanzables) {
       const source = read(file)
       const nombre = etiqueta(file)
@@ -230,31 +283,45 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     }
   })
 
-  it('prisma.unit solo aparece en el adaptador driven de unidades', () => {
-    // R16 (y R15): la tabla `units` la toca UN solo archivo de todo el repo. Se barre `lib`,
-    // `app`, `components`, `hooks`, `scripts` y `middleware.ts` — `lib/composition` incluido:
-    // la composicion CABLEA el adaptador, no consulta la tabla.
+  it('ningun archivo del repo consulta la tabla de unidades, y el barrido lo demuestra sobre una consulta real', () => {
+    // R15 y R16, leidos al dia de hoy. El criterio de las rondas 1 y 2 era «`prisma.unit`
+    // aparece EXACTAMENTE en el adaptador driven de `unidades` y en ninguno mas». Ese
+    // adaptador se retiro el 2026-09-03 con el aparato del seed, asi que el criterio se
+    // endurece en vez de aflojarse: la respuesta correcta ya no es «un sitio» sino NINGUNO.
+    //
+    // POR QUE LA LISTA REAL ES VACIA: el catalogo lo siembra el `INSERT` de la propia
+    // migracion (R25), no un caso de uso; y las LECTURAS del catalogo llegaran con QC-38, que
+    // implementara el `UnitCatalog` que publica `domain/unit-catalog.ts` y lo cablea en
+    // `lib/composition`. Hasta entonces no hay un solo archivo de aplicacion con motivo para
+    // tocar `units`.
+    //
+    // QUE LO VOLVERIA ROJO: cualquier `prisma.unit.<metodo>` o `<receptor>.unit.<metodo>` en
+    // `lib`, `app`, `components`, `hooks`, `scripts` o `middleware.ts` —`lib/composition` y
+    // `lib/modules/unidades` incluidos—. Cuando QC-38 anada el suyo, este test se pone rojo a
+    // proposito y su spec tiene que decir cual es el archivo permitido y por que.
     expect(todoElCodigo.length).toBeGreaterThan(0)
-    expect(existsSync(adaptadorDriven), `falta ${etiqueta(adaptadorDriven)}`).toBe(true)
+    expect(entradasReales).toHaveLength(todoElCodigo.length)
+    expect(nombresQueConsultanUnidades(entradasReales)).toEqual([])
 
-    const consultan = todoElCodigo
-      .filter((file) => consultaTablaDeUnidades(readFileSync(file, 'utf8')))
-      .map(etiqueta)
-    expect(consultan).toEqual([
-      'lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts',
+    // Y la MISMA funcion, sobre los MISMOS archivos reales mas una entrada sintetica con una
+    // consulta de verdad, devuelve exactamente esa. Esto es lo que sustituye al viejo «y ese
+    // archivo la consulta de verdad»: sin esta segunda pasada, el `toEqual([])` de arriba
+    // seria verde tambien si el barrido no leyera nada o si el predicado hubiera dejado de
+    // reconocer una consulta.
+    const sintetico: EntradaDeBarrido = {
+      nombre: '<sintetico>',
+      fuente: 'export async function x(prisma: unknown) { await prisma.unit.findMany({}) }',
+    }
+    expect(nombresQueConsultanUnidades([...entradasReales, sintetico])).toEqual(['<sintetico>'])
+    // Tambien con el receptor renombrado, que es la forma por la que se escaparia: el barrido
+    // no depende de que el cliente se llame `prisma`.
+    const conOtroReceptor: EntradaDeBarrido = {
+      nombre: '<sintetico-db>',
+      fuente: 'await db.unit.create({ data })',
+    }
+    expect(nombresQueConsultanUnidades([...entradasReales, conOtroReceptor])).toEqual([
+      '<sintetico-db>',
     ])
-
-    // Y ese archivo la consulta de verdad, con las DOS operaciones que el puerto pide: si el
-    // unico sitio permitido se vaciara, la asercion de arriba seguiria verde por vacio. Se
-    // escribe sin fijar el nombre del receptor porque el adaptador es una fabrica y consulta
-    // sobre su parametro (`db.unit.findMany`), no sobre el cliente compartido.
-    const adaptador = read(adaptadorDriven)
-    expect(adaptador, 'el adaptador driven ya no lee la tabla de unidades').toMatch(
-      /[A-Za-z0-9_$]\s*\.\s*unit\s*\.\s*findMany\s*\(/,
-    )
-    expect(adaptador, 'el adaptador driven ya no escribe en la tabla de unidades').toMatch(
-      /[A-Za-z0-9_$]\s*\.\s*unit\s*\.\s*create\s*\(/,
-    )
   })
 
   it('el criterio de «consulta prisma.unit» distingue codigo de comentario, y cae ante una consulta real', () => {
@@ -280,8 +347,11 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(consultaTablaDeUnidades('await prisma.units.findMany({})')).toBe(false)
     expect(consultaTablaDeUnidades('await prisma.unitConversion.findMany({})')).toBe(false)
     // Y un campo `unit` de un objeto del dominio, que no es un delegado de Prisma. Este caso
-    // EXISTE hoy en `lib/modules/unidades/domain/seed-units.ts` (`candidate.unit.name`): si
-    // el predicado lo contara, el barrido de arriba seria rojo por algo que no es R16.
+    // EXISTIO hasta el 2026-09-03 en `lib/modules/unidades/domain/seed-units.ts`
+    // (`candidate.unit.name`), retirado con el seed. El predicado tiene que seguir
+    // distinguiendolo igual: en cuanto QC-38 escriba un caso de uso que reciba una unidad y
+    // lea su nombre, un predicado mas grosero pondria el barrido rojo por algo que no es
+    // R15/R16, y la respuesta seria aflojar el barrido. Se prueba aqui para que no ocurra.
     expect(consultaTablaDeUnidades('createdUnits.push(candidate.unit.name)')).toBe(false)
     expect(consultaTablaDeUnidades('const s = candidate.unit.symbol')).toBe(false)
   })
@@ -348,13 +418,26 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     const campos = [...cuerpoUnitRef.matchAll(/(\w+)\s*:/g)].map((m) => m[1])
     expect(campos).toEqual(['id', 'name', 'symbol'])
 
-    // Tampoco hay una tabla de equivalencias escondida en el conjunto arrancador.
-    const starter = read(join(unidadesDir, 'domain', 'starter-units.ts'))
-    const cuerpoStarterUnit = /export type StarterUnit = \{([^}]*)\}/.exec(starter)?.[1] ?? ''
-    expect([...cuerpoStarterUnit.matchAll(/(\w+)\s*:/g)].map((m) => m[1])).toEqual([
-      'name',
-      'symbol',
-    ])
+    // Tampoco hay una tabla de equivalencias escondida en el conjunto arrancador. Desde el
+    // 2026-09-03 el arrancador no es `domain/starter-units.ts` —retirado con el seed— sino el
+    // `INSERT` de la migracion, asi que la comprobacion se hace DONDE AHORA VIVE EL DATO: las
+    // columnas que ese INSERT rellena son exactamente el nombre, el nombre normalizado, el
+    // simbolo y la marca de modificacion. Ni `factor`, ni `base`, ni `equivalencia`: si algun
+    // dia alguien las anade al arrancador, tendra que anadirlas ahi y este test cae.
+    const arrancadores = readdirSync(migrationsDir).filter((name) =>
+      name.endsWith('_units_catalog'),
+    )
+    expect(arrancadores, 'debe existir exactamente una migracion *_units_catalog').toHaveLength(1)
+    const sqlDelArrancador = readFileSync(
+      join(migrationsDir, arrancadores[0] as string, 'migration.sql'),
+      'utf8',
+    )
+    const insert = /INSERT INTO "units"\s*\(([^)]*)\)/.exec(sqlDelArrancador)
+    expect(insert, 'la migracion ya no inserta el conjunto arrancador').not.toBeNull()
+    const columnasDelInsert = [
+      ...((insert as RegExpExecArray)[1] as string).matchAll(/"(\w+)"/g),
+    ].map((match) => match[1])
+    expect(columnasDelInsert).toEqual(['name', 'name_normalized', 'symbol', 'updated_at'])
   })
 
   it('ProductRef, ProductView, NewProduct y el esquema zod de producto usan unitId y ningun texto de unidad', () => {
@@ -393,7 +476,8 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
   })
 
   it('la feature no anade adaptadores driving, rutas ni Server Actions', () => {
-    // R27: esta ficha es esquema, migracion, seed y armazon. Ningun alta, edicion ni borrado
+    // R27: esta ficha es esquema, migracion —con su arrancador en SQL— y armazon del modulo.
+    // Ningun alta, edicion ni borrado
     // de unidades —eso es QC-38— y por tanto ningun flujo navegable que un E2E pueda visitar
     // (decision cerrada 18).
     const driving = join(unidadesDir, 'adapters', 'driving')
@@ -425,14 +509,28 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       )
     }
 
-    // `lib/composition` SI se toca en esta ficha (`design.md > 5.4`), pero solo para cablear
-    // el seed: es lo unico que `unidades` expone hoy.
+    // MITAD NEGATIVA DE R26, y el criterio esta INVERTIDO respecto a las rondas 1 y 2: ahi se
+    // exigia que `lib/composition` nombrara `seedStarterUnits`. Desde el 2026-09-03
+    // `lib/composition` vuelve a quedar SIN NADA de `unidades` (`design.md > 5.4`, anulada) y
+    // `scripts/seed.ts` vuelve a hablar solo de roles y usuario inicial (QC-6): no hay seed de
+    // aplicacion que cree, actualice o pise unidades del catalogo. Esta es la asercion que se
+    // pone roja si alguien reintroduce ese aparato por la puerta de atras.
     const composicion = sourcesIn(join(repoRoot, 'lib', 'composition'))
       .map((file) => read(file))
       .join('\n')
-    expect(composicion).toMatch(/seedStarterUnits/)
-    expect(composicion, 'la composicion cablea algo mas que el seed').not.toMatch(
+    expect(composicion.length).toBeGreaterThan(0)
+    expect(composicion, 'la composicion volvio a cablear un seed de unidades').not.toMatch(
+      /STARTER_UNITS|[sS]eedStarterUnits|[uU]nitSeedRepository|unit-seed-repository|seed-units/,
+    )
+    expect(composicion, 'la composicion nombra el dominio, un puerto o un adaptador de unidades')
+      .not.toMatch(/modules\/unidades\/(adapters|ports|domain)/)
+    expect(composicion, 'la composicion cablea alguna operacion de unidades').not.toMatch(
       /unitCatalog|createUnit|updateUnit|deleteUnit/i,
     )
+
+    // Y `db:seed` no sabe de unidades: el catalogo nace con su migracion, no con este script.
+    const seedScript = read(join(repoRoot, 'scripts', 'seed.ts'))
+    expect(seedScript.length).toBeGreaterThan(0)
+    expect(seedScript, 'scripts/seed.ts volvio a sembrar unidades').not.toMatch(/unidades|unit/i)
   })
 })

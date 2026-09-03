@@ -99,26 +99,34 @@ describe('normalizeUnitName — forma canonica del nombre de una unidad', () => 
 
   it('unidades distintas siguen siendo claves distintas: litro no colisiona con mililitro', () => {
     // R4 no puede fundir dos unidades del conjunto arrancador (`design.md > 6.1`): si lo
-    // hiciera, el seed crearia cuatro y no cinco, y R25 caeria.
+    // hiciera, el `INSERT` de la migracion chocaria contra el indice unico de R5 y la
+    // migracion entera no aplicaria, con lo que R25 caeria.
     expect(normalizeUnitName('litro')).toBe('litro')
     expect(normalizeUnitName('mililitro')).toBe('mililitro')
     expect(normalizeUnitName('litro')).not.toBe(normalizeUnitName('mililitro'))
 
-    // Y los cinco nombres arrancadores dan cinco claves distintas.
-    const arrancadoras = ['kilogramo', 'gramo', 'litro', 'mililitro', 'unidad']
-    expect(new Set(arrancadoras.map(normalizeUnitName)).size).toBe(5)
+    // Y los cuatro nombres arrancadores dan cuatro claves distintas. Se comprueba tambien con
+    // «unidad», que estuvo en el arrancador hasta el 2026-09-03 y que QC-38 podria dar de alta
+    // a mano: cinco nombres, cinco claves.
+    const arrancadoras = ['kilogramo', 'gramo', 'litro', 'mililitro']
+    expect(new Set(arrancadoras.map(normalizeUnitName)).size).toBe(4)
+    expect(new Set([...arrancadoras, 'unidad'].map(normalizeUnitName)).size).toBe(5)
   })
 
-  it('los simbolos L y mL tampoco se funden al normalizar, y no se normalizan en ninguna parte', () => {
+  it('los simbolos del litro y del mililitro tampoco se funden al normalizar, y no se normalizan en ninguna parte', () => {
     // `design.md > 6.1`: «la normalizacion ignora mayusculas, asi que `litro` y `mililitro`
     // son claves distintas y no chocan. Los simbolos no se normalizan ni se comparan (R7)».
     // Aqui se comprueba la mitad que es propiedad de esta funcion: aplicada a los dos
     // simbolos daria claves distintas —o sea que ni siquiera colisionarian si algun dia
     // alguien los normalizara—. Que el simbolo NO pasa por aqui al guardarse lo vigila
-    // `seed-units.test.ts` (se persiste 'L' y 'mL', tal cual).
+    // `schema/unidades-migration.test.ts`: los simbolos arrancadores son 'l' y 'ml' desde el
+    // 2026-09-03 y el `INSERT` de la migracion los escribe tal cual, sin normalizar. Se sigue
+    // probando con 'L' y 'mL' —las mayusculas que tenian hasta esa fecha— porque es el caso en
+    // el que la funcion PODRIA fundir dos simbolos distintos, y no lo hace.
     expect(normalizeUnitName('L')).toBe('l')
     expect(normalizeUnitName('mL')).toBe('ml')
     expect(normalizeUnitName('L')).not.toBe(normalizeUnitName('mL'))
+    expect(normalizeUnitName('l')).not.toBe(normalizeUnitName('ml'))
   })
 
   it('es idempotente: normalizar una clave ya normalizada devuelve la misma clave', () => {

@@ -465,3 +465,231 @@ menor-1 (comentario en `down.sql`), menor-3 (el flake conocido de `dev` es
 `tests/ui/login-form-uncontrolled-warning.test.tsx`, corregido arriba) y menor-4 (la fila de
 `.gitkeep` de la tabla de `design.md > 1`, alineada con la § 5.1). **menor-2 y menor-5 no se tocan**:
 son anotaciones, no defectos.
+
+---
+
+## Ronda 3 — el arrancador pasa a la migracion
+
+**No reescribe las rondas 1 y 2**: las continua. El 2026-09-03, con el PR #22 abierto y el gate
+verde, el humano corrigio el alcance: «no existe nada relacionado con unidades de medida asi que
+ese seeder y mapeo esta de sobra, genera un seed mediante migracion con las unidades basicas, ml,
+l, gr y kg, remueve el otro seed». Al acotarlo cerro las dos ambiguedades: las filas van con
+**nombre completo y simbolo**, **cuatro y no cinco**; y «mapeo» era **solo el aparato del seed**
+—el reapuntado a `unit_id` y las dos guardias de datos se quedan, que son el nucleo de la ficha—.
+
+Tasks nuevas: **T15** (mover el arrancador al SQL y retirar el seed) y **T16** (remapear R25/R26 y
+rehacer el criterio del contrato), en `specs/QC-32-modelo-unidades/tasks.md > Bloque G`. Reparto:
+`backend_dev` hizo el codigo y los tests; el ciclo contra Postgres real lo corri yo.
+
+### 1. Lo que se borro
+
+| Archivo | Que era |
+| --- | --- |
+| `lib/modules/unidades/domain/starter-units.ts` | `STARTER_UNITS`, las cinco unidades como dato del dominio |
+| `lib/modules/unidades/domain/seed-units.ts` | el caso de uso idempotente `createSeedStarterUnits` |
+| `lib/modules/unidades/ports/unit-seed-repository.ts` | el puerto que ese caso de uso pedia |
+| `lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts` | su adaptador Prisma (y la carpeta `persistence/`) |
+| `tests/unit/unidades/domain/seed-units.test.ts` | el seed con dobles del puerto |
+| `tests/unit/unidades/seed-wiring.test.ts` | que la composicion y `scripts/seed.ts` lo invocaban |
+| `tests/integration/unidades/unidades-seed.int.test.ts` | el seed contra base real |
+
+Y ademas: el `export const unidades = { seedStarterUnits }` de `lib/composition/index.ts` con sus
+dos imports; la llamada y el `console.log` de unidades de `scripts/seed.ts`; y los dos reexports
+del barrel `lib/modules/unidades/index.ts`, que queda con `normalizeUnitName` y los tipos de
+`unit-catalog`. `lib/modules/unidades/ports/` y `adapters/driven/` quedan con `.gitkeep`, **igual
+que `lib/modules/recetas`** —el precedente del repo para un modulo que hoy es solo modelo y
+contrato—. `tests/integration/unidades/unidades-constraints.int.test.ts` **se queda entero**:
+nunca dependio del seed, cada caso crea sus propias filas dentro de su transaccion.
+
+`down.sql` **no se toco**: su `DROP TABLE "units"` se lleva las cuatro filas, y su guardia mira lo
+que apunta al catalogo, no el catalogo.
+
+### 2. Como quedaron R25 y R26
+
+Los dos enunciados viejos se conservan citados en `requirements.md`; los nuevos:
+
+- **R25** — cuando se aplica la migracion, el catalogo queda con **exactamente** las cuatro
+  unidades arrancadoras (`mililitro`/`ml`, `litro`/`l`, `gramo`/`gr`, `kilogramo`/`kg`, nombres en
+  minuscula, las cuatro con simbolo) y ninguna mas.
+- **R26** — el `name_normalized` persistido de cada una coincide con lo que produce sobre su
+  nombre la **unica definicion** de la normalizacion (R4); y **no** existe ningun seed de
+  aplicacion —caso de uso, puerto, adaptador, cableado o llamada— que cree, actualice o pise
+  unidades.
+
+R26 dejo de hablar de idempotencia a proposito: una migracion se aplica una vez y eso lo garantiza
+`_prisma_migrations`. Lo que si es un riesgo real, y no lo era antes, es que **`name_normalized` se
+escribe LITERAL en el SQL** —no hay forma de llamar a `normalizeUnitName` desde una migracion—:
+un duplicado de la unica definicion de R4 que se puede desincronizar en silencio. Eso es lo que
+R26 vigila ahora, y de paso cierra la consecuencia que el reviewer anoto en **menor-2** («ningun
+test comprueba que `name_normalized` se llene con la salida de `normalizeUnitName`») para las
+filas arrancadoras; para el alta a mano sigue siendo de QC-38.
+
+Tests a los que se mapean, en `tests/unit/unidades/schema/unidades-migration.test.ts`
+(`describe('migration.sql — el conjunto arrancador')`), con predicados puros exportados y
+mutaciones en memoria:
+
+| R | Test | Muerde porque |
+| --- | --- | --- |
+| R25 | «las cuatro filas, en orden, con su nombre y su simbolo» | cae con una quinta fila (bien normalizada a proposito, para que caiga R25 y no R26) y cae si se quita el `INSERT` |
+| R26 | «el `name_normalized` literal coincide con `normalizeUnitName`» | importa la funcion REAL y la aplica a los literales extraidos del SQL; cae si se muta un normalizado a `Mililitro` |
+| R25/R26 | «el `INSERT` va entre el `CREATE TABLE` y el `FORCE ROW LEVEL SECURITY`» | cae si se mueve el `INSERT` detras del `FORCE` |
+| R26 (mitad negativa) | `module-contract.test.ts` · «la composicion no cablea ningun seed de unidades y `scripts/seed.ts` no las nombra» | cae si se reintroduce el cableado |
+
+**Esto disuelve MAYOR-1** de `progress/review_QC-32-modelo-unidades.md`: el hallazgo era que R25 y
+R26 estaban mapeados a tests que ejercitaban una **copia** del adaptador de produccion. Sin
+adaptador y sin seed, ese objeto ya no existe, y R25/R26 apuntan ahora al SQL que crea las filas y
+a la funcion que las normaliza. **El informe del reviewer no se borra**: la ronda 1 y su rechazo
+se quedan en el historial.
+
+### 3. `module-contract.test.ts`: por que no queda mas flojo
+
+El test vigilaba con `toEqual` la lista **exacta** de archivos que consultan `units` y esperaba
+**uno** (el adaptador driven), rematando con «y ese archivo la consulta de verdad» para que la
+lista no valiera por vacuidad. Al desaparecer el adaptador, la lista queda **vacia** y ese remate
+se queda sin sujeto.
+
+El criterio nuevo: el barrido es una **funcion pura exportada**
+(`nombresQueConsultanUnidades(entradas)`), sobre el mismo predicado `consultaTablaDeUnidades`
+—intacto, con su test de sensibilidad entero—, y se aplica **tres** veces:
+
+1. a los archivos **reales** (`lib`, `app`, `components`, `hooks`, `scripts`, `middleware.ts`,
+   `lib/modules/unidades` incluido) da la lista vacia, con `todoElCodigo.length > 0` y
+   comprobando que se leyeron todos;
+2. a esos mismos **mas una entrada sintetica** con `await prisma.unit.findMany({})`, la sintetica
+   sale señalada;
+3. y otra con el receptor renombrado (`db.unit.create`), tambien sale señalada.
+
+O sea: el criterio pasa de «exactamente un sitio» a **«ninguno»**, que es mas estricto, y la misma
+cañeria que devuelve la lista vacia devuelve el sintetico, asi que esa lista no puede estar vacia
+por vacuidad. Queda escrito en el propio test por que es vacia y que la volveria roja. Comprobado
+en **rojo de verdad** por `backend_dev`: añadiendo `prisma.unit.findMany()` a `domain/unit-name.ts`
+fallan dos casos (`expected [ Array(1) ] to deeply equal []` y el del cierre del barrel); archivo
+restaurado, `git diff` limpio.
+
+Ademas: desaparece `adaptadorDriven`; el cierre transitivo del barrel afirma ahora que ningun
+archivo alcanzable vive bajo `adapters/` ni `ports/` —regla sobre la **capa**, no sobre un nombre,
+y sigue valiendo cuando QC-38 llene esas carpetas—; el trozo que leia `starter-units.ts` para R14
+se sustituye por la lista de columnas del `INSERT`, que tiene que ser exactamente
+`name, name_normalized, symbol, updated_at` (ni factor, ni base, ni equivalencia); y la asercion
+final se **invierte** (la composicion no puede nombrar el seed ni el adaptador, `scripts/seed.ts`
+no puede nombrar `unidades`).
+
+**Limite conocido, anotado y no arreglado aqui:** el barrido cubre `lib`, `app`, `components`,
+`hooks`, `scripts` y `middleware.ts`, **no `tests/`**.
+`tests/integration/inventario/product-crud.int.test.ts` usa `prisma.unit.deleteMany` para limpiar
+su unidad de prueba, y es legitimo. Extender la frontera a los tests seria una decision, no un
+arreglo de esta tanda: queda para el humano.
+
+### 4. La migracion, contra Postgres real (esto es lo que cierra R25 en su forma real)
+
+Corrido por el **implementer** contra la base local, no por un subagente. La migracion **no estaba
+mergeada**, asi que se edito **en su sitio** en vez de apilar otra encima. Cinco pasos:
+
+**Paso 0 · Punto de partida.** La base venia con la migracion aplicada y con las **cinco** unidades
+que sembro el seed viejo (`kilogramo/kg`, `gramo/g`, `litro/L`, `mililitro/mL`, `unidad/null`).
+`pnpm run db:rollback` da `20260903121404_units_catalog revertida.` (exit 0). Estado despues:
+`units existe: null` · `products.unit` vuelve `text` anulable · `recipe_lines.unit` vuelve
+`text NOT NULL` · sin FK · sin RLS. El `DROP TABLE` se llevo las cinco filas viejas, que es como
+se limpio el rastro del seed retirado.
+
+**Paso 1 · La guardia del UP (R22) sigue mordiendo, ahora con el `INSERT` dentro.** Sembrados a
+mano una presentacion y un producto con `unit = 'kg'`, y `pnpm run db:migrate`:
+
+```
+Applying migration `20260903121404_units_catalog`
+Error: P3018 · Database error code: P0001
+ERROR: QC-32: hay 1 producto(s) y 0 linea(s) de receta con unidad escrita. La migracion se
+detiene para no perder ese dato: reabre la decision (specs/QC-32-modelo-unidades/requirements.md,
+pregunta abierta 2) antes de aplicarla.
+=== EXIT: 1 ===
+```
+
+Y el estado despues del fallo, que es la otra mitad de R22:
+
+```
+units existe                : null          <- NO se creo, y NINGUNA fila arrancadora se inserto
+products.unit sigue siendo  : text / YES
+recipe_lines.unit sigue     : text / NO
+el dato NO se perdio        : [{"name":"QC32 R3 TMP Producto","unit":"kg"}]
+registro de la migracion    : finished_at null
+```
+
+Borradas las filas de prueba y `prisma migrate resolve --rolled-back 20260903121404_units_catalog`
+da «marked as rolled back», que es el paso obligatorio para reintentar.
+
+**Paso 2 · Aplicar de verdad y comprobar las cuatro filas.** `pnpm run db:migrate` da
+`All migrations have been successfully applied.` (exit 0). Leido de la base, no del texto del SQL:
+
+```
+total filas: 4
+gramo     | name_normalized=gramo     | symbol=gr | created_at NOT NULL | updated_at NOT NULL
+kilogramo | name_normalized=kilogramo | symbol=kg | created_at NOT NULL | updated_at NOT NULL
+litro     | name_normalized=litro     | symbol=l  | created_at NOT NULL | updated_at NOT NULL
+mililitro | name_normalized=mililitro | symbol=ml | created_at NOT NULL | updated_at NOT NULL
+FK  : products_unit_id_fkey confdeltype=r confupdtype=c · recipe_lines_unit_id_fkey idem
+RLS : relrowsecurity=true · relforcerowsecurity=true
+columnas: products.unit_id uuid YES · recipe_lines.unit_id uuid NO · ninguna columna `unit`
+```
+
+Cuatro filas y **ninguna mas**; «unidad» no esta; las cuatro con simbolo; `updated_at` relleno
+—que es por lo que va explicito en el `INSERT`, la columna es `NOT NULL` sin default—. Y el
+`INSERT` inserto **a pesar** de que la misma migracion activa `FORCE ROW LEVEL SECURITY` unas
+lineas mas abajo: por eso el sitio del `INSERT` no es cosmetico.
+
+**Paso 3 · El normalizado de la base contra la funcion real (R26, forma real).** Script que lee
+`units` y aplica `normalizeUnitName` de `lib/modules/unidades/domain/unit-name.ts` a cada nombre:
+
+```
+gramo       | symbol=gr  | en la base='gramo'     | normalizeUnitName()='gramo'     | COINCIDE
+kilogramo   | symbol=kg  | en la base='kilogramo' | normalizeUnitName()='kilogramo' | COINCIDE
+litro       | symbol=l   | en la base='litro'     | normalizeUnitName()='litro'     | COINCIDE
+mililitro   | symbol=ml  | en la base='mililitro' | normalizeUnitName()='mililitro' | COINCIDE
+filas: 4 | veredicto: OK
+```
+
+**Paso 4 · La guardia del DOWN (R24) sigue mordiendo, y ahora con una unidad ARRANCADORA.** Un
+producto apuntando a `kilogramo` (la fila que crea la propia migracion), y `pnpm run db:rollback`:
+
+```
+db:rollback: la reversion de 20260903121404_units_catalog fallo y no se aplico nada
+(transaccion deshecha): QC-32 down: hay 1 fila(s) apuntando a una unidad del catalogo. Revertir
+borraria esa referencia sin poder reconstruir el texto anterior: vacia o migra esas filas a mano
+antes de revertir.
+=== EXIT: 1 ===
+```
+
+Y no toco nada: `units` sigue con sus **4** filas, las dos FK siguen, el RLS sigue, la migracion
+sigue aplicada y la referencia sigue viva. Las cuatro filas arrancadoras **sin** referencias no
+bloquean la reversion —la guardia mira lo que apunta al catalogo, no el catalogo—, y eso es lo
+correcto.
+
+**Paso 5 · Ciclo completo `rollback` y `migrate`.** Borradas las filas de prueba,
+`pnpm run db:rollback` termina en exit 0, `units existe: null`, `unit` vuelve `text` y
+`text NOT NULL` en las dos tablas, sin FK ni RLS residual. `pnpm run db:migrate` termina en exit 0
+y las **cuatro filas vuelven a estar**, con el mismo veredicto `OK` del paso 3. El `down.sql` se
+lleva las filas sin necesitar ningun `DELETE`, y reaplicar las reconstruye.
+
+**De propina:** `pnpm run db:seed` imprime `db:seed: nada que crear` y **ni una linea de unidades**
+(exit 0), y el catalogo sigue con sus cuatro filas intactas. El seed de QC-6 vuelve a ocuparse
+solo de roles y usuario inicial.
+
+### 5. Gate de esta tanda (el completo lo corre el leader)
+
+De `backend_dev`, que por su rol **no** corre la suite entera:
+
+- `pnpm typecheck` — limpio (exit 0, sin salida).
+- `pnpm lint` — limpio (exit 0, sin salida).
+- `pnpm exec vitest --run tests/unit/unidades` — **4 archivos, 47 tests, verde** (423 ms).
+- `pnpm exec vitest related --run` sobre los archivos tocados — **22 archivos, 230 tests, verde**
+  (14,95 s).
+- `pnpm exec vitest run guard` — **12 archivos, 123 tests, verde**.
+
+El flake conocido de `dev` (`tests/ui/login-form-uncontrolled-warning.test.tsx`) no aparecio.
+**`./init.sh` completo y la suite entera los corre el leader**, y son los que mandan antes del PR.
+
+### 6. Veredicto de la ronda 3
+
+Hecho lo que pedia el cambio de alcance: el arrancador vive en la migracion con sus cuatro filas,
+el aparato del seed no existe, R25 y R26 dicen lo que ahora es verdad y muerden, el criterio del
+contrato quedo **mas** estricto que antes, y el reapuntado a `unit_id` y las dos guardias de datos
+siguen intactos y verificados contra base real. No me autoapruebo: decide el reviewer.

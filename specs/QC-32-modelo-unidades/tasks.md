@@ -18,6 +18,14 @@ lo resuelve **antes** de arrancar el bloque C.
 conservando lo que el requisito de su feature vigila y con el porqué fechado dentro del propio
 test. Van todos en T12, no repartidos por ahí.
 
+**Ronda 3 — 2026-09-03.** El humano corrigió el alcance con T0–T14 ya hechas y el PR #22 abierto:
+el conjunto arrancador pasa a ser **cuatro filas de la propia migración** y el aparato del seed se
+retira entero (`requirements.md` > decisión cerrada del 2026-09-03, `design.md > 6`). **No se
+borra nada del historial de abajo**: T5 y las partes de T9 y T11 que hablaban del seed se marcan
+como **ANULADAS**, con lo que se hizo y por qué dejó de aplicar, y lo nuevo entra como **T15 y
+T16**. Lo que **no** se toca: T1–T3 (salvo el `INSERT` que T15 añade a `migration.sql`), T6, T7,
+T8, T10 y T12.
+
 ---
 
 ## Bloque A — Preparación
@@ -104,7 +112,11 @@ test. Van todos en T12, no repartidos por ahí.
 - **Hecho cuando:** `pnpm run typecheck` y `pnpm run lint` pasan y
   `tests/guards/guard-arquitectura-modulos.test.ts` sigue verde con el módulo nuevo dentro.
 
-### [x] T5. El seed arrancador: caso de uso, puerto, adaptador y cableado
+### [x] ~~T5.~~ **ANULADA en la ronda 3 (2026-09-03)** — El seed arrancador: caso de uso, puerto, adaptador y cableado
+> Se hizo en la ronda 1 y se endureció en la ronda 2 (cierre de MAYOR-1 del review). El humano
+> retiró el alcance el 2026-09-03: todo lo que esta task construyó **se ha borrado** en T15, y su
+> «hecho cuando» (`pnpm run db:seed` dos veces) ya no aplica porque `scripts/seed.ts` no siembra
+> unidades. Se deja escrita tal cual para que se lea qué existió.
 - Dep: T1 (necesita el cliente Prisma con `Unit`), T4.
 - Archivos: `lib/modules/unidades/domain/seed-units.ts`,
   `lib/modules/unidades/ports/unit-seed-repository.ts`,
@@ -171,6 +183,10 @@ test. Van todos en T12, no repartidos por ahí.
   **solo** en el adaptador driven de `unidades`; `inventario` y `recetas` importan `unidades`
   **solo por el barrel**; y la feature **no** crea adaptadores driving, rutas ni Server Actions.
 - **Hecho cuando:** pasan y cubren R4, R14, R16, R17, R19, R25, R26, R27.
+- **Ronda 3 (2026-09-03):** la parte de `seed-units` **queda anulada** (el archivo y su test se
+  borran en T15) y `module-contract` **se rehace** en T16: R25 y R26 pasan a cerrarse en
+  `unidades-migration.test.ts`. `unit-name` no cambia salvo un comentario que citaba símbolos que
+  ya no existen.
 
 ---
 
@@ -211,6 +227,10 @@ test. Van todos en T12, no repartidos por ahí.
 - Casos exactos: los de la tabla de trazabilidad, columna **I**.
 - **Hecho cuando:** todos pasan y cubren R1, R2, R3, R5, R7, R9, R10, R11, R12, R13, R14, R18,
   R25, R26.
+- **Ronda 3 (2026-09-03):** `unidades-seed.int.test.ts` **se borra** en T15 (probaba el seed
+  retirado), así que esta task ya **no** cubre R25 ni R26; los cubre `unidades-migration.test.ts`
+  (T16) más el ciclo contra base real de T15. `unidades-constraints.int.test.ts` **se queda
+  entero**: nunca dependió del seed.
 
 ---
 
@@ -256,16 +276,69 @@ test. Van todos en T12, no repartidos por ahí.
 
 ---
 
+## Bloque G — Ronda 3: el arrancador pasa a la migración (2026-09-03)
+
+Añadido tras la corrección de alcance del humano, con T0–T14 ya cerradas. No sustituye al
+historial de arriba: lo continúa.
+
+### [x] T15. Mover el arrancador al SQL y retirar el aparato del seed
+- Dep: T1–T14 (todas hechas).
+- Archivos que **se modifican**: `db/migrations/20260903121404_units_catalog/migration.sql` (el
+  `INSERT` de las cuatro filas), `lib/modules/unidades/index.ts`, `lib/composition/index.ts`,
+  `scripts/seed.ts`, `tests/unit/unidades/domain/unit-name.test.ts` (solo un comentario).
+- Archivos que **se crean**: `lib/modules/unidades/ports/.gitkeep`,
+  `lib/modules/unidades/adapters/driven/.gitkeep` (precedente: `lib/modules/recetas`).
+- Archivos que **se borran**: `lib/modules/unidades/domain/starter-units.ts`,
+  `lib/modules/unidades/domain/seed-units.ts`,
+  `lib/modules/unidades/ports/unit-seed-repository.ts`,
+  `lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts`,
+  `tests/unit/unidades/domain/seed-units.test.ts`, `tests/unit/unidades/seed-wiring.test.ts`,
+  `tests/integration/unidades/unidades-seed.int.test.ts`.
+- El `INSERT` va **después** del índice único y **antes** del `FORCE ROW LEVEL SECURITY`
+  (`design.md > 6.1`): con el FORCE puesto y sin policies, ni el dueño inserta.
+- La migración **no está mergeada**: se edita **en su sitio**, no se apila otra encima.
+- **No se toca** la guardia de datos del UP, ni la del DOWN, ni las FK, ni los `DROP COLUMN`, ni
+  el RLS, ni el reapuntado a `unit_id`.
+- **Hecho cuando:** `pnpm typecheck` y `pnpm lint` pasan, no queda ninguna referencia colgando a
+  `STARTER_UNITS`/`seedStarterUnits`/`unitSeedRepositoryPrisma` en código, y el ciclo real
+  `db:migrate` → comprobar las cuatro filas → `db:rollback` → `db:migrate` termina como se
+  espera, con las dos guardias de datos aún fallando cuando deben. Evidencia pegada en
+  `progress/impl_QC-32-modelo-unidades.md > Ronda 3`.
+
+### [x] T16. Remapear R25 y R26 a tests que muerdan, y rehacer el criterio del contrato
+- Dep: T15.
+- Archivos: `tests/unit/unidades/schema/unidades-migration.test.ts`,
+  `tests/unit/unidades/module-contract.test.ts`.
+- **R25 y R26** pasan al bloque «el conjunto arrancador» de `unidades-migration.test.ts`: las
+  cuatro filas en orden con su nombre y símbolo y ninguna más; `normalizeUnitName(name) ===
+  name_normalized` **importando la función real**, que es lo único que detecta que el literal del
+  SQL y la normalización se han desincronizado; el `INSERT` antes del `FORCE`; y tres mutaciones
+  de sensibilidad en memoria (cambiar un normalizado, quitar el `INSERT`, añadir una quinta fila).
+- **`module-contract.test.ts` se rehace sin aflojarlo.** Su lista `toEqual` de archivos que
+  consultan `units` queda **vacía** al desaparecer el adaptador, y la aserción «y ese archivo la
+  consulta de verdad» se queda sin sujeto. El criterio nuevo: el barrido es una **función pura**
+  que se aplica dos veces —a los archivos reales, que deben dar `[]`, y a esos mismos **más una
+  entrada sintética** con `prisma.unit.findMany`, que **debe** salir señalada—, así que la lista
+  vacía no puede estar vacía por vacuidad. Más la mitad negativa de R26: la composición no nombra
+  ningún seed de unidades y `scripts/seed.ts` no nombra `unidades`. Queda escrito en el propio
+  test por qué la lista es vacía y qué la volvería roja.
+- **Hecho cuando:** pasan, cubren R4, R14, R16, R17, R19, R25, R26, R27, y las mutaciones de
+  sensibilidad se han corrido en rojo de verdad, no solo escritas.
+
+---
+
 ## Trazabilidad
 
 Abreviaturas:
 **S** = `tests/unit/unidades/schema/unidades-schema.test.ts` ·
 **M** = `tests/unit/unidades/schema/unidades-migration.test.ts` ·
 **N** = `tests/unit/unidades/domain/unit-name.test.ts` ·
-**D** = `tests/unit/unidades/domain/seed-units.test.ts` ·
+~~**D** = `tests/unit/unidades/domain/seed-units.test.ts`~~ (borrado en T15) ·
 **C** = `tests/unit/unidades/module-contract.test.ts` ·
 **I** = `tests/integration/unidades/unidades-constraints.int.test.ts` ·
-**IS** = `tests/integration/unidades/unidades-seed.int.test.ts` ·
+~~**IS** = `tests/integration/unidades/unidades-seed.int.test.ts`~~ (borrado en T15) ·
+**T15** = la task T15 de este archivo (evidencia contra base real en
+`progress/impl_QC-32-modelo-unidades.md > Ronda 3`) ·
 **G1** = `tests/guards/guard-rls-force.test.ts` ·
 **G2** = `tests/guards/guard-arquitectura-modulos.test.ts` ·
 **G3** = `tests/guards/guard-dependencias-aprobadas.test.ts` ·
@@ -297,8 +370,21 @@ Abreviaturas:
 | R22 | M · «el UP empieza con la guardia DO $$ que aborta si hay unidad escrita, y el test cae si se quita» | **T10** paso 1 · la migracion falla con el mensaje de la guardia y units no se crea |
 | R23 | M · «down.sql devuelve products.unit a TEXT y recipe_lines.unit a TEXT NOT NULL, y borra units» | **T10** paso 2 · ciclo apply → rollback → apply |
 | R24 | M · «el DOWN empieza con su propia guardia DO $$, y el test cae si se quita» | **T10** paso 3 · el rollback falla con el mensaje de la guardia y no toca nada |
-| R25 | D · «sobre catalogo vacio crea las cinco unidades arrancadoras y ninguna mas» | IS · «db:seed deja las cinco unidades en la base» |
-| R26 | D · «con tres presentes crea solo dos, no actualiza ninguna existente, y dos corridas dejan el mismo estado» | IS · «una segunda corrida no crea nada y no pisa una unidad renombrada a mano» |
+| R25 | M · «el INSERT del arrancador deja exactamente las cuatro unidades, en orden, con su nombre y su simbolo» (y cae si se anade una quinta o se quita el INSERT) | **T15** · tras el UP, las cuatro filas estan en la base con su nombre, su simbolo y su normalizado |
+| R26 | M · «el name_normalized literal del SQL coincide con normalizeUnitName» (y cae si se muta un normalizado) · C · «ningun archivo del repo consulta la tabla units, y el barrido senala una entrada sintetica que si la consulta» · C · «la composicion no cablea ningun seed de unidades y scripts/seed.ts no las nombra» | **T15** · el normalizado real leido de la base coincide con el de la funcion |
+
+> **Reescritas en la ronda 3 (2026-09-03).** Decían: R25 → `D · «sobre catalogo vacio crea las
+> cinco unidades arrancadoras y ninguna mas»` / `IS · «db:seed deja las cinco unidades en la
+> base»`; R26 → `D · «con tres presentes crea solo dos, no actualiza ninguna existente, y dos
+> corridas dejan el mismo estado»` / `IS · «una segunda corrida no crea nada y no pisa una unidad
+> renombrada a mano»`. **D** e **IS** eran `tests/unit/unidades/domain/seed-units.test.ts` y
+> `tests/integration/unidades/unidades-seed.int.test.ts`, los dos borrados en T15 junto con el
+> seed que probaban. Esto es lo que **disuelve MAYOR-1** de
+> `progress/review_QC-32-modelo-unidades.md`: el hallazgo era que R25/R26 estaban mapeados a
+> tests que ejercitaban una copia del adaptador; sin adaptador y sin seed, ese objeto ya no
+> existe, y R25/R26 apuntan ahora al SQL que sí crea las filas y a la función que sí las
+> normaliza. El informe del reviewer **no se borra**: la ronda 1 y su rechazo se quedan en el
+> historial.
 | R27 | C · «la feature no anade adaptadores driving, rutas ni Server Actions» | — (no hay flujo navegable: E2E diferido con motivo, decision cerrada 18) |
 | R28 | G3 · «toda dependencia de package.json tiene su fila en el registro» | — |
 
@@ -308,3 +394,7 @@ una función pura, del texto del esquema o del árbol de archivos, y una base re
 —en el caso de R21 añadiría un falso verde (`docs/architecture.md > Acceso a datos y
 autorizacion`)—. **R22, R23 y R24 se cierran de verdad en T10**, no en el test estático, que solo
 lee texto.
+
+**Ronda 3:** R25 y R26 se cierran con el bloque del arrancador de **M** (estático, con sus tres
+mutaciones de sensibilidad) y con **C** en su mitad negativa, más el ciclo real de **T15**. Sigue
+sin haber requisito sin `R<n> → test`.

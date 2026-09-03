@@ -1,10 +1,11 @@
 /**
  * db:seed — deja la base utilizable desde cero: siembra el catalogo de roles y, si hace
- * falta, el usuario inicial con rol Administrador (`design.md > 5`, T13), y el catalogo
- * arrancador de unidades de medida (QC-32 `design.md > 6`, T5).
+ * falta, el usuario inicial con rol Administrador (`design.md > 5`, T13).
  *
- * Cascara fina: TODA la logica vive en `lib/modules/identity/domain/seed-initial-access.ts`
- * y en `lib/modules/unidades/domain/seed-units.ts`.
+ * El catalogo de unidades de medida NO se siembra aqui: lo insertan cuatro filas de la
+ * migracion de QC-32 (`db/migrations/20260903121404_units_catalog/migration.sql`).
+ *
+ * Cascara fina: TODA la logica vive en `lib/modules/identity/domain/seed-initial-access.ts`.
  * Este script solo carga el entorno, invoca la composicion, resume el resultado por
  * consola sin secretos, y traduce exito/fallo a codigo de salida.
  *
@@ -32,7 +33,7 @@ async function main(): Promise<void> {
 
   const { prisma } = await import('../lib/shared/db/prisma')
   try {
-    const { identity, unidades } = await import('../lib/composition')
+    const { identity } = await import('../lib/composition')
     const outcome = await identity.seedInitialAccess()
 
     if (outcome.createdRoles.length > 0 || outcome.createdAdmin) {
@@ -45,15 +46,6 @@ async function main(): Promise<void> {
     } else {
       console.log('db:seed: nada que crear')
     }
-
-    // QC-32: catalogo arrancador de unidades. Idempotente por lectura previa, no por
-    // `upsert`: una segunda corrida no crea nada y no pisa ninguna unidad existente (R26).
-    const units = await unidades.seedStarterUnits()
-    console.log(
-      units.createdUnits.length > 0
-        ? `db:seed: unidades creadas: ${units.createdUnits.length} (${units.createdUnits.join(', ')})`
-        : 'db:seed: unidades creadas: 0',
-    )
   } finally {
     await prisma.$disconnect()
   }

@@ -5,9 +5,17 @@
 // simetrica del DOWN —las dos escritas a mano, las dos existen para fallar antes que perder el
 // texto de unidad de una fila—, las DOS FK que cruzan de modulo (`products_unit_id_fkey` y
 // `recipe_lines_unit_id_fkey`, `ON DELETE RESTRICT`), el indice unico del nombre normalizado,
-// los dos `DROP COLUMN "unit"` y los dos ALTER de RLS. Si una migracion futura de `products` o
-// de `recipe_lines` se los lleva por drift, el esquema sigue validando y el cliente sigue
+// los dos `DROP COLUMN "unit"`, los dos ALTER de RLS y —desde el 2026-09-03— el CONJUNTO
+// ARRANCADOR, que ya no es un seed de aplicacion sino un `INSERT` de esta misma migracion
+// (`design.md` seccion 6.1, R25 y R26). Si una migracion futura de `products` o de
+// `recipe_lines` se lleva algo de eso por drift, el esquema sigue validando y el cliente sigue
 // compilando: tiene que caer aqui, que es la unica guardia que tienen.
+//
+// El bloque del arrancador vigila ademas el punto MAS FRAGIL de la ficha: `name_normalized` se
+// escribe LITERAL en el SQL porque no hay forma de llamar a `normalizeUnitName` (TypeScript)
+// desde una migracion, asi que este archivo importa la funcion REAL y la aplica a los literales
+// extraidos del `INSERT`. Es lo unico en todo el repo que se da cuenta si alguien cambia la
+// normalizacion o un literal del SQL y deja las dos mitades desincronizadas (R26).
 //
 // Cada afirmacion se escribe como un PREDICADO PURO EXPORTADO que recibe el texto SQL y
 // devuelve el veredicto, y se aplica dos veces: al SQL real y a una version MUTADA EN MEMORIA
@@ -18,13 +26,17 @@
 //
 // R22, R23 y R24 se cierran DE VERDAD en T10, contra la base real: aqui solo se lee texto.
 //
-// Cubre R5, R8, R10 y R11 (su parte de SQL), R12, R13, R18, R20, R21, R22, R23 y R24.
+// Cubre R5, R8, R10 y R11 (su parte de SQL), R12, R13, R18, R20, R21, R22, R23, R24, R25 y R26
+// (su primera mitad: que el nombre normalizado persistido coincide con la unica definicion de
+// R4; la mitad negativa —que no hay seed de aplicacion— la cubre `module-contract.test.ts`).
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+
+import { normalizeUnitName } from '@/lib/modules/unidades'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -215,6 +227,97 @@ export function hasUniqueIndexOnNormalizedName(sql: string): boolean {
   return statements(sql).some((statement) =>
     /^CREATE UNIQUE INDEX "?\w+"? ON "?units"?\s*\(\s*"?name_normalized"?\s*\)/i.test(statement),
   )
+}
+
+/** Una fila del conjunto arrancador, tal como esta ESCRITA en el `INSERT` de la migracion. El
+ *  cuarto valor (`updated_at`) no es un literal sino `CURRENT_TIMESTAMP`, y se comprueba
+ *  aparte. */
+export type FilaArrancadora = {
+  readonly name: string
+  readonly nameNormalized: string
+  readonly symbol: string | null
+}
+
+/**
+ * R25. Las filas del `INSERT INTO "units"` del UP, EN EL ORDEN en que estan escritas; `null`
+ * si no hay INSERT o si no rellena exactamente las cuatro columnas esperadas.
+ *
+ * Devolver `null` en vez de `[]` cuando el INSERT falta es deliberado: una lista vacia y un
+ * arrancador ausente son la misma cosa para un `toEqual([])` distraido, y esa es justo la
+ * mutacion (b) de los tests de sensibilidad.
+ */
+export function starterRows(sql: string): readonly FilaArrancadora[] | null {
+  const ejecutable = stripSqlComments(sql)
+  const insert = /INSERT\s+INTO\s+"units"\s*\(([^)]*)\)\s*VALUES([\s\S]*?);/i.exec(ejecutable)
+  if (insert === null) return null
+  const columnas = [...(insert[1] as string).matchAll(/"(\w+)"/g)].map((match) => match[1])
+  if (columnas.join(',') !== 'name,name_normalized,symbol,updated_at') return null
+
+  const literal = (valor: string): string | null => {
+    const match = /^'([^']*)'$/.exec(valor.trim())
+    return match === null ? null : (match[1] as string)
+  }
+  const filas: FilaArrancadora[] = []
+  for (const tupla of (insert[2] as string).matchAll(/\(([^)]*)\)/g)) {
+    const valores = (tupla[1] as string).split(',')
+    if (valores.length !== 4) return null
+    const name = literal(valores[0] as string)
+    const nameNormalized = literal(valores[1] as string)
+    if (name === null || nameNormalized === null) return null
+    filas.push({ name, nameNormalized, symbol: literal(valores[2] as string) })
+  }
+  return filas
+}
+
+/** Las CUATRO unidades arrancadoras que cerro el humano el 2026-09-03 (R25, pregunta abierta
+ *  4). Nombres en minuscula, las cuatro con simbolo, «unidad» fuera. */
+const CONJUNTO_ARRANCADOR: readonly FilaArrancadora[] = [
+  { name: 'mililitro', nameNormalized: 'mililitro', symbol: 'ml' },
+  { name: 'litro', nameNormalized: 'litro', symbol: 'l' },
+  { name: 'gramo', nameNormalized: 'gramo', symbol: 'gr' },
+  { name: 'kilogramo', nameNormalized: 'kilogramo', symbol: 'kg' },
+]
+
+/** R25. ¿El INSERT deja EXACTAMENTE esas cuatro filas, en ese orden, y ninguna mas? */
+export function insertsExactlyTheStarterSet(sql: string): boolean {
+  const filas = starterRows(sql)
+  if (filas === null || filas.length !== CONJUNTO_ARRANCADOR.length) return false
+  return filas.every((fila, indice) => {
+    const esperada = CONJUNTO_ARRANCADOR[indice] as FilaArrancadora
+    return (
+      fila.name === esperada.name &&
+      fila.nameNormalized === esperada.nameNormalized &&
+      fila.symbol === esperada.symbol
+    )
+  })
+}
+
+/**
+ * R26. ¿El nombre normalizado literal de cada fila es el que produce sobre su nombre la UNICA
+ * definicion de la normalizacion (R4, `lib/modules/unidades/domain/unit-name.ts`)?
+ *
+ * Este es el punto fragil de la ficha: el SQL no puede llamar a `normalizeUnitName`, asi que
+ * el literal es un DUPLICADO que se desincroniza en silencio. Aqui se importa la funcion real.
+ */
+export function normalizedNamesMatchTheOnlyDefinition(sql: string): boolean {
+  const filas = starterRows(sql)
+  if (filas === null || filas.length === 0) return false
+  return filas.every((fila) => fila.nameNormalized === normalizeUnitName(fila.name))
+}
+
+/**
+ * R25 y `design.md` seccion 6.1: el INSERT va DESPUES del `CREATE TABLE "units"` y, sobre
+ * todo, ANTES del `FORCE ROW LEVEL SECURITY`. No es cosmetico: `FORCE` sin policies deniega
+ * TAMBIEN al dueno de la tabla, que es con quien se conecta Prisma, asi que un INSERT
+ * colocado despues no insertaria nada — y el catalogo naceria vacio sin que nada fallara.
+ */
+export function starterInsertSitsBetweenTableAndForce(sql: string): boolean {
+  const ejecutable = stripSqlComments(sql)
+  const tabla = ejecutable.search(/CREATE\s+TABLE\s+"units"/i)
+  const insert = ejecutable.search(/INSERT\s+INTO\s+"units"/i)
+  const force = ejecutable.search(/ALTER\s+TABLE\s+"units"\s+FORCE\s+ROW\s+LEVEL\s+SECURITY/i)
+  if (tabla === -1 || insert === -1 || force === -1) return false
+  return tabla < insert && insert < force
 }
 
 /** R10 y R11. ¿Desaparece la columna `unit` de TEXTO de las dos tablas ajenas? */
@@ -417,6 +520,115 @@ describe('migration.sql — la tabla units', () => {
     expect(createUnits).not.toMatch(/VARCHAR\s*\(/i)
     expect(createUnits).not.toMatch(/CHARACTER\s+VARYING/i)
     expect(up.filter((statement) => /CHECK\s*\(/i.test(statement))).toEqual([])
+  })
+})
+
+describe('migration.sql — el conjunto arrancador', () => {
+  it('el INSERT deja exactamente las cuatro unidades arrancadoras, en orden y sin ninguna mas', () => {
+    // R25 y decision cerrada 9 (sustituida el 2026-09-03): el catalogo nace CON su tabla, no
+    // con un seed de aplicacion. La idempotencia la da `_prisma_migrations` —una migracion se
+    // aplica una vez—, no un `findMany` previo.
+    expect(starterRows(upSource)).toEqual(CONJUNTO_ARRANCADOR)
+    expect(insertsExactlyTheStarterSet(upSource)).toBe(true)
+
+    // Los nombres van en MINUSCULA y las CUATRO llevan simbolo (pregunta abierta 4, cerrada
+    // por el humano). «unidad» NO esta en el arrancador.
+    const filas = starterRows(upSource) as readonly FilaArrancadora[]
+    expect(filas).toHaveLength(4)
+    for (const fila of filas) {
+      expect(fila.name, `${fila.name} no esta en minuscula`).toBe(fila.name.toLowerCase())
+      expect(fila.symbol, `la unidad ${fila.name} deberia llevar simbolo`).not.toBeNull()
+    }
+    expect(filas.map((fila) => fila.name)).not.toContain('unidad')
+
+    // Un solo INSERT en toda la migracion, y sobre `units`: esta ficha no siembra datos en
+    // ninguna tabla ajena.
+    expect(up.filter((statement) => /^INSERT INTO/i.test(statement))).toHaveLength(1)
+    // `updated_at` va EXPLICITO en las cuatro filas: `id` y `created_at` tienen DEFAULT, pero
+    // `updated_at` es NOT NULL sin default —lo rellena `@updatedAt` en tiempo de ejecucion, y
+    // aqui no hay tiempo de ejecucion de Prisma— (`design.md` seccion 6.1).
+    const insert = findStatement(up, /^INSERT INTO "units"/i)
+    expect([...insert.matchAll(/CURRENT_TIMESTAMP/gi)]).toHaveLength(4)
+  })
+
+  it('el nombre normalizado literal de cada fila es el que produce normalizeUnitName', () => {
+    // R26, primera mitad, y es LA razon de que R26 exista: `name_normalized` se escribe
+    // LITERAL en el SQL porque no se puede llamar a `normalizeUnitName` (TypeScript) desde una
+    // migracion. Este test importa la funcion REAL y la aplica a los literales extraidos del
+    // INSERT, asi que es LO UNICO en todo el repo que se da cuenta si alguien cambia la
+    // normalizacion (o un literal del SQL) y deja las dos mitades desincronizadas.
+    expect(normalizedNamesMatchTheOnlyDefinition(upSource)).toBe(true)
+    for (const fila of starterRows(upSource) as readonly FilaArrancadora[]) {
+      expect(fila.nameNormalized, `name_normalized de «${fila.name}»`).toBe(
+        normalizeUnitName(fila.name),
+      )
+    }
+    // Y las cuatro claves son DISTINTAS entre si, o el propio INSERT chocaria contra el indice
+    // unico de R5 y la migracion entera no aplicaria.
+    const claves = (starterRows(upSource) as readonly FilaArrancadora[]).map(
+      (fila) => fila.nameNormalized,
+    )
+    expect(new Set(claves).size).toBe(claves.length)
+  })
+
+  it('el INSERT va despues del CREATE TABLE y antes del FORCE ROW LEVEL SECURITY', () => {
+    // `design.md` seccion 6.1, punto 1: el sitio no es cosmetico. `FORCE ROW LEVEL SECURITY`
+    // sin policies deniega TAMBIEN al dueno de la tabla —que es con quien se conecta Prisma—,
+    // asi que un INSERT colocado despues del FORCE no insertaria nada y el catalogo naceria
+    // vacio SIN QUE NADA FALLARA. Ese es el fallo silencioso que vigila este caso.
+    expect(starterInsertSitsBetweenTableAndForce(upSource)).toBe(true)
+
+    // Sensibilidad: movido detras del FORCE, el predicado cae. Mutacion EN MEMORIA.
+    const sqlDelInsert = /INSERT INTO "units"[\s\S]*?;/.exec(upSource)?.[0] as string
+    expect(sqlDelInsert).toBeDefined()
+    const detrasDelForce = `${upSource.replace(sqlDelInsert, '')}\n${sqlDelInsert}`
+    expect(detrasDelForce, 'la mutacion no movio el INSERT').not.toBe(upSource)
+    expect(
+      starterInsertSitsBetweenTableAndForce(detrasDelForce),
+      'un INSERT despues del FORCE no deberia pasar',
+    ).toBe(false)
+    // Las filas siguen siendo las cuatro correctas: lo que cae es el ORDEN, no el contenido.
+    expect(insertsExactlyTheStarterSet(detrasDelForce)).toBe(true)
+  })
+
+  it('los predicados del arrancador caen ante una normalizacion desincronizada, ante el INSERT quitado y ante una quinta fila', () => {
+    // Un test que no puede fallar no vigila nada (`design.md` seccion 9). Las tres mutaciones
+    // son EN MEMORIA; el archivo en disco no se toca.
+
+    // (a) `name_normalized` desincronizado: 'Mililitro' con mayuscula NO es lo que produce
+    // `normalizeUnitName('mililitro')`. Es exactamente el fallo que R26 teme, y en la base
+    // real no lo detecta nada: la fila entra igual.
+    const desincronizado = upSource.replace(
+      "('mililitro', 'mililitro', 'ml'",
+      "('mililitro', 'Mililitro', 'ml'",
+    )
+    expect(desincronizado, 'la mutacion no cambio el name_normalized').not.toBe(upSource)
+    expect(
+      normalizedNamesMatchTheOnlyDefinition(desincronizado),
+      'un name_normalized que la funcion no produce no deberia pasar',
+    ).toBe(false)
+    expect(insertsExactlyTheStarterSet(desincronizado)).toBe(false)
+
+    // (b) sin el INSERT no hay arrancador: `starterRows` devuelve `null`, no una lista vacia,
+    // para que no pueda colarse como «cero filas correctas».
+    const sinInsert = upSource.replace(/INSERT INTO "units"[\s\S]*?;/, '')
+    expect(sinInsert, 'la mutacion no quito el INSERT').not.toBe(upSource)
+    expect(starterRows(sinInsert)).toBeNull()
+    expect(insertsExactlyTheStarterSet(sinInsert), 'sin INSERT no deberia pasar').toBe(false)
+    expect(normalizedNamesMatchTheOnlyDefinition(sinInsert)).toBe(false)
+    expect(starterInsertSitsBetweenTableAndForce(sinInsert)).toBe(false)
+
+    // (c) una quinta fila: R25 dice «y NO DEBE crear ninguna otra». Ojo con la trampa —esta
+    // quinta fila esta bien normalizada, asi que el predicado de R26 la acepta: es el de R25
+    // el que tiene que caer.
+    const conQuinta = upSource.replace(
+      "  ('kilogramo', 'kilogramo', 'kg', CURRENT_TIMESTAMP);",
+      "  ('kilogramo', 'kilogramo', 'kg', CURRENT_TIMESTAMP),\n  ('unidad', 'unidad', NULL, CURRENT_TIMESTAMP);",
+    )
+    expect(conQuinta, 'la mutacion no anadio la quinta fila').not.toBe(upSource)
+    expect(starterRows(conQuinta)).toHaveLength(5)
+    expect(insertsExactlyTheStarterSet(conQuinta), 'cinco filas no deberian pasar').toBe(false)
+    expect(normalizedNamesMatchTheOnlyDefinition(conQuinta)).toBe(true)
   })
 })
 

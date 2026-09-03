@@ -6,8 +6,14 @@
 > El **qué** está en `requirements.md` (R1–R28) y su alcance lo cerró el humano el 2026-09-02.
 > Aquí va el **cómo**: la forma exacta del modelo `Unit`, la migración que **altera dos tablas
 > que no son suyas** y su `down.sql`, la guardia de datos que la hace fallar antes que perder
-> nada, el armazón del módulo `unidades` con su contrato, el conjunto arrancador en el seed y el
+> nada, el armazón del módulo `unidades` con su contrato, el conjunto arrancador y el
 > reapuntado del código de `inventario` que hoy trata la unidad como texto.
+>
+> **Ronda 3 (2026-09-03).** El humano corrigió el alcance: el conjunto arrancador pasa a ser
+> **cuatro filas de la propia migración** y el aparato del seed se retira entero. Lo que cambia
+> está en § 1, § 5.1, § 5.4, § 6 y § 9, marcado ronda a ronda y sin borrar lo anterior. Lo que
+> **no** cambia: la migración que altera dos tablas ajenas, sus dos guardias de datos, el
+> `down.sql` y el reapuntado a `unit_id`.
 >
 > Precedentes literales que se copian, no se reinventan: **QC-24 — modelo-recetas**
 > (`specs/QC-24-modelo-recetas/`, `db/migrations/20260902163256_recipes_and_recipe_lines/`) para
@@ -15,8 +21,9 @@
 > de tests; **QC-14/QC-20** (`db/migrations/20260902005510_products_and_presentations/`,
 > `.../20260902170759_product_audit_and_presentation_uniqueness/`) para la columna normalizada
 > persistida con índice único y para el patrón de migración que altera una tabla existente;
-> **QC-6** (`scripts/seed.ts`, `lib/modules/identity/domain/seed-initial-access.ts`) para el
-> seed idempotente que **lee lo que falta y crea exactamente eso**.
+> ~~**QC-6** (`scripts/seed.ts`, `lib/modules/identity/domain/seed-initial-access.ts`) para el
+> seed idempotente que **lee lo que falta y crea exactamente eso**~~ — precedente **ya no
+> aplicable** desde la ronda 3: esta ficha no tiene seed de aplicación (§ 6.2).
 
 ---
 
@@ -25,22 +32,22 @@
 | Archivo | Qué se hace |
 | --- | --- |
 | `db/schema.prisma` | **Nuevo** modelo `Unit` con `/// @module unidades`. **Se modifican** `Product` (`unit: String?` → `unitId: String? @db.Uuid`) y `RecipeLine` (`unit: String` → `unitId: String @db.Uuid`). |
-| `db/migrations/<ts>_units_catalog/migration.sql` | UP: guardia de datos (§ 4.1), `CREATE TABLE units`, índice único del nombre normalizado, las dos columnas `unit_id` con sus FK escritas a mano, los índices de FK, el `DROP COLUMN unit` de las dos tablas y los dos `ALTER` de RLS. |
+| `db/migrations/<ts>_units_catalog/migration.sql` | UP: guardia de datos (§ 4.1), `CREATE TABLE units`, índice único del nombre normalizado, **el `INSERT` de las cuatro unidades arrancadoras (§ 6.1, ronda 3)**, las dos columnas `unit_id` con sus FK escritas a mano, los índices de FK, el `DROP COLUMN unit` de las dos tablas y los dos `ALTER` de RLS. |
 | `db/migrations/<ts>_units_catalog/down.sql` | DOWN manual: guardia simétrica (§ 4.6) y vuelta al esquema exacto anterior. |
 | `lib/modules/unidades/index.ts` | **Nuevo**: contrato público del módulo. |
 | `lib/modules/unidades/domain/unit-name.ts` | **Nuevo**: `normalizeUnitName`, la única definición de la normalización (R4). |
 | `lib/modules/unidades/domain/unit-catalog.ts` | **Nuevo**: `UnitId`, `UnitRef`, `UnitCatalog` — la costura hacia los demás módulos (§ 5.2). |
-| `lib/modules/unidades/domain/starter-units.ts` | **Nuevo**: `STARTER_UNITS`, el conjunto arrancador como dato del dominio (§ 6). |
-| `lib/modules/unidades/adapters/driving/.gitkeep` | **Nuevo**: la única carpeta del armazón que nace vacía (la llena QC-38), igual que QC-24 con `recetas`. `ports/` y `adapters/driven/` **no** llevan `.gitkeep`: nacen con archivo real (§ 5.1). |
-| `lib/modules/unidades/domain/seed-units.ts` | **Nuevo**: caso de uso del seed arrancador (§ 6.2). |
-| `lib/modules/unidades/ports/unit-seed-repository.ts` | **Nuevo**: el puerto que ese caso de uso necesita. |
-| `lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts` | **Nuevo**: su implementación con Prisma. Es el **único** sitio del repo con `prisma.unit`. |
-| `lib/composition/index.ts` | Se **añade** `export const unidades = { seedStarterUnits }`. Aquí sí hay algo que cablear (a diferencia de QC-24). |
-| `scripts/seed.ts` | Se **añade** la llamada al seed de unidades y su línea de resumen. |
+| `lib/modules/unidades/ports/.gitkeep`, `adapters/driven/.gitkeep`, `adapters/driving/.gitkeep` | **Nuevo**: las tres carpetas del armazón nacen vacías, igual que en `lib/modules/recetas` (§ 5.1, ronda 3). Las llena QC-38. |
+| ~~`lib/modules/unidades/domain/starter-units.ts`~~ | **RETIRADO en la ronda 3** (§ 6.2). El arrancador vive en el `INSERT` de la migración. |
+| ~~`lib/modules/unidades/domain/seed-units.ts`~~ | **RETIRADO en la ronda 3**: no hay caso de uso de seed. |
+| ~~`lib/modules/unidades/ports/unit-seed-repository.ts`~~ | **RETIRADO en la ronda 3**: sin caso de uso no hay puerto. |
+| ~~`lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts`~~ | **RETIRADO en la ronda 3**: hoy **ningún** archivo del repo consulta `units`. |
+| `lib/composition/index.ts` | **Vuelve a quedar sin tocar por esta ficha** (ronda 3, § 5.4): `unidades` no cablea nada. |
+| `scripts/seed.ts` | **Vuelve a quedar sin llamada de unidades** (ronda 3): solo roles y usuario inicial de QC-6. |
 | `lib/modules/inventario/domain/product-input.ts`, `product-view.ts`, `product-catalog.ts` | `unit: string` → `unitId: UnitId` (R19). |
 | `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`, `adapters/driving/product-actions.ts` | Reapuntado del campo (select, create, update, lectura del `FormData`). |
-| `tests/unit/unidades/schema/unidades-schema.test.ts`, `.../unidades-migration.test.ts`, `tests/unit/unidades/domain/unit-name.test.ts`, `tests/unit/unidades/domain/seed-units.test.ts`, `tests/unit/unidades/module-contract.test.ts` | Estáticos y unitarios (§ 9). |
-| `tests/integration/unidades/unidades-constraints.int.test.ts`, `tests/integration/unidades/unidades-seed.int.test.ts` | Contra Postgres real (§ 9). |
+| `tests/unit/unidades/schema/unidades-schema.test.ts`, `.../unidades-migration.test.ts`, `tests/unit/unidades/domain/unit-name.test.ts`, `tests/unit/unidades/module-contract.test.ts` | Estáticos y unitarios (§ 9). En la ronda 3, `unidades-migration.test.ts` **gana** el bloque del arrancador (R25, R26) y `module-contract.test.ts` **rehace** el criterio de «quién consulta la tabla»; `domain/seed-units.test.ts` y `seed-wiring.test.ts` **se retiran** con el seed. |
+| `tests/integration/unidades/unidades-constraints.int.test.ts` | Contra Postgres real (§ 9). ~~`unidades-seed.int.test.ts`~~ **retirado en la ronda 3**. |
 | Tests existentes de `inventario` que nombran `unit` | Se **acotan** al campo nuevo: `tests/unit/inventario/product-input.test.ts`, `product-prisma.test.ts`, `product-actions.test.ts`, `product-service.test.ts`, `tests/unit/inventario/schema/inventario-schema.test.ts`, `tests/integration/inventario/product-crud.int.test.ts`, `inventario-constraints.int.test.ts`; y de `recetas`: `tests/unit/recetas/schema/recetas-schema.test.ts`, `recetas-migration.test.ts`, `tests/integration/recetas/recetas-constraints.int.test.ts`. Ver § 7. |
 
 ---
@@ -306,23 +313,26 @@ test estático, que solo lee texto.
 
 ### 5.1 Carpetas que nacen
 
+**Actualizado en la ronda 3 (2026-09-03).** El árbol que queda, sin el aparato del seed:
+
 ```
 lib/modules/unidades/
   index.ts                       # CONTRATO PUBLICO: solo reexporta de ./domain
   domain/
     unit-name.ts                 # normalizeUnitName (R4)
     unit-catalog.ts              # UnitId, UnitRef, UnitCatalog (R16, R19)
-    starter-units.ts             # STARTER_UNITS (R25)
-    seed-units.ts                # seedStarterUnits (R25, R26)
-  ports/
-    unit-seed-repository.ts      # lo que el seed necesita
+  ports/.gitkeep                 # vacia: no hay puerto todavia (lo trae QC-38)
   adapters/
-    driven/persistence/unit-seed-repository-prisma.ts   # unico sitio con `prisma.unit`
+    driven/.gitkeep              # vacia: NADIE consulta `units` hoy (R26)
     driving/.gitkeep             # vacia: la llena QC-38
 ```
 
-`ports/` y `adapters/driven/` **no** llevan `.gitkeep` porque nacen con archivo real; `driving/`
-sí. La guardia de módulos prohíbe cualquier carpeta que no sea `domain/`, `ports/` o `adapters/`.
+Lo que había hasta la ronda 2 y **se retiró**: `domain/starter-units.ts`, `domain/seed-units.ts`,
+`ports/unit-seed-repository.ts` y
+`adapters/driven/persistence/unit-seed-repository-prisma.ts`. Las tres carpetas quedan vacías con
+`.gitkeep`, **igual que `lib/modules/recetas`** —el precedente del repo para un módulo que hoy es
+solo modelo y contrato—. La guardia de módulos prohíbe cualquier carpeta que no sea `domain/`,
+`ports/` o `adapters/`, y sigue verde con las tres presentes y vacías.
 
 ```ts
 // lib/modules/unidades/index.ts — CONTRATO PUBLICO del modulo `unidades`.
@@ -330,8 +340,6 @@ sí. La guardia de módulos prohíbe cualquier carpeta que no sea `domain/`, `po
 // arrastrar servidor: nada de 'use server', @prisma/client ni next/* en su cierre de imports.
 export { normalizeUnitName } from './domain/unit-name';
 export type { UnitCatalog, UnitId, UnitRef } from './domain/unit-catalog';
-export { STARTER_UNITS, type StarterUnit } from './domain/starter-units';
-export { createSeedStarterUnits, type SeedStarterUnitsDeps, type SeedUnitsOutcome } from './domain/seed-units';
 ```
 
 `unidades` **no** hay que añadirlo a `REQUIRED_MODULES` de
@@ -396,80 +404,97 @@ Tres decisiones dentro de ese cambio:
   QC-38 —y va a tropezar con lo que QC-24 § 10.1 dejó anotado: por la API tipada, Prisma convierte
   el SQLSTATE en `P2003` antes de que llegue a `meta.code`—.
 
-### 5.4 `lib/composition/index.ts` (a diferencia de QC-24, aquí SÍ se toca)
+### 5.4 `lib/composition/index.ts` — **ANULADA en la ronda 3 (2026-09-03)**
 
-```ts
-// lib/composition/index.ts (añadido por QC-32)
-import { createSeedStarterUnits } from '@/lib/modules/unidades';
-import { unitSeedRepositoryPrisma } from '@/lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma';
+Decía que aquí sí había algo que cablear, porque había un puerto y un adaptador reales: el seed.
+El texto era:
 
-export const unidades = {
-  seedStarterUnits: createSeedStarterUnits({ repository: unitSeedRepositoryPrisma }),
-} as const;
-```
+> ```ts
+> // lib/composition/index.ts (añadido por QC-32)
+> import { createSeedStarterUnits } from '@/lib/modules/unidades';
+> import { unitSeedRepositoryPrisma } from '@/lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma';
+>
+> export const unidades = {
+>   seedStarterUnits: createSeedStarterUnits({ repository: unitSeedRepositoryPrisma }),
+> } as const;
+> ```
 
-Hay algo que cablear porque hay un puerto y un adaptador reales: el seed. Es el mismo patrón que
-`identity` usa hoy con `InitialAccessRepository`.
+**Ya no.** Retirado el seed, `unidades` **no cablea nada** y `lib/composition/index.ts` vuelve a
+quedar como con QC-24: sin `export const unidades`. El `UnitCatalog` que publica el contrato
+(§ 5.2) lo implementa y cablea **QC-38**, cuando haya consumidor. Que la composición **no** nombre
+ningún seed de unidades es la mitad negativa de **R26**, y `module-contract.test.ts` lo vigila.
 
 ---
 
-## 6. El conjunto arrancador y el seed (R25, R26)
+## 6. El conjunto arrancador: cuatro filas de la migración (R25, R26)
 
-### 6.1 Las cinco unidades
+> **Reescrita entera en la ronda 3 (2026-09-03)**, por la corrección de alcance del humano
+> (`requirements.md` > decisiones cerradas, fila del 2026-09-03). Lo que decía esta sección
+> —`STARTER_UNITS` con **cinco** unidades en `domain/starter-units.ts` y el caso de uso
+> idempotente `seedStarterUnits` de § 6.2, cableado en la composición y llamado por
+> `scripts/seed.ts`— **queda anulado**: se implementó en las rondas 1 y 2 y se ha retirado. La
+> historia está en `progress/impl_QC-32-modelo-unidades.md`.
 
-```ts
-// lib/modules/unidades/domain/starter-units.ts
-export type StarterUnit = { readonly name: string; readonly symbol: string | null };
+### 6.1 Las cuatro unidades, en el SQL
 
-/** Conjunto arrancador (decision cerrada 9). Los nombres van en minuscula y «unidad» NO lleva
- *  simbolo: es el caso que estrena el simbolo opcional (R3). Posicion por defecto de
- *  `design.md > 6`, pendiente de confirmacion (requirements.md > pregunta abierta 4). */
-export const STARTER_UNITS: readonly StarterUnit[] = [
-  { name: 'kilogramo', symbol: 'kg' },
-  { name: 'gramo', symbol: 'g' },
-  { name: 'litro', symbol: 'L' },
-  { name: 'mililitro', symbol: 'mL' },
-  { name: 'unidad', symbol: null },
-];
+El catálogo nace **con la tabla**. En `db/migrations/20260903121404_units_catalog/migration.sql`,
+justo **después** del `CREATE UNIQUE INDEX "units_name_normalized_key"` y **antes** de los `ALTER
+TABLE "units" … ROW LEVEL SECURITY`:
+
+```sql
+INSERT INTO "units" ("name", "name_normalized", "symbol", "updated_at") VALUES
+  ('mililitro', 'mililitro', 'ml', CURRENT_TIMESTAMP),
+  ('litro',     'litro',     'l',  CURRENT_TIMESTAMP),
+  ('gramo',     'gramo',     'gr', CURRENT_TIMESTAMP),
+  ('kilogramo', 'kilogramo', 'kg', CURRENT_TIMESTAMP);
 ```
 
-**Esto es la posición por defecto, no una decisión cerrada.** La decisión 9 nombra el conjunto con
-los símbolos («kg, g, L, mL, unidad») y la decisión 3 da el ejemplo «Kilogramo» / «kg»; lo que no
-está fijado es la capitalización ni si «unidad» lleva símbolo (pregunta abierta 4). Cambiarlo es
-editar cinco literales y el test que los espera; no toca ni el esquema ni la migración.
+Cuatro cosas de este bloque no son cosméticas:
 
-Ojo con `L` y `mL`: la normalización **ignora mayúsculas**, así que `litro` y `mililitro` son
-claves distintas (`litro` / `mililitro`) y no chocan. Los símbolos no se normalizan ni se comparan
-(R7).
+1. **El orden respecto al RLS.** `FORCE ROW LEVEL SECURITY` sin policies deniega **también al
+   dueño de la tabla**, que es con quien se conecta Prisma (§ 4.4). Un `INSERT` colocado después
+   del `FORCE` no insertaría nada. Va antes, y el test estático lo comprueba.
+2. **`updated_at` va explícito.** `id` y `created_at` tienen `DEFAULT`; `updated_at` es
+   `NOT NULL` **sin** default (lo rellena Prisma en tiempo de ejecución, § 2.1), así que en SQL
+   crudo hay que darlo.
+3. **`name_normalized` se escribe LITERAL**, y es el punto frágil de la ficha: no hay forma de
+   llamar a `normalizeUnitName` (TypeScript, § 3) desde una migración. Es un duplicado que se
+   puede desincronizar en silencio —cambiar la normalización o un literal y que nadie se entere—,
+   y por eso **R26** existe y lo vigila un test que importa la función real y la aplica a los
+   literales extraídos del SQL (§ 9).
+4. **`down.sql` no necesita nada nuevo**: su `DROP TABLE "units"` se lleva las cuatro filas. Su
+   guardia sigue mirando lo que apunta al catálogo, no el catálogo (§ 4.6): cuatro unidades
+   **sin** referencias no bloquean la reversión, y eso es correcto.
 
-### 6.2 El caso de uso, idempotente
+Los nombres van en **minúscula** y las **cuatro** llevan símbolo (pregunta abierta 4, cerrada por
+el humano). «unidad» **no** está: se retiró del arrancador. El símbolo sigue siendo **opcional** en
+la columna (R3) aunque ninguna fila arrancadora estrene ya la ausencia; quien lo estrene será una
+unidad dada de alta por QC-38, y lo cubre el test de integración «acepta una unidad sin simbolo».
 
-```ts
-// lib/modules/unidades/domain/seed-units.ts (forma)
-export type SeedUnitsOutcome = { readonly createdUnits: readonly string[] };
+Los símbolos no se normalizan ni se comparan (R7), y la normalización **ignora mayúsculas**, así
+que `litro` y `mililitro` son claves distintas y no chocan contra el índice único.
 
-export function createSeedStarterUnits(deps: SeedStarterUnitsDeps) {
-  return async function seedStarterUnits(): Promise<SeedUnitsOutcome> {
-    const existing = await deps.repository.findExistingNormalizedNames(
-      STARTER_UNITS.map((u) => normalizeUnitName(u.name)),
-    );
-    // crea SOLO lo que falta; nunca actualiza, nunca hace upsert.
-  };
-}
-```
+### 6.2 Por qué ya no hay caso de uso, y qué se retiró
 
-Copia literal de la forma de QC-6: **leer qué falta y crear exactamente eso**. Lo que hace
-idempotente al seed no es un `upsert` —un `upsert` **pisaría** un símbolo que alguien haya
-cambiado a mano, y R26 lo prohíbe— sino la lectura previa por nombre normalizado. La comparación
-va por `name_normalized`, no por `name`: si alguien renombró «litro» a «Litro», el seed **no**
-crea un duplicado y **no** lo toca.
+Un catálogo cerrado de cuatro filas que nace con su tabla no necesita un caso de uso idempotente
+que lo siembre: la idempotencia la da `_prisma_migrations` —una migración se aplica una vez—, no un
+`findMany` previo. Retirado el seed, **ningún archivo del repositorio consulta `units`**: ni el
+dominio, ni la composición, ni `scripts/seed.ts`. Esa es la frontera que R15/R16 protegían con «un
+solo archivo puede tocar la tabla», leída al día de hoy, y **no queda más floja**: lo que antes era
+«exactamente un sitio» ahora es «ninguno», y `module-contract.test.ts` ejercita el barrido contra
+una entrada sintética con `prisma.unit.findMany` para demostrar que la lista vacía no es vacía por
+vacuidad. El primer sitio legítimo llegará con QC-38, y tendrá que pasar por su spec.
 
-Carrera: dos seeds simultáneos podrían intentar crear la misma unidad. El índice único de § 2.1 lo
-resuelve —uno de los dos falla con `23505`— y ese es el comportamiento correcto para un comando de
-instalación que se corre a mano. No se añade lógica de reintento.
+Archivos retirados: `lib/modules/unidades/domain/starter-units.ts`,
+`lib/modules/unidades/domain/seed-units.ts`, `lib/modules/unidades/ports/unit-seed-repository.ts`,
+`lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts`, el
+`export const unidades` de `lib/composition/index.ts`, y la llamada más el `console.log` de
+unidades de `scripts/seed.ts` —que vuelve a hablar solo de roles y usuario inicial (QC-6)—.
 
-`scripts/seed.ts` sigue siendo cáscara fina: una llamada más a `unidades.seedStarterUnits()` y una
-línea de resumen sin secretos.
+Y con ellos sus tests: `tests/unit/unidades/domain/seed-units.test.ts`,
+`tests/unit/unidades/seed-wiring.test.ts` y
+`tests/integration/unidades/unidades-seed.int.test.ts`. `unidades-constraints.int.test.ts` **se
+queda**: no dependía del seed, cada caso crea sus propias filas dentro de su transacción.
 
 ---
 
@@ -560,10 +585,11 @@ dependieran de `inventario` para algo que no es inventario.
 | Estático | `tests/unit/unidades/schema/unidades-schema.test.ts` | La **declaración**: `Unit` con sus seis campos, `symbol` opcional, `@@unique` sobre `name_normalized`, **ausencia** de `deletedAt`, `/// @module unidades`; y en las dos tablas ajenas, `unitId` uuid **sin `@relation`** (opcional en `Product`, obligatorio en `RecipeLine`) y **ninguna** columna `unit` de texto. Lee `db/schema.prisma` como texto. |
 | Estático | `tests/unit/unidades/schema/unidades-migration.test.ts` | El **SQL**: la guardia `RAISE EXCEPTION` del UP y la del DOWN, las dos FK con `ON DELETE RESTRICT`, el índice único, los `DROP COLUMN "unit"`, los dos `ALTER` de RLS, identificadores en inglés, y que `down.sql` revierte exactamente el UP (`unit` vuelve `TEXT` en `products` y `TEXT NOT NULL` en `recipe_lines`). Con **tests de sensibilidad** obligatorios: mutar `RESTRICT` a `CASCADE`, quitar el bloque `DO $$` del UP y quitar el `NOT NULL` del DOWN, y comprobar que el predicado cae en los tres casos. Un test que no puede fallar no vigila nada. |
 | Unitario | `tests/unit/unidades/domain/unit-name.test.ts` | La normalización: acentos, mayúsculas, signos, espacios, cadena vacía e idempotencia (`f(f(x)) === f(x)`), que es la propiedad que hace segura la columna persistida. |
-| Unitario | `tests/unit/unidades/domain/seed-units.test.ts` | El seed con dobles del puerto: crea las cinco en base vacía; con tres ya presentes crea **dos**; **no** actualiza ninguna existente; dos corridas seguidas dejan el mismo estado. |
-| Unitario | `tests/unit/unidades/module-contract.test.ts` | La forma del módulo y las fronteras: `index.ts` solo reexporta de `./domain`; carpetas exactamente `domain`/`ports`/`adapters`; ningún `'use server'` alcanzable desde el barrel; `prisma.unit` aparece **solo** en el adaptador driven de `unidades`; `inventario` y `recetas` importan `unidades` **solo por el barrel**; y la feature no crea adaptadores driving, rutas ni Server Actions (R27). |
+| Estático (ronda 3) | `tests/unit/unidades/schema/unidades-migration.test.ts` > «el conjunto arrancador» | **R25 y R26.** Las cuatro filas del `INSERT`, en orden, con su nombre y su símbolo, y ninguna más; que `normalizeUnitName(name) === name_normalized` **importando la función real** —lo único que se da cuenta si el literal del SQL y la normalización se desincronizan (§ 6.1.3)—; y que el `INSERT` va después del `CREATE TABLE` y **antes** del `FORCE ROW LEVEL SECURITY` (§ 6.1.1). Con tres mutaciones de sensibilidad en memoria: cambiar un `name_normalized`, quitar el `INSERT` y añadir una quinta fila. |
+| ~~Unitario~~ | ~~`tests/unit/unidades/domain/seed-units.test.ts`~~ | **RETIRADO en la ronda 3** con el caso de uso que probaba. Lo mismo con `tests/unit/unidades/seed-wiring.test.ts`. |
+| Unitario | `tests/unit/unidades/module-contract.test.ts` | La forma del módulo y las fronteras: `index.ts` solo reexporta de `./domain`; carpetas exactamente `domain`/`ports`/`adapters`; ningún `'use server'` alcanzable desde el barrel; `inventario` y `recetas` importan `unidades` **solo por el barrel**; y la feature no crea adaptadores driving, rutas ni Server Actions (R27). **Ronda 3:** donde decía «`prisma.unit` aparece solo en el adaptador driven» ahora dice **«no aparece en ningún archivo»** (§ 6.2), y para que esa lista vacía no sea vacía por vacuidad el barrido es una función pura que se aplica dos veces: a los archivos reales (`[]`) y a esos mismos más una entrada sintética con `prisma.unit.findMany` (que **debe** salir señalada). Además vigila la mitad negativa de R26: `lib/composition/index.ts` no nombra ningún seed de unidades y `scripts/seed.ts` no nombra `unidades`. |
 | Integración | `tests/integration/unidades/unidades-constraints.int.test.ts` | Que la base **de verdad** rechaza y permite lo que debe. Cada caso en `prisma.$transaction` con `ROLLBACK`, cada operación que debe fallar dentro de un `SAVEPOINT`, y se afirma sobre el **SQLSTATE** (`23502`, `23503`, `23505`), **nunca** sobre el texto del mensaje: en esta máquina Postgres responde en español. Las operaciones que deben fallar van con `$executeRaw`, no con la API tipada (QC-24 § 10.1). Copiar los helpers de `tests/integration/recetas/recetas-constraints.int.test.ts`. |
-| Integración | `tests/integration/unidades/unidades-seed.int.test.ts` | El seed contra base real: corrida sobre catálogo vacío, segunda corrida sin cambios, y corrida con una unidad renombrada a mano que **no** se pisa. |
+| ~~Integración~~ | ~~`tests/integration/unidades/unidades-seed.int.test.ts`~~ | **RETIRADO en la ronda 3** con el seed. Lo que queda por comprobar contra base real —que tras el UP las cuatro filas están con su nombre, su símbolo y su normalizado— es del **ciclo de T10**, no de un test de Vitest: la migración se aplica una vez y el gate corre sobre una base ya migrada. Evidencia en `progress/impl_QC-32-modelo-unidades.md > Ronda 3`. |
 | Guardia (ya existe) | `tests/guards/guard-rls-force.test.ts` | R21. |
 | Guardia (ya existe) | `tests/guards/guard-arquitectura-modulos.test.ts` | R15, R16, R17. |
 | Guardia (ya existe) | `tests/guards/guard-dependencias-aprobadas.test.ts` | R28. |
