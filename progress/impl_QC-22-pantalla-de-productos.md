@@ -230,3 +230,29 @@ compilando y probada sin ellos en vez de crear un archivo muerto.
 **Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
 `grep -rn "100vh\|parseFloat(\|hover:"` sobre `app/(private)/inventario/`: solo aparece dentro de
 un comentario que explica por que no se usan.
+
+## T7 — Barra de herramientas: tamano de pagina y paginacion
+
+**Archivos:** `app/(private)/inventario/components/product-list-toolbar.tsx` (nuevo) y el barrel.
+
+- Selector con **exactamente dos opciones** (R10), recorriendo `PAGE_SIZE_OPTIONS` -que sale de
+  `DEFAULT_PAGE_SIZE`/`MAX_PAGE_SIZE`-, y controles anterior/siguiente con el indicador
+  «Página X de Y» (R11), desactivados en los extremos.
+- **Ningun control guarda estado local**: los dos NAVEGAN reescribiendo la cadena de consulta
+  (`router.push`), y el Server Component vuelve a pedir los datos. Recargar o volver con «atras»
+  conserva la pagina (lo que R17 necesita al cerrar el panel).
+- **La URL no se escribe a mano**: el camino sale de `usePathname()` y la consulta de
+  `buildProductListQuery`. El literal `'/inventario'` no aparece en el archivo (R2).
+- **Desviacion anotada frente a T7 (menor, deliberada):** el componente **no** usa
+  `useSearchParams()`. Los dos unicos parametros llegan ya parseados por props desde el servidor,
+  y el hook obligaria a envolver la barra en un `<Suspense>` propio solo para releer lo que ya
+  tiene. El efecto -navegar cambiando la cadena de consulta, nunca estado local- es el que T7
+  pide.
+- Cambiar el tamano vuelve a la **primera** pagina: con 25 por pagina, la «pagina 7» que se veia
+  con 10 puede no existir, y el usuario acabaria en un vacio que no ha provocado.
+- **R31**: disparador del selector y los dos botones con `min-h-11 min-w-11` (los primitivos
+  miden 32 px de alto). Los botones tienen `aria-label` y el indicador es `role="status"`.
+- El primitivo `select` de Base UI admite deseleccionar (`value: null`); este selector no ofrece
+  esa opcion, asi que un `null` se ignora en vez de navegar a un tamano invalido.
+
+**Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.

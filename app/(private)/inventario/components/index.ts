@@ -21,5 +21,6 @@ export {
 } from './product-columns';
 export { ProductListEmpty } from './product-list-empty';
 export { ProductListError } from './product-list-error';
+export { ProductListToolbar } from './product-list-toolbar';
 export { ProductTable } from './product-table';
 export { ProductTableSkeleton } from './product-table-skeleton';

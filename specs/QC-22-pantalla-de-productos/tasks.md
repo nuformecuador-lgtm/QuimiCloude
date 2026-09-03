@@ -131,7 +131,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios y `grep` no encuentra `100vh`, `parseFloat(`,
   `Number(` sobre `cost` ni `hover:` como única vía en estos archivos.
 
-### [ ] T7 — Barra de herramientas: tamaño de página y paginación
+### [x] T7 — Barra de herramientas: tamaño de página y paginación
 - **Depende de**: T5, T6. **Archivos**: `product-list-toolbar.tsx`, barrel.
 - **Qué**: `select` con **10 y 25** (R10) y controles de página anterior/siguiente con indicador
   «página X de Y» (R11). Cambiar cualquiera de los dos **navega** cambiando la cadena de consulta
