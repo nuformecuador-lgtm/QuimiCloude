@@ -622,6 +622,8 @@ Ninguno de los 54 queda huerfano. Abreviaturas de archivo:
 `guard-priv` = `tests/guards/guard-rutas-privadas-cubiertas.test.ts` ·
 `guard-dep` = `tests/guards/guard-dependencias-aprobadas.test.ts` ·
 `guard-arq` = `tests/guards/guard-arquitectura-modulos.test.ts` ·
+`unitrepo` = `tests/integration/unidades/unit-repository.int.test.ts` (**anadido en la ronda 2**) ·
+`recetascontract` = `tests/unit/recetas/module-contract.test.ts` ·
 `e2e` = `e2e/recetas.spec.ts`
 
 | Req | Test (nombre real) | Archivo |
@@ -665,23 +667,25 @@ Ninguno de los 54 queda huerfano. Abreviaturas de archivo:
 | R37 | `elegir un archivo valido muestra su vista previa, y el envio en curso impide un segundo envio` | form |
 | R38 | `un archivo demasiado grande se rechaza sin invocar la operacion` + `un archivo con formato no aceptado se rechaza sin invocar la operacion` | form |
 | R39 | `el borrado pide confirmacion nombrando la receta y sin confirmar no invoca la operacion` + `un borrado rechazado muestra el error en el dialogo y no navega ni refresca` | page |
-| R40 | `el listado de unidades devuelve el catalogo ordenado y pide siempre un limite declarado` + `el orden que devuelve es el que da el repositorio, estable por nombre` | units |
-| R41 | `sin actor` / `con rol vacio` / `con rol desconocido` / `con rol distinto de Administrador se rechaza sin leer del repositorio` (cuatro tests, con un doble que **falla si se le llama**) + `sin sesion invoca el caso de uso con actor null, sin decidir nada por su cuenta` | units + unitact |
+| R40 | `el listado de unidades devuelve el catalogo ordenado y pide siempre un limite declarado` + `el orden que devuelve es el que da el repositorio, estable por nombre` (**caso de uso**, contra un doble) + `R40: la cota > devuelve exactamente el limite pedido cuando la tabla tiene mas filas que el limite` + `R40: el orden > devuelve las filas ordenadas de forma ascendente por nombre, no en orden de insercion` (**repositorio REAL contra Postgres**, ronda 2) | units + unitrepo |
+| R41 | `sin actor` / `con rol vacio` / `con rol nulo` (**anadido en la ronda 2**) / `con rol desconocido` / `con rol distinto de Administrador se rechaza sin leer del repositorio` (cinco tests, con un doble que **falla si se le llama**) + `sin sesion invoca el caso de uso con actor null, sin decidir nada por su cuenta` | units + unitact |
 | R42 | `la action traduce el error de dominio a estado serializable sin relanzar` + `un error que no es de dominio se relanza y no se traduce` + `el modulo unidades tiene index.ts, solo carpetas domain/ports/adapters y ningun 'use server' alcanzable desde el barrel` + la guardia de arquitectura | unitact + modcontract + guard-arq |
 | R43 | `la pantalla obtiene las unidades solo por listUnitsAction y ninguna operacion de escritura de unidades entra en esta feature` + la asercion de `app/` que solo permite el barrel o el adaptador driving de listado | contract + modcontract |
-| R44 | `la feature no toca lib/modules/recetas ni db/` (via `git diff --name-only`) + la asercion de que `adapters/driving/` **solo** expone `listUnitsAction` y ningun archivo del modulo nombra una escritura de unidades (**en negativo**) | contract + modcontract |
+| R44 | `la feature no toca lib/modules/recetas ni db/` (via `git diff --name-only`, que **ahora cae en rojo si el rango no esta disponible** en vez de pasar en silencio) + `la feature no anade ningun route handler bajo app/, y lib/modules/recetas no cambio de forma` (ronda 2: el censo literal de 19 archivos se sustituyo por el **mismo diff de rama**) + la asercion de que `adapters/driving/` **solo** expone `listUnitsAction` y ningun archivo del modulo nombra una escritura de unidades (**en negativo**) | contract + modcontract + recetascontract |
 | R45 | `package.json solo incorpora los tres paquetes de arrastre aprobados y sus filas declaran el check fallido` + `toda dependencia de package.json tiene su fila en el registro` | contract + guard-dep |
 | R46 | `los componentes de ruta se exponen por el barrel, las tres paginas importan solo del barrel y no queda ningun componente suelto` | contract |
 | R47 | `ningun archivo de la ruta usa fetch a rutas API propias` | contract |
 | R48 | `las primitivas de components/ui que usa la ruta existen y ninguna se escribio a mano` | contract |
 | R49 | `los componentes de cliente no importan composicion, Prisma ni sesion por su cuenta` + `elige Litro y Gramo` (las unidades llegan **por props**) | contract + form |
 | R50 | `presenta la lista y sus acciones en viewport angosto y en ancho` + `no usa 100vh, ni hover como unica via, y respeta tamanos tactiles y de fuente` (**control a control**) | page + contract |
-| R51 | `la feature no duplica el armazon heredado: layout, sidebar, avisos y primitivas siguen siendo unicos` | contract |
+| R51 | `la feature no duplica el armazon heredado: layout, sidebar, avisos y primitivas siguen siendo unicos` (ronda 2: el censo de layouts de **toda** la zona privada se sustituyo por «**la carpeta de la ruta de recetas** no declara layout propio», derivada de `FORMULAS_ROUTE`) | contract |
 | R52 | `el Administrador entra, da de alta una receta con una linea y un paso, y la ve en la lista (R52)` + `un usuario que no es Administrador acaba fuera y no ve el catalogo (R6)` | e2e |
 | R53 | `(b) con dos lineas de baja existen los dos marcadores -y solo esos- y el aviso cuenta 2` + `la celda de una linea disponible no lleva testid de no disponible` | unavail |
 | R54 | `(a) sin lineas de baja, el aviso no existe y ninguna celda lleva marcador` + `(c) al quitar una de las dos lineas de baja, data-count pasa a 1` + `(d) al quitar la ultima linea de baja, el aviso desaparece del DOM` + `(e) el payload enviado sigue conteniendo la linea marcada, intacta` | unavail |
 
-**Los 54 requisitos tienen al menos un test nombrado. Ningun hueco.**
+**Los 54 requisitos tienen al menos un test nombrado. Ningun hueco.** Tras la ronda 2, **R40 y R41
+estan mejor cubiertos que antes**: R40 ya no se verifica solo contra un doble, sino tambien contra
+Postgres real.
 
 ## Tests de alcance heredados: tres mas retensados (no borrados)
 
@@ -759,3 +763,126 @@ recipe-route-contract.test.ts}`, `tests/unit/unidades/{list-units.test.ts, unit-
 
 **Cero cambios en**: `db/`, `lib/modules/recetas/**`, `lib/modules/inventario/**`,
 `components/ui/**`, `app/(private)/layout.tsx`, `components/private/app-sidebar.tsx`.
+
+---
+
+# Ronda 2 — respuesta al review (`progress/review_QC-26-pantalla-de-recetas.md`)
+
+El reviewer RECHAZO la ficha con 3 mayores y 6 menores. Al implementer le tocaban **MAYOR 1,
+MAYOR 3 y los menores 1-4**. MAYOR 2 (seis archivos de otra sesion arrastrados a la rama) lo
+resolvio el leader en el commit `cc0a547`, verificado aqui: `git diff origin/dev HEAD --
+components/ui components/private "app/(private)/inventario"` sale **vacio**. Los menores 5 y 6
+son del leader (marcas de T25/T28 y `history.md`).
+
+**Cero cambios de produccion en toda la ronda.** `git diff HEAD -- lib app components db` sale
+vacio: los dos mayores se cierran con tests y con margen de tiempo, no tocando el codigo.
+
+## MAYOR 1 — la suite completa estaba roja de forma reproducible (R30 y R31 por timeout)
+
+`tests/unit/recetas-ui/recipe-form.test.tsx`. Se atacaron **las dos causas**, sin debilitar ni
+una asercion y sin `retry` (un test que solo pasa a veces seguiria siendo rojo):
+
+1. **`setupUser()`** — `userEvent.setup({ delay: null })`, aplicado a los 19 casos del archivo.
+   Por defecto `user-event` intercala un `setTimeout(0)` entre **cada** evento, y estos casos
+   emiten cientos. `delay: null` quita **solo** esa espera artificial: la secuencia de eventos
+   que recibe el DOM es identica y siguen activas todas las comprobaciones de `user-event`,
+   incluida la de `pointer-events`. Medido en aislado, el tiempo de tests del archivo baja de
+   **13,90 s a 8,54 s**.
+2. **`vi.setConfig({ testTimeout: 30_000 })`** — margen de sobra para la carga de la suite
+   entera. No es un parche a un test lento: un formulario completo con popups no se cronometra
+   igual que una funcion pura.
+
+**Por que hacian falta las dos.** Con `delay: null` sola, R30/R31 seguian en ~1,3 s en aislado
+pero volvian a ~2,0 s con solo tres archivos en paralelo. Medido **bajo la suite completa** ya
+con el arreglo puesto (`--reporter=verbose`):
+
+```
+R30  2700 ms      R31  3191 ms      R31 (2.o)  1352 ms      R33  961 ms      R34  930 ms
+```
+
+Eso explica el fallo original y demuestra el arreglo: contra el `testTimeout` por defecto de
+**5000 ms**, R30 y R31 estaban justo en el borde bajo carga -de ahi que expiraran las cuatro
+veces que los corrio el reviewer-. Contra los 30 000 ms de ahora el margen es de **~9x**.
+
+**No se toco `tests/baseline-rojos.json`**: sigue vacio. Este rojo era propio, no deuda ajena de
+`dev`, y meterlo ahi habria sido esconderlo.
+
+## MAYOR 3 — el adaptador driven ya no puede perder la cota ni el orden en silencio
+
+Nuevo: `tests/integration/unidades/unit-repository.int.test.ts`, que ejercita
+`listUnits(limit)` de `lib/modules/unidades/adapters/driven/persistence/unit-prisma.ts`
+**directamente contra Postgres**, no contra un doble. Dos casos (R40): la **cota** -con una
+precondicion explicita de que la tabla tiene mas filas que el limite, para que no pueda quedar
+verde por vacuidad- y el **orden** -tres unidades marcadas insertadas en orden NO alfabetico,
+filtradas por su marcador-. Aislamiento por la estrategia 2 de `recipe-crud.int.test.ts`
+(`listUnits` usa el cliente Prisma global, asi que no admite `$transaction` + ROLLBACK): siembra
+con `prisma` real y borra por `id` exacto en un `finally`. Ninguna afirmacion global.
+
+**La prueba de que muerde — las dos mutaciones, ejecutadas y no supuestas:**
+
+| Linea borrada de `unit-prisma.ts` | Resultado |
+| --- | --- |
+| `take: limit` | **ROJO** — cae `R40: la cota > devuelve exactamente el limite pedido cuando la tabla tiene mas filas que el limite`: `expected 7 to be less than or equal to 2`. El caso del orden sigue verde: cada mutacion mata exactamente su caso. |
+| `orderBy: { name: 'asc' }` | **ROJO** — cae `R40: el orden > devuelve las filas ordenadas de forma ascendente por nombre, no en orden de insercion`: esperado `[01, 02, 03]`, recibido `[02, 03, 01]`. Sin `ORDER BY`, Postgres devolvio el orden de heap. |
+
+Tras cada una se restauro el archivo; `git diff --stat lib/` quedo vacio. Es la misma M2/M10 del
+reviewer, que antes salia **verde**.
+
+## Los cuatro menores
+
+- **menor 1** (`recipe-route-contract.test.ts`, caso de R51) — fuera el censo de layouts de
+  **toda** la zona privada. En su lugar, lo que R51 pide de **esta** feature: la carpeta de la
+  ruta de recetas -derivada de `FORMULAS_ROUTE`, nunca de un literal- no contiene ningun
+  `layout.tsx`, con `existsSync` de la carpeta y un `length > 0` de sus fuentes para que no
+  pueda quedar verde por vacuidad. **Muerde**: creado un `layout.tsx` vacio en esa carpeta, el
+  caso cae con `ningun archivo bajo app\(private)\produccion\formulas puede ser un layout`.
+  Borrado despues.
+- **menor 2** (`tests/unit/recetas/module-contract.test.ts`) — fuera `EXPECTED_RECETAS_MODULE_FILES`,
+  la lista literal de 19 rutas de un modulo **ajeno** que congelaba `recetas` (QC-25, ya `done`).
+  La misma intencion -«QC-26 no toca `recetas` por la puerta de atras»- se expresa ahora sobre el
+  **diff de rama**, como el caso de R44. Intactas la prohibicion de `app/api/recipes|recetas` y la
+  defensa `fueraDeSuCarpeta`.
+- **menor 3** (`recipe-route-contract.test.ts`, caso de R44) — el `catch` que dejaba `diff = []`
+  permitia terminar en `expect(diff).toEqual([])`: verde sin mirar un solo archivo. Ahora el caso
+  exige `diff.length > 0` con el mensaje `el rango git origin/dev...HEAD no estaba disponible:
+  este caso no ha comprobado nada`. **Muerde**: apuntando el rango a una ref inexistente, caen
+  **los dos** casos (este y el de menor 2) con `expected 0 to be greater than 0`. Restaurado.
+- **menor 4** (`tests/unit/unidades/list-units.test.ts`) — anadido el quinto caso de R41,
+  `con rol nulo se rechaza sin leer del repositorio`, con el mismo doble que **lanza si se le
+  llama**. No habia defecto de produccion: `requireAdmin` ya lo manejaba por igualdad estricta;
+  faltaba el caso escrito.
+
+## Gate de la ronda 2 — salida REAL
+
+```
+pnpm run typecheck   -> tsc --noEmit, sin salida, exit 0
+pnpm run lint        -> eslint, sin salida, exit 0
+
+pnpm exec vitest run   (suite COMPLETA, 1.a corrida)
+  Test Files  125 passed (125)
+  Tests       1369 passed (1369)
+  Duration    75.79s
+
+pnpm exec vitest run   (suite COMPLETA, 2.a corrida seguida)
+  Test Files  125 passed (125)
+  Tests       1369 passed (1369)
+  Duration    64.46s
+```
+
+Dos corridas completas seguidas, **las dos verdes**, frente al `1364/1366` que el reviewer
+reprodujo cuatro veces de cuatro. Los numeros cuadran con lo anadido: **+1 archivo** (el de
+integracion, 124 -> 125) y **+3 tests** (dos de R40 y uno de R41, 1366 -> 1369).
+
+Todo se corrio con el entorno del worktree cargado (`set -a && . ./.env && set +a`), contra su
+base propia `QuimiCloude_QC26`.
+
+**`./init.sh` completo y el PR siguen siendo del leader** (`tasks.md > T28`). El E2E no se
+reejecuto en esta ronda: ningun cambio la toca -cero produccion modificada- y su ultima salida
+verde consta arriba.
+
+### Una nota util que salio de la ronda, declarada en vez de omitida
+
+`pnpm exec vitest run tests/integration/unidades tests/unit/unidades` (dos filtros a la vez)
+**no ejecuta los tests de integracion**: selecciona solo los archivos del proyecto `node`. Es un
+falso verde facil de pisar al verificar a mano un cambio de datos. El gate completo no filtra, asi
+que no le afecta -pero conviene saberlo antes de concluir «no se rompio nada» tras un filtro.
