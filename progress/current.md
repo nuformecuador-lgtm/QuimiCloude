@@ -14,7 +14,6 @@
 | QC-30 | rediseno-login | QC-17 Identidad y acceso | frontend | **in_progress — PR #20 ABIERTO** | `feature/QC-30-rediseno-login` | **Esperando que el humano mergee el [PR #20](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/20).** Sesión labs-4b. Spec aprobado el 2026-09-02 (26 requisitos, 11 tareas). **Dos rondas de revisión**: la primera rechazó por un bloqueante real —R9 sin test que mordiera: se podía borrar el modo oscuro entero y recortar la sombra con la suite en verde—; la segunda aprobó con 0 hallazgos, repitiendo cada mutación. Las correcciones fueron **cero cambios de producción**: solo crecieron los tests (20 → 26). Gate completo verde: 65 archivos, 663 tests. Al mergear: F2.5 (tarjeta a *Hecho*, `status: done`, `wt.sh done QC-30-rediseno-login`) y F2.6 (resumen en `history.md`) |
 | QC-42 | modelo-proveedores | QC-41 Proveedores | backend | **in_progress — implementer corriendo (F2.1), 4.º intento** | `feature/QC-42-modelo-proveedores` | Sesión de hoy (2026-09-03). **Spec aprobado por el humano** (36 requisitos EARS, 15 tareas, `667ab98`); acotada antes con `/afinar-feature` (semilla `ee47f69`, 22 decisiones cerradas). Tarjeta en *En curso*. **Preguntas abiertas 6, 7 y 8 siguen ABIERTAS**: el humano aprobó sin cerrarlas, el implementer las respeta y NO las rellena (regla 6). **Tres implementers murieron por 5xx de la API (500, 529, 529), ninguno por fallo del trabajo**; el 4.º corre en **Sonnet 5 por decisión explícita del humano** —desvío con motivo del «todos heredan el modelo de la sesión» de `AGENTS.md`, no norma nueva— y pasa `model: sonnet` también a sus `backend_dev`. **`b60236f` es un commit `wip` SIN AUDITAR**: esquema, migración con `down.sql` y armazón del módulo que dejó el primer implementer; se commiteó solo como red de seguridad y auditarlo es la primera tarea real del siguiente. 0 de 15 tareas marcadas, sin `impl_*.md`. Zona `backend` en **2 de 2** (QC-32 + QC-42); **QC-25 bloqueada por cupo**, y el humano dio permiso explícito para pasar de 2 si hiciera falta (2026-09-03). **Riesgo vivo: QC-32 toca `db/schema.prisma` y las migraciones** — T13 sincroniza con `dev` y repite T10 antes de dar la migración por buena. Flake ajeno conocido: `tests/ui/login-form-uncontrolled-warning.test.tsx`. |
 | QC-25 | crud-de-recetas | QC-27 Recetas | backend | **in_progress — implementer corriendo** | `feature/QC-25-crud-de-recetas` | Sesión de hoy (2026-09-03). **Spec aprobado por el humano el 2026-09-03** (F1.4): 49 requisitos (R1–R49), 19 tasks (T0–T18), 26 decisiones cerradas y cero preguntas abiertas propias. Tarjeta en *En curso*. La aprobación del spec **incluyó la dependencia**: la fila de `@supabase/storage-js` ya está en `docs/dependencias.md`, y NO entra `@supabase/supabase-js`. Sin migración propia: el CRUD cabe sobre el modelo de QC-24. Ojo al cerrar la tanda: `lib/composition/index.ts` es el archivo que ha chocado en **todas** las parejas backend del repo |
-| QC-32 | modelo-unidades | QC-37 Catálogos | backend | **in_progress — [PR #22](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/22) APROBADO, esperando merge humano** | `feature/QC-32-modelo-unidades` | Sesión de hoy (2026-09-03). **Tres rondas.** R1: reviewer RECHAZÓ (1 mayor — R25/R26 vigilaban una *copia* del adaptador driven del seed). R2 (`536ce49`): cerrado pasando el adaptador a fábrica; **nunca llegó a firmarse** porque doce intentos de subagente murieron por 500/529 de la API. R3 (`62f321d`): **el humano decidió que el aparato del seed sobra** — las cuatro unidades (`mililitro/ml`, `litro/l`, `gramo/gr`, `kilogramo/kg`) las inserta la propia migración —, lo que **disolvió MAYOR-1 borrando su objeto**. **Reviewer APROBÓ sobre `62f321d`: 0 mayores, 4 menores** (menor-6 a menor-9, todos de documentación o cobertura opcional). HEAD `05e6119`, **gate completo verde corrido por el leader: 94 archivos, 1020 tests, `== init OK ==`**. Al mergear: **F2.5** (tarjeta a *Hecho*, `status: done`, comentar la URL del PR, `wt.sh done QC-32-modelo-unidades`) y **F2.6** (resumen en `history.md`) |
 | QC-22 | pantalla-de-productos | QC-18 Inventario | frontend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-22-pantalla-de-productos` | Sesión de hoy (2026-09-03). F1.0 hecha: zona `frontend` con **1 feature `in_progress`** (QC-30, que ya no recibe más código —solo espera el merge del PR #20—), sin intersección de archivos: QC-30 toca `app/(public)/login/*`, `app/globals.css` y `components/ui/`; QC-22 vive en `app/(private)/`. Dependencia **QC-20 `done`**. `complexity: medium` evaluada aquí y **empujada al issue como label** (antes solo tenía `zone:frontend`). Worktree en `.worktrees/QC-22-pantalla-de-productos` (rama desde `origin/dev` en `8f4a5ae`). **Parada en F1.2**: la propia description delega la forma de la pantalla al acotado —una ruta o dos, formulario en modal o en página, búsqueda y orden, y si hace falta E2E— y no existe `specs/QC-22-pantalla-de-productos/`. **F1.2 en curso**: `/afinar-feature` corrió el 2026-09-03 y sembró `specs/QC-22-pantalla-de-productos/requirements.md` con 22 decisiones cerradas y 1 pregunta abierta. Cambió el alcance —solo productos; la pantalla de presentaciones salió a **QC-45**, creada en el board— y eso se escribió en el issue ANTES de sembrar. Semilla commiteada en `dev` (`30186f3`) y mergeada al worktree. `spec_author` escribió **32 requisitos (R1-R32) y 20 tareas (T0-T19)** con mapa `R<n> → test` completo (commit `3a85ea6` en la rama). F1.3 hecha: tarjeta en *En revisión* y ruta comentada en el issue. **Spec APROBADO por el humano el 2026-09-03** (F1.4); tarjeta en *En curso*. La aprobación cerró tres cosas: (1) **P2 cerrada sin dependencias nuevas**: `shadcn add form` NO se corre, `react-hook-form` y `@hookform/resolvers` NO se instalan y `docs/dependencias.md` NO cambia — se usa `<form action>` + `useActionState`, el patrón del login (commit `0f36d60`); (2) montar `<Toaster />` **supera** el R36/D9 de QC-11 y su test en negativo (`tests/unit/private-layout.test.tsx:260`), que T4 invierte con la fecha escrita, no borra; (3) `INVENTORY_ROUTE` se muda de `private-nav.ts` a `lib/shared/routes.ts`, tocando cuatro archivos heredados que R32 declara como los únicos permitidos |
 
 La feature **QC-20 — crud-de-productos** se cerró el 2026-09-02 (PR #19, merge `1be1021`):
@@ -240,6 +239,24 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   los dos caminos compartan la misma operación del puerto (R47/R48)—; y un borrado de archivo
   fallido **no revierte** la edición ya guardada (R49). La 5 se cerró **contra** la posición por
   defecto del diseño, y `design.md > 13.1` quedó marcada como descartada con lo que se implementa.
+- **[override de modelo, con su razón escrita — F2.1 de QC-25, 2026-09-03]** El `implementer` se
+  lanzó con **Sonnet** en vez de heredar el modelo de la sesión, que es lo que manda
+  `AGENTS.md > Modelos`. La razón concreta, que es la que esa regla exige: **cinco arranques
+  seguidos murieron con `529 Overloaded` de la API contra `claude-opus-5`**, y los cinco perdieron
+  el 100 % del trabajo porque cayeron antes de escribir una línea. Se probó esperar cinco minutos,
+  reanudar el mismo subagente y lanzar uno nuevo con contexto limpio: los tres fallaron igual, así
+  que **no era la transcripción acumulada** —esa hipótesis quedó descartada por el intento con
+  agente nuevo—. La sesión del leader nunca falló contra el mismo modelo: lo que rebotaba era el
+  arranque de subagentes. Decisión humana del 2026-09-03. **Mitigación**: el `reviewer` de F2.2
+  hereda el modelo de la sesión y tiene el encargo explícito de morder fuerte en las tres partes
+  sutiles del spec —la conciliación de líneas, la validación solo de productos nuevos (R45/R46) y
+  los tres estados de la imagen (R47–R49)—, que es donde un modelo distinto mete deuda callada.
+- **[lección para `/afinar-regla`] Los cinco cortes de hoy son la misma lección que ya está escrita
+  en `AGENTS.md > Regla del gate`** sobre los cinco subagentes que murieron en corridas largas de
+  verificación — pero allí solo se aplicó al gate. Lo que faltaba decir es que **un subagente tiene
+  que escribir en disco a medida que avanza**, no al final: marcar cada task en cuanto cierra y
+  commitear al cerrar cada grupo. Con eso, un corte cuesta la tanda en curso; sin eso, cuesta todo.
+  Es la regla 3 de `CLAUDE.md` aplicada al subagente y no solo al chat.
 - **[deuda del arnés] La columna del board se llama «En revisión», no «Spec en revisión»** como
   afirma `docs/jira.md > El board de este repo`. El mapeo de F0 que traduce columna → `status` está
   escrito contra el nombre que no es; hoy no rompió nada porque ninguna ficha estaba en esa columna
@@ -1108,35 +1125,27 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
-### QC-32: los cuatro menores que el reviewer dejó abiertos (2026-09-03)
+### QC-32 se cerró el 2026-09-03 — lo que deja abierto
 
-El reviewer **APROBÓ** sobre `62f321d` con **0 mayores**. Los cuatro menores no bloquean el
-merge y quedan aquí para que alguien decida, no para que se olviden:
+Resumen completo en `progress/history.md`. Lo que sigue vivo:
 
-- **menor-6** — ninguna aserción automática comprueba **las cuatro filas en la base**; la única
-  evidencia real es el log de T15. Es coherente con el precedente de R22/R23/R24, pero
-  `tests/integration/unidades/unidades-constraints.int.test.ts` ya corre contra Postgres y un
-  caso acotado costaría poco. **Es el único de los cuatro que añade cobertura real.**
-- **menor-7** — `specs/QC-32-modelo-unidades/tasks.md`, filas R16 y R19 de la tabla de
-  trazabilidad, citan nombres de test que ya no existen (R16) o incompletos (R19).
-- **menor-8** — el mapa `R<n> → test` de `progress/impl_QC-32-modelo-unidades.md > T14` sigue
-  citando artefactos borrados y «unidades creadas: 5»; la ronda 3 no lo marcó como superado.
-- **menor-9** — la mitad negativa de R26 se apoya en una lista de nombres literales; lo que
-  cierra la red de verdad es el barrido. Anotado **para QC-38**.
+- **menor-6, el único con cobertura real:** ninguna aserción automática comprueba **las cuatro
+  filas en la base**; la evidencia es el log de la tarea. `unidades-constraints.int.test.ts` ya
+  corre contra Postgres y un caso acotado costaría poco.
+- **menor-7 y menor-8** — deriva de documentación: la tabla de trazabilidad de
+  `specs/QC-32-modelo-unidades/tasks.md` (filas R16 y R19) y el mapa `R<n> → test` de
+  `progress/impl_QC-32-modelo-unidades.md > T14` citan artefactos que la ronda 3 borró.
+- **menor-9** — la mitad negativa de R26 se apoya en una lista de nombres literales; lo que cierra
+  la red es el barrido. **Para QC-38.**
+- **Preguntas abiertas que siguen abiertas:** si el símbolo debe ser único cuando existe (n.º 1) y
+  si presentación y unidad convergen (n.º 3).
 
-**Dos preguntas resueltas por el reviewer, que conviene no reabrir:**
-
-1. **`tests/` fuera del barrido de `module-contract.test.ts` es frontera legítima, no agujero.**
-   R15/R16 hablan de *módulos* y un fixture no lo es. Extenderlo pondría rojos a
-   `product-crud.int.test.ts`, `inventario-constraints.int.test.ts` y
-   `recetas-constraints.int.test.ts`, que crean su unidad porque `recipe_lines.unit_id` es
-   `NOT NULL` con FK: el requisito se volvería **incomprobable** contra base real.
-2. **La migración de QC-42 aplicada en la base local no invalida la evidencia.** Crea
-   `suppliers` y `supplier_catalog_lines` y no toca `units`, `products.unit(_id)` ni
-   `recipe_lines`; además `121404 < 131417`, así que en base limpia QC-32 aplica antes.
-   **Salvedad anotada:** la evidencia se obtuvo revirtiendo y reaplicando QC-32 *por debajo* de
-   una migración posterior ya aplicada, cosa que `migrate deploy` no hará en producción. No
-   invalida nada porque no hay dependencia, pero es lo único que la separa de un despliegue real.
+**Dos cosas resueltas que conviene no reabrir:** `tests/` fuera del barrido de
+`module-contract.test.ts` es frontera legítima —extenderlo volvería R15/R16 **incomprobables**
+contra base real, porque `recipe_lines.unit_id` es `NOT NULL` con FK—; y la migración de QC-42
+aplicada en la base local no invalidó la evidencia, con la salvedad de que se obtuvo revirtiendo y
+reaplicando QC-32 *por debajo* de una migración posterior, cosa que `migrate deploy` no hará en
+producción.
 
 ### Arranque de un worktree: falta `pnpm install` y `next typegen` (2026-09-03, hallazgo de QC-32)
 
