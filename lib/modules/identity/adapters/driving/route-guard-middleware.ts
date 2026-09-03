@@ -22,8 +22,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { identityEdge } from '@/lib/composition/edge';
+// La LISTA de reglas ruta→rol es CABLEADO y vive en `lib/composition` desde el 2026-09-03
+// (ver la cabecera de ese archivo): el dominio no puede nombrar rutas y este adaptador no puede
+// importar el barrel de `inventario` como valor. Sigue habiendo un solo punto de composicion.
+import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
 import {
-  ROUTE_ROLE_RULES,
   decideRouteAccess,
   isSessionExpired,
   type RouteAccessSession,

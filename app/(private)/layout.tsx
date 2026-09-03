@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { Toaster } from '@/components/ui/sonner';
 import { identity } from '@/lib/composition';
 import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE } from '@/lib/shared/routes';
@@ -23,8 +24,13 @@ import { SidebarToggle, ThemeToggle } from './components';
  * y esta dicho para que no se lea como olvido): no lee ni emite cookie de sesion y no toca
  * base de datos ni red. La proteccion barata de ruta en `middleware.ts` es **QC-9**, anterior
  * a este render y mas eficiente; el chequeo de aqui no la sustituye, es la ultima linea de
- * defensa si algo llega hasta el Server Component sin sesion. Tampoco monta ninguna region
- * de notificaciones (R36, D9): `sonner` no entra en esta feature.
+ * defensa si algo llega hasta el Server Component sin sesion.
+ *
+ * Este layout SI monta la region de avisos emergentes (`<Toaster />`, R22 de QC-22). Eso
+ * **supera expresamente a R36/D9 de QC-11**, que la dejaba fuera: es decision humana del
+ * 2026-09-03, no una regresion ni un «ya que estamos». Se monta con las mismas opciones que
+ * la zona publica (`richColors`) y **no** se promueve al root layout: hoy son dos zonas con
+ * armazones distintos y promoverlo obligaria a tocar un tercer archivo sin necesidad.
  *
  * El route group no crea ninguna URL (D11): no hay `page.tsx` y la primera pantalla privada
  * la trae la feature 9. Es lo esperado, no un archivo que falte.
@@ -84,6 +90,16 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
         </header>
         {children}
       </SidebarInset>
+      {/* R22 de QC-22 (decision humana del 2026-09-03, supera a R36/D9 de QC-11): region de
+          avisos de la zona privada, hermana del contenido para que ningun toast quede dentro
+          del `<main>`. Misma configuracion que la zona publica.
+
+          Efecto secundario que conviene saber, no es un bug: `markOthers` de Base UI excluye
+          del `aria-hidden` la rama que lleva a cualquier `[aria-live]`, para que los toasts se
+          sigan anunciando con el panel movil abierto. Desde que esta region existe, el
+          `aria-hidden` cae en los hijos (el `<main>`, que es lo que importa) y ya no en el
+          contenedor exterior, que solo conserva el marcador `data-base-ui-inert`. */}
+      <Toaster richColors />
     </SidebarProvider>
   );
 }
