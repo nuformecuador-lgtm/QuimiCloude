@@ -75,7 +75,7 @@ verificado contra el árbol de la rama, no contra este documento.
       adelanta a propósito: es mientras se llena `domain/` cuando el alcance se escapa (lección de
       QC-20 T15 y QC-25 T3).
 
-- [ ] **T3 — La migración de los tres cambios.** `db/schema.prisma` (solo los dos campos de autor
+- [x] **T3 — La migración de los tres cambios.** `db/schema.prisma` (solo los dos campos de autor
       de `SupplierCatalogLine` y sus dos `@@index`, más los comentarios `///` que hoy dicen que la
       línea no tiene autor) y
       `db/migrations/<ts>_supplier_contact_cost_and_line_audit/{migration.sql,down.sql}` con el SQL
@@ -86,7 +86,7 @@ verificado contra el árbol de la rama, no contra este documento.
       dos restricciones de QC-42 con su definición literal —no solo las dropea— y el UP no contiene
       ningún `ALTER` sobre otra tabla.
 
-- [ ] **T4 [P] — Test estático de la migración.**
+- [x] **T4 [P] — Test estático de la migración.**
       `tests/unit/proveedores/schema/proveedores-migration.test.ts`: los tres cambios, el
       `COALESCE(btrim(...))`, el `> 0`, las dos FK a mano con su `RESTRICT`, los dos índices, los
       nombres en inglés, que `supplier_catalog_lines_cost_non_negative` **ya no existe** en el UP y

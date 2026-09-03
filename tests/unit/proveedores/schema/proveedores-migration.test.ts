@@ -228,6 +228,7 @@ const VOCABULARIO_INGLES = new Set([
   'normalized',
   'phone',
   'pkey',
+  'positive',
   'product',
   'purchase',
   'required',
@@ -675,5 +676,377 @@ describe('down.sql — reversion exacta', () => {
       expect(dropeadas, `el DOWN no debe dropear ${ajena}`).not.toContain(ajena)
       expect(downEjecutable).not.toMatch(new RegExp(`\\b${ajena}\\b`, 'i'))
     }
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// T4 (QC-43) — Contrato estatico del SQL de `supplier_contact_cost_and_line_audit`.
+//
+// Los TRES CAMBIOS de `specs/QC-43-crud-de-proveedores/design.md` seccion 2: el contacto
+// en blanco deja de valer (R12), el costo deja de admitir cero (R29) y la linea gana
+// columnas de autor con sus dos FK a mano (R31, R32). Cubre R38, R39 y R40.
+//
+// Igual que arriba, cada afirmacion se escribe como PREDICADO reutilizable y se aplica dos
+// veces: al SQL real y a una version MUTADA EN MEMORIA. Las mutaciones obligatorias son
+// quitar el `COALESCE`, cambiar `>` por `>=`, cambiar un `RESTRICT` por `SET NULL` y dejar
+// el `down.sql` con solo `DROP`. Un test que no puede fallar no vigila nada.
+// ---------------------------------------------------------------------------------------
+
+const migrationDir43 = join(
+  repoRoot,
+  'db',
+  'migrations',
+  '20260903200343_supplier_contact_cost_and_line_audit',
+)
+
+const downSource43 = readFileSync(join(migrationDir43, 'down.sql'), 'utf8')
+const up43 = statements(readFileSync(join(migrationDir43, 'migration.sql'), 'utf8'))
+const down43 = statements(downSource43)
+
+/**
+ * ¿La columna se compara tratando el BLANCO como ausencia, con el `COALESCE` puesto? (R12)
+ *
+ * Sin el `COALESCE`, con la columna a NULL, `btrim(NULL) <> ''` evalua a NULL y UN CHECK
+ * QUE EVALUA A NULL SE CUMPLE: la restriccion dejaria pasar justo la fila que existe para
+ * bloquear. Es el error mas facil de cometer aqui, y por eso el predicado exige el
+ * `COALESCE` explicitamente en vez de conformarse con ver un `btrim`.
+ */
+function treatsBlankAsMissing(statement: string, column: string): boolean {
+  const conCoalesce = new RegExp(
+    `COALESCE\\s*\\(\\s*btrim\\s*\\(\\s*"${column}"\\s*\\)\\s*,\\s*''\\s*\\)\\s*<>\\s*''`,
+    'i',
+  ).test(statement)
+  const btrimPelado = new RegExp(
+    `(?<!COALESCE\\s*\\(\\s*)btrim\\s*\\(\\s*"${column}"\\s*\\)\\s*<>`,
+    'i',
+  ).test(statement)
+  return conCoalesce && !btrimPelado
+}
+
+/** ¿El CHECK exime a las filas dadas de baja? Variante B de P2, cerrada por el humano. */
+function exemptsDeletedRows(statement: string): boolean {
+  return /CHECK\s*\(\s*"?deleted_at"?\s+IS\s+NOT\s+NULL\s+OR\b/i.test(statement)
+}
+
+/** ¿El CHECK exige la columna ESTRICTAMENTE mayor que cero, sin admitir el cero? (R29) */
+function isStrictlyPositiveCheck(statement: string, column: string): boolean {
+  const estricto = new RegExp(`CHECK\\s*\\(\\s*"?${column}"?\\s*>\\s*0\\s*\\)`, 'i').test(statement)
+  const admiteCero = new RegExp(`CHECK\\s*\\(\\s*"?${column}"?\\s*>=\\s*0\\s*\\)`, 'i').test(
+    statement,
+  )
+  return estricto && !admiteCero
+}
+
+/** Tablas sobre las que una sentencia hace `ALTER TABLE` o crea un indice. */
+function touchedTables(source: readonly string[]): readonly string[] {
+  const nombres = new Set<string>()
+  for (const statement of source) {
+    const alter = /^ALTER TABLE (?:ONLY )?"?(\w+)"?/i.exec(statement)
+    if (alter) nombres.add(alter[1] as string)
+    const index = /^CREATE (?:UNIQUE )?INDEX "?[^"]+"? ON "?(\w+)"?/i.exec(statement)
+    if (index) nombres.add(index[1] as string)
+  }
+  return [...nombres]
+}
+
+/** ¿El DOWN vuelve a CREAR la restriccion con su definicion literal, no solo la dropea? (R39) */
+function recreatesConstraint(source: readonly string[], name: string, check: RegExp): boolean {
+  return source.some(
+    (statement) =>
+      new RegExp(`ADD CONSTRAINT "${name}"`, 'i').test(statement) && check.test(statement),
+  )
+}
+
+describe('QC-43 migration.sql — los tres cambios sobre el esquema de QC-42', () => {
+  it('el CHECK de contacto trata el blanco como ausencia y solo alcanza a las filas vivas', () => {
+    // R12. `btrim` es IMMUTABLE, asi que es legitima dentro de un CHECK. El nombre de la
+    // restriccion NO cambia: es la misma regla con distinta definicion, y renombrarla
+    // obligaria a QC-44 y a cualquier traductor de SQLSTATE a conocer dos nombres.
+    expect(
+      findStatement(
+        up43,
+        /^ALTER TABLE "?suppliers"? DROP CONSTRAINT "?suppliers_contact_required"?/i,
+      ),
+    ).toBeTruthy()
+
+    const add = findStatement(up43, /ADD CONSTRAINT "suppliers_contact_required"/i)
+    expect(treatsBlankAsMissing(add, 'phone'), 'falta el COALESCE(btrim("phone"))').toBe(true)
+    expect(treatsBlankAsMissing(add, 'email'), 'falta el COALESCE(btrim("email"))').toBe(true)
+    // «Al menos uno», no «los dos»: el conector entre las dos comparaciones es OR.
+    expect(add).toMatch(/<>\s*''\s+OR\s+COALESCE/i)
+    expect(add).not.toMatch(/<>\s*''\s+AND\s+COALESCE/i)
+
+    // P2, cerrada por el humano el 2026-09-03 al aprobar el spec: VARIANTE B. Un proveedor
+    // dado de baja SI puede quedarse sin telefono y sin correo -lo que exigiria una
+    // solicitud de borrado de datos personales- sin borrar la fila entera.
+    expect(exemptsDeletedRows(add), 'la variante B exime a las filas dadas de baja').toBe(true)
+  })
+
+  it('el CHECK de contacto sin COALESCE deja de vigilar, y ese es justo el agujero', () => {
+    // Sensibilidad OBLIGATORIA de R12. `btrim(NULL) <> ''` evalua a NULL y un CHECK que
+    // evalua a NULL SE CUMPLE: la mutacion produce un SQL que compila, se aplica sin
+    // ruido y no bloquea nada. Si el predicado no cayera aqui, no vigilaria nada.
+    const add = findStatement(up43, /ADD CONSTRAINT "suppliers_contact_required"/i)
+    const sinCoalesce = add.replace(
+      /COALESCE\s*\(\s*(btrim\s*\(\s*"\w+"\s*\))\s*,\s*''\s*\)/gi,
+      '$1',
+    )
+    expect(sinCoalesce, 'la mutacion no cambio nada').not.toBe(add)
+    expect(treatsBlankAsMissing(sinCoalesce, 'phone')).toBe(false)
+    expect(treatsBlankAsMissing(sinCoalesce, 'email')).toBe(false)
+
+    // Y la otra mutacion: volver a la forma de QC-42, que solo miraba ausencia de VALOR.
+    const comoQc42 =
+      'ALTER TABLE "suppliers" ADD CONSTRAINT "suppliers_contact_required" CHECK ("phone" IS NOT NULL OR "email" IS NOT NULL)'
+    expect(treatsBlankAsMissing(comoQc42, 'phone')).toBe(false)
+  })
+
+  it('el CHECK del costo pasa a exigir mayor que cero y la restriccion vieja desaparece', () => {
+    // R29, decision cerrada 4. La restriccion SI se renombra, y a proposito: un nombre
+    // `_non_negative` sobreviviendo a la regla `> 0` es el tipo de mentira que nadie
+    // detecta leyendo el esquema.
+    const add = findStatement(up43, /ADD CONSTRAINT "supplier_catalog_lines_cost_positive"/i)
+    expect(isStrictlyPositiveCheck(add, 'cost'), 'el CHECK debe ser "cost" > 0').toBe(true)
+
+    // La vieja se dropea y NO vuelve a aparecer en el UP.
+    expect(
+      findStatement(up43, /DROP CONSTRAINT "?supplier_catalog_lines_cost_non_negative"?/i),
+    ).toBeTruthy()
+    expect(
+      up43.filter((statement) =>
+        /ADD CONSTRAINT "supplier_catalog_lines_cost_non_negative"/i.test(statement),
+      ),
+      'el UP no puede volver a crear la restriccion vieja',
+    ).toEqual([])
+
+    // `min_purchase` y `delivery_time` NO se tocan: siguen `>= 0` y siguen opcionales
+    // (decision 5 de QC-42, R30). Cero es «sin minimo pactado» y «mismo dia».
+    for (const intacta of ['min_purchase', 'delivery_time']) {
+      expect(
+        up43.filter((statement) => new RegExp(`"?${intacta}"?`, 'i').test(statement)),
+        `esta migracion no debe tocar ${intacta}`,
+      ).toEqual([])
+    }
+
+    // Sensibilidad OBLIGATORIA: `>` -> `>=` devuelve la regla de QC-42 sin cambiar el
+    // nombre. Si el predicado no cayera, el rename seria decorativo.
+    const conCero = add.replace(/"cost"\s*>\s*0/i, '"cost" >= 0')
+    expect(conCero, 'la mutacion no cambio nada').not.toBe(add)
+    expect(isStrictlyPositiveCheck(conCero, 'cost')).toBe(false)
+  })
+
+  it('la linea gana las dos columnas de autor con sus dos FK a users y sus dos indices', () => {
+    // R31, R32. Escalares SIN `@relation` en Prisma y FK REAL aqui: la base garantiza la
+    // integridad y el cliente no puede atravesar de `proveedores` a `identity`.
+    for (const columna of ['created_by', 'updated_by']) {
+      const addColumn = findStatement(
+        up43,
+        new RegExp(`^ALTER TABLE "?supplier_catalog_lines"? ADD COLUMN "?${columna}"?`, 'i'),
+      )
+      // ANULABLE (R32): NULL es «no lo creo una persona» -una importacion, un seed-.
+      expect(addColumn, `${columna} debe ser UUID`).toMatch(/UUID/i)
+      expect(addColumn, `${columna} no puede ser NOT NULL`).not.toMatch(/NOT\s+NULL/i)
+      expect(addColumn, `${columna} no puede tener DEFAULT`).not.toMatch(/DEFAULT/i)
+
+      const fk = findStatement(
+        up43,
+        new RegExp(`ADD CONSTRAINT "supplier_catalog_lines_${columna}_fkey"`, 'i'),
+      )
+      expect(fk, `la FK de ${columna} debe apuntar a users(id)`).toMatch(
+        /REFERENCES "users"\("id"\)/i,
+      )
+      // RESTRICT, NUNCA SET NULL: `SET NULL` convertiria «al usuario lo borraron» en «no
+      // lo creo una persona», que son cosas distintas.
+      expect(isRestrictOnDelete(fk), `la FK de ${columna} debe ser ON DELETE RESTRICT`).toBe(true)
+
+      // Postgres no indexa el lado hijo de una FK, y por ahi pasa el RESTRICT.
+      expect(
+        findStatement(
+          up43,
+          new RegExp(
+            `^CREATE INDEX "supplier_catalog_lines_${columna}_idx" ON "?supplier_catalog_lines"?`,
+            'i',
+          ),
+        ),
+      ).toBeTruthy()
+    }
+
+    // Sensibilidad OBLIGATORIA: RESTRICT -> SET NULL tiene que tumbar el predicado.
+    const fk = findStatement(up43, /ADD CONSTRAINT "supplier_catalog_lines_created_by_fkey"/i)
+    const conSetNull = fk.replace(/ON DELETE RESTRICT/i, 'ON DELETE SET NULL')
+    expect(conSetNull, 'la mutacion no cambio nada').not.toBe(fk)
+    expect(isRestrictOnDelete(conSetNull)).toBe(false)
+  })
+
+  it('la migracion solo contiene los tres cambios y no toca ninguna otra tabla', () => {
+    // R38. Se cuenta el CENSO COMPLETO de sentencias ejecutables: si alguien anade un
+    // `ALTER` «de paso», la cuenta deja de cuadrar. Son diez:
+    //   2 (contacto: DROP + ADD) + 2 (costo: DROP + ADD) + 2 ADD COLUMN + 2 FK + 2 INDEX
+    //   ... y ninguna mas.
+    expect(up43).toHaveLength(10)
+    expect([...touchedTables(up43)].sort()).toEqual(['supplier_catalog_lines', 'suppliers'])
+
+    // Ninguna tabla nueva y ninguna tabla dropeada: los tres cambios son ALTER secos.
+    expect(createdTables(up43)).toEqual([])
+    expect(droppedTables(up43)).toEqual([])
+
+    // Ninguna mencion a una tabla ajena SALVO las dos FK que la linea declara sobre si
+    // misma hacia `users`. Es la afirmacion que R38 pide en positivo.
+    const conUsers = up43.filter((statement) => /\busers\b/i.test(statement))
+    expect(conUsers).toHaveLength(2)
+    expect(conUsers.every((statement) => /REFERENCES "users"\("id"\)/i.test(statement))).toBe(true)
+    for (const ajena of [
+      'products',
+      'presentations',
+      'recipes',
+      'recipe_lines',
+      'units',
+      'roles',
+      'document_types',
+    ]) {
+      expect(
+        up43.filter((statement) => new RegExp(`\\b${ajena}\\b`, 'i').test(statement)),
+        `esta migracion no puede mencionar ${ajena}`,
+      ).toEqual([])
+    }
+
+    // En particular: los diez `DROP CONSTRAINT` de drift que genero
+    // `prisma migrate dev --create-only` sobre `products`, `recipes` y `recipe_lines` NO
+    // pueden estar aqui. Aplicarlos destruiria en silencio la integridad referencial de
+    // tres features ya mergeadas.
+    const dropsAjenos = up43.filter(
+      (statement) =>
+        /DROP CONSTRAINT/i.test(statement) &&
+        !/^ALTER TABLE "?(suppliers|supplier_catalog_lines)"?/i.test(statement),
+    )
+    expect(dropsAjenos).toEqual([])
+
+    // Y el RLS de QC-42 no se toca: ni se desactiva, ni se «reactiva por si acaso».
+    expect(up43.filter((statement) => /ROW LEVEL SECURITY/i.test(statement))).toEqual([])
+  })
+
+  it('toda columna, indice y restriccion nueva esta en ingles y en snake_case', () => {
+    // R40. Se toman los identificadores que ESTA migracion crea y se exige que cada pieza
+    // separada por `_` sea una palabra inglesa del vocabulario declarado arriba.
+    const creados = createdIdentifiers(up43)
+    expect([...creados].sort()).toEqual([
+      'supplier_catalog_lines_cost_positive',
+      'supplier_catalog_lines_created_by_fkey',
+      'supplier_catalog_lines_created_by_idx',
+      'supplier_catalog_lines_updated_by_fkey',
+      'supplier_catalog_lines_updated_by_idx',
+      'suppliers_contact_required',
+    ])
+    for (const identificador of creados) {
+      expect(isEnglishSnakeCase(identificador), `${identificador} no es ingles snake_case`).toBe(
+        true,
+      )
+    }
+    // Las dos columnas nuevas, tambien.
+    for (const columna of ['created_by', 'updated_by']) {
+      expect(isEnglishSnakeCase(columna)).toBe(true)
+    }
+  })
+})
+
+describe('QC-43 down.sql — reversion al esquema exacto de QC-42', () => {
+  it('el down.sql recrea las dos restricciones de QC-42 con su definicion literal y borra las dos columnas de autor', () => {
+    // R39, decision cerrada 15. La diferencia entre «deshacer» y «revertir»: un `down.sql`
+    // que solo dropeara dejaria la base SIN NINGUNA regla de contacto y SIN NINGUNA de
+    // costo, que no es el estado anterior.
+    expect(
+      recreatesConstraint(
+        down43,
+        'supplier_catalog_lines_cost_non_negative',
+        /CHECK\s*\(\s*"cost"\s*>=\s*0\s*\)/i,
+      ),
+      'el DOWN debe recrear el CHECK de costo de QC-42, no solo dropear el nuevo',
+    ).toBe(true)
+    expect(
+      recreatesConstraint(
+        down43,
+        'suppliers_contact_required',
+        /CHECK\s*\(\s*"phone"\s+IS\s+NOT\s+NULL\s+OR\s+"email"\s+IS\s+NOT\s+NULL\s*\)/i,
+      ),
+      'el DOWN debe recrear el CHECK de contacto de QC-42 con su definicion literal',
+    ).toBe(true)
+
+    // El contacto vuelve a alcanzar a TODA fila: la exencion de las dadas de baja es de
+    // QC-43 y tiene que irse con ella.
+    const contacto = findStatement(down43, /ADD CONSTRAINT "suppliers_contact_required"/i)
+    expect(exemptsDeletedRows(contacto), 'la variante B no puede sobrevivir al rollback').toBe(
+      false,
+    )
+    expect(contacto).not.toMatch(/COALESCE/i)
+
+    // Y las dos columnas de autor, sus dos FK y sus dos indices desaparecen.
+    for (const columna of ['created_by', 'updated_by']) {
+      expect(
+        findStatement(
+          down43,
+          new RegExp(
+            `^ALTER TABLE "?supplier_catalog_lines"? DROP COLUMN IF EXISTS "?${columna}"?`,
+            'i',
+          ),
+        ),
+      ).toBeTruthy()
+      expect(
+        findStatement(
+          down43,
+          new RegExp(`^DROP INDEX IF EXISTS "supplier_catalog_lines_${columna}_idx"`, 'i'),
+        ),
+      ).toBeTruthy()
+      expect(
+        findStatement(
+          down43,
+          new RegExp(`DROP CONSTRAINT IF EXISTS "supplier_catalog_lines_${columna}_fkey"`, 'i'),
+        ),
+      ).toBeTruthy()
+    }
+    expect(
+      findStatement(down43, /DROP CONSTRAINT IF EXISTS "supplier_catalog_lines_cost_positive"/i),
+    ).toBeTruthy()
+
+    // El DOWN no toca ninguna tabla ajena ni deja residuos: solo las dos de la feature.
+    expect([...touchedTables(down43)].sort()).toEqual(['supplier_catalog_lines', 'suppliers'])
+    expect(droppedTables(down43)).toEqual([])
+    for (const ajena of ['products', 'recipes', 'recipe_lines', 'units', 'roles']) {
+      expect(stripSqlComments(downSource43)).not.toMatch(new RegExp(`\\b${ajena}\\b`, 'i'))
+    }
+  })
+
+  it('un down.sql que solo dropeara dejaria la base sin ninguna de las dos reglas', () => {
+    // Sensibilidad OBLIGATORIA de R39: se muta el DOWN en memoria quitando sus dos
+    // `ADD CONSTRAINT`. El SQL resultante se aplica sin error y la base queda sin regla de
+    // contacto y sin regla de costo -que es el fallo que este test existe para ver-.
+    const soloDrops = down43.filter((statement) => !/ADD CONSTRAINT/i.test(statement))
+    expect(soloDrops.length, 'la mutacion no quito ninguna sentencia').toBe(down43.length - 2)
+    expect(
+      recreatesConstraint(
+        soloDrops,
+        'supplier_catalog_lines_cost_non_negative',
+        /CHECK\s*\(\s*"cost"\s*>=\s*0\s*\)/i,
+      ),
+    ).toBe(false)
+    expect(
+      recreatesConstraint(
+        soloDrops,
+        'suppliers_contact_required',
+        /CHECK\s*\(\s*"phone"\s+IS\s+NOT\s+NULL\s+OR\s+"email"\s+IS\s+NOT\s+NULL\s*\)/i,
+      ),
+    ).toBe(false)
+
+    // Y un DOWN que recreara la restriccion con OTRA definicion tampoco vale: revertir es
+    // volver al esquema EXACTO, no a uno parecido.
+    const conOtraDefinicion = down43.map((statement) =>
+      statement.replace(/CHECK\s*\(\s*"cost"\s*>=\s*0\s*\)/i, 'CHECK ("cost" > 0)'),
+    )
+    expect(
+      recreatesConstraint(
+        conOtraDefinicion,
+        'supplier_catalog_lines_cost_non_negative',
+        /CHECK\s*\(\s*"cost"\s*>=\s*0\s*\)/i,
+      ),
+    ).toBe(false)
   })
 })

@@ -298,16 +298,23 @@ model Supplier {
 /// su costo, su minimo de compra y su tiempo de entrega (decision cerrada 3).
 ///
 /// NO lleva `deletedAt` a proposito (decision cerrada 11, R28): la linea es parte del
-/// catalogo, no un hecho historico. Tampoco lleva `createdBy`/`updatedBy` (decision cerrada
-/// 14, R25), igual que `recipe_lines`.
+/// catalogo, no un hecho historico.
 ///
-/// OJO — `productId` es una FK REAL a `products` declarada como ESCALAR SIN `@relation`
-/// (decision cerrada 13, R22). La FK esta escrita a mano en `migration.sql`. Lo que
-/// `proveedores` sabe del producto llega por el contrato publico `@/lib/modules/inventario`,
-/// nunca por un `include` ni por `prisma.product`.
+/// SI lleva `createdBy`/`updatedBy` desde QC-43 (su decision cerrada 3, R31, R32). Se APARTA
+/// de la decision cerrada 14 de QC-42, que la dejo sin auditoria heredando el criterio de
+/// `recipe_lines`: alli editar una linea es editar la formula y el rastro queda en
+/// `recipes.updated_by`, mientras que aqui SUBIR EL COSTO es un hecho comercial propio que no
+/// modifica ningun dato del proveedor.
 ///
-/// OJO 2 — los tres CHECK de no negatividad (`cost`, `min_purchase`, `delivery_time`) son
-/// SQL escrito a mano: Prisma no modela CHECK. Ver `design.md > 4.4`.
+/// OJO — `productId`, `createdBy` y `updatedBy` son FK REALES -a `products` y a `users`-
+/// declaradas como ESCALARES SIN `@relation` (decision cerrada 13/14 de QC-42, R22; QC-43
+/// R26, R44). Las tres estan escritas a mano en su `migration.sql`. Lo que `proveedores` sabe
+/// del producto llega por el contrato publico `@/lib/modules/inventario`, nunca por un
+/// `include` ni por `prisma.product`; y el cliente Prisma no puede atravesar a `users`.
+///
+/// OJO 2 — los CHECK de `cost` (`> 0` desde QC-43), `min_purchase` y `delivery_time` (`>= 0`)
+/// son SQL escrito a mano: Prisma no modela CHECK. Ver `design.md > 4.4` de QC-42 y
+/// `design.md > 2.2` de QC-43.
 /// @module proveedores
 model SupplierCatalogLine {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -316,6 +323,8 @@ model SupplierCatalogLine {
   cost         Decimal  @db.Decimal(14, 4)
   minPurchase  Decimal? @map("min_purchase") @db.Decimal(14, 4)
   deliveryTime Int?     @map("delivery_time")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedBy    String?  @map("updated_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -323,6 +332,8 @@ model SupplierCatalogLine {
 
   @@unique([supplierId, productId], map: "supplier_catalog_lines_supplier_id_product_id_key")
   @@index([productId], map: "supplier_catalog_lines_product_id_idx")
+  @@index([createdBy], map: "supplier_catalog_lines_created_by_idx")
+  @@index([updatedBy], map: "supplier_catalog_lines_updated_by_idx")
   @@map("supplier_catalog_lines")
 }
 
