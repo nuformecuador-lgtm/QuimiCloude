@@ -252,32 +252,42 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       'adapters/driven/persistence/supplier-catalog-line-prisma.ts',
       'adapters/driven/persistence/supplier-prisma.ts',
     ])
-    // `adapters/driving/` sigue vacia y con su `.gitkeep`: las Server Actions son T14.
-    // Cuando lleguen, derogan estas dos lineas -y la de 'use server' de mas abajo- igual
-    // que T7, T11 y T12 derogaron las de arriba.
+    // `adapters/driving/` estaba vacia con su `.gitkeep` hasta T14, que la llena con las
+    // DOS Server Actions y borra el `.gitkeep`. La afirmacion pasa de «vacia» a «exactamente
+    // estos dos archivos», igual de falsable: un tercero cae aqui.
     expect(
-      sourcesIn(join(proveedoresDir, 'adapters', 'driving')),
-      'adapters/driving deberia estar vacia',
-    ).toEqual([])
-    expect(
-      existsSync(join(proveedoresDir, 'adapters', 'driving', '.gitkeep')),
-      'adapters/driving',
-    ).toBe(true)
-    // Y los `.gitkeep` de las carpetas que T7, T11 y T12 llenaron ya NO estan: git no
-    // versiona carpetas vacias, pero tampoco carpetas con contenido y un `.gitkeep`
+      sourcesIn(join(proveedoresDir, 'adapters', 'driving')).map((f) =>
+        toPosix(relative(proveedoresDir, f)),
+      ),
+      'adapters/driving/ gano un archivo fuera de las dos Server Actions de QC-43',
+    ).toEqual([
+      'adapters/driving/supplier-actions.ts',
+      'adapters/driving/supplier-catalog-actions.ts',
+    ])
+    // Y los `.gitkeep` de las tres carpetas que T7, T11, T12 y T14 llenaron ya NO estan: git
+    // no versiona carpetas vacias, pero tampoco carpetas con contenido y un `.gitkeep`
     // sobrante.
-    for (const carpeta of ['ports', 'adapters/driven']) {
+    for (const carpeta of ['ports', 'adapters/driven', 'adapters/driving']) {
       expect(
         existsSync(join(proveedoresDir, ...carpeta.split('/'), '.gitkeep')),
         `${carpeta}/.gitkeep sobra: la carpeta ya tiene archivos reales`,
       ).toBe(false)
     }
 
-    // Ningun 'use server' en TODO el modulo, no solo en lo alcanzable desde el barrel.
+    // `'use server'` SOLO en `adapters/driving/`, y en su primera linea util. En el resto del
+    // modulo -dominio, puertos, adaptadores driven- sigue prohibido: una directiva de
+    // servidor colada en `domain/` haria del caso de uso una frontera HTTP.
     for (const file of proveedoresSources) {
-      expect(read(file), `${toPosix(relative(repoRoot, file))} declara 'use server'`).not.toMatch(
-        /['"]use server['"]/,
-      )
+      const etiqueta = toPosix(relative(repoRoot, file))
+      const esDriving = toPosix(file).includes('/adapters/driving/')
+      if (esDriving) {
+        expect(
+          readFileSync(file, 'utf8').trimStart(),
+          `${etiqueta} debe declarar 'use server' en la primera linea`,
+        ).toMatch(/^(['"])use server\1/)
+      } else {
+        expect(read(file), `${etiqueta} declara 'use server'`).not.toMatch(/['"]use server['"]/)
+      }
     }
 
     // Ninguna ruta HTTP ni pantalla de proveedores.
@@ -352,12 +362,23 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       .map((file) => toPosix(relative(repoRoot, file)))
     expect(fuera, `cablean proveedores fuera de la composicion: ${fuera.join(', ')}`).toEqual([])
 
-    // Y el modulo NO importa la composicion en ningun sentido (la flecha va al reves).
+    // Y el dominio, los puertos y los adaptadores DRIVEN no importan la composicion: la
+    // flecha va driving -> composicion -> driven, nunca al reves (regla 3 de
+    // `docs/architecture.md`). El driving SI puede -y debe- pedirle la fachada.
     for (const file of proveedoresSources) {
+      if (toPosix(file).includes('/adapters/driving/')) continue
       expect(
         read(file),
         `${toPosix(relative(repoRoot, file))} importa @/lib/composition`,
       ).not.toMatch(/@\/lib\/composition/)
+    }
+
+    // Los dos adaptadores driving piden la fachada a la composicion, no instancian nada.
+    for (const file of sourcesIn(join(proveedoresDir, 'adapters', 'driving'))) {
+      expect(
+        read(file),
+        `${toPosix(relative(repoRoot, file))} deberia consumir @/lib/composition`,
+      ).toMatch(/from '@\/lib\/composition'/)
     }
   })
 })

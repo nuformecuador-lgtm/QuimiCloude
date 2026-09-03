@@ -167,7 +167,7 @@ verificado contra el árbol de la rama, no contra este documento.
       *Depende de:* T8, T9, T11, T12. **Hecho cuando:** la guardia de módulos pasa y el contrato no
       arrastra `'use server'`, Prisma ni `next/*` en su cierre transitivo (R44).
 
-- [ ] **T14 — Server Actions.** `adapters/driving/supplier-actions.ts` y
+- [x] **T14 — Server Actions.** `adapters/driving/supplier-actions.ts` y
       `adapters/driving/supplier-catalog-actions.ts`: `'use server'`, `FormData` en crear, editar y
       dar de baja; argumentos tipados en consultar y listar; actor desde `identity.getSessionUser()`
       vía `@/lib/composition`; errores traducidos a `{ status, code, message }` por el **`code`** de
