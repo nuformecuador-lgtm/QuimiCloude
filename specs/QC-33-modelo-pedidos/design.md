@@ -6,8 +6,16 @@
 > El **qué** está en `requirements.md` (R1–R40) y su alcance lo cerró el humano el 2026-09-03
 > (26 decisiones cerradas). Aquí va el **cómo**: la forma exacta del modelo `Order`, los dos
 > tipos enumerados —los **primeros** `enum` de Prisma del repositorio—, el correlativo por año
-> con lo que el esquema garantiza y lo que no, los tres `CHECK`, las cuatro FK escritas a mano,
+> con lo que el esquema garantiza y lo que no, los **cinco** `CHECK`, las cuatro FK escritas a mano,
 > el `down.sql`, y el armazón del módulo `pedidos` con su contrato.
+>
+> **Segunda vuelta (2026-09-03, F1.4).** El humano cerró tres de las preguntas abiertas que dejó la
+> primera: **los huecos del correlativo se aceptan** (decisión 27, R42), **el año es el de
+> `created_at` en UTC** y baja a la base como `CHECK` (decisión 28, **R41**, y es lo único de estas
+> tres que **cambia el esquema**), y **el número visible lleva siete dígitos** (decisión 29, R24).
+> Lo que cambia está en § 3, § 5.2, § 5.3, § 5.4, § 7.1, § 7.3, § 8.2 y § 9, y **no se borra lo que
+> decía antes**: se marca qué se decidió y por qué. La pregunta abierta 2 —quién asigna la posición y
+> qué pasa con dos altas simultáneas— **sigue abierta y se sube a QC-34**.
 >
 > Precedentes literales que se copian, no se reinventan:
 > **QC-24 — modelo-recetas** (`specs/QC-24-modelo-recetas/`,
@@ -27,7 +35,7 @@
 | Archivo | Qué se hace |
 | --- | --- |
 | `db/schema.prisma` | **Nuevos**: `enum OrderStatus`, `enum OrderPriority` y el modelo `Order` con `/// @module pedidos`. **No se modifica ningún modelo existente** (R5). |
-| `db/migrations/<ts>_orders/migration.sql` | UP: los dos `CREATE TYPE`, `CREATE TABLE "orders"`, el índice único del correlativo, los índices de FK, las **cuatro FK escritas a mano**, los **tres `CHECK`** y los dos `ALTER` de RLS. |
+| `db/migrations/<ts>_orders/migration.sql` | UP: los dos `CREATE TYPE`, `CREATE TABLE "orders"`, el índice único del correlativo, los índices de FK, las **cuatro FK escritas a mano**, los **cinco `CHECK`** y los dos `ALTER` de RLS. |
 | `db/migrations/<ts>_orders/down.sql` | DOWN manual: `DROP TABLE "orders"` más los dos `DROP TYPE`. |
 | `lib/modules/pedidos/index.ts` | **Nuevo**: contrato público del módulo. |
 | `lib/modules/pedidos/domain/order-number.ts` | **Nuevo**: `OrderId`, `OrderNumber` y `formatOrderNumber`, la única definición del formato visible (R24). |
@@ -107,7 +115,10 @@ enum OrderPriority {
 /// OJO 1 — el correlativo son DOS columnas, `orderYear` + `orderSequence`, con indice unico
 /// COMPUESTO y TOTAL (R21, R22). NO es parcial, a diferencia de `recipes_name_unique`: un
 /// pedido borrado logicamente conserva su numero y NO lo libera (decision cerrada 9). El
-/// numero visible `2026-0001` NO se guarda: lo compone `formatOrderNumber` del dominio (R24).
+/// numero visible `2026-0000001` NO se guarda: lo compone `formatOrderNumber` del dominio (R24).
+/// `orderYear` es el ano de `createdAt` MEDIDO EN UTC, y lo garantiza el CHECK
+/// `orders_order_year_matches_created_at` (decision cerrada 28, R41): quien inserte con otro
+/// reloj se lleva un 23514.
 ///
 /// OJO 2 — `recipeId`, `unitId`, `createdBy` y `updatedBy` son FK REALES pero se declaran como
 /// ESCALARES SIN `@relation` a proposito (decision cerrada 17 y su aplicacion a las otras dos
@@ -148,7 +159,7 @@ model Order {
 | Campo | Columna | Tipo Postgres | Nulo | Requisito |
 | --- | --- | --- | --- | --- |
 | `id` | `id` | `UUID DEFAULT gen_random_uuid()` | no | R1 |
-| `orderYear` | `order_year` | `INTEGER` | no | R20, R23 |
+| `orderYear` | `order_year` | `INTEGER` | no | R20, R23, **R41** |
 | `orderSequence` | `order_sequence` | `INTEGER` | no | R20, R21, R22 |
 | `recipeId` | `recipe_id` | `UUID` | **no** | R14, R33 |
 | `quantity` | `quantity` | `DECIMAL(14,4)` | no | R6, R7 |
@@ -175,7 +186,7 @@ explícitamente. Es el mismo criterio con el que QC-24 R5 dejó los pasos en lis
 
 ---
 
-## 3. Los tres `CHECK` (Prisma no modela ninguno)
+## 3. Los cinco `CHECK` (Prisma no modela ninguno)
 
 ```sql
 -- La cantidad es siempre positiva (decision cerrada 7, R7). `> 0`, no `>= 0`: ni negativa ni
@@ -214,8 +225,41 @@ Un cuarto `CHECK` que **sí** se añade y no viene de una decisión literal:
 ALTER TABLE "orders" ADD CONSTRAINT "orders_order_sequence_positive" CHECK ("order_sequence" > 0);
 ```
 
-**No se añade ningún `CHECK` sobre `order_year`.** El porqué y la alternativa evaluada están en
-§ 5.2; es la pregunta abierta 4 de `requirements.md`.
+Y un quinto, **añadido en la segunda vuelta** por la decisión cerrada 28 (R41):
+
+```sql
+-- El ano del correlativo es el ano de `created_at` medido en UTC (decision cerrada 28, R41).
+-- La garantia vive en la base, no en QC-34: sin esto, nada impide un pedido de 2027 numerado
+-- como 2026-0000001 (era la pregunta abierta 4, que el humano cerro el 2026-09-03).
+ALTER TABLE "orders" ADD CONSTRAINT "orders_order_year_matches_created_at"
+  CHECK ("order_year" = EXTRACT(YEAR FROM ("created_at" AT TIME ZONE 'UTC'))::int);
+```
+
+**Sí cabe en un `CHECK`, y la inmutabilidad es la parte que hay que mirar.** Postgres exige que la
+expresión de un `CHECK` sea `IMMUTABLE` y rechaza con *«functions in check constraint must be marked
+IMMUTABLE»* cualquier cosa que dependa de la sesión. Aquí no depende:
+
+- `"created_at" AT TIME ZONE 'UTC'` es la forma de dos argumentos `timezone(text, timestamptz)`, que
+  devuelve `timestamp` **sin** zona y **es `IMMUTABLE`**: la zona va escrita en el propio constraint,
+  no se lee del `TimeZone` de la conexión. Es justo lo contrario de
+  `EXTRACT(YEAR FROM "created_at")` a secas sobre un `timestamptz`, que es `STABLE` y **no**
+  serviría — el mismo muro que impidió a QC-24 y QC-32 normalizar en SQL (§ 5.2).
+- `EXTRACT(YEAR FROM <timestamp>)` sobre el resultado ya es `IMMUTABLE`.
+
+Tres consecuencias que el implementer y QC-34 tienen que conocer, porque este `CHECK` **acopla dos
+columnas** y eso siempre tiene precio:
+
+1. **Quien inserta tiene que calcular el año con el mismo reloj.** Si QC-34 escribe `order_year` con
+   el año local de Ecuador y `created_at` cae ya en el año siguiente en UTC, el `INSERT` falla con
+   `23514`. Es exactamente lo que se quiere que pase, pero el mensaje hay que traducirlo.
+2. **`created_at` deja de ser libremente editable.** Un `UPDATE` que la mueva a otro año obliga a
+   mover también `order_year`, y mover `order_year` puede chocar con el índice único del correlativo.
+   En la práctica: `created_at` no se toca, que es lo que ya decía la decisión 10.
+3. **Una importación con fechas del pasado tiene que traer su año coherente.** No hay backfill que
+   valga: el `CHECK` se verifica fila a fila al insertar.
+
+**No se añade ningún `CHECK` sobre la continuidad de las posiciones**, y ahora es una decisión
+cerrada y no un vacío: la 27 acepta los huecos (§ 5.3, R42).
 
 ---
 
@@ -312,13 +356,17 @@ y otro de negocio:
   que identifica se guarda; uno que se calcula al vuelo puede cambiar de valor sin que nadie escriba
   nada (basta con que cambie la zona horaria de la conexión).
 
-Se evaluó un `CHECK` que atara las dos columnas —
-`CHECK (order_year = EXTRACT(YEAR FROM (created_at AT TIME ZONE 'UTC'))::int)`, que **sí** sería
-inmutable— y **no se añade**: obliga a elegir una zona horaria, y esa elección no está decidida. Un
-pedido creado el 31 de diciembre a las 20:00 en Ecuador (UTC−5) ya es del año siguiente en UTC, así
-que el `CHECK` rechazaría un pedido correcto o forzaría un correlativo del año que no toca. Queda
-como **pregunta abierta 4** de `requirements.md` con su posición por defecto escrita: hoy nada ata
-`order_year` a `created_at`, y quien asigne el correlativo (QC-34) decide con qué reloj.
+**Segunda vuelta (2026-09-03): el `CHECK` que ata las dos columnas SÍ se añade.** En la primera
+vuelta este párrafo decía que no se añadía porque obligaba a elegir una zona horaria y esa elección
+no estaba decidida, y quedaba como pregunta abierta 4. **El humano la cerró en F1.4: el año es el de
+`created_at` medido en UTC** (decisión cerrada 28), así que la elección existe y la garantía baja a
+la base, en la línea del resto de la ficha —lo que puede garantizar la base, lo garantiza la base—.
+El constraint, su inmutabilidad y sus tres consecuencias están en § 3; el requisito es **R41**.
+
+Lo que se asume a conciencia: un pedido creado el 31 de diciembre a las 20:00 en Ecuador (UTC−5) es
+**del año siguiente** y lleva el correlativo `2027-0000001`, no el `2026-...` que esperaría quien
+mira el reloj de la pared. A cambio, el año del correlativo tiene **una sola** definición y no
+depende de dónde esté conectado quien inserta.
 
 ### 5.3 Lo que NO cabe en esta ficha, y hay que decirlo
 
@@ -336,11 +384,23 @@ producción:
 | `SELECT ... FOR UPDATE` sobre una fila de contador por año, o `pg_advisory_xact_lock(year)` | Se serializan: la segunda espera | Sin huecos, pero las altas del mismo año dejan de ser paralelas |
 | Una `SEQUENCE` de Postgres por año | No se estorban | DDL en tiempo de ejecución (crear la secuencia del año nuevo el 1 de enero), y **una transacción abortada consume el número**: aparecen huecos |
 
-**No se elige ninguna aquí a propósito.** Elegirla sin el caso de uso delante sería adivinar, y las
-tres tienen consecuencias distintas sobre si el correlativo puede tener huecos —que **tampoco está
-decidido**: preguntas abiertas 2 y 3 de `requirements.md`—. Lo que esta ficha garantiza es que
-**ninguna de las tres puede producir un número duplicado ni reutilizado**, porque el índice único
-está debajo de todas.
+**No se elige ninguna aquí a propósito.** Elegirla sin el caso de uso delante sería adivinar. Lo que
+esta ficha garantiza es que **ninguna de las tres puede producir un número duplicado ni reutilizado**,
+porque el índice único está debajo de todas. Sigue siendo la **pregunta abierta 2**, y se sube a
+QC-34.
+
+**Lo que sí quedó decidido en la segunda vuelta: los huecos se aceptan** (decisión cerrada 27, R42).
+Un alta que se cae a medio camino consume su número y nadie lo reutiliza. Eso **elimina la segunda
+columna de la tabla como criterio de elección**: la fila del bloqueo dejó de comprar lo único que
+compraba —continuidad— y su coste, serializar todas las altas del año, ya no tiene contrapartida.
+El motivo del humano: este ERP no factura ni liquida impuestos (decisión 23), así que ninguna norma
+contable exige que la numeración sea continua. La consecuencia práctica para QC-34: **la estrategia
+de `max + 1` con reintento ante `23505` es la que queda en cabeza**, y no hace falta inventar un
+contador serializado.
+
+`orders` no lleva ninguna restricción de continuidad, y eso es ahora una ausencia **deliberada** que
+el test comprueba en positivo: insertar `(2026, 1)` y `(2026, 5)` en la misma transacción tiene que
+pasar (R42).
 
 ### 5.4 El número visible no se guarda (R24)
 
@@ -357,13 +417,13 @@ export type OrderNumber = {
   readonly sequence: number;
 };
 
-/** UNICA definicion del formato visible del correlativo: `2026-0001` (R24). La posicion se
- *  rellena a cuatro digitos; si algun ano pasa de 9.999 el numero crece en vez de truncarse
- *  (requirements.md, pregunta abierta 5). No se persiste el resultado: guardar el texto
- *  formateado seria un tercer sitio donde vive el mismo dato, y el tercer sitio siempre es el
- *  que se desincroniza. */
+/** UNICA definicion del formato visible del correlativo: `2026-0000001` (R24). La posicion se
+ *  rellena a SIETE digitos (decision cerrada 29, 2026-09-03): techo de 9.999.999 pedidos al ano.
+ *  Si algun ano lo pasara, el numero crece en vez de truncarse. No se persiste el resultado:
+ *  guardar el texto formateado seria un tercer sitio donde vive el mismo dato, y el tercer sitio
+ *  siempre es el que se desincroniza. */
 export function formatOrderNumber({ year, sequence }: OrderNumber): string {
-  return `${year}-${String(sequence).padStart(4, '0')}`;
+  return `${year}-${String(sequence).padStart(7, '0')}`;
 }
 ```
 
@@ -502,7 +562,7 @@ test de QC-24. Lo que **no** se hace es publicar ya un `RecipeCatalog` con `find
 5. `CREATE UNIQUE INDEX "orders_order_year_order_sequence_key"` (§ 5.1).
 6. Los cuatro `CREATE INDEX` del lado hijo de las FK.
 7. Las **cuatro FK** escritas a mano (§ 4).
-8. Los **cuatro `CHECK`** escritos a mano (§ 3).
+8. Los **cinco `CHECK`** escritos a mano (§ 3), incluido el del año a UTC (R41).
 9. `ALTER TABLE "orders" ENABLE ROW LEVEL SECURITY;` + `... FORCE ROW LEVEL SECURITY;` (R37).
 
 **No hay guardia de datos `DO $$` en esta migración**, a diferencia de QC-32. No hace falta: esta
@@ -510,7 +570,7 @@ feature **crea** una tabla y dos tipos y no toca ni una fila ni una columna exis
 hay ningún dato que pueda perderse. Escribir una guardia «por simetría» sería ruido.
 
 Cabecera del `migration.sql` indicando, como en QC-24 y QC-32, **qué se escribió a mano** —las
-cuatro FK, los cuatro `CHECK` y los dos `ALTER` de RLS— y que toda migración futura sobre `orders`
+cuatro FK, los cinco `CHECK` y los dos `ALTER` de RLS— y que toda migración futura sobre `orders`
 hay que revisarla a mano para que el drift de `prisma migrate dev` no las borre. Si esas líneas se
 pierden, el esquema sigue validando y el cliente sigue compilando: no se entera nadie.
 
@@ -548,7 +608,7 @@ El orden importa: los tipos se borran **después** de la tabla que los usa, o Po
 `orders_created_by_idx`, `orders_updated_by_idx`, `orders_recipe_id_fkey`, `orders_unit_id_fkey`,
 `orders_created_by_fkey`, `orders_updated_by_fkey`, `orders_quantity_positive`,
 `orders_unit_price_non_negative`, `orders_delivered_not_deleted`, `orders_order_sequence_positive`,
-`OrderStatus`, `OrderPriority`. Todos en inglés, sin excepciones. Los **valores**
+`orders_order_year_matches_created_at`, `OrderStatus`, `OrderPriority`. Todos en inglés, sin excepciones. Los **valores**
 (`PENDIENTE`, `EN_CURSO`, `ENTREGADO`, `BAJA`, `MEDIA`, `ALTA`, `CRITICA`) van en castellano porque
 los fijó el humano y son datos, no identificadores (R36).
 
@@ -569,7 +629,7 @@ mismo de QC-24 y QC-32: Prisma no valida estas FK, el error llega en tiempo de e
 
 ### 8.2 Una sola columna `order_number TEXT` con el número ya formateado — **descartada**
 
-Sería una columna en vez de dos, un índice único simple, y las búsquedas por «2026-0001» serían
+Sería una columna en vez de dos, un índice único simple, y las búsquedas por «2026-0000001» serían
 directas. Se descarta por tres motivos:
 
 1. **Calcular el siguiente exige parsear texto.** `max(order_sequence)` filtrando por año es una
@@ -578,8 +638,10 @@ directas. Se descarta por tres motivos:
 2. **El reinicio anual se vuelve implícito.** Con dos columnas, `(2026, 1)` y `(2027, 1)` son
    claves distintas porque el año **es** parte de la clave. Con texto, el reinicio depende de que
    quien formatee no se equivoque.
-3. **El ancho fijo se convierte en una regla de la base.** Con cuatro dígitos guardados,
-   `2026-10000` ordenaría antes que `2026-0999`; con enteros, el orden es el de los números.
+3. **El ancho fijo se convierte en una regla de la base.** Con siete dígitos guardados,
+   `2026-10000000` ordenaría antes que `2026-0999999`; con enteros, el orden es el de los números.
+   Y el día que el ancho cambie —ya cambió una vez, de cuatro a siete, entre la primera y la segunda
+   vuelta de este spec— habría que reescribir todas las filas en vez de cambiar un `padStart`.
 
 Coste aceptado: buscar por número visible obliga a descomponerlo primero (QC-34), y el texto se
 compone en dos sitios distintos si alguien olvida `formatOrderNumber`. Por eso R24 exige **una
@@ -631,8 +693,8 @@ Prisma no la modela y R10 la prohíbe explícitamente: el humano no pidió «un 
 | Nivel | Archivo | Qué demuestra |
 | --- | --- | --- |
 | Estático | `tests/unit/pedidos/schema/pedidos-schema.test.ts` | La **declaración**: los dos `enum` con sus valores exactos y en orden; `Order` con sus catorce campos, sus tipos y su nulabilidad; los dos `@default`; `@@unique([orderYear, orderSequence])`; las cuatro referencias **sin `@relation`**; `/// @module pedidos`; y **en positivo** las ausencias deliberadas (sin `total`, sin impuestos, sin cliente, sin fecha de solicitud, sin campos de vuelta en `Recipe`/`Unit`/`User`). Lee `db/schema.prisma` como texto, con los helpers de `tests/unit/recetas/schema/recetas-schema.test.ts`. |
-| Estático | `tests/unit/pedidos/schema/pedidos-migration.test.ts` | El **SQL**: los dos `CREATE TYPE`, la tabla, el índice único **sin `WHERE`**, los cuatro índices de FK, las cuatro FK con `ON DELETE RESTRICT`, los cuatro `CHECK` **con su texto exacto** —en particular `"deleted_at" IS NULL OR "status" <> 'ENTREGADO'`—, los dos `ALTER` de RLS, identificadores en inglés, y que `down.sql` borra la tabla **y los dos tipos** y nada más. **Mutaciones de sensibilidad obligatorias**: añadir `WHERE "deleted_at" IS NULL` al índice único, cambiar un `RESTRICT` por `CASCADE`, cambiar `> 0` por `>= 0` en la cantidad, quitar el `CHECK` del entregado y quitar un `DROP TYPE` del DOWN — el predicado debe caer en los cinco casos. Un test que no puede fallar no vigila nada. |
-| Unitario | `tests/unit/pedidos/domain/order-number.test.ts` | `formatOrderNumber`: `(2026, 1) → '2026-0001'`, `(2026, 42) → '2026-0042'`, `(2026, 9999) → '2026-9999'`, y que con 10.000 **crece** en vez de truncar (pregunta abierta 5). |
+| Estático | `tests/unit/pedidos/schema/pedidos-migration.test.ts` | El **SQL**: los dos `CREATE TYPE`, la tabla, el índice único **sin `WHERE`**, los cuatro índices de FK, las cuatro FK con `ON DELETE RESTRICT`, los **cinco `CHECK`** **con su texto exacto** —en particular `"deleted_at" IS NULL OR "status" <> 'ENTREGADO'` y el del año a UTC (R41)—, los dos `ALTER` de RLS, identificadores en inglés, y que `down.sql` borra la tabla **y los dos tipos** y nada más. **Mutaciones de sensibilidad obligatorias**: añadir `WHERE "deleted_at" IS NULL` al índice único, cambiar un `RESTRICT` por `CASCADE`, cambiar `> 0` por `>= 0` en la cantidad, quitar el `CHECK` del entregado, quitar el `AT TIME ZONE 'UTC'` del `CHECK` del año y quitar un `DROP TYPE` del DOWN — el predicado debe caer en los seis casos. Un test que no puede fallar no vigila nada. |
+| Unitario | `tests/unit/pedidos/domain/order-number.test.ts` | `formatOrderNumber` con **siete** dígitos (decisión cerrada 29): `(2026, 1) → '2026-0000001'`, `(2026, 42) → '2026-0000042'`, `(2026, 9999999) → '2026-9999999'`, y que con 10.000.000 **crece** en vez de truncar. |
 | Unitario | `tests/unit/pedidos/module-contract.test.ts` | La forma del módulo y las fronteras: `index.ts` solo reexporta de `./domain`; carpetas exactamente `domain`/`ports`/`adapters`; ningún `'use server'` alcanzable desde el barrel; **ningún archivo del repo consulta `prisma.order`**, y el barrido —función pura— señala una entrada sintética que sí lo hace, para que la lista vacía no lo sea por vacuidad (patrón de QC-32 § 9); `pedidos` no nombra `prisma.recipe`, `prisma.unit` ni `prisma.user`; `pedidos` importa `recetas` y `unidades` **solo por el barrel**; la feature no crea driving, rutas ni Server Actions (R39). **Y R35**: lee los dos `enum` de `db/schema.prisma` y los compara valor a valor y en orden con `ORDER_STATUS_VALUES` / `ORDER_PRIORITY_VALUES`, más los dos `@default` contra `DEFAULT_ORDER_*`. |
 | Integración | `tests/integration/pedidos/pedidos-constraints.int.test.ts` | Que la base **de verdad** rechaza y permite lo que debe. Cada caso dentro de `prisma.$transaction` que termina en `ROLLBACK`; toda operación que debe fallar, envuelta en `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` y ejecutada con `$executeRaw` (**no** con la API tipada: Prisma convierte el SQLSTATE en `P2003`/`P2002` antes de que llegue a `meta.code`, QC-24 § 10.1). Se afirma sobre el **SQLSTATE** (`23502`, `23503`, `23505`, `23514`, `22P02` para el valor fuera del enum), **nunca** sobre el texto del mensaje: en esta máquina Postgres responde en español. Cada caso crea su propia unidad, presentación, producto, receta y usuario dentro de la transacción: las FK son reales. Copiar los helpers de `tests/integration/recetas/recetas-constraints.int.test.ts` y de `tests/integration/unidades/unidades-constraints.int.test.ts`. |
 | Base real (task) | T8 de `tasks.md` | El ciclo `db:migrate` → inspección del esquema real → `db:rollback` → `db:migrate`, con la salida pegada en `progress/impl_QC-33-modelo-pedidos.md`. Es lo que cierra **R38** de verdad. |
@@ -645,7 +707,7 @@ pide E2E para «importes» y esta feature **es** la que trae el primer importe a
 trae ninguna operación que un navegador pueda ejecutar: no hay ruta, ni acción, ni formulario. Lo
 decide **QC-35**, y ahí el E2E deja de ser diferible.
 
-Cuatro avisos para el implementer:
+Seis avisos para el implementer:
 
 - **Un test de RLS escrito con Prisma sale verde pase lo que pase** (Prisma se conecta como dueño de
   las tablas). No se escribe: R37 se cierra con la guardia estática sobre el SQL.
@@ -658,6 +720,13 @@ Cuatro avisos para el implementer:
   ficha de QC-24, y sin él el índice podría ser parcial sin que nadie se entere.
 - **`beforeAll` debe fallar con un mensaje claro** («corre `pnpm run db:migrate`») si `orders` no
   existe, no con un error de Prisma a mitad del primer caso.
+- **R41 se prueba con un `created_at` explícito, no con el de por defecto.** Con la fecha por
+  defecto, el año correcto y el incorrecto se distinguen mal y el caso pasa por casualidad. El caso
+  que muerde es el de la frontera: `created_at = '2026-12-31T20:00:00-05:00'` —que en UTC ya es
+  2027— con `order_year = 2026` **debe** fallar con `23514`, y con `order_year = 2027` **debe**
+  pasar. Ese par de casos es lo único que demuestra que el `AT TIME ZONE 'UTC'` está haciendo algo.
+- **R42 se prueba en positivo**: insertar `(2026, 1)` y después `(2026, 5)` en la misma transacción
+  tiene que pasar. Es una ausencia de restricción, y una ausencia solo se demuestra ejerciéndola.
 
 ---
 
@@ -678,14 +747,17 @@ Una candidata que **podría parecerlo y no entra aquí**:
 
 ## 11. Preguntas abiertas que deja este diseño
 
-Las cinco de `requirements.md` no se repiten —las tres del correlativo (2, 3 y 4) son las que este
-diseño no puede cerrar solo, y su posición por defecto está en § 5.2 y § 5.3—. Estas son propias del
-diseño, ninguna bloquea la implementación:
+Las de `requirements.md` no se repiten. De las cinco que había en la primera vuelta, **el humano
+cerró la 3, la 4 y la 5 el 2026-09-03**; queda abierta la **2** —quién asigna la posición y qué pasa
+con dos altas simultáneas—, que es la que este diseño no puede cerrar solo (§ 5.3) y **se sube a
+QC-34**, más la **1** del humano, que no toca al esquema. Estas son propias del diseño, ninguna
+bloquea la implementación:
 
 1. **¿`order_year` debería ser `SMALLINT` en vez de `INTEGER`?** Un año cabe de sobra en dos bytes.
    Se deja `INTEGER` porque es lo que Prisma genera para `Int` sin `@db.SmallInt` y porque cuatro
-   bytes por fila no son un problema en una tabla de pedidos. Cambiarlo después es una migración de
-   tipo, barata mientras la tabla sea pequeña.
+   bytes por fila no son un problema en una tabla de pedidos. El `CHECK` de R41 no lo impide
+   —`EXTRACT(...)::int` compara igual de bien contra un `SMALLINT`—, pero cambiar el tipo con el
+   constraint puesto obliga a recrearlo. Barato mientras la tabla sea pequeña.
 2. **¿Hace falta un índice por `status` o por `deleted_at`?** No se crea ninguno. Las consultas que
    los necesitarían («pedidos pendientes», «pedidos vivos») son de **QC-34**, y añadir un índice
    sin la consulta delante es adivinar. Es aditivo y barato.

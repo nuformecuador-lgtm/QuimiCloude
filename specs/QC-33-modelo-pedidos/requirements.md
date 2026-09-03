@@ -29,6 +29,10 @@ con `recetas`, con `unidades` y con `identity`. No hay caso de uso, ni service, 
 dónde: cuando un requisito dice «rechazar», quiere decir que lo rechaza **la propia base**, no una
 validación de aplicación que llegará en QC-34.
 
+> **Segunda vuelta, 2026-09-03 (F1.4).** El humano cerró las preguntas abiertas 3, 4 y 5 de
+> `spec_author` al revisar el spec. **R24** cambió (siete dígitos en vez de cuatro) y nacieron
+> **R41** y **R42**, al final de la sección. Ningún otro requisito se movió ni se renumeró.
+
 ### Estructura del pedido
 
 **R1.** El sistema DEBE persistir, para cada pedido, un identificador propio, estable y no derivado
@@ -130,9 +134,10 @@ R9**).
 **R23.** El sistema DEBE permitir que dos pedidos de **años distintos** tengan la misma posición,
 de modo que la numeración se reinicie cada año.
 
-**R24.** El sistema NO DEBE persistir el número visible ya formateado (`2026-0001`), y DEBE exponer
-**una única definición** de ese formato, publicada por el contrato del módulo `pedidos`, de modo que
-cualquier consumidor futuro lo componga igual a partir del año y la posición.
+**R24.** El sistema NO DEBE persistir el número visible ya formateado (`2026-0000001`), y DEBE
+exponer **una única definición** de ese formato —el año, un guion y la posición rellenada a **siete
+dígitos**— publicada por el contrato del módulo `pedidos`, de modo que cualquier consumidor futuro lo
+componga igual a partir del año y la posición.
 
 ### Auditoría, borrado y marcas de tiempo
 
@@ -208,6 +213,20 @@ navegable que un test E2E pueda visitar.
 **R40.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
 requisitos anteriores.
 
+### Añadidos tras cerrar las preguntas abiertas (2026-09-03)
+
+El humano cerró en F1.4 las preguntas abiertas 3, 4 y 5 de `spec_author`. La 5 solo cambia R24 (de
+cuatro a siete dígitos) y no necesita requisito nuevo; las otras dos sí, y una de ellas **cambia el
+esquema**.
+
+**R41.** El sistema DEBE garantizar **en la propia base de datos** que el año del correlativo de un
+pedido es el año de su instante de creación **medido en UTC**, y SI se intenta persistir o modificar
+un pedido cuyo año no coincida con ese, ENTONCES DEBE rechazar la operación.
+
+**R42.** El sistema DEBE aceptar que las posiciones de un mismo año **no sean consecutivas**: NO
+DEBE exigir que la posición de un pedido sea la siguiente a la del último pedido de ese año, y NO
+DEBE reutilizar una posición que quedó sin usar (los huecos se aceptan y no se rellenan).
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el
@@ -241,6 +260,9 @@ requisito que la hace testeable. Ninguna queda sin `R<n>`.
 | 24 | Los permisos no se deciden aquí | R39 |
 | 25 | E2E diferido con motivo | R39 |
 | 26 | Ninguna librería nueva | R40 |
+| 27 | **Se aceptan huecos** en el correlativo (2026-09-03, cierra la pregunta abierta 3) | R42 (y R21, R22, que siguen impidiendo el duplicado y la reutilización) |
+| 28 | **El año del correlativo es el de `created_at` en UTC** (2026-09-03, cierra la pregunta abierta 4) | R41 |
+| 29 | **El formato visible lleva siete dígitos**: `2026-0000001` (2026-09-03, cierra la pregunta abierta 5) | R24 |
 
 ## Preguntas abiertas
 
@@ -257,6 +279,10 @@ rellena con un supuesto sin decirlo, y las cuatro tienen su posición por defect
 primeras salen de la misma grieta: **la decisión 9 fija la garantía del correlativo, pero la
 garantía completa no cabe en el esquema** (`design.md > 5`).
 
+**El humano cerró la 3, la 4 y la 5 el 2026-09-03, al revisar el spec (F1.4).** Bajaron a la tabla
+de decisiones cerradas (filas 27, 28 y 29) y se conservan aquí tachadas, con lo que preguntaban, para
+que se lea qué se decidió. **La 2 sigue abierta y se sube a QC-34.**
+
 2. **¿Quién asigna la posición del correlativo, y qué pasa con dos altas simultáneas?** Esta ficha
    garantiza en la base que el número **no se duplica** (índice único, R21) y que **no se reutiliza**
    (índice **no** parcial, R22). Lo que no puede garantizar un esquema es **quién calcula la
@@ -265,22 +291,28 @@ garantía completa no cabe en el esquema** (`design.md > 5`).
    máximo del año y reintentar ante `23505`, o serializar con un bloqueo). **No se da por cerrada
    aquí**: si QC-34 no la resuelve, dos altas simultáneas del mismo año fallarán una de las dos con
    un error de índice único que nadie tradujo.
-3. **¿Se acepta que el correlativo tenga huecos?** La decisión 9 dice «único, creciente y no
-   reutilizado dentro del año», y eso lo cumple el esquema. No dice **sin huecos**, que es otra
-   cosa: un alta que empieza y falla puede consumir una posición según qué estrategia elija QC-34.
-   Un correlativo sin huecos es un requisito bastante más caro (obliga a serializar las altas) y a
-   veces es una exigencia contable. Posición por defecto: **se aceptan huecos**.
-4. **¿Qué zona horaria decide el año de un pedido, y el año guardado tiene que coincidir con el de
-   `created_at`?** Un pedido creado el 31 de diciembre a las 20:00 en Ecuador ya es del año
-   siguiente en UTC. Esta ficha guarda el año como **columna propia** (R20) y **no** añade ninguna
-   restricción que lo ate a `created_at`, así que hoy nada impide que un pedido de 2027 lleve el año
-   2026. El porqué y la alternativa evaluada están en `design.md > 5.2`. Es barato de cerrar
-   mientras no haya pedidos cargados y caro después, igual que todo lo demás de esta épica.
-5. **El formato `2026-0001` tiene cuatro dígitos: son 9.999 pedidos al año.** El límite no está en
-   la columna —la posición es un entero (R20)—, sino en el **formato** que publica el contrato
-   (R24). Si algún año se pasa de 9.999, el número visible deja de tener ancho fijo y deja de
-   ordenar alfabéticamente. Posición por defecto: **cuatro dígitos**, como escribió el humano, y el
-   formato no trunca ni falla, solo crece.
+3. ~~**¿Se acepta que el correlativo tenga huecos?**~~ **CERRADA por el humano el 2026-09-03: SÍ,
+   se aceptan.** Un alta que falla a medio camino consume su número y **nadie lo reutiliza** — el
+   humano vio el caso concreto (el `2026-0000042` que se pierde) y lo aceptó explícitamente. El
+   motivo que pesó: una numeración continua obligaría a **serializar las altas** con un bloqueo, y
+   **este ERP no factura ni liquida impuestos** (decisión 23, que cerró hoy la pregunta abierta n.º
+   4 del dominio), así que no hay norma contable que exija continuidad. Queda fijado en **R42** y en
+   la fila 27 de las decisiones cerradas.
+   Lo que preguntaba: la decisión 9 dice «único, creciente y no reutilizado dentro del año», y eso lo
+   cumple el esquema; no decía **sin huecos**, que es otra cosa y bastante más cara.
+4. ~~**¿Qué zona horaria decide el año de un pedido, y el año guardado tiene que coincidir con el de
+   `created_at`?**~~ **CERRADA por el humano el 2026-09-03: el año es el de `created_at` medido en
+   UTC**, y la garantía baja a la base como un `CHECK` (`design.md > 5.2`). **Esto cambia el
+   esquema respecto de la primera vuelta**, donde `order_year` era una columna suelta que nada ataba
+   a `created_at`. Queda fijado en **R41** y en la fila 28.
+   Lo que preguntaba: un pedido creado el 31 de diciembre a las 20:00 en Ecuador (UTC−5) ya es del
+   año siguiente en UTC, así que sin regla nada impedía un pedido de 2027 con el año 2026. Con la
+   regla, ese pedido **es de 2027**.
+5. ~~**El formato `2026-0001` tiene cuatro dígitos: son 9.999 pedidos al año.**~~ **CERRADA por el
+   humano el 2026-09-03: son SIETE dígitos**, `2026-0000001`, que sube el techo a **9.999.999
+   pedidos por año** — un límite que ya no es realista alcanzar. Queda fijado en **R24** y en la fila
+   29. El límite nunca estuvo en la columna (la posición es un entero, R20), solo en el formato que
+   publica el contrato, y por eso cerrarlo cuesta un `padStart`.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -312,3 +344,6 @@ garantía completa no cabe en el esquema** (`design.md > 5`).
 | 2026-09-03 | Permisos | **Aquí no se deciden**: no hay service en esta ficha. Los fija **QC-34**, con su test (`CHECKPOINTS.md > Permisos`) |
 | 2026-09-03 | E2E | **Diferido con motivo**: no hay pantalla ni flujo navegable, es esquema y migración. Lo decide **QC-35**. Mismo criterio que QC-14, QC-24 y QC-32 |
 | 2026-09-03 | Librería nueva | **Ninguna.** Es esquema Prisma, migración y el armazón del módulo. Regla 7 de `CLAUDE.md` sin propuesta que abrir |
+| 2026-09-03 (F1.4) | ¿Se aceptan huecos en el correlativo? (pregunta abierta 3 de `spec_author`) | **Sí, se aceptan.** Un alta que se cae a medio camino **consume su número** y nadie lo reutiliza: el `2026-0000042` perdido se queda perdido. Motivo: una numeración continua obligaría a **serializar las altas** con un bloqueo, y este ERP **no factura ni liquida impuestos** (decisión 23), así que ninguna norma contable exige continuidad. Lo que **no** cambia: el número sigue sin duplicarse (R21) y sin reutilizarse tras el borrado lógico (R22). Fijado en **R42** |
+| 2026-09-03 (F1.4) | ¿Qué año lleva el correlativo? (pregunta abierta 4 de `spec_author`) | **El año de `created_at` medido en UTC**, y la garantía vive **en la base**: un `CHECK` que compara `order_year` con `EXTRACT(YEAR FROM (created_at AT TIME ZONE 'UTC'))`. Se aparta de la primera vuelta del spec, donde `order_year` era una columna que nada ataba a `created_at`. Un pedido creado el 31 de diciembre a las 20:00 en Ecuador **es del año siguiente**, y eso se asume. Misma filosofía que las decisiones 14 y 21: lo que puede garantizar la base, lo garantiza la base. Fijado en **R41** |
+| 2026-09-03 (F1.4) | ¿Cuántos dígitos lleva el número visible? (pregunta abierta 5 de `spec_author`) | **Siete**, más el año: `2026-0000001`. Techo de **9.999.999 pedidos por año** en vez de 9.999. No toca la columna —la posición siempre fue un entero— solo el formato que publica el contrato del módulo. Fijado en **R24** |

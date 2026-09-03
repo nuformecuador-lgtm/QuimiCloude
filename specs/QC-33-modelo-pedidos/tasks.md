@@ -7,6 +7,12 @@ que no está listado, se anota aquí antes de seguir.
 
 `<ts>` = el timestamp que genere Prisma; la carpeta de migración es `db/migrations/<ts>_orders/`.
 
+**Segunda vuelta del spec — 2026-09-03 (F1.4).** El humano cerró tres preguntas abiertas antes de
+que empezara la implementación, así que **ninguna task se anula**: se actualizan **T2** (un `CHECK`
+más), **T6** (una mutación de sensibilidad más), **T7** (siete dígitos en el formato) y **T9** (dos
+casos nuevos y un aviso sobre el año). Nacen **R41** y **R42**; **R24** cambia de cuatro a siete
+dígitos. Detalle en `requirements.md`, filas 27, 28 y 29 de las decisiones cerradas.
+
 **Aviso de conflicto.** Esta ficha crea el módulo `pedidos` entero (archivos nuevos, sin conflicto) y
 toca **dos archivos de `recetas`**: `lib/modules/recetas/index.ts` y el archivo nuevo
 `lib/modules/recetas/domain/recipe-catalog.ts` (`design.md > 6.4`). Si **QC-25** estuviera
@@ -60,10 +66,14 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 - Dep: T0, T1.
 - Archivos: `db/migrations/<ts>_orders/migration.sql`.
 - `pnpm run db:migrate:create` (no aplica nada) y después **completar a mano** lo que Prisma no
-  modela, según `design.md > 7.1`: las **cuatro FK** (`design.md > 4`), los **cuatro `CHECK`**
+  modela, según `design.md > 7.1`: las **cuatro FK** (`design.md > 4`), los **cinco `CHECK`**
   (`design.md > 3`) y los dos `ALTER TABLE` de RLS (`ENABLE` **y** `FORCE`).
 - El `CHECK` del entregado se escribe **tal cual lo fijó el humano**:
   `CHECK ("deleted_at" IS NULL OR "status" <> 'ENTREGADO')`. No se reformula ni se «mejora».
+- El `CHECK` del año (R41, decisión cerrada 28) va con la forma **de dos argumentos** del cambio de
+  zona: `CHECK ("order_year" = EXTRACT(YEAR FROM ("created_at" AT TIME ZONE 'UTC'))::int)`. Sin el
+  `AT TIME ZONE 'UTC'`, la expresión es `STABLE` y **Postgres rechaza la migración** con «functions
+  in check constraint must be marked IMMUTABLE» (`design.md > 3`).
 - Revisar que el índice único que genera Prisma **no** lleve ningún `WHERE`: tiene que ser **total**
   (`design.md > 5.1`). Es lo contrario de `recipes_name_unique`, y es fácil de copiar mal.
 - Cabecera del archivo indicando qué se escribió a mano y que toda migración futura sobre `orders`
@@ -72,7 +82,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
   existente (`design.md > 7.1`).
 - **Hecho cuando:** el archivo contiene, en este orden, `pgcrypto`, los dos `CREATE TYPE`,
   `CREATE TABLE "orders"`, el índice único **sin `WHERE`**, los cuatro índices de FK, las cuatro FK,
-  los cuatro `CHECK` y los dos `ALTER` de RLS.
+  los cinco `CHECK` y los dos `ALTER` de RLS.
 
 ### [ ] T3. Escribir `down.sql` a mano
 - Dep: T2.
@@ -133,18 +143,20 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
   `findStatement`, `createdTables`, `droppedTables`).
 - **Mutaciones de sensibilidad obligatorias** (`design.md > 9`), en memoria: (1) añadir
   `WHERE "deleted_at" IS NULL` al índice único, (2) cambiar un `RESTRICT` por `CASCADE`, (3) cambiar
-  `> 0` por `>= 0` en el `CHECK` de la cantidad, (4) quitar el `CHECK` del entregado, (5) quitar un
-  `DROP TYPE` del DOWN. El predicado debe caer en los cinco casos. Un test que no puede fallar no
-  vigila nada.
-- El `CHECK` del entregado se compara con su **texto exacto**, no con una expresión equivalente.
-- **Hecho cuando:** pasa y cubre R7, R9, R13, R15, R21, R22, R23, R25, R29, R33, R36, R37, R38.
+  `> 0` por `>= 0` en el `CHECK` de la cantidad, (4) quitar el `CHECK` del entregado, (5) quitar el
+  `AT TIME ZONE 'UTC'` del `CHECK` del año, (6) quitar un `DROP TYPE` del DOWN. El predicado debe
+  caer en los seis casos. Un test que no puede fallar no vigila nada.
+- El `CHECK` del entregado y el del año se comparan con su **texto exacto**, no con una expresión
+  equivalente.
+- **Hecho cuando:** pasa y cubre R7, R9, R13, R15, R21, R22, R23, R25, R29, R33, R36, R37, R38, R41.
 
 ### [ ] T7. [P] Dominio y forma del módulo
 - Dep: T4.
 - Archivos: `tests/unit/pedidos/domain/order-number.test.ts`,
   `tests/unit/pedidos/module-contract.test.ts`.
-- `order-number`: `(2026, 1) → '2026-0001'`, `(2026, 42)`, `(2026, 9999)` y que con `10000` el número
-  **crece** en vez de truncarse (pregunta abierta 5 de `requirements.md`).
+- `order-number`: **siete dígitos** (decisión cerrada 29) — `(2026, 1) → '2026-0000001'`,
+  `(2026, 42) → '2026-0000042'`, `(2026, 9999999)` y que con `10000000` el número **crece** en vez de
+  truncarse.
 - `module-contract`: la forma del módulo y las fronteras de `design.md > 9`, incluido el barrido como
   **función pura** aplicada dos veces —a los archivos reales (`[]`) y a esos mismos más una entrada
   sintética con `prisma.order.findMany`, que **debe** salir señalada—, para que la lista vacía no lo
@@ -164,7 +176,8 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 - Archivos: ninguno versionado; la salida se pega en `progress/impl_QC-33-modelo-pedidos.md`.
 - Ciclo completo: `pnpm run db:migrate` → comprobar el esquema **real** (`orders` en
   `information_schema`; los cuatro `pg_constraint` de tipo `f` con `confdeltype = 'r'`; los cuatro
-  `CHECK` en `pg_constraint` con su expresión; el índice único en `pg_indexes` **sin predicado**;
+  `CHECK` en `pg_constraint` con su expresión —los **cinco**, incluido el del año a UTC—; el índice
+  único en `pg_indexes` **sin predicado**;
   `relrowsecurity` y `relforcerowsecurity` en `pg_class`; los dos tipos en `pg_type`) →
   `pnpm run db:rollback` → comprobar que `orders` **y los dos tipos** desaparecen, que no desaparece
   ninguna tabla de `identity`, `inventario`, `recetas` ni `unidades`, y que `_prisma_migrations`
@@ -183,13 +196,24 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
   `tests/integration/recetas/recetas-constraints.int.test.ts`.
 - **Cada caso crea su propia unidad, presentación, producto, receta y usuario dentro de la
   transacción**: las cuatro FK son reales y no se depende de ningún seed.
+- **Ojo con R41 en todos los demás casos**: desde la decisión 28, un pedido con `created_at` por
+  defecto **solo** admite el año UTC de hoy. El helper que crea pedidos tiene que calcularlo
+  (`new Date().getUTCFullYear()`) en vez de escribir `2026` a mano, o toda la suite se pondrá roja
+  con `23514` el 1 de enero. Los casos que hablan de `(2026, 1)` en la tabla de trazabilidad usan
+  ese helper: el año es el de hoy, no el literal.
 - Los cuatro casos del `CHECK` del entregado, no uno (`design.md > 9`), y el caso de R22 **con la
   fila borrada** —crear `(2026, 1)`, borrarlo lógicamente, y comprobar que un segundo `(2026, 1)`
   sigue fallando—, que es el que distingue esta ficha de QC-24.
+- **R41 con `created_at` explícito en la frontera del año**: `'2026-12-31T20:00:00-05:00'` —que en
+  UTC ya es 2027— con `order_year = 2026` debe fallar con `23514` y con `2027` debe pasar. Con la
+  fecha por defecto el caso pasa por casualidad y no demuestra nada (`design.md > 9`).
+- **R42 en positivo**: `(2026, 1)` y después `(2026, 5)` en la misma transacción tienen que pasar.
+  Los huecos se aceptan (decisión cerrada 27) y una ausencia de restricción solo se demuestra
+  ejerciéndola.
 - `beforeAll` que falle con un mensaje claro («corre `pnpm run db:migrate`») si `orders` no existe.
 - Casos exactos: los de la tabla de trazabilidad, columna **I**.
 - **Hecho cuando:** todos pasan y cubren R1, R6, R7, R9, R10, R12, R13, R14, R15, R16, R17, R18, R19,
-  R20, R21, R22, R23, R25, R26, R27, R28, R29, R30, R33.
+  R20, R21, R22, R23, R25, R26, R27, R28, R29, R30, R33, R41, R42.
 
 ---
 
@@ -208,11 +232,12 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 - Dep: T10.
 - Archivos: `progress/impl_QC-33-modelo-pedidos.md`.
 - Copiar la tabla de trazabilidad de abajo con la **salida real** de los tests, no con la intención.
-- Si durante la implementación se resuelve alguna de las preguntas abiertas 2–5 de `requirements.md`
-  (o alguna de `design.md > 11`), se anota aquí; **no** se cierra por cuenta propia (regla 6 de
-  `CLAUDE.md`). Las preguntas 2, 3 y 4 son las que hay que **subir a QC-34**: son las que el esquema
-  no puede cerrar (`design.md > 5.3`).
-- **Hecho cuando:** el archivo existe, cada R1–R40 tiene al menos un test **ejecutado** (no solo
+- Si durante la implementación se resuelve alguna de las preguntas abiertas que quedan —la **1** del
+  humano y la **2** de `spec_author`— o alguna de `design.md > 11`, se anota aquí; **no** se cierra
+  por cuenta propia (regla 6 de `CLAUDE.md`). La **2 hay que subirla a QC-34**: es la que el esquema
+  no puede cerrar (`design.md > 5.3`). Las preguntas 3, 4 y 5 **ya no están abiertas**: las cerró el
+  humano el 2026-09-03 y son las decisiones 27, 28 y 29.
+- **Hecho cuando:** el archivo existe, cada R1–R42 tiene al menos un test **ejecutado** (no solo
   escrito) y el reviewer lo valida contra `CHECKPOINTS.md > Trazabilidad`.
 
 ---
@@ -256,7 +281,7 @@ Abreviaturas:
 | R21 | M · «existe CREATE UNIQUE INDEX sobre (order_year, order_sequence)» | I · «rechaza un segundo pedido con el mismo año y posicion con SQLSTATE 23505» |
 | R22 | M · «el indice unico del correlativo NO lleva WHERE, y el test cae si se le añade `WHERE deleted_at IS NULL`» | I · «tras borrar logicamente el pedido (2026, 1), un segundo (2026, 1) sigue fallando con 23505» |
 | R23 | M · «el año forma parte de la clave unica» | I · «acepta (2026, 1) y (2027, 1) a la vez» |
-| R24 | N · «formatOrderNumber compone 2026-0001 y crece en vez de truncar» · C · «el barrel de pedidos exporta formatOrderNumber y no hay ninguna otra composicion del numero visible» · S · «Order no declara ninguna columna con el numero formateado» | — (propiedad de una funcion pura) |
+| R24 | N · «formatOrderNumber compone 2026-0000001 con siete digitos y crece en vez de truncar» · C · «el barrel de pedidos exporta formatOrderNumber y no hay ninguna otra composicion del numero visible» · S · «Order no declara ninguna columna con el numero formateado» | — (propiedad de una funcion pura) |
 | R25 | S · «createdBy y updatedBy son uuid sin @relation» · M · «existen orders_created_by_fkey y orders_updated_by_fkey» | I · «rechaza un autor inexistente con 23503» |
 | R26 | S · «createdBy y updatedBy son anulables» | I · «acepta un pedido sin autor y lo relee con ausencia de valor» |
 | R27 | S · «Order declara deletedAt anulable» | I · «tras el borrado logico la fila sigue completa, con su instante de borrado y su correlativo» |
@@ -273,10 +298,16 @@ Abreviaturas:
 | R38 | M · «down.sql borra la tabla y los dos tipos, en ese orden, y nada mas; y el test cae si se quita un DROP TYPE» | **T8** · ciclo migrate → rollback → migrate, con los dos tipos comprobados en `pg_type` |
 | R39 | C · «la feature no añade adaptadores driving, rutas ni Server Actions» | — (no hay flujo navegable: E2E diferido con motivo, decision cerrada 25) |
 | R40 | G3 · «toda dependencia de package.json tiene su fila en el registro» | — |
+| R41 | M · «existe el CHECK orders_order_year_matches_created_at con su texto exacto, y el test cae si se le quita el AT TIME ZONE 'UTC'» | I · «con created_at el 31/12/2026 a las 20:00 de Ecuador —2027 en UTC— rechaza order_year 2026 con 23514 y acepta 2027» |
+| R42 | M · «la migracion no crea ninguna restriccion de continuidad sobre order_sequence» | I · «acepta (2026, 1) y despues (2026, 5): los huecos no se rechazan ni se rellenan» |
 
-Los 40 requisitos tienen al menos un test ejecutable. **R2, R3, R4, R5, R10, R11, R24, R31, R32,
+Los 42 requisitos tienen al menos un test ejecutable. **R2, R3, R4, R5, R10, R11, R24, R31, R32,
 R34, R35, R36, R37, R39 y R40 se cierran solo con tests estáticos, unitarios o guardias, a
 propósito**: son propiedades del texto del esquema, de una función pura o del árbol de archivos, y
 una base real no añadiría nada — en el caso de R37 añadiría un falso verde
 (`docs/architecture.md > Acceso a datos y autorizacion`). **R38 se cierra de verdad en T8**, no en el
 test estático, que solo lee texto.
+
+**Segunda vuelta (2026-09-03, F1.4).** R41 y R42 nacen de las decisiones cerradas 28 y 27; R24
+cambió de cuatro a siete dígitos por la 29. **R41 es el único de los tres que toca el SQL**, y por
+eso aparece en T2, T6 y T9. El resto de la ficha no se movió.
