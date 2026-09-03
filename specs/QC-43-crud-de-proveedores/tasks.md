@@ -126,7 +126,7 @@ verificado contra el árbol de la rama, no contra este documento.
       *Depende de:* T7. **Hecho cuando:** `tests/unit/proveedores/supplier-service.test.ts` pasa con
       dobles del puerto (R7, R8, R13, R14, R15, R16, R22, R24, R35).
 
-- [ ] **T9 — Los cuatro casos de uso del catálogo.** `create`, `update`, `delete`, `list`.
+- [x] **T9 — Los cuatro casos de uso del catálogo.** `create`, `update`, `delete`, `list`.
       Validación del producto **en una sola llamada** a `ProductCatalog.findRefs`
       (`design.md > 5.3`); el listado resuelve el `productName` de toda la página con otra sola
       llamada y deja `null` el del producto dado de baja.

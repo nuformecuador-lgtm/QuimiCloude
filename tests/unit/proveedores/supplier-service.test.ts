@@ -67,7 +67,14 @@ function makeSuppliers(overrides: Partial<SupplierRepository> = {}): {
     softDeleteAlive: vi.fn(async () => true),
     listAlive: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 })),
   }
-  return { repo: { ...spies, ...overrides } as unknown as SupplierRepository, spies }
+  // Los `overrides` REEMPLAZAN al espia por defecto, asi que `spies` tiene que ser el
+  // objeto ya fusionado: si no, una asercion sobre un metodo sobrescrito miraria un espia
+  // que nadie llamo y pasaria por vacio.
+  const repo = { ...spies, ...overrides }
+  return {
+    repo: repo as unknown as SupplierRepository,
+    spies: repo as unknown as Record<keyof SupplierRepository, ReturnType<typeof vi.fn>>,
+  }
 }
 
 const ENTRADA_VALIDA = {
