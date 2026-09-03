@@ -192,7 +192,17 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       const etiqueta = toPosix(relative(repoRoot, file))
       expect(source, `${etiqueta} consulta la tabla de productos`).not.toMatch(/prisma\.product/i)
       expect(source, `${etiqueta} consulta la tabla de usuarios`).not.toMatch(/prisma\.user/i)
-      expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
+      // `@prisma/client` solo lo pueden importar los DOS adaptadores driven de persistencia
+      // que trae QC-43 (T11, T12): son el unico sitio del modulo que habla con el ORM
+      // (`design.md > 7`). En QC-42 no habia ninguno y la prohibicion era total; la lista
+      // blanca es EXACTA, asi que un tercer archivo con Prisma sigue cayendo aqui.
+      const ADAPTADORES_CON_ORM = [
+        'lib/modules/proveedores/adapters/driven/persistence/supplier-prisma.ts',
+        'lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts',
+      ]
+      if (!ADAPTADORES_CON_ORM.includes(etiqueta)) {
+        expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
+      }
       // Ninguna ruta profunda a otro modulo: solo el barrel de cada uno.
       for (const spec of importSpecifiers(source)) {
         expect(spec, `${etiqueta}: ruta profunda a inventario`).not.toMatch(
@@ -224,28 +234,60 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
   })
 
   it('la feature no anade adaptadores driving, rutas ni Server Actions', () => {
-    // R35: esta ficha es esquema, migracion y armazon. Ningun alta, consulta, edicion ni
-    // borrado, y por tanto ningun flujo navegable que un E2E pueda visitar (decision 21).
-    for (const carpeta of [
-      join(proveedoresDir, 'adapters', 'driving'),
-      join(proveedoresDir, 'adapters', 'driven'),
-      join(proveedoresDir, 'ports'),
-    ]) {
-      expect(sourcesIn(carpeta), `${toPosix(relative(repoRoot, carpeta))} deberia estar vacia`)
-        .toEqual([])
-    }
-    // Las tres siguen sembradas con su `.gitkeep`, para que git las versione.
+    // R35 de QC-42 decia «ni ports/ ni adapters/»: esa era la frontera de la ficha de
+    // ESQUEMA. QC-43 la DEROGA expresamente (`tasks.md` T7, T11, T12: «borra el
+    // .gitkeep»), asi que la afirmacion pasa de «vacias» a «exactamente estos archivos»,
+    // que es igual de falsable y sigue cerrando el hueco: cualquier archivo de mas en
+    // `ports/` o en `adapters/driven/` cae aqui.
+    expect(
+      sourcesIn(join(proveedoresDir, 'ports')).map((f) => toPosix(relative(proveedoresDir, f))),
+      'ports/ gano un archivo fuera de los dos puertos de QC-43',
+    ).toEqual(['ports/supplier-catalog-repository.ts', 'ports/supplier-repository.ts'])
+    expect(
+      sourcesIn(join(proveedoresDir, 'adapters', 'driven')).map((f) =>
+        toPosix(relative(proveedoresDir, f)),
+      ),
+      'adapters/driven/ gano un archivo fuera de los dos adaptadores de QC-43',
+    ).toEqual([
+      'adapters/driven/persistence/supplier-catalog-line-prisma.ts',
+      'adapters/driven/persistence/supplier-prisma.ts',
+    ])
+    // `adapters/driving/` estaba vacia con su `.gitkeep` hasta T14, que la llena con las
+    // DOS Server Actions y borra el `.gitkeep`. La afirmacion pasa de «vacia» a «exactamente
+    // estos dos archivos», igual de falsable: un tercero cae aqui.
+    expect(
+      sourcesIn(join(proveedoresDir, 'adapters', 'driving')).map((f) =>
+        toPosix(relative(proveedoresDir, f)),
+      ),
+      'adapters/driving/ gano un archivo fuera de las dos Server Actions de QC-43',
+    ).toEqual([
+      'adapters/driving/supplier-actions.ts',
+      'adapters/driving/supplier-catalog-actions.ts',
+    ])
+    // Y los `.gitkeep` de las tres carpetas que T7, T11, T12 y T14 llenaron ya NO estan: git
+    // no versiona carpetas vacias, pero tampoco carpetas con contenido y un `.gitkeep`
+    // sobrante.
     for (const carpeta of ['ports', 'adapters/driven', 'adapters/driving']) {
-      expect(existsSync(join(proveedoresDir, ...carpeta.split('/'), '.gitkeep')), carpeta).toBe(
-        true,
-      )
+      expect(
+        existsSync(join(proveedoresDir, ...carpeta.split('/'), '.gitkeep')),
+        `${carpeta}/.gitkeep sobra: la carpeta ya tiene archivos reales`,
+      ).toBe(false)
     }
 
-    // Ningun 'use server' en TODO el modulo, no solo en lo alcanzable desde el barrel.
+    // `'use server'` SOLO en `adapters/driving/`, y en su primera linea util. En el resto del
+    // modulo -dominio, puertos, adaptadores driven- sigue prohibido: una directiva de
+    // servidor colada en `domain/` haria del caso de uso una frontera HTTP.
     for (const file of proveedoresSources) {
-      expect(read(file), `${toPosix(relative(repoRoot, file))} declara 'use server'`).not.toMatch(
-        /['"]use server['"]/,
-      )
+      const etiqueta = toPosix(relative(repoRoot, file))
+      const esDriving = toPosix(file).includes('/adapters/driving/')
+      if (esDriving) {
+        expect(
+          readFileSync(file, 'utf8').trimStart(),
+          `${etiqueta} debe declarar 'use server' en la primera linea`,
+        ).toMatch(/^(['"])use server\1/)
+      } else {
+        expect(read(file), `${etiqueta} declara 'use server'`).not.toMatch(/['"]use server['"]/)
+      }
     }
 
     // Ninguna ruta HTTP ni pantalla de proveedores.
@@ -265,13 +307,78 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       ).not.toMatch(/proveedores|supplier/i)
     }
 
-    // `lib/composition` NO se toca en esta ficha: sin puertos ni adaptadores no hay nada que
-    // cablear, y un `export const proveedores = {}` seria una fachada vacia (`design.md` 5.5).
-    for (const file of sourcesIn(join(repoRoot, 'lib', 'composition'))) {
+    // QC-42 afirmaba aqui que `lib/composition` NO menciona `proveedores`: sin puertos ni
+    // adaptadores no habia nada que cablear (`design.md` de QC-42, 5.5). QC-43 T13 lo
+    // DEROGA -es literalmente su encargo-, y la afirmacion se invierte: la composicion
+    // cablea la fachada, y lo hace EXACTAMENTE una vez. Ver el caso de mas abajo.
+  })
+
+  it('el cableado puerto-implementacion de proveedores vive SOLO en lib/composition y una sola vez', () => {
+    // T13, R44: `lib/composition` es el UNICO sitio del repo que puede atar un puerto de
+    // `proveedores` a su adaptador driven. Se afirma en los dos sentidos, y los dos son
+    // falsables:
+    //
+    //  a) La fachada existe y esta completa: las nueve claves, ni una mas ni una menos.
+    //     Un caso de uso sin cablear -o un decimo colado- cae aqui.
+    //  b) Nadie MAS instancia esos adaptadores: si un archivo de `app/`, de otro modulo o
+    //     un adaptador driving importara `adapters/driven/persistence/*` de `proveedores`,
+    //     el cableado habria dejado de ser exclusivo de la composicion.
+    const composicion = sourcesIn(join(repoRoot, 'lib', 'composition'))
+    const cablean = composicion.filter((file) => /export const proveedores\b/.test(read(file)))
+    expect(
+      cablean.map((f) => toPosix(relative(repoRoot, f))),
+      'la fachada `proveedores` tiene que existir exactamente una vez en lib/composition',
+    ).toEqual(['lib/composition/index.ts'])
+
+    const fuente = read(cablean[0] as string)
+    const bloque = fuente.slice(fuente.indexOf('export const proveedores'))
+    const claves = [...bloque.matchAll(/^  (\w+):/gm)].map((m) => m[1] as string).sort()
+    expect(claves).toEqual([
+      'createCatalogLine',
+      'createSupplier',
+      'deleteCatalogLine',
+      'deleteSupplier',
+      'getSupplier',
+      'listCatalogLines',
+      'listSuppliers',
+      'updateCatalogLine',
+      'updateSupplier',
+    ])
+
+    // `productCatalog` se REUTILIZA, no se vuelve a construir (`design.md > 10`): una
+    // segunda instancia serian dos cableados del mismo puerto que pueden divergir.
+    expect(
+      [...fuente.matchAll(/const productCatalog\s*:/g)].length,
+      'productCatalog se construye mas de una vez en lib/composition',
+    ).toBe(1)
+
+    // Nadie mas que la composicion instancia los adaptadores driven de `proveedores`.
+    const fuera = sourcesIn(join(repoRoot, 'lib'))
+      .concat(sourcesIn(join(repoRoot, 'app')))
+      .filter((file) => !toPosix(file).includes('/lib/composition/'))
+      .filter((file) =>
+        /@\/lib\/modules\/proveedores\/(adapters|ports)\//.test(read(file)),
+      )
+      .map((file) => toPosix(relative(repoRoot, file)))
+    expect(fuera, `cablean proveedores fuera de la composicion: ${fuera.join(', ')}`).toEqual([])
+
+    // Y el dominio, los puertos y los adaptadores DRIVEN no importan la composicion: la
+    // flecha va driving -> composicion -> driven, nunca al reves (regla 3 de
+    // `docs/architecture.md`). El driving SI puede -y debe- pedirle la fachada.
+    for (const file of proveedoresSources) {
+      if (toPosix(file).includes('/adapters/driving/')) continue
       expect(
         read(file),
-        `${toPosix(relative(repoRoot, file))} cablea proveedores`,
-      ).not.toMatch(/proveedores|supplier/i)
+        `${toPosix(relative(repoRoot, file))} importa @/lib/composition`,
+      ).not.toMatch(/@\/lib\/composition/)
+    }
+
+    // Los dos adaptadores driving piden la fachada a la composicion, no instancian nada.
+    for (const file of sourcesIn(join(proveedoresDir, 'adapters', 'driving'))) {
+      expect(
+        read(file),
+        `${toPosix(relative(repoRoot, file))} deberia consumir @/lib/composition`,
+      ).toMatch(/from '@\/lib\/composition'/)
     }
   })
 })
@@ -310,6 +417,67 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     expect(relationTargets('Product')).toEqual(['Presentation'])
     expect(relationTargets('Product')).not.toContain('SupplierCatalogLine')
     expect(relationTargets('Product')).not.toContain('Supplier')
+  })
+
+  it('el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User', () => {
+    // T15 (QC-43), R26 y R44. QC-42 ya afirmaba que `SupplierCatalogLine` no tenia relacion
+    // hacia `Product`; lo que esta ficha CAMBIA es que la linea gana DOS columnas nuevas
+    // -`createdBy` y `updatedBy`- que apuntan a `users` con una FK real en la base. Esa es
+    // exactamente la tentacion que este caso vigila: declararlas con `@relation` "porque la
+    // FK existe" (decision cerrada 14 de QC-42, mantenida por la 3 de QC-43 y por
+    // `design.md > 12.9`).
+    //
+    // Ninguna guardia detecta ese cruce -`guard-arquitectura-modulos` busca imports y la
+    // cadena `prisma.<modelo>`, y un `include: { creator: true }` no es ninguna de las dos
+    // cosas-, y por eso este test existe. Se afirma sobre el dmmf, que es el modelo TAL COMO
+    // el cliente generado lo entiende, con el censo EXACTO de campos: cualquier `@relation`
+    // anadido aparece como un campo `object` de mas y el `toEqual` cae. Requiere el cliente
+    // regenerado (`pnpm prisma generate`), que es justo lo que hace que el test siga a la
+    // verdad y no al texto del esquema.
+    const linea = Prisma.dmmf.datamodel.models.find((m) => m.name === 'SupplierCatalogLine')
+    expect(linea, 'Prisma.dmmf no conoce SupplierCatalogLine').toBeDefined()
+
+    // Las dos columnas de autor EXISTEN, y existen como ESCALARES anulables: si estuvieran
+    // ausentes, el cambio 3 de la migracion no estaria en el esquema; si fueran `object`,
+    // serian la relacion que la decision 14 prohibe. Las dos mitades importan.
+    const autoria = linea!.fields.filter((f) => f.name === 'createdBy' || f.name === 'updatedBy')
+    expect(autoria.map((f) => `${f.name}:${f.kind}:${f.type}:${f.isRequired}`)).toEqual([
+      'createdBy:scalar:String:false',
+      'updatedBy:scalar:String:false',
+    ])
+
+    // Censo COMPLETO de campos de la linea: ni una relacion de mas, ni una columna de mas.
+    expect(linea!.fields.map((f) => f.name)).toEqual([
+      'id',
+      'supplierId',
+      'productId',
+      'cost',
+      'minPurchase',
+      'deliveryTime',
+      'createdBy',
+      'updatedBy',
+      'createdAt',
+      'updatedAt',
+      'supplier',
+    ])
+
+    // Y la unica relacion sigue siendo la intra-modulo hacia su proveedor.
+    expect(relationTargets('SupplierCatalogLine')).toEqual(['Supplier'])
+    expect(relationTargets('SupplierCatalogLine')).not.toContain('Product')
+    expect(relationTargets('SupplierCatalogLine')).not.toContain('User')
+
+    // `Supplier` tampoco cambia por esta ficha: sus columnas de autor son de QC-42 y
+    // tampoco llevan `@relation`.
+    expect(
+      Prisma.dmmf.datamodel.models
+        .find((m) => m.name === 'Supplier')!
+        .fields.filter((f) => f.name === 'createdBy' || f.name === 'updatedBy')
+        .map((f) => `${f.name}:${f.kind}`),
+    ).toEqual(['createdBy:scalar', 'updatedBy:scalar'])
+
+    // El reverso: `User` no gana ningun campo hacia la linea ni hacia el proveedor. La lista
+    // esperada es el conjunto EXACTO que QC-4 le dio.
+    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
   })
 
   it('User NO gana ningun campo de relacion de vuelta hacia Supplier', () => {
