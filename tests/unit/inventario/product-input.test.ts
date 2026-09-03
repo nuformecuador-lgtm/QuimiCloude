@@ -4,11 +4,19 @@ import {
 import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
 import { pageQuerySchema } from '@/lib/modules/inventario/domain/page';
 
+/**
+ * Los dos campos que la decision del humano del 2026-09-03 volvio OBLIGATORIOS en la entrada
+ * (`stock` y `qtyAlert`). Se anaden a cada caso que espera un producto VALIDO: sin ellos
+ * cualquier `safeParse` correcto fallaria por un motivo que ese caso no esta midiendo.
+ * Su propia obligatoriedad tiene caso aparte, al final del describe.
+ */
+const REQUERIDOS = { stock: 0, qtyAlert: 0 } as const;
+
 // Esquemas zod de entrada del borde (R9, R10, R11, R25, R28, R37; `design.md > 6`, T4 de tasks.md).
 describe('createProductSchema', () => {
   it('rechaza el nombre vacio o de solo espacios y recorta los extremos del nombre valido', () => {
     // R9
-    const base = { name: '', presentationId: '11111111-1111-4111-8111-111111111111' };
+    const base = { name: '', presentationId: '11111111-1111-4111-8111-111111111111', ...REQUERIDOS };
 
     expect(createProductSchema.safeParse(base).success).toBe(false);
     expect(
@@ -24,6 +32,7 @@ describe('createProductSchema', () => {
     const base = {
       name: 'Producto',
       presentationId: '11111111-1111-4111-8111-111111111111',
+      ...REQUERIDOS,
     };
 
     expect(
@@ -42,12 +51,14 @@ describe('createProductSchema', () => {
       createProductSchema.safeParse({
         name: productName121,
         presentationId: '11111111-1111-4111-8111-111111111111',
+        ...REQUERIDOS,
       }).success,
     ).toBe(false);
     expect(
       createProductSchema.safeParse({
         name: productName120,
         presentationId: '11111111-1111-4111-8111-111111111111',
+        ...REQUERIDOS,
       }).success,
     ).toBe(true);
 
@@ -94,6 +105,7 @@ describe('createProductSchema', () => {
     const base = {
       name: 'Producto',
       presentationId: '11111111-1111-4111-8111-111111111111',
+      ...REQUERIDOS,
     };
 
     expect(
@@ -121,6 +133,7 @@ describe('createProductSchema', () => {
     const base = {
       name: 'Producto',
       presentationId: '11111111-1111-4111-8111-111111111111',
+      ...REQUERIDOS,
     };
 
     expect(createProductSchema.safeParse(base).success).toBe(true);
@@ -136,10 +149,53 @@ describe('createProductSchema', () => {
     expect(createProductSchema.safeParse({ ...base, unitId: 'kg' }).success).toBe(false);
   });
 
+  it('exige stock y qtyAlert, y los sigue queriendo enteros de 0 o mas', () => {
+    // DECISION DEL HUMANO, 2026-09-03: acota a R5, que los declaraba opcionales. La COLUMNA
+    // sigue siendo nullable -eso lo afirma `inventario-schema.test.ts`-; lo que cambia es lo
+    // que la aplicacion acepta. Ni ausente, ni nulo, ni negativo, ni con decimales.
+    const soloObligatoriosDeAntes = {
+      name: 'Producto',
+      presentationId: '11111111-1111-4111-8111-111111111111',
+    };
+
+    expect(createProductSchema.safeParse(soloObligatoriosDeAntes).success).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: 0 }).success,
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: 0 }).success,
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: null, qtyAlert: null })
+        .success,
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: -1, qtyAlert: 0 }).success,
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: 1.5, qtyAlert: 0 })
+        .success,
+    ).toBe(false);
+
+    const parsed = createProductSchema.parse({
+      ...soloObligatoriosDeAntes,
+      stock: 7,
+      qtyAlert: 3,
+    });
+    expect(parsed.stock).toBe(7);
+    expect(parsed.qtyAlert).toBe(3);
+
+    // Los tres que NO se volvieron obligatorios siguen pudiendo faltar.
+    expect(parsed.cost).toBeUndefined();
+    expect(parsed.deliveryTime).toBeUndefined();
+    expect(parsed.unitId).toBeUndefined();
+  });
+
   it('usa 0 como valor por defecto de minPurchase cuando no se indica', () => {
     const parsed = createProductSchema.parse({
       name: 'Producto',
       presentationId: '11111111-1111-4111-8111-111111111111',
+      ...REQUERIDOS,
     });
     expect(parsed.minPurchase).toBe(0);
   });

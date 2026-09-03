@@ -43,6 +43,15 @@ export type ProductColumn = {
   readonly align: 'start' | 'end';
   /** Texto de la celda. Devuelve SIEMPRE cadena: la tabla no formatea nada por su cuenta. */
   readonly value: (product: ProductView) => string;
+  /**
+   * Si devuelve `true`, la tabla pinta ESA celda en rojo. Opcional: una columna que no lo
+   * declara nunca se resalta.
+   *
+   * Es presentacion y solo presentacion: no hay ninguna columna derivada en la base ni ningun
+   * campo calculado en `ProductView` (R11 y decision cerrada 10 de QC-14 lo prohiben). La
+   * comparacion se hace aqui, al pintar, sobre dos valores que ya venian en la fila.
+   */
+  readonly alert?: (product: ProductView) => boolean;
 };
 
 /** Marca de "sin dato" para las columnas opcionales. Constante para que ningun test dependa del glifo. */
@@ -63,13 +72,29 @@ function formatOptionalInt(value: number | null): string {
 }
 
 /**
- * Las nueve columnas de negocio (R6, sin la unidad desde el merge de QC-32; ver
- * `HiddenProductField`). El orden es el de lectura: primero identifica el producto, despues sus
- * cantidades y su costo, y al final las marcas de tiempo.
+ * ¿La existencia esta en alarma? Lo esta cuando la alerta de cantidad SUPERA a la existencia:
+ * queda menos de lo que el producto declara como minimo aceptable.
  *
- * **`cost` se pinta TAL CUAL** (R8): es una cadena decimal que el backend produce a proposito
- * para no pasar un importe por el binario de coma flotante. Aqui no hay `Number(...)`, no hay
- * `parseFloat(...)` y no hay ninguna operacion aritmetica sobre el.
+ * **Solo cuando los dos son numeros.** Un producto anterior a la decision del 2026-09-03 puede
+ * tener cualquiera de los dos a NULL en la base, y `null` no se compara: sin los dos valores no
+ * se sabe si hay alarma, y pintar de rojo una incognita seria inventarse el dato. Se escribe con
+ * `typeof` y no con `!== null` porque el tipo los declara `number | null` y asi la funcion
+ * sigue siendo correcta si algun dia admiten `undefined`.
+ */
+function isBelowAlert(product: ProductView): boolean {
+  if (typeof product.stock !== 'number') return false;
+  if (typeof product.qtyAlert !== 'number') return false;
+  return product.qtyAlert > product.stock;
+}
+
+/**
+ * Las cuatro columnas que quedan (decision del humano, 2026-09-03).
+ *
+ * ACOTA A R6, que enumeraba nueve. Salen costo, compra minima, tiempo de entrega, creado y
+ * actualizado: cinco columnas que ensanchaban la tabla sin que nadie las leyera de un vistazo.
+ * NO desaparece ningun dato del sistema -siguen en `ProductView`, en la base y en el envio de
+ * la edicion-; lo que desaparece es su columna. El orden sigue siendo el de lectura: que
+ * producto es, en que presentacion, cuanto hay y a partir de cuanto avisar.
  */
 export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
   {
@@ -92,27 +117,7 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
     testId: 'product-column-stock',
     align: 'end',
     value: (product) => formatOptionalInt(product.stock),
-  },
-  {
-    key: 'cost',
-    label: 'Costo',
-    testId: 'product-column-cost',
-    align: 'end',
-    value: (product) => product.cost ?? EMPTY_CELL,
-  },
-  {
-    key: 'minPurchase',
-    label: 'Compra mínima',
-    testId: 'product-column-minPurchase',
-    align: 'end',
-    value: (product) => String(product.minPurchase),
-  },
-  {
-    key: 'deliveryTime',
-    label: 'Tiempo de entrega',
-    testId: 'product-column-deliveryTime',
-    align: 'end',
-    value: (product) => formatOptionalInt(product.deliveryTime),
+    alert: isBelowAlert,
   },
   {
     key: 'qtyAlert',
@@ -120,19 +125,5 @@ export const PRODUCT_COLUMNS: readonly ProductColumn[] = [
     testId: 'product-column-qtyAlert',
     align: 'end',
     value: (product) => formatOptionalInt(product.qtyAlert),
-  },
-  {
-    key: 'createdAt',
-    label: 'Creado',
-    testId: 'product-column-createdAt',
-    align: 'start',
-    value: (product) => formatDate(product.createdAt),
-  },
-  {
-    key: 'updatedAt',
-    label: 'Actualizado',
-    testId: 'product-column-updatedAt',
-    align: 'start',
-    value: (product) => formatDate(product.updatedAt),
   },
 ];

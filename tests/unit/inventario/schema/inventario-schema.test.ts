@@ -297,6 +297,13 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // La lista completa de columnas: si alguien anade o quita una, este test lo dice.
     // `createdBy`/`updatedBy` los anade QC-20 (design.md > 2.1, R6, R7): campos ESCALARES
     // a proposito, sin `@relation`, para que el ORM no pueda atravesar hacia `users`.
+    //
+    // 2026-09-03: se anade `imagePath` (`image_path`, migracion
+    // `20260903200000_product_image_path`), columna OPCIONAL para la ruta de la imagen del
+    // producto. Entra en ESTE censo -que es el que vigila que nadie anada una columna sin
+    // enterarse- y NO en `PRODUCT_BUSINESS_FIELDS`: esa lista es la de los ocho datos que R3
+    // enumera, y R3 no habla de imagenes. Inflarla a nueve haria decir a R3 algo que no dice.
+    // Tampoco entra en `OPTIONAL_FIELDS`, que es la lista cerrada de R5.
     const scalarNames = product.fields
       .filter((candidate) => !candidate.isList && candidate.type !== 'Presentation')
       .map((candidate) => candidate.name)
@@ -305,6 +312,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       [
         'id',
         ...PRODUCT_BUSINESS_FIELDS.map(([name]) => name),
+        'imagePath',
         'createdAt',
         'updatedAt',
         'deletedAt',

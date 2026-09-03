@@ -168,6 +168,11 @@ model Product {
   deliveryTime   Int?      @map("delivery_time")
   qtyAlert       Int?      @map("qty_alert")
   unitId         String?   @map("unit_id") @db.Uuid
+  /// Ruta de la imagen del producto. OPCIONAL: su ausencia es «este producto no tiene
+  /// imagen», no «se perdio el dato». Es TEXTO LIBRE y la base no valida su forma: aqui no
+  /// se decide si es una clave de Supabase Storage, una ruta relativa o una URL, porque esa
+  /// decision no esta tomada en ningun sitio del repo. Sin CHECK, sin default y sin indice.
+  imagePath      String?   @map("image_path")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
