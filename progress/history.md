@@ -1293,3 +1293,79 @@ rechazo**: el spec pasó a la primera, a diferencia de QC-32.
 - **Dos preguntas abiertas, las dos a propósito:** quién asigna la posición del correlativo y qué
   pasa con dos altas simultáneas (**QC-34**; si no se resuelve allí, una de las dos fallará con un
   `23505` sin traducir), y si algún día se exporta a un contable externo.
+
+## QC-13 — guardia-de-sesion-en-navegacion (2026-09-03)
+
+PR [#27](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/27), merge `045074c`. Épica QC-17,
+`zone: frontend`, `complexity: low`. **16 requisitos EARS, los 16 con test que muerde.** 1349 tests
+con 1341 en verde; **E2E verde en Chromium y WebKit**. Reviewer **APROBADO, 0 mayores**.
+
+### La ficha mentía, y eso fue el hallazgo principal
+
+Su `description` prometía «conectar la maquetación con la sesión real»: validar la cookie en cada
+navegación, redirigir en los dos sentidos, que el formulario autentique, que el layout muestre al
+usuario y que el logout funcione. **Se escribió antes de que existiera QC-9, que se llevó casi
+todo.** Verificado en el código y no en los documentos: `login-form.tsx` ya llamaba a
+`loginAction`, `layout.tsx` ya hacía `identity.getSessionUser()`, `nav-user.tsx` ya montaba
+`logoutAction`. **Y el E2E que QC-12 le difirió explícitamente ya existía** —`session.spec.ts`,
+R24 de QC-9—: esa deuda se cerró **por constatación**.
+
+`/afinar-feature` corrigió **cuatro campos del board antes de sembrar**: `description` reescrita,
+`zone` de `fullstack` a `frontend` (sin partición), `complexity` de `medium` a `low`, y `QC-22`
+añadida a `depends_on`. El alcance real quedó en tres cosas: quitar cuatro ítems muertos del menú,
+mover un test a fixture propia, y que el E2E del retorno pida `/inventario`.
+
+**La lección general: una ficha vieja no describe el repo de hoy.** Antes de especificar, se
+verifica contra el código lo que la tarjeta afirma que falta.
+
+### El choque con QC-26, evitado en la validación de F1.0
+
+QC-13 iba a borrar los **cinco** ítems de relleno. Uno de ellos, «Fórmulas», **lo está reclamando
+QC-26** para el catálogo de recetas: su R5 dice que «NO DEBE seguir presentando la etiqueta
+Fórmulas». Las dos features se destruían entre sí.
+
+**Solo se ve entrando a leer el spec de la otra**, porque el de QC-26 vivía en su worktree y no en
+`dev`. Es la comprobación que `AGENTS.md > Paralelismo` asigna al **leader** y que el validador no
+automatiza — y es la primera vez que se cobra su valor. El alcance bajó a **cuatro** ítems y
+`FORMULAS_ROUTE` quedó marcada como intocable en los tres archivos del spec.
+
+### El gate del leader encontró lo que los subagentes no podían ver
+
+`tests/unit/sidebar-ajuste.test.tsx` afirmaba que **algún ítem del menú real declara contador**.
+Era cierto solo porque «Notificaciones» —placeholder de QC-11— era el único con `badge`. Vive en un
+archivo **fuera del alcance de la ficha**, así que `vitest related` no lo alcanzaba y ningún
+subagente lo iba a ver. Se retiró esa aserción conservando la que prueba lo que el test dice
+probar, con fixture propia. **Es exactamente el reparto que `AGENTS.md > Regla del gate` describe.**
+
+### El rol del E2E: de dependencia silenciosa a fallo ruidoso
+
+Para aterrizar en `/inventario` hace falta el rol `Administrador` (regla ruta-rol de QC-22), pero
+el fixture creaba un **rol efímero propio**, así que el middleware lo rebotaba al dashboard y el
+E2E caía en los dos navegadores. Decisión del humano: **lo efímero que importa es el usuario, no el
+rol**. El fixture pasa a **leer** el `Administrador` del seed y a **fallar con un mensaje claro si
+no existe**, pidiendo correr el seed de QC-6. El `afterAll` ya no toca la tabla `roles` en ningún
+caso. Cierra en la práctica la pregunta abierta 2.
+
+### Lo que destapó fuera de la feature
+
+- **`dev` local y `origin/dev` llevaban divergidos 11↔10 commits**, y ninguna rama podía sincronizar
+  limpio. Se reconciliaron como **unión** sin descartar notas de ninguna sesión: `history.md`
+  conflictaba **entero** por finales de línea —la deuda del `.gitattributes` que falta—, y de
+  `current.md` se trajeron tres secciones de Evaluaciones que solo tenía el remoto.
+- **El worktree principal quedó en la rama `fix-ux`, no en `dev`**, y varias sesiones commitearon
+  ahí creyendo que era `dev`. `CLAUDE.md` dice que el principal se queda en `dev` y que nadie hace
+  `checkout` en él. Sigue así al cerrar esta ficha.
+
+### Deuda que hereda
+
+- **QC-26 y esta ficha escriben las dos en `private-nav.ts` y `app-sidebar.test.tsx`.** Aquí el
+  merge salió limpio porque QC-26 aún no estaba en `dev`; **el conflicto sigue pendiente para
+  quien mergee después**.
+- **`./init.sh` no llegó a `== init OK ==`** por dos causas ajenas, declaradas en el PR: la
+  asimetría del validador desde un worktree secundario, y los 8 rojos del seed por el producto
+  residual de QC-22 que el humano decidió no tocar.
+- **La raíz `/` sigue siendo la plantilla de `create-next-app`**, pública. Fuera de esta ficha por
+  decisión explícita del humano, a la espera de una pantalla de inicio de verdad **que todavía no
+  tiene tarjeta**.
+- **El menú quedó con tres entradas** —Dashboard, Inventario y Producción con un solo hijo—, y
+  nadie ha decidido si una sección de un elemento se justifica.

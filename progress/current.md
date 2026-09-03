@@ -11,9 +11,12 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-13 | guardia-de-sesion-en-navegacion | QC-17 Identidad y acceso | frontend | **in_progress — [PR #27](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/27) ABIERTO** | `feature/QC-13-guardia-de-sesion-en-navegacion` | **Esperando que el humano mergee el PR #27.** Sesión de hoy (2026-09-03). 16 requisitos EARS con test que muerde, 6 tareas. **Reviewer APROBADO, 0 mayores**: verificó por mutación reintroduciendo las 4 constantes, el ítem de Lotes y el grupo Compras — **cayeron 5 tests**, incluida `guard-nav-serializable`. `typecheck` y `lint` limpios, **1349 tests / 1341 verdes**, **E2E verde en Chromium y WebKit** aterrizando en `/inventario`. **`./init.sh` no llega a `== init OK ==` por dos causas ajenas declaradas en el PR**: la asimetría del validador desde worktree secundario (QC-26 tiene su spec solo en su rama) y los 8 rojos del seed por el producto residual de QC-22. **El gate del leader destapó un rojo propio invisible para los subagentes** (`sidebar-ajuste.test.tsx` acoplado al `badge` de Notificaciones). **Falta comentar el PR en el issue: el MCP de Jira devolvió un captcha de WAF.** Al mergear: F2.5 y F2.6. |
 | QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | **in_progress — PR #29 ABIERTO** | `feature/QC-26-pantalla-de-recetas` | **Esperando que el humano mergee el [PR #29](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/29).** 54 requisitos con test, 30 tasks (**T25 pendiente a propósito**: comprobación manual en móvil real, que ningún agente puede cerrar). Gate: **125 archivos, 1369 tests**, tres corridas idénticas. `reviewer` en dos rondas (3 mayores → 0, **15 mutaciones**) y **cero cambios de producción** al corregir. **Base propia `QuimiCloude_QC26`, hay que borrarla al cerrar.** Al mergear: F2.5 y F2.6 |
 | QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | **in_progress — implementación por bloques (F2.1)** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. `/afinar-feature` sembró 16 decisiones y `spec_author` escribió **47 requisitos (R1-R47) y 21 tareas** con mapa `R<n> → test` completo (commit `0f5a3de`). Base propia `QuimiCloude_QC43` montada, gate verde en el worktree (116 archivos). **Spec APROBADO el 2026-09-03** (F1.4), tarjeta en *En curso*. **P2 cerrada**: la restricción de contacto se escribe **solo para filas vivas**, lo que cierra de paso la pregunta abierta 8 de QC-42 y desbloquea T3. Se implementa **por bloques**, no con un implementer monolítico: la lección de QC-22, donde el implementer murió dos veces por 529 y lo que funcionó fue repartir. **PR [#28](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/28) MERGEADO a `dev` el 2026-09-03** (merge `760e3eb`): el modulo `proveedores` completo -dominio, puertos, adaptadores, composicion y la migracion `20260903200343_supplier_contact_cost_and_line_audit`- ya esta en esta rama. **Queda cerrar la ficha (F2.5, F2.6)**, que ninguna de las dos ramas habia hecho todavia. |
+
+La feature **QC-13 — guardia-de-sesion-en-navegacion** se cerró el 2026-09-03 (PR #27, merge
+`045074c`): resumen en `progress/history.md`. El menú privado queda con **Dashboard, Inventario y
+Producción**; `FORMULAS_ROUTE` se conservó intacta para **QC-26**, que se la queda.
 
 La feature **QC-33 — modelo-pedidos** se cerró el 2026-09-03 (PR #26, merge `73c2fb6`):
 resumen en `progress/history.md`. Desbloquea **QC-34**.
@@ -1412,6 +1415,15 @@ afirmaciones de QC-4, QC-14 y QC-24 de que en todo el esquema no existe ningún 
 enums de QC-33 dejaron viejas. `vitest related` no los relaciona porque no los une el árbol de
 archivos sino una afirmación sobre el repositorio entero. **Es el mismo agujero que ya costó caro
 en QC-20**, y es la razón por la que el gate completo antes del PR no es ceremonia.
+
+- **[arnés — la regla 1 NO cambió: sigue siendo «máximo 2 `in_progress` por zona»]** Varias notas
+  de este archivo dan por hecha una regla nueva de «1 por zona y **por épica**». **Esa regla no
+  existe en `dev`**: `CLAUDE.md`, `AGENTS.md`, `scripts/validate-features.mjs` y
+  `.claude/agents/leader.md` conservan el límite original — verificado el 2026-09-03, no deducido.
+  Se llegó a redactar con `/afinar-regla` y **el humano pidió revertirla**; se revirtió entera,
+  incluidos los espejos git-ignorados de `harnessConfig/`. Quien lea aquí «cupo libre con la regla
+  nueva» está leyendo una nota que envejeció mal: **el validador cuenta por zona, no por épica**, y
+  es él quien manda.
 
 ### QC-32 se cerró el 2026-09-03 — lo que deja abierto
 
