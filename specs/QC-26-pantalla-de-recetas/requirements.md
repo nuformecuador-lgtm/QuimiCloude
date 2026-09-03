@@ -87,7 +87,11 @@ quien la creó o la modificó.
 
 **R10** — La lista NO DEBE presentar las líneas de producto de cada receta y NO DEBE invocar la
 operación de detalle para obtenerlas: pintar una página de la lista DEBE costar **una sola**
-invocación de la operación de listado.
+invocación de la operación de listado. En consecuencia, la lista NO DEBE presentar ninguna marca,
+icono ni aviso que señale que una receta tiene líneas con el producto dado de baja: esa señal existe
+**solo en el formulario** (R53, R54), y pintarla en la lista exigiría o un campo nuevo en el listado
+del backend —feature ajena y ya `done`— o una consulta de detalle por fila, que es justo lo que este
+requisito prohíbe.
 
 **R11** — La pantalla DEBE ofrecer un selector de tamaño de página con exactamente dos opciones,
 10 y 25, y DEBE usar 10 cuando no se indique ninguno. CUANDO el usuario cambie el tamaño de
@@ -280,6 +284,26 @@ línea de producto y un paso, y comprobar que aparece en la lista; **y** que un 
 distinto de Administrador no llega a verla. Esa verificación NO DEBE incluir la subida de una
 imagen ni depender de que el almacenamiento externo esté disponible.
 
+### Líneas con el producto dado de baja
+
+Pertenecen al bloque de «Líneas de producto» (R27-R31); se numeran a continuación de R52 porque
+salen de una decisión cerrada más tarde y **renumerar rompería la trazabilidad ya escrita**. La
+prohibición complementaria —que la lista **no** lleve marca— vive en R10, ampliado.
+
+**R53** — MIENTRAS el formulario presente una línea cuya operación de detalle no entregue nombre de
+producto —el producto está dado de baja—, el sistema DEBE señalar **esa línea y solo esa** con un
+marcador identificable por `data-testid` en su celda de producto, y NO DEBE señalar las líneas cuyo
+producto sí está disponible. El marcador NO DEBE deshabilitar la línea, quitarla ni impedir el
+guardado: R21 sigue mandando y la línea se reenvía intacta.
+
+**R54** — MIENTRAS el formulario contenga **una o más** líneas con el producto dado de baja, el
+sistema DEBE presentar, **al pie del bloque de líneas**, un aviso identificable por `data-testid`
+que indique **cuántas** líneas están en esa situación; CUANDO el usuario quite o sustituya una de
+esas líneas, el aviso DEBE reflejar el nuevo número, y CUANDO no quede ninguna, el aviso NO DEBE
+estar presente. MIENTRAS ninguna línea esté en esa situación, el aviso NO DEBE estar presente.
+Ni el marcador ni el aviso DEBEN identificarse por su texto: los tests afirman sobre `data-testid`
+y sobre el número, nunca sobre el copy.
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con los
@@ -306,6 +330,8 @@ requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
 | 17 | Sesión por props, rutas en constantes, asserts sobre roles/testid/constantes | R3, R49 |
 | 18 | Multiplataforma sin excepción, con el arrastre y el scroll como puntos calientes | R19, R34, R50 |
 | 19 | Base heredada: no se re-crea | R51 |
+| 20 | La lectura del catálogo de unidades es **solo de Administrador** (pregunta 4) | R41 |
+| 21 | Marcador en la celda **más** aviso al pie del bloque de líneas, **solo en el formulario**; la lista no lleva marca (pregunta 5) | R53 (marcador), R54 (aviso), R10 (la lista no lo lleva) |
 
 Requisitos que no salen de una fila de la tabla, y de dónde salen: **R8**, **R12**, **R15**,
 **R16**, **R17**, **R27** y **R32** del propio Alcance —la lista paginada, sus tres estados, las
@@ -350,10 +376,10 @@ que condicionó la respuesta.
 5. **¿Cómo se presenta la línea cuyo producto está dado de baja?** QC-25 (R18, R45) garantiza que la
    receta conserva esa línea y que la edición la puede reenviar, y el detalle devuelve su nombre de
    producto **vacío**. R21 exige conservarla y reenviarla intacta —eso sí es derivable—, pero **qué
-   se le enseña al usuario en esa celda** (el identificador, un texto de «producto no disponible»,
-   un icono) no lo fija ninguna decisión. Mientras no haya respuesta, el `design.md` deja la celda
-   con un marcador identificable por `data-testid` y **sin depender del copy**, para que responderla
-   después sea cambiar una cadena y no una estructura.
+   se le enseña al usuario en esa celda** no lo fijaba ninguna decisión. **Cerrada**: marcador en la
+   celda (**R53**) más aviso al pie del bloque de líneas (**R54**), los dos por `data-testid` y sin
+   depender del copy; y la lista **no** lleva marca (**R10**, ampliado), porque el listado de QC-25
+   no devuelve las líneas.
 
 ## Decisiones cerradas (no reabrir)
 

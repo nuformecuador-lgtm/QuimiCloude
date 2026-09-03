@@ -220,8 +220,7 @@ Dos páginas, un solo componente `RecipeForm` en dos modos:
   `not_found`, pinta el estado «no encontrada» con enlace a la lista (R21). Si responde
   `unauthorized`, el estado de error (R7). Si responde bien, precarga el formulario con el detalle,
   **incluidas las líneas cuyo `productName` es `null`** (producto de baja): se conservan, se
-  reenvían intactas y se marcan con un `data-testid` propio (pregunta abierta 5 — se cierra con una
-  cadena, no con una estructura).
+  reenvían intactas y se señalan como fija §6.1 (decisión cerrada del 2026-09-03).
 
 **Por qué el formulario es controlado y NO usa `useActionState`, apartándose de QC-22.** Dos hechos
 del contrato, no gusto: (a) `createRecipeAction(input)` y `updateRecipeAction(id, input)` **no
@@ -272,6 +271,30 @@ guardia de fuente de que en la ruta no aparecen `type="number"` sobre la cantida
 `listUnitsAction()` (§9). Muestra `symbol` cuando existe y `name` cuando no, y **envía el `id`**.
 Nunca texto libre: el esquema exige un UUID y el caso de uso comprueba la existencia contra el
 catálogo (QC-25 R50).
+
+### 6.1 La línea cuyo producto está dado de baja (R53, R54; decisión cerrada del 2026-09-03)
+
+`RecipeDetail` entrega `productName: null` cuando el producto de esa línea está dado de baja
+(QC-25 R18/R45). Eso es el **único** discriminante disponible, y de él salen dos piezas:
+
+| Pieza | Dónde | Cómo se identifica | Requisito |
+| --- | --- | --- | --- |
+| **Marcador de celda** | en la celda de producto de **esa** línea, dentro de `recipe-lines-field.tsx` | `data-testid="recipe-line-unavailable-<índice>"` (uno por línea afectada; las demás **no** lo llevan) | R53 |
+| **Aviso al pie** | último hijo del bloque de líneas, `role="status"` | `data-testid="recipe-lines-unavailable-notice"` con el **número** en un `data-*` propio (`data-count`) además de en el texto | R54 |
+
+- **El aviso es derivado, no un flag.** Se calcula de la lista de líneas en render
+  (`lines.filter(l => l.productUnavailable).length`), de modo que quitar una línea baja el número y
+  quitar la última **desmonta** el aviso. Un aviso montado con un booleano de carga se quedaría
+  pegado y el test de R54 lo cazaría.
+- **El test de R54 muerde**: afirma (a) que con cero líneas de baja el nodo **no existe**, (b) que
+  con dos existe y su `data-count` es `2`, y (c) que tras quitar una pasa a `1`. Borrar el cálculo,
+  el filtro o el desmontaje pone el test en rojo; un test que solo comprobase «aparece algo» seguiría
+  verde con el número mentiroso.
+- **Ni marcador ni aviso dependen del copy** (decisión 17): los asserts van sobre `data-testid`,
+  `role` y `data-count`.
+- **La lista NO lleva marca** (R10 ampliado). El motivo es de coste y está en §13.L.
+- **Nada de esto altera el payload**: la línea viaja intacta (R21, R22). `buildRecipePayload` **no
+  conoce** `productUnavailable`; es un dato de presentación derivado de `productName === null`.
 
 ## 7. Pasos, arrastre y teclado (R32-R34)
 
@@ -336,6 +359,16 @@ ports/unit-repository.ts interface UnitRepository { listAll(limit: number): Prom
 adapters/driven/persistence/unit-prisma.ts   listUnits(limit) -> prisma.unit.findMany({ orderBy: { name: 'asc' }, take: limit })
 adapters/driving/unit-actions.ts             'use server'; listUnitsAction(): Promise<UnitListResult>
 ```
+
+**Quién puede invocarla: solo Administrador — CONFIRMADO por el humano el 2026-09-03** (fila 20 de
+las decisiones cerradas, pregunta 4). El motivo es técnico y conviene que quede escrito aquí porque
+es lo que decide **dónde** va la comprobación: **una Server Action es un endpoint invocable
+directamente**, con su id en el bundle, aunque la regla ruta→rol proteja la pantalla que la usa. Un
+no-Administrador nunca vería `/produccion/formulas`, pero **sí podría llamar a `listUnitsAction`**
+si el rol solo se comprobara en la ruta. Por eso el corte vive **en la operación** (R41) y la regla
+ruta→rol es adicional, exactamente el criterio que QC-9 R29 dejó escrito. Ensanchar después es
+barato; una fuga no se deshace: si QC-38 o una pantalla de Operador necesitan leer unidades con otro
+rol, lo decide esa ficha y R41 se relaja entonces.
 
 - **El actor entra por parámetro (R41).** `listUnitsAction` lo resuelve con
   `identity.getSessionUser()` vía `@/lib/composition`, exactamente como `recipe-actions.ts`, y el
@@ -488,6 +521,23 @@ módulo de navegación.
 **K — Traer también el CRUD de unidades «ya que estamos».** El formulario lo agradecería el día que
 falte una unidad. **Descartada por decisión humana**: es **QC-38**. Aquí entra solo la lectura, y
 el catálogo ya viene sembrado por la migración de QC-32, así que ninguna pantalla queda muerta.
+
+**L — Marcar también en la lista la receta que tiene líneas con el producto dado de baja.** Sería
+coherente: el usuario vería en el catálogo cuáles necesitan atención sin abrir cada una.
+**Descartada el 2026-09-03, y por un coste concreto, no por gusto:** `RecipeSummary` **no trae las
+líneas** —es una decisión propia de QC-25, que está `done` y mergeada—, así que la marca solo tendría
+dos caminos y los dos son peores que no tenerla:
+
+1. **Añadir un campo al listado del backend** (p. ej. `unavailableLineCount`): abre
+   `lib/modules/recetas/**`, que R44 prohíbe expresamente y que es feature ajena ya cerrada.
+2. **Pedir el detalle de cada fila**: hasta **25 invocaciones de `getRecipeAction` por página**, que
+   es literalmente lo que **R10 prohíbe** y el peor patrón de rendimiento que esta pantalla podía
+   adoptar.
+
+Por eso la señal vive **solo en el formulario** (§6.1), que además es **donde el usuario puede
+actuar**: en la lista sería una alarma sin remedio a mano. Si algún día el campo entra en el listado,
+es ficha de backend y esta decisión se revisa entonces; hoy R10 la prohíbe explícitamente para que
+nadie la cuele por consultas por fila sin que nada se ponga rojo.
 
 ## 14. Riesgos y cómo se mitigan
 

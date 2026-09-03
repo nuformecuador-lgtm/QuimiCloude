@@ -159,7 +159,9 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `recipe-table-skeleton.tsx`, `recipe-list-empty.tsx`, `recipe-list-error.tsx`, barrel.
 - **Qué** (`design.md > 4.3`): columnas como datos (`key`, `label`, `testId`), **sin** `id`,
   `createdBy` ni `updatedBy` (R9); imagen pintada con `imageUrl` **tal cual** y marcador cuando es
-  `null` (R18); envoltorio con `overflow-x-auto` **en la tabla** (R19); esqueleto con tantas filas
+  `null` (R18); **ninguna marca ni aviso de líneas con producto de baja** —esa señal es solo del
+  formulario y la lista no tiene de dónde sacarla sin romper R10 (`design.md > 13.L`)—; envoltorio
+  con `overflow-x-auto` **en la tabla** (R19); esqueleto con tantas filas
   como `pageSize` (R16); vacío con acción de crear (R15); error con mensaje, `code` y reintento
   (R17).
 - **Hecho cuando**: typecheck y lint limpios; `grep` no encuentra `100vh`, ni ninguna variable de
@@ -221,10 +223,29 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Depende de**: T13, T14, T15. **Archivos**: `recipe-lines-field.tsx`, barrel.
 - **Qué**: añadir y quitar líneas; receta sin líneas permitida (R27); cantidad `type="text"` con
   `inputMode="decimal"`, **nunca `type="number"`** (R29); error por línea con `aria-invalid` +
-  `aria-describedby` a partir de `error.issues[].path` del esquema del contrato (R31); la línea
-  cuyo producto está de baja se conserva y se marca con `data-testid` (R21, pregunta abierta 5).
+  `aria-describedby` a partir de `error.issues[].path` del esquema del contrato (R31).
+- **Producto dado de baja** (`design.md > 6.1`, decisión cerrada del 2026-09-03): la línea cuyo
+  `productName` es `null` se conserva y se reenvía intacta (R21), se marca en **su** celda con
+  `data-testid="recipe-line-unavailable-<índice>"` (R53), y el bloque de líneas cierra con un aviso
+  `role="status"`, `data-testid="recipe-lines-unavailable-notice"` y `data-count` con el número de
+  líneas afectadas, **calculado en cada render** a partir de la lista (R54). Con cero afectadas el
+  aviso **no se monta**.
 - **Hecho cuando**: typecheck y lint limpios; `grep` no encuentra `type="number"`, `parseFloat(`,
-  `Number(` ni `toFixed(` sobre la cantidad.
+  `Number(` ni `toFixed(` sobre la cantidad; el número del aviso sale de la lista de líneas y no de
+  ningún booleano guardado al cargar.
+
+### [ ] T16b — [P] Tests del marcador y del aviso de líneas con producto de baja
+- **Depende de**: T16. **Archivos**: `tests/unit/recetas-ui/recipe-lines-unavailable.test.tsx`.
+- **Qué** (`design.md > 6.1`): (a) con **cero** líneas de baja el aviso **no existe** en el DOM y
+  ninguna celda lleva marcador; (b) con **dos**, existen los dos marcadores —y solo en esas dos
+  líneas—, el aviso existe y su `data-count` es `2`; (c) tras quitar una con `user-event` el
+  `data-count` pasa a `1`; (d) tras quitar la última el aviso **desaparece**; (e) el payload enviado
+  sigue conteniendo la línea marcada, intacta (R21 y R22 no se rompen). Asserts sobre `data-testid`,
+  `role` y `data-count`, **nunca** sobre el copy.
+- **Criterio de honestidad**: borrar el filtro que cuenta, el marcador o el desmontaje del aviso
+  **debe** poner este test en rojo. Un test que solo comprobase «aparece algo» seguiría verde con el
+  número mentiroso.
+- **Hecho cuando**: cubre R53 y R54 y sale en verde.
 
 ### [ ] T17 — Campo de pasos con arrastre y equivalente por teclado
 - **Depende de**: T2, T13. **Archivos**: `recipe-steps-field.tsx`, barrel.
@@ -290,7 +311,8 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `tests/unit/dashboard-route-contract.test.ts`): las tres rutas derivadas de `FORMULAS_ROUTE`; sin
   literales de ruta; sin `fetch(`; sin `@/lib/composition` ni `prisma` en cliente; imports por
   barrel; sin `100vh`; `@dnd-kit` **sólo** en `recipe-steps-field.tsx`; sin `type="number"` en la
-  cantidad; sin `createdBy`/`updatedBy` en las columnas; sin búsqueda ni orden; sin `<Toaster />`
+  cantidad; sin `createdBy`/`updatedBy` en las columnas; **el `data-testid` del marcador de producto
+  de baja no aparece en ningún archivo de la lista** (R10 ampliado); sin búsqueda ni orden; sin `<Toaster />`
   propio; sin operaciones de creación, edición o borrado de unidades; sin cambios en
   `lib/modules/recetas/**` ni en `db/`.
 - **Hecho cuando**: cubre R3, R7, R9, R10, R14, R18, R22, R25, R28, R29, R43, R44, R45, R46, R47,
@@ -335,10 +357,10 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   de escritorio**: se arregla o se para y se reporta.
 
 ### [ ] T26 — Mapa de trazabilidad `R<n> → test`
-- **Depende de**: T7, T20, T21, T22, T23, T24, T25.
+- **Depende de**: T7, T16b, T20, T21, T22, T23, T24, T25.
 - **Qué**: volcar la tabla de abajo, ya con los nombres reales de los tests, en
   `progress/impl_QC-26-pantalla-de-recetas.md`, junto a los archivos tocados y la salida real.
-- **Hecho cuando**: **los 52 requisitos (R1-R52)** tienen al menos un test nombrado. Un hueco es
+- **Hecho cuando**: **los 54 requisitos (R1-R54)** tienen al menos un test nombrado. Un hueco es
   hallazgo bloqueante del reviewer.
 
 ### [ ] T27 — [P] Declarar los «no aplica» de `CHECKPOINTS.md`
@@ -368,7 +390,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 | R7 | `la pantalla no repite requireAdmin` + `un error unauthorized se presenta y no se muestran datos` | recipe-route-contract.test.ts + recipe-page.test.tsx |
 | R8 | `la lista presenta todas las columnas de negocio declaradas` | recipe-page.test.tsx |
 | R9 | `la lista no muestra id, createdBy ni updatedBy` (**en negativo**) | recipe-page.test.tsx + recipe-route-contract.test.ts |
-| R10 | `pintar una pagina invoca la operacion de listado una sola vez y nunca la de detalle` (**en negativo**) | recipe-page.test.tsx |
+| R10 | `pintar una pagina invoca la operacion de listado una sola vez y nunca la de detalle` + `la lista no pinta ninguna marca de linea con producto de baja` (**los dos en negativo**) | recipe-page.test.tsx |
 | R11 | `el selector de tamano ofrece 10 y 25 y usa 10 por defecto` | recipe-page.test.tsx + recipe-list-params.test.ts |
 | R12 | `permite avanzar y retroceder e indica pagina actual y total` | recipe-page.test.tsx |
 | R13 | `los parametros invalidos o fuera de rango se acotan` | recipe-list-params.test.ts |
@@ -411,9 +433,11 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 | R50 | `las tres pantallas son usables en viewport angosto y ancho` + `sin 100vh, sin hover como unica via, tamanos tactiles y de fuente` | recipe-page.test.tsx + recipe-form.test.tsx + recipe-route-contract.test.ts |
 | R51 | `la feature no duplica layout, sidebar, avisos ni primitivas: solo edita los archivos heredados autorizados` | recipe-route-contract.test.ts |
 | R52 | `alta completa de una receta y rechazo de un no Administrador` | recetas.spec.ts |
+| R53 | `solo la linea con productName nulo lleva el marcador de producto no disponible` | recipe-lines-unavailable.test.tsx |
+| R54 | `sin lineas de baja no hay aviso; con dos el aviso cuenta dos; al quitar una cuenta una; al quitar la ultima desaparece` | recipe-lines-unavailable.test.tsx |
 
-Ningún requisito queda huérfano: R1-R52, sin saltos. **R9, R10, R14, R18, R20, R22, R25, R28, R29,
-R36, R44 y R51 son tests en negativo a propósito**: mostrar el autor, pedir el detalle por fila,
+Ningún requisito queda huérfano: R1-R54, sin saltos. **R9, R10, R14, R18, R20, R22, R25, R28, R29,
+R36, R44, R51 y R54 (su caso de cero) son tests en negativo a propósito**: mostrar el autor, pedir el detalle por fila,
 colar un buscador que miente, componer la URL de la imagen a mano, volver al panel lateral, montar
 un segundo `<Toaster />`, convertir la cantidad a número o colar el CRUD de unidades son justo las
 cosas que una feature posterior puede añadir sin que nada se ponga rojo.
@@ -421,7 +445,8 @@ cosas que una feature posterior puede añadir sin que nada se ponga rojo.
 ## Cobertura de las decisiones cerradas
 
 La tabla completa está en `requirements.md > Cobertura de las decisiones cerradas`: cada una de las
-19 filas tiene al menos un `R<n>`, y cada `R<n>` tiene al menos un test en el mapa de arriba.
+21 filas —incluidas las dos que el humano cerró en F1.4— tiene al menos un `R<n>`, y cada `R<n>`
+tiene al menos un test en el mapa de arriba.
 
 ## Checklist de `CHECKPOINTS.md`: qué «no aplica» (declararlo, no omitirlo)
 
@@ -447,10 +472,12 @@ La tabla completa está en `requirements.md > Cobertura de las decisiones cerrad
   la salida a `@atlaskit/pragmatic-drag-and-drop` sea barata.
 - **Sigue sin haber búsqueda** ni en recetas ni en productos (pregunta abierta 2): es la misma deuda
   que dejó QC-22 y **sigue sin ficha**.
-- **Quién puede leer el catálogo de unidades** (pregunta abierta 4): R41 lo cierra por el lado
-  seguro (solo Administrador). Si QC-38 necesita otro rol, lo relaja esa ficha.
-- **Qué se enseña en la celda del producto dado de baja** (pregunta abierta 5): queda un marcador
-  con `data-testid`, para que responderla sea cambiar una cadena.
+- **Quién puede leer el catálogo de unidades** (pregunta 4): **cerrada el 2026-09-03**, solo
+  Administrador (R41, `design.md > 9`). Si QC-38 necesita otro rol, lo relaja esa ficha.
+- **Marcar en la lista las recetas con producto de baja** (pregunta 5): **descartado** por coste
+  —exigiría un campo nuevo en el listado de QC-25, `done`, o 25 consultas de detalle por página, que
+  rompen R10 (`design.md > 13.L`)—. Si algún día el listado trae ese campo, es ficha de backend y la
+  decisión se revisa; hoy R10 lo prohíbe explícitamente.
 - **`revalidatePath` en las actions de `recetas`** sería más barato que `router.refresh()` si más
   pantallas repiten el patrón. Es ficha de backend (`design.md > 13.I`).
 - **El ítem «Fórmulas» del sidebar pasa a «Recetas»** y deja de dar 404; la pregunta abierta 1 deja
