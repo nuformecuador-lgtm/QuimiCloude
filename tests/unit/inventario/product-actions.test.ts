@@ -70,7 +70,11 @@ const VALID_PRODUCT_FIELDS = {
   minPurchase: '1',
   deliveryTime: '3',
   qtyAlert: '2',
-  unit: 'litro',
+  // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El formulario ya no
+  // envia `unit: 'litro'` (texto libre) sino `unitId`, el identificador de la unidad elegida
+  // del catalogo. Cambia el NOMBRE y la FORMA del campo del `FormData`, no lo que este
+  // fixture representa: un alta valida con todos los campos rellenos.
+  unitId: '22222222-2222-4222-8222-222222222222',
 };
 
 beforeEach(() => {
@@ -166,7 +170,16 @@ describe('updateProductAction', () => {
 
     expect(updateProductMock).toHaveBeenCalledWith(
       'product-1',
-      expect.objectContaining({ name: 'Bidon 20 L', stock: 10, minPurchase: 1 }),
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se anade `unitId`
+      // a la asercion para que el campo nuevo SIGA MORDIENDO: la Server Action tiene que
+      // leerlo del `FormData` con su nombre nuevo y pasarlo al caso de uso tal cual, sin
+      // interpretarlo (la unidad sigue siendo anotativa, QC-32 R14).
+      expect.objectContaining({
+        name: 'Bidon 20 L',
+        stock: 10,
+        minPurchase: 1,
+        unitId: '22222222-2222-4222-8222-222222222222',
+      }),
       { id: 'user-admin-1', roleName: 'Administrador' },
     );
   });

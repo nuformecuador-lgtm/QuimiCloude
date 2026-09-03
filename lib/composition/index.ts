@@ -148,3 +148,7 @@ export const inventario = {
   deletePresentation: createDeletePresentation({ presentations: presentationRepository }),
   listPresentations: createListPresentations({ presentations: presentationRepository }),
 } as const;
+
+// El modulo `unidades` (QC-32) NO cablea nada aqui: su catalogo lo siembra su propia migracion
+// y el `UnitCatalog` que publica su contrato lo implementa y cablea QC-38, cuando haya
+// consumidor.

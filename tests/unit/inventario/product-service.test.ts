@@ -33,7 +33,12 @@ const VISTA_PRODUCTO: ProductView = {
   minPurchase: 0,
   deliveryTime: null,
   qtyAlert: null,
-  unit: null,
+  // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
+  // este fixture decia -un producto SIN unidad declarada, que sigue siendo valido porque la
+  // unidad del producto sigue siendo OPCIONAL (QC-14 R5, QC-32 R10)-; solo cambia el campo
+  // que lo expresa: `unit: null` (texto ausente) pasa a `unitId: null` (sin referencia al
+  // catalogo).
+  unitId: null,
   createdAt: AHORA,
   updatedAt: AHORA,
   createdBy: 'admin-1',

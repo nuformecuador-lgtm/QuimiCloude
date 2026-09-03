@@ -144,6 +144,19 @@ model Presentation {
 /// Son anulables a proposito: `products` ya tenia filas cuando se anadieron estas columnas
 /// y no existe un «usuario del sistema» al que apuntar en el backfill. La garantia de R6 —
 /// todo alta y toda edicion registran al actor— es del service, no del esquema.
+///
+/// OJO 2 — `unitId` (QC-32, decision cerrada 13, R10, R18) es ese mismo criterio aplicado a
+/// la frontera con el modulo `unidades`: es un campo ESCALAR uuid SIN `@relation`, y es
+/// deliberado. La FK real (`products_unit_id_fkey`, ON DELETE RESTRICT ON UPDATE CASCADE)
+/// vive escrita A MANO en el SQL de la migracion `<ts>_units_catalog`
+/// (`specs/QC-32-modelo-unidades/design.md` secciones 4.3 y 8.1). Si llevara `@relation`,
+/// Prisma ofreceria `include: { unit: true }`: una lectura de la tabla de `unidades` desde
+/// `inventario` que NINGUNA guardia detecta, porque no es un import ni un `prisma.unit`.
+/// Ademas obligaria a declarar `products Product[]` dentro de `Unit`, que es de otro modulo.
+/// Lo que `inventario` sepa de una unidad llega por `@/lib/modules/unidades`. Es por tanto
+/// DRIFT para Prisma, igual que las dos FK de auditoria: toda migracion futura de `products`
+/// hay que revisarla a mano para que no la borre. Antes de QC-32 esto era `unit String?`,
+/// texto libre; ahora es una referencia al catalogo, OPCIONAL (decision cerrada 7, R10).
 /// @module inventario
 model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -154,7 +167,7 @@ model Product {
   minPurchase    Int       @default(0) @map("min_purchase")
   deliveryTime   Int?      @map("delivery_time")
   qtyAlert       Int?      @map("qty_alert")
-  unit           String?
+  unitId         String?   @map("unit_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -164,6 +177,7 @@ model Product {
   presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([presentationId], map: "products_presentation_id_idx")
+  @@index([unitId], map: "products_unit_id_idx")
   @@map("products")
 }
 
@@ -211,13 +225,25 @@ model Recipe {
 /// (decision cerrada 3 aplicada a la frontera con `inventario`, R19). La FK esta escrita a
 /// mano en `migration.sql`. Lo que `recetas` sabe del producto llega por el contrato publico
 /// `@/lib/modules/inventario`, nunca por un `include` ni por `prisma.product`.
+///
+/// OJO 2 — `unitId` (QC-32, decision cerrada 13, R11, R18) es exactamente lo mismo en la
+/// frontera con el modulo `unidades`: campo ESCALAR uuid SIN `@relation`, con la FK real
+/// (`recipe_lines_unit_id_fkey`, ON DELETE RESTRICT ON UPDATE CASCADE) escrita A MANO en el
+/// SQL de la migracion `<ts>_units_catalog` (`specs/QC-32-modelo-unidades/design.md`
+/// secciones 4.3 y 8.1). Con `@relation`, Prisma habilitaria `include: { unit: true }` desde
+/// `recetas` —un cruce de frontera que la guardia de modulos NO ve, porque no es un import—
+/// y obligaria a declarar `lines RecipeLine[]` dentro de `Unit`, que es de otro modulo. Es
+/// DRIFT para Prisma: toda migracion futura de `recipe_lines` hay que revisarla a mano para
+/// que no borre esa FK. Antes de QC-32 esto era `unit String`, texto libre; ahora es una
+/// referencia al catalogo, OBLIGATORIA (decision cerrada 8, R11) y sigue siendo ANOTATIVA:
+/// no hay conversion entre unidades y la linea no hereda la del producto (R14).
 /// @module recetas
 model RecipeLine {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId  String   @map("recipe_id") @db.Uuid
   productId String   @map("product_id") @db.Uuid
   quantity  Decimal  @db.Decimal(14, 4)
-  unit      String
+  unitId    String   @map("unit_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -225,5 +251,33 @@ model RecipeLine {
 
   @@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")
   @@index([productId], map: "recipe_lines_product_id_idx")
+  @@index([unitId], map: "recipe_lines_unit_id_idx")
   @@map("recipe_lines")
+}
+
+/// Catalogo de unidades de medida (QC-32). Modulo propio `unidades`: `inventario`,
+/// `recetas` y lo que venga lo consumen por su contrato publico `@/lib/modules/unidades`,
+/// nunca por esta tabla.
+///
+/// NO lleva `deletedAt` a proposito (decision cerrada 11, R8), igual que `Role` y
+/// `Presentation`: el borrado logico es un UPDATE y una FK no puede bloquear un UPDATE, asi
+/// que la columna neutralizaria en silencio la unica garantia real de R13.
+///
+/// `nameNormalized` la calcula el dominio de `unidades` (`normalizeUnitName`, funcion pura) y
+/// se persiste junto a `name` en toda escritura. El `@@unique` es la UNICA garantia de la
+/// unicidad (R5): no hay comprobacion previa por igualdad -- seria una carrera.
+///
+/// `symbol` NO tiene indice unico y es deliberado (R7, pregunta abierta 1): la identidad de la
+/// unidad es su nombre.
+/// @module unidades
+model Unit {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  nameNormalized String   @map("name_normalized")
+  symbol         String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([nameNormalized], map: "units_name_normalized_key")
+  @@map("units")
 }
