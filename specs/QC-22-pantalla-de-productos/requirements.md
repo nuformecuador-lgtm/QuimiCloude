@@ -196,6 +196,15 @@ público de `inventario` ya exporta, sin ninguna dependencia nueva—. **Lo apru
 aprobar el spec (F1.4).** Mientras no haya respuesta, el diseño asume la alternativa sin
 dependencias, que es la que cumple R29 sin abrir la puerta 7.
 
+**RESUELTA el 2026-09-03 al aprobar el spec (F1.4): NO entra la dependencia.** El humano
+aprobó el spec tal como estaba presentado, y el diseño presentado es el de la alternativa sin
+dependencias. `react-hook-form` y `@hookform/resolvers` **no se instalan**, `shadcn add form`
+**no se corre**, y `docs/dependencias.md` **no cambia**: no hay fila que añadir porque no hay
+dependencia nueva. Si al implementar el patrón `<form action>` + `useActionState` resultara
+insuficiente para algún requisito, el `frontend_dev` **para y lo reporta al leader**; no instala
+nada por su cuenta (regla 7 de `CLAUDE.md`, y `tests/guards/guard-dependencias-aprobadas.test.ts`
+lo pondría en rojo igualmente).
+
 Si durante la implementación aparece cualquier otra ambigüedad, el `frontend_dev` **para y la
 reporta al leader**; no la rellena con supuestos.
 
