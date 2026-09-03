@@ -31,7 +31,7 @@
 | `lib/modules/unidades/domain/unit-name.ts` | **Nuevo**: `normalizeUnitName`, la única definición de la normalización (R4). |
 | `lib/modules/unidades/domain/unit-catalog.ts` | **Nuevo**: `UnitId`, `UnitRef`, `UnitCatalog` — la costura hacia los demás módulos (§ 5.2). |
 | `lib/modules/unidades/domain/starter-units.ts` | **Nuevo**: `STARTER_UNITS`, el conjunto arrancador como dato del dominio (§ 6). |
-| `lib/modules/unidades/ports/.gitkeep`, `adapters/driven/.gitkeep`, `adapters/driving/.gitkeep` | **Nuevos**: carpetas vacías del armazón, igual que QC-24 con `recetas`. |
+| `lib/modules/unidades/adapters/driving/.gitkeep` | **Nuevo**: la única carpeta del armazón que nace vacía (la llena QC-38), igual que QC-24 con `recetas`. `ports/` y `adapters/driven/` **no** llevan `.gitkeep`: nacen con archivo real (§ 5.1). |
 | `lib/modules/unidades/domain/seed-units.ts` | **Nuevo**: caso de uso del seed arrancador (§ 6.2). |
 | `lib/modules/unidades/ports/unit-seed-repository.ts` | **Nuevo**: el puerto que ese caso de uso necesita. |
 | `lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts` | **Nuevo**: su implementación con Prisma. Es el **único** sitio del repo con `prisma.unit`. |

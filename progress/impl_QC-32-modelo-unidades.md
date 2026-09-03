@@ -292,7 +292,7 @@ Los tres archivos de integracion de esta ficha y los ajenos, dentro de esa corri
 ✓ |integration| tests/integration/inventario/product-crud.int.test.ts       (7 tests)
 ```
 
-**El flake conocido de `dev` no aparecio.** `tests/unit/login-form.test.tsx` paso dentro de la
+**El flake conocido de `dev` no aparecio.** `tests/ui/login-form-uncontrolled-warning.test.tsx` paso dentro de la
 suite completa (25 tests, 7.7 s). No se toco nada suyo.
 
 ---
@@ -377,6 +377,8 @@ Ninguna decision cerrada se reabrio. Ninguna pregunta abierta se cerro por cuent
    cableado de `lib/composition` existe. La alternativa limpia seria exportar tambien una fabrica
    que reciba el cliente; **no se hizo porque el design no la pide** (regla 6), y el cableado real
    si queda verificado de punta a punta por las dos corridas de `pnpm run db:seed` de T10.
+   **SUPERADA por la ronda 2** (ver mas abajo): el reviewer demostro que esa copia dejaba a R25
+   y R26 sin vigilancia sobre el codigo que de verdad corre, y la fabrica se implemento.
 
 ## Veredicto
 
@@ -386,3 +388,80 @@ ejecutado, y **R22, R23 y R24 cerrados contra Postgres real**, no solo contra el
 Ningun test ajeno aflojado; dos ganaron cobertura y uno muerde mas que antes.
 
 **No me autoapruebo: lo decide el reviewer.**
+
+---
+
+## Ronda 2 — cierre de MAYOR-1 de `progress/review_QC-32-modelo-unidades.md`
+
+**El hallazgo.** El adaptador driven se exportaba solo ya construido sobre el cliente Prisma
+compartido, asi que el test de integracion no podia usarlo dentro de una transaccion y **escribia
+una copia** del adaptador (`createUnitSeedRepositoryOn`) y probaba la copia. Con eso, vaciar el
+adaptador real o quitar la llamada de `scripts/seed.ts` dejaba la suite entera verde: R25 y R26
+estaban mapeados a tests que no vigilaban el codigo de produccion.
+
+### Produccion
+
+- `lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts` — ahora exporta
+  la **fabrica** `createUnitSeedRepository(db: PrismaClient | Prisma.TransactionClient)` con la
+  logica real, y **conserva** `unitSeedRepositoryPrisma = createUnitSeedRepository(prisma)`, que es
+  lo que sigue importando `lib/composition/index.ts` (su firma **no cambia**). Mismo patron que
+  `createInitialAccessRepository` de `identity` (QC-6). Comportamiento identico: sin `upsert`, sin
+  `update`, sin `catch` de `P2002`. El docstring que decia «se exporta el objeto ya construido —y no
+  una fabrica— porque…» se reescribio: ahora explica el motivo real de la fabrica, que es que el
+  test de integracion pueda ejercitar **el adaptador de produccion** dentro de una transaccion con
+  ROLLBACK.
+- `db/migrations/20260903121404_units_catalog/down.sql` — **solo un comentario** (menor-1): queda
+  anotado como limite conocido que el DOWN devuelve las dos columnas `unit` **al final de la
+  tabla** y no a su posicion ordinal original. El SQL no se toco.
+
+### Tests
+
+- `tests/integration/unidades/unidades-seed.int.test.ts` — **borrada** la copia del adaptador; los
+  dos casos usan `createUnitSeedRepository(tx)`, el de produccion. Cabecera reescrita. El caso del
+  cableado (`typeof unidades.seedStarterUnits === 'function'`) se conserva pero ya no es lo unico
+  que vigila el cableado.
+- `tests/unit/unidades/seed-wiring.test.ts` — **nuevo**. Lee `scripts/seed.ts` y
+  `lib/composition/index.ts` como TEXTO, al estilo de `tests/unit/identity/seed/deploy-hook.test.ts`:
+  el script importa la fachada de composicion **e invoca** `unidades.seedStarterUnits()`, y la
+  composicion ata `createSeedStarterUnits` al adaptador driven real. Los tres predicados
+  (`importaLaComposicion`, `invocaElSeedDeUnidades`, `cableaElAdaptadorDriven`) son **funciones
+  puras exportadas** y cada uno se demuestra con fuentes sinteticos que lo violan y que no.
+- `tests/unit/unidades/module-contract.test.ts` — el criterio se **acoto, no se aflojo**: al pasar a
+  fabrica, el adaptador consulta sobre su parametro (`db.unit.findMany`) y el patron literal
+  `prisma.unit` habria dejado de casar. `consultaTablaDeUnidades` cuenta ahora **dos** formas —
+  `prisma.unit…` y `<cualquier receptor>.unit.<metodo de Prisma>(` — asi que es **estrictamente mas
+  fuerte** que antes: todo lo que detectaba sigue detectandolo, y ademas detecta la consulta escrita
+  sobre otro receptor. Sigue siendo una **igualdad exacta** (`toEqual`) sobre la lista de archivos
+  que consultan la tabla, nunca un `toContain`. El acceso a un campo del dominio
+  (`candidate.unit.name`, que existe hoy en `seed-units.ts`) **no** cuenta, porque no lleva metodo
+  de Prisma detras, y hay casos sinteticos para las dos cosas. La asercion de que el adaptador la
+  consulta de verdad pasa a exigir **findMany Y create** sin fijar el nombre del receptor.
+
+### Las cuatro mutaciones del hallazgo, ahora en ROJO (mutadas en disco, corridas y revertidas)
+
+| Mutacion sobre produccion | Test que se pone rojo | Mensaje |
+| --- | --- | --- |
+| `findExistingNormalizedNames` devuelve siempre `[]` | `unidades-seed.int.test.ts` · «una segunda corrida no crea nada…» | `PrismaClientKnownRequestError: Unique constraint failed on the fields: (name_normalized)` |
+| `createUnit` escribe el nombre normalizado como nombre y descarta el simbolo | `unidades-seed.int.test.ts` · «db:seed deja las cinco unidades…» | `toEqual` de las cinco filas: `- "symbol": "g"` / `+ "symbol": null` |
+| `scripts/seed.ts` deja de invocar `unidades.seedStarterUnits()` | `tests/unit/unidades/seed-wiring.test.ts` · «invoca unidades.seedStarterUnits()» | «scripts/seed.ts ya no invoca `unidades.seedStarterUnits()`… (R25)» |
+| `createUnit` escribe `''` en vez de `null` cuando no hay simbolo (R3) | `unidades-seed.int.test.ts` · «db:seed deja las cinco unidades…» | `- "symbol": null` / `+ "symbol": ""` |
+
+Y dos mas, para demostrar que `module-contract.test.ts` no quedo aflojado: anadir
+`db.unit.findMany({})` en `lib/composition/index.ts` lo pone rojo (`+ "lib/composition/index.ts"` en
+la igualdad exacta), y vaciar la lectura del adaptador tambien («el adaptador driven ya no lee la
+tabla de unidades»). Las seis mutaciones se revirtieron; `git status --porcelain` no deja ninguna.
+
+### Gate de esta tanda (el completo lo corre el leader)
+
+- `pnpm run typecheck` — limpio.
+- `pnpm run lint` — limpio.
+- `pnpm exec vitest run tests/integration/unidades/ tests/unit/unidades/` — **8 archivos, 73 tests,
+  todo verde** (la integracion corre contra la base local real, migracion ya aplicada).
+- `pnpm exec vitest run guard` — **12 archivos, 123 tests, todo verde**.
+
+### Menores cerrados en esta ronda
+
+menor-1 (comentario en `down.sql`), menor-3 (el flake conocido de `dev` es
+`tests/ui/login-form-uncontrolled-warning.test.tsx`, corregido arriba) y menor-4 (la fila de
+`.gitkeep` de la tabla de `design.md > 1`, alineada con la § 5.1). **menor-2 y menor-5 no se tocan**:
+son anotaciones, no defectos.

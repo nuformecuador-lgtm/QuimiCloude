@@ -95,14 +95,34 @@ export function leerFuente(texto: string): string {
     .join('\n')
 }
 
+/** Los metodos con los que Prisma consulta una tabla. Lista cerrada a proposito: es lo que
+ *  distingue `db.unit.findMany(...)` —una consulta— de `candidate.unit.name`, que es un
+ *  campo del dominio y existe hoy en `lib/modules/unidades/domain/seed-units.ts`. */
+const METODOS_DE_PRISMA =
+  'findMany|findFirst|findFirstOrThrow|findUnique|findUniqueOrThrow|create|createMany|createManyAndReturn|update|updateMany|upsert|delete|deleteMany|count|aggregate|groupBy'
+
 /**
- * ¿Este fuente CONSULTA la tabla de unidades? Se exige `prisma.unit` como acceso real, no
- * como texto: comentarios fuera (ver `leerFuente`) y sin confundirlo con un modelo distinto
- * cuyo nombre EMPIECE por `unit` —`prisma.units`, `prisma.unitConversion`—, que serian otra
- * cosa y no deben contar como cumplimiento de R16.
+ * ¿Este fuente CONSULTA la tabla de unidades? Dos formas cuentan, y las dos son acceso real
+ * al delegado, no texto: comentarios fuera (ver `leerFuente`).
+ *
+ * 1. `prisma.unit...` — el cliente compartido, sobre cualquier receptor llamado `prisma`.
+ * 2. `<lo que sea>.unit.<metodo de Prisma>(...)` — el delegado sobre un receptor con otro
+ *    nombre. Hace falta desde que el adaptador driven se exporta como FABRICA y escribe sus
+ *    consultas sobre su parametro (`db.unit.findMany`): sin esta segunda forma, R16 podria
+ *    incumplirse en cualquier archivo con solo renombrar el receptor, y el barrido de abajo
+ *    quedaria verde por vacio.
+ *
+ * NO cuenta un modelo distinto cuyo nombre EMPIECE por `unit` —`prisma.units`,
+ * `prisma.unitConversion`—: serian otra tabla. Ni el acceso a un campo `unit` de un objeto
+ * del dominio, que no lleva metodo de Prisma detras.
  */
 export function consultaTablaDeUnidades(texto: string): boolean {
-  return /\bprisma\s*\.\s*unit(?![A-Za-z0-9_])/.test(leerFuente(texto))
+  const codigo = leerFuente(texto)
+  const clienteCompartido = /\bprisma\s*\.\s*unit(?![A-Za-z0-9_])/
+  const delegadoSobreOtroReceptor = new RegExp(
+    `[A-Za-z0-9_$]\\s*\\.\\s*unit\\s*\\.\\s*(?:${METODOS_DE_PRISMA})\\s*[(<]`,
+  )
+  return clienteCompartido.test(codigo) || delegadoSobreOtroReceptor.test(codigo)
 }
 
 /** Especificadores de import/reexport de un fuente (`from '...'` y `import '...'`). */
@@ -224,9 +244,17 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       'lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma.ts',
     ])
 
-    // Y ese archivo la consulta de verdad: si el unico sitio permitido dejara de usarla, la
-    // asercion de arriba seguiria verde por vacio.
-    expect(read(adaptadorDriven)).toMatch(/prisma\.unit\.(findMany|create)/)
+    // Y ese archivo la consulta de verdad, con las DOS operaciones que el puerto pide: si el
+    // unico sitio permitido se vaciara, la asercion de arriba seguiria verde por vacio. Se
+    // escribe sin fijar el nombre del receptor porque el adaptador es una fabrica y consulta
+    // sobre su parametro (`db.unit.findMany`), no sobre el cliente compartido.
+    const adaptador = read(adaptadorDriven)
+    expect(adaptador, 'el adaptador driven ya no lee la tabla de unidades').toMatch(
+      /[A-Za-z0-9_$]\s*\.\s*unit\s*\.\s*findMany\s*\(/,
+    )
+    expect(adaptador, 'el adaptador driven ya no escribe en la tabla de unidades').toMatch(
+      /[A-Za-z0-9_$]\s*\.\s*unit\s*\.\s*create\s*\(/,
+    )
   })
 
   it('el criterio de «consulta prisma.unit» distingue codigo de comentario, y cae ante una consulta real', () => {
@@ -236,6 +264,12 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(consultaTablaDeUnidades('await prisma.unit.findMany({})')).toBe(true)
     expect(consultaTablaDeUnidades('const a = prisma . unit . create({})')).toBe(true)
     expect(consultaTablaDeUnidades('return tx.prisma.unit.count()')).toBe(true)
+    // El delegado sobre un receptor con OTRO nombre: es como consulta hoy el adaptador, y es
+    // tambien como se escaparia una consulta prohibida en otro archivo.
+    expect(consultaTablaDeUnidades('await db.unit.findMany({})')).toBe(true)
+    expect(consultaTablaDeUnidades('await tx.unit.create({ data })')).toBe(true)
+    expect(consultaTablaDeUnidades('await cliente . unit . deleteMany({})')).toBe(true)
+    expect(consultaTablaDeUnidades('await this.db.unit.upsert({})')).toBe(true)
 
     // Negativos: los dos tipos de comentario que EXISTEN hoy en el repo con ese texto.
     expect(consultaTablaDeUnidades('// el unico sitio con `prisma.unit` es el adaptador')).toBe(
@@ -245,6 +279,11 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     // Y un modelo distinto cuyo nombre empieza igual: no es la tabla `units`.
     expect(consultaTablaDeUnidades('await prisma.units.findMany({})')).toBe(false)
     expect(consultaTablaDeUnidades('await prisma.unitConversion.findMany({})')).toBe(false)
+    // Y un campo `unit` de un objeto del dominio, que no es un delegado de Prisma. Este caso
+    // EXISTE hoy en `lib/modules/unidades/domain/seed-units.ts` (`candidate.unit.name`): si
+    // el predicado lo contara, el barrido de arriba seria rojo por algo que no es R16.
+    expect(consultaTablaDeUnidades('createdUnits.push(candidate.unit.name)')).toBe(false)
+    expect(consultaTablaDeUnidades('const s = candidate.unit.symbol')).toBe(false)
   })
 
   it('inventario y recetas importan unidades solo por el barrel', () => {

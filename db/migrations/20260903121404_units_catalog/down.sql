@@ -42,6 +42,14 @@ DROP INDEX "recipe_lines_unit_id_idx";
 DROP INDEX "products_unit_id_idx";
 ALTER TABLE "recipe_lines" DROP COLUMN "unit_id";
 ALTER TABLE "products"     DROP COLUMN "unit_id";
+-- LIMITE CONOCIDO (R23): estos dos ADD COLUMN devuelven la columna con su tipo y su
+-- obligatoriedad exactos, pero NO en su posicion ordinal original: `products.unit` era la
+-- novena columna (entre `qty_alert` y `created_at`, ver
+-- 20260902005510_products_and_presentations/migration.sql) y vuelve al final de la tabla;
+-- lo mismo con `recipe_lines.unit`. Postgres no permite reordenar columnas sin reescribir
+-- la tabla, y ninguna consulta del repo depende del orden ordinal (nadie usa SELECT * ni
+-- INSERT sin lista de columnas). Se anota aqui para que R23 no se lea como «exacto» sin
+-- este matiz.
 ALTER TABLE "products"     ADD COLUMN "unit" TEXT;
 ALTER TABLE "recipe_lines" ADD COLUMN "unit" TEXT NOT NULL;
 DROP TABLE "units";

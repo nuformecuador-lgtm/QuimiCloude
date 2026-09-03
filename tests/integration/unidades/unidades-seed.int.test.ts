@@ -10,16 +10,19 @@
  *
  * QUE SE EJERCITA, Y POR QUE ASI — el caso de uso REAL del dominio
  * (`createSeedStarterUnits`, el mismo que `lib/composition` cablea y que `scripts/seed.ts`
- * invoca) contra un repositorio Prisma REAL, pero construido sobre el `tx` del test. No se
- * llama a `unidades.seedStarterUnits()` de `lib/composition` porque el adaptador que ese
- * cableado ata (`unitSeedRepositoryPrisma`, `design.md > 5.4`) se exporta ya construido
- * sobre el cliente COMPARTIDO, no como fabrica: invocarlo desde dentro de un
- * `prisma.$transaction` escribiria por OTRA conexion, quedaria comiteado en la base de
- * verdad y ni siquiera veria las filas de la transaccion del test. Es la misma razon por la
- * que `identity-seed.int.test.ts` usa `createInitialAccessRepository(tx)` y no la fachada.
- * El repositorio local de abajo hace EXACTAMENTE las dos mismas llamadas que el adaptador
- * de produccion; lo que no se puede sustituir —que el cableado exista— se comprueba aparte,
- * en el ultimo caso.
+ * invoca) contra el adaptador Prisma REAL DE PRODUCCION
+ * (`createUnitSeedRepository`, `design.md > 5.4`), construido sobre el `tx` del test. Aqui
+ * no se escribe ninguna copia del adaptador: una copia solo demostraria que la copia
+ * funciona, y vaciar el adaptador de verdad dejaria este archivo verde. Por eso el
+ * adaptador se exporta como fabrica, igual que `createInitialAccessRepository` en
+ * `identity-seed.int.test.ts`.
+ *
+ * No se llama a `unidades.seedStarterUnits()` de `lib/composition` porque ese cableado ata
+ * el adaptador al cliente COMPARTIDO: invocarlo desde dentro de un `prisma.$transaction`
+ * escribiria por OTRA conexion, quedaria comiteado en la base de verdad y ni siquiera veria
+ * las filas de la transaccion del test. Que el cableado exista se comprueba aparte —en el
+ * ultimo caso de este archivo y, sobre el texto de los fuentes, en
+ * `tests/unit/unidades/seed-wiring.test.ts`.
  *
  * NINGUNA AFIRMACION GLOBAL SOBRE LA TABLA — no se cuenta `units` entera ni se afirma que
  * este vacia: se mira SOLO las cinco claves arrancadoras. Otra sesion puede tener unidades
@@ -36,9 +39,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { unidades } from '@/lib/composition'
 import { createSeedStarterUnits } from '@/lib/modules/unidades'
+import { createUnitSeedRepository } from '@/lib/modules/unidades/adapters/driven/persistence/unit-seed-repository-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
-
-import type { UnitSeedRepository } from '@/lib/modules/unidades/ports/unit-seed-repository'
 
 // ---------------------------------------------------------------------------
 // Aislamiento
@@ -64,27 +66,6 @@ async function inRolledBackTransaction(
     )
   } catch (error) {
     if (!(error instanceof RollbackSignal)) throw error
-  }
-}
-
-// ---------------------------------------------------------------------------
-// El repositorio real, atado al `tx` del test (ver cabecera)
-// ---------------------------------------------------------------------------
-
-function createUnitSeedRepositoryOn(tx: Prisma.TransactionClient): UnitSeedRepository {
-  return {
-    async findExistingNormalizedNames(normalizedNames) {
-      const rows = await tx.unit.findMany({
-        where: { nameNormalized: { in: [...normalizedNames] } },
-        select: { nameNormalized: true },
-      })
-      return rows.map((row) => row.nameNormalized)
-    },
-    async createUnit(unit) {
-      await tx.unit.create({
-        data: { name: unit.name, nameNormalized: unit.nameNormalized, symbol: unit.symbol },
-      })
-    },
   }
 }
 
@@ -144,7 +125,7 @@ describe('el seed arrancador de unidades contra base real', () => {
       expect(await readStarterUnits(tx)).toEqual([])
 
       const seedStarterUnits = createSeedStarterUnits({
-        repository: createUnitSeedRepositoryOn(tx),
+        repository: createUnitSeedRepository(tx),
       })
       const outcome = await seedStarterUnits()
 
@@ -181,7 +162,7 @@ describe('el seed arrancador de unidades contra base real', () => {
     await inRolledBackTransaction(async (tx) => {
       await emptyStarterCatalog(tx)
       const seedStarterUnits = createSeedStarterUnits({
-        repository: createUnitSeedRepositoryOn(tx),
+        repository: createUnitSeedRepository(tx),
       })
 
       const first = await seedStarterUnits()
@@ -225,11 +206,14 @@ describe('el seed arrancador de unidades contra base real', () => {
   })
 
   it('el catalogo arrancador esta cableado en lib/composition, que es lo que invoca scripts/seed.ts', async () => {
-    // Los dos casos de arriba ejercitan el caso de uso del dominio con un repositorio
-    // Prisma atado al `tx` (ver cabecera). Lo unico que ese montaje NO puede demostrar es
-    // que el cableado exista: sin esta comprobacion, `lib/composition` podria quedarse sin
-    // `unidades` y los dos casos seguirian verdes mientras `pnpm run db:seed` no siembra
+    // Los dos casos de arriba ejercitan el caso de uso del dominio con el adaptador de
+    // produccion atado al `tx` (ver cabecera). Lo unico que ese montaje NO puede demostrar
+    // es que el cableado exista: sin esta comprobacion, `lib/composition` podria quedarse
+    // sin `unidades` y los dos casos seguirian verdes mientras `pnpm run db:seed` no siembra
     // nada. No se invoca: hacerlo escribiria en la base compartida fuera de transaccion.
+    // Esto ya no es lo UNICO que vigila el cableado: `tests/unit/unidades/seed-wiring.test.ts`
+    // comprueba sobre el texto de los fuentes que `lib/composition` ata el puerto al
+    // adaptador driven real y que `scripts/seed.ts` invoca el seed de unidades.
     expect(typeof unidades.seedStarterUnits).toBe('function')
   })
 })
