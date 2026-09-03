@@ -27,7 +27,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 
 ## Bloque A — Preparación
 
-### [ ] T0. Dejar el worktree en condiciones de compilar y de hablar con la base
+### [x] T0. Dejar el worktree en condiciones de compilar y de hablar con la base
 - Dep: ninguna. **Primera task, antes de cualquier `pnpm run db:*`.**
 - Archivos: `.env` (git-ignorado, **no versionado**).
 - El worktree se acaba de crear: hace falta `pnpm install` y `pnpm exec next typegen` (sin lo
@@ -44,7 +44,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 
 ## Bloque B — Esquema y migración
 
-### [ ] T1. Añadir los dos `enum` y el modelo `Order` a `db/schema.prisma`
+### [x] T1. Añadir los dos `enum` y el modelo `Order` a `db/schema.prisma`
 - Dep: ninguna (T0 solo hace falta para los `db:*`).
 - Archivos: `db/schema.prisma`.
 - Los dos `enum` y el modelo `Order` tal como están en `design.md > 2.1` y `> 2.2`, **al final** del
@@ -62,7 +62,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 - **Hecho cuando:** `pnpm exec prisma validate` pasa y `pnpm exec prisma generate` produce el cliente
   con `Order`, `OrderStatus` y `OrderPriority`.
 
-### [ ] T2. Generar y completar a mano `migration.sql`
+### [x] T2. Generar y completar a mano `migration.sql`
 - Dep: T0, T1.
 - Archivos: `db/migrations/<ts>_orders/migration.sql`.
 - `pnpm run db:migrate:create` (no aplica nada) y después **completar a mano** lo que Prisma no
@@ -84,7 +84,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
   `CREATE TABLE "orders"`, el índice único **sin `WHERE`**, los cuatro índices de FK, las cuatro FK,
   los cinco `CHECK` y los dos `ALTER` de RLS.
 
-### [ ] T3. Escribir `down.sql` a mano
+### [x] T3. Escribir `down.sql` a mano
 - Dep: T2.
 - Archivos: `db/migrations/<ts>_orders/down.sql`.
 - Exactamente lo de `design.md > 7.2`: `DROP TABLE "orders"` y **después** los dos `DROP TYPE`. Al
@@ -98,7 +98,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 
 ## Bloque C — El módulo `pedidos`
 
-### [ ] T4. Crear el armazón del módulo `pedidos` y su contrato, y publicar `RecipeId` en `recetas`
+### [x] T4. Crear el armazón del módulo `pedidos` y su contrato, y publicar `RecipeId` en `recetas`
 - Dep: ninguna.
 - Archivos **nuevos**: `lib/modules/pedidos/index.ts`,
   `lib/modules/pedidos/domain/order-number.ts`,
@@ -124,7 +124,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 
 ## Bloque D — Tests estáticos y unitarios (no necesitan base)
 
-### [ ] T5. [P] Contrato estático del esquema
+### [x] T5. [P] Contrato estático del esquema
 - Dep: T1.
 - Archivos: `tests/unit/pedidos/schema/pedidos-schema.test.ts`.
 - Lee `db/schema.prisma` como **texto**. Reutilizar los helpers de
@@ -136,7 +136,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 - **Hecho cuando:** pasa y cubre R1, R2, R3, R4, R5, R6, R8, R10, R11, R12, R14, R16, R17, R18, R20,
   R26, R27, R28, R31, R33, R36.
 
-### [ ] T6. [P] Contrato estático del SQL de la migración
+### [x] T6. [P] Contrato estático del SQL de la migración
 - Dep: T2, T3.
 - Archivos: `tests/unit/pedidos/schema/pedidos-migration.test.ts`.
 - Helpers de `tests/unit/recetas/schema/recetas-migration.test.ts` (`statements`, `stripSqlComments`,
@@ -150,7 +150,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
   equivalente.
 - **Hecho cuando:** pasa y cubre R7, R9, R13, R15, R21, R22, R23, R25, R29, R33, R36, R37, R38, R41.
 
-### [ ] T7. [P] Dominio y forma del módulo
+### [x] T7. [P] Dominio y forma del módulo
 - Dep: T4.
 - Archivos: `tests/unit/pedidos/domain/order-number.test.ts`,
   `tests/unit/pedidos/module-contract.test.ts`.
@@ -171,7 +171,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 
 ## Bloque E — Base de datos real
 
-### [ ] T8. Aplicar y revertir de verdad
+### [x] T8. Aplicar y revertir de verdad
 - Dep: T0, T2, T3.
 - Archivos: ninguno versionado; la salida se pega en `progress/impl_QC-33-modelo-pedidos.md`.
 - Ciclo completo: `pnpm run db:migrate` → comprobar el esquema **real** (`orders` en
@@ -186,7 +186,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
   `progress/impl_QC-33-modelo-pedidos.md`, y cierra **R38** en su forma real (el test estático solo
   mira el texto del SQL).
 
-### [ ] T9. Tests de integración contra Postgres real
+### [x] T9. Tests de integración contra Postgres real
 - Dep: T8, T5 (para no duplicar lo que ya cubre el estático).
 - Archivos: `tests/integration/pedidos/pedidos-constraints.int.test.ts`.
 - Cada caso dentro de `prisma.$transaction` que termina en `ROLLBACK`; toda operación que se espera
@@ -228,7 +228,7 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
 - Atención especial al merge sobre `db/schema.prisma` y sobre `lib/modules/recetas/index.ts`.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con todas las guardias en verde.
 
-### [ ] T11. Documentar el mapa `R<n> → test`
+### [x] T11. Documentar el mapa `R<n> → test`
 - Dep: T10.
 - Archivos: `progress/impl_QC-33-modelo-pedidos.md`.
 - Copiar la tabla de trazabilidad de abajo con la **salida real** de los tests, no con la intención.
