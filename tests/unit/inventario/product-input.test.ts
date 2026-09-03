@@ -108,6 +108,34 @@ describe('createProductSchema', () => {
     ).toBe(false);
   });
 
+  it('acepta la unidad ausente y exige que la presente sea una referencia con forma de uuid', () => {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este archivo no
+    // tenia caso propio para la unidad —el campo `unit` era texto libre y no habia nada que
+    // validar en el borde—, asi que al cambiar la FORMA queda cubierto aqui lo que sigue
+    // vigilandose: la unidad del producto SIGUE SIENDO OPCIONAL (QC-14 R5, QC-32 R10) y
+    // SIGUE SIENDO ANOTATIVA (QC-32 R14) —zod no la compara con nada ni la restringe segun
+    // el producto—. Lo unico nuevo es que hoy se valida su forma de uuid.
+    //
+    // Que el uuid EXISTA no lo comprueba zod: lo rechaza la base con 23503 (QC-32 R12), y
+    // eso se prueba en `tests/integration/unidades/unidades-constraints.int.test.ts`.
+    const base = {
+      name: 'Producto',
+      presentationId: '11111111-1111-4111-8111-111111111111',
+    };
+
+    expect(createProductSchema.safeParse(base).success).toBe(true);
+    expect(createProductSchema.parse(base).unitId).toBeUndefined();
+    expect(createProductSchema.safeParse({ ...base, unitId: null }).success).toBe(true);
+    expect(
+      createProductSchema.safeParse({
+        ...base,
+        unitId: '22222222-2222-4222-8222-222222222222',
+      }).success,
+    ).toBe(true);
+    // Ya no vale cualquier texto: la unidad es una referencia, no una etiqueta.
+    expect(createProductSchema.safeParse({ ...base, unitId: 'kg' }).success).toBe(false);
+  });
+
   it('usa 0 como valor por defecto de minPurchase cuando no se indica', () => {
     const parsed = createProductSchema.parse({
       name: 'Producto',

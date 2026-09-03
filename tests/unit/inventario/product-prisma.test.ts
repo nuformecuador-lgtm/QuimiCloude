@@ -66,7 +66,11 @@ describe('toProductView', () => {
     minPurchase: 1,
     deliveryTime: 3,
     qtyAlert: 5,
-    unit: 'L',
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La fila que devuelve
+    // Prisma ya no trae `unit: 'L'` (texto) sino `unit_id`, la referencia a `units`. Cambia
+    // la FORMA del dato, no lo que este describe hace: comprobar que `toProductView` no
+    // pierde ni reinterpreta ningun campo de la fila.
+    unitId: 'u-1',
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
     createdBy: 'user-1',
@@ -88,6 +92,24 @@ describe('toProductView', () => {
     const vista = toProductView(filaBase);
     expect(vista.createdBy).toBe('user-1');
     expect(vista.updatedBy).toBe('user-2');
+  });
+
+  it('mapea la unidad como referencia al catalogo, sin resolver nombre ni simbolo', () => {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Mismo criterio que
+    // `createdBy`/`updatedBy` (D20): la vista lleva el IDENTIFICADOR, no el nombre resuelto
+    // -resolverlo obligaria a `inventario` a leer la tabla de `unidades`, que es justo lo
+    // que la frontera de modulo prohibe (QC-32 R16, `design.md > 5.3`)-. La unidad sigue
+    // siendo ANOTATIVA (QC-32 R14): el mapeo no la convierte ni la compara con nada.
+    const vista = toProductView(filaBase);
+    expect(vista.unitId).toBe('u-1');
+  });
+
+  it('mapea una unidad ausente como null, no como cadena vacia', () => {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
+    // QC-14 R5 vigila -la unidad del producto es OPCIONAL y la ausencia se devuelve como
+    // ausencia (QC-32 R10)-, ahora sobre `unitId`.
+    const vista = toProductView({ ...filaBase, unitId: null });
+    expect(vista.unitId).toBeNull();
   });
 
   // Mutacion: si el mapeo devolviera null en vez de la cadena de costo, esta asercion caeria.
