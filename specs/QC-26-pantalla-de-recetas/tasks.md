@@ -26,7 +26,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 0 — Precondiciones
 
-### [ ] T0 — Verificar la base heredada (BLOQUEA TODO)
+### [x] T0 — Verificar la base heredada (BLOQUEA TODO)
 - **Depende de**: que QC-11, QC-9, QC-20, QC-22, QC-24, QC-25 y QC-32 estén `done` y mergeadas en
   `dev`.
 - **Qué se HEREDA ya montado y NO se re-crea** (comprobar uno por uno tras `git merge origin/dev`;
@@ -55,7 +55,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: los nueve puntos están verificados con su evidencia en
   `progress/impl_QC-26-pantalla-de-recetas.md`.
 
-### [ ] T1 — Anotar el contrato que se consume (BLOQUEA el código de datos)
+### [x] T1 — Anotar el contrato que se consume (BLOQUEA el código de datos)
 - **Depende de**: T0.
 - **Qué**: anotar en `progress/impl_QC-26-pantalla-de-recetas.md`: (a) la firma exacta de las siete
   actions que se usan; (b) que create/update **reciben un objeto tipado, no `FormData`, y no toman
@@ -67,7 +67,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: los cinco puntos están anotados. Si algo difiere de `design.md > 0`, **parar y
   avisar**: cambia el diseño, no el contrato.
 
-### [ ] T2 — Instalar la dependencia aprobada y su fila del registro
+### [x] T2 — Instalar la dependencia aprobada y su fila del registro
 - **Depende de**: T0 y de la aprobación del spec (F1.4). **Archivos**: `package.json`,
   `docs/dependencias.md`.
 - **Qué**: instalar `@dnd-kit/core` y `@dnd-kit/sortable`. La fila de `docs/dependencias.md` va con
@@ -83,7 +83,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 1 — Ruta, prefijo y regla de rol (va ANTES que las páginas)
 
-### [ ] T3 — Mudar la constante, cubrir el prefijo, declarar la segunda regla ruta→rol
+### [x] T3 — Mudar la constante, cubrir el prefijo, declarar la segunda regla ruta→rol
 - **Depende de**: T0. **Archivos**: `lib/shared/routes.ts`,
   `lib/shared/navigation/private-nav.ts`, `lib/composition/route-role-rules.ts`.
 - **Qué** (`design.md > 2`, `> 3`):
@@ -107,7 +107,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 2 — La lectura del catálogo de unidades (backend, decisión D4)
 
-### [ ] T4 — Dominio: caso de uso, actor y errores de `unidades`
+### [x] T4 — Dominio: caso de uso, actor y errores de `unidades`
 - **Depende de**: T0. **Archivos**: `lib/modules/unidades/domain/actor.ts`,
   `domain/errors.ts`, `domain/list-units.ts`, `ports/unit-repository.ts`,
   `lib/modules/unidades/index.ts`.
@@ -118,7 +118,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `next/*`, `@prisma/client`, `lib/shared/` ni `@/lib/composition`; `pnpm run test:guardias` sigue
   verde.
 
-### [ ] T5 — [P] Adaptador driven y Server Action de unidades
+### [x] T5 — [P] Adaptador driven y Server Action de unidades
 - **Depende de**: T4. **Archivos**:
   `lib/modules/unidades/adapters/driven/persistence/unit-prisma.ts`,
   `lib/modules/unidades/adapters/driving/unit-actions.ts`.
@@ -128,14 +128,14 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   error de dominio a estado serializable. **`unit-catalog-prisma.ts` no se toca.**
 - **Hecho cuando**: typecheck y lint limpios; la action no repite `requireAdmin` ni ninguna regla.
 
-### [ ] T6 — Cablear la fachada `unidades` en el punto de composición
+### [x] T6 — Cablear la fachada `unidades` en el punto de composición
 - **Depende de**: T4, T5. **Archivos**: `lib/composition/index.ts`.
 - **Qué**: bloque **nuevo al final** del archivo, sin reordenar ni reformatear nada existente
   (`design.md > 14.7`): `export const unidades = { listUnits: createListUnits({ units: unitRepository }) }`.
 - **Hecho cuando**: typecheck, lint y `pnpm run test:guardias` verdes, y el diff no toca ninguna
   línea previa del archivo.
 
-### [ ] T7 — [P] Tests del caso de uso y de la action de unidades
+### [x] T7 — [P] Tests del caso de uso y de la action de unidades
 - **Depende de**: T5. **Archivos**: `tests/unit/unidades/list-units.test.ts`,
   `tests/unit/unidades/unit-actions.test.ts`.
 - **Qué**: rol distinto de Administrador, actor nulo y rol desconocido → rechazo **con un doble del
@@ -148,13 +148,13 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 3 — La lista
 
-### [ ] T8 — Parser de parámetros de lista
+### [x] T8 — Parser de parámetros de lista
 - **Depende de**: T3. **Archivos**: `…/formulas/components/recipe-list-params.ts`, barrel.
 - **Qué**: `parseRecipeListParams` puro (`design.md > 4.2`): `page` entero ≥ 1 con defecto 1;
   `pageSize` sólo 10 o 25, **importados** de `lib/shared/pagination`. Sin DOM, sin React.
 - **Hecho cuando**: typecheck y lint limpios y el archivo no importa `react` ni `next/*`.
 
-### [ ] T9 — Columnas, tabla, esqueleto, vacío y error
+### [x] T9 — Columnas, tabla, esqueleto, vacío y error
 - **Depende de**: T8. **Archivos**: `recipe-columns.ts`, `recipe-table.tsx`,
   `recipe-table-skeleton.tsx`, `recipe-list-empty.tsx`, `recipe-list-error.tsx`, barrel.
 - **Qué** (`design.md > 4.3`): columnas como datos (`key`, `label`, `testId`), **sin** `id`,
@@ -167,7 +167,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios; `grep` no encuentra `100vh`, ni ninguna variable de
   entorno de almacenamiento, ni concatenación de URL de imagen en estos archivos.
 
-### [ ] T10 — Barra de herramientas: tamaño de página y paginación
+### [x] T10 — Barra de herramientas: tamaño de página y paginación
 - **Depende de**: T8, T9. **Archivos**: `recipe-list-toolbar.tsx`, barrel.
 - **Qué**: selector con **10 y 25** (R11) y controles anterior/siguiente con «página X de Y»
   (R12). Cambiar cualquiera **navega** cambiando la cadena de consulta, nunca estado local.
@@ -175,13 +175,13 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios; el componente no construye la URL con el literal de la
   ruta.
 
-### [ ] T11 — Diálogo de borrado
+### [x] T11 — Diálogo de borrado
 - **Depende de**: T9. **Archivos**: `delete-recipe-dialog.tsx`, barrel.
 - **Qué**: `alert-dialog` que **nombra la receta** y advierte que no se puede deshacer; sólo al
   confirmar invoca `deleteRecipeAction(id)`; luego toast + `router.refresh()` (R39, R24).
 - **Hecho cuando**: typecheck y lint limpios.
 
-### [ ] T12 — `page.tsx` de la lista y sección de datos
+### [x] T12 — `page.tsx` de la lista y sección de datos
 - **Depende de**: T9, T10, T11. **Archivos**: `…/formulas/page.tsx`,
   `…/components/recipe-list-section.tsx`, barrel.
 - **Qué** (`design.md > 4.3`): Server Component con `metadata` construida con `BRAND_LABEL` y
@@ -285,7 +285,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 5 — Tests
 
-### [ ] T20 — [P] Tests de la lista
+### [x] T20 — [P] Tests de la lista
 - **Depende de**: T12. **Archivos**: `tests/unit/recetas-ui/recipe-page.test.tsx`,
   `tests/unit/recetas-ui/recipe-list-params.test.ts`.
 - **Qué**: ver el mapa de trazabilidad. Render dentro del layout privado con el patrón de mocks de

@@ -62,7 +62,9 @@ import type { PresentationRepository } from '@/lib/modules/inventario/ports/pres
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type { ProductCatalog } from '@/lib/modules/inventario';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
-import type { UnitCatalog } from '@/lib/modules/unidades';
+import { listUnits } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
+import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
+import { createListUnits, type UnitCatalog } from '@/lib/modules/unidades';
 import {
   createCreateRecipe,
   createDeleteRecipe,
@@ -247,4 +249,21 @@ export const recetas = {
     images: recipeImageStorage,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// `unidades` (QC-26, T6). Bloque nuevo, separado a proposito: no reordena ni reformatea
+// nada de lo existente arriba -diff minimo, hay otras sesiones tocando este mismo
+// archivo en paralelo-.
+// ---------------------------------------------------------------------------------------
+
+/** `UnitRepository` cableado con el adaptador driven DE UNIDADES (`design.md > 9`,
+ *  R40): el caso de uso de listado solo conoce el TIPO `UnitRepository`, nunca esta
+ *  implementacion. */
+const unitRepository: UnitRepository = { listAll: listUnits };
+
+/** Fachada del modulo `unidades` ya cableada (R40-R42). Es lo que consume la Server
+ *  Action de listado (`adapters/driving/unit-actions.ts`). */
+export const unidades = {
+  listUnits: createListUnits({ units: unitRepository }),
 } as const;
