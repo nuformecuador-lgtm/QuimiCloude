@@ -942,3 +942,150 @@ proceso`: lo que no aplica **se dice y se justifica**; omitirlo es lo que el rev
 - **`Multiplataforma`** — SI APLICA y **NO se declara ninguna excepcion de escritorio** (R31). La
   parte que ningun test automatico puede afirmar es T16, del humano.
 - **`Trazabilidad`** — SI APLICA: el mapa `R<n> -> test` completo es T17, aqui arriba.
+
+---
+
+## Tanda de cierre del gate — 2026-09-03 (dos rojos)
+
+Encargo acotado: apagar los **dos unicos rojos** que quedaban en el gate (1012/1014). Sin abrir
+alcance, sin tareas nuevas, sin dependencias.
+
+### Rojo 1 — `tests/unit/inventario/scope.test.ts` (T15 de QC-20)
+
+El caso «no existe ninguna pantalla, pagina ni componente de productos, ni spec E2E nuevo»
+afirmaba, por R34 de QC-20, que la pantalla del catalogo estaba **diferida a QC-22**. QC-22 es la
+ficha que la construye, asi que la premisa cayo: listaba los 12 componentes de
+`app/(private)/inventario/components/`.
+
+**Se invirtio, con fecha (2026-09-03) y motivo dentro del test** — mismo trato que
+`tests/unit/private-layout.test.tsx` (T4) y `tests/unit/sidebar-mobile.test.tsx`. No se borro, no
+se vacio de sentido, no se marco `skip`. Lo que R34 protegia de verdad no era la ausencia, sino
+que la pantalla no apareciese por goteo y sin ficha; eso sigue vigilado en cuatro clausulas:
+
+1. la pantalla **existe** (`app/(private)/inventario/page.tsx`) — si alguien la borra, rojo;
+2. vive **entera** bajo su carpeta de ruta: cualquier pieza de catalogo en otra ruta de `app/`, rojo;
+3. `components/` sigue **sin una sola pieza** de catalogo (mitad de R34 intacta y en negativo);
+4. la lista de specs E2E de catalogo es **cerrada**: solo `e2e/inventario.spec.ts`.
+
+El patron se amplio a `inventario` porque es el nombre real de la ruta: sin el, ni la pagina ni el
+spec E2E casaban y media guardia no miraba nada.
+
+**Falsabilidad comprobada, no supuesta.** Con tres arboles sinteticos, uno por clausula:
+`app/(private)/productos/page.tsx` -> rojo (clausula 2); `components/product-stray.tsx` -> rojo
+(clausula 3); `e2e/productos.spec.ts` -> rojo (clausula 4). Los tres se borraron despues.
+
+El primer caso del archivo (R29, sin route handlers bajo `app/api`) queda **intacto**.
+
+### Rojo 2 — `ROUTE_ROLE_RULES` y el centinela del barrel de `inventario`
+
+`tests/unit/inventario/schema/inventario-schema.test.ts` exige que **todo import del barrel
+`@/lib/modules/inventario` hecho fuera de `lib/composition/` sea `import type`**. La correccion
+anterior habia sacado la lista del dominio de `identity` (que no puede importar `lib/shared`) y la
+habia puesto en `identity/adapters/driving/route-role-rules.ts`: eso apago
+`guard-arquitectura-modulos` y encendio este otro centinela, porque `ADMIN_ROLE_NAME` es un
+**valor** en ejecucion y `import type` no sirve.
+
+**Decision humana del 2026-09-03, aplicada tal cual:** la lista se muda a
+`lib/composition/route-role-rules.ts`. Es la capa de cableado del repo; la tabla de dependencias
+le permite importar barriles de modulos **como valor** y `lib/shared/**`, asi que el centinela
+queda satisfecho **por construccion** y no por una exencion escrita a mano. No se declaro
+`/inventario` como literal ni constante propia dentro de `identity`, y `ADMIN_ROLE_NAME` no se
+movio de sitio.
+
+Las dos comprobaciones que el encargo pedia **no dar por hechas**:
+
+- **El borde.** `middleware.ts` -> `identity/adapters/driving/route-guard-middleware.ts` ->
+  `@/lib/composition/route-role-rules`. El archivo mudado no importa Prisma, ni `next/headers`, ni
+  `lib/composition/index.ts` (que si cablea Prisma). **`pnpm exec vitest run
+  tests/guards/guard-middleware-edge.test.ts` -> 7/7 en verde**, y la suite entera de
+  `tests/guards/` tambien.
+- **El doble del test de middleware sigue aplicando.**
+  `tests/unit/identity/route-guard-middleware.test.ts` sustituye `ROUTE_ROLE_RULES` con un getter
+  sobre una caja mutable; el `vi.mock` se reapunto al nuevo especificador. Verificado
+  **empiricamente**, apuntando el `vi.mock` a `@/lib/composition/route-role-rules-NO-EXISTE`: caen
+  **exactamente 2** casos, los dos de rol insuficiente, porque sus reglas sinteticas usan el
+  prefijo `/dashboard/productos`, que la lista real (unica fila: `/inventario`) no cubre.
+  Restaurado el especificador, 12/12 en verde. El motivo quedo escrito en la cabecera del test
+  para que la proxima mudanza no lo pierda.
+
+### Archivos tocados
+
+Rojo 1: `tests/unit/inventario/scope.test.ts`.
+
+Rojo 2: `lib/composition/route-role-rules.ts` (movido con `git mv`, antes en
+`lib/modules/identity/adapters/driving/route-role-rules.ts`),
+`lib/modules/identity/adapters/driving/route-guard-middleware.ts`,
+`lib/modules/identity/index.ts`, `lib/modules/identity/domain/route-access.ts`,
+`lib/modules/identity/domain/route-role-rules.ts` (los tres ultimos, **solo comentarios** que
+apuntaban a la ubicacion vieja), `tests/unit/identity/route-role-rules.test.ts`,
+`tests/unit/identity/route-access.test.ts`, `tests/unit/identity/route-guard-middleware.test.ts`.
+
+`lib/modules/inventario/` **no se toco**. Ninguna dependencia nueva: `package.json` y
+`pnpm-lock.yaml` intactos.
+
+### Salida real
+
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin salida)
+
+$ pnpm lint
+> eslint
+(sin salida)
+
+$ pnpm exec vitest run tests/guards/ tests/unit/identity/
+ Test Files  37 passed (37)
+      Tests  442 passed (442)
+
+$ pnpm exec vitest run tests/unit/inventario/scope.test.ts
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+
+$ pnpm exec vitest run tests/guards/guard-middleware-edge.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+```
+
+> Nota de entorno: **Vitest en este worktree no carga el `.env` por su cuenta** (en `dev` si). Hay
+> que exportarlo antes (`set -a && . ./.env && set +a`) o los tests de integracion fallan con
+> `Environment variable not found: DATABASE_URL`, que es un fantasma y no un fallo real.
+
+### PARADA — un tercer ofensor, que estaba TAPADO por el rojo 2
+
+`tests/unit/inventario/schema/inventario-schema.test.ts` **sigue rojo**, pero ya **no por
+`ROUTE_ROLE_RULES`**. El barrido recorre `lib/modules` antes que `app`, asi que el primer
+`expect` que fallaba era el de la lista de reglas y el test nunca llegaba a leer `app/`. Al
+apagarlo aparecio el siguiente:
+
+```
+app/(private)/inventario/components/presentation-select.tsx:
+  todo import del barrel de inventario fuera de lib/composition debe ser 'import type'
+  (import { createPresentationSchema } from '@/lib/modules/inventario';)
+```
+
+Es un **componente de cliente** que importa el esquema zod del contrato publico como **valor**,
+para prevalidar el nombre con la misma regla que valida el servidor (linea 141,
+`createPresentationSchema.safeParse`).
+
+**No se toca y se devuelve al humano**, porque las tres salidas posibles chocan con una regla del
+encargo o del rol:
+
+1. cambiar el componente -> es **UI**, fuera del alcance de este rol y ademas es una decision de
+   diseno (que hace la pantalla si deja de prevalidar);
+2. importar por ruta profunda (`.../domain/presentation-input`) -> lo **prohibe R13** de
+   `guard-arquitectura-modulos`: `app/` no puede importar `domain` de un modulo;
+3. reexportar el esquema desde `adapters/driving/presentation-actions` (subruta **exenta** del
+   centinela) -> exige **abrir `lib/modules/inventario/`**, expresamente vetado en el encargo.
+
+Hay una cuarta lectura, que es la que probablemente toque decidir: si el centinela **debe** dejar
+pasar un esquema zod del contrato hacia un componente de cliente —es tipo y validacion, no una
+factoria de caso de uso ni el runtime de persistencia que QC-24 queria contener—, entonces lo que
+cambia es el centinela, no el componente. Eso es una conversacion sobre la regla y no la abre este
+rol.
+
+### Veredicto
+
+Rojo 1 apagado y con falsabilidad demostrada; rojo 2 apagado en su causa declarada (guardias y
+`identity` enteras en verde, borde incluido), pero el mismo archivo de test destapo un tercer
+ofensor en UI que este rol no puede tocar y queda **en manos del humano**.
