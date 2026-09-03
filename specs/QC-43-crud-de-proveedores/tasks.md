@@ -114,7 +114,7 @@ verificado contra el árbol de la rama, no contra este documento.
       (R28, R30, R33, R41) y el esquema de edición **rechaza** un `productId` de más en vez de
       ignorarlo en silencio.
 
-- [ ] **T7 — Tipos de salida y los dos puertos.** `domain/supplier-view.ts`,
+- [x] **T7 — Tipos de salida y los dos puertos.** `domain/supplier-view.ts`,
       `domain/catalog-line-view.ts`, `ports/supplier-repository.ts`,
       `ports/supplier-catalog-repository.ts` con los resultados discriminados de `design.md > 7`.
       **Borra `ports/.gitkeep`.**

@@ -192,7 +192,17 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       const etiqueta = toPosix(relative(repoRoot, file))
       expect(source, `${etiqueta} consulta la tabla de productos`).not.toMatch(/prisma\.product/i)
       expect(source, `${etiqueta} consulta la tabla de usuarios`).not.toMatch(/prisma\.user/i)
-      expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
+      // `@prisma/client` solo lo pueden importar los DOS adaptadores driven de persistencia
+      // que trae QC-43 (T11, T12): son el unico sitio del modulo que habla con el ORM
+      // (`design.md > 7`). En QC-42 no habia ninguno y la prohibicion era total; la lista
+      // blanca es EXACTA, asi que un tercer archivo con Prisma sigue cayendo aqui.
+      const ADAPTADORES_CON_ORM = [
+        'lib/modules/proveedores/adapters/driven/persistence/supplier-prisma.ts',
+        'lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts',
+      ]
+      if (!ADAPTADORES_CON_ORM.includes(etiqueta)) {
+        expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
+      }
       // Ninguna ruta profunda a otro modulo: solo el barrel de cada uno.
       for (const spec of importSpecifiers(source)) {
         expect(spec, `${etiqueta}: ruta profunda a inventario`).not.toMatch(
@@ -224,21 +234,35 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
   })
 
   it('la feature no anade adaptadores driving, rutas ni Server Actions', () => {
-    // R35: esta ficha es esquema, migracion y armazon. Ningun alta, consulta, edicion ni
-    // borrado, y por tanto ningun flujo navegable que un E2E pueda visitar (decision 21).
-    for (const carpeta of [
-      join(proveedoresDir, 'adapters', 'driving'),
-      join(proveedoresDir, 'adapters', 'driven'),
-      join(proveedoresDir, 'ports'),
-    ]) {
-      expect(sourcesIn(carpeta), `${toPosix(relative(repoRoot, carpeta))} deberia estar vacia`)
-        .toEqual([])
-    }
-    // Las tres siguen sembradas con su `.gitkeep`, para que git las versione.
-    for (const carpeta of ['ports', 'adapters/driven', 'adapters/driving']) {
+    // R35 de QC-42 decia «ni ports/ ni adapters/»: esa era la frontera de la ficha de
+    // ESQUEMA. QC-43 la DEROGA expresamente (`tasks.md` T7, T11, T12: «borra el
+    // .gitkeep»), asi que la afirmacion pasa de «vacias» a «exactamente estos archivos»,
+    // que es igual de falsable y sigue cerrando el hueco: cualquier archivo de mas en
+    // `ports/` o en `adapters/driven/` cae aqui.
+    expect(
+      sourcesIn(join(proveedoresDir, 'ports')).map((f) => toPosix(relative(proveedoresDir, f))),
+      'ports/ gano un archivo fuera de los dos puertos de QC-43',
+    ).toEqual(['ports/supplier-catalog-repository.ts', 'ports/supplier-repository.ts'])
+    // `adapters/driven/` y `adapters/driving/` siguen vacias y con su `.gitkeep`: los dos
+    // adaptadores de persistencia son T11/T12 y las Server Actions T14. Cuando lleguen,
+    // derogan estas lineas -y la de 'use server' de mas abajo- igual que T7 derogo la de
+    // `ports/`.
+    for (const carpeta of ['adapters/driven', 'adapters/driving']) {
+      expect(
+        sourcesIn(join(proveedoresDir, ...carpeta.split('/'))),
+        `${carpeta} deberia estar vacia`,
+      ).toEqual([])
       expect(existsSync(join(proveedoresDir, ...carpeta.split('/'), '.gitkeep')), carpeta).toBe(
         true,
       )
+    }
+    // Y el `.gitkeep` de la carpeta que T7 lleno ya NO esta: git no versiona carpetas
+    // vacias, pero tampoco carpetas con contenido y un `.gitkeep` sobrante.
+    for (const carpeta of ['ports']) {
+      expect(
+        existsSync(join(proveedoresDir, ...carpeta.split('/'), '.gitkeep')),
+        `${carpeta}/.gitkeep sobra: la carpeta ya tiene archivos reales`,
+      ).toBe(false)
     }
 
     // Ningun 'use server' en TODO el modulo, no solo en lo alcanzable desde el barrel.
