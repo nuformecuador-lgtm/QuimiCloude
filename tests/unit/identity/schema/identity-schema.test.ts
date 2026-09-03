@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { DOCUMENT_TYPE_CODES } from '@/lib/modules/identity'
+
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
   let dir = startDir
@@ -89,6 +91,65 @@ function field(model: PrismaModel, name: string): PrismaField {
 
 function has(model: PrismaModel, name: string): boolean {
   return model.fields.some((candidate) => candidate.name === name)
+}
+
+/** Un bloque `enum` del esquema: su nombre y sus valores. */
+interface PrismaEnum {
+  readonly name: string
+  readonly values: readonly string[]
+}
+
+function parseEnums(source: string): readonly PrismaEnum[] {
+  return [...source.matchAll(/^enum\s+(\w+)\s*\{([\s\S]*?)^\}/gm)]
+    .map((match): PrismaEnum | null => {
+      const [, name, body] = match
+      if (name === undefined || body === undefined) return null
+      return {
+        name,
+        values: body
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0 && !line.startsWith('@')),
+      }
+    })
+    .filter((candidate): candidate is PrismaEnum => candidate !== null)
+}
+
+const schemaEnums = parseEnums(schema)
+
+/**
+ * ACOTADO EL 2026-09-03 POR QC-33 (`specs/QC-33-modelo-pedidos/`).
+ *
+ * Antes se afirmaba `expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)`: NINGUN `enum` en
+ * TODO el esquema. Esa mitad CADUCA. El repo no tenia ni uno el dia que se escribio, pero
+ * el requisito de esta ficha (R10, `design.md > 3`) es que EL TIPO DE DOCUMENTO sea una
+ * tabla ampliable con un INSERT, no que el repositorio entero carezca de enums. QC-33
+ * declara `OrderStatus` y `OrderPriority` por decision cerrada 4 del humano, apartandose a
+ * conciencia de este precedente porque su conjunto NO tiene que crecer sin migrar. Una
+ * feature no puede cumplir la afirmacion de alcance de otra.
+ *
+ * Lo que R10 vigilaba y SIGUE VIGENTE se conserva entero: ningun `enum` del esquema es el
+ * tipo de documento —ni por nombre ni por contenido—. Este helper muere si alguien declara
+ * `enum DocumentType { CC }`, y muere igual si lo bautiza `TipoDocumento` o si mete los
+ * codigos de `document_types` como valores de un enum con cualquier otro nombre.
+ *
+ * Los codigos NO se escriben aqui a mano: salen de `DOCUMENT_TYPE_CODES`, la contrapartida
+ * en TypeScript de las filas que siembra `20260806122638_users_and_roles/migration.sql`.
+ */
+function expectDocumentTypeIsNotAnEnum(): void {
+  for (const declared of schemaEnums) {
+    expect(
+      declared.name,
+      `el enum ${declared.name} no puede ser el tipo de documento`,
+    ).not.toMatch(/documen|tipodoc/i)
+    const upperValues = declared.values.map((value) => value.toUpperCase())
+    for (const code of DOCUMENT_TYPE_CODES) {
+      expect(
+        upperValues,
+        `el enum ${declared.name} no puede declarar el codigo de documento ${code}`,
+      ).not.toContain(code.toUpperCase())
+    }
+  }
 }
 
 /** Los nueve datos de negocio de R1, con su columna en la base. */
@@ -198,8 +259,9 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
     expect(relation.attributes).toMatch(/references:\s*\[code\]/)
     expect(relation.attributes).toMatch(/onDelete:\s*Restrict/)
 
-    // Ningun `enum` en todo el schema: el conjunto cerrado es una tabla (design.md > 3).
-    expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)
+    // El conjunto cerrado del tipo de documento es una TABLA, no un `enum` (design.md > 3).
+    // Acotado por QC-33: ver `expectDocumentTypeIsNotAnEnum`.
+    expectDocumentTypeIsNotAnEnum()
   })
 
   it('el tipo de documento no es enum ni check, es tabla', () => {
@@ -208,7 +270,8 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
     expect(has(documentType, 'isActive')).toBe(true)
     // El lado usuario guarda solo el codigo, en texto: anadir un tipo es un INSERT (R10).
     expect(field(user, 'documentTypeCode').type).toBe('String')
-    expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)
+    // Ni enum ni check: acotado por QC-33 a SU sujeto, ver `expectDocumentTypeIsNotAnEnum`.
+    expectDocumentTypeIsNotAnEnum()
   })
 
   it('passwordHash es String sin longitud declarada', () => {

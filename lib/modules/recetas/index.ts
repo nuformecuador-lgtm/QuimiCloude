@@ -11,6 +11,7 @@ export {
   ValidationError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
+export type { RecipeId } from './domain/recipe-catalog';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
   MAX_IMAGE_BYTES,
