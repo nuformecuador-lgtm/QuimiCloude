@@ -928,15 +928,19 @@ describe('estructura de la linea de catalogo', () => {
       const line = await tx.supplierCatalogLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.deliveryTime).toBe(7)
 
-      // Un plazo fraccionario lo rechaza el TIPO de la columna (INTEGER), no un CHECK: se
-      // documenta el SQLSTATE exacto porque no es el generico de CHECK (23514).
+      // Este expect NO prueba que la columna sea INTEGER: prueba que un parametro de
+      // tipo texto no se liga (bind) contra NINGUNA columna de la familia numerica, sea
+      // entera o decimal (una columna NUMERIC(14,4) daria el mismo 42804 ante el mismo
+      // insert). Que `delivery_time` sea especificamente INTEGER lo verifica, aparte, el
+      // test de mas abajo que lee `information_schema.columns`. Se documenta el SQLSTATE
+      // exacto porque no es el generico de CHECK (23514).
       // Tiene que ir como PARAMETRO de texto (no como literal numerico sin comillas): un
       // literal `3.5` sin comillas es una constante NUMERIC y Postgres la redondearia via
       // el cast de asignacion numeric->integer en vez de rechazarla. Ligado como parametro
-      // de tipo desconocido contra una columna INTEGER, Postgres responde `42804`
-      // (datatype_mismatch: «la columna es de tipo integer pero la expresion es de tipo
-      // text»), no `22P02` (que seria el error si el propio texto no fuera numerico, p.
-      // ej. 'abc').
+      // de tipo desconocido contra una columna de familia numerica, Postgres responde
+      // `42804` (datatype_mismatch: «la columna es de tipo integer [o numeric] pero la
+      // expresion es de tipo text»), no `22P02` (que seria el error si el propio texto no
+      // fuera numerico, p. ej. 'abc').
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
@@ -955,6 +959,14 @@ describe('estructura de la linea de catalogo', () => {
         select: { id: true },
       })
       expect(survivors).toEqual([])
+    })
+  })
+
+  it('el plazo de entrega es una columna integer de verdad, no numeric (R16)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const columns = await columnInfo(tx, 'supplier_catalog_lines', ['delivery_time'])
+      expect(columns).toHaveLength(1)
+      expect(columns[0]?.data_type).toBe('integer')
     })
   })
 

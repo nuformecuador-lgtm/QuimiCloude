@@ -27,7 +27,18 @@ armazon del modulo SIN auditar") o se anadio despues, auditado y verificado:
 - tests/unit/proveedores/module-contract.test.ts -- forma del modulo y cruce por ORM
   contra Prisma.dmmf (T9, nuevo).
 - tests/integration/proveedores/proveedores-constraints.int.test.ts -- 25 casos contra
-  Postgres real (T11, nuevo).
+  Postgres real (T11, nuevo). Correccion posterior (ronda 2, hallazgo menor 1): el
+  comentario del test R16 ("rechaza un plazo con parte fraccionaria...") atribuia el
+  rechazo SQLSTATE 42804 al TIPO INTEGER de `delivery_time`, cuando en realidad ese
+  expect solo prueba que un parametro de texto no se liga contra ninguna columna de
+  familia numerica (entera o decimal) -- verificado por el reviewer contra Postgres
+  real. Se reescribio el comentario y se anadio un test nuevo, "el plazo de entrega es
+  una columna integer de verdad, no numeric (R16)", que lee `information_schema.columns`
+  con el helper `columnInfo` (mismo patron que el test R14 de cost/min_purchase) y
+  afirma `data_type='integer'`. Verificado por mutacion: con `delivery_time` mutado
+  temporalmente a `DECIMAL(14,4)` en schema.prisma, migration.sql y aplicado a la base
+  de pruebas, el test nuevo cayo (rojo); revertido todo, vuelve a pasar (verde) y
+  `git diff` quedo vacio sobre db/schema.prisma y db/migrations/.
 - progress/impl_QC-42-modelo-proveedores.md -- este archivo.
 - specs/QC-42-modelo-proveedores/tasks.md -- checkboxes T0-T12 marcadas [x].
 
@@ -147,7 +158,7 @@ T10 = ciclo real apply -> rollback -> apply, documentado arriba.
 | R13 | S, M | I - NULL, no cero |
 | R14 | S, M (sensible a DOUBLE PRECISION) | I - 4 decimales exactos, numeric(14,4) |
 | R15 | S | I - 2.5 sin redondear |
-| R16 | S, M | I - 42804 en fraccionario, entero aceptado |
+| R16 | S, M | I - 42804 en fraccionario, entero aceptado; I - `information_schema` confirma `delivery_time` `data_type='integer'` (test "el plazo de entrega es una columna integer de verdad, no numeric") |
 | R17 | M (sensible a > -1) | I - 23514 en los tres, cero aceptado |
 | R18 | S | -- (ausencia de columna) |
 | R19 | S, M | T10 - products identica tras el rollback |
