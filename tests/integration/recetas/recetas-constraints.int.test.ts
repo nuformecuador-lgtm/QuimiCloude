@@ -229,16 +229,47 @@ async function createRecipe(tx: Prisma.TransactionClient, seed: RecipeSeed): Pro
   return recipe.id
 }
 
-/** Crea una linea con la API tipada. Devuelve el id para poder releerla por el. */
+/**
+ * Crea una unidad REAL dentro de la transaccion del test y devuelve su identificador.
+ *
+ * 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Donde estos tests
+ * escribian el texto 'kg' ahora hay una FK de verdad (`recipe_lines_unit_id_fkey`), asi que
+ * un uuid inventado lo rechazaria la base con 23503: la unidad hay que crearla. El nombre
+ * lleva `token()` porque `units.name_normalized` tiene indice unico y la base local ya trae
+ * las unidades del seed arrancador.
+ */
+async function createUnit(
+  tx: Prisma.TransactionClient,
+  symbol: string | null = 'kg',
+): Promise<string> {
+  const marca = token()
+  const unit = await tx.unit.create({
+    data: { name: `unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol },
+    select: { id: true },
+  })
+  return unit.id
+}
+
+/** Crea una linea con la API tipada. Devuelve el id para poder releerla por el.
+ *
+ *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El quinto parametro era
+ *  el TEXTO de la unidad con `'kg'` por defecto; ahora es el ID de una unidad del catalogo, y
+ *  si no se pasa se crea una para esa linea. La unidad SIGUE SIENDO OBLIGATORIA en toda linea
+ *  (QC-32 R11): por eso el helper nunca puede dejarla sin poner. */
 async function createLine(
   tx: Prisma.TransactionClient,
   recipeId: string,
   productId: string,
   quantity: string,
-  unit = 'kg',
+  unitId?: string,
 ): Promise<string> {
   const line = await tx.recipeLine.create({
-    data: { recipeId, productId, quantity: new Prisma.Decimal(quantity), unit },
+    data: {
+      recipeId,
+      productId,
+      quantity: new Prisma.Decimal(quantity),
+      unitId: unitId ?? (await createUnit(tx)),
+    },
     select: { id: true },
   })
   return line.id
@@ -256,7 +287,9 @@ type WritableColumn =
   | 'recipe_id'
   | 'product_id'
   | 'quantity'
-  | 'unit'
+  // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La columna `unit`
+  // (TEXT) ya no existe; su sitio lo ocupa `unit_id` (UUID con FK hacia `units`).
+  | 'unit_id'
 
 /**
  * `INSERT` crudo. `columns` decide que se escribe: omitir una entrada es exactamente el
@@ -317,11 +350,14 @@ function sleep(ms: number): Promise<void> {
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
-    WHERE schemaname = 'public' AND tablename IN ('recipes', 'recipe_lines')`
-  if (tables.length !== 2) {
+    WHERE schemaname = 'public' AND tablename IN ('recipes', 'recipe_lines', 'units')`
+  if (tables.length !== 3) {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva la
+    // comprobacion previa -sin la migracion de QC-24 estos tests no pueden correr- y se le
+    // suma `units`, sin la cual ninguna linea de receta se puede escribir.
     throw new Error(
-      'la base de pruebas no tiene aplicada la migracion de QC-24 (recipes y recipe_lines). ' +
-        'Corre `pnpm run db:migrate` antes de estos tests.',
+      'la base de pruebas no tiene aplicadas las migraciones de QC-24 (recipes y ' +
+        'recipe_lines) y QC-32 (units). Corre `pnpm run db:migrate` antes de estos tests.',
     )
   }
 })
@@ -608,8 +644,11 @@ describe('estructura de la linea de receta', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La linea sigue
+      // teniendo unidad PROPIA -es lo que R10 vigila-; hoy esa unidad es una referencia.
+      const unitId = await createUnit(tx)
 
-      const lineId = await createLine(tx, recipeId, productId, '2.5000', 'kg')
+      const lineId = await createLine(tx, recipeId, productId, '2.5000', unitId)
 
       // R10: la pareja receta-producto es ENTIDAD PROPIA — tiene id propio, cantidad y
       // unidad propias y sus marcas de tiempo. No es una tabla de union sin datos.
@@ -619,7 +658,7 @@ describe('estructura de la linea de receta', () => {
       expect(line.productId).toBe(productId)
       expect(line.quantity.equals(new Prisma.Decimal('2.5'))).toBe(true)
       expect(line.quantity.toString()).toBe('2.5')
-      expect(line.unit).toBe('kg')
+      expect(line.unitId).toBe(unitId)
       expect(line.createdAt).toBeInstanceOf(Date)
       expect(line.updatedAt).toBeInstanceOf(Date)
     })
@@ -631,7 +670,12 @@ describe('estructura de la linea de receta', () => {
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
 
-      const firstLine = await createLine(tx, recipeId, productId, '1.0000', 'kg')
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Dos unidades
+      // DISTINTAS, igual que antes eran dos textos distintos ('kg' y 'L'): lo que este caso
+      // demuestra es que el `@@unique(recipe_id, product_id)` no depende de la unidad.
+      const unitId = await createUnit(tx)
+      const otraUnidad = await createUnit(tx, 'L')
+      const firstLine = await createLine(tx, recipeId, productId, '1.0000', unitId)
 
       const sqlState = await expectRejectedByDatabase(
         tx,
@@ -640,7 +684,7 @@ describe('estructura de la linea de receta', () => {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
             quantity: Prisma.sql`3.0000`,
-            unit: Prisma.sql`${'L'}`,
+            unit_id: asUuid(otraUnidad),
           }),
         'segunda linea del mismo producto en la misma receta',
       )
@@ -649,9 +693,9 @@ describe('estructura de la linea de receta', () => {
       // «No crear ninguna fila»: la receta se queda con la linea que ya tenia.
       const lines = await tx.recipeLine.findMany({
         where: { recipeId },
-        select: { id: true, unit: true },
+        select: { id: true, unitId: true },
       })
-      expect(lines).toEqual([{ id: firstLine, unit: 'kg' }])
+      expect(lines).toEqual([{ id: firstLine, unitId }])
     })
   })
 
@@ -665,10 +709,12 @@ describe('estructura de la linea de receta', () => {
       const product2 = await createProduct(tx, 'Hidroxido de sodio')
       const product3 = await createProduct(tx, 'Colorante azul')
 
-      await createLine(tx, recipeA, product1, '10.0000', 'kg')
-      await createLine(tx, recipeA, product2, '0.5000', 'kg')
-      await createLine(tx, recipeA, product3, '0.0100', 'g')
-      await createLine(tx, recipeB, product1, '4.0000', 'kg')
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este caso no habla
+      // de la unidad: cada linea toma la suya del catalogo por el helper.
+      await createLine(tx, recipeA, product1, '10.0000')
+      await createLine(tx, recipeA, product2, '0.5000')
+      await createLine(tx, recipeA, product3, '0.0100')
+      await createLine(tx, recipeB, product1, '4.0000')
 
       // Sin limite de lineas por receta: se cuentan SOLO las de esta receta.
       const linesOfA = await tx.recipeLine.findMany({
@@ -728,6 +774,10 @@ describe('estructura de la linea de receta', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La unidad se pone
+      // en los tres intentos, igual que antes se ponia 'kg', para que la UNICA razon posible
+      // del rechazo sea la cantidad y no una unidad que falta.
+      const unitId = await createUnit(tx)
 
       const cero = await expectRejectedByDatabase(
         tx,
@@ -736,7 +786,7 @@ describe('estructura de la linea de receta', () => {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
             quantity: Prisma.sql`0.0000`,
-            unit: Prisma.sql`${'kg'}`,
+            unit_id: asUuid(unitId),
           }),
         'linea con cantidad cero',
       )
@@ -749,7 +799,7 @@ describe('estructura de la linea de receta', () => {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
             quantity: Prisma.sql`-1.5000`,
-            unit: Prisma.sql`${'kg'}`,
+            unit_id: asUuid(unitId),
           }),
         'linea con cantidad negativa',
       )
@@ -763,7 +813,7 @@ describe('estructura de la linea de receta', () => {
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
-            unit: Prisma.sql`${'kg'}`,
+            unit_id: asUuid(unitId),
           }),
         'linea sin cantidad',
       )
@@ -775,25 +825,40 @@ describe('estructura de la linea de receta', () => {
     })
   })
 
-  it('acepta cualquier texto como unidad de linea y rechaza la linea sin unidad', async () => {
+  it('acepta cualquier unidad del catalogo, sin restriccion por producto, y rechaza la linea sin unidad', async () => {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este caso cubria R15
+    // de QC-24, que decia «texto libre» porque el catalogo no existia. Esa mitad caduca. Lo
+    // que R15 vigilaba y SIGUE VIGENTE se conserva entero aqui:
+    //   - la unidad de la linea es OBLIGATORIA (QC-32 R11): sin ella, 23502;
+    //   - es ANOTATIVA (QC-32 R14): la base acepta CUALQUIER unidad del catalogo en
+    //     cualquier linea, no la deduce de la unidad del producto y no exige que coincidan
+    //     -por eso cada producto se crea con una unidad distinta de la de su linea-;
+    //   - y no hay ningun `enum` de Postgres del que tomarla: el catalogo es una tabla, que
+    //     se puede ampliar sin desplegar (QC-32 `design.md > 8.5`).
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
 
-      // Texto libre y anotativo: ni enum, ni catalogo, ni relacion con la unidad del
-      // producto (que aqui se deja en NULL a proposito).
-      const units = ['kg', 'gotas por litro', 'ug/mL', 'cucharadas soperas', '%']
-      for (const unit of units) {
-        const productId = await createProduct(tx, `Insumo ${unit}`)
-        const lineId = await createLine(tx, recipeId, productId, '1.0000', unit)
+      const symbols = ['kg', 'gotas por litro', 'ug/mL', 'cucharadas soperas', null]
+      for (const symbol of symbols) {
+        const unidadDeLaLinea = await createUnit(tx, symbol)
+        const unidadDelProducto = await createUnit(tx, 'kg')
+        // El producto declara una unidad DISTINTA de la de su linea: nada las relaciona.
+        const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`)
+        await tx.product.update({
+          where: { id: productId },
+          data: { unitId: unidadDelProducto },
+        })
+        const lineId = await createLine(tx, recipeId, productId, '1.0000', unidadDeLaLinea)
         const line = await tx.recipeLine.findUniqueOrThrow({
           where: { id: lineId },
-          select: { unit: true },
+          select: { unitId: true },
         })
-        expect(line.unit).toBe(unit)
+        expect(line.unitId).toBe(unidadDeLaLinea)
+        expect(line.unitId).not.toBe(unidadDelProducto)
       }
 
-      // Pero es OBLIGATORIA, a diferencia de `products.unit`.
+      // Pero es OBLIGATORIA, a diferencia de la unidad del producto (QC-32 R10).
       const productoSinUnidad = await createProduct(tx, 'Insumo sin unidad de linea')
       const sqlState = await expectRejectedByDatabase(
         tx,
@@ -813,7 +878,7 @@ describe('estructura de la linea de receta', () => {
       })
       expect(survivors).toEqual([])
 
-      // Y no hay ningun catalogo ni enum de unidades del que tomarla.
+      // Y el catalogo es una TABLA: no hay ningun tipo `enum` de Postgres de unidades.
       const unitTypes = await tx.$queryRaw<{ typname: string }[]>`
         SELECT t.typname FROM pg_type t
         JOIN pg_namespace n ON n.oid = t.typnamespace
@@ -827,7 +892,11 @@ describe('estructura de la linea de receta', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      const trace = `linea-${marker}`
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. `trace` era un
+      // TEXTO de unidad inventado que servia de MARCA para reconocer despues las filas que
+      // los cuatro intentos habrian escrito. La marca sigue siendo la unidad -misma idea-,
+      // pero ahora es el id de una unidad creada para este test, porque `unit_id` tiene FK.
+      const trace = await createUnit(tx)
 
       const sinReceta = await expectRejectedByDatabase(
         tx,
@@ -835,7 +904,7 @@ describe('estructura de la linea de receta', () => {
           rawInsert(tx, 'recipe_lines', {
             product_id: asUuid(productId),
             quantity: Prisma.sql`1.0000`,
-            unit: Prisma.sql`${trace}`,
+            unit_id: asUuid(trace),
           }),
         'linea sin receta',
       )
@@ -847,7 +916,7 @@ describe('estructura de la linea de receta', () => {
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             quantity: Prisma.sql`1.0000`,
-            unit: Prisma.sql`${trace}`,
+            unit_id: asUuid(trace),
           }),
         'linea sin producto',
       )
@@ -860,7 +929,7 @@ describe('estructura de la linea de receta', () => {
             recipe_id: asUuid(randomUUID()),
             product_id: asUuid(productId),
             quantity: Prisma.sql`1.0000`,
-            unit: Prisma.sql`${trace}`,
+            unit_id: asUuid(trace),
           }),
         'linea con receta inexistente',
       )
@@ -873,14 +942,17 @@ describe('estructura de la linea de receta', () => {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(randomUUID()),
             quantity: Prisma.sql`1.0000`,
-            unit: Prisma.sql`${trace}`,
+            unit_id: asUuid(trace),
           }),
         'linea con producto inexistente',
       )
       expect(productoInexistente).toBe(FOREIGN_KEY_VIOLATION)
 
       // «No crear ninguna fila»: ninguno de los cuatro intentos dejo rastro.
-      const survivors = await tx.recipeLine.findMany({ where: { unit: trace }, select: { id: true } })
+      const survivors = await tx.recipeLine.findMany({
+        where: { unitId: trace },
+        select: { id: true },
+      })
       expect(survivors).toEqual([])
     })
   })
@@ -891,6 +963,10 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La unidad es
+      // VALIDA a proposito, igual que antes se ponia 'kg': asi la unica FK que puede
+      // dispararse es la del producto, que es lo que este caso demuestra.
+      const unitId = await createUnit(tx)
 
       const productoFantasma = await expectRejectedByDatabase(
         tx,
@@ -899,7 +975,7 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
             recipe_id: asUuid(recipeId),
             product_id: asUuid(randomUUID()),
             quantity: Prisma.sql`1.0000`,
-            unit: Prisma.sql`${'kg'}`,
+            unit_id: asUuid(unitId),
           }),
         'linea con product_id inventado',
       )
@@ -917,9 +993,15 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
       )
       expect(autorFantasma).toBe(FOREIGN_KEY_VIOLATION)
 
-      // El porque: las cuatro FK existen en la base aunque el esquema Prisma declare
-      // `product_id`, `created_by` y `updated_by` como escalares sin `@relation`. La
-      // integridad la da Postgres; el ORM no puede atravesar la frontera con un `include`.
+      // El porque: las FK existen en la base aunque el esquema Prisma declare `product_id`,
+      // `unit_id`, `created_by` y `updated_by` como escalares sin `@relation`. La integridad
+      // la da Postgres; el ORM no puede atravesar la frontera con un `include`.
+      //
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Eran cuatro FK y
+      // son cinco. Se conserva entero lo que este caso vigila -la lista es CERRADA, asi que
+      // si una migracion futura se lleva una FK por drift, o alguien anade una relacion a
+      // escondidas, el test cae-, y la nueva `recipe_lines_unit_id_fkey` entra bajo el mismo
+      // criterio: escalar sin `@relation` en Prisma, FK de verdad en Postgres (QC-32 R18).
       const foreignKeys = await tx.$queryRaw<{ conname: string; referencia: string }[]>`
         SELECT c.conname, ft.relname AS referencia
         FROM pg_constraint c
@@ -930,6 +1012,7 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
       expect(foreignKeys).toEqual([
         { conname: 'recipe_lines_product_id_fkey', referencia: 'products' },
         { conname: 'recipe_lines_recipe_id_fkey', referencia: 'recipes' },
+        { conname: 'recipe_lines_unit_id_fkey', referencia: 'units' },
         { conname: 'recipes_created_by_fkey', referencia: 'users' },
         { conname: 'recipes_updated_by_fkey', referencia: 'users' },
       ])
@@ -1163,17 +1246,23 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const product1 = await createProduct(tx, 'Insumo 1')
       const product2 = await createProduct(tx, 'Insumo 2')
 
-      const line1 = await createLine(tx, recipeId, product1, '10.5000', 'kg')
-      const line2 = await createLine(tx, recipeId, product2, '0.2500', 'L')
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Dos unidades
+      // distintas, como antes eran 'kg' y 'L'; el orden por unidad se mantiene solo para que
+      // las dos lecturas se comparen fila a fila, y hoy ordena por `unit_id`.
+      const line1 = await createLine(tx, recipeId, product1, '10.5000', await createUnit(tx))
+      const line2 = await createLine(tx, recipeId, product2, '0.2500', await createUnit(tx, 'L'))
       const antes = await tx.recipeLine.findMany({
         where: { recipeId },
-        orderBy: { unit: 'asc' },
+        orderBy: { unitId: 'asc' },
       })
 
       await tx.recipe.update({ where: { id: recipeId }, data: { deletedAt: new Date() } })
 
       // R26: las lineas siguen existiendo, sin modificar y asociadas a su receta.
-      const despues = await tx.recipeLine.findMany({ where: { recipeId }, orderBy: { unit: 'asc' } })
+      const despues = await tx.recipeLine.findMany({
+        where: { recipeId },
+        orderBy: { unitId: 'asc' },
+      })
       expect(despues.map((line) => line.id).sort()).toEqual([line1, line2].sort())
       expect(despues.map((line) => line.recipeId)).toEqual([recipeId, recipeId])
       expect(despues.map((line) => line.quantity.toString())).toEqual(
@@ -1190,7 +1279,8 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx, 'Insumo descatalogado')
-      const lineId = await createLine(tx, recipeId, productId, '3.0000', 'kg')
+      const unitId = await createUnit(tx)
+      const lineId = await createLine(tx, recipeId, productId, '3.0000', unitId)
 
       // El borrado de producto es LOGICO (QC-20 D5): un UPDATE, no un DELETE.
       await tx.product.update({ where: { id: productId }, data: { deletedAt: new Date() } })
@@ -1198,7 +1288,10 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const line = await tx.recipeLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.productId).toBe(productId)
       expect(line.quantity.toString()).toBe('3')
-      expect(line.unit).toBe('kg')
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
+      // el caso vigila -borrar logicamente el producto no toca NINGUN dato de la linea, su
+      // unidad incluida-, ahora sobre `unit_id`.
+      expect(line.unitId).toBe(unitId)
 
       // Y la fila del producto sigue existiendo, que es lo que hace que la linea no
       // apunte al vacio (decision cerrada 13).

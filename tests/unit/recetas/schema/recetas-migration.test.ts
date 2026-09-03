@@ -15,6 +15,13 @@
 // fallar no vigila nada.
 //
 // Cubre R3, R5, R7, R9, R11, R13, R14, R16, R19, R21, R25, R27, R28, R29, R30, R33.
+//
+// 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este archivo NO cambia
+// de veredicto: afirma sobre el SQL ya APLICADO de `20260902163256_recipes_and_recipe_lines`,
+// que es historia y no se reescribe. La columna `recipe_lines.unit` que aqui se comprueba la
+// sustituye despues `20260903121404_units_catalog` por `unit_id`; ese SQL lo vigila
+// `tests/unit/unidades/schema/unidades-migration.test.ts`. Para saber la forma VIGENTE de la
+// tabla hay que leer los dos archivos, en ese orden.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -239,6 +246,15 @@ describe('migration.sql — columnas y tipos', () => {
     expect(createRecipes).toMatch(/"name" TEXT NOT NULL/i)
     expect(createRecipes).toMatch(/"name_normalized" TEXT NOT NULL/i)
     expect(createRecipes).toMatch(/"description" TEXT/i)
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Esta asercion se
+    // CONSERVA TAL CUAL y es deliberado: lo que este archivo lee es el SQL HISTORICO de la
+    // migracion de QC-24, que ya se aplico y no se reescribe nunca -reescribir una
+    // migracion aplicada es drift, y esta guardia existe justo para que no ocurra-. La
+    // columna `recipe_lines.unit` existio con esa forma exacta, y la que la sustituye por
+    // `unit_id` es la migracion `20260903121404_units_catalog`, cuyo SQL vigila
+    // `tests/unit/unidades/schema/unidades-migration.test.ts`. Lo que sigue vivo de R15 de
+    // QC-24 -unidad OBLIGATORIA en toda linea- se comprueba hoy sobre `unit_id`, que
+    // tambien nace `NOT NULL` (QC-32 R11).
     expect(createRecipeLines).toMatch(/"unit" TEXT NOT NULL/i)
     // Y ningun CHECK de longitud disfrazado.
     expect(up.filter((statement) => /length\s*\(/i.test(statement))).toHaveLength(0)
