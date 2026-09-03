@@ -166,9 +166,20 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
 
     // Modalidad real de Base UI: el resto del documento queda inerte y oculto al arbol de
     // accesibilidad. Con el panel abierto ni el `main` del contenido esta expuesto.
-    const inerte = screen.getByTestId(testId.toggle).closest('[data-base-ui-inert]');
-    expect(inerte).not.toBeNull();
-    expect(inerte).toHaveAttribute('aria-hidden', 'true');
+    //
+    // **Ajuste del 2026-09-03 (autorizado por el humano, QC-22 T12/T13).** Antes se exigia que
+    // el MISMO nodo llevase `data-base-ui-inert` y `aria-hidden="true"`. Desde que el layout
+    // privado monta la region de avisos (R22 de QC-22), `markOthers` de Base UI calcula dos
+    // conjuntos distintos: el marcador de inercia excluye solo el popup, mientras que el
+    // `aria-hidden` excluye ademas la rama que lleva a cualquier `[aria-live]` **a proposito**,
+    // para que los toasts se sigan anunciando con un modal abierto. El resultado que R30
+    // protege no cambia -el contenido, `main` incluido, sigue fuera del arbol de
+    // accesibilidad-; lo que cambio es la granularidad del marcado. Asi que el assert pasa a
+    // afirmar el RESULTADO: el contenido de detras esta marcado como inerte y esta oculto al
+    // arbol de accesibilidad, sin exigir que ambos marcadores caigan en el mismo nodo.
+    const contenidoDeDetras = screen.getByTestId(testId.toggle);
+    expect(contenidoDeDetras.closest('[data-base-ui-inert]')).not.toBeNull();
+    expect(contenidoDeDetras.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(screen.queryByRole('main')).toBeNull();
 
     // Y el foco se traslada dentro del panel.

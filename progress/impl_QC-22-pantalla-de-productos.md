@@ -433,3 +433,27 @@ pnpm exec next build                -> verde, `/inventario` sale como ruta dinam
 
 **`package.json` y `pnpm-lock.yaml` sin cambios** (`git status` limpio para los dos): ninguna
 dependencia entro en esta tanda, ni por CLI ni a mano.
+
+## Ajuste autorizado en `tests/unit/sidebar-mobile.test.tsx` (2026-09-03)
+
+**Archivo:** `tests/unit/sidebar-mobile.test.tsx` (heredado de QC-11, R30). **Autorizado
+expresamente por el humano el 2026-09-03**, y **solo** para esto; va en su propio commit para que
+se pueda leer solo, porque supera una decision de otra feature.
+
+- **Que fallaba:** la asercion exigia que el **mismo nodo** llevase `data-base-ui-inert` **y**
+  `aria-hidden="true"`. Desde que T4 monto la region de avisos, `markOthers` de Base UI calcula
+  dos conjuntos distintos: el marcador de inercia excluye solo el popup, mientras que el
+  `aria-hidden` excluye ademas **la rama que lleva a cualquier `[aria-live]`**, a proposito, para
+  que los toasts se sigan anunciando con un modal abierto. El `aria-hidden` cae entonces en los
+  hijos —el `<main>` incluido— y ya no en el contenedor exterior. **Cambio la granularidad del
+  marcado, no el resultado**: no es una regresion de accesibilidad.
+- **Que se cambio:** la asercion pasa a afirmar el **resultado** —el contenido de detras esta
+  marcado como inerte **y** esta oculto al arbol de accesibilidad— en vez de exigir que ambos
+  marcadores caigan en el mismo nodo. La fecha y el motivo quedan escritos **dentro del test**,
+  igual que se hizo al invertir el test de `private-layout`. La linea 172 original
+  (`queryByRole('main')` nulo), que es la que de verdad protege R30, se conserva intacta.
+- **Comprobado que sigue mordiendo:** con `modal={false}` en el `<Sheet>` de
+  `components/ui/sidebar.tsx` (cambio temporal, revertido con `git checkout` en el acto) el test
+  se pone **rojo** en la asercion de inercia. Si el contenido dejara de ocultarse, enrojece.
+- **Salida:** `pnpm exec vitest run --project ui tests/unit/sidebar-mobile.test.tsx` -> 7 tests,
+  **verde**.
