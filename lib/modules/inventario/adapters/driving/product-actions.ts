@@ -151,7 +151,7 @@ function buildProductCandidate(formData: FormData): unknown | typeof INVALID_NUM
     minPurchase,
     deliveryTime,
     qtyAlert,
-    unit: readOptionalFormString(formData, 'unit'),
+    unitId: readOptionalFormString(formData, 'unitId'),
   };
 }
 

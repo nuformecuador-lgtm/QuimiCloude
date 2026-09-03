@@ -32,7 +32,8 @@ hay ninguna feature de dominio quimico implementada.**
 No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Estan aqui porque **son caras de meter
 despues**: cambiarlas con datos ya cargados obliga a migrar historico. Conviene cerrarlas
 antes de la primera feature de inventario o de producto, no despues. De las cuatro
-originales, **la 1 esta cerrada** desde el 2026-09-01; siguen abiertas la 2, la 3 y la 4.
+originales quedan **dos cerradas** —la 1 desde el 2026-09-01 (QC-14, revisada por QC-32) y
+la 4 desde el 2026-09-03 (QC-33)—; siguen abiertas **la 2 y la 3**.
 
 1. ~~**Unidades de medida.**~~ **CERRADA el 2026-09-01 (QC-14) y REVISADA el 2026-09-02
    (QC-32).** Una sola unidad por elemento y **sin conversiones**: eso no ha cambiado y la
@@ -50,9 +51,14 @@ originales, **la 1 esta cerrada** desde el 2026-09-01; siguen abiertas la 2, la 
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
-4. **Contabilidad e impuestos.** ¿El ERP factura y liquida impuestos, o solo opera y
-   exporta a un contable externo? Define si entra dinero al modelo y con que precision
-   decimal (nunca `float` para importes).
+4. ~~**Contabilidad e impuestos.**~~ **CERRADA el 2026-09-03 (QC-33).** El ERP **no
+   factura ni liquida impuestos**. El dinero **si** entra al modelo —el precio de venta del
+   pedido nace aqui— con `decimal(14,4)` y nunca `float`, y los calculos de dinero, empezando
+   por el total del pedido, son **internos y derivados**: se calculan multiplicando precio
+   unitario por cantidad y **no se guardan**, para que no puedan contradecir a sus factores.
+   **Queda un fleco abierto**: si algun dia hay que exportar esos datos a un contable externo
+   no se evaluo, y esta anotado como pregunta abierta en
+   `specs/QC-33-modelo-pedidos/requirements.md`.
 
 ## Stack
 - **Frontend/servidor:** Next.js (App Router) + TypeScript en modo strict.

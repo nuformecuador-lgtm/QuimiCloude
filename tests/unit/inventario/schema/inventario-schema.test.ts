@@ -99,7 +99,11 @@ function has(model: PrismaModel, name: string): boolean {
   return model.fields.some((candidate) => candidate.name === name)
 }
 
-/** Los ocho datos del producto (R3), con su columna en la base (R19). */
+/** Los ocho datos del producto (R3), con su columna en la base (R19).
+ *
+ *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El octavo dato SIGUE
+ *  SIENDO la unidad de medida —R3 no se toca—; lo que cambia es su forma: `unit`/`unit`
+ *  (texto libre) pasa a `unitId`/`unit_id` (referencia a `units`). */
 const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['name', 'name'],
   ['presentationId', 'presentation_id'],
@@ -108,14 +112,18 @@ const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['minPurchase', 'min_purchase'],
   ['deliveryTime', 'delivery_time'],
   ['qtyAlert', 'qty_alert'],
-  ['unit', 'unit'],
+  ['unitId', 'unit_id'],
 ]
 
 /** Las cuatro columnas que R7 exige enteras. */
 const INTEGER_FIELDS = ['stock', 'minPurchase', 'qtyAlert', 'deliveryTime'] as const
 
-/** Las cinco columnas que R5 exige opcionales. */
-const OPTIONAL_FIELDS = ['stock', 'cost', 'deliveryTime', 'qtyAlert', 'unit'] as const
+/** Las cinco columnas que R5 exige opcionales.
+ *
+ *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva intacto lo
+ *  que R5 vigila —la unidad del producto SIGUE SIENDO OPCIONAL (QC-32 R10)—; solo cambia el
+ *  nombre del campo que lo cumple. */
+const OPTIONAL_FIELDS = ['stock', 'cost', 'deliveryTime', 'qtyAlert', 'unitId'] as const
 
 describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('Presentation declara id uuid propio y name obligatorio', () => {
@@ -254,7 +262,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(field(product, 'presentationId').attributes).toContain('@db.Uuid')
   })
 
-  it('stock, cost, deliveryTime, qtyAlert y unit son opcionales', () => {
+  it('stock, cost, deliveryTime, qtyAlert y unitId son opcionales', () => {
     // R5: ausencia de valor, no cero ni cadena vacia. Un `@default` convertiria la
     // ausencia en un valor y R5 dejaria de cumplirse sin que nadie lo note.
     for (const name of OPTIONAL_FIELDS) {
@@ -305,18 +313,30 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@db\.(Real|DoublePrecision)/)
   })
 
-  it('unit es String opcional y el esquema no declara ningun enum', () => {
-    // R10: texto libre, sin conjunto cerrado de valores admitidos.
-    const unit = field(product, 'unit')
-    expect(unit.type).toBe('String')
-    expect(unit.isOptional).toBe(true)
-    expect(unit.attributes).not.toMatch(/@default\(/)
-    // Sin `varchar(n)` arbitrario: la convencion del esquema es `text`.
-    expect(unit.attributes).not.toMatch(/@db\.(VarChar|Char)\s*\(/)
-    // Ni enum de Prisma ni relacion a un catalogo: `unit` es una columna escalar suelta.
+  it('unitId es uuid opcional, escalar sin @relation, y no queda columna unit de texto', () => {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. De lo que este caso
+    // afirmaba antes —«unit es String opcional, texto libre, sin conjunto cerrado de valores
+    // admitidos»— caduca UNICAMENTE la forma: hoy la unidad se guarda como referencia a
+    // `units` (QC-32 R10). Lo que R10 de QC-14 vigilaba y SIGUE VIGENTE se conserva aqui:
+    //   - la unidad del producto sigue siendo OPCIONAL (ausencia de valor, sin `@default`);
+    //   - sigue siendo ANOTATIVA: nada deriva de ella una conversion entre unidades y nada
+    //     restringe que unidad puede usar cada producto (QC-32 R14);
+    //   - el esquema sigue sin declarar ningun `enum`: el catalogo es una tabla, no un
+    //     conjunto cerrado compilado en el esquema (QC-32 `design.md > 8.5`).
+    const unitId = field(product, 'unitId')
+    expect(unitId.type).toBe('String')
+    expect(unitId.isOptional).toBe(true)
+    expect(unitId.attributes).toContain('@db.Uuid')
+    expect(unitId.attributes).toContain('@map("unit_id")')
+    expect(unitId.attributes).not.toMatch(/@default\(/)
+    // Escalar SIN `@relation` (QC-32 R18), mismo criterio que `createdBy`/`updatedBy`: la FK
+    // real vive en el SQL, para que `inventario` no pueda leer la tabla de `unidades` con un
+    // `include` que ninguna guardia detecta.
+    expect(unitId.attributes).not.toMatch(/@relation/)
     expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)
-    expect(has(product, 'unitId')).toBe(false)
-    expect(product.body).not.toMatch(/unit_id/)
+    // Ninguna columna de unidad de texto libre sobrevive en el producto (QC-32 R10).
+    expect(has(product, 'unit')).toBe(false)
+    expect(product.body).not.toMatch(/^\s*unit\s+String/m)
   })
 
   it('no hay ninguna columna derivada de bajo de existencias ni relacion entre qtyAlert y stock', () => {
@@ -468,7 +488,11 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     const indexMaps = [...product.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g)].map(
       (match) => match[1],
     )
-    expect(indexMaps).toEqual(['products_presentation_id_idx'])
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
+    // este caso vigila —que TODO indice de `products` este en ingles y que la lista sea
+    // cerrada, para que anadir uno a escondidas ponga el test rojo—; solo se suma el indice
+    // de la FK nueva `products_unit_id_idx` (QC-32 R20).
+    expect(indexMaps).toEqual(['products_presentation_id_idx', 'products_unit_id_idx'])
   })
 
   it('los dos modelos declaran /// @module inventario', () => {

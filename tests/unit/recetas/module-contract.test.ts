@@ -159,16 +159,28 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     }
   })
 
-  it('lib/modules/recetas no contiene prisma.product, @prisma/client ni rutas profundas a inventario', () => {
+  it('lib/modules/recetas no contiene prisma.product, @prisma/client fuera de su unico adaptador ni rutas profundas a inventario', () => {
     // R18: todo lo que `recetas` sepa del producto llega por el contrato publico de
     // `inventario`. Se barre TODO el modulo, no solo lo alcanzable desde el barrel: un
     // adaptador driven que consultara `prisma.product` violaria R18 igual (`design.md` 5.3).
+    //
+    // AJUSTE T10 (QC-25, Grupo C): `prisma.product` sigue prohibido en TODO el modulo sin
+    // excepcion. `@prisma/client` en cambio SI tiene una excepcion, unica y nombrada por
+    // el propio `design.md > 1` y `> 7.3`: `adapters/driven/persistence/recipe-prisma.ts`
+    // es "el UNICO archivo del modulo que importa `@prisma/client`" -es el adaptador de
+    // persistencia de `Recipe`/`RecipeLine`, modelos que `recetas` SI posee (`@module
+    // recetas` en `db/schema.prisma`)-. Prohibirlo aqui por completo chocaria con ese
+    // requisito de diseno; la guardia real de "solo un archivo lo importa" la vigila
+    // `tests/guards/guard-arquitectura-modulos.test.ts` (bloque 10, propiedad de modelos).
+    const RECIPE_PRISMA_ADAPTER = 'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts'
     expect(recetasSources.length).toBeGreaterThan(0)
     for (const file of recetasSources) {
       const source = read(file)
       const etiqueta = toPosix(relative(repoRoot, file))
       expect(source, `${etiqueta} consulta la tabla de productos`).not.toMatch(/prisma\.product/i)
-      expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
+      if (etiqueta !== RECIPE_PRISMA_ADAPTER) {
+        expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
+      }
       // Ninguna ruta profunda a otro modulo: solo el barrel.
       for (const spec of importSpecifiers(source)) {
         expect(spec, `${etiqueta}: ruta profunda a inventario`).not.toMatch(
@@ -233,30 +245,18 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     expect(definiciones).toEqual(['lib/modules/recetas/domain/recipe-name.ts'])
   })
 
-  it('la feature no anade adaptadores driving, rutas ni Server Actions', () => {
-    // R31: esta ficha es esquema, migracion y armazon. Ningun alta, consulta, edicion ni
-    // borrado, y por tanto ningun flujo navegable que un E2E pueda visitar (decision 17).
-    for (const carpeta of [
-      join(recetasDir, 'adapters', 'driving'),
-      join(recetasDir, 'adapters', 'driven'),
-      join(recetasDir, 'ports'),
-    ]) {
-      expect(sourcesIn(carpeta), `${toPosix(relative(repoRoot, carpeta))} deberia estar vacia`)
-        .toEqual([])
-    }
-    // Las tres siguen sembradas con su `.gitkeep`, para que git las versione.
-    for (const carpeta of ['ports', 'adapters/driven', 'adapters/driving']) {
-      expect(existsSync(join(recetasDir, ...carpeta.split('/'), '.gitkeep')), carpeta).toBe(true)
-    }
-
-    // Ningun 'use server' en TODO el modulo, no solo en lo alcanzable desde el barrel.
-    for (const file of recetasSources) {
-      expect(read(file), `${toPosix(relative(repoRoot, file))} declara 'use server'`).not.toMatch(
-        /['"]use server['"]/,
-      )
-    }
-
-    // Ninguna ruta HTTP ni pantalla de recetas.
+  it('la feature no anade ninguna pantalla ni route handler bajo app/ (la pantalla es QC-26)', () => {
+    // Esta afirmacion nacio en QC-24 (T10 de esa ficha), cuando `recetas` era solo
+    // esquema y armazon vacio, y se endurecio en el Grupo A/B de QC-25 (`ports/` y
+    // `domain/` con contenido, `adapters/` todavia vacia). El Grupo C (T9-T13) es
+    // EXACTAMENTE el que llena `adapters/driven/` (Prisma, Supabase Storage) y
+    // `adapters/driving/` (la Server Action) y cablea `lib/composition`: por eso las
+    // afirmaciones de "adapters vacia", "ningun 'use server' en el modulo" y
+    // "composicion no menciona recetas" de las rondas anteriores se retiran aqui a
+    // proposito, no por descuido -son justo lo que esta ronda construye, y quedan
+    // cubiertas por sus propios tests (`scope.test.ts`, `recipe-actions.test.ts`)-. Lo
+    // que SIGUE sin existir, y es lo unico que sigue siendo requisito de ESTA feature
+    // (R44), es la pantalla: no hay ruta HTTP ni componente de recetas bajo `app/`.
     for (const ruta of [
       join(repoRoot, 'app', 'api', 'recipes'),
       join(repoRoot, 'app', 'api', 'recetas'),
@@ -269,14 +269,6 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     for (const file of sourcesIn(join(repoRoot, 'app'))) {
       expect(read(file), `${toPosix(relative(repoRoot, file))} menciona recetas`).not.toMatch(
         /recetas|recipe/i,
-      )
-    }
-
-    // `lib/composition` NO se toca en esta ficha: sin puertos ni adaptadores no hay nada que
-    // cablear, y un `export const recetas = {}` seria una fachada vacia (`design.md` 5.4).
-    for (const file of sourcesIn(join(repoRoot, 'lib', 'composition'))) {
-      expect(read(file), `${toPosix(relative(repoRoot, file))} cablea recetas`).not.toMatch(
-        /recetas/i,
       )
     }
   })
