@@ -9,6 +9,7 @@ import {
 import type { ProductView } from '@/lib/modules/inventario';
 
 import { PRODUCT_COLUMNS } from './product-columns';
+import { ProductSheet } from './product-sheet';
 
 /**
  * Tabla del catalogo (R6-R9, `design.md > 4.3`, `> 7`).
@@ -25,6 +26,9 @@ import { PRODUCT_COLUMNS } from './product-columns';
  * edita el primitivo (R29) ni se anade columna pegajosa: `position: sticky` horizontal se
  * comporta distinto en WebKit y las acciones se alcanzan con el scroll de la propia tabla.
  */
+/** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
+export const ACTIONS_COLUMN_LABEL = 'Acciones';
+
 export function ProductTable({ products }: { readonly products: readonly ProductView[] }) {
   return (
     <Table data-testid="product-table">
@@ -40,6 +44,9 @@ export function ProductTable({ products }: { readonly products: readonly Product
               {column.label}
             </TableHead>
           ))}
+          <TableHead scope="col" data-testid="product-column-actions" className="text-right">
+            {ACTIONS_COLUMN_LABEL}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -54,6 +61,16 @@ export function ProductTable({ products }: { readonly products: readonly Product
                 {column.value(product)}
               </TableCell>
             ))}
+            {/*
+              Las acciones van en la ultima columna y se alcanzan con el scroll de la propia
+              tabla. **Siempre visibles**: nada de revelarlas con `:hover`, que en tactil no
+              existe (R31).
+            */}
+            <TableCell className="text-right" data-testid="product-cell-actions">
+              <div className="flex justify-end gap-1">
+                <ProductSheet product={product} />
+              </div>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

@@ -288,3 +288,42 @@ un comentario que explica por que no se usan.
   intenta pintar nada.
 
 **Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
+
+## T9 — Formulario y panel lateral de alta/edicion
+
+**Archivos:** `product-form.tsx` (nuevo), `product-sheet.tsx` (nuevo), el barrel y
+`product-table.tsx` (se le anade la columna de acciones con el disparador de edicion; era la
+deuda que T6 dejo anotada).
+
+- `<form action={formAction}>` con campos **no controlados** + `useActionState`, con el literal
+  `{ status: 'idle' }`. **Ninguna dependencia nueva**: no se corrio `shadcn add form` ni se
+  instalo nada (P2, resuelta el 2026-09-03).
+- **Validacion previa con `createProductSchema` importado del barrel** `@/lib/modules/inventario`:
+  los mensajes por campo salen de la misma regla que valida el servidor, que revalida igual. Los
+  cuatro campos enteros se convierten antes de validar (`FormData` solo entrega cadenas) y una
+  cadena no entera es error **de ese campo**, no el unico mensaje generico que devolveria la
+  action para los cuatro.
+- **R20 tiene dos mitades y las dos estan**: (a) los errores que identifican campo van junto al
+  campo con `aria-invalid` + `aria-describedby`; los que no (`invalid_input`, `not_found`,
+  `unauthorized` del servidor) van a una region `role="alert"` del formulario. (b) **no se pierde
+  lo escrito**: React 19 resetea los campos no controlados de un `<form action>` al completarse la
+  action, asi que el estado de fallo **devuelve los valores escritos** y cada campo los recupera
+  por `defaultValue`, con la `key` de montaje del mismo patron que `login-form.tsx`. Sin esto, R20
+  se cumpliria a medias y ningun typecheck lo habria dicho.
+- **R19**: la edicion precarga todos los valores actuales y envia el reemplazo completo
+  (`updateProductSchema` **es** `createProductSchema`). El panel monta el formulario solo cuando
+  se abre, asi que cada apertura parte de los valores del producto.
+- **R21 vive en el panel**: con exito cierra, `toast.success` y `router.refresh()`. Las actions de
+  QC-20 no revalidan nada y esta ficha no las abre (`design.md > 10.G`).
+- **R23**: `unit` es un `Input` de texto libre, con el comentario escrito de que QC-32 lo
+  convertira en selector — retrabajo aceptado a conciencia, no descuido.
+- `cost` es `type="text"` con `inputMode="decimal"`, **nunca** `type="number"`: un `number` de
+  HTML pasa por el binario de coma flotante y el importe viaja como cadena decimal a proposito.
+- **R31**: campos y botones con `min-h-11 min-w-11` y `text-base md:text-base` (16 px en todos los
+  anchos). El panel es `w-full` en angosto, con `overflow-y-auto` y
+  `pb-[env(safe-area-inset-bottom)]` para que el ultimo control no quede bajo la barra de gestos
+  de iOS. Las acciones de fila estan **siempre visibles**: nada de `:hover` como unica via.
+- **`grep` sobre toda la ruta**: sin `fetch(`, sin `@/lib/composition`, sin `prisma` y sin el
+  nombre de ninguna libreria de formularios (se reescribio el comentario que la nombraba).
+
+**Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.

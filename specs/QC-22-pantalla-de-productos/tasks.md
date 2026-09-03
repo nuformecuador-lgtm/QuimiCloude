@@ -149,7 +149,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 - **Hecho cuando**: typecheck y lint limpios; `grep` confirma que el archivo **no** importa
   `updatePresentationAction` ni `deletePresentationAction`.
 
-### [ ] T9 — Formulario y panel lateral de alta/edición
+### [x] T9 — Formulario y panel lateral de alta/edición
 - **Depende de**: T8. **Archivos**: `product-form.tsx`, `product-sheet.tsx`, barrel.
 - **Qué** (`design.md > 5`): `<form action>` no controlado + `useActionState` con literal
   `{ status: 'idle' }`; validación previa con `createProductSchema` importado del **barrel**

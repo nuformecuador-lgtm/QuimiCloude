@@ -23,5 +23,7 @@ export { PRESENTATION_FIELD, PresentationSelect } from './presentation-select';
 export { ProductListEmpty } from './product-list-empty';
 export { ProductListError } from './product-list-error';
 export { ProductListToolbar } from './product-list-toolbar';
-export { ProductTable } from './product-table';
+export { ProductForm } from './product-form';
+export { ProductSheet } from './product-sheet';
+export { ACTIONS_COLUMN_LABEL, ProductTable } from './product-table';
 export { ProductTableSkeleton } from './product-table-skeleton';
