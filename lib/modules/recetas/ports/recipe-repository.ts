@@ -15,7 +15,8 @@ export type RecipeLineData = {
   readonly productId: string;
   /** Cadena decimal(14,4): el dominio no puede importar `@prisma/client` (`design.md > 2`). */
   readonly quantity: string;
-  readonly unit: string;
+  /** Referencia al catalogo de `unidades` (R50, deroga R15): ya no es texto libre. */
+  readonly unitId: string;
 };
 
 /** Linea de producto tal como sale de una lectura, con su propio identificador. */

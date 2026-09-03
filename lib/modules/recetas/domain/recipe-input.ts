@@ -22,13 +22,19 @@ const quantitySchema = z
     message: 'La cantidad debe ser mayor que cero.',
   });
 
-/** Unidad de la linea: texto libre, sin catalogo (R15). */
-const unitSchema = z.string().trim().min(1);
+/**
+ * Unidad de la linea: referencia al catalogo de `unidades`, no texto libre (R50,
+ * deroga R15). Aqui, en el borde, solo se valida la FORMA -un UUID valido-; la
+ * EXISTENCIA real contra el catalogo la comprueba el caso de uso a traves de
+ * `UnitCatalog` (`@/lib/modules/unidades`), igual que `productId` no valida existencia
+ * en zod.
+ */
+const unitIdSchema = z.string().uuid();
 
 export const recipeLineSchema = z.object({
   productId: z.string().uuid(),
   quantity: quantitySchema,
-  unit: unitSchema,
+  unitId: unitIdSchema,
 });
 
 export type RecipeLineInput = z.infer<typeof recipeLineSchema>;

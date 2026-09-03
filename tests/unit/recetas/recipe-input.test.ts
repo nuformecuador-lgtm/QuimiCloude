@@ -1,6 +1,9 @@
 // T4 — Esquemas de entrada zod de receta (`design.md > 7.1`, `tasks.md > T4`). Validacion
-// de borde (R38): cierra R7, R9, R14, R15, R16, R19, R20, R30 (minimo e integridad) y el
+// de borde (R38): cierra R7, R9, R14, R16, R19, R20, R30, R50 (minimo e integridad) y el
 // test explicito de que el esquema no colapsa `undefined` y `null` del campo `image`.
+// R15 esta DEROGADO por R50: la unidad ya no es texto libre, es una referencia (UUID) al
+// catalogo de `unidades` -aqui solo se valida la FORMA, la existencia real es del caso de
+// uso, ver `tests/unit/recetas/recipe-service.test.ts`-.
 
 import { createRecipeSchema, recipeLineSchema, updateRecipeSchema } from '@/lib/modules/recetas/domain/recipe-input';
 import { pageQuerySchema } from '@/lib/modules/recetas/domain/page';
@@ -8,7 +11,7 @@ import { pageQuerySchema } from '@/lib/modules/recetas/domain/page';
 const LINEA_VALIDA = {
   productId: '11111111-1111-4111-8111-111111111111',
   quantity: '10.5000',
-  unit: 'litros',
+  unitId: '33333333-3333-4333-8333-333333333333',
 };
 
 const RECETA_VALIDA = {
@@ -18,21 +21,27 @@ const RECETA_VALIDA = {
   lines: [LINEA_VALIDA],
 };
 
-describe('recipeLineSchema — cantidad y unidad (R14, R15)', () => {
-  it('rechaza la cantidad cero, negativa o ausente, y la unidad vacia o solo espacios', () => {
+describe('recipeLineSchema — cantidad y unidad (R14, R50)', () => {
+  it('rechaza la cantidad cero, negativa o ausente, y el unitId ausente', () => {
     expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '0' }).success).toBe(false);
     expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '0.0000' }).success).toBe(false);
     expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '-1' }).success).toBe(false);
-    expect(recipeLineSchema.safeParse({ productId: LINEA_VALIDA.productId, unit: 'litros' }).success).toBe(
-      false,
-    );
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unit: '' }).success).toBe(false);
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unit: '   ' }).success).toBe(false);
+    expect(
+      recipeLineSchema.safeParse({ productId: LINEA_VALIDA.productId, quantity: '1' }).success,
+    ).toBe(false);
   });
 
-  it('acepta cualquier texto no vacio como unidad, sin catalogo', () => {
-    // R15
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unit: 'kg/mol raro' }).success).toBe(true);
+  it('rechaza un unitId que no es un UUID valido (R50)', () => {
+    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: '' }).success).toBe(false);
+    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: 'litros' }).success).toBe(false);
+    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: '123' }).success).toBe(false);
+  });
+
+  it('acepta cualquier UUID valido como unitId; la existencia real la valida el caso de uso (R50)', () => {
+    expect(
+      recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: '44444444-4444-4444-8444-444444444444' })
+        .success,
+    ).toBe(true);
   });
 
   it('acepta una cantidad decimal valida de hasta 14 digitos y 4 decimales, mayor que cero', () => {

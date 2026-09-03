@@ -2,8 +2,8 @@
 // aviso; tasks.md > T8; requirements.md R1, R2, R3). Es la unica red que existe para
 // R2/R3: un service test de un solo caso de uso puede seguir verde aunque `requireAdmin`
 // desaparezca de otro archivo, asi que aqui se barren los cinco, uno por uno, con dobles
-// de los TRES puertos -repositorio, catalogo de productos y almacenamiento- que FALLAN
-// si se les llama.
+// de los CUATRO puertos -repositorio, catalogo de productos, catalogo de unidades (R50) y
+// almacenamiento- que FALLAN si se les llama.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -19,6 +19,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
@@ -60,6 +61,15 @@ function catalogoQueFalla(): ProductCatalog {
   };
 }
 
+function catalogoUnidadesQueFalla(): UnitCatalog {
+  const explota = () => {
+    throw new Error('el catalogo de unidades no debe ser llamado');
+  };
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(explota),
+  };
+}
+
 function almacenamientoQueFalla(): RecipeImageStorage {
   const explota = () => {
     throw new Error('el almacenamiento de imagenes no debe ser llamado');
@@ -74,6 +84,7 @@ function almacenamientoQueFalla(): RecipeImageStorage {
 type Puertos = {
   readonly recipes: RecipeRepository;
   readonly products: ProductCatalog;
+  readonly units: UnitCatalog;
   readonly images: RecipeImageStorage;
 };
 
@@ -81,6 +92,7 @@ function montarPuertos(): Puertos {
   return {
     recipes: repositorioQueFalla(),
     products: catalogoQueFalla(),
+    units: catalogoUnidadesQueFalla(),
     images: almacenamientoQueFalla(),
   };
 }
@@ -92,6 +104,7 @@ function afirmarQueNingunPuertoFueLlamado(puertos: Puertos): void {
   expect(puertos.recipes.replaceAlive).not.toHaveBeenCalled();
   expect(puertos.recipes.softDeleteAlive).not.toHaveBeenCalled();
   expect(puertos.products.findRefs).not.toHaveBeenCalled();
+  expect(puertos.units.findRefs).not.toHaveBeenCalled();
   expect(puertos.images.upload).not.toHaveBeenCalled();
   expect(puertos.images.remove).not.toHaveBeenCalled();
   expect(puertos.images.publicUrl).not.toHaveBeenCalled();
@@ -109,10 +122,12 @@ const CASOS_DE_USO: ReadonlyArray<{
   {
     nombre: 'create-recipe',
     invocar: (puertos, actor) =>
-      createCreateRecipe({ recipes: puertos.recipes, products: puertos.products, images: puertos.images })(
-        RECETA_VALIDA,
-        actor,
-      ),
+      createCreateRecipe({
+        recipes: puertos.recipes,
+        products: puertos.products,
+        units: puertos.units,
+        images: puertos.images,
+      })(RECETA_VALIDA, actor),
   },
   {
     nombre: 'get-recipe',
@@ -135,11 +150,12 @@ const CASOS_DE_USO: ReadonlyArray<{
   {
     nombre: 'update-recipe',
     invocar: (puertos, actor) =>
-      createUpdateRecipe({ recipes: puertos.recipes, products: puertos.products, images: puertos.images })(
-        'receta-1',
-        RECETA_VALIDA,
-        actor,
-      ),
+      createUpdateRecipe({
+        recipes: puertos.recipes,
+        products: puertos.products,
+        units: puertos.units,
+        images: puertos.images,
+      })('receta-1', RECETA_VALIDA, actor),
   },
   {
     nombre: 'delete-recipe',
@@ -204,12 +220,13 @@ describe('R1 — el actor entra por parametro', () => {
       softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     };
     const products: ProductCatalog = { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
+    const units: UnitCatalog = { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) };
     const images: RecipeImageStorage = {
       upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/x.jpg'),
       remove: vi.fn<RecipeImageStorage['remove']>(async () => undefined),
       publicUrl: vi.fn<RecipeImageStorage['publicUrl']>((path) => `https://bucket.example/${path}`),
     };
-    const createRecipe = createCreateRecipe({ recipes, products, images });
+    const createRecipe = createCreateRecipe({ recipes, products, units, images });
 
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).resolves.toEqual({ id: 'receta-1' });
     await expect(createRecipe(RECETA_VALIDA, OPERADOR)).rejects.toBeInstanceOf(UnauthorizedError);

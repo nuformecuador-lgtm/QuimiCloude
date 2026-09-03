@@ -61,6 +61,8 @@ import {
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 import {
   createCreateRecipe,
   createDeleteRecipe,
@@ -173,9 +175,10 @@ export const inventario = {
   listPresentations: createListPresentations({ presentations: presentationRepository }),
 } as const;
 
-// El modulo `unidades` (QC-32) NO cablea nada aqui: su catalogo lo siembra su propia migracion
-// y el `UnitCatalog` que publica su contrato lo implementa y cablea QC-38, cuando haya
-// consumidor.
+// El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`
+// (QC-25) es el primer CONSUMIDOR de `UnitCatalog`: implementa el adaptador driven
+// (`lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts`) y lo
+// cablea aqui, mas abajo, para sus casos de uso de alta y edicion (R50).
 
 // ---------------------------------------------------------------------------------------
 // `recetas` (QC-25, T12). Bloque nuevo, separado a proposito: no reordena ni reformatea
@@ -187,6 +190,10 @@ export const inventario = {
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
 const productCatalog: ProductCatalog = { findRefs: findProductRefs };
+
+/** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
+ *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. */
+const unitCatalog: UnitCatalog = { findRefs: findUnitRefs };
 
 const recipeRepository: RecipeRepository = {
   create: createRecipe,
@@ -220,7 +227,12 @@ const recipeImageStorage: RecipeImageStorage = {
  * caso de uso lo recibe por parametro, y quien lo obtiene es la Server Action.
  */
 export const recetas = {
-  createRecipe: createCreateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
+  createRecipe: createCreateRecipe({
+    recipes: recipeRepository,
+    products: productCatalog,
+    units: unitCatalog,
+    images: recipeImageStorage,
+  }),
   getRecipe: createGetRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
   listRecipes: createListRecipes({
     recipes: recipeRepository,
@@ -228,6 +240,11 @@ export const recetas = {
     toOffsetLimit,
     buildPage,
   }),
-  updateRecipe: createUpdateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
+  updateRecipe: createUpdateRecipe({
+    recipes: recipeRepository,
+    products: productCatalog,
+    units: unitCatalog,
+    images: recipeImageStorage,
+  }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
 } as const;

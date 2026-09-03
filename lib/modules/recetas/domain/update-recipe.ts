@@ -7,6 +7,7 @@ import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** Advertencia de un borrado de almacenamiento que fallo, con su contexto (R49). */
 export type StorageWarning = {
@@ -23,6 +24,7 @@ export type UpdateRecipeResult = {
 export type UpdateRecipeDeps = {
   readonly recipes: RecipeRepository;
   readonly products: ProductCatalog;
+  readonly units: UnitCatalog;
   readonly images: RecipeImageStorage;
   /** Ver el comentario identico en `create-recipe.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -83,6 +85,18 @@ export function createUpdateRecipe(
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = idsANuevoValidar.some((productId) => !foundIds.has(productId));
       if (missing) throw new ValidationError();
+    }
+
+    // R50: a diferencia de `productId` (que solo valida las lineas NUEVAS, R45/R46),
+    // aqui se valida el `unitId` de TODAS las lineas de la lista FINAL en cada edicion
+    // -no hay excepcion para lineas preexistentes: `Unit` no tiene borrado logico y R50
+    // no la prevee-.
+    const unitIdsEnviados = [...new Set(data.lines.map((line) => line.unitId))];
+    if (unitIdsEnviados.length > 0) {
+      const unitRefs = await deps.units.findRefs(unitIdsEnviados);
+      const foundUnitIds = new Set(unitRefs.map((ref) => ref.id));
+      const missingUnit = unitIdsEnviados.some((unitId) => !foundUnitIds.has(unitId));
+      if (missingUnit) throw new ValidationError();
     }
 
     // R47 (`design.md > 7.1`, `> 9.3`): los TRES estados de `image`.

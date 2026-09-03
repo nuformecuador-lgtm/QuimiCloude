@@ -46,7 +46,7 @@ function toLineRow(line: RecipeWithLines['lines'][number]): RecipeLineRow {
     id: line.id,
     productId: line.productId,
     quantity: fromDecimalQuantity(line.quantity),
-    unit: line.unit,
+    unitId: line.unitId,
   };
 }
 
@@ -127,7 +127,7 @@ export async function createRecipe(
           create: data.lines.map((line) => ({
             productId: line.productId,
             quantity: toDecimalInput(line.quantity),
-            unit: line.unit,
+            unitId: line.unitId,
           })),
         },
       },
@@ -232,11 +232,11 @@ export async function replaceAliveRecipe(
             recipeId: id,
             productId: line.productId,
             quantity: toDecimalInput(line.quantity),
-            unit: line.unit,
+            unitId: line.unitId,
           },
           update: {
             quantity: toDecimalInput(line.quantity),
-            unit: line.unit,
+            unitId: line.unitId,
           },
         });
       }

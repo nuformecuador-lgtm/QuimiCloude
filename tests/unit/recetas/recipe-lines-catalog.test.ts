@@ -14,6 +14,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
@@ -22,10 +23,23 @@ const PRODUCTO_VIEJO = '11111111-1111-4111-8111-111111111111'; // ya en la recet
 const PRODUCTO_NUEVO = '22222222-2222-4222-8222-222222222222'; // se anade en esta edicion
 const PRODUCTO_NUEVO_DE_BAJA = '33333333-3333-4333-8333-333333333333';
 
-const LINEA_VIEJA = { productId: PRODUCTO_VIEJO, quantity: '10.0000', unit: 'litros' };
-const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, quantity: '2.0000', unit: 'kg' };
+const UNIT_ID = '44444444-4444-4444-8444-444444444444';
 
-const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', unit: 'kg' };
+const LINEA_VIEJA = { productId: PRODUCTO_VIEJO, quantity: '10.0000', unitId: UNIT_ID };
+const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, quantity: '2.0000', unitId: UNIT_ID };
+
+const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', unitId: null };
+
+/** Doble de `UnitCatalog` (R50): por defecto resuelve como existentes TODOS los `unitId`
+ *  pedidos -este archivo prueba R45/R46 sobre `productId`, no R50, asi que el doble no
+ *  necesita variantes-. */
+function montarCatalogoUnidades(): UnitCatalog {
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
+      ids.map((id) => ({ id, name: 'Unidad', symbol: null })),
+    ),
+  };
+}
 
 function filaConLineaVieja(): RecipeRow {
   return {
@@ -66,7 +80,7 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
     const recipes = montarRepositorio();
     const products: ProductCatalog = { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     // La receta solo reenvia la linea que YA tenia: ningun producto nuevo que validar.
     const resultado = await updateRecipe(
@@ -92,7 +106,7 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [REF_NUEVO]),
     };
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await updateRecipe(
       'receta-1',
@@ -114,7 +128,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
     };
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await expect(
       updateRecipe(
@@ -123,7 +137,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
           name: 'Desengrasante 5%',
           description: null,
           steps: [],
-          lines: [LINEA_VIEJA, { productId: PRODUCTO_NUEVO_DE_BAJA, quantity: '1.0000', unit: 'kg' }],
+          lines: [LINEA_VIEJA, { productId: PRODUCTO_NUEVO_DE_BAJA, quantity: '1.0000', unitId: UNIT_ID }],
         },
         ADMIN,
       ),
@@ -138,11 +152,11 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
     const products: ProductCatalog = {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         REF_NUEVO,
-        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unit: 'litros' },
+        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null },
       ]),
     };
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await createRecipe(
       { name: 'Receta nueva', description: null, steps: [], lines: [LINEA_VIEJA, LINEA_NUEVA] },
@@ -167,7 +181,7 @@ describe('R18 — productName del detalle sigue pidiendose sobre TODAS las linea
 
     expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_VIEJO]);
     expect(detalle.lines).toEqual([
-      { id: 'linea-1', productId: PRODUCTO_VIEJO, productName: null, quantity: '10.0000', unit: 'litros' },
+      { id: 'linea-1', productId: PRODUCTO_VIEJO, productName: null, quantity: '10.0000', unitId: UNIT_ID },
     ]);
   });
 });

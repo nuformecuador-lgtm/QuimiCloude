@@ -1,7 +1,7 @@
-// T6 — Los cinco casos de uso de receta, con dobles de los tres puertos (`design.md > 3`,
+// T6 — Los cinco casos de uso de receta, con dobles de los cuatro puertos (`design.md > 3`,
 // `> 6`, `> 7`, `> 9`; `tasks.md > T6`). Sin base de datos ni bucket: lo que se prueba
 // aqui es la DECISION que vive en `domain/`, no la implementacion Prisma/Supabase (T9-T11).
-// Cierra R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37.
+// Cierra R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37, R50.
 
 import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
@@ -14,15 +14,18 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
+const UNIT_ID = '33333333-3333-4333-8333-333333333333';
+
 const LINEA_VALIDA = {
   productId: '11111111-1111-4111-8111-111111111111',
   quantity: '10.5000',
-  unit: 'litros',
+  unitId: UNIT_ID,
 };
 
 const RECETA_VALIDA = {
@@ -42,10 +45,12 @@ const FILA_RECETA: RecipeRow = {
   updatedBy: 'admin-1',
   createdAt: AHORA,
   updatedAt: AHORA,
-  lines: [{ id: 'linea-1', productId: LINEA_VALIDA.productId, quantity: '10.5000', unit: 'litros' }],
+  lines: [{ id: 'linea-1', productId: LINEA_VALIDA.productId, quantity: '10.5000', unitId: UNIT_ID }],
 };
 
-const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unit: 'litros' };
+const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unitId: null };
+
+const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L' };
 
 function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepository {
   return {
@@ -61,6 +66,17 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
 function montarCatalogo(overrides: Partial<ProductCatalog> = {}): ProductCatalog {
   return {
     findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [PRODUCTO_REF]),
+    ...overrides,
+  };
+}
+
+/** Doble de `UnitCatalog` (R50): por defecto resuelve como existentes TODOS los `unitId`
+ *  que se le pidan -mismo patron que `montarCatalogo` para `ProductCatalog`-. */
+function montarCatalogoUnidades(overrides: Partial<UnitCatalog> = {}): UnitCatalog {
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
+      ids.map((id) => ({ id, name: UNIDAD_REF.name, symbol: UNIDAD_REF.symbol })),
+    ),
     ...overrides,
   };
 }
@@ -82,7 +98,7 @@ describe('R5, R6 — alta de receta', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     const resultado = await createRecipe(RECETA_VALIDA, ADMIN);
 
@@ -103,8 +119,8 @@ describe('R5, R6 — alta de receta', () => {
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
 
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
     const deleteRecipe = createDeleteRecipe({ recipes, now: () => AHORA });
 
     await createRecipe(RECETA_VALIDA, ADMIN);
@@ -138,7 +154,7 @@ describe('R8 — nombre duplicado', () => {
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toBeInstanceOf(DuplicateNameError);
   });
@@ -149,19 +165,19 @@ describe('R11 — la edicion recibe la lista final completa', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     const nuevaListaCompleta = {
       ...RECETA_VALIDA,
       lines: [
         LINEA_VALIDA,
-        { productId: '22222222-2222-4222-8222-222222222222', quantity: '1.0000', unit: 'kg' },
+        { productId: '22222222-2222-4222-8222-222222222222', quantity: '1.0000', unitId: UNIT_ID },
       ],
     };
     // La segunda linea es "nueva": hace falta que el catalogo la reconozca para pasar.
     (products.findRefs as ReturnType<typeof vi.fn>).mockResolvedValue([
       PRODUCTO_REF,
-      { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unit: 'kg' },
+      { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null },
     ]);
 
     await updateRecipe('receta-1', nuevaListaCompleta, ADMIN);
@@ -184,11 +200,43 @@ describe('R17 — producto inexistente', () => {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
     });
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toThrow();
     expect(products.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.productId]);
     expect(recipes.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('R50 — unidad inexistente', () => {
+  it('rechaza la linea cuyo unitId no existe en el catalogo de unidades, sin crear nada', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo();
+    const units = montarCatalogoUnidades({
+      findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
+    });
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, units, images, now: () => AHORA });
+
+    await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toThrow();
+    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId]);
+    expect(recipes.create).not.toHaveBeenCalled();
+  });
+
+  it('en la edicion valida el unitId de TODAS las lineas finales, no solo de las nuevas', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo();
+    const units = montarCatalogoUnidades({
+      findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
+    });
+    const images = montarAlmacenamiento();
+    const updateRecipe = createUpdateRecipe({ recipes, products, units, images, now: () => AHORA });
+
+    // La linea es la MISMA que ya trae `FILA_RECETA` (existing) -no es "nueva"- pero R50
+    // no exime a las lineas preexistentes: se valida igual.
+    await expect(updateRecipe('receta-1', RECETA_VALIDA, ADMIN)).rejects.toThrow();
+    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId]);
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
   });
 });
 
@@ -197,8 +245,8 @@ describe('R21 — receta sin imagen', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await createRecipe(RECETA_VALIDA, ADMIN);
     await updateRecipe('receta-1', RECETA_VALIDA, ADMIN);
@@ -213,7 +261,7 @@ describe('R22 — sube la imagen a traves del puerto', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await createRecipe({ ...RECETA_VALIDA, image: { bytes: JPEG_BYTES } }, ADMIN);
 
@@ -231,7 +279,7 @@ describe('R26 — reemplazo de imagen', () => {
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     const llamadas: string[] = [];
     (recipes.replaceAlive as ReturnType<typeof vi.fn>).mockImplementation(async () => {
@@ -299,7 +347,7 @@ describe('R33 — la lista no trae lineas, el detalle si', () => {
         productId: LINEA_VALIDA.productId,
         productName: PRODUCTO_REF.name,
         quantity: '10.5000',
-        unit: 'litros',
+        unitId: UNIT_ID,
       },
     ]);
   });

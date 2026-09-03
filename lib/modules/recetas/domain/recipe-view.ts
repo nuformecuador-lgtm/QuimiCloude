@@ -25,14 +25,16 @@ export type RecipeSummary = {
  * Linea de producto tal como sale en el DETALLE (R33). `productName` sale de
  * `ProductCatalog.findRefs` (`design.md > 6`), y es `null` cuando el producto esta
  * borrado logicamente (R18): la linea se conserva igual. `quantity` sigue siendo cadena
- * -mismo criterio que en el borde (`design.md > 2`)-.
+ * -mismo criterio que en el borde (`design.md > 2`)-. `unitId` es la REFERENCIA al
+ * catalogo de `unidades` (R50): este modulo no resuelve nombre ni simbolo, solo pasa el
+ * identificador tal cual.
  */
 export type RecipeLineView = {
   readonly id: string;
   readonly productId: string;
   readonly productName: string | null;
   readonly quantity: string;
-  readonly unit: string;
+  readonly unitId: string;
 };
 
 /** Detalle de una receta (D14, R33): el resumen mas los pasos y las lineas completas. */

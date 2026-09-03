@@ -53,7 +53,7 @@ export function createGetRecipe(
         productId: line.productId,
         productName: namesById.get(line.productId) ?? null,
         quantity: line.quantity,
-        unit: line.unit,
+        unitId: line.unitId,
       })),
     };
   };

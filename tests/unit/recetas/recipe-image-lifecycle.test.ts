@@ -10,6 +10,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
@@ -62,12 +63,18 @@ function montarCatalogo(): ProductCatalog {
   return { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
 }
 
+/** Doble simple de `UnitCatalog`: este archivo prueba el ciclo de vida de la imagen
+ *  (R47-R49), no R50, y todas sus recetas van sin lineas -no hace falta variar el doble. */
+function montarCatalogoUnidades(): UnitCatalog {
+  return { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) };
+}
+
 describe('R47 — image omitido conserva la imagen sin tocar el almacenamiento', () => {
   it('image omitido conserva imagePath existente, no llama a upload ni a remove', async () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await updateRecipe('receta-1', RECETA_VALIDA, ADMIN);
 
@@ -86,7 +93,7 @@ describe('R47 — image null deja la receta sin ruta y borra el archivo', () => 
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     const resultado = await updateRecipe('receta-1', { ...RECETA_VALIDA, image: null }, ADMIN);
 
@@ -106,7 +113,7 @@ describe('R47 — image null deja la receta sin ruta y borra el archivo', () => 
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await updateRecipe('receta-1', { ...RECETA_VALIDA, image: null }, ADMIN);
 
@@ -119,7 +126,7 @@ describe('R26 — image { bytes } sube, persiste la ruta nueva y borra la anteri
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     const resultado = await updateRecipe(
       'receta-1',
@@ -148,6 +155,7 @@ describe('R48 — un solo remove para los dos caminos de borrado', () => {
     const updateReemplazo = createUpdateRecipe({
       recipes: recipesReemplazo,
       products,
+      units: montarCatalogoUnidades(),
       images: imagesReemplazo,
       now: () => AHORA,
     });
@@ -159,6 +167,7 @@ describe('R48 — un solo remove para los dos caminos de borrado', () => {
     const updateQuitar = createUpdateRecipe({
       recipes: recipesQuitar,
       products,
+      units: montarCatalogoUnidades(),
       images: imagesQuitar,
       now: () => AHORA,
     });
@@ -184,7 +193,7 @@ describe('R49 — un remove que falla no revierte la edicion', () => {
         throw new Error('el bucket no respondio');
       }),
     });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     // No debe lanzar ni propagar el fallo de `remove`: la edicion resuelve igual.
     const resultado = await updateRecipe('receta-1', { ...RECETA_VALIDA, image: null }, ADMIN);
@@ -209,7 +218,7 @@ describe('R49 — un remove que falla no revierte la edicion', () => {
         throw new Error('timeout de red');
       }),
     });
-    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     const resultado = await updateRecipe(
       'receta-1',

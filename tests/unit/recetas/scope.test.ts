@@ -151,9 +151,15 @@ describe('alcance de QC-25 (crud-de-recetas): sin pantalla, sin route handler, s
     // tal cual. Es una afirmacion DESCRIPTIVA sobre el archivo actual, ligada a los
     // nombres de columna concretos de `Recipe`/`RecipeLine` -no un censo global del
     // schema-: si alguien anade, quita o renombra una columna, un indice o una
-    // restriccion de estos DOS modelos, esta prueba cae. QC-32 (migracion de la unidad a
-    // catalogo) actualizara este test como parte de su propio cambio, tal como manda
-    // `design.md > 14`.
+    // restriccion de estos DOS modelos, esta prueba cae.
+    //
+    // NOTA (2026-09-03): `RecipeLine.unit` (texto) paso a `RecipeLine.unitId` (UUID, FK al
+    // catalogo de `unidades`, R50) cuando QC-32 se mergeo a `dev` a mitad de la
+    // implementacion de esta ficha. NO es una regresion de R41: esta feature (QC-25) no
+    // anadio la columna, la trajo QC-32 por su cuenta; este test solo se actualiza para
+    // reflejar el estado REAL y correcto del schema tras ese merge -"design.md > 14"
+    // preveia que QC-32 lo actualizaria, pero por el orden real del merge quedo pendiente
+    // hasta este cierre.
     const schema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8')
 
     function bodyOfModel(model: string): string {
@@ -193,12 +199,13 @@ describe('alcance de QC-25 (crud-de-recetas): sin pantalla, sin route handler, s
       'recipeId String @map("recipe_id") @db.Uuid',
       'productId String @map("product_id") @db.Uuid',
       'quantity Decimal @db.Decimal(14, 4)',
-      'unit String',
+      'unitId String @map("unit_id") @db.Uuid',
       'createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)',
       'updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)',
       'recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)',
       '@@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")',
       '@@index([productId], map: "recipe_lines_product_id_idx")',
+      '@@index([unitId], map: "recipe_lines_unit_id_idx")',
       '@@map("recipe_lines")',
     ]
 

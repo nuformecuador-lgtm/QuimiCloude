@@ -11,6 +11,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
@@ -51,6 +52,10 @@ function montarCatalogo(): ProductCatalog {
   return { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
 }
 
+function montarCatalogoUnidades(): UnitCatalog {
+  return { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) };
+}
+
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0, 0, 0]);
 
 describe('R24 — se persiste la ruta, no la URL', () => {
@@ -58,7 +63,13 @@ describe('R24 — se persiste la ruta, no la URL', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({
+      recipes,
+      products,
+      units: montarCatalogoUnidades(),
+      images,
+      now: () => AHORA,
+    });
 
     await createRecipe({ ...RECETA_VALIDA, image: { bytes: JPEG_BYTES } }, ADMIN);
 
