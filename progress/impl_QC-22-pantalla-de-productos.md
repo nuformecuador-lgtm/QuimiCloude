@@ -1089,3 +1089,95 @@ rol.
 Rojo 1 apagado y con falsabilidad demostrada; rojo 2 apagado en su causa declarada (guardias y
 `identity` enteras en verde, borde incluido), pero el mismo archivo de test destapo un tercer
 ofensor en UI que este rol no puede tocar y queda **en manos del humano**.
+
+---
+
+## Continuacion — el tercer ofensor, RESUELTO (2026-09-03)
+
+**La PARADA de la seccion anterior queda cerrada.** Decision humana del 2026-09-03: **se acota el
+guard, no el componente**. La cuarta lectura que se habia propuesto era la correcta.
+
+### Que cambia
+
+Solo `tests/unit/inventario/schema/inventario-schema.test.ts`. **No** `presentation-select.tsx`,
+**no** ningun archivo de UI, **no** `lib/modules/inventario/`.
+
+La regla acotaba por la **forma** del import («todo import del barrel fuera de `lib/composition`
+debe ser `import type`»). Pasa a acotar por **lo que se importa**: lo que enrojece es traerse una
+**factoria de caso de uso** fuera de `lib/composition`. Tipos, esquemas zod y constantes del
+contrato pasan.
+
+Es exactamente lo que el propio comentario del guard decia defender —«un Server Component podria
+importar una FACTORIA de `inventario` del barrel y saltarse `lib/composition`, que es el punto
+UNICO de cableado»—. Un esquema zod no es eso: no cablea nada, no arrastra persistencia, y no se
+puede importar como tipo porque se evalua.
+
+Dos apoyos citados dentro del test, que no son opinion de esta ficha:
+
+1. la cabecera del **propio barrel de QC-20** dice literalmente que «debe poder importarse desde un
+   componente de cliente sin arrastrar servidor (R31, `design.md > 3`) **—QC-22 lo hara—**». QC-20
+   previo este import y a la vez escribio un guard que lo prohibia: contradiccion interna suya,
+   resuelta a favor de lo que el barrel **promete**;
+2. `docs/architecture.md > La regla de dependencias` ya permite a `components/**`, `hooks/**` y a
+   los archivos `'use client'` importar `@/lib/modules/M`, sin exigir que sea solo tipo.
+
+Fecha (2026-09-03) y motivo quedan **dentro del test**, igual que en el centinela de alcance.
+
+### Como quedo la condicion
+
+- La lista de las nueve factorias **no se escribe a mano**: se **deriva del propio barrel** por el
+  tipo `...Deps` hermano de cada sentencia de reexport
+  (`export { createListProducts, type ListProductsDeps } from './domain/list-products'`). Esa es la
+  firma estructural que separa `createListProducts` de `createProductSchema`, que tambien empieza
+  por «create» y no es factoria. Una decima factoria queda vigilada el dia que se publique.
+- **Centinela sobre el derivador**: si el parseo dejase de encontrar nada, la guardia no miraria
+  nada y pasaria en verde. Una asercion sobre las nueve por nombre lo impide.
+- El barrido pasa a leer **sentencias** de import y no lineas sueltas: un import multilinea
+  escondia el binding.
+- **Hueco cerrado de paso**: `import * as inventario from '@/lib/modules/inventario'` se trae el
+  modulo entero, factorias incluidas, y no da ningun nombre que comparar. Ahora se marca por si
+  mismo.
+- Las **dos exenciones previas se conservan tal cual**: subrutas del modulo (Server Actions, que la
+  UI importa en runtime a proposito) y `lib/composition/**`, que no esta entre las raices barridas.
+
+### Prueba de que sigue mordiendo
+
+Cuatro archivos sinteticos, creados y borrados:
+
+| Caso | Archivo | Resultado |
+| --- | --- | --- |
+| Factoria desde `app/` | `app/(private)/inventario/mal-factoria.ts` (`createListProducts`) | **rojo** |
+| Factoria en import MULTILINEA junto a un esquema legitimo, desde `components/` | `components/mal-multilinea.ts` (`createProductSchema` + `createCreateProduct`) | **rojo**, y senala **solo** `createCreateProduct` |
+| Espacio de nombres desde `hooks/` | `hooks/mal-namespace.ts` (`import * as`) | **rojo** |
+| **Legitimo**: esquema zod, como el de `presentation-select` | `components/legitimo-esquema.ts` (`createPresentationSchema`) | **verde** |
+
+El segundo caso es el que importa: demuestra que la guardia distingue **dentro del mismo import**
+lo que pasa de lo que no.
+
+### Ningun otro ofensor tapado
+
+`tests/unit/inventario/schema/inventario-schema.test.ts` pasa **entero (20/20)**, no se detiene en
+un primer `expect`: el barrido recorre las cuatro raices completas. Y las tres suites que podian
+desestabilizarse pasan enteras. **No queda nada tapado detras.**
+
+### Salida real
+
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin salida)
+
+$ pnpm lint
+> eslint
+(sin salida)
+
+$ pnpm exec vitest run tests/unit/inventario/ tests/guards/ tests/unit/identity/
+ Test Files  53 passed (53)
+      Tests  641 passed (641)
+```
+
+### Veredicto
+
+Los dos rojos del encargo y el tercer ofensor que destaparon quedan apagados; `typecheck`, `lint`
+y las tres suites relacionadas (641 tests) en verde, sin tocar UI ni `lib/modules/inventario/` ni
+anadir dependencias. Falta el gate completo, que corre el leader.
