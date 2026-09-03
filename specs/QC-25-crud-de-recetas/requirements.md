@@ -99,8 +99,23 @@ aplica ninguno.
 o es solo espacios, ENTONCES el sistema DEBE rechazar la operación **antes de llegar al
 repositorio**.
 
-**R15.** El sistema DEBE aceptar la unidad de la línea como **texto libre**, y NO DEBE
-restringirla a ningún catálogo de unidades ni derivarla de la unidad del producto.
+**R15.** ~~El sistema DEBE aceptar la unidad de la línea como **texto libre**, y NO DEBE
+restringirla a ningún catálogo de unidades ni derivarla de la unidad del producto.~~
+**DEROGADO el 2026-09-03 por decisión humana**, y sustituido por **R50**: QC-32 se mergeó en `dev`
+mientras esta feature se implementaba, y en `dev` la columna ya no es `unit` sino `unit_id`. La
+decisión cerrada que fijaba el texto libre **anticipó por escrito esta sustitución exacta** —«cuando
+QC-32 llegue, la validación “unidad vacía” de aquí se sustituye por “la unidad existe en el
+catálogo”»—; lo que no anticipó es que ocurriera el mismo día. Se conserva tachado y con el motivo,
+como se hizo con la D3 de **QC-9**, en vez de borrarlo: un requisito que se deroga cuenta algo que
+uno reescrito calla.
+
+**R50.** El sistema DEBE tomar la unidad de la línea como **una referencia al catálogo del módulo
+`unidades`**, y SI una línea apunta a una unidad que **no existe** en ese catálogo, ENTONCES DEBE
+rechazar la operación y NO DEBE crear ni modificar ninguna fila; la comprobación DEBE hacerse **a
+través del contrato público de `unidades`** (`@/lib/modules/unidades`), nunca contra su tabla, su
+modelo de Prisma ni su repositorio. La unidad sigue siendo **obligatoria** —eso no lo cambia QC-32,
+que solo cambió la forma— y sigue **sin derivarse** de la unidad del producto y **sin conversión**
+entre unidades.
 
 **R16.** SI la lista de líneas contiene dos o más líneas que apuntan al **mismo producto**,
 ENTONCES el sistema DEBE rechazar la operación y no DEBE crear ni modificar ninguna fila.
@@ -360,7 +375,7 @@ del `design.md`**, que hay que corregir en consecuencia (`design.md > 13.1`).
 | 2026-09-03 | ¿Cómo llegan los productos al editar? | **La lista final completa, y el servidor concilia** qué línea es nueva, cuál cambió y cuál desapareció. No hay operaciones sueltas por línea: la línea no existe separada de su receta. Quitar un producto **borra la línea de verdad**, sin `deleted_at` (**QC-24 D5**) |
 | 2026-09-03 | ¿Qué se rechaza antes de guardar? | Nombre vacío o solo espacios (se recortan los extremos antes de guardar); nombre de más de **120**; descripción de más de **500**; nombre repetido comparado **normalizado** (sin acentos, sin caracteres especiales, sin distinguir mayúsculas); **nombre que al normalizar queda vacío** —un `«---»` no puede llegar al índice único y anunciarse al usuario como «ya existe», heredado de **QC-20 D22**—; cantidad negativa o cero; unidad vacía; producto repetido dentro de la misma receta; producto inexistente; y unos pasos que no sean una lista de textos o que traigan algún texto vacío |
 | 2026-09-03 | Topes de los pasos | **Hasta 50 pasos, 1.000 caracteres cada uno.** Es validación de aplicación: la columna sigue guardando el documento JSON tal cual (**QC-24 D10**). El tope no lo alcanza ninguna receta real, pero impide que alguien mande un documento de megabytes a una columna sin límite |
-| 2026-09-03 | La unidad de la línea, ¿sigue siendo texto libre? | **Sí, aquí sí.** No se adelanta el catálogo: **QC-32** ya está acotada para migrar `products.unit` y la unidad de la línea a FK, y **su ficha cuenta explícitamente con que esta las deja como texto**. Cuando QC-32 llegue, la validación «unidad vacía» de aquí se sustituye por «la unidad existe en el catálogo» |
+| 2026-09-03 | La unidad de la línea, ¿sigue siendo texto libre? | ~~**Sí, aquí sí.** No se adelanta el catálogo: **QC-32** ya está acotada para migrar `products.unit` y la unidad de la línea a FK, y **su ficha cuenta explícitamente con que esta las deja como texto**. Cuando QC-32 llegue, la validación «unidad vacía» de aquí se sustituye por «la unidad existe en el catálogo»~~ — **DEROGADA el 2026-09-03, el mismo día**: ver la fila «QC-32 llegó antes de tiempo» al final de esta tabla. La sustitución que esta decisión dejó escrita es exactamente la que hubo que aplicar |
 | 2026-09-03 | ¿Se puede borrar un producto que alguna receta usa? | **Sí, sigue permitido**, y la receta conserva su línea. El borrado de producto es lógico (**QC-20 D5**), así que la fila sigue existiendo y la línea sigue apuntando al mismo producto (**QC-24**) |
 | 2026-09-03 | Módulo, capas y borde | Módulo **`recetas`**. Mutaciones por **Server Action** en `adapters/driving/`, no Route Handler (`docs/architecture.md > Server Actions vs Route Handlers`). Validación de entrada con **zod** en el borde (`docs/conventions.md`). El producto se conoce **por el contrato público de `inventario`** (`@/lib/modules/inventario`), nunca por su tabla, su modelo de Prisma ni su repositorio (**QC-24 D1**, **QC-15**). Identificadores de la DB en **inglés** (**QC-4**) |
 | 2026-09-03 | ¿De dónde sale el usuario en sesión? | De **QC-8 — sesión actual**, que ya es bloqueante de esta ficha. El *service* recibe el actor y su rol **por parámetro**; quien lo resuelve es el adaptador driving. Heredado de **QC-20 D17** |
@@ -374,4 +389,5 @@ correspondientes se dan por cerradas y bajan aquí.
 | --- | --- | --- |
 | 2026-09-03 | ¿Se puede quitar la imagen de una receta sin poner otra? (pregunta 5) | **Sí, y ese archivo SÍ se borra del bucket.** Se aparta de la posición por defecto del `design.md`, que proponía conservarlo. Consecuencia asumida: hay **dos** caminos que borran en Storage —reemplazar y quitar—, así que **los dos pasan por el mismo adaptador y comparten sus tests**; lo que se descartó es tener dos implementaciones del borrado, no tener dos caminos |
 | 2026-09-03 | Si falla el borrado del archivo anterior al reemplazar, ¿falla la edición? (pregunta 6) | **No: la edición NO falla.** La receta ya está guardada y correcta; deshacerla por un archivo que ya no referencia nadie cambiaría un huérfano barato por una edición perdida cara. El fallo **se registra con contexto** y nunca se traga en un `catch` vacío (`docs/conventions.md`). Aplica igual al borrado de la pregunta 5 |
+| 2026-09-03 | **QC-32 llegó antes de tiempo: ¿QC-25 se adapta o se cierra como está?** | **Se adapta en esta misma ficha.** QC-32 se mergeó en `dev` **mientras QC-25 se implementaba**, y allí `recipe_lines.unit` ya es `unit_id`, un UUID obligatorio con FK al catálogo del módulo `unidades`. La unidad de la línea pasa a ser **una referencia al catálogo**, validada por el **contrato público** `@/lib/modules/unidades` — nunca contra su tabla—, y la validación «unidad vacía» se sustituye por «la unidad existe en el catálogo» (**R50**, que deroga R15). QC-25 pasa a ser el **primer consumidor** de ese contrato, así que implementa y cablea el adaptador de `UnitCatalog` **dentro de `unidades`**, exactamente como ya hizo con `ProductCatalog` dentro de `inventario`. Se descartó cerrar QC-25 con el texto libre y dejar la adaptación a una ficha nueva: **el PR no compilaría contra `dev`**, así que esa ficha no sería una mejora futura sino un bloqueante inmediato. Lo que **no** cambia: la unidad sigue obligatoria, sigue sin derivarse de la del producto y sigue sin haber conversión |
 | 2026-09-03 | Al editar una receta con una línea de un producto ya dado de baja, ¿se puede guardar? (pregunta 7) | **Sí: se admite la línea que ya estaba.** La existencia del producto se exige **solo para los que no estaban ya en la receta**, así que sigue siendo imposible **añadir** un producto inexistente o de baja, pero editar la descripción no obliga a mutilar la fórmula. Resuelve el choque real entre **R17** (el producto debe existir) y **R18** (la receta conserva la línea del producto de baja), que `ProductCatalog` provocaba al devolver solo productos vivos. Lo contrario habría convertido dar de baja un producto en una limpieza en cadena de todas las recetas que lo usan |
