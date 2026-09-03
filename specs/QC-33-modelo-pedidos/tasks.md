@@ -212,14 +212,14 @@ se sube al leader**: significa que algo de lo de arriba dejó de ser cierto.
   ejerciéndola.
 - `beforeAll` que falle con un mensaje claro («corre `pnpm run db:migrate`») si `orders` no existe.
 - Casos exactos: los de la tabla de trazabilidad, columna **I**.
-- **Hecho cuando:** todos pasan y cubren R1, R6, R7, R9, R10, R12, R13, R14, R15, R16, R17, R18, R19,
+- **Hecho cuando:** todos pasan y cubren R1, R6, R7, R8, R9, R12, R13, R14, R15, R16, R17, R18, R19,
   R20, R21, R22, R23, R25, R26, R27, R28, R29, R30, R33, R41, R42.
 
 ---
 
 ## Bloque F — Cierre
 
-### [ ] T10. Sincronizar con `dev` y correr el gate completo
+### [x] T10. Sincronizar con `dev` y correr el gate completo
 - Dep: T0–T9.
 - Archivos: ninguno (salvo lo que traiga el merge).
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` **sin flags**. El modo rápido no vale
