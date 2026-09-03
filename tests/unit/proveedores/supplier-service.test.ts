@@ -223,6 +223,13 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     // 2. Ni el dominio ni el puerto nombran la idea en ninguna forma.
     const puerto = sinComentarios(read('ports', 'supplier-repository.ts'))
     expect(puerto).not.toMatch(/includeDeleted|onlyDeleted|withDeleted/i)
+    expect(metodosDelPuerto('supplier-repository.ts')).toEqual([
+      'create',
+      'findAliveById',
+      'listAlive',
+      'softDeleteAlive',
+      'updateAlive',
+    ])
     for (const archivo of [
       'create-supplier.ts',
       'update-supplier.ts',
