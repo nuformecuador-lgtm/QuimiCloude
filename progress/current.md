@@ -13,8 +13,10 @@
 |---|---|---|---|---|---|---|
 | QC-13 | guardia-de-sesion-en-navegacion | QC-17 Identidad y acceso | frontend | pending — **worktree montado, F1.2 en curso** | `feature/QC-13-guardia-de-sesion-en-navegacion` | Sesión de hoy (2026-09-03). **Acotada con `/afinar-feature`**: `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md`, 16 decisiones cerradas y 6 preguntas abiertas. **El board se corrigió antes de sembrar**: la `description` prometía trabajo que QC-9, QC-8, QC-11 y QC-12 ya entregaron —la ficha se escribió antes de que QC-9 existiera—, `zone` bajó de `fullstack` a **`frontend`** (sin partición), `complexity` de `medium` a **`low`**, y se añadió **QC-22** a `depends_on`. **La validación de conflicto de F1.0 evitó un choque real con QC-26**, que se apropia del ítem «Fórmulas»: QC-13 lo borraba. Su spec no está en `dev`, solo en su worktree. **Queda intersección de archivos viva** (`private-nav.ts`, `app-sidebar.test.tsx`): sincronizar con `dev` justo antes del PR. Worktree desde `origin/dev` (`d532662`). Siguiente: `spec_author`, luego F1.3 y **F1.4, parada de aprobación humana**. |
 | QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | **spec_ready — ESPERANDO APROBACIÓN HUMANA (F1.4)** | `feature/QC-26-pantalla-de-recetas` | Sesión del 2026-09-03. Acotada y especificada: **52 requisitos (R1–R52), 29 tasks**, 19 decisiones cerradas y **2 preguntas abiertas** que `spec_author` no rellenó con supuestos (quién puede invocar la lectura de unidades, y qué se muestra en la línea de un producto dado de baja). Tarjeta en *En revisión*. **Al aprobar**: F2.0, escribir la fila de `dnd-kit` en `docs/dependencias.md` **como `excepcion` y diciendo qué check falló**, y lanzar `implementer`. Ojo: el worktree nació antes de que `/afinar-regla` cambiara la regla 1, así que su `CLAUDE.md` está viejo — se arregla solo al sincronizar con `dev` en F2.3 |
-| QC-33 | modelo-pedidos | QC-31 Pedidos | backend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-33-modelo-pedidos` | Sesión de hoy (2026-09-03), `labs-c2`. **Spec aprobado por el humano** tras dos vueltas: 42 requisitos EARS, 12 tareas, 29 decisiones cerradas, commit `a26baba`. Tarjeta en *En curso*. **El cupo se resolvió solo**: QC-25 se mergeó (PR #23) mientras se revisaba, así que `backend` entró en **1 de 2** y no hubo que forzar la regla. Worktree ya sincronizado con `origin/dev`, que trae QC-25 y QC-32. Cinco encargos al implementer: **R41** usa `timezone(text, timestamptz)` porque es `IMMUTABLE` y `EXTRACT(YEAR FROM created_at)` a secas es `STABLE` y Postgres la rechaza en un `CHECK`; el caso que muerde es el de **frontera** (`2026-12-31T20:00:00-05:00` con año 2026 → `23514`); **ningún test escribe el año literal**, se calcula con `new Date().getUTCFullYear()` o la suite se pone roja sola el 1 de enero; el índice único del correlativo es **total y no parcial**, al revés que QC-24; y `RecipeId` es aditivo sobre un `recetas` que **QC-25 acaba de tocar**. Quedan **2 preguntas abiertas** y las dos siguen abiertas a propósito |
 | QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | **spec_ready — PARADA EN F1.4** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. `/afinar-feature` sembró 16 decisiones y `spec_author` escribió **47 requisitos (R1-R47) y 21 tareas** con mapa `R<n> → test` completo (commit `0f5a3de`). Base propia `QuimiCloude_QC43` montada, gate verde en el worktree (116 archivos). **Esperando aprobación humana**; **P2 bloquea T3** |
+
+La feature **QC-33 — modelo-pedidos** se cerró el 2026-09-03 (PR #26, merge `73c2fb6`):
+resumen en `progress/history.md`. Desbloquea **QC-34**.
 
 La feature **QC-30 — rediseno-login** se cerró el 2026-09-03, pero **su PR [#20] se había
 mergeado el 2026-09-02 a las 22:55Z**: la sesión que la implementó nunca corrió F2.5 ni F2.6, así
@@ -1047,6 +1049,40 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   de la imagen (tamaño, tipos, bucket público o privado). Las tres las decide la acotación de
   QC-25, salvo la primera, que es de negocio y no tiene ficha.
 
+
+### La base compartida tiene una fila residual que rompe el gate de TODAS las sesiones (2026-09-03)
+
+`tests/integration/identity/identity-seed.int.test.ts` sale rojo con **8 casos** en cualquier
+worktree, `dev` incluido — verificado, no deducido. **No es un defecto de código**: es estado sucio
+de la base compartida.
+
+- **La fila:** un producto `FeldesQuack` en `products`, creado el 2026-09-03 a las 19:36 UTC, con
+  `created_by`/`updated_by` apuntando al admin del seed. Encaja con una corrida de **QC-22** sin
+  limpiar.
+- **El mecanismo:** `resetIdentityToEmptyState` hace `DELETE FROM users` dentro de una transacción
+  y la FK `products_created_by_fkey` lo bloquea con `23503`.
+- **Decisión del humano (2026-09-03): no se borra la fila, no se arregla el helper y NO se mete al
+  baseline.** El baseline es para deuda ajena de `dev`; esto es transitorio, y enmascararlo ahí
+  ocultaría para siempre un test que volverá a pasar solo. Se declaró en el PR #26.
+- **La causa de fondo, que sigue viva:** `resetIdentityToEmptyState` borra usuarios sin limpiar
+  antes las tablas que los referencian, así que **cualquier feature futura con una FK a `users`
+  puede volver a provocarlo** — y QC-33 acaba de añadir dos. Candidato a ficha propia.
+
+### El gate rápido no ve los tests de alcance de otros módulos (2026-09-03, confirmado por QC-33)
+
+El implementer de QC-33 reportó **1** rojo; el gate completo destapó **6**, y **5 eran suyos**: las
+afirmaciones de QC-4, QC-14 y QC-24 de que en todo el esquema no existe ningún enum, que los dos
+enums de QC-33 dejaron viejas. `vitest related` no los relaciona porque no los une el árbol de
+archivos sino una afirmación sobre el repositorio entero. **Es el mismo agujero que ya costó caro
+en QC-20**, y es la razón por la que el gate completo antes del PR no es ceremonia.
+
+### El worktree principal quedó fuera de `dev` (2026-09-03)
+
+`AGENTS.md > Worktrees` dice que el worktree principal se queda en `dev` y **nadie hace `git
+checkout` en él**. Hoy alguien lo dejó en **`fix-ux`**, y el commit de cierre de QC-33 aterrizó allí
+en vez de en `dev`: `git push origin dev` empujaba la rama `dev` local, desactualizada, y salía
+rechazado. Se resolvió aplicando el cierre sobre `dev` desde un worktree temporal, **sin tocar
+`fix-ux`**. Si esa rama tiene trabajo vivo, merece su propio worktree.
 ## Conflictos pendientes > DOS SESIONES DE LEADER`.
 
 - `zone: backend`. La description es toda servidor: verificar credenciales, responder sin

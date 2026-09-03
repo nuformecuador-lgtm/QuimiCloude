@@ -99,6 +99,96 @@ function has(model: PrismaModel, name: string): boolean {
   return model.fields.some((candidate) => candidate.name === name)
 }
 
+// ---------------------------------------------------------------------------------------
+// ACOTADO EL 2026-09-03 POR QC-33 (`specs/QC-33-modelo-pedidos/`).
+//
+// El caso de la unidad afirmaba `expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)`:
+// NINGUN `enum` en TODO el esquema. Esa mitad CADUCA. El repo no tenia ni uno el dia que se
+// escribio, pero lo que se garantiza es que EL CATALOGO DE UNIDADES sea una tabla ampliable
+// sin desplegar (QC-32 `design.md > 8.5`), no que el repositorio entero carezca de enums.
+// QC-33 declara `OrderStatus` y `OrderPriority` por decision cerrada 4 del humano,
+// apartandose a conciencia del precedente porque su conjunto NO tiene que crecer sin
+// migrar. Una feature no puede cumplir la afirmacion de alcance de otra.
+//
+// Lo que se vigilaba y SIGUE VIGENTE se conserva entero en `expectUnitCatalogIsNotAnEnum`:
+// ningun `enum` del esquema es el catalogo de unidades, ni por nombre (`Unit`, `UnitCode`,
+// `Unidad`, `UoM`...) ni por contenido (sus valores no pueden ser las unidades que hoy
+// viven en la tabla). Muere igual que antes si alguien convierte el catalogo en enum.
+//
+// Las unidades NO se escriben aqui a mano: se leen de los `INSERT INTO "units"` de las
+// migraciones (hoy, el conjunto arrancador de `20260903121404_units_catalog`). Si no
+// aparece ninguno, el helper LANZA en vez de quedarse en verde sin sujeto.
+// ---------------------------------------------------------------------------------------
+
+/** Un bloque `enum` del esquema: su nombre y sus valores. */
+interface PrismaEnum {
+  readonly name: string
+  readonly values: readonly string[]
+}
+
+function parseEnums(source: string): readonly PrismaEnum[] {
+  return [...source.matchAll(/^enum\s+(\w+)\s*\{([\s\S]*?)^\}/gm)]
+    .map((match): PrismaEnum | null => {
+      const [, name, body] = match
+      if (name === undefined || body === undefined) return null
+      return {
+        name,
+        values: body
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0 && !line.startsWith('@')),
+      }
+    })
+    .filter((candidate): candidate is PrismaEnum => candidate !== null)
+}
+
+const schemaEnums = parseEnums(schema)
+
+/** Nombres y simbolos del catalogo de unidades, leidos de las migraciones que lo siembran. */
+function unitCatalogWords(): readonly string[] {
+  const migrationsDir = join(repoRoot, 'db', 'migrations')
+  const words = new Set<string>()
+  for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    let sql: string
+    try {
+      sql = readFileSync(join(migrationsDir, entry.name, 'migration.sql'), 'utf8')
+    } catch {
+      continue
+    }
+    for (const insert of sql.matchAll(/INSERT\s+INTO\s+"units"\s*\([^)]*\)\s*VALUES([\s\S]*?);/gi)) {
+      for (const literal of (insert[1] ?? '').matchAll(/'([^']+)'/g)) {
+        const value = literal[1]
+        if (value !== undefined) words.add(value.toUpperCase())
+      }
+    }
+  }
+  if (words.size === 0) {
+    throw new Error(
+      'no hay ningun INSERT INTO "units" en db/migrations: el acotado se quedaria sin sujeto',
+    )
+  }
+  return [...words]
+}
+
+const UNIT_CATALOG_WORDS = unitCatalogWords()
+
+/** El catalogo de unidades es una TABLA: ningun `enum` del esquema lo suplanta. */
+function expectUnitCatalogIsNotAnEnum(): void {
+  for (const declared of schemaEnums) {
+    expect(declared.name, `el enum ${declared.name} no puede ser el catalogo de unidades`).not.toMatch(
+      /unit|unidad|uom|medida|measure/i,
+    )
+    const upperValues = declared.values.map((value) => value.toUpperCase())
+    for (const word of UNIT_CATALOG_WORDS) {
+      expect(
+        upperValues,
+        `el enum ${declared.name} no puede declarar la unidad ${word}`,
+      ).not.toContain(word)
+    }
+  }
+}
+
 /** Los ocho datos del producto (R3), con su columna en la base (R19).
  *
  *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El octavo dato SIGUE
@@ -323,6 +413,10 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     //     restringe que unidad puede usar cada producto (QC-32 R14);
     //   - el esquema sigue sin declarar ningun `enum`: el catalogo es una tabla, no un
     //     conjunto cerrado compilado en el esquema (QC-32 `design.md > 8.5`).
+    //
+    // ACOTADO EL 2026-09-03 POR QC-33: de esa tercera vinneta caduca el «ningun enum EN EL
+    // ESQUEMA» y queda «ningun enum ES EL CATALOGO DE UNIDADES». El porque, entero, en el
+    // bloque de `expectUnitCatalogIsNotAnEnum` (arriba). Las otras dos no se tocan.
     const unitId = field(product, 'unitId')
     expect(unitId.type).toBe('String')
     expect(unitId.isOptional).toBe(true)
@@ -333,7 +427,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // real vive en el SQL, para que `inventario` no pueda leer la tabla de `unidades` con un
     // `include` que ninguna guardia detecta.
     expect(unitId.attributes).not.toMatch(/@relation/)
-    expect(schema).not.toMatch(/^\s*enum\s+\w+\s*\{/m)
+    // El catalogo sigue siendo una TABLA. Acotado por QC-33 al sujeto propio de esta
+    // afirmacion: ver el bloque de `expectUnitCatalogIsNotAnEnum`.
+    expectUnitCatalogIsNotAnEnum()
     // Ninguna columna de unidad de texto libre sobrevive en el producto (QC-32 R10).
     expect(has(product, 'unit')).toBe(false)
     expect(product.body).not.toMatch(/^\s*unit\s+String/m)
