@@ -114,7 +114,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 2 — La pantalla
 
-### [ ] T5 — Parser de parámetros de lista
+### [x] T5 — Parser de parámetros de lista
 - **Depende de**: T3. **Archivos**: `app/(private)/inventario/components/product-list-params.ts`,
   `.../components/index.ts`.
 - **Qué**: `parseProductListParams` puro (`design.md > 4.2`): `page` entero ≥ 1 con defecto 1;

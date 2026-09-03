@@ -170,3 +170,23 @@ Los tres rojos son los tres descritos arriba, todos en archivos ajenos a los que
 T14) y `sidebar-mobile.test.tsx` (**decisión pendiente del leader**). Los proyectos de integración
 quedan fuera de esta medición: fallan por no haber base de datos en el worktree, y ya fallaban
 antes de tocar nada (se comprobó con `git stash`).
+
+## T5 — Parser de parametros de lista
+
+**Archivos:** `app/(private)/inventario/components/product-list-params.ts` (nuevo),
+`app/(private)/inventario/components/index.ts` (nuevo, barrel de la ruta).
+
+- `parseProductListParams` es **puro**: sus unicos imports son `DEFAULT_PAGE_SIZE` y
+  `MAX_PAGE_SIZE` de `@/lib/shared/pagination`. No importa `react` ni `next/*` (comprobado con
+  `grep`), asi que R12 se puede probar sin montar la pantalla.
+- `PAGE_SIZE_OPTIONS = [DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE] as const` — las dos opciones (10 y 25)
+  salen de las constantes del backend, **no escritas a mano**; el tipo `ProductPageSize` es
+  `10 | 25` derivado de esa tupla, asi que un tamano fuera de la lista no compila.
+- `page`: se valida el **texto** con `/^\d+$/` antes de convertir. `Number('1.5')`, `' 2 '`,
+  `'1e3'` y `'0x2'` convierten a numero sin ser lo que el usuario escribio en una URL; con la
+  comprobacion sobre el texto, todos caen al defecto 1.
+- Se anaden dos utilidades que consumen T6/T7/T11 y que evitan literales repetidos:
+  `PAGE_PARAM`/`PAGE_SIZE_PARAM` y `buildProductListQuery` (la cadena de consulta canonica, la
+  misma forma que el parser sabe leer).
+
+**Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
