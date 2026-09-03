@@ -23,8 +23,9 @@ export const metadata: Metadata = {
  * ella la ruta esperada en vez de incrustar el literal (R2). Por eso la marca del titulo tambien
  * llega importada (`BRAND_LABEL`), nunca escrita a mano.
  *
- * **El contenedor exterior es un `<div>` y NO un `<main>`** (R1): `SidebarInset` del layout
- * privado ya es el `<main>` y R5 de QC-11 exige que sea unico.
+ * **El contenedor exterior es un `div` y NO declara el landmark `main`** (R1): `SidebarInset`
+ * del layout privado ya lo es, y R5 de QC-11 exige que sea unico. (Escrito sin el signo de menor
+ * que a proposito: una guardia de fuente que busque la etiqueta no debe encontrarla ni aqui.)
  *
  * **Los componentes se importan SOLO desde `./components`** (R27), nunca por ruta profunda. El
  * barrel no declara `'use client'`: la frontera la declara cada componente, asi que esta pagina

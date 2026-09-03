@@ -401,3 +401,35 @@ lib/modules/identity/domain/route-role-rules.ts importa '@/lib/shared/routes' de
   todas **cambio de alcance o de diseño**, y `design.md > 3` dice literalmente que en ese caso
   «se para y se avisa: no se arregla con un literal ni tocando la guardia». **Decision del leader.**
 - **No bloquea T5-T11**: ningun archivo de esta tanda participa en el hallazgo.
+
+## T5-T11 — estado de la trazabilidad al cerrar esta tanda (sin adornos)
+
+**Los tests de la pantalla NO son de esta tanda**: los traen T12 (render), T13 (guardias de
+fuente y contrato de ruta) y T14 (ruta y rol). Por tanto, y se dice en vez de darlo por cubierto:
+
+| Requisito | Test que lo muerde HOY | Estado |
+| --- | --- | --- |
+| R3 | `tests/guards/guard-rutas-privadas-cubiertas.test.ts` | **Verde y muerde**: borrar `INVENTORY_ROUTE` de `PRIVATE_ROUTE_PREFIXES` -o la `page.tsx`- lo pone rojo nombrando la ruta. Es el que T11 cerraba. |
+| R22 | `tests/unit/private-layout.test.tsx` | Verde desde T4 (invertido, no borrado). |
+| R1, R5-R21, R23-R27, R31 | **ninguno todavia** | Implementados en T5-T11; **sin test que los muerda hasta T12/T13**. `pnpm exec vitest related --run <archivos de la ruta>` devuelve literalmente «No test files found». |
+| R4 | `tests/unit/identity/route-role-rules.test.ts` sigue **rojo** | Es el centinela de QC-9 que **invierte T14**, no esta tanda. |
+
+Quien haga T12/T13 tiene el mapa de `tasks.md` con los nombres previstos; el criterio de que el
+test muerda -borrar lo que el requisito exige y ver el rojo- vale especialmente para **R7, R13 y
+R25**, que son los tres tests en negativo.
+
+**Comandos corridos en esta tanda (los tres que el gate asigna al `frontend_dev`, y nada mas):**
+
+```
+pnpm typecheck                      -> tsc --noEmit, sin errores
+pnpm lint                           -> eslint, sin hallazgos
+pnpm exec vitest related --run <los 13 archivos de app/(private)/inventario/>
+                                    -> No test files found (T12/T13 aun no existen)
+pnpm exec vitest run tests/guards/guard-rutas-privadas-cubiertas.test.ts
+                                    -> 1 archivo, 7 tests, VERDE (el rojo previsto queda cerrado)
+pnpm run test:guardias              -> 11 de 12 verdes; el rojo es el de T3 descrito en T11
+pnpm exec next build                -> verde, `/inventario` sale como ruta dinamica
+```
+
+**`package.json` y `pnpm-lock.yaml` sin cambios** (`git status` limpio para los dos): ninguna
+dependencia entro en esta tanda, ni por CLI ni a mano.
