@@ -262,8 +262,8 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "pantalla-de-productos",
-      "description": "La pantalla del catalogo de productos dentro del layout privado: la lista paginada, el formulario de alta y edicion, el borrado, y lo mismo para el catalogo de presentaciones. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-20 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo.",
-      "status": "pending",
+      "description": "La pantalla del catalogo de productos dentro del layout privado, en la ruta /inventario: la lista paginada, el alta y la edicion en un panel lateral (sheet), y el borrado con confirmacion. Solo la ve el Administrador, y esta ficha estrena la primera regla ruta-rol del repo. Las operaciones ya existen y las expone QC-20 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). El selector de presentacion permite crear una presentacion nueva sin salir del formulario, porque un producto no puede existir sin ella. Sin busqueda ni orden configurable: el backend no los soporta y meterlos seria reabrir QC-20. La pantalla del catalogo de presentaciones (lista, edicion y borrado) va aparte.",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
@@ -314,7 +314,7 @@
       "epic_name": "Recetas",
       "name": "crud-de-recetas",
       "description": "Los casos de uso del catalogo de recetas, sobre el modelo que crea QC-24: alta, consulta paginada, edicion y borrado de recetas, incluyendo las lineas de producto de cada receta, que se crean, cambian y quitan junto con la receta que las contiene y no por separado. Solo el Administrador puede: ni el Operador ni nadie mas consulta, crea, edita o borra, y ese permiso se valida en el service. Borrar una receta la oculta y no se restaura; borrar un producto que alguna receta usa sigue estando permitido y la receta conserva la linea. Cada receta guarda quien la creo y quien la modifico por ultima vez. Aqui entra la subida de la imagen de la receta: el archivo se sube a Supabase Storage y en la receta queda su direccion. La imagen sigue siendo opcional, asi que guardar una receta sin imagen no falla nunca. Esta ficha deja el almacenamiento configurado y utilizable, con las variables de entorno que necesita declaradas y vacias en el archivo de ejemplo, y documentadas. Subir la imagen exige una libreria de cliente de Supabase que hoy no esta aprobada ni instalada: entra por la regla 7 de CLAUDE.md, con sus cuatro checks de salud, su fila en docs/dependencias.md y aprobacion humana antes de instalarla. Antes de guardar se rechaza el nombre vacio, el nombre con un largo mayor al maximo, el nombre repetido comparado sin acentos ni mayusculas, la cantidad negativa o cero, la unidad vacia, el producto repetido dentro de la misma receta, el producto inexistente, y unos pasos que no sean una lista de textos o que traigan algun texto vacio. La consulta viene paginada, de diez en diez por defecto, reutilizando el calculo de paginacion que extrae el CRUD de productos en vez de duplicarlo. La pantalla va aparte.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -518,7 +518,7 @@
       "epic_name": "Proveedores",
       "name": "modelo-proveedores",
       "description": "Necesitamos persistir proveedores y lo que cada uno nos vende. Un proveedor tiene un nombre completo, un telefono y un correo electronico. El telefono y el correo son opcionales por separado, pero al menos uno de los dos tiene que estar: un proveedor sin ninguna forma de contacto no se puede guardar. Ademas, cada proveedor tiene un catalogo (proveedor_catalogo): por cada producto que nos vende se guarda el producto, el costo al que nos lo vende, el minimo de compra y el tiempo de entrega. Un mismo producto puede estar en el catalogo de varios proveedores, y no se repite dos veces dentro del catalogo del mismo proveedor. El CRUD y la pantalla van aparte.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -562,6 +562,109 @@
         "QC-43"
       ],
       "spec_path": "specs/QC-44-pantalla-de-proveedores"
+    },
+    {
+      "key": "QC-45",
+      "id": 45,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "pantalla-de-presentaciones",
+      "description": "El catalogo de presentaciones (bidon, tambor, saco) dentro del layout privado: la lista paginada, el alta, la edicion y el borrado. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-20 como Server Actions. Salio del alcance de QC-22, que se quedo solo con productos; QC-22 si permite crear una presentacion desde el selector del formulario de producto, pero no listarlas, editarlas ni borrarlas. La forma de la pantalla se decide al acotar esta ficha.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-45-pantalla-de-presentaciones",
+      "depends_on": [
+        "QC-22"
+      ],
+      "spec_path": "specs/QC-45-pantalla-de-presentaciones"
+    },
+    {
+      "key": "QC-47",
+      "id": 47,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "modelo-empresa-y-membresias",
+      "description": "Necesitamos representar la empresa como entidad propia y a que empresas pertenece cada usuario. Una empresa tiene nombre y queda identificada de forma unica. Un usuario puede pertenecer a mas de una empresa, aunque por ahora todos pertenecen a una sola y no hay pantalla para cambiar de empresa: eso se decide despues. Los roles y los tipos de documento siguen siendo del sistema y no se separan por empresa: \"Administrador\" significa lo mismo en todas. La base se siembra limpia, con una empresa inicial a la que pertenece el usuario semilla. Esta ficha solo crea la empresa y la pertenencia: ni la sesion ni la separacion de los datos ya existentes entran aqui.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-47-modelo-empresa-y-membresias",
+      "depends_on": null,
+      "spec_path": "specs/QC-47-modelo-empresa-y-membresias"
+    },
+    {
+      "key": "QC-48",
+      "id": 48,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "tenant-en-la-sesion",
+      "description": "Al iniciar sesion el sistema debe resolver a que empresa corresponde el usuario y dejarla fijada en la sesion, viajando firmada igual que ya viaja el rol. El middleware que hoy valida la firma, la caducidad y el rol debe validar ademas que la sesion lleva una empresa y que esa empresa sigue existiendo y sigue siendo suya; si no, la sesion no vale. Tambien hay que poder preguntar desde el servidor en que empresa estamos, para que los servicios lo usen despues. Que la empresa vaya en la sesion no autoriza por si solo: sigue siendo el servicio quien decide, como con el rol. Separar los datos ya guardados va aparte.\n\nPregunta abierta que hereda el spec: si un usuario llega a tener mas de una membresia y todavia no hay selector, con cual inicia sesion. Se cierra al acotar esta ficha.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-48-tenant-en-la-sesion",
+      "depends_on": [
+        "QC-47"
+      ],
+      "spec_path": "specs/QC-48-tenant-en-la-sesion"
+    },
+    {
+      "key": "QC-49",
+      "id": 49,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "aislamiento-por-empresa-en-inventario",
+      "description": "Los productos y las presentaciones pasan a pertenecer cada uno a una empresa, y nadie puede ver ni tocar los de otra. Toda consulta y toda escritura del inventario se limitan a la empresa de quien pide, y el intento de leer o modificar un producto de otra empresa se rechaza aunque se conozca su identificador. La base se siembra limpia. Recetas y unidades se separan en sus propias fichas.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-49-aislamiento-por-empresa-en-inventario",
+      "depends_on": [
+        "QC-48",
+        "QC-32"
+      ],
+      "spec_path": "specs/QC-49-aislamiento-por-empresa-en-inventario"
+    },
+    {
+      "key": "QC-50",
+      "id": 50,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "aislamiento-por-empresa-en-recetas",
+      "description": "Las recetas y sus lineas pasan a pertenecer cada una a una empresa, y nadie puede ver ni tocar las de otra. Toda consulta y toda escritura de recetas se limitan a la empresa de quien pide, y una receta no puede referirse a un producto de otra empresa. La base se siembra limpia.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-50-aislamiento-por-empresa-en-recetas",
+      "depends_on": [
+        "QC-48",
+        "QC-32"
+      ],
+      "spec_path": "specs/QC-50-aislamiento-por-empresa-en-recetas"
+    },
+    {
+      "key": "QC-51",
+      "id": 51,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "aislamiento-por-empresa-en-unidades",
+      "description": "El catalogo de unidades pasa a ser de cada empresa: cada una tiene sus propias unidades y no ve las de otra. La unicidad del nombre se mide dentro de la empresa, no entre todas: dos empresas pueden tener cada una su \"kilogramo\". El conjunto arrancador que hoy siembra el seed se siembra por empresa. La base se siembra limpia.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "low",
+      "zone": "backend",
+      "branch": "feature/QC-51-aislamiento-por-empresa-en-unidades",
+      "depends_on": [
+        "QC-48",
+        "QC-32"
+      ],
+      "spec_path": "specs/QC-51-aislamiento-por-empresa-en-unidades"
     }
   ]
 }
