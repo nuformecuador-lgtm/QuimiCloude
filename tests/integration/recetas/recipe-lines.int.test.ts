@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { createRecipe, findAliveRecipeById } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import { ValidationError } from '@/lib/modules/recetas/domain/errors';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -281,6 +282,30 @@ describe('R18: la linea de un producto borrado logicamente se conserva', () => {
     } finally {
       if (recipeId !== null) await prisma.recipe.delete({ where: { id: recipeId } });
       await deleteTestProduct(prisma, productId);
+    }
+  });
+});
+
+describe('R17: findProductRefs solo devuelve productos vivos', () => {
+  it('devuelve la ref del producto vivo y omite la del producto borrado logicamente', async () => {
+    // MAYOR-1 (review QC-25): este es el UNICO test de todo el repo que ejercita
+    // `deleted_at IS NULL` de `findProductRefs` contra Postgres real. Si alguien quita
+    // ese filtro del `where` de `product-catalog-prisma.ts`, este `it` es el que lo
+    // detecta -ver `tests/unit/inventario/product-catalog.test.ts` para la explicacion
+    // de por que el test unitario homonimo no lo prueba.
+    const vivoId = await createTestProduct(prisma, 'Insumo vivo para findProductRefs');
+    const borradoId = await createTestProduct(prisma, 'Insumo a borrar para findProductRefs');
+
+    try {
+      await prisma.product.update({ where: { id: borradoId }, data: { deletedAt: new Date() } });
+
+      const refs = await findProductRefs([vivoId, borradoId]);
+
+      expect(refs.map((ref) => ref.id)).toEqual([vivoId]);
+      expect(refs.some((ref) => ref.id === borradoId)).toBe(false);
+    } finally {
+      await deleteTestProduct(prisma, vivoId);
+      await deleteTestProduct(prisma, borradoId);
     }
   });
 });

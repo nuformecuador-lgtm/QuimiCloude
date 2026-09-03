@@ -247,7 +247,7 @@ de esa lista. No se tocó ninguna otra aserción del archivo.
 | R14 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza la cantidad cero, negativa o ausente, y la unidad vacia...` |
 | R15 | `tests/unit/recetas/recipe-input.test.ts` → `acepta cualquier texto no vacio como unidad, sin catalogo` |
 | R16 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza dos lineas con el mismo producto` |
-| R17 | `tests/unit/recetas/recipe-service.test.ts` → `rechaza la linea cuyo producto no existe...` |
+| R17 | `tests/unit/recetas/recipe-service.test.ts` → `rechaza la linea cuyo producto no existe...` + `tests/integration/recetas/recipe-lines.int.test.ts` → describe `R17: findProductRefs solo devuelve productos vivos` → `devuelve la ref del producto vivo y omite la del producto borrado logicamente` (nuevo, corrige MAYOR-1 de review: es el unico test que ejercita `deleted_at IS NULL` contra Postgres real; `tests/unit/inventario/product-catalog.test.ts` solo prueba el mapeo puro y el atajo de lista vacia, renombrado a `findRefs con lista vacia`) |
 | R18 | `tests/unit/recetas/recipe-service.test.ts` → `la lista no trae lineas y el detalle si las trae con producto, cantidad y unidad` |
 | R19 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza unos pasos que no son lista de textos...` |
 | R20 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza mas de 50 pasos y el paso de mas de 1000 caracteres` |

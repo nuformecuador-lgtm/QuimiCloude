@@ -2,9 +2,12 @@
 //
 // HONESTIDAD: este archivo NO toca Postgres, mismo criterio que
 // `tests/unit/inventario/product-prisma.test.ts`. Solo prueba el mapeo PURO
-// (`toProductRef`) y documenta el contrato de `findRefs` (R17): que solo devuelve
-// productos vivos. La garantia real de `deleted_at IS NULL` contra Postgres es del
-// test de integracion de esta feature (T14, `recipe-lines.int.test.ts`), no de este.
+// (`toProductRef`) y el atajo sin consulta de `findRefs([])`. La garantia REAL de que
+// `findRefs` solo devuelve productos vivos (R17, `deleted_at IS NULL` en el `where`) la
+// da el test de integracion contra Postgres real
+// `tests/integration/recetas/recipe-lines.int.test.ts`, describe `'R17: findProductRefs
+// solo devuelve productos vivos'` -ese es el que muerde si alguien quita el filtro; este
+// archivo, con mocks, no podria detectarlo.
 
 import {
   findProductRefs,
@@ -23,7 +26,7 @@ describe('toProductRef', () => {
   });
 });
 
-describe('findRefs devuelve solo los productos vivos', () => {
+describe('findRefs con lista vacia', () => {
   it('con una lista vacia de ids no consulta la base y devuelve una lista vacia', async () => {
     // R17: `findRefs([])` no dispara ninguna consulta -evita un `IN ()` sin sentido.
     const refs = await findProductRefs([]);
