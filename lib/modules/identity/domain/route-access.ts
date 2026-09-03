@@ -37,9 +37,8 @@ export type RouteAccessInput = {
   /**
    * Reglas ruta→rol. Entran como parametro (R12): la decision no las declara ni sabe donde
    * viven. Hoy las aporta `ROUTE_ROLE_RULES`, que ya NO esta vacio y ya NO vive en `domain/`:
-   * lo mudo QC-22 a `identity/adapters/driving/route-role-rules.ts` -la lista concreta es
-   * configuracion del borde- y trae su primera fila, la pantalla de inventario solo para
-   * Administrador.
+   * lo mudo QC-22 a `lib/composition/route-role-rules.ts` -la lista concreta es CABLEADO- y
+   * trae su primera fila, la pantalla de inventario solo para Administrador.
    */
   readonly rules: readonly RouteRoleRule[];
   readonly routes: { readonly login: string; readonly dashboard: string };

@@ -10,9 +10,18 @@
 // TRADUCCION que hace el adaptador y no el contenido de la lista real. La lista real —que desde
 // QC-22 tiene su primera fila— se afirma en `route-role-rules.test.ts` y en `route-access.test.ts`.
 //
-// QC-22 (2026-09-03) movio esa lista de `domain/route-role-rules.ts` a
-// `adapters/driving/route-role-rules.ts` —nombrar una ruta exige `lib/shared/routes`, y el dominio
-// no puede importar `lib/shared`—, asi que el doble se pone sobre ESE modulo y no sobre el barrel.
+// QC-22 (2026-09-03) movio esa lista dos veces: de `domain/route-role-rules.ts` a
+// `adapters/driving/`, y de ahi a `lib/composition/route-role-rules.ts`, donde vive hoy. Nombrar
+// la ruta exige `lib/shared/routes` —vetado al dominio— y nombrar el rol exige el barrel de
+// `inventario` **como valor** —reservado a `lib/composition`—. El doble se pone sobre ESE modulo,
+// no sobre el barrel de `identity`, que nunca exporto la lista.
+//
+// **El doble aplica de verdad**, y se comprueba sin fe: las reglas sinteticas de abajo usan el
+// prefijo `/dashboard/productos`, que la lista REAL no cubre (su unica fila es `/inventario`). Si
+// `vi.mock` dejase de interceptar —por un especificador que ya no resuelve, por ejemplo—,
+// `middleware` veria la lista real, `/dashboard/productos` no casaria con ninguna regla, el
+// Operador pasaria y los dos casos de rol insuficiente se pondrian rojos. Comprobado el
+// 2026-09-03 apuntando el `vi.mock` a una ruta inexistente: caen esos dos y solo esos dos.
 
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
@@ -32,7 +41,7 @@ import type { RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rul
 // cambiar las reglas por test sin volver a importar el modulo.
 const { reglas } = vi.hoisted(() => ({ reglas: { actuales: [] as RouteRoleRule[] } }));
 
-vi.mock('@/lib/modules/identity/adapters/driving/route-role-rules', () => ({
+vi.mock('@/lib/composition/route-role-rules', () => ({
   get ROUTE_ROLE_RULES() {
     return reglas.actuales;
   },

@@ -7,9 +7,9 @@
 
 import { readFileSync } from 'node:fs';
 
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
-import { ROUTE_ROLE_RULES } from '@/lib/modules/identity/adapters/driving/route-role-rules';
+import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
 import { findRouteRule, type RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
+import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 const PRODUCTOS: RouteRoleRule = { prefix: '/productos', roles: ['Administrador', 'Operador'] };
@@ -61,8 +61,10 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   // la declarada, ni una mas. Anadir una segunda regla sin ficha que la respalde sigue poniendo
   // esto en rojo, que es para lo que el centinela existe.
   //
-  // La lista vive en `adapters/driving/` desde el mismo 2026-09-03: nombrar la ruta exige
-  // `INVENTORY_ROUTE` de `lib/shared/routes` y el dominio no puede importar `lib/shared`.
+  // La lista vive en `lib/composition/` desde el mismo 2026-09-03: nombrar la ruta exige
+  // `INVENTORY_ROUTE` de `lib/shared/routes` —que el dominio no puede importar— y nombrar el rol
+  // exige `ADMIN_ROLE_NAME` del barrel de `inventario` **como valor**, que solo `lib/composition`
+  // tiene permitido (`tests/unit/inventario/schema/inventario-schema.test.ts`).
   it('declara exactamente una regla: la pantalla de inventario, solo Administrador (R4)', () => {
     expect(ROUTE_ROLE_RULES).toEqual([{ prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] }]);
   });
@@ -82,10 +84,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
 
   // R2 — la fila se deriva de la constante unica de ruta; el literal no se reescribe aqui.
   it('la fila se deriva de INVENTORY_ROUTE y de ADMIN_ROLE_NAME, no de literales propios', () => {
-    const fuente = readFileSync(
-      'lib/modules/identity/adapters/driving/route-role-rules.ts',
-      'utf8',
-    )
+    const fuente = readFileSync('lib/composition/route-role-rules.ts', 'utf8')
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, ' ');
 

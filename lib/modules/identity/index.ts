@@ -35,7 +35,8 @@ export {
   isInternalPath,
   resolveReturnPath,
 } from './domain/return-path';
-// La LISTA de reglas ya no sale de aqui: es configuracion del borde y vive en
-// `adapters/driving/route-role-rules.ts` (el dominio no puede importar `lib/shared`). El
-// contrato sigue exponiendo el tipo y la busqueda, que si son dominio.
+// La LISTA de reglas ya no sale de aqui: es CABLEADO y vive en `lib/composition/route-role-rules.ts`
+// (el dominio no puede importar `lib/shared`, y nombrar el rol exige el barrel de `inventario` como
+// valor, cosa reservada a `lib/composition`). El contrato sigue exponiendo el tipo y la busqueda,
+// que si son dominio.
 export { findRouteRule, type RouteRoleRule } from './domain/route-role-rules';

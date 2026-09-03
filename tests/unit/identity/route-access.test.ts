@@ -5,6 +5,8 @@
 
 import { readFileSync } from 'node:fs';
 
+// La lista real de reglas es CABLEADO y vive en `lib/composition` desde el 2026-09-03 (QC-22).
+import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
 import {
   decideRouteAccess,
   type RouteAccessDecision,
@@ -12,7 +14,6 @@ import {
   type RouteAccessSession,
 } from '@/lib/modules/identity/domain/route-access';
 import type { RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
-import { ROUTE_ROLE_RULES } from '@/lib/modules/identity/adapters/driving/route-role-rules';
 import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import {
   DASHBOARD_ROUTE,
