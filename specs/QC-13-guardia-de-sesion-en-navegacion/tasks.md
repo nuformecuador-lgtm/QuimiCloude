@@ -3,7 +3,7 @@
 > Checklist discreto y verificable. `[P]` = paralelizable con la tarea anterior/hermana. Cada
 > task cita el/los archivo(s) que toca y su criterio de "hecho".
 
-## T1 — Retirar los cuatro ítems de placeholder de `private-nav.ts`
+## T1 — Retirar los cuatro ítems de placeholder de `private-nav.ts` [x]
 
 **Archivo:** `lib/shared/navigation/private-nav.ts`
 
@@ -28,7 +28,7 @@ constantes retiradas en el resto del repo (`grep` de cada nombre solo debe apare
 
 ---
 
-## T2 — Tests que hacen morder el borrado (R1–R6, R14) [P con T3]
+## T2 — Tests que hacen morder el borrado (R1–R6, R14) [P con T3] [x]
 
 **Archivo:** `tests/unit/app-sidebar.test.tsx` (ampliado) — o un archivo unitario hermano
 dedicado a `private-nav.ts`, a elección del implementer (`design.md > 4`, alternativa
@@ -56,7 +56,7 @@ esperados).
 
 ---
 
-## T3 — Migrar el test de agrupación a una fixture propia (R9, R10) [P con T2]
+## T3 — Migrar el test de agrupación a una fixture propia (R9, R10) [P con T2] [x]
 
 **Archivo:** `tests/unit/app-sidebar.test.tsx`
 
@@ -80,7 +80,7 @@ que esta tarea lo arregle — es intencional: fuerza a no dejar T3 a medias).
 
 ---
 
-## T4 — Modificar el E2E: el retorno pide `/inventario` (R11, R12, R13)
+## T4 — Modificar el E2E: el retorno pide `/inventario` (R11, R12, R13) [x]
 
 **Archivo:** `e2e/session.spec.ts`
 
