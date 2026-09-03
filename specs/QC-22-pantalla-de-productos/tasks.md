@@ -167,7 +167,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   confirmar envía el `<form>` con el `id` oculto a `deleteProductAction`; luego R21 (R26).
 - **Hecho cuando**: typecheck y lint limpios.
 
-### [ ] T11 — `page.tsx` y sección de lista
+### [x] T11 — `page.tsx` y sección de lista
 - **Depende de**: T5, T6, T7, T9, T10. **Archivos**: `app/(private)/inventario/page.tsx`,
   `.../components/product-list-section.tsx`, barrel.
 - **Qué** (`design.md > 4.3`): Server Component con `export const metadata` construida con

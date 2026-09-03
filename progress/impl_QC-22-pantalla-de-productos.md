@@ -346,3 +346,58 @@ acciones estrena el disparador de borrado junto al de edicion).
   prohibe (regla activa en el `eslint` del repo) y de paso se ahorra un render.
 
 **Salida real:** `pnpm typecheck` y `pnpm lint`, ambos sin hallazgos.
+
+## T11 — `page.tsx` y seccion de lista
+
+**Archivos:** `app/(private)/inventario/page.tsx` (nuevo),
+`app/(private)/inventario/components/product-list-section.tsx` (nuevo), el barrel.
+
+- Server Component con `export const metadata` construida con `BRAND_LABEL` **importado**; lee
+  `searchParams`, llama a `parseProductListParams` y monta
+  `<Suspense key={`${page}-${pageSize}`} fallback={<ProductTableSkeleton rows={pageSize} />}>`.
+  La `key` es lo que hace reaparecer el esqueleto en **cada** cambio de pagina o de tamano, no
+  solo en la primera carga (R15).
+- El contenedor exterior es un `<div>`: **no se declara `<main>`** (R1). `SidebarInset` del layout
+  privado ya es el `<main>` y R5 de QC-11 exige que sea unico.
+- La pagina importa **solo desde `./components`** (R27), nunca por ruta profunda. El barrel no
+  declara `'use client'`, asi que la pagina sigue siendo Server Component.
+- `ProductListSection` es `async`, llama a `listProductsAction` y despacha a los tres estados:
+  error / vacio (con la accion de crear como `children`, y con enlace a la primera pagina cuando
+  la pedida se quedo atras) / tabla + barra de herramientas.
+- El literal `'/inventario'` **no aparece** en ningun archivo de la ruta: el enlace a la primera
+  pagina se construye con `INVENTORY_ROUTE` y la barra con `usePathname()`.
+
+**Verificacion de T11 — que se pudo correr aqui y que no:**
+
+- `pnpm exec next typegen` regenerado, para que `tsc` valide de verdad la firma de la nueva
+  pagina contra los tipos de ruta de Next 16 (sin esto, el validador seguia sin conocerla).
+- `pnpm typecheck` y `pnpm lint`: sin hallazgos.
+- **`pnpm exec next build`: verde.** La ruta aparece en la tabla de salida como `ƒ /inventario`
+  (dinamica, servida en cada peticion), que es lo correcto: el layout privado lee `cookies()`.
+- **`pnpm run build` NO se pudo correr**, y no por el codigo: ese script es
+  `prisma migrate deploy && tsx scripts/seed.ts && next build`, y **este worktree no tiene base de
+  datos**. Por la misma razon **no se pudo comprobar `/inventario` con sesion de Administrador en
+  `pnpm dev`**: sin base no hay usuario con el que iniciar sesion. Queda **pendiente de evidencia
+  para el leader**, que si tiene base; T16 (verificacion manual, incluida iOS) cubre esa
+  comprobacion y no es de esta tanda.
+- **`pnpm run test:guardias`**: `guard-rutas-privadas-cubiertas.test.ts` **ya esta VERDE** — era la
+  ventana roja que el propio orden del spec abrio en T3 y que T11 cierra, tal como estaba previsto.
+
+**HALLAZGO BLOQUEANTE que NO es de esta tanda y que se reporta sin tocar nada** (regla 6 y
+`design.md > 12.5`, que ordena parar y avisar si la guardia de arquitectura objeta):
+
+`tests/guards/guard-arquitectura-modulos.test.ts` falla con
+
+```
+lib/modules/identity/domain/route-role-rules.ts importa '@/lib/shared/routes' de lib/shared (R7)
+```
+
+- **Lo introdujo T3** (commit `28ac546`), no esta tanda: el archivo no se ha tocado en T5-T11 y el
+  hallazgo depende solo de el. El `design.md > 3` previo la objecion de la guardia sobre el import
+  del **barrel de `inventario`** —que la guardia acepta sin problema— pero el que objeta es el otro:
+  `domain/**` **no puede importar `lib/shared/**` en absoluto** (R7, pureza del dominio).
+- **No se arregla aqui a proposito.** Las salidas posibles —declarar la ruta en `identity`,
+  inyectar el prefijo desde fuera del dominio, o mover la lista de reglas fuera de `domain/`— son
+  todas **cambio de alcance o de diseño**, y `design.md > 3` dice literalmente que en ese caso
+  «se para y se avisa: no se arregla con un literal ni tocando la guardia». **Decision del leader.**
+- **No bloquea T5-T11**: ningun archivo de esta tanda participa en el hallazgo.
