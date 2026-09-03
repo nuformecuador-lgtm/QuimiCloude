@@ -289,6 +289,17 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   o dos, formulario en modal o en página, cómo se agregan, quitan y reordenan líneas y pasos,
   búsqueda y orden— **y que ahí también se decide si hace falta E2E**. Lanzar `spec_author` sin eso
   es pedirle que invente el producto.
+- **Acotada y sembrada el 2026-09-03** con `/afinar-feature`: 18 decisiones cerradas y 3 preguntas
+  abiertas en **`specs/QC-26-pantalla-de-recetas/requirements.md`** (en el worktree) — esa es la
+  fuente, aquí no se copia. **El board SÍ cambió**: la `description` se reescribió antes de sembrar
+  porque la ficha decía «es la capa visual» y ahora incluye una operación de backend. Tres cosas
+  que salieron de la acotación y que nadie había visto: **el selector de unidad no tenía de dónde
+  leer** —QC-32 creó la tabla y sembró cuatro unidades pero no expuso consulta, así que la pantalla
+  habría quedado muerta—; **la URL no se inventa**, se toma el placeholder «Fórmulas»
+  (`/produccion/formulas`) y su etiqueta pasa a «Recetas»; y **`dnd-kit` falla el check 2** (sin
+  publicar desde 2024-12-05), así que entra como **`excepcion`** aprobada explícitamente, no como
+  `aprobada`. Su fila en `docs/dependencias.md` la escribe el leader en F1.4 y **debe decir qué
+  check falló y por qué se aceptó**.
 - **Contexto fresco que la acotación hereda de QC-25, y que conviene no volver a preguntar:** el
   listado **no trae las líneas** y el detalle sí; la edición manda **la lista final completa** y el
   servidor concilia; la imagen se guarda como **ruta** y la URL pública se compone al leer; el
