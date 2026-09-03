@@ -1,3 +1,5 @@
+import type { UnitId } from '@/lib/modules/unidades';
+
 /**
  * Contratos de entrada y salida de producto (`design.md > 6.1`, `> 3`). Viven en
  * `domain/` -no en `ports/`- porque describen el QUE se dice, no el COMO se habla con el
@@ -18,7 +20,7 @@ export type NewProduct = {
   readonly minPurchase: number;
   readonly deliveryTime?: number | null;
   readonly qtyAlert?: number | null;
-  readonly unit?: string | null;
+  readonly unitId?: UnitId | null;
 };
 
 /**
@@ -36,7 +38,7 @@ export type ProductView = {
   readonly minPurchase: number;
   readonly deliveryTime: number | null;
   readonly qtyAlert: number | null;
-  readonly unit: string | null;
+  readonly unitId: UnitId | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;

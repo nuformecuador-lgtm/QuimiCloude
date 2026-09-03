@@ -901,3 +901,71 @@ fabricaba el `cwd` del validador. Se retractó ante las cuatro sesiones y nadie 
   `product-prisma.test.ts` de QC-20 y cinco archivos de integración en rojo, los dos por cliente de
   Prisma y migración sin aplicar. Ninguno era un defecto.
 - **`wt.sh done` falló otra vez en Windows.** Van cuatro veces el mismo día.
+
+
+## QC-32 — modelo-unidades (cerrada el 2026-09-03, PR #22, merge `0b7aacc`)
+
+Primera feature de la épica **QC-37 — Catálogos**. Crea el catálogo de unidades de medida como
+**módulo hexagonal propio `unidades`** —no como parte de `inventario`— y reapunta a él la unidad
+del producto y la de la línea de receta, que hasta hoy eran texto libre. Con eso **se cierra la
+pregunta abierta n.º 1 del dominio**, que QC-14 había dejado como texto libre el 2026-09-01
+asumiendo a conciencia el coste de normalizar después. Desbloquea **QC-33** y **QC-38**.
+
+Gate final: **94 archivos, 1020 tests**. Reviewer **APROBADO con 0 mayores** tras rechazar en la
+primera ronda.
+
+### Tres rondas, y la tercera borró el trabajo de la segunda
+
+- **Ronda 1 — RECHAZADO por un bloqueante real.** R25 y R26 estaban mapeados a tests que probaban
+  una **copia** del adaptador driven del seed, no el de producción: tres mutaciones sobre
+  producción dejaban los 1025 tests en verde. Es el mismo fallo que hundió la primera ronda de
+  QC-30 y la razón por la que el reviewer muerde cada requisito en vez de contar tests verdes.
+- **Ronda 2 — cerrada pero nunca firmada.** Se pasó el adaptador a fábrica
+  `createUnitSeedRepository(db)`, con el patrón de `createInitialAccessRepository` de `identity`,
+  y seis mutaciones lo verificaron en rojo. **Doce intentos de reviewer murieron por errores de
+  servidor de la API** (un 500 y once 529) y esa firma no llegó nunca.
+- **Ronda 3 — el humano borró el problema en vez de arreglarlo.** Decidió que, no existiendo
+  ningún dato de unidades en el sistema, el aparato del seed sobraba: las **cuatro** unidades
+  básicas (`mililitro/ml`, `litro/l`, `gramo/gr`, `kilogramo/kg`) las inserta **la propia
+  migración**. Eso **disolvió MAYOR-1 eliminando su objeto** y adelgazó la feature en 7 archivos
+  —caso de uso, `STARTER_UNITS`, puerto, adaptador Prisma y tres de test—, más el cableado en
+  `lib/composition` y la llamada en `scripts/seed.ts`.
+
+### Lo que hay que recordar de aquí
+
+- **Un aparato hexagonal completo para insertar cuatro filas era el defecto, no el bloqueante que
+  contenía.** El reviewer encontró un fallo real dentro de una estructura que no debía existir. La
+  pregunta «¿esto necesita puerto y adaptador?» sale más barata antes del spec que después de dos
+  rondas de revisión.
+- **Meter el normalizado a mano en el SQL duplica la normalización**, y el riesgo era que el test
+  comparase el SQL consigo mismo. El reviewer **mutó `normalizeUnitName` misma** y cayeron dos
+  casos: R26 ata **los dos extremos** del duplicado. Ese es el listón para cualquier valor
+  derivado que se escriba a mano en una migración.
+- **Una guardia cuyo sujeto desaparece es la forma más silenciosa de quedarse sin guardia.** Al
+  borrar el adaptador driven, la lista exacta de archivos que consultan `units` en
+  `module-contract.test.ts` quedó **vacía**. Pasó de «exactamente un sitio» a «ninguno» —más
+  estricto— y se verificó metiendo un `prisma.unit.findMany` en un archivo real.
+- **`tests/` fuera del barrido de fronteras es legítimo**: R15/R16 hablan de módulos y un fixture
+  no lo es. Extenderlo volvería el requisito **incomprobable** contra base real, porque
+  `recipe_lines.unit_id` es `NOT NULL` con FK y los tests tienen que crear su unidad.
+- **La corrida larga del gate rompe el stream de los subagentes.** Volvió a pasar dos veces: el
+  implementer murió las dos en `./init.sh`. En cuanto el leader se lo quitó de encima —que es lo
+  que `AGENTS.md` ya mandaba— el mismo agente terminó sin incidencias.
+- **El estado en disco salvó la sesión.** Con quince caídas de API, el encargo pendiente escrito
+  en `progress/current.md` permitió reanudar sin reconstruir nada y sin perder una línea.
+
+### Deuda que deja
+
+- **menor-6, el único con cobertura real:** ninguna aserción automática comprueba las cuatro filas
+  **en la base**; la evidencia es el log de la tarea. `unidades-constraints.int.test.ts` ya corre
+  contra Postgres y un caso acotado costaría poco.
+- **menor-7 y menor-8:** deriva de documentación — la tabla de trazabilidad de `tasks.md` (R16 y
+  R19) y el mapa `R<n> → test` del parte citan artefactos borrados.
+- **menor-9:** la mitad negativa de R26 se apoya en una lista de nombres literales. **Para QC-38.**
+- **Preguntas abiertas que siguen abiertas:** si el símbolo debe ser único cuando existe (n.º 1) y
+  si presentación y unidad convergen algún día (n.º 3). La n.º 2 se cerró por los hechos —la base
+  estaba vacía— y la n.º 4 la cerró el humano en la ronda 3.
+- **Montar un worktree no deja el árbol compilable:** además del `.env` hacen falta `pnpm install`
+  y `pnpm exec next typegen`, o `app/layout.tsx` no compila por `LayoutProps`, que vive en
+  `.next/types` (git-ignorado), **y el gate sale rojo por algo ajeno**. `docs/worktrees.md` no lo
+  dice. Candidato a `/afinar-regla`.

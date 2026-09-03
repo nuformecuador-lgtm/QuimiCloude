@@ -147,7 +147,31 @@ async function createPresentation(
   return presentation.id
 }
 
-/** Columnas de `products` que un alta cruda puede escribir (todas menos las marcas). */
+/**
+ * Crea una unidad REAL dentro de la transaccion del test y devuelve su identificador.
+ *
+ * 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Donde estos tests
+ * escribian `unit: 'kg'` (texto libre) ahora hay una FK de verdad
+ * (`products_unit_id_fkey`), asi que un uuid inventado lo rechazaria la base con 23503: la
+ * unidad hay que crearla. El nombre se aleatoriza porque `units.name_normalized` tiene
+ * indice unico y la base local ya trae las unidades del seed arrancador.
+ */
+async function createUnit(
+  tx: Prisma.TransactionClient,
+  symbol: string | null = 'kg',
+): Promise<string> {
+  const name = `unidad de prueba ${randomUUID()}`
+  const unit = await tx.unit.create({
+    data: { name, nameNormalized: normalizeForTest(name), symbol },
+    select: { id: true },
+  })
+  return unit.id
+}
+
+/** Columnas de `products` que un alta cruda puede escribir (todas menos las marcas).
+ *
+ *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. `unit` (TEXT) ya no
+ *  existe como columna; su sitio lo ocupa `unit_id` (UUID con FK). */
 type ProductColumn =
   | 'name'
   | 'stock'
@@ -155,7 +179,7 @@ type ProductColumn =
   | 'min_purchase'
   | 'delivery_time'
   | 'qty_alert'
-  | 'unit'
+  | 'unit_id'
 
 /**
  * `INSERT INTO products` crudo. `columns` decide que se escribe: omitir una entrada es
@@ -213,11 +237,14 @@ function sleep(ms: number): Promise<void> {
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
-    WHERE schemaname = 'public' AND tablename IN ('products', 'presentations')`
-  if (tables.length !== 2) {
+    WHERE schemaname = 'public' AND tablename IN ('products', 'presentations', 'units')`
+  if (tables.length !== 3) {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva la
+    // comprobacion previa —sin la migracion de QC-14 estos tests no pueden correr— y se le
+    // suma `units`, de la que ahora dependen las altas de producto con unidad.
     throw new Error(
-      'la base de pruebas no tiene aplicada la migracion de QC-14 (products y presentations). ' +
-        'Corre `pnpm run db:migrate` antes de estos tests.',
+      'la base de pruebas no tiene aplicadas las migraciones de QC-14 (products y ' +
+        'presentations) y QC-32 (units). Corre `pnpm run db:migrate` antes de estos tests.',
     )
   }
 })
@@ -274,6 +301,10 @@ describe('estructura del producto', () => {
   it('crea un producto con todos sus datos y los relee sin perdida', async () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El octavo dato
+      // sigue siendo la unidad de medida (R3 de QC-14 intacto); lo que cambia es que hoy
+      // es una referencia a `units` y hay que crear la unidad de verdad.
+      const unitId = await createUnit(tx)
       const { id } = await tx.product.create({
         data: {
           name: 'Acido citrico monohidratado',
@@ -283,7 +314,7 @@ describe('estructura del producto', () => {
           minPurchase: 5,
           deliveryTime: 12,
           qtyAlert: 20,
-          unit: 'kg',
+          unitId,
         },
         select: { id: true },
       })
@@ -298,7 +329,7 @@ describe('estructura del producto', () => {
       expect(product.minPurchase).toBe(5)
       expect(product.deliveryTime).toBe(12)
       expect(product.qtyAlert).toBe(20)
-      expect(product.unit).toBe('kg')
+      expect(product.unitId).toBe(unitId)
       expect(product.deletedAt).toBeNull()
       expect(product.id).toMatch(/^[0-9a-f-]{36}$/u)
     })
@@ -307,11 +338,21 @@ describe('estructura del producto', () => {
   it('rechaza el alta si falta el nombre o la presentacion', async () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La unidad se usa
+      // aqui, igual que antes, solo como MARCA para reconocer despues la fila que el alta
+      // rechazada habria escrito. Antes la marca era el texto 'kg-sin-nombre'; ahora es el
+      // id de una unidad creada para este test, porque `unit_id` tiene FK real.
+      const unitId = await createUnit(tx)
 
       // Sin nombre: la unica columna obligatoria omitida es `name`.
       const withoutName = await expectRejectedByDatabase(
         tx,
-        () => rawInsertProduct(tx, { unit: Prisma.sql`${'kg-sin-nombre'}` }, presentationId),
+        () =>
+          rawInsertProduct(
+            tx,
+            { unit_id: Prisma.sql`CAST(${unitId} AS uuid)` },
+            presentationId,
+          ),
         'alta de producto sin nombre',
       )
       expect(withoutName).toBe(NOT_NULL_VIOLATION)
@@ -327,7 +368,7 @@ describe('estructura del producto', () => {
       // R4 «no crear ninguna fila»: se busca lo que cada intento habria escrito, no el
       // total de la tabla.
       const survivors = await tx.product.findMany({
-        where: { OR: [{ unit: 'kg-sin-nombre' }, { name: 'Sin presentacion' }] },
+        where: { OR: [{ unitId }, { name: 'Sin presentacion' }] },
         select: { id: true },
       })
       expect(survivors).toEqual([])
@@ -349,10 +390,13 @@ describe('estructura del producto', () => {
       expect(product.cost).toBeNull()
       expect(product.deliveryTime).toBeNull()
       expect(product.qtyAlert).toBeNull()
-      expect(product.unit).toBeNull()
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva
+      // exactamente lo que R5 vigila —la unidad ausente vuelve como AUSENCIA de valor, no
+      // como cero ni como cadena vacia (QC-32 R10)—, ahora sobre `unit_id`.
+      expect(product.unitId).toBeNull()
       expect(product.stock).not.toBe(0)
       expect(product.qtyAlert).not.toBe(0)
-      expect(product.unit).not.toBe('')
+      expect(product.unitId).not.toBe('')
     })
   })
 
@@ -493,39 +537,58 @@ describe('estructura del producto', () => {
     })
   })
 
-  it('acepta cualquier texto como unidad y tambien un producto sin unidad', async () => {
+  it('acepta cualquier unidad del catalogo, sin restriccion por producto, y tambien un producto sin unidad', async () => {
+    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este caso decia
+    // «acepta cualquier TEXTO como unidad»; esa mitad de R10 de QC-14 —«texto libre»— es la
+    // que el humano cambio. Lo que R10 vigilaba y SIGUE VIGENTE se conserva entero aqui:
+    //   - NADA restringe que unidad puede usar cada producto (QC-32 R14): seis productos
+    //     distintos, seis unidades cualesquiera del catalogo, y la base no opina;
+    //   - la unidad NO se normaliza ni se sustituye al guardarla en el producto: vuelve
+    //     TAL CUAL la que se asigno (la normalizacion vive en `units.name_normalized`, que
+    //     es identidad del CATALOGO, no del producto);
+    //   - un producto puede no declarar unidad (QC-32 R10).
+    // Lo unico que ya no se puede probar es «cualquier texto»: hoy la columna es una FK y
+    // un texto suelto ni siquiera es un uuid.
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
-      // Texto libre de verdad: sin catalogo, sin enum, sin normalizacion (R10).
-      const units = ['kg', 'KG', 'Litros', 'bidon de 20 L', 'ug/mL', 'unidad-que-nadie-espera']
+      const symbols = ['kg', 'KG', 'Litros', 'bidon de 20 L', 'ug/mL', null]
 
+      const unitIds: string[] = []
       const ids: string[] = []
-      for (const unit of units) {
+      for (const symbol of symbols) {
+        const unitId = await createUnit(tx, symbol)
+        unitIds.push(unitId)
         const { id } = await tx.product.create({
-          data: { name: `Producto en ${unit}`, presentationId, unit },
+          data: { name: `Producto en ${symbol ?? 'unidad sin simbolo'}`, presentationId, unitId },
           select: { id: true },
         })
         ids.push(id)
       }
       const stored = await tx.product.findMany({
         where: { id: { in: ids } },
-        select: { id: true, unit: true },
+        select: { id: true, unitId: true },
       })
-      // Cada texto vuelve TAL CUAL: ni recortado, ni en minusculas, ni sustituido.
-      expect(ids.map((id) => stored.find((row) => row.id === id)?.unit)).toEqual(units)
+      // Cada producto conserva EXACTAMENTE la unidad que se le asigno: ni sustituida, ni
+      // deducida de la presentacion, ni unificada con la de otro producto.
+      expect(ids.map((id) => stored.find((row) => row.id === id)?.unitId)).toEqual(unitIds)
+      expect(new Set(unitIds).size).toBe(symbols.length)
 
       const { id: withoutUnit } = await tx.product.create({
         data: { name: 'Sin unidad', presentationId },
         select: { id: true },
       })
       const bare = await tx.product.findUniqueOrThrow({ where: { id: withoutUnit } })
-      expect(bare.unit).toBeNull()
+      expect(bare.unitId).toBeNull()
     })
   })
 
   it('guardar una cantidad de alerta por debajo de la existencia no cambia ninguna otra columna', async () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La fila sigue
+      // teniendo TODAS sus columnas rellenas, que es lo que este caso necesita para poder
+      // afirmar despues que ninguna cambio; solo cambia la forma de la unidad.
+      const unitId = await createUnit(tx)
       const { id } = await tx.product.create({
         data: {
           name: 'Producto vigilado',
@@ -535,7 +598,7 @@ describe('estructura del producto', () => {
           minPurchase: 1,
           deliveryTime: 7,
           qtyAlert: 50,
-          unit: 'kg',
+          unitId,
         },
         select: { id: true },
       })
@@ -726,6 +789,10 @@ describe('borrado logico y marcas de tiempo', () => {
   it('el borrado logico conserva la fila del producto y marca deleted_at', async () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Igual que arriba:
+      // la fila nace completa para que R17 pueda comprobar que el borrado logico no pierde
+      // NINGUN dato, la unidad incluida.
+      const unitId = await createUnit(tx, 'L')
       const { id } = await tx.product.create({
         data: {
           name: 'Producto que se retira',
@@ -735,7 +802,7 @@ describe('borrado logico y marcas de tiempo', () => {
           minPurchase: 2,
           deliveryTime: 4,
           qtyAlert: 1,
-          unit: 'L',
+          unitId,
         },
         select: { id: true },
       })

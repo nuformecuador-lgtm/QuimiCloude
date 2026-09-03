@@ -173,6 +173,10 @@ export const inventario = {
   listPresentations: createListPresentations({ presentations: presentationRepository }),
 } as const;
 
+// El modulo `unidades` (QC-32) NO cablea nada aqui: su catalogo lo siembra su propia migracion
+// y el `UnitCatalog` que publica su contrato lo implementa y cablea QC-38, cuando haya
+// consumidor.
+
 // ---------------------------------------------------------------------------------------
 // `recetas` (QC-25, T12). Bloque nuevo, separado a proposito: no reordena ni reformatea
 // nada de `identity` ni de `inventario` arriba -diff minimo, hay otra sesion (QC-22)

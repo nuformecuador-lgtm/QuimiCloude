@@ -2,6 +2,9 @@
  * db:seed — deja la base utilizable desde cero: siembra el catalogo de roles y, si hace
  * falta, el usuario inicial con rol Administrador (`design.md > 5`, T13).
  *
+ * El catalogo de unidades de medida NO se siembra aqui: lo insertan cuatro filas de la
+ * migracion de QC-32 (`db/migrations/20260903121404_units_catalog/migration.sql`).
+ *
  * Cascara fina: TODA la logica vive en `lib/modules/identity/domain/seed-initial-access.ts`.
  * Este script solo carga el entorno, invoca la composicion, resume el resultado por
  * consola sin secretos, y traduce exito/fallo a codigo de salida.
