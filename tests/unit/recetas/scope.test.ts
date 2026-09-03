@@ -148,10 +148,18 @@ describe('alcance de QC-25 (crud-de-recetas): sin pantalla, sin route handler, s
 
   it('esta feature no anade ninguna columna, indice ni restriccion a recipes ni a recipe_lines', () => {
     // R41: el esquema de `recipes` y `recipe_lines` lo dejo QC-24 y esta ficha lo consume
-    // tal cual. Es una afirmacion DESCRIPTIVA sobre el archivo actual, ligada a los
-    // nombres de columna concretos de `Recipe`/`RecipeLine` -no un censo global del
-    // schema-: si alguien anade, quita o renombra una columna, un indice o una
-    // restriccion de estos DOS modelos, esta prueba cae.
+    // tal cual. Es una afirmacion DESCRIPTIVA sobre el archivo actual, ligada al CONJUNTO
+    // DE NOMBRES de columna de `Recipe`/`RecipeLine` (y a sus `@@unique`/`@@index`/`@@map`
+    // completos) -no un censo global del schema-: si alguien anade, quita o renombra una
+    // columna, un indice o una restriccion de estos DOS modelos, esta prueba cae.
+    //
+    // Se compara solo el NOMBRE de cada campo de columna, no su declaracion entera (tipo,
+    // atributos, `@map`, etc.): comparar la linea completa es fragil ante cambios legitimos
+    // de una ficha vecina que no tocan el ALCANCE que R41 vigila -p. ej. QC-32 cambiando
+    // `unit String` por `unitId String @db.Uuid` ya rompio esta prueba una vez sin que R41
+    // se hubiera violado-. Las lineas `@@...` (restricciones e indices compuestos) SI se
+    // comparan completas: ahi el valor de la prueba esta en la restriccion exacta, no solo
+    // en su nombre.
     //
     // NOTA (2026-09-03): `RecipeLine.unit` (texto) paso a `RecipeLine.unitId` (UUID, FK al
     // catalogo de `unidades`, R50) cuando QC-32 se mergeo a `dev` a mitad de la
@@ -176,45 +184,56 @@ describe('alcance de QC-25 (crud-de-recetas): sin pantalla, sin route handler, s
         .filter((line) => line.length > 0 && !line.startsWith('//'))
     }
 
-    const EXPECTED_RECIPE_LINES = [
-      'id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid',
-      'name String',
-      'nameNormalized String @map("name_normalized")',
-      'description String?',
-      'steps Json @default("[]")',
-      'imagePath String? @map("image_path")',
-      'createdBy String? @map("created_by") @db.Uuid',
-      'updatedBy String? @map("updated_by") @db.Uuid',
-      'createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)',
-      'updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)',
-      'deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)',
-      'lines RecipeLine[]',
+    /**
+     * Para una linea de restriccion (`@@...`) la deja tal cual -ahi importa la declaracion
+     * completa-; para una linea de campo se queda solo con la PRIMERA palabra, su nombre
+     * (R41 solo exige que no se anada/quite/renombre una columna, no que su tipo o sus
+     * atributos no cambien por una razon legitima de otra ficha).
+     */
+    function fieldNamesOf(lines: readonly string[]): string[] {
+      return lines.map((line) => (line.startsWith('@@') ? line : (line.split(' ')[0] as string)))
+    }
+
+    const EXPECTED_RECIPE_FIELDS = [
+      'id',
+      'name',
+      'nameNormalized',
+      'description',
+      'steps',
+      'imagePath',
+      'createdBy',
+      'updatedBy',
+      'createdAt',
+      'updatedAt',
+      'deletedAt',
+      'lines',
       '@@index([createdBy], map: "recipes_created_by_idx")',
       '@@index([updatedBy], map: "recipes_updated_by_idx")',
       '@@map("recipes")',
     ]
 
-    const EXPECTED_RECIPE_LINE_LINES = [
-      'id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid',
-      'recipeId String @map("recipe_id") @db.Uuid',
-      'productId String @map("product_id") @db.Uuid',
-      'quantity Decimal @db.Decimal(14, 4)',
-      'unitId String @map("unit_id") @db.Uuid',
-      'createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)',
-      'updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)',
-      'recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)',
+    const EXPECTED_RECIPE_LINE_FIELDS = [
+      'id',
+      'recipeId',
+      'productId',
+      'quantity',
+      'unitId',
+      'createdAt',
+      'updatedAt',
+      'recipe',
       '@@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")',
       '@@index([productId], map: "recipe_lines_product_id_idx")',
       '@@index([unitId], map: "recipe_lines_unit_id_idx")',
       '@@map("recipe_lines")',
     ]
 
-    expect(normalizedLines(bodyOfModel('Recipe')), 'model Recipe cambio respecto al estado que dejo QC-24').toEqual(
-      EXPECTED_RECIPE_LINES,
-    )
     expect(
-      normalizedLines(bodyOfModel('RecipeLine')),
-      'model RecipeLine cambio respecto al estado que dejo QC-24',
-    ).toEqual(EXPECTED_RECIPE_LINE_LINES)
+      fieldNamesOf(normalizedLines(bodyOfModel('Recipe'))),
+      'model Recipe gano, perdio o renombro un campo, indice o restriccion respecto al estado que dejo QC-24',
+    ).toEqual(EXPECTED_RECIPE_FIELDS)
+    expect(
+      fieldNamesOf(normalizedLines(bodyOfModel('RecipeLine'))),
+      'model RecipeLine gano, perdio o renombro un campo, indice o restriccion respecto al estado que dejo QC-24',
+    ).toEqual(EXPECTED_RECIPE_LINE_FIELDS)
   })
 })

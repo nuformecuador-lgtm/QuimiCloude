@@ -397,8 +397,8 @@ describe('R37 — no encontrado', () => {
     const deleteRecipe = createDeleteRecipe({ recipes, now: () => AHORA });
 
     await expect(getRecipe('x', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
-    // La edicion consulta `findAliveById` primero (para conocer la imagen anterior y las
-    // lineas ya existentes): con el doble devolviendo `null`, ya rechaza ahi.
+    // `deleteRecipe` no tiene entrada que validar antes: llama a `softDeleteAlive`
+    // directamente, y con el doble devolviendo `'not_found'` ya rechaza ahi.
     await expect(deleteRecipe('x', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

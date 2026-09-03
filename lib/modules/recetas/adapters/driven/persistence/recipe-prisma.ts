@@ -97,12 +97,43 @@ function sqlStateOf(error: unknown): string | null {
   return null;
 }
 
-/** `23505`/`P2002`: el indice unico parcial de `recipes` (`design.md > 7.3`, R10). */
+/** Columna que protege el indice unico parcial de `recipes` (`recipes_name_unique`,
+ *  escrito a mano en `migration.sql`: Prisma no modela indices parciales, ver el
+ *  comentario de `model Recipe` en `db/schema.prisma`). Verificado empiricamente contra
+ *  Postgres real (T14): cuando el conector de Prisma traduce un `23505` a `P2002` para
+ *  ESTE indice, `error.meta.target` es `['name_normalized']` -la(s) COLUMNA(S), nunca el
+ *  nombre del indice-. Es la UNICA columna cuya violacion cuenta como "nombre duplicado"
+ *  (R10); el otro unico de esta feature -`(recipe_id, product_id)` de `recipe_lines`
+ *  (R16), verificado con el mismo metodo y cuyo `target` sale `['recipe_id',
+ *  'product_id']`- es un dato distinto y jamas debe traducirse a `DuplicateNameError`. */
+const RECIPE_NAME_UNIQUE_COLUMN = 'name_normalized';
+
+/**
+ * `P2002` SOLO cuenta como "nombre duplicado" cuando la columna que dispara la violacion
+ * es la de `recipes` (`design.md > 7.3`, R10). Antes de esta correccion (hallazgo menor-5
+ * de review QC-25) CUALQUIER `P2002`/`23505` -incluido el de
+ * `recipe_lines_recipe_id_product_id_key`- se traducia a `DuplicateNameError`; hoy ese
+ * caso es inalcanzable en la practica porque zod rechaza antes las lineas repetidas
+ * (R16), pero traducirlo mal seria incorrecto si algun dia dejara de serlo.
+ *
+ * Se inspecciona `error.meta.target` (columnas afectadas, ver la constante de arriba
+ * para la forma real verificada empiricamente). La ruta `23505` sin `meta.target`
+ * disponible -`PrismaClientUnknownRequestError`, escritura anidada, ver `sqlStateOf`- no
+ * trae informacion inspeccionable sobre QUE columna violo: ahi no se puede distinguir con
+ * seguridad entre el nombre y `(recipe_id, product_id)`, asi que se documenta la
+ * limitacion y NO se asume "nombre duplicado" a ciegas -conservador: mejor relanzar el
+ * error crudo que traducirlo mal. Solo se cierra con seguridad el caso
+ * `PrismaClientKnownRequestError` con `meta.target`.
+ */
 function isUniqueNameViolation(error: unknown): boolean {
-  return (
-    (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') ||
-    sqlStateOf(error) === '23505'
-  );
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+
+  const target: unknown = error.meta?.target;
+  if (typeof target === 'string') return target.includes(RECIPE_NAME_UNIQUE_COLUMN);
+  if (Array.isArray(target)) return target.includes(RECIPE_NAME_UNIQUE_COLUMN);
+  // `meta.target` ausente en este conector: sin forma de distinguir la columna, no se
+  // asume que es la del nombre.
+  return false;
 }
 
 /** `23514`: el `CHECK` de `quantity > 0` (`design.md > 7.3`, R14). Nunca `'duplicate'`. */

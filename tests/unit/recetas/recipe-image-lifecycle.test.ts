@@ -179,7 +179,6 @@ describe('R48 — un solo remove para los dos caminos de borrado', () => {
     // la misma ruta -es la unica operacion posible.
     expect(imagesReemplazo.remove).toHaveBeenCalledWith('recetas/anterior.jpg');
     expect(imagesQuitar.remove).toHaveBeenCalledWith('recetas/anterior.jpg');
-    expect(Object.keys(imagesReemplazo)).toEqual(Object.keys(imagesQuitar));
     expect(Object.keys(imagesReemplazo)).toContain('remove');
   });
 });

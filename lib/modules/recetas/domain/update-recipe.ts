@@ -50,9 +50,11 @@ async function removeImageSafely(
 }
 
 /**
- * Edicion de receta (R6, R11, R13, R37, R45-R49). `requireAdmin` es la PRIMERA linea. Lee
- * la receta viva ANTES de conciliar -para conocer su `imagePath` anterior y las lineas
- * que ya tenia (R45)- y responde `NotFoundError` si no existe o ya esta borrada (R37).
+ * Edicion de receta (R6, R11, R13, R37, R45-R49). `requireAdmin` es la PRIMERA linea,
+ * luego se valida la forma de `input` (`updateRecipeSchema`) y SOLO DESPUES se lee la
+ * receta viva -para conocer su `imagePath` anterior y las lineas que ya tenia (R45)-,
+ * respondiendo `NotFoundError` si no existe o ya esta borrada (R37). Ese orden evita
+ * gastar una consulta a la base cuando el cuerpo de la peticion ya es invalido.
  */
 export function createUpdateRecipe(
   deps: UpdateRecipeDeps,
@@ -66,12 +68,12 @@ export function createUpdateRecipe(
   ): Promise<UpdateRecipeResult> {
     requireAdmin(actor);
 
-    const existing = await deps.recipes.findAliveById(id);
-    if (existing === null) throw new NotFoundError();
-
     const parsed = updateRecipeSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const data = parsed.data;
+
+    const existing = await deps.recipes.findAliveById(id);
+    if (existing === null) throw new NotFoundError();
 
     // R45, R46 (`design.md > 6`): diferencia de conjuntos. Solo se valida contra el
     // catalogo la linea NUEVA -la que no estaba ya en la receta-; la preexistente se
