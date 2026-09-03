@@ -37,14 +37,31 @@ const unitIdSchema = z.string().uuid();
  */
 const deliveryTimeSchema = z.number().int().min(0);
 
+/**
+ * DECISION DEL HUMANO, 2026-09-03: `stock` y `qtyAlert` pasan a ser OBLIGATORIOS en la entrada.
+ *
+ * Acota a R5, que los declaraba opcionales. Lo que R5 garantizaba SOBRE LA BASE no se toca -las
+ * columnas `stock` y `qty_alert` siguen siendo NULLABLE, y el modelo lo sigue afirmando en
+ * `tests/unit/inventario/schema/inventario-schema.test.ts`-: lo que cambia es lo que la
+ * APLICACION acepta al dar de alta o editar. Son los dos unicos campos numericos que quedan en
+ * el formulario, y dejarlos vacios ahi ya no significa nada util.
+ *
+ * CONSECUENCIA QUE HAY QUE CONOCER: la edicion es reemplazo completo (R13/R19) y usa este mismo
+ * esquema, asi que un producto anterior con `stock` o `qty_alert` a NULL en la base NO se puede
+ * guardar sin rellenar los dos. El formulario los marca `required`, de modo que quien edite uno
+ * de esos productos vera el campo vacio y tendra que darle un valor.
+ *
+ * `cost`, `deliveryTime` y `unitId` siguen siendo opcionales: ninguno se pinta ya en el
+ * formulario, y exigirlos dejaria la edicion sin salida.
+ */
 export const createProductSchema = z.object({
   name: productNameSchema,
   presentationId: z.string().uuid(),
-  stock: nonNegativeIntSchema.nullish(),
+  stock: nonNegativeIntSchema,
   cost: costSchema.nullish(),
   minPurchase: nonNegativeIntSchema.default(0),
   deliveryTime: deliveryTimeSchema.nullish(),
-  qtyAlert: nonNegativeIntSchema.nullish(),
+  qtyAlert: nonNegativeIntSchema,
   unitId: unitIdSchema.nullish(),
 });
 

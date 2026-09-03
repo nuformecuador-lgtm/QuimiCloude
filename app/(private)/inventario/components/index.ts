@@ -11,6 +11,7 @@ export {
   type ProductColumn,
   type ProductColumnKey,
 } from './product-columns';
+export { ProductField } from './product-field';
 export { ProductForm } from './product-form';
 export { ProductListEmpty } from './product-list-empty';
 export { ProductListError } from './product-list-error';

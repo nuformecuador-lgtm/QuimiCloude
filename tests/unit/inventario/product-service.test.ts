@@ -17,10 +17,14 @@ const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 /** Instante fijo, inyectado como dependencia (`now`): ver el comentario en `create-product.ts`. */
 const AHORA = new Date('2026-09-02T10:00:00.000Z');
 
+/** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
+ *  del 2026-09-03 los volvio obligatorios en `createProductSchema`. */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
   presentationId: '11111111-1111-4111-8111-111111111111',
   minPurchase: 0,
+  stock: 0,
+  qtyAlert: 0,
 };
 
 const VISTA_PRODUCTO: ProductView = {
