@@ -7,6 +7,9 @@
 // modulo es si se enseña una pantalla; la autorizacion sobre datos y operaciones se valida en
 // el service (`docs/architecture.md > Acceso a datos y autorizacion`).
 
+import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+
 /** Una regla: bajo `prefix`, solo entra quien tenga uno de estos roles (por nombre). */
 export type RouteRoleRule = {
   readonly prefix: string;
@@ -16,16 +19,22 @@ export type RouteRoleRule = {
 /**
  * Conjunto declarado de reglas ruta→rol.
  *
- * **Esta VACIO A PROPOSITO (D8, R12), no a medias.** QC-9 construye el gancho —el tipo, la
- * busqueda y su uso en `decideRouteAccess`— pero no declara ninguna regla: las reglas concretas
- * las trae la ficha de cada modulo (la primera sera la pantalla de productos, solo
- * Administrador). Mientras esta lista este vacia, toda sesion valida pasa a cualquier ruta
- * privada, y eso es el comportamiento especificado.
+ * QC-9 construyo el gancho —el tipo, la busqueda y su uso en `decideRouteAccess`— y dejo esta
+ * lista **vacia a proposito (D8, R12)**, con el encargo escrito de que «la primera sera la
+ * pantalla de productos, solo Administrador». **Esa primera regla es la de abajo**, que trae
+ * QC-22 (R4): la lista ya no esta vacia, y sigue sin estar a medias.
  *
- * Si estas leyendo esto pensando en «arreglarlo» rellenandolo: no hay nada roto. Añade la fila
- * en la ficha que introduce la pantalla, junto con su test.
+ * Toda ruta privada que NO case con ninguna fila sigue abierta a cualquier sesion valida, y eso
+ * es el comportamiento especificado: cada ficha de modulo añade su fila, junto con su test.
+ *
+ * `ADMIN_ROLE_NAME` se toma del **barrel** de `inventario` —nunca por ruta profunda y nunca como
+ * el literal `'Administrador'`—: un tercer literal del mismo rol es justo la deuda que `actor.ts`
+ * ya declaro. `domain/**` → `@/lib/modules/N` lo permite `docs/architecture.md > La regla de
+ * dependencias`.
  */
-export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [];
+export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
+  { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
+];
 
 /** `true` si `pathname` cae bajo `prefix` respetando los limites de segmento. */
 function matchesPrefix(pathname: string, prefix: string): boolean {
