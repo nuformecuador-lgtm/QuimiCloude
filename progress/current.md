@@ -12,8 +12,8 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | pending — **worktree montado, esperando F1.2** | `feature/QC-26-pantalla-de-recetas` | Sesión del 2026-09-03. F1.0 hecha: la pareja `(frontend, QC-27)` está **libre** bajo la regla nueva —en vuelo solo `(backend, QC-31)` y `(backend, QC-41)`—, y su única dependencia, QC-25, se cerró hoy. **`complexity: high` asignada por el leader** (estaba `null`) y escrita como label en el issue: no es una tabla más como QC-22 (`medium`), porque suma sub-formulario de líneas de producto, editor de pasos ordenados y subida de imagen con vista previa y su propio estado. **Parada en F1.2**: la `description` dice literalmente que la forma de la pantalla se decide al acotar la ficha, y no existe `specs/QC-26-pantalla-de-recetas/` |
-| QC-22 | pantalla-de-productos | QC-18 Inventario | frontend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-22-pantalla-de-productos` | Sesión de hoy (2026-09-03). F1.0 hecha: zona `frontend` con **1 feature `in_progress`** (QC-30, que ya no recibe más código —solo espera el merge del PR #20—), sin intersección de archivos: QC-30 toca `app/(public)/login/*`, `app/globals.css` y `components/ui/`; QC-22 vive en `app/(private)/`. Dependencia **QC-20 `done`**. `complexity: medium` evaluada aquí y **empujada al issue como label** (antes solo tenía `zone:frontend`). Worktree en `.worktrees/QC-22-pantalla-de-productos` (rama desde `origin/dev` en `8f4a5ae`). **Parada en F1.2**: la propia description delega la forma de la pantalla al acotado —una ruta o dos, formulario en modal o en página, búsqueda y orden, y si hace falta E2E— y no existe `specs/QC-22-pantalla-de-productos/`. **F1.2 en curso**: `/afinar-feature` corrió el 2026-09-03 y sembró `specs/QC-22-pantalla-de-productos/requirements.md` con 22 decisiones cerradas y 1 pregunta abierta. Cambió el alcance —solo productos; la pantalla de presentaciones salió a **QC-45**, creada en el board— y eso se escribió en el issue ANTES de sembrar. Semilla commiteada en `dev` (`30186f3`) y mergeada al worktree. `spec_author` escribió **32 requisitos (R1-R32) y 20 tareas (T0-T19)** con mapa `R<n> → test` completo (commit `3a85ea6` en la rama). F1.3 hecha: tarjeta en *En revisión* y ruta comentada en el issue. **Spec APROBADO por el humano el 2026-09-03** (F1.4); tarjeta en *En curso*. La aprobación cerró tres cosas: (1) **P2 cerrada sin dependencias nuevas**: `shadcn add form` NO se corre, `react-hook-form` y `@hookform/resolvers` NO se instalan y `docs/dependencias.md` NO cambia — se usa `<form action>` + `useActionState`, el patrón del login (commit `0f36d60`); (2) montar `<Toaster />` **supera** el R36/D9 de QC-11 y su test en negativo (`tests/unit/private-layout.test.tsx:260`), que T4 invierte con la fecha escrita, no borra; (3) `INVENTORY_ROUTE` se muda de `private-nav.ts` a `lib/shared/routes.ts`, tocando cuatro archivos heredados que R32 declara como los únicos permitidos |
 | QC-33 | modelo-pedidos | QC-31 Pedidos | backend | **in_progress — implementer corriendo (F2.1)** | `feature/QC-33-modelo-pedidos` | Sesión de hoy (2026-09-03), `labs-c2`. **Spec aprobado por el humano** tras dos vueltas: 42 requisitos EARS, 12 tareas, 29 decisiones cerradas, commit `a26baba`. Tarjeta en *En curso*. **El cupo se resolvió solo**: QC-25 se mergeó (PR #23) mientras se revisaba, así que `backend` entró en **1 de 2** y no hubo que forzar la regla. Worktree ya sincronizado con `origin/dev`, que trae QC-25 y QC-32. Cinco encargos al implementer: **R41** usa `timezone(text, timestamptz)` porque es `IMMUTABLE` y `EXTRACT(YEAR FROM created_at)` a secas es `STABLE` y Postgres la rechaza en un `CHECK`; el caso que muerde es el de **frontera** (`2026-12-31T20:00:00-05:00` con año 2026 → `23514`); **ningún test escribe el año literal**, se calcula con `new Date().getUTCFullYear()` o la suite se pone roja sola el 1 de enero; el índice único del correlativo es **total y no parcial**, al revés que QC-24; y `RecipeId` es aditivo sobre un `recetas` que **QC-25 acaba de tocar**. Quedan **2 preguntas abiertas** y las dos siguen abiertas a propósito |
+| QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | pending — **worktree montado, esperando F1.2** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. Se ofreció `/afinar-feature QC-43` |
 
 La feature **QC-30 — rediseno-login** se cerró el 2026-09-03, pero **su PR [#20] se había
 mergeado el 2026-09-02 a las 22:55Z**: la sesión que la implementó nunca corrió F2.5 ni F2.6, así
@@ -144,6 +144,47 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-43 — crud-de-proveedores: F1.0 (2026-09-03)
+
+- **Gate de `dev` en verde** al arrancar (97 archivos), y el propio gate avisó de que la entrada
+  del baseline que dejó QC-22 **ya pasaba**: era la guardia de dependencias, roja por la fila de
+  `@supabase/storage-js` de QC-25, y QC-25 ya está mergeada. **Retirada**; el baseline vuelve a
+  estar vacío, que es como informa.
+- **`zone: backend` y `complexity: high` ya venían del board**, con las cuatro labels puestas
+  (`sdd`, `slug:crud-de-proveedores`, `zone:backend`, `complexity:high`). No hizo falta empujar
+  nada a Jira: esta vez la evaluación ya estaba hecha.
+- **Cupo, con la regla nueva de una feature por zona Y épica.** La única en vuelo es **QC-33**
+  (backend · épica QC-31 Pedidos). QC-43 es backend · **QC-41 Proveedores**: par distinto, así que
+  entra. Con la regla vieja de «2 por zona» habría entrado igual, pero por poco.
+- **Dependencias**: QC-42 y QC-8, las dos `done` y `Finalizado` en el board. Worktree en
+  `.worktrees/QC-43-crud-de-proveedores`, rama desde `origin/dev` en `d532662` (el merge del PR
+  #25, que es justo QC-42).
+- **Parada en F1.2, y aquí no es una formalidad.** QC-42 no dejó preguntas vagas: dejó **encargos
+  con destinatario**. Su `requirements.md` y su `design.md` nombran a QC-43 quince veces. Lo que
+  cae de lleno en esta ficha:
+  1. **El contacto en blanco.** La decisión 7 de QC-42 exige «al menos teléfono o correo», pero el
+     `CHECK` de la base solo mira **ausencia de valor**: `phone = ''` lo satisface igual que un
+     teléfono real. La posición por defecto escrita es que **QC-43 lo rechace con zod**. Si la
+     respuesta fuera que la base también debe impedirlo, es otro `CHECK` y cambiarlo con
+     proveedores cargados obliga a limpiar datos.
+  2. **El rastro de quién edita una línea del catálogo.** La línea no lleva columnas de autor
+     (decisión 14, heredada de `recipe_lines`), pero allí editar una línea es editar la fórmula y
+     el rastro queda en `recipes.updated_by`; aquí **subir el costo es un hecho comercial propio**.
+     Dos caminos y ninguno gratis: que QC-43 toque `suppliers.updated_by` (barato, impreciso) o
+     columnas de auditoría propias (una migración más).
+  3. **¿Un costo de 0 es válido?** Hoy la base solo prohíbe negativos. Una muestra gratis lo
+     justifica; un cero por descuido, no.
+  4. **El mínimo de compra no dice en qué se mide**: se lee según la unidad del producto, que
+     QC-32 dejó **opcional**.
+  5. **El filtro de borrado lógico en las consultas lo pone QC-43**: QC-42 no tiene ninguna.
+  Y además: los puertos, los adaptadores driven y driving del módulo `proveedores` están **vacíos
+  con `.gitkeep`** esperando a esta ficha, y la autorización en el service la fija QC-43
+  (decisión 20 de QC-42).
+  No existe `specs/QC-43-crud-de-proveedores/`. **Se ofreció `/afinar-feature QC-43`**: lanzar
+  `spec_author` sin cerrar esos cinco puntos es pagar la ronda dos veces, y aquí están escritos
+  con nombre.
+- **Acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 4 preguntas abiertas en `specs/QC-43-crud-de-proveedores/requirements.md`; no se copian aquí. **Cambió el alcance en dos cosas y las dos se escribieron en el issue ANTES de sembrar**: los permisos pasan de «usuarios con sesión iniciada» a **solo el Administrador**, y la ficha **trae tres cambios de esquema sobre QC-42** —contacto en blanco rechazado también en la base, costo estrictamente mayor que cero, y columnas de autor en la línea del catálogo—, baratos porque las tablas están vacías. Ninguna ficha nueva ni huérfana.
 
 ### QC-33 — modelo-pedidos (acotada el 2026-09-03)
 
