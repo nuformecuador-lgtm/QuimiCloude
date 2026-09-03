@@ -287,6 +287,14 @@ esta ficha **ya toca ese `CHECK`**, es el momento barato de decidirlo. Posición
 escrita, no decidida: hacerlo parcial (`WHERE deleted_at IS NULL`) no cuesta nada más ahora y deja
 la puerta abierta. Lo cierra el humano al aprobar el spec, o el `design.md` lo deja explícito.
 
+**RESUELTA el 2026-09-03 al aprobar el spec (F1.4): la restricción se escribe SOLO para las
+filas vivas.** Decisión del humano, con la recomendación del `design.md`. Consecuencia buscada:
+un proveedor dado de baja **sí** puede quedarse sin teléfono y sin correo, que es lo que exigiría
+una solicitud de borrado de datos personales, y se consigue sin eliminar la fila ni romper nada
+que la referencie. Esto **cierra de paso la pregunta abierta 8 de QC-42**, que quedó anotada allí
+como asumida por no haber ficha de retención. **T3 queda desbloqueada.**
+
+
 **P3 — El mínimo de compra no dice en qué se mide.** Se lee según la unidad del producto, que
 QC-32 dejó **opcional**: un mínimo de `2,5` sobre un producto sin unidad es ambiguo. Heredada de
 QC-42 (pregunta 4). No se añade columna de unidad a la línea: hacerlo después es barato mientras
