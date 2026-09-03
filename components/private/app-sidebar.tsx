@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 
 import { NavUser } from '@/components/private/nav-user';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
@@ -219,17 +220,19 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
           Solo escritorio: en movil el panel es un `Sheet` que se cierra solo al navegar (R33)
           y una pastilla colgada de su borde no tendria donde anclarse.
         */}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={toggleSidebar}
           aria-label={SIDEBAR_EDGE_TOGGLE_LABEL}
           aria-expanded={open}
           aria-controls={SIDEBAR_PANEL_ID}
           data-testid="private-sidebar-edge-toggle"
-          className="absolute top-6 -right-[26px] hidden size-7 items-center justify-center rounded-[10px] bg-sidebar text-sidebar-foreground shadow-[0_0_0_1px_var(--sidebar-border),0_8px_18px_-8px_rgba(10,40,40,0.55)] transition-colors md:flex hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-hidden"
+          className="absolute top-6 -right-[26px] hidden rounded-[10px] bg-sidebar text-sidebar-foreground shadow-[0_0_0_1px_var(--sidebar-border),0_8px_18px_-8px_rgba(10,40,40,0.55)] md:inline-flex hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
           <PanelLeftIcon className="size-3.5" />
-        </button>
+        </Button>
       </div>
     </Sidebar>
   );
