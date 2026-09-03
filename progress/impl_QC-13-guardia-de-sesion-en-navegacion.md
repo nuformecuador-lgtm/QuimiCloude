@@ -247,3 +247,44 @@ completo (T6), tarea del leader antes del PR.
 Solo queda T6: correr `./init.sh` completo (typecheck + lint + toda la suite unitaria y de
 integracion + todas las guardias + el E2E) y confirmar verde. Es tarea del leader, no de este
 implementer, segun el encargo recibido.
+
+## Rojo destapado por el gate completo: test de OTRA feature acoplado a datos de relleno de QC-13
+
+El gate completo (`./init.sh`) que corre el leader antes del PR dio 9 rojos en 2 archivos.
+8 de ellos son deuda ajena en `tests/integration/identity/identity-seed.int.test.ts`
+(producto residual `FeldesQuack` de una corrida de QC-22 que bloquea el `DELETE FROM users`
+del helper con FK `23503`; el humano decidio el 2026-09-03 no tocarlo). No son de esta ficha.
+
+El noveno es de `tests/unit/sidebar-ajuste.test.tsx`, un archivo que **no forma parte del
+alcance de QC-13** (es un arreglo directo de diseno, sin ficha, del 2026-09-02) pero que
+quedo acoplado a un dato de relleno que QC-13 retira: su test `'el contador sale del array,
+no de un literal del componente'` afirmaba dos cosas -(1) sobre una fixture propia
+(`NAV_MINIMA`), que el contador se pinta desde el array, y (2) sobre el menu real
+(`PRIVATE_NAV_ITEMS`), que algun item declaraba `badge`. La (2) solo era cierta porque
+"Notificaciones" -uno de los cuatro items de relleno de QC-11 que esta ficha retira en T1- era
+el unico item del array real con `badge`. Al quitarlo, la asercion (2) paso a ser falsa por
+construccion: exigia un dato que ya no debia existir.
+
+Mismo criterio que la decision cerrada 5 de esta ficha ya aplico a `app-sidebar.test.tsx`
+(migrar del menu real a fixture propia): la capacidad -pintar un contador que viene del
+array, no de un literal- sigue cubierta y sigue mordiendo por la asercion (1), que usa
+`NAV_MINIMA`. Se retiro solo la asercion (2) y se dejo un comentario en el propio test
+explicando por que: el menu real ya no declara ningun `badge` porque el unico que lo hacia
+era placeholder de QC-11; inventar uno en Dashboard o Inventario seria dominio no
+especificado (lo dice el comentario de `private-nav.ts`); y la ficha que traiga las
+notificaciones reales devolvera su propio contador con su propio origen.
+
+Delegado a `frontend_dev` (modelo sonnet). Verificacion de mutacion hecha por el propio
+subagente: quitando `badge: 7` de `NAV_MINIMA` (item `nav-uno`), el test cayo
+(`TestingLibraryElementError: Unable to find an element by [data-testid="nav-uno-badge"]`);
+revertido el experimento, `git diff` quedo limpio salvo el cambio real. Gate del subagente:
+`pnpm typecheck` limpio, `pnpm lint` limpio, `npx vitest related --run
+tests/unit/sidebar-ajuste.test.tsx` -> 1 archivo, 13 tests, todos en verde.
+
+Archivo: `tests/unit/sidebar-ajuste.test.tsx` (fuera del listado de "Archivos tocados" de
+T1-T5 porque no es parte del scope original de la ficha; se toco solo para destrabar el gate
+completo). Commit `b1c412d` fix(QC-13): retirar aserción de sidebar-ajuste acoplada a datos
+de relleno de QC-11.
+
+No se toco `FORMULAS_ROUTE` ni nada de QC-26. No se reabrio el spec ni las decisiones
+cerradas; las 6 preguntas abiertas siguen abiertas.
