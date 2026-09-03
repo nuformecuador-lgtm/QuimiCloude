@@ -208,7 +208,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   sesión redirige al login (R3, R4). La guardia de rutas privadas ya cubre la cobertura del prefijo.
 - **Hecho cuando**: cubre R3 y R4 y `pnpm run test:guardias` sigue en verde.
 
-### [ ] T15 — E2E del camino completo y del rechazo por rol
+### [x] T15 — E2E del camino completo y del rechazo por rol
 - **Depende de**: T11, T14. **Archivos**: `e2e/inventario.spec.ts`.
 - **Qué** (`design.md > 11`): (1) login → `/inventario` → alta (creando presentación si hace
   falta) → el producto aparece en la lista; (2) sesión con rol distinto de Administrador pide
@@ -217,6 +217,11 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   por el nombre con `RUN_ID`, **nunca** por «la primera fila» ni por totales.
 - **Hecho cuando**: `pnpm run e2e` pasa en Chromium y WebKit y la base queda limpia
   (`prisma.product.count()` con el prefijo = 0 tras la corrida).
+- **Estado 2026-09-03**: el spec esta **escrito** (`e2e/inventario.spec.ts`) y pasa `typecheck` y
+  `lint`, pero **NO se ha ejecutado**: este worktree no tiene `DATABASE_URL`, asi que no hay
+  migraciones, ni seed, ni roles, ni servidor. **No se declara verificado.** El comando exacto y
+  lo que necesita estan en `progress/impl_QC-22-pantalla-de-productos.md > T15`; el verde lo
+  comprueba el leader en el gate.
 
 ---
 

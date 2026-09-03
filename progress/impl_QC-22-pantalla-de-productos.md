@@ -709,3 +709,102 @@ dependencia nueva.
 comentario que `ROUTE_ROLE_RULES` «esta vacio a proposito»; ya no lo esta, y ademas la constante
 no vive ahi. Ese archivo no entra en los de esta tarea, asi que se reporta en vez de tocarlo.
 
+
+---
+
+## Correccion del comentario obsoleto de `route-access.ts` (autorizada por el leader)
+
+`lib/modules/identity/domain/route-access.ts:37` decia que las reglas las aporta
+`ROUTE_ROLE_RULES`, «que esta vacio a proposito (R12)». Esta ficha lo convirtio en mentira **por
+dos motivos a la vez**: la lista ya tiene una fila -la de `/inventario`- y ademas ya no vive en
+`domain/`, sino en `adapters/driving/route-role-rules.ts`, adonde la mudo la correccion de
+arquitectura de esta misma feature.
+
+- **Solo el comentario.** Ni una linea de codigo de ese archivo cambia: el tipo, la firma y el
+  cuerpo de `decideRouteAccess` quedan como estaban. Lo unico que se reescribe es el JSDoc del
+  campo `rules` de `RouteAccessInput`, que ahora dice donde vive la lista y cual es su primera
+  regla, y **conserva** lo que si sigue siendo cierto: que las reglas entran como parametro (R12).
+- Se hace en commit propio, separado del E2E, porque no es trabajo de T15: es deuda que esta
+  ficha genero y que se arrastraba anotada desde la tanda de T3.
+
+## T15 — E2E del camino completo y del rechazo por rol
+
+**Archivo (nuevo):** `e2e/inventario.spec.ts`, sobre el patron de `e2e/session.spec.ts` (fixtures
+propios con prefijo, `RUN_ID` por worker, limpieza de huerfanos **por edad**, borrado en
+`afterAll` con `try`/`finally` anidados). Dos recorridos, los dos que pidio el humano:
+
+1. **Camino completo del Administrador:** login real -> `/inventario` -> abrir el panel lateral ->
+   escribir el producto -> crear su presentacion **desde el propio selector** -> guardar -> el
+   panel se cierra, aparece un aviso emergente y **el producto esta en la lista**. Cierra con una
+   comprobacion en base (`prisma.product.count`) de que lo guardo el backend de verdad y no solo
+   lo pinto la pantalla.
+2. **Rechazo del no-Administrador:** usuario con rol `Operador`, sesion valida, pide
+   `/inventario` y **acaba en el dashboard** -no en el login: no autorizado no es no autenticado-
+   sin ver ni el titulo, ni la tabla, ni el estado vacio.
+
+**Decisiones del spec que no son obvias y se dejan escritas:**
+
+- **Los roles NO se crean.** `Administrador` y `Operador` los siembra `pnpm run db:seed`
+  (`lib/modules/identity/domain/roles.ts`). La regla ruta->rol compara por **nombre exacto**, asi
+  que un rol efimero `qc22_e2e_rol_<RUN_ID>` -el patron de `session.spec.ts`- no probaria nada.
+  Si el rol falta, el `beforeAll` falla diciendo que hay que sembrar, en vez de dar un rojo
+  incomprensible a mitad del recorrido.
+- **La fila se busca recorriendo paginas, no mirando la primera.** La pantalla no ofrece busqueda
+  (R13, decision cerrada) y el orden es fijo `name ASC`: un producto recien creado cae en
+  cualquier pagina. `findProductCell` avanza con el control real de paginacion -de paso ejercita
+  R11 en un navegador- hasta que «siguiente» queda deshabilitado. El assert filtra por el nombre
+  con `RUN_ID`; **nunca** por «la primera fila» ni por el total, que el otro proyecto puede estar
+  moviendo en el mismo instante.
+- **El borrado de la limpieza es FISICO** (`prisma.product.deleteMany`), no el de la pantalla, que
+  es logico (`deletedAt`): un borrado logico dejaria la fila viva para el resto del repo. Orden
+  impuesto por las FK: productos -> presentaciones -> usuarios.
+- **El toast se afirma por estructura** (`[data-sonner-toast]`), no por su texto: los asserts de
+  este repo no miran literales de copy.
+- `product-create-open` aparece **dos veces** cuando el catalogo esta vacio (cabecera y estado
+  vacio), asi que se toma `.first()`: sin eso, el modo estricto de Playwright rompe con un error
+  que no es del codigo.
+
+### NO SE PUDO EJECUTAR — y por tanto NO se declara verificado
+
+En este worktree **no hay `DATABASE_URL`**. Sin base no hay migraciones, ni seed, ni roles, ni
+`next dev` util: Playwright no se corrio y **este E2E no ha visto un solo navegador**. Se dice tal
+cual, sin adornos: el spec esta escrito y pasa `typecheck` y `lint`, pero **su verde esta
+pendiente**. Lo verifica el leader en el gate.
+
+**Comando exacto y lo que necesita:**
+
+```bash
+# 1. Entorno: .env del worktree con DATABASE_URL (y DIRECT_URL si hay pooler) apuntando a
+#    una Postgres accesible. SESSION_SECRET tambien, que es lo que firma la cookie.
+# 2. Esquema al dia:
+pnpm run db:migrate
+# 3. Semilla: crea los roles `Administrador` y `Operador`. SIN ESTO el beforeAll falla a
+#    proposito con el mensaje que lo explica.
+pnpm run db:seed
+# 4. El E2E (Chromium + WebKit, servidor propio en el puerto 3117, lo levanta Playwright):
+pnpm run e2e
+# o solo este spec:
+pnpm exec playwright test e2e/inventario.spec.ts
+```
+
+- **Usuarios:** los crea el propio spec en `beforeAll`, con hash real de bcrypt, y los borra en
+  `afterAll`. **No hay que crearlos a mano**: uno con rol `Administrador`
+  (`qc22_e2e_admin_<RUN_ID>`) y otro con rol `Operador` (`qc22_e2e_oper_<RUN_ID>`).
+- **Datos de catalogo:** tambien los crea y los borra el spec (`qc22_e2e_producto_<RUN_ID>` y
+  `qc22_e2e_presentacion_<RUN_ID>`).
+- **Criterio de limpieza que hay que comprobar tras la corrida:**
+  `prisma.product.count({ where: { name: { startsWith: 'qc22_e2e_' } } })` = 0, y lo mismo para
+  `presentation` y para `user` con ese prefijo.
+
+**Salida real de lo que SI se pudo correr:**
+
+```
+pnpm typecheck  -> tsc --noEmit, sin errores
+pnpm lint       -> eslint, sin hallazgos
+pnpm exec vitest related --run --project node --project ui   lib/modules/identity/domain/route-access.ts e2e/inventario.spec.ts
+  -> Test Files  26 passed (26)   ·   Tests  299 passed (299)
+```
+
+Los proyectos de **integracion** siguen rojos por la misma ausencia de `DATABASE_URL`
+(`tests/integration/identity/*.int.test.ts`): es previo a esta tanda y ajeno a ella.
+`package.json` y `pnpm-lock.yaml`, sin cambios: **ninguna dependencia nueva**.
