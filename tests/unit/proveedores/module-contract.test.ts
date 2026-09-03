@@ -243,22 +243,30 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       sourcesIn(join(proveedoresDir, 'ports')).map((f) => toPosix(relative(proveedoresDir, f))),
       'ports/ gano un archivo fuera de los dos puertos de QC-43',
     ).toEqual(['ports/supplier-catalog-repository.ts', 'ports/supplier-repository.ts'])
-    // `adapters/driven/` y `adapters/driving/` siguen vacias y con su `.gitkeep`: los dos
-    // adaptadores de persistencia son T11/T12 y las Server Actions T14. Cuando lleguen,
-    // derogan estas lineas -y la de 'use server' de mas abajo- igual que T7 derogo la de
-    // `ports/`.
-    for (const carpeta of ['adapters/driven', 'adapters/driving']) {
-      expect(
-        sourcesIn(join(proveedoresDir, ...carpeta.split('/'))),
-        `${carpeta} deberia estar vacia`,
-      ).toEqual([])
-      expect(existsSync(join(proveedoresDir, ...carpeta.split('/'), '.gitkeep')), carpeta).toBe(
-        true,
-      )
-    }
-    // Y el `.gitkeep` de la carpeta que T7 lleno ya NO esta: git no versiona carpetas
-    // vacias, pero tampoco carpetas con contenido y un `.gitkeep` sobrante.
-    for (const carpeta of ['ports']) {
+    expect(
+      sourcesIn(join(proveedoresDir, 'adapters', 'driven')).map((f) =>
+        toPosix(relative(proveedoresDir, f)),
+      ),
+      'adapters/driven/ gano un archivo fuera de los dos adaptadores de QC-43',
+    ).toEqual([
+      'adapters/driven/persistence/supplier-catalog-line-prisma.ts',
+      'adapters/driven/persistence/supplier-prisma.ts',
+    ])
+    // `adapters/driving/` sigue vacia y con su `.gitkeep`: las Server Actions son T14.
+    // Cuando lleguen, derogan estas dos lineas -y la de 'use server' de mas abajo- igual
+    // que T7, T11 y T12 derogaron las de arriba.
+    expect(
+      sourcesIn(join(proveedoresDir, 'adapters', 'driving')),
+      'adapters/driving deberia estar vacia',
+    ).toEqual([])
+    expect(
+      existsSync(join(proveedoresDir, 'adapters', 'driving', '.gitkeep')),
+      'adapters/driving',
+    ).toBe(true)
+    // Y los `.gitkeep` de las carpetas que T7, T11 y T12 llenaron ya NO estan: git no
+    // versiona carpetas vacias, pero tampoco carpetas con contenido y un `.gitkeep`
+    // sobrante.
+    for (const carpeta of ['ports', 'adapters/driven']) {
       expect(
         existsSync(join(proveedoresDir, ...carpeta.split('/'), '.gitkeep')),
         `${carpeta}/.gitkeep sobra: la carpeta ya tiene archivos reales`,

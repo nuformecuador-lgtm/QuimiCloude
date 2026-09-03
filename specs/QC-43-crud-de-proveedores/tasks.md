@@ -144,14 +144,14 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo C — adaptadores y cableado (depende de B)
 
-- [ ] **T11 [P] — Adaptador driven de proveedores.**
+- [x] **T11 [P] — Adaptador driven de proveedores.**
       `adapters/driven/persistence/supplier-prisma.ts`: filtro `deleted_at IS NULL`, escritura de
       `created_by`/`updated_by`, `name ASC, id ASC`, uso de `toOffsetLimit`/`buildPage` de
       `lib/shared/pagination` y traducción de SQLSTATE (`23505` → `'duplicate'`).
       *Depende de:* T7. **Hecho cuando:** typecheck limpio y es uno de los dos únicos archivos del
       módulo que importan `@prisma/client`. **Borra `adapters/driven/.gitkeep`.**
 
-- [ ] **T12 [P] — Adaptador driven del catálogo.**
+- [x] **T12 [P] — Adaptador driven del catálogo.**
       `adapters/driven/persistence/supplier-catalog-line-prisma.ts`: `listBySupplierAlive`
       comprobando que el **proveedor** está vivo antes de devolver nada (R36), conversión
       `string ↔ Prisma.Decimal`, orden `created_at ASC, id ASC`, `DELETE` físico y traducción de
