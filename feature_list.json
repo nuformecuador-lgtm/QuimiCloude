@@ -262,7 +262,7 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "pantalla-de-productos",
-      "description": "La pantalla del catalogo de productos dentro del layout privado: la lista paginada, el formulario de alta y edicion, el borrado, y lo mismo para el catalogo de presentaciones. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-20 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo.",
+      "description": "La pantalla del catalogo de productos dentro del layout privado, en la ruta /inventario: la lista paginada, el alta y la edicion en un panel lateral (sheet), y el borrado con confirmacion. Solo la ve el Administrador, y esta ficha estrena la primera regla ruta-rol del repo. Las operaciones ya existen y las expone QC-20 como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). El selector de presentacion permite crear una presentacion nueva sin salir del formulario, porque un producto no puede existir sin ella. Sin busqueda ni orden configurable: el backend no los soporta y meterlos seria reabrir QC-20. La pantalla del catalogo de presentaciones (lista, edicion y borrado) va aparte.",
       "status": "pending",
       "sdd": true,
       "complexity": "medium",
@@ -562,6 +562,23 @@
         "QC-43"
       ],
       "spec_path": "specs/QC-44-pantalla-de-proveedores"
+    },
+    {
+      "key": "QC-45",
+      "id": 45,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "pantalla-de-presentaciones",
+      "description": "El catalogo de presentaciones (bidon, tambor, saco) dentro del layout privado: la lista paginada, el alta, la edicion y el borrado. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-20 como Server Actions. Salio del alcance de QC-22, que se quedo solo con productos; QC-22 si permite crear una presentacion desde el selector del formulario de producto, pero no listarlas, editarlas ni borrarlas. La forma de la pantalla se decide al acotar esta ficha.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-45-pantalla-de-presentaciones",
+      "depends_on": [
+        "QC-22"
+      ],
+      "spec_path": "specs/QC-45-pantalla-de-presentaciones"
     }
   ]
 }

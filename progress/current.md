@@ -164,6 +164,7 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   al acotar esta ficha, y ahí también se decide si hace falta prueba de extremo a extremo». No
   existe `specs/QC-22-pantalla-de-productos/requirements.md`. Lanzar `spec_author` en crudo
   sería pagar la ronda dos veces. Se ofreció `/afinar-feature QC-22`.
+- **Acotada con `/afinar-feature` el 2026-09-03.** El alcance, las 22 decisiones cerradas y la unica pregunta abierta viven en `specs/QC-22-pantalla-de-productos/requirements.md`; no se copian aqui. Cambio de alcance: la ficha se queda **solo con productos** y la pantalla de presentaciones salio a **QC-45**, creada en el board ese dia (epica QC-18, `is blocked by` QC-22). La `description` de QC-22 se reescribio en el issue y las dos cosas estan reflejadas en `feature_list.json`.
 
 ### QC-25 — crud-de-recetas: F0 + F1.0 (2026-09-03)
 
