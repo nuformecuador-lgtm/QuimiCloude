@@ -182,7 +182,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
 
 ## Bloque 3 — Tests
 
-### [ ] T12 — [P] Tests de la pantalla (render)
+### [x] T12 — [P] Tests de la pantalla (render)
 - **Depende de**: T11. **Archivos**: `tests/unit/inventario/product-page.test.tsx`,
   `tests/unit/inventario/product-list-params.test.ts`.
 - **Qué**: ver el mapa de trazabilidad de abajo. Render dentro del layout privado reutilizando el

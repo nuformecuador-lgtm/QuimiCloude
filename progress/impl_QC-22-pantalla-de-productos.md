@@ -457,3 +457,65 @@ se pueda leer solo, porque supera una decision de otra feature.
   se pone **rojo** en la asercion de inercia. Si el contenido dejara de ocultarse, enrojece.
 - **Salida:** `pnpm exec vitest run --project ui tests/unit/sidebar-mobile.test.tsx` -> 7 tests,
   **verde**.
+
+## T12 — Tests de la pantalla (render)
+
+**Archivos (nuevos):** `tests/unit/inventario/product-page.test.tsx` (25 tests, proyecto `ui`),
+`tests/unit/inventario/product-list-params.test.ts` (8 tests, proyecto `node`).
+
+- **La pantalla se monta DENTRO del layout privado**, igual que en produccion, reutilizando el
+  patron de mocks de `tests/unit/private-layout.test.tsx` (`next/headers`, `next/navigation`,
+  `@/lib/composition`) y el helper `tests/helpers/viewport.ts`.
+- **Las seis Server Actions estan sustituidas por dobles.** Son el borde del modulo `inventario`
+  (QC-20, `done`, que esta ficha no abre) y es lo unico que permite ejercitar los tres estados de
+  la lista y un guardado rechazado sin base de datos.
+- **Hallazgo del entorno, anotado porque condiciona el diseno del test:** `react-dom` en jsdom
+  **no sabe ejecutar un componente `async`** —queda suspendido para siempre—, asi que
+  `ProductListSection` se resuelve antes de entregar el arbol al renderer (`resolverServerComponents`).
+  El arbol que se renderiza sigue siendo el REAL de `page.tsx`: la `<Suspense>`, su `key` y su
+  `fallback` son los que declara la pagina. **El test de R15 se apoya en lo contrario**: renderiza
+  el arbol SIN resolver, la seccion queda suspendida y `<Suspense>` pinta su `fallback`. Es la
+  unica forma honesta de observar el estado de carga sin escribirlo a mano.
+- Interacciones con `@testing-library/user-event`, nunca `fireEvent`. Asserts sobre roles ARIA,
+  `data-testid` y constantes exportadas; el unico texto que aparece es **dato del fixture** (el
+  nombre de un producto, el mensaje que devuelve una action), nunca copy de la pantalla.
+- El parser se prueba **sin DOM** (proyecto `node`): R12 no depende de que nada se renderice.
+
+### Que muerde cada test (comprobado rompiendo el codigo, no razonado)
+
+Se aplicaron mutaciones reales sobre `app/(private)/inventario/**`, se corrio la suite y se
+revirtieron con `git checkout` (arbol limpio despues, comprobado con `git status`):
+
+| Mutacion introducida | Test que se puso ROJO |
+| --- | --- |
+| La pagina declara su propio `main` | R1 |
+| Se cae la columna `qtyAlert` de `PRODUCT_COLUMNS` | R6 |
+| La columna `name` pinta ademas `createdBy` | R7 |
+| `overflow-x-auto` sube al contenedor de la pagina | R9 |
+| `pageSize` por defecto pasa de 10 a 25 | R10 y los cuatro de R12 |
+| «Siguiente» no avanza; los extremos dejan de desactivarse | los dos de R11 |
+| Se cuela un `input[type=search]` en la barra | R13 |
+| La lista vacia se pinta como tabla sin filas | R14 (y el de «pagina que se quedo atras») |
+| El `<Suspense>` se queda sin `fallback` | R15 |
+| El estado de error deja de mostrar el `code` | R16 y R5 |
+| Abrir el panel navega (`router.push`) | R17 |
+| La edicion deja de precargar `unit` | R19 |
+| El estado de fallo deja de devolver lo escrito | las dos mitades de R20 |
+| Se quita `router.refresh()` tras el exito | R21 |
+| `unit` pasa a campo numerico | R23 |
+| La presentacion creada deja de quedar seleccionada | R24 |
+| El campo oculto del borrado pierde el `id` | R26 |
+
+**Un hueco que NO se tapa con adorno y se declara:** la mitad de R31 que dice «nada de `:hover`
+como unica via» **no se puede observar en jsdom**. Se comprobo: escondiendo las acciones de fila
+con `hidden hover:flex`, `toBeVisible()` sigue pasando, porque jsdom no aplica las hojas de estilo
+de Tailwind. Ese medio requisito lo muerde la guardia de fuente de **T13**, no este archivo. Lo que
+T12 si cubre de R31 es que la lista y sus acciones se presentan en viewport angosto **y** ancho.
+
+**Salida real:**
+```
+pnpm typecheck  -> tsc --noEmit, sin errores
+pnpm lint       -> eslint, sin hallazgos
+pnpm exec vitest related --run tests/unit/inventario/product-page.test.tsx   tests/unit/inventario/product-list-params.test.ts
+  -> Test Files  2 passed (2)   ·   Tests  33 passed (33)
+```
