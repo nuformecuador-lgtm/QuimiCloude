@@ -1324,3 +1324,95 @@ aqui: ni `package.json` ni `docs/dependencias.md` entran en este ajuste.
 unicas apariciones de «unit» son la palabra «unit» hablando de tests unitarios). Tampoco hizo
 falta tocar `product-table.tsx` ni `product-table-skeleton.tsx`: ambos **iteran**
 `PRODUCT_COLUMNS` en vez de contar columnas a mano, que es justo para lo que se declararon asi.
+
+---
+
+## Ronda de revision — la guardia de R31 medía por archivo (2026-09-03)
+
+### El hallazgo
+
+`tests/unit/inventario/product-route-contract.test.ts`, prueba `no usa 100vh, ni hover como unica
+via, y respeta tamanos tactiles y de fuente`. Las dos mitades de tamaños se afirmaban **sobre el
+archivo entero**:
+
+- si el archivo renderizaba algún control, bastaba con que `min-h-11` apareciese **una vez en
+  cualquier parte**;
+- si el archivo tenía un `<Input`, bastaba con un `text-base` suelto.
+
+Un archivo con cinco controles donde cuatro llevan el área táctil y uno no pasaba en verde. El
+reviewer lo demostró: quitando `TOUCH_TARGET` y `FIELD_TEXT` de **un campo entero** de
+`product-form.tsx`, la suite seguía verde. Un test que no falla al romper lo que afirma no cuenta
+— es la misma clase de agujero por la que se rechazó QC-30 en su primera ronda.
+
+### Lo que se hizo
+
+La aserción pasa a ser **por control**: cada etiqueta de apertura `<Button`, `<SelectTrigger`,
+`<Input` y `<AlertDialogAction` de las fuentes de la ruta debe llevar el área táctil en **su
+propio** `className`, y cada `<Input>` además el tamaño de fuente. El conjunto de controles
+vigilados es el mismo de antes; lo que cambia es la granularidad.
+
+Dos detalles que lo hacían no trivial, ambos resueltos con lectura de fuente y expresiones
+regulares —**ninguna dependencia nueva**, nada de un parser de JSX del ecosistema—:
+
+1. **Los componentes no escriben las clases literales**, las agrupan en constantes locales
+   (`const TOUCH_TARGET = 'min-h-11 min-w-11'`, `const FIELD_TEXT = 'text-base md:text-base'`), y
+   las usan como `className={\`${TOUCH_TARGET} ${FIELD_TEXT}\`}`. Buscar `min-h-11` a ojo sobre el
+   `className` daría rojos falsos. La guardia **resuelve las constantes del archivo**: una `const`
+   cuyo valor de cadena contenga `min-h-11` cuenta como área táctil, y una que contenga
+   `text-base`, como tamaño de fuente; se acepta tanto la clase literal como la referencia a esa
+   constante (con límites de palabra, para que `TOUCH_TARGET_SM` no cuele por `TOUCH_TARGET`).
+2. **Las etiquetas de apertura ocupan varias líneas.** Se opera sobre la **etiqueta completa**:
+   un lector que avanza desde `<Nombre` contando llaves e ignorando lo que cae dentro de una
+   cadena, hasta el `>` a profundidad cero. El mismo lector extrae el valor del atributo, sea
+   `attr="..."` o `attr={...}` con plantillas anidadas. Mirar línea a línea es el error que ya
+   apareció antes en esta feature con los imports multilínea.
+
+Añadidos que evitan que la guardia se quede **muda** en vez de roja:
+
+- **Autocomprobación por archivo**: si la fuente escribe `<Nombre` y el lector no devuelve ninguna
+  etiqueta, el test falla. Un lector roto no puede parecer un archivo limpio.
+- **Contador global**: `expect(controlesVigilados).toBeGreaterThan(0)`.
+- **Mensajes con archivo, línea real y control**: las líneas se mapean de la fuente sin
+  comentarios de vuelta al archivo original (`lineasOriginales`), y el control se nombra por su
+  `data-testid`, `aria-label` o `id`. Antes el fallo solo decía el archivo.
+
+Las otras dos mitades de la prueba —`100vh` y `hover:` como única vía de revelar— **se quedan
+igual**: ya mordían.
+
+### Alcance vigilado y excepciones
+
+**17 controles en 7 archivos** (`delete-product-dialog` 2, `presentation-select` 6, `product-form`
+3, `product-list-empty` 1, `product-list-error` 1, `product-list-toolbar` 3, `product-sheet` 1),
+de los cuales **3 son `<Input>`** y llevan además el tamaño de fuente.
+
+**Ningún control incumplía**: al acotar la guardia, los 17 pasaron sin tocar un solo componente.
+Así que **no se declaró ninguna excepción** ni se ablandó nada, y **no se modificó ningún archivo
+de producción** en esta ronda. Solo cambia el test.
+
+### Verificacion por mutacion (rota, se ve el rojo, se revierte)
+
+| Mutacion | Resultado |
+| --- | --- |
+| `product-form.tsx`: `className={\`w-full ${TOUCH_TARGET}\`}` -> `className="w-full"` en **un solo** botón | ROJO — `product-form.tsx:415 <Button> ("product-form-submit") debe forzar el area tactil en SU className` |
+| `product-form.tsx`: `className={\`${TOUCH_TARGET} ${FIELD_TEXT}\`}` -> `className={TOUCH_TARGET}` en **un solo** `<Input>` | ROJO — `product-form.tsx:353 <Input> ({\`product-field-${field}\`}) debe fijar 16px en SU className` |
+| `product-list-toolbar.tsx`: se borra la línea `className` de **un solo** `SelectTrigger` | ROJO — `product-list-toolbar.tsx:81 <SelectTrigger> ("product-page-size") debe forzar el area tactil` |
+| `product-sheet.tsx`: `const TOUCH_TARGET = 'min-h-9 min-w-9'` (la constante deja de valer) | ROJO — la resolución de constantes no es un pase en blanco |
+| `product-sheet.tsx`: se añade `min-h-[100vh]` | ROJO — `no debe usar 100vh` (la mitad que ya funcionaba, sigue) |
+| `product-sheet.tsx`: `className={\`${TOUCH_TARGET} hidden hover:flex\`}` | ROJO — `«hover» no puede ser la unica via de revelar «hidden»` |
+| Codigo correcto, sin tocar | VERDE — 202/202 |
+
+Las tres primeras son la prueba de que la medida es **por control**: en cada una, los demás
+controles del mismo archivo siguen bien y la guardia se pone roja igual. Con la guardia anterior,
+las tres pasaban en verde.
+
+### Verificacion
+
+```
+set -a && . ./.env && set +a
+pnpm typecheck                            -> limpio
+pnpm lint                                 -> limpio
+pnpm exec vitest run tests/unit/inventario/
+  -> Test Files  16 passed (16)   ·   Tests  202 passed (202)
+```
+
+Suite completa y `./init.sh` no se corren aqui: el gate lo pasa el leader.

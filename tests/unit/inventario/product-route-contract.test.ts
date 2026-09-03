@@ -51,6 +51,25 @@ function fuenteSinComentarios(rutaRelativa: string): string {
     .join('\n');
 }
 
+/**
+ * Numero de linea en el archivo ORIGINAL de cada linea de `fuenteSinComentarios`. Sin esto, un
+ * fallo de R31 apuntaria a una linea que no existe en el archivo que hay que abrir.
+ */
+function lineasOriginales(rutaRelativa: string): number[] {
+  const numeros: number[] = [];
+
+  leer(rutaRelativa)
+    .split('\n')
+    .forEach((linea, indice) => {
+      const limpia = linea.trim();
+      if (!(limpia.startsWith('//') || limpia.startsWith('*') || limpia.startsWith('/*'))) {
+        numeros.push(indice + 1);
+      }
+    });
+
+  return numeros;
+}
+
 /** Todos los archivos `.ts`/`.tsx` bajo una carpeta, en rutas relativas a la raiz del repo. */
 function fuentesBajo(carpetaRelativa: string): string[] {
   const encontradas: string[] = [];
@@ -78,6 +97,124 @@ const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
 
 /** Los que declaran frontera de cliente. R30 va sobre estos. */
 const FUENTES_DE_CLIENTE = FUENTES_DE_LA_RUTA.filter((ruta) => leer(ruta).includes("'use client'"));
+
+/**
+ * Los controles que R31 obliga a agrandar. Se buscan como **etiqueta de apertura JSX**
+ * (`<Nombre`), no como texto suelto: `AlertDialogAction` tambien aparece en la linea del import.
+ */
+const CONTROLES_VIGILADOS = ['Button', 'SelectTrigger', 'Input', 'AlertDialogAction'] as const;
+
+/**
+ * Avanza desde `inicio` hasta el cierre de la expresion, ignorando lo que caiga dentro de una
+ * cadena y contando llaves. Es lo minimo para leer una etiqueta JSX **completa** aunque ocupe
+ * varias lineas o lleve `className={`${A} ${B}`}` — mirar linea a linea es justo el error que ya
+ * se colo antes en esta feature con los imports multilinea.
+ */
+function finDeExpresion(codigo: string, inicio: number, cierre: '>' | '}'): number {
+  let profundidad = 0;
+  let comilla: string | null = null;
+
+  for (let i = inicio; i < codigo.length; i += 1) {
+    const caracter = codigo[i];
+
+    if (comilla !== null) {
+      if (caracter === '\\') i += 1;
+      else if (caracter === comilla) comilla = null;
+      continue;
+    }
+    if (caracter === "'" || caracter === '"' || caracter === '`') {
+      comilla = caracter;
+      continue;
+    }
+    if (caracter === '{') {
+      profundidad += 1;
+      continue;
+    }
+    if (caracter === '}') {
+      profundidad -= 1;
+      if (cierre === '}' && profundidad === 0) return i + 1;
+      continue;
+    }
+    if (cierre === '>' && caracter === '>' && profundidad === 0) return i + 1;
+  }
+
+  return -1;
+}
+
+/** Cada etiqueta de apertura `<Nombre ...>` del archivo, con su linea, como texto completo. */
+function etiquetasDeApertura(
+  codigo: string,
+  nombre: string,
+  lineas: number[],
+): { texto: string; linea: number }[] {
+  const encontradas: { texto: string; linea: number }[] = [];
+  const patron = new RegExp(`<${nombre}(?![A-Za-z0-9_$])`, 'g');
+  let encaje: RegExpExecArray | null;
+
+  while ((encaje = patron.exec(codigo)) !== null) {
+    const fin = finDeExpresion(codigo, encaje.index, '>');
+    expect(fin, `no se pudo leer la etiqueta <${nombre}> entera`).toBeGreaterThan(-1);
+    encontradas.push({
+      texto: codigo.slice(encaje.index, fin),
+      linea: lineas[codigo.slice(0, encaje.index).split('\n').length - 1] ?? 0,
+    });
+  }
+
+  return encontradas;
+}
+
+/** Valor de un atributo de la etiqueta, sea `attr="..."` o `attr={...}`. */
+function valorDeAtributo(etiqueta: string, nombre: string): string | null {
+  const inicio = etiqueta.indexOf(`${nombre}=`);
+  if (inicio === -1) return null;
+
+  const abre = inicio + nombre.length + 1;
+  const caracter = etiqueta[abre];
+
+  if (caracter === '{') {
+    const fin = finDeExpresion(etiqueta, abre, '}');
+    return fin === -1 ? null : etiqueta.slice(abre, fin);
+  }
+  if (caracter === '"' || caracter === "'") {
+    const fin = etiqueta.indexOf(caracter, abre + 1);
+    return fin === -1 ? null : etiqueta.slice(abre, fin + 1);
+  }
+  return null;
+}
+
+/**
+ * Constantes locales de cadena cuyo valor contiene `clase`. Los componentes no escriben la clase
+ * literal, la agrupan (`const TOUCH_TARGET = 'min-h-11 min-w-11'`), asi que resolver `min-h-11` a
+ * ojo sobre el `className` daria falsos rojos.
+ */
+function constantesConLaClase(codigo: string, clase: string): string[] {
+  const nombres: string[] = [];
+  const patron = /const\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([^'"`]*)\2/g;
+  let encaje: RegExpExecArray | null;
+
+  while ((encaje = patron.exec(codigo)) !== null) {
+    if (encaje[3].includes(clase)) nombres.push(encaje[1]);
+  }
+
+  return nombres;
+}
+
+/** El `className` lleva la clase, literal o a traves de una constante local que la contiene. */
+function llevaLaClase(className: string | null, clase: string, constantes: string[]): boolean {
+  if (className === null) return false;
+  if (className.includes(clase)) return true;
+  return constantes.some((nombre) => new RegExp(`(?<![\\w$])${nombre}(?![\\w$])`).test(className));
+}
+
+/** Como se nombra un control en el mensaje de fallo, para no obligar a buscarlo a mano. */
+function identificaAlControl(etiqueta: string): string {
+  return (
+    valorDeAtributo(etiqueta, 'data-testid') ??
+    valorDeAtributo(etiqueta, 'aria-label') ??
+    valorDeAtributo(etiqueta, 'id') ??
+    'sin identificador'
+  );
+}
 
 /** Comprueba que ningun archivo de la ruta contiene ninguno de los textos prohibidos. */
 function ningunArchivoContiene(prohibidos: readonly string[], fuentes = FUENTES_DE_LA_RUTA) {
@@ -334,6 +471,9 @@ describe('contrato de la ruta de inventario', () => {
     // declarada: el `design.md` no declara ninguna.
     const utilidadesQueOcultan = ['hidden', 'invisible', 'opacity-0', 'sr-only', 'scale-0'];
 
+    let controlesVigilados = 0;
+    const archivosConControles = new Set<string>();
+
     for (const ruta of FUENTES_DE_LA_RUTA) {
       const codigo = fuenteSinComentarios(ruta);
 
@@ -349,22 +489,54 @@ describe('contrato de la ruta de inventario', () => {
         }
       }
 
-      // Area tactil de 44x44 px en todo archivo que renderice un control (R31). Los primitivos
-      // miden 32 px de alto, asi que hay que forzarlo por clase.
-      const renderizaControl = ['<Button', 'SelectTrigger', '<Input', 'AlertDialogAction'].some(
-        (marca) => codigo.includes(marca),
-      );
-      if (renderizaControl) {
-        expect(codigo, `${ruta} renderiza controles y debe forzar el area tactil`).toContain(
-          'min-h-11',
-        );
-      }
+      // Area tactil de 44x44 px y 16 px de fuente, **control a control** (R31). Los primitivos
+      // miden 32 px de alto y heredan un `text-sm`, asi que ambos hay que forzarlos por clase.
+      //
+      // Acotado el 2026-09-03: hasta entonces esto se media POR ARCHIVO (`codigo` completo
+      // `toContain('min-h-11')`), y una sola aparicion en cualquier parte lo satisfacia. El
+      // reviewer lo demostro quitando `TOUCH_TARGET` y `FIELD_TEXT` de un campo ENTERO de
+      // `product-form.tsx`: la suite seguia verde. Un test que no falla al romper lo que afirma
+      // no cuenta — es el mismo agujero por el que se rechazo QC-30 en su primera ronda.
+      const constantesTactiles = constantesConLaClase(codigo, 'min-h-11');
+      const constantesDeFuente = constantesConLaClase(codigo, 'text-base');
 
-      // 16 px en los campos: por debajo, iOS hace zoom al enfocar.
-      if (codigo.includes('<Input')) {
-        expect(codigo, `${ruta} debe fijar 16px en sus campos`).toContain('text-base');
+      for (const nombre of CONTROLES_VIGILADOS) {
+        const etiquetas = etiquetasDeApertura(codigo, nombre, lineasOriginales(ruta));
+
+        // Autocomprobacion: si el archivo escribe la etiqueta, el lector tiene que verla. Sin
+        // esto, un fallo del lector dejaria la guardia muda en vez de roja.
+        if (codigo.includes(`<${nombre}`)) {
+          expect(
+            etiquetas.length,
+            `${ruta}: escribe <${nombre} pero la guardia no leyo ninguna etiqueta`,
+          ).toBeGreaterThan(0);
+        }
+
+        for (const { texto, linea } of etiquetas) {
+          const className = valorDeAtributo(texto, 'className');
+          const control = `${ruta}:${linea} <${nombre}> (${identificaAlControl(texto)})`;
+          controlesVigilados += 1;
+          archivosConControles.add(ruta);
+
+          expect(
+            llevaLaClase(className, 'min-h-11', constantesTactiles),
+            `${control} debe forzar el area tactil en SU className (min-h-11, literal o via constante local)`,
+          ).toBe(true);
+
+          // 16 px en los campos: por debajo, iOS hace zoom al enfocar.
+          if (nombre === 'Input') {
+            expect(
+              llevaLaClase(className, 'text-base', constantesDeFuente),
+              `${control} debe fijar 16px en SU className (text-base, literal o via constante local)`,
+            ).toBe(true);
+          }
+        }
       }
     }
+
+    // Y la guardia no puede quedarse sin nada que vigilar: la pantalla renderiza controles.
+    expect(controlesVigilados, 'R31 no esta vigilando ningun control').toBeGreaterThan(0);
+    expect(archivosConControles.size).toBeGreaterThan(0);
   });
 
   it('la feature no duplica el armazon heredado: solo edita los cuatro archivos autorizados', () => {
