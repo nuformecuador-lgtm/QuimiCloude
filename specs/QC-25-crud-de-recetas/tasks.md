@@ -55,7 +55,7 @@
 
 ## Grupo B — casos de uso (depende de A)
 
-- [ ] **T4 — Esquemas de entrada zod.** `domain/recipe-input.ts` (`design.md > 7.1`): trim, mínimo
+- [x] **T4 — Esquemas de entrada zod.** `domain/recipe-input.ts` (`design.md > 7.1`): trim, mínimo
       1 y máximo 120 en el nombre, 500 en la descripción, `refine` que rechaza el nombre que
       normaliza a vacío, cantidad decimal como **cadena** `> 0`, unidad no vacía, pasos (≤ 50, ≤
       1.000 cada uno, ninguno vacío) y `refine` de producto repetido.
@@ -65,25 +65,25 @@
       (R7, R9, R14, R15, R16, R19, R20, R30, R38) y el esquema **no** colapsa `undefined` y `null`
       del campo `image` en el mismo valor.
 
-- [ ] **T5 — Tipos de salida y puertos.** `domain/recipe-view.ts` (`RecipeSummary`,
+- [x] **T5 — Tipos de salida y puertos.** `domain/recipe-view.ts` (`RecipeSummary`,
       `RecipeDetail`, `RecipeLineView`), `ports/recipe-repository.ts` y
       `ports/recipe-image-storage.ts` con los resultados discriminados de `design.md > 7.3` y `> 9.1`.
       *Depende de:* T1, T4. **Hecho cuando:** typecheck limpio y ningún import prohibido en
       `ports/`.
 
-- [ ] **T6 — Los cinco casos de uso.** `create`, `get`, `list`, `update`, `delete`. `requireAdmin`
+- [x] **T6 — Los cinco casos de uso.** `create`, `get`, `list`, `update`, `delete`. `requireAdmin`
       en la **primera línea** de cada uno. Orden de operaciones de la imagen y `remove` solo al
       reemplazar (`design.md > 9.3`); validación de existencia del producto por `ProductCatalog`
       en una sola llamada (`design.md > 6`).
       *Depende de:* T5. **Hecho cuando:** `tests/unit/recetas/recipe-service.test.ts` pasa con
       dobles de los tres puertos (R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37).
 
-- [ ] **T7 [P] — Composición de la URL de lectura.** El caso de uso mapea `imagePath → imageUrl`
+- [x] **T7 [P] — Composición de la URL de lectura.** El caso de uso mapea `imagePath → imageUrl`
       a través de `publicUrl` del puerto; sin firma ni caducidad (D5, D6).
       *Depende de:* T6. **Hecho cuando:** `tests/unit/recetas/recipe-image-url.test.ts` pasa
       (R24, R25) y ningún caso de uso conoce el bucket.
 
-- [ ] **T8 — Test de autorización de los cinco casos de uso.**
+- [x] **T8 — Test de autorización de los cinco casos de uso.**
       `tests/unit/recetas/authorization.test.ts`, con dobles de repositorio, catálogo y
       almacenamiento que **fallan si los llaman** (`design.md > 14`, cuarto aviso).
       *Depende de:* T6. **Hecho cuando:** los cinco casos cubren Operador, rol nulo, rol
@@ -94,7 +94,7 @@
 > numeradas al final para no renumerar las tasks ya escritas, pero **se ejecutan aquí**, en el
 > Grupo B, porque son comportamiento de los casos de uso.
 
-- [ ] **T17 — Ciclo de vida de la imagen en la edición.** Los tres estados de `image`
+- [x] **T17 — Ciclo de vida de la imagen en la edición.** Los tres estados de `image`
       (`design.md > 7.1`, `> 9.3`): omitido conserva y no llama al almacenamiento; `{ bytes }` sube,
       persiste y borra la anterior; `null` deja `imagePath` en `NULL` y **borra** el archivo que
       tenía. Los dos borrados llaman al **mismo** `remove` del puerto —una sola implementación

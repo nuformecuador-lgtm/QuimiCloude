@@ -109,10 +109,205 @@ cerrar con `./init.sh` completo antes del PR.
 Nada. Las cuatro tasks del Grupo A se completaron tal como las describen `design.md` y
 `tasks.md`, sin necesidad de reinterpretar ningún requisito.
 
+## Grupo B — casos de uso (T4, T5, T6, T7, T8, T17)
+
+Alcance de esta tanda: los cinco casos de uso de `recetas`, sus esquemas de entrada, sus
+tipos de salida y puertos, el test de autorización de los cinco casos y el ciclo de vida
+completo de la imagen en la edición. **T18 NO entra** (depende de T9 — `ProductCatalog`
+real de `inventario` — que todavía no existe; otra tanda del Grupo C lo hace, y ajustará
+si hace falta la lógica de conjuntos que T6 ya deja implementada).
+
+### T4 — Esquemas de entrada zod
+
+- `lib/modules/recetas/domain/recipe-input.ts`: `recipeLineSchema` (productId uuid,
+  `quantity` cadena decimal(14,4) con regex + `refine` de `> 0` real, `unit` trim min 1),
+  `createRecipeSchema` (nombre trim 1–120 con `refine` de `normalizeRecipeName !== ''`,
+  descripción trim máx 500 `nullish`, `steps` array trim 1–1000 máx 50 con default `[]`,
+  `lines` array con `refine` de producto no repetido, `image` opcional `{ bytes }` —solo
+  dos estados—), `updateRecipeSchema` (mismo shape, pero `image` es
+  `.nullable().optional()` para admitir los TRES estados: omitido/`{ bytes }`/`null`).
+- **Punto crítico verificado con test explícito** (R47): `updateRecipeSchema.parse({...sin
+  image...})` da `image === undefined`, y `updateRecipeSchema.parse({..., image: null})`
+  da `image === null`, sin que uno pise al otro. Se usó `.nullable().optional()` (nunca
+  `.default()`) precisamente para preservar esa distinción.
+- Test: `tests/unit/recetas/recipe-input.test.ts` — 13 tests.
+
+### T5 — Tipos de salida y puertos
+
+- `lib/modules/recetas/domain/recipe-view.ts`: `RecipeSummary` (sin `lines`),
+  `RecipeLineView`, `RecipeDetail`.
+- `lib/modules/recetas/ports/recipe-repository.ts`: `RecipeRepository` copiado
+  literalmente de `design.md > 7.3` (`create`, `findAliveById`, `listAlive`,
+  `replaceAlive`, `softDeleteAlive` con sus resultados discriminados), más
+  `NewRecipe`/`RecipeRow`/`RecipeLineData`/`RecipeLineRow` (quantity siempre como
+  `string`, nunca `number` ni `Prisma.Decimal`).
+- `lib/modules/recetas/ports/recipe-image-storage.ts`: `RecipeImageStorage`
+  (`upload`/`remove`/`publicUrl`) y `RecipeImageUpload`, copiados de `design.md > 9.1`.
+- Ningún import prohibido: `ports/` no importa Prisma, `@supabase/storage-js` ni
+  framework (confirmado por `guard-arquitectura-modulos.test.ts`, que sigue en verde).
+
+### T6 — Los cinco casos de uso
+
+`domain/create-recipe.ts`, `get-recipe.ts`, `list-recipes.ts`, `update-recipe.ts`,
+`delete-recipe.ts`. `requireAdmin(actor)` en la primera línea de los cinco, antes de zod
+y de tocar cualquier puerto.
+
+- **create**: valida, si hay líneas pide `products.findRefs` una sola vez sobre TODAS
+  (R17, R46: en el alta todas son "nuevas"), si hay imagen la valida con
+  `validateRecipeImage` y sube ANTES de `repository.create`; `'duplicate'` del puerto se
+  traduce a `DuplicateNameError` (R8).
+- **update**: lee `repository.findAliveById(id)` PRIMERO (si no existe, `NotFoundError`,
+  R37) — para conocer `imagePath` anterior y las líneas ya existentes. Calcula
+  `idsANuevoValidar = idsEnviados \ idsYaEnLaReceta` y llama `products.findRefs` SOLO
+  sobre esos (R45, R46): la línea preexistente con producto de baja se admite sin
+  consultar el catálogo por ella. Los tres estados de `image` (T17, ver abajo) se
+  implementan aquí directamente.
+- **delete**: `softDeleteAlive` → `NotFoundError` si `'not_found'`. NO recibe
+  `RecipeImageStorage` en sus deps: estructuralmente no puede tocar el almacenamiento
+  (R27).
+- **get**: arma `RecipeDetail` con `imageUrl` vía `images.publicUrl(imagePath)` si hay
+  ruta, y `productName` de CADA línea (incluida la de baja, que sale `null`) vía
+  `products.findRefs` sobre todos los `productId` de las líneas — uso que DECORA, distinto
+  del que VALIDA en create/update (R18).
+- **list**: valida con `pageQuerySchema` y DELEGA toda la aritmética de paginación —
+  `toOffsetLimit`/`buildPage`— a dos funciones INYECTADAS en `ListRecipesDeps` (ver nota
+  de diseño abajo). Mapea a `RecipeSummary[]` sin líneas (R33).
+- Autoría (R6): `create` escribe `createdBy`+`updatedBy` con `actor.id`; `update`/`delete`
+  solo pasan `actor.id` como el `actorId` de `replaceAlive`/`softDeleteAlive` (el puerto no
+  expone `createdBy` en esas firmas, así que conservar el autor de creación real a través
+  de un `UPDATE` lo demuestra el adaptador Prisma + el test de integración, T10/T14 —no
+  este archivo, mismo criterio que dejó `inventario`).
+- Test: `tests/unit/recetas/recipe-service.test.ts` — 13 tests.
+
+**Decisión de diseño no explícita en `design.md > 7.3` que hubo que resolver**: el puerto
+`listAlive(offset, limit)` recibe `offset`/`limit` ya calculados, pero el dominio no puede
+importar `lib/shared/pagination` (R40) y R31 prohíbe reimplementar esa aritmética dentro
+de `recetas`. Se resolvió inyectando `toOffsetLimit` y `buildPage` como DEPENDENCIAS de
+`ListRecipesDeps` (mismo patrón que `now`): `list-recipes.ts` no contiene ninguna
+aritmética propia — ni `Math.ceil`, ni `(page-1)*`, ni `* pageSize` — y quien cablea el
+caso de uso en producción (Grupo C, T12) le pasa las funciones REALES importadas de
+`lib/shared/pagination`. El test de alcance (`scope.test.ts`, ya verde) vigila justo estos
+patrones sobre el texto fuente y sigue pasando. En los tests de este grupo se le pasan
+implementaciones equivalentes simples porque `lib/shared/pagination` no está prohibido de
+importar desde un test.
+
+### T7 — Composición de la URL de lectura
+
+Ya cubierto dentro de `get-recipe.ts`/`list-recipes.ts` (T6): `imagePath → imageUrl` vía
+`images.publicUrl`. Test dedicado: `tests/unit/recetas/recipe-image-url.test.ts` — 3
+tests: persiste la ruta (nunca la URL) en `NewRecipe.imagePath`, compone la URL al leer
+con un doble de `RecipeImageStorage`, y confirma que la URL no lleva firma ni caducidad
+(sin `token=`/`signature=`/`expires=`). Ningún caso de uso conoce el bucket ni la URL del
+proyecto: el doble del puerto es libre de componer la URL como quiera.
+
+### T8 — Test de autorización de los cinco casos de uso
+
+`tests/unit/recetas/authorization.test.ts` — dobles de los TRES puertos (repositorio,
+catálogo, almacenamiento) que **lanzan si se les llama**. Los cinco casos de uso, con
+actor Operador, `roleName: null`, `roleName: ''`, rol desconocido (`'Administradores
+externos'` y `'Fantasma'`) y actor `undefined`: en los cinco, `expect(...).not.toHaveBeenCalled()`
+sobre los tres dobles. Más un test de que ningún archivo de `domain/` lee
+`next/headers`/`cookies(`/`headers(`/`getSessionUser`/`lib/composition`. 4 tests.
+
+### T17 — Ciclo de vida de la imagen en la edición
+
+Implementado dentro de `update-recipe.ts` (T6): los tres estados de `image` siguiendo la
+tabla de `design.md > 7.1` y el orden de operaciones de `> 9.3`. Test dedicado:
+`tests/unit/recetas/recipe-image-lifecycle.test.ts` — 7 tests: omitido conserva sin tocar
+el almacenamiento; `null` deja `imagePath` en `NULL` y borra (o no llama a `remove` si no
+había imagen previa); `{ bytes }` sube, persiste y borra la anterior DESPUÉS de que
+`replaceAlive` confirme; los dos caminos de borrado (`{ bytes }` y `null`) usan el MISMO
+`images.remove` — se verifica comparando las claves del doble entre los dos caminos, no
+solo que ambos lo llamen—; y dos casos con `remove` que rechaza (uno por cada camino de
+borrado) donde la edición resuelve igual, `replaceAlive` ya se llamó una sola vez, y el
+resultado trae `warnings: [{ operation: 'remove', path, message }]`.
+
+### Ajuste a un test preexistente de QC-24
+
+`tests/unit/recetas/module-contract.test.ts` (sembrado por QC-24, T10 de esa ficha)
+afirmaba que `lib/modules/recetas/ports` debía quedar VACÍA — cierto cuando esa ficha
+cerró, falso a propósito ahora que T5 la llena. Se actualizó el test para que solo seguir
+vigilando que `adapters/driven` y `adapters/driving` sigan vacíos (eso es Grupo C, T9–T13,
+todavía no construido en esta tanda), con el comentario explicando por qué `ports/` salió
+de esa lista. No se tocó ninguna otra aserción del archivo.
+
+## Mapa `R<n> → test` de este grupo
+
+| R | Test |
+| --- | --- |
+| R1 | `tests/unit/recetas/authorization.test.ts` → `cada caso de uso recibe el actor por parametro y no lee ninguna sesion` |
+| R2 | `tests/unit/recetas/authorization.test.ts` → `un actor con rol Operador es rechazado en los cinco casos de uso sin llamar a ningun puerto` |
+| R3 | `tests/unit/recetas/authorization.test.ts` → `un actor ausente, con rol nulo o con rol desconocido es rechazado igual que el Operador` |
+| R5 | `tests/unit/recetas/recipe-service.test.ts` → `crea la receta junto con sus lineas y devuelve su identificador` |
+| R6 | `tests/unit/recetas/recipe-service.test.ts` → `guarda al actor como autor de creacion y de modificacion al crear, y solo de modificacion al editar y al borrar` |
+| R7 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza el nombre vacio...` / `...mas de 120...` |
+| R8 | `tests/unit/recetas/recipe-service.test.ts` → `persiste el nombre normalizado...traduce el duplicado` |
+| R9 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza como nombre invalido el que queda vacio al normalizarlo` |
+| R11 | `tests/unit/recetas/recipe-service.test.ts` → `la edicion recibe la lista final completa...` |
+| R14 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza la cantidad cero, negativa o ausente, y la unidad vacia...` |
+| R15 | `tests/unit/recetas/recipe-input.test.ts` → `acepta cualquier texto no vacio como unidad, sin catalogo` |
+| R16 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza dos lineas con el mismo producto` |
+| R17 | `tests/unit/recetas/recipe-service.test.ts` → `rechaza la linea cuyo producto no existe...` |
+| R18 | `tests/unit/recetas/recipe-service.test.ts` → `la lista no trae lineas y el detalle si las trae con producto, cantidad y unidad` |
+| R19 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza unos pasos que no son lista de textos...` |
+| R20 | `tests/unit/recetas/recipe-input.test.ts` → `rechaza mas de 50 pasos y el paso de mas de 1000 caracteres` |
+| R21 | `tests/unit/recetas/recipe-service.test.ts` → `crea y edita la receta sin imagen sin llamar al almacenamiento` |
+| R22 | `tests/unit/recetas/recipe-service.test.ts` → `sube la imagen a traves del puerto, con un doble en memoria` |
+| R24 | `tests/unit/recetas/recipe-image-url.test.ts` → `persiste la ruta dentro del bucket y compone la URL al leer` |
+| R25 | `tests/unit/recetas/recipe-image-url.test.ts` → `la URL que compone el caso de uso no lleva firma ni parametro de expiracion` |
+| R26 | `tests/unit/recetas/recipe-service.test.ts` → `al reemplazar la imagen borra el archivo anterior despues de persistir la nueva ruta` |
+| R27 | `tests/unit/recetas/recipe-service.test.ts` → `al borrar la receta no llama al almacenamiento y conserva la ruta` |
+| R30 (mínimo e integridad) | `tests/unit/recetas/recipe-input.test.ts` → `rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1` |
+| R33 | `tests/unit/recetas/recipe-service.test.ts` → `la lista no trae lineas y el detalle si las trae...` |
+| R34 | `tests/unit/recetas/recipe-service.test.ts` → `devuelve los autores como identificadores y acepta la receta sin autor` |
+| R36 | `tests/unit/recetas/recipe-service.test.ts` → `el detalle de una receta borrada se traduce a no encontrado...` |
+| R37 | `tests/unit/recetas/recipe-service.test.ts` → `devuelve no encontrado al consultar, editar o borrar una receta inexistente o ya borrada` |
+| R38 | `tests/unit/recetas/recipe-input.test.ts` (todo el archivo: los esquemas validan en el borde) |
+| R45 | `tests/unit/recetas/recipe-service.test.ts` → `la edicion recibe la lista final completa...` (linea preexistente admitida sin `findRefs`) |
+| R46 | `tests/unit/recetas/recipe-service.test.ts` → `rechaza la linea cuyo producto no existe...` (alta: todas nuevas) |
+| R47 | `tests/unit/recetas/recipe-image-lifecycle.test.ts` → `image null deja la receta sin ruta y borra el archivo` / `image omitido conserva...` |
+| R48 | `tests/unit/recetas/recipe-image-lifecycle.test.ts` → `reemplazar y quitar la imagen llaman al mismo remove del puerto...` |
+| R49 | `tests/unit/recetas/recipe-image-lifecycle.test.ts` → `si el remove falla la edicion no se revierte y devuelve la advertencia con su contexto` |
+
+R4, R10, R12, R13, R23, R28, R29, R31 (parte), R32, R35, R39-R44 no se cierran en este
+grupo: son de integración (Grupo D), del adaptador de Storage/config (Grupo C, T9-T11), de
+la Server Action (Grupo C, T13), o ya los cierran guardias/tests preexistentes citados en
+`tasks.md > Trazabilidad`.
+
+## Verificación de la tanda (Grupo B: T4, T5, T6, T7, T8, T17)
+
+- `pnpm run typecheck` → limpio (sin salida, exit 0).
+- `pnpm run lint` → limpio (sin salida, exit 0).
+- `pnpm exec vitest run tests/unit/recetas` → **11 test files, 102 tests, todos passed**
+  (incluye los 5 archivos nuevos de este grupo — `recipe-input.test.ts` 13,
+  `recipe-service.test.ts` 13, `recipe-image-url.test.ts` 3, `authorization.test.ts` 4,
+  `recipe-image-lifecycle.test.ts` 7 — más los 6 ya existentes de Grupo A/QC-24, uno de
+  ellos ajustado).
+- `pnpm exec vitest run guard` → **12 test files, 123 tests, todos passed** (sin
+  regresión en `guard-arquitectura-modulos`, `guard-dependencias-aprobadas`,
+  `guard-rls-force`).
+
+No se corrió `./init.sh` completo ni la suite entera: instrucción explícita del prompt
+para esta tanda. Corresponde a T16 (Grupo D) cerrar con `./init.sh` completo antes del PR.
+
+## Qué resultó imposible de cumplir tal como está escrito en el spec
+
+Nada de R1-R49 resultó imposible. Un punto SÍ exigió una decisión de diseño no explícita
+en el texto (documentada arriba, no una reinterpretación de un requisito): cómo dividir la
+aritmética de paginación entre `domain/list-recipes.ts` y el adaptador cuando el puerto
+`listAlive` recibe `offset`/`limit` ya calculados pero el dominio no puede importar
+`lib/shared/pagination` ni reimplementarla (R31, R40). Se resolvió con inyección de
+dependencia (`toOffsetLimit`/`buildPage` en `ListRecipesDeps`), verificable porque
+`scope.test.ts` ya vigila que `recetas` no contenga esa aritmética y sigue en verde.
+
 ## Veredicto
 
-Grupo A (T0–T3) cerrado: dependencia instalada y aprobada, dominio base (`actor.ts`,
-`errors.ts`, `page.ts`) sin imports prohibidos, detección de imagen por contenido con su
-tabla de firmas, y test de alcance adelantado en verde y sensible a las cuatro
-regresiones que debe cazar. Listo para que el Grupo B (T4–T8, T17, T18) construya sobre
-esta base.
+Grupo A (T0–T3) y Grupo B (T4-T8, T17) cerrados: cinco casos de uso con `requireAdmin` en
+primera línea, esquemas de entrada que distinguen correctamente los tres estados de
+`image` en la edición, el ciclo de vida completo de la imagen (subida/reemplazo/quitar,
+mismo `remove` para los dos caminos de borrado, fallo de `remove` no revierte la edición),
+y el test de autorización que demuestra que el Operador y los actores inválidos no tocan
+ningún puerto. `typecheck`, `lint` y los 225 tests (102 de `recetas` + 123 de guardias)
+en verde. T18 queda para la tanda que traiga T9 (`ProductCatalog` real de `inventario`).
+Listo para que el Grupo C (T9-T13) construya los adaptadores y el cableado sobre esta
+base.

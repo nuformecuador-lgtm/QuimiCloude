@@ -234,18 +234,20 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
   })
 
   it('la feature no anade adaptadores driving, rutas ni Server Actions', () => {
-    // R31: esta ficha es esquema, migracion y armazon. Ningun alta, consulta, edicion ni
-    // borrado, y por tanto ningun flujo navegable que un E2E pueda visitar (decision 17).
-    for (const carpeta of [
-      join(recetasDir, 'adapters', 'driving'),
-      join(recetasDir, 'adapters', 'driven'),
-      join(recetasDir, 'ports'),
-    ]) {
+    // Esta afirmacion nacio en QC-24 (T10 de esa ficha), cuando `recetas` era solo
+    // esquema y armazon vacio. QC-25 (esta ficha) es la que llena `domain/` y `ports/`
+    // con los cinco casos de uso y sus contratos de entrada/salida (T4-T8, T17;
+    // `tasks.md > Grupo B`): `ports/` YA NO esta vacia a proposito, y seguir exigiendolo
+    // aqui bloquearia exactamente el trabajo que esta feature tiene que hacer. Lo que
+    // SIGUE sin existir en este grupo son los ADAPTADORES -driven y driving-, que son
+    // Grupo C (T9-T13): Prisma, Supabase Storage y la Server Action todavia no cablean
+    // nada, y eso si se vigila.
+    for (const carpeta of [join(recetasDir, 'adapters', 'driving'), join(recetasDir, 'adapters', 'driven')]) {
       expect(sourcesIn(carpeta), `${toPosix(relative(repoRoot, carpeta))} deberia estar vacia`)
         .toEqual([])
     }
-    // Las tres siguen sembradas con su `.gitkeep`, para que git las versione.
-    for (const carpeta of ['ports', 'adapters/driven', 'adapters/driving']) {
+    // Las dos siguen sembradas con su `.gitkeep`, para que git las versione.
+    for (const carpeta of ['adapters/driven', 'adapters/driving']) {
       expect(existsSync(join(recetasDir, ...carpeta.split('/'), '.gitkeep')), carpeta).toBe(true)
     }
 
