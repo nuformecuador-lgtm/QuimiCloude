@@ -23,11 +23,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { identityEdge } from '@/lib/composition/edge';
 import {
-  ROUTE_ROLE_RULES,
   decideRouteAccess,
   isSessionExpired,
   type RouteAccessSession,
 } from '@/lib/modules/identity';
+import { ROUTE_ROLE_RULES } from './route-role-rules';
 import { DASHBOARD_ROUTE, LOGIN_ROUTE, PRIVATE_ROUTE_PREFIXES } from '@/lib/shared/routes';
 
 /**

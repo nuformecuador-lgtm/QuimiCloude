@@ -605,3 +605,45 @@ pnpm exec vitest related --run tests/unit/inventario/product-page.test.tsx   tes
 (`guard-arquitectura-modulos.test.ts`: `route-role-rules.ts` importa `@/lib/shared/routes` desde
 `domain/`), que es **decision del leader** y no se ha tocado. `package.json` y `pnpm-lock.yaml`,
 sin cambios.
+
+---
+
+## Correccion de T3 — la lista de reglas ruta→rol sale del dominio (2026-09-03)
+
+`tests/guards/guard-arquitectura-modulos.test.ts` estaba en ROJO por lo que introdujo T3:
+
+```
+lib/modules/identity/domain/route-role-rules.ts importa '@/lib/shared/routes' de lib/shared (R7)
+```
+
+**Salida elegida por el humano** (no se reabrio ni se propuso otra): la LISTA concreta de reglas
+es configuracion, no dominio, y se muda al adaptador driving. El tipo `RouteRoleRule` y la
+funcion `findRouteRule` se quedan en `domain/`, que es donde se decide QUE regla gana.
+
+| Archivo | Que le paso |
+| --- | --- |
+| `lib/modules/identity/adapters/driving/route-role-rules.ts` | **nuevo**: aqui vive `ROUTE_ROLE_RULES`, con `INVENTORY_ROUTE` de `lib/shared/routes` y `ADMIN_ROLE_NAME` del barrel de `inventario`. La fila driving de la tabla permite ambos. |
+| `lib/modules/identity/domain/route-role-rules.ts` | pierde los dos imports y la constante; conserva el tipo, `matchesPrefix` y `findRouteRule`, y deja escrito por que la lista ya no esta ahi. |
+| `lib/modules/identity/index.ts` | el barrel deja de reexportar `ROUTE_ROLE_RULES` (ya no sale de `./domain`) y sigue exportando `findRouteRule` y `RouteRoleRule`. |
+| `lib/modules/identity/adapters/driving/route-guard-middleware.ts` | toma `ROUTE_ROLE_RULES` de su propia carpeta (`./route-role-rules`); el resto del archivo, intacto. |
+| `tests/unit/identity/route-guard-middleware.test.ts` | la caja mutable con getter **sigue viva**: el doble se pone ahora sobre `.../adapters/driving/route-role-rules` en vez de sobre el barrel. |
+
+Por que fue barato, y esta comprobado en el codigo antes de tocarlo: `findRouteRule(rules, ...)`
+ya recibia las reglas por parametro, `decideRouteAccess` ya las recibia en su input y el UNICO
+consumidor de la constante era el middleware. La arquitectura de QC-9 ya estaba preparada; la
+constante estaba en el sitio equivocado.
+
+**Nada declara `/inventario` como literal ni como constante propia dentro de `identity`**: sigue
+habiendo una sola constante por ruta (`lib/shared/routes.ts`), y un test nuevo lo muerde.
+
+```
+pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts
+  antes -> Tests  1 failed | 55 passed (56)
+  ahora -> Test Files  1 passed (1)   ·   Tests  56 passed (56)
+```
+
+**Deuda menor que NO se toco por estar fuera de los archivos de esta tarea:**
+`lib/modules/identity/domain/route-access.ts:37` sigue diciendo en un comentario que
+`ROUTE_ROLE_RULES` «esta vacio a proposito (R12)». Ya no es cierto ni por el contenido ni por la
+ubicacion. Se reporta al leader en vez de corregirlo por cuenta propia.
+

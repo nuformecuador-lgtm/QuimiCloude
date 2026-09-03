@@ -1,14 +1,14 @@
-// T8 — El gancho de reglas ruta→rol (R12). Dominio puro: sin Next, sin cookies, sin base (R20).
+// QC-9 T8 — El gancho de reglas ruta→rol (R12). Dominio puro: sin Next, sin cookies, sin base (R20).
+// QC-22 T14 — La PRIMERA regla real del repositorio (R4).
 //
-// Las reglas de estos tests son SINTETICAS a proposito (`design.md > 4.3`): `ROUTE_ROLE_RULES`
-// esta vacio en esta ficha, asi que `findRouteRule` se ejercita con reglas propias del test. Asi
-// la busqueda tiene test real hoy y la primera ficha que añada una regla no estrena codigo.
+// Las reglas del primer bloque siguen siendo SINTETICAS a proposito (`design.md > 4.3`): asi lo
+// que se ejercita de `findRouteRule` es la BUSQUEDA, sin depender de que la lista real diga hoy
+// una cosa u otra. El segundo bloque, en cambio, mira la lista REAL.
 
-import {
-  ROUTE_ROLE_RULES,
-  findRouteRule,
-  type RouteRoleRule,
-} from '@/lib/modules/identity/domain/route-role-rules';
+import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import { ROUTE_ROLE_RULES } from '@/lib/modules/identity/adapters/driving/route-role-rules';
+import { findRouteRule, type RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
+import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 const PRODUCTOS: RouteRoleRule = { prefix: '/productos', roles: ['Administrador', 'Operador'] };
 const PRODUCTOS_NUEVO: RouteRoleRule = { prefix: '/productos/nuevo', roles: ['Administrador'] };
@@ -49,16 +49,19 @@ describe('findRouteRule', () => {
   });
 });
 
-describe('ROUTE_ROLE_RULES', () => {
-  // R12 — el conjunto esta vacio A PROPOSITO (D8): mientras lo este, toda sesion valida pasa a
-  // cualquier ruta privada. Si alguien añade una fila aqui sin ficha que la respalde, este test
-  // se pone rojo y obliga a decidirlo en el sitio correcto.
-  it('esta vacio a proposito: QC-9 construye el gancho, no declara reglas', () => {
-    expect(ROUTE_ROLE_RULES).toEqual([]);
-  });
-
-  it('estando vacio, ninguna ruta privada tiene regla aplicable', () => {
-    expect(findRouteRule(ROUTE_ROLE_RULES, '/dashboard')).toBeNull();
-    expect(findRouteRule(ROUTE_ROLE_RULES, '/dashboard/reportes')).toBeNull();
+describe('ROUTE_ROLE_RULES — la lista real', () => {
+  // CENTINELA INVERTIDO el 2026-09-03 (QC-22 T14, R4).
+  //
+  // Hasta QC-9 este bloque afirmaba que la lista estaba «vacia a proposito (D8)», con el encargo
+  // escrito de que «la primera regla sera la pantalla de productos, solo Administrador». QC-22
+  // trae exactamente esa pantalla, asi que la premisa dejo de ser cierta y el centinela se
+  // INVIERTE en vez de borrarse: donde antes exigia el vacio, ahora exige que la unica fila sea
+  // la declarada, ni una mas. Anadir una segunda regla sin ficha que la respalde sigue poniendo
+  // esto en rojo, que es para lo que el centinela existe.
+  //
+  // La lista vive en `adapters/driving/` desde el mismo 2026-09-03: nombrar la ruta exige
+  // `INVENTORY_ROUTE` de `lib/shared/routes` y el dominio no puede importar `lib/shared`.
+  it('declara exactamente una regla: la pantalla de inventario, solo Administrador (R4)', () => {
+    expect(ROUTE_ROLE_RULES).toEqual([{ prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] }]);
   });
 });

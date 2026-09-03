@@ -7,34 +7,22 @@
 // modulo es si se enseña una pantalla; la autorizacion sobre datos y operaciones se valida en
 // el service (`docs/architecture.md > Acceso a datos y autorizacion`).
 
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
-
 /** Una regla: bajo `prefix`, solo entra quien tenga uno de estos roles (por nombre). */
 export type RouteRoleRule = {
   readonly prefix: string;
   readonly roles: readonly string[];
 };
 
-/**
- * Conjunto declarado de reglas ruta→rol.
- *
- * QC-9 construyo el gancho —el tipo, la busqueda y su uso en `decideRouteAccess`— y dejo esta
- * lista **vacia a proposito (D8, R12)**, con el encargo escrito de que «la primera sera la
- * pantalla de productos, solo Administrador». **Esa primera regla es la de abajo**, que trae
- * QC-22 (R4): la lista ya no esta vacia, y sigue sin estar a medias.
- *
- * Toda ruta privada que NO case con ninguna fila sigue abierta a cualquier sesion valida, y eso
- * es el comportamiento especificado: cada ficha de modulo añade su fila, junto con su test.
- *
- * `ADMIN_ROLE_NAME` se toma del **barrel** de `inventario` —nunca por ruta profunda y nunca como
- * el literal `'Administrador'`—: un tercer literal del mismo rol es justo la deuda que `actor.ts`
- * ya declaro. `domain/**` → `@/lib/modules/N` lo permite `docs/architecture.md > La regla de
- * dependencias`.
- */
-export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
-  { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
-];
+// **La lista concreta de reglas NO vive aqui.** Vive en el adaptador driving
+// (`adapters/driving/route-role-rules.ts`), porque para nombrar una ruta necesita
+// `INVENTORY_ROUTE` de `lib/shared/routes`, y un archivo de `domain/` no puede importar
+// `lib/shared` (`docs/architecture.md > La regla de dependencias`). QC-22 la puso aqui por un
+// momento y la guardia de arquitectura lo cazo: la lista es CONFIGURACION —que ruta pide que
+// rol—, no logica de negocio. Lo que si es dominio, y se queda, es el TIPO de arriba y la
+// BUSQUEDA de abajo, que se ejercitan sin Next, sin cookies y sin base (R20 de QC-9).
+//
+// Consecuencia buscada: `findRouteRule` y `decideRouteAccess` reciben las reglas POR PARAMETRO,
+// asi que el dominio nunca lee una lista global y cada test declara las suyas.
 
 /** `true` si `pathname` cae bajo `prefix` respetando los limites de segmento. */
 function matchesPrefix(pathname: string, prefix: string): boolean {

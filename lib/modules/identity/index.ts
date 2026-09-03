@@ -35,4 +35,7 @@ export {
   isInternalPath,
   resolveReturnPath,
 } from './domain/return-path';
-export { ROUTE_ROLE_RULES, findRouteRule, type RouteRoleRule } from './domain/route-role-rules';
+// La LISTA de reglas ya no sale de aqui: es configuracion del borde y vive en
+// `adapters/driving/route-role-rules.ts` (el dominio no puede importar `lib/shared`). El
+// contrato sigue exponiendo el tipo y la busqueda, que si son dominio.
+export { findRouteRule, type RouteRoleRule } from './domain/route-role-rules';
