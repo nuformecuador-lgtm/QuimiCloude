@@ -57,7 +57,7 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo A — cimientos
 
-- [ ] **T1 [P] — Dominio base del módulo.** `domain/actor.ts` (`Actor`, `requireAdmin`, con
+- [x] **T1 [P] — Dominio base del módulo.** `domain/actor.ts` (`Actor`, `requireAdmin`, con
       `ROLE_ADMINISTRADOR` importado del **barrel** `@/lib/modules/identity`, nunca por ruta
       profunda y nunca copiando el literal), `domain/errors.ts` (`ProveedoresError` y las seis
       clases con su `code` de `design.md > 6.4`), `domain/page.ts` (`Page<T>`, `PageQuery`,
