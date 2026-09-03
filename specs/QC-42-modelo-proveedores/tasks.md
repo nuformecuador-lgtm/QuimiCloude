@@ -265,7 +265,7 @@ da por hecho:**
 
 ## Bloque F — Cierre
 
-### [ ] T12. Confirmar que no entró ninguna dependencia nueva
+### [x] T12. Confirmar que no entró ninguna dependencia nueva
 - Dep: T4, T11.
 - Archivos: ninguno.
 - `git diff origin/dev -- package.json pnpm-lock.yaml` **vacío** (decisión cerrada 22, R36). Si el
