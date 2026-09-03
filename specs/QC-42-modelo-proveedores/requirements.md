@@ -22,7 +22,197 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es la **capa de persistencia** de
+QuimiCloude —el esquema Prisma (`db/schema.prisma`) más la base Postgres con la migración de
+esta feature aplicada— **más el armazón del módulo `proveedores`** y la frontera que ese módulo
+tiene con `inventario` y con `identity`. No hay caso de uso, ni service, ni interfaz de usuario
+en esta ficha (decisiones cerradas 20 y 21), así que ningún requisito habla de quién llama ni
+desde dónde. Mismo encuadre que **QC-24**, que es el precedente literal de casi todo lo de
+abajo.
+
+### Estructura del proveedor
+
+**R1.** El sistema DEBE persistir, para cada proveedor, un identificador propio, estable y no
+derivado de sus datos de negocio, más su nombre, su teléfono y su correo.
+
+**R2.** SI se intenta persistir un proveedor sin nombre, ENTONCES el sistema DEBE rechazar la
+operación **en la propia base de datos** y no crear ninguna fila.
+
+**R3.** El sistema DEBE aceptar un proveedor con teléfono y sin correo, y también uno con correo
+y sin teléfono, conservando el dato ausente como ausencia de valor: los dos son opcionales **por
+separado**.
+
+**R4.** SI se intenta persistir o modificar un proveedor que no tenga ni teléfono ni correo,
+ENTONCES el sistema DEBE rechazar la operación **en la propia base de datos**, y NO DEBE
+depender de ninguna comprobación de la capa de aplicación para hacerlo.
+
+**R5.** El sistema NO DEBE limitar en la columna la longitud del nombre, del teléfono ni del
+correo, y NO DEBE rechazar un proveedor por la longitud de ninguno de los tres: los largos
+máximos —120 para el nombre— son validación de aplicación y pertenecen a **QC-43**.
+
+**R6.** El sistema NO DEBE exigir unicidad ni formato del teléfono ni del correo: DEBE aceptar
+dos proveedores vivos distintos que compartan el mismo teléfono o el mismo correo, y DEBE
+aceptar como correo cualquier texto, incluido uno que no tenga forma de correo.
+
+### Unicidad del nombre del proveedor
+
+**R7.** SI se intenta persistir un proveedor cuyo nombre coincida con el de otro proveedor vivo
+ya existente **una vez normalizado** —sin acentos, sin caracteres especiales y sin distinguir
+mayúsculas de minúsculas—, ENTONCES el sistema DEBE rechazar la operación **en la propia base de
+datos** y no crear ni modificar ninguna fila.
+
+**R8.** El sistema DEBE persistir el nombre normalizado de cada proveedor en una columna propia
+junto al nombre original, y DEBE exponer **una única definición** de esa normalización, publicada
+por el contrato público del módulo `proveedores`, de modo que la columna y cualquier consumidor
+futuro normalicen igual.
+
+**R9.** MIENTRAS un proveedor esté borrado lógicamente, el sistema DEBE permitir que otro
+proveedor vivo use su mismo nombre normalizado.
+
+### Estructura de la línea del catálogo
+
+**R10.** El sistema DEBE persistir cada pareja proveedor–producto como **entidad propia**, con su
+propio costo, su propio mínimo de compra y su propio tiempo de entrega, y NO DEBE modelarla como
+una tabla de unión sin datos.
+
+**R11.** SI se intenta persistir en el catálogo de un mismo proveedor una segunda línea que
+apunte al mismo producto, ENTONCES el sistema DEBE rechazar la operación **en la propia base de
+datos** y no crear ninguna fila.
+
+**R12.** El sistema DEBE permitir que un proveedor tenga un número ilimitado de líneas de
+catálogo y que un mismo producto aparezca en los catálogos de un número ilimitado de proveedores
+distintos, cada uno con su propio costo.
+
+**R13.** El sistema DEBE exigir producto y costo en cada línea, y DEBE aceptar una línea sin
+mínimo de compra y sin tiempo de entrega, conservando los dos como ausencia de valor y no como
+cero.
+
+**R14.** El sistema DEBE almacenar el costo y el mínimo de compra de la línea como número
+**decimal exacto** de 14 dígitos de precisión y 4 decimales, DEBE devolver sin pérdida cualquier
+valor con hasta 4 decimales, y NO DEBE usar ninguna representación de coma flotante binaria
+(`float`, `double`, `real`).
+
+**R15.** El sistema DEBE aceptar un mínimo de compra con parte fraccionaria y devolverlo sin
+redondear, y NO DEBE restringirlo a valores enteros.
+
+**R16.** El sistema DEBE almacenar el tiempo de entrega de la línea como número **entero** de
+días, y NO DEBE almacenar ninguna otra unidad de tiempo ni ninguna parte fraccionaria.
+
+**R17.** SI se intenta persistir una línea cuyo costo, cuyo mínimo de compra o cuyo tiempo de
+entrega sea negativo, ENTONCES el sistema DEBE rechazar la operación **en la propia base de
+datos** y no crear ni modificar ninguna fila.
+
+**R18.** El sistema NO DEBE almacenar ninguna moneda, divisa ni tasa de cambio junto al costo: la
+moneda es implícita y única para todo el ERP.
+
+**R19.** El sistema NO DEBE modificar la tabla de productos: NO DEBE añadirle, quitarle ni
+cambiar ninguna columna, y en particular DEBE dejar intactos su costo, su mínimo de compra y su
+tiempo de entrega, que conviven con los de la línea de catálogo con significado distinto.
+
+### Frontera de módulo
+
+**R20.** El sistema DEBE declarar `proveedores` como módulo propietario de los dos modelos de
+esta feature, y ningún módulo distinto de `proveedores` DEBE consultarlos con el cliente Prisma.
+
+**R21.** El módulo `proveedores` NO DEBE consultar el modelo de producto ni el de usuario con el
+cliente Prisma, ni importar el dominio, los puertos o los adaptadores de `inventario` o de
+`identity` por ruta profunda: todo lo que `proveedores` sepa del producto DEBE llegarle por el
+contrato público de `inventario` (`@/lib/modules/inventario`).
+
+**R22.** El sistema DEBE declarar la referencia de la línea al producto y las dos referencias de
+auditoría del proveedor al usuario como **campos escalares sin relación de Prisma**, de modo que
+**ninguna consulta del cliente Prisma pueda atravesar** desde un proveedor o una línea hasta un
+producto o un usuario —ni por `include`, ni por `select`, ni por filtro anidado—; y DEBE mantener
+aun así la restricción de clave foránea **real en la base de datos**.
+
+**R23.** El módulo `proveedores` DEBE nacer con la forma hexagonal del repositorio: un contrato
+público (`index.ts`) que solo reexporta símbolos de su propio `domain/`, las carpetas `domain/`,
+`ports/` y `adapters/` como únicas carpetas del módulo, y ningún `'use server'` alcanzable desde
+ese contrato.
+
+### Auditoría, borrado y marcas de tiempo
+
+**R24.** El sistema DEBE registrar, para cada proveedor, qué usuario lo creó y qué usuario lo
+modificó por última vez **cuando ese usuario exista**; DEBE aceptar un proveedor sin ninguno de
+los dos, conservándolos como ausencia de valor; y SI se intenta registrar como autor un usuario
+inexistente, ENTONCES DEBE rechazar la operación.
+
+**R25.** El sistema NO DEBE registrar autor de creación ni autor de última modificación en la
+línea del catálogo.
+
+**R26.** CUANDO se borra un proveedor, el sistema DEBE conservar su fila completa y registrar el
+instante del borrado, sin eliminar ninguno de sus datos; y NO DEBE mantener ningún otro indicador
+de estado activo o inactivo del proveedor.
+
+**R27.** El sistema DEBE registrar, para cada proveedor y cada línea de catálogo, el instante de
+creación y el instante de la última modificación, y DEBE actualizar el segundo cada vez que la
+fila cambia.
+
+**R28.** CUANDO se quita un producto del catálogo de un proveedor, el sistema DEBE eliminar la
+fila de la línea por completo, y NO DEBE conservar ninguna marca de borrado lógico de líneas.
+
+**R29.** SI se elimina físicamente un proveedor, ENTONCES el sistema DEBE eliminar también todas
+sus líneas de catálogo y NO DEBE dejar ninguna línea huérfana.
+
+**R30.** CUANDO se borra lógicamente un proveedor, el sistema DEBE conservar sus líneas de
+catálogo sin modificar y asociadas a él.
+
+**R31.** MIENTRAS un producto usado por al menos una línea de catálogo esté borrado lógicamente,
+el sistema DEBE conservar esa línea apuntando al mismo producto; y SI se intenta eliminar
+físicamente un producto referenciado por alguna línea, ENTONCES DEBE rechazar el borrado.
+
+### Esquema, seguridad y migración
+
+**R32.** El sistema DEBE nombrar en **inglés** y en `snake_case` todas las tablas, columnas,
+índices y restricciones que cree esta feature, y las dos tablas DEBEN llamarse `suppliers` y
+`supplier_catalog_lines`.
+
+**R33.** El sistema DEBE tener `ROW LEVEL SECURITY` activado **y forzado**
+(`FORCE ROW LEVEL SECURITY`) en las dos tablas que crea esta feature.
+
+**R34.** CUANDO se revierte la migración de esta feature, el sistema DEBE quedar exactamente en
+el estado de esquema previo a aplicarla, sin dejar tablas, restricciones, índices ni columnas
+residuales.
+
+### Límite de alcance
+
+**R35.** El sistema NO DEBE incluir en esta feature ninguna operación de alta, consulta, edición
+o baja de proveedores ni de sus líneas de catálogo, ni ninguna regla de permisos, ni adaptador
+driving, ruta, Server Action o pantalla que las exponga; por lo tanto esta feature no aporta
+ningún flujo navegable que un test E2E pueda visitar.
+
+**R36.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el
+requisito que la hace testeable. Ninguna queda sin `R<n>` (regla 4 de `CLAUDE.md`).
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Módulo propio `proveedores`; el producto se conoce por el contrato de `inventario` | R20, R21, R23 |
+| 2 | Costo, mínimo y plazo conviven en producto y en catálogo; QC-42 no toca `products` | R19, R10 |
+| 3 | La relación proveedor-producto es entidad propia, única por pareja | R10, R11, R12 |
+| 4 | `product_id` y `cost` obligatorios; `min_purchase` y `delivery_time` opcionales | R13 |
+| 5 | `decimal(14,4)` para costo y mínimo, entero de días para el plazo, ninguno negativo | R14, R16, R17 |
+| 6 | El mínimo de compra admite fracciones | R15 |
+| 7 | `name` obligatorio; `phone` y `email` opcionales por separado, con `CHECK` de «al menos uno» | R1, R2, R3, R4 |
+| 8 | Nombre único normalizado: columna persistida + índice único **parcial** | R7, R8, R9 |
+| 9 | Correo y teléfono: sin unicidad y sin `CHECK` de formato | R6 |
+| 10 | Baja del proveedor: borrado lógico y nada más, sin estado activo/inactivo | R26, R27 |
+| 11 | La línea se borra físicamente y se va con su proveedor (`CASCADE`) | R28, R29, R30 |
+| 12 | Un producto dado de baja no se lleva la línea (`RESTRICT`) | R31 |
+| 13 | FK al producto: escalar SIN `@relation`, escrita a mano en el SQL | R22 |
+| 14 | Auditoría en `suppliers`, anulable, escalar sin `@relation`; la línea no la lleva | R24, R25, R22 |
+| 15 | Largos máximos en la validación de aplicación, no en la columna | R5 |
+| 16 | Moneda implícita, no se guarda | R18 |
+| 17 | Tablas `suppliers` y `supplier_catalog_lines`, identificadores en inglés | R32 |
+| 18 | RLS activada y forzada en las dos tablas | R33 |
+| 19 | Migración con `down.sql` que revierte al esquema exacto anterior | R34 |
+| 20 | Los permisos no se deciden aquí | R35 |
+| 21 | E2E diferido con motivo | R35 |
+| 22 | Ninguna librería nueva | R36 |
 
 ## Preguntas abiertas
 
@@ -43,6 +233,35 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bloquea el modelo
    añade columna de unidad a la línea: hacerlo después es barato mientras el catálogo esté vacío.
 5. **Trazabilidad por lote y vencimiento** (pregunta abierta n.º 2 del dominio). Sigue abierta y
    sigue siendo cara. No se decide aquí: el lote vive en el movimiento, no en el catálogo.
+
+Las tres siguientes las **añadió `spec_author` en F1.2** (2026-09-03) y son nuevas: el acotado no
+las vio. Ninguna bloquea el modelo y las tres tienen posición por defecto escrita, pero las
+cierra el humano —como pasó en QC-24 con las tres de `spec_author`, que bajaron a la tabla de
+decisiones—.
+
+6. **¿Un teléfono o un correo en blanco cuenta como contacto?** La decisión 7 exige «al menos
+   uno», y el `CHECK` de la base solo puede mirar **ausencia de valor**: `phone = ''` y
+   `email = ''` lo satisfacen igual que un teléfono real. La posición por defecto de este spec es
+   **no añadir nada más en la base** y dejar que **QC-43** rechace el texto en blanco con `zod`,
+   coherente con la decisión 15 (los largos viven en la validación de aplicación). Se anota
+   porque, si la respuesta fuera que la base también lo tiene que impedir, es un `CHECK` distinto
+   (`coalesce(nullif(btrim(phone),''), nullif(btrim(email),'')) IS NOT NULL`) y cambiarlo con
+   proveedores ya cargados obliga a limpiar datos antes.
+7. **Editar una línea del catálogo no deja rastro de quién la editó.** La decisión 14 dice que la
+   línea no lleva columnas de autor, heredando el criterio de `recipe_lines`. Pero allí editar una
+   línea es editar la fórmula, y el rastro queda en `recipes.updated_by`; aquí **subir el costo de
+   un producto es un hecho comercial propio** que no modifica ninguna otra cosa del proveedor. Si
+   se quiere rastro, hay dos caminos y ninguno es gratis: que **QC-43** toque `suppliers.updated_by`
+   al escribir una línea (barato, impreciso), o columnas de auditoría propias en la línea (una
+   migración más). Se relaciona con la pregunta abierta 2: sin historial de costo **y** sin autor,
+   una subida de precio no deja ningún dato.
+8. **El `CHECK` de contacto también alcanza a los proveedores dados de baja.** Un `CHECK` se
+   evalúa en toda fila, viva o no, así que **no se pueden vaciar el teléfono y el correo de un
+   proveedor ya borrado lógicamente** —lo que pediría una solicitud de borrado de datos de
+   contacto— sin violar la restricción o borrar la fila entera. La posición por defecto es
+   asumirlo: hoy no hay ninguna ficha de retención ni de borrado de datos personales. Si la
+   hubiera, el `CHECK` pasa a ser parcial (`WHERE deleted_at IS NULL`), que es una migración
+   pequeña mientras no haya datos.
 
 ## Decisiones cerradas (no reabrir)
 

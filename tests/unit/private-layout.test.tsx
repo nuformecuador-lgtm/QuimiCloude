@@ -17,7 +17,10 @@ import {
 } from '../helpers/viewport';
 
 /**
- * Armazon del layout privado: R1, R5, R16, R35 y R36 (`design.md > 5.2`).
+ * Armazon del layout privado: R1, R5, R16 y R35 de QC-11 (`design.md > 5.2`), mas R22 de
+ * QC-22 (region de avisos), que **supera a R36/D9 de QC-11** por decision humana del
+ * 2026-09-03: el test de la region de avisos pasa de negativo a positivo, invertido y no
+ * borrado.
  *
  * Aqui conviven dos clases de test y es deliberado: los de render (que el armazon coloca las
  * piezas donde toca) y los de **guardia de codigo** (que el layout no hace lo que tiene
@@ -257,24 +260,41 @@ describe('layout privado', () => {
     }
   });
 
-  it('el layout privado no monta ninguna region de notificaciones', async () => {
-    // R36 — test **en negativo por decision humana (D9)**, no por olvido: la zona privada
-    // se queda sin toasts hasta que una feature lo pida, y `sonner` ni siquiera es
-    // dependencia de esta feature. Sin este test, montar un `<Toaster />` «ya que estamos»
-    // no pondria nada en rojo.
+  it('el layout privado monta exactamente una region de avisos y ningun otro landmark nuevo', async () => {
+    // R22 de QC-22. Este test estaba **en negativo** (R36/D9 de QC-11: la zona privada se
+    // quedaba sin toasts hasta que una feature los pidiera). Esa feature llego: por decision
+    // humana del **2026-09-03**, R36/D9 de QC-11 **queda superada por R22 de QC-22**, porque
+    // la pantalla de inventario notifica el resultado de sus operaciones con toasts y sin
+    // region montada no serian visibles. El test se **invierte, no se borra**: la mitad que
+    // sigue vigente —un solo `<main>` y ningun landmark nuevo aparte de la region de
+    // avisos— seguiria sin cubrir si se hubiera borrado. Esto NO es una regresion de QC-11.
     await renderLayout();
 
-    expect(document.querySelectorAll('[data-sonner-toaster]')).toHaveLength(0);
-    expect(document.querySelectorAll('[aria-live]')).toHaveLength(0);
-    expect(screen.queryAllByRole('region')).toHaveLength(0);
+    // `sonner` solo pinta el `<ol data-sonner-toaster>` cuando hay algun toast en cola; lo
+    // que si esta siempre montado es su `<section aria-live>`. Por eso la region se observa
+    // por el landmark y no por el atributo de datos, que aqui seria siempre 0 y no morderia.
+    const regiones = screen.getAllByRole('region');
+    expect(regiones).toHaveLength(1);
+
+    // Exactamente una, no dos: un `<Toaster />` duplicado (aqui y en un layout padre) es un
+    // bug real y este conteo es lo unico que lo delata.
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+    expect(regiones[0]).toHaveAttribute('aria-live');
+
+    // Sigue habiendo un solo `<main>`: la region de avisos es hermana del contenido, no se
+    // ha anidado dentro ni ha traido un landmark propio de mas.
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getAllByRole('main')[0]).not.toContainElement(regiones[0]);
+
+    // Y ningun otro landmark nuevo respecto a lo que este test ya daba por bueno.
     expect(screen.queryAllByRole('status')).toHaveLength(0);
     expect(screen.queryAllByRole('alert')).toHaveLength(0);
     expect(screen.queryAllByRole('log')).toHaveLength(0);
 
-    // Guardia de codigo: el layout no importa ni renderiza la region de notificaciones.
+    // Guardia de codigo, tambien invertida: la region se monta desde la primitiva compartida
+    // y no reimplementada a mano.
     const codigo = fuenteSinComentarios('app/(private)/layout.tsx');
-    expect(codigo).not.toContain('sonner');
-    expect(codigo).not.toContain('@/components/ui/sonner');
-    expect(codigo).not.toContain('<Toaster');
+    expect(codigo).toContain('@/components/ui/sonner');
+    expect(codigo).toContain('<Toaster');
   });
 });
