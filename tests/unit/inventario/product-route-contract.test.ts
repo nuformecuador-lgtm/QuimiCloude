@@ -1,0 +1,395 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
+import { INVENTORY_ROUTE, PRIVATE_ROUTE_PREFIXES } from '@/lib/shared/routes';
+
+/**
+ * Contrato de la ruta de inventario: R2, R5, R7, R8, R9, R13, R18, R22, R25, R27, R28, R29, R30,
+ * R31 y R32 (`specs/QC-22-pantalla-de-productos/tasks.md > T13`).
+ *
+ * **Guardias de codigo, sin DOM**, mismo patron que `tests/unit/dashboard-route-contract.test.ts`.
+ * Todo lo que esta feature promete **no hacer** —no incrustar la ruta, no llamar a rutas de API
+ * propias, no repetir la autorizacion, no ofrecer la gestion de presentaciones, no esconder una
+ * accion detras del puntero, no duplicar el armazon heredado— es invisible renderizando: si
+ * manana la pantalla empezase a hacer cualquiera de esas cosas, ningun assert de DOM se pondria
+ * rojo. De ahi este archivo.
+ *
+ * Es tambien donde aterriza la mitad de R31 que **jsdom no puede observar**: sin hojas de estilo,
+ * un control escondido con `hidden hover:flex` sigue pareciendo visible en un test de render
+ * (comprobado al escribir T12). Aqui se mira la fuente, que es donde esa regla se rompe.
+ */
+
+const RAIZ = join(__dirname, '..', '..', '..');
+
+/** Carpeta de la ruta, **derivada de la constante** (R2). El App Router es el unico que exige
+ *  que el nombre de la carpeta coincida con la URL; el route group `(private)` no aporta
+ *  segmento. */
+const CARPETA_RUTA = join('app', '(private)', INVENTORY_ROUTE.replace(/^\//, ''));
+const PAGE_PATH = join(CARPETA_RUTA, 'page.tsx');
+const COMPONENTES_PATH = join(CARPETA_RUTA, 'components');
+const BARREL_PATH = join(COMPONENTES_PATH, 'index.ts');
+
+/** El layout privado, unico archivo heredado de la zona privada que R32 autoriza a tocar. */
+const LAYOUT_PRIVADO_PATH = join('app', '(private)', 'layout.tsx');
+
+/** El literal de la ruta, en las dos comillas en las que se puede escribir. */
+const LITERALES_DE_RUTA = [`'${INVENTORY_ROUTE}'`, `"${INVENTORY_ROUTE}"`, `\`${INVENTORY_ROUTE}`];
+
+function leer(rutaRelativa: string): string {
+  return readFileSync(join(RAIZ, rutaRelativa), 'utf8');
+}
+
+/** Fuente sin lineas de comentario: las guardias miran codigo, no prosa. */
+function fuenteSinComentarios(rutaRelativa: string): string {
+  return leer(rutaRelativa)
+    .split('\n')
+    .filter((linea) => {
+      const limpia = linea.trim();
+      return !(limpia.startsWith('//') || limpia.startsWith('*') || limpia.startsWith('/*'));
+    })
+    .join('\n');
+}
+
+/** Todos los archivos `.ts`/`.tsx` bajo una carpeta, en rutas relativas a la raiz del repo. */
+function fuentesBajo(carpetaRelativa: string): string[] {
+  const encontradas: string[] = [];
+
+  const recorrer = (directorio: string) => {
+    for (const entrada of readdirSync(directorio, { withFileTypes: true })) {
+      const completa = join(directorio, entrada.name);
+      if (entrada.isDirectory()) {
+        if (entrada.name === 'node_modules' || entrada.name === '.next') continue;
+        recorrer(completa);
+        continue;
+      }
+      if (entrada.name.endsWith('.ts') || entrada.name.endsWith('.tsx')) {
+        encontradas.push(relative(RAIZ, completa).split('\\').join('/'));
+      }
+    }
+  };
+
+  recorrer(join(RAIZ, carpetaRelativa));
+  return encontradas.sort();
+}
+
+/** Los archivos de la ruta: `page.tsx` y todos los componentes propios. */
+const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
+
+/** Los que declaran frontera de cliente. R30 va sobre estos. */
+const FUENTES_DE_CLIENTE = FUENTES_DE_LA_RUTA.filter((ruta) => leer(ruta).includes("'use client'"));
+
+/** Comprueba que ningun archivo de la ruta contiene ninguno de los textos prohibidos. */
+function ningunArchivoContiene(prohibidos: readonly string[], fuentes = FUENTES_DE_LA_RUTA) {
+  for (const ruta of fuentes) {
+    const codigo = fuenteSinComentarios(ruta);
+    for (const prohibido of prohibidos) {
+      expect(codigo, `${ruta} no debe contener «${prohibido}»`).not.toContain(prohibido);
+    }
+  }
+}
+
+describe('contrato de la ruta de inventario', () => {
+  it('la pantalla existe donde la ubica INVENTORY_ROUTE y sus componentes viven en su barrel', () => {
+    // R2, R27 — la ruta esperada se DERIVA de la constante, no se escribe a mano.
+    expect(existsSync(join(RAIZ, PAGE_PATH)), `deberia existir ${PAGE_PATH}`).toBe(true);
+    expect(existsSync(join(RAIZ, BARREL_PATH)), `deberia existir ${BARREL_PATH}`).toBe(true);
+    expect(FUENTES_DE_LA_RUTA.length).toBeGreaterThan(1);
+  });
+
+  it('la ubicacion de la ruta se deriva de INVENTORY_ROUTE y ningun archivo incrusta el literal', () => {
+    // R2 — el literal existe en UN solo sitio del repo: la constante. Duplicarlo es como se
+    // acaba con `/dashboard` y `/panel` conviviendo.
+    const conElLiteral: string[] = [];
+
+    for (const carpeta of ['app', 'components', 'lib', 'hooks']) {
+      if (!existsSync(join(RAIZ, carpeta))) continue;
+      for (const ruta of fuentesBajo(carpeta)) {
+        if (ruta === 'lib/shared/routes.ts') continue;
+        const codigo = fuenteSinComentarios(ruta);
+        if (LITERALES_DE_RUTA.some((literal) => codigo.includes(literal))) conElLiteral.push(ruta);
+      }
+    }
+
+    expect(conElLiteral, 'el literal de la ruta solo puede vivir en lib/shared/routes.ts').toEqual(
+      [],
+    );
+
+    // Y la constante se declara una sola vez.
+    expect(leer('lib/shared/routes.ts')).toContain('export const INVENTORY_ROUTE');
+    expect(fuenteSinComentarios('lib/shared/navigation/private-nav.ts')).not.toContain(
+      'const INVENTORY_ROUTE =',
+    );
+  });
+
+  it('el item Inventario del sidebar y el prefijo privado apuntan a la misma constante', () => {
+    // R2 (+ R3, cuya cobertura del prefijo vigila `guard-rutas-privadas-cubiertas.test.ts`).
+    const enlaces = PRIVATE_NAV_ITEMS.filter((item): item is NavLink => item.kind === 'link');
+    expect(enlaces.filter((enlace) => enlace.href === INVENTORY_ROUTE)).toHaveLength(1);
+
+    expect(PRIVATE_ROUTE_PREFIXES).toContain(INVENTORY_ROUTE);
+
+    // La pantalla no redeclara constantes de ruta por su cuenta.
+    ningunArchivoContiene(['export const INVENTORY_ROUTE', 'PRIVATE_NAV_ITEMS =']);
+  });
+
+  it('la pantalla no repite requireAdmin ni decide autorizacion', () => {
+    // R5 — la autorizacion sobre los datos la aportan los casos de uso; el corte de ruta lo hace
+    // el middleware. Repetirla aqui seria una tercera regla que nadie mantiene sincronizada.
+    ningunArchivoContiene([
+      'requireAdmin',
+      'getSessionUser',
+      'ADMIN_ROLE_NAME',
+      'decideRouteAccess',
+      'ROUTE_ROLE_RULES',
+      'next/headers',
+      'redirect(',
+    ]);
+  });
+
+  it('la tabla no puede pintar quien creo o modifico un producto', () => {
+    // R7 — test **en negativo** sobre la fuente: el dato existe en `ProductView` y esta a un
+    // caracter de distancia de aparecer en la pantalla.
+    //
+    // Lo prohibido es **leerlo o declararlo como columna**, no nombrarlo: la declaracion de
+    // columnas nombra los dos campos justamente para EXCLUIRLOS del tipo, y una prohibicion
+    // ciega borraria esa defensa al primer cambio, que es como mueren las guardias.
+    ningunArchivoContiene([
+      '.createdBy',
+      '.updatedBy',
+      "key: 'createdBy'",
+      "key: 'updatedBy'",
+      "'product-column-createdBy'",
+      "'product-column-updatedBy'",
+    ]);
+
+    // Y la defensa de tipos sigue en pie: `key: 'createdBy'` ni siquiera compilaria.
+    const columnas = fuenteSinComentarios(
+      join(COMPONENTES_PATH, 'product-columns.ts').split('\\').join('/'),
+    );
+    expect(columnas).toContain('Exclude<keyof ProductView');
+    expect(columnas).toContain("'createdBy'");
+    expect(columnas).toContain("'updatedBy'");
+  });
+
+  it('el costo no se convierte a numero en ningun archivo de la ruta', () => {
+    // R8 — `cost` es cadena decimal a proposito: pasarla por coma flotante la corrompe.
+    ningunArchivoContiene(['parseFloat(', 'toFixed(', 'Number.parseFloat(']);
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      for (const linea of fuenteSinComentarios(ruta).split('\n')) {
+        if (!linea.includes('cost')) continue;
+        for (const prohibido of ['Number(', '+', '*', '/ ']) {
+          expect(
+            linea,
+            `${ruta}: el costo no puede pasar por «${prohibido}»`,
+          ).not.toContain(prohibido);
+        }
+      }
+    }
+  });
+
+  it('el desbordamiento horizontal no lo declara ningun archivo de la ruta', () => {
+    // R9 — lo absorbe el envoltorio del primitivo `table` (`data-slot=table-container`), que ya
+    // trae `overflow-x-auto`. Declararlo aqui significaria un segundo contenedor con scroll, o
+    // el scroll en un ancestro, que es justo lo que R9 prohibe.
+    ningunArchivoContiene(['overflow-x', 'sticky', 'position: fixed', 'fixed inset']);
+  });
+
+  it('la pantalla no ofrece busqueda ni control de orden', () => {
+    // R13 — test **en negativo**: el backend solo acepta `page` y `pageSize` y ordena fijo, asi
+    // que cualquier buscador de esta capa mentiria (solo filtraria la pagina visible).
+    ningunArchivoContiene(['type="search"', 'orderBy', 'sortBy', 'sortDirection', 'filter(']);
+  });
+
+  it('el alta y la edicion salen por las Server Actions del catalogo', () => {
+    // R18, R28 — y jamas por una ruta de API propia.
+    const formulario = fuenteSinComentarios(
+      join(COMPONENTES_PATH, 'product-form.tsx').split('\\').join('/'),
+    );
+
+    expect(formulario).toContain('createProductAction');
+    expect(formulario).toContain('updateProductAction');
+    expect(formulario).toContain('@/lib/modules/inventario/adapters/driving/product-actions');
+  });
+
+  it('ningun archivo de la ruta usa fetch a rutas API propias', () => {
+    // R28 — la prohibicion es de `docs/architecture.md` y de la decision del 2026-09-03.
+    ningunArchivoContiene(['fetch(', "'/api/", '"/api/', 'axios', 'XMLHttpRequest']);
+  });
+
+  it('el layout privado monta la region de avisos y la pantalla no monta otra', () => {
+    // R22 — la region vive en el layout (superando a R36/D9 de QC-11 por decision humana del
+    // 2026-09-03). Si cada pantalla montase la suya, habria varias regiones `aria-live`
+    // compitiendo por anunciar lo mismo.
+    const layout = fuenteSinComentarios(LAYOUT_PRIVADO_PATH);
+    expect(layout).toContain('@/components/ui/sonner');
+    expect(layout).toContain('<Toaster');
+
+    ningunArchivoContiene(['<Toaster', '@/components/ui/sonner']);
+  });
+
+  it('la pantalla no ofrece listar, editar ni borrar presentaciones', () => {
+    // R25 — test **en negativo**, y sobre la fuente CRUDA (comentarios incluidos): abrir la
+    // gestion de presentaciones es exactamente lo que una feature posterior puede colar aqui, y
+    // esa pantalla es QC-45. La unica operacion permitida es el alta desde el selector (R24).
+    const prohibidas = ['updatePresentationAction', 'deletePresentationAction'];
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const crudo = leer(ruta);
+      for (const prohibida of prohibidas) {
+        expect(crudo, `${ruta} no debe nombrar «${prohibida}»`).not.toContain(prohibida);
+      }
+    }
+
+    // Y las dos que si se usan siguen siendo solo esas dos.
+    const selector = fuenteSinComentarios(
+      join(COMPONENTES_PATH, 'presentation-select.tsx').split('\\').join('/'),
+    );
+    expect(selector).toContain('listPresentationsAction');
+    expect(selector).toContain('createPresentationAction');
+  });
+
+  it('los componentes de ruta se exponen por el barrel y no se importan por ruta profunda', () => {
+    // R27 — regla del arnes (`docs/architecture.md > Componentes`), y el reviewer la trata como
+    // anti-patron si se incumple.
+    const barrel = fuenteSinComentarios(BARREL_PATH.split('\\').join('/'));
+
+    // Todos los componentes de la ruta salen por el barrel.
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      if (!ruta.includes('/components/') || ruta.endsWith('/index.ts')) continue;
+      const nombreDeArchivo = ruta.split('/').pop() as string;
+      const modulo = `./${nombreDeArchivo.replace(/\.tsx?$/, '')}`;
+      expect(barrel, `el barrel debe reexportar ${modulo}`).toContain(`from '${modulo}'`);
+    }
+
+    // La pagina importa SOLO desde el barrel.
+    const pagina = fuenteSinComentarios(PAGE_PATH.split('\\').join('/'));
+    expect(pagina).toContain("from './components'");
+    expect(pagina).not.toContain("from './components/");
+
+    // El barrel NO declara frontera cliente/servidor: eso va en cada componente.
+    expect(barrel).not.toContain('use client');
+
+    // Y no queda ningun componente suelto junto a `page.tsx`.
+    const raizDeLaRuta = readdirSync(join(RAIZ, CARPETA_RUTA), { withFileTypes: true });
+    const archivosDeAppRouter = ['page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx'];
+    for (const entrada of raizDeLaRuta) {
+      if (entrada.isDirectory()) {
+        expect(entrada.name, 'la unica carpeta de la ruta es components/').toBe('components');
+        continue;
+      }
+      expect(archivosDeAppRouter, `${entrada.name} no es un archivo del App Router`).toContain(
+        entrada.name,
+      );
+    }
+  });
+
+  it('ninguna primitiva se escribe a mano y no entraron dependencias nuevas', () => {
+    // R29 — las primitivas vienen del CLI de shadcn/ui. La pantalla no puede rehacer a mano lo
+    // que ya existe en `components/ui/`, y la decision del 2026-09-03 (P2) cerro que **no** entra
+    // ninguna dependencia nueva.
+    for (const primitiva of ['table.tsx', 'select.tsx', 'alert-dialog.tsx', 'sheet.tsx']) {
+      expect(
+        existsSync(join(RAIZ, 'components', 'ui', primitiva)),
+        `falta components/ui/${primitiva}`,
+      ).toBe(true);
+    }
+
+    // Nada de tablas, dialogos ni paneles escritos a mano en la ruta.
+    ningunArchivoContiene(['<table', '<dialog', 'role="dialog"', 'createPortal']);
+
+    const packageJson = JSON.parse(leer('package.json')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const instaladas = {
+      ...(packageJson.dependencies ?? {}),
+      ...(packageJson.devDependencies ?? {}),
+    };
+
+    for (const descartada of ['react-hook-form', '@hookform/resolvers']) {
+      expect(instaladas, `«${descartada}» quedo descartada el 2026-09-03`).not.toHaveProperty(
+        descartada,
+      );
+    }
+
+    ningunArchivoContiene(['@/components/ui/form', 'react-hook-form', '@hookform/']);
+  });
+
+  it('los componentes de cliente no importan composicion ni base de datos', () => {
+    // R30 — los datos de catalogo bajan por props desde el Server Component, o salen de una
+    // Server Action. Nunca del punto de composicion ni de Prisma.
+    expect(FUENTES_DE_CLIENTE.length).toBeGreaterThan(0);
+
+    ningunArchivoContiene(
+      ['@/lib/composition', '@prisma/client', 'prisma.', 'supabase', 'next/headers'],
+      FUENTES_DE_CLIENTE,
+    );
+  });
+
+  it('no usa 100vh, ni hover como unica via, y respeta tamanos tactiles y de fuente', () => {
+    // R31 — la mitad que jsdom NO puede observar (sin hojas de estilo, un control escondido con
+    // `hidden hover:flex` sigue pasando un `toBeVisible()`). Sin excepcion de escritorio
+    // declarada: el `design.md` no declara ninguna.
+    const utilidadesQueOcultan = ['hidden', 'invisible', 'opacity-0', 'sr-only', 'scale-0'];
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const codigo = fuenteSinComentarios(ruta);
+
+      expect(codigo, `${ruta} no debe usar 100vh`).not.toContain('100vh');
+
+      for (const linea of codigo.split('\n')) {
+        if (!linea.includes('hover:') && !linea.includes('group-hover:')) continue;
+        for (const utilidad of utilidadesQueOcultan) {
+          expect(
+            linea,
+            `${ruta}: «hover» no puede ser la unica via de revelar «${utilidad}»`,
+          ).not.toContain(utilidad);
+        }
+      }
+
+      // Area tactil de 44x44 px en todo archivo que renderice un control (R31). Los primitivos
+      // miden 32 px de alto, asi que hay que forzarlo por clase.
+      const renderizaControl = ['<Button', 'SelectTrigger', '<Input', 'AlertDialogAction'].some(
+        (marca) => codigo.includes(marca),
+      );
+      if (renderizaControl) {
+        expect(codigo, `${ruta} renderiza controles y debe forzar el area tactil`).toContain(
+          'min-h-11',
+        );
+      }
+
+      // 16 px en los campos: por debajo, iOS hace zoom al enfocar.
+      if (codigo.includes('<Input')) {
+        expect(codigo, `${ruta} debe fijar 16px en sus campos`).toContain('text-base');
+      }
+    }
+  });
+
+  it('la feature no duplica el armazon heredado: solo edita los cuatro archivos autorizados', () => {
+    // R32 — el choque entre las features 4 y 10 ya ocurrio una vez en este repo. Lo que se
+    // vigila no es «no tocar nada», es **no re-crear** lo que ya esta mergeado.
+    expect(existsSync(join(RAIZ, LAYOUT_PRIVADO_PATH))).toBe(true);
+    expect(existsSync(join(RAIZ, 'components', 'private', 'app-sidebar.tsx'))).toBe(true);
+
+    // La ruta no trae su propio layout, ni su sidebar, ni su copia de las primitivas.
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      expect(ruta, 'la ruta no declara su propio layout').not.toContain('/layout.tsx');
+      expect(ruta, 'la ruta no re-crea la barra lateral').not.toContain('sidebar');
+    }
+
+    // Y no se declara un segundo `main`: `SidebarInset` del layout privado ya lo es.
+    ningunArchivoContiene(['<main', 'SidebarInset', 'SidebarProvider', 'AppSidebar']);
+
+    // Un solo layout privado y un solo declarante de la navegacion privada.
+    expect(
+      fuentesBajo(join('app', '(private)')).filter((ruta) => ruta.endsWith('/layout.tsx')),
+    ).toHaveLength(1);
+    expect(
+      fuentesBajo('lib').filter((ruta) =>
+        fuenteSinComentarios(ruta).includes('export const PRIVATE_NAV_ITEMS'),
+      ),
+    ).toHaveLength(1);
+  });
+});

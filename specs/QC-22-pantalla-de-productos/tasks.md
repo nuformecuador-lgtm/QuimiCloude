@@ -191,7 +191,7 @@ Si una task te pide abrir **cualquier otro** archivo ajeno —y en particular
   `data-testid` y constantes exportadas; **nunca** sobre literales de copy.
 - **Hecho cuando**: cubre R1, R6-R17, R19-R21, R23, R24, R26, R31 y sale en verde.
 
-### [ ] T13 — [P] Guardias de fuente y contrato de ruta
+### [x] T13 — [P] Guardias de fuente y contrato de ruta
 - **Depende de**: T11. **Archivos**: `tests/unit/inventario/product-route-contract.test.ts`.
 - **Qué**: lo que «no hacer» exige, que no se observa renderizando (patrón de
   `tests/unit/dashboard-route-contract.test.ts`): ruta derivada de `INVENTORY_ROUTE`; sin literales

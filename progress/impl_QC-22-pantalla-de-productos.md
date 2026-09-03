@@ -519,3 +519,89 @@ pnpm lint       -> eslint, sin hallazgos
 pnpm exec vitest related --run tests/unit/inventario/product-page.test.tsx   tests/unit/inventario/product-list-params.test.ts
   -> Test Files  2 passed (2)   ·   Tests  33 passed (33)
 ```
+
+## T13 — Guardias de fuente y contrato de ruta
+
+**Archivo (nuevo):** `tests/unit/inventario/product-route-contract.test.ts` (17 tests, proyecto
+`node`). Mismo patron que `tests/unit/dashboard-route-contract.test.ts`: **guardias de codigo, sin
+DOM**.
+
+- Todo lo que la ficha promete **no hacer** —incrustar la ruta, repetir la autorizacion, llamar a
+  una ruta de API propia, ofrecer la gestion de presentaciones, esconder una accion tras el
+  puntero, duplicar el armazon heredado— es **invisible renderizando**. Sin este archivo, esas
+  promesas no tienen quien las vigile.
+- La carpeta de la ruta se **deriva de `INVENTORY_ROUTE`**, no se escribe: `app/(private)` +
+  la constante. Y el barrido del literal `'/inventario'` recorre `app/`, `components/`, `lib/` y
+  `hooks/` enteros, con `lib/shared/routes.ts` como unica excepcion.
+- **Dos matices que se dejan escritos porque una guardia ciega habria muerto al primer cambio:**
+  1. **R7** prohibe *leer o declarar como columna* `createdBy`/`updatedBy` (`.createdBy`,
+     `key: 'createdBy'`, …), no *nombrarlos*: `product-columns.ts` los nombra justamente para
+     **excluirlos** del tipo `ProductColumnKey`, y esa exclusion es una defensa, no una fuga. El
+     test ademas afirma que la exclusion sigue en pie.
+  2. **R25** se comprueba sobre la fuente **cruda, comentarios incluidos**: los nombres de las dos
+     acciones de presentacion prohibidas no aparecen ni en un comentario.
+- **R31 aterriza aqui la mitad que jsdom no puede observar** (ver T12): sin hojas de estilo, un
+  control escondido con `hidden hover:flex` sigue pasando un `toBeVisible()`. La guardia mira la
+  fuente: nada de `100vh`, ninguna linea que combine `hover:`/`group-hover:` con una utilidad que
+  oculte, `min-h-11` obligatorio en todo archivo que renderice un control y `text-base` en todo
+  archivo con campos.
+- **R29** se comprueba en tres frentes: existen las cuatro primitivas usadas, la ruta **no
+  reescribe a mano** ninguna (`<table`, `<dialog`, `role="dialog"`, `createPortal` prohibidos) y
+  `package.json` **no** trae las dos dependencias descartadas el 2026-09-03.
+- **R32** no se vigila como «no tocar nada» sino como **no re-crear**: la ruta no declara `main`,
+  ni `SidebarProvider`/`SidebarInset`/`AppSidebar`, ni su propio layout; y sigue habiendo **un
+  solo** layout privado y **un solo** declarante de `PRIVATE_NAV_ITEMS`.
+
+### Que muerde cada guardia (comprobado rompiendo el codigo, no razonado)
+
+Mutaciones reales sobre la ruta (y una sobre `lib/shared/routes.ts`), revertidas con
+`git checkout`; arbol limpio despues, comprobado con `git status`:
+
+| Mutacion introducida | Guardia que se puso ROJA |
+| --- | --- |
+| La barra construye la URL con el literal `'/inventario'` | R2 (literal) |
+| `PRIVATE_ROUTE_PREFIXES` pierde `INVENTORY_ROUTE` | R2/R3 (sidebar y prefijo) |
+| `page.tsx` importa `requireAdmin` | R5 |
+| La tabla pinta `product.createdBy` | R7 |
+| El costo pasa por `Number(...)` | R8 |
+| La seccion de lista declara `overflow-x-scroll` | R9 |
+| Se cuela un `input[type=search]` | R13 |
+| El formulario deja de importar las actions del catalogo | R18 |
+| El formulario hace `fetch('/api/productos')` | R28 |
+| La pagina monta su propio `<Toaster />` | R22 |
+| El selector importa la accion de borrar presentaciones | R25 |
+| La pagina importa por ruta profunda (`./components/index`) | R27 |
+| El esqueleto escribe un `<table` a mano | R29 |
+| Un componente de cliente importa `@/lib/composition` | R30 |
+| Las acciones de fila se esconden con `hidden hover:flex` | R31 |
+| La pagina declara su propio `<main>` | R32 |
+
+**Salida real (T13):**
+```
+pnpm typecheck  -> tsc --noEmit, sin errores
+pnpm lint       -> eslint, sin hallazgos
+pnpm exec vitest run --project node tests/unit/inventario/product-route-contract.test.ts
+  -> Test Files  1 passed (1)   ·   Tests  17 passed (17)
+```
+
+## Cierre de la tanda T12 + T13
+
+```
+pnpm exec vitest related --run tests/unit/inventario/product-page.test.tsx   tests/unit/inventario/product-list-params.test.ts   tests/unit/inventario/product-route-contract.test.ts   tests/unit/sidebar-mobile.test.tsx
+  -> Test Files  4 passed (4)   ·   Tests  57 passed (57)
+```
+
+**Estado de la trazabilidad tras esta tanda** (lo que queda abierto se dice, no se da por cubierto):
+
+| Requisito | Test que lo muerde HOY |
+| --- | --- |
+| R1, R6-R17, R19-R21, R23, R24, R26 | `tests/unit/inventario/product-page.test.tsx` (+ `product-list-params.test.ts` para R10/R12) |
+| R2, R5, R7, R8, R9, R13, R18, R22, R25, R27, R28, R29, R30, R31, R32 | `tests/unit/inventario/product-route-contract.test.ts` |
+| R3 | `tests/guards/guard-rutas-privadas-cubiertas.test.ts` (verde desde T11) |
+| R22 | tambien `tests/unit/private-layout.test.tsx` (invertido en T4) |
+| **R4** | **sigue sin test: lo trae T14**, que ademas invierte el centinela de QC-9 |
+
+**No se toco nada fuera de alcance.** Sigue en pie el hallazgo bloqueante de T3
+(`guard-arquitectura-modulos.test.ts`: `route-role-rules.ts` importa `@/lib/shared/routes` desde
+`domain/`), que es **decision del leader** y no se ha tocado. `package.json` y `pnpm-lock.yaml`,
+sin cambios.
