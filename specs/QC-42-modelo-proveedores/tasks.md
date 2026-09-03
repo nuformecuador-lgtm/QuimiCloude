@@ -41,7 +41,7 @@ da por hecho:**
 
 ## Bloque A — Preparación
 
-### [ ] T0. Inventariar lo que YA está montado y no se re-crea (BLOQUEA TODO)
+### [x] T0. Inventariar lo que YA está montado y no se re-crea (BLOQUEA TODO)
 - Dep: ninguna. **Primera task.** Mismo papel que la T0 de `specs/11-layout-privado-con-sidebar/tasks.md`.
 - Archivos: ninguno versionado; la evidencia va a `progress/impl_QC-42-modelo-proveedores.md`.
 - Comprobar **uno por uno**, en este worktree y tras `git merge origin/dev`, que existen:
@@ -72,7 +72,7 @@ da por hecho:**
 
 ## Bloque B — Esquema y migración
 
-### [ ] T1. Añadir `Supplier` y `SupplierCatalogLine` a `db/schema.prisma`
+### [x] T1. Añadir `Supplier` y `SupplierCatalogLine` a `db/schema.prisma`
 - Dep: T0.
 - Archivos: `db/schema.prisma`.
 - Los dos modelos tal como están en `design.md > 2`, **añadidos al final**, sin tocar
@@ -95,7 +95,7 @@ da por hecho:**
   `git diff db/schema.prisma` **no muestra ninguna línea modificada dentro de `model Product`**
   (R19).
 
-### [ ] T2. Generar y completar a mano `migration.sql`
+### [x] T2. Generar y completar a mano `migration.sql`
 - Dep: T0, T1.
 - Archivos: `db/migrations/<ts>_suppliers_and_supplier_catalog_lines/migration.sql`.
 - `pnpm run db:migrate:create` (no aplica nada) y después **completar a mano** lo que Prisma no
@@ -116,7 +116,7 @@ da por hecho:**
   tres a mano con `RESTRICT`), los cuatro índices, el índice único parcial, los cuatro `CHECK` y
   los cuatro `ALTER` de RLS; y **no aparece ningún `ALTER TABLE "products"`** (R19).
 
-### [ ] T3. Escribir `down.sql` a mano
+### [x] T3. Escribir `down.sql` a mano
 - Dep: T2.
 - Archivos: `db/migrations/<ts>_suppliers_and_supplier_catalog_lines/down.sql`.
 - Exactamente dos sentencias, en orden inverso al UP (`design.md > 4.7`):
@@ -130,7 +130,7 @@ da por hecho:**
 
 ## Bloque C — El módulo `proveedores`
 
-### [ ] T4. Crear el armazón completo del módulo `proveedores`
+### [x] T4. Crear el armazón completo del módulo `proveedores`
 - Dep: T0. (Independiente de T1–T3; se puede hacer en paralelo al bloque B.)
 - Archivos: `lib/modules/proveedores/index.ts`,
   `lib/modules/proveedores/domain/supplier-name.ts`,
@@ -148,7 +148,7 @@ da por hecho:**
 - **Hecho cuando:** `pnpm run typecheck` y `pnpm run lint` pasan, y
   `tests/guards/guard-arquitectura-modulos.test.ts` sigue en verde con el módulo nuevo dentro.
 
-### [ ] T5. Confirmar que `lib/composition/index.ts` NO se toca
+### [x] T5. Confirmar que `lib/composition/index.ts` NO se toca
 - Dep: T4.
 - Archivos: ninguno.
 - Comprobación explícita, no un olvido (`design.md > 5.5`): en esta ficha no hay puertos ni
@@ -194,7 +194,7 @@ da por hecho:**
 - **Hecho cuando:** pasa y cubre R2, R4, R5, R7, R9, R11, R13, R14, R16, R17, R19, R22, R24, R26,
   R29, R31, R32, R33, R34.
 
-### [ ] T8. [P] La normalización del nombre
+### [x] T8. [P] La normalización del nombre
 - Dep: T4.
 - Archivos: `tests/unit/proveedores/domain/supplier-name.test.ts`.
 - Casos: acentos (`Químicos` → `quimicos`), mayúsculas, signos y espacios (`Quimicos del
