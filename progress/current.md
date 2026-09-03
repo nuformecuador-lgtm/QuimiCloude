@@ -11,9 +11,12 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-13 | guardia-de-sesion-en-navegacion | QC-17 Identidad y acceso | frontend | pending — **worktree montado, F1.2 en curso** | `feature/QC-13-guardia-de-sesion-en-navegacion` | Sesión de hoy (2026-09-03). **Acotada con `/afinar-feature`**: `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md`, 16 decisiones cerradas y 6 preguntas abiertas. **El board se corrigió antes de sembrar**: la `description` prometía trabajo que QC-9, QC-8, QC-11 y QC-12 ya entregaron —la ficha se escribió antes de que QC-9 existiera—, `zone` bajó de `fullstack` a **`frontend`** (sin partición), `complexity` de `medium` a **`low`**, y se añadió **QC-22** a `depends_on`. **La validación de conflicto de F1.0 evitó un choque real con QC-26**, que se apropia del ítem «Fórmulas»: QC-13 lo borraba. Su spec no está en `dev`, solo en su worktree. **Queda intersección de archivos viva** (`private-nav.ts`, `app-sidebar.test.tsx`): sincronizar con `dev` justo antes del PR. Worktree desde `origin/dev` (`d532662`). Siguiente: `spec_author`, luego F1.3 y **F1.4, parada de aprobación humana**. |
 | QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | **spec_ready — ESPERANDO APROBACIÓN HUMANA (F1.4)** | `feature/QC-26-pantalla-de-recetas` | Sesión del 2026-09-03. Acotada y especificada: **52 requisitos (R1–R52), 29 tasks**, 19 decisiones cerradas y **2 preguntas abiertas** que `spec_author` no rellenó con supuestos (quién puede invocar la lectura de unidades, y qué se muestra en la línea de un producto dado de baja). Tarjeta en *En revisión*. **Al aprobar**: F2.0, escribir la fila de `dnd-kit` en `docs/dependencias.md` **como `excepcion` y diciendo qué check falló**, y lanzar `implementer`. Ojo: el worktree nació antes de que `/afinar-regla` cambiara la regla 1, así que su `CLAUDE.md` está viejo — se arregla solo al sincronizar con `dev` en F2.3 |
 | QC-43 | crud-de-proveedores | QC-41 Proveedores | backend | **spec_ready — PARADA EN F1.4** | `feature/QC-43-crud-de-proveedores` | Sesión de hoy (2026-09-03). F1.0 hecha: `zone:backend` y `complexity:high` ya venían del board con las cuatro labels, así que no se empujó nada a Jira. Cupo libre con la regla nueva (1 por zona y épica): la única en vuelo es QC-33, backend · Pedidos, par distinto. QC-42 y QC-8 las dos `done`. Worktree desde `origin/dev` en `d532662`. **Parada en F1.2**: QC-42 dejó **cinco encargos con destinatario** para esta ficha —contacto en blanco, rastro de quién edita una línea, si un costo de 0 vale, en qué se mide el mínimo de compra, y el filtro de borrado lógico en las consultas—, y sus puertos y adaptadores están vacíos con `.gitkeep` esperándola. `/afinar-feature` sembró 16 decisiones y `spec_author` escribió **47 requisitos (R1-R47) y 21 tareas** con mapa `R<n> → test` completo (commit `0f5a3de`). Base propia `QuimiCloude_QC43` montada, gate verde en el worktree (116 archivos). **Esperando aprobación humana**; **P2 bloquea T3** |
+
+La feature **QC-13 — guardia-de-sesion-en-navegacion** se cerró el 2026-09-03 (PR #27, merge
+`045074c`): resumen en `progress/history.md`. El menú privado queda con **Dashboard, Inventario y
+Producción**; `FORMULAS_ROUTE` se conservó intacta para **QC-26**, que se la queda.
 
 La feature **QC-33 — modelo-pedidos** se cerró el 2026-09-03 (PR #26, merge `73c2fb6`):
 resumen en `progress/history.md`. Desbloquea **QC-34**.
@@ -1329,6 +1332,15 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+- **[arnés — la regla 1 NO cambió: sigue siendo «máximo 2 `in_progress` por zona»]** Varias notas
+  de este archivo dan por hecha una regla nueva de «1 por zona y **por épica**». **Esa regla no
+  existe en `dev`**: `CLAUDE.md`, `AGENTS.md`, `scripts/validate-features.mjs` y
+  `.claude/agents/leader.md` conservan el límite original — verificado el 2026-09-03, no deducido.
+  Se llegó a redactar con `/afinar-regla` y **el humano pidió revertirla**; se revirtió entera,
+  incluidos los espejos git-ignorados de `harnessConfig/`. Quien lea aquí «cupo libre con la regla
+  nueva» está leyendo una nota que envejeció mal: **el validador cuenta por zona, no por épica**, y
+  es él quien manda.
 
 ### QC-32 se cerró el 2026-09-03 — lo que deja abierto
 

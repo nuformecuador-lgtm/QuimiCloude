@@ -157,7 +157,7 @@
       "epic_name": "Identidad y acceso",
       "name": "guardia-de-sesion-en-navegacion",
       "description": "Limpiar la navegacion privada del relleno de maqueta: quitar cuatro de los cinco enlaces que hoy dan 404 -Notificaciones, Ordenes de compra, Proveedores y Lotes- y sus constantes de ruta. El quinto, Formulas, NO se toca: QC-26 se lo esta apropiando para la pantalla de recetas, asi que borrarlo destruiria su trabajo. El menu queda con Dashboard, Inventario y el grupo Produccion con su unico hijo; el grupo Compras desaparece entero. La capacidad de agrupar del menu se conserva y su test pasa a datos de prueba propios, para no atarse a constantes que QC-26 esta moviendo. Ademas, el recorrido de extremo a extremo del retorno tras iniciar sesion pasa a pedir la pantalla de inventario en vez del dashboard, porque el dashboard es a la vez destino y respaldo y aterrizar ahi no demuestra que el retorno funcionara. Lo que la descripcion original de esta ficha prometia -validar la sesion en cada navegacion, redirigir en ambos sentidos, que el formulario autentique de verdad, que el layout muestre al usuario real y que cerrar sesion funcione- ya esta entregado por QC-9, QC-8, QC-11 y QC-12: la ficha se escribio antes de que QC-9 existiera. El destino de la raiz del sitio no entra: seguira siendo la plantilla de create-next-app hasta que exista una pantalla de inicio de verdad, que sera ficha propia.",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "complexity": "low",
       "zone": "frontend",
