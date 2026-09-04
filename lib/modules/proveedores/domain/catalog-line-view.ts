@@ -1,51 +1,56 @@
-import type { ProductId } from '@/lib/modules/inventario';
-
 /**
- * Contratos de entrada y salida de la linea de catalogo (`design.md > 6.2`, `> 7`).
+ * Contratos de entrada y salida de la linea de catalogo (QC-52, `design.md > 6.2`, `> 7`).
  *
- * `ProductId` se toma del BARREL de `inventario` (`@/lib/modules/inventario`), nunca por
- * ruta profunda y nunca redeclarado aqui (R26, R44): el producto es un concepto de
- * `inventario` y lo unico que este modulo guarda de el es su identificador.
+ * Este archivo NO importa nada de `@/lib/modules/inventario`, y ese es justo el cambio de
+ * QC-52 (R9, R18, decision cerrada 3): la linea del catalogo ya no guarda ninguna
+ * referencia a un articulo del inventario -ni columna, ni clave foranea, ni campo de
+ * contrato-, asi que el tipo del identificador que este archivo importaba del barrel vecino
+ * desaparecio, y con el la unica dependencia que este modulo tenia de `inventario`.
+ *
+ * Consecuencia aceptada y escrita para que no se lea como olvido (`design.md > 6.2`):
+ * `CatalogLineView` devuelve `presentationId` y `unitId` EN CRUDO, sin nombre. Resolverlos
+ * exigiria un contrato publico nuevo en `inventario` y en `unidades`, y eso es de la
+ * pantalla del catalogo (QC-44), no de esta ficha.
  */
 
 /**
- * Condiciones comerciales de la linea: lo UNICO que la edicion reemplaza (R33). Que sea
- * un tipo propio y no `Partial<NewCatalogLine>` es deliberado: el puerto de edicion no
- * puede ni siquiera expresar un cambio de proveedor o de producto.
+ * Los SIETE campos de negocio de la linea: lo que el alta escribe y lo que la edicion
+ * REEMPLAZA ENTERO (R24, P6). El proveedor NO esta aqui a proposito -es lo unico que la
+ * edicion no puede cambiar, y no porque se filtre sino porque el tipo no lo tiene-.
  *
- * `cost` y `minPurchase` son CADENA decimal, no `number` (`design.md > 6.2`): el dominio
+ * `cost` y `minPurchase` son CADENA decimal, no `number` (R11, `design.md > 7`): el dominio
  * no importa `@prisma/client` y el binario de coma flotante esta prohibido para importes.
- * La conversion a `Prisma.Decimal` es del adaptador driven.
+ * La conversion a `Prisma.Decimal` -y la vuelta con `.toFixed(4)`- vive SOLO en el
+ * adaptador driven.
+ *
+ * `nameNormalized` NO forma parte de este tipo: se deriva de `name` con
+ * `normalizeSupplierName`, que es la UNICA definicion de «mismo nombre» del modulo
+ * (`design.md > 2.3`). Derivarlo en el adaptador, en toda escritura, es lo que impide que
+ * las dos columnas puedan diverger.
  */
-export type CatalogLineTerms = {
+export type CatalogLineFields = {
+  /** Recortado y no vacio al normalizar (R14). Lo garantiza el esquema del borde. */
+  readonly name: string;
+  /** uuid, OBLIGATORIO (R10, decision cerrada 4): forma parte de la identidad de la linea. */
+  readonly presentationId: string;
+  /** uuid, opcional (R10): una linea sin unidad es valida. */
+  readonly unitId: string | null;
+  readonly imagePath: string | null;
   readonly cost: string;
   readonly minPurchase: string | null;
   readonly deliveryTime: number | null;
 };
 
-/** Alta de una linea: sus condiciones comerciales mas la pareja que la identifica. */
-export type NewCatalogLine = CatalogLineTerms & {
-  readonly supplierId: string;
-  readonly productId: ProductId;
-};
+/** Alta de una linea: sus campos de negocio mas el proveedor al que pertenece. */
+export type NewCatalogLine = CatalogLineFields & { readonly supplierId: string };
 
 /**
- * Salida de una consulta del catalogo (`design.md > 6.2`).
- *
- * `productName` es `string | null` a proposito (R37, `design.md > 5.3`): lo resuelve el
- * caso de uso con UNA sola llamada a `ProductCatalog.findRefs` para toda la pagina, y un
- * producto dado de baja simplemente no vuelve de ahi. La linea SIGUE apareciendo con el
- * nombre en `null`: darla por desaparecida seria perder el precio pactado de un producto
- * que solo esta descatalogado.
+ * Salida de una consulta del catalogo. `deletedAt` NO sale: nunca es dato de salida, y
+ * ninguna consulta devuelve lineas dadas de baja (R22).
  */
-export type CatalogLineView = {
+export type CatalogLineView = CatalogLineFields & {
   readonly id: string;
   readonly supplierId: string;
-  readonly productId: ProductId;
-  readonly productName: string | null;
-  readonly cost: string;
-  readonly minPurchase: string | null;
-  readonly deliveryTime: number | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;

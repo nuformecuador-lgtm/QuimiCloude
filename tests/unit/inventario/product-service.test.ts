@@ -22,7 +22,6 @@ const AHORA = new Date('2026-09-02T10:00:00.000Z');
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
   presentationId: '11111111-1111-4111-8111-111111111111',
-  minPurchase: 0,
   stock: 0,
   qtyAlert: 0,
 };
@@ -33,9 +32,6 @@ const VISTA_PRODUCTO: ProductView = {
   presentationId: '11111111-1111-4111-8111-111111111111',
   presentationName: 'Bidon 20 L',
   stock: 0,
-  cost: null,
-  minPurchase: 0,
-  deliveryTime: null,
   qtyAlert: null,
   // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
   // este fixture decia -un producto SIN unidad declarada, que sigue siendo valido porque la
@@ -212,13 +208,18 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
     expect(products.create).not.toHaveBeenCalled();
   });
 
-  it('R10 — tiempo de entrega negativo', async () => {
+  // QC-52 R1 deroga QC-14 R10 en lo que este caso medía: el tiempo de entrega ya no es
+  // del producto, asi que no se valida su signo — se rechaza el campo entero, igual que
+  // el costo y la compra minima, y por el mismo motivo (`strictObject`).
+  it('QC-52 R1 — costo, compra minima o tiempo de entrega en la entrada', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await expect(
-      createProduct({ ...PRODUCTO_VALIDO, deliveryTime: -1 }, ADMIN),
-    ).rejects.toBeInstanceOf(ValidationError);
+    for (const sobra of [{ cost: '10.0000' }, { minPurchase: 0 }, { deliveryTime: 3 }]) {
+      await expect(
+        createProduct({ ...PRODUCTO_VALIDO, ...sobra }, ADMIN),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
     expect(products.create).not.toHaveBeenCalled();
   });
 

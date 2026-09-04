@@ -229,6 +229,7 @@ const VOCABULARIO_INGLES = new Set([
   'phone',
   'pkey',
   'positive',
+  'presentation',
   'product',
   'purchase',
   'required',
@@ -236,7 +237,12 @@ const VOCABULARIO_INGLES = new Set([
   'suppliers',
   'time',
   'unique',
+  'unit',
   'updated',
+  // QC-52 (R12): el vocabulario que traen las columnas nuevas de la linea.
+  'image',
+  'path',
+  'split',
 ])
 
 /** ¿El identificador es snake_case ASCII y todas sus piezas son palabras inglesas? (R32) */
@@ -1048,5 +1054,618 @@ describe('QC-43 down.sql — reversion al esquema exacto de QC-42', () => {
         /CHECK\s*\(\s*"cost"\s*>=\s*0\s*\)/i,
       ),
     ).toBe(false)
+  })
+})
+
+
+// =========================================================================================
+// QC-52 (separar-producto-de-catalogo-de-proveedor) — contrato estatico del SQL de la
+// migracion unica de esta ficha, `20260904123854_split_product_and_supplier_catalog`.
+//
+// Cubre R26, R27, R29 y R30, y todo se afirma SOBRE EL TEXTO del `migration.sql`, no contra
+// la base. El motivo es concreto y esta escrito en `design.md > 3.1`: la parte cara de esta
+// migracion no es el SQL, es AUDITARLO. `prisma migrate dev --create-only` emite un
+// `DROP CONSTRAINT` por cada FK que cruza de modulo -quince en esta generacion, diez en la
+// de QC-43- porque ninguna esta declarada en el esquema; se borraron a mano, una por una, y
+// aplicarlas habria destruido en silencio la integridad referencial de cinco features ya
+// mergeadas. Un test contra la base NO habria detectado nada de eso: la base esta bien
+// AHORA, porque la auditoria se hizo bien. Lo que este bloque protege es el archivo, que es
+// lo que se vuelve a ejecutar en cada entorno nuevo.
+//
+// Estos casos MUERDEN: se comprobo a mano inyectando un `DROP CONSTRAINT` en el SQL, verlos
+// rojos y restaurar el archivo desde una copia. Los tests de sensibilidad de mas abajo dejan
+// esa comprobacion automatizada, mutando el SQL EN MEMORIA (el archivo en disco no se toca).
+// =========================================================================================
+
+const migrationDir52 = join(
+  repoRoot,
+  'db',
+  'migrations',
+  '20260904123854_split_product_and_supplier_catalog',
+)
+
+const upSource52 = readFileSync(join(migrationDir52, 'migration.sql'), 'utf8')
+const up52 = statements(upSource52)
+const downSource52 = readFileSync(join(migrationDir52, 'down.sql'), 'utf8')
+const down52 = statements(downSource52)
+
+/**
+ * Las FK que cruzan de modulo y viven escritas a mano, enumeradas por R29. Prisma propone
+ * borrarlas en CADA generacion porque no estan en `db/schema.prisma`, y ninguna guardia del
+ * repo las vigila: si una migracion se las lleva, el esquema sigue validando y el cliente
+ * sigue compilando.
+ */
+const FK_ESCRITAS_A_MANO: readonly string[] = [
+  'products_created_by_fkey',
+  'products_updated_by_fkey',
+  'products_unit_id_fkey',
+  'recipes_created_by_fkey',
+  'recipes_updated_by_fkey',
+  'recipe_lines_product_id_fkey',
+  'recipe_lines_unit_id_fkey',
+  'suppliers_created_by_fkey',
+  'suppliers_updated_by_fkey',
+  'supplier_catalog_lines_created_by_fkey',
+  'supplier_catalog_lines_updated_by_fkey',
+  'orders_recipe_id_fkey',
+  'orders_unit_id_fkey',
+  'orders_created_by_fkey',
+  'orders_updated_by_fkey',
+]
+
+/** Nombres de restriccion que una lista de sentencias DROPEA. */
+function droppedConstraints(source: readonly string[]): readonly string[] {
+  return source
+    .map((statement) => /DROP CONSTRAINT (?:IF EXISTS )?"?([\w]+)"?/i.exec(statement))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map((match) => match[1] as string)
+}
+
+/** ¿Existe una FK con ese nombre, hacia esa tabla y con `ON DELETE RESTRICT`? (R30) */
+function addsRestrictForeignKey(
+  source: readonly string[],
+  name: string,
+  target: string,
+): boolean {
+  return source.some(
+    (statement) =>
+      new RegExp(`ADD CONSTRAINT "${name}"`, 'i').test(statement) &&
+      new RegExp(`REFERENCES "${target}"`, 'i').test(statement) &&
+      /ON DELETE RESTRICT/i.test(statement) &&
+      !/ON DELETE (CASCADE|SET NULL)/i.test(statement),
+  )
+}
+
+describe('QC-52 migration.sql — la auditoria del SQL generado (R27, R29)', () => {
+  it('no contiene ningun DROP CONSTRAINT de las quince FK que cruzan de modulo', () => {
+    // R29. Es la afirmacion mas cara de esta ficha y la que justifica todo el bloque: el
+    // generador PROPUSO las quince y hubo que borrarlas a mano. Se comparan por NOMBRE
+    // exacto, no por «contiene fkey»: un nombre parecido no es el mismo constraint.
+    const dropeadas = droppedConstraints(up52)
+    const prohibidas = dropeadas.filter((nombre) => FK_ESCRITAS_A_MANO.includes(nombre))
+    expect(
+      prohibidas,
+      `la migracion de QC-52 borra FK que cruzan de modulo: ${prohibidas.join(', ')}`,
+    ).toEqual([])
+  })
+
+  it('el UNICO DROP CONSTRAINT es el legitimo de la columna que unia las dos tablas', () => {
+    // R27, `design.md > 3.1`. Solo hay dos borrados legitimos y son los dos de la linea:
+    // su FK hacia la tabla de `inventario` y su indice unico total. Cualquier tercero es
+    // alcance escapandose, y este `toEqual` completo -no un `not.toContain`- lo pilla.
+    expect(droppedConstraints(up52)).toEqual(['supplier_catalog_lines_product_id_fkey'])
+
+    const dropIndex = up52
+      .map((statement) => /^DROP INDEX (?:IF EXISTS )?"?([\w]+)"?/i.exec(statement))
+      .filter((match): match is RegExpExecArray => match !== null)
+      .map((match) => match[1] as string)
+      .sort()
+    expect(dropIndex).toEqual([
+      'supplier_catalog_lines_product_id_idx',
+      'supplier_catalog_lines_supplier_id_product_id_key',
+    ])
+  })
+
+  it('la guardia cae si alguien deja entrar un DROP CONSTRAINT del generador', () => {
+    // Prueba de SENSIBILIDAD: un test que no puede fallar no vigila nada. Se muta el SQL EN
+    // MEMORIA -el archivo en disco no se toca- reintroduciendo justo la linea que el
+    // generador propone y que la auditoria borro.
+    for (const fk of ['products_created_by_fkey', 'recipe_lines_product_id_fkey']) {
+      const mutado = statements(
+        `${upSource52}\nALTER TABLE "x" DROP CONSTRAINT "${fk}";`,
+      )
+      expect(
+        droppedConstraints(mutado).filter((nombre) => FK_ESCRITAS_A_MANO.includes(nombre)),
+        `la guardia no detecta ${fk}: no esta vigilando nada`,
+      ).not.toEqual([])
+    }
+  })
+
+  it('no toca ninguna tabla que no sean products y supplier_catalog_lines', () => {
+    // R27: «una sola migracion con los dos cambios, y esa migracion NO DEBE anadir, quitar
+    // ni modificar ninguna columna, indice o restriccion de ninguna OTRA tabla».
+    //
+    // `presentations` y `units` aparecen en el SQL, pero SOLO como destino de un
+    // `REFERENCES`: la FK se declara sobre `supplier_catalog_lines`, no sobre ellas.
+    // `touchedTables` mira el sujeto del `ALTER TABLE` y del `CREATE INDEX ... ON`, que es
+    // exactamente esa distincion.
+    expect([...touchedTables(up52)].sort()).toEqual(['products', 'supplier_catalog_lines'])
+  })
+
+  it('no contiene ninguna sentencia de RLS (R26)', () => {
+    // R26: RLS sigue habilitada y forzada en las dos tablas desde sus migraciones
+    // originales, y esta migracion NO la toca. Una sentencia aqui solo podria estropearlo:
+    // un `DISABLE` o un `NO FORCE` colado entre dieciocho sentencias no destaca, y la
+    // guardia `guard-rls-force` solo mira el estado final de la base de desarrollo.
+    for (const statement of up52) {
+      expect(statement, `sentencia de RLS en la migracion: ${statement}`).not.toMatch(
+        /ROW LEVEL SECURITY|CREATE POLICY|DROP POLICY|ALTER POLICY/i,
+      )
+    }
+    // Y tampoco en el DOWN: revertir el esquema no puede cambiar quien ve que.
+    for (const statement of down52) {
+      expect(statement, `sentencia de RLS en el down: ${statement}`).not.toMatch(
+        /ROW LEVEL SECURITY|CREATE POLICY|DROP POLICY|ALTER POLICY/i,
+      )
+    }
+  })
+
+  it('no contiene ningun DROP COLUMN de products fuera de los tres terminos comerciales', () => {
+    // R1 y R4 vistos desde el SQL. `image_path` es el caso peligroso (P4): estaba en la base
+    // y no en el modelo Prisma, asi que el generador propuso borrarla MEZCLADA entre los
+    // tres `DROP COLUMN` que si queriamos, que es el peor sitio posible para un drift.
+    const columnasBorradas = [...stripSqlComments(upSource52).matchAll(/DROP COLUMN "(\w+)"/gi)]
+      .map((match) => match[1] as string)
+      .sort()
+    expect(columnasBorradas).toEqual(['cost', 'delivery_time', 'min_purchase', 'product_id'])
+    expect(columnasBorradas).not.toContain('image_path')
+    expect(columnasBorradas).not.toContain('stock')
+    expect(columnasBorradas).not.toContain('qty_alert')
+  })
+})
+
+describe('QC-52 migration.sql — las dos FK nuevas y el indice unico parcial (R30, R15, R17)', () => {
+  it('las dos FK nuevas existen, con ON DELETE RESTRICT y hacia la tabla que toca', () => {
+    // R30. `RESTRICT` y no `CASCADE` ni `SET NULL`: `presentations` no tiene borrado logico
+    // -se borra de verdad (QC-20 D6)- y el RESTRICT es justo lo que impide que borrar una
+    // presentacion deje lineas apuntando al vacio. Mismo trato que
+    // `products_presentation_id_fkey`.
+    expect(
+      addsRestrictForeignKey(up52, 'supplier_catalog_lines_presentation_id_fkey', 'presentations'),
+      'falta la FK de la presentacion, o no es ON DELETE RESTRICT',
+    ).toBe(true)
+    expect(
+      addsRestrictForeignKey(up52, 'supplier_catalog_lines_unit_id_fkey', 'units'),
+      'falta la FK de la unidad, o no es ON DELETE RESTRICT',
+    ).toBe(true)
+
+    // Y la guardia MUERDE: con `CASCADE` en vez de `RESTRICT`, el predicado da false.
+    const conCascade = up52.map((statement) =>
+      statement.replace(/ON DELETE RESTRICT/gi, 'ON DELETE CASCADE'),
+    )
+    expect(
+      addsRestrictForeignKey(conCascade, 'supplier_catalog_lines_presentation_id_fkey', 'presentations'),
+    ).toBe(false)
+  })
+
+  it('cada FK nueva tiene indice en su lado hijo', () => {
+    // R30, ultima frase. Postgres no indexa el lado hijo de una FK, y por ahi pasa la
+    // verificacion del RESTRICT al borrar una presentacion o una unidad: sin indice, cada
+    // borrado de presentacion es un recorrido completo de `supplier_catalog_lines`.
+    for (const [indice, columna] of [
+      ['supplier_catalog_lines_presentation_id_idx', 'presentation_id'],
+      ['supplier_catalog_lines_unit_id_idx', 'unit_id'],
+    ] as const) {
+      expect(
+        up52.some((statement) =>
+          new RegExp(
+            `^CREATE INDEX "${indice}" ON "supplier_catalog_lines"\\("${columna}"\\)`,
+            'i',
+          ).test(statement),
+        ),
+        `falta el indice ${indice}`,
+      ).toBe(true)
+    }
+  })
+
+  it('el indice unico de la identidad de la linea existe, es PARCIAL y lleva las tres columnas en orden', () => {
+    // R15, R16 y R17 en una sola sentencia:
+    //   - UNIQUE sobre `(supplier_id, name_normalized, presentation_id)`: dos proveedores
+    //     pueden vender lo mismo y un proveedor puede tener el mismo nombre en dos
+    //     presentaciones (R16), porque las dos columnas estan en la clave;
+    //   - PARCIAL, `WHERE deleted_at IS NULL`: dar de baja una linea LIBERA su combinacion
+    //     (R17). El de QC-43 era TOTAL, y por eso no vale copiarlo;
+    //   - el ORDEN importa: el prefijo izquierdo `supplier_id` sirve ademas de indice del
+    //     listado paginado, y por eso no hay un `supplier_id_idx` aparte.
+    const indice = findStatement(
+      up52,
+      /CREATE UNIQUE INDEX "supplier_catalog_lines_name_presentation_unique"/i,
+    )
+    expect(indice).toMatch(
+      /ON "supplier_catalog_lines" \(\s*"supplier_id",\s*"name_normalized",\s*"presentation_id"\s*\)/i,
+    )
+    expect(isPartialOnLiveRows(indice), 'el indice unico de la linea no es PARCIAL').toBe(true)
+
+    // Y MUERDE: sin el `WHERE`, el indice pasa a ser total y R17 se incumpliria en silencio
+    // -una linea dada de baja seguiria ocupando su combinacion para siempre-.
+    const sinWhere = indice.replace(/\s*WHERE\s+"deleted_at"\s+IS\s+NULL/i, '')
+    expect(isPartialOnLiveRows(sinWhere)).toBe(false)
+  })
+
+  it('las columnas nuevas de la linea entran con el tipo y la obligatoriedad que R8 y R10 piden', () => {
+    // R8, R10, R12. `name` y `name_normalized` NOT NULL y SIN `DEFAULT`: un `DEFAULT ''`
+    // convertiria «esta linea no tiene nombre» en un valor valido. `presentation_id` NOT
+    // NULL porque es identidad; `unit_id`, `image_path` y `deleted_at` anulables.
+    const alter = findStatement(up52, /^ALTER TABLE "supplier_catalog_lines" DROP COLUMN/i)
+    expect(alter).toMatch(/ADD COLUMN\s+"name" TEXT NOT NULL/i)
+    expect(alter).toMatch(/ADD COLUMN\s+"name_normalized" TEXT NOT NULL/i)
+    expect(alter).toMatch(/ADD COLUMN\s+"presentation_id" UUID NOT NULL/i)
+    expect(alter).toMatch(/ADD COLUMN\s+"unit_id" UUID(?!\s+NOT NULL)/i)
+    expect(alter).toMatch(/ADD COLUMN\s+"image_path" TEXT(?!\s+NOT NULL)/i)
+    expect(alter).toMatch(/ADD COLUMN\s+"deleted_at" TIMESTAMPTZ\(6\)(?!\s+NOT NULL)/i)
+    expect(alter, 'ninguna columna nueva puede llevar DEFAULT').not.toMatch(/DEFAULT/i)
+    // Y en el mismo ALTER se va la columna que unia las dos tablas (R9).
+    expect(alter).toMatch(/DROP COLUMN "product_id"/i)
+
+    // Y ninguna columna nueva se llama en espanol ni sale del vocabulario del repo (R12).
+    for (const columna of [
+      'name',
+      'name_normalized',
+      'presentation_id',
+      'unit_id',
+      'image_path',
+      'deleted_at',
+    ]) {
+      expect(isEnglishSnakeCase(columna), `${columna} no esta en ingles y snake_case`).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// QC-52 down.sql — R28: revertir es volver al esquema EXACTO anterior, no «deshacer».
+//
+// Mismo criterio que `describe('down.sql — reversion exacta')` (QC-42) y que
+// `describe('QC-43 down.sql — reversion al esquema exacto de QC-42')`: cada afirmacion es un
+// predicado reutilizable que se aplica DOS VECES, al `down.sql` real y a una version
+// EMPOBRECIDA EN MEMORIA (el archivo en disco no se toca). La diferencia entre deshacer y
+// revertir es donde R28 se rompe EN SILENCIO: un `min_purchase` anulable, un CHECK que no
+// vuelve o un indice unico que vuelve parcial producen SQL que se aplica sin un solo error y
+// dejan una base que YA NO es la anterior. Ninguna guardia del repo lo veria.
+// ---------------------------------------------------------------------------------------
+
+/** Columnas que una sentencia ANADE o BORRA, en orden alfabetico. */
+function columnasDeSentencia(statement: string, verbo: 'ADD' | 'DROP'): readonly string[] {
+  const re = new RegExp(`\\b${verbo} COLUMN (?:IF (?:NOT )?EXISTS )?"(\\w+)"`, 'gi')
+  return [...statement.matchAll(re)].map((match) => match[1] as string).sort()
+}
+
+/** Columnas que una migracion ANADE o BORRA sobre UNA tabla concreta, en orden alfabetico. */
+function columnasPorTabla(
+  source: readonly string[],
+  table: string,
+  verbo: 'ADD' | 'DROP',
+): readonly string[] {
+  return source
+    .filter((statement) => new RegExp(`^ALTER TABLE (?:ONLY )?"?${table}"?\\b`, 'i').test(statement))
+    .flatMap((statement) => columnasDeSentencia(statement, verbo))
+    .sort()
+}
+
+/**
+ * La declaracion con la que una migracion vuelve a anadir una columna: el texto que sigue al
+ * nombre. Es lo que hay que comparar LITERALMENTE, porque `UUID` y `UUID NOT NULL` son dos
+ * esquemas distintos y solo uno es el anterior (R28).
+ */
+function declaracionDeColumnaAnadida(
+  source: readonly string[],
+  table: string,
+  column: string,
+): string | null {
+  const re = new RegExp(`^ALTER TABLE (?:ONLY )?"?${table}"? ADD COLUMN "?${column}"? (.+)$`, 'i')
+  for (const statement of source) {
+    const match = re.exec(statement)
+    if (match?.[1] !== undefined) return match[1].trim()
+  }
+  return null
+}
+
+/** ¿La columna vuelve con EXACTAMENTE esa declaracion? Ni mas laxa ni mas estricta. (R28) */
+function restauraColumnaComo(
+  source: readonly string[],
+  table: string,
+  column: string,
+  declaracion: string,
+): boolean {
+  const encontrada = declaracionDeColumnaAnadida(source, table, column)
+  return encontrada !== null && encontrada.toUpperCase() === declaracion.toUpperCase()
+}
+
+/** ¿El DOWN se para con un error legible en vez de destruir datos que no puede reconstruir? */
+function paraAntesDeDestruir(sourceText: string): boolean {
+  const ejecutable = stripSqlComments(sourceText)
+  const guardas = ejecutable.match(/RAISE\s+EXCEPTION/gi) ?? []
+  return (
+    /DO \$\$[\s\S]*?RAISE\s+EXCEPTION[\s\S]*?END \$\$/i.test(ejecutable) && guardas.length >= 2
+  )
+}
+
+/** Nombres de indice que una lista de sentencias DROPEA, en orden alfabetico. */
+function indicesDropeados(source: readonly string[]): readonly string[] {
+  return source
+    .map((statement) => /^DROP INDEX (?:IF EXISTS )?"?([\w]+)"?/i.exec(statement))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map((match) => match[1] as string)
+    .sort()
+}
+
+describe('QC-52 down.sql — reversion al esquema EXACTO anterior (R28)', () => {
+  it('cada ADD COLUMN del up tiene su DROP COLUMN en el down, y cada DROP COLUMN su ADD COLUMN', () => {
+    // R28, simetria columna a columna, DERIVADA del `migration.sql` y no de una lista
+    // escrita a mano: si manana el UP anade una septima columna a la linea y el DOWN se
+    // olvida de ella, esta comparacion se rompe sola.
+    const lineaGana = columnasPorTabla(up52, 'supplier_catalog_lines', 'ADD')
+    expect(lineaGana).toEqual([
+      'deleted_at',
+      'image_path',
+      'name',
+      'name_normalized',
+      'presentation_id',
+      'unit_id',
+    ])
+    expect(
+      columnasPorTabla(down52, 'supplier_catalog_lines', 'DROP'),
+      'el DOWN no borra exactamente las columnas que el UP anadio',
+    ).toEqual(lineaGana)
+
+    // Y al reves: las tres del producto vuelven, y `product_id` tambien.
+    const productoPierde = columnasPorTabla(up52, 'products', 'DROP')
+    expect(productoPierde).toEqual(['cost', 'delivery_time', 'min_purchase'])
+    expect(
+      columnasPorTabla(down52, 'products', 'ADD'),
+      'el DOWN no devuelve exactamente las tres columnas que el UP borro',
+    ).toEqual(productoPierde)
+
+    expect(columnasPorTabla(up52, 'supplier_catalog_lines', 'DROP')).toEqual(['product_id'])
+    expect(columnasPorTabla(down52, 'supplier_catalog_lines', 'ADD')).toEqual(['product_id'])
+
+    // Nada residual por el otro lado: el DOWN no borra de `products` ninguna columna.
+    expect(columnasPorTabla(down52, 'products', 'DROP')).toEqual([])
+  })
+
+  it('las tres columnas de products vuelven con su tipo, su NOT NULL y su DEFAULT literales', () => {
+    // R28, y aqui es donde se rompe en silencio. `min_purchase` es `INTEGER NOT NULL
+    // DEFAULT 0` desde QC-14: devolverla ANULABLE seria «casi» el esquema anterior -se
+    // aplica sin un solo error y admite justo la fila que el esquema anterior rechazaba-.
+    expect(
+      restauraColumnaComo(down52, 'products', 'min_purchase', 'INTEGER NOT NULL DEFAULT 0'),
+      '`min_purchase` debe volver como INTEGER NOT NULL DEFAULT 0, no anulable',
+    ).toBe(true)
+    // `cost` es DECIMAL(14,4) ANULABLE: dinero en decimal exacto, nunca coma flotante.
+    expect(
+      restauraColumnaComo(down52, 'products', 'cost', 'DECIMAL(14,4)'),
+      '`cost` debe volver como DECIMAL(14,4) anulable',
+    ).toBe(true)
+    // `delivery_time` es INTEGER ANULABLE y NUNCA tuvo CHECK (QC-14 decision 7): no se le
+    // inventa uno al revertir.
+    expect(
+      restauraColumnaComo(down52, 'products', 'delivery_time', 'INTEGER'),
+      '`delivery_time` debe volver como INTEGER anulable',
+    ).toBe(true)
+    expect(
+      down52.some((statement) => /ADD CONSTRAINT "products_delivery_time/i.test(statement)),
+      '`delivery_time` no tenia CHECK: el DOWN no puede inventarle uno',
+    ).toBe(false)
+  })
+
+  it('el down.sql recrea A MANO los dos CHECK de products que el DROP COLUMN se llevo', () => {
+    // R28, decision cerrada 9. Postgres se lleva el CHECK CON la columna que solo el
+    // menciona, pero NO lo devuelve con el `ADD COLUMN`: por eso el UP no tiene un
+    // `DROP CONSTRAINT` para ellos y el DOWN si tiene que tener su `ADD CONSTRAINT`.
+    expect(
+      recreatesConstraint(
+        down52,
+        'products_min_purchase_non_negative',
+        /CHECK\s*\(\s*"min_purchase"\s*>=\s*0\s*\)/i,
+      ),
+      'el DOWN debe recrear el CHECK de min_purchase con su definicion literal de QC-14',
+    ).toBe(true)
+    expect(
+      recreatesConstraint(
+        down52,
+        'products_cost_non_negative',
+        /CHECK\s*\(\s*"cost"\s*>=\s*0\s*\)/i,
+      ),
+      'el DOWN debe recrear el CHECK de cost con su definicion literal de QC-14',
+    ).toBe(true)
+
+    // Y son `>= 0`, no una version relajada con el mismo nombre.
+    for (const columna of ['min_purchase', 'cost']) {
+      const check = findStatement(
+        down52,
+        new RegExp(`ADD CONSTRAINT "products_${columna}_non_negative"`, 'i'),
+      )
+      expect(isNonNegativeCheck(check, columna), `el CHECK de ${columna} debe ser >= 0`).toBe(true)
+    }
+
+    // El UP, en efecto, no los dropea: se van con la columna. Si algun dia apareciera un
+    // `DROP CONSTRAINT` explicito, esta afirmacion avisa de que la simetria cambio.
+    expect(droppedConstraints(up52).filter((nombre) => nombre.startsWith('products_'))).toEqual([])
+  })
+
+  it('product_id vuelve como UUID NOT NULL, con su FK RESTRICT, su indice y su unico TOTAL', () => {
+    // R28. Los cuatro objetos que se fueron con la columna en el UP vuelven los cuatro.
+    expect(
+      restauraColumnaComo(down52, 'supplier_catalog_lines', 'product_id', 'UUID NOT NULL'),
+      '`product_id` debe volver como UUID NOT NULL: anulable no es el esquema anterior',
+    ).toBe(true)
+    expect(
+      addsRestrictForeignKey(down52, 'supplier_catalog_lines_product_id_fkey', 'products'),
+      'falta la FK de `product_id` hacia products, o no es ON DELETE RESTRICT',
+    ).toBe(true)
+    expect(
+      findStatement(
+        down52,
+        /^CREATE INDEX "supplier_catalog_lines_product_id_idx" ON "supplier_catalog_lines"\("product_id"\)/i,
+      ),
+    ).toBeTruthy()
+
+    // El unico de la identidad vuelve a ser `(supplier_id, product_id)` y TOTAL: en QC-42
+    // la linea no tenia borrado logico, asi que un `WHERE deleted_at IS NULL` aqui seria
+    // otro esquema -y ademas apuntaria a una columna que el DOWN acaba de borrar-.
+    const unico = findStatement(
+      down52,
+      /^CREATE UNIQUE INDEX "supplier_catalog_lines_supplier_id_product_id_key"/i,
+    )
+    expect(unico).toMatch(/ON "supplier_catalog_lines"\(\s*"supplier_id",\s*"product_id"\s*\)/i)
+    expect(isPartialOnLiveRows(unico), 'el unico de QC-42 era TOTAL, no parcial').toBe(false)
+  })
+
+  it('el down.sql no deja residuos: se lleva las dos FK nuevas, sus indices y el unico parcial', () => {
+    // R28, «sin dejar columnas, indices ni restricciones residuales». Se comparan CENSOS
+    // COMPLETOS con `toEqual`, no `toContain`: un objeto de mas tambien incumple R28.
+    expect(droppedConstraints(down52)).toEqual([
+      'supplier_catalog_lines_unit_id_fkey',
+      'supplier_catalog_lines_presentation_id_fkey',
+    ])
+    expect(indicesDropeados(down52)).toEqual([
+      'supplier_catalog_lines_name_presentation_unique',
+      'supplier_catalog_lines_presentation_id_idx',
+      'supplier_catalog_lines_unit_id_idx',
+    ])
+
+    // Todo lo que el UP crea con nombre propio, el DOWN lo borra con ese mismo nombre.
+    const creadosPorElUp = [...createdIdentifiers(up52)].sort()
+    expect(creadosPorElUp).toEqual([
+      'supplier_catalog_lines_name_presentation_unique',
+      'supplier_catalog_lines_presentation_id_fkey',
+      'supplier_catalog_lines_presentation_id_idx',
+      'supplier_catalog_lines_unit_id_fkey',
+      'supplier_catalog_lines_unit_id_idx',
+    ])
+    const borradosPorElDown = new Set([...droppedConstraints(down52), ...indicesDropeados(down52)])
+    for (const identificador of creadosPorElUp) {
+      expect(borradosPorElDown.has(identificador), `el DOWN deja residual ${identificador}`).toBe(
+        true,
+      )
+    }
+  })
+
+  it('el down.sql solo toca products y supplier_catalog_lines, y no dropea ninguna FK escrita a mano', () => {
+    // R28 + R29. Revertir esta feature no puede llevarse por delante la integridad
+    // referencial de las otras features mergeadas, igual que no puede el UP.
+    expect([...touchedTables(down52)].sort()).toEqual(['products', 'supplier_catalog_lines'])
+    expect(createdTables(down52)).toEqual([])
+    expect(droppedTables(down52)).toEqual([])
+
+    const prohibidas = droppedConstraints(down52).filter((nombre) =>
+      FK_ESCRITAS_A_MANO.includes(nombre),
+    )
+    expect(prohibidas, `el DOWN borra FK que cruzan de modulo: ${prohibidas.join(', ')}`).toEqual([])
+
+    // Ninguna tabla ajena aparece en el SQL ejecutable. `products` SI es legitima aqui -es
+    // la mitad de la reversion-; `presentations` y `units` NO, porque el DOWN solo borra
+    // sus dos FK por el NOMBRE y no necesita nombrarlas.
+    const ejecutable = stripSqlComments(downSource52)
+    for (const ajena of [
+      'users',
+      'roles',
+      'document_types',
+      'presentations',
+      'units',
+      'recipes',
+      'recipe_lines',
+      'orders',
+    ]) {
+      expect(ejecutable, `el DOWN no debe mencionar ${ajena}`).not.toMatch(
+        new RegExp(`\\b${ajena}\\b`, 'i'),
+      )
+    }
+  })
+
+  it('el down.sql se para con un error legible antes de destruir lo que no puede reconstruir', () => {
+    // R28 con datos cargados. `product_id` NO SE PUEDE RECONSTRUIR -la ficha corto todo
+    // vinculo entre la linea y el producto (decision cerrada 3)- y `image_path` tampoco. Un
+    // DOWN que se limitara a DROP/ADD vaciaria el catalogo sin avisar, y ademas reventaria
+    // a media reversion en el `ADD COLUMN "product_id" UUID NOT NULL`.
+    expect(paraAntesDeDestruir(downSource52), 'el DOWN no tiene guarda que lo pare').toBe(true)
+    const ejecutable = stripSqlComments(downSource52)
+    expect(ejecutable, 'falta la guarda de `image_path`').toMatch(
+      /WHERE "image_path" IS NOT NULL/i,
+    )
+    expect(ejecutable, 'falta la guarda de filas de catalogo').toMatch(
+      /count\(\*\)[\s\S]*?"supplier_catalog_lines"/i,
+    )
+  })
+
+  it('un down.sql empobrecido no pasa ninguna de las comprobaciones de arriba', () => {
+    // Sensibilidad OBLIGATORIA de R28, al estilo del caso de QC-43. Los cinco
+    // empobrecimientos de abajo producen SQL VALIDO que se aplica sin un solo error: por eso
+    // hacen falta los predicados. Si alguno pasara, este bloque no vigilaria nada.
+
+    // (a) `min_purchase` anulable: «casi» el esquema anterior.
+    const conMinPurchaseAnulable = down52.map((statement) =>
+      statement.replace(/"min_purchase" INTEGER NOT NULL DEFAULT 0/i, '"min_purchase" INTEGER'),
+    )
+    expect(conMinPurchaseAnulable, 'la mutacion no cambio nada').not.toEqual(down52)
+    expect(
+      restauraColumnaComo(
+        conMinPurchaseAnulable,
+        'products',
+        'min_purchase',
+        'INTEGER NOT NULL DEFAULT 0',
+      ),
+    ).toBe(false)
+
+    // (b) sin los dos ADD CONSTRAINT: `products` se queda con las dos columnas y NINGUNA
+    // regla de no negatividad, que no es el estado anterior.
+    const soloDrops = down52.filter((statement) => !/ADD CONSTRAINT "products_/i.test(statement))
+    expect(soloDrops.length, 'la mutacion no quito ninguna sentencia').toBe(down52.length - 2)
+    expect(
+      recreatesConstraint(
+        soloDrops,
+        'products_min_purchase_non_negative',
+        /CHECK\s*\(\s*"min_purchase"\s*>=\s*0\s*\)/i,
+      ),
+    ).toBe(false)
+    expect(
+      recreatesConstraint(
+        soloDrops,
+        'products_cost_non_negative',
+        /CHECK\s*\(\s*"cost"\s*>=\s*0\s*\)/i,
+      ),
+    ).toBe(false)
+
+    // (c) `cost` como coma flotante: mismo nombre, misma nulabilidad, otro esquema.
+    const conFloat = down52.map((statement) =>
+      statement.replace(/"cost" DECIMAL\(14,4\)/i, '"cost" DOUBLE PRECISION'),
+    )
+    expect(conFloat, 'la mutacion no cambio nada').not.toEqual(down52)
+    expect(restauraColumnaComo(conFloat, 'products', 'cost', 'DECIMAL(14,4)')).toBe(false)
+
+    // (d) `product_id` anulable, y el unico devuelto como PARCIAL: los dos aflojan la
+    // identidad de QC-42 sin que ninguna otra guardia del repo se entere.
+    const conProductIdAnulable = down52.map((statement) =>
+      statement.replace(/"product_id" UUID NOT NULL/i, '"product_id" UUID'),
+    )
+    expect(conProductIdAnulable, 'la mutacion no cambio nada').not.toEqual(down52)
+    expect(
+      restauraColumnaComo(
+        conProductIdAnulable,
+        'supplier_catalog_lines',
+        'product_id',
+        'UUID NOT NULL',
+      ),
+    ).toBe(false)
+    const unicoParcial = `${findStatement(
+      down52,
+      /^CREATE UNIQUE INDEX "supplier_catalog_lines_supplier_id_product_id_key"/i,
+    )} WHERE "deleted_at" IS NULL`
+    expect(isPartialOnLiveRows(unicoParcial)).toBe(true)
+
+    // (e) un DOWN sin las dos guardas: se aplicaria en silencio sobre datos cargados.
+    const ejecutable = stripSqlComments(downSource52)
+    const sinGuardas = ejecutable.replace(/DO \$\$[\s\S]*?END \$\$;/gi, '')
+    expect(sinGuardas, 'la mutacion no quito las guardas').not.toBe(ejecutable)
+    expect(paraAntesDeDestruir(sinGuardas)).toBe(false)
   })
 })

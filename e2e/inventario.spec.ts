@@ -75,6 +75,20 @@ const operatorUser: Credentials = {
 const productName = `${FIXTURE_PREFIX}producto_${RUN_ID}`;
 const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
 
+/**
+ * Existencia que se escribe en el alta. Constante para que el assert de «crear la presentacion no
+ * pierde lo ya escrito» compare contra el mismo valor que se tecleo, sin repetir el literal.
+ */
+const stockValue = '7';
+
+/**
+ * Alerta de cantidad. El campo es `required` en el formulario (`product-field.tsx` lo traslada al
+ * `<input>`), asi que sin el la validacion NATIVA del navegador bloquea el envio y la Server
+ * Action ni se llama: el panel se queda abierto sin ningun error en pantalla. Se rellena aqui
+ * porque el alta lo exige, no porque este recorrido lo afirme.
+ */
+const qtyAlertValue = '3';
+
 async function createUserWithRole(user: Credentials, roleName: string): Promise<void> {
   const role = await prisma.role.findUnique({ where: { name: roleName }, select: { id: true } });
   if (!role) {
@@ -204,10 +218,11 @@ test.describe('catalogo de productos', () => {
     expect(page.url(), 'abrir el panel no debe navegar').toBe(urlBeforeSheet);
 
     // --- 3. Se escriben los campos del producto ANTES de crear la presentacion, para poder
-    // afirmar despues que crearla no se llevo por delante lo escrito (R24).
+    // afirmar despues que crearla no se llevo por delante lo escrito (R24). Son el nombre y la
+    // existencia: el costo dejo de existir en el producto con QC-52, y con el se fue su campo.
     await page.getByTestId('product-field-name').fill(productName);
-    await page.getByTestId('product-field-cost').fill('12.5000');
-    await page.getByTestId('product-field-stock').fill('7');
+    await page.getByTestId('product-field-stock').fill(stockValue);
+    await page.getByTestId('product-field-qtyAlert').fill(qtyAlertValue);
 
     // --- 4. La presentacion se crea desde el propio selector y queda SELECCIONADA (R24).
     await page.getByTestId('presentation-create-open').click();
@@ -220,6 +235,10 @@ test.describe('catalogo de productos', () => {
       page.getByTestId('product-field-name'),
       'crear la presentacion no puede perder lo ya escrito',
     ).toHaveValue(productName);
+    await expect(
+      page.getByTestId('product-field-stock'),
+      'crear la presentacion no puede perder lo ya escrito',
+    ).toHaveValue(stockValue);
 
     // --- 5. Guardar: la Server Action de QC-20 contra Postgres, sin `fetch` de por medio (R18).
     await page.getByTestId('product-form-submit').click();

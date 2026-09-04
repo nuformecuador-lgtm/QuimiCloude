@@ -23,29 +23,18 @@ import { PRESENTATION_FIELD, PresentationSelect } from './presentation-select';
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
- * Los tres campos que el formulario YA NO PINTA (decision del humano, 2026-09-03): costo,
- * compra minima y tiempo de entrega.
- *
- * Se siguen LEYENDO y VALIDANDO, y no es un descuido: la edicion es reemplazo completo (R19),
- * asi que un `update` que no los mande los borraria -`updateAliveProduct` escribe
- * `data.cost ?? null` y `data.minPurchase`, no ignora los ausentes-. En edicion viajan como
- * campos ocultos con el valor actual del producto; en el alta no viajan, y entonces `cost` y
- * `deliveryTime` nacen nulos y `minPurchase` toma el `default(0)` del esquema.
- *
- * Si algun dia se quiere que la edicion TAMBIEN los olvide, se quitan los ocultos de abajo y
- * esta constante entera con ellos.
- */
-const HIDDEN_FIELDS = ['cost', 'minPurchase', 'deliveryTime'] as const;
-
-/**
  * Campos de texto del producto. `presentationId` no esta aqui: lo aporta su propio selector (T8).
  *
  * **La unidad tampoco esta**, y no por descuido: ver el comentario del formulario mas abajo.
+ *
+ * **El costo tampoco**: QC-52 lo saco del producto entero -junto con la compra minima y el
+ * tiempo de entrega- porque son terminos comerciales del catalogo de cada proveedor. Ya no hay
+ * campo, ni oculto, ni valor precargado que enviar (R5).
  */
-const TEXT_FIELDS = ['name', 'cost'] as const;
+const TEXT_FIELDS = ['name'] as const;
 
 /** Campos enteros. `FormData` solo entrega cadenas, asi que se convierten antes de validar. */
-const INT_FIELDS = ['stock', 'minPurchase', 'deliveryTime', 'qtyAlert'] as const;
+const INT_FIELDS = ['stock', 'qtyAlert'] as const;
 
 type ProductFieldName =
   | (typeof TEXT_FIELDS)[number]
@@ -66,9 +55,6 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   name: 'Escribe un nombre de 1 a 120 caracteres.',
   presentationId: 'Elige una presentación.',
   stock: 'Debe ser un número entero de 0 o más.',
-  cost: 'Usa hasta 10 enteros y 4 decimales, con punto (por ejemplo 12.5000).',
-  minPurchase: 'Debe ser un número entero de 0 o más.',
-  deliveryTime: 'Debe ser un número entero de 0 o más.',
   qtyAlert: 'Debe ser un número entero de 0 o más.',
 };
 
@@ -76,9 +62,6 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
   presentationId: 'Presentación',
   stock: 'Existencia',
-  cost: 'Costo',
-  minPurchase: 'Compra mínima',
-  deliveryTime: 'Tiempo de entrega',
   qtyAlert: 'Alerta de cantidad',
 };
 
@@ -137,10 +120,6 @@ function parseInteger(raw: string): number | undefined | 'invalid' {
   return Number(trimmed);
 }
 
-function optionalText(raw: string): string | undefined {
-  return raw.trim() === '' ? undefined : raw;
-}
-
 type ProductFormProps = {
   /** Producto que se edita. Ausente en el alta (R19). */
   readonly product?: ProductView;
@@ -194,7 +173,6 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
     const candidate = {
       name: values.name,
       presentationId: values.presentationId,
-      cost: optionalText(values.cost),
       ...numbers,
     };
 
@@ -253,14 +231,10 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
   const initialValue = (field: ProductFieldName, fromProduct: string): string =>
     values?.[field] ?? fromProduct;
 
-  // Un rechazo solo se puede pintar EN LINEA si su campo sigue en pantalla. Si el unico error
-  // cae en uno de los ocultos, no hay donde ponerlo: se manda a la region del formulario, que es
-  // peor mensaje pero mejor que no decir nada. `some` y no `filter`: el contrato de la ruta
-  // prohibe la cadena «filter(» en estos archivos -es la guardia que impide colar busqueda-.
-  const hayErrorVisible = Object.keys(fieldErrors).some(
-    (field) => !HIDDEN_FIELDS.includes(field as (typeof HIDDEN_FIELDS)[number]),
-  );
-  const showFormError = state.status === 'error' && !hayErrorVisible;
+  // Todo error de campo tiene ya SU campo en pantalla: desde QC-52 el formulario no tiene
+  // ningun campo oculto, asi que no hay rechazo que se quede sin sitio donde pintarse. La region
+  // de error del formulario queda para los rechazos que NO senalan campo.
+  const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
 
   const isEdit = product !== undefined;
 
@@ -347,40 +321,6 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         (`crud-de-unidades`) exponga como listar unidades. Poner aqui un campo que escriba un UUID
         a mano seria peor que no tener campo.
       */}
-
-      {/*
-        COSTO, COMPRA MINIMA Y TIEMPO DE ENTREGA YA NO SE PINTAN (ver `HIDDEN_FIELDS`).
-
-        En EDICION siguen viajando, ocultos y con el valor actual del producto, porque R19 hace de
-        la edicion un reemplazo completo: si no se mandaran, `updateAliveProduct` escribiria
-        `cost: null`, `deliveryTime: null` y `minPurchase: 0` y el producto perderia tres datos
-        que nadie pidio borrar. En el ALTA no se pinta ninguno: no hay valor previo que conservar
-        y el esquema ya sabe que hacer con su ausencia.
-
-        `defaultValue` y no `value` para que sigan siendo campos NO controlados, como el resto.
-      */}
-      {isEdit ? (
-        <>
-          <input
-            type="hidden"
-            name="cost"
-            defaultValue={initialValue('cost', product.cost ?? '')}
-            data-testid="product-hidden-cost"
-          />
-          <input
-            type="hidden"
-            name="minPurchase"
-            defaultValue={initialValue('minPurchase', product.minPurchase.toString())}
-            data-testid="product-hidden-minPurchase"
-          />
-          <input
-            type="hidden"
-            name="deliveryTime"
-            defaultValue={initialValue('deliveryTime', product.deliveryTime?.toString() ?? '')}
-            data-testid="product-hidden-deliveryTime"
-          />
-        </>
-      ) : null}
 
       <ProductField
         name="qtyAlert"

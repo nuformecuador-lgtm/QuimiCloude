@@ -774,14 +774,18 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
         WHERE c.contype = 'f' AND n.nspname = 'public' AND fn.nspname = 'public'
           AND ft.relname = 'units'
         ORDER BY c.conname`
-      // ACTUALIZADO EL 2026-09-03 POR QC-33 (`specs/QC-33-modelo-pedidos/`). La lista era de
-      // DOS y sigue siendo EXACTA: se SUMA la tercera FK hacia `units`, la que nace con
-      // `orders.unit_id` (`orders_unit_id_fkey`), con las mismas dos reglas que las otras dos
-      // —RESTRICT al borrar ('r'), CASCADE al actualizar ('c')—, que es justamente lo que R13
-      // de QC-32 exige de CUALQUIER referencia al catalogo. Va la primera porque la consulta
-      // ordena por `conname`. No se convierte en `toContain`: si manana alguien anade una FK
-      // a `units` sin RESTRICT, o se pierde una de las tres en un drift de `migrate dev`,
-      // este caso tiene que seguir siendo quien lo diga.
+      // ACTUALIZADO EL 2026-09-04 POR QC-52
+      // (`specs/QC-52-separar-producto-de-catalogo-de-proveedor/`). La lista era de TRES
+      // —dos originales mas `orders_unit_id_fkey`, que sumo QC-33 el 2026-09-03— y sigue
+      // siendo EXACTA: ahora son CUATRO. La nueva la trae QC-52, que da unidad propia a la
+      // linea de catalogo del proveedor (`supplier_catalog_lines.unit_id`, R8 y R10) y por
+      // eso anade `supplier_catalog_lines_unit_id_fkey`, con las mismas dos reglas que las
+      // otras tres —RESTRICT al borrar ('r'), CASCADE al actualizar ('c')—, que es
+      // justamente lo que R13 de QC-32 exige de CUALQUIER referencia al catalogo. Que la
+      // columna sea anulable no afloja nada: la FK solo se verifica cuando hay valor. Va la
+      // ultima porque la consulta ordena por `conname`. No se convierte en `toContain`: si
+      // manana alguien anade una FK a `units` sin RESTRICT, o se pierde una de las cuatro en
+      // un drift de `migrate dev`, este caso tiene que seguir siendo quien lo diga.
       expect(foreignKeys).toEqual([
         {
           conname: 'orders_unit_id_fkey',
@@ -797,6 +801,12 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
         },
         {
           conname: 'recipe_lines_unit_id_fkey',
+          referencia: 'units',
+          confdeltype: 'r',
+          confupdtype: 'c',
+        },
+        {
+          conname: 'supplier_catalog_lines_unit_id_fkey',
           referencia: 'units',
           confdeltype: 'r',
           confupdtype: 'c',

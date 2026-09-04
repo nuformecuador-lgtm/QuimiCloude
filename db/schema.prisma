@@ -126,7 +126,24 @@ model Presentation {
 }
 
 /// Producto del catalogo quimico. Es TAMBIEN el elemento de inventario: una sola tabla
-/// (decision cerrada 1), con costo, compra minima, tiempo de entrega y unidad.
+/// (decision cerrada 1 de QC-14), con su presentacion, su unidad y lo que HAY de el
+/// (`stock`, `qtyAlert`).
+///
+/// OJO 0 — QC-52 le QUITO `cost`, `minPurchase` y `deliveryTime` (su decision cerrada 1,
+/// R1). No son propiedades de la cosa sino TERMINOS COMERCIALES, y dependen de a quien se
+/// la compres: viven ahora en `SupplierCatalogLine`, una linea por proveedor. Las tres
+/// columnas se fueron de la base en `<ts>_split_product_and_supplier_catalog`, con ellas se
+/// fueron los CHECK `products_cost_non_negative` y `products_min_purchase_non_negative`
+/// (Postgres se lleva el CHECK con la columna que solo el menciona), y el `down.sql` de esa
+/// migracion los recrea A MANO porque no vuelven solos con el `ADD COLUMN`.
+/// El producto CONSERVA todo lo demas: lo que la cosa ES y lo que HAY de ella.
+///
+/// OJO 0.1 — `imagePath` esta declarada aqui desde QC-52 (R4) y la columna existe en la base
+/// desde `20260903200000_product_image_path`. Estuvo un tiempo en la base y NO en el modelo:
+/// eso es DRIFT, y significaba que cualquier `prisma migrate dev` sobre `products` emitiria
+/// `DROP COLUMN "image_path"` -- justo mezclado entre los DROP que si se querian. Declararla
+/// no cambia la base ni un byte y desarma esa mina para toda migracion futura. Sigue SIN
+/// CHECK, SIN DEFAULT y SIN indice: la forma de la ruta no esta acordada en el repo (P1).
 ///
 /// `name` NO tiene indice unico, y es deliberado (decision cerrada 6, R16): dos productos
 /// pueden llamarse igual. Se aparta a proposito del precedente de `users`.
@@ -163,11 +180,9 @@ model Product {
   name           String
   presentationId String    @map("presentation_id") @db.Uuid
   stock          Int?
-  cost           Decimal?  @db.Decimal(14, 4)
-  minPurchase    Int       @default(0) @map("min_purchase")
-  deliveryTime   Int?      @map("delivery_time")
   qtyAlert       Int?      @map("qty_alert")
   unitId         String?   @map("unit_id") @db.Uuid
+  imagePath      String?   @map("image_path")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -294,44 +309,88 @@ model Supplier {
   @@map("suppliers")
 }
 
-/// Linea del catalogo de un proveedor: la pareja proveedor-producto como ENTIDAD PROPIA, con
-/// su costo, su minimo de compra y su tiempo de entrega (decision cerrada 3).
+/// Linea del catalogo de un proveedor: COMO VENDE ESTE PROVEEDOR ESTA COSA. Entidad propia,
+/// con su nombre, su presentacion, su unidad, su costo, su minimo de compra y su tiempo de
+/// entrega (QC-42 decision cerrada 3, reformada entera por QC-52).
 ///
-/// NO lleva `deletedAt` a proposito (decision cerrada 11, R28): la linea es parte del
-/// catalogo, no un hecho historico.
+/// OJO 0 — LA LINEA YA NO CONOCE EL PRODUCTO. QC-52 le quito `productId`, su FK
+/// `supplier_catalog_lines_product_id_fkey` y su indice unico
+/// `supplier_catalog_lines_supplier_id_product_id_key` (su decision cerrada 3, R9, R18). NO
+/// hay vinculo entre esta tabla y `products`, ni siquiera opcional, y se descarto
+/// expresamente una referencia anulable: es lo que permite que el catalogo de un proveedor
+/// incluya cosas que aun no tienes dadas de alta. CONSECUENCIA ACEPTADA Y ESCRITA: el sistema
+/// NO PUEDE responder «a cuanto me vende cada proveedor este producto» ni comparar precios
+/// entre proveedores. Si algun dia se quiere, es ficha propia y la via razonable es una tabla
+/// de equivalencias, no devolver esta columna.
+/// A cambio, la linea gana la estructura del producto MENOS `stock` y `qty_alert` -- cuanto
+/// tienes es tuyo, no del proveedor--: `name`, `nameNormalized`, `presentationId`, `unitId`,
+/// `imagePath` y `deletedAt`.
 ///
-/// SI lleva `createdBy`/`updatedBy` desde QC-43 (su decision cerrada 3, R31, R32). Se APARTA
-/// de la decision cerrada 14 de QC-42, que la dejo sin auditoria heredando el criterio de
-/// `recipe_lines`: alli editar una linea es editar la formula y el rastro queda en
-/// `recipes.updated_by`, mientras que aqui SUBIR EL COSTO es un hecho comercial propio que no
-/// modifica ningun dato del proveedor.
+/// OJO 1 — LA IDENTIDAD DE LA LINEA es ahora `(supplier_id, name_normalized, presentation_id)`
+/// sobre las VIVAS. NO esta aqui como `@@unique` y es deliberado: es un indice unico PARCIAL
+/// (`WHERE deleted_at IS NULL`) y Prisma no modela indices parciales. Vive escrito a mano en
+/// `<ts>_split_product_and_supplier_catalog/migration.sql`
+/// (`supplier_catalog_lines_name_presentation_unique`), mismo patron que `suppliers_name_unique`
+/// y `recipes_name_unique`. Es la UNICA garantia de la unicidad (R15): no hay `SELECT` previo
+/// por igualdad -- seria una carrera-- y el puerto no expone busqueda por nombre. El mensaje al
+/// usuario sale de traducir el SQLSTATE `23505`. `presentationId` es OBLIGATORIA por eso mismo:
+/// forma parte de la clave. Que `deletedAt` libere la combinacion es R17, y por eso el indice
+/// es parcial y no total como era el de `(supplier_id, product_id)`.
 ///
-/// OJO — `productId`, `createdBy` y `updatedBy` son FK REALES -a `products` y a `users`-
-/// declaradas como ESCALARES SIN `@relation` (decision cerrada 13/14 de QC-42, R22; QC-43
-/// R26, R44). Las tres estan escritas a mano en su `migration.sql`. Lo que `proveedores` sabe
-/// del producto llega por el contrato publico `@/lib/modules/inventario`, nunca por un
-/// `include` ni por `prisma.product`; y el cliente Prisma no puede atravesar a `users`.
+/// OJO 2 — `presentationId`, `unitId`, `createdBy` y `updatedBy` son FK REALES -a
+/// `presentations`, `units` y `users`- declaradas como ESCALARES SIN `@relation` (QC-42
+/// decision cerrada 13/14, QC-52 decision cerrada 10, R30). Las cuatro estan escritas A MANO
+/// en SQL. Con `@relation`, el cliente Prisma ofreceria `include: { presentation: true }`
+/// desde `proveedores` -- una lectura de la tabla de otro modulo que NINGUNA guardia detecta,
+/// porque no es un import ni un `prisma.presentation`-- y ademas obligaria a declarar
+/// `catalogLines SupplierCatalogLine[]` dentro de `Presentation`, `Unit` y `User`, que son de
+/// otros modulos. Es por tanto DRIFT para Prisma: TODA MIGRACION FUTURA sobre esta tabla hay
+/// que revisarla A MANO para que no emita un `DROP CONSTRAINT` sobre esas cuatro FK. Las dos
+/// nuevas van `ON DELETE RESTRICT ON UPDATE CASCADE`, no `CASCADE` ni `SET NULL`:
+/// `presentations` no tiene borrado logico, y el RESTRICT es justo lo que impide que borrar
+/// una presentacion deje lineas apuntando al vacio.
 ///
-/// OJO 2 — los CHECK de `cost` (`> 0` desde QC-43), `min_purchase` y `delivery_time` (`>= 0`)
-/// son SQL escrito a mano: Prisma no modela CHECK. Ver `design.md > 4.4` de QC-42 y
-/// `design.md > 2.2` de QC-43.
+/// OJO 3 — `deletedAt` la gana QC-52 (su decision cerrada 5, R21): borrado LOGICO, la fila
+/// nunca se elimina. Al dar de baja un proveedor sus lineas caen con el, en la MISMA
+/// transaccion y con LA MISMA MARCA DE TIEMPO (R20). El `onDelete: Cascade` hacia `suppliers`
+/// se conserva tal cual, pero ya no es la politica: es solo la red de un borrado FISICO -- una
+/// purga, un `down.sql`--, y no se dispara nunca en operacion normal porque ninguna FK
+/// reacciona a un UPDATE.
+///
+/// OJO 4 — MANDAN LOS TIPOS ESTRICTOS DE LA LINEA, no los del producto (decision cerrada 6):
+/// `cost` sigue NOT NULL y `> 0`, y `minPurchase` sigue `Decimal(14,4)`, no entero. Copiar el
+/// producto al pie de la letra habria hecho el costo opcional y el minimo entero. Los CHECK de
+/// `cost` (`> 0` desde QC-43), `min_purchase` y `delivery_time` (`>= 0`) son SQL escrito a
+/// mano: Prisma no modela CHECK. Ver `design.md > 4.4` de QC-42 y `> 2.2` de QC-43.
+///
+/// `nameNormalized` la calcula `normalizeSupplierName` (dominio de `proveedores`, funcion
+/// pura) y se persiste junto a `name` en toda escritura (R14). No se escribe otra: dos
+/// definiciones de «mismo nombre» en el mismo modulo divergen.
+///
+/// `imagePath` va SIN CHECK, SIN DEFAULT y SIN indice, igual que `products.image_path`: la
+/// forma de la ruta no esta acordada en el repo y no hay flujo de subida todavia (P1).
 /// @module proveedores
 model SupplierCatalogLine {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  supplierId   String   @map("supplier_id") @db.Uuid
-  productId    String   @map("product_id") @db.Uuid
-  cost         Decimal  @db.Decimal(14, 4)
-  minPurchase  Decimal? @map("min_purchase") @db.Decimal(14, 4)
-  deliveryTime Int?     @map("delivery_time")
-  createdBy    String?  @map("created_by") @db.Uuid
-  updatedBy    String?  @map("updated_by") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  supplierId     String    @map("supplier_id") @db.Uuid
+  name           String
+  nameNormalized String    @map("name_normalized")
+  presentationId String    @map("presentation_id") @db.Uuid
+  unitId         String?   @map("unit_id") @db.Uuid
+  imagePath      String?   @map("image_path")
+  cost           Decimal   @db.Decimal(14, 4)
+  minPurchase    Decimal?  @map("min_purchase") @db.Decimal(14, 4)
+  deliveryTime   Int?      @map("delivery_time")
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  @@unique([supplierId, productId], map: "supplier_catalog_lines_supplier_id_product_id_key")
-  @@index([productId], map: "supplier_catalog_lines_product_id_idx")
+  @@index([presentationId], map: "supplier_catalog_lines_presentation_id_idx")
+  @@index([unitId], map: "supplier_catalog_lines_unit_id_idx")
   @@index([createdBy], map: "supplier_catalog_lines_created_by_idx")
   @@index([updatedBy], map: "supplier_catalog_lines_updated_by_idx")
   @@map("supplier_catalog_lines")
