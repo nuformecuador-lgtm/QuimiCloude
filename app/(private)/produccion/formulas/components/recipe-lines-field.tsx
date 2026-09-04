@@ -1,5 +1,6 @@
 'use client';
 
+import { PlusIcon, XIcon } from 'lucide-react';
 import { useId } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,17 @@ import {
  *
  * **Añadir y quitar líneas, y una receta SIN ninguna se puede guardar** (R27): el botón de quitar
  * no tiene mínimo que respetar.
+ *
+ * **La fila en blanco de arranque es un FANTASMA, no una línea del estado**: cuando `lines` está
+ * vacío se pinta una fila vacía que todavía NO existe en `lines`, y solo se materializa cuando el
+ * usuario toca uno de sus tres campos o pulsa su `+`. Es lo que permite que la pantalla siempre
+ * muestre un selector listo para usar SIN romper R27: si el usuario no la toca, `state.lines`
+ * sigue vacío y `buildRecipePayload` envía `lines: []` como siempre. Nada de filtrar líneas
+ * vacías en el payload -esa función no toma decisiones sobre las líneas (R21, R22)-.
+ *
+ * **Cada fila lleva sus dos acciones, `X` y `+`** (no hay botón de añadir en la cabecera): la `X`
+ * quita esa línea -y si era la última, reaparece el fantasma, así que nunca se queda la pantalla
+ * sin filas- y el `+` deja la fila donde está y añade otra vacía debajo.
  *
  * **La cantidad es SIEMPRE `type="text"` con `inputMode="decimal"`** (R29): nunca `type="number"`,
  * que pasaría el valor por el binario de coma flotante del navegador. Esta pantalla no convierte
@@ -47,6 +59,18 @@ import {
  */
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
+
+/**
+ * La fila en blanco que se pinta cuando `lines` está vacío. Su clave es constante a propósito:
+ * no es una línea del estado, así que no compite con las claves locales de `createLocalKey`.
+ */
+const GHOST_LINE: RecipeLineFormValue = {
+  key: 'linea-en-blanco',
+  productId: '',
+  productName: '',
+  quantity: '',
+  unitId: '',
+};
 const FIELD_TEXT = 'text-base';
 
 /** Texto del disparador del selector de producto según el estado de la línea. Sin depender del copy en los tests (R54). */
@@ -83,31 +107,46 @@ export function RecipeLinesField({
   // guardado en el estado.
   const unavailableCount = lines.filter((line) => line.productName === null).length;
 
-  function addLine() {
-    onChange([
-      ...lines,
-      { key: createLocalKey('line'), productId: '', productName: '', quantity: '', unitId: '' },
-    ]);
+  /** Fila vacía recién creada, ya con su clave local. */
+  function blankLine(): RecipeLineFormValue {
+    return { key: createLocalKey('line'), productId: '', productName: '', quantity: '', unitId: '' };
+  }
+
+  /** `true` si lo que se está pintando es el fantasma y no una línea real de `lines`. */
+  const isGhost = lines.length === 0;
+  const rows: readonly RecipeLineFormValue[] = isGhost ? [GHOST_LINE] : lines;
+
+  function addLineAfter(index: number) {
+    // Con el fantasma en pantalla no hay nada que conservar todavía: se materializa y se le
+    // añade la segunda, que es lo que el usuario acaba de pedir.
+    if (isGhost) {
+      onChange([blankLine(), blankLine()]);
+      return;
+    }
+    onChange([...lines.slice(0, index + 1), blankLine(), ...lines.slice(index + 1)]);
   }
 
   function updateLine(index: number, patch: Partial<RecipeLineFormValue>) {
+    // Tocar el fantasma es lo que lo convierte en línea de verdad.
+    if (isGhost) {
+      onChange([{ ...blankLine(), ...patch }]);
+      return;
+    }
     onChange(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
 
   function removeLine(index: number) {
+    // El fantasma no está en `lines`: no hay nada que quitar, y su `X` no puede dejar la
+    // pantalla sin filas.
+    if (isGhost) return;
     onChange(lines.filter((_, i) => i !== index));
   }
 
   return (
     <section aria-labelledby={headingId} data-testid="recipe-lines-field" className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id={headingId} className="text-lg font-medium">
-          Ingredientes
-        </h2>
-        <Button type="button" className={TOUCH_TARGET} data-testid="recipe-line-add" onClick={addLine}>
-          Añadir línea
-        </Button>
-      </div>
+      <h2 id={headingId} className="text-lg font-medium">
+        Ingredientes
+      </h2>
 
       {generalError === undefined ? null : (
         <p role="alert" className="text-sm text-destructive" data-testid="recipe-lines-error">
@@ -116,7 +155,7 @@ export function RecipeLinesField({
       )}
 
       <div className="flex flex-col gap-4">
-        {lines.map((line, index) => {
+        {rows.map((line, index) => {
           const isUnavailable = line.productName === null;
           const lineErrors = errors?.[index];
           const quantityErrorId = `recipe-line-quantity-error-${index}`;
@@ -183,16 +222,30 @@ export function RecipeLinesField({
                 />
               </div>
 
-              <Button
-                type="button"
-                variant="ghost"
-                className={`${TOUCH_TARGET} self-start sm:mt-6`}
-                aria-label={`Quitar línea ${index + 1}`}
-                data-testid={`recipe-line-remove-${index}`}
-                onClick={() => removeLine(index)}
-              >
-                Quitar
-              </Button>
+              <div className="flex gap-1 self-start sm:mt-6">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={TOUCH_TARGET}
+                  aria-label={`Quitar línea ${index + 1}`}
+                  data-testid={`recipe-line-remove-${index}`}
+                  onClick={() => removeLine(index)}
+                >
+                  <XIcon aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={TOUCH_TARGET}
+                  aria-label={`Añadir una línea después de la ${index + 1}`}
+                  data-testid={`recipe-line-add-${index}`}
+                  onClick={() => addLineAfter(index)}
+                >
+                  <PlusIcon aria-hidden />
+                </Button>
+              </div>
             </div>
           );
         })}
