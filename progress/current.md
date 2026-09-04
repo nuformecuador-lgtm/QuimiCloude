@@ -12,7 +12,7 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | in_progress | feature/QC-52-separar-producto-de-catalogo-de-proveedor | implementer cerrado, F2.2 (reviewer) pendiente |
+| QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | in_progress | feature/QC-52-separar-producto-de-catalogo-de-proveedor | PR #32 abierto, esperando merge humano (F2.5) |
 | QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
 | QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | implementer (spec aprobado por el humano el 2026-09-04) |
 
