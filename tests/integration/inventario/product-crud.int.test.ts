@@ -206,7 +206,9 @@ function baseProductInput(overrides: Partial<NewProduct> = {}): Omit<NewProduct,
   };
 }
 
-/** `INSERT INTO products` crudo, solo para el caso R7 que necesita el SQLSTATE real. */
+/** `INSERT INTO products` crudo, solo para el caso R7 que necesita el SQLSTATE real.
+ *  `name_normalized` (QC-57) es NOT NULL sin DEFAULT, asi que va SIEMPRE: sin ella el
+ *  rechazo seria un 23502 y el caso dejaria de probar la FK de autor que dice probar. */
 function rawInsertProductWithAuthor(
   tx: Prisma.TransactionClient,
   name: string,
@@ -214,8 +216,8 @@ function rawInsertProductWithAuthor(
   createdBy: string,
 ): Promise<number> {
   return tx.$executeRaw`
-    INSERT INTO "products" ("name", "presentation_id", "created_by", "updated_by", "updated_at")
-    VALUES (${name}, CAST(${presentationId} AS uuid), CAST(${createdBy} AS uuid), CAST(${createdBy} AS uuid), CURRENT_TIMESTAMP)`;
+    INSERT INTO "products" ("name", "name_normalized", "presentation_id", "created_by", "updated_by", "updated_at")
+    VALUES (${name}, ${normalizeForTest(name)}, CAST(${presentationId} AS uuid), CAST(${createdBy} AS uuid), CAST(${createdBy} AS uuid), CURRENT_TIMESTAMP)`;
 }
 
 /** Recorre TODAS las paginas de `listAliveProducts` con un `pageSize` dado y devuelve la
@@ -289,6 +291,7 @@ describe('auditoria de autor (R7)', () => {
       const created = await tx.product.create({
         data: {
           name: 'Producto con autor real',
+          nameNormalized: normalizeForTest('Producto con autor real'),
           presentationId,
           createdBy: realUserId,
           updatedBy: realUserId,

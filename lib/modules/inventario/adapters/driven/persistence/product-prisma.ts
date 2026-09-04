@@ -4,6 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { NotFoundError, ValidationError } from '../../../domain/errors';
+import { normalizeProductName } from '../../../domain/product-name';
 
 import type { ProductQuery, Page } from '../../../domain/page';
 import type { NewProduct, ProductView } from '../../../domain/product-view';
@@ -21,6 +22,14 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
  * (D20, R8). Este archivo no consulta el modelo de usuarios de Prisma, ni `include`/
  * `select` hacia `users`, ni `$queryRaw` sobre esa tabla. Quien necesite el nombre del
  * autor pide el contrato publico de `identity` (alcance de QC-22, no de esta ficha).
+ *
+ * `nameNormalized` se calcula AQUI, en TODA escritura de producto (`createProduct` y
+ * `updateAliveProduct`), con la UNICA definicion del modulo -`normalizeProductName`- y en la
+ * misma llamada que escribe `name`: mismo patron que `recipe-prisma.ts` y
+ * `supplier-catalog-line-prisma.ts` (QC-57, R19, R23). No hay ningun camino que escriba el
+ * nombre sin escribir su forma normalizada, que es lo que permite que la busqueda del listado
+ * y la comparacion de nombres no discrepen. `softDeleteAliveProduct` no toca el nombre, asi
+ * que tampoco toca esta columna.
  */
 
 /** `select` unico para las tres lecturas, con el `join` a `presentation` DENTRO del modulo (legitimo, `design.md > 6.1`). */
@@ -130,6 +139,7 @@ export async function createProduct(
     const created = await prisma.product.create({
       data: {
         name: data.name,
+        nameNormalized: normalizeProductName(data.name),
         presentationId: data.presentationId,
         stock: data.stock ?? null,
         qtyAlert: data.qtyAlert ?? null,
@@ -180,6 +190,7 @@ export async function updateAliveProduct(
       where: { id, deletedAt: null },
       data: {
         name: data.name,
+        nameNormalized: normalizeProductName(data.name),
         presentationId: data.presentationId,
         stock: data.stock ?? null,
         qtyAlert: data.qtyAlert ?? null,

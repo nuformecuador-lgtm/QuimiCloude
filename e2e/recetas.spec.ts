@@ -53,6 +53,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizePresentationName } from '@/lib/modules/inventario/domain/presentation-name';
+import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
 import { prisma } from '@/lib/shared/db/prisma';
 import { DASHBOARD_ROUTE, FORMULAS_ROUTE, LOGIN_ROUTE, NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
@@ -217,7 +218,14 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   await prisma.product.create({
-    data: { name: productName, presentationId: presentation.id, createdBy: adminUserId },
+    // `name_normalized` (QC-57) es NOT NULL: el fixture la escribe con la MISMA funcion del
+    // dominio que usa la app, igual que la presentacion de arriba con la suya.
+    data: {
+      name: productName,
+      nameNormalized: normalizeProductName(productName),
+      presentationId: presentation.id,
+      createdBy: adminUserId,
+    },
   });
 });
 

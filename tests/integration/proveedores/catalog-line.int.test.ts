@@ -195,8 +195,9 @@ async function createTestUnit(db: Db): Promise<string> {
  */
 async function createTestProduct(db: Db): Promise<{ id: string; presentationId: string }> {
   const presentationId = await createTestPresentation(db);
+  const productName = `Articulo ${token()}`;
   const product = await db.product.create({
-    data: { name: `Articulo ${token()}`, presentationId },
+    data: { name: productName, nameNormalized: normalizeForTest(productName), presentationId },
     select: { id: true },
   });
   return { id: product.id, presentationId };

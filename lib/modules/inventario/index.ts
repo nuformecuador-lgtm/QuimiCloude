@@ -19,6 +19,10 @@ export {
   productQuerySchema,
 } from './domain/page';
 export { normalizePresentationName } from './domain/presentation-name';
+// QC-57 (R19): la UNICA definicion de «mismo nombre de producto». Se publica en el contrato
+// -como las otras cuatro `normalize*Name`- para que sus tests la importen por aqui y no por
+// una ruta profunda: si el barrel dejara de exportarla, el test no compilaria.
+export { normalizeProductName } from './domain/product-name';
 export {
   createPresentationSchema,
   updatePresentationSchema,
