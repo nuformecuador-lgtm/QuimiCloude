@@ -31,7 +31,10 @@ const LINEA_VALIDA = {
 const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
   description: 'Formula base',
-  steps: ['Mezclar', 'Envasar'],
+  steps: [
+    { body: 'Mezclar', type: 'texto' },
+    { body: 'Envasar', type: 'texto' },
+  ],
   lines: [LINEA_VALIDA],
 };
 
@@ -39,7 +42,10 @@ const FILA_RECETA: RecipeRow = {
   id: 'receta-1',
   name: 'Desengrasante 5%',
   description: 'Formula base',
-  steps: ['Mezclar', 'Envasar'],
+  steps: [
+    { body: 'Mezclar', type: 'texto' },
+    { body: 'Envasar', type: 'texto' },
+  ],
   imagePath: null,
   createdBy: 'admin-1',
   updatedBy: 'admin-1',

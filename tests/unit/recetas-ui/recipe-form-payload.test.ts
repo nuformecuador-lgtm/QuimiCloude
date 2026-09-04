@@ -33,8 +33,12 @@ function line(overrides: Partial<RecipeLineFormValue> = {}): RecipeLineFormValue
   };
 }
 
-function step(text: string, key = `step-${text}`): RecipeStepFormValue {
-  return { key, text };
+function step(
+  text: string,
+  key = `step-${text}`,
+  type: RecipeStepFormValue['type'] = 'texto',
+): RecipeStepFormValue {
+  return { key, text, type };
 }
 
 function baseState(overrides: Partial<RecipeFormState> = {}): RecipeFormState {
@@ -115,13 +119,31 @@ describe('buildRecipePayload — la cantidad viaja como la MISMA cadena que se e
   );
 });
 
+describe('buildRecipePayload — cada paso viaja como { body, type }', () => {
+  it('el texto del formulario sale como `body` y el tipo lo acompaña, paso a paso', () => {
+    const state = baseState({
+      steps: [step('Mezclar'), step('Comprobar', 'step-check', 'checklist')],
+    });
+
+    const payload = buildRecipePayload('edit', state);
+
+    expect(payload.steps).toEqual([
+      { body: 'Mezclar', type: 'texto' },
+      { body: 'Comprobar', type: 'checklist' },
+    ]);
+    // La clave local de React es de PRESENTACIÓN: nunca cruza al contrato.
+    expect(payload.steps[0]).not.toHaveProperty('key');
+    expect(payload.steps[0]).not.toHaveProperty('text');
+  });
+});
+
 describe('buildRecipePayload — los pasos salen en el orden mostrado (R32)', () => {
   it('payload.steps sigue exactamente el orden de state.steps', () => {
     const state = baseState({ steps: [step('Mezclar'), step('Calentar'), step('Enfriar')] });
 
     const payload = buildRecipePayload('edit', state);
 
-    expect(payload.steps).toEqual(['Mezclar', 'Calentar', 'Enfriar']);
+    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar', 'Enfriar']);
   });
 
   it('un orden distinto en state.steps produce un payload.steps distinto', () => {
@@ -131,7 +153,7 @@ describe('buildRecipePayload — los pasos salen en el orden mostrado (R32)', ()
 
     const payload = buildRecipePayload('edit', reordenado);
 
-    expect(payload.steps).toEqual(['Enfriar', 'Mezclar', 'Calentar']);
+    expect(payload.steps.map((step) => step.body)).toEqual(['Enfriar', 'Mezclar', 'Calentar']);
   });
 });
 
