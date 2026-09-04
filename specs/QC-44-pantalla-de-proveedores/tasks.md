@@ -205,27 +205,27 @@ se abre. Si una task parece pedirlo, se **para y se avisa al leader**.
 
 ## T17 — Guardias de convención de la feature `[P]` (depende de T6, T13)
 
-- [ ] **Toca:** `tests/unit/proveedores/**` (archivos de test nuevos).
-- [ ] Guardia de fuente: ningún archivo de las dos rutas contiene el literal `'/proveedores'`; ningún
+- [x] **Toca:** `tests/unit/proveedores/**` (archivos de test nuevos).
+- [x] Guardia de fuente: ningún archivo de las dos rutas contiene el literal `'/proveedores'`; ningún
       componente importa por ruta profunda saltándose el barrel; ningún archivo hace `fetch` a una
       ruta propia; ningún componente de cliente importa `lib/composition` ni `lib/shared/db`; no se
       edita ni se crea nada en `components/ui/`; `package.json` no cambia.
-- [ ] **Hecho cuando:** las guardias pasan y **fallan** si se introduce a propósito la violación que
+- [x] **Hecho cuando:** las guardias pasan y **fallan** si se introduce a propósito la violación que
       vigilan. **R2, R3, R42, R43, R44, R45, R46, R49.**
 
 ## T18 — E2E (depende de T9, T16)
 
-- [ ] **Toca:** `e2e/proveedores.spec.ts`.
-- [ ] Recorrido 1: login → `SUPPLIERS_ROUTE` → alta de proveedor → detalle → alta de línea → la línea
+- [x] **Toca:** `e2e/proveedores.spec.ts`.
+- [x] Recorrido 1: login → `SUPPLIERS_ROUTE` → alta de proveedor → detalle → alta de línea → la línea
       aparece en el catálogo. Recorrido 2: sesión no-Administrador pide la URL y acaba fuera.
-- [ ] Fixtures con prefijo `qc44_e2e_` y `RUN_ID`, limpieza en `afterAll`, asserts filtrando por el
+- [x] Fixtures con prefijo `qc44_e2e_` y `RUN_ID`, limpieza en `afterAll`, asserts filtrando por el
       nombre con `RUN_ID` (nunca «la primera fila» ni totales).
-- [ ] **Hecho cuando:** los dos recorridos pasan en Chromium y WebKit y la base queda limpia. **R51,
+- [x] **Hecho cuando:** los dos recorridos pasan en Chromium y WebKit y la base queda limpia. **R51,
       R52.**
 
 ## T19 — Cierre
 
-- [ ] **Toca:** `progress/impl_QC-44-pantalla-de-proveedores.md`.
-- [ ] Escribir el mapa **`R1`–`R52` → test concreto** (`CHECKPOINTS.md > Trazabilidad`) y anotar
+- [x] **Toca:** `progress/impl_QC-44-pantalla-de-proveedores.md`.
+- [x] Escribir el mapa **`R1`–`R52` → test concreto** (`CHECKPOINTS.md > Trazabilidad`) y anotar
       cualquier desviación respecto de `design.md` en vez de silenciarla.
-- [ ] **Hecho cuando:** `./init.sh` termina en verde y todas las tasks de este archivo están `[x]`.
+- [x] **Hecho cuando:** `./init.sh` termina en verde y todas las tasks de este archivo están `[x]`.
