@@ -147,7 +147,7 @@ Todas dependen de T3 y T4.
   aislamiento entre dos `tableId` y `localStorage` que lanza en `setItem` y en `getItem`. Ninguno
   deja estado colgando entre tests.
 
-### T11 — El componente compuesto
+### [x] T11 — El componente compuesto
 - **Depende de**: T5, T6, T7, T8, T9, T10.
 - **Qué**: `data-table.tsx` (`'use client'`): monta la instancia de `@tanstack/react-table` con
   `DATA_TABLE_FEATURES` = `[columnPinningFeature, rowSortingFeature]` (constante **exportada**) y

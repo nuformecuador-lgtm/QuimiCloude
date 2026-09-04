@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import {
   ArrowDownIcon,
@@ -165,6 +165,13 @@ export type DataTableHeaderCellProps<TRow> = {
   readonly onSortChange: (sort: DataTableSort | null) => void;
   /** El menu de la columna (`DataTableHeaderMenu`), compuesto por quien llama (T11). */
   readonly children?: ReactNode;
+  /**
+   * Lado al que esta fijada la columna, o `false` si no lo esta (T11, R24). Marca la celda con
+   * `data-pinned` para que el test la localice sin depender de estilos.
+   */
+  readonly pinned?: 'left' | 'right' | false;
+  /** Estilo `position: sticky` con el desplazamiento calculado por quien compone (T11, R24, R28). */
+  readonly style?: CSSProperties;
 };
 
 /**
@@ -178,6 +185,8 @@ export function DataTableHeaderCell<TRow>({
   sort,
   onSortChange,
   children,
+  pinned = false,
+  style,
 }: DataTableHeaderCellProps<TRow>) {
   const isSortable = column.sortable === true;
   const isActive = sort !== null && sort.columnId === column.id;
@@ -193,7 +202,9 @@ export function DataTableHeaderCell<TRow>({
     <TableHead
       aria-sort={ariaSort}
       data-testid={`data-table-head-${column.id}`}
-      className={cn(column.align === 'end' && 'text-right')}
+      data-pinned={pinned === false ? undefined : pinned}
+      style={style}
+      className={cn(column.align === 'end' && 'text-right', pinned !== false && 'bg-background')}
     >
       <div className="flex items-center gap-2">
         {isSortable ? (
