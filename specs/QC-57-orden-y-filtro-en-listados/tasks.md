@@ -127,7 +127,7 @@
 - [x] **T22. Adaptar los llamantes del listado de pedidos** a los filtros `select` (R25).
       Mismo criterio de hecho que T21. Depende de T20.
 
-- [ ] **T23. Comprobar que la suite heredada sigue verde** (R26).
+- [x] **T23. Comprobar que la suite heredada sigue verde** (R26).
       **Hecho cuando** `./init.sh` completo termina en verde y `progress/impl_QC-57-*.md` deja
       escrito el mapa **`R1..R35 -> test`** (`CHECKPOINTS.md > Trazabilidad`), incluida la fila de
       **R35** («sin E2E», con el motivo y el precedente QC-20/QC-25/QC-34).
