@@ -320,13 +320,15 @@ async function renderPantallaCargando(searchParams: Consulta = {}) {
   return render(await PrivateLayout({ children: await arbolDeLaPantalla(searchParams) }));
 }
 
-/** Datos validos del formulario de producto. Valores del test, nunca los del fixture de lista. */
+/** Datos validos del formulario de producto. Valores del test, nunca los del fixture de lista.
+ *
+ *  ACOTADO EL 2026-09-03: costo, compra minima y tiempo de entrega salieron del formulario por
+ *  decision del humano. Ya no hay control que rellenar para ellos, asi que salen tambien de aqui.
+ *  Lo que la edicion sigue enviando con esos tres campos NO se deja de vigilar: pasa a
+ *  `OCULTOS_EN_EDICION`, en el caso de R19, que es donde se puede afirmar de verdad. */
 const ALTA_VALIDA: Readonly<Record<string, string>> = {
   name: 'Ácido cítrico',
   stock: '12',
-  cost: '99.5000',
-  minPurchase: '2',
-  deliveryTime: '4',
   qtyAlert: '1',
 };
 
@@ -421,22 +423,21 @@ describe('pantalla de productos — lista', () => {
       );
     }
 
-    // Las columnas de negocio que exige R6, por su clave: si alguna desaparece de la
-    // declaracion, esto se pone rojo aunque la tabla siga pintando.
+    // Las columnas de la tabla, por su clave: si alguna desaparece de la declaracion, esto se
+    // pone rojo aunque la tabla siga pintando.
     //
-    // Son NUEVE, no las diez de R6: la unidad salio de la pantalla el 2026-09-03 tras el merge
-    // de QC-32 (ver el test «el formulario no captura la unidad»). R6 queda modificado en ese
-    // punto, y esta lista es la que dice la verdad.
+    // ACOTADO DOS VECES, las dos por decision del humano y las dos el 2026-09-03:
+    //   1. la unidad salio de la pantalla tras el merge de QC-32 (ver el test «el formulario no
+    //      captura la unidad»), asi que de las diez de R6 quedaron nueve;
+    //   2. salen ademas costo, compra minima, tiempo de entrega, creado y actualizado. R6 queda
+    //      modificado en esos cinco puntos y esta lista es la que dice la verdad. Ninguno de los
+    //      cinco datos se pierde: siguen en `ProductView`, en la base y -los tres del
+    //      formulario- en el envio de la edicion.
     expect(PRODUCT_COLUMNS.map((columna) => columna.key)).toEqual([
       'name',
       'presentationName',
       'stock',
-      'cost',
-      'minPurchase',
-      'deliveryTime',
       'qtyAlert',
-      'createdAt',
-      'updatedAt',
     ]);
   });
 
@@ -462,20 +463,65 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('el costo se presenta tal cual lo entrega la operacion', async () => {
+  it('el costo ya no es columna, y donde sigue apareciendo viaja tal cual', async () => {
     // R8 — cadena decimal, con sus ceros: convertirla a numero la mutaria a «1234.5».
+    //
+    // ACOTADO EL 2026-09-03: el costo dejo de ser columna de la tabla por decision del humano,
+    // asi que este caso ya no puede mirar una celda. Lo que R8 protege NO se deja de vigilar: se
+    // mira donde el costo sigue estando en la pantalla, que es el campo oculto con el que la
+    // edicion lo conserva. Si alguien lo pasara por `Number(...)` en el camino, «1234.5000»
+    // llegaria como «1234.5» y esto se pondria rojo.
+    const user = userEvent.setup();
     const conCentavos = producto({ cost: '1234.5000' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([conCentavos]));
 
     await renderPantalla();
-    expect(screen.getByTestId('product-cell-cost').textContent).toBe(conCentavos.cost);
+
+    expect(screen.queryByTestId('product-column-cost')).toBeNull();
+    expect(screen.queryByTestId('product-cell-cost')).toBeNull();
+
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+    expect(screen.getByTestId('product-hidden-cost')).toHaveValue(conCentavos.cost);
 
     cleanup();
 
-    // Y un costo ausente no se convierte en «0» ni en «null»: se marca como vacio.
+    // Y un costo ausente no se convierte en «0» ni en «null»: el campo oculto va vacio.
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto({ cost: null })]));
     await renderPantalla();
-    expect(screen.getByTestId('product-cell-cost').textContent).toBe(EMPTY_CELL);
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+    expect(screen.getByTestId('product-hidden-cost')).toHaveValue('');
+  });
+
+  it('la existencia se pinta en rojo cuando la alerta de cantidad la supera', async () => {
+    // Decision del humano, 2026-09-03. Es PRESENTACION y solo presentacion: no hay columna
+    // derivada en la base ni campo calculado en `ProductView` -R11 y la decision cerrada 10 de
+    // QC-14 lo prohiben-. La comparacion se hace al pintar, con dos valores que ya venian.
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({ id: crypto.randomUUID(), stock: 2, qtyAlert: 5 }),
+        producto({ id: crypto.randomUUID(), stock: 5, qtyAlert: 5 }),
+        producto({ id: crypto.randomUUID(), stock: 9, qtyAlert: 5 }),
+        producto({ id: crypto.randomUUID(), stock: null, qtyAlert: 5 }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    const celdas = screen.getAllByTestId('product-cell-stock');
+    // Por debajo de la alerta: en rojo.
+    expect(celdas[0]).toHaveAttribute('data-alert', 'true');
+    // Justo en la alerta y por encima: no. La alarma salta cuando la SUPERA, no al igualarla.
+    expect(celdas[1]).not.toHaveAttribute('data-alert');
+    expect(celdas[2]).not.toHaveAttribute('data-alert');
+    // Sin existencia no se sabe si hay alarma: pintar de rojo una incognita seria inventarsela.
+    expect(celdas[3]).not.toHaveAttribute('data-alert');
+
+    // La alerta nunca se tine a si misma: la que esta en alarma es la existencia.
+    for (const celda of screen.getAllByTestId('product-cell-qtyAlert')) {
+      expect(celda).not.toHaveAttribute('data-alert');
+    }
   });
 
   it('el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro', async () => {
@@ -735,17 +781,34 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     const precargado: Record<string, string> = {
       name: elProducto.name,
-      cost: String(elProducto.cost),
       stock: String(elProducto.stock),
+      qtyAlert: String(elProducto.qtyAlert),
+    };
+
+    // Los tres campos que el formulario ya no pinta pero que R19 obliga a seguir enviando: sin
+    // ellos, `updateAliveProduct` escribiria `cost: null`, `deliveryTime: null` y
+    // `minPurchase: 0` y la edicion borraria datos que nadie pidio borrar. Viajan ocultos.
+    const OCULTOS_EN_EDICION: Record<string, string> = {
+      cost: String(elProducto.cost),
       minPurchase: String(elProducto.minPurchase),
       deliveryTime: String(elProducto.deliveryTime),
-      qtyAlert: String(elProducto.qtyAlert),
     };
 
     for (const [campo, valor] of Object.entries(precargado)) {
       expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(
-        campo === 'name' || campo === 'cost' ? valor : Number(valor),
+        campo === 'name' ? valor : Number(valor),
       );
+    }
+
+    // Ninguno de los tres tiene ya control visible...
+    for (const campo of Object.keys(OCULTOS_EN_EDICION)) {
+      expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
+    }
+    // ...pero los tres estan en el formulario, ocultos y con el valor actual del producto.
+    for (const [campo, valor] of Object.entries(OCULTOS_EN_EDICION)) {
+      const oculto = screen.getByTestId(`product-hidden-${campo}`);
+      expect(oculto, campo).toHaveAttribute('type', 'hidden');
+      expect(oculto, campo).toHaveValue(valor);
     }
     expect(presentacionSeleccionada()).toBe(elProducto.presentationId);
 
@@ -760,7 +823,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(id).toBe(elProducto.id);
     expect(enviado.get('name')).toBe('Sosa cáustica perlas');
     expect(enviado.get('presentationId')).toBe(elProducto.presentationId);
-    for (const [campo, valor] of Object.entries(precargado)) {
+    for (const [campo, valor] of Object.entries({ ...precargado, ...OCULTOS_EN_EDICION })) {
       if (campo === 'name') continue;
       expect(enviado.get(campo), `${campo} debe viajar en el reemplazo`).toBe(valor);
     }
@@ -775,22 +838,28 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
+    // ACOTADO EL 2026-09-03: el rechazo se provocaba con un costo no numerico. Ese campo ya no se
+    // pinta, asi que el caso se muda al nombre, que sigue en pantalla y tiene su propia regla en
+    // el MISMO esquema del servidor: 120 caracteres como maximo. Lo que R20 vigila -el error va
+    // junto a SU campo, la operacion ni se llama y el panel sigue abierto- no cambia.
+    const nombreLargo = 'x'.repeat(121);
     await crearPresentacionEnLinea(user);
-    await rellenarFormulario(user, { cost: 'mil pesos' });
+    await rellenarFormulario(user, { name: nombreLargo });
     await user.click(screen.getByTestId(testId.enviar));
 
-    const errorDeCampo = await screen.findByTestId('product-error-cost');
+    const errorDeCampo = await screen.findByTestId('product-error-name');
     expect(errorDeCampo).toBeInTheDocument();
-    expect(screen.getByTestId('product-field-cost')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByTestId('product-field-cost')).toHaveAttribute(
+    expect(screen.getByTestId('product-field-name')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('product-field-name')).toHaveAttribute(
       'aria-describedby',
       errorDeCampo.id,
     );
 
     expect(createProductActionMock).not.toHaveBeenCalled();
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
-    // Y no se pierde lo escrito.
-    expect(screen.getByTestId('product-field-name')).toHaveValue(ALTA_VALIDA.name);
+    // Y no se pierde lo escrito: ni lo que provoco el rechazo ni el resto.
+    expect(screen.getByTestId('product-field-name')).toHaveValue(nombreLargo);
+    expect(screen.getByTestId('product-field-stock')).toHaveValue(Number(ALTA_VALIDA.stock));
   });
 
   it('un guardado rechazado por la operacion muestra el error del formulario y conserva lo escrito', async () => {
@@ -824,7 +893,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(toastExito).not.toHaveBeenCalled();
     expect(routerMock.refresh).not.toHaveBeenCalled();
     expect(screen.getByTestId('product-field-name')).toHaveValue(ALTA_VALIDA.name);
-    expect(screen.getByTestId('product-field-cost')).toHaveValue(ALTA_VALIDA.cost);
+    expect(screen.getByTestId('product-field-stock')).toHaveValue(Number(ALTA_VALIDA.stock));
   });
 
   it('un guardado con exito cierra el panel, avisa por toast y refresca la lista', async () => {
@@ -850,6 +919,35 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
     expect(toastExito).toHaveBeenCalledTimes(1);
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
+    // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
+    // Se vigilan las tres cosas que pueden romperse en silencio:
+    //   1. que el disparador sea `type="button"` -desde que el panel entero es un `<form>`, un
+    //      boton sin tipo dentro de el lo ENVIA, y pedir ayuda guardaria el producto-;
+    //   2. que tenga nombre accesible propio, porque su contenido es un icono;
+    //   3. que el texto de la ayuda no este en el documento hasta que se pide.
+    const user = userEvent.setup();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // El nombre no lleva ayuda: se explica solo.
+    expect(screen.queryByTestId('product-helper-name')).toBeNull();
+
+    const ayuda = screen.getByTestId('product-helper-stock');
+    expect(ayuda).toHaveAttribute('type', 'button');
+    expect(ayuda).toHaveAccessibleName('Qué es Existencia');
+    expect(screen.queryByTestId('product-helper-text-stock')).toBeNull();
+
+    await user.hover(ayuda);
+    const texto = await screen.findByTestId('product-helper-text-stock', {}, { timeout: 3_000 });
+    expect(texto).toHaveTextContent('Se guarda tal cual');
+
+    // Pedir ayuda no envia el formulario.
+    expect(createProductActionMock).not.toHaveBeenCalled();
   });
 
   it('el formulario no captura la unidad, y el alta viaja sin ella', async () => {

@@ -6,14 +6,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { ProductView } from '@/lib/modules/inventario';
 
 import { ProductForm } from './product-form';
@@ -36,6 +29,11 @@ const UPDATE_SUCCESS = 'Producto actualizado.';
  * **El contenido se monta solo cuando el panel esta abierto** (lo hace el portal del primitivo):
  * el formulario se crea de cero en cada apertura, asi que la edicion siempre precarga los valores
  * actuales del producto y un intento fallido anterior no deja restos (R19).
+ *
+ * **El panel lo pinta `ProductForm`, no esta ficha.** Desde que el panel entero es un `<form>`
+ * (`SheetContent isForm`), la cabecera, el cuerpo y el pie con el boton de guardar son partes del
+ * mismo formulario, y quien tiene la `action` es `ProductForm`. Aqui quedan el disparador, el
+ * estado de apertura y el cierre.
  *
  * **R21 vive aqui**: con exito se cierra, se avisa por toast -la region la monta el layout
  * privado (R22)- y se llama a `router.refresh()`, que vuelve a ejecutar el Server Component de la
@@ -67,27 +65,7 @@ export function ProductSheet({ product }: { readonly product?: ProductView }) {
         {isEdit ? <PencilIcon /> : <PlusIcon />}
         {isEdit ? null : 'Nuevo producto'}
       </SheetTrigger>
-      {/*
-        `w-full` en angosto y `sm:max-w-md` a partir de ahi: el primitivo trae `w-3/4`, que en un
-        telefono deja el formulario en una columna incomoda. `overflow-y-auto` para que el
-        desbordamiento vertical lo absorba el panel, y `pb-[env(safe-area-inset-bottom)]` para que
-        el ultimo control no quede bajo la barra de gestos de iOS.
-      */}
-      <SheetContent
-        side="right"
-        className="w-full overflow-y-auto pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-        data-testid="product-sheet"
-      >
-        <SheetHeader>
-          <SheetTitle>{isEdit ? 'Editar producto' : 'Nuevo producto'}</SheetTitle>
-          <SheetDescription>
-            {isEdit
-              ? 'Cambia los datos del producto. Se guardan todos los campos.'
-              : 'Completa los datos del producto.'}
-          </SheetDescription>
-        </SheetHeader>
-        <ProductForm product={product} onSaved={handleSaved} />
-      </SheetContent>
+      <ProductForm product={product} onSaved={handleSaved} />
     </Sheet>
   );
 }

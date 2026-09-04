@@ -29,7 +29,7 @@
 
 import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import type { RouteRoleRule } from '@/lib/modules/identity';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 /**
  * Conjunto declarado de reglas ruta→rol.
@@ -49,4 +49,5 @@ import { INVENTORY_ROUTE } from '@/lib/shared/routes';
  */
 export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
+  { prefix: FORMULAS_ROUTE, roles: [ADMIN_ROLE_NAME] },
 ];

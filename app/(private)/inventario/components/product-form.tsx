@@ -4,20 +4,38 @@ import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { createProductSchema, type ProductView } from '@/lib/modules/inventario';
 import {
   createProductAction,
   updateProductAction,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
+import { ProductField } from './product-field';
 import { PRESENTATION_FIELD, PresentationSelect } from './presentation-select';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
-/** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R31 no distingue por ancho. */
-const FIELD_TEXT = 'text-base md:text-base';
+/**
+ * Los tres campos que el formulario YA NO PINTA (decision del humano, 2026-09-03): costo,
+ * compra minima y tiempo de entrega.
+ *
+ * Se siguen LEYENDO y VALIDANDO, y no es un descuido: la edicion es reemplazo completo (R19),
+ * asi que un `update` que no los mande los borraria -`updateAliveProduct` escribe
+ * `data.cost ?? null` y `data.minPurchase`, no ignora los ausentes-. En edicion viajan como
+ * campos ocultos con el valor actual del producto; en el alta no viajan, y entonces `cost` y
+ * `deliveryTime` nacen nulos y `minPurchase` toma el `default(0)` del esquema.
+ *
+ * Si algun dia se quiere que la edicion TAMBIEN los olvide, se quitan los ocultos de abajo y
+ * esta constante entera con ellos.
+ */
+const HIDDEN_FIELDS = ['cost', 'minPurchase', 'deliveryTime'] as const;
 
 /**
  * Campos de texto del producto. `presentationId` no esta aqui: lo aporta su propio selector (T8).
@@ -235,10 +253,46 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
   const initialValue = (field: ProductFieldName, fromProduct: string): string =>
     values?.[field] ?? fromProduct;
 
-  const showFormError = state.status === 'error' && Object.keys(state.fieldErrors).length === 0;
+  // Un rechazo solo se puede pintar EN LINEA si su campo sigue en pantalla. Si el unico error
+  // cae en uno de los ocultos, no hay donde ponerlo: se manda a la region del formulario, que es
+  // peor mensaje pero mejor que no decir nada. `some` y no `filter`: el contrato de la ruta
+  // prohibe la cadena «filter(» en estos archivos -es la guardia que impide colar busqueda-.
+  const hayErrorVisible = Object.keys(fieldErrors).some(
+    (field) => !HIDDEN_FIELDS.includes(field as (typeof HIDDEN_FIELDS)[number]),
+  );
+  const showFormError = state.status === 'error' && !hayErrorVisible;
+
+  const isEdit = product !== undefined;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 p-4" data-testid="product-form">
+    /*
+      `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar puede vivir en el pie
+      -donde R31 lo quiere, sin estirarse al ancho- y `useFormStatus()` lo sigue viendo, porque
+      el formulario es su ancestro. Por eso este componente monta el panel y no solo los campos.
+
+      `w-full` en angosto y `sm:max-w-md` a partir de ahi: el primitivo trae `w-3/4`, que en un
+      telefono deja el formulario en una columna incomoda. `pb-[env(safe-area-inset-bottom)]`
+      para que el pie no quede bajo la barra de gestos de iOS. El desbordamiento vertical lo
+      absorbe el CUERPO, no el panel: asi la cabecera y el pie no se van con el scroll.
+    */
+    <SheetContent
+      side="right"
+      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
+      data-testid="product-sheet"
+      isForm
+      formProps={{ action: formAction, 'data-testid': 'product-form' }}
+      footer={<FormActions />}
+    >
+      <SheetHeader>
+        <SheetTitle>{isEdit ? 'Editar producto' : 'Nuevo producto'}</SheetTitle>
+        <SheetDescription>
+          {isEdit
+            ? 'Cambia los datos del producto. Se guardan todos los campos.'
+            : 'Completa los datos del producto.'}
+        </SheetDescription>
+      </SheetHeader>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
       {showFormError ? (
         // Region de error del formulario (R20): aqui van los rechazos que no senalan un campo.
         <div
@@ -254,12 +308,13 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         </div>
       ) : null}
 
-      <TextField
-        field="name"
-        idPrefix={fieldId}
+      <ProductField
+        name="name"
+        label={FIELD_LABELS.name}
+        type="text"
+        required
         defaultValue={initialValue('name', product?.name ?? '')}
         error={fieldErrors.name}
-        required
       />
 
       <PresentationSelect
@@ -267,9 +322,12 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         error={fieldErrors.presentationId}
       />
 
-      <IntegerField
-        field="stock"
-        idPrefix={fieldId}
+      <ProductField
+        name="stock"
+        label={FIELD_LABELS.stock}
+        type="number"
+        required
+        helper="Las unidades que hay ahora mismo. Se guarda tal cual, sin recalcularse a partir de ningún movimiento."
         defaultValue={initialValue('stock', product?.stock?.toString() ?? '')}
         error={fieldErrors.stock}
       />
@@ -291,115 +349,77 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
       */}
 
       {/*
-        `cost` es `type="text"` y NUNCA `type="number"`: un `number` de HTML pasa por el binario de
-        coma flotante, y el importe viaja como cadena decimal a proposito desde el dominio.
+        COSTO, COMPRA MINIMA Y TIEMPO DE ENTREGA YA NO SE PINTAN (ver `HIDDEN_FIELDS`).
+
+        En EDICION siguen viajando, ocultos y con el valor actual del producto, porque R19 hace de
+        la edicion un reemplazo completo: si no se mandaran, `updateAliveProduct` escribiria
+        `cost: null`, `deliveryTime: null` y `minPurchase: 0` y el producto perderia tres datos
+        que nadie pidio borrar. En el ALTA no se pinta ninguno: no hay valor previo que conservar
+        y el esquema ya sabe que hacer con su ausencia.
+
+        `defaultValue` y no `value` para que sigan siendo campos NO controlados, como el resto.
       */}
-      <TextField
-        field="cost"
-        idPrefix={fieldId}
-        defaultValue={initialValue('cost', product?.cost ?? '')}
-        error={fieldErrors.cost}
-        inputMode="decimal"
-      />
+      {isEdit ? (
+        <>
+          <input
+            type="hidden"
+            name="cost"
+            defaultValue={initialValue('cost', product.cost ?? '')}
+            data-testid="product-hidden-cost"
+          />
+          <input
+            type="hidden"
+            name="minPurchase"
+            defaultValue={initialValue('minPurchase', product.minPurchase.toString())}
+            data-testid="product-hidden-minPurchase"
+          />
+          <input
+            type="hidden"
+            name="deliveryTime"
+            defaultValue={initialValue('deliveryTime', product.deliveryTime?.toString() ?? '')}
+            data-testid="product-hidden-deliveryTime"
+          />
+        </>
+      ) : null}
 
-      <IntegerField
-        field="minPurchase"
-        idPrefix={fieldId}
-        defaultValue={initialValue('minPurchase', product?.minPurchase.toString() ?? '')}
-        error={fieldErrors.minPurchase}
-      />
-
-      <IntegerField
-        field="deliveryTime"
-        idPrefix={fieldId}
-        defaultValue={initialValue('deliveryTime', product?.deliveryTime?.toString() ?? '')}
-        error={fieldErrors.deliveryTime}
-      />
-
-      <IntegerField
-        field="qtyAlert"
-        idPrefix={fieldId}
+      <ProductField
+        name="qtyAlert"
+        label={FIELD_LABELS.qtyAlert}
+        type="number"
+        required
+        helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
         defaultValue={initialValue('qtyAlert', product?.qtyAlert?.toString() ?? '')}
         error={fieldErrors.qtyAlert}
       />
 
-      <SaveButton />
-    </form>
+      </div>
+    </SheetContent>
   );
 }
-
-type FieldProps = {
-  readonly field: ProductFieldName;
-  readonly idPrefix: string;
-  readonly defaultValue: string;
-  readonly error?: string;
-  readonly required?: boolean;
-  readonly inputMode?: 'decimal';
-};
 
 /**
- * Campo de texto con su etiqueta y su error en linea. `key={defaultValue}` por la misma razon que
- * en `login-form.tsx`: Base UI avisa cuando el `defaultValue` de un campo no controlado cambia
- * despues de montarse, y la clave fuerza un remontaje justo en ese salto -el campo sigue sin
- * estar controlado-.
+ * Acciones del pie: cancelar y guardar, en ese orden de lectura y alineadas a la derecha por el
+ * pie del panel. **Cancelar es `type="button"`** -y no un submit- porque desde que el panel
+ * entero es un `<form>` cualquier boton sin tipo dentro de el lo enviaria. Cierra por el
+ * primitivo (`SheetClose`), asi que no necesita saber nada del estado de apertura.
  */
-function TextField({ field, idPrefix, defaultValue, error, required, inputMode }: FieldProps) {
-  const inputId = `${idPrefix}-${field}`;
-  const errorId = `${inputId}-error`;
-
+function FormActions() {
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>{FIELD_LABELS[field]}</Label>
-      <Input
-        key={defaultValue}
-        id={inputId}
-        name={field}
-        type="text"
-        inputMode={inputMode}
-        required={required}
-        defaultValue={defaultValue}
-        className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={`product-field-${field}`}
-      />
-      {error === undefined ? null : (
-        <p id={errorId} className="text-sm text-destructive" data-testid={`product-error-${field}`}>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** Campo entero. `type="number"` con `inputMode` numerico: la action rechaza lo que no sea entero. */
-function IntegerField({ field, idPrefix, defaultValue, error }: FieldProps) {
-  const inputId = `${idPrefix}-${field}`;
-  const errorId = `${inputId}-error`;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>{FIELD_LABELS[field]}</Label>
-      <Input
-        key={defaultValue}
-        id={inputId}
-        name={field}
-        type="number"
-        inputMode="numeric"
-        step={1}
-        min={0}
-        defaultValue={defaultValue}
-        className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={`product-field-${field}`}
-      />
-      {error === undefined ? null : (
-        <p id={errorId} className="text-sm text-destructive" data-testid={`product-error-${field}`}>
-          {error}
-        </p>
-      )}
-    </div>
+    <>
+      <SheetClose
+        render={
+          <Button
+            type="button"
+            variant="outline-dashed"
+            className={TOUCH_TARGET}
+            data-testid="product-form-cancel"
+          />
+        }
+      >
+        Cancelar
+      </SheetClose>
+      <SaveButton />
+    </>
   );
 }
 
@@ -414,7 +434,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={`w-full ${TOUCH_TARGET}`}
+      className={TOUCH_TARGET}
       disabled={pending}
       aria-busy={pending}
       data-testid="product-form-submit"

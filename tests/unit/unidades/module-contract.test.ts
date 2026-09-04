@@ -29,7 +29,29 @@
 // vacia y `lib/composition` cablea la LECTURA (`findUnitRefs`) -nunca una escritura,
 // que sigue siendo QC-38-. Donde eso cambia el criterio de un test, queda anotado ahi.
 //
-// Cubre R14, R16, R17, R19, R26 (su mitad negativa) y R27; y refuerza R4 y R15.
+// ACTUALIZADO el 2026-09-03 (ronda 5, QC-26): las tres aserciones que quedaban escritas
+// como «esta carpeta esta vacia» codificaban el LIMITE DE ALCANCE de QC-32, no una
+// invariante permanente -`design.md > 9` y la fila 4 de «Decisiones cerradas» de
+// `requirements.md` mandan explicitamente que ESTA ficha le anada a `unidades` dominio,
+// puerto, adaptador driven y adaptador driving-. Lo que cambia:
+//   * `ports/` deja de estar vacia: tiene EXACTAMENTE `unit-repository.ts` (R40).
+//   * El barrido de `prisma.unit` pasa de un adaptador permitido a EXACTAMENTE dos, los
+//     dos de `adapters/driven/persistence/`: `unit-catalog-prisma.ts` (resolver ids
+//     conocidos, QC-25/R50) y `unit-prisma.ts` (listar el catalogo entero, QC-26/R40).
+//   * `adapters/driving/` deja de estar vacia: tiene EXACTAMENTE `unit-actions.ts`, que
+//     exporta EXACTAMENTE `listUnitsAction` y ninguna otra funcion -R44 prohibe que esta
+//     ficha anada crear, editar o borrar unidades, eso es QC-38-, y `'use server'` deja
+//     de estar prohibido en TODO el modulo para estarlo en TODO menos ese archivo.
+//   * La asercion «ningun archivo de `app/` conoce el modulo unidades» se INVIERTE a «solo
+//     puede conocerlo por su adaptador driving de listado o por el barrel, nunca por ruta
+//     profunda a dominio, puertos o un adaptador driven»: es la forma util de R43 ahora
+//     que el formulario de recetas de esta misma ficha importa `listUnitsAction`.
+// Lo que NO cambia: `app/api/units`, `app/api/unidades`, `app/(private)/unidades` y
+// `app/(private)/units` siguen sin poder existir -no hay pantalla de UNIDADES, sigue
+// siendo QC-38/QC-39-, y ninguna operacion de escritura de unidades puede aparecer en
+// ningun archivo del modulo.
+//
+// Cubre R4, R14, R15, R16, R17, R19, R26 (su mitad negativa), R27, R40, R43 y R44.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
@@ -235,20 +257,27 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
         .sort(),
     ).toEqual(['driven', 'driving'])
 
-    // `ports/` sigue VACIA y sembrada con `.gitkeep` (`design.md > 5.1`, ronda 3): el
-    // contrato de lectura (`UnitCatalog`) vive en `domain/`, mismo criterio que
-    // `ProductCatalog` de `inventario` -no hace falta un puerto aparte para el, es la
-    // interfaz que el propio dominio publica-.
+    // `ports/` YA NO esta vacia (ACTUALIZADO 2026-09-03, ronda 5, QC-26): esta ficha le
+    // anade `UnitRepository`, el puerto que pide el UNICO adaptador driving del modulo
+    // para listar el catalogo entero (R40). El contrato de RESOLUCION de ids conocidos
+    // (`UnitCatalog`, el que usa `recetas`) se mantiene en `domain/`, sin cambios -mismo
+    // criterio que `ProductCatalog` de `inventario`-.
     //
+    // Se afirma la lista EXACTA, no que "algo" haya: si manana alguien anade un segundo
+    // puerto sin que este test lo sepa, la lista real diverge del `toEqual` y cae.
+    expect(sourcesIn(join(unidadesDir, 'ports')).map(etiqueta), 'ports/ ya no tiene EXACTAMENTE un fuente').toEqual([
+      'lib/modules/unidades/ports/unit-repository.ts',
+    ])
+    expect(
+      readdirSync(join(unidadesDir, 'ports')).sort(),
+      'ports/ deberia tener exactamente .gitkeep y unit-repository.ts',
+    ).toEqual(['.gitkeep', 'unit-repository.ts'])
+
     // ACTUALIZADO 2026-09-03 (QC-25, R50): `adapters/driven/` YA NO esta vacia. El
     // consumidor que esta ronda anticipaba para QC-38 llego antes, con QC-25: `recetas`
     // necesita validar `unitId` contra el catalogo en el alta y en la edicion, asi que
-    // implementa `unit-catalog-prisma.ts` -el UNICO archivo del repo que consulta
-    // `prisma.unit`, ver el test de barrido mas abajo-.
-    expect(sourcesIn(join(unidadesDir, 'ports')), 'ports/ no deberia tener fuentes').toEqual([])
-    expect(readdirSync(join(unidadesDir, 'ports')), 'ports/ deberia tener solo .gitkeep').toEqual([
-      '.gitkeep',
-    ])
+    // implementa `unit-catalog-prisma.ts` -uno de los DOS unicos archivos del repo que
+    // consultan `prisma.unit`, ver el test de barrido mas abajo-.
 
     // El contrato solo reexporta de `./domain`: ni puertos, ni adaptadores, ni nada de fuera.
     const contrato = read(barrel)
@@ -265,14 +294,22 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     const alcanzables = reachableFrom(barrel)
     expect(alcanzables.length).toBeGreaterThan(1)
     for (const file of alcanzables) {
-      // El barrel solo alcanza DOMINIO: ni un puerto ni un adaptador. Antes esto se escribia
-      // como «el adaptador driven del seed no es alcanzable»; ese archivo ya no existe, asi
-      // que la regla se afirma sobre la CAPA y no sobre un nombre concreto, y sigue valiendo
-      // el dia que QC-38 llene esas dos carpetas.
+      // El barrel solo alcanza DOMINIO y, transitivamente, los PUERTOS que el dominio
+      // declara -son la interfaz que el dominio publica hacia su implementacion, pura
+      // firma sin framework, tan importable desde cliente como el propio dominio-. Lo que
+      // sigue prohibido es un ADAPTADOR: ese si arrastra Prisma, Next o `'use server'`.
+      //
+      // ACTUALIZADO 2026-09-03 (ronda 5, QC-26): `ports/` dejo de estar vacia y
+      // `domain/list-units.ts` importa `UnitRepository` de forma relativa (`../ports/
+      // unit-repository`), asi que ese puerto entra al cierre transitivo del barrel a
+      // proposito. La regla se estrecha de «ni puertos ni adaptadores» a «ningun
+      // adaptador»; los chequeos de abajo (sin 'use server', sin @prisma/client, sin
+      // next/react, sin consultar `prisma.unit`) siguen aplicandose IGUAL a `ports/`, asi
+      // que un puerto que se saliera de ser una interfaz pura seguiria cayendo ahi.
       expect(
         toPosix(relative(unidadesDir, file)),
-        `${etiqueta(file)} vive en adapters/ o ports/ y es alcanzable desde el barrel`,
-      ).not.toMatch(/^(adapters|ports)\//)
+        `${etiqueta(file)} vive en adapters/ y es alcanzable desde el barrel`,
+      ).not.toMatch(/^adapters\//)
     }
     for (const file of alcanzables) {
       const source = read(file)
@@ -292,7 +329,7 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     }
   })
 
-  it('a lo sumo el adaptador driven de unidades consulta la tabla de unidades, y el barrido lo demuestra sobre una consulta real', () => {
+  it('a lo sumo los adaptadores driven de unidades consultan la tabla de unidades, y el barrido lo demuestra sobre una consulta real', () => {
     // R15 y R16, leidos al dia de hoy. El criterio de las rondas 1 y 2 era «`prisma.unit`
     // aparece EXACTAMENTE en el adaptador driven de `unidades` y en ninguno mas». Ese
     // adaptador se retiro el 2026-09-03 con el aparato del seed y la ronda 3 endurecio el
@@ -304,26 +341,34 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     // `lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts`, y ningun
     // otro archivo.
     //
+    // ACTUALIZADO 2026-09-03 (ronda 5, QC-26): el conjunto permitido pasa de UNO a
+    // EXACTAMENTE DOS, los dos de `adapters/driven/persistence/`: `unit-catalog-prisma.ts`
+    // (resolver ids conocidos para `recetas`, QC-25/R50, sin cambios) y `unit-prisma.ts`
+    // (listar el catalogo entero para el adaptador driving de esta ficha, QC-26/R40). El
+    // orden es alfabetico por ruta -asi es como recorre `filesIn`-, no de aparicion.
+    //
     // QUE LO VOLVERIA ROJO: cualquier `prisma.unit.<metodo>` o `<receptor>.unit.<metodo>` en
     // OTRO archivo de `lib`, `app`, `components`, `hooks`, `scripts` o `middleware.ts`
-    // -`lib/composition` incluido, que solo puede REFERENCIAR `findUnitRefs`, nunca
-    // consultar la tabla por su cuenta-.
-    const ADAPTADOR_PERMITIDO = 'lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts'
+    // -`lib/composition` incluido, que solo puede REFERENCIAR `findUnitRefs` y `listUnits`,
+    // nunca consultar la tabla por su cuenta-.
+    const ADAPTADOR_CATALOGO = 'lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts'
+    const ADAPTADOR_LISTADO = 'lib/modules/unidades/adapters/driven/persistence/unit-prisma.ts'
     expect(todoElCodigo.length).toBeGreaterThan(0)
     expect(entradasReales).toHaveLength(todoElCodigo.length)
-    expect(nombresQueConsultanUnidades(entradasReales)).toEqual([ADAPTADOR_PERMITIDO])
+    expect(nombresQueConsultanUnidades(entradasReales)).toEqual([ADAPTADOR_CATALOGO, ADAPTADOR_LISTADO])
 
     // Y la MISMA funcion, sobre los MISMOS archivos reales mas una entrada sintetica con una
-    // consulta de verdad, devuelve el adaptador permitido MAS esa. Esto es lo que sustituye
-    // al viejo «y ese archivo la consulta de verdad»: sin esta segunda pasada, el `toEqual`
-    // de arriba seria verde tambien si el barrido no leyera nada o si el predicado hubiera
-    // dejado de reconocer una consulta.
+    // consulta de verdad, devuelve los dos adaptadores permitidos MAS esa. Esto es lo que
+    // sustituye al viejo «y ese archivo la consulta de verdad»: sin esta segunda pasada, el
+    // `toEqual` de arriba seria verde tambien si el barrido no leyera nada o si el predicado
+    // hubiera dejado de reconocer una consulta.
     const sintetico: EntradaDeBarrido = {
       nombre: '<sintetico>',
       fuente: 'export async function x(prisma: unknown) { await prisma.unit.findMany({}) }',
     }
     expect(nombresQueConsultanUnidades([...entradasReales, sintetico])).toEqual([
-      ADAPTADOR_PERMITIDO,
+      ADAPTADOR_CATALOGO,
+      ADAPTADOR_LISTADO,
       '<sintetico>',
     ])
     // Tambien con el receptor renombrado, que es la forma por la que se escaparia: el barrido
@@ -333,7 +378,8 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       fuente: 'await db.unit.create({ data })',
     }
     expect(nombresQueConsultanUnidades([...entradasReales, conOtroReceptor])).toEqual([
-      ADAPTADOR_PERMITIDO,
+      ADAPTADOR_CATALOGO,
+      ADAPTADOR_LISTADO,
       '<sintetico-db>',
     ])
   })
@@ -489,24 +535,75 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(acciones, "el formulario sigue leyendo la clave 'unit'").not.toMatch(/'unit'/)
   })
 
-  it('la feature no anade adaptadores driving, rutas ni Server Actions', () => {
-    // R27: esta ficha es esquema, migracion —con su arrancador en SQL— y armazon del modulo.
-    // Ningun alta, edicion ni borrado
-    // de unidades —eso es QC-38— y por tanto ningun flujo navegable que un E2E pueda visitar
-    // (decision cerrada 18).
+  it('la feature anade UNICAMENTE la Server Action de listado, y ninguna operacion de escritura de unidades', () => {
+    // R27, R44: esta ficha es esquema, migracion —con su arrancador en SQL—, armazon del
+    // modulo, y (ronda 5, QC-26) su UNICA operacion de lectura publicada (R40-R42). Ningun
+    // alta, edicion ni borrado de unidades —eso es QC-38— y por tanto ninguna pantalla de
+    // UNIDADES que un E2E pueda visitar (decision cerrada 18): la pantalla que SI abre esta
+    // ficha es la de RECETAS, que consume esta lectura (R43).
     const driving = join(unidadesDir, 'adapters', 'driving')
-    expect(sourcesIn(driving), `${etiqueta(driving)} deberia estar vacia`).toEqual([])
-    // Sigue sembrada con su `.gitkeep`, para que git la versione (`design.md > 5.1`).
-    expect(readdirSync(driving)).toEqual(['.gitkeep'])
 
-    // Ningun 'use server' en TODO el modulo, no solo en lo alcanzable desde el barrel.
+    // `adapters/driving/` YA NO esta vacia (ACTUALIZADO 2026-09-03, ronda 5, QC-26): tiene
+    // EXACTAMENTE `unit-actions.ts`. Lista exacta, no "algo hay".
+    expect(sourcesIn(driving).map(etiqueta), 'adapters/driving/ ya no tiene EXACTAMENTE un fuente').toEqual([
+      'lib/modules/unidades/adapters/driving/unit-actions.ts',
+    ])
+    expect(
+      readdirSync(driving).sort(),
+      'adapters/driving/ deberia tener exactamente .gitkeep y unit-actions.ts',
+    ).toEqual(['.gitkeep', 'unit-actions.ts'])
+
+    const unitActionsFile = join(driving, 'unit-actions.ts')
+    const unitActionsSource = read(unitActionsFile)
+
+    // Ese archivo exporta EXACTAMENTE una funcion, `listUnitsAction`, y ninguna otra: R44
+    // prohibe que esta ficha anada crear/editar/borrar unidades (eso es QC-38), y esta
+    // asercion cae en cuanto alguien anada, por ejemplo, `createUnitAction` al lado.
+    const funcionesExportadas = [
+      ...unitActionsSource.matchAll(/export\s+async\s+function\s+(\w+)/g),
+      ...unitActionsSource.matchAll(/export\s+function\s+(\w+)/g),
+    ].map((m) => m[1])
+    expect(funcionesExportadas).toEqual(['listUnitsAction'])
+
+    // Ninguna operacion de ESCRITURA de unidades en NINGUN archivo del modulo: ni el nombre
+    // de una funcion de mutacion, ni un metodo de escritura de Prisma sobre `unit`. Esto es
+    // lo que se pondria rojo si alguien coloca `createUnit`/`updateUnit`/`deleteUnit` en
+    // `unit-actions.ts`, en el dominio o en un adaptador -aunque nunca llegue a exportarse-.
+    const NOMBRE_DE_ESCRITURA = /\b(createUnit|updateUnit|deleteUnit|renameUnit)\b/
+    const METODOS_DE_ESCRITURA = 'create|createMany|createManyAndReturn|update|updateMany|upsert|delete|deleteMany'
+    const escrituraPrisma = new RegExp(
+      `[A-Za-z0-9_$]\\s*\\.\\s*unit\\s*\\.\\s*(?:${METODOS_DE_ESCRITURA})\\s*[(<]`,
+    )
     for (const file of unidadesSources) {
-      expect(read(file), `${etiqueta(file)} declara 'use server'`).not.toMatch(
+      const source = read(file)
+      const nombre = etiqueta(file)
+      expect(source, `${nombre} nombra una operacion de escritura de unidades`).not.toMatch(
+        NOMBRE_DE_ESCRITURA,
+      )
+      expect(source, `${nombre} escribe la tabla de unidades por Prisma`).not.toMatch(
+        escrituraPrisma,
+      )
+    }
+
+    // `'use server'` YA NO esta prohibido en TODO el modulo (ronda 3): el unico adaptador
+    // driving lo necesita para ser una Server Action. Lo que sigue prohibido es que aparezca
+    // en OTRO archivo -eso volveria alcanzable desde el barrel algo de servidor, o abriria
+    // una segunda Server Action sin pasar por esta ficha-.
+    for (const file of unidadesSources) {
+      const nombre = etiqueta(file)
+      if (file === unitActionsFile) {
+        expect(unitActionsSource, `${nombre} deberia declarar 'use server'`).toMatch(
+          /['"]use server['"]/,
+        )
+        continue
+      }
+      expect(read(file), `${nombre} declara 'use server' fuera de unit-actions.ts`).not.toMatch(
         /['"]use server['"]/,
       )
     }
 
-    // Ninguna ruta HTTP ni pantalla de unidades.
+    // Ninguna ruta HTTP ni pantalla de UNIDADES: sigue sin haber una pantalla de unidades,
+    // la que SI abre esta ficha es la de recetas (QC-38/QC-39 para la de unidades).
     for (const ruta of [
       join(repoRoot, 'app', 'api', 'units'),
       join(repoRoot, 'app', 'api', 'unidades'),
@@ -516,11 +613,24 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       expect(existsSync(ruta), `${etiqueta(ruta)} no debe existir`).toBe(false)
     }
 
-    // Y ningun archivo de `app/` conoce todavia el modulo: la pantalla es QC-39.
+    // ACTUALIZADO 2026-09-03 (ronda 5, QC-26): la vieja asercion «ningun archivo de `app/`
+    // conoce el modulo unidades» hoy pasaba pero se iba a poner roja en la siguiente tanda a
+    // proposito -el formulario de recetas de esta misma ficha importa `listUnitsAction`,
+    // que es exactamente lo que R43 manda-. Se retensa: `app/` puede importar `unidades`
+    // SOLO por el adaptador driving de listado o por el barrel, nunca por ruta profunda a
+    // `domain/`, `ports/` ni a un adaptador DRIVEN, ni instanciando ese adaptador, ni
+    // tocando `prisma` directamente.
+    const IMPORT_PERMITIDO_DE_UNIDADES = /^@\/lib\/modules\/unidades(\/adapters\/driving\/unit-actions)?$/
     for (const file of sourcesIn(join(repoRoot, 'app'))) {
-      expect(read(file), `${etiqueta(file)} importa el modulo unidades`).not.toMatch(
-        /@\/lib\/modules\/unidades/,
-      )
+      const source = read(file)
+      const nombre = etiqueta(file)
+      for (const spec of importSpecifiers(source)) {
+        if (!spec.startsWith('@/lib/modules/unidades')) continue
+        expect(spec, `${nombre}: importa unidades por una ruta que no es el barrel ni la Server Action de listado`).toMatch(
+          IMPORT_PERMITIDO_DE_UNIDADES,
+        )
+      }
+      expect(consultaTablaDeUnidades(source), `${nombre} consulta prisma.unit`).toBe(false)
     }
 
     // MITAD NEGATIVA DE R26, y el criterio esta INVERTIDO respecto a las rondas 1 y 2: ahi se
@@ -544,8 +654,22 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(composicion, 'la composicion cablea la LECTURA de unidades (UnitCatalog, R50)').toMatch(
       /findUnitRefs/,
     )
-    expect(composicion, 'la composicion nombra un puerto o adaptador de unidades fuera del de lectura')
-      .not.toMatch(/modules\/unidades\/(adapters(?!\/driven\/persistence\/unit-catalog-prisma)|ports)/)
+    // ACTUALIZADO 2026-09-03 (ronda 5, QC-26): esto TAMPOCO incluye ya solo `findUnitRefs`
+    // -R40 anade una SEGUNDA lectura, el listado completo para la pantalla de recetas-.
+    // `lib/composition` cablea `UnitRepository` (el puerto de esta ficha) con
+    // `unit-prisma.ts` (su unico adaptador driven). Las dos rutas quedan permitidas por
+    // nombre EXACTO; cualquier otro adaptador o puerto de unidades -y en particular el
+    // adaptador DRIVING, que la composicion nunca instancia (R12)- sigue prohibido.
+    expect(composicion, 'la composicion cablea la LECTURA de unidades (UnitRepository, R40)').toMatch(
+      /listUnits/,
+    )
+    expect(composicion, 'la composicion nombra un puerto o adaptador de unidades fuera de los de lectura')
+      .not.toMatch(
+        /modules\/unidades\/(adapters(?!\/driven\/persistence\/(unit-catalog-prisma|unit-prisma))|ports(?!\/unit-repository))/,
+      )
+    expect(composicion, 'la composicion importa el adaptador driving de unidades').not.toMatch(
+      /modules\/unidades\/adapters\/driving/,
+    )
     expect(composicion, 'la composicion cablea una ESCRITURA de unidades (alta/edicion/borrado, QC-38)').not.toMatch(
       /createUnit|updateUnit|deleteUnit/i,
     )

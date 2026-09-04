@@ -12,6 +12,24 @@ export const LOGIN_ROUTE = '/login';
  */
 export const INVENTORY_ROUTE = '/inventario';
 
+/**
+ * Pantalla de recetas de produccion (QC-26, R3).
+ *
+ * Vive aqui y no en `navigation/private-nav.ts` —donde nacio como placeholder— porque el
+ * middleware y la regla ruta->rol de `identity` la necesitan y **no pueden depender de la
+ * navegacion**, que arrastra etiquetas, iconos y agrupacion de UI. `private-nav.ts` ya importa de
+ * este archivo, asi que la flecha no se invierte ni aparece un ciclo.
+ */
+export const FORMULAS_ROUTE = '/produccion/formulas';
+
+/** Ruta de alta de una receta nueva, derivada de `FORMULAS_ROUTE` (QC-26, R4). */
+export const NEW_RECIPE_ROUTE = `${FORMULAS_ROUTE}/nueva`;
+
+/** Ruta de edicion de una receta existente, derivada de `FORMULAS_ROUTE` (QC-26, R5, R6). */
+export function recipeEditRoute(id: string): string {
+  return `${FORMULAS_ROUTE}/${id}`;
+}
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
@@ -25,4 +43,4 @@ export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
  * nueva sin prefijo que la cubra pone el gate en rojo con su nombre, y un prefijo que ya no
  * corresponde a ninguna pantalla, tambien.
  */
-export const PRIVATE_ROUTE_PREFIXES = [DASHBOARD_ROUTE, INVENTORY_ROUTE] as const;
+export const PRIVATE_ROUTE_PREFIXES = [DASHBOARD_ROUTE, INVENTORY_ROUTE, FORMULAS_ROUTE] as const;

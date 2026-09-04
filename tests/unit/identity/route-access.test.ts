@@ -17,9 +17,12 @@ import type { RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rul
 import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import {
   DASHBOARD_ROUTE,
+  FORMULAS_ROUTE,
   INVENTORY_ROUTE,
   LOGIN_ROUTE,
+  NEW_RECIPE_ROUTE,
   PRIVATE_ROUTE_PREFIXES,
+  recipeEditRoute,
 } from '@/lib/shared/routes';
 
 const ROUTES = { login: '/login', dashboard: '/dashboard' } as const;
@@ -303,6 +306,71 @@ describe('la pantalla de inventario con las constantes reales (R3, R4)', () => {
   it('no corta al Operador en las rutas privadas que no tienen regla (R4)', () => {
     expect(decideRouteAccess({ ...REAL, pathname: DASHBOARD_ROUTE, session: OPERADOR })).toEqual({
       kind: 'allow',
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-26 T23 — La pantalla de recetas, con las constantes REALES (R4, R6)
+// ---------------------------------------------------------------------------
+//
+// Mismo patron que el bloque de inventario de arriba, pero con `FORMULAS_ROUTE` y sus DOS
+// subrutas de formulario. La regla de inventario (R4) sigue existiendo y no se toca aqui: se
+// anadio, no se sustituyo.
+describe('la pantalla de recetas con las constantes reales (R4, R6)', () => {
+  const ID_RECETA = '11111111-1111-4111-8111-111111111111';
+
+  // R4 — las tres rutas de recetas quedan cubiertas por el prefijo privado declarado: sin
+  // sesion no se renderiza ninguna, se redirige al login llevando el destino de vuelta.
+  it.each([
+    ['la lista', FORMULAS_ROUTE],
+    ['el alta', NEW_RECIPE_ROUTE],
+    ['la edicion', recipeEditRoute(ID_RECETA)],
+  ])('sin sesion, pedir %s redirige al login con esa ruta como destino de vuelta (R4)', (_, ruta) => {
+    expect(decideRouteAccess({ ...REAL, pathname: ruta, session: ANONIMO })).toEqual({
+      kind: 'redirect',
+      to: `${LOGIN_ROUTE}?next=${encodeURIComponent(ruta)}`,
+      reason: 'unauthenticated',
+    });
+  });
+
+  // Trampa deliberada: comparte el texto del prefijo pero no el limite de segmento. Si el
+  // prefijo se comprobase con `startsWith` en vez de por segmentos, esto quedaria cubierto por
+  // error y este test lo distingue.
+  it('una ruta que solo comparte el texto del prefijo, sin limite de segmento, no queda cubierta (R4)', () => {
+    expect(decideRouteAccess({ ...REAL, pathname: '/produccion/formulasX', session: ANONIMO })).toEqual({
+      kind: 'allow',
+    });
+  });
+
+  // R6 — con sesion de Administrador entra a las tres; con cualquier otro rol, fuera y sin
+  // renderizar, con motivo `forbidden`.
+  it('deja pasar al Administrador en las tres rutas (R6)', () => {
+    const admin = { kind: 'authenticated', sub: SUB, roleName: ADMIN_ROLE_NAME } as const;
+
+    for (const ruta of [FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute(ID_RECETA)]) {
+      expect(decideRouteAccess({ ...REAL, pathname: ruta, session: admin })).toEqual({
+        kind: 'allow',
+      });
+    }
+  });
+
+  it('a un rol distinto de Administrador lo redirige con motivo forbidden en las tres rutas (R6)', () => {
+    for (const ruta of [FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute(ID_RECETA)]) {
+      expect(decideRouteAccess({ ...REAL, pathname: ruta, session: OPERADOR })).toEqual({
+        kind: 'redirect',
+        to: DASHBOARD_ROUTE,
+        reason: 'forbidden',
+      });
+    }
+  });
+
+  // La regla de inventario (R4) no se sustituyo: sigue restringiendo su propia ruta.
+  it('la regla de inventario sigue en pie: un no Administrador tampoco entra ahi (R4)', () => {
+    expect(decideRouteAccess({ ...REAL, pathname: INVENTORY_ROUTE, session: OPERADOR })).toEqual({
+      kind: 'redirect',
+      to: DASHBOARD_ROUTE,
+      reason: 'forbidden',
     });
   });
 });
