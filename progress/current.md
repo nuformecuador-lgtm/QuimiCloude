@@ -222,6 +222,30 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-47 — modelo-empresa-y-membresias: acotada y sembrada (2026-09-04)
+
+- **Sembrada en `specs/QC-47-modelo-empresa-y-membresias/requirements.md`** — 15 decisiones
+  cerradas y 3 preguntas abiertas. La fuente es ese archivo; aquí no se copia la tabla.
+- **Board actualizado antes de sembrar (Paso 5):** `description` reescrita y label
+  `complexity:high` (era `medium`). Lo que la subió: **el rol sale de `users` y pasa a la
+  pertenencia**, así que la ficha arrastra el seed (QC-6) y el login (QC-7), y su `down.sql`
+  tiene que devolver `role_id` a `users`.
+- **Antes hubo que reescribir una regla del arnés**, y no era opcional: `docs/architecture.md >
+  Dominio` decía como regla no opinable «un solo tenant, no hay `empresa_id` ni aislamiento por
+  tenant», que es exactamente lo que el `reviewer` habría citado para rechazar QC-47 entera.
+  Corrida de `/afinar-regla` en el commit `3b9b464`: el punto 1 pasa a **multiempresa en los
+  datos de operación, un solo sistema en la identidad**, con línea nueva en `reviewer.md`,
+  casilla nueva en `CHECKPOINTS.md` y la pregunta abierta del dominio n.º 5 (moneda por empresa,
+  porque QC-14 y QC-42 cerraron «la moneda es implícita» citando la regla vieja).
+- **Tres fichas nuevas en el board**, todas deuda que la épica QC-46 se había dejado fuera:
+  **QC-59** aislamiento en proveedores y **QC-60** en pedidos (los dos módulos ya construidos que
+  nadie iba a aislar), y **QC-61**, la guardia de esquema que hace cumplir la columna de empresa —
+  sale como ficha porque es código y `/afinar-regla` solo escribe markdown del arnés.
+- **El aviso de conflicto con QC-34 de más arriba quedó obsoleto el mismo día**: otra sesión cerró
+  QC-34 y QC-55 mientras esto se acotaba, así que `backend` queda sin nada en curso y F2.0 de
+  QC-47 ya no espera a nadie. Lo que sí sigue vivo: el worktree nació de `origin/dev` (`855fae6`)
+  y le faltan los merges posteriores — hay que traerlos antes de lanzar `spec_author`.
+
 ### QC-55 — tabla-de-datos-compartida: acotada y sembrada (2026-09-04)
 
 - **Sembrada en `specs/QC-55-tabla-de-datos-compartida/requirements.md`** — 21 decisiones cerradas
