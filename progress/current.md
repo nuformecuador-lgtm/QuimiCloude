@@ -14,6 +14,31 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
 | QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | **PR [#33] abierto**, esperando merge humano (F2.5). `reviewer` APROBADO en 2ª ronda |
+| QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
+| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | pending | feature/QC-47-modelo-empresa-y-membresias | esta sesión (`labs`) — worktree montado en F1.0, sin spec todavía |
+
+### QC-47 — arranque del 2026-09-04 (F1.0)
+
+Arrancada por decisión humana explícita («arranca con 47»), no por el orden de `id`. Zona
+`backend`, `complexity: medium` y `depends_on: null` ya venían evaluadas del board; no hizo falta
+empujar labels a Jira. Worktree montado desde `origin/dev` (`855fae6`) — **ojo: el `dev` local va
+25 commits por delante de `origin/dev`**, así que el worktree nace sin los merges de `fix-ui` ni
+los cierres de QC-52/QC-55. Se resuelve solo en F2.3, pero conviene saberlo antes de medir un
+diff.
+
+**Aviso de conflicto de archivos para F2.0, no para F1.** QC-34 (`backend`, `in_progress`) toca
+`db/schema.prisma` y `lib/composition/index.ts`, que es exactamente donde va a caer el modelo de
+empresa y membresías. La validación de `AGENTS.md > Paralelismo` se hace contra
+`specs/<feature>/tasks.md`, que en F1.0 todavía no existe: por eso el spec se escribe igual —no
+toca código— pero **la implementación de QC-47 no arranca hasta que QC-34 esté `done`**, o hasta
+que sus `tasks.md` demuestren que no hay intersección real. Anotado aquí para que no se decida
+dos veces.
+
+**Base de datos propia pendiente.** Van cuatro veces que el drift de base entre worktrees bloquea
+una feature, y QC-47 introduce migración nueva sobre `users`: cuando entre en F2, `QuimiCloude_QC47`
+antes de la primera migración, no después.
+
+
 
 La feature **QC-52 — separar-producto-de-catalogo-de-proveedor** se cerró el 2026-09-04 (PR #32,
 merge `855fae6`): resumen en `progress/history.md`, worktree desmontado, rama borrada y **base

@@ -586,13 +586,14 @@
       "epic_name": "Proveedores",
       "name": "pantalla-de-proveedores",
       "description": "Pantalla para listar, crear, editar y dar de baja proveedores, con sus datos de contacto y las lineas de su catalogo de productos (producto, costo, minimo de compra y tiempo de entrega), sobre el CRUD de proveedores.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "frontend",
       "branch": "feature/QC-44-pantalla-de-proveedores",
       "depends_on": [
-        "QC-43"
+        "QC-43",
+        "QC-52"
       ],
       "spec_path": "specs/QC-44-pantalla-de-proveedores"
     },
