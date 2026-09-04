@@ -48,7 +48,14 @@ type PresentationSelectProps = {
 };
 
 /**
- * Selector de presentacion con alta en linea (R24, R25, `design.md > 5`).
+ * Selector de presentacion con alta en linea (QC-22 R24 y R25; QC-44 R37, R38 y R39).
+ *
+ * **Vive en `components/shared/` desde QC-44**, sin cambiar ni un detalle de su API
+ * (`defaultValue`, `error`, campo `presentationId`, alta en linea y «Cargar más»): dos pantallas
+ * -inventario y proveedores- lo necesitan igual, que es la condicion que
+ * `docs/architecture.md > Regla: sin sobre-ingenieria` pone para promover. El barrel de
+ * `app/(private)/inventario/components` lo reexporta, asi que la ruta lo sigue consumiendo por su
+ * barrel.
  *
  * **Por que carga por su cuenta y no por props**: el conjunto de presentaciones no depende de la
  * pagina de productos que se este viendo y cambia cuando el propio usuario crea una sin salir del

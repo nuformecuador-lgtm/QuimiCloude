@@ -3,6 +3,10 @@
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import {
+  PRESENTATION_FIELD,
+  PresentationSelect,
+} from '@/components/shared/presentation-select';
 import { Button } from '@/components/ui/button';
 import {
   SheetClose,
@@ -18,7 +22,6 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
 import { ProductField } from './product-field';
-import { PRESENTATION_FIELD, PresentationSelect } from './presentation-select';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 

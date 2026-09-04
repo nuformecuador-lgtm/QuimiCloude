@@ -4,7 +4,11 @@
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
 export { DeleteProductDialog } from './delete-product-dialog';
-export { PRESENTATION_FIELD, PresentationSelect } from './presentation-select';
+// `PresentationSelect` ya no es propio de esta ruta: QC-44 lo promovio a
+// `components/shared/` porque la pantalla de proveedores lo necesita con la MISMA API
+// (`docs/architecture.md > Regla: sin sobre-ingenieria`). Se reexporta aqui para que la
+// ruta lo siga consumiendo por su barrel, sin cambiar ni un consumidor.
+export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 export {
   EMPTY_CELL,
   PRODUCT_COLUMNS,
