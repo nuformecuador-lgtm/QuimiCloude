@@ -340,6 +340,13 @@ describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handle
     // de QC-43 con sus tres cambios y la de QC-52 que separa las dos tablas. Una cuarta seria
     // alcance escapandose por una via que el censo de campos de arriba no ve (p. ej. un
     // CHECK, que Prisma no modela).
+    //
+    // RETENSADO 2026-09-04 (QC-47). El censo gana una cuarta entrada,
+    // `companies_and_memberships`: QC-47 mudo el rol de `users` a `memberships` (R14) y su
+    // `migration.sql` NOMBRA `suppliers` y `supplier_catalog_lines` en los COMENTARIOS que
+    // explican por que el `down.sql` recrea a mano las FK del repo. No ejecuta ni un DDL
+    // sobre ellas, y eso se afirma abajo quitando los comentarios antes de mirar: la entrada
+    // esta nombrada pero NO tiene licencia para tocar las tablas.
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanLasTablas = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -358,7 +365,23 @@ describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handle
       '20260903131417_suppliers_and_supplier_catalog_lines',
       '20260903200343_supplier_contact_cost_and_line_audit',
       '20260904123854_split_product_and_supplier_catalog',
+      '20260904180600_companies_and_memberships',
     ])
+
+    // Y la cuarta las nombra SOLO en comentarios: sin los `--`, no queda ni una mencion. Si
+    // QC-47 —o quien la edite— llegara a escribir DDL de verdad sobre estas dos tablas, esto
+    // se pone rojo.
+    const qc47 = readFileSync(
+      join(migracionesDir, '20260904180600_companies_and_memberships', 'migration.sql'),
+      'utf8',
+    )
+      .split('\n')
+      .filter((linea) => !linea.trimStart().startsWith('--'))
+      .join('\n')
+    expect(
+      /\b(suppliers|supplier_catalog_lines)\b/i.test(qc47),
+      'la migracion de QC-47 no puede ejecutar ningun DDL sobre suppliers ni supplier_catalog_lines',
+    ).toBe(false)
   })
 
   it('ningun .gitkeep convive con archivos reales en las carpetas del modulo', () => {

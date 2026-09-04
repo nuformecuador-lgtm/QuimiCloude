@@ -44,6 +44,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
 // ---------------------------------------------------------------------------
@@ -175,6 +176,13 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     data: { name: `rol-${marca}`, description: 'Rol de prueba' },
     select: { id: true },
   })
+  // QC-47 (R14): el rol ya no es columna de `users`; llega por la pertenencia. La empresa es
+  // PROPIA de este test -nunca la de instalacion- para no chocar con el seed (R4).
+  const companyName = `Empresa de prueba ${marca}`
+  const company = await tx.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  })
   const user = await tx.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -186,7 +194,7 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
       documentNumber: marca.slice(0, 12),
       username: `ana.${marca}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
-      roleId: role.id,
+      memberships: { create: { companyId: company.id, roleId: role.id } },
     },
     select: { id: true },
   })

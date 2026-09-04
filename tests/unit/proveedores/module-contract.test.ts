@@ -515,16 +515,26 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     ).toEqual(['createdBy:scalar', 'updatedBy:scalar'])
 
     // El reverso: `User` no gana ningun campo hacia la linea ni hacia el proveedor. La lista
-    // esperada es el conjunto EXACTO que QC-4 le dio.
-    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
+    // esperada es el conjunto EXACTO de relaciones que `User` tiene hoy.
+    //
+    // RETENSADO 2026-09-04 (QC-47). `Role` sale y entra `Membership`: R14 mudo el rol de la
+    // persona de `users.role_id` a la pertenencia, asi que `User` ya no relaciona con `Role`
+    // sino con `Membership`. Sigue siendo un `toEqual` cerrado, y si esta ficha colara una
+    // relacion hacia `Supplier` o `SupplierCatalogLine` caeria igual.
+    expect(relationTargets('User')).toEqual(['DocumentType', 'Membership'])
   })
 
   it('User NO gana ningun campo de relacion de vuelta hacia Supplier', () => {
     // Si `createdBy` o `updatedBy` llevaran `@relation`, `User` ganaria un campo reverso
     // (`createdSuppliers Supplier[]` o similar) y este `toEqual` completo caeria. La lista
-    // esperada es el conjunto EXACTO que QC-4 ya le dio a `User` (hacia `DocumentType` y
-    // `Role`), sin proveedores adentro.
-    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
+    // esperada es el conjunto EXACTO de relaciones de `User` hoy (hacia `DocumentType` y
+    // `Membership`), sin proveedores adentro.
+    //
+    // RETENSADO 2026-09-04 (QC-47). Antes decia `Role`; R14 mudo el rol de `users` a
+    // `memberships`, asi que la relacion de `User` con `Role` desaparecio y en su lugar hay
+    // `memberships Membership[]`. La intencion de la guardia no se toca: los dos
+    // `not.toContain` de abajo son lo que de verdad afirma que `proveedores` no se cuela.
+    expect(relationTargets('User')).toEqual(['DocumentType', 'Membership'])
     expect(relationTargets('User')).not.toContain('Supplier')
     expect(relationTargets('User')).not.toContain('SupplierCatalogLine')
   })

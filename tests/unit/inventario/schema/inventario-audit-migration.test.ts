@@ -174,8 +174,10 @@ describe('migration.sql — auditoria de products: columnas y claves foraneas (R
     expect(updatedByFk).toMatch(/FOREIGN KEY\s*\(\s*"?updated_by"?\s*\)/i)
 
     // ON DELETE RESTRICT (decision del leader, el spec no fijaba esta accion): convencion
-    // del repo (mismo patron que `users.role_id`, `users.document_type_code` y
+    // del repo (mismo patron que `memberships.role_id`, `users.document_type_code` y
     // `products.presentation_id`) y R7 exige referencia real, sin silencio de SET NULL.
+    // El ejemplo era `users.role_id` hasta QC-47 (R14), que se llevo esa columna; la
+    // convencion no cambio, solo el sitio donde vive el rol.
     for (const fk of [createdByFk, updatedByFk]) {
       expect(fk).toMatch(/ON DELETE RESTRICT/i)
       expect(fk).not.toMatch(/ON DELETE (SET NULL|CASCADE|SET DEFAULT|NO ACTION)/i)

@@ -226,6 +226,13 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
     }
 
     // Y el modelo User conserva exactamente sus columnas: la politica es regla, no dato.
+    //
+    // RETENSADO 2026-09-04 (QC-47). La lista esperada pierde `roleId` y `role` y gana
+    // `memberships`: QC-47 R14 mudo el rol de la persona de `users.role_id` a la pertenencia,
+    // asi que esas dos columnas ya no existen y el censo se ponia rojo por un cambio que no
+    // es de QC-19. No se afloja nada: sigue siendo un `toEqual` contra la lista CERRADA, y
+    // cualquier columna de politica de credenciales o de contrasenas anteriores que alguien
+    // anada a `User` lo pone rojo igual.
     const cuerpo = /^model\s+User\s*\{([\s\S]*?)^\}/m.exec(rawSchema)?.[1] ?? '';
     const campos = cuerpo
       .split('\n')
@@ -246,7 +253,6 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         'documentNumber',
         'username',
         'passwordHash',
-        'roleId',
         'createdAt',
         'updatedAt',
         'deletedAt',
@@ -255,7 +261,7 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         'lockedUntil',
         'mustChangeCredential',
         'documentType',
-        'role',
+        'memberships',
       ].sort(),
     );
   });

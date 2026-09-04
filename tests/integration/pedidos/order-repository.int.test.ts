@@ -49,6 +49,7 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { normalizeCompanyName } from '@/lib/modules/identity'
 import {
   cancelAliveOrder,
   createOrder,
@@ -104,6 +105,8 @@ let recipeId: string
 let unitId: string
 let actorId: string
 let roleId: string
+let companyId: string
+let membershipId: string
 let documentTypeCode: string
 
 async function seedFixtures(): Promise<void> {
@@ -132,6 +135,15 @@ async function seedFixtures(): Promise<void> {
       select: { id: true },
     })
   ).id
+  // QC-47 (R14): el rol ya no es columna de `users`; llega por la pertenencia. La empresa es
+  // PROPIA de este archivo -nunca la de instalacion- para no chocar con el seed (R4).
+  const companyName = `Empresa de prueba ${marca}`
+  companyId = (
+    await prisma.company.create({
+      data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+      select: { id: true },
+    })
+  ).id
   actorId = (
     await prisma.user.create({
       data: {
@@ -144,16 +156,27 @@ async function seedFixtures(): Promise<void> {
         documentNumber: marca.slice(0, 12),
         username: `ana.${marca}`,
         passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
-        roleId,
       },
+      select: { id: true },
+    })
+  ).id
+  membershipId = (
+    await prisma.membership.create({
+      data: { userId: actorId, companyId, roleId },
       select: { id: true },
     })
   ).id
 }
 
-/** Retira las cuatro FK sembradas, en el orden que las FK permiten. */
+/**
+ * Retira lo sembrado, en el orden que las FK permiten. Las tres FK de `memberships` son
+ * `onDelete: Restrict` (QC-47 R11), asi que la pertenencia se va PRIMERO, despues el usuario,
+ * y solo entonces empresa y rol.
+ */
 async function dropFixtures(): Promise<void> {
+  await prisma.membership.delete({ where: { id: membershipId } })
   await prisma.user.delete({ where: { id: actorId } })
+  await prisma.company.delete({ where: { id: companyId } })
   await prisma.role.delete({ where: { id: roleId } })
   await prisma.documentType.delete({ where: { code: documentTypeCode } })
   await prisma.recipe.delete({ where: { id: recipeId } })

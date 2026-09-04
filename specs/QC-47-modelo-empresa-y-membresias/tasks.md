@@ -179,7 +179,7 @@
 
 ## Bloque E — constraints contra Postgres real
 
-- [ ] **T18 · Test de integración de restricciones.**
+- [x] **T18 · Test de integración de restricciones.**
       Archivos: `tests/integration/identity/identity-constraints.int.test.ts` (existente).
       Añade, dentro de transacción con `ROLLBACK`: dos empresas con el mismo nombre en distinta
       capitalización y con acentos chocan (R4); dos pertenencias con la misma pareja usuario+empresa
@@ -191,7 +191,7 @@
 
 ## Bloque F — cierre
 
-- [ ] **T19 · Barrido de lectores huérfanos del rol.** ⚠ REGRESIÓN
+- [x] **T19 · Barrido de lectores huérfanos del rol.** ⚠ REGRESIÓN
       Archivos: todo el repo (búsqueda, no edición masiva).
       `rg 'role_id|roleId'` sobre `lib/`, `app/`, `components/`, `scripts/`, `tests/`, `db/`: lo
       único que puede quedar es dentro de `memberships`, del `down.sql` y de la migración de QC-4.
@@ -201,7 +201,7 @@
       *Hecho*: la búsqueda no devuelve ninguna lectura del rol desde `users` (R14).
       **Depende de**: T11, T12, T15.
 
-- [ ] **T20 · El E2E de login de QC-7 sigue verde, sin tocar su guion.**
+- [x] **T20 · El E2E de login de QC-7 sigue verde, sin tocar su guion.**
       Archivos: `e2e/login.spec.ts` y `e2e/session.spec.ts` — **se ejecutan, no se editan**.
       Es la decisión cerrada 14: no hay E2E nuevo, y este es el que demuestra que nada se rompió
       hacia fuera. El rol firmado en la cookie tiene que seguir llevando a las mismas pantallas.
@@ -209,7 +209,7 @@
       algo cambió hacia fuera y eso contradice la decisión 6: parar y avisar al leader (R16, R28).
       **Depende de**: T17, T19.
 
-- [ ] **T21 · Trazabilidad y gate completo.**
+- [x] **T21 · Trazabilidad y gate completo.**
       Archivos: `progress/impl_QC-47-modelo-empresa-y-membresias.md`.
       Mapa `R1..R29 -> test concreto`, sin ningún hueco (regla 4 de `CLAUDE.md`,
       `CHECKPOINTS.md > Trazabilidad`). Repasar además la casilla nueva de

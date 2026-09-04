@@ -537,10 +537,18 @@ describe('contrato de la ruta de recetas', () => {
     // es una migracion del tipo enumerado (R48, R49, R50) con su columna de motivo. La carpeta
     // de migracion es EXACTAMENTE UNA y esta nombrada; el esquema solo gana la columna nueva.
     // Ninguna otra migracion, ningun otro archivo de `db/`.
+    //
+    // RETENSADO 2026-09-04 (QC-47). La lista gana la carpeta de `companies_and_memberships`,
+    // que no es de esta ficha: QC-47 R14 muda el rol de la persona de `users.role_id` a
+    // `memberships`, y esa migracion viaja en el mismo rango `origin/dev...HEAD` que este
+    // caso barre. Se nombra archivo por archivo, igual que la de QC-34: cualquier otra cosa
+    // bajo `db/` sigue poniendo el caso rojo.
     const MIGRACION_QC34 = [
       'db/schema.prisma',
       'db/migrations/20260904135210_order_cancellation/migration.sql',
       'db/migrations/20260904135210_order_cancellation/down.sql',
+      'db/migrations/20260904180600_companies_and_memberships/migration.sql',
+      'db/migrations/20260904180600_companies_and_memberships/down.sql',
     ];
 
     const tocaRecetas = diff
