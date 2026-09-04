@@ -342,11 +342,45 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       // Y su implementacion, adaptador driven NUEVO -no toca `recipe-prisma.ts`-.
       'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
     ]
+    // ACTUALIZADO 2026-09-04 (QC-62, T1-T3): segunda lista permitida, NOMBRADA APARTE de la de
+    // QC-34 a proposito. Meter estos archivos en `AMPLIACION_QC34` seria mas corto y mentiria
+    // sobre de que ficha vienen: dentro de seis meses nadie sabria cual de las dos features
+    // justifica cual ruta, que es justo lo que una guardia de alcance tiene que poder decir.
+    //
+    // Por que entran: QC-62 cambia la FORMA del paso de receta -de `{ body, type }` a un
+    // documento de estructura cerrada- y retira el tipo de paso del contrato (R1-R5, R9). Eso es,
+    // por definicion, trabajo DENTRO del dominio de `recetas`, aprobado por el humano en F1.4;
+    // un filtro que no lo contemple lo declararia violacion sin que nada este mal.
+    //
+    // Que sigue PROHIBIDO, y es lo que este caso protege de verdad:
+    //   * que la PANTALLA vuelva a caer dentro del modulo -sigue siendo QC-26/QC-64 y vive bajo
+    //     `app/(private)/produccion/formulas/`; la asercion de `fueraDeSuCarpeta`, mas abajo, es
+    //     la que lo vigila desde el otro angulo-;
+    //   * que aparezca cualquier route handler de recetas bajo `app/api/` (asercion de arriba);
+    //   * y que se toque NADA MAS del modulo por la puerta de atras: el repositorio, los cinco
+    //     casos de uso, la Server Action y el adaptador de almacenamiento de QC-25 siguen
+    //     congelados -QC-62 no los abre-, igual que `db/schema.prisma`, que su decision cerrada 6
+    //     declara intocable.
+    //
+    // `lib/modules/recetas/index.ts` NO se repite aqui: ya esta en `AMPLIACION_QC34`. QC-62
+    // tambien lo cambia -retira `RECIPE_STEP_TYPES` y `RecipeStepType` y publica el esquema del
+    // documento, `MAX_STEP_ELEMENTS` y `countRecipeStepElements`-, y se deja dicho por escrito en
+    // vez de duplicar la entrada.
+    const CAMBIO_DE_FORMA_DEL_PASO_QC62 = [
+      // El esquema del documento del paso, con el tope de elementos y el conteo (T1).
+      'lib/modules/recetas/domain/recipe-input.ts',
+      // `RecipeStepView` pasa a ser un ALIAS del documento, no una copia (T2).
+      'lib/modules/recetas/domain/recipe-view.ts',
+      // `toSteps` valida cada elemento guardado y descarta el que no pase (T3, R17). Es lo UNICO
+      // que QC-62 abre del adaptador de Prisma: la escritura y las consultas no cambian.
+      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+    ]
+    const AMPLIACIONES_APROBADAS = [...AMPLIACION_QC34, ...CAMBIO_DE_FORMA_DEL_PASO_QC62]
     expect(
       diff
         .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
-        .filter((ruta) => !AMPLIACION_QC34.includes(ruta)),
-      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10) puede estar en el diff',
+        .filter((ruta) => !AMPLIACIONES_APROBADAS.includes(ruta)),
+      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10) y del cambio de forma del paso de QC-62 (T1-T3) puede estar en el diff',
     ).toEqual([])
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se

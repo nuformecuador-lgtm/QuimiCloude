@@ -170,3 +170,44 @@ anadir `WHERE "deleted_at" IS NULL` hace caer los predicados `alcanzaTodasLasFil
 ## Decisiones que no se pudieron tomar sin inventar
 
 Ninguna. No hubo que reabrir ninguna decision cerrada ni rellenar ningun dato ausente.
+
+## Correccion posterior: `module-contract.test.ts` SI era rojo mio
+
+La primera version de esta bitacora daba por ajeno el rojo de
+`tests/unit/recetas/module-contract.test.ts`. **Era mio, y bloqueaba el gate rapido.** El
+diagnostico inicial fue erroneo por una razon concreta: cuando lo corri, la rama aun no tenia
+commits, el rango `git diff --name-only origin/dev...HEAD` salia vacio y el caso caia en la
+asercion de "el rango no estaba disponible" -que es la que el baseline documenta-. Con los commits
+hechos, el rango si existe y el caso cae por otro motivo distinto: los tres archivos de
+`lib/modules/recetas/` que QC-62 cambia.
+
+Es una guardia que QC-26 escribio para probar que aquella ficha -de PANTALLA- no tocaba el
+backend, y sobrevivio a su feature. **No se borro ni se anulo**: gana una segunda lista permitida
+nombrada aparte, `CAMBIO_DE_FORMA_DEL_PASO_QC62`, con `recipe-input.ts`, `recipe-view.ts` y
+`recipe-prisma.ts`. No se metieron en `AMPLIACION_QC34` porque esa lista habla de otra ficha y
+mentiria sobre su procedencia. El barrel no se duplica: ya estaba en la lista de QC-34, y que
+QC-62 tambien lo cambia queda dicho en el comentario.
+
+**Lo que la guardia sigue vigilando**, y esta escrito en el propio test: que la pantalla no vuelva
+a caer dentro del modulo, que no aparezca ningun route handler de recetas bajo `app/api/`, y que
+no se toque nada mas del modulo por la puerta de atras -repositorio, los cinco casos de uso, la
+Server Action y el adaptador de almacenamiento de QC-25 siguen congelados-.
+
+**Comprobado que sigue mordiendo, con una mutacion real**: se anadio una linea a
+`lib/modules/recetas/ports/recipe-repository.ts` -que no esta en ninguna de las dos listas-, se
+commiteo, y el caso cayo con `expected [ Array(1) ] to deeply equal []`. La mutacion se revirtio
+con `git reset --hard`; el arbol quedo limpio.
+
+Salida tras el arreglo:
+
+```
+pnpm typecheck                                                          -> verde, sin salida
+pnpm lint                                                               -> verde, sin hallazgos
+pnpm exec vitest related --run tests/unit/recetas/module-contract.test.ts
+  Test Files  1 passed (1)
+       Tests  5 passed (5)
+```
+
+De los rojos listados mas arriba, sigue siendo ajeno **solo** el de
+`tests/unit/recetas-ui/recipe-route-contract.test.ts` (baseline, rango `origin/dev...HEAD`), mas
+el flake de `proveedores-ui` y los de integracion por el `DATABASE_URL` que falta en este worktree.
