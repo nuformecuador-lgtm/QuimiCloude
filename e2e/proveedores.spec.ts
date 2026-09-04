@@ -43,6 +43,11 @@
  * nombre): la FK `supplier_catalog_lines_presentation_id_fkey` es RESTRICT, asi que apuntar una
  * linea nuestra a la presentacion de otro spec haria fallar el `afterAll` de aquel spec.
  *
+ * LA EMPRESA SI ES PROPIA DEL SPEC (QC-47). Desde que el rol vive en `memberships`, un usuario
+ * sin pertenencia no puede entrar, asi que el fixture crea su propia empresa marcada con el
+ * prefijo y el `RUN_ID`, NUNCA la de instalacion: el indice unico de `companies` es global y
+ * chocaria con la que siembra el seed.
+ *
  * LO QUE ESTE SPEC NO CREA: los roles. `Administrador` y `Operador` los siembra
  * `pnpm run db:seed` (`lib/modules/identity/domain/roles.ts`), y el rol tiene que llamarse
  * EXACTAMENTE asi porque la regla ruta->rol compara por nombre: un rol efimero con sufijo
@@ -57,6 +62,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
@@ -120,7 +126,19 @@ const catalogLineCost = '12.3456';
  */
 let reusablePresentationName: string | null = null;
 
+/**
+ * Nombre de la EMPRESA efimera (QC-47). Desde que el rol vive en `memberships` (R14), un usuario
+ * sin pertenencia no puede entrar (R17), asi que el fixture necesita una empresa. Es PROPIA de
+ * este spec -nunca la de instalacion-: el indice unico de `companies` es global y chocaria con la
+ * que siembra el seed (R4). El rol, en cambio, sigue siendo el real del seed.
+ */
+const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
+
+let companyId: string | null = null;
+
 async function createUserWithRole(user: Credentials, roleName: string): Promise<void> {
+  if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
+
   const role = await prisma.role.findUnique({ where: { name: roleName }, select: { id: true } });
   if (!role) {
     throw new Error(
@@ -142,7 +160,8 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
       documentNumber: user.username,
       username: user.username,
       passwordHash: await createPasswordHash(user.password),
-      roleId: role.id,
+      // QC-47 (R14, R17): el rol llega por la pertenencia, no por una columna de `users`.
+      memberships: { create: { companyId, roleId: role.id } },
     },
     select: { id: true },
   });
@@ -249,7 +268,8 @@ test.beforeAll(async () => {
   // LIMPIEZA DEFENSIVA DE HUERFANOS: un `pnpm run e2e` interrumpido deja filas `qc44_e2e_*` en la
   // base, y esa basura pone rojo tests de OTRAS features que cuentan filas
   // (`tests/integration/**`). El orden lo imponen las FK RESTRICT: lineas -> proveedores ->
-  // presentaciones -> usuarios (`suppliers.created_by` apunta a `users`).
+  // presentaciones -> pertenencias -> usuarios -> empresas (`suppliers.created_by` apunta a
+  // `users`, y las tres FK de `memberships` son RESTRICT).
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
 
   await prisma.supplierCatalogLine.deleteMany({
@@ -261,9 +281,26 @@ test.beforeAll(async () => {
   await prisma.presentation.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
-  await prisma.user.deleteMany({
+  // QC-47: las pertenencias primero (las tres FK de `memberships` son `Restrict`, R11), y las
+  // empresas huerfanas al final, cuando ya no las sujeta ninguna.
+  const orphanUsers = await prisma.user.findMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+    select: { id: true },
   });
+  const orphanUserIds = orphanUsers.map((orphan) => orphan.id);
+  await prisma.membership.deleteMany({ where: { userId: { in: orphanUserIds } } });
+  await prisma.user.deleteMany({ where: { id: { in: orphanUserIds } } });
+  await prisma.company.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+
+  // La empresa del fixture (QC-47 R17): sin ella no hay pertenencia, y sin pertenencia el login
+  // trataria a estos usuarios como no encontrados.
+  const company = await prisma.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  });
+  companyId = company.id;
 
   await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);
@@ -298,9 +335,15 @@ test.afterAll(async () => {
         await prisma.presentation.deleteMany({ where: { name: presentationName } });
       } finally {
         try {
-          await prisma.user.deleteMany({
+          // QC-47 (R11): las pertenencias antes que los usuarios, y la empresa despues de ellos.
+          const users = await prisma.user.findMany({
             where: { username: { in: [adminUser.username, operatorUser.username] } },
+            select: { id: true },
           });
+          const userIds = users.map((user) => user.id);
+          await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
+          await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+          await prisma.company.deleteMany({ where: { name: companyName } });
         } finally {
           await prisma.$disconnect();
         }

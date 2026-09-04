@@ -53,7 +53,7 @@ Tests:
 - `tests/unit/inventario/schema/inventario-audit-migration.test.ts` (solo un comentario)
 - `tests/integration/identity/{identity-constraints,identity-seed,login,session-user}.int.test.ts`
 - `tests/integration/{inventario,pedidos,proveedores,recetas}/*.int.test.ts` (fixtures)
-- `e2e/{login,session,inventario,recetas}.spec.ts` (**solo fixtures**, ver el cierre)
+- `e2e/{login,session,inventario,recetas,proveedores}.spec.ts` (**solo fixtures**, ver el cierre)
 
 ## Mapa `R<n> -> test`
 
@@ -95,7 +95,7 @@ Los 29 requisitos, sin hueco. Rutas relativas a la raiz del worktree. Abreviatur
 | R25 | `MIG` > "devuelve role_id a users OBLIGATORIA y con el rol que guardaba la pertenencia", "recrea la FK y el indice de role_id con EXACTAMENTE el texto de QC-4" (leido del migration.sql de QC-4, no copiado) y "borra las dos tablas nuevas en orden inverso a la FK y no toca pgcrypto". Verificado ademas contra Postgres real (T9): snapshot de users -columnas, indices y constraints- antes de aplicar y despues de revertir, diff sin diferencias, y _prisma_migrations sin la fila |
 | R26 | `MIG` > "empieza con la guardia que aborta si alguien no tiene exactamente una pertenencia". Verificado ademas contra Postgres real (T9e): con un usuario con dos pertenencias el down.sql aborta con el mensaje de R26 y el ROLLBACK deja todo intacto |
 | R27 | `MIG` > "no hay ningun DROP sobre los tres indices unicos de users que escribio QC-4" y "no se toca ninguna FK, CHECK ni RLS de las tablas de otros modulos"; `tests/unit/identity/schema/identity-migration.test.ts` sigue verde y vigila los tres indices de QC-4 |
-| R28 | `e2e/login.spec.ts` y `e2e/session.spec.ts` en verde sin un solo cambio dentro de ningun test(); `tests/unit/recetas-ui/recipe-route-contract.test.ts` y `tests/unit/proveedores/scope.test.ts` (guardias de alcance: la feature no estrena ruta, pantalla ni flujo navegable) |
+| R28 | `e2e/login.spec.ts` y `e2e/session.spec.ts` en verde sin un solo cambio dentro de ningun test(); `e2e/proveedores.spec.ts` en verde (4 passed) tras el merge de QC-44, tambien sin tocar su guion; `tests/unit/recetas-ui/recipe-route-contract.test.ts` y `tests/unit/proveedores/scope.test.ts` (guardias de alcance: la feature no estrena ruta, pantalla ni flujo navegable) |
 | R29 | `tests/guards/` en verde (12 archivos, 123 tests) y `package.json` / `pnpm-lock.yaml` sin ningun cambio en el diff de la rama |
 
 ## Nota para el reviewer sobre `CHECKPOINTS.md > Datos y seguridad`
@@ -196,3 +196,52 @@ pertenencia. **Ninguna lectura del rol desde `users`** (R14).
 `./init.sh --rapido` no llega a correr en este worktree: se corta antes, en
 `scripts/validate-features.mjs`, con `faltan specs para features sdd en vuelo: QC-44`. Es estado
 compartido de `feature_list.json`, no de esta rama, y hay que resolverlo antes del gate completo.
+
+## Addendum tras el merge de `dev` (F2.3, merge `9838014`)
+
+El leader mergeo `dev` en la rama. Eso resolvio el bloqueo de `validate-features` que se reporta
+mas arriba (QC-44 ya esta `done` en `dev` con su spec), y **trajo un quinto fixture con el mismo
+problema**: `e2e/proveedores.spec.ts`, de la pantalla de proveedores de QC-44, creaba su usuario
+con `roleId` y el typecheck lo cazo (`TS2353` en la linea 145).
+
+Se le aplico el **mismo cambio mecanico** que a los otros cuatro: empresa propia del spec
+(`qc44_e2e_empresa_<RUN_ID>`, con `nameNormalized` calculado por `normalizeCompanyName`), usuario
+con `memberships: { create: { companyId, roleId } }` en vez de `roleId`, y limpieza en orden de FK
+`RESTRICT` (`memberships` -> `users` -> `companies`). Todos los hunks caen en cabecera, imports,
+constantes de modulo, `createUserWithRole`, `beforeAll` y `afterAll`: **cero coincidencias** de
+`test(`, `expect(`, `getByRole`, `getByLabel`, `page.goto` o `toHaveURL` en el diff. Los dos tests
+del spec solo se desplazaron de linea.
+
+Verificado tras el merge:
+
+- `pnpm run typecheck` -> exit 0, sin salida.
+- `pnpm run lint` -> exit 0, sin salida.
+- `pnpm exec playwright test e2e/proveedores.spec.ts` -> **4 passed (32.9s)**, chromium y webkit.
+- `vitest run tests/unit/proveedores tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/identity tests/guards` -> **65 archivos, 793 tests, 4 skipped**, todo verde. Se corrio
+  este subconjunto a proposito: el merge tocó `tests/unit/proveedores/{module-contract,scope}.test.ts`,
+  que son dos de las cuatro guardias retensadas, y `recipe-route-contract.test.ts` compara contra
+  `origin/dev...HEAD`, cuyo rango cambia con el merge. El retensado sobrevivio al merge intacto.
+- `vitest related e2e/proveedores.spec.ts --run` -> `No test files found`. Es lo esperado: los tres
+  proyectos de vitest llevan `e2e/**` en su `exclude`; es un spec de Playwright.
+- Barrido final `rg 'roleId|role_id' e2e/ tests/`: **ningun `user.create` del repo escribe ya
+  `roleId` como columna**. Lo que queda es `Membership.roleId`, variables locales que alimentan una
+  pertenencia, aserciones sobre el SQL de migracion y comentarios.
+
+### Material para el reviewer y para `/afinar-regla`
+
+**El barrido de fixtures ajenos crecio de cuatro a cinco archivos E2E por un merge.** Ese es el
+dato que merece una regla. Esta ficha borra una columna del modelo compartido (`users.role_id`), y
+toda feature en vuelo que siembre un usuario en su fixture rompe al mergear — no en el momento de
+implementar, sino cuando las dos ramas se encuentran. El `tasks.md` de QC-47 no podia preverlo:
+QC-44 estaba en vuelo en paralelo y su `e2e/proveedores.spec.ts` no existia en `dev` cuando se
+escribio el spec.
+
+Dos cosas que esto sugiere:
+
+1. Una ficha que **quita una columna de una tabla que los fixtures de otras features siembran**
+   deberia declararlo en su `design.md` como coste conocido, y su `tasks.md` deberia llevar una
+   task explicita de «adaptar los fixtures ajenos», en vez de que aparezca por el typecheck.
+2. El barrido de T19 **hay que repetirlo despues de cada merge de `dev`**, no solo una vez al
+   cerrar el bloque F. Aqui se repitio y encontro uno; si se hubiera dado por hecho, el gate
+   completo del leader habria sido el que lo descubriera.
