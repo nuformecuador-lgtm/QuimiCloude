@@ -11,7 +11,13 @@ export {
   PresentationInUseError,
   ValidationError,
 } from './domain/errors';
-export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
+export {
+  type Page,
+  type PageQuery,
+  pageQuerySchema,
+  type ProductQuery,
+  productQuerySchema,
+} from './domain/page';
 export { normalizePresentationName } from './domain/presentation-name';
 export {
   createPresentationSchema,

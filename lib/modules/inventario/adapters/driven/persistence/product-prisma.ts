@@ -5,7 +5,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { NotFoundError, ValidationError } from '../../../domain/errors';
 
-import type { PageQuery, Page } from '../../../domain/page';
+import type { ProductQuery, Page } from '../../../domain/page';
 import type { NewProduct, ProductView } from '../../../domain/product-view';
 
 /**
@@ -243,9 +243,17 @@ export async function softDeleteAliveProduct(
  * `total` sale de un `count` con el MISMO `where` que el `findMany` (mismo filtro
  * `deleted_at IS NULL`).
  */
-export async function listAliveProducts(query: PageQuery): Promise<Page<ProductView>> {
+export async function listAliveProducts(query: ProductQuery): Promise<Page<ProductView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where: Prisma.ProductWhereInput = { deletedAt: null };
+  // La busqueda va al MOTOR, no a la pagina ya traida: `contains` insensible a mayusculas
+  // sobre `name`, con el MISMO `where` para el `findMany` y el `count`, de modo que el
+  // `total` -y con el `totalPages`- describa el resultado filtrado y no el catalogo entero.
+  const where: Prisma.ProductWhereInput = {
+    deletedAt: null,
+    ...(query.search === undefined
+      ? {}
+      : { name: { contains: query.search, mode: 'insensitive' } }),
+  };
 
   const [rows, total] = await Promise.all([
     prisma.product.findMany({

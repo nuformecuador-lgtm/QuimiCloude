@@ -29,6 +29,10 @@ import {
  * sigue vacío y `buildRecipePayload` envía `lines: []` como siempre. Nada de filtrar líneas
  * vacías en el payload -esa función no toma decisiones sobre las líneas (R21, R22)-.
  *
+ * **Un ingrediente no se puede repetir**: cada selector recibe en `excludedIds` los ingredientes
+ * ya elegidos en las OTRAS líneas y los ofrece deshabilitados -visibles, para no hacer creer que
+ * el producto no existe en el catálogo-. El de la propia línea nunca se deshabilita a sí mismo.
+ *
  * **Cada fila lleva sus dos acciones, `X` y `+`** (no hay botón de añadir en la cabecera): la `X`
  * quita esa línea -y si era la última, reaparece el fantasma, así que nunca se queda la pantalla
  * sin filas- y el `+` deja la fila donde está y añade otra vacía debajo.
@@ -73,10 +77,10 @@ const GHOST_LINE: RecipeLineFormValue = {
 };
 const FIELD_TEXT = 'text-base';
 
-/** Texto del disparador del selector de producto según el estado de la línea. Sin depender del copy en los tests (R54). */
+/** Texto del selector de ingrediente según el estado de la línea. Sin depender del copy en los tests (R54). */
 function productPickerLabel(productName: string | null): string {
-  if (productName === null) return 'Producto no disponible';
-  if (productName === '') return 'Elegir producto';
+  if (productName === null) return 'Ingrediente no disponible';
+  if (productName === '') return 'Buscar ingrediente';
   return productName;
 }
 
@@ -135,6 +139,18 @@ export function RecipeLinesField({
     onChange(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
 
+  /**
+   * Ingredientes ya elegidos en las OTRAS líneas: el selector los ofrece deshabilitados, así que
+   * el mismo ingrediente no puede entrar dos veces en la receta. Se deriva en cada render de
+   * `lines` -nunca de un conjunto guardado-, para que quitar una línea libere su ingrediente de
+   * inmediato.
+   */
+  function usedProductIds(exceptIndex: number): readonly string[] {
+    return rows
+      .filter((line, i) => i !== exceptIndex && line.productId !== '')
+      .map((line) => line.productId);
+  }
+
   function removeLine(index: number) {
     // El fantasma no está en `lines`: no hay nada que quitar, y su `X` no puede dejar la
     // pantalla sin filas.
@@ -170,17 +186,18 @@ export function RecipeLinesField({
                 data-testid={isUnavailable ? `recipe-line-unavailable-${index}` : undefined}
                 className="flex flex-col gap-1"
               >
-                <Label className="text-sm">Producto</Label>
+                <Label className="text-sm">Ingrediente</Label>
                 <ProductPicker
                   value={line.productId}
                   label={productPickerLabel(line.productName)}
-                  ariaLabel={`Producto de la línea ${index + 1}`}
+                  ariaLabel={`Ingrediente de la línea ${index + 1}`}
                   onSelect={(option: ProductPickerOption) =>
                     updateLine(index, { productId: option.id, productName: option.name })
                   }
                   error={lineErrors?.productId}
                   testId={`recipe-line-product-${index}`}
                   initialPage={initialProductPage}
+                  excludedIds={usedProductIds(index)}
                 />
               </div>
 

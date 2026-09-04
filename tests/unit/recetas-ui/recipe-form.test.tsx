@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { toast } from 'sonner';
 
@@ -518,13 +518,6 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
 
     await user.click(screen.getByTestId('recipe-line-product-0'));
 
-    // No hay ningún campo de texto para "buscar" DENTRO del propio desplegable: el selector no
-    // filtra sobre lo ya descargado (R28). Se acota al popup porque el resto del formulario sí
-    // tiene campos de texto legítimos (nombre, descripción...).
-    const popup = screen.getByTestId('recipe-line-product-0-popup');
-    expect(within(popup).queryByRole('searchbox')).toBeNull();
-    expect(within(popup).queryByRole('textbox')).toBeNull();
-
     await user.click(screen.getByTestId('recipe-line-product-0-next'));
 
     await waitFor(() =>
@@ -534,7 +527,24 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
     const opcionPagina2 = await screen.findByRole('option', { name: PRODUCT_PAGE2_NAME });
     await user.click(opcionPagina2);
 
-    expect(screen.getByTestId('recipe-line-product-0')).toHaveTextContent(PRODUCT_PAGE2_NAME);
+    expect(screen.getByTestId('recipe-line-product-0')).toHaveValue(PRODUCT_PAGE2_NAME);
+  });
+
+  it('escribir en el selector BUSCA EN EL BACKEND, no sobre la página ya descargada', async () => {
+    const user = setupUser();
+    renderCreateForm();
+
+    await user.type(screen.getByTestId('recipe-line-product-0'), 'áci');
+
+    // La prueba de que no filtra en cliente es que el término VIAJA al backend: si el
+    // componente recortara `items` por su cuenta, esta llamada no existiría.
+    await waitFor(() =>
+      expect(listProductsActionMock).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: MAX_PAGE_SIZE,
+        search: 'áci',
+      }),
+    );
   });
 });
 
@@ -562,22 +572,27 @@ describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombr
 });
 
 describe('R31 — dos líneas del mismo producto y una cantidad inválida no se envían', () => {
-  it('dos líneas con el mismo producto no se envían: el error sale en el bloque de líneas', async () => {
+  it('un ingrediente ya usado se ofrece DESHABILITADO en las demás líneas: no se puede repetir', async () => {
+    // R16 desde la interfaz. La regla vive en `createRecipeSchema` y su test está en
+    // `tests/unit/recetas/recipe-input.test.ts`; lo que se afirma AQUÍ es que el formulario ya
+    // no deja llegar hasta ahí -el repetido es imposible de elegir, no solo rechazado al
+    // enviar-. Se ofrece deshabilitado y no oculto: esconderlo haría creer que el producto no
+    // existe en el catálogo.
     const user = setupUser();
     renderCreateForm();
 
-    await user.type(screen.getByTestId('recipe-field-name'), 'Receta duplicada');
+    await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin repetidos');
     await addValidLine(user, 0, { quantity: '1' });
-    await addValidLine(user, 1, { quantity: '2' }); // mismo producto por defecto: PRODUCT_1_NAME
 
-    await user.click(screen.getByTestId('recipe-form-submit'));
+    await user.click(screen.getByTestId('recipe-line-add-0'));
+    await user.click(screen.getByTestId('recipe-line-product-1'));
 
-    const error = await screen.findByTestId('recipe-lines-error');
-    expect(error).toHaveAttribute('role', 'alert');
-    expect(within(screen.getByTestId('recipe-lines-field')).getByTestId('recipe-lines-error')).toBe(
-      error,
-    );
-    expect(createRecipeActionMock).not.toHaveBeenCalled();
+    // El nombre accesible de la opción vetada lleva el motivo detrás, de ahí la expresión regular.
+    const repetido = await screen.findByRole('option', { name: new RegExp(`^${PRODUCT_1_NAME}`) });
+    expect(repetido).toBeDisabled();
+
+    await user.click(repetido);
+    expect(screen.getByTestId('recipe-line-product-1')).toHaveValue('');
   });
 
   it('una cantidad que el esquema rechaza presenta el error junto a la línea afectada', async () => {
