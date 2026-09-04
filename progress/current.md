@@ -1506,6 +1506,42 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
+### QC-34 tiene base propia `QuimiCloude_QC34` — hay que BORRARLA al cerrar la ficha (2026-09-04)
+
+Tercera vez que el drift de base entre worktrees bloquea una feature, y tercera vez que se resuelve
+a mano: la sesion paralela de **QC-52** aplico su migracion a la base compartida y eso revento los
+tests de integracion de QC-34 con un `P2022` en cualquier lectura de `orders`. Se replico lo de
+**QC-20**, **QC-25** y **QC-26**: base propia para el worktree.
+
+- **Creada** `QuimiCloude_QC34`, con `DATABASE_URL` y `DIRECT_URL` del `.env` del worktree
+  apuntando ahi y `prisma migrate deploy` aplicado.
+- **Efecto colateral bueno:** con base limpia, `tests/integration/identity/identity-seed.int.test.ts`
+  vuelve a **verde** dentro del worktree. Su rojo era de los datos hechos a mano en la compartida,
+  que siguen ahi y siguen sin tocarse por decision del humano.
+- **La trampa de siempre:** ni `init.sh` ni Vitest cargan ese `.env`. Sin
+  `set -a && . ./.env && set +a` delante, el gate pega contra la compartida y la base propia es
+  decorativa. Ya estaba escrito en este archivo y volvio a pasar hoy.
+- **Deuda que esto crea:** `./scripts/wt.sh done` no sabe nada de la base propia, asi que **al
+  cerrar QC-34 hay que borrar `QuimiCloude_QC34` a mano**. Siguen vivas y huerfanas
+  `QuimiCloude_QC14` y `QuimiCloude_FIXGATE`, comprobado hoy contra el servidor.
+
+### Aviso cruzado a la sesion de QC-52 (2026-09-04)
+
+Cuando la migracion de QC-34 (`cancellation_reason` en `orders`) llegue a `dev`, la copia de
+`tests/integration/pedidos/pedidos-constraints.int.test.ts` **que vive en `dev`** se pondra roja:
+afirma la lista exacta de columnas de `orders`. **En la rama de QC-34 ya esta corregida**, asi que
+se arregla sola al mergear; el ruido es solo mientras las dos ramas convivan. Nadie tiene que tocar
+el worktree principal por esto.
+
+### El commit `7a3af59` lleva un mensaje que no le corresponde (2026-09-04)
+
+Ese commit dice «base propia QuimiCloude_QC34 y aviso cruzado a QC-52» y **lo que contiene es
+trabajo de la sesion paralela**: QC-55 pasando a `in_progress` y su fila en la tabla de arriba. Fue
+un `git commit -am` del leader de QC-34 sobre un arbol que la otra sesion acababa de tocar. **No se
+perdio nada y no se reescribe la historia** —hay dos sesiones sobre `dev`—, pero es el mismo agujero
+que ya causo el MAYOR 2 de la review de QC-26: **commitear sin nombrar los archivos en un repo con
+dos sesiones vivas**. La nota real va en este commit.
+
 ### La base compartida quedó por delante de `dev`: el gate de `dev` NO puede pasar (2026-09-04)
 
 A las **07:42** la sesión paralela que lleva **QC-52** aplicó
