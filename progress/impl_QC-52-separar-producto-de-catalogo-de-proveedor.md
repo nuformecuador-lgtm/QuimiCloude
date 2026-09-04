@@ -367,3 +367,124 @@ más.
    Mientras tanto `./init.sh` termina en rojo por un archivo que no es de esta feature.
 2. **T13** (sección 5.3): cuál de las tres salidas.
 3. **El `fill` de `qtyAlert` en el E2E** (sección 5.4): se queda o se saca a ficha propia.
+
+---
+
+# Apéndice A — F2.3: sincronización con `dev` y base de datos propia (2026-09-04)
+
+Todo lo de arriba está commiteado como `5a22663`. Este apéndice cubre lo que vino después.
+
+## A.1 El punto bloqueante 1 está cerrado, y no como yo proponía
+
+`dev` avanzó mientras se implementaba y trae `b2ffa09 fix(gate): sanear el reset del seed de
+identity y sembrar el baseline de rojos`, que **reescribe `resetIdentityToEmptyState`** para que lea
+del catálogo de Postgres las tablas que dependen de `users` y las vacíe en orden antes de borrar
+usuarios. **Mi diagnóstico de la causa era correcto** (sección 5.1: filas de negocio con autor y FK
+`RESTRICT`); lo que no sabía es que la cura ya estaba escrita en otra sesión. **No hizo falta ni
+tocar la base compartida ni aflojar el gate**, que eran las dos salidas que yo dejaba a decisión
+humana.
+
+Verificado tras el merge: `tests/integration` entero pasa **16 archivos / 221 tests**,
+`identity-seed.int.test.ts` incluido. **El punto 1 de la sección 5.1 queda cerrado.**
+
+## A.2 Merge de `origin/dev` — los dos conflictos
+
+Commit del merge: **`624ced1`**. `dev` aportaba `b2ffa09` y
+`a581782 fix(gate): acotar al esquema public las consultas a pg_constraint de 4 tests`.
+
+**`tests/integration/inventario/presentation-uniqueness.int.test.ts` — conflicto de archivo
+entero, y la causa no era semántica.** Comparando las tres versiones (`:1` base, `:2` mía, `:3`
+`dev`) con `diff --strip-trailing-cr`, el diff real de QC-52 sobre ese archivo es **UNA línea**:
+quitar `minPurchase: 0` del fixture de producto, que ya no existe en `Product`. El conflicto de 686
+líneas lo provocó que un subagente reescribió el archivo con **CRLF**. Resolución: se toma la
+versión de `dev` **intacta** —con sus dos JOIN a `pg_namespace`— y se le aplica esa única línea. El
+archivo vuelve a quedar en LF.
+
+**`tests/integration/proveedores/proveedores-constraints.int.test.ts` — conflicto pequeño (líneas
+1330–1351).** Chocaban el comentario y la **proyección** del censo de FK. Gana la proyección de
+QC-52 (`c.confdeltype AS regla`), porque es la que el `toEqual` de más abajo —parte común, no en
+conflicto— necesita para afirmar la regla `ON DELETE` de cada FK; con la de `dev` el test no
+compilaría su propia aserción. Y se conserva el comentario de `dev` que explica por qué el JOIN con
+`pg_namespace` no es adorno. **El filtro por esquema ya estaba en las dos versiones**, así que ahí
+no había nada que elegir.
+
+**`tests/integration/unidades/unidades-constraints.int.test.ts` fusionó solo** y se comprobó a mano
+que conserva las dos intenciones: el censo cerrado de **cuatro** FK hacia `units` de QC-52 y el
+filtro por esquema de `dev`.
+
+**Nada quedó ambiguo.** En los dos casos había un criterio objetivo —la línea real del diff en uno,
+el `toEqual` que consume la proyección en el otro— y no hubo que elegir a ojo.
+
+## A.3 Base de datos propia: `QuimiCloude_QC52`
+
+Aplicar la migración de esta ficha a la base **compartida** rompió los tests de integración de la
+sesión paralela de QC-34 con un `P2022` en cualquier lectura de `orders`. **Es culpa de esta
+sesión.** QC-52 se pasa al patrón que ya siguieron QC-20, QC-25, QC-26 y QC-34:
+
+- `CREATE DATABASE "QuimiCloude_QC52"` en el mismo servidor (`localhost:5432`).
+- `DATABASE_URL` y `DIRECT_URL` del `.env` **de este worktree** apuntando ahí. **El `.env` del
+  worktree principal no se tocó.**
+- `prisma migrate deploy` — las 12 migraciones aplicadas, la de QC-52 incluida.
+- `pnpm run db:seed` — `roles creados: 2 (Administrador, Operador) - usuario inicial: creado`.
+
+**No se borró ni modificó ninguna fila de la base compartida**, cuyos datos hechos a mano se
+conservan por decisión del humano.
+
+### A.3.1 La trampa del `.env`, medida en vez de supuesta
+
+El aviso recibido era que ni `init.sh` ni Vitest cargan el `.env`, y que sin
+`set -a && . ./.env && set +a` delante el gate pegaría contra la compartida. **Lo comprobé, y en
+este repo no es así.** Sonda temporal (`current_database()`) forzada a fallar para leer el nombre,
+corrida **sin** sourcear nada:
+
+```
+Expected: "__FUERZO_EL_FALLO_PARA_VER_EL_NOMBRE__"
+Received: "QuimiCloude_QC52"
+```
+
+El motivo: `vitest.config.mts` no carga `.env` —confirmado, no hay `dotenv` ni `loadEnvFile` en la
+config ni en `tests/setup.ts`— pero **el cliente Prisma generado sí lee el `.env` de la raíz al
+importarse**, y `lib/shared/db/prisma.ts` es la única instancia del proyecto. Por el lado del CLI,
+`prisma.config.ts` llama a `process.loadEnvFile()` explícitamente, así que `db:migrate`, `db:seed` y
+`db:rollback` también leen el archivo.
+
+**Aun así, sourcear el `.env` es lo correcto y es lo que se hizo** en `migrate deploy` y en `db:seed`:
+cuesta nada, deja la intención escrita y no depende de un comportamiento implícito del cliente
+generado que puede cambiar de versión. En `process.env` gana la variable exportada, así que el
+resultado es el mismo.
+
+```bash
+cd .worktrees/QC-52-separar-producto-de-catalogo-de-proveedor
+set -a && . ./.env && set +a && ./init.sh
+```
+
+## A.4 Verificación después del merge y del cambio de base
+
+```
+> pnpm run typecheck
+(sin salida)
+
+> pnpm run lint
+(sin salida)
+
+> pnpm exec vitest related --run tests/integration/inventario/presentation-uniqueness.int.test.ts tests/integration/proveedores/proveedores-constraints.int.test.ts
+ Test Files  2 passed (2)
+      Tests  34 passed (34)
+
+> pnpm exec vitest run tests/integration
+ Test Files  16 passed (16)
+      Tests  221 passed (221)
+   Duration  13.30s
+```
+
+`./init.sh` completo **no se corrió**: lo corre el leader.
+
+## A.5 Estado de los tres puntos que esperaban decisión humana
+
+1. **`identity-seed.int.test.ts`** — **CERRADO** por `b2ffa09` de `dev` más la base propia (A.1).
+2. **T13, `meta.field_name` en Prisma 6.19.3** (sección 5.3) — **sigue esperando**. Sin tocar.
+3. **El `fill` de `qtyAlert` en el E2E** (sección 5.4) — **sigue esperando**. Sin tocar.
+
+> **Aviso para quien corra el E2E:** `playwright.config.ts` levanta su propio `next dev` en el 3117,
+> que leerá este `.env` y por tanto **la base `QuimiCloude_QC52`**, ya sembrada. Las corridas de la
+> sección 4.2 se hicieron contra la compartida, antes del cambio.
