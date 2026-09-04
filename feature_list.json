@@ -795,6 +795,57 @@
       "branch": "feature/QC-58-flake-formulario-producto",
       "depends_on": null,
       "spec_path": "specs/QC-58-flake-formulario-producto"
+    },
+    {
+      "key": "QC-59",
+      "id": 59,
+      "epic": "QC-41",
+      "epic_name": "Proveedores",
+      "name": "aislamiento-por-empresa-en-proveedores",
+      "description": "Los proveedores y las lineas de su catalogo pasan a pertenecer cada uno a una empresa, y nadie puede ver ni tocar los de otra. Toda consulta y toda escritura de proveedores se limitan a la empresa de quien pide, y el intento de leer o modificar un proveedor de otra empresa se rechaza aunque se conozca su identificador. Una linea de catalogo no puede apuntar a un producto de otra empresa. La base se siembra limpia.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-59-aislamiento-por-empresa-en-proveedores",
+      "depends_on": [
+        "QC-48"
+      ],
+      "spec_path": "specs/QC-59-aislamiento-por-empresa-en-proveedores"
+    },
+    {
+      "key": "QC-60",
+      "id": 60,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "aislamiento-por-empresa-en-pedidos",
+      "description": "Los pedidos y sus lineas pasan a pertenecer cada uno a una empresa, y nadie puede ver ni tocar los de otra. Toda consulta y toda escritura de pedidos se limitan a la empresa de quien pide, y el intento de leer o modificar un pedido de otra empresa se rechaza aunque se conozca su identificador. Un pedido no puede referirse a un producto ni a una unidad de otra empresa, y la numeracion o secuencia del pedido se mide dentro de la empresa, no entre todas. La base se siembra limpia.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-60-aislamiento-por-empresa-en-pedidos",
+      "depends_on": [
+        "QC-48"
+      ],
+      "spec_path": "specs/QC-60-aislamiento-por-empresa-en-pedidos"
+    },
+    {
+      "key": "QC-61",
+      "id": 61,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "guardia-empresa-en-esquema",
+      "description": "Una guardia ejecutable que lee db/schema.prisma y da rojo si un modelo de datos de operacion no lleva su columna de empresa. Dos listas explicitas y cortas la acotan: las tablas del sistema, exentas a proposito (users, roles, document_types), y las tablas ya construidas pendientes de aislar, cada una anotada con la ficha que la salda. Esa segunda lista solo puede encoger: anadir una entrada nueva es rojo. Cuando quede vacia se borra, y con ella la vineta correspondiente de docs/architecture.md.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-61-guardia-empresa-en-esquema",
+      "depends_on": [
+        "QC-47"
+      ],
+      "spec_path": "specs/QC-61-guardia-empresa-en-esquema"
     }
   ]
 }

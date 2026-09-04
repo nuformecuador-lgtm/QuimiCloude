@@ -25,6 +25,9 @@ esta lista.
 
 
 ## Datos y seguridad (Supabase)
+- [ ] **Toda tabla de operacion nueva lleva su columna de empresa** y toda consulta suya
+      filtra por la empresa de quien pide, con test del rechazo cruzado. Exentas solo
+      `users`, `roles` y `document_types` (`docs/architecture.md > Dominio` n.º 1).
 - [ ] **Cada permiso de la feature se valida en el SERVICE y tiene su test.** Esta es la
       frontera real: Prisma se conecta como dueño de las tablas y las policies de RLS no
       filtran sus queries (`docs/architecture.md > Acceso a datos y autorizacion`). Un

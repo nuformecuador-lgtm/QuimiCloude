@@ -8,11 +8,36 @@ esta bien hecha, no solo si "funciona".
 **QuimiCloude es un ERP para una empresa de productos quimicos.** De ahi salen tres
 consecuencias de arquitectura que no son opinables:
 
-1. **Un solo tenant.** Es el ERP *de una* empresa, no un SaaS multi-empresa. No hay
-   `empresa_id` ni aislamiento por tenant: la RLS de Supabase existe para separar **roles
-   y permisos**, no clientes. Si algun dia hubiera que multiplicar empresas, es una
-   migracion grande y consciente, no algo que se prepara "por si acaso" (eso seria
-   sobre-ingenieria y el reviewer lo rechaza).
+1. **Multiempresa en los datos de operacion, un solo sistema en la identidad** (reescrita
+   el 2026-09-04 al abrir la epica QC-46; antes decia «un solo tenant, no hay `empresa_id`
+   ni aislamiento por tenant»). El ERP sirve a varias empresas y **todo dato de operacion
+   pertenece a una y solo una**: inventario, recetas, unidades, proveedores y pedidos.
+   Ninguna consulta ni escritura de esos datos cruza la frontera de la empresa de quien
+   pide, y conocer el identificador de una fila ajena no da acceso a ella. **La identidad
+   NO se parte**: usuarios, roles y tipos de documento son del sistema y se comparten —
+   «Administrador» significa lo mismo en todas. Lo que une las dos mitades es la
+   **membresia**: a que empresas pertenece cada usuario, y con que rol en cada una.
+   - **La frontera se valida en el service.** `## Acceso a datos y autorizacion` sigue
+     mandando entero: la RLS no filtra ninguna query de esta aplicacion, asi que un
+     aislamiento implementado solo como policy **no cuenta como implementado**, igual que
+     no cuenta un permiso. La empresa viaja firmada en la sesion (QC-48) y **eso tampoco
+     autoriza por si solo**.
+   - **Toda tabla de negocio nueva nace con su columna de empresa.** Las unicas exentas
+     son las del sistema, y son una lista corta y cerrada: `users`, `roles`,
+     `document_types`. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
+   - **Lo ya construido todavia no lo esta**, y esa es la deuda que salda la epica QC-46:
+     inventario (QC-49), recetas (QC-50), unidades (QC-51), proveedores (QC-59) y pedidos
+     (QC-60). La guardia que lo hace cumplir es QC-61. Mientras una tabla siga en esa
+     lista es deuda registrada, no
+     incumplimiento; cuando la lista quede vacia, esta vineta se borra.
+   - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
+     si acaso». Lo que cambio es que multiplicar empresas dejo de ser hipotetico y paso a
+     ser backlog; sigue siendo sobre-ingenieria —y el reviewer la rechaza— todo lo que no
+     esta pedido: jerarquias de empresas, empresas anidadas, permisos por empresa mas alla
+     del rol de la membresia, o un selector de empresa antes de que exista su ficha.
+   - **Coste que esto impone y se acepta**: cada feature de datos pasa a llevar columna de
+     empresa, filtro en cada consulta, rechazo probado del acceso cruzado y su test. No es
+     gratis y no es opcional.
 2. **Modulos, no pantallas sueltas.** Un ERP crece por areas funcionales (inventario,
    compras, ventas, produccion, contabilidad...) que comparten entidades. La separacion
    de capas de mas abajo es lo que evita que un modulo nuevo tenga que tocar las tripas
@@ -33,7 +58,8 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Estan aqui porque **son c
 despues**: cambiarlas con datos ya cargados obliga a migrar historico. Conviene cerrarlas
 antes de la primera feature de inventario o de producto, no despues. De las cuatro
 originales quedan **dos cerradas** —la 1 desde el 2026-09-01 (QC-14, revisada por QC-32) y
-la 4 desde el 2026-09-03 (QC-33)—; siguen abiertas **la 2 y la 3**.
+la 4 desde el 2026-09-03 (QC-33)—; siguen abiertas **la 2 y la 3**, y el 2026-09-04 se
+abrio **la 5** al reescribir el punto 1 del dominio.
 
 1. ~~**Unidades de medida.**~~ **CERRADA el 2026-09-01 (QC-14) y REVISADA el 2026-09-02
    (QC-32).** Una sola unidad por elemento y **sin conversiones**: eso no ha cambiado y la
@@ -59,6 +85,11 @@ la 4 desde el 2026-09-03 (QC-33)—; siguen abiertas **la 2 y la 3**.
    **Queda un fleco abierto**: si algun dia hay que exportar esos datos a un contable externo
    no se evaluo, y esta anotado como pregunta abierta en
    `specs/QC-33-modelo-pedidos/requirements.md`.
+5. **Moneda por empresa.** QC-14 y QC-42 cerraron que la moneda del costo es **implicita y
+   no se guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya no
+   vale. Si dos empresas pueden operar en monedas distintas, es columna nueva y conversion
+   sobre datos ya cargados. **No se rellena con supuestos**: la cierra la primera ficha de
+   aislamiento que toque importes.
 
 ## Stack
 - **Frontend/servidor:** Next.js (App Router) + TypeScript en modo strict.
