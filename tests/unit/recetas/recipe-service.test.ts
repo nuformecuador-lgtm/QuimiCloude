@@ -32,8 +32,8 @@ const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
   description: 'Formula base',
   steps: [
-    { body: 'Mezclar', type: 'texto' },
-    { body: 'Envasar', type: 'texto' },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Envasar' }] }] },
   ],
   lines: [LINEA_VALIDA],
 };
@@ -43,8 +43,8 @@ const FILA_RECETA: RecipeRow = {
   name: 'Desengrasante 5%',
   description: 'Formula base',
   steps: [
-    { body: 'Mezclar', type: 'texto' },
-    { body: 'Envasar', type: 'texto' },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Envasar' }] }] },
   ],
   imagePath: null,
   createdBy: 'admin-1',

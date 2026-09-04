@@ -58,8 +58,8 @@ const VALID_RECIPE_INPUT = {
   name: 'Desengrasante 5%',
   description: 'Formula base',
   steps: [
-    { body: 'Mezclar', type: 'texto' },
-    { body: 'Envasar', type: 'texto' },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Envasar' }] }] },
   ],
   lines: [
     {

@@ -1,4 +1,4 @@
-import type { RecipeStepType } from './recipe-input';
+import type { RecipeStepDocument } from './recipe-input';
 
 /**
  * Contratos de salida de receta (`design.md > 7.2`). Viven en `domain/` -no en `ports/`-
@@ -40,11 +40,16 @@ export type RecipeLineView = {
 };
 
 /** Detalle de una receta (D14, R33): el resumen mas los pasos y las lineas completas. */
-/** Un paso tal y como sale del detalle: el texto y su tipo. */
-export type RecipeStepView = {
-  readonly body: string;
-  readonly type: RecipeStepType;
-};
+/**
+ * Un paso tal y como sale del detalle: EL MISMO DOCUMENTO que entra (QC-62 R10,
+ * `design.md > 2`). Entrada y salida comparten forma porque el paso no tiene ningun campo que
+ * nazca en el servidor -ni id, ni orden derivado (R16)-, y se declara como ALIAS, no como
+ * copia: dos definiciones que hay que mantener sincronizadas a mano se desincronizan.
+ *
+ * No sale ningun dato DERIVADO del documento -en particular, ninguna marca de "este paso lleva
+ * lista de verificacion"-: quien lo necesite lo deduce de los propios bloques (R10).
+ */
+export type RecipeStepView = RecipeStepDocument;
 
 export type RecipeDetail = RecipeSummary & {
   readonly steps: readonly RecipeStepView[];
