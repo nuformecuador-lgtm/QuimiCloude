@@ -167,7 +167,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
 - **Hecho cuando:** cada aserción cae al mutar lo que vigila (se demuestra mutando, no leyendo).
 - **Depende de:** T10.
 
-### T12. Cierre de tanda B
+### [x] T12. Cierre de tanda B
 - **Hecho cuando:** `./init.sh --rapido` en verde.
 - **Depende de:** T11.
 
@@ -206,7 +206,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
 - **Hecho cuando:** los cuatro casos existen y caen al mutar la implementación.
 - **Depende de:** T13. Paralelizable con T16.
 
-### T16. `[P]` Tests de integración de constraints contra Postgres real
+### [x] T16. `[P]` Tests de integración de constraints contra Postgres real
 - **Archivos:** `tests/integration/identity/identity-constraints.int.test.ts`.
 - **Qué, como mínimo, cada uno dentro de una transacción que acaba en `ROLLBACK`:**
   - R4: segunda empresa con el mismo nombre en otras mayúsculas y con acentos → `23505`;
@@ -224,14 +224,14 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
 - **Hecho cuando:** los casos de R16–R18 fallan si alguien devuelve los índices a su forma de QC-4.
 - **Depende de:** T13. Paralelizable con T15.
 
-### T17. `[P]` Tests de integración del login y de la sesión
+### [x] T17. `[P]` Tests de integración del login y de la sesión
 - **Archivos:** `tests/integration/identity/{login,session-user}.int.test.ts`.
 - **Qué:** el rol resuelto es el de `users.role_id` y cambia con él (R14); un usuario dado de baja
   no entra ni tiene sesión; ninguna consulta necesita una segunda lectura para el rol.
 - **Hecho cuando:** verde y sin ninguna mención de pertenencia.
 - **Depende de:** T13. Paralelizable con T15 y T16.
 
-### T18. Cierre de tanda C
+### [x] T18. Cierre de tanda C
 - **Hecho cuando:** `./init.sh --rapido` en verde.
 - **Depende de:** T14, T15, T16, T17.
 
@@ -239,7 +239,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
 
 ## Tanda D — Fixtures ajenos, guardias y E2E
 
-### T19. Añadir `companyId` a los 19 fixtures
+### [x] T19. Añadir `companyId` a los 19 fixtures
 - **Archivos:** los de la tabla de `design.md > 6` (5 E2E + 14 de integración).
 - **Qué:** cada `user.create` gana `companyId`; cada spec crea su **empresa efímera propia** en el
   `beforeAll` (nombre con prefijo + `RUN_ID`, `nameNormalized` vía `normalizeCompanyName`, **nunca**
@@ -250,7 +250,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   imports, constantes de módulo, helpers de creación, `beforeAll` y `afterAll`.
 - **Depende de:** T18.
 
-### T20. Retensar las cuatro guardias de alcance ajenas
+### [x] T20. Retensar las cuatro guardias de alcance ajenas
 - **Archivos:** `tests/unit/identity/credential-policy-contract.test.ts`,
   `tests/unit/proveedores/module-contract.test.ts`, `tests/unit/proveedores/scope.test.ts`,
   `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
@@ -262,7 +262,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   mire una a una (tocar la guardia de otra feature siempre merece un segundo par de ojos).
 - **Depende de:** T19.
 
-### T21. Barrido final de residuo del modelo viejo
+### [x] T21. Barrido final de residuo del modelo viejo
 - **Qué:** `rg -i 'membership|memberships|pertenencia' lib/ app/ components/ scripts/ db/ tests/
   e2e/` y `rg 'roleId|role_id' e2e/ tests/ lib/`.
 - **Hecho cuando:** el primero devuelve cero; el segundo devuelve **solo** aciertos legítimos
@@ -270,7 +270,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
 - **Se repite después de cada merge de `dev`**, no una sola vez (`design.md > 8`, riesgo 5).
 - **Depende de:** T20.
 
-### T22. Comprobar que los E2E existentes siguen verdes
+### [x] T22. Comprobar que los E2E existentes siguen verdes
 Es un requisito con nombre (R28, decisión cerrada 15), no una consecuencia.
 
 - **Qué:** `pnpm exec playwright test e2e/login.spec.ts e2e/session.spec.ts e2e/inventario.spec.ts
@@ -281,7 +281,7 @@ Es un requisito con nombre (R28, decisión cerrada 15), no una consecuencia.
   y no se añade ninguno.
 - **Depende de:** T19, T21.
 
-### T23. Bitácora y mapa de trazabilidad
+### [x] T23. Bitácora y mapa de trazabilidad
 - **Archivos:** `progress/impl_QC-47-modelo-empresa-y-membresias.md`.
 - **Qué:** reescribirla entera para el modelo nuevo —la actual describe el viejo—, con el mapa
   `R1..R29 -> test concreto` **sin hueco** (`CHECKPOINTS.md > Trazabilidad`), la respuesta de T5 a

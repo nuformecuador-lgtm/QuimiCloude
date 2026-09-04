@@ -1,247 +1,286 @@
 # QC-47 — modelo-empresa-y-membresias · bitacora de implementacion
 
-> Worktree: `.worktrees/QC-47-modelo-empresa-y-membresias` · Rama:
-> `feature/QC-47-modelo-empresa-y-membresias` · Base propia del worktree: `QuimiCloude_QC47`
-> (la compartida `QuimiCloude` no se toco en ningun momento).
+> **Reescrita de cero el 2026-09-04.** La version anterior de este archivo describia la PRIMERA
+> VUELTA de la ficha: un modelo de muchos a muchos con tabla `memberships` y el rol mudado alli.
+> El humano reacoto la ficha y ese modelo esta descartado entero. No se le ha anadido un apendice
+> a la bitacora vieja porque quedaria mintiendo sobre lo que hay en la rama.
 >
-> Las 21 tasks de `tasks.md` estan cerradas. `./init.sh` completo y el PR son del leader, tras
-> el reviewer.
+> El slug dice «membresias» y ya no hay membresias: se conserva a proposito (`requirements.md`).
+
+## Que se construyo
+
+Una tabla `companies` y **una columna nueva en `users`: `company_id`**, obligatoria, con FK
+`RESTRICT`. Un usuario pertenece a **una sola** empresa y tiene **un solo** rol.
+**`users.role_id` no se toco**: sigue exactamente donde estaba. Y el correo, el nombre de usuario
+y el documento pasan a ser unicos **dentro de la empresa**, lo que obligo a rehacer los tres
+indices unicos de QC-4.
 
 ## Tandas y commits
 
-| Tanda | Tasks | Commit | Que entra |
-| --- | --- | --- | --- |
-| A — dominio puro | T1, T2, T3 | `f76b990` | `normalizeCompanyName`, `INITIAL_COMPANY_NAME`, contrato publico |
-| B — esquema | T4, T5, T6 | `8bdf5b3` | `Company` y `Membership`; `User` pierde el rol; test de esquema |
-| C — migracion | T7, T8, T9, T10 | `25692d3` | `migration.sql` con backfill, `down.sql`, test sobre el texto de los dos SQL |
-| D — los tres consumidores | T11-T17 | `7a45677` | login, sesion, puerto, dominio y adaptador del seed, `scripts/seed.ts` |
-| E/F — constraints y cierre | T18, T19, T20, T21 | (esta tanda) | constraints contra Postgres real, barrido de huerfanos, E2E, bitacora |
+| Commit | Que |
+| --- | --- |
+| `bb6f65b` | **Tanda A** — fuera el modelo de muchos a muchos. Membership desaparece, `role_id` vuelve byte a byte, los 19 fixtures y las guardias se revierten a `dev` con `git checkout` |
+| `8ae8f21` | **Merge de `dev`** (12 commits, trajo QC-62). Hecho a mitad de camino a proposito, no al final |
+| `979b0b5` | **Tanda B** — `companies`, `users.company_id`, migracion reescrita en su sitio + carpeta renombrada, los tres unicos rehechos, `down.sql` y el test de esquema |
+| `d1c7455` | **Tanda C** — el seed crea la empresa inicial y mete dentro al administrador |
+| `fb5f269` | **Tanda D** — los 15 fixtures ajenos ganan su empresa; 4 guardias retensadas |
+| `451f543` | **Tanda D** — la unicidad dentro de la empresa, medida contra Postgres real |
+| `8bdaae1` | **Fix** — la empresa efimera de 9 fixtures nacia con nombre literal (ver «Lo que salio mal») |
 
-## Archivos creados
+## La comprobacion de RLS (T5) — pregunta abierta 3, cerrada
 
-- `lib/modules/identity/domain/company-name.ts` — `normalizeCompanyName`, la UNICA definicion de
-  «mismo nombre de empresa» (R3).
-- `lib/modules/identity/domain/companies.ts` — `INITIAL_COMPANY_NAME`, unico sitio del repo que
-  escribe ese literal en TypeScript (R20).
-- `db/migrations/20260904180600_companies_and_memberships/migration.sql`
-- `db/migrations/20260904180600_companies_and_memberships/down.sql`
-- `tests/unit/identity/company-name.test.ts`
-- `tests/unit/identity/schema/companies-migration.test.ts`
+**La pregunta:** `users` quedo desde QC-4 con `ENABLE` + `FORCE ROW LEVEL SECURITY` y **cero
+policies**. El backfill de esta ficha necesita **escribir** ahi, cosa que ninguna migracion
+posterior a QC-4 habia hecho. `FORCE` alcanza tambien al dueno de la tabla.
 
-## Archivos modificados
+**Medido contra `QuimiCloude_QC47` con la cadena `DIRECT_URL` que usa Prisma Migrate:**
 
-Produccion:
-- `db/schema.prisma` — `Company`, `Membership`, `User` sin rol, `Role` sin `users`.
-- `lib/modules/identity/index.ts` — reexporta los dos simbolos nuevos.
-- `lib/modules/identity/ports/initial-access-repository.ts`
-- `lib/modules/identity/domain/seed-initial-access.ts`
+```
+OK | quien soy         | current_user=postgres  is_superuser=on
+OK | atributos del rol | rolsuper=true  rolbypassrls=true
+OK | rls forzada       | relrowsecurity=true  relforcerowsecurity=true
+OK | policies en users | 0
+-- ensayo del backfill real, en transaccion que acaba en ROLLBACK --
+OK | ADD COLUMN + UPDATE ... SET | rows=1
+OK | SELECT tras el UPDATE       | escritos=1
+OK | SET NOT NULL                | (sin error)
+```
+
+**Respuesta: si pasa — pero pasa por la razon equivocada, y eso importa mas que el si.** El rol
+local es superusuario **con BYPASSRLS**, y un superusuario salta la RLS pase lo que pase,
+`FORCE` incluido. La medicion demuestra que el backfill corre **aqui**, no que la RLS lo deje
+pasar.
+
+Asi que se midio tambien el caso que el superusuario oculta: misma configuracion
+(`ENABLE`+`FORCE`, cero policies) sobre una tabla cuyo **dueno NO es superusuario**:
+
+```
+OK | >>> UPDATE como duenyo NO superusuario <<< | (sin error, 0 filas afectadas)
+OK | >>> SELECT como duenyo NO superusuario <<< | visibles=0
+```
+
+**El UPDATE no falla: afecta a cero filas y se calla.** Es el modo de fallo peor.
+
+**Decision tomada, y por que no se improviso otra.** El backfill se escribe **tal cual** dice
+`design.md > 3.2`, **sin** envolverlo en NO FORCE / FORCE. T5 dice «si no pasa, se aplica la
+salida del riesgo 2; no se elige a ciegas» — y paso. Elegir la salida igualmente seria aplicar
+una mitigacion que la medicion no pide. El riesgo residual queda **acotado**: el paso 6 del UP es
+`SET NOT NULL`, que sobre una base con usuarios y un backfill sin efecto revienta con `23502`.
+Es decir, **un despliegue con dueno no superusuario rompe ruidosamente en vez de callarse**.
+Queda anotado para la ficha que despliegue fuera de local; **el leader decide** si quiere la
+mitigacion preventiva.
+
+## Archivos creados y modificados
+
+**Esquema y migracion**
+- `db/schema.prisma` — `model Company` (con `users User[]`); `User` gana `companyId` + su
+  `@@index`; `Role` recupera `users User[]`; `roleId` intacto
+- `db/migrations/20260904180600_companies_and_user_company/migration.sql` — **renombrada** desde
+  la carpeta vieja con `git mv`, y reescrita entera
+- `db/migrations/20260904180600_companies_and_user_company/down.sql` — reescrito entero
+
+**Dominio y adaptadores de `identity`**
+- `lib/modules/identity/domain/companies.ts` — `INITIAL_COMPANY_NAME` (conservado de la 1.a vuelta)
+- `lib/modules/identity/domain/company-name.ts` — `normalizeCompanyName` (conservado)
+- `lib/modules/identity/index.ts` — contrato publico (conservado)
+- `lib/modules/identity/ports/initial-access-repository.ts` — el puerto gana la empresa
+- `lib/modules/identity/domain/seed-initial-access.ts` — resuelve la empresa dentro de `needsAdmin`
 - `lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts`
-- `lib/modules/identity/adapters/driven/persistence/user-credentials-prisma.ts`
-- `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts`
-- `scripts/seed.ts`
+- `.../user-credentials-prisma.ts` y `.../session-user-prisma.ts` — **revertidos a `dev`**
+- `scripts/seed.ts` — **no se toco** (ver «Decisiones que el leader tiene que mirar», punto 1)
 
-**`lib/composition/index.ts`: CERO cambios (T16).** El repositorio sale de la misma fabrica
-(`withInitialAccessTransaction` -> `createInitialAccessRepository(tx)`), asi que los metodos
-nuevos llegan solos y con el mismo `tx`. La atomicidad de R18 se conserva sin tocar el cableado.
-
-Tests:
-- `tests/unit/identity/schema/identity-schema.test.ts`
+**Tests propios**
+- `tests/unit/identity/schema/companies-migration.test.ts` (reescrito), `.../identity-schema.test.ts`
+- `tests/unit/identity/company-name.test.ts` (conservado intacto)
 - `tests/unit/identity/seed/seed-initial-access.test.ts`
-- `tests/unit/identity/credential-policy-contract.test.ts` (linea base del censo de `User`)
+- `tests/integration/identity/{identity-constraints,login,session-user,identity-seed}.int.test.ts`
+
+**Fixtures ajenos que ganan `companyId` (15)**
+- `e2e/{login,session,inventario,recetas,proveedores}.spec.ts`
+- `tests/integration/inventario/product-crud`, `recetas/{recetas-constraints,recipe-crud}`,
+  `pedidos/{order-crud,order-repository,order-sequence,pedidos-constraints}`,
+  `proveedores/{catalog-line,supplier-crud,proveedores-constraints}`
+
+**Guardias ajenas retensadas (4)** — ver la nota dedicada mas abajo
+- `tests/unit/identity/credential-policy-contract.test.ts`
 - `tests/unit/proveedores/module-contract.test.ts`, `tests/unit/proveedores/scope.test.ts`
 - `tests/unit/recetas-ui/recipe-route-contract.test.ts`
-- `tests/unit/inventario/schema/inventario-audit-migration.test.ts` (solo un comentario)
-- `tests/integration/identity/{identity-constraints,identity-seed,login,session-user}.int.test.ts`
-- `tests/integration/{inventario,pedidos,proveedores,recetas}/*.int.test.ts` (fixtures)
-- `e2e/{login,session,inventario,recetas,proveedores}.spec.ts` (**solo fixtures**, ver el cierre)
 
-## Mapa `R<n> -> test`
+## Mapa de trazabilidad R<n> -> test
 
-Los 29 requisitos, sin hueco. Rutas relativas a la raiz del worktree. Abreviaturas:
-`SCHEMA` = `tests/unit/identity/schema/identity-schema.test.ts`;
-`MIG` = `tests/unit/identity/schema/companies-migration.test.ts`;
-`CONSTR` = `tests/integration/identity/identity-constraints.int.test.ts`;
-`SEED-U` = `tests/unit/identity/seed/seed-initial-access.test.ts`;
-`SEED-I` = `tests/integration/identity/identity-seed.int.test.ts`;
-`LOGIN-I` = `tests/integration/identity/login.int.test.ts`;
-`SESION-I` = `tests/integration/identity/session-user.int.test.ts`.
+Los 29 requisitos, cada uno con archivo y titulo de test. Sin hueco.
 
-| R | Test concreto |
-| --- | --- |
-| R1 | `SCHEMA` > "Company y Membership tienen id uuid con default generado (R1)"; `MIG` > "las dos tablas nuevas" (DEFAULT gen_random_uuid) |
-| R2 | `SCHEMA` > "Company declara name y nameNormalized obligatorios, en texto sin longitud (R2, R21)" |
-| R3 | `tests/unit/identity/company-name.test.ts` (8 casos: acentos, mayusculas, signos, trim, digitos, idempotencia); `SCHEMA` > "Company declara name y nameNormalized obligatorios" |
-| R4 | `CONSTR` > "rechaza una segunda empresa con el mismo nombre en otras mayusculas y con acentos" (SQLSTATE 23505); `MIG` > "la empresa lleva el indice unico FUNCIONAL y PARCIAL de su nombre normalizado" |
-| R5 | `SCHEMA` > "Company declara deletedAt opcional (R5)" |
-| R6 | `SCHEMA` > "Company y Membership registran creacion y actualizacion (R6)"; `CONSTR` > "created_at y updated_at se rellenan solos y updated_at cambia al modificar" |
-| R7 | `SCHEMA` > "Membership declara sus tres referencias obligatorias en uuid (R7)" |
-| R8 | `CONSTR` > "acepta que la misma persona pertenezca a dos empresas con un rol distinto en cada una" |
-| R9 | `CONSTR` > "rechaza una segunda pertenencia de la misma persona a la misma empresa" (23505); `SCHEMA` > "la pareja usuario+empresa es unica, y el unico es TOTAL (R9)" |
-| R10 | `CONSTR` > "rechaza una pertenencia con persona, empresa o rol inexistentes" (23503, tres casos) |
-| R11 | `CONSTR` > "rechaza borrar la empresa, el rol o la persona de una pertenencia, y las filas quedan intactas" (23503, tres casos) y "rechaza borrar un rol cuya unica persona esta borrada logicamente"; `SCHEMA` > "las tres relaciones de Membership son Restrict, nunca Cascade al borrar (R11)" |
-| R12 | `SCHEMA` > "Membership no tiene deletedAt (R12)" |
-| R13 | `SCHEMA` > "ninguna columna de User huele a rol"; `MIG` > "no se toca ninguna FK, CHECK ni RLS de las tablas de otros modulos" (la migracion no anade columna de empresa a users, roles ni document_types); `CONSTR` > "acepta varias personas con el mismo rol en la misma empresa" (el rol es del sistema, no se separa) |
-| R14 | `SCHEMA` > "User no declara roleId, ni la relacion role, ni el indice users_role_id_idx" y "Role ya no tiene campo de vuelta hacia User"; `CONSTR` > "crea un usuario con todos sus datos" (las claves del usuario no contienen roleId); `tests/unit/identity/credential-policy-contract.test.ts` (censo cerrado de campos de User); `tests/unit/proveedores/module-contract.test.ts` (relationTargets de User) |
-| R15 | `SESION-I` > "el rol cambiado en la pertenencia entre dos lecturas devuelve el nuevo" y "un usuario activo devuelve nombres, username y el rol actual" |
-| R16 | `LOGIN-I` > "el rol resuelto es el de la pertenencia, y cambia con ella"; `e2e/login.spec.ts` y `e2e/session.spec.ts` con el guion sin tocar (decision cerrada 14) |
-| R17 | `LOGIN-I` > "un usuario vivo sin ninguna pertenencia no se encuentra ni entra"; `SESION-I` > "un usuario vivo sin ninguna pertenencia devuelve null" |
-| R18 | `SEED-U` > "sobre una base vacia crea la empresa inicial y le da al administrador su pertenencia"; `SEED-I` > "la primera corrida sobre base vacia crea los dos roles y el administrador" y "mitad negativa: si run lanza, lo escrito antes del fallo NO queda commiteado" (transaccion unica) |
-| R19 | `SEED-U` > "si la empresa inicial ya existe la reutiliza por nombre normalizado y no crea ninguna otra", "sobre una base que ya tiene su acceso inicial no crea empresa, ni pertenencia, ni nada" y "needsAdmin sale de countLiveUsersWithRole(Administrador)"; `SEED-I` > "tras la primera corrida devuelve 1, y una segunda corrida no crea segunda empresa, admin ni pertenencia", "una persona con DOS pertenencias de rol Administrador sigue contando UNA", "una persona viva cuya unica pertenencia es de rol Operador no cuenta como Administrador", "un administrador dado de baja NO cuenta" y "una persona viva SIN ninguna pertenencia no cuenta con ningun rol" |
-| R20 | `MIG` > "el literal de la empresa sale de la UNICA definicion, y el test cae si divergen" (importa INITIAL_COMPANY_NAME y normalizeCompanyName de verdad); `tests/unit/identity/company-name.test.ts` (el nombre inicial normaliza a quimicloud) |
-| R21 | `SCHEMA` > "Company declara name y nameNormalized obligatorios, en texto sin longitud (R2, R21)"; `MIG` > "las dos tablas nuevas" (identificadores en ingles y snake_case) |
-| R22 | `SCHEMA` > "los dos modelos nuevos declaran su modulo propietario identity (R22)"; `tests/guards/guard-arquitectura-modulos.test.ts` bloque 10 (prohibe prisma.company / prisma.membership fuera de identity) |
-| R23 | `MIG` > "companies y memberships quedan con RLS activada Y forzada" |
-| R24 | `MIG` > "la pertenencia se crea con el rol LITERAL de cada usuario, bajas incluidas", "el backfill va ANTES del FORCE ROW LEVEL SECURITY, y el test cae si se mueve detras" y "el DROP COLUMN de role_id va DESPUES del backfill". Verificado ademas contra Postgres real (T8): base con 3 usuarios, uno de baja, deja 3 pertenencias con el rol que cada uno tenia y 0 usuarios con un numero de pertenencias distinto de 1 |
-| R25 | `MIG` > "devuelve role_id a users OBLIGATORIA y con el rol que guardaba la pertenencia", "recrea la FK y el indice de role_id con EXACTAMENTE el texto de QC-4" (leido del migration.sql de QC-4, no copiado) y "borra las dos tablas nuevas en orden inverso a la FK y no toca pgcrypto". Verificado ademas contra Postgres real (T9): snapshot de users -columnas, indices y constraints- antes de aplicar y despues de revertir, diff sin diferencias, y _prisma_migrations sin la fila |
-| R26 | `MIG` > "empieza con la guardia que aborta si alguien no tiene exactamente una pertenencia". Verificado ademas contra Postgres real (T9e): con un usuario con dos pertenencias el down.sql aborta con el mensaje de R26 y el ROLLBACK deja todo intacto |
-| R27 | `MIG` > "no hay ningun DROP sobre los tres indices unicos de users que escribio QC-4" y "no se toca ninguna FK, CHECK ni RLS de las tablas de otros modulos"; `tests/unit/identity/schema/identity-migration.test.ts` sigue verde y vigila los tres indices de QC-4 |
-| R28 | `e2e/login.spec.ts` y `e2e/session.spec.ts` en verde sin un solo cambio dentro de ningun test(); `e2e/proveedores.spec.ts` en verde (4 passed) tras el merge de QC-44, tambien sin tocar su guion; `tests/unit/recetas-ui/recipe-route-contract.test.ts` y `tests/unit/proveedores/scope.test.ts` (guardias de alcance: la feature no estrena ruta, pantalla ni flujo navegable) |
-| R29 | `tests/guards/` en verde (12 archivos, 123 tests) y `package.json` / `pnpm-lock.yaml` sin ningun cambio en el diff de la rama |
-
-## Nota para el reviewer sobre `CHECKPOINTS.md > Datos y seguridad`
-
-Esta ficha **no crea ninguna tabla de operacion**, asi que:
-
-- la exencion de `users` / `roles` / `document_types` sigue intacta y sin tocar;
-- `companies` y `memberships` **no llevan columna de empresa, y es correcto**: son ellas mismas
-  la frontera. `companies` ES la empresa, y `memberships` es precisamente la fila que dice a que
-  empresa pertenece alguien. Pedirles una columna de empresa seria circular. Se deja escrito
-  porque es la excepcion que un reviewer va a mirar;
-- separar por empresa las tablas de operacion es de **QC-49** (inventario), **QC-50** (recetas),
-  **QC-51** (unidades), **QC-59** (proveedores) y **QC-60** (pedidos), y la guardia de esquema
-  que lo hara cumplir es **QC-61**. Nada de eso entra aqui (R28);
-- las dos tablas nuevas llevan `ENABLE` **y** `FORCE ROW LEVEL SECURITY` sin policies:
-  deny-by-default para toda via que no sea Prisma (R23). Es defensa en profundidad, no la
-  frontera de autorizacion, que vive en el service.
+| R | Que exige | Test |
+| --- | --- | --- |
+| **R1** | id propio, no correlativo, generado por la base | `identity-constraints` › *el id de la empresa lo genera la base y no es correlativo* · `identity-schema` › *Company declara id uuid generado por la base, nombre, normalizado y sus tres fechas* |
+| **R2** | nombre obligatorio en la base, sin limite de longitud | `identity-constraints` › *rechaza una empresa sin nombre y no limita la longitud del nombre* |
+| **R3** | nombre normalizado en columna propia, definicion unica | `unit/identity/company-name` (8 casos) · `companies-migration` › *el literal de la empresa sale de la UNICA definicion, y el test cae si divergen* |
+| **R4** | segunda empresa viva con el mismo nombre -> rechazada por indice | `identity-constraints` › *rechaza una segunda empresa con el mismo nombre en otras mayusculas y con acentos* · `identity-schema` › *la unicidad del nombre de empresa NO esta en el esquema, y es deliberado* |
+| **R5** | empresa de baja libera su nombre | `identity-constraints` › *el nombre de una empresa dada de baja se puede reutilizar* |
+| **R6** | `deleted_at` nace vacia y nadie la escribe | `companies-migration` › *la empresa nace con deleted_at, con sus marcas de tiempo y sin varchar(n)* |
+| **R7** | `created_at`/`updated_at` y el segundo cambia | `identity-constraints` › *created_at y updated_at de la empresa se rellenan solos y updated_at cambia al modificar* |
+| **R8** | identificadores en ingles y snake_case | `companies-migration` › *la empresa nace con deleted_at...* + *la columna de empresa entra anulable, se endurece y queda con FK RESTRICT e indice* |
+| **R9** | referencia a exactamente una empresa, obligatoria en la base | `identity-schema` › *companyId es obligatorio, uuid y mapea a company_id (R9)* · `identity-constraints` › *rechaza un usuario sin empresa o con una empresa inexistente* |
+| **R10** | empresa inexistente -> rechazada por la base | `identity-constraints` › *rechaza un usuario sin empresa o con una empresa inexistente* · `identity-schema` › *la relacion User-Company va con @relation y ON DELETE RESTRICT* |
+| **R11** | borrar empresa con usuarios -> rechazado (vivos **y** de baja) | `identity-constraints` › *rechaza borrar una empresa con un usuario vivo dentro* + *rechaza borrar una empresa cuyo unico usuario esta dado de baja* + *permite borrar una empresa sin ningun usuario* |
+| **R12** | ninguna tabla ni modelo de pertenencia multiple | `identity-schema` › *nadie puede estar en dos empresas: no hay modelo intermedio (R12)* + *companyId lleva su indice y NO lleva unicidad* · `companies-migration` › *crea UNA sola tabla, y es la empresa: no hay tabla intermedia* |
+| **R13** | el rol se conserva en la fila del usuario, sin tocar | `identity-schema` › *roleId es obligatorio y FK a Role* + *la relacion User-Role declara onDelete Restrict* + *roleId no tiene restriccion de unicidad* · `companies-migration` › *ni el UP ni el DOWN nombran la FK ni el indice del rol* · `identity-constraints` › *el usuario se crea con su rol y su empresa como columnas propias de su fila* |
+| **R14** | el rol se resuelve de esa columna, sin lectura adicional | `login` › *el rol del login sale de users.role_id y cambia con el, sin una segunda lectura* · `session-user` › *el rol cambiado entre dos lecturas devuelve el nuevo* · `seed-initial-access` › *needsAdmin sale de countLiveUsersWithRole(Administrador), leido de users.role_id* |
+| **R15** | ni roles ni tipos de documento ganan empresa | `identity-schema` › *roles y tipos de documento NO ganan columna de empresa (R15)* · `identity-constraints` › *dos usuarios de empresas distintas comparten el mismo rol del mismo catalogo* |
+| **R16** | correo unico **dentro** de la empresa | `identity-constraints` › *rechaza el mismo correo en la misma empresa y lo acepta en otra* · `companies-migration` › *los tres se borran y se recrean con company_id como primera columna* |
+| **R17** | usuario unico **dentro** de la empresa | `identity-constraints` › *rechaza el mismo nombre de usuario en la misma empresa y lo acepta en otra* |
+| **R18** | documento unico **dentro** de la empresa | `identity-constraints` › *rechaza el mismo documento en la misma empresa y lo acepta en otra* |
+| **R19** | ninguna unicidad global, y solo entre vivos | `companies-migration` › *conservan el lower(...) y el WHERE deleted_at IS NULL que QC-4 les dio (R19)* · `identity-constraints` › *dar de baja a un usuario libera su correo, su username y su documento dentro de su empresa* |
+| **R20** | el seed deja empresa + semilla en la misma transaccion | `seed-initial-access` › *sobre una base vacia crea la empresa inicial y el administrador DENTRO de ella, en la misma llamada* · `identity-seed` › *la primera corrida deja la empresa inicial con el usuario semilla dentro; la segunda no crea una segunda empresa* |
+| **R21** | el nombre sale de una unica constante, no del entorno | `companies-migration` › *el literal de la empresa sale de la UNICA definicion, y el test cae si divergen* · `company-name` › *la empresa inicial normaliza a quimicloud, que es lo que persistira el backfill* |
+| **R22** | el seed es idempotente | `seed-initial-access` › *si la empresa inicial ya existe la reutiliza por nombre normalizado y NO crea una segunda* + *sobre una base que ya tiene acceso inicial no toca companies NI PARA LEER* · `identity-seed` › *la primera corrida ... la segunda no crea una segunda empresa* |
+| **R23** | la migracion mete a todos y no toca el rol de nadie | `companies-migration` › *mete a TODOS los usuarios, incluidos los dados de baja (R23)* + *no menciona la columna del rol fuera de los comentarios (R13, R23)* + *no crea ninguna empresa si no hay ningun usuario (R20)* |
+| **R24** | RLS activada **y** forzada en la tabla nueva | `companies-migration` › *companies queda con RLS activada Y forzada* · `identity-constraints` › *companies tiene ROW LEVEL SECURITY activada y forzada* |
+| **R25** | revertir devuelve el esquema exacto, indices incluidos | `companies-migration` › *devuelve los tres indices unicos al TEXTO LITERAL de QC-4 (R25)* + *quita el indice, la FK y la columna de empresa, en ese orden* + *borra la empresa la ultima y no toca pgcrypto*. **Ademas, medido:** ciclo migrate -> rollback con diff de snapshots VACIO |
+| **R26** | si revertir perdiera un dato, la reversion aborta | `companies-migration` › *empieza por la guardia de R26, antes de tocar el esquema*. **Ademas, medido** contra Postgres real: la guardia se disparo con dos empresas que comparten `ada` |
+| **R27** | `identity` es el modulo propietario | `identity-schema` › *Company es del modulo identity (R27)* · `companies-migration` › *Company declara /// @module identity (R27)* · guardia `tests/guards/guard-arquitectura-modulos` |
+| **R28** | ni ruta ni pantalla nueva; los E2E pasan sin cambiar de guion | **Medido:** los 5 E2E en chromium+webkit, 18/18. Y el diff de los 5 specs tiene **0** lineas con `test(`, `expect(`, `getByRole`, `getByLabel`, `page.goto` o `toHaveURL` |
+| **R29** | ninguna dependencia nueva | `git diff origin/dev -- package.json pnpm-lock.yaml` **vacio**. Guardia `credential-policy-contract` › *esta feature no anade migraciones ni columnas* |
 
 ## Salida real de los tests
 
-`pnpm test` (vitest, suite completa, con el `.env` del worktree cargado):
+Sobre `QuimiCloude_QC47` reiniciada desde cero (DROP SCHEMA + `db:migrate` + `db:seed`), para que
+el verde no dependa de residuo de corridas anteriores:
 
-    Test Files  169 passed (169)
-         Tests  1949 passed (1949)
-      Duration  101.96s
+```
+$ pnpm run typecheck
+tsc --noEmit                (sin salida, verde)
 
-`pnpm run typecheck` -> `tsc --noEmit`, sin salida, exit 0.
-`pnpm run lint` -> `eslint`, sin salida, exit 0.
-`pnpm run test:guardias` -> `Test Files 12 passed (12)`, `Tests 123 passed (123)`.
+$ pnpm run lint
+eslint                      (sin salida, verde)
 
-E2E (`pnpm exec playwright test e2e/login.spec.ts e2e/session.spec.ts`, chromium + webkit, sobre
-la base propia ya sembrada):
+$ pnpm test
+ Test Files  186 passed (186)
+      Tests  2161 passed (2161)
+   Duration  81.41s
 
-    ok [chromium] login.spec.ts > entra con credenciales correctas y recibe la cookie de sesion httpOnly
-    ok [webkit]   login.spec.ts > entra con credenciales correctas y recibe la cookie de sesion httpOnly
-    ok [chromium] login.spec.ts > con credenciales incorrectas se queda en el login, avisa y no emite sesion
-    ok [webkit]   login.spec.ts > con credenciales incorrectas se queda en el login, avisa y no emite sesion
-    ok [chromium] session.spec.ts > ciclo de sesion sobre una ruta privada
-    ok [webkit]   session.spec.ts > ciclo de sesion sobre una ruta privada
-    6 passed (55.2s)
+$ pnpm exec playwright test e2e/login.spec.ts e2e/session.spec.ts e2e/inventario.spec.ts \
+                            e2e/recetas.spec.ts e2e/proveedores.spec.ts
+  18 passed (2.1m)          (chromium + webkit)
+```
 
-Seed contra la base propia, dos corridas seguidas (R18, R19):
+Ciclo de la migracion, verificado contra Postgres real y no leido:
 
-    db:seed: roles creados: 2 (Administrador, Operador) - empresa inicial: creada (QuimiCloud) - usuario inicial: creado
-    db:seed: nada que crear
-    despues: roles=2, users=1, companies=1, memberships=1
+```
+$ pnpm run db:migrate
+Applying migration `20260904180600_companies_and_user_company`
+Applying migration `20260904181500_recipe_steps_reset`
+All migrations have been successfully applied.
 
-## Como se demostro el riesgo 1 del `design.md > 9`
+$ pnpm run db:rollback   &&   diff -u snapshot-antes.json snapshot-despues.json
+=== DIFF VACIO: el esquema revertido es IDENTICO al de antes (R25) ===
 
-Era una exigencia explicita: un test que lo demuestre, no una lectura.
-`countLiveUsersWithRole` se muto tres veces en el adaptador y se corrio el test de integracion:
+# guardia del DOWN, con dos empresas que comparten `ada`:
+R26 OK — la reversion aborta: QC-47: hay 3 clave(s) de usuario (correo, nombre de usuario o
+documento) repetidas entre usuarios vivos de empresas distintas. La reversion se detiene...
+```
 
-| Mutacion | Resultado |
-| --- | --- |
-| `memberships: { some: {} }` (pierde el rol) | ROJO — "una persona viva cuya unica pertenencia es de rol Operador no cuenta como Administrador" |
-| quitar `deletedAt: null` | ROJO — "un administrador dado de baja NO cuenta..." |
-| `db.membership.count(...)` en vez de `db.user.count(...)` | ROJO — "una persona con DOS pertenencias de rol Administrador sigue contando UNA..." |
+El snapshot compara columnas con su `ordinal_position`, indices con su `indexdef`, restricciones
+con su `pg_get_constraintdef` y la lista de tablas.
 
-El `where` que quedo es
-`{ deletedAt: null, memberships: { some: { role: { name: roleName } } } }`, y la misma traduccion
-se aplico al `catch (P2002)` de `createInitialAdmin`, que era el segundo sitio con el mismo patron.
+Prueba de que el test de R16-R18 **vale algo** (se recrearon los tres indices en su forma global
+de QC-4 sobre la base y se volvio a correr):
 
-Riesgo 2 (literal duplicado), tambien demostrado mutando: cambiar el literal del `INSERT` a otro
-nombre -> ROJO; mover los cuatro `ALTER ... ROW LEVEL SECURITY` delante del `DO $$` -> ROJO.
+```
+ × rechaza el mismo correo en la misma empresa y lo acepta en otra
+ × rechaza el mismo nombre de usuario en la misma empresa y lo acepta en otra
+ × rechaza el mismo documento en la misma empresa y lo acepta en otra
+      Tests  3 failed | 66 passed (69)
+```
 
-## Barrido de lectores huerfanos del rol (T19)
+Los tres fallan por la mitad «y lo acepta en otra». Restaurada la forma nueva: 69/69.
 
-`rg 'role_id|roleId'` sobre `lib/`, `app/`, `components/`, `scripts/`, `tests/`, `db/` y `e2e/`
-solo devuelve aciertos legitimos: el `roleId` propio de `Membership`, el `down.sql` y la migracion
-de QC-4, comentarios que narran la mudanza, y variables de fixture que sirven para construir una
-pertenencia. **Ninguna lectura del rol desde `users`** (R14).
+Y cada asercion del test de esquema se demostro **mutando el archivo vigilado**, no leyendola:
+devolver un indice del UP a la forma global, recrear el del DOWN con `company_id`, quitar el
+`WHERE deleted_at IS NULL`, cambiar el literal de la empresa, mover el backfill detras del RLS o
+detras del `SET NOT NULL`, meter un `DROP COLUMN role_id`, quitar el FORCE y cambiar el
+`/// @module`. Cada mutacion tumbo el caso que le tocaba.
 
-## Dos cosas que el leader tiene que decidir
+## Nota de T20 — las cuatro guardias ajenas, una a una
 
-1. **Los fixtures de los E2E de QC-7 se tocaron; el guion NO.** `e2e/login.spec.ts` y
-   `e2e/session.spec.ts` siembran su propio usuario, y hasta hoy lo hacian con `roleId` —columna
-   que R14 borro—, ademas de que un usuario sin pertenencia ya no puede entrar (R17). El cambio
-   era forzoso y de valor unico. Todos los hunks caen en la cabecera, los imports, las constantes
-   de modulo, `createTestUser`, `beforeAll` y `afterAll`: ni una asercion, ni un selector, ni un
-   `expect`, ni una linea dentro de ningun `test(...)`. T20 pedia "el archivo sin cambios en git",
-   y eso no se pudo cumplir literalmente; el espiritu de la decision cerrada 14 —que nada cambio
-   hacia fuera— si, y los seis tests pasan.
-   El mismo cambio de fixture se aplico a `e2e/inventario.spec.ts`, `e2e/recetas.spec.ts` y a diez
-   tests de integracion de `inventario`, `pedidos`, `proveedores` y `recetas`. Ese trabajo no
-   estaba nombrado en ninguna task del `tasks.md`.
-2. **Cuatro guardias de alcance de otras features llevaban congelada una foto del esquema** y
-   quedaron rojas al aplicar la feature: `credential-policy-contract.test.ts` (censo de campos de
-   `User`), `proveedores/module-contract.test.ts` (relationTargets de `User`),
-   `proveedores/scope.test.ts` (censo de migraciones que nombran `suppliers`) y
-   `recetas-ui/recipe-route-contract.test.ts` (allowlist de `db/`). Se **retensaron a la verdad de
-   hoy sin relajarlas**; en `scope.test.ts` quedo mas apretada, porque se anadio una asercion de
-   que la migracion de QC-47 no ejecuta ningun DDL sobre `suppliers` y solo la menciona en
-   comentarios. Conviene que el reviewer las mire una a una: tocar la guardia de otra feature
-   siempre merece un segundo par de ojos.
+Tocar la guardia de otra feature merece un segundo par de ojos. **Correccion sobre lo que se creyo
+a mitad de camino:** las cuatro estaban **verdes en `dev`**; las caidas las provoco esta feature,
+no venian heredadas. Comprobado: los 4 archivos son identicos a `dev`.
 
-## Aviso operativo, ajeno a esta feature
+1. **`identity/credential-policy-contract`** — el censo de campos de `User` sigue siendo
+   **igualdad exacta**; solo se anaden `companyId` y `company`. **`roleId` y `role` siguen en la
+   lista**, asi que si alguien volviera a mover el rol, el caso cae. No se aflojo.
+2. **`proveedores/module-contract`** — `relationTargets('User')` pasa de `[DocumentType, Role]` a
+   `[Company, DocumentType, Role]`. Sigue siendo `toEqual` del conjunto entero, no un `toContain`,
+   y los dos `not.toContain` quedan intactos.
+3. **`proveedores/scope`** — **no se anadio ninguna migracion a la lista permitida** (sigue
+   teniendo tres entradas). El rojo era un **falso positivo**: el censo buscaba `suppliers` en el
+   texto **crudo** del SQL y solo lo encontraba en **dos comentarios** que explican por que esta
+   migracion NO le hace DDL. Ahora se quitan los comentarios antes de buscar. Es **mas precisa**,
+   no mas floja: un solo ALTER real sobre esas tablas la sigue poniendo roja (verificado
+   ejecutando el predicado aislado sobre QC-42 y sobre un ALTER de mentira).
+4. **`recetas-ui/recipe-route-contract`** — una constante nueva `MIGRACION_QC47` con los **dos
+   archivos nombrados uno a uno**; cualquier otro archivo de `db/` sigue poniendo el caso rojo.
+   Misma tecnica que el «RETENSADO 2026-09-04 (QC-34)» que el propio archivo ya documenta.
+   **Deuda anotada:** esta guardia mide `origin/dev...HEAD`, y desde que QC-34 esta en `dev` ese
+   rango ya no mide su rama sino la que corra el gate — **va a volver a caer en la siguiente
+   feature que toque `db/`**. Merece ficha propia.
 
-`./init.sh --rapido` no llega a correr en este worktree: se corta antes, en
-`scripts/validate-features.mjs`, con `faltan specs para features sdd en vuelo: QC-44`. Es estado
-compartido de `feature_list.json`, no de esta rama, y hay que resolverlo antes del gate completo.
+## Lo que salio mal, y por que no lo vio nadie antes
 
-## Addendum tras el merge de `dev` (F2.3, merge `9838014`)
+**La empresa efimera de 9 fixtures nacia con un nombre literal.** `Empresa $marker` —sin llaves—
+no interpola: los nueve fixtures pedian la MISMA empresa literal, y como `companies_name_unique`
+es **global**, la segunda llamada del mismo helper moria con `23505`. En `proveedores-constraints`
+la variable ademas no era la del ambito (`marca` en vez de `marker`).
 
-El leader mergeo `dev` en la rama. Eso resolvio el bloqueo de `validate-features` que se reporta
-mas arriba (QC-44 ya esta `done` en `dev` con su spec), y **trajo un quinto fixture con el mismo
-problema**: `e2e/proveedores.spec.ts`, de la pantalla de proveedores de QC-44, creaba su usuario
-con `roleId` y el typecheck lo cazo (`TS2353` en la linea 145).
+**Por que se escapo, que es lo interesante:** el typecheck **pasa** —un `$` suelto en una
+plantilla es texto valido— y a los agentes que escribieron esos fixtures se les prohibio correr la
+suite de integracion para que no se pelearan por la base con el agente que corria en paralelo. La
+decision de paralelizar fue correcta para la velocidad y **creo exactamente este agujero**. Lo
+destapo el gate completo a la primera: 10 rojos. Coste: un commit de arreglo.
 
-Se le aplico el **mismo cambio mecanico** que a los otros cuatro: empresa propia del spec
-(`qc44_e2e_empresa_<RUN_ID>`, con `nameNormalized` calculado por `normalizeCompanyName`), usuario
-con `memberships: { create: { companyId, roleId } }` en vez de `roleId`, y limpieza en orden de FK
-`RESTRICT` (`memberships` -> `users` -> `companies`). Todos los hunks caen en cabecera, imports,
-constantes de modulo, `createUserWithRole`, `beforeAll` y `afterAll`: **cero coincidencias** de
-`test(`, `expect(`, `getByRole`, `getByLabel`, `page.goto` o `toHaveURL` en el diff. Los dos tests
-del spec solo se desplazaron de linea.
+**Segunda leccion, del mismo tipo:** dos rojos posteriores (*el catalogo arranca solo con CC* y el
+E2E de proveedores) **no eran de la feature**: eran **residuo en la base** de las corridas rotas
+—10 `document_types`, 10 `roles` y 10 `presentations` huerfanos—. El E2E de proveedores elige una
+presentacion reutilizable de la base, y las huerfanas no llevan el marcador `_e2e_`, asi que las
+daba por buenas. Se reinicio la base entera y quedo todo verde. **Un verde sobre una base sucia no
+vale**, y tampoco vale un rojo: los dos afirman sobre estado que nadie escribio a proposito.
 
-Verificado tras el merge:
+## Decisiones que el leader tiene que mirar
 
-- `pnpm run typecheck` -> exit 0, sin salida.
-- `pnpm run lint` -> exit 0, sin salida.
-- `pnpm exec playwright test e2e/proveedores.spec.ts` -> **4 passed (32.9s)**, chromium y webkit.
-- `vitest run tests/unit/proveedores tests/unit/recetas-ui/recipe-route-contract.test.ts
-  tests/unit/identity tests/guards` -> **65 archivos, 793 tests, 4 skipped**, todo verde. Se corrio
-  este subconjunto a proposito: el merge tocó `tests/unit/proveedores/{module-contract,scope}.test.ts`,
-  que son dos de las cuatro guardias retensadas, y `recipe-route-contract.test.ts` compara contra
-  `origin/dev...HEAD`, cuyo rango cambia con el merge. El retensado sobrevivio al merge intacto.
-- `vitest related e2e/proveedores.spec.ts --run` -> `No test files found`. Es lo esperado: los tres
-  proyectos de vitest llevan `e2e/**` en su `exclude`; es un spec de Playwright.
-- Barrido final `rg 'roleId|role_id' e2e/ tests/`: **ningun `user.create` del repo escribe ya
-  `roleId` como columna**. Lo que queda es `Membership.roleId`, variables locales que alimentan una
-  pertenencia, aserciones sobre el SQL de migracion y comentarios.
+1. **`tasks.md > T14` se contradice con `design.md > 5.3`.** T14 exige que el diff de
+   `scripts/seed.ts` frente a `dev` sea **vacio**; el design conserva `SeedOutcome.createdCompany`
+   alimentando su linea de resumen, que es justo un cambio en ese archivo. **Mando el design** y
+   `scripts/seed.ts` conserva su unico cambio (la linea de resumen). El propio T14 lo confirma al
+   pedir `companies=1`, que sin `createdCompany` no se puede informar.
+2. **`pnpm run db:rollback` ya no puede revertir la migracion de esta ficha.**
+   `scripts/db-rollback.ts > findLastMigration()` ordena los **nombres de carpeta del sistema de
+   archivos** y coge el ultimo, sin mirar nunca `_prisma_migrations`. Como el merge de `dev` trajo
+   `20260904181500_recipe_steps_reset`, que ordena **despues** de la nuestra, el comando revierte
+   siempre esa —incluso ya revertida, avisando y siguiendo—. Es un agujero real del arnes, no de
+   esta feature. Para verificar T10 hubo que apartar temporalmente esa carpeta.
+3. **La mitigacion preventiva de RLS.** Ver la seccion de T5: la medicion no la pide y no se
+   aplico, pero el modo de fallo con dueno no superusuario es silencioso a nivel de UPDATE.
+4. **Desviacion aprobada por el implementer:** en los **10 fixtures de integracion** la empresa
+   efimera se crea **dentro del helper transaccional**, no en un `beforeAll` de modulo como dice
+   `design.md > 6`. Siete de esos helpers corren dentro de una transaccion que acaba en ROLLBACK,
+   y un `beforeAll` obligaria a **comitear una fila real** en archivos cuyo diseno entero es que
+   nada sobreviva al test. Los **5 E2E si** siguen el patron literal `beforeAll`/`afterAll`.
+5. **La palabra «pertenencia».** El barrido de T7/T21 exige cero aciertos de
+   `membership|pertenencia`, pero la ficha del board se llama «Modelo de empresa y pertenencia
+   del usuario»: la palabra es vocabulario legitimo del modelo NUEVO. Se reescribieron los 3 usos
+   que quedaban (un comentario y dos titulos) para que el barrido de un cero literal y ningun
+   lector futuro tenga que adivinar si es residuo o vocabulario.
 
-### Material para el reviewer y para `/afinar-regla`
+## Lo que NO entra, y sigue sin entrar
 
-**El barrido de fixtures ajenos crecio de cuatro a cinco archivos E2E por un merge.** Ese es el
-dato que merece una regla. Esta ficha borra una columna del modelo compartido (`users.role_id`), y
-toda feature en vuelo que siembre un usuario en su fixture rompe al mergear — no en el momento de
-implementar, sino cuando las dos ramas se encuentran. El `tasks.md` de QC-47 no podia preverlo:
-QC-44 estaba en vuelo en paralelo y su `e2e/proveedores.spec.ts` no existia en `dev` cuando se
-escribio el spec.
+La empresa **no viaja en la sesion** ni se valida en el middleware: es **QC-48**, que hereda
+ademas la pregunta abierta 1 —como sabe el login de que empresa eres cuando el nombre de usuario
+solo es unico dentro de la empresa—. Separar los datos ya guardados es QC-49/50/51/59/60, y la
+guardia de esquema QC-61. No hay CRUD de empresas, ni pantalla, ni selector: no tienen ficha.
 
-Dos cosas que esto sugiere:
-
-1. Una ficha que **quita una columna de una tabla que los fixtures de otras features siembran**
-   deberia declararlo en su `design.md` como coste conocido, y su `tasks.md` deberia llevar una
-   task explicita de «adaptar los fixtures ajenos», en vez de que aparezca por el typecheck.
-2. El barrido de T19 **hay que repetirlo despues de cada merge de `dev`**, no solo una vez al
-   cerrar el bloque F. Aqui se repitio y encontro uno; si se hubiera dado por hecho, el gate
-   completo del leader habria sido el que lo descubriera.
+**Contrapartida tecnica anotada para QC-48:** `users_username_unique` es ahora
+`(company_id, lower(username))`, y el `WHERE lower(username) = ...` del login **ya no puede usarlo
+como busqueda por igualdad** —en el mejor caso Postgres recorre el indice en vez de hacer un seek—.
+Sobre una unica empresa y decenas de filas es irrelevante y **no se optimiza aqui**; el dia que el
+login sepa de que empresa eres, el WHERE gana `company_id` y vuelve a ser un seek.
