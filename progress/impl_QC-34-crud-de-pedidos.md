@@ -689,3 +689,98 @@ M7 es un predicado de test.
 rojo en `dev` **antes** de esta rama, que no toca inventario ni UI. Por decision del humano esta en
 `tests/baseline-rojos.json` con motivo y fecha (commit `27f23ae` del leader) y tiene ficha propia,
 **QC-58**. No se arregla aqui y no es deuda de QC-34.
+
+---
+
+## F2.3 — Sincronizacion con `dev`. 2026-09-04
+
+`./init.sh` completo cerro en `== init OK ==` y el reviewer aprobo M6 y M7, asi que toca merge.
+`origin/dev` se habia movido **13 commits**; la rama iba **8 por delante**. Merge contra
+**`origin/dev`**, no contra el `dev` local, que estaba por detras del remoto.
+
+Lo que llegaba: **PR #32 (QC-52)**, que quita `cost`, `min_purchase` y `delivery_time` de
+`products`, rehace `supplier_catalog_lines` con cinco columnas y sus FK y trae su migracion
+`20260904123854_split_product_and_supplier_catalog`; el **PR #31** de arreglos de gate; y la
+**normalizacion a LF** de 15 archivos que un subagente habia pasado a CRLF.
+
+### Antes de mergear: donde podia doler
+
+Se cruzaron las dos listas de archivos tocados (`c0c16af..origin/dev` contra `c0c16af..HEAD`) y el
+solape eran **cuatro** archivos: `db/schema.prisma`, `feature_list.json`, `lib/composition/index.ts`
+y `tests/baseline-rojos.json`. Mirarlo antes vale la pena: convierte «a ver que pasa» en «se donde
+mirar».
+
+### Conflictos: uno solo, y su resolucion es una UNION
+
+**`tests/baseline-rojos.json`.** Las dos ramas anadieron entradas **distintas** a un archivo que
+hasta ayer estaba **vacio**, asi que la resolucion **no es elegir una version**: es quedarse con las
+**tres**.
+
+| Entrada | De donde | Por que |
+| --- | --- | --- |
+| `tests/unit/inventario/product-page.test.tsx` | mia | Flake de `userEvent` bajo carga (QC-22), ficha propia **QC-58** |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | de `dev` | Rojo **estructural** en `dev`: su guardia se apoya en `git diff origin/dev...HEAD`, rango vacio estando **en** `dev` |
+| `tests/unit/recetas/module-contract.test.ts` | de `dev` | Lo mismo |
+
+Se conserva el **`_nota` de `dev`**, no el mio: el mio decia «**Vacio** … significa que CUALQUIER
+archivo rojo es bloqueante», y eso **ya es falso** porque la lista dejo de estar vacia. Quedarse con
+el propio por inercia habria dejado el archivo describiendose mal a si mismo.
+
+El JSON resultante se genero **programaticamente** desde las dos versiones en vez de transcribir a
+mano los `motivo`, que son parrafos largos, y se valido (`json.load` OK, sin marcas de conflicto,
+**LF**).
+
+**Detalle que conviene saber:** las dos entradas que trae `dev` son de los **mismos dos archivos que
+esta ficha retenso** en la tanda 1. En `dev` estan rojos por definicion; **en esta rama estan
+verdes**, porque aqui el rango `origin/dev...HEAD` si trae diff. No hay contradiccion: el baseline
+los ignora en las dos ramas, y aqui ademas pasan.
+
+### Lo que auto-mergeo — verificado a mano, no dado por bueno
+
+- **`db/schema.prisma`** — es **concatenacion, no eleccion**: cada rama toco modelos distintos.
+  Comprobado tras el merge: `enum OrderStatus` con sus **cuatro** valores y `CANCELADO` el ultimo,
+  `Order.cancellationReason` presente, `Product` **sin** las tres columnas y `SupplierCatalogLine`
+  **con** ellas.
+- **`db/migrations/`** — las dos migraciones son independientes y **coexisten**. La mia
+  (`...135210_order_cancellation`) sigue ordenando **despues** de la de QC-52 (`...123854`), asi que
+  **no se renumera ni se renombra** —hacerlo habria roto el `_prisma_migrations` de cualquier base
+  que ya tuviera la mia aplicada, que es justo el caso de este worktree—.
+- **`lib/composition/index.ts`** — mi bloque de `pedidos` sigue **al final** e intacto; QC-52 tocaba
+  el cableado de `inventario` y `proveedores`, mas arriba.
+- **`feature_list.json`** — auto-mergeo sin roce.
+
+Ningun marcador de conflicto residual en todo el arbol (`grep -rn '^<<<<<<< '`).
+
+### Despues del merge
+
+1. `pnpm install --frozen-lockfile` y **`pnpm exec prisma generate`**. Es el sintoma documentado del
+   repo: tras un merge el cliente queda por detras y `typecheck` revienta con campos inexistentes que
+   **no son un error de codigo**. Se regenera, no se tocan tipos.
+2. **La migracion de QC-52 aplicada a la base propia `QuimiCloude_QC34`**, que no la tenia:
+
+       Applying migration `20260904123854_split_product_and_supplier_catalog`
+       All migrations have been successfully applied.
+       ...
+       13 migrations found in prisma/migrations
+       Database schema is up to date!
+
+   Aplico **limpia**. Y se comprobo que **no se llevo por delante nada mio**, leyendo el catalogo:
+   `OrderStatus` = `PENDIENTE,EN_CURSO,ENTREGADO,CANCELADO`; `cancellation_reason` presente; **seis**
+   `CHECK` en `orders`; `next_order_sequence` viva; y `products` ya **sin** `cost`.
+
+### Estado tras la sincronizacion
+
+    $ pnpm run typecheck  -> limpio, sin salida
+    $ pnpm run lint       -> LIMPIO, 0 errores y 0 warnings
+    $ vitest run tests/unit/pedidos tests/unit/recetas tests/unit/recetas-ui tests/integration/pedidos tests/guards
+      -> 51 archivos, 606 tests, 0 fallos
+    $ vitest run tests/integration tests/unit/inventario tests/unit/proveedores
+      -> 49 archivos, 593 tests, 0 fallos
+
+**Los dos warnings de lint desaparecieron**, y no los arregle yo: eran de
+`app/(private)/inventario/components/product-columns.ts` y `tests/unit/inventario/product-page.test.tsx`,
+y **los limpio QC-52** al tocar esos archivos. Es la primera vez en la ficha que `lint` sale
+completamente en blanco.
+
+**No se corrio la suite completa ni `./init.sh`**: es del leader, ahora sobre el arbol ya
+sincronizado. **F2.4 (el PR) no se ha hecho**, por instruccion expresa.
