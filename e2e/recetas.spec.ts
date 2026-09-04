@@ -280,7 +280,8 @@ test.describe('catalogo de recetas', () => {
 
     // --- 4. Una linea de producto: producto de FIXTURE, unidad TOMADA DEL SELECTOR, cantidad
     // decimal escrita como texto (R27, R28, R29, R30).
-    await page.getByTestId('recipe-line-add').click();
+    // La fila 0 ya esta en pantalla al abrir el formulario: es la fila en blanco de arranque,
+    // asi que no hay que pedirla con ningun boton.
     await selectProductByName(page, 'recipe-line-product-0', productName);
     await page.getByTestId('recipe-line-quantity-0').fill('12.5');
     await page.getByTestId('recipe-line-unit-0').click();

@@ -210,7 +210,9 @@ async function addValidLine(
   index: number,
   { productName = PRODUCT_1_NAME, unitLabel = 'L', quantity = '1' } = {},
 ) {
-  await user.click(screen.getByTestId('recipe-line-add'));
+  // La fila 0 ya está en pantalla al abrir el formulario (fila en blanco de arranque); las
+  // siguientes se piden con el `+` de la anterior.
+  if (index > 0) await user.click(screen.getByTestId(`recipe-line-add-${index - 1}`));
   await chooseProductForLine(user, index, productName);
   await chooseUnitForLine(user, index, unitLabel);
   await user.type(screen.getByTestId(`recipe-line-quantity-${index}`), quantity);
@@ -493,11 +495,13 @@ describe('R27 — añadir y quitar líneas; una receta sin ninguna se guarda', (
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin ingredientes');
 
-    await user.click(screen.getByTestId('recipe-line-add'));
+    await addValidLine(user, 0);
     expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(1);
 
     await user.click(screen.getByTestId('recipe-line-remove-0'));
-    expect(screen.queryAllByTestId('recipe-line-row')).toHaveLength(0);
+    // Sigue viéndose UNA fila, pero es la de arranque: no está en el estado, así que el payload
+    // viaja sin líneas igual que antes de que existiera esa fila (R27).
+    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(1);
 
     await user.click(screen.getByTestId('recipe-form-submit'));
 
@@ -512,7 +516,6 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
     const user = setupUser();
     renderCreateForm();
 
-    await user.click(screen.getByTestId('recipe-line-add'));
     await user.click(screen.getByTestId('recipe-line-product-0'));
 
     // No hay ningún campo de texto para "buscar" DENTRO del propio desplegable: el selector no
@@ -541,7 +544,6 @@ describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombr
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con unidades');
-    await user.click(screen.getByTestId('recipe-line-add'));
     await chooseProductForLine(user, 0, PRODUCT_1_NAME);
 
     await chooseUnitForLine(user, 0, 'L');
@@ -583,7 +585,6 @@ describe('R31 — dos líneas del mismo producto y una cantidad inválida no se 
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con cantidad inválida');
-    await user.click(screen.getByTestId('recipe-line-add'));
     await chooseProductForLine(user, 0, PRODUCT_1_NAME);
     await chooseUnitForLine(user, 0, 'L');
     await user.type(screen.getByTestId('recipe-line-quantity-0'), 'abc'); // no cumple el patrón decimal
