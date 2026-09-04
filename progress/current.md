@@ -12,8 +12,31 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | pending → F1.2 | feature/QC-52-separar-producto-de-catalogo-de-proveedor | leader (worktree montado, spec_author lanzado) |
-| QC-34 | crud-de-pedidos | Pedidos | backend | pending → F1.2 | feature/QC-34-crud-de-pedidos | leader (worktree montado, sin spec: pendiente `/afinar-feature`) |
+| QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | implementer (spec aprobado por el humano el 2026-09-04) |
+
+La feature **QC-52 — separar-producto-de-catalogo-de-proveedor** se cerró el 2026-09-04 (PR #32,
+merge `855fae6`): resumen en `progress/history.md`, worktree desmontado, rama borrada y **base
+propia `QuimiCloude_QC52` eliminada**. 34 requisitos con test y `reviewer` en **una sola ronda**
+(0 mayores, 6 menores, cinco ajenos a la ficha) — la ficha llegó acotada por `/afinar-feature` con
+16 decisiones cerradas antes del spec, y se notó. **Desbloquea QC-44.**
+
+**Tres deudas de arnés que destapó y que no le tocaban:** falta un `.gitattributes` (un subagente
+convirtió 15 archivos a CRLF y el diff pasó a marcar 497 líneas donde el cambio real son 19); la
+entrada de `recipe-route-contract.test.ts` en `baseline-rojos.json` **documenta un motivo que ya no
+es el que ocurre** —en las ramas de feature falla porque la guardia R44 de QC-26 muerde a cualquier
+rama que toque `db/`, y la cura que el propio baseline propone no arregla ese caso—; y **`./init.sh`
+no corre Playwright**, así que el E2E de inventario estuvo roto en `dev` por dos motivos
+independientes sin que ningún gate lo dijera. Las tres son candidatas a `/afinar-regla`.
+
+**Corrección a una nota de este archivo:** que sin `set -a && . ./.env && set +a` el gate pegue
+contra la base compartida **no es cierto en este repo**. Se midió: el cliente Prisma generado lee el
+`.env` al importarse y `prisma.config.ts` llama a `process.loadEnvFile()`. Sourcear sigue siendo
+buena idea por no depender de un implícito, pero la base propia no es decorativa sin ello.
+
+**Cuarta vez que el drift de base entre worktrees bloquea una feature**, y esta vez QC-52 fue quien
+rompió a QC-34 al aplicar su migración a la compartida. Siguen vivas y huérfanas
+`QuimiCloude_FIXGATE` y `QuimiCloude_QC14`; `QuimiCloude_QC34` sigue en uso.
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
@@ -159,6 +182,24 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-55 — tabla-de-datos-compartida: acotada y sembrada (2026-09-04)
+
+- **Sembrada en `specs/QC-55-tabla-de-datos-compartida/requirements.md`** — 21 decisiones cerradas
+  y 2 preguntas abiertas. La fuente es ese archivo; aquí no se copia la tabla.
+- **Board actualizado antes de sembrar (Paso 5):** `description` reescrita, label
+  `complexity:high`, y **QC-57 `orden-y-filtro-en-listados`** creada (`zone:backend`, parent
+  QC-16) con link *blocks* hacia QC-56. Es la «ficha de backend nueva» a la que QC-22 remitió el
+  2026-09-03 y que QC-26 repitió; **cierra también la deuda de búsqueda por texto**, que llevaba
+  dos fichas anotada sin dueño.
+- **Dos dependencias aprobadas por el humano**, con los cuatro checks corridos y escritos:
+  `@tanstack/react-table` 9.2.4 y `react-day-picker` 10.0.1. **`rsuite` se descartó** pese a pasar
+  los cuatro, por sus 14 dependencias (incluida `rsuite-table`) y su sistema de tema propio. Las
+  filas de `docs/dependencias.md` las escribe la implementación.
+- **Excepción declarada** a `docs/architecture.md > Regla: sin sobre-ingeniería`: se promueve a
+  `shared/` sin consumidor, con los dos identificados en QC-56. Está escrita en el spec para que
+  el reviewer no la lea como desvío.
+- **Sin E2E, diferido con motivo**: ninguna pantalla usa el componente en esta ficha. Lo trae QC-56.
 
 ### QC-55 y QC-56 — creadas al acotar la tabla compartida (2026-09-04)
 
@@ -1486,6 +1527,84 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### QC-34 tiene base propia `QuimiCloude_QC34` — hay que BORRARLA al cerrar la ficha (2026-09-04)
+
+Tercera vez que el drift de base entre worktrees bloquea una feature, y tercera vez que se resuelve
+a mano: la sesion paralela de **QC-52** aplico su migracion a la base compartida y eso revento los
+tests de integracion de QC-34 con un `P2022` en cualquier lectura de `orders`. Se replico lo de
+**QC-20**, **QC-25** y **QC-26**: base propia para el worktree.
+
+- **Creada** `QuimiCloude_QC34`, con `DATABASE_URL` y `DIRECT_URL` del `.env` del worktree
+  apuntando ahi y `prisma migrate deploy` aplicado.
+- **Efecto colateral bueno:** con base limpia, `tests/integration/identity/identity-seed.int.test.ts`
+  vuelve a **verde** dentro del worktree. Su rojo era de los datos hechos a mano en la compartida,
+  que siguen ahi y siguen sin tocarse por decision del humano.
+- **La trampa de siempre:** ni `init.sh` ni Vitest cargan ese `.env`. Sin
+  `set -a && . ./.env && set +a` delante, el gate pega contra la compartida y la base propia es
+  decorativa. Ya estaba escrito en este archivo y volvio a pasar hoy.
+- **Deuda que esto crea:** `./scripts/wt.sh done` no sabe nada de la base propia, asi que **al
+  cerrar QC-34 hay que borrar `QuimiCloude_QC34` a mano**. Siguen vivas y huerfanas
+  `QuimiCloude_QC14` y `QuimiCloude_FIXGATE`, comprobado hoy contra el servidor.
+
+### Aviso cruzado a la sesion de QC-52 (2026-09-04)
+
+Cuando la migracion de QC-34 (`cancellation_reason` en `orders`) llegue a `dev`, la copia de
+`tests/integration/pedidos/pedidos-constraints.int.test.ts` **que vive en `dev`** se pondra roja:
+afirma la lista exacta de columnas de `orders`. **En la rama de QC-34 ya esta corregida**, asi que
+se arregla sola al mergear; el ruido es solo mientras las dos ramas convivan. Nadie tiene que tocar
+el worktree principal por esto.
+
+### El commit `7a3af59` lleva un mensaje que no le corresponde (2026-09-04)
+
+Ese commit dice «base propia QuimiCloude_QC34 y aviso cruzado a QC-52» y **lo que contiene es
+trabajo de la sesion paralela**: QC-55 pasando a `in_progress` y su fila en la tabla de arriba. Fue
+un `git commit -am` del leader de QC-34 sobre un arbol que la otra sesion acababa de tocar. **No se
+perdio nada y no se reescribe la historia** —hay dos sesiones sobre `dev`—, pero es el mismo agujero
+que ya causo el MAYOR 2 de la review de QC-26: **commitear sin nombrar los archivos en un repo con
+dos sesiones vivas**. La nota real va en este commit.
+
+### La base compartida quedó por delante de `dev`: el gate de `dev` NO puede pasar (2026-09-04)
+
+A las **07:42** la sesión paralela que lleva **QC-52** aplicó
+`20260904123854_split_product_and_supplier_catalog` sobre el esquema `public` de la base
+compartida `QuimiCloude`. **Verificado, no deducido:** `products` ya no tiene `cost`,
+`min_purchase` ni `delivery_time`.
+
+- **Consecuencia inmediata:** cualquier `product.create()` desde código de `dev` muere con
+  **SQLSTATE 42703**, así que `./init.sh` sobre `dev` —o sobre cualquier rama que no sea la de
+  QC-52— **no puede terminar en verde en esta máquina** hasta que QC-52 mergee. Comprobado con
+  `git stash`: los mismos fallos con y sin cambios locales.
+- **Ojo con el mensaje de error:** Prisma lo reporta como ``The column `existe` does not exist``.
+  Es un artefacto de parsear el error de Postgres en español (`no existe la columna ...`). **No
+  hay ninguna columna `existe`**; no pierdas media hora buscándola.
+- **Cómo se sorteó, y es la salida recomendada mientras dure:** dar a la rama su propia base.
+  `feature/fix-gate-rojos-dev` corre contra **`QuimiCloude_FIXGATE`** (creada, migrada y
+  sembrada; `.env` del worktree, fuera de git) y con eso el gate completo da **139/139 archivos y
+  1529/1529 tests**. Mismo patrón que `QuimiCloude_QC26`.
+- **La causa de fondo, que no arregla ninguna ficha:** todas las sesiones comparten **un solo
+  Postgres**, así que la primera que toque el esquema deja el gate rojo para todas las demás.
+  Hoy pasó **dos veces en media hora** —primero filas de prueba hechas a mano, después una
+  migración— y la primera vez costó un diagnóstico completo. **Una base por worktree es candidato
+  a ficha propia del arnés** (`/afinar-regla`), no a parche de sesión.
+- **Falsa pista descartada, para que nadie la vuelva a seguir:** durante unos minutos existió un
+  esquema `public_shadow_qc52` que duplicaba cada FK en `pg_constraint`. Era la *shadow database*
+  que `prisma migrate dev` crea y destruye, no un esquema abandonado. El filtro por `public` que
+  añadió el PR #31 a esas consultas se queda porque inmuniza contra esa ventana, pero **no era la
+  causa** del rojo que persistía.
+
+### Actualización a la deuda del rojo de `identity-seed` (2026-09-04)
+
+La decisión del **2026-09-03** —«no se borra la fila, no se arregla el helper y NO se mete al
+baseline»— **queda sustituida por la del humano del 2026-09-04**: se arregla el helper. Va en el
+**PR #31**. `resetIdentityToEmptyState` ya no depende de con qué datos arranque la base local, y
+la causa de fondo que quedó escrita el 2026-09-03 —«cualquier feature futura con una FK a `users`
+puede volver a provocarlo»— **queda cerrada**: el orden de borrado se deriva del catálogo, no de
+una lista. Se comprobó contra la base ya migrada por QC-52, con las dos FK nuevas de
+`supplier_catalog_lines`: 10/10 en verde.
+
+Lo que **no** se cerró y sigue vivo es la fila residual como problema de convivencia: ver la deuda
+de la base compartida, justo arriba.
 
 ### La base compartida tiene una fila residual que rompe el gate de TODAS las sesiones (2026-09-03)
 

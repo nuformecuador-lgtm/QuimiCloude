@@ -450,7 +450,7 @@
       "epic_name": "Pedidos",
       "name": "crud-de-pedidos",
       "description": "Los casos de uso de pedidos, sobre el modelo que creo la ficha del modelo de pedidos: alta, consulta paginada, edicion, cancelacion y borrado. Sin pantalla: solo los casos de uso y su superficie de servidor, como en el CRUD de productos y el de recetas. Solo el Administrador puede consultar, crear, editar, cancelar y borrar; el permiso se valida en el service y lleva su prueba. El alta recibe la receta, la cantidad, el precio de venta unitario, la unidad y, si viene, la prioridad; el estado nace en pendiente. NO hay fecha de solicitud de entrada: es la fecha de creacion de la fila, como cerro la ficha del modelo. Cada pedido guarda quien lo creo y quien lo modifico por ultima vez, tomados de la sesion en curso y nunca de la entrada. Esta ficha ANADE UN CUARTO ESTADO, cancelado, con un motivo obligatorio que se guarda en el pedido y no se borra despues. Eso trae migracion: un valor mas en el tipo enumerado del estado y una columna nueva para el motivo, y el down tiene que recrear el tipo porque Postgres no sabe quitar un valor. Cancelar es una operacion propia y es el unico camino que escribe ese estado; la edicion normal no cancela. Las transiciones solo avanzan: pendiente a en curso, en curso a entregado, pendiente a entregado, y cancelar desde pendiente o desde en curso. Entregado y cancelado son finales, no se sale de ellos y no admiten ninguna edicion. Borrar sigue siendo logico y sin restaurar, y ya no se puede borrar ni un pedido entregado ni uno cancelado: eso cambia la restriccion que escribio la ficha del modelo y va en la misma migracion. El numero correlativo lo entrega una secuencia de la base por ano, de modo que dos altas simultaneas no compiten y ninguna falla; se aceptan huecos, como ya estaba decidido. Cierra asi la pregunta que dejo abierta la ficha del modelo sobre quien calcula la posicion. Antes de guardar se rechaza la receta inexistente o dada de baja, la unidad inexistente, la cantidad negativa o cero, el precio de venta negativo, una prioridad o un estado que no esten en su conjunto cerrado, cancelar sin motivo y poner motivo sin cancelar. Al editar se admite la receta que el pedido ya tenia aunque este dada de baja. Borrar una receta que algun pedido usa sigue estando permitido y el pedido conserva su referencia. La consulta viene paginada, de diez en diez por defecto y con tope de veinticinco, reutilizando el calculo de paginacion que extrae el CRUD de productos en vez de duplicarlo, con filtros opcionales por estado y por prioridad, sin busqueda por texto. Los borrados no salen y los cancelados si. Llega ordenada por prioridad de mayor a menor y, dentro de cada prioridad, por antiguedad, con el correlativo como desempate. Devuelve el nombre de la receta y el de la unidad resueltos por sus contratos publicos, y devuelve el nombre de la receta tambien cuando esta dada de baja, lo que obliga al contrato de recetas a publicar una consulta por identificadores que incluya las de baja. La pantalla va aparte.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -706,7 +706,7 @@
       "epic_name": "Inventario",
       "name": "separar-producto-de-catalogo-de-proveedor",
       "description": "El producto pierde cost, min_purchase y delivery_time. El catalogo del proveedor pasa a ser una tabla con la misma estructura que el producto, omitiendo stock y qty_alert, mas supplier_id: gana name, presentation_id, unit_id, image_path y deleted_at, y pierde product_id. Las dos tablas quedan independientes, sin ningun vinculo ni siquiera opcional. Una linea se identifica por nombre mas presentacion, unicos por proveedor. Dar de baja un proveedor da de baja tambien sus lineas. Los tipos conservan lo estricto de QC-43. Trae la actualizacion del E2E de productos de QC-22. Arrastra QC-20, QC-22 y QC-43.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -737,10 +737,10 @@
       "epic": "QC-16",
       "epic_name": "Plataforma",
       "name": "tabla-de-datos-compartida",
-      "description": "Necesitamos un componente de tabla compartido que hoy no existe: la pantalla de productos y la de recetas tienen el mismo esqueleto copiado -parser de parametros de la URL, seccion que pide los datos, tabla, barra de paginacion, y los estados vacio, error y esqueleto de carga-, y cada pantalla nueva del backlog (proveedores, unidades, presentaciones, pedidos) lo volveria a copiar. El componente pinta una tabla a partir de las filas y la configuracion de columnas que recibe por props, y NO trae los datos: quien los trae sigue siendo la pantalla. Incluye la barra de filtros y la barra de paginacion, y cuando el usuario cambia de pagina, ordena o filtra, el componente no consulta nada: devuelve los parametros nuevos a quien lo use, que es quien decide que hacer con ellos. Se puede ordenar pulsando la cabecera de una columna, y se pueden fijar columnas para que no se desplacen al mover la tabla en horizontal. Que columnas son ordenables y cuales filtrables, y con que forma se filtra cada una, lo declara la pantalla en la configuracion que pasa. Entra una dependencia nueva por la regla 7 de CLAUDE.md: @tanstack/react-table. Los cuatro checks de salud PASAN, verificados el 2026-09-04 contra el registro de npm: sin deprecated; ultima release 9.2.4 del 2026-08-28; 20.010.461 descargas semanales; licencia MIT. Verificado en el paquete publicado que soporta lo que esta ficha necesita: columnPinningFeature / ColumnPinningState / getIsPinned para fijar columnas, rowSortingFeature / onSortingChange para ordenar por cabecera, y manualSorting / manualPagination / manualFiltering para el modo en que la tabla no toca los datos y solo emite el cambio. Migrar las pantallas de productos y recetas al componente NO entra aqui y va aparte. Cual de las pantallas pendientes lo estrena se decide al acotar.",
-      "status": "pending",
+      "description": "Necesitamos un componente de tabla compartido que hoy no existe: la pantalla de productos y la de recetas tienen el mismo esqueleto copiado -parser de parametros de la URL, seccion que pide los datos, tabla, barra de paginacion, y los estados vacio, error y esqueleto de carga-, y cada pantalla nueva del backlog (proveedores, unidades, presentaciones, pedidos) lo volveria a copiar. El componente pinta una tabla a partir de las filas y la configuracion de columnas que recibe por props, y NO trae los datos: quien los trae sigue siendo la pantalla. Incluye la barra de filtros, la barra de paginacion y los tres estados -vacio, cargando y error-, con sus textos por props. El error es su propio estado y dice que fallo: NO se pinta como lista vacia. Cuando el usuario cambia de pagina, ordena o filtra, el componente no consulta nada: devuelve los parametros nuevos a quien lo use. Se ordena pulsando la cabecera de una columna. Las columnas se pueden fijar para que no se desplacen al mover la tabla en horizontal, y lo decide EL USUARIO desde la cabecera, no la pantalla: su eleccion se recuerda en localStorage por pantalla, con la limitacion aceptada de ser por navegador y no por usuario. El menu por columna tiene que ser alcanzable por toque y por teclado. Un filtro es de una de cuatro formas: texto, rango numerico, seleccion de un conjunto de valores, y rango de fechas; la pantalla declara cual usa cada columna. La busqueda por texto se emite igual aunque ningun backend la soporte hoy. El rango de fechas entra por el CLI de shadcn (add calendar), que monta react-day-picker en modo rango, con los atajos -ultima semana, ultimo mes, ultimo ano- escritos aqui porque la libreria no los trae; se descarto rsuite por sus 14 dependencias y su sistema de tema propio. Se promueve a components/shared/ SIN consumidor todavia: excepcion declarada a la regla de sobre-ingenieria, con los dos consumidores identificados (QC-56). Ninguna pantalla se estrena aqui, asi que NO trae E2E: lo trae QC-56. Dos dependencias nuevas por la regla 7, las dos con los cuatro checks PASANDO al 2026-09-04: @tanstack/react-table 9.2.4 y react-day-picker 10.0.1. Ningun backend acepta hoy orden ni filtro; hacerlos reales es QC-57.",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "frontend",
       "branch": "feature/QC-55-tabla-de-datos-compartida",
       "depends_on": null,
@@ -760,9 +760,25 @@
       "branch": "feature/QC-56-migrar-listas-a-tabla-compartida",
       "depends_on": [
         "QC-55",
-        "QC-52"
+        "QC-52",
+        "QC-57"
       ],
       "spec_path": "specs/QC-56-migrar-listas-a-tabla-compartida"
+    },
+    {
+      "key": "QC-57",
+      "id": 57,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "orden-y-filtro-en-listados",
+      "description": "Ningun listado del repo acepta orden ni filtro: pageQuerySchema solo admite pagina y tamano, y cada adaptador ordena fijo. QC-22 lo cerro el 2026-09-03 remitiendo a una ficha de backend nueva, y QC-26 lo repitio; esta es esa ficha. QC-55 entrega un componente de tabla que ordena por cabecera y filtra emitiendo los parametros, pero hasta que esto exista nadie los honra. Los listados pasan a aceptar por que columna ordenar y en que sentido, y un conjunto de filtros, aplicados sobre el conjunto completo y no sobre la pagina visible. Las formas de filtro que el componente emite son cuatro y el backend tiene que entenderlas: texto, rango numerico, seleccion de un conjunto de valores, y rango de fechas. La busqueda por texto ENTRA en esta ficha: es la deuda que QC-22 y QC-26 dejaron anotada sin ficha y aqui se cierra. Que listados entran y que columnas son ordenables y filtrables en cada uno se decide al acotar. La forma exacta de los parametros tiene que casar con la que QC-55 emite.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-57-orden-y-filtro-en-listados",
+      "depends_on": null,
+      "spec_path": "specs/QC-57-orden-y-filtro-en-listados"
     }
   ]
 }

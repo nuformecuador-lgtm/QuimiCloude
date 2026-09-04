@@ -1629,3 +1629,86 @@ como lo que fueron.
 arrastrar un paso con el dedo, que ningún input haga zoom al enfocar—. Hay guardias de fuente y
 asserts de viewport, pero, como lo dejó escrito el implementer, *una guardia no es un dedo sobre un
 cristal*.
+
+---
+
+## QC-52 — separar-producto-de-catalogo-de-proveedor (2026-09-04, PR #32, merge `855fae6`)
+
+Fullstack, `high`, épica **Inventario**. Separa **lo que la cosa es** de **cómo la vende cada
+proveedor**: el producto pierde `cost`, `min_purchase` y `delivery_time`, y la línea de catálogo
+pierde `product_id` y gana `name`, `name_normalized`, `presentation_id`, `unit_id`, `image_path` y
+`deleted_at`. Las dos tablas quedan **independientes, sin ningún vínculo ni siquiera opcional**, con
+la consecuencia aceptada a conciencia de que el sistema **no podrá comparar precios entre
+proveedores**. Una sola migración con su `down.sql`. Arrastra QC-20, QC-22 y buena parte de QC-43.
+
+**34 requisitos con test**, `reviewer` en una ronda con **0 mayores y 6 menores**, y `./init.sh`
+completo en 1572/1573 con el único rojo en el baseline.
+
+### La ficha llegó acotada, y se notó
+
+`/afinar-feature` la sembró el día anterior con el Alcance y **16 decisiones cerradas** por el humano
+**antes** del spec. `spec_author` solo escribió los requisitos, y el ciclo entero necesitó **una sola
+ronda de review**. Es el contraste con las tres primeras features del repo, que necesitaron una o dos
+revisiones completas del spec por preguntas que nadie había cerrado.
+
+### El drift que iba camuflado
+
+`products.image_path` existía en la base desde `20260903200000_product_image_path` y **no estaba
+declarada en el modelo Prisma**. O sea que `prisma migrate dev` habría propuesto un `DROP COLUMN
+"image_path"` **mezclado entre los tres `DROP COLUMN` legítimos** de esta misma migración, donde se
+lee como parte del trabajo. Lo encontró `spec_author` al diseñar, no el implementer al ejecutar. Se
+cerró declarando la columna en el modelo, sin una sola sentencia SQL.
+
+### Tres diagnósticos del implementer que no sobrevivieron a verificarlos
+
+1. Reportó que `identity-seed.int.test.ts` **bloqueaba el gate** y proponía o limpiar la base de
+   desarrollo o **meterlo en `baseline-rojos.json`**, que es aflojar el gate. Ninguna de las dos hacía
+   falta: `dev` había avanzado mientras implementaba y ya traía `b2ffa09`, que reescribe el reset del
+   seed leyendo del catálogo de Postgres las tablas que dependen de `users`. Se comprobó corriendo el
+   mismo archivo en los dos worktrees contra la misma base: 10/10 en uno, 8/10 en el otro. **La cura
+   ya estaba escrita; faltaba mergear.** Su diagnóstico de la causa sí era correcto.
+2. Avisó de que sin `set -a && . ./.env && set +a` el gate pegaría contra la base compartida —nota
+   que este mismo archivo llevaba escrita— y luego **la midió en vez de repetirla**: el cliente Prisma
+   generado lee el `.env` al importarse y `prisma.config.ts` llama a `process.loadEnvFile()`. Sonda
+   forzada a fallar: `Received: "QuimiCloude_QC52"` sin sourcear nada. **La nota del arnés estaba
+   desactualizada.**
+3. El conflicto de 686 líneas de `presentation-uniqueness.int.test.ts` al mergear `origin/dev`
+   **no era semántico**: el diff real de QC-52 sobre ese archivo es **una línea**. Lo provocó un
+   subagente que reescribió el archivo en CRLF.
+
+### La sesión rompió a la de al lado
+
+Aplicar la migración a la base de desarrollo **compartida** reventó los tests de integración de la
+sesión paralela de **QC-34** con un `P2022` en `orders`. Ellos se defendieron creándose base propia y
+dejaron un aviso cruzado escrito. QC-52 hizo lo mismo después (`QuimiCloude_QC52`, ya borrada). Es la
+**cuarta** vez que el drift de base entre worktrees bloquea una feature.
+
+Y en el otro sentido: las dos sesiones paralelas **pisaron dos commits de estado de esta**, dejando
+QC-52 de vuelta en `pending` con el implementer ya cerrado. Se restauró tocando solo sus entradas.
+
+### CRLF: 497 líneas de diff donde el cambio real son 19
+
+Un subagente convirtió **15 archivos** a CRLF. `product-actions.ts` marcaba 497 líneas cambiadas
+cuando el cambio real son 19, y `product-page.test.tsx` 2191 cuando son 95. Se normalizó a LF antes
+del PR para que no se lo comieran QC-34 y QC-55 al mergear. **El repo sigue sin `.gitattributes`.**
+
+### Lo que queda abierto
+
+- **T13 aceptada como está, con el agujero anotado.** Prisma 6.19.3 **no puebla** `meta.field_name`
+  ni `meta.constraint` en un `P2003` —llega `constraint: null` y `on the (not available)`—, así que
+  decidir por él es indecidible, y el precedente que el diseño manda copiar
+  (`classifyForeignKeyViolation` de `product-prisma.ts`) **ya estaba muerto por lo mismo**. El
+  clasificador queda escrito como pide el diseño y el test afirma **lo que de verdad ocurre**. Se
+  descartaron mover de versión de Prisma (regla 7) y el pre-`SELECT` de existencia. Consecuencia: el
+  `P2003` de `presentation_id`/`unit_id` **escapa sin código de dominio estable**, hoy inalcanzable
+  desde la interfaz porque QC-44 no existe.
+- **El E2E de inventario llevaba roto en `dev` por dos motivos independientes** —`product-field-cost`,
+  un `data-testid` que el formulario ya no renderiza, y el `required` de `qtyAlert` que introdujo
+  `b4822de` sin que el spec lo rellenara— y **ningún gate lo dijo, porque `./init.sh` no corre
+  Playwright**. Los dos arreglados aquí.
+- **La entrada de `recipe-route-contract.test.ts` en `baseline-rojos.json` documenta un motivo que ya
+  no es el que ocurre.** Dice que en `dev` falla por el rango `origin/dev...HEAD` vacío; en las ramas
+  de feature falla porque la guardia R44 de QC-26 muerde a **cualquier** rama que toque `db/`. La cura
+  que el propio baseline propone —auto-saltarse cuando el rango está vacío— **no arregla este caso**.
+
+Las tres últimas son deuda de arnés y candidatas a `/afinar-regla`, no a una ficha de producto.
