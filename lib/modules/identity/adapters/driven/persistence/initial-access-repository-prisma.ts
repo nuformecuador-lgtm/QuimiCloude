@@ -7,9 +7,9 @@ import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
 import type { InitialAccessRepository } from '../../../ports/initial-access-repository';
 
 /**
- * Adaptador Prisma del puerto `InitialAccessRepository` (`design.md > 5.3`, T11). Solo
- * toca `role` y `user`, los dos modelos de `identity` que le tocan al seed: nunca
- * `documentType` (R17).
+ * Adaptador Prisma del puerto `InitialAccessRepository` (`design.md > 5.3`, T11). Toca
+ * `role`, `user`, `company` y `membership` — los cuatro modelos de `identity` que le
+ * tocan al seed desde QC-47: nunca `documentType` (R17).
  *
  * Exporta una FABRICA y no un objeto ya construido a proposito: el test de integracion
  * necesita construirla sobre un `Prisma.TransactionClient` para poder correr el seed dos
@@ -30,9 +30,47 @@ export function createInitialAccessRepository(
     },
 
     async countLiveUsersWithRole(roleName) {
+      // QC-47: `users.role_id` ya no existe. La MISMA pregunta —«hay alguna persona viva
+      // que sea ese rol en alguna empresa»— se hace ahora contra la pertenencia. El
+      // `some` es lo que conserva la semantica: cuenta usuarios, no pertenencias, asi que
+      // una persona con dos pertenencias del mismo rol sigue contando UNA vez. Traducirlo
+      // a un conteo sobre `membership` romperia la idempotencia del seed y crearia un
+      // segundo administrador en cada despliegue (`QC-47 design.md > 9`, riesgo 1).
       return db.user.count({
-        where: { deletedAt: null, role: { name: roleName } },
+        where: { deletedAt: null, memberships: { some: { role: { name: roleName } } } },
       });
+    },
+
+    async findCompanyIdByNormalizedName(normalized) {
+      // Empresa VIVA: `companies_name_unique` es un unico PARCIAL sobre
+      // `deleted_at IS NULL` (`QC-47 design.md > 2.1`), asi que este `where` es
+      // exactamente el conjunto sobre el que la unicidad se garantiza.
+      const company = await db.company.findFirst({
+        where: { nameNormalized: normalized, deletedAt: null },
+        select: { id: true },
+      });
+      return company?.id ?? null;
+    },
+
+    async createCompany(input) {
+      try {
+        const created = await db.company.create({
+          data: { name: input.name, nameNormalized: input.nameNormalized },
+        });
+        return created.id;
+      } catch (error) {
+        // Misma carrera y MISMO criterio que `createRole`, aqui sobre
+        // `companies_name_unique` (23505 -> P2002): se relee la empresa viva con ese
+        // nombre normalizado y se devuelve su id, SIN sobrescribir su `name` (R15,
+        // QC-47 R19). Nunca se crea una segunda empresa.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          const existing = await db.company.findFirstOrThrow({
+            where: { nameNormalized: input.nameNormalized, deletedAt: null },
+          });
+          return existing.id;
+        }
+        throw error;
+      }
     },
 
     async createRole(role) {
@@ -55,7 +93,8 @@ export function createInitialAccessRepository(
       try {
         const created = await db.user.create({
           data: {
-            roleId: input.roleId,
+            // QC-47: `users.role_id` ya no existe; el rol viaja en la pertenencia de
+            // abajo, no en la fila del usuario.
             username: input.username,
             email: input.email,
             passwordHash: input.passwordHash,
@@ -67,6 +106,10 @@ export function createInitialAccessRepository(
             documentNumber: input.documentNumber,
             // R9: el usuario inicial nace obligado a cambiar su contrasena.
             mustChangeCredential: true,
+            // QC-47 R18: la pertenencia se escribe en la MISMA sentencia que el usuario
+            // (`create` anidado), dentro del mismo `db` y por tanto del mismo `tx`. No
+            // hay ningun instante en el que exista la persona sin su rol en la empresa.
+            memberships: { create: { companyId: input.companyId, roleId: input.roleId } },
           },
         });
         return { id: created.id };
@@ -75,8 +118,10 @@ export function createInitialAccessRepository(
         // `users_email_unique`. Se relee el usuario vivo con rol Administrador y se
         // devuelve su id, sin sobrescribir nada (R15).
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          // QC-47: misma traduccion que en `countLiveUsersWithRole`, y por la misma
+          // razon. El rol ya no cuelga del usuario sino de su pertenencia.
           const existing = await db.user.findFirstOrThrow({
-            where: { deletedAt: null, role: { name: ROLE_ADMINISTRADOR } },
+            where: { deletedAt: null, memberships: { some: { role: { name: ROLE_ADMINISTRADOR } } } },
           });
           return { id: existing.id };
         }

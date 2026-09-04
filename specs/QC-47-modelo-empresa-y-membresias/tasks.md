@@ -111,7 +111,7 @@
 > Aquí es donde esta ficha se rompe si se rompe. Los tres cambian de **fuente** y ninguno puede
 > cambiar de **resultado** (R16, decisión cerrada 6).
 
-- [ ] **T11 · Login: la consulta de credenciales.** ⚠ REGRESIÓN
+- [x] **T11 · Login: la consulta de credenciales.** ⚠ REGRESIÓN
       Archivos: `lib/modules/identity/adapters/driven/persistence/user-credentials-prisma.ts`.
       El `$queryRaw` gana `JOIN memberships` y el `JOIN roles` pasa por `m.role_id`
       (`design.md > 5.1`). Sigue siendo **una** consulta, sigue siendo `$queryRaw` parametrizado —no
@@ -122,14 +122,14 @@
       no hay ninguna (R16, R17).
       **Depende de**: T8.
 
-- [ ] **T12 [P] · Sesión: la lectura del usuario.** ⚠ REGRESIÓN
+- [x] **T12 [P] · Sesión: la lectura del usuario.** ⚠ REGRESIÓN
       Archivos: `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts`.
       El `select` cambia `role` por `memberships` (`design.md > 5.2`). `select` explícito y mínimo:
       ni correo, ni teléfono, ni documento, ni `password_hash`. Sin pertenencia → `null`.
       *Hecho*: unitario en verde; sigue siendo una sola consulta por clave primaria (R15, R17).
       **Depende de**: T8.
 
-- [ ] **T13 · Seed: el puerto.** ⚠ REGRESIÓN
+- [x] **T13 · Seed: el puerto.** ⚠ REGRESIÓN
       Archivos: `lib/modules/identity/ports/initial-access-repository.ts`.
       Añade `findCompanyIdByNormalizedName` y `createCompany`; `createInitialAdmin` recibe ahora
       `companyId` además de `roleId` y **crea usuario y pertenencia en la misma llamada**
@@ -137,7 +137,7 @@
       *Hecho*: tipa; el dominio compila contra el puerto nuevo.
       **Depende de**: T5.
 
-- [ ] **T14 · Seed: el caso de uso.** ⚠ REGRESIÓN
+- [x] **T14 · Seed: el caso de uso.** ⚠ REGRESIÓN
       Archivos: `lib/modules/identity/domain/seed-initial-access.ts`.
       Resuelve la empresa inicial por nombre normalizado (la reutiliza si existe, la crea si no) y
       crea la pertenencia junto con el usuario. `needsAdmin` sigue saliendo de
@@ -146,7 +146,7 @@
       cubriendo base vacía (R18) y segunda corrida sin crear nada (R19).
       **Depende de**: T13.
 
-- [ ] **T15 · Seed: el adaptador Prisma.** ⚠ REGRESIÓN
+- [x] **T15 · Seed: el adaptador Prisma.** ⚠ REGRESIÓN
       Archivos:
       `lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts`.
       Implementa los métodos nuevos sobre el mismo `db` (`PrismaClient | Prisma.TransactionClient`),
@@ -160,7 +160,7 @@
       sola pertenencia (R19).
       **Depende de**: T13, T8.
 
-- [ ] **T16 · Cableado.** ⚠ REGRESIÓN
+- [x] **T16 · Cableado.** ⚠ REGRESIÓN
       Archivos: `lib/composition/index.ts`.
       `seedInitialAccess` sigue envuelto en `withInitialAccessTransaction`; solo se suman los
       métodos nuevos del repositorio. **No se reordena ni se reformatea nada más del archivo**:
@@ -168,7 +168,7 @@
       *Hecho*: typecheck verde y `pnpm run test:guardias` verde (bloques 7, 12 y 13).
       **Depende de**: T14, T15.
 
-- [ ] **T17 · `scripts/seed.ts`.** ⚠ REGRESIÓN
+- [x] **T17 · `scripts/seed.ts`.** ⚠ REGRESIÓN
       Archivos: `scripts/seed.ts`.
       Sigue siendo una cáscara fina: carga entorno, invoca la composición, resume por consola **sin
       secretos**, traduce a código de salida. Único cambio admisible: mencionar la empresa en la

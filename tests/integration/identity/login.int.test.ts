@@ -19,6 +19,13 @@
  * operacion de negocio: el veto al borrado fisico de `docs/architecture.md > Anti-patrones`
  * aplica al codigo de produccion, y los tests estan exentos en la tabla de dependencias.
  *
+ * QC-47 (R15, R16, R17) — el rol ya NO sale de `users.role_id`, que dejo de existir, sino de la
+ * PERTENENCIA. Por eso el fixture crea ademas una empresa y una fila de `memberships`, y hay dos
+ * casos nuevos: uno que mueve el rol EN LA PERTENENCIA y comprueba que el login resuelve el
+ * nuevo (R15, R16), y otro con un usuario vivo SIN ninguna pertenencia, que tiene que tratarse
+ * como no encontrado (R17). El `$queryRaw` con el doble `JOIN` solo se puede probar de verdad
+ * contra Postgres: no esta tipado contra el cliente, asi que el compilador no lo vigila.
+ *
  * SIN SEED (R21) — el rol y el usuario los crea este archivo con un `username` aleatorio
  * (`qc7_login_<uuid>`); el correo y el documento tambien llevan el uuid para no chocar con los
  * indices unicos parciales. La unica fila ajena de la que depende es el tipo de documento
@@ -71,6 +78,13 @@ const nombreDeUsuario = `qc7_login_${sufijo}`;
 
 let usuarioId = '';
 let rolId = '';
+/** Segundo rol, para mover el rol DE LA PERTENENCIA y ver que el login resuelve el nuevo (R15). */
+let rolAlternativoId = '';
+let empresaId = '';
+/** Usuario vivo y con la clave correcta, pero SIN ninguna pertenencia (R17). */
+let usuarioSinPertenenciaId = '';
+const sufijoSinPertenencia = randomUUID();
+const nombreSinPertenencia = `qc47_sin_pertenencia_${sufijoSinPertenencia}`;
 
 type EspiaDeSesion = {
   readonly tickets: SessionTicket[];
@@ -126,6 +140,20 @@ beforeAll(async () => {
   });
   rolId = rol.id;
 
+  const rolAlternativo = await prisma.role.create({
+    data: { name: `qc47-login-alt-${sufijo}`, description: 'Rol alternativo de prueba de QC-47' },
+    select: { id: true },
+  });
+  rolAlternativoId = rolAlternativo.id;
+
+  // La empresa de la pertenencia: nombre propio de esta ejecucion para no chocar con
+  // `companies_name_unique` ni con la empresa inicial del seed.
+  const empresa = await prisma.company.create({
+    data: { name: `QC-47 Login ${sufijo}`, nameNormalized: `qc47login${sufijo}` },
+    select: { id: true },
+  });
+  empresaId = empresa.id;
+
   const usuario = await prisma.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -139,21 +167,51 @@ beforeAll(async () => {
       // Hash producido con el adaptador real: si cambiara el coste o el algoritmo, este test
       // se enteraria, en vez de comparar contra una cadena copiada a mano.
       passwordHash: await createPasswordHash(CLAVE_CORRECTA),
-      roleId: rolId,
     },
     select: { id: true },
   });
   usuarioId = usuario.id;
+
+  // QC-47 — el rol de esta persona vive AQUI, no en `users`.
+  await prisma.membership.create({
+    data: { userId: usuarioId, companyId: empresaId, roleId: rolId },
+    select: { id: true },
+  });
+
+  // Segundo usuario, identico salvo por lo unico que importa: no tiene pertenencia (R17).
+  const usuarioSinPertenencia = await prisma.user.create({
+    data: {
+      firstNames: 'Juan Carlos',
+      lastNames: 'Rojas Diaz',
+      birthDate: new Date('1990-05-17T00:00:00.000Z'),
+      email: `qc47.sin.${sufijoSinPertenencia}@example.test`,
+      phone: '+57 300 111 2233',
+      documentTypeCode: DOCUMENT_TYPE_CC,
+      documentNumber: sufijoSinPertenencia.replaceAll('-', '').slice(0, 20),
+      username: nombreSinPertenencia,
+      passwordHash: await createPasswordHash(CLAVE_CORRECTA),
+    },
+    select: { id: true },
+  });
+  usuarioSinPertenenciaId = usuarioSinPertenencia.id;
 }, 30_000);
 
 afterAll(async () => {
-  // El rol se borra en el `finally` para que se limpie aunque el borrado del usuario falle:
+  // El orden es el de las FK `RESTRICT`: primero las pertenencias, luego usuarios, y empresa y
+  // roles al final. Va en `finally` encadenado para que se limpie aunque un borrado falle:
   // dejar filas huerfanas convertiria el segundo pase del archivo en un falso rojo.
   try {
-    await prisma.user.deleteMany({ where: { id: usuarioId } });
+    await prisma.membership.deleteMany({ where: { userId: usuarioId } });
   } finally {
-    await prisma.role.deleteMany({ where: { id: rolId } });
-    await prisma.$disconnect();
+    try {
+      await prisma.user.deleteMany({
+        where: { id: { in: [usuarioId, usuarioSinPertenenciaId] } },
+      });
+    } finally {
+      await prisma.company.deleteMany({ where: { id: empresaId } });
+      await prisma.role.deleteMany({ where: { id: { in: [rolId, rolAlternativoId] } } });
+      await prisma.$disconnect();
+    }
   }
 });
 
@@ -168,7 +226,8 @@ describe('login contra Postgres real', () => {
   // QC-9 R26 — el rol que acaba FIRMADO en la cookie es el que la base tiene en ese instante.
   //
   // Se comprueba de extremo a extremo y contra Postgres: el rol se lee de la fila con Prisma, el
-  // login corre con el adaptador real (`findActiveByUsername`, `$queryRaw` con el `JOIN roles`), y
+  // login corre con el adaptador real (`findActiveByUsername`, `$queryRaw` con el doble `JOIN`
+  // `users -> memberships -> roles`), y
   // el ticket que emitio se firma con el codec de verdad y se vuelve a verificar. Si alguien
   // quitara el `JOIN`, fijara un rol por defecto o firmara otra cosa, esto se pone rojo.
   it('el rol firmado en la cookie es el que la base tiene en ese instante', TIEMPO_HOLGADO, async () => {
@@ -192,6 +251,61 @@ describe('login contra Postgres real', () => {
 
     expect(claims?.sub).toBe(usuarioId);
     expect(claims?.roleName).toBe(rolEnLaBase);
+  });
+
+  // --- QC-47: el rol sale de la PERTENENCIA ------------------------------------------------
+
+  it('el rol resuelto es el de la pertenencia, y cambia con ella', TIEMPO_HOLGADO, async () => {
+    // R15, R16 — `users.role_id` ya no existe: la unica fuente del rol es `memberships.role_id`.
+    // Se mueve el rol EN LA PERTENENCIA (no en el usuario, que ya no tiene columna) y el
+    // adaptador real tiene que devolver el nuevo en la misma consulta que autentica. Si alguien
+    // quitara el `JOIN memberships` o volviera a leer el rol de otro sitio, esto se pone rojo.
+    expect((await findActiveByUsername(nombreDeUsuario))?.roleName).toBe(`qc7-login-${sufijo}`);
+
+    await prisma.membership.updateMany({
+      where: { userId: usuarioId, companyId: empresaId },
+      data: { roleId: rolAlternativoId },
+    });
+
+    try {
+      expect((await findActiveByUsername(nombreDeUsuario))?.roleName).toBe(
+        `qc47-login-alt-${sufijo}`,
+      );
+
+      // Y de extremo a extremo: el ticket que emite el login lleva ese mismo rol.
+      const { verificar, sesion } = montarLogin();
+      expect(await verificar({ username: nombreDeUsuario, password: CLAVE_CORRECTA })).toEqual({
+        ok: true,
+      });
+      expect(sesion.tickets[0]?.roleName).toBe(`qc47-login-alt-${sufijo}`);
+    } finally {
+      await prisma.membership.updateMany({
+        where: { userId: usuarioId, companyId: empresaId },
+        data: { roleId: rolId },
+      });
+    }
+  });
+
+  it('un usuario vivo sin ninguna pertenencia no se encuentra ni entra', TIEMPO_HOLGADO, async () => {
+    // R17 — el `INNER JOIN memberships` es lo que lo garantiza: sin pertenencia no hay fila que
+    // devolver, asi que no se emite sesion con un rol inventado ni con un rol vacio. El usuario
+    // esta vivo (`deleted_at IS NULL`) y la contrasena es la correcta: lo unico que le falta es
+    // la pertenencia.
+    expect(
+      await prisma.user.count({ where: { id: usuarioSinPertenenciaId, deletedAt: null } }),
+    ).toBe(1);
+    expect(await prisma.membership.count({ where: { userId: usuarioSinPertenenciaId } })).toBe(0);
+
+    expect(await findActiveByUsername(nombreSinPertenencia)).toBeNull();
+
+    const { verificar, sesion } = montarLogin();
+    const resultado = await verificar({
+      username: nombreSinPertenencia,
+      password: CLAVE_CORRECTA,
+    });
+
+    expect(resultado).toEqual({ ok: false });
+    expect(sesion.tickets).toHaveLength(0);
   });
 
   it('autentica contra una fila real', TIEMPO_HOLGADO, async () => {
