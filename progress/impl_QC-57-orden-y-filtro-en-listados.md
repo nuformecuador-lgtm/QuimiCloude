@@ -130,3 +130,33 @@ Los dos subagentes reportaron `tests/unit/proveedores-ui/guard-convenciones-prov
 **Ya no aplica y no se tocó ni una línea de ese archivo**: el commit en cuestión (`0b7d68f`) está **dentro de `origin/dev`**, así que no cae en el rango `origin/dev..HEAD`; con el rango vacío la guardia **se salta** los tres casos de diff, que es su comportamiento diseñado. Verificado: `4 passed | 3 skipped`.
 
 **Queda anotado como fragilidad del arnés, para el leader:** la heurística es sensible a que un commit de OTRA feature mencione la marca en el cuerpo. Filtrar por el **asunto**, donde vive la convención `tipo(QC-44): …`, la haría exacta sin perder ni un aserto. **No se cambia aquí**: es un archivo de otra feature y la decisión no es de esta ficha.
+
+## Grupo 3/4 — el log y el vertical de `inventario` (T7, T8, T9, T14, T15) · commit `1575190`
+
+**T7 — el log del campo omitido (R6).** `ports/list-query-log.ts` en los **cinco** módulos (misma duplicación deliberada que `list-query.ts`) y **una sola** implementación en `lib/shared/observability/list-query-log.ts`, cableada en `lib/composition/index.ts` con edición quirúrgica y sin reordenar nada.
+
+Dos propiedades que no son casualidad:
+- **La PII no puede colarse aunque alguien quiera**: la firma `ignoredFields(listName, fields)` **no admite el valor**, así que ni el texto buscado ni el contenido del filtro tienen por dónde entrar. No es una convención confiada al que escriba el `console.warn`, es el tipo.
+- **No emite nada si `fields` viene vacío**: un log por cada consulta limpia es ruido, y el ruido es lo que hace que nadie lea el log — que es justo lo que la decisión cerrada 7 quiere evitar.
+
+**Por qué puerto y no un `console.warn` suelto en el dominio** (`design.md > 8`): el dominio no conoce el mundo exterior, y —más práctico— **R6 solo es testeable si el test puede espiar la llamada**; un `console.warn` suelto obliga a parchear la consola global y ensucia el resto de la suite.
+
+**T8/T9 — los dos casos de uso**, en los cinco pasos del `design.md > 1`: `requireAdmin` (primera línea, siempre) → `createListQuerySchema().safeParse` → `sanitizeListQuery` → `log.ignoredFields` → repositorio con la consulta **ya saneada**.
+
+**`productQuerySchema` y `ProductQuery` DESAPARECEN de `page.ts`** (R24): productos deja de tener forma propia. `pageQuerySchema` y `Page<T>` **se quedan**, que los usan los demás listados.
+
+**T14/T15 — los dos adaptadores.** `orderBy` dinámico con desempate por `id`; `where` con los cuatro filtros en conjunción; **el mismo `where` para el `findMany` y para el `count`**. `presentations` no lleva filtro de vida porque **no tiene `deleted_at`**. La búsqueda es `nameNormalized: { contains: normalizeProductName(search) }` **sin `mode: 'insensitive'`**: la columna ya está normalizada, y normalizar el término con la MISMA función que escribe la columna es lo que hace que buscar y comparar dejen de discrepar (R19).
+
+### Las dos decisiones tardías, con la forma exacta que se usó
+
+- **Nulos al final**: `orderBy: [{ stock: { sort: dir, nulls: 'last' } }, { id: 'asc' }]`, igual para `qtyAlert`, **en `asc` y en `desc`**. **Comprobado contra la Prisma 6.19.3 del repo antes de darlo por bueno**, no supuesto: el cliente generado declara `SortOrderInput = { sort: SortOrder; nulls?: NullsOrder }` y `ProductOrderByWithRelationInput` lo acepta **solo en las columnas anulables**. En `presentations` no hay ninguna columna ordenable anulable, así que allí no se declara nada — no hay nulos que colocar.
+- **`dateRange` en UTC**: `{ gte: <día>T00:00:00.000Z, lt: <día siguiente>T00:00:00.000Z }`. Se eligió `lt` del día siguiente en vez de `<= 23:59:59.999Z` **y está comentado en el código**: Postgres guarda `timestamptz` con precisión de microsegundo, así que `23:59:59.9995Z` existe y el `<=` la perdería. Una fecha ilegible se trata como «sin cota por ese lado» y no puede reventar la consulta.
+
+### Tests heredados tocados, con su motivo
+
+1. `tests/unit/inventario/authorization.test.ts` — las dos factorías reciben ahora `log`. Se añadió un doble del puerto **que también explota** y un aserto **nuevo**: el log **no** se llama cuando la autorización falla. **R34 sale reforzado, no aflojado.**
+2. `tests/unit/inventario/product-service.test.ts` y `presentation-service.test.ts` — el `toHaveBeenCalledWith({ page: 2 })` pasa a la consulta **ya saneada** `{ page: 2, sort: null, filters: {}, search: '' }`. Es el cambio de contrato de R24; **el aserto sigue siendo exacto**.
+3. `tests/integration/inventario/product-crud.int.test.ts` — solo el helper `collectAllPages` construye un `ListQuery` completo. **Ningún aserto tocado.**
+4. `tests/unit/proveedores/module-contract.test.ts` y `tests/unit/unidades/module-contract.test.ts` — afirman la lista **exacta** de `ports/`; el puerto de T7 la cambia. Se añadió `list-query-log.ts` a lo esperado: **siguen siendo `toEqual` exactos**, y un puerto de más sigue cayendo ahí.
+
+**Ni `app/` ni `components/` se tocaron, y no hizo falta**: el esquema nuevo acepta tal cual `{page, pageSize}` y `{page, pageSize, search}`, que es exactamente lo que emiten hoy `product-list-section.tsx` y `product-picker.tsx`. Eso adelanta buena parte de T21.

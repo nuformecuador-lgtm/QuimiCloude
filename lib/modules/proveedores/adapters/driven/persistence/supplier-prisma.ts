@@ -3,7 +3,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import type { Page, PageQuery } from '../../../domain/page';
+import { normalizeSupplierName } from '../../../domain/supplier-name';
+
+import { dateRangeCondition, normalizedSearchCondition, textCondition } from './list-query-sql';
+
+import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
+import type { Page } from '../../../domain/page';
 import type { NewSupplier, SupplierView } from '../../../domain/supplier-view';
 
 /**
@@ -208,27 +213,144 @@ export async function softDeleteAliveSupplier(
 }
 
 /**
- * `listAlive` (R18, R19, R21, R22).
+ * Desempate ESTABLE por identificador (R10). No es adorno y por eso es una constante con
+ * nombre: el nombre solo es unico ENTRE LOS VIVOS -indice unico parcial-, asi que sin este
+ * segundo criterio dos filas empatadas pueden intercambiarse -o perderse- entre paginas,
+ * porque el orden de las empatadas no esta definido y Postgres puede devolverlas distinto en
+ * cada consulta.
+ */
+const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.SupplierOrderByWithRelationInput;
+
+/** Orden POR DEFECTO: exactamente el de hoy, `name ASC, id ASC` (R11). Sin `sort`, la lista no
+ *  se mueve. Se construye en CADA llamada, no como constante compartida: Prisma exige un array
+ *  mutable en `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la
+ *  mutara para todos. */
+function defaultOrderBy(): Prisma.SupplierOrderByWithRelationInput[] {
+  return [{ name: 'asc' }, TIE_BREAKER];
+}
+
+/**
+ * `sort` del contrato -> `orderBy` de Prisma (R10, R11).
+ *
+ * Ninguna de las tres columnas ordenables de `SUPPLIER_QUERYABLE` es anulable, asi que aqui no
+ * hace falta `nulls: 'last'` -donde SI hace falta es en el catalogo, con `min_purchase` y
+ * `delivery_time`-.
+ *
+ * El `default` NO puede darse por inalcanzable: `sanitizeListQuery` ya poda lo que no esta
+ * declarado, pero el adaptador no puede depender de que su llamante lo haya hecho. Es defensa
+ * en profundidad, y ademas mantiene R5 cierto tambien aqui: un campo desconocido cae al orden
+ * por defecto, no revienta la consulta.
+ */
+export function supplierOrderBy(
+  sort: ListSort | null,
+): Prisma.SupplierOrderByWithRelationInput[] {
+  if (sort === null) return defaultOrderBy();
+  const dir = sort.direction;
+
+  switch (sort.columnId) {
+    case 'name':
+      return [{ name: dir }, TIE_BREAKER];
+    case 'createdAt':
+      return [{ createdAt: dir }, TIE_BREAKER];
+    case 'updatedAt':
+      return [{ updatedAt: dir }, TIE_BREAKER];
+    default:
+      return defaultOrderBy();
+  }
+}
+
+/**
+ * Un filtro del contrato -> la condicion de la columna que le corresponde. Devuelve `null` -y
+ * el filtro no aparece en el `where`- cuando el campo no es filtrable aqui o cuando el valor no
+ * acota nada (rango con los dos extremos nulos, `select` con lista VACIA: «no he elegido nada»
+ * NO es «ningun resultado», `design.md > 3.3`).
+ *
+ * Las CUATRO formas estan contempladas (R12) aunque hoy `SUPPLIER_QUERYABLE` solo declare
+ * `createdAt` como `dateRange`: traducir es trabajo del adaptador, y declarar manana un campo
+ * nuevo no puede depender de que alguien recuerde que aqui faltaba una rama.
+ */
+function supplierFilterWhere(
+  field: string,
+  value: ListFilterValue,
+): Prisma.SupplierWhereInput | null {
+  switch (value.kind) {
+    case 'dateRange': {
+      const condition = dateRangeCondition(value.from, value.to);
+      if (condition === null) return null;
+      if (field === 'createdAt') return { createdAt: condition };
+      if (field === 'updatedAt') return { updatedAt: condition };
+      return null;
+    }
+    case 'text': {
+      const condition = textCondition(value.value);
+      if (condition === null) return null;
+      if (field === 'name') return { name: condition };
+      if (field === 'email') return { email: condition };
+      if (field === 'phone') return { phone: condition };
+      return null;
+    }
+    // Ningun campo de `SUPPLIER_QUERYABLE` se declara `select` ni `numberRange`, y el proveedor
+    // no tiene ninguna columna que lo admitiria: un filtro asi se poda antes de llegar aqui
+    // (R8) y, si llegara, se omite en vez de romper la consulta (R5).
+    case 'select':
+    case 'numberRange':
+      return null;
+  }
+}
+
+/**
+ * `where` UNICO del listado de proveedores: el mismo objeto para el `findMany` y para el
+ * `count` (R14). Tres capas, y ninguna sobra:
+ *
+ *   1. **`deletedAt: null` SIEMPRE** (R7, R22). No es un filtro que el llamante pueda quitar:
+ *      `deletedAt` no es consultable en ninguna lista blanca y `sanitizeListQuery` lo poda
+ *      ademas por su cuenta.
+ *   2. **La busqueda contra `name_normalized`** (R16, R18, R19), normalizando el termino con
+ *      `normalizeSupplierName` -la MISMA funcion que escribio la columna y que decide si un
+ *      nombre ya existe-. Es lo que hace que «quimicos» encuentre «Químicos del Pacífico».
+ *      Sin `mode: 'insensitive'`: la columna ya viene sin acentos ni mayusculas, y pedirlo
+ *      ademas dejaria fuera el indice de trigramas.
+ *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale
+ *      solo si los cumple todos.
+ */
+export function buildSupplierWhere(query: ListQuery): Prisma.SupplierWhereInput {
+  const search = normalizedSearchCondition(query.search, normalizeSupplierName);
+  const filters = Object.entries(query.filters)
+    .map(([field, value]) => supplierFilterWhere(field, value))
+    .filter((condition): condition is Prisma.SupplierWhereInput => condition !== null);
+
+  return {
+    deletedAt: null,
+    ...(search === null ? {} : { nameNormalized: search }),
+    ...(filters.length === 0 ? {} : { AND: filters }),
+  };
+}
+
+/**
+ * `listAlive` con el CONTRATO GENERICO de consulta (QC-57 R10, R11, R13, R14, R15, R16, R18,
+ * R29; QC-43 R18, R19, R21, R22).
  *
  * El `limit` que llega a Prisma -y el `pageSize` que sale en el `Page`- es el ACOTADO que
  * devuelve `toOffsetLimit`, nunca el que pidio el llamante: pasarle el pedido a `buildPage`
- * dejaria un `totalPages` mentiroso aunque el `LIMIT` de SQL fuera correcto.
+ * dejaria un `totalPages` mentiroso aunque el `LIMIT` de SQL fuera correcto. Pedir 100 se
+ * ACOTA a 25, no se rechaza (R29).
  *
- * Orden `name ASC, id ASC` (R21). El desempate por `id` no es adorno: el nombre solo es
- * unico entre los vivos, y aunque hoy eso baste, cuesta cero y evita que dos proveedores se
- * intercambien entre paginas.
+ * ORDEN, FILTRO Y BUSQUEDA VAN AL MOTOR, nunca a la pagina ya traida (R13): filtrar lo ya
+ * descargado es justo lo que QC-22 y QC-26 rechazaron por enganoso, y ademas dejaria un `total`
+ * mentiroso.
  *
- * `total` sale de un `count` con el MISMO `where` que el `findMany`.
+ * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
+ * misma constante, no dos copias parecidas-.
  */
-export async function listAliveSuppliers(query: PageQuery): Promise<Page<SupplierView>> {
+export async function listAliveSuppliers(query: ListQuery): Promise<Page<SupplierView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where: Prisma.SupplierWhereInput = { deletedAt: null };
+  const where = buildSupplierWhere(query);
 
   const [rows, total] = await Promise.all([
     prisma.supplier.findMany({
       where,
       select: SUPPLIER_SELECT,
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      orderBy: supplierOrderBy(query.sort),
       skip: offset,
       take: limit,
     }),

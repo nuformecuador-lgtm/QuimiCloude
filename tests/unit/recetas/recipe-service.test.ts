@@ -331,6 +331,9 @@ describe('R33 — la lista no trae lineas, el detalle si', () => {
     const listRecipes = createListRecipes({
       recipes,
       images,
+      // QC-57 (R6): el caso de uso gana el puerto del log de campos omitidos. Doble mudo:
+      // este caso comprueba que la lista no trae lineas, no el log.
+      log: { ignoredFields: vi.fn() },
       toOffsetLimit: () => ({ offset: 0, limit: 10 }),
       buildPage: (items, total, page, pageSize) => ({
         items,

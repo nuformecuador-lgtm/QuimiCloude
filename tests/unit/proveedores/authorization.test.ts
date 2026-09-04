@@ -97,10 +97,16 @@ function dobles() {
     listBySupplierAlive: explota('catalog.listBySupplierAlive'),
   }
 
+  // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion. `requireAdmin`
+  // es la PRIMERA linea de los dos listados, antes de zod y antes de sanear, asi que un actor
+  // rechazado no llega ni a saber que su consulta traia campos raros.
+  const log = { ignoredFields: explota('log.ignoredFields') }
+
   return {
     suppliers: suppliers as unknown as SupplierRepository,
     catalog: catalog as unknown as SupplierCatalogRepository,
-    espias: [...Object.values(suppliers), ...Object.values(catalog)],
+    log,
+    espias: [...Object.values(suppliers), ...Object.values(catalog), ...Object.values(log)],
   }
 }
 
@@ -140,7 +146,8 @@ const CASOS_DE_USO: readonly {
   {
     nombre: 'listSuppliers',
     archivo: 'list-suppliers.ts',
-    ejecutar: (d, actor) => createListSuppliers({ suppliers: d.suppliers })({ page: 1 }, actor),
+    ejecutar: (d, actor) =>
+      createListSuppliers({ suppliers: d.suppliers, log: d.log })({ page: 1 }, actor),
   },
   {
     nombre: 'createCatalogLine',
@@ -162,7 +169,7 @@ const CASOS_DE_USO: readonly {
     nombre: 'listCatalogLines',
     archivo: 'list-catalog-lines.ts',
     ejecutar: (d, actor) =>
-      createListCatalogLines({ catalog: d.catalog })(SUPPLIER_ID, { page: 1 }, actor),
+      createListCatalogLines({ catalog: d.catalog, log: d.log })(SUPPLIER_ID, { page: 1 }, actor),
   },
 ]
 

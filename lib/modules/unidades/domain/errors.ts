@@ -27,3 +27,20 @@ export class UnauthorizedError extends UnidadesError {
     super(message);
   }
 }
+
+/**
+ * QC-57 (R30): la entrada del contrato de consulta no cumple la FORMA -una pagina 0, un `kind`
+ * de filtro que no es ninguno de los cuatro, una propiedad de mas-. Un campo NO DECLARADO es
+ * otra cosa y NO llega aqui: se omite sin fallar y se anota en el log (R5, R6).
+ *
+ * Mismo `code` estable que `ValidationError` de `recetas` y de `inventario`: la traduccion a
+ * `{ status: 'error', code, message }` la hace el adaptador driving, con el codigo y nunca con
+ * el texto.
+ */
+export class ValidationError extends UnidadesError {
+  readonly code = 'invalid_input';
+
+  constructor(message = 'La entrada recibida no es valida.') {
+    super(message);
+  }
+}

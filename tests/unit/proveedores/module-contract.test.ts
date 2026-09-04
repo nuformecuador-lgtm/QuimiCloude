@@ -265,8 +265,14 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       sourcesIn(join(proveedoresDir, 'adapters', 'driven')).map((f) =>
         toPosix(relative(proveedoresDir, f)),
       ),
-      'adapters/driven/ gano un archivo fuera de los dos adaptadores de QC-43',
+      'adapters/driven/ gano un archivo fuera de los adaptadores de QC-43 y QC-57',
+      // ACTUALIZADO 2026-09-04 (QC-57, T17/T18): `list-query-sql.ts` traduce el contrato
+      // generico de consulta a las condiciones de Prisma y lo comparten los DOS adaptadores
+      // del modulo. Vive aqui -y no en `lib/shared/`- porque es una copia deliberada de la
+      // gemela de `inventario`: importar de otro modulo por una ruta profunda es lo que la
+      // regla de dependencias prohibe. La afirmacion sigue siendo la lista EXACTA.
     ).toEqual([
+      'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driven/persistence/supplier-catalog-line-prisma.ts',
       'adapters/driven/persistence/supplier-prisma.ts',
     ])

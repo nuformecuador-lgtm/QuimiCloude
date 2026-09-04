@@ -77,14 +77,14 @@
 
 ## Grupo 3 — Casos de uso (depende del Grupo 1)
 
-- [ ] **T7. Puerto `ListQueryLog` en los cinco módulos + implementación única en
+- [x] **T7. Puerto `ListQueryLog` en los cinco módulos + implementación única en
       `lib/shared/observability/list-query-log.ts` + cableado en `lib/composition/index.ts`.**
       **Hecho cuando** el log **nunca** recibe el texto buscado ni el valor del filtro, solo el
       listado y los nombres de campo, y hay un test que lo afirma (R6, anti-patrón de PII).
 
-- [ ] **T8. [P] `list-products`**: sustituir `productQuerySchema` por el contrato, sanear, loguear
+- [x] **T8. [P] `list-products`**: sustituir `productQuerySchema` por el contrato, sanear, loguear
       y delegar (R24, R30, R33).
-- [ ] **T9. [P] `list-presentations`** con el contrato.
+- [x] **T9. [P] `list-presentations`** con el contrato.
 - [ ] **T10. [P] `list-recipes`** con el contrato, conservando la inyección de
       `toOffsetLimit`/`buildPage` que ya tiene.
 - [ ] **T11. [P] `list-suppliers`** y **el listado del catálogo de proveedor**
@@ -103,7 +103,7 @@
 
 ## Grupo 4 — Adaptadores driven (depende del Grupo 3 y de T4)
 
-- [ ] **T14. [P] `product-prisma.ts`**: `orderBy` dinámico con desempate por `id`, `where` con los
+- [x] **T14. [P] `product-prisma.ts`**: `orderBy` dinámico con desempate por `id`, `where` con los
       cuatro tipos de filtro, búsqueda contra `name_normalized`; **el mismo `where` para el
       `findMany` y para el `count`** (R10, R13, R14, R15, R16, R18).
 - [ ] **T15. [P] `presentation-prisma.ts`**, **T16. [P] `recipe-prisma.ts`**,

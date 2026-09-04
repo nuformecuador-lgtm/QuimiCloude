@@ -64,7 +64,11 @@ import type { ProductRepository } from '@/lib/modules/inventario/ports/product-r
 import type { ProductCatalog } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
-import { listUnits } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
+import {
+  listUnits,
+  listUnitsPage,
+} from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
+import type { ListQueryLog as UnidadesListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
 import { createListUnits, type UnitCatalog } from '@/lib/modules/unidades';
 import {
@@ -86,6 +90,7 @@ import {
   removeRecipeImage,
   uploadRecipeImage,
 } from '@/lib/modules/recetas/adapters/driven/storage/recipe-image-supabase';
+import type { ListQueryLog as RecetasListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
 import {
@@ -112,6 +117,7 @@ import {
   replaceAliveCatalogLine,
   softDeleteAliveCatalogLine,
 } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma';
+import type { ListQueryLog as ProveedoresListQueryLog } from '@/lib/modules/proveedores/ports/list-query-log';
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
@@ -131,6 +137,7 @@ import {
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -277,6 +284,10 @@ const recipeImageStorage: RecipeImageStorage = {
   publicUrl: recipeImagePublicUrl,
 };
 
+/** QC-57 (T7, R6): el MISMO `logIgnoredListQueryFields` que `inventario`, visto por el puerto
+ *  que declara `recetas`. Cinco puertos con la misma forma, una sola implementacion. */
+const recetasListQueryLog: RecetasListQueryLog = { ignoredFields: logIgnoredListQueryFields };
+
 /**
  * Fachada del modulo `recetas` ya cableada (T12, `design.md > 3`, `> 11`). Es lo que
  * consume la Server Action de T13.
@@ -300,6 +311,7 @@ export const recetas = {
   listRecipes: createListRecipes({
     recipes: recipeRepository,
     images: recipeImageStorage,
+    log: recetasListQueryLog,
     toOffsetLimit,
     buildPage,
   }),
@@ -321,6 +333,13 @@ export const recetas = {
 // cableada mas arriba (`design.md > 10`). Dos instancias del mismo puerto serian dos
 // cableados que pueden divergir.
 // ---------------------------------------------------------------------------------------
+
+/** QC-57 (T7, R6): la MISMA implementacion de `lib/shared/observability`, tipada con el puerto
+ *  que declara `proveedores`. Los cinco modulos declaran el suyo con la misma forma y cablean
+ *  esta misma funcion; este archivo es el unico sitio donde puerto e implementacion se atan. */
+const proveedoresListQueryLog: ProveedoresListQueryLog = {
+  ignoredFields: logIgnoredListQueryFields,
+};
 
 const supplierRepository: SupplierRepository = {
   create: createSupplier,
@@ -354,7 +373,10 @@ export const proveedores = {
   updateSupplier: createUpdateSupplier({ suppliers: supplierRepository }),
   deleteSupplier: createDeleteSupplier({ suppliers: supplierRepository }),
   getSupplier: createGetSupplier({ suppliers: supplierRepository }),
-  listSuppliers: createListSuppliers({ suppliers: supplierRepository }),
+  listSuppliers: createListSuppliers({
+    suppliers: supplierRepository,
+    log: proveedoresListQueryLog,
+  }),
   // QC-52 (R18, decision cerrada 3): las dos factories del catalogo PIERDEN
   // `products: productCatalog`. `proveedores` ya no conoce `inventario` por ninguna via, y
   // este archivo es el unico sitio desde el que podria volver a atarlas.
@@ -365,7 +387,10 @@ export const proveedores = {
   createCatalogLine: createCreateCatalogLine({ catalog: supplierCatalogRepository }),
   updateCatalogLine: createUpdateCatalogLine({ catalog: supplierCatalogRepository }),
   deleteCatalogLine: createDeleteCatalogLine({ catalog: supplierCatalogRepository }),
-  listCatalogLines: createListCatalogLines({ catalog: supplierCatalogRepository }),
+  listCatalogLines: createListCatalogLines({
+    catalog: supplierCatalogRepository,
+    log: proveedoresListQueryLog,
+  }),
 };
 
 // ---------------------------------------------------------------------------------------
@@ -377,12 +402,15 @@ export const proveedores = {
 /** `UnitRepository` cableado con el adaptador driven DE UNIDADES (`design.md > 9`,
  *  R40): el caso de uso de listado solo conoce el TIPO `UnitRepository`, nunca esta
  *  implementacion. */
-const unitRepository: UnitRepository = { listAll: listUnits };
+const unitRepository: UnitRepository = { listAll: listUnits, listPage: listUnitsPage };
+
+/** QC-57 (T7, R6): la misma implementacion unica del log, vista por el puerto de `unidades`. */
+const unidadesListQueryLog: UnidadesListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
 /** Fachada del modulo `unidades` ya cableada (R40-R42). Es lo que consume la Server
  *  Action de listado (`adapters/driving/unit-actions.ts`). */
 export const unidades = {
-  listUnits: createListUnits({ units: unitRepository }),} as const;
+  listUnits: createListUnits({ units: unitRepository, log: unidadesListQueryLog }),} as const;
 
 
 // ---------------------------------------------------------------------------------------
@@ -405,6 +433,9 @@ export const unidades = {
  *  `findRefsIncludingDeleted`, y no una consulta de solo vivas, porque un pedido conserva su
  *  receta aunque la den de baja y la fila tiene que seguir diciendo que se pidio (R44). */
 const recipeCatalog: RecipeCatalog = { findRefsIncludingDeleted: findRecipeRefsIncludingDeleted };
+
+/** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
+const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
 const orderRepository: OrderRepository = {
   create: createOrder,
@@ -446,6 +477,7 @@ export const pedidos = {
     orders: orderRepository,
     recipes: recipeCatalog,
     units: unitCatalog,
+    log: pedidosListQueryLog,
   }),
   updateOrder: createUpdateOrder({
     orders: orderRepository,

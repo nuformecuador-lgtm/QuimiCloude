@@ -3,8 +3,18 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import type { Page, PageQuery } from '../../../domain/page';
-import type { NewOrder, OrderFilters, OrderRow } from '../../../domain/order-view';
+import {
+  ORDER_PRIORITY_VALUES,
+  ORDER_STATUS_VALUES,
+  type OrderPriority,
+  type OrderStatus,
+} from '../../../domain/order-classification';
+
+import { dateRangeCondition, numberRangeCondition, selectCondition } from './list-query-sql';
+
+import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
+import type { Page } from '../../../domain/page';
+import type { NewOrder, OrderRow } from '../../../domain/order-view';
 
 /**
  * Implementa `OrderRepository` (`ports/order-repository.ts`, `design.md > 4.2`, `> 7.4`,
@@ -249,43 +259,212 @@ export async function findAliveOrderById(id: string): Promise<OrderRow | null> {
  * `listAlive` (R34-R41).
  *
  * PAGINACION: `toOffsetLimit`/`buildPage` de `lib/shared/pagination` se llaman AQUI (R37,
- * `design.md > 10`), porque `domain/` no puede importar `lib/shared/**`. El `limit` que llega
- * a Prisma -y el `pageSize` que sale en la `Page`- es el ACOTADO que devuelve `toOffsetLimit`
- * (defecto 10, tope 25, R35), nunca el que pidio el llamante: pasarle el pedido a `buildPage`
- * dejaria un `totalPages` mentiroso aunque el `LIMIT` de SQL fuera correcto.
+ * `design.md > 10`), porque `domain/` no puede importar `lib/shared/**
+ * Desempate ESTABLE por identificador (R10). El orden de hoy ya era total gracias al
+ * correlativo, pero un orden pedido por el contrato -por `status`, por `quantity`- empata sin
+ * remedio: sin este ultimo criterio dos filas empatadas pueden intercambiarse -o perderse-
+ * entre paginas, porque el orden de las empatadas no esta definido.
+ */
+const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.OrderOrderByWithRelationInput;
+
+/**
+ * Orden POR DEFECTO: exactamente el de hoy (R11, R41), `priority DESC, created_at ASC,
+ * order_year ASC, order_sequence ASC`. Sin `sort`, la lista no se mueve.
  *
- * ORDEN (R41): `priority DESC, created_at ASC, order_year ASC, order_sequence ASC`.
  * `priority DESC` da `CRITICA -> ALTA -> MEDIA -> BAJA` porque Postgres ordena un enum por su
  * ORDEN DE DECLARACION, que QC-33 R16 fijo de menor a mayor -por eso reordenar esas cuatro
- * lineas del enum cambiaria el listado, y el test estatico de QC-33 lo vigila-. El desempate
- * por el correlativo hace el orden TOTAL, y eso es lo que hace la paginacion estable: sin el,
- * dos pedidos creados en el mismo milisegundo podrian salir en dos paginas o en ninguna.
+ * lineas del enum cambiaria el listado, y el test estatico de QC-33 lo vigila-. **No es orden
+ * alfabetico**: alfabeticamente `ALTA` iria antes que `MEDIA`, y de mayor a menor la lista
+ * empezaria por `MEDIA` en vez de por `CRITICA`.
  *
- * FILTROS (R38): estado y prioridad, opcionales y combinables. `deleted_at IS NULL` NO es un
- * filtro opcional: va siempre (R40), y por eso no esta en `OrderFilters`.
- *
- * `total` sale de un `count` con el MISMO `where` que el `findMany`.
+ * Se construye en CADA llamada, no como constante compartida: Prisma exige un array mutable en
+ * `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la mutara para todos.
  */
-export async function listAliveOrders(
-  filters: OrderFilters,
-  query: PageQuery,
-): Promise<Page<OrderRow>> {
-  const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
+function defaultOrderBy(): Prisma.OrderOrderByWithRelationInput[] {
+  return [
+    { priority: 'desc' },
+    { createdAt: 'asc' },
+    { orderYear: 'asc' },
+    { orderSequence: 'asc' },
+  ];
+}
 
-  const where: Prisma.OrderWhereInput = { deletedAt: null };
-  if (filters.status !== undefined) where.status = filters.status;
-  if (filters.priority !== undefined) where.priority = filters.priority;
+/**
+ * `sort` del contrato -> `orderBy` de Prisma (R10, R11).
+ *
+ * DOS COSAS QUE NO SON OBVIAS:
+ *
+ *   1. **`orderNumber` es la UNICA traduccion uno-a-dos del contrato** (`design.md > 5`): el
+ *      numero visible NO esta guardado -lo compone `formatOrderNumber`-, es el par
+ *      `(order_year, order_sequence)`. Se presenta como UN campo ordenable y aqui se traduce a
+ *      DOS criterios, el ano primero. Ordenar por el texto compuesto seria ordenar
+ *      alfabeticamente, y `2026-0000010` iria antes que `2026-0000009`... solo mientras los
+ *      correlativos tengan el mismo numero de digitos; el par de enteros no tiene ese problema.
+ *   2. **`priority` y `status` ordenan por el ORDEN DE DECLARACION del enum**, no por el
+ *      alfabetico, porque son enums de Postgres. En `priority` ese orden ES el de la prioridad
+ *      (QC-33 R16) y por eso es el que se quiere; esta escrito en `db/schema.prisma` y no se
+ *      toca.
+ *
+ * Ninguna columna ordenable de `ORDER_QUERYABLE` es anulable, asi que aqui no hace falta
+ * `nulls: 'last'`.
+ *
+ * El `default` NO puede darse por inalcanzable: `sanitizeListQuery` ya poda lo que no esta
+ * declarado, pero el adaptador no puede depender de que su llamante lo haya hecho. Es defensa
+ * en profundidad, y mantiene R5 cierto tambien aqui.
+ */
+export function orderOrderBy(sort: ListSort | null): Prisma.OrderOrderByWithRelationInput[] {
+  if (sort === null) return defaultOrderBy();
+  const dir = sort.direction;
+
+  switch (sort.columnId) {
+    case 'orderNumber':
+      return [{ orderYear: dir }, { orderSequence: dir }, TIE_BREAKER];
+    case 'priority':
+      return [{ priority: dir }, TIE_BREAKER];
+    case 'status':
+      return [{ status: dir }, TIE_BREAKER];
+    case 'createdAt':
+      return [{ createdAt: dir }, TIE_BREAKER];
+    case 'quantity':
+      return [{ quantity: dir }, TIE_BREAKER];
+    case 'unitPrice':
+      return [{ unitPrice: dir }, TIE_BREAKER];
+    default:
+      return defaultOrderBy();
+  }
+}
+
+/**
+ * `select` del contrato -> `in` del enum correspondiente.
+ *
+ * El caso de uso ya poda los valores que no estan en el conjunto cerrado (R5, R25), pero el
+ * adaptador vuelve a filtrar y no por desconfianza: es lo que le da el TIPO. `selectCondition`
+ * devuelve `string[]` y Prisma exige `OrderStatus[]`; sin este filtro habria que mentirle al
+ * compilador con un `as`, y un valor que no existe en el enum haria que Postgres rechazara la
+ * consulta entera -que es justo lo que R5 prohibe-.
+ */
+function enumIn<T extends string>(
+  values: readonly string[],
+  allowed: readonly T[],
+): { in: T[] } | null {
+  const kept = values.filter((value): value is T => (allowed as readonly string[]).includes(value));
+  return kept.length === 0 ? null : { in: kept };
+}
+
+/**
+ * Rango numerico del contrato -> rango en `Prisma.Decimal` (`design.md > 5`).
+ *
+ * `quantity` y `unit_price` son `DECIMAL(14,4)` y el `numberRange` de QC-55 emite `number`. La
+ * conversion vive AQUI, en el adaptador: `docs/architecture.md > Anti-patrones` prohibe
+ * comparar importes en coma flotante binaria, y el dominio ademas no puede importar
+ * `@prisma/client`.
+ */
+function toDecimalRange(
+  condition: { gte?: number; lte?: number },
+): { gte?: Prisma.Decimal; lte?: Prisma.Decimal } {
+  return {
+    ...(condition.gte === undefined ? {} : { gte: new Prisma.Decimal(condition.gte) }),
+    ...(condition.lte === undefined ? {} : { lte: new Prisma.Decimal(condition.lte) }),
+  };
+}
+
+/**
+ * Un filtro del contrato -> la condicion de la columna que le corresponde. Devuelve `null` -y
+ * el filtro no aparece en el `where`- cuando el campo no es filtrable aqui o cuando el valor no
+ * acota nada (rango con los dos extremos nulos, `select` con lista VACIA: no haber elegido nada
+ * NO es «ningun resultado», `design.md > 3.3`).
+ *
+ * Las CUATRO formas del contrato estan contempladas (R12). La de `text` no llega hoy -`orders`
+ * no declara ningun campo de texto filtrable y ni siquiera busca (R17)-; se escribe igual
+ * porque traducir es trabajo del adaptador y declarar manana un campo de texto no puede
+ * depender de que alguien recuerde que aqui faltaba una rama.
+ */
+function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWhereInput | null {
+  switch (value.kind) {
+    case 'select': {
+      const condition = selectCondition(value.values);
+      if (condition === null) return null;
+      if (field === 'status') {
+        const enumCondition = enumIn<OrderStatus>(condition.in, ORDER_STATUS_VALUES);
+        return enumCondition === null ? null : { status: enumCondition };
+      }
+      if (field === 'priority') {
+        const enumCondition = enumIn<OrderPriority>(condition.in, ORDER_PRIORITY_VALUES);
+        return enumCondition === null ? null : { priority: enumCondition };
+      }
+      return null;
+    }
+    case 'numberRange': {
+      const condition = numberRangeCondition(value.min, value.max);
+      if (condition === null) return null;
+      if (field === 'quantity') return { quantity: toDecimalRange(condition) };
+      if (field === 'unitPrice') return { unitPrice: toDecimalRange(condition) };
+      if (field === 'orderYear') return { orderYear: condition };
+      return null;
+    }
+    case 'dateRange': {
+      const condition = dateRangeCondition(value.from, value.to);
+      if (condition === null) return null;
+      if (field === 'createdAt') return { createdAt: condition };
+      if (field === 'updatedAt') return { updatedAt: condition };
+      return null;
+    }
+    case 'text':
+      return null;
+  }
+}
+
+/**
+ * `where` UNICO del listado de pedidos: el mismo objeto para el `findMany` y para el `count`
+ * (R14). Dos capas, y ninguna sobra:
+ *
+ *   1. **`deletedAt: null` SIEMPRE** (R7, R40). NO es un filtro opcional y por eso nunca estuvo
+ *      en los parametros del listado: `deletedAt` no es consultable en ninguna lista blanca y
+ *      `sanitizeListQuery` lo poda ademas por su cuenta. Los CANCELADOS si salen -tienen estado
+ *      propio en vez de desaparecer (R25)-; los borrados no salen nunca.
+ *   2. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
+ *      si los cumple todos. Estado y prioridad son dos de ellos (R25), ya no dos parametros.
+ *
+ * NO hay capa de busqueda, y es el requisito: `orders` no tiene columna `name` (R17), asi que
+ * la busqueda se omite y se registra en el caso de uso y aqui no llega nada que aplicar.
+ */
+export function buildOrderWhere(query: ListQuery): Prisma.OrderWhereInput {
+  const filters = Object.entries(query.filters)
+    .map(([field, value]) => orderFilterWhere(field, value))
+    .filter((condition): condition is Prisma.OrderWhereInput => condition !== null);
+
+  return {
+    deletedAt: null,
+    ...(filters.length === 0 ? {} : { AND: filters }),
+  };
+}
+
+/**
+ * `listAlive` con el CONTRATO GENERICO de consulta (QC-57 R10, R11, R13, R14, R15, R17, R25,
+ * R29; QC-34 R34, R38, R40, R41).
+ *
+ * PAGINACION: `toOffsetLimit`/`buildPage` de `lib/shared/pagination` se llaman AQUI (R37,
+ * `design.md > 10`), porque `domain/` no puede importar `lib/shared/**`. El `limit` que llega
+ * a Prisma -y el `pageSize` que sale en la `Page`- es el ACOTADO que devuelve `toOffsetLimit`
+ * (defecto 10, tope 25, R35, R29), nunca el que pidio el llamante: pasarle el pedido a
+ * `buildPage` dejaria un `totalPages` mentiroso aunque el `LIMIT` de SQL fuera correcto. Pedir
+ * 100 se ACOTA a 25, no se rechaza.
+ *
+ * ORDEN Y FILTROS VAN AL MOTOR, nunca a la pagina ya traida (R13): filtrar lo ya descargado es
+ * justo lo que QC-22 y QC-26 rechazaron por enganoso, y ademas dejaria un `total` mentiroso.
+ *
+ * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
+ * misma constante, no dos copias parecidas-.
+ */
+export async function listAliveOrders(query: ListQuery): Promise<Page<OrderRow>> {
+  const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
+  const where = buildOrderWhere(query);
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
       where,
       select: ORDER_SELECT,
-      orderBy: [
-        { priority: 'desc' },
-        { createdAt: 'asc' },
-        { orderYear: 'asc' },
-        { orderSequence: 'asc' },
-      ],
+      orderBy: orderOrderBy(query.sort),
       skip: offset,
       take: limit,
     }),

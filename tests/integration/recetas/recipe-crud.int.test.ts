@@ -39,7 +39,16 @@ import {
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination';
 
+import type { ListQuery } from '@/lib/modules/recetas/domain/list-query';
 import type { NewRecipe } from '@/lib/modules/recetas/ports/recipe-repository';
+
+/**
+ * QC-57: `listAliveRecipes` recibe ahora, ademas de la ventana, el CONTRATO GENERICO de
+ * consulta ya saneado. Esta es la consulta VACIA -sin orden, sin filtro y sin busqueda-, o sea
+ * exactamente el comportamiento que este archivo ya verificaba antes de la ficha: orden por
+ * nombre y solo las vivas. Se adapta la LLAMADA; ningun aserto de comportamiento cambia (R26).
+ */
+const SIN_CONSULTA: ListQuery = { page: 1, sort: null, filters: {}, search: '' };
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento (estrategia 1: tx + ROLLBACK), identicas en forma a
@@ -209,10 +218,10 @@ function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {
 async function collectAllRecipes(
   limit: number,
 ): Promise<{ id: string; name: string }[]> {
-  const first = await listAliveRecipes(0, limit);
+  const first = await listAliveRecipes(0, limit, SIN_CONSULTA);
   const items = [...first.rows];
   for (let offset = limit; offset < first.total; offset += limit) {
-    const next = await listAliveRecipes(offset, limit);
+    const next = await listAliveRecipes(offset, limit, SIN_CONSULTA);
     items.push(...next.rows);
   }
   return items.map((item) => ({ id: item.id, name: item.name }));
@@ -429,7 +438,7 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
         createdIds.push((created as { id: string }).id);
       }
 
-      const { rows, total } = await listAliveRecipes(0, 2);
+      const { rows, total } = await listAliveRecipes(0, 2, SIN_CONSULTA);
       expect(rows.length).toBeLessThanOrEqual(2);
       // Al menos las tres que este caso acaba de sembrar estan vivas.
       expect(total).toBeGreaterThanOrEqual(3);
@@ -446,7 +455,7 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
     const { offset, limit } = toOffsetLimit(1, 999_999);
     expect(limit).toBe(MAX_PAGE_SIZE);
 
-    const { rows } = await listAliveRecipes(offset, limit);
+    const { rows } = await listAliveRecipes(offset, limit, SIN_CONSULTA);
     expect(rows.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
   });
 

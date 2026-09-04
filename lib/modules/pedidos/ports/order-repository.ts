@@ -1,5 +1,6 @@
-import type { Page, PageQuery } from '../domain/page';
-import type { NewOrder, OrderFilters, OrderRow } from '../domain/order-view';
+import type { ListQuery } from '../domain/list-query';
+import type { Page } from '../domain/page';
+import type { NewOrder, OrderRow } from '../domain/order-view';
 
 /**
  * Puerto de acceso a datos del pedido (`design.md > 7.4`). Seis metodos, uno por caso de uso.
@@ -46,22 +47,29 @@ export interface OrderRepository {
   findAliveById(id: string): Promise<OrderRow | null>;
 
   /**
-   * Listado paginado (R34, R38, R41). Recibe la `PageQuery` YA VALIDADA y devuelve una `Page`
-   * armada: `toOffsetLimit`/`buildPage` viven en `lib/shared/pagination`, que `domain/` NO
-   * puede importar (`docs/architecture.md > La regla de dependencias`), asi que quien pagina
-   * es el adaptador driven (R37, `design.md > 10`) — igual que en
+   * Listado paginado (R34, R38, R41) con el CONTRATO GENERICO de consulta (QC-57 R13, R25).
+   *
+   * **Un solo parametro.** `OrderFilters` desaparecio con QC-57: el estado y la prioridad ya no
+   * son parametros propios del listado, son filtros `select` DENTRO de la consulta (R25), como
+   * en las otras seis listas. La consulta llega YA SANEADA -lo que no esta en `ORDER_QUERYABLE`
+   * no llega aqui (R5)- y con los valores de los dos `select` ya acotados a su conjunto cerrado.
+   *
+   * Devuelve una `Page` armada: `toOffsetLimit`/`buildPage` viven en `lib/shared/pagination`,
+   * que `domain/` NO puede importar (`docs/architecture.md > La regla de dependencias`), asi
+   * que quien pagina es el adaptador driven (R37, `design.md > 10`) — igual que en
    * `lib/modules/proveedores/ports/supplier-repository.ts`. Si la firma entregase `offset` y
    * `limit`, el caso de uso tendria que calcular el `offset` a mano, que es justo la
    * reimplementacion que R37 prohibe.
    *
-   * El orden es `priority DESC, created_at ASC, order_year ASC, order_sequence ASC`, total y
-   * por tanto estable. El `total` de la `Page` es el numero de pedidos que cumplen los
-   * filtros, no el de la pagina.
+   * Sin `sort`, el orden es el de HOY (R11): `priority DESC, created_at ASC, order_year ASC,
+   * order_sequence ASC`, total y por tanto estable. El orden, los filtros y la paginacion se
+   * aplican sobre el conjunto completo y ANTES de paginar (R13), y el `total` describe ese
+   * conjunto ya filtrado (R14), no el catalogo entero.
    *
    * (Firma corregida el 2026-09-04, aprobada por el leader; ver la nota al final de
-   * `design.md > 7.4`.)
+   * `design.md > 7.4`. QC-57 le quita el primer parametro.)
    */
-  listAlive(filters: OrderFilters, query: PageQuery): Promise<Page<OrderRow>>;
+  listAlive(query: ListQuery): Promise<Page<OrderRow>>;
 
   /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo. */
   updateAlive(id: string, data: NewOrder, actorId: string, now: Date): Promise<'ok' | 'not_found'>;

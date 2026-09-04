@@ -6,7 +6,6 @@ import {
   ORDER_STATUS_VALUES,
   type OrderStatus,
 } from './order-classification';
-import { pageQuerySchema } from './page';
 
 /**
  * Esquemas de entrada de los seis casos de uso (`design.md > 7.1-7.3`). Validacion de BORDE
@@ -118,19 +117,23 @@ export const cancelOrderSchema = z.object({
 });
 
 /**
- * Listado (R34-R39). Hereda de `pageQuerySchema` el minimo y la integridad de la paginacion
- * (R36); el defecto de 10 y el tope de 25 los aplica `lib/shared/pagination` en el adaptador.
+ * QC-57 (R25): **`listOrdersSchema` DESAPARECIO.** El listado de pedidos ya no tiene forma
+ * propia de consulta: el estado y la prioridad dejan de ser parametros suyos y entran como
+ * filtros `select` del contrato generico (`domain/list-query.ts`), igual que en las otras seis
+ * listas. Lo que aquel esquema garantizaba sigue garantizado, en otro sitio:
  *
- * Los dos filtros son OPCIONALES y COMBINABLES (R38), y su conjunto es cerrado (R19). El de
- * estado SI admite `CANCELADO`: los pedidos cancelados se consultan, son los borrados los que
- * no salen nunca (R40). No hay busqueda por texto ni filtro por numero correlativo (R39).
+ *   - los dos filtros OPCIONALES y COMBINABLES -ahora dos entradas de `filters`-;
+ *   - su conjunto CERRADO (R19) -ahora lo poda `list-orders.ts` contra `ORDER_STATUS_VALUES` y
+ *     `ORDER_PRIORITY_VALUES`; la diferencia deliberada es que un valor de fuera ya no rechaza
+ *     la consulta: se omite y se anota, como cualquier campo no declarado (R5)-;
+ *   - que un pedido `CANCELADO` SI se consulta (R25);
+ *   - y que no hay busqueda por texto (R17: `orders` no tiene columna `name`, la busqueda se
+ *     omite y se registra).
+ *
+ * `pageQuerySchema` se queda: lo publica el contrato del modulo y su forma es la que el
+ * contrato de lista hereda para `page`/`pageSize`.
  */
-export const listOrdersSchema = pageQuerySchema.extend({
-  status: z.enum(ORDER_STATUS_VALUES).optional(),
-  priority: prioritySchema.optional(),
-});
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
-export type ListOrdersInput = z.infer<typeof listOrdersSchema>;

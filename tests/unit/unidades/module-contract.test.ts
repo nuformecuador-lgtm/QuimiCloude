@@ -668,9 +668,16 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(composicion, 'la composicion cablea la LECTURA de unidades (UnitRepository, R40)').toMatch(
       /listUnits/,
     )
+    // ACTUALIZADO 2026-09-04 (QC-57, T7/T12): la lista de puertos permitidos suma
+    // `ports/list-query-log`, el puerto del log del campo omitido (R6). `lib/composition` es
+    // el UNICO sitio que puede atarlo a su implementacion -`lib/shared/observability/
+    // list-query-log.ts`, una sola para los cinco modulos-, asi que nombrarlo aqui no es una
+    // fuga: es exactamente lo que hace este archivo. Sigue prohibido cualquier OTRO puerto o
+    // adaptador de unidades, y en particular el DRIVING (R12). La lista sigue siendo EXACTA:
+    // un tercer puerto vuelve a caer aqui.
     expect(composicion, 'la composicion nombra un puerto o adaptador de unidades fuera de los de lectura')
       .not.toMatch(
-        /modules\/unidades\/(adapters(?!\/driven\/persistence\/(unit-catalog-prisma|unit-prisma))|ports(?!\/unit-repository))/,
+        /modules\/unidades\/(adapters(?!\/driven\/persistence\/(unit-catalog-prisma|unit-prisma))|ports(?!\/(unit-repository|list-query-log)))/,
       )
     expect(composicion, 'la composicion importa el adaptador driving de unidades').not.toMatch(
       /modules\/unidades\/adapters\/driving/,

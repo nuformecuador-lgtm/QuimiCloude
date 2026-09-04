@@ -41,6 +41,16 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { listUnits } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
+
+import type { ListQuery } from '@/lib/modules/unidades/domain/list-query'
+
+/**
+ * QC-57: `listUnits` recibe ahora, ademas de la cota, el CONTRATO GENERICO de consulta ya
+ * saneado. Esta es la consulta VACIA -sin orden, sin filtro y sin busqueda-, o sea exactamente
+ * el comportamiento que este archivo ya verificaba: catalogo entero ordenado por nombre. Se
+ * adapta la LLAMADA; ningun aserto de comportamiento cambia (R26).
+ */
+const SIN_CONSULTA: ListQuery = { page: 1, sort: null, filters: {}, search: '' }
 import { prisma } from '@/lib/shared/db/prisma'
 
 /** Marcador irrepetible de solo letras y digitos: sobrevive a cualquier normalizacion. */
@@ -102,7 +112,7 @@ describe('listUnits — R40: la cota', () => {
           `pide ${String(limit)}; sin mas filas que el limite el caso seria verde por vacuidad`,
       ).toBeGreaterThan(limit)
 
-      const rows = await listUnits(limit)
+      const rows = await listUnits(limit, SIN_CONSULTA)
 
       // La cota se respeta...
       expect(rows.length).toBeLessThanOrEqual(limit)
@@ -137,7 +147,7 @@ describe('listUnits — R40: el orden', () => {
       // Limite mayor que el total de filas: este caso mira el ORDEN, no la cota, asi que
       // las ocho filas sembradas tienen que caber enteras en la pagina.
       const total = await prisma.unit.count()
-      const rows = await listUnits(total + 10)
+      const rows = await listUnits(total + 10, SIN_CONSULTA)
 
       // Solo las filas de este caso, localizadas por el marcador irrepetible.
       const own = rows.filter((row) => row.name.startsWith(prefix))

@@ -6,6 +6,10 @@ import { normalizeRecipeName } from '../../../domain/recipe-name';
 import { ValidationError } from '../../../domain/errors';
 import type { RecipeStepView } from '../../../domain/recipe-view';
 
+import { dateRangeCondition, normalizedSearchCondition } from './list-query-sql';
+
+import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
+
 import type { NewRecipe, RecipeLineData, RecipeLineRow, RecipeRow } from '../../../ports/recipe-repository';
 
 /**
@@ -215,23 +219,136 @@ export async function findAliveRecipeById(id: string): Promise<RecipeRow | null>
 }
 
 /**
- * `listAlive` de `RecipeRepository` (R29-R32, R36). `offset`/`limit` llegan YA
- * calculados por quien llama -el dominio de `recetas` los recibe como dependencia
- * inyectada de `lib/shared/pagination`, R31, R40-: este adaptador no hace ninguna
- * aritmetica de paginacion, solo pasa `skip`/`take` a Prisma. Orden `name ASC` SIN
- * desempate (D13, R32): el nombre de receta es unico entre vivas.
+ * Desempate ESTABLE por identificador (QC-57 R10). No es adorno y por eso es una constante con
+ * nombre: aunque el nombre de receta viva sea unico -por eso el orden de hoy no lo necesitaba
+ * (D13, R32 de QC-26)-, el contrato deja ordenar por `createdAt`/`updatedAt`, donde el empate SI
+ * es posible; sin un segundo criterio, dos recetas empatadas pueden intercambiarse -o perderse-
+ * entre paginas, porque el orden de las filas empatadas no esta definido y Postgres puede
+ * devolverlas distinto en cada consulta.
+ */
+const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.RecipeOrderByWithRelationInput;
+
+/**
+ * Orden POR DEFECTO: exactamente el de hoy, `name ASC` (R11). Sin `sort`, la lista no se mueve;
+ * el desempate por `id` que se le anade detras no la cambia -el nombre es unico entre vivas, asi
+ * que no hay empates que romper- y la deja estable el dia que deje de serlo.
+ *
+ * Se construye en CADA llamada, no como constante compartida: Prisma exige un array mutable en
+ * `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la mutara para todos.
+ */
+function defaultOrderBy(): Prisma.RecipeOrderByWithRelationInput[] {
+  return [{ name: 'asc' }, TIE_BREAKER];
+}
+
+/**
+ * `sort` del contrato -> `orderBy` de Prisma (R10, R11). Los tres campos de
+ * `RECIPE_QUERYABLE.sortable` -`name`, `createdAt`, `updatedAt`- son NO ANULABLES en
+ * `schema.prisma`, asi que aqui no hay ningun `nulls: 'last'` que declarar: la decision cerrada
+ * de los nulos no tiene materia en `recipes`.
+ *
+ * El `default` no puede darse por inalcanzable: `sanitizeListQuery` ya poda lo que no esta
+ * declarado, pero el adaptador no puede depender de que su llamante lo haya hecho -es defensa en
+ * profundidad, y mantiene R5 cierto tambien aqui: un campo desconocido cae al orden por defecto,
+ * no revienta la consulta-.
+ */
+export function recipeOrderBy(sort: ListSort | null): Prisma.RecipeOrderByWithRelationInput[] {
+  if (sort === null) return defaultOrderBy();
+  const dir = sort.direction;
+
+  switch (sort.columnId) {
+    case 'name':
+      return [{ name: dir }, TIE_BREAKER];
+    case 'createdAt':
+      return [{ createdAt: dir }, TIE_BREAKER];
+    case 'updatedAt':
+      return [{ updatedAt: dir }, TIE_BREAKER];
+    default:
+      return defaultOrderBy();
+  }
+}
+
+/**
+ * Un filtro del contrato -> la condicion de la columna que le corresponde. Devuelve `null` -y el
+ * filtro no aparece en el `where`- cuando el campo no es filtrable aqui o cuando el valor no
+ * acota nada (rango con los dos extremos nulos).
+ *
+ * `RECIPE_QUERYABLE` declara UN filtro, `createdAt` (`dateRange`). Las otras tres formas del
+ * contrato (R12) no tienen ninguna columna declarada que traducir en `recipes` y devuelven
+ * `null`: `sanitizeListQuery` ya las habria podado antes, y escribir una rama para una columna
+ * que nadie declara seria codigo muerto. El dia que `recipes` declare un `select` o un
+ * `numberRange`, la rama se anade aqui y su helper se replica desde `inventario`.
+ */
+function recipeFilterWhere(field: string, value: ListFilterValue): Prisma.RecipeWhereInput | null {
+  switch (value.kind) {
+    case 'dateRange': {
+      const condition = dateRangeCondition(value.from, value.to);
+      if (condition === null) return null;
+      if (field === 'createdAt') return { createdAt: condition };
+      if (field === 'updatedAt') return { updatedAt: condition };
+      return null;
+    }
+    case 'text':
+    case 'numberRange':
+    case 'select':
+      return null;
+  }
+}
+
+/**
+ * `where` UNICO del listado de recetas: el mismo objeto para el `findMany` y para el `count`
+ * (R14). Tres capas, y ninguna sobra:
+ *
+ *   1. **`deletedAt: null` SIEMPRE** (R7, R36 de QC-26). No es un filtro que el llamante pueda
+ *      quitar: `deletedAt` no es consultable en ninguna lista blanca y `sanitizeListQuery` lo
+ *      poda ademas por su cuenta.
+ *   2. **La busqueda contra `name_normalized`** (R16, R18, R19), normalizando el termino con
+ *      `normalizeRecipeName` -la MISMA funcion que escribio la columna y la MISMA con la que el
+ *      modulo compara nombres para la unicidad: R19 prohibe una segunda definicion de "mismo
+ *      nombre"-. Es lo que hace que buscar "solucion" encuentre "Solucion Buffer pH 7". Sin
+ *      `mode: 'insensitive'`: la columna ya viene sin acentos ni mayusculas, y pedirlo ademas
+ *      dejaria fuera el indice de trigramas.
+ *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
+ *      si los cumple todos.
+ */
+export function buildRecipeWhere(query: ListQuery): Prisma.RecipeWhereInput {
+  const search = normalizedSearchCondition(query.search, normalizeRecipeName);
+  const filters = Object.entries(query.filters)
+    .map(([field, value]) => recipeFilterWhere(field, value))
+    .filter((condition): condition is Prisma.RecipeWhereInput => condition !== null);
+
+  return {
+    deletedAt: null,
+    ...(search === null ? {} : { nameNormalized: search }),
+    ...(filters.length === 0 ? {} : { AND: filters }),
+  };
+}
+
+/**
+ * `listAlive` de `RecipeRepository` con el CONTRATO GENERICO de consulta (QC-57 R10, R11, R13,
+ * R14, R15, R16, R18; R29-R32, R36 de QC-26). `offset`/`limit` siguen llegando YA calculados por
+ * quien llama -el dominio de `recetas` recibe la aritmetica de `lib/shared/pagination`
+ * INYECTADA, R31, R40-: este adaptador no hace ninguna aritmetica de paginacion, solo pasa
+ * `skip`/`take` a Prisma. Lo que ahora recibe ademas es la consulta ya saneada, para traducirla.
+ *
+ * ORDEN, FILTRO Y BUSQUEDA VAN AL MOTOR, nunca a la pagina ya traida (R13): filtrar lo ya
+ * descargado es justo lo que QC-22 y QC-26 rechazaron por enganoso, y ademas dejaria un `total`
+ * mentiroso.
+ *
+ * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la misma
+ * constante, no dos copias parecidas-, de modo que el `total` describa el conjunto YA FILTRADO.
  */
 export async function listAliveRecipes(
   offset: number,
   limit: number,
+  query: ListQuery,
 ): Promise<{ rows: readonly RecipeRow[]; total: number }> {
-  const where: Prisma.RecipeWhereInput = { deletedAt: null };
+  const where = buildRecipeWhere(query);
 
   const [rows, total] = await Promise.all([
     prisma.recipe.findMany({
       where,
       include: RECIPE_INCLUDE,
-      orderBy: { name: 'asc' },
+      orderBy: recipeOrderBy(query.sort),
       skip: offset,
       take: limit,
     }),

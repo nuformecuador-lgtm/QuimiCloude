@@ -13,11 +13,11 @@ import { describe, expect, it } from 'vitest'
 
 import type {
   NewOrder,
-  OrderFilters,
   OrderRow,
   OrderSummary,
   OrderView,
 } from '@/lib/modules/pedidos/domain/order-view'
+import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 
 const NEW_ORDER: NewOrder = {
@@ -111,15 +111,24 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
     expect(enLaVista).toBe(true)
   })
 
-  it('los filtros del listado son solo estado y prioridad, los dos opcionales', () => {
-    // R38, R39: sin busqueda por texto y sin filtro por numero correlativo.
-    const sinFiltros: OrderFilters = {}
-    const combinados: OrderFilters = { status: 'EN_CURSO', priority: 'ALTA' }
-    expect([sinFiltros, combinados]).toHaveLength(2)
+  it('los filtros del listado son solo estado, prioridad y fecha, y no hay busqueda', () => {
+    // R38/R39 heredados, dichos sobre la forma NUEVA. QC-57 (R25) borro `OrderFilters`: estado
+    // y prioridad dejaron de ser parametros propios del listado y son filtros `select` del
+    // contrato generico. Lo que aquel tipo garantizaba lo garantiza ahora la lista blanca, y se
+    // afirma sobre ella -no sobre un tipo que ya no existe-.
+    expect(Object.keys(ORDER_QUERYABLE.filterable).sort()).toEqual([
+      'createdAt',
+      'priority',
+      'status',
+    ])
+    expect(ORDER_QUERYABLE.filterable.status).toBe('select')
+    expect(ORDER_QUERYABLE.filterable.priority).toBe('select')
 
-    // @ts-expect-error el listado no admite busqueda por texto (R39)
-    const conTexto: OrderFilters = { q: 'acido' }
-    expect(conTexto).toBeTruthy()
+    // R17: `orders` no tiene columna `name`. Es la UNICA de las siete que no busca.
+    expect(ORDER_QUERYABLE.searchable).toBe(false)
+
+    // Y no hay filtro por el numero correlativo (R39): no esta declarado.
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('orderNumber')
   })
 })
 
