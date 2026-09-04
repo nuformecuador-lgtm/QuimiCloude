@@ -1031,12 +1031,20 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
       // si una migracion futura se lleva una FK por drift, o alguien anade una relacion a
       // escondidas, el test cae-, y la nueva `recipe_lines_unit_id_fkey` entra bajo el mismo
       // criterio: escalar sin `@relation` en Prisma, FK de verdad en Postgres (QC-32 R18).
+      // El JOIN con `pg_namespace` acota la consulta al esquema `public` y NO es adorno:
+      // `pg_constraint` es global a la BASE, no al esquema. La base de pruebas es
+      // compartida y llego a tener un esquema espejo (`public_shadow_qc52`) con las
+      // mismas tablas; sin este filtro cada FK aparecia DOS veces. No sirve confiar en
+      // el `search_path` ni en `::regclass`, que solo cualifica cuando la tabla NO esta
+      // en el path: por eso el sintoma era tan confuso.
       const foreignKeys = await tx.$queryRaw<{ conname: string; referencia: string }[]>`
         SELECT c.conname, ft.relname AS referencia
         FROM pg_constraint c
         JOIN pg_class t ON t.oid = c.conrelid
         JOIN pg_class ft ON ft.oid = c.confrelid
-        WHERE c.contype = 'f' AND t.relname IN ('recipes', 'recipe_lines')
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE c.contype = 'f' AND n.nspname = 'public'
+          AND t.relname IN ('recipes', 'recipe_lines')
         ORDER BY c.conname`
       expect(foreignKeys).toEqual([
         { conname: 'recipe_lines_product_id_fkey', referencia: 'products' },

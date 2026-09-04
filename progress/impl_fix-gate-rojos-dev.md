@@ -136,3 +136,125 @@ Los 8 casos del seed quedan en verde de forma determinista —ya no dependen de 
 arranque la base local— y los dos guardias de rama de recetas quedan en el baseline con
 motivo y coste declarados; el único rojo restante, `LayoutProps` en `pnpm typecheck`, es
 ambiental por falta de `.next/types` en este worktree.
+
+---
+
+# Encargo 3 — acotar al esquema `public` las consultas al catalogo (4 archivos)
+
+Añadido después del primer commit, a petición del coordinador.
+
+## Qué cambié
+
+Cinco consultas a `pg_constraint`, en cuatro archivos, pasan a unir con `pg_namespace`
+sobre el `relnamespace` de la tabla que declara la FK (`conrelid`) y a filtrar
+`n.nspname = 'public'`:
+
+- `tests/integration/inventario/presentation-uniqueness.int.test.ts` — **dos**: la del
+  `beforeAll` (`products_presentation_id_fkey`) y la de `fkAfter` que relee `confdeltype`.
+- `tests/integration/proveedores/proveedores-constraints.int.test.ts` — el censo de FK de
+  `suppliers` y `supplier_catalog_lines`.
+- `tests/integration/recetas/recetas-constraints.int.test.ts` — el censo de FK de `recipes`
+  y `recipe_lines`.
+- `tests/integration/unidades/unidades-constraints.int.test.ts` — el censo de FK hacia
+  `units`. Aquí se acotan **las dos puntas** (`conrelid` y `confrelid`), no una: el
+  predicado del caso es sobre la tabla REFERENCIADA (`ft.relname = 'units'`), así que
+  limitar sólo el lado que declara la FK dejaría pasar una FK de `public` hacia una tabla
+  `units` de otro esquema. No cambia lo que el caso comprueba; sólo lo dice con precisión.
+
+Ninguna lista esperada de FK se tocó, ni ninguna aserción. El cambio es de **alcance de la
+consulta**, más comentarios que explican por qué el filtro existe (para que nadie lo
+"simplifique" luego).
+
+## Barrido del resto de consultas al catálogo en esos cuatro archivos
+
+Revisadas todas las de `pg_constraint`, `pg_class`, `pg_index`/`pg_indexes`, `pg_tables`,
+`pg_type` e `information_schema` de los cuatro archivos. **Las demás ya estaban acotadas** y
+no hacía falta tocarlas:
+
+- `information_schema.columns` → todas con `table_schema = 'public'` (helpers `columnInfo`,
+  y los casos de `image_path`, `deleted_at`, columnas de `units`).
+- `pg_indexes` y `pg_tables` → todas con `schemaname = 'public'`.
+- `pg_type` de `recetas` (censo de enums) → ya unía con `pg_namespace` y filtraba
+  `n.nspname = 'public'`.
+
+O sea que el agujero estaba exactamente en las cinco consultas a `pg_constraint`, que es la
+única vista del catálogo aquí usada que es **global a la base** y no lleva columna de
+esquema propia.
+
+## Lo que NO pude demostrar, y por qué: la base compartida se movió debajo
+
+Esto es lo importante de esta sección.
+
+**El síntoma que motivó el encargo ya no es reproducible, y los 4 archivos siguen rojos por
+OTRA causa.** Medido en esta misma sesión, con marca de tiempo:
+
+- 07:40 — `pg_namespace` tenía `public` y `public_shadow_qc52`; `SELECT count(*) FROM
+  pg_constraint WHERE conname = 'products_presentation_id_fkey'` devolvía **2**. El
+  diagnóstico del coordinador era exacto.
+- 07:45 — mismas consultas: sólo queda el esquema `public`, `public_shadow_qc52` tiene
+  **0 tablas** y esa cuenta es **1**. `public_shadow_qc52` era la **shadow database** que
+  `prisma migrate dev` crea y destruye durante la sesión de QC-52; su vida es la de esa
+  invocación.
+- Y en esa ventana la sesión paralela **aplicó su migración a la base compartida**:
+  `_prisma_migrations` tiene ahora `20260904123854_split_product_and_supplier_catalog`, que
+  no existe en esta rama. `public.products` perdió `cost`, `min_purchase` y `delivery_time`
+  (quedan `created_at, created_by, deleted_at, id, image_path, name, presentation_id,
+  qty_alert, stock, unit_id, updated_at, updated_by`) y `supplier_catalog_lines` ganó
+  `supplier_catalog_lines_presentation_id_fkey` y `supplier_catalog_lines_unit_id_fkey`.
+
+Consecuencia: cualquier `tx.product.create()` de esos archivos revienta con **SQLSTATE
+42703** (columna inexistente) porque el cliente Prisma de ESTA rama pide columnas que la
+base ya no tiene. El mensaje que se ve —«The column `existe` does not exist in the current
+database»— es engañoso: el servidor habla español (`no existe la columna ...`) y Prisma
+extrae `existe` como si fuera el nombre de la columna. No hay ninguna columna `existe`.
+Los censos de FK ni siquiera llegan a evaluarse: el caso muere antes, creando el producto.
+
+Comprobado que **no es mío**: con `git stash` (es decir, el archivo tal cual está en la
+rama, sin mi cambio) `unidades-constraints` da exactamente los mismos `6 failed | 7 passed`
+y los mismos seis nombres de caso.
+
+No toco las listas esperadas de FK —está prohibido y además sería incorrecto: la lista de
+`supplier_catalog_lines` la actualizará QC-52 cuando su rama entre—. Esos cuatro archivos
+volverán a poder correr cuando esta rama tenga la migración de QC-52, o cuando la base local
+vuelva al esquema de `dev`.
+
+**Verificación del cambio, hecha de la única forma honesta disponible:** ejecuté las cinco
+consultas, en su versión ANTES y DESPUÉS, directamente contra el catálogo, y comparé los
+conjuntos de filas. Con el estado actual de la base (sin esquema espejo) devuelven
+**exactamente lo mismo** — el filtro no altera lo que el test observa cuando hay un solo
+esquema, que es el invariante que hay que preservar—; y con el esquema espejo presente el
+filtro es justo lo que elimina el duplicado. Nada de lo que los casos afirman cambia.
+
+Nota lateral, y es una buena señal: `identity-seed.int.test.ts` (encargo 1) **sigue en verde,
+10/10, contra esta base ya migrada por QC-52**, con `supplier_catalog_lines` estrenando dos
+FK nuevas. Eso es exactamente lo que compra derivar el orden de borrado del catálogo en vez
+de una lista escrita a mano.
+
+## Verificación (acotada)
+
+```
+$ pnpm typecheck
+(sin salida: limpio — con `.next/types` ya copiado, el rojo ambiental de `LayoutProps`
+desapareció, tal como se anticipó)
+
+$ pnpm lint
+✖ 2 problems (0 errors, 2 warnings)   # las mismas 2 advertencias preexistentes de dev
+
+$ pnpm exec vitest run <los 4 archivos>
+ Test Files  4 failed (4)
+      Tests  36 failed | 33 passed (69)
+      # 100% de los fallos son SQLSTATE 42703 por el drift de QC-52 descrito arriba;
+      # idénticos con y sin mi cambio (comprobado con git stash).
+
+$ pnpm exec vitest run tests/integration/identity/identity-seed.int.test.ts
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+```
+
+## Veredicto del encargo 3
+
+Las cinco consultas a `pg_constraint` quedan acotadas a `public` y el resto del catálogo ya
+lo estaba; el arreglo es correcto pero **hoy no se puede demostrar en verde**, porque la
+base compartida ya no es la de `dev`: la sesión de QC-52 aplicó
+`20260904123854_split_product_and_supplier_catalog` sobre `public` y esos cuatro archivos
+fallan ahora por drift de esquema (SQLSTATE 42703), con y sin mi cambio.
