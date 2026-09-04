@@ -441,12 +441,12 @@ Todas las rutas verificadas **contra el arbol de la rama**, no contra el spec. L
 | R5 | El driving toma el actor de `identity.getSessionUser()` | `order-actions.test.ts` |
 | R6 | Los dos autores salen del actor, **nunca** de la entrada | `order-service.test.ts` |
 | R7 | RLS activada **y forzada** tras la migracion | `tests/guards/guard-rls-force.test.ts` |
-| R8 | El alta persiste y devuelve id + correlativo | `order-service.test.ts` + `integration/pedidos/order-crud.int.test.ts` |
+| R8 | El alta persiste y devuelve id + correlativo | `order-service.test.ts` (dominio) + `integration/pedidos/order-crud.int.test.ts` (SQL) + **`order-repository.int.test.ts`** (el **adaptador real**: `toEqual` entre alta y ficha, decimales fuera de escala con `.toFixed(4)`; muere con la mutacion G) |
 | R9 | Nace `PENDIENTE`/`BAJA`; no acepta estado, motivo, correlativo ni autores | `order-input.test.ts` + `order-service.test.ts` |
 | R10 | El ano del correlativo y `created_at`, **del mismo instante UTC** | `order-crud.int.test.ts` (frontera 31/12 20:00 Ecuador) |
 | R11 | La posicion sale de una **secuencia de la base** por ano | `order-sequence.int.test.ts` |
 | R12 | La primera alta del ano **crea** la secuencia y arranca en 1; dos simultaneas acaban las dos | `order-sequence.int.test.ts` (dos `pg.Client` reales) |
-| R13 | No se reutiliza una posicion consumida; se aceptan huecos | `order-sequence.int.test.ts` |
+| R13 | No se reutiliza una posicion consumida; se aceptan huecos | `order-sequence.int.test.ts` (el hueco, en positivo) + **`order-prisma-errors.test.ts`** (la **traduccion** del `23505` del correlativo: `isDuplicateOrderNumber` traduce con el nombre del indice y **relanza** sin el; muere con la mutacion F) |
 | R14 | El numero visible se compone con la **unica** definicion publicada | `domain/order-number.test.ts` + `order-service.test.ts` |
 | R15 | Receta ausente/inexistente/de baja: rechazo **antes** del repositorio | `order-service.test.ts` |
 | R16 | Unidad ausente/inexistente: rechazo antes del repositorio | `order-service.test.ts` |
@@ -467,14 +467,14 @@ Todas las rutas verificadas **contra el arbol de la rama**, no contra el spec. L
 | R31 | Borrado logico, sin restaurar ni listar borrados | `delete-order.test.ts` |
 | R32 | No se borra `ENTREGADO` ni `CANCELADO`: aplicacion **y** base | `delete-order.test.ts` + `order-crud.int.test.ts` (los **seis** casos) |
 | R33 | «No encontrado» en consulta, edicion, cancelacion y borrado | `order-service.test.ts`, `cancel-order.test.ts`, `delete-order.test.ts` |
-| R34 | Tamano de pagina efectivo + total | `list-orders.test.ts` |
-| R35 | Por defecto 10, tope 25 | `list-orders.test.ts` + `tests/unit/pagination.test.ts` (QC-20) |
+| R34 | Tamano de pagina efectivo + total | `list-orders.test.ts` (el dominio conserva la `Page`) + **`order-repository.int.test.ts`** (el `total` se cruza contra `prisma.order.count` con el **mismo `where`**, nunca escrito a mano; muere con la mutacion C) |
+| R35 | Por defecto 10, tope 25, **y ninguna consulta sin limite superior** | **`integration/pedidos/order-repository.int.test.ts`** — el **unico** que lo verifica: siembra `MAX_PAGE_SIZE + 1` vivos y comprueba `pageSize` omitido -> 10, `pageSize` 100 -> **25 elementos y `pageSize` 25 en la `Page`**, con `totalPages` distinto de `ceil(total/100)`. Muere con la mutacion A |
 | R36 | Pagina/tamano no enteros o menores que 1: rechazo **sin leer** | `order-input.test.ts` + `list-orders.test.ts` |
 | R37 | La aritmetica de paginacion **no** se reimplementa | `scope.test.ts` + `list-orders.test.ts` |
-| R38 | Filtros por estado y prioridad, opcionales y combinables | `list-orders.test.ts` |
+| R38 | Filtros por estado y prioridad, opcionales y combinables | `list-orders.test.ts` (dominio) + **`order-repository.int.test.ts`** (los dos sueltos y **combinados** contra la base: el `and`, no el `or`; muere con la mutacion I) |
 | R39 | Sin busqueda por texto ni filtro por numero | `list-orders.test.ts` |
-| R40 | Borrados nunca; cancelados si | `list-orders.test.ts` + `order-service.test.ts` + `order-crud.int.test.ts` |
-| R41 | Prioridad DESC, antiguedad ASC, desempate por correlativo | `list-orders.test.ts` + `order-crud.int.test.ts` (con el enum real) |
+| R40 | Borrados nunca; cancelados si | `list-orders.test.ts` + `order-service.test.ts` + `order-crud.int.test.ts` + **`order-repository.int.test.ts`** (los `deletedAt: null` **del adaptador**, en los dos sentidos: el borrado sale de ficha y listado pero **la fila sigue existiendo**; muere con las mutaciones E y H) |
+| R41 | Prioridad DESC, antiguedad ASC, desempate por correlativo | `list-orders.test.ts` + `order-crud.int.test.ts` (con el enum real) + **`order-repository.int.test.ts`** (el `ORDER BY` **del adaptador**, ocho filas en desorden y dos `CRITICA` con el mismo `created_at` **al milisegundo**; muere con la mutacion D) |
 | R42 | La ficha devuelve los campos del pedido | `order-service.test.ts` (campo a campo) |
 | R43 | Nombres de receta y unidad **por contrato publico** | `order-service.test.ts` + `list-orders.test.ts` + `scope.test.ts` |
 | R44 | La receta de baja **devuelve su nombre igual** | `list-orders.test.ts` + `tests/unit/recetas/recipe-catalog.test.ts` |
@@ -597,3 +597,95 @@ R35 pasa de «citado pero no verificado» a **verificado contra Postgres real** 
 `order-repository.int.test.ts`. R8, R34, R40 y R41 ganan su **capa de adaptador** en el mismo
 archivo, y R13 su unitario en `order-prisma-errors.test.ts`. Las filas de la tabla de T18 siguen
 siendo validas; estos tests **se anaden** a ellas, no las sustituyen.
+
+---
+
+## Tanda 6 — segunda ronda del reviewer (M6, M7). Cerrada 2026-09-04
+
+La segunda ronda dio **OK**: **B1, M1 y M4 cerrados**, 0 bloqueantes. El reviewer no se fio de mis
+dos mutaciones y corrio **nueve** sobre el codigo real —`take: limit`, el `ORDER BY`, los dos
+`deletedAt: null`, `toFixed(4)`, el filtro de prioridad e `isDuplicateOrderNumber`, mas las dos
+mias—: **murieron las nueve**. Quedaban dos menores, los dos mios.
+
+### M6 — la tabla `R<n> -> test` de T18 apuntaba a los tests viejos
+
+**Corregido, y no era cosmetica.** La prosa de la tanda 5 explicaba lo que se anadio, pero **las
+filas de la tabla seguian intactas**: R35 citaba `list-orders.test.ts` + `tests/unit/pagination.test.ts`,
+que es **exactamente la cita que el reviewer rechazo en la primera ronda** por no verificar el
+requisito. La trazabilidad es la **regla 4 de `CLAUDE.md`**, y una tabla que apunta al test
+equivocado **es peor que no tenerla**: el proximo que la lea —QC-35, o el siguiente reviewer— creera
+que esta cubierto y no lo esta.
+
+Actualizadas las **siete** filas (R8, R13, R34, R35, R38, R40, R41). Cada una nombra ahora los
+archivos nuevos, dice **que capa** cubre cada test —dominio, SQL crudo o **adaptador real**— y cita
+**la mutacion que la mata**, para que la fila no sea una promesa sino una comprobacion. R35 pasa de
+citar dos tests que no lo verificaban a nombrar el **unico** que si lo hace.
+
+### M7 — el predicado de R4 solo cazaba el literal entre comillas simples
+
+`expect(codigo).not.toContain("'Administrador'")` no ve `"Administrador"`. El reviewer lo demostro:
+con el literal en comillas dobles en `domain/order-input.ts`, `authorization.test.ts` salia **verde
+15/15** y `pnpm run lint` daba **0 errors** —no hay regla de comillas que lo impida—, asi que la
+puerta estaba abierta de verdad, no en teoria. El ensanchamiento a todo el arbol que cerro M1 estaba
+bien; lo corto era el **predicado**.
+
+Corregido y **verificado por mutacion en las tres formas de escribir el literal en TypeScript**
+(comilla simple, doble y backtick), mas la comprobacion de que el **descuento de comentarios sigue
+vivo** —que es lo que impide un falso rojo cuando el modulo habla del rol en prosa—. Detalle y
+salidas, abajo.
+
+**Por que se muta tambien el caso que debe salir VERDE:** en la tanda 5 mi primera mutacion de M1
+cayo **dentro de un comentario** y salio verde; parecia que el test no mordia, y en realidad estaba
+haciendo lo correcto. Un falso verde y un falso rojo se parecen mucho desde fuera, y la unica forma
+de distinguirlos es mutar las dos direcciones.
+
+**Criterio elegido para M7, y por que no se hizo lo minimo.** El literal escrito a mano
+(`"'Administrador'"`) tenia **dos** agujeros, no uno: (a) solo veia la comilla **simple**, y ninguna
+regla de lint obliga a una comilla concreta —el reviewer lo demostro con `lint` en 0 errores—; y
+(b) si `identity` **renombrara** el rol, el barrido seguiria vigilando un nombre que ya no existe y
+quedaria **verde por vacuidad** — el mismo tipo de falso verde que M1 acababa de cerrar por el lado
+de la lista de archivos. Admitir solo las comillas arregla (a) y deja (b) vivo. Asi que el patron se
+**deriva del valor** `ROLE_ADMINISTRADOR` (escapado, aunque hoy no tenga metacaracteres) **y** admite
+las **tres** formas de escribir una cadena en TypeScript:
+
+    const nombreDelRol = ROLE_ADMINISTRADOR.replace(/[.*+?^${}()|[\]\]/g, '\$&')
+    const literalDelRol = new RegExp('[\'"`]' + nombreDelRol + '[\'"`]')
+
+Se conserva `expect(ROLE_ADMINISTRADOR).toBe('Administrador')` como **ancla**: si el valor cambiara,
+el caso lo **anuncia** en vez de callarse. `soloCodigo()` y el barrido de M1 —`sourcesIn(pedidosDir)`,
+el suelo de 19 archivos y la lista de rutas esperadas— quedan **intactos**.
+
+### Verificacion por mutacion de M7, corrida por el implementer sobre el codigo real
+
+Cuatro mutaciones en `lib/modules/pedidos/domain/order-input.ts`, revertidas todas
+(`git status lib/` -> 0 al final de cada una):
+
+| Mutacion | Esperado | Resultado |
+| --- | --- | --- |
+| `export const MUT = 'Administrador';` | ROJO | **`Tests 1 failed`** |
+| `export const MUT = "Administrador";` — **la que salia verde antes** | ROJO | **`Tests 1 failed`** |
+| ``export const MUT = `Administrador`;`` | ROJO | **`Tests 1 failed`** |
+| El literal **entre las tres comillas** dentro de comentario de linea **y** de bloque | VERDE | **`Tests 15 passed`** |
+
+Las cuatro direcciones importan: las tres primeras demuestran que el agujero esta cerrado; la cuarta,
+que **no se cerro de mas** rompiendo el descuento de comentarios. El `backend_dev` reporto que su
+primer intento de la cuarta fue un **falso verde** —puso el literal en prosa **sin comillas**, que el
+regex no cazaria ni con el descuento roto— y la repitio bien. Es la segunda vez en esta ficha que una
+mutacion mal construida da un verde que no significa nada.
+
+### Salida real de la tanda
+
+    $ pnpm run typecheck  -> limpio, sin salida
+    $ pnpm run lint       -> 0 errors, 2 warnings (preexistentes y ajenos)
+    $ vitest run tests/unit/pedidos tests/unit/recetas tests/unit/recetas-ui tests/integration/pedidos tests/guards
+      -> 51 archivos, 606 tests, 0 fallos
+
+**El codigo de produccion no cambia en esta tanda**: `git status lib/ db/` limpio. M6 es bitacora y
+M7 es un predicado de test.
+
+### Rojo ajeno, para que conste y no se me cuente
+
+`tests/unit/inventario/product-page.test.tsx` es un **flake de `userEvent` bajo carga** de QC-22,
+rojo en `dev` **antes** de esta rama, que no toca inventario ni UI. Por decision del humano esta en
+`tests/baseline-rojos.json` con motivo y fecha (commit `27f23ae` del leader) y tiene ficha propia,
+**QC-58**. No se arregla aqui y no es deuda de QC-34.

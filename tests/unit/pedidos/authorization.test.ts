@@ -266,13 +266,25 @@ describe('QC-34 — requireAdmin es la primera linea de los seis (R2, R3)', () =
       ).toBe(true)
     }
 
+    // EL CRITERIO COMPARA CONTRA EL VALOR, NO CONTRA UN LITERAL REESCRITO AQUI.
+    // Buscar la cadena "'Administrador'" tenia dos agujeros a la vez: (a) solo veia la comilla
+    // SIMPLE, asi que la doble -y el backtick- se colaban, y ninguna regla de lint obliga a una
+    // comilla concreta, luego la puerta estaba abierta de verdad; y (b) si identity renombrara el
+    // rol, este barrido seguiria vigilando un nombre que ya no existe y quedaria verde por
+    // vacuidad. El patron se DERIVA de `ROLE_ADMINISTRADOR` -escapado, aunque hoy no tenga
+    // metacaracteres- y admite las TRES formas de escribir una cadena en TypeScript: comilla
+    // simple, comilla doble y backtick.
+    const nombreDelRol = ROLE_ADMINISTRADOR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const literalDelRol = new RegExp('[\'"`]' + nombreDelRol + '[\'"`]')
+
     for (const file of pedidosSources) {
       // Fuente SIN comentarios: `domain/actor.ts` NOMBRA el literal en su prosa para explicar
       // que «Administradores externos» no debe colarse. Un barrido sobre el texto crudo leeria
-      // esa ADVERTENCIA como la infraccion.
+      // esa ADVERTENCIA como la infraccion. Ese descuento es deliberado y se conserva.
       const codigo = soloCodigo(readFileSync(file, 'utf8'))
-      expect(codigo, file).not.toContain("'Administrador'")
+      expect(codigo, file).not.toMatch(literalDelRol)
     }
+    // Ancla del criterio: si identity cambiara el valor, este caso lo dice en vez de callarse.
     expect(ROLE_ADMINISTRADOR).toBe('Administrador')
   })
 })

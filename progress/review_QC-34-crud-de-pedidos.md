@@ -292,3 +292,132 @@ recrea el tipo y aborta ante datos, el `CHECK` de borrado ampliado en sus seis c
 por año con concurrencia de verdad, las fronteras entre módulos, cero dependencias nuevas y los
 siete retensados— está bien y no hay que rehacerlo. Vuelve al implementer solo por **B1** (y, si se
 quiere de paso, M1 y M4, que son una línea y un párrafo).
+
+---
+
+# Segunda ronda — 2026-09-04
+
+> Alcance: **solo el commit `d891bdd`** («test(QC-34): el adaptador driven bajo test real, y R35
+> verificado»), contra los hallazgos **B1**, **M1** y **M4** de la primera ronda. Lo aprobado
+> arriba no se vuelve a revisar. **M2** (estado en disco) lo asume el leader y ya está hecho en
+> `dev`; **M3** son pasos de cierre; **M5** queda aceptado como límite conocido.
+>
+> **Veredicto: OK** — 0 bloqueantes, 2 menores nuevos (ninguno impide cerrar).
+
+**El código de producción no cambia.** El diff son dos tests nuevos, la ampliación de
+`authorization.test.ts`, la nota de `design.md` y bitácora. Lo comprobé sobre el diff:
+`order-prisma.ts` y el resto de `lib/**` no aparecen. Era lo correcto — B1 era una carencia de
+tests, no un bug.
+
+## Lo que se corrió en esta ronda
+
+| Comando | Resultado |
+| --- | --- |
+| `vitest run tests/integration tests/unit/pedidos tests/unit/recetas tests/unit/recetas-ui tests/guards` | **66 archivos, 788 tests, 0 fallos** (toda la integración incluida) |
+| `vitest run tests/integration/pedidos/order-repository.int.test.ts --reporter=verbose` | 7 casos, contra `QuimiCloude_QC34` real |
+| Higiene tras **nueve** corridas, varias de ellas rojas a mitad por las mutaciones | `orders 0`, `users 0`, `roles 0`, `recipes 0`, `units 4`, `document_types 1`, cero `orders_sequence_%` |
+
+No se repite `./init.sh`: lo corrió el leader. El rojo de
+`tests/unit/inventario/product-page.test.tsx` **no se cuenta** — es de QC-22, ya fallaba en `dev` y
+esta rama no toca inventario ni UI.
+
+## B1 — CERRADO
+
+`tests/integration/pedidos/order-repository.int.test.ts` (7 casos) importa y llama las **seis
+funciones reales** del adaptador desde `@/lib/modules/pedidos/adapters/driven/persistence/order-prisma`
+—`createOrder`, `findAliveOrderById`, `listAliveOrders`, `updateAliveOrder`, `cancelAliveOrder`,
+`softDeleteAliveOrder`—, con el cliente global, sin transacción revertida y sin copiar SQL. Es la
+opción 1 de la review y el patrón de `recipe-crud`/`supplier-crud`. Verificado además:
+
+- **R35, el caso que no existía en ningún sitio**: siembra `MAX_PAGE_SIZE + 1` pedidos vivos —la
+  única forma de distinguir «devuelve el tope» de «devuelve todo lo que hay»—, y comprueba
+  `pageSize` omitido → `DEFAULT_PAGE_SIZE` elementos **y** `pageSize` en la `Page`; `pageSize` 100 →
+  `MAX_PAGE_SIZE` elementos, `pageSize` acotado en la `Page`, `totalPages` **distinto** de
+  `ceil(total/100)`, y `pageSize: 999_999` acotado igual. Los topes se **importan** de
+  `lib/shared/pagination` y se cruzan con `toOffsetLimit(1, 100).limit`, así que un cambio del tope
+  en un solo sitio no deja el test verde por casualidad.
+- **R41** con las ocho filas sembradas **en desorden** y dos `CRITICA` que comparten `created_at`
+  **al milisegundo**, para que el desempate por el correlativo sea lo único que los separe.
+- **R40** en los dos sentidos (el borrado sale de ficha y listado y la fila **sigue existiendo**, con
+  su `deleted_at` y su correlativo; el cancelado vuelve con su motivo).
+- **R8** con decimales que **no** son los de la escala (`10.5` → `10.5000`, `0.125` → `0.1250`), el
+  `now` inyectado releído idéntico, y `expect(ficha).toEqual(alta)` — que es lo que impide que el
+  `RETURNING` y el `select` diverjan.
+- **R34/R38** con el `total` **preguntado a la base con el mismo `where`**, nunca escrito a mano, y
+  los dos filtros sueltos y combinados (el `and`, no el `or`).
+- **R33/R40** en las tres escrituras: `ok` sobre vivo, `not_found` sobre inexistente y sobre ya
+  borrado, y la fila borrada **no** se queda con lo que pedía la escritura rechazada.
+- **R13**: `tests/unit/pedidos/order-prisma-errors.test.ts` (7 casos) cubre las **dos** ramas de
+  `isDuplicateOrderNumber` —el nombre del índice en `meta.message` y en el mensaje crudo, el `23505`
+  sin nombre, otro índice, otro SQLSTATE, el `P2002` de la API tipada y lo que no es error de
+  Prisma—. La rama negativa es la que importa y está.
+
+**La higiene está bien resuelta**, que era el riesgo real de abandonar la transacción: años de
+prueba 288x propios, limpieza por `id` **exacto** en `finally` (nunca un `deleteMany` con filtro
+amplio), `beforeAll`/`afterAll` borrando las secuencias, y **ninguna afirmación global** sobre
+cuántos pedidos hay. Lo comprobé: tras nueve corridas, varias interrumpidas por mutaciones, la base
+quedó en cero.
+
+### Las mutaciones — no me fié: repetí las dos suyas y añadí seis más
+
+Todas sobre el **código real**, revertidas después (`git status lib/` limpio al final de cada una).
+
+| # | Mutación | Resultado |
+| --- | --- | --- |
+| A | `buildPage(…, query.pageSize ?? limit)` (la suya) | **ROJO** — `expected 100 to be 25` |
+| B | `const ROL_MUTADO = 'Administrador'` en `domain/order-input.ts` (la suya) | **ROJO** — `expected … not to contain ''Administrador''` |
+| C | quitar `take: limit` del `findMany` | **ROJO** — `to have a length of 10 but got 26` y `length of 2 but got 6` |
+| D | `{ priority: 'asc' }` en el `ORDER BY` | **ROJO** — el orden esperado no coincide |
+| E | quitar `deletedAt: null` del `where` de `findAliveById` | **ROJO** — `expected { … } to be null` |
+| F | `isDuplicateOrderNumber` traduciendo cualquier `23505` | **ROJO** — 5 casos |
+| G | `fromDecimal` con `toFixed(2)` | **ROJO** — `expected '10.50' to be '10.5000'` |
+| H | quitar `deletedAt: null` del `where` de `updateAlive` | **ROJO** — `expected 'ok' to be 'not_found'` |
+| I | ignorar el filtro de prioridad en el `where` | **ROJO** — `expected 6 to be 4` |
+
+Nueve de nueve muertas. Los tests nuevos vigilan de verdad.
+
+## M1 — CERRADO (con la salvedad M7)
+
+El barrido de R4 pasa de una lista de siete escrita a mano a **todo el árbol del módulo**
+(`sourcesIn(pedidosDir)`), con **suelo de 19 archivos** y, además, una lista de rutas que **tienen
+que aparecer** en el barrido —incluidos el adaptador driven, el driving, el puerto y el barrel, que
+eran justo los que faltaban—. Las dos defensas juntas impiden que la lista se vacíe en silencio por
+un `pedidosDir` mal calculado. La mutación B lo confirma: el literal en `order-input.ts` —archivo
+que antes no se miraba— pone el caso rojo.
+
+## M4 — CERRADO
+
+`design.md > 4.2` gana su nota fechada del 2026-09-04, con la misma forma que la de § 7.4: dice qué
+muestra el diseño, qué escribe el adaptador, por qué parametrizar no abre ningún camino hacia
+`CANCELADO` y qué pasaría con el literal. Correcto además que **no** invente una aprobación del
+leader que no consta en disco y cite en su lugar la calificación del reviewer (regla 6 de
+`CLAUDE.md`).
+
+## Hallazgos que deja esta ronda
+
+### `menor` — M6. La tabla `R<n> → test` de T18 sigue citando los tests viejos
+
+La prosa de la segunda tanda explica bien lo que se añadió, pero **las filas de la tabla no se
+tocaron**: R35 sigue diciendo «`list-orders.test.ts` + `tests/unit/pagination.test.ts` (QC-20)», que
+es exactamente la cita que esta review rechazó por no verificar el requisito; R8, R13, R34, R38, R40
+y R41 tampoco mencionan los dos archivos nuevos. La tabla es lo que `CHECKPOINTS.md > Trazabilidad`
+manda mantener y lo que leerá QC-35 o el próximo reviewer, y hoy apunta al sitio equivocado. **No
+bloquea** —el test existe, lo corrí y lo maté por mutación—, pero hay que actualizar esas siete
+filas para que el mapa diga la verdad.
+
+### `menor` — M7. El criterio de R4 solo caza el literal entre comillas simples
+
+`expect(codigo).not.toContain("'Administrador'")` no ve `"Administrador"`. Lo comprobé: añadiendo
+`const ROL_MUTADO = "Administrador";` a `domain/order-input.ts`, `authorization.test.ts` sale
+**verde** (15/15) y `pnpm run lint` da **0 errors** —no hay regla de comillas que lo impida—, así que
+la puerta está abierta de verdad y no solo en teoría. El ensanchamiento a todo el árbol que pedía M1
+está bien hecho; lo que se queda corto es el predicado. Se cierra comparando contra el valor y no
+contra el literal escrito, o admitiendo las dos comillas.
+
+## Veredicto de la segunda ronda
+
+**OK.** El bloqueante **B1** está cerrado por donde había que cerrarlo —el adaptador driven se
+ejecuta de verdad, R35 tiene por fin su test y las nueve mutaciones lo matan—, y **M1** y **M4**
+también. Quedan **dos menores nuevos** (M6, la tabla de trazabilidad desactualizada; M7, el
+predicado de R4 ciego a las comillas dobles) que **no impiden cerrar la feature**: son una edición
+de tabla y una línea de test. **QC-34 queda aprobada.**
