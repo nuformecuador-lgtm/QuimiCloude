@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { createRecipeSchema, updateRecipeSchema, type RecipeDetail } from '@/lib/modules/recetas';
 import {
   createRecipeAction,
@@ -229,10 +230,10 @@ export function RecipeForm(props: RecipeFormProps) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label htmlFor="recipe-field-description-input">Descripción</Label>
-        <Input
+        <Label htmlFor="recipe-field-description-input">Receta</Label>
+        <Textarea
           id="recipe-field-description-input"
-          type="text"
+          rows={4}
           value={state.description}
           onChange={(event) =>
             setState((previous) => ({ ...previous, description: event.target.value }))
