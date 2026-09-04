@@ -10,6 +10,7 @@ import {
   CATALOG_PAGE_SIZE_OPTIONS,
   CATALOG_PAGE_SIZE_PARAM,
   EMPTY_CELL,
+  UNRESOLVED_CELL,
 } from '@/app/(private)/proveedores/[id]/components';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { CatalogLineView, SupplierView } from '@/lib/modules/proveedores';
@@ -338,10 +339,11 @@ describe('pagina de detalle — datos del proveedor (R19, R46)', () => {
   });
 
   it('las unidades se piden UNA sola vez en el servidor y bajan por props', async () => {
-    // R46 — ningun componente de cliente pide el catalogo de unidades por su cuenta.
+    // R46 — ningun componente de cliente pide el catalogo de unidades por su cuenta, y el
+    // diccionario de la tabla reutiliza las mismas unidades en vez de volver a pedirlas.
     await renderPantalla();
 
-    expect(listUnitsActionMock).toHaveBeenCalledTimes(2);
+    expect(listUnitsActionMock).toHaveBeenCalledTimes(1);
   });
 
   it('la pagina no muestra el identificador ni la autoria del proveedor', async () => {
@@ -515,17 +517,37 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
   });
 
   it('cuando el nombre no se resuelve pinta el marcador y NUNCA el identificador', async () => {
-    // R22 (segunda mitad) — presentacion fuera de la cota del diccionario y linea sin unidad.
+    // R22 (segunda mitad) — presentacion fuera de la cota del diccionario y unidad que el
+    // diccionario no conoce: en los dos casos hay un id que resolver y no se pudo.
     const PRESENTACION_FUERA = 'PRESENTACION-FUERA-DEL-DICCIONARIO';
+    const UNIDAD_FUERA = 'UNIDAD-FUERA-DEL-DICCIONARIO';
     listCatalogLinesActionMock.mockResolvedValue(
-      paginaDeLineas([linea({ presentationId: PRESENTACION_FUERA, unitId: null })]),
+      paginaDeLineas([linea({ presentationId: PRESENTACION_FUERA, unitId: UNIDAD_FUERA })]),
     );
 
     await renderPantalla();
 
     expect(screen.getByTestId('catalog-unresolved-presentationId')).toBeInTheDocument();
     expect(screen.getByTestId('catalog-unresolved-unitId')).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain(PRESENTACION_FUERA);
+    for (const identificador of [PRESENTACION_FUERA, UNIDAD_FUERA]) {
+      expect(document.body.textContent, identificador).not.toContain(identificador);
+    }
+  });
+
+  it('una linea SIN unidad se lee distinto de una unidad que no se pudo resolver', async () => {
+    // R22 + R40 — la unidad es opcional (QC-52), asi que su ausencia es una eleccion valida del
+    // usuario y NO un dato perdido. Las dos celdas se distinguen por testid (R47) y ademas por su
+    // glifo, para que la diferencia tambien exista en pantalla.
+    expect(UNRESOLVED_CELL).not.toBe(EMPTY_CELL);
+
+    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea({ unitId: null })]));
+
+    await renderPantalla();
+
+    const celda = screen.getByTestId('catalog-cell-unitId');
+    expect(celda.textContent).toBe(EMPTY_CELL);
+    // Sin unidad NO es «no se pudo resolver»: el marcador de R22 no aparece.
+    expect(screen.queryByTestId('catalog-unresolved-unitId')).toBeNull();
   });
 
   it('los diccionarios se construyen UNA vez por render, nunca por fila', async () => {
@@ -537,9 +559,9 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     await renderPantalla();
 
     expect(screen.getAllByTestId(testId.fila)).toHaveLength(3);
-    // Una llamada de la pagina (las unidades que bajan por props) y otra del diccionario de la
-    // seccion: dos en total, independientemente del numero de filas.
-    expect(listUnitsActionMock).toHaveBeenCalledTimes(2);
+    // Una sola llamada: la de la pagina. El diccionario de unidades de la seccion se construye
+    // con esas mismas unidades, sin consulta propia, y no depende del numero de filas.
+    expect(listUnitsActionMock).toHaveBeenCalledTimes(1);
     expect(listPresentationsActionMock).toHaveBeenCalledTimes(1);
   });
 

@@ -52,11 +52,13 @@ export const EMPTY_CELL = '—';
 
 /**
  * Marca de «no resuelto» de presentacion y unidad (R22). Es **distinta** de `EMPTY_CELL` en
- * significado -«no se pudo resolver el nombre» no es lo mismo que «este dato no existe»- y la
- * tabla la pinta con su propio `data-testid`, de modo que el test la localiza sin depender del
- * glifo.
+ * significado -«no se pudo resolver el nombre» no es lo mismo que «este dato no existe»- y por eso
+ * es tambien un glifo distinto: con la misma raya para los dos casos, una linea sin unidad -que
+ * R40 permite expresamente- y un nombre que el diccionario no pudo resolver se leian igual en
+ * pantalla. Ademas la tabla la pinta con su propio `data-testid` y su `aria-label`, de modo que el
+ * test la localiza sin depender del glifo (R47).
  */
-export const UNRESOLVED_CELL = '—';
+export const UNRESOLVED_CELL = '(?)';
 
 /**
  * Fecha en `YYYY-MM-DD` y en UTC, **no con `toLocaleDateString`**: el Server Component y el
@@ -98,7 +100,14 @@ export const CATALOG_COLUMNS: readonly CatalogColumn[] = [
     label: 'Unidad',
     testId: 'catalog-column-unitId',
     align: 'start',
-    value: (line, directories) => resolveUnitLabel(directories, line.unitId),
+    /*
+      Dos ausencias que NO significan lo mismo (R22, R40): una linea **sin unidad** es un caso
+      valido del contrato y pinta la marca de «sin dato»; un `unitId` que el diccionario no
+      resuelve devuelve `null` y pinta el marcador de «no resuelto», que la tabla distingue con su
+      propio testid. Confundirlas hacia pasar por dato perdido lo que era una eleccion del usuario.
+    */
+    value: (line, directories) =>
+      line.unitId === null ? EMPTY_CELL : resolveUnitLabel(directories, line.unitId),
   },
   {
     key: 'cost',
