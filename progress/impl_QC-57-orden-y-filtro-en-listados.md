@@ -200,3 +200,119 @@ Los tres campos ordenables de `recetas` (`name`, `createdAt`, `updatedAt`) **no 
 Una edición hecha con python reescribió archivos enteros convirtiendo **CRLF → LF**. Importa porque **varias guardias leen el fuente en crudo** y no despegan comentarios en CRLF: una conversión silenciosa las rompe. El agente restauró `lib/composition/index.ts` (diff real: 37 inserciones / 5 borrados, con los bloques de los otros módulos intactos), pero **se le escapó `tests/unit/proveedores/module-contract.test.ts`**, que quedó con un diff de **1192 líneas** de puro ruido.
 
 **Detectado y corregido aquí** comparando `file` de cada archivo del diff contra su versión en `HEAD`. Tras restaurar CRLF, el cambio real de ese archivo son **7 líneas**: `list-query-sql.ts` añadido a la lista **exacta** de `adapters/driven/`. Ningún otro archivo quedó afectado.
+
+## Grupo 5 — llamantes (T21, T22)
+
+**Ni una línea de código ejecutable cambió en `app/`.** El contrato nuevo acepta tal cual lo que las pantallas ya emiten —`{page, pageSize}` y `{page, pageSize, search}`— porque `sort`, `filters` y `search` tienen defecto en el esquema. Eso es lo que hace que **T21 no sea una migración de llamantes sino una de documentación**, y que el selector de unidad del formulario de recetas siga verde **sin tocarlo**, que es el criterio de hecho de T12.
+
+Lo que sí había que arreglar, y no es cosmético: **once archivos afirmaban por escrito cosas falsas**. En este repo los comentarios de cabecera son contrato documentado; varios mandaban al lector a buscar `productQuerySchema` y `listOrdersSchema`, **símbolos que esta ficha borró**.
+
+Lo más importante que ahora queda escrito: **la búsqueda de productos ignora ACENTOS**. Antes era `contains` + `mode: 'insensitive'` (solo mayúsculas); ahora compara contra `name_normalized` servida por el GIN de trigramas, así que **buscar «solucion» encuentra «Solución Buffer pH 7», que antes NO encontraba**. Es una mejora **visible para el usuario**, y justo la clase de cambio que si no se documenta nadie sabe que puede usar.
+
+En `supplier-list-toolbar.tsx` el porqué cambió de raíz: la decisión de no poner un buscador de cliente **sigue siendo correcta**, pero ya no porque el dominio no sepa buscar —ahora sabe—, sino porque **esa pantalla todavía no emite el contrato**, que es de QC-44/QC-45. Se reescribió con esa honestidad en vez de dejar una justificación que había dejado de ser cierta.
+
+**T22 no tenía llamantes de producción que adaptar**: el listado de pedidos **no tiene pantalla** (QC-35 sigue `pending`), así que sus únicos consumidores eran tests, ya adaptados con el cambio de contrato.
+
+## Dos hallazgos para el reviewer (ninguno se resolvió aquí, y es deliberado)
+
+1. **`pageQuerySchema` quedó HUÉRFANO en producción.** Grep exhaustivo sobre `lib/` y `app/`: ningún archivo de producción lo importa ni lo llama. Solo sobrevive definido en cuatro `domain/page.ts`, reexportado por sus barrels, y usado por cuatro tests de contrato. Su forma de `page`/`pageSize` está replicada literalmente dentro de `createListQuerySchema()`, así que **borrarlo no perdería ninguna garantía** — pero eso es una decisión de contrato que ninguna task de esta ficha pide, y **retirar un símbolo público del barrel de cuatro módulos no se hace de paso**.
+2. **`createListQuerySchema()` usa `z.strictObject`**, así que una clave **de primer nivel** desconocida **sí** hace fallar la consulta con `ValidationError`. **No contradice R5**: la tolerancia de R5 es para *campos no declarados* dentro de `sort` y `filters`, que es donde vive la lista blanca, y la forma del contrato es fija por R1 y R3. Se anota porque la distinción es fina y el reviewer la va a mirar: `{page: 1, foo: 2}` se rechaza; `{page: 1, sort: {columnId: 'foo', direction: 'asc'}}` se **omite y se registra**.
+
+## Mapa de trazabilidad `R1..R35 -> test` (`CHECKPOINTS.md > Trazabilidad`)
+
+Abreviaturas: **LQ** `tests/unit/inventario/list-query.test.ts` · **LB** `tests/unit/shared/listas-blancas-listados.test.ts` · **GC** `tests/guards/guard-contrato-listados.test.ts` · **LOG** `tests/unit/shared/list-query-log.test.ts` · **UI-inv** `tests/unit/inventario/list-use-cases.test.ts` · **UI-prov** `tests/unit/proveedores/list-use-cases.test.ts` · **LR** `tests/unit/recetas/list-recipes.test.ts` · **LU** `tests/unit/unidades/list-units-query.test.ts` · **LO** `tests/unit/pedidos/list-orders.test.ts` · **MIG** `tests/unit/inventario/schema/list-query-indexes-migration.test.ts` · **INT-x** los `tests/integration/**/list-query-*.int.test.ts` de cada listado.
+
+| R | Qué exige | Test que lo cierra |
+| --- | --- | --- |
+| R1 | un solo contrato, misma forma | LQ acepta una consulta completa y devuelve la misma forma para cualquier listado / sin nada aplica los defectos · GC aplica los mismos defectos en los cinco |
+| R2 | los SIETE listados lo aceptan | LB son SIETE, una por listado de R2 + los casos de uso de los siete (UI-inv x2, UI-prov x2, LR, LU, LO) |
+| R3 | campo por nombre de la base; añadir uno no cambia la forma | LQ deja intacta una consulta que solo pide campos declarados / anadir un campo consultable no cambia la forma de la consulta |
+| R4 | cada listado declara su lista blanca | LB cada una declara al menos un campo ordenable y ninguno repetido / son SIETE |
+| R5 | campo no declarado: se omite, NO falla | LQ omite el orden por un campo no declarado y NO falla / omite un filtro por un campo no declarado · GC · LO un estado o una prioridad fuera del conjunto cerrado se OMITEN y se anotan |
+| R6 | se anota en el log del servidor | LOG (3 casos) · UI-inv, UI-prov, LR, LU, LO el log recibe NOMBRES de campo y nunca el valor buscado ni el del filtro |
+| R7 | `deletedAt` nunca consultable; nada borrado sale | LQ omite deletedAt como orden y como filtro / omite deletedAt AUNQUE una lista blanca lo declarase · LB ninguna declara deletedAt ni nameNormalized · GC · INT de products, recipes, suppliers, catalog-lines y orders una fila borrada que cumple el filtro sigue sin aparecer y no cuenta en el total |
+| R8 | forma de filtro equivocada: se omite | LQ omite un filtro cuya FORMA no es la que el campo declara / un campo ordenable no se vuelve filtrable · GC · UI-inv, UI-prov, LR, LU, LO un filtro con la forma equivocada se omite y se anota, sin fallar |
+| R9 | como mucho UN campo de orden | LQ rechaza una LISTA de ordenes / rechaza una direccion que no sea asc o desc · GC rechaza en los cinco: una LISTA de ordenes |
+| R10 | orden aplicado + desempate estable por id | INT-products cuatro homonimos con el mismo valor de orden no se repiten ni se pierden entre paginas, y sus gemelos en presentations, recipes, units, suppliers, catalog-lines y orders · INT-orders orderNumber ordena por el par (ano, correlativo) |
+| R11 | sin orden, el orden de HOY | UI-inv, LR, LU sin orden la consulta llega con sort nulo · INT de los 7 sin orden explicito el orden es el de HOY (catálogo `created_at ASC` y NO `name ASC`; pedidos `priority DESC` primero) |
+| R12 | exactamente CUATRO formas de filtro | LQ acepta las CUATRO formas de filtro y ninguna mas / rechaza un QUINTO kind · LB todo campo filtrable declara una de las cuatro formas · GC |
+| R13 | todo sobre el conjunto completo, ANTES de paginar | INT de los 7: la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves |
+| R14 | `total` y `totalPages` describen lo ya filtrado | INT de los 7: el total describe el conjunto YA FILTRADO |
+| R15 | varios filtros a la vez, en conjunción | INT-products dos filtros a la vez: una fila sale solo si cumple LOS DOS · INT-catalog-lines presentacion, rango de costo y rango de entrega en conjuncion · INT-orders estado, prioridad y los dos a la vez · INT-recipes rango de creacion Y rango de edicion |
+| R16 | búsqueda: una propiedad, contra `name` | INT de products, presentations, recipes, suppliers, catalog-lines y units: la busqueda es por SUBCADENA · UI-inv la busqueda del contrato llega al repositorio |
+| R17 | pedidos no busca: se omite y se registra | LO la busqueda se OMITE y se registra, y la lista vuelve igual · `tests/unit/pedidos/order-input.test.ts` la busqueda por texto se OMITE y se anota · LB pedidos es el UNICO listado que no busca · GC · INT-orders la busqueda NO recorta nada |
+| R18 | ignora acentos y mayúsculas | INT-products buscar «solucion» encuentra «Solución Buffer pH 7», y sus gemelos en presentations, recipes, suppliers, catalog-lines y units |
+| R19 | misma forma normalizada que la unicidad | `tests/unit/inventario/product-name.test.ts` (8 casos) · `list-query-indexes.int.test.ts` el adaptador escribe name_normalized en toda alta y edicion · los INT de búsqueda, que comparan contra la MISMA función del dominio |
+| R20 | búsqueda vacía o de espacios, sin búsqueda | LQ trata una busqueda de solo espacios como ausencia de busqueda / corta una busqueda absurdamente larga · GC · UI-inv, UI-prov, LR, LU |
+| R21 | índice para todo campo ordenable o buscable | MIG crea los 35 indices declarados / no crea ningun indice de mas / los seis de busqueda son GIN · `list-query-indexes.int.test.ts` los 35 indices nuevos existen / la extension pg_trgm esta instalada / los indices que ya existian siguen todos ahi |
+| R22 | migración versionada con su `down.sql` | MIG down.sql revierte exactamente el up (4 casos, incluido NO hace DROP EXTENSION y lo dice por escrito) + el ciclo real `db:migrate` → `db:rollback` → `migrate status` → `db:migrate` |
+| R23 | columna normalizada poblada para las filas YA existentes | MIG la anade, la rellena y solo despues la pone NOT NULL · `list-query-indexes.int.test.ts` el backfill dejo la columna igual a lo que devuelve normalizeProductName / products.name_normalized existe, es texto y es NOT NULL |
+| R24 | productos pierde su búsqueda propia; el selector sigue encontrando | UI-inv el selector de ingredientes encuentra por nombre A TRAVES DEL CONTRATO · `tests/unit/recetas-ui/recipe-form.test.tsx` (heredado, verde) · el borrado de `productQuerySchema` lo fija el typecheck |
+| R25 | pedidos pierde estado y prioridad propios; CANCELADO se consulta | LO estado y prioridad son filtros select, opcionales y COMBINABLES · `order-view.test.ts` los filtros del listado son solo estado, prioridad y fecha · INT-orders un pedido CANCELADO SI se consulta; uno BORRADO no sale nunca |
+| R26 | lo que hoy verifican productos y pedidos sigue verificándose | la suite heredada entera, adaptada y verde: `product-crud.int`, `product-service`, `presentation-service`, `order-repository.int`, `order-input`, `order-view` y los `authorization` de los cinco módulos |
+| R27 | unidades acepta orden, filtro y búsqueda | LU el orden, el filtro y la busqueda se aplican TAMBIEN en el modo catalogo / con page devuelve una Page de UnitRef · INT-units |
+| R28 | unidades sin parámetros, catálogo entero sin paginar | LU SIN PARAMETROS devuelve el catalogo entero / con una consulta SIN page ni pageSize sigue siendo el catalogo entero · `unit-actions.test.ts` (heredado) |
+| R29 | 10 por defecto, 25 de tope, ACOTANDO | INT de los 7: pedir 100 por pagina se ACOTA a 25, no se rechaza · LU con pageSize a solas tambien devuelve una pagina |
+| R30 | zod DENTRO del caso de uso | UI-inv, UI-prov, LR, LU, LO la entrada que no cumple la FORMA se rechaza antes de tocar el repositorio · todo el bloque del esquema del contrato de lista en LQ |
+| R31 | el esquema vive en su módulo; el dominio no depende de fuera | GC ninguno de los cinco importa lib/shared, Prisma, next ni components / los cinco importan zod y nada mas / dispara con un fuente sintetico que importa lo prohibido / no se ciega por un comentario que nombre una ruta prohibida |
+| R32 | los cinco esquemas aceptan y rechazan LO MISMO | GC, bloques 1 y 2 completos (19 casos), y **se comprobó que falla** al divergir uno |
+| R33 | autorización en el caso de uso, sin cambiar quién ve qué | los `authorization.test.ts` de los cinco módulos + UI-inv, UI-prov, LR, LU, LO autorizacion antes que todo |
+| R34 | sin autorización falla SIN tocar el repositorio | UI-inv, UI-prov, LR, LU, LO rechaza al Operador y al actor ausente, con consulta valida Y con consulta con campos no declarados, sin tocar el repositorio — **contando invocaciones del mock**, y afirmando además que **el log tampoco se llama** |
+| R35 | unitarios e integración, y NINGÚN E2E nuevo | **Verificado, no afirmado**: `git diff --name-status origin/dev...HEAD -- e2e/` devuelve **una sola `M`** (`e2e/recetas.spec.ts`, adaptado a la columna NOT NULL) y **ninguna `A`**. Cero E2E añadidos. **Motivo** (`design.md > 12`, decisión cerrada 19): es backend sin pantalla, no hay camino de usuario que recorrer; la cobertura E2E se difiere a las fichas que consuman el contrato (QC-56, QC-35, QC-39, QC-45). **Precedente: QC-20, QC-25 y QC-34**, que cerraron con el mismo criterio |
+
+**Ningún `R<n>` de R1 a R35 queda sin test.**
+
+### El test en negativo que `design.md > 12` exige, y dónde está
+
+«Pedir orden por `deletedAt` y comprobar **las tres cosas a la vez** — que responde, que el orden aplicado es el de por defecto, y que el log recibió el campo. Comprobar solo la primera pasa en verde con un `catch` vacío.»
+
+Está en los **cinco** módulos, con ese nombre: UI-inv, UI-prov, LR, LU y LO, caso `ordenar por deletedAt: no falla, aplica el orden por defecto Y el log recibe el campo`.
+
+## T23 — el gate completo, y el único punto que NO cierro yo
+
+`./init.sh` **completo**, última ejecución:
+
+```
+✓ regla max-2-por-zona respetada (in_progress=1)
+✓ specs presentes para features sdd en vuelo
+-> pnpm run typecheck   → tsc --noEmit, sin salida (verde)
+-> pnpm run lint        → eslint, sin salida (verde)
+
+ Test Files  3 failed | 195 passed (198)
+      Tests  4 failed | 2293 passed | 4 skipped (2301)
+
+hay 1 archivo(s) de test en rojo que NO estan en el baseline:
+  tests/unit/proveedores-ui/catalog-line-sheet.test.tsx
+✗ hay rojos NUEVOS respecto del baseline
+```
+
+De partida eran **180 archivos / 2058 tests**; ahora **198 / 2301**: la ficha añade **18 archivos de test y 243 tests**.
+
+### Los 3 archivos rojos, uno por uno
+
+**Dos están en `tests/baseline-rojos.json` y el gate los tolera** — `tests/unit/recetas/module-contract.test.ts` y `tests/unit/recetas-ui/recipe-route-contract.test.ts`. Son guardias de alcance de QC-26/QC-34 que afirman «esta feature no toca `lib/modules/recetas`». QC-57 **sí** lo toca, legítimamente y por spec (recetas es uno de los siete listados). Es el mismo patrón estructural de la guardia de proveedores: una guardia que pregunta por el diff de la rama se rompe con **cualquier** ficha posterior que toque su módulo. **No se tocaron**: son de otras fichas y decidir si se actualizan o se retiran del baseline no es de esta ficha.
+
+**El tercero es el que deja el gate en rojo, y NO es una regresión de esta ficha:**
+`tests/unit/proveedores-ui/catalog-line-sheet.test.tsx`, `Error: Test timed out in 5000ms`.
+
+**Diagnóstico medido, no supuesto** — cuatro observaciones:
+
+1. **En aislado pasa**: `Test Files 1 passed / Tests 20 passed`, pero tarda **30,8 s** para 20 tests.
+2. **El rojo se MUEVE de archivo entre corridas**: una vez fue `catalog-line-sheet`, otra `catalog-line-sheet` + `supplier-page`. Es la firma de un flake de saturación, no de un fallo determinista.
+3. **Corriendo SOLO el proyecto `ui`** (36 archivos, 439 tests, **sin un solo test de integración de esta ficha**) **sigue fallando** uno por timeout. Es decir: **la causa no es la carga que añade QC-57**, es que la suite jsdom va justa contra el timeout por defecto de 5 s de Vitest.
+4. **Con `--testTimeout=20000` todo se pone verde**: el proyecto `ui` solo → `36 passed / 439 passed`; y la suite entera → solo quedan los **2 rojos de baseline**.
+
+**Esta ficha no toca `app/` ni `components/` de proveedores, ni una línea de código ejecutable de UI.**
+
+### Lo que hace falta decidir, y por qué NO lo he hecho yo
+
+La corrección obvia es **declarar un `testTimeout` explícito para el proyecto `ui` en `vitest.config.mts`** (hoy no hay ninguno: se hereda el defecto implícito de 5 s de Vitest). **No es relajar ningún aserto** —no cambia ni una afirmación—, es poner un valor explícito donde había uno implícito y demasiado justo para jsdom + `userEvent`.
+
+**No lo he aplicado por cuenta propia** porque `vitest.config.mts` es **el gate de TODAS las features**, no solo de esta: cambiarlo altera el veredicto de las fichas que corren en paralelo, y eso es una decisión del leader y del humano, no de un implementer cerrando su tanda.
+
+**Las dos salidas, para quien decida:**
+
+- **Recomendada:** `testTimeout: 20000` en el proyecto `ui` de `vitest.config.mts`, con el comentario de por qué. Una línea, y el gate vuelve a responder lo único que debe responder.
+- **Descartable pero posible:** meter los archivos en `tests/baseline-rojos.json`. **Es peor**, y `docs/verification.md` lo dice casi con estas palabras: el baseline es «el sitio donde cualquiera mete lo que le estorba», y además **no funcionaría** — el flake **cambia de archivo**, así que habría que listar toda la carpeta de UI y el gate dejaría de morder ahí para siempre.
+
+**Nada de esta ficha depende de esa decisión**: typecheck, lint, las 15 guardias, los 2301 tests menos el flake, y el ciclo real de migración y rollback están verdes.
