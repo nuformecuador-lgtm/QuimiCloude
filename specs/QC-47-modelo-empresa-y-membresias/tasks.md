@@ -62,7 +62,7 @@
 
 ## Bloque C — migración
 
-- [ ] **T7 · Generar y limpiar el `migration.sql`.**
+- [x] **T7 · Generar y limpiar el `migration.sql`.**
       Archivos: `db/migrations/<ts>_companies_and_memberships/migration.sql` (nuevo).
       `pnpm run db:migrate:create`, y después **a mano**: borrar todos los `DROP` de drift que Prisma
       emite sobre lo que no conoce —los tres índices únicos funcionales de `users`, las FK
@@ -72,7 +72,7 @@
       `users_username_unique`, `users_document_unique` ni sobre ninguna FK/CHECK/RLS ajena (R27).
       **Depende de**: T5.
 
-- [ ] **T8 · Completar el UP a mano.**
+- [x] **T8 · Completar el UP a mano.**
       Archivos: el mismo `migration.sql`.
       Añade, en el orden de `design.md > 4.1`: `CREATE EXTENSION IF NOT EXISTS pgcrypto`, el índice
       único **parcial y funcional** `companies_name_unique`, el bloque `DO $$` del backfill
@@ -82,7 +82,7 @@
       con exactamente una pertenencia y su rol de antes (R24).
       **Depende de**: T2 (el literal del backfill), T7.
 
-- [ ] **T9 · Escribir el `down.sql`.**
+- [x] **T9 · Escribir el `down.sql`.**
       Archivos: `db/migrations/<ts>_companies_and_memberships/down.sql` (nuevo).
       Los seis pasos de `design.md > 4.3`: guardia de reversión, `ADD COLUMN` anulable, `UPDATE`
       desde la pertenencia, `SET NOT NULL`, recreación **a mano** de `users_role_id_fkey` y
@@ -94,7 +94,7 @@
       cambia nada.
       **Depende de**: T8.
 
-- [ ] **T10 · Test de migración.**
+- [x] **T10 · Test de migración.**
       Archivos: `tests/unit/identity/schema/companies-migration.test.ts` (nuevo).
       Sobre el texto de los dos SQL: el backfill va antes de los `FORCE ROW LEVEL SECURITY`; las dos
       tablas tienen `ENABLE` **y** `FORCE`; el `down.sql` recrea la FK y el índice de `role_id` con
