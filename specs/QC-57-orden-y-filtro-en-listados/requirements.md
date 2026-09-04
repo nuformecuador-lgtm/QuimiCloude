@@ -19,7 +19,180 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> «Listado» significa cualquiera de los **siete** de R2. «Campo consultable» significa un campo
+> presente en la lista blanca que ese listado declara (R4). Los requisitos hablan del QUÉ: dónde
+> vive cada pieza y con qué forma se escribe es `design.md`.
+
+### El contrato
+
+**R1.** El sistema DEBE ofrecer **un solo** contrato de consulta de lista, con la **misma forma**
+para los siete listados, compuesto por: página, tamaño de página, un **orden** que es un objeto
+`{campo, dirección}` **o nulo**, un conjunto de **filtros** indexado por nombre de campo, y una
+**búsqueda**.
+
+**R2.** El sistema DEBE aceptar ese contrato en los **SIETE** listados: productos,
+presentaciones, recetas, proveedores, catálogo de proveedor, unidades y pedidos.
+
+**R3.** El sistema DEBE identificar cada campo consultable por el **nombre del campo de la base**,
+en inglés, y CUANDO un listado añada un campo consultable nuevo, la **forma** del contrato NO DEBE
+cambiar: no aparece ningún parámetro nuevo ni ninguna propiedad nueva.
+
+**R4.** Cada uno de los siete listados DEBE declarar explícitamente su **lista blanca**: qué campos
+suyos son ordenables, qué campos son filtrables y con qué forma de filtro cada uno.
+
+**R5.** SI la consulta pide ordenar o filtrar por un campo que **no** está en la lista blanca de
+ese listado, ENTONCES el sistema DEBE **omitir esa parte** y devolver la lista como si no se
+hubiera pedido, y la consulta **NO DEBE** fallar.
+
+**R6.** CUANDO el sistema omite una parte de la consulta por no estar declarada, DEBE registrar en
+el **log del servidor** una advertencia que nombre el listado y el campo omitido.
+
+**R7.** `deletedAt` (`deleted_at`) NO DEBE aparecer en la lista blanca de **ningún** listado; SI la
+consulta lo pide como orden o como filtro, ENTONCES se omite y se registra como cualquier otro
+campo no declarado (R5, R6), y ninguna fila con borrado lógico DEBE salir del listado en ningún
+caso.
+
+**R8.** SI la consulta trae para un campo declarado una **forma de filtro distinta** de la que ese
+campo declara (por ejemplo un rango numérico sobre un campo de texto), ENTONCES el sistema DEBE
+omitir ese filtro y registrarlo (R6), sin fallar.
+
+### Orden
+
+**R9.** El sistema DEBE ordenar por **como mucho un** campo. El contrato NO DEBE admitir una lista
+de órdenes.
+
+**R10.** CUANDO la consulta trae un orden por un campo ordenable declarado, el sistema DEBE
+aplicarlo en la **dirección** pedida (`asc` o `desc`) sobre el conjunto completo, con un desempate
+estable por identificador para que ninguna fila se repita ni se pierda entre páginas.
+
+**R11.** SI la consulta no trae orden (nulo), ENTONCES el listado DEBE devolver el **mismo orden
+por defecto que tiene hoy**.
+
+### Filtros
+
+**R12.** El sistema DEBE entender exactamente **cuatro** formas de filtro —texto, rango numérico,
+selección de un conjunto de valores y rango de fechas— y **ninguna más**.
+
+**R13.** El sistema DEBE aplicar orden, filtros y búsqueda sobre el **conjunto completo** de filas
+del listado y **antes** de paginar; NUNCA sobre la página ya obtenida.
+
+**R14.** CUANDO se aplican filtros o búsqueda, el **total** y el **número de páginas** devueltos
+DEBEN describir el conjunto **ya filtrado**, no el catálogo entero.
+
+**R15.** CUANDO la consulta trae más de un filtro, el sistema DEBE aplicarlos **todos a la vez**:
+una fila sale solo si los cumple todos.
+
+### Búsqueda
+
+**R16.** La búsqueda DEBE ser **una sola propiedad** del contrato y DEBE compararse contra el campo
+`name` del listado.
+
+**R17.** DONDE el listado **no tiene** campo `name` —pedidos—, la búsqueda DEBE **omitirse** y
+registrarse (R6), y la consulta DEBE devolver la lista como si no se hubiera buscado.
+
+**R18.** La búsqueda DEBE ignorar **acentos y mayúsculas**: buscar `solucion` DEBE encontrar
+`Solución Buffer pH 7`.
+
+**R19.** La búsqueda DEBE usar la **misma forma normalizada** con la que ese módulo ya compara
+nombres para la unicidad; NO DEBE existir una segunda definición de «mismo nombre» dentro de un
+módulo.
+
+**R20.** SI la búsqueda llega vacía o compuesta solo de espacios, ENTONCES el sistema DEBE tratarla
+como ausencia de búsqueda y devolver la lista sin filtrar por texto.
+
+### Base de datos
+
+**R21.** Al terminar esta feature, **todo** campo que algún listado declare ordenable o buscable
+DEBE tener **índice** en la base.
+
+**R22.** La feature DEBE traer una migración versionada con su **`down.sql`**, que revierte
+exactamente lo que hace su `migration.sql`.
+
+**R23.** La columna normalizada de la búsqueda DEBE existir en toda tabla buscable y DEBE quedar
+**poblada para las filas que ya existen**, no solo para las que se escriban después.
+
+### Lo que ya tenía forma propia
+
+**R24.** El listado de **productos** DEBE dejar de exponer su parámetro de búsqueda propio y
+aceptar la búsqueda del contrato; el **selector de ingredientes** del formulario de recetas DEBE
+seguir encontrando productos por nombre, ahora a través del contrato.
+
+**R25.** El listado de **pedidos** DEBE dejar de exponer sus parámetros propios de estado y
+prioridad y aceptarlos como **filtros de selección** del contrato, conservando que un pedido
+`CANCELADO` sí se consulta.
+
+**R26.** Los comportamientos que hoy verifican los tests de productos y de pedidos DEBEN seguir
+verificándose después de la migración.
+
+### Unidades
+
+**R27.** El listado de **unidades** DEBE aceptar orden, filtro y búsqueda como los demás.
+
+**R28.** SI la consulta de unidades llega **sin parámetros**, ENTONCES el sistema DEBE devolver el
+**catálogo entero**, sin paginar.
+
+### Paginación, validación y permisos
+
+**R29.** DONDE la consulta pide paginación, el sistema DEBE aplicar **10** por defecto y **acotar**
+a **25** como máximo, sin rechazar la consulta por pedir más.
+
+**R30.** El sistema DEBE validar la entrada del contrato **con zod y dentro del caso de uso**,
+antes de tocar el repositorio.
+
+**R31.** Cada listado DEBE declarar su esquema de consulta **dentro de su propio módulo**; el
+dominio NO DEBE depender de ningún archivo compartido fuera de su módulo para hacerlo.
+
+**R32.** Ante la **misma** entrada canónica, los esquemas de consulta de todos los módulos DEBEN
+aceptar y rechazar **lo mismo**: la forma del contrato es una sola aunque el archivo sea seis.
+
+**R33.** Cada uno de los siete listados DEBE seguir validando la **autorización en su caso de uso**
+antes de consultar el repositorio, y esta feature NO DEBE cambiar quién puede ver qué.
+
+**R34.** SI el actor no está autorizado, ENTONCES el listado DEBE fallar **sin tocar el
+repositorio**, tanto con una consulta válida como con una que traiga campos no declarados.
+
+### Verificación
+
+**R35.** La feature DEBE quedar cubierta por tests unitarios y de integración, y **NO DEBE** añadir
+pruebas E2E: no hay camino de usuario que recorrer, y la cobertura E2E se difiere a las fichas de
+pantalla que consuman el contrato, con el motivo escrito en `design.md`.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con los
+requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Contrato **genérico y abierto**: se manda el nombre del campo de la base | R1, R3 |
+| 2 | Se aplica a las **SIETE** listas | R2 |
+| 3 | Una sola propiedad de búsqueda, contra `name`; en pedidos se omite | R16, R17 |
+| 4 | Orden por **una sola** columna, `campo` + `asc`/`desc` | R1, R9, R10, R11 |
+| 5 | **Cuatro** formas de filtro, sobre el conjunto completo | R12, R13, R14, R15 |
+| 6 | **Lista blanca por módulo**; lo no declarado no existe | R4, R5, R8 |
+| 7 | Campo inválido: se omite, no falla, **y se anota en el log** | R5, R6, R8, R17 |
+| 8 | `deleted_at` **nunca** consultable | R7 |
+| 9 | La búsqueda ignora **acentos y mayúsculas**, alineada con la unicidad | R18, R19, R23 |
+| 10 | Los índices entran **aquí**, con migración y su `down.sql` | R21, R22, R23 |
+| 11 | Productos y pedidos **se migran**; sus tests siguen pasando | R11, R20, R24, R25, R26 |
+| 12 | Unidades entra, con la **página opcional** | R27, R28 |
+| 13 | `pageQuerySchema` **no** se unifica: se comparte la forma, no el archivo | R1, R31, R32 |
+| 14 | QC-44 ya no choca (cerrada el 2026-09-04) | R2 (proveedores y su catálogo entran como los demás; la precondición se verifica en `tasks.md > T0`) |
+| 15 | Autorización **en el service**, con su test; no cambia quién ve qué | R33, R34 |
+| 16 | Paginación **10 / 25**, acotando en vez de rechazar | R29 |
+| 17 | Identificadores de la base **en inglés** | R3 |
+| 18 | Validación con **zod, dentro del caso de uso** | R30 |
+| 19 | **Sin E2E**, diferido con motivo | R35 |
+
+Requisitos que no salen de una fila de la tabla y de dónde salen: **R10** (el desempate estable) y
+**R11** (el orden por defecto de hoy) del comportamiento ya escrito en los ocho adaptadores —
+`orderBy: [{ name: 'asc' }, { id: 'asc' }]` y su comentario en `product-prisma.ts`, que explica que
+el desempate evita que dos homónimos se intercambien entre páginas—; **R14** y **R15** del bloque
+de Alcance («todo se aplica sobre el conjunto completo») más el precedente literal de
+`listOrdersSchema`, cuyos dos filtros ya son «opcionales y combinables»; **R20** del
+`productQuerySchema` de hoy, que ya trata una búsqueda de solo espacios como la lista completa;
+**R32** del coste que la fila 13 acepta —seis copias solo son un contrato si algo comprueba que
+siguen diciendo lo mismo—.
 
 ## Preguntas abiertas
 
@@ -32,6 +205,33 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bloquea la featur
 2. **Qué campos concretos declara consultables cada uno de los siete módulos** no está cerrado. Lo
    propone `spec_author` en F1.2 a partir de lo que cada pantalla ya muestra, y el humano lo revisa
    al aprobar el spec. Lo único fijado aquí es qué **no** puede estar (fila 8).
+
+### Estado de las dos anteriores tras F1.2
+
+- **1 — CERRADA en `design.md > 4`**: **columna persistida**. Cinco de las seis tablas buscables ya
+  la tienen (`name_normalized` en `presentations`, `recipes`, `suppliers`,
+  `supplier_catalog_lines`, `units`) y ya la escriben con una función pura del dominio; la que
+  falta es `products`. El índice funcional se descarta con su porqué en `design.md > 4.2`.
+- **2 — PROPUESTA en `design.md > 5`**, tabla por tabla. Sigue siendo del humano al aprobar: lo que
+  `design.md` aporta es una propuesta razonada, no un cierre.
+
+### Añadidas por spec_author en F1.2
+
+3. **La búsqueda por SUBCADENA no tiene índice que la sirva.** Se conserva la semántica de hoy
+   —productos busca con `contains`—, pero un índice btree no acelera `%texto%`: eso lo sirve un
+   índice **GIN de trigramas**, que necesita la extensión de Postgres `pg_trgm`. No es una
+   dependencia de npm y la guardia de `docs/dependencias.md` no la ve, así que **no se da por
+   buena** (regla 7 de `CLAUDE.md`): la decide el humano al aprobar el spec, con las dos salidas
+   escritas en `design.md > 4.3`. Afecta a la migración y, si se rechaza, a la semántica de la
+   búsqueda (pasa a **prefijo**).
+4. **Huso horario del filtro de rango de fechas.** QC-55 emite `YYYY-MM-DD` sin huso y las columnas
+   son `timestamptz`. Interpretar «del 1 al 3» en UTC o en la zona de quien mira cambia qué filas
+   salen en los bordes del día. Posición por defecto escrita en `design.md > 3.3` (UTC, extremos
+   inclusivos), sin decidir por el humano.
+5. **Orden de los nulos.** Varios campos ordenables son anulables (`stock`, `qtyAlert`,
+   `minPurchase`, `deliveryTime`). Postgres pone los `NULL` al final en `ASC` y al principio en
+   `DESC`; nadie ha decidido si esa es la lectura que se quiere. Posición por defecto: el
+   comportamiento por defecto de Postgres, sin `NULLS FIRST/LAST` explícito (`design.md > 3.3`).
 
 ## Decisiones cerradas (no reabrir)
 
