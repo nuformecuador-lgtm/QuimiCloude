@@ -168,7 +168,7 @@ Todas dependen de T3 y T4.
 
 ## Bloque 4 — Verificación transversal
 
-### T12 — Angosto y ancho
+### [x] T12 — Angosto y ancho
 - **Depende de**: T11.
 - **Qué**: repetir los casos sensibles —menú de cabecera, barra de filtros, paginación, calendario
   y columna fijada— en `NARROW_VIEWPORT` y `WIDE_VIEWPORT` con `tests/helpers/viewport.ts`.
@@ -188,7 +188,7 @@ Todas dependen de T3 y T4.
   `progress/impl_QC-55-*.md`. SI falla, se PARA y se devuelve al leader: es una decisión cerrada la
   que está en juego, no un detalle de estilo.
 
-### T14 — Alcance: nada fuera de sitio
+### [x] T14 — Alcance: nada fuera de sitio
 - **Depende de**: T11.
 - **Qué**: revisar el diff completo.
 - **Criterio**: R34, R35.
