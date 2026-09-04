@@ -8,7 +8,7 @@
 
 ## Grupo 0 — Precondición heredada
 
-- [ ] **T0. Verificar el punto de partida antes de escribir una línea.** No se da nada por hecho
+- [x] **T0. Verificar el punto de partida antes de escribir una línea.** No se da nada por hecho
       (regla 6).
       **Hecho cuando** las cinco comprobaciones están anotadas en `progress/impl_QC-57-*.md`:
       1. el worktree está en `feature/QC-57-orden-y-filtro-en-listados` con `dev` mergeado;
@@ -21,7 +21,7 @@
          casar; si la forma real difiere del spec, **se para**;
       5. las siete listas de `design.md > 1` existen en las rutas ahí escritas.
 
-- [ ] **T0.1. Confirmar la decisión de `pg_trgm`** (`design.md > 4.3`, pregunta abierta 3).
+- [x] **T0.1. Confirmar la decisión de `pg_trgm`** (`design.md > 4.3`, pregunta abierta 3).
       **Bloquea T4.** No se instala ni se habilita nada por cuenta propia (regla 7).
       **Hecho cuando** en `progress/impl_QC-57-*.md` consta la vía elegida (**A** con extensión y
       búsqueda por subcadena, o **B** sin extensión y búsqueda por prefijo) y quién la aprobó.
