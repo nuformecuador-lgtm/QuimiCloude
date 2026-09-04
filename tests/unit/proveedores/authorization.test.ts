@@ -6,9 +6,15 @@
 // existiera como policy no estaria implementado, y un `requireAdmin` que se saltara UNO de
 // los nueve seria justo el agujero que esta revision existe para encontrar.
 //
-// Por eso los tres puertos -repositorio de proveedores, repositorio del catalogo y el
-// contrato `ProductCatalog` de `inventario`- son dobles que FALLAN SI LOS LLAMAN: no basta
-// con que la operacion lance; tiene que lanzar sin haber tocado nada.
+// Por eso los DOS puertos que quedan -repositorio de proveedores y repositorio del
+// catalogo- son dobles que FALLAN SI LOS LLAMAN: no basta con que la operacion lance; tiene
+// que lanzar sin haber tocado nada.
+//
+// QC-52 (R25) lo reescribe en tres sitios: desaparece el tercer doble -el contrato de
+// `inventario`, que este modulo ya no consume (R18)-, la entrada valida de la linea pasa a
+// llevar nombre y presentacion, y las CUATRO operaciones de la linea se invocan con las
+// firmas nuevas (`replaceAlive`, `softDeleteAlive`). Que la comprobacion siga siendo la
+// PRIMERA linea de cada caso de uso no cambia, y es lo que este archivo mide.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -52,18 +58,22 @@ function fuentesDelModulo(dir: string = moduloDir): readonly string[] {
 }
 
 const SUPPLIER_ID = '22222222-2222-4222-8222-222222222222'
-const PRODUCT_ID = '33333333-3333-4333-8333-333333333333'
+const PRESENTATION_ID = '33333333-3333-4333-8333-333333333333'
 const ENTRADA_PROVEEDOR = { name: 'Insumos Andinos', phone: '+593 99 000 0000', email: null }
-const ENTRADA_LINEA = {
-  supplierId: SUPPLIER_ID,
-  productId: PRODUCT_ID,
+/** Campos de negocio VALIDOS de una linea: la edicion los reemplaza todos (R24). */
+const CAMPOS_LINEA = {
+  name: 'Acido citrico',
+  presentationId: PRESENTATION_ID,
+  unitId: null,
+  imagePath: null,
   cost: '12.5000',
   minPurchase: null,
   deliveryTime: null,
 }
+const ENTRADA_LINEA = { supplierId: SUPPLIER_ID, ...CAMPOS_LINEA }
 
 /**
- * Los tres dobles. Cada metodo explota si alguien lo llama: si un caso de uso comprobara el
+ * Los dos dobles. Cada metodo explota si alguien lo llama: si un caso de uso comprobara el
  * rol DESPUES de tocar el puerto, el test caeria por la excepcion del doble aunque el
  * `rejects.toBeInstanceOf(UnauthorizedError)` pudiera enganarse.
  */
@@ -82,21 +92,15 @@ function dobles() {
   }
   const catalog = {
     create: explota('catalog.create'),
-    updateTerms: explota('catalog.updateTerms'),
-    deleteById: explota('catalog.deleteById'),
+    replaceAlive: explota('catalog.replaceAlive'),
+    softDeleteAlive: explota('catalog.softDeleteAlive'),
     listBySupplierAlive: explota('catalog.listBySupplierAlive'),
   }
-  const products = { findRefs: explota('products.findRefs') }
 
   return {
     suppliers: suppliers as unknown as SupplierRepository,
     catalog: catalog as unknown as SupplierCatalogRepository,
-    products: products as unknown as { findRefs: (ids: readonly string[]) => Promise<never> },
-    espias: [
-      ...Object.values(suppliers),
-      ...Object.values(catalog),
-      ...Object.values(products),
-    ],
+    espias: [...Object.values(suppliers), ...Object.values(catalog)],
   }
 }
 
@@ -141,18 +145,13 @@ const CASOS_DE_USO: readonly {
   {
     nombre: 'createCatalogLine',
     archivo: 'create-catalog-line.ts',
-    ejecutar: (d, actor) =>
-      createCreateCatalogLine({ catalog: d.catalog, products: d.products })(ENTRADA_LINEA, actor),
+    ejecutar: (d, actor) => createCreateCatalogLine({ catalog: d.catalog })(ENTRADA_LINEA, actor),
   },
   {
     nombre: 'updateCatalogLine',
     archivo: 'update-catalog-line.ts',
     ejecutar: (d, actor) =>
-      createUpdateCatalogLine({ catalog: d.catalog })(
-        'linea-1',
-        { cost: '9.0000', minPurchase: null, deliveryTime: null },
-        actor,
-      ),
+      createUpdateCatalogLine({ catalog: d.catalog })('linea-1', CAMPOS_LINEA, actor),
   },
   {
     nombre: 'deleteCatalogLine',
@@ -163,11 +162,7 @@ const CASOS_DE_USO: readonly {
     nombre: 'listCatalogLines',
     archivo: 'list-catalog-lines.ts',
     ejecutar: (d, actor) =>
-      createListCatalogLines({ catalog: d.catalog, products: d.products })(
-        SUPPLIER_ID,
-        { page: 1 },
-        actor,
-      ),
+      createListCatalogLines({ catalog: d.catalog })(SUPPLIER_ID, { page: 1 }, actor),
   },
 ]
 

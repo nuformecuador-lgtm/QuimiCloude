@@ -415,20 +415,23 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
   }
 
   it('la UNICA relacion que el cliente generado conoce entre SupplierCatalogLine y Supplier es mutua, e intra-modulo', () => {
-    // `productId` es un escalar sin `@relation`: no genera campo de relacion. Por eso el
-    // dmmf de `SupplierCatalogLine` no puede traer nada mas que `Supplier`, la relacion
-    // intra-modulo declarada a proposito con `@relation` (`design.md` 2.2).
+    // `presentationId` y `unitId` son escalares sin `@relation`: no generan campo de
+    // relacion. Por eso el dmmf de `SupplierCatalogLine` no puede traer nada mas que
+    // `Supplier`, la relacion intra-modulo declarada a proposito con `@relation`
+    // (`design.md > 2.2`). Desde QC-52 ya no hay ningun `productId` que vigilar (R9).
     expect(relationTargets('SupplierCatalogLine')).toEqual(['Supplier'])
     // Y en el otro sentido: `Supplier` solo conoce sus propias lineas de catalogo.
     expect(relationTargets('Supplier')).toEqual(['SupplierCatalogLine'])
   })
 
   it('Product NO gana ningun campo de relacion de vuelta hacia SupplierCatalogLine ni hacia Supplier', () => {
-    // Si `productId` llevara `@relation`, Prisma exigiria el campo reverso en `Product`
-    // (`supplierCatalogLines SupplierCatalogLine[]`) y este `toEqual` completo —no un
-    // `not.toContain` suelto— caeria en el instante en que apareciera. La lista esperada es
-    // el conjunto EXACTO y completo de relaciones que QC-14/QC-20 ya le dieron a `Product`
-    // (hacia `Presentation`), sin proveedores adentro.
+    // QC-52 borro la columna que unia las dos tablas (R9), asi que hoy ni siquiera existe el
+    // escalar del que podria colgar un `@relation`. El caso se conserva igualmente porque es
+    // el que caeria si alguien reintrodujera el vinculo: Prisma exigiria el campo reverso en
+    // `Product` (`supplierCatalogLines SupplierCatalogLine[]`) y este `toEqual` completo —no
+    // un `not.toContain` suelto— caeria en el instante en que apareciera. La lista esperada
+    // es el conjunto EXACTO de relaciones que QC-14/QC-20 le dieron a `Product` (hacia
+    // `Presentation`), sin proveedores adentro.
     expect(relationTargets('Product')).toEqual(['Presentation'])
     expect(relationTargets('Product')).not.toContain('SupplierCatalogLine')
     expect(relationTargets('Product')).not.toContain('Supplier')
@@ -436,8 +439,8 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
 
   it('el catalogo no gana ninguna relacion Prisma hacia Product ni hacia User', () => {
     // T15 (QC-43), R26 y R44. QC-42 ya afirmaba que `SupplierCatalogLine` no tenia relacion
-    // hacia `Product`; lo que esta ficha CAMBIA es que la linea gana DOS columnas nuevas
-    // -`createdBy` y `updatedBy`- que apuntan a `users` con una FK real en la base. Esa es
+    // hacia `Product`; QC-43 anadio `createdBy`/`updatedBy` y QC-52 anade `presentationId` y
+    // `unitId`: CUATRO columnas que apuntan a otra tabla con una FK real en la base. Esa es
     // exactamente la tentacion que este caso vigila: declararlas con `@relation` "porque la
     // FK existe" (decision cerrada 14 de QC-42, mantenida por la 3 de QC-43 y por
     // `design.md > 12.9`).
@@ -461,11 +464,17 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
       'updatedBy:scalar:String:false',
     ])
 
-    // Censo COMPLETO de campos de la linea: ni una relacion de mas, ni una columna de mas.
+    // Censo COMPLETO de campos de la linea tras QC-52: ni una relacion de mas, ni una
+    // columna de mas. `productId` YA NO ESTA (R9) y en su lugar entran `name`,
+    // `nameNormalized`, `presentationId`, `unitId`, `imagePath` y `deletedAt` (R8).
     expect(linea!.fields.map((f) => f.name)).toEqual([
       'id',
       'supplierId',
-      'productId',
+      'name',
+      'nameNormalized',
+      'presentationId',
+      'unitId',
+      'imagePath',
       'cost',
       'minPurchase',
       'deliveryTime',
@@ -473,8 +482,23 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
       'updatedBy',
       'createdAt',
       'updatedAt',
+      'deletedAt',
       'supplier',
     ])
+
+    // R30 — las DOS claves foraneas nuevas se declaran como ESCALARES SIN `@relation`, y por
+    // eso el cliente del ORM no puede atravesar de `proveedores` a `inventario` ni a
+    // `unidades`: no hay `include: { presentation: true }` que ofrecer. Se afirma sobre el
+    // dmmf (`kind`), no sobre el texto del esquema. La FK existe de verdad en la base y eso
+    // lo prueba `proveedores-constraints.int.test.ts` contra Postgres: son las dos mitades
+    // de R30 y ninguna basta sola.
+    expect(
+      linea!.fields
+        .filter((f) => f.name === 'presentationId' || f.name === 'unitId')
+        .map((f) => `${f.name}:${f.kind}:${f.type}:${f.isRequired}`),
+    ).toEqual(['presentationId:scalar:String:true', 'unitId:scalar:String:false'])
+    expect(relationTargets('SupplierCatalogLine')).not.toContain('Presentation')
+    expect(relationTargets('SupplierCatalogLine')).not.toContain('Unit')
 
     // Y la unica relacion sigue siendo la intra-modulo hacia su proveedor.
     expect(relationTargets('SupplierCatalogLine')).toEqual(['Supplier'])

@@ -126,7 +126,7 @@ async function createProductFor(
   name = `Producto ${token()}`,
 ): Promise<string> {
   const product = await tx.product.create({
-    data: { name, presentationId, minPurchase: 0 },
+    data: { name, presentationId },
     select: { id: true },
   });
   return product.id;

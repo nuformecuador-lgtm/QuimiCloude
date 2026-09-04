@@ -1,59 +1,23 @@
 // T9 — Adaptador driven de producto.
 //
 // HONESTIDAD (obligatoria por el prompt de esta task): este archivo NO toca Postgres.
-// Solo prueba las funciones PURAS de `product-prisma.ts` -conversion `cost`
-// `string <-> Prisma.Decimal`, el mapeo de fila a `ProductView` y la clasificacion del
-// nombre de restriccion de una FK-, que es lo unico de ese archivo que se puede probar
+// Solo prueba las funciones PURAS de `product-prisma.ts` -el mapeo de fila a
+// `ProductView` y la clasificacion del nombre de restriccion de una FK-, que es lo unico de ese archivo que se puede probar
 // sin base. La garantia real de que `deleted_at IS NULL`, el orden `name ASC, id ASC`,
 // la escritura de `created_by`/`updated_by` y la traduccion de `P2003` funcionan contra
 // Postgres es de los tests de INTEGRACION (T14,
 // `tests/integration/inventario/product-crud.int.test.ts`), no de este archivo.
 
-import { Prisma } from '@prisma/client';
-
 import {
   classifyForeignKeyViolation,
-  fromDecimalCost,
-  toDecimalInput,
   toProductView,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 
-describe('toDecimalInput', () => {
-  it('convierte una cadena decimal a Prisma.Decimal', () => {
-    const resultado = toDecimalInput('12.3400');
-    expect(resultado).not.toBeNull();
-    expect(resultado?.toFixed(4)).toBe('12.3400');
-  });
-
-  it('conserva null cuando el costo es null', () => {
-    expect(toDecimalInput(null)).toBeNull();
-  });
-
-  it('conserva undefined cuando el costo esta omitido', () => {
-    expect(toDecimalInput(undefined)).toBeUndefined();
-  });
-
-  // Mutacion: si el codigo devolviera '' en vez de null/undefined, esta asercion caeria.
-  it('no confunde null con undefined', () => {
-    expect(toDecimalInput(null)).not.toBeUndefined();
-    expect(toDecimalInput(undefined)).not.toBeNull();
-  });
-});
-
-describe('fromDecimalCost', () => {
-  it('convierte Prisma.Decimal a cadena con 4 decimales fijos', () => {
-    expect(fromDecimalCost(new Prisma.Decimal('7'))).toBe('7.0000');
-  });
-
-  it('devuelve null cuando el costo es null', () => {
-    expect(fromDecimalCost(null)).toBeNull();
-  });
-
-  // Mutacion: si el codigo redondeara a 2 decimales en vez de 4, esta asercion caeria.
-  it('no trunca los cuatro decimales', () => {
-    expect(fromDecimalCost(new Prisma.Decimal('1.2345'))).toBe('1.2345');
-  });
-});
+// QC-52 (R1): los describes de `toDecimalInput` y `fromDecimalCost` se fueron con el
+// costo del producto. No se «arreglaron» ni se relajaron: las funciones que probaban ya
+// no existen en este adaptador, porque el producto ya no lleva ningun importe. La
+// conversion `string <-> Prisma.Decimal` sigue probada donde el importe se quedo, en el
+// adaptador de la linea de catalogo de `proveedores`.
 
 describe('toProductView', () => {
   const filaBase = {
@@ -62,9 +26,6 @@ describe('toProductView', () => {
     presentationId: 'pr-1',
     presentation: { name: 'Bidon 20 L' },
     stock: 10,
-    cost: new Prisma.Decimal('99.9900'),
-    minPurchase: 1,
-    deliveryTime: 3,
     qtyAlert: 5,
     // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La fila que devuelve
     // Prisma ya no trae `unit: 'L'` (texto) sino `unit_id`, la referencia a `units`. Cambia
@@ -82,10 +43,25 @@ describe('toProductView', () => {
     expect(vista.presentationName).toBe('Bidon 20 L');
   });
 
-  it('mapea el costo como cadena, nunca como number', () => {
+  // QC-52 (R1, R2): lo que antes se afirmaba sobre el costo se afirma ahora sobre lo que
+  // el producto CONSERVA. `stock` y `qtyAlert` siguen siendo numeros anulables, con la
+  // misma forma y la misma opcionalidad de antes.
+  it('mapea la existencia y la alerta de cantidad sin reinterpretarlas', () => {
     const vista = toProductView(filaBase);
-    expect(vista.cost).toBe('99.9900');
-    expect(typeof vista.cost).toBe('string');
+    expect(vista.stock).toBe(10);
+    expect(vista.qtyAlert).toBe(5);
+    expect(toProductView({ ...filaBase, stock: null, qtyAlert: null }).stock).toBeNull();
+    expect(toProductView({ ...filaBase, stock: null, qtyAlert: null }).qtyAlert).toBeNull();
+  });
+
+  // QC-52 (R1): la vista NO puede llevar costo, compra minima ni tiempo de entrega. Se
+  // comprueba sobre el objeto devuelto, no solo con el compilador: un `as any` en el
+  // adaptador dejaria pasar el campo sin que el typecheck dijera nada.
+  it('no devuelve costo, compra minima ni tiempo de entrega', () => {
+    const vista = toProductView(filaBase);
+    expect(Object.keys(vista)).not.toContain('cost');
+    expect(Object.keys(vista)).not.toContain('minPurchase');
+    expect(Object.keys(vista)).not.toContain('deliveryTime');
   });
 
   it('mapea createdBy/updatedBy como identificadores, sin resolver ningun nombre (D20, R8)', () => {
@@ -112,14 +88,11 @@ describe('toProductView', () => {
     expect(vista.unitId).toBeNull();
   });
 
-  // Mutacion: si el mapeo devolviera null en vez de la cadena de costo, esta asercion caeria.
-  it('no pierde el costo cuando la fila lo trae', () => {
-    expect(toProductView(filaBase).cost).not.toBeNull();
-  });
-
-  it('mapea un costo null como null', () => {
-    const vista = toProductView({ ...filaBase, cost: null });
-    expect(vista.cost).toBeNull();
+  // Mutacion: si el mapeo devolviera la presentacion como identificador en vez del nombre
+  // del `join`, esta asercion caeria.
+  it('no confunde el nombre de la presentacion con su identificador', () => {
+    const vista = toProductView(filaBase);
+    expect(vista.presentationName).not.toBe(vista.presentationId);
   });
 });
 

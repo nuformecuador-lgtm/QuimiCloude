@@ -1,29 +1,32 @@
-import type { CatalogLineTerms, CatalogLineView, NewCatalogLine } from '../domain/catalog-line-view';
+import type { CatalogLineFields, CatalogLineView, NewCatalogLine } from '../domain/catalog-line-view';
 import type { Page, PageQuery } from '../domain/page';
 
 /**
- * Puerto de acceso a datos del catalogo del proveedor (`design.md > 7`).
+ * Puerto de acceso a datos del catalogo del proveedor (`design.md > 6`, `> 7`).
  *
- * Igual que en `SupplierRepository`, NO hay ningun metodo de busqueda por la pareja
- * proveedor-producto (R27): la unicidad viene del indice unico de la base y la
- * comprobacion previa no es expresable.
+ * NO hay ningun metodo de busqueda por nombre, ni por la terna que identifica una linea, y
+ * es deliberado (R15, `design.md > 10.4`): la unicidad la garantiza SOLO el indice unico
+ * parcial de la base. Un `SELECT` previo al `INSERT` es una carrera -entre la lectura y la
+ * escritura cabe otra transaccion- y no aporta ningun mensaje que el `'duplicate'` no de
+ * ya; sin metodo de busqueda, esa comprobacion previa ni siquiera es expresable.
  *
- * `listBySupplierAlive` es lo que hace verdadera la decision cerrada 7 (R36): comprueba
- * que el PROVEEDOR este vivo antes de devolver nada, aunque la linea no tenga borrado
- * logico propio. El `productName` de la pagina NO lo resuelve este puerto -no sabe nada de
- * productos, y preguntarlo seria cruzar la frontera de `inventario`-: sale `null` y lo
- * completa el caso de uso con una sola llamada a `ProductCatalog.findRefs`
- * (`design.md > 5.3`).
+ * Tampoco hay ninguna operacion de restaurar ni ningun listado de lineas dadas de baja
+ * (R22): lo que no se puede expresar no se puede hacer por descuido.
+ *
+ * Este puerto no sabe nada de productos, ni de presentaciones, ni de unidades: devuelve
+ * `presentationId` y `unitId` en crudo (`design.md > 6.2`). QC-52 corto esa dependencia
+ * entera (R18).
  */
 export interface SupplierCatalogRepository {
   /**
-   * `'duplicate'` = la pareja (proveedor, producto) ya tiene linea (R27);
-   * `'supplier_not_found'` = **no hay ningun proveedor VIVO con ese id** (R25, R48): ni
-   * porque no exista -la FK a `suppliers` rechaza la escritura- ni porque este dado de
-   * baja. Los dos casos son el mismo para el dominio, que los traduce a «no encontrado»
-   * igual que R24 hace con el proveedor. Un proveedor dado de baja **no admite lineas
-   * nuevas**: la fila sigue en la base tras la baja logica, asi que sin esta comprobacion
-   * el alta se aceptaria y crearia una linea que R36 no deja ver nunca.
+   * `'duplicate'` = ya hay una linea VIVA de ese proveedor con el mismo nombre normalizado
+   * y la misma presentacion (R15);
+   * `'supplier_not_found'` = no hay ningun proveedor VIVO con ese id (R23): ni porque no
+   * exista -la FK a `suppliers` rechaza la escritura- ni porque este dado de baja. Los dos
+   * casos son el mismo para el dominio, que los traduce a «no encontrado».
+   *
+   * Una presentacion o una unidad inexistentes NO son un resultado de este union: los
+   * rechaza la FK y el adaptador los traduce a `ValidationError` (`design.md > 6.2`).
    */
   create(
     data: NewCatalogLine,
@@ -32,28 +35,48 @@ export interface SupplierCatalogRepository {
   ): Promise<{ id: string } | 'duplicate' | 'supplier_not_found'>;
 
   /**
-   * Solo las condiciones comerciales (R33): ni proveedor ni producto son cambiables.
+   * Edicion = REEMPLAZO COMPLETO de los siete campos de negocio (R24, P6), nombre y
+   * presentacion incluidos. El sufijo `Alive` no es adorno: la linea tiene que estar viva Y
+   * su proveedor tambien.
    *
-   * `'not_found'` cubre tanto la linea inexistente como la de un proveedor DADO DE BAJA
-   * (R48): editar el precio de un proveedor que ya no opera es la misma escritura sin
-   * efecto visible que crearlo. El BORRADO de la linea si sigue permitido -quita una fila
-   * en vez de escribir uno que nadie vera-, y por eso `deleteById` no lo comprueba.
+   * `'not_found'` cubre los tres casos que R23 trata igual: linea inexistente, linea ya
+   * dada de baja y linea de un proveedor dado de baja. `'duplicate'` es el mismo choque
+   * contra el indice unico parcial que en el alta: renombrar hacia una combinacion ya
+   * ocupada por otra linea viva del mismo proveedor.
+   *
+   * El nombre `replaceAlive` -y no `updateTerms`- es del cambio de QC-52: ya no son solo
+   * «terminos» comerciales. Se alinea con `SupplierRepository.updateAlive` y
+   * `RecipeRepository.replaceAlive`.
    */
-  updateTerms(
+  replaceAlive(
     id: string,
-    data: CatalogLineTerms,
+    data: CatalogLineFields,
     actorId: string,
     now: Date,
-  ): Promise<'ok' | 'not_found'>;
+  ): Promise<'ok' | 'not_found' | 'duplicate'>;
 
   /**
-   * Borrado FISICO (R34), no logico, y no contradice `docs/architecture.md >
-   * Anti-patrones`: la linea del catalogo no es una tabla transaccional -no mueve
-   * existencias ni dinero- y QC-42 la dejo a proposito sin `deleted_at` (su decision 11),
-   * asi que no hay donde marcar una baja. Mismo caso que `presentations` en QC-20 (D6).
+   * Baja LOGICA de la linea (R21): marca `deleted_at` -y sella `updated_at`/`updated_by`-,
+   * y JAMAS borra la fila. Sustituye al `deleteById` fisico de QC-43 (su R34 queda
+   * derogada por la decision cerrada 5 de QC-52).
+   *
+   * `false` = no hay ninguna linea viva con ese id, o su proveedor esta dado de baja: los
+   * tres son «no encontrado» (R23). **QC-43 R48 queda derogada entera** (P5): la baja de
+   * una linea de un proveedor dado de baja tambien responde «no encontrado». El argumento
+   * que sostenia aquella excepcion -«rechazarlo dejaria esas filas atrapadas sin ninguna
+   * operacion capaz de eliminarlas»- desaparecio con la decision cerrada 5: esas filas ya
+   * estan dadas de baja, arrastradas por la baja de su proveedor.
+   *
+   * Como el indice unico es PARCIAL sobre las vivas, dar de baja una linea LIBERA su
+   * combinacion de nombre y presentacion para otra linea del mismo proveedor (R17).
    */
-  deleteById(id: string): Promise<'deleted' | 'not_found'>;
+  softDeleteAlive(id: string, actorId: string, now: Date): Promise<boolean>;
 
+  /**
+   * Listado paginado de las lineas VIVAS de un proveedor VIVO (R22). Las dos condiciones
+   * viven en el `where` del adaptador, no en un `if` del dominio, y por eso ningun caso de
+   * uso puede olvidarlas.
+   */
   listBySupplierAlive(
     supplierId: string,
     query: PageQuery,

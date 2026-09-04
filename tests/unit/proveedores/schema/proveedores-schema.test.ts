@@ -136,24 +136,43 @@ const SUPPLIER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
 ]
 
-/** Cada campo escalar de `SupplierCatalogLine`, con su columna (R32). */
+/**
+ * CENSO EXACTO de los campos escalares de `SupplierCatalogLine` tras QC-52 (R8, R12).
+ *
+ * Es la estructura del articulo del inventario OMITIENDO `stock` y `qty_alert` -cuanto
+ * tienes es tuyo, no del proveedor-, mas `supplier_id`. Respecto a QC-43 GANA `name`,
+ * `name_normalized`, `presentation_id`, `unit_id`, `image_path` y `deleted_at`, y PIERDE
+ * `product_id` (decision cerrada 2, R9).
+ *
+ * Que sea una lista EXACTA -y no una serie de `has(...)` sueltos- es lo que hace que la
+ * ausencia de `stock` y `qty_alert` sea una afirmacion y no un olvido: cualquier columna de
+ * mas rompe el `toEqual` que la compara con los escalares reales del modelo.
+ */
 const SUPPLIER_CATALOG_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['supplierId', 'supplier_id'],
-  ['productId', 'product_id'],
+  ['name', 'name'],
+  ['nameNormalized', 'name_normalized'],
+  ['presentationId', 'presentation_id'],
+  ['unitId', 'unit_id'],
+  ['imagePath', 'image_path'],
   ['cost', 'cost'],
   ['minPurchase', 'min_purchase'],
   ['deliveryTime', 'delivery_time'],
-  // QC-43 (su decision cerrada 3, R31/R32): la linea gana autor propio.
+  // QC-43 (su decision cerrada 3): la linea gana autor propio.
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
+  // QC-52 (decision cerrada 11, R8, R21): borrado LOGICO.
+  ['deletedAt', 'deleted_at'],
 ]
 
-/** Los cinco escalares que cruzan de modulo y por eso NO llevan `@relation` (R22). */
+/** Los seis escalares que cruzan de modulo y por eso NO llevan `@relation` (R30). */
 const CROSS_MODULE_SCALARS: ReadonlyArray<readonly [PrismaModel, string, string]> = [
-  [supplierCatalogLine, 'productId', 'product_id'],
+  // QC-52: las dos FK nuevas de la linea, hacia `inventario` y hacia `unidades`.
+  [supplierCatalogLine, 'presentationId', 'presentation_id'],
+  [supplierCatalogLine, 'unitId', 'unit_id'],
   [supplier, 'createdBy', 'created_by'],
   [supplier, 'updatedBy', 'updated_by'],
   [supplierCatalogLine, 'createdBy', 'created_by'],
@@ -236,19 +255,40 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     expect(field(supplier, 'name').attributes).not.toMatch(/@unique/)
     expect(field(supplier, 'nameNormalized').attributes).not.toMatch(/@unique/)
     expect(supplier.body).not.toMatch(/@@unique\(/)
-    // El unico `@@unique` de esta feature es el de la linea, y es por pareja.
-    expect(supplierCatalogLine.body).toMatch(/@@unique\(\[supplierId,\s*productId\]/)
+
+    // QC-52 (R15, R17): la linea TAMPOCO tiene ya ningun `@@unique`. El de QC-43 era TOTAL
+    // -sobre la pareja del proveedor con el articulo del inventario- y se fue con esa
+    // columna; el nuevo es un indice PARCIAL sobre las vivas
+    // `(supplier_id, name_normalized, presentation_id) WHERE deleted_at IS NULL`, que Prisma
+    // no sabe modelar y por eso vive escrito a mano en la migracion.
+    //
+    // Volver a poner un `@@unique` aqui seria un indice TOTAL, y R17 dejaria de cumplirse en
+    // silencio: dar de baja una linea no liberaria su combinacion para otra nueva.
+    expect(supplierCatalogLine.body).not.toMatch(/@@unique\(/)
+    expect(field(supplierCatalogLine, 'name').attributes).not.toMatch(/@unique/)
+    expect(field(supplierCatalogLine, 'nameNormalized').attributes).not.toMatch(/@unique/)
   })
 
-  it('SupplierCatalogLine declara proveedor, producto, costo, minimo y plazo como entidad propia con id', () => {
-    // R10 y decision cerrada 3: entidad propia, no tabla de union sin datos. Tiene clave
-    // primaria propia y datos propios (costo, minimo, plazo).
+  it('SupplierCatalogLine es una entidad propia con nombre, presentacion y costo, y sin existencia ni alerta', () => {
+    // R8. Entidad propia, no tabla de union: clave primaria propia y datos propios. QC-52 le
+    // da ademas identidad propia -nombre y presentacion- porque ya no la toma prestada de
+    // ningun articulo del inventario (decision cerrada 4).
     const id = field(supplierCatalogLine, 'id')
     expect(id.attributes).toContain('@id')
     expect(id.attributes).toContain('@db.Uuid')
     expect(supplierCatalogLine.body).not.toMatch(/@@id\(/)
 
-    for (const fieldName of ['supplierId', 'productId', 'cost'] as const) {
+    // R8, la mitad NEGATIVA: la linea NO tiene existencia, NO tiene alerta de cantidad y NO
+    // tiene ninguna referencia a un articulo del inventario. Cuanto tienes es tuyo, no del
+    // proveedor (decision cerrada 2), y el vinculo se corto entero (decision cerrada 3).
+    for (const ausente of ['stock', 'qtyAlert', 'productId', 'product']) {
+      expect(has(supplierCatalogLine, ausente), `la linea no puede tener ${ausente}`).toBe(false)
+    }
+    expect(supplierCatalogLine.body).not.toMatch(/\bstock\b/)
+    expect(supplierCatalogLine.body).not.toMatch(/qty_alert/)
+    expect(supplierCatalogLine.body).not.toMatch(/product_id/)
+
+    for (const fieldName of ['supplierId', 'name', 'nameNormalized', 'presentationId', 'cost'] as const) {
       const candidate = field(supplierCatalogLine, fieldName)
       expect(candidate.isOptional, `SupplierCatalogLine.${fieldName} no puede ser opcional`).toBe(
         false,
@@ -270,11 +310,25 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     expect(field(supplier, 'catalogLines').type).toBe('SupplierCatalogLine')
   })
 
-  it('product_id y cost obligatorios; min_purchase y delivery_time opcionales y sin default', () => {
-    // R13 y decision cerrada 4: la razon de existir de la linea es «este proveedor me
-    // vende esto a este precio»; el plazo y el minimo se confirman despues.
-    expect(field(supplierCatalogLine, 'productId').isOptional).toBe(false)
+  it('presentacion y costo obligatorios; unidad, imagen, minimo y plazo opcionales y sin default', () => {
+    // R10 y decision cerrada 4/6: la razon de existir de la linea es «este proveedor me
+    // vende ESTO, ASI presentado, a este precio». La presentacion forma parte de su
+    // identidad, asi que es OBLIGATORIA -a diferencia de lo que pasa en `products`-; la
+    // unidad sigue siendo opcional (QC-32), y el plazo y el minimo se confirman despues.
+    expect(field(supplierCatalogLine, 'presentationId').isOptional).toBe(false)
     expect(field(supplierCatalogLine, 'cost').isOptional).toBe(false)
+    expect(field(supplierCatalogLine, 'name').isOptional).toBe(false)
+    expect(field(supplierCatalogLine, 'nameNormalized').isOptional).toBe(false)
+
+    // Sin `@default` en ninguna de las dos columnas del nombre: un `@default("")` convertiria
+    // «esta linea no tiene nombre» en un valor valido (R14).
+    expect(field(supplierCatalogLine, 'name').attributes).not.toMatch(/@default\(/)
+    expect(field(supplierCatalogLine, 'nameNormalized').attributes).not.toMatch(/@default\(/)
+
+    for (const opcional of ['unitId', 'imagePath'] as const) {
+      expect(field(supplierCatalogLine, opcional).isOptional, `${opcional} es opcional`).toBe(true)
+      expect(field(supplierCatalogLine, opcional).attributes).not.toMatch(/@default\(/)
+    }
 
     const minPurchase = field(supplierCatalogLine, 'minPurchase')
     expect(minPurchase.isOptional).toBe(true)
@@ -369,10 +423,19 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     expect(owners.get('User')).toBe('identity')
   })
 
-  it('product_id, created_by y updated_by son escalares uuid SIN @relation', () => {
-    // R22 y decision cerrada 13/14: la FK es REAL, pero vive escrita a mano en
-    // `migration.sql`. Declararla con `@relation` regalaria `include: { product: true }`
-    // desde `proveedores`, y ninguna guardia lo detectaria porque no es un import.
+  it('presentation_id, unit_id, created_by y updated_by son escalares uuid SIN @relation (R30)', () => {
+    // R30 y decision cerrada 10: las FK son REALES -viven escritas a mano en
+    // `migration.sql`- pero los campos son ESCALARES. Declararlas con `@relation` regalaria
+    // `include: { presentation: true }` desde `proveedores`, un cruce de modulo que ninguna
+    // guardia detecta porque no es un import ni una cadena `prisma.<modelo>`; y ademas
+    // obligaria a declarar el campo reverso dentro de `Presentation` y de `Unit`, que son de
+    // otros modulos.
+    //
+    // Esta es la mitad de R30 que se mide sobre el ESQUEMA. La otra -que las dos FK existen
+    // de verdad en la base, con `ON DELETE RESTRICT`- se mide contra Postgres en
+    // `tests/integration/proveedores/proveedores-constraints.int.test.ts`. Ninguna basta
+    // sola: un escalar sin FK dejaria lineas apuntando al vacio, y una FK con `@relation`
+    // abriria el cruce.
     for (const [model, fieldName, column] of CROSS_MODULE_SCALARS) {
       const candidate = field(model, fieldName)
       expect(candidate.type, `${fieldName} debe ser String`).toBe('String')
@@ -383,14 +446,13 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
       expect(candidate.attributes, `${fieldName} NO puede llevar @relation`).not.toMatch(/@relation/)
     }
 
-    // Ningun campo de los dos modelos apunta a `Product` ni a `User` como objeto: no hay
+    // Ningun campo de los dos modelos apunta como OBJETO a un modelo de otro modulo: no hay
     // por donde atravesar con un `include`.
     for (const model of [supplier, supplierCatalogLine]) {
       for (const candidate of model.fields) {
-        expect(candidate.type, `${candidate.name} no puede apuntar a otro modulo`).not.toBe(
-          'Product',
-        )
-        expect(candidate.type, `${candidate.name} no puede apuntar a otro modulo`).not.toBe('User')
+        for (const ajeno of ['Product', 'User', 'Presentation', 'Unit']) {
+          expect(candidate.type, `${candidate.name} no puede apuntar a ${ajeno}`).not.toBe(ajeno)
+        }
       }
     }
     // El unico `@relation` de los dos modelos es el intra-modulo linea -> proveedor.
@@ -501,13 +563,21 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     }
   })
 
-  it('SupplierCatalogLine no declara deletedAt', () => {
-    // R28 y decision cerrada 11: quitar un producto del catalogo ELIMINA la fila. La
-    // linea es parte del catalogo, no un hecho historico.
-    expect(has(supplierCatalogLine, 'deletedAt')).toBe(false)
-    expect(supplierCatalogLine.body).not.toMatch(/deleted_at/)
-    expect(supplierCatalogLine.body).not.toMatch(/deletedAt/)
-    // El proveedor si la lleva: las dos decisiones conviven a proposito.
+  it('SupplierCatalogLine declara deletedAt: la baja de una linea es logica (R8, R21)', () => {
+    // INVERTIDO respecto a QC-43, y con motivo. Su R34 y su decision cerrada 11 decian que
+    // quitar una linea del catalogo ELIMINABA la fila, y este mismo caso lo fijaba afirmando
+    // que `deletedAt` NO existia. QC-52 lo deroga (decision cerrada 5): la linea gana borrado
+    // logico, nada se borra fisicamente y el historico queda.
+    //
+    // Es ademas lo que hace posible el indice unico PARCIAL: sin `deleted_at` no habria
+    // sobre que ponerle el `WHERE`, y R17 -dar de baja libera la combinacion- no existiria.
+    const deletedAt = field(supplierCatalogLine, 'deletedAt')
+    expect(deletedAt.type).toBe('DateTime')
+    expect(deletedAt.isOptional).toBe(true)
+    expect(deletedAt.attributes).toContain('@map("deleted_at")')
+    expect(deletedAt.attributes).toContain('@db.Timestamptz(6)')
+    expect(deletedAt.attributes).not.toMatch(/@default\(/)
+    // Y el proveedor la conserva: las dos tablas caen juntas (R20).
     expect(has(supplier, 'deletedAt')).toBe(true)
   })
 
@@ -546,13 +616,21 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     expect(indexMaps).toEqual([
       'suppliers_created_by_idx',
       'suppliers_updated_by_idx',
-      'supplier_catalog_lines_product_id_idx',
-      // Los dos que anade QC-43 con las columnas de autor de la linea.
+      // QC-52 (R30): el lado hijo de cada FK nueva. Postgres no lo indexa solo, y por ahi
+      // pasa la verificacion del RESTRICT al borrar una presentacion o una unidad.
+      'supplier_catalog_lines_presentation_id_idx',
+      'supplier_catalog_lines_unit_id_idx',
+      // Los dos que anadio QC-43 con las columnas de autor de la linea.
       'supplier_catalog_lines_created_by_idx',
       'supplier_catalog_lines_updated_by_idx',
     ])
-    expect(supplierCatalogLine.body).toMatch(
-      /map:\s*"supplier_catalog_lines_supplier_id_product_id_key"/,
-    )
+
+    // Y NO hay indice propio de `supplier_id` ni queda rastro del que se fue con la columna
+    // que unia las dos tablas: el prefijo izquierdo del indice unico parcial ya sirve de
+    // indice de «lineas de este proveedor» (`design.md > 2.3`), asi que uno aparte seria
+    // redundante.
+    expect(indexMaps).not.toContain('supplier_catalog_lines_product_id_idx')
+    expect(indexMaps).not.toContain('supplier_catalog_lines_supplier_id_idx')
+    expect(supplierCatalogLine.body).not.toMatch(/supplier_catalog_lines_supplier_id_product_id_key/)
   })
 })

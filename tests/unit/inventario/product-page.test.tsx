@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
 import {
-  EMPTY_CELL,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
@@ -56,6 +55,20 @@ import {
  * filtraria la pagina visible, son justo las cosas que una feature posterior puede anadir sin que
  * nada se ponga rojo.
  */
+
+// Timeout propio del archivo, no el de 5 s por defecto. Son 27 casos de `user-event` sobre jsdom
+// -que teclea caracter a caracter, con su espera entre pulsaciones- y el archivo entero tarda
+// ~25 s. Medido en aislamiento el 2026-09-04, los mas pesados van de 3,5 s a 4,4 s (el rechazo
+// por nombre largo teclea 121 caracteres; el alta de una presentacion en linea abre un segundo
+// formulario dentro del panel): a 5 s no les sobra nada, y con la suite completa saturando la
+// maquina se pasan del limite. El fallo que provocaban no era de logica -en aislamiento pasaban
+// enteros-, y ademas contaminaba al caso siguiente: al cortarse a mitad del tecleo, las pulsadas
+// que quedaban pendientes caian en el input del test posterior (`xxxxxÁxcxixdxox...`).
+//
+// Subirlo no afloja ningun assert: un `waitFor` que nunca se cumpla sigue fallando, solo que a los
+// 20 s en vez de a los 5. Va aqui, a nivel de archivo, y no en el proyecto `ui` de
+// `vitest.config.mts`, para no regalarle margen al resto de la UI: la lentitud es de este archivo.
+vi.setConfig({ testTimeout: 20_000 });
 
 type CookieStoreStub = {
   get: (name: string) => { name: string; value: string } | undefined;
@@ -210,9 +223,6 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     presentationId: PRESENTACION_A.id,
     presentationName: PRESENTACION_A.name,
     stock: 42,
-    cost: '1234.5000',
-    minPurchase: 3,
-    deliveryTime: 7,
     qtyAlert: 5,
     unitId: UNIDAD_QUE_NO_DEBE_VERSE,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
@@ -323,9 +333,9 @@ async function renderPantallaCargando(searchParams: Consulta = {}) {
 /** Datos validos del formulario de producto. Valores del test, nunca los del fixture de lista.
  *
  *  ACOTADO EL 2026-09-03: costo, compra minima y tiempo de entrega salieron del formulario por
- *  decision del humano. Ya no hay control que rellenar para ellos, asi que salen tambien de aqui.
- *  Lo que la edicion sigue enviando con esos tres campos NO se deja de vigilar: pasa a
- *  `OCULTOS_EN_EDICION`, en el caso de R19, que es donde se puede afirmar de verdad. */
+ *  decision del humano. QC-52 (R1, R5) los saca ademas del producto entero, asi que ya no hay
+ *  nada que enviar oculto: `OCULTOS_EN_EDICION` desaparecio y en su lugar el caso de R19 afirma
+ *  que los tres NO viajan en el reemplazo. */
 const ALTA_VALIDA: Readonly<Record<string, string>> = {
   name: 'Ácido cítrico',
   stock: '12',
@@ -430,9 +440,9 @@ describe('pantalla de productos — lista', () => {
     //   1. la unidad salio de la pantalla tras el merge de QC-32 (ver el test «el formulario no
     //      captura la unidad»), asi que de las diez de R6 quedaron nueve;
     //   2. salen ademas costo, compra minima, tiempo de entrega, creado y actualizado. R6 queda
-    //      modificado en esos cinco puntos y esta lista es la que dice la verdad. Ninguno de los
-    //      cinco datos se pierde: siguen en `ProductView`, en la base y -los tres del
-    //      formulario- en el envio de la edicion.
+    //      modificado en esos cinco puntos y esta lista es la que dice la verdad. QC-52 (R1)
+    //      va mas lejos con los tres primeros: ya no estan en `ProductView` ni en la base -son
+    //      del catalogo del proveedor-, asi que aqui no pueden volver ni como columna oculta.
     expect(PRODUCT_COLUMNS.map((columna) => columna.key)).toEqual([
       'name',
       'presentationName',
@@ -463,35 +473,28 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('el costo ya no es columna, y donde sigue apareciendo viaja tal cual', async () => {
-    // R8 — cadena decimal, con sus ceros: convertirla a numero la mutaria a «1234.5».
-    //
-    // ACOTADO EL 2026-09-03: el costo dejo de ser columna de la tabla por decision del humano,
-    // asi que este caso ya no puede mirar una celda. Lo que R8 protege NO se deja de vigilar: se
-    // mira donde el costo sigue estando en la pantalla, que es el campo oculto con el que la
-    // edicion lo conserva. Si alguien lo pasara por `Number(...)` en el camino, «1234.5000»
-    // llegaria como «1234.5» y esto se pondria rojo.
+  it('el costo, la compra minima y el tiempo de entrega no aparecen en la lista por ninguna via', async () => {
+    // QC-52 R6 (deroga QC-14 R8 en este punto). Antes este caso miraba el campo OCULTO con el
+    // que la edicion conservaba el costo; ese campo se fue con la columna, asi que lo que se
+    // afirma ahora es la ausencia completa: ni columna, ni celda, ni campo oculto, ni ningun
+    // valor derivado de los tres.
     const user = userEvent.setup();
-    const conCentavos = producto({ cost: '1234.5000' });
-    listProductsActionMock.mockResolvedValue(paginaDeProductos([conCentavos]));
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
 
-    expect(screen.queryByTestId('product-column-cost')).toBeNull();
-    expect(screen.queryByTestId('product-cell-cost')).toBeNull();
+    for (const campo of ['cost', 'minPurchase', 'deliveryTime']) {
+      expect(screen.queryByTestId(`product-column-${campo}`), campo).toBeNull();
+      expect(screen.queryByTestId(`product-cell-${campo}`), campo).toBeNull();
+    }
 
     await user.click(screen.getByTestId(testId.abrirEdicion));
     await screen.findByTestId(testId.formulario);
-    expect(screen.getByTestId('product-hidden-cost')).toHaveValue(conCentavos.cost);
 
-    cleanup();
-
-    // Y un costo ausente no se convierte en «0» ni en «null»: el campo oculto va vacio.
-    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto({ cost: null })]));
-    await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
-    await screen.findByTestId(testId.formulario);
-    expect(screen.getByTestId('product-hidden-cost')).toHaveValue('');
+    for (const campo of ['cost', 'minPurchase', 'deliveryTime']) {
+      expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
+      expect(screen.queryByTestId(`product-hidden-${campo}`), campo).toBeNull();
+    }
   });
 
   it('la existencia se pinta en rojo cuando la alerta de cantidad la supera', async () => {
@@ -772,7 +775,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
   it('la edicion precarga los valores actuales y envia el reemplazo completo', async () => {
     // R19
     const user = userEvent.setup();
-    const elProducto = producto({ name: 'Sosa cáustica', cost: '10.2500' });
+    const elProducto = producto({ name: 'Sosa cáustica' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
@@ -785,14 +788,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       qtyAlert: String(elProducto.qtyAlert),
     };
 
-    // Los tres campos que el formulario ya no pinta pero que R19 obliga a seguir enviando: sin
-    // ellos, `updateAliveProduct` escribiria `cost: null`, `deliveryTime: null` y
-    // `minPurchase: 0` y la edicion borraria datos que nadie pidio borrar. Viajan ocultos.
-    const OCULTOS_EN_EDICION: Record<string, string> = {
-      cost: String(elProducto.cost),
-      minPurchase: String(elProducto.minPurchase),
-      deliveryTime: String(elProducto.deliveryTime),
-    };
+    // QC-52 R5: los tres que el formulario enviaba ocultos ya no existen en el producto. La
+    // edicion no puede enviarlos POR NINGUNA VIA -ni campo visible, ni oculto, ni precargado-.
+    const FUERA_DEL_PRODUCTO = ['cost', 'minPurchase', 'deliveryTime'] as const;
 
     for (const [campo, valor] of Object.entries(precargado)) {
       expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(
@@ -800,15 +798,10 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       );
     }
 
-    // Ninguno de los tres tiene ya control visible...
-    for (const campo of Object.keys(OCULTOS_EN_EDICION)) {
+    // Ninguno de los tres tiene control, ni visible ni oculto.
+    for (const campo of FUERA_DEL_PRODUCTO) {
       expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
-    }
-    // ...pero los tres estan en el formulario, ocultos y con el valor actual del producto.
-    for (const [campo, valor] of Object.entries(OCULTOS_EN_EDICION)) {
-      const oculto = screen.getByTestId(`product-hidden-${campo}`);
-      expect(oculto, campo).toHaveAttribute('type', 'hidden');
-      expect(oculto, campo).toHaveValue(valor);
+      expect(screen.queryByTestId(`product-hidden-${campo}`), campo).toBeNull();
     }
     expect(presentacionSeleccionada()).toBe(elProducto.presentationId);
 
@@ -823,9 +816,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(id).toBe(elProducto.id);
     expect(enviado.get('name')).toBe('Sosa cáustica perlas');
     expect(enviado.get('presentationId')).toBe(elProducto.presentationId);
-    for (const [campo, valor] of Object.entries({ ...precargado, ...OCULTOS_EN_EDICION })) {
+    for (const [campo, valor] of Object.entries(precargado)) {
       if (campo === 'name') continue;
       expect(enviado.get(campo), `${campo} debe viajar en el reemplazo`).toBe(valor);
+    }
+    // Y los tres que el producto perdio no viajan (R5).
+    for (const campo of FUERA_DEL_PRODUCTO) {
+      expect(enviado.get(campo), `${campo} no debe viajar en el reemplazo`).toBeNull();
     }
   });
 

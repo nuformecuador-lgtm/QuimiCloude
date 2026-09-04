@@ -30,9 +30,6 @@ const PRODUCT_SELECT = {
   presentationId: true,
   presentation: { select: { name: true } },
   stock: true,
-  cost: true,
-  minPurchase: true,
-  deliveryTime: true,
   qtyAlert: true,
   unitId: true,
   createdAt: true,
@@ -44,26 +41,11 @@ const PRODUCT_SELECT = {
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
 
 /**
- * `cost` viaja como cadena en el puerto (R31, importes): el dominio no puede importar
- * `@prisma/client` y `number` es coma flotante binaria, prohibida para importes
- * (`docs/architecture.md > Dominio` n.o 4). Este es el UNICO sitio del modulo que hace la
- * conversion `string <-> Prisma.Decimal`, en los dos sentidos (`design.md > 6.1`).
- *
- * `undefined` se conserva como `undefined` (campo omitido: no tocar la columna en un
- * `updateMany` sin sentido para este puerto, ya que `NewProduct.cost` siempre llega
- * definido por el reemplazo completo de `updateProductSchema`, pero se respeta el
- * contrato del tipo por si `create` lo recibe omitido).
+ * QC-52 (R1): `toDecimalInput`/`fromDecimalCost` se fueron con `cost`. Eran la unica
+ * conversion `string <-> Prisma.Decimal` del modulo, y sin costo en el producto no queda
+ * ningun importe que convertir aqui. La misma pareja de funciones vive, viva, en el
+ * adaptador de la linea de catalogo de `proveedores`, que es donde el importe se quedo.
  */
-export function toDecimalInput(cost: string | null | undefined): Prisma.Decimal | null | undefined {
-  if (cost === undefined) return undefined;
-  if (cost === null) return null;
-  return new Prisma.Decimal(cost);
-}
-
-/** Camino inverso de `toDecimalInput`: `Prisma.Decimal` -> cadena con 4 decimales fijos. */
-export function fromDecimalCost(cost: Prisma.Decimal | null): string | null {
-  return cost === null ? null : cost.toFixed(4);
-}
 
 /** Fila de Prisma (con el `join` de presentacion) -> `ProductView` del puerto. */
 export function toProductView(row: ProductRow): ProductView {
@@ -73,9 +55,6 @@ export function toProductView(row: ProductRow): ProductView {
     presentationId: row.presentationId,
     presentationName: row.presentation.name,
     stock: row.stock,
-    cost: fromDecimalCost(row.cost),
-    minPurchase: row.minPurchase,
-    deliveryTime: row.deliveryTime,
     qtyAlert: row.qtyAlert,
     unitId: row.unitId,
     createdAt: row.createdAt,
@@ -153,9 +132,6 @@ export async function createProduct(
         name: data.name,
         presentationId: data.presentationId,
         stock: data.stock ?? null,
-        cost: toDecimalInput(data.cost),
-        minPurchase: data.minPurchase,
-        deliveryTime: data.deliveryTime ?? null,
         qtyAlert: data.qtyAlert ?? null,
         unitId: data.unitId ?? null,
         createdAt: now,
@@ -206,9 +182,6 @@ export async function updateAliveProduct(
         name: data.name,
         presentationId: data.presentationId,
         stock: data.stock ?? null,
-        cost: toDecimalInput(data.cost),
-        minPurchase: data.minPurchase,
-        deliveryTime: data.deliveryTime ?? null,
         qtyAlert: data.qtyAlert ?? null,
         unitId: data.unitId ?? null,
         updatedAt: now,

@@ -11,8 +11,7 @@ import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/
  *   `FormData`. El esquema (`createProductSchema`/`updateProductSchema`) vive en el CASO
  *   DE USO -no aqui- y valida con `z.number()` los campos numericos; `FormData` solo
  *   entrega cadenas, asi que esta action convierte ANTES de llamar al caso de uso
- *   (`buildProductCandidate`). Una cadena no numerica en `stock`, `minPurchase`,
- *   `deliveryTime` o `qtyAlert` se rechaza AQUI -sin llamar al caso de uso- en vez de
+ *   (`buildProductCandidate`). Una cadena no numerica en `stock` o `qtyAlert` se rechaza AQUI -sin llamar al caso de uso- en vez de
  *   colarse como `NaN`: `NaN` pasaria `z.number().int()` como un numero valido y el
  *   rechazo de R28 no ocurriria nunca.
  * - `delete` tambien es una mutacion de formulario (un boton con un campo oculto `id`):
@@ -127,19 +126,16 @@ async function currentActor(): Promise<Actor | null> {
  * Construye la entrada `unknown` que espera `createProductSchema`/`updateProductSchema`
  * a partir de un `FormData`. Devuelve `INVALID_NUMBER` si algun campo numerico no es un
  * entero -es la senal para que la action rechace sin tocar el caso de uso-.
+ *
+ * QC-52 (R1, R5): NO se lee `cost`, `minPurchase` ni `deliveryTime` del `FormData`. Y si
+ * alguien los enviara de todos modos, no llegarian aqui como campo del candidato: el
+ * esquema es `strictObject` y el caso de uso los rechaza con `invalid_input`.
  */
 function buildProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
   const stock = readOptionalFormInt(formData, 'stock');
-  const minPurchase = readOptionalFormInt(formData, 'minPurchase');
-  const deliveryTime = readOptionalFormInt(formData, 'deliveryTime');
   const qtyAlert = readOptionalFormInt(formData, 'qtyAlert');
 
-  if (
-    stock === INVALID_NUMBER ||
-    minPurchase === INVALID_NUMBER ||
-    deliveryTime === INVALID_NUMBER ||
-    qtyAlert === INVALID_NUMBER
-  ) {
+  if (stock === INVALID_NUMBER || qtyAlert === INVALID_NUMBER) {
     return INVALID_NUMBER;
   }
 
@@ -147,9 +143,6 @@ function buildProductCandidate(formData: FormData): unknown | typeof INVALID_NUM
     name: readFormString(formData, 'name'),
     presentationId: readFormString(formData, 'presentationId'),
     stock,
-    cost: readOptionalFormString(formData, 'cost'),
-    minPurchase,
-    deliveryTime,
     qtyAlert,
     unitId: readOptionalFormString(formData, 'unitId'),
   };

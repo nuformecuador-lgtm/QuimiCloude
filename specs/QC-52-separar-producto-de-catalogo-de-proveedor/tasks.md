@@ -13,7 +13,7 @@
 
 ## Grupo A — Esquema y migración (bloquea a todo lo demás)
 
-### T0 — Cerrar el drift de `products.image_path` antes de generar nada
+### T0 [x] — Cerrar el drift de `products.image_path` antes de generar nada
 - **Archivos:** `db/schema.prisma` (modelo `Product`).
 - **Qué:** añadir `imagePath String? @map("image_path")` al modelo `Product`. **Solo el modelo**:
   ninguna sentencia SQL, la columna ya existe en la base desde
@@ -23,7 +23,7 @@
 - **Hecho cuando:** `pnpm run typecheck` pasa y una comprobación de esquema afirma que
   `Product.imagePath` existe, es opcional y mapea a `image_path` (R4).
 
-### T1 — Esquema Prisma: producto adelgaza, línea engorda
+### T1 [x] — Esquema Prisma: producto adelgaza, línea engorda
 - **Depende de:** T0.
 - **Archivos:** `db/schema.prisma` (modelos `Product` y `SupplierCatalogLine`).
 - **Qué:**
@@ -39,7 +39,7 @@
 - **Hecho cuando:** `pnpm exec prisma validate` pasa y `pnpm run typecheck` señala exactamente los
   archivos que T4–T9 van a arreglar (es la lista de trabajo, no un fallo).
 
-### T2 — Generar la migración y **auditarla línea a línea**
+### T2 [x] — Generar la migración y **auditarla línea a línea**
 - **Depende de:** T1.
 - **Archivos:** `db/migrations/<ts>_split_product_and_supplier_catalog/migration.sql`.
 - **Qué:**
@@ -62,7 +62,7 @@
   `supplier_catalog_lines` (salvo como destino de una FK); y no contiene ninguna sentencia de RLS
   (R26, R27, R29).
 
-### T3 — `down.sql` que revierte al esquema exacto anterior
+### T3 [x] — `down.sql` que revierte al esquema exacto anterior
 - **Depende de:** T2.
 - **Archivos:** `db/migrations/<ts>_split_product_and_supplier_catalog/down.sql`.
 - **Qué:** revertir en orden inverso (`design.md > 3.2`). Restaurar `products.min_purchase` como
@@ -80,7 +80,7 @@
 
 ## Grupo B — Módulo `inventario` (depende de A)
 
-### T4 [P] — Contratos y validación del producto
+### T4 [x] — Contratos y validación del producto
 - **Archivos:** `lib/modules/inventario/domain/product-input.ts`,
   `lib/modules/inventario/domain/product-view.ts`.
 - **Qué:** quitar `cost`, `minPurchase` y `deliveryTime` de `createProductSchema`,
@@ -89,14 +89,14 @@
 - **Hecho cuando:** un test afirma que la entrada con `cost` da `invalid_input` (R1) y que la
   entrada válida sin los tres campos pasa.
 
-### T5 [P] — Adaptador Prisma del producto
+### T5 [x] — Adaptador Prisma del producto
 - **Archivos:** `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`.
 - **Qué:** quitar los tres campos del `select`, del `create`, del `updateAlive` y del mapeo a
   `ProductView`. **No tocar** la traducción de `P2003` ni el borrado lógico.
 - **Hecho cuando:** `tests/unit/inventario/product-prisma.test.ts` pasa sin referencias a los tres
   campos y `tests/integration/inventario/product-crud.int.test.ts` sigue verde.
 
-### T6 [P] — Server Action del producto
+### T6 [x] — Server Action del producto
 - **Archivos:** `lib/modules/inventario/adapters/driving/product-actions.ts`.
 - **Qué:** dejar de leer `cost`, `minPurchase` y `deliveryTime` del `FormData`.
 - **Hecho cuando:** `tests/unit/inventario/product-actions.test.ts` pasa y ningún test envía los
@@ -106,7 +106,7 @@
 
 ## Grupo C — Pantalla de productos y E2E (depende de B)
 
-### T7 — Formulario de producto
+### T7 [x] — Formulario de producto
 - **Archivos:** `app/(private)/inventario/components/product-form.tsx`.
 - **Qué:** borrar `HIDDEN_FIELDS` y los tres `<input type="hidden">` del bloque de edición; sacar
   `cost` de `TEXT_FIELDS`, `minPurchase` y `deliveryTime` de `INT_FIELDS`, y las tres entradas de
@@ -115,14 +115,14 @@
 - **Hecho cuando:** el formulario **no envía** los tres campos por ninguna vía —ni en alta ni en
   edición— y guardar sigue funcionando en los dos casos (R5).
 
-### T8 [P] — Tabla y columnas
+### T8 [x] — Tabla y columnas
 - **Archivos:** `app/(private)/inventario/components/product-columns.ts` (verificación),
   `product-table.tsx` si hiciera falta.
 - **Qué:** comprobar que `ProductColumnKey` sigue compilando al encoger `ProductView` y que ninguna
   columna ni ningún valor derivan de los tres campos.
 - **Hecho cuando:** `pnpm run typecheck` pasa y el test en negativo de columnas sigue verde (R6).
 
-### T9 — E2E de productos
+### T9 [x] — E2E de productos
 - **Depende de:** T7.
 - **Archivos:** `e2e/inventario.spec.ts`.
 - **Qué:** borrar la línea que rellena `product-field-cost` —un `data-testid` que **la pantalla ya
@@ -136,7 +136,7 @@
 
 ## Grupo D — Módulo `proveedores` (depende de A; paralelo a B y C)
 
-### T10 — Cortar la dependencia con `inventario`
+### T10 [x] — Cortar la dependencia con `inventario`
 - **Archivos:** `lib/modules/proveedores/domain/catalog-line-input.ts`,
   `catalog-line-view.ts`, `create-catalog-line.ts`, `list-catalog-lines.ts`, `errors.ts`,
   `index.ts`.
@@ -148,7 +148,7 @@
   `@/lib/modules/inventario` ni `product`, y `tests/unit/proveedores/scope.test.ts` —invertido—
   lo afirma (R18).
 
-### T11 — Campos nuevos de la línea y su validación
+### T11 [x] — Campos nuevos de la línea y su validación
 - **Depende de:** T10.
 - **Archivos:** `lib/modules/proveedores/domain/catalog-line-input.ts`, `catalog-line-view.ts`.
 - **Qué:** añadir `name`, `presentationId` (uuid, obligatorio), `unitId` (uuid, opcional),
@@ -159,7 +159,7 @@
   presentación ausente, unidad ausente (válida), costo cero (rechazado) y decimal fuera de patrón
   (R10, R14).
 
-### T12 — Normalización y unicidad
+### T12 [x] — Normalización y unicidad
 - **Depende de:** T11.
 - **Archivos:** `lib/modules/proveedores/domain/create-catalog-line.ts`, `update-catalog-line.ts`,
   `adapters/driven/persistence/supplier-catalog-line-prisma.ts`.
@@ -170,7 +170,7 @@
   que dos presentaciones distintas del mismo nombre conviven y que dos proveedores distintos pueden
   tener la misma línea (R15, R16).
 
-### T13 — Traducción de las FK nuevas
+### T13 [x, CON SALVEDAD] — Traducción de las FK nuevas
 - **Depende de:** T11.
 - **Archivos:** `lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts`.
 - **Qué:** traducir `P2003` sobre `presentation_id` y `unit_id` a `ValidationError`
@@ -178,8 +178,18 @@
   relanzando crudo el de `created_by`/`updated_by` (`design.md > 6.2`).
 - **Hecho cuando:** un test de integración con una presentación inexistente da `invalid_input`, y
   uno con un autor inexistente relanza (R10, R32).
+- **SALVEDAD (implementer, 2026-09-04):** con Prisma 6.19.3 el conector **no puebla**
+  `meta.field_name` ni `meta.constraint` en un `P2003`: llega `{ modelName, constraint: null }` y el
+  mensaje dice `on the (not available)`. Decidir por `meta.field_name` es **hoy indecidible**, y el
+  precedente que `design.md > 6.2` manda copiar (`classifyForeignKeyViolation` de
+  `product-prisma.ts`) ya estaba muerto por lo mismo. El clasificador queda escrito tal como pide el
+  diseño —lee `field_name` y `constraint`, y empezaría a traducir solo si el conector los entregara—
+  y el test de integración afirma **lo que de verdad ocurre**: la base rechaza con `23503` y el
+  adaptador **relanza el `P2003` crudo**. No se traduce a ciegas: diría `invalid_input` también
+  cuando el fallo fuera del autor, que es la mentira que el diseño prohíbe en el otro sentido.
+  **Decisión pendiente del humano** (ver la bitácora de la feature).
 
-### T14 — Borrado lógico de la línea y caída con el proveedor
+### T14 [x] — Borrado lógico de la línea y caída con el proveedor
 - **Depende de:** T11.
 - **Archivos:** `lib/modules/proveedores/ports/supplier-catalog-repository.ts`,
   `ports/supplier-repository.ts`, `domain/delete-catalog-line.ts`, `domain/list-catalog-lines.ts`,
@@ -196,7 +206,7 @@
   las tres filas siguen existiendo, las tres tienen `deleted_at` y **es el mismo instante**; y que
   ninguna consulta las devuelve (R20, R21, R22, R23).
 
-### T15 — Edición como reemplazo completo
+### T15 [x] — Edición como reemplazo completo
 - **Depende de:** T11, T12.
 - **Archivos:** `lib/modules/proveedores/domain/update-catalog-line.ts`,
   `ports/supplier-catalog-repository.ts`, el adaptador.
@@ -206,7 +216,7 @@
 - **Hecho cuando:** un test prueba el renombrado válido, el renombrado que choca con otra línea viva
   (duplicado) y el intento de cambiar de proveedor (rechazado como entrada inválida) (R24).
 
-### T16 — Server Actions y cableado
+### T16 [x] — Server Actions y cableado
 - **Depende de:** T10–T15.
 - **Archivos:** `lib/modules/proveedores/adapters/driving/supplier-catalog-actions.ts`,
   `lib/composition/index.ts`.
@@ -220,14 +230,14 @@
 
 ## Grupo E — Verificación (depende de A–D)
 
-### T17 [P] — Autorización, en el service
+### T17 [x] — Autorización, en el service
 - **Archivos:** `tests/unit/inventario/authorization.test.ts`,
   `tests/unit/proveedores/authorization.test.ts`.
 - **Qué:** confirmar que las nueve operaciones rechazan al no-Administrador, al actor ausente y al
   rol vacío o desconocido **sin tocar ningún puerto**. Ampliar a las operaciones cuya firma cambió.
 - **Hecho cuando:** cada una tiene su caso y los dobles de repositorio afirman cero llamadas (R25).
 
-### T18 [P] — Censo de esquema y de migración
+### T18 [x] — Censo de esquema y de migración
 - **Archivos:** `tests/unit/inventario/schema/*.test.ts`,
   `tests/unit/proveedores/schema/*.test.ts`.
 - **Qué:** afirmar las columnas exactas de `products` y de `supplier_catalog_lines` tras la
@@ -237,7 +247,7 @@
 - **Hecho cuando:** los tres asserts pasan y **muerden**: se comprueba a mano que introducir un
   `DROP CONSTRAINT` en el SQL los pone rojos (R1, R2, R4, R8, R26, R27, R29).
 
-### T19 — Trazabilidad y gate completo
+### T19 [x] — Trazabilidad y gate completo
 - **Depende de:** todas.
 - **Archivos:** `progress/impl_QC-52-separar-producto-de-catalogo-de-proveedor.md`.
 - **Qué:** escribir el mapa **`R1`–`R34` → test concreto**, con la salida real de la suite pegada.

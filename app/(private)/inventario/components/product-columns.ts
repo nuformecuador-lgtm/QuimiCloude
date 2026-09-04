@@ -57,16 +57,6 @@ export type ProductColumn = {
 /** Marca de "sin dato" para las columnas opcionales. Constante para que ningun test dependa del glifo. */
 export const EMPTY_CELL = '—';
 
-/**
- * Fecha en `YYYY-MM-DD` y en UTC, **no con `toLocaleDateString`**: el Server Component y el
- * navegador tienen husos y locales distintos, y una fecha formateada con el local del entorno
- * produce una discrepancia de hidratacion que nadie relaciona con la tabla. Determinista aqui,
- * legible en cualquier maquina.
- */
-function formatDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
 function formatOptionalInt(value: number | null): string {
   return value === null ? EMPTY_CELL : String(value);
 }

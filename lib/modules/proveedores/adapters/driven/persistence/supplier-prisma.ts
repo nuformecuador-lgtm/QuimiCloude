@@ -16,9 +16,10 @@ import type { NewSupplier, SupplierView } from '../../../domain/supplier-view';
  * la fila siga viva, nunca en un `if` posterior (R22): el filtro es del puerto, y por eso
  * ningun caso de uso puede olvidarlo.
  *
- * PROHIBIDO tocar `users` y `products`: `created_by`/`updated_by` viajan como
- * identificadores en crudo (R26, `design.md > 6.1`). Ni `include`, ni `select`, ni
- * `$queryRaw` hacia esas tablas.
+ * PROHIBIDO tocar `users` y las tablas de `inventario`: `created_by`/`updated_by` viajan
+ * como identificadores en crudo. Ni `include`, ni `select`, ni `$queryRaw` hacia ellas.
+ * `supplier_catalog_lines` SI se escribe desde aqui, y solo en un sitio: la baja logica del
+ * proveedor arrastra su catalogo en la misma transaccion (R20, ver mas abajo).
  */
 
 /** `select` unico para las dos lecturas. `deleted_at` NO sale: nunca es dato de salida. */
@@ -162,20 +163,48 @@ export async function updateAliveSupplier(
 }
 
 /**
- * `softDeleteAlive` (R8, R22, R23, R24). Borrado LOGICO: marca `deleted_at` -y sella
+ * `softDeleteAlive` (R13, R20, R21, R22, R23). Borrado LOGICO: marca `deleted_at` -y sella
  * `updated_at`/`updated_by`-, NUNCA `prisma.supplier.delete`. La fila se conserva entera, y
- * como el indice unico del nombre es PARCIAL sobre los vivos, el nombre queda libre (R15).
+ * como el indice unico del nombre es PARCIAL sobre los vivos, el nombre queda libre.
+ *
+ * QC-52 le anade LA CAIDA DEL CATALOGO (R20, decision cerrada 5): la baja arrastra todas
+ * las lineas vivas de ese proveedor. Tres cosas de esta implementacion son el requisito, no
+ * detalles:
+ *
+ * 1. **Una sola transaccion.** No puede quedar un proveedor dado de baja con alguna linea
+ *    viva ni al reves, ni siquiera durante un instante ni si el proceso muere en medio.
+ * 2. **La MISMA marca de tiempo** en las dos sentencias, la que inyecto el caso de uso. Dos
+ *    `now()` distintos harian imposible saber despues que lineas cayeron con que baja.
+ * 3. **Transaccion INTERACTIVA, no un array.** Si el primer `UPDATE` afecta 0 filas -no hay
+ *    proveedor vivo con ese id- se sale antes del segundo y la transaccion NO ESCRIBE NADA
+ *    (R23). Con `$transaction([a, b])` las dos sentencias corren siempre, y la segunda
+ *    podria marcar lineas de un proveedor que nadie acaba de dar de baja.
+ *
+ * `supplier_catalog_lines` es tabla del MISMO modulo, asi que escribirla desde aqui no cruza
+ * ninguna frontera. Lo que sigue prohibido es `users` y las tablas de `inventario`.
+ *
+ * El `onDelete: Cascade` de `supplier_catalog_lines_supplier_id_fkey` se conserva y NO tiene
+ * nada que ver con esto: ninguna FK reacciona a un `UPDATE`. Sigue siendo la red de un
+ * borrado fisico -una purga, el `down.sql`- que no ocurre en operacion normal.
  */
 export async function softDeleteAliveSupplier(
   id: string,
   actorId: string,
   now: Date,
 ): Promise<boolean> {
-  const { count } = await prisma.supplier.updateMany({
-    where: { id, deletedAt: null },
-    data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.supplier.updateMany({
+      where: { id, deletedAt: null },
+      data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
+    });
+    if (count !== 1) return false;
+
+    await tx.supplierCatalogLine.updateMany({
+      where: { supplierId: id, deletedAt: null },
+      data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
+    });
+    return true;
   });
-  return count === 1;
 }
 
 /**

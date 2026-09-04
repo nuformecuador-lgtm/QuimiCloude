@@ -1,11 +1,19 @@
-// T9 (QC-43) — Los cuatro casos de uso del catalogo, con DOBLES del repositorio y del
-// contrato de `inventario`.
+// T10, T14, T15 (QC-52) — Los cuatro casos de uso del catalogo, con DOBLES del repositorio.
 //
-// Cubre R25, R26, R27, R31, R33, R34, R35, R36 y R37 (`tasks.md > Grupo B`). El doble de
-// `ProductCatalog` no solo responde: CUENTA cuantas veces le preguntan, porque «una sola
-// llamada por operacion» (`design.md > 5.3`) es la mitad del requisito -la otra es que se
-// pregunte al contrato y no a `prisma.product`, que cierran `module-contract.test.ts` y la
-// guardia de arquitectura-.
+// Cubre R9, R13, R15, R18, R21, R22, R23, R24 y R32.
+//
+// Reemplaza al archivo de QC-43 T9. Lo que se cayo, y con que regla se caia:
+//   - los tres casos que exigian `ProductNotFoundError` cuando el articulo del inventario no
+//     existia o estaba dado de baja: QC-43 R26, derogada por la decision cerrada 3 y por R9.
+//     La clase de error ya no existe (R32).
+//   - el doble de `ProductCatalog` y todas las aserciones de «una sola llamada a findRefs»:
+//     QC-43 R26 y R37, derogadas por R18. `proveedores` no consume `inventario`.
+//   - el caso que fijaba el duplicado por la pareja proveedor-articulo: QC-43 R27, sustituida
+//     por R15 (nombre normalizado + presentacion).
+//   - el caso que fijaba el borrado FISICO de la linea y el metodo `deleteById` del puerto:
+//     QC-43 R34, derogada por la decision cerrada 5 y por R21.
+//   - el que fijaba la edicion como «solo condiciones comerciales»: QC-43 R33, derogada por
+//     P6 y por R24.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -19,12 +27,11 @@ import { createDeleteCatalogLine } from '@/lib/modules/proveedores/domain/delete
 import {
   DuplicateCatalogLineError,
   NotFoundError,
-  ProductNotFoundError,
+  ValidationError,
 } from '@/lib/modules/proveedores/domain/errors'
 import { createListCatalogLines } from '@/lib/modules/proveedores/domain/list-catalog-lines'
 import { createUpdateCatalogLine } from '@/lib/modules/proveedores/domain/update-catalog-line'
 
-import type { ProductRef } from '@/lib/modules/inventario'
 import type { Actor } from '@/lib/modules/proveedores/domain/actor'
 import type { CatalogLineView } from '@/lib/modules/proveedores/domain/catalog-line-view'
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository'
@@ -42,20 +49,25 @@ const read = (...partes: readonly string[]): string =>
   readFileSync(join(moduloDir, ...partes), 'utf8')
 
 const ADMIN: Actor = { id: '11111111-1111-4111-8111-111111111111', roleName: ROLE_ADMINISTRADOR }
-const AHORA = new Date('2026-09-03T12:00:00.000Z')
+const AHORA = new Date('2026-09-04T12:00:00.000Z')
 const now = () => AHORA
 
 const SUPPLIER_ID = '22222222-2222-4222-8222-222222222222'
-const PRODUCTO_VIVO = '33333333-3333-4333-8333-333333333333'
-const PRODUCTO_DE_BAJA = '44444444-4444-4444-8444-444444444444'
+const PRESENTACION_A = '33333333-3333-4333-8333-333333333333'
+const PRESENTACION_B = '44444444-4444-4444-8444-444444444444'
+const UNIDAD = '55555555-5555-4555-8555-555555555555'
 
-const ALTA_VALIDA = {
-  supplierId: SUPPLIER_ID,
-  productId: PRODUCTO_VIVO,
+const CAMPOS_VALIDOS = {
+  name: 'Acido citrico',
+  presentationId: PRESENTACION_A,
+  unitId: null,
+  imagePath: null,
   cost: '12.5000',
   minPurchase: null,
   deliveryTime: null,
 }
+
+const ALTA_VALIDA = { supplierId: SUPPLIER_ID, ...CAMPOS_VALIDOS }
 
 /** Doble del repositorio del catalogo: espias con resultado exitoso por defecto. */
 function makeCatalog(overrides: Partial<SupplierCatalogRepository> = {}): {
@@ -64,8 +76,8 @@ function makeCatalog(overrides: Partial<SupplierCatalogRepository> = {}): {
 } {
   const spies = {
     create: vi.fn(async () => ({ id: 'linea-1' })),
-    updateTerms: vi.fn(async () => 'ok'),
-    deleteById: vi.fn(async () => 'deleted'),
+    replaceAlive: vi.fn(async () => 'ok'),
+    softDeleteAlive: vi.fn(async () => true),
     listBySupplierAlive: vi.fn(async () => ({
       items: [],
       total: 0,
@@ -84,30 +96,15 @@ function makeCatalog(overrides: Partial<SupplierCatalogRepository> = {}): {
   }
 }
 
-/**
- * Doble del contrato de `inventario`. Devuelve SOLO los ids que estan en `vivos`, que es
- * exactamente lo que hace `findRefs` de verdad (`design.md > 5.3`): un producto dado de
- * baja no vuelve, y por eso «no existe» y «esta de baja» son el mismo caso.
- */
-function makeProducts(vivos: readonly string[]): {
-  readonly products: { findRefs: (ids: readonly string[]) => Promise<readonly ProductRef[]> }
-  readonly findRefs: ReturnType<typeof vi.fn>
-} {
-  const findRefs = vi.fn(async (ids: readonly string[]) =>
-    ids
-      .filter((id) => vivos.includes(id))
-      .map((id) => ({ id, name: `Producto ${id.slice(0, 4)}`, unitId: null })),
-  )
-  return { products: { findRefs }, findRefs }
-}
-
-/** Fila del catalogo tal como la devuelve el puerto: con `productName` todavia en null. */
-function linea(id: string, productId: string): CatalogLineView {
+/** Fila del catalogo tal como la devuelve el puerto. */
+function linea(id: string, name: string, presentationId: string): CatalogLineView {
   return {
     id,
     supplierId: SUPPLIER_ID,
-    productId,
-    productName: null,
+    name,
+    presentationId,
+    unitId: null,
+    imagePath: null,
     cost: '12.5000',
     minPurchase: null,
     deliveryTime: null,
@@ -118,192 +115,262 @@ function linea(id: string, productId: string): CatalogLineView {
   }
 }
 
-describe('casos de uso del catalogo del proveedor (QC-43 T9)', () => {
-  it('rechaza la linea cuyo producto no existe o esta dado de baja, preguntando al contrato de inventario', async () => {
-    // R26. Se pregunta UNA vez, con la lista de ids, y el repositorio NO se toca cuando el
-    // producto no vuelve. Mutacion que lo pone rojo: quitar el `if (refs.length === 0)` de
-    // `create-catalog-line.ts`, o preguntar despues de escribir en vez de antes.
+describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => {
+  it('ninguno de los cuatro casos de uso depende del modulo inventario', () => {
+    // R18, y es el corazon de la ficha. Se mide sobre el TIPO `*Deps` de cada caso de uso,
+    // que es la unica puerta por la que una dependencia podria entrar al dominio: si
+    // alguien vuelve a atar `proveedores` a `inventario`, tiene que declararlo aqui.
+    //
+    // Mutacion que lo pone rojo: devolver `readonly products: ProductCatalog` a cualquiera
+    // de los dos casos de uso que lo tenian.
+    expect(clavesDelTipoDeps(read('domain', 'create-catalog-line.ts'))).toEqual(['catalog', 'now'])
+    expect(clavesDelTipoDeps(read('domain', 'update-catalog-line.ts'))).toEqual(['catalog', 'now'])
+    expect(clavesDelTipoDeps(read('domain', 'delete-catalog-line.ts'))).toEqual(['catalog', 'now'])
+    expect(clavesDelTipoDeps(read('domain', 'list-catalog-lines.ts'))).toEqual(['catalog'])
+
+    // Y el puerto expone EXACTAMENTE estos cuatro metodos. `deleteById` ya no esta -la baja
+    // es logica (R21)- y `updateTerms` tampoco -la edicion es reemplazo completo (R24)-. No
+    // hay ningun metodo de busqueda por nombre, y esa ausencia es deliberada (R15,
+    // `design.md > 10.4`): sin el, el `SELECT` previo al `INSERT` no es expresable.
+    expect(metodosDelPuerto()).toEqual([
+      'create',
+      'listBySupplierAlive',
+      'replaceAlive',
+      'softDeleteAlive',
+    ])
+  })
+
+  it('el alta manda los siete campos de negocio al puerto, con el actor y el instante inyectados', async () => {
+    // R13. El puerto recibe el `actorId` y el instante inyectado. Que al crear se escriban
+    // las DOS columnas de autor y al editar solo `updated_by` es del adaptador y se prueba
+    // contra Postgres en integracion; lo que se cierra aqui es que el dominio entrega los
+    // siete campos, el proveedor y nada mas.
     const { repo, spies } = makeCatalog()
-    const { products, findRefs } = makeProducts([PRODUCTO_VIVO])
 
-    const fallo = await createCreateCatalogLine({ catalog: repo, products, now })(
-      { ...ALTA_VALIDA, productId: PRODUCTO_DE_BAJA },
-      ADMIN,
-    ).catch((error: unknown) => error)
-
-    expect(fallo).toBeInstanceOf(ProductNotFoundError)
-    expect((fallo as ProductNotFoundError).code).toBe('product_not_found')
-    expect(spies.create).not.toHaveBeenCalled()
-    expect(findRefs).toHaveBeenCalledTimes(1)
-    expect(findRefs).toHaveBeenCalledWith([PRODUCTO_DE_BAJA])
-
-    // Y con el producto vivo, la misma alta pasa y devuelve el identificador (R25).
-    const creada = await createCreateCatalogLine({ catalog: repo, products, now })(
-      ALTA_VALIDA,
+    const creada = await createCreateCatalogLine({ catalog: repo, now })(
+      { ...ALTA_VALIDA, unitId: UNIDAD, imagePath: 'catalogo/x.png', minPurchase: '2.5' },
       ADMIN,
     )
     expect(creada).toEqual({ id: 'linea-1' })
+    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA)
+    expect(spies.create.mock.calls[0]?.[0]).toEqual({
+      supplierId: SUPPLIER_ID,
+      name: 'Acido citrico',
+      presentationId: PRESENTACION_A,
+      unitId: UNIDAD,
+      imagePath: 'catalogo/x.png',
+      cost: '12.5000',
+      minPurchase: '2.5',
+      deliveryTime: null,
+    })
+
+    // R10: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
+    await createCreateCatalogLine({ catalog: repo, now })(
+      { supplierId: SUPPLIER_ID, name: 'Sosa', presentationId: PRESENTACION_A, cost: '1.0000' },
+      ADMIN,
+    )
+    expect(spies.create.mock.calls[1]?.[0]).toEqual({
+      supplierId: SUPPLIER_ID,
+      name: 'Sosa',
+      presentationId: PRESENTACION_A,
+      unitId: null,
+      imagePath: null,
+      cost: '1.0000',
+      minPurchase: null,
+      deliveryTime: null,
+    })
   })
 
-  it('traduce el duplicado del puerto a error de linea repetida', async () => {
-    // R27. El 23505 del indice unico (supplier_id, product_id) llega ya traducido a un
-    // resultado discriminado; el dominio lo convierte en su error con `code` estable y no
-    // intenta ninguna segunda escritura.
-    const { repo, spies } = makeCatalog({ create: vi.fn(async () => 'duplicate' as const) })
-    const { products } = makeProducts([PRODUCTO_VIVO])
+  it('rechaza el alta con un identificador de articulo del inventario sin tocar el repositorio', async () => {
+    // R9. La entrada de mas se RECHAZA como entrada invalida, no se ignora, y el repositorio
+    // no se llama. Mutacion que lo pone rojo: pasar `createCatalogLineSchema` de
+    // `strictObject` a `object`.
+    const { repo, spies } = makeCatalog()
 
-    const fallo = await createCreateCatalogLine({ catalog: repo, products, now })(
+    const fallo = await createCreateCatalogLine({ catalog: repo, now })(
+      { ...ALTA_VALIDA, productId: '66666666-6666-4666-8666-666666666666' },
+      ADMIN,
+    ).catch((error: unknown) => error)
+
+    expect(fallo).toBeInstanceOf(ValidationError)
+    expect((fallo as ValidationError).code).toBe('invalid_input')
+    expect(spies.create).not.toHaveBeenCalled()
+  })
+
+  it('traduce el duplicado del puerto a error de linea repetida, en el alta y en el renombrado', async () => {
+    // R15, R24, R32. El 23505 del indice unico parcial llega ya traducido a un resultado
+    // discriminado; el dominio lo convierte en su error con `code` ESTABLE -el mismo que
+    // usaba QC-43, porque el caso sigue existiendo y solo cambia la clave que lo dispara- y
+    // no intenta ninguna segunda escritura.
+    const alta = makeCatalog({ create: vi.fn(async () => 'duplicate' as const) })
+
+    const fallo = await createCreateCatalogLine({ catalog: alta.repo, now })(
       ALTA_VALIDA,
       ADMIN,
     ).catch((error: unknown) => error)
 
     expect(fallo).toBeInstanceOf(DuplicateCatalogLineError)
     expect((fallo as DuplicateCatalogLineError).code).toBe('duplicate_catalog_line')
-    expect(spies.updateTerms).not.toHaveBeenCalled()
+    expect(alta.spies.replaceAlive).not.toHaveBeenCalled()
 
-    // Y el proveedor inexistente -la FK- es «no encontrado», no un duplicado (R25).
+    // El renombrado que choca contra otra linea VIVA del mismo proveedor da el MISMO error y
+    // el mismo `code` (R24 remite a R15): no se introduce un codigo nuevo para un caso que
+    // ya tiene uno (R32).
+    const edicion = makeCatalog({ replaceAlive: vi.fn(async () => 'duplicate' as const) })
+    const falloEdicion = await createUpdateCatalogLine({ catalog: edicion.repo, now })(
+      'linea-1',
+      CAMPOS_VALIDOS,
+      ADMIN,
+    ).catch((error: unknown) => error)
+    expect(falloEdicion).toBeInstanceOf(DuplicateCatalogLineError)
+    expect((falloEdicion as DuplicateCatalogLineError).code).toBe('duplicate_catalog_line')
+
+    // Y el proveedor inexistente o dado de baja es «no encontrado», no un duplicado (R23).
     const sinProveedor = makeCatalog({ create: vi.fn(async () => 'supplier_not_found' as const) })
     await expect(
-      createCreateCatalogLine({ catalog: sinProveedor.repo, products, now })(ALTA_VALIDA, ADMIN),
+      createCreateCatalogLine({ catalog: sinProveedor.repo, now })(ALTA_VALIDA, ADMIN),
     ).rejects.toBeInstanceOf(NotFoundError)
   })
 
-  it('guarda al actor como autor de creacion y de modificacion de la linea, y al editarla no toca ningun dato del proveedor', async () => {
-    // R31. El puerto recibe el `actorId` y el instante inyectado en las dos operaciones.
-    // Que al crear se escriban las DOS columnas de autor y al editar solo `updated_by` es
-    // del adaptador (T12) y se prueba contra Postgres en T18; lo que se cierra aqui es que
-    // el dominio no manda ningun dato de proveedor en la edicion -no tiene con que
-    // tocarlo- y que la edicion no llama a ningun repositorio de proveedores.
-    const { repo, spies } = makeCatalog()
-    const { products } = makeProducts([PRODUCTO_VIVO])
-
-    await createCreateCatalogLine({ catalog: repo, products, now })(ALTA_VALIDA, ADMIN)
-    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA)
-
-    await createUpdateCatalogLine({ catalog: repo, now })(
-      'linea-1',
-      { cost: '9.0000', minPurchase: null, deliveryTime: null },
-      ADMIN,
-    )
-    expect(spies.updateTerms).toHaveBeenCalledWith('linea-1', expect.anything(), ADMIN.id, AHORA)
-
-    // La edicion depende SOLO del repositorio del catalogo: no hay repositorio de
-    // proveedores en sus dependencias, asi que no puede escribir en `suppliers`.
-    // Mutacion que lo pone rojo: anadir `readonly suppliers: SupplierRepository` a
-    // `UpdateCatalogLineDeps`.
-    expect(clavesDelTipoDeps(read('domain', 'update-catalog-line.ts'))).toEqual(['catalog', 'now'])
-  })
-
-  it('la edicion cambia solo costo, minimo y plazo', async () => {
-    // R33. El dato que llega al puerto tiene EXACTAMENTE las tres condiciones comerciales:
-    // ni `supplierId` ni `productId`. Mutacion que lo pone rojo: pasarle `parsed.data` con
-    // un `supplierId` colado, o cambiar el esquema de edicion para que lo admita.
+  it('la edicion reemplaza los siete campos y no puede cambiar el proveedor', async () => {
+    // R24 (P6). El dato que llega al puerto tiene EXACTAMENTE los siete campos de negocio:
+    // ni `supplierId` ni ninguna referencia a un articulo del inventario. Mutacion que lo
+    // pone rojo: pasarle `parsed.data` con un `supplierId` colado, o cambiar el esquema de
+    // edicion para que lo admita.
     const { repo, spies } = makeCatalog()
 
     await createUpdateCatalogLine({ catalog: repo, now })(
       'linea-1',
-      { cost: '9.0000', minPurchase: '25.0000', deliveryTime: 3 },
+      {
+        name: '  Sosa caustica  ',
+        presentationId: PRESENTACION_B,
+        unitId: UNIDAD,
+        imagePath: 'catalogo/sosa.png',
+        cost: '9.0000',
+        minPurchase: '25.0000',
+        deliveryTime: 3,
+      },
       ADMIN,
     )
-    expect(spies.updateTerms.mock.calls[0]?.[1]).toEqual({
+    expect(spies.replaceAlive).toHaveBeenCalledWith('linea-1', expect.anything(), ADMIN.id, AHORA)
+    expect(spies.replaceAlive.mock.calls[0]?.[1]).toEqual({
+      // El nombre llega ya RECORTADO: lo hizo el esquema, antes de salir del borde (R14).
+      name: 'Sosa caustica',
+      presentationId: PRESENTACION_B,
+      unitId: UNIDAD,
+      imagePath: 'catalogo/sosa.png',
       cost: '9.0000',
       minPurchase: '25.0000',
       deliveryTime: 3,
     })
 
-    // R30: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
-    await createUpdateCatalogLine({ catalog: repo, now })('linea-1', { cost: '9.0000' }, ADMIN)
-    expect(spies.updateTerms.mock.calls[1]?.[1]).toEqual({
+    // R10: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
+    await createUpdateCatalogLine({ catalog: repo, now })(
+      'linea-1',
+      { name: 'Sosa', presentationId: PRESENTACION_A, cost: '9.0000' },
+      ADMIN,
+    )
+    expect(spies.replaceAlive.mock.calls[1]?.[1]).toEqual({
+      name: 'Sosa',
+      presentationId: PRESENTACION_A,
+      unitId: null,
+      imagePath: null,
       cost: '9.0000',
       minPurchase: null,
       deliveryTime: null,
     })
 
-    // Y la baja de la linea es FISICA (R34): el puerto solo ofrece `deleteById`, no hay
-    // ningun `softDelete` que llamar.
-    const { repo: repo2, spies: spies2 } = makeCatalog()
-    await createDeleteCatalogLine({ catalog: repo2 })('linea-1', ADMIN)
-    expect(spies2.deleteById).toHaveBeenCalledWith('linea-1')
-    expect(metodosDelPuerto()).toEqual([
-      'create',
-      'deleteById',
-      'listBySupplierAlive',
-      'updateTerms',
-    ])
+    // Intentar cambiar de proveedor es entrada INVALIDA, no un campo ignorado, y no llega
+    // ninguna escritura al puerto.
+    const conProveedor = makeCatalog()
+    const fallo = await createUpdateCatalogLine({ catalog: conProveedor.repo, now })(
+      'linea-1',
+      { ...CAMPOS_VALIDOS, supplierId: '77777777-7777-4777-8777-777777777777' },
+      ADMIN,
+    ).catch((error: unknown) => error)
+    expect(fallo).toBeInstanceOf(ValidationError)
+    expect((fallo as ValidationError).code).toBe('invalid_input')
+    expect(conProveedor.spies.replaceAlive).not.toHaveBeenCalled()
 
-    // Y una linea inexistente es «no encontrado» (R34, R24).
-    const vacio = makeCatalog({ deleteById: vi.fn(async () => 'not_found' as const) })
+    // Y una linea inexistente, ya dada de baja o de un proveedor dado de baja es «no
+    // encontrado»: los tres son el mismo caso para el dominio (R23).
+    const vacio = makeCatalog({ replaceAlive: vi.fn(async () => 'not_found' as const) })
     await expect(
-      createDeleteCatalogLine({ catalog: vacio.repo })('linea-x', ADMIN),
+      createUpdateCatalogLine({ catalog: vacio.repo, now })('linea-x', CAMPOS_VALIDOS, ADMIN),
     ).rejects.toBeInstanceOf(NotFoundError)
   })
 
-  it('el catalogo se consulta con su propio listado paginado y ordenado', async () => {
-    // R35, R36 y R37, mas la parte de R26 que dice «una sola llamada»:
-    //
-    // - el listado es propio y paginado: recibe el proveedor y la consulta de pagina, y
-    //   devuelve la pagina tal cual la dio el puerto -con `total` y `pageSize` efectivos-;
-    // - se pregunta al catalogo de productos UNA sola vez para TODA la pagina, con los tres
-    //   ids juntos. Mutacion que lo pone rojo: mover el `findRefs` dentro del `map` de
-    //   lineas -tres llamadas y `toHaveBeenCalledTimes(1)` cae-;
-    // - la linea del producto dado de baja SIGUE en la pagina, con `productName` en null.
-    const PRODUCTO_VIVO_2 = '55555555-5555-4555-8555-555555555555'
+  it('la baja de la linea es logica, sella al actor y al instante, y no encuentra la de un proveedor dado de baja', async () => {
+    // R13, R21, R23. El caso de uso llama a `softDeleteAlive` -no hay ningun `deleteById`
+    // que llamar: QC-43 R34 queda derogada (decision cerrada 5)- y le pasa el actor y el
+    // instante inyectado, porque una baja logica SI tiene `deleted_at` y `updated_at` que
+    // sellar.
+    const { repo, spies } = makeCatalog()
+    await createDeleteCatalogLine({ catalog: repo, now })('linea-1', ADMIN)
+    expect(spies.softDeleteAlive).toHaveBeenCalledWith('linea-1', ADMIN.id, AHORA)
+
+    // QC-43 R48 DEROGADA ENTERA (P5): la baja de una linea inexistente, de una ya dada de
+    // baja o de una cuyo PROVEEDOR esta dado de baja responde «no encontrado», igual que las
+    // otras tres operaciones. Quien decide los tres casos es el puerto, con un solo `false`.
+    const vacio = makeCatalog({ softDeleteAlive: vi.fn(async () => false) })
+    await expect(
+      createDeleteCatalogLine({ catalog: vacio.repo, now })('linea-x', ADMIN),
+    ).rejects.toBeInstanceOf(NotFoundError)
+  })
+
+  it('el catalogo se consulta con su propio listado paginado, sin resolver nada de otro modulo', async () => {
+    // R18, R22. La pagina se devuelve TAL CUAL la da el puerto: ni un `map`, ni una segunda
+    // consulta, ni ningun nombre pegado desde fuera. `presentationId` y `unitId` salen en
+    // crudo, y eso es la consecuencia aceptada de `design.md > 6.2`.
     const { repo, spies } = makeCatalog({
       listBySupplierAlive: vi.fn(async () => ({
         items: [
-          linea('l-1', PRODUCTO_VIVO),
-          linea('l-2', PRODUCTO_DE_BAJA),
-          linea('l-3', PRODUCTO_VIVO_2),
+          linea('l-1', 'Acido citrico', PRESENTACION_A),
+          linea('l-2', 'Acido citrico', PRESENTACION_B),
         ],
-        total: 3,
+        total: 2,
         page: 1,
         pageSize: 10,
         totalPages: 1,
       })),
     })
-    const { products, findRefs } = makeProducts([PRODUCTO_VIVO, PRODUCTO_VIVO_2])
 
-    const pagina = await createListCatalogLines({ catalog: repo, products })(
-      SUPPLIER_ID,
-      { page: 1 },
-      ADMIN,
-    )
+    const pagina = await createListCatalogLines({ catalog: repo })(SUPPLIER_ID, { page: 1 }, ADMIN)
 
     expect(spies.listBySupplierAlive).toHaveBeenCalledWith(SUPPLIER_ID, { page: 1 })
-    expect(findRefs).toHaveBeenCalledTimes(1)
-    expect(findRefs).toHaveBeenCalledWith([PRODUCTO_VIVO, PRODUCTO_DE_BAJA, PRODUCTO_VIVO_2])
-    expect(pagina.total).toBe(3)
-    expect(pagina.items.map((item) => item.id)).toEqual(['l-1', 'l-2', 'l-3'])
-    expect(pagina.items.map((item) => item.productName)).toEqual([
-      `Producto ${PRODUCTO_VIVO.slice(0, 4)}`,
-      null,
-      `Producto ${PRODUCTO_VIVO_2.slice(0, 4)}`,
+    expect(spies.listBySupplierAlive).toHaveBeenCalledTimes(1)
+    expect(pagina.total).toBe(2)
+    // R16 visto desde el dominio: dos lineas del MISMO nombre en presentaciones distintas
+    // conviven y llegan las dos.
+    expect(pagina.items.map((item) => item.id)).toEqual(['l-1', 'l-2'])
+    expect(pagina.items.map((item) => item.presentationId)).toEqual([
+      PRESENTACION_A,
+      PRESENTACION_B,
     ])
+    // Y ninguna linea trae ningun campo derivado de otro modulo.
+    for (const item of pagina.items) {
+      expect(Object.keys(item).some((clave) => /product/i.test(clave))).toBe(false)
+    }
   })
 
-  it('el listado no devuelve nada de un proveedor dado de baja y no pregunta por sus productos', async () => {
-    // R36. El filtro de proveedor vivo es del PUERTO (`listBySupplierAlive`), no de un `if`
-    // del dominio; cuando dice que no hay proveedor, el caso de uso lanza «no encontrado» y
-    // ni siquiera llega a preguntar por los nombres de producto.
+  it('el listado no devuelve nada de un proveedor dado de baja', async () => {
+    // R22, R23. El filtro de proveedor vivo -y el de linea viva- son del PUERTO
+    // (`listBySupplierAlive`), no de un `if` del dominio; cuando el puerto dice que no hay
+    // proveedor, el caso de uso lanza «no encontrado».
     const { repo } = makeCatalog({
       listBySupplierAlive: vi.fn(async () => 'supplier_not_found' as const),
     })
-    const { products, findRefs } = makeProducts([PRODUCTO_VIVO])
 
     await expect(
-      createListCatalogLines({ catalog: repo, products })(SUPPLIER_ID, { page: 1 }, ADMIN),
+      createListCatalogLines({ catalog: repo })(SUPPLIER_ID, { page: 1 }, ADMIN),
     ).rejects.toBeInstanceOf(NotFoundError)
-    expect(findRefs).not.toHaveBeenCalled()
 
-    // Y con la pagina vacia tampoco se pregunta: no hay ningun id por el que preguntar.
-    const vacio = makeCatalog()
-    const pagina = await createListCatalogLines({ catalog: vacio.repo, products })(
-      SUPPLIER_ID,
-      { page: 1 },
-      ADMIN,
-    )
-    expect(pagina.items).toEqual([])
-    expect(findRefs).not.toHaveBeenCalled()
+    // Y una consulta de pagina invalida es entrada invalida, no una pagina vacia.
+    const otro = makeCatalog()
+    await expect(
+      createListCatalogLines({ catalog: otro.repo })(SUPPLIER_ID, { page: 0 }, ADMIN),
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(otro.spies.listBySupplierAlive).not.toHaveBeenCalled()
   })
 })
 

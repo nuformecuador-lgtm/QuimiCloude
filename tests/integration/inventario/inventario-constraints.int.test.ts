@@ -25,9 +25,14 @@
  * SQLSTATE y NUNCA sobre el texto del mensaje: el Postgres de esta maquina responde en
  * espanol. Los caminos felices y las lecturas van con la API tipada.
  *
- * COSTO — `cost` se maneja siempre como `Prisma.Decimal` y se compara con `.toString()` o
- * `.equals()`. Convertirlo a `number` reintroduciria justo la coma flotante binaria que
- * `docs/architecture.md > Dominio` n.o 4 prohibe, y el test dejaria de demostrar R8.
+ * COSTO — QC-52 (R1) se llevo `cost`, `min_purchase` y `delivery_time` de `products`: son
+ * terminos comerciales y viven en el catalogo del proveedor. Lo que este archivo hacia con
+ * el costo -tratarlo como `Prisma.Decimal` y no como `number`- se hace ahora en
+ * `tests/integration/proveedores/`, sobre la linea de catalogo. Aqui, en su lugar, hay un
+ * CENSO del estado nuevo de `products` (R1, R2, R3): que las columnas que quedan son
+ * exactamente esas, que `image_path` sigue ahi (R4), que sobreviven las cuatro FK y los dos
+ * CHECK, que RLS sigue habilitada y forzada, y que no queda ninguna restriccion que
+ * mencione una columna eliminada.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -172,14 +177,7 @@ async function createUnit(
  *
  *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. `unit` (TEXT) ya no
  *  existe como columna; su sitio lo ocupa `unit_id` (UUID con FK). */
-type ProductColumn =
-  | 'name'
-  | 'stock'
-  | 'cost'
-  | 'min_purchase'
-  | 'delivery_time'
-  | 'qty_alert'
-  | 'unit_id'
+type ProductColumn = 'name' | 'stock' | 'qty_alert' | 'unit_id'
 
 /**
  * `INSERT INTO products` crudo. `columns` decide que se escribe: omitir una entrada es
@@ -310,9 +308,6 @@ describe('estructura del producto', () => {
           name: 'Acido citrico monohidratado',
           presentationId,
           stock: 120,
-          cost: new Prisma.Decimal('15340.7500'),
-          minPurchase: 5,
-          deliveryTime: 12,
           qtyAlert: 20,
           unitId,
         },
@@ -325,9 +320,6 @@ describe('estructura del producto', () => {
       expect(product.name).toBe('Acido citrico monohidratado')
       expect(product.presentationId).toBe(presentationId)
       expect(product.stock).toBe(120)
-      expect(product.cost?.toString()).toBe('15340.75')
-      expect(product.minPurchase).toBe(5)
-      expect(product.deliveryTime).toBe(12)
       expect(product.qtyAlert).toBe(20)
       expect(product.unitId).toBe(unitId)
       expect(product.deletedAt).toBeNull()
@@ -375,7 +367,7 @@ describe('estructura del producto', () => {
     })
   })
 
-  it('acepta un producto sin existencia, costo, tiempo de entrega, cantidad de alerta ni unidad, y los devuelve como ausencia de valor', async () => {
+  it('acepta un producto sin existencia, cantidad de alerta ni unidad, y los devuelve como ausencia de valor', async () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
       const { id } = await tx.product.create({
@@ -387,8 +379,6 @@ describe('estructura del producto', () => {
       // R5: ausencia de valor, NO cero y NO cadena vacia. `toBeNull` distingue las tres
       // cosas; un `toBeFalsy` las confundiria y el test no valdria nada.
       expect(product.stock).toBeNull()
-      expect(product.cost).toBeNull()
-      expect(product.deliveryTime).toBeNull()
       expect(product.qtyAlert).toBeNull()
       // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva
       // exactamente lo que R5 vigila —la unidad ausente vuelve como AUSENCIA de valor, no
@@ -400,35 +390,19 @@ describe('estructura del producto', () => {
     })
   })
 
-  it('un producto dado de alta sin compra minima queda con compra minima 0', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
-      const { id } = await tx.product.create({
-        data: { name: 'Sin compra minima', presentationId },
-        select: { id: true },
-      })
+  // QC-52 (R1) deroga QC-14 R6: `min_purchase` ya no es columna de `products`, asi que su
+  // DEFAULT 0 no tiene nada que defender aqui. El caso no se relaja, se muda: el minimo de
+  // compra vive hoy en la linea del catalogo del proveedor y alli tiene sus propias reglas.
 
-      const product = await tx.product.findUniqueOrThrow({ where: { id } })
-      // R6: el DEFAULT actua y la columna NO es anulable, asi que «compra minima 0» y
-      // «compra minima desconocida» no pueden convivir (design.md > 2.2).
-      expect(product.minPurchase).toBe(0)
-      expect(product.minPurchase).not.toBeNull()
-    })
-  })
-
-  it('las cuatro columnas enteras son integer en information_schema', async () => {
+  it('las dos columnas enteras que quedan son integer en information_schema', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const types = await columnTypes(tx, 'products', [
-        'stock',
-        'min_purchase',
-        'qty_alert',
-        'delivery_time',
-      ])
+      // QC-52 (R1, R2): de las cuatro de QC-14 R7 quedan dos. `min_purchase` y
+      // `delivery_time` se fueron con la migracion; `stock` y `qty_alert` conservan su tipo
+      // exacto, que es lo que R2 exige (la misma forma y la misma opcionalidad).
+      const types = await columnTypes(tx, 'products', ['stock', 'qty_alert'])
       // R7: el tipo REAL en la base, no el declarado en el esquema. `numeric` o
       // `double precision` harian caer esta lista.
       expect(types.map((type) => [type.column_name, type.data_type])).toEqual([
-        ['delivery_time', 'integer'],
-        ['min_purchase', 'integer'],
         ['qty_alert', 'integer'],
         ['stock', 'integer'],
       ])
@@ -451,52 +425,21 @@ describe('estructura del producto', () => {
     })
   })
 
-  it('el costo conserva cuatro decimales exactos y su columna es numeric(14,4)', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const [cost] = await columnTypes(tx, 'products', ['cost'])
-      // R8: `numeric(14,4)`. Si alguien lo cambiase a `double precision`, `data_type`
-      // diria «double precision» y la precision declarada desapareceria.
-      expect(cost?.data_type).toBe('numeric')
-      expect(Number(cost?.numeric_precision)).toBe(14)
-      expect(Number(cost?.numeric_scale)).toBe(4)
+  // QC-52 (R1) deroga QC-14 R8 sobre `products`: no hay columna `cost` que pueda ser
+  // `numeric(14,4)` ni cuatro decimales que conservar. La garantia no se pierde -el importe
+  // se mudo a `supplier_catalog_lines.cost`, con el mismo `DECIMAL(14,4)`- y su test vive
+  // ahora en `tests/integration/proveedores/`. Que la columna YA NO ESTE lo afirma el censo
+  // del describe de QC-52 que cierra este archivo.
 
-      const presentationId = await createPresentation(tx)
-      const exact = new Prisma.Decimal('1234567890.1234')
-      const { id } = await tx.product.create({
-        data: { name: 'Costo exacto', presentationId, cost: exact },
-        select: { id: true },
-      })
-
-      const product = await tx.product.findUniqueOrThrow({ where: { id } })
-      // Se compara como Decimal o como texto, NUNCA convirtiendo a `number`: esa
-      // conversion es justamente la perdida que R8 prohibe.
-      expect(product.cost).toBeInstanceOf(Prisma.Decimal)
-      expect(product.cost?.toString()).toBe('1234567890.1234')
-      expect(product.cost?.equals(exact)).toBe(true)
-
-      // El cuarto decimal sobrevive incluso cuando es lo unico que distingue dos valores.
-      const { id: otherId } = await tx.product.create({
-        data: {
-          name: 'Costo exacto',
-          presentationId,
-          cost: new Prisma.Decimal('1234567890.1235'),
-        },
-        select: { id: true },
-      })
-      const other = await tx.product.findUniqueOrThrow({ where: { id: otherId } })
-      expect(other.cost?.toString()).toBe('1234567890.1235')
-      expect(other.cost?.equals(exact)).toBe(false)
-    })
-  })
-
-  it('rechaza existencia, compra minima, cantidad de alerta y costo negativos con SQLSTATE 23514', async () => {
+  it('rechaza existencia y cantidad de alerta negativas con SQLSTATE 23514', async () => {
+    // QC-52 (R3): de los cuatro CHECK de no negatividad de QC-14 R9, los de `cost` y
+    // `min_purchase` se fueron CON su columna -Postgres se lleva el CHECK que solo menciona
+    // la columna borrada- y los dos que quedan tienen que seguir mordiendo igual.
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
       const negatives: readonly [ProductColumn, Prisma.Sql][] = [
         ['stock', Prisma.sql`${-1}`],
-        ['min_purchase', Prisma.sql`${-1}`],
         ['qty_alert', Prisma.sql`${-1}`],
-        ['cost', Prisma.sql`${'-0.0001'}::numeric`],
       ]
 
       for (const [column, value] of negatives) {
@@ -506,8 +449,8 @@ describe('estructura del producto', () => {
         columns[column] = value
 
         // Un SAVEPOINT por caso: el 23514 aborta la transaccion entera y sin el no se
-        // podrian probar los tres siguientes. Cada alta pone UN solo valor negativo, asi
-        // que el CHECK que salta es el de esa columna y no otro.
+        // podria probar el siguiente. Cada alta pone UN solo valor negativo, asi que el
+        // CHECK que salta es el de esa columna y no otro.
         const sqlState = await expectRejectedByDatabase(
           tx,
           () => rawInsertProduct(tx, columns, presentationId),
@@ -516,7 +459,7 @@ describe('estructura del producto', () => {
         expect(sqlState, `columna "${column}"`).toBe(CHECK_VIOLATION)
       }
 
-      // R9 «no crear ni modificar ninguna fila»: ninguno de los cuatro intentos escribio.
+      // R9 «no crear ni modificar ninguna fila»: ninguno de los dos intentos escribio.
       const survivors = await tx.product.findMany({
         where: { name: { startsWith: 'negativo en ' } },
         select: { id: true },
@@ -526,14 +469,12 @@ describe('estructura del producto', () => {
       // El CHECK rechaza el negativo, no el cero ni el valor ausente: R5 y R6 conviven
       // con R9 porque en SQL un CHECK que evalua a NULL se cumple.
       const { id } = await tx.product.create({
-        data: { name: 'Ceros y nulos', presentationId, stock: 0, minPurchase: 0, qtyAlert: 0 },
+        data: { name: 'Ceros y nulos', presentationId, stock: 0, qtyAlert: 0 },
         select: { id: true },
       })
       const zeroed = await tx.product.findUniqueOrThrow({ where: { id } })
       expect(zeroed.stock).toBe(0)
-      expect(zeroed.minPurchase).toBe(0)
       expect(zeroed.qtyAlert).toBe(0)
-      expect(zeroed.cost).toBeNull()
     })
   })
 
@@ -594,9 +535,6 @@ describe('estructura del producto', () => {
           name: 'Producto vigilado',
           presentationId,
           stock: 3,
-          cost: new Prisma.Decimal('10.0000'),
-          minPurchase: 1,
-          deliveryTime: 7,
           qtyAlert: 50,
           unitId,
         },
@@ -798,9 +736,6 @@ describe('borrado logico y marcas de tiempo', () => {
           name: 'Producto que se retira',
           presentationId,
           stock: 9,
-          cost: new Prisma.Decimal('99.9999'),
-          minPurchase: 2,
-          deliveryTime: 4,
           qtyAlert: 1,
           unitId,
         },
@@ -814,7 +749,9 @@ describe('borrado logico y marcas de tiempo', () => {
       const after = await tx.product.findUniqueOrThrow({ where: { id } })
       // R17: la fila sigue ahi ENTERA. Ningun dato se pierde; solo cambian las marcas.
       expect(after.deletedAt).toEqual(deletedAt)
-      expect(after.cost?.toString()).toBe('99.9999')
+      // QC-52 (R2): la fila conserva ENTERO lo que le queda -incluida `image_path`, que la
+      // migracion no toca (R4)-. El `toEqual` sobre la fila completa es lo que lo cierra.
+      expect(after.imagePath).toBeNull()
       expect({ ...after, deletedAt: null, updatedAt: before.updatedAt }).toEqual(before)
     })
   })
@@ -852,5 +789,141 @@ describe('borrado logico y marcas de tiempo', () => {
       expect(renamed.createdAt.getTime()).toBe(presentation.createdAt.getTime())
       expect(renamed.updatedAt.getTime()).toBeGreaterThan(presentation.updatedAt.getTime())
     })
+  })
+})
+
+
+/**
+ * QC-52 — censo del estado NUEVO de `products` contra Postgres real (R1, R2, R3, R4, R26).
+ *
+ * Los casos de arriba prueban COMPORTAMIENTO; este describe prueba ESTRUCTURA, que es lo
+ * unico capaz de detectar que la migracion se llevo por delante algo que no debia. Todo se
+ * lee de los catalogos del sistema (`information_schema`, `pg_constraint`, `pg_class`), no
+ * del esquema Prisma: lo que importa es lo que hay EN LA BASE.
+ *
+ * Estos casos NO abren transaccion ni escriben nada: solo leen catalogo.
+ */
+describe('QC-52 — censo de products tras la migracion', () => {
+  /** Columnas exactas que `products` debe tener despues de la migracion (R1, R2, R4). */
+  const COLUMNAS_ESPERADAS = [
+    'created_at',
+    'created_by',
+    'deleted_at',
+    'id',
+    'image_path',
+    'name',
+    'presentation_id',
+    'qty_alert',
+    'stock',
+    'unit_id',
+    'updated_at',
+    'updated_by',
+  ] as const
+
+  /** Las tres que la migracion se llevo y que no pueden volver por ninguna via (R1). */
+  const COLUMNAS_ELIMINADAS = ['cost', 'min_purchase', 'delivery_time'] as const
+
+  async function nombresDeColumna(): Promise<string[]> {
+    const rows = await prisma.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'products'
+      ORDER BY column_name`
+    return rows.map((row) => row.column_name)
+  }
+
+  it('tiene exactamente las columnas que R1 y R2 dejan, ni una mas ni una menos', async () => {
+    // R1 (las tres se fueron) y R2 (todo lo demas se queda, con su misma forma). Es una
+    // igualdad, no un `toContain`: una columna de mas -o de menos- pone esto rojo.
+    expect(await nombresDeColumna()).toEqual([...COLUMNAS_ESPERADAS])
+    for (const columna of COLUMNAS_ELIMINADAS) {
+      expect(await nombresDeColumna(), columna).not.toContain(columna)
+    }
+  })
+
+  it('image_path sigue existiendo, es TEXT y sigue siendo anulable', async () => {
+    // R4: la migracion no toca esa columna. Estaba desde
+    // `20260903200000_product_image_path` y tiene que seguir exactamente igual -si el
+    // drift del modelo Prisma hubiera colado un `DROP COLUMN "image_path"` entre los tres
+    // que si queriamos, esto seria lo que lo delataria-.
+    const [row] = await prisma.$queryRaw<
+      { data_type: string; is_nullable: string; column_default: string | null }[]
+    >`
+      SELECT data_type, is_nullable, column_default FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'image_path'`
+    expect(row?.data_type).toBe('text')
+    expect(row?.is_nullable).toBe('YES')
+    expect(row?.column_default).toBeNull()
+  })
+
+  it('conserva las cuatro claves foraneas: presentacion, unidad y las dos de autoria', async () => {
+    // R3. Son las que `prisma migrate dev` propone borrar en CADA generacion, porque
+    // `unit_id`, `created_by` y `updated_by` son escalares sin `@relation` y el esquema no
+    // las conoce. Si una auditoria del SQL bajara la guardia, este caso lo dice.
+    const rows = await prisma.$queryRaw<{ conname: string; confrelid: string }[]>`
+      SELECT c.conname, c.confrelid::regclass::text AS confrelid
+      FROM pg_constraint c
+      WHERE c.conrelid = 'public.products'::regclass AND c.contype = 'f'
+      ORDER BY c.conname`
+    expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([
+      ['products_created_by_fkey', 'users'],
+      ['products_presentation_id_fkey', 'presentations'],
+      ['products_unit_id_fkey', 'units'],
+      ['products_updated_by_fkey', 'users'],
+    ])
+  })
+
+  it('conserva los dos CHECK de no negatividad que quedan, y solo esos dos', async () => {
+    // R3. Los de `cost` y `min_purchase` se fueron CON su columna, sin sentencia propia:
+    // Postgres borra el CHECK que solo menciona la columna eliminada. Los de `stock` y
+    // `qty_alert` no mencionan ninguna, asi que tienen que seguir enteros.
+    const rows = await prisma.$queryRaw<{ conname: string }[]>`
+      SELECT conname FROM pg_constraint
+      WHERE conrelid = 'public.products'::regclass AND contype = 'c'
+      ORDER BY conname`
+    expect(rows.map((row) => row.conname)).toEqual([
+      'products_qty_alert_non_negative',
+      'products_stock_non_negative',
+    ])
+  })
+
+  it('no queda ninguna restriccion que mencione una columna eliminada', async () => {
+    // R3, segunda mitad, y es la que de verdad muerde: una restriccion residual que
+    // nombrara `cost` habria dejado el esquema en un estado que ni la lista de columnas ni
+    // la de CHECK detectan por si solas (p. ej. un indice, o un CHECK multicolumna). Se
+    // mira el TEXTO de cada restriccion de la tabla y el de cada indice.
+    const restricciones = await prisma.$queryRaw<{ conname: string; definicion: string }[]>`
+      SELECT conname, pg_get_constraintdef(oid) AS definicion
+      FROM pg_constraint WHERE conrelid = 'public.products'::regclass`
+    const indices = await prisma.$queryRaw<{ indexname: string; indexdef: string }[]>`
+      SELECT indexname, indexdef FROM pg_indexes
+      WHERE schemaname = 'public' AND tablename = 'products'`
+
+    const textos = [
+      ...restricciones.map((row) => [row.conname, row.definicion] as const),
+      ...indices.map((row) => [row.indexname, row.indexdef] as const),
+    ]
+    // Ancla: si la consulta no devolviera nada, los `not.toContain` de abajo pasarian por
+    // vacio y este caso seria un placebo.
+    expect(textos.length).toBeGreaterThan(0)
+
+    for (const [nombre, texto] of textos) {
+      for (const columna of COLUMNAS_ELIMINADAS) {
+        expect(`${nombre} :: ${texto}`, `${nombre} menciona "${columna}"`).not.toContain(columna)
+      }
+    }
+  })
+
+  it('RLS sigue habilitada Y forzada en products', async () => {
+    // R26. `relforcerowsecurity` es la mitad que de verdad importa aqui: Prisma se conecta
+    // como DUENO de la tabla, y a un dueno Postgres no le aplica RLS salvo con FORCE. La
+    // migracion de esta ficha no contiene ninguna sentencia de RLS, asi que las dos banderas
+    // tienen que seguir como las dejo QC-14.
+    const [row] = await prisma.$queryRaw<
+      { relrowsecurity: boolean; relforcerowsecurity: boolean }[]
+    >`
+      SELECT relrowsecurity, relforcerowsecurity FROM pg_class
+      WHERE oid = 'public.products'::regclass`
+    expect(row?.relrowsecurity).toBe(true)
+    expect(row?.relforcerowsecurity).toBe(true)
   })
 })

@@ -202,7 +202,6 @@ async function deleteTestUser(db: Db, userId: string): Promise<void> {
 function baseProductInput(overrides: Partial<NewProduct> = {}): Omit<NewProduct, 'presentationId'> {
   return {
     name: `Producto ${token()}`,
-    minPurchase: 0,
     ...overrides,
   };
 }
@@ -291,7 +290,6 @@ describe('auditoria de autor (R7)', () => {
         data: {
           name: 'Producto con autor real',
           presentationId,
-          minPurchase: 0,
           createdBy: realUserId,
           updatedBy: realUserId,
         },

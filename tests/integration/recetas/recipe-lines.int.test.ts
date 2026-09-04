@@ -109,7 +109,7 @@ async function createTestProduct(db: Db, name = `Producto ${token()}`): Promise<
     select: { id: true },
   });
   const product = await db.product.create({
-    data: { name, presentationId: presentation.id, minPurchase: 0 },
+    data: { name, presentationId: presentation.id },
     select: { id: true },
   });
   return product.id;
