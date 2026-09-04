@@ -35,7 +35,7 @@
 
 ## Bloque B — esquema
 
-- [ ] **T4 · Los dos modelos nuevos en el esquema.**
+- [x] **T4 · Los dos modelos nuevos en el esquema.**
       Archivos: `db/schema.prisma`.
       `Company` y `Membership` según `design.md > 2.1` y `> 2.2`, cada uno con su `/// @module
       identity` (R22) y con el comentario `///` que explica **por qué** la unicidad del nombre de
@@ -43,7 +43,7 @@
       mismo tono que los de `Recipe` y `Supplier`.
       *Hecho*: `pnpm prisma validate` pasa y `pnpm prisma generate` produce el cliente.
 
-- [ ] **T5 · `User` pierde el rol.**
+- [x] **T5 · `User` pierde el rol.**
       Archivos: `db/schema.prisma`.
       Fuera `roleId`, la relación `role` y `@@index([roleId])`; dentro `memberships Membership[]`.
       Fuera también `users User[]` de `Role`, sustituido por `memberships Membership[]`.
@@ -52,7 +52,7 @@
       lectura oculta (R14).
       **Depende de**: T4.
 
-- [ ] **T6 · Test de esquema.**
+- [x] **T6 · Test de esquema.**
       Archivos: `tests/unit/identity/schema/identity-schema.test.ts` (existente).
       Amplía: `@module identity` en los dos modelos nuevos; `User` sin ninguna columna de rol;
       `Membership` con sus tres referencias obligatorias, su `@@unique(user_id, company_id)` y **sin**

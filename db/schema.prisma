@@ -45,12 +45,20 @@ model Role {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  users User[]
+  memberships Membership[]
 
   @@map("roles")
 }
 
 /// Usuario del ERP. Borrado logico: `deletedAt` NULL = usuario vivo.
+///
+/// OJO 0 — EL USUARIO YA NO TIENE ROL. QC-47 (R14) le quito `roleId`, su relacion `role`,
+/// su FK `users_role_id_fkey` y su indice `users_role_id_idx`: el rol de una persona vive
+/// ahora en `Membership`, y es el rol QUE TIENE EN ESA EMPRESA (R8, R15). No hay ninguna
+/// columna de rol en esta tabla y no debe volver: quien la reintroduzca parte en dos la
+/// verdad sobre el rol, porque la pertenencia seguiria existiendo. La migracion
+/// `<ts>_companies_and_memberships` mueve el dato antes de borrar la columna y su
+/// `down.sql` la devuelve recreando FK e indice a mano.
 ///
 /// OJO — las tres unicidades de esta tabla (correo, nombre de usuario y la pareja
 /// tipo+numero de documento) NO estan aqui como `@unique`/`@@unique` y eso es
@@ -74,7 +82,6 @@ model User {
   documentNumber   String    @map("document_number")
   username         String
   passwordHash     String    @map("password_hash")
-  roleId           String    @map("role_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -89,11 +96,91 @@ model User {
   mustChangeCredential Boolean @default(false) @map("must_change_credential")
 
   documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
-  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([roleId], map: "users_role_id_idx")
+  memberships Membership[]
+
   @@index([documentTypeCode], map: "users_document_type_code_idx")
   @@map("users")
+}
+
+/// Empresa del ERP (QC-47). Borrado LOGICO: `deletedAt` NULL = empresa viva (R5). Nace con
+/// la tabla y NADIE la escribe en esta ficha: no hay alta, edicion ni baja de empresas
+/// (R28), solo el modelo y la empresa inicial que crea el seed.
+///
+/// Vive en `identity` y no en un modulo propio (design.md > 1): la pertenencia esta hecha de
+/// usuario + rol + empresa, y partir esas tres filas en dos modulos costaria una consulta mas
+/// en el login, la transaccion unica del seed y tres FK escritas a mano. Si algun dia nace un
+/// CRUD de empresas, la mudanza es barata MIENTRAS nadie lea `companies` desde fuera — y eso
+/// ya lo prohibe R22.
+///
+/// OJO — la unicidad del nombre NO esta aqui como `@@unique` y es deliberado, igual que en
+/// `Recipe` y `Supplier`: es un indice unico FUNCIONAL (`lower(...)`) y PARCIAL
+/// (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela ninguna de las
+/// dos cosas. Vive escrito a mano en `migration.sql` (`companies_name_unique`) y ese es el
+/// unico sitio donde existe. Si alguien "arregla" el esquema anadiendo el `@@unique`, la
+/// unicidad pasa a ser TOTAL sin que nadie se entere y una empresa dada de baja quema su
+/// nombre para siempre.
+///
+/// Es la UNICA garantia de R4: no hay `SELECT` previo por igualdad —seria una carrera, entre
+/// el `SELECT` y el `INSERT` cabe otra transaccion— y el choque se traduce del SQLSTATE
+/// `23505`, mismo criterio que `Presentation`, `Unit` y `Supplier`.
+///
+/// `nameNormalized` la calcula `normalizeCompanyName` (dominio de `identity`, funcion pura) y
+/// se persiste junto a `name` en toda escritura (R3).
+/// @module identity
+model Company {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  nameNormalized String    @map("name_normalized")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  memberships Membership[]
+
+  @@map("companies")
+}
+
+/// Pertenencia (QC-47): que persona pertenece a que empresa, y CON QUE ROL EN ESA EMPRESA
+/// (R7, R8). Es lo que une las dos mitades del dominio, y es la unica fuente del rol desde
+/// que `users.role_id` dejo de existir.
+///
+/// NO lleva `deletedAt` a proposito (R12), igual que `Role`, `Presentation`, `Unit` y
+/// `RecipeLine`: esta ficha no construye ninguna revocacion, y una columna que ningun codigo
+/// escribe es deuda.
+///
+/// El `@@unique([userId, companyId])` es TOTAL y no parcial —a diferencia de
+/// `companies_name_unique`— justamente porque aqui no hay borrado logico: no hay filas
+/// muertas que puedan liberar la pareja (R9). Este si lo modela Prisma, asi que lo genera el.
+///
+/// Las tres relaciones van con `@relation` de Prisma, y eso se aparta A PROPOSITO del patron
+/// `products.unit_id` / `recipe_lines.product_id` (design.md > 2.2): aquel existe para impedir
+/// que un `include` cruce de modulo, y aqui `User`, `Role` y `Company` son los tres de
+/// `identity`, asi que no hay frontera que proteger y las tres FK las genera Prisma en vez de
+/// quedar como drift manual. `Restrict` y nunca `Cascade` (R11): borrar un rol o una empresa
+/// no debe llevarse por delante pertenencias en silencio.
+///
+/// NO se declara `memberships_user_id_idx` y es deliberado (design.md > 2.2): el unico
+/// compuesto ya tiene `userId` como columna lider y sirve para las busquedas por usuario, que
+/// son las del login. Los otros dos indices si hacen falta: Postgres no indexa el lado hijo de
+/// una FK y por ahi pasa la verificacion del `Restrict`.
+/// @module identity
+model Membership {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([userId, companyId], map: "memberships_user_id_company_id_key")
+  @@index([companyId], map: "memberships_company_id_idx")
+  @@index([roleId], map: "memberships_role_id_idx")
+  @@map("memberships")
 }
 
 /// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo

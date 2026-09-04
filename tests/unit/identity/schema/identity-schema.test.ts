@@ -5,6 +5,10 @@
 // default, ni dice si la relacion es `Restrict`, ni si existe un `enum`.
 //
 // Cubre R1, R2, R3, R8, R10 (parcial), R12, R13, R15, R16, R17 (parcial), R21, R24.
+//
+// AMPLIADO POR QC-47 (`specs/QC-47-modelo-empresa-y-membresias/`): los dos bloques del final
+// cubren `Company` y `Membership` (R1, R2, R5, R6, R7, R9, R11, R12, R21, R22) y la
+// desaparicion de toda columna de rol en `users` (R14).
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -82,6 +86,8 @@ function parseModel(name: string): PrismaModel {
 const user = parseModel('User')
 const role = parseModel('Role')
 const documentType = parseModel('DocumentType')
+const company = parseModel('Company')
+const membership = parseModel('Membership')
 
 function field(model: PrismaModel, name: string): PrismaField {
   const found = model.fields.find((candidate) => candidate.name === name)
@@ -195,14 +201,13 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
 
     // La lista completa de columnas: si alguien anade o quita una, este test lo dice.
     const scalarNames = user.fields
-      .filter((candidate) => !candidate.isList && candidate.type !== 'DocumentType' && candidate.type !== 'Role')
+      .filter((candidate) => !candidate.isList && candidate.type !== 'DocumentType')
       .map((candidate) => candidate.name)
       .sort()
     expect(scalarNames).toEqual(
       [
         'id',
         ...BUSINESS_FIELDS.map(([name]) => name),
-        'roleId',
         'createdAt',
         'updatedAt',
         'deletedAt',
@@ -294,30 +299,13 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
     expect(description.attributes).not.toMatch(/@default\(/)
   })
 
-  it('roleId es obligatorio y FK a Role', () => {
-    const roleId = field(user, 'roleId')
-    expect(roleId.type).toBe('String')
-    expect(roleId.isOptional).toBe(false)
-    expect(roleId.attributes).toContain('@db.Uuid')
-    expect(roleId.attributes).toContain('@map("role_id")')
-
-    const relation = field(user, 'role')
-    expect(relation.type).toBe('Role')
-    expect(relation.isOptional).toBe(false)
-    expect(relation.attributes).toMatch(/fields:\s*\[roleId\]/)
-    expect(relation.attributes).toMatch(/references:\s*\[id\]/)
-  })
-
-  it('roleId no tiene restriccion de unicidad', () => {
-    // Un `@unique` aqui convertiria la relacion en 1-1 y romperia R16 en silencio.
-    expect(field(user, 'roleId').attributes).not.toMatch(/@unique/)
-    expect(user.body).not.toMatch(/@@unique\([^)]*roleId/)
-    expect(role.fields.find((candidate) => candidate.name === 'users')?.isList).toBe(true)
-  })
-
-  it('la relacion User-Role declara onDelete Restrict', () => {
-    expect(field(user, 'role').attributes).toMatch(/onDelete:\s*Restrict/)
-    expect(field(user, 'role').attributes).not.toMatch(/onDelete:\s*(Cascade|SetNull|SetDefault)/)
+  it('un rol se puede repetir en muchas pertenencias', () => {
+    // ACOTADO POR QC-47 (R14): antes esto se afirmaba sobre `User.roleId` y sobre el campo de
+    // vuelta `Role.users`, que ya no existen. Lo que R16 vigilaba —que el rol NO sea una
+    // relacion 1-1— sigue vigente, solo que el lado muchos es ahora la pertenencia.
+    expect(field(membership, 'roleId').attributes).not.toMatch(/@unique/)
+    expect(membership.body).not.toMatch(/@@unique\([^)]*roleId/)
+    expect(role.fields.find((candidate) => candidate.name === 'memberships')?.isList).toBe(true)
   })
 
   it('Role no tiene deletedAt', () => {
@@ -417,5 +405,189 @@ describe('db/schema.prisma — marca de cambio de credencial obligatorio (R9, R1
       expect(declared.attributes, `User.${name} debe mapear a ${column}`).toContain(`@map("${column}")`)
     }
     expect(SEED_FIELDS).toHaveLength(1)
+  })
+})
+
+// --- QC-47 — empresa y pertenencia (R1, R2, R5, R6, R7, R8, R9, R12, R14, R21, R22) ---
+
+describe('db/schema.prisma — Company y Membership (QC-47)', () => {
+  it('los dos modelos nuevos declaran su modulo propietario identity (R22)', () => {
+    // El bloque 10 de `guard-arquitectura-modulos` se apoya en esta linea para saber quien
+    // puede hacer `prisma.company` / `prisma.membership`. Sin ella, la tabla no tiene dueno.
+    const normalized = rawSchema.replace(/\r\n/g, '\n')
+    expect(normalized).toContain('/// @module identity\nmodel Company {')
+    expect(normalized).toContain('/// @module identity\nmodel Membership {')
+  })
+
+  it('Company y Membership tienen id uuid con default generado (R1)', () => {
+    for (const [modelName, model] of [
+      ['Company', company],
+      ['Membership', membership],
+    ] as const) {
+      const id = field(model, 'id')
+      expect(id.type, `${modelName}.id`).toBe('String')
+      expect(id.attributes).toContain('@id')
+      expect(id.attributes).toContain('@db.Uuid')
+      expect(id.attributes).toMatch(/@default\(dbgenerated\("gen_random_uuid\(\)"\)\)/)
+      expect(id.isOptional).toBe(false)
+    }
+  })
+
+  it('Company declara name y nameNormalized obligatorios, en texto sin longitud (R2, R21)', () => {
+    for (const [name, column] of [
+      ['name', 'name'],
+      ['nameNormalized', 'name_normalized'],
+    ] as const) {
+      const declared = field(company, name)
+      expect(declared.type, `Company.${name}`).toBe('String')
+      expect(declared.isOptional, `Company.${name} no puede ser opcional`).toBe(false)
+      expect(declared.attributes, `Company.${name} no debe tener @default`).not.toMatch(/@default\(/)
+      expect(declared.attributes, `Company.${name} no lleva longitud declarada`).not.toMatch(/@db\./)
+      if (name !== column) {
+        expect(declared.attributes, `Company.${name} debe mapear a ${column}`).toContain(
+          `@map("${column}")`,
+        )
+      }
+    }
+    expect(company.body).toContain('@@map("companies")')
+  })
+
+  it('Company NO declara unicidad sobre el nombre: es funcional y parcial, vive en el SQL', () => {
+    // Un `@@unique` aqui convertiria la unicidad en TOTAL y sin `lower()`, y entonces una
+    // empresa dada de baja quemaria su nombre para siempre. `companies_name_unique` vive
+    // escrito a mano en `migration.sql` (design.md > 2.1), igual que en `Recipe` y `Supplier`.
+    expect(company.body).not.toMatch(/@@unique/)
+    expect(field(company, 'name').attributes).not.toMatch(/@unique/)
+    expect(field(company, 'nameNormalized').attributes).not.toMatch(/@unique/)
+  })
+
+  it('Company declara deletedAt opcional (R5)', () => {
+    const deletedAt = field(company, 'deletedAt')
+    expect(deletedAt.type).toBe('DateTime')
+    expect(deletedAt.isOptional).toBe(true)
+    expect(deletedAt.attributes).toContain('@map("deleted_at")')
+    expect(deletedAt.attributes).toContain('@db.Timestamptz(6)')
+  })
+
+  it('Company y Membership registran creacion y actualizacion (R6)', () => {
+    for (const [modelName, model] of [
+      ['Company', company],
+      ['Membership', membership],
+    ] as const) {
+      const createdAt = field(model, 'createdAt')
+      const updatedAt = field(model, 'updatedAt')
+      expect(createdAt.type, `${modelName}.createdAt`).toBe('DateTime')
+      expect(createdAt.isOptional).toBe(false)
+      expect(createdAt.attributes).toMatch(/@default\(now\(\)\)/)
+      expect(createdAt.attributes).toContain('@map("created_at")')
+      expect(createdAt.attributes).toContain('@db.Timestamptz(6)')
+      expect(updatedAt.type, `${modelName}.updatedAt`).toBe('DateTime')
+      expect(updatedAt.isOptional).toBe(false)
+      expect(updatedAt.attributes).toContain('@updatedAt')
+      expect(updatedAt.attributes).toContain('@map("updated_at")')
+      expect(updatedAt.attributes).toContain('@db.Timestamptz(6)')
+    }
+  })
+
+  it('Membership declara sus tres referencias obligatorias en uuid (R7)', () => {
+    for (const [name, column] of [
+      ['userId', 'user_id'],
+      ['companyId', 'company_id'],
+      ['roleId', 'role_id'],
+    ] as const) {
+      const declared = field(membership, name)
+      expect(declared.type, `Membership.${name}`).toBe('String')
+      expect(declared.isOptional, `Membership.${name} no puede ser opcional`).toBe(false)
+      expect(declared.attributes).toContain('@db.Uuid')
+      expect(declared.attributes, `Membership.${name} debe mapear a ${column}`).toContain(
+        `@map("${column}")`,
+      )
+      expect(declared.attributes, `Membership.${name} no debe tener @default`).not.toMatch(
+        /@default\(/,
+      )
+    }
+    expect(membership.body).toContain('@@map("memberships")')
+
+    // La lista completa de columnas: si alguien anade o quita una, este test lo dice.
+    const scalarNames = membership.fields
+      .filter(
+        (candidate) =>
+          !candidate.isList &&
+          candidate.type !== 'User' &&
+          candidate.type !== 'Company' &&
+          candidate.type !== 'Role',
+      )
+      .map((candidate) => candidate.name)
+      .sort()
+    expect(scalarNames).toEqual(
+      ['id', 'userId', 'companyId', 'roleId', 'createdAt', 'updatedAt'].sort(),
+    )
+  })
+
+  it('las tres relaciones de Membership son Restrict, nunca Cascade al borrar (R11)', () => {
+    for (const [name, type, scalar] of [
+      ['user', 'User', 'userId'],
+      ['company', 'Company', 'companyId'],
+      ['role', 'Role', 'roleId'],
+    ] as const) {
+      const relation = field(membership, name)
+      expect(relation.type, `Membership.${name}`).toBe(type)
+      expect(relation.isOptional, `Membership.${name} no puede ser opcional`).toBe(false)
+      expect(relation.attributes).toMatch(new RegExp(`fields:\\s*\\[${scalar}\\]`))
+      expect(relation.attributes).toMatch(/references:\s*\[id\]/)
+      expect(relation.attributes).toMatch(/onDelete:\s*Restrict/)
+      expect(relation.attributes).toMatch(/onUpdate:\s*Cascade/)
+      expect(relation.attributes).not.toMatch(/onDelete:\s*(Cascade|SetNull|SetDefault)/)
+    }
+    // Y el campo de vuelta existe en los tres duenos.
+    expect(user.fields.find((candidate) => candidate.name === 'memberships')?.isList).toBe(true)
+    expect(role.fields.find((candidate) => candidate.name === 'memberships')?.isList).toBe(true)
+    expect(company.fields.find((candidate) => candidate.name === 'memberships')?.isList).toBe(true)
+  })
+
+  it('la pareja usuario+empresa es unica, y el unico es TOTAL (R9)', () => {
+    expect(membership.body).toMatch(
+      /@@unique\(\[userId,\s*companyId\],\s*map:\s*"memberships_user_id_company_id_key"\)/,
+    )
+  })
+
+  it('Membership indexa companyId y roleId, y NO userId', () => {
+    // Postgres no indexa el lado hijo de una FK y por ahi pasa la verificacion del RESTRICT.
+    // `userId` no lleva indice propio: ya es columna lider del unico compuesto (design.md > 2.2).
+    expect(membership.body).toContain('@@index([companyId], map: "memberships_company_id_idx")')
+    expect(membership.body).toContain('@@index([roleId], map: "memberships_role_id_idx")')
+    expect(membership.body).not.toMatch(/@@index\(\[userId\]/)
+    expect(membership.body).not.toContain('memberships_user_id_idx')
+  })
+
+  it('Membership no tiene deletedAt (R12)', () => {
+    // Deliberado: esta ficha no construye revocacion, y una columna que nadie escribe es deuda.
+    expect(has(membership, 'deletedAt')).toBe(false)
+    expect(membership.body).not.toMatch(/deleted_at/)
+  })
+})
+
+// --- QC-47 — R14: `users` se queda SIN ninguna columna de rol -------------------------
+
+describe('db/schema.prisma — users ya no guarda el rol (R14)', () => {
+  it('User no declara roleId, ni la relacion role, ni el indice users_role_id_idx', () => {
+    // Este test es la red del bloque D: si alguien "arregla" un typecheck roto devolviendole
+    // `roleId` a `User`, el rol pasa a vivir en dos sitios que pueden contradecirse.
+    expect(has(user, 'roleId'), 'User.roleId debe haber desaparecido').toBe(false)
+    expect(has(user, 'role'), 'la relacion User.role debe haber desaparecido').toBe(false)
+    expect(user.body).not.toMatch(/role_id/)
+    expect(user.body).not.toContain('users_role_id_idx')
+  })
+
+  it('ninguna columna de User huele a rol', () => {
+    for (const declared of user.fields) {
+      expect(declared.name, `User.${declared.name} parece una columna de rol`).not.toMatch(/^role/i)
+      expect(declared.type, `User.${declared.name} referencia a Role`).not.toBe('Role')
+    }
+  })
+
+  it('Role ya no tiene campo de vuelta hacia User: el lado muchos es la pertenencia', () => {
+    expect(has(role, 'users'), 'Role.users debe haber desaparecido').toBe(false)
+    expect(has(role, 'memberships')).toBe(true)
   })
 })
