@@ -13,8 +13,9 @@
 |---|---|---|---|---|---|---|
 | QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
+| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | pending → F1.2 | feature/QC-57-orden-y-filtro-en-listados | leader (worktree montado, requirements.md sembrado, spec_author lanzado) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
-| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | spec_ready | feature/QC-47-modelo-empresa-y-membresias | esperando aprobación humana del spec (F1.4). 29 requisitos EARS en `a00940b`; **dos preguntas abiertas se cierran al aprobar** |
+| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 

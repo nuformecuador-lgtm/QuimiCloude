@@ -621,7 +621,7 @@
       "epic_name": "Multiempresa",
       "name": "modelo-empresa-y-membresias",
       "description": "Necesitamos representar la empresa como entidad propia y a que empresas pertenece cada usuario, con que rol en cada una. Una empresa tiene nombre y se identifica por un identificador propio no adivinable; su nombre tampoco se repite. Un usuario puede pertenecer a mas de una empresa, aunque por ahora todos pertenecen a una sola y no hay pantalla para cambiar de empresa: eso se decide despues. El rol deja de estar en la ficha del usuario y pasa a la pertenencia: una persona puede ser Administrador en una empresa y otra cosa en otra. El catalogo de roles y los tipos de documento siguen siendo del sistema y no se separan por empresa: \"Administrador\" significa lo mismo en todas. Como hoy cada persona pertenece a una sola empresa, el seed y el login se adaptan a leer el rol de esa unica pertenencia y siguen funcionando igual hacia fuera. La base se siembra limpia, con una empresa inicial a la que pertenece el usuario semilla. Una empresa se puede dar de baja de forma logica, pero esta ficha no construye ninguna operacion de baja. Esta ficha crea la empresa, la pertenencia y mueve el rol: ni la sesion ni la separacion de los datos ya existentes entran aqui.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
