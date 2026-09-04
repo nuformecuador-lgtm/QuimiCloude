@@ -215,7 +215,7 @@ export function FileField({
       : DROPZONE_IDLE;
 
   return (
-    <div className="flex flex-col gap-2" data-testid={`${testIdPrefix}-field`}>
+    <div className="flex flex-col gap-1" data-testid={`${testIdPrefix}-field`}>
       <Label htmlFor={inputId}>{label}</Label>
 
       <div

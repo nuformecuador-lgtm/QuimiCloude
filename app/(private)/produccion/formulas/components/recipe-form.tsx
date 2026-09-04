@@ -230,7 +230,7 @@ export function RecipeForm(props: RecipeFormProps) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label htmlFor="recipe-field-description-input">Receta</Label>
+        <Label htmlFor="recipe-field-description-input">Descripción</Label>
         <Textarea
           id="recipe-field-description-input"
           rows={4}
@@ -254,6 +254,13 @@ export function RecipeForm(props: RecipeFormProps) {
         )}
       </div>
 
+      <RecipeImageField
+        mode={props.mode}
+        initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
+        value={state.image}
+        onChange={(image) => setState((previous) => ({ ...previous, image }))}
+      />
+
       <RecipeLinesField
         lines={state.lines}
         onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
@@ -267,13 +274,6 @@ export function RecipeForm(props: RecipeFormProps) {
         steps={state.steps}
         onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
         errors={fieldErrors.steps}
-      />
-
-      <RecipeImageField
-        mode={props.mode}
-        initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
-        value={state.image}
-        onChange={(image) => setState((previous) => ({ ...previous, image }))}
       />
 
       <div className="flex justify-end gap-2">
