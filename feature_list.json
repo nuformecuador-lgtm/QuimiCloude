@@ -281,7 +281,7 @@
       "epic_name": "Identidad y acceso",
       "name": "registro-de-sesiones",
       "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos. Solo el mecanismo y sus operaciones: sin pantalla. Las dos acciones NO son la misma y se resuelven distinto. Cerrar sesion en un dispositivo cierra SOLO ese dispositivo: quien sale en el movil sigue dentro en la oficina. En cambio cerrar todas las sesiones las cierra todas, incluida la actual. Y cuando el cierre lo ordena un administrador sobre otro usuario es SIEMPRE total, nunca una sesion suelta: el administrador no elige dispositivo. Cambiar el rol de alguien o darlo de baja tambien corta todas sus sesiones en el acto, y tiene que volver a entrar. Eso cierra la deuda que dejo escrita la ficha de proteccion de rutas privadas, donde el rol viaja firmado dentro del codigo de sesion y hasta hoy un cambio de rol tardaba en surtir efecto lo que tardara la sesion en caducar. Si el sistema no puede comprobar si una sesion fue cerrada -porque la base no responde, o porque falle la memoria rapida cuando exista- la sesion se trata como invalida y la persona vuelve al login. Ante la duda se corta: una revocacion que se puede saltar provocando un fallo no es una revocacion. El administrador puede cerrar las sesiones de otro usuario; el permiso se comprueba en el servicio y lleva su prueba. Que el usuario pueda VER la lista de sus dispositivos abiertos y cerrar uno concreto de la lista NO entra, y no habra ficha para ello: se descarto a proposito porque obliga a una lectura por peticion sin dar nada que no de el cierre total. Los botones tampoco entran aqui: el del usuario va en ficha aparte. Guardar en memoria rapida la comprobacion va en la ficha de cache de sesion.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -449,8 +449,8 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "crud-de-pedidos",
-      "description": "Los casos de uso de pedidos, sobre el modelo que crea la ficha del modelo de pedidos: alta, consulta paginada, edicion y borrado. Sin pantalla: solo los casos de uso y su superficie de servidor, como en el CRUD de productos y el de recetas. El alta recibe la receta, la cantidad, el precio de venta, la unidad, la fecha de solicitud y, si viene, la prioridad; el estado nace en pendiente y cambiarlo es parte de la edicion. Cada pedido guarda quien lo creo y quien lo modifico por ultima vez, tomados de la sesion en curso y nunca de la entrada. Borrar un pedido lo oculta y no se restaura; borrar una receta que algun pedido usa sigue estando permitido y el pedido conserva su referencia. Antes de guardar se rechaza la receta inexistente o dada de baja, la unidad inexistente, la cantidad negativa o cero, el precio de venta negativo, la fecha de solicitud ausente, y una prioridad o un estado que no esten en su conjunto cerrado. La consulta viene paginada, de diez en diez por defecto, reutilizando el calculo de paginacion que extrae el CRUD de productos en vez de duplicarlo. Que rol puede consultar, crear, editar y borrar pedidos -y si el Operador ve solo los suyos- no esta decidido y se cierra al acotar la ficha, igual que si hay filtros por estado o por prioridad en la consulta. La pantalla va aparte.",
-      "status": "pending",
+      "description": "Los casos de uso de pedidos, sobre el modelo que creo la ficha del modelo de pedidos: alta, consulta paginada, edicion, cancelacion y borrado. Sin pantalla: solo los casos de uso y su superficie de servidor, como en el CRUD de productos y el de recetas. Solo el Administrador puede consultar, crear, editar, cancelar y borrar; el permiso se valida en el service y lleva su prueba. El alta recibe la receta, la cantidad, el precio de venta unitario, la unidad y, si viene, la prioridad; el estado nace en pendiente. NO hay fecha de solicitud de entrada: es la fecha de creacion de la fila, como cerro la ficha del modelo. Cada pedido guarda quien lo creo y quien lo modifico por ultima vez, tomados de la sesion en curso y nunca de la entrada. Esta ficha ANADE UN CUARTO ESTADO, cancelado, con un motivo obligatorio que se guarda en el pedido y no se borra despues. Eso trae migracion: un valor mas en el tipo enumerado del estado y una columna nueva para el motivo, y el down tiene que recrear el tipo porque Postgres no sabe quitar un valor. Cancelar es una operacion propia y es el unico camino que escribe ese estado; la edicion normal no cancela. Las transiciones solo avanzan: pendiente a en curso, en curso a entregado, pendiente a entregado, y cancelar desde pendiente o desde en curso. Entregado y cancelado son finales, no se sale de ellos y no admiten ninguna edicion. Borrar sigue siendo logico y sin restaurar, y ya no se puede borrar ni un pedido entregado ni uno cancelado: eso cambia la restriccion que escribio la ficha del modelo y va en la misma migracion. El numero correlativo lo entrega una secuencia de la base por ano, de modo que dos altas simultaneas no compiten y ninguna falla; se aceptan huecos, como ya estaba decidido. Cierra asi la pregunta que dejo abierta la ficha del modelo sobre quien calcula la posicion. Antes de guardar se rechaza la receta inexistente o dada de baja, la unidad inexistente, la cantidad negativa o cero, el precio de venta negativo, una prioridad o un estado que no esten en su conjunto cerrado, cancelar sin motivo y poner motivo sin cancelar. Al editar se admite la receta que el pedido ya tenia aunque este dada de baja. Borrar una receta que algun pedido usa sigue estando permitido y el pedido conserva su referencia. La consulta viene paginada, de diez en diez por defecto y con tope de veinticinco, reutilizando el calculo de paginacion que extrae el CRUD de productos en vez de duplicarlo, con filtros opcionales por estado y por prioridad, sin busqueda por texto. Los borrados no salen y los cancelados si. Llega ordenada por prioridad de mayor a menor y, dentro de cada prioridad, por antiguedad, con el correlativo como desempate. Devuelve el nombre de la receta y el de la unidad resueltos por sus contratos publicos, y devuelve el nombre de la receta tambien cuando esta dada de baja, lo que obliga al contrato de recetas a publicar una consulta por identificadores que incluya las de baja. La pantalla va aparte.",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -467,7 +467,7 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "pantalla-de-pedidos",
-      "description": "La pantalla de pedidos dentro del layout privado: la lista paginada, el formulario de alta y edicion, y el borrado. Las operaciones ya existen y las expone el CRUD de pedidos como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). El formulario elige la receta y la unidad de sus catalogos, captura cantidad, precio de venta y fecha de solicitud, y deja la prioridad opcional con baja como valor por defecto visible. La lista muestra el estado y la prioridad de cada pedido. La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, como se elige la receta cuando el catalogo crece, si el estado se cambia desde la lista o solo desde el formulario, busqueda, filtros y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo. Quien la ve depende del permiso que cierre el CRUD de pedidos.",
+      "description": "La pantalla de pedidos dentro del layout privado: la lista paginada, el formulario de alta y edicion, la cancelacion y el borrado. Las operaciones ya existen y las expone el CRUD de pedidos como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error). Solo la ve el Administrador, que es el permiso que cerro el CRUD de pedidos. El formulario elige la receta y la unidad de sus catalogos, captura cantidad y precio de venta unitario, y deja la prioridad opcional con baja como valor por defecto visible. NO hay campo de fecha de solicitud: la pone el sistema y no se edita. La lista muestra el estado y la prioridad de cada pedido, con el nombre de la receta y el de la unidad que ya devuelve la consulta, y llega ordenada por prioridad y por antiguedad, con filtros por estado y por prioridad. Cancelar un pedido es una accion propia y pide el motivo, que es obligatorio; la pantalla muestra ese motivo en los pedidos cancelados. Un pedido entregado o cancelado no se edita ni se borra, y la pantalla lo refleja en vez de dejar intentarlo. La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, como se elige la receta cuando el catalogo crece, si el estado se cambia desde la lista o solo desde el formulario, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -528,6 +528,21 @@
         "QC-38"
       ],
       "spec_path": "specs/QC-39-pantalla-de-unidades"
+    },
+    {
+      "key": "QC-40",
+      "id": 40,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "ajuste-sidebar",
+      "description": "QC-29 pinto la barra lateral con la paleta nueva pero dejo fuera todo lo que no era color, asi que la barra lateral no se parece al diseno aprobado. Esta ficha cerraba esa distancia: el elemento activo con el acento naranja (barra de acento a la izquierda y velo calido), un icono por elemento del menu, agrupacion en secciones con titulo, un contador en notificaciones con el componente de etiqueta estandar, la marca con simbolo y bajada, y el control de plegar de vuelta al borde del panel como pastilla flotante. Los elementos del menu vivian en un unico array configurable. No entraba cambiar destinos de enlaces, inventar el origen del contador, tocar el login ni rehacer la paleta. Cancelada en el board.",
+      "status": "cancelled",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "frontend",
+      "branch": "feature/QC-40-ajuste-sidebar",
+      "depends_on": null,
+      "spec_path": "specs/QC-40-ajuste-sidebar"
     },
     {
       "key": "QC-42",
@@ -691,7 +706,7 @@
       "epic_name": "Inventario",
       "name": "separar-producto-de-catalogo-de-proveedor",
       "description": "El producto pierde cost, min_purchase y delivery_time. El catalogo del proveedor pasa a ser una tabla con la misma estructura que el producto, omitiendo stock y qty_alert, mas supplier_id: gana name, presentation_id, unit_id, image_path y deleted_at, y pierde product_id. Las dos tablas quedan independientes, sin ningun vinculo ni siquiera opcional. Una linea se identifica por nombre mas presentacion, unicos por proveedor. Dar de baja un proveedor da de baja tambien sus lineas. Los tipos conservan lo estricto de QC-43. Trae la actualizacion del E2E de productos de QC-22. Arrastra QC-20, QC-22 y QC-43.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -715,6 +730,55 @@
       "branch": "feature/QC-54-unificar-constante-rol-administrador",
       "depends_on": null,
       "spec_path": "specs/QC-54-unificar-constante-rol-administrador"
+    },
+    {
+      "key": "QC-55",
+      "id": 55,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "tabla-de-datos-compartida",
+      "description": "Necesitamos un componente de tabla compartido que hoy no existe: la pantalla de productos y la de recetas tienen el mismo esqueleto copiado -parser de parametros de la URL, seccion que pide los datos, tabla, barra de paginacion, y los estados vacio, error y esqueleto de carga-, y cada pantalla nueva del backlog (proveedores, unidades, presentaciones, pedidos) lo volveria a copiar. El componente pinta una tabla a partir de las filas y la configuracion de columnas que recibe por props, y NO trae los datos: quien los trae sigue siendo la pantalla. Incluye la barra de filtros, la barra de paginacion y los tres estados -vacio, cargando y error-, con sus textos por props. El error es su propio estado y dice que fallo: NO se pinta como lista vacia. Cuando el usuario cambia de pagina, ordena o filtra, el componente no consulta nada: devuelve los parametros nuevos a quien lo use. Se ordena pulsando la cabecera de una columna. Las columnas se pueden fijar para que no se desplacen al mover la tabla en horizontal, y lo decide EL USUARIO desde la cabecera, no la pantalla: su eleccion se recuerda en localStorage por pantalla, con la limitacion aceptada de ser por navegador y no por usuario. El menu por columna tiene que ser alcanzable por toque y por teclado. Un filtro es de una de cuatro formas: texto, rango numerico, seleccion de un conjunto de valores, y rango de fechas; la pantalla declara cual usa cada columna. La busqueda por texto se emite igual aunque ningun backend la soporte hoy. El rango de fechas entra por el CLI de shadcn (add calendar), que monta react-day-picker en modo rango, con los atajos -ultima semana, ultimo mes, ultimo ano- escritos aqui porque la libreria no los trae; se descarto rsuite por sus 14 dependencias y su sistema de tema propio. Se promueve a components/shared/ SIN consumidor todavia: excepcion declarada a la regla de sobre-ingenieria, con los dos consumidores identificados (QC-56). Ninguna pantalla se estrena aqui, asi que NO trae E2E: lo trae QC-56. Dos dependencias nuevas por la regla 7, las dos con los cuatro checks PASANDO al 2026-09-04: @tanstack/react-table 9.2.4 y react-day-picker 10.0.1. Ningun backend acepta hoy orden ni filtro; hacerlos reales es QC-57.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "frontend",
+      "branch": "feature/QC-55-tabla-de-datos-compartida",
+      "depends_on": null,
+      "spec_path": "specs/QC-55-tabla-de-datos-compartida"
+    },
+    {
+      "key": "QC-56",
+      "id": 56,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "migrar-listas-a-tabla-compartida",
+      "description": "Las pantallas de productos (QC-22) y de recetas (QC-26) tienen hoy el mismo esqueleto de lista copiado pieza por pieza: el parser de parametros de la URL, la seccion que pide los datos y despacha estados, la tabla, la barra de paginacion, y los estados vacio, error y esqueleto de carga. Esta ficha las pasa a usar la tabla compartida de QC-55 y borra el codigo duplicado, sin cambiar lo que el usuario ve ni lo que la pantalla hace: las dos listas siguen paginando igual, y los tests que hoy pasan deben seguir pasando. Como QC-55 anade ordenar por cabecera y fijar columnas, al migrar hay que decidir que columnas de cada lista son ordenables y cuales se fijan, y si ordenar exige que el backend soporte un parametro de orden que hoy no expone. Si lo exige, eso es trabajo de backend y va en su propia ficha. Se separa de QC-55 a proposito, por decision del humano el 2026-09-04: QC-55 entrega el componente y esta ficha lo adopta, de modo que el componente no nace atado a la forma de dos pantallas concretas. Va despues de QC-52, que reescribe la pantalla de productos y toca los mismos archivos: migrar antes seria resolver el mismo conflicto dos veces.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-56-migrar-listas-a-tabla-compartida",
+      "depends_on": [
+        "QC-55",
+        "QC-52",
+        "QC-57"
+      ],
+      "spec_path": "specs/QC-56-migrar-listas-a-tabla-compartida"
+    },
+    {
+      "key": "QC-57",
+      "id": 57,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "orden-y-filtro-en-listados",
+      "description": "Ningun listado del repo acepta orden ni filtro: pageQuerySchema solo admite pagina y tamano, y cada adaptador ordena fijo. QC-22 lo cerro el 2026-09-03 remitiendo a una ficha de backend nueva, y QC-26 lo repitio; esta es esa ficha. QC-55 entrega un componente de tabla que ordena por cabecera y filtra emitiendo los parametros, pero hasta que esto exista nadie los honra. Los listados pasan a aceptar por que columna ordenar y en que sentido, y un conjunto de filtros, aplicados sobre el conjunto completo y no sobre la pagina visible. Las formas de filtro que el componente emite son cuatro y el backend tiene que entenderlas: texto, rango numerico, seleccion de un conjunto de valores, y rango de fechas. La busqueda por texto ENTRA en esta ficha: es la deuda que QC-22 y QC-26 dejaron anotada sin ficha y aqui se cierra. Que listados entran y que columnas son ordenables y filtrables en cada uno se decide al acotar. La forma exacta de los parametros tiene que casar con la que QC-55 emite.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-57-orden-y-filtro-en-listados",
+      "depends_on": null,
+      "spec_path": "specs/QC-57-orden-y-filtro-en-listados"
     }
   ]
 }

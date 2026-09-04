@@ -1,0 +1,174 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { z } from 'zod';
+
+/**
+ * Persistencia del pineo de columnas en `localStorage` (`design.md > 5`, T10).
+ *
+ * La UNICA preferencia que el componente persiste por su cuenta (R5). No conoce
+ * `DataTableParams` ni emite nada por `onParamsChange`: el pineo vive fuera de los parametros de
+ * lista.
+ */
+
+/** Lado al que puede fijarse una columna (`design.md > 13`, pregunta abierta 6: ambos bordes). */
+export type PinSide = 'left' | 'right';
+
+/** Forma persistida y expuesta: ids de columna fijados a cada borde (R25). */
+export type PinnedColumnsState = {
+  readonly left: readonly string[];
+  readonly right: readonly string[];
+};
+
+const EMPTY_PINNING: PinnedColumnsState = { left: [], right: [] };
+
+/** Forma que se valida al leer de `localStorage`: JSON corrupto o de otra forma se descarta (R25). */
+const persistedPinningSchema = z.object({
+  left: z.array(z.string()),
+  right: z.array(z.string()),
+});
+
+/**
+ * Construye la clave de `localStorage` para un `tableId` (R25, R26), en una funcion pura y
+ * exportada para que el test no la escriba a mano.
+ */
+export function buildPinningStorageKey(tableId: string): string {
+  return `qc:data-table:${tableId}:pinning`;
+}
+
+/**
+ * Lee y valida el valor guardado para `tableId`. Envuelve `localStorage.getItem`: en modo
+ * privado de Safari o con la API ausente puede lanzar, y eso degrada a "sin nada fijado" en vez
+ * de propagar el error (R25).
+ */
+function readPersistedPinning(tableId: string): PinnedColumnsState {
+  let raw: string | null;
+
+  try {
+    raw = window.localStorage.getItem(buildPinningStorageKey(tableId));
+  } catch {
+    // localStorage no disponible (modo privado, permisos) o getItem lanza: se degrada a "sin
+    // nada fijado" sin propagar el error (R25).
+    return EMPTY_PINNING;
+  }
+
+  if (raw === null) {
+    return EMPTY_PINNING;
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Valor guardado no es JSON valido (versión anterior u otra escritura): se descarta (R25).
+    return EMPTY_PINNING;
+  }
+
+  const result = persistedPinningSchema.safeParse(parsed);
+
+  if (!result.success) {
+    // JSON valido pero con una forma distinta a la esperada: se descarta (R25).
+    return EMPTY_PINNING;
+  }
+
+  return result.data;
+}
+
+/**
+ * Escribe el valor para `tableId`. Envuelve `localStorage.setItem`: cuota llena o modo privado
+ * pueden lanzar, y eso degrada a "funciona sin recordar" sin propagar el error (R25).
+ */
+function writePersistedPinning(tableId: string, state: PinnedColumnsState): void {
+  try {
+    window.localStorage.setItem(buildPinningStorageKey(tableId), JSON.stringify(state));
+  } catch {
+    // setItem lanzo (cuota llena, modo privado de Safari): fijar/soltar sigue funcionando en la
+    // sesion actual, simplemente no se recuerda entre visitas (R25).
+  }
+}
+
+/** Descarta del estado los ids de columna que ya no existen en `columnIds` (R25). */
+function withOnlyExistingColumns(
+  state: PinnedColumnsState,
+  columnIds: readonly string[],
+): PinnedColumnsState {
+  const validIds = new Set(columnIds);
+
+  return {
+    left: state.left.filter((id) => validIds.has(id)),
+    right: state.right.filter((id) => validIds.has(id)),
+  };
+}
+
+export type UsePinnedColumnsResult = {
+  readonly pinning: PinnedColumnsState;
+  /**
+   * Fija `columnId` en `side` (izquierda por defecto); si ya estaba fijada en cualquiera de los
+   * dos bordes, la suelta.
+   */
+  togglePin(columnId: string, side?: PinSide): void;
+  setPinning(next: PinnedColumnsState): void;
+};
+
+/**
+ * Hook de persistencia del pineo (R25, R26). Estado inicial: sin nada fijado, siempre — la
+ * lectura de `localStorage` ocurre en un efecto tras el montaje, nunca en render, porque leerlo
+ * en render de un componente que tambien se renderiza en servidor produce discrepancia de
+ * hidratacion (`design.md > 5`).
+ */
+export function usePinnedColumns(
+  tableId: string,
+  columnIds: readonly string[],
+): UsePinnedColumnsResult {
+  const [pinning, setPinningState] = useState<PinnedColumnsState>(EMPTY_PINNING);
+
+  // Resume `columnIds` como cadena para no depender de su identidad de array.
+  const columnIdsKey = columnIds.join('\u0000');
+
+  useEffect(() => {
+    // Restaura tras el montaje, nunca durante el render (discrepancia de hidratacion, R25). La
+    // funcion nombrada, en vez de un `setState` como primera sentencia del efecto, es lo que este
+    // repo usa para una restauracion desde una fuente externa (`data-table-filter-date.tsx`).
+    const restore = () => {
+      const persisted = readPersistedPinning(tableId);
+      setPinningState(withOnlyExistingColumns(persisted, columnIds));
+    };
+    restore();
+    // Se relee al cambiar de tabla o de conjunto de columnas validas; `columnIdsKey` resume
+    // `columnIds` para no depender de su identidad de array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId, columnIdsKey]);
+
+  const setPinning = useCallback(
+    (next: PinnedColumnsState) => {
+      setPinningState(next);
+      writePersistedPinning(tableId, next);
+    },
+    [tableId],
+  );
+
+  const togglePin = useCallback(
+    (columnId: string, side: PinSide = 'left') => {
+      setPinningState((current) => {
+        const isPinned = current.left.includes(columnId) || current.right.includes(columnId);
+
+        const next: PinnedColumnsState = isPinned
+          ? {
+              left: current.left.filter((id) => id !== columnId),
+              right: current.right.filter((id) => id !== columnId),
+            }
+          : {
+              left: side === 'left' ? [...current.left, columnId] : current.left,
+              right: side === 'right' ? [...current.right, columnId] : current.right,
+            };
+
+        writePersistedPinning(tableId, next);
+        return next;
+      });
+    },
+    [tableId],
+  );
+
+  return useMemo(() => ({ pinning, togglePin, setPinning }), [pinning, togglePin, setPinning]);
+}
