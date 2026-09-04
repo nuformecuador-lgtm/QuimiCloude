@@ -36,6 +36,7 @@ export { CatalogListSection } from './catalog-list-section';
 export { CatalogListToolbar } from './catalog-list-toolbar';
 export { CATALOG_ACTIONS_COLUMN_LABEL, CatalogTable } from './catalog-table';
 export { CatalogTableSkeleton } from './catalog-table-skeleton';
+export { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 export { SupplierDetailHeader } from './supplier-detail-header';
 export { SupplierNotFound } from './supplier-not-found';
 export { NO_UNIT_LABEL, NO_UNIT_VALUE, UNIT_FIELD, UnitSelect } from './unit-select';

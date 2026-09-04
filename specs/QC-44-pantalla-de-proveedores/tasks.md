@@ -198,9 +198,9 @@ se abre. Si una task parece pedirlo, se **para y se avisa al leader**.
 
 ## T16 — Baja de línea (depende de T13, T15)
 
-- [ ] **Toca:** `app/(private)/proveedores/[id]/components/{delete-catalog-line-dialog.tsx,index.ts}`.
-- [ ] Diálogo que **nombra la línea** y advierte de que no se puede deshacer; `id` en oculto.
-- [ ] **Hecho cuando:** test de que sin confirmar no se invoca `deleteCatalogLineAction` y de que al
+- [x] **Toca:** `app/(private)/proveedores/[id]/components/{delete-catalog-line-dialog.tsx,index.ts}`.
+- [x] Diálogo que **nombra la línea** y advierte de que no se puede deshacer; `id` en oculto.
+- [x] **Hecho cuando:** test de que sin confirmar no se invoca `deleteCatalogLineAction` y de que al
       confirmar se invoca y se refresca la lista. **R36, R33.**
 
 ## T17 — Guardias de convención de la feature `[P]` (depende de T6, T13)

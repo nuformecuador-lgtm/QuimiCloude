@@ -9,6 +9,7 @@ import { CatalogListError } from './catalog-list-error';
 import { buildCatalogListQuery, type CatalogPageSize } from './catalog-list-params';
 import { CatalogListToolbar } from './catalog-list-toolbar';
 import { CatalogTable } from './catalog-table';
+import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 
 /** La primera pagina, a la que vuelve el estado vacio cuando la pedida se quedo atras. */
 const FIRST_PAGE = 1;
@@ -95,7 +96,10 @@ export async function CatalogListSection({
           su API. Las acciones estan SIEMPRE visibles: nada detras de `:hover` (R48).
         */
         rowActions={(line) => (
-          <CatalogLineSheet supplierId={supplierId} units={units} line={line} />
+          <>
+            <CatalogLineSheet supplierId={supplierId} units={units} line={line} />
+            <DeleteCatalogLineDialog line={line} />
+          </>
         )}
       />
       <CatalogListToolbar page={currentPage} pageSize={pageSize} totalPages={totalPages} />
