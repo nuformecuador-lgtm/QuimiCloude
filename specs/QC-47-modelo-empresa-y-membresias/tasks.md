@@ -10,7 +10,7 @@
 
 ## Bloque A — dominio puro (sin base, sin migración)
 
-- [ ] **T1 · `normalizeCompanyName`.**
+- [x] **T1 · `normalizeCompanyName`.**
       Archivos: `lib/modules/identity/domain/company-name.ts` (nuevo).
       Función pura, misma forma y mismo comportamiento que `normalizeUnitName`
       (`lib/modules/unidades/domain/unit-name.ts`): sin acentos, sin caracteres especiales, sin
@@ -18,7 +18,7 @@
       *Hecho*: `tests/unit/identity/company-name.test.ts` en verde con los casos con acento, con
       mayúsculas y con signos (R3).
 
-- [ ] **T2 [P] · La constante del nombre de la empresa inicial.**
+- [x] **T2 [P] · La constante del nombre de la empresa inicial.**
       Archivos: `lib/modules/identity/domain/companies.ts` (nuevo).
       `export const INITIAL_COMPANY_NAME` con el literal de `design.md > 6.1`. Único sitio del repo
       que lo escribe en TypeScript, mismo criterio que `roles.ts` con `'Administrador'`.
@@ -26,7 +26,7 @@
       **Depende de**: la respuesta del humano a la pregunta abierta 4 al aprobar el spec. Si no dice
       nada, se implementa la posición por defecto escrita en el `design.md`.
 
-- [ ] **T3 · Contrato público.** ⚠ REGRESIÓN
+- [x] **T3 · Contrato público.** ⚠ REGRESIÓN
       Archivos: `lib/modules/identity/index.ts`.
       Reexporta `normalizeCompanyName` e `INITIAL_COMPANY_NAME`. Solo desde `./domain`.
       *Hecho*: `pnpm run test:guardias` verde — el bloque 6 de `guard-arquitectura-modulos`
