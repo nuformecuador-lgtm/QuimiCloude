@@ -14,6 +14,7 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | pending → F1.2 | feature/QC-52-separar-producto-de-catalogo-de-proveedor | leader (worktree montado, spec_author lanzado) |
 | QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | implementer (spec aprobado por el humano el 2026-09-04) |
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
