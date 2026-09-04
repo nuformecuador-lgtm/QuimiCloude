@@ -12,6 +12,14 @@
     "tests/unit/recetas/module-contract.test.ts": {
       "motivo": "Mismo motivo estructural que el anterior: uno de sus casos comprueba, sobre `git diff --name-only origin/dev...HEAD`, que QC-26 (feature de presentacion) no toca `lib/modules/recetas/**`. En dev el rango esta vacio y el caso falla adrede con 'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada'. COSTE ACEPTADO: listarlo aqui apaga el archivo COMPLETO para el comparador, incluidas sus comprobaciones de contrato del modulo `recetas` (barrel, ausencia de rutas HTTP bajo app/api) que si podrian correr en cualquier rama, y lo apaga tambien en las ramas de feature donde deberia morder. Correccion pendiente: que el caso del diff se salte explicitamente cuando el rango no existe, y borrar esta entrada.",
       "desde": "2026-09-04"
+    },
+    "tests/unit/proveedores-ui/catalog-line-sheet.test.tsx": {
+      "motivo": "Mismo flake de userEvent bajo carga que product-page.test.tsx, en la pantalla de proveedores que QC-44 acaba de mergear: pasa en aislado y falla de forma intermitente en la suite completa, con un caso distinto cada vez. VERIFICADO EN dev (commit 82c1379), SIN la rama de QC-47 de por medio, que no toca UI ni proveedores: la suite unit completa da 16 rojos entre estos dos archivos, y correr LOS DOS SOLOS da 50/50 verde. Es de QC-44. La ficha del arreglo es QC-58, que hoy solo nombra el formulario de productos: hay que ampliarla a esta clase de fallo o abrir ficha hermana, y RETIRAR estas dos entradas en el mismo cambio que lo arregle.",
+      "desde": "2026-09-04"
+    },
+    "tests/unit/proveedores-ui/supplier-page.test.tsx": {
+      "motivo": "Mismo flake de userEvent bajo carga que product-page.test.tsx, en la pantalla de proveedores que QC-44 acaba de mergear: pasa en aislado y falla de forma intermitente en la suite completa, con un caso distinto cada vez. VERIFICADO EN dev (commit 82c1379), SIN la rama de QC-47 de por medio, que no toca UI ni proveedores: la suite unit completa da 16 rojos entre estos dos archivos, y correr LOS DOS SOLOS da 50/50 verde. Es de QC-44. La ficha del arreglo es QC-58, que hoy solo nombra el formulario de productos: hay que ampliarla a esta clase de fallo o abrir ficha hermana, y RETIRAR estas dos entradas en el mismo cambio que lo arregle.",
+      "desde": "2026-09-04"
     }
   }
 }
