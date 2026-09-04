@@ -226,3 +226,67 @@ como deuda anotada y **no se tocaron**.
 Verificación de la ronda: `pnpm run typecheck` y `pnpm run lint` verdes; `vitest run
 tests/unit/proveedores-ui/ --maxWorkers=2 --testTimeout=30000` verde (12 archivos, 141 tests). La trazabilidad sigue en
 52/52: los tests de R22, R40 y R46 se ampliaron, ninguno se eliminó ni se movió de archivo.
+
+## Segunda ronda: los tres centinelas de alcance de QC-43 (2026-09-04)
+
+Los tres rojos que quedaron reportados sin tocar. **Ninguno era un defecto del código de QC-44**:
+dos vigilaban una premisa que caducó **por diseño** y el tercero era un falso positivo de su propia
+regex. Solo se tocaron tests; **cero cambios en producción**.
+
+- **A — `tests/unit/proveedores/scope.test.ts` > `la pantalla de proveedores vive solo donde la
+  declara QC-44, y en ningún otro sitio`** (antes «no existe ninguna pantalla… ni spec E2E nuevo»).
+  Afirmaba R47 de QC-43: pantalla y E2E **diferidos** a QC-44 (decisión cerrada 8). QC-44 los
+  construye (R1, R3, R51, R52). **Retensado, no borrado ni vaciado**, con el patrón exacto de
+  `tests/unit/inventario/scope.test.ts`: nota fechada en la cabecera, la carpeta permitida derivada
+  de `SUPPLIERS_ROUTE` (nunca un literal), y la defensa extra de que **lo excluido tiene que
+  existir** (`(private)/proveedores/page.tsx` y `[id]/page.tsx`). Lo que sigue prohibido cae igual:
+  cualquier pieza de proveedores fuera de esa carpeta, cualquier componente bajo `components/`, y
+  un segundo spec E2E (la lista es cerrada: `['proveedores.spec.ts']`).
+- **B — `tests/unit/proveedores/module-contract.test.ts` > `la feature no anade adaptadores driving
+  ni rutas API, y la unica pantalla es la de QC-44`.** Misma premisa caducada: afirmaba que
+  `app/(private)/proveedores` no existe. Sale de la lista de rutas prohibidas **solo esa**;
+  `app/(private)/suppliers` y las dos de `app/api/` siguen. Se añade que la pantalla **debe**
+  existir, que ningún archivo de `app/` **fuera** de ella puede mencionar el módulo, y —lo que R49
+  sigue prohibiendo— que **ningún archivo de la pantalla declara `'use server'`**. Las listas
+  exactas de `ports/`, `adapters/driven/` y `adapters/driving/` quedan intactas.
+- **C — `module-contract.test.ts` > `el cableado puerto-implementacion de proveedores vive SOLO en
+  lib/composition y una sola vez`. FALSO POSITIVO de la regex, no un aflojamiento.** El caso dice
+  vigilar que nadie más que la composición instancie los adaptadores **driven**, pero filtraba
+  `(adapters|ports)/`, que atrapaba también `adapters/driving/`. Los siete archivos señalados solo
+  importaban `adapters/driving/supplier-actions` (4) y `supplier-catalog-actions` (3) —las Server
+  Actions, el único camino que R43 autoriza, y lo mismo que hace QC-22 con `product-actions`—.
+  La regex se **estrecha** a `(adapters\/driven|ports)\/`. Las otras cuatro afirmaciones del caso
+  (nueve claves de la fachada, `productCatalog` único, flecha driving→composición→driven, y que los
+  driving piden la fachada) **no se tocaron**.
+
+**Falsabilidad comprobada de verdad**, mutando el repo y revirtiendo (no de palabra):
+
+| Mutación introducida | Cae |
+| --- | --- |
+| `app/api/proveedores/route.ts` | A (pieza fuera de la carpeta), B (ruta prohibida) y el caso de route handlers |
+| `components/supplier-card.tsx` | A (componente bajo `components/`) |
+| `e2e/suppliers.spec.ts` | A (lista cerrada de specs) |
+| borrar `(private)/proveedores/page.tsx` | A y B (la exclusión sobra si lo excluido no existe) |
+| `'use server'` en un archivo de la pantalla | B (R49) |
+| `import … from '@/lib/…/proveedores/adapters/driving/…'` en `app/(private)/dashboard/page.tsx` | B (menciona el módulo fuera de la pantalla) |
+| `import … adapters/driven/persistence/supplier-prisma` desde `app/` | C |
+| `import … ports/supplier-repository` desde `app/` | C |
+| `import … ports/supplier-repository` desde `lib/shared/pagination.ts` | C |
+
+**Trazabilidad: sigue 52/52 y ningún mapeo `R<n> -> test` cambia.** Los tres casos son centinelas de
+alcance de **QC-43**, no portadores del mapeo de ningún requisito de QC-44; A refuerza R1/R3/R51/R52
+y B refuerza R49, que ya tenían su test propio.
+
+Verificación de la ronda (ejecutada por ruta explícita, porque estos archivos **barren el sistema de
+archivos y no importan nada**, así que `vitest related` no los relaciona con ningún cambio y no se
+llaman `guard*`: solo salen en la suite completa — esa es la razón de que se escaparan):
+
+```
+pnpm typecheck   → verde (tsc --noEmit, sin salida)
+pnpm lint        → verde (eslint, sin salida)
+pnpm exec vitest run tests/unit/proveedores/scope.test.ts \
+  tests/unit/proveedores/module-contract.test.ts \
+  tests/unit/inventario/scope.test.ts --maxWorkers=2 --testTimeout=30000
+  → Test Files  3 passed (3)
+    Tests  18 passed (18)
+```
