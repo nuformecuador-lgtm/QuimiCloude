@@ -20,7 +20,7 @@ regla 7 de `CLAUDE.md` no deja hacer por cuenta propia.
 
 ## Bloque 0 — Precondiciones (BLOQUEA TODO)
 
-### T0 — Verificar la base heredada
+### [x] T0 — Verificar la base heredada
 - **Depende de**: nada. Es lo primero.
 - **Qué**: comprobar, uno por uno, que existen en el worktree tras `git merge origin/dev`:
   1. `components.json` (shadcn inicializado) y `lib/utils.ts` exportando `cn`.
@@ -37,7 +37,7 @@ regla 7 de `CLAUDE.md` no deja hacer por cuenta propia.
   con la lista de primitivas que faltan. **Nada de esto se re-crea.** Si algo falta, se PARA y se
   avisa al leader antes de escribir una línea.
 
-### T1 — Instalar las dos dependencias aprobadas y escribir sus filas
+### [x] T1 — Instalar las dos dependencias aprobadas y escribir sus filas
 - **Depende de**: T0 **y** la aprobación humana del spec (F1.4).
 - **Qué**: `pnpm add @tanstack/react-table` y añadir las **dos** filas a `docs/dependencias.md`
   (`@tanstack/react-table` y `react-day-picker`), estado `aprobada`, con los cuatro checks del
@@ -48,7 +48,7 @@ regla 7 de `CLAUDE.md` no deja hacer por cuenta propia.
   pasa en verde, y `@tanstack/react-store`, `date-fns` y `@date-fns/tz` **no** tienen fila (son
   transitivas y no están en `dependencies` directas).
 
-### T2 — Añadir las primitivas de shadcn que falten, por CLI
+### [x] T2 — Añadir las primitivas de shadcn que falten, por CLI
 - **Depende de**: T0.
 - **Qué**: `pnpm dlx shadcn@latest add calendar` (trae `react-day-picker`) y las que T0 haya
   marcado como ausentes. **Ningún archivo de `components/ui/` se escribe ni se edita a mano.**
@@ -61,7 +61,7 @@ regla 7 de `CLAUDE.md` no deja hacer por cuenta propia.
 
 ## Bloque 1 — El núcleo puro (sin DOM)
 
-### T3 — Tipos del contrato
+### [x] T3 — Tipos del contrato
 - **Depende de**: T1.
 - **Qué**: `components/shared/data-table/data-table-types.ts` con `DataTableColumn<TRow>`,
   `DataTableFilterSpec`, `DataTableFilterValue`, `DataTableSort`, `DataTableParams`,
@@ -71,7 +71,7 @@ regla 7 de `CLAUDE.md` no deja hacer por cuenta propia.
 - **Hecho cuando**: `pnpm run typecheck` en verde y el archivo no contiene ningún import de
   `@/lib/modules`, `@/lib/composition` ni `next/*`.
 
-### T4 — Transiciones de parámetros (puro) + sus tests
+### [x] T4 — Transiciones de parámetros (puro) + sus tests
 - **Depende de**: T3.
 - **Qué**: `data-table-params.ts` con la forma canónica y una función por transición (cambio de
   página, de tamaño, de orden, de un filtro, de la búsqueda), más `PAGE_SIZE_OPTIONS` derivado de
@@ -88,7 +88,7 @@ regla 7 de `CLAUDE.md` no deja hacer por cuenta propia.
 
 Todas dependen de T3 y T4.
 
-### T5 [P] — Los tres estados
+### [x] T5 [P] — Los tres estados
 - **Qué**: `data-table-states.tsx`: vacío, cargando (con `skeleton`) y error (`role="alert"`, con
   `errorMessage`), todos con textos por props y `data-testid` propio, mutuamente excluyentes según
   `design.md > 7`. Precedencia dictada por `status`, no por una cadena de booleanos.
@@ -97,7 +97,7 @@ Todas dependen de T3 y T4.
   copy**) y **un test en negativo** que comprueba que `status: 'error'` NO renderiza el estado
   vacío.
 
-### T6 [P] — Barra de paginación y tamaño de página
+### [x] T6 [P] — Barra de paginación y tamaño de página
 - **Qué**: `data-table-pagination.tsx`: anterior/siguiente con `aria-label`, indicador de página
   con `role="status"`, selector de tamaño con las dos opciones de T4, todos con `min-h-11 min-w-11`.
   Emite por `onParamsChange`; **no navega**.
@@ -105,7 +105,7 @@ Todas dependen de T3 y T4.
 - **Hecho cuando**: hay tests de los dos extremos (deshabilitado en la primera y en la última) y
   uno que comprueba que cambiar el tamaño emite `page: 1`. Ningún import de `next/navigation`.
 
-### T7 [P] — Menú de cabecera: ordenar y fijar
+### [x] T7 [P] — Menú de cabecera: ordenar y fijar
 - **Qué**: `data-table-header-menu.tsx` sobre `dropdown-menu`: se abre con un botón **visible**
   (nada de `:hover`), operable con teclado, con las acciones ordenar asc/desc, fijar/soltar y abrir
   el filtro de esa columna. La cabecera refleja el orden vigente con `aria-sort` y un icono.
@@ -114,7 +114,7 @@ Todas dependen de T3 y T4.
   que una columna sin `sortable` no ofrece la acción ni emite nada; otro comprueba `aria-sort` y el
   tamaño mínimo del disparador.
 
-### T8 [P] — Barra de filtros: texto, rango numérico y selección
+### [x] T8 [P] — Barra de filtros: texto, rango numérico y selección
 - **Qué**: `data-table-filters.tsx` con tres de las cuatro formas más el campo de búsqueda global
   (rebote de T4, `text-base` en los inputs). Solo aparecen las columnas que declaran `filter`.
 - **Criterio**: R15, R16, R17, R27.
@@ -122,7 +122,7 @@ Todas dependen de T3 y T4.
   «limpiar saca la clave del objeto», uno de que la búsqueda se emite en su propio campo y **uno en
   negativo**: una columna sin `filter` no aparece en la barra.
 
-### T9 [P] — Filtro de rango de fechas con atajos
+### [x] T9 [P] — Filtro de rango de fechas con atajos
 - **Depende de**: T2 (necesita `components/ui/calendar.tsx`).
 - **Qué**: `data-table-filter-date.tsx` con el calendario en `mode="range"`, controlado, y los tres
   atajos (última semana, último mes, último año) calculados con `date-fns`. Emite `from`/`to` como
@@ -136,7 +136,7 @@ Todas dependen de T3 y T4.
 
 ## Bloque 3 — Composición
 
-### T10 — Persistencia del pineo
+### [x] T10 — Persistencia del pineo
 - **Depende de**: T3.
 - **Qué**: `use-pinned-columns.ts`: lectura **en efecto tras el montaje** (nunca en render),
   clave `qc:data-table:<tableId>:pinning`, validación con zod, descarte de ids de columna
