@@ -170,14 +170,19 @@
   que dos presentaciones distintas del mismo nombre conviven y que dos proveedores distintos pueden
   tener la misma línea (R15, R16).
 
-### T13 [x, CON SALVEDAD] — Traducción de las FK nuevas
+### T13 [x] — Traducción de las FK nuevas
 - **Depende de:** T11.
 - **Archivos:** `lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts`.
 - **Qué:** traducir `P2003` sobre `presentation_id` y `unit_id` a `ValidationError`
   (`invalid_input`), decidiendo por `meta.field_name` y **nunca** por el texto del mensaje; seguir
   relanzando crudo el de `created_by`/`updated_by` (`design.md > 6.2`).
-- **Hecho cuando:** un test de integración con una presentación inexistente da `invalid_input`, y
-  uno con un autor inexistente relanza (R10, R32).
+- **Hecho cuando (reescrito el 2026-09-04, decisión del humano — ver la SALVEDAD):** el
+  clasificador está escrito tal como pide `design.md > 6.2` —decide por `meta.field_name` y
+  `meta.constraint`, nunca por el texto del mensaje— y un unitario lo prueba con los nombres
+  reales de restricción; y un test de integración afirma **el comportamiento observable de hoy**:
+  con una presentación inexistente y con un autor inexistente, la base rechaza con `23503` y el
+  adaptador relanza el `P2003` crudo (R10, R32). El día que el conector entregue `field_name`, el
+  clasificador empieza a traducir solo y ese test de integración es el que hay que cambiar.
 - **SALVEDAD (implementer, 2026-09-04):** con Prisma 6.19.3 el conector **no puebla**
   `meta.field_name` ni `meta.constraint` en un `P2003`: llega `{ modelName, constraint: null }` y el
   mensaje dice `on the (not available)`. Decidir por `meta.field_name` es **hoy indecidible**, y el
@@ -187,7 +192,12 @@
   y el test de integración afirma **lo que de verdad ocurre**: la base rechaza con `23503` y el
   adaptador **relanza el `P2003` crudo**. No se traduce a ciegas: diría `invalid_input` también
   cuando el fallo fuera del autor, que es la mentira que el diseño prohíbe en el otro sentido.
-  **Decisión pendiente del humano** (ver la bitácora de la feature).
+  **DECIDIDA por el humano el 2026-09-04: se acepta el estado actual** —opción (a) de las tres que
+  planteó el implementer—. Se descartaron mover de versión de Prisma (dependencia nueva, regla 7) y
+  el pre-`SELECT` de existencia (reabre la dependencia que esta ficha viene a cortar). El «hecho
+  cuando» de arriba está reescrito en consecuencia. **Queda un agujero anotado:** el `P2003` de
+  `presentation_id`/`unit_id` escapa sin código de dominio estable. Hoy es inalcanzable desde la
+  interfaz —QC-44 no existe— y `inventario` lo hereda igual.
 
 ### T14 [x] — Borrado lógico de la línea y caída con el proveedor
 - **Depende de:** T11.
