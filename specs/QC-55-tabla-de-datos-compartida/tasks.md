@@ -197,7 +197,7 @@ Todas dependen de T3 y T4.
   archivo a `components/ui/` que no venga del CLI; y no hay ninguna pantalla consumiendo el
   componente.
 
-### T15 — Cierre
+### [x] T15 — Cierre
 - **Depende de**: T12, T13, T14.
 - **Qué**: escribir el mapa `R1..R36 -> test` en `progress/impl_QC-55-tabla-de-datos-compartida.md`
   y correr `./init.sh` **completo**.
