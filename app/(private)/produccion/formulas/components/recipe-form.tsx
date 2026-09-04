@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createRecipeSchema, updateRecipeSchema, type RecipeDetail } from '@/lib/modules/recetas';
@@ -15,6 +15,7 @@ import {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { cn } from '@/lib/utils';
 
 import type { ProductPickerOption } from './product-picker';
 import { RecipeImageField } from './recipe-image-field';
@@ -275,15 +276,14 @@ export function RecipeForm(props: RecipeFormProps) {
       />
 
       <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className={TOUCH_TARGET}
+        <Link
+          href={FORMULAS_ROUTE}
+          data-slot="button"
           data-testid="recipe-form-cancel"
-          render={<Link href={FORMULAS_ROUTE} />}
+          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
         >
           Cancelar
-        </Button>
+        </Link>
         <Button
           type="submit"
           className={TOUCH_TARGET}

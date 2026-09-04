@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 type ProductListEmptyProps = {
   /**
@@ -24,6 +25,12 @@ type ProductListEmptyProps = {
  * Una tabla con cero filas no comunica nada: dice lo mismo que una consulta que fallo. Por eso
  * el vacio es un estado propio, identificable, y **con la accion de crear a mano**, que es lo
  * unico util que se puede hacer en un catalogo vacio.
+ *
+ * **La vuelta a la primera pagina es un `<Link>` real pintado con `buttonVariants`**, no el
+ * primitivo `Button` con `render`: lo que hace es navegar. Pasar un enlace por el boton de Base UI
+ * dispara su aviso de `nativeButton` y acaba poniendole `role="button"` al `<a>`, que es mentir
+ * sobre lo que el control hace. `data-slot="button"` se conserva porque de el cuelgan los
+ * selectores de estilo.
  */
 export function ProductListEmpty({ children, firstPageHref }: ProductListEmptyProps) {
   return (
@@ -37,14 +44,14 @@ export function ProductListEmpty({ children, firstPageHref }: ProductListEmptyPr
           : 'Esta página ya no tiene productos.'}
       </p>
       {firstPageHref === undefined ? null : (
-        <Button
-          variant="outline"
-          className="min-h-11 min-w-11"
+        <Link
+          href={firstPageHref}
+          data-slot="button"
           data-testid="product-list-first-page"
-          render={<Link href={firstPageHref} />}
+          className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
         >
           Volver a la primera página
-        </Button>
+        </Link>
       )}
       {children}
     </div>

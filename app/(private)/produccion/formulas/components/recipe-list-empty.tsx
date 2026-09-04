@@ -1,7 +1,8 @@
 import Link from 'next/link';
 
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
+import { cn } from '@/lib/utils';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -21,6 +22,11 @@ type RecipeListEmptyProps = {
  * el vacio es un estado propio, identificable, y **con la accion de crear a mano**, que es lo
  * unico util que se puede hacer en un catalogo vacio. La accion NAVEGA a la pagina de alta
  * propia (R20): no abre ni panel ni dialogo.
+ *
+ * **Las dos acciones son `<Link>` reales pintados con `buttonVariants`**, no el primitivo `Button`
+ * con `render`: lo que hacen es navegar. Pasar un enlace por el boton de Base UI dispara su aviso
+ * de `nativeButton` y acaba poniendole `role="button"` al `<a>`, que es mentir sobre lo que el
+ * control hace. `data-slot="button"` se conserva porque de el cuelgan los selectores de estilo.
  */
 export function RecipeListEmpty({ firstPageHref }: RecipeListEmptyProps) {
   return (
@@ -34,23 +40,23 @@ export function RecipeListEmpty({ firstPageHref }: RecipeListEmptyProps) {
           : 'Esta página ya no tiene recetas.'}
       </p>
       {firstPageHref === undefined ? null : (
-        <Button
-          variant="outline"
-          className={TOUCH_TARGET}
+        <Link
+          href={firstPageHref}
+          data-slot="button"
           data-testid="recipe-list-first-page"
-          render={<Link href={firstPageHref} />}
+          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
         >
           Volver a la primera página
-        </Button>
+        </Link>
       )}
-      <Button
-        variant="default"
-        className={TOUCH_TARGET}
+      <Link
+        href={NEW_RECIPE_ROUTE}
+        data-slot="button"
         data-testid="recipe-create-open"
-        render={<Link href={NEW_RECIPE_ROUTE} />}
+        className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
       >
         Nueva receta
-      </Button>
+      </Link>
     </div>
   );
 }

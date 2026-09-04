@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
@@ -44,7 +45,10 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
  * **Aqui no se decide ningun permiso** (R7): el corte de ruta lo hace el middleware con la regla
  * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `recetas`.
  *
- * **Crear NAVEGA a su pagina propia** (R20): nunca abre un `sheet` ni un dialogo modal.
+ * **Crear NAVEGA a su pagina propia** (R20): nunca abre un `sheet` ni un dialogo modal. Y por eso
+ * la accion es un `<Link>` real pintado con `buttonVariants`, NO el primitivo `Button` con
+ * `render`: lo que navega es un enlace, y hacerlo pasar por el boton de Base UI dispara su aviso
+ * de `nativeButton` y termina falseando la semantica del `<a>` con un `role="button"`.
  */
 export default async function FormulasPage({
   searchParams,
@@ -59,14 +63,14 @@ export default async function FormulasPage({
         <h1 data-testid="recipes-title" className="text-2xl font-semibold">
           {RECIPES_LABEL}
         </h1>
-        <Button
-          variant="default"
-          className={TOUCH_TARGET}
+        <Link
+          href={NEW_RECIPE_ROUTE}
+          data-slot="button"
           data-testid="recipe-create-open"
-          render={<Link href={NEW_RECIPE_ROUTE} />}
+          className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
         >
           Nueva receta
-        </Button>
+        </Link>
       </div>
       <Suspense
         key={`${page}-${pageSize}`}

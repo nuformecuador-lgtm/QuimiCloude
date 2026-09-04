@@ -3,6 +3,7 @@
 import { ChevronRightIcon, FlaskConicalIcon, PanelLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
 import { NavUser } from '@/components/private/nav-user';
 import { Badge } from '@/components/ui/badge';
@@ -291,16 +292,21 @@ type NavGroupProps = {
  * primitivo aporta `aria-expanded` y desmonta el panel al colapsar (`keepMounted` es
  * `false` por defecto), que es lo que hace verificable R10.
  *
- * `defaultOpen` y no `open` controlado (R12): el submenu de la ruta activa arranca
- * abierto, pero el usuario puede colapsarlo despues sin que se le vuelva a abrir solo.
+ * Controlado con estado local sembrado desde la ruta activa (R12): el submenu de la ruta
+ * activa arranca abierto, pero a partir de ahi manda el usuario —si lo colapsa, no se le
+ * vuelve a abrir solo en el siguiente render—. No hay `useEffect` que resincronice `open`
+ * con `pathname`: eso reabriria el submenu por su cuenta y romperia R12. Con `defaultOpen`
+ * el valor inicial cambiaba al navegar y Base UI avisaba de que un `Collapsible` no
+ * controlado estaba cambiando su estado inicial tras inicializarse.
  */
 function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
   const hasActiveChild = group.items.some((child) => child.href === pathname);
   const Icon = group.icon ? NAV_ICONS[group.icon] : undefined;
+  const [open, setOpen] = useState(hasActiveChild);
 
   return (
     <SidebarMenuItem>
-      <Collapsible defaultOpen={hasActiveChild}>
+      <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger
           render={
             <SidebarMenuButton

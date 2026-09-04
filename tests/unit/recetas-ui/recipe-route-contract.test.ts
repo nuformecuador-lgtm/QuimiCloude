@@ -129,7 +129,24 @@ const FUENTES_DE_CLIENTE = FUENTES_DE_LA_RUTA.filter((ruta) => leer(ruta).includ
  * Los controles que R50 obliga a agrandar. Se buscan como **etiqueta de apertura JSX**
  * (`<Nombre`), no como texto suelto: `AlertDialogAction` tambien aparece en la linea del import.
  */
-const CONTROLES_VIGILADOS = ['Button', 'SelectTrigger', 'Input', 'AlertDialogAction'] as const;
+const CONTROLES_VIGILADOS = [
+  'Button',
+  'SelectTrigger',
+  'Input',
+  'AlertDialogAction',
+  'Link',
+] as const;
+
+/**
+ * `Link` no es un control por si mismo: solo se vigila cuando se pinta CON ASPECTO DE BOTON
+ * (`data-slot="button"` + `buttonVariants`). Las acciones que navegan son enlaces reales -no el
+ * primitivo `Button` con `render`, que avisa por `nativeButton` y le cuelga un `role="button"` al
+ * `<a>`-, y sin este filtro esas acciones se saldrian de la guardia del area tactil. Los enlaces
+ * de texto corriente quedan fuera a proposito.
+ */
+function vigilaLaEtiqueta(nombre: string, texto: string): boolean {
+  return nombre !== 'Link' || texto.includes('data-slot="button"');
+}
 
 /**
  * Avanza desde `inicio` hasta el cierre de la expresion, ignorando lo que caiga dentro de una
@@ -647,15 +664,17 @@ describe('contrato de la ruta de recetas', () => {
       const constantesDeFuente = constantesConLaClase(codigo, 'text-base');
 
       for (const nombre of CONTROLES_VIGILADOS) {
-        const etiquetas = etiquetasDeApertura(codigo, nombre, lineasOriginales(ruta));
+        const todasLasEtiquetas = etiquetasDeApertura(codigo, nombre, lineasOriginales(ruta));
 
         // Autocomprobacion: si el archivo escribe la etiqueta, el lector tiene que verla.
         if (codigo.includes(`<${nombre}`)) {
           expect(
-            etiquetas.length,
+            todasLasEtiquetas.length,
             `${ruta}: escribe <${nombre} pero la guardia no leyo ninguna etiqueta`,
           ).toBeGreaterThan(0);
         }
+
+        const etiquetas = todasLasEtiquetas.filter(({ texto }) => vigilaLaEtiqueta(nombre, texto));
 
         for (const { texto, linea } of etiquetas) {
           const className = valorDeAtributo(texto, 'className');
