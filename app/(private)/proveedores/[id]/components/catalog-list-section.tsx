@@ -3,6 +3,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import { supplierDetailRoute } from '@/lib/shared/routes';
 
 import { buildCatalogDirectories } from './catalog-directories';
+import { CatalogLineSheet } from './catalog-line-sheet';
 import { CatalogListEmpty } from './catalog-list-empty';
 import { CatalogListError } from './catalog-list-error';
 import { buildCatalogListQuery, type CatalogPageSize } from './catalog-list-params';
@@ -18,10 +19,9 @@ type CatalogListSectionProps = {
   readonly pageSize: CatalogPageSize;
   /**
    * Catalogo de unidades, pedido **una sola vez** por la pagina de detalle con `listUnitsAction()`
-   * y bajado por props (R46, `design.md > 8.2`). Es el punto por el que T15 enchufa el panel
-   * lateral de la linea -`CatalogLineSheet` -> `CatalogLineForm` -> `UnitSelect`-, tanto en el
-   * estado vacio como en las acciones de fila; declararlo ya evita que T15 tenga que cambiar la
-   * firma de la pagina y del propio Server Component.
+   * y bajado por props (R46, `design.md > 8.2`). Desde aqui viaja al panel lateral de la linea
+   * -`CatalogLineSheet` -> `CatalogLineForm` -> `UnitSelect`-, tanto en el estado vacio como en
+   * las acciones de fila. **Ningun componente de cliente las pide por su cuenta.**
    */
   readonly units: readonly UnitRef[];
 };
@@ -52,12 +52,6 @@ export async function CatalogListSection({
   pageSize,
   units,
 }: CatalogListSectionProps) {
-  // Las unidades viajan hasta aqui para que T15 las entregue al panel lateral de la linea sin
-  // cambiar ninguna firma. Todavia no hay panel: esta tanda cierra la parte de LECTURA del
-  // catalogo (T10-T14). Se marca como deliberadamente sin consumir en lugar de dejar de pedirlas
-  // y tener que volver a cablearlas.
-  void units;
-
   const result = await listCatalogLinesAction(supplierId, { page, pageSize });
 
   if (result.status === 'error') {
@@ -77,7 +71,11 @@ export async function CatalogListSection({
               })}`
             : undefined
         }
-      />
+      >
+        {/* R23 — lo unico util en un catalogo vacio es anadir la primera linea, y se ofrece a
+            mano. El estado vacio no conoce el panel: lo recibe como slot. */}
+        <CatalogLineSheet supplierId={supplierId} units={units} />
+      </CatalogListEmpty>
     );
   }
 
@@ -85,7 +83,21 @@ export async function CatalogListSection({
 
   return (
     <div className="flex flex-col gap-4" data-testid="catalog-list">
-      <CatalogTable lines={items} directories={directories} />
+      <div className="flex justify-end">
+        <CatalogLineSheet supplierId={supplierId} units={units} />
+      </div>
+      <CatalogTable
+        lines={items}
+        directories={directories}
+        /*
+          Editar y dar de baja entran por el SLOT de la tabla (R26, R36): asi la tabla no importa
+          ni el panel lateral ni el dialogo, no arrastra frontera de cliente y sigue sin conocer
+          su API. Las acciones estan SIEMPRE visibles: nada detras de `:hover` (R48).
+        */
+        rowActions={(line) => (
+          <CatalogLineSheet supplierId={supplierId} units={units} line={line} />
+        )}
+      />
       <CatalogListToolbar page={currentPage} pageSize={pageSize} totalPages={totalPages} />
     </div>
   );

@@ -13,7 +13,11 @@ import {
 } from '@/app/(private)/proveedores/[id]/components';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { CatalogLineView, SupplierView } from '@/lib/modules/proveedores';
-import type { CatalogLineListResult } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
+import type {
+  CatalogLineListResult,
+  CatalogLineMutationFormState,
+  CreateCatalogLineFormState,
+} from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
 import type { SupplierQueryResult } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
@@ -50,6 +54,9 @@ const {
   routerMock,
   getSupplierActionMock,
   listCatalogLinesActionMock,
+  createCatalogLineActionMock,
+  updateCatalogLineActionMock,
+  deleteCatalogLineActionMock,
   listUnitsActionMock,
   listPresentationsActionMock,
 } = vi.hoisted(() => ({
@@ -65,6 +72,22 @@ const {
   getSupplierActionMock: vi.fn<(id: string) => Promise<SupplierQueryResult>>(),
   listCatalogLinesActionMock:
     vi.fn<(supplierId: string, query: unknown) => Promise<CatalogLineListResult>>(),
+  createCatalogLineActionMock:
+    vi.fn<
+      (prev: CreateCatalogLineFormState, data: FormData) => Promise<CreateCatalogLineFormState>
+    >(),
+  updateCatalogLineActionMock:
+    vi.fn<
+      (
+        id: string,
+        prev: CatalogLineMutationFormState,
+        data: FormData,
+      ) => Promise<CatalogLineMutationFormState>
+    >(),
+  deleteCatalogLineActionMock:
+    vi.fn<
+      (prev: CatalogLineMutationFormState, data: FormData) => Promise<CatalogLineMutationFormState>
+    >(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
   listPresentationsActionMock: vi.fn<(query: unknown) => Promise<PresentationListResult>>(),
 }));
@@ -79,8 +102,14 @@ vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
   getSupplierAction: getSupplierActionMock,
 }));
 
+// Las cuatro operaciones del catalogo: la de lectura y las tres de escritura que el panel
+// lateral y el dialogo de baja invocan (T15, T16). Se declaran todas aunque este archivo solo
+// ejercite la lectura: un mock parcial rompe el import de las que falten.
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions', () => ({
   listCatalogLinesAction: listCatalogLinesActionMock,
+  createCatalogLineAction: createCatalogLineActionMock,
+  updateCatalogLineAction: updateCatalogLineActionMock,
+  deleteCatalogLineAction: deleteCatalogLineActionMock,
 }));
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
@@ -260,6 +289,9 @@ beforeEach(() => {
   getSupplierActionMock.mockResolvedValue({ status: 'success', data: proveedor() });
   listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea()]));
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
+  createCatalogLineActionMock.mockResolvedValue({ status: 'success', id: 'linea-creada' });
+  updateCatalogLineActionMock.mockResolvedValue({ status: 'success' });
+  deleteCatalogLineActionMock.mockResolvedValue({ status: 'success' });
   listPresentationsActionMock.mockResolvedValue(paginaDePresentaciones());
   setViewportWidth(WIDE_VIEWPORT);
 });

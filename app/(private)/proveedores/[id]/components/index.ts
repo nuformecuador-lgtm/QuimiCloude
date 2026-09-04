@@ -18,6 +18,8 @@ export {
   resolveUnitLabel,
   type CatalogDirectories,
 } from './catalog-directories';
+export { CatalogLineForm, SUPPLIER_FIELD } from './catalog-line-form';
+export { CatalogLineSheet } from './catalog-line-sheet';
 export { CATALOG_LIST_EMPTY_TESTID, CatalogListEmpty } from './catalog-list-empty';
 export { CatalogListError } from './catalog-list-error';
 export {
