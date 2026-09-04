@@ -175,7 +175,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
 
 ## Tanda C — Los consumidores y el seed
 
-### T13. `[ID]` `createInitialAdmin` escribe la empresa como columna
+### [x] T13. `[ID]` `createInitialAdmin` escribe la empresa como columna
 - **Archivos:** `lib/modules/identity/ports/initial-access-repository.ts`,
   `lib/modules/identity/domain/seed-initial-access.ts`,
   `lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts`.
@@ -186,7 +186,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   módulo afirma que el rol vive fuera de `users`.
 - **Depende de:** T12.
 
-### T14. `[SEED]` `scripts/seed.ts`: verificar que NO cambia
+### [x] T14. `[SEED]` `scripts/seed.ts`: verificar que NO cambia
 - **Archivos:** `scripts/seed.ts`.
 - **Qué:** el script solo lee `outcome.createdRoles`, `outcome.createdAdmin` y
   `outcome.createdCompany` para su línea de resumen, y `SeedOutcome` se conserva íntegro
@@ -197,7 +197,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   y la segunda no crea nada (R22).
 - **Depende de:** T13.
 
-### T15. `[P]` Tests de unidad del seed y del dominio
+### [x] T15. `[P]` Tests de unidad del seed y del dominio
 - **Archivos:** `tests/unit/identity/seed/seed-initial-access.test.ts`.
 - **Qué:** con dobles del puerto: sobre base vacía crea la empresa inicial y el administrador
   dentro (R20); si la empresa ya existe la reutiliza por nombre normalizado y no crea otra (R22);

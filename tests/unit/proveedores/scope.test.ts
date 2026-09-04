@@ -415,7 +415,18 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       .filter((entry) => {
         const sql = join(migracionesDir, entry.name, 'migration.sql')
         if (!existsSync(sql)) return false
-        return /\b(suppliers|supplier_catalog_lines)\b/i.test(readFileSync(sql, 'utf8'))
+        // RETENSADO 2026-09-04 (QC-47). Antes se buscaba el nombre de la tabla en el texto
+        // CRUDO del SQL, comentarios incluidos, y eso daba un falso positivo: la migracion de
+        // QC-47 solo NOMBRA `suppliers` en dos lineas de comentario que explican por que NO le
+        // hace DDL. Un comentario no toca una tabla. Se quitan los comentarios (`--` de linea y
+        // bloques) ANTES de buscar, asi que la lista de abajo sigue teniendo TRES entradas y no
+        // cuatro: la guardia no se afloja -no se anade ninguna migracion a la lista permitida-,
+        // se le quita el ruido para que mida DDL de verdad. Si QC-47 escribiera un solo ALTER
+        // sobre esas tablas, este caso caeria.
+        const sqlSinComentarios = readFileSync(sql, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, ' ')
+          .replace(/--[^\n]*/g, ' ')
+        return /\b(suppliers|supplier_catalog_lines)\b/i.test(sqlSinComentarios)
       })
       .map((entry) => entry.name)
       .sort()
