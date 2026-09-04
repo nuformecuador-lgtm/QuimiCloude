@@ -1,4 +1,9 @@
 {
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Vacio (el estado de hoy, 2026-08-28: 93/93 en verde) significa que CUALQUIER archivo rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
-  "archivos": {}
+  "archivos": {
+    "tests/unit/inventario/product-page.test.tsx": {
+      "motivo": "Flake de userEvent bajo carga, NO un fallo de codigo: pasa en aislado (27/27) y falla de forma intermitente en la suite completa, con un caso distinto cada vez. El sintoma es que las teclas llegan intercaladas al campo controlado (\"xxxxxAxcxixdxox\" en vez de \"Acido citrico\"), o sea que el re-render por tecla se retrasa bajo carga. Verificado rojo en dev (commit c0c16af) ANTES de la rama de QC-34, que no toca inventario ni UI. Es de QC-22. Arreglarlo tiene ficha propia en el board.",
+      "desde": "2026-09-04"
+    }
+  }
 }
