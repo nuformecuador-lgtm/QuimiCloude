@@ -223,9 +223,26 @@ async function addValidLine(
   await user.type(screen.getByTestId(`recipe-line-quantity-${index}`), quantity);
 }
 
-/** Paso tal y como lo devuelve el detalle: `texto` es el tipo por defecto. */
-function stepView(body: string, type: RecipeStepView['type'] = 'texto'): RecipeStepView {
-  return { body, type };
+/**
+ * Paso tal y como lo devuelve el detalle (QC-62): un DOCUMENTO, no `{ body, type }`. Se escribe
+ * literal a proposito -sin llamar a `textToStepDocument`- para que la ida y vuelta del puente
+ * (R19) se compruebe contra una forma fijada a mano y no contra la funcion que se esta probando.
+ */
+function stepView(text: string): RecipeStepView {
+  return { blocks: [{ kind: 'paragraph', spans: [{ text }] }] };
+}
+
+/**
+ * Texto plano de los pasos de un payload: aplana los parrafos igual que hace la pantalla. Sirve
+ * para afirmar sobre el ORDEN de los pasos enviados sin repetir el documento entero.
+ */
+function stepTexts(steps: readonly RecipeStepView[]): string[] {
+  return steps.map((step) =>
+    step.blocks
+      .filter((block) => block.kind === 'paragraph')
+      .map((block) => block.spans.map((span) => span.text).join(''))
+      .join('\n'),
+  );
 }
 
 // --- Imagen: firmas de contenido reales (`recipe-image.ts`), no solo la extensión del nombre. ---
@@ -430,11 +447,11 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [
       string,
-      { lines: { productId: string }[]; steps: { body: string }[] },
+      { lines: { productId: string }[]; steps: RecipeStepView[] },
     ];
     expect(payload.lines).toHaveLength(1);
     expect(payload.lines[0]?.productId).toBe(PRODUCT_1_ID);
-    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar']);
+    expect(stepTexts(payload.steps)).toEqual(['Mezclar', 'Calentar']);
   });
 });
 
@@ -646,8 +663,8 @@ describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orde
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-    const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
-    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar']);
+    const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: RecipeStepView[] }];
+    expect(stepTexts(payload.steps)).toEqual(['Mezclar', 'Calentar']);
   });
 });
 
@@ -684,10 +701,10 @@ describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () =
       await user.click(screen.getByTestId('recipe-form-submit'));
 
       await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
-      expect(payload.steps.map((step) => step.body)).not.toEqual(['Mezclar', 'Calentar', 'Enfriar']);
+      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: RecipeStepView[] }];
+      expect(stepTexts(payload.steps)).not.toEqual(['Mezclar', 'Calentar', 'Enfriar']);
       expect(payload.steps).toHaveLength(3);
-      expect(payload.steps.map((step) => step.body)).toEqual(['Calentar', 'Enfriar', 'Mezclar']);
+      expect(stepTexts(payload.steps)).toEqual(['Calentar', 'Enfriar', 'Mezclar']);
     } finally {
       uninstall();
     }
@@ -732,8 +749,8 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
       // teclado. Si se borrara el `KeyboardSensor` (o su `coordinateGetter`), este `ArrowDown`
       // no movería nada y esta aserción -no una que solo mirase el `role` del asa- se pondría
       // en rojo (`design.md > 7`, riesgo 5).
-      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
-      expect(payload.steps.map((step) => step.body)).toEqual(['Calentar', 'Mezclar', 'Enfriar']);
+      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: RecipeStepView[] }];
+      expect(stepTexts(payload.steps)).toEqual(['Calentar', 'Mezclar', 'Enfriar']);
     } finally {
       uninstall();
     }
@@ -814,5 +831,54 @@ describe('R38 — un archivo rechazado no llega al payload y su error queda junt
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
     expect('image' in (createRecipeActionMock.mock.calls[0]?.[0] as object)).toBe(false);
     expect(screen.getByTestId('recipe-image-error')).toBeInTheDocument();
+  });
+});
+
+describe('R19 — el puente de texto plano hasta QC-64', () => {
+  it('la precarga aplana el documento del paso a texto y lo devuelve como un solo párrafo al guardar', async () => {
+    const user = setupUser();
+    const recipe = recipeDetail({
+      steps: [
+        // Documento de DOS párrafos: la precarga los une con un salto de línea.
+        {
+          blocks: [
+            { kind: 'paragraph', spans: [{ text: 'Mezclar' }] },
+            { kind: 'paragraph', spans: [{ text: 'despacio' }] },
+          ],
+        },
+      ],
+    });
+
+    renderEditForm(recipe);
+
+    // `stepDocumentToText` une los dos párrafos con un salto de línea, pero el control es un
+    // `<input type="text">` de UNA línea y el propio DOM sanea el salto al asignar el valor. Es
+    // el límite conocido del puente y hoy es una ventana cerrada: R14 dejó a todas las recetas
+    // sin pasos y el puente -único escritor hasta QC-64- solo produce documentos de UN párrafo.
+    // El ESTADO sí conserva el salto: lo que se sanea es lo que el control puede PINTAR.
+    expect(screen.getByTestId('recipe-step-text-0')).toHaveValue('Mezclardespacio');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { steps: RecipeStepView[] }];
+    // De vuelta al contrato: UN párrafo con UN fragmento, sin marcas y sin `type`.
+    expect(payload.steps).toEqual([
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar\ndespacio' }] }] },
+    ]);
+  });
+
+  it('la pantalla no ofrece selector de tipo de paso: ni el control ni sus etiquetas están en el DOM', async () => {
+    const user = setupUser();
+    renderEditForm(recipeDetail({ steps: [stepView('Mezclar')] }));
+
+    expect(screen.queryByTestId('recipe-step-type-0')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /tipo del paso/i })).toBeNull();
+    expect(screen.queryByText('Lista de verificación')).toBeNull();
+
+    // Un paso nuevo tampoco lo trae: el control no existe en ninguna fila.
+    await user.click(screen.getByTestId('recipe-step-add'));
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
+    expect(screen.queryByTestId('recipe-step-type-1')).toBeNull();
   });
 });

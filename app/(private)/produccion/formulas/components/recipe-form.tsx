@@ -29,6 +29,7 @@ import {
   extractGeneralLinesError,
   extractLineErrors,
   extractStepErrors,
+  stepDocumentToText,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeLineFormValue,
@@ -119,8 +120,10 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         unitId: line.unitId,
       }),
     ),
+    // R19 (`design.md > 6`): el paso llega como DOCUMENTO y el puente lo aplana a texto plano,
+    // que es lo unico que este formulario sabe editar hasta QC-64.
     steps: recipe.steps.map(
-      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), text: step.body, type: step.type }),
+      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), text: stepDocumentToText(step) }),
     ),
     image: { kind: 'untouched' },
   };
