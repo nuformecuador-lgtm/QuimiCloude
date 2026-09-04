@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | pending → F1.2 | feature/QC-52-separar-producto-de-catalogo-de-proveedor | leader (worktree montado, spec_author lanzado) |
-| QC-34 | crud-de-pedidos | Pedidos | backend | pending → F1.2 | feature/QC-34-crud-de-pedidos | leader (worktree montado, sin spec: pendiente `/afinar-feature`) |
+| QC-34 | crud-de-pedidos | Pedidos | backend | spec_ready | feature/QC-34-crud-de-pedidos | esperando aprobación humana del spec (F1.4) |
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
@@ -1486,6 +1486,48 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### La base compartida quedó por delante de `dev`: el gate de `dev` NO puede pasar (2026-09-04)
+
+A las **07:42** la sesión paralela que lleva **QC-52** aplicó
+`20260904123854_split_product_and_supplier_catalog` sobre el esquema `public` de la base
+compartida `QuimiCloude`. **Verificado, no deducido:** `products` ya no tiene `cost`,
+`min_purchase` ni `delivery_time`.
+
+- **Consecuencia inmediata:** cualquier `product.create()` desde código de `dev` muere con
+  **SQLSTATE 42703**, así que `./init.sh` sobre `dev` —o sobre cualquier rama que no sea la de
+  QC-52— **no puede terminar en verde en esta máquina** hasta que QC-52 mergee. Comprobado con
+  `git stash`: los mismos fallos con y sin cambios locales.
+- **Ojo con el mensaje de error:** Prisma lo reporta como ``The column `existe` does not exist``.
+  Es un artefacto de parsear el error de Postgres en español (`no existe la columna ...`). **No
+  hay ninguna columna `existe`**; no pierdas media hora buscándola.
+- **Cómo se sorteó, y es la salida recomendada mientras dure:** dar a la rama su propia base.
+  `feature/fix-gate-rojos-dev` corre contra **`QuimiCloude_FIXGATE`** (creada, migrada y
+  sembrada; `.env` del worktree, fuera de git) y con eso el gate completo da **139/139 archivos y
+  1529/1529 tests**. Mismo patrón que `QuimiCloude_QC26`.
+- **La causa de fondo, que no arregla ninguna ficha:** todas las sesiones comparten **un solo
+  Postgres**, así que la primera que toque el esquema deja el gate rojo para todas las demás.
+  Hoy pasó **dos veces en media hora** —primero filas de prueba hechas a mano, después una
+  migración— y la primera vez costó un diagnóstico completo. **Una base por worktree es candidato
+  a ficha propia del arnés** (`/afinar-regla`), no a parche de sesión.
+- **Falsa pista descartada, para que nadie la vuelva a seguir:** durante unos minutos existió un
+  esquema `public_shadow_qc52` que duplicaba cada FK en `pg_constraint`. Era la *shadow database*
+  que `prisma migrate dev` crea y destruye, no un esquema abandonado. El filtro por `public` que
+  añadió el PR #31 a esas consultas se queda porque inmuniza contra esa ventana, pero **no era la
+  causa** del rojo que persistía.
+
+### Actualización a la deuda del rojo de `identity-seed` (2026-09-04)
+
+La decisión del **2026-09-03** —«no se borra la fila, no se arregla el helper y NO se mete al
+baseline»— **queda sustituida por la del humano del 2026-09-04**: se arregla el helper. Va en el
+**PR #31**. `resetIdentityToEmptyState` ya no depende de con qué datos arranque la base local, y
+la causa de fondo que quedó escrita el 2026-09-03 —«cualquier feature futura con una FK a `users`
+puede volver a provocarlo»— **queda cerrada**: el orden de borrado se deriva del catálogo, no de
+una lista. Se comprobó contra la base ya migrada por QC-52, con las dos FK nuevas de
+`supplier_catalog_lines`: 10/10 en verde.
+
+Lo que **no** se cerró y sigue vivo es la fila residual como problema de convivencia: ver la deuda
+de la base compartida, justo arriba.
 
 ### La base compartida tiene una fila residual que rompe el gate de TODAS las sesiones (2026-09-03)
 
