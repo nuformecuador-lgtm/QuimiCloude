@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | pending → F1.2 | feature/QC-57-orden-y-filtro-en-listados | leader (worktree montado, requirements.md sembrado, spec_author lanzado) |
+| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | in_progress | feature/QC-57-orden-y-filtro-en-listados | implementer (spec aprobado por el humano el 2026-09-04) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
 | QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
 
@@ -223,6 +223,35 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-62 — pasos-de-receta-enriquecidos: nacida, acotada, sembrada y **partida** (2026-09-04)
+
+- **Nació en esta sesión.** La ficha no existía en el board y `/afinar-feature` paró por su guarda
+  del paso 0. Se creó **QC-62** en Jira (épica QC-27 Recetas) y después se acotó.
+- **Sembrada** en `specs/QC-62-pasos-de-receta-enriquecidos/requirements.md` y
+  `specs/QC-64-editor-y-lectura-de-pasos/requirements.md`. La fuente son esos archivos; aquí no se
+  copian las tablas.
+- **Partida en dos (F1.0)**, por decisión humana explícita al aplicar la regla de partición de
+  `fullstack` de `AGENTS.md > F1.0`: **QC-62** se queda con el contrato (`zone: backend`,
+  `complexity: medium`) y **QC-64 — editor-y-lectura-de-pasos** nace con la pantalla
+  (`zone: frontend`, `complexity: high`, `depends_on: QC-62`). Las 12 decisiones cerradas de la
+  acotación se repartieron entre las dos: 8 al contrato, 10 a la pantalla, ninguna se perdió ni se
+  duplicó con distinto texto.
+- **Board actualizado antes de sembrar (Paso 5):** `description` de QC-62 reescrita dos veces —la
+  segunda al partir—, labels `zone:backend` y `complexity:medium`; **QC-64** creada con
+  `zone:frontend`, `complexity:high` y link *is blocked by* → QC-62; y **QC-63 —
+  ejecutar-receta-operador** creada antes de la partición, ahora bloqueada también por QC-64, que
+  es quien construye el componente que ella necesita.
+- **Decisión destructiva y consciente**: la migración de QC-62 **deja sin pasos** a las recetas
+  existentes. No se convierten. Es irreversible y está escrita así en el spec.
+- **Dependencia sin cerrar**: el editor enriquecido entra por el `design.md` de **QC-64** con los
+  cuatro checks, y se aprueba con ese spec (F1.4). El diseño apunta a TipTap/ProseMirror, **sin
+  cerrar**.
+- **Sin conflicto de archivos con QC-47** (`backend`, `in_progress`): QC-47 vive en
+  `db/schema.prisma` y en el módulo de multiempresa; QC-62 **no abre `db/schema.prisma`** por
+  decisión cerrada y se queda dentro de `lib/modules/recetas/`.
+- **Diseño acordado** (tres direcciones exploradas, elegida la C):
+  https://claude.ai/code/artifact/fef7d60d-55c7-4ace-ad59-43415b442319
 
 ### QC-57 — orden-y-filtro-en-listados: acotada y sembrada (2026-09-04)
 
@@ -1596,6 +1625,55 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### `pg_trgm` entra como dependencia de infraestructura que NINGUNA guardia vigila (2026-09-04, QC-57)
+
+`docs/dependencias.md` y su guardia comparan **entradas de `package.json`**. Una extensión de
+Postgres no aparece en ninguna de las dos listas, así que **no lleva fila y el gate no la ve**.
+
+- **Aprobada por el humano el 2026-09-04** al cerrar QC-57, sobre dato medido: `pg_trgm` ya está
+  **disponible** en el servidor (`pg_available_extensions` la da en `1.6`, sin instalar), así que
+  cuesta una línea en la migración y otra en el `down`.
+- **Por qué se aceptó**: la alternativa era bajar la búsqueda de subcadena a prefijo, lo que
+  habría degradado en silencio el selector de ingredientes, que ya busca por subcadena.
+- **El riesgo, escrito**: si la base se mudara a un Postgres sin `pg_trgm`, la migración falla y
+  **nada en el repo lo avisaría antes**. Queda como candidata a ficha propia si algún día hay más
+  de una extensión.
+
+### Quinta vez: el drift de la base compartida bloquea la integracion (QC-62, 2026-09-04)
+
+El humano decidio **no** montar base propia para QC-62 y abrir el PR con los rojos declarados. Lo
+que se midio, para que la proxima sesion no repita el diagnostico:
+
+- La base `QuimiCloude` tiene aplicada `20260904160000_list_query_indexes`, **que esta rama no
+  tiene**, y su columna `products.name_normalized` es `NOT NULL`. El modelo `Product` de
+  `db/schema.prisma` en esta rama **no** declara `nameNormalized`, asi que la fixture no puede
+  pasarlo: `prisma.product.create` responde `Unknown argument nameNormalized`.
+- Por eso **9 archivos de `tests/integration/`** caen con el mismo `Null constraint violation on
+  the fields: (name_normalized)` — los tres de `inventario`, los tres de `recetas`,
+  `pedidos/pedidos-constraints`, `proveedores/catalog-line` y `unidades/unidades-constraints`.
+  **Fallan igual en `dev`**: no es regresion de ninguna feature, es la base yendo por delante del
+  codigo.
+- El primer diagnostico del leader —«fixtures viejas de QC-52»— **era falso**, y el encargo de
+  arreglarlas era inaplicable. Lo tumbo el implementer con medidas, no con opinion.
+
+**Dos agujeros del gate que esto destapo, y que siguen sin dueno:**
+
+1. `./init.sh` da por bueno su check de `.env presente` mientras la integracion cae con
+   `DATABASE_URL not found`: **vitest no carga `.env`** y hay que exportarlo a mano
+   (`set -a && . ./.env && set +a`). Un worktree recien montado da un **verde falso** en
+   integracion.
+2. Las dos guardias gemelas de alcance del modulo `recetas` —`tests/unit/recetas/module-contract.test.ts`
+   y `tests/unit/recetas-ui/recipe-route-contract.test.ts:555`— **ya no dicen lo mismo**: QC-62
+   actualizo la primera con su lista de archivos permitidos y la segunda sigue con la vieja, tapada
+   por `baseline-rojos.json` con un motivo escrito que **ya no es el que ocurre**. Replicar las
+   listas alli no la pondria verde igualmente (detras espera `tocaDb` por la migracion, que es la
+   deuda R44 ya anotada), asi que se deja **declarado, no tapado**.
+
+**Un hallazgo que si se corrigio**: la migracion de QC-62 y la foranea compartian marca de tiempo
+exacta (`20260904160000`). Prisma las distingue por nombre, pero el orden entre dos que empatan
+queda al azar — y la de QC-62 **borra datos de forma irreversible**. Renombrada a
+`20260904181500_recipe_steps_reset`.
 
 ### La base propia de QC-34 ya se borro; la deuda de fondo sigue viva (2026-09-04)
 

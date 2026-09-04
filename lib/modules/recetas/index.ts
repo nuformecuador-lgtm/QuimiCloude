@@ -36,11 +36,21 @@ export {
   type RecipeImageFormat,
   type RecipeImageValidation,
 } from './domain/recipe-image';
+// QC-62: `RECIPE_STEP_TYPES` y `RecipeStepType` SE RETIRARON del contrato (R9). El paso es un
+// documento y su forma es la unica fuente. `MAX_STEP_ELEMENTS` y `countRecipeStepElements` se
+// publican aqui para que el tope viva en UNA sola constante (R11) y nadie lo reescriba a mano.
 export {
-  RECIPE_STEP_TYPES,
-  type RecipeStepType,
   recipeStepSchema,
+  recipeStepBlockSchema,
+  recipeStepSpanSchema,
+  recipeStepChecklistItemSchema,
+  MAX_STEP_ELEMENTS,
+  countRecipeStepElements,
   type RecipeStepInput,
+  type RecipeStepDocument,
+  type RecipeStepBlock,
+  type RecipeStepSpan,
+  type RecipeStepChecklistItem,
   recipeLineSchema,
   createRecipeSchema,
   updateRecipeSchema,

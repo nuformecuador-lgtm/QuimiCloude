@@ -35,6 +35,8 @@ export {
   extractGeneralLinesError,
   extractLineErrors,
   extractStepErrors,
+  stepDocumentToText,
+  textToStepDocument,
   type ImageFieldState,
   type RecipeFormMode,
   type RecipeFormState,

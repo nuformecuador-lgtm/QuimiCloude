@@ -266,8 +266,8 @@ describe('R5: alta de una receta con sus lineas', () => {
       const input = baseRecipeInput({
         description: 'Formula de prueba',
         steps: [
-          { body: 'Pesar', type: 'texto' },
-          { body: 'Mezclar', type: 'texto' },
+          { blocks: [{ kind: 'paragraph', spans: [{ text: 'Pesar' }] }] },
+          { blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Mezclar' }] }] }] },
         ],
         lines: [
           { productId: productA, quantity: '10.0000', unitId: sharedUnitId },
@@ -285,10 +285,11 @@ describe('R5: alta de una receta con sus lineas', () => {
       expect(detail).not.toBeNull();
       expect(detail?.name).toBe(input.name);
       expect(detail?.description).toBe('Formula de prueba');
-      // El paso viaja y vuelve con su tipo: la columna `steps` es JSON y guarda el objeto entero.
+      // El DOCUMENTO del paso viaja y vuelve entero, con sus bloques y su orden (QC-62 R1, R16):
+      // la columna `steps` es JSON y guarda el objeto tal cual, sin aplanar ni derivar nada.
       expect(detail?.steps).toEqual([
-        { body: 'Pesar', type: 'texto' },
-        { body: 'Mezclar', type: 'texto' },
+        { blocks: [{ kind: 'paragraph', spans: [{ text: 'Pesar' }] }] },
+        { blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Mezclar' }] }] }] },
       ]);
       expect(detail?.lines).toHaveLength(2);
       const byProduct = new Map(detail?.lines.map((line) => [line.productId, line]));
