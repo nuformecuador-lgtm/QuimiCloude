@@ -24,7 +24,107 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Vocabulario que usan todos los requisitos de abajo, para que no haya dos lecturas:
+> **documento** es el contenido completo de UN paso; **elemento** es cada párrafo y cada ítem de
+> lista de verificación que hay dentro de ese documento; **fragmento** es cada trozo de texto de
+> un párrafo o de un ítem, con sus marcas. «Rechazar la operación» significa rechazar el alta o
+> la edición **entera**, sin guardar nada.
+
+### Forma del documento de un paso
+
+**R1.** El sistema DEBE representar el contenido de un paso como un **documento** formado por una
+lista ordenada de elementos, DEBE admitir que un mismo documento mezcle párrafos y listas de
+verificación **en cualquier orden**, y DEBE conservar ese orden tal como se recibió, tanto al
+guardarlo como al devolverlo.
+
+**R2.** El sistema DEBE admitir exactamente dos clases de elemento estructural: **párrafo** y
+**lista de verificación**, y la lista de verificación DEBE estar compuesta por una lista ordenada
+de **ítems**. Un párrafo PUEDE no tener ningún fragmento —es una línea en blanco— y, cuando así
+llega, el sistema DEBE conservarlo: los saltos de línea del paso son estos elementos y no
+caracteres dentro de un texto.
+
+**R3.** El sistema DEBE admitir, dentro de un párrafo y dentro de un ítem, fragmentos de texto con
+las marcas **negrilla** y **cursiva**, aplicables de forma independiente y combinables sobre el
+mismo fragmento; y SI un fragmento no tiene ningún carácter, ENTONCES DEBE rechazar la operación.
+
+**R4.** SI el documento de un paso contiene una clase de elemento o una marca que no sea párrafo,
+lista de verificación, negrilla o cursiva —encabezado, enlace, imagen, tabla, cita, cualquier
+otra—, o contiene un campo que la forma admitida no declara, ENTONCES el sistema DEBE rechazar la
+operación.
+
+**R5.** El sistema DEBE conservar el texto de cada fragmento **tal como se recibió**, y NO DEBE
+recortarlo, normalizarlo ni reordenar el documento: lo que se guarda es lo que llegó, o no se
+guarda nada.
+
+### Validación en el borde
+
+**R6.** CUANDO se recibe un alta o una edición de receta, el sistema DEBE validar el documento de
+cada paso **en el borde del módulo `recetas`**, antes de que llegue al caso de uso, comprobando
+únicamente su **forma**; y NO DEBE juzgar el contenido del texto de ningún fragmento.
+
+**R7.** SI el documento de un paso no contiene ningún carácter distinto de espacio, ENTONCES el
+sistema DEBE rechazar la operación; y SI un ítem de una lista de verificación no contiene ningún
+carácter distinto de espacio, ENTONCES DEBE rechazar la operación igualmente.
+
+**R8.** CUANDO el sistema rechaza una operación porque un paso incumple R1–R7 o R9, DEBE
+identificar en el error la **posición** del paso que falla dentro de la lista de pasos.
+
+### Desaparición del tipo de paso
+
+**R9.** El contrato público del módulo `recetas` NO DEBE exponer ningún tipo de paso: ni la lista
+de tipos admitidos, ni su tipo TypeScript, ni un campo `type` en la entrada de alta o edición, ni
+en el paso que devuelve el detalle de una receta.
+
+**R10.** CUANDO se devuelve el detalle de una receta, el sistema DEBE devolver cada paso como su
+documento y NO DEBE devolver ningún dato derivado de él —en particular, ninguna marca de «este
+paso lleva lista de verificación»—: quien lo necesite lo deduce del propio documento.
+
+### Topes
+
+**R11.** SI el documento de un paso tiene más elementos que el tope máximo de elementos por paso,
+ENTONCES el sistema DEBE rechazar la operación en la validación de aplicación; y ese tope DEBE
+estar publicado por el contrato del módulo como **una sola constante**, de modo que nadie lo
+reescriba a mano en otra capa. *(El número lo cerró el humano en F1.4 el 2026-09-04: **30**. Ver la
+última fila de «Decisiones cerradas».)*
+
+**R12.** El sistema NO DEBE imponer ningún tope de **caracteres**: ni al documento del paso, ni a
+un párrafo, ni a un ítem, ni a un fragmento.
+
+**R13.** SI la lista de pasos de una receta tiene más de **50** elementos, ENTONCES el sistema
+DEBE seguir rechazando la operación, y SI no se indican pasos, ENTONCES DEBE persistir una **lista
+vacía** (se mantiene lo vigente de QC-24/QC-25).
+
+### Borrado de los pasos ya guardados
+
+**R14.** CUANDO se aplica esta feature sobre una base con datos, el sistema DEBE dejar **sin
+pasos** —lista vacía— a **todas** las recetas existentes, incluidas las borradas lógicamente, y NO
+DEBE convertir ningún paso guardado a la nueva forma.
+
+**R15.** El sistema NO DEBE ofrecer ninguna vía de recuperación de lo borrado por R14: revertir la
+migración DEBE dejar las recetas igualmente sin pasos, y la reversión DEBE declarar por escrito
+esa irreversibilidad en vez de aparentar que restaura.
+
+### Persistencia y permisos, sin cambios
+
+**R16.** El sistema DEBE seguir guardando los pasos como **un único documento JSON en la columna
+ya existente** de la receta, y NO DEBE crear tabla ni entidad de paso, NO DEBE añadir columna
+alguna, NO DEBE derivar columna de orden y NO DEBE cambiar el tipo de la columna (QC-24 R4).
+
+**R17.** SI la columna de pasos de una receta contiene un elemento que no tiene la forma admitida
+—dato heredado, o escrito fuera de la aplicación—, ENTONCES al leer el sistema DEBE descartar
+**ese** elemento y devolver los demás, y NO DEBE fallar la lectura ni dejar la pantalla sin
+respuesta.
+
+**R18.** El sistema DEBE mantener las cinco operaciones de receta como operaciones de
+**Administrador**, con el actor por parámetro y la autorización en el service (QC-25 R1–R3); esta
+feature NO DEBE cambiar quién puede leer ni escribir pasos.
+
+### Puente hasta QC-64
+
+**R19.** MIENTRAS QC-64 no esté implementada, el sistema DEBE seguir permitiendo dar de alta y
+editar una receta con pasos desde la pantalla de fórmulas, escribiendo cada paso como texto plano
+que viaja al contrato como un documento de un solo párrafo; y esa pantalla NO DEBE ofrecer ni
+marcas ni listas de verificación mientras tanto.
 
 ## Preguntas abiertas
 
