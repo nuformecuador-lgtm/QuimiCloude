@@ -12,7 +12,6 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | **PR #34 abierto**, esperando revisión y merge humano (F2.4 hecha) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
 | QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | pending | feature/QC-47-modelo-empresa-y-membresias | esta sesión (`labs`) — worktree montado en F1.0, sin spec todavía |
 
@@ -280,57 +279,10 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
   board), que se importó como `cancelled`. Las dos sesiones la vieron faltar y la escribió una
   sola: el `feature_list.json` quedó con 43 fichas y sin duplicados, verificado.
 
-### QC-34 — crud-de-pedidos: F0 + F1.0 (2026-09-04)
+### QC-34 — crud-de-pedidos: CERRADA el 2026-09-04 (PR #34, merge `4c98fe1`)
 
-- **F0 — importación del board.** 43 issues de tipo `Tarea` en `QC`. Comparado campo a campo
-  contra `feature_list.json` (`status`, `epic`, `epic_name`, `zone`, `complexity`, `slug`, `sdd`,
-  `depends_on`): coinciden en las 42 fichas de disco salvo una. **Divergencia real: QC-23 estaba
-  en el board en *En revisión* y en disco como `pending`** — manda el board, así que pasa a
-  `spec_ready` (su `requirements.md` sembrado ya existe, el gate lo acepta). **QC-40 `ajuste-sidebar`** (board: *Cancelado*) **no estaba
-  en disco al empezar la comparación y sí al terminarla**: la sesión paralela que lleva QC-52 la
-  importó a mitad de esta F0. Se conserva como `cancelled` — invierte el criterio del 2026-09-03,
-  que la dejaba fuera a propósito, y no la revierte esta sesión por ser trabajo ajeno en vuelo. Nada que empujar a Jira: QC-34 ya tiene `zone:backend`, `complexity:high`, `sdd` y
-  `slug:crud-de-pedidos`.
-- **El gate completo terminó en ROJO antes de tocar nada, y ninguno de los cinco archivos es de
-  esta sesión.** Diagnóstico uno por uno, corriéndolos aislados:
-  - `tests/integration/identity/identity-seed.int.test.ts` (8 casos) — **rojo de verdad y
-    reproducible en aislado**: `tx.user.deleteMany()` viola una FK porque la base local tiene
-    **datos hechos a mano** (6 productos, 1 receta, 2 líneas) cuyo `created_by` apunta al usuario
-    semilla. El test asume que ningún otro módulo tiene filas apuntando a `users`, supuesto que
-    dejó de ser cierto en cuanto QC-20/QC-24 empezaron a guardar autoría. Se limpia la base o se
-    endurece el test; **es decisión del humano porque son sus datos de prueba manual**.
-  - `tests/integration/proveedores/supplier-crud.int.test.ts` y
-    `tests/unit/inventario/product-page.test.tsx` — **flakes bajo carga**: los dos pasan al
-    correrlos solos (`supplier` tiene 0 filas; el campo del formulario recibió las teclas
-    intercaladas, patrón conocido de jsdom).
-  - `tests/unit/recetas/module-contract.test.ts` y
-    `tests/unit/recetas-ui/recipe-route-contract.test.ts` — **artefacto de correr el gate sobre
-    `dev`**: exigen que `origin/dev...HEAD` traiga diff y en `dev` ese rango está vacío
-    (`HEAD == origin/dev`). Dentro del worktree de una feature pasan.
-- **F1.0.** `zone: backend`, `complexity: high` y `branch` ya venían evaluados del board; no se
-  reevalúa nada. `depends_on` **QC-33** y **QC-8**, las dos `done`. Cupo: **cero** features
-  `in_progress` en `backend` (QC-23 está `spec_ready`, no consume cupo). Sin conflicto de archivos:
-  lo único en vuelo es **QC-52**, de zona `fullstack` —zonas distintas corren en paralelo sin
-  restricción— y toca inventario/proveedores, no `lib/modules/pedidos`.
-- Worktree montado en `.worktrees/QC-34-crud-de-pedidos`.
-- **F1.2 en pausa a propósito**: la ficha llega con **preguntas abiertas escritas en su propia
-  `description`** —qué rol puede consultar/crear/editar/borrar, si el Operador ve solo los suyos,
-  y si hay filtros por estado o prioridad— y **no existe** `specs/QC-34-crud-de-pedidos/`. Es
-  exactamente el caso que F1.2 manda ofrecer `/afinar-feature` antes de lanzar `spec_author`.
-- **QC-34 acotada con `/afinar-feature` el 2026-09-04.** Alcance, **24 decisiones cerradas** y **2
-  preguntas abiertas** en `specs/QC-34-crud-de-pedidos/requirements.md` — esa es la fuente, aqui
-  solo se enlaza. La acotacion **crecio la ficha**: el humano anadio un **cuarto estado
-  `CANCELADO` con motivo obligatorio**, asi que QC-34 deja de ser solo casos de uso y **trae
-  migracion** (valor nuevo del enum, columna del motivo, y el `CHECK` de borrado de QC-33 ampliado
-  para que tampoco se borre un cancelado). Cierra ademas las **tres cosas que QC-33 dejo escritas
-  para aqui**: permisos (solo Administrador), transiciones (solo hacia delante, con `ENTREGADO` y
-  `CANCELADO` finales) y quien calcula el correlativo (**secuencia de la base por ano**, que
-  cierra su pregunta abierta 2). **Board actualizado ANTES de sembrar**: se reescribio la
-  `description` de **QC-34** entera y se ajusto la de **QC-35**, que seguia pidiendo un campo de
-  fecha de solicitud que ya no existe y no sabia nada de cancelar. `zone`, `complexity` y
-  `depends_on` no cambian; no se creo ni cancelo ninguna ficha.
-
-- **QC-52 acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 3 preguntas abiertas en `specs/QC-52-separar-producto-de-catalogo-de-proveedor/requirements.md`; no se copian aquí. Nació de una decisión del humano posterior al merge de QC-43 y **arrastra tres features ya mergeadas** (QC-20, QC-22 y el propio QC-43, del que se caen las reglas que dependían del producto). El board se actualizó antes de sembrar: `description` reescrita y `complexity: high` asignada. También se importaron a `feature_list.json` las fichas **QC-52** y **QC-54**, creadas en el board despues de la ultima F0.
+Resumen completo en `progress/history.md`. El alcance y las 25 decisiones cerradas al acotar
+viven en `specs/QC-34-crud-de-pedidos/requirements.md`. **Desbloquea QC-35.**
 
 ### QC-23 — registro-de-sesiones (acotada el 2026-09-03)
 
@@ -1568,7 +1520,7 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
-### QC-34 tiene base propia `QuimiCloude_QC34` — hay que BORRARLA al cerrar la ficha (2026-09-04)
+### La base propia de QC-34 ya se borro; la deuda de fondo sigue viva (2026-09-04)
 
 Tercera vez que el drift de base entre worktrees bloquea una feature, y tercera vez que se resuelve
 a mano: la sesion paralela de **QC-52** aplico su migracion a la base compartida y eso revento los
@@ -1583,17 +1535,12 @@ tests de integracion de QC-34 con un `P2022` en cualquier lectura de `orders`. S
 - **La trampa de siempre:** ni `init.sh` ni Vitest cargan ese `.env`. Sin
   `set -a && . ./.env && set +a` delante, el gate pega contra la compartida y la base propia es
   decorativa. Ya estaba escrito en este archivo y volvio a pasar hoy.
-- **Deuda que esto crea:** `./scripts/wt.sh done` no sabe nada de la base propia, asi que **al
-  cerrar QC-34 hay que borrar `QuimiCloude_QC34` a mano**. Siguen vivas y huerfanas
-  `QuimiCloude_QC14` y `QuimiCloude_FIXGATE`, comprobado hoy contra el servidor.
-
-### Aviso cruzado a la sesion de QC-52 (2026-09-04)
-
-Cuando la migracion de QC-34 (`cancellation_reason` en `orders`) llegue a `dev`, la copia de
-`tests/integration/pedidos/pedidos-constraints.int.test.ts` **que vive en `dev`** se pondra roja:
-afirma la lista exacta de columnas de `orders`. **En la rama de QC-34 ya esta corregida**, asi que
-se arregla sola al mergear; el ruido es solo mientras las dos ramas convivan. Nadie tiene que tocar
-el worktree principal por esto.
+- **Hecho al cerrar la ficha:** `QuimiCloude_QC34` **borrada** a mano, porque
+  `./scripts/wt.sh done` no sabe que existe. Ese paso manual es la deuda, y **sigue viva para la
+  proxima feature**: nada en `wt.sh new` crea la base ni nada en `wt.sh done` la retira.
+- **Bases huerfanas comprobadas hoy contra el servidor:** `QuimiCloude_QC14` y
+  `QuimiCloude_FIXGATE` siguen vivas con sus features cerradas hace dias. `QuimiCloude_QC44` esta
+  en uso por la sesion paralela y no se toca.
 
 ### El commit `7a3af59` lleva un mensaje que no le corresponde (2026-09-04)
 
