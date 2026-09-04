@@ -11,7 +11,14 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-26 | pantalla-de-recetas | QC-27 Recetas | frontend | **in_progress — PR #29 ABIERTO** | `feature/QC-26-pantalla-de-recetas` | **Esperando que el humano mergee el [PR #29](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/29).** 54 requisitos con test, 30 tasks (**T25 pendiente a propósito**: comprobación manual en móvil real, que ningún agente puede cerrar). Gate: **125 archivos, 1369 tests**, tres corridas idénticas. `reviewer` en dos rondas (3 mayores → 0, **15 mutaciones**) y **cero cambios de producción** al corregir. **Base propia `QuimiCloude_QC26`, hay que borrarla al cerrar.** Al mergear: F2.5 y F2.6 |
+
+La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
+resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
+`QuimiCloude_QC26` eliminada**. **Cierra la épica Recetas** — QC-24 el modelo, QC-25 el CRUD,
+QC-26 la pantalla. 54 requisitos con test y `reviewer` en dos rondas (3 mayores → 0, **15
+mutaciones**). **Queda T25 sin hacer y ningún agente puede cerrarla**: la verificación manual en
+un móvil real (375 px, arrastrar un paso con el dedo, zoom al enfocar). Si al probarlo aparece
+algo, es ficha nueva.
 
 La feature **QC-13 — guardia-de-sesion-en-navegacion** se cerró el 2026-09-03 (PR #27, merge
 `045074c`): resumen en `progress/history.md`. El menú privado queda con **Dashboard, Inventario y

@@ -1449,3 +1449,183 @@ vuelta con su definición literal.
   qué se mide el mínimo de compra (la unidad es opcional desde QC-32), quién concilia los dos costos
   —que QC-52 responde— y que **el alta de línea no es atómica**, declarado con el motivo de por qué
   hacerlo atómico costaría perder la traducción del error de duplicado.
+
+
+## QC-26 — pantalla-de-recetas (2026-09-03)
+
+PR [#29](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/29), merge `4c4ee11`. Épica QC-27,
+`zone: frontend`, `complexity: high`. **54 requisitos con test**, 30 tasks, **21 decisiones
+cerradas**. Gate completo verde tras sincronizar con `dev`: **139 archivos, 1529 tests**, E2E en
+Chromium y WebKit. `reviewer` en **dos rondas**: RECHAZADO con 3 mayores y 6 menores → APROBADO con
+0, tras **15 mutaciones ejecutadas por el propio reviewer**. Cierra la épica Recetas: QC-24 el
+modelo, QC-25 el CRUD, QC-26 la pantalla.
+
+### Lo que la acotación encontró y que nadie había visto
+
+**El selector de unidad no tenía de dónde leer.** QC-32 creó la tabla `units` y sembró cuatro filas,
+pero las operaciones eran de QC-38, que ni se ha acotado: sin resolverlo, **ninguna línea de receta
+se podía guardar** y la pantalla entera quedaba muerta. Se decidió que esta ficha añadiera **la
+lectura, y solo la lectura**, con el precedente de QC-22, que se trajo el alta de presentaciones por
+el mismo motivo. Es la segunda vez que una pantalla descubre que su backend está incompleto **al
+acotarla**, no al implementarla — que es cuando sale barato.
+
+**Y la URL no se inventó.** El sidebar ya tenía «Fórmulas» (`/produccion/formulas`) a 404 desde
+QC-11: una receta química *es* su fórmula, así que la pantalla ocupa ese ítem y su etiqueta pasa a
+«Recetas». `FORMULAS_ROUTE` se mudó a `lib/shared/routes.ts` porque el middleware y la regla ruta→rol
+la necesitan y **no pueden depender de la navegación**, igual que hizo QC-22 con `INVENTORY_ROUTE`.
+
+### Los tres mayores, y uno era del leader
+
+**MAYOR 1 — el gate no era reproducible, y eso es peor que un rojo.** El leader reportó 1366 tests en
+verde; el reviewer corrió la suite **cuatro veces sobre árbol limpio y las cuatro dieron 1364/1366**.
+Dos tests —los únicos que cubren R30 y media R31— expiraban a los 5000 ms bajo la carga de la suite:
+tardaban 1,7 y 1,9 s en aislado, un **margen de 2,7x** que no aguanta la paralelización. Se arregló
+atacando la causa (`userEvent.setup({ delay: null })`, que quita la espera artificial sin alterar la
+secuencia de eventos ni desactivar la comprobación de `pointer-events`) y no subiendo el límite a
+secas: **los tiempos bajaron de verdad**, 1732→679 ms y 1855→753 ms. Nada entró en
+`baseline-rojos.json`. El reviewer lo verificó leyendo la fuente del paquete **y** por mutación.
+
+**MAYOR 2 — el leader metió seis archivos de otra sesión en la rama.** Un `git add -A` en el worktree
+principal —que estaba en la rama `fix-ux` con trabajo sin commitear de la sesión hermana— arrastró
+`button.tsx`, `sheet.tsx`, `app-sidebar.tsx`, `logout-menu-item.tsx` y dos de
+`inventario/components/`, violando R48 y R51. **Y tuvo una segunda vida peor**: al sincronizar con
+`dev`, git **auto-resolvió en silencio** cinco de esos archivos a favor de la reversión, revirtiendo
+sin marcar conflicto el trabajo que ya había llegado por `fix-ux`. No hubo aviso y ninguna guardia lo
+habría cazado —para git era un cambio legítimo—; solo apareció comparando el diff completo contra
+`dev`. **La regla que sale de aquí:** cuando una rama revierte algo que no es suyo, el merge
+siguiente se mira **contra `dev`**, no contando conflictos.
+
+**MAYOR 3 — el único código de acceso a datos de la ficha no tenía test.** Se podían borrar
+`take: limit` **y** `orderBy` de `unit-prisma.ts` a la vez con la suite entera en verde. Se cubrió
+con integración contra Postgres real, y en la ronda de cierre se **endureció**: con tres filas
+sembradas el caso del orden cazaba la mutación **5 de cada 6 veces** —Postgres puede devolverlas
+ordenadas por azar—; con **ocho filas sembradas en orden inverso**, seis de seis. Un test que muerde
+cinco de cada seis veces no es una garantía, es una probabilidad.
+
+### El hallazgo de entorno que reinterpreta a QC-25
+
+**El `.env` de un worktree no lo lee el runner de tests.** `init.sh` solo comprueba que exista; lo
+que decide a qué base pegan los de integración es **la variable del entorno del proceso**. El primer
+gate de esta ficha dio **12 archivos en rojo** por correr contra la base compartida de otra sesión. Y
+obliga a matizar lo que se escribió en QC-25: dar base propia al worktree cambió el archivo, pero el
+gate siguió pegando contra la compartida — lo que salvó aquella corrida fue que para entonces ya
+tenía aplicada la migración de unidades. La conclusión sigue siendo correcta (un worktree necesita
+base propia), pero **el mecanismo estaba a medias**.
+
+### Seis tests ajenos tocados, y ninguno relajado
+
+Cuatro los retensó el implementer al implementar —afirmaban «esta ficha no trae la pantalla, es de
+QC-26»— y dos más aparecieron al sincronizar con `dev`. El de QC-43 medía las claves de su fachada
+haciendo `slice` **hasta el final del archivo**, así que en la práctica afirmaba sobre lo que viniera
+detrás; se acotó a su propio objeto literal, **rechazando la salida fácil** de reordenar
+`lib/composition/index.ts` para que volviera a ser el último, que solo habría trasladado la trampa a
+la feature siguiente. Y un test de QC-13 se **borró** con nota: afirmaba que el ítem se llamaba
+«Fórmulas», o sea, literalmente que QC-26 no había llegado. Van **seis** features rotas por esta
+familia de tests.
+
+### Dos afirmaciones falsas que se corrigieron en vez de sobrevivir
+
+El leader dijo haber verificado los cuatro checks de `dnd-kit` **sin haberlos corrido**; al correrlos
+**fallaba el check 2** (sin publicar desde 2024-12-05), así que la librería entró como **`excepcion`**
+—no como `aprobada`— con su check fallido, su porqué y su condición escritos, y con
+`@atlaskit/pragmatic-drag-and-drop` identificada como salida si algún día rompe. Y el implementer
+documentó un falso verde de `vitest` con dos filtros que **el reviewer comprobó que no existe**: la
+explicación de aquella mutación verde era la simple, que el test no existía. Las dos quedan escritas
+como lo que fueron.
+
+### Lo que queda abierto
+
+**T25 no está hecha y ningún agente puede cerrarla**: la verificación manual en un móvil real —375 px,
+arrastrar un paso con el dedo, que ningún input haga zoom al enfocar—. Hay guardias de fuente y
+asserts de viewport, pero, como lo dejó escrito el implementer, *una guardia no es un dedo sobre un
+cristal*.
+
+
+## QC-26 — pantalla-de-recetas (2026-09-03)
+
+PR [#29](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/29), merge `4c4ee11`. Épica QC-27,
+`zone: frontend`, `complexity: high`. **54 requisitos con test**, 30 tasks, **21 decisiones
+cerradas**. Gate completo verde tras sincronizar con `dev`: **139 archivos, 1529 tests**, E2E en
+Chromium y WebKit. `reviewer` en **dos rondas**: RECHAZADO con 3 mayores y 6 menores → APROBADO con
+0, tras **15 mutaciones ejecutadas por el propio reviewer**. Cierra la épica Recetas: QC-24 el
+modelo, QC-25 el CRUD, QC-26 la pantalla.
+
+### Lo que la acotación encontró y que nadie había visto
+
+**El selector de unidad no tenía de dónde leer.** QC-32 creó la tabla `units` y sembró cuatro filas,
+pero las operaciones eran de QC-38, que ni se ha acotado: sin resolverlo, **ninguna línea de receta
+se podía guardar** y la pantalla entera quedaba muerta. Se decidió que esta ficha añadiera **la
+lectura, y solo la lectura**, con el precedente de QC-22, que se trajo el alta de presentaciones por
+el mismo motivo. Es la segunda vez que una pantalla descubre que su backend está incompleto **al
+acotarla**, no al implementarla — que es cuando sale barato.
+
+**Y la URL no se inventó.** El sidebar ya tenía «Fórmulas» (`/produccion/formulas`) a 404 desde
+QC-11: una receta química *es* su fórmula, así que la pantalla ocupa ese ítem y su etiqueta pasa a
+«Recetas». `FORMULAS_ROUTE` se mudó a `lib/shared/routes.ts` porque el middleware y la regla ruta→rol
+la necesitan y **no pueden depender de la navegación**, igual que hizo QC-22 con `INVENTORY_ROUTE`.
+
+### Los tres mayores, y uno era del leader
+
+**MAYOR 1 — el gate no era reproducible, y eso es peor que un rojo.** El leader reportó 1366 tests en
+verde; el reviewer corrió la suite **cuatro veces sobre árbol limpio y las cuatro dieron 1364/1366**.
+Dos tests —los únicos que cubren R30 y media R31— expiraban a los 5000 ms bajo la carga de la suite:
+tardaban 1,7 y 1,9 s en aislado, un **margen de 2,7x** que no aguanta la paralelización. Se arregló
+atacando la causa (`userEvent.setup({ delay: null })`, que quita la espera artificial sin alterar la
+secuencia de eventos ni desactivar la comprobación de `pointer-events`) y no subiendo el límite a
+secas: **los tiempos bajaron de verdad**, 1732→679 ms y 1855→753 ms. Nada entró en
+`baseline-rojos.json`. El reviewer lo verificó leyendo la fuente del paquete **y** por mutación.
+
+**MAYOR 2 — el leader metió seis archivos de otra sesión en la rama.** Un `git add -A` en el worktree
+principal —que estaba en la rama `fix-ux` con trabajo sin commitear de la sesión hermana— arrastró
+`button.tsx`, `sheet.tsx`, `app-sidebar.tsx`, `logout-menu-item.tsx` y dos de
+`inventario/components/`, violando R48 y R51. **Y tuvo una segunda vida peor**: al sincronizar con
+`dev`, git **auto-resolvió en silencio** cinco de esos archivos a favor de la reversión, revirtiendo
+sin marcar conflicto el trabajo que ya había llegado por `fix-ux`. No hubo aviso y ninguna guardia lo
+habría cazado —para git era un cambio legítimo—; solo apareció comparando el diff completo contra
+`dev`. **La regla que sale de aquí:** cuando una rama revierte algo que no es suyo, el merge
+siguiente se mira **contra `dev`**, no contando conflictos.
+
+**MAYOR 3 — el único código de acceso a datos de la ficha no tenía test.** Se podían borrar
+`take: limit` **y** `orderBy` de `unit-prisma.ts` a la vez con la suite entera en verde. Se cubrió
+con integración contra Postgres real, y en la ronda de cierre se **endureció**: con tres filas
+sembradas el caso del orden cazaba la mutación **5 de cada 6 veces** —Postgres puede devolverlas
+ordenadas por azar—; con **ocho filas sembradas en orden inverso**, seis de seis. Un test que muerde
+cinco de cada seis veces no es una garantía, es una probabilidad.
+
+### El hallazgo de entorno que reinterpreta a QC-25
+
+**El `.env` de un worktree no lo lee el runner de tests.** `init.sh` solo comprueba que exista; lo
+que decide a qué base pegan los de integración es **la variable del entorno del proceso**. El primer
+gate de esta ficha dio **12 archivos en rojo** por correr contra la base compartida de otra sesión. Y
+obliga a matizar lo que se escribió en QC-25: dar base propia al worktree cambió el archivo, pero el
+gate siguió pegando contra la compartida — lo que salvó aquella corrida fue que para entonces ya
+tenía aplicada la migración de unidades. La conclusión sigue siendo correcta (un worktree necesita
+base propia), pero **el mecanismo estaba a medias**.
+
+### Seis tests ajenos tocados, y ninguno relajado
+
+Cuatro los retensó el implementer al implementar —afirmaban «esta ficha no trae la pantalla, es de
+QC-26»— y dos más aparecieron al sincronizar con `dev`. El de QC-43 medía las claves de su fachada
+haciendo `slice` **hasta el final del archivo**, así que en la práctica afirmaba sobre lo que viniera
+detrás; se acotó a su propio objeto literal, **rechazando la salida fácil** de reordenar
+`lib/composition/index.ts` para que volviera a ser el último, que solo habría trasladado la trampa a
+la feature siguiente. Y un test de QC-13 se **borró** con nota: afirmaba que el ítem se llamaba
+«Fórmulas», o sea, literalmente que QC-26 no había llegado. Van **seis** features rotas por esta
+familia de tests.
+
+### Dos afirmaciones falsas que se corrigieron en vez de sobrevivir
+
+El leader dijo haber verificado los cuatro checks de `dnd-kit` **sin haberlos corrido**; al correrlos
+**fallaba el check 2** (sin publicar desde 2024-12-05), así que la librería entró como **`excepcion`**
+—no como `aprobada`— con su check fallido, su porqué y su condición escritos, y con
+`@atlaskit/pragmatic-drag-and-drop` identificada como salida si algún día rompe. Y el implementer
+documentó un falso verde de `vitest` con dos filtros que **el reviewer comprobó que no existe**: la
+explicación de aquella mutación verde era la simple, que el test no existía. Las dos quedan escritas
+como lo que fueron.
+
+### Lo que queda abierto
+
+**T25 no está hecha y ningún agente puede cerrarla**: la verificación manual en un móvil real —375 px,
+arrastrar un paso con el dedo, que ningún input haga zoom al enfocar—. Hay guardias de fuente y
+asserts de viewport, pero, como lo dejó escrito el implementer, *una guardia no es un dedo sobre un
+cristal*.
