@@ -383,15 +383,16 @@ prueba (decisión cerrada 14, R28).
 
 ### 6.1 Nombre de la empresa inicial
 
-Es la **pregunta abierta 4** de `requirements.md`, y la posición por defecto que se implementa si el
-humano no dice otra cosa al aprobar el spec:
+Era la **pregunta abierta 4** de `requirements.md`. **CERRADA por el humano el 2026-09-04 al
+aprobar el spec (F1.4)**, apartándose de la posición por defecto que aquí se proponía
+(`Empresa Inicial`):
 
-- literal propuesto: **`Empresa Inicial`**, en `lib/modules/identity/domain/companies.ts`, como
-  `export const INITIAL_COMPANY_NAME = 'Empresa Inicial'`;
-- normalizado esperado: `empresa inicial`;
-- criterio: marcador de instalación reconocible a simple vista, mismo espíritu que
-  `INITIAL_ADMIN_FIRST_NAMES = 'Administrador'` / `'Inicial'` de QC-6. **No** sale del entorno: no es
-  un secreto, y `.env` no es donde vive un dato de negocio.
+- literal: **`QuimiCloud`**, en `lib/modules/identity/domain/companies.ts`, como
+  `export const INITIAL_COMPANY_NAME = 'QuimiCloud'`;
+- normalizado esperado: `quimicloud`;
+- **No** sale del entorno: no es un secreto, y `.env` no es donde vive un dato de negocio. Ese
+  criterio de la propuesta original se mantiene; lo que cambió es el literal, que pasa de ser un
+  marcador genérico de instalación a ser el nombre real de la empresa que opera el ERP.
 
 Ese archivo es el **único** sitio del repo que escribe ese literal en TypeScript, igual que
 `roles.ts` es el único que escribe `'Administrador'`. En SQL aparece una segunda vez, en el backfill
