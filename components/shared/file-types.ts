@@ -71,3 +71,10 @@ export function formatMegabytes(bytes: number): string {
   const megabytes = bytes / (1024 * 1024);
   return Number.isInteger(megabytes) ? `${megabytes}` : megabytes.toFixed(1);
 }
+
+/** Tamaño legible de un archivo: `480 KB`, `2.1 MB`. Para el pie de la miniatura. */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${formatMegabytes(bytes)} MB`;
+}
