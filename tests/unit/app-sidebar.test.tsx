@@ -465,8 +465,16 @@ describe('el borrado de items de relleno (QC-13)', () => {
     ]);
   });
 
-  it('el grupo nav-produccion conserva un unico hijo, nav-produccion-formulas', () => {
-    // R6
+  it('el grupo nav-produccion conserva un unico hijo: el item de recetas', () => {
+    // R6. La asercion original comparaba contra el literal 'nav-produccion-formulas'. QC-26
+    // (R5) le cambio el testId a 'nav-produccion-recetas', y volver a escribir aqui a mano el
+    // literal nuevo repetiria el mismo error que rompio este test hoy: dos copias sueltas de un
+    // mismo dato que solo una de las dos actualiza. En su lugar se deriva el testId esperado del
+    // propio `PRIVATE_NAV_ITEMS`, localizando el item por `FORMULAS_ROUTE` -la fuente que ya usa
+    // el test de R5 de este archivo-, asi que si alguien vuelve a renombrar el testId, ambos
+    // lados de la comparacion se mueven juntos. Lo que esta ficha (QC-13) garantiza sigue igual:
+    // el grupo tiene exactamente un hijo. Actualizado el 2026-09-03 al resolver el conflicto de
+    // F2.3 (merge con dev).
     const grupoProduccion = PRIVATE_NAV_ITEMS.find(
       (item): item is NavGroup => item.kind === 'group' && item.testId === 'nav-produccion',
     );
@@ -474,8 +482,15 @@ describe('el borrado de items de relleno (QC-13)', () => {
       throw new Error('PRIVATE_NAV_ITEMS no contiene el grupo nav-produccion');
     }
 
+    const itemRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    ).find((item) => item.href === FORMULAS_ROUTE);
+    if (!itemRecetas) {
+      throw new Error('PRIVATE_NAV_ITEMS no contiene el item de recetas (FORMULAS_ROUTE)');
+    }
+
     expect(grupoProduccion.items).toHaveLength(1);
-    expect(grupoProduccion.items[0]?.testId).toBe('nav-produccion-formulas');
+    expect(grupoProduccion.items[0]?.testId).toBe(itemRecetas.testId);
   });
 
   // El test «FORMULAS_ROUTE y su item se conservan intactos: terreno de QC-26» vivia aqui y lo
