@@ -217,6 +217,11 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bloquea la featur
 
 ### Añadidas por spec_author en F1.2
 
+> **Las tres CERRADAS por el humano el 2026-09-04**, antes de aprobar el spec. Sus decisiones
+> son las **tres últimas filas** de `## Decisiones cerradas (no reabrir)`; ahí está lo que vale.
+> Se conservan aquí con su enunciado porque explican por qué había que preguntarlas — y la 1
+> documenta que la extensión ya estaba disponible en el servidor, que es lo que abarató la vía A.
+
 3. **La búsqueda por SUBCADENA no tiene índice que la sirva.** Se conserva la semántica de hoy
    —productos busca con `contains`—, pero un índice btree no acelera `%texto%`: eso lo sirve un
    índice **GIN de trigramas**, que necesita la extensión de Postgres `pg_trgm`. No es una
@@ -256,3 +261,6 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bloquea la featur
 | 2026-09-04 | Identificadores de la base | **En inglés**, heredado de QC-4 |
 | 2026-09-04 | Dónde se valida la entrada | **Con zod, DENTRO del caso de uso**, como ya hacen `pageQuerySchema` y `listOrdersSchema`. Acotar es de la capa de presentación; validar es del dominio |
 | 2026-09-04 | ¿E2E? | **NO, y se difiere con motivo.** Es backend sin pantalla: no hay camino de usuario que recorrer. Mismo criterio y mismo precedente que QC-20, QC-25 y QC-34. Lo cubrirán los E2E de las pantallas que lo consuman |
+| 2026-09-04 | `pg_trgm`: ¿se habilita la extensión, o se baja a búsqueda por prefijo? | **SE HABILITA (vía A). La búsqueda sigue siendo por SUBCADENA.** Decidido por el humano el 2026-09-04 sobre dos datos medidos contra el servidor real, no supuestos: **`pg_trgm` ya está DISPONIBLE ahí** (`pg_available_extensions` la da en `1.6`, sin instalar), así que cuesta una línea en la migración y otra en el `down`; y **hay 6 productos vivos**, así que el escaneo secuencial que motivó la pregunta hoy no duele — la vía B no ahorraba nada real y solo costaba comportamiento. **El motivo es de producto, no de rendimiento**: bajar a prefijo degradaría en silencio algo que YA funciona —el selector de ingredientes busca por subcadena— y en un catálogo químico los nombres son compuestos («Hipoclorito de sodio 5%», «Solución Buffer pH 7»), donde buscar por una palabra del medio es el caso normal. **El riesgo queda anotado y aceptado**: es una dependencia de INFRAESTRUCTURA que **ninguna guardia vigila** —no es un paquete de npm—, y si la base se mudara a un Postgres sin `pg_trgm` la migración fallaría. Mismo criterio con el que se aceptó a conciencia el riesgo de `dnd-kit` en QC-26 |
+| 2026-09-04 | ¿Contra qué reloj se compara el filtro de rango de fechas? | **UTC**, que es como Postgres guarda los `timestamptz` y lo que `spec_author` había puesto como posición por defecto. Extremos inclusivos. **La consecuencia se acepta a conciencia**: un pedido creado el día 4 después de las 19:00 hora de Bogotá cae en el día 5 en UTC, así que quien filtre por el 4 no lo verá. Se descartó convertir con el huso de Colombia y se descartó que la pantalla mandara el huso —eso habría obligado a tocar el contrato de QC-55, que hoy no lo emite— |
+| 2026-09-04 | Al ordenar por un campo anulable, ¿dónde van los vacíos? | **SIEMPRE AL FINAL**, en ascendente y en descendente, declarado explícito en la consulta y no heredado del comportamiento por defecto de Postgres. Afecta a `stock`, `qty_alert`, `min_purchase` y `delivery_time`. El motivo: quien ordena por existencia quiere ver los extremos reales, y por defecto ordenar de mayor a menor arrancaría con todos los productos que no tienen existencia registrada |
