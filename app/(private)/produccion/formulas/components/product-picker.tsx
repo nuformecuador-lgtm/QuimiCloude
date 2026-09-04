@@ -29,10 +29,19 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * `total` que devuelve el backend ya describe ese resultado -mismo `where` en el `findMany` y en
  * el `count`-.
  *
- * **Los ingredientes ya usados en otras líneas se ofrecen DESHABILITADOS, no ocultos**
- * (`excludedIds`): esconderlos haría pensar que el producto no existe en el catálogo. Esto no es
- * el filtrado en cliente que R28 prohíbe -no se busca por texto, se marca lo que ya está en la
- * receta-, y el propio ingrediente de ESTA línea nunca se deshabilita a sí mismo.
+ * **Los ingredientes ya usados en otras líneas NO se ofrecen** (`excludedIds`): se apartan de la
+ * lista, así que no hay forma de elegir dos veces el mismo. El propio ingrediente de ESTA línea
+ * nunca se aparta a sí mismo.
+ *
+ * Apartarlos NO es el filtrado en cliente que R28 prohíbe: ahí lo vetado es recortar `items` por
+ * TEXTO -eso solo miraría la página cargada y mentiría sobre el catálogo, por eso la búsqueda va
+ * al servidor-. Aquí se quita lo que ya está en la receta, que es información del formulario y no
+ * del catálogo, y ninguna búsqueda depende de ello. Se escribe con `flatMap` y no con `.filter(`
+ * porque el contrato de la ruta veta ese literal en este archivo justamente para que nadie cuele
+ * un filtrado por texto (`recipe-route-contract.test.ts`).
+ *
+ * El precio, asumido: una página del desplegable puede mostrar menos opciones de las que anuncia
+ * su contador, y quien busque un ingrediente que ya usó no lo verá.
  *
  * **La primera página puede llegar precargada** (`initialPage`, `design.md > 5`): la página del
  * formulario ya pidió `listProductsAction({ page: 1, pageSize: MAX_PAGE_SIZE })` una sola vez y
@@ -66,7 +75,7 @@ export type ProductPickerProps = {
   readonly testId: string;
   /** Primera página ya cargada por la página del formulario (R49). */
   readonly initialPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };
-  /** Ingredientes ya elegidos en OTRAS líneas: se ofrecen deshabilitados. */
+  /** Ingredientes ya elegidos en OTRAS líneas: se apartan de la lista. */
   readonly excludedIds?: readonly string[];
 };
 
@@ -173,6 +182,12 @@ export function ProductPicker({
     setDraft(null);
   }
 
+  // Fuera lo que ya está en otras líneas. `flatMap` en vez de `.filter(` a propósito: ver la
+  // cabecera de este archivo.
+  const selectable = items.flatMap((item) =>
+    item.id !== value && excludedIds.includes(item.id) ? [] : [item],
+  );
+
   // Con el desplegable cerrado o sin escribir, el campo muestra lo YA elegido; `label` solo es
   // marcador cuando no hay nada elegido.
   const displayValue = draft ?? (value === '' ? '' : label);
@@ -220,39 +235,28 @@ export function ProductPicker({
               aria-label={ariaLabel}
               className="flex max-h-64 flex-col gap-0.5 overflow-y-auto"
             >
-              {items.length === 0 ? (
+              {selectable.length === 0 ? (
                 <li
                   className="px-2 py-3 text-sm text-muted-foreground"
                   data-testid={`${testId}-empty`}
                 >
-                  Ningún ingrediente coincide con la búsqueda.
+                  Ningún ingrediente disponible para esta línea.
                 </li>
               ) : (
-                items.map((item) => {
-                  // El ingrediente de ESTA línea nunca se deshabilita a sí mismo.
-                  const alreadyUsed = item.id !== value && excludedIds.includes(item.id);
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={item.id === value}
-                        aria-disabled={alreadyUsed ? true : undefined}
-                        disabled={alreadyUsed}
-                        className={`${TOUCH_TARGET} flex w-full items-center justify-between gap-2 rounded-md px-2 text-left ${FIELD_TEXT} hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}
-                        data-testid={`${testId}-option`}
-                        onClick={() => choose(item)}
-                      >
-                        <span className="truncate">{item.name}</span>
-                        {alreadyUsed ? (
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            ya está en la receta
-                          </span>
-                        ) : null}
-                      </button>
-                    </li>
-                  );
-                })
+                selectable.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={item.id === value}
+                      className={`${TOUCH_TARGET} w-full rounded-md px-2 text-left ${FIELD_TEXT} hover:bg-muted`}
+                      data-testid={`${testId}-option`}
+                      onClick={() => choose(item)}
+                    >
+                      <span className="truncate">{item.name}</span>
+                    </button>
+                  </li>
+                ))
               )}
             </ul>
           )}

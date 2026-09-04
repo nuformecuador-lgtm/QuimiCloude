@@ -572,12 +572,11 @@ describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombr
 });
 
 describe('R31 — dos líneas del mismo producto y una cantidad inválida no se envían', () => {
-  it('un ingrediente ya usado se ofrece DESHABILITADO en las demás líneas: no se puede repetir', async () => {
+  it('un ingrediente ya usado NO se ofrece en las demás líneas: no se puede repetir', async () => {
     // R16 desde la interfaz. La regla vive en `createRecipeSchema` y su test está en
     // `tests/unit/recetas/recipe-input.test.ts`; lo que se afirma AQUÍ es que el formulario ya
     // no deja llegar hasta ahí -el repetido es imposible de elegir, no solo rechazado al
-    // enviar-. Se ofrece deshabilitado y no oculto: esconderlo haría creer que el producto no
-    // existe en el catálogo.
+    // enviar-: el ingrediente ya usado se aparta de la lista de las demás líneas.
     const user = setupUser();
     renderCreateForm();
 
@@ -587,12 +586,12 @@ describe('R31 — dos líneas del mismo producto y una cantidad inválida no se 
     await user.click(screen.getByTestId('recipe-line-add-0'));
     await user.click(screen.getByTestId('recipe-line-product-1'));
 
-    // El nombre accesible de la opción vetada lleva el motivo detrás, de ahí la expresión regular.
-    const repetido = await screen.findByRole('option', { name: new RegExp(`^${PRODUCT_1_NAME}`) });
-    expect(repetido).toBeDisabled();
-
-    await user.click(repetido);
-    expect(screen.getByTestId('recipe-line-product-1')).toHaveValue('');
+    // La opción del ingrediente ya usado NO se ofrece en la segunda línea...
+    expect(await screen.findByTestId('recipe-line-product-1-popup')).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: PRODUCT_1_NAME })).toBeNull();
+    // ...pero sigue estando en la línea que lo usa: no se veta a sí mismo.
+    await user.click(screen.getByTestId('recipe-line-product-0'));
+    expect(await screen.findByRole('option', { name: PRODUCT_1_NAME })).toBeInTheDocument();
   });
 
   it('una cantidad que el esquema rechaza presenta el error junto a la línea afectada', async () => {

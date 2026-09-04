@@ -46,6 +46,8 @@ export function RecipeImageField({ mode, initialImageUrl, value, onChange }: Rec
   return (
     <FileField
       label="Imagen"
+      // La zona de arrastre ya se explica sola; la etiqueta se queda solo para el lector de pantalla.
+      hideLabel
       accept={ACCEPTED_TYPES}
       maxBytes={MAX_IMAGE_BYTES}
       testIdPrefix="recipe-image"

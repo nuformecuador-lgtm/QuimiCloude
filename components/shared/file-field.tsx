@@ -63,6 +63,12 @@ export type FileFieldValidation =
 
 export type FileFieldProps = {
   readonly label: string;
+  /**
+   * Oculta la etiqueta A LA VISTA, no al lector de pantalla: sigue en el DOM con `sr-only` y con
+   * su `htmlFor`, así que el input conserva su nombre accesible. Quitarla del todo dejaría un
+   * campo de archivo anónimo.
+   */
+  readonly hideLabel?: boolean;
   /** Tipos admitidos. Delimita el `accept` del input Y el formato de salida del compresor. */
   readonly accept: readonly UploadableFileType[];
   /** Limite duro en bytes. Las imagenes por encima se comprimen; el resto se rechaza. */
@@ -95,6 +101,7 @@ const DROPZONE_INVALID = 'border-destructive bg-destructive/5';
 
 export function FileField({
   label,
+  hideLabel = false,
   accept,
   maxBytes,
   maxDimension,
@@ -216,7 +223,9 @@ export function FileField({
 
   return (
     <div className="flex flex-col gap-1" data-testid={`${testIdPrefix}-field`}>
-      <Label htmlFor={inputId}>{label}</Label>
+      <Label htmlFor={inputId} className={hideLabel ? 'sr-only' : undefined}>
+        {label}
+      </Label>
 
       <div
         className={`${DROPZONE_BASE} ${dropzoneState}`}

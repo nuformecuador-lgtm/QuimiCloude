@@ -30,8 +30,8 @@ import {
  * vacías en el payload -esa función no toma decisiones sobre las líneas (R21, R22)-.
  *
  * **Un ingrediente no se puede repetir**: cada selector recibe en `excludedIds` los ingredientes
- * ya elegidos en las OTRAS líneas y los ofrece deshabilitados -visibles, para no hacer creer que
- * el producto no existe en el catálogo-. El de la propia línea nunca se deshabilita a sí mismo.
+ * ya elegidos en las OTRAS líneas y los aparta de su lista. El de la propia línea nunca se aparta
+ * a sí mismo.
  *
  * **Cada fila lleva sus dos acciones, `X` y `+`** (no hay botón de añadir en la cabecera): la `X`
  * quita esa línea -y si era la última, reaparece el fantasma, así que nunca se queda la pantalla
@@ -258,6 +258,7 @@ export function RecipeLinesField({
                   className={TOUCH_TARGET}
                   aria-label={`Añadir una línea después de la ${index + 1}`}
                   data-testid={`recipe-line-add-${index}`}
+                  disabled={line.productId === ''}
                   onClick={() => addLineAfter(index)}
                 >
                   <PlusIcon aria-hidden />
