@@ -691,7 +691,7 @@
       "epic_name": "Inventario",
       "name": "separar-producto-de-catalogo-de-proveedor",
       "description": "El producto pierde cost, min_purchase y delivery_time. El catalogo del proveedor pasa a ser una tabla con la misma estructura que el producto, omitiendo stock y qty_alert, mas supplier_id: gana name, presentation_id, unit_id, image_path y deleted_at, y pierde product_id. Las dos tablas quedan independientes, sin ningun vinculo ni siquiera opcional. Una linea se identifica por nombre mas presentacion, unicos por proveedor. Dar de baja un proveedor da de baja tambien sus lineas. Los tipos conservan lo estricto de QC-43. Trae la actualizacion del E2E de productos de QC-22. Arrastra QC-20, QC-22 y QC-43.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
