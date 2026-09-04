@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | pending → F1.2 | feature/QC-52-separar-producto-de-catalogo-de-proveedor | leader (worktree montado, spec_author lanzado) |
-| QC-34 | crud-de-pedidos | Pedidos | backend | spec_ready | feature/QC-34-crud-de-pedidos | esperando aprobación humana del spec (F1.4) |
+| QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
@@ -159,6 +159,24 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-55 — tabla-de-datos-compartida: acotada y sembrada (2026-09-04)
+
+- **Sembrada en `specs/QC-55-tabla-de-datos-compartida/requirements.md`** — 21 decisiones cerradas
+  y 2 preguntas abiertas. La fuente es ese archivo; aquí no se copia la tabla.
+- **Board actualizado antes de sembrar (Paso 5):** `description` reescrita, label
+  `complexity:high`, y **QC-57 `orden-y-filtro-en-listados`** creada (`zone:backend`, parent
+  QC-16) con link *blocks* hacia QC-56. Es la «ficha de backend nueva» a la que QC-22 remitió el
+  2026-09-03 y que QC-26 repitió; **cierra también la deuda de búsqueda por texto**, que llevaba
+  dos fichas anotada sin dueño.
+- **Dos dependencias aprobadas por el humano**, con los cuatro checks corridos y escritos:
+  `@tanstack/react-table` 9.2.4 y `react-day-picker` 10.0.1. **`rsuite` se descartó** pese a pasar
+  los cuatro, por sus 14 dependencias (incluida `rsuite-table`) y su sistema de tema propio. Las
+  filas de `docs/dependencias.md` las escribe la implementación.
+- **Excepción declarada** a `docs/architecture.md > Regla: sin sobre-ingeniería`: se promueve a
+  `shared/` sin consumidor, con los dos identificados en QC-56. Está escrita en el spec para que
+  el reviewer no la lea como desvío.
+- **Sin E2E, diferido con motivo**: ninguna pantalla usa el componente en esta ficha. Lo trae QC-56.
 
 ### QC-55 y QC-56 — creadas al acotar la tabla compartida (2026-09-04)
 
