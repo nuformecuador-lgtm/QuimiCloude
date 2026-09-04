@@ -25,6 +25,21 @@
  * CONTRASENA — solo se rellena `password_hash` con una cadena cualquiera. El hashing es
  * la feature 2 (`design.md > 6`); aqui la unica propiedad que importa es que la columna
  * acepta texto de longitud arbitraria (R12).
+ *
+ * QC-47 (T16, T19) — LA EMPRESA. `users.company_id` es obligatoria, asi que ningun usuario
+ * se puede crear sin ella. Cada transaccion de test fabrica su PROPIA empresa efimera
+ * (`defaultCompanyId`), con nombre irrepetible: nunca se usa la empresa de instalacion que
+ * siembra QC-6, porque `companies_name_unique` es GLOBAL y el alta chocaria con ella. Como
+ * todo ocurre dentro de la transaccion que termina en ROLLBACK, ninguna de esas empresas
+ * sobrevive al test y no hace falta barrer nada en `afterAll`.
+ *
+ * Los tres indices unicos del usuario ya NO son globales: son
+ * `(company_id, lower(email))`, `(company_id, lower(username))` y
+ * `(company_id, document_type_code, document_number)`, los tres
+ * `WHERE deleted_at IS NULL` (R16, R17, R18, R19). Los casos de QC-4 que ya estaban aqui
+ * siguen valiendo tal cual porque todos sus usuarios caen en la MISMA empresa; lo que la
+ * ficha añade es la otra mitad, la que solo pasa con la empresa dentro del indice: el mismo
+ * correo, el mismo `username` y el mismo documento SI se aceptan en empresas distintas.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -32,7 +47,7 @@ import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { prisma } from '@/lib/shared/db/prisma'
-import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity'
+import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity'
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento
@@ -53,6 +68,11 @@ async function inRolledBackTransaction(
   try {
     await prisma.$transaction(
       async (tx) => {
+        // La empresa por defecto del test se crea AQUI, antes del cuerpo, y no perezosamente
+        // dentro de un `SAVEPOINT`: si naciera dentro de uno que luego se deshace, su fila
+        // desapareceria mientras su id seguiria cacheado, y el siguiente usuario fallaria con
+        // un 23503 que no tiene nada que ver con lo que el caso quiere medir.
+        await defaultCompanyId(tx)
         await body(tx)
         throw new RollbackSignal()
       },
@@ -129,12 +149,54 @@ async function createRole(tx: Prisma.TransactionClient, prefix = 'rol'): Promise
   return role.id
 }
 
+/**
+ * Nombre de empresa irrepetible (QC-47). `companies_name_unique` es GLOBAL —no esta acotado
+ * a nada— asi que dos tests que usaran el mismo nombre chocarian entre si, y usar el nombre
+ * de la empresa de instalacion chocaria con la fila que ya sembro QC-6.
+ */
+function uniqueCompanyName(prefix: string): string {
+  return `${prefix}-${randomUUID()}`
+}
+
+/** Crea una empresa viva con nombre irrepetible y devuelve su id (QC-47 R3). */
+async function createCompany(
+  tx: Prisma.TransactionClient,
+  prefix = 'empresa',
+): Promise<string> {
+  const name = uniqueCompanyName(prefix)
+  const company = await tx.company.create({
+    // El normalizado sale de la UNICA definicion publicada por el contrato del modulo (R3):
+    // el test no reimplementa la normalizacion, la importa.
+    data: { name, nameNormalized: normalizeCompanyName(name) },
+    select: { id: true },
+  })
+  return company.id
+}
+
+/**
+ * Empresa por defecto de ESTA transaccion, creada una sola vez y compartida por todos los
+ * usuarios del caso. Es lo que permite que los casos heredados de QC-4 sigan midiendo lo que
+ * median —dos usuarios en la MISMA empresa— sin tocar ni una linea de su cuerpo.
+ * `WeakMap` porque la clave es el propio `tx`, que muere con la transaccion.
+ */
+const defaultCompanyByTransaction = new WeakMap<Prisma.TransactionClient, Promise<string>>()
+
+function defaultCompanyId(tx: Prisma.TransactionClient): Promise<string> {
+  const cached = defaultCompanyByTransaction.get(tx)
+  if (cached !== undefined) return cached
+  const created = createCompany(tx, 'empresa-del-caso')
+  defaultCompanyByTransaction.set(tx, created)
+  return created
+}
+
 interface UserSeed {
   readonly email: string
   readonly username: string
   readonly documentNumber: string
   readonly documentTypeCode?: string
   readonly passwordHash?: string
+  /** QC-47 R9: si no se dice otra cosa, el usuario nace en la empresa por defecto del caso. */
+  readonly companyId?: string
 }
 
 async function createUser(
@@ -154,6 +216,7 @@ async function createUser(
       username: seed.username,
       passwordHash: seed.passwordHash ?? 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId,
+      companyId: seed.companyId ?? (await defaultCompanyId(tx)),
     },
     select: { id: true },
   })
@@ -202,10 +265,14 @@ function userSqlValues(seed: {
  * exactamente el caso "falta un dato obligatorio". `updated_at` se da siempre porque es
  * NOT NULL sin DEFAULT (lo rellena el cliente Prisma via `@updatedAt`, no la base).
  */
-function rawInsertUser(
+async function rawInsertUser(
   tx: Prisma.TransactionClient,
   columns: Partial<Record<RequiredUserColumn, Prisma.Sql>>,
   roleId: string | null,
+  // QC-47: `undefined` = la empresa por defecto del caso; una cadena = esa empresa (aunque no
+  // exista, que es como se prueba R10); `null` = la columna NO se escribe, que es el unico
+  // modo de expresar "usuario sin empresa" (R9) contra una columna NOT NULL.
+  companyId?: string | null,
 ): Promise<number> {
   const entries = Object.entries(columns) as [RequiredUserColumn, Prisma.Sql][]
   const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
@@ -215,10 +282,38 @@ function rawInsertUser(
     names.push(Prisma.raw('"role_id"'))
     values.push(Prisma.sql`CAST(${roleId} AS uuid)`)
   }
+  const company = companyId === undefined ? await defaultCompanyId(tx) : companyId
+  if (company !== null) {
+    names.push(Prisma.raw('"company_id"'))
+    values.push(Prisma.sql`CAST(${company} AS uuid)`)
+  }
   names.push(Prisma.raw('"updated_at"'))
   values.push(Prisma.sql`CURRENT_TIMESTAMP`)
 
   return tx.$executeRaw`INSERT INTO "users" (${Prisma.join(names)}) VALUES (${Prisma.join(values)})`
+}
+
+/**
+ * `INSERT INTO companies` crudo. Va crudo por lo mismo que el de `users`: omitir el nombre no
+ * se puede expresar con la API tipada, y el SQLSTATE llega literal.
+ */
+function rawInsertCompany(
+  tx: Prisma.TransactionClient,
+  values: { name?: string; nameNormalized: string; deletedAt?: Date },
+): Promise<number> {
+  const names: Prisma.Sql[] = [Prisma.raw('"name_normalized"'), Prisma.raw('"updated_at"')]
+  const data: Prisma.Sql[] = [Prisma.sql`${values.nameNormalized}`, Prisma.sql`CURRENT_TIMESTAMP`]
+
+  if (values.name !== undefined) {
+    names.push(Prisma.raw('"name"'))
+    data.push(Prisma.sql`${values.name}`)
+  }
+  if (values.deletedAt !== undefined) {
+    names.push(Prisma.raw('"deleted_at"'))
+    data.push(Prisma.sql`${values.deletedAt}`)
+  }
+
+  return tx.$executeRaw`INSERT INTO "companies" (${Prisma.join(names)}) VALUES (${Prisma.join(data)})`
 }
 
 /** Marca un usuario como borrado logicamente y devuelve la fila resultante. */
@@ -241,10 +336,10 @@ function sleep(ms: number): Promise<void> {
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
-    WHERE schemaname = 'public' AND tablename IN ('users', 'roles', 'document_types')`
-  if (tables.length !== 3) {
+    WHERE schemaname = 'public' AND tablename IN ('users', 'roles', 'document_types', 'companies')`
+  if (tables.length !== 4) {
     throw new Error(
-      'la base de pruebas no tiene aplicada la migracion de la feature 1. ' +
+      'la base de pruebas no tiene aplicadas las migraciones de identity (QC-4 + QC-47). ' +
         'Corre `pnpm run db:migrate` antes de estos tests.',
     )
   }
@@ -881,6 +976,591 @@ describe('borrado logico y marcas de tiempo', () => {
       })
       expect(updatedRole.createdAt.getTime()).toBe(role.createdAt.getTime())
       expect(updatedRole.updatedAt.getTime()).toBeGreaterThan(role.updatedAt.getTime())
+    })
+  })
+})
+
+// ===========================================================================
+// QC-47 — LA EMPRESA Y LA PERTENENCIA DEL USUARIO (T16)
+//
+// Todo lo de aqui abajo es de QC-47 y sigue el mismo patron que lo anterior: cada `it`
+// dentro de una transaccion que termina en ROLLBACK, las altas que deben fallar por SQL
+// crudo dentro de un SAVEPOINT, y la afirmacion sobre el SQLSTATE y sobre el efecto, nunca
+// sobre el texto del mensaje.
+// ===========================================================================
+
+describe('la empresa', () => {
+  it('el id de la empresa lo genera la base y no es correlativo', async () => {
+    // R1 — identificador propio, estable, NO correlativo y NO derivado de los datos de
+    // negocio, generado por la base. Nunca se pasa `id` en el `create`.
+    await inRolledBackTransaction(async (tx) => {
+      const ids: string[] = []
+      for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
+        ids.push(await createCompany(tx, `empresa-r1-${String(n)}`))
+      }
+
+      // Forma de UUID v4 aleatorio (`gen_random_uuid()`), no un entero ni un hash del nombre.
+      for (const id of ids) {
+        expect(id).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+        )
+      }
+      expect(new Set(ids).size).toBe(8)
+
+      // "No correlativo": ocho altas seguidas no salen ordenadas. Que ocho valores al azar
+      // caigan justo en orden tiene probabilidad 1/8! (~2,5e-5) por sentido, asi que esto no
+      // es un test intermitente; con un contador o un serial seria rojo SIEMPRE.
+      const ascendente = [...ids].sort()
+      expect(ids).not.toEqual(ascendente)
+      expect(ids).not.toEqual([...ascendente].reverse())
+
+      // "No derivado de sus datos de negocio": cambiar el nombre no cambia el id.
+      const [primero] = ids
+      if (primero === undefined) throw new Error('inalcanzable')
+      const renombrada = uniqueCompanyName('empresa-renombrada')
+      const despues = await tx.company.update({
+        where: { id: primero },
+        data: { name: renombrada, nameNormalized: normalizeCompanyName(renombrada) },
+        select: { id: true, name: true },
+      })
+      expect(despues.name).toBe(renombrada)
+      expect(despues.id).toBe(primero)
+    })
+  })
+
+  it('rechaza una empresa sin nombre y no limita la longitud del nombre', async () => {
+    // R2 — la obligatoriedad la impone la BASE, no el llamante; y la columna es `text`.
+    await inRolledBackTransaction(async (tx) => {
+      const nameNormalized = normalizeCompanyName(uniqueCompanyName('empresa-sin-nombre'))
+
+      // La unica columna omitida es `name`: el SQLSTATE no puede venir de otra cosa.
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertCompany(tx, { nameNormalized }),
+        'alta de empresa sin nombre',
+      )
+      expect(sqlState).toBe(NOT_NULL_VIOLATION)
+      expect(await tx.company.count({ where: { nameNormalized } })).toBe(0)
+
+      // Y un nombre larguisimo entra entero: `text` sin `varchar(n)` (R2, R8).
+      const nombreLargo = `${'x'.repeat(10_000)}-${randomUUID()}`
+      const creada = await tx.company.create({
+        data: { name: nombreLargo, nameNormalized: normalizeCompanyName(nombreLargo) },
+        select: { name: true },
+      })
+      expect(creada.name).toHaveLength(nombreLargo.length)
+      expect(creada.name).toBe(nombreLargo)
+    })
+  })
+
+  it('rechaza una segunda empresa con el mismo nombre en otras mayusculas y con acentos', async () => {
+    // R4 — contra el INDICE UNICO, no contra un SELECT previo. El rechazo tiene que llegar
+    // como 23505 desde Postgres.
+    await inRolledBackTransaction(async (tx) => {
+      const nombre = `Química Cloud ${randomUUID()}`
+      const variante = nombre.toUpperCase()
+      // Lo que hace comparables a las dos es la UNICA definicion del contrato (R3).
+      expect(normalizeCompanyName(variante)).toBe(normalizeCompanyName(nombre))
+
+      const { id } = await tx.company.create({
+        data: { name: nombre, nameNormalized: normalizeCompanyName(nombre) },
+        select: { id: true },
+      })
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertCompany(tx, {
+            name: variante,
+            nameNormalized: normalizeCompanyName(variante),
+          }),
+        'segunda empresa con el mismo nombre en otras mayusculas y con acentos',
+      )
+      expect(sqlState).toBe(UNIQUE_VIOLATION)
+
+      // Y tambien si quien escribe no normalizo la caja: el indice va sobre
+      // `lower("name_normalized")`, asi que la unicidad no depende del llamante.
+      const enOtraCaja = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertCompany(tx, {
+            name: variante,
+            nameNormalized: normalizeCompanyName(nombre).toUpperCase(),
+          }),
+        'segunda empresa con el nombre normalizado escrito en mayusculas',
+      )
+      expect(enOtraCaja).toBe(UNIQUE_VIOLATION)
+
+      // "no crear ni modificar ninguna fila": queda solo la primera, tal como se tecleo.
+      const filas = await tx.company.findMany({
+        where: { nameNormalized: normalizeCompanyName(nombre) },
+        select: { id: true, name: true },
+      })
+      expect(filas).toEqual([{ id, name: nombre }])
+    })
+  })
+
+  it('el nombre de una empresa dada de baja se puede reutilizar', async () => {
+    // R5 — indice unico PARCIAL (`WHERE deleted_at IS NULL`).
+    await inRolledBackTransaction(async (tx) => {
+      const nombre = uniqueCompanyName('empresa-que-se-da-de-baja')
+      const nameNormalized = normalizeCompanyName(nombre)
+
+      const { id: muerta } = await tx.company.create({
+        data: { name: nombre, nameNormalized, deletedAt: new Date() },
+        select: { id: true },
+      })
+
+      // Misma clave normalizada, y la base la ACEPTA porque la otra no cuenta.
+      const { id: viva } = await tx.company.create({
+        data: { name: nombre, nameNormalized },
+        select: { id: true },
+      })
+      expect(viva).not.toBe(muerta)
+
+      const filas = await tx.company.findMany({
+        where: { nameNormalized },
+        select: { id: true, deletedAt: true },
+      })
+      expect(filas).toHaveLength(2)
+      expect(filas.filter((fila) => fila.deletedAt === null).map((fila) => fila.id)).toEqual([viva])
+
+      // Pero dos VIVAS con ese nombre siguen sin poder convivir.
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertCompany(tx, { name: nombre, nameNormalized }),
+        'tercera empresa viva con el nombre ya reutilizado',
+      )
+      expect(sqlState).toBe(UNIQUE_VIOLATION)
+    })
+  })
+
+  it('created_at y updated_at de la empresa se rellenan solos y updated_at cambia al modificar', async () => {
+    // R7 — nunca se pasan: los ponen el DEFAULT de la base y el `@updatedAt` de Prisma.
+    await inRolledBackTransaction(async (tx) => {
+      const nombre = uniqueCompanyName('empresa-con-marcas')
+      const creada = await tx.company.create({
+        data: { name: nombre, nameNormalized: normalizeCompanyName(nombre) },
+      })
+      expect(creada.createdAt).toBeInstanceOf(Date)
+      expect(creada.updatedAt).toBeInstanceOf(Date)
+      // R6: la marca de baja nace VACIA.
+      expect(creada.deletedAt).toBeNull()
+
+      await sleep(20)
+      const otroNombre = uniqueCompanyName('empresa-con-marcas-modificada')
+      const modificada = await tx.company.update({
+        where: { id: creada.id },
+        data: { name: otroNombre, nameNormalized: normalizeCompanyName(otroNombre) },
+      })
+
+      expect(modificada.createdAt.getTime()).toBe(creada.createdAt.getTime())
+      expect(modificada.updatedAt.getTime()).toBeGreaterThan(creada.updatedAt.getTime())
+    })
+  })
+
+  it('companies tiene ROW LEVEL SECURITY activada y forzada', async () => {
+    // R24 — defensa en profundidad, no la frontera de autorizacion. Se lee del catalogo de
+    // Postgres, que es donde vive la verdad, y no del texto de la migracion.
+    const filas = await prisma.$queryRaw<
+      { relrowsecurity: boolean; relforcerowsecurity: boolean }[]
+    >`
+      SELECT c.relrowsecurity, c.relforcerowsecurity
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relname = 'companies'`
+    expect(filas).toEqual([{ relrowsecurity: true, relforcerowsecurity: true }])
+  })
+})
+
+describe('la pertenencia del usuario a su empresa', () => {
+  it('rechaza un usuario sin empresa o con una empresa inexistente', async () => {
+    // R9 (obligatoria en la propia base) y R10 (la empresa referenciada tiene que existir).
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const documentNumber = '444000111'
+      const values = userSqlValues({
+        email: 'sin.empresa@example.com',
+        username: 'sinempresa',
+        documentNumber,
+      })
+
+      // Sin empresa: la unica columna omitida es `company_id`.
+      const sinEmpresa = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertUser(tx, values, roleId, null),
+        'alta de usuario sin empresa',
+      )
+      expect(sinEmpresa).toBe(NOT_NULL_VIOLATION)
+      expect(await tx.user.count({ where: { documentNumber } })).toBe(0)
+
+      // Con una empresa inexistente: el rol y el tipo de documento SI existen, asi que la
+      // unica FK que puede fallar es `users_company_id_fkey`.
+      const empresaFantasma = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertUser(tx, values, roleId, randomUUID()),
+        'alta de usuario con una empresa inexistente',
+      )
+      expect(empresaFantasma).toBe(FOREIGN_KEY_VIOLATION)
+      expect(await tx.user.count({ where: { documentNumber } })).toBe(0)
+    })
+  })
+
+  it('rechaza borrar una empresa con un usuario vivo dentro', async () => {
+    // R11 — `ON DELETE RESTRICT` de `users_company_id_fkey`.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const companyId = await createCompany(tx, 'empresa-con-gente')
+      const { id: userId } = await createUser(tx, roleId, {
+        email: 'ana@example.com',
+        username: 'anaperez',
+        documentNumber: '111000111',
+        companyId,
+      })
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "companies" WHERE "id" = CAST(${companyId} AS uuid)`,
+        'borrado de una empresa con un usuario vivo',
+      )
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+
+      // La empresa y su usuario quedan intactos.
+      expect(await tx.company.findUnique({ where: { id: companyId } })).not.toBeNull()
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      expect(user.companyId).toBe(companyId)
+      expect(user.deletedAt).toBeNull()
+    })
+  })
+
+  it('rechaza borrar una empresa cuyo unico usuario esta dado de baja', async () => {
+    // R11 en su mitad olvidada: la FK no sabe nada de `deleted_at`, y eso es deliberado. Un
+    // usuario de baja SIGUE contando como "esta empresa tiene gente".
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const companyId = await createCompany(tx, 'empresa-con-gente-de-baja')
+      const { id: userId } = await createUser(tx, roleId, {
+        email: 'ana@example.com',
+        username: 'anaperez',
+        documentNumber: '111000111',
+        companyId,
+      })
+      await softDelete(tx, userId)
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "companies" WHERE "id" = CAST(${companyId} AS uuid)`,
+        'borrado de una empresa cuyo unico usuario esta dado de baja',
+      )
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+
+      expect(await tx.company.findUnique({ where: { id: companyId } })).not.toBeNull()
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } })
+      expect(user.companyId).toBe(companyId)
+      expect(user.deletedAt).not.toBeNull()
+    })
+  })
+
+  it('permite borrar una empresa sin ningun usuario', async () => {
+    // La otra cara de R11: el RESTRICT no es un candado permanente.
+    await inRolledBackTransaction(async (tx) => {
+      const companyId = await createCompany(tx, 'empresa-vacia')
+      expect(await tx.user.count({ where: { companyId } })).toBe(0)
+
+      await tx.company.delete({ where: { id: companyId } })
+
+      expect(await tx.company.findUnique({ where: { id: companyId } })).toBeNull()
+    })
+  })
+
+  it('el usuario se crea con su rol y su empresa como columnas propias de su fila', async () => {
+    // R13 (el rol sigue en `users.role_id`, sin tabla intermedia) + R9 + R12.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const companyId = await createCompany(tx, 'empresa-del-usuario')
+      const { id } = await createUser(tx, roleId, {
+        email: 'ana@example.com',
+        username: 'anaperez',
+        documentNumber: '111000111',
+        companyId,
+      })
+
+      // Una sola lectura de `users` trae las dos cosas: no hay ninguna tabla en medio (R12).
+      const fila = await tx.user.findUniqueOrThrow({
+        where: { id },
+        select: { roleId: true, companyId: true },
+      })
+      expect(fila).toEqual({ roleId, companyId })
+
+      // Y borrar el rol que esta en uso sigue rechazandose, con empresa o sin ella (R13).
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "roles" WHERE "id" = CAST(${roleId} AS uuid)`,
+        'borrado de un rol en uso por un usuario de una empresa',
+      )
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+      expect(await tx.user.findUniqueOrThrow({ where: { id } })).toMatchObject({
+        roleId,
+        companyId,
+      })
+    })
+  })
+
+  it('dos usuarios de empresas distintas comparten el mismo rol del mismo catalogo', async () => {
+    // R15 — los roles son del sistema: ni el catalogo de roles ni el de tipos de documento
+    // ganan columna de empresa, y "Administrador" significa lo mismo en todas.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx, 'rol-compartido')
+      const empresaA = await createCompany(tx, 'empresa-a')
+      const empresaB = await createCompany(tx, 'empresa-b')
+
+      const { id: enA } = await createUser(tx, roleId, {
+        email: 'ana@empresa-a.example.com',
+        username: 'ana.a',
+        documentNumber: '111000111',
+        companyId: empresaA,
+      })
+      const { id: enB } = await createUser(tx, roleId, {
+        email: 'ana@empresa-b.example.com',
+        username: 'ana.b',
+        documentNumber: '222000222',
+        companyId: empresaB,
+      })
+
+      const filas = await tx.user.findMany({
+        where: { id: { in: [enA, enB] } },
+        select: { id: true, roleId: true, companyId: true },
+        orderBy: { username: 'asc' },
+      })
+      expect(filas).toEqual([
+        { id: enA, roleId, companyId: empresaA },
+        { id: enB, roleId, companyId: empresaB },
+      ])
+
+      // Y las columnas por las que se separaria el catalogo NO existen: R15 al pie de la letra.
+      const columnas = await tx.$queryRaw<{ table_name: string }[]>`
+        SELECT table_name::text
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name IN ('roles', 'document_types')
+          AND column_name = 'company_id'`
+      expect(columnas).toEqual([])
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL CORAZON DE LA FICHA (R16, R17, R18, R19).
+//
+// Cada uno de los tres va en los DOS sentidos: dentro de la misma empresa la base rechaza
+// con 23505, y en empresas distintas la base ACEPTA. La mitad que rechaza ya pasaba con los
+// indices globales de QC-4; la que acepta es la que solo puede pasar con `company_id` dentro
+// del indice, y es la que se pone roja si alguien devuelve los tres indices a su forma
+// anterior. Se comprobo recreandolos de verdad sobre la base y volviendo a correr el archivo.
+// ---------------------------------------------------------------------------
+
+describe('unicidad DENTRO de la empresa', () => {
+  it('rechaza el mismo correo en la misma empresa y lo acepta en otra', async () => {
+    // R16.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const empresaA = await createCompany(tx, 'empresa-correo-a')
+      const empresaB = await createCompany(tx, 'empresa-correo-b')
+      const email = 'Ana.Perez@Example.com'
+
+      const { id: enA } = await createUser(tx, roleId, {
+        email,
+        username: 'ana.a',
+        documentNumber: '111000111',
+        companyId: empresaA,
+      })
+
+      // Mismo correo, misma empresa: solo el correo coincide, asi que el 23505 solo puede
+      // venir de `users_email_unique`. Y en otras mayusculas, porque el indice lleva `lower`.
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: 'ANA.perez@EXAMPLE.COM',
+              username: 'otra.a',
+              documentNumber: '222000222',
+            }),
+            roleId,
+            empresaA,
+          ),
+        'segundo usuario con el mismo correo en la misma empresa',
+      )
+      expect(sqlState).toBe(UNIQUE_VIOLATION)
+
+      // Mismo correo, OTRA empresa: aceptado. Esto es lo nuevo de QC-47.
+      const { id: enB } = await createUser(tx, roleId, {
+        email,
+        username: 'ana.b',
+        documentNumber: '333000333',
+        companyId: empresaB,
+      })
+
+      // Acotado a las dos empresas del caso: `users` tiene tambien las filas de la
+      // instalacion, y el correo ya no es una clave global.
+      const filas = await tx.user.findMany({
+        where: { email, companyId: { in: [empresaA, empresaB] } },
+        select: { id: true, companyId: true },
+      })
+      expect(filas.map((fila) => fila.id).sort()).toEqual([enA, enB].sort())
+      expect(new Set(filas.map((fila) => fila.companyId))).toEqual(new Set([empresaA, empresaB]))
+    })
+  })
+
+  it('rechaza el mismo nombre de usuario en la misma empresa y lo acepta en otra', async () => {
+    // R17 — y es exactamente el caso que el humano cerro: dos empresas pueden tener cada una
+    // su `admin`.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const empresaA = await createCompany(tx, 'empresa-usuario-a')
+      const empresaB = await createCompany(tx, 'empresa-usuario-b')
+
+      const { id: enA } = await createUser(tx, roleId, {
+        email: 'admin@empresa-a.example.com',
+        username: 'admin',
+        documentNumber: '111000111',
+        companyId: empresaA,
+      })
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: 'otro@empresa-a.example.com',
+              username: 'ADMIN',
+              documentNumber: '222000222',
+            }),
+            roleId,
+            empresaA,
+          ),
+        'segundo usuario con el mismo nombre de usuario en la misma empresa',
+      )
+      expect(sqlState).toBe(UNIQUE_VIOLATION)
+
+      const { id: enB } = await createUser(tx, roleId, {
+        email: 'admin@empresa-b.example.com',
+        username: 'admin',
+        documentNumber: '333000333',
+        companyId: empresaB,
+      })
+
+      // Acotado a las dos empresas del caso: el `admin` de la instalacion tambien esta en
+      // `users`, y ese es justamente el punto — `admin` ya no es una clave global.
+      const filas = await tx.user.findMany({
+        where: { username: 'admin', companyId: { in: [empresaA, empresaB] } },
+        select: { id: true, companyId: true },
+      })
+      expect(filas.map((fila) => fila.id).sort()).toEqual([enA, enB].sort())
+      expect(new Set(filas.map((fila) => fila.companyId))).toEqual(new Set([empresaA, empresaB]))
+    })
+  })
+
+  it('rechaza el mismo documento en la misma empresa y lo acepta en otra', async () => {
+    // R18 — la pareja (tipo, numero).
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const empresaA = await createCompany(tx, 'empresa-documento-a')
+      const empresaB = await createCompany(tx, 'empresa-documento-b')
+      const documentNumber = '1030555777'
+
+      const { id: enA } = await createUser(tx, roleId, {
+        email: 'ana@empresa-a.example.com',
+        username: 'ana.a',
+        documentNumber,
+        companyId: empresaA,
+      })
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: 'otra@empresa-a.example.com',
+              username: 'otra.a',
+              documentNumber,
+            }),
+            roleId,
+            empresaA,
+          ),
+        'segundo usuario con el mismo documento en la misma empresa',
+      )
+      expect(sqlState).toBe(UNIQUE_VIOLATION)
+
+      const { id: enB } = await createUser(tx, roleId, {
+        email: 'ana@empresa-b.example.com',
+        username: 'ana.b',
+        documentNumber,
+        companyId: empresaB,
+      })
+
+      // Acotado a las dos empresas del caso, por lo mismo que en R16 y R17.
+      const filas = await tx.user.findMany({
+        where: {
+          documentTypeCode: DOCUMENT_TYPE_CC,
+          documentNumber,
+          companyId: { in: [empresaA, empresaB] },
+        },
+        select: { id: true, companyId: true },
+      })
+      expect(filas.map((fila) => fila.id).sort()).toEqual([enA, enB].sort())
+      expect(new Set(filas.map((fila) => fila.companyId))).toEqual(new Set([empresaA, empresaB]))
+    })
+  })
+
+  it('dar de baja a un usuario libera su correo, su username y su documento dentro de su empresa', async () => {
+    // R19 — las tres unicidades siguen midiendose SOLO entre usuarios vivos: los indices
+    // conservan su `WHERE deleted_at IS NULL` ademas de ganar la empresa.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const companyId = await createCompany(tx, 'empresa-que-libera')
+      const seed = {
+        email: 'Ana.Perez@Example.com',
+        username: 'anaperez',
+        documentNumber: '1030555777',
+        companyId,
+      }
+
+      const { id: viejo } = await createUser(tx, roleId, seed)
+
+      // Vivo: el correo esta ocupado EN ESTA empresa.
+      const ocupado = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: seed.email,
+              username: 'otro.username',
+              documentNumber: '999000999',
+            }),
+            roleId,
+            companyId,
+          ),
+        'correo ocupado por un usuario vivo de la misma empresa',
+      )
+      expect(ocupado).toBe(UNIQUE_VIOLATION)
+
+      await softDelete(tx, viejo)
+
+      // Dado de baja: los tres valores quedan libres a la vez, en la MISMA empresa.
+      const { id: nuevo } = await createUser(tx, roleId, seed)
+      expect(nuevo).not.toBe(viejo)
+
+      const filas = await tx.user.findMany({
+        where: { companyId },
+        select: { id: true, deletedAt: true },
+      })
+      expect(filas).toHaveLength(2)
+      expect(filas.filter((fila) => fila.deletedAt === null).map((fila) => fila.id)).toEqual([nuevo])
     })
   })
 })
