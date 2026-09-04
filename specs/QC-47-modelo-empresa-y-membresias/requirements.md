@@ -21,7 +21,170 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es (a) la **capa de persistencia** de
+QuimiCloude —el esquema Prisma (`db/schema.prisma`) más la base Postgres con la migración de esta
+feature aplicada— y (b) los **dos únicos consumidores** que hoy leen el rol de una persona: el
+**seed** (`identity/domain/seed-initial-access.ts` + `scripts/seed.ts`) y el **login**
+(`identity/adapters/driven/persistence/user-credentials-prisma.ts` y `session-user-prisma.ts`).
+No hay CRUD de empresas, ni service de empresa, ni pantalla, ni selector: ningún requisito habla
+de quién llama ni desde dónde, salvo donde nombra explícitamente al seed o al login.
+
+### La empresa
+
+**R1.** El sistema DEBE persistir, para cada empresa, un identificador propio **estable, no
+derivado de sus datos de negocio y no adivinable** —un UUID aleatorio, ni correlativo ni derivado
+del nombre—, más su **nombre**.
+
+**R2.** SI se intenta persistir una empresa sin nombre, ENTONCES el sistema DEBE rechazar la
+operación **en la propia base de datos** y no crear ninguna fila.
+
+**R3.** El sistema DEBE persistir el **nombre normalizado** de cada empresa —sin acentos, sin
+caracteres especiales y sin distinguir mayúsculas de minúsculas— en una **columna propia** junto al
+nombre original, y DEBE exponer **una única definición** de esa normalización, publicada por el
+contrato público del módulo propietario, de modo que la columna y cualquier consumidor futuro
+normalicen igual.
+
+**R4.** SI se intenta persistir una empresa cuyo nombre coincida, **una vez normalizado**, con el de
+otra empresa **no dada de baja**, ENTONCES el sistema DEBE rechazar la operación **en la propia base
+de datos** —contra un índice único, no contra una comprobación previa al vuelo— y no crear ni
+modificar ninguna fila.
+
+**R5.** El sistema DEBE declarar en la empresa una **marca de baja lógica** que nace vacía y que
+significa «empresa viva» mientras esté vacía; y NO DEBE incluir en esta feature ninguna operación,
+caso de uso, adaptador driving, ruta ni pantalla que dé de baja una empresa, ni ningún borrado
+físico de la fila.
+
+**R6.** El sistema DEBE registrar, en la empresa **y** en la pertenencia, el instante de creación y
+el instante de la última modificación, y DEBE actualizar el segundo cada vez que la fila cambia.
+
+### La pertenencia
+
+**R7.** El sistema DEBE persistir, para cada pertenencia, un identificador propio más **tres
+referencias obligatorias**: la persona, la empresa y el **rol que esa persona tiene en esa empresa**.
+
+**R8.** El sistema DEBE admitir que una misma persona tenga pertenencias a **varias empresas
+distintas**, con un **rol distinto en cada una**, y NO DEBE limitar a una el número de pertenencias
+de una persona ni exigir que el rol coincida entre ellas.
+
+**R9.** SI se intenta persistir una segunda pertenencia con la **misma pareja persona + empresa**
+que una ya existente, ENTONCES el sistema DEBE rechazar la operación **en la propia base de datos**
+—contra un índice único— y no crear ni modificar ninguna fila.
+
+**R10.** SI se intenta persistir una pertenencia cuya referencia de persona, de empresa o de rol no
+corresponda a ninguna fila existente, ENTONCES el sistema DEBE rechazar la operación **en la propia
+base de datos** y no crear ni modificar ninguna fila.
+
+**R11.** SI se intenta eliminar una persona, una empresa o un rol referenciados por al menos una
+pertenencia, ENTONCES el sistema DEBE rechazar el borrado y conservar las tres filas intactas.
+
+**R12.** El sistema NO DEBE declarar ninguna marca de borrado lógico en la pertenencia: esta feature
+no construye ninguna revocación de pertenencia, y una columna que nadie escribe es deuda, no
+información.
+
+**R13.** El sistema NO DEBE añadir ninguna columna de empresa a `users`, `roles` ni
+`document_types`, y NO DEBE separar por empresa el catálogo de roles ni el de tipos de documento: un
+mismo rol, con un mismo identificador y un mismo nombre, DEBE poder usarse desde pertenencias a
+empresas distintas.
+
+### El rol se muda de la persona a la pertenencia
+
+**R14.** El sistema NO DEBE conservar ninguna columna de rol en la tabla de usuarios: la columna
+`role_id`, su clave foránea y su índice DEBEN desaparecer de `users`, y ningún archivo del
+repositorio DEBE volver a leer ni escribir el rol de una persona desde esa tabla.
+
+**R15.** El sistema DEBE resolver el rol de una persona **por su pertenencia**; y MIENTRAS una
+persona tenga **exactamente una** pertenencia, el rol resuelto para ella DEBE ser el de esa
+pertenencia (con más de una, quién elige es de **QC-48**, ver pregunta abierta 2).
+
+**R16.** CUANDO alguien inicia sesión con credenciales válidas, el sistema DEBE firmar en la sesión
+**el mismo rol que firmaba antes de esta feature** para esa misma persona, DEBE resolverlo **en la
+misma consulta que autentica** —sin añadir una segunda lectura a la base en el camino de login— y
+esa consulta DEBE seguir apoyándose en el índice único funcional `users_username_unique`.
+
+**R17.** SI una persona viva no tiene **ninguna** pertenencia, ENTONCES el login DEBE tratarla como
+no encontrada y NO DEBE emitir sesión con ningún rol: el sistema NO DEBE inventar un rol por
+defecto ni emitir una sesión sin rol.
+
+### El seed
+
+**R18.** CUANDO se ejecuta el seed sobre una base sin acceso inicial, el sistema DEBE dejar creados
+—**en una única transacción**, de modo que si cualquier paso falla no quede nada a medias— los roles
+del catálogo, **exactamente una empresa inicial**, el usuario semilla, y **una pertenencia** que une
+a ese usuario con esa empresa y con el rol `Administrador`.
+
+**R19.** CUANDO se ejecuta el seed sobre una base que ya tiene su acceso inicial, el sistema NO DEBE
+crear una segunda empresa ni una segunda pertenencia ni pisar las existentes: ejecutarlo dos veces
+seguidas DEBE dejar exactamente el mismo estado que ejecutarlo una, y DEBE seguir informando por
+consola sin exponer ninguna credencial.
+
+**R20.** El nombre de la empresa inicial DEBE salir de **una única definición** del repositorio, y su
+nombre normalizado persistido DEBE coincidir con el que produce sobre ese nombre la **única
+definición** de la normalización (R3), tanto si la fila la crea el seed como si la crea la migración.
+
+### Esquema, seguridad y migración
+
+**R21.** El sistema DEBE nombrar en **inglés** las tablas, columnas, índices y restricciones que cree
+esta feature.
+
+**R22.** El sistema DEBE declarar el **módulo propietario** (`/// @module`) de los dos modelos
+nuevos en el esquema, y ningún módulo distinto de ese propietario DEBE consultarlos con el cliente
+Prisma.
+
+**R23.** El sistema DEBE tener `ROW LEVEL SECURITY` activado **y forzado**
+(`FORCE ROW LEVEL SECURITY`) en las **dos** tablas que crea esta feature.
+
+**R24.** CUANDO se aplica la migración de esta feature sobre una base con usuarios ya cargados, el
+sistema DEBE dejar para **cada** usuario una pertenencia con **exactamente el rol que tenía** en
+`users.role_id`, sin perder ni cambiar el rol de ninguno y sin dejar ningún usuario sin rol
+resoluble.
+
+**R25.** CUANDO se revierte la migración de esta feature, el sistema DEBE quedar **exactamente** en
+el estado de esquema previo a aplicarla: `users.role_id` vuelve a existir, obligatoria, con su clave
+foránea y su índice tal como los dejó **QC-4**, y con el rol que la pertenencia guardaba; y no queda
+tabla, columna, índice ni restricción residual de la empresa ni de la pertenencia.
+
+**R26.** SI al revertir la migración algún usuario tiene un número de pertenencias **distinto de
+una**, ENTONCES el sistema DEBE **abortar la reversión completa** y NO DEBE inventar, elegir al azar
+ni descartar en silencio ningún rol (es R24 leído al revés: fallar antes que perder el dato).
+
+**R27.** El sistema NO DEBE eliminar, recrear ni alterar los índices únicos **funcionales y
+parciales** de `users` (`users_email_unique`, `users_username_unique`, `users_document_unique`), que
+viven escritos a mano en la migración de **QC-4**, ni el `FORCE ROW LEVEL SECURITY` de las tablas
+existentes: esta feature los deja byte a byte como estaban.
+
+### Límite de alcance
+
+**R28.** El sistema NO DEBE incluir en esta feature ninguna operación de alta, edición o baja de
+empresas, ninguna pantalla, ningún selector de empresa, ninguna empresa en la sesión ni ninguna
+columna de empresa en las tablas de operación; por lo tanto esta feature **no aporta ningún flujo
+navegable nuevo** que un test E2E pueda visitar, y el E2E de login que ya existe (**QC-7**) DEBE
+seguir pasando **sin cambios en su guion**.
+
+**R29.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el o los
+requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | La empresa se identifica por un UUID aleatorio, no adivinable | R1 |
+| 2 | El nombre de empresa es único sin distinguir mayúsculas ni acentos | R2, R3, R4 |
+| 3 | Un usuario puede pertenecer a varias empresas | R8 |
+| 4 | La pareja usuario + empresa es única | R9 |
+| 5 | El rol es por empresa y vive en la pertenencia | R7, R8, R15 |
+| 6 | `users.role_id` se mueve del todo; seed y login siguen dando el mismo resultado | R14, R15, R16, R17, R18, R24 |
+| 7 | Roles y tipos de documento son del sistema, no se separan por empresa | R13 |
+| 8 | Baja lógica de empresa; la operación de baja no se construye aquí | R5 |
+| 9 | Identificadores de la base en inglés | R21 |
+| 10 | `created_at` y `updated_at` en las dos tablas nuevas | R6 |
+| 11 | RLS activada y forzada en las dos tablas nuevas | R23 |
+| 12 | Migración con `down.sql` que revierte al esquema exacto anterior, `role_id` incluida | R25, R26, R27 |
+| 13 | `/// @module` obligatorio en los dos modelos nuevos | R22 |
+| 14 | No hay E2E nuevo; el E2E de login de QC-7 es la prueba de que nada se rompió hacia fuera | R16, R28 |
+| 15 | Ninguna librería nueva | R29 |
 
 ## Preguntas abiertas
 
@@ -37,6 +200,29 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
    abierta. Aquí solo se hace constar que el modelo no la cierra.
 3. **Moneda por empresa** (pregunta abierta n.º 5 del dominio, abierta el 2026-09-04 al
    reescribir el punto 1). No bloquea esta ficha: aquí no entra ningún importe.
+
+**Añadidas por `spec_author` el 2026-09-04 (F1.2).** No reabren ninguna decisión cerrada: son dos
+datos que la ficha necesita y que no están en `docs/`, `specs/` ni el código (regla 6 de
+`CLAUDE.md`). Las dos llevan escrita su **posición por defecto**, que es lo que se implementa si el
+humano no dice otra cosa al aprobar el spec (F1.4). Mismo patrón que las preguntas 4 y 5 de
+**QC-32**.
+
+4. **¿Cómo se llama la empresa inicial que crea el seed?** El alcance dice «el seed deja una empresa
+   inicial», pero no fija su nombre, y ese nombre lo necesitan **dos sitios**: el seed (R18, R20) y
+   el backfill de la migración, que tiene que meter a los usuarios ya cargados en alguna empresa
+   (R24). *Posición por defecto*: un **marcador fijo de instalación**, en una sola constante del
+   dominio, con el mismo criterio que los marcadores del usuario semilla de **QC-6**
+   (`Administrador` / `Inicial` / `+00 000 000 0000`): quien mire la fila tiene que ver que es de
+   instalación y no un dato real. El literal exacto propuesto está en `design.md > 6.1`. **No** se
+   toma del entorno: no es un secreto y `.env` no es donde vive un dato de negocio.
+5. **¿Una empresa dada de baja libera su nombre?** La decisión 2 dice «el nombre es único» y la 8
+   añade la baja lógica, pero no se cruzaron. Hoy da igual —esta ficha no construye ninguna
+   operación de baja (R5), así que ninguna fila puede llegar a estar de baja—, pero el índice hay
+   que escribirlo ya. *Posición por defecto, y lo que dice R4*: índice único **parcial**
+   (`WHERE deleted_at IS NULL`), que es el precedente del repo para toda tabla con borrado lógico
+   —`recipes_name_unique`, `suppliers_name_unique`, `users_email_unique`—; un índice total
+   quemaría el nombre para siempre en cuanto alguien dé de baja una empresa. Se anota porque
+   cambiarlo después es una migración, no una línea.
 
 ## Decisiones cerradas (no reabrir)
 
