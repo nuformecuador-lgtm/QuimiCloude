@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
-| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | pending | feature/QC-47-modelo-empresa-y-membresias | esta sesión (`labs`) — worktree montado en F1.0, sin spec todavía |
+| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | spec_ready | feature/QC-47-modelo-empresa-y-membresias | esperando aprobación humana del spec (F1.4). 29 requisitos EARS en `a00940b`; **dos preguntas abiertas se cierran al aprobar** |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
