@@ -1839,3 +1839,37 @@ mecanismo desde que existe.
   sincronizar dos veces. El único conflicto en las dos fue `tests/baseline-rojos.json`, y la
   resolución correcta no era elegir versión sino **unir**: el archivo llevaba vacío hasta ayer y cada
   rama le añadía entradas distintas.
+
+## QC-62 — pasos-de-receta-enriquecidos (cerrada el 2026-09-04, PR #36, merge `aa4d551`)
+
+El contenido de un paso de receta dejó de ser una cadena y pasó a ser un **documento de estructura
+cerrada** —párrafo, negrilla, cursiva y lista de verificación—, validado en el borde con `zod` y
+`.strict()` en cada objeto, para que las claves desconocidas se rechacen en vez de descartarse en
+silencio. El campo `type` (`'texto' | 'checklist'`) **desapareció**: era derivable del propio
+contenido. El tope pasó de 1.000 caracteres a `MAX_STEP_ELEMENTS = 30`, publicado como **una sola
+constante** del contrato. Sin tocar `db/schema.prisma`: los pasos ya vivían como un documento JSON
+en una columna desde QC-24.
+
+- **Nació en esta sesión.** No existía en el board: `/afinar-feature` paró por su guarda del paso 0,
+  se creó la tarjeta y después se acotó. **12 decisiones cerradas antes del spec**, y se notó — el
+  reviewer cerró con **0 mayores** en una sola ronda.
+- **Partida en dos por F1.0** al evaluar como `fullstack`: QC-62 se quedó el contrato y nació
+  **QC-64 — editor-y-lectura-de-pasos** (`frontend`), que esta ficha desbloquea. Las decisiones se
+  repartieron 8/10 sin perder ninguna. **QC-63 — ejecutar-receta-operador** quedó bloqueada por
+  QC-64.
+- **Migración destructiva y aprobada:** `20260904181500_recipe_steps_reset` **borró** los pasos de
+  las recetas existentes en vez de convertirlos. Irreversible, y decidido así al acotar.
+- **El hallazgo que más cerca estuvo de costar caro:** esa migración compartía **marca de tiempo
+  exacta** con una foránea (`20260904160000_list_query_indexes`). Prisma las distingue por nombre,
+  pero el orden entre dos que empatan queda al azar — y ésta borra datos. Lo detectó el implementer
+  al consultar `_prisma_migrations`, no ninguna guardia. **Nada en el repo vigila los empates de
+  timestamp entre migraciones.**
+- **Una premisa del leader que resultó falsa, y bien tumbada:** se diagnosticaron 9 rojos de
+  integración como «fixtures viejas de QC-52» y se encargó arreglarlas. El implementer **se negó con
+  medidas**: el modelo `Product` de la rama ni siquiera declara `nameNormalized`, así que el arreglo
+  era inaplicable; la causa real es que la base compartida tiene aplicada una migración que ninguna
+  rama tiene. Quinta vez que ese drift bloquea una feature.
+- **Deuda que deja en `dev`:** el formulario escribe los pasos por un **puente de texto plano** hasta
+  que QC-64 traiga el editor. Y las dos guardias gemelas de alcance de `recetas` ya no dicen lo
+  mismo: una se actualizó y la otra sigue tapada por `baseline-rojos.json` con un motivo escrito que
+  ya no es el que ocurre.

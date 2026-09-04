@@ -368,7 +368,7 @@
       "epic_name": "Recetas",
       "name": "pasos-de-receta-enriquecidos",
       "description": "El contenido de un paso de receta deja de ser una cadena y pasa a ser un documento con una estructura cerrada -parrafo, negrilla, cursiva y lista de verificacion, y nada mas-, de modo que un mismo paso pueda mezclar texto y elementos marcables y conservar los saltos de linea. Esta ficha cubre solo el contrato y el dominio: el esquema que valida el documento en el borde, la desaparicion del campo tipo (texto/checklist) -que ya no aporta nada porque el propio documento dice si lleva lista de verificacion-, el tope por numero de elementos en vez de por caracteres, y el borrado de los pasos ya guardados, que no se convierten porque no hay nada que preservar. Los pasos se siguen guardando como un unico documento JSON en una sola columna (QC-24), asi que no hay cambio de esquema de base de datos ni tabla nueva de paso. El editor enriquecido, el componente de lectura y la vista previa van en la ficha de frontend. Partida de la ficha original por la regla de F1.0 de AGENTS.md. Diseno acordado: https://claude.ai/code/artifact/fef7d60d-55c7-4ace-ad59-43415b442319",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
