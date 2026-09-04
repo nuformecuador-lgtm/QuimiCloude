@@ -25,6 +25,13 @@ import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
  * | `components/ui/` sin tocar                       | AQUI (R44)                                   |
  * | `package.json` sin cambios                       | AQUI (R45)                                   |
  * | `lib/modules/**`, `db/**`, composicion sin tocar | AQUI, sobre el DIFF (R49)                    |
+ * | armazon privado heredado y no re-creado (R50)    | `guard-herencia-armazon-privado.test.ts`     |
+ *
+ * La ultima fila esta aqui solo como indice: R50 —layout, barra lateral, navegacion privada,
+ * region de avisos, primitivas y utilidades de test **heredadas y no duplicadas**— vive en su
+ * propio archivo porque pregunta por lo que NO existe en el arbol, no por como esta escrito lo que
+ * si existe. Ese archivo **no reimplementa** el caso de `components/ui/` de aqui: lo cita, y se
+ * pone rojo si desaparece. Si tocas el nombre de ese caso o el intocable `primitivas`, mira alli.
  *
  * Las tres ultimas no se pueden ver leyendo un archivo: son propiedades del **cambio**, no del
  * arbol. Se miran sobre el diff de la rama y sobre el arbol de trabajo. Y siguiendo lo que pide
