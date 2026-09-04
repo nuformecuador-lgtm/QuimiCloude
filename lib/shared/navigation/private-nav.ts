@@ -1,4 +1,4 @@
-import { DASHBOARD_ROUTE, FORMULAS_ROUTE, INVENTORY_ROUTE } from '../routes';
+import { DASHBOARD_ROUTE, FORMULAS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE } from '../routes';
 
 /**
  * Navegacion de la zona privada (`design.md > 4.3`).
@@ -45,6 +45,14 @@ export { FORMULAS_ROUTE };
 
 /** Etiqueta del sidebar para la pantalla de recetas (QC-26, R3). */
 export const RECIPES_LABEL = 'Recetas';
+
+/**
+ * Etiqueta del sidebar para la pantalla de proveedores (QC-44, R4).
+ *
+ * `SUPPLIERS_ROUTE` **no se reexporta** desde aqui: nacio en `lib/shared/routes.ts` y no hay
+ * codigo previo que la importara de este archivo, asi que no hay compatibilidad que sostener.
+ */
+export const SUPPLIERS_LABEL = 'Proveedores';
 
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
@@ -157,6 +165,17 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         icon: 'flask-conical',
       },
     ],
+  },
+  // QC-44 R4: item de NIVEL SUPERIOR en la seccion «Cadena», hermano del grupo «Producción» y
+  // **no un hijo suyo**: proveedores es modulo de dominio propio (epica QC-41, creada fuera de
+  // Catalogos y de Inventario). El icono `truck` ya existe en `NavIconName` y en `NAV_ICONS`.
+  {
+    kind: 'link',
+    href: SUPPLIERS_ROUTE,
+    label: SUPPLIERS_LABEL,
+    testId: 'nav-proveedores',
+    icon: 'truck',
+    section: NAV_SECTION_CHAIN,
   },
 ];
 

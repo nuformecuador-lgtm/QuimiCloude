@@ -30,6 +30,28 @@ export function recipeEditRoute(id: string): string {
   return `${FORMULAS_ROUTE}/${id}`;
 }
 
+/**
+ * Pantalla de proveedores (QC-44, R2).
+ *
+ * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
+ * `identity` la necesitan y **no pueden depender de la navegacion**, que arrastra etiquetas,
+ * iconos y agrupacion de UI. `private-nav.ts` ya importa de este archivo, asi que la flecha no se
+ * invierte ni aparece un ciclo. A diferencia de `INVENTORY_ROUTE` y `FORMULAS_ROUTE`, esta
+ * constante **nace** aqui —no se muda desde la navegacion—, asi que no necesita reexport de
+ * compatibilidad: nadie la importaba antes de `private-nav`.
+ */
+export const SUPPLIERS_ROUTE = '/proveedores';
+
+/**
+ * Ruta de la pagina de detalle de un proveedor, derivada de `SUPPLIERS_ROUTE` (QC-44, R3).
+ *
+ * Mismo patron que `recipeEditRoute`: ningun archivo de producto incrusta la URL del detalle como
+ * literal, se construye siempre aqui.
+ */
+export function supplierDetailRoute(id: string): string {
+  return `${SUPPLIERS_ROUTE}/${id}`;
+}
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
@@ -43,4 +65,12 @@ export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
  * nueva sin prefijo que la cubra pone el gate en rojo con su nombre, y un prefijo que ya no
  * corresponde a ninguna pantalla, tambien.
  */
-export const PRIVATE_ROUTE_PREFIXES = [DASHBOARD_ROUTE, INVENTORY_ROUTE, FORMULAS_ROUTE] as const;
+export const PRIVATE_ROUTE_PREFIXES = [
+  DASHBOARD_ROUTE,
+  INVENTORY_ROUTE,
+  FORMULAS_ROUTE,
+  // QC-44 R5: UNA sola entrada cubre la lista y el detalle. La guardia y el middleware comparan
+  // por segmentos (`route === prefix || route.startsWith(prefix + '/')`), asi que
+  // `/proveedores/<id>` ya cae dentro; una segunda fila para el detalle seria redundante.
+  SUPPLIERS_ROUTE,
+] as const;

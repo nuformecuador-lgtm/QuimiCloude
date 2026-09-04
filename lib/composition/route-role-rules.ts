@@ -29,7 +29,7 @@
 
 import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import type { RouteRoleRule } from '@/lib/modules/identity';
-import { FORMULAS_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
 /**
  * Conjunto declarado de reglas ruta→rol.
@@ -50,4 +50,10 @@ import { FORMULAS_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
   { prefix: FORMULAS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+  // QC-44 R6 — la pantalla de proveedores, solo Administrador. UNA sola fila: la busqueda casa
+  // por segmentos, asi que este prefijo cubre la lista y `/proveedores/<id>`. Reutiliza el
+  // `ADMIN_ROLE_NAME` que este archivo ya importa del barrel de `inventario`: un segundo import
+  // del mismo valor desde el barrel de `proveedores` seria la misma constante entrando dos veces
+  // por dos puertas, y un literal nuevo del rol es la deuda que `actor.ts` ya declaro.
+  { prefix: SUPPLIERS_ROUTE, roles: [ADMIN_ROLE_NAME] },
 ];

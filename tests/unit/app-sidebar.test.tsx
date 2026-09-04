@@ -455,13 +455,20 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente tres entradas de nivel superior en orden', () => {
-    // R5
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(3);
+  it('PRIVATE_NAV_ITEMS tiene exactamente cuatro entradas de nivel superior en orden', () => {
+    // R5. AMPLIADO el 2026-09-04 (QC-44 T2, R4): la CUARTA entrada es la pantalla de proveedores,
+    // item de nivel superior de la seccion «Cadena» -hermano del grupo de produccion, no hijo
+    // suyo-. El centinela no se relaja: sigue exigiendo la lista exacta y su orden, asi que una
+    // quinta entrada sin ficha que la respalde lo vuelve a poner en rojo. El destino y la
+    // etiqueta del item nuevo los afirma
+    // `tests/unit/proveedores/supplier-route-contract.test.ts` sobre `SUPPLIERS_ROUTE` y
+    // `SUPPLIERS_LABEL`, nunca sobre el literal del copy.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(4);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
       'nav-inventario',
       'nav-produccion',
+      'nav-proveedores',
     ]);
   });
 

@@ -95,8 +95,22 @@ function fuentesBajo(carpetaRelativa: string): string[] {
 /** Los archivos de la ruta: `page.tsx` y todos los componentes propios. */
 const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
 
+/**
+ * El selector de presentacion ya NO vive en la ruta: QC-44 lo promovio a `components/shared/`
+ * porque la pantalla de proveedores lo necesita con la MISMA API, y el barrel de la ruta lo
+ * reexporta. Sigue siendo parte de lo que esta pantalla pinta, asi que las guardias que miran
+ * ESE archivo -R25, R30 y R31- lo siguen mirando en su ubicacion nueva; si no, la mudanza habria
+ * apagado su cobertura en silencio.
+ */
+const SELECTOR_PRESENTACION_PATH = join('components', 'shared', 'presentation-select.tsx')
+  .split('\\')
+  .join('/');
+
+/** Lo que esta pantalla pinta: sus archivos propios mas el selector promovido. */
+const FUENTES_VIGILADAS = [...FUENTES_DE_LA_RUTA, SELECTOR_PRESENTACION_PATH];
+
 /** Los que declaran frontera de cliente. R30 va sobre estos. */
-const FUENTES_DE_CLIENTE = FUENTES_DE_LA_RUTA.filter((ruta) => leer(ruta).includes("'use client'"));
+const FUENTES_DE_CLIENTE = FUENTES_VIGILADAS.filter((ruta) => leer(ruta).includes("'use client'"));
 
 /**
  * Los controles que R31 obliga a agrandar. Se buscan como **etiqueta de apertura JSX**
@@ -387,7 +401,7 @@ describe('contrato de la ruta de inventario', () => {
     // esa pantalla es QC-45. La unica operacion permitida es el alta desde el selector (R24).
     const prohibidas = ['updatePresentationAction', 'deletePresentationAction'];
 
-    for (const ruta of FUENTES_DE_LA_RUTA) {
+    for (const ruta of FUENTES_VIGILADAS) {
       const crudo = leer(ruta);
       for (const prohibida of prohibidas) {
         expect(crudo, `${ruta} no debe nombrar «${prohibida}»`).not.toContain(prohibida);
@@ -395,9 +409,7 @@ describe('contrato de la ruta de inventario', () => {
     }
 
     // Y las dos que si se usan siguen siendo solo esas dos.
-    const selector = fuenteSinComentarios(
-      join(COMPONENTES_PATH, 'presentation-select.tsx').split('\\').join('/'),
-    );
+    const selector = fuenteSinComentarios(SELECTOR_PRESENTACION_PATH);
     expect(selector).toContain('listPresentationsAction');
     expect(selector).toContain('createPresentationAction');
   });
@@ -489,7 +501,7 @@ describe('contrato de la ruta de inventario', () => {
     let controlesVigilados = 0;
     const archivosConControles = new Set<string>();
 
-    for (const ruta of FUENTES_DE_LA_RUTA) {
+    for (const ruta of FUENTES_VIGILADAS) {
       const codigo = fuenteSinComentarios(ruta);
 
       expect(codigo, `${ruta} no debe usar 100vh`).not.toContain('100vh');
