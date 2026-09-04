@@ -1334,12 +1334,24 @@ describe('frontera con otros modulos: FK reales sin relacion de Prisma (QC-52 R3
       //
       // QC-52 cambia dos filas: entran `presentation_id` -> `presentations` y `unit_id` ->
       // `units`, y sale `product_id` -> `products`, que se fue con la columna (R9).
+      //
+      // Las FK existen en la base aunque el esquema Prisma declare `unit_id`, `created_by` y
+      // `updated_by` como escalares sin `@relation`.
+      //
+      // El JOIN con `pg_namespace` acota la consulta al esquema `public` y NO es adorno:
+      // `pg_constraint` es global a la BASE, no al esquema. La base de pruebas llego a ser
+      // compartida y a tener un esquema espejo (`public_shadow_qc52`) con las mismas tablas;
+      // sin este filtro cada FK aparecia DOS veces. No sirve confiar en el `search_path` ni
+      // en `::regclass`, que solo cualifica cuando la tabla NO esta en el path: por eso el
+      // sintoma era tan confuso.
       const foreignKeys = await tx.$queryRaw<{ conname: string; referencia: string; regla: string }[]>`
         SELECT c.conname, ft.relname AS referencia, c.confdeltype AS regla
         FROM pg_constraint c
         JOIN pg_class t ON t.oid = c.conrelid
         JOIN pg_class ft ON ft.oid = c.confrelid
-        WHERE c.contype = 'f' AND t.relname IN ('suppliers', 'supplier_catalog_lines')
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE c.contype = 'f' AND n.nspname = 'public'
+          AND t.relname IN ('suppliers', 'supplier_catalog_lines')
         ORDER BY c.conname`
       expect(foreignKeys).toEqual([
         { conname: 'supplier_catalog_lines_created_by_fkey', referencia: 'users', regla: 'r' },
