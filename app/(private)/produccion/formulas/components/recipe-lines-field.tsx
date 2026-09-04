@@ -102,7 +102,7 @@ export function RecipeLinesField({
     <section aria-labelledby={headingId} data-testid="recipe-lines-field" className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <h2 id={headingId} className="text-lg font-medium">
-          Líneas de producto
+          Ingredientes
         </h2>
         <Button type="button" className={TOUCH_TARGET} data-testid="recipe-line-add" onClick={addLine}>
           Añadir línea
