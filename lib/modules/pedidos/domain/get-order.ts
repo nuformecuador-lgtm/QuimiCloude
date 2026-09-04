@@ -1,0 +1,88 @@
+import { requireAdmin, type Actor } from './actor';
+import { NotFoundError } from './errors';
+import { formatOrderNumber } from './order-number';
+import type { OrderRow, OrderView } from './order-view';
+
+import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
+
+import type { OrderRepository } from '../ports/order-repository';
+
+export type GetOrderDeps = {
+  readonly orders: OrderRepository;
+  readonly recipes: RecipeCatalog;
+  readonly units: UnitCatalog;
+};
+
+/**
+ * Compone la salida de una fila con los nombres ya resueltos (R42, R43, R44, R46).
+ *
+ * Vive aqui y lo IMPORTA `list-orders.ts` para que la ficha y el listado no puedan diverger:
+ * `OrderSummary` es un alias de `OrderView` (`design.md > 7.3`) y una segunda copia de este
+ * mapeo seria el sitio exacto por donde empezarian a diferir.
+ *
+ * `recipeName`/`unitName` son `null` solo si el id NO vuelve del catalogo -una receta borrada
+ * FISICAMENTE por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila
+ * SIGUE saliendo (mismo criterio que QC-25 R18 y QC-43 R37). Una receta dada de BAJA si
+ * vuelve, con su nombre (R44).
+ *
+ * `numberText` lo compone `formatOrderNumber`, la UNICA definicion del formato (R14): no se
+ * persiste ni se vuelve a formatear en ningun otro sitio. Los dos autores salen como
+ * IDENTIFICADORES (R46): este modulo no consulta el modelo `User`.
+ */
+export function toOrderView(
+  row: OrderRow,
+  recipeNames: ReadonlyMap<string, string>,
+  unitNames: ReadonlyMap<string, string>,
+): OrderView {
+  return {
+    id: row.id,
+    number: row.number,
+    numberText: formatOrderNumber(row.number),
+    recipeId: row.recipeId,
+    recipeName: recipeNames.get(row.recipeId) ?? null,
+    quantity: row.quantity,
+    unitId: row.unitId,
+    unitName: unitNames.get(row.unitId) ?? null,
+    unitPrice: row.unitPrice,
+    priority: row.priority,
+    status: row.status,
+    // R29: el motivo se devuelve en la ficha Y en el listado mientras el pedido este
+    // cancelado. Ningun caso de uso lo vacia ni lo sustituye.
+    cancellationReason: row.cancellationReason,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    createdBy: row.createdBy,
+    updatedBy: row.updatedBy,
+  };
+}
+
+/**
+ * Ficha de un pedido (R42). Consultar TAMBIEN exige `requireAdmin` (decision cerrada 1): el
+ * Operador ni siquiera lee, y el `requireAdmin` va antes de tocar el repositorio y los dos
+ * catalogos (R2).
+ */
+export function createGetOrder(
+  deps: GetOrderDeps,
+): (id: string, actor: Actor | null | undefined) => Promise<OrderView> {
+  return async function getOrder(
+    id: string,
+    actor: Actor | null | undefined,
+  ): Promise<OrderView> {
+    requireAdmin(actor);
+
+    // null = no existe o ya esta borrado: para el dominio son el mismo caso (R33), y el
+    // filtro `deleted_at IS NULL` es del puerto, no de un `if` de aqui (R40).
+    const row = await deps.orders.findAliveById(id);
+    if (row === null) throw new NotFoundError();
+
+    const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId]);
+    const units = await deps.units.findRefs([row.unitId]);
+
+    return toOrderView(
+      row,
+      new Map(recipes.map((recipe) => [recipe.id, recipe.name])),
+      new Map(units.map((unit) => [unit.id, unit.name])),
+    );
+  };
+}

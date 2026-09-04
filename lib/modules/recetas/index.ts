@@ -11,7 +11,9 @@ export {
   ValidationError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
-export type { RecipeId } from './domain/recipe-catalog';
+// `RecipeCatalog` y `RecipeRef` los anade QC-34 (T10, R43/R44); `RecipeId` es de QC-33 y no
+// cambia. Son SOLO TIPOS: el barrel no gana nada de servidor por reexportarlos.
+export type { RecipeId, RecipeRef, RecipeCatalog } from './domain/recipe-catalog';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
   MAX_IMAGE_BYTES,

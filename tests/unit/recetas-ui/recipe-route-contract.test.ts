@@ -511,12 +511,52 @@ describe('contrato de la ruta de recetas', () => {
       'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
     ).toBeGreaterThan(0);
 
-    const tocaRecetas = diff.filter((ruta) => ruta.startsWith('lib/modules/recetas/'));
-    const tocaDb = diff.filter((ruta) => ruta.startsWith('db/'));
-    expect(tocaRecetas, 'ningun archivo de lib/modules/recetas/ deberia estar en el diff').toEqual(
-      [],
-    );
-    expect(tocaDb, 'ningun archivo de db/ deberia estar en el diff').toEqual([]);
+    // RETENSADO 2026-09-04 (QC-34). Las dos listas permitidas dejan de estar VACIAS y pasan a
+    // tener entradas NOMBRADAS UNA A UNA. No es un aflojamiento: la premisa vieja -«esta rama
+    // no cambia nada de `recetas` ni de `db/`»- cayo por dos requisitos de QC-34, y lo que
+    // este caso protegia de verdad -que nada MAS se toque por la puerta de atras- sigue
+    // vigilado, porque cualquier archivo fuera de estas listas pone el caso rojo.
+    //
+    // POR QUE `recetas` cambia: QC-34 R43/R44 necesitan el nombre de la receta de un pedido,
+    // incluida la dada de BAJA, y QC-33 R32 le prohibe a `pedidos` consultar `prisma.recipe`
+    // -exige que «todo lo que sepa de una receta le llegue por los contratos publicos, que
+    // DEBEN publicarlo»-. Publicar eso es, por definicion, trabajo DENTRO de `recetas`. Es el
+    // mismo criterio y las mismas tres rutas que ya se anotaron en
+    // `tests/unit/recetas/module-contract.test.ts`. El repositorio, los casos de uso, la
+    // Server Action y el adaptador de almacenamiento de QC-25 siguen CONGELADOS.
+    const AMPLIACION_RECETAS_QC34 = [
+      // El barrel gana DOS reexportaciones de tipo (`RecipeCatalog`, `RecipeRef`).
+      'lib/modules/recetas/index.ts',
+      // El contrato de catalogo, que ya existia con `RecipeId` desde QC-33, gana los dos tipos.
+      'lib/modules/recetas/domain/recipe-catalog.ts',
+      // Y su implementacion, adaptador driven NUEVO -no toca `recipe-prisma.ts`-.
+      'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+    ];
+
+    // POR QUE `db/` cambia: QC-34 decision cerrada 3 anade el cuarto estado `CANCELADO`, y eso
+    // es una migracion del tipo enumerado (R48, R49, R50) con su columna de motivo. La carpeta
+    // de migracion es EXACTAMENTE UNA y esta nombrada; el esquema solo gana la columna nueva.
+    // Ninguna otra migracion, ningun otro archivo de `db/`.
+    const MIGRACION_QC34 = [
+      'db/schema.prisma',
+      'db/migrations/20260904135210_order_cancellation/migration.sql',
+      'db/migrations/20260904135210_order_cancellation/down.sql',
+    ];
+
+    const tocaRecetas = diff
+      .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
+      .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta));
+    const tocaDb = diff
+      .filter((ruta) => ruta.startsWith('db/'))
+      .filter((ruta) => !MIGRACION_QC34.includes(ruta));
+    expect(
+      tocaRecetas,
+      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',
+    ).toEqual([]);
+    expect(
+      tocaDb,
+      'ningun archivo de db/ fuera de la migracion de cancelacion de QC-34 deberia estar en el diff',
+    ).toEqual([]);
   });
 
   it('package.json solo incorpora los tres paquetes de arrastre aprobados y sus filas declaran el check fallido', () => {
