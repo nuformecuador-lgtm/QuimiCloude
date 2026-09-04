@@ -11,3 +11,13 @@
 // 2026-09-03 por decision del humano (R26).
 export { normalizeUnitName } from './domain/unit-name';
 export type { UnitCatalog, UnitId, UnitRef } from './domain/unit-catalog';
+
+// QC-26 (R40-R42): la unica operacion de lectura del catalogo completo, para el
+// selector de unidad del formulario de recetas. El contrato NUNCA reexporta la Server
+// Action (`adapters/driving/unit-actions.ts`) ni nada con 'use server': eso rompe la
+// invariante de que este barrel es importable desde un componente de cliente.
+export { createListUnits, MAX_UNITS } from './domain/list-units';
+export type { ListUnitsDeps } from './domain/list-units';
+export { ADMIN_ROLE_NAME, requireAdmin } from './domain/actor';
+export type { Actor } from './domain/actor';
+export { UnidadesError, UnauthorizedError } from './domain/errors';

@@ -8,12 +8,24 @@
 // del disco). Ninguna aclaracion aqui hace un censo GLOBAL del repo -numero de modelos,
 // de migraciones, etc.-: solo mide lo que la feature `recetas` garantiza sobre si misma
 // (`design.md > 14`, quinto aviso).
+//
+// ACTUALIZADO 2026-09-03 (QC-26): el primer caso afirmaba «no existe ninguna pantalla,
+// pagina ni componente de recetas»; esa era el LIMITE DE ALCANCE de QC-25 -«la pantalla es
+// QC-26»-, no una invariante permanente. QC-26 la trajo, asi que la premisa cayo y el
+// criterio se INVIERTE, no se borra ni se afloja: la pantalla de recetas tiene que existir
+// EXACTAMENTE donde la ubica `FORMULAS_ROUTE` (`@/lib/shared/routes`) -nunca un literal
+// escrito a mano, para que un cambio de ruta futuro mueva esta prueba con el mismo commit
+// que la mueve de verdad- y en NINGUN otro sitio de `app/` ni de `components/`. Lo que
+// seguia protegiendo de verdad ese caso -que no apareciera una ruta HTTP de recetas- ya
+// estaba cubierto por el segundo caso de este archivo y sigue intacto ahi.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+
+import { FORMULAS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -40,13 +52,30 @@ function filesIn(dir: string, pattern: RegExp): readonly string[] {
     .map((entry) => join(entry.parentPath ?? entry.path, entry.name))
 }
 
-describe('alcance de QC-25 (crud-de-recetas): sin pantalla, sin route handler, sin E2E nuevo', () => {
-  it('no existe ninguna pantalla, pagina ni componente de recetas, ni spec E2E nuevo', () => {
-    // R44: la pantalla de recetas es QC-26, no esta feature. Se busca la palabra en la
-    // RUTA COMPLETA (no solo en el nombre del archivo): una carpeta de ruta de Next como
-    // `app/(private)/recetas/page.tsx` delata la feature por el nombre de carpeta, no del
-    // archivo (`page.tsx` es generico).
+describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, solo la de QC-26', () => {
+  it('la pantalla de recetas vive solo donde la declara QC-26, y en ningun otro sitio', () => {
+    // CENTINELA INVERTIDO el 2026-09-03 (QC-26). Hasta hoy este caso afirmaba «no existe
+    // ninguna pantalla, pagina ni componente de recetas»: la pantalla estaba DIFERIDA a
+    // QC-26 (D23). QC-26 es precisamente la ficha que la construye, asi que esa premisa
+    // dejo de ser cierta -mismo trato que recibio `tests/unit/inventario/scope.test.ts`
+    // cuando QC-22 trajo la pantalla del catalogo-.
+    //
+    // Lo que R44 protegia de verdad no era la ausencia: era que la pantalla no apareciera
+    // por goteo, repartida por el repositorio y sin ficha que la respalde. Eso sigue
+    // vigente y es lo que este caso vigila ahora: la carpeta permitida se DERIVA de
+    // `FORMULAS_ROUTE` (nunca de un literal escrito a mano, para que un cambio de ruta
+    // arrastre esta prueba con el mismo commit que la mueve de verdad), la pantalla existe
+    // ahi, y ni `app/` fuera de esa carpeta ni `components/` tienen una sola pieza de
+    // recetas. Un `app/(private)/dashboard/recetas-algo.tsx` o un
+    // `components/recipe-card.tsx` de manana -los dos sin ficha- ponen esto en rojo igual
+    // que antes.
     const screenPattern = /recet|recipe/i
+
+    // `FORMULAS_ROUTE` es '/produccion/formulas': la carpeta real cuelga de `app/(private)`
+    // -el route group no aparece en la URL, pero si en el disco-.
+    const routeSegments = FORMULAS_ROUTE.split('/').filter((segment) => segment.length > 0)
+    const recipesRouteDir = join(repoRoot, 'app', '(private)', ...routeSegments)
+    expect(routeSegments.length, 'FORMULAS_ROUTE no tiene segmentos').toBeGreaterThan(0)
 
     function matchingFiles(dir: string): readonly string[] {
       if (!existsSync(dir)) return []
@@ -56,17 +85,36 @@ describe('alcance de QC-25 (crud-de-recetas): sin pantalla, sin route handler, s
         .filter((absolutePath) => screenPattern.test(absolutePath.slice(dir.length)))
     }
 
+    // La pantalla EXISTE: si alguien la borra, el resto del caso pasaria en verde sobre un
+    // repositorio sin pantalla de recetas, que es justo el falso verde que la inversion
+    // tenia que evitar.
+    expect(existsSync(join(recipesRouteDir, 'page.tsx')), `falta ${join(recipesRouteDir, 'page.tsx')}`).toBe(
+      true,
+    )
+
     const appMatches = matchingFiles(join(repoRoot, 'app'))
+    const fueraDeSuCarpeta = appMatches.filter(
+      (absolutePath) => relative(recipesRouteDir, absolutePath).startsWith(`..${sep}`),
+    )
+    expect(
+      fueraDeSuCarpeta,
+      `pantalla de recetas fuera de ${relative(repoRoot, recipesRouteDir)}/: ${fueraDeSuCarpeta.join(', ')}`,
+    ).toEqual([])
+
     const componentMatches = matchingFiles(join(repoRoot, 'components'))
-    expect(appMatches, `pantalla de recetas encontrada bajo app/: ${appMatches.join(', ')}`).toEqual([])
     expect(
       componentMatches,
       `componente de recetas encontrado bajo components/: ${componentMatches.join(', ')}`,
     ).toEqual([])
 
-    // R44: el E2E de recetas queda diferido a QC-26 (D23), ningun spec nuevo bajo e2e/.
-    const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
-    expect(e2eMatches, `spec E2E de recetas encontrado: ${e2eMatches.join(', ')}`).toEqual([])
+    // R44: el E2E de recetas estaba diferido a QC-26 (D23); esa mitad de la premisa tambien
+    // cayo -QC-26 trajo `e2e/recetas.spec.ts`- y se invierte igual que las dos de arriba: la
+    // lista es CERRADA, un segundo spec de recetas sin ficha pone esto en rojo.
+    const e2eDir = join(repoRoot, 'e2e')
+    const e2eMatches = matchingFiles(e2eDir).map((absolutePath) => relative(e2eDir, absolutePath).split(sep).join('/'))
+    expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
+      'recetas.spec.ts',
+    ])
   })
 
   it('las mutaciones de recetas son Server Actions y no hay ningun route handler bajo app/api', () => {

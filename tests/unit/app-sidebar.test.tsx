@@ -5,16 +5,16 @@ import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import {
   BRAND_LABEL,
-  FORMULAS_ROUTE,
   PRIVATE_NAV_ITEMS,
   PRIVATE_NAV_LABEL,
   INVENTORY_ROUTE,
+  RECIPES_LABEL,
   type NavGroup,
   type NavItem,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
 import * as privateNav from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { DASHBOARD_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/modules/identity';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
@@ -373,6 +373,45 @@ describe('barra lateral privada', () => {
       expect(esperados.has(href as string)).toBe(true);
     }
   });
+
+  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y ya no dice Formulas (R5)', async () => {
+    // R5 — QC-26 T23. El item nace en el barrel `private-nav.ts` (T3) ya migrado; aqui se
+    // afirma sobre el DOM real: un solo item apunta a `FORMULAS_ROUTE`, con el testId nuevo, y
+    // el testId viejo (`nav-produccion-formulas`) ya no existe en ningun sitio del arbol.
+    const user = userEvent.setup();
+
+    const itemsDeRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    ).filter((item) => item.href === FORMULAS_ROUTE);
+
+    // Hay exactamente un item que apunta a la constante: ni cero, ni un duplicado.
+    expect(itemsDeRecetas).toHaveLength(1);
+    const itemRecetas = itemsDeRecetas[0] as NavLink;
+    expect(itemRecetas.testId).toBe('nav-produccion-recetas');
+    expect(itemRecetas.label).toBe(RECIPES_LABEL);
+
+    const grupo = PRIVATE_NAV_ITEMS.find(
+      (item): item is NavGroup =>
+        item.kind === 'group' && item.items.some((hijo) => hijo.href === FORMULAS_ROUTE),
+    );
+    if (!grupo) {
+      throw new Error('ningun grupo de PRIVATE_NAV_ITEMS contiene el item de recetas');
+    }
+
+    renderSidebar();
+
+    await user.click(screen.getByTestId(grupo.testId));
+    await waitFor(() =>
+      expect(screen.getByTestId(grupo.testId)).toHaveAttribute('aria-expanded', 'true'),
+    );
+
+    const enlace = screen.getByTestId('nav-produccion-recetas');
+    expect(enlace).toHaveAttribute('href', FORMULAS_ROUTE);
+    expect(enlace.textContent).not.toContain('Fórmulas');
+
+    // El testId viejo ya no aparece en ningun sitio del arbol renderizado.
+    expect(screen.queryByTestId('nav-produccion-formulas')).toBeNull();
+  });
 });
 
 describe('el borrado de items de relleno (QC-13)', () => {
@@ -426,38 +465,40 @@ describe('el borrado de items de relleno (QC-13)', () => {
     ]);
   });
 
-  it('el grupo nav-produccion conserva un unico hijo, nav-produccion-formulas', () => {
-    // R6
+  it('el grupo nav-produccion conserva un unico hijo: el item de recetas', () => {
+    // R6. La asercion original comparaba contra el literal 'nav-produccion-formulas'. QC-26
+    // (R5) le cambio el testId a 'nav-produccion-recetas', y volver a escribir aqui a mano el
+    // literal nuevo repetiria el mismo error que rompio este test hoy: dos copias sueltas de un
+    // mismo dato que solo una de las dos actualiza. En su lugar se deriva el testId esperado del
+    // propio `PRIVATE_NAV_ITEMS`, localizando el item por `FORMULAS_ROUTE` -la fuente que ya usa
+    // el test de R5 de este archivo-, asi que si alguien vuelve a renombrar el testId, ambos
+    // lados de la comparacion se mueven juntos. Lo que esta ficha (QC-13) garantiza sigue igual:
+    // el grupo tiene exactamente un hijo. Actualizado el 2026-09-03 al resolver el conflicto de
+    // F2.3 (merge con dev).
     const grupoProduccion = PRIVATE_NAV_ITEMS.find(
       (item): item is NavGroup => item.kind === 'group' && item.testId === 'nav-produccion',
     );
     if (!grupoProduccion) {
       throw new Error('PRIVATE_NAV_ITEMS no contiene el grupo nav-produccion');
+    }
+
+    const itemRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    ).find((item) => item.href === FORMULAS_ROUTE);
+    if (!itemRecetas) {
+      throw new Error('PRIVATE_NAV_ITEMS no contiene el item de recetas (FORMULAS_ROUTE)');
     }
 
     expect(grupoProduccion.items).toHaveLength(1);
-    expect(grupoProduccion.items[0]?.testId).toBe('nav-produccion-formulas');
+    expect(grupoProduccion.items[0]?.testId).toBe(itemRecetas.testId);
   });
 
-  it('FORMULAS_ROUTE y su item se conservan intactos: terreno de QC-26', () => {
-    // R4, R14
-    expect(FORMULAS_ROUTE).toBe('/produccion/formulas');
-
-    const grupoProduccion = PRIVATE_NAV_ITEMS.find(
-      (item): item is NavGroup => item.kind === 'group' && item.testId === 'nav-produccion',
-    );
-    if (!grupoProduccion) {
-      throw new Error('PRIVATE_NAV_ITEMS no contiene el grupo nav-produccion');
-    }
-    const hijoFormulas = grupoProduccion.items.find(
-      (hijo) => hijo.testId === 'nav-produccion-formulas',
-    );
-    if (!hijoFormulas) {
-      throw new Error('el grupo nav-produccion no contiene nav-produccion-formulas');
-    }
-
-    expect(hijoFormulas.href).toBe(FORMULAS_ROUTE);
-    expect(hijoFormulas.label).toBe('Fórmulas');
-    expect(hijoFormulas.testId).toBe('nav-produccion-formulas');
-  });
+  // El test «FORMULAS_ROUTE y su item se conservan intactos: terreno de QC-26» vivia aqui y lo
+  // BORRO QC-26 al llegar, no por incomodo: afirmaba `label === 'Formulas'` y
+  // `testId === 'nav-produccion-formulas'`, que son exactamente las dos cosas que esta ficha
+  // cambia por decision cerrada (R5). Su propio titulo lo declaraba: guardaba «terreno de QC-26»
+  // mientras QC-26 no existiera. Lo que protegia -que el item existe, es unico y apunta a la
+  // constante- lo cubre ahora el test de R5 de este mismo archivo, que ademas comprueba que el
+  // item YA NO dice «Formulas». Mantener los dos seria mantener dos versiones contradictorias de
+  // la misma verdad. Decision humana del 2026-09-03, al resolver el conflicto de F2.3.
 });

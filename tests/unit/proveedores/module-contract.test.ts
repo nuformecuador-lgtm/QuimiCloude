@@ -331,7 +331,22 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
     ).toEqual(['lib/composition/index.ts'])
 
     const fuente = read(cablean[0] as string)
-    const bloque = fuente.slice(fuente.indexOf('export const proveedores'))
+    const inicioBloque = fuente.indexOf('export const proveedores')
+    // Acotado al OBJETO de `proveedores`, no al resto del archivo: hasta QC-26 este bloque
+    // era el ultimo de `lib/composition/index.ts`, y `slice(inicioBloque)` sin un limite de
+    // cierre en realidad afirmaba sobre "lo que venga despues de `proveedores`", no sobre
+    // `proveedores` mismo. Al resolver el conflicto de F2.3 el bloque `unidades` de QC-26 quedo
+    // detras del de `proveedores`, y sus claves (`listUnits`) se colaron en `claves`. La
+    // garantia real -nueve claves, ni una mas ni una menos- solo puede sostenerse cerrando el
+    // slice en el `};` que cierra ESTE objeto, la primera linea que empieza por `};` despues del
+    // inicio del bloque. Retensado el 2026-09-03; no reordenar `index.ts` para volver a poner
+    // `proveedores` al final: eso solo traslada la misma trampa a la siguiente feature que
+    // añada un bloque detras.
+    const cierreRelativo = fuente.slice(inicioBloque).search(/^\};$/m)
+    if (cierreRelativo === -1) {
+      throw new Error('no se encontro el cierre `};` del objeto `proveedores` en lib/composition/index.ts')
+    }
+    const bloque = fuente.slice(inicioBloque, inicioBloque + cierreRelativo)
     const claves = [...bloque.matchAll(/^  (\w+):/gm)].map((m) => m[1] as string).sort()
     expect(claves).toEqual([
       'createCatalogLine',
