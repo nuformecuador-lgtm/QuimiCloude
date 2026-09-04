@@ -33,27 +33,52 @@ const WIDE_CALENDAR_MONTHS = 2;
 /** Los tres atajos que R18 exige, mas alla de lo que trae la libreria (decision 6). */
 export type DateShortcutKind = 'lastWeek' | 'lastMonth' | 'lastYear';
 
+/** Ultimo dia del mes indicado: el dia 0 del mes SIGUIENTE es el ultimo del pedido. */
+function lastDayOfMonth(year: number, monthIndex: number): number {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+/**
+ * Resta meses a una fecha **acotando el dia al ultimo del mes destino**.
+ *
+ * `setMonth`/`setFullYear` NO valen aqui: desbordan. `new Date(2026, 2, 31).setMonth(1)` es
+ * "31 de febrero", que JavaScript normaliza a marzo, asi que el 31 de cualquier mes el atajo
+ * devolvia un rango que ni siquiera cubria el mes anterior (el 2026-05-31 daba 2026-05-01, sin
+ * un solo dia de abril). Lo mismo con el 29 de febrero de un bisiesto al restar un año.
+ *
+ * El indice de mes se lleva a una cuenta absoluta antes de repartirlo en año y mes, para que el
+ * cruce de año hacia atras no dependa del signo del resto.
+ */
+function subtractMonthsClamped(date: Date, months: number): Date {
+  const absoluteMonth = date.getFullYear() * 12 + date.getMonth() - months;
+  const targetYear = Math.floor(absoluteMonth / 12);
+  const targetMonth = absoluteMonth - targetYear * 12;
+  const day = Math.min(date.getDate(), lastDayOfMonth(targetYear, targetMonth));
+
+  return new Date(targetYear, targetMonth, day);
+}
+
 /**
  * Calcula el rango `[from, to]` de un atajo con aritmetica nativa de `Date`. `to` es siempre
  * "hoy" a medianoche local; `from` es el resultado de restarle 7 dias, 1 mes o 1 año a esa misma
  * fecha, ambos inclusive. Funcion pura y exportada para poder probarla sin montar nada.
+ *
+ * Restar dias con `setDate` si es seguro -desborda al mes anterior, que es justo lo que se
+ * quiere-; restar meses o años no lo es, y por eso pasa por `subtractMonthsClamped`.
  */
 export function computeDateShortcutRange(
   kind: DateShortcutKind,
   now: Date = new Date(),
 ): { readonly from: Date; readonly to: Date } {
   const to = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const from = new Date(to);
 
   if (kind === 'lastWeek') {
+    const from = new Date(to);
     from.setDate(from.getDate() - 7);
-  } else if (kind === 'lastMonth') {
-    from.setMonth(from.getMonth() - 1);
-  } else {
-    from.setFullYear(from.getFullYear() - 1);
+    return { from, to };
   }
 
-  return { from, to };
+  return { from: subtractMonthsClamped(to, kind === 'lastMonth' ? 1 : 12), to };
 }
 
 /**

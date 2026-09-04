@@ -83,22 +83,96 @@ afterEach(() => {
   resetViewport()
 })
 
+/**
+ * Casos del calculo puro de los atajos (R18).
+ *
+ * **Los valores esperados estan escritos a mano, uno por uno.** La version anterior de este
+ * bloque reimplementaba la formula de la funcion bajo prueba (`setMonth`/`setFullYear`), asi que
+ * confirmaba el bug en vez de encontrarlo: el 31 de cualquier mes, `setMonth` desborda -"31 de
+ * febrero" se normaliza a marzo- y el rango dejaba de cubrir el mes anterior. Un test que repite
+ * la implementacion no verifica nada; solo pregunta si la funcion se parece a si misma.
+ *
+ * Por eso se prueban varias fechas de sistema y no solo una comoda: un 31 en mes corto y en mes
+ * largo, un 29 de febrero bisiesto, y cruces de año hacia atras.
+ */
+const CASOS_ATAJO: readonly {
+  readonly nombre: string
+  readonly hoy: Date
+  readonly kind: DateShortcutKind
+  readonly from: string
+  readonly to: string
+}[] = [
+  // Mitad de mes, año no bisiesto: el caso comodo, el unico que cubria el test anterior.
+  { nombre: 'semana desde mitad de mes', hoy: new Date(2026, 5, 15), kind: 'lastWeek', from: '2026-06-08', to: '2026-06-15' },
+  { nombre: 'mes desde mitad de mes', hoy: new Date(2026, 5, 15), kind: 'lastMonth', from: '2026-05-15', to: '2026-06-15' },
+  { nombre: 'año desde mitad de mes', hoy: new Date(2026, 5, 15), kind: 'lastYear', from: '2025-06-15', to: '2026-06-15' },
+
+  // Un 31 cuyo mes anterior tiene 28 dias: el 2026-02-31 no existe, se acota al 28.
+  { nombre: 'mes desde el 31 de marzo (febrero tiene 28)', hoy: new Date(2026, 2, 31), kind: 'lastMonth', from: '2026-02-28', to: '2026-03-31' },
+  // Un 31 cuyo mes anterior tiene 30: antes daba 2026-05-01 y NO cubria abril en absoluto.
+  { nombre: 'mes desde el 31 de mayo (abril tiene 30)', hoy: new Date(2026, 4, 31), kind: 'lastMonth', from: '2026-04-30', to: '2026-05-31' },
+  // Un 31 en mes largo hacia otro mes largo: no se acota nada.
+  { nombre: 'mes desde el 31 de enero (diciembre tiene 31)', hoy: new Date(2026, 0, 31), kind: 'lastMonth', from: '2025-12-31', to: '2026-01-31' },
+  // 29 de febrero de un bisiesto: el año destino no lo es.
+  { nombre: 'año desde el 29 de febrero de un bisiesto', hoy: new Date(2028, 1, 29), kind: 'lastYear', from: '2027-02-28', to: '2028-02-29' },
+  { nombre: 'mes desde el 29 de febrero de un bisiesto', hoy: new Date(2028, 1, 29), kind: 'lastMonth', from: '2028-01-29', to: '2028-02-29' },
+
+  // Cruces de año hacia atras: el indice de mes se vuelve negativo si se calcula a la ligera.
+  { nombre: 'mes desde el 1 de enero', hoy: new Date(2026, 0, 1), kind: 'lastMonth', from: '2025-12-01', to: '2026-01-01' },
+  { nombre: 'semana desde el 1 de enero', hoy: new Date(2026, 0, 1), kind: 'lastWeek', from: '2025-12-25', to: '2026-01-01' },
+  { nombre: 'año desde el 1 de enero', hoy: new Date(2026, 0, 1), kind: 'lastYear', from: '2025-01-01', to: '2026-01-01' },
+]
+
 describe('DataTableFilterDate: calculo puro de los atajos (sin montar nada)', () => {
-  const casos: { readonly kind: DateShortcutKind; readonly restar: (d: Date) => void }[] = [
-    { kind: 'lastWeek', restar: (d) => d.setDate(d.getDate() - 7) },
-    { kind: 'lastMonth', restar: (d) => d.setMonth(d.getMonth() - 1) },
-    { kind: 'lastYear', restar: (d) => d.setFullYear(d.getFullYear() - 1) },
-  ]
+  it.each(CASOS_ATAJO)(
+    'el atajo de $nombre va de $from a $to, ambos inclusive',
+    ({ hoy, kind, from, to }) => {
+      const rango = computeDateShortcutRange(kind, hoy)
 
-  it.each(casos)('el atajo "$kind" va desde hoy menos el periodo hasta hoy, ambos inclusive', ({ kind, restar }) => {
-    const to = new Date(SYSTEM_DATE.getFullYear(), SYSTEM_DATE.getMonth(), SYSTEM_DATE.getDate())
-    const from = new Date(to)
-    restar(from)
+      expect(formatDateLocalISO(rango.from)).toBe(from)
+      expect(formatDateLocalISO(rango.to)).toBe(to)
+    },
+  )
 
-    const rango = computeDateShortcutRange(kind, SYSTEM_DATE)
+  it('el fin del rango es siempre el dia de hoy, sin arrastrar la hora', () => {
+    const conHora = new Date(2026, 4, 31, 23, 47, 12)
 
-    expect(formatDateLocalISO(rango.from)).toBe(formatDateLocalISO(from))
-    expect(formatDateLocalISO(rango.to)).toBe(formatDateLocalISO(to))
+    const rango = computeDateShortcutRange('lastMonth', conHora)
+
+    expect(formatDateLocalISO(rango.to)).toBe('2026-05-31')
+    expect(rango.to.getHours()).toBe(0)
+    expect(rango.to.getMinutes()).toBe(0)
+  })
+
+  it('el inicio del rango nunca cae DESPUES del fin, ni siquiera en los dias 29, 30 y 31', () => {
+    // Barrido: para cada dia 28..31 de cada mes de dos años -uno bisiesto-, el rango tiene que
+    // ser un intervalo valido y quedarse dentro del periodo pedido. Es la red que atrapa el
+    // desborde de `setMonth` en cualquier combinacion, no solo en las escritas arriba.
+    for (const year of [2027, 2028]) {
+      for (let month = 0; month < 12; month += 1) {
+        for (const day of [28, 29, 30, 31]) {
+          const hoy = new Date(year, month, day)
+          // `new Date` normaliza un dia inexistente (p. ej. 31 de abril): se descarta.
+          if (hoy.getMonth() !== month) continue
+
+          for (const kind of ['lastWeek', 'lastMonth', 'lastYear'] as const) {
+            const { from, to } = computeDateShortcutRange(kind, hoy)
+
+            expect(from.getTime()).toBeLessThan(to.getTime())
+
+            if (kind === 'lastMonth') {
+              // El inicio cae en el mes inmediatamente anterior, nunca en el mismo mes.
+              const mesesAtras = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth())
+              expect(mesesAtras).toBe(1)
+            }
+
+            if (kind === 'lastYear') {
+              expect(to.getFullYear() - from.getFullYear()).toBe(1)
+            }
+          }
+        }
+      }
+    }
   })
 })
 

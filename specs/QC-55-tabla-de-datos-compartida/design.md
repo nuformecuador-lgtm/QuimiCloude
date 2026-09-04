@@ -168,11 +168,30 @@ sabe si el usuario puede crear (R30). Recibe un nodo ya decidido por la pantalla
 componente declara una constante exportada con la lista, que es lo que hace R32 verificable:
 
 ```ts
-export const DATA_TABLE_FEATURES = [
-  columnPinningFeature,   // R23, R24 — getIsPinned / getStart / ColumnPinningState
-  rowSortingFeature,      // R12, R14 — onSortingChange, estado de orden en la cabecera
+export const DATA_TABLE_OPTED_FEATURES = [
+  'columnPinningFeature',  // R23, R24 — getIsPinned / getCanPin / ColumnPinningState
+  'columnSizingFeature',   // R24 — getStart() / getAfter(): los offsets acumulados del pineo
+  'rowSortingFeature',     // R12, R14 — onSortingChange, estado de orden en la cabecera
 ] as const;
 ```
+
+> **CORRECCIÓN, escrita en la implementación (2026-09-04): son TRES capacidades, no dos.**
+>
+> Esta sección listaba solo `columnPinningFeature` y `rowSortingFeature`, dando por hecho que
+> `getStart()` —el mecanismo que **§5 manda usar** para calcular el desplazamiento de una columna
+> fijada— lo aportaba el pineo. **No es así en v9.** Verificado en el paquete instalado
+> (`@tanstack/table-core@9.2.4`): `column_getStart` y `column_getAfter` se registran en
+> `features/column-sizing/columnSizingFeature.js`, mientras que `columnPinningFeature.js` solo
+> aporta `getIsPinned`, `getCanPin` y `getPinnedIndex`. `columnSizingFeature` es el
+> **prerrequisito** del pineo para offsets, no una capacidad de más.
+>
+> Sin él solo quedan dos salidas, y las dos son peores: cablear a mano un ancho fijo por columna
+> —que es justo el «reimplementar lo que la librería ya hace» que §10 B descarta, y que además
+> miente en cuanto dos columnas midan distinto— o no cumplir R24. **Registrarlo es lo que cumple
+> R24 por el mecanismo que este mismo diseño pide.**
+>
+> **R32 se sigue cumpliendo**: se optan solo las capacidades que la ficha usa, no el conjunto
+> completo. El test de R32 nombra las **catorce** que quedan fuera.
 
 Y los tres modos manuales, que son lo que hace que la librería **no toque los datos** (R13):
 
@@ -181,8 +200,9 @@ manualSorting: true, manualPagination: true, manualFiltering: true,
 ```
 
 **No** se activan las capacidades de agrupación, expansión, selección de filas, visibilidad,
-reordenación ni redimensionado de columnas: ninguna la pide esta ficha, y activarlas es peso y
-superficie de API que nadie usa. Cuando una feature futura las necesite, se añade a la lista.
+reordenación ni **redimensionado interactivo** de columnas (`columnResizingFeature`, que es otra
+cosa que `columnSizingFeature`): ninguna la pide esta ficha, y activarlas es peso y superficie de
+API que nadie usa. Cuando una feature futura las necesite, se añade a la lista.
 
 `manualPagination` merece énfasis: el backend ya devuelve `totalPages` (`buildPage` de
 `lib/shared/pagination.ts`) y la tabla **no** debe recalcularlo sobre las filas que tiene, que son
@@ -235,16 +255,45 @@ genera `components/ui/calendar.tsx` ya tematizado contra QC-29. En `mode="range"
 
 **Los atajos no existen en la librería** (verificado en la decisión 13: no hay ninguna prop de
 atajos). Se escriben aquí: tres botones que calculan el rango y lo fijan en el calendario
-controlado. El cálculo usa **`date-fns`** (`subWeeks`, `subMonths`, `subYears`), que según la
-decisión 6 **ya viaja con `react-day-picker`** y según la decisión 14 es **transitiva y no lleva
-fila** en `docs/dependencias.md`. Se prefiere a escribir aritmética de fechas a mano por
-`docs/architecture.md > Dependencias de terceros` («no reimplementes lo que ya resuelve una
-librería mantenida»).
+controlado. El cálculo **iba a usar `date-fns`** (`subWeeks`, `subMonths`, `subYears`), que según
+la decisión 6 **ya viaja con `react-day-picker`** y según la decisión 14 es **transitiva y no
+lleva fila** en `docs/dependencias.md`, por `docs/architecture.md > Dependencias de terceros`
+(«no reimplementes lo que ya resuelve una librería mantenida»).
 
-> **Riesgo anotado, no oculto:** importar una transitiva es frágil — si una versión de
-> `react-day-picker` dejara de depender de `date-fns`, el import se rompe. La salida es barata y
-> está identificada: promover `date-fns` a dependencia directa con su fila y sus cuatro checks. No
-> se hace hoy porque la decisión 14 ya cerró que no lleva fila.
+> **CORRECCIÓN, escrita en la implementación (2026-09-04). No se usa `date-fns`: los atajos
+> llevan aritmética nativa de `Date`.**
+>
+> El plan de arriba **no es ejecutable en este repo**, y el motivo no se descubre hasta intentarlo:
+> **pnpm aísla las dependencias por defecto**. Una transitiva vive bajo `node_modules/.pnpm/` y
+> **no** se enlaza en `node_modules/` raíz, así que un `import … from 'date-fns'` escrito en
+> código nuestro **no resuelve** — no es que sea frágil, es que no compila. La única forma de
+> importarla sería declararla como dependencia **directa**, y eso choca de frente con **R31**, que
+> prohíbe expresamente «incorporar ninguna otra entrada directa nueva en el manifiesto» y que la
+> guardia `guard-dependencias-aprobadas.test.ts` hace cumplir.
+>
+> Entre las dos, **manda R31**: es un requisito aprobado, y esta sección §6.1 es un «cómo».
+> El coste es acotado y está aislado: el cálculo vive en **una función pura y exportada**
+> (`computeDateShortcutRange` en `data-table-filter-date.tsx`), no esparcido por el componente.
+>
+> **La aritmética de fechas a mano tiene una trampa concreta y ya mordió una vez:**
+> `setMonth`/`setFullYear` **desbordan**. `new Date(2026, 2, 31).setMonth(1)` es «31 de febrero»,
+> que JavaScript normaliza a **marzo**, así que el día 31 de cualquier mes el atajo devolvía un
+> rango que ni siquiera cubría el mes anterior (el 2026-05-31 daba `from = 2026-05-01`, sin un
+> solo día de abril), y el 29 de febrero de un bisiesto pasaba lo mismo al restar un año. La
+> salida es **acotar el día al último del mes destino** antes de construir la fecha. Los valores
+> esperados de su test se escriben **a mano, uno por uno** —nunca reimplementando la fórmula, que
+> es como el bug sobrevivió a la primera ronda— y cubren un 31 en mes corto y en mes largo, un
+> 29-feb bisiesto y los cruces de año.
+>
+> **La salida sigue identificada** si algún día se quiere la librería: promover `date-fns` a
+> dependencia directa con su fila y sus cuatro checks, lo que exige aprobación humana (regla 7) y
+> reabrir R31.
+
+> **Riesgo anotado antes de implementar, y que resultó ser peor de lo previsto:** importar una
+> transitiva se anotó aquí como *frágil* —si una versión de `react-day-picker` dejara de depender
+> de `date-fns`, el import se rompe—. Al implementarlo se vio que con pnpm **ni siquiera resuelve
+> hoy**, no en una versión futura. Queda como está escrito para dejar constancia de que el riesgo
+> se había visto y se había subestimado; lo que se hizo es la corrección de arriba.
 
 ## 7. Los tres estados (R19, R20, R21, R22)
 

@@ -86,7 +86,7 @@ describe('DataTable: consumible desde un envoltorio de cliente sin serializar na
     const columns: readonly DataTableColumn<Producto>[] = [
       { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => <span data-testid={`celda-${row.id}`}>{row.nombre}</span> },
     ]
-    const handleParamsChange = (_next: DataTableParams) => {
+    const handleParamsChange = () => {
       // Manejador de cliente de verdad, no una prop serializada.
     }
 

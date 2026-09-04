@@ -157,7 +157,7 @@ requisitos tienen al menos un test nombrado.**
 | R15 | `data-table-filters.test.tsx`: la columna sin filter NO aparece en la barra, en negativo; las columnas con filter si aparecen, una por forma; los cuatro casos de forma -texto, rango numerico, seleccion y rango de fechas- |
 | R16 | `data-table-filters.test.tsx`: el boton de limpiar de un filtro activo saca su clave del objeto; limpiar un filtro no toca los demas filtros activos. `data-table-params.test.ts`: limpiar un filtro con null lo SACA del objeto en vez de emitirlo vacio |
 | R17 | `data-table-filters.test.tsx`: escribir en la busqueda emite el campo global con rebote. `data-table-params.test.ts`: cambiar la busqueda por texto emite el campo global sin tocar los filtros |
-| R18 | `data-table-filter-date.test.tsx`: un caso por atajo -ultima semana, ultimo mes, ultimo ano- con la fecha del sistema fijada; el rango del atajo activado queda seleccionado y visible en el calendario; elegir dos dias en el calendario controlado emite el rango completo. `data-table-viewport.test.tsx`: se abre y un atajo emite su rango, en 375 y en 1280 |
+| R18 | `data-table-filter-date.test.tsx`: **once casos de calculo con valores esperados escritos a mano** -un 31 hacia febrero, un 31 hacia un mes de 30, un 31 hacia otro de 31, un 29-feb bisiesto por mes y por año, tres cruces de año hacia atras y los tres desde mitad de mes-; el fin del rango es hoy sin arrastrar hora; un barrido de los dias 28 a 31 de los 24 meses de 2027 y 2028 que exige que el intervalo sea valido y caiga en el periodo pedido; el rango del atajo activado queda seleccionado y visible en el calendario; elegir dos dias en el calendario controlado emite el rango completo. `data-table-viewport.test.tsx`: se abre y un atajo emite su rango, en 375 y en 1280 |
 | R19 | `data-table-states.test.tsx`: el estado vacio se identifica por su data-testid propio; pinta el emptyAction opcional cuando la pantalla lo entrega. `data-table.test.tsx`: vacio, sin filas y sin carga ni error, estado vacio identificable |
 | R20 | `data-table-states.test.tsx`: se identifica por su data-testid propio y pinta filas de esqueleto. `data-table.test.tsx`: loading, indicador de carga, con las barras visibles |
 | R21 | `data-table-states.test.tsx`: se identifica por role alert; con status error NO se renderiza el estado vacio; los cuatro casos del helper de precedencia. `data-table.test.tsx`: error, role alert, sin filas, sin barras |
@@ -265,3 +265,129 @@ EXIT=0
 
 Hechas: T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T14, T15.
 Pendiente: **T13**, bloqueada por falta de dispositivo, ver arriba.
+
+---
+
+# Segunda vuelta: correcciones del rechazo del reviewer (2026-09-04)
+
+El `reviewer` RECHAZO la feature. Su veredicto esta en
+`progress/review_QC-55-tabla-de-datos-compartida.md`. Reprodujo el gate por su cuenta, confirmo que
+el mapa `R<n> -> test` es fiel y que 35 de 36 requisitos tenian test que verifica de verdad. Lo
+corregido, punto por punto:
+
+## B2 (bloqueante) — `computeDateShortcutRange` calculaba mal, y su test no podia verlo
+
+**El bug era real y estaba en produccion.** `data-table-filter-date.tsx` restaba meses y años con
+`setMonth`/`setFullYear`, que **desbordan**: `new Date(2026, 2, 31).setMonth(1)` es «31 de
+febrero», que JavaScript normaliza a marzo. **El dia 31 de cualquier mes el atajo estaba roto.**
+Reproducido con el codigo tal como estaba, y son los tres numeros que dio el reviewer:
+
+| Atajo | Hoy | Daba | Debia dar |
+| --- | --- | --- | --- |
+| Ultimo mes | 2026-03-31 | `2026-03-03` | `2026-02-28` |
+| Ultimo mes | 2026-05-31 | `2026-05-01` -no cubria **ni un dia** de abril- | `2026-04-30` |
+| Ultimo año | 2028-02-29 | `2027-03-01` | `2027-02-28` |
+
+**Arreglo.** Restar dias con `setDate` sigue siendo seguro -desbordar al mes anterior es justo lo
+que se quiere-, pero restar meses o años pasa ahora por `subtractMonthsClamped`, que **acota el
+dia al ultimo del mes destino** antes de construir la fecha, y que lleva el indice de mes a una
+cuenta absoluta -`año * 12 + mes`- para que el cruce de año hacia atras no dependa del signo del
+resto. `lastYear` es el mismo camino con 12 meses, asi que el 29-feb queda cubierto por la misma
+linea que el 31.
+
+**Por que el test no lo veia, y como se arreglo.** Las dos razones que dio el reviewer eran
+correctas y las dos estaban en el mismo bloque:
+
+1. **Reimplementaba la formula bajo prueba** (`restar: (d) => d.setMonth(d.getMonth() - 1)`), asi
+   que confirmaba el bug en vez de encontrarlo. Un test que repite la implementacion no verifica
+   nada: solo pregunta si la funcion se parece a si misma. Sustituido por **valores esperados
+   literales, escritos a mano uno por uno**.
+2. **Probaba una sola fecha de sistema**, `2026-06-15` — mitad de mes y año no bisiesto, el unico
+   caso que pasaba por casualidad. Ahora son **once casos** con las fechas que muerden: los tres
+   31 (hacia febrero, hacia un mes de 30 y hacia otro de 31), el 29-feb de un bisiesto por mes y
+   por año, y tres cruces de año hacia atras desde el 1 de enero.
+
+Ademas se añadieron dos tests que el reviewer no pidio pero que cierran el hueco de raiz:
+- el fin del rango es siempre hoy **sin arrastrar la hora** (se le pasa una fecha con 23:47:12);
+- un **barrido** de los dias 28, 29, 30 y 31 de los 24 meses de 2027 y 2028 -uno bisiesto- que
+  exige, para los tres atajos, que `from < to` y que el salto sea exactamente de un mes o de un
+  año. Esa es la red que atrapa el desborde en cualquier combinacion, no solo en las escritas.
+
+**Comprobado que el test MUERDE.** Se reintrodujo a proposito la aritmetica con
+`setMonth`/`setFullYear` y se corrio el archivo: **4 tests en rojo**, con los tres numeros exactos
+del reviewer y el barrido cayendo al mismo tiempo.
+
+```
+× el atajo de 'mes desde el 31 de marzo (febrero tie…' va de '2026-02-28' a '2026-03-31'
+× el atajo de 'mes desde el 31 de mayo (abril tiene …' va de '2026-04-30' a '2026-05-31'
+× el atajo de 'año desde el 29 de febrero de un bisi…' va de '2027-02-28' a '2028-02-29'
+× el inicio del rango nunca cae DESPUES del fin, ni siquiera en los dias 29, 30 y 31
+
+AssertionError: expected '2026-03-03' to be '2026-02-28'
+AssertionError: expected '2026-05-01' to be '2026-04-30'
+AssertionError: expected '2027-03-01' to be '2027-02-28'
+AssertionError: expected +0 to be 1
+
+Tests  4 failed | 15 passed (19)
+```
+
+Restaurada la version corregida: **19 passed (19)**. Con esto **R18 pasa a tener test que
+verifica de verdad**, y los 36 requisitos quedan cubiertos.
+
+Se mantiene la premisa de **no usar `date-fns`**, que el reviewer valido de forma independiente
+(no existe `node_modules/date-fns`, solo bajo `.pnpm/`).
+
+## M1 (mayor) — la desviacion de `design.md > 6.1` vivia solo aqui
+
+`docs/architecture.md` exige que el porque de apartarse del diseño este **en el `design.md`**, no
+en `progress/`. Añadido alli, en §6.1, un bloque de correccion fechado que explica que pnpm aisla
+las transitivas —asi que el import ni siquiera resuelve, no es que sea «fragil»—, que hacerla
+directa choca con R31, que entre las dos manda R31 por ser requisito frente a un «como», y que la
+salida sigue identificada si algun dia se quiere la libreria. Se documenta ahi tambien la trampa
+del desborde de `setMonth` y la regla de que los esperados del test se escriben a mano. El parrafo
+de «Riesgo anotado, no oculto» que ya existia se deja, anotando que el riesgo se habia visto y se
+habia **subestimado**.
+
+## M2 (mayor) — dos documentos decian «dos capacidades» y el codigo registra tres
+
+El reviewer **confirmo la afirmacion contra el paquete instalado**: en
+`@tanstack/table-core@9.2.4`, `column_getStart` y `column_getAfter` se registran en
+`columnSizingFeature.js`, y `columnPinningFeature.js` solo aporta `getIsPinned`, `getCanPin` y
+`getPinnedIndex`. **El codigo estaba bien; el incompleto era el diseño.** Corregidos los dos
+sitios que quedaban mintiendo:
+
+- **`design.md > 4`**: la lista pasa a las tres capacidades, con un bloque de correccion fechado
+  que explica que `columnSizingFeature` es el **prerrequisito** que aporta `getStart()` —el
+  mecanismo que §5 manda usar— y no una capacidad de mas, que sin el solo quedan dos salidas
+  peores (cablear un ancho fijo, que es lo que §10 B descarta, o incumplir R24), y que R32 se
+  sigue cumpliendo. Aclarado ademas que lo que sigue fuera es `columnResizingFeature`, el
+  redimensionado **interactivo**, que es otra cosa que `columnSizingFeature`.
+- **la fila de `@tanstack/react-table` en `docs/dependencias.md`**: misma correccion, con la
+  verificacion contra el paquete instalado citada.
+
+## Lo que NO se toco, por instruccion del leader
+
+- **T13** (comprobacion manual del `sticky` en iOS): el reviewer dictamino que no es exigible
+  aqui, pero que solo el humano puede trasladarla por escrito. Sigue en su mesa y sigue `[ ]`.
+- **La edicion del import de `cn` en `calendar.tsx` y `popover.tsx`**: dictaminada **aceptable**
+  por el reviewer, que verifico que `components.json` declara `"utils": "@/lib/utils"` y que los
+  otros 16 archivos de `components/ui/` importan igual. Entre la regla 7 y «ninguna primitiva se
+  edita a mano», gana la regla 7. Pendiente solo de ratificacion humana escrita.
+
+## Gate tras las correcciones
+
+```
+$ ./init.sh
+ Test Files  152 passed (152)
+      Tests  1704 passed (1704)
+
+tests: sin rojos nuevos
+== init OK ==
+
+EXIT=0
+```
+
+`typecheck` limpio, `lint` **0 errores y 0 warnings** -de paso se limpio el unico warning propio
+que quedaba, un parametro sin usar en `data-table-contrato.test.tsx`-. Diez tests mas que en la
+primera vuelta: el bloque de atajos pasa de 3 casos generados por la propia formula a 11 escritos
+a mano, mas los dos de red -hora y barrido de los dias 28 a 31-.
