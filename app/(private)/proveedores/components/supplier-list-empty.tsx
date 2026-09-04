@@ -8,8 +8,8 @@ type SupplierListEmptyProps = {
   /**
    * Accion de crear el primer proveedor (R16). Llega como slot desde `SupplierListSection` —un
    * Server Component— en vez de importarse aqui: asi el estado vacio no conoce el panel lateral
-   * y sigue sin frontera de cliente. **El panel lo monta T8**; hasta entonces el slot llega
-   * vacio y este componente no inventa un boton que no lleve a ninguna parte.
+   * y sigue sin frontera de cliente. **El panel lo monta `SupplierSheet`** (T8), y la seccion
+   * es quien lo pasa: este componente no conoce el panel ni la operacion de alta.
    */
   readonly children?: ReactNode;
   /**

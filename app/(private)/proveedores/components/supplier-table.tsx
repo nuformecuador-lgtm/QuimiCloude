@@ -11,7 +11,9 @@ import {
 import type { SupplierView } from '@/lib/modules/proveedores';
 import { supplierDetailRoute } from '@/lib/shared/routes';
 
+import { DeleteSupplierDialog } from './delete-supplier-dialog';
 import { SUPPLIER_COLUMNS } from './supplier-columns';
+import { SupplierSheet } from './supplier-sheet';
 
 /**
  * Tabla de la lista de proveedores (R13, R14, R15, `design.md > 5.3`).
@@ -34,11 +36,15 @@ import { SUPPLIER_COLUMNS } from './supplier-columns';
  * edita el primitivo (R44) ni se anade columna pegajosa: `position: sticky` horizontal se
  * comporta distinto en WebKit.
  *
- * **La columna final de acciones de fila —editar y dar de baja— la anaden T8 y T9**, que son las
- * tasks que construyen el panel lateral y el dialogo de confirmacion. Hoy la unica accion de
- * fila que existe es la navegacion al detalle, y se declara donde va a quedarse; no se pinta una
- * columna «Acciones» vacia que prometa controles que todavia no hay.
+ * **La columna final de acciones de fila —editar y dar de baja— la anaden T8 y T9**, y ya esta:
+ * cada accion es un componente de cliente independiente con su propio disparador y su propio
+ * estado de apertura, asi que la tabla no coordina cual fila esta abierta y sigue sin frontera
+ * de cliente propia. Las acciones son **siempre visibles** —nada de revelarlas con `:hover`, que
+ * en tactil no existe (R48)— y se alcanzan con el scroll de la propia tabla.
  */
+
+/** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
+export const ACTIONS_COLUMN_LABEL = 'Acciones';
 
 /** Clase de area tactil minima de R48 (44x44 px). Los primitivos miden 32 px de alto por defecto. */
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -58,6 +64,9 @@ export function SupplierTable({ suppliers }: { readonly suppliers: readonly Supp
               {column.label}
             </TableHead>
           ))}
+          <TableHead scope="col" data-testid="supplier-column-actions" className="text-right">
+            {ACTIONS_COLUMN_LABEL}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -83,6 +92,12 @@ export function SupplierTable({ suppliers }: { readonly suppliers: readonly Supp
                 )}
               </TableCell>
             ))}
+            <TableCell className="text-right" data-testid="supplier-cell-actions">
+              <div className="flex justify-end gap-1">
+                <SupplierSheet supplier={supplier} />
+                <DeleteSupplierDialog supplier={supplier} />
+              </div>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

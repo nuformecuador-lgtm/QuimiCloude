@@ -6,6 +6,7 @@ import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-na
 import {
   parseSupplierListParams,
   SupplierListSection,
+  SupplierSheet,
   SupplierTableSkeleton,
   type SupplierListSearchParams,
 } from './components';
@@ -41,8 +42,9 @@ export const metadata: Metadata = {
  * **Aqui no se decide ningun permiso** (R7): el corte de ruta lo hace el middleware con la regla
  * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `proveedores`.
  *
- * **El disparador del alta (`<SupplierSheet />`) lo anade T8** junto al titulo: es la task que
- * construye el panel lateral, y adelantarlo aqui seria un boton sin nada detras.
+ * **El disparador del alta (`<SupplierSheet />`) va junto al titulo** (T8): es un componente de
+ * cliente con su propio estado de apertura, asi que esta pagina sigue siendo un Server Component
+ * y no necesita saber si el panel esta abierto.
  */
 export default async function ProveedoresPage({
   searchParams,
@@ -57,6 +59,7 @@ export default async function ProveedoresPage({
         <h1 data-testid="proveedores-title" className="text-2xl font-semibold">
           {SUPPLIERS_LABEL}
         </h1>
+        <SupplierSheet />
       </div>
       <Suspense key={`${page}-${pageSize}`} fallback={<SupplierTableSkeleton rows={pageSize} />}>
         <SupplierListSection page={page} pageSize={pageSize} />

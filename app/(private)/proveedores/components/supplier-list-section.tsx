@@ -5,6 +5,7 @@ import { SupplierListEmpty } from './supplier-list-empty';
 import { SupplierListError } from './supplier-list-error';
 import { buildSupplierListQuery, type SupplierPageSize } from './supplier-list-params';
 import { SupplierListToolbar } from './supplier-list-toolbar';
+import { SupplierSheet } from './supplier-sheet';
 import { SupplierTable } from './supplier-table';
 
 /** La primera pagina, a la que vuelve el estado vacio cuando la pedida se quedo atras. */
@@ -48,8 +49,9 @@ export async function SupplierListSection({ page, pageSize }: SupplierListSectio
   const { items, page: currentPage, totalPages } = result.data;
 
   if (items.length === 0) {
-    // El slot de «crear el primer proveedor» (R16) lo llena T8 con `<SupplierSheet />`, que es
-    // la task que construye el panel lateral. No se adelanta aqui un boton sin panel detras.
+    // El slot de «crear el primer proveedor» (R16) lo llena `<SupplierSheet />` (T8): es la
+    // unica accion util cuando no hay ni un proveedor, y desde aqui baja como `children` para
+    // que el estado vacio no tenga que conocer el panel lateral.
     return (
       <SupplierListEmpty
         firstPageHref={
@@ -57,7 +59,9 @@ export async function SupplierListSection({ page, pageSize }: SupplierListSectio
             ? `${SUPPLIERS_ROUTE}?${buildSupplierListQuery({ page: FIRST_PAGE, pageSize })}`
             : undefined
         }
-      />
+      >
+        <SupplierSheet />
+      </SupplierListEmpty>
     );
   }
 

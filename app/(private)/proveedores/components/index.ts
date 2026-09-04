@@ -3,12 +3,15 @@
 //
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
+export { DeleteSupplierDialog } from './delete-supplier-dialog';
 export {
   EMPTY_CELL,
   SUPPLIER_COLUMNS,
   type SupplierColumn,
   type SupplierColumnKey,
 } from './supplier-columns';
+export { SupplierField } from './supplier-field';
+export { SupplierForm } from './supplier-form';
 export { SupplierListEmpty } from './supplier-list-empty';
 export { SupplierListError } from './supplier-list-error';
 export {
@@ -23,5 +26,6 @@ export {
 } from './supplier-list-params';
 export { SupplierListSection } from './supplier-list-section';
 export { SupplierListToolbar } from './supplier-list-toolbar';
-export { SupplierTable } from './supplier-table';
+export { SupplierSheet } from './supplier-sheet';
+export { ACTIONS_COLUMN_LABEL, SupplierTable } from './supplier-table';
 export { SupplierTableSkeleton } from './supplier-table-skeleton';
