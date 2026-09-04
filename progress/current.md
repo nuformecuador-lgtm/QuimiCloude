@@ -15,6 +15,7 @@
 | QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | in_progress | feature/QC-52-separar-producto-de-catalogo-de-proveedor | PR #32 abierto, esperando merge humano (F2.5) |
 | QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
 | QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-44 | pantalla-de-proveedores | Proveedores | frontend | spec_ready | feature/QC-44-pantalla-de-proveedores | esperando aprobación humana del spec (F1.4) |
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia

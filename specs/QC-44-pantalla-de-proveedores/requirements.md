@@ -28,7 +28,254 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> **Glosario mínimo.** **Pantalla de proveedores**: la página de lista que esta ficha crea, servida
+> en la URL que declara la constante de ruta de proveedores. **Página de detalle**: la página del
+> proveedor concreto, servida en la ruta derivada de esa misma constante. **Layout privado**: el
+> armazón de QC-11 (sidebar + cabecera + `<main>`) que envuelve todo `app/(private)/`; se hereda
+> montado. **Panel lateral**: el `sheet` donde ocurren el alta y la edición. **Línea de catálogo**:
+> la fila del catálogo de un proveedor en su forma post-QC-52 —nombre propio, presentación
+> obligatoria, unidad opcional, costo, mínimo de compra, tiempo de entrega y ruta de imagen—, **sin
+> ninguna referencia a un artículo del inventario**. **Los siete campos de negocio de la línea**:
+> los que declara `CatalogLineFields`. **Operaciones de proveedores**: las nueve Server Actions que
+> QC-43 expone y QC-52 reforma (`listSuppliersAction`, `getSupplierAction`, `createSupplierAction`,
+> `updateSupplierAction`, `deleteSupplierAction`, `listCatalogLinesAction`,
+> `createCatalogLineAction`, `updateCatalogLineAction`, `deleteCatalogLineAction`). **Las dos listas
+> paginadas**: la de proveedores y la del catálogo de un proveedor.
+
+### Ruta, navegación y protección
+
+**R1** — El sistema DEBE exponer la pantalla de proveedores en la URL que declara la constante de
+ruta de proveedores, dentro del grupo de rutas privadas, de modo que se renderice **envuelta por el
+layout privado existente** y sin declarar ningún armazón propio (no DEBE declarar un landmark
+principal propio).
+
+**R2** — La URL de la pantalla DEBE estar declarada en **una sola** constante exportada del módulo
+de rutas compartidas —no en el módulo de navegación—, y todo consumidor —el ítem de navegación, la
+lista de prefijos privados, la regla ruta→rol y cualquier destino de navegación de las dos
+pantallas— DEBE derivarse de esa misma constante. Ningún archivo de producto DEBE incrustar esa URL
+como literal.
+
+**R3** — El sistema DEBE exponer la ruta de la página de detalle mediante un **helper exportado que
+la derive** de la constante de R2 a partir del identificador del proveedor. Todo enlace o
+navegación hacia el detalle DEBE construirse con ese helper, y ningún archivo de producto DEBE
+incrustar la URL de detalle como literal.
+
+**R4** — La navegación privada DEBE incluir un ítem **de nivel superior** en la sección «Cadena»
+cuyo destino sea la constante de R2.
+
+**R5** — La URL de la pantalla de proveedores DEBE quedar cubierta por la lista declarada de
+prefijos de ruta privada, de modo que tanto la lista como la página de detalle exijan sesión válida
+y una petición sin ella sea redirigida al login antes de renderizarlas.
+
+**R6** — El sistema DEBE declarar una regla ruta→rol que restrinja el prefijo de proveedores al rol
+Administrador. MIENTRAS la sesión tenga un rol distinto de Administrador, el sistema DEBE
+redirigirla fuera de la lista y del detalle sin renderizar su contenido; MIENTRAS la sesión tenga el
+rol Administrador, DEBE permitir el acceso a ambas.
+
+**R7** — Ninguna de las dos pantallas DEBE tomar decisiones de autorización sobre los datos ni
+repetir las que ya toman las operaciones de proveedores: toda lectura y toda escritura DEBEN pasar
+por esas operaciones. SI una operación responde con un error de autorización, ENTONCES el sistema
+DEBE presentar ese error y NO DEBE mostrar ningún dato de proveedores ni de catálogo.
+
+### Las dos listas paginadas (reglas comunes)
+
+**R8** — Cada una de las dos listas paginadas DEBE ofrecer un selector de tamaño de página con
+exactamente dos opciones, 10 y 25, y DEBE usar 10 cuando no se indique ninguno. CUANDO el usuario
+cambie el tamaño de página, el sistema DEBE recargar esa lista con el nuevo tamaño.
+
+**R9** — CUANDO existan más elementos de los que caben en una página, cada lista paginada DEBE
+permitir avanzar y retroceder de página e indicar la página actual y el total de páginas.
+
+**R10** — SI los parámetros de paginación recibidos por cualquiera de las dos listas son inválidos,
+están fuera de rango o exceden el tope soportado, ENTONCES el sistema DEBE acotarlos a valores
+válidos y presentar la lista, y NO DEBE fallar ni mostrar un error.
+
+**R11** — Ninguna de las dos listas DEBE ofrecer búsqueda ni control de ordenación configurable.
+
+**R12** — Ninguna de las dos listas DEBE mostrar el identificador ni el nombre de quien creó o
+modificó un proveedor o una línea de catálogo.
+
+**R13** — MIENTRAS el ancho disponible no alcance para todas las columnas, cada lista DEBE resolver
+el desbordamiento con **scroll horizontal contenido en la propia tabla**, sin provocar scroll
+horizontal del documento, y los controles de acción de cada fila DEBEN seguir siendo alcanzables.
+
+### Lista de proveedores
+
+**R14** — La pantalla de proveedores DEBE presentar los proveedores obtenidos con la operación de
+listado en una tabla paginada con sus columnas de negocio: nombre, teléfono, correo electrónico,
+fecha de creación y fecha de actualización.
+
+**R15** — Cada fila de la lista DEBE ofrecer una navegación a la página de detalle de ese proveedor,
+construida según R3.
+
+**R16** — MIENTRAS no exista ningún proveedor, el sistema DEBE presentar un estado vacío
+identificable **propio de la lista de proveedores**, que ofrezca la acción de crear el primer
+proveedor, en lugar de una tabla sin filas.
+
+**R17** — MIENTRAS la lista de proveedores se está obteniendo, el sistema DEBE presentar un
+indicador de carga identificable en lugar de la tabla.
+
+**R18** — SI la operación de listado de proveedores responde con error, ENTONCES el sistema DEBE
+presentar un estado de error identificable con el mensaje devuelto y una acción para reintentar, y
+NO DEBE presentar una tabla vacía como si no hubiera proveedores.
+
+### Página de detalle y catálogo del proveedor
+
+**R19** — La página de detalle DEBE presentar los datos de contacto del proveedor obtenidos con la
+operación de consulta —nombre, teléfono y correo electrónico— y, debajo, su catálogo paginado
+obtenido con la operación de listado de líneas de ese proveedor.
+
+**R20** — SI la operación de consulta del proveedor responde con «no encontrado», ENTONCES la
+página de detalle DEBE presentar un estado identificable de proveedor inexistente con una
+navegación de vuelta a la lista, y NO DEBE presentar el catálogo.
+
+**R21** — La tabla del catálogo DEBE presentar, por cada línea, sus campos de negocio: nombre,
+presentación, unidad, costo, mínimo de compra, tiempo de entrega, fecha de creación y fecha de
+actualización.
+
+**R22** — El sistema DEBE presentar la presentación y la unidad de cada línea por su **nombre**, no
+por su identificador. SI el nombre de la presentación o el de la unidad no puede resolverse,
+ENTONCES el sistema DEBE presentar un marcador identificable en esa celda y NO DEBE presentar el
+identificador técnico.
+
+**R23** — MIENTRAS el proveedor no tenga ninguna línea de catálogo, el sistema DEBE presentar un
+estado vacío identificable **distinto del de la lista de proveedores**, que ofrezca la acción de
+añadir la primera línea, en lugar de una tabla sin filas.
+
+**R24** — MIENTRAS el catálogo del proveedor se está obteniendo, el sistema DEBE presentar un
+indicador de carga identificable en lugar de la tabla del catálogo.
+
+**R25** — SI la operación de listado del catálogo responde con error, ENTONCES el sistema DEBE
+presentar un estado de error identificable con el mensaje devuelto y una acción para reintentar, y
+NO DEBE presentar una tabla vacía como si el catálogo estuviera vacío.
+
+### Alta y edición (proveedor y línea)
+
+**R26** — CUANDO el usuario active la acción de crear o de editar un proveedor, o la de crear o
+editar una línea de catálogo, el sistema DEBE abrir el formulario correspondiente en un **panel
+lateral** sobre la pantalla actual, NO DEBE navegar a otra URL de pantalla completa y NO DEBE usar
+un diálogo modal centrado. CUANDO el panel se cierre —por guardado o por cancelación—, el sistema
+DEBE devolver al usuario a la lista de la que salió **en la misma página y con el mismo tamaño de
+página** que tenía antes de abrirlo.
+
+**R27** — El formulario de alta de proveedor DEBE permitir capturar nombre, teléfono y correo
+electrónico, y enviarlos mediante la operación de alta de proveedor.
+
+**R28** — CUANDO el usuario abra el formulario de edición de un proveedor, el sistema DEBE
+precargarlo con los valores actuales de ese proveedor y enviar el **reemplazo completo** de sus
+campos mediante la operación de edición de proveedor.
+
+**R29** — El formulario de la línea de catálogo DEBE permitir capturar **los siete campos de
+negocio** —nombre, presentación, unidad, ruta de imagen, costo, mínimo de compra y tiempo de
+entrega— con la presentación **obligatoria** y la unidad **opcional**, y NO DEBE ofrecer ningún
+selector, campo ni referencia a un artículo del inventario.
+
+**R30** — El formulario de la línea NO DEBE pedir ninguna imagen ni ofrecer subirla, y la tabla del
+catálogo NO DEBE mostrar la imagen de la línea.
+
+**R31** — CUANDO el usuario abra el formulario de edición de una línea, el sistema DEBE precargarlo
+con los valores actuales de esa línea y enviar el **reemplazo completo** de sus siete campos de
+negocio mediante la operación de edición de línea; NO DEBE ofrecer cambiar el proveedor al que
+pertenece la línea.
+
+**R32** — SI un guardado se rechaza por validación o por cualquier otro error de la operación,
+ENTONCES el sistema DEBE presentar el error **en línea dentro del formulario** —junto al campo
+cuando el error identifique uno, y en una región de error del formulario cuando no—, decidiendo
+**por el código estable** del error y nunca por su texto, y NO DEBE cerrar el panel ni perder lo
+escrito.
+
+**R33** — CUANDO una operación de alta, edición o baja termine con éxito, el sistema DEBE cerrar el
+panel o el diálogo abierto, notificar el éxito mediante un aviso emergente (toast) y actualizar la
+lista afectada para que refleje el cambio sin que el usuario tenga que recargar la pantalla.
+
+**R34** — El sistema DEBE emitir sus avisos emergentes sobre la región de avisos que el layout
+privado **ya monta**, y NO DEBE montar una segunda región de avisos.
+
+### Baja
+
+**R35** — CUANDO el usuario active la baja de un proveedor, el sistema DEBE pedir confirmación en un
+diálogo que **nombre al proveedor**, advierta de que **sus líneas de catálogo se dan de baja con
+él** y advierta de que la acción no se puede deshacer. MIENTRAS el usuario no confirme, el sistema
+NO DEBE invocar la operación de baja; CUANDO confirme, DEBE invocarla y aplicar R33.
+
+**R36** — CUANDO el usuario active la baja de una línea de catálogo, el sistema DEBE pedir
+confirmación en un diálogo que **nombre la línea** y advierta de que la acción no se puede deshacer.
+MIENTRAS el usuario no confirme, el sistema NO DEBE invocar la operación de baja; CUANDO confirme,
+DEBE invocarla y aplicar R33.
+
+### Selectores de la línea
+
+**R37** — El formulario de la línea DEBE exigir una presentación y DEBE permitir alcanzar cualquier
+presentación existente desde su selector, aunque haya más de las que caben en una consulta.
+
+**R38** — CUANDO no exista la presentación que el usuario necesita, el sistema DEBE permitir crearla
+desde el propio formulario mediante la operación de alta de presentación, y CUANDO esa creación
+termine con éxito, DEBE dejarla seleccionada sin perder lo ya escrito en el formulario.
+
+**R39** — El sistema NO DEBE ofrecer listar, editar ni borrar presentaciones; la única operación de
+presentación disponible es su alta desde el selector (R38).
+
+**R40** — El selector de unidad DEBE ofrecer únicamente las unidades existentes obtenidas con la
+operación de listado de unidades, DEBE permitir dejar la línea **sin unidad**, y NO DEBE permitir
+crear una unidad ni aceptar texto libre.
+
+### Importes
+
+**R41** — El sistema DEBE presentar y enviar el costo y el mínimo de compra **tal como los entrega y
+los espera el contrato** (cadena decimal), y NO DEBE convertirlos a coma flotante, ni operar
+aritméticamente con ellos, ni capturarlos con un control numérico del navegador.
+
+### Estructura, convenciones y plataforma
+
+**R42** — Los componentes propios de cada una de las dos rutas DEBEN vivir en la carpeta
+`components/` de su ruta y exponerse por su barrel `index.ts`; las páginas NO DEBEN importarlos por
+ruta profunda ni dejarlos sueltos junto a `page.tsx`, y las páginas DEBEN vivir bajo el route group
+privado.
+
+**R43** — Toda lectura y toda mutación DEBEN realizarse mediante las Server Actions ya publicadas
+por los módulos correspondientes; el sistema NO DEBE llamar a rutas API propias con `fetch` ni
+crear ninguna.
+
+**R44** — Las primitivas de interfaz que las pantallas necesiten DEBEN provenir de la librería de
+componentes por su CLI; el sistema NO DEBE escribir a mano ni editar archivos de `components/ui/`.
+
+**R45** — Los formularios DEBEN construirse con el patrón de formulario no controlado del repo
+(`<form action>` + `useActionState`) y con los esquemas de validación que el contrato público de
+proveedores ya exporta; el sistema NO DEBE añadir ninguna dependencia nueva a `package.json`.
+
+**R46** — Los componentes de cliente de las dos pantallas DEBEN recibir por props los datos de
+sesión y los datos de negocio que muestran; NO DEBEN importar el punto de composición, ni el cliente
+de base de datos, ni obtener esos datos por su cuenta, salvo las invocaciones de Server Action que
+R43 autoriza.
+
+**R47** — Cada control interactivo y cada región de estado de las dos pantallas DEBE ser
+identificable por su rol accesible o por un `data-testid` estable, de modo que se pueda localizar
+sin depender del texto visible.
+
+**R48** — Las dos pantallas DEBEN ser utilizables en viewport angosto y en viewport ancho: NO DEBEN
+usar `100vh` como alto de pantalla, NO DEBEN depender de `:hover` como única vía para descubrir o
+activar una acción, sus controles táctiles DEBEN medir al menos 44×44 px y sus campos de formulario
+DEBEN tener un tamaño de fuente de al menos 16 px.
+
+**R49** — El sistema NO DEBE modificar `lib/modules/**`, `db/**` ni `lib/composition/index.ts`: los
+módulos se consumen solo por su contrato público y por sus adaptadores driving ya existentes. Los
+únicos archivos heredados que esta feature puede modificar son los que exigen R2 y R3 (constantes de
+ruta), R4 (navegación privada), R5 (prefijos privados) y R6 (reglas ruta→rol), más la reubicación de
+componente compartido que declara `design.md`.
+
+**R50** — El sistema NO DEBE re-crear ni duplicar el layout privado, la barra lateral, la navegación
+privada, la región de avisos, las primitivas ya instaladas ni las utilidades de test: las hereda
+montadas.
+
+### Verificación de extremo a extremo
+
+**R51** — El sistema DEBE cubrir con una prueba de extremo a extremo el camino completo del
+Administrador: iniciar sesión, llegar a la pantalla de proveedores, dar de alta un proveedor, entrar
+a su página de detalle, añadir una línea de catálogo y verla en la lista del catálogo.
+
+**R52** — El sistema DEBE cubrir con una prueba de extremo a extremo el rechazo de una sesión válida
+con rol distinto de Administrador que pide la URL de proveedores: DEBE acabar fuera de la pantalla y
+sin ver ningún dato.
 
 ## Preguntas abiertas
 
@@ -41,10 +288,29 @@ sigue sin decidirse. No se rellena con un supuesto (regla 6 de `CLAUDE.md`).
 dejó **opcional**: un mínimo de `2,5` sobre una línea sin unidad es ambiguo. Heredada de QC-42 (P4)
 y de QC-52 (P3), y sigue abierta.
 
-**P3 — QC-52 todavía se está implementando.** Esta ficha se especifica contra las decisiones
-cerradas de su `requirements.md`, no contra código mergeado. SI al implementar QC-52 alguna de esas
-decisiones cambia, el `frontend_dev` **para y lo reporta al leader**; no adapta la pantalla por su
-cuenta.
+**P3 — CERRADA el 2026-09-04 por el merge de QC-52.** La pregunta decía que QC-52 todavía se estaba
+implementando y que esta ficha se especificaba contra sus decisiones cerradas y no contra código
+mergeado. **Ya no aplica**: QC-52 se mergeó en `dev` (PR #32, merge `855fae6`) y su código está en
+el worktree de esta feature. Este spec se escribió **contra el código real y verificado**: la
+migración `db/migrations/20260904123854_split_product_and_supplier_catalog/`, el contrato público
+`lib/modules/proveedores/index.ts`, `domain/catalog-line-view.ts` (los siete campos de negocio, sin
+`product_id`), `domain/catalog-line-input.ts`, `domain/errors.ts` y los dos adaptadores driving
+(`supplier-actions.ts`, `supplier-catalog-actions.ts`). La condición «si alguna decisión de QC-52
+cambia, para y reporta» queda sin objeto porque ya no hay implementación pendiente; lo que sigue
+vigente es lo de siempre: si el código no coincide con lo que `design.md` describe, el
+`frontend_dev` **para y lo reporta al leader**.
+
+**P4 — Cómo se resuelve el nombre de la presentación de una línea (nueva, abierta).**
+`CatalogLineView` entrega `presentationId` y `unitId` **en crudo** —QC-52 lo dejó escrito y lo
+reenvió a esta ficha—. Las unidades tienen una operación de listado completo (`listUnitsAction`,
+acotada a 200 por QC-26), pero las presentaciones **solo** tienen `listPresentationsAction`
+paginada, con tope de 25 por página y sin operación de «listar todas» ni de «resolver estos ids».
+`design.md > 6.2` elige la única solución que no abre backend —recorrer páginas hasta una cota
+declarada y pintar un marcador cuando el nombre no se resuelva (R22)—, pero **si un catálogo de
+presentaciones grande hiciera esa resolución impracticable, la solución real es una operación de
+lectura nueva en `inventario` (por ids o sin paginar), y eso es ficha de backend**, no un añadido
+aquí. No se rellena con un supuesto (regla 6 de `CLAUDE.md`): queda anotada para que el humano
+decida si la abre.
 
 Si durante la implementación aparece cualquier otra ambigüedad, el `frontend_dev` **para y la
 reporta al leader**; no la rellena con supuestos.
