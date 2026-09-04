@@ -112,7 +112,7 @@ de test rojo que no estuviera ya en `tests/baseline-rojos.json`**.
 - **La comparación es por archivo, no por conteo.** Una suite grande tira 2–5 flakes de
   saturación que cambian de sitio —se midieron 30, 31 y 32 rojos sobre el mismo código—, así
   que exigir conteos exactos daría falsas alarmas constantes, y un gate que grita en falso se
-  ignora.
+  ignora. **Qué son exactamente esos flakes y qué NO los cura: la subsección de abajo.**
 - **Coste aceptado:** si un archivo ya listado gana un rojo nuevo de verdad, no lo ves. A cambio
   la pregunta que sí responde —«¿apareció un archivo que antes no fallaba?»— aguanta el ruido.
 - **Cada entrada del baseline necesita `motivo` y `desde`**, y el comparador falla si faltan.
@@ -126,7 +126,7 @@ de test rojo que no estuviera ya en `tests/baseline-rojos.json`**.
 saber que la deuda es de `dev` y no tuya. Y síémbralo con pocas entradas: si nace con cincuenta,
 nadie lo va a limpiar nunca.
 
-> **Estado en QuimiCloude (2026-09-04):** el baseline tiene **dos** entradas, ambas por el
+> **Estado en QuimiCloude (2026-09-04):** el baseline tiene **cinco** entradas. Dos son por el
 > mismo motivo estructural: `tests/unit/recetas-ui/recipe-route-contract.test.ts` y
 > `tests/unit/recetas/module-contract.test.ts` contienen guardias que se apoyan en
 > `git diff --name-only origin/dev...HEAD` y que, estando en `dev`, no tienen rango que mirar
@@ -135,6 +135,40 @@ nadie lo va a limpiar nunca.
 > ignorados también en las ramas de feature donde sus guardias sí morderían. Lo correcto es
 > que el caso del diff se salte explícitamente cuando el rango no existe y que estas dos
 > entradas desaparezcan.
+
+### Los flakes de saturación: qué son, y qué NO los cura (2026-09-04)
+
+Los «2–5 flakes de saturación» de arriba tienen una firma concreta, y merece la pena reconocerla
+antes de perder una tarde: **`Test timed out in 5000ms`, en un test de UI que escribe con
+`userEvent`**. El campo controlado no llega a repintarse entre tecla y tecla cuando la máquina va
+cargada, y la prueba escribe más rápido de lo que el campo se actualiza. El síntoma clásico es que
+las letras salgan intercaladas —`xxxxxAxcxixdxox` donde debía salir `Acido citrico`—.
+
+**Cómo distinguirlo de un rojo de verdad**, y es barato: corre el archivo **solo**. Si pasa en
+aislado y falla en la suite, es saturación. Si falla también solo, es tuyo. La otra comprobación,
+cuando sospechas de una rama, es correrlo en `dev` sin tu rama encima.
+
+**Lo que NO lo cura: bajar los workers de vitest.** Es la primera idea que se le ocurre a
+cualquiera y está medida, en esta máquina (12 núcleos, 25,5 GB de RAM, 3,4 GB libres) y sobre la
+misma rama:
+
+| `--maxWorkers` | Resultado | Duración |
+| --- | --- | --- |
+| por defecto (12) | 2 archivos rojos | 114 s |
+| 4 | 1 archivo rojo | 335 s |
+| 2 | 1 archivo rojo | 541 s |
+
+Una corrida anterior con `--maxWorkers=2` salió verde y **eso fue suerte, no prueba**: se tomó por
+buena y llevó a proponer un límite de workers como arreglo del gate. Repetida, volvió a fallar.
+Queda escrito para que el siguiente no recorra el mismo callejón: el límite multiplica por cinco
+el tiempo del gate y no elimina el fallo, porque la causa no es cuántos procesos hay sino que el
+plazo de 5 s es demasiado corto para `userEvent` en una máquina cargada.
+
+**El arreglo de verdad es de código y tiene ficha propia** —subir el `testTimeout` del proyecto de
+UI, o quitar el retardo entre teclas de `userEvent`—. Hasta que entre, estos archivos viven en el
+baseline, y ahí está el coste: **el baseline se está usando para tapar un problema que no es suyo
+y crece con cada feature**, que es exactamente lo que su propia nota advierte que no debe pasar.
+Sus entradas por esta causa se retiran **todas** en el mismo cambio que arregle el plazo.
 
 ## Cuando lo que verificas es el gate mismo
 
