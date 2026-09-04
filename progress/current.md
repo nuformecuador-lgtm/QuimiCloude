@@ -13,7 +13,6 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | **PR #34 abierto**, esperando revisión y merge humano (F2.4 hecha) |
-| QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | **PR [#33] abierto**, esperando merge humano (F2.5). `reviewer` APROBADO en 2ª ronda |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
 | QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | pending | feature/QC-47-modelo-empresa-y-membresias | esta sesión (`labs`) — worktree montado en F1.0, sin spec todavía |
 
@@ -62,6 +61,22 @@ buena idea por no depender de un implícito, pero la base propia no es decorativ
 **Cuarta vez que el drift de base entre worktrees bloquea una feature**, y esta vez QC-52 fue quien
 rompió a QC-34 al aplicar su migración a la compartida. Siguen vivas y huérfanas
 `QuimiCloude_FIXGATE` y `QuimiCloude_QC14`; `QuimiCloude_QC34` sigue en uso.
+
+La feature **QC-55 — tabla-de-datos-compartida** se cerró el 2026-09-04 (PR #33, merge
+`c2f61ec`): resumen en `progress/history.md`, worktree desmontado y rama borrada. 36 requisitos con
+test y `reviewer` en dos rondas (RECHAZADO → APROBADO). **Nació en esta misma sesión**: la ficha no
+existía en el board, y acotarla con `/afinar-feature` creó además **QC-56** y **QC-57**.
+
+Lo que deja abierto, todo en QC-56 y escrito en su ficha del board: **la comprobación del `sticky`
+anidado en Safari de iOS (T13)**, que allí es exigible y bloqueante —aquí no había pantalla que
+abrir—; `DataTableColumn` sin ancho, así que todas las columnas caen en los 150 px por defecto;
+`focusColumnFilter` sin acotar por `tableId`; y **cómo se declara una columna de acciones de fila,
+sin lo cual la migración de productos no se puede completar**. **QC-57 sigue sin acotar**: hasta
+que exista, el orden, los filtros y la búsqueda se emiten y nadie los honra.
+
+**El aviso del gate sobre dos archivos del baseline que ya pasan** —`recipe-route-contract.test.ts`
+y `module-contract.test.ts`— es deuda vieja de `dev` que se arregló sola. No se limpió desde QC-55
+para no ensuciar su PR; sigue pendiente.
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia

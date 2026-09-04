@@ -1712,3 +1712,130 @@ del PR para que no se lo comieran QC-34 y QC-55 al mergear. **El repo sigue sin 
   que el propio baseline propone —auto-saltarse cuando el rango está vacío— **no arregla este caso**.
 
 Las tres últimas son deuda de arnés y candidatas a `/afinar-regla`, no a una ficha de producto.
+
+## 2026-09-04 — QC-55-tabla-de-datos-compartida
+
+- Componente de tabla en `components/shared/`: pinta filas a partir de la configuración de
+  columnas que recibe por props, con barra de filtros (texto, rango numérico, selección y rango
+  de fechas con atajos), barra de paginación, orden por cabecera y pineo de columnas que decide
+  el usuario y se recuerda en `localStorage`. **No trae los datos**: emite los parámetros nuevos
+  por `onChange` y quien lo usa decide.
+- Requisitos cubiertos: **R1–R36**, todos con test. Gate completo en verde: 152 archivos,
+  1704 tests. PR #33, merge commit `c2f61ec`.
+- **Se acotó con `/afinar-feature` antes del spec y eso cambió el board tres veces**: la ficha no
+  existía —se creó QC-55 y QC-56 el mismo día—, la acotación creó **QC-57** (el backend que honre
+  orden y filtros, la «ficha de backend nueva» que QC-22 pidió el 2026-09-03 y QC-26 repitió), y
+  QC-55 pasó a `complexity: high`. Las 23 decisiones cerradas están en su `requirements.md`.
+- **Dos dependencias aprobadas con los cuatro checks corridos**: `@tanstack/react-table` 9.2.4 y
+  `react-day-picker` 10.0.1. **`rsuite` se descartó pese a pasar los cuatro** —14 dependencias,
+  incluida `rsuite-table`, y un sistema de tema propio—; queda anotado que el rechazo fue por
+  coste y no por check fallado, por si se reabre. **`cn` NO se aprueba** (falla el check 3): el
+  CLI de shadcn lo emite hoy como entrada directa y el especificador se normalizó a
+  `@/lib/utils`, edición ratificada por el humano.
+- **Dos excepciones declaradas, no desvíos**: `shared/` sin consumidor todavía (contra la regla de
+  sobre-ingeniería; los dos consumidores están identificados en QC-56), y **sin E2E**, diferido
+  con motivo porque ninguna pantalla monta el componente.
+- **Lo que costó, y es la lección de esta feature.** El `reviewer` RECHAZÓ en primera ronda por un
+  bug real que el test estaba escrito para no ver: los atajos de fecha restaban meses y años con
+  `setMonth`/`setFullYear`, que desbordan, así que **el día 31 de cualquier mes «último mes» no
+  cubría el mes anterior** (31-may daba `2026-05-01`). Su test **reimplementaba la fórmula bajo
+  prueba** y solo probaba el 15 de junio —mitad de mes, año no bisiesto—, el único caso que pasaba
+  por casualidad. Un test que recalcula lo que verifica no es una red, es un espejo. El arreglo
+  llegó con once esperados escritos a mano y un barrido de propiedades, y el `reviewer`
+  **reprodujo la mutación por su cuenta** antes de aprobar.
+- **El diseño estaba incompleto y el código tenía razón**: `design.md > 4` mandaba activar dos
+  capacidades de TanStack, pero en v9 `getStart()` —el mecanismo con el que `design.md > 5` manda
+  calcular el offset del pineo— lo aporta `columnSizingFeature`, no `columnPinningFeature`.
+  Verificado contra el paquete instalado. Se corrigieron `design.md` y la fila de
+  `docs/dependencias.md`.
+- **Deuda trasladada a QC-56, por escrito y no en silencio**: la **T13** —comprobar el `sticky`
+  anidado en Safari de iOS— no se pudo hacer aquí porque ninguna pantalla monta el componente y
+  fabricar una de prueba era lo que la decisión 11 rechazó. Allí es **exigible y bloqueante**, y
+  la decisión 17 no se levanta. Con ella van: `DataTableColumn` sin ancho (todas las columnas
+  caen en 150 px), `focusColumnFilter` sin acotar por `tableId`, y **cómo se declara una columna
+  de acciones de fila, que sigue sin decidirse y sin lo cual la migración de productos no se
+  puede completar**.
+- **Queda vivo**: QC-57 sin acotar. Hasta que exista, el orden, los filtros y la búsqueda se
+  emiten y **nadie los honra**.
+
+## 2026-09-04 — QC-34-crud-de-pedidos
+
+**PR [#34], merge `4c98fe1`.** `backend`, `high`, épica **QC-31 — Pedidos**. Spec en
+`specs/QC-34-crud-de-pedidos/`. Worktree desmontado, rama borrada y **base propia
+`QuimiCloude_QC34` eliminada**.
+
+Los cinco casos de uso de pedidos sobre el modelo de QC-33 —alta, consulta paginada, edición,
+cancelación y borrado— y **una migración**, porque la acotación con el humano añadió un cuarto
+estado. **58 requisitos con test**, cero dependencias nuevas.
+
+### La acotación creció la ficha, y es lo que decidió todo lo demás
+
+`/afinar-feature` cerró **25 decisiones** antes de que `spec_author` escribiera una línea. Tres
+salieron de lo que QC-33 había dejado escrito para aquí —permisos (solo Administrador en las cinco
+operaciones), transiciones (solo hacia delante, `ENTREGADO` final) y quién calcula el correlativo
+(**secuencia de la base por año**, que cierra su pregunta abierta 2)—, pero **la que cambió la
+ficha la trajo el humano**: un cuarto estado `CANCELADO` con motivo obligatorio. Eso convirtió una
+ficha de casos de uso en una ficha con migración: `ALTER TYPE ... ADD VALUE`, columna nueva, y el
+`CHECK` de borrado de QC-33 ampliado para que tampoco se borre un cancelado. Es exactamente el coste
+que QC-33 asumió a conciencia al elegir enum en vez de tabla.
+
+De paso, la acotación **cazó una contradicción del board**: la ficha pedía que el alta recibiera una
+«fecha de solicitud» que QC-33 ya había decidido que no existe —es `created_at`—. Se reescribió la
+`description` del issue **antes** de sembrar, y también la de **QC-35**, que seguía pidiendo ese
+campo en su formulario.
+
+### El bloqueante del reviewer: una copia no vigila a su original
+
+El `reviewer` **RECHAZÓ** en primera ronda, y tenía razón. `order-prisma.ts` —382 líneas, el único
+dueño de Prisma del módulo— **no lo ejecutaba ningún test**: los de integración corrían *una copia a
+mano* de su SQL dentro de una transacción revertida, y los unitarios usaban dobles del puerto.
+Consecuencia concreta: **R35 se quedaba sin un solo test que lo verificara** —ni el defecto de 10, ni
+el tope de 25, ni que `buildPage` reciba el `limit` acotado y no el `pageSize` pedido, que es el
+error que deja un `totalPages` mentiroso—. Lo que cerró el argumento no fue la teoría sino el
+precedente: **`recipe-crud.int` y `supplier-crud.int` importan y llaman su adaptador real**. Se
+arregló copiando ese patrón, y la segunda ronda cerró con **cero mayores y nueve mutaciones
+muertas**.
+
+### Dos falsos verdes por mutaciones mal construidas
+
+El menor **M7** era que el predicado de R4 solo cazaba `'Administrador'` con comilla simple: con
+comillas dobles el test salía verde. Al cerrarlo apareció la segunda mitad —si `identity` renombrara
+el rol, el barrido vigilaría un nombre inexistente y quedaría **verde por vacuidad**—, así que el
+patrón pasó a derivarse del valor de `ROLE_ADMINISTRADOR` y a admitir las tres formas de escribir una
+cadena en TypeScript. Y **dos veces en esta ficha** una mutación mal construida dio un verde que no
+significaba nada (el literal puesto en prosa, sin comillas, que el regex no cazaría ni con el
+descuento de comentarios roto). La lección quedó en la bitácora: **una mutación que no mata hay que
+comprobar que estaba bien construida antes de concluir que el test cubre**.
+
+### El drift de base, por tercera vez
+
+La base compartida volvió a bloquear una feature: la sesión paralela de QC-52 aplicó su migración y
+los tests de integración de QC-34 empezaron a fallar con un `P2022` en cualquier lectura de `orders`.
+Se resolvió como en QC-20, QC-25 y QC-26 —**base propia `QuimiCloude_QC34`**—, y **con base limpia el
+rojo de `identity-seed` desapareció**: era de los datos hechos a mano en la compartida, no un defecto.
+Sigue sin haber nada en `wt.sh new` que automatice esto, y `wt.sh done` sigue sin saber que existe una
+base que borrar.
+
+### El flake que sí entró al baseline
+
+`tests/unit/inventario/product-page.test.tsx` (de QC-22) falla de forma intermitente bajo carga y pasa
+en aislado: las teclas llegan intercaladas al campo controlado. Verificado rojo en `dev` (`c0c16af`)
+**antes** de esta rama. Decisión del humano: **al baseline con motivo y fecha, declarado en el PR, y
+ficha propia — QC-58**, cuyo alcance incluye retirarlo del baseline. Es el primer uso real del
+mecanismo desde que existe.
+
+### Lo que queda abierto
+
+- **Cinco preguntas abiertas** en el spec, ninguna bloqueante. Las dos que más pueden afectar a
+  **QC-35**: si la consulta devuelve el total calculado —que arrastraría una dependencia decimal— y
+  si la edición es reemplazo completo.
+- **Sin ficha, y deliberado:** qué hacer cuando un pedido entregado no debió salir. No hay
+  devoluciones y crear la ficha obligaría a inventar un módulo que nadie pidió.
+- **Límite conocido:** el `down.sql` se vigila por **texto** en la suite; el ciclo
+  `migrate → rollback → migrate` y la guardia que aborta ante un pedido `CANCELADO` se ejercitaron a
+  mano —por el implementer y por el reviewer, con resultado correcto—, pero nada en `pnpm test` los
+  ejecuta.
+- **`dev` se movió dos veces durante la ficha** (PR #32 de QC-52 y #33 de QC-55) y hubo que
+  sincronizar dos veces. El único conflicto en las dos fue `tests/baseline-rojos.json`, y la
+  resolución correcta no era elegir versión sino **unir**: el archivo llevaba vacío hasta ayer y cada
+  rama le añadía entradas distintas.
