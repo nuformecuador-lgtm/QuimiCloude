@@ -12,7 +12,7 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | **PR #34 abierto**, esperando revisión y merge humano (F2.4 hecha) |
 | QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | **PR [#33] abierto**, esperando merge humano (F2.5). `reviewer` APROBADO en 2ª ronda |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
 | QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | pending | feature/QC-47-modelo-empresa-y-membresias | esta sesión (`labs`) — worktree montado en F1.0, sin spec todavía |
