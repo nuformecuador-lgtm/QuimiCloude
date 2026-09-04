@@ -284,7 +284,7 @@ emparejar por nombre —frágil— o rehacer la tabla.
 dejó **opcional**: un mínimo de `2,5` sobre una línea sin unidad es ambiguo. Heredada de QC-42
 (pregunta 4) y sigue abierta.
 
-**P4 — `products.image_path` existe en la base pero NO en el modelo Prisma.** Hallazgo de
+**P4 [CERRADA 2026-09-04 — se mantiene la columna y se declara en el modelo. Ver la tabla de decisiones] — `products.image_path` existe en la base pero NO en el modelo Prisma.** Hallazgo de
 `spec_author` en F1.2, no cubierto por la tabla. La migración
 `20260903200000_product_image_path` añadió la columna, pero el modelo `Product` de
 `db/schema.prisma` **no la declara** (sí lo hace `Recipe`, que es lo que confunde al leerlo por
@@ -298,7 +298,7 @@ todas las siguientes y no cambia la base ni un byte. La escribe **R4**; si el hu
 dejar el drift, R4 se reduce a «la migración no toca esa columna» y el `tasks.md` conserva igual
 su paso de auditoría.
 
-**P5 — Con las líneas cayendo con su proveedor, la excepción de QC-43 R48 se queda sin
+**P5 [CERRADA 2026-09-04 — R48 derogada entera. Ver la tabla de decisiones] — Con las líneas cayendo con su proveedor, la excepción de QC-43 R48 se queda sin
 sentido.** Hallazgo de `spec_author` en F1.2. R48 permitía **borrar** —y solo borrar— una línea de
 un proveedor dado de baja, con el argumento de que rechazarlo dejaría esas filas «atrapadas sin
 ninguna operación capaz de eliminarlas». Desde la decisión cerrada 5 esas filas **ya están dadas
@@ -306,7 +306,7 @@ de baja**, así que no hay nada que atrapar. Posición por defecto escrita, no d
 (`design.md > 6.4`): **las cuatro operaciones sobre las líneas de un proveedor dado de baja
 responden «no encontrado»**, la baja incluida, y R48 queda derogada entera. La escribe **R23**.
 
-**P6 — ¿La edición de una línea puede cambiar su nombre y su presentación?** Hallazgo de
+**P6 [CERRADA 2026-09-04 — edición = reemplazo completo salvo el proveedor. Ver la tabla de decisiones] — ¿La edición de una línea puede cambiar su nombre y su presentación?** Hallazgo de
 `spec_author` en F1.2. QC-43 R33 lo dejaba en solo condiciones comerciales, porque la pareja
 `(supplier_id, product_id)` era la identidad y no se tocaba. Al quitar `product_id` ese argumento
 desaparece: la identidad pasa a ser un texto que se escribe a mano y **una errata en el nombre no
@@ -340,3 +340,6 @@ al leader**; no la rellena con supuestos.
 | 2026-09-03 | RLS | **Habilitada y forzada** en las dos tablas, como ya están. La migración **no la toca**, y ninguna policy sustituye la comprobación de permiso del service |
 | 2026-09-03 | Permisos | **Solo el Administrador**, en todas las operaciones de las dos tablas, heredado de QC-20 y QC-43. La autorización se valida **en el service** (`docs/architecture.md > Acceso a datos y autorizacion`), y `CHECKPOINTS.md` exige su test |
 | 2026-09-03 | Dependencias nuevas | **Ninguna.** Si el diseño creyera necesitar una librería, el implementer **para y la propone**; no la instala (regla 7 de `CLAUDE.md`) |
+| 2026-09-04 | **P4** — `products.image_path` es drift: está en la base y no en el modelo Prisma | **La columna se mantiene y se declara en el modelo `Product` de `db/schema.prisma`**, sin ninguna sentencia SQL. Desarma la mina para esta migración y para todas las siguientes, y no cambia la base ni un byte. La escribe **R4**. Cerrada por el humano en F1.4 |
+| 2026-09-04 | **P5** — la excepción de QC-43 R48 se queda sin sentido | **QC-43 R48 queda derogada entera.** Las cuatro operaciones sobre las líneas de un proveedor dado de baja responden «no encontrado», la baja incluida. La escribe **R23**. Cerrada por el humano en F1.4 |
+| 2026-09-04 | **P6** — ¿la edición de una línea puede cambiar nombre y presentación? | **Sí: la edición es reemplazo completo de los campos de negocio**, nombre y presentación incluidos, porque al desaparecer `product_id` el argumento de QC-43 R33 desaparece con él y una errata en el nombre sería incorregible. Puede chocar con el índice único igual que un renombrado (QC-43 R15). **Lo único que nunca cambia es el proveedor.** La escribe **R24**. Cerrada por el humano en F1.4 |
