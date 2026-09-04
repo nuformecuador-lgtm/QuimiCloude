@@ -517,6 +517,12 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   preguntas abiertas en `specs/QC-42-modelo-proveedores/requirements.md`. El board no cambio
   (los cuatro campos seguian siendo ciertos, QC-43 y QC-44 ya existen, ninguna ficha quedo
   huerfana), asi que tampoco cambio `feature_list.json`. QC-43 y QC-44 siguen SIN acotar.
+- **QC-44 acotada con `/afinar-feature` el 2026-09-04.** Alcance, 26 decisiones cerradas y 3
+  preguntas abiertas en `specs/QC-44-pantalla-de-proveedores/requirements.md`; no se copian aqui.
+  El board se actualizo ANTES de sembrar: `description` reescrita contra la forma post-QC-52 y link
+  *is blocked by* **QC-52** anadido, porque esa ficha borra el `product_id` de la linea que la
+  pantalla iba a mostrar. `complexity: high`. **La spec se escribe ya; F2.1 espera a que QC-52 este
+  `done`.** Worktree montado en F1.0.
 
 ### QC-21 — ayuda-visual-de-contrasena (2026-09-02)
 
