@@ -43,7 +43,7 @@ Todo el diseño de la migración (`design.md > 3`) se apoya en que
 > siendo válido (`design.md > 0`). Al final de la tanda el typecheck **estará roto a propósito**
 > hasta T7: es esperable y no se parchea inventando columnas.
 
-### T2. `[ID]` Quitar `Membership` del esquema y devolver `role_id` a `User`
+### [x] T2. `[ID]` Quitar `Membership` del esquema y devolver `role_id` a `User`
 - **Archivos:** `db/schema.prisma`.
 - **Qué:** borrar `model Membership` entero; quitar `memberships Membership[]` de `User`, `Role` y
   `Company`; devolver a `Role` su `users User[]`; devolver a `User` el campo `roleId`, la relación
@@ -54,7 +54,7 @@ Todo el diseño de la migración (`design.md > 3`) se apoya en que
   `roleId` + `role` + `users_role_id_idx` de `User` es idéntico al de `dev`.
 - **Depende de:** T1.
 
-### T3. `[ID]` Devolver el rol a los tres consumidores de `identity`
+### [x] T3. `[ID]` Devolver el rol a los tres consumidores de `identity`
 - **Archivos:** `lib/modules/identity/adapters/driven/persistence/user-credentials-prisma.ts`,
   `…/session-user-prisma.ts`, `…/initial-access-repository-prisma.ts`,
   `lib/modules/identity/ports/initial-access-repository.ts`,
@@ -69,7 +69,7 @@ Todo el diseño de la migración (`design.md > 3`) se apoya en que
   salen de `users.role_id`.
 - **Depende de:** T2.
 
-### T4. `[P]` Borrar los tests del modelo muerto
+### [x] T4. `[P]` Borrar los tests del modelo muerto
 - **Archivos:** `tests/unit/identity/schema/companies-migration.test.ts`,
   `tests/integration/identity/identity-constraints.int.test.ts`,
   `tests/unit/identity/seed/seed-initial-access.test.ts`,
@@ -107,7 +107,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   añadirá después. Cero coincidencias de `memberships`.
 - **Depende de:** T2. Paralelizable con T4 y T5.
 
-### T7. Cierre de tanda A
+### [x] T7. Cierre de tanda A
 - **Hecho cuando:** `rg -i 'membership|memberships|pertenencia' lib/ app/ components/ scripts/ db/
   tests/ e2e/` devuelve **cero** (§0 de `design.md`), y el árbol coincide con `dev` en todo lo que
   no sea `companies`, `company-name.ts`, `companies.ts`, el export del contrato y la carpeta de
