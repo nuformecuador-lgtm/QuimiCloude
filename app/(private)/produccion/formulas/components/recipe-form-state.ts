@@ -1,5 +1,7 @@
 import type { ZodIssue } from 'zod';
 
+import type { RecipeStepType } from '@/lib/modules/recetas';
+
 /**
  * Tipos del estado del formulario de receta y el armado de su payload (T13, R22, R29, R32, R35,
  * R36; `design.md > 5`, `> 8`).
@@ -47,10 +49,17 @@ export type RecipeLineFormValue = {
   readonly unitId: string;
 };
 
-/** Paso del formulario, con su clave local de React (mismo motivo que en `RecipeLineFormValue`). */
+/**
+ * Paso del formulario, con su clave local de React (mismo motivo que en `RecipeLineFormValue`).
+ *
+ * `text` es lo que el usuario escribe -viaja al contrato como `body`- y `type` es el tipo de
+ * paso, `'texto'` por defecto. Los dos valores validos los pone el CONTRATO
+ * (`RECIPE_STEP_TYPES`), no esta pantalla.
+ */
 export type RecipeStepFormValue = {
   readonly key: string;
   readonly text: string;
+  readonly type: RecipeStepType;
 };
 
 /** Estado completo y controlado del formulario. */
@@ -75,10 +84,16 @@ export type RecipeLinePayload = {
  * explícita solo cuando el estado es `cleared` (edición). Coincide con la forma que esperan
  * `createRecipeSchema.safeParse` y `updateRecipeSchema.safeParse` del contrato público.
  */
+/** Un paso tal y como lo reciben `createRecipeSchema`/`updateRecipeSchema`. */
+export type RecipeStepPayload = {
+  readonly body: string;
+  readonly type: RecipeStepType;
+};
+
 export type RecipePayload = {
   readonly name: string;
   readonly description: string | null;
-  readonly steps: readonly string[];
+  readonly steps: readonly RecipeStepPayload[];
   readonly lines: readonly RecipeLinePayload[];
   readonly image?: { readonly bytes: Uint8Array } | null;
 };
@@ -97,6 +112,9 @@ export type RecipePayload = {
  * **La cantidad se copia TAL CUAL, como cadena** (R29): esta función no la parsea, no la
  * redondea y no la convierte a número en ningún punto. `grep` de la ruta confirma que en ningún
  * archivo de esta feature aparece `parseFloat(`, `Number(` ni `toFixed(` sobre la cantidad.
+ *
+ * **Cada paso viaja como `{ body, type }`** -el texto tal cual lo escribio el usuario y su tipo-,
+ * nunca como cadena suelta: el contrato dejo de aceptar eso cuando el paso gano tipo.
  *
  * **Los pasos salen en el orden en que `state.steps` los tiene** (R32): es responsabilidad de
  * `recipe-steps-field.tsx` mantener ese array en el orden que el usuario ve, arrastre o teclado
@@ -121,7 +139,7 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
   const base = {
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
-    steps: state.steps.map((step) => step.text),
+    steps: state.steps.map((step): RecipeStepPayload => ({ body: step.text, type: step.type })),
     lines: state.lines.map(
       (line): RecipeLinePayload => ({
         productId: line.productId,

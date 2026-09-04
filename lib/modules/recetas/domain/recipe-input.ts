@@ -59,11 +59,28 @@ const recipeNameSchema = z
 
 const recipeDescriptionSchema = z.string().trim().max(500).nullish();
 
+/**
+ * Los dos tipos de paso. `texto` es el que existia -y el DEFECTO, para que un paso sin `type`
+ * siga siendo valido-; `checklist` marca el paso que la pantalla presentara como lista de
+ * verificacion.
+ */
+export const RECIPE_STEP_TYPES = ['texto', 'checklist'] as const;
+
+export type RecipeStepType = (typeof RECIPE_STEP_TYPES)[number];
+
+/**
+ * Un paso: su texto (`body`) y su tipo. Antes de esto un paso ERA la cadena; el `body` es esa
+ * misma cadena con las mismas cotas (R19, R20) y el `type` es lo unico nuevo.
+ */
+export const recipeStepSchema = z.object({
+  body: z.string().trim().min(1).max(1000),
+  type: z.enum(RECIPE_STEP_TYPES).default('texto'),
+});
+
+export type RecipeStepInput = z.infer<typeof recipeStepSchema>;
+
 /** Pasos: hasta 50, cada uno de hasta 1.000 caracteres, ninguno vacio (R19, R20). */
-const recipeStepsSchema = z
-  .array(z.string().trim().min(1).max(1000))
-  .max(50)
-  .default([]);
+const recipeStepsSchema = z.array(recipeStepSchema).max(50).default([]);
 
 /** Rechaza que la lista de lineas repita el mismo `productId` (R16). */
 function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {

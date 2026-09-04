@@ -25,7 +25,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { RECIPE_STEP_TYPES, type RecipeStepType } from '@/lib/modules/recetas';
+
 import { createLocalKey, type RecipeStepErrors, type RecipeStepFormValue } from './recipe-form-state';
+
+/**
+ * Etiqueta visible de cada tipo de paso. Los VALORES los pone el contrato
+ * (`RECIPE_STEP_TYPES`); aqui solo se les pone nombre en pantalla, asi que anadir un tipo al
+ * contrato sin pasar por aqui rompe la compilacion en vez de pintar una etiqueta vacia.
+ */
+const STEP_TYPE_LABELS: Readonly<Record<RecipeStepType, string>> = {
+  texto: 'Texto',
+  checklist: 'Lista de verificación',
+};
 
 /**
  * Campo de pasos, con arrastre y equivalente por teclado (T17, R32-R34; `design.md > 7`, `> 10`).
@@ -90,11 +109,12 @@ export function RecipeStepsField({ steps, onChange, errors }: RecipeStepsFieldPr
   );
 
   function addStep() {
-    onChange([...steps, { key: createLocalKey('step'), text: '' }]);
+    // `texto` es el tipo por defecto de un paso nuevo, igual que en el contrato.
+    onChange([...steps, { key: createLocalKey('step'), text: '', type: 'texto' }]);
   }
 
-  function updateStep(index: number, text: string) {
-    onChange(steps.map((step, i) => (i === index ? { ...step, text } : step)));
+  function updateStep(index: number, patch: Partial<RecipeStepFormValue>) {
+    onChange(steps.map((step, i) => (i === index ? { ...step, ...patch } : step)));
   }
 
   function removeStep(index: number) {
@@ -142,7 +162,8 @@ export function RecipeStepsField({ steps, onChange, errors }: RecipeStepsFieldPr
                 index={index}
                 total={steps.length}
                 error={errors?.[index]}
-                onChangeText={(text) => updateStep(index, text)}
+                onChangeText={(text) => updateStep(index, { text })}
+                onChangeType={(type) => updateStep(index, { type })}
                 onRemove={() => removeStep(index)}
               />
             ))}
@@ -159,10 +180,19 @@ type RecipeStepRowProps = {
   readonly total: number;
   readonly error?: string;
   readonly onChangeText: (text: string) => void;
+  readonly onChangeType: (type: RecipeStepType) => void;
   readonly onRemove: () => void;
 };
 
-function RecipeStepRow({ step, index, total, error, onChangeText, onRemove }: RecipeStepRowProps) {
+function RecipeStepRow({
+  step,
+  index,
+  total,
+  error,
+  onChangeText,
+  onChangeType,
+  onRemove,
+}: RecipeStepRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: step.key,
   });
@@ -203,6 +233,26 @@ function RecipeStepRow({ step, index, total, error, onChangeText, onRemove }: Re
           aria-describedby={error === undefined ? undefined : errorId}
           data-testid={`recipe-step-text-${index}`}
         />
+        {/*
+          Tipo del paso: viaja al contrato junto al texto (`{ body, type }`). Los dos valores
+          salen de `RECIPE_STEP_TYPES`, nunca escritos a mano aqui.
+        */}
+        <Select value={step.type} onValueChange={(next) => onChangeType(next as RecipeStepType)}>
+          <SelectTrigger
+            className={`${TOUCH_TARGET} w-full text-base sm:w-56`}
+            aria-label={`Tipo del paso ${index + 1}`}
+            data-testid={`recipe-step-type-${index}`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {RECIPE_STEP_TYPES.map((type) => (
+              <SelectItem key={type} value={type} data-testid={`recipe-step-type-${index}-option`}>
+                {STEP_TYPE_LABELS[type]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {error === undefined ? null : (
           <p id={errorId} className="text-sm text-destructive" data-testid={`recipe-step-field-error-${index}`}>
             {error}

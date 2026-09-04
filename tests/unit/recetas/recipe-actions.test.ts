@@ -57,7 +57,10 @@ const ADMIN_SESSION_USER = {
 const VALID_RECIPE_INPUT = {
   name: 'Desengrasante 5%',
   description: 'Formula base',
-  steps: ['Mezclar', 'Envasar'],
+  steps: [
+    { body: 'Mezclar', type: 'texto' },
+    { body: 'Envasar', type: 'texto' },
+  ],
   lines: [
     {
       productId: '11111111-1111-4111-8111-111111111111',

@@ -5,7 +5,13 @@
 // catalogo de `unidades` -aqui solo se valida la FORMA, la existencia real es del caso de
 // uso, ver `tests/unit/recetas/recipe-service.test.ts`-.
 
-import { createRecipeSchema, recipeLineSchema, updateRecipeSchema } from '@/lib/modules/recetas/domain/recipe-input';
+import {
+  RECIPE_STEP_TYPES,
+  createRecipeSchema,
+  recipeLineSchema,
+  updateRecipeSchema,
+  type RecipeStepType,
+} from '@/lib/modules/recetas/domain/recipe-input';
 import { pageQuerySchema } from '@/lib/modules/recetas/domain/page';
 
 const LINEA_VALIDA = {
@@ -17,7 +23,10 @@ const LINEA_VALIDA = {
 const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
   description: 'Formula base',
-  steps: ['Mezclar', 'Envasar'],
+  steps: [
+    { body: 'Mezclar', type: 'texto' },
+    { body: 'Envasar', type: 'checklist' },
+  ],
   lines: [LINEA_VALIDA],
 };
 
@@ -109,35 +118,63 @@ describe('createRecipeSchema — lineas repetidas (R16)', () => {
   });
 });
 
+/** Paso valido del contrato: `texto` es el tipo por defecto. */
+function paso(body: string, type: RecipeStepType = 'texto') {
+  return { body, type };
+}
+
 describe('createRecipeSchema — pasos (R19, R20)', () => {
-  it('rechaza unos pasos que no son lista de textos o que traen alguno vacio, y guarda lista vacia si no hay pasos', () => {
+  it('rechaza unos pasos que no son lista de objetos o que traen el cuerpo vacio, y guarda lista vacia si no hay pasos', () => {
     expect(
       createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: 'no es una lista' }).success,
     ).toBe(false);
-    expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: ['Mezclar', ''] }).success).toBe(
+    // La cadena suelta dejo de ser un paso valido cuando el paso gano tipo: ahora es `{ body }`.
+    expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: ['Mezclar'] }).success).toBe(
       false,
     );
-    expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: ['Mezclar', '   '] }).success).toBe(
-      false,
-    );
+    expect(
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('Mezclar'), paso('')] }).success,
+    ).toBe(false);
+    expect(
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('Mezclar'), paso('   ')] })
+        .success,
+    ).toBe(false);
 
     const { name, description, lines } = RECETA_VALIDA;
     const parsed = createRecipeSchema.parse({ name, description, lines });
     expect(parsed.steps).toEqual([]);
   });
 
+  it('el tipo es opcional y vale `texto` por defecto, y solo admite los dos del contrato', () => {
+    const sinTipo = createRecipeSchema.parse({ ...RECETA_VALIDA, steps: [{ body: 'Mezclar' }] });
+    expect(sinTipo.steps).toEqual([{ body: 'Mezclar', type: 'texto' }]);
+
+    expect(RECIPE_STEP_TYPES).toEqual(['texto', 'checklist']);
+    for (const type of RECIPE_STEP_TYPES) {
+      expect(
+        createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [{ body: 'Mezclar', type }] })
+          .success,
+      ).toBe(true);
+    }
+
+    expect(
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [{ body: 'Mezclar', type: 'video' }] })
+        .success,
+    ).toBe(false);
+  });
+
   it('rechaza mas de 50 pasos y el paso de mas de 1000 caracteres', () => {
-    const pasos51 = Array.from({ length: 51 }, (_, i) => `Paso ${i}`);
+    const pasos51 = Array.from({ length: 51 }, (_, i) => paso(`Paso ${i}`));
     expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: pasos51 }).success).toBe(false);
 
-    const pasos50 = Array.from({ length: 50 }, (_, i) => `Paso ${i}`);
+    const pasos50 = Array.from({ length: 50 }, (_, i) => paso(`Paso ${i}`));
     expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: pasos50 }).success).toBe(true);
 
     expect(
-      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: ['a'.repeat(1001)] }).success,
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('a'.repeat(1001))] }).success,
     ).toBe(false);
     expect(
-      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: ['a'.repeat(1000)] }).success,
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('a'.repeat(1000))] }).success,
     ).toBe(true);
   });
 });

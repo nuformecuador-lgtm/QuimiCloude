@@ -20,6 +20,10 @@ export {
   type RecipeImageValidation,
 } from './domain/recipe-image';
 export {
+  RECIPE_STEP_TYPES,
+  type RecipeStepType,
+  recipeStepSchema,
+  type RecipeStepInput,
   recipeLineSchema,
   createRecipeSchema,
   updateRecipeSchema,
@@ -27,7 +31,12 @@ export {
   type CreateRecipeInput,
   type UpdateRecipeInput,
 } from './domain/recipe-input';
-export { type RecipeSummary, type RecipeLineView, type RecipeDetail } from './domain/recipe-view';
+export {
+  type RecipeSummary,
+  type RecipeLineView,
+  type RecipeStepView,
+  type RecipeDetail,
+} from './domain/recipe-view';
 
 // Las cinco factories de caso de uso (`design.md > 3`).
 export { createCreateRecipe, type CreateRecipeDeps } from './domain/create-recipe';

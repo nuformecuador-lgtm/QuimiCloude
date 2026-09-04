@@ -119,7 +119,9 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         unitId: line.unitId,
       }),
     ),
-    steps: recipe.steps.map((text): RecipeStepFormValue => ({ key: createLocalKey('step'), text })),
+    steps: recipe.steps.map(
+      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), text: step.body, type: step.type }),
+    ),
     image: { kind: 'untouched' },
   };
 }

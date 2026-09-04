@@ -4,7 +4,12 @@ import { toast } from 'sonner';
 
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
 import { RecipeForm } from '@/app/(private)/produccion/formulas/components';
-import { MAX_IMAGE_BYTES, type RecipeDetail, type RecipeLineView } from '@/lib/modules/recetas';
+import {
+  MAX_IMAGE_BYTES,
+  type RecipeDetail,
+  type RecipeLineView,
+  type RecipeStepView,
+} from '@/lib/modules/recetas';
 import type {
   CreateRecipeFormState,
   RecipeQueryResult,
@@ -162,7 +167,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedAt: new Date('2026-01-02T00:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    steps: ['Mezclar'],
+    steps: [stepView('Mezclar')],
     lines: [lineView()],
     ...overrides,
   };
@@ -216,6 +221,11 @@ async function addValidLine(
   await chooseProductForLine(user, index, productName);
   await chooseUnitForLine(user, index, unitLabel);
   await user.type(screen.getByTestId(`recipe-line-quantity-${index}`), quantity);
+}
+
+/** Paso tal y como lo devuelve el detalle: `texto` es el tipo por defecto. */
+function stepView(body: string, type: RecipeStepView['type'] = 'texto'): RecipeStepView {
+  return { body, type };
 }
 
 // --- Imagen: firmas de contenido reales (`recipe-image.ts`), no solo la extensión del nombre. ---
@@ -350,7 +360,7 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     const recipe = recipeDetail({
       name: 'Receta existente',
       description: 'Una descripción',
-      steps: ['Paso uno', 'Paso dos'],
+      steps: [stepView('Paso uno'), stepView('Paso dos')],
       lines: [
         lineView({
           id: 'line-baja',
@@ -406,7 +416,7 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
         lineView({ id: 'line-a', productId: PRODUCT_1_ID, quantity: '1.0000' }),
         lineView({ id: 'line-b', productId: PRODUCT_2_ID, productName: PRODUCT_2_NAME, quantity: '2.0000' }),
       ],
-      steps: ['Mezclar', 'Calentar'],
+      steps: [stepView('Mezclar'), stepView('Calentar')],
     });
 
     renderEditForm(recipe);
@@ -420,11 +430,11 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [
       string,
-      { lines: { productId: string }[]; steps: string[] },
+      { lines: { productId: string }[]; steps: { body: string }[] },
     ];
     expect(payload.lines).toHaveLength(1);
     expect(payload.lines[0]?.productId).toBe(PRODUCT_1_ID);
-    expect(payload.steps).toEqual(['Mezclar', 'Calentar']);
+    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar']);
   });
 });
 
@@ -636,8 +646,8 @@ describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orde
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-    const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: string[] }];
-    expect(payload.steps).toEqual(['Mezclar', 'Calentar']);
+    const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
+    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar']);
   });
 });
 
@@ -674,10 +684,10 @@ describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () =
       await user.click(screen.getByTestId('recipe-form-submit'));
 
       await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: string[] }];
-      expect(payload.steps).not.toEqual(['Mezclar', 'Calentar', 'Enfriar']);
+      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
+      expect(payload.steps.map((step) => step.body)).not.toEqual(['Mezclar', 'Calentar', 'Enfriar']);
       expect(payload.steps).toHaveLength(3);
-      expect(payload.steps).toEqual(['Calentar', 'Enfriar', 'Mezclar']);
+      expect(payload.steps.map((step) => step.body)).toEqual(['Calentar', 'Enfriar', 'Mezclar']);
     } finally {
       uninstall();
     }
@@ -722,8 +732,8 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
       // teclado. Si se borrara el `KeyboardSensor` (o su `coordinateGetter`), este `ArrowDown`
       // no movería nada y esta aserción -no una que solo mirase el `role` del asa- se pondría
       // en rojo (`design.md > 7`, riesgo 5).
-      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: string[] }];
-      expect(payload.steps).toEqual(['Calentar', 'Mezclar', 'Enfriar']);
+      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
+      expect(payload.steps.map((step) => step.body)).toEqual(['Calentar', 'Mezclar', 'Enfriar']);
     } finally {
       uninstall();
     }
