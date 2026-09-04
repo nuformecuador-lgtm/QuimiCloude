@@ -12,10 +12,32 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | in_progress | feature/QC-52-separar-producto-de-catalogo-de-proveedor | PR #32 abierto, esperando merge humano (F2.5) |
 | QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
 | QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | implementer (spec aprobado por el humano el 2026-09-04) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | implementer (spec aprobado por el humano el 2026-09-04) |
+
+La feature **QC-52 — separar-producto-de-catalogo-de-proveedor** se cerró el 2026-09-04 (PR #32,
+merge `855fae6`): resumen en `progress/history.md`, worktree desmontado, rama borrada y **base
+propia `QuimiCloude_QC52` eliminada**. 34 requisitos con test y `reviewer` en **una sola ronda**
+(0 mayores, 6 menores, cinco ajenos a la ficha) — la ficha llegó acotada por `/afinar-feature` con
+16 decisiones cerradas antes del spec, y se notó. **Desbloquea QC-44.**
+
+**Tres deudas de arnés que destapó y que no le tocaban:** falta un `.gitattributes` (un subagente
+convirtió 15 archivos a CRLF y el diff pasó a marcar 497 líneas donde el cambio real son 19); la
+entrada de `recipe-route-contract.test.ts` en `baseline-rojos.json` **documenta un motivo que ya no
+es el que ocurre** —en las ramas de feature falla porque la guardia R44 de QC-26 muerde a cualquier
+rama que toque `db/`, y la cura que el propio baseline propone no arregla ese caso—; y **`./init.sh`
+no corre Playwright**, así que el E2E de inventario estuvo roto en `dev` por dos motivos
+independientes sin que ningún gate lo dijera. Las tres son candidatas a `/afinar-regla`.
+
+**Corrección a una nota de este archivo:** que sin `set -a && . ./.env && set +a` el gate pegue
+contra la base compartida **no es cierto en este repo**. Se midió: el cliente Prisma generado lee el
+`.env` al importarse y `prisma.config.ts` llama a `process.loadEnvFile()`. Sourcear sigue siendo
+buena idea por no depender de un implícito, pero la base propia no es decorativa sin ello.
+
+**Cuarta vez que el drift de base entre worktrees bloquea una feature**, y esta vez QC-52 fue quien
+rompió a QC-34 al aplicar su migración a la compartida. Siguen vivas y huérfanas
+`QuimiCloude_FIXGATE` y `QuimiCloude_QC14`; `QuimiCloude_QC34` sigue en uso.
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia

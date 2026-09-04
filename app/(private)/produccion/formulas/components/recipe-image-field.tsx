@@ -49,7 +49,7 @@ export function RecipeImageField({ mode, initialImageUrl, value, onChange }: Rec
       accept={ACCEPTED_TYPES}
       maxBytes={MAX_IMAGE_BYTES}
       testIdPrefix="recipe-image"
-      placeholder="Sin imagen"
+      placeholder="Arrastra la imagen aquí o haz clic para elegirla"
       clearLabel="Quitar imagen"
       // R36: en el alta no hay nada que quitar; y ya vaciada, tampoco.
       clearable={mode === 'edit' && value.kind !== 'cleared'}

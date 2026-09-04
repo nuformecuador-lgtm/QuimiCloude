@@ -2,16 +2,26 @@
 
 // components/shared/file-field.tsx
 //
-// Campo de carga de archivos COMPARTIDO: el consumidor delimita los tipos admitidos pasando un
-// array de `UploadableFileType` (`file-types.ts`) -una union de `type`, no `string`-, y el campo
-// se encarga del `accept` del input, de la vista previa, del rechazo por tamano/formato y de la
-// COMPRESION de las imagenes que se pasan del limite (`compress-image.ts`).
+// Campo de carga de archivos COMPARTIDO, con zona de arrastrar y soltar: el consumidor delimita
+// los tipos admitidos pasando un array de `UploadableFileType` (`file-types.ts`) -una union de
+// `type`, no `string`-, y el campo se encarga del `accept` del input, de la MINIATURA de lo
+// cargado, del rechazo por tamano/formato y de la COMPRESION de las imagenes que se pasan del
+// limite (`compress-image.ts`).
 //
 // **Compatible con el formulario controlado** (`recipe-form.tsx` y los que sigan ese patron):
 // no envia nada por su cuenta ni depende de `FormData` -las Server Actions de este repo reciben
 // objetos tipados, no `FormData`-. Entrega `onSelect({ file, bytes, type, compressed })` con los
 // bytes YA comprimidos y validados, que es justo lo que el payload necesita; quien decide que
 // hacer con ellos es el formulario.
+//
+// **El `<input type="file">` sigue siendo el control real**, solo que `sr-only`: la zona de
+// arrastre es un `<div>` que reenvia el clic al input, no un control paralelo. Asi el teclado y
+// los lectores de pantalla ven un campo de archivo normal con su `<Label>`, y el arrastre es una
+// comodidad de raton encima -no la unica via, que dejaria fuera a quien no puede arrastrar-.
+//
+// **El arrastre NO se fia del navegador para el `accept`**: al soltar, el filtrado por tipo lo
+// hace este componente (`isAcceptedType`), porque el atributo `accept` solo gobierna el dialogo
+// de seleccion, nunca lo que cae en la zona.
 //
 // **La compresion es SOLO para imagenes**: un PDF o un CSV que se pasa del limite se rechaza,
 // no se reencodea. Y una imagen que ya cabe no se toca (`compressed: false`), para no degradarla
@@ -20,15 +30,16 @@
 // **La validacion de dominio no vive aqui**: `validateBytes` deja que el consumidor imponga lo
 // suyo -la deteccion por FIRMA de `validateRecipeImage`, por ejemplo- sobre los bytes finales.
 
-import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
+import { FileIcon, UploadCloudIcon } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 import { compressImage } from './compress-image';
 import {
   describeAcceptedTypes,
+  formatFileSize,
   formatMegabytes,
   isAcceptedType,
   isImageType,
@@ -65,6 +76,7 @@ export type FileFieldProps = {
   readonly clearLabel?: string;
   /** Vista previa que aporta el consumidor (una URL ya existente). La local tiene prioridad. */
   readonly previewUrl?: string | null;
+  /** Llamada a la accion de la zona vacia. */
   readonly placeholder?: string;
   /** Validacion de dominio sobre los bytes finales (firma, cabeceras...). */
   readonly validateBytes?: (bytes: Uint8Array, type: UploadableFileType) => FileFieldValidation;
@@ -73,6 +85,13 @@ export type FileFieldProps = {
 };
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
+
+/** Estado visual de la zona: reposo, arrastre encima, trabajando y error. */
+const DROPZONE_BASE =
+  'relative flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors focus-within:ring-3 focus-within:ring-ring/50';
+const DROPZONE_IDLE = 'border-input bg-transparent hover:border-ring hover:bg-accent/40';
+const DROPZONE_DRAGGING = 'border-primary bg-primary/5';
+const DROPZONE_INVALID = 'border-destructive bg-destructive/5';
 
 export function FileField({
   label,
@@ -84,19 +103,25 @@ export function FileField({
   clearable = false,
   clearLabel = 'Quitar archivo',
   previewUrl = null,
-  placeholder = 'Sin archivo',
+  placeholder = 'Arrastra un archivo aquí o haz clic para elegirlo',
   validateBytes,
   testIdPrefix,
 }: FileFieldProps) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
+  const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<{ name: string; size: number; compressed: boolean } | null>(
+    null,
+  );
+  const [isDragging, setIsDragging] = useState(false);
+  const [isWorking, setIsWorking] = useState(false);
   const objectUrlRef = useRef<string | null>(null);
 
   const tooLargeMessage = `El archivo supera el tamaño máximo (${formatMegabytes(maxBytes)} MB).`;
   const unsupportedMessage = `Formato no admitido: usa ${describeAcceptedTypes(accept)}.`;
+  const hint = `${describeAcceptedTypes(accept)} · hasta ${formatMegabytes(maxBytes)} MB`;
 
   // Revoca el objeto URL vigente al desmontar: evita filtrar memoria.
   useEffect(() => {
@@ -111,28 +136,25 @@ export function FileField({
     setLocalPreviewUrl(next);
   }
 
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const chosen = event.target.files?.[0];
-    // Permite volver a elegir el MISMO archivo dos veces seguidas (el navegador no dispara
-    // `change` si el valor no cambia).
-    event.target.value = '';
-    if (chosen === undefined) return;
-
-    if (!isAcceptedType(chosen.type, accept)) {
+  /** Camino unico: da igual si el archivo llega del diálogo o de un arrastre. */
+  async function acceptFile(candidate: File) {
+    if (!isAcceptedType(candidate.type, accept)) {
       setError(unsupportedMessage);
       return;
     }
-    const chosenType = chosen.type;
+    const candidateType = candidate.type;
 
     // Compresion: SOLO imagenes, y solo si hace falta (`compress-image.ts`).
-    let file = chosen;
+    let file = candidate;
     let compressed = false;
-    if (chosen.size > maxBytes) {
-      if (!isImageType(chosenType)) {
+    if (candidate.size > maxBytes) {
+      if (!isImageType(candidateType)) {
         setError(tooLargeMessage);
         return;
       }
-      const result = await compressImage(chosen, { maxBytes, maxDimension, accept });
+      setIsWorking(true);
+      const result = await compressImage(candidate, { maxBytes, maxDimension, accept });
+      setIsWorking(false);
       if (!result.ok) {
         setError(tooLargeMessage);
         return;
@@ -142,7 +164,7 @@ export function FileField({
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const outputType = isAcceptedType(file.type, accept) ? file.type : chosenType;
+    const outputType = isAcceptedType(file.type, accept) ? file.type : candidateType;
 
     const validation = validateBytes?.(bytes, outputType) ?? { ok: true };
     if (!validation.ok) {
@@ -151,58 +173,127 @@ export function FileField({
     }
 
     setError(null);
-    setFileName(file.name);
+    setChosen({ name: file.name, size: file.size, compressed });
     replaceObjectUrl(isImageType(outputType) ? URL.createObjectURL(file) : null);
     onSelect({ file, bytes, type: outputType, compressed });
   }
 
   function handleClear() {
     replaceObjectUrl(null);
-    setFileName(null);
+    setChosen(null);
     setError(null);
     onClear?.();
   }
 
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    // Pasar por encima de un hijo dispara `dragleave` en el contenedor: sin esta guarda el
+    // resaltado parpadearía mientras el cursor recorre la miniatura o el texto.
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setIsDragging(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    // Sin esto el navegador ABRE el archivo soltado y se lleva la página por delante.
+    event.preventDefault();
+    setIsDragging(false);
+    const dropped = event.dataTransfer.files?.[0];
+    if (dropped !== undefined) void acceptFile(dropped);
+  }
+
   const displayUrl = localPreviewUrl ?? previewUrl;
-  const canOfferClear = clearable && onClear !== undefined && (displayUrl !== null || fileName !== null);
+  const canOfferClear = clearable && onClear !== undefined && (displayUrl !== null || chosen !== null);
+
+  const dropzoneState = isDragging
+    ? DROPZONE_DRAGGING
+    : error !== null
+      ? DROPZONE_INVALID
+      : DROPZONE_IDLE;
 
   return (
     <div className="flex flex-col gap-2" data-testid={`${testIdPrefix}-field`}>
       <Label htmlFor={inputId}>{label}</Label>
 
-      {displayUrl === null ? (
-        fileName === null ? (
-          <span
-            data-testid={`${testIdPrefix}-preview-placeholder`}
-            className="text-sm text-muted-foreground"
-          >
-            {placeholder}
-          </span>
+      <div
+        className={`${DROPZONE_BASE} ${dropzoneState}`}
+        data-testid={`${testIdPrefix}-dropzone`}
+        data-dragging={isDragging ? '' : undefined}
+        // La zona es una comodidad de ratón: reenvía el clic al input, que es el control real.
+        onClick={() => inputRef.current?.click()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {displayUrl !== null ? (
+          // eslint-disable-next-line @next/next/no-img-element -- vista previa local o URL ya compuesta por el backend, sin optimizacion propia
+          <img
+            src={displayUrl}
+            alt=""
+            className="h-28 w-28 rounded-lg border border-border object-cover"
+            data-testid={`${testIdPrefix}-preview`}
+          />
+        ) : chosen !== null ? (
+          <FileIcon className="size-8 text-muted-foreground" aria-hidden />
         ) : (
-          <span data-testid={`${testIdPrefix}-file-name`} className="text-sm">
-            {fileName}
-          </span>
-        )
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- vista previa local o URL ya compuesta por el backend, sin optimizacion propia
-        <img
-          src={displayUrl}
-          alt=""
-          className="h-24 w-24 rounded object-cover"
-          data-testid={`${testIdPrefix}-preview`}
-        />
-      )}
+          <UploadCloudIcon
+            className={`size-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`}
+            aria-hidden
+          />
+        )}
 
-      <Input
-        id={inputId}
-        type="file"
-        accept={toAcceptAttribute(accept)}
-        className="min-h-11 text-base"
-        aria-invalid={error === null ? undefined : true}
-        aria-describedby={error === null ? undefined : errorId}
-        data-testid={`${testIdPrefix}-input`}
-        onChange={(event) => void handleFileChange(event)}
-      />
+        {isWorking ? (
+          <p className="text-sm text-muted-foreground" data-testid={`${testIdPrefix}-working`}>
+            Comprimiendo la imagen…
+          </p>
+        ) : chosen === null ? (
+          <div className="flex flex-col gap-1">
+            <p
+              className="text-sm font-medium"
+              data-testid={
+                displayUrl === null ? `${testIdPrefix}-preview-placeholder` : `${testIdPrefix}-hint`
+              }
+            >
+              {isDragging ? 'Suelta el archivo para cargarlo' : placeholder}
+            </p>
+            <p className="text-xs text-muted-foreground">{hint}</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium" data-testid={`${testIdPrefix}-file-name`}>
+              {chosen.name}
+            </p>
+            <p className="text-xs text-muted-foreground" data-testid={`${testIdPrefix}-file-meta`}>
+              {formatFileSize(chosen.size)}
+              {chosen.compressed ? ' · comprimida para caber en el límite' : ''}
+            </p>
+            <p className="text-xs text-muted-foreground">Haz clic o arrastra otro para cambiarla</p>
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          accept={toAcceptAttribute(accept)}
+          className="sr-only"
+          aria-invalid={error === null ? undefined : true}
+          aria-describedby={error === null ? undefined : errorId}
+          data-testid={`${testIdPrefix}-input`}
+          onChange={(event) => {
+            const picked = event.target.files?.[0];
+            // Permite volver a elegir el MISMO archivo dos veces seguidas (el navegador no
+            // dispara `change` si el valor no cambia).
+            event.target.value = '';
+            if (picked !== undefined) void acceptFile(picked);
+          }}
+          // El clic del input burbujearía hasta la zona, que volvería a abrir el diálogo.
+          onClick={(event) => event.stopPropagation()}
+        />
+      </div>
 
       {error === null ? null : (
         <p
@@ -219,7 +310,7 @@ export function FileField({
         <Button
           type="button"
           variant="outline"
-          className={TOUCH_TARGET}
+          className={`${TOUCH_TARGET} self-start`}
           data-testid={`${testIdPrefix}-clear`}
           onClick={handleClear}
         >
