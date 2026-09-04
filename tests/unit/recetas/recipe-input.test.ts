@@ -1,16 +1,21 @@
 // T4 — Esquemas de entrada zod de receta (`design.md > 7.1`, `tasks.md > T4`). Validacion
-// de borde (R38): cierra R7, R9, R14, R16, R19, R20, R30, R50 (minimo e integridad) y el
+// de borde (R38): cierra R7, R9, R14, R16, R19, R30, R50 (minimo e integridad) y el
 // test explicito de que el esquema no colapsa `undefined` y `null` del campo `image`.
+//
+// QC-62: el paso dejo de ser `{ body, type }` y es un DOCUMENTO; R20 de QC-24 (1.000
+// caracteres por paso) queda DEROGADO por QC-62 R12. Aqui viven los requisitos de QC-62 que
+// se juegan en `createRecipeSchema`/`updateRecipeSchema` -R6 (validacion en el borde), R8
+// (posicion del paso que falla) y R13 (50 pasos, lista vacia por defecto)-; la forma del
+// documento en si la cubre `recipe-step-document.test.ts`.
 // R15 esta DEROGADO por R50: la unidad ya no es texto libre, es una referencia (UUID) al
 // catalogo de `unidades` -aqui solo se valida la FORMA, la existencia real es del caso de
 // uso, ver `tests/unit/recetas/recipe-service.test.ts`-.
 
 import {
-  RECIPE_STEP_TYPES,
+  MAX_STEP_ELEMENTS,
   createRecipeSchema,
   recipeLineSchema,
   updateRecipeSchema,
-  type RecipeStepType,
 } from '@/lib/modules/recetas/domain/recipe-input';
 import { pageQuerySchema } from '@/lib/modules/recetas/domain/page';
 
@@ -24,8 +29,8 @@ const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
   description: 'Formula base',
   steps: [
-    { body: 'Mezclar', type: 'texto' },
-    { body: 'Envasar', type: 'checklist' },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] },
+    { blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Envasar' }] }] }] },
   ],
   lines: [LINEA_VALIDA],
 };
@@ -118,20 +123,78 @@ describe('createRecipeSchema — lineas repetidas (R16)', () => {
   });
 });
 
-/** Paso valido del contrato: `texto` es el tipo por defecto. */
-function paso(body: string, type: RecipeStepType = 'texto') {
-  return { body, type };
+/** Paso valido del contrato: el documento mas corto que existe, un parrafo de un fragmento. */
+function paso(text: string) {
+  return { blocks: [{ kind: 'paragraph', spans: [{ text }] }] };
 }
 
-describe('createRecipeSchema — pasos (R19, R20)', () => {
-  it('rechaza unos pasos que no son lista de objetos o que traen el cuerpo vacio, y guarda lista vacia si no hay pasos', () => {
-    expect(
-      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: 'no es una lista' }).success,
-    ).toBe(false);
-    // La cadena suelta dejo de ser un paso valido cuando el paso gano tipo: ahora es `{ body }`.
+describe('createRecipeSchema — el documento del paso se valida EN EL BORDE (QC-62 R6)', () => {
+  it('rechaza el documento invalido antes de que llegue al caso de uso', () => {
+    // R6: el esquema de alta es la frontera. Lo que no tiene la forma admitida no cruza, y
+    // rechaza el ALTA ENTERA, no solo el paso.
+    expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: 'no es una lista' }).success).toBe(
+      false,
+    );
+    // La cadena suelta dejo de ser un paso valido: hoy un paso es un DOCUMENTO (QC-62 R1).
     expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: ['Mezclar'] }).success).toBe(
       false,
     );
+    // Y el campo `type` que desaparecio del contrato se rechaza como cualquier clave extra (R4, R9).
+    expect(
+      createRecipeSchema.safeParse({
+        ...RECETA_VALIDA,
+        steps: [{ ...paso('Mezclar'), type: 'texto' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [{ body: 'Mezclar' }] }).success,
+    ).toBe(false);
+  });
+
+  it('acepta un texto raro pero bien formado: el borde juzga la FORMA, nunca el contenido', () => {
+    // R6 en positivo, y R5: `  <script>  ` y los emojis son texto valido; el borde no opina
+    // sobre lo que dice el paso, solo sobre como esta hecho.
+    const raro = createRecipeSchema.parse({
+      ...RECETA_VALIDA,
+      steps: [paso('  <script>alert(1)</script> 50% H2O2 — 15 °C  ')],
+    });
+    expect(raro.steps[0]).toEqual(paso('  <script>alert(1)</script> 50% H2O2 — 15 °C  '));
+  });
+});
+
+describe('createRecipeSchema — la posicion del paso que falla (QC-62 R8)', () => {
+  it('el issue del segundo paso invalido apunta a `steps` con el indice 1', () => {
+    const result = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      steps: [paso('Mezclar'), paso('   '), paso('Envasar')],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      // El error identifica QUE paso falla por su posicion en la lista: la da zod sola en el
+      // `path` del issue, no hay que componer ningun mensaje a mano (`design.md > 3`).
+      const rutas = result.error.issues.map((issue) => issue.path.slice(0, 2));
+      expect(rutas).toContainEqual(['steps', 1]);
+      expect(rutas).not.toContainEqual(['steps', 0]);
+      expect(rutas).not.toContainEqual(['steps', 2]);
+    }
+  });
+
+  it('el issue de una clave extra apunta al paso y al bloque que la trae', () => {
+    const result = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      steps: [paso('Mezclar'), { blocks: [{ kind: 'paragraph', spans: [], level: 2 }] }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path.slice(0, 2))).toContainEqual(['steps', 1]);
+    }
+  });
+});
+
+describe('createRecipeSchema — pasos vacios y lista de pasos (R19, R20; QC-62 R7, R13)', () => {
+  it('rechaza el paso sin contenido y persiste lista vacia cuando no se indican pasos', () => {
     expect(
       createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('Mezclar'), paso('')] }).success,
     ).toBe(false);
@@ -139,43 +202,46 @@ describe('createRecipeSchema — pasos (R19, R20)', () => {
       createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('Mezclar'), paso('   ')] })
         .success,
     ).toBe(false);
+    expect(
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [{ blocks: [] }] }).success,
+    ).toBe(false);
 
+    // R13: sin `steps` sale `[]`, no `undefined`. Se mantiene lo vigente de QC-24/QC-25.
     const { name, description, lines } = RECETA_VALIDA;
     const parsed = createRecipeSchema.parse({ name, description, lines });
     expect(parsed.steps).toEqual([]);
   });
 
-  it('el tipo es opcional y vale `texto` por defecto, y solo admite los dos del contrato', () => {
-    const sinTipo = createRecipeSchema.parse({ ...RECETA_VALIDA, steps: [{ body: 'Mezclar' }] });
-    expect(sinTipo.steps).toEqual([{ body: 'Mezclar', type: 'texto' }]);
-
-    expect(RECIPE_STEP_TYPES).toEqual(['texto', 'checklist']);
-    for (const type of RECIPE_STEP_TYPES) {
-      expect(
-        createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [{ body: 'Mezclar', type }] })
-          .success,
-      ).toBe(true);
-    }
-
-    expect(
-      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [{ body: 'Mezclar', type: 'video' }] })
-        .success,
-    ).toBe(false);
-  });
-
-  it('rechaza mas de 50 pasos y el paso de mas de 1000 caracteres', () => {
-    const pasos51 = Array.from({ length: 51 }, (_, i) => paso(`Paso ${i}`));
-    expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: pasos51 }).success).toBe(false);
-
+  it('acepta 50 pasos y rechaza 51 (R13)', () => {
     const pasos50 = Array.from({ length: 50 }, (_, i) => paso(`Paso ${i}`));
     expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: pasos50 }).success).toBe(true);
 
+    const pasos51 = Array.from({ length: 51 }, (_, i) => paso(`Paso ${i}`));
+    expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: pasos51 }).success).toBe(false);
+  });
+
+  it('el paso ya no tiene tope de caracteres, pero si tope de elementos (QC-62 R11, R12)', () => {
+    // Los 1.000 caracteres por paso de QC-24 R20 ESTAN DEROGADOS por QC-62 R12.
     expect(
-      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('a'.repeat(1001))] }).success,
-    ).toBe(false);
-    expect(
-      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('a'.repeat(1000))] }).success,
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [paso('a'.repeat(5000))] }).success,
     ).toBe(true);
+
+    // Lo que si acota el paso es el numero de elementos, y el tope es la constante del
+    // contrato: nadie lo reescribe a mano aqui (R11).
+    const parrafos = (n: number) => ({
+      blocks: Array.from({ length: n }, (_, i) => ({
+        kind: 'paragraph',
+        spans: [{ text: `P${i}` }],
+      })),
+    });
+    expect(
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [parrafos(MAX_STEP_ELEMENTS)] })
+        .success,
+    ).toBe(true);
+    expect(
+      createRecipeSchema.safeParse({ ...RECETA_VALIDA, steps: [parrafos(MAX_STEP_ELEMENTS + 1)] })
+        .success,
+    ).toBe(false);
   });
 });
 

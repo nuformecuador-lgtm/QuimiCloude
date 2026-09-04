@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildRecipePayload,
+  stepDocumentToText,
+  textToStepDocument,
   type RecipeFormState,
   type RecipeLineFormValue,
   type RecipeStepFormValue,
+  type RecipeStepPayload,
 } from '@/app/(private)/produccion/formulas/components/recipe-form-state';
 
 /**
@@ -33,12 +36,22 @@ function line(overrides: Partial<RecipeLineFormValue> = {}): RecipeLineFormValue
   };
 }
 
-function step(
-  text: string,
-  key = `step-${text}`,
-  type: RecipeStepFormValue['type'] = 'texto',
-): RecipeStepFormValue {
-  return { key, text, type };
+function step(text: string, key = `step-${text}`): RecipeStepFormValue {
+  return { key, text };
+}
+
+/**
+ * Texto plano de cada paso del payload, aplanando sus parrafos. Se escribe aqui a mano -en vez
+ * de reusar `stepDocumentToText`- para que las aserciones de ORDEN no dependan de la misma
+ * funcion que otro test de este archivo esta probando.
+ */
+function stepTexts(steps: readonly RecipeStepPayload[]): string[] {
+  return steps.map((document) =>
+    document.blocks
+      .filter((block) => block.kind === 'paragraph')
+      .map((block) => block.spans.map((span) => span.text).join(''))
+      .join('\n'),
+  );
 }
 
 function baseState(overrides: Partial<RecipeFormState> = {}): RecipeFormState {
@@ -119,21 +132,70 @@ describe('buildRecipePayload — la cantidad viaja como la MISMA cadena que se e
   );
 });
 
-describe('buildRecipePayload — cada paso viaja como { body, type }', () => {
-  it('el texto del formulario sale como `body` y el tipo lo acompaña, paso a paso', () => {
-    const state = baseState({
-      steps: [step('Mezclar'), step('Comprobar', 'step-check', 'checklist')],
-    });
+describe('buildRecipePayload — cada paso viaja como el documento del contrato (R19)', () => {
+  it('el texto del formulario sale como un documento de un solo párrafo con un solo fragmento', () => {
+    const state = baseState({ steps: [step('Mezclar'), step('Comprobar', 'step-check')] });
 
     const payload = buildRecipePayload('edit', state);
 
     expect(payload.steps).toEqual([
-      { body: 'Mezclar', type: 'texto' },
-      { body: 'Comprobar', type: 'checklist' },
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] },
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Comprobar' }] }] },
     ]);
     // La clave local de React es de PRESENTACIÓN: nunca cruza al contrato.
     expect(payload.steps[0]).not.toHaveProperty('key');
     expect(payload.steps[0]).not.toHaveProperty('text');
+    // El `type` DESAPARECIÓ del contrato (R9): el puente no lo reintroduce por la puerta de atrás.
+    expect(payload.steps[0]).not.toHaveProperty('type');
+    expect(payload.steps[0]).not.toHaveProperty('body');
+  });
+
+  it('el texto se proyecta TAL CUAL: ni se recorta ni se parte por los saltos de línea (R5)', () => {
+    const payload = buildRecipePayload('edit', baseState({ steps: [step('  Mezclar\ndespacio  ')] }));
+
+    expect(payload.steps).toEqual([
+      { blocks: [{ kind: 'paragraph', spans: [{ text: '  Mezclar\ndespacio  ' }] }] },
+    ]);
+  });
+});
+
+describe('el puente de la pantalla: ida y vuelta entre texto y documento (R19)', () => {
+  it('textToStepDocument produce un párrafo de un fragmento sin marcas', () => {
+    expect(textToStepDocument('Mezclar')).toEqual({
+      blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }],
+    });
+  });
+
+  it('stepDocumentToText concatena los fragmentos de cada párrafo y separa los párrafos con un salto de línea', () => {
+    const document: RecipeStepPayload = {
+      blocks: [
+        { kind: 'paragraph', spans: [{ text: 'Mez' }, { text: 'clar', bold: true }] },
+        { kind: 'paragraph', spans: [{ text: 'despacio' }] },
+      ],
+    };
+
+    expect(stepDocumentToText(document)).toBe('Mezclar\ndespacio');
+  });
+
+  it('un texto que pasa por textToStepDocument y vuelve por stepDocumentToText es el mismo texto', () => {
+    for (const text of ['Mezclar', '  con espacios  ', 'con\nsalto']) {
+      expect(stepDocumentToText(textToStepDocument(text))).toBe(text);
+    }
+  });
+
+  it('un párrafo sin fragmentos aplana a la línea en blanco, y la lista de verificación se pierde: el puente es lossy y se asume', () => {
+    const document: RecipeStepPayload = {
+      blocks: [
+        { kind: 'paragraph', spans: [{ text: 'Antes' }] },
+        { kind: 'paragraph', spans: [] },
+        { kind: 'checklist', items: [{ spans: [{ text: 'Comprobar' }] }] },
+        { kind: 'paragraph', spans: [{ text: 'Después' }] },
+      ],
+    };
+
+    // Los párrafos sobreviven -incluida la línea en blanco-; el checklist NO tiene
+    // representación en un `<Input>` de texto y desaparece (`design.md > 6`).
+    expect(stepDocumentToText(document)).toBe('Antes\n\nDespués');
   });
 });
 
@@ -143,7 +205,7 @@ describe('buildRecipePayload — los pasos salen en el orden mostrado (R32)', ()
 
     const payload = buildRecipePayload('edit', state);
 
-    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar', 'Enfriar']);
+    expect(stepTexts(payload.steps)).toEqual(['Mezclar', 'Calentar', 'Enfriar']);
   });
 
   it('un orden distinto en state.steps produce un payload.steps distinto', () => {
@@ -153,7 +215,7 @@ describe('buildRecipePayload — los pasos salen en el orden mostrado (R32)', ()
 
     const payload = buildRecipePayload('edit', reordenado);
 
-    expect(payload.steps.map((step) => step.body)).toEqual(['Enfriar', 'Mezclar', 'Calentar']);
+    expect(stepTexts(payload.steps)).toEqual(['Enfriar', 'Mezclar', 'Calentar']);
   });
 });
 

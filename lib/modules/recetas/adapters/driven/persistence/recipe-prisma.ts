@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
 import { ValidationError } from '../../../domain/errors';
 import type { RecipeStepView } from '../../../domain/recipe-view';
@@ -38,27 +39,23 @@ export function fromDecimalQuantity(quantity: Prisma.Decimal): string {
 }
 
 /**
- * `Json` de la columna `steps` -> lista de pasos del puerto (R20).
+ * `Json` de la columna `steps` -> lista de pasos del puerto (R20, QC-62 R17).
  *
- * **Tolera los pasos ya guardados como CADENA suelta**, que es como se guardaban antes de que el
- * paso tuviera tipo: se leen como `{ body, type: 'texto' }`. No hay migracion de datos porque la
- * columna es `Json` y no hay nada que alterar en el esquema; convertir las filas existentes seria
- * reescribir datos de usuario para no ganar nada que esta funcion no resuelva al leer.
+ * Cada elemento se valida con el esquema del DOMINIO y el que no pasa **se descarta**,
+ * conservando los demas y su orden. Se descarta en vez de fallar la lectura porque una fila
+ * escrita a mano en la consola no debe tumbar la pantalla de recetas de todo el mundo.
+ *
+ * La tolerancia anterior -paso guardado como cadena suelta, con relleno del tipo por
+ * defecto- SE ELIMINO: la migracion `recipe_steps_reset` deja la columna en `[]` en todas
+ * las recetas (QC-62 R14), asi que ya no queda nada de aquella forma que tolerar.
  */
-function toSteps(steps: Prisma.JsonValue): readonly RecipeStepView[] {
+export function toSteps(steps: Prisma.JsonValue): readonly RecipeStepView[] {
   if (!Array.isArray(steps)) return [];
 
   const parsed: RecipeStepView[] = [];
   for (const step of steps) {
-    if (typeof step === 'string') {
-      parsed.push({ body: step, type: 'texto' });
-      continue;
-    }
-    if (step === null || typeof step !== 'object' || Array.isArray(step)) continue;
-    const body = 'body' in step ? step.body : undefined;
-    if (typeof body !== 'string') continue;
-    const type = 'type' in step ? step.type : undefined;
-    parsed.push({ body, type: type === 'checklist' ? 'checklist' : 'texto' });
+    const result = recipeStepSchema.safeParse(step);
+    if (result.success) parsed.push(result.data);
   }
   return parsed;
 }

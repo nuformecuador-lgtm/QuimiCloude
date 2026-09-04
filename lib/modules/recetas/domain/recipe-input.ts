@@ -60,26 +60,150 @@ const recipeNameSchema = z
 const recipeDescriptionSchema = z.string().trim().max(500).nullish();
 
 /**
- * Los dos tipos de paso. `texto` es el que existia -y el DEFECTO, para que un paso sin `type`
- * siga siendo valido-; `checklist` marca el paso que la pantalla presentara como lista de
- * verificacion.
+ * EL DOCUMENTO DE UN PASO (QC-62, `design.md > 2`). Un paso ya NO es `{ body, type }`: es un
+ * DOCUMENTO de estructura cerrada -parrafo, negrilla, cursiva y lista de verificacion, y nada
+ * mas (decision cerrada 1)-. El campo `type` desaparecio del contrato (R9, decision cerrada 2):
+ * si el documento lleva una lista de verificacion, ES un paso con checks; un dato derivado que
+ * se guarda acaba contradiciendo a su origen.
+ *
+ * `.strict()` en CADA objeto no es adorno: por defecto zod DESCARTA en silencio las claves que
+ * no declara, y R4 exige RECHAZARLAS. Sin esto, un documento con `href` o `level` cruzaria el
+ * borde recortado y nadie se enteraria.
  */
-export const RECIPE_STEP_TYPES = ['texto', 'checklist'] as const;
-
-export type RecipeStepType = (typeof RECIPE_STEP_TYPES)[number];
 
 /**
- * Un paso: su texto (`body`) y su tipo. Antes de esto un paso ERA la cadena; el `body` es esa
- * misma cadena con las mismas cotas (R19, R20) y el `type` es lo unico nuevo.
+ * Fragmento de texto con sus marcas (R3). `text` va SIN `.trim()` -R5: lo que llega se guarda
+ * tal cual- y SIN `.max()` -R12: no hay tope de caracteres en ninguna parte-. `min(1)` cierra
+ * "un fragmento sin ningun caracter se rechaza" (R3).
  */
-export const recipeStepSchema = z.object({
-  body: z.string().trim().min(1).max(1000),
-  type: z.enum(RECIPE_STEP_TYPES).default('texto'),
-});
+export const recipeStepSpanSchema = z
+  .object({
+    text: z.string().min(1),
+    bold: z.boolean().optional(),
+    italic: z.boolean().optional(),
+  })
+  .strict();
+
+export type RecipeStepSpan = z.infer<typeof recipeStepSpanSchema>;
+
+/** ¿La lista de fragmentos aporta al menos un caracter distinto de espacio? (R7) */
+function tieneCaracterVisible(spans: readonly { readonly text: string }[]): boolean {
+  return spans.some((span) => span.text.trim() !== '');
+}
+
+/**
+ * Item de una lista de verificacion. A diferencia del parrafo, NO puede quedar en blanco
+ * (R7): una linea en blanco dentro de una lista de verificacion no representa nada.
+ */
+export const recipeStepChecklistItemSchema = z
+  .object({
+    spans: z.array(recipeStepSpanSchema),
+  })
+  .strict()
+  .superRefine((item, ctx) => {
+    if (!tieneCaracterVisible(item.spans)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Un item de la lista de verificacion no puede quedar vacio.',
+      });
+    }
+  });
+
+export type RecipeStepChecklistItem = z.infer<typeof recipeStepChecklistItemSchema>;
+
+/**
+ * Bloque del documento. `kind` es un discriminante de BLOQUE, no el `type` que desaparece:
+ * el `type` clasificaba el paso entero y era derivable de su contenido; `kind` clasifica UN
+ * bloque y no es derivable de nada -sin el, un objeto con `spans` y otro con `items` solo se
+ * distinguen adivinando campos-. R9 prohibe el primero, no el segundo.
+ *
+ * Un `paragraph` SIN `spans` se acepta: es la linea en blanco, y los saltos de linea del paso
+ * son estos bloques, no caracteres dentro de un texto (R2). Un `checklist` SIN items se
+ * rechaza. La asimetria es deliberada.
+ */
+export const recipeStepBlockSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('paragraph'),
+      spans: z.array(recipeStepSpanSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('checklist'),
+      items: z.array(recipeStepChecklistItemSchema).min(1),
+    })
+    .strict(),
+]);
+
+export type RecipeStepBlock = z.infer<typeof recipeStepBlockSchema>;
+
+/**
+ * Tope de ELEMENTOS por paso (R11). Un elemento es cada parrafo y cada item de lista de
+ * verificacion; el bloque `checklist` en si NO suma, es el envoltorio de sus items.
+ *
+ * 30 lo cerro el humano al aprobar el spec (F1.4, ultima fila de "Decisiones cerradas"). Vive
+ * aqui, en UNA sola constante que el barrel publica, para que ninguna otra capa lo reescriba a
+ * mano y las dos se desincronicen.
+ */
+export const MAX_STEP_ELEMENTS = 30;
+
+/**
+ * Cuenta los elementos de un documento: nº de parrafos + nº de items. Funcion PURA y exportada
+ * para que quien tenga que avisar antes de enviar -y el test- cuente exactamente igual que el
+ * esquema, en vez de replicar la aritmetica (R11).
+ */
+export function countRecipeStepElements(document: {
+  readonly blocks: readonly RecipeStepBlock[];
+}): number {
+  return document.blocks.reduce(
+    (total, block) => total + (block.kind === 'paragraph' ? 1 : block.items.length),
+    0,
+  );
+}
+
+/** ¿El documento entero aporta al menos un caracter distinto de espacio? (R7) */
+function documentoTieneCaracterVisible(blocks: readonly RecipeStepBlock[]): boolean {
+  return blocks.some((block) =>
+    block.kind === 'paragraph'
+      ? tieneCaracterVisible(block.spans)
+      : block.items.some((item) => tieneCaracterVisible(item.spans)),
+  );
+}
+
+/**
+ * Un paso: el documento entero. Se valida por su FORMA, nunca por su contenido (R6, decision
+ * cerrada 8). El orden de los bloques se conserva tal cual llego (R1, R5).
+ */
+export const recipeStepSchema = z
+  .object({
+    blocks: z.array(recipeStepBlockSchema),
+  })
+  .strict()
+  .superRefine((document, ctx) => {
+    if (!documentoTieneCaracterVisible(document.blocks)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Un paso no puede quedar vacio.',
+      });
+    }
+    if (countRecipeStepElements(document) > MAX_STEP_ELEMENTS) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Un paso admite como maximo ${MAX_STEP_ELEMENTS} elementos.`,
+      });
+    }
+  });
 
 export type RecipeStepInput = z.infer<typeof recipeStepSchema>;
 
-/** Pasos: hasta 50, cada uno de hasta 1.000 caracteres, ninguno vacio (R19, R20). */
+/** Alias de lectura: el documento de un paso es el mismo dentro y fuera (`design.md > 2`). */
+export type RecipeStepDocument = RecipeStepInput;
+
+/**
+ * Pasos: hasta 50 por receta, y ninguno vacio (R13; se mantiene lo vigente de QC-24/QC-25).
+ * `.default([])`: sin pasos se persiste la lista vacia, no `undefined`.
+ */
 const recipeStepsSchema = z.array(recipeStepSchema).max(50).default([]);
 
 /** Rechaza que la lista de lineas repita el mismo `productId` (R16). */
