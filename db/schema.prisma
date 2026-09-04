@@ -298,16 +298,23 @@ model Supplier {
 /// su costo, su minimo de compra y su tiempo de entrega (decision cerrada 3).
 ///
 /// NO lleva `deletedAt` a proposito (decision cerrada 11, R28): la linea es parte del
-/// catalogo, no un hecho historico. Tampoco lleva `createdBy`/`updatedBy` (decision cerrada
-/// 14, R25), igual que `recipe_lines`.
+/// catalogo, no un hecho historico.
 ///
-/// OJO — `productId` es una FK REAL a `products` declarada como ESCALAR SIN `@relation`
-/// (decision cerrada 13, R22). La FK esta escrita a mano en `migration.sql`. Lo que
-/// `proveedores` sabe del producto llega por el contrato publico `@/lib/modules/inventario`,
-/// nunca por un `include` ni por `prisma.product`.
+/// SI lleva `createdBy`/`updatedBy` desde QC-43 (su decision cerrada 3, R31, R32). Se APARTA
+/// de la decision cerrada 14 de QC-42, que la dejo sin auditoria heredando el criterio de
+/// `recipe_lines`: alli editar una linea es editar la formula y el rastro queda en
+/// `recipes.updated_by`, mientras que aqui SUBIR EL COSTO es un hecho comercial propio que no
+/// modifica ningun dato del proveedor.
 ///
-/// OJO 2 — los tres CHECK de no negatividad (`cost`, `min_purchase`, `delivery_time`) son
-/// SQL escrito a mano: Prisma no modela CHECK. Ver `design.md > 4.4`.
+/// OJO — `productId`, `createdBy` y `updatedBy` son FK REALES -a `products` y a `users`-
+/// declaradas como ESCALARES SIN `@relation` (decision cerrada 13/14 de QC-42, R22; QC-43
+/// R26, R44). Las tres estan escritas a mano en su `migration.sql`. Lo que `proveedores` sabe
+/// del producto llega por el contrato publico `@/lib/modules/inventario`, nunca por un
+/// `include` ni por `prisma.product`; y el cliente Prisma no puede atravesar a `users`.
+///
+/// OJO 2 — los CHECK de `cost` (`> 0` desde QC-43), `min_purchase` y `delivery_time` (`>= 0`)
+/// son SQL escrito a mano: Prisma no modela CHECK. Ver `design.md > 4.4` de QC-42 y
+/// `design.md > 2.2` de QC-43.
 /// @module proveedores
 model SupplierCatalogLine {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -316,6 +323,8 @@ model SupplierCatalogLine {
   cost         Decimal  @db.Decimal(14, 4)
   minPurchase  Decimal? @map("min_purchase") @db.Decimal(14, 4)
   deliveryTime Int?     @map("delivery_time")
+  createdBy    String?  @map("created_by") @db.Uuid
+  updatedBy    String?  @map("updated_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -323,6 +332,8 @@ model SupplierCatalogLine {
 
   @@unique([supplierId, productId], map: "supplier_catalog_lines_supplier_id_product_id_key")
   @@index([productId], map: "supplier_catalog_lines_product_id_idx")
+  @@index([createdBy], map: "supplier_catalog_lines_created_by_idx")
+  @@index([updatedBy], map: "supplier_catalog_lines_updated_by_idx")
   @@map("supplier_catalog_lines")
 }
 
@@ -351,4 +362,82 @@ model Unit {
 
   @@unique([nameNormalized], map: "units_name_normalized_key")
   @@map("units")
+}
+
+/// Estado del pedido (QC-33, decision cerrada 4). Conjunto CERRADO en el propio esquema:
+/// anadir un valor es una migracion del tipo en Postgres, y el humano lo asumio a conciencia.
+/// Se aparta a proposito de `DocumentType` (QC-4), que resolvio el mismo problema con una
+/// tabla porque el conjunto DEBIA crecer sin migrar; aqui no debe.
+/// Que transiciones son validas NO se decide aqui: es QC-34 (R19).
+enum OrderStatus {
+  PENDIENTE
+  EN_CURSO
+  ENTREGADO
+}
+
+/// Prioridad del pedido (QC-33, decision cerrada 4). EL ORDEN DE DECLARACION ES EL ORDEN DE
+/// LA PRIORIDAD, de menor a mayor: reordenar estas cuatro lineas cambia el significado del
+/// dato y el `ORDER BY priority` de cualquier consulta futura. Postgres ordena un enum por su
+/// orden de declaracion, no alfabeticamente.
+enum OrderPriority {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+/// Pedido del ERP (QC-33). Una sola LINEA: receta, cantidad, unidad y precio UNITARIO
+/// (decision cerrada 1). No hay cabecera ni items, y no hay cliente ni destinatario
+/// (decision cerrada 8, R3): eso es deliberado y anadirlo despues obliga a decidir que
+/// cliente llevaban los pedidos ya cargados.
+///
+/// NO hay columna de total y es deliberado (decision cerrada 5, R10): el total es
+/// `quantity * unitPrice`, se calcula al leer y no se guarda, para que no pueda contradecir
+/// a sus factores. Tampoco hay impuestos ni facturacion: este ERP no factura
+/// (`docs/architecture.md > Dominio`, pregunta abierta 4, cerrada por esta ficha).
+///
+/// NO hay columna de fecha de solicitud (decision cerrada 10, R4): la pone el sistema y no se
+/// edita, o sea que es exactamente `createdAt`. Dos columnas con el mismo dato solo divergen.
+///
+/// OJO 1 — el correlativo son DOS columnas, `orderYear` + `orderSequence`, con indice unico
+/// COMPUESTO y TOTAL (R21, R22). NO es parcial, a diferencia de `recipes_name_unique`: un
+/// pedido borrado logicamente conserva su numero y NO lo libera (decision cerrada 9). El
+/// numero visible `2026-0000001` NO se guarda: lo compone `formatOrderNumber` del dominio (R24).
+/// `orderYear` es el ano de `createdAt` MEDIDO EN UTC, y lo garantiza el CHECK
+/// `orders_order_year_matches_created_at` (decision cerrada 28, R41): quien inserte con otro
+/// reloj se lleva un 23514.
+///
+/// OJO 2 — `recipeId`, `unitId`, `createdBy` y `updatedBy` son FK REALES pero se declaran como
+/// ESCALARES SIN `@relation` a proposito (decision cerrada 17 y su aplicacion a las otras dos
+/// fronteras, R33): las cuatro FK estan escritas A MANO en `migration.sql`. Asi la base
+/// garantiza la integridad y, a la vez, el cliente Prisma NO puede atravesar de `pedidos` a
+/// `recetas`, `unidades` ni `users` con un `include`. La guardia de modulos NO detectaria ese
+/// cruce, porque no es un import. Es DRIFT para Prisma: toda migracion futura de `orders` hay
+/// que revisarla a mano para que no borre las cuatro FK, los cinco CHECK ni el RLS.
+///
+/// `createdBy`/`updatedBy` son ANULABLES (decision cerrada 18, R26): NULL significa «no lo creo
+/// una persona» —una importacion, un seed—, no «se perdio el dato».
+/// @module pedidos
+model Order {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderYear     Int           @map("order_year")
+  orderSequence Int           @map("order_sequence")
+  recipeId      String        @map("recipe_id") @db.Uuid
+  quantity      Decimal       @db.Decimal(14, 4)
+  unitId        String        @map("unit_id") @db.Uuid
+  unitPrice     Decimal       @map("unit_price") @db.Decimal(14, 4)
+  priority      OrderPriority @default(BAJA)
+  status        OrderStatus   @default(PENDIENTE)
+  createdBy     String?       @map("created_by") @db.Uuid
+  updatedBy     String?       @map("updated_by") @db.Uuid
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([orderYear, orderSequence], map: "orders_order_year_order_sequence_key")
+  @@index([recipeId], map: "orders_recipe_id_idx")
+  @@index([unitId], map: "orders_unit_id_idx")
+  @@index([createdBy], map: "orders_created_by_idx")
+  @@index([updatedBy], map: "orders_updated_by_idx")
+  @@map("orders")
 }

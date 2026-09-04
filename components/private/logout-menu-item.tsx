@@ -33,7 +33,7 @@ export function LogoutMenuItem({ className, ...props }: React.ComponentProps<'bu
       disabled={pending}
       aria-busy={pending}
       data-testid="private-logout"
-      className={cn('w-full cursor-default text-left', className)}
+      className={cn('w-full cursor-pointer text-left', className)}
     >
       {LOGOUT_LABEL}
     </button>

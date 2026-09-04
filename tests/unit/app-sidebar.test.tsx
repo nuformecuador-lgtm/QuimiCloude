@@ -9,11 +9,11 @@ import {
   PRIVATE_NAV_LABEL,
   INVENTORY_ROUTE,
   RECIPES_LABEL,
-  SUPPLIERS_ROUTE,
   type NavGroup,
   type NavItem,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
+import * as privateNav from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/modules/identity';
 
@@ -58,15 +58,42 @@ function primerGrupo(): NavGroup {
   return grupo;
 }
 
-/** Segundo grupo de `PRIVATE_NAV_ITEMS`. */
-function segundoGrupo(): NavGroup {
-  const grupos = PRIVATE_NAV_ITEMS.filter((item): item is NavGroup => item.kind === 'group');
-  const segundo = grupos[1];
-  if (!segundo) {
-    throw new Error('PRIVATE_NAV_ITEMS no contiene un segundo item con submenu');
-  }
-  return segundo;
-}
+/**
+ * Fixture propia con dos grupos de un hijo cada uno, reconocible como dato de prueba y
+ * desacoplada de `PRIVATE_NAV_ITEMS` (R9, R10): no referencia `SUPPLIERS_ROUTE` (retirada en
+ * QC-13) ni `FORMULAS_ROUTE` (terreno de QC-26).
+ */
+const FIXTURE_GRUPO_A: NavGroup = {
+  kind: 'group',
+  label: 'Grupo A',
+  testId: 'grupo-a',
+  section: 'Fixture',
+  items: [
+    {
+      kind: 'link',
+      href: '/fixture/grupo-a/hijo',
+      label: 'Hijo A',
+      testId: 'grupo-a-hijo',
+    },
+  ],
+};
+
+const FIXTURE_GRUPO_B: NavGroup = {
+  kind: 'group',
+  label: 'Grupo B',
+  testId: 'grupo-b',
+  section: 'Fixture',
+  items: [
+    {
+      kind: 'link',
+      href: '/fixture/grupo-b/hijo',
+      label: 'Hijo B',
+      testId: 'grupo-b-hijo',
+    },
+  ],
+};
+
+const FIXTURE_DOS_GRUPOS: readonly NavItem[] = [FIXTURE_GRUPO_A, FIXTURE_GRUPO_B];
 
 function sessionUser(): SessionUser {
   return {
@@ -292,20 +319,19 @@ describe('barra lateral privada', () => {
 
   it('si la ruta activa es la de un hijo, su submenu arranca expandido y el hijo queda marcado como actual', () => {
     // R12
-    usePathnameMock.mockReturnValue(SUPPLIERS_ROUTE);
-    const grupo = primerGrupo();
-    const hijoActivo = grupo.items.find((hijo) => hijo.href === SUPPLIERS_ROUTE);
+    const hijoActivo = FIXTURE_GRUPO_A.items[0];
     if (!hijoActivo) {
-      throw new Error('el primer grupo no contiene un hijo hacia SUPPLIERS_ROUTE');
+      throw new Error('el fixture de grupo A no tiene hijos');
     }
-    renderSidebar();
+    usePathnameMock.mockReturnValue(hijoActivo.href);
+    renderSidebar(FIXTURE_DOS_GRUPOS);
 
     // Sin ninguna interaccion previa.
-    expect(screen.getByTestId(grupo.testId)).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(FIXTURE_GRUPO_A.testId)).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId(hijoActivo.testId)).toHaveAttribute('aria-current', 'page');
 
     // El otro submenu no se abre por contagio.
-    expect(screen.getByTestId(segundoGrupo().testId)).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId(FIXTURE_GRUPO_B.testId)).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('los destinos de la marca y de todas las entradas salen de las constantes exportadas', async () => {
@@ -386,4 +412,78 @@ describe('barra lateral privada', () => {
     // El testId viejo ya no aparece en ningun sitio del arbol renderizado.
     expect(screen.queryByTestId('nav-produccion-formulas')).toBeNull();
   });
+});
+
+describe('el borrado de items de relleno (QC-13)', () => {
+  it('private-nav.ts no exporta las constantes de ruta retiradas', () => {
+    // R1
+    const exportadas = Object.keys(privateNav);
+
+    expect(exportadas).not.toEqual(
+      expect.arrayContaining([
+        'NOTIFICATIONS_ROUTE',
+        'PURCHASE_ORDERS_ROUTE',
+        'SUPPLIERS_ROUTE',
+        'BATCHES_ROUTE',
+      ]),
+    );
+  });
+
+  it('PRIVATE_NAV_ITEMS no contiene ningun destino ni testId de los items retirados', () => {
+    // R2, R3
+    const rutasRetiradas = [
+      '/notificaciones',
+      '/compras/ordenes',
+      '/compras/proveedores',
+      '/produccion/lotes',
+    ];
+    const testIdsRetirados = ['nav-notificaciones', 'nav-compras'];
+
+    const todosLosItems: NavItem[] = [];
+    for (const item of PRIVATE_NAV_ITEMS) {
+      todosLosItems.push(item);
+      if (item.kind === 'group') {
+        todosLosItems.push(...item.items);
+      }
+    }
+
+    for (const item of todosLosItems) {
+      if (item.kind === 'link') {
+        expect(rutasRetiradas).not.toContain(item.href);
+      }
+      expect(testIdsRetirados).not.toContain(item.testId);
+    }
+  });
+
+  it('PRIVATE_NAV_ITEMS tiene exactamente tres entradas de nivel superior en orden', () => {
+    // R5
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(3);
+    expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
+      'nav-dashboard',
+      'nav-inventario',
+      'nav-produccion',
+    ]);
+  });
+
+  it('el grupo nav-produccion conserva un unico hijo, nav-produccion-formulas', () => {
+    // R6
+    const grupoProduccion = PRIVATE_NAV_ITEMS.find(
+      (item): item is NavGroup => item.kind === 'group' && item.testId === 'nav-produccion',
+    );
+    if (!grupoProduccion) {
+      throw new Error('PRIVATE_NAV_ITEMS no contiene el grupo nav-produccion');
+    }
+
+    expect(grupoProduccion.items).toHaveLength(1);
+    expect(grupoProduccion.items[0]?.testId).toBe('nav-produccion-formulas');
+  });
+
+  // El test «FORMULAS_ROUTE y su item se conservan intactos: terreno de QC-26» vivia aqui y lo
+  // BORRO QC-26 al llegar, no por incomodo: afirmaba `label === 'Formulas'` y
+  // `testId === 'nav-produccion-formulas'`, que son exactamente las dos cosas que esta ficha
+  // cambia por decision cerrada (R5). Su propio titulo lo declaraba: guardaba «terreno de QC-26»
+  // mientras QC-26 no existiera. Lo que protegia -que el item existe, es unico y apunta a la
+  // constante- lo cubre ahora el test de R5 de este mismo archivo, que ademas comprueba que el
+  // item YA NO dice «Formulas». Mantener los dos seria mantener dos versiones contradictorias de
+  // la misma verdad. Decision humana del 2026-09-03, al resolver el conflicto de F2.3.
 });

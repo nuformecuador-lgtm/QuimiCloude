@@ -157,7 +157,7 @@
       "epic_name": "Identidad y acceso",
       "name": "guardia-de-sesion-en-navegacion",
       "description": "Limpiar la navegacion privada del relleno de maqueta: quitar cuatro de los cinco enlaces que hoy dan 404 -Notificaciones, Ordenes de compra, Proveedores y Lotes- y sus constantes de ruta. El quinto, Formulas, NO se toca: QC-26 se lo esta apropiando para la pantalla de recetas, asi que borrarlo destruiria su trabajo. El menu queda con Dashboard, Inventario y el grupo Produccion con su unico hijo; el grupo Compras desaparece entero. La capacidad de agrupar del menu se conserva y su test pasa a datos de prueba propios, para no atarse a constantes que QC-26 esta moviendo. Ademas, el recorrido de extremo a extremo del retorno tras iniciar sesion pasa a pedir la pantalla de inventario en vez del dashboard, porque el dashboard es a la vez destino y respaldo y aterrizar ahi no demuestra que el retorno funcionara. Lo que la descripcion original de esta ficha prometia -validar la sesion en cada navegacion, redirigir en ambos sentidos, que el formulario autentique de verdad, que el layout muestre al usuario real y que cerrar sesion funcione- ya esta entregado por QC-9, QC-8, QC-11 y QC-12: la ficha se escribio antes de que QC-9 existiera. El destino de la raiz del sitio no entra: seguira siendo la plantilla de create-next-app hasta que exista una pantalla de inicio de verdad, que sera ficha propia.",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "complexity": "low",
       "zone": "frontend",
@@ -280,16 +280,33 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "registro-de-sesiones",
-      "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos.",
+      "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos. Solo el mecanismo y sus operaciones: sin pantalla. Las dos acciones NO son la misma y se resuelven distinto. Cerrar sesion en un dispositivo cierra SOLO ese dispositivo: quien sale en el movil sigue dentro en la oficina. En cambio cerrar todas las sesiones las cierra todas, incluida la actual. Y cuando el cierre lo ordena un administrador sobre otro usuario es SIEMPRE total, nunca una sesion suelta: el administrador no elige dispositivo. Cambiar el rol de alguien o darlo de baja tambien corta todas sus sesiones en el acto, y tiene que volver a entrar. Eso cierra la deuda que dejo escrita la ficha de proteccion de rutas privadas, donde el rol viaja firmado dentro del codigo de sesion y hasta hoy un cambio de rol tardaba en surtir efecto lo que tardara la sesion en caducar. Si el sistema no puede comprobar si una sesion fue cerrada -porque la base no responde, o porque falle la memoria rapida cuando exista- la sesion se trata como invalida y la persona vuelve al login. Ante la duda se corta: una revocacion que se puede saltar provocando un fallo no es una revocacion. El administrador puede cerrar las sesiones de otro usuario; el permiso se comprueba en el servicio y lleva su prueba. Que el usuario pueda VER la lista de sus dispositivos abiertos y cerrar uno concreto de la lista NO entra, y no habra ficha para ello: se descarto a proposito porque obliga a una lectura por peticion sin dar nada que no de el cierre total. Los botones tampoco entran aqui: el del usuario va en ficha aparte. Guardar en memoria rapida la comprobacion va en la ficha de cache de sesion.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "backend",
       "branch": "feature/QC-23-registro-de-sesiones",
       "depends_on": [
         "QC-8"
       ],
       "spec_path": "specs/QC-23-registro-de-sesiones"
+    },
+    {
+      "key": "QC-53",
+      "id": 53,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "cerrar-mis-sesiones",
+      "description": "El usuario necesita poder cerrar todas sus sesiones abiertas desde cualquiera de sus dispositivos, sin esperar a que caduquen. Es el boton que falta para que sirva el mecanismo de revocacion. Cerrar sesion normal, el de siempre, cierra solo el dispositivo desde el que se pulsa. Esta accion es la otra: cierra TODAS las sesiones de la persona, incluida la que esta usando en ese momento, asi que despues de pulsarla acaba en el login. Por eso tiene que quedar claro antes de pulsar que es lo que va a pasar, y no confundirse con el cerrar sesion de siempre. El caso real: alguien entro desde un equipo compartido de planta o desde un telefono que ya no tiene, se da cuenta al llegar a casa, y quiere cortar ese acceso sin llamar a nadie. Solo la pantalla y su conexion con el mecanismo, que ya existe: el mecanismo es la ficha de registro de sesiones. El boton del administrador para cerrar las sesiones de OTRO usuario no entra aqui, y hoy no tiene donde vivir porque no existe pantalla de administracion de usuarios.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-53-cerrar-mis-sesiones",
+      "depends_on": [
+        "QC-23"
+      ],
+      "spec_path": "specs/QC-53-cerrar-mis-sesiones"
     },
     {
       "key": "QC-24",
@@ -415,7 +432,7 @@
       "epic_name": "Pedidos",
       "name": "modelo-pedidos",
       "description": "Necesitamos persistir los pedidos. Solo el modelo de datos: sin pantalla y sin API. La tabla se llama Order, en ingles como el resto del esquema. Un pedido es una sola linea y no una cabecera con varias: pide una receta, en una cantidad, con un precio de venta y una unidad. La receta es obligatoria y cada pedido apunta a una sola; una misma receta puede estar en muchos pedidos. La cantidad es un numero con decimales exactos, obligatoria, y nunca negativa ni cero. El precio de venta lo escribe a mano quien crea el pedido -la receta no tiene precio-, es obligatorio, con decimales exactos y nunca negativo, y es un precio UNITARIO: es lo que cuesta una unidad, y el total del pedido se calcula multiplicando por la cantidad y no se guarda. La unidad sale del catalogo compartido de unidades, no es texto libre y es obligatoria: sin ella la cantidad y el precio no se pueden interpretar. Cada pedido lleva un numero visible correlativo que asigna el sistema, unico y creciente, que se REINICIA CADA ANO -2026-0001, 2027-0001- y que no se reutiliza dentro del mismo ano aunque el pedido se borre. El pedido guarda ademas una prioridad y un estado. La prioridad es opcional y vale baja cuando no se indica, dentro de un conjunto cerrado y ordenado: baja, media, alta, critica. El estado sale de otro conjunto cerrado -pendiente, en curso, entregado- y nace en pendiente; que transiciones son validas entre estados no entra aqui. Los dos conjuntos se guardan como enum, asumiendo a conciencia que anadir un valor mas adelante sera una migracion del tipo. NO hay fecha de solicitud propia: la pone el sistema y no se edita, o sea que es la fecha de creacion de la fila, y una segunda columna con el mismo dato solo podria divergir. Cada pedido guarda quien lo creo y quien lo modifico por ultima vez, ademas de sus fechas de creacion y modificacion. Borrar un pedido es logico, y un pedido ENTREGADO no se puede borrar. Si una receta se da de baja, el pedido conserva su referencia y sigue apuntando a la misma receta. El pedido NO registra a quien se le vende: no hay cliente ni destinatario, y es deliberado porque todavia no existe catalogo de clientes. Pedidos es un modulo propio y no parte de recetas ni de inventario: conoce la receta por lo que recetas publica y la unidad por lo que publica unidades, nunca por sus tablas. El alta, la consulta, la edicion y el borrado de pedidos van aparte.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",

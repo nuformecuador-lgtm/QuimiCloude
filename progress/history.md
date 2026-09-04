@@ -1234,3 +1234,138 @@ QC-25: **tercer caso en tres días**.
 - **QC-45** nació al acotar esta ficha y está desbloqueada.
 - Dos guardias de fuente más anchas que su requisito, y el centinela de alcance que **pondrá en
   rojo a QC-45 por construcción** — que se lea como premisa caída, no como guardia que estorba.
+
+## QC-33 — modelo-pedidos (cerrada el 2026-09-03, PR #26, merge `73c2fb6`)
+
+Primera ficha de la épica **QC-31 — Pedidos**. Crea `Order` como **módulo hexagonal propio
+`pedidos`**, que conoce la receta por el contrato público de `recetas` y la unidad por el de
+`unidades`, nunca por sus tablas. **42 requisitos** y **29 decisiones cerradas**. Gate del leader:
+120 de 121 archivos verdes, **1336 tests**. Reviewer **APROBADO con 0 mayores** y once mutaciones,
+todas revertidas y sin escribir una fila en la base. Desbloquea **QC-34**.
+
+Acotada con `/afinar-feature` en dos tandas, más una tercera vuelta al revisar en F1.4. **Ningún
+rechazo**: el spec pasó a la primera, a diferencia de QC-32.
+
+### Lo que hay que recordar
+
+- **Un enum nuevo invalida las afirmaciones de alcance de todo el repo.** QC-4, QC-14 y QC-24
+  habían escrito cada uno un test que decía que en **todo** el esquema no existe ningún enum,
+  porque entonces la regla era «los conjuntos cerrados van como tabla». El humano decidió enum
+  para QC-33 y esas cuatro afirmaciones pasaron a ser falsas de golpe, más dos que contaban tipos
+  y FK contra la base. **Los tests no estaban mal: se quedaron viejos.**
+- **El gate rápido no ve esos tests, y por eso el completo antes del PR no es ceremonia.** El
+  implementer reportó **1** rojo y el gate completo destapó **6**, de los que **5 eran suyos**.
+  `vitest related` no los relaciona porque no los une el árbol de archivos sino una afirmación
+  sobre el repositorio entero. Es el mismo agujero que ya costó caro en **QC-20**. El leader los
+  atribuyó corriéndolos contra `dev` limpio antes de devolverlos, no por deducción.
+- **Acotar no es aflojar, y se mide.** El diff de la corrección son 308 inserciones y **9**
+  borrados, y lo borrado son exactamente las cuatro líneas de alcance global. `unidades-constraints`
+  mantuvo su `toEqual` y **sumó** `orders_unit_id_fkey`; `recetas-constraints` filtró por sujeto
+  propio **sin lista negra** de `OrderStatus`/`OrderPriority`, que habría atado `recetas` a
+  `pedidos` — la dependencia que la arquitectura prohíbe.
+- **Una garantía puede caber en la base solo si se escribe de una forma concreta.** El `CHECK` que
+  ata el año del correlativo a `created_at` en UTC usa `timezone(text, timestamptz)` porque es
+  `IMMUTABLE`; `EXTRACT(YEAR FROM created_at)` a secas es `STABLE` y **Postgres la rechaza dentro
+  de un `CHECK`**. La garantía existía; la primera forma de escribirla no.
+- **Un test con una fecha literal es una bomba de relojería.** Los de integración calculan el año
+  con `new Date().getUTCFullYear()`: escribir `2026` habría puesto la suite roja sola el 1 de enero.
+- **El precio se guarda unitario y el total no se guarda**, para que no pueda contradecir a sus
+  factores. Y el índice único del correlativo es **total, no parcial** —al revés que QC-24—, que es
+  lo que impide reutilizar un número tras el borrado lógico.
+- **Un spec honesto dice lo que no puede cerrar.** La asignación de la posición del correlativo es
+  una escritura, y en una ficha de modelo no hay ninguna: se subió a **QC-34** con las tres
+  estrategias comparadas y ninguna elegida, en vez de fingir que estaba resuelta.
+
+### Deuda que deja
+
+- **La base compartida tiene una fila residual que rompe el gate de todas las sesiones.** Un
+  producto `FeldesQuack` bloquea el `DELETE FROM users` de `identity-seed.int.test.ts` con `23503`
+  (8 casos rojos, **también en `dev`**). Decisión del humano: **no se borra, no se arregla el helper
+  y NO se mete al baseline** — el baseline es para deuda de código, y enmascarar esto ocultaría
+  para siempre un test que volverá a pasar solo. **La causa de fondo sigue viva**:
+  `resetIdentityToEmptyState` borra usuarios sin limpiar antes las tablas que los referencian, así
+  que cualquier feature con una FK a `users` puede repetirlo — y QC-33 acaba de añadir dos.
+  Candidato a ficha propia.
+- **Tres menores del review**, ninguno bloqueante: el cierre transitivo del barrel en
+  `module-contract.test.ts` se detiene en la frontera de módulo (hoy lo tapa un regex, no el
+  cierre); el filtro por etiqueta de `recetas-constraints` usa símbolos de una y dos letras, con
+  riesgo de falso positivo pero nunca de falso verde; y una nota de bitácora ya corregida.
+- **Dos preguntas abiertas, las dos a propósito:** quién asigna la posición del correlativo y qué
+  pasa con dos altas simultáneas (**QC-34**; si no se resuelve allí, una de las dos fallará con un
+  `23505` sin traducir), y si algún día se exporta a un contable externo.
+
+## QC-13 — guardia-de-sesion-en-navegacion (2026-09-03)
+
+PR [#27](https://github.com/nuformecuador-lgtm/QuimiCloude/pull/27), merge `045074c`. Épica QC-17,
+`zone: frontend`, `complexity: low`. **16 requisitos EARS, los 16 con test que muerde.** 1349 tests
+con 1341 en verde; **E2E verde en Chromium y WebKit**. Reviewer **APROBADO, 0 mayores**.
+
+### La ficha mentía, y eso fue el hallazgo principal
+
+Su `description` prometía «conectar la maquetación con la sesión real»: validar la cookie en cada
+navegación, redirigir en los dos sentidos, que el formulario autentique, que el layout muestre al
+usuario y que el logout funcione. **Se escribió antes de que existiera QC-9, que se llevó casi
+todo.** Verificado en el código y no en los documentos: `login-form.tsx` ya llamaba a
+`loginAction`, `layout.tsx` ya hacía `identity.getSessionUser()`, `nav-user.tsx` ya montaba
+`logoutAction`. **Y el E2E que QC-12 le difirió explícitamente ya existía** —`session.spec.ts`,
+R24 de QC-9—: esa deuda se cerró **por constatación**.
+
+`/afinar-feature` corrigió **cuatro campos del board antes de sembrar**: `description` reescrita,
+`zone` de `fullstack` a `frontend` (sin partición), `complexity` de `medium` a `low`, y `QC-22`
+añadida a `depends_on`. El alcance real quedó en tres cosas: quitar cuatro ítems muertos del menú,
+mover un test a fixture propia, y que el E2E del retorno pida `/inventario`.
+
+**La lección general: una ficha vieja no describe el repo de hoy.** Antes de especificar, se
+verifica contra el código lo que la tarjeta afirma que falta.
+
+### El choque con QC-26, evitado en la validación de F1.0
+
+QC-13 iba a borrar los **cinco** ítems de relleno. Uno de ellos, «Fórmulas», **lo está reclamando
+QC-26** para el catálogo de recetas: su R5 dice que «NO DEBE seguir presentando la etiqueta
+Fórmulas». Las dos features se destruían entre sí.
+
+**Solo se ve entrando a leer el spec de la otra**, porque el de QC-26 vivía en su worktree y no en
+`dev`. Es la comprobación que `AGENTS.md > Paralelismo` asigna al **leader** y que el validador no
+automatiza — y es la primera vez que se cobra su valor. El alcance bajó a **cuatro** ítems y
+`FORMULAS_ROUTE` quedó marcada como intocable en los tres archivos del spec.
+
+### El gate del leader encontró lo que los subagentes no podían ver
+
+`tests/unit/sidebar-ajuste.test.tsx` afirmaba que **algún ítem del menú real declara contador**.
+Era cierto solo porque «Notificaciones» —placeholder de QC-11— era el único con `badge`. Vive en un
+archivo **fuera del alcance de la ficha**, así que `vitest related` no lo alcanzaba y ningún
+subagente lo iba a ver. Se retiró esa aserción conservando la que prueba lo que el test dice
+probar, con fixture propia. **Es exactamente el reparto que `AGENTS.md > Regla del gate` describe.**
+
+### El rol del E2E: de dependencia silenciosa a fallo ruidoso
+
+Para aterrizar en `/inventario` hace falta el rol `Administrador` (regla ruta-rol de QC-22), pero
+el fixture creaba un **rol efímero propio**, así que el middleware lo rebotaba al dashboard y el
+E2E caía en los dos navegadores. Decisión del humano: **lo efímero que importa es el usuario, no el
+rol**. El fixture pasa a **leer** el `Administrador` del seed y a **fallar con un mensaje claro si
+no existe**, pidiendo correr el seed de QC-6. El `afterAll` ya no toca la tabla `roles` en ningún
+caso. Cierra en la práctica la pregunta abierta 2.
+
+### Lo que destapó fuera de la feature
+
+- **`dev` local y `origin/dev` llevaban divergidos 11↔10 commits**, y ninguna rama podía sincronizar
+  limpio. Se reconciliaron como **unión** sin descartar notas de ninguna sesión: `history.md`
+  conflictaba **entero** por finales de línea —la deuda del `.gitattributes` que falta—, y de
+  `current.md` se trajeron tres secciones de Evaluaciones que solo tenía el remoto.
+- **El worktree principal quedó en la rama `fix-ux`, no en `dev`**, y varias sesiones commitearon
+  ahí creyendo que era `dev`. `CLAUDE.md` dice que el principal se queda en `dev` y que nadie hace
+  `checkout` en él. Sigue así al cerrar esta ficha.
+
+### Deuda que hereda
+
+- **QC-26 y esta ficha escriben las dos en `private-nav.ts` y `app-sidebar.test.tsx`.** Aquí el
+  merge salió limpio porque QC-26 aún no estaba en `dev`; **el conflicto sigue pendiente para
+  quien mergee después**.
+- **`./init.sh` no llegó a `== init OK ==`** por dos causas ajenas, declaradas en el PR: la
+  asimetría del validador desde un worktree secundario, y los 8 rojos del seed por el producto
+  residual de QC-22 que el humano decidió no tocar.
+- **La raíz `/` sigue siendo la plantilla de `create-next-app`**, pública. Fuera de esta ficha por
+  decisión explícita del humano, a la espera de una pantalla de inicio de verdad **que todavía no
+  tiene tarjeta**.
+- **El menú quedó con tres entradas** —Dashboard, Inventario y Producción con un solo hijo—, y
+  nadie ha decidido si una sección de un elemento se justifica.

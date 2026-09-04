@@ -4,10 +4,12 @@ import { DASHBOARD_ROUTE, FORMULAS_ROUTE, INVENTORY_ROUTE } from '../routes';
  * Navegacion de la zona privada (`design.md > 4.3`).
  *
  * **Los items y sus rutas nacieron como datos de relleno (placeholder, D2), no dominio.** Salvo
- * el dashboard —que crea la feature 9— e `INVENTORY_ROUTE` —que estrena QC-22—, **ninguna de
- * estas rutas existe**: visitarlas hoy da **404, y eso es lo esperado**, mismo patron que
- * `FORGOT_PASSWORD_ROUTE` de la feature 7. La feature que traiga cada modulo del ERP sustituye su
- * item y su constante de ruta; nadie debe leer esta tabla como definicion del dominio quimico.
+ * el dashboard —que crea la feature 9— e `INVENTORY_ROUTE` —que estrena QC-22—, la unica ruta de
+ * placeholder que queda es `FORMULAS_ROUTE`: visitarla hoy da **404, y eso es lo esperado**,
+ * mismo patron que `FORGOT_PASSWORD_ROUTE` de la feature 7, hasta que QC-26 la convierta en real.
+ * Las demas rutas de relleno (notificaciones, compras, lotes) se retiraron en QC-13 por no tener
+ * feature que las respalde. La feature que traiga cada modulo del ERP sustituye su item y su
+ * constante de ruta; nadie debe leer esta tabla como definicion del dominio quimico.
  *
  * `DASHBOARD_ROUTE`, `INVENTORY_ROUTE` y `FORMULAS_ROUTE` se **reutilizan** de
  * `lib/shared/routes.ts` en vez de redeclararlas: dos constantes con la misma ruta es como se
@@ -35,15 +37,11 @@ export { INVENTORY_ROUTE };
  * Reexport por compatibilidad: `FORMULAS_ROUTE` **vive en `lib/shared/routes.ts`**, no aqui.
  *
  * Nacio en este archivo como placeholder y quien ya la importaba de `private-nav` sigue
- * funcionando sin tocarse. Codigo nuevo debe importarla de `lib/shared/routes.ts`.
+ * funcionando sin tocarse. Codigo nuevo debe importarla de `lib/shared/routes.ts`, que es de
+ * donde la leen el middleware y la regla ruta->rol: esos NO pueden depender de la navegacion,
+ * que arrastra etiquetas, iconos y agrupacion de UI. Mismo criterio que `INVENTORY_ROUTE`.
  */
 export { FORMULAS_ROUTE };
-
-// --- Rutas de ejemplo (placeholder, D2). Ninguna de estas cuatro existe todavia: hoy dan 404. ---
-export const NOTIFICATIONS_ROUTE = '/notificaciones';
-export const PURCHASE_ORDERS_ROUTE = '/compras/ordenes';
-export const SUPPLIERS_ROUTE = '/compras/proveedores';
-export const BATCHES_ROUTE = '/produccion/lotes';
 
 /** Etiqueta del sidebar para la pantalla de recetas (QC-26, R3). */
 export const RECIPES_LABEL = 'Recetas';
@@ -145,38 +143,6 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     section: NAV_SECTION_OPERATION,
   },
   {
-    kind: 'link',
-    href: NOTIFICATIONS_ROUTE,
-    label: 'Notificaciones',
-    testId: 'nav-notificaciones',
-    icon: 'bell',
-    section: NAV_SECTION_OPERATION,
-    badge: 3,
-  },
-  {
-    kind: 'group',
-    label: 'Compras',
-    testId: 'nav-compras',
-    icon: 'shopping-cart',
-    section: NAV_SECTION_CHAIN,
-    items: [
-      {
-        kind: 'link',
-        href: PURCHASE_ORDERS_ROUTE,
-        label: 'Órdenes de compra',
-        testId: 'nav-compras-ordenes',
-        icon: 'clipboard-list',
-      },
-      {
-        kind: 'link',
-        href: SUPPLIERS_ROUTE,
-        label: 'Proveedores',
-        testId: 'nav-compras-proveedores',
-        icon: 'truck',
-      },
-    ],
-  },
-  {
     kind: 'group',
     label: 'Producción',
     testId: 'nav-produccion',
@@ -189,13 +155,6 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         label: RECIPES_LABEL,
         testId: 'nav-produccion-recetas',
         icon: 'flask-conical',
-      },
-      {
-        kind: 'link',
-        href: BATCHES_ROUTE,
-        label: 'Lotes',
-        testId: 'nav-produccion-lotes',
-        icon: 'boxes',
       },
     ],
   },
