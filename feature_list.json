@@ -779,6 +779,21 @@
       "branch": "feature/QC-57-orden-y-filtro-en-listados",
       "depends_on": null,
       "spec_path": "specs/QC-57-orden-y-filtro-en-listados"
+    },
+    {
+      "key": "QC-58",
+      "id": 58,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "flake-formulario-producto",
+      "description": "El archivo de pruebas de la pantalla de productos falla de forma intermitente cuando se corre la bateria completa, y pasa siempre cuando se corre solo. Falla un caso distinto en cada corrida, asi que no es un fallo de una regla concreta sino del propio andamiaje de la prueba. El sintoma es claro: al escribir un nombre en el formulario, las letras llegan intercaladas -sale \"xxxxxAxcxixdxox\" donde deberia salir \"Acido citrico\"-, lo que indica que el campo tarda en repintarse entre tecla y tecla cuando la maquina va cargada, y la prueba escribe mas rapido de lo que el campo se actualiza. Se verifico rojo en dev (commit c0c16af) ANTES de la rama de QC-34, que no toca ni inventario ni pantalla. El 2026-09-04, al cerrar QC-34, se metio al baseline de rojos heredados con su motivo y su fecha, y esta ficha es el compromiso de arreglarlo de verdad. Que entra: dejar el archivo verde de forma estable en la suite completa, demostrarlo con varias corridas seguidas, y RETIRARLO del baseline en el mismo cambio. Si resulta que el campo del formulario tiene un problema real de control del valor, arreglarlo tambien entra. Que NO entra: rehacer la pantalla de productos ni sus reglas, que son de QC-20 y QC-22.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-58-flake-formulario-producto",
+      "depends_on": null,
+      "spec_path": "specs/QC-58-flake-formulario-producto"
     }
   ]
 }
