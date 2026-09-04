@@ -3,30 +3,31 @@ import type { CatalogLineView } from './catalog-line-view';
 import { NotFoundError, ValidationError } from './errors';
 import { pageQuerySchema, type Page } from './page';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
-
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
 export type ListCatalogLinesDeps = {
   readonly catalog: SupplierCatalogRepository;
-  /** El contrato publico de `inventario`, por el barrel y solo como tipo (R26). */
-  readonly products: ProductCatalog;
 };
 
 /**
- * Listado paginado del catalogo de UN proveedor (R35, R36, R37).
+ * Listado paginado del catalogo de UN proveedor (R22, R23, R25, R31).
  *
- * Tres cosas que este archivo hace y conviene no perder de vista:
+ * QC-52 lo deja en un caso de uso de tres lineas, y ese adelgazamiento ES el requisito
+ * (R18, decision cerrada 3): desaparecen la dependencia hacia el catalogo de articulos de
+ * `inventario`, la consulta que resolvia sus referencias y el `map` que pegaba sus nombres
+ * a cada linea. La pagina se devuelve TAL CUAL la da el puerto.
  *
- * 1. **Una sola llamada a `findRefs` para toda la pagina**, con los ids de todas sus lineas
- *    (`design.md > 5.3`). Preguntar una vez por linea seria N+1 consultas cruzando la
- *    frontera de un modulo.
- * 2. **El producto dado de baja no borra la linea** (R37): `findRefs` solo devuelve vivos,
- *    asi que su nombre sale `null` y la linea SIGUE en la pagina. Perderla seria perder el
- *    precio pactado de un producto que solo esta descatalogado.
- * 3. **El proveedor dado de baja no tiene catalogo** (R36): lo comprueba el puerto
- *    (`listBySupplierAlive`), no un `if` de aqui, y sus lineas no se devuelven aunque las
- *    filas sigan existiendo.
+ * Consecuencia aceptada (`design.md > 6.2`): las lineas salen con `presentationId` y
+ * `unitId` en crudo, sin nombre. Resolverlos es de la pantalla del catalogo (QC-44), que
+ * tendra que pedir esos contratos a quien es dueno de cada concepto.
+ *
+ * Dos filtros que NO estan aqui, y es deliberado: «el proveedor tiene que estar vivo» y «la
+ * linea tiene que estar viva» son del PUERTO (`listBySupplierAlive`), no de un `if` de este
+ * archivo (R22), y por eso ningun caso de uso puede olvidarlos.
+ *
+ * El orden sigue siendo `created_at ASC, id ASC` y no cambia a `name ASC` aunque ahora la
+ * linea tenga nombre propio: seria alcance de mas y el listado no tiene pantalla hasta
+ * QC-44 (`design.md > 6.5`).
  */
 export function createListCatalogLines(
   deps: ListCatalogLinesDeps,
@@ -47,17 +48,7 @@ export function createListCatalogLines(
 
     const page = await deps.catalog.listBySupplierAlive(supplierId, parsed.data);
     if (page === 'supplier_not_found') throw new NotFoundError();
-    if (page.items.length === 0) return page;
 
-    const refs = await deps.products.findRefs(page.items.map((line) => line.productId));
-    const nombrePorId = new Map(refs.map((ref) => [ref.id, ref.name]));
-
-    return {
-      ...page,
-      items: page.items.map((line) => ({
-        ...line,
-        productName: nombrePorId.get(line.productId) ?? null,
-      })),
-    };
+    return page;
   };
 }

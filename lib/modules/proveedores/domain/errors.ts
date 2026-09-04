@@ -48,26 +48,32 @@ export class DuplicateNameError extends ProveedoresError {
   }
 }
 
-/** R27: la pareja proveedor-producto ya tiene linea en el catalogo. */
+/**
+ * R15, R24: el proveedor ya tiene una linea VIVA con ese nombre normalizado y esa
+ * presentacion.
+ *
+ * QC-52 le cambia la DEFINICION -antes era la pareja del proveedor con el articulo del
+ * inventario, ahora es `(supplier_id, name_normalized, presentation_id)`- pero NO el nombre
+ * ni el `code`
+ * (`design.md > 6.1`): el caso sigue existiendo, solo cambia la clave que lo dispara.
+ * Renombrarlo obligaria a QC-44 a conocer dos codigos para lo mismo, que es exactamente lo
+ * que R32 prohibe. Mismo criterio con el que QC-43 conservo `suppliers_contact_required` al
+ * cambiarle la definicion.
+ */
 export class DuplicateCatalogLineError extends ProveedoresError {
   readonly code = 'duplicate_catalog_line';
 
-  constructor(message = 'Ese producto ya esta en el catalogo de este proveedor.') {
+  constructor(message = 'Ese proveedor ya tiene una linea con ese nombre y esa presentacion.') {
     super(message);
   }
 }
 
-/**
- * R26: el producto no existe o esta dado de baja. Para este modulo son EL MISMO CASO:
- * `ProductCatalog.findRefs` solo devuelve productos vivos (`design.md > 5.3`).
- */
-export class ProductNotFoundError extends ProveedoresError {
-  readonly code = 'product_not_found';
-
-  constructor(message = 'El producto indicado no existe o esta dado de baja.') {
-    super(message);
-  }
-}
+// QC-52 borro la clase de error de «articulo del inventario no encontrado» y su `code`
+// (R32, decision cerrada 7). NO se conserva «por compatibilidad»: la linea ya no guarda
+// ninguna referencia a ese modulo, asi que el caso no puede ocurrir, y un codigo de error
+// que nadie puede provocar es una rama muerta que el proximo lector cree viva. Que la
+// presentacion o la unidad no existan es `ValidationError` -lo traduce el adaptador desde
+// el `P2003` de la FK (`design.md > 6.2`)-, no un codigo nuevo.
 
 /** R41: la entrada no pasa el esquema `zod` del borde. */
 export class ValidationError extends ProveedoresError {

@@ -66,9 +66,6 @@ const VALID_PRODUCT_FIELDS = {
   name: 'Bidon 20 L',
   presentationId: '11111111-1111-4111-8111-111111111111',
   stock: '10',
-  cost: '12.5000',
-  minPurchase: '1',
-  deliveryTime: '3',
   qtyAlert: '2',
   // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El formulario ya no
   // envia `unit: 'litro'` (texto libre) sino `unitId`, el identificador de la unidad elegida
@@ -177,7 +174,6 @@ describe('updateProductAction', () => {
       expect.objectContaining({
         name: 'Bidon 20 L',
         stock: 10,
-        minPurchase: 1,
         unitId: '22222222-2222-4222-8222-222222222222',
       }),
       { id: 'user-admin-1', roleName: 'Administrador' },
@@ -194,6 +190,41 @@ describe('updateProductAction', () => {
     );
 
     expect(result).toEqual({ status: 'error', code: 'not_found', message: expect.any(String) });
+  });
+});
+
+// QC-52 (R1, R5): la Server Action dejo de leer `cost`, `minPurchase` y `deliveryTime`
+// del `FormData`. Se prueba con el caso hostil -un `FormData` que SI los trae, como lo
+// enviaria un formulario viejo cacheado o un `curl`-: el candidato que llega al caso de
+// uso no puede contenerlos, porque si los leyera el `strictObject` rechazaria un alta que
+// deberia funcionar.
+describe('los tres campos que el producto perdio no cruzan la Server Action', () => {
+  it('no los lee del FormData aunque vengan, ni al crear ni al editar', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+    updateProductMock.mockResolvedValue(undefined);
+
+    const conSobras = formDataOf({
+      ...VALID_PRODUCT_FIELDS,
+      cost: '12.5000',
+      minPurchase: '1',
+      deliveryTime: '3',
+    });
+
+    await createProductAction(CREATE_INITIAL, conSobras);
+    await updateProductAction('product-1', MUTATION_INITIAL, conSobras);
+
+    for (const mock of [createProductMock, updateProductMock]) {
+      const candidato = mock.mock.calls[0]?.[mock === createProductMock ? 0 : 1] as Record<
+        string,
+        unknown
+      >;
+      // Ancla: si `candidato` no fuera el argumento correcto (o fuera `undefined`), los
+      // tres `not.toContain` pasarian por vacio y el test no mediria nada.
+      expect(Object.keys(candidato)).toContain('name');
+      expect(Object.keys(candidato)).not.toContain('cost');
+      expect(Object.keys(candidato)).not.toContain('minPurchase');
+      expect(Object.keys(candidato)).not.toContain('deliveryTime');
+    }
   });
 });
 
