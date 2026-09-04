@@ -10,19 +10,23 @@ import { ProveedoresError, type Actor, type CatalogLineView, type Page } from '@
  * una diferencia propia: aqui SI hay conversiones que hacer.
  *
  * `FormData` solo entrega cadenas, y el esquema de la linea espera dos formas distintas:
- * - `cost` y `minPurchase` viajan como CADENA hasta el adaptador driven (`design.md > 6.2`):
- *   el importe no pasa por coma flotante en ningun punto, asi que aqui NO se convierten. Se
- *   entregan tal cual y `zod` los mide con el patron de `DECIMAL(14,4)`.
+ * - `cost` y `minPurchase` viajan como CADENA hasta el adaptador driven (R11): el importe no
+ *   pasa por coma flotante en ningun punto, asi que aqui NO se convierten. Se entregan tal
+ *   cual y `zod` los mide con el patron de `DECIMAL(14,4)`.
  * - `deliveryTime` es `z.number().int()`: hay que convertirlo. Una cadena no entera se
  *   rechaza AQUI -sin llamar al caso de uso- en vez de colarse como `NaN`, que
  *   `z.number().int()` trataria como un numero valido y el rechazo no ocurriria nunca.
  *   Mismo criterio y mismo sentinela que `inventario` (QC-20 T12).
  *
  * Un campo opcional que llega VACIO del formulario se trata como ausencia (`undefined`),
- * no como cadena vacia, tambien igual que `inventario`: `minPurchase` y `deliveryTime` son
- * opcionales (R30) y un `<input>` sin rellenar envia `''`. Esto es traduccion de la forma
- * del borde, no una regla de negocio: el costo, que es OBLIGATORIO, se entrega tal cual y
- * su vacio lo rechaza `zod`.
+ * no como cadena vacia, tambien igual que `inventario`: `unitId`, `imagePath`, `minPurchase`
+ * y `deliveryTime` son opcionales (R10) y un `<input>` sin rellenar envia `''`. Esto es
+ * traduccion de la forma del borde, no una regla de negocio: los OBLIGATORIOS -`name`,
+ * `presentationId` y `cost`- se entregan tal cual y su vacio lo rechaza `zod`.
+ *
+ * QC-52 cambia lo que se lee del formulario (R31): entra `name`, `presentationId`, `unitId`
+ * e `imagePath`, y sale el identificador de articulo del inventario que QC-43 leia. Ningun
+ * route handler nuevo y ningun `fetch` a una ruta propia: siguen siendo Server Actions.
  */
 
 export type CreateCatalogLineFormState =
@@ -82,7 +86,7 @@ function readOptionalFormInt(
   return Number(trimmed);
 }
 
-/** Alta de linea (R25, R26, R27, R28, R29, R30, R31). */
+/** Alta de linea (R10, R14, R15, R23, R25, R31). */
 export async function createCatalogLineAction(
   prevState: CreateCatalogLineFormState,
   formData: FormData,
@@ -96,7 +100,10 @@ export async function createCatalogLineAction(
 
   const candidate = {
     supplierId: readFormString(formData, 'supplierId'),
-    productId: readFormString(formData, 'productId'),
+    name: readFormString(formData, 'name'),
+    presentationId: readFormString(formData, 'presentationId'),
+    unitId: readOptionalFormString(formData, 'unitId'),
+    imagePath: readOptionalFormString(formData, 'imagePath'),
     cost: readFormString(formData, 'cost'),
     minPurchase: readOptionalFormString(formData, 'minPurchase'),
     deliveryTime,
@@ -113,9 +120,10 @@ export async function createCatalogLineAction(
 }
 
 /**
- * Edicion de la linea: SOLO condiciones comerciales (R33). El candidato NO lleva
- * `supplierId` ni `productId` -y `updateCatalogLineSchema` es `strictObject`, asi que
- * colarlos daria `invalid_input` en vez de ignorarse en silencio-.
+ * Edicion de la linea: REEMPLAZO COMPLETO de los siete campos de negocio (R24, P6). El
+ * candidato NO lleva `supplierId` -y `updateCatalogLineSchema` es `strictObject`, asi que
+ * colarlo daria `invalid_input` en vez de ignorarse en silencio-: el proveedor de una linea
+ * es lo unico que la edicion no puede cambiar.
  */
 export async function updateCatalogLineAction(
   id: string,
@@ -130,6 +138,10 @@ export async function updateCatalogLineAction(
   }
 
   const candidate = {
+    name: readFormString(formData, 'name'),
+    presentationId: readFormString(formData, 'presentationId'),
+    unitId: readOptionalFormString(formData, 'unitId'),
+    imagePath: readOptionalFormString(formData, 'imagePath'),
     cost: readFormString(formData, 'cost'),
     minPurchase: readOptionalFormString(formData, 'minPurchase'),
     deliveryTime,
@@ -145,7 +157,11 @@ export async function updateCatalogLineAction(
   }
 }
 
-/** Baja FISICA de la linea (R34). El `id` viaja como campo oculto del formulario. */
+/**
+ * Baja LOGICA de la linea (R21). El `id` viaja como campo oculto del formulario. QC-52
+ * cambia lo que ocurre por debajo -la fila se marca en vez de borrarse- sin cambiar ni la
+ * firma de la action ni el estado que devuelve.
+ */
 export async function deleteCatalogLineAction(
   prevState: CatalogLineMutationFormState,
   formData: FormData,
@@ -168,7 +184,7 @@ export async function deleteCatalogLineAction(
 }
 
 /**
- * Listado paginado del catalogo de UN proveedor (R35, R36, R37). Consulta: argumentos ya
+ * Listado paginado del catalogo de UN proveedor (R22, R23). Consulta: argumentos ya
  * tipados -el `supplierId` sale de la URL y `{ page, pageSize }` ya son numeros-. `query`
  * es `unknown` porque quien lo valida es `pageQuerySchema`, dentro del caso de uso.
  */

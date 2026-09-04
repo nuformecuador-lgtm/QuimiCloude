@@ -12,8 +12,31 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | pending → F1.2 | feature/QC-52-separar-producto-de-catalogo-de-proveedor | leader (worktree montado, spec_author lanzado) |
 | QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | implementer (spec aprobado por el humano el 2026-09-04) |
+
+La feature **QC-52 — separar-producto-de-catalogo-de-proveedor** se cerró el 2026-09-04 (PR #32,
+merge `855fae6`): resumen en `progress/history.md`, worktree desmontado, rama borrada y **base
+propia `QuimiCloude_QC52` eliminada**. 34 requisitos con test y `reviewer` en **una sola ronda**
+(0 mayores, 6 menores, cinco ajenos a la ficha) — la ficha llegó acotada por `/afinar-feature` con
+16 decisiones cerradas antes del spec, y se notó. **Desbloquea QC-44.**
+
+**Tres deudas de arnés que destapó y que no le tocaban:** falta un `.gitattributes` (un subagente
+convirtió 15 archivos a CRLF y el diff pasó a marcar 497 líneas donde el cambio real son 19); la
+entrada de `recipe-route-contract.test.ts` en `baseline-rojos.json` **documenta un motivo que ya no
+es el que ocurre** —en las ramas de feature falla porque la guardia R44 de QC-26 muerde a cualquier
+rama que toque `db/`, y la cura que el propio baseline propone no arregla ese caso—; y **`./init.sh`
+no corre Playwright**, así que el E2E de inventario estuvo roto en `dev` por dos motivos
+independientes sin que ningún gate lo dijera. Las tres son candidatas a `/afinar-regla`.
+
+**Corrección a una nota de este archivo:** que sin `set -a && . ./.env && set +a` el gate pegue
+contra la base compartida **no es cierto en este repo**. Se midió: el cliente Prisma generado lee el
+`.env` al importarse y `prisma.config.ts` llama a `process.loadEnvFile()`. Sourcear sigue siendo
+buena idea por no depender de un implícito, pero la base propia no es decorativa sin ello.
+
+**Cuarta vez que el drift de base entre worktrees bloquea una feature**, y esta vez QC-52 fue quien
+rompió a QC-34 al aplicar su migración a la compartida. Siguen vivas y huérfanas
+`QuimiCloude_FIXGATE` y `QuimiCloude_QC14`; `QuimiCloude_QC34` sigue en uso.
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
@@ -1504,6 +1527,42 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### QC-34 tiene base propia `QuimiCloude_QC34` — hay que BORRARLA al cerrar la ficha (2026-09-04)
+
+Tercera vez que el drift de base entre worktrees bloquea una feature, y tercera vez que se resuelve
+a mano: la sesion paralela de **QC-52** aplico su migracion a la base compartida y eso revento los
+tests de integracion de QC-34 con un `P2022` en cualquier lectura de `orders`. Se replico lo de
+**QC-20**, **QC-25** y **QC-26**: base propia para el worktree.
+
+- **Creada** `QuimiCloude_QC34`, con `DATABASE_URL` y `DIRECT_URL` del `.env` del worktree
+  apuntando ahi y `prisma migrate deploy` aplicado.
+- **Efecto colateral bueno:** con base limpia, `tests/integration/identity/identity-seed.int.test.ts`
+  vuelve a **verde** dentro del worktree. Su rojo era de los datos hechos a mano en la compartida,
+  que siguen ahi y siguen sin tocarse por decision del humano.
+- **La trampa de siempre:** ni `init.sh` ni Vitest cargan ese `.env`. Sin
+  `set -a && . ./.env && set +a` delante, el gate pega contra la compartida y la base propia es
+  decorativa. Ya estaba escrito en este archivo y volvio a pasar hoy.
+- **Deuda que esto crea:** `./scripts/wt.sh done` no sabe nada de la base propia, asi que **al
+  cerrar QC-34 hay que borrar `QuimiCloude_QC34` a mano**. Siguen vivas y huerfanas
+  `QuimiCloude_QC14` y `QuimiCloude_FIXGATE`, comprobado hoy contra el servidor.
+
+### Aviso cruzado a la sesion de QC-52 (2026-09-04)
+
+Cuando la migracion de QC-34 (`cancellation_reason` en `orders`) llegue a `dev`, la copia de
+`tests/integration/pedidos/pedidos-constraints.int.test.ts` **que vive en `dev`** se pondra roja:
+afirma la lista exacta de columnas de `orders`. **En la rama de QC-34 ya esta corregida**, asi que
+se arregla sola al mergear; el ruido es solo mientras las dos ramas convivan. Nadie tiene que tocar
+el worktree principal por esto.
+
+### El commit `7a3af59` lleva un mensaje que no le corresponde (2026-09-04)
+
+Ese commit dice «base propia QuimiCloude_QC34 y aviso cruzado a QC-52» y **lo que contiene es
+trabajo de la sesion paralela**: QC-55 pasando a `in_progress` y su fila en la tabla de arriba. Fue
+un `git commit -am` del leader de QC-34 sobre un arbol que la otra sesion acababa de tocar. **No se
+perdio nada y no se reescribe la historia** —hay dos sesiones sobre `dev`—, pero es el mismo agujero
+que ya causo el MAYOR 2 de la review de QC-26: **commitear sin nombrar los archivos en un repo con
+dos sesiones vivas**. La nota real va en este commit.
 
 ### La base compartida quedó por delante de `dev`: el gate de `dev` NO puede pasar (2026-09-04)
 

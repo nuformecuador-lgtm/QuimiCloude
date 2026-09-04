@@ -52,7 +52,100 @@ function coincidenciasEn(dir: string): readonly string[] {
 
 const moduloDir = join(repoRoot, 'lib', 'modules', 'proveedores')
 
+/**
+ * R18 INVERTIDO — las marcas concretas por las que `proveedores` conocia a `inventario`.
+ *
+ * QC-43 tenia un caso que AFIRMABA que el modulo importaba el contrato de `inventario`; con
+ * la decision cerrada 3 de QC-52 ese caso se invierte y pasa a afirmar que NO aparece.
+ *
+ * Se buscan MARCAS, no la palabra suelta: un comentario que explique por que la linea ya no
+ * conoce ningun articulo del inventario es informacion util y no puede poner el test rojo.
+ * Lo que no puede aparecer es ninguna de estas, y cada una es un vinculo real.
+ */
+const MARCAS_DE_INVENTARIO: readonly { readonly nombre: string; readonly pattern: RegExp }[] = [
+  { nombre: 'tipo ProductCatalog / ProductRef / ProductId', pattern: /\bProduct(Catalog|Ref|Id)\b/ },
+  { nombre: 'llamada a findRefs', pattern: /\bfindRefs\b/ },
+  { nombre: 'consulta del modelo Product por Prisma', pattern: /prisma\.product/i },
+  { nombre: 'campo productId / productName', pattern: /\bproduct(Id|Name)\b/ },
+  { nombre: 'columna product_id', pattern: /\bproduct_id\b/ },
+  { nombre: 'error de producto no encontrado', pattern: /ProductNotFound|product_not_found/ },
+]
+
 describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handler, sin E2E nuevo', () => {
+  it('ningun archivo del modulo importa inventario ni conserva una sola marca suya (R18)', () => {
+    // R18, decision cerrada 3, y es el corazon de QC-52: «Ninguna operacion del catalogo del
+    // proveedor DEBE leer, comprobar ni resolver nada del producto».
+    //
+    // Este caso ESTA INVERTIDO respecto a QC-43, donde afirmaba lo contrario: que el modulo
+    // consumia el contrato publico de `inventario` y que lo hacia por el barrel. Aquella
+    // regla (QC-43 R26) queda derogada entera.
+    //
+    // Dos mitades, y ninguna basta sola:
+    //   1. Ningun IMPORT -estatico, de tipo o dinamico- cuyo especificador nombre el modulo.
+    //      Se mira el especificador, no el texto entero del archivo: un comentario que
+    //      explique la separacion es documentacion valiosa y no puede ponerlo rojo.
+    //   2. Ninguna MARCA de las de arriba en ningun sitio del archivo, ni en el codigo ni en
+    //      un comentario: `ProductCatalog`, `findRefs`, `prisma.product`, `productId`,
+    //      `product_id` o el error borrado. Cualquiera de ellas seria el vinculo volviendo.
+    const hallazgos: string[] = []
+    const archivos = filesIn(moduloDir, /\.tsx?$/)
+    expect(archivos.length, 'el modulo proveedores no tiene archivos que revisar').toBeGreaterThan(
+      0,
+    )
+
+    for (const archivo of archivos) {
+      const fuente = readFileSync(archivo, 'utf8')
+      const relativo = archivo.slice(repoRoot.length + 1)
+
+      for (const coincidencia of fuente.matchAll(
+        /(?:from|import|require)\s*\(?\s*['"]([^'"]+)['"]/g,
+      )) {
+        const especificador = coincidencia[1] as string
+        if (/inventario/.test(especificador)) {
+          hallazgos.push(`${relativo}: importa '${especificador}'`)
+        }
+      }
+
+      for (const { nombre, pattern } of MARCAS_DE_INVENTARIO) {
+        if (pattern.test(fuente)) hallazgos.push(`${relativo}: ${nombre}`)
+      }
+    }
+
+    expect(
+      hallazgos,
+      `lib/modules/proveedores/** sigue atado a inventario: ${hallazgos.join('; ')}`,
+    ).toEqual([])
+  })
+
+  it('la composicion deja de pasar el catalogo de articulos a proveedores, pero no lo borra (R18)', () => {
+    // `lib/composition` es el UNICO sitio del repo que puede volver a atar los dos modulos,
+    // asi que el corte tiene que verse tambien ahi: la fachada `proveedores` no recibe
+    // `products` en ninguna de sus nueve entradas.
+    //
+    // Y la otra mitad, que es la que evita romper a un vecino: `productCatalog` SIGUE
+    // construido y cableado, porque `recetas` lo usa en tres de sus casos de uso. Lo que se
+    // quita son las dos lineas que se lo pasaban a `proveedores`, no la constante.
+    const fuente = readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8')
+    const bloque = (/export const proveedores = \{([\s\S]*?)\n\};/.exec(fuente)?.[1] ?? '')
+      // Sin los comentarios: el bloque explica POR QUE se quitaron esas dos lineas, y esa
+      // explicacion no puede poner el test rojo. Lo que se mide es el cableado real.
+      .replace(/\/\/.*$/gm, '')
+    expect(
+      bloque,
+      'no se encontro la fachada `proveedores` en lib/composition',
+    ).toContain('createCatalogLine:')
+    expect(
+      bloque,
+      'la fachada de proveedores sigue recibiendo el catalogo de articulos',
+    ).not.toMatch(/products\s*:/)
+
+    expect(fuente, 'productCatalog desaparecio de la composicion y recetas lo necesita').toMatch(
+      /const productCatalog\s*:/,
+    )
+    const recetas = /export const recetas = \{([\s\S]*?)\n\} as const;/.exec(fuente)?.[1] ?? ''
+    expect(recetas, 'recetas dejo de recibir productCatalog').toMatch(/products: productCatalog/)
+  })
+
   it('no existe ninguna pantalla, pagina ni componente de proveedores, ni spec E2E nuevo', () => {
     // R47: la pantalla de proveedores es QC-44, que ya existe en el board y esta bloqueada
     // por esta ficha. Se busca en la RUTA COMPLETA, no solo en el nombre del archivo: una
@@ -202,16 +295,27 @@ describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handle
       '@@map("suppliers")',
     ])
 
-    // `SupplierCatalogLine` gana EXACTAMENTE dos columnas y dos indices, los del cambio 3.
-    // Ni una mas: en particular NO gana `deletedAt` (decision cerrada 11 de QC-42) ni
-    // ningun `@relation` hacia `Product` o `User`.
+    // `SupplierCatalogLine` tras QC-52: pierde la columna que la unia a `inventario`, su
+    // `@@unique` y su `@@index` (R9), y gana `name`, `nameNormalized`, `presentationId`,
+    // `unitId`, `imagePath` y `deletedAt` con los dos `@@index` de las FK nuevas (R8). Ni una
+    // columna mas: en particular NO gana `stock` ni `qtyAlert` -cuanto tienes es tuyo, no del
+    // proveedor- ni ningun `@relation` hacia otro modulo.
+    //
+    // Y NO hay ningun `@@unique` nuevo, que es lo que mas facil se cuela: la unicidad de la
+    // linea es un indice PARCIAL sobre las vivas (R15, R17) y Prisma no modela indices
+    // parciales, asi que vive escrito a mano en la migracion. Un `@@unique` aqui seria un
+    // indice TOTAL que romperia R17 -dar de baja una linea no liberaria su combinacion-.
     expect(
       camposDe('SupplierCatalogLine'),
-      'model SupplierCatalogLine gano algo fuera de las dos columnas de autor del cambio 3',
+      'model SupplierCatalogLine no quedo como lo dejo QC-52',
     ).toEqual([
       'id',
       'supplierId',
-      'productId',
+      'name',
+      'nameNormalized',
+      'presentationId',
+      'unitId',
+      'imagePath',
       'cost',
       'minPurchase',
       'deliveryTime',
@@ -219,17 +323,23 @@ describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handle
       'updatedBy',
       'createdAt',
       'updatedAt',
+      'deletedAt',
       'supplier',
-      '@@unique([supplierId, productId], map: "supplier_catalog_lines_supplier_id_product_id_key")',
-      '@@index([productId], map: "supplier_catalog_lines_product_id_idx")',
+      '@@index([presentationId], map: "supplier_catalog_lines_presentation_id_idx")',
+      '@@index([unitId], map: "supplier_catalog_lines_unit_id_idx")',
       '@@index([createdBy], map: "supplier_catalog_lines_created_by_idx")',
       '@@index([updatedBy], map: "supplier_catalog_lines_updated_by_idx")',
       '@@map("supplier_catalog_lines")',
     ])
+    expect(
+      camposDe('SupplierCatalogLine').some((linea) => linea.startsWith('@@unique')),
+      'la unicidad de la linea es un indice PARCIAL escrito a mano, no un @@unique de Prisma',
+    ).toBe(false)
 
-    // Y SOLO DOS migraciones del repo tocan estas dos tablas: la de QC-42 que las creo y
-    // la de QC-43 con los tres cambios. Una tercera seria alcance escapandose por una via
-    // que el censo de campos de arriba no ve (p. ej. un CHECK, que Prisma no modela).
+    // Y SOLO TRES migraciones del repo tocan estas dos tablas: la de QC-42 que las creo, la
+    // de QC-43 con sus tres cambios y la de QC-52 que separa las dos tablas. Una cuarta seria
+    // alcance escapandose por una via que el censo de campos de arriba no ve (p. ej. un
+    // CHECK, que Prisma no modela).
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanLasTablas = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -247,6 +357,7 @@ describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handle
     ).toEqual([
       '20260903131417_suppliers_and_supplier_catalog_lines',
       '20260903200343_supplier_contact_cost_and_line_audit',
+      '20260904123854_split_product_and_supplier_catalog',
     ])
   })
 

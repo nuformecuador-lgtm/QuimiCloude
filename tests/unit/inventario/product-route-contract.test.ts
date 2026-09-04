@@ -326,21 +326,19 @@ describe('contrato de la ruta de inventario', () => {
     expect(columnas).toContain("'updatedBy'");
   });
 
-  it('el costo no se convierte a numero en ningun archivo de la ruta', () => {
-    // R8 — `cost` es cadena decimal a proposito: pasarla por coma flotante la corrompe.
-    ningunArchivoContiene(['parseFloat(', 'toFixed(', 'Number.parseFloat(']);
+  it('el costo, la compra minima y el tiempo de entrega no se nombran en ningun archivo de la ruta', () => {
+    // QC-52 R5 y R6 (derogan la parte de QC-22 R8 que trataba el costo como campo del producto).
+    //
+    // ACOTADO: hasta QC-52 este caso recorria las lineas que contuvieran `cost` para prohibir que
+    // pasaran por coma flotante. Desde que el producto perdio los tres campos no queda ninguna
+    // linea que recorrer, y un bucle sobre cero elementos no asegura nada
+    // (`docs/verification.md > Que NO cuenta`). Lo que se afirma ahora es EN POSITIVO: la
+    // pantalla no los menciona por ninguna via -ni campo, ni oculto, ni columna, ni valor
+    // derivado-, que es exactamente lo que R5 y R6 piden.
+    ningunArchivoContiene(['cost', 'minPurchase', 'deliveryTime']);
 
-    for (const ruta of FUENTES_DE_LA_RUTA) {
-      for (const linea of fuenteSinComentarios(ruta).split('\n')) {
-        if (!linea.includes('cost')) continue;
-        for (const prohibido of ['Number(', '+', '*', '/ ']) {
-          expect(
-            linea,
-            `${ruta}: el costo no puede pasar por «${prohibido}»`,
-          ).not.toContain(prohibido);
-        }
-      }
-    }
+    // Y sigue sin haber conversion a coma flotante de ningun importe en esta capa.
+    ningunArchivoContiene(['parseFloat(', 'toFixed(', 'Number.parseFloat(']);
   });
 
   it('el desbordamiento horizontal no lo declara ningun archivo de la ruta', () => {

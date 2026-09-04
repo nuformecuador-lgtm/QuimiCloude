@@ -106,9 +106,9 @@ import {
 } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-prisma';
 import {
   createCatalogLine,
-  deleteCatalogLineById,
   listCatalogLinesBySupplierAlive,
-  updateCatalogLineTerms,
+  replaceAliveCatalogLine,
+  softDeleteAliveCatalogLine,
 } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma';
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
@@ -297,8 +297,8 @@ const supplierRepository: SupplierRepository = {
 
 const supplierCatalogRepository: SupplierCatalogRepository = {
   create: createCatalogLine,
-  updateTerms: updateCatalogLineTerms,
-  deleteById: deleteCatalogLineById,
+  replaceAlive: replaceAliveCatalogLine,
+  softDeleteAlive: softDeleteAliveCatalogLine,
   listBySupplierAlive: listCatalogLinesBySupplierAlive,
 };
 
@@ -320,16 +320,17 @@ export const proveedores = {
   deleteSupplier: createDeleteSupplier({ suppliers: supplierRepository }),
   getSupplier: createGetSupplier({ suppliers: supplierRepository }),
   listSuppliers: createListSuppliers({ suppliers: supplierRepository }),
-  createCatalogLine: createCreateCatalogLine({
-    catalog: supplierCatalogRepository,
-    products: productCatalog,
-  }),
+  // QC-52 (R18, decision cerrada 3): las dos factories del catalogo PIERDEN
+  // `products: productCatalog`. `proveedores` ya no conoce `inventario` por ninguna via, y
+  // este archivo es el unico sitio desde el que podria volver a atarlas.
+  //
+  // `productCatalog` NO se borra ni se toca: sigue arriba, cableado, porque `recetas` lo
+  // usa en tres de sus casos de uso. Lo que desaparece son las dos lineas que se lo
+  // pasaban a `proveedores`.
+  createCatalogLine: createCreateCatalogLine({ catalog: supplierCatalogRepository }),
   updateCatalogLine: createUpdateCatalogLine({ catalog: supplierCatalogRepository }),
   deleteCatalogLine: createDeleteCatalogLine({ catalog: supplierCatalogRepository }),
-  listCatalogLines: createListCatalogLines({
-    catalog: supplierCatalogRepository,
-    products: productCatalog,
-  }),
+  listCatalogLines: createListCatalogLines({ catalog: supplierCatalogRepository }),
 };
 
 // ---------------------------------------------------------------------------------------
