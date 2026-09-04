@@ -81,14 +81,14 @@ Los tests de UI viven en `tests/unit/proveedores-ui/` salvo donde se indica otra
 | R19 | `supplier-detail-page` (nombre, teléfono, correo, y el catálogo debajo) |
 | R20 | `supplier-detail-page` (`not_found` con vuelta a `SUPPLIERS_ROUTE` y sin catálogo) |
 | R21 | `supplier-detail-page` (las ocho columnas declaradas y pintadas) |
-| R22 | `catalog-directories` (id presente → nombre; ausente → «no resuelto»; llamadas acotadas) · `supplier-detail-page` (marcador, y el uuid no aparece) |
+| R22 | `catalog-directories` (id presente → nombre; ausente → «no resuelto»; llamadas acotadas; el diccionario de unidades **no cuesta ninguna consulta**) · `supplier-detail-page` (marcador y el uuid no aparece; *«una línea SIN unidad se lee distinto de una unidad que no se pudo resolver»*, marca de «sin dato» ≠ marcador de «no resuelto») |
 | R23 | `supplier-detail-page` (`data-testid` distinto del vacío de la lista) · `catalog-line-sheet` (el vacío abre el panel) |
 | R24 | `supplier-detail-page` (esqueleto del catálogo) |
 | R25 | `supplier-detail-page` (error con mensaje y reintento, sin tabla vacía) |
 | R26 | `supplier-page` · `catalog-line-sheet` (panel lateral sobre la pantalla, sin navegar) · `supplier-list-params` (ida y vuelta conserva página y tamaño) |
 | R27 | `supplier-page` (captura nombre, teléfono y correo y los envía por la operación de alta) |
 | R28 | `supplier-page` (edición precargada, reemplazo completo) |
-| R29 | `catalog-line-sheet` (los siete campos; **en negativo**, sin selector de artículo del inventario) |
+| R29 | `catalog-line-sheet` (los seis campos capturados, con la ruta de imagen declarada como ausencia decidida sobre los siete del contrato; **en negativo**, sin selector de artículo del inventario) |
 | R30 | `catalog-line-sheet` (no pide imagen ni la emite) · `supplier-detail-page` (la tabla no la muestra) · `catalog-route-contract` (sin `<img`/`<Image`) |
 | R31 | `catalog-line-sheet` (edición precargada con reemplazo completo de los siete; **en negativo**, no ofrece cambiar de proveedor) |
 | R32 | `supplier-page` (`duplicate_name` junto al campo) · `catalog-line-sheet` (`duplicate_catalog_line`, `unauthorized`, `not_found`; el panel no se cierra ni pierde lo escrito) |
@@ -99,13 +99,13 @@ Los tests de UI viven en `tests/unit/proveedores-ui/` salvo donde se indica otra
 | R37 | `catalog-line-sheet` (presentación obligatoria y alcanzable) · `tests/unit/inventario/product-page.test.tsx` (más allá de la primera página) |
 | R38 | `catalog-line-sheet` · `tests/unit/inventario/product-page.test.tsx` (alta en línea que deja la presentación seleccionada sin perder lo escrito) |
 | R39 | `tests/unit/inventario/product-route-contract.test.ts > la pantalla no ofrece listar, editar ni borrar presentaciones` — **tras T7 lee el archivo promovido** (`SELECTOR_PRESENTACION_PATH = components/shared/presentation-select.tsx`), que es exactamente el que usa el formulario de la línea; refuerzo en `tests/unit/inventario/scope.test.ts` |
-| R40 | `unit-select` (solo existentes; «sin unidad» envía vacío; sin alta ni texto libre) · `catalog-route-contract` (no importa ningún adaptador de creación de unidad) |
+| R40 | `unit-select` (solo existentes; «sin unidad» envía vacío; sin alta ni texto libre) · `catalog-route-contract` (no importa ningún adaptador de creación de unidad) · `supplier-detail-page` (una línea sin unidad se pinta como «sin dato», no como fallo) |
 | R41 | `catalog-line-sheet` (`0.1005` llega como esa misma cadena; `type=text` + `inputMode=decimal`) · `supplier-detail-page` (la celda pinta la cadena tal cual) · `catalog-route-contract` (guardia de fuente: sin `parseFloat(`, `Number(`, `toFixed(`, `Intl.NumberFormat` ni `type="number"` sobre costo/mínimo) |
 | R42 | `supplier-route-contract` · `catalog-route-contract` (componentes en `components/` con barrel) · `guard-convenciones-proveedores` (nadie importa por ruta profunda desde fuera) |
 | R43 | `supplier-route-contract` · `catalog-route-contract` · `guard-convenciones-proveedores` (ningún `fetch` a ruta propia) |
 | R44 | `guard-convenciones-proveedores` (la feature no crea ni edita nada en `components/ui/`) |
 | R45 | `guard-convenciones-proveedores` (`package.json` sin cambios y dependencias idénticas a `dev`) · `supplier-page` y `catalog-line-sheet` (validación previa con los esquemas del contrato público) |
-| R46 | `supplier-detail-page` (`listUnitsAction` una vez, por props) · `unit-select` · `catalog-route-contract` y `guard-convenciones-proveedores` (cliente sin `lib/composition` ni base de datos) |
+| R46 | `supplier-detail-page` (`listUnitsAction` **una** vez, por props, sea cual sea el número de filas) · `catalog-directories` (`listUnitsAction` no se llama: las unidades llegan por parámetro) · `unit-select` · `catalog-route-contract` y `guard-convenciones-proveedores` (cliente sin `lib/composition` ni base de datos) |
 | R47 | `supplier-page` · `delete-catalog-line-dialog` · `tests/unit/app-sidebar.test.tsx` (roles y `data-testid`, nunca copy) |
 | R48 | `supplier-page` · `supplier-detail-page` · `unit-select` · `catalog-line-sheet` · `delete-catalog-line-dialog` (angosto y ancho con `tests/helpers/viewport.ts`, 44×44 px, ≥16 px, sin `100vh`, sin `:hover` como única vía) |
 | R49 | `guard-convenciones-proveedores` (la feature no modifica módulos, `db/**` ni el barrel de composición) · `catalog-route-contract` (solo contrato público y adaptadores driving) |
@@ -200,3 +200,29 @@ El gate completo (`./init.sh`) **no** lo corrió el implementer: es del leader, 
    `.env` en el shell, **sin tocar `.env` ni ningún archivo del repo**.
 2. **Desviación 1** (el import de `product-form.tsx`) y **desviación 3** (unidades en error), por si
    se prefiere la otra salida en cualquiera de las dos.
+
+## Ronda de correcciones del review (2026-09-04)
+
+Tres de los seis hallazgos menores del `reviewer`, elegidos por el humano. Los otros tres quedan
+como deuda anotada y **no se tocaron**.
+
+- **Menor 1 — las unidades se pedían dos veces por render del detalle.** `buildCatalogDirectories`
+  ya no llama a `listUnitsAction`: recibe por parámetro el catálogo que la página resolvió una sola
+  vez y baja por props (R46). `buildUnitDirectory` pasa a ser una función pura sobre ese arreglo.
+  El test que lo vigila ahora afirma **1** llamada y su título dice lo que afirma; en
+  `catalog-directories.test.ts` el mock de `listUnitsAction` se conserva a propósito para afirmar
+  que **no** se llama. Archivos: `catalog-directories.ts`, `catalog-list-section.tsx`,
+  `catalog-directories.test.ts`, `supplier-detail-page.test.tsx`, `catalog-line-sheet.test.tsx`.
+- **Menor 5 — `EMPTY_CELL` y `UNRESOLVED_CELL` eran el mismo glifo.** `UNRESOLVED_CELL` pasa a
+  `(?)` y la columna de unidad distingue las dos ausencias: una línea **sin unidad** (R40, caso
+  válido) pinta la marca de «sin dato» y **no** el marcador de R22, que queda para el `unitId` que
+  el diccionario no resuelve. La distinción se localiza por `data-testid`
+  (`catalog-unresolved-unitId` presente o ausente) y por constante importada, nunca por copy (R47).
+  Archivos: `catalog-columns.ts`, `catalog-directories.ts` (comentario), `supplier-detail-page.test.tsx`.
+- **Menor 6 — R29 contradecía a R30.** Corregido el texto de R29 en `requirements.md`: captura los
+  **seis** campos de negocio y la ruta de imagen queda fuera por decisión, gobernada por R30. Sin
+  tocar numeración, decisiones cerradas ni código.
+
+Verificación de la ronda: `pnpm run typecheck` y `pnpm run lint` verdes; `vitest run
+tests/unit/proveedores-ui/ --maxWorkers=2 --testTimeout=30000` verde (12 archivos, 141 tests). La trazabilidad sigue en
+52/52: los tests de R22, R40 y R46 se ampliaron, ninguno se eliminó ni se movió de archivo.

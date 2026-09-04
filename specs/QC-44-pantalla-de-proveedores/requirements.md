@@ -165,10 +165,12 @@ electrónico, y enviarlos mediante la operación de alta de proveedor.
 precargarlo con los valores actuales de ese proveedor y enviar el **reemplazo completo** de sus
 campos mediante la operación de edición de proveedor.
 
-**R29** — El formulario de la línea de catálogo DEBE permitir capturar **los siete campos de
-negocio** —nombre, presentación, unidad, ruta de imagen, costo, mínimo de compra y tiempo de
+**R29** — El formulario de la línea de catálogo DEBE permitir capturar **los seis campos de negocio
+que esta pantalla captura** —nombre, presentación, unidad, costo, mínimo de compra y tiempo de
 entrega— con la presentación **obligatoria** y la unidad **opcional**, y NO DEBE ofrecer ningún
-selector, campo ni referencia a un artículo del inventario.
+selector, campo ni referencia a un artículo del inventario. El séptimo campo de negocio del
+contrato de la línea, la **ruta de imagen**, queda fuera del formulario por decisión y lo gobierna
+R30: la pantalla la ignora.
 
 **R30** — El formulario de la línea NO DEBE pedir ninguna imagen ni ofrecer subirla, y la tabla del
 catálogo NO DEBE mostrar la imagen de la línea.
