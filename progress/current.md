@@ -11,9 +11,11 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
+| QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
+| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | pending → F1.2 | feature/QC-57-orden-y-filtro-en-listados | leader (worktree montado, requirements.md sembrado, spec_author lanzado) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
-| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | pending | feature/QC-47-modelo-empresa-y-membresias | esta sesión (`labs`) — worktree montado en F1.0, sin spec todavía |
+| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -222,6 +224,46 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-57 — orden-y-filtro-en-listados: acotada y sembrada (2026-09-04)
+
+- **Sembrada en `specs/QC-57-orden-y-filtro-en-listados/requirements.md`** — 19 decisiones cerradas
+  y 2 preguntas abiertas. La fuente es ese archivo; aquí no se copia la tabla.
+- **Board actualizado antes de sembrar (Paso 5)**: `description` reescrita y label
+  `complexity:high`. Ninguna ficha nueva ni huérfana.
+- **El alcance creció respecto a la ficha de ayer, por decisión del humano**: contrato genérico
+  y abierto para **las siete listas**, no solo las dos que QC-56 necesita; **la búsqueda pasa a
+  ignorar acentos**; y **los índices entran aquí**, lo que convierte la ficha en una que **trae
+  migración** en vez de ser backend puro sin esquema.
+- **Dos cosas que la acotación descubrió leyendo el repo y que la ficha de ayer daba por falsas**:
+  productos **ya** busca por nombre (`productQuerySchema`, del selector de ingredientes) y pedidos
+  **ya** filtra por estado y prioridad (QC-34). Las dos **se migran** al contrato nuevo, lo que
+  obliga a adaptar sus llamantes.
+- **`pageQuerySchema` está copiado en cuatro módulos y NO se unifica**: el dominio no puede
+  importar `lib/shared/` (QC-15). La duplicación es deliberada y queda escrita para que nadie la
+  «arregle».
+- **QC-44 verificada como cerrada** (PR #35, *Finalizado*), así que el choque que se temía sobre
+  el listado de proveedores no existe.
+
+### QC-35 — pantalla-de-pedidos: F1.0 (2026-09-04)
+
+- **Arranca porque se despejaron las dos cosas que la bloqueaban el mismo dia**: su `depends_on`
+  **QC-34** paso a `done` (PR #34, merge `4c98fe1`) y **QC-44** cerro (PR #35, merge `f966a7b`),
+  que era el choque de archivos real — las dos pantallas necesitan `lib/shared/routes.ts`,
+  `lib/shared/navigation/private-nav.ts` y `lib/composition/route-role-rules.ts`. Con QC-44 en
+  `done`, la zona `frontend` queda con **cero** features `in_progress` y sin interseccion viva.
+- **`complexity: high`**, evaluada aqui y escrita como label en el issue (no la traia). Mismo
+  criterio que **QC-26** y **QC-44**, las dos pantallas comparables: lista paginada con filtros,
+  formulario de alta y edicion, una accion propia con dialogo —cancelar, que exige motivo— y
+  estados prohibidos que la interfaz tiene que reflejar en vez de dejar intentar.
+- **Lo que cambio el terreno desde que se escribio la ficha:** **QC-55** mergeo la **tabla de
+  datos compartida** (`components/shared/`), que hasta hoy no tenia ningun consumidor. Si esta
+  pantalla la estrena o copia el esqueleto de productos y recetas es **decision de la acotacion**,
+  no del spec, y arrastra a **QC-56**.
+- Worktree montado en `.worktrees/QC-35-pantalla-de-pedidos` desde `origin/dev` ya sincronizado.
+- **F1.2 en pausa**: la propia `description` dice que la forma de la pantalla se decide al acotar,
+  y QC-34 le hereda dos preguntas abiertas (si la consulta devuelve el total calculado y si la
+  edicion es reemplazo completo). Se corre `/afinar-feature` antes de lanzar `spec_author`.
+
 ### QC-47 — modelo-empresa-y-membresias: acotada y sembrada (2026-09-04)
 
 - **Sembrada en `specs/QC-47-modelo-empresa-y-membresias/requirements.md`** — 15 decisiones
@@ -284,6 +326,10 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ### QC-44 — pantalla-de-proveedores: F0 + F1.0 (2026-09-04)
 
+> **SUPERADA el 2026-09-04 por la sesión de arranque de QC-44.** QC-52 se mergeó en `dev`
+> (PR #32, merge `855fae6`) y otra sesión está haciendo su cierre; el humano dio la orden
+> de arrancar. Lo que sigue queda como registro de por qué esperó, no como estado actual.
+
 - **NO arranca. Decisión del humano: espera a QC-52.** El `requirements.md` sembrado de QC-52 lo
   dice con todas las letras en su bloque de alcance: *«Lo que NO entra: la pantalla del catálogo de
   proveedores: es QC-44, que todavía no existe y **solo nace con más alcance**»*. QC-52 rehace la
@@ -307,6 +353,13 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 Resumen completo en `progress/history.md`. El alcance y las 25 decisiones cerradas al acotar
 viven en `specs/QC-34-crud-de-pedidos/requirements.md`. **Desbloquea QC-35.**
+
+- **QC-52 acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 3 preguntas abiertas en `specs/QC-52-separar-producto-de-catalogo-de-proveedor/requirements.md`; no se copian aquí. Nació de una decisión del humano posterior al merge de QC-43 y **arrastra tres features ya mergeadas** (QC-20, QC-22 y el propio QC-43, del que se caen las reglas que dependían del producto). El board se actualizó antes de sembrar: `description` reescrita y `complexity: high` asignada. También se importaron a `feature_list.json` las fichas **QC-52** y **QC-54**, creadas en el board despues de la ultima F0.
+- **QC-44 acotada con `/afinar-feature` el 2026-09-04.** Alcance, 26 decisiones cerradas y 3
+  preguntas abiertas en `specs/QC-44-pantalla-de-proveedores/requirements.md`; no se copian aqui.
+  El board se actualizo ANTES de sembrar: `description` reescrita contra la forma post-QC-52 y
+  link *is blocked by* **QC-52** anadido, porque esa ficha borra el `product_id` de la linea que
+  la pantalla iba a mostrar. `complexity: high`.
 
 ### QC-23 — registro-de-sesiones (acotada el 2026-09-03)
 

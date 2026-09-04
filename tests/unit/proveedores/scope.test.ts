@@ -11,11 +11,19 @@
 // `proveedores` garantiza sobre si misma, para no romperse cuando una ficha vecina se
 // mergee.
 
+// **2026-09-04 (QC-44, pantalla-de-proveedores):** el tercer caso se RETENSO. Afirmaba que no
+// existia pantalla de proveedores ni spec E2E porque las dos estaban diferidas a QC-44 (R47,
+// decision cerrada 8); QC-44 las construye (R1, R51, R52), asi que la premisa caduco por diseno.
+// El caso no se borra ni se vacia: pasa de «no existe» a «existe y vive SOLO donde la declara
+// QC-44». El motivo entero y que sigue vigilando, dentro del propio caso.
+
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+
+import { SUPPLIERS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -45,9 +53,17 @@ function filesIn(dir: string, pattern: RegExp = /./): readonly string[] {
 /** La palabra delata la feature tanto en el nombre del archivo como en el de la carpeta. */
 const PATRON_PROVEEDORES = /proveedor|supplier/i
 
+/**
+ * Rutas RELATIVAS al directorio barrido, en POSIX, de los archivos cuya ruta delata la
+ * feature. Relativas y en POSIX para poder compararlas contra una carpeta de ruta concreta
+ * sin depender del separador del sistema operativo.
+ */
 function coincidenciasEn(dir: string): readonly string[] {
   if (!existsSync(dir)) return []
-  return filesIn(dir).filter((ruta) => PATRON_PROVEEDORES.test(ruta.slice(dir.length)))
+  return filesIn(dir)
+    .map((ruta) => relative(dir, ruta).split(sep).join('/'))
+    .filter((relativa) => PATRON_PROVEEDORES.test(relativa))
+    .sort()
 }
 
 const moduloDir = join(repoRoot, 'lib', 'modules', 'proveedores')
@@ -71,7 +87,7 @@ const MARCAS_DE_INVENTARIO: readonly { readonly nombre: string; readonly pattern
   { nombre: 'error de producto no encontrado', pattern: /ProductNotFound|product_not_found/ },
 ]
 
-describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handler, sin E2E nuevo', () => {
+describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla, solo la de QC-44', () => {
   it('ningun archivo del modulo importa inventario ni conserva una sola marca suya (R18)', () => {
     // R18, decision cerrada 3, y es el corazon de QC-52: «Ninguna operacion del catalogo del
     // proveedor DEBE leer, comprobar ni resolver nada del producto».
@@ -146,23 +162,76 @@ describe('alcance de QC-43 (crud-de-proveedores): sin pantalla, sin route handle
     expect(recetas, 'recetas dejo de recibir productCatalog').toMatch(/products: productCatalog/)
   })
 
-  it('no existe ninguna pantalla, pagina ni componente de proveedores, ni spec E2E nuevo', () => {
-    // R47: la pantalla de proveedores es QC-44, que ya existe en el board y esta bloqueada
-    // por esta ficha. Se busca en la RUTA COMPLETA, no solo en el nombre del archivo: una
-    // ruta de Next como `app/(private)/proveedores/page.tsx` delata la feature por el
-    // nombre de CARPETA (`page.tsx` es generico y no diria nada).
+  it('la pantalla de proveedores vive solo donde la declara QC-44, y en ningun otro sitio', () => {
+    // CENTINELA RETENSADO el 2026-09-04 (QC-44, pantalla-de-proveedores).
+    //
+    // Hasta hoy este caso afirmaba, por R47 de QC-43, que «no existe ninguna pantalla, pagina
+    // ni componente de proveedores, ni spec E2E nuevo»: la pantalla estaba DIFERIDA a QC-44 y
+    // el E2E con ella (decision cerrada 8). QC-44 es precisamente la ficha que las construye
+    // (R1, R51, R52), asi que la premisa caduco POR DISENO, no por defecto, y el centinela se
+    // **retensa, no se borra ni se vacia**. Mismo trato que recibio
+    // `tests/unit/inventario/scope.test.ts` cuando QC-22 construyo la pantalla del catalogo.
+    //
+    // Lo que R47 protegia de verdad NO era la ausencia: era que la pantalla de proveedores no
+    // apareciese por goteo, repartida por el repositorio y sin ficha que la respalde. Eso
+    // sigue vigente y es lo que se vigila ahora: la pantalla existe, vive ENTERA bajo su
+    // carpeta de ruta, `components/` sigue sin una sola pieza de proveedores, y el unico spec
+    // E2E de proveedores es el que trae QC-44. Un `app/api/proveedores/route.ts`, un
+    // `app/(private)/compras/supplier-table.tsx` o un segundo `e2e/suppliers.spec.ts` de
+    // manana —los tres sin ficha— ponen esto en rojo igual que antes.
+    //
+    // Se busca en la RUTA COMPLETA, no solo en el nombre del archivo: una ruta de Next como
+    // `app/(private)/proveedores/page.tsx` delata la feature por el nombre de CARPETA
+    // (`page.tsx` es generico y no diria nada).
+    //
+    // La carpeta permitida se deriva de `SUPPLIERS_ROUTE` (`@/lib/shared/routes`), nunca de un
+    // literal a mano: si la ruta se renombra, esta guardia la sigue.
+    const RUTA_DE_LA_PANTALLA = join(
+      '(private)',
+      ...SUPPLIERS_ROUTE.split('/').filter((segmento) => segmento.length > 0),
+    )
+      .split(sep)
+      .join('/')
+
+    // La pantalla EXISTE, con sus DOS rutas (R1 lista, R3 detalle). Sin este assert el resto
+    // del caso pasaria en verde sobre un repositorio sin pantalla, que es justo el falso verde
+    // que el retensado tiene que evitar: si manana desaparece, la excepcion sobra y hay que
+    // borrar el caso entero, no dejarlo pasando por vacio.
     const enApp = coincidenciasEn(join(repoRoot, 'app'))
+    expect(enApp, 'la pantalla de proveedores de QC-44 no aparece bajo app/').toContain(
+      `${RUTA_DE_LA_PANTALLA}/page.tsx`,
+    )
+    expect(enApp, 'la pagina de detalle de proveedor de QC-44 no aparece bajo app/').toContain(
+      `${RUTA_DE_LA_PANTALLA}/[id]/page.tsx`,
+    )
+
+    // Y vive ENTERA ahi: ni una pieza de proveedores suelta en otra ruta de `app/`. Lo que se
+    // permite es LA PANTALLA DE QC-44, no «cualquier cosa bajo app/»: un route handler en
+    // `app/api/proveedores/` o un componente de proveedores colgado de otra ruta caen aqui
+    // porque no empiezan por la carpeta de la pantalla.
+    const fueraDeSuCarpeta = enApp.filter(
+      (relativa) => !relativa.startsWith(`${RUTA_DE_LA_PANTALLA}/`),
+    )
+    expect(
+      fueraDeSuCarpeta,
+      `pieza de proveedores fuera de app/${RUTA_DE_LA_PANTALLA}/: ${fueraDeSuCarpeta.join(', ')}`,
+    ).toEqual([])
+
+    // Esta mitad sigue INTACTA y en negativo: QC-44 monto sus piezas dentro de la carpeta de
+    // ruta, asi que `components/` (compartido entre pantallas) no gano ninguna de proveedores.
     const enComponents = coincidenciasEn(join(repoRoot, 'components'))
-    expect(enApp, `pantalla de proveedores encontrada bajo app/: ${enApp.join(', ')}`).toEqual([])
     expect(
       enComponents,
       `componente de proveedores encontrado bajo components/: ${enComponents.join(', ')}`,
     ).toEqual([])
 
-    // R47: el E2E queda DIFERIDO CON MOTIVO a QC-44 (decision cerrada 8) -- esta ficha es
-    // backend puro y Playwright no tendria pantalla que abrir--. Ningun spec nuevo.
+    // El E2E dejo de estar diferido (la decision cerrada 8 de QC-43 queda superada por QC-44,
+    // R51 y R52), pero la lista es CERRADA y nombra EL spec de QC-44: un segundo spec de
+    // proveedores sin ficha pone esto en rojo, y si el de QC-44 desaparece, tambien.
     const enE2e = coincidenciasEn(join(repoRoot, 'e2e'))
-    expect(enE2e, `spec E2E de proveedores encontrado: ${enE2e.join(', ')}`).toEqual([])
+    expect(enE2e, `spec E2E de proveedores inesperado: ${enE2e.join(', ')}`).toEqual([
+      'proveedores.spec.ts',
+    ])
   })
 
   it('no hay ningun route handler de proveedores bajo app/api', () => {
