@@ -4,6 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { normalizeRecipeName } from '../../../domain/recipe-name';
 import { ValidationError } from '../../../domain/errors';
+import type { RecipeStepView } from '../../../domain/recipe-view';
 
 import type { NewRecipe, RecipeLineData, RecipeLineRow, RecipeRow } from '../../../ports/recipe-repository';
 
@@ -36,9 +37,30 @@ export function fromDecimalQuantity(quantity: Prisma.Decimal): string {
   return quantity.toFixed(4);
 }
 
-/** `Json` de la columna `steps` -> lista de textos del puerto. La columna solo guarda eso (R20). */
-function toSteps(steps: Prisma.JsonValue): readonly string[] {
-  return Array.isArray(steps) ? (steps as string[]) : [];
+/**
+ * `Json` de la columna `steps` -> lista de pasos del puerto (R20).
+ *
+ * **Tolera los pasos ya guardados como CADENA suelta**, que es como se guardaban antes de que el
+ * paso tuviera tipo: se leen como `{ body, type: 'texto' }`. No hay migracion de datos porque la
+ * columna es `Json` y no hay nada que alterar en el esquema; convertir las filas existentes seria
+ * reescribir datos de usuario para no ganar nada que esta funcion no resuelva al leer.
+ */
+function toSteps(steps: Prisma.JsonValue): readonly RecipeStepView[] {
+  if (!Array.isArray(steps)) return [];
+
+  const parsed: RecipeStepView[] = [];
+  for (const step of steps) {
+    if (typeof step === 'string') {
+      parsed.push({ body: step, type: 'texto' });
+      continue;
+    }
+    if (step === null || typeof step !== 'object' || Array.isArray(step)) continue;
+    const body = 'body' in step ? step.body : undefined;
+    if (typeof body !== 'string') continue;
+    const type = 'type' in step ? step.type : undefined;
+    parsed.push({ body, type: type === 'checklist' ? 'checklist' : 'texto' });
+  }
+  return parsed;
 }
 
 function toLineRow(line: RecipeWithLines['lines'][number]): RecipeLineRow {

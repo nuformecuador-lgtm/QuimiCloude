@@ -1,10 +1,15 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { toast } from 'sonner';
 
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
 import { RecipeForm } from '@/app/(private)/produccion/formulas/components';
-import { MAX_IMAGE_BYTES, type RecipeDetail, type RecipeLineView } from '@/lib/modules/recetas';
+import {
+  MAX_IMAGE_BYTES,
+  type RecipeDetail,
+  type RecipeLineView,
+  type RecipeStepView,
+} from '@/lib/modules/recetas';
 import type {
   CreateRecipeFormState,
   RecipeQueryResult,
@@ -162,7 +167,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedAt: new Date('2026-01-02T00:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    steps: ['Mezclar'],
+    steps: [stepView('Mezclar')],
     lines: [lineView()],
     ...overrides,
   };
@@ -210,10 +215,17 @@ async function addValidLine(
   index: number,
   { productName = PRODUCT_1_NAME, unitLabel = 'L', quantity = '1' } = {},
 ) {
-  await user.click(screen.getByTestId('recipe-line-add'));
+  // La fila 0 ya está en pantalla al abrir el formulario (fila en blanco de arranque); las
+  // siguientes se piden con el `+` de la anterior.
+  if (index > 0) await user.click(screen.getByTestId(`recipe-line-add-${index - 1}`));
   await chooseProductForLine(user, index, productName);
   await chooseUnitForLine(user, index, unitLabel);
   await user.type(screen.getByTestId(`recipe-line-quantity-${index}`), quantity);
+}
+
+/** Paso tal y como lo devuelve el detalle: `texto` es el tipo por defecto. */
+function stepView(body: string, type: RecipeStepView['type'] = 'texto'): RecipeStepView {
+  return { body, type };
 }
 
 // --- Imagen: firmas de contenido reales (`recipe-image.ts`), no solo la extensión del nombre. ---
@@ -348,7 +360,7 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     const recipe = recipeDetail({
       name: 'Receta existente',
       description: 'Una descripción',
-      steps: ['Paso uno', 'Paso dos'],
+      steps: [stepView('Paso uno'), stepView('Paso dos')],
       lines: [
         lineView({
           id: 'line-baja',
@@ -404,7 +416,7 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
         lineView({ id: 'line-a', productId: PRODUCT_1_ID, quantity: '1.0000' }),
         lineView({ id: 'line-b', productId: PRODUCT_2_ID, productName: PRODUCT_2_NAME, quantity: '2.0000' }),
       ],
-      steps: ['Mezclar', 'Calentar'],
+      steps: [stepView('Mezclar'), stepView('Calentar')],
     });
 
     renderEditForm(recipe);
@@ -418,11 +430,11 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [
       string,
-      { lines: { productId: string }[]; steps: string[] },
+      { lines: { productId: string }[]; steps: { body: string }[] },
     ];
     expect(payload.lines).toHaveLength(1);
     expect(payload.lines[0]?.productId).toBe(PRODUCT_1_ID);
-    expect(payload.steps).toEqual(['Mezclar', 'Calentar']);
+    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar']);
   });
 });
 
@@ -493,11 +505,13 @@ describe('R27 — añadir y quitar líneas; una receta sin ninguna se guarda', (
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin ingredientes');
 
-    await user.click(screen.getByTestId('recipe-line-add'));
+    await addValidLine(user, 0);
     expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(1);
 
     await user.click(screen.getByTestId('recipe-line-remove-0'));
-    expect(screen.queryAllByTestId('recipe-line-row')).toHaveLength(0);
+    // Sigue viéndose UNA fila, pero es la de arranque: no está en el estado, así que el payload
+    // viaja sin líneas igual que antes de que existiera esa fila (R27).
+    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(1);
 
     await user.click(screen.getByTestId('recipe-form-submit'));
 
@@ -512,15 +526,7 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
     const user = setupUser();
     renderCreateForm();
 
-    await user.click(screen.getByTestId('recipe-line-add'));
     await user.click(screen.getByTestId('recipe-line-product-0'));
-
-    // No hay ningún campo de texto para "buscar" DENTRO del propio desplegable: el selector no
-    // filtra sobre lo ya descargado (R28). Se acota al popup porque el resto del formulario sí
-    // tiene campos de texto legítimos (nombre, descripción...).
-    const popup = screen.getByTestId('recipe-line-product-0-popup');
-    expect(within(popup).queryByRole('searchbox')).toBeNull();
-    expect(within(popup).queryByRole('textbox')).toBeNull();
 
     await user.click(screen.getByTestId('recipe-line-product-0-next'));
 
@@ -531,7 +537,24 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
     const opcionPagina2 = await screen.findByRole('option', { name: PRODUCT_PAGE2_NAME });
     await user.click(opcionPagina2);
 
-    expect(screen.getByTestId('recipe-line-product-0')).toHaveTextContent(PRODUCT_PAGE2_NAME);
+    expect(screen.getByTestId('recipe-line-product-0')).toHaveValue(PRODUCT_PAGE2_NAME);
+  });
+
+  it('escribir en el selector BUSCA EN EL BACKEND, no sobre la página ya descargada', async () => {
+    const user = setupUser();
+    renderCreateForm();
+
+    await user.type(screen.getByTestId('recipe-line-product-0'), 'áci');
+
+    // La prueba de que no filtra en cliente es que el término VIAJA al backend: si el
+    // componente recortara `items` por su cuenta, esta llamada no existiría.
+    await waitFor(() =>
+      expect(listProductsActionMock).toHaveBeenCalledWith({
+        page: 1,
+        pageSize: MAX_PAGE_SIZE,
+        search: 'áci',
+      }),
+    );
   });
 });
 
@@ -541,7 +564,6 @@ describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombr
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con unidades');
-    await user.click(screen.getByTestId('recipe-line-add'));
     await chooseProductForLine(user, 0, PRODUCT_1_NAME);
 
     await chooseUnitForLine(user, 0, 'L');
@@ -560,22 +582,26 @@ describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombr
 });
 
 describe('R31 — dos líneas del mismo producto y una cantidad inválida no se envían', () => {
-  it('dos líneas con el mismo producto no se envían: el error sale en el bloque de líneas', async () => {
+  it('un ingrediente ya usado NO se ofrece en las demás líneas: no se puede repetir', async () => {
+    // R16 desde la interfaz. La regla vive en `createRecipeSchema` y su test está en
+    // `tests/unit/recetas/recipe-input.test.ts`; lo que se afirma AQUÍ es que el formulario ya
+    // no deja llegar hasta ahí -el repetido es imposible de elegir, no solo rechazado al
+    // enviar-: el ingrediente ya usado se aparta de la lista de las demás líneas.
     const user = setupUser();
     renderCreateForm();
 
-    await user.type(screen.getByTestId('recipe-field-name'), 'Receta duplicada');
+    await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin repetidos');
     await addValidLine(user, 0, { quantity: '1' });
-    await addValidLine(user, 1, { quantity: '2' }); // mismo producto por defecto: PRODUCT_1_NAME
 
-    await user.click(screen.getByTestId('recipe-form-submit'));
+    await user.click(screen.getByTestId('recipe-line-add-0'));
+    await user.click(screen.getByTestId('recipe-line-product-1'));
 
-    const error = await screen.findByTestId('recipe-lines-error');
-    expect(error).toHaveAttribute('role', 'alert');
-    expect(within(screen.getByTestId('recipe-lines-field')).getByTestId('recipe-lines-error')).toBe(
-      error,
-    );
-    expect(createRecipeActionMock).not.toHaveBeenCalled();
+    // La opción del ingrediente ya usado NO se ofrece en la segunda línea...
+    expect(await screen.findByTestId('recipe-line-product-1-popup')).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: PRODUCT_1_NAME })).toBeNull();
+    // ...pero sigue estando en la línea que lo usa: no se veta a sí mismo.
+    await user.click(screen.getByTestId('recipe-line-product-0'));
+    expect(await screen.findByRole('option', { name: PRODUCT_1_NAME })).toBeInTheDocument();
   });
 
   it('una cantidad que el esquema rechaza presenta el error junto a la línea afectada', async () => {
@@ -583,7 +609,6 @@ describe('R31 — dos líneas del mismo producto y una cantidad inválida no se 
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con cantidad inválida');
-    await user.click(screen.getByTestId('recipe-line-add'));
     await chooseProductForLine(user, 0, PRODUCT_1_NAME);
     await chooseUnitForLine(user, 0, 'L');
     await user.type(screen.getByTestId('recipe-line-quantity-0'), 'abc'); // no cumple el patrón decimal
@@ -621,8 +646,8 @@ describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orde
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-    const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: string[] }];
-    expect(payload.steps).toEqual(['Mezclar', 'Calentar']);
+    const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
+    expect(payload.steps.map((step) => step.body)).toEqual(['Mezclar', 'Calentar']);
   });
 });
 
@@ -659,10 +684,10 @@ describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () =
       await user.click(screen.getByTestId('recipe-form-submit'));
 
       await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: string[] }];
-      expect(payload.steps).not.toEqual(['Mezclar', 'Calentar', 'Enfriar']);
+      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
+      expect(payload.steps.map((step) => step.body)).not.toEqual(['Mezclar', 'Calentar', 'Enfriar']);
       expect(payload.steps).toHaveLength(3);
-      expect(payload.steps).toEqual(['Calentar', 'Enfriar', 'Mezclar']);
+      expect(payload.steps.map((step) => step.body)).toEqual(['Calentar', 'Enfriar', 'Mezclar']);
     } finally {
       uninstall();
     }
@@ -707,8 +732,8 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
       // teclado. Si se borrara el `KeyboardSensor` (o su `coordinateGetter`), este `ArrowDown`
       // no movería nada y esta aserción -no una que solo mirase el `role` del asa- se pondría
       // en rojo (`design.md > 7`, riesgo 5).
-      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: string[] }];
-      expect(payload.steps).toEqual(['Calentar', 'Mezclar', 'Enfriar']);
+      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: { body: string }[] }];
+      expect(payload.steps.map((step) => step.body)).toEqual(['Calentar', 'Mezclar', 'Enfriar']);
     } finally {
       uninstall();
     }

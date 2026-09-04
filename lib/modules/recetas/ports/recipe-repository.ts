@@ -1,3 +1,5 @@
+import type { RecipeStepView } from '../domain/recipe-view';
+
 /**
  * Puerto de persistencia de receta (`design.md > 7.3`). El sufijo `Alive` en el nombre de
  * metodo NO es adorno: el filtro `deleted_at IS NULL` es responsabilidad de ESTE
@@ -33,7 +35,7 @@ export type RecipeLineRow = RecipeLineData & {
 export type NewRecipe = {
   readonly name: string;
   readonly description: string | null;
-  readonly steps: readonly string[];
+  readonly steps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineData[];
   readonly imagePath: string | null;
 };
@@ -48,7 +50,7 @@ export type RecipeRow = {
   readonly id: string;
   readonly name: string;
   readonly description: string | null;
-  readonly steps: readonly string[];
+  readonly steps: readonly RecipeStepView[];
   readonly imagePath: string | null;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;

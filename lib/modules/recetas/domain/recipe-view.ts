@@ -1,3 +1,5 @@
+import type { RecipeStepType } from './recipe-input';
+
 /**
  * Contratos de salida de receta (`design.md > 7.2`). Viven en `domain/` -no en `ports/`-
  * porque describen el QUE se dice, no el COMO se habla con el mundo: es lo que el
@@ -38,7 +40,13 @@ export type RecipeLineView = {
 };
 
 /** Detalle de una receta (D14, R33): el resumen mas los pasos y las lineas completas. */
+/** Un paso tal y como sale del detalle: el texto y su tipo. */
+export type RecipeStepView = {
+  readonly body: string;
+  readonly type: RecipeStepType;
+};
+
 export type RecipeDetail = RecipeSummary & {
-  readonly steps: readonly string[];
+  readonly steps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineView[];
 };

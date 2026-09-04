@@ -119,7 +119,9 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         unitId: line.unitId,
       }),
     ),
-    steps: recipe.steps.map((text): RecipeStepFormValue => ({ key: createLocalKey('step'), text })),
+    steps: recipe.steps.map(
+      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), text: step.body, type: step.type }),
+    ),
     image: { kind: 'untouched' },
   };
 }
@@ -210,48 +212,62 @@ export function RecipeForm(props: RecipeFormProps) {
         </div>
       )}
 
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="recipe-field-name-input">Nombre</Label>
-        <Input
-          id="recipe-field-name-input"
-          type="text"
-          value={state.name}
-          onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
-          className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-          aria-invalid={fieldErrors.name === undefined ? undefined : true}
-          aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-error-name'}
-          data-testid="recipe-field-name"
-        />
-        {fieldErrors.name === undefined ? null : (
-          <p id="recipe-error-name" className="text-sm text-destructive" data-testid="recipe-error-name">
-            {fieldErrors.name}
-          </p>
-        )}
-      </div>
+      {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompanan (9). */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
+        <div className="sm:col-span-3">
+          <RecipeImageField
+            mode={props.mode}
+            initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
+            value={state.image}
+            onChange={(image) => setState((previous) => ({ ...previous, image }))}
+          />
+        </div>
 
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="recipe-field-description-input">Receta</Label>
-        <Textarea
-          id="recipe-field-description-input"
-          rows={4}
-          value={state.description}
-          onChange={(event) =>
-            setState((previous) => ({ ...previous, description: event.target.value }))
-          }
-          className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-          aria-invalid={fieldErrors.description === undefined ? undefined : true}
-          aria-describedby={fieldErrors.description === undefined ? undefined : 'recipe-error-description'}
-          data-testid="recipe-field-description"
-        />
-        {fieldErrors.description === undefined ? null : (
-          <p
-            id="recipe-error-description"
-            className="text-sm text-destructive"
-            data-testid="recipe-error-description"
-          >
-            {fieldErrors.description}
-          </p>
-        )}
+        <div className="flex flex-col gap-4 sm:col-span-9">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="recipe-field-name-input">Nombre</Label>
+            <Input
+              id="recipe-field-name-input"
+              type="text"
+              value={state.name}
+              onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
+              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              aria-invalid={fieldErrors.name === undefined ? undefined : true}
+              aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-error-name'}
+              data-testid="recipe-field-name"
+            />
+            {fieldErrors.name === undefined ? null : (
+              <p id="recipe-error-name" className="text-sm text-destructive" data-testid="recipe-error-name">
+                {fieldErrors.name}
+              </p>
+            )}
+        </div>
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="recipe-field-description-input">Descripción</Label>
+            <Textarea
+              id="recipe-field-description-input"
+              rows={4}
+              value={state.description}
+              onChange={(event) =>
+                setState((previous) => ({ ...previous, description: event.target.value }))
+              }
+              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              aria-invalid={fieldErrors.description === undefined ? undefined : true}
+              aria-describedby={fieldErrors.description === undefined ? undefined : 'recipe-error-description'}
+              data-testid="recipe-field-description"
+            />
+            {fieldErrors.description === undefined ? null : (
+              <p
+                id="recipe-error-description"
+                className="text-sm text-destructive"
+                data-testid="recipe-error-description"
+              >
+                {fieldErrors.description}
+              </p>
+            )}
+        </div>
+        </div>
       </div>
 
       <RecipeLinesField
@@ -267,13 +283,6 @@ export function RecipeForm(props: RecipeFormProps) {
         steps={state.steps}
         onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
         errors={fieldErrors.steps}
-      />
-
-      <RecipeImageField
-        mode={props.mode}
-        initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
-        value={state.image}
-        onChange={(image) => setState((previous) => ({ ...previous, image }))}
       />
 
       <div className="flex justify-end gap-2">

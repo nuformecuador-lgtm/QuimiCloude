@@ -12,9 +12,33 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | implementer (spec aprobado por el humano el 2026-09-04) |
-| QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | implementer (spec aprobado por el humano el 2026-09-04) |
-| QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-34 | crud-de-pedidos | Pedidos | backend | in_progress | feature/QC-34-crud-de-pedidos | **PR #34 abierto**, esperando revisión y merge humano (F2.4 hecha) |
+| QC-55 | tabla-de-datos-compartida | Plataforma | frontend | in_progress | feature/QC-55-tabla-de-datos-compartida | **PR [#33] abierto**, esperando merge humano (F2.5). `reviewer` APROBADO en 2ª ronda |
+| QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
+| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | pending | feature/QC-47-modelo-empresa-y-membresias | esta sesión (`labs`) — worktree montado en F1.0, sin spec todavía |
+
+### QC-47 — arranque del 2026-09-04 (F1.0)
+
+Arrancada por decisión humana explícita («arranca con 47»), no por el orden de `id`. Zona
+`backend`, `complexity: medium` y `depends_on: null` ya venían evaluadas del board; no hizo falta
+empujar labels a Jira. Worktree montado desde `origin/dev` (`855fae6`) — **ojo: el `dev` local va
+25 commits por delante de `origin/dev`**, así que el worktree nace sin los merges de `fix-ui` ni
+los cierres de QC-52/QC-55. Se resuelve solo en F2.3, pero conviene saberlo antes de medir un
+diff.
+
+**Aviso de conflicto de archivos para F2.0, no para F1.** QC-34 (`backend`, `in_progress`) toca
+`db/schema.prisma` y `lib/composition/index.ts`, que es exactamente donde va a caer el modelo de
+empresa y membresías. La validación de `AGENTS.md > Paralelismo` se hace contra
+`specs/<feature>/tasks.md`, que en F1.0 todavía no existe: por eso el spec se escribe igual —no
+toca código— pero **la implementación de QC-47 no arranca hasta que QC-34 esté `done`**, o hasta
+que sus `tasks.md` demuestren que no hay intersección real. Anotado aquí para que no se decida
+dos veces.
+
+**Base de datos propia pendiente.** Van cuatro veces que el drift de base entre worktrees bloquea
+una feature, y QC-47 introduce migración nueva sobre `users`: cuando entre en F2, `QuimiCloude_QC47`
+antes de la primera migración, no después.
+
+
 
 La feature **QC-52 — separar-producto-de-catalogo-de-proveedor** se cerró el 2026-09-04 (PR #32,
 merge `855fae6`): resumen en `progress/history.md`, worktree desmontado, rama borrada y **base
@@ -296,6 +320,11 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
   `depends_on` no cambian; no se creo ni cancelo ninguna ficha.
 
 - **QC-52 acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 3 preguntas abiertas en `specs/QC-52-separar-producto-de-catalogo-de-proveedor/requirements.md`; no se copian aquí. Nació de una decisión del humano posterior al merge de QC-43 y **arrastra tres features ya mergeadas** (QC-20, QC-22 y el propio QC-43, del que se caen las reglas que dependían del producto). El board se actualizó antes de sembrar: `description` reescrita y `complexity: high` asignada. También se importaron a `feature_list.json` las fichas **QC-52** y **QC-54**, creadas en el board despues de la ultima F0.
+- **QC-44 acotada con `/afinar-feature` el 2026-09-04.** Alcance, 26 decisiones cerradas y 3
+  preguntas abiertas en `specs/QC-44-pantalla-de-proveedores/requirements.md`; no se copian aqui.
+  El board se actualizo ANTES de sembrar: `description` reescrita contra la forma post-QC-52 y
+  link *is blocked by* **QC-52** anadido, porque esa ficha borra el `product_id` de la linea que
+  la pantalla iba a mostrar. `complexity: high`.
 
 ### QC-23 — registro-de-sesiones (acotada el 2026-09-03)
 
@@ -655,11 +684,6 @@ Una entrada por feature evaluada (paso F1.0 de `AGENTS.md`): qué `zone` y
   preguntas abiertas en `specs/QC-42-modelo-proveedores/requirements.md`. El board no cambio
   (los cuatro campos seguian siendo ciertos, QC-43 y QC-44 ya existen, ninguna ficha quedo
   huerfana), asi que tampoco cambio `feature_list.json`. QC-43 y QC-44 siguen SIN acotar.
-- **QC-44 acotada con `/afinar-feature` el 2026-09-04.** Alcance, 26 decisiones cerradas y 3
-  preguntas abiertas en `specs/QC-44-pantalla-de-proveedores/requirements.md`; no se copian aqui.
-  El board se actualizo ANTES de sembrar: `description` reescrita contra la forma post-QC-52 y
-  link *is blocked by* **QC-52** anadido, porque esa ficha borra el `product_id` de la linea que
-  la pantalla iba a mostrar. `complexity: high`.
 
 ### QC-21 — ayuda-visual-de-contrasena (2026-09-02)
 

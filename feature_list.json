@@ -753,7 +753,7 @@
       "epic": "QC-16",
       "epic_name": "Plataforma",
       "name": "migrar-listas-a-tabla-compartida",
-      "description": "Las pantallas de productos (QC-22) y de recetas (QC-26) tienen hoy el mismo esqueleto de lista copiado pieza por pieza: el parser de parametros de la URL, la seccion que pide los datos y despacha estados, la tabla, la barra de paginacion, y los estados vacio, error y esqueleto de carga. Esta ficha las pasa a usar la tabla compartida de QC-55 y borra el codigo duplicado, sin cambiar lo que el usuario ve ni lo que la pantalla hace: las dos listas siguen paginando igual, y los tests que hoy pasan deben seguir pasando. Como QC-55 anade ordenar por cabecera y fijar columnas, al migrar hay que decidir que columnas de cada lista son ordenables y cuales se fijan, y si ordenar exige que el backend soporte un parametro de orden que hoy no expone. Si lo exige, eso es trabajo de backend y va en su propia ficha. Se separa de QC-55 a proposito, por decision del humano el 2026-09-04: QC-55 entrega el componente y esta ficha lo adopta, de modo que el componente no nace atado a la forma de dos pantallas concretas. Va despues de QC-52, que reescribe la pantalla de productos y toca los mismos archivos: migrar antes seria resolver el mismo conflicto dos veces.",
+      "description": "Las pantallas de productos (QC-22) y de recetas (QC-26) tienen hoy el mismo esqueleto de lista copiado pieza por pieza: el parser de parametros de la URL, la seccion que pide los datos y despacha estados, la tabla, la barra de paginacion, y los estados vacio, error y esqueleto de carga. Esta ficha las pasa a usar la tabla compartida de QC-55 y borra el codigo duplicado, sin cambiar lo que el usuario ve ni lo que la pantalla hace: las dos listas siguen paginando igual, y los tests que hoy pasan deben seguir pasando. Como QC-55 anade ordenar por cabecera y fijar columnas, al migrar hay que decidir que columnas de cada lista son ordenables y cuales se fijan, y si ordenar exige que el backend soporte un parametro de orden que hoy no expone. Si lo exige, eso es trabajo de backend y va en su propia ficha. Se separa de QC-55 a proposito, por decision del humano el 2026-09-04: QC-55 entrega el componente y esta ficha lo adopta, de modo que el componente no nace atado a la forma de dos pantallas concretas. Va despues de QC-52, que reescribe la pantalla de productos y toca los mismos archivos: migrar antes seria resolver el mismo conflicto dos veces. --- Anadido el 2026-09-04, al cerrar QC-55: ESTA FICHA HEREDA LA COMPROBACION EN iOS. La task T13 de QC-55 -sticky de la columna fijada en Safari de iOS real, scroll de la TABLA y no del body, y menu de cabecera por toque- no se pudo hacer alli porque ninguna pantalla montaba el componente y fabricar una de prueba era lo que su decision 11 rechazo. Trasladada aqui por decision del humano, y aqui es EXIGIBLE y bloqueante. Deuda anotada por QC-55 que esta ficha probablemente tenga que resolver: DataTableColumn no expone ancho (todas las columnas caen en 150 px), focusColumnFilter no esta acotado por tableId, y como se declara una columna de ACCIONES de fila sigue sin decidirse -sin eso la migracion de productos no se puede completar-.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -780,6 +780,21 @@
       "branch": "feature/QC-57-orden-y-filtro-en-listados",
       "depends_on": null,
       "spec_path": "specs/QC-57-orden-y-filtro-en-listados"
+    },
+    {
+      "key": "QC-58",
+      "id": 58,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "flake-formulario-producto",
+      "description": "El archivo de pruebas de la pantalla de productos falla de forma intermitente cuando se corre la bateria completa, y pasa siempre cuando se corre solo. Falla un caso distinto en cada corrida, asi que no es un fallo de una regla concreta sino del propio andamiaje de la prueba. El sintoma es claro: al escribir un nombre en el formulario, las letras llegan intercaladas -sale \"xxxxxAxcxixdxox\" donde deberia salir \"Acido citrico\"-, lo que indica que el campo tarda en repintarse entre tecla y tecla cuando la maquina va cargada, y la prueba escribe mas rapido de lo que el campo se actualiza. Se verifico rojo en dev (commit c0c16af) ANTES de la rama de QC-34, que no toca ni inventario ni pantalla. El 2026-09-04, al cerrar QC-34, se metio al baseline de rojos heredados con su motivo y su fecha, y esta ficha es el compromiso de arreglarlo de verdad. Que entra: dejar el archivo verde de forma estable en la suite completa, demostrarlo con varias corridas seguidas, y RETIRARLO del baseline en el mismo cambio. Si resulta que el campo del formulario tiene un problema real de control del valor, arreglarlo tambien entra. Que NO entra: rehacer la pantalla de productos ni sus reglas, que son de QC-20 y QC-22.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-58-flake-formulario-producto",
+      "depends_on": null,
+      "spec_path": "specs/QC-58-flake-formulario-producto"
     }
   ]
 }

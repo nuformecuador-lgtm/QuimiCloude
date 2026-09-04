@@ -323,9 +323,30 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       diff.length,
       'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
     ).toBeGreaterThan(0)
+    // ACTUALIZADO 2026-09-04 (QC-34, T10): la lista permitida deja de estar VACIA y pasa a
+    // tener exactamente TRES entradas, y no es un aflojamiento. QC-34 necesita el nombre de la
+    // receta de un pedido, incluida la dada de baja (R43, R44), y QC-33 R32 le prohibe
+    // consultar `prisma.recipe`: la unica salida que ese mismo requisito preve es que
+    // `recetas` AMPLIE su contrato publico -exactamente el movimiento que QC-25 hizo con
+    // `ProductCatalog` en `inventario`-. Ese trabajo es, por definicion, un cambio dentro de
+    // `lib/modules/recetas/`, asi que un filtro vacio lo declararia violacion. Lo que este
+    // caso sigue vigilando -y es lo que de verdad protegia- es que NADA MAS del modulo se
+    // toque por la puerta de atras: el repositorio, los casos de uso, la Server Action y el
+    // adaptador de almacenamiento de QC-25 siguen congelados, y que el cambio sea ADITIVO
+    // (ninguna firma anterior cambio) lo demuestra `tests/unit/recetas/recipe-catalog.test.ts`.
+    const AMPLIACION_QC34 = [
+      // El barrel gana DOS reexportaciones de tipo (`RecipeCatalog`, `RecipeRef`).
+      'lib/modules/recetas/index.ts',
+      // El contrato de catalogo, que ya existia con `RecipeId` desde QC-33, gana los dos tipos.
+      'lib/modules/recetas/domain/recipe-catalog.ts',
+      // Y su implementacion, adaptador driven NUEVO -no toca `recipe-prisma.ts`-.
+      'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+    ]
     expect(
-      diff.filter((ruta) => ruta.startsWith('lib/modules/recetas/')),
-      'QC-26 es una feature de PRESENTACION: ningun archivo de lib/modules/recetas/ puede estar en el diff',
+      diff
+        .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
+        .filter((ruta) => !AMPLIACION_QC34.includes(ruta)),
+      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10) puede estar en el diff',
     ).toEqual([])
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se

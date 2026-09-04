@@ -1,4 +1,4 @@
-import type { PageQuery, Page } from '../domain/page';
+import type { ProductQuery, Page } from '../domain/page';
 import type { NewProduct, ProductView } from '../domain/product-view';
 
 /**
@@ -16,5 +16,5 @@ export interface ProductRepository {
   findAliveById(id: string): Promise<ProductView | null>;
   updateAlive(id: string, data: NewProduct, actorId: string, now: Date): Promise<boolean>;
   softDeleteAlive(id: string, actorId: string, now: Date): Promise<boolean>;
-  listAlive(query: PageQuery): Promise<Page<ProductView>>;
+  listAlive(query: ProductQuery): Promise<Page<ProductView>>;
 }
