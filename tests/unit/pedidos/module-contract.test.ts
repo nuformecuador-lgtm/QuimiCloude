@@ -262,15 +262,25 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
 
     // Las tres carpetas nacen VACIAS y sembradas con `.gitkeep`, para que git las versione
     // (`design.md > 6.1`). Las llena QC-34.
-    for (const vacia of [
+    // QC-34 llena estas carpetas y borra el `.gitkeep` de cada una al aparecer su primer
+    // archivo real (su R52). Lo que se sigue vigilando -y es lo que importaba- es la EXCLUSION
+    // MUTUA: o la carpeta esta vacia CON su `.gitkeep`, o tiene codigo y NINGUN `.gitkeep`. Un
+    // `.gitkeep` conviviendo con codigo es basura.
+    for (const carpeta of [
       join(pedidosDir, 'ports'),
       join(pedidosDir, 'adapters', 'driven'),
       join(pedidosDir, 'adapters', 'driving'),
     ]) {
-      expect(sourcesIn(vacia), `${etiqueta(vacia)} deberia estar vacia`).toEqual([])
-      expect(readdirSync(vacia), `${etiqueta(vacia)} deberia tener solo .gitkeep`).toEqual([
-        '.gitkeep',
-      ])
+      const contenido = readdirSync(carpeta)
+      if (sourcesIn(carpeta).length === 0) {
+        expect(contenido, `${etiqueta(carpeta)} esta vacia y deberia tener solo .gitkeep`).toEqual([
+          '.gitkeep',
+        ])
+      } else {
+        expect(contenido, `${etiqueta(carpeta)} tiene codigo y conserva un .gitkeep`).not.toContain(
+          '.gitkeep',
+        )
+      }
     }
 
     // El contrato solo reexporta de `./domain`: ni puertos, ni adaptadores, ni nada de fuera.
@@ -448,7 +458,14 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `> 8.3`): el duplicado no se evita, se VIGILA. Se compara valor a valor y EN ORDEN —el
     // orden de la prioridad ES el dato (decision cerrada 4)—, asi que un `toEqual` sobre el
     // array, no un `toContain` ni un conjunto.
-    expect(enumValues('OrderStatus')).toEqual(['PENDIENTE', 'EN_CURSO', 'ENTREGADO'])
+    // El CUARTO estado -`CANCELADO`- lo anadio QC-34 (su decision cerrada 3) a las DOS listas a
+    // la vez; que sigan cuadrando valor a valor y EN ORDEN es exactamente lo que R35 vigila.
+    expect(enumValues('OrderStatus')).toEqual([
+      'PENDIENTE',
+      'EN_CURSO',
+      'ENTREGADO',
+      'CANCELADO',
+    ])
     expect([...ORDER_STATUS_VALUES]).toEqual(enumValues('OrderStatus'))
 
     expect(enumValues('OrderPriority')).toEqual(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'])
@@ -476,24 +493,50 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     expect(() => defaultOf('campoInexistente')).toThrow(/no declara el campo/)
   })
 
-  it('el modulo pedidos no declara ninguna transicion ni maquina de estados', () => {
-    // R19: esta ficha NO restringe que cambio de estado es valido —cualquier estado puede
-    // sustituir a cualquier otro, salvo lo que impone el CHECK del entregado (R29, R30)—. Las
-    // transiciones validas son de QC-34, y adelantarlas aqui seria decidir sin el caso de uso
-    // delante. Se vigila el CODIGO del modulo entero, comentarios fuera: la prosa SI puede
-    // decir que las transiciones son de QC-34, y de hecho lo dice.
+  it('la regla de transiciones vive en UN SOLO archivo del modulo, y la base no la impone', () => {
+    // QC-33 R19 dejo escrito que ESTA base NO restringe que cambio de estado es valido
+    // -cualquier estado puede sustituir a cualquier otro, salvo lo que impone el CHECK del
+    // entregado- y que las transiciones validas eran de QC-34. YA LO SON: QC-34 las escribio en
+    // `domain/order-transitions.ts` como regla de APLICACION (su R22, R23).
+    //
+    // Asi que lo que este caso vigila ya no es la AUSENCIA sino la UNICIDAD, que es lo que
+    // seguia importando de R19: la tabla de transiciones esta en UN SOLO sitio y ningun otro
+    // archivo del modulo declara la suya. Dos tablas serian dos verdades sobre lo mismo. Se
+    // vigila el CODIGO, comentarios fuera: la prosa si puede hablar de transiciones.
     const PROHIBIDO =
       /\b(transitions?|transicion\w*|canTransition|allowedStatus\w*|nextStatus|stateMachine|maquina)\b/i
+    const DECLARA_LA_TABLA = /\bALLOWED\b|assertTransition|isAllowedTransition/
     expect(pedidosSources.length).toBeGreaterThan(0)
+
+    const DUENO = 'lib/modules/pedidos/domain/order-transitions.ts'
+    expect(pedidosSources.filter((file) => DECLARA_LA_TABLA.test(read(file))).map(etiqueta)).toEqual(
+      [DUENO],
+    )
+
     for (const file of pedidosSources) {
+      if (etiqueta(file) === DUENO) continue
       expect(read(file), `${etiqueta(file)} declara una transicion de estado`).not.toMatch(PROHIBIDO)
     }
 
-    // Lo que el modulo publica sobre el estado es la LISTA de valores y su defecto, nada mas:
-    // ninguna funcion que decida si un cambio es legal.
+    // Y la restriccion NO baja a la base (QC-33 R19, QC-34 R23): ningun trigger impone que
+    // estado puede seguir a cual. No hay ni un trigger en este repositorio.
+    const sqlDeOrders = readdirSync(join(repoRoot, 'db', 'migrations'))
+      .filter((name) => /_orders$|_order_cancellation$/.test(name))
+      .flatMap((name) =>
+        ['migration.sql', 'down.sql']
+          .map((archivo) => join(repoRoot, 'db', 'migrations', name, archivo))
+          .filter((archivo) => existsSync(archivo)),
+      )
+      .map((archivo) => readFileSync(archivo, 'utf8'))
+      .join('\n')
+    expect(sqlDeOrders.length).toBeGreaterThan(0)
+    expect(sqlDeOrders, 'la base impone las transiciones con un trigger').not.toMatch(
+      /CREATE\s+(OR\s+REPLACE\s+)?TRIGGER/i,
+    )
+
+    // Lo que el contrato publica sobre el estado sigue siendo la LISTA de valores y su defecto.
     const contrato = read(barrel)
     expect(contrato).toMatch(/ORDER_STATUS_VALUES/)
-    expect(contrato, 'el contrato publica una regla de transicion').not.toMatch(PROHIBIDO)
   })
 
   it('el barrel de pedidos exporta formatOrderNumber y no hay ninguna otra composicion del numero visible', () => {

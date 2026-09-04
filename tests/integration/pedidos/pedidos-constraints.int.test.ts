@@ -435,6 +435,10 @@ describe('el pedido como fila completa', () => {
        WHERE table_schema = 'public' AND table_name = 'orders'`
     const names = columns.map((c) => c.column_name).sort()
     expect(names).toEqual([
+      // `cancellation_reason` la anade QC-34 (su R48, decision cerrada 4): es la UNICA columna
+      // que esa ficha puede anadir a `orders`. Aparece la PRIMERA porque el `sort()` es
+      // lexicografico y 'ca' < 'cr'. Sigue sin haber total, subtotal, impuesto ni cliente.
+      'cancellation_reason',
       'created_at',
       'created_by',
       'deleted_at',

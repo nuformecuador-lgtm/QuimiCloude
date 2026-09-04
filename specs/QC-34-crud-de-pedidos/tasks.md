@@ -59,7 +59,7 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo A — cimientos (nada depende de la base todavía)
 
-- [ ] **T1 [P] — Dominio base del módulo.** `domain/actor.ts` (`Actor`, `requireAdmin`, con
+- [x] **T1 [P] — Dominio base del módulo.** `domain/actor.ts` (`Actor`, `requireAdmin`, con
       `ROLE_ADMINISTRADOR` importado del **barrel** `@/lib/modules/identity`), `domain/errors.ts`
       (`PedidosError` y las nueve clases con su `code` de `design.md > 7.5`), `domain/page.ts`
       (`Page<T>`, `PageQuery`, `pageQuerySchema`, copia de `recetas`).
@@ -67,7 +67,7 @@ verificado contra el árbol de la rama, no contra este documento.
       framework, Prisma, `lib/shared/` ni `composition`; `guard-arquitectura-modulos` verde con el
       import del barrel de `identity`.
 
-- [ ] **T2 [P] — Test de alcance, adelantado.** `tests/unit/pedidos/scope.test.ts`: ninguna ruta,
+- [x] **T2 [P] — Test de alcance, adelantado.** `tests/unit/pedidos/scope.test.ts`: ninguna ruta,
       página ni componente de pedidos bajo `app/`, ningún route handler, ningún spec E2E nuevo,
       ninguna reimplementación de la aritmética de paginación, ningún `.gitkeep` en carpeta con
       archivos, el contrato sin `'use server'`, y `pedidos` sin `prisma.recipe`/`prisma.unit`/
@@ -75,21 +75,21 @@ verificado contra el árbol de la rama, no contra este documento.
       *Depende de:* T0. **Hecho cuando:** el test pasa **y** falla si se le añade una entrada
       sintética que viole cada regla (R37, R52, R53, R57, R58).
 
-- [ ] **T3 — El valor `CANCELADO` en el esquema y en el dominio.** `enum OrderStatus` gana
+- [x] **T3 — El valor `CANCELADO` en el esquema y en el dominio.** `enum OrderStatus` gana
       `CANCELADO` en `db/schema.prisma`; `Order` gana `cancellationReason String? @map(...)`;
       `domain/order-classification.ts` añade el valor a `ORDER_STATUS_VALUES` **en el mismo orden**.
       *Depende de:* T1. **Hecho cuando:** `pnpm prisma validate` pasa, `pnpm run typecheck` limpio, y
       el test de contrato de QC-33 —que compara el esquema con las listas del dominio, valor a valor y
       en orden— **sigue verde con los cuatro valores** (QC-33 R35).
 
-- [ ] **T4 — Transiciones de estado.** `domain/order-transitions.ts` con la tabla `ALLOWED` de
+- [x] **T4 — Transiciones de estado.** `domain/order-transitions.ts` con la tabla `ALLOWED` de
       `design.md > 5` y `assertTransition`, más
       `tests/unit/pedidos/order-transitions.test.ts` con la matriz **completa** 4×4.
       *Depende de:* T1, T3. **Hecho cuando:** los 16 pares están cubiertos, los dos estados finales no
       admiten ni siquiera «quedarse igual», y ningún par tiene `CANCELADO` como destino (R22, R23,
       R24).
 
-- [ ] **T5 [P] — Esquemas de entrada.** `domain/order-input.ts`: `createOrderSchema`,
+- [x] **T5 [P] — Esquemas de entrada.** `domain/order-input.ts`: `createOrderSchema`,
       `updateOrderSchema` (con `EDITABLE_STATUS` **derivado** de `ORDER_STATUS_VALUES`, no escrito a
       mano), `cancelOrderSchema`, `listOrdersSchema`. Más
       `tests/unit/pedidos/order-input.test.ts`.
@@ -98,7 +98,7 @@ verificado contra el árbol de la rama, no contra este documento.
       501 caracteres, `status: 'CANCELADO'` en la edición (rechazado) y que `createOrderSchema`
       **descarta** `status`, `createdBy` y el correlativo (R9, R17, R18, R19, R24, R27, R55).
 
-- [ ] **T6 [P] — Tipos de salida y puerto.** `domain/order-view.ts` (`OrderView`, `OrderSummary`,
+- [x] **T6 [P] — Tipos de salida y puerto.** `domain/order-view.ts` (`OrderView`, `OrderSummary`,
       `NewOrder` con `status: EditableOrderStatus`, `OrderFilters`) y
       `ports/order-repository.ts` con los seis métodos de `design.md > 7.4`. Se **borra**
       `ports/.gitkeep`.
@@ -135,7 +135,7 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo C — el contrato de `recetas` (módulo ajeno, aditivo)
 
-- [ ] **T10 [P] — `RecipeCatalog` en `recetas`.** `domain/recipe-catalog.ts` gana `RecipeRef` y
+- [x] **T10 [P] — `RecipeCatalog` en `recetas`.** `domain/recipe-catalog.ts` gana `RecipeRef` y
       `RecipeCatalog.findRefsIncludingDeleted`; `adapters/driven/persistence/recipe-catalog-prisma.ts`
       lo implementa (una sola consulta `where: { id: { in: ids } }`, **sin** filtro de `deletedAt`,
       mapeando `isDeleted`); el barrel lo reexporta. Más

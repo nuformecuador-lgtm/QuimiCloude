@@ -373,6 +373,12 @@ enum OrderStatus {
   PENDIENTE
   EN_CURSO
   ENTREGADO
+  /// QC-34 (decision cerrada 3): CUARTO valor, anadido por la migracion `_order_cancellation`
+  /// con `ALTER TYPE ... ADD VALUE`. Es el coste que QC-33 asumio al elegir enum en vez de
+  /// tabla. Va el ULTIMO: el orden de declaracion de este tipo no significa nada —a diferencia
+  /// del de `OrderPriority`—, pero reordenarlo obligaria a recrear el tipo en vez de anadir un
+  /// valor. `CANCELADO` es FINAL: no se sale de el (QC-34 R21, R22).
+  CANCELADO
 }
 
 /// Prioridad del pedido (QC-33, decision cerrada 4). EL ORDEN DE DECLARACION ES EL ORDEN DE
@@ -419,20 +425,26 @@ enum OrderPriority {
 /// una persona» —una importacion, un seed—, no «se perdio el dato».
 /// @module pedidos
 model Order {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderYear     Int           @map("order_year")
-  orderSequence Int           @map("order_sequence")
-  recipeId      String        @map("recipe_id") @db.Uuid
-  quantity      Decimal       @db.Decimal(14, 4)
-  unitId        String        @map("unit_id") @db.Uuid
-  unitPrice     Decimal       @map("unit_price") @db.Decimal(14, 4)
-  priority      OrderPriority @default(BAJA)
-  status        OrderStatus   @default(PENDIENTE)
-  createdBy     String?       @map("created_by") @db.Uuid
-  updatedBy     String?       @map("updated_by") @db.Uuid
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderYear          Int           @map("order_year")
+  orderSequence      Int           @map("order_sequence")
+  recipeId           String        @map("recipe_id") @db.Uuid
+  quantity           Decimal       @db.Decimal(14, 4)
+  unitId             String        @map("unit_id") @db.Uuid
+  unitPrice          Decimal       @map("unit_price") @db.Decimal(14, 4)
+  priority           OrderPriority @default(BAJA)
+  status             OrderStatus   @default(PENDIENTE)
+  /// QC-34 (decision cerrada 4, R27, R30): motivo de la cancelacion. ANULABLE, porque solo
+  /// existe en un pedido cancelado, y `TEXT` SIN longitud: el tope de 500 vive en `zod`
+  /// (`order-input.ts`), no en el tipo de la columna —cambiarlo no puede ser una migracion—.
+  /// Que exista si y solo si `status = 'CANCELADO'` lo garantiza el CHECK
+  /// `orders_cancellation_reason_matches_status`, escrito a mano en la migracion.
+  cancellationReason String?       @map("cancellation_reason")
+  createdBy          String?       @map("created_by") @db.Uuid
+  updatedBy          String?       @map("updated_by") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?     @map("deleted_at") @db.Timestamptz(6)
 
   @@unique([orderYear, orderSequence], map: "orders_order_year_order_sequence_key")
   @@index([recipeId], map: "orders_recipe_id_idx")
