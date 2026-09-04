@@ -181,7 +181,9 @@ El puerto pasa a `listAlive(offset, limit, query)` y **no** a `listAlive(query)`
 
 `status` y `priority` dejan de ser parámetros propios y pasan a filtros `select` (R25); `listOrdersSchema` y el tipo `OrderFilters` **desaparecen**.
 
-**Regresión aceptada y exigida por el spec, anotada en el propio test:** un `status` o `priority` **fuera del conjunto cerrado ya no lanza `invalid_input`** —como hacía QC-34—; **se omite, se anota en el log y la consulta no falla** (R5). Es el precio de que el contrato sea uno solo: un campo inválido nunca tumba una lista. La poda vive en el dominio, que es quien conoce los valores y quien tiene el log; una lista mixta conserva los válidos, y si no queda ninguno el filtro desaparece.
+**Regresión aceptada y exigida por el spec, anotada en el propio test:** un `status` o `priority` **fuera del conjunto cerrado ya no lanza `invalid_input`** —como hacía QC-34—; **se omite, se anota en el log y la consulta no falla**. Es el precio de que el contrato sea uno solo: un campo inválido nunca tumba una lista.
+
+**La autoridad de esto es `design.md > 5`, nota 3** —«un valor de fuera se ignora como campo no declarado»—, **y NO R5**: llegué a citar R5 y es incorrecto, porque R5 habla de **campos** no declarados y aquí se trata de **valores** fuera de un conjunto cerrado. Corregido tras el review. El reviewer verificó además que el cambio **no rompe ninguna decisión de QC-34** (revisó R38–R41). La poda vive en el dominio, que es quien conoce los valores y quien tiene el log; una lista mixta conserva los válidos, y si no queda ninguno el filtro desaparece.
 
 Lo que **no** cambió y sigue con su test: un pedido `CANCELADO` **sí** se consulta; `priority` ordena por el **orden de declaración del enum** (`BAJA < MEDIA < ALTA < CRITICA`) y no por el alfabético — el test afirma las dos cosas, que ordena por prioridad **y** que eso no es el descendente alfabético; y las **tres consultas por página** con los ids deduplicados (R45 de QC-34), con su test que las **cuenta**.
 
@@ -195,11 +197,19 @@ Lo que **no** cambió y sigue con su test: un pedido `CANCELADO` **sí** se cons
 
 Los tres campos ordenables de `recetas` (`name`, `createdAt`, `updatedAt`) **no son anulables**, así que allí no se declara ningún `NULLS LAST`: no hay nulos que colocar. La decisión tiene materia en `products` (`stock`, `qtyAlert`), en `supplier_catalog_lines` (`minPurchase`, `deliveryTime`) y en `units.symbol`, y en los tres está explícita **en las dos direcciones** con su test. `UNIT_QUERYABLE.filterable` está vacío, así que **R15 no se puede demostrar en unidades**; se cierra en `recetas` combinando `createdAt` + `updatedAt`.
 
-### Incidente de finales de línea, detectado y corregido
+### Incidente de finales de línea: lo que pasó de verdad
 
 Una edición hecha con python reescribió archivos enteros convirtiendo **CRLF → LF**. Importa porque **varias guardias leen el fuente en crudo** y no despegan comentarios en CRLF: una conversión silenciosa las rompe. El agente restauró `lib/composition/index.ts` (diff real: 37 inserciones / 5 borrados, con los bloques de los otros módulos intactos), pero **se le escapó `tests/unit/proveedores/module-contract.test.ts`**, que quedó con un diff de **1192 líneas** de puro ruido.
 
-**Detectado y corregido aquí** comparando `file` de cada archivo del diff contra su versión en `HEAD`. Tras restaurar CRLF, el cambio real de ese archivo son **7 líneas**: `list-query-sql.ts` añadido a la lista **exacta** de `adapters/driven/`. Ningún otro archivo quedó afectado.
+**Lo que escribí aquí antes era FALSO y lo corrijo (B2 del review).** Dije que lo había detectado y corregido comparando cada archivo «contra su versión en `HEAD`». Ese era justo el error: **`HEAD` ya era el commit roto**, así que la comparación daba «coherente» sobre un estado que ya estaba mal, y encima me llevó a convertir `tests/unit/proveedores/module-contract.test.ts` **a CRLF**, propagando el fallo en vez de arreglarlo. **La comparación buena es contra la rama base (`origin/dev`)**, no contra `HEAD`.
+
+**Alcance real del destrozo, medido después:** el commit `1575190` pasó **14 archivos de LF a CRLF** —incluido `lib/modules/inventario/adapters/driven/persistence/list-query-sql.ts`, que **nació** en CRLF mientras sus cuatro copias literales son LF—, unas **4.700 líneas fantasma** que dejaban **irrevisables** `lib/composition/index.ts` (978 líneas de diff en vez de 62), `product-prisma.ts` (834 en vez de 189) y `presentation-prisma.ts`.
+
+**Corregido** en un commit propio que solo toca terminadores de línea. Tras él, el diff de la rama contra `origin/dev` muestra los cambios reales: `module-contract.test.ts` son **20 líneas**, no 1198.
+
+**La causa, para que no se repita:** escribir con **Python en modo texto sobre Windows** traduce `
+` a `
+` al guardar. Se evita abriendo **y** escribiendo con `newline=''`. Es el mismo hallazgo que QC-55 tuvo con `docs/dependencias.md`.
 
 ## Grupo 5 — llamantes (T21, T22)
 
@@ -298,7 +308,7 @@ De partida eran **180 archivos / 2058 tests**; ahora **198 / 2301**: la ficha a�
 **Diagnóstico medido, no supuesto** — cuatro observaciones:
 
 1. **En aislado pasa**: `Test Files 1 passed / Tests 20 passed`, pero tarda **30,8 s** para 20 tests.
-2. **El rojo se MUEVE de archivo entre corridas**: una vez fue `catalog-line-sheet`, otra `catalog-line-sheet` + `supplier-page`. Es la firma de un flake de saturación, no de un fallo determinista.
+2. **El número de archivos rojos varió entre corridas** (una vez `catalog-line-sheet`, otra `catalog-line-sheet` + `supplier-page`). **CORRECCIÓN**: llegué a escribir que el rojo «se mueve de archivo», y **el reviewer no pudo reproducirlo** — en sus dos corridas se quedó en el mismo archivo. Retiro esa afirmación: lo que sí está medido es que el conjunto de rojos **no es estable entre corridas**, que ya descarta un fallo determinista, pero no que migre de archivo.
 3. **Corriendo SOLO el proyecto `ui`** (36 archivos, 439 tests, **sin un solo test de integración de esta ficha**) **sigue fallando** uno por timeout. Es decir: **la causa no es la carga que añade QC-57**, es que la suite jsdom va justa contra el timeout por defecto de 5 s de Vitest.
 4. **Con `--testTimeout=20000` todo se pone verde**: el proyecto `ui` solo → `36 passed / 439 passed`; y la suite entera → solo quedan los **2 rojos de baseline**.
 
