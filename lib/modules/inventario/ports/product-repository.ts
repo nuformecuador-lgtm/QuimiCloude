@@ -1,4 +1,5 @@
-import type { ProductQuery, Page } from '../domain/page';
+import type { ListQuery } from '../domain/list-query';
+import type { Page } from '../domain/page';
 import type { NewProduct, ProductView } from '../domain/product-view';
 
 /**
@@ -16,5 +17,7 @@ export interface ProductRepository {
   findAliveById(id: string): Promise<ProductView | null>;
   updateAlive(id: string, data: NewProduct, actorId: string, now: Date): Promise<boolean>;
   softDeleteAlive(id: string, actorId: string, now: Date): Promise<boolean>;
-  listAlive(query: ProductQuery): Promise<Page<ProductView>>;
+  /** QC-57 (R24): recibe el CONTRATO GENERICO ya saneado por el caso de uso, no la
+   *  consulta cruda del llamante. Traducir `columnId`/filtros a SQL es del adaptador. */
+  listAlive(query: ListQuery): Promise<Page<ProductView>>;
 }

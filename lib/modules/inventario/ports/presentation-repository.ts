@@ -1,4 +1,5 @@
-import type { PageQuery, Page } from '../domain/page';
+import type { ListQuery } from '../domain/list-query';
+import type { Page } from '../domain/page';
 import type { PresentationView } from '../domain/presentation-view';
 
 /**
@@ -24,5 +25,7 @@ export interface PresentationRepository {
     nameNormalized: string,
   ): Promise<'ok' | 'not_found' | 'duplicate'>;
   deleteById(id: string): Promise<'deleted' | 'not_found' | 'in_use'>;
-  list(query: PageQuery): Promise<Page<PresentationView>>;
+  /** QC-57: el CONTRATO GENERICO ya saneado por el caso de uso (mismo criterio que
+   *  `ProductRepository.listAlive`). */
+  list(query: ListQuery): Promise<Page<PresentationView>>;
 }

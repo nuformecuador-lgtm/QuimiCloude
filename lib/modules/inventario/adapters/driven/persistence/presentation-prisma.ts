@@ -3,7 +3,16 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import type { Page, PageQuery } from '../../../domain/page';
+import { normalizePresentationName } from '../../../domain/presentation-name';
+
+import {
+  dateRangeCondition,
+  normalizedSearchCondition,
+  textCondition,
+} from './list-query-sql';
+
+import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
+import type { Page } from '../../../domain/page';
 import type { PresentationView } from '../../../domain/presentation-view';
 
 /**
@@ -102,23 +111,123 @@ export async function deletePresentationById(id: string): Promise<'deleted' | 'n
   }
 }
 
-/** R23, R24, R26, R27, R35, R36: paginacion con `lib/shared/pagination`. El `limit` que
- * llega a Prisma y el `pageSize` que sale en el `Page` son SIEMPRE el acotado que devuelve
- * `toOffsetLimit`, nunca el `pageSize` que pidio el llamante -si no, un `pageSize: 500`
- * devolveria 25 elementos con un `Page` diciendo `pageSize: 500` y un `totalPages`
- * mentiroso-. `total` sale de un `count` con el MISMO `where` que el `findMany` -aqui
- * vacio, porque la lista de presentaciones no filtra nada-. Orden estable
- * `name ASC, id ASC` (D19, R26, R35).
+/**
+ * Desempate ESTABLE por identificador (R10), por el mismo motivo que en productos: sin el, dos
+ * filas empatadas por el criterio pedido pueden intercambiarse entre paginas.
+ *
+ * A diferencia de productos, el NOMBRE de una presentacion si es unico
+ * (`presentations_name_normalized_key`), asi que ordenando por `name` el empate no puede darse;
+ * ordenando por `createdAt` -dos altas del mismo instante- si.
  */
-export async function listPresentations(query: PageQuery): Promise<Page<PresentationView>> {
+const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.PresentationOrderByWithRelationInput;
+
+/** Orden POR DEFECTO: exactamente el de hoy, `name ASC, id ASC` (R11). */
+/** Se construye en CADA llamada, no como constante compartida: Prisma exige un array
+ *  mutable en `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la
+ *  mutara para todos. */
+function defaultOrderBy(): Prisma.PresentationOrderByWithRelationInput[] {
+  return [{ name: 'asc' }, TIE_BREAKER];
+}
+
+/**
+ * `sort` del contrato -> `orderBy` de Prisma (R10, R11). Ninguna columna ordenable de
+ * `presentations` es anulable (`name`, `created_at` y `updated_at` son NOT NULL), asi que aqui
+ * no hay `nulls: 'last'` que declarar: no hay nulos que colocar. El `default` cae al orden por
+ * defecto en vez de fallar, misma defensa en profundidad que en productos (R5).
+ */
+export function presentationOrderBy(
+  sort: ListSort | null,
+): Prisma.PresentationOrderByWithRelationInput[] {
+  if (sort === null) return defaultOrderBy();
+  const dir = sort.direction;
+
+  switch (sort.columnId) {
+    case 'name':
+      return [{ name: dir }, TIE_BREAKER];
+    case 'createdAt':
+      return [{ createdAt: dir }, TIE_BREAKER];
+    case 'updatedAt':
+      return [{ updatedAt: dir }, TIE_BREAKER];
+    default:
+      return defaultOrderBy();
+  }
+}
+
+/**
+ * Un filtro del contrato -> la condicion de su columna. `null` cuando el campo no es filtrable
+ * aqui o cuando el valor no acota nada. `PRESENTATION_QUERYABLE` solo declara `createdAt`
+ * (`dateRange`); las otras formas se traducen igual -es trabajo del adaptador- y hoy no llegan
+ * porque `sanitizeListQuery` las poda antes.
+ *
+ * `numberRange` no aparece: `presentations` no tiene ninguna columna numerica.
+ */
+function presentationFilterWhere(
+  field: string,
+  value: ListFilterValue,
+): Prisma.PresentationWhereInput | null {
+  switch (value.kind) {
+    case 'dateRange': {
+      const condition = dateRangeCondition(value.from, value.to);
+      if (condition === null) return null;
+      if (field === 'createdAt') return { createdAt: condition };
+      if (field === 'updatedAt') return { updatedAt: condition };
+      return null;
+    }
+    case 'text': {
+      const condition = textCondition(value.value);
+      if (condition === null) return null;
+      if (field === 'name') return { name: condition };
+      return null;
+    }
+    case 'select':
+    case 'numberRange':
+      return null;
+  }
+}
+
+/**
+ * `where` UNICO del listado de presentaciones: el mismo objeto para el `findMany` y para el
+ * `count` (R14).
+ *
+ * **No lleva ninguna condicion de vida, y es deliberado**: `presentations` NO tiene
+ * `deleted_at` (D6 de QC-20, verificado contra el esquema), el borrado es fisico y anadir aqui
+ * un `deletedAt: null` no compilaria siquiera. Lo que en productos es R7, aqui no aplica.
+ *
+ * La busqueda va contra `name_normalized` normalizando el termino con la MISMA funcion que
+ * escribe esa columna (`normalizePresentationName`, la que ya respalda la unicidad): buscar y
+ * comparar no pueden discrepar (R19), y por eso «solucion» encuentra «Solución» (R18).
+ */
+export function buildPresentationWhere(query: ListQuery): Prisma.PresentationWhereInput {
+  const search = normalizedSearchCondition(query.search, normalizePresentationName);
+  const filters = Object.entries(query.filters)
+    .map(([field, value]) => presentationFilterWhere(field, value))
+    .filter((condition): condition is Prisma.PresentationWhereInput => condition !== null);
+
+  return {
+    ...(search === null ? {} : { nameNormalized: search }),
+    ...(filters.length === 0 ? {} : { AND: filters }),
+  };
+}
+
+/**
+ * `list` de `PresentationRepository` con el CONTRATO GENERICO de consulta (QC-57 R10, R11, R13,
+ * R14, R15, R16, R18, R29). El `limit` que llega a Prisma y el `pageSize` que sale en el `Page`
+ * son SIEMPRE el acotado que devuelve `toOffsetLimit`, nunca el que pidio el llamante -si no, un
+ * `pageSize: 500` devolveria 25 elementos con un `Page` diciendo `pageSize: 500` y un
+ * `totalPages` mentiroso-. Pedir de mas se ACOTA, no se rechaza (R29).
+ *
+ * Orden, filtro y busqueda los aplica el MOTOR sobre el conjunto completo y antes de paginar
+ * (R13); `total` sale de un `count` con el MISMO `where` que el `findMany` (R14).
+ */
+export async function listPresentations(query: ListQuery): Promise<Page<PresentationView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = {};
+  const where = buildPresentationWhere(query);
 
   const [items, total] = await Promise.all([
     prisma.presentation.findMany({
       where,
       select: presentationSelect,
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      orderBy: presentationOrderBy(query.sort),
       skip: offset,
       take: limit,
     }),

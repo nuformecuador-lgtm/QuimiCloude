@@ -6,7 +6,16 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import { NotFoundError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
 
-import type { ProductQuery, Page } from '../../../domain/page';
+import {
+  dateRangeCondition,
+  normalizedSearchCondition,
+  numberRangeCondition,
+  selectCondition,
+  textCondition,
+} from './list-query-sql';
+
+import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
+import type { Page } from '../../../domain/page';
 import type { NewProduct, ProductView } from '../../../domain/product-view';
 
 /**
@@ -241,36 +250,163 @@ export async function softDeleteAliveProduct(
 }
 
 /**
- * `listAlive` de `ProductRepository` (R16, R23, R24, R26, R27, R35, R36). El `limit` que
- * llega a Prisma -y el `pageSize` que sale en el `Page`- es el ACOTADO que devuelve
- * `toOffsetLimit`, nunca el `pageSize` que pidio el llamante (`design.md > 8`): pasarle
- * el pedido a `buildPage` dejaria un `Page` con un `pageSize` y un `totalPages` mentirosos
- * aunque el `LIMIT` de SQL fuera correcto.
- *
- * Orden `name ASC, id ASC` (D19, R26, R35): el desempate por `id` no es adorno, es lo que
- * evita que dos productos homonimos -el nombre no es unico, D14, R12- se intercambien
- * entre paginas.
- *
- * `total` sale de un `count` con el MISMO `where` que el `findMany` (mismo filtro
- * `deleted_at IS NULL`).
+ * Desempate ESTABLE por identificador (R10). No es adorno y por eso es una constante con
+ * nombre: el nombre de un producto NO es unico (D14 de QC-20), asi que sin este segundo criterio
+ * dos homonimos pueden intercambiarse -o perderse- entre paginas, porque el orden de las filas
+ * empatadas no esta definido y Postgres puede devolverlas distinto en cada consulta.
  */
-export async function listAliveProducts(query: ProductQuery): Promise<Page<ProductView>> {
-  const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  // La busqueda va al MOTOR, no a la pagina ya traida: `contains` insensible a mayusculas
-  // sobre `name`, con el MISMO `where` para el `findMany` y el `count`, de modo que el
-  // `total` -y con el `totalPages`- describa el resultado filtrado y no el catalogo entero.
-  const where: Prisma.ProductWhereInput = {
+const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.ProductOrderByWithRelationInput;
+
+/** Orden POR DEFECTO: exactamente el de hoy (R11). Sin `sort`, la lista no se mueve. */
+/** Se construye en CADA llamada, no como constante compartida: Prisma exige un array
+ *  mutable en `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la
+ *  mutara para todos. */
+function defaultOrderBy(): Prisma.ProductOrderByWithRelationInput[] {
+  return [{ name: 'asc' }, TIE_BREAKER];
+}
+
+/**
+ * `sort` del contrato -> `orderBy` de Prisma (R10, R11).
+ *
+ * TRES COSAS QUE NO SON OBVIAS:
+ *
+ *   1. **`presentationName` no es una columna de `products`**: es el `name` de la presentacion
+ *      unida, y Prisma lo ordena atravesando la relacion (`{ presentation: { name: dir } }`).
+ *      Se declara ordenable porque la pantalla ya muestra esa columna.
+ *   2. **`stock` y `qtyAlert` son ANULABLES y sus nulos van SIEMPRE AL FINAL**, en `asc` Y en
+ *      `desc`, **declarado explicito** (`nulls: 'last'`) y NO heredado del defecto de Postgres
+ *      -que los pone al final en `ASC` pero al PRINCIPIO en `DESC`-. Es la decision cerrada del
+ *      2026-09-04, que manda sobre `design.md > 3.3`: quien ordena por existencia quiere ver los
+ *      extremos reales, y de mayor a menor arrancaria si no con todos los productos sin
+ *      existencia registrada.
+ *   3. **El `default` no puede darse por inalcanzable**: `sanitizeListQuery` ya poda lo que no
+ *      esta en `PRODUCT_QUERYABLE`, pero el adaptador no puede depender de que su llamante lo
+ *      haya hecho -es defensa en profundidad, y ademas mantiene R5 cierto aqui tambien: un campo
+ *      desconocido cae al orden por defecto, no revienta la consulta-.
+ */
+export function productOrderBy(
+  sort: ListSort | null,
+): Prisma.ProductOrderByWithRelationInput[] {
+  if (sort === null) return defaultOrderBy();
+  const dir = sort.direction;
+
+  switch (sort.columnId) {
+    case 'name':
+      return [{ name: dir }, TIE_BREAKER];
+    case 'presentationName':
+      return [{ presentation: { name: dir } }, TIE_BREAKER];
+    case 'stock':
+      return [{ stock: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
+    case 'qtyAlert':
+      return [{ qtyAlert: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
+    case 'createdAt':
+      return [{ createdAt: dir }, TIE_BREAKER];
+    case 'updatedAt':
+      return [{ updatedAt: dir }, TIE_BREAKER];
+    default:
+      return defaultOrderBy();
+  }
+}
+
+/**
+ * Un filtro del contrato -> la condicion de la columna que le corresponde. Devuelve `null` -y el
+ * filtro no aparece en el `where`- cuando el campo no es filtrable aqui o cuando el valor no
+ * acota nada (rango con los dos extremos nulos, `select` con lista VACIA: «no he elegido nada»
+ * NO es «ningun resultado», `design.md > 3.3`).
+ *
+ * Las CUATRO formas del contrato estan contempladas (R12). La de `text` sobre `name` no llega
+ * hoy -`PRODUCT_QUERYABLE` no declara `name` filtrable: el nombre se BUSCA con `search`, no se
+ * filtra-, y `sanitizeListQuery` la podaria antes; se escribe igual porque traducir es trabajo
+ * del adaptador y declarar manana un campo de texto no puede depender de que alguien recuerde
+ * que aqui faltaba una rama.
+ */
+function productFilterWhere(
+  field: string,
+  value: ListFilterValue,
+): Prisma.ProductWhereInput | null {
+  switch (value.kind) {
+    case 'select': {
+      const condition = selectCondition(value.values);
+      if (condition === null) return null;
+      if (field === 'presentationId') return { presentationId: condition };
+      if (field === 'unitId') return { unitId: condition };
+      return null;
+    }
+    case 'numberRange': {
+      const condition = numberRangeCondition(value.min, value.max);
+      if (condition === null) return null;
+      if (field === 'stock') return { stock: condition };
+      if (field === 'qtyAlert') return { qtyAlert: condition };
+      return null;
+    }
+    case 'dateRange': {
+      const condition = dateRangeCondition(value.from, value.to);
+      if (condition === null) return null;
+      if (field === 'createdAt') return { createdAt: condition };
+      if (field === 'updatedAt') return { updatedAt: condition };
+      return null;
+    }
+    case 'text': {
+      const condition = textCondition(value.value);
+      if (condition === null) return null;
+      if (field === 'name') return { name: condition };
+      return null;
+    }
+  }
+}
+
+/**
+ * `where` UNICO del listado de productos: el mismo objeto para el `findMany` y para el `count`
+ * (R14). Tres capas, y ninguna sobra:
+ *
+ *   1. **`deletedAt: null` SIEMPRE** (R7, R16 de QC-20). No es un filtro que el llamante pueda
+ *      quitar: `deletedAt` no es consultable en ninguna lista blanca y `sanitizeListQuery` lo
+ *      poda ademas por su cuenta.
+ *   2. **La busqueda contra `name_normalized`** (R16, R18, R19), normalizando el termino con
+ *      `normalizeProductName` -la MISMA funcion que escribio la columna-. Es lo que hace que
+ *      «solucion» encuentre «Solución Buffer pH 7». Sin `mode: 'insensitive'`: la columna ya
+ *      viene sin acentos ni mayusculas, y pedirlo ademas dejaria fuera el indice de trigramas.
+ *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
+ *      si los cumple todos.
+ */
+export function buildProductWhere(query: ListQuery): Prisma.ProductWhereInput {
+  const search = normalizedSearchCondition(query.search, normalizeProductName);
+  const filters = Object.entries(query.filters)
+    .map(([field, value]) => productFilterWhere(field, value))
+    .filter((condition): condition is Prisma.ProductWhereInput => condition !== null);
+
+  return {
     deletedAt: null,
-    ...(query.search === undefined
-      ? {}
-      : { name: { contains: query.search, mode: 'insensitive' } }),
+    ...(search === null ? {} : { nameNormalized: search }),
+    ...(filters.length === 0 ? {} : { AND: filters }),
   };
+}
+
+/**
+ * `listAlive` de `ProductRepository` con el CONTRATO GENERICO de consulta (QC-57 R10, R11,
+ * R13, R14, R15, R16, R18, R29). El `limit` que llega a Prisma -y el `pageSize` que sale en el
+ * `Page`- es el ACOTADO que devuelve `toOffsetLimit`, nunca el `pageSize` que pidio el llamante
+ * (`design.md > 8`): pasarle el pedido a `buildPage` dejaria un `Page` con un `pageSize` y un
+ * `totalPages` mentirosos aunque el `LIMIT` de SQL fuera correcto. Pedir 100 se ACOTA a 25, no
+ * se rechaza (R29).
+ *
+ * ORDEN, FILTRO Y BUSQUEDA VAN AL MOTOR, nunca a la pagina ya traida (R13): filtrar lo ya
+ * descargado es justo lo que QC-22 y QC-26 rechazaron por enganoso, y ademas dejaria un `total`
+ * mentiroso.
+ *
+ * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la misma
+ * constante, no dos copias parecidas-, de modo que el `total` y el `totalPages` describan el
+ * conjunto YA FILTRADO y no el catalogo entero.
+ */
+export async function listAliveProducts(query: ListQuery): Promise<Page<ProductView>> {
+  const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
+  const where = buildProductWhere(query);
 
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
       where,
       select: PRODUCT_SELECT,
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      orderBy: productOrderBy(query.sort),
       skip: offset,
       take: limit,
     }),

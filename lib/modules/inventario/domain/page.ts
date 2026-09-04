@@ -26,19 +26,11 @@ export const pageQuerySchema = z.object({
 export type PageQuery = z.infer<typeof pageQuerySchema>;
 
 /**
- * Consulta paginada de PRODUCTOS, con busqueda por nombre opcional (R23-R26 mas la busqueda
- * que pide el selector de ingredientes de `recetas`).
+ * QC-57 (R24, T8): `productQuerySchema` y `ProductQuery` YA NO EXISTEN. El listado de
+ * productos dejo de tener parametro de busqueda propio y acepta el contrato generico de
+ * `domain/list-query.ts` -el mismo de las siete listas-, asi que una segunda forma de pedir
+ * la lista de productos ya no puede existir por descuido.
  *
- * La busqueda va aqui y no en `pageQuerySchema` porque ese esquema lo comparten productos y
- * presentaciones, y la de presentaciones no busca por texto: ensancharlo dejaria un parametro
- * que un llamante podria pasar y nadie honraria.
- *
- * `trim` antes de validar, y `min(1)` DESPUES: una busqueda de solo espacios no es una
- * busqueda, es la lista completa, y asi la trata el adaptador -no filtra-. El tope de 120
- * caracteres corta por lo sano una consulta absurda antes de llegar a la base.
+ * `pageQuerySchema` y `Page<T>` SIGUEN aqui: `Page<T>` es la salida de las siete listas
+ * (`design.md > 3.2`) y `pageQuerySchema` lo usan otros listados del repo.
  */
-export const productQuerySchema = pageQuerySchema.extend({
-  search: z.string().trim().min(1).max(120).optional(),
-});
-
-export type ProductQuery = z.infer<typeof productQuerySchema>;

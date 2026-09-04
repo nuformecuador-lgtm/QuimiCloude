@@ -19,6 +19,7 @@ import { createListProducts } from '@/lib/modules/inventario/domain/list-product
 import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
+import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
@@ -71,12 +72,30 @@ function repositorioPresentacionQueFalla(): PresentationRepository {
   };
 }
 
-type Repos = { readonly products: ProductRepository; readonly presentations: PresentationRepository };
+/**
+ * QC-57 (T7): los dos casos de uso de listado reciben ademas el puerto del log de campos
+ * omitidos. Aqui es un doble que tambien EXPLOTA: el permiso se comprueba antes de sanear la
+ * consulta, asi que un actor sin permiso no puede haber llegado ni siquiera a loguear nada.
+ */
+function logQueFalla(): ListQueryLog {
+  return {
+    ignoredFields: vi.fn<ListQueryLog['ignoredFields']>(() => {
+      throw new Error('el log no debe ser llamado');
+    }),
+  };
+}
+
+type Repos = {
+  readonly products: ProductRepository;
+  readonly presentations: PresentationRepository;
+  readonly log: ListQueryLog;
+};
 
 function montarRepos(): Repos {
   return {
     products: repositorioProductoQueFalla(),
     presentations: repositorioPresentacionQueFalla(),
+    log: logQueFalla(),
   };
 }
 
@@ -91,6 +110,8 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.presentations.rename).not.toHaveBeenCalled(),
     () => expect(repos.presentations.deleteById).not.toHaveBeenCalled(),
     () => expect(repos.presentations.list).not.toHaveBeenCalled(),
+    // QC-57 R34: sin permiso no se toca el repositorio NI se registra nada en el log.
+    () => expect(repos.log.ignoredFields).not.toHaveBeenCalled(),
   ];
 }
 
@@ -120,7 +141,8 @@ const CASOS_DE_USO: ReadonlyArray<{
   },
   {
     nombre: 'list-products',
-    invocar: (repos, actor) => createListProducts({ products: repos.products })({}, actor),
+    invocar: (repos, actor) =>
+      createListProducts({ products: repos.products, log: repos.log })({}, actor),
   },
   {
     nombre: 'update-product',
@@ -152,7 +174,8 @@ const CASOS_DE_USO: ReadonlyArray<{
   },
   {
     nombre: 'list-presentations',
-    invocar: (repos, actor) => createListPresentations({ presentations: repos.presentations })({}, actor),
+    invocar: (repos, actor) =>
+      createListPresentations({ presentations: repos.presentations, log: repos.log })({}, actor),
   },
 ];
 

@@ -58,9 +58,11 @@ import {
   listPresentations,
   renamePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
+import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { listUnits } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
@@ -185,6 +187,17 @@ export const identity = {
     ),
 } as const;
 
+/**
+ * QC-57 (T7, R6): UNICA implementacion del puerto `ListQueryLog`, la de
+ * `lib/shared/observability/list-query-log.ts`. El puerto esta declarado en los cinco modulos
+ * con listado -el dominio no puede importar `lib/shared/**`-; aqui, que si puede, se ata puerto
+ * -> implementacion, que es lo unico que hace este archivo.
+ *
+ * Se tipa con el puerto de `inventario` porque es el modulo que lo consume en esta linea; los
+ * otros cuatro modulos declaran el suyo con la MISMA forma y cablean la MISMA funcion.
+ */
+const inventarioListQueryLog: ListQueryLog = { ignoredFields: logIgnoredListQueryFields };
+
 const productRepository: ProductRepository = {
   create: createProduct,
   findAliveById: findAliveProductById,
@@ -215,11 +228,14 @@ export const inventario = {
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
   getProduct: createGetProduct({ products: productRepository }),
-  listProducts: createListProducts({ products: productRepository }),
+  listProducts: createListProducts({ products: productRepository, log: inventarioListQueryLog }),
   createPresentation: createCreatePresentation({ presentations: presentationRepository }),
   updatePresentation: createUpdatePresentation({ presentations: presentationRepository }),
   deletePresentation: createDeletePresentation({ presentations: presentationRepository }),
-  listPresentations: createListPresentations({ presentations: presentationRepository }),
+  listPresentations: createListPresentations({
+    presentations: presentationRepository,
+    log: inventarioListQueryLog,
+  }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`

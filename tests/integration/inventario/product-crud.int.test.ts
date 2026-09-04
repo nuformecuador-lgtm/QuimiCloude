@@ -42,6 +42,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 
 // ---------------------------------------------------------------------------
@@ -226,10 +227,20 @@ function rawInsertProductWithAuthor(
 async function collectAllPages(
   pageSize: number,
 ): Promise<{ id: string; name: string }[]> {
-  const first = await listAliveProducts({ page: 1, pageSize });
+  // QC-57: el adaptador recibe ahora el CONTRATO GENERICO de consulta. Sin orden, sin filtros
+  // y sin busqueda, que es exactamente la lista de siempre (R11): estos casos siguen midiendo
+  // lo mismo -paginacion estable y orden por defecto- y ningun aserto se relaja.
+  const listQuery = (page: number): ListQuery => ({
+    page,
+    pageSize,
+    sort: null,
+    filters: {},
+    search: '',
+  });
+  const first = await listAliveProducts(listQuery(1));
   const items = [...first.items];
   for (let page = 2; page <= first.totalPages; page += 1) {
-    const next = await listAliveProducts({ page, pageSize });
+    const next = await listAliveProducts(listQuery(page));
     items.push(...next.items);
   }
   return items.map((item) => ({ id: item.id, name: item.name }));

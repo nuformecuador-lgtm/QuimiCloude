@@ -25,6 +25,7 @@ import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import type { Page } from '@/lib/modules/inventario/domain/page';
 import type { PresentationView } from '@/lib/modules/inventario/domain/presentation-view';
+import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 
 const ADMIN: Actor = { id: 'actor-admin', roleName: 'Administrador' };
@@ -188,22 +189,29 @@ describe('delete-presentation', () => {
   });
 });
 
+/** Doble del puerto del log de campos omitidos (QC-57 T7). */
+function logDoble(): ListQueryLog {
+  return { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };
+}
+
 describe('list-presentations', () => {
   it('delega la consulta valida en el puerto', async () => {
     const list = vi.fn<PresentationRepository['list']>(async () => PAGINA_VACIA);
     const presentations = montarRepositorio({ list });
-    const listPresentations = createListPresentations({ presentations });
+    const listPresentations = createListPresentations({ presentations, log: logDoble() });
 
     const resultado = await listPresentations({ page: 1 }, ADMIN);
 
     expect(resultado).toBe(PAGINA_VACIA);
-    expect(list).toHaveBeenCalledWith({ page: 1 });
+    // QC-57: lo que llega al puerto es la consulta del contrato generico ya saneada, con sus
+    // defectos aplicados -no el `{ page: 1 }` crudo del llamante-.
+    expect(list).toHaveBeenCalledWith({ page: 1, sort: null, filters: {}, search: '' });
   });
 
   it('rechaza una consulta con pagina invalida antes de llamar al puerto', async () => {
     const list = vi.fn<PresentationRepository['list']>(async () => PAGINA_VACIA);
     const presentations = montarRepositorio({ list });
-    const listPresentations = createListPresentations({ presentations });
+    const listPresentations = createListPresentations({ presentations, log: logDoble() });
 
     await expect(listPresentations({ page: 0 }, ADMIN)).rejects.toThrow(ValidationError);
     expect(list).not.toHaveBeenCalled();
@@ -216,7 +224,7 @@ describe('autorizacion de los cuatro casos de uso (complemento a T8)', () => {
     const createPresentation = createCreatePresentation({ presentations });
     const updatePresentation = createUpdatePresentation({ presentations });
     const deletePresentation = createDeletePresentation({ presentations });
-    const listPresentations = createListPresentations({ presentations });
+    const listPresentations = createListPresentations({ presentations, log: logDoble() });
 
     await expect(createPresentation({ name: 'Bidon 20 L' }, OPERADOR)).rejects.toThrow(
       UnauthorizedError,

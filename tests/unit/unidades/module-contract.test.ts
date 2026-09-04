@@ -265,13 +265,18 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     //
     // Se afirma la lista EXACTA, no que "algo" haya: si manana alguien anade un segundo
     // puerto sin que este test lo sepa, la lista real diverge del `toEqual` y cae.
-    expect(sourcesIn(join(unidadesDir, 'ports')).map(etiqueta), 'ports/ ya no tiene EXACTAMENTE un fuente').toEqual([
+    //
+    // ACTUALIZADO 2026-09-04 (QC-57, T7): se suma `list-query-log.ts`, el puerto del log del
+    // campo omitido (R6), declarado en los CINCO modulos con listado porque el dominio no
+    // puede importar `lib/shared/**`. Sigue siendo la lista EXACTA: un tercer puerto cae aqui.
+    expect(sourcesIn(join(unidadesDir, 'ports')).map(etiqueta), 'ports/ ya no tiene EXACTAMENTE dos fuentes').toEqual([
+      'lib/modules/unidades/ports/list-query-log.ts',
       'lib/modules/unidades/ports/unit-repository.ts',
     ])
     expect(
       readdirSync(join(unidadesDir, 'ports')).sort(),
-      'ports/ deberia tener exactamente .gitkeep y unit-repository.ts',
-    ).toEqual(['.gitkeep', 'unit-repository.ts'])
+      'ports/ deberia tener exactamente .gitkeep, list-query-log.ts y unit-repository.ts',
+    ).toEqual(['.gitkeep', 'list-query-log.ts', 'unit-repository.ts'])
 
     // ACTUALIZADO 2026-09-03 (QC-25, R50): `adapters/driven/` YA NO esta vacia. El
     // consumidor que esta ronda anticipaba para QC-38 llego antes, con QC-25: `recetas`

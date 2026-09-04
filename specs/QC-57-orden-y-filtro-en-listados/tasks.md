@@ -28,26 +28,26 @@
 
 ## Grupo 1 — El contrato en el dominio (depende de T0)
 
-- [ ] **T1. Escribir `list-query.ts` en `inventario`**: tipos `ListSort`/`ListFilterValue`/
+- [x] **T1. Escribir `list-query.ts` en `inventario`**: tipos `ListSort`/`ListFilterValue`/
       `ListQuery`, fábrica del esquema zod a partir de una lista blanca, y `sanitize` puro que
       devuelve `{ query, ignored }`.
       **Hecho cuando** hay tests unitarios que cubren R1, R3, R5, R7, R8, R9, R12 y R20, y el
       archivo **no importa** `lib/shared/**`, `@prisma/client` ni `next/*`.
 
-- [ ] **T2. Replicar `list-query.ts` en `recetas`, `proveedores`, `unidades` y `pedidos`.**
+- [x] **T2. Replicar `list-query.ts` en `recetas`, `proveedores`, `unidades` y `pedidos`.**
       Copia literal del de T1 (`design.md > 2.1`): la duplicación es la decisión, no un descuido.
       **Hecho cuando** los cinco archivos son idénticos salvo el nombre del módulo en los
       comentarios.
       Depende de T1.
 
-- [ ] **T3. Guardia de equivalencia `tests/guards/guard-contrato-listados.test.ts`** (R32).
+- [x] **T3. Guardia de equivalencia `tests/guards/guard-contrato-listados.test.ts`** (R32).
       **Hecho cuando** somete a los cinco esquemas la misma batería canónica —entrada válida,
       campo no declarado, forma de filtro equivocada, `deletedAt`, `sort` con lista, quinto `kind`,
       búsqueda de solo espacios— y exige el mismo veredicto y la misma salida saneada; y cuando
       **falla** al introducir a mano una divergencia en uno de los cinco (comprobado y revertido).
       Depende de T2.
 
-- [ ] **T3.1. Listas blancas por listado** (`design.md > 5`), un archivo por lista.
+- [x] **T3.1. Listas blancas por listado** (`design.md > 5`), un archivo por lista.
       **Hecho cuando** las siete están declaradas, ninguna incluye `deletedAt` ni `nameNormalized`,
       y hay un test que lo afirma **sobre las siete a la vez** (R4, R7) — recorriendo las listas,
       no repitiendo siete asertos que alguien puede olvidar ampliar.
@@ -55,7 +55,7 @@
 
 ## Grupo 2 — Base de datos (depende de T0; T4 depende además de T0.1)
 
-- [ ] **T4. Migración `<ts>_list_query_indexes`.** Columna `products.name_normalized`, backfill,
+- [x] **T4. Migración `<ts>_list_query_indexes`.** Columna `products.name_normalized`, backfill,
       `NOT NULL`, índices de búsqueda (vía elegida en T0.1) e índices de orden y filtro,
       **parciales** donde hay borrado lógico (`design.md > 10`).
       **Hecho cuando**: `migration.sql` **revisado a mano línea a línea** y sin ningún
@@ -63,13 +63,13 @@
       `down.sql` que revierte exactamente el UP y **no** hace `DROP EXTENSION`; `pnpm run db:migrate`
       aplica y `pnpm run db:rollback` revierte dejando `_prisma_migrations` coherente (R21, R22).
 
-- [ ] **T5. `normalizeProductName` + escritura de `name_normalized` en producto.**
+- [x] **T5. `normalizeProductName` + escritura de `name_normalized` en producto.**
       Gemela de las otras cuatro; se escribe en **toda** alta y edición de producto.
       **Hecho cuando** hay test unitario de la función (mismos casos que `unit-name.test.ts`) y
       test de integración que crea y edita un producto y comprueba la columna (R19, R23).
       Depende de T4.
 
-- [ ] **T6. Test de esquema/migración** en `tests/unit/inventario/schema/`.
+- [x] **T6. Test de esquema/migración** en `tests/unit/inventario/schema/`.
       **Hecho cuando** afirma que la columna y cada índice nuevo existen con su nombre, que los
       parciales llevan su `WHERE deleted_at IS NULL`, y que el backfill deja la columna igual a lo
       que devuelve `normalizeProductName` para los nombres ya cargados (R21, R23).
