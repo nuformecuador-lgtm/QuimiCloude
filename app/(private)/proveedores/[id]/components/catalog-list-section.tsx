@@ -41,7 +41,8 @@ type CatalogListSectionProps = {
  *
  * **Los diccionarios se construyen UNA vez, aqui, y solo cuando hay filas que pintar** (R22,
  * `design.md > 6.2`): nunca por fila, y nunca cuando la consulta fallo o el catalogo esta vacio,
- * porque entonces no hay ningun identificador que resolver.
+ * porque entonces no hay ningun identificador que resolver. El de unidades no cuesta ninguna
+ * consulta: se construye con las `units` que ya bajaron por props (R46).
  *
  * **Un catalogo vacio NO se pinta como tabla sin filas** (R23, R25): son tres situaciones
  * distintas -fallo, catalogo vacio y pagina que se quedo atras tras una baja- y cada una dice lo
@@ -80,7 +81,9 @@ export async function CatalogListSection({
     );
   }
 
-  const directories = await buildCatalogDirectories();
+  // Las unidades ya vienen resueltas por la pagina: el diccionario las reutiliza en vez de
+  // volver a pedirlas (R46).
+  const directories = await buildCatalogDirectories(units);
 
   return (
     <div className="flex flex-col gap-4" data-testid="catalog-list">

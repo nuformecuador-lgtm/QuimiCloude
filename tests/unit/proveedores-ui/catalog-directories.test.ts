@@ -19,6 +19,9 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * Los tres asuntos que R22 obliga a demostrar y que **no se ven renderizando**: que un id presente
  * se resuelve a su nombre, que un id ausente devuelve «no resuelto» -para que la celda pinte el
  * marcador en vez del uuid- y que la secuencia de consultas tiene **limite superior**.
+ *
+ * **Las unidades llegan por parametro**, ya cargadas por la pagina de detalle (R46): el mock de
+ * `listUnitsAction` sigue puesto justamente para comprobar que esta funcion **no lo llama**.
  */
 
 const { listPresentationsActionMock, listUnitsActionMock } = vi.hoisted(() => ({
@@ -37,6 +40,9 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 const PRESENTACION = { id: 'pres-1', name: 'Tambor 200 L' };
 const UNIDAD_CON_SIMBOLO = { id: 'unit-1', name: 'Kilogramo', symbol: 'kg' };
 const UNIDAD_SIN_SIMBOLO = { id: 'unit-2', name: 'Pieza', symbol: null };
+
+/** El catalogo de unidades tal como lo baja la pagina de detalle por props (R46). */
+const UNIDADES = [UNIDAD_CON_SIMBOLO, UNIDAD_SIN_SIMBOLO];
 
 /** Id que NO esta en ningun diccionario. Inconfundible: el test comprueba que no se resuelve. */
 const ID_FUERA_DEL_DICCIONARIO = 'ID-QUE-NADIE-RESUELVE';
@@ -65,15 +71,11 @@ function paginaDePresentaciones(
 beforeEach(() => {
   vi.clearAllMocks();
   listPresentationsActionMock.mockResolvedValue(paginaDePresentaciones([PRESENTACION]));
-  listUnitsActionMock.mockResolvedValue({
-    status: 'success',
-    data: [UNIDAD_CON_SIMBOLO, UNIDAD_SIN_SIMBOLO],
-  });
 });
 
 describe('diccionarios del catalogo — resolucion de nombres (R22)', () => {
   it('un id presente se resuelve a su nombre, no a su identificador', async () => {
-    const directorios = await buildCatalogDirectories();
+    const directorios = await buildCatalogDirectories(UNIDADES);
 
     expect(resolvePresentationName(directorios, PRESENTACION.id)).toBe(PRESENTACION.name);
     expect(resolveUnitLabel(directorios, UNIDAD_CON_SIMBOLO.id)).toBe(UNIDAD_CON_SIMBOLO.symbol);
@@ -82,7 +84,7 @@ describe('diccionarios del catalogo — resolucion de nombres (R22)', () => {
   });
 
   it('un id ausente devuelve «no resuelto» para que la celda pinte el marcador', async () => {
-    const directorios = await buildCatalogDirectories();
+    const directorios = await buildCatalogDirectories(UNIDADES);
 
     expect(resolvePresentationName(directorios, ID_FUERA_DEL_DICCIONARIO)).toBeNull();
     expect(resolveUnitLabel(directorios, ID_FUERA_DEL_DICCIONARIO)).toBeNull();
@@ -91,15 +93,10 @@ describe('diccionarios del catalogo — resolucion de nombres (R22)', () => {
     expect(resolveUnitLabel(directorios, null)).toBeNull();
   });
 
-  it('si un directorio falla, lo suyo queda sin resolver y lo demas se sigue resolviendo', async () => {
-    // R22 + R7: un `unauthorized` de unidades no puede inventar un nombre ni tumbar la tabla.
-    listUnitsActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'unauthorized',
-      message: 'No autorizado.',
-    });
-
-    const directorios = await buildCatalogDirectories();
+  it('sin catalogo de unidades lo suyo queda sin resolver y lo demas se sigue resolviendo', async () => {
+    // R22 + R7: que las unidades no lleguen no puede inventar un nombre ni tumbar la tabla. El
+    // fallo de `listUnitsAction` lo atiende la pagina de detalle, que corta antes de llegar aqui.
+    const directorios = await buildCatalogDirectories([]);
 
     expect(resolveUnitLabel(directorios, UNIDAD_CON_SIMBOLO.id)).toBeNull();
     expect(resolvePresentationName(directorios, PRESENTACION.id)).toBe(PRESENTACION.name);
@@ -110,7 +107,7 @@ describe('diccionarios del catalogo — resolucion de nombres (R22)', () => {
       .mockResolvedValueOnce(paginaDePresentaciones([PRESENTACION], { page: 1, totalPages: 3 }))
       .mockResolvedValueOnce({ status: 'error', code: 'invalid_input', message: 'Falló.' });
 
-    const directorios = await buildCatalogDirectories();
+    const directorios = await buildCatalogDirectories(UNIDADES);
 
     expect(listPresentationsActionMock).toHaveBeenCalledTimes(2);
     expect(resolvePresentationName(directorios, PRESENTACION.id)).toBe(PRESENTACION.name);
@@ -119,10 +116,13 @@ describe('diccionarios del catalogo — resolucion de nombres (R22)', () => {
 });
 
 describe('diccionarios del catalogo — coste de la construccion (R22)', () => {
-  it('las unidades se piden UNA sola vez y las presentaciones con el tope importado', async () => {
-    await buildCatalogDirectories();
+  it('el diccionario de unidades no cuesta NINGUNA consulta y las presentaciones usan el tope importado', async () => {
+    // R46 — las unidades llegan por parametro desde la pagina; volver a pedirlas aqui seria
+    // repetir en cada carga una consulta que ya esta hecha.
+    const directorios = await buildCatalogDirectories(UNIDADES);
 
-    expect(listUnitsActionMock).toHaveBeenCalledTimes(1);
+    expect(listUnitsActionMock).not.toHaveBeenCalled();
+    expect(resolveUnitLabel(directorios, UNIDAD_CON_SIMBOLO.id)).toBe(UNIDAD_CON_SIMBOLO.symbol);
     expect(listPresentationsActionMock).toHaveBeenCalledTimes(1);
     expect(listPresentationsActionMock).toHaveBeenCalledWith({ page: 1, pageSize: MAX_PAGE_SIZE });
   });
@@ -136,7 +136,7 @@ describe('diccionarios del catalogo — coste de la construccion (R22)', () => {
       });
     });
 
-    const directorios = await buildCatalogDirectories();
+    const directorios = await buildCatalogDirectories(UNIDADES);
 
     expect(listPresentationsActionMock).toHaveBeenCalledTimes(3);
     expect(resolvePresentationName(directorios, 'pres-3')).toBe('Presentación 3');
@@ -154,7 +154,7 @@ describe('diccionarios del catalogo — coste de la construccion (R22)', () => {
       });
     });
 
-    const directorios = await buildCatalogDirectories();
+    const directorios = await buildCatalogDirectories(UNIDADES);
 
     expect(listPresentationsActionMock).toHaveBeenCalledTimes(MAX_PRESENTATION_PAGES);
     expect(resolvePresentationName(directorios, `pres-${MAX_PRESENTATION_PAGES + 1}`)).toBeNull();

@@ -1,5 +1,5 @@
 import { listPresentationsAction } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
-import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /**
@@ -11,8 +11,10 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * serian hasta 25 consultas por pagina, el peor patron que esta pantalla podia adoptar
  * (`design.md > 13.F`).
  *
- * **Unidades**: una unica llamada a `listUnitsAction()`, que devuelve el catalogo entero ya
- * acotado a 200 por QC-26. Sin paginacion que gestionar.
+ * **Unidades**: NO se piden aqui. El catalogo entero -ya acotado a 200 por QC-26- lo pide la
+ * pagina de detalle **una sola vez** con `listUnitsAction()` y baja por props hasta esta funcion
+ * (R46, `design.md > 8.2`). Construir el diccionario es entonces recorrer un arreglo que ya esta
+ * en memoria: cero consultas. Pedirlas de nuevo aqui era trabajo duplicado en cada carga.
  *
  * **Presentaciones**: `listPresentationsAction` **solo existe paginada** (tope 25). Se recorren
  * paginas mientras queden y **hasta la cota declarada** `MAX_PRESENTATION_PAGES`, de modo que no
@@ -67,10 +69,13 @@ export function resolvePresentationName(
 }
 
 /**
- * Etiqueta de la unidad, o `null` cuando la linea no tiene unidad o no se puede resolver (R22).
- * La unidad es **opcional** en la linea (QC-52), asi que `null` de entrada es un caso normal, no
- * un fallo; la celda lo pinta con el mismo marcador porque para quien mira la tabla significa
- * exactamente lo mismo: aqui no hay nombre que mostrar.
+ * Etiqueta de la unidad, o `null` cuando no se puede resolver (R22).
+ *
+ * La unidad es **opcional** en la linea (QC-52), asi que un `unitId` nulo de entrada es un caso
+ * normal y no un fallo: quien decide como se pinta esa ausencia es la columna, que usa la marca de
+ * «sin dato» y no el marcador de «no resuelto». Aqui los dos siguen devolviendo `null` porque para
+ * esta funcion la pregunta es una sola -¿hay nombre que mostrar?-, y devolver el identificador
+ * jamas es una respuesta.
  */
 export function resolveUnitLabel(
   directories: CatalogDirectories,
@@ -80,13 +85,14 @@ export function resolveUnitLabel(
   return directories.units.get(unitId) ?? null;
 }
 
-/** Catalogo completo de unidades en una sola consulta. Si falla, diccionario vacio (marcadores). */
-async function buildUnitDirectory(): Promise<ReadonlyMap<string, string>> {
+/**
+ * Diccionario de unidades a partir del catalogo **ya cargado** por la pagina. Funcion pura: no
+ * consulta nada. Un arreglo vacio -el catalogo no llego- deja el diccionario vacio, y entonces
+ * cada unidad pinta el marcador de «no resuelto» (R22).
+ */
+function buildUnitDirectory(units: readonly UnitRef[]): ReadonlyMap<string, string> {
   const directory = new Map<string, string>();
-  const result = await listUnitsAction();
-  if (result.status === 'error') return directory;
-
-  for (const unit of result.data) {
+  for (const unit of units) {
     // `symbol` cuando existe y `name` cuando no: mismo criterio que QC-26 (`design.md > 8.2`).
     directory.set(unit.id, unit.symbol ?? unit.name);
   }
@@ -116,12 +122,17 @@ async function buildPresentationDirectory(): Promise<ReadonlyMap<string, string>
   return directory;
 }
 
-/** Construye los dos diccionarios. Se llama UNA vez por render de la seccion del catalogo. */
-export async function buildCatalogDirectories(): Promise<CatalogDirectories> {
-  const [presentations, units] = await Promise.all([
-    buildPresentationDirectory(),
-    buildUnitDirectory(),
-  ]);
-
-  return { presentations, units };
+/**
+ * Construye los dos diccionarios. Se llama UNA vez por render de la seccion del catalogo.
+ *
+ * Las unidades llegan **por parametro**, no se vuelven a pedir: son las mismas que la pagina de
+ * detalle ya resolvio para el panel lateral (R46).
+ */
+export async function buildCatalogDirectories(
+  units: readonly UnitRef[],
+): Promise<CatalogDirectories> {
+  return {
+    presentations: await buildPresentationDirectory(),
+    units: buildUnitDirectory(units),
+  };
 }

@@ -556,7 +556,7 @@ describe('linea de catalogo — edicion (R31, R46)', () => {
 
     // Abrir la edicion no vuelve a consultar nada (R46).
     expect(listCatalogLinesActionMock).toHaveBeenCalledTimes(1);
-    expect(listUnitsActionMock).toHaveBeenCalledTimes(2);
+    expect(listUnitsActionMock).toHaveBeenCalledTimes(1);
 
     await user.clear(screen.getByTestId('catalog-field-name'));
     await user.type(screen.getByTestId('catalog-field-name'), 'Ácido cítrico monohidrato');
