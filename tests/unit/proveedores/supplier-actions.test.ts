@@ -37,7 +37,6 @@ import {
   DuplicateCatalogLineError,
   DuplicateNameError,
   NotFoundError,
-  ProductNotFoundError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/proveedores'
@@ -89,7 +88,8 @@ const ADMIN_SESSION_USER = {
 }
 
 const SUPPLIER_ID = '33333333-3333-4333-8333-333333333333'
-const PRODUCT_ID = '44444444-4444-4444-8444-444444444444'
+const PRESENTATION_ID = '44444444-4444-4444-8444-444444444444'
+const UNIT_ID = '55555555-5555-4555-8555-555555555555'
 const LINE_ID = '55555555-5555-4555-8555-555555555555'
 
 function formDataOf(fields: Record<string, string>): FormData {
@@ -109,9 +109,17 @@ const VALID_SUPPLIER_FIELDS = {
   email: 'ventas@quimpacifico.ec',
 }
 
+/**
+ * Lo que el formulario de la linea envia tras QC-52 (R31): entra `name`, `presentationId`,
+ * `unitId` e `imagePath`, y sale el identificador de articulo del inventario que QC-43 leia.
+ * Todos los valores son CADENA porque eso es lo unico que `FormData` entrega.
+ */
 const VALID_LINE_FIELDS = {
   supplierId: SUPPLIER_ID,
-  productId: PRODUCT_ID,
+  name: 'Acido citrico anhidro',
+  presentationId: PRESENTATION_ID,
+  unitId: UNIT_ID,
+  imagePath: 'catalogo/acido-citrico.png',
   cost: '12.5000',
   minPurchase: '5',
   deliveryTime: '3',
@@ -265,7 +273,10 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
     await createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(VALID_LINE_FIELDS))
     expect(createCatalogLineMock.mock.calls[0]?.[0]).toEqual({
       supplierId: SUPPLIER_ID,
-      productId: PRODUCT_ID,
+      name: 'Acido citrico anhidro',
+      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      imagePath: 'catalogo/acido-citrico.png',
       cost: '12.5000',
       minPurchase: '5',
       deliveryTime: 3,
@@ -284,14 +295,33 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
     })
     expect(createCatalogLineMock).toHaveBeenCalledTimes(1)
 
-    // Los dos opcionales vacios llegan como AUSENCIA, no como cadena vacia.
+    // Los CUATRO opcionales vacios llegan como AUSENCIA, no como cadena vacia (R10). QC-52
+    // anade `unitId` e `imagePath` a la lista: un `<input>` sin rellenar envia `''`, y `''`
+    // no es un uuid ni una ruta, asi que dejarlo pasar convertiria «no lo indique» en
+    // `invalid_input`. El costo, que es OBLIGATORIO, se entrega tal cual y su vacio lo
+    // rechaza `zod`: eso es traduccion de la forma del borde, no una regla de negocio.
     await createCatalogLineAction(
       CREATE_LINE_INITIAL,
-      formDataOf({ ...VALID_LINE_FIELDS, minPurchase: '', deliveryTime: '' }),
+      formDataOf({
+        ...VALID_LINE_FIELDS,
+        unitId: '',
+        imagePath: '',
+        minPurchase: '',
+        deliveryTime: '',
+      }),
     )
     expect(createCatalogLineMock.mock.calls[1]?.[0]).toMatchObject({
+      unitId: undefined,
+      imagePath: undefined,
       minPurchase: undefined,
       deliveryTime: undefined,
+    })
+    // Y el nombre y la presentacion, que son OBLIGATORIOS, se entregan tal cual -incluso
+    // vacios-: quien los rechaza es el esquema del dominio, no la action.
+    expect(createCatalogLineMock.mock.calls[1]?.[0]).toMatchObject({
+      name: 'Acido citrico anhidro',
+      presentationId: PRESENTATION_ID,
+      cost: '12.5000',
     })
 
     // La baja de la linea, igual que la del proveedor, lleva el id en el formulario y sin
@@ -306,13 +336,21 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
     })
     expect(deleteCatalogLineMock).toHaveBeenCalledTimes(1)
 
-    // La edicion de la linea no manda proveedor ni producto (R33, `strictObject`).
+    // La edicion de la linea manda los SIETE campos de negocio y NO manda el proveedor
+    // (R24, P6): el `FormData` trae `supplierId` -es el mismo formulario- y la action NO lo
+    // lee. Si lo colara, `updateCatalogLineSchema` es `strictObject` y daria
+    // `invalid_input`, pero la defensa util es que ni siquiera se lee.
     await updateCatalogLineAction(LINE_ID, LINE_MUTATION_INITIAL, formDataOf(VALID_LINE_FIELDS))
     expect(updateCatalogLineMock.mock.calls[0]?.[1]).toEqual({
+      name: 'Acido citrico anhidro',
+      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      imagePath: 'catalogo/acido-citrico.png',
       cost: '12.5000',
       minPurchase: '5',
       deliveryTime: 3,
     })
+    expect(updateCatalogLineMock.mock.calls[0]?.[1]).not.toHaveProperty('supplierId')
 
     // 2. Firmas: las cinco mutaciones terminan en `FormData`; las cuatro consultas no lo
     //    mencionan siquiera.
@@ -376,10 +414,12 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
       })
     }
 
-    // Los dos errores propios del catalogo, por su action.
+    // El error propio del catalogo, por su action. QC-52 deja UNO donde QC-43 tenia dos: el
+    // de «articulo del inventario no encontrado» se borro del modulo porque su caso ya no
+    // puede ocurrir (R32), y `duplicate_catalog_line` se CONSERVA con su `code` intacto
+    // porque el caso sigue existiendo y solo cambia la clave que lo dispara.
     for (const caso of [
       { error: new DuplicateCatalogLineError(), code: 'duplicate_catalog_line' },
-      { error: new ProductNotFoundError(), code: 'product_not_found' },
     ] as const) {
       createCatalogLineMock.mockRejectedValueOnce(caso.error)
       const result = await createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(VALID_LINE_FIELDS))

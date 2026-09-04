@@ -16,6 +16,7 @@ import { UnauthorizedError } from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
+import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
@@ -25,11 +26,11 @@ const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
 const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
 
 /** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
- *  del 2026-09-03 los volvio obligatorios en `createProductSchema`. */
+ *  del 2026-09-03 los volvio obligatorios en `createProductSchema`; `minPurchase` se fue
+ *  con QC-52 (R1), y dejarlo habria convertido este fixture en entrada INVALIDA. */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
   presentationId: '11111111-1111-4111-8111-111111111111',
-  minPurchase: 0,
   stock: 0,
   qtyAlert: 0,
 };
@@ -154,6 +155,34 @@ const CASOS_DE_USO: ReadonlyArray<{
     invocar: (repos, actor) => createListPresentations({ presentations: repos.presentations })({}, actor),
   },
 ];
+
+/**
+ * QC-52 (R25): el fixture tiene que ser entrada VALIDA. Si dejara de serlo -y con el
+ * `strictObject` de R1 basta un campo de mas para que lo sea-, los casos de abajo
+ * seguirian rojos... por `ValidationError`, no por `UnauthorizedError`, y el test dejaria
+ * de medir que el permiso se comprueba ANTES de zod y ANTES de tocar el puerto. Este
+ * ancla lo hace imposible de pasar por alto.
+ */
+describe('QC-52 R25 — el fixture con el que se mide el permiso es entrada valida', () => {
+  it('PRODUCTO_VALIDO pasa createProductSchema, asi que el rechazo solo puede venir del permiso', () => {
+    expect(createProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
+  });
+
+  it('las cinco operaciones del producto estan en la tabla que se barre', () => {
+    // R25 nombra las cinco por su nombre: crear, listar, consultar ficha, editar y dar de
+    // baja. Si alguna se cayera de `CASOS_DE_USO`, el bucle seguiria verde con cuatro.
+    const nombres = CASOS_DE_USO.map((caso) => caso.nombre);
+    expect(nombres).toEqual(
+      expect.arrayContaining([
+        'create-product',
+        'list-products',
+        'get-product',
+        'update-product',
+        'delete-product',
+      ]),
+    );
+  });
+});
 
 describe('R2 — rechazo de Operador', () => {
   it('un actor con rol Operador es rechazado en los nueve casos de uso sin llamar al repositorio', async () => {

@@ -31,7 +31,17 @@ export interface SupplierRepository {
     now: Date,
   ): Promise<'ok' | 'not_found' | 'duplicate'>;
 
-  /** Baja LOGICA (R23): marca `deleted_at`, jamas borra la fila. `false` = R24. */
+  /**
+   * Baja LOGICA del proveedor: marca `deleted_at`, jamas borra la fila. `false` = no habia
+   * ningun proveedor vivo con ese id (R23).
+   *
+   * QC-52 le anade una obligacion que la firma no puede expresar y por eso se escribe aqui
+   * (R20, decision cerrada 5): la baja arrastra TODAS las lineas vivas del catalogo de ese
+   * proveedor, en la MISMA operacion atomica y con la MISMA marca de tiempo. Dos `now()`
+   * distintos harian imposible saber despues que lineas cayeron con que baja. Y si no hay
+   * proveedor vivo que dar de baja, la transaccion NO escribe nada: ni en `suppliers` ni en
+   * `supplier_catalog_lines`.
+   */
   softDeleteAlive(id: string, actorId: string, now: Date): Promise<boolean>;
 
   listAlive(query: PageQuery): Promise<Page<SupplierView>>;

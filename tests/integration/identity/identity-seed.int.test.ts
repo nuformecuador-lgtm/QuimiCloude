@@ -18,8 +18,10 @@
  * (no logico) a proposito: un usuario borrado logicamente sigue bloqueando el borrado de
  * su rol (`ON DELETE RESTRICT`, ya probado en `identity-constraints.int.test.ts`), y aqui
  * hace falta reproducir "no existe ningun usuario, ni vivo ni borrado" para que el
- * catalogo de roles pueda quedar realmente vacio. Como todo el `tx` termina en
- * `ROLLBACK`, este borrado nunca toca la base de verdad.
+ * catalogo de roles pueda quedar realmente vacio. Y antes de `users` hay que vaciar lo que
+ * le apunta (`recipes`, `products`, `suppliers`, `orders`, `supplier_catalog_lines`, y lo
+ * que cuelgue de ellas): esas FK de auditoria son `ON DELETE RESTRICT`. Como todo el `tx`
+ * termina en `ROLLBACK`, este borrado nunca toca la base de verdad.
  *
  * NINGUNA CREDENCIAL REAL — los valores de `FAKE_ADMIN_*` son marcadores de instalacion
  * de test, evidentemente ficticios, y solo existen en memoria durante la transaccion.
@@ -111,13 +113,88 @@ async function withSeedAdminEnvVarsCleared<T>(run: () => Promise<T>): Promise<T>
 // Construccion determinista del escenario "base vacia" (ver cabecera del archivo)
 // ---------------------------------------------------------------------------
 
+/** Una arista `child -> parent` del grafo de claves foraneas del esquema `public`. */
+type ForeignKeyEdge = { readonly child: string; readonly parent: string };
+
+/** Identificador de tabla admisible para interpolar en un `DELETE FROM`. */
+const SAFE_TABLE_NAME = /^[a-z_][a-z0-9_]*$/;
+
+/**
+ * Devuelve las tablas que dependen de `users` (directa o transitivamente), ordenadas para
+ * poder borrarlas de arriba a abajo sin violar ninguna FK: primero las hojas, al final las
+ * que estan pegadas a `users`. `users` NO va en la lista; lo borra su llamador.
+ *
+ * Se lee del CATALOGO de Postgres, no de una lista escrita a mano, a proposito: cuando un
+ * modulo nuevo añada una columna de auditoria hacia `users` (ya pasó con `recipes`,
+ * `products`, `suppliers`, `orders` y `supplier_catalog_lines`), este helper lo recoge solo
+ * y el archivo no vuelve a ponerse rojo por una tabla que nadie recordo listar aqui.
+ */
+async function tablesDependingOnUsers(tx: Prisma.TransactionClient): Promise<readonly string[]> {
+  const edges = await tx.$queryRaw<ForeignKeyEdge[]>`
+    SELECT hijo.relname::text AS child, padre.relname::text AS parent
+    FROM pg_constraint con
+    JOIN pg_class hijo ON hijo.oid = con.conrelid
+    JOIN pg_class padre ON padre.oid = con.confrelid
+    JOIN pg_namespace ns ON ns.oid = hijo.relnamespace
+    WHERE con.contype = 'f' AND ns.nspname = 'public' AND hijo.relname <> padre.relname
+  `;
+
+  // Cierre transitivo hacia abajo desde `users`, sin incluir a `users`.
+  const pending = new Set<string>();
+  const queue: string[] = ['users'];
+  while (queue.length > 0) {
+    const parent = queue.shift() as string;
+    for (const edge of edges) {
+      if (edge.parent !== parent || pending.has(edge.child) || edge.child === 'users') continue;
+      pending.add(edge.child);
+      queue.push(edge.child);
+    }
+  }
+
+  // Orden de borrado: en cada vuelta salen las tablas a las que ya no apunta ninguna otra
+  // tabla pendiente. El grafo de este esquema es aciclico; si dejara de serlo, se avisa en
+  // vez de emitir un DELETE que reventaria con un mensaje mucho peor.
+  const ordered: string[] = [];
+  while (pending.size > 0) {
+    const leaves = [...pending].filter(
+      (table) => !edges.some((edge) => edge.parent === table && pending.has(edge.child)),
+    );
+    if (leaves.length === 0) {
+      throw new Error(
+        `ciclo de claves foraneas entre las tablas dependientes de users: ${[...pending].join(', ')}`,
+      );
+    }
+    for (const leaf of leaves.sort()) {
+      ordered.push(leaf);
+      pending.delete(leaf);
+    }
+  }
+  return ordered;
+}
+
 /**
  * Deja, DENTRO del `tx`, un estado sin ningun usuario (vivo ni borrado) y sin los roles
  * `Administrador`/`Operador`. Necesario porque la base local YA trae 2 roles y 1
  * administrador vivo de una corrida anterior del seed real: sin este borrado, ningun
  * caso podria observar "primera corrida sobre base vacia".
+ *
+ * Antes de tocar `users` hay que vaciar lo que le apunta: las FK de auditoria
+ * (`created_by`/`updated_by` de `recipes`, `products`, `suppliers`, `orders`,
+ * `supplier_catalog_lines`) son `ON DELETE RESTRICT`, asi que basta UNA fila viva de
+ * cualquiera de esas tablas para que `tx.user.deleteMany({})` reviente. Este archivo pasaba
+ * "por suerte" mientras la base local no tenia productos ni recetas sembrados; en cuanto
+ * alguien sembro datos, los 8 casos se pusieron rojos. Ahora el escenario se construye
+ * entero y el test no depende de con que datos arranque la base local.
+ *
+ * TODO ESTO SIGUE DENTRO DEL `tx` QUE TERMINA EN ROLLBACK: no se pierde ni una fila real.
  */
 async function resetIdentityToEmptyState(tx: Prisma.TransactionClient): Promise<void> {
+  for (const table of await tablesDependingOnUsers(tx)) {
+    if (!SAFE_TABLE_NAME.test(table)) {
+      throw new Error(`nombre de tabla inesperado en el catalogo: ${table}`);
+    }
+    await tx.$executeRawUnsafe(`DELETE FROM "${table}"`);
+  }
   await tx.user.deleteMany({});
   await tx.role.deleteMany({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } });
 }

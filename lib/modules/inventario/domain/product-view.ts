@@ -9,16 +9,17 @@ import type { UnitId } from '@/lib/modules/unidades';
 
 /**
  * Datos de negocio de un producto, ya validados por `product-input.ts` (`design.md >
- * 6.1`, `7`). `cost` sigue siendo cadena aqui: la conversion a `Prisma.Decimal` es del
- * adaptador driven (R31, el dominio no importa `@prisma/client`).
+ * 6.1`, `7`).
+ *
+ * QC-52 (R1, R2): sin `cost`, `minPurchase` ni `deliveryTime` -son del catalogo del
+ * proveedor-. Lo que queda es lo que la cosa ES (`name`, `presentationId`, `unitId`) y lo
+ * que HAY de ella (`stock`, `qtyAlert`), con la misma forma y la misma opcionalidad de
+ * antes.
  */
 export type NewProduct = {
   readonly name: string;
   readonly presentationId: string;
   readonly stock?: number | null;
-  readonly cost?: string | null;
-  readonly minPurchase: number;
-  readonly deliveryTime?: number | null;
   readonly qtyAlert?: number | null;
   readonly unitId?: UnitId | null;
 };
@@ -34,9 +35,6 @@ export type ProductView = {
   readonly presentationId: string;
   readonly presentationName: string;
   readonly stock: number | null;
-  readonly cost: string | null;
-  readonly minPurchase: number;
-  readonly deliveryTime: number | null;
   readonly qtyAlert: number | null;
   readonly unitId: UnitId | null;
   readonly createdAt: Date;

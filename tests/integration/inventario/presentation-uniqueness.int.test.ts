@@ -126,7 +126,7 @@ async function createProductFor(
   name = `Producto ${token()}`,
 ): Promise<string> {
   const product = await tx.product.create({
-    data: { name, presentationId, minPurchase: 0 },
+    data: { name, presentationId },
     select: { id: true },
   });
   return product.id;
@@ -156,9 +156,18 @@ beforeAll(async () => {
     );
   }
 
+  // El JOIN con `pg_namespace` acota la consulta al esquema `public` y NO es adorno:
+  // `pg_constraint` es global a la BASE, no al esquema. La base de pruebas es
+  // compartida y llego a tener un esquema espejo (`public_shadow_qc52`) con las
+  // mismas tablas; sin este filtro cada FK aparecia DOS veces. No sirve confiar en
+  // el `search_path` ni en `::regclass`, que solo cualifica cuando la tabla NO esta
+  // en el path: por eso el sintoma era tan confuso.
   const fk = await prisma.$queryRaw<{ conname: string }[]>`
-    SELECT conname FROM pg_constraint
-    WHERE conname = 'products_presentation_id_fkey' AND contype = 'f'`;
+    SELECT c.conname FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE c.conname = 'products_presentation_id_fkey' AND c.contype = 'f'
+      AND n.nspname = 'public'`;
   if (fk.length !== 1) {
     throw new Error(
       'la base de pruebas no tiene la FK "products_presentation_id_fkey" (migracion de ' +
@@ -325,9 +334,13 @@ describe('mutacion de esquema: sin el constraint, el requisito deja de cumplirse
     expect(sawDeleteSucceed).toBe(true);
 
     // Verificacion FUERA de la transaccion ya deshecha: la FK sigue en pie.
+    // Acotada a `public` por el mismo motivo que la del `beforeAll`.
     const fkAfter = await prisma.$queryRaw<{ conname: string; deleteAction: string }[]>`
-      SELECT conname, confdeltype AS "deleteAction" FROM pg_constraint
-      WHERE conname = 'products_presentation_id_fkey' AND contype = 'f'`;
+      SELECT c.conname, c.confdeltype AS "deleteAction" FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE c.conname = 'products_presentation_id_fkey' AND c.contype = 'f'
+        AND n.nspname = 'public'`;
     expect(fkAfter).toHaveLength(1);
     // 'r' = RESTRICT, la accion original de la migracion de QC-14.
     expect(fkAfter[0]?.deleteAction).toBe('r');
