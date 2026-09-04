@@ -30,6 +30,14 @@
 // exige, para lo que quede fuera de esa exclusion, una senal real de pantalla de catalogo
 // (`page.tsx`, o un archivo que declare `ProductListSection`/una tabla de productos), no basta
 // con que el nombre de archivo contenga la palabra. El detalle, dentro del caso.
+//
+// **2026-09-04 (QC-44, pantalla-de-proveedores):** tercera vez, y otra vez el mismo tipo de ajuste
+// -FALSO POSITIVO del barrido por NOMBRE-. QC-44 promovio el selector de presentacion a
+// `components/shared/presentation-select.tsx` porque dos pantallas lo necesitan con la misma API;
+// ese archivo no es una segunda pantalla del catalogo, solo consume `listPresentationsAction` y
+// `createPresentationAction`. Se excluye por nombre y motivo, con la misma defensa extra que la
+// exclusion de recetas: el archivo tiene que existir y no puede llevar senal de pantalla. El
+// motivo entero, dentro del caso.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
@@ -187,12 +195,47 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     ).toEqual([])
 
     // Esta mitad de R34 sigue INTACTA y en negativo: QC-22 monto sus piezas dentro de la
-    // carpeta de ruta, asi que `components/` (compartido entre pantallas) no gano ninguna.
+    // carpeta de ruta, asi que `components/` (compartido entre pantallas) no gano ninguna
+    // PANTALLA de catalogo.
+    //
+    // ACTUALIZADO 2026-09-04 (QC-44, pantalla-de-proveedores): mismo movimiento que hizo QC-26
+    // arriba y por el mismo motivo -un FALSO POSITIVO del barrido por NOMBRE, no un cambio de
+    // premisa-. QC-44 (T7) promovio el selector de presentacion de la ruta de inventario a
+    // `components/shared/presentation-select.tsx` porque la pantalla de proveedores lo necesita
+    // con la MISMA API (`design.md > 8.1`, `docs/architecture.md > Regla: sin sobre-ingenieria`).
+    // Ese archivo casa con `screenPattern` solo porque su nombre contiene «presentation»: NO es
+    // una segunda pantalla del catalogo, es el selector que unicamente CONSUME
+    // `listPresentationsAction`/`createPresentationAction` -las dos operaciones que QC-44/R39 le
+    // permite tocar-. Se excluye por nombre y motivo, no se afloja `screenPattern` ni se vacia
+    // la lista de matches: cualquier OTRO archivo de catalogo bajo `components/` sigue poniendo
+    // esto en rojo.
+    const SELECTOR_PROMOVIDO = 'shared/presentation-select.tsx'
     const componentMatches = matchingFiles(join(repoRoot, 'components'))
+    const componentesDeCatalogo = componentMatches.filter(
+      (relPath) => relPath !== SELECTOR_PROMOVIDO,
+    )
+    expect(
+      componentesDeCatalogo,
+      `componente de catalogo encontrado bajo components/: ${componentesDeCatalogo.join(', ')}`,
+    ).toEqual([])
+
+    // Y la exclusion no es una puerta trasera, exactamente igual que la de la ruta de recetas:
+    // el archivo promovido tiene que seguir existiendo -si desaparece, la exclusion sobra y hay
+    // que borrarla- y no puede llevar ninguna senal REAL de pantalla de catalogo
+    // (`ProductListSection` o una tabla de productos). Si manana alguien convierte ese archivo
+    // en una pantalla para esquivar esta guardia, esto cae aunque la exclusion lo deje pasar.
     expect(
       componentMatches,
-      `componente de catalogo encontrado bajo components/: ${componentMatches.join(', ')}`,
-    ).toEqual([])
+      `el selector promovido por QC-44 no esta donde dice la exclusion: ${componentMatches.join(', ')}`,
+    ).toContain(SELECTOR_PROMOVIDO)
+    const fuenteDelSelector = readFileSync(
+      join(repoRoot, 'components', ...SELECTOR_PROMOVIDO.split('/')),
+      'utf8',
+    )
+    expect(
+      /ProductListSection|product-table/.test(fuenteDelSelector),
+      `${SELECTOR_PROMOVIDO} no puede ser una pantalla de catalogo`,
+    ).toBe(false)
 
     // El E2E del catalogo dejo de estar diferido (D4 de QC-20 queda superada por QC-22), pero
     // la lista es CERRADA: un segundo spec de catalogo sin ficha pone esto en rojo.

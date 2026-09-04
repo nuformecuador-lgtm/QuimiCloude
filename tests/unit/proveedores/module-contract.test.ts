@@ -32,6 +32,16 @@
 //    fallarian. Lo mismo aplica a `createdBy`/`updatedBy` con `@relation(...)` hacia `User`.
 //
 // Cubre R20, R21, R22, R23, R35, y refuerza R8.
+//
+// **2026-09-04 (QC-44, pantalla-de-proveedores):** dos ajustes en este archivo, ninguno un
+// aflojamiento.
+//   1. El caso «la feature no anade adaptadores driving, rutas ni Server Actions» se RETENSO:
+//      afirmaba que `app/(private)/proveedores` no existia porque la pantalla estaba diferida a
+//      QC-44, y QC-44 la construye (R1, R3). Pasa de «no existe» a «existe y es la unica».
+//   2. El caso del cableado corrige un FALSO POSITIVO de su propia regex: filtraba
+//      `(adapters|ports)/`, que atrapaba tambien `adapters/driving/` -las Server Actions que
+//      R43 autoriza consumir desde `app/`-. Se estrecha a `adapters/driven/` y `ports/`, que es
+//      lo que el caso dice vigilar. El motivo entero, en cada caso.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
@@ -233,7 +243,7 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
     expect(definiciones).toEqual(['lib/modules/proveedores/domain/supplier-name.ts'])
   })
 
-  it('la feature no anade adaptadores driving, rutas ni Server Actions', () => {
+  it('la feature no anade adaptadores driving ni rutas API, y la unica pantalla es la de QC-44', () => {
     // R35 de QC-42 decia «ni ports/ ni adapters/»: esa era la frontera de la ficha de
     // ESQUEMA. QC-43 la DEROGA expresamente (`tasks.md` T7, T11, T12: «borra el
     // .gitkeep»), asi que la afirmacion pasa de «vacias» a «exactamente estos archivos»,
@@ -290,21 +300,55 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       }
     }
 
-    // Ninguna ruta HTTP ni pantalla de proveedores.
+    // Ninguna ruta HTTP de proveedores: las mutaciones son Server Actions y `app/api/` queda
+    // reservado a webhooks y APIs publicas (`docs/architecture.md`). Falsable con solo crear
+    // `app/api/proveedores/route.ts`.
+    //
+    // RETENSADO el 2026-09-04 (QC-44, pantalla-de-proveedores): esta lista incluia tambien
+    // `app/(private)/proveedores` y `app/(private)/suppliers`, porque QC-42/QC-43 eran fichas
+    // de backend y la pantalla estaba DIFERIDA a QC-44. QC-44 es precisamente la ficha que la
+    // construye (R1, R3), asi que esa premisa caduco POR DISENO y sale de la lista **solo la
+    // ruta que QC-44 declara**: `app/(private)/suppliers` sigue prohibida -la ruta real es la
+    // castellana, `SUPPLIERS_ROUTE`- y las dos de `app/api/` siguen intactas.
     for (const ruta of [
       join(repoRoot, 'app', 'api', 'suppliers'),
       join(repoRoot, 'app', 'api', 'proveedores'),
-      join(repoRoot, 'app', '(private)', 'proveedores'),
       join(repoRoot, 'app', '(private)', 'suppliers'),
     ]) {
       expect(existsSync(ruta), `${toPosix(relative(repoRoot, ruta))} no debe existir`).toBe(false)
     }
-    // Y ningun archivo de `app/` conoce todavia el modulo: la pantalla es QC-44.
+
+    // La pantalla de QC-44 EXISTE: si desaparece, la excepcion de arriba sobra y hay que
+    // borrarla. Sin este assert el resto pasaria en verde sobre un repo sin pantalla.
+    const PANTALLA_QC44 = join(repoRoot, 'app', '(private)', 'proveedores')
+    expect(
+      existsSync(join(PANTALLA_QC44, 'page.tsx')),
+      'la pantalla de proveedores de QC-44 no existe: la excepcion de arriba sobra',
+    ).toBe(true)
+
+    // Y el modulo lo conoce SOLO esa pantalla: lo que se permite es la pantalla de QC-44, no
+    // «cualquier cosa bajo app/». Cualquier otro archivo de `app/` que mencione proveedores
+    // -un route handler con otro nombre de carpeta, un componente suelto en otra ruta- cae
+    // aqui igual que antes. Se mira el CONTENIDO sin comentarios (`read`), no el nombre de la
+    // carpeta: el camino corto para esquivar esto es pedirle la fachada a `@/lib/composition`
+    // desde una ruta que no se llame «proveedores».
     for (const file of sourcesIn(join(repoRoot, 'app'))) {
+      if (toPosix(file).startsWith(toPosix(PANTALLA_QC44))) continue
       expect(
         read(file),
-        `${toPosix(relative(repoRoot, file))} menciona proveedores`,
+        `${toPosix(relative(repoRoot, file))} menciona proveedores fuera de la pantalla de QC-44`,
       ).not.toMatch(/proveedores|supplier/i)
+    }
+
+    // Y la excepcion no es una puerta trasera: lo que R49 SIGUE prohibiendo es que la pantalla
+    // anada Server Actions. Los adaptadores driving del modulo ya quedaron cerrados arriba en
+    // los dos de QC-43; aqui se cierra la otra mitad, que ninguna Server Action se declare en
+    // la propia pantalla. Falsable poniendo `'use server'` en cualquier archivo suyo.
+    for (const file of sourcesIn(PANTALLA_QC44)) {
+      expect(
+        read(file),
+        `${toPosix(relative(repoRoot, file))} declara 'use server': R49 prohibe anadir Server Actions`,
+      ).not.toMatch(/['"]use server['"]/)
     }
 
     // QC-42 afirmaba aqui que `lib/composition` NO menciona `proveedores`: sin puertos ni
@@ -368,11 +412,21 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
     ).toBe(1)
 
     // Nadie mas que la composicion instancia los adaptadores driven de `proveedores`.
+    //
+    // FALSO POSITIVO CORREGIDO el 2026-09-04 (QC-44, pantalla-de-proveedores). El filtro decia
+    // `(adapters|ports)/`, que ademas de `adapters/driven/` atrapaba `adapters/driving/`. Eso
+    // no es lo que este caso quiere vigilar: consumir una Server Action del modulo desde `app/`
+    // es EXACTAMENTE el unico camino que R43 autoriza -y lo que la pantalla de inventario de
+    // QC-22 lleva haciendo con `adapters/driving/product-actions`-. Nunca habia saltado porque
+    // hasta QC-44 no existia ninguna pantalla de proveedores. El filtro se ESTRECHA al camino
+    // real: `adapters/driven/` y `ports/`. NO se afloja nada: si un archivo de `app/` o de otro
+    // sitio de `lib/` importara `adapters/driven/persistence/*` o un `ports/*` de proveedores,
+    // el cableado dejaria de ser exclusivo de la composicion y esto seguiria cayendo.
     const fuera = sourcesIn(join(repoRoot, 'lib'))
       .concat(sourcesIn(join(repoRoot, 'app')))
       .filter((file) => !toPosix(file).includes('/lib/composition/'))
       .filter((file) =>
-        /@\/lib\/modules\/proveedores\/(adapters|ports)\//.test(read(file)),
+        /@\/lib\/modules\/proveedores\/(adapters\/driven|ports)\//.test(read(file)),
       )
       .map((file) => toPosix(relative(repoRoot, file)))
     expect(fuera, `cablean proveedores fuera de la composicion: ${fuera.join(', ')}`).toEqual([])

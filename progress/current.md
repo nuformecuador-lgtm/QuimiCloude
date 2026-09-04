@@ -246,6 +246,10 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ### QC-44 — pantalla-de-proveedores: F0 + F1.0 (2026-09-04)
 
+> **SUPERADA el 2026-09-04 por la sesión de arranque de QC-44.** QC-52 se mergeó en `dev`
+> (PR #32, merge `855fae6`) y otra sesión está haciendo su cierre; el humano dio la orden
+> de arrancar. Lo que sigue queda como registro de por qué esperó, no como estado actual.
+
 - **NO arranca. Decisión del humano: espera a QC-52.** El `requirements.md` sembrado de QC-52 lo
   dice con todas las letras en su bloque de alcance: *«Lo que NO entra: la pantalla del catálogo de
   proveedores: es QC-44, que todavía no existe y **solo nace con más alcance**»*. QC-52 rehace la
@@ -316,6 +320,11 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
   `depends_on` no cambian; no se creo ni cancelo ninguna ficha.
 
 - **QC-52 acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 3 preguntas abiertas en `specs/QC-52-separar-producto-de-catalogo-de-proveedor/requirements.md`; no se copian aquí. Nació de una decisión del humano posterior al merge de QC-43 y **arrastra tres features ya mergeadas** (QC-20, QC-22 y el propio QC-43, del que se caen las reglas que dependían del producto). El board se actualizó antes de sembrar: `description` reescrita y `complexity: high` asignada. También se importaron a `feature_list.json` las fichas **QC-52** y **QC-54**, creadas en el board despues de la ultima F0.
+- **QC-44 acotada con `/afinar-feature` el 2026-09-04.** Alcance, 26 decisiones cerradas y 3
+  preguntas abiertas en `specs/QC-44-pantalla-de-proveedores/requirements.md`; no se copian aqui.
+  El board se actualizo ANTES de sembrar: `description` reescrita contra la forma post-QC-52 y
+  link *is blocked by* **QC-52** anadido, porque esa ficha borra el `product_id` de la linea que
+  la pantalla iba a mostrar. `complexity: high`.
 
 ### QC-23 — registro-de-sesiones (acotada el 2026-09-03)
 
