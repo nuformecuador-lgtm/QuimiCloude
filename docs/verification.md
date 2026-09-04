@@ -126,10 +126,15 @@ de test rojo que no estuviera ya en `tests/baseline-rojos.json`**.
 saber que la deuda es de `dev` y no tuya. Y síémbralo con pocas entradas: si nace con cincuenta,
 nadie lo va a limpiar nunca.
 
-> **Estado en QuimiCloude (2026-08-28):** el baseline está **vacío** y no es un descuido: la
-> suite está verde (93/93, gate completo en 113 s) y no hay deuda heredada en `dev`. Con el
-> baseline vacío esto no afloja nada —cualquier archivo rojo es «nuevo» y bloquea—; la
-> maquinaria está montada para cuando la suite crezca, que es cuando dejará de ser gratis.
+> **Estado en QuimiCloude (2026-09-04):** el baseline tiene **dos** entradas, ambas por el
+> mismo motivo estructural: `tests/unit/recetas-ui/recipe-route-contract.test.ts` y
+> `tests/unit/recetas/module-contract.test.ts` contienen guardias que se apoyan en
+> `git diff --name-only origin/dev...HEAD` y que, estando en `dev`, no tienen rango que mirar
+> y fallan a propósito en vez de pasar sin comprobar nada. El coste está anotado en cada
+> `motivo` y no es menor: al ser la comparación **por archivo**, esos dos archivos quedan
+> ignorados también en las ramas de feature donde sus guardias sí morderían. Lo correcto es
+> que el caso del diff se salte explícitamente cuando el rango no existe y que estas dos
+> entradas desaparezcan.
 
 ## Cuando lo que verificas es el gate mismo
 
