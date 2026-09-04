@@ -209,7 +209,7 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
   // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
   // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de una copia
   // escrita a mano aqui.
-  const companyName = `Empresa $marca`
+  const companyName = `Empresa ${marca}`
   const company = await tx.company.create({
     data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
     select: { id: true },

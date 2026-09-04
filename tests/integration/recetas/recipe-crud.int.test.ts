@@ -131,7 +131,7 @@ async function createTestUser(db: Db): Promise<string> {
   // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
   // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de una copia
   // escrita a mano aqui.
-  const companyName = `Empresa $marker`;
+  const companyName = `Empresa ${marker}`;
   const company = await db.company.create({
     data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
     select: { id: true },

@@ -230,8 +230,8 @@ describe('login contra Postgres real', () => {
   });
 
   // QC-47 R14 — el rol resuelto por el login sale de `users.role_id` y CAMBIA CON EL. Es un
-  // requisito de no-regresion: la primera vuelta de QC-47 movio el rol a una tabla de
-  // pertenencias, y este caso es el que se pondria rojo si alguien lo volviera a mover o lo
+  // requisito de no-regresion: la primera vuelta de QC-47 movio el rol a una tabla aparte,
+  // y este caso es el que se pondria rojo si alguien lo volviera a mover o lo
   // congelara en otra fuente. Se cambia la columna de la fila —nada mas— y se vuelve a entrar.
   //
   // Ademas, UNA sola llamada al adaptador trae ya el nombre del rol (`JOIN roles` en la misma

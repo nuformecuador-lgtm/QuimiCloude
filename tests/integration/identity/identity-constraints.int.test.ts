@@ -981,7 +981,7 @@ describe('borrado logico y marcas de tiempo', () => {
 })
 
 // ===========================================================================
-// QC-47 — LA EMPRESA Y LA PERTENENCIA DEL USUARIO (T16)
+// QC-47 — LA EMPRESA DEL USUARIO (T16)
 //
 // Todo lo de aqui abajo es de QC-47 y sigue el mismo patron que lo anterior: cada `it`
 // dentro de una transaccion que termina en ROLLBACK, las altas que deben fallar por SQL
@@ -1173,7 +1173,7 @@ describe('la empresa', () => {
   })
 })
 
-describe('la pertenencia del usuario a su empresa', () => {
+describe('la empresa a la que pertenece el usuario', () => {
   it('rechaza un usuario sin empresa o con una empresa inexistente', async () => {
     // R9 (obligatoria en la propia base) y R10 (la empresa referenciada tiene que existir).
     await inRolledBackTransaction(async (tx) => {
