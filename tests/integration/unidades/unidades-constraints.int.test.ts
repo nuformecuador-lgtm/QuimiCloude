@@ -753,6 +753,15 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       // = 'r') y ON UPDATE CASCADE (`confupdtype` = 'c')— aunque el esquema Prisma
       // declare `unit_id` como escalar sin `@relation`. La integridad la da Postgres; el
       // ORM no puede atravesar la frontera con un `include` (R18, `design.md` 4.3).
+      // El JOIN con `pg_namespace` acota la consulta al esquema `public` y NO es adorno:
+      // `pg_constraint` es global a la BASE, no al esquema. La base de pruebas es
+      // compartida y llego a tener un esquema espejo (`public_shadow_qc52`) con las
+      // mismas tablas; sin este filtro cada FK aparecia DOS veces. No sirve confiar en
+      // el `search_path` ni en `::regclass`, que solo cualifica cuando la tabla NO esta
+      // en el path: por eso el sintoma era tan confuso.
+      // Aqui se acota el esquema de las DOS puntas (`n` la tabla que declara la FK, `fn` la
+      // referenciada) porque el predicado del caso es sobre la referenciada: son las FK de
+      // `public` hacia `public.units`, no hacia cualquier tabla llamada `units`.
       const foreignKeys = await tx.$queryRaw<
         { conname: string; referencia: string; confdeltype: string; confupdtype: string }[]
       >`
@@ -760,7 +769,10 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
         FROM pg_constraint c
         JOIN pg_class t ON t.oid = c.conrelid
         JOIN pg_class ft ON ft.oid = c.confrelid
-        WHERE c.contype = 'f' AND ft.relname = 'units'
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN pg_namespace fn ON fn.oid = ft.relnamespace
+        WHERE c.contype = 'f' AND n.nspname = 'public' AND fn.nspname = 'public'
+          AND ft.relname = 'units'
         ORDER BY c.conname`
       // ACTUALIZADO EL 2026-09-03 POR QC-33 (`specs/QC-33-modelo-pedidos/`). La lista era de
       // DOS y sigue siendo EXACTA: se SUMA la tercera FK hacia `units`, la que nace con
