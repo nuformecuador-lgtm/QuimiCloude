@@ -1597,6 +1597,41 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
+### Quinta vez: el drift de la base compartida bloquea la integracion (QC-62, 2026-09-04)
+
+El humano decidio **no** montar base propia para QC-62 y abrir el PR con los rojos declarados. Lo
+que se midio, para que la proxima sesion no repita el diagnostico:
+
+- La base `QuimiCloude` tiene aplicada `20260904160000_list_query_indexes`, **que esta rama no
+  tiene**, y su columna `products.name_normalized` es `NOT NULL`. El modelo `Product` de
+  `db/schema.prisma` en esta rama **no** declara `nameNormalized`, asi que la fixture no puede
+  pasarlo: `prisma.product.create` responde `Unknown argument nameNormalized`.
+- Por eso **9 archivos de `tests/integration/`** caen con el mismo `Null constraint violation on
+  the fields: (name_normalized)` — los tres de `inventario`, los tres de `recetas`,
+  `pedidos/pedidos-constraints`, `proveedores/catalog-line` y `unidades/unidades-constraints`.
+  **Fallan igual en `dev`**: no es regresion de ninguna feature, es la base yendo por delante del
+  codigo.
+- El primer diagnostico del leader —«fixtures viejas de QC-52»— **era falso**, y el encargo de
+  arreglarlas era inaplicable. Lo tumbo el implementer con medidas, no con opinion.
+
+**Dos agujeros del gate que esto destapo, y que siguen sin dueno:**
+
+1. `./init.sh` da por bueno su check de `.env presente` mientras la integracion cae con
+   `DATABASE_URL not found`: **vitest no carga `.env`** y hay que exportarlo a mano
+   (`set -a && . ./.env && set +a`). Un worktree recien montado da un **verde falso** en
+   integracion.
+2. Las dos guardias gemelas de alcance del modulo `recetas` —`tests/unit/recetas/module-contract.test.ts`
+   y `tests/unit/recetas-ui/recipe-route-contract.test.ts:555`— **ya no dicen lo mismo**: QC-62
+   actualizo la primera con su lista de archivos permitidos y la segunda sigue con la vieja, tapada
+   por `baseline-rojos.json` con un motivo escrito que **ya no es el que ocurre**. Replicar las
+   listas alli no la pondria verde igualmente (detras espera `tocaDb` por la migracion, que es la
+   deuda R44 ya anotada), asi que se deja **declarado, no tapado**.
+
+**Un hallazgo que si se corrigio**: la migracion de QC-62 y la foranea compartian marca de tiempo
+exacta (`20260904160000`). Prisma las distingue por nombre, pero el orden entre dos que empatan
+queda al azar — y la de QC-62 **borra datos de forma irreversible**. Renombrada a
+`20260904181500_recipe_steps_reset`.
+
 ### La base propia de QC-34 ya se borro; la deuda de fondo sigue viva (2026-09-04)
 
 Tercera vez que el drift de base entre worktrees bloquea una feature, y tercera vez que se resuelve
