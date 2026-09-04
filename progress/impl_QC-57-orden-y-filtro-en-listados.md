@@ -17,6 +17,8 @@ aquí porque el `design.md` no se ha reescrito y el reviewer leerá los dos:
 
 ## T0 — Precondición (`tasks.md > Grupo 0`)
 
+> **Nota tras el review (F2.3):** el punto 1 de esta lista se quedó corto. Se mergeó `dev` LOCAL, no `origin/dev`, que ya iba por delante. La comprobación buena es `git fetch origin dev` + `git merge origin/dev`, y hacerla al empezar habría evitado el falso bloqueante del final. Corregido en T23.
+
 Las cinco comprobaciones, verificadas y no supuestas:
 
 1. **Rama y `dev` mergeado** — OK. `git merge dev` trajo `82c1379` (QC-47 `in_progress`); merge
@@ -278,51 +280,42 @@ Abreviaturas: **LQ** `tests/unit/inventario/list-query.test.ts` · **LB** `tests
 
 Está en los **cinco** módulos, con ese nombre: UI-inv, UI-prov, LR, LU y LO, caso `ordenar por deletedAt: no falla, aplica el orden por defecto Y el log recibe el campo`.
 
-## T23 — el gate completo, y el único punto que NO cierro yo
 
-`./init.sh` **completo**, última ejecución:
+## T23 — el gate completo, EN VERDE
+
+**Reescrito tras el review**: la versión anterior de esta sección describía un bloqueante que no existía. Se me escapó la salida buena, y era gratis — **F2.3**.
+
+### F2.3 — `git fetch origin dev` + `git merge origin/dev`
+
+La rama estaba **desactualizada**. `origin/dev` había avanzado 13 commits (QC-62 mergeada por el PR #36) y traía, entre otras cosas:
+
+- **`tests/baseline-rojos.json` con CINCO entradas** en vez de las tres de mi rama. Las dos nuevas son **`catalog-line-sheet.test.tsx` y `supplier-page.test.tsx`**, declaradas rojos heredados **de QC-44** en el commit `ac86bd5`. Es decir: **el rojo que yo daba por bloqueante ya estaba resuelto en `dev`**, y bastaba con mergear.
+- **`docs/verification.md > Los flakes de saturación`**, que asigna ese arreglo a **QC-58** y declara el baseline como **interino**.
+
+El merge fue **limpio**: la migración `20260904181500_recipe_steps_reset` de QC-62 no existía en mi rama, así que no hubo conflicto que resolver. Después: `pnpm exec prisma generate` y `pnpm run db:migrate` para poner la base y el cliente al día con el modelo de pasos de QC-62.
+
+**Mi decisión de NO tocar `vitest.config.mts` era la correcta**, y ahora con un motivo mejor del que yo tenía: el arreglo **ya tiene dueño (QC-58)** y está escrito en `docs/verification.md`. Tocarlo habría sido pisar otra ficha.
+
+### Resultado
 
 ```
-✓ regla max-2-por-zona respetada (in_progress=1)
-✓ specs presentes para features sdd en vuelo
+✓ regla max-2-por-zona respetada
 -> pnpm run typecheck   → tsc --noEmit, sin salida (verde)
 -> pnpm run lint        → eslint, sin salida (verde)
 
- Test Files  3 failed | 195 passed (198)
-      Tests  4 failed | 2293 passed | 4 skipped (2301)
+ Test Files  3 failed | 199 passed (202)
+      Tests  4 failed | 2337 passed | 4 skipped (2345)
 
-hay 1 archivo(s) de test en rojo que NO estan en el baseline:
-  tests/unit/proveedores-ui/catalog-line-sheet.test.tsx
-✗ hay rojos NUEVOS respecto del baseline
+✓ tests: sin rojos nuevos (3 rojos, todos en el baseline de 5); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
 ```
 
-De partida eran **180 archivos / 2058 tests**; ahora **198 / 2301**: la ficha añade **18 archivos de test y 243 tests**.
+**`== init OK ==`. Cero rojos nuevos**: los 3 que quedan están **todos** en el baseline de 5 y ninguno es de QC-57 —dos son las guardias de alcance de QC-26/QC-34 y el tercero el flake de QC-44 que ahora está declarado—.
 
-### Los 3 archivos rojos, uno por uno
+El gate avisa además de **2 archivos del baseline que ya pasan** (`product-page.test.tsx` y `supplier-page.test.tsx`). **No se limpian aquí**: son entradas de QC-22 y QC-44 cuyo arreglo pertenece a **QC-58**, y retirarlas cambiaría el gate de las fichas que corren en paralelo.
 
-**Dos están en `tests/baseline-rojos.json` y el gate los tolera** — `tests/unit/recetas/module-contract.test.ts` y `tests/unit/recetas-ui/recipe-route-contract.test.ts`. Son guardias de alcance de QC-26/QC-34 que afirman «esta feature no toca `lib/modules/recetas`». QC-57 **sí** lo toca, legítimamente y por spec (recetas es uno de los siete listados). Es el mismo patrón estructural de la guardia de proveedores: una guardia que pregunta por el diff de la rama se rompe con **cualquier** ficha posterior que toque su módulo. **No se tocaron**: son de otras fichas y decidir si se actualizan o se retiran del baseline no es de esta ficha.
+### Las dos guardias de alcance de QC-26/QC-34 quedaron INVÁLIDAS, y no se parchean aquí
 
-**El tercero es el que deja el gate en rojo, y NO es una regresión de esta ficha:**
-`tests/unit/proveedores-ui/catalog-line-sheet.test.tsx`, `Error: Test timed out in 5000ms`.
-
-**Diagnóstico medido, no supuesto** — cuatro observaciones:
-
-1. **En aislado pasa**: `Test Files 1 passed / Tests 20 passed`, pero tarda **30,8 s** para 20 tests.
-2. **El número de archivos rojos varió entre corridas** (una vez `catalog-line-sheet`, otra `catalog-line-sheet` + `supplier-page`). **CORRECCIÓN**: llegué a escribir que el rojo «se mueve de archivo», y **el reviewer no pudo reproducirlo** — en sus dos corridas se quedó en el mismo archivo. Retiro esa afirmación: lo que sí está medido es que el conjunto de rojos **no es estable entre corridas**, que ya descarta un fallo determinista, pero no que migre de archivo.
-3. **Corriendo SOLO el proyecto `ui`** (36 archivos, 439 tests, **sin un solo test de integración de esta ficha**) **sigue fallando** uno por timeout. Es decir: **la causa no es la carga que añade QC-57**, es que la suite jsdom va justa contra el timeout por defecto de 5 s de Vitest.
-4. **Con `--testTimeout=20000` todo se pone verde**: el proyecto `ui` solo → `36 passed / 439 passed`; y la suite entera → solo quedan los **2 rojos de baseline**.
-
-**Esta ficha no toca `app/` ni `components/` de proveedores, ni una línea de código ejecutable de UI.**
-
-### Lo que hace falta decidir, y por qué NO lo he hecho yo
-
-La corrección obvia es **declarar un `testTimeout` explícito para el proyecto `ui` en `vitest.config.mts`** (hoy no hay ninguno: se hereda el defecto implícito de 5 s de Vitest). **No es relajar ningún aserto** —no cambia ni una afirmación—, es poner un valor explícito donde había uno implícito y demasiado justo para jsdom + `userEvent`.
-
-**No lo he aplicado por cuenta propia** porque `vitest.config.mts` es **el gate de TODAS las features**, no solo de esta: cambiarlo altera el veredicto de las fichas que corren en paralelo, y eso es una decisión del leader y del humano, no de un implementer cerrando su tanda.
-
-**Las dos salidas, para quien decida:**
-
-- **Recomendada:** `testTimeout: 20000` en el proyecto `ui` de `vitest.config.mts`, con el comentario de por qué. Una línea, y el gate vuelve a responder lo único que debe responder.
-- **Descartable pero posible:** meter los archivos en `tests/baseline-rojos.json`. **Es peor**, y `docs/verification.md` lo dice casi con estas palabras: el baseline es «el sitio donde cualquiera mete lo que le estorba», y además **no funcionaría** — el flake **cambia de archivo**, así que habría que listar toda la carpeta de UI y el gate dejaría de morder ahí para siempre.
-
-**Nada de esta ficha depende de esa decisión**: typecheck, lint, las 15 guardias, los 2301 tests menos el flake, y el ciclo real de migración y rollback están verdes.
+`tests/unit/recetas/module-contract.test.ts` y `tests/unit/recetas-ui/recipe-route-contract.test.ts` vigilan el diff de una rama **ya mergeada**, así que **no existe ninguna rama en la que puedan volver a estar verdes**. No son de QC-57: **se escalan, no se parchean**.
