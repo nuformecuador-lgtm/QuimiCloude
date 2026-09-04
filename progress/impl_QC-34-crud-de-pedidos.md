@@ -507,3 +507,93 @@ Los tres `.gitkeep` de `lib/modules/pedidos/` estan **borrados**, comprobado sob
 **Lo que falta para cerrar T18 es el `./init.sh` completo, que corre el leader**: esta ficha acopla
 SQL, tipos enumerados y forma del arbol de modulos, y **el grafo de imports no lo ve**. **F2.3 y F2.4
 no se han hecho**: ni sincronizacion con `dev` ni PR, por instruccion expresa.
+
+---
+
+## Tanda 5 — respuesta al RECHAZO del reviewer (B1, M1, M4). Cerrada 2026-09-04
+
+`progress/review_QC-34-crud-de-pedidos.md` rechazo la ficha por **un bloqueante**. Se arreglan B1,
+M1 y M4. **M2, M3 y M5 no se tocan**: los dos primeros son del leader y M5 es un limite conocido
+aceptado. **El codigo de produccion NO cambia** —`git status lib/ db/` limpio—: B1 era una carencia
+de tests, no un bug.
+
+### B1 (bloqueante) — el adaptador driven no lo ejecutaba ningun test
+
+El diagnostico del reviewer era correcto y la consecuencia seria: los tests de integracion
+ejecutaban **una copia a mano** del SQL del adaptador dentro de una transaccion revertida, y **una
+copia no vigila a su original**. Con eso **R35 no lo comprobaba nada** —ni el defecto de 10, ni el
+tope de 25, ni que `buildPage` reciba el `limit` **acotado**—, y R8, R13, R34, R40 y R41 se quedaban
+sin su capa de adaptador.
+
+Se arregla por la **opcion 1** de la review, que es lo que ya hacen `recipe-crud.int.test.ts` y
+`supplier-crud.int.test.ts`: **llamar al adaptador real** con el cliente global y limpiar al final.
+**No** se conserva el patron de transaccion revertida para esto, y **no** se usa la opcion 3 (leer el
+`ORDER BY` del fuente), que la propia review califica de mas debil.
+
+**Nuevo `tests/integration/pedidos/order-repository.int.test.ts` (7 casos).** Importa y llama las
+**seis** funciones reales (`createOrder`, `findAliveOrderById`, `listAliveOrders`, `updateAliveOrder`,
+`cancelAliveOrder`, `softDeleteAliveOrder`) y toma `MAX_PAGE_SIZE`/`DEFAULT_PAGE_SIZE`/`toOffsetLimit`
+de `@/lib/shared/pagination` en vez de escribir 25 y 10 a mano. Cubre R8, **R35**, R41, R40, R34/R38
+y los discriminantes `ok`/`not_found` sobre inexistente **y** sobre ya borrado.
+
+**El caso que no existia en ningun sitio (R35):** con 26 pedidos vivos sembrados, `pageSize: 100`
+devuelve **25 elementos y `pageSize: 25` en la `Page`**, y se afirma ademas que `totalPages` **no** es
+`ceil(total/100)`. Eso es lo que demuestra que `buildPage` recibe el `limit` acotado y no el pedido
+—el error contra el que avisa el comentario del propio adaptador, que dejaria un `totalPages`
+mentiroso—.
+
+**Nuevo `tests/unit/pedidos/order-prisma-errors.test.ts` (7 casos)** para `isDuplicateOrderNumber`
+(R13): un `PrismaClientKnownRequestError` con `meta.code` `23505` **y** el nombre del indice ->
+`true`; con `23505` **sin** ese nombre -> `false`, para demostrar que **relanza** en vez de traducir
+mal.
+
+**Aislamiento:** cada caso siembra lo suyo y lo borra **por id exacto** en un `finally`, sin ninguna
+afirmacion global; usa anos de prueba 2881-2886 —distintos de los 287x de `order-sequence`— para que
+el correlativo salga de una secuencia de prueba y no de la del ano real, y `beforeAll`/`afterAll` las
+borran.
+
+### M1 — R4 se comprobaba sobre 7 de los ~15 archivos del modulo
+
+`authorization.test.ts` barria una lista escrita a mano. Ahora recorre **el arbol entero** de
+`lib/modules/pedidos/**` (con un suelo de **19** archivos, para que la lista no pueda vaciarse en
+silencio), que es lo que R4 pide de verdad: «**ningun** archivo de `lib/modules/pedidos/**`».
+
+### M4 — nota fechada que faltaba
+
+`design.md > 4.2` ya lleva su nota del 2026-09-04 sobre la parametrizacion del `status` en el
+`INSERT`, con la misma forma que la de paginacion de `> 7.4`. Cita el hallazgo **M4** y que el
+reviewer califico la desviacion de «CORRECTA» (review, punto 3). **No** se le atribuye al leader una
+aprobacion que no consta en disco (regla 6 de `CLAUDE.md`).
+
+### Las dos correcciones se verificaron POR MUTACION, no solo corriendolas
+
+No basta con que el test nuevo pase; hay que demostrar que **puede caer**. Mutando el codigo real y
+revirtiendolo despues (`git status lib/` limpio en las dos):
+
+| Mutacion | Resultado |
+| --- | --- |
+| `buildPage(..., query.pageSize ?? limit)` en `order-prisma.ts` | **ROJO**: `AssertionError: expected 100 to be 25` — exactamente el `totalPages` mentiroso |
+| `export const MUTACION_TEMPORAL = 'Administrador'` en `domain/order-input.ts` (archivo que **antes no se miraba**) | **ROJO**: `expected ... not to contain ''Administrador''` |
+
+La segunda se probo primero **dentro de un comentario** y salio verde, que es lo correcto: el
+predicado descuenta comentarios. Solo cuenta como codigo.
+
+### Salida real
+
+    $ pnpm run typecheck  -> limpio, sin salida
+    $ pnpm run lint       -> 0 errors, 2 warnings (preexistentes y ajenos)
+    $ vitest run tests/unit/pedidos tests/unit/recetas tests/unit/recetas-ui tests/integration/pedidos tests/guards
+      -> 51 archivos, 606 tests, 0 fallos   (antes 49 / 592: +2 archivos, +14 casos)
+    $ vitest run tests/integration/pedidos  -> 4 archivos, 55 tests, verdes, DOS corridas seguidas
+      (55 = los 48 aprobados + los 7 nuevos; no dependen del orden)
+
+**Base sin residuos** tras la doble corrida: `orders 0`, `recipes 0`, `users 0`, `roles 0`, ninguna
+secuencia `orders_sequence_%`. Solo quedan las filas de catalogo de las migraciones (`units` 4,
+`documentTypes` 1), verificadas por nombre.
+
+### Trazabilidad, actualizada
+
+R35 pasa de «citado pero no verificado» a **verificado contra Postgres real** por
+`order-repository.int.test.ts`. R8, R34, R40 y R41 ganan su **capa de adaptador** en el mismo
+archivo, y R13 su unitario en `order-prisma-errors.test.ts`. Las filas de la tabla de T18 siguen
+siendo validas; estos tests **se anaden** a ellas, no las sustituyen.

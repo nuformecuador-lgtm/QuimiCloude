@@ -352,6 +352,17 @@ Tres consecuencias que hay que respetar al pie de la letra:
    dominio con `code` propio, para que ese caso no llegue como excepción de Prisma sin traducir —que
    es lo que la pregunta abierta 2 de QC-33 temía.
 
+> **Nota del 2026-09-04, detectada al implementar (T13) y aceptada por el reviewer**
+> (`progress/review_QC-34-crud-de-pedidos.md > 3`, que la califica de «CORRECTA»; la nota misma la
+> pidió su hallazgo **M4**, porque la desviación solo constaba en la bitácora y en un comentario del
+> código). El
+> `INSERT` de arriba muestra `'PENDIENTE'` como **literal**; el adaptador lo escribe
+> **parametrizado**, `${data.status}::"OrderStatus"`. Quien decide el estado de alta es el caso de
+> uso (R9), y `NewOrder.status` es `EditableOrderStatus`, que **no puede expresar** la cancelación
+> (§ 8, capa 1): parametrizarlo no abre ningún camino hacia `CANCELADO`, mientras que el literal
+> haría que el adaptador **ignorara en silencio** lo que el puerto recibe. El resto del `INSERT`
+> —incluidos `next_order_sequence($1)` y el `RETURNING`— es literalmente el de arriba.
+
 ### 4.3 Lo que este diseño NO añade
 
 **Ninguna restricción de continuidad** y **ninguna tabla de contadores**. Los huecos se aceptan

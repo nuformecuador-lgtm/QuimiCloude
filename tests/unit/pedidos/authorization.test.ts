@@ -14,8 +14,8 @@
 // habria leido igual — que es exactamente lo que la decision cerrada 1 prohibe, tambien al
 // consultar y al listar.
 
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it, vi } from 'vitest'
@@ -155,7 +155,7 @@ describe('QC-34 — los seis casos de uso solo los ejecuta un Administrador (R1-
 // abajo se vea aqui aunque los dobles siguieran sin llamarse por casualidad.
 // ---------------------------------------------------------------------------------------
 
-const domainDir = join(
+const pedidosDir = join(
   dirname(fileURLToPath(import.meta.url)),
   '..',
   '..',
@@ -163,8 +163,32 @@ const domainDir = join(
   'lib',
   'modules',
   'pedidos',
-  'domain',
 )
+
+const domainDir = join(pedidosDir, 'domain')
+
+/** Todos los archivos bajo `dir`, recursivamente. Rutas absolutas. Misma forma que el ayudante
+ *  homonimo de `tests/unit/pedidos/module-contract.test.ts`. */
+function filesIn(dir: string): readonly string[] {
+  if (!existsSync(dir)) return []
+  const salida: string[] = []
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    if (statSync(full).isDirectory()) salida.push(...filesIn(full))
+    else salida.push(full)
+  }
+  return salida.sort()
+}
+
+/** Solo fuentes TypeScript: los `.gitkeep` del armazon no son codigo. */
+function sourcesIn(dir: string): readonly string[] {
+  return filesIn(dir).filter((file) => /\.tsx?$/.test(file))
+}
+
+/** Ruta comparable: separadores POSIX, para que esto corra igual en Windows. */
+function toPosix(file: string): string {
+  return file.split(sep).join('/')
+}
 
 const SEIS_ARCHIVOS = [
   'create-order.ts',
@@ -209,12 +233,45 @@ describe('QC-34 — requireAdmin es la primera linea de los seis (R2, R3)', () =
     })
   }
 
-  it('el literal del rol no vive en pedidos: sale del contrato de identity (R4)', () => {
+  it('el literal del rol no vive en NINGUN archivo de pedidos: sale del contrato de identity (R4)', () => {
     // Hoy hay cuatro copias del literal en el repo y retirarlas es otra ficha; `pedidos` nace
     // del lado correcto sin anadir la quinta.
-    for (const archivo of [...SEIS_ARCHIVOS, 'actor.ts']) {
-      const codigo = soloCodigo(readFileSync(join(domainDir, archivo), 'utf8'))
-      expect(codigo, archivo).not.toContain("'Administrador'")
+    //
+    // El barrido va sobre TODOS los fuentes del modulo -no sobre los siete que este archivo
+    // conoce de memoria-, porque R4 dice «ningun archivo de `lib/modules/pedidos/**`»: un archivo
+    // NUEVO tiene que entrar en la vigilancia solo, sin que nadie se acuerde de anadirlo aqui.
+    const pedidosSources = sourcesIn(pedidosDir).map(toPosix)
+
+    // Sin esto el test saldria verde por VACUIDAD: un `pedidosDir` mal calculado dejaria la lista
+    // en cero y el bucle no miraria nada. Se comprueba el tamano y ademas que esten los siete de
+    // siempre, el adaptador driven, el driving, el puerto y el barrel — que son justo los que el
+    // barrido anterior dejaba fuera.
+    expect(pedidosSources.length).toBeGreaterThanOrEqual(19)
+    const esperados = [
+      ...[...SEIS_ARCHIVOS, 'actor.ts'].map((a) => `lib/modules/pedidos/domain/${a}`),
+      'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts',
+      'lib/modules/pedidos/adapters/driving/order-actions.ts',
+      'lib/modules/pedidos/domain/errors.ts',
+      'lib/modules/pedidos/domain/order-input.ts',
+      'lib/modules/pedidos/domain/order-transitions.ts',
+      'lib/modules/pedidos/domain/order-view.ts',
+      'lib/modules/pedidos/domain/page.ts',
+      'lib/modules/pedidos/ports/order-repository.ts',
+      'lib/modules/pedidos/index.ts',
+    ]
+    for (const esperado of esperados) {
+      expect(
+        pedidosSources.some((file) => file.endsWith(esperado)),
+        `${esperado} tiene que entrar en el barrido`,
+      ).toBe(true)
+    }
+
+    for (const file of pedidosSources) {
+      // Fuente SIN comentarios: `domain/actor.ts` NOMBRA el literal en su prosa para explicar
+      // que «Administradores externos» no debe colarse. Un barrido sobre el texto crudo leeria
+      // esa ADVERTENCIA como la infraccion.
+      const codigo = soloCodigo(readFileSync(file, 'utf8'))
+      expect(codigo, file).not.toContain("'Administrador'")
     }
     expect(ROLE_ADMINISTRADOR).toBe('Administrador')
   })
