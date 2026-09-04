@@ -127,7 +127,9 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los catorce campos de `Order`, con la columna en ingles que le toca (R36). */
+/** Los QUINCE campos de `Order`, con la columna en ingles que le toca (R36). Eran catorce en
+ *  QC-33; `cancellationReason` lo anade QC-34 (su R48), y es la UNICA columna que esa ficha
+ *  puede anadir: la lista sigue siendo cerrada y anadir cualquier otra pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -138,6 +140,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['unitPrice', 'unit_price'],
   ['priority', 'priority'],
   ['status', 'status'],
+  ['cancellationReason', 'cancellation_reason'], // QC-34 R48, decision cerrada 4
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
   ['createdAt', 'created_at'],
@@ -353,11 +356,21 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toMatch(/@@index\(\[recipeId\],\s*map:\s*"orders_recipe_id_idx"\)/)
   })
 
-  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas', () => {
+  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas', () => {
     // R16 y decision cerrada 4: dos conjuntos CERRADOS del propio esquema, con esos valores
     // exactos. EL ORDEN DE DECLARACION DE LA PRIORIDAD ES SU ORDEN, de menor a mayor: Postgres
     // ordena un enum por declaracion, no alfabeticamente, asi que reordenar cambia el dato.
-    expect(parseEnum('OrderStatus')).toEqual(['PENDIENTE', 'EN_CURSO', 'ENTREGADO'])
+    //
+    // `CANCELADO` es el CUARTO estado y lo anade QC-34 (su decision cerrada 3, R48). Va el
+    // ULTIMO y eso NO es indiferente: `ALTER TYPE ... ADD VALUE` anade al final, y ponerlo en
+    // otra posicion obligaria a recrear el tipo. La lista sigue siendo cerrada: un quinto valor
+    // pone este test rojo.
+    expect(parseEnum('OrderStatus')).toEqual([
+      'PENDIENTE',
+      'EN_CURSO',
+      'ENTREGADO',
+      'CANCELADO',
+    ])
     expect(parseEnum('OrderPriority')).toEqual(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'])
 
     // Los dos unicos enum del esquema son los que crea esta feature.
@@ -370,6 +383,23 @@ describe('db/schema.prisma — modelo de pedido', () => {
     // catalogo de filas (se aparta a proposito de `DocumentType`, QC-4).
     expect(field(order, 'status').type).toBe('OrderStatus')
     expect(field(order, 'priority').type).toBe('OrderPriority')
+  })
+
+  it('cancellationReason es TEXT anulable, sin longitud en la columna y sin default', () => {
+    // QC-34 R27, R30 y decision cerrada 4. Tres cosas, y las tres importan:
+    //   - ANULABLE, porque el motivo solo existe en un pedido cancelado. Que exista si y solo
+    //     si `status = 'CANCELADO'` lo garantiza el CHECK de la migracion, no el esquema.
+    //   - SIN `@db.VarChar(n)`: el tope de 500 vive en `zod` (validacion de aplicacion), no en
+    //     el tipo de la columna. Cambiar el tope no puede ser una migracion.
+    //   - SIN `@default`: la ausencia de motivo es ausencia, no una cadena vacia.
+    const reason = field(order, 'cancellationReason')
+    expect(reason.type).toBe('String')
+    expect(reason.isOptional).toBe(true)
+    expect(reason.attributes).toContain('@map("cancellation_reason")')
+    expect(reason.attributes, 'el tope de 500 vive en zod, no en la columna').not.toMatch(
+      /@db\.(VarChar|Char)\(/,
+    )
+    expect(reason.attributes).not.toMatch(/@default\(/)
   })
 
   it('status es obligatorio y su default es PENDIENTE', () => {
