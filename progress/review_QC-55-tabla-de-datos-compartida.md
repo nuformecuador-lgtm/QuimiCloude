@@ -151,3 +151,102 @@ dejar T13 sin marcar y la ficha en done.
 atajos de fecha incorrecto a fin de mes y en bisiesto, con test autorreferencial que no verifica
 R18). Mas dos mayores documentales (M1, M2) y cuatro menores. B1 se resuelve sin tocar codigo; B2
 vuelve al implementer.
+
+---
+
+# Segunda ronda (2026-09-04) - sobre `2e89d9f`
+
+Revisadas las correcciones de B2, M1 y M2. El diff de la ronda toca siete archivos: el calculo y
+su test, design.md, docs/dependencias.md, la bitacora, este review y un parametro sin usar en
+data-table-contrato.test.tsx. **Nada mas se movio**: components/ui/ intacto, package.json intacto,
+el resto de components/shared/data-table/ intacto.
+
+## B2 - CERRADO. Verificado con mi propia mutacion, no con la suya
+
+**El arreglo es correcto.** `subtractMonthsClamped` acota el dia con
+`Math.min(date.getDate(), lastDayOfMonth(...))` y lleva el mes a cuenta absoluta
+(`año * 12 + mes`), repartiendola con `Math.floor`. Comprobado a mano:
+2026-03-31 -1 mes -> 2026-02-28; 2026-05-31 -> 2026-04-30; 2028-02-29 -1 año -> 2027-02-28.
+`lastWeek` sigue con `setDate`, que es lo correcto: ahi desbordar al mes anterior es lo que se
+quiere.
+
+**Los esperados del test estan escritos a mano.** Revisado uno por uno el array `CASOS_ATAJO`:
+son once literales `'2026-02-28'`, `'2026-04-30'`, `'2027-02-28'`... y en ningun caso se deriva de
+la formula bajo prueba. El barrido de los dias 28..31 de los 24 meses de 2027 y 2028 tampoco
+reimplementa el calculo: afirma propiedades (from < to, salto de exactamente un mes / un año), que
+es la forma correcta de escribir esa red.
+
+**Mutacion reproducida por el reviewer.** Sustitui `Math.min(date.getDate(), lastDayOfMonth(...))`
+por `date.getDate()` -que reintroduce exactamente el desborde viejo- y corri el archivo:
+
+```
+Tests  4 failed | 15 passed (19)
+  x mes desde el 31 de marzo   -> recibido 2026-03-03, esperado 2026-02-28
+  x mes desde el 31 de mayo    -> recibido 2026-05-01, esperado 2026-04-30
+  x año desde el 29 de febrero -> recibido 2027-03-01, esperado 2027-02-28
+  x el inicio del rango nunca cae DESPUES del fin (barrido 28..31)
+```
+
+Cuatro rojos con los tres numeros exactos que dio la primera ronda, mas el barrido. Revertida la
+mutacion, 19/19 en verde y el arbol limpio (`git status` sin cambios). **El test ya no es una
+tautologia: muerde cuando el calculo se rompe. R18 queda cubierto de verdad.**
+
+## M1 - CERRADO
+`design.md > 6.1` lleva ahora un bloque de correccion fechado que explica por que no se usa
+`date-fns` (pnpm aisla las transitivas, importarla exigiria hacerla directa y eso rompe R31, que
+manda sobre un "como" del diseno), y ademas deja escrita la trampa del desborde y la salida si
+algun dia se quiere la libreria. El parrafo anterior se reescribio a «iba a usar», sin borrar el
+riesgo que se habia anotado antes. Esta donde `docs/architecture.md > Anti-patrones` lo exige.
+
+## M2 - CERRADO
+`design.md > 4` lista las tres capacidades con el porque de `columnSizingFeature` y la cita al
+paquete instalado, y aclara que lo que sigue fuera es `columnResizingFeature`, que es otra cosa.
+La fila de `@tanstack/react-table` en `docs/dependencias.md` lleva la misma correccion, marcada
+como tal. Verificado con `git diff -w`: en ese archivo **solo cambia esa fila**.
+
+## Hallazgos nuevos de esta ronda
+
+- **m7 . menor - `docs/dependencias.md` y `progress/impl_QC-55-*.md` pasaron de LF a CRLF.**
+  Confirmado con `file` sobre las dos versiones. Por eso `docs/dependencias.md` aparece con 70
+  lineas cambiadas cuando solo cambia una: con `git diff -w` se ve la real. No hay `.gitattributes`
+  en el repo, asi que no rompe nada, pero ensucia el historial de un archivo que se toca en cada
+  feature. Ningun archivo de codigo ni de tests se vio afectado.
+- Nada mas. La correccion no introdujo deuda: no toca el componente fuera de la funcion de
+  calculo, no anade dependencias y no cambia el contrato publico.
+
+## Estado de los hallazgos de la primera ronda
+
+| Hallazgo | Estado |
+| --- | --- |
+| B1 . T13 en iOS | ABIERTO - **en la mesa del humano**, no del implementer |
+| B2 . calculo de fechas + test tautologico | **CERRADO**, verificado con mutacion propia |
+| M1 . desviacion no escrita en design.md | **CERRADO** |
+| M2 . documentacion desincronizada | **CERRADO** |
+| m3 . edicion de calendar.tsx / popover.tsx | ABIERTO - **en la mesa del humano** (ratificacion) |
+| m4 . focusColumnFilter sin acotar por tableId | abierto, deuda anotada para QC-56 |
+| m5 . columnMenu no reflejado en design.md > 3.3 | abierto, cosmetico |
+| m6 . DataTableColumn sin size | abierto, anotado para QC-56 |
+| m7 . CRLF en dos .md | abierto, cosmetico |
+
+## Verificacion de la segunda ronda
+
+`./init.sh` completo corrido por el reviewer: **152 archivos / 1704 tests passed**, 0 rojos nuevos,
+typecheck y lint en verde, migraciones con down.sql, `== init OK ==`, salida 0. Coincide con lo que
+declara la bitacora.
+
+## Veredicto de la segunda ronda
+
+**APROBADO**, con dos puntos que quedan **en la mesa del humano** y que no dependen del
+implementer ni del codigo:
+
+1. **T13 - comprobacion del `sticky` anidado en Safari de iOS.** No hay dispositivo, y sobre todo
+   no hay pantalla que montar: la primera oportunidad real es QC-56. Recomiendo trasladarla alli
+   por escrito -fila en «Decisiones cerradas», T13 marcada como trasladada con la referencia, y
+   task explicita en QC-56- en vez de dejarla en silencio. La decision 17 es del humano; el
+   reviewer no la mueve.
+2. **Ratificacion de la edicion de `components/ui/calendar.tsx` y `popover.tsx`** (una linea por
+   archivo, el especificador de `cn` alineado con el alias de `components.json` y con los otros 16
+   archivos de la carpeta). Es lo que evita mantener `cn@0.2.5`, que falla el check 3 y rompe R31.
+
+Los cuatro menores restantes (m4, m5, m6, m7) no bloquean y quedan anotados: m4 y m6 son deuda
+identificada para QC-56.
