@@ -9,10 +9,16 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * de cliente. Que este archivo sea una funcion pura es lo que permite probar R12 sin montar la
  * pantalla.
  *
- * **Acotar aqui no duplica ninguna regla de negocio.** `pageQuerySchema` (dominio de
- * `inventario`) *rechaza* `page: 0` con `ValidationError`, y esta pantalla mostraria un error
- * donde el usuario solo esperaba la primera pagina. Acotar es de la capa de presentacion;
- * validar sigue siendo del dominio.
+ * **Acotar aqui no duplica ninguna regla de negocio.** Quien valida la consulta de lista es
+ * `createListQuerySchema()`, dentro del caso de uso `listProducts` (QC-57), y *rechaza* `page: 0`
+ * con `ValidationError`: esta pantalla mostraria un error donde el usuario solo esperaba la
+ * primera pagina. Acotar es de la capa de presentacion; validar sigue siendo del dominio.
+ *
+ * **Que este parser lea SOLO `page` y `pageSize` es decision de esta pantalla, no un limite del
+ * dominio.** Desde QC-57 el contrato de lista acepta ademas `sort`, `filters` y `search`, podados
+ * contra la lista blanca `PRODUCT_QUERYABLE`; `pageQuerySchema` sigue existiendo pero ya no es
+ * quien valida este listado. Emitir esos campos desde la pantalla es de QC-56, no de aqui
+ * (`specs/QC-57-orden-y-filtro-en-listados/tasks.md > Lo que esta ficha NO hace`).
  */
 
 /**

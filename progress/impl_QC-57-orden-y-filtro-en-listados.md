@@ -160,3 +160,43 @@ Dos propiedades que no son casualidad:
 4. `tests/unit/proveedores/module-contract.test.ts` y `tests/unit/unidades/module-contract.test.ts` — afirman la lista **exacta** de `ports/`; el puerto de T7 la cambia. Se añadió `list-query-log.ts` a lo esperado: **siguen siendo `toEqual` exactos**, y un puerto de más sigue cayendo ahí.
 
 **Ni `app/` ni `components/` se tocaron, y no hizo falta**: el esquema nuevo acepta tal cual `{page, pageSize}` y `{page, pageSize, search}`, que es exactamente lo que emiten hoy `product-list-section.tsx` y `product-picker.tsx`. Eso adelanta buena parte de T21.
+
+## Grupos 3 y 4 — los cuatro módulos restantes (T10–T13, T16–T20) · commit `e4f1f72`
+
+### Unidades: la página opcional (`design.md > 7`, R27, R28) — lo más delicado de la ficha
+
+`listUnits(input, actor)` con `input` **opcional**, y **un solo caso de uso**, no dos métodos: dos métodos obligarían a QC-39 a elegir cuál llamar según lo que traiga la URL, que es justo la decisión que este contrato quita de encima de las pantallas.
+
+La discriminación va en dos planos:
+- **En compilación**, con dos firmas sobrecargadas: quien llama **sin** consulta recibe `readonly UnitRef[]` **sin unión que estrechar**. Por eso `listUnitsAction()` y sus tres llamantes en `app/` —el selector de unidad del formulario de recetas y la ficha de proveedor— **no se tocaron**, que es literalmente el criterio de hecho de T12.
+- **En ejecución**, `requestsPagination(input)` mira la entrada **CRUDA, antes del `parse`**. Es la sutileza que hace que esto funcione: el esquema pone `page: 1` por defecto, así que **después** de validar ya no se distingue «no pidió página» de «pidió la primera».
+
+El puerto sí tiene dos métodos (`listAll(limit, query)` / `listPage(query)`): son dos consultas SQL distintas y eso es detalle de persistencia, escrito en el propio puerto.
+
+### Recetas: conservar la inyección de la aritmética
+
+El puerto pasa a `listAlive(offset, limit, query)` y **no** a `listAlive(query)`. El motivo está escrito y tiene un test que lo fija: si el adaptador dedujera el `offset`, la aritmética de paginación se habría mudado a `lib/shared/pagination` **por la puerta de atrás** y la inyección de `toOffsetLimit`/`buildPage` —que existe porque `recetas` no puede importar `lib/shared/**`— habría quedado de adorno.
+
+### Pedidos: el único cambio de comportamiento deliberado de la ficha
+
+`status` y `priority` dejan de ser parámetros propios y pasan a filtros `select` (R25); `listOrdersSchema` y el tipo `OrderFilters` **desaparecen**.
+
+**Regresión aceptada y exigida por el spec, anotada en el propio test:** un `status` o `priority` **fuera del conjunto cerrado ya no lanza `invalid_input`** —como hacía QC-34—; **se omite, se anota en el log y la consulta no falla** (R5). Es el precio de que el contrato sea uno solo: un campo inválido nunca tumba una lista. La poda vive en el dominio, que es quien conoce los valores y quien tiene el log; una lista mixta conserva los válidos, y si no queda ninguno el filtro desaparece.
+
+Lo que **no** cambió y sigue con su test: un pedido `CANCELADO` **sí** se consulta; `priority` ordena por el **orden de declaración del enum** (`BAJA < MEDIA < ALTA < CRITICA`) y no por el alfabético — el test afirma las dos cosas, que ordena por prioridad **y** que eso no es el descendente alfabético; y las **tres consultas por página** con los ids deduplicados (R45 de QC-34), con su test que las **cuenta**.
+
+`orderNumber` es la **única traducción uno-a-dos** del contrato y se resuelve **solo en el adaptador**: `[{ orderYear: dir }, { orderSequence: dir }, desempate]`. El dominio lo trata como un `columnId` cualquiera.
+
+### `Decimal`: el dominio nunca ve uno
+
+`cost`, `minPurchase`, `quantity` y `unitPrice` son `Decimal(14,4)` y el `numberRange` del contrato emite `number`. La conversión a `Prisma.Decimal` vive en el **adaptador** (`docs/architecture.md > Anti-patrones`: nada de comparar importes en coma flotante). Hay test de borde: un tope de `19.99` incluye `19.9900` y **excluye** `19.9901`.
+
+### Dónde las decisiones tardías no tienen materia, dicho y no fingido
+
+Los tres campos ordenables de `recetas` (`name`, `createdAt`, `updatedAt`) **no son anulables**, así que allí no se declara ningún `NULLS LAST`: no hay nulos que colocar. La decisión tiene materia en `products` (`stock`, `qtyAlert`), en `supplier_catalog_lines` (`minPurchase`, `deliveryTime`) y en `units.symbol`, y en los tres está explícita **en las dos direcciones** con su test. `UNIT_QUERYABLE.filterable` está vacío, así que **R15 no se puede demostrar en unidades**; se cierra en `recetas` combinando `createdAt` + `updatedAt`.
+
+### Incidente de finales de línea, detectado y corregido
+
+Una edición hecha con python reescribió archivos enteros convirtiendo **CRLF → LF**. Importa porque **varias guardias leen el fuente en crudo** y no despegan comentarios en CRLF: una conversión silenciosa las rompe. El agente restauró `lib/composition/index.ts` (diff real: 37 inserciones / 5 borrados, con los bloques de los otros módulos intactos), pero **se le escapó `tests/unit/proveedores/module-contract.test.ts`**, que quedó con un diff de **1192 líneas** de puro ruido.
+
+**Detectado y corregido aquí** comparando `file` de cada archivo del diff contra su versión en `HEAD`. Tras restaurar CRLF, el cambio real de ese archivo son **7 líneas**: `list-query-sql.ts` añadido a la lista **exacta** de `adapters/driven/`. Ningún otro archivo quedó afectado.

@@ -32,5 +32,8 @@ export type PageQuery = z.infer<typeof pageQuerySchema>;
  * la lista de productos ya no puede existir por descuido.
  *
  * `pageQuerySchema` y `Page<T>` SIGUEN aqui: `Page<T>` es la salida de las siete listas
- * (`design.md > 3.2`) y `pageQuerySchema` lo usan otros listados del repo.
+ * (`design.md > 3.2`), y `pageQuerySchema` se queda publicado en el contrato aunque YA NO
+ * valide ninguna de las siete consultas de lista -de eso se ocupa `createListQuerySchema()`
+ * dentro de cada caso de uso-: su forma de `page`/`pageSize` es la que el contrato de lista
+ * repite.
  */

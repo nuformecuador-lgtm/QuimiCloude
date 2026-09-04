@@ -15,10 +15,17 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * detalle *antes* de que exista nada de cliente, y ser una funcion pura es lo que permite probar
  * R10 sin montar la pantalla.
  *
- * **Acotar aqui no duplica ninguna regla de negocio.** `pageQuerySchema` (dominio de
- * `proveedores`) *rechaza* `page: 0` con `ValidationError`, y la pantalla mostraria un error donde
- * el usuario solo esperaba la primera pagina. Acotar es de la capa de presentacion; validar sigue
- * siendo del dominio.
+ * **Acotar aqui no duplica ninguna regla de negocio.** Quien valida la consulta de lista es
+ * `createListQuerySchema()`, dentro del caso de uso `listCatalogLines` (QC-57), y *rechaza*
+ * `page: 0` con `ValidationError`: la pantalla mostraria un error donde el usuario solo esperaba
+ * la primera pagina. Acotar es de la capa de presentacion; validar sigue siendo del dominio.
+ *
+ * **Que este parser lea SOLO `page` y `pageSize` es decision de esta pantalla, no un limite del
+ * dominio.** Desde QC-57 el contrato de lista acepta ademas `sort`, `filters` y `search`, podados
+ * contra la lista blanca `SUPPLIER_CATALOG_LINE_QUERYABLE`; `pageQuerySchema` sigue existiendo
+ * pero ya no es quien valida este listado. QC-44 dejo `buscar y ordenar` fuera de esta pantalla
+ * por escrito, y QC-57 no las anade
+ * (`specs/QC-57-orden-y-filtro-en-listados/tasks.md > Lo que esta ficha NO hace`).
  */
 
 /** Nombres de los dos parametros de consulta del catalogo. Constantes: los comparten parser, barra y tests. */

@@ -12,7 +12,8 @@ export {
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 // QC-57 (R27, R31): el contrato generico de consulta de lista, publicado igual que en
-// `inventario`. `pageQuerySchema` se queda: lo siguen usando otras lecturas del modulo.
+// `inventario`. `pageQuerySchema` se queda publicado, pero ya NO valida el listado: de eso
+// se ocupa `createListQuerySchema()` dentro de `domain/list-recipes.ts`.
 export {
   type ListFilterKind,
   type ListFilterValue,

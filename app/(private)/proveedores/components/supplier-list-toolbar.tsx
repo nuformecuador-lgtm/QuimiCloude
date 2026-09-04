@@ -48,8 +48,16 @@ type SupplierListToolbarProps = {
  * barra en un `<Suspense>` propio solo para volver a leer lo que ya se tiene.
  *
  * **Ni busqueda ni control de orden** (R11): el unico control de seleccion es el tamano de
- * pagina. `pageQuerySchema` solo acepta `page` y `pageSize`, asi que un buscador de cliente solo
- * miraria dentro de la pagina visible.
+ * pagina, y esta barra sigue navegando solo con `page` y `pageSize`.
+ *
+ * **Desde QC-57 el motivo ya NO es que el dominio no sepa buscar ni ordenar** -si sabe: el
+ * contrato de lista acepta `sort`, `filters` y `search`, y `SUPPLIER_QUERYABLE` declara ordenable
+ * `name`, `createdAt` y `updatedAt`, filtrable `createdAt` y la busqueda activa-. El motivo es que
+ * ESTA PANTALLA todavia no emite ese contrato: QC-44 dejo `buscar y ordenar` fuera por escrito y
+ * QC-57 no toca ninguna pantalla
+ * (`specs/QC-57-orden-y-filtro-en-listados/tasks.md > Lo que esta ficha NO hace`). Mientras siga
+ * asi, anadir aqui un buscador de cliente seguiria siendo un error: solo miraria dentro de la
+ * pagina visible y mentiria sobre el total.
  */
 export function SupplierListToolbar({ page, pageSize, totalPages }: SupplierListToolbarProps) {
   const router = useRouter();

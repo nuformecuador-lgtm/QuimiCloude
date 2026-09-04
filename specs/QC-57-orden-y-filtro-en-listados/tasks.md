@@ -85,15 +85,15 @@
 - [x] **T8. [P] `list-products`**: sustituir `productQuerySchema` por el contrato, sanear, loguear
       y delegar (R24, R30, R33).
 - [x] **T9. [P] `list-presentations`** con el contrato.
-- [ ] **T10. [P] `list-recipes`** con el contrato, conservando la inyección de
+- [x] **T10. [P] `list-recipes`** con el contrato, conservando la inyección de
       `toOffsetLimit`/`buildPage` que ya tiene.
-- [ ] **T11. [P] `list-suppliers`** y **el listado del catálogo de proveedor**
+- [x] **T11. [P] `list-suppliers`** y **el listado del catálogo de proveedor**
       (`listBySupplierAlive`), conservando las dos condiciones de vida del `where` (R7).
-- [ ] **T12. [P] `list-units`** con **página opcional** (`design.md > 7`).
+- [x] **T12. [P] `list-units`** con **página opcional** (`design.md > 7`).
       **Hecho cuando** un test demuestra que **sin parámetros devuelve el catálogo entero** y otro
       que con `page` devuelve `Page<UnitRef>` (R27, R28), y el **selector de unidad** del
       formulario de recetas sigue verde sin tocarlo.
-- [ ] **T13. [P] `list-orders`**: `status` y `priority` dejan de ser parámetros propios y pasan a
+- [x] **T13. [P] `list-orders`**: `status` y `priority` dejan de ser parámetros propios y pasan a
       filtros `select` (R25).
 
   T8–T13 comparten criterio de hecho: cada uno con su test de **autorización** (falla sin tocar el
@@ -106,7 +106,7 @@
 - [x] **T14. [P] `product-prisma.ts`**: `orderBy` dinámico con desempate por `id`, `where` con los
       cuatro tipos de filtro, búsqueda contra `name_normalized`; **el mismo `where` para el
       `findMany` y para el `count`** (R10, R13, R14, R15, R16, R18).
-- [ ] **T15. [P] `presentation-prisma.ts`**, **T16. [P] `recipe-prisma.ts`**,
+- [x] **T15. [P] `presentation-prisma.ts`**, **T16. [P] `recipe-prisma.ts`**,
       **T17. [P] `supplier-prisma.ts`**, **T18. [P] `supplier-catalog-line-prisma.ts`**,
       **T19. [P] `unit-prisma.ts`**, **T20. [P] `order-prisma.ts`** (sin búsqueda, R17; `orderNumber`
       traducido al par año+correlativo; `Decimal` en los rangos numéricos).
@@ -118,13 +118,13 @@
 
 ## Grupo 5 — Llamantes y cierre
 
-- [ ] **T21. Adaptar el selector de ingredientes** del formulario de recetas a la forma nueva
+- [x] **T21. Adaptar el selector de ingredientes** del formulario de recetas a la forma nueva
       (R24). **Hecho cuando** sus tests actuales pasan **sin relajar ningún aserto de
       comportamiento**; si alguno hay que tocar, se anota qué y por qué en
       `progress/impl_QC-57-*.md`.
       Depende de T14.
 
-- [ ] **T22. Adaptar los llamantes del listado de pedidos** a los filtros `select` (R25).
+- [x] **T22. Adaptar los llamantes del listado de pedidos** a los filtros `select` (R25).
       Mismo criterio de hecho que T21. Depende de T20.
 
 - [ ] **T23. Comprobar que la suite heredada sigue verde** (R26).
