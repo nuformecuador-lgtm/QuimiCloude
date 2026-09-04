@@ -177,7 +177,13 @@ Todas dependen de T3 y T4.
   en el contenedor de la tabla y **no** en un ancestro con scroll del documento, y **ningún archivo
   de la feature contiene `100vh`**.
 
-### T13 — Comprobación manual en iOS del `sticky` anidado
+### [~] T13 — Comprobación manual en iOS del `sticky` anidado — **TRASLADADA A QC-56**
+- **Estado**: no se hace aquí. **Trasladada a QC-56 por decisión del humano el 2026-09-04**, con su
+  fila en `requirements.md > ## Decisiones cerradas (no reabrir)`. Motivo: ninguna pantalla monta el
+  componente en esta ficha (decisión 11), así que no hay URL que abrir en un móvil, y fabricar una
+  pantalla de prueba es justo lo que esa decisión rechazó. QC-56 lo monta en productos y recetas.
+  **La decisión 17 NO se levanta**: el `sticky` anidado sigue siendo el punto caliente y la
+  comprobación en iOS es exigible en QC-56 antes de dar por buena la pantalla.
 - **Depende de**: T11.
 - **Qué**: abrir el componente en Safari de iOS (o WebKit real, no jsdom) con una tabla más ancha
   que la pantalla y una columna fijada, y verificar que la columna se queda quieta, que el scroll
