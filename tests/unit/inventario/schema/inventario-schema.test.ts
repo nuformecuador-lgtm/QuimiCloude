@@ -189,31 +189,39 @@ function expectUnitCatalogIsNotAnEnum(): void {
   }
 }
 
-/** Los ocho datos del producto (R3), con su columna en la base (R19).
+/** Los datos de negocio del producto, con su columna en la base (R19).
  *
  *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El octavo dato SIGUE
  *  SIENDO la unidad de medida —R3 no se toca—; lo que cambia es su forma: `unit`/`unit`
- *  (texto libre) pasa a `unitId`/`unit_id` (referencia a `units`). */
+ *  (texto libre) pasa a `unitId`/`unit_id` (referencia a `units`).
+ *
+ *  2026-09-04, QC-52 (R1): de los ocho de QC-14 R3 quedan CINCO. `cost`, `minPurchase` y
+ *  `deliveryTime` son terminos comerciales y se fueron al catalogo del proveedor. Y entra
+ *  `imagePath` (R4), que existia en la base desde `20260903200000_product_image_path` pero
+ *  que el modelo no declaraba: eso era drift, y era justo lo que iba a hacer que
+ *  `prisma migrate dev` propusiera `DROP COLUMN "image_path"` mezclado entre los tres
+ *  `DROP COLUMN` legitimos de esta ficha. */
 const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['name', 'name'],
   ['presentationId', 'presentation_id'],
   ['stock', 'stock'],
-  ['cost', 'cost'],
-  ['minPurchase', 'min_purchase'],
-  ['deliveryTime', 'delivery_time'],
   ['qtyAlert', 'qty_alert'],
   ['unitId', 'unit_id'],
+  ['imagePath', 'image_path'],
 ]
 
-/** Las cuatro columnas que R7 exige enteras. */
-const INTEGER_FIELDS = ['stock', 'minPurchase', 'qtyAlert', 'deliveryTime'] as const
+/** Las dos columnas que R7 exige enteras tras QC-52 (`minPurchase` y `deliveryTime` se fueron). */
+const INTEGER_FIELDS = ['stock', 'qtyAlert'] as const
 
-/** Las cinco columnas que R5 exige opcionales.
+/** Las columnas que R5 exige opcionales.
  *
  *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva intacto lo
  *  que R5 vigila —la unidad del producto SIGUE SIENDO OPCIONAL (QC-32 R10)—; solo cambia el
- *  nombre del campo que lo cumple. */
-const OPTIONAL_FIELDS = ['stock', 'cost', 'deliveryTime', 'qtyAlert', 'unitId'] as const
+ *  nombre del campo que lo cumple.
+ *
+ *  2026-09-04, QC-52: salen `cost` y `deliveryTime` (ya no son del producto) y entra
+ *  `imagePath`, que R4 exige declarada Y opcional. */
+const OPTIONAL_FIELDS = ['stock', 'qtyAlert', 'unitId', 'imagePath'] as const
 
 describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('Presentation declara id uuid propio y name obligatorio', () => {
@@ -286,13 +294,21 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@@map\("(inventory|inventory_items|stock_items|items)"\)/)
   })
 
-  it('Product declara los ocho datos del producto en una sola tabla', () => {
-    // R3: nombre, presentacion, existencia, costo, compra minima, tiempo de entrega,
-    // cantidad de alerta y unidad. Los ocho, en `products`.
+  it('Product declara sus datos de negocio en una sola tabla, sin los tres que QC-52 le quito', () => {
+    // R3 de QC-14, acotado por QC-52 R1 y R2: nombre, presentacion, existencia, cantidad de
+    // alerta, unidad y ruta de imagen. Los seis, en `products`, y ninguno mas.
     for (const [name] of PRODUCT_BUSINESS_FIELDS) {
       expect(has(product, name), `falta el campo Product.${name}`).toBe(true)
     }
-    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(8)
+    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(6)
+
+    // QC-52 R1: los tres no pueden volver al modelo por descuido. Se afirma en negativo y
+    // por separado del censo de abajo, para que el motivo quede escrito.
+    for (const name of ['cost', 'minPurchase', 'deliveryTime']) {
+      expect(has(product, name), `Product.${name} tenia que haber desaparecido (QC-52 R1)`).toBe(
+        false,
+      )
+    }
 
     // La lista completa de columnas: si alguien anade o quita una, este test lo dice.
     // `createdBy`/`updatedBy` los anade QC-20 (design.md > 2.1, R6, R7): campos ESCALARES
@@ -352,7 +368,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(field(product, 'presentationId').attributes).toContain('@db.Uuid')
   })
 
-  it('stock, cost, deliveryTime, qtyAlert y unitId son opcionales', () => {
+  it('stock, qtyAlert, unitId e imagePath son opcionales', () => {
     // R5: ausencia de valor, no cero ni cadena vacia. Un `@default` convertiria la
     // ausencia en un valor y R5 dejaria de cumplirse sin que nadie lo note.
     for (const name of OPTIONAL_FIELDS) {
@@ -362,20 +378,30 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         /@default\(/,
       )
     }
-    expect(OPTIONAL_FIELDS).toHaveLength(5)
+    expect(OPTIONAL_FIELDS).toHaveLength(4)
   })
 
-  it('minPurchase no es opcional y declara default 0', () => {
-    // R6 y `design.md > 8.1`: `NOT NULL DEFAULT 0`. Si fuera anulable, un NULL explicito
-    // sobreviviria y «compra minima 0» y «compra minima desconocida» convivirian.
-    const minPurchase = field(product, 'minPurchase')
-    expect(minPurchase.type).toBe('Int')
-    expect(minPurchase.isOptional).toBe(false)
-    expect(minPurchase.attributes).toMatch(/@default\(0\)/)
-    expect(minPurchase.attributes).toContain('@map("min_purchase")')
+  it('imagePath esta declarado en el modelo, es opcional y mapea a image_path', () => {
+    // QC-52 R4 (cierra la pregunta abierta P4). La columna ya existia en la base; lo que
+    // faltaba era la DECLARACION. Sin ella, cada `prisma migrate dev` sobre `products`
+    // vuelve a proponer `DROP COLUMN "image_path"`, y en una migracion que ya borra tres
+    // columnas de esa misma tabla un cuarto `DROP COLUMN` no destaca.
+    //
+    // `String?` sin `@default` y sin `@db.`: es `TEXT` anulable, exactamente como la creo
+    // `20260903200000_product_image_path`. Un `@default("")` convertiria «sin imagen» en
+    // una cadena vacia y cambiaria la base, que es justo lo que R4 prohibe.
+    const imagePath = field(product, 'imagePath')
+    expect(imagePath.type).toBe('String')
+    expect(imagePath.isOptional).toBe(true)
+    expect(imagePath.attributes).toContain('@map("image_path")')
+    expect(imagePath.attributes).not.toMatch(/@default\(/)
+    expect(imagePath.attributes).not.toMatch(/@db\./)
   })
 
-  it('stock, minPurchase, qtyAlert y deliveryTime son Int', () => {
+  // QC-52 (R1) deroga QC-14 R6: `minPurchase` no es campo del producto, asi que no hay
+  // `NOT NULL DEFAULT 0` que defender. Su ausencia la afirma el censo de campos de arriba.
+
+  it('stock y qtyAlert son Int', () => {
     // R7: enteros, sin parte decimal.
     for (const name of INTEGER_FIELDS) {
       const candidate = field(product, name)
@@ -384,16 +410,16 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         /@db\.(Decimal|Money|Real|DoublePrecision)/,
       )
     }
-    expect(INTEGER_FIELDS).toHaveLength(4)
+    expect(INTEGER_FIELDS).toHaveLength(2)
   })
 
-  it('cost es Decimal(14,4) y en el esquema no hay ningun Float', () => {
-    // R8: decimal exacto. La coma flotante binaria es un anti-patron bloqueante
-    // (`docs/architecture.md > Dominio` n.o 4).
-    const cost = field(product, 'cost')
-    expect(cost.type).toBe('Decimal')
-    expect(cost.isOptional).toBe(true)
-    expect(cost.attributes).toMatch(/@db\.Decimal\(\s*14\s*,\s*4\s*\)/)
+  it('en el esquema no hay ningun Float, y el producto ya no declara ningun importe', () => {
+    // QC-52 (R1) deroga la primera mitad de QC-14 R8: `Product.cost` no existe, asi que no
+    // hay `Decimal(14,4)` que comprobar aqui —ese assert se mudo con el importe, al modelo
+    // `SupplierCatalogLine`—. La SEGUNDA mitad de R8 sigue viva y es la que importa: la coma
+    // flotante binaria es un anti-patron bloqueante (`docs/architecture.md > Dominio` n.o 4)
+    // y no puede aparecer en NINGUN modelo del esquema.
+    expect(has(product, 'cost')).toBe(false)
 
     for (const candidate of [...product.fields, ...presentation.fields]) {
       expect(candidate.type, `${candidate.name} no puede ser Float`).not.toBe('Float')

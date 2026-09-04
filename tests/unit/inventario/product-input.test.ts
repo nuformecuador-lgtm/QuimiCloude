@@ -1,7 +1,12 @@
+import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
+import { ValidationError } from '@/lib/modules/inventario/domain/errors';
 import {
   createPresentationSchema,
 } from '@/lib/modules/inventario/domain/presentation-input';
-import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
+import {
+  createProductSchema,
+  updateProductSchema,
+} from '@/lib/modules/inventario/domain/product-input';
 import { pageQuerySchema } from '@/lib/modules/inventario/domain/page';
 
 /**
@@ -25,22 +30,6 @@ describe('createProductSchema', () => {
 
     const parsed = createProductSchema.parse({ ...base, name: '  Cloro Granulado  ' });
     expect(parsed.name).toBe('Cloro Granulado');
-  });
-
-  it('rechaza un tiempo de entrega negativo', () => {
-    // R10
-    const base = {
-      name: 'Producto',
-      presentationId: '11111111-1111-4111-8111-111111111111',
-      ...REQUERIDOS,
-    };
-
-    expect(
-      createProductSchema.safeParse({ ...base, deliveryTime: -1 }).success,
-    ).toBe(false);
-    expect(
-      createProductSchema.safeParse({ ...base, deliveryTime: 0 }).success,
-    ).toBe(true);
   });
 
   it('rechaza el nombre de producto de mas de 120 caracteres y el de presentacion de mas de 60', () => {
@@ -101,23 +90,67 @@ describe('createProductSchema', () => {
     }
   });
 
-  it('acepta el cost como cadena decimal valida y rechaza number o mas de 4 decimales', () => {
-    const base = {
+  // QC-52 R1: el costo, la compra minima y el tiempo de entrega dejaron de ser del
+  // producto. Aqui se prueba lo contrario de lo que probaba QC-14: ya no se validan,
+  // se RECHAZAN. El esquema es `strictObject` justamente para eso -con `z.object` los
+  // tres se ignorarian en silencio y quien enviara un costo creeria haberlo guardado-.
+  it('rechaza la entrada que trae costo, compra minima o tiempo de entrega', () => {
+    // R1
+    const valida = {
       name: 'Producto',
       presentationId: '11111111-1111-4111-8111-111111111111',
       ...REQUERIDOS,
     };
 
-    expect(
-      createProductSchema.safeParse({ ...base, cost: '1234.5678' }).success,
-    ).toBe(true);
-    expect(
-      createProductSchema.safeParse({ ...base, cost: 1234.5678 as unknown as string })
-        .success,
-    ).toBe(false);
-    expect(
-      createProductSchema.safeParse({ ...base, cost: '1234.56789' }).success,
-    ).toBe(false);
+    // La entrada valida SIN los tres campos pasa.
+    expect(createProductSchema.safeParse(valida).success).toBe(true);
+    expect(updateProductSchema.safeParse(valida).success).toBe(true);
+
+    for (const sobra of [
+      { cost: '1234.5678' },
+      { cost: null },
+      { minPurchase: 0 },
+      { deliveryTime: 5 },
+      { deliveryTime: null },
+    ]) {
+      const alta = createProductSchema.safeParse({ ...valida, ...sobra });
+      expect(alta.success).toBe(false);
+      if (!alta.success) {
+        expect(alta.error.issues[0].code).toBe('unrecognized_keys');
+      }
+
+      // La edicion es reemplazo completo con el MISMO esquema: rechaza igual.
+      expect(updateProductSchema.safeParse({ ...valida, ...sobra }).success).toBe(false);
+    }
+  });
+
+  // El rechazo de R1 tiene que llegar al llamante como `invalid_input`, no como un
+  // detalle de zod: es el `code` estable que el adaptador driving traduce (R32).
+  it('el caso de uso traduce la entrada con costo a invalid_input y no toca el puerto', async () => {
+    // R1, R32
+    const products = {
+      create: vi.fn(),
+      findAliveById: vi.fn(),
+      updateAlive: vi.fn(),
+      softDeleteAlive: vi.fn(),
+      listAlive: vi.fn(),
+    };
+    const createProduct = createCreateProduct({ products });
+
+    const error = await createProduct(
+      {
+        name: 'Producto',
+        presentationId: '11111111-1111-4111-8111-111111111111',
+        stock: 0,
+        qtyAlert: 0,
+        cost: '10.0000',
+      },
+      { id: 'actor-1', roleName: 'Administrador' },
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).code).toBe('invalid_input');
+    expect(products.create).not.toHaveBeenCalled();
   });
 
   it('acepta la unidad ausente y exige que la presente sea una referencia con forma de uuid', () => {
@@ -185,18 +218,7 @@ describe('createProductSchema', () => {
     expect(parsed.stock).toBe(7);
     expect(parsed.qtyAlert).toBe(3);
 
-    // Los tres que NO se volvieron obligatorios siguen pudiendo faltar.
-    expect(parsed.cost).toBeUndefined();
-    expect(parsed.deliveryTime).toBeUndefined();
+    // El unico opcional que queda tras QC-52 sigue pudiendo faltar.
     expect(parsed.unitId).toBeUndefined();
-  });
-
-  it('usa 0 como valor por defecto de minPurchase cuando no se indica', () => {
-    const parsed = createProductSchema.parse({
-      name: 'Producto',
-      presentationId: '11111111-1111-4111-8111-111111111111',
-      ...REQUERIDOS,
-    });
-    expect(parsed.minPurchase).toBe(0);
   });
 });

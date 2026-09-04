@@ -14,7 +14,6 @@ export {
   NotFoundError,
   DuplicateNameError,
   DuplicateCatalogLineError,
-  ProductNotFoundError,
   ValidationError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
@@ -32,12 +31,18 @@ export {
 export {
   createCatalogLineSchema,
   updateCatalogLineSchema,
+  CATALOG_LINE_NAME_MAX_LENGTH,
   type CreateCatalogLineInput,
   type UpdateCatalogLineInput,
 } from './domain/catalog-line-input';
 export { type NewSupplier, type SupplierView } from './domain/supplier-view';
+// QC-52: `CatalogLineTerms` desaparece y lo sustituye `CatalogLineFields`. No es un
+// renombrado cosmetico: la edicion paso de tres campos comerciales a los SIETE de negocio
+// (R24, P6), asi que conservar el nombre anterior habria descrito mal lo que el tipo es.
+// El error de «articulo del inventario no encontrado» tampoco se reexporta ya: QC-52 lo
+// borro del modulo porque su caso no puede ocurrir (R32).
 export {
-  type CatalogLineTerms,
+  type CatalogLineFields,
   type CatalogLineView,
   type NewCatalogLine,
 } from './domain/catalog-line-view';

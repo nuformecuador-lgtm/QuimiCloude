@@ -4,12 +4,11 @@ import { z } from 'zod';
  * Esquema de entrada del producto (`design.md > 6.1`). Validacion de borde (R28): nada
  * sin tipar ni sin validar cruza hacia el dominio.
  *
- * `cost` viaja como CADENA, nunca como `number`: el dominio no puede importar
- * `@prisma/client` (R31) y el binario de coma flotante esta prohibido para importes
- * (`docs/architecture.md > Dominio` n.o 4). El patron admite hasta 10 enteros y 4
- * decimales; quien lo convierte a `Prisma.Decimal` es el adaptador driven (Grupo C).
+ * QC-52 (R1): el producto ya NO tiene costo, compra minima ni tiempo de entrega. Son
+ * terminos COMERCIALES y dependen de a quien le compres, asi que viven en la linea del
+ * catalogo del proveedor. Con ellos se fueron `COST_PATTERN`, `costSchema` y
+ * `deliveryTimeSchema` de este archivo: lo que ya no se acepta tampoco se valida.
  */
-const COST_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
 
 /**
  * `trim()` va ANTES de `min(1)`: si se aplicara despues, '   ' pasaria el minimo de
@@ -21,8 +20,6 @@ const productNameSchema = z.string().trim().min(1).max(120);
 
 const nonNegativeIntSchema = z.number().int().min(0);
 
-const costSchema = z.string().regex(COST_PATTERN);
-
 /**
  * La unidad del producto es una REFERENCIA al catalogo de `unidades` (QC-32, R10, R19), no
  * texto libre: aqui solo se valida la FORMA -que sea un uuid-. Que ese uuid EXISTA no lo
@@ -30,12 +27,6 @@ const costSchema = z.string().regex(COST_PATTERN);
  * Traducir ese error a un mensaje de usuario es de QC-38.
  */
 const unitIdSchema = z.string().uuid();
-
-/**
- * `deliveryTime >= 0` se valida AQUI, en la aplicacion, porque la base no tiene `CHECK`
- * para el (D10). No se anade ningun `CHECK` a la base: el limite vive solo en zod.
- */
-const deliveryTimeSchema = z.number().int().min(0);
 
 /**
  * DECISION DEL HUMANO, 2026-09-03: `stock` y `qtyAlert` pasan a ser OBLIGATORIOS en la entrada.
@@ -51,16 +42,19 @@ const deliveryTimeSchema = z.number().int().min(0);
  * guardar sin rellenar los dos. El formulario los marca `required`, de modo que quien edite uno
  * de esos productos vera el campo vacio y tendra que darle un valor.
  *
- * `cost`, `deliveryTime` y `unitId` siguen siendo opcionales: ninguno se pinta ya en el
- * formulario, y exigirlos dejaria la edicion sin salida.
+ * `unitId` sigue siendo opcional: no se pinta ya en el formulario, y exigirlo dejaria la
+ * edicion sin salida.
+ *
+ * `strictObject`, no `z.object` (QC-52 R1, `design.md > 4`): una entrada que traiga
+ * `cost`, `minPurchase` o `deliveryTime` se RECHAZA como `invalid_input`, no se ignora en
+ * silencio. Mismo criterio -y mismo motivo- que `createCatalogLineSchema` de QC-43:
+ * ignorar el campo de mas es peor que rechazarlo, porque quien lo envia cree haber
+ * guardado un costo que nunca se guardo.
  */
-export const createProductSchema = z.object({
+export const createProductSchema = z.strictObject({
   name: productNameSchema,
   presentationId: z.string().uuid(),
   stock: nonNegativeIntSchema,
-  cost: costSchema.nullish(),
-  minPurchase: nonNegativeIntSchema.default(0),
-  deliveryTime: deliveryTimeSchema.nullish(),
   qtyAlert: nonNegativeIntSchema,
   unitId: unitIdSchema.nullish(),
 });
