@@ -157,6 +157,8 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+- **QC-52 acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 3 preguntas abiertas en `specs/QC-52-separar-producto-de-catalogo-de-proveedor/requirements.md`; no se copian aquí. Nació de una decisión del humano posterior al merge de QC-43 y **arrastra tres features ya mergeadas** (QC-20, QC-22 y el propio QC-43, del que se caen las reglas que dependían del producto). El board se actualizó antes de sembrar: `description` reescrita y `complexity: high` asignada. También se importaron a `feature_list.json` las fichas **QC-52** y **QC-54**, creadas en el board despues de la ultima F0.
+
 ### QC-23 — registro-de-sesiones (acotada el 2026-09-03)
 
 - El alcance y las **20 decisiones cerradas** viven en
