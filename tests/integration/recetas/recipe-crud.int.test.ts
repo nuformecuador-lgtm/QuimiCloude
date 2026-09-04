@@ -29,7 +29,6 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
   createRecipe,
   findAliveRecipeById,
@@ -125,13 +124,6 @@ async function createTestUser(db: Db): Promise<string> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   });
-  // QC-47 (R14): el rol ya no es columna de `users`; llega por la pertenencia. La empresa es
-  // PROPIA de este test -nunca la de instalacion- para no chocar con el seed (R4).
-  const companyName = `Empresa de prueba ${marker}`;
-  const company = await db.company.create({
-    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
-    select: { id: true },
-  });
   const user = await db.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -143,31 +135,20 @@ async function createTestUser(db: Db): Promise<string> {
       documentNumber: marker.slice(0, 12),
       username: `ana.${marker}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
-      memberships: { create: { companyId: company.id, roleId: role.id } },
+      roleId: role.id,
     },
     select: { id: true },
   });
   return user.id;
 }
 
-/**
- * Borra el usuario de prueba y todo lo que se sembro con el. El orden lo manda el
- * `onDelete: Restrict` de las tres FK de `memberships` (QC-47 R11): pertenencia, usuario y
- * solo entonces empresa, rol y tipo de documento.
- */
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
-  const memberships = await db.membership.findMany({
-    where: { userId },
-    select: { id: true, companyId: true, roleId: true },
-  });
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { documentTypeCode: true },
+    select: { roleId: true, documentTypeCode: true },
   });
-  await db.membership.deleteMany({ where: { id: { in: memberships.map((m) => m.id) } } });
   await db.user.delete({ where: { id: userId } });
-  await db.company.deleteMany({ where: { id: { in: memberships.map((m) => m.companyId) } } });
-  await db.role.deleteMany({ where: { id: { in: memberships.map((m) => m.roleId) } } });
+  await db.role.delete({ where: { id: user.roleId } });
   await db.documentType.delete({ where: { code: user.documentTypeCode } });
 }
 
@@ -263,8 +244,8 @@ describe('R5: alta de una receta con sus lineas', () => {
       const input = baseRecipeInput({
         description: 'Formula de prueba',
         steps: [
-          { body: 'Pesar', type: 'texto' },
-          { body: 'Mezclar', type: 'texto' },
+          { blocks: [{ kind: 'paragraph', spans: [{ text: 'Pesar' }] }] },
+          { blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Mezclar' }] }] }] },
         ],
         lines: [
           { productId: productA, quantity: '10.0000', unitId: sharedUnitId },
@@ -282,10 +263,11 @@ describe('R5: alta de una receta con sus lineas', () => {
       expect(detail).not.toBeNull();
       expect(detail?.name).toBe(input.name);
       expect(detail?.description).toBe('Formula de prueba');
-      // El paso viaja y vuelve con su tipo: la columna `steps` es JSON y guarda el objeto entero.
+      // El DOCUMENTO del paso viaja y vuelve entero, con sus bloques y su orden (QC-62 R1, R16):
+      // la columna `steps` es JSON y guarda el objeto tal cual, sin aplanar ni derivar nada.
       expect(detail?.steps).toEqual([
-        { body: 'Pesar', type: 'texto' },
-        { body: 'Mezclar', type: 'texto' },
+        { blocks: [{ kind: 'paragraph', spans: [{ text: 'Pesar' }] }] },
+        { blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Mezclar' }] }] }] },
       ]);
       expect(detail?.lines).toHaveLength(2);
       const byProduct = new Map(detail?.lines.map((line) => [line.productId, line]));

@@ -20,7 +20,7 @@ export interface SeedOutcome {
   readonly createdRoles: readonly string[];
   readonly createdAdmin: boolean;
   /**
-   * QC-47 R18/R19: nombre de la empresa inicial creada en ESTA corrida, o `null` si ya
+   * QC-47 R20/R22: nombre de la empresa inicial creada en ESTA corrida, o `null` si ya
    * existia (o si no hizo falta ninguna porque el administrador ya estaba). Solo lo usa
    * `scripts/seed.ts` para su linea de resumen; no es una credencial.
    */
@@ -95,8 +95,8 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
   }
 
   // 5. Si faltaAdmin: resolver la empresa inicial (reutilizandola si ya esta) y crear el
-  // usuario con su pertenencia, con el roleId del rol Administrador (el existente o el
-  // recien creado) y los marcadores fijos de esta ficha.
+  // usuario con el roleId del rol Administrador (el existente o el recien creado) y los
+  // marcadores fijos de esta ficha.
   let createdAdmin = false;
   let createdCompany: string | null = null;
   if (needsAdmin && hashedAdmin !== null) {
@@ -105,26 +105,27 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
       throw new Error('no se pudo resolver el id del rol Administrador tras crearlo');
     }
 
-    // QC-47 R18/R19: la empresa inicial se resuelve por NOMBRE NORMALIZADO antes de
+    // QC-47 R20/R22: la empresa inicial se resuelve por NOMBRE NORMALIZADO antes de
     // crearla. Si ya existe se reutiliza — nunca se pisa, nunca se crea una segunda—;
     // solo si no hay ninguna se crea. La resolucion vive dentro de este `if` a proposito:
     // sobre una instalacion que ya tiene administrador, el seed no toca `companies` ni
     // para leer de mas ni para crear una empresa sin nadie dentro.
     const initialCompanyNameNormalized = normalizeCompanyName(INITIAL_COMPANY_NAME);
-    let companyId = await repository.findCompanyIdByNormalizedName(initialCompanyNameNormalized);
-    if (companyId === null) {
-      companyId = await repository.createCompany({
+    const existingCompanyId = await repository.findCompanyIdByNormalizedName(
+      initialCompanyNameNormalized,
+    );
+    if (existingCompanyId === null) {
+      await repository.createCompany({
         name: INITIAL_COMPANY_NAME,
         nameNormalized: initialCompanyNameNormalized,
       });
       createdCompany = INITIAL_COMPANY_NAME;
     }
 
-    // El usuario y su pertenencia se crean en UNA sola llamada al puerto (R18): no hay
-    // ningun punto intermedio en el que exista una persona sin rol en ninguna empresa.
+    // El usuario se crea en UNA sola llamada al puerto, con su rol como columna propia
+    // (QC-47 R13): no hay ningun punto intermedio en el que exista una persona sin rol.
     await repository.createInitialAdmin({
       roleId: administradorRoleId,
-      companyId,
       username: hashedAdmin.username,
       email: hashedAdmin.email,
       passwordHash: hashedAdmin.passwordHash,

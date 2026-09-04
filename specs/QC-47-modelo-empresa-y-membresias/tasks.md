@@ -14,7 +14,7 @@
 
 ## Tanda 0 — Condición previa (bloquea todo)
 
-### T0. Verificar que la rama NO está mergeada
+### [x] T0. Verificar que la rama NO está mergeada
 Todo el diseño de la migración (`design.md > 3`) se apoya en que
 `20260904180600_companies_and_memberships` no se ha aplicado en ningún sitio fuera del worktree.
 
@@ -25,7 +25,7 @@ Todo el diseño de la migración (`design.md > 3`) se apoya en que
   que hacer la migración aditiva. No se sigue por cuenta propia.
 - **Depende de:** nada.
 
-### T1. Revertir la migración vieja en la base del worktree
+### [x] T1. Revertir la migración vieja en la base del worktree
 - **Archivos:** ninguno (operación sobre `QuimiCloude_QC47`).
 - **Hecho cuando:** `pnpm run db:rollback` aplica el `down.sql` **viejo** y deja
   `_prisma_migrations` sin la fila de `20260904180600_companies_and_memberships`; `users.role_id`
@@ -84,7 +84,7 @@ Todo el diseño de la migración (`design.md > 3`) se apoya en que
 - **Hecho cuando:** `rg -i 'membership|pertenencia' tests/` devuelve cero.
 - **Depende de:** T2. Paralelizable con T5 y T6.
 
-### T5. `[P]` Comprobar si el backfill puede escribir en `users` bajo `FORCE RLS`
+### [x] T5. `[P]` Comprobar si el backfill puede escribir en `users` bajo `FORCE RLS`
 Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md > 8`.
 
 - **Archivos:** ninguno de producción (comprobación ejecutable contra `QuimiCloude_QC47`).
@@ -97,7 +97,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   anota; **no se elige a ciegas.**
 - **Depende de:** T1. Paralelizable con T4 y T6.
 
-### T6. `[P]` Revertir los fixtures que no hacen falta (el rol vuelve)
+### [x] T6. `[P]` Revertir los fixtures que no hacen falta (el rol vuelve)
 - **Archivos:** los 19 de la tabla de `design.md > 6` (5 E2E + 14 de integración).
 - **Qué:** deshacer el cambio de la primera vuelta: donde puso
   `memberships: { create: { companyId, roleId } }`, vuelve `roleId` como columna del `user.create`.

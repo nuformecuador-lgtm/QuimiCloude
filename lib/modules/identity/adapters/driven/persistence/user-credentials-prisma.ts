@@ -32,39 +32,24 @@ type FilaCredenciales = {
  * nombre, ni telefono: lo que no sale de la base no se puede filtrar por error en un log (R15).
  * Por lo mismo, aqui no hay ni un `console.*`.
  *
- * QC-9 (R26) — el rol entra por un `JOIN` en ESTA misma consulta, no en una segunda: el
+ * QC-9 (R26) — el rol entra por un `JOIN roles` en ESTA misma consulta, no en una segunda: el
  * login sigue costando exactamente una lectura. `design.md > 3.6` lo describe como
  * «el `select` añade `role: { select: { name: true } }`», que es la forma tipada; aqui no aplica
  * porque esta consulta va con `$queryRaw` por el motivo del parrafo anterior (el indice funcional
  * parcial), y cambiarla a la API tipada para añadir una columna reintroduciria el seq scan que
  * ese parrafo evita. El `JOIN` es la traduccion literal de esa fila a SQL.
  *
- * QC-47 (R15, R16) — EL ROL YA NO ESTA EN `users`. La columna `users.role_id` no existe: el rol
- * de una persona es el de su PERTENENCIA, y es el rol que tiene EN ESA EMPRESA. Por eso el
- * camino es `users -> memberships -> roles` (`design.md > 5.1`), y sigue siendo UNA sola
- * consulta: el plan llega a la fila por `users_username_unique` y a la pertenencia por
- * `memberships_user_id_company_id_key`, cuya columna lider es `user_id`.
- *
- * `INNER JOIN` y no `LEFT`, igual que antes y por la misma razon: quien no tiene rol resoluble
- * no se encuentra —y no entra— en vez de emitirse una sesion con un rol inventado. Lo que cambia
- * es DE DONDE viene esa garantia: ya no la da el `NOT NULL` de `users.role_id` —esa columna
- * murio con QC-47 (R14)— sino la EXISTENCIA de la pertenencia. Una persona viva sin ninguna
- * pertenencia se trata como no encontrada, que es literalmente R17.
- *
- * El `ORDER BY m.created_at, m.company_id` NO decide nada de negocio: hoy nadie puede tener mas
- * de una pertenencia (solo el seed da de alta, y crea una). Esta para que el dia que las haya el
- * resultado sea REPRODUCIBLE en vez de arbitrario. Elegir empresa es de QC-48, y esta linea no
- * lo prejuzga (`design.md > 5.1`).
+ * `INNER JOIN` y no `LEFT`: `users.role_id` es NOT NULL con clave foranea `onDelete: Restrict`,
+ * asi que todo usuario vivo tiene rol. Si un dia no lo tuviera, el usuario no se encontraria —y
+ * no entraria— en vez de emitirse una sesion con un rol inventado.
  */
 export async function findActiveByUsername(username: string): Promise<AuthenticatableUser | null> {
   const filas = await prisma.$queryRaw<FilaCredenciales[]>`
     SELECT u.id, u.password_hash, u.failed_login_attempts, u.lock_level, u.locked_until,
            r.name AS role_name
     FROM users u
-    JOIN memberships m ON m.user_id = u.id
-    JOIN roles r       ON r.id = m.role_id
+    JOIN roles r ON r.id = u.role_id
     WHERE lower(u.username) = lower(${username}) AND u.deleted_at IS NULL
-    ORDER BY m.created_at, m.company_id
     LIMIT 1
   `;
 

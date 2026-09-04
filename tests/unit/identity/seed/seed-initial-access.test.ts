@@ -7,8 +7,6 @@
 // afirmar que el resto no ocurrio: un doble mal cableado que no recibe nada no debe
 // pasar en verde (`design.md > 11`, «la trampa que este repo ya piso dos veces»).
 
-import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
-import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
@@ -40,15 +38,11 @@ type LlamadaRegistrada = { readonly metodo: string; readonly args: readonly unkn
 function crearRepositorioFalso(options: {
   rolesExistentes?: ReadonlyMap<string, string>;
   usuariosVivosConAdministrador?: number;
-  /** QC-47: empresas VIVAS ya presentes, indexadas por su nombre NORMALIZADO. */
-  empresasExistentes?: ReadonlyMap<string, string>;
 } = {}): InitialAccessRepository & { readonly llamadas: LlamadaRegistrada[] } {
   const llamadas: LlamadaRegistrada[] = [];
   const rolesExistentes = new Map(options.rolesExistentes ?? []);
   const usuariosVivosConAdministrador = options.usuariosVivosConAdministrador ?? 0;
-  const empresasExistentes = new Map(options.empresasExistentes ?? []);
   let siguienteIdDeRol = rolesExistentes.size + 1;
-  let siguienteIdDeEmpresa = empresasExistentes.size + 1;
 
   return {
     llamadas,
@@ -70,17 +64,6 @@ function crearRepositorioFalso(options: {
       const id = `rol-${siguienteIdDeRol}`;
       siguienteIdDeRol += 1;
       rolesExistentes.set(role.name, id);
-      return id;
-    },
-    async findCompanyIdByNormalizedName(normalized) {
-      llamadas.push({ metodo: 'findCompanyIdByNormalizedName', args: [normalized] });
-      return empresasExistentes.get(normalized) ?? null;
-    },
-    async createCompany(input) {
-      llamadas.push({ metodo: 'createCompany', args: [input] });
-      const id = `empresa-${siguienteIdDeEmpresa}`;
-      siguienteIdDeEmpresa += 1;
-      empresasExistentes.set(input.nameNormalized, id);
       return id;
     },
     async createInitialAdmin(input) {
@@ -106,15 +89,9 @@ function crearHasherFalso() {
   };
 }
 
-/**
- * Llamadas de ESCRITURA: crear rol, crear empresa o crear usuario+pertenencia. QC-47 suma
- * `createCompany` a la lista — si se olvidara, los casos que afirman "no se escribio nada"
- * pasarian en verde con una empresa creada de mas.
- */
-const METODOS_DE_ESCRITURA: readonly string[] = ['createRole', 'createCompany', 'createInitialAdmin'];
-
+/** Llamadas cuyo metodo o argumentos son de ESCRITURA (crear rol o crear usuario). */
 function llamadasDeEscritura(llamadas: readonly LlamadaRegistrada[]): readonly LlamadaRegistrada[] {
-  return llamadas.filter((llamada) => METODOS_DE_ESCRITURA.includes(llamada.metodo));
+  return llamadas.filter((llamada) => llamada.metodo === 'createRole' || llamada.metodo === 'createInitialAdmin');
 }
 
 /** Llamadas de LECTURA (las dos del paso 1 del algoritmo). */
@@ -416,122 +393,9 @@ describe('seedInitialAccess', () => {
 
     // Y el orden se respeta: no se produjo hash ni se escribio el usuario.
     expect(passwordHasher.hash).not.toHaveBeenCalled();
-    // QC-47: tampoco se creo la empresa. La politica corta ANTES de cualquier escritura.
-    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
     expect(
       repository.llamadas.some((llamada) => llamada.metodo === 'createInitialAdmin'),
     ).toBe(false);
-  });
-
-  // ------------------------------------------------------------------------
-  // QC-47 — la empresa inicial y la pertenencia (R18, R19)
-  // ------------------------------------------------------------------------
-
-  // Caso 10 (QC-47 R18): base vacia -> se crea LA empresa inicial y el usuario nace con
-  // su pertenencia a ella, en la misma llamada al puerto.
-  it('sobre una base vacia crea la empresa inicial y le da al administrador su pertenencia', async () => {
-    const repository = crearRepositorioFalso();
-    const passwordHasher = crearHasherFalso();
-    const checkCredentialPolicy = crearPoliticaFalsa();
-    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
-
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
-
-    // Primero: la empresa SI se busco antes de crearla, y con la clave NORMALIZADA que
-    // produce la unica definicion de la normalizacion (R20).
-    const busquedas = repository.llamadas.filter(
-      (llamada) => llamada.metodo === 'findCompanyIdByNormalizedName',
-    );
-    expect(busquedas).toHaveLength(1);
-    expect(busquedas[0]?.args[0]).toBe(normalizeCompanyName(INITIAL_COMPANY_NAME));
-
-    // Luego: se creo exactamente UNA empresa, con el literal de la unica constante.
-    const creacionesDeEmpresa = repository.llamadas.filter((llamada) => llamada.metodo === 'createCompany');
-    expect(creacionesDeEmpresa).toHaveLength(1);
-    expect(creacionesDeEmpresa[0]?.args[0]).toEqual({
-      name: INITIAL_COMPANY_NAME,
-      nameNormalized: normalizeCompanyName(INITIAL_COMPANY_NAME),
-    });
-    expect(outcome.createdCompany).toBe(INITIAL_COMPANY_NAME);
-
-    // Y el alta del usuario recibio ESE companyId: usuario y pertenencia, una sola llamada.
-    const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
-    expect(creacionDeAdmin).toBeDefined();
-    const input = creacionDeAdmin?.args[0] as { companyId: string; roleId: string };
-    expect(input.companyId).toBe('empresa-1');
-    expect(input.roleId).toBeTruthy();
-    expect(outcome.createdAdmin).toBe(true);
-
-    // Orden: la empresa se busca y se crea ANTES del alta del usuario.
-    const metodos = repository.llamadas.map((llamada) => llamada.metodo);
-    expect(metodos.indexOf('findCompanyIdByNormalizedName')).toBeLessThan(metodos.indexOf('createCompany'));
-    expect(metodos.indexOf('createCompany')).toBeLessThan(metodos.indexOf('createInitialAdmin'));
-  });
-
-  // Caso 11 (QC-47 R19): la empresa ya existe -> se REUTILIZA, no se crea una segunda.
-  it('si la empresa inicial ya existe la reutiliza por nombre normalizado y no crea ninguna otra', async () => {
-    const repository = crearRepositorioFalso({
-      empresasExistentes: new Map([[normalizeCompanyName(INITIAL_COMPANY_NAME), 'empresa-ya-existente']]),
-    });
-    const passwordHasher = crearHasherFalso();
-    const checkCredentialPolicy = crearPoliticaFalsa();
-    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
-
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
-
-    // Primero: la busqueda ocurrio (si no, este caso pasaria en verde sin probar nada).
-    expect(
-      repository.llamadas.filter((llamada) => llamada.metodo === 'findCompanyIdByNormalizedName'),
-    ).toHaveLength(1);
-    // Luego: NINGUNA empresa nueva, y la pertenencia apunta a la que ya estaba.
-    expect(repository.llamadas.some((llamada) => llamada.metodo === 'createCompany')).toBe(false);
-    expect(outcome.createdCompany).toBeNull();
-
-    const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
-    expect(creacionDeAdmin).toBeDefined();
-    expect((creacionDeAdmin?.args[0] as { companyId: string }).companyId).toBe('empresa-ya-existente');
-  });
-
-  // Caso 12 (QC-47 R19): segunda corrida sobre una instalacion completa -> NADA.
-  it('sobre una base que ya tiene su acceso inicial no crea empresa, ni pertenencia, ni nada', async () => {
-    const repository = crearRepositorioFalso({
-      rolesExistentes: new Map(SEED_ROLES.map((role, index) => [role.name, `rol-${index}`])),
-      usuariosVivosConAdministrador: 1,
-      empresasExistentes: new Map([[normalizeCompanyName(INITIAL_COMPANY_NAME), 'empresa-ya-existente']]),
-    });
-    const passwordHasher = crearHasherFalso();
-    const checkCredentialPolicy = crearPoliticaFalsa();
-    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
-
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
-
-    // Primero: las lecturas del paso 1 SI ocurrieron.
-    expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
-    // Luego: ni una escritura, de ningun tipo.
-    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
-    expect(outcome).toEqual({ createdRoles: [], createdAdmin: false, createdCompany: null });
-  });
-
-  // Caso 13 (QC-47 R19, riesgo 1 de `design.md > 9`): `needsAdmin` sale de
-  // `countLiveUsersWithRole`, y basta que devuelva 1 para que NO se cree un segundo
-  // administrador ni una segunda empresa. Es la mitad de dominio del riesgo; la otra
-  // mitad —que el `where` del adaptador cuente lo mismo que contaba con `users.role_id`—
-  // vive en `tests/integration/identity/identity-seed.int.test.ts`.
-  it('needsAdmin sale de countLiveUsersWithRole(Administrador): si devuelve 1, no hay segundo admin', async () => {
-    const repository = crearRepositorioFalso({ usuariosVivosConAdministrador: 1 });
-    const passwordHasher = crearHasherFalso();
-    const checkCredentialPolicy = crearPoliticaFalsa();
-    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
-
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
-
-    const conteos = repository.llamadas.filter((llamada) => llamada.metodo === 'countLiveUsersWithRole');
-    expect(conteos).toHaveLength(1);
-    expect(conteos[0]?.args[0]).toBe(ROLE_ADMINISTRADOR);
-    expect(repository.llamadas.some((llamada) => llamada.metodo === 'createInitialAdmin')).toBe(false);
-    expect(repository.llamadas.some((llamada) => llamada.metodo === 'createCompany')).toBe(false);
-    expect(outcome.createdAdmin).toBe(false);
-    expect(outcome.createdCompany).toBeNull();
   });
 
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos

@@ -26,13 +26,6 @@
  * fixture. La otra fila ajena de la que depende es `documentTypeCode: 'CC'`, que inserta la
  * migracion de QC-4.
  *
- * QC-47 (R14, R17): el rol dejo de ser una columna de `users` y vive en `memberships`, y una
- * persona SIN pertenencia no puede entrar —el login la trata como no encontrada—. Asi que el
- * fixture siembra ademas una EMPRESA propia, con prefijo y `RUN_ID` como todo lo demas, y la
- * pertenencia que une usuario, empresa y rol `Administrador`. La empresa si es un fixture (a
- * diferencia del rol): no hay ninguna regla de acceso que mire la empresa, y usar la de
- * instalacion chocaria con el indice unico de nombre que siembra el seed (R4).
- *
  * AISLAMIENTO ENTRE PROYECTOS Y WORKERS: `RUN_ID` se calcula al cargar el modulo, o sea una vez
  * por PROCESO de worker, y va dentro del `username`, del correo, del documento y del nombre de
  * pila —los tres indices unicos de `users` son globales, y el nombre de pila entra ahi para que
@@ -47,7 +40,6 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
-import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
@@ -62,9 +54,6 @@ const LOGIN_PATH = '/login';
 
 /** Prefijo con el que este spec marca TODO usuario que crea. Nada fuera de el se toca. */
 const USERNAME_PREFIX = 'qc9_e2e_';
-
-/** Prefijo de la empresa efimera (QC-47). Mismo criterio que el de usuario: solo lo propio. */
-const COMPANY_NAME_PREFIX = 'qc9_e2e_empresa_';
 
 /** Identificador unico de este proceso de worker. */
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -81,7 +70,6 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 const LAST_NAMES = 'Sesion';
 
 let roleId: string | null = null;
-let companyId: string | null = null;
 
 /**
  * Usuario propio de este worker. Se crea uno solo porque el recorrido tiene un unico test y
@@ -94,7 +82,6 @@ async function createTestUser(): Promise<{
   displayName: string;
 }> {
   if (!roleId) throw new Error('el rol del fixture no existe: fallo el beforeAll');
-  if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
   const username = `${USERNAME_PREFIX}${RUN_ID}`;
   /** Contrasena conocida del usuario de prueba. Solo vive aqui; nunca se escribe en consola. */
@@ -117,9 +104,7 @@ async function createTestUser(): Promise<{
       documentNumber: `qc9${RUN_ID}`,
       username,
       passwordHash: await createPasswordHash(password),
-      // QC-47 (R17): sin pertenencia el login trataria a esta persona como no encontrada, y el
-      // rol `Administrador` que el middleware exige llega por aqui, no por una columna de `users`.
-      memberships: { create: { companyId, roleId } },
+      roleId,
     },
     select: { id: true },
   });
@@ -148,68 +133,31 @@ test.beforeAll(async () => {
   }
   roleId = adminRole.id;
 
-  // La EMPRESA si es un fixture propio (QC-47): ninguna regla de acceso la mira, y el nombre de
-  // instalacion chocaria con el indice unico de `companies` que ya usa el seed (R4).
-  const companyName = `${COMPANY_NAME_PREFIX}${RUN_ID}`;
-  companyId = (
-    await prisma.company.create({
-      data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
-      select: { id: true },
-    })
-  ).id;
-
   // LIMPIEZA DEFENSIVA DE HUERFANOS. Existe porque un `pnpm run e2e` interrumpido a media
   // ejecucion deja usuarios `qc9_e2e_*` en la base, y esa basura pone rojo un test de OTRA
   // feature —`tests/integration/identity/identity-constraints.int.test.ts` afirma
   // `user.count() === 0`—: media hora para entender un rojo que no es del codigo.
-  // El rol usado aqui es `Administrador`, un dato real, no un fixture con prefijo, asi que no
-  // hay ningun rol huerfano que barrer (nunca se crea uno con `ROLE_NAME_PREFIX` porque esa
-  // constante ya no existe). Lo que si hay desde QC-47 son pertenencias y empresas propias, y se
-  // barren en el orden que imponen las tres FK `Restrict` de `memberships` (R11): pertenencias,
-  // usuarios y solo entonces empresas. El razonamiento completo sobre el corte de edad esta en
-  // `e2e/login.spec.ts`, que resolvio esto primero; aqui se replica sobre los prefijos propios de
-  // QC-9. Las empresas condenadas arrastran a sus usuarios aunque sean recientes, por la misma
-  // ventana de pocos segundos que alli se explica: la empresa se crea ANTES que el usuario.
+  // Solo usuarios: el rol usado aqui es `Administrador`, un dato real, no un fixture con prefijo,
+  // asi que no hay ningun rol huerfano que barrer (nunca se crea uno con `ROLE_NAME_PREFIX`
+  // porque esa constante ya no existe). El razonamiento completo sobre el corte de edad esta en
+  // `e2e/login.spec.ts`, que resolvio esto primero; aqui se replica sobre el prefijo de usuario
+  // propio de QC-9.
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
-  const orphanCompanies = await prisma.company.findMany({
-    where: { name: { startsWith: COMPANY_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
-    select: { id: true },
+  await prisma.user.deleteMany({
+    where: { username: { startsWith: USERNAME_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
-  const orphanCompanyIds = orphanCompanies.map((company) => company.id);
-
-  const orphanUsers = await prisma.user.findMany({
-    where: {
-      username: { startsWith: USERNAME_PREFIX },
-      OR: [
-        { createdAt: { lt: orphanCutoff } },
-        { memberships: { some: { companyId: { in: orphanCompanyIds } } } },
-      ],
-    },
-    select: { id: true },
-  });
-  const orphanUserIds = orphanUsers.map((user) => user.id);
-
-  await prisma.membership.deleteMany({ where: { userId: { in: orphanUserIds } } });
-  await prisma.user.deleteMany({ where: { id: { in: orphanUserIds } } });
-  await prisma.company.deleteMany({ where: { id: { in: orphanCompanyIds } } });
 });
 
 test.afterAll(async () => {
   // Borra SIEMPRE, aunque el test reventara: por eso se borra por prefijo de `RUN_ID` (no por un
-  // id acumulado en memoria). El rol (`Administrador`) es un dato real sembrado por QC-6, nunca
-  // un fixture de este test, asi que este `afterAll` NO toca la tabla `roles` en absoluto
-  // —borrar por `name: ADMIN_ROLE_NAME` se llevaria por delante el rol real que usan otros tests
-  // y el propio seed—. La empresa y la pertenencia si son fixtures y se van, en el orden que
-  // imponen las FK `Restrict` de `memberships` (QC-47 R11).
+  // id acumulado en memoria). Solo usuarios: el rol (`Administrador`) es un dato real sembrado
+  // por QC-6, nunca un fixture de este test, asi que este `afterAll` NO toca la tabla `roles` en
+  // absoluto —borrar por `name: ADMIN_ROLE_NAME` se llevaria por delante el rol real que usan
+  // otros tests y el propio seed—.
   try {
-    const users = await prisma.user.findMany({
+    await prisma.user.deleteMany({
       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
-      select: { id: true },
     });
-    const userIds = users.map((user) => user.id);
-    await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-    await prisma.company.deleteMany({ where: { name: `${COMPANY_NAME_PREFIX}${RUN_ID}` } });
   } finally {
     await prisma.$disconnect();
   }

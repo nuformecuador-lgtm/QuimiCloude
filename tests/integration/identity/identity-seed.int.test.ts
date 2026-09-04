@@ -37,9 +37,6 @@ import {
   createInitialAccessRepository,
   withInitialAccessTransaction,
 } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
-import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
-import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
-import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -199,10 +196,6 @@ async function resetIdentityToEmptyState(tx: Prisma.TransactionClient): Promise<
     await tx.$executeRawUnsafe(`DELETE FROM "${table}"`);
   }
   await tx.user.deleteMany({});
-  // QC-47: `memberships` ya cae en el barrido de arriba (es hija de `users` en el catalogo
-  // de FK), pero `companies` NO apunta a `users`, asi que hay que vaciarla aparte para
-  // poder observar de verdad "no existe ninguna empresa" (R18). Sigue dentro del `tx`.
-  await tx.company.deleteMany({});
   await tx.role.deleteMany({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } });
 }
 
@@ -214,45 +207,10 @@ async function seedRoleNames(tx: Prisma.TransactionClient): Promise<readonly str
   return roles.map((role) => role.name);
 }
 
-/**
- * QC-47: el administrador vivo ya no se busca por `users.role_id` sino por su
- * PERTENENCIA. Es la misma pregunta que hace `countLiveUsersWithRole`, escrita aqui para
- * las aserciones del test.
- */
 async function findLiveAdmin(tx: Prisma.TransactionClient) {
   return tx.user.findFirst({
-    where: { deletedAt: null, memberships: { some: { role: { name: ROLE_ADMINISTRADOR } } } },
-    include: { memberships: { include: { role: true, company: true } } },
-  });
-}
-
-/** Nombre del rol con el que la persona figura en su unica pertenencia. */
-function roleNameOf(admin: { memberships: readonly { role: { name: string } }[] }): string {
-  expect(admin.memberships).toHaveLength(1);
-  const first = admin.memberships[0];
-  if (first === undefined) throw new Error('inalcanzable');
-  return first.role.name;
-}
-
-/** Crea un usuario vivo con UNA pertenencia al rol y empresa dados. */
-async function createUserWithMembership(
-  tx: Prisma.TransactionClient,
-  input: { username: string; email: string; documentNumber: string; roleId: string; companyId: string },
-): Promise<{ id: string }> {
-  return tx.user.create({
-    data: {
-      firstNames: 'Persona',
-      lastNames: 'De Prueba',
-      birthDate: new Date('1990-05-17T00:00:00.000Z'),
-      email: input.email,
-      phone: '+57 300 111 2233',
-      documentTypeCode: DOCUMENT_TYPE_CC,
-      documentNumber: input.documentNumber,
-      username: input.username,
-      passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
-      memberships: { create: { companyId: input.companyId, roleId: input.roleId } },
-    },
-    select: { id: true },
+    where: { deletedAt: null, role: { name: ROLE_ADMINISTRADOR } },
+    include: { role: true },
   });
 }
 
@@ -269,8 +227,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       await resetIdentityToEmptyState(tx);
       expect(await seedRoleNames(tx)).toEqual([]);
       expect(await findLiveAdmin(tx)).toBeNull();
-      expect(await tx.company.count()).toBe(0);
-      expect(await tx.membership.count()).toBe(0);
 
       const repository = createInitialAccessRepository(tx);
 
@@ -296,23 +252,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const adminAfterFirst = await findLiveAdmin(tx);
       expect(adminAfterFirst).not.toBeNull();
       if (adminAfterFirst === null) throw new Error('inalcanzable');
-      expect(roleNameOf(adminAfterFirst)).toBe(ROLE_ADMINISTRADOR);
+      expect(adminAfterFirst.role.name).toBe(ROLE_ADMINISTRADOR);
 
       const usersAfterFirst = await tx.user.count();
       expect(usersAfterFirst).toBe(1);
-
-      // QC-47 R18: UNA empresa, con el literal de la unica constante y su normalizado
-      // calculado por la unica definicion de la normalizacion (R20), y UNA pertenencia
-      // que une al administrador con ella.
-      expect(first.createdCompany).toBe(INITIAL_COMPANY_NAME);
-      const companiesAfterFirst = await tx.company.findMany();
-      expect(companiesAfterFirst).toHaveLength(1);
-      expect(companiesAfterFirst[0]?.name).toBe(INITIAL_COMPANY_NAME);
-      expect(companiesAfterFirst[0]?.nameNormalized).toBe(normalizeCompanyName(INITIAL_COMPANY_NAME));
-      const membershipsAfterFirst = await tx.membership.findMany();
-      expect(membershipsAfterFirst).toHaveLength(1);
-      expect(membershipsAfterFirst[0]?.userId).toBe(adminAfterFirst.id);
-      expect(membershipsAfterFirst[0]?.companyId).toBe(companiesAfterFirst[0]?.id);
 
       // Segunda corrida: no debe duplicar ni modificar nada (R14, R15, R16).
       const second = await seedInitialAccess({
@@ -326,7 +269,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       });
       expect(second.createdRoles).toEqual([]);
       expect(second.createdAdmin).toBe(false);
-      expect(second.createdCompany).toBeNull();
 
       const rolesAfterSecond = await tx.role.findMany({
         where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } },
@@ -345,11 +287,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       expect(await tx.user.count()).toBe(1);
       expect(await tx.role.count({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } })).toBe(2);
-
-      // QC-47 R19: sigue habiendo UNA empresa y UNA pertenencia, y son las mismas filas
-      // (comparacion campo a campo, ids y timestamps incluidos: nada se reescribio).
-      expect(await tx.company.findMany()).toEqual(companiesAfterFirst);
-      expect(await tx.membership.findMany()).toEqual(membershipsAfterFirst);
     });
   });
 
@@ -374,7 +311,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(admin).not.toBeNull();
       if (admin === null) throw new Error('inalcanzable');
       expect(admin.mustChangeCredential).toBe(true);
-      expect(roleNameOf(admin)).toBe(ROLE_ADMINISTRADOR);
+      expect(admin.role.name).toBe(ROLE_ADMINISTRADOR);
     });
   });
 
@@ -604,199 +541,6 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const documentTypesAfter = await tx.documentType.findMany({ orderBy: { code: 'asc' } });
       expect(documentTypesAfter).toHaveLength(documentTypesBefore.length);
       expect(documentTypesAfter).toEqual(documentTypesBefore);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// QC-47 — `countLiveUsersWithRole` contra la pertenencia (R19, `design.md > 9` riesgo 1)
-// ---------------------------------------------------------------------------
-//
-// Este bloque existe porque la ficha declara ESTA traduccion como su riesgo numero 1: la
-// lectura que decide `needsAdmin` paso de `users.role_id` a `memberships`, y si cuenta de
-// mas o de menos el seed deja de ser idempotente y crea un segundo administrador en cada
-// despliegue, con el E2E de login en verde. No basta con leer el resultado del seed: cada
-// caso construye un escenario que DISTINGUE la traduccion correcta de las plausibles
-// (contar pertenencias en vez de personas, olvidar `deleted_at`, ignorar el nombre del rol)
-// y comprueba ademas que el seed se comporta en consecuencia.
-
-describe('countLiveUsersWithRole cuenta PERSONAS VIVAS con ese rol en ALGUNA empresa (R19)', () => {
-  it('tras la primera corrida devuelve 1, y una segunda corrida no crea segunda empresa, admin ni pertenencia', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      await resetIdentityToEmptyState(tx);
-      const repository = createInitialAccessRepository(tx);
-
-      // Sobre la base vacia la cuenta es 0: sin esto, un `where` que devolviera siempre
-      // un numero fijo pasaria el resto del caso.
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(0);
-
-      const first = await seedInitialAccess({
-        repository,
-        passwordHasher: identity.passwordHasher,
-        checkCredentialPolicy: identity.checkCredentialPolicy,
-        credentials: fakeCredentialsProvider,
-      });
-      expect(first.createdAdmin).toBe(true);
-      expect(first.createdCompany).toBe(INITIAL_COMPANY_NAME);
-
-      // La lectura ve al administrador POR SU PERTENENCIA.
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(1);
-
-      const second = await seedInitialAccess({
-        repository,
-        passwordHasher: identity.passwordHasher,
-        checkCredentialPolicy: identity.checkCredentialPolicy,
-        credentials: fakeCredentialsProvider,
-      });
-      expect(second.createdAdmin).toBe(false);
-      expect(second.createdCompany).toBeNull();
-      expect(second.createdRoles).toEqual([]);
-
-      expect(await tx.company.count()).toBe(1);
-      expect(await tx.user.count()).toBe(1);
-      expect(await tx.membership.count()).toBe(1);
-    });
-  });
-
-  it('una persona con DOS pertenencias de rol Administrador sigue contando UNA, y el seed no crea nada', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      await resetIdentityToEmptyState(tx);
-      const repository = createInitialAccessRepository(tx);
-
-      const first = await seedInitialAccess({
-        repository,
-        passwordHasher: identity.passwordHasher,
-        checkCredentialPolicy: identity.checkCredentialPolicy,
-        credentials: fakeCredentialsProvider,
-      });
-      expect(first.createdAdmin).toBe(true);
-
-      const admin = await findLiveAdmin(tx);
-      if (admin === null) throw new Error('inalcanzable');
-      const administradorRole = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
-
-      // Segunda empresa y segunda pertenencia de la MISMA persona (el modelo lo permite
-      // desde el dia uno, R8). Una traduccion que contara `memberships` en vez de `users`
-      // devolveria 2 aqui, y este caso es el unico que la caza.
-      const otraEmpresa = await tx.company.create({
-        data: { name: 'Otra Empresa QC-47', nameNormalized: normalizeCompanyName('Otra Empresa QC-47') },
-      });
-      await tx.membership.create({
-        data: { userId: admin.id, companyId: otraEmpresa.id, roleId: administradorRole.id },
-      });
-      expect(await tx.membership.count()).toBe(2);
-
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(1);
-
-      const second = await seedInitialAccess({
-        repository,
-        passwordHasher: identity.passwordHasher,
-        checkCredentialPolicy: identity.checkCredentialPolicy,
-        credentials: fakeCredentialsProvider,
-      });
-      expect(second.createdAdmin).toBe(false);
-      expect(second.createdCompany).toBeNull();
-      expect(await tx.user.count()).toBe(1);
-      expect(await tx.membership.count()).toBe(2);
-    });
-  });
-
-  it('un administrador dado de baja NO cuenta, y entonces el seed vuelve a crear administrador reutilizando la empresa', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      await resetIdentityToEmptyState(tx);
-      const repository = createInitialAccessRepository(tx);
-
-      const first = await seedInitialAccess({
-        repository,
-        passwordHasher: identity.passwordHasher,
-        checkCredentialPolicy: identity.checkCredentialPolicy,
-        credentials: fakeCredentialsProvider,
-      });
-      expect(first.createdAdmin).toBe(true);
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(1);
-
-      const admin = await findLiveAdmin(tx);
-      if (admin === null) throw new Error('inalcanzable');
-      // Baja LOGICA: la pertenencia sigue ahi. Si el `where` perdiera `deleted_at: null`,
-      // seguiria contando 1 y este caso se pondria rojo.
-      await tx.user.update({ where: { id: admin.id }, data: { deletedAt: new Date(), username: 'baja.qc47' } });
-      expect(await tx.membership.count()).toBe(1);
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(0);
-
-      // Y el seed reacciona: crea un administrador nuevo, pero REUTILIZA la empresa que ya
-      // existe (R19). Dos empresas aqui serian el fallo que describe `design.md > 9`.
-      const second = await seedInitialAccess({
-        repository,
-        passwordHasher: identity.passwordHasher,
-        checkCredentialPolicy: identity.checkCredentialPolicy,
-        credentials: fakeCredentialsProvider,
-      });
-      expect(second.createdAdmin).toBe(true);
-      expect(second.createdCompany).toBeNull();
-      expect(await tx.company.count()).toBe(1);
-      expect(await tx.membership.count()).toBe(2);
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(1);
-    });
-  });
-
-  it('una persona viva cuya unica pertenencia es de rol Operador no cuenta como Administrador', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      await resetIdentityToEmptyState(tx);
-      const repository = createInitialAccessRepository(tx);
-
-      const first = await seedInitialAccess({
-        repository,
-        passwordHasher: identity.passwordHasher,
-        checkCredentialPolicy: identity.checkCredentialPolicy,
-        credentials: fakeCredentialsProvider,
-      });
-      expect(first.createdAdmin).toBe(true);
-
-      const empresa = await tx.company.findFirstOrThrow();
-      const operadorRole = await tx.role.findUniqueOrThrow({ where: { name: ROLE_OPERADOR } });
-      await createUserWithMembership(tx, {
-        username: 'operador.qc47.test',
-        email: 'operador.qc47@example.test',
-        documentNumber: '47000001',
-        roleId: operadorRole.id,
-        companyId: empresa.id,
-      });
-
-      // Dos personas vivas con pertenencia, pero solo UNA es Administrador. Un `where` que
-      // ignorara el nombre del rol devolveria 2.
-      expect(await tx.user.count({ where: { deletedAt: null } })).toBe(2);
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(1);
-      expect(await repository.countLiveUsersWithRole(ROLE_OPERADOR)).toBe(1);
-    });
-  });
-
-  it('una persona viva SIN ninguna pertenencia no cuenta con ningun rol', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      await resetIdentityToEmptyState(tx);
-      const repository = createInitialAccessRepository(tx);
-
-      const administradorRole = await tx.role.create({
-        data: { name: ROLE_ADMINISTRADOR, description: 'rol de prueba QC-47' },
-      });
-      await tx.user.create({
-        data: {
-          firstNames: 'Sin',
-          lastNames: 'Pertenencia',
-          birthDate: new Date('1990-05-17T00:00:00.000Z'),
-          email: 'sin.pertenencia.qc47@example.test',
-          phone: '+57 300 111 2233',
-          documentTypeCode: DOCUMENT_TYPE_CC,
-          documentNumber: '47000002',
-          username: 'sin.pertenencia.qc47',
-          passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
-        },
-      });
-
-      expect(administradorRole.name).toBe(ROLE_ADMINISTRADOR);
-      expect(await tx.user.count({ where: { deletedAt: null } })).toBe(1);
-      // La persona existe y esta viva, pero no es nada en ninguna empresa: el `some` no
-      // la ve. Es lo que hace que el seed le de a la instalacion su administrador (R17).
-      expect(await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR)).toBe(0);
     });
   });
 });

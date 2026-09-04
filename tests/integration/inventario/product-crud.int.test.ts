@@ -33,7 +33,6 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
   createProduct,
   findAliveProductById,
@@ -157,13 +156,9 @@ async function createTestUnit(db: Db, symbol: string | null = 'kg'): Promise<str
 }
 
 /**
- * Usuario REAL completo (tipo de documento + rol + empresa + usuario + pertenencia),
- * necesario para R7: la FK de auditoria exige una referencia que exista de verdad. Marcado
- * con `token()` porque `users` tiene indices unicos parciales sobre correo, usuario y
- * documento (QC-4), y porque el nombre de empresa tambien es unico (QC-47 R4).
- *
- * QC-47 (R14): el rol ya NO es una columna de `users`. Se sirve por su pertenencia, y la
- * empresa es PROPIA de este test -nunca la de instalacion- para no chocar con el seed.
+ * Usuario REAL completo (tipo de documento + rol + usuario), necesario para R7: la FK de
+ * auditoria exige una referencia que exista de verdad. Marcado con `token()` porque
+ * `users` tiene indices unicos parciales sobre correo, usuario y documento (QC-4).
  */
 async function createTestUser(db: Db): Promise<string> {
   const marker = token();
@@ -173,11 +168,6 @@ async function createTestUser(db: Db): Promise<string> {
   });
   const role = await db.role.create({
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
-    select: { id: true },
-  });
-  const companyName = `Empresa de prueba ${marker}`;
-  const company = await db.company.create({
-    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
     select: { id: true },
   });
   const user = await db.user.create({
@@ -191,31 +181,21 @@ async function createTestUser(db: Db): Promise<string> {
       documentNumber: marker.slice(0, 12),
       username: `ana.${marker}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
-      memberships: { create: { companyId: company.id, roleId: role.id } },
+      roleId: role.id,
     },
     select: { id: true },
   });
   return user.id;
 }
 
-/**
- * Borra un usuario REAL creado con `createTestUser` y todo lo que sembro con el. El orden lo
- * manda el `onDelete: Restrict` de las tres FK de `memberships` (QC-47 R11): primero la
- * pertenencia, despues el usuario, y solo entonces empresa, rol y tipo de documento.
- */
+/** Borra, en orden, un usuario REAL creado con `createTestUser` y su rol/tipo de documento. */
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
-  const memberships = await db.membership.findMany({
-    where: { userId },
-    select: { id: true, companyId: true, roleId: true },
-  });
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { documentTypeCode: true },
+    select: { roleId: true, documentTypeCode: true },
   });
-  await db.membership.deleteMany({ where: { id: { in: memberships.map((m) => m.id) } } });
   await db.user.delete({ where: { id: userId } });
-  await db.company.deleteMany({ where: { id: { in: memberships.map((m) => m.companyId) } } });
-  await db.role.deleteMany({ where: { id: { in: memberships.map((m) => m.roleId) } } });
+  await db.role.delete({ where: { id: user.roleId } });
   await db.documentType.delete({ where: { code: user.documentTypeCode } });
 }
 

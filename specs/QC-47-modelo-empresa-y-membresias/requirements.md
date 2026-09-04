@@ -221,7 +221,26 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
 supuesto. La 3 es la única que puede cambiar la forma de la migración, y por eso `tasks.md` la
 resuelve con una comprobación ejecutable antes de escribir el backfill definitivo.
 
-3. **¿`FORCE ROW LEVEL SECURITY` sobre `users` deja pasar el `UPDATE` del backfill?** QC-4 dejó
+3. **~~¿`FORCE ROW LEVEL SECURITY` sobre `users` deja pasar el `UPDATE` del backfill?~~
+   CERRADA el 2026-09-04 por la comprobacion ejecutable de T5.** **Sí, aquí pasa**, y la razón
+   importa más que la respuesta. Medido contra `QuimiCloude_QC47`, con la cadena `DIRECT_URL`
+   que usa Prisma Migrate: `users` está en `ENABLE`+`FORCE ROW LEVEL SECURITY` con **cero
+   policies**, y un `ADD COLUMN` + `UPDATE … SET` + `SET NOT NULL` dentro de una transacción
+   escribió **1 de 1** filas sin que Postgres lo denegara. Pero el rol de esa conexión es
+   `postgres` con `rolsuper = true` y `rolbypassrls = true`, y **un superusuario salta la RLS
+   pase lo que pase, `FORCE` incluido**: la medición confirma que el backfill corre aquí, no que
+   la RLS lo deje pasar. La misma comprobación reproducida sobre una tabla `ENABLE`+`FORCE` sin
+   policies cuyo **dueño NO es superusuario** da el resultado contrario y **silencioso**: el
+   `UPDATE` termina en `OK` afectando **0 filas** y el `SELECT count(*)` ve **0**. No hay error.
+   Consecuencia para el diseño: el backfill de §3.2 **se escribe tal cual** (no se elige a
+   ciegas una salida que la medición no pide), y el riesgo residual queda acotado por el paso 6
+   —`SET NOT NULL` fallaría con `23502` sobre una base con usuarios y sin backfill efectivo—,
+   de modo que un despliegue con dueño no superusuario **rompe ruidosamente en vez de callar**.
+   Queda anotado para la ficha que despliegue fuera de local.
+
+**Redacción original de la pregunta 3, conservada:**
+
+   **¿`FORCE ROW LEVEL SECURITY` sobre `users` deja pasar el `UPDATE` del backfill?** QC-4 dejó
    `users` con RLS **activada y forzada y sin ninguna policy**, y `FORCE` alcanza también al dueño
    de la tabla. El backfill de esta ficha necesita **escribir** en `users` (`SET company_id = …`),
    cosa que ninguna migración posterior a QC-4 ha hecho todavía: la única evidencia disponible es
