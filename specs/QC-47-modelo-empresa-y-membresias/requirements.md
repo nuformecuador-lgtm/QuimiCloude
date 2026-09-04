@@ -185,6 +185,8 @@ requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
 | 13 | `/// @module` obligatorio en los dos modelos nuevos | R22 |
 | 14 | No hay E2E nuevo; el E2E de login de QC-7 es la prueba de que nada se rompió hacia fuera | R16, R28 |
 | 15 | Ninguna librería nueva | R29 |
+| 16 | El nombre de la empresa inicial es `QuimiCloud`, en una única definición usada por el seed y por el backfill (cerrada en F1.4) | R20 |
+| 17 | Una empresa dada de baja libera su nombre: índice único parcial (cerrada en F1.4) | R4 |
 
 ## Preguntas abiertas
 
@@ -201,68 +203,9 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
 3. **Moneda por empresa** (pregunta abierta n.º 5 del dominio, abierta el 2026-09-04 al
    reescribir el punto 1). No bloquea esta ficha: aquí no entra ningún importe.
 
-**Las dos preguntas que añadió `spec_author` el 2026-09-04 quedaron CERRADAS por el humano el
-mismo día, al aprobar el spec (F1.4).** Sus respuestas están en las dos últimas filas de la tabla
-de abajo. No quedan preguntas abiertas que bloqueen la implementación.
-
-## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el o los
-requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
-
-| # | Decisión cerrada | Requisito(s) |
-| --- | --- | --- |
-| 1 | La empresa se identifica por un UUID aleatorio, no adivinable | R1 |
-| 2 | El nombre de empresa es único sin distinguir mayúsculas ni acentos | R2, R3, R4 |
-| 3 | Un usuario puede pertenecer a varias empresas | R8 |
-| 4 | La pareja usuario + empresa es única | R9 |
-| 5 | El rol es por empresa y vive en la pertenencia | R7, R8, R15 |
-| 6 | `users.role_id` se mueve del todo; seed y login siguen dando el mismo resultado | R14, R15, R16, R17, R18, R24 |
-| 7 | Roles y tipos de documento son del sistema, no se separan por empresa | R13 |
-| 8 | Baja lógica de empresa; la operación de baja no se construye aquí | R5 |
-| 9 | Identificadores de la base en inglés | R21 |
-| 10 | `created_at` y `updated_at` en las dos tablas nuevas | R6 |
-| 11 | RLS activada y forzada en las dos tablas nuevas | R23 |
-| 12 | Migración con `down.sql` que revierte al esquema exacto anterior, `role_id` incluida | R25, R26, R27 |
-| 13 | `/// @module` obligatorio en los dos modelos nuevos | R22 |
-| 14 | No hay E2E nuevo; el E2E de login de QC-7 es la prueba de que nada se rompió hacia fuera | R16, R28 |
-| 15 | Ninguna librería nueva | R29 |
-
-## Preguntas abiertas
-
-No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
-
-1. **Módulo propietario de las dos tablas nuevas.** ¿Un módulo `empresas` propio, como se hizo
-   con `unidades` en QC-32, o dentro de `identity`? No es libre: la guardia
-   `guard-arquitectura-modulos` prohíbe que un módulo consulte un modelo ajeno con Prisma, y el
-   login y el seed —que son de `identity`— pasan a necesitar el rol, que vivirá en la
-   pertenencia. Lo decide el `design.md` con ese condicionante encima de la mesa.
-2. **Con qué empresa inicia sesión quien tenga más de una pertenencia.** El modelo lo permite
-   desde el primer día; quién elige es de **QC-48**, que ya la lleva anotada como su pregunta
-   abierta. Aquí solo se hace constar que el modelo no la cierra.
-3. **Moneda por empresa** (pregunta abierta n.º 5 del dominio, abierta el 2026-09-04 al
-   reescribir el punto 1). No bloquea esta ficha: aquí no entra ningún importe.
-
-**Añadidas por `spec_author` el 2026-09-04 (F1.2).** No reabren ninguna decisión cerrada: son dos
-datos que la ficha necesita y que no están en `docs/`, `specs/` ni el código (regla 6 de
-`CLAUDE.md`). Las dos llevan escrita su **posición por defecto**, que es lo que se implementa si el
-humano no dice otra cosa al aprobar el spec (F1.4). Mismo patrón que las preguntas 4 y 5 de
-**QC-32**.
-
-4. **¿Cómo se llama la empresa inicial que crea el seed?** El alcance dice «el seed deja una empresa
-   inicial», pero no fija su nombre, y ese nombre lo necesitan **dos sitios**: el seed (R18, R20) y
-   el backfill de la migración, que tiene que meter a los usuarios ya cargados en alguna empresa
-   (R24). *Posición por defecto*: un **marcador fijo de instalación**, en una sola constante del
-   dominio, con el mismo criterio que los marcadores del usuario semilla de **QC-6**
-   (`Administrador` / `Inicial` / `+00 000 000 0000`): quien mire la fila tiene que ver que es de
-   instalación y no un dato real. El literal exacto propuesto está en `design.md > 6.1`. **No** se
-   toma del entorno: no es un secreto y `.env` no es donde vive un dato de negocio.
-5. **¿Una empresa dada de baja libera su nombre?** La decisión 2 dice «el nombre es único» y la 8
-   añade la baja lógica, pero no se cruzaron. Hoy da igual —esta ficha no construye ninguna
-   operación de baja (R5), así que ninguna fila puede llegar a estar de baja—, pero el índice hay
-   que escribirlo ya. *Posición por defecto, y lo que dice R4*: índice único **parcial**
-   (`WHERE deleted_at IS NULL`), que es el precedente del repo para toda tabla con borrado lógico
-   —`recipes_name_unique`, `suppliers_name_unique`, `users_email_unique`—; un índice total
-   quemaría el nombre para siempre en cuanto alguien dé de baja una empresa. Se anota porque
-   cambiarlo después es una migración, no una línea.
+**Las dos preguntas que añadió `spec_author` el 2026-09-04 (F1.2) quedaron CERRADAS por el humano
+el mismo día, al aprobar el spec (F1.4).** Sus respuestas son las dos últimas filas de la tabla de
+abajo. No queda ninguna pregunta abierta que bloquee la implementación.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -283,5 +226,5 @@ humano no dice otra cosa al aprobar el spec (F1.4). Mismo patrón que las pregun
 | 2026-09-04 | Módulo declarado en el esquema | `/// @module` obligatorio en los dos modelos nuevos. Heredado de **QC-14**; qué módulo, pregunta abierta 1 |
 | 2026-09-04 | ¿Hace falta E2E? | **No hay E2E nuevo.** Es ficha de modelo y seed, no estrena pantalla. Pero el login **sí** cambia de fuente para el rol, así que el E2E de login que ya existe (**QC-7**) tiene que seguir verde y **esa es la prueba de que nada se rompió hacia fuera** |
 | 2026-09-04 | ¿Librería nueva? | **Ninguna** |
-| 2026-09-04 | Cómo se llama la empresa inicial que crea el seed (pregunta 4 del `spec_author`) | **`QuimiCloud`**, en una única constante del dominio (`INITIAL_COMPANY_NAME`), usada tanto por el seed como por el backfill de la migración. **No** sale del entorno. Cerrada por el humano en F1.4; se aparta de la posición por defecto propuesta (`Empresa Inicial`) |
+| 2026-09-04 | Cómo se llama la empresa inicial que crea el seed (pregunta 4 del `spec_author`) | **`QuimiCloud`**, en una única constante del dominio (`INITIAL_COMPANY_NAME`), usada tanto por el seed como por el backfill de la migración. **No** sale del entorno. Cerrada por el humano en F1.4; se aparta de la posición por defecto que proponía `design.md > 6.1` (`Empresa Inicial`) |
 | 2026-09-04 | ¿Una empresa dada de baja libera su nombre? (pregunta 5 del `spec_author`) | **Sí, lo libera.** Índice único **parcial** (`WHERE deleted_at IS NULL`), el precedente de `recipes`, `suppliers` y `users`. Cerrada por el humano en F1.4; coincide con la posición por defecto y es lo que ya dice **R4** |
