@@ -11,6 +11,9 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
+| QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
+| QC-52 | separar-producto-de-catalogo-de-proveedor | Inventario | fullstack | pending → F1.2 | feature/QC-52-separar-producto-de-catalogo-de-proveedor | leader (worktree montado, spec_author lanzado) |
+| QC-34 | crud-de-pedidos | Pedidos | backend | pending → F1.2 | feature/QC-34-crud-de-pedidos | leader (worktree montado, sin spec: pendiente `/afinar-feature`) |
 
 La feature **QC-26 — pantalla-de-recetas** se cerró el 2026-09-03 (PR #29, merge `4c4ee11`):
 resumen en `progress/history.md`, worktree desmontado, rama borrada y **base propia
@@ -156,6 +159,95 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-55 y QC-56 — creadas al acotar la tabla compartida (2026-09-04)
+
+- **Nacen del intento de acotar una feature que no existía.** `/afinar-feature` paró en su Paso 0:
+  no había ficha en el board ni en `feature_list.json`. Se crearon las dos en Jira antes de sembrar
+  nada, como manda `docs/jira.md > Cuando el disco descubre que el board está desactualizado`.
+- **Sin épica nueva.** El humano descartó crear «Componentes del sistema» y las colgó de
+  **QC-16 Plataforma**, que ya se define como «el armazón que comparten todos los módulos» y cuya
+  propia descripción pide ser la única excepción al criterio «una épica = un módulo».
+- **QC-55 no migra nada.** Entrega el componente; adoptarlo en productos y recetas es QC-56, que
+  nace `is blocked by` QC-55 **y** QC-52 (las dos editan `product-table.tsx`).
+- **`complexity` sigue `null` en ambas** a propósito: la asigna el leader en F1.0.
+- **Ninguna está sembrada.** QC-55 se acota con su propia corrida de `/afinar-feature`; los ejes
+  que quedaron identificados y sin cerrar son: el contrato de la config de filtros, si el `onChange`
+  escribe la URL o estado de React, quién pinta vacío/error/skeleton, y qué pantalla lo estrena.
+- **Divergencia detectada y NO tocada:** el board tiene **QC-52 en *En curso*** y
+  `feature_list.json` la trae `pending`. Este comando solo refleja las fichas que tocó; lo corrige
+  el F0 de la próxima sesión.
+
+### QC-44 — pantalla-de-proveedores: F0 + F1.0 (2026-09-04)
+
+- **NO arranca. Decisión del humano: espera a QC-52.** El `requirements.md` sembrado de QC-52 lo
+  dice con todas las letras en su bloque de alcance: *«Lo que NO entra: la pantalla del catálogo de
+  proveedores: es QC-44, que todavía no existe y **solo nace con más alcance**»*. QC-52 rehace la
+  línea de catálogo entera —pierde `product_id`, gana `name`, `presentation_id`, `unit_id`,
+  `image_path` y `deleted_at`, y la presentación pasa a obligatoria—, así que una pantalla
+  especificada hoy contra el CRUD de QC-43 nace muerta: formulario, tabla y tests se escribirían
+  sobre columnas que QC-52 borra. **El cupo no era el problema** (`frontend` con 0 `in_progress`);
+  lo era el alcance.
+- **`depends_on` en el board dice solo QC-43, y se queda así.** La dependencia real con QC-52 no se
+  añade como link «is blocked by» porque QC-52 no *bloquea* a QC-44: la *redefine*. Cuando QC-52
+  cierre, QC-44 se acota con `/afinar-feature` contra la estructura nueva y de ahí sale su alcance
+  ampliado. Anotado aquí para que la próxima sesión no lea el board y arranque.
+- **`complexity` sigue `null` a propósito.** Evaluarla ahora sería evaluar una ficha cuyo alcance
+  aún no existe. Se asigna al acotar.
+- **F0 de esta sesión**, corrida en paralelo con la de QC-34 y con el mismo resultado en lo
+  sustantivo: 43 issues `Tarea`, todo coincide salvo **QC-40 `ajuste-sidebar`** (*Cancelado* en el
+  board), que se importó como `cancelled`. Las dos sesiones la vieron faltar y la escribió una
+  sola: el `feature_list.json` quedó con 43 fichas y sin duplicados, verificado.
+
+### QC-34 — crud-de-pedidos: F0 + F1.0 (2026-09-04)
+
+- **F0 — importación del board.** 43 issues de tipo `Tarea` en `QC`. Comparado campo a campo
+  contra `feature_list.json` (`status`, `epic`, `epic_name`, `zone`, `complexity`, `slug`, `sdd`,
+  `depends_on`): coinciden en las 42 fichas de disco salvo una. **Divergencia real: QC-23 estaba
+  en el board en *En revisión* y en disco como `pending`** — manda el board, así que pasa a
+  `spec_ready` (su `requirements.md` sembrado ya existe, el gate lo acepta). **QC-40 `ajuste-sidebar`** (board: *Cancelado*) **no estaba
+  en disco al empezar la comparación y sí al terminarla**: la sesión paralela que lleva QC-52 la
+  importó a mitad de esta F0. Se conserva como `cancelled` — invierte el criterio del 2026-09-03,
+  que la dejaba fuera a propósito, y no la revierte esta sesión por ser trabajo ajeno en vuelo. Nada que empujar a Jira: QC-34 ya tiene `zone:backend`, `complexity:high`, `sdd` y
+  `slug:crud-de-pedidos`.
+- **El gate completo terminó en ROJO antes de tocar nada, y ninguno de los cinco archivos es de
+  esta sesión.** Diagnóstico uno por uno, corriéndolos aislados:
+  - `tests/integration/identity/identity-seed.int.test.ts` (8 casos) — **rojo de verdad y
+    reproducible en aislado**: `tx.user.deleteMany()` viola una FK porque la base local tiene
+    **datos hechos a mano** (6 productos, 1 receta, 2 líneas) cuyo `created_by` apunta al usuario
+    semilla. El test asume que ningún otro módulo tiene filas apuntando a `users`, supuesto que
+    dejó de ser cierto en cuanto QC-20/QC-24 empezaron a guardar autoría. Se limpia la base o se
+    endurece el test; **es decisión del humano porque son sus datos de prueba manual**.
+  - `tests/integration/proveedores/supplier-crud.int.test.ts` y
+    `tests/unit/inventario/product-page.test.tsx` — **flakes bajo carga**: los dos pasan al
+    correrlos solos (`supplier` tiene 0 filas; el campo del formulario recibió las teclas
+    intercaladas, patrón conocido de jsdom).
+  - `tests/unit/recetas/module-contract.test.ts` y
+    `tests/unit/recetas-ui/recipe-route-contract.test.ts` — **artefacto de correr el gate sobre
+    `dev`**: exigen que `origin/dev...HEAD` traiga diff y en `dev` ese rango está vacío
+    (`HEAD == origin/dev`). Dentro del worktree de una feature pasan.
+- **F1.0.** `zone: backend`, `complexity: high` y `branch` ya venían evaluados del board; no se
+  reevalúa nada. `depends_on` **QC-33** y **QC-8**, las dos `done`. Cupo: **cero** features
+  `in_progress` en `backend` (QC-23 está `spec_ready`, no consume cupo). Sin conflicto de archivos:
+  lo único en vuelo es **QC-52**, de zona `fullstack` —zonas distintas corren en paralelo sin
+  restricción— y toca inventario/proveedores, no `lib/modules/pedidos`.
+- Worktree montado en `.worktrees/QC-34-crud-de-pedidos`.
+- **F1.2 en pausa a propósito**: la ficha llega con **preguntas abiertas escritas en su propia
+  `description`** —qué rol puede consultar/crear/editar/borrar, si el Operador ve solo los suyos,
+  y si hay filtros por estado o prioridad— y **no existe** `specs/QC-34-crud-de-pedidos/`. Es
+  exactamente el caso que F1.2 manda ofrecer `/afinar-feature` antes de lanzar `spec_author`.
+- **QC-34 acotada con `/afinar-feature` el 2026-09-04.** Alcance, **24 decisiones cerradas** y **2
+  preguntas abiertas** en `specs/QC-34-crud-de-pedidos/requirements.md` — esa es la fuente, aqui
+  solo se enlaza. La acotacion **crecio la ficha**: el humano anadio un **cuarto estado
+  `CANCELADO` con motivo obligatorio**, asi que QC-34 deja de ser solo casos de uso y **trae
+  migracion** (valor nuevo del enum, columna del motivo, y el `CHECK` de borrado de QC-33 ampliado
+  para que tampoco se borre un cancelado). Cierra ademas las **tres cosas que QC-33 dejo escritas
+  para aqui**: permisos (solo Administrador), transiciones (solo hacia delante, con `ENTREGADO` y
+  `CANCELADO` finales) y quien calcula el correlativo (**secuencia de la base por ano**, que
+  cierra su pregunta abierta 2). **Board actualizado ANTES de sembrar**: se reescribio la
+  `description` de **QC-34** entera y se ajusto la de **QC-35**, que seguia pidiendo un campo de
+  fecha de solicitud que ya no existe y no sabia nada de cancelar. `zone`, `complexity` y
+  `depends_on` no cambian; no se creo ni cancelo ninguna ficha.
 
 - **QC-52 acotada con `/afinar-feature` el 2026-09-03.** Alcance, 16 decisiones cerradas y 3 preguntas abiertas en `specs/QC-52-separar-producto-de-catalogo-de-proveedor/requirements.md`; no se copian aquí. Nació de una decisión del humano posterior al merge de QC-43 y **arrastra tres features ya mergeadas** (QC-20, QC-22 y el propio QC-43, del que se caen las reglas que dependían del producto). El board se actualizó antes de sembrar: `description` reescrita y `complexity: high` asignada. También se importaron a `feature_list.json` las fichas **QC-52** y **QC-54**, creadas en el board despues de la ultima F0.
 
@@ -1415,6 +1507,12 @@ de la base compartida.
 - **La causa de fondo, que sigue viva:** `resetIdentityToEmptyState` borra usuarios sin limpiar
   antes las tablas que los referencian, así que **cualquier feature futura con una FK a `users`
   puede volver a provocarlo**. Arreglarlo es candidato a ficha propia.
+- **Actualización 2026-09-04 (F0 de QC-34):** sigue rojo y **ha crecido**. La base local ya no
+  tiene una fila residual sino **6 productos, 1 receta y 2 líneas**, hechos a mano probando la UI
+  (encajan con el commit `c0c16af` «fix: ui errors»). El humano **ratifica la decisión**: no se
+  borran los datos, no se mete al baseline, se declara y se sigue. Los otros cuatro archivos rojos
+  de esa corrida **no son deuda**: dos son flakes bajo carga —pasan en aislado— y dos exigen diff
+  en `origin/dev...HEAD`, vacío cuando el gate corre sobre `dev`.
 
 ### El gate rápido no ve los tests de alcance de otros módulos (2026-09-03, confirmado por QC-33)
 
