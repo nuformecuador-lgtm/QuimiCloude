@@ -118,7 +118,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
 
 ## Tanda B — El modelo nuevo en el esquema y en el SQL
 
-### T8. `[ID]` `Company` sin membresías y `users.company_id` en el esquema
+### [x] T8. `[ID]` `Company` sin membresías y `users.company_id` en el esquema
 - **Archivos:** `db/schema.prisma`.
 - **Qué:** `design.md > 1.1` y `> 1.2`. `Company` conserva todo menos `memberships`, gana
   `users User[]`, y su comentario se reescribe para que hable de la columna del usuario y no de una
@@ -129,7 +129,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   `user.roleId` a la vez.
 - **Depende de:** T7.
 
-### T9. Reescribir `migration.sql` en su sitio y renombrar la carpeta
+### [x] T9. Reescribir `migration.sql` en su sitio y renombrar la carpeta
 - **Archivos:** `db/migrations/20260904180600_companies_and_memberships/migration.sql` →
   `db/migrations/20260904180600_companies_and_user_company/migration.sql`.
 - **Qué:** los diez pasos de `design.md > 3.1`, en ese orden, incluidos los tres `DROP INDEX` + los
@@ -140,7 +140,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   `pnpm run db:migrate` la aplica limpia sobre `QuimiCloude_QC47`.
 - **Depende de:** T8, T5.
 
-### T10. Reescribir `down.sql` en su sitio
+### [x] T10. Reescribir `down.sql` en su sitio
 - **Archivos:** `db/migrations/20260904180600_companies_and_user_company/down.sql`.
 - **Qué:** los siete pasos de `design.md > 3.3`, con la guardia de R26 **la primera** y los tres
   índices de QC-4 con su texto literal (`> 2.3`). **No menciona `role_id`, ni
@@ -150,7 +150,7 @@ Resuelve la pregunta abierta 3 de `requirements.md` y el riesgo 2 de `design.md 
   `_prisma_migrations` queda sin la fila. Verificado contra Postgres real, no leído.
 - **Depende de:** T9.
 
-### T11. Test de esquema y de migración
+### [x] T11. Test de esquema y de migración
 - **Archivos:** `tests/unit/identity/schema/companies-migration.test.ts` (reescrito),
   `tests/unit/identity/schema/identity-schema.test.ts`.
 - **Qué, como mínimo:**

@@ -35,9 +35,15 @@ export interface InitialAccessRepository {
    * para incluir explicitamente los marcadores personales fijos (R7): el dominio es
    * quien los decide, no el adaptador, asi que tienen que llegar como parametros y no
    * quedar hardcodeados en la implementacion Prisma.
+   *
+   * QC-47 R20: `roleId` y `companyId` son las DOS columnas propias de la fila del
+   * usuario, y llegan juntas a esta unica llamada. La implementacion tiene que
+   * escribirlas en una sola sentencia: no puede existir ningun instante en el que quede
+   * una persona sin empresa o sin rol.
    */
   createInitialAdmin(input: {
     roleId: string;
+    companyId: string;
     username: string;
     email: string;
     passwordHash: string;

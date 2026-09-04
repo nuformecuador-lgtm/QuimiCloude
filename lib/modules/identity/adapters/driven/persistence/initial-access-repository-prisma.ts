@@ -85,9 +85,14 @@ export function createInitialAccessRepository(
 
     async createInitialAdmin(input) {
       try {
+        // QC-47 R20: `roleId` y `companyId` van como columnas del propio `user.create`,
+        // en UNA sola sentencia dentro del mismo `tx`. No hay creacion anidada ni un
+        // segundo `update` posterior: no existe ningun instante en el que la fila este
+        // escrita sin su empresa o sin su rol.
         const created = await db.user.create({
           data: {
             roleId: input.roleId,
+            companyId: input.companyId,
             username: input.username,
             email: input.email,
             passwordHash: input.passwordHash,

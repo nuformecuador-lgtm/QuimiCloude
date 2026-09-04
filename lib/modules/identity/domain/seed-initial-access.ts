@@ -111,21 +111,21 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
     // sobre una instalacion que ya tiene administrador, el seed no toca `companies` ni
     // para leer de mas ni para crear una empresa sin nadie dentro.
     const initialCompanyNameNormalized = normalizeCompanyName(INITIAL_COMPANY_NAME);
-    const existingCompanyId = await repository.findCompanyIdByNormalizedName(
-      initialCompanyNameNormalized,
-    );
-    if (existingCompanyId === null) {
-      await repository.createCompany({
+    let companyId = await repository.findCompanyIdByNormalizedName(initialCompanyNameNormalized);
+    if (companyId === null) {
+      companyId = await repository.createCompany({
         name: INITIAL_COMPANY_NAME,
         nameNormalized: initialCompanyNameNormalized,
       });
       createdCompany = INITIAL_COMPANY_NAME;
     }
 
-    // El usuario se crea en UNA sola llamada al puerto, con su rol como columna propia
-    // (QC-47 R13): no hay ningun punto intermedio en el que exista una persona sin rol.
+    // El usuario se crea en UNA sola llamada al puerto, con su rol y su empresa como
+    // columnas propias de su fila (QC-47 R13, R20): no hay ningun punto intermedio en el
+    // que exista una persona sin rol ni una persona sin empresa.
     await repository.createInitialAdmin({
       roleId: administradorRoleId,
+      companyId,
       username: hashedAdmin.username,
       email: hashedAdmin.email,
       passwordHash: hashedAdmin.passwordHash,
