@@ -1,3 +1,4 @@
+import type { Page, PageQuery } from '../domain/page';
 import type { NewOrder, OrderFilters, OrderRow } from '../domain/order-view';
 
 /**
@@ -45,16 +46,22 @@ export interface OrderRepository {
   findAliveById(id: string): Promise<OrderRow | null>;
 
   /**
-   * Listado paginado (R34, R38, R41). El `offset`/`limit` los calcula el adaptador con
-   * `lib/shared/pagination` -que el dominio no puede importar (R37)-; el orden es
-   * `priority DESC, created_at ASC, order_year ASC, order_sequence ASC`, total y por tanto
-   * estable. `total` es el numero de pedidos que cumplen los filtros, no el de la pagina.
+   * Listado paginado (R34, R38, R41). Recibe la `PageQuery` YA VALIDADA y devuelve una `Page`
+   * armada: `toOffsetLimit`/`buildPage` viven en `lib/shared/pagination`, que `domain/` NO
+   * puede importar (`docs/architecture.md > La regla de dependencias`), asi que quien pagina
+   * es el adaptador driven (R37, `design.md > 10`) — igual que en
+   * `lib/modules/proveedores/ports/supplier-repository.ts`. Si la firma entregase `offset` y
+   * `limit`, el caso de uso tendria que calcular el `offset` a mano, que es justo la
+   * reimplementacion que R37 prohibe.
+   *
+   * El orden es `priority DESC, created_at ASC, order_year ASC, order_sequence ASC`, total y
+   * por tanto estable. El `total` de la `Page` es el numero de pedidos que cumplen los
+   * filtros, no el de la pagina.
+   *
+   * (Firma corregida el 2026-09-04, aprobada por el leader; ver la nota al final de
+   * `design.md > 7.4`.)
    */
-  listAlive(
-    filters: OrderFilters,
-    offset: number,
-    limit: number,
-  ): Promise<{ rows: readonly OrderRow[]; total: number }>;
+  listAlive(filters: OrderFilters, query: PageQuery): Promise<Page<OrderRow>>;
 
   /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo. */
   updateAlive(id: string, data: NewOrder, actorId: string, now: Date): Promise<'ok' | 'not_found'>;

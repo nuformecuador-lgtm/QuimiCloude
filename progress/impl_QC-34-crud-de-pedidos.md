@@ -167,3 +167,343 @@ permite.
 `ports/order-repository.ts` esta hoy escrito con la firma **literal de `> 7.4`**
 (`offset`, `limit`), que es lo que pedia T6. Si el leader acepta la propuesta, es un cambio de tres
 lineas en ese archivo antes de T11.
+
+> **Cerrado el 2026-09-04 por el leader.** Gana la seccion 10, que es lo que hace todo el repo.
+> `design.md > 7.4` y `> 6.4` quedaron corregidos y llevan una **nota fechada** que explica la
+> contradiccion y como se resolvio, para que el reviewer pueda verla. `ports/order-repository.ts`
+> pasa a `listAlive(filters: OrderFilters, query: PageQuery): Promise<Page<OrderRow>>`.
+
+---
+
+## Tanda 2 — Grupo B (T7-T9) + Grupo D (T11, T12). Cerrada 2026-09-04
+
+Dos hilos de `backend_dev` en paralelo, sin solape de archivos: uno sobre `db/migrations/**`,
+`tests/unit/pedidos/schema/**` y `tests/integration/**`; otro sobre `lib/modules/pedidos/domain/**`
+y los tests de servicio.
+
+### Cambio de entorno (lo hizo el leader, y cambia el diagnostico de los rojos)
+
+La base **compartida** dejo de servir: la sesion paralela de QC-52 le aplico su migracion. Este
+worktree pasa a tener **base propia `QuimiCloude_QC34`**, con el `.env` del worktree apuntando ahi
+y `prisma migrate deploy` al dia. Es el precedente de QC-20, QC-25 y QC-26.
+
+**La trampa, y hay que escribirla:** ni `init.sh` ni Vitest ni `tsx` cargan ese `.env`. Todo comando
+de esta ficha va con `set -a && . ./.env && set +a && <comando>`. Si se olvida, se pega contra la
+base compartida y se leen rojos ajenos. **Con la base propia, la deuda de
+`tests/integration/identity/identity-seed.int.test.ts` desaparece**: era de los datos hechos a mano
+de la base compartida, no del codigo.
+
+### T7 — `db/migrations/20260904135210_order_cancellation/migration.sql`
+
+Escrita entera a mano, con la cabecera de aviso de drift de QC-33 y la nota de `design.md > 4.4`
+sobre `setval` e importaciones. Los cinco pasos en orden: `ADD VALUE` -> `ADD COLUMN` -> `CHECK` del
+motivo -> `DROP`/`ADD` del `CHECK` de borrado -> la funcion `next_order_sequence`.
+
+**El `::text` de los dos `CHECK` no es cosmetico**: sin el, Postgres tira `55P04 unsafe use of new
+value` por usar un valor de enum recien anadido en la misma transaccion. No se simplifica.
+
+Salida real:
+
+    Applying migration `20260904135210_order_cancellation`
+    All migrations have been successfully applied.
+
+Inspeccion del catalogo tras el UP — **los seis** `CHECK`, la columna, la funcion, el enum de cuatro
+valores, y las cuatro FK y el RLS de QC-33 **intactos** (R48):
+
+    orders_cancellation_reason_matches_status | CHECK ((((status)::text = 'CANCELADO'::text) = (cancellation_reason IS NOT NULL)))
+    orders_delivered_not_deleted              | CHECK (((deleted_at IS NULL) OR ((status)::text <> ALL (ARRAY['ENTREGADO'::text, 'CANCELADO'::text]))))
+    orders_order_sequence_positive            | CHECK ((order_sequence > 0))
+    orders_order_year_matches_created_at      | CHECK ((order_year = (EXTRACT(year FROM (created_at AT TIME ZONE 'UTC'::text)))::integer))
+    orders_quantity_positive                  | CHECK ((quantity > (0)::numeric))
+    orders_unit_price_non_negative            | CHECK ((unit_price >= (0)::numeric))
+    cancellation_reason | text | is_nullable: YES
+    OrderStatus: PENDIENTE(1) EN_CURSO(2) ENTREGADO(3) CANCELADO(4)
+    next_order_sequence(p_year integer)
+    FK: orders_created_by_fkey, orders_recipe_id_fkey, orders_unit_id_fkey, orders_updated_by_fkey
+    RLS: relrowsecurity=true, relforcerowsecurity=true
+
+### T8 — `down.sql`, y el ciclo real (R49, R50)
+
+Los cinco pasos de `design.md > 3.5`, con la guardia de datos del paso 0 y la **recreacion del
+tipo**. **Nunca `ALTER TYPE ... DROP VALUE`: no existe en Postgres, en ninguna version.**
+
+**(a) y (b) — `db:migrate` -> `db:rollback` -> `db:migrate`**, con el esquema intermedio comparado
+contra el catalogo capturado **antes** de aplicar (estado QC-33):
+
+    db:rollback: aplicando down.sql de 20260904135210_order_cancellation y borrando su fila de _prisma_migrations
+    db:rollback: 20260904135210_order_cancellation revertida.
+    === DIFF baseline QC-33 vs intermedio ===
+    IDENTICO
+    Applying migration `20260904135210_order_cancellation`
+    All migrations have been successfully applied.
+
+El `diff` compara `pg_get_constraintdef`, la columna en `information_schema`, los labels de
+`pg_enum`, `pg_proc`, `pg_class relkind='S'`, el default de `status`, las FK y el RLS. El intermedio
+trae el `CHECK` de QC-33 **literal**, **sin** `cancellation_reason`, enum de **tres** valores, sin
+funcion ni secuencias y sin ningun `OrderStatus_old` huerfano.
+
+**(c) — rollback con un pedido `CANCELADO` en la tabla.** La fila se inserto con
+`next_order_sequence(2026)`, que **creo la secuencia al vuelo y devolvio 1** — o sea R11/R12
+ejercitadas de verdad, no razonadas:
+
+    insertado: {"order_year":2026,"order_sequence":1,"status":"CANCELADO","cancellation_reason":"prueba de la guardia de datos del down.sql (T8)"}
+    === count antes ===  {"total":1}
+    === rollback (debe abortar) ===
+    db:rollback: la reversion de 20260904135210_order_cancellation fallo y no se aplico nada (transaccion deshecha):
+    ROLLBACK ABORTADO: hay 1 pedido(s) en estado CANCELADO. Revertir esta migracion los dejaria sin
+    estado valido. Decide que hacer con ellos (borrarlos fisicamente o moverlos a mano) y vuelve a intentarlo.
+    === estado despues ===
+    SIN CAMBIOS: esquema y filas identicos
+
+### T9 — `tests/unit/pedidos/schema/pedidos-migration.test.ts`, ampliado
+
+**+618 lineas, 0 borradas**: el bloque de QC-33 queda literalmente intacto. Localiza su carpeta por
+sufijo `_order_cancellation`, trocea el SQL con un partidor **consciente de `$$`** —el de QC-33
+parte por `;` a secas y despedazaria el cuerpo de la funcion y los dos bloques `DO`— y usa un
+vocabulario ingles **propio**, sin ampliar la lista cerrada de QC-33: ampliarla habria aflojado una
+guardia ajena. **Las seis mutaciones obligatorias estan y el predicado cae en las seis**,
+comprobado una a una.
+
+### T11, T12 — Los seis casos de uso y sus tests
+
+Los seis en `domain/`, factories `createXxx(deps)`, con `requireAdmin` en la **primera linea** de
+las seis. `get-order.ts` exporta `toOrderView`, que consume `list-orders.ts` para que **ficha y
+listado no puedan diverger**. `create-order.ts` estrecha `DEFAULT_ORDER_STATUS` a
+`EditableOrderStatus` con una **comprobacion real en carga de modulo**, no con un `as`: si alguien
+pusiera `CANCELADO` de defecto, revienta al cargar en vez de abrir un segundo camino hacia una
+cancelacion sin motivo.
+
+Cinco archivos de test con dobles del puerto y de los dos catalogos. Lo que demuestran, y no es
+decorativo: los seis casos de uso rechazan **siete** actores distintos —Operador, `null`,
+`undefined`, rol nulo, vacio, desconocido y `'Administradores externos'`— con dobles que **lanzan si
+los llaman** y `not.toHaveBeenCalled()` sobre los ocho metodos; ademas se comprueba
+estructuralmente que `requireAdmin` va **antes** de `safeParse` y de cualquier `deps.*` en los seis
+archivos. `list-orders` cuenta invocaciones y obtiene `[1, 1, 1]` con ids deduplicados, y el numero
+de consultas **no crece** con 1, 10 ni 25 filas (R45).
+
+### Salida real de los tests
+
+    $ pnpm run typecheck                    -> limpio, sin salida
+    $ pnpm run lint                         -> 0 errors, 2 warnings (preexistentes y ajenos)
+    $ vitest run tests/unit/pedidos         -> 13 archivos, 201 tests, 0 fallos
+    $ vitest run tests/integration/pedidos  -> 1 archivo,   27 tests, 0 fallos
+    $ vitest run guard                      -> 12 archivos, 123 tests, 0 fallos
+
+### Tres ajustes a tests existentes, declarados para el reviewer
+
+1. **`tests/integration/pedidos/pedidos-constraints.int.test.ts`** — el caso «rechaza un estado
+   fuera del enum con `22P02`» usaba `CAST('CANCELADO' AS "OrderStatus")` **como ejemplo de valor
+   inexistente**, y T7 acaba de meter `CANCELADO` en el enum: hoy es valido como enum y muere en el
+   `CHECK` de R30 con `23514`. El ejemplo pasa a `'DEVUELTO'`, que sigue sin existir en el tipo.
+   **No es una relajacion**: mismo SQLSTATE, misma fuerza, y el comentario original ya lo
+   anticipaba («anadir un valor manana es una migracion del tipo»).
+2. **`tests/unit/pedidos/module-contract.test.ts`** — el caso «la regla de transiciones vive en un
+   solo archivo» prohibia que **cualquier** otro archivo del modulo nombrase `assertTransition`, lo
+   que hace **imposible** lo que el design exige: `updateOrder` **tiene** que llamar a la guardia
+   (`design.md > 8`, capa 3; es lo que hace testeables R21 y R22). El predicado no distinguia
+   **declarar** la tabla de **consumirla** — marcaba hasta el `import`. Se ajusta conservando los
+   dientes: `DECLARA_LA_TABLA` exige `export function`/`ALLOWED`, se descuentan las dos formas
+   legitimas de consumir, y **se afirma el conjunto exacto de consumidores**
+   (`order-transitions.ts` + `update-order.ts`), de modo que uno nuevo sea una decision y no un
+   descuido. Con tres aserciones de mutacion que demuestran que el criterio todavia puede fallar.
+3. **`tests/unit/pedidos/order-view.test.ts`** — el doble del puerto devolvia
+   `{ rows: [], total: 0 }`, la firma vieja de `listAlive`. Una linea, al `Page` completo.
+
+**Ninguna dependencia nueva.** No se corrio la suite completa ni `./init.sh`: es del leader.
+
+---
+
+## Tanda 3 — Grupo E (T13, T14, T15). Cerrada 2026-09-04
+
+### Archivos
+
+Creados: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (T13),
+`lib/modules/pedidos/adapters/driving/order-actions.ts` (T15),
+`tests/unit/pedidos/order-actions.test.ts` (T15).
+
+Modificados: `lib/modules/pedidos/index.ts` (T14, las seis factories y los tipos, **solo de
+`./domain`**), `lib/composition/index.ts` (T14, **bloque nuevo al final**, reutilizando el
+`unitCatalog` que ya existia y sin reordenar nada de arriba),
+`tests/unit/recetas-ui/recipe-route-contract.test.ts` y `tests/unit/pedidos/module-contract.test.ts`.
+
+**Borrados los dos `.gitkeep` que quedaban** (`adapters/driven/`, `adapters/driving/`). **Ya no queda
+ninguno en `lib/modules/pedidos/`** (R52), comprobado sobre el arbol.
+
+### Desviacion del design, minima y declarada
+
+`design.md > 4.2` escribe el `INSERT` con el literal `'PENDIENTE'` en `status`. Se parametriza como
+`${data.status}::"OrderStatus"`. Motivo: el puerto recibe `NewOrder.status`, de tipo
+`EditableOrderStatus` —que **no puede expresar** la cancelacion—, y dejar el literal haria que el
+adaptador **ignorara en silencio** lo que el caso de uso decide (R9). Queda comentado en el archivo.
+El resto del `INSERT` es literal, con `next_order_sequence($year)` **dentro** y **un solo reloj**
+para `created_at` y `order_year` (R10).
+
+### Prueba de humo contra el Postgres real
+
+Ademas de los tests, el adaptador se ejercito contra `QuimiCloude_QC34` con un script temporal (ya
+borrado): correlativos `2026-1` y `2026-2` desde la secuencia **creada al vuelo**, decimales de
+vuelta como `12.5000` y `0.0000`, `ORDER BY priority DESC` dando `ALTA` antes que `BAJA`, filtros
+combinados, `updateAlive` -> `ok`/`not_found`, `cancelAlive` escribiendo estado y motivo **juntos**,
+la base **rechazando** borrar el cancelado, y el borrado logico de un `PENDIENTE` sacandolo de
+`findAliveById`. La base quedo **exactamente** como estaba: sin filas y sin `orders_sequence_2026`.
+
+### CINCO retensados de tests, y el reviewer tiene que mirarlos uno a uno
+
+Todos con **allowlist nombrada, comentada y fechada (2026-09-04)**, y en los cinco se pasa de «cero»
+a «un dueno nombrado» — nunca a «cualquiera». La causa es la misma en todos: **QC-33 congelo el
+armazon vacio de `pedidos` y esta ficha es, por definicion, la que lo llena**; varias premisas de
+QC-33 caen por requisitos que la propia QC-33 anuncio que resolveria QC-34.
+
+1. **`tests/unit/recetas-ui/recipe-route-contract.test.ts`** (era el unico rojo real de la tanda):
+   `AMPLIACION_RECETAS_QC34` con los tres archivos de `recetas` (R43/R44 + QC-33 R32) y
+   `MIGRACION_QC34` con `db/schema.prisma` y los dos `.sql` de la migracion, **nombrados uno a uno**.
+   Todo lo demas de `recetas` y de `db/` sigue congelado.
+2. **Cierre transitivo del barrel**: prohibia `adapters/` **y** `ports/`. El barrel publica ahora las
+   seis factories, y una factory tipa su repositorio con el puerto -> `ports/` es alcanzable **por
+   fuerza**. `adapters/` **sigue prohibido**, y las siete aserciones de «nada de servidor» se aplican
+   a todo lo alcanzable, el puerto incluido.
+3. **`prisma.order`**: de lista vacia a exactamente `order-prisma.ts`, sobre todo el repo (R53).
+4. **`@prisma/client` dentro de `pedidos`**: mismo dueno unico.
+5. **`driving/` vacia + «ningun `'use server'`» + «composicion no nombra pedidos»**: pasa a «un solo
+   archivo driving», «`'use server'` solo ahi» y **exclusividad** de `lib/composition` (nadie mas
+   importa `order-prisma`).
+
+### Salida real
+
+    $ pnpm run typecheck  -> limpio, sin salida
+    $ pnpm run lint       -> 0 errors, 2 warnings (preexistentes y ajenos)
+    $ vitest run tests/unit/pedidos/ tests/unit/recetas/ tests/unit/recetas-ui/ tests/integration/pedidos/ guard
+      -> 48 archivos, 583 tests, 0 fallos
+
+---
+
+## Tanda 4 — Grupo F (T16, T17). Cerrada 2026-09-04
+
+Creados `tests/integration/pedidos/order-crud.int.test.ts` (**16 casos**) y
+`tests/integration/pedidos/order-sequence.int.test.ts` (**5 casos**).
+
+**T16** (R8, R10, R30, R32, R40, R41): el alta con **la sentencia real del adaptador**
+(`next_order_sequence` dentro del `INSERT`, `RETURNING` id + correlativo) y su relectura; la frontera
+del **31/12/2026 a las 20:00 en Ecuador** (`order_year` 2026 -> `23514`; 2027 aceptado, y
+`created_at` releido como `2027-01-01T01:00:00.000Z`); los **cuatro** casos del `CHECK` del motivo
+—cancelado con motivo pasa, cancelado sin motivo `23514`, no-cancelado con motivo `23514` **en los
+tres estados vivos**, no-cancelado sin motivo pasa en los tres—; los **seis** del `CHECK` de borrado
+—`PENDIENTE` si, `EN_CURSO` si, `ENTREGADO` no, `CANCELADO` no, poner `ENTREGADO` a uno borrado no,
+poner `CANCELADO` a uno borrado no—; `priority DESC` dando `CRITICA, ALTA, MEDIA, BAJA` con las filas
+**sembradas en desorden**, y el desempate por `(order_year, order_sequence)` con `created_at`
+**identico al milisegundo**; y que el borrado no vuelve en ficha ni listado —con la fila intacta—
+mientras el cancelado si vuelve con su motivo.
+
+**T17** (R11, R12, R13): primera alta de un ano **comprobando en `pg_class` que la secuencia no
+existia**, sale 1, y despues existe; dos altas del mismo ano -> 1 y 2; el **hueco** (una cantidad
+cero viola `orders_quantity_positive` **despues** de consumir el numero: la siguiente sale 3 y el 2
+queda vacio para siempre); un ano nuevo arranca en 1 sin mover el anterior; y la **concurrencia con
+dos `pg.Client` reales**: A crea la secuencia dentro de su transaccion, B queda **bloqueada** —y eso
+se comprueba mirando `pg_locks` con `NOT granted AND pid = <pid de B>`, **no con un `setTimeout` a
+ojo**, afirmando ademas que su promesa no ha resuelto—, A confirma y B obtiene 2. Las dos acaban
+bien, con posiciones distintas.
+
+### Tres decisiones de los tests de integracion, documentadas en la cabecera de cada archivo
+
+1. **No se llaman las funciones del adaptador** (`createOrder`, etc.): hablan con el cliente Prisma
+   **global**, asi que dentro de `prisma.$transaction` correrian en **otra conexion del pool** y
+   harian `COMMIT` en la base. Se ejecuta **la misma sentencia** por `tx.$queryRaw`, que es lo que
+   de verdad ejercita `next_order_sequence` dentro del `INSERT`.
+2. **El caso concurrente no inserta pedidos**, solo llama a la funcion con dos conexiones: para que
+   B vea la secuencia, A tiene que **confirmar**, y una transaccion no ve las FK que otra no ha
+   confirmado; un alta completa concurrente exigiria **commitear fixtures** en una base que los
+   demas archivos comparten. La unica huella es la secuencia, y se borra en el `finally`, en
+   `afterAll` **y** en `beforeAll` —por si una corrida se interrumpio—.
+3. El sexto caso del `CHECK` de borrado escribe estado **y** motivo en la misma sentencia **a
+   proposito**: sin el motivo saltaria el `CHECK` de la seccion 3.3 y el test dejaria de demostrar
+   el de la 3.4.
+
+### Higiene de la base, verificada tras las corridas
+
+`orders = 0`, secuencias `orders_sequence_% = 0`, `users = 0`, `roles = 0`, `recipes = 0`,
+`document_types = 1` (solo `CC`, del seed) y `units = 4` (solo el catalogo arrancador). **Cero
+residuos.** Los 48 casos de `tests/integration/pedidos/` se corrieron **dos veces seguidas** con el
+mismo resultado: no dependen del orden.
+
+---
+
+## T18 — Trazabilidad `R<n> -> test`. Los 58 requisitos, ninguno sin test
+
+Todas las rutas verificadas **contra el arbol de la rama**, no contra el spec. Las de
+`tests/unit/pedidos/` van sin prefijo.
+
+| R | Que exige | Test que lo cierra |
+| --- | --- | --- |
+| R1 | El actor entra **por parametro**; `domain/` y `ports/` no leen sesion | `authorization.test.ts` + `scope.test.ts` |
+| R2 | No-Administrador rechazado **sin tocar ningun puerto** | `authorization.test.ts` (dobles que **lanzan** si los llaman) |
+| R3 | Falla cerrado: sin actor, rol nulo/vacio/desconocido | `authorization.test.ts` (siete actores) |
+| R4 | El rol sale de **una sola constante importada** | `authorization.test.ts` + `module-contract.test.ts` |
+| R5 | El driving toma el actor de `identity.getSessionUser()` | `order-actions.test.ts` |
+| R6 | Los dos autores salen del actor, **nunca** de la entrada | `order-service.test.ts` |
+| R7 | RLS activada **y forzada** tras la migracion | `tests/guards/guard-rls-force.test.ts` |
+| R8 | El alta persiste y devuelve id + correlativo | `order-service.test.ts` + `integration/pedidos/order-crud.int.test.ts` |
+| R9 | Nace `PENDIENTE`/`BAJA`; no acepta estado, motivo, correlativo ni autores | `order-input.test.ts` + `order-service.test.ts` |
+| R10 | El ano del correlativo y `created_at`, **del mismo instante UTC** | `order-crud.int.test.ts` (frontera 31/12 20:00 Ecuador) |
+| R11 | La posicion sale de una **secuencia de la base** por ano | `order-sequence.int.test.ts` |
+| R12 | La primera alta del ano **crea** la secuencia y arranca en 1; dos simultaneas acaban las dos | `order-sequence.int.test.ts` (dos `pg.Client` reales) |
+| R13 | No se reutiliza una posicion consumida; se aceptan huecos | `order-sequence.int.test.ts` |
+| R14 | El numero visible se compone con la **unica** definicion publicada | `domain/order-number.test.ts` + `order-service.test.ts` |
+| R15 | Receta ausente/inexistente/de baja: rechazo **antes** del repositorio | `order-service.test.ts` |
+| R16 | Unidad ausente/inexistente: rechazo antes del repositorio | `order-service.test.ts` |
+| R17 | Cantidad ausente, cero o negativa | `order-input.test.ts` + `order-service.test.ts` |
+| R18 | Precio ausente o negativo; **el cero vale** | `order-input.test.ts` |
+| R19 | Prioridad/estado fuera del conjunto cerrado, **en el borde** | `order-input.test.ts` |
+| R20 | Edicion como **reemplazo completo** | `order-service.test.ts` |
+| R21 | `ENTREGADO`/`CANCELADO` no admiten **ninguna** edicion | `order-service.test.ts` + `order-transitions.test.ts` |
+| R22 | Las transiciones permitidas, y solo esas | `order-transitions.test.ts` (matriz **4x4 completa**) |
+| R23 | La restriccion **no** baja a la base | `order-transitions.test.ts` + `module-contract.test.ts` (ningun `TRIGGER`) |
+| R24 | La edicion **no** puede escribir `CANCELADO` ni motivo | `order-input.test.ts` + `order-transitions.test.ts` + `order-view.test.ts` |
+| R25 | Receta de baja: se acepta si **no cambia**, se rechaza si cambia | `order-service.test.ts` |
+| R26 | Cancelar es caso de uso propio y **unico** camino a `CANCELADO` | `cancel-order.test.ts` + `order-service.test.ts` |
+| R27 | Motivo ausente, vacio, de espacios o de 501 caracteres | `order-input.test.ts` + `cancel-order.test.ts` |
+| R28 | Se cancela desde `PENDIENTE`/`EN_CURSO`, nunca desde los finales | `cancel-order.test.ts` |
+| R29 | El motivo se conserva integro y vuelve en ficha y listado | `cancel-order.test.ts` + `order-service.test.ts` + `list-orders.test.ts` |
+| R30 | Motivo **si y solo si** cancelado, **en la propia base** | `order-crud.int.test.ts` (los **cuatro** casos) + `schema/pedidos-migration.test.ts` |
+| R31 | Borrado logico, sin restaurar ni listar borrados | `delete-order.test.ts` |
+| R32 | No se borra `ENTREGADO` ni `CANCELADO`: aplicacion **y** base | `delete-order.test.ts` + `order-crud.int.test.ts` (los **seis** casos) |
+| R33 | «No encontrado» en consulta, edicion, cancelacion y borrado | `order-service.test.ts`, `cancel-order.test.ts`, `delete-order.test.ts` |
+| R34 | Tamano de pagina efectivo + total | `list-orders.test.ts` |
+| R35 | Por defecto 10, tope 25 | `list-orders.test.ts` + `tests/unit/pagination.test.ts` (QC-20) |
+| R36 | Pagina/tamano no enteros o menores que 1: rechazo **sin leer** | `order-input.test.ts` + `list-orders.test.ts` |
+| R37 | La aritmetica de paginacion **no** se reimplementa | `scope.test.ts` + `list-orders.test.ts` |
+| R38 | Filtros por estado y prioridad, opcionales y combinables | `list-orders.test.ts` |
+| R39 | Sin busqueda por texto ni filtro por numero | `list-orders.test.ts` |
+| R40 | Borrados nunca; cancelados si | `list-orders.test.ts` + `order-service.test.ts` + `order-crud.int.test.ts` |
+| R41 | Prioridad DESC, antiguedad ASC, desempate por correlativo | `list-orders.test.ts` + `order-crud.int.test.ts` (con el enum real) |
+| R42 | La ficha devuelve los campos del pedido | `order-service.test.ts` (campo a campo) |
+| R43 | Nombres de receta y unidad **por contrato publico** | `order-service.test.ts` + `list-orders.test.ts` + `scope.test.ts` |
+| R44 | La receta de baja **devuelve su nombre igual** | `list-orders.test.ts` + `tests/unit/recetas/recipe-catalog.test.ts` |
+| R45 | **Una** consulta a cada catalogo por pagina | `list-orders.test.ts` (**contador de invocaciones**, ids deduplicados, 1/10/25 filas) |
+| R46 | Los autores salen como **ids** | `order-service.test.ts` + `list-orders.test.ts` |
+| R47 | El total **no** se persiste ni se anade columna | `order-view.test.ts` + `schema/pedidos-schema.test.ts` + `pedidos-constraints.int.test.ts` |
+| R48 | La migracion se limita a lo declarado | `schema/pedidos-migration.test.ts` (los cuatro `ALTER TABLE` exactos **y nada mas**) |
+| R49 | Revertir deja el esquema **exacto** de QC-33, recreando el tipo | `schema/pedidos-migration.test.ts` + **T8, ciclo real ejecutado** |
+| R50 | Con un `CANCELADO`, la reversion **aborta** sin tocar filas | `schema/pedidos-migration.test.ts` + **T8 (c), ejecutado** |
+| R51 | Identificadores de base **en ingles** | `schema/pedidos-migration.test.ts` (vocabulario propio de QC-34) |
+| R52 | Forma del modulo, contrato solo de `./domain`, sin `.gitkeep` sobrantes | `scope.test.ts` + `module-contract.test.ts` + `guard-arquitectura-modulos` |
+| R53 | `pedidos` no consulta receta/unidad/usuario con Prisma | `scope.test.ts` + `module-contract.test.ts` + `guard-arquitectura-modulos` |
+| R54 | Server Actions: `FormData` en mutaciones, tipado en consultas; sin route handler | `order-actions.test.ts` + `scope.test.ts` |
+| R55 | Toda entrada externa validada con esquema en el borde | `order-input.test.ts` + `order-actions.test.ts` |
+| R56 | Errores con `code` estable, traducidos **por el `code`, nunca el texto** | `order-actions.test.ts` + los cinco tests de servicio |
+| R57 | Ninguna pantalla, pagina, ruta ni E2E en esta ficha | `scope.test.ts` |
+| R58 | Ninguna dependencia de terceros nueva | `scope.test.ts` + `tests/guards/guard-dependencias-aprobadas.test.ts` |
+
+**58 de 58 con test.** Ninguno queda sin cerrar, y `CHECKPOINTS.md > Trazabilidad` se puede marcar.
+
+### Estado final que verifica el implementer (no la suite entera: esa es del leader)
+
+    $ pnpm run typecheck   -> limpio, sin salida
+    $ pnpm run lint        -> 0 errors, 2 warnings (preexistentes y ajenos a esta ficha)
+    $ vitest run tests/unit/pedidos tests/unit/recetas tests/unit/recetas-ui tests/integration/pedidos tests/guards
+      -> 49 archivos, 592 tests, 0 fallos
+
+Los tres `.gitkeep` de `lib/modules/pedidos/` estan **borrados**, comprobado sobre el arbol (R52).
+
+**Lo que falta para cerrar T18 es el `./init.sh` completo, que corre el leader**: esta ficha acopla
+SQL, tipos enumerados y forma del arbol de modulos, y **el grafo de imports no lo ve**. **F2.3 y F2.4
+no se han hecho**: ni sincronizacion con `dev` ni PR, por instruccion expresa.

@@ -130,7 +130,11 @@ describe('pedidos — el puerto declara los seis metodos de design.md > 7.4', ()
     const doble: OrderRepository = {
       create: async () => 'duplicate_number',
       findAliveById: async () => null,
-      listAlive: async () => ({ rows: [], total: 0 }),
+      // `listAlive` devuelve una `Page` ya armada, no `{ rows, total }`: la firma se corrigio
+      // el 2026-09-04 (nota al final de `design.md > 7.4`, aprobada por el leader) para que el
+      // caso de uso no tenga que calcular el `offset`, que es la reimplementacion que R37
+      // prohibe. Quien pagina es el adaptador driven con `lib/shared/pagination`.
+      listAlive: async () => ({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 }),
       updateAlive: async () => 'not_found',
       cancelAlive: async (_id, reason) => (reason.length > 0 ? 'ok' : 'not_found'),
       softDeleteAlive: async () => 'ok',

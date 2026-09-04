@@ -298,10 +298,23 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     const alcanzables = reachableFrom(barrel)
     expect(alcanzables.length).toBeGreaterThan(1)
     for (const file of alcanzables) {
+      // RETENSADO 2026-09-04 (QC-34, T14): antes se prohibia `adapters/` Y `ports/`. Esa
+      // premisa cayo, y no por un aflojamiento: el barrel publica ahora las SEIS factories de
+      // caso de uso (su R52), y una factory declara su repositorio con el TIPO del puerto, asi
+      // que `ports/order-repository.ts` es alcanzable por fuerza. Prohibirlo obligaria a que el
+      // dominio dejara de tipar sus dependencias, que es lo contrario de lo que la arquitectura
+      // pide.
+      //
+      // Lo que este caso protegia de verdad -que el barrel no arrastre SERVIDOR- sigue intacto,
+      // y con mas dientes que antes: `adapters/` sigue PROHIBIDO -ahi vive Prisma-, y las siete
+      // aserciones de abajo (nada de 'use server', ni @prisma/client, ni next, ni react, ni
+      // lib/shared, ni lib/composition, ni prisma.order) se aplican a TODO archivo alcanzable,
+      // el puerto incluido. Un puerto es una interfaz sin framework; un adaptador es la
+      // implementacion, y esa es la linea.
       expect(
         toPosix(relative(pedidosDir, file)),
-        `${etiqueta(file)} vive en adapters/ o ports/ y es alcanzable desde el barrel`,
-      ).not.toMatch(/^(adapters|ports)\//)
+        `${etiqueta(file)} vive en adapters/ y es alcanzable desde el barrel`,
+      ).not.toMatch(/^adapters\//)
 
       const source = read(file)
       const nombre = etiqueta(file)
@@ -325,9 +338,18 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // el —`adapters/driven/` esta vacia hasta QC-34 (R39)—. Lo que se afirma es la lista vacia
     // sobre TODO el codigo de aplicacion: `lib`, `app`, `components`, `hooks`, `scripts` y
     // `middleware.ts`.
+    //
+    // RETENSADO 2026-09-04 (QC-34, T13). La lista permitida deja de estar VACIA y pasa a tener
+    // EXACTAMENTE UN archivo, nombrado. No es un aflojamiento: QC-33 escribio el modelo y dejo
+    // `adapters/driven/` vacia, asi que entonces la respuesta correcta era «nadie»; QC-34
+    // escribe el adaptador, y R52 dice literalmente donde va. Lo que este caso protege -que
+    // NINGUN otro modulo, ninguna pantalla y ningun script toquen `orders`, y que dentro de
+    // `pedidos` solo lo haga el driven- se vigila ahora mejor: cualquier segundo archivo, aqui
+    // o en cualquier otra carpeta del repo, pone esto rojo.
+    const DUENO_DE_ORDERS = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
     expect(todoElCodigo.length).toBeGreaterThan(0)
     expect(entradasReales).toHaveLength(todoElCodigo.length)
-    expect(nombresQueConsultan(entradasReales, 'order')).toEqual([])
+    expect(nombresQueConsultan(entradasReales, 'order')).toEqual([DUENO_DE_ORDERS])
 
     // Y la MISMA funcion, sobre los MISMOS archivos reales mas una entrada sintetica con una
     // consulta de verdad, devuelve exactamente esa entrada. Esto es lo que impide que la lista
@@ -337,7 +359,10 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       nombre: '<sintetico>',
       fuente: 'export async function x(prisma: unknown) { await prisma.order.findMany({}) }',
     }
-    expect(nombresQueConsultan([...entradasReales, sintetico], 'order')).toEqual(['<sintetico>'])
+    expect(nombresQueConsultan([...entradasReales, sintetico], 'order')).toEqual([
+      DUENO_DE_ORDERS,
+      '<sintetico>',
+    ])
 
     // Tambien con el receptor renombrado, que es la forma por la que se escaparia: el barrido
     // no depende de que el cliente se llame `prisma`.
@@ -346,6 +371,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       fuente: 'await db.order.create({ data })',
     }
     expect(nombresQueConsultan([...entradasReales, conOtroReceptor], 'order')).toEqual([
+      DUENO_DE_ORDERS,
       '<sintetico-db>',
     ])
   })
@@ -407,9 +433,24 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       ])
     }
 
-    // Tampoco importa el cliente de Prisma en ningun archivo del modulo, ni el cliente
-    // compartido: hoy `pedidos` es modelo y contrato, y no habla con ninguna base.
+    // Y el cliente de Prisma lo importa UN SOLO archivo del modulo, nombrado.
+    //
+    // RETENSADO 2026-09-04 (QC-34, T13). Antes: NINGUNO, porque «hoy `pedidos` es modelo y
+    // contrato y no habla con ninguna base». Eso dejo de ser cierto con esta ficha, que escribe
+    // el adaptador driven que R52 exige. La regla que importaba no era «cero Prisma» sino «un
+    // solo dueno»: el dominio y los puertos siguen sin poder verlo -que es lo que los hace
+    // testeables sin base-, y un segundo archivo del modulo que importe el cliente sigue
+    // poniendo esto rojo.
+    const DUENO_DE_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
+    expect(
+      pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),
+    ).toEqual([DUENO_DE_PRISMA])
+    expect(
+      pedidosSources.filter((file) => /@\/lib\/shared\/(db|prisma)/.test(read(file))).map(etiqueta),
+    ).toEqual([DUENO_DE_PRISMA])
+    // Y ni el dominio ni los puertos lo ven, dicho aparte para que se lea como lo que es.
     for (const file of pedidosSources) {
+      if (etiqueta(file) === DUENO_DE_PRISMA) continue
       const source = read(file)
       expect(source, `${etiqueta(file)} importa @prisma/client`).not.toMatch(/@prisma\/client/)
       expect(source, `${etiqueta(file)} importa el cliente compartido`).not.toMatch(
@@ -503,9 +544,21 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // seguia importando de R19: la tabla de transiciones esta en UN SOLO sitio y ningun otro
     // archivo del modulo declara la suya. Dos tablas serian dos verdades sobre lo mismo. Se
     // vigila el CODIGO, comentarios fuera: la prosa si puede hablar de transiciones.
+    //
+    // AJUSTADO EN T11 (2026-09-04), y hay que decir por que. La version anterior exigia que
+    // NINGUN otro archivo nombrase `assertTransition`, y eso no distinguia DECLARAR la tabla
+    // de CONSUMIRLA: `updateOrder` tiene que llamar a la guardia -es la tercera de las cuatro
+    // capas de `design.md > 8` y lo que hace testeables R21 y R22-, asi que con el criterio
+    // viejo la regla no se podia cumplir sin dejar la edicion sin guardia. Lo que se vigila
+    // sigue siendo lo mismo y con los mismos dientes: la tabla se DECLARA en un solo sitio y
+    // nadie escribe una segunda; lo unico que se admite fuera del dueno es la LLAMADA, y el
+    // conjunto de quien llama se afirma explicitamente para que un consumidor nuevo sea una
+    // decision y no un descuido.
     const PROHIBIDO =
       /\b(transitions?|transicion\w*|canTransition|allowedStatus\w*|nextStatus|stateMachine|maquina)\b/i
-    const DECLARA_LA_TABLA = /\bALLOWED\b|assertTransition|isAllowedTransition/
+    const DECLARA_LA_TABLA =
+      /\bALLOWED\b|export function assertTransition|export function isAllowedTransition/
+    const CONSUME_LA_GUARDIA = /\b(assertTransition|isAllowedTransition)\s*\(/
     expect(pedidosSources.length).toBeGreaterThan(0)
 
     const DUENO = 'lib/modules/pedidos/domain/order-transitions.ts'
@@ -513,10 +566,32 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       [DUENO],
     )
 
+    // Quien la CONSUME, y nadie mas: cancelar no pasa por aqui -es `cancelOrder` y su propio
+    // `NotCancellableError` (R28)- y borrar tampoco (R32).
+    expect(
+      pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
+    ).toEqual([DUENO, 'lib/modules/pedidos/domain/update-order.ts'])
+
     for (const file of pedidosSources) {
       if (etiqueta(file) === DUENO) continue
-      expect(read(file), `${etiqueta(file)} declara una transicion de estado`).not.toMatch(PROHIBIDO)
+      // Se descuentan las DOS formas legitimas de consumir al dueno -importarlo y llamarlo-;
+      // lo que quede tiene que estar limpio. Un `const ALLOWED = {...}` propio, un
+      // `canTransition`, un `nextStatus` o una segunda `stateMachine` siguen cayendo aqui.
+      const sinConsumo = read(file)
+        .replace(/from\s+'[^']*order-transitions'/g, ' ')
+        .replace(/\b(assertTransition|isAllowedTransition)\b/g, ' ')
+      expect(sinConsumo, `${etiqueta(file)} declara una transicion de estado`).not.toMatch(PROHIBIDO)
     }
+
+    // El criterio tiene que poder FALLAR: una segunda tabla en otro archivo se ve, y una
+    // simple llamada a la guardia no.
+    expect(DECLARA_LA_TABLA.test('const ALLOWED = { PENDIENTE: [] }')).toBe(true)
+    expect(DECLARA_LA_TABLA.test('assertTransition(row.status, data.status)')).toBe(false)
+    expect(
+      PROHIBIDO.test(
+        "const nextStatus = 'EN_CURSO'".replace(/\b(assertTransition|isAllowedTransition)\b/g, ' '),
+      ),
+    ).toBe(true)
 
     // Y la restriccion NO baja a la base (QC-33 R19, QC-34 R23): ningun trigger impone que
     // estado puede seguir a cual. No hay ni un trigger en este repositorio.
@@ -561,18 +636,33 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     expect(rellenos).toEqual(['lib/modules/pedidos/domain/order-number.ts'])
   })
 
-  it('la feature no añade adaptadores driving, rutas ni Server Actions', () => {
-    // R39: esta ficha es esquema, migracion y armazon del modulo. Ninguna alta, consulta,
-    // edicion ni borrado de pedidos —eso es QC-34— y por tanto ningun flujo navegable que un
-    // E2E pueda visitar (decision cerrada 25).
+  it('las Server Actions viven en UN SOLO archivo driving, y no hay ninguna ruta HTTP ni pantalla', () => {
+    // RETENSADO 2026-09-04 (QC-34, T15). La version de QC-33 exigia que `adapters/driving/`
+    // estuviera VACIA y que no hubiera ni un `'use server'` en el modulo, porque aquella ficha
+    // era esquema, migracion y armazon: las Server Actions eran explicitamente de QC-34 (su
+    // R39 lo decia con esas palabras). QC-34 las escribe (su R54), asi que la premisa cayo por
+    // el requisito que la propia QC-33 anuncio, no por conveniencia.
+    //
+    // Lo que se sigue vigilando -y es todo lo que ese caso protegia de verdad- es el ALCANCE:
+    // las actions estan en UN solo archivo dentro de `adapters/driving/`, ningun otro archivo
+    // del modulo declara `'use server'`, no hay ninguna ruta HTTP ni pantalla de pedidos, y
+    // `app/`/`components/` siguen sin conocer el modulo -la pantalla es QC-35 (R57)-.
+    const ACTIONS = 'lib/modules/pedidos/adapters/driving/order-actions.ts'
     const driving = join(pedidosDir, 'adapters', 'driving')
-    expect(sourcesIn(driving), `${etiqueta(driving)} deberia estar vacia`).toEqual([])
-    expect(readdirSync(driving)).toEqual(['.gitkeep'])
+    expect(sourcesIn(driving).map(etiqueta)).toEqual([ACTIONS])
+    expect(readdirSync(driving), 'driving/ conserva un .gitkeep con codigo dentro').not.toContain(
+      '.gitkeep',
+    )
 
-    // Ningun 'use server' en TODO el modulo, no solo en lo alcanzable desde el barrel.
-    for (const file of pedidosSources) {
-      expect(read(file), `${etiqueta(file)} declara 'use server'`).not.toMatch(/['"]use server['"]/)
-    }
+    // El `'use server'` esta en ese archivo y SOLO en ese: ni el dominio, ni los puertos, ni el
+    // adaptador driven pueden declararlo.
+    expect(
+      pedidosSources.filter((file) => /['"]use server['"]/.test(read(file))).map(etiqueta),
+    ).toEqual([ACTIONS])
+
+    // Y la action NO pasa por el barrel (`docs/architecture.md`, excepcion de los driving):
+    // QC-35 la importara por su ruta exacta.
+    expect(read(barrel), 'el barrel reexporta la Server Action').not.toMatch(/order-actions/)
 
     // Ninguna ruta HTTP ni pantalla de pedidos.
     for (const ruta of [
@@ -595,14 +685,28 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       )
     }
 
-    // `lib/composition` NO se toca: `pedidos` no cablea nada porque no tiene puerto ni
-    // adaptador (`design.md > 1`). Esta es la asercion que se pone roja si alguien adelanta
-    // QC-34 por la puerta de atras.
+    // `lib/composition` cablea `pedidos`, y es el UNICO sitio del repo que puede hacerlo (R52).
+    //
+    // RETENSADO 2026-09-04 (QC-34, T14). QC-33 afirmaba aqui que la composicion no nombraba
+    // `pedidos` -«no cablea nada porque no tiene puerto ni adaptador»-, y era la asercion que
+    // impedia adelantar QC-34 por la puerta de atras. Ya no se adelanta nada: es su ficha. Lo
+    // que se vigila ahora es la EXCLUSIVIDAD, que es la regla que de verdad importaba: el
+    // puerto se ata a su implementacion en `lib/composition` y en ningun otro sitio.
     const composicion = sourcesIn(join(repoRoot, 'lib', 'composition'))
       .map((file) => read(file))
       .join('\n')
     expect(composicion.length).toBeGreaterThan(0)
-    expect(composicion, 'la composicion ya cablea algo de pedidos').not.toMatch(/modules\/pedidos/)
+    expect(composicion, 'la composicion deberia cablear pedidos').toMatch(
+      /adapters\/driven\/persistence\/order-prisma/,
+    )
+
+    // Y nadie mas instancia el adaptador driven: ni una pantalla, ni un script, ni el propio
+    // driving -que lo pide a la composicion, nunca lo construye (regla 3 de los modulos)-.
+    expect(
+      todoElCodigo
+        .filter((file) => /adapters\/driven\/persistence\/order-prisma/.test(read(file)))
+        .map(etiqueta),
+    ).toEqual(['lib/composition/index.ts'])
 
     // Y `db:seed` tampoco sabe de pedidos.
     const seedScript = read(join(repoRoot, 'scripts', 'seed.ts'))

@@ -468,7 +468,9 @@ El caso de uso de listado hace, **en este orden**:
 
 1. `requireAdmin(actor)`.
 2. `pageQuerySchema` + esquema de filtros.
-3. **una** llamada al repositorio: `listAlive(filters, offset, limit)` → `{ rows, total }`.
+3. **una** llamada al repositorio: `listAlive(filters, query)` → `Page<OrderRow>`. El caso de uso
+   **no** calcula `offset`/`limit`: los deriva el adaptador driven con `lib/shared/pagination`
+   (§ 10, R37). *(Corregido el 2026-09-04 al implementar; ver la nota al final de § 7.4.)*
 4. `const recipeIds = [...new Set(rows.map(r => r.recipeId))]` y lo mismo con `unitIds`.
 5. **una** llamada a `recipes.findRefsIncludingDeleted(recipeIds)` y **una** a
    `units.findRefs(unitIds)` — dos llamadas por página, no dos por fila.
@@ -555,7 +557,7 @@ aprobada (§ 13).
 export interface OrderRepository {
   create(data: NewOrder, year: number, actorId: string, now: Date): Promise<OrderRow | 'duplicate_number'>;
   findAliveById(id: string): Promise<OrderRow | null>;
-  listAlive(filters: OrderFilters, offset: number, limit: number): Promise<{ rows: readonly OrderRow[]; total: number }>;
+  listAlive(filters: OrderFilters, query: PageQuery): Promise<Page<OrderRow>>;
   updateAlive(id: string, data: NewOrder, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
   cancelAlive(id: string, reason: string, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
   softDeleteAlive(id: string, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
@@ -578,6 +580,22 @@ export interface OrderRepository {
   y dos ediciones simultáneas del mismo pedido pueden aplicar una transición que ya no es válida. Es
   la última escritura la que gana, no hay bloqueo optimista, y **nada de esto puede producir un
   estado imposible**, porque las dos invariantes caras siguen en la base (§ 3.3, § 3.4).
+
+> **Corrección del 2026-09-04, detectada al implementar (T6/T11) y aprobada por el leader.** Esta
+> sección y § 6.4 declaraban `listAlive(filters, offset, limit): Promise<{ rows, total }>`, es decir,
+> el **caso de uso** entregando `offset` y `limit`. Eso **contradice § 10**, que dice —con su motivo
+> escrito— que `lib/shared/pagination` lo llama el **adaptador driven** porque `domain/` no puede
+> importarlo. La contradicción no era cosmética: con la firma vieja, `listOrders` tendría que
+> calcular el `offset` a mano, que es justo la reimplementación que **R37** prohíbe y que
+> `tests/unit/pedidos/scope.test.ts` pone en rojo. Gana **§ 10**, que además es lo que hace todo el
+> repo —`lib/modules/proveedores/ports/supplier-repository.ts` declara
+> `listAlive(query: PageQuery): Promise<Page<SupplierView>>`, y `toOffsetLimit`/`buildPage` solo
+> aparecen en `adapters/driven/persistence/**` de `inventario` y `proveedores`, nunca en `domain/`—.
+> Las dos firmas quedan alineadas arriba. Ningún requisito cambia: sigue habiendo **una** llamada al
+> repositorio y **una** a cada catálogo por página (R45), el orden y los filtros siguen en el
+> adaptador (R38, R40, R41) y el defecto de 10 / tope de 25 siguen siendo de `lib/shared/pagination`
+> (R35). El caso de uso mapea `Page<OrderRow>` a `Page<OrderSummary>` conservando `total`, `page`,
+> `pageSize` y `totalPages`.
 
 ### 7.5 Errores (R56)
 

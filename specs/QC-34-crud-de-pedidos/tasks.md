@@ -110,7 +110,7 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo B — la migración (lo caro; no se paraleliza consigo misma)
 
-- [ ] **T7 — `migration.sql`.** Carpeta `db/migrations/<ts>_order_cancellation/`, escrita **entera a
+- [x] **T7 — `migration.sql`.** Carpeta `db/migrations/<ts>_order_cancellation/`, escrita **entera a
       mano** siguiendo `design.md > 3.1–3.4` y `> 4.1`, con la cabecera de aviso de drift: `ADD VALUE`
       → `ADD COLUMN` → `CHECK` del motivo → `DROP`/`ADD` del `CHECK` de borrado → la función
       `next_order_sequence`.
@@ -118,7 +118,7 @@ verificado contra el árbol de la rama, no contra este documento.
       real —**el fallo esperable aquí es el `55P04`** si alguien olvidó un `::text`— y una inspección
       del esquema muestra los seis `CHECK`, la columna y la función (R48, R51).
 
-- [ ] **T8 — `down.sql`.** Los cinco pasos de `design.md > 3.5`, con la **guardia de datos** del paso
+- [x] **T8 — `down.sql`.** Los cinco pasos de `design.md > 3.5`, con la **guardia de datos** del paso
       0 y la recreación del tipo. Nunca `ALTER TYPE ... DROP VALUE`.
       *Depende de:* T7. **Hecho cuando:** `db:migrate` → `db:rollback` → `db:migrate` cierra el ciclo
       y el esquema intermedio es **idéntico** al de QC-33 (mismo `CHECK` literal, sin columna, tipo de
@@ -126,7 +126,7 @@ verificado contra el árbol de la rama, no contra este documento.
       rollback **aborta con el mensaje** y no modifica ninguna fila. Salida pegada en
       `progress/impl_QC-34-crud-de-pedidos.md` (R49, R50).
 
-- [ ] **T9 — Test estático de la migración.** `tests/unit/pedidos/schema/pedidos-migration.test.ts`,
+- [x] **T9 — Test estático de la migración.** `tests/unit/pedidos/schema/pedidos-migration.test.ts`,
       con las **seis mutaciones de sensibilidad** de `design.md > 12`.
       *Depende de:* T8. **Hecho cuando:** el predicado cae en las seis mutaciones. Un test que no
       puede fallar no vigila nada.
@@ -148,13 +148,13 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo D — casos de uso (depende de A y C; no de la base)
 
-- [ ] **T11 — Los seis casos de uso.** `domain/{create,get,list,update,cancel,delete}-order.ts` como
+- [x] **T11 — Los seis casos de uso.** `domain/{create,get,list,update,cancel,delete}-order.ts` como
       **factories** `createXxx(deps)`, con `requireAdmin` en la **primera línea** de las seis y el
       orden de `design.md > 6.4` en el listado.
       *Depende de:* T4, T6, T10. **Hecho cuando:** `typecheck` limpio y `cancelOrder` es el único que
       recibe y escribe `reason` (R26).
 
-- [ ] **T12 [P] — Tests de servicio.** `authorization.test.ts`, `order-service.test.ts`,
+- [x] **T12 [P] — Tests de servicio.** `authorization.test.ts`, `order-service.test.ts`,
       `cancel-order.test.ts`, `delete-order.test.ts`, `list-orders.test.ts`, con **dobles del puerto y
       de los dos catálogos**.
       *Depende de:* T11. **Hecho cuando:** (a) los seis casos de uso rechazan al Operador **sin tocar
@@ -164,7 +164,7 @@ verificado contra el árbol de la rama, no contra este documento.
       pero se rechaza al cambiarla (R25); (d) editar y borrar un `ENTREGADO`/`CANCELADO` fallan con su
       `code` propio (R21, R32).
 
-- [ ] **T13 — Adaptador driven.** `adapters/driven/persistence/order-prisma.ts`: el `INSERT` con
+- [x] **T13 — Adaptador driven.** `adapters/driven/persistence/order-prisma.ts`: el `INSERT` con
       `next_order_sequence($1)` de `design.md > 4.2` —**un solo reloj** para `created_at` y
       `order_year`—, el `ORDER BY` de `design.md > 10`, el filtro `deleted_at IS NULL` en las cuatro
       lecturas/escrituras `…Alive`, `toOffsetLimit`/`buildPage` y la traducción de SQLSTATE a
@@ -176,13 +176,13 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo E — superficie y cableado
 
-- [ ] **T14 — Contrato y composición.** `lib/modules/pedidos/index.ts` reexporta tipos, esquemas,
+- [x] **T14 — Contrato y composición.** `lib/modules/pedidos/index.ts` reexporta tipos, esquemas,
       errores y las seis factories —**solo** de `./domain`—; `lib/composition/index.ts` gana el bloque
       nuevo **al final**, reutilizando `unitCatalog`, sin reordenar nada de lo existente.
       *Depende de:* T13. **Hecho cuando:** el barrel no arrastra `'use server'`, `@prisma/client` ni
       `next/*` en su cierre de imports; `guard-arquitectura-modulos` verde (R52).
 
-- [ ] **T15 — Server Actions.** `adapters/driving/order-actions.ts` con `'use server'`: `FormData` en
+- [x] **T15 — Server Actions.** `adapters/driving/order-actions.ts` con `'use server'`: `FormData` en
       crear, editar, cancelar y borrar; argumentos tipados en consultar y listar; actor de
       `identity.getSessionUser()`; traducción por `code`. Se **borra** `adapters/driving/.gitkeep`.
       Más `tests/unit/pedidos/order-actions.test.ts`.
@@ -194,14 +194,14 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo F — integración contra Postgres real
 
-- [ ] **T16 — `order-crud.int.test.ts`.** R8, R10, R30, R32, R40, R41 contra la base: los **cuatro**
+- [x] **T16 — `order-crud.int.test.ts`.** R8, R10, R30, R32, R40, R41 contra la base: los **cuatro**
       casos del `CHECK` del motivo, los **seis** del `CHECK` de borrado, el `ORDER BY` con el enum, y
       el caso frontera del 31 de diciembre a las 20:00 en Ecuador contra el `CHECK` de QC-33 R41.
       *Depende de:* T13. **Hecho cuando:** todo lo que debe fallar va con `$executeRaw` y se afirma
       sobre el **SQLSTATE**, nunca sobre el texto; cada caso dentro de una transacción con `ROLLBACK`;
       `beforeAll` falla con un mensaje claro si falta la migración.
 
-- [ ] **T17 — `order-sequence.int.test.ts`.** R11, R12, R13: primera alta de un año, dos altas del
+- [x] **T17 — `order-sequence.int.test.ts`.** R11, R12, R13: primera alta de un año, dos altas del
       mismo año, **dos altas concurrentes con dos conexiones distintas** siendo las dos la primera del
       año, un alta abortada que deja hueco, y un año nuevo que vuelve a arrancar en 1.
       *Depende de:* T13. **Hecho cuando:** el caso concurrente usa dos conexiones de verdad (no dos
@@ -211,7 +211,8 @@ verificado contra el árbol de la rama, no contra este documento.
 
 ## Grupo G — cierre
 
-- [ ] **T18 — Trazabilidad y gate.** Mapa `R<n> → test` completo en
+- [x] **T18 — Trazabilidad y gate.** *(Mapa `R<n> → test` completo y los tres `.gitkeep`
+      comprobados como borrados. **El `./init.sh` completo lo corre el leader**, F2.2.)* Mapa `R<n> → test` completo en
       `progress/impl_QC-34-crud-de-pedidos.md`, `./init.sh` **completo** en verde, y los tres
       `.gitkeep` comprobados como borrados.
       *Depende de:* todo lo anterior. **Hecho cuando:** ningún `R<n>` de la tabla siguiente queda sin

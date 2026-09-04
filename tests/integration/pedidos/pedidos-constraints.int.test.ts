@@ -679,9 +679,16 @@ describe('la unidad y la receta', () => {
 
 describe('el estado y la prioridad', () => {
   it('rechaza un estado y una prioridad fuera del enum con SQLSTATE 22P02', async () => {
-    // R16: los dos conjuntos son CERRADOS en el propio esquema. `CANCELADO` y `URGENTE` son
+    // R16: los dos conjuntos son CERRADOS en el propio esquema. `DEVUELTO` y `URGENTE` son
     // dos valores plausibles que alguien pedira algun dia: hoy son una migracion del tipo,
     // no un INSERT.
+    //
+    // El ejemplo del estado ERA `CANCELADO` y lo cambio QC-34 (T7), no por relajar nada, sino
+    // porque su migracion `..._order_cancellation` hizo EXACTAMENTE la migracion del tipo que
+    // este comentario anticipaba: `CANCELADO` ya esta en `OrderStatus`, asi que ha dejado de
+    // servir como «valor fuera del enum» -de hecho hoy caeria con 23514, el CHECK del motivo de
+    // QC-34 R30, y no con 22P02-. `DEVUELTO` sigue sin existir en el tipo y por tanto sigue
+    // demostrando que el conjunto es cerrado.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
 
@@ -690,7 +697,7 @@ describe('el estado y la prioridad', () => {
         () =>
           rawInsertOrder(tx, {
             ...baseColumns(f, freshSequence()),
-            status: Prisma.raw(`CAST('CANCELADO' AS "OrderStatus")`),
+            status: Prisma.raw(`CAST('DEVUELTO' AS "OrderStatus")`),
           }),
         'estado fuera del enum',
       )

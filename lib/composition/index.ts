@@ -113,6 +113,25 @@ import {
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
+import {
+  createCancelOrder,
+  createCreateOrder,
+  createDeleteOrder,
+  createGetOrder,
+  createListOrders,
+  createUpdateOrder,
+} from '@/lib/modules/pedidos';
+import {
+  cancelAliveOrder,
+  createOrder,
+  findAliveOrderById,
+  listAliveOrders,
+  softDeleteAliveOrder,
+  updateAliveOrder,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -347,3 +366,75 @@ const unitRepository: UnitRepository = { listAll: listUnits };
  *  Action de listado (`adapters/driving/unit-actions.ts`). */
 export const unidades = {
   listUnits: createListUnits({ units: unitRepository }),} as const;
+
+
+// ---------------------------------------------------------------------------------------
+// `pedidos` (QC-34, T14, `design.md > 9`). Bloque NUEVO al final, mismo criterio que los de
+// `recetas`, `proveedores` y `unidades`: no reordena ni reformatea NADA de lo de arriba
+// -diff minimo, hay varias sesiones tocando este archivo-. Sus imports viven al final del
+// bloque de imports, arriba.
+//
+// `unitCatalog` NO se vuelve a construir: se REUTILIZA la constante que QC-25 ya dejo
+// cableada mas arriba (`design.md > 6.3`). Dos instancias del mismo puerto serian dos
+// cableados que pueden divergir, y `unidades` no necesita ninguna ampliacion porque `units`
+// no tiene borrado logico (QC-32 decision 11).
+// ---------------------------------------------------------------------------------------
+
+/** `RecipeCatalog` cableado con el adaptador driven DE RECETAS (`design.md > 6.2`, R43,
+ *  R44): `recetas` es el UNICO autorizado a consultar `prisma.recipe`, y `pedidos` solo
+ *  conoce el TIPO. Es el hueco que QC-33 R32 previo -«todo lo que sepa de una receta le
+ *  llegue por los contratos publicos, que DEBEN publicarlo»- y que QC-34 llena.
+ *
+ *  `findRefsIncludingDeleted`, y no una consulta de solo vivas, porque un pedido conserva su
+ *  receta aunque la den de baja y la fila tiene que seguir diciendo que se pidio (R44). */
+const recipeCatalog: RecipeCatalog = { findRefsIncludingDeleted: findRecipeRefsIncludingDeleted };
+
+const orderRepository: OrderRepository = {
+  create: createOrder,
+  findAliveById: findAliveOrderById,
+  listAlive: listAliveOrders,
+  updateAlive: updateAliveOrder,
+  cancelAlive: cancelAliveOrder,
+  softDeleteAlive: softDeleteAliveOrder,
+};
+
+/**
+ * Fachada del modulo `pedidos` ya cableada (T14, `design.md > 9`). Es lo que consumen las
+ * Server Actions de T15.
+ *
+ * El ACTOR NO se resuelve aqui, mismo criterio que `inventario`, `recetas` y `proveedores`
+ * (R1, R5): cada caso de uso lo recibe por parametro y quien lo obtiene de
+ * `identity.getSessionUser()` es la Server Action. `lib/composition` no conoce cookies ni
+ * sesion; solo ata puerto -> adaptador.
+ *
+ * La paginacion tampoco se inyecta: como en `proveedores`, el adaptador driven de `pedidos`
+ * usa `toOffsetLimit`/`buildPage` directamente (R37, `design.md > 10`), asi que el dominio
+ * no necesita recibirla.
+ *
+ * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca receta
+ * ni unidad, y darles catalogos que no usan seria cablear una dependencia falsa.
+ */
+export const pedidos = {
+  createOrder: createCreateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+  }),
+  getOrder: createGetOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+  }),
+  listOrders: createListOrders({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+  }),
+  updateOrder: createUpdateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+  }),
+  cancelOrder: createCancelOrder({ orders: orderRepository }),
+  deleteOrder: createDeleteOrder({ orders: orderRepository }),
+} as const;
