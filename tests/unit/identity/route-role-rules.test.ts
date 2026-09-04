@@ -15,6 +15,8 @@ import {
   INVENTORY_ROUTE,
   NEW_RECIPE_ROUTE,
   recipeEditRoute,
+  SUPPLIERS_ROUTE,
+  supplierDetailRoute,
 } from '@/lib/shared/routes';
 
 const PRODUCTOS: RouteRoleRule = { prefix: '/productos', roles: ['Administrador', 'Operador'] };
@@ -72,11 +74,29 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   // importar— y nombrar el rol exige `ADMIN_ROLE_NAME` del barrel de `inventario` **como
   // valor**, que solo `lib/composition` tiene permitido
   // (`tests/unit/inventario/schema/inventario-schema.test.ts`).
-  it('declara exactamente dos reglas, en orden: inventario y recetas, las dos solo Administrador (R4, R6)', () => {
+  it('declara exactamente tres reglas, en orden: inventario, recetas y proveedores, las tres solo Administrador (R4, R6)', () => {
+    // AMPLIADO otra vez el 2026-09-04 (QC-44 T3, R6): la TERCERA fila es la pantalla de
+    // proveedores. El centinela no se relaja: sigue exigiendo la lista EXACTA y COMPLETA, en el
+    // orden real, asi que una cuarta regla sin ficha que la respalde vuelve a ponerlo en rojo.
     expect(ROUTE_ROLE_RULES).toEqual([
       { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
       { prefix: FORMULAS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+      { prefix: SUPPLIERS_ROUTE, roles: [ADMIN_ROLE_NAME] },
     ]);
+  });
+
+  // QC-44 R6 — UNA sola fila cubre la lista y el detalle: la busqueda casa por segmentos.
+  it('la regla de proveedores cubre la lista y la pagina de detalle, y es la MISMA fila (R6)', () => {
+    const detalle = supplierDetailRoute('22222222-2222-4222-8222-222222222222');
+
+    expect(findRouteRule(ROUTE_ROLE_RULES, SUPPLIERS_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, detalle)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, detalle)).toBe(
+      findRouteRule(ROUTE_ROLE_RULES, SUPPLIERS_ROUTE),
+    );
+
+    // Y no casa lo que solo comparte el texto del prefijo sin limite de segmento.
+    expect(findRouteRule(ROUTE_ROLE_RULES, `${SUPPLIERS_ROUTE}X`)).toBeNull();
   });
 
   it('la regla se aplica a la ruta de inventario y a lo que cuelgue de ella (R4)', () => {
@@ -113,7 +133,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   });
 
   // R2 — la fila se deriva de la constante unica de ruta; el literal no se reescribe aqui.
-  it('las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE y ADMIN_ROLE_NAME, no de literales propios', () => {
+  it('las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE y ADMIN_ROLE_NAME, no de literales propios', () => {
     const fuente = readFileSync('lib/composition/route-role-rules.ts', 'utf8')
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -122,6 +142,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
     expect(fuente).toContain("from '@/lib/modules/inventario'");
     expect(fuente).not.toContain(`'${INVENTORY_ROUTE}'`);
     expect(fuente).not.toContain(`'${FORMULAS_ROUTE}'`);
+    expect(fuente).not.toContain(`'${SUPPLIERS_ROUTE}'`);
     expect(fuente).not.toContain(`'${ADMIN_ROLE_NAME}'`);
   });
 });
