@@ -33,7 +33,7 @@ function findRepoRoot(startDir: string): string {
 }
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
-const migrationDir = join(repoRoot, 'db', 'migrations', '20260904160000_recipe_steps_reset')
+const migrationDir = join(repoRoot, 'db', 'migrations', '20260904181500_recipe_steps_reset')
 
 /** Quita comentarios de linea y de bloque: lo que se afirma es SQL ejecutable, no prosa. */
 function stripSqlComments(sql: string): string {

@@ -5,7 +5,7 @@
 > Coordino `implementer`; escribieron `backend_dev` (T1-T4, T8-T11 y los fixtures backend de T12) y
 > `frontend_dev` (T5-T7 y los tests de pantalla de T12).
 >
-> **AVISO QUE VIAJA CON ESTA FEATURE:** la migracion `20260904160000_recipe_steps_reset` **borra
+> **AVISO QUE VIAJA CON ESTA FEATURE:** la migracion `20260904181500_recipe_steps_reset` **borra
 > los pasos de TODAS las recetas existentes**, incluidas las borradas logicamente, y es
 > **IRREVERSIBLE** (R14, R15, decision cerrada 5). El `down.sql` existe y lo declara por escrito;
 > no restaura nada porque no hay copia en ninguna parte. Es deliberado y esta aprobado.
@@ -19,8 +19,8 @@ implementer no corre `./init.sh` ni la suite completa (regla del gate de `AGENTS
 
 | Archivo | Tarea |
 | --- | --- |
-| `db/migrations/20260904160000_recipe_steps_reset/migration.sql` | T4 |
-| `db/migrations/20260904160000_recipe_steps_reset/down.sql` | T4 |
+| `db/migrations/20260904181500_recipe_steps_reset/migration.sql` | T4 |
+| `db/migrations/20260904181500_recipe_steps_reset/down.sql` | T4 |
 | `tests/unit/recetas/recipe-step-document.test.ts` | T8 |
 | `tests/unit/recetas/recipe-step-contract.test.ts` | T9 |
 | `tests/unit/recetas/recipe-prisma-steps.test.ts` | T10 |
@@ -211,3 +211,62 @@ pnpm exec vitest related --run tests/unit/recetas/module-contract.test.ts
 De los rojos listados mas arriba, sigue siendo ajeno **solo** el de
 `tests/unit/recetas-ui/recipe-route-contract.test.ts` (baseline, rango `origin/dev...HEAD`), mas
 el flake de `proveedores-ui` y los de integracion por el `DATABASE_URL` que falta en este worktree.
+
+## Encargo de arreglar las fixtures de integracion: PARADO, la premisa no se sostiene
+
+Se encargo -aprobado por el humano- arreglar las funciones auxiliares de
+`tests/integration/recetas/recipe-lines.int.test.ts` y `recipe-crud.int.test.ts` para que pasen el
+`nameNormalized` que el esquema exige al crear un producto. **No se toco ninguna fixture**, porque
+al medirlo el diagnostico resulto ser otro y arreglarlo como estaba descrito es imposible.
+
+**Lo que se midio, no lo que se supone:**
+
+1. El sintoma es real: `db.product.create()` cae con
+   `Null constraint violation on the fields: (name_normalized)` (5 casos rojos en
+   `recipe-lines.int.test.ts`).
+2. Pero **el modelo `Product` de `db/schema.prisma` NO tiene el campo `nameNormalized`** en esta
+   rama, y **ninguna migracion de `db/migrations/` lo anade a `products`** -las apariciones de
+   `name_normalized` en las migraciones son de `presentations`, `units`, `recipes` y
+   `supplier_catalog_lines`, nunca de `products`-. Tampoco existe un `normalizeProductName`
+   publicado: `create-product.ts` no normaliza nada.
+3. Pasarlo desde la fixture **no compila ni corre**. Probado contra el cliente real:
+   `prisma.product.create({ data: { name, nameNormalized, presentationId } })` responde
+   `Invalid prisma.product.create() invocation: nameNormalized ~~~~` -argumento desconocido-.
+4. La columna **si existe en la base**: `information_schema` sobre `QuimiCloude` devuelve
+   `name_normalized null=NO def=-` en `products`.
+5. Y la base tiene aplicada una migracion **que no existe en esta rama**:
+   `_prisma_migrations` lista `20260904160000_list_query_indexes`, que no esta en
+   `db/migrations/`.
+
+**Conclusion: no son fixtures rotas, es DRIFT de la base compartida.** `QuimiCloude` va por delante
+de esta rama con trabajo de otra feature. Ninguna edicion de los tests de recetas puede arreglarlo
+sin escribir SQL crudo que codifique una columna que el esquema de esta rama dice que no existe -o
+sea, congelar el drift dentro del test-. Es la quinta vez que la deuda de "base propia por
+worktree" de `progress/current.md` bloquea una feature. **Devuelto al leader sin tocar nada**
+(regla 6 de `CLAUDE.md`: no se rellena con supuestos).
+
+**Alcance del patron, que era la otra pregunta:** `product.create` sin `nameNormalized` aparece en
+**nueve** archivos de `tests/integration/`, no en dos: los tres de `inventario`, `pedidos/pedidos-constraints`,
+`proveedores/catalog-line`, `unidades/unidades-constraints` y los tres de `recetas`
+(`recetas-constraints`, `recipe-crud`, `recipe-lines`). Si el arreglo fuera por fixture, seria una
+invasion de nueve archivos y cinco modulos ajenos; que este en todas partes es justamente la senal
+de que el problema no esta en las fixtures.
+
+### Lo que si se corrigio, porque si era mio: la marca de tiempo de la migracion
+
+`_prisma_migrations` destapo una **colision de marca de tiempo**: la migracion foranea aplicada se
+llama `20260904160000_list_query_indexes` y la de esta ficha se habia creado a mano como
+`20260904160000_recipe_steps_reset` — **el mismo `20260904160000`**. Prisma las distingue por
+nombre completo, pero el orden de aplicacion entre dos migraciones con identica marca queda al azar
+del ordenamiento, y esta borra datos: no es un sitio para dejar un empate. Se renombro a
+`20260904181500_recipe_steps_reset`, con `git mv`, y se actualizo la unica referencia literal
+(`recipe-steps-reset-migration.test.ts`, la constante `migrationDir`). El SQL no cambia ni una
+letra.
+
+```
+pnpm typecheck                                                                          -> verde
+pnpm lint                                                                               -> verde
+pnpm exec vitest related --run tests/unit/recetas/schema/recipe-steps-reset-migration.test.ts
+  Test Files  1 passed (1)
+       Tests  7 passed (7)
+```
