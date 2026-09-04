@@ -31,7 +31,178 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es la **capa de persistencia** de
+QuimiCloude —el esquema Prisma (`db/schema.prisma`) más la base Postgres con la migración de esta
+feature aplicada—, **más el seed de acceso inicial** (`lib/modules/identity/domain/
+seed-initial-access.ts` y su adaptador) y las **lecturas existentes** del login y de la sesión.
+No hay alta, edición ni baja de empresas, ni service, ni pantalla, ni Server Action: ningún
+requisito habla de quién llama ni desde dónde, y R28 lo fija como límite.
+
+**Dos avisos de lectura.** (a) Los requisitos R13, R14 y R15 son de **no-regresión**: dicen que
+algo NO cambia. Están escritos como requisitos y no como comentarios porque la primera vuelta de
+esta ficha sí lo cambió, y un enunciado que nadie testea es un enunciado que se vuelve a romper.
+(b) R25 y R26 son la misma exigencia en los dos sentidos: revertir devuelve el esquema exacto, y
+si devolverlo obligara a perder o inventar un dato, la reversión falla en vez de hacerlo.
+
+### La empresa
+
+**R1.** El sistema DEBE persistir, para cada empresa, un identificador propio, estable, **no
+correlativo y no derivado de sus datos de negocio**, y DEBE generarlo la propia base de datos.
+
+**R2.** SI se intenta persistir una empresa sin nombre, ENTONCES el sistema DEBE rechazar la
+operación **en la propia base de datos** y no crear ninguna fila; y NO DEBE limitar en la columna
+la longitud del nombre.
+
+**R3.** El sistema DEBE persistir el nombre normalizado de cada empresa —sin acentos, sin signos y
+sin distinguir mayúsculas de minúsculas— en una **columna propia** junto al nombre original, y
+DEBE exponer **una única definición** de esa normalización, publicada por el contrato público del
+módulo `identity`, de modo que la columna, el seed y cualquier consumidor futuro normalicen igual.
+
+**R4.** SI se intenta persistir una empresa **viva** cuyo nombre coincida, una vez normalizado, con
+el de otra empresa viva ya existente, ENTONCES el sistema DEBE rechazar la operación **contra un
+índice único de la base de datos** —no contra una comprobación previa al vuelo— y no crear ni
+modificar ninguna fila.
+
+**R5.** MIENTRAS una empresa esté dada de baja, el sistema DEBE aceptar el alta de otra empresa con
+ese mismo nombre normalizado, y NO DEBE rechazarla por colisión.
+
+**R6.** El sistema DEBE declarar en la empresa una marca de baja lógica que nace **vacía**, y NO
+DEBE incluir en esta feature ninguna operación que la escriba: no hay alta, edición ni baja de
+empresas.
+
+**R7.** El sistema DEBE registrar, para cada empresa, el instante de creación y el instante de la
+última modificación, y DEBE actualizar el segundo cada vez que la fila cambia.
+
+**R8.** El sistema DEBE nombrar en **inglés** y en `snake_case` la tabla, las columnas, los índices
+y las restricciones que cree, renombre o recree esta feature.
+
+### La pertenencia del usuario
+
+**R9.** El sistema DEBE persistir, para cada usuario, una referencia a **exactamente una** empresa,
+y esa referencia DEBE ser **obligatoria en la propia base de datos**.
+
+**R10.** SI se intenta persistir un usuario cuya referencia de empresa no corresponda a ninguna
+empresa existente, ENTONCES el sistema DEBE rechazar la operación **en la propia base de datos** y
+no crear ni modificar ninguna fila.
+
+**R11.** SI se intenta eliminar una empresa referenciada por al menos un usuario —esté ese usuario
+vivo o dado de baja—, ENTONCES el sistema DEBE rechazar el borrado y DEBE dejar la empresa y sus
+usuarios intactos.
+
+**R12.** El sistema NO DEBE incluir ninguna tabla, modelo, columna ni relación de **pertenencia**
+que permita a un usuario pertenecer a más de una empresa, y NO DEBE ofrecer ninguna forma de
+asociar un usuario a una segunda empresa.
+
+### El rol: lo que NO cambia (no-regresión)
+
+**R13.** El sistema DEBE conservar la columna de rol **en la propia fila del usuario**, obligatoria
+y con el mismo nombre, tipo, clave foránea (borrado restringido hacia el catálogo de roles) e
+índice con los que ya existía antes de esta feature; y esta feature NO DEBE moverla, renombrarla,
+recrearla, hacerla anulable ni sustituirla por ninguna otra fuente del rol.
+
+**R14.** CUANDO el sistema resuelve el rol de una persona —al autenticarla, al leer su sesión o al
+decidir el acceso a una ruta—, DEBE tomarlo de esa misma columna del usuario y NO DEBE necesitar
+ninguna lectura adicional a otra tabla para obtenerlo.
+
+**R15.** El sistema NO DEBE añadir columna de empresa al catálogo de roles ni al catálogo de tipos
+de documento, y DEBE permitir que usuarios de empresas distintas tengan el mismo rol del mismo
+catálogo.
+
+### La unicidad, ahora dentro de la empresa
+
+**R16.** SI se intenta persistir un usuario **vivo** cuyo correo coincida, sin distinguir mayúsculas
+de minúsculas, con el de otro usuario vivo **de la misma empresa**, ENTONCES el sistema DEBE
+rechazar la operación **en la propia base de datos**; y DEBE aceptar ese mismo correo en un usuario
+de **otra** empresa.
+
+**R17.** SI se intenta persistir un usuario **vivo** cuyo nombre de usuario coincida, sin distinguir
+mayúsculas de minúsculas, con el de otro usuario vivo **de la misma empresa**, ENTONCES el sistema
+DEBE rechazar la operación **en la propia base de datos**; y DEBE aceptar ese mismo nombre de
+usuario en un usuario de **otra** empresa.
+
+**R18.** SI se intenta persistir un usuario **vivo** cuya pareja tipo de documento + número coincida
+con la de otro usuario vivo **de la misma empresa**, ENTONCES el sistema DEBE rechazar la operación
+**en la propia base de datos**; y DEBE aceptar esa misma pareja en un usuario de **otra** empresa.
+
+**R19.** El sistema NO DEBE conservar en la base ningún índice único ni restricción que haga el
+correo, el nombre de usuario o la pareja de documento únicos **fuera del alcance de una empresa**;
+y las tres unicidades de R16, R17 y R18 DEBEN seguir midiéndose **solo entre usuarios vivos**, de
+modo que dar de baja a un usuario libere su correo, su nombre de usuario y su documento dentro de
+su empresa.
+
+### La empresa inicial y el seed
+
+**R20.** CUANDO se ejecuta el seed de acceso inicial sobre una base sin acceso inicial, el sistema
+DEBE dejar creada la empresa inicial y el usuario semilla **dentro de ella**, en la misma
+transacción, de modo que no exista ningún instante en el que quede una persona sin empresa ni una
+empresa creada por un seed que después falló.
+
+**R21.** El nombre de la empresa inicial DEBE salir de **una única constante del dominio** —la
+misma que usa el backfill de la migración— y NO DEBE leerse de ninguna variable de entorno ni
+escribirse como literal en ningún otro punto del código.
+
+**R22.** CUANDO se ejecuta el seed sobre una base que ya tiene su acceso inicial, el sistema NO
+DEBE crear una segunda empresa, ni un segundo usuario semilla, ni modificar los existentes:
+ejecutarlo dos veces seguidas DEBE dejar exactamente el mismo estado que ejecutarlo una.
+
+### La migración
+
+**R23.** CUANDO se aplica la migración de esta feature sobre una base que ya tiene usuarios
+cargados, el sistema DEBE crear la empresa inicial y dejar a **todos** esos usuarios —incluidos los
+dados de baja— referenciando esa empresa, y DEBE dejar el rol de cada uno **exactamente como
+estaba**, sin cambiar, vaciar ni reasignar ninguno.
+
+**R24.** El sistema DEBE tener `ROW LEVEL SECURITY` activado **y forzado**
+(`FORCE ROW LEVEL SECURITY`) en la tabla que crea esta feature.
+
+**R25.** CUANDO se revierte la migración de esta feature, el sistema DEBE quedar exactamente en el
+estado de esquema previo a aplicarla: no queda tabla, columna, índice, clave foránea ni restricción
+residual de la empresa, y los tres índices únicos del usuario —correo, nombre de usuario y
+documento— vuelven a tener **la definición literal** que tenían antes de esta feature.
+
+**R26.** SI al revertir la migración existieran dos usuarios vivos de empresas distintas que
+comparten correo, nombre de usuario o pareja de documento, ENTONCES el sistema DEBE **abortar la
+reversión completa**, NO DEBE aplicar ninguno de sus cambios y NO DEBE borrar, renombrar ni dar de
+baja ninguna fila para poder recrear los índices (es R25 leído al revés: fallar antes que perder el
+dato).
+
+### Frontera de módulo y límite de alcance
+
+**R27.** El sistema DEBE declarar `identity` como módulo propietario del modelo que crea esta
+feature, y ningún módulo distinto de `identity` DEBE consultarlo con el cliente Prisma.
+
+**R28.** El sistema NO DEBE incluir en esta feature ninguna ruta, pantalla, Server Action, route
+handler ni regla de permisos, y por tanto NO DEBE aportar ningún flujo navegable nuevo; y los
+tests E2E que ya existen DEBEN seguir pasando **sin cambios en su guion** (lo que ejercita cada
+`test(...)`, sus selectores y sus aserciones).
+
+**R29.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con los
+requisitos que la hacen testeable. Ninguna queda sin `R<n>`.
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Empresa identificada por UUID aleatorio, ni correlativo ni derivado del nombre | R1 |
+| 2 | No hay dos empresas con el mismo nombre, medido sin mayúsculas ni acentos | R2, R3, R4 |
+| 3 | Una empresa dada de baja libera su nombre (índice único parcial) | R5 |
+| 4 | Un usuario pertenece a UNA sola empresa: `users.company_id` obligatoria, FK que impide borrar una empresa con usuarios, **sin tabla de pertenencias** | R9, R10, R11, R12 |
+| 5 | Un solo rol, y `users.role_id` se queda intacto: seed, login y cookie lo leen del mismo sitio | R13, R14 |
+| 6 | Correo, usuario y documento pasan a ser únicos DENTRO de la empresa; hay que rehacer los tres índices de QC-4 | R16, R17, R18, R19 |
+| 7 | Baja lógica de empresa: `deleted_at` nace con la tabla, la operación no se construye aquí | R6 |
+| 8 | Roles y tipos de documento son del sistema, no se separan por empresa | R15 |
+| 9 | La empresa inicial se llama `QuimiCloud`, en una única constante del dominio usada por el seed y por el backfill, y no sale del entorno | R20, R21, R22 |
+| 10 | La migración crea la empresa inicial y mete dentro a los usuarios ya cargados sin perder ni cambiar su rol | R23 |
+| 11 | Identificadores de la base en inglés | R8 |
+| 12 | `created_at` y `updated_at` en la tabla nueva | R7 |
+| 13 | RLS activada y forzada en `companies` | R24 |
+| 14 | Migración con `down.sql` que revierte al esquema exacto anterior, incluidos los tres índices únicos de QC-4 tal como estaban | R25, R26 |
+| 15 | No hay E2E nuevo; los existentes tienen que seguir verdes | R28 |
+| 16 | `/// @module identity` en `Company` | R27 |
+| 17 | Ninguna librería nueva | R29 |
 
 ## Preguntas abiertas
 
@@ -45,6 +216,24 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
    empresa, o dejar el usuario global). **No se decide aquí.**
 2. **Moneda por empresa** (pregunta abierta n.º 5 del dominio). No bloquea: aquí no entra ningún
    importe.
+
+**Añadidas por `spec_author` (F1.2).** Ninguna bloquea el modelo y ninguna se rellena con un
+supuesto. La 3 es la única que puede cambiar la forma de la migración, y por eso `tasks.md` la
+resuelve con una comprobación ejecutable antes de escribir el backfill definitivo.
+
+3. **¿`FORCE ROW LEVEL SECURITY` sobre `users` deja pasar el `UPDATE` del backfill?** QC-4 dejó
+   `users` con RLS **activada y forzada y sin ninguna policy**, y `FORCE` alcanza también al dueño
+   de la tabla. El backfill de esta ficha necesita **escribir** en `users` (`SET company_id = …`),
+   cosa que ninguna migración posterior a QC-4 ha hecho todavía: la única evidencia disponible es
+   que la primera vuelta de QC-47 **leyó** `users` desde su migración sin que la denegaran. Que el
+   rol con el que corre Prisma Migrate tenga `BYPASSRLS` no está escrito en `docs/` ni en el
+   código, así que es un **desconocido** (regla 6). No cambia ningún requisito; cambia el `design`
+   solo si la respuesta es «no», y en ese caso la salida está escrita en
+   `design.md > 8, riesgo 2`.
+4. **¿Puede entrar quien pertenece a una empresa dada de baja?** No se decide aquí: la decisión 7
+   deja fuera la operación de baja, así que hoy no hay forma de que exista un usuario en una
+   empresa muerta. Cuando esa operación exista habrá que decidir si arrastra a sus usuarios, si
+   los bloquea en el login o si no hace nada. Es de la ficha que construya la baja, no de esta.
 
 ## Decisiones cerradas (no reabrir)
 
