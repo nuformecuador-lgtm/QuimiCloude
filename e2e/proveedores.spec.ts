@@ -256,8 +256,10 @@ async function findSupplierRow(page: Page, name: string): Promise<Locator> {
 
 /** Lo mismo, pero sobre la lista del catalogo de la pagina de detalle. */
 async function findCatalogRow(page: Page, name: string): Promise<Locator> {
-  const row = page.getByTestId('catalog-row').filter({ hasText: name });
-  const next = page.getByTestId('catalog-page-next');
+  // Desde el 2026-09-07 el catalogo monta la tabla compartida: la fila lleva el id de la linea
+  // (`data-table-row-<id>`) y el control de pagina su `data-testid`.
+  const row = page.locator('[data-testid^="data-table-row-"]').filter({ hasText: name });
+  const next = page.getByTestId('data-table-next');
 
   for (;;) {
     if ((await row.count()) > 0) return row;
@@ -442,8 +444,12 @@ test.describe('proveedores', () => {
     // --- 10. Y la linea esta en la lista del catalogo, con el importe TAL CUAL se tecleo (R41).
     const catalogRow = await findCatalogRow(page, catalogLineName);
     await expect(catalogRow.first()).toBeVisible({ timeout: 60_000 });
-    await expect(catalogRow.first().getByTestId('catalog-cell-name')).toHaveText(catalogLineName);
-    await expect(catalogRow.first().getByTestId('catalog-cell-cost')).toHaveText(catalogLineCost);
+    await expect(catalogRow.first().getByTestId('data-table-cell-name')).toHaveText(
+      catalogLineName,
+    );
+    await expect(catalogRow.first().getByTestId('data-table-cell-cost')).toHaveText(
+      catalogLineCost,
+    );
 
     // Lo guardo el backend de verdad, no solo lo pinto la pantalla.
     expect(

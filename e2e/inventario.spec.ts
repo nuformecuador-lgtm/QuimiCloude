@@ -155,8 +155,10 @@ async function login(page: Page, user: Credentials): Promise<void> {
  * existe una celda con ESTE nombre.
  */
 async function findProductCell(page: Page, name: string): Promise<Locator> {
-  const cell = page.getByTestId('product-cell-name').filter({ hasText: name });
-  const next = page.getByTestId('product-page-next');
+  // Desde el 2026-09-07 la lista monta la tabla compartida: la celda y el control de pagina
+  // llevan sus `data-testid` (`data-table-cell-<columna>`, `data-table-next`).
+  const cell = page.getByTestId('data-table-cell-name').filter({ hasText: name });
+  const next = page.getByTestId('data-table-next');
 
   for (;;) {
     if ((await cell.count()) > 0) return cell;
@@ -313,7 +315,7 @@ test.describe('catalogo de productos', () => {
     await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
 
     await expect(page.getByTestId('inventario-title')).toHaveCount(0);
-    await expect(page.getByTestId('product-table')).toHaveCount(0);
+    await expect(page.getByTestId('data-table')).toHaveCount(0);
     await expect(page.getByTestId('product-list-empty')).toHaveCount(0);
   });
 });
