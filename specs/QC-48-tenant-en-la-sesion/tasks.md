@@ -141,9 +141,15 @@
       **Hecho cuando:** contiene el mapa `R1..R28 -> test concreto` (archivo + nombre del `test`),
       sin ningún hueco. `CHECKPOINTS.md > Trazabilidad` lo exige y el reviewer rechaza si falta uno.
 
-- [ ] **T14 — Gate completo. Depende de T13.**
+- [x] **T14 — Gate completo. Depende de T13.** Corrido por el LEADER el 2026-09-07.
       **Hecho cuando:** `./init.sh` termina en verde (typecheck, lint, unit, integración, guardias
       y E2E) y queda anotado en `progress/`. Antes del PR, sin excepción (regla 5 de `CLAUDE.md`).
+      **Resultado:** `typecheck` verde, `lint` verde, suite completa **206/206 archivos,
+      2438 tests, 4 saltados, CERO rojos** —ni siquiera los cinco del baseline heredado—. El paso
+      del validador de `feature_list.json` NO se pudo correr desde aquí por la deuda conocida del
+      arnés (`WT_DIR` se resuelve contra el cwd y no ve los specs de las otras features en vuelo);
+      se corrió desde la raíz, donde pasa. Único rojo de todo el recorrido: basura de la base
+      compartida en `document_types`, ajena a esta ficha y ya borrada.
 
 ## Nota de despliegue (no es una task de código)
 

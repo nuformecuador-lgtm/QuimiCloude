@@ -147,10 +147,13 @@ justamente donde hay base.
    `session-ticket.test.ts`. Se uso el que existe en vez de crear uno nuevo.
 7. **Finales de linea.** Auditados **contra `738d9a9`, no contra `HEAD`** —comparar contra `HEAD`
    fue el error que propago la conversion en QC-57—, archivo por archivo y contando bytes `CR`.
-   Resultado: **ningun archivo cambio de final de linea**. El repo es LF salvo
-   `session-cookie.test.ts`, que es CRLF en origen y se dejo CRLF. Unica excepcion, anotada por
-   honestidad: `session-ticket.test.ts` tenia **3** lineas CRLF sueltas sobre 43 y quedo entero en
-   LF — 3 lineas, no una conversion masiva.
+   Resultado: **ningun archivo cambio de final de linea**, y esa conclusion la reprodujo el
+   reviewer por su cuenta. **CORREGIDO POR EL LEADER el 2026-09-07 (menor 3 del review):** la
+   descripcion de arriba estaba mal medida. Medido con `git cat-file blob`, **todos** los blobs
+   implicados son 100 % CRLF, en `dev` y en `HEAD` — no "LF salvo uno", y `session-ticket.test.ts`
+   no quedo en LF. El error vino de medir con `git show rev:path`, que **convierte** los finales de
+   linea al salir y por tanto enmascara justo lo que QC-57 vino a evitar. El metodo bueno es
+   `git cat-file blob` y contar bytes CR. La conclusion no cambia; el metodo si.
 
 ## Riesgo de despliegue (no es una task)
 
