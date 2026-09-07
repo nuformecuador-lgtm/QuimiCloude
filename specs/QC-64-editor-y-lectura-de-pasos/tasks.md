@@ -120,7 +120,7 @@
     editable, ausencia de `100vh` y ausencia de cualquier acción que sólo exista tras `:hover`
     (R26).
 
-- [ ] **T14 — E2E del camino completo.** Depende de **todo lo anterior**.
+- [x] **T14 — E2E del camino completo.** Depende de **todo lo anterior**.
   - Archivos: `e2e/recetas-pasos.spec.ts` (nuevo).
   - Recorrido: login como Administrador → nueva receta → redactar un paso con **negrilla** y una
     **lista de verificación** → guardar → volver a abrir la receta → **el paso se ve igual que se

@@ -13,7 +13,7 @@
 | Ola 2 | T5, T6 | `77753e8` | cerrada |
 | Ola 3 | T4, T7, T8, T12 | `ac16d58` | cerrada |
 | Ola 4 | T10, T11, T13 | `f2c247a` | cerrada |
-| Ola 5 | T14 (E2E) | — | en curso |
+| Ola 5 | T14 (E2E) | ver `git log` | cerrada |
 
 ## Dos cosas que el leader tiene que decidir
 
@@ -236,3 +236,67 @@ $ pnpm run typecheck
 | R26 | `step-reader.test.tsx`: «mantiene los objetivos tactiles de 44x44 px en viewport angosto»; «presenta el mismo paso y los mismos controles en viewport ancho»; «no usa 100vh en ninguna parte de su fuente»; «no esconde nada detras de :hover y usa text-base en el contenido». `recipe-step-editor.test.tsx`: «R26: en viewport angosto y ancho los botones de la barra miden al menos 44x44 px y el area editable usa text-base»; «R26: no se usa 100vh y ninguna accion vive detras de :hover» |
 | R27 | `step-reader.test.tsx`: «permite marcar un item y avanzar sin tocar el raton»; «anuncia el paso actual en una region aria-live=polite». `recipe-step-editor.test.tsx`: «R27: los tres botones de la barra son alcanzables por tabulador y se activan sin raton, y aria-pressed refleja el estado»; «R27: el area editable tiene nombre accesible y es la que recibe el contenteditable» |
 | R28 | `e2e/recetas-pasos.spec.ts`, en Chromium y WebKit |
+
+## T14 — el E2E, salida real
+
+`e2e/recetas-pasos.spec.ts`, caso «el Administrador redacta un paso con negrilla y lista de
+verificacion, lo guarda, lo reabre igual y recorre la vista previa hasta Finalizar (R28)».
+Ejercita interfaz real: teclado dentro del `contenteditable`, `Shift+Home` para seleccionar y el
+**boton** de la barra para la negrilla (nunca `Control+b`, por WebKit), boton de lista de
+verificacion y dos items; asserts de `<strong>` y de `li[data-type="taskItem"]` **al reabrir**
+(R9), bloqueo con `step-reader-finish` deshabilitado y `step-reader-blocked-reason` visible (R17),
+y Finalizar cerrando el modal sin navegar y con `updatedAt` **identico en base** (R22).
+
+```
+$ pnpm exec playwright test e2e/recetas-pasos.spec.ts
+Running 2 tests using 2 workers
+  ok  1 [chromium] > editor y lectura de pasos > ... (R28)  (13.7s)
+  ok  2 [webkit]   > editor y lectura de pasos > ... (R28)  (18.4s)
+  2 passed (24.7s)
+```
+
+Dos corridas seguidas en verde. Con esto queda acreditado el **punto 2 de `design.md > 2.5`**
+(Safari/WebKit), que era lo unico que quedaba pendiente de verificar de la dependencia.
+
+### Dos cosas del entorno que salieron a la luz al correrlo
+
+1. **El worktree no traia `.env`** (solo `.env.example`) y Prisma abortaba con
+   `Environment variable not found: DATABASE_URL`. Se copio el `.env` del worktree principal
+   —esta en `.gitignore`, no toca nada versionado— **y ademas** hay que exportar las variables en
+   el shell: Prisma 6.19 no carga el `.env` en el proceso del test. El comando que funciona es
+   `set -a && . ./.env && set +a && pnpm exec playwright test ...`. Sin eso, ningun E2E arranca en
+   un worktree recien montado.
+2. **Un rojo real en WebKit que NO es de esta feature.** Rellenar `recipe-field-name` justo despues
+   de que la pagina se pinte deja el valor en el DOM y **la hidratacion de React lo borra** (el
+   input es controlado con `value={state.name}`). Chromium hidrata antes de llegar ahi; WebKit no.
+   Es comportamiento estandar de un input controlado, **no una regresion de QC-64**, y
+   **`e2e/recetas.spec.ts` tiene el mismo patron**, o sea que es potencialmente flaky en WebKit por
+   la misma causa. Aqui se resolvio **sin tocar produccion**: se pulsa «Anadir paso» y se espera al
+   area editable —eso *acredita* que ya hubo hidratacion— y solo despues se rellenan los campos,
+   con un helper que reintenta hasta que el valor se queda. **Merece ficha propia para el spec
+   heredado**, pero no la abre esta feature.
+
+## Cierre
+
+Verificacion final corrida por el `implementer` sobre el arbol completo de la feature:
+
+```
+$ pnpm exec vitest run tests/unit/recetas-ui/
+ Test Files  9 passed (9)
+      Tests  154 passed (154)
+
+$ pnpm run test:guardias
+ Test Files  16 passed (16)
+      Tests  159 passed | 4 skipped (163)
+
+$ pnpm run typecheck
+(2 errores, los 2 heredados de dev)
+
+$ pnpm run lint
+(limpio)
+```
+
+**T15 queda sin marcar a proposito**: exige `./init.sh` completo en verde, y el gate lo corre el
+leader (F2.3), no el `implementer`. Y no puede salir verde hasta que se resuelvan los **2 errores
+de typecheck heredados de `dev`** descritos al principio de esta bitacora, que no son de esta
+feature.
