@@ -138,7 +138,7 @@ nunca de `./kit` ni de la raíz del paquete**.
 
 Lo que **sigue sin verificar** de 2.5, porque no se puede sin instalar ni sin correr el navegador:
 el punto 2 (Safari/WebKit y Chrome Android, que cierra el E2E de R28) y el punto 3 (si
-`npx shadcn add dialog checkbox toggle-group` mete entradas nuevas en `package.json`; se comprueba
+`npx shadcn add dialog checkbox` mete entradas nuevas en `package.json`; se comprueba
 con `git diff package.json` justo después de correr el CLI, en T2).
 
 Lo que sí se puede afirmar sin red, y se separa a propósito de la tabla porque **no la sustituye**:
@@ -166,11 +166,14 @@ Ninguno de estos es un check de salud, y ninguno se puede dar por bueno de memor
    verificar **antes** de añadir la dependencia de UI. Un editor es justo el tipo de librería donde
    iOS se comporta distinto. La verificación real es el E2E de R28, que ya corre en los dos
    proyectos de Playwright del repo (Chromium y WebKit; ver la cabecera de `e2e/recetas.spec.ts`).
-3. **`npx shadcn add dialog checkbox toggle-group`**: hoy `components/ui/` **no tiene** `dialog`,
-   `checkbox` ni `toggle`/`toggle-group` (sí `alert-dialog`, `sheet`, `popover`, `tooltip`). Si el
-   CLI añade una entrada nueva a `package.json` —y no sólo código sobre el `@base-ui/react` que ya
-   está—, esa entrada **también necesita fila**. Se comprueba con `git diff package.json` justo
-   después de correr el CLI, no se supone.
+3. **`npx shadcn add dialog checkbox`**: hoy `components/ui/` **no tiene** `dialog` ni `checkbox`
+   (sí `alert-dialog`, `sheet`, `popover`, `tooltip`). Si el CLI añade una entrada nueva a
+   `package.json` —y no sólo código sobre el `@base-ui/react` que ya está—, esa entrada **también
+   necesita fila**. Se comprueba con `git diff package.json` justo después de correr el CLI, no se
+   supone.
+   **Sólo esas dos, y `toggle`/`toggle-group` a propósito no:** la barra de formato se hace con
+   **botones propios** (sección 8), porque así el `aria-pressed` de cada botón y el objetivo táctil
+   de 44×44 px quedan bajo nuestro control en vez de depender de lo que traiga la primitiva.
 
 ## 3. El esquema cerrado: cómo se impide producir algo más (R2, R3, R4, R5)
 
@@ -317,7 +320,7 @@ fuera del formulario — el repo ya tiene el precedente en
 | `app/(private)/produccion/formulas/components/recipe-form.tsx` | precarga con documentos, botón y modal de vista previa | no |
 | `app/(private)/produccion/formulas/components/index.ts` | barrel: entra lo nuevo | no |
 | `components/shared/step-reader/*` | **nuevo**: el asistente (sección 5) | no |
-| `components/ui/dialog.tsx`, `checkbox.tsx`, `toggle-group.tsx` | por CLI de shadcn (R24) | no |
+| `components/ui/dialog.tsx`, `checkbox.tsx` | por CLI de shadcn (R24). **No entra `toggle-group`**: la barra de formato son botones propios, para controlar `aria-pressed` y los 44×44 px (sección 8) | no |
 
 **Sólo dos archivos importan la librería del editor**, y una **guardia de fuente** lo hace cumplir
 —copiando el patrón que QC-26 usó para `@dnd-kit` (`recipe-steps-field.tsx` es su único

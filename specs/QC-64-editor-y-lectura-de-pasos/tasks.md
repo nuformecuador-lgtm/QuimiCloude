@@ -20,10 +20,11 @@
   - **Si algún check falla:** se para y se sube la decisión (fila `excepcion` con el check fallado
     escrito, o cambio a la opción 9.2). **No se instala nada por cuenta propia.**
 
-- [x] **T2 — Instalar** lo aprobado en T1 y `npx shadcn add dialog checkbox toggle-group`.
+- [x] **T2 — Instalar** lo aprobado en T1 y `npx shadcn add dialog checkbox`.
       Depende de **T1**.
   - Archivos: `package.json`, `pnpm-lock.yaml`, `components/ui/dialog.tsx`,
-    `components/ui/checkbox.tsx`, `components/ui/toggle-group.tsx`.
+    `components/ui/checkbox.tsx`. **`toggle`/`toggle-group` no entran**: la barra de formato son
+    botones propios, para controlar `aria-pressed` y los 44×44 px (`design.md > 8`).
   - **Hecho cuando:** `pnpm run test:guardias` pasa —incluida
     `tests/guards/guard-dependencias-aprobadas.test.ts`— y `git diff package.json` no muestra
     **ninguna** entrada sin fila en `docs/dependencias.md` (incluidas las que haya podido añadir el
