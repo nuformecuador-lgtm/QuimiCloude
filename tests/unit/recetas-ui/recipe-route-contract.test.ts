@@ -127,6 +127,25 @@ const ARCHIVOS_DE_LA_LISTA = [
   PAGE_PATH,
 ].map((ruta) => ruta.split('\\').join('/'));
 
+/**
+ * EXCEPCION UNICA Y NOMBRADA a la regla «todo archivo de `components/` sale por el barrel» (R46).
+ *
+ * `recipe-step-schema.ts` (QC-64) es el unico archivo de la carpeta cuyo simbolo publico tiene un
+ * tipo **de la libreria del editor**: `RECIPE_STEP_EXTENSIONS` es un `Extensions` de
+ * `@tiptap/core`. Reexportarlo desde el barrel deja escapar ese tipo por una puerta que la
+ * guardia de aislamiento no ve —`tests/guards/guard-editor-aislado.test.ts` compara el literal
+ * `@tiptap`, y el barrel no lo escribe—, de modo que cualquier archivo del repo podria acabar
+ * dependiendo de la libreria sin nombrarla. R25 y `specs/QC-64-editor-y-lectura-de-pasos/design.md
+ * > 7` exigen lo contrario: que la libreria viva en DOS archivos y que sustituirla sea reescribir
+ * esos dos. Su unico consumidor legitimo es `recipe-step-editor.tsx`, en la misma carpeta, por
+ * ruta relativa; el barrel si exporta `RecipeStepEditor`, que es lo que el resto de la ruta usa.
+ *
+ * La regla general sigue mordiendo para TODOS los demas archivos de `components/`: esta lista es
+ * por NOMBRE, no un patron. Y `tests/guards/guard-editor-aislado.test.ts` tiene un caso que se
+ * pone rojo si el reexport vuelve a entrar.
+ */
+const FUERA_DEL_BARREL = ['recipe-step-schema.ts'];
+
 /** Los que declaran frontera de cliente. R50 y R49 van sobre estos. */
 const FUENTES_DE_CLIENTE = FUENTES_DE_LA_RUTA.filter((ruta) => leer(ruta).includes("'use client'"));
 
@@ -617,6 +636,22 @@ describe('contrato de la ruta de recetas', () => {
     for (const ruta of FUENTES_DE_LA_RUTA) {
       if (!ruta.includes('/components/') || ruta.endsWith('/index.ts')) continue;
       const nombreDeArchivo = ruta.split('/').pop() as string;
+      if (FUERA_DEL_BARREL.includes(nombreDeArchivo)) {
+        // La excepcion es EXPLICITA y se comprueba en los dos sentidos: el archivo no puede
+        // salir por el barrel, y sigue teniendo que existir. Asi la excepcion no se convierte en
+        // una via para dejar de exponer componentes sin que nadie se entere.
+        const modulo = `./${nombreDeArchivo.replace(/\.tsx?$/, '')}`;
+        expect(
+          existsSync(join(RAIZ, ruta)),
+          `${nombreDeArchivo} figura como excepcion del barrel pero ya no existe: si se ha ` +
+            'borrado o renombrado, quita tambien la excepcion',
+        ).toBe(true);
+        expect(
+          barrel,
+          `${nombreDeArchivo} NO puede reexportarse desde el barrel (ver FUERA_DEL_BARREL)`,
+        ).not.toContain(`from '${modulo}'`);
+        continue;
+      }
       const modulo = `./${nombreDeArchivo.replace(/\.tsx?$/, '')}`;
       expect(barrel, `el barrel debe reexportar ${modulo}`).toContain(`from '${modulo}'`);
     }

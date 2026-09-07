@@ -10,8 +10,9 @@
  * QUE APORTA sobre los unitarios, que es lo unico que justifica su coste:
  *  - **El editor de verdad en un navegador de verdad.** En jsdom, ProseMirror no tiene ni
  *    `getClientRects` ni `Range` completos: lo que se afirma alli es el DOM que la libreria pinta,
- *    no que SELECCIONAR con el teclado y pulsar el boton de la barra produzca `<strong>`. Aqui se
- *    escribe con teclado real, se selecciona con `Shift+Home` y se pulsa el boton de la barra.
+ *    no que SELECCIONAR de verdad y pulsar el boton de la barra produzca `<strong>`. Aqui se
+ *    escribe con teclado real, se selecciona el parrafo con un triple clic y se pulsa el boton de
+ *    la barra.
  *  - **La ida y vuelta completa del documento del paso** (QC-62): editor -> `editorJsonToStepDocument`
  *    -> Server Action REAL -> Postgres -> `RecipeDetail` -> `stepDocumentToEditorJson` -> editor.
  *    Ninguna prueba unitaria cruza esa cadena; R9 es justo esa cadena.
@@ -199,6 +200,27 @@ async function findRecipeRow(page: Page, name: string): Promise<Locator> {
   }
 }
 
+/**
+ * Pulsa un boton de la barra de formato y NO sigue hasta que el area editable tiene el foco DE
+ * VERDAD.
+ *
+ * No es una espera decorativa ni un `sleep` disfrazado: el comando `focus()` de TipTap devuelve el
+ * foco al `contenteditable` **dentro de un `requestAnimationFrame`**, asi que durante ese fotograma
+ * el foco sigue en el BOTON. Las teclas que se manden en esa ventana las recibe el boton — y un
+ * `Enter` sobre un boton enfocado lo **vuelve a activar** en vez de partir el parrafo—. Con la
+ * maquina cargada (los dos proyectos de Playwright a la vez) el fotograma se colaba a tiempo y el
+ * caso pasaba; corrido en aislado fallaba 5 de 5 en Chromium, con TODO el texto en negrilla y el
+ * primer item pegado al parrafo.
+ *
+ * Es el equivalente en Playwright del `esperarAlFocoDiferidoDelEditor()` que el unitario de R27 ya
+ * usa en jsdom: se espera A LA CONDICION —el area editable enfocada—, no a un reloj. Vive en un
+ * helper para que no se olvide en ninguna pulsacion.
+ */
+async function pulsarBarraYEsperarFoco(boton: Locator, editable: Locator): Promise<void> {
+  await boton.click();
+  await expect(editable).toBeFocused({ timeout: 60_000 });
+}
+
 test.beforeAll(async () => {
   // LIMPIEZA DEFENSIVA DE HUERFANOS: un E2E interrumpido deja filas `qc64_e2e_*`, y esa basura pone
   // rojos tests de otras features que cuentan filas. Orden que imponen las FK RESTRICT.
@@ -311,37 +333,40 @@ test.describe('editor y lectura de pasos', () => {
     // `contenteditable` y los BOTONES de la barra de formato. Nada de inyectar JSON por JS: el
     // valor entero de este test es que ejercita la interfaz en un navegador de verdad.
     await editable.click();
+    await expect(editable).toBeFocused({ timeout: 60_000 });
     await page.keyboard.type(PARAGRAPH_TEXT);
 
-    // Seleccionar con el teclado y pulsar NEGRILLA en la barra. El boton, no `Control+b`: en
-    // WebKit/macOS el atajo del sistema es otro y R2/R27 hablan del control, no del atajo.
-    await page.keyboard.press('Shift+Home');
-    await boldButton.click();
-    await expect(boldButton).toHaveAttribute('aria-pressed', 'true');
-
-    // Colapsar la seleccion al final. `ArrowRight` se comporta igual en los dos motores; `End`
-    // depende del sistema.
-    await page.keyboard.press('ArrowRight');
-
-    // Tras colapsar, el cursor hereda la negrilla del caracter anterior: se apaga para que los
-    // items de la lista salgan sin marca y el assert de `<strong>` sea inequivoco.
-    if ((await boldButton.getAttribute('aria-pressed')) === 'true') {
-      await boldButton.click();
-      await expect(boldButton).toHaveAttribute('aria-pressed', 'false');
-    }
-
-    // Un parrafo nuevo, y sobre el la LISTA DE VERIFICACION desde su boton.
+    // Un parrafo nuevo, y sobre el la LISTA DE VERIFICACION desde su boton. `Enter` se manda con el
+    // foco ya dentro del area editable —aqui no ha habido pulsacion de barra por medio—, y la
+    // pulsacion del boton espera al foco diferido antes de que se teclee el primer item.
     await page.keyboard.press('Enter');
-    await checklistButton.click();
+    await pulsarBarraYEsperarFoco(checklistButton, editable);
     await expect(checklistButton).toHaveAttribute('aria-pressed', 'true');
 
     await page.keyboard.type(ITEM_1_TEXT);
     await page.keyboard.press('Enter');
     await page.keyboard.type(ITEM_2_TEXT);
+    await expect(editable.locator('li[data-type="taskItem"]')).toHaveCount(2);
 
-    // Lo que el editor pinta ANTES de guardar: una negrilla y dos items.
+    // LA NEGRILLA, AL FINAL Y SOBRE UNA SELECCION EXPLICITA. El orden no es cosmetico: aplicarla
+    // antes obligaba a apagarla despues —al colapsar la seleccion el cursor hereda la marca del
+    // caracter anterior— y esa salvaguarda decidia leyendo `aria-pressed`, que lo pinta el estado
+    // de React (`useEditorState`) y puede ir un tick por detras de la marca guardada en el editor.
+    // Redactando primero el texto y marcando despues, no hay nada que apagar ni atributo que leer.
+    //
+    // El triple clic selecciona el parrafo entero y se comporta igual en los dos motores; `End`
+    // depende del sistema. Y se pulsa el BOTON de la barra, no `Control+b`: en WebKit/macOS el
+    // atajo del sistema es otro, y R2/R27 hablan del control, no del atajo.
+    await editable.locator('p').first().click({ clickCount: 3 });
+    await pulsarBarraYEsperarFoco(boldButton, editable);
+    await expect(boldButton).toHaveAttribute('aria-pressed', 'true');
+
+    // Lo que el editor pinta ANTES de guardar: UNA negrilla, la del parrafo —el `strict mode` de
+    // Playwright hace de conteo: si la marca se hubiera colado en los items, habria mas de un
+    // `<strong>` y esto seria rojo—, dos items, y ninguna marca dentro de la lista.
     await expect(editable.locator('strong')).toHaveText(PARAGRAPH_TEXT);
     await expect(editable.locator('li[data-type="taskItem"]')).toHaveCount(2);
+    await expect(editable.locator('li strong')).toHaveCount(0);
 
     // --- 5. Guardar: la Server Action REAL contra Postgres, sin `fetch` de por medio.
     await page.getByTestId('recipe-form-submit').click();

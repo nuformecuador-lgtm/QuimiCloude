@@ -259,6 +259,53 @@ describe(`guardia: la libreria del editor esta aislada (${DESIGN} > 7, R25)`, ()
     ).toEqual([])
   })
 
+  it('el barrel de la ruta no reexporta recipe-step-schema ni ningun simbolo suyo', () => {
+    // El agujero que esto tapa (hallazgo del reviewer, 2026-09-06): el barrel reexportaba
+    // `RECIPE_STEP_EXTENSIONS`, cuyo tipo es `Extensions` de `@tiptap/core`. La guardia de
+    // arriba no lo veia porque compara el LITERAL `@tiptap` y el barrel no lo escribe; el
+    // efecto practico es que cualquier archivo del repo podia tocar un tipo de la libreria a
+    // traves del barrel sin nombrarla, que es exactamente lo que R25 quiere evitar. Ademas
+    // convertia al barrel en un SEGUNDO consumidor del esquema, y `tasks.md > T5` pide que
+    // `recipe-step-editor.tsx` sea el unico.
+    const BARREL = 'app/(private)/produccion/formulas/components/index.ts'
+    const ESQUEMA = IMPORTADORES_AUTORIZADOS[1]
+    const MODULO = './recipe-step-schema'
+
+    const barrel = fuenteSinComentarios(BARREL)
+
+    expect(
+      barrel.includes(MODULO),
+      `${BARREL} reexporta ${MODULO}. La lista de extensiones NO sale por el barrel: su tipo ` +
+        `es de la libreria del editor (${DESIGN} > 7, R25) y el barrel es una puerta que la ` +
+        'guardia del literal `@tiptap` no ve. `RecipeStepEditor` si tiene sentido en el barrel; ' +
+        'la lista de extensiones no. Su unico consumidor es ' +
+        `${IMPORTADORES_AUTORIZADOS[0]}, por ruta relativa.`,
+    ).toBe(false)
+
+    // Y tampoco por el nombre del simbolo: renombrar el modulo o reexportar con `export *`
+    // dejaria pasar la comprobacion de arriba. Los simbolos se LEEN del esquema, no se copian
+    // aqui a mano, para que anadir uno nuevo quede vigilado sin tocar esta guardia.
+    const simbolos = [
+      ...fuenteSinComentarios(ESQUEMA).matchAll(
+        /export\s+(?:const|function|class|type|interface|enum)\s+([A-Za-z_$][\w$]*)/g,
+      ),
+    ].map((encaje) => encaje[1])
+
+    expect(
+      simbolos.length,
+      `no se leyo ningun simbolo exportado de ${ESQUEMA}: la comprobacion pasaria en vacio`,
+    ).toBeGreaterThan(0)
+
+    for (const simbolo of simbolos) {
+      expect(
+        new RegExp(`(?<![A-Za-z0-9_$])${simbolo}(?![A-Za-z0-9_$])`).test(barrel),
+        `${BARREL} nombra «${simbolo}», que es un simbolo de ${ESQUEMA}. Nada del esquema sale ` +
+          `por el barrel (${DESIGN} > 7, R25): pasa lo que necesites por props o por tipos ` +
+          'propios desde el editor.',
+      ).toBe(false)
+    }
+  })
+
   it('el asistente de lectura no conoce la libreria del editor', () => {
     // Riesgo 2 de `design.md > 10`: el asistente es lo que QC-63 pondra en manos del Operador.
     // Si arrastra el editor, esa ruta se traga un bundle de ProseMirror que no usa.
