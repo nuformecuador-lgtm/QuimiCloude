@@ -22,62 +22,62 @@ excepción**.
 
 ## T0 — Verificar lo heredado antes de escribir nada (BLOQUEA TODO)
 
-- [ ] **Toca:** nada (solo lectura).
-- [ ] **Se hereda montado y NO se re-crea** (R47): layout privado con `<Toaster />`, `AppSidebar` y
+- [x] **Toca:** nada (solo lectura).
+- [x] **Se hereda montado y NO se re-crea** (R47): layout privado con `<Toaster />`, `AppSidebar` y
       `PRIVATE_NAV_ITEMS`, `NAV_SECTION_OPERATION`, el icono `clipboard-list` en `NavIconName`/
       `NAV_ICONS`, `PRIVATE_ROUTE_PREFIXES` con su guardia, `ROUTE_ROLE_RULES` con sus tres filas,
       `lib/shared/pagination.ts`, las primitivas `table`, `select`, `sheet`, `alert-dialog`,
       `dropdown-menu`, `sonner`, `button`, `input`, `label`, `skeleton` de `components/ui/`,
       **la tabla de datos compartida `components/shared/data-table/` entera con su barrel**,
       `@tanstack/react-table` ya aprobada, Vitest, Playwright y `tests/helpers/viewport.ts`.
-- [ ] Comprobar que las **seis** Server Actions de `pedidos` tienen la firma que declara
+- [x] Comprobar que las **seis** Server Actions de `pedidos` tienen la firma que declara
       `design.md > 4`, que se importan **por ruta exacta** (no por el barrel) y que
       `listRecipesAction` acepta `search` y `listUnitsAction` no recibe argumentos.
-- [ ] Comprobar los tres hechos de los que depende `design.md > 6`: `DataTableColumn.cell` devuelve
+- [x] Comprobar los tres hechos de los que depende `design.md > 6`: `DataTableColumn.cell` devuelve
       `ReactNode`; `DataTableFilters` monta **siempre** la caja de búsqueda; `usePinnedColumns`
       arranca **siempre** vacío.
-- [ ] **Hecho cuando:** la lista está verificada por lectura y **no se ha creado ningún archivo**. Si
+- [x] **Hecho cuando:** la lista está verificada por lectura y **no se ha creado ningún archivo**. Si
       algo falta o su firma no coincide, se **para y se reporta** (R47).
 
 ## T1 — Constante de ruta y prefijo privado (depende de T0)
 
-- [ ] **Toca:** `lib/shared/routes.ts`.
-- [ ] Añadir `ORDERS_ROUTE = '/pedidos'` con el comentario del patrón ya establecido (por qué vive
+- [x] **Toca:** `lib/shared/routes.ts`.
+- [x] Añadir `ORDERS_ROUTE = '/pedidos'` con el comentario del patrón ya establecido (por qué vive
       aquí y no en `private-nav.ts`) y **sin** helper de detalle: no hay página de detalle.
-- [ ] Añadir `ORDERS_ROUTE` a `PRIVATE_ROUTE_PREFIXES`.
-- [ ] **Hecho cuando:** `pnpm run typecheck` pasa y `guard-rutas-privadas-cubiertas` sigue verde (si
+- [x] Añadir `ORDERS_ROUTE` a `PRIVATE_ROUTE_PREFIXES`.
+- [x] **Hecho cuando:** `pnpm run typecheck` pasa y `guard-rutas-privadas-cubiertas` sigue verde (si
       se queja de prefijo huérfano, T1 y T5 se cierran en la misma tanda). **R2, R4.**
 
 ## T2 — Ítem de navegación `[P]` (depende de T1)
 
-- [ ] **Toca:** `lib/shared/navigation/private-nav.ts`.
-- [ ] Exportar `ORDERS_LABEL` y añadir un `NavLink` de **nivel superior** en `NAV_SECTION_OPERATION`
+- [x] **Toca:** `lib/shared/navigation/private-nav.ts`.
+- [x] Exportar `ORDERS_LABEL` y añadir un `NavLink` de **nivel superior** en `NAV_SECTION_OPERATION`
       con `href: ORDERS_ROUTE`, `icon: 'clipboard-list'` (ya existe: no se añade icono) y
       `testId: 'nav-pedidos'`.
-- [ ] **Hecho cuando:** un test itera `PRIVATE_NAV_ITEMS` y encuentra el ítem afirmando sobre
+- [x] **Hecho cuando:** un test itera `PRIVATE_NAV_ITEMS` y encuentra el ítem afirmando sobre
       `ORDERS_ROUTE`, `ORDERS_LABEL` y el `testId`, **nunca sobre el literal del copy**. **R3, R44.**
 
 ## T3 — Regla ruta→rol (depende de T1)
 
-- [ ] **Toca:** `lib/composition/route-role-rules.ts`.
-- [ ] Añadir la cuarta fila `{ prefix: ORDERS_ROUTE, roles: [ADMIN_ROLE_NAME] }`, **reutilizando** el
+- [x] **Toca:** `lib/composition/route-role-rules.ts`.
+- [x] Añadir la cuarta fila `{ prefix: ORDERS_ROUTE, roles: [ADMIN_ROLE_NAME] }`, **reutilizando** el
       `ADMIN_ROLE_NAME` que el archivo ya importa. Ningún import nuevo de módulos.
-- [ ] **Hecho cuando:** hay test de que una sesión no-Administrador es redirigida fuera del prefijo y
+- [x] **Hecho cuando:** hay test de que una sesión no-Administrador es redirigida fuera del prefijo y
       una Administrador pasa, y `guard-middleware-edge` sigue verde. **R5.**
 
 ## T4 — Las dos props que la tabla compartida no tiene (depende de T0)
 
-- [ ] **Toca:** `components/shared/data-table/data-table-types.ts`,
+- [x] **Toca:** `components/shared/data-table/data-table-types.ts`,
       `components/shared/data-table/data-table.tsx`,
       `components/shared/data-table/data-table-filters.tsx`,
       `components/shared/data-table/use-pinned-columns.ts`,
       `tests/unit/shared/data-table-filters.test.tsx`, `tests/unit/shared/data-table.test.tsx`.
-- [ ] `searchable?: boolean` (ausente = `true`): con `false`, `DataTableFilters` **no monta** el campo
+- [x] `searchable?: boolean` (ausente = `true`): con `false`, `DataTableFilters` **no monta** el campo
       de búsqueda (`design.md > 6.2`). `DataTableTexts` **no se toca**.
-- [ ] `defaultPinnedColumns?: readonly string[]`: `usePinnedColumns` lo aplica **solo si no hay nada
+- [x] `defaultPinnedColumns?: readonly string[]`: `usePinnedColumns` lo aplica **solo si no hay nada
       persistido** para ese `tableId`, dentro del efecto de restauración y **nunca en render**
       (`design.md > 6.3`).
-- [ ] **Hecho cuando:** hay casos nuevos para las dos props (con y sin ellas), **ningún test existente
+- [x] **Hecho cuando:** hay casos nuevos para las dos props (con y sin ellas), **ningún test existente
       de `tests/unit/shared/data-table*` se modifica** y todos siguen verdes. Si hubiera que
       modificar uno, se **para y se avisa**. Queda anotado en el PR que esta feature cambia el
       componente de QC-55. **R19, R20.**
