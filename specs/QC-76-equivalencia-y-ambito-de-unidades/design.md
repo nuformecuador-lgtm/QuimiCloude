@@ -295,13 +295,17 @@ visible (R17).
 El caso de uso solo hace de correa: `deps.units.listPage(query, { companyId: actor.companyId })`.
 Ni construye SQL ni conoce el `OR`.
 
-### 4.3 Lo que se queda fuera a propósito
+### 4.3 Lo que se queda fuera a propósito: `findRefs` (decisión cerrada 33, R36)
 
-`findUnitRefs(ids)` (`unit-catalog-prisma.ts`) **no** recibe ámbito (R36). Sus llamantes son casos de
-uso de `recetas`, que todavía no tienen empresa —`recetas` es QC-50 en la deuda de
-`docs/architecture.md > Dominio`— y añadirle un parámetro obligaría a tocar ese módulo entero, que no
-es esta ficha. Queda escrito aquí, no escondido: `companyScopeWhere` se exporta del adaptador
-precisamente para que QC-50 lo reutilice y no escriba un segundo `OR`.
+`findUnitRefs(ids)` (`unit-catalog-prisma.ts`) **no** recibe ámbito, y eso es **decisión cerrada del
+humano el 2026-09-07** (última fila de la tabla de `requirements.md`), no un descuido. Sus llamantes
+son casos de uso de `recetas`, que todavía no tiene empresa —es **QC-50** en la deuda de
+`docs/architecture.md > Dominio`—, y añadirle un parámetro obligaría a tocar ese módulo entero, que
+no es esta ficha.
+
+Es la **única excepción** al «un único punto de consulta del módulo» de R18, y por eso está escrita
+con su destino nombrado: **QC-50**. `companyScopeWhere` se exporta del adaptador precisamente para
+que esa ficha lo reutilice y no escriba un segundo `OR`.
 
 ## 5. La conversión
 

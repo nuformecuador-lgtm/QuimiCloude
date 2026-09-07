@@ -249,15 +249,16 @@ que la hace testeable. Ninguna queda sin `R<n>`.
 | 29 | Las unidades de una empresa borrada no se tocan | R16 |
 | 30 | Presentación y unidad no convergen | R37 |
 | 31 | Escala del resultado cuando la división no termina: 12 decimales, truncando | R22, R23 |
+| 32 | «Solo Administrador» se lee hoy por el permiso `unidades.consultar`, no por `ADMIN_ROLE_NAME` | R20 |
+| 33 | `findRefs` se queda sin filtro de empresa; su ámbito es QC-50 | R36, R18 (la excepción es a este requisito: R18 rige el **listado**, y R36 nombra lo que queda fuera y dónde va) |
 
-> **Nota sobre la fila 24, sin reabrirla.** La decisión nombra `ADMIN_ROLE_NAME` en
-> `lib/modules/unidades/domain/actor.ts`. Ese símbolo **ya no existe**: QC-54 lo retiró y QC-74
-> cambió la autorización de «nombre de rol» a **permiso**, de modo que hoy `listUnits` exige
-> `unidades.consultar` y ese código lo tiene, en el seed, **únicamente** el rol Administrador
-> (`lib/modules/identity/domain/permissions.ts`). Lo que la decisión fija —los permisos de hoy, solo
-> Administrador, validado en el service y fallando cerrado— se cumple **tal cual**; solo cambia el
-> mecanismo con el que se comprueba, y por eso R20 se escribe sobre el permiso y no sobre el nombre
-> del rol. No es una decisión nueva: es la misma leída sobre el código que hay en la rama.
+> **Cómo leer las filas 24 y 32 juntas.** La 24 fija el comportamiento —los permisos de hoy, solo
+> Administrador, validado en el service y fallando cerrado— y **sigue cerrada tal cual**. La 32,
+> cerrada por el humano el 2026-09-07, dice **por dónde se pregunta** sobre el código que hay en la
+> rama: `ADMIN_ROLE_NAME` ya no existe (QC-54 lo retiró, QC-74 pasó la autorización a permisos), así
+> que `listUnits` exige `unidades.consultar` y ese código lo tiene en el seed **únicamente** el rol
+> Administrador (`lib/modules/identity/domain/permissions.ts`). Por eso R20 está escrito sobre el
+> permiso y no sobre el nombre del rol: mismo comportamiento, mecanismo actual.
 
 ## Preguntas abiertas
 
@@ -305,3 +306,5 @@ resultado de convertir cuando la división no termina— y **el humano la cerró
 | 2026-09-07 | ¿Qué pasa con las unidades de una empresa que se borra? | **Nada.** `companies` tiene borrado lógico (**QC-47**), así que ninguna fila desaparece de verdad y las unidades de esa empresa se quedan como están |
 | 2026-09-07 | ¿Convergen presentación y unidad? | **No: son entidades separadas** y no convergen. **Cierra la pregunta abierta 3 de QC-32** |
 | 2026-09-07 | ¿Qué escala tiene el resultado de la conversión cuando la división no termina? | **12 decimales, truncando** —nunca redondeando hacia arriba—, en una **constante con nombre** documentada en el contrato. Cuando la división **sí** termina, el resultado sale **exacto**, con todas sus cifras: eso no cambia. No se falla y no se expone el resultado como par exacto. Los 12 salen de que la escala máxima que guarda hoy cualquier columna del ERP son **4** decimales (`decimal(14,4)`, **QC-33**), así que dejan **ocho dígitos de margen** por debajo de lo que cualquier consumidor vaya a mostrar. **Cierra la pregunta abierta que `spec_author` levantó al escribir los requisitos**: «no redondea» no estaba definido para un factor de destino con algún divisor distinto de 2 y de 5 —un `3.0000` produce un decimal periódico— |
+| 2026-09-07 | ¿Cómo se lee hoy «solo Administrador», si `ADMIN_ROLE_NAME` ya no existe? | **Por el permiso `unidades.consultar`**, que en el seed tiene **únicamente** el rol Administrador (`lib/modules/identity/domain/permissions.ts`). El símbolo `ADMIN_ROLE_NAME` que nombra la decisión 24 lo retiró **QC-54**, y **QC-74** cambió la autorización de «nombre de rol» a **permiso**. El comportamiento es **el mismo** —los permisos de hoy, validados en el service y fallando cerrado—; lo único que cambia es **por dónde se pregunta**. La decisión 24 **no se reescribe**: sigue cerrada tal cual, y esta fila dice cómo se lee sobre el código que hay en la rama |
+| 2026-09-07 | ¿`UnitCatalog.findRefs` gana también el filtro por empresa? | **No: se queda sin filtro, fuera del alcance.** Acotarlo obligaría a tocar `recetas`, que es quien lo llama y que se aísla en **QC-50** (deuda registrada en `docs/architecture.md > Dominio`); esta ficha no abre ese módulo. Es una **excepción explícita** a «el filtro vive en un único punto de consulta del módulo», y por eso queda **escrita y con destino nombrado** en vez de quedar como olvido: quien cierre QC-50 reutiliza la definición del ámbito que esta ficha deja exportada, sin escribir un segundo filtro |

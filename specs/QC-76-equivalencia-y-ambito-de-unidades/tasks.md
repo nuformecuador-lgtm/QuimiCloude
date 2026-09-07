@@ -77,7 +77,10 @@
     **exige** el ámbito en su firma (`design.md > 4.2`). La Server Action resuelve
     `getSessionUser()` **y** `getSessionContext()` y devuelve actor `null` si falta cualquiera de las
     dos. `requirePermission` sigue siendo la primera línea del caso de uso, antes de zod.
-  - **No se toca** `unit-catalog-prisma.ts` (R36).
+  - **No se toca** `unit-catalog-prisma.ts`: `findRefs` se queda sin ámbito por **decisión cerrada**
+    del 2026-09-07 (excepción explícita a R18, con destino en **QC-50**; R36). El permiso que exige
+    el caso de uso sigue siendo `unidades.consultar` —el que solo tiene Administrador—, no un nombre
+    de rol (decisión cerrada 32; R20).
   - **Hecho cuando**: `pnpm typecheck` en verde y quitar el `scope` de cualquier llamada **no
     compila**. Cubre: R17, R18, R19, R20, R21, R36.
 
