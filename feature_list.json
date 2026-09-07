@@ -887,7 +887,7 @@
       "epic_name": "Recetas",
       "name": "editor-y-lectura-de-pasos",
       "description": "La mitad de pantalla de los pasos enriquecidos; el contrato del documento lo trae QC-62. En el formulario de receta, cada paso se escribe con un editor enriquecido de terceros de esquema cerrado -parrafo, negrilla, cursiva y lista de verificacion, y nada mas- que produce el documento que define QC-62, y se quita el selector de tipo del paso. Se anade un componente de lectura que presenta la receta como formulario de un paso por pantalla, con Anterior y Siguiente y Finalizar en el ultimo, donde los elementos se marcan y desmarcan y NO se puede avanzar mientras queden elementos sin marcar en ese paso; lo que se marca no se guarda, vive solo en el navegador. Ese componente se construye independiente y reutilizable, pero se monta unicamente dentro del modal de vista previa del editor, que solo usa el Administrador. La libreria del editor entra por la regla 7: la propone el diseno con los cuatro checks de salud y su fila en docs/dependencias.md, y se aprueba junto con el spec. Lleva prueba de punta a punta del camino completo: redactar con negrilla y lista, guardar, reabrir y comprobar que se ve igual, y recorrer el asistente hasta Finalizar. El reordenado de pasos por arrastre y su equivalente por teclado se heredan de QC-26 y no se re-montan. Abrirle el asistente al Operador con ruta propia va aparte. Partida de la ficha original por la regla de F1.0 de AGENTS.md. Diseno acordado: https://claude.ai/code/artifact/fef7d60d-55c7-4ace-ad59-43415b442319",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "frontend",

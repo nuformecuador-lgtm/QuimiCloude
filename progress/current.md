@@ -15,7 +15,7 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-57 | orden-y-filtro-en-listados | Plataforma | backend | in_progress | feature/QC-57-orden-y-filtro-en-listados | implementer (spec aprobado por el humano el 2026-09-04) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | done | feature/QC-44-pantalla-de-proveedores | **cerrada** (PR #35, merge `f966a7b`); la fila decía `in_progress` por descuido. Falta su resumen en `history.md` (F2.6) |
-| QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | spec_ready | feature/QC-64-editor-y-lectura-de-pasos | **esperando aprobación humana del spec (F1.4)**, y con él la librería del editor (nueve paquetes de TipTap v3). Spec en el commit `0044950` de la rama |
+| QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
 | QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
@@ -252,6 +252,10 @@ Arrancada por decisión humana explícita («avanza con 64»), no por el orden d
   nueve paquetes de TipTap `3.31.3`. Verificado además **sobre el paquete publicado** (`npm pack`)
   que `TaskList`/`TaskItem` viven en `@tiptap/extension-list`: **nueve** entradas directas, no
   once. Las nueve filas de `docs/dependencias.md` **no se escriben hasta la aprobación**.
+- **Aprobada por el humano el 2026-09-06 (F1.4 → F2.0).** Con el spec entra la **dependencia**:
+  nueve entradas de TipTap fijadas a `3.31.3`, todas `aprobada` y ninguna `excepcion`, escritas en
+  `docs/dependencias.md` **antes** de instalar nada (commit `3c26268`). Tarjeta en *En curso* y
+  `implementer` lanzado desde **T2**; T1 queda cerrada.
 
 ### QC-62 — pasos-de-receta-enriquecidos: nacida, acotada, sembrada y **partida** (2026-09-04)
 
