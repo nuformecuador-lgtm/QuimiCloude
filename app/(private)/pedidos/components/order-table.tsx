@@ -1,12 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useMemo } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import type { OrderSummary } from '@/lib/modules/pedidos';
+import type { UnitRef } from '@/lib/modules/unidades';
 
-import { ORDER_COLUMNS, ORDER_DEFAULT_PINNED_COLUMNS } from './order-columns';
+import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
 import { orderListHref } from './order-list-params';
+import type { RecipePickerPage } from './recipe-picker';
 
 /**
  * La tabla de la lista de pedidos (R7, R13, R14, R15, R17, R19, R20, R22, `design.md > 5, 7`).
@@ -77,15 +80,25 @@ export type OrderTableProps = {
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;
   readonly totalPages: number;
+  /**
+   * Primera pagina del catalogo de recetas y unidades existentes. **Atraviesan la tabla** hasta
+   * la celda de acciones, que es donde se monta el panel de edicion (R25) y donde se necesitan.
+   * Los pide una sola vez el Server Component de la seccion y bajan por props (R43).
+   */
+  readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitRef[];
 };
 
-export function OrderTable({ orders, params, totalPages }: OrderTableProps) {
+export function OrderTable({ orders, params, totalPages, recipes, units }: OrderTableProps) {
   const router = useRouter();
+  // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
+  // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
+  const columns = useMemo(() => buildOrderColumns({ recipes, units }), [recipes, units]);
 
   return (
     <DataTable
       tableId={ORDER_TABLE_ID}
-      columns={ORDER_COLUMNS}
+      columns={columns}
       rows={orders}
       getRowId={(order) => order.id}
       params={params}

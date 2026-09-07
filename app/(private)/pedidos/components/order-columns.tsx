@@ -2,13 +2,15 @@
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import {
   CREATED_AT_COLUMN_ID,
   PRIORITY_COLUMN_ID,
   STATUS_COLUMN_ID,
 } from './order-list-params';
-import { OrderRowActions } from './order-row-actions';
+import { OrderRowSheetActions } from './order-sheet';
+import type { RecipePickerPage } from './recipe-picker';
 import {
   ORDER_PRIORITY_FILTER_OPTIONS,
   ORDER_STATUS_FILTER_OPTIONS,
@@ -24,6 +26,11 @@ import {
  * elementos y las demas devuelven funciones de celda, y una configuracion con funciones no cruza
  * la frontera servidor->cliente. Por eso `OrderListSection` (servidor) baja solo datos
  * serializables y es esta declaracion la que vive del lado del navegador.
+ *
+ * **Se declaran con una FACTORIA, `buildOrderColumns`** (y no como un array del modulo): la
+ * celda de acciones monta el panel de edicion y los dos dialogos, que necesitan los catalogos de
+ * recetas y de unidades por props (R43). Mientras fue un array estatico esos catalogos no tenian
+ * por donde llegar y los tres botones de la fila no abrian nada.
  *
  * **La columna de acciones es una columna NORMAL** (`design.md > 6.1`, alternativa B descartada):
  * `DataTableColumn.cell` ya devuelve `ReactNode` y `DataTable` lo pinta directamente. No se
@@ -89,85 +96,106 @@ function formatRequestDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-export const ORDER_COLUMNS: readonly DataTableColumn<OrderSummary>[] = [
-  {
-    id: ORDER_NUMBER_COLUMN_ID,
-    label: 'Nº de pedido',
-    align: 'start',
-    sortable: true,
-    // R10: el correlativo SIEMPRE sale de la funcion de formato del contrato. Ni aqui ni en
-    // ningun otro archivo se compone `${year}-${sequence}` a mano.
-    cell: (order) => formatOrderNumber(order.number),
-  },
-  {
-    id: STATUS_COLUMN_ID,
-    label: 'Estado',
-    align: 'start',
-    sortable: true,
-    filter: { kind: 'select', options: ORDER_STATUS_FILTER_OPTIONS },
-    cell: (order) => <OrderStatusBadge status={order.status} />,
-  },
-  {
-    id: PRIORITY_COLUMN_ID,
-    label: 'Prioridad',
-    align: 'start',
-    sortable: true,
-    filter: { kind: 'select', options: ORDER_PRIORITY_FILTER_OPTIONS },
-    cell: (order) => <OrderPriorityBadge priority={order.priority} />,
-  },
-  {
-    id: RECIPE_NAME_COLUMN_ID,
-    label: 'Receta',
-    align: 'start',
-    // R9: el nombre viene RESUELTO en la propia fila (alternativa M, descartada). Si no viene,
-    // marcador — nunca `order.recipeId`.
-    cell: (order) =>
-      order.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />,
-  },
-  {
-    id: QUANTITY_COLUMN_ID,
-    label: 'Cantidad',
-    align: 'end',
-    // R39: la cadena decimal, tal cual la entrega la consulta.
-    cell: (order) => order.quantity,
-  },
-  {
-    id: UNIT_NAME_COLUMN_ID,
-    label: 'Unidad',
-    align: 'start',
-    cell: (order) => order.unitName ?? <MissingValue field={UNIT_NAME_COLUMN_ID} />,
-  },
-  {
-    id: UNIT_PRICE_COLUMN_ID,
-    label: 'Precio unitario',
-    align: 'end',
-    // R39: idem. Sin `Intl.NumberFormat`, sin `toFixed`, sin aritmetica.
-    cell: (order) => order.unitPrice,
-  },
-  {
-    id: CREATED_AT_COLUMN_ID,
-    label: 'Fecha de solicitud',
-    align: 'start',
-    sortable: true,
-    filter: { kind: 'dateRange' },
-    cell: (order) => formatRequestDate(order.createdAt),
-  },
-  {
-    id: CANCELLATION_REASON_COLUMN_ID,
-    label: 'Motivo de cancelación',
-    align: 'start',
-    // R11: con motivo, el motivo; sin el, marcador de ausencia. Nunca una celda vacia que
-    // parezca un fallo de carga.
-    cell: (order) =>
-      order.cancellationReason ?? <MissingValue field={CANCELLATION_REASON_COLUMN_ID} />,
-  },
-  {
-    id: ACTIONS_COLUMN_ID,
-    label: 'Acciones',
-    align: 'end',
-    // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
-    // `pinnable: false` para que el usuario no pueda fijarla y tapar la del correlativo.
-    pinnable: false,
-    cell: (order) => <OrderRowActions order={order} />,
-  },
-];
+/**
+ * Los dos catalogos que el panel lateral de edicion necesita, bajados por props desde el Server
+ * Component de la seccion (R43): la primera pagina de recetas y las unidades existentes.
+ */
+export type OrderColumnsDeps = {
+  readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitRef[];
+};
+
+/**
+ * **Factoria, y no un array estatico**, por una razon concreta: la celda de acciones tiene que
+ * montar el panel de edicion y los dos dialogos, y esos necesitan los catalogos de recetas y
+ * unidades. Un array declarado en el modulo no puede recibirlos, asi que las acciones quedaban
+ * sin cablear -los botones existian y no abrian nada-. Las columnas siguen siendo DATOS: lo que
+ * cambia es que se construyen con sus dependencias.
+ */
+export function buildOrderColumns({
+  recipes,
+  units,
+}: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
+  return [
+    {
+      id: ORDER_NUMBER_COLUMN_ID,
+      label: 'Nº de pedido',
+      align: 'start',
+      sortable: true,
+      // R10: el correlativo SIEMPRE sale de la funcion de formato del contrato. Ni aqui ni en
+      // ningun otro archivo se compone `${year}-${sequence}` a mano.
+      cell: (order) => formatOrderNumber(order.number),
+    },
+    {
+      id: STATUS_COLUMN_ID,
+      label: 'Estado',
+      align: 'start',
+      sortable: true,
+      filter: { kind: 'select', options: ORDER_STATUS_FILTER_OPTIONS },
+      cell: (order) => <OrderStatusBadge status={order.status} />,
+    },
+    {
+      id: PRIORITY_COLUMN_ID,
+      label: 'Prioridad',
+      align: 'start',
+      sortable: true,
+      filter: { kind: 'select', options: ORDER_PRIORITY_FILTER_OPTIONS },
+      cell: (order) => <OrderPriorityBadge priority={order.priority} />,
+    },
+    {
+      id: RECIPE_NAME_COLUMN_ID,
+      label: 'Receta',
+      align: 'start',
+      // R9: el nombre viene RESUELTO en la propia fila (alternativa M, descartada). Si no viene,
+      // marcador — nunca `order.recipeId`.
+      cell: (order) =>
+        order.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />,
+    },
+    {
+      id: QUANTITY_COLUMN_ID,
+      label: 'Cantidad',
+      align: 'end',
+      // R39: la cadena decimal, tal cual la entrega la consulta.
+      cell: (order) => order.quantity,
+    },
+    {
+      id: UNIT_NAME_COLUMN_ID,
+      label: 'Unidad',
+      align: 'start',
+      cell: (order) => order.unitName ?? <MissingValue field={UNIT_NAME_COLUMN_ID} />,
+    },
+    {
+      id: UNIT_PRICE_COLUMN_ID,
+      label: 'Precio unitario',
+      align: 'end',
+      // R39: idem. Sin `Intl.NumberFormat`, sin `toFixed`, sin aritmetica.
+      cell: (order) => order.unitPrice,
+    },
+    {
+      id: CREATED_AT_COLUMN_ID,
+      label: 'Fecha de solicitud',
+      align: 'start',
+      sortable: true,
+      filter: { kind: 'dateRange' },
+      cell: (order) => formatRequestDate(order.createdAt),
+    },
+    {
+      id: CANCELLATION_REASON_COLUMN_ID,
+      label: 'Motivo de cancelación',
+      align: 'start',
+      // R11: con motivo, el motivo; sin el, marcador de ausencia. Nunca una celda vacia que
+      // parezca un fallo de carga.
+      cell: (order) =>
+        order.cancellationReason ?? <MissingValue field={CANCELLATION_REASON_COLUMN_ID} />,
+    },
+    {
+      id: ACTIONS_COLUMN_ID,
+      label: 'Acciones',
+      align: 'end',
+      // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
+      // `pinnable: false` para que el usuario no pueda fijarla y tapar la del correlativo.
+      pinnable: false,
+      cell: (order) => <OrderRowSheetActions order={order} recipes={recipes} units={units} />,
+    },
+  ];
+}

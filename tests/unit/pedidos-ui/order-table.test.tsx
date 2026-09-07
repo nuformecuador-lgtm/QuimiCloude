@@ -18,6 +18,7 @@ import {
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
+import type { UnitRef } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -93,9 +94,24 @@ function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
   };
 }
 
+/**
+ * Los dos catalogos que la tabla PROPAGA hasta la celda de acciones (panel de edicion). Vacios:
+ * ningun caso de este archivo abre el panel, y lo que se comprueba aqui es la lista.
+ */
+const RECETAS = { items: [], totalPages: 1 };
+const UNIDADES: readonly UnitRef[] = [];
+
 function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
   const params = parametros(overrides);
-  render(<OrderTable orders={PEDIDOS} params={params} totalPages={totalPages} />);
+  render(
+    <OrderTable
+      orders={PEDIDOS}
+      params={params}
+      totalPages={totalPages}
+      recipes={RECETAS}
+      units={UNIDADES}
+    />,
+  );
   return params;
 }
 

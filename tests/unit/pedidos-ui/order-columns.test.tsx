@@ -20,7 +20,6 @@ import {
   CANCELLATION_REASON_COLUMN_ID,
   CREATED_AT_COLUMN_ID,
   MISSING_VALUE_MARK,
-  ORDER_COLUMNS,
   ORDER_DEFAULT_PINNED_COLUMNS,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_LABELS,
@@ -32,6 +31,7 @@ import {
   RECIPE_NAME_COLUMN_ID,
   UNIT_NAME_COLUMN_ID,
   UNIT_PRICE_COLUMN_ID,
+  buildOrderColumns,
 } from '@/app/(private)/pedidos/components';
 import {
   ORDER_PRIORITY_VALUES,
@@ -53,6 +53,16 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
     cancelOrderAction: vi.fn(noDebeInvocarse('cancelOrderAction')),
     deleteOrderAction: vi.fn(noDebeInvocarse('deleteOrderAction')),
   };
+});
+
+/**
+ * Las columnas se construyen con la FACTORIA (`buildOrderColumns`) porque la celda de acciones
+ * necesita los dos catalogos del panel de edicion. Es el unico cambio respecto de la version que
+ * las declaraba como array del modulo: **ningun assert de este archivo se relaja**.
+ */
+const ORDER_COLUMNS = buildOrderColumns({
+  recipes: { items: [], totalPages: 1 },
+  units: [],
 });
 
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222';

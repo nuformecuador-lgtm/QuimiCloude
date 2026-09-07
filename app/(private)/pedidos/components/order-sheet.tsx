@@ -10,6 +10,8 @@ import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitRef } from '@/lib/modules/unidades';
 
+import { CancelOrderDialog } from './cancel-order-dialog';
+import { DeleteOrderDialog } from './delete-order-dialog';
 import { OrderForm } from './order-form';
 import { OrderRowActions } from './order-row-actions';
 import type { RecipePickerPage } from './recipe-picker';
@@ -112,47 +114,51 @@ export type OrderRowSheetActionsProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitRef[];
-  /** Enganche de T11 (dialogo de cancelacion con motivo). */
-  readonly onCancel?: (order: OrderSummary) => void;
-  /** Enganche de T12 (dialogo de confirmacion de borrado). */
-  readonly onDelete?: (order: OrderSummary) => void;
 };
 
 /**
- * Las acciones de la fila con **`onEdit` ya cableado al panel lateral** (R25).
+ * Las acciones de la fila con **las tres ya cableadas**: editar al panel lateral (R25), cancelar
+ * al dialogo de motivo (R37) y borrar a la confirmacion (R38).
  *
- * Es la pieza que une lo que T8 dejo enganchado y lo que T10 construye: `OrderRowActions` emite
- * `onEdit(order)` y aqui se traduce en abrir el panel CONTROLADO con ese pedido precargado. Con
- * el pedido en estado final `OrderRowActions` no llega a emitir nada (R24), asi que el panel no
- * se abre y no se monta ningun formulario.
+ * Es la pieza que une lo que T8 dejo enganchado con lo que T10, T11 y T12 construyen:
+ * `OrderRowActions` emite `onEdit`/`onCancel`/`onDelete` y aqui cada uno abre su panel o su
+ * dialogo, CONTROLADO, con ese mismo pedido. Con el pedido en estado final `OrderRowActions` no
+ * llega a emitir nada (R24), asi que **no se monta ninguno de los tres**.
  *
- * `onCancel` y `onDelete` se dejan pasar tal cual: son de T11 y T12, y cuando existan sus
- * dialogos se cablean aqui con la misma forma, sin tocar `order-row-actions.tsx`.
+ * **Los dos dialogos se montan solo mientras estan abiertos.** No es un detalle de rendimiento:
+ * asi cada apertura arranca con el estado de accion limpio -un `not_cancellable` de un intento
+ * anterior no reaparece- y el arbol de una fila cerrada no contiene ningun formulario de
+ * cancelacion ni de borrado, que es lo que R24 comprueba en negativo.
+ *
+ * Es lo que la celda de acciones de `buildOrderColumns` renderiza por fila: sin esta pieza, los
+ * tres botones de `OrderRowActions` no abririan nada.
  */
-export function OrderRowSheetActions({
-  order,
-  recipes,
-  units,
-  onCancel,
-  onDelete,
-}: OrderRowSheetActionsProps) {
-  const [open, setOpen] = useState(false);
+export function OrderRowSheetActions({ order, recipes, units }: OrderRowSheetActionsProps) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
     <>
       <OrderRowActions
         order={order}
-        onEdit={() => setOpen(true)}
-        onCancel={onCancel}
-        onDelete={onDelete}
+        onEdit={() => setEditOpen(true)}
+        onCancel={() => setCancelOpen(true)}
+        onDelete={() => setDeleteOpen(true)}
       />
       <OrderSheet
         order={order}
         recipes={recipes}
         units={units}
-        open={open}
-        onOpenChange={setOpen}
+        open={editOpen}
+        onOpenChange={setEditOpen}
       />
+      {cancelOpen ? (
+        <CancelOrderDialog order={order} open onOpenChange={setCancelOpen} />
+      ) : null}
+      {deleteOpen ? (
+        <DeleteOrderDialog order={order} open onOpenChange={setDeleteOpen} />
+      ) : null}
     </>
   );
 }

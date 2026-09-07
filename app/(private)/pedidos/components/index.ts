@@ -7,16 +7,40 @@
 //
 // La pagina y los componentes de la ruta importan SIEMPRE desde aqui, nunca por ruta profunda.
 export {
+  CANCEL_ORDER_CONFIRM_TESTID,
+  CANCEL_ORDER_DIALOG_TESTID,
+  CANCEL_ORDER_DISMISS_TESTID,
+  CANCEL_ORDER_ERROR_TESTID,
+  CANCEL_ORDER_ID_FIELD,
+  CANCEL_ORDER_ID_TESTID,
+  CANCEL_ORDER_REASON_FIELD,
+  CANCEL_ORDER_REASON_TESTID,
+  CancelOrderDialog,
+  type CancelOrderDialogProps,
+} from './cancel-order-dialog';
+export {
+  DELETE_ORDER_CONFIRM_TESTID,
+  DELETE_ORDER_DIALOG_TESTID,
+  DELETE_ORDER_DISMISS_TESTID,
+  DELETE_ORDER_ERROR_TESTID,
+  DELETE_ORDER_ID_FIELD,
+  DELETE_ORDER_ID_TESTID,
+  DELETE_ORDER_MESSAGE_TESTID,
+  DeleteOrderDialog,
+  type DeleteOrderDialogProps,
+} from './delete-order-dialog';
+export {
   ACTIONS_COLUMN_ID,
   CANCELLATION_REASON_COLUMN_ID,
   MISSING_VALUE_MARK,
-  ORDER_COLUMNS,
   ORDER_DEFAULT_PINNED_COLUMNS,
   ORDER_NUMBER_COLUMN_ID,
   QUANTITY_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
   UNIT_NAME_COLUMN_ID,
   UNIT_PRICE_COLUMN_ID,
+  buildOrderColumns,
+  type OrderColumnsDeps,
 } from './order-columns';
 export { OrderField, type OrderFieldProps } from './order-field';
 export {

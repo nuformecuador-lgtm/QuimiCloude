@@ -120,7 +120,13 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         total de paginas. La tabla recibe `status: 'idle'` siempre: los tres estados se pintan
         FUERA de `<DataTable>` (alternativa Q, descartada).
       */}
-      <OrderTable orders={items} params={params} totalPages={totalPages} />
+      <OrderTable
+        orders={items}
+        params={params}
+        totalPages={totalPages}
+        recipes={recipes}
+        units={units}
+      />
     </div>
   );
 }

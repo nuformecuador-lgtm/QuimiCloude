@@ -179,20 +179,20 @@ excepción**.
 
 ## T11 — Cancelación con motivo (depende de T8, T10)
 
-- [ ] **Toca:** `app/(private)/pedidos/components/{cancel-order-dialog.tsx,index.ts}`.
-- [ ] Diálogo propio con campo de motivo, `id` en oculto, validado con `cancelOrderSchema` del
+- [x] **Toca:** `app/(private)/pedidos/components/{cancel-order-dialog.tsx,index.ts}`.
+- [x] Diálogo propio con campo de motivo, `id` en oculto, validado con `cancelOrderSchema` del
       contrato. Confirmar deshabilitado mientras el motivo esté vacío.
-- [ ] **Hecho cuando:** hay test de que con motivo vacío **no** se invoca `cancelOrderAction` (doble
+- [x] **Hecho cuando:** hay test de que con motivo vacío **no** se invoca `cancelOrderAction` (doble
       que falla si se le llama), de que con motivo se invoca **esa** action y ninguna otra, de que
       `not_cancellable` se pinta en la región del diálogo, y de que el éxito aplica T10. **R37, R35,
       R44.**
 
 ## T12 — Borrado `[P]` (depende de T8, T10)
 
-- [ ] **Toca:** `app/(private)/pedidos/components/{delete-order-dialog.tsx,index.ts}`.
-- [ ] Confirmación que **nombra el pedido por su correlativo** (`formatOrderNumber`, nunca el uuid) y
+- [x] **Toca:** `app/(private)/pedidos/components/{delete-order-dialog.tsx,index.ts}`.
+- [x] Confirmación que **nombra el pedido por su correlativo** (`formatOrderNumber`, nunca el uuid) y
       advierte de que no se puede deshacer; `id` en oculto.
-- [ ] **Hecho cuando:** hay test de que sin confirmar **no** se invoca `deleteOrderAction`, de que al
+- [x] **Hecho cuando:** hay test de que sin confirmar **no** se invoca `deleteOrderAction`, de que al
       confirmar se invoca y se aplica el éxito de T10, y de que el texto de confirmación contiene el
       correlativo derivado del contrato y **no** el identificador técnico. **R38, R35.**
 
