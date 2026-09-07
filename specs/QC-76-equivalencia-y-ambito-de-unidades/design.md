@@ -347,9 +347,16 @@ resultado = quantity * factorEfectivo(from) / factorEfectivo(to)
 Aritmética con `BigInt` sobre enteros escalados (el decimal se parte en signo, dígitos y escala; la
 multiplicación suma escalas; la división se hace sobre el numerador ampliado). El resultado sale
 **exacto** siempre que la división termine, y se recorta sin ceros de relleno a la derecha: 1 litro
-→ `1000`, 1 gramo → tonelada → `0.000001` (R23, nada de `0`). Cuando **no** termina, se aplica la
-posición por defecto de la pregunta abierta 1 (12 decimales, truncando) — y si el humano la cierra de
-otra forma, cambia una constante y su test, nada más.
+→ `1000`, 1 gramo → tonelada → `0.000001` (R23, nada de `0`).
+
+Cuando la división **no** termina —factor de destino con algún divisor distinto de 2 y de 5, un
+`3.0000`—, se calcula con **12 decimales truncando**, nunca redondeando hacia arriba (decisión
+cerrada del 2026-09-07, última fila de la tabla; R23). Los 12 viven en **una sola constante con
+nombre** —`CONVERSION_SCALE`— exportada o no, pero documentada en el JSDoc del contrato con su
+porqué: la escala máxima que guarda cualquier columna del ERP son 4 decimales (`decimal(14,4)`,
+QC-33), así que 12 dejan ocho dígitos de margen bajo lo que cualquier consumidor vaya a mostrar.
+Truncar y no redondear es lo que impide que un resultado crezca por encima de su valor real al
+convertir muchas veces.
 
 ### 5.3 Ninguna librería (R38, regla 7 de `CLAUDE.md`)
 

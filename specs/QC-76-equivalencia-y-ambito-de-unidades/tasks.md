@@ -5,9 +5,10 @@
 > que su criterio se cumpla; el cierre de tanda es `./init.sh --rapido` y el cierre de feature
 > `./init.sh` completo (regla 5 de `CLAUDE.md`).
 >
-> **Pregunta abierta 1** (escala del resultado cuando la división no termina): T7 implementa la
-> **posición por defecto** escrita en `requirements.md` —12 decimales, truncando— en **una sola
-> constante con nombre**, para que cerrarla de otra forma cueste una línea y un test.
+> **Sin preguntas abiertas.** La escala del resultado cuando la división no termina la **cerró el
+> humano el 2026-09-07** (última fila de la tabla de decisiones): **12 decimales, truncando**, en una
+> **constante con nombre** documentada en el contrato. T7 y T8 la implementan y la prueban como
+> requisito firme (R23), no como posición por defecto.
 
 ## Fase A — Esquema y base de datos
 
@@ -85,10 +86,13 @@
     (`IncompatibleUnitsError`), `lib/modules/unidades/index.ts`.
   - Función **pura**, decimales como texto, aritmética con `BigInt` sobre enteros escalados, base
     efectiva `baseUnitId ?? id` y factor efectivo `factor ?? '1'` (`design.md > 5.2`). La escala de
-    la división no exacta va en **una constante con nombre** y su JSDoc apunta a la pregunta abierta
-    1. **Ninguna dependencia nueva** (R38).
+    la división no exacta —**12 decimales, truncando**, R23— va en **una sola constante con nombre**
+    (`CONVERSION_SCALE`), con su JSDoc explicando el porqué de los 12 (4 decimales es la escala
+    máxima que guarda el ERP, QC-33). **Ninguna dependencia nueva** (R38).
   - **Hecho cuando**: el barrel la exporta, `module-contract.test.ts` sigue verde (nada de servidor
-    en el cierre de imports) y `pnpm typecheck` pasa. Cubre: R22, R25, R38.
+    en el cierre de imports), `pnpm typecheck` pasa y la escala aparece **una sola vez** en el
+    módulo (`rg 12 lib/modules/unidades/domain/convert-quantity.ts` no revela literales sueltos).
+    Cubre: R22, R23, R25, R38.
 
 ## Fase C — Verificación
 
@@ -97,8 +101,9 @@
   - Casos: unidad consigo misma; derivada → su base (1 litro = `1000` mililitros); base → derivada;
     dos derivadas de la misma base; factor menor que 1 (media garrafa); resultado muy pequeño
     (1 gramo en toneladas → `0.000001`, **nunca** `0`, R23); bases distintas →
-    `IncompatibleUnitsError`; entradas inválidas → `ValidationError`; división no exacta → la escala
-    de la constante, truncando.
+    `IncompatibleUnitsError`; entradas inválidas → `ValidationError`; **división que no termina**
+    (factor de destino `3.0000`) → exactamente **12 decimales truncados**, comprobando que la última
+    cifra es la truncada y **no** una redondeada hacia arriba (R23).
   - **Hecho cuando**: todos verdes y los nombres describen el comportamiento
     (`docs/conventions.md > Tests`). Cubre: R23, R24, R25.
 

@@ -144,8 +144,13 @@ framework y sin estado.
 
 **R23.** CUANDO se convierte una cantidad entre dos unidades que **comparten unidad base** —incluido
 el caso de una unidad consigo misma y el de una unidad base con una derivada suya—, el sistema DEBE
-devolver la cantidad equivalente **exacta** según los factores declarados, NO DEBE redondearla a
-ninguna escala de presentación y NO DEBE guardarla en ninguna columna.
+devolver la cantidad equivalente según los factores declarados, NO DEBE redondearla a ninguna escala
+de presentación y NO DEBE guardarla en ninguna columna. En concreto: SI la división termina,
+ENTONCES el resultado DEBE ser **exacto**, con todas sus cifras y sin ceros de relleno; SI la
+división **no termina** —el factor de destino tiene algún divisor distinto de 2 y de 5—, ENTONCES el
+sistema DEBE calcularlo con una **escala interna fija de 12 decimales, truncando** y nunca
+redondeando hacia arriba, y esa escala DEBE estar declarada en **una única constante con nombre**
+documentada en el contrato, no repartida por el cálculo.
 
 **R24.** SI las dos unidades **no comparten unidad base**, ENTONCES el sistema DEBE fallar con un
 error de dominio distinguible del resto y NO DEBE devolver ninguna cantidad.
@@ -243,6 +248,7 @@ que la hace testeable. Ninguna queda sin `R<n>`.
 | 28 | El símbolo es único cuando existe, con el mismo ámbito que el nombre | R15 |
 | 29 | Las unidades de una empresa borrada no se tocan | R16 |
 | 30 | Presentación y unidad no convergen | R37 |
+| 31 | Escala del resultado cuando la división no termina: 12 decimales, truncando | R22, R23 |
 
 > **Nota sobre la fila 24, sin reabrirla.** La decisión nombra `ADMIN_ROLE_NAME` en
 > `lib/modules/unidades/domain/actor.ts`. Ese símbolo **ya no existe**: QC-54 lo retiró y QC-74
@@ -255,29 +261,14 @@ que la hace testeable. Ninguna queda sin `R<n>`.
 
 ## Preguntas abiertas
 
-**Ninguna quedó abierta al acotar.** Las cuatro que quedaron abiertas al acotar las cerró el humano
-el 2026-09-07, y están en la tabla de abajo (cuatro últimas filas). Dos de ellas —el símbolo único y
-la convergencia de presentación con unidad— cerraron además **las preguntas abiertas 1 y 3 de
+**Ninguna.** Las cuatro que quedaron abiertas al acotar las cerró el humano el 2026-09-07, y
+están en la tabla de abajo (cuatro últimas filas). Dos de ellas —el símbolo único y la
+convergencia de presentación con unidad— cerraron además **las preguntas abiertas 1 y 3 de
 QC-32**, vivas desde el 2026-09-02; queda anotado en el issue QC-32, cuyo spec no se toca.
 
-**Añadida por `spec_author` el 2026-09-07 (F1.2).** Una sola, y no bloquea el modelo ni la
-migración: solo la última cifra del resultado de convertir. Lleva escrita su **posición por
-defecto**, para que el implementer no se pare, pero la posición **no es la decisión**.
-
-1. **¿Qué escala tiene el resultado de la conversión cuando la división no termina?** La decisión
-   cerrada dice «no redondea: sale con toda la precisión de la operación y redondea quien lo
-   muestra», y para casi todos los casos eso es exacto y finito —convertir 1 litro a mililitros da
-   `1000`, y 1 gramo a toneladas da `0.000001`, con todas sus cifras—. Pero convertir entre dos
-   unidades cuyo factor de destino tenga un divisor distinto de 2 y de 5 —por ejemplo un factor
-   `3.0000`— produce un decimal **periódico**: `1 / 3` no tiene «toda su precisión» en ninguna
-   cadena finita. Ahí «no redondear» no está definido y no se puede deducir de la tabla.
-   **Posición por defecto mientras el humano no diga otra cosa:** el resultado se devuelve
-   **exacto** siempre que la división termine; cuando no termina, se calcula con una escala interna
-   fija de **12 decimales truncando** (nunca redondeando hacia arriba), documentada en el contrato.
-   El número sale de que la escala máxima que hoy guarda cualquier columna del ERP son **4**
-   decimales (`decimal(14,4)`, QC-33), así que 12 deja ocho dígitos de margen por debajo de lo que
-   cualquier consumidor vaya a mostrar. Si el humano prefiere fallar en vez de truncar, o exponer el
-   resultado como par exacto, es un cambio de contrato pequeño y localizado en una función pura.
+`spec_author` abrió una quinta el 2026-09-07 al escribir los requisitos —qué escala tiene el
+resultado de convertir cuando la división no termina— y **el humano la cerró ese mismo día**: es la
+**última fila** de la tabla de abajo y vive en R23. No queda ninguna abierta.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -313,3 +304,4 @@ defecto**, para que el implementer no se pare, pero la posición **no es la deci
 | 2026-09-07 | ¿El símbolo debe ser único? | **Sí.** Único **cuando existe** —sigue siendo **opcional**— y con el **mismo ámbito que el nombre**: dentro de la empresa, y las de sistema entre ellas. Medirlo distinto haría que el «kg» de sistema bloqueara el «kg» de una empresa que sí puede tener su propio kilogramo. **Cierra la pregunta abierta 1 de QC-32**, que dejó el símbolo sin índice a propósito |
 | 2026-09-07 | ¿Qué pasa con las unidades de una empresa que se borra? | **Nada.** `companies` tiene borrado lógico (**QC-47**), así que ninguna fila desaparece de verdad y las unidades de esa empresa se quedan como están |
 | 2026-09-07 | ¿Convergen presentación y unidad? | **No: son entidades separadas** y no convergen. **Cierra la pregunta abierta 3 de QC-32** |
+| 2026-09-07 | ¿Qué escala tiene el resultado de la conversión cuando la división no termina? | **12 decimales, truncando** —nunca redondeando hacia arriba—, en una **constante con nombre** documentada en el contrato. Cuando la división **sí** termina, el resultado sale **exacto**, con todas sus cifras: eso no cambia. No se falla y no se expone el resultado como par exacto. Los 12 salen de que la escala máxima que guarda hoy cualquier columna del ERP son **4** decimales (`decimal(14,4)`, **QC-33**), así que dejan **ocho dígitos de margen** por debajo de lo que cualquier consumidor vaya a mostrar. **Cierra la pregunta abierta que `spec_author` levantó al escribir los requisitos**: «no redondea» no estaba definido para un factor de destino con algún divisor distinto de 2 y de 5 —un `3.0000` produce un decimal periódico— |
