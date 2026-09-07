@@ -340,3 +340,150 @@ el conteo baja al cambio real, y **corregir el párrafo de la bitácora**, que h
 - **R21**: recorridas las siete listas blancas contra los 35 índices; todo campo ordenable o
   buscable tiene índice, contando los seis que ya existían y `presentations_name_idx` como el que
   sirve el orden por `presentationName` de productos.
+
+---
+---
+
+# Segunda ronda — 2026-09-04
+
+> `HEAD` = `3fca474`. Revisión de los dos bloqueantes y de la parte del código que el ruido de B2
+> hacía irrevisable. Todo lo de abajo está **medido por mí en este worktree**.
+
+## VEREDICTO: APROBADO
+
+Los dos bloqueantes están cerrados y verificados. Los hallazgos nuevos son todos **menores** y
+ninguno toca contrato, trazabilidad ni seguridad.
+
+## Evidencia propia
+
+**B1 — cerrado.** `git fetch origin dev` y luego `git merge-base origin/dev HEAD` devuelve
+`2191567`, que es **exactamente `origin/dev`**: la rama ya no está detrás, F2.3 está hecha de
+verdad y contra el remoto. La causa de raíz que reporta el implementer —en T0 mergeó `dev`
+**local**, no `origin/dev`— explica el fallo entero y ya está anotada en la bitácora, que es donde
+sirve.
+
+**Gate reproducido por mí, completo:** `typecheck` verde, `lint` verde,
+`Test Files 3 failed | 199 passed (202)`, `Tests 4 failed | 2341 passed (2345)`,
+`tests: sin rojos nuevos (3 rojos, todos en el baseline de 5); 2 por limpiar`, `== init OK ==`,
+**exit code 0**.
+
+Coinciden con lo reportado los totales que importan —**202 archivos y 2345 tests**—; el reparto
+entre `failed` y `skipped` difiere de su corrida, que es lo normal en los casos que se auto-saltan
+según el rango de git, y no cambia el veredicto. Los 3 rojos son los del baseline de cinco entradas
+que trajo el merge. **`vitest.config.mts` sigue sin tocar**, comprobado en el diff. Y el aviso «2
+archivos del baseline ya pasan» es de QC-58, escalado y ajeno.
+
+**B2 — cerrado.** Recorrí los 126 archivos del diff comprobando el blob de `HEAD` uno a uno:
+**cero archivos con CRLF**. El diff pasa a `126 archivos, +11.209/−504`. Confirmo tu lectura: las
+~5.900 líneas borradas que desaparecieron eran **todas** fantasma. El commit `5f3277d` solo toca
+terminadores.
+
+**Bitácora.** Verificadas las cuatro correcciones. La del incidente de finales de línea es la que
+valía la pena y está bien hecha: nombra el error de método —comparó contra `HEAD`, que **ya era el
+commit roto**, en vez de contra la rama base— y reconoce que eso le llevó a **propagar** la
+conversión en vez de arreglarla. Esa lección es reutilizable y por eso importa que esté escrita.
+
+**m2 y m3.** Los dos en `progress/current.md > Deudas y cosas abiertas`, con lo que hacía falta: el
+aviso de `products.name_normalized NOT NULL` incluye el síntoma exacto —`23502`, «Null constraint
+violation on the fields: (name_normalized)»—, qué hacer, y **el rechazo escrito del
+`SET DEFAULT ''`** con su porqué. `pageQuerySchema` queda como candidata a ficha propia con el
+motivo de por qué no se hizo aquí. Cerrados.
+
+## Sobre `list-query-sql.ts` y la guardia de equivalencia — el dato del implementer está mal contado
+
+Comprobado: **los `adapters/driven/persistence/list-query-sql.ts` NO son «cuatro copias
+literales»**. Son cinco archivos **distintos a propósito**, de 32, 74, 118, 123 y 124 líneas, uno
+por módulo, con las columnas de sus propias tablas. La cabecera del de `inventario` lo dice: «se
+comparte entre `product-prisma.ts` y `presentation-prisma.ts`… **no entre módulos**: cada módulo
+traduce el suyo con sus columnas». Nunca debieron ser idénticos, y que uno naciera en CRLF no
+significaba nada sobre los demás.
+
+**Las copias literales son los cinco `domain/list-query.ts`, y esos SIEMPRE fueron LF.** Verificado:
+los cinco son ASCII/LF hoy, ninguno estuvo en la lista de 14, y neutralizando solo el nombre del
+módulo son **idénticos byte a byte** entre sí.
+
+**Mi dictamen sobre la guardia de equivalencia no cambia, y por partida doble**: no vigilaba el
+archivo afectado, y aunque lo hubiera vigilado, `textoComparable` **normaliza los `\r\n` a `\n`**
+antes de comparar, con un comentario que dice explícitamente que es «para que esto corra igual en
+Windows». Ni había agujero ni lo hubo. Conviene corregir esa frase de la bitácora para que nadie
+concluya que la guardia falló.
+
+## Hallazgos nuevos, en los tres archivos que antes eran irrevisables
+
+Revisados ya sin ruido: `lib/composition/index.ts` (55/7), `product-prisma.ts` (168/21) y
+`presentation-prisma.ts` (120/11).
+
+**`lib/composition/index.ts`: limpio, sin hallazgos.** Es exactamente lo que dice ser: cinco
+constantes que atan los cinco puertos `ListQueryLog` a **la misma y única**
+`logIgnoredListQueryFields` de `lib/shared/observability/`, más `listUnitsPage` en el
+`UnitRepository` y el `log` añadido a las siete factorías. Edición quirúrgica, sin reordenar nada,
+y cada binding con su comentario. Es el único sitio del repo donde puerto e implementación pueden
+atarse, y así se usa.
+
+**`product-prisma.ts` y `presentation-prisma.ts`: bien construidos.** El mismo `where` para
+`findMany` y `count` es **literalmente la misma constante**, no dos objetos parecidos —R14 de
+verdad, no de palabra—; el desempate por `id` es una constante con nombre; `nulls: 'last'` está en
+las dos direcciones; la búsqueda va contra `nameNormalized` **sin `mode: 'insensitive'`**, que es lo
+correcto porque pedirlo dejaría fuera el índice de trigramas; y el `deletedAt: null` de productos no
+es negociable por el llamante. `presentations` no lleva condición de vida y está justificado: esa
+tabla no tiene `deleted_at`.
+
+Tres cosas nuevas, las tres **menores**:
+
+- **N1 (menor) — doce funciones exportadas sin un solo consumidor.** `buildProductWhere`,
+  `productOrderBy`, `buildPresentationWhere`, `presentationOrderBy`, `buildRecipeWhere`,
+  `recipeOrderBy`, `buildSupplierWhere`, `supplierOrderBy`, `catalogLineOrderBy`, `unitOrderBy`,
+  `orderOrderBy` y `buildOrderWhere` están declaradas `export` en los siete adaptadores y **cada
+  una se menciona en un solo archivo: el suyo**. Ni el barrel, ni `composition`, ni `app/`, ni los
+  tests las importan. Es superficie pública sin dueño —la misma familia que m3, pero **creada por
+  esta ficha**, no heredada—. Deberían ser `function` a secas. `eslint` no lo caza.
+- **N2 (menor, y es el que más me interesa) — el adaptador tiene una SEGUNDA lista blanca implícita
+  que nada compara con la declarada.** La lista blanca del dominio dice qué campos son
+  consultables; el `switch` y los `if (field === ...)` del adaptador dicen cuáles sabe traducir a
+  columna, y devuelven «filtro ausente» para el resto. **Son dos listas que tienen que coincidir y
+  nada las confronta.** Auditadas hoy las siete contra sus adaptadores: **coinciden todas, no hay
+  ningún campo declarado sin traducir, así que hoy no hay bug**. Pero si mañana alguien añade un
+  campo a una lista blanca y olvida la rama del adaptador, el filtro **desaparece en silencio**: no
+  falla, no sale en el `Page`, y **no llega al log**, porque el log solo registra lo que podó
+  `sanitize` en el dominio. Es exactamente el modo de fallo que la decisión cerrada 7 quiso evitar
+  —«mostraría datos sin filtrar, y sin rastro ese error no se descubre nunca»—, colándose por el
+  otro lado de la frontera. La guardia que faltaría es barata y muy de esta casa: recorrer las
+  siete listas blancas, pasar cada campo declarado por el traductor de su adaptador y exigir
+  condición no nula y `orderBy` distinto del de por defecto. **No se pide para esta ficha**
+  —ninguna task la contempla y hoy no protege de nada real—, pero es la continuación natural de la
+  guardia de equivalencia y merece ficha.
+- **N3 (menor) — una fecha ilegible en `dateRange` se descarta sin dejar rastro.** `startOfDayUtc`
+  devuelve nulo ante un `from`/`to` que no parsea y el filtro se trata como «sin cota por ese
+  lado». La decisión de **no lanzar** es correcta y está razonada en el código: una excepción ahí
+  convertiría un parámetro raro en un 500. Lo que falta es la otra mitad: **no se anota en ningún
+  sitio**, porque el log vive en el dominio y esta poda ocurre en el adaptador. Una pantalla que
+  emita `01/03/2026` en vez de `2026-03-01` devolvería la lista sin filtrar y nadie se enteraría.
+  Mismo origen que N2. Se anota para QC-56, que es quien va a emitir esas fechas.
+
+## Estado de los hallazgos de la primera ronda
+
+| # | Estado |
+| --- | --- |
+| **B1** gate rojo y falta F2.3 | **CERRADO**, verificado: merge-base = `origin/dev`, `init OK` reproducido |
+| **B2** 14 archivos en CRLF | **CERRADO**, verificado: cero CRLF en los 126 archivos del diff |
+| **m1** guardias inválidas de QC-26/QC-34 | escalado a QC-58 y al leader; no cambia el veredicto |
+| **m2** aviso de `name_normalized NOT NULL` | **CERRADO** en `progress/current.md > Deudas` |
+| **m3** `pageQuerySchema` huérfano | **CERRADO** como deuda anotada, con candidatura a ficha |
+| **m4** autoridad del cambio de pedidos | **CORREGIDO** en la bitácora: `design.md > 5` nota 3 |
+| **m5** nombre de test engañoso | abierto, cosmético |
+| **m6** búsqueda de más de 120 caracteres tumba la consulta | abierto, anotado para QC-56 |
+| **m7** rendija de `textoComparable` | abierto, cubierto por el otro lado |
+| **m8** `feature_list.json` desactualizado | **CERRADO** por el merge (`in_progress=2`) |
+| **N1, N2, N3** | nuevos, menores, ninguno bloquea |
+
+## Checklist final
+
+- [x] Especificación completa y las 21 tasks en `[x]`.
+- [x] `R1`–`R35` con test real. **`R<n>` sin test: CERO.**
+- [x] `./init.sh` **en verde**, reproducido por mí (exit 0).
+- [x] Sin CRLF, sin dependencias nuevas, sin modelo nuevo, RLS intacta, migración reversible.
+- [x] Autorización en el service con su test en los cinco módulos.
+- [x] Las 22 decisiones cerradas respetadas, incluidas las tres tardías que mandan sobre el
+      `design.md`.
+
+**VEREDICTO DE LA SEGUNDA RONDA: APROBADO.**
