@@ -1,4 +1,10 @@
-import { DASHBOARD_ROUTE, FORMULAS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE } from '../routes';
+import {
+  DASHBOARD_ROUTE,
+  FORMULAS_ROUTE,
+  INVENTORY_ROUTE,
+  ORDERS_ROUTE,
+  SUPPLIERS_ROUTE,
+} from '../routes';
 
 /**
  * Navegacion de la zona privada (`design.md > 4.3`).
@@ -53,6 +59,15 @@ export const RECIPES_LABEL = 'Recetas';
  * codigo previo que la importara de este archivo, asi que no hay compatibilidad que sostener.
  */
 export const SUPPLIERS_LABEL = 'Proveedores';
+
+/**
+ * Etiqueta del sidebar para la pantalla de pedidos (QC-35, R3).
+ *
+ * `ORDERS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay codigo
+ * previo que la importara de este archivo, asi que no hay compatibilidad que sostener. Mismo
+ * criterio que `SUPPLIERS_LABEL`.
+ */
+export const ORDERS_LABEL = 'Pedidos';
 
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
@@ -148,6 +163,17 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     label: 'Inventario',
     testId: 'nav-inventario',
     icon: 'package',
+    section: NAV_SECTION_OPERATION,
+  },
+  // QC-35 R3: item de NIVEL SUPERIOR en la seccion «Operación» —un pedido es produccion, no
+  // cadena de suministro (decision humana del 2026-09-06)—. El icono `clipboard-list` ya existe
+  // en `NavIconName` y en `NAV_ICONS`: no se anade ningun icono.
+  {
+    kind: 'link',
+    href: ORDERS_ROUTE,
+    label: ORDERS_LABEL,
+    testId: 'nav-pedidos',
+    icon: 'clipboard-list',
     section: NAV_SECTION_OPERATION,
   },
   {

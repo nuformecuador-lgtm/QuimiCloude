@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   DATA_TABLE_FEATURES,
@@ -10,6 +10,8 @@ import {
   DataTable,
 } from '@/components/shared/data-table/data-table'
 import { createDefaultParams, withSort } from '@/components/shared/data-table/data-table-params'
+// QC-35 T4: la clave de `localStorage` se construye con la funcion del propio hook, nunca a mano.
+import { buildPinningStorageKey } from '@/components/shared/data-table/use-pinned-columns'
 import type {
   DataTableColumn,
   DataTableParams,
@@ -343,5 +345,93 @@ describe('DataTable: toolbarActions (R30)', () => {
 
     const barraAcciones = screen.getByTestId('data-table-toolbar-actions')
     expect(within(barraAcciones).getByRole('button', { name: 'Nuevo producto' })).toBeInTheDocument()
+  })
+})
+
+/**
+ * QC-35 T4 (`design.md > 6.3`, R19): la prop `defaultPinnedColumns`. Casos NUEVOS; ningun test
+ * previo de este archivo cambia, porque sin la prop el comportamiento es el de siempre.
+ *
+ * Se renderiza con props propias (no con `renderTabla`) para no tocar el helper existente, y
+ * cada caso usa su propio `tableId` para no compartir estado de `localStorage`.
+ */
+describe('DataTable: columna fijada por defecto (QC-35 R19)', () => {
+  const columnas: readonly DataTableColumn<Producto>[] = [
+    { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => row.nombre },
+    { id: 'stock', label: 'Stock', align: 'end', cell: (row) => String(row.stock) },
+  ]
+
+  function renderConDefecto(tableId: string, defaultPinnedColumns?: readonly string[]) {
+    const props: DataTableProps<Producto> = {
+      tableId,
+      columns: columnas,
+      rows: PRODUCTOS,
+      getRowId: (row) => row.id,
+      params: createDefaultParams(),
+      totalPages: 1,
+      onParamsChange: vi.fn<(next: DataTableParams) => void>(),
+      status: 'idle',
+      texts,
+      defaultPinnedColumns,
+    }
+    render(<DataTable {...props} />)
+  }
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('sin nada persistido, la columna declarada nace fijada al borde izquierdo', () => {
+    renderConDefecto('qc35-defecto-limpio', ['nombre'])
+
+    expect(screen.getByTestId('data-table-head-nombre')).toHaveAttribute('data-pinned', 'left')
+    expect(screen.getAllByTestId('data-table-cell-nombre')[0]).toHaveAttribute('data-pinned', 'left')
+    // Solo la declarada: el resto sigue sin fijar.
+    expect(screen.getByTestId('data-table-head-stock')).not.toHaveAttribute('data-pinned')
+  })
+
+  it('con algo persistido para ese tableId gana lo persistido, no el defecto (R25, R26)', () => {
+    window.localStorage.setItem(
+      buildPinningStorageKey('qc35-defecto-con-persistido'),
+      JSON.stringify({ left: ['stock'], right: [] }),
+    )
+
+    renderConDefecto('qc35-defecto-con-persistido', ['nombre'])
+
+    expect(screen.getByTestId('data-table-head-stock')).toHaveAttribute('data-pinned', 'left')
+    expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
+  })
+
+  it('si el usuario solto TODO, su decision se recuerda y el defecto no revive (R25, R26)', () => {
+    window.localStorage.setItem(
+      buildPinningStorageKey('qc35-defecto-soltado'),
+      JSON.stringify({ left: [], right: [] }),
+    )
+
+    renderConDefecto('qc35-defecto-soltado', ['nombre'])
+
+    expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
+    expect(screen.getByTestId('data-table-head-stock')).not.toHaveAttribute('data-pinned')
+  })
+
+  it('sin la prop no hay nada fijado al montar (comportamiento de siempre)', () => {
+    renderConDefecto('qc35-sin-defecto')
+
+    expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
+    expect(screen.getByTestId('data-table-head-stock')).not.toHaveAttribute('data-pinned')
+  })
+
+  it('la columna fijada por defecto se puede soltar desde el menu de su cabecera (R25)', async () => {
+    renderConDefecto('qc35-defecto-soltable', ['nombre'])
+
+    expect(screen.getByTestId('data-table-head-nombre')).toHaveAttribute('data-pinned', 'left')
+
+    fireEvent.click(screen.getByTestId('data-table-header-menu-nombre'))
+    fireEvent.click(await screen.findByTestId('data-table-unpin-nombre'))
+
+    expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
+    expect(
+      JSON.parse(window.localStorage.getItem(buildPinningStorageKey('qc35-defecto-soltable')) as string),
+    ).toEqual({ left: [], right: [] })
   })
 })

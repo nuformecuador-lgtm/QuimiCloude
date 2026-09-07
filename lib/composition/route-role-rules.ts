@@ -29,7 +29,12 @@
 
 import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import type { RouteRoleRule } from '@/lib/modules/identity';
-import { FORMULAS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
+import {
+  FORMULAS_ROUTE,
+  INVENTORY_ROUTE,
+  ORDERS_ROUTE,
+  SUPPLIERS_ROUTE,
+} from '@/lib/shared/routes';
 
 /**
  * Conjunto declarado de reglas ruta→rol.
@@ -56,4 +61,11 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   // del mismo valor desde el barrel de `proveedores` seria la misma constante entrando dos veces
   // por dos puertas, y un literal nuevo del rol es la deuda que `actor.ts` ya declaro.
   { prefix: SUPPLIERS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+  // QC-35 R5 — la pantalla de pedidos, solo Administrador. UNA sola fila: no hay pagina de
+  // detalle, y la busqueda casa por segmentos igualmente. Reutiliza el `ADMIN_ROLE_NAME` que
+  // este archivo ya importa del barrel de `inventario`: un segundo import del mismo valor desde
+  // el barrel de `pedidos` seria la misma constante entrando dos veces por dos puertas. La fila
+  // solo anade una constante de `lib/shared/routes`, ya en el cierre de imports, asi que este
+  // archivo sigue cargando en el BORDE (`guard-middleware-edge`).
+  { prefix: ORDERS_ROUTE, roles: [ADMIN_ROLE_NAME] },
 ];
