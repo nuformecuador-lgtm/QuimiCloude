@@ -13,8 +13,9 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | pending | feature/QC-75-menu-y-rutas-por-permiso | worktree montado (F1.0/F1.1). **`/afinar-feature` en curso** antes de lanzar `spec_author` (F1.2) |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | pending | feature/QC-58-timeout-tests-ui-bajo-carga | worktree montado el 2026-09-07 (F1.0/F1.1). Pendiente decidir si se acota con `/afinar-feature` antes de lanzar `spec_author` (F1.2) |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | pending | feature/QC-58-timeout-tests-ui-bajo-carga | worktree montado el 2026-09-07 (F1.0/F1.1) y **rebasado sobre `dev` unificado (`af5d258`)**: ya tiene QC-54 y QC-74. Decisión humana tomada: se acota con `/afinar-feature` antes de lanzar `spec_author` (F1.2) |
 | QC-45 | pantalla-de-presentaciones | Inventario | frontend | pending | feature/QC-45-pantalla-de-presentaciones | worktree montado el 2026-09-07 (F1.0/F1.1) desde `dev` LOCAL. **F1.2 en pausa**: su `description` dice que la forma de la pantalla se decide al acotar, así que se ofrece `/afinar-feature` antes de lanzar `spec_author` |
+| QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | spec_ready | feature/QC-76-equivalencia-y-ambito-de-unidades | **esperando aprobación humana del spec (F1.4)**. 38 requisitos EARS, `design.md` y `tasks.md` en el worktree. Una pregunta abierta que abrió `spec_author` (escala de la conversión) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -281,6 +282,37 @@ tocar su spec. QC-38 reescrita: pierde la consulta, gana las validaciones de la 
 - **Queda abierto**: si la pantalla de presentaciones (QC-45) vive también bajo esa sección
   Configuración; qué permiso exige ver y editar unidades (lo cierra QC-38); y si el símbolo debe
   ser único, abierta desde QC-32.
+
+#### QC-76 — arranque del 2026-09-07 (F1.0/F1.1)
+
+Arrancada por **decisión humana explícita** («76»), tras preguntar qué se podía avanzar. Se pidió
+QC-38 y **no se pudo**: su `depends_on` incluye QC-76, que sigue `pending`, y `AGENTS.md >
+Paralelismo` no deja arrancar una ficha con una dependencia sin cerrar. QC-76 es exactamente lo
+que la desbloquea.
+
+- **Lo que la bloqueaba ya no existe.** Esta ficha estaba parada por conflicto de archivos con
+  QC-74, que tocaba su misma superficie (`lib/modules/unidades/**`, `db/schema.prisma`).
+  **QC-74 cerró hoy** (PR #43, merge `95b9b51`), así que el conflicto se disolvió.
+- **Cupo y conflicto, los dos verdes.** `backend` no tiene ninguna `in_progress`: QC-23 está en
+  `spec_ready` esperando aprobación humana y vive en el módulo de sesiones — cero intersección
+  con `unidades`.
+- **Zone, complexity y branch ya venían evaluadas** (`backend`, `high`, con sus labels en el
+  issue desde la acotación). No hizo falta empujar nada a Jira en este paso.
+- **EL WORKTREE CUELGA DE `origin/dev`, y esta vez no es preferencia.** Las dos ramas siguen
+  **divergidas** (`origin/dev` +18, `dev` local +16). Los 18 que le faltan al local son **QC-54
+  entero y QC-74 entero** — y QC-74 reescribió los archivos de `unidades` que esta ficha toca.
+  Colgarla de `dev` local sería construir sobre un módulo que ya no existe así. Los 16 locales
+  sin pushear son todos frontend (autocomplete, tabla compartida, columna de imagen): no le hacen
+  falta a una ficha de esquema y service.
+- **El requirements sembrado y el board importado entraron a la rama en `7a3203b`**, primer
+  commit del worktree. Nacida de `origin/dev`, la rama no conocía ni el
+  `specs/QC-76-.../requirements.md` que sembró `/afinar-feature` ni las tres celdas que la
+  importación de hoy cambió en `feature_list.json` (QC-74 a `done`, complexity de QC-45 y
+  QC-75). Es exactamente lo que hizo abortar el gate dos veces en QC-74, prevenido de entrada.
+- **F1.2 sin escala en `/afinar-feature`**: el requirements ya trae 30 decisiones cerradas y
+  **cero preguntas abiertas**. `spec_author` solo escribe `## Requisitos (EARS)`, `design.md` y
+  `tasks.md`; el bloque de Alcance y la tabla de decisiones no se reabren.
+
 
 La feature **QC-74 — modelo-de-permisos** se cerró el 2026-09-07 (PR #43, merge `95b9b51`):
 resumen en `progress/history.md`, tarjeta en *Finalizado*. 24 requisitos con test y `reviewer`
@@ -1930,7 +1962,44 @@ literalmente «mientras no hay verificación real». Cuando la haya, ese test mi
 la task T6b, no suelto.
 ## Conflictos pendientes
 
-### `dev` local y `origin/dev` DIVERGIERON: 6 conflictos, merge abortado (2026-09-07)
+### ~~`dev` local y `origin/dev` DIVERGIERON~~ → RESUELTO Y PUSHEADO (2026-09-07)
+
+> **Cerrado el mismo día.** Merge `af5d258`, `dev` pusheado (`95b9b51..af5d258`) y las dos ramas
+> en sync. Gate completo **verde**: 233/233 archivos, 2842/2842 tests, cero rojos — incluidas las
+> 5 entradas del baseline, que esta corrida pasaron todas.
+>
+> **El criterio que resolvió los 7 conflictos, en una línea: la autorización de QC-74 gana, la
+> forma del pedido local gana.** No eran alternativas, eran ejes distintos que cayeron en las
+> mismas funciones. Detalle archivo por archivo en el mensaje de `af5d258`.
+>
+> **Dos cosas que el conflicto no dijo y hubo que ver aparte:**
+>
+> 1. **`UnitNotFoundError` no se podía reimportar.** Los dos lados del conflicto lo incluían en la
+>    lista de errores, pero el `errors.ts` ya mergeado no lo exporta —su propio comentario dice
+>    que desapareció con la unidad—. Aceptar cualquiera de los dos lados tal cual rompía el
+>    typecheck.
+> 2. **Una baja del automerge, sin conflicto y rota igual.** QC-74 reescribió
+>    `tests/unit/inventario/authorization.test.ts` en otra rama mientras aquí entraba la columna
+>    de imagen del producto. Tocaron líneas distintas, git no dijo nada, y el fixture
+>    `PRODUCTO_EN_BASE` quedó sin el `imagePath` que `ProductView` ahora exige. **Lección: en un
+>    merge de dos ramas largas, los conflictos que git marca son el suelo, no el techo — el
+>    typecheck encontró lo que el merge no.**
+>
+> **Falsa alarma que costó un rato, anotada para no repetirla:**
+> `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` se puso rojo acusando a QC-35 de tocar
+> `lib/modules/recetas/**` y `lib/modules/unidades/**`. No era cierto: ese centinela suma
+> `git status --porcelain` al rango de commits, y con el merge **staged** el árbol tenía los ~140
+> archivos de QC-74 encima. Se puso verde solo al commitear el merge. Correr un centinela de
+> alcance con un merge a medias en el índice no informa de nada.
+>
+> **La deuda de la rama de QC-58 quedó cerrada**: se rebasó sobre el `dev` unificado (`af5d258`) y
+> ya tiene QC-54, QC-74, el autocomplete y los cambios de pedidos.
+>
+> Lo que sigue abierto, y no es de este merge: hubo que correr `prisma generate` por los modelos
+> nuevos y dio `EPERM` —otra sesión tenía el motor bloqueado—. Alcanzó a regenerar los tipos y el
+> gate pasó, pero conviene repetirlo limpio cuando las demás sesiones paren.
+
+#### Lo que decía mientras estaba abierto
 
 **No es un problema de QC-58; lo encontro QC-58 al montarse.** Al intentar publicar `dev` el push
 salio rechazado por *non-fast-forward*: las dos ramas se habian separado. Van **15 commits
