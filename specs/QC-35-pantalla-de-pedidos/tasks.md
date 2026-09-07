@@ -233,12 +233,12 @@ excepción**.
 
 ## T16 — Cierre y trazabilidad (depende de T13, T14, T15)
 
-- [ ] **Toca:** `progress/impl_QC-35-pantalla-de-pedidos.md`.
-- [ ] Volcar el mapa **`R1`–`R49` → test concreto** con los nombres reales
+- [x] **Toca:** `progress/impl_QC-35-pantalla-de-pedidos.md`.
+- [x] Volcar el mapa **`R1`–`R49` → test concreto** con los nombres reales
       (`CHECKPOINTS.md > Trazabilidad`), anotar los **dos cambios al componente compartido de QC-55**
       para que el PR los declare, y anotar cualquier desviación respecto de `design.md` en vez de
       silenciarla.
-- [ ] **Hecho cuando:** `./init.sh` termina en verde —lo corre el **leader**—, los 49 requisitos
+- [ ] **Hecho cuando (PENDIENTE, lo corre el leader tras el merge de F2.3):** `./init.sh` termina en verde —lo corre el **leader**—, los 49 requisitos
       tienen al menos un test nombrado y todas las tasks de este archivo están `[x]`.
 
 ---
