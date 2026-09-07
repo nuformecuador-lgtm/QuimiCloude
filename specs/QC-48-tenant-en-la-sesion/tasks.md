@@ -126,7 +126,7 @@
 
 ## Bloque 5 — E2E y cierre
 
-- [ ] **T12 — Extender el E2E de login. Depende de T5.**
+- [x] **T12 — Extender el E2E de login. Depende de T5.**
       Archivos: `e2e/login.spec.ts` (**se extiende, no se crea uno nuevo** — decisión cerrada 9).
       Un `test(...)` más en el `describe` existente: fixture con una segunda empresa `deletedAt`
       puesto (su nombre no choca: `companies_name_unique` es parcial) y un usuario dentro; login

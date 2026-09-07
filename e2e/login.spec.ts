@@ -71,14 +71,20 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 let roleId: string | null = null;
 let companyId: string | null = null;
+/** Empresa efimera que nace ya dada de baja (QC-48 R3): sirve al caso de la empresa no viva. */
+let deletedCompanyId: string | null = null;
 
 /**
  * Crea un usuario propio del test que lo pide. `label` distingue los usuarios dentro del
- * mismo worker; `RUN_ID` los distingue entre workers y proyectos.
+ * mismo worker; `RUN_ID` los distingue entre workers y proyectos. `targetCompanyId` solo lo
+ * pasa el caso de la empresa dada de baja (QC-48 R3); por defecto se usa la empresa viva.
  */
-async function createTestUser(label: string): Promise<{ username: string; password: string }> {
+async function createTestUser(
+  label: string,
+  targetCompanyId: string | null = companyId,
+): Promise<{ username: string; password: string }> {
   if (!roleId) throw new Error('el rol del fixture no existe: fallo el beforeAll');
-  if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
+  if (!targetCompanyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
   const suffix = `${RUN_ID}${label}`;
   const username = `${USERNAME_PREFIX}${suffix}`;
@@ -99,7 +105,7 @@ async function createTestUser(label: string): Promise<{ username: string; passwo
       username,
       passwordHash: await createPasswordHash(password),
       roleId,
-      companyId,
+      companyId: targetCompanyId,
     },
     select: { id: true },
   });
@@ -176,6 +182,21 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+
+  // La segunda empresa nace YA dada de baja (QC-48 R3). Puede compartir el mismo nombre base
+  // que la viva porque `companies_name_unique` es PARCIAL —`WHERE deleted_at IS NULL`—, o sea
+  // que una empresa muerta no ocupa nombre; aun asi lleva sufijo propio para que el barrido de
+  // huerfanos por `COMPANY_NAME_PREFIX` la alcance y para no confundirlas al leer la base.
+  const deletedCompanyName = `${COMPANY_NAME_PREFIX}${RUN_ID}_baja`;
+  const deletedCompany = await prisma.company.create({
+    data: {
+      name: deletedCompanyName,
+      nameNormalized: normalizeCompanyName(deletedCompanyName),
+      deletedAt: new Date(),
+    },
+    select: { id: true },
+  });
+  deletedCompanyId = deletedCompany.id;
 });
 
 test.afterAll(async () => {
@@ -195,9 +216,13 @@ test.afterAll(async () => {
   } catch {
     // se borra la empresa igualmente
   }
-  // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict` (QC-47 R11).
+  // Las empresas, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict` (QC-47 R11).
+  // `startsWith` y no igualdad exacta porque este worker crea DOS: la viva y la dada de baja
+  // (QC-48 R3), y las dos empiezan por `${COMPANY_NAME_PREFIX}${RUN_ID}`.
   try {
-    await prisma.company.deleteMany({ where: { name: `${COMPANY_NAME_PREFIX}${RUN_ID}` } });
+    await prisma.company.deleteMany({
+      where: { name: { startsWith: `${COMPANY_NAME_PREFIX}${RUN_ID}` } },
+    });
   } catch {
     // se cierra la conexion igualmente
   }
@@ -260,5 +285,32 @@ test.describe('login en navegador real', () => {
       (cookie) => cookie.name === SESSION_COOKIE_NAME,
     );
     expect(sessionCookie, 'un intento fallido no debe emitir cookie de sesion').toBeUndefined();
+  });
+
+  test('con la empresa dada de baja no entra pese a tener las credenciales correctas', async ({
+    page,
+    context,
+  }) => {
+    // Cubre QC-48 R3 y R27 en navegador real: la contrasena es la BUENA, y aun asi el login
+    // rechaza porque la empresa de esa persona no esta viva. El rechazo es el generico de
+    // siempre, asi que desde fuera este caso no se distingue de una contrasena incorrecta.
+    const { username, password } = await createTestUser('baja', deletedCompanyId);
+
+    await page.goto(LOGIN_PATH);
+
+    await page.getByTestId('login-username').fill(username);
+    await page.getByTestId('login-password').fill(password);
+    await page.getByTestId('login-submit').click();
+
+    // Misma constante exportada que usa el caso de credenciales incorrectas: si los dos mensajes
+    // dejaran de ser el mismo, este test dejaria de pasar — que es justo lo que R3 pide afirmar.
+    await expect(page.getByText(GENERIC_CREDENTIALS_ERROR)).toBeVisible({ timeout: 60_000 });
+
+    expect(new URL(page.url()).pathname).toBe(LOGIN_PATH);
+
+    const sessionCookie = (await context.cookies()).find(
+      (cookie) => cookie.name === SESSION_COOKIE_NAME,
+    );
+    expect(sessionCookie, 'una empresa no viva no debe emitir cookie de sesion').toBeUndefined();
   });
 });
