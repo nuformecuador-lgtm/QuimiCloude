@@ -172,7 +172,7 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
       ningun requisito sin test, y la bitacora de comandos con su salida (`CHECKPOINTS.md >
       Trazabilidad`).
 
-- [ ] **T18. Gate completo.** Depende de T17.
+- [x] **T18. Gate completo.** Depende de T17.
       **Hecho cuando**: `./init.sh` termina en verde y queda anotado en
       `progress/impl_QC-74-modelo-de-permisos.md`. Sin E2E nuevo: desviacion declarada en
       `design.md > 10` por la decision 12.
