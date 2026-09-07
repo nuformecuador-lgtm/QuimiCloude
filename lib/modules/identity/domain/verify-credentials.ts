@@ -146,6 +146,19 @@ export function createVerifyCredentials(
       return REJECTED;
     }
 
+    // Empresa dada de baja: la credencial era correcta, pero no se emite sesion (QC-48 R3).
+    // `null` en la marca de baja es «empresa viva» (QC-47 R6), y el corte va exactamente aqui:
+    // - DESPUES de la verificacion de hash (R4), porque cortar antes responderia en
+    //   microsegundos y seria el mismo oraculo de tiempo que evita el señuelo;
+    // - DESPUES del `!correcta`, porque una contrasena mala sobre una empresa muerta tiene que
+    //   seguir contando para el bloqueo: si no, dar de baja una empresa seria un modo de
+    //   desactivar el contador de intentos;
+    // - ANTES de `attempts.set` y de `startSession`, porque este camino NO ESCRIBE NADA: ni
+    //   registra fallo —bloquear a alguien por una decision administrativa que no puede
+    //   arreglar seria un castigo— ni reinicia los contadores, porque no hubo login.
+    // Y devuelve el MISMO objeto congelado que los otros rechazos, no uno nuevo (R2, R3, R28).
+    if (usuario.companyDeletedAt !== null) return REJECTED;
+
     // El exito si se escribe de forma incondicional: su estado es todo ceros, o sea que **no
     // depende del valor previo**. Es idempotente y no tiene el problema de
     // lectura-modificacion-escritura que obliga al camino de fallo a ir con `compareAndSet`.

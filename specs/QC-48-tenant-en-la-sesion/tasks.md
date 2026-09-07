@@ -40,7 +40,7 @@
 
 ## Bloque 2 — El login
 
-- [ ] **T4 — El puerto de credenciales trae la empresa y su estado.**
+- [x] **T4 — El puerto de credenciales trae la empresa y su estado.**
       Archivos: `lib/modules/identity/ports/user-credentials-reader.ts`,
       `lib/modules/identity/adapters/driven/persistence/user-credentials-prisma.ts`.
       `AuthenticatableUser` gana `companyId: string` y `companyDeletedAt: Date | null`; el
@@ -51,7 +51,7 @@
       `companyDeletedAt: null`, y que un usuario de una empresa dada de baja devuelve
       `companyDeletedAt` no nulo (la fila **sí** se devuelve: el corte es del dominio). Cubre R2.
 
-- [ ] **T5 — El corte y la emisión, en el dominio. Depende de T2 y T4.**
+- [x] **T5 — El corte y la emisión, en el dominio. Depende de T2 y T4.**
       Archivos: `lib/modules/identity/domain/verify-credentials.ts`,
       `tests/unit/identity/verify-credentials.test.ts`.
       En el camino de éxito, tras la única verificación de hash y tras `isLocked`: si
