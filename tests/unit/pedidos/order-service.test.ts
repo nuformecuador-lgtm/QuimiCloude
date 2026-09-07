@@ -18,7 +18,6 @@ import {
   InvalidTransitionError,
   NotFoundError,
   RecipeNotFoundError,
-  UnitNotFoundError,
   ValidationError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
@@ -30,14 +29,12 @@ import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classificat
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
-import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR }
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
 const OTRA_RECETA = '44444444-4444-4444-8444-444444444444'
-const UNIT_ID = '33333333-3333-4333-8333-333333333333'
 
 /** Un instante FIJO, con su ano en UTC: el correlativo y `created_at` tienen que salir del
  *  MISMO reloj (R10), y con un reloj real el test no podria afirmarlo. */
@@ -47,13 +44,9 @@ const RECETA_VIVA: RecipeRef = { id: RECIPE_ID, name: 'Acido citrico 50%', isDel
 const RECETA_DE_BAJA: RecipeRef = { id: RECIPE_ID, name: 'Formula retirada', isDeleted: true }
 const OTRA_VIVA: RecipeRef = { id: OTRA_RECETA, name: 'Detergente neutro', isDeleted: false }
 const OTRA_DE_BAJA: RecipeRef = { id: OTRA_RECETA, name: 'Formula vieja', isDeleted: true }
-const UNIDAD: UnitRef = { id: UNIT_ID, name: 'Kilogramo', symbol: 'kg' }
-
 const ENTRADA_ALTA = {
   recipeId: RECIPE_ID,
   quantity: '10.0000',
-  unitId: UNIT_ID,
-  unitPrice: '2.5000',
 }
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
@@ -62,8 +55,6 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     number: { year: 2026, sequence: 7 },
     recipeId: RECIPE_ID,
     quantity: '10.0000',
-    unitId: UNIT_ID,
-    unitPrice: '2.5000',
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
@@ -78,14 +69,12 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
 type Dobles = {
   readonly orders: OrderRepository
   readonly recipes: RecipeCatalog
-  readonly units: UnitCatalog
   readonly now: () => Date
 }
 
 function dobles(opciones: {
   fila?: OrderRow | null
   recetas?: readonly RecipeRef[]
-  unidades?: readonly UnitRef[]
   alta?: OrderRow | 'duplicate_number'
   edicion?: 'ok' | 'not_found'
 }): Dobles & {
@@ -93,13 +82,11 @@ function dobles(opciones: {
   readonly findAliveById: ReturnType<typeof vi.fn>
   readonly updateAlive: ReturnType<typeof vi.fn>
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>
-  readonly findRefs: ReturnType<typeof vi.fn>
 } {
   const create = vi.fn(async () => opciones.alta ?? fila())
   const findAliveById = vi.fn(async () => opciones.fila ?? null)
   const updateAlive = vi.fn(async () => opciones.edicion ?? 'ok')
   const findRefsIncludingDeleted = vi.fn(async () => opciones.recetas ?? [RECETA_VIVA])
-  const findRefs = vi.fn(async () => opciones.unidades ?? [UNIDAD])
 
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -118,13 +105,11 @@ function dobles(opciones: {
   return {
     orders,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
-    units: { findRefs } as unknown as UnitCatalog,
     now: () => AHORA,
     create,
     findAliveById,
     updateAlive,
     findRefsIncludingDeleted,
-    findRefs,
   }
 }
 
@@ -159,8 +144,6 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     expect(d.create.mock.calls[0]?.[0]).toEqual({
       recipeId: RECIPE_ID,
       quantity: '10.0000',
-      unitId: UNIT_ID,
-      unitPrice: '2.5000',
       priority: 'BAJA',
       status: 'PENDIENTE',
     })
@@ -200,14 +183,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
 
     const [data, , actorId] = d.create.mock.calls[0] as [Record<string, unknown>, number, string]
     expect(actorId).toBe(ADMIN.id)
-    expect(Object.keys(data).sort()).toEqual([
-      'priority',
-      'quantity',
-      'recipeId',
-      'status',
-      'unitId',
-      'unitPrice',
-    ])
+    expect(Object.keys(data).sort()).toEqual(['priority', 'quantity', 'recipeId', 'status'])
     expect(data.status).toBe('PENDIENTE')
   })
 
@@ -232,15 +208,10 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     expect(d.create).not.toHaveBeenCalled()
   })
 
-  it('rechaza una unidad inexistente ANTES de llegar al repositorio (R16)', async () => {
-    const d = dobles({ unidades: [] })
-
-    expect(await codigoDelFallo(() => createCreateOrder(d)(ENTRADA_ALTA, ADMIN))).toBe(
-      'unit_not_found',
-    )
-    expect(d.create).not.toHaveBeenCalled()
-    await expect(createCreateOrder(d)(ENTRADA_ALTA, ADMIN)).rejects.toBeInstanceOf(UnitNotFoundError)
-  })
+  // QC-35bis (2026-09-07): aqui vivia «rechaza una unidad inexistente ANTES de llegar al
+  // repositorio (R16)». No se ha relajado ninguna comprobacion: la unidad SALIO del pedido -del
+  // esquema, del tipo y de la tabla-, asi que ya no hay entrada que rechazar ni catalogo que
+  // consultar. R16 se quedo sin sujeto.
 
   it('una entrada invalida muere en zod, sin tocar los catalogos ni el repositorio', async () => {
     // R17: cantidad cero. La validacion va DESPUES de `requireAdmin` y ANTES de todo lo demas.
@@ -252,7 +223,6 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       ),
     ).toBe('invalid_input')
     expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
-    expect(d.findRefs).not.toHaveBeenCalled()
     expect(d.create).not.toHaveBeenCalled()
     await expect(
       createCreateOrder(d)({ ...ENTRADA_ALTA, quantity: '0.0000' }, ADMIN),
@@ -286,9 +256,6 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       recipeId: RECIPE_ID,
       recipeName: 'Acido citrico 50%',
       quantity: '10.0000',
-      unitId: UNIT_ID,
-      unitName: 'Kilogramo',
-      unitPrice: '2.5000',
       priority: 'BAJA',
       status: 'PENDIENTE',
       cancellationReason: null,
@@ -338,8 +305,6 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
     expect(data).toEqual({
       recipeId: RECIPE_ID,
       quantity: '10.0000',
-      unitId: UNIT_ID,
-      unitPrice: '2.5000',
       priority: 'ALTA',
       status: 'EN_CURSO',
     })
@@ -362,7 +327,6 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
     expect(d.updateAlive).not.toHaveBeenCalled()
     // Y ni siquiera se pregunto a los catalogos: la edicion muere en la tabla de transiciones.
     expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
-    expect(d.findRefs).not.toHaveBeenCalled()
   })
 
   it('un pedido CANCELADO tampoco admite edicion (R21)', async () => {
@@ -458,14 +422,10 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
     expect(d.updateAlive).toHaveBeenCalledTimes(1)
   })
 
-  it('la unidad se exige SIEMPRE, aunque no cambie (R16)', async () => {
-    const d = dobles({ fila: fila(), unidades: [] })
-
-    expect(await codigoDelFallo(() => createUpdateOrder(d)(ORDER_ID, EDICION, ADMIN))).toBe(
-      'unit_not_found',
-    )
-    expect(d.updateAlive).not.toHaveBeenCalled()
-  })
+  // QC-35bis (2026-09-07): aqui vivia «la unidad se exige SIEMPRE, aunque no cambie (R16)»,
+  // la contraparte en la EDICION del caso del alta. Cayo por lo mismo: no hay unidad en el
+  // pedido, y la excepcion de R25 -la receta de baja se acepta si no cambia- sigue con su test
+  // intacto justo encima.
 
   it('editar un pedido inexistente o ya borrado responde not_found (R33)', async () => {
     const d = dobles({ fila: null })

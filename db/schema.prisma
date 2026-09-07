@@ -597,9 +597,12 @@ enum OrderPriority {
 /// `orders_order_year_matches_created_at` (decision cerrada 28, R41): quien inserte con otro
 /// reloj se lleva un 23514.
 ///
-/// OJO 2 — `recipeId`, `unitId`, `createdBy` y `updatedBy` son FK REALES pero se declaran como
+/// OJO 2 — `recipeId`, `createdBy` y `updatedBy` son FK REALES pero se declaran como
 /// ESCALARES SIN `@relation` a proposito (decision cerrada 17 y su aplicacion a las otras dos
-/// fronteras, R33): las cuatro FK estan escritas A MANO en `migration.sql`. Asi la base
+/// fronteras, R33): las TRES FK estan escritas A MANO en `migration.sql`. Eran cuatro hasta el
+/// 2026-09-07, cuando la decision humana de quitar la unidad y el precio unitario del pedido se
+/// llevo `unit_id`, `unit_price` y con ellos `orders_unit_id_fkey`
+/// (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`). Asi la base
 /// garantiza la integridad y, a la vez, el cliente Prisma NO puede atravesar de `pedidos` a
 /// `recetas`, `unidades` ni `users` con un `include`. La guardia de modulos NO detectaria ese
 /// cruce, porque no es un import. Es DRIFT para Prisma: toda migracion futura de `orders` hay
@@ -611,8 +614,8 @@ enum OrderPriority {
 /// OJO 3 — QC-57 (`design.md > 10.2`): los indices de orden y filtro de esta tabla NO estan
 /// aqui porque son PARCIALES (`WHERE deleted_at IS NULL`) y Prisma no los modela. Escritos a
 /// mano en `db/migrations/20260904160000_list_query_indexes/migration.sql`:
-/// `orders_status_idx`, `orders_priority_idx`, `orders_created_at_idx`, `orders_quantity_idx`
-/// y `orders_unit_price_idx`. NO hay indice de busqueda: `orders` no tiene `name` y la
+/// `orders_status_idx`, `orders_priority_idx`, `orders_created_at_idx` y `orders_quantity_idx`
+/// (`orders_unit_price_idx` cayo con la columna el 2026-09-07). NO hay indice de busqueda: `orders` no tiene `name` y la
 /// busqueda se omite (R17). El correlativo lo ordena `orders_order_year_order_sequence_key`,
 /// que ya existia.
 /// @module pedidos
@@ -622,8 +625,6 @@ model Order {
   orderSequence      Int           @map("order_sequence")
   recipeId           String        @map("recipe_id") @db.Uuid
   quantity           Decimal       @db.Decimal(14, 4)
-  unitId             String        @map("unit_id") @db.Uuid
-  unitPrice          Decimal       @map("unit_price") @db.Decimal(14, 4)
   priority           OrderPriority @default(BAJA)
   status             OrderStatus   @default(PENDIENTE)
   /// QC-34 (decision cerrada 4, R27, R30): motivo de la cancelacion. ANULABLE, porque solo
@@ -640,7 +641,6 @@ model Order {
 
   @@unique([orderYear, orderSequence], map: "orders_order_year_order_sequence_key")
   @@index([recipeId], map: "orders_recipe_id_idx")
-  @@index([unitId], map: "orders_unit_id_idx")
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
   @@map("orders")

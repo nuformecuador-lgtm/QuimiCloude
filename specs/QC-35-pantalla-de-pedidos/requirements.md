@@ -37,8 +37,9 @@
 > en su adaptador driving (`listOrdersAction`, `getOrderAction`, `createOrderAction`,
 > `updateOrderAction`, `cancelOrderAction`, `deleteOrderAction`). **Fila de pedido**: lo que la
 > consulta de listado entrega por pedido (`OrderView`/`OrderSummary`), con el nombre de la receta y
-> el de la unidad **ya resueltos**. **Los cinco campos de negocio del pedido**: receta, cantidad,
-> unidad, precio unitario y prioridad. **Correlativo**: el número visible del pedido, compuesto por
+> el de la unidad **ya resueltos** (desde el 2026-09-07, solo el de la receta). **Los campos de
+> negocio del pedido**: receta, cantidad y prioridad —eran cinco hasta el 2026-09-07, con la unidad
+> y el precio unitario—. **Correlativo**: el número visible del pedido, compuesto por
 > la única función de formato que publica el contrato de `pedidos`. **Estado final**: `ENTREGADO` o
 > `CANCELADO`. **Consulta de lista**: la forma genérica de QC-57 (página, tamaño, orden, filtros,
 > búsqueda) que la operación de listado acepta. **Lista blanca de pedidos**: `ORDER_QUERYABLE`, que
@@ -224,6 +225,21 @@ confirme, DEBE invocarla y aplicar R35.
 y los espera el contrato** (cadena decimal), y NO DEBE convertirlos a coma flotante, ni operar
 aritméticamente con ellos —tampoco para obtener un total—, ni capturarlos con un control numérico
 del navegador.
+
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** El pedido **YA NO TIENE unidad ni precio
+> unitario**. Las columnas `orders.unit_id` y `orders.unit_price` se dropearon —con su FK
+> `orders_unit_id_fkey`, el CHECK `orders_unit_price_non_negative` y los índices
+> `orders_unit_id_idx` y `orders_unit_price_idx`— en
+> `db/migrations/20260907120000_orders_drop_unit_and_unit_price`, y con ellas salieron del
+> esquema Prisma, del dominio de `pedidos`, de su adaptador driven, del cableado y de la
+> pantalla. Un pedido es hoy **receta + cantidad + prioridad + estado**, más su correlativo, sus
+> autores y su borrado lógico.
+>
+> Los requisitos que hablan de la unidad o del precio unitario quedan **sin sujeto**; se conservan
+> escritos para que se vea qué se decidió antes y qué lo sustituyó, no porque sigan vigentes. Sus
+> tests se retiraron uno a uno, cada uno con la nota de por qué (búsquese «QC-35bis» en
+> `tests/`). El `DROP COLUMN` **perdió los datos** de precio y unidad de los pedidos existentes:
+> el `down.sql` recrea la forma, no el contenido.
 
 ### Estructura, convenciones y plataforma
 

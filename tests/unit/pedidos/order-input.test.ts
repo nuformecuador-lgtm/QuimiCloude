@@ -24,27 +24,22 @@ import {
 import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 
 const RECIPE_ID = '11111111-1111-4111-8111-111111111111'
-const UNIT_ID = '22222222-2222-4222-8222-222222222222'
 
 /** Un alta valida, para mutarla campo a campo en cada caso. */
 function altaValida(): Record<string, unknown> {
   return {
     recipeId: RECIPE_ID,
     quantity: '12.5000',
-    unitId: UNIT_ID,
-    unitPrice: '3.7500',
   }
 }
 
 describe('pedidos — createOrderSchema (alta)', () => {
-  it('acepta un alta valida y devuelve los importes como CADENA, no como number', () => {
+  it('acepta un alta valida y devuelve la cantidad como CADENA, no como number', () => {
     // R8 y `design.md > 7.1`: 14 digitos con 4 decimales no caben en un `number` sin riesgo de
-    // redondeo, asi que viajan como texto y el adaptador los convierte a `Prisma.Decimal`.
+    // redondeo, asi que viaja como texto y el adaptador la convierte a `Prisma.Decimal`.
     const parsed = createOrderSchema.parse(altaValida())
     expect(parsed.quantity).toBe('12.5000')
-    expect(parsed.unitPrice).toBe('3.7500')
     expect(typeof parsed.quantity).toBe('string')
-    expect(typeof parsed.unitPrice).toBe('string')
   })
 
   it('rechaza la cantidad ausente, cero o negativa', () => {
@@ -59,30 +54,32 @@ describe('pedidos — createOrderSchema (alta)', () => {
     expect(createOrderSchema.safeParse({ ...altaValida(), quantity: '0.0001' }).success).toBe(true)
   })
 
-  it('acepta el precio unitario CERO y rechaza el negativo y el ausente', () => {
-    // R18 y QC-33 R9: el cero SI vale -un pedido puede registrar una entrega sin cargo-. Es la
-    // asimetria con la cantidad y la parte que mas facil se copia mal.
-    expect(createOrderSchema.safeParse({ ...altaValida(), unitPrice: '0' }).success).toBe(true)
-    expect(createOrderSchema.safeParse({ ...altaValida(), unitPrice: '0.0000' }).success).toBe(true)
-    for (const unitPrice of [undefined, '-1', '-0.0001', '', 'abc']) {
-      const entrada = { ...altaValida(), unitPrice }
-      expect(createOrderSchema.safeParse(entrada).success, `unitPrice=${String(unitPrice)}`).toBe(
-        false,
-      )
+  it('la unidad y el precio unitario ya no existen: se DESCARTAN sin dejar rastro', () => {
+    // QC-35bis (2026-09-07). El esquema no los declara, asi que `z.object` los descarta como
+    // cualquier clave desconocida: enviarlos NO rechaza el alta -eso convertiria a un cliente
+    // desactualizado en un error de validacion- pero tampoco los cuela hacia el caso de uso.
+    // Es la mitad que hace imposible reintroducirlos por descuido.
+    const conCamposViejos = {
+      ...altaValida(),
+      unitId: '22222222-2222-4222-8222-222222222222',
+      unitPrice: '3.7500',
     }
+
+    const parsed = createOrderSchema.parse(conCamposViejos)
+
+    expect(parsed).not.toHaveProperty('unitId')
+    expect(parsed).not.toHaveProperty('unitPrice')
   })
 
-  it('rechaza receta y unidad ausentes o con forma que no es un uuid', () => {
-    // R15, R16 en su mitad de BORDE: aqui solo se valida la forma; la existencia y la vigencia
-    // las comprueba el caso de uso por los contratos publicos de `recetas` y `unidades`.
-    for (const campo of ['recipeId', 'unitId'] as const) {
-      expect(createOrderSchema.safeParse({ ...altaValida(), [campo]: undefined }).success).toBe(
-        false,
-      )
-      expect(createOrderSchema.safeParse({ ...altaValida(), [campo]: 'no-es-uuid' }).success).toBe(
-        false,
-      )
-    }
+  it('rechaza la receta ausente o con forma que no es un uuid', () => {
+    // R15 en su mitad de BORDE: aqui solo se valida la forma; la existencia y la vigencia las
+    // comprueba el caso de uso por el contrato publico de `recetas`.
+    expect(createOrderSchema.safeParse({ ...altaValida(), recipeId: undefined }).success).toBe(
+      false,
+    )
+    expect(createOrderSchema.safeParse({ ...altaValida(), recipeId: 'no-es-uuid' }).success).toBe(
+      false,
+    )
   })
 
   it('la prioridad es opcional y su ausencia significa BAJA; fuera del conjunto se rechaza', () => {
@@ -113,13 +110,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
       createdBy: '33333333-3333-4333-8333-333333333333',
       updatedBy: '33333333-3333-4333-8333-333333333333',
     })
-    expect(Object.keys(parsed).sort()).toEqual([
-      'priority',
-      'quantity',
-      'recipeId',
-      'unitId',
-      'unitPrice',
-    ])
+    expect(Object.keys(parsed).sort()).toEqual(['priority', 'quantity', 'recipeId'])
     expect(parsed).not.toHaveProperty('status')
     expect(parsed).not.toHaveProperty('cancellationReason')
     expect(parsed).not.toHaveProperty('orderYear')
@@ -153,8 +144,6 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
       'quantity',
       'recipeId',
       'status',
-      'unitId',
-      'unitPrice',
     ])
   })
 
@@ -184,11 +173,11 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
     }
   })
 
-  it('hereda del alta las reglas de cantidad y precio', () => {
-    // R17, R18: no hay dos verdades sobre la cantidad segun se cree o se edite.
+  it('hereda del alta la regla de la cantidad', () => {
+    // R17: no hay dos verdades sobre la cantidad segun se cree o se edite.
     expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '0' }).success).toBe(false)
-    expect(updateOrderSchema.safeParse({ ...edicionValida, unitPrice: '0' }).success).toBe(true)
-    expect(updateOrderSchema.safeParse({ ...edicionValida, unitPrice: '-1' }).success).toBe(false)
+    expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '-1' }).success).toBe(false)
+    expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '0.0001' }).success).toBe(true)
   })
 })
 

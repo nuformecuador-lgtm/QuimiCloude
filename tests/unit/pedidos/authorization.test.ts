@@ -8,7 +8,7 @@
 // existe para encontrar.
 //
 // POR QUE LOS DOBLES EXPLOTAN. Los tres puertos -el repositorio de pedidos y los contratos
-// `RecipeCatalog` y `UnitCatalog`- FALLAN SI LOS LLAMAN. No basta con que la operacion lance
+// `RecipeCatalog`- FALLAN SI LOS LLAMAN. No basta con que la operacion lance
 // `UnauthorizedError`: tiene que lanzarlo SIN HABER TOCADO NADA (R2). Con dobles permisivos,
 // un caso de uso que comprobara el rol DESPUES de leer la fila pasaria verde, y el Operador
 // habria leido igual — que es exactamente lo que la decision cerrada 1 prohibe, tambien al
@@ -32,21 +32,17 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
-import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
-const UNIT_ID = '33333333-3333-4333-8333-333333333333'
 
 const ENTRADA_ALTA = {
   recipeId: RECIPE_ID,
   quantity: '10.0000',
-  unitId: UNIT_ID,
-  unitPrice: '2.5000',
 }
 const ENTRADA_EDICION = { ...ENTRADA_ALTA, status: 'EN_CURSO' }
 
-/** Los tres dobles. Cada metodo explota si alguien lo llama. */
+/** Los dobles. Cada metodo explota si alguien lo llama. */
 function dobles() {
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -66,8 +62,6 @@ function dobles() {
     findRefsIncludingDeleted: explota('recipes.findRefsIncludingDeleted'),
   } as unknown as RecipeCatalog
 
-  const units = { findRefs: explota('units.findRefs') } as unknown as UnitCatalog
-
   // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion. `requireAdmin`
   // va antes de zod y antes de sanear, asi que un actor rechazado no llega ni a saber que su
   // consulta traia campos no declarados.
@@ -77,17 +71,16 @@ function dobles() {
     [
       ...Object.values(orders as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(recipes as unknown as Record<string, ReturnType<typeof vi.fn>>),
-      ...Object.values(units as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, units, log, llamadas }
+  return { orders, recipes, log, llamadas }
 }
 
 /** Los seis casos de uso, cada uno invocado con el actor que se le pase. */
 function operaciones(actor: Actor | null | undefined) {
-  const { orders, recipes, units, log, llamadas } = dobles()
-  const deps = { orders, recipes, units, log }
+  const { orders, recipes, log, llamadas } = dobles()
+  const deps = { orders, recipes, log }
 
   return {
     llamadas,
@@ -233,7 +226,7 @@ describe('QC-34 — requireAdmin es la primera linea de los seis (R2, R3)', () =
       const validacion = cuerpo.indexOf('safeParse')
       if (validacion > -1) expect(autorizacion).toBeLessThan(validacion)
 
-      const primerPuerto = cuerpo.search(/\bdeps\s*\.\s*(orders|recipes|units)\b/)
+      const primerPuerto = cuerpo.search(/\bdeps\s*\.\s*(orders|recipes)\b/)
       expect(primerPuerto, 'algun puerto tiene que usarse').toBeGreaterThan(-1)
       expect(autorizacion).toBeLessThan(primerPuerto)
     })

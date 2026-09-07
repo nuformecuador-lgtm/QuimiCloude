@@ -29,8 +29,6 @@ import {
   QUANTITY_COLUMN_ID,
   STATUS_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
-  UNIT_NAME_COLUMN_ID,
-  UNIT_PRICE_COLUMN_ID,
   buildOrderColumns,
 } from '@/app/(private)/pedidos/components';
 import {
@@ -62,11 +60,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
  */
 const ORDER_COLUMNS = buildOrderColumns({
   recipes: { items: [], totalPages: 1 },
-  units: [],
 });
 
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222';
-const UNIT_ID = '33333333-3333-4333-8333-333333333333';
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -76,9 +72,6 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     recipeId: RECIPE_ID,
     recipeName: 'Esmalte azul',
     quantity: '12.5000',
-    unitId: UNIT_ID,
-    unitName: 'Kilogramo',
-    unitPrice: '0.1005',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
@@ -101,29 +94,34 @@ afterEach(() => {
   cleanup();
 });
 
-describe('las columnas declaradas son exactamente las diez acordadas (R8)', () => {
-  it('en positivo: los diez ids, en el orden de `design.md > 7`', () => {
+// QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
+// tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
+// acordada baja a ocho. Sigue siendo cerrada y en el orden de `design.md > 7`.
+describe('las columnas declaradas son exactamente las ocho acordadas (R8)', () => {
+  it('en positivo: los ocho ids, en el orden de `design.md > 7`', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
-      UNIT_NAME_COLUMN_ID,
-      UNIT_PRICE_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(10);
+    expect(ORDER_COLUMNS).toHaveLength(8);
   });
 
-  it('en negativo: ninguna columna es `total`, `createdBy` ni `updatedBy`', () => {
+  it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
 
     expect(ids).not.toContain('total');
     expect(ids).not.toContain('createdBy');
     expect(ids).not.toContain('updatedBy');
+    // Los dos que se fueron el 2026-09-07. En negativo para que devolverlos sin decidirlo
+    // ponga el test rojo.
+    expect(ids).not.toContain('unitName');
+    expect(ids).not.toContain('unitPrice');
   });
 
   it('el esqueleto de carga pinta tantas celdas como columnas hay (R21)', () => {
@@ -131,7 +129,7 @@ describe('las columnas declaradas son exactamente las diez acordadas (R8)', () =
   });
 });
 
-describe('solo cuatro columnas ordenan, y son las de la lista blanca menos las dos no acordadas (R12)', () => {
+describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no acordada (R12)', () => {
   it('en positivo: correlativo, estado, prioridad y fecha de solicitud', () => {
     const ordenables = ORDER_COLUMNS.filter((column) => column.sortable === true).map((c) => c.id);
 
@@ -147,20 +145,19 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos las d
     }
   });
 
-  it('en negativo: ninguna otra columna es ordenable, ni siquiera cantidad o precio unitario', () => {
+  it('en negativo: ninguna otra columna es ordenable, ni siquiera la cantidad', () => {
     const noOrdenables = ORDER_COLUMNS.filter((column) => column.sortable !== true).map((c) => c.id);
 
     expect(noOrdenables).toEqual([
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
-      UNIT_NAME_COLUMN_ID,
-      UNIT_PRICE_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    // Estan en `ORDER_QUERYABLE.sortable` pero la decision cerrada NO pide su cabecera.
+    // Esta en `ORDER_QUERYABLE.sortable` pero la decision cerrada NO pide su cabecera.
     expect(ORDER_QUERYABLE.sortable).toContain(QUANTITY_COLUMN_ID);
-    expect(ORDER_QUERYABLE.sortable).toContain(UNIT_PRICE_COLUMN_ID);
+    // Y `unitPrice` ya no esta ni en la lista blanca: se fue con la columna (2026-09-07).
+    expect(ORDER_QUERYABLE.sortable).not.toContain('unitPrice');
   });
 });
 
@@ -240,14 +237,6 @@ describe('receta y unidad se presentan por su NOMBRE, tomado de la propia fila (
     expect(container.textContent).not.toContain(RECIPE_ID);
   });
 
-  it('sin nombre de unidad se pinta un marcador identificable y NUNCA el uuid', () => {
-    const { container } = pintarCelda(UNIT_NAME_COLUMN_ID, pedido({ unitName: null }));
-
-    expect(screen.getByTestId(`order-missing-${UNIT_NAME_COLUMN_ID}`)).toHaveTextContent(
-      MISSING_VALUE_MARK,
-    );
-    expect(container.textContent).not.toContain(UNIT_ID);
-  });
 });
 
 describe('el motivo de cancelacion (R11)', () => {
@@ -269,16 +258,15 @@ describe('el motivo de cancelacion (R11)', () => {
   });
 });
 
-describe('cantidad y precio unitario se pintan TAL CUAL llegan (R39)', () => {
+describe('la cantidad se pinta TAL CUAL llega (R39)', () => {
   it('la cadena decimal no se reformatea, ni se redondea, ni pierde ceros', () => {
-    const order = pedido({ quantity: '12.5000', unitPrice: '0.1005' });
+    // El precio unitario acompanaba a la cantidad en este caso hasta el 2026-09-07. Lo que R39
+    // protege -que una cadena decimal del contrato no pase por `Intl`, `toFixed` ni coma
+    // flotante- sigue comprobandose sobre el unico decimal que le queda al pedido.
+    const order = pedido({ quantity: '12.5000' });
 
     const cantidad = pintarCelda(QUANTITY_COLUMN_ID, order);
     expect(cantidad.container.textContent).toBe('12.5000');
-    cleanup();
-
-    const precio = pintarCelda(UNIT_PRICE_COLUMN_ID, order);
-    expect(precio.container.textContent).toBe('0.1005');
   });
 });
 

@@ -96,7 +96,6 @@ const LIST_SORT = 'createdAt:desc';
 
 /** Cantidad y precio DECIMALES (R39, R48): viajan como cadena de punta a punta. */
 const ORDER_QUANTITY = '12.5';
-const ORDER_UNIT_PRICE = '1234.5678';
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -126,7 +125,6 @@ const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
 let companyId: string | null = null;
 let adminUserId: string | null = null;
 let recipeId: string | null = null;
-let unitId: string | null = null;
 
 async function createUserWithRole(user: Credentials, roleName: string): Promise<string> {
   if (!companyId) {
@@ -233,22 +231,14 @@ test.beforeAll(async () => {
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
     select: { id: true },
   });
-  const orphanUnits = await prisma.unit.findMany({
-    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
-    select: { id: true },
-  });
   const orphanRecipeIds = orphanRecipes.map((recipe) => recipe.id);
-  const orphanUnitIds = orphanUnits.map((unit) => unit.id);
 
-  // Los pedidos huerfanos se identifican por SU receta o SU unidad de fixture: la tabla `orders`
-  // no tiene ningun campo de texto donde llevar el prefijo. Por eso van primero, y por eso este
-  // borrado no puede alcanzar ningun pedido que no sea de un E2E viejo de esta ficha.
-  if (orphanRecipeIds.length > 0 || orphanUnitIds.length > 0) {
-    await prisma.order.deleteMany({
-      where: {
-        OR: [{ recipeId: { in: orphanRecipeIds } }, { unitId: { in: orphanUnitIds } }],
-      },
-    });
+  // Los pedidos huerfanos se identifican por SU receta de fixture: la tabla `orders` no tiene
+  // ningun campo de texto donde llevar el prefijo, y desde el 2026-09-07 tampoco tiene unidad.
+  // Por eso van primero, y por eso este borrado no puede alcanzar ningun pedido que no sea de un
+  // E2E viejo de esta ficha.
+  if (orphanRecipeIds.length > 0) {
+    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
   }
   await prisma.recipe.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -290,14 +280,15 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  // SIN simbolo a proposito: el selector pinta `symbol ?? name`, asi que la opcion se localiza
-  // por el nombre con `RUN_ID` y no por un simbolo que compartiria con otras unidades.
-  unitId = (
-    await prisma.unit.create({
-      data: { name: unitName, nameNormalized: normalizeUnitName(unitName), symbol: null },
-      select: { id: true },
-    })
-  ).id;
+  // La unidad de fixture se sigue creando -y borrando- aunque el PEDIDO ya no la use desde el
+  // 2026-09-07: el catalogo de unidades sigue existiendo y la limpieza de huerfanos de arriba lo
+  // recorre. Su id ya no hace falta en ninguna asercion, asi que no se guarda.
+  //
+  // SIN simbolo a proposito: asi ninguna otra unidad del entorno comparte su etiqueta.
+  await prisma.unit.create({
+    data: { name: unitName, nameNormalized: normalizeUnitName(unitName), symbol: null },
+    select: { id: true },
+  });
 });
 
 test.afterAll(async () => {
@@ -313,15 +304,8 @@ test.afterAll(async () => {
   // El pedido se borra FISICAMENTE: el borrado de la pantalla es logico (`deleted_at`) y dejaria
   // la fila contando en los tests de integracion de otras features.
   try {
-    if (recipeId !== null || unitId !== null) {
-      await prisma.order.deleteMany({
-        where: {
-          OR: [
-            ...(recipeId === null ? [] : [{ recipeId }]),
-            ...(unitId === null ? [] : [{ unitId }]),
-          ],
-        },
-      });
+    if (recipeId !== null) {
+      await prisma.order.deleteMany({ where: { recipeId } });
     }
   } finally {
     try {
@@ -376,15 +360,11 @@ test.describe('pantalla de pedidos', () => {
     // Lo que viaja en el `FormData` es el id elegido, no el texto escrito.
     await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-    // --- 4. Cantidad y precio DECIMALES, escritos como texto (R39).
+    // --- 4. Cantidad DECIMAL, escrita como texto (R39). El precio unitario y el selector de
+    // unidad salieron del formulario el 2026-09-07 (decision humana).
     await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
-    await page.getByTestId('order-field-unitPrice').fill(ORDER_UNIT_PRICE);
 
-    // --- 5. Unidad, del selector (R32).
-    await page.getByTestId('order-unit-select').click();
-    await page.getByTestId('order-unit-option').filter({ hasText: unitName }).click();
-
-    // --- 6. La prioridad por defecto esta VISIBLE y preseleccionada (R27): no se toca el
+    // --- 5. La prioridad por defecto esta VISIBLE y preseleccionada (R27): no se toca el
     // desplegable, solo se comprueba que muestra algo. Que ese algo sea el defecto del contrato
     // se afirma mas abajo sobre lo que el backend guardo, sin depender de ningun copy (R44).
     await expect(page.getByTestId('order-priority-select')).not.toHaveText('');
@@ -408,8 +388,6 @@ test.describe('pantalla de pedidos', () => {
         orderSequence: true,
         priority: true,
         quantity: true,
-        unitPrice: true,
-        unitId: true,
       },
     });
     const numberText = formatOrderNumber({
@@ -420,9 +398,7 @@ test.describe('pantalla de pedidos', () => {
     // La prioridad que se guardo es la del contrato (R27) y los decimales llegaron intactos
     // (R39): ni el formulario ni la pantalla los pasaron por coma flotante.
     expect(created.priority).toBe(DEFAULT_ORDER_PRIORITY);
-    expect(created.unitId).toBe(unitId);
     expect(Number(created.quantity)).toBe(Number(ORDER_QUANTITY));
-    expect(Number(created.unitPrice)).toBe(Number(ORDER_UNIT_PRICE));
 
     // --- 10. Y el pedido esta en la lista, localizado POR SU CORRELATIVO (R7, R10).
     const row = await findOrderRow(page, numberText);

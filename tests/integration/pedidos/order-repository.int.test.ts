@@ -199,8 +199,6 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
   return {
     recipeId,
     quantity: '10.0000',
-    unitId,
-    unitPrice: '2.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     ...overrides,
@@ -324,7 +322,6 @@ describe('R8 — alta por el adaptador y relectura sin perdida', () => {
         // Decimales que NO son los de la escala de la columna: la vuelta tiene que traerlos
         // con CUATRO decimales exactos (`Decimal(14, 4)`), ni tres ni seis.
         quantity: '10.5',
-        unitPrice: '0.125',
         priority: 'ALTA',
       })
 
@@ -338,10 +335,8 @@ describe('R8 — alta por el adaptador y relectura sin perdida', () => {
       expect(ficha?.id).toBe(alta.id)
       expect(ficha?.number).toEqual({ year: YEAR_ALTA, sequence: 1 })
       expect(ficha?.recipeId).toBe(recipeId)
-      expect(ficha?.unitId).toBe(unitId)
       // `.toFixed(4)`: la escala de la columna, en la ida y en la vuelta.
       expect(ficha?.quantity).toBe('10.5000')
-      expect(ficha?.unitPrice).toBe('0.1250')
       expect(ficha?.priority).toBe('ALTA')
       expect(ficha?.status).toBe('PENDIENTE')
       expect(ficha?.cancellationReason).toBeNull()

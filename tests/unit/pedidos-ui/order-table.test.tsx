@@ -18,7 +18,6 @@ import {
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitRef } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -62,9 +61,6 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: `Receta ${sequence}`,
     quantity: '1.0000',
-    unitId: '33333333-3333-4333-8333-333333333333',
-    unitName: 'Kilogramo',
-    unitPrice: '2.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
@@ -99,7 +95,6 @@ function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
  * ningun caso de este archivo abre el panel, y lo que se comprueba aqui es la lista.
  */
 const RECETAS = { items: [], totalPages: 1 };
-const UNIDADES: readonly UnitRef[] = [];
 
 function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
   const params = parametros(overrides);
@@ -109,7 +104,6 @@ function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
       params={params}
       totalPages={totalPages}
       recipes={RECETAS}
-      units={UNIDADES}
     />,
   );
   return params;

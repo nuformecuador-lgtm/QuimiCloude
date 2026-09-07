@@ -59,8 +59,6 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
   return {
     recipeId,
     quantity: '10.0000',
-    unitId,
-    unitPrice: '2.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     ...overrides,
@@ -417,13 +415,17 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
   })
 })
 
-describe('los importes se comparan como Decimal, no como coma flotante', () => {
+describe('los decimales se comparan como Decimal, no como coma flotante', () => {
   it('un tope de 19.99 incluye el pedido que vale exactamente 19.9900 y excluye 19.9901', async () => {
     // El adaptador convierte el `number` del contrato a `Prisma.Decimal` ANTES de comparar. El
     // limite exacto es justo donde la coma flotante binaria falla.
-    const justo = await alta(instantIn(20, 1), { unitPrice: '19.9900' })
-    await alta(instantIn(20, 2), { unitPrice: '19.9901' })
-    const menos = await alta(instantIn(20, 3), { unitPrice: '19.9899' })
+    //
+    // QC-35bis (2026-09-07): el caso se media sobre `unit_price`, que ya no existe. Se mide sobre
+    // `quantity`, que es el otro `Decimal(14,4)` de la tabla y pasa por la MISMA conversion del
+    // adaptador (`toDecimalRange`), asi que lo que se comprueba no ha cambiado.
+    const justo = await alta(instantIn(20, 1), { quantity: '19.9900' })
+    await alta(instantIn(20, 2), { quantity: '19.9901' })
+    const menos = await alta(instantIn(20, 3), { quantity: '19.9899' })
 
     const pagina = await listAliveOrders(
       consulta({
@@ -434,13 +436,13 @@ describe('los importes se comparan como Decimal, no como coma flotante', () => {
             from: `${String(YEAR)}-01-20`,
             to: `${String(YEAR)}-01-20`,
           },
-          unitPrice: { kind: 'numberRange', min: null, max: 19.99 },
+          quantity: { kind: 'numberRange', min: null, max: 19.99 },
         },
       }),
     )
 
     expect(pagina.items.map((o) => o.id).sort()).toEqual([justo.id, menos.id].sort())
-    expect(pagina.items.map((o) => o.unitPrice)).toContain('19.9900')
+    expect(pagina.items.map((o) => o.quantity)).toContain('19.9900')
   })
 })
 

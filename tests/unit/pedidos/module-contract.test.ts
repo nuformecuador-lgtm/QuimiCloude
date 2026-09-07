@@ -461,7 +461,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     }
   })
 
-  it('pedidos importa recetas y unidades solo por el barrel, y los dos barrels publican lo que usa', () => {
+  it('pedidos importa recetas solo por el barrel, y ese barrel publica lo que usa', () => {
     // R32, segunda mitad: todo lo que `pedidos` sabe de una receta o de una unidad llega por
     // `@/lib/modules/recetas` y `@/lib/modules/unidades`. Ni dominio, ni puertos, ni
     // adaptadores por ruta profunda; tampoco de `identity` ni de `inventario`.
@@ -474,25 +474,26 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       }
     }
 
-    // Y el barrel de cada uno es un camino REAL, no una regla vacia: `order-contents.ts` los usa
-    // hoy (`design.md > 6.3`). Sin esta mitad, R32 pasaria por no existir el sujeto.
+    // Y el barrel es un camino REAL, no una regla vacia: `order-contents.ts` lo usa hoy
+    // (`design.md > 6.3`). Sin esta mitad, R32 pasaria por no existir el sujeto.
+    //
+    // QC-35bis (2026-09-07): eran DOS barrels. Al salir la unidad del pedido, `pedidos` dejo de
+    // importar `@/lib/modules/unidades` en cualquiera de sus archivos -lo sigue vigilando el
+    // barrido de rutas profundas de arriba, que cubre los cuatro modulos-, asi que el unico
+    // contrato ajeno que este modulo consume es el de `recetas`.
     const contents = read(join(pedidosDir, 'domain', 'order-contents.ts'))
     const specsDeContents = importSpecifiers(contents)
     expect(specsDeContents).toContain('@/lib/modules/recetas')
-    expect(specsDeContents).toContain('@/lib/modules/unidades')
+    expect(specsDeContents).not.toContain('@/lib/modules/unidades')
     expect(contents).toMatch(
       /import type \{[^}]*\bRecipeId\b[^}]*\} from '@\/lib\/modules\/recetas'/,
     )
-    expect(contents).toMatch(
-      /import type \{[^}]*\bUnitId\b[^}]*\} from '@\/lib\/modules\/unidades'/,
-    )
+    expect(contents).not.toContain('UnitId')
 
-    // Los dos contratos ajenos PUBLICAN lo que `pedidos` usa: R32 exige que los barrels lo
-    // expongan, y `RecipeId` lo anadio esta misma ficha (`design.md > 6.4`).
+    // El contrato ajeno PUBLICA lo que `pedidos` usa: R32 exige que el barrel lo exponga, y
+    // `RecipeId` lo anadio esta misma ficha (`design.md > 6.4`).
     const recetas = read(join(repoRoot, 'lib', 'modules', 'recetas', 'index.ts'))
     expect(recetas).toMatch(/export type \{[^}]*\bRecipeId\b[^}]*\} from '\.\/domain\//)
-    const unidades = read(join(repoRoot, 'lib', 'modules', 'unidades', 'index.ts'))
-    expect(unidades).toMatch(/export type \{[^}]*\bUnitId\b[^}]*\} from '\.\/domain\//)
   })
 
   it('los valores del dominio coinciden, en orden, con los enum del esquema, y los dos defectos con los @default', () => {

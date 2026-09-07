@@ -65,8 +65,6 @@ import {
   ORDER_PRIORITY_SELECT_TESTID,
   QUANTITY_COLUMN_ID,
   RECIPE_PICKER_TESTID,
-  UNIT_PRICE_COLUMN_ID,
-  UNIT_SELECT_TESTID,
   buildOrderColumns,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
@@ -204,9 +202,6 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     recipeId: RECETA.id,
     recipeName: RECETA.name,
     quantity: '12.5000',
-    unitId: UNIDAD.id,
-    unitName: UNIDAD.name,
-    unitPrice: '0.1005',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
@@ -433,11 +428,11 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
+    // Eran cinco campos hasta el 2026-09-07: el precio unitario y el selector de unidad salieron
+    // del formulario con la decision humana. Los que quedan se siguen midiendo uno a uno.
     const campos = [
       screen.getByTestId(`order-field-${QUANTITY_COLUMN_ID}`),
-      screen.getByTestId(`order-field-${UNIT_PRICE_COLUMN_ID}`),
       screen.getByTestId(RECIPE_PICKER_TESTID),
-      screen.getByTestId(UNIT_SELECT_TESTID),
       screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
     ];
 
@@ -487,8 +482,8 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
   it('P2 — ninguna columna declara ancho y ninguna celda recibe uno en linea', async () => {
     // Primera mitad: la CONFIGURACION. Si una columna declarase `size`, la libreria si tendria un
     // ancho que imponer, y los 150 px por defecto dejarian de ser inertes.
-    const columnas = buildOrderColumns({ recipes: RECETAS, units: [UNIDAD] });
-    expect(columnas).toHaveLength(10);
+    const columnas = buildOrderColumns({ recipes: RECETAS });
+    expect(columnas).toHaveLength(8);
 
     for (const columna of columnas) {
       for (const clave of ['size', 'width', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {

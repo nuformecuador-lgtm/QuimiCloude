@@ -34,9 +34,6 @@ import {
   OrderForm,
   RECIPE_FIELD,
   RECIPE_PICKER_TESTID,
-  UNIT_FIELD,
-  UNIT_OPTION_TESTID,
-  UNIT_SELECT_TESTID,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { Sheet } from '@/components/ui/sheet';
@@ -52,7 +49,6 @@ import type {
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { UnitRef } from '@/lib/modules/unidades';
 
 const { createOrderActionMock, updateOrderActionMock, prohibida, listRecipesActionMock } =
   vi.hoisted(() => {
@@ -90,14 +86,12 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 }));
 
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul' };
-const UNIDAD: UnitRef = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
-const OTRA_UNIDAD: UnitRef = { id: crypto.randomUUID(), name: 'Litro', symbol: 'L' };
-const UNIDADES = [UNIDAD, OTRA_UNIDAD] as const;
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
-/** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta (R39). */
-const PRECIO_EXACTO = '0.1005';
-const CANTIDAD = '12.5000';
+/** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta (R39).
+ *  Desde el 2026-09-07 la cantidad es el UNICO decimal del pedido, asi que es ella la que lleva
+ *  el valor dificil. */
+const CANTIDAD = '0.1005';
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -107,9 +101,6 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     recipeId: RECETA.id,
     recipeName: RECETA.name,
     quantity: CANTIDAD,
-    unitId: UNIDAD.id,
-    unitName: UNIDAD.name,
-    unitPrice: PRECIO_EXACTO,
     priority: 'ALTA',
     status: 'EN_CURSO',
     cancellationReason: null,
@@ -126,25 +117,20 @@ const onSaved = vi.fn();
 function renderFormulario(order?: OrderSummary) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={RECETAS} units={UNIDADES} onSaved={onSaved} />
+      <OrderForm order={order} recipes={RECETAS} onSaved={onSaved} />
     </Sheet>,
   );
 }
 
-/** Elige la receta y la unidad, que son los dos campos que no se escriben a mano. */
+/** Elige la receta, que es el unico campo que no se escribe a mano (la unidad se fue en 2026-09-07). */
 async function elegirCatalogos(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
   await user.click(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`));
-
-  await user.click(screen.getByTestId(UNIT_SELECT_TESTID));
-  const unidades = await screen.findAllByTestId(UNIT_OPTION_TESTID);
-  await user.click(unidades[0]);
 }
 
 async function rellenarAlta(user: ReturnType<typeof userEvent.setup>) {
   await elegirCatalogos(user);
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
-  await user.type(screen.getByTestId('order-field-unitPrice'), PRECIO_EXACTO);
 }
 
 beforeEach(() => {
@@ -162,8 +148,10 @@ afterEach(() => {
 });
 
 describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
-  it('captura los CINCO campos de negocio y los envia a la operacion de alta', async () => {
-    // R26, R33 — el `FormData` lleva exactamente los cinco nombres que el adaptador driving lee.
+  it('captura los TRES campos de negocio y los envia a la operacion de alta', async () => {
+    // R26, R33 — el `FormData` lleva exactamente los nombres que el adaptador driving lee. Eran
+    // cinco hasta el 2026-09-07, cuando la unidad y el precio unitario salieron del pedido; la
+    // lista sigue derivandose de `ORDER_BUSINESS_FIELDS`, no de literales sueltos.
     const user = userEvent.setup();
     renderFormulario();
 
@@ -177,12 +165,14 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
       expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
     }
     expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
-    expect(enviado.get(UNIT_FIELD)).toBe(UNIDAD.id);
+    // Y lo que ya no existe NO viaja: ni unidad ni precio, aunque el backend los ignorase.
+    expect(enviado.get('unitId')).toBeNull();
+    expect(enviado.get('unitPrice')).toBeNull();
     expect(updateOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('el precio escrito como «0.1005» llega a la operacion COMO ESA MISMA CADENA', async () => {
-    // R39 — ni `Number`, ni `parseFloat`, ni `toFixed`, ni `type="number"`: el importe es texto de
+  it('la cantidad escrita como «0.1005» llega a la operacion COMO ESA MISMA CADENA', async () => {
+    // R39 — ni `Number`, ni `parseFloat`, ni `toFixed`, ni `type="number"`: el decimal es texto de
     // punta a punta y una conversion a coma flotante binaria no lo devolveria intacto.
     const user = userEvent.setup();
     renderFormulario();
@@ -193,19 +183,19 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
 
     const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.get('unitPrice')).toBe(PRECIO_EXACTO);
     expect(enviado.get('quantity')).toBe(CANTIDAD);
   });
 
-  it('captura cantidad y precio con un control de TEXTO, nunca con el numerico del navegador', () => {
+  it('captura la cantidad con un control de TEXTO, nunca con el numerico del navegador', () => {
     // R39 — el valor de un `type="number"` de HTML pasa por el binario de coma flotante.
     renderFormulario();
 
-    for (const campo of ['quantity', 'unitPrice'] as const) {
-      const control = screen.getByTestId(`order-field-${campo}`);
-      expect(control).toHaveAttribute('type', 'text');
-      expect(control).toHaveAttribute('inputmode', 'decimal');
-    }
+    const control = screen.getByTestId('order-field-quantity');
+    expect(control).toHaveAttribute('type', 'text');
+    expect(control).toHaveAttribute('inputmode', 'decimal');
+
+    // Y el campo de precio unitario NO existe: se fue con la columna (2026-09-07).
+    expect(screen.queryByTestId('order-field-unitPrice')).toBeNull();
   });
 
   it('presenta la prioridad por defecto del contrato PRESELECCIONADA y visible', async () => {
@@ -281,7 +271,6 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
 
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
     expect(screen.getByTestId('order-field-quantity')).toHaveValue(elPedido.quantity);
-    expect(screen.getByTestId('order-field-unitPrice')).toHaveValue(elPedido.unitPrice);
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
@@ -294,7 +283,6 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
       expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
     }
     expect(enviado.get(RECIPE_FIELD)).toBe(elPedido.recipeId);
-    expect(enviado.get(UNIT_FIELD)).toBe(elPedido.unitId);
     expect(enviado.get('priority')).toBe(elPedido.priority);
     expect(enviado.get(ORDER_STATUS_FIELD)).toBe(elPedido.status);
     expect(createOrderActionMock).not.toHaveBeenCalled();
@@ -335,22 +323,13 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('«unit_not_found» va al selector de unidad y «invalid_transition» al de estado', async () => {
+  it('«invalid_transition» va al selector de estado', async () => {
     // R34 — el resto de la tabla de `design.md > 8`, tambien por codigo.
+    //
+    // QC-35bis (2026-09-07): este caso comprobaba TAMBIEN que «unit_not_found» iba al selector de
+    // unidad. Ese codigo ya no lo emite nadie -la unidad salio del pedido, y con ella
+    // `UnitNotFoundError`-, asi que la mitad que sobrevive es la de la transicion.
     const user = userEvent.setup();
-
-    updateOrderActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'unit_not_found',
-      message: 'La unidad no existe.',
-    });
-    renderFormulario(pedido());
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-    await waitFor(() =>
-      expect(screen.getByTestId(`${UNIT_SELECT_TESTID}-error`)).toBeInTheDocument(),
-    );
-
-    cleanup();
 
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -358,10 +337,15 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
       message: 'Transición no permitida.',
     });
     renderFormulario(pedido());
+
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
     await waitFor(() =>
       expect(screen.getByTestId(`order-error-${ORDER_STATUS_FIELD}`)).toBeInTheDocument(),
     );
+    // El aviso va al CAMPO, no a la region general del formulario.
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('un codigo que no senala campo va a la region de aviso del formulario y no pierde lo escrito', async () => {

@@ -1,17 +1,16 @@
 import { requireAdmin, type Actor } from './actor';
-import { NotFoundError, RecipeNotFoundError, UnitNotFoundError, ValidationError } from './errors';
+import { NotFoundError, RecipeNotFoundError, ValidationError } from './errors';
 import { updateOrderSchema } from './order-input';
 import { assertTransition } from './order-transitions';
 
 import type { RecipeCatalog } from '@/lib/modules/recetas';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
+/** QC-35bis (2026-09-07): sin unidad en el pedido, `units` deja de ser dependencia. */
 export type UpdateOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
-  readonly units: UnitCatalog;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -68,11 +67,6 @@ export function createUpdateOrder(
       const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId]);
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
-
-    // La unidad se exige SIEMPRE (R16): `units` no tiene borrado logico (QC-32 decision 11),
-    // asi que la excepcion de R25 no tiene equivalente aqui.
-    const [unit] = await deps.units.findRefs([data.unitId]);
-    if (unit === undefined) throw new UnitNotFoundError();
 
     const result = await deps.orders.updateAlive(id, data, actor.id, now());
 

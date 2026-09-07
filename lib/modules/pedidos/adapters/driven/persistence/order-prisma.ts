@@ -21,17 +21,21 @@ import type { NewOrder, OrderRow } from '../../../domain/order-view';
  * `> 10`) con Prisma. UNICO archivo del modulo `pedidos` que importa `@prisma/client`,
  * `@/lib/shared/db/prisma` y `@/lib/shared/pagination` (R52, R53).
  *
- * NO HAY NI UN `include` NI UN `select` hacia `recipes`, `units` ni `users` (R53, QC-33
- * R31/R32): el nombre de la receta y el de la unidad los resuelve el caso de uso por los
- * contratos publicos de `recetas` y `unidades`, y los dos autores viajan como
- * IDENTIFICADORES en crudo (R46). Por eso QC-33 dejo las cuatro FK como escalares sin
- * `@relation`: aqui no hay relacion que navegar ni por descuido.
+ * NO HAY NI UN `include` NI UN `select` hacia `recipes` ni `users` (R53, QC-33 R31/R32): el
+ * nombre de la receta lo resuelve el caso de uso por el contrato publico de `recetas`, y los dos
+ * autores viajan como IDENTIFICADORES en crudo (R46). Por eso QC-33 dejo las FK como escalares
+ * sin `@relation`: aqui no hay relacion que navegar ni por descuido.
+ *
+ * QC-35bis (2026-09-07): `unit_id` y `unit_price` salieron de `orders`
+ * (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`), asi que este adaptador ya no
+ * los selecciona, no los inserta, no los actualiza, no los ordena y no los filtra. La FK hacia
+ * `units` cayo con la columna.
  *
  * `deleted_at IS NULL` va en el `where` de TODA lectura y de TODA escritura `…Alive`, nunca
  * en un `if` posterior (R40): el filtro es del puerto, y por eso ningun caso de uso puede
  * olvidarlo.
  *
- * Los importes viajan como CADENA decimal por el puerto -el dominio no puede importar
+ * La cantidad viaja como CADENA decimal por el puerto -el dominio no puede importar
  * `Prisma.Decimal` (`docs/architecture.md > Anti-patrones`)-: `toDecimalInput` y
  * `fromDecimal` son el UNICO sitio del modulo que convierte en los dos sentidos, y a la
  * salida siempre con `.toFixed(4)`, que es la escala de la columna `Decimal(14, 4)`.
@@ -49,8 +53,6 @@ const ORDER_SELECT = {
   orderSequence: true,
   recipeId: true,
   quantity: true,
-  unitId: true,
-  unitPrice: true,
   priority: true,
   status: true,
   cancellationReason: true,
@@ -81,8 +83,6 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     number: { year: row.orderYear, sequence: row.orderSequence },
     recipeId: row.recipeId,
     quantity: fromDecimal(row.quantity),
-    unitId: row.unitId,
-    unitPrice: fromDecimal(row.unitPrice),
     priority: row.priority,
     status: row.status,
     cancellationReason: row.cancellationReason,
@@ -191,15 +191,13 @@ export async function createOrder(
   try {
     const filas = await prisma.$queryRaw<readonly CreatedOrderRow[]>`
       INSERT INTO "orders" (
-        "order_year", "order_sequence", "recipe_id", "quantity", "unit_id", "unit_price",
+        "order_year", "order_sequence", "recipe_id", "quantity",
         "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
       ) VALUES (
         ${year}::integer,
         next_order_sequence(${year}::integer),
         ${data.recipeId}::uuid,
         ${data.quantity}::numeric,
-        ${data.unitId}::uuid,
-        ${data.unitPrice}::numeric,
         ${data.priority}::"OrderPriority",
         ${data.status}::"OrderStatus",
         ${actorId}::uuid,
@@ -225,8 +223,6 @@ export async function createOrder(
       number: { year: Number(fila.order_year), sequence: Number(fila.order_sequence) },
       recipeId: data.recipeId,
       quantity: fromDecimal(toDecimalInput(data.quantity)),
-      unitId: data.unitId,
-      unitPrice: fromDecimal(toDecimalInput(data.unitPrice)),
       priority: data.priority,
       status: data.status,
       // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive` (R26, R30).
@@ -327,8 +323,8 @@ export function orderOrderBy(sort: ListSort | null): Prisma.OrderOrderByWithRela
       return [{ createdAt: dir }, TIE_BREAKER];
     case 'quantity':
       return [{ quantity: dir }, TIE_BREAKER];
-    case 'unitPrice':
-      return [{ unitPrice: dir }, TIE_BREAKER];
+    // QC-35bis (2026-09-07): `unitPrice` ya no es ordenable -salio de `ORDER_QUERYABLE` y de la
+    // tabla-, asi que cae por el `default` como cualquier columna desconocida.
     default:
       return defaultOrderBy();
   }
@@ -398,7 +394,6 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
       const condition = numberRangeCondition(value.min, value.max);
       if (condition === null) return null;
       if (field === 'quantity') return { quantity: toDecimalRange(condition) };
-      if (field === 'unitPrice') return { unitPrice: toDecimalRange(condition) };
       if (field === 'orderYear') return { orderYear: condition };
       return null;
     }
@@ -499,8 +494,6 @@ export async function updateAliveOrder(
     data: {
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
-      unitId: data.unitId,
-      unitPrice: toDecimalInput(data.unitPrice),
       priority: data.priority,
       status: data.status,
       updatedAt: now,

@@ -21,7 +21,7 @@
  * las filas que el mismo sembro, localizadas por su `id`.
  *
  * CADA CASO SIEMBRA SUS PROPIAS FK — las cuatro referencias del pedido (`recipe_id`,
- * `unit_id`, `created_by`, `updated_by`) son FK REALES aunque Prisma las declare como
+ * `created_by`, `updated_by`) son FK REALES aunque Prisma las declare como
  * escalares sin `@relation`. Nada viene de un seed.
  *
  * LO QUE DEBE FALLAR VA CON SQL CRUDO (`design.md > 12`, primer aviso): la API tipada traduce
@@ -213,8 +213,6 @@ type WritableColumn =
   | 'order_sequence'
   | 'recipe_id'
   | 'quantity'
-  | 'unit_id'
-  | 'unit_price'
   | 'priority'
   | 'status'
   | 'cancellation_reason'
@@ -280,8 +278,6 @@ function baseColumns(f: Fixtures, sequence: number): Partial<Record<WritableColu
     order_sequence: Prisma.sql`${sequence}`,
     recipe_id: asUuid(f.recipeId),
     quantity: asDecimal('10'),
-    unit_id: asUuid(f.unitId),
-    unit_price: asDecimal('25'),
   }
 }
 
@@ -307,9 +303,7 @@ async function createOrder(
       orderYear: currentUtcYear(),
       orderSequence: seed.sequence ?? freshSequence(),
       recipeId: f.recipeId,
-      unitId: f.unitId,
       quantity: new Prisma.Decimal('10'),
-      unitPrice: new Prisma.Decimal('25'),
       status: seed.status,
       cancellationReason: seed.cancellationReason,
       priority: seed.priority,
@@ -390,15 +384,13 @@ describe('el alta contra la base (R8, R10)', () => {
         { id: string; order_year: number; order_sequence: number }[]
       >`
         INSERT INTO "orders" (
-          "order_year", "order_sequence", "recipe_id", "quantity", "unit_id", "unit_price",
+          "order_year", "order_sequence", "recipe_id", "quantity",
           "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
         ) VALUES (
           ${year}::integer,
           next_order_sequence(${year}::integer),
           ${f.recipeId}::uuid,
           ${'12.5000'}::numeric,
-          ${f.unitId}::uuid,
-          ${'3.7500'}::numeric,
           ${'ALTA'}::"OrderPriority",
           ${'PENDIENTE'}::"OrderStatus",
           ${f.userId}::uuid,
@@ -420,9 +412,7 @@ describe('el alta contra la base (R8, R10)', () => {
       expect(stored.orderYear).toBe(Number(devuelta.order_year))
       expect(stored.orderSequence).toBe(Number(devuelta.order_sequence))
       expect(stored.recipeId).toBe(f.recipeId)
-      expect(stored.unitId).toBe(f.unitId)
       expect(stored.quantity.toFixed(4)).toBe('12.5000')
-      expect(stored.unitPrice.toFixed(4)).toBe('3.7500')
       expect(stored.priority).toBe('ALTA')
       expect(stored.status).toBe('PENDIENTE')
       expect(stored.cancellationReason).toBeNull()

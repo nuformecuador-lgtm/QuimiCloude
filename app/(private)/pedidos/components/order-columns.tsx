@@ -2,7 +2,6 @@
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitRef } from '@/lib/modules/unidades';
 
 import {
   CREATED_AT_COLUMN_ID,
@@ -28,9 +27,9 @@ import {
  * serializables y es esta declaracion la que vive del lado del navegador.
  *
  * **Se declaran con una FACTORIA, `buildOrderColumns`** (y no como un array del modulo): la
- * celda de acciones monta el panel de edicion y los dos dialogos, que necesitan los catalogos de
- * recetas y de unidades por props (R43). Mientras fue un array estatico esos catalogos no tenian
- * por donde llegar y los tres botones de la fila no abrian nada.
+ * celda de acciones monta el panel de edicion y los dos dialogos, que necesitan el catalogo de
+ * recetas por props (R43). Mientras fue un array estatico ese catalogo no tenia por donde llegar
+ * y los tres botones de la fila no abrian nada.
  *
  * **La columna de acciones es una columna NORMAL** (`design.md > 6.1`, alternativa B descartada):
  * `DataTableColumn.cell` ya devuelve `ReactNode` y `DataTable` lo pinta directamente. No se
@@ -38,16 +37,20 @@ import {
  * de hacer lo que `cell` ya hace. Esto es lo que QC-56 adopta.
  *
  * **Solo cuatro columnas ordenan** (R12): correlativo, estado, prioridad y fecha de solicitud.
- * Son `ORDER_QUERYABLE.sortable` **menos** `quantity` y `unitPrice`, que la decision cerrada no
- * pide: declarar `sortable` en una cabecera que nadie acordo seria inventar alcance.
+ * Son `ORDER_QUERYABLE.sortable` **menos** `quantity`, que la decision cerrada no pide: declarar
+ * `sortable` en una cabecera que nadie acordo seria inventar alcance. (`unitPrice` estaba tambien
+ * en esa resta hasta el 2026-09-07; hoy ya no esta ni en la lista blanca ni en la tabla.)
  *
  * **No hay columna de total ni de autoria** (R8, alternativa N descartada): el total lo calculara
  * el servidor en QC-68, y `createdBy`/`updatedBy` son identificadores, no nombres. El test de R8
  * lo comprueba recorriendo esta misma declaracion.
  *
- * **Cantidad y precio se pintan TAL CUAL llegan** (R39): son cadenas decimales del contrato. Ni
+ * **La cantidad se pinta TAL CUAL llega** (R39): es una cadena decimal del contrato. Ni
  * `Intl.NumberFormat`, ni `toFixed`, ni conversion a coma flotante, ni aritmetica —tampoco para
  * un total, que aqui no existe—.
+ *
+ * **QC-35bis (2026-09-07): no hay columna de unidad ni de precio unitario.** Salieron del pedido
+ * entero -formulario, contrato del modulo y tabla `orders`-, asi que no queda dato que pintar.
  */
 
 /** Id de la columna del correlativo. Se exporta porque la tabla la fija por defecto (R19). */
@@ -55,9 +58,7 @@ export const ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 
 /** Ids de las columnas que no filtran ni ordenan, pero que los tests localizan por su celda. */
 export const RECIPE_NAME_COLUMN_ID = 'recipeName';
-export const UNIT_NAME_COLUMN_ID = 'unitName';
 export const QUANTITY_COLUMN_ID = 'quantity';
-export const UNIT_PRICE_COLUMN_ID = 'unitPrice';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 export const ACTIONS_COLUMN_ID = 'actions';
 
@@ -102,7 +103,6 @@ function formatRequestDate(value: Date): string {
  */
 export type OrderColumnsDeps = {
   readonly recipes: RecipePickerPage;
-  readonly units: readonly UnitRef[];
 };
 
 /**
@@ -114,7 +114,6 @@ export type OrderColumnsDeps = {
  */
 export function buildOrderColumns({
   recipes,
-  units,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -159,19 +158,6 @@ export function buildOrderColumns({
       cell: (order) => order.quantity,
     },
     {
-      id: UNIT_NAME_COLUMN_ID,
-      label: 'Unidad',
-      align: 'start',
-      cell: (order) => order.unitName ?? <MissingValue field={UNIT_NAME_COLUMN_ID} />,
-    },
-    {
-      id: UNIT_PRICE_COLUMN_ID,
-      label: 'Precio unitario',
-      align: 'end',
-      // R39: idem. Sin `Intl.NumberFormat`, sin `toFixed`, sin aritmetica.
-      cell: (order) => order.unitPrice,
-    },
-    {
       id: CREATED_AT_COLUMN_ID,
       label: 'Fecha de solicitud',
       align: 'start',
@@ -195,7 +181,7 @@ export function buildOrderColumns({
       // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
       // `pinnable: false` para que el usuario no pueda fijarla y tapar la del correlativo.
       pinnable: false,
-      cell: (order) => <OrderRowSheetActions order={order} recipes={recipes} units={units} />,
+      cell: (order) => <OrderRowSheetActions order={order} recipes={recipes} />,
     },
   ];
 }

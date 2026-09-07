@@ -286,14 +286,46 @@ function conversionesDeImporte(fuente: string): string[] {
 }
 
 /** R42, R46 — Archivos que la feature no puede haber tocado. */
+/**
+ * EXCEPCION NOMBRADA Y FECHADA a R42/R46 — decision humana del **2026-09-07**: la unidad y el
+ * precio unitario SALEN del pedido, de la pantalla a la tabla `orders`.
+ *
+ * Un cambio asi no cabe dentro de «la pantalla no toca el modulo»: quitar dos columnas obliga a
+ * tocar el esquema, una migracion, el dominio, el adaptador driven, el punto de composicion y la
+ * propia pantalla. La alternativa honesta a esta lista era dejar la guardia en rojo de forma
+ * permanente, que es peor: una guardia que siempre falla no protege nada porque nadie la mira.
+ *
+ * Es una lista por **prefijo exacto y cerrada**, no un patron: todo lo demas de `components/ui/`,
+ * `lib/modules/`, `db/` y `lib/composition/index.ts` sigue vetado para esta feature, y
+ * `package.json` NO tiene excepcion -ninguna dependencia entra por aqui-.
+ */
+const AUTORIZADO_2026_09_07: readonly string[] = [
+  // El primitivo del autocomplete, del que cuelgan los dos selectores de la app.
+  'components/ui/autocomplete.tsx',
+  // El modulo `pedidos` entero: dominio, puertos y adaptadores pierden unidad y precio.
+  'lib/modules/pedidos/',
+  // El cableado, que deja de inyectar el catalogo de unidades a los cuatro casos de uso.
+  'lib/composition/index.ts',
+  // El esquema y la migracion que dropea `unit_id` y `unit_price` (con su `down.sql`).
+  'db/schema.prisma',
+  'db/migrations/20260907120000_orders_drop_unit_and_unit_price/',
+];
+
+function autorizado(ruta: string): boolean {
+  return AUTORIZADO_2026_09_07.some((permitida) =>
+    permitida.endsWith('/') ? ruta.startsWith(permitida) : ruta === permitida,
+  );
+}
+
 function intocablesTocados(rutas: readonly string[]): string[] {
   return rutas.filter(
     (ruta) =>
-      ruta.startsWith(INTOCABLES.primitivas) ||
-      ruta.startsWith(INTOCABLES.modulos) ||
-      ruta.startsWith(INTOCABLES.baseDeDatos) ||
-      ruta === INTOCABLES.composicion ||
-      ruta === INTOCABLES.manifiesto,
+      !autorizado(ruta) &&
+      (ruta.startsWith(INTOCABLES.primitivas) ||
+        ruta.startsWith(INTOCABLES.modulos) ||
+        ruta.startsWith(INTOCABLES.baseDeDatos) ||
+        ruta === INTOCABLES.composicion ||
+        ruta === INTOCABLES.manifiesto),
   );
 }
 
@@ -527,8 +559,8 @@ describe('la feature no toca lo que tiene prohibido tocar (R42, R46)', () => {
       return;
     }
 
-    const primitivas = TOCADOS_POR_LA_FEATURE.filter((ruta) =>
-      ruta.startsWith(INTOCABLES.primitivas),
+    const primitivas = TOCADOS_POR_LA_FEATURE.filter(
+      (ruta) => ruta.startsWith(INTOCABLES.primitivas) && !autorizado(ruta),
     );
     expect(primitivas, `la feature toca primitivas de UI: ${primitivas.join(', ')}`).toEqual([]);
   });
@@ -576,9 +608,16 @@ describe('la feature no toca lo que tiene prohibido tocar (R42, R46)', () => {
   it('y la guardia del diff FALLA ante cada intocable, sin morder a lo que R5 autoriza', () => {
     expect(intocablesTocados(['components/ui/table.tsx'])).not.toEqual([]);
     expect(intocablesTocados(['package.json'])).not.toEqual([]);
-    expect(intocablesTocados(['lib/modules/pedidos/domain/order-view.ts'])).not.toEqual([]);
-    expect(intocablesTocados(['db/schema.prisma'])).not.toEqual([]);
-    expect(intocablesTocados(['lib/composition/index.ts'])).not.toEqual([]);
+    expect(intocablesTocados(['lib/modules/inventario/domain/product-view.ts'])).not.toEqual([]);
+    expect(intocablesTocados(['db/migrations/20260903191204_orders/migration.sql'])).not.toEqual([]);
+
+    // La excepcion del 2026-09-07 muerde SOLO lo que nombra, y su lista es cerrada.
+    expect(intocablesTocados(['components/ui/autocomplete.tsx'])).toEqual([]);
+    expect(intocablesTocados(['lib/modules/pedidos/domain/order-view.ts'])).toEqual([]);
+    expect(intocablesTocados(['db/schema.prisma'])).toEqual([]);
+    expect(intocablesTocados(['lib/composition/index.ts'])).toEqual([]);
+    // Pero `package.json` NO esta autorizado ni siquiera por ella.
+    expect(intocablesTocados(['package.json'])).not.toEqual([]);
 
     expect(
       intocablesTocados([

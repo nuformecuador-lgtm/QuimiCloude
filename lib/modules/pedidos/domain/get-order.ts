@@ -4,14 +4,18 @@ import { formatOrderNumber } from './order-number';
 import type { OrderRow, OrderView } from './order-view';
 
 import type { RecipeCatalog } from '@/lib/modules/recetas';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
+/**
+ * QC-35bis (2026-09-07): `units` YA NO ES UNA DEPENDENCIA de este caso de uso. Al salir la
+ * unidad del pedido no queda ningun id que resolver contra el catalogo de `unidades`, asi que
+ * pedirlo aqui seria cablear una dependencia falsa -exactamente lo que `design.md > 9` evita en
+ * `cancelOrder` y `deleteOrder`-. Es tambien una consulta menos por ficha y por pagina.
+ */
 export type GetOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
-  readonly units: UnitCatalog;
 };
 
 /**
@@ -21,10 +25,10 @@ export type GetOrderDeps = {
  * `OrderSummary` es un alias de `OrderView` (`design.md > 7.3`) y una segunda copia de este
  * mapeo seria el sitio exacto por donde empezarian a diferir.
  *
- * `recipeName`/`unitName` son `null` solo si el id NO vuelve del catalogo -una receta borrada
- * FISICAMENTE por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila
- * SIGUE saliendo (mismo criterio que QC-25 R18 y QC-43 R37). Una receta dada de BAJA si
- * vuelve, con su nombre (R44).
+ * `recipeName` es `null` solo si el id NO vuelve del catalogo -una receta borrada FISICAMENTE
+ * por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila SIGUE saliendo
+ * (mismo criterio que QC-25 R18 y QC-43 R37). Una receta dada de BAJA si vuelve, con su nombre
+ * (R44).
  *
  * `numberText` lo compone `formatOrderNumber`, la UNICA definicion del formato (R14): no se
  * persiste ni se vuelve a formatear en ningun otro sitio. Los dos autores salen como
@@ -33,7 +37,6 @@ export type GetOrderDeps = {
 export function toOrderView(
   row: OrderRow,
   recipeNames: ReadonlyMap<string, string>,
-  unitNames: ReadonlyMap<string, string>,
 ): OrderView {
   return {
     id: row.id,
@@ -42,9 +45,6 @@ export function toOrderView(
     recipeId: row.recipeId,
     recipeName: recipeNames.get(row.recipeId) ?? null,
     quantity: row.quantity,
-    unitId: row.unitId,
-    unitName: unitNames.get(row.unitId) ?? null,
-    unitPrice: row.unitPrice,
     priority: row.priority,
     status: row.status,
     // R29: el motivo se devuelve en la ficha Y en el listado mientras el pedido este
@@ -59,8 +59,8 @@ export function toOrderView(
 
 /**
  * Ficha de un pedido (R42). Consultar TAMBIEN exige `requireAdmin` (decision cerrada 1): el
- * Operador ni siquiera lee, y el `requireAdmin` va antes de tocar el repositorio y los dos
- * catalogos (R2).
+ * Operador ni siquiera lee, y el `requireAdmin` va antes de tocar el repositorio y el catalogo
+ * de recetas (R2).
  */
 export function createGetOrder(
   deps: GetOrderDeps,
@@ -77,12 +77,7 @@ export function createGetOrder(
     if (row === null) throw new NotFoundError();
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId]);
-    const units = await deps.units.findRefs([row.unitId]);
 
-    return toOrderView(
-      row,
-      new Map(recipes.map((recipe) => [recipe.id, recipe.name])),
-      new Map(units.map((unit) => [unit.id, unit.name])),
-    );
+    return toOrderView(row, new Map(recipes.map((recipe) => [recipe.id, recipe.name])));
   };
 }

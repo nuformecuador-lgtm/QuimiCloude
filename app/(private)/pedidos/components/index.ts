@@ -37,8 +37,6 @@ export {
   ORDER_NUMBER_COLUMN_ID,
   QUANTITY_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
-  UNIT_NAME_COLUMN_ID,
-  UNIT_PRICE_COLUMN_ID,
   buildOrderColumns,
   type OrderColumnsDeps,
 } from './order-columns';
@@ -111,10 +109,3 @@ export {
   OrderStatusBadge,
 } from './order-status-badge';
 export { ORDER_TABLE_ID, ORDER_TABLE_TEXTS, OrderTable, type OrderTableProps } from './order-table';
-export {
-  UNIT_FIELD,
-  UNIT_OPTION_TESTID,
-  UNIT_SELECT_TESTID,
-  UnitSelect,
-  type UnitSelectProps,
-} from './unit-select';

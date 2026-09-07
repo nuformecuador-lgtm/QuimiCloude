@@ -22,7 +22,6 @@ import {
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitRef } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -64,7 +63,6 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 }));
 
 const RECETA = { id: '22222222-2222-4222-8222-222222222222', name: 'Esmalte azul' };
-const UNIDAD: UnitRef = { id: '33333333-3333-4333-8333-333333333333', name: 'Kilogramo', symbol: 'kg' };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 function pedido(status: OrderStatus): OrderSummary {
@@ -75,9 +73,6 @@ function pedido(status: OrderStatus): OrderSummary {
     recipeId: RECETA.id,
     recipeName: RECETA.name,
     quantity: '12.5000',
-    unitId: UNIDAD.id,
-    unitName: UNIDAD.name,
-    unitPrice: '0.1005',
     priority: 'MEDIA',
     status,
     cancellationReason: null,
@@ -104,7 +99,6 @@ function montarLista(status: OrderStatus = 'PENDIENTE') {
       params={PARAMS}
       totalPages={1}
       recipes={RECETAS}
-      units={[UNIDAD]}
     />,
   );
 }

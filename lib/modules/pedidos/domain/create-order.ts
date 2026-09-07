@@ -1,16 +1,10 @@
 import { requireAdmin, type Actor } from './actor';
-import {
-  DuplicateOrderNumberError,
-  RecipeNotFoundError,
-  UnitNotFoundError,
-  ValidationError,
-} from './errors';
+import { DuplicateOrderNumberError, RecipeNotFoundError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 
 import type { RecipeCatalog } from '@/lib/modules/recetas';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
@@ -31,10 +25,11 @@ const STATUS_DE_ALTA: EditableOrderStatus = ((status = DEFAULT_ORDER_STATUS) => 
 
 export type CreateOrderDeps = {
   readonly orders: OrderRepository;
-  /** Contrato PUBLICO de `recetas` (R15, R43): `pedidos` no consulta `prisma.recipe`. */
+  /** Contrato PUBLICO de `recetas` (R15, R43): `pedidos` no consulta `prisma.recipe`.
+   *
+   *  QC-35bis (2026-09-07): era el primero de DOS catalogos. El de `unidades` se fue con la
+   *  unidad del pedido, y con el la comprobacion de R16. */
   readonly recipes: RecipeCatalog;
-  /** Contrato PUBLICO de `unidades` (R16, R43). */
-  readonly units: UnitCatalog;
   /**
    * El reloj entra INYECTADO -mismo patron que `recetas` y `proveedores`- para que el test
    * lo pueda fijar sin tocar el reloj global. Aqui NO se lee `next/headers` ni ninguna
@@ -89,11 +84,6 @@ export function createCreateOrder(
     // R25 en `update-order.ts`).
     const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId]);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
-
-    // R16: `units` no tiene borrado logico (QC-32 decision 11), asi que «existe» y «esta
-    // vigente» son lo mismo y basta con que el id vuelva.
-    const [unit] = await deps.units.findRefs([data.unitId]);
-    if (unit === undefined) throw new UnitNotFoundError();
 
     const instant = now();
 

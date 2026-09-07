@@ -56,15 +56,12 @@ export class RecipeNotFoundError extends PedidosError {
   }
 }
 
-/** R16: la unidad esta ausente o no existe. `units` no tiene borrado logico (QC-32
- *  decision 11), asi que «existe» y «esta vigente» son lo mismo. */
-export class UnitNotFoundError extends PedidosError {
-  readonly code = 'unit_not_found';
-
-  constructor(message = 'La unidad indicada no existe.') {
-    super(message);
-  }
-}
+/*
+ * QC-35bis (2026-09-07): `UnitNotFoundError` (code `unit_not_found`) DESAPARECIO junto con la
+ * unidad del pedido. No queda ningun caso de uso que pueda emitirlo, asi que dejar la clase
+ * publicada seria ofrecer un codigo de error que nada produce -y que el traductor de la pantalla
+ * tendria que seguir mapeando por si acaso-.
+ */
 
 /** R21, R22: la transicion de estado pedida no esta permitida, o se intenta editar un
  *  pedido final (`ENTREGADO` o `CANCELADO`), que no admite ninguna edicion. */
