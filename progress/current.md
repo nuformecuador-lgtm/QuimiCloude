@@ -11,7 +11,7 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-35 | pantalla-de-pedidos | Pedidos | frontend | spec_ready | feature/QC-35-pantalla-de-pedidos | **esperando aprobacion humana del spec (F1.4)** — acotada y sembrada hoy, 49 requisitos y 17 tasks. Dos decisiones cerradas exigen tocar `components/shared/data-table/` (el componente de QC-55): esta en el comentario del issue |
+| QC-35 | pantalla-de-pedidos | Pedidos | frontend | in_progress | feature/QC-35-pantalla-de-pedidos | implementer (spec aprobado por el humano el 2026-09-07). Worktree sincronizado con `origin/dev` — venia 60 commits atras |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | done | feature/QC-44-pantalla-de-proveedores | **cerrada** (PR #35, merge `f966a7b`); la fila decía `in_progress` por descuido. Falta su resumen en `history.md` (F2.6) |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
@@ -284,6 +284,14 @@ Arrancada por decision humana explicita, y es la de mas rendimiento del tablero:
 - **F1.2 pendiente: hay que acotarla antes de lanzar `spec_author`.** No existe
   `specs/QC-48-tenant-en-la-sesion/requirements.md` y la ficha arrastra una pregunta abierta
   escrita en su propia description.
+- **ACOTADA con `/afinar-feature` el 2026-09-06.** Las nueve decisiones cerradas y la unica
+  pregunta abierta viven en `specs/QC-48-tenant-en-la-sesion/requirements.md`; no se copian aqui.
+  La acotacion toco el board dos veces: se reescribio la `description` de QC-48 (hablaba de
+  "membresia" y de una pregunta sin materia) y se creo **QC-69 — Alta de usuarios**, que
+  **se cancelo el mismo dia por duplicada**: la absorbe **QC-66 — crud-de-usuarios**, que la otra
+  sesion habia anadido a `feature_list.json` sin commitear despues de la ultima lectura del leader.
+  La regla que la motivo —el usuario nuevo hereda la empresa del administrador que lo crea— queda
+  comentada en QC-66.
 - **La pregunta abierta que hereda ya no se puede responder como esta escrita, y eso hay que
   resolverlo al acotar.** Dice: «si un usuario llega a tener mas de una membresia y todavia no hay
   selector, con cual inicia sesion». Pero **QC-47 se reacoto a una empresa por usuario**
@@ -1786,6 +1794,28 @@ no escribía una columna `NOT NULL` que la base ya exigía **con razón**.
   contra un `dev` viejo sin que nada lo diga, y el gate falla por un motivo que no tiene que ver
   con lo que se está haciendo. Ya pasó antes (ver «El worktree principal quedó fuera de `dev`»,
   2026-09-03): **es la segunda vez**. Candidata a `/afinar-regla`.
+
+- **Confirmado con la medición, ya con `dev` al día (2026-09-07):**
+  `prisma migrate diff --from-schema-datamodel --to-schema-datasource` **no reporta ni una columna**
+  de diferencia contra `QuimiCloude`, `products.name_normalized` incluida. Lo único que sigue
+  saliendo son **índices y claves foráneas** que viven en SQL crudo dentro de las migraciones y que
+  `db/schema.prisma` no declara: deriva estructural conocida, de otra naturaleza, y **no** el fallo
+  que rompía los diez archivos de integración. Que nadie la confunda con una regresión.
+
+### El commit `89e8589` lleva un mensaje que no le corresponde (2026-09-07)
+
+Segunda vez que pasa (la primera fue `7a3af59`, más abajo), y por la misma causa: **dos sesiones de
+leader escribiendo `progress/current.md` a la vez**. La sesión de QC-64 fue a añadir la medición de
+arriba, su edición **no aplicó** —el ancla que buscaba ya no existía, porque la otra sesión había
+reescrito el archivo—, y el `git add` que venía detrás commiteó **el trabajo sin commitear de la
+otra sesión** con el mensaje de la medición.
+
+- **Qué hay de verdad en `89e8589`:** la fila de QC-35 pasando a `spec_ready`, la de QC-48 recién
+  montada, y la retirada de las filas de QC-57 y QC-47. **Nada de eso lo escribió esa sesión.**
+- **No se reescribe la historia**: el commit se queda y esta nota es la corrección.
+- **La lección operativa:** encadenar `git add` a una edición que puede no aplicar es cómo se
+  commitea trabajo ajeno. Si la edición falla, el `add` no debe correr —y `git diff --stat` antes
+  del commit lo habría cazado en un segundo—.
 
 ### QC-57 y QC-47 están mergeadas y el board todavía no lo sabe (2026-09-06)
 
