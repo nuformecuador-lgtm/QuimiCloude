@@ -1,17 +1,6 @@
-import { UnauthorizedError } from './errors';
+import { assertAdminRole } from '@/lib/modules/identity';
 
-/**
- * Nombre del rol con permiso sobre la lectura del catalogo de unidades (`design.md > 9`,
- * pregunta 4 cerrada el 2026-09-03): solo Administrador.
- *
- * Propia de `unidades`, NO importada del barrel de `inventario`: ese import seria un
- * VALOR en ejecucion, y el centinela de `tests/unit/inventario/schema/inventario-schema.test.ts`
- * exige `import type` para todo uso del barrel de `inventario` fuera de
- * `lib/composition/`. `recetas` ya resolvio esto igual (`lib/modules/recetas/domain/actor.ts`):
- * es un cuarto literal del mismo rol, deuda consciente y de una linea, no abierta por esta
- * ficha.
- */
-export const ADMIN_ROLE_NAME = 'Administrador';
+import { UnauthorizedError } from './errors';
 
 /** Actor de entrada del caso de uso (R41): id y rol, nada mas. */
 export type Actor = {
@@ -21,14 +10,13 @@ export type Actor = {
 
 /**
  * Primera linea del caso de uso de listado (R41). Falla cerrado: actor ausente, rol nulo,
- * vacio o distinto de `ADMIN_ROLE_NAME` se rechazan igual, todos con el mismo error de
+ * vacio o distinto del rol Administrador se rechazan igual, todos con el mismo error de
  * autorizacion, y ANTES de tocar el repositorio.
  *
  * La comparacion es de igualdad exacta, sin `includes` ni normalizacion: un rol llamado
- * "Administradores externos" no debe colarse.
+ * "Administradores externos" no debe colarse. Delega en `assertAdminRole` de `identity`,
+ * que es la unica implementacion de la regla.
  */
 export function requireAdmin(actor: Actor | null | undefined): asserts actor is Actor {
-  if (!actor || actor.roleName !== ADMIN_ROLE_NAME) {
-    throw new UnauthorizedError();
-  }
+  assertAdminRole(actor, () => new UnauthorizedError());
 }

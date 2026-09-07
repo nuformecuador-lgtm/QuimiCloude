@@ -1,19 +1,11 @@
-// QC-22 T3 (corregido dos veces) — La lista concreta de reglas ruta→rol, como CABLEADO.
+// QC-22 T3 (corregido dos veces), QC-54 T8 — La lista concreta de reglas ruta→rol, como CABLEADO.
 //
-// **Vive en `lib/composition/` desde el 2026-09-03, por decision humana.** El recorrido, porque
-// las dos paradas anteriores explican por que esta es la buena:
-//   1. `identity/domain/`: imposible. Nombrar una ruta exige `INVENTORY_ROUTE` de
-//      `lib/shared/routes`, y el dominio no puede importar `lib/shared`
-//      (`docs/architecture.md > La regla de dependencias`).
-//   2. `identity/adapters/driving/`: apagaba `guard-arquitectura-modulos` pero encendia el
-//      centinela de `tests/unit/inventario/schema/inventario-schema.test.ts`, que exige que todo
-//      import del barrel de `inventario` hecho fuera de `lib/composition/` sea `import type`.
-//      `ADMIN_ROLE_NAME` es un VALOR en ejecucion, asi que `import type` no sirve, y las salidas
-//      alternativas —declarar `/inventario` como literal propio dentro de `identity`, o mudar
-//      `ADMIN_ROLE_NAME`— estan descartadas: las dos duplican una constante unica.
-//   3. `lib/composition/`: la capa de cableado del repo. La tabla de dependencias le permite
-//      importar barriles de modulos **como valor** y `lib/shared/**`, asi que el centinela queda
-//      satisfecho POR CONSTRUCCION y no por una exencion escrita a mano.
+// **Vive en `lib/composition/` desde el 2026-09-03, por decision humana.** El motivo que sigue
+// vigente: nombrar una ruta exige `INVENTORY_ROUTE` de `lib/shared/routes`, y el dominio de
+// `identity` no puede importar `lib/shared` (`docs/architecture.md > La regla de dependencias`).
+// El rol, en cambio, ya no exige nada de `lib/composition`: `identity/domain/roles.ts` es su
+// unica fuente y su barrel la publica (QC-54 T1), asi que este archivo la importa como cualquier
+// otro consumidor.
 //
 // Este archivo tiene que poder cargar en el BORDE: `middleware.ts` lo alcanza a traves de
 // `identity/adapters/driving/route-guard-middleware.ts`. Por eso no importa Prisma, ni
@@ -27,7 +19,7 @@
 // que se enseña una pantalla. La autorizacion sobre datos y operaciones se valida en el caso de
 // uso, antes del repositorio.
 
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import type { RouteRoleRule } from '@/lib/modules/identity';
 import { FORMULAS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
@@ -41,19 +33,18 @@ import { FORMULAS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/r
  * Toda ruta privada que NO case con ninguna fila sigue abierta a cualquier sesion valida, y eso
  * es el comportamiento especificado: cada ficha de modulo añade su fila, junto con su test.
  *
- * `ADMIN_ROLE_NAME` se toma del **barrel** de `inventario` —nunca por ruta profunda y nunca como
- * `import type`, porque es un valor que se evalua—: un tercer literal del mismo rol es justo la
- * deuda que `actor.ts` ya declaro. Y `INVENTORY_ROUTE` sale de `lib/shared/routes`, unica
- * constante de esa ruta en el repositorio: declarar aqui otra es como se acaba con `/dashboard` y
- * `/panel` conviviendo.
+ * `ROLE_ADMINISTRADOR` se toma del **barrel** de `identity` —nunca por ruta profunda—, que es su
+ * unica fuente (QC-54). Y `INVENTORY_ROUTE` sale de `lib/shared/routes`, unica constante de esa
+ * ruta en el repositorio: declarar aqui otra es como se acaba con `/dashboard` y `/panel`
+ * conviviendo.
  */
 export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
-  { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
-  { prefix: FORMULAS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+  { prefix: INVENTORY_ROUTE, roles: [ROLE_ADMINISTRADOR] },
+  { prefix: FORMULAS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
   // QC-44 R6 — la pantalla de proveedores, solo Administrador. UNA sola fila: la busqueda casa
   // por segmentos, asi que este prefijo cubre la lista y `/proveedores/<id>`. Reutiliza el
-  // `ADMIN_ROLE_NAME` que este archivo ya importa del barrel de `inventario`: un segundo import
+  // `ROLE_ADMINISTRADOR` que este archivo ya importa del barrel de `identity`: un segundo import
   // del mismo valor desde el barrel de `proveedores` seria la misma constante entrando dos veces
-  // por dos puertas, y un literal nuevo del rol es la deuda que `actor.ts` ya declaro.
-  { prefix: SUPPLIERS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+  // por dos puertas.
+  { prefix: SUPPLIERS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
 ];

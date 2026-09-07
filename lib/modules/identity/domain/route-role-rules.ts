@@ -15,12 +15,12 @@ export type RouteRoleRule = {
 
 // **La lista concreta de reglas NO vive aqui.** Vive en `lib/composition/route-role-rules.ts`,
 // porque para nombrar una ruta necesita `INVENTORY_ROUTE` de `lib/shared/routes` —y `domain/` no
-// puede importar `lib/shared` (`docs/architecture.md > La regla de dependencias`)— y para nombrar
-// el rol necesita `ADMIN_ROLE_NAME` del barrel de `inventario` **como valor**, que solo
-// `lib/composition` puede importar asi. QC-22 la puso aqui por un momento, y luego en
-// `adapters/driving/`, y cada parada encendio una guardia distinta: la lista es CABLEADO —que
-// ruta pide que rol—, no logica de negocio. Lo que si es dominio, y se queda, es el TIPO de
-// arriba y la BUSQUEDA de abajo, que se ejercitan sin Next, sin cookies y sin base (R20 de QC-9).
+// puede importar `lib/shared` (`docs/architecture.md > La regla de dependencias`)—. El rol ya no
+// es motivo: `ROLE_ADMINISTRADOR` sale de `identity/domain/roles.ts` y este mismo modulo lo
+// publica (QC-54). QC-22 puso la lista aqui por un momento, y luego en `adapters/driving/`, y
+// cada parada encendio una guardia distinta: la lista es CABLEADO —que ruta pide que rol—, no
+// logica de negocio. Lo que si es dominio, y se queda, es el TIPO de arriba y la BUSQUEDA de
+// abajo, que se ejercitan sin Next, sin cookies y sin base (R20 de QC-9).
 //
 // Consecuencia buscada: `findRouteRule` y `decideRouteAccess` reciben las reglas POR PARAMETRO,
 // asi que el dominio nunca lee una lista global y cada test declara las suyas.
