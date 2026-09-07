@@ -69,6 +69,28 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // recetas. Un `app/(private)/dashboard/recetas-algo.tsx` o un
     // `components/recipe-card.tsx` de manana -los dos sin ficha- ponen esto en rojo igual
     // que antes.
+    //
+    // AJUSTADO el 2026-09-07 (QC-35), y lo decide el HUMANO. La mitad de `app/` de este caso
+    // reconocia una «pantalla de recetas» POR EL NOMBRE del archivo, y eso declaraba
+    // violacion sin que nada estuviera mal en cuanto otra pantalla consumia el catalogo: lo
+    // disparo `recipe-picker.tsx`, el selector de receta de la pantalla de pedidos (QC-35
+    // R31), aprobado el 2026-09-06.
+    //
+    // El criterio que lo sustituye, con las palabras del humano: «pedidos tiene su propia
+    // ruta separada, con acceso solo para el administrador». Una PANTALLA se reconoce por
+    // tener RUTA PROPIA, no por llamarse de una manera. No hay lista blanca de rutas escrita
+    // a mano -envejeceria y habria que tocarla en cada ficha-: se deriva del arbol,
+    // preguntando si el archivo cuelga de una carpeta con su propio `page.tsx`. Y mover el
+    // selector bajo la carpeta de formulas quedaba descartado por el mismo motivo: seria
+    // poner un componente de pedidos bajo otra pantalla y otra superficie de permiso.
+    //
+    // Que sigue PROHIBIDO, y es lo que este caso protege de verdad:
+    //   * una SEGUNDA pantalla de recetas: ningun `page.tsx` ni `layout.tsx` fuera de esta
+    //     carpeta puede renderizar recetas;
+    //   * el goteo suelto: un archivo de recetas que no cuelgue de ninguna pantalla con ruta
+    //     propia -un `app/(private)/recetas-algo.tsx` de manana cae igual que antes-;
+    //   * y `components/` sigue con CERO menciones, sin aflojar: ahi no hay ruta ni ficha que
+    //     respalde nada, asi que es exactamente el goteo que R44 caza.
     const screenPattern = /recet|recipe/i
 
     // `FORMULAS_ROUTE` es '/produccion/formulas': la carpeta real cuelga de `app/(private)`
@@ -92,13 +114,64 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       true,
     )
 
-    const appMatches = matchingFiles(join(repoRoot, 'app'))
-    const fueraDeSuCarpeta = appMatches.filter(
-      (absolutePath) => relative(recipesRouteDir, absolutePath).startsWith(`..${sep}`),
-    )
+    const appDir = join(repoRoot, 'app')
+
+    /**
+     * La carpeta de la pantalla a la que pertenece el archivo, o `null` si no cuelga de
+     * ninguna. Es la condicion ESTRUCTURAL -«tener ruta propia»-, derivada del arbol: se sube
+     * desde el archivo hasta `app/` buscando el primer ancestro que declare su `page.tsx`.
+     */
+    function screenRootOf(file: string): string | null {
+      // `app/` NO cuenta como carpeta de pantalla, a proposito: un archivo suelto en la raiz
+      // o en un route group -`app/(private)/recetas-algo.tsx`- no cuelga de ninguna pantalla
+      // y no es routable, que es exactamente el goteo que este caso caza. Sin esta condicion,
+      // `app/page.tsx` haria pasar por «pantalla propia» a cualquier archivo del arbol.
+      let dir = dirname(file)
+      while (dir.startsWith(appDir) && dir !== appDir) {
+        if (existsSync(join(dir, 'page.tsx'))) return dir
+        dir = dirname(dir)
+      }
+      return null
+    }
+
+    /**
+     * Fuente SIN comentarios: lo que se vigila es el CODIGO, no la prosa. Sin esto, una
+     * pagina que solo menciona recetas en un comentario -«mismo criterio que la pagina de
+     * edicion de receta»- se leeria como una segunda pantalla. Mismo criterio que el `read`
+     * de `tests/unit/recetas/module-contract.test.ts`.
+     */
+    function codeOf(file: string): string {
+      return readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .split('\n')
+        .map((line) => line.replace(/\/\/.*$/, ''))
+        .join('\n')
+    }
+
+    // Una SEGUNDA pantalla de recetas sigue prohibida: se mira el `page.tsx`/`layout.tsx` de
+    // cualquier carpeta de `app/` fuera de la de formulas, por su ruta Y por su codigo.
+    const segundasPantallas = filesIn(appDir, /^(page|layout)\.tsx$/)
+      .filter((file) => relative(recipesRouteDir, file).startsWith(`..${sep}`))
+      .filter(
+        (file) =>
+          screenPattern.test(file.slice(appDir.length)) || screenPattern.test(codeOf(file)),
+      )
     expect(
-      fueraDeSuCarpeta,
-      `pantalla de recetas fuera de ${relative(repoRoot, recipesRouteDir)}/: ${fueraDeSuCarpeta.join(', ')}`,
+      segundasPantallas,
+      `segunda pantalla de recetas fuera de ${relative(repoRoot, recipesRouteDir)}/: ${segundasPantallas.join(', ')}`,
+    ).toEqual([])
+
+    // Y el goteo suelto: un archivo de recetas que no cuelgue de NINGUNA pantalla con ruta
+    // propia. El que si cuelga de una -el selector de receta de pedidos- esta permitido, y
+    // que solo consuma el contrato publico lo comprueba
+    // `tests/unit/recetas/module-contract.test.ts`.
+    const appMatches = matchingFiles(appDir)
+    const sinPantallaPropia = appMatches
+      .filter((absolutePath) => relative(recipesRouteDir, absolutePath).startsWith(`..${sep}`))
+      .filter((absolutePath) => screenRootOf(absolutePath) === null)
+    expect(
+      sinPantallaPropia,
+      `archivo de recetas que no cuelga de ninguna pantalla con ruta propia: ${sinPantallaPropia.join(', ')}`,
     ).toEqual([])
 
     const componentMatches = matchingFiles(join(repoRoot, 'components'))
