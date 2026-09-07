@@ -20,6 +20,21 @@ export type SessionUserRecord = {
    * fuera del sitio donde se puede testear con objetos planos (`design.md > 3.1`).
    */
   readonly companyDeletedAt: Date | null;
+  /**
+   * QC-74 (T8, R7, R11): los codigos de permiso del rol del usuario, tal y como estan HOY en
+   * `role_permissions`. Salen del MISMO `findFirst` que ya se hacia, por la relacion
+   * `Role.permissions`: ni una consulta adicional por peticion, que era la condicion de R11.
+   *
+   * `readonly string[]` y no `PermissionCode[]`: lo que hay en la base es texto y este puerto
+   * describe la base. Estrechar aqui a la union de literales seria mentir sobre una fila que
+   * pudo escribirse a mano. Quien compara —`assertPermission`— exige el codigo por pertenencia
+   * exacta, asi que un codigo desconocido simplemente no concede nada (R13).
+   *
+   * El adaptador NO normaliza, NO ordena y NO deduplica: la clave primaria compuesta de
+   * `role_permissions` ya garantiza que no hay repetidos, y reordenar aqui seria trabajo
+   * invisible en la ruta mas caliente de la aplicacion.
+   */
+  readonly permissions: readonly string[];
 };
 
 /**

@@ -71,6 +71,10 @@ export function createResolveSession(
         username: record.username,
         displayName: buildDisplayName(record.firstNames, record.lastNames, record.username),
         roleName: record.roleName,
+        // QC-74 R7, R11 — los permisos viajan TAL CUAL desde el record: sin normalizar, sin
+        // ordenar y sin deduplicar. Esta cadena decide si hay sesion, no que puede hacer quien
+        // la tiene; eso lo decide `assertPermission` en cada caso de uso.
+        permissions: record.permissions,
       },
       context: {
         userId: record.id,

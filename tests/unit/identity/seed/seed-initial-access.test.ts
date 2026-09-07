@@ -10,6 +10,7 @@
 import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
 import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
+import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import type { CredentialRule } from '@/lib/modules/identity/domain/credential-policy';
@@ -42,21 +43,32 @@ function crearRepositorioFalso(options: {
   usuariosVivosConAdministrador?: number;
   /** QC-47 R22: empresas VIVAS ya existentes, indexadas por su nombre normalizado. */
   empresasVivas?: ReadonlyMap<string, string>;
+  /** QC-74 R10: codigos del catalogo que ya estan en la base. */
+  permisosExistentes?: ReadonlySet<string>;
+  /** QC-74 R10: asignaciones ya existentes, codificadas `${roleId}|${permissionCode}`. */
+  asignacionesExistentes?: ReadonlySet<string>;
 } = {}): InitialAccessRepository & {
   readonly llamadas: LlamadaRegistrada[];
   /** Estado de `companies` tal como lo ve el doble, para poder afirmar QUE id se reutilizo. */
   readonly empresasVivas: ReadonlyMap<string, string>;
+  /** Estado de `permissions` y `role_permissions` tal como queda TRAS la corrida. */
+  readonly permisosExistentes: ReadonlySet<string>;
+  readonly asignacionesExistentes: ReadonlySet<string>;
 } {
   const llamadas: LlamadaRegistrada[] = [];
   const rolesExistentes = new Map(options.rolesExistentes ?? []);
   const usuariosVivosConAdministrador = options.usuariosVivosConAdministrador ?? 0;
   const empresasVivas = new Map(options.empresasVivas ?? []);
+  const permisosExistentes = new Set(options.permisosExistentes ?? []);
+  const asignacionesExistentes = new Set(options.asignacionesExistentes ?? []);
   let siguienteIdDeRol = rolesExistentes.size + 1;
   let siguienteIdDeEmpresa = empresasVivas.size + 1;
 
   return {
     llamadas,
     empresasVivas,
+    permisosExistentes,
+    asignacionesExistentes,
     async findRoleIdsByName(names) {
       llamadas.push({ metodo: 'findRoleIdsByName', args: [names] });
       const encontrados = new Map<string, string>();
@@ -87,6 +99,31 @@ function crearRepositorioFalso(options: {
       siguienteIdDeEmpresa += 1;
       empresasVivas.set(input.nameNormalized, id);
       return id;
+    },
+    async findExistingPermissionCodes(codes) {
+      llamadas.push({ metodo: 'findExistingPermissionCodes', args: [codes] });
+      const encontrados = new Set<string>();
+      for (const code of codes) {
+        if (permisosExistentes.has(code)) encontrados.add(code);
+      }
+      return encontrados;
+    },
+    async createPermissions(rows) {
+      llamadas.push({ metodo: 'createPermissions', args: [rows] });
+      for (const row of rows) permisosExistentes.add(row.code);
+    },
+    async findRolePermissionCodes(roleIds) {
+      llamadas.push({ metodo: 'findRolePermissionCodes', args: [roleIds] });
+      const encontrados = new Set<string>();
+      for (const clave of asignacionesExistentes) {
+        const roleId = clave.slice(0, clave.indexOf('|'));
+        if (roleIds.includes(roleId)) encontrados.add(clave);
+      }
+      return encontrados;
+    },
+    async createRolePermissions(pairs) {
+      llamadas.push({ metodo: 'createRolePermissions', args: [pairs] });
+      for (const pair of pairs) asignacionesExistentes.add(`${pair.roleId}|${pair.permissionCode}`);
     },
     async createInitialAdmin(input) {
       llamadas.push({ metodo: 'createInitialAdmin', args: [input] });
@@ -125,7 +162,11 @@ function llamadasDeEscritura(llamadas: readonly LlamadaRegistrada[]): readonly L
     (llamada) =>
       llamada.metodo === 'createRole' ||
       llamada.metodo === 'createCompany' ||
-      llamada.metodo === 'createInitialAdmin',
+      llamada.metodo === 'createInitialAdmin' ||
+      // QC-74: los dos metodos de escritura nuevos entran aqui a proposito, para que los
+      // casos que afirman «no se escribio nada» tambien los cubran.
+      llamada.metodo === 'createPermissions' ||
+      llamada.metodo === 'createRolePermissions',
   );
 }
 
@@ -135,6 +176,38 @@ function llamadasDeLectura(llamadas: readonly LlamadaRegistrada[]): readonly Lla
     (llamada) => llamada.metodo === 'findRoleIdsByName' || llamada.metodo === 'countLiveUsersWithRole',
   );
 }
+
+// ---------------------------------------------------------------------------------
+// QC-74 — estado de permisos «base ya sembrada», derivado SIEMPRE del catalogo real y de
+// `SEED_ROLE_PERMISSIONS`, nunca de una lista escrita a mano en este archivo.
+// ---------------------------------------------------------------------------------
+
+/** Ids de rol estables para los dos roles del seed, los que usan los casos «ya sembrada». */
+const ROLES_YA_SEMBRADOS: ReadonlyMap<string, string> = new Map(
+  SEED_ROLES.map((role, index) => [role.name, `rol-${index}`]),
+);
+
+/** Los diez codigos del catalogo, tal y como los veria una base ya sembrada. */
+const TODOS_LOS_CODIGOS_DEL_CATALOGO: ReadonlySet<string> = new Set(
+  PERMISSIONS.map((permission) => permission.code),
+);
+
+/** Las asignaciones del seed para unos ids de rol dados, en la codificacion del puerto. */
+function asignacionesDelSeed(rolesPorNombre: ReadonlyMap<string, string>): ReadonlySet<string> {
+  const pares = new Set<string>();
+  for (const [roleName, codes] of Object.entries(SEED_ROLE_PERMISSIONS)) {
+    const roleId = rolesPorNombre.get(roleName);
+    if (roleId === undefined) continue;
+    for (const code of codes) pares.add(`${roleId}|${code}`);
+  }
+  return pares;
+}
+
+/** Numero total de asignaciones que el seed tiene que dejar (hoy: diez + una = once). */
+const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
+  (total, codes) => total + codes.length,
+  0,
+);
 
 describe('seedInitialAccess', () => {
   // Caso 9: `console.log`/`console.error` se capturan durante TODOS los casos, y al
@@ -266,8 +339,13 @@ describe('seedInitialAccess', () => {
   // Caso 5 (R12)
   it('si ya existe un administrador vivo, el proveedor de credenciales no se invoca ni una vez', async () => {
     const repository = crearRepositorioFalso({
-      rolesExistentes: new Map(SEED_ROLES.map((role, index) => [role.name, `rol-${index}`])),
+      rolesExistentes: ROLES_YA_SEMBRADOS,
       usuariosVivosConAdministrador: 1,
+      // QC-74: «base ya sembrada» incluye ahora el catalogo y sus asignaciones. Sin esto,
+      // el seed crearia los permisos que faltan y estos casos dejarian de describir una
+      // instalacion completa.
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
     });
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -288,8 +366,13 @@ describe('seedInitialAccess', () => {
   // Caso 6 (R15)
   it('si el admin ya existe con hash y marca distintos, no hay ninguna llamada de escritura ni de actualizacion', async () => {
     const repository = crearRepositorioFalso({
-      rolesExistentes: new Map(SEED_ROLES.map((role, index) => [role.name, `rol-${index}`])),
+      rolesExistentes: ROLES_YA_SEMBRADOS,
       usuariosVivosConAdministrador: 1,
+      // QC-74: «base ya sembrada» incluye ahora el catalogo y sus asignaciones. Sin esto,
+      // el seed crearia los permisos que faltan y estos casos dejarian de describir una
+      // instalacion completa.
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
     });
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -302,7 +385,13 @@ describe('seedInitialAccess', () => {
     // El puerto no tiene ningun metodo de actualizacion que pudiera haberse llamado.
     expect(
       repository.llamadas.every(
-        (llamada) => llamada.metodo === 'findRoleIdsByName' || llamada.metodo === 'countLiveUsersWithRole',
+        (llamada) =>
+          llamada.metodo === 'findRoleIdsByName' ||
+          llamada.metodo === 'countLiveUsersWithRole' ||
+          // QC-74: las dos lecturas del paso de permisos. Son lecturas, no escrituras: el
+          // puerto sigue sin exponer ningun `update` ni `upsert`.
+          llamada.metodo === 'findExistingPermissionCodes' ||
+          llamada.metodo === 'findRolePermissionCodes',
       ),
     ).toBe(true);
   });
@@ -515,8 +604,13 @@ describe('seedInitialAccess', () => {
   // Caso 12 (QC-47 R22)
   it('sobre una base que ya tiene acceso inicial no toca companies NI PARA LEER', async () => {
     const repository = crearRepositorioFalso({
-      rolesExistentes: new Map(SEED_ROLES.map((role, index) => [role.name, `rol-${index}`])),
+      rolesExistentes: ROLES_YA_SEMBRADOS,
       usuariosVivosConAdministrador: 1,
+      // QC-74: «base ya sembrada» incluye ahora el catalogo y sus asignaciones. Sin esto,
+      // el seed crearia los permisos que faltan y estos casos dejarian de describir una
+      // instalacion completa.
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
       empresasVivas: new Map([[NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL, 'empresa-preexistente']]),
     });
     const passwordHasher = crearHasherFalso();
@@ -542,8 +636,13 @@ describe('seedInitialAccess', () => {
     // nombre devuelve 0. Si el dominio preguntara por otro rol, veria 0, creeria que
     // falta el administrador y lo crearia: eso es lo que hace caer este caso.
     const repository = crearRepositorioFalso({
-      rolesExistentes: new Map(SEED_ROLES.map((role, index) => [role.name, `rol-${index}`])),
+      rolesExistentes: ROLES_YA_SEMBRADOS,
       usuariosVivosConAdministrador: 1,
+      // QC-74: «base ya sembrada» incluye ahora el catalogo y sus asignaciones. Sin esto,
+      // el seed crearia los permisos que faltan y estos casos dejarian de describir una
+      // instalacion completa.
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
     });
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -574,6 +673,198 @@ describe('seedInitialAccess', () => {
       checkCredentialPolicy: crearPoliticaFalsa(),
     });
     expect(otroDesenlace.createdAdmin).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------------
+  // QC-74 (T6). El paso de permisos. Mismo orden que el resto del archivo: PRIMERO se
+  // afirma que algo ocurrio, y solo despues que el resto no ocurrio.
+  //
+  // CONVENCION DE ESTOS CASOS: cuando no hay nada que crear, el dominio NO llama a
+  // `createPermissions` ni a `createRolePermissions` — ni siquiera con un array vacio. Se
+  // elige asi (y se afirma asi) porque una escritura con cero filas sigue siendo un viaje
+  // a la base en cada arranque, y porque «no se llamo» es una afirmacion mas fuerte que
+  // «se llamo con nada».
+  // ---------------------------------------------------------------------------------
+
+  // Caso 14 (QC-74 R8, R9, R10)
+  it('sobre una base vacia crea los diez permisos del catalogo y las once asignaciones del seed', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    // Primero: el catalogo SI se creo, entero y derivado de `PERMISSIONS`.
+    const creacionesDePermisos = repository.llamadas.filter((llamada) => llamada.metodo === 'createPermissions');
+    expect(creacionesDePermisos).toHaveLength(1);
+    const filasCreadas = creacionesDePermisos[0]?.args[0] as readonly {
+      code: string;
+      module: string;
+      action: string;
+      description: string;
+    }[];
+    expect(filasCreadas.map((fila) => fila.code)).toEqual(PERMISSIONS.map((permission) => permission.code));
+    expect(filasCreadas).toEqual(
+      PERMISSIONS.map((permission) => ({
+        code: permission.code,
+        module: permission.module,
+        action: permission.action,
+        description: permission.description,
+      })),
+    );
+    expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
+
+    // Luego: las asignaciones, las once (diez del Administrador + una del Operador).
+    const creacionesDeAsignaciones = repository.llamadas.filter(
+      (llamada) => llamada.metodo === 'createRolePermissions',
+    );
+    expect(creacionesDeAsignaciones).toHaveLength(1);
+    const paresCreados = creacionesDeAsignaciones[0]?.args[0] as readonly {
+      roleId: string;
+      permissionCode: string;
+    }[];
+    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(11);
+    expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+    expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+
+    // Y cada rol recibio EXACTAMENTE los codigos que declara `SEED_ROLE_PERMISSIONS`, con
+    // el id que el doble le dio al crearlo: nada de ids escritos a mano.
+    const rolesCreados = new Map(
+      repository.llamadas
+        .filter((llamada) => llamada.metodo === 'createRole')
+        .map((llamada, index) => [(llamada.args[0] as { name: string }).name, `rol-${index + 1}`]),
+    );
+    expect(new Set(paresCreados.map((par) => `${par.roleId}|${par.permissionCode}`))).toEqual(
+      new Set(asignacionesDelSeed(rolesCreados)),
+    );
+    const codigosDelAdministrador = paresCreados
+      .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
+      .map((par) => par.permissionCode);
+    expect(codigosDelAdministrador).toHaveLength(10);
+    expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
+    expect(
+      paresCreados
+        .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
+        .map((par) => par.permissionCode),
+    ).toEqual(['inventario.consultar']);
+
+    // Y el orden del algoritmo: los roles ANTES que los permisos, y los permisos ANTES
+    // que el administrador (`design.md > 3`). Sin ese orden, una asignacion no tendria
+    // id de rol al que colgarse.
+    const indiceDe = (metodo: string): number =>
+      repository.llamadas.findIndex((llamada) => llamada.metodo === metodo);
+    expect(indiceDe('createRole')).toBeLessThan(indiceDe('createPermissions'));
+    expect(indiceDe('createPermissions')).toBeLessThan(indiceDe('createRolePermissions'));
+    expect(indiceDe('createRolePermissions')).toBeLessThan(indiceDe('createInitialAdmin'));
+  });
+
+  // Caso 15 (QC-74 R10)
+  it('sobre una base ya sembrada la segunda corrida no crea ningun permiso ni ninguna asignacion', async () => {
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
+    });
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    // Primero: las dos LECTURAS del paso de permisos si ocurrieron, y con el catalogo
+    // real y los ids de los dos roles sembrados. Sin esto, un doble mal cableado que
+    // nunca se llama pasaria en verde.
+    const lecturasDelCatalogo = repository.llamadas.filter(
+      (llamada) => llamada.metodo === 'findExistingPermissionCodes',
+    );
+    expect(lecturasDelCatalogo).toHaveLength(1);
+    expect(lecturasDelCatalogo[0]?.args[0]).toEqual(PERMISSIONS.map((permission) => permission.code));
+    const lecturasDeAsignaciones = repository.llamadas.filter(
+      (llamada) => llamada.metodo === 'findRolePermissionCodes',
+    );
+    expect(lecturasDeAsignaciones).toHaveLength(1);
+    expect(new Set(lecturasDeAsignaciones[0]?.args[0] as readonly string[])).toEqual(
+      new Set([...ROLES_YA_SEMBRADOS.values()]),
+    );
+
+    // Luego: ni una escritura. Los dos metodos NO se llamaron (ver la convencion de arriba).
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createPermissions')).toEqual([]);
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createRolePermissions')).toEqual([]);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+    expect(outcome.createdPermissions).toEqual([]);
+    expect(outcome.createdRolePermissions).toBe(0);
+
+    // Y el estado que ve el doble es exactamente el de antes: mismo conteo, mismas filas.
+    expect(repository.permisosExistentes.size).toBe(PERMISSIONS.length);
+    expect(repository.asignacionesExistentes.size).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+  });
+
+  // Caso 16 (QC-74 R10)
+  it('una asignacion que ya existe no se vuelve a crear ni se duplica: solo se crean las que faltan', async () => {
+    const asignacionPreexistente = `${ROLES_YA_SEMBRADOS.get(ROLE_OPERADOR) ?? ''}|inventario.consultar`;
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: new Set([asignacionPreexistente]),
+    });
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    // Primero: SI se crearon las que faltaban — las diez del Administrador.
+    const creaciones = repository.llamadas.filter((llamada) => llamada.metodo === 'createRolePermissions');
+    expect(creaciones).toHaveLength(1);
+    const paresCreados = creaciones[0]?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED - 1);
+    expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED - 1);
+
+    // Luego: la preexistente NO viajo en esa creacion y no quedo duplicada.
+    expect(paresCreados.map((par) => `${par.roleId}|${par.permissionCode}`)).not.toContain(
+      asignacionPreexistente,
+    );
+    expect(repository.asignacionesExistentes.size).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+    expect(new Set(repository.asignacionesExistentes)).toEqual(new Set(asignacionesDelSeed(ROLES_YA_SEMBRADOS)));
+
+    // Y el catalogo, que estaba completo, no se toco (R10, R5: no hay `upsert`).
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createPermissions')).toEqual([]);
+    expect(outcome.createdPermissions).toEqual([]);
+  });
+
+  // Caso 17 (QC-74 R10) — el reporte, cuando falta solo una parte del catalogo.
+  it('SeedOutcome nombra exactamente los permisos creados y cuenta exactamente las asignaciones creadas', async () => {
+    const codigoQueFalta = 'pedidos.modificar';
+    const yaExistentes = PERMISSIONS.map((permission) => permission.code).filter(
+      (code) => code !== codigoQueFalta,
+    );
+    const asignacionesCompletas = [...asignacionesDelSeed(ROLES_YA_SEMBRADOS)];
+    const asignacionQueFalta = `${ROLES_YA_SEMBRADOS.get(ROLE_ADMINISTRADOR) ?? ''}|${codigoQueFalta}`;
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      permisosExistentes: new Set(yaExistentes),
+      asignacionesExistentes: new Set(
+        asignacionesCompletas.filter((asignacion) => asignacion !== asignacionQueFalta),
+      ),
+    });
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    // Primero: se creo lo que faltaba, y solo eso.
+    expect(outcome.createdPermissions).toEqual([codigoQueFalta]);
+    expect(outcome.createdRolePermissions).toBe(1);
+
+    // Luego: el estado final es el completo, sin duplicados ni filas de mas.
+    expect(repository.permisosExistentes.size).toBe(PERMISSIONS.length);
+    expect(repository.asignacionesExistentes.size).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+    expect(new Set(repository.asignacionesExistentes)).toEqual(new Set(asignacionesCompletas));
   });
 
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos

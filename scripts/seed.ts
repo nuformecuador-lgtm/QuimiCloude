@@ -36,7 +36,14 @@ async function main(): Promise<void> {
     const { identity } = await import('../lib/composition')
     const outcome = await identity.seedInitialAccess()
 
-    if (outcome.createdRoles.length > 0 || outcome.createdAdmin || outcome.createdCompany !== null) {
+    const creoAlgo =
+      outcome.createdRoles.length > 0 ||
+      outcome.createdAdmin ||
+      outcome.createdCompany !== null ||
+      outcome.createdPermissions.length > 0 ||
+      outcome.createdRolePermissions > 0
+
+    if (creoAlgo) {
       const roles =
         outcome.createdRoles.length > 0
           ? `roles creados: ${outcome.createdRoles.length} (${outcome.createdRoles.join(', ')})`
@@ -48,7 +55,15 @@ async function main(): Promise<void> {
           ? `empresa inicial: creada (${outcome.createdCompany})`
           : 'empresa inicial: ya existia'
       const admin = outcome.createdAdmin ? 'usuario inicial: creado' : 'usuario inicial: ya existia'
-      console.log(`db:seed: ${roles} - ${empresa} - ${admin}`)
+      // QC-74: los permisos creados se NOMBRAN (son codigos publicos del catalogo, no un
+      // secreto) y las asignaciones se cuentan, que es lo unico que dice algo util de
+      // ellas en una linea.
+      const permisos =
+        outcome.createdPermissions.length > 0
+          ? `permisos creados: ${outcome.createdPermissions.length} (${outcome.createdPermissions.join(', ')})`
+          : 'permisos creados: 0'
+      const asignaciones = `asignaciones permiso-rol creadas: ${outcome.createdRolePermissions}`
+      console.log(`db:seed: ${roles} - ${permisos} - ${asignaciones} - ${empresa} - ${admin}`)
     } else {
       console.log('db:seed: nada que crear')
     }

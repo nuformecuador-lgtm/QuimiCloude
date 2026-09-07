@@ -7,6 +7,10 @@
 // —que le anadio dos cortes mas, empresa que no casa y empresa muerta— porque esta ficha necesita
 // DOS proyecciones de la misma politica y dos copias serian dos definiciones de «hay sesion»
 // (R21). Este archivo se queda con lo que siempre fue su contrato: la proyeccion de usuario.
+//
+// QC-74 (T8, R7, R11): el `SessionUser` que sale de aqui lleva ya `permissions`, porque la
+// proyeccion los compone en `resolve-session.ts` a partir del MISMO record de la unica consulta.
+// Este archivo no toca el array: lo pasa tal cual, sin normalizar ni reordenar.
 
 import { createResolveSession } from './resolve-session';
 

@@ -49,14 +49,14 @@
 
 ## Bloque C — seed
 
-- [ ] **T5. Puerto y adaptador del seed de permisos.** Depende de T3.
+- [x] **T5. Puerto y adaptador del seed de permisos.** Depende de T3.
       Archivos: `lib/modules/identity/ports/initial-access-repository.ts`,
       `lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts`.
       Cuatro metodos nuevos: `findExistingPermissionCodes`, `createPermissions`,
       `findRolePermissionCodes`, `createRolePermissions`. Sin `upsert` y sin `update`.
       **Hecho cuando**: typecheck verde y la integracion de T7 los ejercita.
 
-- [ ] **T6. El paso de permisos dentro de `seedInitialAccess`.** Depende de T1, T5.
+- [x] **T6. El paso de permisos dentro de `seedInitialAccess`.** Depende de T1, T5.
       Archivos: `lib/modules/identity/domain/seed-initial-access.ts`.
       Entre crear roles y crear el administrador; crea solo lo que falta; `SeedOutcome` gana
       `createdPermissions` y `createdRolePermissions`.
@@ -64,7 +64,7 @@
       dobles: base vacia crea los diez permisos y las once asignaciones; segunda corrida no crea
       nada; una asignacion preexistente no se toca ni se duplica (R10).
 
-- [ ] **T7. Resumen del seed y verificacion contra base real.** Depende de T6.
+- [x] **T7. Resumen del seed y verificacion contra base real.** Depende de T6.
       Archivos: `scripts/seed.ts`, `tests/integration/identity/identity-seed.int.test.ts`.
       **Hecho cuando**: la integracion comprueba, contra la base de test, que tras el seed el
       Administrador tiene los diez permisos y el Operador exactamente `inventario.consultar` (R8, R9,
@@ -72,7 +72,7 @@
 
 ## Bloque D — el conjunto de permisos llega al servicio
 
-- [ ] **T8. La sesion trae los permisos.** Depende de T3.
+- [x] **T8. La sesion trae los permisos.** Depende de T3.
       Archivos: `lib/modules/identity/ports/session-user-reader.ts`,
       `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts`,
       `lib/modules/identity/domain/session-user.ts`,
@@ -149,7 +149,7 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
 
 ## Bloque G — guardias (`[P]` entre si)
 
-- [ ] **T15. [P] Guardia: ningun permiso declarado sin rol.** Depende de T1.
+- [x] **T15. [P] Guardia: ningun permiso declarado sin rol.** Depende de T1.
       Archivos: `tests/guards/guard-permisos-sembrados.test.ts` (nuevo).
       **Hecho cuando**: falla en rojo con un catalogo sintetico que declara un permiso sin asignar,
       pasa con el real, comprueba tambien el sentido inverso, y tiene las anclas contra el verde por

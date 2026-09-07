@@ -30,6 +30,17 @@ import type { SessionUserRecord } from '../../../ports/session-user-reader';
  * en la ruta mas caliente de la aplicacion, que ya hacia otro `JOIN` por `users_role_id_idx`—;
  * (b) el `select` deja de ser tan estrecho: sale de la base una marca de tiempo mas, que **no es
  * PII** y no se registra en ningun log.
+ *
+ * QC-74 (T8, R7, R11, `design.md > 4`): el `select` gana `role.permissions`, otra vez en ESTA
+ * MISMA llamada a `findFirst`. Prisma lo resuelve por la relacion `Role.permissions`, o sea por
+ * la clave primaria compuesta `(role_id, permission_code)` de `role_permissions`, que hoy
+ * devuelve como maximo diez filas. **Ni una consulta adicional por peticion** (R11), que era la
+ * condicion; el test `trae los permisos del rol sin una segunda consulta` la vigila con un
+ * contador de invocaciones.
+ *
+ * El mapeo es un `map` a los codigos y nada mas: sin normalizar, sin ordenar y sin deduplicar.
+ * La comparacion de `assertPermission` es por pertenencia exacta (R13), asi que cualquier
+ * cocina aqui solo podria cambiar el resultado, nunca mejorarlo.
  */
 export async function findActiveSessionUserById(id: string): Promise<SessionUserRecord | null> {
   const usuario = await prisma.user.findFirst({
@@ -39,7 +50,7 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
       username: true,
       firstNames: true,
       lastNames: true,
-      role: { select: { name: true } },
+      role: { select: { name: true, permissions: { select: { permissionCode: true } } } },
       companyId: true,
       company: { select: { deletedAt: true } },
     },
@@ -56,5 +67,7 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
     companyId: usuario.companyId,
     // QC-48 R15: la marca cruda. Quien decide si «esta viva» es el dominio, no este adaptador.
     companyDeletedAt: usuario.company.deletedAt,
+    // QC-74 R7: los permisos salen de la ASIGNACION rol-permiso, nunca del nombre del rol.
+    permissions: usuario.role.permissions.map((asignacion) => asignacion.permissionCode),
   };
 }

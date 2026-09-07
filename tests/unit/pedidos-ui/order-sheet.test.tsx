@@ -56,6 +56,8 @@ const USUARIO_DEL_TEST: SessionUser = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Administrador',
+  // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
+  permissions: [],
 };
 
 const {

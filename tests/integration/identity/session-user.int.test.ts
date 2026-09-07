@@ -17,6 +17,12 @@
  * `findFirst`: la condicion de `design.md > 4.1` era «cero consultas nuevas por peticion», no
  * «un JOIN mas y ya veremos».
  *
+ * QC-74 (T8, R7, R11) — el mismo `select` trae ademas los permisos del rol, por la relacion
+ * `Role.permissions`. Se afirma aqui, contra Postgres, que salen de verdad y que salen en UNA
+ * SOLA llamada a `findFirst`: la condicion de `design.md > 4` era «ni una consulta adicional por
+ * peticion». El fixture crea su PROPIO catalogo efimero (`qc74-<uuid>`) y no toca el catalogo
+ * real: `permissions.code` es clave primaria global, igual que `companies_name_unique`.
+ *
  * EL ROL NO SE MUEVE (R13, R14): sigue saliendo de `users.role_id`, en el mismo `select` y sin
  * ninguna consulta adicional. El caso «el rol cambiado entre dos lecturas devuelve el nuevo»
  * ya lo demuestra, y esta ficha lo deja intacto a proposito.
@@ -38,6 +44,10 @@ let usuarioId = '';
 let rolId = '';
 let rolAlternativoId = '';
 let empresaId = '';
+/** QC-74: catalogo efimero de este fixture. `module` es irrepetible por el `@@unique`. */
+const moduloDePrueba = `qc74-${sufijo}`;
+const CODIGO_CONSULTAR = `${moduloDePrueba}.consultar`;
+const CODIGO_MODIFICAR = `${moduloDePrueba}.modificar`;
 
 beforeAll(async () => {
   const rol = await prisma.role.create({
@@ -76,12 +86,45 @@ beforeAll(async () => {
     select: { id: true },
   });
   usuarioId = usuario.id;
+
+  // QC-74 T8: dos permisos propios del fixture, asignados SOLO al rol principal. El rol
+  // alternativo se queda sin ninguno a proposito: es el caso «rol sin asignaciones» -> `[]`.
+  await prisma.permission.createMany({
+    data: [
+      {
+        code: CODIGO_CONSULTAR,
+        module: moduloDePrueba,
+        action: 'consultar',
+        description: 'Permiso de prueba de QC-74',
+      },
+      {
+        code: CODIGO_MODIFICAR,
+        module: moduloDePrueba,
+        action: 'modificar',
+        description: 'Permiso de prueba de QC-74',
+      },
+    ],
+  });
+  await prisma.rolePermission.createMany({
+    data: [
+      { roleId: rolId, permissionCode: CODIGO_CONSULTAR },
+      { roleId: rolId, permissionCode: CODIGO_MODIFICAR },
+    ],
+  });
 }, 30_000);
 
 afterAll(async () => {
   try {
     await prisma.user.deleteMany({ where: { id: usuarioId } });
   } finally {
+    // QC-74: primero las asignaciones y luego el catalogo; las dos FKs son `ON DELETE RESTRICT`,
+    // asi que borrar el rol antes que su `role_permissions` reventaria.
+    await prisma.rolePermission.deleteMany({
+      where: { permissionCode: { in: [CODIGO_CONSULTAR, CODIGO_MODIFICAR] } },
+    });
+    await prisma.permission.deleteMany({
+      where: { code: { in: [CODIGO_CONSULTAR, CODIGO_MODIFICAR] } },
+    });
     // QC-47: el orden es `users -> companies`; la FK hacia la empresa es `ON DELETE RESTRICT`.
     await prisma.role.deleteMany({ where: { id: { in: [rolId, rolAlternativoId] } } });
     await prisma.company.deleteMany({ where: { id: empresaId } });
@@ -103,7 +146,47 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       // QC-48 R13: la empresa de la ficha y su estado, en la misma fila.
       companyId: empresaId,
       companyDeletedAt: null,
+      // QC-74 R7: los permisos del rol, en la misma fila. `arrayContaining` porque la consulta
+      // no lleva `orderBy` —el adaptador no ordena a proposito— y el orden de `role_permissions`
+      // lo decide Postgres; el `toHaveLength` de abajo cierra la puerta a que sobre alguno.
+      permissions: expect.arrayContaining([CODIGO_CONSULTAR, CODIGO_MODIFICAR]),
     });
+    expect(resultado?.permissions).toHaveLength(2);
+  });
+
+  // QC-74 R7 — los permisos salen de la ASIGNACION, no del nombre del rol: el rol alternativo
+  // existe, tiene nombre, y no tiene ninguna fila en `role_permissions`.
+  it('un rol sin asignaciones devuelve permissions vacio', async () => {
+    await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolAlternativoId } });
+
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId);
+
+      expect(resultado?.roleName).toBe(`qc8-session-alt-${sufijo}`);
+      expect(resultado?.permissions).toEqual([]);
+    } finally {
+      await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolId } });
+    }
+  });
+
+  // QC-74 R11 — la condicion dura de `design.md > 4`: los permisos salen del MISMO `findFirst`.
+  // Se cuenta la unica via tipada que podria haber servido para una segunda ida a la base
+  // (`prisma.rolePermission.findMany`) ademas del contador de `findFirst`: si alguien resolviera
+  // los permisos aparte, uno de los dos contadores lo delata.
+  it('trae los permisos del rol sin una segunda consulta', async () => {
+    const espiaUsuario = vi.spyOn(prisma.user, 'findFirst');
+    const espiaAsignaciones = vi.spyOn(prisma.rolePermission, 'findMany');
+
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId);
+
+      expect(resultado?.permissions).toHaveLength(2);
+      expect(espiaUsuario).toHaveBeenCalledTimes(1);
+      expect(espiaAsignaciones).not.toHaveBeenCalled();
+    } finally {
+      espiaUsuario.mockRestore();
+      espiaAsignaciones.mockRestore();
+    }
   });
 
   it('un usuario con deleted_at con valor devuelve null', async () => {
