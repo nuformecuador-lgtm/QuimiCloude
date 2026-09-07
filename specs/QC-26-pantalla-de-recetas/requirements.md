@@ -169,6 +169,15 @@ más de los que caben en una consulta, pasando de página **dentro del propio se
 al backend el mayor tamaño de página que soporta; NO DEBE filtrar ni buscar en el cliente sobre los
 productos ya descargados.
 
+> **Enmienda del 2026-09-07 (decisión humana).** Lo que R28 exige —alcanzar cualquier producto sin
+> filtrar en cliente, con el mayor tamaño de página— NO cambia. Cambia CÓMO se pasa de página
+> dentro del selector: ya no son los controles «Anterior»/«Siguiente» con su indicador, sino la
+> **carga por scroll**, que anexa la página siguiente al llegar al final de la lista. El selector
+> pasó a componerse con `components/ui/autocomplete.tsx` (primitivos de `@base-ui/react`, sin
+> dependencia nueva) y el hook `hooks/use-async-paginated-options.ts`. Los `data-testid` `-prev`,
+> `-next` y `-page-indicator` desaparecieron; el test de R28 y los dos helpers de E2E se
+> reescribieron con el gesto nuevo.
+
 **R29** — La cantidad de cada línea DEBE viajar a la operación como **cadena decimal** tal como la
 capturó el formulario, y el sistema NO DEBE convertirla a número de coma flotante en ningún punto
 del camino, ni siquiera de forma intermedia a través de un control que la reconvierta.

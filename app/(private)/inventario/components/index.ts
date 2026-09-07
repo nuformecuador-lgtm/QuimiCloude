@@ -10,27 +10,49 @@ export { DeleteProductDialog } from './delete-product-dialog';
 // ruta lo siga consumiendo por su barrel, sin cambiar ni un consumidor.
 export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 export {
+  ACTIONS_COLUMN_ID,
+  ACTIONS_COLUMN_LABEL,
   EMPTY_CELL,
-  PRODUCT_COLUMNS,
+  IMAGE_COLUMN_ID,
+  IMAGE_COLUMN_LABEL,
+  PRODUCT_DEFAULT_PINNED_COLUMNS,
+  buildProductColumns,
   type ProductColumn,
-  type ProductColumnKey,
+  type ProductColumnId,
+  type ProductColumnsDeps,
 } from './product-columns';
+export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { ProductField } from './product-field';
 export { ProductForm } from './product-form';
 export { ProductListEmpty } from './product-list-empty';
 export { ProductListError } from './product-list-error';
 export {
+  FIRST_PAGE,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
+  QTY_ALERT_COLUMN_ID,
+  QTY_ALERT_MAX_PARAM,
+  QTY_ALERT_MIN_PARAM,
+  SEARCH_PARAM,
+  SHARED_PAGE_SIZES,
+  SORT_PARAM,
+  SORT_SEPARATOR,
+  STOCK_COLUMN_ID,
+  STOCK_MAX_PARAM,
+  STOCK_MIN_PARAM,
   buildProductListQuery,
   parseProductListParams,
-  type ProductListParams,
+  productListHref,
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
 export { ProductListSection } from './product-list-section';
-export { ProductListToolbar } from './product-list-toolbar';
 export { ProductSheet } from './product-sheet';
-export { ACTIONS_COLUMN_LABEL, ProductTable } from './product-table';
+export {
+  PRODUCT_TABLE_ID,
+  PRODUCT_TABLE_TEXTS,
+  ProductTable,
+  type ProductTableProps,
+} from './product-table';
 export { ProductTableSkeleton } from './product-table-skeleton';

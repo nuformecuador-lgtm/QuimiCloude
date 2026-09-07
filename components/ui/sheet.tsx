@@ -7,8 +7,43 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
-function Sheet({ ...props }: SheetPrimitive.Root.Props) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+/**
+ * El panel se cierra por «Cancelar» o por la X -ambas razon `close-press`- y, por defecto, por
+ * nada mas: un click fuera o un Escape sobre un panel con `isForm` tira un formulario a medio
+ * llenar de un gesto que el usuario no queria.
+ *
+ * Son DOS ejes distintos y por eso son dos props. El click fuera lo frena el propio primitivo con
+ * `disablePointerDismissal`; el Escape hay que cancelarlo aqui, y hacerlo se aparta a conciencia
+ * de WAI-ARIA -que espera que Escape cierre un dialogo modal-: se acepta en un panel de formulario
+ * porque siempre ofrece dos salidas visibles y enfocables.
+ *
+ * Un panel SIN formulario detras no gana nada con esto y pierde: el cajon de navegacion movil de
+ * `components/ui/sidebar.tsx` monta un `Sheet` y debe cerrarse tocando el velo o con Escape. Ese
+ * caso desactiva ambas guardas.
+ */
+function Sheet({
+  disablePointerDismissal = true,
+  disableEscapeDismissal = true,
+  onOpenChange,
+  ...props
+}: SheetPrimitive.Root.Props & {
+  /** Con `false`, un Escape cierra el panel (comportamiento nativo del dialogo). */
+  disableEscapeDismissal?: boolean
+}) {
+  return (
+    <SheetPrimitive.Root
+      data-slot="sheet"
+      disablePointerDismissal={disablePointerDismissal}
+      onOpenChange={(open, eventDetails) => {
+        if (!open && disableEscapeDismissal && eventDetails.reason === "escape-key") {
+          eventDetails.cancel()
+          return
+        }
+        onOpenChange?.(open, eventDetails)
+      }}
+      {...props}
+    />
+  )
 }
 
 function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {

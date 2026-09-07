@@ -26,7 +26,6 @@ import {
   NotFoundError,
   RecipeNotFoundError,
   UnauthorizedError,
-  UnitNotFoundError,
   ValidationError,
 } from '@/lib/modules/pedidos'
 import {
@@ -82,7 +81,6 @@ const ADMIN_SESSION_USER = {
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
-const UNIT_ID = '33333333-3333-4333-8333-333333333333'
 
 function formDataOf(fields: Record<string, string>): FormData {
   const formData = new FormData()
@@ -96,8 +94,6 @@ const MUTATION_INITIAL: OrderMutationFormState = { status: 'idle' }
 const VALID_CREATE_FIELDS = {
   recipeId: RECIPE_ID,
   quantity: '12.5000',
-  unitId: UNIT_ID,
-  unitPrice: '3.2500',
   priority: 'ALTA',
 }
 
@@ -226,14 +222,13 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     cancelOrderMock.mockResolvedValue(undefined)
     deleteOrderMock.mockResolvedValue(undefined)
 
-    // 1. El alta traslada los cinco campos del formulario SIN tocarlos: los importes siguen
-    //    siendo cadena y el recorte/los rangos son de `zod`, no del borde.
+    // 1. El alta traslada los TRES campos del formulario SIN tocarlos: la cantidad sigue siendo
+    //    cadena y el recorte/los rangos son de `zod`, no del borde. (Eran cinco hasta el
+    //    2026-09-07: la unidad y el precio unitario salieron del pedido.)
     await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
     expect(createOrderMock.mock.calls[0]?.[0]).toEqual({
       recipeId: RECIPE_ID,
       quantity: '12.5000',
-      unitId: UNIT_ID,
-      unitPrice: '3.2500',
       priority: 'ALTA',
     })
     // Y lo que el esquema no declara NO se envia: ni estado, ni motivo, ni correlativo, ni
@@ -257,8 +252,6 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       formDataOf({
         recipeId: RECIPE_ID,
         quantity: '12.5000',
-        unitId: UNIT_ID,
-        unitPrice: '3.2500',
       }),
     )
     expect(createOrderMock.mock.calls[1]?.[0]).toMatchObject({ priority: undefined })
@@ -270,8 +263,6 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     expect(updateOrderMock.mock.calls[0]?.[1]).toEqual({
       recipeId: RECIPE_ID,
       quantity: '12.5000',
-      unitId: UNIT_ID,
-      unitPrice: '3.2500',
       priority: 'ALTA',
       status: 'EN_CURSO',
     })
@@ -375,7 +366,6 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       { error: new UnauthorizedError(), code: 'unauthorized' },
       { error: new NotFoundError(), code: 'not_found' },
       { error: new RecipeNotFoundError(), code: 'recipe_not_found' },
-      { error: new UnitNotFoundError(), code: 'unit_not_found' },
       { error: new InvalidTransitionError(), code: 'invalid_transition' },
       { error: new NotCancellableError(), code: 'not_cancellable' },
       { error: new NotDeletableError(), code: 'not_deletable' },

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
+  buildProductListQuery,
   parseProductListParams,
   ProductListSection,
   ProductSheet,
@@ -47,7 +48,7 @@ export default async function InventarioPage({
 }: {
   searchParams: Promise<ProductListSearchParams>;
 }) {
-  const { page, pageSize } = parseProductListParams(await searchParams);
+  const params = parseProductListParams(await searchParams);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -57,11 +58,16 @@ export default async function InventarioPage({
         </h1>
         <ProductSheet />
       </div>
+      {/*
+        La `key` lleva la cadena de consulta CANONICA y no solo pagina y tamano: desde el
+        2026-09-07 la lista tambien ordena, filtra y busca, y el esqueleto tiene que reaparecer en
+        cualquiera de esos cambios (R15).
+      */}
       <Suspense
-        key={`${page}-${pageSize}`}
-        fallback={<ProductTableSkeleton rows={pageSize} />}
+        key={buildProductListQuery(params)}
+        fallback={<ProductTableSkeleton rows={params.pageSize} />}
       >
-        <ProductListSection page={page} pageSize={pageSize} />
+        <ProductListSection params={params} />
       </Suspense>
     </div>
   );

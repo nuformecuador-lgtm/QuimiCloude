@@ -63,9 +63,11 @@ hay ninguna feature de dominio quimico implementada.**
 No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Estan aqui porque **son caras de meter
 despues**: cambiarlas con datos ya cargados obliga a migrar historico. Conviene cerrarlas
 antes de la primera feature de inventario o de producto, no despues. De las cuatro
-originales quedan **dos cerradas** —la 1 desde el 2026-09-01 (QC-14, revisada por QC-32) y
-la 4 desde el 2026-09-03 (QC-33)—; siguen abiertas **la 2 y la 3**, y el 2026-09-04 se
-abrio **la 5** al reescribir el punto 1 del dominio.
+originales queda **una cerrada**, la 4 desde el 2026-09-03 (QC-33). La **1 se reabrio el
+2026-09-07 (QC-76)**: estuvo cerrada desde el 2026-09-01 (QC-14) y revisada el 2026-09-02
+(QC-32), pero la conversion entre unidades, que las dos daban por descartada, ahora existe.
+Siguen abiertas **la 2 y la 3**, y el 2026-09-04 se abrio **la 5** al reescribir el punto 1
+del dominio.
 
 1. ~~**Unidades de medida.**~~ **CERRADA el 2026-09-01 (QC-14) y REVISADA el 2026-09-02
    (QC-32).** Una sola unidad por elemento y **sin conversiones**: eso no ha cambiado y la
@@ -77,6 +79,17 @@ abrio **la 5** al reescribir el punto 1 del dominio.
    receta apuntan a el en vez de guardar texto. Se paga el coste que QC-14 anticipo, con la
    suerte de que la base todavia esta vacia. Detalle en
    `specs/QC-32-modelo-unidades/requirements.md`.
+   **REABIERTA el 2026-09-07 (QC-76).** Lo que cambia es justo la mitad que QC-14 y QC-32
+   daban por cerrada: **si va a haber conversion**. La unidad gana la unidad de la que deriva y
+   un **factor decimal exacto de cuatro decimales, mayor que cero** —1 litro = 1000 mililitros—,
+   con derivacion de **un solo nivel**, y el modulo `unidades` publica la funcion que convierte.
+   Efecto util: la derivacion **deduce la familia de la magnitud**, asi que convertir entre dos
+   unidades que no comparten base es un error, no un resultado. **Ningun consumidor la usa** aun:
+   inventario, recetas y pedidos siguen tratando la unidad como anotativa, y quien la estrene ira
+   en su propia ficha. QC-76 anade tambien el **ambito por empresa** (`company_id` opcional; sin
+   el, la unidad es de sistema y vale para todas), lo que **absorbio y cancelo QC-51**. Detalle y
+   las 30 decisiones cerradas en
+   `specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`.
 2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
    suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
    guarda totales es de las migraciones mas dolorosas que existen.

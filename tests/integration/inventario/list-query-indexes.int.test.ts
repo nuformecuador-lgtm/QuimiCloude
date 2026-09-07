@@ -171,7 +171,9 @@ const PARTIAL_INDEXES = [
   'orders_priority_idx',
   'orders_created_at_idx',
   'orders_quantity_idx',
-  'orders_unit_price_idx',
+  // `orders_unit_price_idx` estuvo aqui hasta el 2026-09-07: cayo con su columna en
+  // `db/migrations/20260907120000_orders_drop_unit_and_unit_price` (decision humana), y con ella
+  // `unitPrice` salio de `ORDER_QUERYABLE.sortable`, asi que ya no hay orden que servir.
 ] as const
 
 /** Los de `presentations` y `units`, que no tienen `deleted_at`: TOTALES. */
@@ -205,7 +207,8 @@ const PRE_EXISTING_INDEXES = [
   'supplier_catalog_lines_presentation_id_idx',
   'supplier_catalog_lines_unit_id_idx',
   'orders_recipe_id_idx',
-  'orders_unit_id_idx',
+  // `orders_unit_id_idx` (indice de la FK que QC-33 creo) cayo el 2026-09-07 con la columna
+  // `orders.unit_id`, en la misma migracion.
   'orders_order_year_order_sequence_key',
 ] as const
 
@@ -233,9 +236,10 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('los 35 indices nuevos existen, cada uno con su nombre exacto', async () => {
+  it('los 34 indices nuevos existen, cada uno con su nombre exacto', async () => {
     const indexes = await readIndexes()
-    expect(ALL_INDEXES).toHaveLength(35)
+    // 34 desde el 2026-09-07: eran 35 hasta que `orders_unit_price_idx` cayo con su columna.
+    expect(ALL_INDEXES).toHaveLength(34)
     const faltan = ALL_INDEXES.filter((name) => !indexes.has(name))
     expect(faltan, `indices que la base no tiene: ${faltan.join(', ')}`).toEqual([])
   })

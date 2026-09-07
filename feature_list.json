@@ -590,7 +590,7 @@
       "description": "El catalogo de presentaciones (bidon, tambor, saco) dentro del layout privado: la lista paginada, el alta, la edicion y el borrado. Solo la ve el Administrador. Las operaciones ya existen y las expone QC-20 como Server Actions. Salio del alcance de QC-22, que se quedo solo con productos; QC-22 si permite crear una presentacion desde el selector del formulario de producto, pero no listarlas, editarlas ni borrarlas. La forma de la pantalla se decide al acotar esta ficha.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "frontend",
       "branch": "feature/QC-45-pantalla-de-presentaciones",
       "depends_on": [
@@ -1046,7 +1046,7 @@
       "epic_name": "Identidad y acceso",
       "name": "modelo-de-permisos",
       "description": "Hoy «quien puede» se responde con una sola pregunta —¿es Administrador?— repetida dentro de cinco modulos. Eso hace imposible que exista un tercer rol, y deja al Operador sin poder consultar nada.\n\nCada modulo pasa a tener sus propios permisos: consultar y modificar, por separado. Un rol es un conjunto de permisos, guardado en base y sembrado; no hay comodin: el Administrador tiene sus permisos escritos uno a uno, como cualquier otro rol. El Operador nace pudiendo consultar inventario, y nada mas. El dashboard es un modulo mas y tambien lleva su permiso. Un modulo que no tiene escritura declara solo el permiso de consultar.\n\nLos cinco modulos dejan de preguntar «es Administrador» y pasan a preguntar por el permiso concreto, dentro del servicio, que es donde se autoriza. Entra una guardia que da rojo si un modulo declara un permiso que ningun rol tiene asignado, y si un servicio sigue autorizando por nombre de rol.\n\nModificar no implica consultar: hacen falta los dos y el seed los da juntos. Borrar entra dentro de modificar. El permiso cuelga del rol y nunca de la empresa. El catalogo es cerrado y no tiene pantalla de administracion, igual que los roles.\n\nEl menu, el corte de rutas y a donde lleva el login van aparte.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -1065,7 +1065,7 @@
       "description": "Con los permisos ya en base, la zona privada deja de ensenar lo que no se puede usar.\n\nEl menu lateral se arma en el servidor con los permisos de quien entra: quien no puede consultar un modulo no ve su item. Entrar por URL a una pantalla sin permiso devuelve 404, no un redirigido: no se confirma siquiera que la pantalla exista.\n\nSe retira la lista de reglas ruta-a-rol del middleware, que queda solo con lo que puede comprobar sin base de datos: firma, caducidad y empresa. Una sola verdad sobre quien entra a que, y vive donde si se lee la base. El coste que se acepta a cambio: la peticion de alguien sin permiso llega al servidor en vez de morir en el borde, y es la lectura de sesion que el layout ya hace en cada render.\n\nEl login deja de llevar siempre al dashboard: lleva a la primera pantalla que esa persona puede ver. Queda por decidir al acotar esta ficha que pasa con un rol que no puede ver ninguna.\n\nAqui vive el E2E que CHECKPOINTS.md exige para permisos: el Operador entra, ve un menu corto y recibe 404 en inventario.\n\nNo construye backend propio: consume el modelo de permisos.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-75-menu-y-rutas-por-permiso",
       "depends_on": [

@@ -15,20 +15,29 @@ import {
  */
 
 /**
- * Cantidad y precio como CADENA decimal, nunca `number`: el dominio no puede importar
+ * QC-35bis (decision humana del 2026-09-07): **el precio unitario y la unidad SALIERON del
+ * pedido**, y con ellos `unitPriceSchema` y `unitIdSchema`. Un pedido es receta + cantidad +
+ * prioridad (+ estado en la edicion). No hay «campo opcional» ni «valor por defecto» para
+ * ninguno de los dos: lo que el esquema no declara no puede llegar, asi que un formulario o un
+ * cliente que siga enviando `unitId` o `unitPrice` no consigue nada -`z.object` descarta las
+ * claves desconocidas- y no hay forma de reintroducirlos por descuido.
+ */
+
+/**
+ * Cantidad como CADENA decimal, nunca `number`: el dominio no puede importar
  * `Prisma.Decimal` y un `number` de JavaScript es coma flotante binaria
  * (`docs/architecture.md > Anti-patrones`). `Decimal(14, 4)` son hasta 10 digitos enteros y 4
  * decimales. Mismo patron -literal- que `recetas` y `proveedores`; el adaptador driven es
  * quien convierte a `Prisma.Decimal`, y a la salida vuelve con `.toFixed(4)`.
  *
- * El patron NO admite signo, asi que un valor NEGATIVO se rechaza aqui, en la forma, tanto en
- * la cantidad como en el precio (R17, R18).
+ * El patron NO admite signo, asi que una cantidad NEGATIVA se rechaza aqui, en la forma (R17).
  */
 const DECIMAL_14_4 = /^\d{1,10}(\.\d{1,4})?$/;
 
 /**
- * R17: la cantidad tiene que ser MAYOR que cero. El patron por si solo deja pasar "0" y
- * "0.0000", asi que el `> 0` real lo cierra el `refine`.
+ * R17: la cantidad tiene que ser MAYOR que cero, y desde el 2026-09-07 es el UNICO decimal que
+ * le queda al pedido. El patron por si solo deja pasar "0" y "0.0000", asi que el `> 0` real lo
+ * cierra el `refine`.
  */
 const quantitySchema = z
   .string()
@@ -38,21 +47,11 @@ const quantitySchema = z
   });
 
 /**
- * R18: el precio unitario admite el CERO -un pedido puede registrar una entrega sin cargo
- * (QC-33 R9)- y rechaza el negativo. No lleva `refine`: el cero es valido y el negativo ya no
- * pasa el patron.
- */
-const unitPriceSchema = z
-  .string()
-  .regex(DECIMAL_14_4, { message: 'El precio unitario debe ser un numero decimal valido.' });
-
-/**
- * Receta y unidad: aqui, en el borde, solo se valida la FORMA -un UUID-. La EXISTENCIA y la
- * vigencia las comprueba el caso de uso a traves de los contratos publicos
- * `@/lib/modules/recetas` y `@/lib/modules/unidades` (R15, R16), nunca consultando sus tablas.
+ * Receta: aqui, en el borde, solo se valida la FORMA -un UUID-. La EXISTENCIA y la vigencia las
+ * comprueba el caso de uso a traves del contrato publico `@/lib/modules/recetas` (R15), nunca
+ * consultando su tabla.
  */
 const recipeIdSchema = z.string().uuid();
-const unitIdSchema = z.string().uuid();
 
 /** R19: conjunto CERRADO. Un valor de fuera muere en el borde y no llega al caso de uso. */
 const prioritySchema = z.enum(ORDER_PRIORITY_VALUES);
@@ -73,8 +72,6 @@ const prioritySchema = z.enum(ORDER_PRIORITY_VALUES);
 export const createOrderSchema = z.object({
   recipeId: recipeIdSchema,
   quantity: quantitySchema,
-  unitId: unitIdSchema,
-  unitPrice: unitPriceSchema,
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
 });
 

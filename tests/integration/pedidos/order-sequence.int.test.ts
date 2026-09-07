@@ -239,15 +239,13 @@ async function altaConSecuencia(
 ): Promise<AltaHecha> {
   const filas = await tx.$queryRaw<{ id: string; order_sequence: number }[]>`
     INSERT INTO "orders" (
-      "order_year", "order_sequence", "recipe_id", "quantity", "unit_id", "unit_price",
+      "order_year", "order_sequence", "recipe_id", "quantity",
       "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
     ) VALUES (
       ${year}::integer,
       next_order_sequence(${year}::integer),
       ${f.recipeId}::uuid,
       ${quantity}::numeric,
-      ${f.unitId}::uuid,
-      ${'25'}::numeric,
       ${'BAJA'}::"OrderPriority",
       ${'PENDIENTE'}::"OrderStatus",
       ${f.userId}::uuid,

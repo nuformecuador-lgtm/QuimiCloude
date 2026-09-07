@@ -23,6 +23,9 @@ describe('toProductView', () => {
   const filaBase = {
     id: 'p-1',
     name: 'Cloro',
+    // 2026-09-07: el producto expone su ruta de imagen. `null` en el fixture base porque hoy
+    // nadie llena esa columna; el caso de abajo comprueba que la ruta se copia tal cual.
+    imagePath: null,
     presentationId: 'pr-1',
     presentation: { name: 'Bidon 20 L' },
     stock: 10,
@@ -41,6 +44,15 @@ describe('toProductView', () => {
   it('mapea el nombre de la presentacion desde el join, no como identificador', () => {
     const vista = toProductView(filaBase);
     expect(vista.presentationName).toBe('Bidon 20 L');
+  });
+
+  it('copia la ruta de imagen tal cual, sin componer ninguna URL', () => {
+    // 2026-09-07: `inventario` no tiene puerto de almacenamiento -a diferencia de `recetas`-,
+    // asi que aqui no se compone URL publica ninguna: lo que hay en la columna es lo que sale.
+    expect(toProductView(filaBase).imagePath).toBeNull();
+    expect(toProductView({ ...filaBase, imagePath: 'productos/cloro.png' }).imagePath).toBe(
+      'productos/cloro.png',
+    );
   });
 
   // QC-52 (R1, R2): lo que antes se afirmaba sobre el costo se afirma ahora sobre lo que

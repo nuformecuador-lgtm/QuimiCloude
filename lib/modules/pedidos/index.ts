@@ -40,7 +40,6 @@ export {
   UnauthorizedError,
   NotFoundError,
   RecipeNotFoundError,
-  UnitNotFoundError,
   InvalidTransitionError,
   NotCancellableError,
   NotDeletableError,

@@ -114,7 +114,8 @@ vi.mock('sonner', async (importOriginal) => ({
 }));
 
 const testId = {
-  fila: 'catalog-row',
+  // La tabla compartida nombra la fila por el id de la linea (`data-table-row-<id>`).
+  fila: /^data-table-row-/,
   abrirBaja: 'catalog-line-delete-open',
   dialogo: 'delete-catalog-line-dialog',
   mensaje: 'delete-catalog-line-message',

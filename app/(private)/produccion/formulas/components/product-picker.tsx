@@ -1,27 +1,46 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { Loader2Icon } from 'lucide-react';
+import { useCallback, useId, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  Autocomplete,
+  AutocompleteContent,
+  AutocompleteInput,
+  AutocompleteInputGroup,
+  AutocompleteItem,
+  AutocompleteList,
+} from '@/components/ui/autocomplete';
+import {
+  useAsyncPaginatedOptions,
+  type AsyncPageRequest,
+} from '@/hooks/use-async-paginated-options';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /**
  * Selector de ingrediente con autocompletado y paginación (T14, R28; `design.md > 6`).
  *
- * **No es una primitiva de shadcn/ui reinventada**: se compone con `Button` e `Input`, que ya son
- * del CLI, y no importa ninguna librería nueva. Se construye a mano -y no con
- * `components/ui/select.tsx`- porque la navegación de página vive DENTRO del propio desplegable
- * (R28) y el elemento seleccionado casi nunca está en la página que el desplegable tiene cargada:
- * un `<select>` nativo o el primitivo de `Select` esperan que el valor elegido figure entre sus
- * `items`.
+ * **QC-26 R28 cambió de mecanismo (decisión humana del 2026-09-07)**: la paginación DENTRO del
+ * desplegable ya no son los botones «Anterior»/«Siguiente» con su indicador, sino la carga por
+ * scroll: al llegar al final de la lista se anexa la página siguiente. Lo que R28 exige de fondo
+ * -que se pueda alcanzar CUALQUIER producto del catálogo sin filtrar en cliente- se cumple igual,
+ * y con un gesto menos por página. Los `data-testid` `-prev`, `-next` y `-page-indicator` han
+ * DESAPARECIDO; el test de R28 y los dos helpers de E2E se reescribieron con el gesto nuevo.
+ *
+ * **No es una primitiva reinventada, y ahora tampoco es un desplegable a mano**: se compone con
+ * `components/ui/autocomplete.tsx` -primitivos de `@base-ui/react`, la misma librería de la que
+ * salen `Input`, `Select` y `Popover` de este repo- y con el hook genérico
+ * `useAsyncPaginatedOptions`, que es quien acumula páginas, sabe si quedan más y descarta lo
+ * obsoleto. Este archivo ya no gestiona a mano ni el rebote, ni el cierre al pulsar fuera, ni la
+ * navegación por teclado: eso lo pone el primitivo. Ninguna dependencia nueva entró en el repo.
  *
  * **La búsqueda va al SERVIDOR, nunca al array ya descargado** (R28): escribir dispara
- * `listProductsAction({ page: 1, pageSize: MAX_PAGE_SIZE, search })`. En este archivo no hay ni un
- * `.filter(` por texto sobre `items`: filtrar en cliente solo miraría la página cargada y mentiría
- * sobre el catálogo, que es exactamente lo que R28 prohíbe. El teclear se agrupa con un rebote de
- * 250 ms para no pedir una consulta por pulsación.
+ * `listProductsAction({ page: 1, pageSize: MAX_PAGE_SIZE, search })` a través de `pedirPagina`.
+ * En este archivo no hay ni un `.filter(` por texto sobre los items: filtrar en cliente solo
+ * miraría la página cargada y mentiría sobre el catálogo, que es exactamente lo que R28 prohíbe.
+ * El rebote de las pulsaciones lo aplica el hook (400 ms), y solo a la primera página: la
+ * siguiente la pide un gesto deliberado -llegar al final del scroll-, no una tecla.
  *
  * **Quién valida ese `search`, desde QC-57**: `productQuerySchema` -la búsqueda propia de
  * productos- YA NO EXISTE (QC-57 R24). `search` es ahora una clave del CONTRATO GENÉRICO de
@@ -35,35 +54,34 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * `products.name_normalized` -servida por el índice GIN de trigramas
  * `products_name_normalized_trgm_idx`-, con el término pasado por la MISMA `normalizeProductName`
  * que escribió esa columna (QC-57 R16, R18, R19). Como esa forma canónica quita los acentos, la
- * búsqueda AHORA LOS IGNORA: escribir «solucion» encuentra «Solución Buffer pH 7», que antes no
- * aparecía. Queda escrito aquí porque es comportamiento visible para quien usa el selector, y sin
- * anotarlo nadie sabría que puede confiar en él.
+ * búsqueda IGNORA los acentos: escribir «solucion» encuentra «Solución Buffer pH 7».
  *
- * **Sin texto escrito, el desplegable sigue siendo el de siempre**: la primera página precargada y
- * sus controles de página. Con texto, la paginación se aplica al resultado de la búsqueda, y el
- * `total` que devuelve el backend ya describe ese resultado -mismo `where` en el `findMany` y en
- * el `count`-.
+ * **El texto que se busca NO es el que se muestra**: mientras el usuario no escribe, el campo
+ * enseña el ingrediente ya elegido (`label`) pero el término de búsqueda es la cadena vacía, así
+ * que abrir un selector ya relleno ofrece el catálogo entero y no solo el producto que ya tiene.
+ * Es la misma distinción `draft`/`label` de antes de QC-26bis, ahora con el primitivo controlado.
  *
  * **Los ingredientes ya usados en otras líneas NO se ofrecen** (`excludedIds`): se apartan de la
  * lista, así que no hay forma de elegir dos veces el mismo. El propio ingrediente de ESTA línea
  * nunca se aparta a sí mismo.
  *
- * Apartarlos NO es el filtrado en cliente que R28 prohíbe: ahí lo vetado es recortar `items` por
- * TEXTO -eso solo miraría la página cargada y mentiría sobre el catálogo, por eso la búsqueda va
- * al servidor-. Aquí se quita lo que ya está en la receta, que es información del formulario y no
+ * Apartarlos NO es el filtrado en cliente que R28 prohíbe: ahí lo vetado es recortar los items
+ * por TEXTO. Aquí se quita lo que ya está en la receta, que es información del formulario y no
  * del catálogo, y ninguna búsqueda depende de ello. Se escribe con `flatMap` y no con `.filter(`
  * porque el contrato de la ruta veta ese literal en este archivo justamente para que nadie cuele
  * un filtrado por texto (`recipe-route-contract.test.ts`).
  *
- * El precio, asumido: una página del desplegable puede mostrar menos opciones de las que anuncia
- * su contador, y quien busque un ingrediente que ya usó no lo verá.
+ * El precio, asumido: una página del desplegable puede mostrar menos opciones de las que trajo,
+ * y quien busque un ingrediente que ya usó no lo verá.
  *
  * **La primera página puede llegar precargada** (`initialPage`, `design.md > 5`): la página del
  * formulario ya pidió `listProductsAction({ page: 1, pageSize: MAX_PAGE_SIZE })` una sola vez y
  * se la pasa a `RecipeForm` por props (R49); cada instancia de este selector -una por línea de
- * receta- reutiliza esos datos en vez de disparar su propia petición al abrirse por primera vez.
- * Cambiar de página o buscar SÍ dispara una petición propia con `listProductsAction`, que es la
- * Server Action del módulo, nunca un `fetch` a una ruta API propia (R47).
+ * receta- devuelve esos datos como página 1 SIN BUSCAR, en vez de disparar su propia petición al
+ * abrirse. Por eso el tamaño de página sigue siendo `MAX_PAGE_SIZE` y no el defecto de 10 del
+ * hook: una página de 10 dejaría inservible una semilla de 25 -la página 2 solaparía con ella-.
+ * Buscar o pedir la página siguiente SÍ dispara una petición propia con `listProductsAction`,
+ * que es la Server Action del módulo, nunca un `fetch` a una ruta API propia (R47).
  */
 
 export type ProductPickerOption = {
@@ -75,7 +93,12 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 const FIRST_PAGE = 1;
 /** Rebote del autocompletado: agrupa las pulsaciones seguidas en una sola consulta. */
-const SEARCH_DEBOUNCE_MS = 250;
+/* Subido de 250 a 400 ms el 2026-09-07: con 250 el rebote vencia ENTRE letra y letra de una
+   escritura normal -entre dos teclas pasan 150-300 ms-, asi que el selector acababa consultando
+   casi por pulsacion, que es justo lo que el rebote existe para evitar. */
+const SEARCH_DEBOUNCE_MS = 400;
+/** Alto máximo del desplegable: siempre hay scroll cuando quedan páginas por traer. */
+const MAX_LIST_HEIGHT = 256;
 
 export type ProductPickerProps = {
   /** Ingrediente ya elegido, o cadena vacía si ninguno. */
@@ -105,100 +128,72 @@ export function ProductPicker({
   excludedIds = [],
 }: ProductPickerProps) {
   const errorId = useId();
-  const listId = useId();
   const [open, setOpen] = useState(false);
-  const [page, setPage] = useState(FIRST_PAGE);
-  const [totalPages, setTotalPages] = useState(initialPage.totalPages);
-  const [items, setItems] = useState<readonly ProductPickerOption[]>(initialPage.items);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   /** Lo que el usuario está escribiendo. `null` = no está escribiendo: se muestra lo elegido. */
   const [draft, setDraft] = useState<string | null>(null);
-  /** El término YA aplicado a una consulta; es el que acompaña a los cambios de página. */
-  const [appliedSearch, setAppliedSearch] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handlePointerDown(event: MouseEvent) {
-      if (containerRef.current !== null && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-        setDraft(null);
-      }
-    }
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [open]);
-
-  // Un rebote pendiente al desmontar la línea -quitarla mientras se escribe- no debe disparar
-  // una consulta contra un componente que ya no existe.
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    };
-  }, []);
 
   /**
-   * Pide una página del catálogo, con el término de búsqueda vigente si lo hay (R28). Es un
-   * manejador de EVENTO, no un efecto -mismo criterio que `loadMore` de `presentation-select.tsx`-,
-   * así que `setLoading(true)` corre síncronamente sin que ningún linter de efectos tenga nada
-   * que decir al respecto.
-   *
-   * La primera página **sin búsqueda** no vuelve a pedirse: `initialPage` ya la trae por props
-   * (R49). Con búsqueda no hay atajo posible: esa página la tiene el backend, no las props.
+   * Pide una página del catálogo, con el término vigente si lo hay (R28). La página 1 SIN
+   * búsqueda no viaja al backend: ya la trae `initialPage` por props (R49). Con búsqueda no hay
+   * atajo posible: esa página la tiene el backend, no las props.
    */
-  async function loadPage(requested: number, search: string) {
-    const next = Math.max(requested, FIRST_PAGE);
-    setPage(next);
+  const pedirPagina = useCallback(
+    async ({ query, page }: AsyncPageRequest) => {
+      const search = query.trim();
 
-    if (next === FIRST_PAGE && search === '') {
-      setItems(initialPage.items);
-      setTotalPages(initialPage.totalPages);
-      setLoadError(null);
-      return;
-    }
+      if (page === FIRST_PAGE && search === '') {
+        return { items: initialPage.items, page, totalPages: initialPage.totalPages };
+      }
 
-    setLoading(true);
-    // Sin término, la consulta es EXACTAMENTE la de siempre: la página completa del catálogo.
-    // La clave `search` se omite por claridad del sitio de llamada, NO porque el esquema fuera a
-    // rechazarla: con el contrato de QC-57 una búsqueda vacía o de solo espacios es AUSENCIA de
-    // búsqueda (R20) -`createListQuerySchema` le pone `''` por defecto y el adaptador no añade
-    // condición alguna-, así que mandar `search: ''` daría el mismo resultado. Con término, viaja
-    // junto a la página.
-    const filtro = search === '' ? {} : { search };
-    const result = await listProductsAction({ page: next, pageSize: MAX_PAGE_SIZE, ...filtro });
-    setLoading(false);
+      // Sin término, la consulta es EXACTAMENTE la de siempre: la página completa del catálogo.
+      // La clave `search` se omite por claridad del sitio de llamada, NO porque el esquema fuera
+      // a rechazarla: con el contrato de QC-57 una búsqueda vacía es AUSENCIA de búsqueda (R20).
+      const filtro = search === '' ? {} : { search };
+      const result = await listProductsAction({ page, pageSize: MAX_PAGE_SIZE, ...filtro });
 
-    if (result.status === 'error') {
-      setLoadError(result.message);
-      return;
-    }
-    setLoadError(null);
-    setItems(result.data.items.map((item) => ({ id: item.id, name: item.name })));
-    setTotalPages(result.data.totalPages);
-  }
+      if (result.status === 'error') {
+        // El mensaje del servidor viaja como `cause` del error que envuelve el hook, y es el que
+        // se presenta abajo: el usuario lee lo que falló, no una frase genérica.
+        throw new Error(result.message);
+      }
 
-  function goToPage(requested: number) {
-    void loadPage(Math.min(requested, totalPages), appliedSearch);
-  }
+      return {
+        items: result.data.items.map((item) => ({ id: item.id, name: item.name })),
+        page: result.data.page,
+        totalPages: result.data.totalPages,
+      };
+    },
+    [initialPage],
+  );
 
-  /** Cada pulsación reinicia el rebote; solo la última dispara la consulta. */
-  function handleDraftChange(next: string) {
+  const { items, isLoading, isLoadingMore, error: loadError, hasMore, loadMore } =
+    useAsyncPaginatedOptions<ProductPickerOption>({
+      fetchPage: pedirPagina,
+      query: draft ?? '',
+      pageSize: MAX_PAGE_SIZE,
+      debounceMs: SEARCH_DEBOUNCE_MS,
+      enabled: open,
+    });
+
+  /** Llegar al final de la lista pide la página siguiente; el hook ignora lo que sobra. */
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const lista = event.currentTarget;
+      if (lista.scrollHeight - lista.scrollTop - lista.clientHeight <= 48) {
+        loadMore();
+      }
+    },
+    [loadMore],
+  );
+
+  function handleValueChange(next: string) {
     setDraft(next);
-    setOpen(true);
-    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      const search = next.trim();
-      setAppliedSearch(search);
-      void loadPage(FIRST_PAGE, search);
-    }, SEARCH_DEBOUNCE_MS);
   }
 
   function choose(option: ProductPickerOption) {
     onSelect(option);
-    setOpen(false);
     setDraft(null);
+    setOpen(false);
   }
 
   // Fuera lo que ya está en otras líneas. `flatMap` en vez de `.filter(` a propósito: ver la
@@ -210,107 +205,99 @@ export function ProductPicker({
   // Con el desplegable cerrado o sin escribir, el campo muestra lo YA elegido; `label` solo es
   // marcador cuando no hay nada elegido.
   const displayValue = draft ?? (value === '' ? '' : label);
+  const cargando = isLoading || isLoadingMore;
+  const mensajeDeFallo =
+    loadError === undefined
+      ? null
+      : loadError.cause instanceof Error
+        ? loadError.cause.message
+        : loadError.message;
 
   return (
-    <div className="relative flex flex-col gap-1" ref={containerRef}>
-      <Input
-        type="text"
-        role="combobox"
-        autoComplete="off"
-        aria-expanded={open}
-        aria-autocomplete="list"
-        aria-controls={listId}
-        aria-label={ariaLabel}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full`}
-        placeholder={label}
+    <div className="relative flex flex-col gap-1">
+      <Autocomplete
+        items={selectable}
+        mode="none"
+        itemToStringValue={(option: ProductPickerOption) => option.name}
         value={displayValue}
-        data-testid={testId}
-        onChange={(event) => handleDraftChange(event.target.value)}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            setOpen(false);
-            setDraft(null);
-          }
-        }}
-      />
+        onValueChange={handleValueChange}
+        open={open}
+        onOpenChange={setOpen}
+        openOnInputClick
+      >
+        <AutocompleteInputGroup>
+          <AutocompleteInput
+            aria-label={ariaLabel}
+            aria-invalid={error === undefined ? undefined : true}
+            aria-describedby={error === undefined ? undefined : errorId}
+            className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full`}
+            placeholder={label}
+            data-testid={testId}
+          />
+        </AutocompleteInputGroup>
 
-      {open ? (
-        <div
-          className="absolute top-full z-50 mt-1 w-full min-w-56 rounded-lg border bg-popover p-1 shadow-md"
-          data-testid={`${testId}-popup`}
-        >
-          {loadError !== null ? (
-            <p role="alert" className="p-2 text-sm text-destructive" data-testid={`${testId}-load-error`}>
-              {loadError}
-            </p>
-          ) : (
-            <ul
-              id={listId}
-              role="listbox"
-              aria-label={ariaLabel}
-              className="flex max-h-64 flex-col gap-0.5 overflow-y-auto"
-            >
-              {selectable.length === 0 ? (
-                <li
-                  className="px-2 py-3 text-sm text-muted-foreground"
-                  data-testid={`${testId}-empty`}
-                >
-                  Ningún ingrediente disponible para esta línea.
-                </li>
-              ) : (
-                selectable.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={item.id === value}
-                      className={`${TOUCH_TARGET} w-full rounded-md px-2 text-left ${FIELD_TEXT} hover:bg-muted`}
+        <AutocompleteContent className="min-w-56">
+          <div
+            data-testid={`${testId}-popup`}
+            className="overflow-y-auto overscroll-contain"
+            style={{ maxHeight: MAX_LIST_HEIGHT }}
+            onScroll={handleScroll}
+          >
+            {mensajeDeFallo === null ? (
+              <>
+                <AutocompleteList>
+                  {(option: ProductPickerOption, index: number) => (
+                    <AutocompleteItem
+                      key={option.id}
+                      index={index}
+                      value={option}
+                      className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
                       data-testid={`${testId}-option`}
-                      onClick={() => choose(item)}
+                      onClick={() => choose(option)}
                     >
-                      <span className="truncate">{item.name}</span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
+                      <span className="truncate">{option.name}</span>
+                    </AutocompleteItem>
+                  )}
+                </AutocompleteList>
 
-          {/* Navegacion de pagina DENTRO del propio desplegable (R28), con la pagina actual y el total. */}
-          <div className="mt-1 flex items-center justify-between gap-2 border-t pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              className={TOUCH_TARGET}
-              disabled={loading || page <= FIRST_PAGE}
-              data-testid={`${testId}-prev`}
-              onClick={() => goToPage(page - 1)}
+                {selectable.length === 0 && !cargando ? (
+                  <p
+                    className="px-2 py-3 text-sm text-muted-foreground"
+                    data-testid={`${testId}-empty`}
+                  >
+                    Ningún ingrediente disponible para esta línea.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p role="alert" className="p-2 text-sm text-destructive" data-testid={`${testId}-load-error`}>
+                {mensajeDeFallo}
+              </p>
+            )}
+
+            {/* El anuncio de carga es también el fondo del scroll: mientras se ve, queda página. */}
+            <p
+              role="status"
+              aria-live="polite"
+              className="flex items-center justify-center gap-1.5 px-2 text-sm text-muted-foreground empty:hidden"
+              data-testid={`${testId}-loading`}
             >
-              Anterior
-            </Button>
-            <span
-              className="text-xs text-muted-foreground"
-              data-testid={`${testId}-page-indicator`}
-            >
-              Página {page} de {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              className={TOUCH_TARGET}
-              disabled={loading || page >= totalPages}
-              data-testid={`${testId}-next`}
-              onClick={() => goToPage(page + 1)}
-            >
-              Siguiente
-            </Button>
+              {cargando ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                  <span className="py-2">Cargando ingredientes...</span>
+                </>
+              ) : null}
+            </p>
+
+            {hasMore && !cargando ? (
+              <span className="sr-only" data-testid={`${testId}-has-more`}>
+                Hay más ingredientes: sigue bajando en la lista.
+              </span>
+            ) : null}
           </div>
-        </div>
-      ) : null}
+        </AutocompleteContent>
+      </Autocomplete>
 
       {error === undefined ? null : (
         <p id={errorId} className="text-sm text-destructive" data-testid={`${testId}-field-error`}>

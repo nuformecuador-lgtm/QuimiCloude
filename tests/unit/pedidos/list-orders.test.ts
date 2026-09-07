@@ -35,7 +35,6 @@ import type { Page } from '@/lib/modules/pedidos/domain/page'
 import type { ListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
-import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -45,8 +44,6 @@ const OPERADOR: Actor = { id: 'operador-1', permissions: ['inventario.consultar'
 
 const RECETA_A = '22222222-2222-4222-8222-222222222222'
 const RECETA_B = '44444444-4444-4444-8444-444444444444'
-const UNIDAD_A = '33333333-3333-4333-8333-333333333333'
-const UNIDAD_B = '55555555-5555-4555-8555-555555555555'
 
 const REFS_RECETA: readonly RecipeRef[] = [
   { id: RECETA_A, name: 'Acido citrico 50%', isDeleted: false },
@@ -54,18 +51,11 @@ const REFS_RECETA: readonly RecipeRef[] = [
   // tiene que seguir diciendo que se pidio.
   { id: RECETA_B, name: 'Formula retirada', isDeleted: true },
 ]
-const REFS_UNIDAD: readonly UnitRef[] = [
-  { id: UNIDAD_A, name: 'Kilogramo', symbol: 'kg' },
-  { id: UNIDAD_B, name: 'Litro', symbol: 'L' },
-]
-
 function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow {
   return {
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA_A,
     quantity: '10.0000',
-    unitId: UNIDAD_A,
-    unitPrice: '2.5000',
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
@@ -84,7 +74,6 @@ function pagina(items: readonly OrderRow[], resto: Partial<Page<OrderRow>> = {})
 function dobles(opciones: {
   pagina?: Page<OrderRow>
   recetas?: readonly RecipeRef[]
-  unidades?: readonly UnitRef[]
 }) {
   // Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- porque lo que este archivo
   // afirma es lo que se LE PASO a cada doble: sin ellos, TypeScript infiere una tupla vacia y
@@ -101,10 +90,6 @@ function dobles(opciones: {
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) =>
     (opciones.recetas ?? REFS_RECETA).filter((ref) => ids.includes(ref.id)),
   )
-  const findRefs = vi.fn(async (ids: readonly string[]) =>
-    (opciones.unidades ?? REFS_UNIDAD).filter((ref) => ids.includes(ref.id)),
-  )
-
   const explota = (nombre: string) =>
     vi.fn(() => {
       throw new Error(`${nombre} no deberia llamarse al listar`)
@@ -124,11 +109,9 @@ function dobles(opciones: {
   return {
     orders,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
-    units: { findRefs } as unknown as UnitCatalog,
     log,
     listAlive,
     findRefsIncludingDeleted,
-    findRefs,
   }
 }
 
@@ -148,17 +131,20 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
   return (error as PedidosError).code
 }
 
-describe('listOrders — tres consultas por pagina, tenga 1 fila o 25 (R45)', () => {
-  it('una sola llamada a cada catalogo, con los ids DEDUPLICADOS (R45)', async () => {
-    // Seis pedidos, dos recetas y dos unidades: si el caso de uso preguntara por fila,
-    // habria seis llamadas a cada catalogo y este test caeria.
+// QC-35bis (2026-09-07): eran TRES consultas -lista, recetas y unidades-. Al salir la unidad del
+// pedido, la del catalogo de unidades desaparecio. Lo que R45 exige sigue afirmandose igual de
+// fuerte: el numero de consultas NO depende del numero de filas.
+describe('listOrders — dos consultas por pagina, tenga 1 fila o 25 (R45)', () => {
+  it('una sola llamada al catalogo de recetas, con los ids DEDUPLICADOS (R45)', async () => {
+    // Seis pedidos y dos recetas: si el caso de uso preguntara por fila, habria seis llamadas al
+    // catalogo y este test caeria.
     const filas = [
-      fila({ id: 'o-1', recipeId: RECETA_A, unitId: UNIDAD_A }),
-      fila({ id: 'o-2', recipeId: RECETA_A, unitId: UNIDAD_A }),
-      fila({ id: 'o-3', recipeId: RECETA_B, unitId: UNIDAD_B }),
-      fila({ id: 'o-4', recipeId: RECETA_A, unitId: UNIDAD_B }),
-      fila({ id: 'o-5', recipeId: RECETA_B, unitId: UNIDAD_A }),
-      fila({ id: 'o-6', recipeId: RECETA_A, unitId: UNIDAD_A }),
+      fila({ id: 'o-1', recipeId: RECETA_A }),
+      fila({ id: 'o-2', recipeId: RECETA_A }),
+      fila({ id: 'o-3', recipeId: RECETA_B }),
+      fila({ id: 'o-4', recipeId: RECETA_A }),
+      fila({ id: 'o-5', recipeId: RECETA_B }),
+      fila({ id: 'o-6', recipeId: RECETA_A }),
     ]
     const d = dobles({ pagina: pagina(filas, { total: 6 }) })
 
@@ -167,10 +153,8 @@ describe('listOrders — tres consultas por pagina, tenga 1 fila o 25 (R45)', ()
     expect(salida.items).toHaveLength(6)
     expect(d.listAlive).toHaveBeenCalledTimes(1)
     expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
-    expect(d.findRefs).toHaveBeenCalledTimes(1)
     // Y los ids llegan sin repetir: dos entradas, no seis.
     expect(d.findRefsIncludingDeleted.mock.calls[0]?.[0]).toEqual([RECETA_A, RECETA_B])
-    expect(d.findRefs.mock.calls[0]?.[0]).toEqual([UNIDAD_A, UNIDAD_B])
   })
 
   it('el numero de consultas NO crece con el numero de filas (R45)', async () => {
@@ -183,8 +167,7 @@ describe('listOrders — tres consultas por pagina, tenga 1 fila o 25 (R45)', ()
       expect([
         d.listAlive.mock.calls.length,
         d.findRefsIncludingDeleted.mock.calls.length,
-        d.findRefs.mock.calls.length,
-      ]).toEqual([1, 1, 1])
+      ]).toEqual([1, 1])
     }
   })
 
@@ -201,13 +184,12 @@ describe('listOrders — tres consultas por pagina, tenga 1 fila o 25 (R45)', ()
 })
 
 describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => {
-  it('resuelve los nombres de receta y unidad por los contratos publicos (R43)', async () => {
-    const d = dobles({ pagina: pagina([fila({ id: 'o-1', recipeId: RECETA_A, unitId: UNIDAD_A })]) })
+  it('resuelve el nombre de la receta por el contrato publico (R43)', async () => {
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1', recipeId: RECETA_A })]) })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(salida.items[0]?.recipeName).toBe('Acido citrico 50%')
-    expect(salida.items[0]?.unitName).toBe('Kilogramo')
     expect(salida.items[0]?.numberText).toBe('2026-0000001')
   })
 
@@ -223,13 +205,12 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
   it('si el id no vuelve del catalogo, el nombre es null y la fila SIGUE apareciendo', async () => {
     // Una receta borrada FISICAMENTE por consola. Las FK RESTRICT de QC-33 lo hacen casi
     // imposible, pero la fila no puede desaparecer del listado por eso.
-    const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]), recetas: [], unidades: [] })
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]), recetas: [] })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(salida.items).toHaveLength(1)
     expect(salida.items[0]?.recipeName).toBeNull()
-    expect(salida.items[0]?.unitName).toBeNull()
   })
 
   it('los autores salen como IDENTIFICADORES y el cancelado trae su motivo (R46, R29, R40)', async () => {
@@ -421,7 +402,6 @@ describe('listOrders — autorizacion antes que todo (QC-57 R33, R34)', () => {
         )
         expect(d.listAlive).toHaveBeenCalledTimes(0)
         expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(0)
-        expect(d.findRefs).toHaveBeenCalledTimes(0)
         expect(d.log.ignoredFields).toHaveBeenCalledTimes(0)
       })
     }

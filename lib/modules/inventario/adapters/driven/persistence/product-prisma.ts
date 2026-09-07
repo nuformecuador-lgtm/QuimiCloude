@@ -45,6 +45,7 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
 const PRODUCT_SELECT = {
   id: true,
   name: true,
+  imagePath: true,
   presentationId: true,
   presentation: { select: { name: true } },
   stock: true,
@@ -70,6 +71,7 @@ export function toProductView(row: ProductRow): ProductView {
   return {
     id: row.id,
     name: row.name,
+    imagePath: row.imagePath,
     presentationId: row.presentationId,
     presentationName: row.presentation.name,
     stock: row.stock,

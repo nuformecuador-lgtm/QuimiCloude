@@ -426,10 +426,10 @@ export const unidades = {
 // -diff minimo, hay varias sesiones tocando este archivo-. Sus imports viven al final del
 // bloque de imports, arriba.
 //
-// `unitCatalog` NO se vuelve a construir: se REUTILIZA la constante que QC-25 ya dejo
-// cableada mas arriba (`design.md > 6.3`). Dos instancias del mismo puerto serian dos
-// cableados que pueden divergir, y `unidades` no necesita ninguna ampliacion porque `units`
-// no tiene borrado logico (QC-32 decision 11).
+// QC-35bis (2026-09-07): este bloque REUTILIZABA `unitCatalog` -la constante que QC-25 dejo
+// cableada mas arriba- para los cuatro casos de uso de pedido que tocaban la unidad. Al salir la
+// unidad del pedido, `pedidos` dejo de necesitarlo: ninguno de sus seis casos de uso recibe ya el
+// catalogo de `unidades`. La constante sigue viva mas arriba, para `recetas`, que si la usa.
 // ---------------------------------------------------------------------------------------
 
 /** `RecipeCatalog` cableado con el adaptador driven DE RECETAS (`design.md > 6.2`, R43,
@@ -466,31 +466,19 @@ const orderRepository: OrderRepository = {
  * usa `toOffsetLimit`/`buildPage` directamente (R37, `design.md > 10`), asi que el dominio
  * no necesita recibirla.
  *
- * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca receta
- * ni unidad, y darles catalogos que no usan seria cablear una dependencia falsa.
+ * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca la receta,
+ * y darles catalogos que no usan seria cablear una dependencia falsa. Desde el 2026-09-07 los
+ * otros cuatro reciben SOLO el catalogo de recetas, por el mismo motivo.
  */
 export const pedidos = {
-  createOrder: createCreateOrder({
-    orders: orderRepository,
-    recipes: recipeCatalog,
-    units: unitCatalog,
-  }),
-  getOrder: createGetOrder({
-    orders: orderRepository,
-    recipes: recipeCatalog,
-    units: unitCatalog,
-  }),
+  createOrder: createCreateOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  getOrder: createGetOrder({ orders: orderRepository, recipes: recipeCatalog }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
-    units: unitCatalog,
     log: pedidosListQueryLog,
   }),
-  updateOrder: createUpdateOrder({
-    orders: orderRepository,
-    recipes: recipeCatalog,
-    units: unitCatalog,
-  }),
+  updateOrder: createUpdateOrder({ orders: orderRepository, recipes: recipeCatalog }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
 } as const;

@@ -92,6 +92,28 @@ válidos y presentar la lista, y NO DEBE fallar ni mostrar un error.
 
 **R11** — Ninguna de las dos listas DEBE ofrecer búsqueda ni control de ordenación configurable.
 
+> **ENMIENDA DEL 2026-09-07 (decisión humana), y solo para la lista del CATÁLOGO.** Esa lista
+> monta la **tabla compartida** (`components/shared/data-table`, la misma de inventario, pedidos y
+> recetas) en lugar de su tabla y su barra de paginación propias —`catalog-list-toolbar.tsx`
+> **desaparece**—. Con ella:
+>
+> - **R11 se invierte para el catálogo**: sí ofrece búsqueda y orden por columna, más filtros de
+>   rango para costo y tiempo de entrega. La razón es que el backend los soporta —
+>   `SUPPLIER_CATALOG_LINE_QUERYABLE` declara `searchable: true`, cinco campos ordenables y cuatro
+>   filtrables desde QC-57—. Lo que R11 protegía de verdad **sigue en pie y afirmado**: nada se
+>   busca, ordena ni filtra en el cliente; cada gesto **navega** y la lista se vuelve a pedir sobre
+>   el conjunto entero. `updatedAt` se muestra pero **no** ordena: no está en la lista blanca.
+> - **La lista de PROVEEDORES no cambia**: sigue sin búsqueda ni orden, con su tabla y su barra.
+> - **R8 y R9 no cambian de contenido, sí de dueño** para el catálogo: el selector de tamaño (10 y
+>   25, con 10 por defecto) y la paginación los pinta la tabla compartida, con sus `data-testid`
+>   (`data-table-page-size`, `data-table-previous`, `data-table-next`,
+>   `data-table-page-indicator`).
+> - **R10 se amplía**: los parámetros acotados pasan de `{ page, pageSize }` al contrato de lista
+>   completo, y siguen sin poder producir un error.
+> - El módulo `proveedores` **publica su lista blanca** (`SUPPLIER_CATALOG_LINE_QUERYABLE`) por su
+>   barrel, como ya hacía `pedidos` con la suya: la pantalla comprueba contra el contrato en vez de
+>   contra una copia escrita a mano.
+
 **R12** — Ninguna de las dos listas DEBE mostrar el identificador ni el nombre de quien creó o
 modificó un proveedor o una línea de catálogo.
 
@@ -174,6 +196,18 @@ R30: la pantalla la ignora.
 
 **R30** — El formulario de la línea NO DEBE pedir ninguna imagen ni ofrecer subirla, y la tabla del
 catálogo NO DEBE mostrar la imagen de la línea.
+
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** La segunda mitad de R30 se INVIERTE: la tabla del
+> catálogo **SÍ muestra la imagen de la línea**, en su **primera columna**, con la miniatura
+> compartida `components/shared/entity-image.tsx`. La primera mitad **no cambia**: el formulario
+> sigue sin pedir imagen y sin ofrecer subirla, así que `supplier_catalog_lines.image_path` sigue
+> sin ser llenada por nadie y lo que se ve hoy en todas las filas es el **marcador**
+> (`public/inv_not_found.png`), que cubre los dos casos: ruta ausente y ruta que no resuelve.
+>
+> Sigue siendo cierto que la imagen **no es una columna de datos**: `CATALOG_COLUMNS` es una lista
+> de celdas de texto y `imagePath` no está en ella; la declara la tabla, igual que la columna de
+> acciones. Y sigue sin haber composición de URL pública: `proveedores` no tiene puerto de
+> almacenamiento y esta enmienda no le añade uno.
 
 **R31** — CUANDO el usuario abra el formulario de edición de una línea, el sistema DEBE precargarlo
 con los valores actuales de esa línea y enviar el **reemplazo completo** de sus siete campos de

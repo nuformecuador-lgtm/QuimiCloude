@@ -26,7 +26,7 @@ import {
  *   `listOrdersSchema` YA NO EXISTE: el estado y la prioridad dejaron de ser parametros
  *   propios y entran como filtros `select` del contrato generico (QC-57 R25).
  *
- * LOS IMPORTES NO SE CONVIERTEN AQUI: `quantity` y `unitPrice` viajan como CADENA decimal
+ * LA CANTIDAD NO SE CONVIERTE AQUI: `quantity` viaja como CADENA decimal
  * hasta el adaptador driven (`design.md > 7.1`). Pasarlos por `Number` seria el redondeo
  * binario que `docs/architecture.md > Anti-patrones` prohibe, y ademas destruiria la
  * validacion de forma que hace `zod` sobre el texto.
@@ -123,8 +123,6 @@ function buildCreateCandidate(formData: FormData): unknown {
   return {
     recipeId: readFormString(formData, 'recipeId'),
     quantity: readFormString(formData, 'quantity'),
-    unitId: readFormString(formData, 'unitId'),
-    unitPrice: readFormString(formData, 'unitPrice'),
     priority: readOptionalFormString(formData, 'priority'),
   };
 }

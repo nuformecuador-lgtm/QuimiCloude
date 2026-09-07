@@ -1,19 +1,19 @@
+import type { DataTableParams } from '@/components/shared/data-table';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
-import { buildProductListQuery, type ProductPageSize } from './product-list-params';
+import { FIRST_PAGE, productListHref } from './product-list-params';
 import { ProductListEmpty } from './product-list-empty';
 import { ProductListError } from './product-list-error';
-import { ProductListToolbar } from './product-list-toolbar';
 import { ProductSheet } from './product-sheet';
 import { ProductTable } from './product-table';
 
-/** La primera pagina, a la que vuelve el estado vacio cuando la pedida se quedo atras. */
-const FIRST_PAGE = 1;
-
 type ProductListSectionProps = {
-  readonly page: number;
-  readonly pageSize: ProductPageSize;
+  /**
+   * Los parametros de lista YA ACOTADOS por `parseProductListParams`. Se pasan ENTEROS a la
+   * operacion de consulta: `DataTableParams` es campo a campo la forma que `createListQuerySchema`
+   * espera (QC-57), asi que aqui no se traduce ni se inventa ninguna clave.
+   */
+  readonly params: DataTableParams;
 };
 
 /**
@@ -32,8 +32,8 @@ type ProductListSectionProps = {
  * **Una lista vacia NO se pinta como tabla sin filas** (R14, R16): son tres situaciones distintas
  * -fallo, catalogo vacio y pagina que se quedo atras tras un borrado- y cada una dice lo suyo.
  */
-export async function ProductListSection({ page, pageSize }: ProductListSectionProps) {
-  const result = await listProductsAction({ page, pageSize });
+export async function ProductListSection({ params }: ProductListSectionProps) {
+  const result = await listProductsAction(params);
 
   if (result.status === 'error') {
     return <ProductListError code={result.code} message={result.message} />;
@@ -46,7 +46,7 @@ export async function ProductListSection({ page, pageSize }: ProductListSectionP
       <ProductListEmpty
         firstPageHref={
           currentPage > FIRST_PAGE
-            ? `${INVENTORY_ROUTE}?${buildProductListQuery({ page: FIRST_PAGE, pageSize })}`
+            ? productListHref({ ...params, page: FIRST_PAGE })
             : undefined
         }
       >
@@ -57,8 +57,11 @@ export async function ProductListSection({ page, pageSize }: ProductListSectionP
 
   return (
     <div className="flex flex-col gap-4" data-testid="product-list">
-      <ProductTable products={items} />
-      <ProductListToolbar page={currentPage} pageSize={pageSize} totalPages={totalPages} />
+      {/*
+        La paginacion y el tamano de pagina los pinta la tabla compartida desde el 2026-09-07:
+        `product-list-toolbar.tsx` desaparecio y con el la barra propia de esta ruta.
+      */}
+      <ProductTable products={items} params={{ ...params, page: currentPage }} totalPages={totalPages} />
     </div>
   );
 }

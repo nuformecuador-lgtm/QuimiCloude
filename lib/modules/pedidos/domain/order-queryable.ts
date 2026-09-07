@@ -22,10 +22,13 @@ export const ORDER_QUERYABLE: ListQueryable = {
    * es el orden de la prioridad, no el alfabetico- y filtran como `select` contra su conjunto
    * cerrado de valores.
    *
-   * `quantity` y `unitPrice` son `Decimal(14,4)`; el rango llega como `number` y lo convierte el
-   * adaptador.
+   * `quantity` es `Decimal(14,4)`; el rango llega como `number` y lo convierte el adaptador.
+   *
+   * QC-35bis (2026-09-07): `unitPrice` SALIO de esta lista al salir de la tabla. Al no estar
+   * declarado, pedir ese orden ya no es un error: se omite y se anota (R5), como cualquier campo
+   * desconocido. El indice parcial `orders_unit_price_idx` cayo en la misma migracion.
    */
-  sortable: ['orderNumber', 'priority', 'status', 'createdAt', 'quantity', 'unitPrice'],
+  sortable: ['orderNumber', 'priority', 'status', 'createdAt', 'quantity'],
   filterable: {
     status: 'select',
     priority: 'select',

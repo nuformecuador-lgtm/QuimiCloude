@@ -70,6 +70,21 @@ pedido entero—; NO DEBE usar coma flotante binaria.
 **R9.** SI se intenta persistir un pedido cuyo precio unitario sea negativo o ausente, ENTONCES el
 sistema DEBE rechazar la operación **en la propia base de datos**; y DEBE aceptar el precio **cero**.
 
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** El pedido **YA NO TIENE unidad ni precio
+> unitario**. Las columnas `orders.unit_id` y `orders.unit_price` se dropearon —con su FK
+> `orders_unit_id_fkey`, el CHECK `orders_unit_price_non_negative` y los índices
+> `orders_unit_id_idx` y `orders_unit_price_idx`— en
+> `db/migrations/20260907120000_orders_drop_unit_and_unit_price`, y con ellas salieron del
+> esquema Prisma, del dominio de `pedidos`, de su adaptador driven, del cableado y de la
+> pantalla. Un pedido es hoy **receta + cantidad + prioridad + estado**, más su correlativo, sus
+> autores y su borrado lógico.
+>
+> Los requisitos que hablan de la unidad o del precio unitario quedan **sin sujeto**; se conservan
+> escritos para que se vea qué se decidió antes y qué lo sustituyó, no porque sigan vigentes. Sus
+> tests se retiraron uno a uno, cada uno con la nota de por qué (búsquese «QC-35bis» en
+> `tests/`). El `DROP COLUMN` **perdió los datos** de precio y unidad de los pedidos existentes:
+> el `down.sql` recrea la forma, no el contenido.
+
 **R10.** El sistema NO DEBE persistir el total del pedido: NO DEBE crear ninguna columna —normal,
 generada ni derivada— que guarde el producto de la cantidad por el precio unitario, ni ningún
 subtotal equivalente.

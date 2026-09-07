@@ -8,7 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { CATALOG_COLUMNS } from './catalog-columns';
+import { CATALOG_SKELETON_COLUMN_COUNT } from './catalog-columns-skeleton';
 
 /**
  * Estado «cargando» del catalogo (R24, `design.md > 6.1`).
@@ -22,15 +22,17 @@ import { CATALOG_COLUMNS } from './catalog-columns';
  * lugar de encontrarse una tabla vacia (que es lo que R25 prohibe confundir).
  */
 export function CatalogTableSkeleton({ rows }: { readonly rows: number }) {
+  const celdas = Array.from({ length: CATALOG_SKELETON_COLUMN_COUNT }, (_, index) => index);
+
   return (
     <div role="status" aria-busy="true" data-testid="catalog-table-skeleton">
       <span className="sr-only">Cargando el catálogo del proveedor…</span>
       <Table>
         <TableHeader>
           <TableRow>
-            {CATALOG_COLUMNS.map((column) => (
-              <TableHead key={column.key} scope="col">
-                {column.label}
+            {celdas.map((celda) => (
+              <TableHead key={celda} scope="col">
+                <Skeleton className="h-4 w-24" />
               </TableHead>
             ))}
           </TableRow>
@@ -38,8 +40,8 @@ export function CatalogTableSkeleton({ rows }: { readonly rows: number }) {
         <TableBody>
           {Array.from({ length: rows }, (_, index) => index).map((index) => (
             <TableRow key={index} data-testid="catalog-row-skeleton">
-              {CATALOG_COLUMNS.map((column) => (
-                <TableCell key={column.key}>
+              {celdas.map((celda) => (
+                <TableCell key={celda}>
                   <Skeleton className="h-4 w-full" />
                 </TableCell>
               ))}

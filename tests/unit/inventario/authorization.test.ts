@@ -119,6 +119,10 @@ function montarReposQueFallan(): Repos {
 const PRODUCTO_EN_BASE = {
   id: 'producto-1',
   name: 'Acido sulfurico',
+  // `imagePath` entro en `ProductView` el 2026-09-07 (columna de imagen del producto), despues
+  // de que QC-74 reescribiera este archivo en otra rama. Los dos lados tocaron lineas distintas,
+  // asi que el merge no dio conflicto y el fixture quedo incompleto: lo caza el typecheck.
+  imagePath: null,
   presentationId: '11111111-1111-4111-8111-111111111111',
   presentationName: 'Bidon 20 L',
   stock: 0,

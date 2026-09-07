@@ -163,3 +163,115 @@ QC-35. Los pasos se corrieron a mano (`typecheck`, `lint`, `test:rapido`) y adem
    ficha.
 
 Nada de esto toca la pantalla: el codigo de producto de QC-35 se revisa **correcto**.
+
+---
+
+# Segunda ronda — 2026-09-07
+
+> HEAD `4fd5be0` · 16 commits propios · **a cero de `origin/dev`** (re-sincronizada).
+> El implementer corrigio los dos mayores. Verificado por mi, no por la bitacora.
+
+## 1. Veredicto de la segunda ronda
+
+**APROBADO.** Cero mayores. Queda **1 menor**, el mismo de la primera ronda, que no bloquea.
+
+## 2. M1 — CERRADO. Cuatro centinelas invertidos, y siguen mordiendo
+
+La inversion es legitima, no un aflojamiento, y la parte que mas importaba —**que la tabla
+compartida siga cerrada al territorio de QC-56**— quedo explicitamente protegida en un caso propio:
+`las pantallas de productos y de recetas siguen SIN consumirlo: migrarlas es QC-56`.
+
+Los cuatro invertidos, con el diff revisado uno a uno:
+
+| Centinela | Que afirmaba | Que afirma ahora |
+| --- | --- | --- |
+| `tests/unit/shared/data-table-alcance.test.ts` | «ninguna pantalla lo consume todavia» | «la pantalla de pedidos es su UNICO consumidor», **mas** un caso aparte que cierra inventario y produccion |
+| `tests/unit/shared/data-table-alcance.test.ts` (R36) | «e2e/ no referencia data-table» | lista **cerrada**: solo `e2e/pedidos.spec.ts` |
+| `tests/unit/pedidos/scope.test.ts` | «ninguna pantalla ni componente de pedidos» | fuera de la carpeta derivada de `ORDERS_ROUTE`, ninguna; `components/` **sigue prohibido del todo** |
+| `tests/unit/pedidos/module-contract.test.ts` | «nadie de app/ ni components/ importa el modulo» | solo la pantalla, y **solo** por el contrato publico o el driving por ruta exacta |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` (QC-64) | lista exacta de constantes de `routes.ts` | la misma lista **mas `ORDERS_ROUTE`**; sigue siendo exacta |
+
+Detalle que conviene dejar escrito: los tres primeros ganaron **aserciones anti-vacio**
+(`consumidores > 0`, `files.length > 0`, `e2eFiles.length > 0`). Sin ellas, un bucle que no
+encuentra nada pasa en verde, que es justo el modo en que un centinela invertido se muere en
+silencio. Estan puestas.
+
+### Falsificaciones que reproduje YO (9 mutaciones, arbol restaurado tras cada una)
+
+`git status` limpio despues de cada bloque.
+
+| # | Mutacion | Resultado |
+| --- | --- | --- |
+| F1 | `app/(private)/inventario/page.tsx` importa `components/shared/data-table` | **ROJO, por los DOS casos** («no es la pantalla de pedidos: migrar las demas es QC-56») |
+| F2 | `app/(private)/produccion/formulas/page.tsx` importa `components/shared/data-table` | **ROJO, por los DOS casos** |
+| F3 | Segunda pantalla: `app/(private)/produccion/pedidos/page.tsx` | **ROJO** en `pedidos/scope.test.ts` |
+| F4 | Componente de pedidos bajo `components/`: `components/orders-card.tsx` | **ROJO** en `pedidos/scope.test.ts` |
+| F5 | Segundo E2E que referencia `data-table` | **ROJO**: la lista cerrada deja de casar |
+| F6 | La pantalla importa `@/lib/modules/pedidos/domain/order-view` | **ROJO en los DOS** centinelas de pedidos |
+| F7 | ...`/ports/order-repository` | **ROJO en los DOS** |
+| F8 | ...`/adapters/driven/persistence/order-prisma` | **ROJO en los DOS** |
+| F9 | Una constante nueva en `lib/shared/routes.ts` (`BOGUS_ROUTE`) | **ROJO** en el centinela de lista exacta de QC-64 |
+
+**F1 y F2 son las que pedia el coordinador como condicion de aprobacion, y caen.** La inversion dice
+«pedidos es el unico consumidor», no «ya puede importarlo cualquiera».
+
+## 3. Los nueve centinelas de alcance del repo
+
+Confirmado: son **nueve** buscados por nombre (`scope|alcance|module-contract`) —`inventario/scope`,
+`pedidos/module-contract`, `pedidos/scope`, `proveedores/module-contract`, `proveedores/scope`,
+`recetas/module-contract`, `recetas/scope`, `shared/data-table-alcance`, `unidades/module-contract`—
+y **los nueve estan verdes**, mas el `recetas-ui/recipe-route-contract` de QC-64:
+`Test Files 10 passed (10)`, `Tests 93 passed (93)`. Ninguno quedo desdentado por arrastre.
+
+## 4. M2 — CERRADO. El conteo de la suite, corrido por mi
+
+```
+$ pnpm exec vitest run
+ Test Files  227 passed (227)
+      Tests  2687 passed (2687)
+```
+
+**Coincide exactamente con lo que afirma la bitacora.** Verde a la primera, sin repetir la corrida:
+el flake de saturacion de la suite de UI no se me manifesto. Ademas, por mi cuenta:
+
+- `pnpm run typecheck` -> limpio, cero errores.
+- `pnpm run lint` -> limpio, sin salida.
+- `pnpm run test:guardias` -> `16 passed (16)`, `168 passed (168)`.
+
+## 5. Estado de cada hallazgo de la primera ronda
+
+| Hallazgo | Estado |
+| --- | --- |
+| **M1** — 6 tests en rojo por centinelas de alcance no invertidos | **CERRADO.** Cuatro centinelas invertidos (tres que reporte mas el de QC-64 que trajo el re-merge), 9 falsificaciones reproducidas por mi |
+| **M2** — gate completo sin correr y verde falso del rapido | **CERRADO.** Suite completa verde, corrida por mi: 227/2687 |
+| **m1** — la bitacora afirmaba un verde no corrido | **CERRADO.** La bitacora ahora lo reconoce por escrito y publica el comando y la salida de cada verde |
+| **m2** — `recetas/module-contract.test.ts` mas estricto que su criterio (la rama `basename` se evalua antes que `screenRootOf`) | **ABIERTO, sigue menor.** Sin cambios. Yerra del lado estricto: no bloquea |
+| **m3** — desviacion del `pattern` en los campos decimales | **CERRADO** (aceptado en la primera ronda) |
+
+**Ningun hallazgo nuevo, y ninguno subio de menor a mayor.**
+
+## 6. Lo que volvi a comprobar, por si el re-merge lo hubiera movido
+
+- **Ninguna dependencia de QC-35**: `git diff origin/dev...HEAD -- package.json pnpm-lock.yaml`
+  **vacio**. El re-merge trajo `package.json`, `pnpm-lock.yaml` y `docs/dependencias.md` cambiados
+  **por QC-64 y QC-48**, no por esta ficha: contra la base de la rama, QC-35 no anade ni una.
+- **El codigo de producto de QC-35 no se toco en la ronda 2**: el commit de la inversion (`54650aa`)
+  cambia **solo tres archivos de test**. El resto del rango son la bitacora y lo que llego de `dev`.
+- La unica task sin marcar en `tasks.md` sigue siendo el `./init.sh` completo del **leader**, que es
+  suyo y no del implementer.
+
+## 7. Ajenos (no son hallazgos)
+
+- **El flake de saturacion de la suite de UI**, documentado dos veces en `progress/current.md`
+  (2026-09-04): 1 fallo, 2 fallos y verde en tres corridas del leader. **No se me manifesto** en
+  ninguna de mis corridas de la suite completa. No es regresion ni es de esta feature.
+- **`./init.sh --rapido` y el spec ausente de QC-48**: punto ciego del arnes dentro de un worktree,
+  ya declarado en la primera ronda.
+- Las dependencias y las primitivas (`components/ui/checkbox.tsx`, `dialog.tsx`) que aparecen en el
+  rango vienen de `dev` (QC-64), con su fila en `docs/dependencias.md`. Fuera del alcance de QC-35.
+
+## 8. Veredicto final
+
+**OK — aprobada.** Cero mayores, un menor abierto (`m2`) que no bloquea y que conviene arrastrar
+como deuda anotada. La feature puede ir a PR una vez el leader cierre el `./init.sh` completo y la
+ultima task de `tasks.md`.

@@ -1,25 +1,43 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { Loader2Icon } from 'lucide-react';
+import { useCallback, useId, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  Autocomplete,
+  AutocompleteContent,
+  AutocompleteInput,
+  AutocompleteInputGroup,
+  AutocompleteItem,
+  AutocompleteList,
+} from '@/components/ui/autocomplete';
+import {
+  useAsyncPaginatedOptions,
+  type AsyncPageRequest,
+} from '@/hooks/use-async-paginated-options';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /**
  * Selector de receta con busqueda al SERVIDOR (R31, R43, `design.md > 9.1`).
  *
- * **Copia la FORMA de `product-picker.tsx`, no su contenido**: `Button` e `Input` del CLI
- * compuestos a mano, rebote de 250 ms y paginacion DENTRO del desplegable. Se construye asi -y no
- * con `components/ui/select.tsx`- porque la navegacion de pagina vive dentro del propio
- * desplegable y la receta elegida casi nunca esta en la pagina cargada: un `<select>` nativo o el
- * primitivo `Select` esperan que el valor elegido figure entre sus `items`.
+ * **Cambio de mecanismo del 2026-09-07 (decision humana)**: la paginacion DENTRO del desplegable
+ * ya no son los controles «Anterior»/«Siguiente» con su indicador, sino la CARGA POR SCROLL, que
+ * anexa la pagina siguiente al llegar al final de la lista. Lo que R31 exige de fondo -alcanzar
+ * cualquier receta existente sin recortar por texto en el navegador- no cambia. Los `data-testid`
+ * `-prev`, `-next` y `-page-indicator` han desaparecido.
  *
- * **No se promueve `ProductPicker` a `components/shared/`** (`design.md > 9.1`): consulta otro
- * catalogo y otro tipo de opcion, y `docs/architecture.md > Regla: sin sobre-ingenieria` pide
- * promover cuando dos features lo necesitan **con la misma API**, que no es el caso. Se comparte
- * el patron, no el archivo.
+ * **Ya no copia la FORMA de `product-picker.tsx`: los dos comparten AHORA el mismo motor**, que
+ * es `components/ui/autocomplete.tsx` (primitivos de `@base-ui/react`, la misma libreria de la
+ * que salen `Input`, `Select` y `Popover` del repo) mas el hook generico
+ * `useAsyncPaginatedOptions`, que acumula paginas, aplica el rebote y descarta lo obsoleto. Este
+ * archivo ya no gestiona a mano el cierre al pulsar fuera, ni el rebote, ni la navegacion por
+ * teclado. Ninguna dependencia nueva entro en el repo.
+ *
+ * **Sigue sin promoverse un selector comun** (`design.md > 9.1`): este consulta otro catalogo y
+ * otro tipo de opcion, y `docs/architecture.md > Regla: sin sobre-ingenieria` pide promover cuando
+ * dos features lo necesitan **con la misma API**. Lo que se comparte es el primitivo y el hook
+ * -piezas genericas, sin nada de pedidos ni de recetas dentro-, no un componente de pantalla.
  *
  * **La busqueda va al SERVIDOR, nunca al array ya descargado** (R31): escribir dispara
  * `listRecipesAction({ page, pageSize, search })`. En este archivo no se recorta `items` por
@@ -27,15 +45,18 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * catalogo. (El nombre del metodo de array que haria ese recorte no se escribe ni en este
  * comentario: la guardia de fuente de esta ruta lo veta y no debe encontrar un falso positivo.)
  * Es posible porque **QC-57 le dio `search` a `recetas`**; antes del 2026-09-06 no lo era. El
- * teclear se agrupa con un rebote de 250 ms para no pedir una consulta por pulsacion.
+ * teclear se agrupa con un rebote de 400 ms para no pedir una consulta por pulsacion, y solo la
+ * primera pagina lo espera: la siguiente la pide un gesto deliberado -llegar al final del scroll-.
  *
- * **Se alcanza CUALQUIER receta** (R31): con la paginacion del desplegable, aunque haya mas de
- * las que caben en una consulta y aunque no se escriba nada.
+ * **Se alcanza CUALQUIER receta** (R31): bajando en el desplegable, aunque haya mas de las que
+ * caben en una consulta y aunque no se escriba nada.
  *
  * **La primera pagina llega por PROPS** (R43): la pide una sola vez el Server Component de la
- * seccion y baja hasta aqui, igual que hace la pagina de receta con sus ingredientes. Este
- * componente no importa `lib/composition` ni el cliente de base de datos, y la unica lectura que
- * hace por su cuenta es la Server Action que R41 autoriza -nunca un `fetch` a una ruta propia-.
+ * seccion y baja hasta aqui. Abrir el desplegable NO consulta al servidor. Por eso el tamano de
+ * pagina es `MAX_PAGE_SIZE` y no el defecto de 10 del hook: una pagina de 10 dejaria inservible
+ * una semilla de 25 -la pagina 2 solapariacon ella-. Este componente no importa `lib/composition`
+ * ni el cliente de base de datos, y la unica lectura que hace por su cuenta es la Server Action
+ * que R41 autoriza -nunca un `fetch` a una ruta propia-.
  *
  * **El valor viaja en un `input` OCULTO** (`recipeId`): el panel lateral usa `<form action>`, asi
  * que lo elegido tiene que estar en el `FormData`, no en estado de React. Lo que se ve es el
@@ -71,13 +92,21 @@ const FIELD_TEXT = 'text-base md:text-base';
 const FIRST_PAGE = 1;
 
 /** Rebote de la busqueda: agrupa las pulsaciones seguidas en una sola consulta. */
-const SEARCH_DEBOUNCE_MS = 250;
+/* Subido de 250 a 400 ms el 2026-09-07: con 250 el rebote vencia ENTRE letra y letra de una
+   escritura normal -entre dos teclas pasan 150-300 ms-, asi que el selector acababa consultando
+   casi por pulsacion, que es justo lo que el rebote existe para evitar. */
+const SEARCH_DEBOUNCE_MS = 400;
+
+/** Alto maximo del desplegable: siempre hay scroll mientras queden paginas por traer. */
+const MAX_LIST_HEIGHT = 256;
+
+/** Margen para pedir la pagina siguiente antes de tocar el fondo, en px. */
+const SCROLL_THRESHOLD = 48;
 
 const PICKER_LABEL = 'Receta';
 const PLACEHOLDER = 'Busca una receta por su nombre';
 const EMPTY_LABEL = 'Ninguna receta coincide con la búsqueda.';
-const PREV_LABEL = 'Anterior';
-const NEXT_LABEL = 'Siguiente';
+const LOADING_LABEL = 'Cargando recetas...';
 
 export type RecipePickerProps = {
   /** Primera pagina del catalogo, por props (R43). */
@@ -97,105 +126,85 @@ export function RecipePicker({
   error,
 }: RecipePickerProps) {
   const errorId = useId();
-  const listId = useId();
   const [open, setOpen] = useState(false);
-  const [page, setPage] = useState(FIRST_PAGE);
-  const [totalPages, setTotalPages] = useState(initialPage.totalPages);
-  const [items, setItems] = useState<readonly RecipePickerOption[]>(initialPage.items);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
   /** Lo elegido: es lo que viaja en el `FormData`. */
   const [selectedId, setSelectedId] = useState(defaultValue);
   const [selectedName, setSelectedName] = useState(defaultLabel);
   /** Lo que el usuario esta escribiendo. `null` = no esta escribiendo: se muestra lo elegido. */
   const [draft, setDraft] = useState<string | null>(null);
-  /** El termino YA aplicado a una consulta; acompana a los cambios de pagina. */
-  const [appliedSearch, setAppliedSearch] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handlePointerDown(event: MouseEvent) {
-      if (containerRef.current !== null && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-        setDraft(null);
-      }
-    }
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [open]);
-
-  // Un rebote pendiente al desmontar -cerrar el panel mientras se escribe- no debe disparar una
-  // consulta contra un componente que ya no existe.
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    };
-  }, []);
 
   /**
-   * Pide una pagina del catalogo, con el termino vigente si lo hay (R31). Es un manejador de
-   * EVENTO, no un efecto, asi que `setLoading(true)` corre sincronamente.
-   *
-   * La primera pagina SIN busqueda no vuelve a pedirse: `initialPage` ya la trae por props (R43).
-   * Con busqueda no hay atajo: esa pagina la tiene el backend, no las props.
+   * Pide una pagina del catalogo, con el termino vigente si lo hay (R31). La primera pagina SIN
+   * busqueda no viaja al backend: ya la trae `initialPage` por props (R43). Con busqueda no hay
+   * atajo: esa pagina la tiene el backend, no las props.
    */
-  async function loadPage(requested: number, search: string) {
-    const next = Math.max(requested, FIRST_PAGE);
-    setPage(next);
+  const pedirPagina = useCallback(
+    async ({ query, page }: AsyncPageRequest) => {
+      const search = query.trim();
 
-    if (next === FIRST_PAGE && search === '') {
-      setItems(initialPage.items);
-      setTotalPages(initialPage.totalPages);
-      setLoadError(null);
-      return;
-    }
+      if (page === FIRST_PAGE && search === '') {
+        return { items: initialPage.items, page, totalPages: initialPage.totalPages };
+      }
 
-    setLoading(true);
-    // Sin termino la clave se omite por claridad del sitio de llamada, no porque el esquema fuera
-    // a rechazarla: con el contrato de QC-57 una busqueda vacia es AUSENCIA de busqueda.
-    const termino = search === '' ? {} : { search };
-    const result = await listRecipesAction({ page: next, pageSize: MAX_PAGE_SIZE, ...termino });
-    setLoading(false);
+      // Sin termino la clave se omite por claridad del sitio de llamada, no porque el esquema
+      // fuera a rechazarla: con el contrato de QC-57 una busqueda vacia es AUSENCIA de busqueda.
+      const termino = search === '' ? {} : { search };
+      const result = await listRecipesAction({ page, pageSize: MAX_PAGE_SIZE, ...termino });
 
-    if (result.status === 'error') {
-      setLoadError(result.message);
-      return;
-    }
-    setLoadError(null);
-    setItems(result.data.items.map((item) => ({ id: item.id, name: item.name })));
-    setTotalPages(result.data.totalPages);
-  }
+      if (result.status === 'error') {
+        // El mensaje del servidor viaja como `cause` del error que envuelve el hook, y es el que
+        // se presenta abajo: quien usa la pantalla lee lo que fallo, no una frase generica.
+        throw new Error(result.message);
+      }
 
-  function goToPage(requested: number) {
-    void loadPage(Math.min(requested, totalPages), appliedSearch);
-  }
+      return {
+        items: result.data.items.map((item) => ({ id: item.id, name: item.name })),
+        page: result.data.page,
+        totalPages: result.data.totalPages,
+      };
+    },
+    [initialPage],
+  );
 
-  /** Cada pulsacion reinicia el rebote; solo la ultima dispara la consulta. */
-  function handleDraftChange(next: string) {
-    setDraft(next);
-    setOpen(true);
-    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      const search = next.trim();
-      setAppliedSearch(search);
-      void loadPage(FIRST_PAGE, search);
-    }, SEARCH_DEBOUNCE_MS);
-  }
+  const { items, isLoading, isLoadingMore, error: loadError, loadMore } =
+    useAsyncPaginatedOptions<RecipePickerOption>({
+      fetchPage: pedirPagina,
+      query: draft ?? '',
+      pageSize: MAX_PAGE_SIZE,
+      debounceMs: SEARCH_DEBOUNCE_MS,
+      enabled: open,
+    });
+
+  /** Llegar al final de la lista pide la pagina siguiente; el hook ignora lo que sobra. */
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const lista = event.currentTarget;
+      if (lista.scrollHeight - lista.scrollTop - lista.clientHeight <= SCROLL_THRESHOLD) {
+        loadMore();
+      }
+    },
+    [loadMore],
+  );
 
   function choose(option: RecipePickerOption) {
     setSelectedId(option.id);
     setSelectedName(option.name);
-    setOpen(false);
     setDraft(null);
+    setOpen(false);
   }
 
   // Con el desplegable cerrado o sin escribir, el campo muestra lo YA elegido.
   const displayValue = draft ?? selectedName;
+  const cargando = isLoading || isLoadingMore;
+  const mensajeDeFallo =
+    loadError === undefined
+      ? null
+      : loadError.cause instanceof Error
+        ? loadError.cause.message
+        : loadError.message;
 
   return (
-    <div className="relative flex flex-col gap-2" ref={containerRef}>
+    <div className="relative flex flex-col gap-2">
       <span className="text-sm font-medium">{PICKER_LABEL}</span>
 
       {/* Lo que se ENVIA. El combobox de arriba solo busca; el id elegido viaja aqui. */}
@@ -206,109 +215,87 @@ export function RecipePicker({
         data-testid={`${RECIPE_PICKER_TESTID}-value`}
       />
 
-      <Input
-        type="text"
-        role="combobox"
-        autoComplete="off"
-        aria-expanded={open}
-        aria-autocomplete="list"
-        aria-controls={listId}
-        aria-label={PICKER_LABEL}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full`}
-        placeholder={PLACEHOLDER}
+      <Autocomplete
+        items={items}
+        mode="none"
+        itemToStringValue={(option: RecipePickerOption) => option.name}
         value={displayValue}
-        data-testid={RECIPE_PICKER_TESTID}
-        onChange={(event) => handleDraftChange(event.target.value)}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            setOpen(false);
-            setDraft(null);
-          }
-        }}
-      />
+        onValueChange={setDraft}
+        open={open}
+        onOpenChange={setOpen}
+        openOnInputClick
+      >
+        <AutocompleteInputGroup>
+          <AutocompleteInput
+            aria-label={PICKER_LABEL}
+            aria-invalid={error === undefined ? undefined : true}
+            aria-describedby={error === undefined ? undefined : errorId}
+            className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full`}
+            placeholder={PLACEHOLDER}
+            data-testid={RECIPE_PICKER_TESTID}
+          />
+        </AutocompleteInputGroup>
 
-      {open ? (
-        <div
-          className="absolute top-full z-50 mt-1 w-full min-w-56 rounded-lg border bg-popover p-1 shadow-md"
-          data-testid={`${RECIPE_PICKER_TESTID}-popup`}
-        >
-          {loadError !== null ? (
-            <p
-              role="alert"
-              className="p-2 text-sm text-destructive"
-              data-testid={`${RECIPE_PICKER_TESTID}-load-error`}
-            >
-              {loadError}
-            </p>
-          ) : (
-            <ul
-              id={listId}
-              role="listbox"
-              aria-label={PICKER_LABEL}
-              className="flex max-h-64 flex-col gap-0.5 overflow-y-auto"
-            >
-              {items.length === 0 ? (
-                <li
-                  className="px-2 py-3 text-sm text-muted-foreground"
-                  data-testid={`${RECIPE_PICKER_TESTID}-empty`}
-                >
-                  {EMPTY_LABEL}
-                </li>
-              ) : (
-                items.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={item.id === selectedId}
-                      className={`${TOUCH_TARGET} w-full rounded-md px-2 text-left ${FIELD_TEXT} hover:bg-muted`}
+        <AutocompleteContent className="min-w-56">
+          <div
+            data-testid={`${RECIPE_PICKER_TESTID}-popup`}
+            className="overflow-y-auto overscroll-contain"
+            style={{ maxHeight: MAX_LIST_HEIGHT }}
+            onScroll={handleScroll}
+          >
+            {mensajeDeFallo === null ? (
+              <>
+                <AutocompleteList>
+                  {(option: RecipePickerOption, index: number) => (
+                    <AutocompleteItem
+                      key={option.id}
+                      index={index}
+                      value={option}
+                      className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
                       data-testid={`${RECIPE_PICKER_TESTID}-option`}
-                      data-recipe-id={item.id}
-                      onClick={() => choose(item)}
+                      data-recipe-id={option.id}
+                      onClick={() => choose(option)}
                     >
-                      <span className="truncate">{item.name}</span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
+                      <span className="truncate">{option.name}</span>
+                    </AutocompleteItem>
+                  )}
+                </AutocompleteList>
 
-          {/* Navegacion de pagina DENTRO del propio desplegable (R31), con pagina actual y total. */}
-          <div className="mt-1 flex items-center justify-between gap-2 border-t pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              className={TOUCH_TARGET}
-              disabled={loading || page <= FIRST_PAGE}
-              data-testid={`${RECIPE_PICKER_TESTID}-prev`}
-              onClick={() => goToPage(page - 1)}
+                {items.length === 0 && !cargando ? (
+                  <p
+                    className="px-2 py-3 text-sm text-muted-foreground"
+                    data-testid={`${RECIPE_PICKER_TESTID}-empty`}
+                  >
+                    {EMPTY_LABEL}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p
+                role="alert"
+                className="p-2 text-sm text-destructive"
+                data-testid={`${RECIPE_PICKER_TESTID}-load-error`}
+              >
+                {mensajeDeFallo}
+              </p>
+            )}
+
+            <p
+              role="status"
+              aria-live="polite"
+              className="flex items-center justify-center gap-1.5 px-2 text-sm text-muted-foreground empty:hidden"
+              data-testid={`${RECIPE_PICKER_TESTID}-loading`}
             >
-              {PREV_LABEL}
-            </Button>
-            <span
-              className="text-xs text-muted-foreground"
-              data-testid={`${RECIPE_PICKER_TESTID}-page-indicator`}
-            >
-              {page} / {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              className={TOUCH_TARGET}
-              disabled={loading || page >= totalPages}
-              data-testid={`${RECIPE_PICKER_TESTID}-next`}
-              onClick={() => goToPage(page + 1)}
-            >
-              {NEXT_LABEL}
-            </Button>
+              {cargando ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                  <span className="py-2">{LOADING_LABEL}</span>
+                </>
+              ) : null}
+            </p>
           </div>
-        </div>
-      ) : null}
+        </AutocompleteContent>
+      </Autocomplete>
 
       {error === undefined ? null : (
         <p

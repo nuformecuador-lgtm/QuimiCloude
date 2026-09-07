@@ -23,8 +23,6 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 const NEW_ORDER: NewOrder = {
   recipeId: '11111111-1111-4111-8111-111111111111',
   quantity: '12.5000',
-  unitId: '22222222-2222-4222-8222-222222222222',
-  unitPrice: '3.7500',
   priority: 'ALTA',
   status: 'EN_CURSO',
 }
