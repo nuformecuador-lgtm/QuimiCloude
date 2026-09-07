@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | in_progress | feature/QC-57-orden-y-filtro-en-listados | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | in_progress → F2.4 | feature/QC-57-orden-y-filtro-en-listados | **PR [#38](https://github.com/singularis-co/QuimiCloude/pull/38) abierto**, esperando merge humano. Reviewer APROBADO (2ª ronda), F2.3 rehecha contra `origin/dev` y `./init.sh` completo en verde (exit 0) el 2026-09-06 |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
 | QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
 
