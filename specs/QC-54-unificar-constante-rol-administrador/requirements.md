@@ -34,7 +34,105 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Notación EARS (`docs/specs.md`). «Código de producción» = `lib/**`, `app/**`, `components/**`,
+> `hooks/**` y los `.ts`/`.tsx` de primer nivel de la raíz; `tests/`, `e2e/`, `scripts/` y `db/` no
+> lo son. «Los cinco módulos» = `inventario`, `recetas`, `unidades`, `pedidos` y `proveedores`.
+
+### El literal: una sola declaración
+
+**R1.** El sistema DEBE tener **exactamente una** declaración del literal del rol Administrador en
+todo el código de producción: `ROLE_ADMINISTRADOR`, en
+`lib/modules/identity/domain/roles.ts`.
+
+**R2.** Los contratos públicos de `inventario`, `recetas` y `unidades` NO DEBEN exportar ninguna
+constante con el nombre del rol Administrador, y sus `domain/actor.ts` NO DEBEN declarar ninguna:
+`ADMIN_ROLE_NAME` deja de existir como símbolo en el repositorio.
+
+**R3.** SI un archivo de producción necesita nombrar el rol Administrador, ENTONCES DEBE obtenerlo
+importando `ROLE_ADMINISTRADOR` del **barrel** `@/lib/modules/identity` —nunca por ruta profunda,
+nunca desde el barrel de otro módulo, nunca reescribiendo la cadena.
+
+**R4.** El valor de `ROLE_ADMINISTRADOR` DEBE seguir siendo exactamente `'Administrador'`, carácter
+por carácter.
+
+**R5.** El sistema NO DEBE cambiar nada bajo `db/`: ni el esquema, ni una migración nueva, ni el
+seed. `SEED_ROLES` DEBE seguir derivando el nombre del rol de `ROLE_ADMINISTRADOR`.
+
+### La regla: una sola implementación
+
+**R6.** El sistema DEBE tener **una sola** implementación de la comprobación «el actor tiene el rol
+Administrador», publicada por el contrato público de `identity`, y el `requireAdmin` de **cada uno
+de los cinco módulos** DEBE delegar en ella sin volver a escribir la comparación.
+
+**R7.** La implementación única DEBE recibir de quien la llama la **fábrica del error** que se lanza
+cuando la comprobación falla, y NO DEBE declarar, construir ni exportar ninguna clase de error de
+autorización propia.
+
+**R8.** CUANDO se invoca el `requireAdmin` de un módulo con un actor ausente (`null` o `undefined`),
+con `roleName` nulo, con `roleName` vacío, o con un `roleName` que no sea **exactamente igual** a
+`ROLE_ADMINISTRADOR` —«Operador», «Supervisor» o «Administradores externos» incluidos—, el sistema
+DEBE lanzar el `UnauthorizedError` **de ese módulo**, que sigue extendiendo la clase base de ese
+módulo, y DEBE hacerlo **antes** de tocar ningún puerto.
+
+**R9.** CUANDO se invoca el `requireAdmin` de un módulo con un actor cuyo `roleName` es exactamente
+igual a `ROLE_ADMINISTRADOR`, el sistema DEBE dejar continuar el caso de uso, en los cinco módulos.
+
+**R10.** Cada uno de los cinco módulos DEBE conservar su propio tipo `Actor` y su propia jerarquía
+de errores sin cambios, y los **siete adaptadores driving** que serializan con
+`error instanceof <Modulo>Error` DEBEN seguir produciendo el mismo estado serializable
+(`{ status: 'error', code, message }`) que producen hoy, con el mismo `code`.
+
+### La guardia contra la reincidencia
+
+**R11.** MIENTRAS exista un archivo de código de producción distinto de
+`lib/modules/identity/domain/roles.ts` que declare el nombre del rol Administrador como literal de
+cadena, la verificación DEBE fallar.
+
+**R12.** La guardia DEBE **derivar** el texto que busca del valor de `ROLE_ADMINISTRADOR` en vez de
+reescribirlo, DEBE reconocer las tres formas de comilla (`'`, `"`, `` ` ``), DEBE descartar los
+comentarios antes de juzgar el archivo —la prosa de un `actor.ts` que advierte sobre
+«Administradores externos» no es una infracción— y DEBE demostrar con fuentes sintéticos que da rojo
+ante una reincidencia y verde en el caso simétrico.
+
+### El borde y el cableado de rutas
+
+**R13.** `ROUTE_ROLE_RULES` DEBE seguir declarando las mismas tres filas
+(`INVENTORY_ROUTE`, `FORMULAS_ROUTE`, `SUPPLIERS_ROUTE`) con el mismo rol, tomándolo de
+`@/lib/modules/identity`.
+
+**R14.** MIENTRAS `middleware.ts` alcance `lib/composition/route-role-rules.ts`, el cierre de
+imports desde `middleware.ts` NO DEBE alcanzar `node:crypto`, `crypto`, `@prisma/client`,
+`next/headers` ni el cliente Prisma compartido.
+
+### Comportamiento invariante y documentación
+
+**R15.** El sistema NO DEBE cambiar ningún comportamiento observable: los tests de autorización que
+ya existen en los cinco módulos DEBEN seguir verdes **sin que cambie ninguna aserción, ningún dato
+de prueba ni ninguna expectativa** —el único cambio admisible en ellos es cómo obtienen el nombre
+del rol—, y NO DEBE añadirse ningún E2E nuevo por esta ficha.
+
+**R16.** El centinela `tests/unit/inventario/schema/inventario-schema.test.ts` NO DEBE modificarse y
+DEBE seguir verde.
+
+**R17.** Ningún comentario ni cabecera de código de producción DEBE seguir afirmando que nombrar el
+rol Administrador exige el barrel de `inventario` ni que `identity` no publica constantes de rol; en
+particular, las cabeceras de `lib/composition/route-role-rules.ts`,
+`lib/modules/identity/index.ts` y `lib/modules/identity/domain/route-role-rules.ts` DEBEN describir
+el estado que deja esta ficha.
+
+### Cobertura de las decisiones cerradas
+
+| Decisión | Requisito(s) |
+|---|---|
+| 1 — el `export` desaparece de los tres barriles | R2, R3 |
+| 2 — también se unifica la función | R6 |
+| 3 — `requireAdmin` parametrizado por el error | R7, R8, R10 |
+| 4 — guardia ejecutable contra la reincidencia | R11, R12 |
+| 5 — sin E2E; valen los tests que ya existen | R15 |
+| 6 — el literal no se renombra | R4, R5 |
+| 7 — no se revierte nada del centinela de `inventario` | R16 |
+| 8 — mover el import a `identity` no arriesga el borde | R13, R14 |
+| 9 — el patrón destino sale de `pedidos` y `proveedores` | R6, R9 |
 
 ## Preguntas abiertas
 
