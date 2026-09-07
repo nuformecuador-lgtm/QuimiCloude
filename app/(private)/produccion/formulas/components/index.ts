@@ -54,3 +54,10 @@ export { RecipeLinesField, type RecipeLinesFieldProps } from './recipe-lines-fie
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
+
+// --- Pasos enriquecidos (QC-64 T3, T5, T6; `design.md > 3`, `> 4`, `> 7`) ---
+// El barrel es la unica puerta de estos tres archivos (R46). `recipe-step-schema` y
+// `recipe-step-editor` son los dos unicos que importan la libreria del editor.
+export { editorJsonToStepDocument, stepDocumentToEditorJson } from './recipe-step-document';
+export { RECIPE_STEP_EXTENSIONS } from './recipe-step-schema';
+export { RecipeStepEditor, type RecipeStepEditorProps } from './recipe-step-editor';

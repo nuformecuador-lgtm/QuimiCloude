@@ -50,13 +50,13 @@
 
 ## Bloque B — el editor
 
-- [ ] **T5 — Esquema cerrado del editor.** Depende de **T2**.
+- [x] **T5 — Esquema cerrado del editor.** Depende de **T2**.
   - Archivos: `app/(private)/produccion/formulas/components/recipe-step-schema.ts` (nuevo).
   - Sólo las extensiones de `design.md > 3` capa 1. **Sin `starter-kit`.** Atajos de teclado ajenos
     desactivados.
   - **Hecho cuando:** existe y `recipe-step-editor.tsx` es su único consumidor.
 
-- [ ] **T6 — El editor de un paso.** Depende de **T5**, **T3**.
+- [x] **T6 — El editor de un paso.** Depende de **T5**, **T3**.
   - Archivos: `app/(private)/produccion/formulas/components/recipe-step-editor.tsx` (nuevo).
   - Barra de formato siempre visible (negrilla, cursiva, lista de verificación), `aria-pressed`,
     ≥44×44 px, área editable `text-base`; checkbox de los ítems **no interactivo** (R6); aviso de
