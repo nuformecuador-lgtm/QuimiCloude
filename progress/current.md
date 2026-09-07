@@ -15,7 +15,7 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
 | QC-48 | tenant-en-la-sesion | Multiempresa | backend | in_progress | feature/QC-48-tenant-en-la-sesion | implementer (**spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*). R1–R28, 14 tasks, sin migración y sin dependencia nueva |
-| QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | spec_ready | feature/QC-54-unificar-constante-rol-administrador | esperando aprobación humana del spec (F1.4). Tarjeta en *En revisión*, commit `5782dd1` en la rama |
+| QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | in_progress | feature/QC-54-unificar-constante-rol-administrador | **spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*. **F2.1 RETENIDA**: conflicto de archivos confirmado con QC-48 (ver Evaluaciones) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -223,6 +223,35 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-54 — F2.0 hecha y F2.1 RETENIDA: el conflicto con QC-48 está medido (2026-09-07)
+
+Spec aprobado por el humano y tarjeta en *En curso*. `status: in_progress`. Zona `backend` queda
+**2/2** (QC-48 y QC-54), o sea en el límite y sin margen para una tercera.
+
+**La validación de `AGENTS.md > Paralelismo` ya se puede hacer de verdad** —`tasks.md` existe en
+las dos fichas, que es contra lo que manda validar— y **da conflicto**. Cruzando los archivos con
+ruta que declara cada `tasks.md` (28 y 28):
+
+| Archivo | QC-54 lo necesita para | QC-48 lo necesita para |
+|---|---|---|
+| `lib/modules/identity/index.ts` | publicar `assertAdminRole` en el contrato | publicar la empresa en la sesión |
+| `tests/guards/guard-middleware-edge.test.ts` | probar que leer el rol de `identity` no ensucia el borde | probar que la empresa firmada no ensucia el borde |
+
+**Por eso F2.1 no se lanza.** La regla es explícita: con intersección de archivos, la feature nueva
+espera a que la que ya está dentro pase a `done`. No es una precaución mía.
+
+**QC-48 está cerca de cerrar, no empezando:** siete commits en su rama, T1–T12 con E2E incluido,
+bitácora con el mapa R1–R28 escrita y `dev` ya mergeado (o sea su F2.3 hecha). La espera debería
+ser corta, y **el orden favorece a QC-48**: si QC-54 tocara el barrel primero, el conflicto se lo
+comería la feature que ya tiene doce tasks hechas.
+
+**Lo que desbloquea F2.1**, cualquiera de las dos: QC-48 pasa a `done`, o el humano decide asumir
+el merge a mano sobre esos dos archivos.
+
+### QC-70 — errores-centralizados: nacida, acotada y sembrada (2026-09-07)
+
+Ficha creada en esta sesión junto a QC-71 (identificador de petición). Acotada con `/afinar-feature`: diez decisiones cerradas y una pregunta abierta en `specs/QC-70-errores-centralizados/requirements.md` — no se releen desde aquí. El alcance **creció y cambió de zona**: `backend` → `fullstack`, `complexity: high`, `depends_on: QC-54`, y la `description` del board se reescribió antes de sembrar. Dos premisas de la ficha original **se cayeron al medirlas**: los códigos de error ya son estables y compartidos de hecho (siete pantallas deciden por ellos), así que el `code: 30` numérico que pedía la ficha se descartó; y «un solo tipo de error» choca con una decisión ya cerrada de QC-54, que está a medio construir en su propio worktree. Salió **QC-72** (`internacionalizacion-de-textos`): «preparado para traducir» arrastra una decisión de aplicación entera y una dependencia nueva que no caben en una ficha de errores.
 
 ### QC-54 — unificar-constante-rol-administrador: arranque del 2026-09-07 (F1.0)
 

@@ -14,7 +14,7 @@ import {
   type RouteAccessSession,
 } from '@/lib/modules/identity/domain/route-access';
 import type { RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import {
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
@@ -239,7 +239,7 @@ describe('decideRouteAccess — R29: la decision no es una autorizacion', () => 
 // Los bloques de arriba usan prefijos y reglas sinteticos a proposito: lo que ejercitan es la
 // POLITICA. Este bloque hace lo contrario y es el unico que lo hace: entra con
 // `PRIVATE_ROUTE_PREFIXES` y `ROUTE_ROLE_RULES` de verdad, mas `INVENTORY_ROUTE` y
-// `ADMIN_ROLE_NAME` de sus constantes unicas, porque lo que se afirma aqui NO es la politica sino
+// `ROLE_ADMINISTRADOR` de sus constantes unicas, porque lo que se afirma aqui NO es la politica sino
 // que ESTA pantalla quedo efectivamente cubierta y restringida. Con reglas sinteticas, sacar
 // `/inventario` de la lista de prefijos privados no pondria rojo ningun test.
 //
@@ -279,7 +279,7 @@ describe('la pantalla de inventario con las constantes reales (R3, R4)', () => {
 
   // R4 — con sesion de Administrador entra; con cualquier otro rol, fuera y sin renderizar.
   it('deja pasar al Administrador (R4)', () => {
-    const admin = { kind: 'authenticated', sub: SUB, roleName: ADMIN_ROLE_NAME } as const;
+    const admin = { kind: 'authenticated', sub: SUB, roleName: ROLE_ADMINISTRADOR } as const;
 
     expect(decideRouteAccess({ ...REAL, pathname: INVENTORY_ROUTE, session: admin })).toEqual({
       kind: 'allow',
@@ -346,7 +346,7 @@ describe('la pantalla de recetas con las constantes reales (R4, R6)', () => {
   // R6 — con sesion de Administrador entra a las tres; con cualquier otro rol, fuera y sin
   // renderizar, con motivo `forbidden`.
   it('deja pasar al Administrador en las tres rutas (R6)', () => {
-    const admin = { kind: 'authenticated', sub: SUB, roleName: ADMIN_ROLE_NAME } as const;
+    const admin = { kind: 'authenticated', sub: SUB, roleName: ROLE_ADMINISTRADOR } as const;
 
     for (const ruta of [FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute(ID_RECETA)]) {
       expect(decideRouteAccess({ ...REAL, pathname: ruta, session: admin })).toEqual({

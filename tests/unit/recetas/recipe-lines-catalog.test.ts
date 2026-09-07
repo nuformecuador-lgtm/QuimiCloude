@@ -6,17 +6,18 @@
 // `findRefs`: no basta `toHaveBeenCalled`, hay que ver que la linea preexistente NUNCA
 // aparece en esos argumentos (R45).
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
 const PRODUCTO_VIEJO = '11111111-1111-4111-8111-111111111111'; // ya en la receta, de baja

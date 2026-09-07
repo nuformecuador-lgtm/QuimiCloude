@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 
 import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
 import { findRouteRule, type RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import {
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
@@ -72,21 +72,20 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   //
   // La lista vive en `lib/composition/` desde el 2026-09-03: nombrar las rutas exige
   // `INVENTORY_ROUTE` y `FORMULAS_ROUTE` de `lib/shared/routes` —que el dominio no puede
-  // importar— y nombrar el rol exige `ADMIN_ROLE_NAME` del barrel de `inventario` **como
-  // valor**, que solo `lib/composition` tiene permitido
-  // (`tests/unit/inventario/schema/inventario-schema.test.ts`).
+  // importar—. El rol ya no es motivo: `ROLE_ADMINISTRADOR` sale del barrel de `identity`,
+  // igual que en cualquier otro consumidor.
   it('declara exactamente cuatro reglas, en orden: inventario, recetas, proveedores y pedidos, las cuatro solo Administrador (R4, R6)', () => {
     // AMPLIADO otra vez el 2026-09-04 (QC-44 T3, R6): la TERCERA fila es la pantalla de
     // proveedores. El centinela no se relaja: sigue exigiendo la lista EXACTA y COMPLETA, en el
     // orden real, asi que una cuarta regla sin ficha que la respalde vuelve a ponerlo en rojo.
     expect(ROUTE_ROLE_RULES).toEqual([
-      { prefix: INVENTORY_ROUTE, roles: [ADMIN_ROLE_NAME] },
-      { prefix: FORMULAS_ROUTE, roles: [ADMIN_ROLE_NAME] },
-      { prefix: SUPPLIERS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+      { prefix: INVENTORY_ROUTE, roles: [ROLE_ADMINISTRADOR] },
+      { prefix: FORMULAS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
+      { prefix: SUPPLIERS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
       // AMPLIADO otra vez el 2026-09-06 (QC-35 T3, R5): la CUARTA fila es la pantalla de
       // pedidos. El centinela sigue exigiendo la lista EXACTA y COMPLETA, en el orden real, asi
       // que una quinta regla sin ficha que la respalde vuelve a ponerlo en rojo.
-      { prefix: ORDERS_ROUTE, roles: [ADMIN_ROLE_NAME] },
+      { prefix: ORDERS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
     ]);
   });
 
@@ -94,8 +93,8 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   it('la regla de proveedores cubre la lista y la pagina de detalle, y es la MISMA fila (R6)', () => {
     const detalle = supplierDetailRoute('22222222-2222-4222-8222-222222222222');
 
-    expect(findRouteRule(ROUTE_ROLE_RULES, SUPPLIERS_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
-    expect(findRouteRule(ROUTE_ROLE_RULES, detalle)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, SUPPLIERS_ROUTE)?.roles).toEqual([ROLE_ADMINISTRADOR]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, detalle)?.roles).toEqual([ROLE_ADMINISTRADOR]);
     expect(findRouteRule(ROUTE_ROLE_RULES, detalle)).toBe(
       findRouteRule(ROUTE_ROLE_RULES, SUPPLIERS_ROUTE),
     );
@@ -105,21 +104,21 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   });
 
   it('la regla se aplica a la ruta de inventario y a lo que cuelgue de ella (R4)', () => {
-    expect(findRouteRule(ROUTE_ROLE_RULES, INVENTORY_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, INVENTORY_ROUTE)?.roles).toEqual([ROLE_ADMINISTRADOR]);
     expect(findRouteRule(ROUTE_ROLE_RULES, `${INVENTORY_ROUTE}/nuevo`)?.roles).toEqual([
-      ADMIN_ROLE_NAME,
+      ROLE_ADMINISTRADOR,
     ]);
   });
 
   // R6 — la regla de recetas cubre la lista Y sus dos subrutas de formulario: alta y edicion.
   // La regla de inventario (R4) sigue existiendo: se anade, no se sustituye.
   it('la regla de recetas cubre la lista y sus dos subrutas de formulario, y la de inventario sigue en pie (R6)', () => {
-    expect(findRouteRule(ROUTE_ROLE_RULES, FORMULAS_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
-    expect(findRouteRule(ROUTE_ROLE_RULES, NEW_RECIPE_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, FORMULAS_ROUTE)?.roles).toEqual([ROLE_ADMINISTRADOR]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, NEW_RECIPE_ROUTE)?.roles).toEqual([ROLE_ADMINISTRADOR]);
     expect(
       findRouteRule(ROUTE_ROLE_RULES, recipeEditRoute('11111111-1111-4111-8111-111111111111'))
         ?.roles,
-    ).toEqual([ADMIN_ROLE_NAME]);
+    ).toEqual([ROLE_ADMINISTRADOR]);
 
     // La regla que casa con las dos subrutas es la MISMA fila que casa con la lista: no hay
     // una tercera fila escondida solo para el formulario.
@@ -128,7 +127,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
     );
 
     // Y la regla de inventario (R4) sigue exactamente igual: no se sustituyo.
-    expect(findRouteRule(ROUTE_ROLE_RULES, INVENTORY_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, INVENTORY_ROUTE)?.roles).toEqual([ROLE_ADMINISTRADOR]);
   });
 
   // Lo que la ficha NO hace: cerrar el resto del area privada. Cada ficha anade su fila.
@@ -138,17 +137,17 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   });
 
   // R2 — la fila se deriva de la constante unica de ruta; el literal no se reescribe aqui.
-  it('las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE y ADMIN_ROLE_NAME, no de literales propios', () => {
+  it('las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE, ORDERS_ROUTE y ROLE_ADMINISTRADOR, no de literales propios', () => {
     const fuente = readFileSync('lib/composition/route-role-rules.ts', 'utf8')
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, ' ');
 
     expect(fuente).toContain("from '@/lib/shared/routes'");
-    expect(fuente).toContain("from '@/lib/modules/inventario'");
+    expect(fuente).toContain("from '@/lib/modules/identity'");
     expect(fuente).not.toContain(`'${INVENTORY_ROUTE}'`);
     expect(fuente).not.toContain(`'${FORMULAS_ROUTE}'`);
     expect(fuente).not.toContain(`'${SUPPLIERS_ROUTE}'`);
     expect(fuente).not.toContain(`'${ORDERS_ROUTE}'`);
-    expect(fuente).not.toContain(`'${ADMIN_ROLE_NAME}'`);
+    expect(fuente).not.toContain(`'${ROLE_ADMINISTRADOR}'`);
   });
 });

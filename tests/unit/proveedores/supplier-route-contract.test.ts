@@ -24,7 +24,7 @@ import {
   type RouteAccessInput,
   type RouteAccessSession,
 } from '@/lib/modules/identity/domain/route-access'
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario'
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity'
 import {
   PRIVATE_NAV_ITEMS,
   SUPPLIERS_LABEL,
@@ -208,7 +208,7 @@ const OPERADOR: RouteAccessSession = { kind: 'authenticated', sub: SUB, roleName
 const ADMIN: RouteAccessSession = {
   kind: 'authenticated',
   sub: SUB,
-  roleName: ADMIN_ROLE_NAME,
+  roleName: ROLE_ADMINISTRADOR,
 }
 
 const REAL = {
@@ -226,7 +226,7 @@ describe('la pantalla de proveedores con las constantes reales (R5, R6)', () => 
   it('la regla se deriva de SUPPLIERS_ROUTE y restringe al Administrador (R6)', () => {
     expect(ROUTE_ROLE_RULES).toContainEqual({
       prefix: SUPPLIERS_ROUTE,
-      roles: [ADMIN_ROLE_NAME],
+      roles: [ROLE_ADMINISTRADOR],
     })
   })
 

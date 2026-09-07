@@ -4,16 +4,17 @@
 // firma ni caducidad-. Confirma que ningun caso de uso conoce el bucket ni la URL del
 // proyecto: el doble es libre de componer la URL de cualquier forma determinista.
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
 const RECETA_VALIDA = {

@@ -4,15 +4,16 @@
 // del puerto, y que un `remove` que rechaza NO hace fallar la edicion y devuelve la
 // advertencia con contexto.
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
 const RECETA_VALIDA = {

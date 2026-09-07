@@ -9,7 +9,8 @@
 // TRES COSAS A LA VEZ -que la consulta no falla, que el orden aplicado es el de por defecto y
 // que el log recibio el campo-. Comprobar solo la primera pasa en verde con un `catch` vacio.
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/inventario/domain/actor';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { UnauthorizedError, ValidationError } from '@/lib/modules/inventario/domain/errors';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
@@ -22,7 +23,7 @@ import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
 const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
 
 function paginaVacia<T>(): Page<T> {
