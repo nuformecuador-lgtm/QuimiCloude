@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { normalizeCompanyName } from '@/lib/modules/identity'
 import {
   createOrder,
   listAliveOrders,
@@ -46,6 +47,7 @@ let unitId: string
 let actorId: string
 let roleId: string
 let documentTypeCode: string
+let companyId: string
 
 const creados: string[] = []
 
@@ -126,6 +128,20 @@ beforeAll(async () => {
       select: { id: true },
     })
   ).id
+  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
+  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
+  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
+  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
+  // nombre de empresa» (R3), importada del contrato publico de `identity`-.
+  companyId = (
+    await prisma.company.create({
+      data: {
+        name: `Empresa ${marca}`,
+        nameNormalized: normalizeCompanyName(`Empresa ${marca}`),
+      },
+      select: { id: true },
+    })
+  ).id
   actorId = (
     await prisma.user.create({
       data: {
@@ -139,6 +155,7 @@ beforeAll(async () => {
         username: `ana.${marca}`,
         passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
         roleId,
+        companyId,
       },
       select: { id: true },
     })
@@ -153,6 +170,7 @@ afterAll(async () => {
   await prisma.user.delete({ where: { id: actorId } })
   await prisma.role.delete({ where: { id: roleId } })
   await prisma.documentType.delete({ where: { code: documentTypeCode } })
+  await prisma.company.delete({ where: { id: companyId } })
   await prisma.recipe.delete({ where: { id: recipeId } })
   await prisma.unit.delete({ where: { id: unitId } })
   await prisma.$disconnect()
