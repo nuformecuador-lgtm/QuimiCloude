@@ -15,6 +15,7 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
 | QC-48 | tenant-en-la-sesion | Multiempresa | backend | pending → F1.2 | feature/QC-48-tenant-en-la-sesion | leader (worktree montado desde `origin/dev`=`738d9a9`, sin spec: pendiente de acotar con `/afinar-feature`) |
+| QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | pending → F1.2 | feature/QC-54-unificar-constante-rol-administrador | leader (worktree montado desde `origin/dev`=`738d9a9`, sin spec: pendiente de decidir si se acota con `/afinar-feature`) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -222,6 +223,52 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-54 — unificar-constante-rol-administrador: arranque del 2026-09-07 (F1.0)
+
+Elegida por decisión humana explícita («comienza con 54»). Zona `backend`, que estaba **vacía de
+`in_progress`** —las dos en curso, QC-35 y QC-64, son `frontend` y llenan su cupo—, así que es la
+primera de su zona y el paralelismo no necesita validación de conflicto contra nadie de `backend`.
+`depends_on: null`. Worktree montado desde `origin/dev` = `738d9a9`.
+
+**`complexity` asignada: `medium`, no `low`.** La ficha parece un buscar-y-reemplazar y no lo es:
+`ADMIN_ROLE_NAME` está **exportado en el barrel** de `inventario`, `recetas` y `unidades`
+(`lib/modules/<m>/index.ts`), así que retirarlo **cambia el contrato público de tres módulos**. Son
+tres declaraciones a borrar, tres barriles a tocar y una veintena de consumidores, la mitad de ellos
+tests de autorización de cuatro módulos. Verificado en el árbol antes de asignar: la ficha describe
+el estado real.
+
+**Lo que ya está bien y no se toca:** `pedidos` y `proveedores` ya importan `ROLE_ADMINISTRADOR` de
+`@/lib/modules/identity` (`domain/actor.ts` de cada uno). Son el patrón destino, no trabajo
+pendiente. La ficha decía «solo proveedores»; son dos.
+
+**El valor de la cadena no puede cambiar, solo de dónde se lee.** `'Administrador'` viaja **firmado
+en la cookie de sesión** (QC-8/QC-9) y está en `SEED_ROLES`, o sea en la base. Renombrarlo invalida
+todas las sesiones vivas y desalinea el seed. Esta ficha mueve el origen del literal, nunca el
+literal.
+
+**Aviso de conflicto que la regla NO cubre, y por eso queda escrito.** QC-64
+(`editor-y-lectura-de-pasos`, `in_progress`) es `frontend`, y `AGENTS.md > Paralelismo` solo valida
+intersección de archivos **dentro de la misma zona**: formalmente no hay nada que validar. Pero
+QC-54 tiene que editar `lib/modules/recetas/index.ts` y `lib/modules/recetas/domain/actor.ts`, y
+QC-64 vive en recetas. El riesgo no es de regla, es de merge en F2.3. Comprobar contra
+`progress/impl_QC-64-*` antes de que el implementer entre en el barrel de recetas.
+
+**Decisiones que la ficha deja abiertas y que el spec no debe rellenar con un supuesto:**
+
+1. ¿`ADMIN_ROLE_NAME` **desaparece** de los tres barriles, o se queda como re-export de
+   `ROLE_ADMINISTRADOR` durante una transición? Lo primero es la ficha tal cual está escrita; lo
+   segundo evita romper a los consumidores de golpe. No es lo mismo y cambia el diff entero.
+2. `lib/composition/route-role-rules.ts` importa hoy `ADMIN_ROLE_NAME` **del barrel de
+   `inventario`**, y ese import es justo el que en QC-22 encendió el centinela que prohíbe importar
+   ese barrel como valor fuera de `lib/composition` — el centinela se **acotó** para permitirlo.
+   Al pasar el import a `identity`, ¿se **revierte** esa acotación del centinela, que es la deuda
+   que la ficha dice que era evitable, o se deja como está? La ficha lo cuenta como motivación pero
+   no lo pide.
+3. ¿Entra una **guardia ejecutable** que impida que un módulo nuevo vuelva a declarar su propio
+   literal `'Administrador'`? Sin ella la ficha limpia el presente y no el futuro, que es el motivo
+   por el que existe.
+
 
 ### QC-35 — pantalla-de-pedidos: acotada y sembrada (2026-09-06)
 

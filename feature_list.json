@@ -726,7 +726,7 @@
       "description": "Hoy el literal 'Administrador' esta declarado CUATRO veces: ROLE_ADMINISTRADOR en identity/domain/roles.ts -que es la buena, y cuyo propio comentario dice que existe para \"cualquier otro archivo que necesite nombrar uno de ellos\"- y ADMIN_ROLE_NAME repetido en inventario, recetas y unidades. Cada modulo que necesito nombrar el rol declaro el suyo en vez de usar el que ya habia. Solo proveedores (QC-43) importa el de identity.\n\nEsta ficha deja una sola constante, la de identity, y retira las tres copias. Los consumidores son unos veinte archivos, incluidos lib/composition/route-role-rules.ts y los tests de autorizacion de cuatro modulos.\n\nPor que importa mas de lo que parece: en QC-22, la primera regla ruta-rol del repo importo ADMIN_ROLE_NAME del barrel de inventario, y eso encendio un centinela que prohibia importar ese barrel como valor fuera de lib/composition. Se acoto el centinela para resolverlo. Si el rol hubiera salido de identity desde el principio, esa guardia no habria saltado: el rodeo era evitable.\n\nCuidado al hacerla: ADMIN_ROLE_NAME es parte del contrato publico de tres modulos, asi que retirarlo cambia sus barriles y los tests que lo importan. No es solo un buscar y reemplazar. Y el nombre del rol viaja FIRMADO en la cookie de sesion (QC-8/QC-9): el valor de la cadena no puede cambiar, solo de donde se lee.\n\nNada de UI: esta ficha no abre app/ ni components/.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "backend",
       "branch": "feature/QC-54-unificar-constante-rol-administrador",
       "depends_on": null,
