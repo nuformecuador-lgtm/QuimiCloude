@@ -2,47 +2,37 @@
 // (`design.md > 2.1`). Encadena cuatro cortes —sin contenido, caducado, sin usuario activo, y
 // solo entonces compone el `SessionUser`— y ese encadenado ES la politica (R1, R10-R14, R23):
 // no delega, decide en que orden se corta y cuando NO hace falta tocar la base.
+//
+// QC-48 (T7, `design.md > 4.2`): la cadena ya no vive aqui. Se mudo entera a `resolve-session.ts`
+// —que le anadio dos cortes mas, empresa que no casa y empresa muerta— porque esta ficha necesita
+// DOS proyecciones de la misma politica y dos copias serian dos definiciones de «hay sesion»
+// (R21). Este archivo se queda con lo que siempre fue su contrato: la proyeccion de usuario.
 
-import { buildDisplayName } from './display-name';
-import { isSessionExpired } from './session-claims';
+import { createResolveSession } from './resolve-session';
 
-import type { SessionReader } from '../ports/session-reader';
-import type { SessionUserReader } from '../ports/session-user-reader';
 import type { SessionUser } from './session-user';
+import type { ResolveSessionDeps } from './resolve-session';
 
-export type ResolveSessionUserDeps = {
-  readonly session: SessionReader;
-  readonly users: SessionUserReader;
-};
+export type ResolveSessionUserDeps = ResolveSessionDeps;
 
 /**
- * `now` entra como parametro con valor por defecto, igual que `createSessionTicket` (QC-7): es
- * lo que hace testeable la caducidad sin reloj falso ni `sleep`.
+ * Misma firma publica que en QC-8 —`(now?) => Promise<SessionUser | null>`— y a proposito: asi
+ * ni el puerto `SessionProvider`, ni `lib/composition`, ni el layout privado, ni los tests de
+ * QC-8 cambian de forma. Lo unico que cambia es de donde sale la decision.
+ *
+ * `now` sigue entrando como parametro con valor por defecto, igual que `createSessionTicket`
+ * (QC-7): es lo que hace testeable la caducidad sin reloj falso ni `sleep`.
  */
 export function createResolveSessionUser(
   deps: ResolveSessionUserDeps,
 ): (now?: Date) => Promise<SessionUser | null> {
+  const resolveSession = createResolveSession(deps);
+
   return async function resolveSessionUser(now: Date = new Date()): Promise<SessionUser | null> {
-    const claims = await deps.session.readClaims();
-    // Sin cookie, prefijo invalido, firma que no casa o contenido que no valida: el lector ya
-    // lo resolvio como "nada" (R2-R6). No se toca el lector de usuario.
-    if (claims === null) return null;
+    // El ternario y no `resolved?.user`: sin sesion hay que devolver `null`, y `undefined` no es
+    // lo mismo que `null` para quien consume esta firma desde QC-8.
+    const resolved = await resolveSession(now);
 
-    // Caducada: tampoco justifica una consulta a la base (R7).
-    if (isSessionExpired(claims, now)) return null;
-
-    // Solo aqui, con una sesion con forma valida y sin caducar, se consulta por el `sub`
-    // en cada peticion (R10): el rol y el estado activo son siempre los actuales.
-    const record = await deps.users.findActiveById(claims.sub);
-    // No existe, o esta dado de baja (`deleted_at`): sin sesion aunque la firma y la
-    // caducidad fueran impecables (R11).
-    if (record === null) return null;
-
-    return {
-      id: record.id,
-      username: record.username,
-      displayName: buildDisplayName(record.firstNames, record.lastNames, record.username),
-      roleName: record.roleName,
-    };
+    return resolved === null ? null : resolved.user;
   };
 }

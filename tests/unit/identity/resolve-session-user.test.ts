@@ -33,12 +33,18 @@ const CLAIMS_CADUCADOS: SessionClaims = {
   expiresAt: new Date('2026-09-01T08:00:00.000Z'),
 };
 
+// QC-48 T7: la ficha gana `companyId` y `companyDeletedAt` porque el tipo los exige. Son la
+// misma empresa que la firmada y una empresa viva, o sea el caso que ya se probaba aqui: los
+// cortes nuevos tienen sus propios tests en `resolve-session.test.ts`. Ni una asercion de este
+// archivo cambia.
 const RECORD: SessionUserRecord = {
   id: SUB,
   username: 'ana.perez',
   firstNames: 'Ana Maria',
   lastNames: 'Perez Gomez',
   roleName: 'operador',
+  companyId: COMPANY_ID,
+  companyDeletedAt: null,
 };
 
 /** Puerto falso de sesion: siempre devuelve el mismo `claims`, contando llamadas si hace falta. */

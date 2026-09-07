@@ -3,7 +3,7 @@
 // Prohibido importar adaptadores driving desde aqui: la flecha va driving -> composicion (R12).
 import {
   createCredentialPolicy,
-  createResolveSessionUser,
+  createResolveSession,
   createVerifyCredentials,
   seedInitialAccess,
 } from '@/lib/modules/identity';
@@ -155,8 +155,15 @@ const loginAttemptRecorder: LoginAttemptRecorder = {
 const sessionWriter: SessionWriter = { startSession };
 const sessionReader: SessionReader = { readClaims: readSessionClaims };
 const sessionUserReader: SessionUserReader = { findActiveById: findActiveSessionUserById };
+// QC-48 (T8, `design.md > 6`): UNA SOLA instancia de la cadena de cortes, y de ella salen las DOS
+// salidas. Dos construcciones serian dos cableados que pueden divergir —mismo criterio que
+// `checkCredentialPolicy` en QC-19— y con ellos dos definiciones de «hay sesion», que es
+// justamente lo que R21 prohibe.
+const resolveSession = createResolveSession({ session: sessionReader, users: sessionUserReader });
 const sessionProvider: SessionProvider = {
-  getSessionUser: createResolveSessionUser({ session: sessionReader, users: sessionUserReader }),
+  getSessionUser: async () => (await resolveSession())?.user ?? null,
+  // R19: `null` en exactamente los mismos casos que `getSessionUser`, por construccion.
+  getSessionContext: async () => (await resolveSession())?.context ?? null,
   endSession: clearSession,
 };
 

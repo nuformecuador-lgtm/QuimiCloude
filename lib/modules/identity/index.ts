@@ -21,6 +21,10 @@ export { normalizeCompanyName } from './domain/company-name';
 export { INITIAL_COMPANY_NAME } from './domain/companies';
 export { seedInitialAccess, type SeedOutcome } from './domain/seed-initial-access';
 export { createResolveSessionUser } from './domain/resolve-session-user';
+// QC-48 T8 — La cadena unica de cortes y lo que expone al servidor. Dominio puro: no arrastra
+// Prisma ni `next/*`, asi que el contrato sigue importable desde un componente de cliente.
+export { createResolveSession, type ResolveSessionDeps, type ResolvedSession } from './domain/resolve-session';
+export type { SessionContext } from './domain/session-context';
 export { buildDisplayName } from './domain/display-name';
 export { isSessionExpired, type SessionClaims } from './domain/session-claims';
 

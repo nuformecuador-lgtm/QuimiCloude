@@ -18,6 +18,18 @@ import type { SessionUserRecord } from '../../../ports/session-user-reader';
  *
  * `id` es `@db.Uuid`: un `sub` sin forma de UUID haria que Prisma lanzara en vez de devolver
  * `null`. Por eso el esquema del dominio exige forma de UUID y corta antes de llegar aqui (R6).
+ *
+ * QC-48 (T6, R13, `design.md > 4.1`): el `select` gana `companyId` y `company.deletedAt`, en
+ * ESTA MISMA llamada a `findFirst`. `companyId` es una columna de `users` y ya venia en la fila;
+ * `company.deletedAt` vive en `companies` y Prisma lo resuelve por la relacion ya declarada y por
+ * la clave primaria de `companies`, igual que ya hace con `role.name`. **Ni una segunda consulta
+ * por peticion**, que era la condicion.
+ *
+ * El coste, aceptado por escrito en `design.md > 4.1` y anotado aqui para que nadie lo descubra
+ * de sorpresa: (a) el plan de esta consulta gana un `JOIN` mas —una busqueda por CLAVE PRIMARIA,
+ * en la ruta mas caliente de la aplicacion, que ya hacia otro `JOIN` por `users_role_id_idx`—;
+ * (b) el `select` deja de ser tan estrecho: sale de la base una marca de tiempo mas, que **no es
+ * PII** y no se registra en ningun log.
  */
 export async function findActiveSessionUserById(id: string): Promise<SessionUserRecord | null> {
   const usuario = await prisma.user.findFirst({
@@ -28,6 +40,8 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
       firstNames: true,
       lastNames: true,
       role: { select: { name: true } },
+      companyId: true,
+      company: { select: { deletedAt: true } },
     },
   });
 
@@ -39,5 +53,8 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
     firstNames: usuario.firstNames,
     lastNames: usuario.lastNames,
     roleName: usuario.role.name,
+    companyId: usuario.companyId,
+    // QC-48 R15: la marca cruda. Quien decide si «esta viva» es el dominio, no este adaptador.
+    companyDeletedAt: usuario.company.deletedAt,
   };
 }

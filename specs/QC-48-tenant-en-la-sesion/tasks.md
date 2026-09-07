@@ -65,7 +65,7 @@
 
 ## Bloque 3 — El lector de sesión
 
-- [ ] **T6 `[P]` — El lector de usuario trae empresa y su estado.**
+- [x] **T6 `[P]` — El lector de usuario trae empresa y su estado.**
       Archivos: `lib/modules/identity/ports/session-user-reader.ts`,
       `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts`.
       `SessionUserRecord` gana `companyId` y `companyDeletedAt`; el `select` gana `companyId: true`
@@ -73,7 +73,7 @@
       **Hecho cuando:** el test de integración afirma los dos campos y que **no hay una segunda
       consulta** (una sola llamada a `findFirst`). Cubre R13.
 
-- [ ] **T7 — La cadena de cortes, en un solo sitio. Depende de T1 y T6.**
+- [x] **T7 — La cadena de cortes, en un solo sitio. Depende de T1 y T6.**
       Archivos nuevos: `lib/modules/identity/domain/session-context.ts`,
       `lib/modules/identity/domain/resolve-session.ts`,
       `tests/unit/identity/resolve-session.test.ts`.
@@ -86,7 +86,7 @@
       igual al **leído de la base**; (e) los tests de QC-8 de `resolve-session-user` siguen verdes
       **sin tocar su guion**. Cubre R14, R15, R16, R17, R19, R20, R21.
 
-- [ ] **T8 — Exponerlo al servidor. Depende de T7.**
+- [x] **T8 — Exponerlo al servidor. Depende de T7.**
       Archivos: `lib/modules/identity/ports/session-provider.ts`,
       `lib/modules/identity/index.ts`, `lib/composition/index.ts`,
       `tests/unit/composition/identity-facade.test.ts`.

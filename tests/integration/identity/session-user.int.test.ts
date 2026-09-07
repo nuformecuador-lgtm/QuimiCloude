@@ -12,13 +12,18 @@
  * nunca la de instalacion, porque `companies_name_unique` es global. El `afterAll` barre en
  * orden `users -> companies` (`users_company_id_fkey` es `ON DELETE RESTRICT`).
  *
+ * QC-48 (T6, R13) — el mismo `select` trae ahora `companyId` y `company.deletedAt`. Se afirma
+ * aqui, contra Postgres, que los dos campos salen de verdad y que salen en UNA SOLA llamada a
+ * `findFirst`: la condicion de `design.md > 4.1` era «cero consultas nuevas por peticion», no
+ * «un JOIN mas y ya veremos».
+ *
  * EL ROL NO SE MUEVE (R13, R14): sigue saliendo de `users.role_id`, en el mismo `select` y sin
  * ninguna consulta adicional. El caso «el rol cambiado entre dos lecturas devuelve el nuevo»
  * ya lo demuestra, y esta ficha lo deja intacto a proposito.
  */
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
 import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity';
@@ -95,6 +100,9 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       firstNames: 'Ana Maria',
       lastNames: 'Perez Gomez',
       roleName: `qc8-session-${sufijo}`,
+      // QC-48 R13: la empresa de la ficha y su estado, en la misma fila.
+      companyId: empresaId,
+      companyDeletedAt: null,
     });
   });
 
@@ -126,6 +134,38 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       expect(segundaLectura?.roleName).toBe(`qc8-session-alt-${sufijo}`);
     } finally {
       await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolId } });
+    }
+  });
+
+  // QC-48 R13 — la empresa dada de baja SI devuelve fila, con su marca de tiempo: el corte es
+  // del dominio (`resolve-session.ts`), no de este adaptador.
+  it('un usuario de una empresa dada de baja devuelve companyDeletedAt no nulo', async () => {
+    const bajada = new Date();
+    await prisma.company.update({ where: { id: empresaId }, data: { deletedAt: bajada } });
+
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId);
+
+      expect(resultado?.companyId).toBe(empresaId);
+      expect(resultado?.companyDeletedAt).toEqual(bajada);
+    } finally {
+      await prisma.company.update({ where: { id: empresaId }, data: { deletedAt: null } });
+    }
+  });
+
+  // QC-48 R13 — la condicion dura de `design.md > 4.1`: empresa y estado salen del MISMO
+  // `findFirst`. Si alguien anadiera una segunda ida a la base, este contador lo delata.
+  it('trae empresa y estado sin una segunda consulta', async () => {
+    const espia = vi.spyOn(prisma.user, 'findFirst');
+
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId);
+
+      expect(resultado?.companyId).toBe(empresaId);
+      expect(resultado?.companyDeletedAt).toBeNull();
+      expect(espia).toHaveBeenCalledTimes(1);
+    } finally {
+      espia.mockRestore();
     }
   });
 });
