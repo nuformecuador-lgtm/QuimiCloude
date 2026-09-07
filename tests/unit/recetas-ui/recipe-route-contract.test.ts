@@ -600,6 +600,17 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260904180600_companies_and_user_company/down.sql',
     ];
 
+    // RETENSADO 2026-09-07 (QC-74), con el mismo criterio que los dos de arriba: el rango
+    // `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
+    // posterior se NOMBRA una a una o el caso deja de vigilar nada. QC-74 introduce el catalogo
+    // de permisos: crea `permissions` y `role_permissions` -con su RLS y su `down.sql`- y nada
+    // mas (`design.md > 1.3`). Ni recetas, ni unidades, ni pedidos. Cualquier OTRO archivo de
+    // `db/` sigue poniendo el caso rojo.
+    const MIGRACION_QC74 = [
+      'db/migrations/20260907183034_permissions_and_role_permissions/migration.sql',
+      'db/migrations/20260907183034_permissions_and_role_permissions/down.sql',
+    ];
+
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
       .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta))
@@ -607,7 +618,8 @@ describe('contrato de la ruta de recetas', () => {
     const tocaDb = diff
       .filter((ruta) => ruta.startsWith('db/'))
       .filter((ruta) => !MIGRACION_QC34.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC47.includes(ruta));
+      .filter((ruta) => !MIGRACION_QC47.includes(ruta))
+      .filter((ruta) => !MIGRACION_QC74.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',

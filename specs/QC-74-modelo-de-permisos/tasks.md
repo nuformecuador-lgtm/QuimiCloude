@@ -137,7 +137,7 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
 
 ## Bloque F — retirada de lo viejo
 
-- [ ] **T14. Borrar `assertAdminRole`.** Depende de T9-T13.
+- [x] **T14. Borrar `assertAdminRole`.** Depende de T9-T13.
       Archivos: `lib/modules/identity/domain/require-admin.ts` (borrado),
       `lib/modules/identity/index.ts`, `tests/unit/identity/require-admin.test.ts` (borrado).
       **NO se tocan** `lib/modules/identity/domain/roles.ts`,
@@ -155,7 +155,7 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
       pasa con el real, comprueba tambien el sentido inverso, y tiene las anclas contra el verde por
       vacuidad (R19, R21).
 
-- [ ] **T16. [P] Guardia: ningun servicio autoriza por nombre de rol.** Depende de T9-T14.
+- [x] **T16. [P] Guardia: ningun servicio autoriza por nombre de rol.** Depende de T9-T14.
       Archivos: `tests/guards/guard-autorizacion-por-permiso.test.ts` (nuevo).
       Barrido y exenciones segun `design.md > 6.2`; patron derivado de `ROLE_ADMINISTRADOR` /
       `ROLE_OPERADOR`, `stripComments` de linea antes que de bloque.
