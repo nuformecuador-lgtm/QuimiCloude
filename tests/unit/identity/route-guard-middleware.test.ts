@@ -49,14 +49,22 @@ vi.mock('@/lib/composition/route-role-rules', () => ({
 
 const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc9-ok';
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
+// QC-48 R6: desde `v3` el contenido firmado lleva tambien el UUID de la empresa. Aqui es solo
+// material de fixture: el portero de rutas NO decide con el (R12), y por eso todos los casos que
+// ya existian siguen firmando la misma.
+const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
 const ORIGEN = 'https://quimicloude.test';
 const ADAPTADOR = 'lib/modules/identity/adapters/driving/route-guard-middleware.ts';
 
 let secretoOriginal: string | undefined;
 
-/** Valor de cookie firmado con el codec real, con el rol y el instante que se le pidan. */
-function cookieFirmada(rol = 'Administrador', emitidaEn = new Date()): Promise<string> {
-  return buildSessionValue(createSessionTicket(USER_ID, rol, emitidaEn), SECRETO);
+/** Valor de cookie firmado con el codec real, con el rol, la empresa y el instante que se le pidan. */
+function cookieFirmada(
+  rol = 'Administrador',
+  emitidaEn = new Date(),
+  empresa = COMPANY_ID,
+): Promise<string> {
+  return buildSessionValue(createSessionTicket(USER_ID, rol, empresa, emitidaEn), SECRETO);
 }
 
 function peticion(url: string, cookie?: string): NextRequest {

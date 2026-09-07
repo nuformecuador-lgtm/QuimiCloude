@@ -13,9 +13,14 @@ const AHORA = new Date('2026-09-01T10:00:00.000Z');
 
 // QC-9: `roleName` es el rol FIRMADO en la cookie. Se pone uno que no existe en la base a
 // proposito: `resolveSessionUser` debe seguir devolviendo el rol de la BASE (QC-8 R12 intacto).
+// QC-48 R6: desde `v3` el contenido firmado lleva tambien la empresa. Aqui entra solo para que
+// los fixtures sigan siendo `SessionClaims` validos; los cortes que la usan llegan con T7.
+const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
+
 const CLAIMS_VIGENTES: SessionClaims = {
   sub: SUB,
   roleName: 'Rol firmado que ya no vale',
+  companyId: COMPANY_ID,
   issuedAt: new Date('2026-09-01T08:00:00.000Z'),
   expiresAt: new Date('2026-09-01T16:00:00.000Z'),
 };
@@ -23,6 +28,7 @@ const CLAIMS_VIGENTES: SessionClaims = {
 const CLAIMS_CADUCADOS: SessionClaims = {
   sub: SUB,
   roleName: 'Rol firmado que ya no vale',
+  companyId: COMPANY_ID,
   issuedAt: new Date('2026-09-01T00:00:00.000Z'),
   expiresAt: new Date('2026-09-01T08:00:00.000Z'),
 };

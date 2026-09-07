@@ -155,7 +155,12 @@ export function createVerifyCredentials(
     // El rol que se firma sale de la BASE (`usuario.roleName`, leido por el puerto en la misma
     // consulta que autentica) y jamas de la entrada: `LoginInput` solo trae usuario y
     // contrasena, y nada de este archivo puede meter un rol por otra via (QC-9 R26).
-    await deps.session.startSession(createSessionTicket(usuario.id, usuario.roleName, now));
+    // La empresa, igual (QC-48 R1, R2, R5): sale de la ficha de esa persona
+    // (`usuario.companyId`, misma consulta), no se pregunta en el login, no se acepta desde la
+    // entrada y no tiene valor por defecto — una empresa por defecto seria una inventada.
+    await deps.session.startSession(
+      createSessionTicket(usuario.id, usuario.roleName, usuario.companyId, now),
+    );
 
     return { ok: true };
   };

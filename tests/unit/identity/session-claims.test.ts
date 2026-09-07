@@ -19,8 +19,18 @@ const EXP = Math.floor(Date.parse('2026-09-01T16:00:00.000Z') / 1000);
 // QC-9 R26: desde `v2` el contenido firmado lleva tambien el NOMBRE del rol.
 const ROL = 'Administrador';
 
+// QC-48 R6: desde `v3` lleva ademas el UUID de la empresa, y nada mas de ella.
+const CID_VALIDO = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
+
 function jsonValido(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP, role: ROL, ...overrides });
+  return JSON.stringify({
+    sub: SUB_VALIDO,
+    iat: IAT,
+    exp: EXP,
+    role: ROL,
+    cid: CID_VALIDO,
+    ...overrides,
+  });
 }
 
 describe('parseSessionClaims', () => {
@@ -47,6 +57,29 @@ describe('parseSessionClaims', () => {
   it('un texto que no es JSON devuelve null sin lanzar', () => {
     expect(() => parseSessionClaims('esto-no-es-json{{{')).not.toThrow();
     expect(parseSessionClaims('esto-no-es-json{{{')).toBeNull();
+  });
+
+  // QC-48 R6 — la empresa firmada se devuelve tal cual, traducida de `cid` a `companyId` en el
+  // mismo sitio donde `role` pasa a `roleName`: fuera del codec nadie ve la abreviatura.
+  it('un JSON valido con cid produce claims con companyId', () => {
+    expect(parseSessionClaims(jsonValido())?.companyId).toBe(CID_VALIDO);
+
+    const otra = '0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d';
+    expect(parseSessionClaims(jsonValido({ cid: otra }))?.companyId).toBe(otra);
+  });
+
+  // QC-48 R9 — sin empresa con forma valida no hay sesion: ni se consulta la base ni se supone
+  // ninguna empresa por defecto. `.uuid()` y no `.min(1)` porque este valor acaba comparandose
+  // contra una columna `@db.Uuid`: un texto sin forma de UUID muere aqui, no en Prisma.
+  it('un cid ausente, vacio, que no es texto o sin forma de UUID devuelve null', () => {
+    expect(
+      parseSessionClaims(JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP, role: ROL })),
+    ).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: '' }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: 42 }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: null }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: [CID_VALIDO] }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: 'no-es-un-uuid' }))).toBeNull();
   });
 
   // R6
@@ -95,6 +128,7 @@ describe('isSessionExpired', () => {
     issuedAt: new Date(IAT * 1000),
     expiresAt: new Date(EXP * 1000),
     roleName: ROL,
+    companyId: CID_VALIDO,
   };
 
   // R7 — en el instante exacto del exp la sesion YA NO vale (>=, no >).

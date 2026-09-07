@@ -29,6 +29,9 @@ const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc9-o
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const AHORA = new Date('2026-09-01T08:00:00.000Z');
 const ROL = 'Administrador';
+// QC-48 R6: desde `v3` el contenido firmado lleva tambien el UUID de la empresa, y nada mas de
+// ella. Sale de la ficha del usuario, no de la entrada del login.
+const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
 
 /** La referencia: exactamente lo que hacia `session-cookie.ts` antes de la migracion. */
 function firmaDeReferencia(mensaje: string, secreto: string): string {
@@ -131,7 +134,7 @@ describe('equalsInConstantTime (R17)', () => {
 
 describe('buildSessionValue / verifySessionValue', () => {
   it('lo que se firma se vuelve a leer con los mismos datos', async () => {
-    const ticket = createSessionTicket(USER_ID, ROL, AHORA);
+    const ticket = createSessionTicket(USER_ID, ROL, COMPANY_ID, AHORA);
 
     const valor = await buildSessionValue(ticket, SECRETO);
     const claims = await verifySessionValue(valor, SECRETO);
@@ -141,7 +144,7 @@ describe('buildSessionValue / verifySessionValue', () => {
   });
 
   it('el valor emitido lleva la firma que produciria node:crypto (R16, de extremo a extremo)', async () => {
-    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, AHORA), SECRETO);
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, COMPANY_ID, AHORA), SECRETO);
 
     const [version, payload, firma] = valor.split('.');
     expect(version).toBe(SESSION_VALUE_VERSION);
@@ -149,7 +152,7 @@ describe('buildSessionValue / verifySessionValue', () => {
   });
 
   it('una firma alterada o de otro secreto resuelve null', async () => {
-    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, AHORA), SECRETO);
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, COMPANY_ID, AHORA), SECRETO);
     const [version, payload, firma] = valor.split('.');
     const alterada = firma.startsWith('A') ? `B${firma.slice(1)}` : `A${firma.slice(1)}`;
 
@@ -191,6 +194,19 @@ describe('rechazo del formato anterior (R27)', () => {
     return `${signedPart}.${firmaDeReferencia(signedPart, SECRETO)}`;
   }
 
+  /**
+   * Un `v2` impecable: el formato COMPLETO de QC-9 —con su rol y todo—, firmado con el secreto
+   * bueno y con `exp` en el futuro. La unica pega que tiene es su version. QC-48 R8.
+   */
+  function tokenV2Impecable(): string {
+    const ahora = Math.floor(Date.now() / 1000);
+    const payload = { sub: USER_ID, iat: ahora, exp: ahora + 8 * 60 * 60, role: ROL };
+    const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    const signedPart = `v2.${encoded}`;
+
+    return `${signedPart}.${firmaDeReferencia(signedPart, SECRETO)}`;
+  }
+
   it('un v1 con firma correcta y exp futuro resuelve null', async () => {
     const valor = tokenV1Impecable();
 
@@ -217,8 +233,47 @@ describe('rechazo del formato anterior (R27)', () => {
     expect(sign).not.toHaveBeenCalled();
   });
 
+  // QC-48 R8 — el formato ANTERIOR INMEDIATO, que es el que de verdad hay desplegado. Un `v2`
+  // con firma correcta y sin caducar se resuelve como "sin sesion": no se verifica, no se
+  // interpreta y no se le añade ninguna rama de compatibilidad. Si este test se pone rojo, la
+  // pregunta no es "como lo hago pasar" sino "quien reabrio la compatibilidad".
+  it('un v2 con firma correcta y exp futuro resuelve null', async () => {
+    const valor = tokenV2Impecable();
+
+    // Primero: que el token es impecable de verdad —firma buena y `exp` futuro—. Sin esto, el
+    // `null` de abajo podria venir de un token mal construido por el propio test.
+    const [version, payload, firma] = valor.split('.');
+    expect(version).toBe('v2');
+    expect(firma).toBe(firmaDeReferencia(`${version}.${payload}`, SECRETO));
+    const contenido = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      exp: number;
+      role: string;
+    };
+    expect(contenido.exp * 1000).toBeGreaterThan(Date.now());
+    expect(contenido.role).toBe(ROL);
+
+    await expect(verifySessionValue(valor, SECRETO)).resolves.toBeNull();
+  });
+
+  // QC-48 R8 — y lo rechaza SIN verificar la firma: el corte por version va por encima del HMAC.
+  it('y rechaza el v2 SIN verificar la firma: no se llama a crypto.subtle.sign', async () => {
+    const sign = vi.spyOn(crypto.subtle, 'sign');
+
+    await expect(verifySessionValue(tokenV2Impecable(), SECRETO)).resolves.toBeNull();
+
+    expect(sign).not.toHaveBeenCalled();
+  });
+
+  // QC-48 R8 — "sin leer el secreto", visto desde este lado: al codec el secreto se le PASA, asi
+  // que se le pasa uno que no firmo nada y con el que ninguna verificacion podria salir bien. El
+  // resultado no cambia, porque el secreto no llega a usarse. La otra mitad —que
+  // `readSessionClaims` no toca `SESSION_SECRET` del entorno— la afirma `session-cookie.test.ts`.
+  it('el v2 se rechaza igual con un secreto que no es el suyo: el secreto no llega a usarse', async () => {
+    await expect(verifySessionValue(tokenV2Impecable(), `${SECRETO}-otro`)).resolves.toBeNull();
+  });
+
   it('el formato vigente si llega a verificar la firma (el contraste que da valor al test anterior)', async () => {
-    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, new Date()), SECRETO);
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, COMPANY_ID, new Date()), SECRETO);
     const sign = vi.spyOn(crypto.subtle, 'sign');
 
     await expect(verifySessionValue(valor, SECRETO)).resolves.not.toBeNull();
@@ -229,13 +284,13 @@ describe('rechazo del formato anterior (R27)', () => {
 
 // QC-9 T5-bis — El rol viaja firmado (R26).
 describe('el rol dentro del contenido firmado (R26)', () => {
-  it('el payload v2 lleva sub/iat/exp/role y el rol se lee de vuelta', async () => {
-    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, AHORA), SECRETO);
+  it('el payload v3 lleva sub/iat/exp/role/cid y el rol se lee de vuelta', async () => {
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, ROL, COMPANY_ID, AHORA), SECRETO);
 
     const payload = JSON.parse(
       Buffer.from(valor.split('.')[1] ?? '', 'base64url').toString('utf8'),
     ) as Record<string, unknown>;
-    expect(Object.keys(payload)).toEqual(['sub', 'iat', 'exp', 'role']);
+    expect(Object.keys(payload)).toEqual(['sub', 'iat', 'exp', 'role', 'cid']);
     expect(payload.role).toBe(ROL);
 
     const claims = await verifySessionValue(valor, SECRETO);
@@ -243,17 +298,66 @@ describe('el rol dentro del contenido firmado (R26)', () => {
   });
 
   it('el rol firmado es el del ticket, sea cual sea', async () => {
-    const valor = await buildSessionValue(createSessionTicket(USER_ID, 'Operador', AHORA), SECRETO);
+    const valor = await buildSessionValue(createSessionTicket(USER_ID, 'Operador', COMPANY_ID, AHORA), SECRETO);
 
     expect((await verifySessionValue(valor, SECRETO))?.roleName).toBe('Operador');
   });
 });
 
+// QC-48 T3 — La empresa viaja firmada (R6).
+describe('la empresa dentro del contenido firmado (QC-48 R6)', () => {
+  it('el payload v3 lleva el cid del ticket y la ida y vuelta conserva el companyId', async () => {
+    const valor = await buildSessionValue(
+      createSessionTicket(USER_ID, ROL, COMPANY_ID, AHORA),
+      SECRETO,
+    );
+
+    const payload = JSON.parse(
+      Buffer.from(valor.split('.')[1] ?? '', 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
+    expect(payload.cid).toBe(COMPANY_ID);
+
+    const claims = await verifySessionValue(valor, SECRETO);
+    expect(claims?.companyId).toBe(COMPANY_ID);
+  });
+
+  it('la empresa firmada es la del ticket, sea cual sea', async () => {
+    const otra = '0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d';
+    const valor = await buildSessionValue(
+      createSessionTicket(USER_ID, ROL, otra, AHORA),
+      SECRETO,
+    );
+
+    expect((await verifySessionValue(valor, SECRETO))?.companyId).toBe(otra);
+  });
+
+  // R6 — de la empresa viaja el IDENTIFICADOR y nada mas: ni nombre, ni normalizado, ni marcas
+  // de tiempo, ni estado de baja. El nombre puede cambiar y una foto vieja mentiria durante 8 h.
+  it('del ticket no se firma nada de la empresa que no sea su identificador', async () => {
+    const valor = await buildSessionValue(
+      createSessionTicket(USER_ID, ROL, COMPANY_ID, AHORA),
+      SECRETO,
+    );
+
+    const payload = JSON.parse(
+      Buffer.from(valor.split('.')[1] ?? '', 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
+    expect(Object.keys(payload).filter((clave) => clave !== 'cid')).toEqual([
+      'sub',
+      'iat',
+      'exp',
+      'role',
+    ]);
+  });
+});
+
 describe('hasCurrentVersion y readSessionSecret', () => {
-  it('reconoce la version vigente y descarta cualquier otra, v1 incluida', () => {
-    expect(SESSION_VALUE_VERSION).toBe('v2');
+  it('reconoce la version vigente y descarta cualquier otra, v1 y v2 incluidas', () => {
+    expect(SESSION_VALUE_VERSION).toBe('v3');
     expect(hasCurrentVersion(`${SESSION_VALUE_VERSION}.payload.firma`)).toBe(true);
     expect(hasCurrentVersion('v1.payload.firma')).toBe(false);
+    // QC-48 R8: el formato anterior inmediato se descarta como cualquier otro.
+    expect(hasCurrentVersion('v2.payload.firma')).toBe(false);
     expect(hasCurrentVersion('v0.payload.firma')).toBe(false);
     expect(hasCurrentVersion('payload')).toBe(false);
     expect(hasCurrentVersion('')).toBe(false);

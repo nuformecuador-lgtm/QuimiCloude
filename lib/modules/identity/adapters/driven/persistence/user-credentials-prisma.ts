@@ -17,6 +17,7 @@ type FilaCredenciales = {
   lock_level: number;
   locked_until: Date | null;
   role_name: string;
+  company_id: string;
 };
 
 /**
@@ -39,6 +40,10 @@ type FilaCredenciales = {
  * parcial), y cambiarla a la API tipada para añadir una columna reintroduciria el seq scan que
  * ese parrafo evita. El `JOIN` es la traduccion literal de esa fila a SQL.
  *
+ * QC-48 (R2) — la empresa entra como una COLUMNA MAS de `users` (`u.company_id`), no como un
+ * `JOIN`: es un campo de la fila que esta consulta ya lee, asi que traerla no cuesta ni una
+ * lectura mas. Es el identificador y nada mas de la empresa.
+ *
  * `INNER JOIN` y no `LEFT`: `users.role_id` es NOT NULL con clave foranea `onDelete: Restrict`,
  * asi que todo usuario vivo tiene rol. Si un dia no lo tuviera, el usuario no se encontraria —y
  * no entraria— en vez de emitirse una sesion con un rol inventado.
@@ -46,7 +51,8 @@ type FilaCredenciales = {
 export async function findActiveByUsername(username: string): Promise<AuthenticatableUser | null> {
   const filas = await prisma.$queryRaw<FilaCredenciales[]>`
     SELECT u.id, u.password_hash, u.failed_login_attempts, u.lock_level, u.locked_until,
-           r.name AS role_name
+           r.name AS role_name,
+           u.company_id
     FROM users u
     JOIN roles r ON r.id = u.role_id
     WHERE lower(u.username) = lower(${username}) AND u.deleted_at IS NULL
@@ -64,6 +70,7 @@ export async function findActiveByUsername(username: string): Promise<Authentica
     lockLevel: Number(fila.lock_level),
     lockedUntil: fila.locked_until === null ? null : new Date(fila.locked_until),
     roleName: fila.role_name,
+    companyId: fila.company_id,
   };
 }
 

@@ -46,10 +46,14 @@ const SIN_BLOQUEO: AccountLockState = { failedAttempts: 0, lockLevel: 0, lockedU
 /** QC-9 R26: el rol lo trae el PUERTO desde la base, y termina firmado dentro de la cookie. */
 const ROL_EN_LA_BASE = 'Administrador';
 
+/** QC-48 R1, R2: la empresa la trae el mismo PUERTO desde la ficha de la persona. */
+const EMPRESA_EN_LA_BASE = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
+
 const USUARIO: AuthenticatableUser = {
   id: 'usuario-1',
   passwordHash: hashDe(CONTRASENA_CORRECTA),
   roleName: ROL_EN_LA_BASE,
+  companyId: EMPRESA_EN_LA_BASE,
   ...SIN_BLOQUEO,
 };
 
