@@ -100,7 +100,7 @@
 
 ## Bloque 4 — El borde y la no-regresión
 
-- [ ] **T9 — Tests del portero. Depende de T3.**
+- [x] **T9 — Tests del portero. Depende de T3.**
       Archivos: `tests/unit/identity/route-guard-middleware.test.ts`. **Sin cambios en
       `route-guard-middleware.ts` ni en `middleware.ts`** (`design.md > 7`): si hace falta tocar
       alguno, parar — el diseño falló.

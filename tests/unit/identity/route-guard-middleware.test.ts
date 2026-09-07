@@ -32,6 +32,7 @@ import { NextRequest } from 'next/server';
 import { middleware } from '@/lib/modules/identity/adapters/driving/route-guard-middleware';
 import {
   SESSION_COOKIE_NAME,
+  SESSION_VALUE_VERSION,
   buildSessionValue,
 } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { createSessionTicket } from '@/lib/modules/identity/domain/session';
@@ -53,6 +54,9 @@ const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 // material de fixture: el portero de rutas NO decide con el (R12), y por eso todos los casos que
 // ya existian siguen firmando la misma.
 const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
+// QC-48 R12: la segunda empresa existe solo para comparar decisiones entre dos sesiones que se
+// diferencian UNICAMENTE en este valor.
+const OTRA_EMPRESA = 'b0d94f7a-6c25-4e18-8a3f-1e7b2c9d0456';
 const ORIGEN = 'https://quimicloude.test';
 const ADAPTADOR = 'lib/modules/identity/adapters/driving/route-guard-middleware.ts';
 
@@ -65,6 +69,24 @@ function cookieFirmada(
   empresa = COMPANY_ID,
 ): Promise<string> {
   return buildSessionValue(createSessionTicket(USER_ID, rol, empresa, emitidaEn), SECRETO);
+}
+
+/**
+ * Valor de cookie de la version VIGENTE firmado sobre un contenido CRUDO, para poder construir
+ * payloads que el emisor real ya no sabe producir: uno sin `cid`, o con un `cid` que no tiene
+ * forma de UUID. Se firma con `node:crypto` —byte a byte lo mismo que `signSessionValue`, y el
+ * test de `session-token.ts` lo ancla—, asi que lo que se ejercita sigue siendo la cadena real:
+ * la firma casa y la caducidad esta en el futuro, de modo que lo unico que puede cortar es el
+ * ESQUEMA del contenido firmado.
+ */
+function cookieConPayload(claims: Record<string, unknown>): string {
+  const ahora = Math.floor(Date.now() / 1000);
+  const payload = { sub: USER_ID, iat: ahora, exp: ahora + 3600, ...claims };
+  const codificado = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const parteFirmada = `${SESSION_VALUE_VERSION}.${codificado}`;
+  const firma = createHmac('sha256', SECRETO).update(parteFirmada).digest('base64url');
+
+  return `${parteFirmada}.${firma}`;
 }
 
 function peticion(url: string, cookie?: string): NextRequest {
@@ -234,6 +256,96 @@ describe('middleware de rutas privadas', () => {
     // «No autorizado» no es «no autenticado»: al dashboard, nunca al login (R13).
     expect(denegado.status).toBe(307);
     expect(destino(denegado)).toBe('/dashboard');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-48 T9 — la empresa firmada, vista desde el portero (R10, R12, R23)
+// ---------------------------------------------------------------------------
+//
+// Lo que este bloque demuestra es que el borde NO gano ni un `if` con QC-48 (`design.md > 7`):
+// quien corta es el ESQUEMA del contenido firmado —`parseSessionClaims` devuelve `null`,
+// `verifySessionValue` propaga ese `null` y el adaptador lo traduce a `{ kind: 'anonymous' }` con
+// el `if` que ya existia desde QC-9—. Por eso estos tests se escriben contra `middleware` y no
+// contra el esquema: afirman la CONSECUENCIA visible en la ruta, que es lo que R10 pide.
+//
+// Y la otra mitad: la empresa entra en la sesion pero NO entra en la decision de ruta (R12). El
+// dia que alguien añada una regla ruta→empresa, el tercer test de aqui se pone rojo.
+describe('la empresa firmada y el portero de rutas (QC-48)', () => {
+  it('redirige al login con la ruta pedida cuando el contenido firmado no lleva empresa (R10)', async () => {
+    // Firma buena, `exp` en el futuro, version vigente y rol correcto: lo unico que falta es
+    // `cid`. No hay rama en el middleware que mire eso; el corte lo hace el esquema.
+    const sinEmpresa = cookieConPayload({ role: 'Administrador' });
+
+    const response = await middleware(peticion('/dashboard/reportes?desde=ayer', sinEmpresa));
+
+    expect(response.status).toBe(307);
+    expect(destino(response)).toBe('/login?next=%2Fdashboard%2Freportes%3Fdesde%3Dayer');
+  });
+
+  it('redirige al login cuando la empresa firmada esta mal formada (R10)', async () => {
+    // Tres formas de estarlo: texto que no es UUID, cadena vacia y un tipo que no es texto. Las
+    // tres acaban en el mismo sitio, y ninguna llega a la base.
+    for (const cid of ['acme', '', 42]) {
+      const response = await middleware(
+        peticion(
+          '/dashboard/reportes?desde=ayer',
+          cookieConPayload({ role: 'Administrador', cid }),
+        ),
+      );
+
+      expect(response.status).toBe(307);
+      expect(destino(response)).toBe('/login?next=%2Fdashboard%2Freportes%3Fdesde%3Dayer');
+    }
+  });
+
+  it('toma la MISMA decision para dos sesiones identicas salvo por su empresa (R12)', async () => {
+    reglas.actuales = [{ prefix: '/dashboard/productos', roles: ['Administrador'] }];
+    const ruta = '/dashboard/productos?pagina=2';
+
+    const permitidoA = await middleware(
+      peticion(ruta, await cookieFirmada('Administrador', new Date(), COMPANY_ID)),
+    );
+    const permitidoB = await middleware(
+      peticion(ruta, await cookieFirmada('Administrador', new Date(), OTRA_EMPRESA)),
+    );
+    const denegadoA = await middleware(
+      peticion(ruta, await cookieFirmada('Operador', new Date(), COMPANY_ID)),
+    );
+    const denegadoB = await middleware(
+      peticion(ruta, await cookieFirmada('Operador', new Date(), OTRA_EMPRESA)),
+    );
+
+    expect(dejaPasar(permitidoA)).toBe(true);
+    expect(dejaPasar(permitidoB)).toBe(dejaPasar(permitidoA));
+    expect(denegadoB.status).toBe(denegadoA.status);
+    expect(destino(denegadoB)).toBe(destino(denegadoA));
+  });
+
+  it('sigue decidiendo por el rol firmado exactamente como antes de esta feature (R23)', async () => {
+    reglas.actuales = [{ prefix: '/dashboard/productos', roles: ['Administrador'] }];
+
+    // Mismo origen que en QC-9 —el contenido firmado, sin consultar la base— y misma clave dentro
+    // del payload: `role`. Que ahora viaje ademas `cid` no cambia ninguna de las dos cosas.
+    const operador = await middleware(
+      peticion('/dashboard/productos', cookieConPayload({ role: 'Operador', cid: OTRA_EMPRESA })),
+    );
+    const administrador = await middleware(
+      peticion(
+        '/dashboard/productos',
+        cookieConPayload({ role: 'Administrador', cid: OTRA_EMPRESA }),
+      ),
+    );
+    // Y la ausencia de rol sigue siendo anonima (QC-9 R28), no un rol por defecto.
+    const sinRol = await middleware(
+      peticion('/dashboard/productos', cookieConPayload({ cid: COMPANY_ID })),
+    );
+
+    expect(dejaPasar(administrador)).toBe(true);
+    expect(operador.status).toBe(307);
+    expect(destino(operador)).toBe('/dashboard');
+    expect(sinRol.status).toBe(307);
+    expect(destino(sinRol)).toBe('/login?next=%2Fdashboard%2Fproductos');
   });
 });
 
