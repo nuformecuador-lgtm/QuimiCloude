@@ -10,7 +10,7 @@
 
 ## Bloque 1 — la pieza compartida
 
-- [ ] **T1. `identity` publica la única implementación de la regla.**
+- [x] **T1. `identity` publica la única implementación de la regla.**
   - Archivos: `lib/modules/identity/domain/require-admin.ts` (nuevo),
     `lib/modules/identity/index.ts`.
   - `RoleBearer` + `assertAdminRole(actor, onDenied)` según `design.md > 2.1`. Dominio puro: el
@@ -27,23 +27,23 @@
 > Cada task de este bloque toca **solo** el `domain/actor.ts` de su módulo. Ninguna toca todavía el
 > barrel: eso es T7.
 
-- [ ] **T2. `inventario` delega.** [P]
+- [x] **T2. `inventario` delega.** [P]
   - Archivo: `lib/modules/inventario/domain/actor.ts`.
   - `requireAdmin` pasa a `assertAdminRole(actor, () => new UnauthorizedError())`. Se borra
     `ADMIN_ROLE_NAME` y su JSDoc de deuda; se conserva el JSDoc que explica la igualdad exacta.
   - **Hecho:** `tests/unit/inventario/authorization.test.ts` verde tras cambiar únicamente cómo
     obtiene el nombre del rol. Cubre: R6, R8, R9.
 
-- [ ] **T3. `recetas` delega.** [P] — `lib/modules/recetas/domain/actor.ts`.
+- [x] **T3. `recetas` delega.** [P] — `lib/modules/recetas/domain/actor.ts`.
   **Hecho:** `tests/unit/recetas/authorization.test.ts` verde con el mismo criterio que T2.
 
-- [ ] **T4. `unidades` delega.** [P] — `lib/modules/unidades/domain/actor.ts`.
+- [x] **T4. `unidades` delega.** [P] — `lib/modules/unidades/domain/actor.ts`.
   `unidades` no tiene `authorization.test.ts` propio: sus casos de rechazo viven en
   `tests/unit/unidades/list-units.test.ts` y `unit-actions.test.ts`, y ahí el rol se escribe como
   literal crudo en el fixture, no vía `ADMIN_ROLE_NAME`.
   **Hecho:** esos dos archivos verdes **sin una línea de diff**.
 
-- [ ] **T5. `pedidos` delega.** [P] — `lib/modules/pedidos/domain/actor.ts`.
+- [x] **T5. `pedidos` delega.** [P] — `lib/modules/pedidos/domain/actor.ts`.
   Ya importa `ROLE_ADMINISTRADOR`; se retira ese import si deja de usarse.
   **Hecho:** `tests/unit/pedidos/authorization.test.ts` verde **sin tocar el archivo** (incluido su
   centinela local, que se conserva). Cubre: R6, R8, R9, R15.
@@ -53,7 +53,7 @@
 
 ## Bloque 3 — se retira el símbolo viejo (depende de T2, T3, T4)
 
-- [ ] **T7. Los tres barriles dejan de exportar `ADMIN_ROLE_NAME`.**
+- [x] **T7. Los tres barriles dejan de exportar `ADMIN_ROLE_NAME`.**
   - Archivos: `lib/modules/inventario/index.ts` (línea 5), `lib/modules/recetas/index.ts` (línea 5),
     `lib/modules/unidades/index.ts` (línea 21).
   - `requireAdmin` y `Actor` siguen exportándose. No se deja re-export ni alias (decisión 1).
@@ -61,7 +61,7 @@
     los tests de contrato de módulo (`module-contract.test.ts` de cada uno) verdes.
   - Cubre: R2.
 
-- [ ] **T8. El cableado de rutas lee el rol de `identity`.** (depende de T7)
+- [x] **T8. El cableado de rutas lee el rol de `identity`.** (depende de T7)
   - Archivo: `lib/composition/route-role-rules.ts`.
   - `import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity'`; las tres filas pasan a
     `[ROLE_ADMINISTRADOR]`. Se reescriben la cabecera (líneas 1-28) y el JSDoc de `ROUTE_ROLE_RULES`
@@ -73,7 +73,7 @@
     casos (`findings` vacío y la cadena que sí recorre).
   - Cubre: R3, R13, R14, R17.
 
-- [ ] **T9. Migrar los consumidores restantes de `ADMIN_ROLE_NAME`.** (depende de T7) [P con T8]
+- [x] **T9. Migrar los consumidores restantes de `ADMIN_ROLE_NAME`.** (depende de T7) [P con T8]
   - Archivos: `e2e/session.spec.ts` (líneas 49-51 y sus tres usos) y los 15 archivos bajo `tests/`
     que hoy importan el símbolo (`tests/unit/{inventario,recetas,proveedores,identity,recetas-ui}/…`).
   - **Solo cambia cómo obtienen el nombre del rol.** Si alguno necesita otro cambio —una aserción,
@@ -83,7 +83,7 @@
     `e2e/` sin ninguna línea que no sea de import o del identificador del rol.
   - Cubre: R3, R15.
 
-- [ ] **T10. Actualizar los comentarios que describen el estado viejo.** [P con T8, T9]
+- [x] **T10. Actualizar los comentarios que describen el estado viejo.** [P con T8, T9]
   - Archivos: `lib/modules/identity/index.ts` (líneas 42-45) y
     `lib/modules/identity/domain/route-role-rules.ts` (líneas ~16-22).
   - Los dos afirman que nombrar el rol exige el barrel de `inventario`. Pasan a decir que el rol sale
