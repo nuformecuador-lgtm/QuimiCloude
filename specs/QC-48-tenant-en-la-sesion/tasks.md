@@ -109,7 +109,7 @@
       mismo; (c) dos sesiones idénticas salvo por su `companyId` ⇒ **misma** decisión para la misma
       ruta; (d) el rol sigue decidiendo igual que en QC-9. Cubre R10, R12, R23.
 
-- [ ] **T10 `[P]` — Guardias y límites, sin código nuevo.**
+- [x] **T10 `[P]` — Guardias y límites, sin código nuevo.**
       Archivos: ninguno de producción; se corren y se comprueban
       `tests/guards/guard-middleware-edge.test.ts`, `guard-arquitectura-modulos.test.ts`,
       `guard-firma-sesion-unica`, `guard-dependencias-aprobadas.test.ts`,
@@ -118,7 +118,7 @@
       `db/migrations/**` intactos, `package.json` intacto y `docs/dependencias.md` sin fila nueva.
       Cubre R11, R24, R28.
 
-- [ ] **T11 `[P]` — Comprobar que nada de negocio se filtró por empresa.**
+- [x] **T11 `[P]` — Comprobar que nada de negocio se filtró por empresa.**
       Archivos: ninguno; se corren las suites de `inventario`, `recetas`, `unidades`, `proveedores`
       y `pedidos`.
       **Hecho cuando:** verdes **sin tocar su guion**, y una revisión del diff confirma que no se
@@ -136,7 +136,7 @@
       usuarios → rol → empresas (FK `RESTRICT`); los dos tests que ya existían siguen verdes sin
       tocar su guion. Cubre R3, R27.
 
-- [ ] **T13 — Trazabilidad. Depende de T1-T12.**
+- [x] **T13 — Trazabilidad. Depende de T1-T12.**
       Archivos: `progress/impl_QC-48-tenant-en-la-sesion.md`.
       **Hecho cuando:** contiene el mapa `R1..R28 -> test concreto` (archivo + nombre del `test`),
       sin ningún hueco. `CHECKPOINTS.md > Trazabilidad` lo exige y el reviewer rechaza si falta uno.
