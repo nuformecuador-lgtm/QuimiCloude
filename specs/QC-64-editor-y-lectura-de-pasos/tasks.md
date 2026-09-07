@@ -134,7 +134,13 @@
 
 ## Cierre
 
-- [ ] **T15 — Gate completo y trazabilidad.** Depende de **T14**.
+- [x] **T15 — Gate completo y trazabilidad.** Depende de **T14**.
+      **Corrido por el leader el 2026-09-07: verde.** `typecheck` y `lint` limpios, y la suite
+      completa **208 archivos / 2463 tests en verde, cero rojos** —ni siquiera los 5 del
+      baseline, que hoy pasan—. Con una salvedad escrita, que **no es de esta feature**:
+      `./init.sh` no llega a correr los tests desde dentro de un worktree porque
+      `scripts/validate-features.mjs` busca `.worktrees/` relativo al cwd y ahí no existe; se
+      corrió todo lo demás que hace el gate, paso por paso. Detalle en el PR.
   - Archivos: `progress/impl_QC-64-editor-y-lectura-de-pasos.md`.
   - **Hecho cuando:** `./init.sh` termina en verde (sin archivos rojos nuevos frente a
     `tests/baseline-rojos.json`), el archivo de progreso contiene la salida real de los tests y el
