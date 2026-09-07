@@ -11,11 +11,11 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
+| QC-35 | pantalla-de-pedidos | Pedidos | frontend | in_progress | feature/QC-35-pantalla-de-pedidos | implementer (spec aprobado por el humano el 2026-09-07). Worktree sincronizado con `origin/dev` — venia 60 commits atras |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | in_progress → F2.4 | feature/QC-57-orden-y-filtro-en-listados | **PR [#38](https://github.com/singularis-co/QuimiCloude/pull/38) abierto**, esperando merge humano. Reviewer APROBADO (2ª ronda), F2.3 rehecha contra `origin/dev` y `./init.sh` completo en verde (exit 0) el 2026-09-06 |
-| QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
-| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
+| QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
+| QC-48 | tenant-en-la-sesion | Multiempresa | backend | in_progress | feature/QC-48-tenant-en-la-sesion | implementer (**spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*). R1–R28, 14 tasks, sin migración y sin dependencia nueva |
+| QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | spec_ready | feature/QC-54-unificar-constante-rol-administrador | esperando aprobación humana del spec (F1.4). Tarjeta en *En revisión*, commit `5782dd1` en la rama |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -223,6 +223,193 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-54 — unificar-constante-rol-administrador: arranque del 2026-09-07 (F1.0)
+
+**OTRA SESIÓN DE LEADER LLEVA QC-48, y eso cambia el paralelismo de QC-54 (2026-09-07).** Al sembrar
+esta ficha el validador pasó de `in_progress=2` a `=3` sin que yo tocara ningún `status`. No es un
+error: QC-48 pasó a `in_progress` desde fuera de esta sesión. Comprobado — su worktree tiene cinco
+archivos de `identity` modificados sin commitear (`domain/session-claims.ts`, `domain/session.ts`,
+`adapters/driven/session/session-token.ts` y sus dos tests) más un `specs/QC-48-tenant-en-la-sesion/`
+sin trackear, y su tarjeta ya está en *En curso* en el board.
+
+**Qué implica.** La zona `backend` deja de estar vacía: con QC-48 dentro, QC-54 sería la segunda, que
+es el límite y no una violación. Pero ahora **sí hay validación de conflicto de archivos que hacer**
+(`AGENTS.md > Paralelismo`), y la intersección probable es real: QC-54 tiene que tocar
+`lib/modules/identity/domain/roles.ts` y **`lib/modules/identity/index.ts`** para publicar el
+`requireAdmin` genérico, y QC-48 está reescribiendo el dominio de sesión de ese mismo módulo y muy
+probablemente su barrel.
+
+**Qué NO bloquea.** F1.2 sigue adelante: `spec_author` no toca código. Es el mismo razonamiento que
+QC-47 dejó escrito el 2026-09-04 — la validación se hace contra `specs/<feature>/tasks.md`, que
+todavía no existe.
+
+**Qué SÍ bloquea, y queda anotado para no decidirlo dos veces:** la implementación de QC-54 **no
+arranca (F2.0)** hasta que QC-48 esté `done`, o hasta que sus `tasks.md` demuestren que no tocan
+`lib/modules/identity/index.ts`. Y con dos sesiones vivas sobre el mismo repo, **el que llegue
+segundo al barrel de `identity` se come el conflicto**.
+
+**Acotada y sembrada el 2026-09-07** con `/afinar-feature`: nueve decisiones cerradas en
+`specs/QC-54-unificar-constante-rol-administrador/requirements.md`, cero preguntas abiertas. El
+alcance **creció** —entra también unificar los cinco `requireAdmin` y una guardia contra la
+reincidencia—, así que la `complexity` subió a `high` y la `description` del board se reescribió
+antes de sembrar. Dos de las tres preguntas que iba a hacer **se cayeron al medirlas**: la deuda de
+centinela que la ficha atribuía a este import no existe, y el borde no corre riesgo. Las tres
+decisiones abiertas que anoté arriba quedan cerradas en ese archivo — no se releen desde aquí.
+
+Elegida por decisión humana explícita («comienza con 54»). Zona `backend`, que estaba **vacía de
+`in_progress`** —las dos en curso, QC-35 y QC-64, son `frontend` y llenan su cupo—, así que es la
+primera de su zona y el paralelismo no necesita validación de conflicto contra nadie de `backend`.
+`depends_on: null`. Worktree montado desde `origin/dev` = `738d9a9`.
+
+**`complexity` asignada: `medium`, no `low`.** La ficha parece un buscar-y-reemplazar y no lo es:
+`ADMIN_ROLE_NAME` está **exportado en el barrel** de `inventario`, `recetas` y `unidades`
+(`lib/modules/<m>/index.ts`), así que retirarlo **cambia el contrato público de tres módulos**. Son
+tres declaraciones a borrar, tres barriles a tocar y una veintena de consumidores, la mitad de ellos
+tests de autorización de cuatro módulos. Verificado en el árbol antes de asignar: la ficha describe
+el estado real.
+
+**Lo que ya está bien y no se toca:** `pedidos` y `proveedores` ya importan `ROLE_ADMINISTRADOR` de
+`@/lib/modules/identity` (`domain/actor.ts` de cada uno). Son el patrón destino, no trabajo
+pendiente. La ficha decía «solo proveedores»; son dos.
+
+**El valor de la cadena no puede cambiar, solo de dónde se lee.** `'Administrador'` viaja **firmado
+en la cookie de sesión** (QC-8/QC-9) y está en `SEED_ROLES`, o sea en la base. Renombrarlo invalida
+todas las sesiones vivas y desalinea el seed. Esta ficha mueve el origen del literal, nunca el
+literal.
+
+**Aviso de conflicto que la regla NO cubre, y por eso queda escrito.** QC-64
+(`editor-y-lectura-de-pasos`, `in_progress`) es `frontend`, y `AGENTS.md > Paralelismo` solo valida
+intersección de archivos **dentro de la misma zona**: formalmente no hay nada que validar. Pero
+QC-54 tiene que editar `lib/modules/recetas/index.ts` y `lib/modules/recetas/domain/actor.ts`, y
+QC-64 vive en recetas. El riesgo no es de regla, es de merge en F2.3. Comprobar contra
+`progress/impl_QC-64-*` antes de que el implementer entre en el barrel de recetas.
+
+**Decisiones que la ficha deja abiertas y que el spec no debe rellenar con un supuesto:**
+
+1. ¿`ADMIN_ROLE_NAME` **desaparece** de los tres barriles, o se queda como re-export de
+   `ROLE_ADMINISTRADOR` durante una transición? Lo primero es la ficha tal cual está escrita; lo
+   segundo evita romper a los consumidores de golpe. No es lo mismo y cambia el diff entero.
+2. `lib/composition/route-role-rules.ts` importa hoy `ADMIN_ROLE_NAME` **del barrel de
+   `inventario`**, y ese import es justo el que en QC-22 encendió el centinela que prohíbe importar
+   ese barrel como valor fuera de `lib/composition` — el centinela se **acotó** para permitirlo.
+   Al pasar el import a `identity`, ¿se **revierte** esa acotación del centinela, que es la deuda
+   que la ficha dice que era evitable, o se deja como está? La ficha lo cuenta como motivación pero
+   no lo pide.
+3. ¿Entra una **guardia ejecutable** que impida que un módulo nuevo vuelva a declarar su propio
+   literal `'Administrador'`? Sin ella la ficha limpia el presente y no el futuro, que es el motivo
+   por el que existe.
+
+
+### QC-35 — pantalla-de-pedidos: acotada y sembrada (2026-09-06)
+
+Arrancada por decision humana explicita («arranca con 35»), retomando la F1.2 que quedo en pausa
+el 2026-09-04. Alcance, decisiones y preguntas abiertas en
+**`specs/QC-35-pantalla-de-pedidos/requirements.md`** — 32 decisiones cerradas y 5 preguntas
+abiertas. No se copian aqui: ese archivo es la fuente.
+
+Lo que la acotacion movio fuera del disco, y por que importa para la proxima F0:
+
+- **Ficha nueva: `QC-68` — busqueda-y-total-en-el-listado-de-pedidos** (`backend`, `pending`, epica
+  QC-31, sin `complexity` porque la asigna el leader en F1.0). Recoge las dos cosas que la pantalla
+  pide y el backend no da: buscar por nombre de receta —QC-57 dejo `orders` como la unica de las
+  siete listas con `searchable: false`, y esta escrito por que— y el **total del pedido calculado en
+  el servidor**, que cierra la pregunta abierta 3 que QC-34 le habia remitido a esta ficha.
+- **El total se calcula en el SERVIDOR y no en la pantalla, y eso evita una dependencia.** Los dos
+  importes son `Decimal(14,4)`; multiplicarlos con `number` pierde precision, asi que hacerlo en el
+  cliente obligaria a meter `decimal.js` con sus cuatro checks de salud y su aprobacion humana
+  (regla 7). Prisma ya opera decimales del lado del servidor: la consulta devolvera `total` como
+  cadena. **Ninguna dependencia nueva entra por esta via.**
+- **QC-35 NO queda bloqueada por QC-68** —decision humana del 2026-09-06—. La pantalla nace **sin
+  caja de busqueda y sin columna de total** en vez de nacer con las dos sin funcionar, que es
+  exactamente lo que QC-56 advirtio por escrito («migrar antes dejaria cabeceras que no hacen
+  nada»). Enchufarlas cuando QC-68 este `done` es una ficha de frontend posterior **que todavia no
+  existe y que no se creo aqui**: se crea cuando QC-68 cierre.
+- **`description` de QC-35 reescrita en el board antes de sembrar**, como manda
+  `docs/jira.md > Cuando el disco descubre que el board esta desactualizado`. La version vieja
+  dejaba la forma de la pantalla «para la acotacion» y no mencionaba ni la tabla compartida ni el
+  total; sin reescribirla, la proxima F0 la habria reimportado y el spec quedaba huerfano de su
+  ficha.
+
+**Esta pantalla es el primer consumidor de la tabla compartida de QC-55**, mergeada el 2026-09-04 y
+hasta hoy sin estrenar. Con ella hereda la **pregunta abierta 4 de QC-55** —como se declara una
+columna de ACCIONES de fila—, que **es bloqueante y no se puede esquivar**: la lista necesita
+editar, cancelar y borrar por fila y hoy la configuracion de columnas solo devuelve texto. Lo que
+QC-35 resuelva ahi es lo que QC-56 adopta despues. La comprobacion en **Safari de iOS real** NO se
+mueve: sigue siendo de QC-56, por decision humana del 2026-09-04.
+
+**Lo que la acotacion NO tuvo que preguntar, porque ya estaba en el codigo mergeado:** el orden por
+defecto (`priority desc, createdAt asc`), los filtros de estado y prioridad, `recipeName` y
+`unitName` en la salida, y los seis campos ordenables de `ORDER_QUERYABLE`. Todo eso lo dejaron
+QC-34 y QC-57; se verifico en el codigo antes de preguntar, no se dio por supuesto.
+
+
+### QC-48 — tenant-en-la-sesion: arranque del 2026-09-06 (F1.0-F1.1)
+
+Arrancada por decision humana explicita, y es la de mas rendimiento del tablero: de ella cuelgan
+**cinco** fichas (QC-49, QC-50, QC-51, QC-59, QC-60).
+
+- **Nada que evaluar**: `zone: backend`, `complexity: medium`, `depends_on: QC-47` y `branch` ya
+  venian del board, y las labels (`zone:backend`, `complexity:medium`, `sdd`,
+  `slug:tenant-en-la-sesion`) estan puestas. No hizo falta empujar nada a Jira en F1.0.
+- **`depends_on` satisfecha**: QC-47 cerrada hoy (PR #37, merge `45bdf18`).
+- **Cupo de zona**: `backend` tiene **0** features `in_progress` tras cerrar QC-47 y QC-57. Sin
+  nada con lo que chocar, no hubo validacion de conflicto de archivos que hacer. Queda **un
+  segundo hueco** de backend libre.
+- **Worktree montado** en `.worktrees/QC-48-tenant-en-la-sesion` desde `origin/dev` (`738d9a9`),
+  que ya trae dentro el modelo de empresa de QC-47 — condicion para poder escribir contra el.
+- **F1.2 pendiente: hay que acotarla antes de lanzar `spec_author`.** No existe
+  `specs/QC-48-tenant-en-la-sesion/requirements.md` y la ficha arrastra una pregunta abierta
+  escrita en su propia description.
+- **ACOTADA con `/afinar-feature` el 2026-09-06.** Las nueve decisiones cerradas y la unica
+  pregunta abierta viven en `specs/QC-48-tenant-en-la-sesion/requirements.md`; no se copian aqui.
+  La acotacion toco el board dos veces: se reescribio la `description` de QC-48 (hablaba de
+  "membresia" y de una pregunta sin materia) y se creo **QC-69 — Alta de usuarios**, que
+  **se cancelo el mismo dia por duplicada**: la absorbe **QC-66 — crud-de-usuarios**, que la otra
+  sesion habia anadido a `feature_list.json` sin commitear despues de la ultima lectura del leader.
+  La regla que la motivo —el usuario nuevo hereda la empresa del administrador que lo crea— queda
+  comentada en QC-66.
+- **La pregunta abierta que hereda ya no se puede responder como esta escrita, y eso hay que
+  resolverlo al acotar.** Dice: «si un usuario llega a tener mas de una membresia y todavia no hay
+  selector, con cual inicia sesion». Pero **QC-47 se reacoto a una empresa por usuario**
+  (`users.company_id` obligatoria, sin tabla de pertenencias), asi que hoy **no puede haber mas de
+  una**: la pregunta no tiene materia contra el modelo que se acaba de mergear. Hay que decidir si
+  se declara cerrada por el modelo o si se convierte en otra cosa —por ejemplo, que pasa si la
+  empresa del usuario se borra o deja de ser suya a mitad de sesion, que el middleware si tiene que
+  contestar—. La description de la ficha tambien deberia dejar de hablar de «membresia», como ya se
+  corrigio en los docs del arnes.
+
+### QC-64 — editor-y-lectura-de-pasos: arranque del 2026-09-06 (F1.0–F1.2)
+
+Arrancada por decisión humana explícita («avanza con 64»), no por el orden de `id`.
+
+- **Nada que evaluar**: `zone: frontend`, `complexity: high`, `depends_on: QC-62` y `branch` ya
+  venían asignados de la partición del 2026-09-04, y las labels están en el board desde entonces.
+  No hizo falta empujar nada a Jira en F1.0.
+- **`depends_on` satisfecha**: QC-62 está `done` y mergeada (PR #36, merge `aa4d551`).
+- **Cupo de zona**: `frontend` tiene **0** features `in_progress` — QC-44 cerró con el PR #35 y su
+  fila en la tabla de arriba había quedado desactualizada en `in_progress`; corregida hoy. QC-35
+  sigue `pending`. No hubo que validar conflicto de archivos porque no hay nada `in_progress` en la
+  zona con lo que chocar.
+- **Worktree montado** en `.worktrees/QC-64-editor-y-lectura-de-pasos` desde `dev`, que hoy
+  coincide con `origin/dev` (`30d0266`): el worktree nace con QC-62 dentro, que es la condición
+  para poder escribir contra su contrato.
+- **F1.2 sin `/afinar-feature`**: `requirements.md` ya estaba sembrado el 2026-09-04 (alcance, 10
+  decisiones cerradas, 2 preguntas abiertas). `spec_author` solo rellena `## Requisitos (EARS)` y
+  escribe `design.md` y `tasks.md`, dentro del worktree.
+- **La librería del editor se aprueba con el spec (F1.4)**, por la regla 7: el `design.md` la
+  propone con los cuatro checks y su fila para `docs/dependencias.md`; la fila **no** se añade
+  hasta que el humano apruebe.
+- **Spec escrito y tarjeta en *En revisión* (F1.2–F1.3).** R1–R28, `design.md` y T1–T15 en el
+  commit `0044950` de la rama. `spec_author` dejó la tabla de los cuatro checks **en blanco** y
+  lo dijo, porque corre sin shell ni red; **los corrió el leader** y los cuatro **pasan** en los
+  nueve paquetes de TipTap `3.31.3`. Verificado además **sobre el paquete publicado** (`npm pack`)
+  que `TaskList`/`TaskItem` viven en `@tiptap/extension-list`: **nueve** entradas directas, no
+  once. Las nueve filas de `docs/dependencias.md` **no se escriben hasta la aprobación**.
+- **Aprobada por el humano el 2026-09-06 (F1.4 → F2.0).** Con el spec entra la **dependencia**:
+  nueve entradas de TipTap fijadas a `3.31.3`, todas `aprobada` y ninguna `excepcion`, escritas en
+  `docs/dependencias.md` **antes** de instalar nada (commit `3c26268`). Tarjeta en *En curso* y
+  `implementer` lanzado desde **T2**; T1 queda cerrada.
 
 ### QC-62 — pasos-de-receta-enriquecidos: nacida, acotada, sembrada y **partida** (2026-09-04)
 
@@ -1650,6 +1837,112 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
+### `docs/jira.md` documenta cinco columnas del board que ya no existen (2026-09-07, hallazgo de QC-54)
+
+Al hacer F1.3 de QC-54 la tabla de `docs/jira.md > 3` no sirvió: mapea `Backlog`,
+**`Spec en revisión`**, `En curso`, `Hecho` y `Cancelado`, y el board real tiene **`Por hacer`,
+`En curso`, `En revisión`, `Finalizado` y `Cancelado`**. Tres de los cinco nombres cambiaron, y
+el que más importa —la puerta de aprobación humana— es justo uno de ellos.
+
+**No lo resolví adivinando: lo resolví leyendo el precedente.** QC-23 lleva desde el 2026-09-03 en
+`spec_ready` y su tarjeta está en **`En revisión`** (id de transición `31`). O sea la convención
+viva del board es `spec_ready` → *En revisión*, y así se movió QC-54.
+
+**Por qué queda aquí y no arreglado:** `docs/jira.md` es arnés, y el arnés se cambia por
+`/afinar-regla` (CLAUDE.md, mapa rápido), no en caliente desde el ciclo de una feature. El parche
+es la tabla de columnas y las dos menciones a *Spec en revisión* de las líneas ~40 y ~173-174.
+Mientras no se aplique, cada F1.3 futuro vuelve a tropezar con lo mismo.
+
+### FALSA ALARMA, y la lección vale más que el susto: el gate rojo era `dev` atrasado (2026-09-06)
+
+**Anulada la nota que ocupaba este sitio.** Decía que el gate de `dev` estaba rojo porque el
+worktree de **QC-57** había escrito su migración en la base compartida `QuimiCloude` teniendo el
+`.env` mal apuntado. **Era falso y la conclusión estaba invertida.**
+
+Lo que pasaba de verdad: **QC-57 ya estaba mergeada** (PR #38, `738d9a9`, mergeado el 2026-09-07
+02:33Z) y también QC-47 (PR #37, 02:27Z). La base compartida no estaba adelantada: estaba **al
+día**. Quien estaba atrasado era el **worktree principal**, parado en `30d0266`, con un
+`schema.prisma` anterior a `products.name_normalized`. Por eso `product.create()` moría: el código
+no escribía una columna `NOT NULL` que la base ya exigía **con razón**.
+
+- **El error de razonamiento, para no repetirlo:** `prisma migrate diff` dice **qué** difiere, no
+  **quién** se movió. Ver una columna en la base y no en el `schema.prisma` admite dos lecturas
+  —la base se adelantó, o el código se atrasó— y elegí la primera porque encajaba con cinco
+  incidentes previos de drift entre worktrees. El precedente hizo de atajo y el atajo estaba mal.
+  **`git fetch && git log dev..origin/dev` habría costado tres segundos y era la pregunta
+  correcta**; el `.env` de QC-57 apuntando a la compartida es cierto pero **no era la causa**, y
+  fue justo lo que confirmó la hipótesis equivocada.
+- **Lo aportó el humano, no el diagnóstico:** «57 ya fue mergeada». Sin esa frase el arreglo
+  propuesto —aplicar el `down.sql` de QC-57 a la base— **habría roto la base compartida de
+  verdad**, quitándole una columna que `dev` ya necesita. Que la decisión fuera «no toques nada»
+  es lo único que dejó el error sin coste.
+- **Lo que sí queda en pie de la nota anulada**, porque se midió aparte: `sidebar-mobile.test.tsx`
+  con `STACK_TRACE_ERROR` es el **flake de saturación** —corrido solo pasa 7/7—, y los dos
+  `module-contract` con «el rango `origin/dev...HEAD` no estaba disponible» siguen en el baseline
+  con un motivo escrito que ya se sabe equivocado. Esa segunda sigue siendo candidata a
+  `/afinar-regla`.
+- **Deuda real que esto destapa:** nada en el arranque de sesión comprueba que el worktree
+  principal esté a la altura de `origin/dev`. `CLAUDE.md > Arranque de sesión` manda importar el
+  board y correr `./init.sh`, y ninguno de los dos mira el remoto — así que la sesión arranca
+  contra un `dev` viejo sin que nada lo diga, y el gate falla por un motivo que no tiene que ver
+  con lo que se está haciendo. Ya pasó antes (ver «El worktree principal quedó fuera de `dev`»,
+  2026-09-03): **es la segunda vez**. Candidata a `/afinar-regla`.
+
+- **Confirmado con la medición, ya con `dev` al día (2026-09-07):**
+  `prisma migrate diff --from-schema-datamodel --to-schema-datasource` **no reporta ni una columna**
+  de diferencia contra `QuimiCloude`, `products.name_normalized` incluida. Lo único que sigue
+  saliendo son **índices y claves foráneas** que viven en SQL crudo dentro de las migraciones y que
+  `db/schema.prisma` no declara: deriva estructural conocida, de otra naturaleza, y **no** el fallo
+  que rompía los diez archivos de integración. Que nadie la confunda con una regresión.
+
+### El commit `89e8589` lleva un mensaje que no le corresponde (2026-09-07)
+
+Segunda vez que pasa (la primera fue `7a3af59`, más abajo), y por la misma causa: **dos sesiones de
+leader escribiendo `progress/current.md` a la vez**. La sesión de QC-64 fue a añadir la medición de
+arriba, su edición **no aplicó** —el ancla que buscaba ya no existía, porque la otra sesión había
+reescrito el archivo—, y el `git add` que venía detrás commiteó **el trabajo sin commitear de la
+otra sesión** con el mensaje de la medición.
+
+- **Qué hay de verdad en `89e8589`:** la fila de QC-35 pasando a `spec_ready`, la de QC-48 recién
+  montada, y la retirada de las filas de QC-57 y QC-47. **Nada de eso lo escribió esa sesión.**
+- **No se reescribe la historia**: el commit se queda y esta nota es la corrección.
+- **La lección operativa:** encadenar `git add` a una edición que puede no aplicar es cómo se
+  commitea trabajo ajeno. Si la edición falla, el `add` no debe correr —y `git diff --stat` antes
+  del commit lo habría cazado en un segundo—.
+
+### QC-57 y QC-47 están mergeadas y el board todavía no lo sabe (2026-09-06)
+
+**Y se pisaron entre ellas: `dev` NO compila.** Los dos PRs se mergearon con **seis minutos de
+diferencia** y ninguno vio al otro. QC-47 hizo `companyId` **obligatorio** en `users`; los dos
+tests que QC-57 estrenó crean usuarios sin ese campo:
+
+```
+tests/integration/inventario/list-query-indexes.int.test.ts(77,5)
+tests/integration/pedidos/list-query-orders.int.test.ts(131,7)
+  error TS2322: Property 'companyId' is missing ... but required in type 'UserUncheckedCreateInput'
+```
+
+Son **dos errores de typecheck y nada más** —el resto de la suite no se llega a correr porque el
+gate para ahí—, así que el arreglo es pequeño: darles `companyId` como ya hacen los demás tests de
+integración. **No lo hace el leader** (no edita código) y no es de QC-35: pertenece al cierre de
+QC-47 y QC-57, que además está a medias. Mientras siga así, **`./init.sh` no puede terminar en
+verde en `dev` ni en ninguna rama que nazca de él**, y eso incluye la futura rama de QC-35.
+
+**Y hay una segunda trampa detrás de esa, que costó una corrida entera:** aunque el código estuviera
+bien, el **cliente Prisma generado se queda viejo** cuando `dev` avanza con una migración. El
+síntoma es un typecheck lleno de `Property 'company' does not exist on type 'TransactionClient'` y
+`'nameNormalized' does not exist`, que **parece** código roto y no lo es. `npx prisma generate`
+lo arregla. Nada en `./init.sh` lo hace ni lo comprueba: es la tercera cosa que el arranque de
+sesión no mira, junto con el remoto. Candidata a `/afinar-regla` en el mismo paquete.
+
+
+PR #38 (QC-57) y PR #37 (QC-47) se mergearon el 2026-09-07 02:27–02:33Z. Sus dos tarjetas siguen
+en *En curso* y sus dos fichas siguen `in_progress` en `feature_list.json`, así que **F2.5 está
+pendiente para las dos**: pasar a `done`, mover la tarjeta a *Hecho*, comentar la URL del PR y
+desmontar el worktree (`./scripts/wt.sh done <key>-<slug>`, con `--assume-merged` si el merge fue
+squash). Hasta que se haga, la zona `backend` figura con sus **dos** plazas ocupadas y ninguna
+feature `backend` nueva puede arrancar.
+
 ### `pg_trgm` entra como dependencia de infraestructura que NINGUNA guardia vigila (2026-09-04, QC-57)
 
 `docs/dependencias.md` y su guardia comparan **entradas de `package.json`**. Una extensión de
@@ -2637,3 +2930,13 @@ pregunta 5 (pepper) la cerró el humano el 2026-08-06 con un no (`design.md > 8.
   `WT_DIR = '.worktrees'` (linea 18) se resuelve contra el cwd, asi que `./init.sh` aborta dentro de
   cualquier worktree con `faltan specs para features sdd en vuelo: <otra feature>` — QC-21 convivio
   con ese rojo por decision humana del 2026-09-02. Desde la raiz pasa en verde. `/afinar-regla`.
+
+La feature **QC-44 — pantalla-de-proveedores** se cerró el 2026-09-04 (PR #35, merge `f966a7b`),
+pero su F2.6 quedó sin hacer hasta el 2026-09-07: la fila de esta tabla siguió diciendo
+`in_progress` tres días y no había entrada en `history.md`. Ya la tiene, y con ella las cinco deudas
+que el reviewer anotó (0 mayores, 6 menores, una sola ronda). El worktree ya estaba desmontado; la
+rama `feature/QC-44-pantalla-de-proveedores` seguía viva y se borró al escribir esto.
+
+De esas deudas, **una tiene ficha y sigue `pending`: QC-58 (`timeout-tests-ui-bajo-carga`)** —
+`catalog-line-sheet.test.tsx` teclea siete campos con `userEvent` y agota los 5000 ms por defecto
+bajo carga. No es un rojo real, pero pondrá el gate en rojo por el reloj de la máquina.

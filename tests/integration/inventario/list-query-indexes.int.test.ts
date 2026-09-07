@@ -28,6 +28,7 @@ import { randomUUID } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
+import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizeProductName } from '@/lib/modules/inventario'
 import {
   createProduct,
@@ -73,6 +74,17 @@ async function createTestUser(db: Db): Promise<string> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   })
+  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
+  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
+  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
+  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
+  // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de la copia
+  // local `normalizeForTest`, que es solo para los datos de apoyo.
+  const companyName = `Empresa ${marker}`
+  const company = await db.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  })
   const user = await db.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -85,6 +97,7 @@ async function createTestUser(db: Db): Promise<string> {
       username: `ana.${marker}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId: role.id,
+      companyId: company.id,
     },
     select: { id: true },
   })
@@ -94,11 +107,12 @@ async function createTestUser(db: Db): Promise<string> {
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { roleId: true, documentTypeCode: true },
+    select: { roleId: true, documentTypeCode: true, companyId: true },
   })
   await db.user.delete({ where: { id: userId } })
   await db.role.delete({ where: { id: user.roleId } })
   await db.documentType.delete({ where: { code: user.documentTypeCode } })
+  await db.company.delete({ where: { id: user.companyId } })
 }
 
 // ---------------------------------------------------------------------------
