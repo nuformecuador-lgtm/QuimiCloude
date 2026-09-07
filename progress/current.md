@@ -14,7 +14,7 @@
 | QC-35 | pantalla-de-pedidos | Pedidos | frontend | in_progress | feature/QC-35-pantalla-de-pedidos | implementer (spec aprobado por el humano el 2026-09-07). Worktree sincronizado con `origin/dev` — venia 60 commits atras |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
-| QC-48 | tenant-en-la-sesion | Multiempresa | backend | pending → F1.2 | feature/QC-48-tenant-en-la-sesion | leader (worktree montado desde `origin/dev`=`738d9a9`, sin spec: pendiente de acotar con `/afinar-feature`) |
+| QC-48 | tenant-en-la-sesion | Multiempresa | backend | in_progress | feature/QC-48-tenant-en-la-sesion | implementer (**spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*). R1–R28, 14 tasks, sin migración y sin dependencia nueva |
 | QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | pending → F1.2 | feature/QC-54-unificar-constante-rol-administrador | leader (worktree montado desde `origin/dev`=`738d9a9`, sin spec: pendiente de decidir si se acota con `/afinar-feature`) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
@@ -225,6 +225,37 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 ## Evaluaciones
 
 ### QC-54 — unificar-constante-rol-administrador: arranque del 2026-09-07 (F1.0)
+
+**OTRA SESIÓN DE LEADER LLEVA QC-48, y eso cambia el paralelismo de QC-54 (2026-09-07).** Al sembrar
+esta ficha el validador pasó de `in_progress=2` a `=3` sin que yo tocara ningún `status`. No es un
+error: QC-48 pasó a `in_progress` desde fuera de esta sesión. Comprobado — su worktree tiene cinco
+archivos de `identity` modificados sin commitear (`domain/session-claims.ts`, `domain/session.ts`,
+`adapters/driven/session/session-token.ts` y sus dos tests) más un `specs/QC-48-tenant-en-la-sesion/`
+sin trackear, y su tarjeta ya está en *En curso* en el board.
+
+**Qué implica.** La zona `backend` deja de estar vacía: con QC-48 dentro, QC-54 sería la segunda, que
+es el límite y no una violación. Pero ahora **sí hay validación de conflicto de archivos que hacer**
+(`AGENTS.md > Paralelismo`), y la intersección probable es real: QC-54 tiene que tocar
+`lib/modules/identity/domain/roles.ts` y **`lib/modules/identity/index.ts`** para publicar el
+`requireAdmin` genérico, y QC-48 está reescribiendo el dominio de sesión de ese mismo módulo y muy
+probablemente su barrel.
+
+**Qué NO bloquea.** F1.2 sigue adelante: `spec_author` no toca código. Es el mismo razonamiento que
+QC-47 dejó escrito el 2026-09-04 — la validación se hace contra `specs/<feature>/tasks.md`, que
+todavía no existe.
+
+**Qué SÍ bloquea, y queda anotado para no decidirlo dos veces:** la implementación de QC-54 **no
+arranca (F2.0)** hasta que QC-48 esté `done`, o hasta que sus `tasks.md` demuestren que no tocan
+`lib/modules/identity/index.ts`. Y con dos sesiones vivas sobre el mismo repo, **el que llegue
+segundo al barrel de `identity` se come el conflicto**.
+
+**Acotada y sembrada el 2026-09-07** con `/afinar-feature`: nueve decisiones cerradas en
+`specs/QC-54-unificar-constante-rol-administrador/requirements.md`, cero preguntas abiertas. El
+alcance **creció** —entra también unificar los cinco `requireAdmin` y una guardia contra la
+reincidencia—, así que la `complexity` subió a `high` y la `description` del board se reescribió
+antes de sembrar. Dos de las tres preguntas que iba a hacer **se cayeron al medirlas**: la deuda de
+centinela que la ficha atribuía a este import no existe, y el borde no corre riesgo. Las tres
+decisiones abiertas que anoté arriba quedan cerradas en ese archivo — no se releen desde aquí.
 
 Elegida por decisión humana explícita («comienza con 54»). Zona `backend`, que estaba **vacía de
 `in_progress`** —las dos en curso, QC-35 y QC-64, son `frontend` y llenan su cupo—, así que es la
