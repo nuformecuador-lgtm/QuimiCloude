@@ -44,3 +44,18 @@ export class ValidationError extends UnidadesError {
     super(message);
   }
 }
+
+/**
+ * QC-76 (R24): se pide convertir una cantidad entre dos unidades que NO comparten unidad base
+ * —litros a gramos—. Es un error de dominio DISTINGUIBLE del resto por su `code`, y no una
+ * `ValidationError`: la entrada tiene la forma correcta y los dos factores son validos; lo que
+ * no existe es la equivalencia. Quien la reciba puede decirlo con esas palabras al usuario en
+ * vez de con un «entrada invalida» generico.
+ */
+export class IncompatibleUnitsError extends UnidadesError {
+  readonly code = 'incompatible_units';
+
+  constructor(message = 'Las dos unidades no comparten unidad base: no son convertibles.') {
+    super(message);
+  }
+}

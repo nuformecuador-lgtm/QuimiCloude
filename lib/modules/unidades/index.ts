@@ -22,6 +22,16 @@ export { requirePermission } from './domain/actor';
 export type { Actor } from './domain/actor';
 export { UnidadesError, UnauthorizedError, ValidationError } from './domain/errors';
 
+// QC-76 (R22-R25): la conversion de una cantidad entre dos unidades que comparten unidad base.
+// Es dominio PURO —sin base de datos, sin framework y sin estado—, asi que publicarla no
+// arrastra nada de servidor al barrel. NADIE la llama todavia (R26, decision cerrada 18): el
+// contrato la publica y `inventario`, `recetas` y `pedidos` siguen tratando la unidad como
+// anotativa. La escala del resultado cuando la division no termina —12 decimales, truncando—
+// vive en `CONVERSION_SCALE`, documentada en `domain/convert-quantity.ts`.
+export { convertQuantity } from './domain/convert-quantity';
+export type { UnitConversion } from './domain/convert-quantity';
+export { IncompatibleUnitsError } from './domain/errors';
+
 // QC-57 (R27-R29): el listado acepta el contrato generico de consulta y su pagina es OPCIONAL.
 // `isUnitPage` es el discriminante en tiempo de ejecucion de `UnitListResult` -sin consulta se
 // devuelve el catalogo entero; con `page` o `pageSize`, una `Page<UnitRef>`-. Son SOLO tipos y
