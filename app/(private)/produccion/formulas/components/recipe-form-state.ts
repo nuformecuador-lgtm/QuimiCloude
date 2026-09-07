@@ -52,14 +52,18 @@ export type RecipeLineFormValue = {
 /**
  * Paso del formulario, con su clave local de React (mismo motivo que en `RecipeLineFormValue`).
  *
- * `text` es lo que el usuario escribe, en TEXTO PLANO: el paso ya no tiene `type` -desaparecio
- * del contrato (QC-62 R9, decision cerrada 2)- y esta pantalla es el PUENTE de R19 hasta QC-64,
- * asi que no conoce marcas ni listas de verificacion. La conversion entre este texto y el
- * documento del contrato la hacen `textToStepDocument` y `stepDocumentToText`.
+ * `document` es EL DOCUMENTO DEL CONTRATO tal cual (QC-64 R1, R5; `design.md > 4`), no una
+ * proyeccion a texto plano: el estado del formulario guarda exactamente lo que se va a enviar,
+ * con sus parrafos, sus marcas y sus listas de verificacion. El paso tampoco tiene `type`
+ * -desaparecio del contrato (QC-62 R9, decision cerrada 2)-.
+ *
+ * Aqui NO hay conversion: quien traduce entre el editor y esta forma es
+ * `recipe-step-document.ts`, y lo hace dentro del editor. El puente de texto plano de QC-62 R19
+ * (`textToStepDocument` / `stepDocumentToText`) se RETIRO con esta feature.
  */
 export type RecipeStepFormValue = {
   readonly key: string;
-  readonly text: string;
+  readonly document: RecipeStepDocument;
 };
 
 /** Estado completo y controlado del formulario. */
@@ -91,33 +95,6 @@ export type RecipeLinePayload = {
  */
 export type RecipeStepPayload = RecipeStepDocument;
 
-/**
- * EL PUENTE DE LA PANTALLA (R19, `design.md > 6`). Dos funciones PURAS -sin React, sin DOM- que
- * traducen entre el texto plano que el formulario edita hoy y el documento del contrato.
- *
- * **Son provisionales por diseno**: QC-64 trae el editor enriquecido y las REEMPLAZA. Mientras
- * tanto, esta pantalla es la unica via de escritura de pasos y R14 dejo sin pasos a todas las
- * recetas existentes, asi que el unico documento que el puente puede aplanar es uno que el mismo
- * creo -un parrafo, un fragmento, sin marcas-.
- */
-
-/** Texto plano -> documento de UN parrafo con UN fragmento sin marcas (R19). */
-export function textToStepDocument(text: string): RecipeStepPayload {
-  return { blocks: [{ kind: 'paragraph', spans: [{ text }] }] };
-}
-
-/**
- * Documento -> texto plano: concatena el `text` de los fragmentos de cada PARRAFO y separa los
- * parrafos con un salto de linea (`design.md > 6`). Es LOSSY y se asume: las marcas y las listas
- * de verificacion no tienen representacion en un `<Input>` de texto.
- */
-export function stepDocumentToText(document: RecipeStepPayload): string {
-  return document.blocks
-    .filter((block) => block.kind === 'paragraph')
-    .map((block) => block.spans.map((span) => span.text).join(''))
-    .join('\n');
-}
-
 export type RecipePayload = {
   readonly name: string;
   readonly description: string | null;
@@ -141,9 +118,10 @@ export type RecipePayload = {
  * redondea y no la convierte a número en ningún punto. `grep` de la ruta confirma que en ningún
  * archivo de esta feature aparece `parseFloat(`, `Number(` ni `toFixed(` sobre la cantidad.
  *
- * **Cada paso viaja como el DOCUMENTO del contrato** (R19): el texto tal cual lo escribio el
- * usuario, proyectado por `textToStepDocument` a un solo parrafo con un solo fragmento sin
- * marcas. Ni cadena suelta ni `{ body, type }`: el contrato dejo de aceptar ambos.
+ * **Cada paso viaja como el DOCUMENTO del contrato, TAL CUAL** (QC-64 R5): esta funcion ya no
+ * proyecta texto -el puente de QC-62 R19 se retiro-, solo copia `step.document` y descarta la
+ * `key`, que es de PRESENTACION. Asi el payload no puede llevar ninguna clave que el contrato no
+ * declare: ni estado de marcado, ni identificador de bloque, ni version, ni tipo de paso.
  *
  * **Los pasos salen en el orden en que `state.steps` los tiene** (R32): es responsabilidad de
  * `recipe-steps-field.tsx` mantener ese array en el orden que el usuario ve, arrastre o teclado
@@ -168,7 +146,7 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
   const base = {
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
-    steps: state.steps.map((step): RecipeStepPayload => textToStepDocument(step.text)),
+    steps: state.steps.map((step): RecipeStepPayload => step.document),
     lines: state.lines.map(
       (line): RecipeLinePayload => ({
         productId: line.productId,

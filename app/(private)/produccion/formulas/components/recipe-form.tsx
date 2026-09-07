@@ -2,10 +2,19 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
+import { StepReader } from '@/components/shared/step-reader';
 import { Button, buttonVariants } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,7 +38,6 @@ import {
   extractGeneralLinesError,
   extractLineErrors,
   extractStepErrors,
-  stepDocumentToText,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeLineFormValue,
@@ -67,6 +75,11 @@ import {
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
+
+const PREVIEW_OPEN_LABEL = 'Vista previa';
+const PREVIEW_TITLE = 'Vista previa';
+const PREVIEW_DESCRIPTION =
+  'Asi se leera esta receta, paso a paso. Nada de lo que hagas aqui se guarda.';
 
 const SAVE_SUCCESS_CREATE = 'Receta creada.';
 const SAVE_SUCCESS_EDIT = 'Receta actualizada.';
@@ -120,10 +133,11 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         unitId: line.unitId,
       }),
     ),
-    // R19 (`design.md > 6`): el paso llega como DOCUMENTO y el puente lo aplana a texto plano,
-    // que es lo unico que este formulario sabe editar hasta QC-64.
+    // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a
+    // texto -el puente de QC-62 R19 se retiro con T4-, asi que reabrir una receta conserva sus
+    // marcas y sus listas de verificacion intactas. `key` es una clave local de React.
     steps: recipe.steps.map(
-      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), text: stepDocumentToText(step) }),
+      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), document: step }),
     ),
     image: { kind: 'untouched' },
   };
@@ -135,6 +149,10 @@ export function RecipeForm(props: RecipeFormProps) {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState<SaveError | null>(null);
   const [isPending, startTransition] = useTransition();
+  // QC-64 R11-R13: la vista previa es SOLO estado de pantalla. Ni guarda, ni invoca ninguna
+  // operacion del modulo, ni navega; abrirla y cerrarla no toca una sola letra del formulario.
+  const [isPreviewOpen, setPreviewOpen] = useState(false);
+  const previewTriggerRef = useRef<HTMLButtonElement>(null);
 
   const isEdit = props.mode === 'edit';
 
@@ -289,6 +307,45 @@ export function RecipeForm(props: RecipeFormProps) {
       />
 
       <div className="flex justify-end gap-2">
+        {/* R11: se proyecta el estado ACTUAL del formulario -`state.steps.map(...)`-, no lo
+            guardado; el asistente se monta solo mientras el modal esta abierto, asi que cerrarlo
+            lo desmonta y se lleva su marcado con el (R13, R19, R22). */}
+        <Dialog open={isPreviewOpen} onOpenChange={setPreviewOpen}>
+          <DialogTrigger
+            data-testid="recipe-form-preview-open"
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                ref={previewTriggerRef}
+                className={TOUCH_TARGET}
+              />
+            }
+          >
+            {PREVIEW_OPEN_LABEL}
+          </DialogTrigger>
+          {/* R26: alto POR CONTENIDO con tope en `85dvh` y scroll interno; el alto de
+              viewport completo esta prohibido -en movil la barra del navegador se come
+              esa medida y el modal deja de caber-. */}
+          <DialogContent
+            data-testid="recipe-form-preview"
+            className="flex max-h-[85dvh] flex-col gap-4 sm:max-w-lg"
+            finalFocus={previewTriggerRef}
+          >
+            <DialogHeader>
+              <DialogTitle>{PREVIEW_TITLE}</DialogTitle>
+              <DialogDescription>{PREVIEW_DESCRIPTION}</DialogDescription>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {isPreviewOpen && (
+                <StepReader
+                  steps={state.steps.map((step) => step.document)}
+                  onFinish={() => setPreviewOpen(false)}
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
         <Link
           href={FORMULAS_ROUTE}
           data-slot="button"

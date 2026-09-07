@@ -35,8 +35,6 @@ export {
   extractGeneralLinesError,
   extractLineErrors,
   extractStepErrors,
-  stepDocumentToText,
-  textToStepDocument,
   type ImageFieldState,
   type RecipeFormMode,
   type RecipeFormState,
@@ -54,3 +52,15 @@ export { RecipeLinesField, type RecipeLinesFieldProps } from './recipe-lines-fie
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
+
+// --- Pasos enriquecidos (QC-64 T3, T5, T6; `design.md > 3`, `> 4`, `> 7`) ---
+// `recipe-step-schema.ts` NO se reexporta aqui, y es la unica excepcion a R46 en esta carpeta:
+// su unico simbolo publico (`RECIPE_STEP_EXTENSIONS`) tiene tipo `Extensions` de `@tiptap/core`,
+// asi que reexportarlo abriria una puerta —el barrel— por la que cualquier archivo del repo
+// podria tocar un tipo de la libreria del editor sin escribir nunca el literal `@tiptap` que
+// vigila `tests/guards/guard-editor-aislado.test.ts`. R25 y `design.md > 7` exigen que la
+// libreria viva en DOS archivos; su unico consumidor es `recipe-step-editor.tsx`, que lo importa
+// por ruta relativa dentro de la misma carpeta. La excepcion esta anotada en el caso del barrel
+// de `tests/unit/recetas-ui/recipe-route-contract.test.ts` y hay una guardia que la sostiene.
+export { editorJsonToStepDocument, stepDocumentToEditorJson } from './recipe-step-document';
+export { RecipeStepEditor, type RecipeStepEditorProps } from './recipe-step-editor';
