@@ -293,7 +293,7 @@ describe('autorizacion de los nueve casos de uso de proveedores (QC-43 T10)', ()
     }
   })
 
-  it('el rol autorizado sale de ROLE_ADMINISTRADOR de identity y ningun archivo del modulo incrusta el literal', () => {
+  it('el rol autorizado sale de identity via assertAdminRole y ningun archivo del modulo incrusta el literal', () => {
     // R4. `identity/domain/roles.ts` dice ser «el UNICO sitio del repo que escribe a mano
     // los literales de rol»; `proveedores` no declara ninguna constante propia ni copia el
     // texto. Mutacion que lo pone rojo: cambiar `actor.ts` por
@@ -308,9 +308,18 @@ describe('autorizacion de los nueve casos de uso de proveedores (QC-43 T10)', ()
     }
 
     // Y lo toma del BARREL de `identity`, no por ruta profunda ni de `inventario`.
+    //
+    // Decision del humano (2026-09-07, QC-54): este centinela vigilaba un MEDIO -que
+    // `actor.ts` importara `ROLE_ADMINISTRADOR`- para garantizar un FIN: que el rol
+    // autorizado salga de `identity`, sin literal local y sin pasar por `inventario`.
+    // Delegar en `assertAdminRole` (la UNICA implementacion de la regla «el actor es
+    // Administrador», en `identity/domain/require-admin.ts`) cumple ese fin MEJOR que el
+    // medio que esta asercion exigia antes, asi que se actualiza al nuevo medio: no se
+    // afloja. La mutacion que sigue poniendola roja es la misma de siempre, declarar un
+    // `const ADMIN_ROLE_NAME = 'Administrador'` propio en el modulo.
     const actor = readFileSync(join(moduloDir, 'domain', 'actor.ts'), 'utf8')
     expect(actor).toMatch(
-      /import \{ ROLE_ADMINISTRADOR \} from '@\/lib\/modules\/identity'/,
+      /import \{ assertAdminRole \} from '@\/lib\/modules\/identity'/,
     )
     expect(actor).not.toMatch(/@\/lib\/modules\/identity\//)
     expect(actor).not.toMatch(/@\/lib\/modules\/inventario/)

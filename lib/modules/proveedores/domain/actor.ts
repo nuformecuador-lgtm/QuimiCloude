@@ -1,11 +1,12 @@
 // El nombre del rol sale del CONTRATO PUBLICO de `identity`, que es su dueno
-// (`design.md > 3`, P1): `lib/modules/identity/domain/roles.ts` dice ser «el UNICO sitio
-// del repo que escribe a mano los literales» y su barrel ya lo exporta. `proveedores` NO
-// declara ninguna constante propia de rol (R4) y NO lo toma de `inventario`: un rol es un
-// concepto de `identity`, no de un modulo de negocio.
+// (`design.md > 2`, QC-54): `lib/modules/identity/domain/roles.ts` es el UNICO sitio del
+// repo que escribe a mano el literal, y `identity/domain/require-admin.ts` es la UNICA
+// implementacion de la regla «el actor es Administrador». `proveedores` NO declara
+// ninguna constante propia de rol y NO incrusta el literal en ningun archivo (R4): delega
+// en `assertAdminRole`, igual que los demas modulos.
 //
 // Barrel, NUNCA ruta profunda (`docs/architecture.md > La regla de dependencias`).
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import { assertAdminRole } from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
@@ -27,7 +28,5 @@ export type Actor = {
  * del catalogo llaman a `requireAdmin` igual que las mutaciones.
  */
 export function requireAdmin(actor: Actor | null | undefined): asserts actor is Actor {
-  if (!actor || actor.roleName !== ROLE_ADMINISTRADOR) {
-    throw new UnauthorizedError();
-  }
+  assertAdminRole(actor, () => new UnauthorizedError());
 }

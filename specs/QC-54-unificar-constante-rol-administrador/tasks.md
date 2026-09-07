@@ -48,7 +48,7 @@
   **Hecho:** `tests/unit/pedidos/authorization.test.ts` verde **sin tocar el archivo** (incluido su
   centinela local, que se conserva). Cubre: R6, R8, R9, R15.
 
-- [ ] **T6. `proveedores` delega.** [P] — `lib/modules/proveedores/domain/actor.ts`.
+- [x] **T6. `proveedores` delega.** [P] — `lib/modules/proveedores/domain/actor.ts`.
   **Hecho:** `tests/unit/proveedores/authorization.test.ts` verde **sin tocar el archivo**.
 
 ## Bloque 3 — se retira el símbolo viejo (depende de T2, T3, T4)
@@ -94,7 +94,7 @@
 
 ## Bloque 4 — la guardia (independiente de los bloques 2 y 3; se cierra al final)
 
-- [ ] **T11. Guardia contra la reincidencia.**
+- [x] **T11. Guardia contra la reincidencia.**
   - Archivo: `tests/guards/guard-rol-administrador-unico.test.ts` (nuevo). Nada más.
   - Patrón, alcance del barrido, orden de `stripComments` y derivación del patrón desde el valor:
     `design.md > 5`. Funciones puras exportadas para poder ejercitarlas con fuentes sintéticos.
@@ -107,7 +107,7 @@
 
 ## Bloque 5 — cierre
 
-- [ ] **T12. Gate completo y trazabilidad.** (depende de todo lo anterior)
+- [x] **T12. Gate completo y trazabilidad.** (depende de todo lo anterior)
   - `./init.sh` completo en verde, sin excepción (regla 5 de `CLAUDE.md`).
   - Comprobar a mano lo que ningún test afirma por sí solo:
     - `git diff --stat` **no toca** `db/`, `app/` ni `components/` (R5, y el «Lo que NO entra»).

@@ -167,7 +167,22 @@ escala de un módulo):
   en `progress/impl_QC-34-crud-de-pedidos.md`: solo veía la comilla simple —la doble y el backtick se
   colaban, y ninguna regla de lint obliga a una comilla concreta— y, si `identity` renombrara el rol,
   seguiría vigilando un nombre inexistente y quedaría **verde por vacuidad**.
-- **Exención única:** `lib/modules/identity/domain/roles.ts`. Y su ancla simétrica:
+- **Exención: DOS archivos, y solo dos.** `lib/modules/identity/domain/roles.ts` y
+  `lib/modules/identity/domain/seed-initial-access.ts`.
+
+  > **CORRECCIÓN del 2026-09-07 (cerrada por el humano durante F2.1).** Esta sección decía
+  > «exención única: `roles.ts`». Se midió al construir la guardia: descontando comentarios, hay
+  > **dos** archivos de producción con el literal, y el segundo es
+  > `const INITIAL_ADMIN_FIRST_NAMES = 'Administrador'` de `seed-initial-access.ts` — el **nombre de
+  > pila** del usuario inicial, hermano de `INITIAL_ADMIN_LAST_NAMES = 'Inicial'`, no el nombre del
+  > rol. Una guardia por texto no puede distinguir un nombre de persona de uno de rol. Renombrarlo
+  > está descartado: rompe `tests/unit/identity/seed/seed-initial-access.test.ts:220` y cambiaría un
+  > dato ya sembrado en la base, fuera del «cero cambios en `db/`». **No se exime
+  > `identity/domain/` entera**: dejaría entrar un segundo literal del rol dentro de `identity` sin
+  > que nada avise. El motivo de la segunda exención va escrito **dentro de la propia guardia**,
+  > porque si no parece un agujero.
+
+  Y su ancla simétrica:
   `expect(infractores).not.toEqual([])` **no**; lo que se ancla es que el archivo exento **sí** casa
   con el patrón (`expect(conElLiteral).toContain(DUENO_UNICO)`), para que la guardia avise en vez de
   callarse si `roles.ts` cambia de forma.
@@ -180,8 +195,21 @@ escala de un módulo):
 de fallo que la ficha ataca: **el módulo número seis nacería sin centinela**, igual que
 `inventario`, `recetas` y `unidades` nacieron sin él teniendo `identity` delante. Una guardia global
 en `tests/guards/` cubre lo que todavía no existe; cinco centinelas locales solo cubren lo que
-alguien se acordó de escribir. Los centinelas locales de `pedidos` y `proveedores` **se dejan como
-están** (defensa en profundidad barata, y tocarlos violaría R15).
+alguien se acordó de escribir. Los centinelas locales de `pedidos` y `proveedores` se conservan como
+defensa en profundidad barata.
+
+> **CORRECCIÓN del 2026-09-07 (cerrada por el humano durante F2.1).** Aquí decía que esos dos
+> centinelas «se dejan como están (…tocarlos violaría R15)». **Esa letra chocaba con R6 y con la
+> decisión cerrada 2, y gana el requisito.** Medido: el de `proveedores` exige por regex el import
+> exacto `import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity'` en su `domain/actor.ts`, así
+> que al delegar —cuando `ROLE_ADMINISTRADOR` deja de usarse ahí— se pondría rojo, y `proveedores`
+> nunca podría cumplir R6. Ese centinela vigila un **medio** para garantizar un **fin** (que el rol
+> salga de `identity`, sin literal local y sin pasar por `inventario`), y delegar cumple el fin
+> mejor que el medio: la regex pasa a exigir el import de `assertAdminRole` del mismo barrel. **No
+> se afloja** — las otras cuatro aserciones del bloque (barrido del literal sobre todos los fuentes
+> del módulo, prohibición de ruta profunda, prohibición de `@/lib/modules/inventario`, ausencia de
+> un `domain/roles.ts` propio) quedan intactas y son las que protegen de verdad. El de `pedidos`
+> **no se toca**: solo mira el literal y ya pasa verde tras delegar.
 
 ## 6. Contrato de I/O
 
