@@ -1873,3 +1873,98 @@ en una columna desde QC-24.
   que QC-64 traiga el editor. Y las dos guardias gemelas de alcance de `recetas` ya no dicen lo
   mismo: una se actualizó y la otra sigue tapada por `baseline-rojos.json` con un motivo escrito que
   ya no es el que ocurre.
+
+---
+
+## QC-57 — orden-y-filtro-en-listados (cerrada el 2026-09-06, PR #38, merge `738d9a9`)
+
+`zone: backend`, `complexity: high`. Un contrato único de consulta —orden, filtros, búsqueda y
+paginación— aplicado a los **siete listados** del producto. Cada módulo declara su **lista blanca**
+de campos consultables en `domain/list-query.ts`; lo que no está declarado se poda en el dominio y
+**queda en el log** en vez de desaparecer en silencio. Búsqueda por subcadena con `pg_trgm` e
+índices GIN (vía A, cerrada por decisión), `NULLS LAST` siempre explícito y `dateRange` en UTC con
+extremos inclusivos. 126 archivos, +11.356/−504. Único cambio de esquema: la columna
+`Product.nameNormalized` y sus 35 índices, con `down.sql` reversible y sin un solo `DROP` en la
+subida.
+
+- **R1–R35 con test real, cero sin cubrir.** 21 tasks, las 21 en `[x]`.
+- **Necesitó dos rondas de review, y ninguna fue por el contrato.** La ficha en sí pasó a la
+  primera; lo que la tumbó fue **el cierre**: F2.3 estaba sin hacer contra `origin/dev` (se había
+  mergeado `dev` **local**, que iba por detrás) y la rama arrastraba **14 archivos commiteados con
+  los finales de línea cambiados a CRLF**, que inflaban el diff con ~5.900 líneas fantasma.
+- **La lección del incidente de CRLF, que el implementer dejó escrita:** comparó contra `HEAD`,
+  que ya *era* el commit roto, en vez de contra la rama base — y así **propagó** la conversión en
+  vez de arreglarla. La guardia de equivalencia nunca falló: normaliza `\r\n` antes de comparar.
+- **Hallazgo que merece ficha propia (N2):** el `switch` del adaptador es una **segunda lista
+  blanca implícita** y nada la confronta con la declarada. Hoy coinciden las siete (auditadas una a
+  una), así que no hay bug; pero el día que se añada un campo a una lista blanca y se olvide la rama
+  del adaptador, el filtro desaparece **sin fallar y sin log**, porque el log solo registra lo que
+  podó el dominio. Es el modo de fallo de la decisión cerrada 7 entrando por el otro lado.
+- **Deuda que deja en `dev`:** doce funciones `export` sin consumidor fuera de su archivo (N1) y
+  una fecha ilegible en `dateRange` que se descarta sin rastro (N3, anotado para QC-56). Y el aviso
+  operativo de que `products.name_normalized` es `NOT NULL` sin default en la base compartida:
+  cualquier rama sin el modelo se lleva un `23502` al crear un producto. El `SET DEFAULT ''` está
+  **rechazado por escrito** — cambiaría un fallo ruidoso por filas invisibles a la búsqueda.
+
+## QC-47 — modelo-empresa-y-membresias (cerrada el 2026-09-06, PR #37, merge `45bdf18`)
+
+`zone: backend`, `complexity: high`. El modelo de empresa y la pertenencia del usuario a ella:
+`users.company_id` obligatoria, un rol por usuario, `users.role_id` intacta. Reviewer en **OK con
+0 bloqueantes y 6 menores**, sobre 29 requisitos `R1`–`R29` y 24 tasks, las 24 en `[x]`.
+
+- **El nombre miente y ya se corrigió en los docs:** no hay tabla de pertenencias. El spec se
+  **reacotó** a una empresa por usuario y el modelo de muchos a muchos de la primera vuelta quedó
+  descartado sin dejar residuo (comprobado por el reviewer).
+- **Corrió contra base propia `QuimiCloude_QC47`**, con el `.env` del worktree apuntando ahí, para
+  no pelearse con el drift de la base compartida.
+- **Su informe de review estuvo a punto de perderse.** Se quedó **sin commitear** dentro del
+  worktree —no entró en el PR ni llegó a `dev`— y lo habría borrado el `wt.sh done`. Se rescató a
+  mano al cerrar la ficha. F2.4 dio el PR por bueno sin comprobar que el árbol estuviera limpio.
+- **Desbloquea la cadena de multiempresa:** QC-48 (`tenant-en-la-sesion`) y QC-61, y tras QC-48 las
+  cinco de aislamiento por empresa (QC-49, QC-50, QC-51, QC-59, QC-60).
+
+## QC-44 — pantalla-de-proveedores (cerrada el 2026-09-04, PR #35, merge `f966a7b`)
+
+`zone: frontend`, `complexity: high`. La pantalla de proveedores dentro del layout privado: lista
+paginada, detalle por proveedor con su catálogo, y el alta, edición y borrado de líneas de catálogo
+en panel lateral. 64 archivos, +10.664/−39 en 26 commits. **Cero cambios en `db/`, cero
+dependencias nuevas** (`package.json` y `pnpm-lock.yaml` con diff vacío contra `origin/dev`, y una
+guardia que lo comprueba por dos vías).
+
+- **R1–R52 con test que los ejerce de verdad, y el reviewer los abrió uno a uno** en vez de fiarse
+  del mapa de la bitácora. 20 tasks (T0–T19), las 20 en `[x]`.
+- **Una sola ronda de review: OK, 0 mayores, 6 menores.** Ninguno pedía tocar código para cerrar.
+- **E2E real en dos motores.** `e2e/proveedores.spec.ts` cubre R51 (camino del Administrador, con
+  comprobación en Postgres de que la línea existe) y R52 (rechazo del Operador, que acaba en el
+  dashboard y no en el login), verde en Chromium **y WebKit**, corrido por el propio reviewer.
+- **Promovió `PresentationSelect` a `components/shared/`** por decisión humana, y la mudanza se
+  verificó contra regresión: 678 tests de `tests/guards`, `tests/unit/inventario`,
+  `tests/unit/identity` y `app-sidebar` siguen verdes. Pero **el componente promovido se quedó sin
+  tests propios en su nueva ubicación** (menor 4): toda su cobertura sigue colgando de
+  `tests/unit/inventario/`, así que el día que esa ruta se reorganice, la cobertura del componente
+  que también usa proveedores se va con ella sin que nada avise.
+
+**Deuda que deja en `dev`, toda anotada por el reviewer:**
+
+- **Un test cuyo título dice lo contrario que su assert** (menor 1): «las unidades se piden UNA sola
+  vez en el servidor y bajan por props» afirma `toHaveBeenCalledTimes(2)`. El comportamiento es
+  correcto y R46 se cumple, pero el detalle **pide el catálogo de unidades dos veces por render**
+  —`page.tsx:64` y `catalog-directories.ts:84`— y es evitable pasando a `buildCatalogDirectories`
+  las unidades ya cargadas.
+- **`catalog-line-sheet.test.tsx` depende del reloj de la máquina** (menor 2): teclea siete campos
+  con `userEvent` y agota los 5000 ms por defecto bajo carga; con `--testTimeout=30000` pasan los
+  20. Es exactamente lo que describe **QC-58 (`timeout-tests-ui-bajo-carga`)**, que sigue `pending`.
+- **Dos `supplier-route-contract.test.ts` con el mismo nombre en dos carpetas distintas**
+  (`tests/unit/proveedores/` y `tests/unit/proveedores-ui/`) y contenido distinto (menor 3). Está
+  declarado en la bitácora como desviación 7, no silenciado, pero invita a editar el que no era.
+- **`EMPTY_CELL` y `UNRESOLVED_CELL` son el mismo glifo** (menor 5): el código documenta con cuidado
+  que «no hay dato» y «no se pudo resolver el nombre» son cosas distintas y pinta las dos como una
+  raya. Cosmético — R22 se cumple y el uuid nunca aparece.
+- **R29 y R30 se contradicen en el propio `requirements.md`** (menor 6): R29 lista la ruta de imagen
+  entre los siete campos a capturar y R30 prohíbe pedir ninguna imagen. La implementación resolvió
+  por R30 y lo dejó escrito como ausencia decidida. Deuda de redacción del spec, no de código.
+
+**Anotación de proceso:** esta entrada se escribió el 2026-09-07, tres días después del merge. La
+feature estaba cerrada y con el worktree ya desmontado, pero `progress/current.md` seguía
+diciendo `in_progress` y F2.6 estaba sin hacer. La fila del board manda, pero el que la mueve es el
+leader: cerrar el PR no cierra la ficha.
