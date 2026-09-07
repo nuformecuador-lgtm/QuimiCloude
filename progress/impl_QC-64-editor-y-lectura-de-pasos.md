@@ -300,3 +300,107 @@ $ pnpm run lint
 leader (F2.3), no el `implementer`. Y no puede salir verde hasta que se resuelvan los **2 errores
 de typecheck heredados de `dev`** descritos al principio de esta bitacora, que no son de esta
 feature.
+
+---
+
+# Vuelta 2 — respuesta al rechazo del reviewer
+
+`progress/review_QC-64-editor-y-lectura-de-pasos.md`, commit `8dd3718` (+ `4878166`).
+Antes de nada se **remergeo `origin/dev`**: los 2 errores de `typecheck` heredados ya estaban
+arreglados alli, y **`pnpm run typecheck` esta ahora en 0 errores**.
+
+## BLOQUEANTE 1 — el E2E de R28 era rojo reproducible. Cerrado.
+
+**El reviewer tenia razon y el veredicto de la vuelta 1 estaba mal fundado.** `e2e/recetas-pasos.spec.ts`
+fallaba **5 de 5** con `--project=chromium` corrido **solo**, y solo pasaba con los dos proyectos a
+la vez. Por el criterio de `docs/verification.md` —«corre el archivo solo; si falla tambien solo,
+es tuyo»— es un rojo real, **no** el flake de saturacion: fallaba **precisamente en aislado**, de
+forma determinista y con una asercion de contenido. En la vuelta 1 se acredito R28 con una corrida
+de los dos proyectos a la vez, que es exactamente la clase de verde que el arnes no acepta.
+
+**Causa** —la misma que ya estaba documentada para el unitario de R27, y que no se aplico al E2E:
+el `focus()` de TipTap devuelve el foco al area editable **dentro de un `requestAnimationFrame`**,
+asi que las teclas enviadas justo despues del boton de la barra las recibia **el boton**, y un
+`Enter` sobre un boton enfocado lo **vuelve a activar** en vez de partir el parrafo. Bajo carga
+—dos navegadores— el fotograma se colaba a tiempo; en aislado, no.
+
+**El componente esta bien** (devolver el foco al texto tras formatear es lo que fija
+`design.md > 8`, y el unitario de R27 ya lo afirma). **Fallaba la prueba.** `recipe-step-editor.tsx`
+no se toco.
+
+**Arreglo, sin bajar el liston:**
+- Helper `pulsarBarraYEsperarFoco(boton, editable)`, que no vuelve hasta
+  `expect(editable).toBeFocused()`. Es el equivalente en Playwright del
+  `esperarAlFocoDiferidoDelEditor()` que ya existia en el unitario. **Se espera a la condicion, no
+  al reloj: ni un solo `waitForTimeout`.** Toda pulsacion de barra pasa por el helper.
+- **Se elimina la salvaguarda que leia `aria-pressed`** —estado de React via `useEditorState`, que
+  puede ir un tick por detras de la marca almacenada del editor— en vez de sustituirla por otra
+  lectura fragil: se reordena el recorrido para que la negrilla se aplique **al final**, sobre una
+  seleccion explicita por **triple clic** (igual en los dos motores; `End` depende del sistema).
+  Como despues de marcar ya no se teclea, no hay marca que herede el cursor ni nada que apagar.
+- **Ninguna asercion se relajo, y se anadio una**:
+  `expect(editable.locator('li strong')).toHaveCount(0)`. Cero `page.evaluate`: todo por interfaz.
+
+**Acreditado con cada proyecto CORRIDO SOLO**, que es lo que el reviewer exigia:
+
+```
+Chromium en aislado, 5 corridas: 5 verdes (subagente)
+WebKit   en aislado, 5 corridas: 5 verdes (subagente)
+
+Reverificado por el implementer, en aislado:
+$ pnpm exec playwright test e2e/recetas-pasos.spec.ts --project=chromium
+  RUN 1  1 passed (9.9s)      RUN 2  1 passed (9.8s)
+$ pnpm exec playwright test e2e/recetas-pasos.spec.ts --project=webkit
+  RUN 1  1 passed (16.5s)     RUN 2  1 passed (16.1s)
+```
+
+## menor 2 — `docs/dependencias.md` vuelve a LF. Cerrado.
+
+El archivo habia pasado a CRLF y git lo veia entero cambiado (79/70 lineas para anadir nueve).
+Convertido a LF: `git diff origin/dev -- docs/dependencias.md` es ahora **exactamente +9 lineas**.
+El registro vuelve a ser revisable linea a linea.
+
+## menor 3 — `toggle.tsx` y `toggle-group.tsx`. Cerrado: **borrados**.
+
+`design.md > 2.5` los pidio por CLI pensando en la barra de formato, pero la barra final son
+botones propios —decision correcta: `aria-pressed` y 44x44 px bajo control—. Un `grep` del arbol
+entero no devolvia **ningun** consumidor fuera de la auto-referencia de `toggle-group` a
+`toggle`. Se van los dos. **`dialog.tsx` y `checkbox.tsx` si se usan** (el modal y el asistente) y
+se quedan.
+
+## menor 4 — el barrel dejaba escapar un tipo de la libreria. Cerrado.
+
+`index.ts` reexportaba `RECIPE_STEP_EXTENSIONS`, cuyo tipo es `Extensions` de `@tiptap/core`: una
+puerta que la guardia **no veia**, porque compara el literal `@tiptap` y el barrel no lo escribe.
+Ademas convertia al barrel en un segundo consumidor de `recipe-step-schema.ts`, rompiendo el
+criterio de T5.
+
+- Fuera el reexport. Un `grep` confirma que `recipe-step-schema.ts` tiene **exactamente un**
+  consumidor: `recipe-step-editor.tsx` (los tests que lo leen con `readFileSync` son texto, no
+  imports).
+- `recipe-route-contract.test.ts` gana una **excepcion explicita y comentada**
+  (`FUERA_DEL_BARREL`) que afirma en los dos sentidos —el archivo existe **y** el barrel no lo
+  reexporta—. La regla general sigue mordiendo para todos los demas archivos de `components/`.
+- `guard-editor-aislado.test.ts` gana un caso que prohibe el modulo **y cada uno de sus simbolos**,
+  para que no vuelva a entrar por otra puerta. Verificado mordiendo **dos veces**, incluida la
+  evasion de reexportar el mismo simbolo desde `recipe-step-editor`.
+
+## Verificacion de la vuelta 2
+
+```
+$ pnpm run typecheck        -> 0 errores (los 2 heredados ya no estan)
+$ pnpm run lint             -> limpio
+$ pnpm exec vitest run tests/unit/recetas-ui/ tests/guards/
+ Test Files  22 passed (22)
+      Tests  292 passed (292)
+$ E2E en aislado            -> Chromium y WebKit, verdes (arriba)
+```
+
+## Queda para el spec, no para el implementer
+
+`design.md > 2.5 punto 3`, la ultima fila de `design.md > 7` y `tasks.md > T1` siguen nombrando
+`toggle-group.tsx` como primitiva que entra por CLI. Con el menor 3 cerrado, el spec queda
+desalineado con el arbol. **Lo cambia el `spec_author`, no el `implementer`.**
+
+**T15 sigue sin marcar**: el gate completo es del leader (menor 1, que el propio reviewer deja
+fuera de esta vuelta).
