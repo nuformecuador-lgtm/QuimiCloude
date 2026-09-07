@@ -14,7 +14,8 @@
 | QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-57 | orden-y-filtro-en-listados | Plataforma | backend | in_progress | feature/QC-57-orden-y-filtro-en-listados | implementer (spec aprobado por el humano el 2026-09-04) |
-| QC-44 | pantalla-de-proveedores | Proveedores | frontend | in_progress | feature/QC-44-pantalla-de-proveedores | T1–T3 commiteadas; **la ficha estaba `pending` en el JSON y el board decía *En curso*** — corregido en el F0 de hoy |
+| QC-44 | pantalla-de-proveedores | Proveedores | frontend | done | feature/QC-44-pantalla-de-proveedores | **cerrada** (PR #35, merge `f966a7b`); la fila decía `in_progress` por descuido. Falta su resumen en `history.md` (F2.6) |
+| QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | spec_ready | feature/QC-64-editor-y-lectura-de-pasos | **esperando aprobación humana del spec (F1.4)**, y con él la librería del editor (nueve paquetes de TipTap v3). Spec en el commit `0044950` de la rama |
 | QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
@@ -223,6 +224,34 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-64 — editor-y-lectura-de-pasos: arranque del 2026-09-06 (F1.0–F1.2)
+
+Arrancada por decisión humana explícita («avanza con 64»), no por el orden de `id`.
+
+- **Nada que evaluar**: `zone: frontend`, `complexity: high`, `depends_on: QC-62` y `branch` ya
+  venían asignados de la partición del 2026-09-04, y las labels están en el board desde entonces.
+  No hizo falta empujar nada a Jira en F1.0.
+- **`depends_on` satisfecha**: QC-62 está `done` y mergeada (PR #36, merge `aa4d551`).
+- **Cupo de zona**: `frontend` tiene **0** features `in_progress` — QC-44 cerró con el PR #35 y su
+  fila en la tabla de arriba había quedado desactualizada en `in_progress`; corregida hoy. QC-35
+  sigue `pending`. No hubo que validar conflicto de archivos porque no hay nada `in_progress` en la
+  zona con lo que chocar.
+- **Worktree montado** en `.worktrees/QC-64-editor-y-lectura-de-pasos` desde `dev`, que hoy
+  coincide con `origin/dev` (`30d0266`): el worktree nace con QC-62 dentro, que es la condición
+  para poder escribir contra su contrato.
+- **F1.2 sin `/afinar-feature`**: `requirements.md` ya estaba sembrado el 2026-09-04 (alcance, 10
+  decisiones cerradas, 2 preguntas abiertas). `spec_author` solo rellena `## Requisitos (EARS)` y
+  escribe `design.md` y `tasks.md`, dentro del worktree.
+- **La librería del editor se aprueba con el spec (F1.4)**, por la regla 7: el `design.md` la
+  propone con los cuatro checks y su fila para `docs/dependencias.md`; la fila **no** se añade
+  hasta que el humano apruebe.
+- **Spec escrito y tarjeta en *En revisión* (F1.2–F1.3).** R1–R28, `design.md` y T1–T15 en el
+  commit `0044950` de la rama. `spec_author` dejó la tabla de los cuatro checks **en blanco** y
+  lo dijo, porque corre sin shell ni red; **los corrió el leader** y los cuatro **pasan** en los
+  nueve paquetes de TipTap `3.31.3`. Verificado además **sobre el paquete publicado** (`npm pack`)
+  que `TaskList`/`TaskItem` viven en `@tiptap/extension-list`: **nueve** entradas directas, no
+  once. Las nueve filas de `docs/dependencias.md` **no se escriben hasta la aprobación**.
 
 ### QC-62 — pasos-de-receta-enriquecidos: nacida, acotada, sembrada y **partida** (2026-09-04)
 
@@ -1649,6 +1678,79 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### La base compartida `QuimiCloude` va POR DELANTE de `dev`, y por eso el gate de `dev` está rojo (2026-09-06)
+
+`./init.sh` completo sobre `dev` **limpio** da **13 archivos de test en rojo fuera del baseline**,
+y **no son flakes de saturación**: diez son de integración y fallan con
+`Null constraint violation on the fields: (name_normalized)` al crear un producto. El archivo
+falla igual **corrido solo**, que es la comprobación barata de `docs/verification.md`.
+
+La causa está verificada contra la propia base, no supuesta. `_prisma_migrations` tiene aplicada
+**`20260904160000_list_query_indexes`** (2026-09-04), que es **la migración de QC-57** y añade
+`products.name_normalized` **NOT NULL**. Esa migración **no está en `dev`**: vive en el worktree de
+QC-57, que está `in_progress`. Y los dos `.env` —el de `dev` y el de QC-57— apuntan a la **misma**
+base `postgresql://localhost:5432/QuimiCloude`. O sea: QC-57 migró la base que comparte con todos,
+el cliente Prisma de `dev` no conoce la columna, y cualquier `create` de producto la deja nula.
+
+`prisma migrate status` dice *Database schema is up to date!* y **eso engaña**: compara nombres de
+migración contra `prisma/migrations`, no el esquema real contra `db/schema.prisma`.
+
+**Esto no es de QC-64 y QC-64 no lo arregla, pero le llega igual**: su rama es `frontend` y aun así
+su gate correrá esos mismos tests de integración contra la misma base. **Antes de F2.4 hay que
+decidirlo**, y son dos caminos:
+
+1. **Una base por worktree**, como ya hizo QC-47 con `QuimiCloude_QC47`. Es lo que el arnés hace ya
+   en un sitio y no en los otros.
+2. **Revertir la migración de QC-57 en la base compartida** (tiene su `down.sql`) hasta que su PR
+   entre en `dev`.
+
+Los otros tres rojos —`tests/unit/login-form.test.tsx`,
+`tests/ui/login-form-uncontrolled-warning.test.tsx` y `tests/unit/sidebar-mobile.test.tsx`— **sí
+son el flake de saturación de QC-58**, y se comprobó con la comprobación barata de
+`docs/verification.md` en vez de suponerlo: corridos **los tres solos**, `36/36 en 27 s`. Son tres
+archivos más de la misma clase que ya tiene cinco entradas en el baseline; **no se añadieron**,
+porque el baseline crece por decisión humana y QC-58 los retira a todos cuando arregle la causa.
+
+### Sexta vez: la base compartida esta por delante de `dev`, ahora por QC-57 (2026-09-06)
+
+El gate completo sobre `dev` **no puede terminar en verde en esta maquina**, y la causa es una
+sola. Medido, no deducido, con
+`prisma migrate diff --from-schema-datamodel db/schema.prisma --to-schema-datasource ...`:
+
+```
+ALTER TABLE "public"."products" ADD COLUMN "name_normalized" TEXT NOT NULL;
+CREATE INDEX units_symbol_idx / units_name_idx / *_created_at_idx / *_updated_at_idx
+CREATE INDEX *_name_normalized_trgm_idx  (GIN, gin_trgm_ops)
+```
+
+Eso es exactamente `db/migrations/20260904160000_list_query_indexes/` de **QC-57**, aplicada sobre
+la base compartida `QuimiCloude`. **El `.env` del worktree `QC-57-orden-y-filtro-en-listados`
+apunta a `QuimiCloude`, no a una base propia** — ahi esta el origen, y es lo que hay que corregir
+cuando se toque.
+
+- **Consecuencia:** `products.name_normalized` es `NOT NULL` y el codigo de `dev` no la escribe,
+  asi que **todo `product.create()` muere**. Son **9 archivos de integracion en rojo** (inventario,
+  recetas, pedidos, proveedores) mas `unidades-constraints`, que afirma que `units_symbol_idx` no
+  existe y ahora existe. Un solo hecho, diez sintomas.
+- **`prisma migrate status` dice "Database schema is up to date!" y miente por omision**: verifica
+  que las 14 migraciones conocidas esten aplicadas, no que no sobre nada. Para este caso el unico
+  comando que sirve es `migrate diff` contra el datasource. No pierdas tiempo con `migrate status`.
+- **Decision humana del 2026-09-06: no se toca nada.** Se ofrecio (a) aplicar el `down.sql` de
+  QC-57 a la compartida y darle base propia `QuimiCloude_QC57`, o (b) `migrate reset`. El humano
+  eligio dejarlo documentado y seguir. Asi que **el gate completo de `dev` queda rojo a sabiendas**
+  hasta que QC-57 mergee o alguien ejecute (a). Cualquier feature que necesite `./init.sh` en verde
+  antes de un PR **necesita base propia**, sin excepcion.
+- **El decimo rojo NO es de esto y no lo confundas:** `tests/unit/sidebar-mobile.test.tsx` sale con
+  `STACK_TRACE_ERROR` dentro de la suite completa y **corrido solo pasa 7/7**. Es el flake de
+  saturacion ya documentado (2026-09-04), no una regresion.
+- **Los dos `module-contract` con «el rango `origin/dev...HEAD` no estaba disponible»** siguen
+  saliendo y **ya estan en el baseline**: el worktree principal *es* `dev`, asi que el rango esta
+  vacio y la guardia no comprueba nada. Es la misma entrada de baseline cuyo motivo escrito ya se
+  sabe equivocado (ver el cierre de QC-52). Candidata a `/afinar-regla`.
+- **Sexta vez.** La nota de QC-62 decia «quinta». Una base por worktree lleva seis incidentes sin
+  ser ficha; el patron ya no es anecdota.
+
 
 ### `pg_trgm` entra como dependencia de infraestructura que NINGUNA guardia vigila (2026-09-04, QC-57)
 
