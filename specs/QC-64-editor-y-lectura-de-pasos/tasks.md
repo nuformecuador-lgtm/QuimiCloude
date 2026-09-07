@@ -20,7 +20,7 @@
   - **Si algún check falla:** se para y se sube la decisión (fila `excepcion` con el check fallado
     escrito, o cambio a la opción 9.2). **No se instala nada por cuenta propia.**
 
-- [ ] **T2 — Instalar** lo aprobado en T1 y `npx shadcn add dialog checkbox toggle-group`.
+- [x] **T2 — Instalar** lo aprobado en T1 y `npx shadcn add dialog checkbox toggle-group`.
       Depende de **T1**.
   - Archivos: `package.json`, `pnpm-lock.yaml`, `components/ui/dialog.tsx`,
     `components/ui/checkbox.tsx`, `components/ui/toggle-group.tsx`.
@@ -31,7 +31,7 @@
 
 ## Bloque A — el contrato en la pantalla
 
-- [ ] **T3 [P] — Mapeo editor ↔ documento del contrato.** Depende de **T1** (necesita saber la forma
+- [x] **T3 [P] — Mapeo editor ↔ documento del contrato.** Depende de **T1** (necesita saber la forma
       del JSON del editor); no depende de T2 si se escribe contra la forma verificada.
   - Archivos: `app/(private)/produccion/formulas/components/recipe-step-document.ts` (nuevo).
   - Contiene `editorJsonToStepDocument` y `stepDocumentToEditorJson` (`design.md > 4`). **Sin React
@@ -80,7 +80,7 @@
 
 ## Bloque C — el asistente de lectura
 
-- [ ] **T9 [P] — El asistente.** Depende de **T2** (necesita `checkbox`); **no** depende de B.
+- [x] **T9 [P] — El asistente.** Depende de **T2** (necesita `checkbox`); **no** depende de B.
   - Archivos: `components/shared/step-reader/step-reader.tsx`,
     `components/shared/step-reader/step-document-view.tsx`,
     `components/shared/step-reader/index.ts` (nuevos).
