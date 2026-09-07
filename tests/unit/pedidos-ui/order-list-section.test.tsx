@@ -19,6 +19,7 @@ import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderListResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { routerMock, listOrdersActionMock, getOrderActionMock } = vi.hoisted(() => ({
   routerMock: {
@@ -113,10 +114,15 @@ function pagina(items: readonly OrderSummary[], overrides: Partial<{ page: numbe
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Desde T7 el estado «lista» monta la tabla compartida, cuyo filtro de fecha usa
+  // `window.matchMedia`, que jsdom no implementa. Se stubea con el helper HEREDADO
+  // (`tests/helpers/viewport.ts`), nunca con una copia local (R47).
+  setViewportWidth(WIDE_VIEWPORT);
 });
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('los tres estados son mutuamente excluyentes y se distinguen por data-testid (R21, R44)', () => {

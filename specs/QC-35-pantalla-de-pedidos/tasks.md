@@ -84,16 +84,16 @@ excepción**.
 
 ## T5 — Página, parser de parámetros y barrel (depende de T1)
 
-- [ ] **Toca:** `app/(private)/pedidos/page.tsx`,
+- [x] **Toca:** `app/(private)/pedidos/page.tsx`,
       `app/(private)/pedidos/components/{index.ts,order-list-params.ts}`.
-- [ ] `page.tsx`: Server Component con `metadata` (marca importada de `private-nav`), `searchParams`
+- [x] `page.tsx`: Server Component con `metadata` (marca importada de `private-nav`), `searchParams`
       como `Promise`, contenedor **sin landmark principal propio**, y `<Suspense>` con la `key`
       derivada de la consulta y el esqueleto de fallback.
-- [ ] `order-list-params.ts`: `parseOrderListParams` y `buildOrderListQuery`, **puros**, con la
+- [x] `order-list-params.ts`: `parseOrderListParams` y `buildOrderListQuery`, **puros**, con la
       codificación de `design.md > 5`; `PAGE_SIZE_OPTIONS` importado de la tabla compartida y los
       conjuntos válidos importados del contrato de `pedidos` (`ORDER_STATUS_VALUES`,
       `ORDER_PRIORITY_VALUES`, `ORDER_QUERYABLE.sortable`). **Nunca** lee ni escribe `search`.
-- [ ] **Hecho cuando:** hay test unitario del parser (entrada inválida, fuera de rango, por encima del
+- [x] **Hecho cuando:** hay test unitario del parser (entrada inválida, fuera de rango, por encima del
       tope, campo de orden no declarado, valor de filtro desconocido → acotado o descartado, nunca
       error), test de ida y vuelta `parse(build(params)) === params`, test en negativo de `search`, y
       test de contrato que **deriva** la ruta esperada de `ORDERS_ROUTE` y comprueba que el archivo
@@ -101,30 +101,30 @@ excepción**.
 
 ## T6 — Los tres estados de la lista (depende de T5)
 
-- [ ] **Toca:** `app/(private)/pedidos/components/{order-list-section.tsx,order-list-empty.tsx,
+- [x] **Toca:** `app/(private)/pedidos/components/{order-list-section.tsx,order-list-empty.tsx,
       order-list-error.tsx,order-list-skeleton.tsx,index.ts}`.
-- [ ] `OrderListSection`: Server Component `async`, **una sola** llamada a `listOrdersAction` con el
+- [x] `OrderListSection`: Server Component `async`, **una sola** llamada a `listOrdersAction` con el
       `DataTableParams` completo, despacho a error / vacío / tabla, y caso «página que se quedó
       atrás» → enlace a la primera.
-- [ ] Vacío **propio de pedidos** con la acción de crear el primero; error con el mensaje devuelto y
+- [x] Vacío **propio de pedidos** con la acción de crear el primero; error con el mensaje devuelto y
       reintento; esqueleto con tantas filas como `pageSize`.
-- [ ] **Hecho cuando:** tres tests distinguen los tres estados por `data-testid` distintos; el de
+- [x] **Hecho cuando:** tres tests distinguen los tres estados por `data-testid` distintos; el de
       error comprueba que **no** se pinta una tabla vacía; y un test con `code: 'unauthorized'`
       comprueba que **no se muestra ni un dato**. **R6, R7, R21.**
 
 ## T7 — Columnas y tabla (depende de T4, T6)
 
-- [ ] **Toca:** `app/(private)/pedidos/components/{order-columns.tsx,order-status-badge.tsx,
+- [x] **Toca:** `app/(private)/pedidos/components/{order-columns.tsx,order-status-badge.tsx,
       order-table.tsx,index.ts}`.
-- [ ] Las diez columnas de `design.md > 7`, como datos, **en un módulo de cliente**. Ordenables solo
+- [x] Las diez columnas de `design.md > 7`, como datos, **en un módulo de cliente**. Ordenables solo
       correlativo, estado, prioridad y fecha; filtros `select` de estado y prioridad y `dateRange` de
       fecha; `orderNumber` en `defaultPinnedColumns`; `actions` con `pinnable: false`.
-- [ ] `order-table.tsx`: monta `<DataTable searchable={false}>` con `status: 'idle'`, traduce
+- [x] `order-table.tsx`: monta `<DataTable searchable={false}>` con `status: 'idle'`, traduce
       `onParamsChange` a `router.push` con `buildOrderListQuery`, y **no ordena, filtra ni recorta
       nada en cliente**.
-- [ ] Correlativo con `formatOrderNumber`; receta/unidad por nombre con marcador cuando falten;
+- [x] Correlativo con `formatOrderNumber`; receta/unidad por nombre con marcador cuando falten;
       motivo de cancelación con marcador de ausencia; cantidad y precio **tal cual**.
-- [ ] **Hecho cuando:** hay test en positivo de las columnas declaradas y en negativo de que ninguna
+- [x] **Hecho cuando:** hay test en positivo de las columnas declaradas y en negativo de que ninguna
       es `total`, `createdBy` ni `updatedBy`; test de que solo las cuatro acordadas son ordenables;
       test del marcador de receta/unidad `null` que comprueba que **no** aparece el uuid; test de que
       cambiar orden/filtro/página navega con la consulta esperada; test de que la caja de búsqueda
@@ -133,11 +133,11 @@ excepción**.
 
 ## T8 — Acciones de fila y estados finales (depende de T7)
 
-- [ ] **Toca:** `app/(private)/pedidos/components/{order-row-actions.tsx,index.ts}`.
-- [ ] Editar, cancelar y borrar por fila, **siempre visibles** (nada tras `:hover`), área táctil
+- [x] **Toca:** `app/(private)/pedidos/components/{order-row-actions.tsx,index.ts}`.
+- [x] Editar, cancelar y borrar por fila, **siempre visibles** (nada tras `:hover`), área táctil
       ≥ 44×44 px. Con el pedido en estado final, los tres `disabled` con **motivo visible** y sin
       montar ningún diálogo.
-- [ ] **Hecho cuando:** hay test de que con un pedido `ENTREGADO` y con uno `CANCELADO` las tres
+- [x] **Hecho cuando:** hay test de que con un pedido `ENTREGADO` y con uno `CANCELADO` las tres
       acciones están deshabilitadas, el motivo es localizable por `data-testid` y **ninguna operación
       se invoca** (dobles que fallan si se les llama). **R23, R24.**
 

@@ -4,6 +4,7 @@ import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-a
 import { OrderListEmpty } from './order-list-empty';
 import { OrderListError } from './order-list-error';
 import { FIRST_PAGE, orderListHref } from './order-list-params';
+import { OrderTable } from './order-table';
 
 type OrderListSectionProps = {
   /**
@@ -66,22 +67,13 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   return (
     <div className="flex flex-col gap-4" data-testid="order-list">
       {/*
-        PUNTO DE MONTAJE DE LA TABLA (T7). El unico cambio pendiente de esta seccion es sustituir
-        este marcador por:
-
-            <OrderTable orders={items} params={params} totalPages={totalPages} />
-
         `order-table.tsx` es un modulo de CLIENTE —la columna de acciones declara celdas con
         elementos y funciones, que no cruzan la frontera servidor->cliente (`design.md > 6.1`)—,
         asi que desde aqui solo bajan datos serializables: las filas, los parametros vigentes y el
-        total de paginas. La tabla recibira `status: 'idle'` siempre: los tres estados se pintan
+        total de paginas. La tabla recibe `status: 'idle'` siempre: los tres estados se pintan
         FUERA de `<DataTable>` (alternativa Q, descartada).
       */}
-      <div
-        data-testid="order-table-slot"
-        data-row-count={items.length}
-        data-total-pages={totalPages}
-      />
+      <OrderTable orders={items} params={params} totalPages={totalPages} />
     </div>
   );
 }
