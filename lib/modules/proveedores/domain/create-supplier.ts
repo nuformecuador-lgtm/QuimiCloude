@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { DuplicateNameError, ValidationError } from './errors';
 import { createSupplierSchema } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
@@ -19,9 +19,9 @@ export type CreateSupplierDeps = {
 /**
  * Alta de proveedor (R7, R8, R15, R16, R41).
  *
- * `requireAdmin` es la PRIMERA linea, antes de `zod` y antes de tocar el puerto (R2, R3):
- * un actor sin permiso ni siquiera dispara la validacion, y el test de autorizacion lo
- * demuestra con dobles que fallan si los llaman.
+ * `requirePermission(actor, 'proveedores.modificar')` es la PRIMERA linea, antes de `zod` y
+ * antes de tocar el puerto (R12): un actor sin permiso ni siquiera dispara la validacion, y
+ * el test de autorizacion lo demuestra con dobles que fallan si los llaman.
  */
 export function createCreateSupplier(
   deps: CreateSupplierDeps,
@@ -32,7 +32,7 @@ export function createCreateSupplier(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<{ id: string }> {
-    requireAdmin(actor);
+    requirePermission(actor, 'proveedores.modificar');
 
     const parsed = createSupplierSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

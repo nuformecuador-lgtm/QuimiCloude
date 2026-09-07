@@ -2,7 +2,7 @@
 // `tasks.md > T6`). Sin base de datos: lo que se prueba aqui es la DECISION que vive en
 // `domain/`, no la implementacion Prisma (esa es T9).
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/inventario/domain/actor';
+import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeleteProduct } from '@/lib/modules/inventario/domain/delete-product';
 import { NotFoundError, ValidationError } from '@/lib/modules/inventario/domain/errors';
@@ -13,7 +13,12 @@ import type { NewProduct, ProductView } from '@/lib/modules/inventario/domain/pr
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+/** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
+ *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
+const ADMIN: Actor = {
+  id: 'admin-1',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
+};
 
 /** Instante fijo, inyectado como dependencia (`now`): ver el comentario en `create-product.ts`. */
 const AHORA = new Date('2026-09-02T10:00:00.000Z');

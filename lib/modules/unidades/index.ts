@@ -18,7 +18,7 @@ export type { UnitCatalog, UnitId, UnitRef } from './domain/unit-catalog';
 // invariante de que este barrel es importable desde un componente de cliente.
 export { createListUnits, MAX_UNITS } from './domain/list-units';
 export type { ListUnitsDeps } from './domain/list-units';
-export { ADMIN_ROLE_NAME, requireAdmin } from './domain/actor';
+export { requirePermission } from './domain/actor';
 export type { Actor } from './domain/actor';
 export { UnidadesError, UnauthorizedError, ValidationError } from './domain/errors';
 

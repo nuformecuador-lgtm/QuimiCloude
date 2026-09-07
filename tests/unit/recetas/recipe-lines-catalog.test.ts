@@ -6,7 +6,7 @@
 // `findRefs`: no basta `toHaveBeenCalled`, hay que ver que la linea preexistente NUNCA
 // aparece en esos argumentos (R45).
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
@@ -16,7 +16,9 @@ import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/re
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+// QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
+// Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
+const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
 const PRODUCTO_VIEJO = '11111111-1111-4111-8111-111111111111'; // ya en la receta, de baja

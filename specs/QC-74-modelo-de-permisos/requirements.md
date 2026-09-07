@@ -28,7 +28,126 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Notacion EARS (`docs/specs.md`). «Permiso» significa siempre un codigo del catalogo
+> (`<modulo>.<accion>`), nunca un nombre de rol. «Servicio» / «caso de uso» significa una funcion
+> de `lib/modules/<m>/domain/`, que es donde se autoriza hoy y donde se sigue autorizando.
+
+### El catalogo de permisos
+
+**R1.** El sistema DEBE declarar un catalogo cerrado de permisos en un unico lugar del codigo de
+produccion, donde cada permiso tiene un codigo con la forma `<modulo>.<accion>`, con `<modulo>` y
+`<accion>` escritos en español y en minusculas, siguiendo los nombres de modulo del repositorio
+(`inventario`, `recetas`, `unidades`, `proveedores`, `pedidos`, `dashboard`).
+
+**R2.** El catalogo DEBE contener exactamente estos diez permisos, ni uno mas ni uno menos:
+`dashboard.consultar`, `inventario.consultar`, `inventario.modificar`, `recetas.consultar`,
+`recetas.modificar`, `unidades.consultar`, `proveedores.consultar`, `proveedores.modificar`,
+`pedidos.consultar`, `pedidos.modificar`.
+
+**R3.** DONDE un modulo tiene casos de uso de escritura, el sistema DEBE declarar para ese modulo
+los dos permisos `<modulo>.consultar` y `<modulo>.modificar`, y el permiso `<modulo>.modificar`
+DEBE cubrir tambien el borrado.
+
+**R4.** SI un modulo no tiene ningun caso de uso de escritura, ENTONCES el sistema DEBE declarar
+para ese modulo unicamente `<modulo>.consultar` (hoy: `dashboard` y `unidades`).
+
+**R5.** El sistema NO DEBE ofrecer ninguna via de aplicacion —Server Action, route handler ni
+caso de uso— que cree, edite o borre un permiso del catalogo o una asignacion de permiso a un rol;
+el catalogo y las asignaciones solo cambian por migracion y seed.
+
+**R6.** El sistema DEBE asignar un permiso unicamente a un rol, y NO DEBE admitir ninguna
+asignacion de permiso condicionada a una empresa: ni la tabla de asignacion ni el modelo de
+dominio del permiso tienen columna ni campo de empresa.
+
+### El conjunto de permisos de un rol
+
+**R7.** El sistema DEBE persistir el catalogo de permisos y la asignacion permiso-rol en la base
+de datos, y DEBE resolver los permisos de un actor a partir de esa asignacion, nunca a partir del
+nombre de su rol.
+
+**R8.** El sistema DEBE asignar al rol `Administrador` los diez permisos del catalogo, escritos
+uno a uno, y NO DEBE reconocer ningun comodin ni regla implicita que conceda permisos por ser
+`Administrador`.
+
+**R9.** El sistema DEBE asignar al rol `Operador` exactamente un permiso: `inventario.consultar`.
+
+**R10.** CUANDO corre el seed, el sistema DEBE crear solo los permisos del catalogo y las
+asignaciones permiso-rol que falten, y DEBE dejar intactas las que ya existan; correr el seed dos
+veces seguidas DEBE producir el mismo estado que correrlo una vez.
+
+**R11.** CUANDO se lee la sesion de un usuario, el sistema DEBE resolver el conjunto de permisos
+vigente de su rol en la base en esa misma lectura, sin una consulta adicional por peticion, y DEBE
+entregarlo al servicio junto con el identificador del actor.
+
+### La comprobacion del permiso
+
+**R12.** El sistema DEBE comprobar el permiso dentro del caso de uso, ANTES de invocar ningun
+puerto —repositorio, log o cualquier otro— y antes de validar la entrada.
+
+**R13.** El sistema DEBE decidir el acceso por pertenencia exacta del codigo al conjunto de
+permisos del actor, sin normalizacion, sin coincidencia parcial y sin ninguna implicacion entre
+permisos: tener `<modulo>.modificar` NO concede `<modulo>.consultar`, y tener `<modulo>.consultar`
+NO concede `<modulo>.modificar`.
+
+**R14.** SI el actor es nulo, no tiene conjunto de permisos, lo tiene vacio, o su conjunto no
+contiene el codigo exigido, ENTONCES el sistema DEBE rechazar la operacion sin efectos sobre los
+datos y sin revelar nada del recurso pedido.
+
+**R15.** CUANDO un caso de uso rechaza por falta de permiso, el sistema DEBE lanzar el error de
+autorizacion **del propio modulo** —subclase de la clase de error raiz de ese modulo—, de modo que
+los adaptadores driving lo sigan serializando con su comprobacion `error instanceof <Modulo>Error`
+y con el mismo codigo estable que hoy.
+
+**R16.** El sistema DEBE exigir en cada caso de uso de los cinco modulos exactamente el permiso de
+esta tabla, y NO DEBE exigir ningun otro:
+
+| Modulo | Casos de uso | Permiso exigido |
+|---|---|---|
+| `inventario` | `getProduct`, `listProducts`, `listPresentations` | `inventario.consultar` |
+| `inventario` | `createProduct`, `updateProduct`, `deleteProduct`, `createPresentation`, `updatePresentation`, `deletePresentation` | `inventario.modificar` |
+| `recetas` | `getRecipe`, `listRecipes` | `recetas.consultar` |
+| `recetas` | `createRecipe`, `updateRecipe`, `deleteRecipe` | `recetas.modificar` |
+| `unidades` | `listUnits` | `unidades.consultar` |
+| `proveedores` | `getSupplier`, `listSuppliers`, `listCatalogLines` | `proveedores.consultar` |
+| `proveedores` | `createSupplier`, `updateSupplier`, `deleteSupplier`, `createCatalogLine`, `updateCatalogLine`, `deleteCatalogLine` | `proveedores.modificar` |
+| `pedidos` | `getOrder`, `listOrders` | `pedidos.consultar` |
+| `pedidos` | `createOrder`, `updateOrder`, `cancelOrder`, `deleteOrder` | `pedidos.modificar` |
+
+**R17.** El sistema DEBE conceder la operacion CUANDO el conjunto de permisos del actor contiene
+el codigo exigido, sea cual sea el nombre de su rol; en particular, un actor con
+`inventario.consultar` DEBE poder consultar el catalogo de producto y DEBE ser rechazado en toda
+operacion de escritura de `inventario` y en todos los casos de uso de los otros cuatro modulos.
+
+**R18.** Ningun caso de uso ni adaptador de los modulos `inventario`, `recetas`, `unidades`,
+`proveedores` y `pedidos` DEBE leer, comparar ni recibir el nombre del rol del actor: el tipo
+`Actor` de cada uno de esos modulos NO DEBE tener campo de nombre de rol.
+
+### Las guardias
+
+**R19.** SI un permiso declarado en el catalogo no esta asignado a ningun rol en el seed, ENTONCES
+una guardia ejecutable de `tests/guards/` DEBE fallar nombrando ese permiso.
+
+**R20.** SI un archivo de produccion de los cinco modulos de negocio autoriza por nombre de rol
+—usa el literal o la constante de un rol, la comprobacion «es Administrador» heredada de QC-54, o
+un campo de nombre de rol en su `Actor`—, ENTONCES una guardia ejecutable de `tests/guards/` DEBE
+fallar nombrando ese archivo.
+
+**R21.** Las dos guardias DEBEN derivar lo que comprueban del catalogo y del seed reales —no de
+una copia escrita a mano— y DEBEN demostrar sobre fuentes sinteticos que disparan ante la
+infraccion y que no disparan ante el caso correcto simetrico.
+
+### Datos y alcance
+
+**R22.** El sistema DEBE crear las tablas nuevas con una migracion versionada que tenga su
+`down.sql`, con `ENABLE ROW LEVEL SECURITY` y `FORCE ROW LEVEL SECURITY` en cada tabla nueva, y
+`pnpm run db:rollback` DEBE revertirla dejando `_prisma_migrations` coherente.
+
+**R23.** El sistema DEBE dejar el corte de rutas por rol del middleware exactamente como esta: las
+reglas ruta -> rol y su comportamiento NO cambian en esta feature.
+
+**R24.** El sistema DEBE probar en cada caso de uso de los cinco modulos tanto la concesion con el
+permiso exigido como el rechazo sin el, en tests de servicio; esta feature NO añade ningun test
+E2E, que corresponde a QC-75 cuando exista la pantalla.
 
 ## Preguntas abiertas
 

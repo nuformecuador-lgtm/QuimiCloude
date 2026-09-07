@@ -9,7 +9,7 @@
 // TRES COSAS A LA VEZ -que la consulta no falla, que el orden aplicado es el de por defecto y
 // que el log recibio el campo-. Comprobar solo la primera pasa en verde con un `catch` vacio.
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/inventario/domain/actor';
+import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { UnauthorizedError, ValidationError } from '@/lib/modules/inventario/domain/errors';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
@@ -22,8 +22,16 @@ import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
-const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
+/** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
+ *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
+const ADMIN: Actor = {
+  id: 'admin-1',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
+};
+
+/** QC-74 (R13, R14): actor con el conjunto VACIO. Sustituye al viejo "rol Operador": desde
+ *  QC-74 el Operador SI tiene `inventario.consultar`, asi que ya no sirve como caso de rechazo. */
+const SIN_PERMISO: Actor = { id: 'sin-permiso-1', permissions: [] };
 
 function paginaVacia<T>(): Page<T> {
   return { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 };
@@ -81,11 +89,11 @@ describe('list-products: autorizacion antes que todo (R33, R34)', () => {
   ];
 
   for (const caso of CONSULTAS) {
-    it(`rechaza al Operador con ${caso.nombre} sin tocar el repositorio`, async () => {
+    it(`rechaza al actor sin permiso con ${caso.nombre} sin tocar el repositorio`, async () => {
       // R34 — se afirma CONTANDO invocaciones del doble, no solo mirando que lanza.
       const { products, log, listProducts } = montarProductos();
 
-      await expect(listProducts(caso.entrada, OPERADOR)).rejects.toBeInstanceOf(
+      await expect(listProducts(caso.entrada, SIN_PERMISO)).rejects.toBeInstanceOf(
         UnauthorizedError,
       );
       expect(products.listAlive).toHaveBeenCalledTimes(0);
@@ -234,11 +242,11 @@ describe('list-products: lo que llega al repositorio (R11, R13, R15, R20, R24, R
 });
 
 describe('list-presentations: mismo contrato, misma disciplina', () => {
-  it('rechaza al Operador sin tocar el repositorio, con consulta valida y con campos no declarados (R34)', async () => {
+  it('rechaza al actor sin permiso sin tocar el repositorio, con consulta valida y con campos no declarados (R34)', async () => {
     for (const entrada of [{ page: 1 }, { sort: { columnId: 'deletedAt', direction: 'asc' } }]) {
       const { presentations, log, listPresentations } = montarPresentaciones();
 
-      await expect(listPresentations(entrada, OPERADOR)).rejects.toBeInstanceOf(
+      await expect(listPresentations(entrada, SIN_PERMISO)).rejects.toBeInstanceOf(
         UnauthorizedError,
       );
       expect(presentations.list).toHaveBeenCalledTimes(0);

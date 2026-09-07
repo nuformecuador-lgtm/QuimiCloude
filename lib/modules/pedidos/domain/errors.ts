@@ -24,7 +24,7 @@ export abstract class PedidosError extends Error {
   }
 }
 
-/** R2, R3: actor ausente, o con rol nulo, vacio o distinto de `ROLE_ADMINISTRADOR`. */
+/** QC-74 (R14, R15): actor ausente, sin conjunto de permisos, o sin el permiso exigido en el. */
 export class UnauthorizedError extends PedidosError {
   readonly code = 'unauthorized';
 

@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { createProductSchema } from './product-input';
 
@@ -17,7 +17,7 @@ export type CreateProductDeps = {
 };
 
 /**
- * Alta de producto (R5, R6, R9, R10, R11, R12). `requireAdmin` es la PRIMERA linea,
+ * Alta de producto (R5, R6, R9, R10, R11, R12). `requirePermission(actor, 'inventario.modificar')` es la PRIMERA linea,
  * antes de zod y antes de tocar el puerto (R2, R3): un actor sin permiso ni siquiera
  * dispara la validacion.
  */
@@ -30,7 +30,7 @@ export function createCreateProduct(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<{ id: string }> {
-    requireAdmin(actor);
+    requirePermission(actor, 'inventario.modificar');
 
     const parsed = createProductSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

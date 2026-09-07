@@ -21,7 +21,12 @@ export abstract class ProveedoresError extends Error {
   }
 }
 
-/** R2, R3: actor ausente, o con rol nulo, vacio o distinto de `ROLE_ADMINISTRADOR`. */
+/**
+ * Falta de permiso (QC-74 R14, R15): actor ausente, sin conjunto de permisos, con el
+ * conjunto vacio o sin el codigo que el caso de uso exige. Subclase de `ProveedoresError`
+ * con el `code` estable de siempre, que es lo que hace que los adaptadores driving la
+ * sigan serializando con `error instanceof ProveedoresError`.
+ */
 export class UnauthorizedError extends ProveedoresError {
   readonly code = 'unauthorized';
 

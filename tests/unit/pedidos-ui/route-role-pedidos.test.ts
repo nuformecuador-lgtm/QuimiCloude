@@ -17,7 +17,7 @@ import {
   type RouteAccessInput,
   type RouteAccessSession,
 } from '@/lib/modules/identity/domain/route-access';
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import {
   DASHBOARD_ROUTE,
   INVENTORY_ROUTE,
@@ -30,7 +30,7 @@ import {
 const SUB = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const ANONIMO: RouteAccessSession = { kind: 'anonymous' };
 const OPERADOR: RouteAccessSession = { kind: 'authenticated', sub: SUB, roleName: 'Operador' };
-const ADMIN: RouteAccessSession = { kind: 'authenticated', sub: SUB, roleName: ADMIN_ROLE_NAME };
+const ADMIN: RouteAccessSession = { kind: 'authenticated', sub: SUB, roleName: ROLE_ADMINISTRADOR };
 
 const REAL = {
   pathname: ORDERS_ROUTE,
@@ -45,7 +45,7 @@ describe('la pantalla de pedidos con las constantes reales (R5)', () => {
   it('la regla se deriva de ORDERS_ROUTE y restringe al Administrador (R5)', () => {
     expect(ROUTE_ROLE_RULES).toContainEqual({
       prefix: ORDERS_ROUTE,
-      roles: [ADMIN_ROLE_NAME],
+      roles: [ROLE_ADMINISTRADOR],
     });
   });
 

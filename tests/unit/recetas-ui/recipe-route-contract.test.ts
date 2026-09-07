@@ -360,12 +360,14 @@ describe('contrato de la ruta de recetas', () => {
     );
   });
 
-  it('la pantalla no repite requireAdmin ni decide autorizacion sobre los datos', () => {
+  it('la pantalla no repite la comprobacion de permiso ni decide autorizacion sobre los datos', () => {
     // R7 — la autorizacion sobre los datos la aportan los casos de uso de `recetas`; el corte de
     // ruta lo hace el middleware. Repetirla aqui seria una tercera regla que nadie mantiene
     // sincronizada.
     ningunArchivoContiene([
       'requireAdmin',
+      // QC-74: el envoltorio se llama asi desde T10; la prohibicion vale igual.
+      'requirePermission',
       'getSessionUser',
       'ADMIN_ROLE_NAME',
       'decideRouteAccess',
@@ -570,6 +572,25 @@ describe('contrato de la ruta de recetas', () => {
       'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
     ];
 
+    // RETENSADO 2026-09-07 (QC-74 T10), con el mismo criterio que los dos retensados de abajo:
+    // el rango `origin/dev...HEAD` mide la rama que corre el gate, no la de QC-34, asi que cada
+    // cambio legitimo posterior se NOMBRA uno a uno o el caso deja de vigilar nada. QC-74
+    // sustituye la pregunta de autorizacion —«es Administrador»— por «tiene este permiso» en los
+    // CINCO casos de uso de `recetas` (R12, R16, R18). Son exactamente estos siete archivos: el
+    // envoltorio del actor, los cinco casos de uso y el adaptador driving que arma el actor con
+    // `permissions`. El repositorio, el adaptador de almacenamiento y el catalogo siguen
+    // congelados, y `index.ts` ya estaba nombrado arriba (QC-74 solo renombra un export suyo).
+    const AUTORIZACION_POR_PERMISO_QC74 = [
+      'lib/modules/recetas/domain/actor.ts',
+      'lib/modules/recetas/domain/errors.ts',
+      'lib/modules/recetas/domain/get-recipe.ts',
+      'lib/modules/recetas/domain/list-recipes.ts',
+      'lib/modules/recetas/domain/create-recipe.ts',
+      'lib/modules/recetas/domain/update-recipe.ts',
+      'lib/modules/recetas/domain/delete-recipe.ts',
+      'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+    ];
+
     // POR QUE `db/` cambia: QC-34 decision cerrada 3 anade el cuarto estado `CANCELADO`, y eso
     // es una migracion del tipo enumerado (R48, R49, R50) con su columna de motivo. La carpeta
     // de migracion es EXACTAMENTE UNA y esta nombrada; el esquema solo gana la columna nueva.
@@ -592,23 +613,37 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260904180600_companies_and_user_company/down.sql',
     ];
 
-    // RETENSADO 2026-09-07, con el MISMO criterio que los dos retensados de arriba: la decision
-    // humana de quitar la unidad y el precio unitario del pedido dropea dos columnas de `orders`.
-    // No toca recetas, ni unidades, ni ninguna otra tabla. Se nombra archivo por archivo para que
-    // cualquier OTRO cambio en `db/` siga poniendo este caso rojo.
-    const MIGRACION_2026_09_07 = [
+    // RETENSADO 2026-09-07, con el MISMO criterio que los dos retensados de arriba: el rango
+    // `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
+    // posterior se NOMBRA una a una o el caso deja de vigilar nada.
+    //
+    // Aqui se nombran DOS, y no es una eleccion: las dos entraron en `dev` y las dos son
+    // legitimas. Quedarse con una sola -que es lo que proponia cada lado del conflicto del
+    // merge de QC-74- habria puesto el caso rojo por la otra.
+    //
+    //  1. La decision humana de quitar la unidad y el precio unitario del pedido, que dropea dos
+    //     columnas de `orders`. No toca recetas, ni unidades, ni ninguna otra tabla.
+    //  2. QC-74, que introduce el catalogo de permisos: crea `permissions` y `role_permissions`
+    //     -con su RLS y su `down.sql`- y nada mas (`design.md > 1.3`). Ni recetas, ni unidades,
+    //     ni pedidos.
+    //
+    // Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+    const MIGRACIONES_LEGITIMAS = [
       'db/migrations/20260907120000_orders_drop_unit_and_unit_price/migration.sql',
       'db/migrations/20260907120000_orders_drop_unit_and_unit_price/down.sql',
+      'db/migrations/20260907183034_permissions_and_role_permissions/migration.sql',
+      'db/migrations/20260907183034_permissions_and_role_permissions/down.sql',
     ];
 
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
-      .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta));
+      .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta))
+      .filter((ruta) => !AUTORIZACION_POR_PERMISO_QC74.includes(ruta));
     const tocaDb = diff
       .filter((ruta) => ruta.startsWith('db/'))
       .filter((ruta) => !MIGRACION_QC34.includes(ruta))
       .filter((ruta) => !MIGRACION_QC47.includes(ruta))
-      .filter((ruta) => !MIGRACION_2026_09_07.includes(ruta));
+      .filter((ruta) => !MIGRACIONES_LEGITIMAS.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',

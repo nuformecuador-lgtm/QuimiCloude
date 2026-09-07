@@ -101,6 +101,8 @@ function sessionUser(): SessionUser {
     username: 'ana.perez',
     displayName: 'Ana Maria Perez',
     roleName: 'Jefa de planta',
+    // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
+    permissions: [],
   };
 }
 

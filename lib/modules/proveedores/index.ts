@@ -7,7 +7,7 @@
 // -lo unico que QC-42 tenia- a exponer tipos, esquemas, errores y las NUEVE factories de
 // caso de uso, que es lo que `lib/composition` necesita para cablearlas y lo que las
 // Server Actions necesitan para tipar su entrada y reconocer sus errores.
-export { requireAdmin, type Actor } from './domain/actor';
+export { requirePermission, type Actor } from './domain/actor';
 export {
   ProveedoresError,
   UnauthorizedError,

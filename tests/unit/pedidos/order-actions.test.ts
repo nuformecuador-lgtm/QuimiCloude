@@ -73,7 +73,10 @@ const ADMIN_SESSION_USER = {
   id: 'user-admin-1',
   username: 'ana.perez',
   displayName: 'Ana Perez',
+  // `roleName` se queda en la sesion: es DISPLAY, lo pinta `nav-user`. Lo que autoriza son los
+  // permisos, y son lo unico que la action baja al caso de uso (QC-74 R18).
   roleName: 'Administrador',
+  permissions: ['pedidos.consultar', 'pedidos.modificar'],
 }
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
@@ -108,7 +111,7 @@ const ACTIONS_PATH = join(
 )
 
 /** Fuente SIN comentarios: se vigila el CODIGO, no la prosa que lo explica. Este archivo
- *  documenta por escrito lo que NO hace -«no repite `requireAdmin`», «sin `revalidatePath`»-,
+ *  documenta por escrito lo que NO hace -«no repite `requirePermission`», «sin `revalidatePath`»-,
  *  y un barrido sobre el texto crudo leeria la advertencia como la infraccion. */
 function readActionsSource(): string {
   return readFileSync(ACTIONS_PATH, 'utf8')
@@ -139,7 +142,10 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     getOrderMock.mockResolvedValue({ id: ORDER_ID })
     listOrdersMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 })
 
-    const ESPERADO = { id: 'user-admin-1', roleName: 'Administrador' }
+    const ESPERADO = {
+      id: 'user-admin-1',
+      permissions: ['pedidos.consultar', 'pedidos.modificar'],
+    }
 
     await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
     expect(createOrderMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
@@ -174,11 +180,11 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       message: expect.any(String),
     })
 
-    // R5, segunda mitad: la action NO decide. No repite `requireAdmin`, no incrusta el rol, no
+    // R5, segunda mitad: la action NO decide. No repite `requirePermission`, no incrusta el rol,
     // valida con los esquemas del dominio, no conoce los estados ni las transiciones, no mide
     // el motivo, no reimplementa la paginacion y no habla con el ORM.
     const source = readActionsSource()
-    expect(source, 'repite la comprobacion de rol').not.toMatch(/requireAdmin/)
+    expect(source, 'repite la comprobacion de permiso').not.toMatch(/requirePermission/)
     expect(source, 'incrusta el nombre del rol').not.toMatch(/Administrador/)
     expect(source, 'incrusta ROLE_ADMINISTRADOR').not.toMatch(/ROLE_ADMINISTRADOR/)
     expect(source, 'valida con el esquema del dominio').not.toMatch(/Schema\b/)

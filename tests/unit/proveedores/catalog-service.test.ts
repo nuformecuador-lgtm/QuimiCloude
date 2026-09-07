@@ -21,7 +21,6 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity'
 import { createCreateCatalogLine } from '@/lib/modules/proveedores/domain/create-catalog-line'
 import { createDeleteCatalogLine } from '@/lib/modules/proveedores/domain/delete-catalog-line'
 import {
@@ -49,7 +48,11 @@ const moduloDir = join(
 const read = (...partes: readonly string[]): string =>
   readFileSync(join(moduloDir, ...partes), 'utf8')
 
-const ADMIN: Actor = { id: '11111111-1111-4111-8111-111111111111', roleName: ROLE_ADMINISTRADOR }
+// QC-74 (R18): el actor no lleva nombre de rol, lleva su conjunto de permisos.
+const ADMIN: Actor = {
+  id: '11111111-1111-4111-8111-111111111111',
+  permissions: ['proveedores.consultar', 'proveedores.modificar'],
+}
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 const now = () => AHORA
 

@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError } from './errors';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
@@ -10,7 +10,8 @@ export type DeleteRecipeDeps = {
 };
 
 /**
- * Borrado de receta (R6, R27, R35, R37). Logico y sin restaurar (D2): usa
+ * Borrado de receta (R6, R27, R35, R37). Exige `recetas.modificar`: el borrado entra
+ * dentro de modificar (QC-74 R3, R16). Logico y sin restaurar (D2): usa
  * `softDeleteAlive`, nunca un borrado fisico. NO llama al almacenamiento -el archivo
  * sobrevive (R27, D3)-.
  */
@@ -23,7 +24,7 @@ export function createDeleteRecipe(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'recetas.modificar');
 
     const result = await deps.recipes.softDeleteAlive(id, actor.id, now());
     if (result === 'not_found') throw new NotFoundError();

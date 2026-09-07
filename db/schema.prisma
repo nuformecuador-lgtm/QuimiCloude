@@ -45,9 +45,57 @@ model Role {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  users User[]
+  users       User[]
+  permissions RolePermission[]
 
   @@map("roles")
+}
+
+/// Catalogo cerrado de permisos (QC-74, R1, R2). Como `roles`, NO lleva `deletedAt`: un
+/// permiso no se da de baja, se retira con una migracion.
+///
+/// `code` es la clave primaria DE TEXTO (`'inventario.consultar'`), no un uuid: mismo patron
+/// que `document_types.code`, y hace legible `role_permissions` sin un JOIN mas. `module` y
+/// `action` van desnormalizados en columnas propias porque la guardia y las consultas por
+/// modulo preguntan por ellas, y partir la cadena en SQL en cada consulta es peor.
+///
+/// El catalogo y sus asignaciones NO se administran por la aplicacion (R5): los siembra
+/// `seedInitialAccess` y se cambian por migracion.
+/// @module identity
+model Permission {
+  code        String   @id
+  module      String
+  action      String
+  description String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  roles RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+/// Permisos asignados a un rol (QC-74, R7, R8, R9). SIN columna de empresa (R6): el permiso
+/// cuelga del rol y de nada mas (`docs/architecture.md > Dominio`).
+///
+/// Clave primaria compuesta: una asignacion no puede duplicarse y el indice de la PK cubre la
+/// consulta caliente (`WHERE role_id = ?`), que es la que hace la lectura de sesion.
+/// `@@index([permissionCode])` sirve el sentido inverso. `onDelete: Restrict` en las dos FKs,
+/// igual que `users.role_id`: no se borran roles ni permisos arrastrando asignaciones en
+/// silencio. `users` NO cambia: el rol sigue siendo `users.role_id` (QC-47 R13/R14).
+/// @module identity
+model RolePermission {
+  roleId         String   @map("role_id") @db.Uuid
+  permissionCode String   @map("permission_code")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([roleId, permissionCode])
+  @@index([permissionCode])
+  @@map("role_permissions")
 }
 
 /// Usuario del ERP. Borrado logico: `deletedAt` NULL = usuario vivo.

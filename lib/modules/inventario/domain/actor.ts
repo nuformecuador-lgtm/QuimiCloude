@@ -1,32 +1,33 @@
+import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
+
 import { UnauthorizedError } from './errors';
 
 /**
- * Nombre del rol con permiso sobre el catalogo (D2, D23; `design.md > 4`).
- *
- * Propia de `inventario`, NO importada de `identity`: los roles son dominio de
- * `identity`, pero su contrato publico (`@/lib/modules/identity`) todavia no exporta
- * ninguna constante de rol (QC-6 sigue `spec_ready`). Cuando la exponga, esta constante
- * se borra y se importa del barrel `@/lib/modules/identity` -nunca por ruta profunda-.
- * Duplicar el literal hoy es deuda consciente y de una linea (D23).
+ * Actor de entrada de cada caso de uso (R1): id y el conjunto de permisos vigente, nada
+ * mas. QC-74 (R18): NO lleva nombre de rol -este modulo no autoriza por rol y no debe ni
+ * recibir el dato-.
  */
-export const ADMIN_ROLE_NAME = 'Administrador';
-
-/** Actor de entrada de cada caso de uso (R1): id y rol, nada mas. */
 export type Actor = {
   readonly id: string;
-  readonly roleName: string | null;
+  readonly permissions: readonly string[];
 };
 
 /**
- * Primera linea de los nueve casos de uso (R2, R3). Falla cerrado: actor ausente, rol
- * nulo, vacio o distinto de `ADMIN_ROLE_NAME` se rechazan igual, todos con el mismo
- * error de autorizacion, y ANTES de tocar cualquier puerto.
+ * Primera linea de los nueve casos de uso (R2, R3, QC-74 R12). Exige un permiso CONCRETO
+ * del catalogo y falla cerrado: actor ausente, sin conjunto de permisos, con el conjunto
+ * vacio o sin el codigo exigido se rechazan igual, todos con el mismo error de
+ * autorizacion, y ANTES de validar la entrada y de tocar cualquier puerto.
  *
- * La comparacion es de igualdad exacta, sin `includes` ni normalizacion (R3): un rol
- * llamado "Administradores externos" no debe colarse.
+ * La decision es por PERTENENCIA EXACTA del codigo al conjunto (QC-74 R13): sin
+ * normalizar, sin coincidencia parcial y sin jerarquia -tener `inventario.modificar` no
+ * concede `inventario.consultar` ni al reves-. Delega en `assertPermission` de `identity`,
+ * que es la unica implementacion de la regla; el error es el de ESTE modulo (QC-74 R15),
+ * subclase de `InventarioError`, para que los adaptadores driving lo sigan serializando
+ * con `error instanceof InventarioError`.
  */
-export function requireAdmin(actor: Actor | null | undefined): asserts actor is Actor {
-  if (!actor || actor.roleName !== ADMIN_ROLE_NAME) {
-    throw new UnauthorizedError();
-  }
+export function requirePermission(
+  actor: Actor | null | undefined,
+  permission: PermissionCode,
+): asserts actor is Actor {
+  assertPermission(actor, permission, () => new UnauthorizedError());
 }

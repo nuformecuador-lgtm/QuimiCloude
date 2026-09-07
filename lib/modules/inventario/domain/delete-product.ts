@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError } from './errors';
 
 import type { ProductRepository } from '../ports/product-repository';
@@ -24,7 +24,7 @@ export function createDeleteProduct(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'inventario.modificar');
 
     // R14: `false` significa que el producto no existe o ya estaba borrado
     // (`softDeleteAlive` tambien filtra `deleted_at IS NULL`, R16).

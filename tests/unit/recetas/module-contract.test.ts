@@ -375,7 +375,30 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       // que QC-62 abre del adaptador de Prisma: la escritura y las consultas no cambian.
       'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
     ]
-    const AMPLIACIONES_APROBADAS = [...AMPLIACION_QC34, ...CAMBIO_DE_FORMA_DEL_PASO_QC62]
+    // RETENSADO 2026-09-07 (QC-74 T10), mismo criterio que los dos de arriba: el rango mide la
+    // rama que corre el gate, asi que cada cambio legitimo posterior se NOMBRA uno a uno. QC-74
+    // sustituye la pregunta de autorizacion —«es Administrador»— por «tiene este permiso» en los
+    // CINCO casos de uso (R12, R16), y retira el nombre del rol del `Actor` (R18). Son estos
+    // ocho archivos y ninguno mas: el envoltorio del actor, su error de autorizacion, los cinco
+    // casos de uso y el adaptador driving que arma el actor con `permissions`. El repositorio,
+    // el adaptador de almacenamiento, el catalogo y `db/schema.prisma` siguen congelados, y
+    // `lib/modules/recetas/index.ts` NO se repite: ya esta en `AMPLIACION_QC34` -QC-74 solo
+    // renombra el export `requireAdmin` a `requirePermission`-.
+    const AUTORIZACION_POR_PERMISO_QC74 = [
+      'lib/modules/recetas/domain/actor.ts',
+      'lib/modules/recetas/domain/errors.ts',
+      'lib/modules/recetas/domain/get-recipe.ts',
+      'lib/modules/recetas/domain/list-recipes.ts',
+      'lib/modules/recetas/domain/create-recipe.ts',
+      'lib/modules/recetas/domain/update-recipe.ts',
+      'lib/modules/recetas/domain/delete-recipe.ts',
+      'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+    ]
+    const AMPLIACIONES_APROBADAS = [
+      ...AMPLIACION_QC34,
+      ...CAMBIO_DE_FORMA_DEL_PASO_QC62,
+      ...AUTORIZACION_POR_PERMISO_QC74,
+    ]
     expect(
       diff
         .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))

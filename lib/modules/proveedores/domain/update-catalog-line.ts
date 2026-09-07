@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { updateCatalogLineSchema } from './catalog-line-input';
 import { DuplicateCatalogLineError, NotFoundError, ValidationError } from './errors';
 
@@ -38,7 +38,7 @@ export function createUpdateCatalogLine(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'proveedores.modificar');
 
     const parsed = updateCatalogLineSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

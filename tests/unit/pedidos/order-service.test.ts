@@ -11,7 +11,6 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity'
 import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
 import {
   DuplicateOrderNumberError,
@@ -30,7 +29,9 @@ import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR }
+// QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
+// porque este archivo ejercita lecturas y escrituras con el mismo fixture.
+const ADMIN: Actor = { id: 'admin-1', permissions: ['pedidos.consultar', 'pedidos.modificar'] }
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'

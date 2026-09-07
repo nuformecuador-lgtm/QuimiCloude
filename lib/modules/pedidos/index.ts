@@ -27,10 +27,10 @@ export type { OrderContents } from './domain/order-contents';
 // primera linea de este archivo promete que no pasa.
 // ---------------------------------------------------------------------------------------
 
-/** El actor entra por PARAMETRO en los seis casos de uso (R1). `requireAdmin` se publica
- *  porque es la definicion unica del permiso de este modulo, no para que la repita nadie: la
- *  Server Action NO la llama (R5), ya es la primera linea de los seis. */
-export { requireAdmin } from './domain/actor';
+/** El actor entra por PARAMETRO en los seis casos de uso (R1). `requirePermission` se publica
+ *  porque es la definicion unica de como este modulo exige un permiso, no para que la repita
+ *  nadie: la Server Action NO la llama (R5), ya es la primera linea de los seis. */
+export { requirePermission } from './domain/actor';
 export type { Actor } from './domain/actor';
 
 /** Los errores, con su `code` ESTABLE. El adaptador driving traduce por el `code`, nunca por

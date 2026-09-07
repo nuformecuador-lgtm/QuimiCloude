@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { PRESENTATION_QUERYABLE } from './presentation-queryable';
@@ -35,7 +35,7 @@ export function createListPresentations(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<Page<PresentationView>> {
-    requireAdmin(actor);
+    requirePermission(actor, 'inventario.consultar');
 
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

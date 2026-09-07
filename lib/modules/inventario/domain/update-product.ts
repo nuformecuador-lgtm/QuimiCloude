@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError, ValidationError } from './errors';
 import { updateProductSchema } from './product-input';
 
@@ -27,7 +27,7 @@ export function createUpdateProduct(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'inventario.modificar');
 
     const parsed = updateProductSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

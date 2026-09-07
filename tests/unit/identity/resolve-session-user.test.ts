@@ -1,6 +1,9 @@
 // T4 — Caso de uso completo, con puertos falsos escritos aqui mismo (nada de vi.mock de
 // modulos reales): `resolveSessionUser` encadena cuatro cortes y ese encadenado es la
 // politica (`design.md > 2.1`). R1, R10, R11, R12, R14, R23.
+//
+// QC-74 (T8): se anaden los casos de los permisos —viajan tal cual del record al `SessionUser`,
+// y un rol sin asignaciones da `[]`— sobre los MISMOS puertos falsos. QC-74 R7, R11, R14.
 
 import { createResolveSessionUser } from '@/lib/modules/identity/domain/resolve-session-user';
 
@@ -45,7 +48,14 @@ const RECORD: SessionUserRecord = {
   roleName: 'operador',
   companyId: COMPANY_ID,
   companyDeletedAt: null,
+  // QC-74 T8 (R7, R11): el record trae los permisos del rol, leidos en la MISMA consulta. Van a
+  // proposito en un orden que no es el alfabetico y con dos modulos distintos: asi un `sort()`
+  // o una deduplicacion metida de contrabando en el camino se ve en el `toEqual`.
+  permissions: ['recetas.modificar', 'inventario.consultar'],
 };
+
+/** QC-74 T8 (R14): un rol al que nadie asigno nada. «Sin permisos» es `[]`, no un hueco. */
+const RECORD_SIN_PERMISOS: SessionUserRecord = { ...RECORD, permissions: [] };
 
 /** Puerto falso de sesion: siempre devuelve el mismo `claims`, contando llamadas si hace falta. */
 function fakeSessionReader(claims: SessionClaims | null): SessionReader {
@@ -129,10 +139,38 @@ describe('createResolveSessionUser', () => {
       username: 'ana.perez',
       displayName: 'Ana Perez',
       roleName: 'operador',
+      // QC-74 T8: `permissions` es campo del `SessionUser` desde esta ficha.
+      permissions: ['recetas.modificar', 'inventario.consultar'],
     });
     expect(Object.keys(resultado ?? {}).sort()).toEqual(
-      ['displayName', 'id', 'roleName', 'username'].sort(),
+      ['displayName', 'id', 'permissions', 'roleName', 'username'].sort(),
     );
+  });
+
+  // QC-74 R7, R11 — los permisos viajan del record al `SessionUser` TAL CUAL: mismos codigos,
+  // mismo orden, misma cantidad. `toEqual` sobre un array compara posicion a posicion, asi que
+  // esta asercion cae si alguien mete un `sort()`, un `toLowerCase()` o un `Set` por el camino.
+  it('los permisos del record viajan al SessionUser sin normalizar ni reordenar', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader(RECORD);
+    const resolveSessionUser = createResolveSessionUser({ session, users });
+
+    const resultado = await resolveSessionUser(AHORA);
+
+    expect(resultado?.permissions).toEqual(['recetas.modificar', 'inventario.consultar']);
+  });
+
+  // QC-74 R14 — un rol sin ninguna asignacion no es un hueco ni un `null`: es la lista vacia,
+  // que es lo que hace que quien compara no tenga que distinguir dos formas de «nada».
+  it('un rol sin asignaciones resuelve permissions vacio y no null', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader(RECORD_SIN_PERMISOS);
+    const resolveSessionUser = createResolveSessionUser({ session, users });
+
+    const resultado = await resolveSessionUser(AHORA);
+
+    expect(resultado?.permissions).toEqual([]);
+    expect(resultado?.roleName).toBe('operador');
   });
 
   // R7 (via R23) — la sesion caducada EN el instante exacto de expiresAt tampoco consulta.

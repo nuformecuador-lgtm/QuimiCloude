@@ -15,6 +15,12 @@ export {
   type CredentialRule,
 } from './domain/credential-policy';
 export { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from './domain/roles';
+// QC-74 T1 — el catalogo cerrado de permisos (R1, R2) y lo que el seed asigna a cada rol (R8, R9).
+// `PermissionCode` es union de literales: exigir un codigo inexistente no compila.
+export { PERMISSIONS, SEED_ROLE_PERMISSIONS, type PermissionCode } from './domain/permissions';
+// QC-74 T2 — la UNICA implementacion de «el actor tiene este permiso» (R12-R14); cada modulo
+// delega aqui desde su propio `requirePermission` y pone su propio error (R15).
+export { assertPermission, type PermissionBearer } from './domain/require-permission';
 // QC-47 T3 — La empresa: la UNICA definicion de «mismo nombre de empresa» (R3) y el UNICO
 // literal del nombre de la empresa inicial (R20). Dominio puro: no arrastran servidor ni Prisma.
 export { normalizeCompanyName } from './domain/company-name';
@@ -44,7 +50,8 @@ export {
   resolveReturnPath,
 } from './domain/return-path';
 // La LISTA de reglas ya no sale de aqui: es CABLEADO y vive en `lib/composition/route-role-rules.ts`
-// (el dominio no puede importar `lib/shared`, y nombrar el rol exige el barrel de `inventario` como
-// valor, cosa reservada a `lib/composition`). El contrato sigue exponiendo el tipo y la busqueda,
+// (el dominio no puede importar `lib/shared`, que es lo que exige nombrar una ruta). El rol sale
+// de `identity/domain/roles.ts`, que este barrel ya publica; la lista solo sigue en
+// `lib/composition` por `lib/shared/routes`. El contrato sigue exponiendo el tipo y la busqueda,
 // que si son dominio.
 export { findRouteRule, type RouteRoleRule } from './domain/route-role-rules';

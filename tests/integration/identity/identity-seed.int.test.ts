@@ -45,6 +45,7 @@ import {
   withInitialAccessTransaction,
 } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import { INITIAL_COMPANY_NAME, normalizeCompanyName } from '@/lib/modules/identity';
+import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -204,6 +205,12 @@ async function resetIdentityToEmptyState(tx: Prisma.TransactionClient): Promise<
     await tx.$executeRawUnsafe(`DELETE FROM "${table}"`);
   }
   await tx.user.deleteMany({});
+  // QC-74: `role_permissions` apunta a `roles` con ON DELETE RESTRICT, asi que las
+  // asignaciones tienen que irse ANTES que los roles; y el catalogo, despues de ellas,
+  // para que «base vacia» incluya de verdad a `permissions`. Sin esto, una base que ya
+  // corrio el seed nuevo haria imposible observar la primera corrida.
+  await tx.rolePermission.deleteMany({});
+  await tx.permission.deleteMany({});
   await tx.role.deleteMany({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } });
   // QC-47: y las empresas, DESPUES de los usuarios. Sin esto, la empresa de instalacion
   // sobreviviria al reset y el seed la reutilizaria: «base vacia» dejaria de serlo.
@@ -223,6 +230,30 @@ async function findLiveAdmin(tx: Prisma.TransactionClient) {
     where: { deletedAt: null, role: { name: ROLE_ADMINISTRADOR } },
     include: { role: true },
   });
+}
+
+/** Los diez codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
+const CODIGOS_DEL_CATALOGO = PERMISSIONS.map((permission) => permission.code).slice().sort();
+
+/** Los codigos que el seed asigna a un rol, ordenados, tal como los declara el dominio. */
+function codigosSembradosDe(roleName: string): readonly string[] {
+  return [...(SEED_ROLE_PERMISSIONS[roleName] ?? [])].sort();
+}
+
+/** Numero total de asignaciones que el seed tiene que dejar (hoy: diez + una = once). */
+const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
+  (total, codes) => total + codes.length,
+  0,
+);
+
+/** Los codigos que la BASE tiene asignados a un rol, leidos de `role_permissions`. */
+async function codigosEnBaseDe(tx: Prisma.TransactionClient, roleName: string): Promise<string[]> {
+  const filas = await tx.rolePermission.findMany({
+    where: { role: { name: roleName } },
+    select: { permissionCode: true },
+    orderBy: { permissionCode: 'asc' },
+  });
+  return filas.map((fila) => fila.permissionCode);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,6 +463,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const administradorBeforeDelete = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
       // Operador no tiene usuarios asignados: es borrable (ya probado en
       // identity-constraints.int.test.ts > "permite borrar un rol sin usuarios asignados").
+      // QC-74: pero SI tiene ya su asignacion de permiso, y esa FK es ON DELETE RESTRICT,
+      // asi que hay que retirarla antes. Que el borrado del rol falle sin este paso es
+      // justo lo que `Restrict` promete: nadie se lleva por delante las asignaciones.
+      await tx.rolePermission.deleteMany({ where: { role: { name: ROLE_OPERADOR } } });
       await tx.role.delete({ where: { name: ROLE_OPERADOR } });
       expect(await tx.role.findUnique({ where: { name: ROLE_OPERADOR } })).toBeNull();
 
@@ -446,9 +481,13 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       });
       expect(second.createdRoles).toEqual([ROLE_OPERADOR]);
       expect(second.createdAdmin).toBe(false);
+      // QC-74 R9, R10: el rol vuelve con su unico permiso, y el catalogo ya estaba.
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(1);
 
       const operadorAfter = await tx.role.findUnique({ where: { name: ROLE_OPERADOR } });
       expect(operadorAfter).not.toBeNull();
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(['inventario.consultar']);
 
       const administradorAfter = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
       expect(administradorAfter).toEqual(administradorBeforeDelete);
@@ -599,6 +638,64 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(second.createdCompany).toBeNull();
       expect(await tx.company.findMany()).toEqual(empresas);
       expect(await tx.user.count()).toBe(1);
+    });
+  });
+
+  // Caso 10 (QC-74 R7, R8, R9, R10): el catalogo y las asignaciones, contra base real.
+  it('la primera corrida deja el catalogo completo, el Administrador con los diez permisos y el Operador solo con inventario.consultar; la segunda no cambia ningun conteo', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      expect(await tx.permission.count()).toBe(0);
+      expect(await tx.rolePermission.count()).toBe(0);
+
+      const repository = createInitialAccessRepository(tx);
+
+      const first = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+
+      // Primero: la corrida SI creo el catalogo entero y las once asignaciones.
+      expect(first.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
+      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(11);
+      expect(first.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+
+      // Y la base lo confirma: las filas de `permissions` son exactamente las del catalogo.
+      const catalogoEnBase = await tx.permission.findMany({ orderBy: { code: 'asc' } });
+      expect(catalogoEnBase.map((permission) => permission.code)).toEqual(CODIGOS_DEL_CATALOGO);
+
+      // R8: el Administrador tiene los diez, escritos uno a uno — sin comodin ni regla
+      // implicita: se leen de `role_permissions`, no de su nombre de rol.
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+      expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+      // R9: el Operador, exactamente uno.
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(['inventario.consultar']);
+      expect(codigosSembradosDe(ROLE_OPERADOR)).toEqual(['inventario.consultar']);
+
+      const permisosTrasPrimera = await tx.permission.count();
+      const asignacionesTrasPrimera = await tx.rolePermission.count();
+      expect(permisosTrasPrimera).toBe(PERMISSIONS.length);
+      expect(asignacionesTrasPrimera).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+
+      // R10: la segunda corrida no crea nada y no cambia ni un conteo ni una fila.
+      const second = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+
+      expect(await tx.permission.count()).toBe(permisosTrasPrimera);
+      expect(await tx.rolePermission.count()).toBe(asignacionesTrasPrimera);
+      // Comparacion fila a fila, `created_at`/`updated_at` incluidos: un `upsert` que
+      // reescribiera el catalogo se veria aqui aunque el conteo no se moviera.
+      expect(await tx.permission.findMany({ orderBy: { code: 'asc' } })).toEqual(catalogoEnBase);
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(['inventario.consultar']);
     });
   });
 });

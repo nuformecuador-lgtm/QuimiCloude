@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { PRODUCT_QUERYABLE } from './product-queryable';
@@ -27,7 +27,7 @@ const listQuerySchema = createListQuerySchema();
  *
  * Los cinco pasos van en ESTE orden y el orden es el requisito (`design.md > 1`):
  *
- *   1. `requireAdmin` PRIMERO, siempre (R33, R34). Antes de zod y antes de tocar el puerto: si
+ *   1. `requirePermission(actor, 'inventario.consultar')` PRIMERO, siempre (R33, R34). Antes de zod y antes de tocar el puerto: si
  *      validara primero, un actor no autorizado con una consulta rota recibiria
  *      `ValidationError` y sabria algo del sistema sin tener permiso para preguntarlo.
  *   2. zod DENTRO del caso de uso (R30). Valida la FORMA; un campo no declarado no puede
@@ -49,7 +49,7 @@ export function createListProducts(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<Page<ProductView>> {
-    requireAdmin(actor);
+    requirePermission(actor, 'inventario.consultar');
 
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

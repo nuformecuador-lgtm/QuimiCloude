@@ -3,7 +3,7 @@
 // aqui es la DECISION que vive en `domain/`, no la implementacion Prisma/Supabase (T9-T11).
 // Cierra R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37, R50.
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
 import { DuplicateNameError, NotFoundError } from '@/lib/modules/recetas/domain/errors';
@@ -16,7 +16,9 @@ import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recet
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+// QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
+// Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
+const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
 
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 

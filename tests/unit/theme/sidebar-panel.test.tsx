@@ -36,6 +36,8 @@ const USUARIO_DEL_TEST: SessionUser = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Analista de calidad',
+  // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
+  permissions: [],
 };
 
 const { usePathnameMock, logoutActionMock, cookiesMock, getSessionUserMock } = vi.hoisted(() => ({

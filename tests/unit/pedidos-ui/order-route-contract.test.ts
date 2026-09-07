@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
 import { findRouteRule } from '@/lib/modules/identity/domain/route-role-rules';
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import {
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
@@ -75,7 +75,7 @@ describe('el prefijo privado cubre la pantalla de pedidos (R4)', () => {
   });
 
   it('existe la fila ruta->rol de pedidos y casa por segmentos con la constante (R4, R5)', () => {
-    expect(findRouteRule(ROUTE_ROLE_RULES, ORDERS_ROUTE)?.roles).toEqual([ADMIN_ROLE_NAME]);
+    expect(findRouteRule(ROUTE_ROLE_RULES, ORDERS_ROUTE)?.roles).toEqual([ROLE_ADMINISTRADOR]);
     expect(findRouteRule(ROUTE_ROLE_RULES, `${ORDERS_ROUTE}X`)).toBeNull();
   });
 });

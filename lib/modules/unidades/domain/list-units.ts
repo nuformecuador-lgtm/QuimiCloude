@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { UNIT_QUERYABLE } from './unit-queryable';
@@ -81,9 +81,11 @@ function requestsPagination(input: unknown): boolean {
  *
  * Los cinco pasos van en ESTE orden y el orden es el requisito (`design.md > 1`):
  *
- *   1. `requireAdmin` PRIMERO, siempre (R33, R34), antes de zod y antes de tocar el
- *      repositorio: si validara primero, un actor no autorizado con una consulta rota recibiria
- *      `ValidationError` y sabria algo del sistema sin tener permiso para preguntarlo.
+ *   1. `requirePermission(actor, 'unidades.consultar')` PRIMERO, siempre (R33, R34 de QC-57;
+ *      R12 de QC-74), antes de zod y antes de tocar el repositorio: si validara primero, un
+ *      actor no autorizado con una consulta rota recibiria `ValidationError` y sabria algo del
+ *      sistema sin tener permiso para preguntarlo. El permiso exigido es el de la tabla R16 de
+ *      QC-74 y es el unico caso de uso del modulo.
  *   2. zod DENTRO del caso de uso (R30). Valida la FORMA; un campo no declarado no puede hacer
  *      fallar la consulta (R5).
  *   3. `sanitizeListQuery` contra `UNIT_QUERYABLE` (R4, R5, R7, R8).
@@ -101,7 +103,7 @@ export function createListUnits(deps: ListUnitsDeps): ListUnits {
   function listUnits(input: null | undefined, actor: Actor | null): Promise<readonly UnitRef[]>;
   function listUnits(input: unknown, actor: Actor | null): Promise<UnitListResult>;
   async function listUnits(input: unknown, actor: Actor | null): Promise<UnitListResult> {
-    requireAdmin(actor);
+    requirePermission(actor, 'unidades.consultar');
 
     const paginated = requestsPagination(input);
 
