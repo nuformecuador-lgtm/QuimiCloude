@@ -13,7 +13,6 @@
 |---|---|---|---|---|---|---|
 | QC-35 | pantalla-de-pedidos | Pedidos | frontend | in_progress | feature/QC-35-pantalla-de-pedidos | implementer (spec aprobado por el humano el 2026-09-07). Worktree sincronizado con `origin/dev` — venia 60 commits atras |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-44 | pantalla-de-proveedores | Proveedores | frontend | done | feature/QC-44-pantalla-de-proveedores | **cerrada** (PR #35, merge `f966a7b`); la fila decía `in_progress` por descuido. Falta su resumen en `history.md` (F2.6) |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
 | QC-48 | tenant-en-la-sesion | Multiempresa | backend | pending → F1.2 | feature/QC-48-tenant-en-la-sesion | leader (worktree montado desde `origin/dev`=`738d9a9`, sin spec: pendiente de acotar con `/afinar-feature`) |
 
@@ -2837,3 +2836,13 @@ pregunta 5 (pepper) la cerró el humano el 2026-08-06 con un no (`design.md > 8.
   `WT_DIR = '.worktrees'` (linea 18) se resuelve contra el cwd, asi que `./init.sh` aborta dentro de
   cualquier worktree con `faltan specs para features sdd en vuelo: <otra feature>` — QC-21 convivio
   con ese rojo por decision humana del 2026-09-02. Desde la raiz pasa en verde. `/afinar-regla`.
+
+La feature **QC-44 — pantalla-de-proveedores** se cerró el 2026-09-04 (PR #35, merge `f966a7b`),
+pero su F2.6 quedó sin hacer hasta el 2026-09-07: la fila de esta tabla siguió diciendo
+`in_progress` tres días y no había entrada en `history.md`. Ya la tiene, y con ella las cinco deudas
+que el reviewer anotó (0 mayores, 6 menores, una sola ronda). El worktree ya estaba desmontado; la
+rama `feature/QC-44-pantalla-de-proveedores` seguía viva y se borró al escribir esto.
+
+De esas deudas, **una tiene ficha y sigue `pending`: QC-58 (`timeout-tests-ui-bajo-carga`)** —
+`catalog-line-sheet.test.tsx` teclea siete campos con `userEvent` y agota los 5000 ms por defecto
+bajo carga. No es un rojo real, pero pondrá el gate en rojo por el reloj de la máquina.
