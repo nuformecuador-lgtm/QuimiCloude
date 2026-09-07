@@ -68,20 +68,26 @@ function dobles() {
 
   const units = { findRefs: explota('units.findRefs') } as unknown as UnitCatalog
 
+  // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion. `requireAdmin`
+  // va antes de zod y antes de sanear, asi que un actor rechazado no llega ni a saber que su
+  // consulta traia campos no declarados.
+  const log = { ignoredFields: explota('log.ignoredFields') }
+
   const llamadas = () =>
     [
       ...Object.values(orders as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(recipes as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(units as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, units, llamadas }
+  return { orders, recipes, units, log, llamadas }
 }
 
 /** Los seis casos de uso, cada uno invocado con el actor que se le pase. */
 function operaciones(actor: Actor | null | undefined) {
-  const { orders, recipes, units, llamadas } = dobles()
-  const deps = { orders, recipes, units }
+  const { orders, recipes, units, log, llamadas } = dobles()
+  const deps = { orders, recipes, units, log }
 
   return {
     llamadas,

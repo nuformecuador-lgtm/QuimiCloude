@@ -102,6 +102,19 @@ function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
+/** Copia local de `normalizeProductName` (QC-57). NO se importa el original a proposito: lo
+ *  que aqui se prueba es otra cosa, y si el algoritmo real se rompiera este archivo no debe
+ *  quedar verde por arrastre. El algoritmo lo prueba
+ *  `tests/unit/inventario/product-name.test.ts`. */
+function normalizeProductNameForTest(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]/gu, '')
+}
+
 async function createTestProduct(db: Db, name = `Producto ${token()}`): Promise<string> {
   const marker = token();
   const presentation = await db.presentation.create({
@@ -109,7 +122,7 @@ async function createTestProduct(db: Db, name = `Producto ${token()}`): Promise<
     select: { id: true },
   });
   const product = await db.product.create({
-    data: { name, presentationId: presentation.id },
+    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id },
     select: { id: true },
   });
   return product.id;

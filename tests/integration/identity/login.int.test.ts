@@ -25,6 +25,17 @@
  * `CC`, que inserta la propia migracion de QC-4. QC-6 (seed) no interviene: si algun dia
  * cambia sus datos, este test no se entera.
  *
+ * QC-47 (T17, T19) — `users.company_id` es obligatoria, asi que este fixture crea tambien su
+ * PROPIA empresa efimera (`qc7-login-<uuid>`) en el `beforeAll` y mete al usuario dentro.
+ * Nunca la empresa de instalacion: `companies_name_unique` es global y el alta chocaria con la
+ * que siembra QC-6. El `afterAll` barre en orden `users -> companies`, que es el unico que
+ * respeta el `ON DELETE RESTRICT` de `users_company_id_fkey`.
+ *
+ * EL ROL SIGUE SALIENDO DE `users.role_id` (R13, R14) — la empresa no lo toca: el adaptador
+ * resuelve el nombre del rol con el mismo `JOIN roles r ON r.id = u.role_id` de siempre, en la
+ * MISMA consulta, y el caso «el rol firmado cambia al cambiar `users.role_id`» lo demuestra
+ * contra la base.
+ *
  * ORDEN — cada `it` arranca con el estado de bloqueo a cero (`beforeEach`), asi que el orden
  * de los tests no importa y el archivo pasa igual corrido dos veces seguidas.
  */
@@ -35,6 +46,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createVerifyCredentials,
   DOCUMENT_TYPE_CC,
+  normalizeCompanyName,
   type SessionTicket,
 } from '@/lib/modules/identity';
 import {
@@ -68,9 +80,14 @@ const CLAVE_INCORRECTA = 'clave-de-prueba-QC7-#2027';
 
 const sufijo = randomUUID();
 const nombreDeUsuario = `qc7_login_${sufijo}`;
+/** QC-47: nombre irrepetible de la empresa efimera de este fixture. */
+const nombreDeEmpresa = `qc7-login-${sufijo}`;
 
 let usuarioId = '';
 let rolId = '';
+/** QC-47 R14: segundo rol, para demostrar que el rol firmado sale de `users.role_id`. */
+let rolAlternativoId = '';
+let empresaId = '';
 
 type EspiaDeSesion = {
   readonly tickets: SessionTicket[];
@@ -126,6 +143,19 @@ beforeAll(async () => {
   });
   rolId = rol.id;
 
+  const rolAlternativo = await prisma.role.create({
+    data: { name: `qc7-login-alt-${sufijo}`, description: 'Rol alternativo de prueba de QC-7' },
+    select: { id: true },
+  });
+  rolAlternativoId = rolAlternativo.id;
+
+  // QC-47: empresa PROPIA del fixture, nunca la de instalacion.
+  const empresa = await prisma.company.create({
+    data: { name: nombreDeEmpresa, nameNormalized: normalizeCompanyName(nombreDeEmpresa) },
+    select: { id: true },
+  });
+  empresaId = empresa.id;
+
   const usuario = await prisma.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -140,6 +170,7 @@ beforeAll(async () => {
       // se enteraria, en vez de comparar contra una cadena copiada a mano.
       passwordHash: await createPasswordHash(CLAVE_CORRECTA),
       roleId: rolId,
+      companyId: empresaId,
     },
     select: { id: true },
   });
@@ -149,10 +180,14 @@ beforeAll(async () => {
 afterAll(async () => {
   // El rol se borra en el `finally` para que se limpie aunque el borrado del usuario falle:
   // dejar filas huerfanas convertiria el segundo pase del archivo en un falso rojo.
+  //
+  // QC-47: el orden es `users -> companies`. `users_company_id_fkey` es `ON DELETE RESTRICT`,
+  // asi que la empresa no se puede borrar mientras le quede su usuario dentro.
   try {
     await prisma.user.deleteMany({ where: { id: usuarioId } });
   } finally {
-    await prisma.role.deleteMany({ where: { id: rolId } });
+    await prisma.role.deleteMany({ where: { id: { in: [rolId, rolAlternativoId] } } });
+    await prisma.company.deleteMany({ where: { id: empresaId } });
     await prisma.$disconnect();
   }
 });
@@ -192,6 +227,44 @@ describe('login contra Postgres real', () => {
 
     expect(claims?.sub).toBe(usuarioId);
     expect(claims?.roleName).toBe(rolEnLaBase);
+  });
+
+  // QC-47 R14 — el rol resuelto por el login sale de `users.role_id` y CAMBIA CON EL. Es un
+  // requisito de no-regresion: la primera vuelta de QC-47 movio el rol a una tabla aparte,
+  // y este caso es el que se pondria rojo si alguien lo volviera a mover o lo
+  // congelara en otra fuente. Se cambia la columna de la fila —nada mas— y se vuelve a entrar.
+  //
+  // Ademas, UNA sola llamada al adaptador trae ya el nombre del rol (`JOIN roles` en la misma
+  // consulta): el login no necesita ninguna lectura adicional para saber el rol de quien entra.
+  it('el rol del login sale de users.role_id y cambia con el, sin una segunda lectura', TIEMPO_HOLGADO, async () => {
+    const { name: rolOriginal } = await prisma.role.findUniqueOrThrow({
+      where: { id: rolId },
+      select: { name: true },
+    });
+    const { name: rolNuevo } = await prisma.role.findUniqueOrThrow({
+      where: { id: rolAlternativoId },
+      select: { name: true },
+    });
+
+    // Antes de tocar nada: una unica llamada al adaptador ya devuelve el nombre del rol.
+    const antes = await findActiveByUsername(nombreDeUsuario);
+    expect(antes?.roleName).toBe(rolOriginal);
+
+    await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolAlternativoId } });
+
+    try {
+      const despues = await findActiveByUsername(nombreDeUsuario);
+      expect(despues?.roleName).toBe(rolNuevo);
+
+      const { verificar, sesion } = montarLogin();
+      expect(await verificar({ username: nombreDeUsuario, password: CLAVE_CORRECTA })).toEqual({
+        ok: true,
+      });
+      expect(sesion.tickets[0]?.roleName).toBe(rolNuevo);
+    } finally {
+      // Se restaura pase lo que pase: los demas `it` esperan el rol original.
+      await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolId } });
+    }
   });
 
   it('autentica contra una fila real', TIEMPO_HOLGADO, async () => {

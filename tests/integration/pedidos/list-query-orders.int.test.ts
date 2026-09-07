@@ -1,0 +1,493 @@
+/**
+ * QC-57 T20 — El listado de PEDIDOS con el contrato generico, contra Postgres REAL.
+ *
+ * POR QUE ESTE ARCHIVO EXISTE Y NO BASTA UN UNITARIO: un doble del puerto puede afirmar que la
+ * consulta saneada llego al repositorio, pero NO que el motor filtro y ordeno el conjunto
+ * completo ANTES de paginar (R13) —la diferencia entre filtrar en la base y filtrar la pagina ya
+ * traida, que es lo que QC-22 y QC-26 rechazaron por enganoso—. Y hay DOS cosas mas que solo
+ * Postgres puede demostrar, y son propias de este listado:
+ *
+ *   - **`priority` ordena por el ORDEN DE DECLARACION DEL ENUM**, que es el de la prioridad
+ *     (`BAJA < MEDIA < ALTA < CRITICA`), y **no** por el alfabetico —donde `ALTA` iria antes que
+ *     `MEDIA`—. Es un enum de Postgres: quien decide ese orden es la base.
+ *   - **`orderNumber` es la unica traduccion uno-a-dos del contrato**: un solo campo ordenable
+ *     que el adaptador convierte en el par `(order_year, order_sequence)`. Un orden alfabetico
+ *     sobre el texto compuesto no daria lo mismo.
+ *
+ * AISLAMIENTO: cada escenario usa su propio ANO de correlativo -como `order-repository.int` y
+ * `order-sequence.int`- y sus propias secuencias se borran al final. Las consultas se acotan por
+ * un filtro de fecha o por los ids sembrados; ninguna afirma nada global sobre la tabla.
+ *
+ * Cubre R7, R10, R11, R13, R14, R15, R17, R25 y R29.
+ */
+import { randomUUID } from 'node:crypto'
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import {
+  createOrder,
+  listAliveOrders,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { prisma } from '@/lib/shared/db/prisma'
+import { MAX_PAGE_SIZE } from '@/lib/shared/pagination'
+
+import type { ListQuery, NewOrder, OrderRow } from '@/lib/modules/pedidos'
+
+/** Un ano por archivo, distinto de los 288x de `order-repository.int.test.ts` y de los 287x de
+ *  `order-sequence.int.test.ts`, para que ninguno pueda pisarle la secuencia a otro. */
+const YEAR = 2891
+
+function token(): string {
+  return randomUUID().replace(/-/gu, '')
+}
+
+let recipeId: string
+let unitId: string
+let actorId: string
+let roleId: string
+let documentTypeCode: string
+
+const creados: string[] = []
+
+function instantIn(day: number, ms = 0): Date {
+  return new Date(Date.UTC(YEAR, 0, day, 12, 0, 0, ms))
+}
+
+function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
+  return {
+    recipeId,
+    quantity: '10.0000',
+    unitId,
+    unitPrice: '2.5000',
+    priority: 'MEDIA',
+    status: 'PENDIENTE',
+    ...overrides,
+  }
+}
+
+/** Alta por el adaptador REAL. Registra el id para que el `afterAll` la borre. */
+async function alta(now: Date, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
+  const resultado = await createOrder(baseOrder(overrides), YEAR, actorId, now)
+  expect(resultado).not.toBe('duplicate_number')
+  const fila = resultado as OrderRow
+  creados.push(fila.id)
+  return fila
+}
+
+/**
+ * Acota TODA consulta de este archivo a las filas sembradas aqui: el `dateRange` sobre
+ * `createdAt` es un filtro DECLARADO del contrato (`ORDER_QUERYABLE`), y todas las altas caen en
+ * enero del ano de prueba. Acotar y ejercitar el contrato son lo mismo.
+ */
+function consulta(partial: Partial<ListQuery> = {}): ListQuery {
+  return {
+    page: 1,
+    sort: null,
+    filters: {
+      createdAt: {
+        kind: 'dateRange',
+        from: `${String(YEAR)}-01-01`,
+        to: `${String(YEAR)}-01-31`,
+      },
+    },
+    search: '',
+    ...partial,
+  }
+}
+
+/** Los mismos filtros de acotado, mas los que pida el caso (R15: todos a la vez). */
+function conFiltros(extra: ListQuery['filters']): ListQuery['filters'] {
+  return { ...consulta().filters, ...extra }
+}
+
+beforeAll(async () => {
+  const marca = token()
+  unitId = (
+    await prisma.unit.create({
+      data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: 'kg' },
+      select: { id: true },
+    })
+  ).id
+  recipeId = (
+    await prisma.recipe.create({
+      data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
+      select: { id: true },
+    })
+  ).id
+  documentTypeCode = (
+    await prisma.documentType.create({
+      data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
+      select: { code: true },
+    })
+  ).code
+  roleId = (
+    await prisma.role.create({
+      data: { name: `rol-${marca}`, description: 'Rol de prueba' },
+      select: { id: true },
+    })
+  ).id
+  actorId = (
+    await prisma.user.create({
+      data: {
+        firstNames: 'Ana Maria',
+        lastNames: 'Perez Gomez',
+        birthDate: new Date('1990-05-17T00:00:00.000Z'),
+        email: `ana.${marca}@quimicloude.test`,
+        phone: '+57 300 111 2233',
+        documentTypeCode,
+        documentNumber: marca.slice(0, 12),
+        username: `ana.${marca}`,
+        passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
+        roleId,
+      },
+      select: { id: true },
+    })
+  ).id
+})
+
+afterAll(async () => {
+  if (creados.length > 0) {
+    await prisma.order.deleteMany({ where: { id: { in: creados } } })
+  }
+  await prisma.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS "orders_sequence_${String(YEAR)}"`)
+  await prisma.user.delete({ where: { id: actorId } })
+  await prisma.role.delete({ where: { id: roleId } })
+  await prisma.documentType.delete({ where: { code: documentTypeCode } })
+  await prisma.recipe.delete({ where: { id: recipeId } })
+  await prisma.unit.delete({ where: { id: unitId } })
+  await prisma.$disconnect()
+})
+
+describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de paginar (R13, R14)', () => {
+  /** Doce pedidos, todos de la MISMA prioridad para que el orden por defecto los ordene por
+   *  `created_at` y el correlativo: mas filas que una pagina de cinco. */
+  let sembrados: readonly OrderRow[] = []
+
+  beforeAll(async () => {
+    const filas: OrderRow[] = []
+    for (let i = 0; i < 12; i += 1) {
+      filas.push(await alta(instantIn(1, i), { quantity: `${String(i + 1)}.0000` }))
+    }
+    sembrados = filas
+  })
+
+  it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
+    // R13 — el aserto que distingue filtrar en la BASE de filtrar la pagina ya traida.
+    const ultimo = sembrados[sembrados.length - 1]?.id
+
+    // Orden de HOY: `priority DESC, created_at ASC, ...`. Todas comparten prioridad, asi que el
+    // ultimo sembrado -el `created_at` mas alto- cae en la pagina 3 con paginas de cinco.
+    const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }))
+    expect(pagina3.items.map((o) => o.id)).toContain(ultimo)
+    const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }))
+    expect(pagina1.items.map((o) => o.id)).not.toContain(ultimo)
+
+    // Pidiendo el orden inverso por el correlativo, la MISMA fila sale en la pagina 1.
+    const desc = await listAliveOrders(
+      consulta({ page: 1, pageSize: 5, sort: { columnId: 'orderNumber', direction: 'desc' } }),
+    )
+    expect(desc.items[0]?.id).toBe(ultimo)
+  })
+
+  it('un filtro que deja fuera casi todo trae la fila en la pagina 1 y el total describe lo filtrado (R14)', async () => {
+    // R13 + R14 — `total` y `totalPages` describen el conjunto YA FILTRADO, no la tabla entera.
+    const pagina = await listAliveOrders(
+      consulta({
+        page: 1,
+        pageSize: 5,
+        filters: conFiltros({ quantity: { kind: 'numberRange', min: 12, max: 12 } }),
+      }),
+    )
+
+    expect(pagina.items.map((o) => o.id)).toEqual([sembrados[sembrados.length - 1]?.id])
+    expect(pagina.total).toBe(1)
+    expect(pagina.totalPages).toBe(1)
+  })
+
+  it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
+    // R29 — acotar, no rechazar. El `pageSize` que sale es el efectivo, nunca el pedido.
+    const pagina = await listAliveOrders(consulta({ page: 1, pageSize: 100 }))
+
+    expect(pagina.pageSize).toBe(MAX_PAGE_SIZE)
+    expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
+  })
+
+  it('la busqueda NO recorta nada: `orders` no busca (R17)', async () => {
+    // R17 — el adaptador no tiene capa de busqueda y no puede tenerla: `orders` no tiene
+    // columna `name`. Aunque el `search` llegara con texto -no llega: el caso de uso lo poda-,
+    // la lista vuelve igual.
+    const conTexto = await listAliveOrders(consulta({ pageSize: 25, search: 'acido' }))
+    const sinTexto = await listAliveOrders(consulta({ pageSize: 25 }))
+
+    expect(conTexto.total).toBe(sinTexto.total)
+    expect(conTexto.items.map((o) => o.id)).toEqual(sinTexto.items.map((o) => o.id))
+  })
+})
+
+describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => {
+  beforeAll(async () => {
+    await alta(instantIn(5, 1), { priority: 'BAJA' })
+    await alta(instantIn(5, 2), { priority: 'MEDIA' })
+    await alta(instantIn(5, 3), { priority: 'ALTA' })
+    await alta(instantIn(5, 4), { priority: 'CRITICA' })
+  })
+
+  it('de mayor a menor da CRITICA, ALTA, MEDIA, BAJA — y no el orden alfabetico', async () => {
+    // Postgres ordena un enum por su ORDEN DE DECLARACION, que QC-33 R16 fijo de menor a mayor.
+    // Alfabeticamente el descendente empezaria por `MEDIA` y `ALTA` iria despues de `CRITICA`
+    // por otro motivo: este aserto cae si alguien reordena el enum en `db/schema.prisma`.
+    const pagina = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        sort: { columnId: 'priority', direction: 'desc' },
+        filters: conFiltros({
+          createdAt: {
+            kind: 'dateRange',
+            from: `${String(YEAR)}-01-05`,
+            to: `${String(YEAR)}-01-05`,
+          },
+        }),
+      }),
+    )
+
+    expect(pagina.items.map((o) => o.priority)).toEqual(['CRITICA', 'ALTA', 'MEDIA', 'BAJA'])
+    // Y el alfabetico descendente seria otro: si coincidieran, el caso no probaria nada.
+    const alfabeticoDesc = ['MEDIA', 'CRITICA', 'BAJA', 'ALTA']
+    expect(pagina.items.map((o) => o.priority)).not.toEqual(alfabeticoDesc)
+  })
+
+  it('sin orden explicito, el orden es el de HOY: priority DESC primero (R11)', async () => {
+    const pagina = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: conFiltros({
+          createdAt: {
+            kind: 'dateRange',
+            from: `${String(YEAR)}-01-05`,
+            to: `${String(YEAR)}-01-05`,
+          },
+        }),
+      }),
+    )
+
+    expect(pagina.items.map((o) => o.priority)).toEqual(['CRITICA', 'ALTA', 'MEDIA', 'BAJA'])
+  })
+})
+
+describe('`orderNumber` ordena por el par (ano, correlativo) y no alfabeticamente (R10)', () => {
+  it('el correlativo 10 va DESPUES del 9, que es donde el texto compuesto mentiria', async () => {
+    // El numero visible no esta guardado: lo compone `formatOrderNumber`. Ordenar por el texto
+    // daria `...0010` antes que `...009` en cuanto los correlativos cambien de longitud; el par
+    // de enteros no tiene ese problema. Se comprueba sobre las filas ya sembradas, cuyos
+    // correlativos van del 1 en adelante y cruzan el 9 -> 10.
+    const pagina = await listAliveOrders(
+      consulta({ pageSize: 25, sort: { columnId: 'orderNumber', direction: 'asc' } }),
+    )
+
+    const secuencias = pagina.items.map((o) => o.number.sequence)
+    expect(secuencias.length).toBeGreaterThan(10)
+    expect([...secuencias].sort((a, b) => a - b)).toEqual(secuencias)
+    // El texto compuesto mentiria: comprobado explicitamente para que el caso no sea vacuo.
+    const comoTexto = secuencias.map((s) => String(s).padStart(3, '0'))
+    expect([...comoTexto].sort()).not.toEqual(secuencias.map(String))
+  })
+})
+
+describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () => {
+  beforeAll(async () => {
+    await alta(instantIn(9, 1), { priority: 'ALTA', status: 'EN_CURSO' })
+    await alta(instantIn(9, 2), { priority: 'BAJA', status: 'EN_CURSO' })
+    await alta(instantIn(9, 3), { priority: 'ALTA', status: 'PENDIENTE' })
+  })
+
+  const soloElDia9 = (extra: ListQuery['filters'] = {}): ListQuery['filters'] => ({
+    createdAt: {
+      kind: 'dateRange',
+      from: `${String(YEAR)}-01-09`,
+      to: `${String(YEAR)}-01-09`,
+    },
+    ...extra,
+  })
+
+  it('filtra por estado, por prioridad y por los dos a la vez (R15, R25)', async () => {
+    const porEstado = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: soloElDia9({ status: { kind: 'select', values: ['EN_CURSO'] } }),
+      }),
+    )
+    expect(porEstado.total).toBe(2)
+    expect(porEstado.items.every((o) => o.status === 'EN_CURSO')).toBe(true)
+
+    const porPrioridad = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: soloElDia9({ priority: { kind: 'select', values: ['ALTA'] } }),
+      }),
+    )
+    expect(porPrioridad.total).toBe(2)
+
+    // Los DOS a la vez: `AND`, no `OR` (R15).
+    const ambos = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: soloElDia9({
+          status: { kind: 'select', values: ['EN_CURSO'] },
+          priority: { kind: 'select', values: ['ALTA'] },
+        }),
+      }),
+    )
+    expect(ambos.total).toBe(1)
+    expect(ambos.items[0]?.status).toBe('EN_CURSO')
+    expect(ambos.items[0]?.priority).toBe('ALTA')
+  })
+
+  it('un `select` con VARIOS valores es un `IN`, no una igualdad', async () => {
+    const pagina = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: soloElDia9({
+          status: { kind: 'select', values: ['EN_CURSO', 'PENDIENTE'] },
+        }),
+      }),
+    )
+
+    expect(pagina.total).toBe(3)
+  })
+
+  it('un pedido CANCELADO SI se consulta; uno BORRADO no sale nunca (R25, R7)', async () => {
+    // R25 conserva lo que QC-34 R40 fijo: el cancelado tiene estado propio en vez de
+    // desaparecer. El borrado logico, en cambio, no sale filtre lo que filtre: `deleted_at IS
+    // NULL` va SIEMPRE en el `where` y `deletedAt` no es consultable (R7).
+    const cancelado = await alta(instantIn(14, 1))
+    await prisma.order.update({
+      where: { id: cancelado.id },
+      data: { status: 'CANCELADO', cancellationReason: 'el cliente anulo el pedido' },
+    })
+    // El borrado se queda `PENDIENTE`: el `CHECK orders_delivered_not_deleted` impide borrar
+    // uno cancelado o entregado, asi que la fila que demuestra R7 tiene que ser otra.
+    const borrado = await alta(instantIn(14, 2))
+    await prisma.order.update({
+      where: { id: borrado.id },
+      data: { deletedAt: new Date() },
+    })
+
+    const soloElDia14 = (extra: ListQuery['filters'] = {}): ListQuery['filters'] => ({
+      createdAt: {
+        kind: 'dateRange',
+        from: `${String(YEAR)}-01-14`,
+        to: `${String(YEAR)}-01-14`,
+      },
+      ...extra,
+    })
+
+    // Sin filtro de estado: el cancelado SALE y el borrado NO, aunque los dos son del dia 14.
+    const todos = await listAliveOrders(consulta({ pageSize: 25, filters: soloElDia14() }))
+    expect(todos.items.map((o) => o.id)).toEqual([cancelado.id])
+    expect(todos.total).toBe(1)
+
+    // Y filtrando explicitamente por CANCELADO tambien sale: es un estado consultable (R25).
+    const pagina = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: soloElDia14({ status: { kind: 'select', values: ['CANCELADO'] } }),
+      }),
+    )
+    expect(pagina.items.map((o) => o.id)).toEqual([cancelado.id])
+    expect(pagina.items[0]?.cancellationReason).toBe('el cliente anulo el pedido')
+    expect(pagina.total).toBe(1)
+  })
+})
+
+describe('los importes se comparan como Decimal, no como coma flotante', () => {
+  it('un tope de 19.99 incluye el pedido que vale exactamente 19.9900 y excluye 19.9901', async () => {
+    // El adaptador convierte el `number` del contrato a `Prisma.Decimal` ANTES de comparar. El
+    // limite exacto es justo donde la coma flotante binaria falla.
+    const justo = await alta(instantIn(20, 1), { unitPrice: '19.9900' })
+    await alta(instantIn(20, 2), { unitPrice: '19.9901' })
+    const menos = await alta(instantIn(20, 3), { unitPrice: '19.9899' })
+
+    const pagina = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: {
+          createdAt: {
+            kind: 'dateRange',
+            from: `${String(YEAR)}-01-20`,
+            to: `${String(YEAR)}-01-20`,
+          },
+          unitPrice: { kind: 'numberRange', min: null, max: 19.99 },
+        },
+      }),
+    )
+
+    expect(pagina.items.map((o) => o.id).sort()).toEqual([justo.id, menos.id].sort())
+    expect(pagina.items.map((o) => o.unitPrice)).toContain('19.9900')
+  })
+})
+
+describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos', () => {
+  it('incluye el primer y el ultimo instante del dia en UTC, y excluye el dia siguiente', async () => {
+    // Decision cerrada del 2026-09-04 (manda sobre `design.md > 3.3`): `from` es 00:00:00.000Z
+    // del dia y `to` es el FINAL del dia, implementado como `< 00:00:00Z del dia siguiente`
+    // para no perder las marcas con microsegundos por encima del ultimo milisegundo.
+    const DIA = 25
+    const inicial = await alta(new Date(Date.UTC(YEAR, 0, DIA, 0, 0, 0, 0)))
+    const final = await alta(new Date(Date.UTC(YEAR, 0, DIA, 23, 59, 59, 999)))
+    await alta(new Date(Date.UTC(YEAR, 0, DIA + 1, 0, 0, 0, 0)))
+    await alta(new Date(Date.UTC(YEAR, 0, DIA - 1, 23, 59, 59, 999)))
+
+    const pagina = await listAliveOrders(
+      consulta({
+        pageSize: 25,
+        filters: {
+          createdAt: {
+            kind: 'dateRange',
+            from: `${String(YEAR)}-01-${String(DIA)}`,
+            to: `${String(YEAR)}-01-${String(DIA)}`,
+          },
+        },
+      }),
+    )
+
+    expect(pagina.items.map((o) => o.id).sort()).toEqual([inicial.id, final.id].sort())
+    expect(pagina.total).toBe(2)
+  })
+})
+
+describe('desempate estable por identificador (R10)', () => {
+  it('cuatro pedidos empatados en el campo de orden no se repiten ni se pierden entre paginas', async () => {
+    // R10 — ordenando por `status`, que empata en las cuatro, lo unico que puede ordenarlas es
+    // el desempate por `id`. Sin el, dos empatadas pueden intercambiarse entre consultas y una
+    // acabaria saliendo dos veces —o ninguna—.
+    const ids: string[] = []
+    for (let i = 0; i < 4; i += 1) {
+      ids.push((await alta(instantIn(28, i), { status: 'PENDIENTE' })).id)
+    }
+
+    const soloElDia28: ListQuery['filters'] = {
+      createdAt: {
+        kind: 'dateRange',
+        from: `${String(YEAR)}-01-28`,
+        to: `${String(YEAR)}-01-28`,
+      },
+    }
+
+    const vistos: string[] = []
+    for (const page of [1, 2]) {
+      const pagina = await listAliveOrders(
+        consulta({
+          page,
+          pageSize: 2,
+          sort: { columnId: 'status', direction: 'asc' },
+          filters: soloElDia28,
+        }),
+      )
+      vistos.push(...pagina.items.map((o) => o.id))
+    }
+
+    expect(vistos).toHaveLength(4)
+    expect(new Set(vistos).size).toBe(4)
+    expect([...vistos].sort()).toEqual(vistos)
+  })
+})

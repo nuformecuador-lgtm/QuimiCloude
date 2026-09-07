@@ -36,10 +36,20 @@ import {
   replaceAliveRecipe,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination';
 
+import type { ListQuery } from '@/lib/modules/recetas/domain/list-query';
 import type { NewRecipe } from '@/lib/modules/recetas/ports/recipe-repository';
+
+/**
+ * QC-57: `listAliveRecipes` recibe ahora, ademas de la ventana, el CONTRATO GENERICO de
+ * consulta ya saneado. Esta es la consulta VACIA -sin orden, sin filtro y sin busqueda-, o sea
+ * exactamente el comportamiento que este archivo ya verificaba antes de la ficha: orden por
+ * nombre y solo las vivas. Se adapta la LLAMADA; ningun aserto de comportamiento cambia (R26).
+ */
+const SIN_CONSULTA: ListQuery = { page: 1, sort: null, filters: {}, search: '' };
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento (estrategia 1: tx + ROLLBACK), identicas en forma a
@@ -124,6 +134,17 @@ async function createTestUser(db: Db): Promise<string> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   });
+  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
+  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
+  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
+  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
+  // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de una copia
+  // escrita a mano aqui.
+  const companyName = `Empresa ${marker}`;
+  const company = await db.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  });
   const user = await db.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -136,6 +157,7 @@ async function createTestUser(db: Db): Promise<string> {
       username: `ana.${marker}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId: role.id,
+      companyId: company.id,
     },
     select: { id: true },
   });
@@ -145,11 +167,27 @@ async function createTestUser(db: Db): Promise<string> {
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { roleId: true, documentTypeCode: true },
+    select: { roleId: true, documentTypeCode: true, companyId: true },
   });
   await db.user.delete({ where: { id: userId } });
   await db.role.delete({ where: { id: user.roleId } });
   await db.documentType.delete({ where: { code: user.documentTypeCode } });
+  // La empresa efimera va DESPUES del usuario: `users_company_id_fkey` es `ON DELETE RESTRICT`
+  // (QC-47 R11), asi que borrarla antes la rechazaria la base con 23503.
+  await db.company.delete({ where: { id: user.companyId } });
+}
+
+/** Copia local de `normalizeProductName` (QC-57). NO se importa el original a proposito: lo
+ *  que aqui se prueba es otra cosa, y si el algoritmo real se rompiera este archivo no debe
+ *  quedar verde por arrastre. El algoritmo lo prueba
+ *  `tests/unit/inventario/product-name.test.ts`. */
+function normalizeProductNameForTest(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]/gu, '')
 }
 
 /** Producto vivo con su propia presentacion, para usar como linea de receta. */
@@ -160,7 +198,7 @@ async function createTestProduct(db: Db, name = `Producto ${token()}`): Promise<
     select: { id: true },
   });
   const product = await db.product.create({
-    data: { name, presentationId: presentation.id },
+    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id },
     select: { id: true },
   });
   return product.id;
@@ -196,10 +234,10 @@ function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {
 async function collectAllRecipes(
   limit: number,
 ): Promise<{ id: string; name: string }[]> {
-  const first = await listAliveRecipes(0, limit);
+  const first = await listAliveRecipes(0, limit, SIN_CONSULTA);
   const items = [...first.rows];
   for (let offset = limit; offset < first.total; offset += limit) {
-    const next = await listAliveRecipes(offset, limit);
+    const next = await listAliveRecipes(offset, limit, SIN_CONSULTA);
     items.push(...next.rows);
   }
   return items.map((item) => ({ id: item.id, name: item.name }));
@@ -417,7 +455,7 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
         createdIds.push((created as { id: string }).id);
       }
 
-      const { rows, total } = await listAliveRecipes(0, 2);
+      const { rows, total } = await listAliveRecipes(0, 2, SIN_CONSULTA);
       expect(rows.length).toBeLessThanOrEqual(2);
       // Al menos las tres que este caso acaba de sembrar estan vivas.
       expect(total).toBeGreaterThanOrEqual(3);
@@ -434,7 +472,7 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
     const { offset, limit } = toOffsetLimit(1, 999_999);
     expect(limit).toBe(MAX_PAGE_SIZE);
 
-    const { rows } = await listAliveRecipes(offset, limit);
+    const { rows } = await listAliveRecipes(offset, limit, SIN_CONSULTA);
     expect(rows.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
   });
 

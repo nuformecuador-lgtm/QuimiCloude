@@ -25,6 +25,13 @@
  *
  * NINGUNA CREDENCIAL REAL — los valores de `FAKE_ADMIN_*` son marcadores de instalacion
  * de test, evidentemente ficticios, y solo existen en memoria durante la transaccion.
+ *
+ * QC-47 (T19) — este fixture no crea usuarios a mano: los crea el propio seed, que ahora los
+ * mete DENTRO de la empresa inicial (R20). Lo que si cambia es el escenario «base vacia»:
+ * `resetIdentityToEmptyState` borra tambien `companies` —despues de `users`, que es el unico
+ * orden que respeta `users_company_id_fkey`— para que la primera corrida tenga que CREAR la
+ * empresa en vez de reutilizar la que dejo la instalacion. Sigue todo dentro del `tx` que
+ * termina en ROLLBACK.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -37,6 +44,7 @@ import {
   createInitialAccessRepository,
   withInitialAccessTransaction,
 } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
+import { INITIAL_COMPANY_NAME, normalizeCompanyName } from '@/lib/modules/identity';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -197,6 +205,9 @@ async function resetIdentityToEmptyState(tx: Prisma.TransactionClient): Promise<
   }
   await tx.user.deleteMany({});
   await tx.role.deleteMany({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } });
+  // QC-47: y las empresas, DESPUES de los usuarios. Sin esto, la empresa de instalacion
+  // sobreviviria al reset y el seed la reutilizaria: «base vacia» dejaria de serlo.
+  await tx.company.deleteMany({});
 }
 
 async function seedRoleNames(tx: Prisma.TransactionClient): Promise<readonly string[]> {
@@ -541,6 +552,53 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const documentTypesAfter = await tx.documentType.findMany({ orderBy: { code: 'asc' } });
       expect(documentTypesAfter).toHaveLength(documentTypesBefore.length);
       expect(documentTypesAfter).toEqual(documentTypesBefore);
+    });
+  });
+
+  // Caso 9 (QC-47 R20, R21, R22): la empresa inicial y el usuario semilla DENTRO de ella.
+  it('la primera corrida deja la empresa inicial con el usuario semilla dentro; la segunda no crea una segunda empresa', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      expect(await tx.company.count()).toBe(0);
+
+      const repository = createInitialAccessRepository(tx);
+
+      const first = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+      expect(first.createdAdmin).toBe(true);
+      // R21: el nombre sale de la UNICA constante del dominio, no de un literal ni del entorno.
+      expect(first.createdCompany).toBe(INITIAL_COMPANY_NAME);
+
+      const empresas = await tx.company.findMany();
+      expect(empresas).toHaveLength(1);
+      const [empresa] = empresas;
+      if (empresa === undefined) throw new Error('inalcanzable');
+      expect(empresa.name).toBe(INITIAL_COMPANY_NAME);
+      expect(empresa.nameNormalized).toBe(normalizeCompanyName(INITIAL_COMPANY_NAME));
+      expect(empresa.deletedAt).toBeNull();
+
+      // R20: no queda ninguna persona fuera de la empresa, y la empresa no queda vacia.
+      const admin = await findLiveAdmin(tx);
+      expect(admin).not.toBeNull();
+      if (admin === null) throw new Error('inalcanzable');
+      expect(admin.companyId).toBe(empresa.id);
+      expect(await tx.user.count({ where: { companyId: empresa.id } })).toBe(1);
+
+      // R22: la segunda corrida no crea una segunda empresa ni toca la que hay.
+      const second = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+      expect(second.createdAdmin).toBe(false);
+      expect(second.createdCompany).toBeNull();
+      expect(await tx.company.findMany()).toEqual(empresas);
+      expect(await tx.user.count()).toBe(1);
     });
   });
 });

@@ -1,4 +1,5 @@
-import type { Page, PageQuery } from '../domain/page';
+import type { ListQuery } from '../domain/list-query';
+import type { Page } from '../domain/page';
 import type { NewSupplier, SupplierView } from '../domain/supplier-view';
 
 /**
@@ -44,5 +45,16 @@ export interface SupplierRepository {
    */
   softDeleteAlive(id: string, actorId: string, now: Date): Promise<boolean>;
 
-  listAlive(query: PageQuery): Promise<Page<SupplierView>>;
+  /**
+   * Listado paginado de los proveedores VIVOS con el CONTRATO GENERICO de consulta
+   * (QC-57 R13). Recibe la consulta YA SANEADA por el caso de uso -lo que no esta en
+   * `SUPPLIER_QUERYABLE` no llega aqui (R5)- y devuelve una `Page` ya armada:
+   * `toOffsetLimit`/`buildPage` viven en `lib/shared/pagination`, que `domain/` NO puede
+   * importar, asi que quien pagina es el adaptador driven.
+   *
+   * El orden, el filtro y la busqueda los aplica el MOTOR sobre el conjunto completo y antes
+   * de paginar (R13), nunca sobre la pagina ya traida; el `total` describe el conjunto ya
+   * filtrado (R14).
+   */
+  listAlive(query: ListQuery): Promise<Page<SupplierView>>;
 }

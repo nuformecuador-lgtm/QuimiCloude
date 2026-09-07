@@ -11,6 +11,21 @@ export {
   ValidationError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
+// QC-57 (R27, R31): el contrato generico de consulta de lista, publicado igual que en
+// `inventario`. `pageQuerySchema` se queda publicado, pero ya NO valida el listado: de eso
+// se ocupa `createListQuerySchema()` dentro de `domain/list-recipes.ts`.
+export {
+  type ListFilterKind,
+  type ListFilterValue,
+  type ListQuery,
+  type ListQueryable,
+  type ListSort,
+  type SanitizedListQuery,
+  type SortDirection,
+  createListQuerySchema,
+  sanitizeListQuery,
+} from './domain/list-query';
+export { RECIPE_QUERYABLE } from './domain/recipe-queryable';
 // `RecipeCatalog` y `RecipeRef` los anade QC-34 (T10, R43/R44); `RecipeId` es de QC-33 y no
 // cambia. Son SOLO TIPOS: el barrel no gana nada de servidor por reexportarlos.
 export type { RecipeId, RecipeRef, RecipeCatalog } from './domain/recipe-catalog';

@@ -157,9 +157,11 @@ export async function getRecipeAction(id: string): Promise<RecipeQueryResult> {
 }
 
 /**
- * Lista paginada de recetas (R29-R34, R36). Consulta: argumento tipado. `pageQuerySchema`
- * ya valida el minimo y la integridad DENTRO del caso de uso (R30); esta action no lo
- * repite.
+ * Lista paginada de recetas (R29-R34, R36). Consulta: argumento tipado, y la cadena entera
+ * vive DENTRO del caso de uso (QC-57 R30): `createListQuerySchema()` valida la forma,
+ * `sanitizeListQuery` poda contra `RECIPE_QUERYABLE`, el caso de uso registra lo omitido
+ * por el puerto `ListQueryLog` y el repositorio recibe la consulta ya saneada. Esta action
+ * no repite ninguno de esos pasos.
  */
 export async function listRecipesAction(query: unknown): Promise<RecipeListResult> {
   const actor = await currentActor();

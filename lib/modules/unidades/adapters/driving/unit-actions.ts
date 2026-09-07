@@ -39,12 +39,22 @@ async function currentActor(): Promise<Actor | null> {
   return { id: sessionUser.id, roleName: sessionUser.roleName };
 }
 
-/** Catalogo completo de unidades (R40, R41). */
+/**
+ * Catalogo completo de unidades (R40, R41 de QC-32).
+ *
+ * QC-57: el caso de uso pasa a `listUnits(input, actor)` con la consulta OPCIONAL
+ * (`design.md > 7`). Esta action sigue pidiendo el CATALOGO ENTERO -pasa `undefined`- y por eso
+ * su firma no cambia: las tres pantallas que la llaman sin argumentos (el formulario de recetas
+ * y el detalle de proveedor) siguen recibiendo `readonly UnitRef[]`, que es la primera
+ * sobrecarga de `ListUnits`. **Quien abra la puerta al contrato aqui es QC-39**, la ficha de la
+ * pantalla de unidades: mientras no haya pantalla que emita orden, filtro o pagina, exponerlo
+ * seria un parametro que nadie manda.
+ */
 export async function listUnitsAction(): Promise<UnitListResult> {
   const actor = await currentActor();
 
   try {
-    const data = await unidades.listUnits(actor);
+    const data = await unidades.listUnits(undefined, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

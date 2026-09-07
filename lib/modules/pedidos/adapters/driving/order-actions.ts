@@ -20,9 +20,11 @@ import {
  *   `cancelOrderSchema`) viven en el CASO DE USO y esta action NO los repite: solo extrae
  *   los campos del formulario y los entrega como candidato `unknown`.
  * - `get`/`list` son consultas que invoca un Server Component con datos que YA tiene tipados
- *   (un `id` de la URL, o `{ page, pageSize }` ya parseados por quien llama): no hay
+ *   (un `id` de la URL, o una consulta de lista que quien llama ya construyo): no hay
  *   formulario del que leer. `listOrdersAction` recibe `query: unknown` porque quien valida
- *   su forma sigue siendo `listOrdersSchema`, dentro del caso de uso (R55).
+ *   su forma es `createListQuerySchema()`, dentro del caso de uso (QC-57 R30).
+ *   `listOrdersSchema` YA NO EXISTE: el estado y la prioridad dejaron de ser parametros
+ *   propios y entran como filtros `select` del contrato generico (QC-57 R25).
  *
  * LOS IMPORTES NO SE CONVIERTEN AQUI: `quantity` y `unitPrice` viajan como CADENA decimal
  * hasta el adaptador driven (`design.md > 7.1`). Pasarlos por `Number` seria el redondeo
@@ -239,9 +241,13 @@ export async function getOrderAction(id: string): Promise<OrderQueryResult> {
 
 /**
  * Lista paginada de pedidos (R34-R41, R45). Consulta: argumento tipado -quien llama ya tiene
- * `{ page, pageSize, status, priority }`-. `query` es `unknown` porque quien lo valida es
- * `listOrdersSchema`, dentro del caso de uso (R55); esta action no repite esa validacion ni
- * conoce el defecto de 10 ni el tope de 25.
+ * la consulta de lista, con el estado y la prioridad como filtros `select` (QC-57 R25)-.
+ * `query` es `unknown` porque la cadena entera vive dentro del caso de uso (QC-57 R30):
+ * `createListQuerySchema()` valida la forma, `sanitizeListQuery` poda contra
+ * `ORDER_QUERYABLE` -y `list-orders.ts` poda ademas los valores de los dos `select`
+ * cerrados-, el caso de uso registra lo omitido por el puerto `ListQueryLog` y el
+ * repositorio recibe la consulta ya saneada. Esta action no repite nada de eso ni conoce el
+ * defecto de 10 ni el tope de 25.
  */
 export async function listOrdersAction(query: unknown): Promise<OrderListResult> {
   const actor = await currentActor();
