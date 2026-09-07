@@ -41,6 +41,12 @@ export type DataTableFiltersProps<TRow> = {
   readonly onParamsChange: (next: DataTableParams) => void;
   /** Acciones de la barra, p. ej. "Nuevo producto" (R30: decididas por la pantalla). */
   readonly toolbarActions?: ReactNode;
+  /**
+   * Si se monta el campo de busqueda global. **Ausente = `true`**: el comportamiento de siempre
+   * (R17). Con `false` el campo NO se monta -no se pinta deshabilitado ni oculto: no existe en
+   * el DOM- para una lista que no admite busqueda (QC-35 `design.md > 6.2`).
+   */
+  readonly searchable?: boolean;
 };
 
 /** Campo de busqueda global, con rebote (R17, `design.md > 6`). Emite en `search`, no en `filters`. */
@@ -121,13 +127,16 @@ export function DataTableFilters<TRow>({
   texts,
   onParamsChange,
   toolbarActions,
+  searchable = true,
 }: DataTableFiltersProps<TRow>) {
   const filterableColumns = columns.filter((column) => column.filter !== undefined);
 
   return (
     <div className="flex flex-col gap-3" data-testid="data-table-filters">
       <div className="flex flex-wrap items-center gap-3">
-        <DataTableSearchField params={params} texts={texts} onParamsChange={onParamsChange} />
+        {searchable ? (
+          <DataTableSearchField params={params} texts={texts} onParamsChange={onParamsChange} />
+        ) : null}
 
         {toolbarActions === undefined ? null : (
           <div className="flex items-center gap-2" data-testid="data-table-toolbar-actions">

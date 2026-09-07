@@ -455,7 +455,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente cuatro entradas de nivel superior en orden', () => {
+  it('PRIVATE_NAV_ITEMS tiene exactamente cinco entradas de nivel superior en orden', () => {
     // R5. AMPLIADO el 2026-09-04 (QC-44 T2, R4): la CUARTA entrada es la pantalla de proveedores,
     // item de nivel superior de la seccion «Cadena» -hermano del grupo de produccion, no hijo
     // suyo-. El centinela no se relaja: sigue exigiendo la lista exacta y su orden, asi que una
@@ -463,10 +463,18 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // etiqueta del item nuevo los afirma
     // `tests/unit/proveedores/supplier-route-contract.test.ts` sobre `SUPPLIERS_ROUTE` y
     // `SUPPLIERS_LABEL`, nunca sobre el literal del copy.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(4);
+    // AMPLIADO otra vez el 2026-09-06 (QC-35 T2, R3): la entrada nueva es la pantalla de
+    // pedidos, item de nivel superior de la seccion «Operación» —hermano de Dashboard e
+    // Inventario— y por eso va detras de ellos y delante del grupo de produccion. El centinela
+    // no se relaja: sigue exigiendo la lista exacta y su orden, asi que una sexta entrada sin
+    // ficha que la respalde lo vuelve a poner en rojo. El destino y la etiqueta del item nuevo
+    // los afirma `tests/unit/pedidos-ui/private-nav-pedidos.test.ts` sobre `ORDERS_ROUTE` y
+    // `ORDERS_LABEL`, nunca sobre el literal del copy.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(5);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
       'nav-inventario',
+      'nav-pedidos',
       'nav-produccion',
       'nav-proveedores',
     ]);

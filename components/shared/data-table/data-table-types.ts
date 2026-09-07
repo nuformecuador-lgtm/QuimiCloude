@@ -147,4 +147,25 @@ export type DataTableProps<TRow> = {
   readonly emptyAction?: ReactNode;
   /** Acciones de la barra, decididas por la pantalla segun sus permisos (R30). */
   readonly toolbarActions?: ReactNode;
+  /**
+   * Si la barra monta el campo de busqueda global (R17). **Ausente = `true`**: el comportamiento
+   * de siempre, para que ningun consumidor existente cambie por esta prop. Con `false` el campo
+   * NO se monta (QC-35 `design.md > 6.2`), lo que necesita una lista cuya lista blanca declara
+   * `searchable: false` y para la que una caja de busqueda inerte mentiria.
+   *
+   * `DataTableTexts` NO cambia por esto: `texts.search` sigue siendo obligatorio, porque hacer
+   * opcional un campo del contrato de textos afectaria a todos los consumidores para ahorrar
+   * una cadena.
+   */
+  readonly searchable?: boolean;
+  /**
+   * Ids de columna que nacen fijadas al borde izquierdo cuando el usuario **no** tiene todavia
+   * ninguna preferencia guardada para este `tableId` (QC-35 `design.md > 6.3`). Ausente = nada
+   * fijado por defecto, el comportamiento de siempre.
+   *
+   * Es un valor **por defecto**, no una imposicion: en cuanto hay algo persistido para ese
+   * `tableId` gana lo persistido, asi que el usuario puede soltar la columna y su decision se
+   * recuerda (R25, R26).
+   */
+  readonly defaultPinnedColumns?: readonly string[];
 };

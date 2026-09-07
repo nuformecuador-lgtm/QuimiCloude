@@ -33,6 +33,8 @@ import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
 } from '@/lib/modules/pedidos'
+// La carpeta de la pantalla se DERIVA de esta constante, nunca de un literal escrito a mano.
+import { ORDERS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -664,26 +666,62 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // QC-35 la importara por su ruta exacta.
     expect(read(barrel), 'el barrel reexporta la Server Action').not.toMatch(/order-actions/)
 
-    // Ninguna ruta HTTP ni pantalla de pedidos.
-    for (const ruta of [
-      join(repoRoot, 'app', 'api', 'orders'),
-      join(repoRoot, 'app', 'api', 'pedidos'),
-      join(repoRoot, 'app', '(private)', 'pedidos'),
-      join(repoRoot, 'app', '(private)', 'orders'),
-    ]) {
+    // Ninguna ruta HTTP de pedidos: las mutaciones son Server Actions. Esto NO se afloja.
+    for (const ruta of [join(repoRoot, 'app', 'api', 'orders'), join(repoRoot, 'app', 'api', 'pedidos')]) {
       expect(existsSync(ruta), `${etiqueta(ruta)} no debe existir`).toBe(false)
     }
 
-    // Y ningun archivo de `app/` ni de `components/` conoce todavia el modulo: la pantalla es
-    // QC-35.
+    // INVERTIDO 2026-09-07 (QC-35), y lo decide el HUMANO. Hasta hoy este caso exigia que no
+    // existiera la carpeta `app/(private)/pedidos` y que ningun archivo de `app/` ni de
+    // `components/` importara el modulo. Era el limite de alcance de QC-34 -«la pantalla es
+    // QC-35 (R57)»-, anunciado por su propio requisito, y QC-35 es la ficha que la construye:
+    // la premisa cayo por el requisito que la anuncio, no por conveniencia. Mismo trato que
+    // recibio la version de QC-33 en el RETENSADO de arriba.
+    //
+    // Lo que se sigue vigilando, que es lo que de verdad protegia: la pantalla vive en la
+    // carpeta que DERIVA de `ORDERS_ROUTE` -nunca de un literal- y quien consume el modulo lo
+    // hace SOLO por su contrato publico o por el driving por RUTA EXACTA. Consumirlo por
+    // dentro -`domain/`, `ports/`, `adapters/driven/`- sigue siendo una infraccion, y
+    // `components/`, que no tiene ruta ni ficha, sigue sin poder tocarlo en absoluto.
+    const carpetaDeLaPantalla = join(
+      repoRoot,
+      'app',
+      '(private)',
+      ...ORDERS_ROUTE.split('/').filter((segmento) => segmento.length > 0),
+    )
+    expect(
+      existsSync(join(carpetaDeLaPantalla, 'page.tsx')),
+      `falta ${etiqueta(carpetaDeLaPantalla)}/page.tsx: la pantalla de pedidos es QC-35`,
+    ).toBe(true)
+
+    let consumidoresDeLaPantalla = 0
     for (const file of [
       ...sourcesIn(join(repoRoot, 'app')),
       ...sourcesIn(join(repoRoot, 'components')),
     ]) {
-      expect(read(file), `${etiqueta(file)} importa el modulo pedidos`).not.toMatch(
-        /@\/lib\/modules\/pedidos/,
+      const codigo = read(file)
+      const especificadores = [...codigo.matchAll(/\bfrom\s+'(@\/lib\/modules\/pedidos[^']*)'/g)].map(
+        (match) => match[1] as string,
       )
+      if (especificadores.length === 0) continue
+
+      const dentroDeLaPantalla = !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`)
+      expect(
+        dentroDeLaPantalla,
+        `${etiqueta(file)} importa el modulo pedidos fuera de la pantalla que lo consume`,
+      ).toBe(true)
+      consumidoresDeLaPantalla += 1
+
+      for (const spec of especificadores) {
+        expect(
+          spec === '@/lib/modules/pedidos' ||
+            spec.startsWith('@/lib/modules/pedidos/adapters/driving/'),
+          `${etiqueta(file)} consume pedidos por dentro (${spec}): solo el contrato publico o el driving por ruta exacta`,
+        ).toBe(true)
+      }
     }
+    // Sin esto, el bucle de arriba pasaria en verde por no haber iterado sobre nada.
+    expect(consumidoresDeLaPantalla, 'la pantalla de pedidos deberia consumir su modulo').toBeGreaterThan(0)
 
     // `lib/composition` cablea `pedidos`, y es el UNICO sitio del repo que puede hacerlo (R52).
     //

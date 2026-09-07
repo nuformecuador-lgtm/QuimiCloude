@@ -242,3 +242,58 @@ describe('DataTableFilters: objetivos tactiles minimos (R27)', () => {
     expect(campo.className).toMatch(/text-base/)
   })
 })
+
+/**
+ * QC-35 T4 (`design.md > 6.2`, R20): la prop `searchable`. Casos NUEVOS; ningun test previo de
+ * este archivo cambia, porque el defecto de la prop es el comportamiento de siempre.
+ */
+describe('DataTableFilters: campo de busqueda opcional (QC-35 R20)', () => {
+  it('con `searchable={false}` el campo de busqueda NO existe en el DOM', () => {
+    render(
+      <DataTableFilters
+        columns={columns}
+        params={createDefaultParams()}
+        texts={texts}
+        onParamsChange={vi.fn()}
+        searchable={false}
+      />,
+    )
+
+    expect(screen.queryByTestId('data-table-search')).toBeNull()
+  })
+
+  it('con `searchable={false}` los filtros por columna se siguen montando', () => {
+    render(
+      <DataTableFilters
+        columns={columns}
+        params={createDefaultParams()}
+        texts={texts}
+        onParamsChange={vi.fn()}
+        searchable={false}
+      />,
+    )
+
+    expect(screen.getByTestId('data-table-filter-nombre')).toBeInTheDocument()
+    expect(screen.getByTestId('data-table-filter-estado')).toBeInTheDocument()
+  })
+
+  it('sin la prop, el campo de busqueda SI existe (ausente = true, comportamiento de siempre)', () => {
+    renderFilters()
+
+    expect(screen.getByTestId('data-table-search')).toBeInTheDocument()
+  })
+
+  it('con `searchable={true}` explicito el campo de busqueda existe igual', () => {
+    render(
+      <DataTableFilters
+        columns={columns}
+        params={createDefaultParams()}
+        texts={texts}
+        onParamsChange={vi.fn()}
+        searchable
+      />,
+    )
+
+    expect(screen.getByTestId('data-table-search')).toBeInTheDocument()
+  })
+})

@@ -11,6 +11,10 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+// La carpeta de la pantalla que estrena la tabla se DERIVA de esta constante, nunca de un
+// literal escrito a mano: asi un cambio de ruta arrastra esta prueba con el mismo commit.
+import { ORDERS_ROUTE } from '@/lib/shared/routes'
+
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
   let dir = startDir
@@ -123,16 +127,58 @@ describe('Alcance QC-55: primitivas de UI (R33)', () => {
   })
 })
 
-describe('Alcance QC-55: ninguna pantalla lo consume todavia (R34)', () => {
+describe('Alcance QC-55: la pantalla de pedidos es su UNICO consumidor (R34)', () => {
+  // CENTINELA INVERTIDO el 2026-09-07 (QC-35), y lo decide el HUMANO. Hasta hoy este bloque
+  // afirmaba «ninguna pantalla lo consume todavia», y era cierto: cuando QC-55 se escribio, la
+  // tabla compartida llevaba mergeada sin UN SOLO consumidor. El humano decidio el 2026-09-06
+  // que QC-35 la estrena -«un componente compartido que nadie usa es un componente que nadie
+  // sabe si funciona»-, asi que la premisa cayo. Mismo trato que ya recibieron los centinelas
+  // de inventario (QC-22) y de recetas (QC-26): se INVIERTE, no se borra ni se relaja.
+  //
+  // Y la inversion NO es «ya puede importarlo cualquiera», que seria tirar el centinela: lo que
+  // este bloque protege ahora es el alcance de QC-56. La pantalla de pedidos es el UNICO
+  // consumidor; productos y recetas siguen SIN tocarlo hasta que QC-56 las migre. Meter
+  // `data-table` en inventario o en formulas manana vuelve a poner esto en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
-  it('ningun archivo bajo app/, lib/modules/, db/ o e2e/ importa components/shared/data-table', () => {
+  /** La carpeta de la pantalla, DERIVADA de `ORDERS_ROUTE` y nunca de un literal. */
+  const carpetaDeLaPantalla = join(
+    repoRoot,
+    'app',
+    '(private)',
+    ...ORDERS_ROUTE.split('/').filter((segmento) => segmento.length > 0),
+  )
+
+  it('solo la pantalla de pedidos importa components/shared/data-table', () => {
+    let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
       for (const file of files) {
-        const contenido = readSource(file)
+        if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
-          contenido,
+          !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`),
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es la pantalla de pedidos: migrar las demas es QC-56 (R34)`,
+        ).toBe(true)
+        consumidores += 1
+      }
+    }
+    // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor, que es
+    // justo el estado que esta ficha vino a terminar.
+    expect(consumidores, 'la pantalla de pedidos deberia consumir la tabla compartida').toBeGreaterThan(0)
+  })
+
+  it('las pantallas de productos y de recetas siguen SIN consumirlo: migrarlas es QC-56', () => {
+    // La mitad del centinela que NO se afloja, y la razon de que este bloque siga existiendo.
+    const territorioDeQc56 = [
+      join(repoRoot, 'app', '(private)', 'inventario'),
+      join(repoRoot, 'app', '(private)', 'produccion'),
+    ]
+    for (const dir of territorioDeQc56) {
+      const files = walkCodeFiles(dir)
+      expect(files.length, `${relative(repoRoot, dir)} deberia tener archivos que mirar`).toBeGreaterThan(0)
+      for (const file of files) {
+        expect(
+          readSource(file),
           `${relative(repoRoot, file)} no debe importar components/shared/data-table todavia (migrar es QC-56, R34)`,
         ).not.toMatch(/components\/shared\/data-table/)
       }
@@ -232,15 +278,20 @@ describe('Alcance QC-55: imports por el barrel, nunca por ruta profunda (R1)', (
   })
 })
 
-describe('Alcance QC-55: sin verificacion de extremo a extremo (R36)', () => {
-  it('e2e/ no contiene ninguna referencia a data-table', () => {
+describe('Alcance QC-55: el unico E2E que lo referencia es el de pedidos (R36)', () => {
+  // CENTINELA INVERTIDO el 2026-09-07 (QC-35), y lo decide el HUMANO. QC-55 no anadia E2E
+  // porque no tenia consumidor (su decision 11); QC-35 estrena la tabla y su E2E lo aprobo el
+  // humano el 2026-09-06 (R48, R49). La lista es CERRADA: en cuanto el E2E de inventario o el
+  // de recetas referencien `data-table` -es decir, en cuanto QC-56 los migre sin su ficha-,
+  // esto vuelve a ponerse rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y es solo el de pedidos', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
-    for (const file of e2eFiles) {
-      const contenido = readSource(file)
-      expect(
-        contenido,
-        `${relative(repoRoot, file)} no debe referenciar data-table: esta feature no anade E2E (decision 11, R36)`,
-      ).not.toMatch(/data-table/)
-    }
+    expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
+    const referencian = e2eFiles
+      .filter((file) => /data-table/.test(readSource(file)))
+      .map((file) => relative(repoRoot, file).split(sep).join('/'))
+    expect(referencian, 'solo el E2E de pedidos puede referenciar la tabla compartida (R36)').toEqual([
+      'e2e/pedidos.spec.ts',
+    ])
   })
 })

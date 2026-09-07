@@ -52,6 +52,20 @@ export function supplierDetailRoute(id: string): string {
   return `${SUPPLIERS_ROUTE}/${id}`;
 }
 
+/**
+ * Pantalla de pedidos (QC-35, R2).
+ *
+ * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
+ * `identity` la necesitan y **no pueden depender de la navegacion**, que arrastra etiquetas,
+ * iconos y agrupacion de UI. `private-nav.ts` ya importa de este archivo, asi que la flecha no se
+ * invierte ni aparece un ciclo. Como `SUPPLIERS_ROUTE`, esta constante **nace** aqui —no se muda
+ * desde la navegacion—, asi que no necesita reexport de compatibilidad: nadie la importaba antes.
+ *
+ * **No hay helper de ruta de detalle**: no hay pagina de detalle de un pedido (R1). La lista, el
+ * alta, la edicion, la cancelacion y el borrado ocurren todos en esta misma ruta.
+ */
+export const ORDERS_ROUTE = '/pedidos';
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
@@ -73,4 +87,7 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // por segmentos (`route === prefix || route.startsWith(prefix + '/')`), asi que
   // `/proveedores/<id>` ya cae dentro; una segunda fila para el detalle seria redundante.
   SUPPLIERS_ROUTE,
+  // QC-35 R4: la pantalla de pedidos. `(private)` no aparece en la URL, asi que sin esta fila
+  // `/pedidos` se serviria SIN sesion. Una sola entrada: no hay pagina de detalle (R1).
+  ORDERS_ROUTE,
 ] as const;

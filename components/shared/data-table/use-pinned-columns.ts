@@ -40,20 +40,26 @@ export function buildPinningStorageKey(tableId: string): string {
  * Lee y valida el valor guardado para `tableId`. Envuelve `localStorage.getItem`: en modo
  * privado de Safari o con la API ausente puede lanzar, y eso degrada a "sin nada fijado" en vez
  * de propagar el error (R25).
+ *
+ * Devuelve `null` cuando NO hay preferencia utilizable del usuario -clave ausente, lectura que
+ * lanza, JSON corrupto u otra forma-, y solo entonces se aplica `defaultPinnedColumns`
+ * (QC-35 `design.md > 6.3`). Distinguir "no hay nada guardado" de "hay un `{left:[],right:[]}`
+ * guardado" es lo que hace que soltar la columna fijada por defecto se recuerde en vez de
+ * revivir en la siguiente visita (R25, R26).
  */
-function readPersistedPinning(tableId: string): PinnedColumnsState {
+function readPersistedPinning(tableId: string): PinnedColumnsState | null {
   let raw: string | null;
 
   try {
     raw = window.localStorage.getItem(buildPinningStorageKey(tableId));
   } catch {
     // localStorage no disponible (modo privado, permisos) o getItem lanza: se degrada a "sin
-    // nada fijado" sin propagar el error (R25).
-    return EMPTY_PINNING;
+    // preferencia guardada" sin propagar el error (R25).
+    return null;
   }
 
   if (raw === null) {
-    return EMPTY_PINNING;
+    return null;
   }
 
   let parsed: unknown;
@@ -62,14 +68,14 @@ function readPersistedPinning(tableId: string): PinnedColumnsState {
     parsed = JSON.parse(raw);
   } catch {
     // Valor guardado no es JSON valido (versión anterior u otra escritura): se descarta (R25).
-    return EMPTY_PINNING;
+    return null;
   }
 
   const result = persistedPinningSchema.safeParse(parsed);
 
   if (!result.success) {
     // JSON valido pero con una forma distinta a la esperada: se descarta (R25).
-    return EMPTY_PINNING;
+    return null;
   }
 
   return result.data;
@@ -101,6 +107,9 @@ function withOnlyExistingColumns(
   };
 }
 
+/** Defecto estable para `defaultPinnedColumns`: sin nada fijado, el comportamiento de siempre. */
+const NO_DEFAULT_PINNED: readonly string[] = [];
+
 export type UsePinnedColumnsResult = {
   readonly pinning: PinnedColumnsState;
   /**
@@ -116,15 +125,24 @@ export type UsePinnedColumnsResult = {
  * lectura de `localStorage` ocurre en un efecto tras el montaje, nunca en render, porque leerlo
  * en render de un componente que tambien se renderiza en servidor produce discrepancia de
  * hidratacion (`design.md > 5`).
+ *
+ * `defaultPinnedColumns` (QC-35 `design.md > 6.3`) se aplica DENTRO de ese mismo efecto y SOLO
+ * cuando no hay nada persistido para el `tableId`. Nunca en el estado inicial ni en render: el
+ * servidor no puede saber si el navegador tiene preferencia guardada, asi que arrancar con la
+ * columna fijada reintroduciria exactamente la discrepancia de hidratacion que esta cabecera
+ * documenta.
  */
 export function usePinnedColumns(
   tableId: string,
   columnIds: readonly string[],
+  defaultPinnedColumns: readonly string[] = NO_DEFAULT_PINNED,
 ): UsePinnedColumnsResult {
   const [pinning, setPinningState] = useState<PinnedColumnsState>(EMPTY_PINNING);
 
   // Resume `columnIds` como cadena para no depender de su identidad de array.
   const columnIdsKey = columnIds.join('\u0000');
+  // Mismo motivo para el defecto: el consumidor suele pasar un array literal en cada render.
+  const defaultPinnedKey = defaultPinnedColumns.join('\u0000');
 
   useEffect(() => {
     // Restaura tras el montaje, nunca durante el render (discrepancia de hidratacion, R25). La
@@ -132,13 +150,16 @@ export function usePinnedColumns(
     // repo usa para una restauracion desde una fuente externa (`data-table-filter-date.tsx`).
     const restore = () => {
       const persisted = readPersistedPinning(tableId);
-      setPinningState(withOnlyExistingColumns(persisted, columnIds));
+      // Sin preferencia guardada -> el defecto que declara la pantalla; con preferencia guardada
+      // gana SIEMPRE la del usuario, incluida la de no tener nada fijado (R25, R26).
+      const next: PinnedColumnsState = persisted ?? { left: [...defaultPinnedColumns], right: [] };
+      setPinningState(withOnlyExistingColumns(next, columnIds));
     };
     restore();
-    // Se relee al cambiar de tabla o de conjunto de columnas validas; `columnIdsKey` resume
-    // `columnIds` para no depender de su identidad de array.
+    // Se relee al cambiar de tabla, de conjunto de columnas validas o de defecto; las claves
+    // resumen los arrays para no depender de su identidad.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, columnIdsKey]);
+  }, [tableId, columnIdsKey, defaultPinnedKey]);
 
   const setPinning = useCallback(
     (next: PinnedColumnsState) => {

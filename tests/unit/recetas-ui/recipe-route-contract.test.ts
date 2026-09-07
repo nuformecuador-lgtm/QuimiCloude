@@ -905,6 +905,14 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
 
     // Y el conjunto exportado es EXACTAMENTE el de hoy: una constante nueva -aunque se llame de
     // otra forma- tiene que pasar por aqui y por quien la revise.
+    //
+    // AMPLIADO el 2026-09-07 (QC-35 T1, R2), que es precisamente «pasar por aqui»: la pantalla
+    // de pedidos publica `ORDERS_ROUTE`, y vive en este archivo y no en `private-nav.ts` porque
+    // el middleware y la regla ruta->rol la necesitan y no pueden depender de la navegacion. El
+    // centinela NO se relaja: sigue exigiendo la lista EXACTA, asi que una constante mas sin
+    // ficha que la respalde lo vuelve a poner en rojo. Lo que R12 protege de verdad -que el
+    // asistente de lectura no gane ruta- queda intacto: `ORDERS_ROUTE` no encaja en el patron
+    // `alude` de arriba, que se sigue aplicando a todas las declaraciones del archivo.
     const exportadas = [...rutas.matchAll(/export\s+(?:const|function)\s+([A-Za-z_$][\w$]*)/g)].map(
       (encaje) => encaje[1],
     );
@@ -916,6 +924,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'INVENTORY_ROUTE',
         'LOGIN_ROUTE',
         'NEW_RECIPE_ROUTE',
+        'ORDERS_ROUTE',
         'PRIVATE_ROUTE_PREFIXES',
         'SUPPLIERS_ROUTE',
         'recipeEditRoute',
