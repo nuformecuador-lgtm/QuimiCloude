@@ -7,10 +7,16 @@
 
 ## 1. Veredicto
 
-Las 17 tasks cerradas y los 49 requisitos mapeados a un test nombrado. Tras el merge de F2.3 y el
-ajuste de las dos guardias de recetas (seccion 5), **typecheck limpio, lint limpio, 773 tests y las
-157 aserciones de las 15 guardias en verde**. El unico rojo que queda es de otra sesion y no toca
-codigo de esta feature (seccion 5.3).
+Las 17 tasks cerradas y los 49 requisitos mapeados a un test nombrado.
+
+**Estado real, medido con la suite COMPLETA (seccion 4):** `227 archivos, 2687 tests, 0 fallos`,
+typecheck y lint limpios, y `./init.sh --rapido` termina en `== init OK ==`.
+
+**Correccion de una afirmacion falsa de una version anterior de esta bitacora.** Aqui se escribio
+que la suite de QC-55 quedaba en "13 archivos, 148 tests, todos verdes". **Era falso**: el dato se
+copio del reporte de un subagente sin correrlo, y el estado real era `1 failed / 12 passed`. La
+regla que sale de ahi, y que se aplica en el resto del documento: **cada afirmacion de verde va con
+el comando exacto y su salida; lo que no se ha corrido se escribe "no corrido", nunca "verde"**.
 
 ## 2. Archivos
 
@@ -132,32 +138,44 @@ Ningun requisito queda huerfano: R1-R49, sin saltos.
 
 ## 4. Salida real de los tests
 
+Cada bloque es el comando tal cual se corrio y su salida tal cual la devolvio.
+
 ```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin salida: cero errores)
+
+$ pnpm run lint
+> eslint
+(sin salida)
+
+$ pnpm exec vitest run                    # LA SUITE COMPLETA
+ Test Files  227 passed (227)
+      Tests  2687 passed (2687)
+   Duration  93.49s
+
+$ ./init.sh --rapido
+ ...
+ v test:rapido paso
+ v todas las migraciones tienen down.sql
+ v .env presente
+ == init OK ==
+
+$ pnpm exec vitest run guard              # todas las guardias
+ Test Files  16 passed (16)
+      Tests  168 passed (168)
+
 $ pnpm exec vitest run tests/unit/pedidos-ui
  Test Files  17 passed (17)
       Tests  172 passed (172)
 
-$ pnpm exec vitest run tests/unit/pedidos-ui tests/unit/shared/data-table.test.tsx \
-    tests/unit/shared/data-table-filters.test.tsx tests/unit/app-sidebar.test.tsx \
-    tests/unit/identity/route-role-rules.test.ts
- Test Files  21 passed (21)
-      Tests  235 passed (235)
+$ pnpm exec vitest run <los NUEVE centinelas de alcance del repo>
+ Test Files  9 passed (9)
+      Tests  69 passed (69)
 
-$ pnpm exec vitest run guard          # TODAS las guardias del arnes
- Test Files  15 passed (15)
-      Tests  157 passed | 4 skipped (161)
-
-$ pnpm exec vitest run tests/unit/shared/     # la suite de QC-55, entera
- Test Files  13 passed (13)
-      Tests  148 passed (148)
-
-$ pnpm run lint
- (sin salida)
-
-$ pnpm run test:rapido                # gate de tanda
- Test Files  2 failed | 65 passed (67)
-      Tests  2 failed | 729 passed | 4 skipped (735)
-   # los 2 fallos son las guardias de recetas de la seccion 5.2
+$ pnpm exec vitest run tests/unit/pedidos/scope.test.ts     tests/unit/pedidos/module-contract.test.ts     tests/unit/shared/data-table-alcance.test.ts
+ Test Files  3 passed (3)
+      Tests  33 passed (33)
 
 $ pnpm run e2e e2e/pedidos.spec.ts
   ok  2 [chromium] - no ve ningun dato de pedidos (R49) (8.7s)
@@ -167,7 +185,17 @@ $ pnpm run e2e e2e/pedidos.spec.ts
   4 passed (24.9s)
 ```
 
-Base de E2E limpia tras la corrida: cero fixtures `qc35_e2e_` y `orders` en 0.
+**Nota sobre la suite de QC-55.** No se declara por separado: entra en la corrida completa de
+arriba, que es la unica cifra que esta bitacora respalda. Medida aparte, tras invertir
+`data-table-alcance.test.ts`:
+
+```
+$ pnpm exec vitest run tests/unit/shared/
+ Test Files  13 passed (13)
+      Tests  149 passed (149)
+```
+
+(149, no 148: el centinela invertido aporta un caso mas que el original.)
 
 ## 5. Los rojos que hubo, y como quedaron
 
@@ -244,12 +272,85 @@ $ pnpm run test:rapido    -> Test Files 69 passed (69) | Tests 773 passed (773)
                              guardias: Test Files 15 passed (15) | Tests 157 passed (157)
 ```
 
+### 5.4 Cuatro centinelas de alcance ajenos, INVERTIDOS (rechazo del reviewer, 2026-09-07)
+
+El reviewer rechazo la feature con seis tests en rojo que el gate rapido nunca senalo. Los seis eran
+centinelas de **limite de alcance** cuya premisa esta ficha derriba **por decision del humano**, no
+invariantes permanentes. Se **invierten**, como ya se hizo con inventario (QC-22) y recetas (QC-26):
+no se borran, no se relajan en bloque y no entran en ningun baseline.
+
+| Archivo | Premisa que cayo | Que sigue protegiendo |
+| --- | --- | --- |
+| `tests/unit/pedidos/scope.test.ts` | QC-34 R57 difirio la pantalla y el E2E a QC-35 | La pantalla existe **donde la declara `ORDERS_ROUTE`** y en ningun otro sitio; `components/` sigue sin una pieza de pedidos; el spec E2E es lista **cerrada** de uno; solo la pantalla consume el modulo |
+| `tests/unit/pedidos/module-contract.test.ts` | idem | Las actions siguen en **un solo** archivo driving; **ninguna ruta HTTP**; se consume **solo** por contrato publico o driving por ruta exacta, nunca `domain/`, `ports/` ni `driven/` |
+| `tests/unit/shared/data-table-alcance.test.ts` | QC-55 R34/R36: no tenia **ningun** consumidor | **La pantalla de pedidos es el UNICO consumidor.** Productos y recetas siguen **sin** tocarlo hasta que QC-56 los migre; y solo el E2E de pedidos referencia `data-table` |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | QC-64 R12: lista exacta de constantes de `routes.ts` | La lista sigue **exacta** (se le anade `ORDERS_ROUTE`, que es lo que su propio comentario pide: "pasar por aqui y por quien la revise"). Lo que R12 protege —que el asistente de lectura no gane ruta— queda intacto |
+
+La inversion de `data-table-alcance` es la delicada, y **no** es "ya puede importarlo cualquiera":
+eso habria tirado el centinela. Protege el alcance de **QC-56**, asi que se escribio como "pedidos
+es el unico consumidor" con una comprobacion explicita de que `inventario` y `produccion` siguen
+limpios.
+
+**Falsabilidad: 13 mutaciones del arbol real, todas en rojo, todas restauradas.**
+
+```
+ROJO  <- 1. segunda pantalla de pedidos fuera de su carpeta
+ROJO  <- 2. componente de pedidos bajo components/
+ROJO  <- 3. consumidor del modulo fuera de la pantalla (scope)
+ROJO  <- 3b. consumidor del modulo fuera de la pantalla (module-contract)
+ROJO  <- 4. consumo del modulo POR DENTRO (scope)
+ROJO  <- 4b. consumo del modulo POR DENTRO (module-contract)
+ROJO  <- 5. inventario consume la tabla compartida (territorio de QC-56)
+ROJO  <- 6. formulas consume la tabla compartida (territorio de QC-56)
+ROJO  <- 7. un segundo E2E referencia data-table
+ROJO  <- 8. un segundo spec E2E de pedidos
+ROJO  <- 9. la pantalla de pedidos desaparece (scope)
+ROJO  <- 9b. la pantalla de pedidos desaparece (module-contract)
+ROJO  <- 13. una constante nueva sin ficha en routes.ts
+```
+
+Se conserva la tecnica de QC-34: cada regla es un **predicado puro** aplicado dos veces, al arbol
+real y a ese mismo arbol mas una entrada sintetica que la viola.
+
+### 5.5 Por que se colaron, y la leccion operativa
+
+`test:rapido` no los vio porque **`vitest related` no puede relacionarlos**: estos centinelas
+recorren el disco con `node:fs`, asi que **no tienen arista en el grafo de imports** y ningun cambio
+de codigo los "relaciona". Ya estaba documentado en `progress/current.md` como "El gate rapido no ve
+los tests de alcance de otros modulos (2026-09-03, confirmado por QC-33)"; esta es la **tercera**
+confirmacion.
+
+**Regla operativa que sale de aqui:** cuando una feature **estrena una pantalla, una ruta o el primer
+consumo de algo compartido**, los centinelas de alcance ajenos **se corren a mano**, buscandolos por
+nombre, porque el gate rapido no los va a senalar nunca:
+
+```
+$ find tests e2e -type f \( -name "*scope*" -o -name "*alcance*" -o -name "*module-contract*" \)
+```
+
+Los **nueve** del repo se corrieron: los cuatro invertidos mas `inventario/scope`,
+`proveedores/scope`, `proveedores/module-contract`, `recetas/scope`, `recetas/module-contract`,
+`unidades/module-contract`. **Ningun otro mordia.** Y la suite **completa** se corrio al final, que
+es la unica forma de saber que no queda un rojo donde `related` no llega: fue asi como aparecieron
+los dos ultimos (seccion 5.6).
+
+### 5.6 Dos rojos mas que solo vio la suite completa, y no eran de codigo
+
+`pedidos-ui/pedidos-convenciones.test.ts` y `proveedores-ui/guard-convenciones-proveedores.test.ts`
+comparan `package.json` **contra `origin/dev`**, y los dos cayeron a la vez. **No era de esta
+feature**: `git diff <merge-base> HEAD -- package.json` sale **vacio** —esta rama no toca
+`package.json`— y el segundo test es de proveedores, anterior a QC-35. `dev` habia avanzado 28
+commits anadiendo nueve dependencias de `@tiptap/*` (QC-64). Se resolvio **re-sincronizando**
+(`git merge origin/dev`, sin conflictos) mas `pnpm install`. El merge trajo ademas
+`specs/QC-48-tenant-en-la-sesion/`, con lo que **desaparecio el bloqueo de `./init.sh`** descrito
+antes en la seccion 5.3.
+
 ## 6. Lo que el PR tiene que declarar
 
 1. **Esta feature modifica `components/shared/data-table/`, que es de QC-55**, con dos props
    opcionales (`searchable`, `defaultPinnedColumns`) cuya ausencia deja el comportamiento actual
    exacto. **Ningun test de QC-55 se modifico ni se borro** -solo se anadieron casos- y su suite
-   sigue entera en verde (13 archivos, 148 tests). **QC-56 hereda las dos props.**
+   sigue entera en verde: `pnpm exec vitest run tests/unit/shared/` -> 13 archivos, 149 tests. **QC-56 hereda las dos props.**
 2. **P1 de QC-55 (columna de acciones) queda resuelta SIN tocar el componente**
    (`design.md` seccion 6.1): es una columna normal cuyo `cell` devuelve `ReactNode`. Era el bloqueo
    declarado de QC-56. **Es lo que QC-56 va a adoptar**, y por eso queda escrito aqui y no en un
