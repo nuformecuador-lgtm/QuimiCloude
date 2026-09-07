@@ -11,6 +11,7 @@ import {
   CatalogTableSkeleton,
   SupplierDetailHeader,
   SupplierNotFound,
+  buildCatalogListQuery,
   parseCatalogListParams,
   type CatalogListSearchParams,
 } from './components';
@@ -59,7 +60,9 @@ export default async function ProveedorDetallePage({
   readonly searchParams: Promise<CatalogListSearchParams>;
 }) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
-  const { page, pageSize } = parseCatalogListParams(resolvedSearchParams);
+  // `params` es el nombre que Next da al parametro de RUTA (`[id]`), asi que los de lista se
+  // llaman `listParams`: dos cosas distintas no pueden compartir nombre en el mismo alcance.
+  const listParams = parseCatalogListParams(resolvedSearchParams);
 
   const [supplierResult, unitsResult] = await Promise.all([getSupplierAction(id), listUnitsAction()]);
 
@@ -89,11 +92,18 @@ export default async function ProveedorDetallePage({
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <SupplierDetailHeader supplier={supplierResult.data} />
-      <Suspense key={`${page}-${pageSize}`} fallback={<CatalogTableSkeleton rows={pageSize} />}>
+      {/*
+        La `key` lleva la cadena de consulta CANONICA y no solo pagina y tamano: desde el
+        2026-09-07 la lista tambien ordena, filtra y busca, y el esqueleto tiene que reaparecer en
+        cualquiera de esos cambios (R24).
+      */}
+      <Suspense
+        key={buildCatalogListQuery(listParams)}
+        fallback={<CatalogTableSkeleton rows={listParams.pageSize} />}
+      >
         <CatalogListSection
           supplierId={supplierResult.data.id}
-          page={page}
-          pageSize={pageSize}
+          params={listParams}
           units={unitsResult.data}
         />
       </Suspense>

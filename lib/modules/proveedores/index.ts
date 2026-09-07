@@ -17,6 +17,10 @@ export {
   ValidationError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
+// 2026-09-07: la pantalla de detalle estrena la tabla compartida y necesita saber QUE se puede
+// ordenar y filtrar. Se publica la lista blanca -como ya hacia `pedidos` con la suya- para que la
+// pantalla la compruebe contra el contrato en vez de contra una copia escrita a mano.
+export { SUPPLIER_CATALOG_LINE_QUERYABLE } from './domain/supplier-catalog-line-queryable';
 export { normalizeSupplierName } from './domain/supplier-name';
 export {
   createSupplierSchema,

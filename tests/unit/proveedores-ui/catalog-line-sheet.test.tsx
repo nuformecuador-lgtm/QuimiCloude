@@ -128,7 +128,7 @@ vi.mock('sonner', async (importOriginal) => ({
 
 const testId = {
   vacio: CATALOG_LIST_EMPTY_TESTID,
-  tabla: 'catalog-table',
+  tabla: 'data-table',
   abrirAlta: 'catalog-line-create-open',
   abrirEdicion: 'catalog-line-edit-open',
   panel: 'catalog-line-sheet',

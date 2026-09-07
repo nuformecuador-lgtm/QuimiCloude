@@ -1,138 +1,124 @@
-import type { ReactNode } from 'react';
+'use client';
 
-import { EntityImage } from '@/components/shared/entity-image';
+import { useRouter } from 'next/navigation';
+import { useMemo, type ReactNode } from 'react';
+
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  DataTable,
+  type DataTableParams,
+  type DataTableTexts,
+} from '@/components/shared/data-table';
 import type { CatalogLineView } from '@/lib/modules/proveedores';
 
-import { CATALOG_COLUMNS, UNRESOLVED_CELL } from './catalog-columns';
+import { CATALOG_DEFAULT_PINNED_COLUMNS, buildCatalogColumns } from './catalog-columns';
 import type { CatalogDirectories } from './catalog-directories';
+import { catalogListHref } from './catalog-list-params';
 
 /**
  * Tabla del catalogo de un proveedor (R12, R13, R21, R22, R30, R41, R48; `design.md > 6`).
  *
- * **Sin `'use client'`**: no tiene estado ni manejadores. Recibe las lineas y los diccionarios por
- * props desde `CatalogListSection`, que es quien llama a la operacion de consulta y quien
- * construye los diccionarios **una sola vez** (R46, R22).
+ * **MIGRADA A LA TABLA COMPARTIDA el 2026-09-07 (decision humana).** Antes esta ruta declaraba su
+ * propia tabla con `components/ui/table.tsx` y su propia barra de paginacion
+ * (`catalog-list-toolbar.tsx`, que DESAPARECE). Ahora monta `components/shared/data-table`, la
+ * misma que ya usan inventario, pedidos y recetas.
  *
- * **R13 lo cumple el primitivo, no una clase escrita aqui**: `components/ui/table.tsx` envuelve el
- * `<table>` en un `div[data-slot=table-container]` con `overflow-x-auto`. El desbordamiento
- * horizontal lo absorbe ese envoltorio y ningun ancestro de la pantalla declara scroll horizontal
- * ni `100vh`, de modo que el documento no se desplaza en viewport angosto. No se edita el
- * primitivo (R44) ni se anade columna pegajosa: `position: sticky` horizontal se comporta distinto
- * en WebKit y las acciones se alcanzan con el scroll de la propia tabla.
+ * **Ahora es `'use client'`**, y antes no: la tabla compartida es interactiva -emite
+ * `onParamsChange`-. El Server Component sigue siendo `CatalogListSection`, que es quien pide los
+ * datos y quien construye los diccionarios UNA vez (R22, R46); aqui solo llegan filas ya
+ * resueltas, los diccionarios y los parametros con los que se pidieron.
+ *
+ * **Solo emite; el servidor recalcula.** `onParamsChange` entrega el `DataTableParams` completo y
+ * aqui se traduce a una navegacion con la cadena de consulta canonica. Esta pantalla **no ordena,
+ * no filtra y no busca en el cliente**: la lista vuelve a pedirse sobre el conjunto entero. El
+ * destino sale de `catalogListHref`, que deriva de `supplierDetailRoute`: ningun archivo de la
+ * ruta escribe la URL como literal.
+ *
+ * **`searchable` se queda en su defecto (`true`)**: `SUPPLIER_CATALOG_LINE_QUERYABLE.searchable`
+ * es `true` y `listCatalogLines` resuelve la busqueda, asi que la caja no miente.
+ *
+ * **`status` es SIEMPRE `'idle'`**: los tres estados de R23/R24/R25 se pintan FUERA de
+ * `<DataTable>` -cada uno con su copy y sus acciones- y el «cargando» lo aporta el `<Suspense>`
+ * de la pagina con `CatalogTableSkeleton`.
+ *
+ * **El desbordamiento horizontal lo absorbe el primitivo** (R13): `components/ui/table.tsx`, que
+ * la tabla compartida usa por dentro, envuelve la tabla en un contenedor con `overflow-x-auto`.
+ * No se edita el primitivo (R44) ni se anade columna pegajosa a mano: el fijado lo ofrece la
+ * tabla compartida.
  */
+
+/** Clave de persistencia del fijado de columnas. Una sola tabla en la pantalla, un solo id. */
+export const CATALOG_TABLE_ID = 'proveedor-catalogo';
 
 /**
- * Encabezado de la columna de imagen. Constante para que ningun test dependa del literal.
- *
- * **ENMIENDA A R30 (decision humana del 2026-09-07)**: R30 dejo escrito que la tabla de la linea
- * «no muestra la imagen». Ahora SI la muestra, en la PRIMERA columna, con el mismo marcador que
- * la tabla de inventario. Lo que NO cambia de R30: el formulario de la linea sigue sin pedir
- * imagen ni ofrecer subirla, asi que `image_path` sigue sin ser llenada por nadie y lo que se ve
- * en todas las filas es el marcador.
- *
- * Se declara AQUI y no en la lista de columnas por lo mismo que en inventario: esa lista es de
- * DATOS -cada columna devuelve una cadena- y una miniatura es marcado. Imagen primero, datos en
- * medio, acciones al final.
+ * Textos del componente compartido. Viven aqui -y no en el componente- porque la tabla compartida
+ * no incrusta copy de ningun dominio. Ningun test afirma sobre estos literales (R47): los
+ * controles se localizan por rol o por `data-testid`.
  */
-export const CATALOG_IMAGE_COLUMN_LABEL = 'Imagen';
-
-/** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
-export const CATALOG_ACTIONS_COLUMN_LABEL = 'Acciones';
-
-type CatalogTableProps = {
-  readonly lines: readonly CatalogLineView[];
-  readonly directories: CatalogDirectories;
-  /**
-   * Acciones de la fila (editar, dar de baja). Es un **slot**: la tabla no importa el panel
-   * lateral ni el dialogo de baja -los enchufa `CatalogListSection`, que es un Server Component-,
-   * asi que la tabla no arrastra frontera de cliente y no conoce la API de esos componentes.
-   *
-   * Cuando no se pasa, la columna de acciones **no se declara**: una columna de encabezado
-   * «Acciones» con celdas vacias solo ensancharia la tabla sin decir nada.
-   */
-  readonly rowActions?: (line: CatalogLineView) => ReactNode;
+export const CATALOG_TABLE_TEXTS: DataTableTexts = {
+  empty: 'Este proveedor no tiene líneas de catálogo.',
+  loading: 'Cargando el catálogo…',
+  error: 'No se pudo cargar el catálogo del proveedor.',
+  search: 'Buscar en el catálogo',
+  filters: 'Filtros',
+  columnMenu: 'opciones de la columna',
+  previousPage: 'Página anterior',
+  nextPage: 'Página siguiente',
+  pageIndicator: (page, totalPages) => `Página ${page} de ${totalPages}`,
+  pageSize: 'Líneas por página',
+  sortAscending: 'Orden ascendente',
+  sortDescending: 'Orden descendente',
+  pinColumn: 'Fijar columna',
+  unpinColumn: 'Soltar columna',
+  filterColumn: 'Filtrar columna',
+  clearFilter: 'Limpiar filtro',
+  lastWeek: 'Última semana',
+  lastMonth: 'Último mes',
+  lastYear: 'Último año',
 };
 
-export function CatalogTable({ lines, directories, rowActions }: CatalogTableProps) {
+export type CatalogTableProps = {
+  readonly lines: readonly CatalogLineView[];
+  readonly directories: CatalogDirectories;
+  /** Los parametros vigentes, los mismos con los que se pidio la lista. */
+  readonly params: DataTableParams;
+  readonly totalPages: number;
+  /** Proveedor al que pertenece el catalogo: de el sale el destino de cada navegacion. */
+  readonly supplierId: string;
+  /**
+   * Acciones de la fila (editar, dar de baja). Sigue siendo un **slot** (R26, R36): la tabla no
+   * importa el panel lateral ni el dialogo -los enchufa `CatalogListSection`- y por eso no conoce
+   * su API. Las acciones estan SIEMPRE visibles: nada detras de `:hover` (R48).
+   */
+  readonly rowActions: (line: CatalogLineView) => ReactNode;
+};
+
+export function CatalogTable({
+  lines,
+  directories,
+  params,
+  totalPages,
+  supplierId,
+  rowActions,
+}: CatalogTableProps) {
+  const router = useRouter();
+
+  const columns = useMemo(
+    () => buildCatalogColumns({ directories, rowActions }),
+    [directories, rowActions],
+  );
+
   return (
-    <Table data-testid="catalog-table">
-      <TableHeader>
-        <TableRow>
-          <TableHead scope="col" data-testid="catalog-column-image" className="w-14 text-left">
-            {CATALOG_IMAGE_COLUMN_LABEL}
-          </TableHead>
-          {CATALOG_COLUMNS.map((column) => (
-            <TableHead
-              key={column.key}
-              data-testid={column.testId}
-              className={column.align === 'end' ? 'text-right' : 'text-left'}
-              scope="col"
-            >
-              {column.label}
-            </TableHead>
-          ))}
-          {rowActions === undefined ? null : (
-            <TableHead scope="col" data-testid="catalog-column-actions" className="text-right">
-              {CATALOG_ACTIONS_COLUMN_LABEL}
-            </TableHead>
-          )}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {lines.map((line) => (
-          <TableRow key={line.id} data-testid="catalog-row">
-            {/* Ver la enmienda a R30 en `CATALOG_IMAGE_COLUMN_LABEL`. */}
-            <TableCell className="text-left" data-testid="catalog-cell-image">
-              <EntityImage path={line.imagePath} name={line.name} testId="catalog-image" />
-            </TableCell>
-            {CATALOG_COLUMNS.map((column) => {
-              const text = column.value(line, directories);
-              return (
-                <TableCell
-                  key={column.key}
-                  data-testid={`catalog-cell-${column.key}`}
-                  className={column.align === 'end' ? 'text-right tabular-nums' : 'text-left'}
-                >
-                  {/*
-                    R22: cuando el nombre no se resuelve -unidad ausente, presentacion fuera de la
-                    cota del diccionario o directorio que fallo- la celda pinta un MARCADOR con su
-                    propio `data-testid`, y en ningun caso el identificador tecnico.
-                  */}
-                  {text === null ? (
-                    <span
-                      data-testid={`catalog-unresolved-${column.key}`}
-                      className="text-muted-foreground"
-                      aria-label="Sin nombre disponible"
-                    >
-                      {UNRESOLVED_CELL}
-                    </span>
-                  ) : (
-                    text
-                  )}
-                </TableCell>
-              );
-            })}
-            {rowActions === undefined ? null : (
-              /*
-                Las acciones van en la ultima columna y se alcanzan con el scroll de la propia
-                tabla. **Siempre visibles**: nada de revelarlas con `:hover`, que en tactil no
-                existe (R48).
-              */
-              <TableCell className="text-right" data-testid="catalog-cell-actions">
-                <div className="flex justify-end gap-1">{rowActions(line)}</div>
-              </TableCell>
-            )}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <DataTable
+      tableId={CATALOG_TABLE_ID}
+      columns={columns}
+      rows={lines}
+      getRowId={(line) => line.id}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => router.push(catalogListHref(supplierId, next))}
+      status="idle"
+      texts={CATALOG_TABLE_TEXTS}
+      defaultPinnedColumns={CATALOG_DEFAULT_PINNED_COLUMNS}
+    />
   );
 }

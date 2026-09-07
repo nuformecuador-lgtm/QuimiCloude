@@ -66,8 +66,13 @@ const MARCA_DE_LA_FEATURE = 'QC-44';
  * siempre falla no protege nada porque nadie la mira.
  */
 const AUTORIZADO_2026_09_07: readonly string[] = [
+  // La ruta de imagen del producto, que `inventario` no publicaba (enmienda a R30).
   'lib/modules/inventario/domain/product-view.ts',
   'lib/modules/inventario/adapters/driven/persistence/product-prisma.ts',
+  // La lista blanca de consulta de la linea de catalogo, que el modulo tenia en su dominio y no
+  // publicaba: la pantalla la necesita para NO escribir a mano que se puede ordenar y filtrar. Es
+  // UNA LINEA de reexport en el barrel, del mismo tipo que la que `pedidos` ya tenia.
+  'lib/modules/proveedores/index.ts',
 ];
 
 /** Rutas que R44, R45 y R49 declaran intocables para esta feature. */
