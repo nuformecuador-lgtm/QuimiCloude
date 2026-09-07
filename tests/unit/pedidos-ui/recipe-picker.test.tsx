@@ -7,7 +7,7 @@
 //
 // **Ningun assert sobre copy** (R44): todo se localiza por `data-testid` y por rol accesible.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,8 +33,7 @@ const testId = {
   campo: RECIPE_PICKER_TESTID,
   valor: `${RECIPE_PICKER_TESTID}-value`,
   opcion: `${RECIPE_PICKER_TESTID}-option`,
-  siguiente: `${RECIPE_PICKER_TESTID}-next`,
-  anterior: `${RECIPE_PICKER_TESTID}-prev`,
+  popup: `${RECIPE_PICKER_TESTID}-popup`,
   vacio: `${RECIPE_PICKER_TESTID}-empty`,
 } as const;
 
@@ -76,6 +75,23 @@ function renderPicker(props: Partial<Parameters<typeof RecipePicker>[0]> = {}) {
       <RecipePicker initialPage={INITIAL_PAGE} {...props} />
     </form>,
   );
+}
+
+/**
+ * Lleva el desplegable al final de su scroll, que es el gesto con el que se pide la pagina
+ * siguiente desde el 2026-09-07. Las tres medidas se definen a mano porque jsdom NO calcula
+ * layout: sin ellas todo elemento mide 0 y ninguna prueba podria distinguir «al final» de «al
+ * principio». El evento se emite tal cual: desplazar no es un gesto de puntero ni de teclado,
+ * asi que `user-event` no tiene API para ello.
+ */
+function scrollAlFinal(altoVisible = 256) {
+  const lista = screen.getByTestId(testId.popup);
+  Object.defineProperty(lista, 'clientHeight', { value: altoVisible, configurable: true });
+  Object.defineProperty(lista, 'scrollHeight', { value: altoVisible * 3, configurable: true });
+  Object.defineProperty(lista, 'scrollTop', { value: altoVisible * 2, configurable: true });
+  act(() => {
+    lista.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
 }
 
 /** Lo que el formulario enviaria hoy: el `FormData` real, no el estado del componente. */
@@ -127,25 +143,31 @@ describe('selector de receta (R31, R43)', () => {
 
   it('alcanza una receta que NO esta en la primera pagina y la envia en el campo del formulario', async () => {
     // R31 — «debe permitir alcanzar cualquier receta existente, aunque haya mas de las que caben
-    // en una consulta»: la paginacion vive DENTRO del desplegable.
+    // en una consulta»: la paginacion vive DENTRO del desplegable. Desde el 2026-09-07 el gesto
+    // que pide la pagina siguiente es llegar al FINAL DE SU SCROLL, no pulsar «Siguiente».
     const user = userEvent.setup();
     renderPicker();
 
     await user.click(screen.getByTestId(testId.campo));
 
     // La primera pagina llega por PROPS (R43): abrirlo no pide nada al servidor.
+    await waitFor(() =>
+      expect(screen.getAllByTestId(testId.opcion)).toHaveLength(PRIMERA_PAGINA.length),
+    );
     expect(listRecipesActionMock).not.toHaveBeenCalled();
-    expect(screen.getAllByTestId(testId.opcion)).toHaveLength(PRIMERA_PAGINA.length);
 
-    await user.click(screen.getByTestId(testId.siguiente));
+    scrollAlFinal();
 
     await waitFor(() => expect(listRecipesActionMock).toHaveBeenCalledTimes(1));
     expect(listRecipesActionMock.mock.calls[0]?.[0]).toMatchObject({ page: 2 });
 
-    const opcion = await screen.findByTestId(testId.opcion);
-    expect(opcion).toHaveAttribute('data-recipe-id', RECETA_LEJANA.id);
+    // La pagina 2 se ANEXA: las dos de la primera siguen en la lista.
+    const opciones = await screen.findAllByTestId(testId.opcion);
+    expect(opciones).toHaveLength(PRIMERA_PAGINA.length + 1);
+    const lejana = opciones[opciones.length - 1] as HTMLElement;
+    expect(lejana).toHaveAttribute('data-recipe-id', RECETA_LEJANA.id);
 
-    await user.click(opcion);
+    await user.click(lejana);
 
     expect(loQueSeEnviaria().get(RECIPE_FIELD)).toBe(RECETA_LEJANA.id);
   });
