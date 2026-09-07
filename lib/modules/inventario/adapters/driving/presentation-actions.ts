@@ -19,7 +19,8 @@ import {
  *   numerica como en producto-, asi que no hay ningun camino de `NaN` que vigilar aqui.
  *   `delete` recibe el `id` como campo oculto del formulario, igual que en producto.
  * - `list` recibe `query: unknown` como argumento tipado: es una consulta, no un
- *   formulario, y `pageQuerySchema` la valida DENTRO del caso de uso (R28).
+ *   formulario, y `createListQuerySchema()` valida su forma DENTRO del caso de uso
+ *   (QC-57 R30).
  */
 
 export type CreatePresentationFormState =
@@ -118,8 +119,11 @@ export async function deletePresentationAction(
 }
 
 /**
- * Lista paginada de presentaciones (R23-R26, R35, R36). Consulta: argumento tipado, la
- * validacion vive en `pageQuerySchema` dentro del caso de uso (R28).
+ * Lista paginada de presentaciones (R23-R26, R35, R36). Consulta: argumento tipado, y la
+ * cadena entera vive dentro del caso de uso (QC-57 R30): `createListQuerySchema()` valida
+ * la forma, `sanitizeListQuery` poda contra `PRESENTATION_QUERYABLE`, el caso de uso
+ * registra los campos omitidos por el puerto `ListQueryLog` y el repositorio recibe la
+ * consulta ya saneada.
  */
 export async function listPresentationsAction(query: unknown): Promise<PresentationListResult> {
   const actor = await currentActor();

@@ -11,14 +11,27 @@ export {
   PresentationInUseError,
   ValidationError,
 } from './domain/errors';
+export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
+// QC-57 (R24, R31): el contrato generico de consulta de lista. `productQuerySchema` y
+// `ProductQuery` se fueron con el: el listado de productos ya no tiene busqueda propia.
 export {
-  type Page,
-  type PageQuery,
-  pageQuerySchema,
-  type ProductQuery,
-  productQuerySchema,
-} from './domain/page';
+  type ListFilterKind,
+  type ListFilterValue,
+  type ListQuery,
+  type ListQueryable,
+  type ListSort,
+  type SanitizedListQuery,
+  type SortDirection,
+  createListQuerySchema,
+  sanitizeListQuery,
+} from './domain/list-query';
+export { PRESENTATION_QUERYABLE } from './domain/presentation-queryable';
+export { PRODUCT_QUERYABLE } from './domain/product-queryable';
 export { normalizePresentationName } from './domain/presentation-name';
+// QC-57 (R19): la UNICA definicion de «mismo nombre de producto». Se publica en el contrato
+// -como las otras cuatro `normalize*Name`- para que sus tests la importen por aqui y no por
+// una ruta profunda: si el barrel dejara de exportarla, el test no compilaria.
+export { normalizeProductName } from './domain/product-name';
 export {
   createPresentationSchema,
   updatePresentationSchema,

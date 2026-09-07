@@ -16,10 +16,9 @@ import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/li
  *   `''` a ausencia tampoco se hace aqui: la hace `blankToNull` DENTRO del esquema (R13),
  *   y adelantarla seria repetir una regla de negocio en el borde.
  * - `get`/`list` son consultas que invoca un Server Component con datos que YA tiene
- *   tipados (un `id` de la URL, o `{ page, pageSize }` ya parseados a numero por quien
- *   llama): no hay formulario del que leer. `listSuppliersAction` recibe `query: unknown`
- *   porque quien valida su forma sigue siendo `pageQuerySchema`, dentro del caso de uso
- *   (R20).
+ *   tipados (un `id` de la URL, o una consulta de lista que quien llama ya construyo): no
+ *   hay formulario del que leer. `listSuppliersAction` recibe `query: unknown` porque quien
+ *   valida su forma es `createListQuerySchema()`, dentro del caso de uso (QC-57 R30).
  *
  * EL ACTOR sale de `identity.getSessionUser()` via `@/lib/composition` (R5, decision
  * cerrada 11): ningun caso de uso lee sesion, cookie ni cabecera por su cuenta. Sin cookie
@@ -177,8 +176,11 @@ export async function getSupplierAction(id: string): Promise<SupplierQueryResult
 
 /**
  * Lista paginada de proveedores (R18-R22, R35). Consulta: argumento tipado -quien llama ya
- * tiene `{ page, pageSize }` como numeros-. `query` es `unknown` porque quien lo valida es
- * `pageQuerySchema`, dentro del caso de uso (R20); esta action no repite esa validacion.
+ * tiene la consulta de lista construida-. `query` es `unknown` porque la cadena entera vive
+ * dentro del caso de uso (QC-57 R30): `createListQuerySchema()` valida la forma,
+ * `sanitizeListQuery` poda contra `SUPPLIER_QUERYABLE`, el caso de uso registra lo omitido
+ * por el puerto `ListQueryLog` y el puerto recibe la consulta ya saneada. Esta action no
+ * repite ninguno de esos pasos.
  */
 export async function listSuppliersAction(query: unknown): Promise<SupplierListResult> {
   const actor = await currentActor();

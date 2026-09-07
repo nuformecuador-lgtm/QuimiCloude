@@ -405,17 +405,35 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       'la unicidad de la linea es un indice PARCIAL escrito a mano, no un @@unique de Prisma',
     ).toBe(false)
 
-    // Y SOLO TRES migraciones del repo tocan estas dos tablas: la de QC-42 que las creo, la
-    // de QC-43 con sus tres cambios y la de QC-52 que separa las dos tablas. Una cuarta seria
-    // alcance escapandose por una via que el censo de campos de arriba no ve (p. ej. un
-    // CHECK, que Prisma no modela).
+    // Y SOLO CUATRO migraciones del repo tocan estas dos tablas: la de QC-42 que las creo, la
+    // de QC-43 con sus tres cambios, la de QC-52 que separa las dos tablas y la de QC-57, que
+    // solo les anade INDICES. Una quinta seria alcance escapandose por una via que el censo de
+    // campos de arriba no ve (p. ej. un CHECK, que Prisma no modela).
+    //
+    // 2026-09-04, QC-57: la cuarta entra aqui a conciencia y no relaja nada. `list_query_indexes`
+    // no anade ni quita ninguna columna de estas dos tablas -el censo de campos de arriba, que es
+    // el que vigila el ALCANCE de QC-43, sigue intacto y en igualdad exacta-, no toca ninguna FK
+    // ni ningun CHECK, y no crea ningun `@@unique`. Lo que trae son indices de orden, filtro y
+    // busqueda que R21 de QC-57 exige para todo campo consultable. Se anade el nombre concreto y
+    // no un comodin: una migracion futura que toque estas tablas sigue poniendo esto rojo.
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanLasTablas = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .filter((entry) => {
         const sql = join(migracionesDir, entry.name, 'migration.sql')
         if (!existsSync(sql)) return false
-        return /\b(suppliers|supplier_catalog_lines)\b/i.test(readFileSync(sql, 'utf8'))
+        // RETENSADO 2026-09-04 (QC-47). Antes se buscaba el nombre de la tabla en el texto
+        // CRUDO del SQL, comentarios incluidos, y eso daba un falso positivo: la migracion de
+        // QC-47 solo NOMBRA `suppliers` en dos lineas de comentario que explican por que NO le
+        // hace DDL. Un comentario no toca una tabla. Se quitan los comentarios (`--` de linea y
+        // bloques) ANTES de buscar, asi que la lista de abajo sigue teniendo TRES entradas y no
+        // cuatro: la guardia no se afloja -no se anade ninguna migracion a la lista permitida-,
+        // se le quita el ruido para que mida DDL de verdad. Si QC-47 escribiera un solo ALTER
+        // sobre esas tablas, este caso caeria.
+        const sqlSinComentarios = readFileSync(sql, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, ' ')
+          .replace(/--[^\n]*/g, ' ')
+        return /\b(suppliers|supplier_catalog_lines)\b/i.test(sqlSinComentarios)
       })
       .map((entry) => entry.name)
       .sort()
@@ -427,6 +445,7 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       '20260903131417_suppliers_and_supplier_catalog_lines',
       '20260903200343_supplier_contact_cost_and_line_audit',
       '20260904123854_split_product_and_supplier_catalog',
+      '20260904160000_list_query_indexes',
     ])
   })
 

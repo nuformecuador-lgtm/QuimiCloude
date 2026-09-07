@@ -34,6 +34,7 @@ import { createUpdateCatalogLine } from '@/lib/modules/proveedores/domain/update
 
 import type { Actor } from '@/lib/modules/proveedores/domain/actor'
 import type { CatalogLineView } from '@/lib/modules/proveedores/domain/catalog-line-view'
+import type { ListQueryLog } from '@/lib/modules/proveedores/ports/list-query-log'
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository'
 
 const moduloDir = join(
@@ -96,6 +97,15 @@ function makeCatalog(overrides: Partial<SupplierCatalogRepository> = {}): {
   }
 }
 
+/**
+ * QC-57: el listado del catalogo recibe ademas el puerto del log de campos omitidos (R6). Es
+ * un espia mudo: lo que ese puerto registra se prueba en `tests/unit/proveedores/list-*`, aqui
+ * solo hace falta para poder construir el caso de uso.
+ */
+function logMudo(): ListQueryLog {
+  return { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
+}
+
 /** Fila del catalogo tal como la devuelve el puerto. */
 function linea(id: string, name: string, presentationId: string): CatalogLineView {
   return {
@@ -126,7 +136,12 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     expect(clavesDelTipoDeps(read('domain', 'create-catalog-line.ts'))).toEqual(['catalog', 'now'])
     expect(clavesDelTipoDeps(read('domain', 'update-catalog-line.ts'))).toEqual(['catalog', 'now'])
     expect(clavesDelTipoDeps(read('domain', 'delete-catalog-line.ts'))).toEqual(['catalog', 'now'])
-    expect(clavesDelTipoDeps(read('domain', 'list-catalog-lines.ts'))).toEqual(['catalog'])
+    // QC-57 (R6) le anade el puerto del LOG de campos omitidos, y nada mas: sigue sin
+    // conocer `inventario`, que es lo que este caso vigila.
+    expect(clavesDelTipoDeps(read('domain', 'list-catalog-lines.ts'))).toEqual([
+      'catalog',
+      'log',
+    ])
 
     // Y el puerto expone EXACTAMENTE estos cuatro metodos. `deleteById` ya no esta -la baja
     // es logica (R21)- y `updateTerms` tampoco -la edicion es reemplazo completo (R24)-. No
@@ -335,9 +350,21 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       })),
     })
 
-    const pagina = await createListCatalogLines({ catalog: repo })(SUPPLIER_ID, { page: 1 }, ADMIN)
+    const pagina = await createListCatalogLines({ catalog: repo, log: logMudo() })(
+      SUPPLIER_ID,
+      { page: 1 },
+      ADMIN,
+    )
 
-    expect(spies.listBySupplierAlive).toHaveBeenCalledWith(SUPPLIER_ID, { page: 1 })
+    // QC-57 (R13): al puerto llega el CONTRATO GENERICO ya saneado, no `{ page }` a secas. Sin
+    // orden, sin filtros y sin busqueda es exactamente la lista de siempre (R11), asi que este
+    // caso sigue midiendo lo mismo y no se relaja ningun aserto.
+    expect(spies.listBySupplierAlive).toHaveBeenCalledWith(SUPPLIER_ID, {
+      page: 1,
+      sort: null,
+      filters: {},
+      search: '',
+    })
     expect(spies.listBySupplierAlive).toHaveBeenCalledTimes(1)
     expect(pagina.total).toBe(2)
     // R16 visto desde el dominio: dos lineas del MISMO nombre en presentaciones distintas
@@ -362,13 +389,17 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     })
 
     await expect(
-      createListCatalogLines({ catalog: repo })(SUPPLIER_ID, { page: 1 }, ADMIN),
+      createListCatalogLines({ catalog: repo, log: logMudo() })(SUPPLIER_ID, { page: 1 }, ADMIN),
     ).rejects.toBeInstanceOf(NotFoundError)
 
     // Y una consulta de pagina invalida es entrada invalida, no una pagina vacia.
     const otro = makeCatalog()
     await expect(
-      createListCatalogLines({ catalog: otro.repo })(SUPPLIER_ID, { page: 0 }, ADMIN),
+      createListCatalogLines({ catalog: otro.repo, log: logMudo() })(
+        SUPPLIER_ID,
+        { page: 0 },
+        ADMIN,
+      ),
     ).rejects.toBeInstanceOf(ValidationError)
     expect(otro.spies.listBySupplierAlive).not.toHaveBeenCalled()
   })

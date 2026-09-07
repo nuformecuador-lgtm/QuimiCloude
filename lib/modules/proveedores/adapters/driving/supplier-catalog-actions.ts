@@ -185,8 +185,11 @@ export async function deleteCatalogLineAction(
 
 /**
  * Listado paginado del catalogo de UN proveedor (R22, R23). Consulta: argumentos ya
- * tipados -el `supplierId` sale de la URL y `{ page, pageSize }` ya son numeros-. `query`
- * es `unknown` porque quien lo valida es `pageQuerySchema`, dentro del caso de uso.
+ * tipados -el `supplierId` sale de la URL y la consulta de lista la construye quien llama-.
+ * `query` es `unknown` porque la cadena entera vive dentro del caso de uso (QC-57 R30):
+ * `createListQuerySchema()` valida la forma, `sanitizeListQuery` poda contra
+ * `SUPPLIER_CATALOG_LINE_QUERYABLE`, el caso de uso registra lo omitido por el puerto
+ * `ListQueryLog` y el puerto recibe la consulta ya saneada.
  */
 export async function listCatalogLinesAction(
   supplierId: string,

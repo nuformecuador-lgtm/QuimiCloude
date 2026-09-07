@@ -1,0 +1,248 @@
+// QC-57 T12 — El caso de uso de listado de UNIDADES con el CONTRATO GENERICO y la PAGINA
+// OPCIONAL (`design.md > 7`, `> 12`), con el repositorio y el log MOCKEADOS.
+//
+// Cubre R5, R6, R7, R8, R11, R16, R20, R27, R28, R29, R30, R33 y R34. Lo que ya cubria QC-32
+// -R40, R41- sigue en `list-units.test.ts`, con sus asertos intactos.
+//
+// EL CASO CENTRAL DE ESTA FICHA es la union discriminada POR LA FORMA DE LA ENTRADA: sin
+// parametros, el catalogo entero -y el selector de unidad del formulario de recetas no se
+// entera-; con `page` o `pageSize`, una `Page<UnitRef>`. Se comprueban las dos, y ademas que el
+// orden, el filtro y la busqueda SI se aplican en el modo catalogo: «sin paginar» no es «sin
+// consultar».
+//
+// EL TEST QUE NO PUEDE FALTAR (`design.md > 12`): pedir orden por `deletedAt` -que ademas es una
+// columna que `units` NI SIQUIERA TIENE- y comprobar LAS TRES COSAS A LA VEZ.
+
+import { createListUnits, isUnitPage, MAX_UNITS } from '@/lib/modules/unidades/domain/list-units';
+import { UnauthorizedError, ValidationError } from '@/lib/modules/unidades/domain/errors';
+
+import type { Actor } from '@/lib/modules/unidades/domain/actor';
+import type { ListQuery } from '@/lib/modules/unidades/domain/list-query';
+import type { Page } from '@/lib/modules/unidades/domain/page';
+import type { UnitRef } from '@/lib/modules/unidades/domain/unit-catalog';
+import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
+import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
+
+const ADMIN: Actor = { id: 'admin-1', roleName: 'Administrador' };
+const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
+
+const CATALOGO: readonly UnitRef[] = [
+  { id: 'unit-1', name: 'Gramo', symbol: 'g' },
+  { id: 'unit-2', name: 'Litro', symbol: 'L' },
+];
+
+const PAGINA: Page<UnitRef> = {
+  items: CATALOGO,
+  total: 2,
+  page: 1,
+  pageSize: 10,
+  totalPages: 1,
+};
+
+function montar() {
+  const listAll = vi.fn<UnitRepository['listAll']>(async () => CATALOGO);
+  const listPage = vi.fn<UnitRepository['listPage']>(async () => PAGINA);
+  const units = { listAll, listPage } satisfies UnitRepository;
+  const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };
+  return { units, log, listUnits: createListUnits({ units, log }) };
+}
+
+/** La consulta que llego a `listAll` (segundo argumento) en la ultima llamada. */
+function consultaDelCatalogo(recibidas: readonly (readonly [number, ListQuery])[]): ListQuery {
+  const ultima = recibidas.at(-1);
+  if (ultima === undefined) throw new Error('listAll no fue llamado');
+  return ultima[1];
+}
+
+/** La consulta que llego a `listPage` (unico argumento) en la ultima llamada. */
+function consultaDeLaPagina(recibidas: readonly (readonly [ListQuery])[]): ListQuery {
+  const ultima = recibidas.at(-1);
+  if (ultima === undefined) throw new Error('listPage no fue llamado');
+  return ultima[0];
+}
+
+describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
+  it('SIN PARAMETROS devuelve el catalogo entero, acotado y sin paginar (R28)', async () => {
+    // R28 — es lo que mantiene verde el selector de unidad del formulario de recetas sin
+    // tocarlo: `listUnitsAction()` sigue recibiendo un array de `UnitRef`, no una pagina.
+    const { units, listUnits } = montar();
+
+    const resultado = await listUnits(undefined, ADMIN);
+
+    expect(resultado).toEqual(CATALOGO);
+    expect(Array.isArray(resultado)).toBe(true);
+    expect(units.listAll).toHaveBeenCalledTimes(1);
+    expect(units.listPage).toHaveBeenCalledTimes(0);
+    // La cota de R40 (QC-32) sigue intacta: ninguna consulta sin limite declarado.
+    expect(units.listAll).toHaveBeenCalledWith(MAX_UNITS, expect.anything());
+  });
+
+  it('con una consulta SIN page ni pageSize sigue siendo el catalogo entero (R28)', async () => {
+    // R28 — «sin parametros» es sin PAGINACION, no sin consulta: pedir orden o busqueda no
+    // convierte la salida en una pagina.
+    const { units, listUnits } = montar();
+
+    const resultado = await listUnits({ sort: { columnId: 'symbol', direction: 'desc' } }, ADMIN);
+
+    expect(isUnitPage(resultado)).toBe(false);
+    expect(units.listAll).toHaveBeenCalledTimes(1);
+    expect(units.listPage).toHaveBeenCalledTimes(0);
+  });
+
+  it('con page devuelve una Page<UnitRef> (R27, R29)', async () => {
+    // R27 + R29 — el otro lado de la union discriminada. QC-39 no elige metodo: manda lo que
+    // trae la URL y la forma de la salida sale de la forma de la entrada.
+    const { units, listUnits } = montar();
+
+    const resultado = await listUnits({ page: 2 }, ADMIN);
+
+    expect(isUnitPage(resultado)).toBe(true);
+    expect(resultado).toEqual(PAGINA);
+    expect(units.listPage).toHaveBeenCalledTimes(1);
+    expect(units.listAll).toHaveBeenCalledTimes(0);
+    expect(consultaDeLaPagina(units.listPage.mock.calls).page).toBe(2);
+  });
+
+  it('con pageSize a solas tambien devuelve una pagina (R29)', async () => {
+    // R29 — pedir un tamano de pagina es pedir paginacion, aunque no se diga que pagina. El
+    // ACOTADO a 25 lo aplica el adaptador con `lib/shared/pagination`, no este caso de uso:
+    // aqui se comprueba que el `pageSize` pedido llega entero y sin rechazarse.
+    const { units, listUnits } = montar();
+
+    const resultado = await listUnits({ pageSize: 100 }, ADMIN);
+
+    expect(isUnitPage(resultado)).toBe(true);
+    expect(consultaDeLaPagina(units.listPage.mock.calls).pageSize).toBe(100);
+  });
+
+  it('el orden, el filtro y la busqueda se aplican TAMBIEN en el modo catalogo (R27)', async () => {
+    // R27 — unidades acepta orden, filtro y busqueda «como los demas». Que no pagine no
+    // significa que no consulte.
+    const { units, listUnits } = montar();
+
+    await listUnits({ sort: { columnId: 'name', direction: 'desc' }, search: 'litro' }, ADMIN);
+
+    const query = consultaDelCatalogo(units.listAll.mock.calls);
+    expect(query.sort).toEqual({ columnId: 'name', direction: 'desc' });
+    expect(query.search).toBe('litro');
+  });
+});
+
+describe('list-units: autorizacion antes que todo (R33, R34)', () => {
+  // R34 exige probarlo DOS veces: con una consulta valida y con una que traiga campos no
+  // declarados. Se afirma CONTANDO invocaciones de los dos metodos del doble, no solo mirando
+  // que lanza.
+  const CONSULTAS: ReadonlyArray<{ readonly nombre: string; readonly entrada: unknown }> = [
+    { nombre: 'consulta valida', entrada: { page: 1, pageSize: 10 } },
+    {
+      nombre: 'consulta con campos no declarados',
+      entrada: {
+        page: 1,
+        sort: { columnId: 'deletedAt', direction: 'asc' },
+        filters: { nombre: { kind: 'text', value: 'x' } },
+      },
+    },
+  ];
+
+  for (const caso of CONSULTAS) {
+    it(`rechaza al Operador con ${caso.nombre} sin tocar el repositorio`, async () => {
+      const { units, log, listUnits } = montar();
+
+      await expect(listUnits(caso.entrada, OPERADOR)).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(units.listAll).toHaveBeenCalledTimes(0);
+      expect(units.listPage).toHaveBeenCalledTimes(0);
+      expect(log.ignoredFields).toHaveBeenCalledTimes(0);
+    });
+
+    it(`rechaza al actor ausente con ${caso.nombre} sin tocar el repositorio`, async () => {
+      const { units, log, listUnits } = montar();
+
+      await expect(listUnits(caso.entrada, null)).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(units.listAll).toHaveBeenCalledTimes(0);
+      expect(units.listPage).toHaveBeenCalledTimes(0);
+      expect(log.ignoredFields).toHaveBeenCalledTimes(0);
+    });
+  }
+});
+
+describe('list-units: el campo no declarado se omite, no rompe y se anota (R5, R6, R7, R8, R11)', () => {
+  it('ordenar por deletedAt: no falla, aplica el orden por defecto Y el log recibe el campo', async () => {
+    // R5 + R7 + R11 + R6, LAS TRES COSAS A LA VEZ (`design.md > 12`). Y aqui `deletedAt` no es
+    // solo un campo no declarado: `units` NI SIQUIERA TIENE esa columna, asi que dejarlo pasar
+    // reventaria la consulta en la base.
+    const { units, log, listUnits } = montar();
+
+    const resultado = await listUnits(
+      { sort: { columnId: 'deletedAt', direction: 'desc' } },
+      ADMIN,
+    );
+
+    // (a) la consulta NO falla
+    expect(resultado).toEqual(CATALOGO);
+    // (b) el orden aplicado es el de por defecto: `sort: null`
+    expect(consultaDelCatalogo(units.listAll.mock.calls).sort).toBeNull();
+    // (c) el log recibio el campo, con el nombre del listado
+    expect(log.ignoredFields).toHaveBeenCalledWith('units', ['deletedAt']);
+  });
+
+  it('cualquier filtro se omite y se anota: unidades no declara ninguno (R5, R8)', async () => {
+    // R5 — `UNIT_QUERYABLE.filterable` esta vacio a proposito. Un filtro que llegue no puede
+    // romper la consulta, pero tampoco puede aplicarse en silencio.
+    const { units, log, listUnits } = montar();
+
+    await listUnits({ filters: { symbol: { kind: 'text', value: 'g' } } }, ADMIN);
+
+    expect(consultaDelCatalogo(units.listAll.mock.calls).filters).toEqual({});
+    expect(log.ignoredFields).toHaveBeenCalledWith('units', ['symbol']);
+  });
+
+  it('el log recibe NOMBRES de campo y nunca el valor buscado ni el del filtro (R6, PII)', async () => {
+    const TERMINO = 'unidad del cliente Perez';
+    const VALOR_DE_FILTRO = 'cliente-secreto';
+    const { log, listUnits } = montar();
+
+    await listUnits(
+      {
+        search: TERMINO,
+        sort: { columnId: 'inventado', direction: 'asc' },
+        filters: { tambienInventado: { kind: 'select', values: [VALOR_DE_FILTRO] } },
+      },
+      ADMIN,
+    );
+
+    expect(log.ignoredFields).toHaveBeenCalledTimes(1);
+    const argumentos = JSON.stringify(vi.mocked(log.ignoredFields).mock.calls[0]);
+    expect(argumentos).toContain('inventado');
+    expect(argumentos).toContain('tambienInventado');
+    expect(argumentos).not.toContain(TERMINO);
+    expect(argumentos).not.toContain(VALOR_DE_FILTRO);
+  });
+
+  it('una consulta limpia tambien llama al log, pero con la lista vacia (R6)', async () => {
+    const { log, listUnits } = montar();
+
+    await listUnits(undefined, ADMIN);
+
+    expect(log.ignoredFields).toHaveBeenCalledWith('units', []);
+  });
+});
+
+describe('list-units: validacion de la forma (R20, R30)', () => {
+  it('una busqueda de solo espacios es ausencia de busqueda (R20)', async () => {
+    const { units, listUnits } = montar();
+
+    await listUnits({ search: '   ' }, ADMIN);
+
+    expect(consultaDelCatalogo(units.listAll.mock.calls).search).toBe('');
+  });
+
+  it('la entrada que no cumple la FORMA se rechaza antes de tocar el repositorio (R30)', async () => {
+    // R30 — una pagina 0 no es un campo no declarado: la forma esta mal y se rechaza.
+    const { units, log, listUnits } = montar();
+
+    await expect(listUnits({ page: 0 }, ADMIN)).rejects.toBeInstanceOf(ValidationError);
+    expect(units.listAll).toHaveBeenCalledTimes(0);
+    expect(units.listPage).toHaveBeenCalledTimes(0);
+    expect(log.ignoredFields).toHaveBeenCalledTimes(0);
+  });
+});

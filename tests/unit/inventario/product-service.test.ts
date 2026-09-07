@@ -10,6 +10,7 @@ import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
 import type { NewProduct, ProductView } from '@/lib/modules/inventario/domain/product-view';
+import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
 const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
@@ -234,21 +235,33 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
   });
 });
 
+/** Doble del puerto del log de campos omitidos (QC-57 T7). */
+function logDoble(): ListQueryLog {
+  return { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };
+}
+
 describe('listar tambien exige Administrador y delega la paginacion en el puerto', () => {
-  it('lista pasando la query tal cual al puerto y devuelve la pagina que este responde', async () => {
-    // R23, R24, R25, R26, R35, R36
+  it('lista pasando la consulta YA SANEADA al puerto y devuelve la pagina que este responde', async () => {
+    // R23, R24, R25, R26, R35, R36 de QC-20 + QC-57 R24: el caso de uso ya no pasa «la query
+    // tal cual», pasa la consulta del contrato generico saneada contra `PRODUCT_QUERYABLE`
+    // -con sus defectos ya aplicados-, que es lo que R13 exige que llegue a la base.
     const products = montarRepositorio();
-    const listProducts = createListProducts({ products });
+    const listProducts = createListProducts({ products, log: logDoble() });
 
     const pagina = await listProducts({ page: 2 }, ADMIN);
 
     expect(pagina.items).toEqual([VISTA_PRODUCTO]);
-    expect(products.listAlive).toHaveBeenCalledWith({ page: 2 });
+    expect(products.listAlive).toHaveBeenCalledWith({
+      page: 2,
+      sort: null,
+      filters: {},
+      search: '',
+    });
   });
 
   it('rechaza una pagina no entera o menor que 1 sin llamar al puerto', async () => {
     const products = montarRepositorio();
-    const listProducts = createListProducts({ products });
+    const listProducts = createListProducts({ products, log: logDoble() });
 
     await expect(listProducts({ page: 0 }, ADMIN)).rejects.toBeInstanceOf(ValidationError);
     expect(products.listAlive).not.toHaveBeenCalled();

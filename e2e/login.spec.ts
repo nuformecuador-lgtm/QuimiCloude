@@ -34,6 +34,9 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
+// La UNICA definicion de «mismo nombre de empresa» (QC-47 R3), del contrato publico
+// del modulo: `companies.name_normalized` se calcula con esta y con ninguna otra.
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 // El nombre de la cookie lo declara el codec del valor de sesion (QC-9 T4), no el adaptador de
 // transporte: un solo dueño por simbolo.
@@ -48,6 +51,12 @@ const LOGIN_PATH = '/login';
 /** Prefijos con los que este spec marca TODO lo que crea. Nada fuera de ellos se toca. */
 const USERNAME_PREFIX = 'qc7_e2e_';
 const ROLE_NAME_PREFIX = 'qc7_e2e_rol_';
+/**
+ * Prefijo de la empresa efimera de este worker. QC-47 R9 hizo `users.company_id` obligatoria,
+ * asi que el fixture necesita su propia empresa. NUNCA la de instalacion: el indice
+ * `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa del seed.
+ */
+const COMPANY_NAME_PREFIX = 'qc7_e2e_empresa_';
 
 /** Identificador unico de este proceso de worker. */
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -61,6 +70,7 @@ const RUN_ID = randomUUID().replace(/-/g, '');
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 let roleId: string | null = null;
+let companyId: string | null = null;
 
 /**
  * Crea un usuario propio del test que lo pide. `label` distingue los usuarios dentro del
@@ -68,6 +78,7 @@ let roleId: string | null = null;
  */
 async function createTestUser(label: string): Promise<{ username: string; password: string }> {
   if (!roleId) throw new Error('el rol del fixture no existe: fallo el beforeAll');
+  if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
   const suffix = `${RUN_ID}${label}`;
   const username = `${USERNAME_PREFIX}${suffix}`;
@@ -88,6 +99,7 @@ async function createTestUser(label: string): Promise<{ username: string; passwo
       username,
       passwordHash: await createPasswordHash(password),
       roleId,
+      companyId,
     },
     select: { id: true },
   });
@@ -122,15 +134,29 @@ test.beforeAll(async () => {
   });
   const orphanRoleIds = orphanRoles.map((role) => role.id);
 
+  // Lo mismo, y por la misma razon, con la empresa efimera: se crea unos segundos ANTES que su
+  // usuario, y `users.company_id` tambien es `onDelete: Restrict`. Se decide primero CUALES se
+  // van a borrar y se arrastran sus usuarios aunque todavia sean recientes.
+  const orphanCompanies = await prisma.company.findMany({
+    where: { name: { startsWith: COMPANY_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
+    select: { id: true },
+  });
+  const orphanCompanyIds = orphanCompanies.map((company) => company.id);
+
   // El prefijo propio sigue siendo condicion en AMBAS ramas del `OR`: ampliar el barrido a los
   // usuarios de los roles condenados no puede convertirse en una puerta para tocar filas ajenas.
   await prisma.user.deleteMany({
     where: {
       username: { startsWith: USERNAME_PREFIX },
-      OR: [{ createdAt: { lt: orphanCutoff } }, { roleId: { in: orphanRoleIds } }],
+      OR: [
+        { createdAt: { lt: orphanCutoff } },
+        { roleId: { in: orphanRoleIds } },
+        { companyId: { in: orphanCompanyIds } },
+      ],
     },
   });
   await prisma.role.deleteMany({ where: { id: { in: orphanRoleIds } } });
+  await prisma.company.deleteMany({ where: { id: { in: orphanCompanyIds } } });
 
   // El rol si se comparte entre los dos tests: ningun intento de login lo muta.
   const role = await prisma.role.create({
@@ -141,6 +167,15 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   roleId = role.id;
+
+  // La empresa efimera de este worker. `nameNormalized` sale de `normalizeCompanyName`, no de
+  // una copia escrita a mano: es la UNICA definicion (QC-47 R3).
+  const companyName = `${COMPANY_NAME_PREFIX}${RUN_ID}`;
+  const company = await prisma.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  });
+  companyId = company.id;
 });
 
 test.afterAll(async () => {
@@ -157,6 +192,12 @@ test.afterAll(async () => {
   }
   try {
     await prisma.role.deleteMany({ where: { name: `${ROLE_NAME_PREFIX}${RUN_ID}` } });
+  } catch {
+    // se borra la empresa igualmente
+  }
+  // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict` (QC-47 R11).
+  try {
+    await prisma.company.deleteMany({ where: { name: `${COMPANY_NAME_PREFIX}${RUN_ID}` } });
   } catch {
     // se cierra la conexion igualmente
   }

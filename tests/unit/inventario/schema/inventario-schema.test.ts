@@ -317,10 +317,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .filter((candidate) => !candidate.isList && candidate.type !== 'Presentation')
       .map((candidate) => candidate.name)
       .sort()
+    // `nameNormalized` (QC-57 R19, R23) NO entra en `PRODUCT_BUSINESS_FIELDS` a proposito: no
+    // es un dato de negocio de R3 sino la forma canonica de `name`, derivada y escrita por el
+    // adaptador en toda escritura. Se declara aparte y en positivo para que el censo siga
+    // siendo una igualdad exacta —una columna de mas seguiria poniendo esto rojo—.
     expect(scalarNames).toEqual(
       [
         'id',
         ...PRODUCT_BUSINESS_FIELDS.map(([name]) => name),
+        'nameNormalized',
         'createdAt',
         'updatedAt',
         'deletedAt',

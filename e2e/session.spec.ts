@@ -40,6 +40,9 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
+// La UNICA definicion de «mismo nombre de empresa» (QC-47 R3), del contrato publico
+// del modulo: `companies.name_normalized` se calcula con esta y con ninguna otra.
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
@@ -54,6 +57,13 @@ const LOGIN_PATH = '/login';
 
 /** Prefijo con el que este spec marca TODO usuario que crea. Nada fuera de el se toca. */
 const USERNAME_PREFIX = 'qc9_e2e_';
+
+/**
+ * Prefijo de la empresa efimera de este worker. QC-47 R9 hizo `users.company_id` obligatoria,
+ * asi que el fixture necesita su propia empresa. NUNCA la de instalacion: el indice
+ * `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa del seed.
+ */
+const COMPANY_NAME_PREFIX = 'qc9_e2e_empresa_';
 
 /** Identificador unico de este proceso de worker. */
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -70,6 +80,7 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 const LAST_NAMES = 'Sesion';
 
 let roleId: string | null = null;
+let companyId: string | null = null;
 
 /**
  * Usuario propio de este worker. Se crea uno solo porque el recorrido tiene un unico test y
@@ -82,6 +93,7 @@ async function createTestUser(): Promise<{
   displayName: string;
 }> {
   if (!roleId) throw new Error('el rol del fixture no existe: fallo el beforeAll');
+  if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
   const username = `${USERNAME_PREFIX}${RUN_ID}`;
   /** Contrasena conocida del usuario de prueba. Solo vive aqui; nunca se escribe en consola. */
@@ -105,6 +117,7 @@ async function createTestUser(): Promise<{
       username,
       passwordHash: await createPasswordHash(password),
       roleId,
+      companyId,
     },
     select: { id: true },
   });
@@ -146,6 +159,19 @@ test.beforeAll(async () => {
   await prisma.user.deleteMany({
     where: { username: { startsWith: USERNAME_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
+  // Las empresas huerfanas, DESPUES de sus usuarios: `users.company_id` es `onDelete: Restrict`.
+  await prisma.company.deleteMany({
+    where: { name: { startsWith: COMPANY_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+
+  // La empresa efimera de este worker. `nameNormalized` sale de `normalizeCompanyName`, no de
+  // una copia escrita a mano: es la UNICA definicion (QC-47 R3).
+  const companyName = `${COMPANY_NAME_PREFIX}${RUN_ID}`;
+  const company = await prisma.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  });
+  companyId = company.id;
 });
 
 test.afterAll(async () => {
@@ -158,6 +184,8 @@ test.afterAll(async () => {
     await prisma.user.deleteMany({
       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
     });
+    // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict` (R11).
+    await prisma.company.deleteMany({ where: { name: `${COMPANY_NAME_PREFIX}${RUN_ID}` } });
   } finally {
     await prisma.$disconnect();
   }

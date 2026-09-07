@@ -265,13 +265,18 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     //
     // Se afirma la lista EXACTA, no que "algo" haya: si manana alguien anade un segundo
     // puerto sin que este test lo sepa, la lista real diverge del `toEqual` y cae.
-    expect(sourcesIn(join(unidadesDir, 'ports')).map(etiqueta), 'ports/ ya no tiene EXACTAMENTE un fuente').toEqual([
+    //
+    // ACTUALIZADO 2026-09-04 (QC-57, T7): se suma `list-query-log.ts`, el puerto del log del
+    // campo omitido (R6), declarado en los CINCO modulos con listado porque el dominio no
+    // puede importar `lib/shared/**`. Sigue siendo la lista EXACTA: un tercer puerto cae aqui.
+    expect(sourcesIn(join(unidadesDir, 'ports')).map(etiqueta), 'ports/ ya no tiene EXACTAMENTE dos fuentes').toEqual([
+      'lib/modules/unidades/ports/list-query-log.ts',
       'lib/modules/unidades/ports/unit-repository.ts',
     ])
     expect(
       readdirSync(join(unidadesDir, 'ports')).sort(),
-      'ports/ deberia tener exactamente .gitkeep y unit-repository.ts',
-    ).toEqual(['.gitkeep', 'unit-repository.ts'])
+      'ports/ deberia tener exactamente .gitkeep, list-query-log.ts y unit-repository.ts',
+    ).toEqual(['.gitkeep', 'list-query-log.ts', 'unit-repository.ts'])
 
     // ACTUALIZADO 2026-09-03 (QC-25, R50): `adapters/driven/` YA NO esta vacia. El
     // consumidor que esta ronda anticipaba para QC-38 llego antes, con QC-25: `recetas`
@@ -663,9 +668,16 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(composicion, 'la composicion cablea la LECTURA de unidades (UnitRepository, R40)').toMatch(
       /listUnits/,
     )
+    // ACTUALIZADO 2026-09-04 (QC-57, T7/T12): la lista de puertos permitidos suma
+    // `ports/list-query-log`, el puerto del log del campo omitido (R6). `lib/composition` es
+    // el UNICO sitio que puede atarlo a su implementacion -`lib/shared/observability/
+    // list-query-log.ts`, una sola para los cinco modulos-, asi que nombrarlo aqui no es una
+    // fuga: es exactamente lo que hace este archivo. Sigue prohibido cualquier OTRO puerto o
+    // adaptador de unidades, y en particular el DRIVING (R12). La lista sigue siendo EXACTA:
+    // un tercer puerto vuelve a caer aqui.
     expect(composicion, 'la composicion nombra un puerto o adaptador de unidades fuera de los de lectura')
       .not.toMatch(
-        /modules\/unidades\/(adapters(?!\/driven\/persistence\/(unit-catalog-prisma|unit-prisma))|ports(?!\/unit-repository))/,
+        /modules\/unidades\/(adapters(?!\/driven\/persistence\/(unit-catalog-prisma|unit-prisma))|ports(?!\/(unit-repository|list-query-log)))/,
       )
     expect(composicion, 'la composicion importa el adaptador driving de unidades').not.toMatch(
       /modules\/unidades\/adapters\/driving/,

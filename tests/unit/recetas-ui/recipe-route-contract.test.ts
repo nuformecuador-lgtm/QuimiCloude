@@ -543,12 +543,25 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260904135210_order_cancellation/down.sql',
     ];
 
+    // RETENSADO 2026-09-04 (QC-47), con el mismo criterio que el retensado de QC-34 de arriba
+    // y por la misma razon: QC-34 esta MERGEADA en `dev`, asi que el rango `origin/dev...HEAD`
+    // ya no mide la rama de QC-34 sino la rama que este corriendo el gate. La premisa que este
+    // caso protege -«por la puerta de atras no se toca `db/` ni `recetas`»- se mantiene solo si
+    // cada migracion legitima posterior se NOMBRA una a una. La de QC-47 crea `companies` y la
+    // columna `users.company_id`: nada de recetas, nada de unidades. Cualquier OTRO archivo de
+    // `db/` sigue poniendo el caso rojo.
+    const MIGRACION_QC47 = [
+      'db/migrations/20260904180600_companies_and_user_company/migration.sql',
+      'db/migrations/20260904180600_companies_and_user_company/down.sql',
+    ];
+
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
       .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta));
     const tocaDb = diff
       .filter((ruta) => ruta.startsWith('db/'))
-      .filter((ruta) => !MIGRACION_QC34.includes(ruta));
+      .filter((ruta) => !MIGRACION_QC34.includes(ruta))
+      .filter((ruta) => !MIGRACION_QC47.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',

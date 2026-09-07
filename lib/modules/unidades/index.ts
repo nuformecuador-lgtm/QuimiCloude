@@ -20,4 +20,25 @@ export { createListUnits, MAX_UNITS } from './domain/list-units';
 export type { ListUnitsDeps } from './domain/list-units';
 export { ADMIN_ROLE_NAME, requireAdmin } from './domain/actor';
 export type { Actor } from './domain/actor';
-export { UnidadesError, UnauthorizedError } from './domain/errors';
+export { UnidadesError, UnauthorizedError, ValidationError } from './domain/errors';
+
+// QC-57 (R27-R29): el listado acepta el contrato generico de consulta y su pagina es OPCIONAL.
+// `isUnitPage` es el discriminante en tiempo de ejecucion de `UnitListResult` -sin consulta se
+// devuelve el catalogo entero; con `page` o `pageSize`, una `Page<UnitRef>`-. Son SOLO tipos y
+// una funcion pura: el barrel no gana nada de servidor por publicarlos, y es lo que QC-39
+// necesita para pintar la pantalla sin conocer el adaptador.
+export { isUnitPage } from './domain/list-units';
+export type { ListUnits, UnitListResult } from './domain/list-units';
+export type { Page } from './domain/page';
+export {
+  type ListFilterKind,
+  type ListFilterValue,
+  type ListQuery,
+  type ListQueryable,
+  type ListSort,
+  type SanitizedListQuery,
+  type SortDirection,
+  createListQuerySchema,
+  sanitizeListQuery,
+} from './domain/list-query';
+export { UNIT_QUERYABLE } from './domain/unit-queryable';

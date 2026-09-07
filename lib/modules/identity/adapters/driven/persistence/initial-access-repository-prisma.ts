@@ -7,9 +7,9 @@ import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
 import type { InitialAccessRepository } from '../../../ports/initial-access-repository';
 
 /**
- * Adaptador Prisma del puerto `InitialAccessRepository` (`design.md > 5.3`, T11). Solo
- * toca `role` y `user`, los dos modelos de `identity` que le tocan al seed: nunca
- * `documentType` (R17).
+ * Adaptador Prisma del puerto `InitialAccessRepository` (`design.md > 5.3`, T11). Toca
+ * `role`, `user` y `company` — los tres modelos de `identity` que le tocan al seed desde
+ * QC-47: nunca `documentType` (R17).
  *
  * Exporta una FABRICA y no un objeto ya construido a proposito: el test de integracion
  * necesita construirla sobre un `Prisma.TransactionClient` para poder correr el seed dos
@@ -35,6 +35,38 @@ export function createInitialAccessRepository(
       });
     },
 
+    async findCompanyIdByNormalizedName(normalized) {
+      // Empresa VIVA: `companies_name_unique` es un unico PARCIAL sobre
+      // `deleted_at IS NULL` (`QC-47 design.md > 2.1`), asi que este `where` es
+      // exactamente el conjunto sobre el que la unicidad se garantiza.
+      const company = await db.company.findFirst({
+        where: { nameNormalized: normalized, deletedAt: null },
+        select: { id: true },
+      });
+      return company?.id ?? null;
+    },
+
+    async createCompany(input) {
+      try {
+        const created = await db.company.create({
+          data: { name: input.name, nameNormalized: input.nameNormalized },
+        });
+        return created.id;
+      } catch (error) {
+        // Misma carrera y MISMO criterio que `createRole`, aqui sobre
+        // `companies_name_unique` (23505 -> P2002): se relee la empresa viva con ese
+        // nombre normalizado y se devuelve su id, SIN sobrescribir su `name` (R15,
+        // QC-47 R22). Nunca se crea una segunda empresa.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          const existing = await db.company.findFirstOrThrow({
+            where: { nameNormalized: input.nameNormalized, deletedAt: null },
+          });
+          return existing.id;
+        }
+        throw error;
+      }
+    },
+
     async createRole(role) {
       try {
         const created = await db.role.create({ data: { name: role.name, description: role.description } });
@@ -53,9 +85,14 @@ export function createInitialAccessRepository(
 
     async createInitialAdmin(input) {
       try {
+        // QC-47 R20: `roleId` y `companyId` van como columnas del propio `user.create`,
+        // en UNA sola sentencia dentro del mismo `tx`. No hay creacion anidada ni un
+        // segundo `update` posterior: no existe ningun instante en el que la fila este
+        // escrita sin su empresa o sin su rol.
         const created = await db.user.create({
           data: {
             roleId: input.roleId,
+            companyId: input.companyId,
             username: input.username,
             email: input.email,
             passwordHash: input.passwordHash,

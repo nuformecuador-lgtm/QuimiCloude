@@ -1,5 +1,6 @@
 import type { CatalogLineFields, CatalogLineView, NewCatalogLine } from '../domain/catalog-line-view';
-import type { Page, PageQuery } from '../domain/page';
+import type { ListQuery } from '../domain/list-query';
+import type { Page } from '../domain/page';
 
 /**
  * Puerto de acceso a datos del catalogo del proveedor (`design.md > 6`, `> 7`).
@@ -76,9 +77,16 @@ export interface SupplierCatalogRepository {
    * Listado paginado de las lineas VIVAS de un proveedor VIVO (R22). Las dos condiciones
    * viven en el `where` del adaptador, no en un `if` del dominio, y por eso ningun caso de
    * uso puede olvidarlas.
+   *
+   * QC-57 (R13): recibe el CONTRATO GENERICO de consulta, YA SANEADO contra
+   * `SUPPLIER_CATALOG_LINE_QUERYABLE`. El orden, los filtros y la busqueda se aplican sobre
+   * el conjunto completo -ya acotado por las dos condiciones de vida- y ANTES de paginar; el
+   * `total` describe ese conjunto ya filtrado (R14). Los rangos numericos de `cost` y
+   * `minPurchase` llegan como `number` y es el adaptador quien los convierte a
+   * `Prisma.Decimal`: el dominio no compara importes en coma flotante.
    */
   listBySupplierAlive(
     supplierId: string,
-    query: PageQuery,
+    query: ListQuery,
   ): Promise<Page<CatalogLineView> | 'supplier_not_found'>;
 }

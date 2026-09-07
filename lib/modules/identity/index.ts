@@ -15,6 +15,10 @@ export {
   type CredentialRule,
 } from './domain/credential-policy';
 export { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from './domain/roles';
+// QC-47 T3 — La empresa: la UNICA definicion de «mismo nombre de empresa» (R3) y el UNICO
+// literal del nombre de la empresa inicial (R20). Dominio puro: no arrastran servidor ni Prisma.
+export { normalizeCompanyName } from './domain/company-name';
+export { INITIAL_COMPANY_NAME } from './domain/companies';
 export { seedInitialAccess, type SeedOutcome } from './domain/seed-initial-access';
 export { createResolveSessionUser } from './domain/resolve-session-user';
 export { buildDisplayName } from './domain/display-name';

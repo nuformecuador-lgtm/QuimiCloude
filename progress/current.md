@@ -13,10 +13,10 @@
 |---|---|---|---|---|---|---|
 | QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | in_progress | feature/QC-57-orden-y-filtro-en-listados | implementer (spec aprobado por el humano el 2026-09-04) |
+| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | done | feature/QC-57-orden-y-filtro-en-listados | **cerrada**: PR #38 mergeado en `origin/dev` (`738d9a9`). Falta F2.5–F2.6 (desmontar worktree y resumir en `history.md`) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | done | feature/QC-44-pantalla-de-proveedores | **cerrada** (PR #35, merge `f966a7b`); la fila decía `in_progress` por descuido. Falta su resumen en `history.md` (F2.6) |
+| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | done | feature/QC-47-modelo-empresa-y-membresias | **cerrada**: PR #37 mergeado en `origin/dev` (`45bdf18`). Falta F2.5–F2.6 |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
-| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | in_progress | feature/QC-47-modelo-empresa-y-membresias | implementer (spec aprobado por el humano el 2026-09-04). Base propia **`QuimiCloude_QC47`** creada y el `.env` del worktree apuntando ahí |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -1683,40 +1683,15 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
-### La base compartida `QuimiCloude` va POR DELANTE de `dev`, y por eso el gate de `dev` está rojo (2026-09-06)
-
-`./init.sh` completo sobre `dev` **limpio** da **13 archivos de test en rojo fuera del baseline**,
-y **no son flakes de saturación**: diez son de integración y fallan con
-`Null constraint violation on the fields: (name_normalized)` al crear un producto. El archivo
-falla igual **corrido solo**, que es la comprobación barata de `docs/verification.md`.
-
-La causa está verificada contra la propia base, no supuesta. `_prisma_migrations` tiene aplicada
-**`20260904160000_list_query_indexes`** (2026-09-04), que es **la migración de QC-57** y añade
-`products.name_normalized` **NOT NULL**. Esa migración **no está en `dev`**: vive en el worktree de
-QC-57, que está `in_progress`. Y los dos `.env` —el de `dev` y el de QC-57— apuntan a la **misma**
-base `postgresql://localhost:5432/QuimiCloude`. O sea: QC-57 migró la base que comparte con todos,
-el cliente Prisma de `dev` no conoce la columna, y cualquier `create` de producto la deja nula.
-
-`prisma migrate status` dice *Database schema is up to date!* y **eso engaña**: compara nombres de
-migración contra `prisma/migrations`, no el esquema real contra `db/schema.prisma`.
-
-**Esto no es de QC-64 y QC-64 no lo arregla, pero le llega igual**: su rama es `frontend` y aun así
-su gate correrá esos mismos tests de integración contra la misma base. **Antes de F2.4 hay que
-decidirlo**, y son dos caminos:
-
-1. **Una base por worktree**, como ya hizo QC-47 con `QuimiCloude_QC47`. Es lo que el arnés hace ya
-   en un sitio y no en los otros.
-2. **Revertir la migración de QC-57 en la base compartida** (tiene su `down.sql`) hasta que su PR
-   entre en `dev`.
-
-Los otros tres rojos —`tests/unit/login-form.test.tsx`,
-`tests/ui/login-form-uncontrolled-warning.test.tsx` y `tests/unit/sidebar-mobile.test.tsx`— **sí
-son el flake de saturación de QC-58**, y se comprobó con la comprobación barata de
-`docs/verification.md` en vez de suponerlo: corridos **los tres solos**, `36/36 en 27 s`. Son tres
-archivos más de la misma clase que ya tiene cinco entradas en el baseline; **no se añadieron**,
-porque el baseline crece por decisión humana y QC-58 los retira a todos cuando arregle la causa.
-
 ### Sexta vez: la base compartida esta por delante de `dev`, ahora por QC-57 (2026-09-06)
+
+> **CERRADA el 2026-09-06.** **QC-57 se mergó en `origin/dev` (PR #38, `738d9a9`)**, y con él su
+> migración, así que la base compartida ya **no** va por delante: iba por delante el `dev` **local**,
+> que estaba **43 commits detrás** del remoto. El síntoma se curó trayendo `origin/dev`, no tocando
+> la base. Lo que **no** caduca es la lección de la última viñeta: seis incidentes por compartir
+> base siguen sin ficha, y el diagnóstico de esta sección —`migrate diff`, no `migrate status`— es
+> el que sirve la próxima vez.
+
 
 El gate completo sobre `dev` **no puede terminar en verde en esta maquina**, y la causa es una
 sola. Medido, no deducido, con
@@ -1755,7 +1730,6 @@ cuando se toque.
 - **Sexta vez.** La nota de QC-62 decia «quinta». Una base por worktree lleva seis incidentes sin
   ser ficha; el patron ya no es anecdota.
 
-
 ### `pg_trgm` entra como dependencia de infraestructura que NINGUNA guardia vigila (2026-09-04, QC-57)
 
 `docs/dependencias.md` y su guardia comparan **entradas de `package.json`**. Una extensión de
@@ -1769,6 +1743,48 @@ Postgres no aparece en ninguna de las dos listas, así que **no lleva fila y el 
 - **El riesgo, escrito**: si la base se mudara a un Postgres sin `pg_trgm`, la migración falla y
   **nada en el repo lo avisaría antes**. Queda como candidata a ficha propia si algún día hay más
   de una extensión.
+
+### `products.name_normalized` es NOT NULL y YA ESTA APLICADA en la base compartida (2026-09-04, QC-57)
+
+**Aviso operativo para toda sesion que cree productos.** La migracion
+`20260904160000_list_query_indexes` de QC-57 esta **aplicada en la base compartida `QuimiCloude`**
+y anade `products.name_normalized` **`NOT NULL` y SIN default**. Es la otra cara de lo que QC-62
+anoto justo debajo, y por eso van juntas.
+
+**Sintoma**: cualquier rama cuyo `db/schema.prisma` no declare `nameNormalized` —o cuyo cliente
+Prisma este generado de antes— se lleva un **`23502` / `Null constraint violation on the fields:
+(name_normalized)`** al crear un producto, y `prisma.product.create` rechaza el campo con
+`Unknown argument nameNormalized`.
+
+**Riesgo vivo hoy**: hay **cuatro worktrees** y **QC-47 esta `in_progress` tocando
+`schema.prisma`**.
+
+**Que hacer si te pasa** (por orden de coste): `git merge origin/dev` para traer el modelo, y
+**`pnpm exec prisma generate`** despues — el cliente resuelve el `.env` y el esquema **en tiempo
+de generacion**, asi que regenerar es obligatorio y no opcional.
+
+**Lo que NO se debe hacer, y esta descartado por escrito:** ponerle un `SET DEFAULT ''` a la
+columna. Cambiaria un `23502` **ruidoso** por **filas invisibles a la busqueda** —un producto con
+la clave normalizada vacia no lo encuentra nadie y nada avisa—, que es mucho peor que un fallo que
+se ve. Rechazado por el reviewer de QC-57 y compartido.
+
+### `pageQuerySchema` quedo HUERFANO en produccion (2026-09-04, QC-57)
+
+Tras QC-57 los siete listados validan con `createListQuerySchema()`, asi que `pageQuerySchema`
+**no tiene ni un uso en `lib/` ni en `app/`** (grep exhaustivo). Sigue, sin embargo:
+
+- **declarado en cuatro `domain/page.ts`** (`inventario`, `pedidos`, `proveedores`, `recetas`;
+  `unidades` nunca lo tuvo),
+- **exportado por esos cuatro barrels**, o sea publicado como contrato del modulo,
+- y **cubierto por 6 tests** que, en la practica, prueban **codigo muerto**.
+
+Su forma de `page`/`pageSize` esta replicada literalmente dentro de `createListQuerySchema()`, asi
+que **borrarlo no perderia ninguna garantia**.
+
+**Por que no se hizo en QC-57**: ninguna task lo pedia, y **retirar un simbolo publico del barrel
+de cuatro modulos no se hace de paso** — toca el contrato de cuatro modulos y sus tests. El
+aplazamiento lo acepta el reviewer **con la condicion de que quede escrito**, y esto es ese
+escrito. **Candidata a ficha propia.**
 
 ### Quinta vez: el drift de la base compartida bloquea la integracion (QC-62, 2026-09-04)
 

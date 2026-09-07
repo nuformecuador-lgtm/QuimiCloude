@@ -12,7 +12,16 @@ import type {
   CatalogLineView,
   NewCatalogLine,
 } from '../../../domain/catalog-line-view';
-import type { Page, PageQuery } from '../../../domain/page';
+import {
+  dateRangeCondition,
+  normalizedSearchCondition,
+  numberRangeCondition,
+  selectCondition,
+  textCondition,
+} from './list-query-sql';
+
+import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
+import type { Page } from '../../../domain/page';
 
 /**
  * Implementa `SupplierCatalogRepository` (`design.md > 6`, `> 7`) con Prisma.
@@ -362,31 +371,182 @@ export async function softDeleteAliveCatalogLine(
 }
 
 /**
- * `listBySupplierAlive` (R22, R23).
+ * Desempate ESTABLE por identificador (R10). El nombre de la linea solo es unico dentro del
+ * mismo proveedor y la misma presentacion, y `created_at` empata en cuanto dos lineas se dan
+ * de alta en el mismo milisegundo: sin este segundo criterio dos filas empatadas pueden
+ * intercambiarse -o perderse- entre paginas.
+ */
+const TIE_BREAKER = {
+  id: 'asc',
+} as const satisfies Prisma.SupplierCatalogLineOrderByWithRelationInput;
+
+/** Orden POR DEFECTO: exactamente el de hoy, `created_at ASC, id ASC` (R11). NO se cambia a
+ *  `name ASC` aunque la linea tenga nombre propio y sea ordenable: sin `sort`, la lista no se
+ *  mueve. Se construye en CADA llamada porque Prisma exige un array mutable en `orderBy`. */
+function defaultOrderBy(): Prisma.SupplierCatalogLineOrderByWithRelationInput[] {
+  return [{ createdAt: 'asc' }, TIE_BREAKER];
+}
+
+/**
+ * `sort` del contrato -> `orderBy` de Prisma (R10, R11).
  *
- * Dos filtros, no uno. Comprueba PRIMERO que el proveedor este vivo -si no lo esta, no
- * devuelve nada, ni siquiera una pagina vacia- y ademas exige `deleted_at IS NULL` en la
- * propia linea. El segundo es el que QC-52 anade: hasta esta ficha la linea no tenia baja
- * logica donde marcar nada.
+ * **`minPurchase` y `deliveryTime` son ANULABLES y sus nulos van SIEMPRE AL FINAL**, en `asc`
+ * Y en `desc`, **declarado explicito** (`nulls: 'last'`) y NO heredado del defecto de Postgres
+ * -que los pone al final en `ASC` pero al PRINCIPIO en `DESC`-. Es la decision cerrada del
+ * 2026-09-04, que manda sobre `design.md > 3.3`: quien ordena por compra minima quiere ver los
+ * extremos reales, y de mayor a menor arrancaria si no con todas las lineas que no la tienen
+ * registrada.
  *
- * Orden `created_at ASC, id ASC` (`design.md > 6.5`): estable y sin depender de nada de
- * otro modulo. NO se cambia a `name ASC` aunque ahora la linea tenga nombre propio; eso es
- * candidato para QC-44, que es quien tendra pantalla.
+ * `cost` NO es anulable, asi que no lleva `nulls`.
+ *
+ * El `default` NO puede darse por inalcanzable: `sanitizeListQuery` ya poda lo que no esta
+ * declarado, pero el adaptador no puede depender de que su llamante lo haya hecho. Es defensa
+ * en profundidad, y mantiene R5 cierto tambien aqui.
+ */
+export function catalogLineOrderBy(
+  sort: ListSort | null,
+): Prisma.SupplierCatalogLineOrderByWithRelationInput[] {
+  if (sort === null) return defaultOrderBy();
+  const dir = sort.direction;
+
+  switch (sort.columnId) {
+    case 'name':
+      return [{ name: dir }, TIE_BREAKER];
+    case 'cost':
+      return [{ cost: dir }, TIE_BREAKER];
+    case 'minPurchase':
+      return [{ minPurchase: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
+    case 'deliveryTime':
+      return [{ deliveryTime: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
+    case 'createdAt':
+      return [{ createdAt: dir }, TIE_BREAKER];
+    default:
+      return defaultOrderBy();
+  }
+}
+
+/**
+ * Rango numerico del contrato -> rango en `Prisma.Decimal` (`design.md > 5`).
+ *
+ * `cost` y `min_purchase` son `DECIMAL(14,4)` y el `numberRange` de QC-55 emite `number`. La
+ * conversion vive AQUI, en el adaptador, y no en el dominio: `docs/architecture.md >
+ * Anti-patrones` prohibe comparar importes en coma flotante binaria, y el dominio ademas no
+ * puede importar `@prisma/client`. Dejar que Prisma comparase el `number` en crudo es
+ * exactamente lo que ese anti-patron nombra.
+ */
+function toDecimalRange(
+  condition: { gte?: number; lte?: number },
+): { gte?: Prisma.Decimal; lte?: Prisma.Decimal } {
+  return {
+    ...(condition.gte === undefined ? {} : { gte: new Prisma.Decimal(condition.gte) }),
+    ...(condition.lte === undefined ? {} : { lte: new Prisma.Decimal(condition.lte) }),
+  };
+}
+
+/**
+ * Un filtro del contrato -> la condicion de la columna que le corresponde. Devuelve `null` -y
+ * el filtro no aparece en el `where`- cuando el campo no es filtrable aqui o cuando el valor no
+ * acota nada (rango con los dos extremos nulos, `select` con lista VACIA: no haber elegido nada
+ * NO es «ningun resultado», `design.md > 3.3`).
+ *
+ * `deliveryTime` es `Int` y se compara como numero; `cost` y `minPurchase` son `Decimal` y
+ * pasan por `toDecimalRange`. Las CUATRO formas del contrato estan contempladas (R12).
+ */
+function catalogLineFilterWhere(
+  field: string,
+  value: ListFilterValue,
+): Prisma.SupplierCatalogLineWhereInput | null {
+  switch (value.kind) {
+    case 'select': {
+      const condition = selectCondition(value.values);
+      if (condition === null) return null;
+      if (field === 'presentationId') return { presentationId: condition };
+      if (field === 'unitId') return { unitId: condition };
+      return null;
+    }
+    case 'numberRange': {
+      const condition = numberRangeCondition(value.min, value.max);
+      if (condition === null) return null;
+      if (field === 'deliveryTime') return { deliveryTime: condition };
+      if (field === 'cost') return { cost: toDecimalRange(condition) };
+      if (field === 'minPurchase') return { minPurchase: toDecimalRange(condition) };
+      return null;
+    }
+    case 'dateRange': {
+      const condition = dateRangeCondition(value.from, value.to);
+      if (condition === null) return null;
+      if (field === 'createdAt') return { createdAt: condition };
+      if (field === 'updatedAt') return { updatedAt: condition };
+      return null;
+    }
+    case 'text': {
+      const condition = textCondition(value.value);
+      if (condition === null) return null;
+      if (field === 'name') return { name: condition };
+      return null;
+    }
+  }
+}
+
+/**
+ * `where` UNICO del listado del catalogo: el mismo objeto para el `findMany` y para el `count`
+ * (R14). Cuatro capas, y ninguna sobra:
+ *
+ *   1. **`supplierId`**: el catalogo es siempre el de UN proveedor.
+ *   2. **`deletedAt: null` SIEMPRE** (R7, R22): la LINEA tiene que estar viva. La otra
+ *      condicion de vida -que el PROVEEDOR lo este- la comprueba `listBySupplierAlive` antes
+ *      de llegar aqui, y las dos juntas son las que ningun caso de uso puede olvidar porque no
+ *      viven en un `if` del dominio.
+ *   3. **La busqueda contra `name_normalized`** (R16, R18, R19), normalizando el termino con
+ *      `normalizeSupplierName` -la MISMA funcion que escribio la columna y que protege el
+ *      indice unico parcial-: buscar y comparar no discrepan.
+ *   4. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale
+ *      solo si los cumple todos.
+ */
+export function buildCatalogLineWhere(
+  supplierId: string,
+  query: ListQuery,
+): Prisma.SupplierCatalogLineWhereInput {
+  const search = normalizedSearchCondition(query.search, normalizeSupplierName);
+  const filters = Object.entries(query.filters)
+    .map(([field, value]) => catalogLineFilterWhere(field, value))
+    .filter((condition): condition is Prisma.SupplierCatalogLineWhereInput => condition !== null);
+
+  return {
+    supplierId,
+    deletedAt: null,
+    ...(search === null ? {} : { nameNormalized: search }),
+    ...(filters.length === 0 ? {} : { AND: filters }),
+  };
+}
+
+/**
+ * `listBySupplierAlive` con el CONTRATO GENERICO de consulta (QC-57 R10, R11, R13, R14, R15,
+ * R16, R18, R29; QC-52 R22, R23).
+ *
+ * DOS FILTROS DE VIDA, no uno, y los dos se conservan: comprueba PRIMERO que el proveedor este
+ * vivo -si no lo esta, no devuelve nada, ni siquiera una pagina vacia- y ademas exige
+ * `deleted_at IS NULL` en la propia linea, dentro del `where`. Ninguno es opcional y ninguno
+ * depende de lo que traiga la consulta.
+ *
+ * ORDEN, FILTRO Y BUSQUEDA VAN AL MOTOR, nunca a la pagina ya traida (R13), y el `total` sale
+ * de un `count` con el MISMO `where` que el `findMany` (R14). El `limit` es el ACOTADO de
+ * `toOffsetLimit`: pedir 100 se acota a 25, no se rechaza (R29).
  */
 export async function listCatalogLinesBySupplierAlive(
   supplierId: string,
-  query: PageQuery,
+  query: ListQuery,
 ): Promise<Page<CatalogLineView> | 'supplier_not_found'> {
   if (!(await isSupplierAlive(supplierId))) return 'supplier_not_found';
 
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where: Prisma.SupplierCatalogLineWhereInput = { supplierId, deletedAt: null };
+  const where = buildCatalogLineWhere(supplierId, query);
 
   const [rows, total] = await Promise.all([
     prisma.supplierCatalogLine.findMany({
       where,
       select: CATALOG_LINE_SELECT,
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: catalogLineOrderBy(query.sort),
       skip: offset,
       take: limit,
     }),

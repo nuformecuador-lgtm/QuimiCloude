@@ -59,14 +59,12 @@ export {
   createOrderSchema,
   updateOrderSchema,
   cancelOrderSchema,
-  listOrdersSchema,
   EDITABLE_STATUS_VALUES,
 } from './domain/order-input';
 export type {
   CreateOrderInput,
   UpdateOrderInput,
   CancelOrderInput,
-  ListOrdersInput,
   EditableOrderStatus,
 } from './domain/order-input';
 
@@ -76,13 +74,23 @@ export { assertTransition, isAllowedTransition } from './domain/order-transition
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio. */
-export type {
-  NewOrder,
-  OrderRow,
-  OrderView,
-  OrderSummary,
-  OrderFilters,
-} from './domain/order-view';
+export type { NewOrder, OrderRow, OrderView, OrderSummary } from './domain/order-view';
+
+/** QC-57 (R25, R31): el contrato generico de consulta de lista y la lista blanca de pedidos.
+ *  `listOrdersSchema`, `ListOrdersInput` y `OrderFilters` se fueron con el: el listado de
+ *  pedidos ya no tiene parametros propios de estado y prioridad. */
+export {
+  type ListFilterKind,
+  type ListFilterValue,
+  type ListQuery,
+  type ListQueryable,
+  type ListSort,
+  type SanitizedListQuery,
+  type SortDirection,
+  createListQuerySchema,
+  sanitizeListQuery,
+} from './domain/list-query';
+export { ORDER_QUERYABLE } from './domain/order-queryable';
 
 /** Las SEIS factories de caso de uso (R52) y sus tipos de dependencias, que es lo que
  *  `lib/composition` necesita para cablearlas. */

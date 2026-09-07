@@ -40,8 +40,10 @@ import {
   softDeleteAliveProduct,
   updateAliveProduct,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 
 // ---------------------------------------------------------------------------
@@ -170,6 +172,17 @@ async function createTestUser(db: Db): Promise<string> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   });
+  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
+  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
+  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
+  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
+  // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de una copia
+  // escrita a mano aqui.
+  const companyName = `Empresa ${marker}`;
+  const company = await db.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  });
   const user = await db.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -182,6 +195,7 @@ async function createTestUser(db: Db): Promise<string> {
       username: `ana.${marker}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId: role.id,
+      companyId: company.id,
     },
     select: { id: true },
   });
@@ -192,11 +206,14 @@ async function createTestUser(db: Db): Promise<string> {
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { roleId: true, documentTypeCode: true },
+    select: { roleId: true, documentTypeCode: true, companyId: true },
   });
   await db.user.delete({ where: { id: userId } });
   await db.role.delete({ where: { id: user.roleId } });
   await db.documentType.delete({ where: { code: user.documentTypeCode } });
+  // La empresa efimera va DESPUES del usuario: `users_company_id_fkey` es `ON DELETE RESTRICT`
+  // (QC-47 R11), asi que borrarla antes la rechazaria la base con 23503.
+  await db.company.delete({ where: { id: user.companyId } });
 }
 
 function baseProductInput(overrides: Partial<NewProduct> = {}): Omit<NewProduct, 'presentationId'> {
@@ -206,7 +223,9 @@ function baseProductInput(overrides: Partial<NewProduct> = {}): Omit<NewProduct,
   };
 }
 
-/** `INSERT INTO products` crudo, solo para el caso R7 que necesita el SQLSTATE real. */
+/** `INSERT INTO products` crudo, solo para el caso R7 que necesita el SQLSTATE real.
+ *  `name_normalized` (QC-57) es NOT NULL sin DEFAULT, asi que va SIEMPRE: sin ella el
+ *  rechazo seria un 23502 y el caso dejaria de probar la FK de autor que dice probar. */
 function rawInsertProductWithAuthor(
   tx: Prisma.TransactionClient,
   name: string,
@@ -214,8 +233,8 @@ function rawInsertProductWithAuthor(
   createdBy: string,
 ): Promise<number> {
   return tx.$executeRaw`
-    INSERT INTO "products" ("name", "presentation_id", "created_by", "updated_by", "updated_at")
-    VALUES (${name}, CAST(${presentationId} AS uuid), CAST(${createdBy} AS uuid), CAST(${createdBy} AS uuid), CURRENT_TIMESTAMP)`;
+    INSERT INTO "products" ("name", "name_normalized", "presentation_id", "created_by", "updated_by", "updated_at")
+    VALUES (${name}, ${normalizeForTest(name)}, CAST(${presentationId} AS uuid), CAST(${createdBy} AS uuid), CAST(${createdBy} AS uuid), CURRENT_TIMESTAMP)`;
 }
 
 /** Recorre TODAS las paginas de `listAliveProducts` con un `pageSize` dado y devuelve la
@@ -224,10 +243,20 @@ function rawInsertProductWithAuthor(
 async function collectAllPages(
   pageSize: number,
 ): Promise<{ id: string; name: string }[]> {
-  const first = await listAliveProducts({ page: 1, pageSize });
+  // QC-57: el adaptador recibe ahora el CONTRATO GENERICO de consulta. Sin orden, sin filtros
+  // y sin busqueda, que es exactamente la lista de siempre (R11): estos casos siguen midiendo
+  // lo mismo -paginacion estable y orden por defecto- y ningun aserto se relaja.
+  const listQuery = (page: number): ListQuery => ({
+    page,
+    pageSize,
+    sort: null,
+    filters: {},
+    search: '',
+  });
+  const first = await listAliveProducts(listQuery(1));
   const items = [...first.items];
   for (let page = 2; page <= first.totalPages; page += 1) {
-    const next = await listAliveProducts({ page, pageSize });
+    const next = await listAliveProducts(listQuery(page));
     items.push(...next.items);
   }
   return items.map((item) => ({ id: item.id, name: item.name }));
@@ -289,6 +318,7 @@ describe('auditoria de autor (R7)', () => {
       const created = await tx.product.create({
         data: {
           name: 'Producto con autor real',
+          nameNormalized: normalizeForTest('Producto con autor real'),
           presentationId,
           createdBy: realUserId,
           updatedBy: realUserId,

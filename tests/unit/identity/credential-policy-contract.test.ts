@@ -247,6 +247,13 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         'username',
         'passwordHash',
         'roleId',
+        // RETENSADO 2026-09-04 (QC-47). El censo NO se afloja: sigue siendo una igualdad
+        // EXACTA, y por eso hubo que nombrar los dos campos que QC-47 anade -la columna
+        // `companyId` (R9, `users.company_id` NOT NULL) y su campo de relacion `company`-.
+        // `roleId` y `role` siguen en la lista porque QC-47 R13 los deja INTACTOS: si
+        // alguien los moviera a otra tabla, este caso caeria, que es justo lo que R13 pide.
+        'companyId',
+        'company',
         'createdAt',
         'updatedAt',
         'deletedAt',

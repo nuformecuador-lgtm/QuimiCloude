@@ -251,14 +251,28 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
     // `ports/` o en `adapters/driven/` cae aqui.
     expect(
       sourcesIn(join(proveedoresDir, 'ports')).map((f) => toPosix(relative(proveedoresDir, f))),
-      'ports/ gano un archivo fuera de los dos puertos de QC-43',
-    ).toEqual(['ports/supplier-catalog-repository.ts', 'ports/supplier-repository.ts'])
+      'ports/ gano un archivo fuera de los puertos de QC-43 y QC-57',
+      // ACTUALIZADO 2026-09-04 (QC-57, T7): `list-query-log.ts` es el TERCER puerto del
+      // modulo -el log del campo omitido (R6)-, declarado en los CINCO modulos con listado
+      // porque el dominio no puede importar `lib/shared/**`. La afirmacion sigue siendo la
+      // lista EXACTA, que es lo que la hace falsable: un cuarto puerto cae aqui igual.
+    ).toEqual([
+      'ports/list-query-log.ts',
+      'ports/supplier-catalog-repository.ts',
+      'ports/supplier-repository.ts',
+    ])
     expect(
       sourcesIn(join(proveedoresDir, 'adapters', 'driven')).map((f) =>
         toPosix(relative(proveedoresDir, f)),
       ),
-      'adapters/driven/ gano un archivo fuera de los dos adaptadores de QC-43',
+      'adapters/driven/ gano un archivo fuera de los adaptadores de QC-43 y QC-57',
+      // ACTUALIZADO 2026-09-04 (QC-57, T17/T18): `list-query-sql.ts` traduce el contrato
+      // generico de consulta a las condiciones de Prisma y lo comparten los DOS adaptadores
+      // del modulo. Vive aqui -y no en `lib/shared/`- porque es una copia deliberada de la
+      // gemela de `inventario`: importar de otro modulo por una ruta profunda es lo que la
+      // regla de dependencias prohibe. La afirmacion sigue siendo la lista EXACTA.
     ).toEqual([
+      'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driven/persistence/supplier-catalog-line-prisma.ts',
       'adapters/driven/persistence/supplier-prisma.ts',
     ])
@@ -569,16 +583,19 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     ).toEqual(['createdBy:scalar', 'updatedBy:scalar'])
 
     // El reverso: `User` no gana ningun campo hacia la linea ni hacia el proveedor. La lista
-    // esperada es el conjunto EXACTO que QC-4 le dio.
-    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
+    // esperada es el conjunto EXACTO que tiene hoy `User`.
+    // RETENSADO 2026-09-04 (QC-47): entra `Company` -R9, `users.company_id`-. Sigue siendo
+    // igualdad EXACTA sobre el conjunto entero, no un `toContain`: cualquier relacion nueva
+    // hacia proveedores, o hacia lo que sea, pone el caso rojo igual que antes.
+    expect(relationTargets('User')).toEqual(['Company', 'DocumentType', 'Role'])
   })
 
   it('User NO gana ningun campo de relacion de vuelta hacia Supplier', () => {
     // Si `createdBy` o `updatedBy` llevaran `@relation`, `User` ganaria un campo reverso
     // (`createdSuppliers Supplier[]` o similar) y este `toEqual` completo caeria. La lista
-    // esperada es el conjunto EXACTO que QC-4 ya le dio a `User` (hacia `DocumentType` y
-    // `Role`), sin proveedores adentro.
-    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
+    // esperada es el conjunto EXACTO que `User` tiene hoy (hacia `DocumentType`, `Role` y
+    // -desde QC-47 R9- `Company`), sin proveedores adentro.
+    expect(relationTargets('User')).toEqual(['Company', 'DocumentType', 'Role'])
     expect(relationTargets('User')).not.toContain('Supplier')
     expect(relationTargets('User')).not.toContain('SupplierCatalogLine')
   })
