@@ -180,8 +180,19 @@ function Sidebar({
   }
 
   if (isMobile) {
+    /*
+      El cajon de navegacion NO es un panel de formulario: no hay nada que perder al cerrarlo, y
+      cerrarlo tocando el velo es el gesto que espera cualquiera en movil. Por eso desactiva las
+      dos guardas que `Sheet` trae por defecto.
+    */
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <Sheet
+        open={openMobile}
+        onOpenChange={setOpenMobile}
+        disablePointerDismissal={false}
+        disableEscapeDismissal={false}
+        {...props}
+      >
         <SheetContent
           dir={dir}
           data-sidebar="sidebar"

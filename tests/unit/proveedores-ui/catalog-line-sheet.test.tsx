@@ -364,7 +364,17 @@ describe('linea de catalogo — el panel lateral (R26)', () => {
     // El catalogo sigue detras: el panel se superpone, no sustituye la pantalla.
     expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
 
+    // El panel NO se cierra ni con Escape ni con un click fuera: lleva un formulario dentro y un
+    // gesto involuntario no puede tirar lo que el usuario llevaba escrito. Solo «Cancelar» y la X.
     await user.keyboard('{Escape}');
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+
+    const velo = document.querySelector('[data-slot="sheet-overlay"]');
+    if (velo === null) throw new Error('el panel lateral no monta velo');
+    await user.click(velo);
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId(testId.cancelar));
     await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
 
     expect(routerMock.push).not.toHaveBeenCalled();
