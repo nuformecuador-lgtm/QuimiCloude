@@ -30,6 +30,7 @@ const PRODUCTO_VALIDO = {
 const VISTA_PRODUCTO: ProductView = {
   id: 'producto-1',
   name: 'Acido sulfurico',
+  imagePath: null,
   presentationId: '11111111-1111-4111-8111-111111111111',
   presentationName: 'Bidon 20 L',
   stock: 0,

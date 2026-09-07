@@ -68,6 +68,21 @@ alerta de cantidad, fecha de creación y fecha de actualización.
 **R7** — La lista NO DEBE mostrar el identificador ni el nombre de quien creó o modificó un
 producto.
 
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** La tabla gana una **primera columna de imagen**,
+> antes del nombre: la miniatura de `products.image_path` con la miniatura compartida
+> `components/shared/entity-image.tsx`. `ProductView` expone ahora `imagePath` —la RUTA guardada,
+> sin componer URL pública: `inventario` no tiene puerto de almacenamiento, a diferencia de
+> `recetas`—.
+>
+> Mientras nadie llene esa columna —hoy no hay forma de subir la imagen de un producto— todas las
+> filas muestran el **marcador** `public/inv_not_found.png`, que cubre los dos casos: ruta ausente
+> y ruta que no resuelve.
+>
+> R6 y R7 no se relajan: la imagen **no es una columna de datos** —`PRODUCT_COLUMNS` sigue siendo
+> una lista de celdas de texto y su tipo sigue impidiendo `key: 'imagePath'`—, la declara la tabla
+> igual que la de acciones, y `imagePath` sigue fuera de `PRODUCT_QUERYABLE`: no se ordena ni se
+> filtra por una ruta de archivo.
+
 **R8** — El sistema DEBE presentar el costo tal como lo entrega la operación de consulta (cadena
 decimal) y NO DEBE convertirlo a coma flotante ni operar aritméticamente con él.
 

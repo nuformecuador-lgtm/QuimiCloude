@@ -32,6 +32,17 @@ export type NewProduct = {
 export type ProductView = {
   readonly id: string;
   readonly name: string;
+  /**
+   * Ruta de la imagen del producto, o `null` si no tiene (2026-09-07).
+   *
+   * Es la RUTA guardada en `products.image_path`, tal cual: este modulo no compone URL publica
+   * -no tiene puerto de almacenamiento, a diferencia de `recetas`- y no inventa ninguna. Quien
+   * pinta decide que hacer con ella; hoy la pantalla cae al marcador cuando es `null` y cuando
+   * la ruta no resuelve.
+   *
+   * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
+   */
+  readonly imagePath: string | null;
   readonly presentationId: string;
   readonly presentationName: string;
   readonly stock: number | null;

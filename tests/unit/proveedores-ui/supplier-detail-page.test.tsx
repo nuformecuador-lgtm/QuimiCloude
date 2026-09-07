@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import {
   CATALOG_COLUMNS,
   CATALOG_LIST_EMPTY_TESTID,
@@ -589,11 +590,15 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     expect(screen.getByTestId('catalog-cell-deliveryTime').textContent).toBe(EMPTY_CELL);
   });
 
-  it('la tabla no muestra imagen, ni identificadores, ni autoria de la linea', async () => {
-    // R30 y R12 — en negativo: son campos que la vista trae y que la decision humana deja fuera.
+  it('la tabla no muestra identificadores ni autoria de la linea', async () => {
+    // R12 — en negativo: son campos que la vista trae y que la decision humana deja fuera.
+    //
+    // ENMIENDA A R30 (2026-09-07): la imagen SI se muestra, en la primera columna, asi que
+    // `imagePath` sale de esta lista de prohibidos y tiene su propio caso justo debajo. Lo que
+    // R30 sigue prohibiendo -que el formulario pida o suba imagen- no lo toca este caso.
     await renderPantalla();
 
-    for (const clave of ['imagePath', 'createdBy', 'updatedBy', 'id', 'supplierId']) {
+    for (const clave of ['createdBy', 'updatedBy', 'id', 'supplierId']) {
       expect(
         CATALOG_COLUMNS.some((columna) => String(columna.key) === clave),
         `«${clave}» no puede ser una columna`,
@@ -601,15 +606,47 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     }
 
     for (const prohibido of [
-      IMAGEN_QUE_NO_DEBE_VERSE,
       LINEA_ID_QUE_NO_DEBE_VERSE,
       AUTOR_QUE_NO_DEBE_VERSE,
       EDITOR_QUE_NO_DEBE_VERSE,
     ]) {
       expect(document.body.textContent, prohibido).not.toContain(prohibido);
     }
-    // Y ninguna imagen se pinta en la tabla.
-    expect(within(screen.getByTestId(testId.tabla)).queryAllByRole('img')).toHaveLength(0);
+  });
+
+  it('la primera columna es la imagen de la linea, y la RUTA no se pinta como texto', async () => {
+    // Enmienda a R30 del 2026-09-07. Se afirma sobre la miniatura -no sobre la lista de
+    // columnas- porque la imagen es marcado y por eso la declara la tabla, no `CATALOG_COLUMNS`.
+    await renderPantalla();
+
+    const tabla = within(screen.getByTestId(testId.tabla));
+    const miniatura = tabla.getAllByTestId('catalog-image')[0] as HTMLImageElement;
+
+    // La ruta de la fixture NO resuelve, asi que arranca en marcador; lo que nunca puede pasar
+    // es que la ruta se lea como texto en la celda.
+    expect(miniatura).toBeInTheDocument();
+    expect(miniatura).toHaveAttribute('src', IMAGEN_QUE_NO_DEBE_VERSE);
+    expect(document.body.textContent, IMAGEN_QUE_NO_DEBE_VERSE).not.toContain(
+      IMAGEN_QUE_NO_DEBE_VERSE,
+    );
+
+    // Y la columna de imagen es la PRIMERA de la cabecera.
+    const cabeceras = tabla.getAllByRole('columnheader');
+    expect(cabeceras[0]).toHaveAttribute('data-testid', 'catalog-column-image');
+  });
+
+  it('sin ruta de imagen, la miniatura cae al marcador de `public/`', async () => {
+    // El caso NORMAL hoy: nadie llena `image_path`, asi que todas las filas ensennan el marcador.
+    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea({ imagePath: null })]));
+
+    await renderPantalla();
+
+    const miniatura = within(screen.getByTestId(testId.tabla)).getAllByTestId(
+      'catalog-image',
+    )[0] as HTMLImageElement;
+
+    expect(miniatura).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(miniatura).toHaveAttribute('data-missing', 'true');
   });
 });
 

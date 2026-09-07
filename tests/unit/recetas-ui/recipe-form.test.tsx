@@ -146,6 +146,7 @@ function productView(overrides: Partial<ProductView> = {}): ProductView {
   return {
     id: PRODUCT_PAGE2_ID,
     name: PRODUCT_PAGE2_NAME,
+    imagePath: null,
     presentationId: 'presentation-1',
     presentationName: 'Bidón',
     stock: 10,

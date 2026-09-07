@@ -592,13 +592,23 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260904180600_companies_and_user_company/down.sql',
     ];
 
+    // RETENSADO 2026-09-07, con el MISMO criterio que los dos retensados de arriba: la decision
+    // humana de quitar la unidad y el precio unitario del pedido dropea dos columnas de `orders`.
+    // No toca recetas, ni unidades, ni ninguna otra tabla. Se nombra archivo por archivo para que
+    // cualquier OTRO cambio en `db/` siga poniendo este caso rojo.
+    const MIGRACION_2026_09_07 = [
+      'db/migrations/20260907120000_orders_drop_unit_and_unit_price/migration.sql',
+      'db/migrations/20260907120000_orders_drop_unit_and_unit_price/down.sql',
+    ];
+
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
       .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta));
     const tocaDb = diff
       .filter((ruta) => ruta.startsWith('db/'))
       .filter((ruta) => !MIGRACION_QC34.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC47.includes(ruta));
+      .filter((ruta) => !MIGRACION_QC47.includes(ruta))
+      .filter((ruta) => !MIGRACION_2026_09_07.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',

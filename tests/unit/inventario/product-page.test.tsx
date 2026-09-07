@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import {
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
@@ -220,6 +221,7 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
   return {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
+    imagePath: null,
     presentationId: PRESENTACION_A.id,
     presentationName: PRESENTACION_A.name,
     stock: 42,
@@ -489,6 +491,49 @@ describe('pantalla de productos — lista', () => {
       ).toBe(false);
       expect(screen.queryByTestId(`product-cell-${prohibida}`)).toBeNull();
     }
+
+    // `imagePath` tampoco es una columna de DATOS -la lista de columnas es de cadenas-, aunque
+    // desde el 2026-09-07 la tabla si pinte la imagen: la declara la tabla, como las acciones.
+    expect(
+      PRODUCT_COLUMNS.some((columna) => String(columna.key) === 'imagePath'),
+      '«imagePath» no puede ser columna de datos',
+    ).toBe(false);
+  });
+
+  it('la primera columna es la imagen del producto, y la RUTA no se pinta como texto', async () => {
+    // Decision humana del 2026-09-07. La imagen es marcado, asi que se afirma sobre la miniatura
+    // y sobre el orden de las cabeceras, no sobre `PRODUCT_COLUMNS`.
+    const RUTA = 'productos/hidroxido.png';
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto({ imagePath: RUTA })]));
+
+    await renderPantalla();
+
+    const tabla = within(screen.getByTestId(testId.tabla));
+    const miniatura = tabla.getAllByTestId('product-image')[0] as HTMLImageElement;
+
+    expect(miniatura).toHaveAttribute('src', RUTA);
+    // La ruta es de la imagen, nunca texto de una celda.
+    expect(document.body.textContent, RUTA).not.toContain(RUTA);
+
+    const cabeceras = tabla.getAllByRole('columnheader');
+    expect(cabeceras[0]).toHaveAttribute('data-testid', 'product-column-image');
+  });
+
+  it('sin ruta de imagen, la miniatura cae al marcador de `public/`', async () => {
+    // El caso NORMAL hoy: `products.image_path` esta vacia en todas las filas, asi que lo que se
+    // ve es el marcador. No es un hueco: es el estado normal mientras nadie suba imagenes.
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto({ imagePath: null })]));
+
+    await renderPantalla();
+
+    const miniatura = within(screen.getByTestId(testId.tabla)).getAllByTestId(
+      'product-image',
+    )[0] as HTMLImageElement;
+
+    expect(miniatura).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(miniatura).toHaveAttribute('data-missing', 'true');
+    // El texto alternativo identifica la fila: la miniatura no es decorativa.
+    expect(miniatura).toHaveAttribute('alt', 'Hidróxido de sodio');
   });
 
   it('el costo, la compra minima y el tiempo de entrega no aparecen en la lista por ninguna via', async () => {

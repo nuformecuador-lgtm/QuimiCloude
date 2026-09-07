@@ -175,6 +175,18 @@ R30: la pantalla la ignora.
 **R30** — El formulario de la línea NO DEBE pedir ninguna imagen ni ofrecer subirla, y la tabla del
 catálogo NO DEBE mostrar la imagen de la línea.
 
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** La segunda mitad de R30 se INVIERTE: la tabla del
+> catálogo **SÍ muestra la imagen de la línea**, en su **primera columna**, con la miniatura
+> compartida `components/shared/entity-image.tsx`. La primera mitad **no cambia**: el formulario
+> sigue sin pedir imagen y sin ofrecer subirla, así que `supplier_catalog_lines.image_path` sigue
+> sin ser llenada por nadie y lo que se ve hoy en todas las filas es el **marcador**
+> (`public/inv_not_found.png`), que cubre los dos casos: ruta ausente y ruta que no resuelve.
+>
+> Sigue siendo cierto que la imagen **no es una columna de datos**: `CATALOG_COLUMNS` es una lista
+> de celdas de texto y `imagePath` no está en ella; la declara la tabla, igual que la columna de
+> acciones. Y sigue sin haber composición de URL pública: `proveedores` no tiene puerto de
+> almacenamiento y esta enmienda no le añade uno.
+
 **R31** — CUANDO el usuario abra el formulario de edición de una línea, el sistema DEBE precargarlo
 con los valores actuales de esa línea y enviar el **reemplazo completo** de sus siete campos de
 negocio mediante la operación de edición de línea; NO DEBE ofrecer cambiar el proveedor al que

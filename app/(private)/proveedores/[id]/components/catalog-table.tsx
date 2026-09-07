@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { EntityImage } from '@/components/shared/entity-image';
 import {
   Table,
   TableBody,
@@ -28,6 +29,21 @@ import type { CatalogDirectories } from './catalog-directories';
  * en WebKit y las acciones se alcanzan con el scroll de la propia tabla.
  */
 
+/**
+ * Encabezado de la columna de imagen. Constante para que ningun test dependa del literal.
+ *
+ * **ENMIENDA A R30 (decision humana del 2026-09-07)**: R30 dejo escrito que la tabla de la linea
+ * «no muestra la imagen». Ahora SI la muestra, en la PRIMERA columna, con el mismo marcador que
+ * la tabla de inventario. Lo que NO cambia de R30: el formulario de la linea sigue sin pedir
+ * imagen ni ofrecer subirla, asi que `image_path` sigue sin ser llenada por nadie y lo que se ve
+ * en todas las filas es el marcador.
+ *
+ * Se declara AQUI y no en la lista de columnas por lo mismo que en inventario: esa lista es de
+ * DATOS -cada columna devuelve una cadena- y una miniatura es marcado. Imagen primero, datos en
+ * medio, acciones al final.
+ */
+export const CATALOG_IMAGE_COLUMN_LABEL = 'Imagen';
+
 /** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
 export const CATALOG_ACTIONS_COLUMN_LABEL = 'Acciones';
 
@@ -50,6 +66,9 @@ export function CatalogTable({ lines, directories, rowActions }: CatalogTablePro
     <Table data-testid="catalog-table">
       <TableHeader>
         <TableRow>
+          <TableHead scope="col" data-testid="catalog-column-image" className="w-14 text-left">
+            {CATALOG_IMAGE_COLUMN_LABEL}
+          </TableHead>
           {CATALOG_COLUMNS.map((column) => (
             <TableHead
               key={column.key}
@@ -70,6 +89,10 @@ export function CatalogTable({ lines, directories, rowActions }: CatalogTablePro
       <TableBody>
         {lines.map((line) => (
           <TableRow key={line.id} data-testid="catalog-row">
+            {/* Ver la enmienda a R30 en `CATALOG_IMAGE_COLUMN_LABEL`. */}
+            <TableCell className="text-left" data-testid="catalog-cell-image">
+              <EntityImage path={line.imagePath} name={line.name} testId="catalog-image" />
+            </TableCell>
             {CATALOG_COLUMNS.map((column) => {
               const text = column.value(line, directories);
               return (
