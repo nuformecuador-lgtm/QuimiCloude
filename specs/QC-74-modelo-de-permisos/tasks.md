@@ -166,7 +166,7 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
 
 ## Bloque H — cierre
 
-- [ ] **T17. Mapa de trazabilidad.** Depende de todo lo anterior.
+- [x] **T17. Mapa de trazabilidad.** Depende de todo lo anterior.
       Archivos: `progress/impl_QC-74-modelo-de-permisos.md`.
       **Hecho cuando**: contiene el mapa `R1..R24 -> test concreto` (archivo + nombre del caso), sin
       ningun requisito sin test, y la bitacora de comandos con su salida (`CHECKPOINTS.md >
