@@ -22,10 +22,10 @@ import { GripVerticalIcon } from 'lucide-react';
 import { useId } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import type { RecipeStepDocument } from '@/lib/modules/recetas';
 
 import { createLocalKey, type RecipeStepErrors, type RecipeStepFormValue } from './recipe-form-state';
+import { RecipeStepEditor } from './recipe-step-editor';
 
 /**
  * Campo de pasos, con arrastre y equivalente por teclado (T17, R32-R34; `design.md > 7`, `> 10`).
@@ -43,9 +43,30 @@ import { createLocalKey, type RecipeStepErrors, type RecipeStepFormValue } from 
  * (`Arrastrar el paso 2 de 4`), **≥ 44×44 px y SIEMPRE visible** -nada detrás de `:hover`, que en
  * táctil no existe (R50)-. Los `announcements` de `DndContext` anuncian el cambio de posición a
  * la tecnología de asistencia (R34).
+ *
+ * **QC-64 T7 (R1, R24)**: el campo de cada paso ya no es un `<Input>` de texto plano, es
+ * `RecipeStepEditor` -el editor enriquecido de esquema cerrado-, y el estado del paso es EL
+ * DOCUMENTO del contrato. Del arrastre no se ha tocado nada: ni el asa, ni `useSortable`, ni los
+ * sensores, ni `handleDragEnd`, ni los `announcements`. Los dos teclados NO se pisan porque los
+ * `listeners` del `KeyboardSensor` viven SOLO en el `<button>` del asa: escribir dentro del área
+ * editable no llega al sensor y no inicia ningún arrastre (`design.md > 8`).
+ *
+ * Este archivo NO importa la librería del editor (`design.md > 7`): monta el componente que la
+ * aísla y habla con él en documentos del contrato.
  */
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
+
+/**
+ * Documento de un paso RECIEN AÑADIDO: un solo parrafo SIN fragmentos (QC-64 R4). No es `{blocks:
+ * []}` -un documento sin bloques no tiene donde escribir- ni `text: ''`, que ya no existe.
+ *
+ * Es una FUNCION y no una constante compartida a proposito: cada paso nuevo se lleva su propio
+ * objeto, asi que editar uno no puede tocar el documento de otro por alias.
+ */
+function emptyStepDocument(): RecipeStepDocument {
+  return { blocks: [{ kind: 'paragraph', spans: [] }] };
+}
 
 export type RecipeStepsFieldProps = {
   readonly steps: readonly RecipeStepFormValue[];
@@ -90,8 +111,10 @@ export function RecipeStepsField({ steps, onChange, errors }: RecipeStepsFieldPr
   );
 
   function addStep() {
-    // El paso ya no tiene tipo (QC-62 R9): un paso nuevo es solo su texto, vacio.
-    onChange([...steps, { key: createLocalKey('step'), text: '' }]);
+    // El paso ya no tiene tipo (QC-62 R9) y tampoco es texto (QC-64 R1): un paso nuevo es un
+    // DOCUMENTO VACIO VALIDO -un parrafo sin fragmentos-, que es lo que el editor monta como
+    // documento en blanco y lo que `recipeStepSchema` acepta sin limpieza previa.
+    onChange([...steps, { key: createLocalKey('step'), document: emptyStepDocument() }]);
   }
 
   function updateStep(index: number, patch: Partial<RecipeStepFormValue>) {
@@ -143,7 +166,7 @@ export function RecipeStepsField({ steps, onChange, errors }: RecipeStepsFieldPr
                 index={index}
                 total={steps.length}
                 error={errors?.[index]}
-                onChangeText={(text) => updateStep(index, { text })}
+                onChangeDocument={(document) => updateStep(index, { document })}
                 onRemove={() => removeStep(index)}
               />
             ))}
@@ -159,7 +182,7 @@ type RecipeStepRowProps = {
   readonly index: number;
   readonly total: number;
   readonly error?: string;
-  readonly onChangeText: (text: string) => void;
+  readonly onChangeDocument: (document: RecipeStepDocument) => void;
   readonly onRemove: () => void;
 };
 
@@ -168,14 +191,13 @@ function RecipeStepRow({
   index,
   total,
   error,
-  onChangeText,
+  onChangeDocument,
   onRemove,
 }: RecipeStepRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: step.key,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
-  const fieldId = `recipe-step-text-input-${step.key}`;
   const errorId = `recipe-step-error-${index}`;
 
   return (
@@ -198,18 +220,22 @@ function RecipeStepRow({
       </button>
 
       <div className="flex flex-1 flex-col gap-1">
-        <Label htmlFor={fieldId} className="sr-only">
-          Paso {index + 1}
-        </Label>
-        <Input
-          id={fieldId}
-          type="text"
-          value={step.text}
-          onChange={(event) => onChangeText(event.target.value)}
-          className={`${TOUCH_TARGET} text-base`}
-          aria-invalid={error === undefined ? undefined : true}
-          aria-describedby={error === undefined ? undefined : errorId}
-          data-testid={`recipe-step-text-${index}`}
+        {/* El NOMBRE ACCESIBLE del area editable sigue siendo «Paso N», el mismo que daba la
+            etiqueta del campo de texto de QC-26. Ahora viaja por la prop `label` del editor, que
+            lo pone como `aria-label` sobre el `contenteditable`, y no por una etiqueta con
+            `htmlFor`: una etiqueta de formulario no puede asociarse a un `contenteditable` -que
+            no es un control de formulario-, y renderizar las dos cosas daria DOS nombres
+            accesibles para el mismo elemento.
+
+            El `data-testid` del area editable se CONSERVA (`recipe-step-text-N`, R24): el E2E
+            heredado de QC-26 escribe por ese testid y `fill()` funciona sobre `contenteditable`. */}
+        <RecipeStepEditor
+          document={step.document}
+          onChange={onChangeDocument}
+          label={`Paso ${index + 1}`}
+          editableTestId={`recipe-step-text-${index}`}
+          error={error}
+          errorId={errorId}
         />
         {error === undefined ? null : (
           <p id={errorId} className="text-sm text-destructive" data-testid={`recipe-step-field-error-${index}`}>

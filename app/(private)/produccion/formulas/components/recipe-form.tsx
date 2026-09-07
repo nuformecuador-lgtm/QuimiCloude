@@ -29,7 +29,6 @@ import {
   extractGeneralLinesError,
   extractLineErrors,
   extractStepErrors,
-  stepDocumentToText,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeLineFormValue,
@@ -120,10 +119,11 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         unitId: line.unitId,
       }),
     ),
-    // R19 (`design.md > 6`): el paso llega como DOCUMENTO y el puente lo aplana a texto plano,
-    // que es lo unico que este formulario sabe editar hasta QC-64.
+    // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a
+    // texto -el puente de QC-62 R19 se retiro con T4-, asi que reabrir una receta conserva sus
+    // marcas y sus listas de verificacion intactas. `key` es una clave local de React.
     steps: recipe.steps.map(
-      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), text: stepDocumentToText(step) }),
+      (step): RecipeStepFormValue => ({ key: createLocalKey('step'), document: step }),
     ),
     image: { kind: 'untouched' },
   };

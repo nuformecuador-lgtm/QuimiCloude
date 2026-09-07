@@ -39,6 +39,20 @@ import { FORMULAS_ROUTE } from '@/lib/shared/routes';
  * pasos (R33), que se conduce con la API de puntero real de `user-event` (`user.pointer(...)`),
  * y su equivalente por teclado (R34), con `user.tab()`/`user.keyboard(...)`.
  *
+ * **QC-64 (T7, T8): el campo de un paso ya NO es un `<input type="text">`, es el area editable
+ * del editor enriquecido** (R1). Eso cambia COMO se escribe en el, no QUE se afirma: donde antes
+ * habia `user.type(...)` + `toHaveValue(...)` ahora se escribe con `escribirEnPaso(...)` -un
+ * pegado real, que es lo que ProseMirror procesa de verdad- y se afirma sobre el DOCUMENTO que
+ * recibe la operacion o sobre el texto del area editable. Ninguna asercion se ha relajado: los
+ * casos siguen comprobando lo mismo -el orden de los pasos enviados, lo que llega al payload y lo
+ * que se ve precargado-, solo que contra el control que la pantalla tiene ahora.
+ *
+ * **Stubs de jsdom para ProseMirror.** Viven AQUI y no en `tests/setup.ts` ni en
+ * `vitest.config.mts` -compartidos, con ramas en vuelo-, igual que en
+ * `recipe-step-editor.test.tsx`. Rellenan geometria que jsdom no calcula nunca
+ * (`Range.getClientRects`, `elementFromPoint`) y transportan el portapapeles; ninguno finge el
+ * comportamiento que se afirma.
+ *
  * **jsdom no mide layout**: todo `getBoundingClientRect()` devuelve un rectángulo vacío, y
  * `dnd-kit` -tanto el sensor de puntero como `sortableKeyboardCoordinates`- decide "arriba/abajo"
  * comparando esos rectángulos. Sin una medida real, ninguna prueba de arrastre podría distinguir
@@ -224,9 +238,9 @@ async function addValidLine(
 }
 
 /**
- * Paso tal y como lo devuelve el detalle (QC-62): un DOCUMENTO, no `{ body, type }`. Se escribe
- * literal a proposito -sin llamar a `textToStepDocument`- para que la ida y vuelta del puente
- * (R19) se compruebe contra una forma fijada a mano y no contra la funcion que se esta probando.
+ * Paso tal y como lo devuelve el detalle (QC-62): un DOCUMENTO, no `{ body, type }`. El
+ * documento minimo -un parrafo con un fragmento- para los casos que solo necesitan un paso con
+ * texto; los que hablan de marcas o de listas de verificacion escriben el suyo entero.
  */
 function stepView(text: string): RecipeStepView {
   return { blocks: [{ kind: 'paragraph', spans: [{ text }] }] };
@@ -268,6 +282,95 @@ function unsupportedFormatFile(name = 'documento.png'): File {
   // así que un archivo de texto disfrazado de `.png` debe rechazarse igual.
   const bytes = new TextEncoder().encode('esto no es una imagen, es texto plano');
   return new File([bytes], name, { type: 'image/png' });
+}
+
+// --- Stubs de jsdom que ProseMirror necesita (ver comentario de cabecera) ---
+beforeAll(() => {
+  if (typeof Range.prototype.getClientRects !== 'function') {
+    Range.prototype.getClientRects = () => {
+      const rects: DOMRect[] = [];
+      return Object.assign(rects, {
+        item: (index: number) => rects[index] ?? null,
+      }) as unknown as DOMRectList;
+    };
+  }
+  if (typeof Range.prototype.getBoundingClientRect !== 'function') {
+    Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0);
+  }
+  // ProseMirror la llama al resolver la posicion de un clic dentro del area editable. jsdom no
+  // hace layout, asi que no hay ningun elemento en ninguna coordenada: `null` es la respuesta
+  // honesta, y ProseMirror ya sabe tratarla.
+  if (typeof document.elementFromPoint !== 'function') {
+    (document as unknown as { elementFromPoint: () => Element | null }).elementFromPoint = () =>
+      null;
+  }
+});
+
+/**
+ * Pega texto en el area editable de un paso. Es un evento `paste` REAL -con la unica API del
+ * portapapeles que ProseMirror lee-, no una escritura directa en el DOM: quien decide que
+ * documento sale de ahi es el esquema cerrado del editor, que corre de verdad.
+ */
+function pegarEn(destino: Element, texto: string): void {
+  const clipboardData = {
+    types: ['text/plain'],
+    getData: () => texto,
+    files: [] as unknown as FileList,
+  };
+  const evento = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(evento, 'clipboardData', { value: clipboardData });
+  destino.dispatchEvent(evento);
+}
+
+/** Texto visible de cada paso, en el ORDEN en que las filas estan en el DOM. */
+function textosVisiblesDeLosPasos(): string[] {
+  return screen
+    .getAllByTestId('recipe-step-row')
+    .map((fila) => fila.querySelector('[contenteditable="true"]')?.textContent ?? '');
+}
+
+/**
+ * Afirma que NO hay ningun selector de tipo de paso en la pantalla (R10): ni el `<select>` que
+ * hubo hasta QC-62, ni un grupo de radios, ni ningun control equivalente que clasifique el paso
+ * entero. Se comprueba tambien por ROL ARIA -no solo por `data-testid`-, que es lo que hace que
+ * un control nuevo con otro nombre tampoco pase.
+ */
+function esperarSinSelectorDeTipo(): void {
+  const campoDePasos = screen.getByTestId('recipe-steps-field');
+  expect(campoDePasos.querySelector('select')).toBeNull();
+  expect(campoDePasos.querySelector('input[type="radio"]')).toBeNull();
+  expect(screen.queryByTestId('recipe-step-type-0')).toBeNull();
+  expect(screen.queryByTestId('recipe-step-type-1')).toBeNull();
+  expect(screen.queryAllByRole('radiogroup')).toHaveLength(0);
+  expect(screen.queryByRole('combobox', { name: /tipo del paso/i })).toBeNull();
+  // Ni etiquetas de tipo: el unico «Lista de verificacion» que puede quedar es el BOTON de la
+  // barra de formato del editor, que produce una construccion DENTRO del documento y no una
+  // clasificacion del paso entero.
+  for (const nodo of screen.queryAllByText(/lista de verificaci/i)) {
+    expect(nodo.closest('[role="toolbar"]')).not.toBeNull();
+  }
+}
+
+/** El area editable del paso `index`. Conserva el `data-testid` heredado de QC-26 (R24). */
+function areaDePaso(index: number): HTMLElement {
+  return screen.getByTestId(`recipe-step-text-${index}`);
+}
+
+/** Escribe `texto` en el paso `index` (equivale al `user.type` sobre el `<input>` de QC-26). */
+async function escribirEnPaso(index: number, texto: string): Promise<void> {
+  const editable = areaDePaso(index);
+  editable.focus();
+  pegarEn(editable, texto);
+  await waitFor(() => expect(editable).toHaveTextContent(texto));
+}
+
+/** Reescribe el paso `index` de cero: selecciona todo con el teclado y escribe encima. */
+async function reescribirPaso(user: UserEvent, index: number, texto: string): Promise<void> {
+  const editable = areaDePaso(index);
+  editable.focus();
+  await user.keyboard('{Control>}a{/Control}');
+  pegarEn(editable, texto);
+  await waitFor(() => expect(editable).toHaveTextContent(texto));
 }
 
 // --- Alto de fila estable para el stub de layout de `dnd-kit` (ver comentario de cabecera). ---
@@ -393,8 +496,10 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
 
     expect(screen.getByTestId('recipe-field-name')).toHaveValue('Receta existente');
     expect(screen.getByTestId('recipe-field-description')).toHaveValue('Una descripción');
-    expect(screen.getByTestId('recipe-step-text-0')).toHaveValue('Paso uno');
-    expect(screen.getByTestId('recipe-step-text-1')).toHaveValue('Paso dos');
+    // El campo del paso es AHORA el area editable del editor (R1): se afirma sobre su texto,
+    // no sobre `value`, que un `contenteditable` no tiene.
+    expect(areaDePaso(0)).toHaveTextContent('Paso uno');
+    expect(areaDePaso(1)).toHaveTextContent('Paso dos');
     expect(screen.getByTestId('recipe-line-quantity-0')).toHaveValue('3.2500');
     // Producto dado de baja (R53): la línea se conserva y se marca, no se descarta.
     expect(screen.getByTestId('recipe-line-unavailable-0')).toBeInTheDocument();
@@ -647,15 +752,14 @@ describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orde
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con pasos');
 
     await user.click(screen.getByTestId('recipe-step-add'));
-    await user.type(screen.getByTestId('recipe-step-text-0'), 'Mezclar');
+    await escribirEnPaso(0, 'Mezclar');
     await user.click(screen.getByTestId('recipe-step-add'));
-    await user.type(screen.getByTestId('recipe-step-text-1'), 'Calentar de mas');
+    await escribirEnPaso(1, 'Calentar de mas');
     await user.click(screen.getByTestId('recipe-step-add'));
-    await user.type(screen.getByTestId('recipe-step-text-2'), 'Enfriar');
+    await escribirEnPaso(2, 'Enfriar');
 
     // Editar el paso 2: corrige "Calentar de mas" -> "Calentar".
-    await user.clear(screen.getByTestId('recipe-step-text-1'));
-    await user.type(screen.getByTestId('recipe-step-text-1'), 'Calentar');
+    await reescribirPaso(user, 1, 'Calentar');
 
     // Quitar el paso 3 ("Enfriar"): el orden final debe ser ['Mezclar', 'Calentar'].
     await user.click(screen.getByTestId('recipe-step-remove-2'));
@@ -677,11 +781,11 @@ describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () =
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con arrastre por ratón');
 
       await user.click(screen.getByTestId('recipe-step-add'));
-      await user.type(screen.getByTestId('recipe-step-text-0'), 'Mezclar');
+      await escribirEnPaso(0, 'Mezclar');
       await user.click(screen.getByTestId('recipe-step-add'));
-      await user.type(screen.getByTestId('recipe-step-text-1'), 'Calentar');
+      await escribirEnPaso(1, 'Calentar');
       await user.click(screen.getByTestId('recipe-step-add'));
-      await user.type(screen.getByTestId('recipe-step-text-2'), 'Enfriar');
+      await escribirEnPaso(2, 'Enfriar');
 
       const handle = screen.getByTestId('recipe-step-handle-0');
 
@@ -720,11 +824,11 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con arrastre por teclado');
 
       await user.click(screen.getByTestId('recipe-step-add'));
-      await user.type(screen.getByTestId('recipe-step-text-0'), 'Mezclar');
+      await escribirEnPaso(0, 'Mezclar');
       await user.click(screen.getByTestId('recipe-step-add'));
-      await user.type(screen.getByTestId('recipe-step-text-1'), 'Calentar');
+      await escribirEnPaso(1, 'Calentar');
       await user.click(screen.getByTestId('recipe-step-add'));
-      await user.type(screen.getByTestId('recipe-step-text-2'), 'Enfriar');
+      await escribirEnPaso(2, 'Enfriar');
 
       const primeraAsa = screen.getByTestId('recipe-step-handle-0');
 
@@ -834,51 +938,146 @@ describe('R38 — un archivo rechazado no llega al payload y su error queda junt
   });
 });
 
-describe('R19 — el puente de texto plano hasta QC-64', () => {
-  it('la precarga aplana el documento del paso a texto y lo devuelve como un solo párrafo al guardar', async () => {
+describe('QC-64 R9 — la precarga de edición NO aplana: el documento llega al editor entero', () => {
+  it('R9: un paso con marcas y lista de verificación se precarga completo y vuelve idéntico al guardar', async () => {
     const user = setupUser();
-    const recipe = recipeDetail({
-      steps: [
-        // Documento de DOS párrafos: la precarga los une con un salto de línea.
+    // Documento con TODO lo que el contrato admite y el puente de QC-62 perdía: marcas sobre
+    // fragmentos concretos, un párrafo en blanco y una lista de verificación con dos elementos.
+    const documento: RecipeStepView = {
+      blocks: [
         {
-          blocks: [
-            { kind: 'paragraph', spans: [{ text: 'Mezclar' }] },
-            { kind: 'paragraph', spans: [{ text: 'despacio' }] },
+          kind: 'paragraph',
+          spans: [
+            { text: 'Mezclar ' },
+            { text: 'despacio', bold: true },
+            { text: ' y ' },
+            { text: 'en frío', italic: true },
           ],
         },
+        { kind: 'paragraph', spans: [] },
+        {
+          kind: 'checklist',
+          items: [{ spans: [{ text: 'Balanza calibrada' }] }, { spans: [{ text: 'Guantes' }] }],
+        },
       ],
-    });
+    };
 
-    renderEditForm(recipe);
+    renderEditForm(recipeDetail({ steps: [documento] }));
 
-    // `stepDocumentToText` une los dos párrafos con un salto de línea, pero el control es un
-    // `<input type="text">` de UNA línea y el propio DOM sanea el salto al asignar el valor. Es
-    // el límite conocido del puente y hoy es una ventana cerrada: R14 dejó a todas las recetas
-    // sin pasos y el puente -único escritor hasta QC-64- solo produce documentos de UN párrafo.
-    // El ESTADO sí conserva el salto: lo que se sanea es lo que el control puede PINTAR.
-    expect(screen.getByTestId('recipe-step-text-0')).toHaveValue('Mezclardespacio');
+    const editable = await screen.findByTestId('recipe-step-text-0');
+
+    // 1. El texto entero está, incluido el de la lista de verificación: nada se perdió.
+    expect(editable).toHaveTextContent('Mezclar despacio y en frío');
+    expect(editable).toHaveTextContent('Balanza calibrada');
+    expect(editable).toHaveTextContent('Guantes');
+
+    // 2. Las MARCAS siguen siendo marcas, no texto plano: un aplanado las habría borrado.
+    expect(editable.querySelector('strong')?.textContent).toBe('despacio');
+    expect(editable.querySelector('em')?.textContent).toBe('en frío');
+
+    // 3. Y la lista de verificación sigue siendo una lista con sus DOS elementos.
+    expect(editable.querySelectorAll('li[data-type="taskItem"]')).toHaveLength(2);
 
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { steps: RecipeStepView[] }];
-    // De vuelta al contrato: UN párrafo con UN fragmento, sin marcas y sin `type`.
-    expect(payload.steps).toEqual([
-      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar\ndespacio' }] }] },
-    ]);
+    // La aserción que de verdad cierra R9: lo que se reenvía es EL MISMO documento. Si la
+    // precarga aplanara -o el editor perdiera un elemento al montarlo-, esto sería rojo.
+    expect(payload.steps).toEqual([documento]);
   });
+});
 
-  it('la pantalla no ofrece selector de tipo de paso: ni el control ni sus etiquetas están en el DOM', async () => {
+describe('QC-64 R1 y R10 — el campo del paso es el editor, y no hay selector de tipo de paso', () => {
+  it('R1: el campo de un paso es el área editable del editor, no un <input type="text">', async () => {
     const user = setupUser();
     renderEditForm(recipeDetail({ steps: [stepView('Mezclar')] }));
 
-    expect(screen.queryByTestId('recipe-step-type-0')).toBeNull();
-    expect(screen.queryByRole('combobox', { name: /tipo del paso/i })).toBeNull();
-    expect(screen.queryByText('Lista de verificación')).toBeNull();
+    const campo = await screen.findByTestId('recipe-step-text-0');
+    expect(campo).toHaveAttribute('contenteditable', 'true');
+    expect(campo.tagName).not.toBe('INPUT');
+    expect(campo.tagName).not.toBe('TEXTAREA');
+    // La barra de formato del editor está montada, con sus tres controles y ninguno más.
+    expect(screen.getByRole('button', { name: 'Negrilla' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cursiva' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lista de verificacion' })).toBeInTheDocument();
 
-    // Un paso nuevo tampoco lo trae: el control no existe en ninguna fila.
+    // Un paso nuevo tampoco trae un campo de texto plano.
+    await user.click(screen.getByTestId('recipe-step-add'));
+    const nuevo = await screen.findByTestId('recipe-step-text-1');
+    expect(nuevo).toHaveAttribute('contenteditable', 'true');
+
+    // Y en NINGUNA fila de pasos queda un `<input type="text">` ni un `<textarea>`.
+    for (const fila of screen.getAllByTestId('recipe-step-row')) {
+      expect(fila.querySelector('input[type="text"]')).toBeNull();
+      expect(fila.querySelector('textarea')).toBeNull();
+    }
+  });
+
+  it('R10: no hay selector de tipo de paso en el alta ni en la edición: ni select, ni radios, ni control equivalente', async () => {
+    const user = setupUser();
+
+    // --- Modo EDICIÓN ---
+    renderEditForm(recipeDetail({ steps: [stepView('Mezclar')] }));
+    await screen.findByTestId('recipe-step-text-0');
+    esperarSinSelectorDeTipo();
+
     await user.click(screen.getByTestId('recipe-step-add'));
     expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
-    expect(screen.queryByTestId('recipe-step-type-1')).toBeNull();
+    esperarSinSelectorDeTipo();
+
+    cleanup();
+
+    // --- Modo ALTA ---
+    renderCreateForm();
+    await user.click(screen.getByTestId('recipe-step-add'));
+    await screen.findByTestId('recipe-step-text-0');
+    esperarSinSelectorDeTipo();
+  });
+});
+
+describe('QC-64 R24 — el arrastre por teclado sigue funcionando con el editor dentro de la fila', () => {
+  it('R24: tomar el asa con Espacio, mover con las flechas y soltar cambia el orden del payload aunque cada paso monte un editor', async () => {
+    const user = setupUser();
+    const uninstall = installStepRowRectStub();
+    try {
+      renderCreateForm();
+      await user.type(screen.getByTestId('recipe-field-name'), 'Receta con editor y arrastre');
+
+      await user.click(screen.getByTestId('recipe-step-add'));
+      await escribirEnPaso(0, 'Mezclar');
+      await user.click(screen.getByTestId('recipe-step-add'));
+      await escribirEnPaso(1, 'Calentar');
+      await user.click(screen.getByTestId('recipe-step-add'));
+      await escribirEnPaso(2, 'Enfriar');
+
+      // El editor ESTÁ montado dentro de cada fila -es lo que este caso añade sobre el R34
+      // heredado, que corría con un `<input>`-: si el arrastre se rompiera al meterlo, esta
+      // prueba lo delataría.
+      for (const fila of screen.getAllByTestId('recipe-step-row')) {
+        expect(fila.querySelector('[contenteditable="true"]')).not.toBeNull();
+      }
+
+      // Escribir dentro del editor NO inicia ningún arrastre: el `KeyboardSensor` sólo actúa con
+      // el foco en el asa, y el foco acaba de estar en el área editable del último paso
+      // (`design.md > 8`). Si los dos teclados se pisaran, el orden ya habría cambiado aquí.
+      expect(textosVisiblesDeLosPasos()).toEqual(['Mezclar', 'Calentar', 'Enfriar']);
+
+      const primeraAsa = screen.getByTestId('recipe-step-handle-0');
+      await tabUntil(user, primeraAsa);
+      expect(document.activeElement).toBe(primeraAsa);
+
+      await user.keyboard(' '); // toma el paso
+      await user.keyboard('{ArrowDown}'); // lo mueve una posición
+      await user.keyboard(' '); // lo suelta
+
+      await user.click(screen.getByTestId('recipe-form-submit'));
+
+      await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
+      const [payload] = createRecipeActionMock.mock.calls[0] as [{ steps: RecipeStepView[] }];
+      expect(stepTexts(payload.steps)).toEqual(['Calentar', 'Mezclar', 'Enfriar']);
+    } finally {
+      uninstall();
+    }
   });
 });

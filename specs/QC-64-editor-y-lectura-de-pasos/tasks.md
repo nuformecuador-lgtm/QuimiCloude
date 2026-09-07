@@ -40,7 +40,7 @@
     párrafo vacío conservado, marcas combinadas sobre el mismo fragmento, texto con espacios **sin
     recortar**, `checked` descartado en ambos sentidos, y nodo desconocido que **no** produce salida.
 
-- [ ] **T4 [P] — Retirar el puente de QC-62 R19 y cambiar el estado del paso.** Depende de **T3**.
+- [x] **T4 [P] — Retirar el puente de QC-62 R19 y cambiar el estado del paso.** Depende de **T3**.
   - Archivos: `app/(private)/produccion/formulas/components/recipe-form-state.ts`.
   - `RecipeStepFormValue` pasa de `text: string` a `document: RecipeStepDocument`; se **borran**
     `textToStepDocument` y `stepDocumentToText`; `buildRecipePayload` pasa el documento tal cual.
@@ -65,13 +65,13 @@
     control de encabezado/enlace/imagen/tabla/lista numerada), R3 (pegar HTML ajeno deja sólo
     texto), R6, R7 y R8 (no hay `maxLength` en ninguna parte).
 
-- [ ] **T7 — Sustituir el `<Input>` por el editor en el campo de pasos.** Depende de **T6**, **T4**.
+- [x] **T7 — Sustituir el `<Input>` por el editor en el campo de pasos.** Depende de **T6**, **T4**.
   - Archivos: `app/(private)/produccion/formulas/components/recipe-steps-field.tsx`.
   - **No se toca** el asa de arrastre, ni los sensores, ni `handleDragEnd` (R24).
   - **Hecho cuando:** el test heredado del arrastre de QC-26 sigue verde y un test nuevo afirma que
     el arrastre por teclado funciona con el editor montado dentro de la fila.
 
-- [ ] **T8 — Precarga de edición sin aplanar.** Depende de **T7**, **T3**.
+- [x] **T8 — Precarga de edición sin aplanar.** Depende de **T7**, **T3**.
   - Archivos: `app/(private)/produccion/formulas/components/recipe-form.tsx`
     (`buildInitialState`).
   - **Hecho cuando:** `tests/unit/recetas-ui/recipe-form.test.tsx` afirma que un `RecipeDetail` con
@@ -108,7 +108,7 @@
 
 ## Bloque E — guardias, plataforma y E2E
 
-- [ ] **T12 [P] — Guardia de aislamiento de la librería.** Depende de **T6**.
+- [x] **T12 [P] — Guardia de aislamiento de la librería.** Depende de **T6**.
   - Archivos: `tests/guards/guard-editor-aislado.test.ts` (nuevo), al estilo de la guardia de
     `@dnd-kit` de QC-26.
   - **Hecho cuando:** falla si algún archivo fuera de los dos enumerados en `design.md > 7` importa
