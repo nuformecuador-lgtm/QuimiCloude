@@ -743,6 +743,36 @@ porque **QC-74 termina en T18 «gate completo»** y el flake dejaría ese cierre
   ['./tests/setup.ts']`, que hoy solo importa `@testing-library/jest-dom/vitest`. Es el punto
   natural donde un helper compartido de `userEvent` podría vivir sin tocar 33 archivos.
 
+**El gate completo corrido en `dev` el 2026-09-07 amplía el alcance de la ficha.** Terminó en rojo
+con 4 fallos; los dos que no estaban en el baseline se corrieron solos, como manda
+`docs/verification.md`, y **los dos pasan en aislado**:
+
+| Fallo | Aislado | Qué es |
+|---|---|---|
+| `tests/unit/composition/identity-facade.test.ts` | 5/5 en 2,5 s | `Test timed out in 5000ms` en `await import('@/lib/composition')` |
+| `tests/integration/pedidos/order-repository.int.test.ts` | 7/7 en 1,5 s | colisión `(order_year, order_sequence)=(2882,1)` |
+| `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` | (en baseline) | el flake de esta ficha, vivo |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | (en baseline) | falla por la migración de QC-35 en el diff, **no** por el motivo que dice su nota de baseline |
+
+Dos consecuencias, las dos para la acotación:
+
+1. **La ficha se queda corta al acotar el arreglo al proyecto `ui` y a `userEvent`.**
+   `identity-facade.test.ts` corre en el proyecto **`node`**, no teclea nada, y muere con el mismo
+   `Test timed out in 5000ms` cargando el barril de composición. O sea que el plazo de 5 s es corto
+   también para *importar*, no solo para teclear — que es exactamente lo que la propia reescritura
+   de la ficha dice («la causa no es cuántos procesos hay sino que el plazo es demasiado corto»),
+   pero su alcance escrito no lo recoge. Hay que decidir si `testTimeout` sube en los tres
+   proyectos o solo en `ui`.
+2. **Apareció una enfermedad distinta que no es de QC-58 y hoy no tiene ficha.** La colisión de
+   `order-repository.int.test.ts` es estado residual en la base de integración compartida, no
+   plazo: el proyecto `integration` ya corre con `fileParallelism: false` y aun así choca en la
+   clave `(order_year, order_sequence)`. No entra aquí; necesita ficha propia en el board.
+
+Y una corrección a `tests/baseline-rojos.json` que esta ficha debería llevarse por delante:
+`recipe-route-contract.test.ts` está listado por el motivo estructural del rango de git vacío, pero
+hoy falla por **otra** cosa —la migración de QC-35 aparece en el diff—. La nota miente sobre por
+qué está ahí.
+
 ### El flake de la suite de UI no es de paralelizacion, y casi me cuesta el gate (2026-09-04)
 
 Al cerrar QC-47 aparecieron rojos en archivos que la ficha no toca, y cambiando de archivo en cada
@@ -1899,6 +1929,50 @@ la misma task o no van.
 literalmente «mientras no hay verificación real». Cuando la haya, ese test miente. Acotado en
 la task T6b, no suelto.
 ## Conflictos pendientes
+
+### `dev` local y `origin/dev` DIVERGIERON: 6 conflictos, merge abortado (2026-09-07)
+
+**No es un problema de QC-58; lo encontro QC-58 al montarse.** Al intentar publicar `dev` el push
+salio rechazado por *non-fast-forward*: las dos ramas se habian separado. Van **15 commits
+locales** que el remoto no tiene y **18 remotos** que el local no tiene.
+
+Lo que trae `origin/dev` y aqui no esta: **QC-54 entero** (los 10 commits que unifican
+`ROLE_ADMINISTRADOR` y `requireAdmin`) y **QC-74 ya mergeado por otra sesion** — esta su migracion
+`db/migrations/20260907183034_permissions_and_role_permissions`. Lo que hay aqui y alla no: el
+primitivo de **autocomplete** (`5e66471`) con los tres refactores de selector, el cambio de pedidos
+que **quita unidad y precio unitario** (`dee47c1`), el interruptor de tema, la columna de imagen y
+el rename de `product-columns`.
+
+**El merge se probo y se aborto.** `dev` quedo limpio en `1b87bb4`, sin conflictos en el arbol,
+porque hay al menos otras dos sesiones trabajando encima y dejarlo a medias las bloquearia. Un
+`git merge-tree` previo habia dado limpio, pero fue contra una foto vieja: entre ese probe y el
+merge real se movieron **las dos** puntas. Leccion: el probe de merge caduca en cuanto otra sesion
+commitea, asi que vale para decidir, no para prometer.
+
+**Los 6 archivos en conflicto, y por que.** El choque es la interseccion de QC-74 —que sustituye
+«es Administrador» por `assertPermission` dentro de cada servicio— con el trabajo local de pedidos
+—que le quita al pedido la unidad y el precio unitario—. Los dos reescriben las mismas funciones:
+
+| Archivo | Naturaleza |
+|---|---|
+| `lib/modules/pedidos/domain/create-order.ts` | semantico: autorizacion (QC-74) vs. firma sin unidad/precio (local) |
+| `lib/modules/pedidos/domain/get-order.ts` | idem |
+| `lib/modules/pedidos/domain/update-order.ts` | idem |
+| `tests/unit/pedidos/authorization.test.ts` | los tests de las dos versiones de la regla |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | el centinela de alcance por diff, tocado por los dos lados |
+| `feature_list.json` | estado del board escrito en paralelo por dos sesiones |
+| `specs/QC-74-modelo-de-permisos/requirements.md` | add/add: sembrado dos veces, aqui y en la rama que se mergeo |
+
+**Ninguno es trivial y ninguno lo resuelve el leader**, que por `CLAUDE.md` no edita codigo. Son
+decisiones de que version de la regla de autorizacion sobrevive sobre una firma que cambio debajo.
+Va a `implementer` con las dos ramas delante, o al humano.
+
+**Consecuencia para QC-58, a cerrar antes de F2.4:** su rama se rebaso sobre `dev` local, o sea que
+hoy le faltan QC-54 y QC-74. En cuanto `dev` integre `origin/dev` hay que volver a rebasarla.
+Mientras tanto la ficha se puede especificar sin problema —toca `vitest.config.mts` y `tests/**`,
+no `lib/modules/**`—, pero **no se puede dar por medida**: el arreglo del plazo hay que demostrarlo
+contra el arbol unificado, no contra este.
+
 
 ### QUIÉN LLEVA QUÉ, AHORA MISMO (2026-09-02) — leer ANTES de tocar un worktree ajeno
 
