@@ -198,37 +198,37 @@ excepción**.
 
 ## T13 — Guardias de convención de la feature `[P]` (depende de T7, T10)
 
-- [ ] **Toca:** `tests/unit/pedidos-ui/**` (archivos de test nuevos).
-- [ ] Guardias de fuente: ningún archivo de la ruta contiene el literal `'/pedidos'`; ningún
+- [x] **Toca:** `tests/unit/pedidos-ui/**` (archivos de test nuevos).
+- [x] Guardias de fuente: ningún archivo de la ruta contiene el literal `'/pedidos'`; ningún
       componente importa por ruta profunda saltándose el barrel de la ruta; las actions de `pedidos`
       se importan **por su ruta exacta y nunca por el barrel del módulo**; ningún archivo hace `fetch`
       a una ruta propia ni crea un route handler; ningún componente de cliente importa
       `lib/composition` ni el cliente de base de datos; no se edita ni se crea nada en
       `components/ui/`; `package.json` no cambia; no aparecen `parseFloat(`, `Number(` ni `toFixed(`
       sobre cantidad o precio, ni `type="number"` en esos campos.
-- [ ] **Hecho cuando:** las guardias pasan y **fallan** si se introduce a propósito la violación que
+- [x] **Hecho cuando:** las guardias pasan y **fallan** si se introduce a propósito la violación que
       vigilan. **R2, R39, R40, R41, R42, R43, R46, R47.**
 
 ## T14 — Multiplataforma y desbordamiento `[P]` (depende de T7, T10)
 
-- [ ] **Toca:** `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` (nuevo).
-- [ ] Con `tests/helpers/viewport.ts`, en angosto y en ancho: el desbordamiento se resuelve **dentro
+- [x] **Toca:** `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` (nuevo).
+- [x] Con `tests/helpers/viewport.ts`, en angosto y en ancho: el desbordamiento se resuelve **dentro
       de la tabla** y no del documento; las acciones de fila siguen alcanzables; ningún control
       depende de `:hover`; controles ≥ 44×44 px; campos de formulario ≥ 16 px; sin `100vh`.
-- [ ] Si las columnas angostas resultan inservibles por la deuda P2 de QC-55, se **para y se avisa**:
+- [x] Si las columnas angostas resultan inservibles por la deuda P2 de QC-55, se **para y se avisa**:
       la salida es una prop de ancho en el componente compartido y **la decide el humano**.
-- [ ] **Hecho cuando:** los dos viewports pasan y la comprobación de P2 está anotada con su resultado.
+- [x] **Hecho cuando:** los dos viewports pasan y la comprobación de P2 está anotada con su resultado.
       **R22, R45.**
 
 ## T15 — E2E (depende de T11, T12)
 
-- [ ] **Toca:** `e2e/pedidos.spec.ts`.
-- [ ] Recorrido 1: login → `ORDERS_ROUTE` → alta de pedido → verlo en la lista por su correlativo →
+- [x] **Toca:** `e2e/pedidos.spec.ts`.
+- [x] Recorrido 1: login → `ORDERS_ROUTE` → alta de pedido → verlo en la lista por su correlativo →
       cancelarlo con motivo → ver el motivo en su fila. Recorrido 2: sesión válida no-Administrador
       pide la URL y acaba fuera, sin ver datos.
-- [ ] Fixtures con prefijo `qc35_e2e_` y `RUN_ID`, limpieza en `afterAll`, asserts filtrando por el
+- [x] Fixtures con prefijo `qc35_e2e_` y `RUN_ID`, limpieza en `afterAll`, asserts filtrando por el
       correlativo y por el motivo con `RUN_ID` (nunca «la primera fila» ni totales).
-- [ ] **Hecho cuando:** los dos recorridos pasan en Chromium y WebKit y la base queda limpia. **R48,
+- [x] **Hecho cuando:** los dos recorridos pasan en Chromium y WebKit y la base queda limpia. **R48,
       R49.**
 
 ## T16 — Cierre y trazabilidad (depende de T13, T14, T15)
