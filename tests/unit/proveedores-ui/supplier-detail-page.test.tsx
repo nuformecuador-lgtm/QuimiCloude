@@ -29,6 +29,7 @@ import type { SupplierQueryResult } from '@/lib/modules/proveedores/adapters/dri
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
+import { PERMISSIONS } from '@/lib/modules/identity';
 
 import {
   NARROW_VIEWPORT,
@@ -57,6 +58,7 @@ import {
  */
 
 const {
+  getSessionUserMock,
   usePathnameMock,
   routerMock,
   getSupplierActionMock,
@@ -67,6 +69,7 @@ const {
   listUnitsActionMock,
   listPresentationsActionMock,
 } = vi.hoisted(() => ({
+  getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   usePathnameMock: vi.fn<() => string>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -97,6 +100,15 @@ const {
     >(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
   listPresentationsActionMock: vi.fn<(query: unknown) => Promise<PresentationListResult>>(),
+}));
+
+// QC-75 (T6): la pagina exige su permiso con `requirePagePermission`, que resuelve la sesion por
+// `@/lib/composition`. Sin este mock la pantalla responderia 404 y este archivo no mediria nada.
+// El usuario lleva el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito a mano: aqui no
+// se prueba autorizacion -eso es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, se
+// prueba lo que se ve cuando SI se puede ver.
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -296,6 +308,13 @@ async function renderPantallaCargando(searchParams: Consulta = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getSessionUserMock.mockResolvedValue({
+    id: 'u-test-42',
+    username: 'carla.duarte',
+    displayName: 'Carla Duarte Salas',
+    roleName: 'Administrador',
+    permissions: PERMISSIONS.map((permiso) => permiso.code),
+  });
   usePathnameMock.mockReturnValue(supplierDetailRoute(PROVEEDOR_ID));
   getSupplierActionMock.mockResolvedValue({ status: 'success', data: proveedor() });
   listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea()]));

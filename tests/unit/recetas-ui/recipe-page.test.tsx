@@ -13,7 +13,7 @@ import {
   parseRecipeListParams,
 } from '@/app/(private)/produccion/formulas/components';
 import { PRIVATE_NAV_ITEMS, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
-import type { SessionUser } from '@/lib/modules/identity';
+import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import type { RecipeSummary } from '@/lib/modules/recetas';
 import type {
   DeleteRecipeFormState,
@@ -60,8 +60,13 @@ const USUARIO_DEL_TEST: SessionUser = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Administrador',
-  // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
-  permissions: [],
+  // QC-75 (T6): las pantallas privadas exigen `<modulo>.consultar` con `requirePagePermission`
+  // antes de pintar nada, asi que un usuario sin permisos aqui daria 404 en vez de la pantalla
+  // que este archivo mide. Se le da el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito
+  // a mano: este archivo no prueba autorizacion -eso es
+  // `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, prueba lo que se ve cuando SI se
+  // puede ver, y con el catalogo entero el menu filtrado tampoco pierde ningun item.
+  permissions: PERMISSIONS.map((permiso) => permiso.code),
 };
 
 const {
