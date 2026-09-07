@@ -83,11 +83,22 @@ const nombreDeUsuario = `qc7_login_${sufijo}`;
 /** QC-47: nombre irrepetible de la empresa efimera de este fixture. */
 const nombreDeEmpresa = `qc7-login-${sufijo}`;
 
+/**
+ * QC-48 (T4) — segunda empresa, DADA DE BAJA, con su propio usuario dentro. `companies_name_unique`
+ * es un indice parcial (`WHERE deleted_at IS NULL`), asi que una empresa con `deleted_at` puesto no
+ * compite por el nombre; aun asi lleva su propio sufijo.
+ */
+const nombreDeUsuarioDeEmpresaMuerta = `qc48_login_${sufijo}`;
+const nombreDeEmpresaMuerta = `qc48-login-baja-${sufijo}`;
+
 let usuarioId = '';
 let rolId = '';
 /** QC-47 R14: segundo rol, para demostrar que el rol firmado sale de `users.role_id`. */
 let rolAlternativoId = '';
 let empresaId = '';
+/** QC-48: la empresa con `deleted_at` puesto y la persona que pertenece a ella. */
+let empresaMuertaId = '';
+let usuarioDeEmpresaMuertaId = '';
 
 type EspiaDeSesion = {
   readonly tickets: SessionTicket[];
@@ -175,6 +186,36 @@ beforeAll(async () => {
     select: { id: true },
   });
   usuarioId = usuario.id;
+
+  // QC-48: empresa dada de baja + una persona dentro. Se necesita contra Postgres porque lo que
+  // se demuestra es el `JOIN companies` del adaptador, no una decision del dominio.
+  const empresaMuerta = await prisma.company.create({
+    data: {
+      name: nombreDeEmpresaMuerta,
+      nameNormalized: normalizeCompanyName(nombreDeEmpresaMuerta),
+      deletedAt: new Date('2026-01-01T00:00:00.000Z'),
+    },
+    select: { id: true },
+  });
+  empresaMuertaId = empresaMuerta.id;
+
+  const usuarioDeEmpresaMuerta = await prisma.user.create({
+    data: {
+      firstNames: 'Beatriz',
+      lastNames: 'Ruiz Salas',
+      birthDate: new Date('1991-07-03T00:00:00.000Z'),
+      email: `qc48.${sufijo}@example.test`,
+      phone: '+57 300 444 5566',
+      documentTypeCode: DOCUMENT_TYPE_CC,
+      documentNumber: `48${sufijo.replaceAll('-', '').slice(0, 18)}`,
+      username: nombreDeUsuarioDeEmpresaMuerta,
+      passwordHash: await createPasswordHash(CLAVE_CORRECTA),
+      roleId: rolId,
+      companyId: empresaMuertaId,
+    },
+    select: { id: true },
+  });
+  usuarioDeEmpresaMuertaId = usuarioDeEmpresaMuerta.id;
 }, 30_000);
 
 afterAll(async () => {
@@ -184,10 +225,12 @@ afterAll(async () => {
   // QC-47: el orden es `users -> companies`. `users_company_id_fkey` es `ON DELETE RESTRICT`,
   // asi que la empresa no se puede borrar mientras le quede su usuario dentro.
   try {
-    await prisma.user.deleteMany({ where: { id: usuarioId } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [usuarioId, usuarioDeEmpresaMuertaId] } },
+    });
   } finally {
     await prisma.role.deleteMany({ where: { id: { in: [rolId, rolAlternativoId] } } });
-    await prisma.company.deleteMany({ where: { id: empresaId } });
+    await prisma.company.deleteMany({ where: { id: { in: [empresaId, empresaMuertaId] } } });
     await prisma.$disconnect();
   }
 });
@@ -265,6 +308,34 @@ describe('login contra Postgres real', () => {
       // Se restaura pase lo que pase: los demas `it` esperan el rol original.
       await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolId } });
     }
+  });
+
+  // QC-48 R2 — la empresa de quien entra sale de la MISMA consulta que ya autentica: una sola
+  // llamada al adaptador devuelve ya `companyId` y la marca de baja de esa empresa. Es el
+  // `JOIN companies c ON c.id = u.company_id` del `$queryRaw`, y solo un test contra Postgres lo
+  // demuestra: si alguien lo quitara, o lo convirtiera en una segunda lectura, esto se pone rojo.
+  it('una sola lectura trae la empresa del usuario y su estado de baja', TIEMPO_HOLGADO, async () => {
+    const encontrado = await findActiveByUsername(nombreDeUsuario);
+
+    expect(encontrado?.id).toBe(usuarioId);
+    expect(encontrado?.companyId).toBe(empresaId);
+    // `null` es «la empresa sigue viva» (QC-47 R6). No se cocina un booleano: la regla es del
+    // dominio y aqui solo viaja el dato.
+    expect(encontrado?.companyDeletedAt).toBeNull();
+  });
+
+  // QC-48 R2, R3 — la fila SI se devuelve cuando la empresa esta dada de baja. El adaptador no
+  // lleva `AND c.deleted_at IS NULL`: el corte es del dominio (`verify-credentials.ts`), porque
+  // ese camino tiene que gastar igualmente su verificacion de hash (R4). Si alguien moviera la
+  // regla al `WHERE`, este caso devolveria `null` y se pondria rojo.
+  it('un usuario de una empresa dada de baja se devuelve, con su deleted_at no nulo', TIEMPO_HOLGADO, async () => {
+    const encontrado = await findActiveByUsername(nombreDeUsuarioDeEmpresaMuerta);
+
+    expect(encontrado).not.toBeNull();
+    expect(encontrado?.id).toBe(usuarioDeEmpresaMuertaId);
+    expect(encontrado?.companyId).toBe(empresaMuertaId);
+    expect(encontrado?.companyDeletedAt).toBeInstanceOf(Date);
+    expect(encontrado?.companyDeletedAt).not.toBeNull();
   });
 
   it('autentica contra una fila real', TIEMPO_HOLGADO, async () => {

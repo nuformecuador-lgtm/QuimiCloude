@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
@@ -82,6 +82,11 @@ function lineasOriginales(rutaRelativa: string): number[] {
   return numeros;
 }
 
+/** La misma ruta con separadores de posix: `fuentesBajo` las devuelve asi tambien en Windows. */
+function enRutaDePosix(ruta: string): string {
+  return ruta.split(sep).join('/');
+}
+
 /** Todos los archivos `.ts`/`.tsx` bajo una carpeta, en rutas relativas a la raiz del repo. */
 function fuentesBajo(carpetaRelativa: string): string[] {
   const encontradas: string[] = [];
@@ -121,6 +126,25 @@ const ARCHIVOS_DE_LA_LISTA = [
   join(COMPONENTES_PATH, 'delete-recipe-dialog.tsx'),
   PAGE_PATH,
 ].map((ruta) => ruta.split('\\').join('/'));
+
+/**
+ * EXCEPCION UNICA Y NOMBRADA a la regla «todo archivo de `components/` sale por el barrel» (R46).
+ *
+ * `recipe-step-schema.ts` (QC-64) es el unico archivo de la carpeta cuyo simbolo publico tiene un
+ * tipo **de la libreria del editor**: `RECIPE_STEP_EXTENSIONS` es un `Extensions` de
+ * `@tiptap/core`. Reexportarlo desde el barrel deja escapar ese tipo por una puerta que la
+ * guardia de aislamiento no ve —`tests/guards/guard-editor-aislado.test.ts` compara el literal
+ * `@tiptap`, y el barrel no lo escribe—, de modo que cualquier archivo del repo podria acabar
+ * dependiendo de la libreria sin nombrarla. R25 y `specs/QC-64-editor-y-lectura-de-pasos/design.md
+ * > 7` exigen lo contrario: que la libreria viva en DOS archivos y que sustituirla sea reescribir
+ * esos dos. Su unico consumidor legitimo es `recipe-step-editor.tsx`, en la misma carpeta, por
+ * ruta relativa; el barrel si exporta `RecipeStepEditor`, que es lo que el resto de la ruta usa.
+ *
+ * La regla general sigue mordiendo para TODOS los demas archivos de `components/`: esta lista es
+ * por NOMBRE, no un patron. Y `tests/guards/guard-editor-aislado.test.ts` tiene un caso que se
+ * pone rojo si el reexport vuelve a entrar.
+ */
+const FUERA_DEL_BARREL = ['recipe-step-schema.ts'];
 
 /** Los que declaran frontera de cliente. R50 y R49 van sobre estos. */
 const FUENTES_DE_CLIENTE = FUENTES_DE_LA_RUTA.filter((ruta) => leer(ruta).includes("'use client'"));
@@ -612,6 +636,22 @@ describe('contrato de la ruta de recetas', () => {
     for (const ruta of FUENTES_DE_LA_RUTA) {
       if (!ruta.includes('/components/') || ruta.endsWith('/index.ts')) continue;
       const nombreDeArchivo = ruta.split('/').pop() as string;
+      if (FUERA_DEL_BARREL.includes(nombreDeArchivo)) {
+        // La excepcion es EXPLICITA y se comprueba en los dos sentidos: el archivo no puede
+        // salir por el barrel, y sigue teniendo que existir. Asi la excepcion no se convierte en
+        // una via para dejar de exponer componentes sin que nadie se entere.
+        const modulo = `./${nombreDeArchivo.replace(/\.tsx?$/, '')}`;
+        expect(
+          existsSync(join(RAIZ, ruta)),
+          `${nombreDeArchivo} figura como excepcion del barrel pero ya no existe: si se ha ` +
+            'borrado o renombrado, quita tambien la excepcion',
+        ).toBe(true);
+        expect(
+          barrel,
+          `${nombreDeArchivo} NO puede reexportarse desde el barrel (ver FUERA_DEL_BARREL)`,
+        ).not.toContain(`from '${modulo}'`);
+        continue;
+      }
       const modulo = `./${nombreDeArchivo.replace(/\.tsx?$/, '')}`;
       expect(barrel, `el barrel debe reexportar ${modulo}`).toContain(`from '${modulo}'`);
     }
@@ -786,5 +826,129 @@ describe('contrato de la ruta de recetas', () => {
         fuenteSinComentarios(ruta).includes('export const PRIVATE_NAV_ITEMS'),
       ),
     ).toHaveLength(1);
+  });
+});
+
+/**
+ * QC-64 R12 — el asistente de lectura NO tiene URL (T11, `design.md > 6`).
+ *
+ * Es la mitad del requisito que renderizando NO se ve: que el asistente **no sea alcanzable por
+ * ninguna via distinta del modal de «Vista previa»** no lo puede afirmar ningun test de DOM —una
+ * `page.tsx` nueva que lo montase renderizaria perfectamente—. De ahi estas guardias de fuente,
+ * al estilo de las de arriba.
+ *
+ * La decision cerrada del 2026-09-04 dice «sin URL propia, sin entrada desde el listado del
+ * catalogo», y **QC-63 es quien la abrira** para el Operador: si esta feature publicase la ruta,
+ * se estaria adelantando a una ficha que aun no se ha decidido.
+ */
+describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
+  /** Como se nombra al asistente en el codigo: su componente y su carpeta. */
+  const SENALES_DEL_ASISTENTE = ['StepReader', 'step-reader'] as const;
+
+  /** El separador de linea, sin escribirlo como escape en un literal. */
+  const SALTO_DE_LINEA = String.fromCharCode(10);
+
+  /** La ruta de import publica del asistente y su unica variante profunda posible. */
+  const IMPORTS_DEL_ASISTENTE = [
+    '@/components/shared/step-reader',
+    'components/shared/step-reader',
+  ] as const;
+
+  /** El unico archivo de PRODUCCION que puede montarlo (`design.md > 6`). */
+  const UNICO_MONTADOR = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-form.tsx'));
+
+  /**
+   * Los archivos de test que legitimamente lo nombran: el que lo monta para probarlo, la guardia
+   * que comprueba que el asistente NO importa la libreria del editor, y este mismo, que tiene que
+   * escribir su nombre para poder prohibirlo. Se excluyen POR NOMBRE, no por carpeta: un test
+   * nuevo que lo montase en otro sitio si tiene que salir en la lista.
+   */
+  const TESTS_QUE_LO_NOMBRAN = [
+    'tests/unit/recetas-ui/step-reader.test.tsx',
+    'tests/unit/recetas-ui/recipe-route-contract.test.ts',
+    'tests/guards/guard-editor-aislado.test.ts',
+  ] as const;
+
+  it('ninguna page.tsx del repo monta el asistente', () => {
+    const paginas = fuentesBajo('app').filter((ruta) => ruta.endsWith('/page.tsx'));
+    expect(paginas.length, 'no se encontro ninguna page.tsx: la guardia no comprobaria nada').
+      toBeGreaterThan(0);
+
+    for (const pagina of paginas) {
+      const codigo = fuenteSinComentarios(pagina);
+      for (const senal of SENALES_DEL_ASISTENTE) {
+        expect(
+          codigo,
+          `${pagina} monta el asistente: R12 dice que solo se alcanza por el modal de vista previa`,
+        ).not.toContain(senal);
+      }
+    }
+  });
+
+  it('lib/shared/routes.ts no gana ninguna constante para el asistente y publica exactamente las de hoy', () => {
+    const rutas = fuenteSinComentarios('lib/shared/routes.ts');
+
+    // Ninguna constante cuyo NOMBRE o cuyo VALOR aluda al asistente, a la lectura o a la
+    // ejecucion de una receta.
+    const alude = /asistente|lectura|leer|ejecucion|ejecutar|reader|read|run|execute|paso|step|guia|wizard/i;
+    for (const linea of rutas.split(SALTO_DE_LINEA)) {
+      const declaracion = /export\s+(?:const|function)\s+([A-Za-z_$][\w$]*)/.exec(linea);
+      if (declaracion === null) continue;
+      expect(
+        declaracion[1],
+        `«${declaracion[1]}» parece una ruta del asistente, y R12 dice que no tiene ninguna`,
+      ).not.toMatch(alude);
+      expect(linea, `${declaracion[1]} apunta a una URL del asistente`).not.toMatch(
+        /['"`]\/[^'"`]*(step|paso|lectura|leer|ejecutar|ejecucion|reader)[^'"`]*['"`]/i,
+      );
+    }
+
+    // Y el conjunto exportado es EXACTAMENTE el de hoy: una constante nueva -aunque se llame de
+    // otra forma- tiene que pasar por aqui y por quien la revise.
+    const exportadas = [...rutas.matchAll(/export\s+(?:const|function)\s+([A-Za-z_$][\w$]*)/g)].map(
+      (encaje) => encaje[1],
+    );
+    expect(exportadas.sort()).toEqual(
+      [
+        'DASHBOARD_ROUTE',
+        'FORGOT_PASSWORD_ROUTE',
+        'FORMULAS_ROUTE',
+        'INVENTORY_ROUTE',
+        'LOGIN_ROUTE',
+        'NEW_RECIPE_ROUTE',
+        'PRIVATE_ROUTE_PREFIXES',
+        'SUPPLIERS_ROUTE',
+        'recipeEditRoute',
+        'supplierDetailRoute',
+      ].sort(),
+    );
+  });
+
+  it('el asistente solo se importa desde recipe-form.tsx', () => {
+    const importadores: string[] = [];
+
+    for (const carpeta of ['app', 'components', 'lib', 'hooks', 'tests', 'e2e']) {
+      if (!existsSync(join(RAIZ, carpeta))) continue;
+      for (const ruta of fuentesBajo(carpeta)) {
+        if ((TESTS_QUE_LO_NOMBRAN as readonly string[]).includes(ruta)) continue;
+        const codigo = fuenteSinComentarios(ruta);
+        if (IMPORTS_DEL_ASISTENTE.some((importado) => codigo.includes(importado))) {
+          importadores.push(ruta);
+        }
+      }
+    }
+
+    expect(importadores.sort()).toEqual([UNICO_MONTADOR]);
+  });
+
+  it('el listado del catalogo no enlaza ni menciona el asistente', () => {
+    // R12 — «no se enlaza desde el listado del catalogo». La tabla y la seccion de lista son las
+    // dos puertas por las que entraria ese enlace.
+    for (const archivo of ['recipe-table.tsx', 'recipe-list-section.tsx']) {
+      const codigo = fuenteSinComentarios(enRutaDePosix(join(COMPONENTES_PATH, archivo)));
+      for (const senal of SENALES_DEL_ASISTENTE) {
+        expect(codigo, `${archivo} no puede enlazar el asistente`).not.toContain(senal);
+      }
+    }
   });
 });
