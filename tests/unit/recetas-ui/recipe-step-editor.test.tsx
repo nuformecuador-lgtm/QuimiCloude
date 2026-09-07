@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -110,6 +110,47 @@ async function montar(inicial: RecipeStepDocument = DOC_VACIO): Promise<HTMLElem
   ultimoDocumento = null;
   render(<Harness inicial={inicial} />);
   return await screen.findByTestId(TEST_ID);
+}
+
+/**
+ * Un fotograma de animacion, esperado de verdad.
+ *
+ * El comando `focus()` de TipTap NO devuelve el foco al area editable en el acto: llama a
+ * `view.focus()` dentro de un `requestAnimationFrame` (`@tiptap/core`, comando `focus`). O sea
+ * que, despues de pulsar un boton de la barra, queda un fotograma PENDIENTE que movera el foco
+ * del boton al `contenteditable` en cuanto el bucle de eventos lo atienda.
+ *
+ * Sin esperarlo, la siguiente pulsacion de teclado es una carrera: si el fotograma se cuela entre
+ * `boton.focus()` y la tecla —`user-event` cede al bucle entre evento y evento—, la tecla la
+ * recibe el editor y no el boton, y un `Espacio` acaba escribiendo un espacio en el documento en
+ * vez de alternar la marca. Es exactamente lo que fallaba 1 de cada 5 corridas EN AISLADO.
+ *
+ * Esto no es «esperar mas»: es esperar A LA CONDICION correcta. La asercion no se toca.
+ */
+async function esperarAlFocoDiferidoDelEditor(): Promise<void> {
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+/**
+ * Pone el foco en `boton`, comprueba que lo tiene DE VERDAD antes de teclear —si no, lo que se
+ * estaria probando es otro elemento— y lo activa con la tecla indicada, sin raton (R27). Al
+ * salir, el foco diferido del editor ya ha ocurrido, asi que la siguiente activacion arranca de
+ * un estado estable.
+ */
+async function activarConElTeclado(
+  usuario: ReturnType<typeof userEvent.setup>,
+  boton: HTMLElement,
+  tecla: string,
+): Promise<void> {
+  await esperarAlFocoDiferidoDelEditor();
+  boton.focus();
+  expect(boton).toHaveFocus();
+  await usuario.keyboard(tecla);
+  await esperarAlFocoDiferidoDelEditor();
 }
 
 describe('RecipeStepEditor', () => {
@@ -394,14 +435,12 @@ describe('RecipeStepEditor', () => {
       expect(negrilla).toHaveAttribute('aria-pressed', 'false');
 
       // Activacion SIN raton: el foco vuelve al boton y se pulsa con el teclado.
-      negrilla.focus();
-      await usuario.keyboard('{Enter}');
+      await activarConElTeclado(usuario, negrilla, '{Enter}');
       await waitFor(() => {
         expect(negrilla).toHaveAttribute('aria-pressed', 'true');
       });
 
-      negrilla.focus();
-      await usuario.keyboard(' ');
+      await activarConElTeclado(usuario, negrilla, ' ');
       await waitFor(() => {
         expect(negrilla).toHaveAttribute('aria-pressed', 'false');
       });

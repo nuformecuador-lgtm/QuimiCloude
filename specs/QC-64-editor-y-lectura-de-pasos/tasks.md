@@ -94,14 +94,14 @@
 
 ## Bloque D — la vista previa
 
-- [ ] **T10 — Modal de «Vista previa».** Depende de **T9**, **T8**.
+- [x] **T10 — Modal de «Vista previa».** Depende de **T9**, **T8**.
   - Archivos: `app/(private)/produccion/formulas/components/recipe-form.tsx`,
     `app/(private)/produccion/formulas/components/index.ts`.
   - **Hecho cuando:** un test afirma que abrir la vista previa **no** invoca ninguna Server Action,
     que cerrarla devuelve el formulario intacto (R13) y que Finalizar cierra el modal sin guardar ni
     navegar (R22).
 
-- [ ] **T11 [P] — Contrato de ruta: el asistente no tiene URL.** Depende de **T10**.
+- [x] **T11 [P] — Contrato de ruta: el asistente no tiene URL.** Depende de **T10**.
   - Archivos: `tests/unit/recetas-ui/recipe-route-contract.test.ts` (se amplía).
   - **Hecho cuando:** el test falla si aparece una `page.tsx` que monte el asistente o una constante
     de ruta nueva para él (R12), y `lib/shared/routes.ts` no cambió.
@@ -114,7 +114,7 @@
   - **Hecho cuando:** falla si algún archivo fuera de los dos enumerados en `design.md > 7` importa
     la librería del editor (R25).
 
-- [ ] **T13 [P] — Multiplataforma.** Depende de **T6**, **T9**.
+- [x] **T13 [P] — Multiplataforma.** Depende de **T6**, **T9**.
   - Archivos: tests de T6 y T9 (se amplían), usando `tests/helpers/viewport.ts`.
   - **Hecho cuando:** se afirma ≥44×44 px en los controles táctiles, `text-base` en el área
     editable, ausencia de `100vh` y ausencia de cualquier acción que sólo exista tras `:hover`

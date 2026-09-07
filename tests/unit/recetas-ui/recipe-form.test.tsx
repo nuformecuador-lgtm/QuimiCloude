@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { toast } from 'sonner';
 
@@ -1079,5 +1079,122 @@ describe('QC-64 R24 — el arrastre por teclado sigue funcionando con el editor 
     } finally {
       uninstall();
     }
+  });
+});
+
+describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no guarda nada', () => {
+  /** Todas las operaciones que este archivo dobla. R11 y R22 exigen que NINGUNA se invoque. */
+  const TODAS_LAS_ACCIONES = [
+    createRecipeActionMock,
+    updateRecipeActionMock,
+    getRecipeActionMock,
+    listProductsActionMock,
+    listUnitsActionMock,
+  ] as const;
+
+  /** Ninguna operacion del modulo se invoco, y tampoco se navego fuera del formulario. */
+  function esperarQueNoSeInvocoNingunaAccion(): void {
+    for (const accion of TODAS_LAS_ACCIONES) {
+      expect(accion).not.toHaveBeenCalled();
+    }
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+  }
+
+  /** Rellena el formulario con los MISMOS datos siempre: es lo que hace comparables los payloads. */
+  async function rellenarFormulario(user: UserEvent, textoDelPaso: string): Promise<void> {
+    await user.type(screen.getByTestId('recipe-field-name'), 'Receta con vista previa');
+    await user.type(screen.getByTestId('recipe-field-description'), 'Una descripcion');
+    await user.click(screen.getByTestId('recipe-step-add'));
+    await escribirEnPaso(0, textoDelPaso);
+  }
+
+  /** Abre el modal y devuelve su contenido, ya en pantalla. */
+  async function abrirLaVistaPrevia(user: UserEvent): Promise<HTMLElement> {
+    await user.click(screen.getByTestId('recipe-form-preview-open'));
+    return await screen.findByTestId('recipe-form-preview');
+  }
+
+  it('R11: abrir la vista previa no invoca ninguna operacion y monta el asistente sobre los pasos escritos EN ESE INSTANTE', async () => {
+    const user = setupUser();
+    renderCreateForm();
+
+    await rellenarFormulario(user, 'Mezclar despacio');
+    // Se reescribe el paso ANTES de abrir: lo que el asistente presenta tiene que ser esto
+    // ultimo, no lo primero que se escribio ni lo que hubiera guardado.
+    await reescribirPaso(user, 0, 'Calentar a fuego lento');
+
+    const modal = await abrirLaVistaPrevia(user);
+
+    // El asistente esta montado DENTRO del modal, con el texto que hay escrito ahora mismo.
+    expect(within(modal).getByTestId('step-reader')).toBeInTheDocument();
+    expect(within(modal).getByText('Calentar a fuego lento')).toBeInTheDocument();
+    expect(within(modal).getByTestId('step-reader-position')).toHaveTextContent('1');
+
+    // R11: ni guarda, ni invoca ninguna operacion del modulo, ni navega.
+    esperarQueNoSeInvocoNingunaAccion();
+  });
+
+  it('R13: cerrar la vista previa con Esc devuelve el formulario intacto y el foco al boton que la abrio, y el payload es el mismo que sin haberla abierto', async () => {
+    const user = setupUser();
+
+    // --- A) Referencia: el mismo formulario, SIN abrir nunca la vista previa ---
+    renderCreateForm();
+    await rellenarFormulario(user, 'Mezclar despacio');
+    await user.click(screen.getByTestId('recipe-form-submit'));
+    await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [payloadSinVistaPrevia] = createRecipeActionMock.mock.calls[0] as [unknown];
+
+    cleanup();
+    vi.clearAllMocks();
+    createRecipeActionMock.mockResolvedValue({ status: 'success', id: RECIPE_ID });
+
+    // --- B) El mismo formulario, abriendo y cerrando la vista previa por el camino ---
+    renderCreateForm();
+    await rellenarFormulario(user, 'Mezclar despacio');
+
+    const modal = await abrirLaVistaPrevia(user);
+    expect(within(modal).getByTestId('step-reader')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('recipe-form-preview')).toBeNull());
+    // El asistente se DESMONTA: no queda escondido en el DOM.
+    expect(screen.queryByTestId('step-reader')).toBeNull();
+
+    // Todo lo escrito sigue como estaba: nombre, descripcion y el paso.
+    expect(screen.getByTestId('recipe-field-name')).toHaveValue('Receta con vista previa');
+    expect(screen.getByTestId('recipe-field-description')).toHaveValue('Una descripcion');
+    expect(areaDePaso(0)).toHaveTextContent('Mezclar despacio');
+
+    // Y el foco vuelve al boton que abrio el modal, no al principio del documento.
+    await waitFor(() => expect(screen.getByTestId('recipe-form-preview-open')).toHaveFocus());
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+    await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [payloadConVistaPrevia] = createRecipeActionMock.mock.calls[0] as [unknown];
+
+    // La asercion que cierra R13: haber abierto la vista previa no cambio NADA de lo que se envia.
+    expect(payloadConVistaPrevia).toEqual(payloadSinVistaPrevia);
+  });
+
+  it('R22: Finalizar cierra el modal y no guarda ni navega', async () => {
+    const user = setupUser();
+    renderCreateForm();
+
+    await rellenarFormulario(user, 'Mezclar despacio');
+    const modal = await abrirLaVistaPrevia(user);
+
+    // Un unico paso sin lista de verificacion: el ultimo, asi que la accion es Finalizar y nada
+    // la bloquea (R15, R18).
+    await user.click(within(modal).getByTestId('step-reader-finish'));
+
+    await waitFor(() => expect(screen.queryByTestId('recipe-form-preview')).toBeNull());
+    expect(screen.queryByTestId('step-reader')).toBeNull();
+
+    // R22: cerrar por Finalizar tampoco guarda ni navega, y el formulario sigue entero.
+    esperarQueNoSeInvocoNingunaAccion();
+    expect(screen.getByTestId('recipe-field-name')).toHaveValue('Receta con vista previa');
+    expect(areaDePaso(0)).toHaveTextContent('Mezclar despacio');
   });
 });
