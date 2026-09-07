@@ -14,7 +14,8 @@
 // alguien la sustituyera por una llamada directa a `lib/shared/pagination`, el dominio pasaria a
 // importar `lib/shared/**` y este archivo se pondria rojo antes que la guardia.
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { UnauthorizedError, ValidationError } from '@/lib/modules/recetas/domain/errors';
 import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
 
@@ -24,7 +25,7 @@ import type { ListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
 const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
 
 function montar() {

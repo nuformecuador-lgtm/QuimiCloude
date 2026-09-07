@@ -3,7 +3,7 @@
 // aqui es la DECISION que vive en `domain/`, no la implementacion Prisma/Supabase (T9-T11).
 // Cierra R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37, R50.
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/recetas/domain/actor';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
 import { DuplicateNameError, NotFoundError } from '@/lib/modules/recetas/domain/errors';
@@ -13,10 +13,11 @@ import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
 
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 

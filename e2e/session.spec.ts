@@ -42,13 +42,12 @@ import { expect, test } from '@playwright/test';
 
 // La UNICA definicion de «mismo nombre de empresa» (QC-47 R3), del contrato publico
 // del modulo: `companies.name_normalized` se calcula con esta y con ninguna otra.
-import { normalizeCompanyName } from '@/lib/modules/identity';
+// `ROLE_ADMINISTRADOR` se toma del mismo barrel, como VALOR (nunca `import type`, nunca por
+// ruta profunda): es la misma regla que ya sigue `lib/composition/route-role-rules.ts`.
+import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
-// `ADMIN_ROLE_NAME` se toma del barrel de `inventario`, como VALOR (nunca `import type`, nunca
-// por ruta profunda): es la misma regla que ya sigue `lib/composition/route-role-rules.ts`.
-import { ADMIN_ROLE_NAME } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
@@ -136,12 +135,12 @@ test.beforeAll(async () => {
   // Si no existe, el fallo tiene que decir exactamente que falta el seed, no un rojo generico de
   // FK al crear el usuario.
   const adminRole = await prisma.role.findUnique({
-    where: { name: ADMIN_ROLE_NAME },
+    where: { name: ROLE_ADMINISTRADOR },
     select: { id: true },
   });
   if (!adminRole) {
     throw new Error(
-      `el rol '${ADMIN_ROLE_NAME}' no existe: correr el seed de QC-6 antes de este E2E`,
+      `el rol '${ROLE_ADMINISTRADOR}' no existe: correr el seed de QC-6 antes de este E2E`,
     );
   }
   roleId = adminRole.id;
@@ -178,7 +177,7 @@ test.afterAll(async () => {
   // Borra SIEMPRE, aunque el test reventara: por eso se borra por prefijo de `RUN_ID` (no por un
   // id acumulado en memoria). Solo usuarios: el rol (`Administrador`) es un dato real sembrado
   // por QC-6, nunca un fixture de este test, asi que este `afterAll` NO toca la tabla `roles` en
-  // absoluto —borrar por `name: ADMIN_ROLE_NAME` se llevaria por delante el rol real que usan
+  // absoluto —borrar por `name: ROLE_ADMINISTRADOR` se llevaria por delante el rol real que usan
   // otros tests y el propio seed—.
   try {
     await prisma.user.deleteMany({

@@ -7,7 +7,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { ADMIN_ROLE_NAME, type Actor } from '@/lib/modules/inventario/domain/actor';
+import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeletePresentation } from '@/lib/modules/inventario/domain/delete-presentation';
@@ -23,7 +24,7 @@ import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ADMIN_ROLE_NAME };
+const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
 const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
 
 /** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
