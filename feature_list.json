@@ -724,7 +724,7 @@
       "epic_name": "Identidad y acceso",
       "name": "unificar-constante-rol-administrador",
       "description": "Hoy no hay una definicion de «es Administrador», hay dos duplicaciones encadenadas. El literal 'Administrador' esta declarado CUATRO veces: ROLE_ADMINISTRADOR en identity/domain/roles.ts -que es la buena, y cuyo propio comentario dice que existe para \"cualquier otro archivo que necesite nombrar uno de ellos\"- y ADMIN_ROLE_NAME repetido en inventario, recetas y unidades. Y la funcion requireAdmin esta copiada CINCO veces, con el mismo cuerpo, en inventario, recetas, unidades, pedidos y proveedores. Cada modulo que necesito nombrar el rol declaro el suyo en vez de usar el que ya habia.\n\nEsta ficha deja una sola constante y una sola implementacion de la regla.\n\nEL LITERAL. Se retiran las tres copias, incluidos los export de ADMIN_ROLE_NAME en los barriles de inventario, recetas y unidades, y los ~20 consumidores pasan a importar ROLE_ADMINISTRADOR del barrel de identity. No se deja re-export de transicion: mantendria dos nombres vivos para la misma cosa y nada obligaria a migrar, o sea cambiaria la deuda de forma en vez de cerrarla. El que se olvide rompe el typecheck, que es donde se quiere que rompa.\n\nLA FUNCION. Los cinco requireAdmin son el mismo cuerpo y cada uno lanza el UnauthorizedError de SU modulo, que extiende la clase base de ese modulo (InventarioError, RecetasError...). Los siete adaptadores driving serializan con `error instanceof <Modulo>Error`, asi que un error compartido que no extienda esa base se caeria de esos siete catch: seria una regresion en los cinco modulos. La solucion decidida es requireAdmin PARAMETRIZADO POR EL ERROR: identity publica una implementacion generica que recibe una fabrica de error, y el requireAdmin de cada modulo la envuelve pasandole su propio UnauthorizedError. Una sola definicion de la regla, cada modulo conserva su jerarquia de errores, cero cambio de comportamiento.\n\nLA GUARDIA. Entra una guardia ejecutable en tests/guards que barre lib/modules y da rojo si el literal 'Administrador' aparece declarado fuera de identity/domain/roles.ts. Mismo patron que QC-61 propone para la columna de empresa. Sin ella la ficha limpia el presente y no el futuro, que es justo el motivo por el que existe: cuatro modulos declararon el suyo teniendo uno bueno delante.\n\nEL VALOR DE LA CADENA NO PUEDE CAMBIAR, solo de donde se lee: 'Administrador' viaja FIRMADO en la cookie de sesion (QC-8/QC-9) y esta en SEED_ROLES, o sea en la base. Renombrarlo invalidaria todas las sesiones vivas y desalinearia el seed.\n\nDOS CORRECCIONES A LA VERSION ANTERIOR DE ESTA DESCRIPCION, las dos medidas en el arbol el 2026-09-07 al acotar la ficha:\n\n1. Decia que «solo proveedores importa el de identity». Son DOS: pedidos/domain/actor.ts tambien importa ROLE_ADMINISTRADOR. Los dos son el patron destino, no trabajo pendiente.\n2. Decia que el import de QC-22 «encendio un centinela que prohibia importar el barrel de inventario como valor fuera de lib/composition, y se acoto el centinela para resolverlo». Es falso en las dos mitades. lib/composition/** NUNCA estuvo vigilado: no esta entre las raicesVigiladas del centinela, asi que el barrido no llega a leer sus archivos y route-role-rules.ts quedo satisfecho POR CONSTRUCCION, no por una exencion. Y la acotacion del centinela del 2026-09-03 fue por OTRA cosa: permitir que un formulario de cliente importe un esquema zod del contrato. Mover el import a identity no revierte nada y no hay deuda de centinela que cerrar aqui.\n\nTampoco hay riesgo en el borde, tambien medido: route-guard-middleware.ts, que si esta en el cierre que vigila guard-middleware-edge, ya importa el barrel de identity COMO VALOR (decideRouteAccess, isSessionExpired). Que route-role-rules.ts lea de ahi ROLE_ADMINISTRADOR no anade un solo import nuevo al borde.\n\nNO ENTRA: nada de UI (no se abre app/ ni components/), ningun cambio en db/, y el tipo Actor -que tambien esta copiado en los cinco modulos- se queda como esta: son dos campos, y compartirlo acoplaria los tipos de dominio de cinco modulos para ahorrar cuatro lineas.\n\nSIN E2E, diferido aqui y con motivo: es un refactor sin cambio de comportamiento observable. La prueba de que nada se movio son los tests de autorizacion que ya existen en los cinco modulos, que deben seguir verdes sin tocarlos salvo el import.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -971,6 +971,38 @@
         "QC-48"
       ],
       "spec_path": "specs/QC-69-alta-de-usuarios"
+    },
+    {
+      "key": "QC-70",
+      "id": 70,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "errores-centralizados",
+      "description": "Hoy cada modulo lanza y traduce sus propios errores por su cuenta, y el mensaje que ve quien llama depende de donde nacio. Esta ficha centraliza eso: un solo tipo de error que atraviesa las capas, y un catalogo unico donde cada codigo tiene asociado su mensaje — por ejemplo, el codigo 30 corresponde a \"usuario inactivo\". Quien lanza el error indica el codigo; el mensaje sale del catalogo y no se escribe suelto en cada sitio.\n\nEntra el tipo de error unico, el catalogo de codigos con su mensaje, y el punto donde ese error se convierte en la respuesta que sale al cliente.\n\nNO entra el identificador de peticion ni lo que se escribe en los logs: eso va en la ficha del identificador de peticion, que depende de esta.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-70-errores-centralizados",
+      "depends_on": null,
+      "spec_path": "specs/QC-70-errores-centralizados"
+    },
+    {
+      "key": "QC-71",
+      "id": 71,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "identificador-de-request",
+      "description": "Cuando algo falla no hay forma de encontrar rapido en los logs la peticion concreta que fallo. Hace falta un middleware que genere un identificador para cada peticion que entra, y que ese identificador viaje a lo largo de toda la peticion, de modo que quede en los registros que esa peticion produce y se pueda buscar por el.\n\nCuando la peticion termina en error, el identificador acompana al error, para que quien lo reporta pueda decir cual buscar.\n\nNO entra el catalogo de codigos ni el tipo de error unico: eso es la ficha de errores centralizados, de la que esta depende.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-71-identificador-de-request",
+      "depends_on": [
+        "QC-70"
+      ],
+      "spec_path": "specs/QC-71-identificador-de-request"
     }
   ]
 }

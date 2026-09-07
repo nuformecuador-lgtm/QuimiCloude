@@ -15,7 +15,7 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
 | QC-48 | tenant-en-la-sesion | Multiempresa | backend | in_progress | feature/QC-48-tenant-en-la-sesion | implementer (**spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*). R1–R28, 14 tasks, sin migración y sin dependencia nueva |
-| QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | pending → F1.2 | feature/QC-54-unificar-constante-rol-administrador | leader (worktree montado desde `origin/dev`=`738d9a9`, sin spec: pendiente de decidir si se acota con `/afinar-feature`) |
+| QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | spec_ready | feature/QC-54-unificar-constante-rol-administrador | esperando aprobación humana del spec (F1.4). Tarjeta en *En revisión*, commit `5782dd1` en la rama |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -1836,6 +1836,22 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### `docs/jira.md` documenta cinco columnas del board que ya no existen (2026-09-07, hallazgo de QC-54)
+
+Al hacer F1.3 de QC-54 la tabla de `docs/jira.md > 3` no sirvió: mapea `Backlog`,
+**`Spec en revisión`**, `En curso`, `Hecho` y `Cancelado`, y el board real tiene **`Por hacer`,
+`En curso`, `En revisión`, `Finalizado` y `Cancelado`**. Tres de los cinco nombres cambiaron, y
+el que más importa —la puerta de aprobación humana— es justo uno de ellos.
+
+**No lo resolví adivinando: lo resolví leyendo el precedente.** QC-23 lleva desde el 2026-09-03 en
+`spec_ready` y su tarjeta está en **`En revisión`** (id de transición `31`). O sea la convención
+viva del board es `spec_ready` → *En revisión*, y así se movió QC-54.
+
+**Por qué queda aquí y no arreglado:** `docs/jira.md` es arnés, y el arnés se cambia por
+`/afinar-regla` (CLAUDE.md, mapa rápido), no en caliente desde el ciclo de una feature. El parche
+es la tabla de columnas y las dos menciones a *Spec en revisión* de las líneas ~40 y ~173-174.
+Mientras no se aplique, cada F1.3 futuro vuelve a tropezar con lo mismo.
 
 ### FALSA ALARMA, y la lección vale más que el susto: el gate rojo era `dev` atrasado (2026-09-06)
 
