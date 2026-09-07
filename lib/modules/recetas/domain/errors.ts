@@ -19,7 +19,7 @@ export abstract class RecetasError extends Error {
   }
 }
 
-/** R2, R3: actor sin rol Administrador, o sin actor. */
+/** QC-74 (R14, R15): actor ausente, o sin el permiso exigido en su conjunto. */
 export class UnauthorizedError extends RecetasError {
   readonly code = 'unauthorized';
 

@@ -28,8 +28,16 @@ import type { PresentationView } from '@/lib/modules/inventario/domain/presentat
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 
-const ADMIN: Actor = { id: 'actor-admin', roleName: 'Administrador' };
-const OPERADOR: Actor = { id: 'actor-operador', roleName: 'Operador' };
+/** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
+ *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
+const ADMIN: Actor = {
+  id: 'actor-admin',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
+};
+
+/** QC-74 (R13, R14): actor con el conjunto VACIO. Sustituye al viejo "rol Operador": desde
+ *  QC-74 el Operador SI tiene `inventario.consultar`, asi que ya no sirve como caso de rechazo. */
+const SIN_PERMISO: Actor = { id: 'actor-sin-permiso', permissions: [] };
 
 const PRESENTACION: PresentationView = {
   id: 'presentacion-1',
@@ -219,23 +227,23 @@ describe('list-presentations', () => {
 });
 
 describe('autorizacion de los cuatro casos de uso (complemento a T8)', () => {
-  it('rechaza al Operador en crear, renombrar, borrar y listar sin llamar al puerto', async () => {
+  it('rechaza al actor sin permiso en crear, renombrar, borrar y listar sin llamar al puerto', async () => {
     const presentations = montarRepositorio();
     const createPresentation = createCreatePresentation({ presentations });
     const updatePresentation = createUpdatePresentation({ presentations });
     const deletePresentation = createDeletePresentation({ presentations });
     const listPresentations = createListPresentations({ presentations, log: logDoble() });
 
-    await expect(createPresentation({ name: 'Bidon 20 L' }, OPERADOR)).rejects.toThrow(
+    await expect(createPresentation({ name: 'Bidon 20 L' }, SIN_PERMISO)).rejects.toThrow(
       UnauthorizedError,
     );
     await expect(
-      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L' }, OPERADOR),
+      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L' }, SIN_PERMISO),
     ).rejects.toThrow(UnauthorizedError);
-    await expect(deletePresentation(PRESENTACION.id, OPERADOR)).rejects.toThrow(
+    await expect(deletePresentation(PRESENTACION.id, SIN_PERMISO)).rejects.toThrow(
       UnauthorizedError,
     );
-    await expect(listPresentations({ page: 1 }, OPERADOR)).rejects.toThrow(UnauthorizedError);
+    await expect(listPresentations({ page: 1 }, SIN_PERMISO)).rejects.toThrow(UnauthorizedError);
 
     expect(presentations.create).not.toHaveBeenCalled();
     expect(presentations.rename).not.toHaveBeenCalled();

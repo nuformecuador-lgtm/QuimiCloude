@@ -90,7 +90,7 @@ Cada task del bloque hace lo mismo en su modulo: `Actor` pasa a `{ id, permissio
 renombra el export, y el adaptador driving construye el actor con `permissions`. **Ningun bloque de
 traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R15).
 
-- [ ] **T9. [P] `inventario`.**
+- [x] **T9. [P] `inventario`.**
       Archivos: `lib/modules/inventario/domain/actor.ts`, `.../domain/{get-product,list-products,
       list-presentations,create-product,update-product,delete-product,create-presentation,
       update-presentation,delete-presentation}.ts`, `lib/modules/inventario/index.ts`,
@@ -101,14 +101,14 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
       rechazo sin el, incluyendo el cruzado (`inventario.consultar` no abre una escritura y viceversa)
       (R13, R16, R17), y el rechazo ocurre sin tocar ningun puerto (espias sin llamadas) (R12).
 
-- [ ] **T10. [P] `recetas`.**
+- [x] **T10. [P] `recetas`.**
       Archivos: `lib/modules/recetas/domain/actor.ts`, `.../domain/{get-recipe,list-recipes,
       create-recipe,update-recipe,delete-recipe}.ts`, `lib/modules/recetas/index.ts`,
       `lib/modules/recetas/adapters/driving/recipe-actions.ts`,
       `tests/unit/recetas/authorization.test.ts` (+ los `tests/unit/recetas/*.test.ts` con `Actor`).
       **Hecho cuando**: mismo criterio que T9 para los cinco casos de uso.
 
-- [ ] **T11. [P] `unidades`.**
+- [x] **T11. [P] `unidades`.**
       Archivos: `lib/modules/unidades/domain/actor.ts`, `lib/modules/unidades/domain/list-units.ts`,
       `lib/modules/unidades/index.ts`,
       `lib/modules/unidades/adapters/driving/unit-actions.ts`,
@@ -117,7 +117,7 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
       rol (`''`, `null`, `'Operador'`, `'Administradores externos'`) pasan a probar rechazo por
       conjunto de permisos (R14, R16).
 
-- [ ] **T12. [P] `proveedores`.**
+- [x] **T12. [P] `proveedores`.**
       Archivos: `lib/modules/proveedores/domain/actor.ts`, `.../domain/{get-supplier,list-suppliers,
       list-catalog-lines,create-supplier,update-supplier,delete-supplier,create-catalog-line,
       update-catalog-line,delete-catalog-line}.ts`, `lib/modules/proveedores/index.ts`,
@@ -126,7 +126,7 @@ traduccion de errores cambia**: `error instanceof <Modulo>Error` sigue igual (R1
       `Actor`).
       **Hecho cuando**: mismo criterio que T9 para los nueve casos de uso.
 
-- [ ] **T13. [P] `pedidos`.**
+- [x] **T13. [P] `pedidos`.**
       Archivos: `lib/modules/pedidos/domain/actor.ts`, `.../domain/{get-order,list-orders,
       create-order,update-order,cancel-order,delete-order}.ts`, `lib/modules/pedidos/index.ts`,
       `lib/modules/pedidos/adapters/driving/order-actions.ts`,

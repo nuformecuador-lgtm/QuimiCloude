@@ -1,19 +1,24 @@
-// T8 -- El test de autorizacion de los NUEVE casos de uso (design.md > 12, cuarto aviso;
-// tasks.md > T8; requirements.md R1, R2, R3). Es la unica red que existe para R2/R3: un
-// service test de un solo caso de uso puede seguir verde aunque `requireAdmin` desaparezca
-// de otro archivo (ya paso una vez en esta feature con `create-product.ts`), asi que aqui
-// se barren los nueve, uno por uno, con un doble que FALLA si lo llaman.
+// T9 -- El test de autorizacion de los NUEVE casos de uso de `inventario`, reescrito por
+// QC-74 (requirements.md R12-R18; design.md > 5; tasks.md bloque E). Sustituye al barrido
+// por rol de QC-20/QC-54: ahora cada caso de uso exige un CODIGO del catalogo
+// (`inventario.consultar` / `inventario.modificar`), y este archivo es la unica red que
+// existe para R16/R17 -las guardias de texto no pueden ver si el codigo exigido es el
+// correcto (design.md > 6.2, ultimo parrafo)-.
+//
+// Sigue siendo un barrido de los nueve, con dobles de puerto que FALLAN si los llaman: un
+// service test de un solo caso de uso puede quedarse verde aunque la comprobacion
+// desaparezca de otro archivo (ya paso una vez en esta feature con `create-product.ts`).
 
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import { PERMISSIONS, type PermissionCode } from '@/lib/modules/identity';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeletePresentation } from '@/lib/modules/inventario/domain/delete-presentation';
 import { createDeleteProduct } from '@/lib/modules/inventario/domain/delete-product';
-import { UnauthorizedError } from '@/lib/modules/inventario/domain/errors';
+import { InventarioError, UnauthorizedError } from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
@@ -24,8 +29,15 @@ import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
-const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
+/** Los dos codigos de este modulo (R16). `satisfies` los ata a la union del catalogo: un
+ *  codigo mal escrito aqui no compila, no falla en tiempo de ejecucion. */
+const CONSULTAR = 'inventario.consultar' satisfies PermissionCode;
+const MODIFICAR = 'inventario.modificar' satisfies PermissionCode;
+
+/** Actor con un conjunto de permisos EXACTO: es lo que hace visible el cruce de R13. */
+function actorCon(...permissions: readonly PermissionCode[]): Actor {
+  return { id: `actor-${permissions.join('+') || 'sin-permisos'}`, permissions };
+}
 
 /** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
  *  del 2026-09-03 los volvio obligatorios en `createProductSchema`; `minPurchase` se fue
@@ -39,13 +51,17 @@ const PRODUCTO_VALIDO = {
 
 const PRESENTACION_VALIDA = { name: 'Bidon 20 L' };
 
+/** Entrada que zod rechaza sin dudarlo: es la que demuestra R12 -el permiso se mira ANTES
+ *  de validar-. */
+const ENTRADA_INVALIDA = { campo: 'que no existe', name: 42 };
+
 /**
  * Doble del puerto de producto que FALLA si cualquiera de sus metodos es llamado
- * (design.md > 12, cuarto aviso): "un doble que registre la llamada y un
+ * (design.md de QC-20 > 12, cuarto aviso): "un doble que registre la llamada y un
  * `expect(...).not.toHaveBeenCalled()`; si el doble es permisivo, el test pasaria con la
  * autorizacion puesta despues de la consulta". `vi.fn` registra la llamada Y lanza, asi
  * que este test puede afirmar las DOS cosas: que se rechaza con `UnauthorizedError` y que
- * ningun metodo del puerto se toco.
+ * ningun metodo del puerto se toco (QC-74 R12, R14).
  */
 function repositorioProductoQueFalla(): ProductRepository {
   const explota = () => {
@@ -92,11 +108,51 @@ type Repos = {
   readonly log: ListQueryLog;
 };
 
-function montarRepos(): Repos {
+function montarReposQueFallan(): Repos {
   return {
     products: repositorioProductoQueFalla(),
     presentations: repositorioPresentacionQueFalla(),
     log: logQueFalla(),
+  };
+}
+
+const PRODUCTO_EN_BASE = {
+  id: 'producto-1',
+  name: 'Acido sulfurico',
+  presentationId: '11111111-1111-4111-8111-111111111111',
+  presentationName: 'Bidon 20 L',
+  stock: 0,
+  qtyAlert: 0,
+  unitId: null,
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  createdBy: null,
+  updatedBy: null,
+};
+
+const PAGINA_VACIA = { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 };
+
+/**
+ * Dobles PERMISIVOS: los de la mitad de la CONCESION (R17). Devuelven lo minimo para que el
+ * caso de uso llegue hasta el final sin lanzar, de modo que la ausencia de error demuestre
+ * que el permiso concedio de verdad, y no que el caso murio antes por otra razon.
+ */
+function montarReposPermisivos(): Repos {
+  return {
+    products: {
+      create: vi.fn<ProductRepository['create']>(async () => ({ id: 'producto-1' })),
+      findAliveById: vi.fn<ProductRepository['findAliveById']>(async () => PRODUCTO_EN_BASE),
+      updateAlive: vi.fn<ProductRepository['updateAlive']>(async () => true),
+      softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(async () => true),
+      listAlive: vi.fn<ProductRepository['listAlive']>(async () => PAGINA_VACIA),
+    },
+    presentations: {
+      create: vi.fn<PresentationRepository['create']>(async () => ({ id: 'presentacion-1' })),
+      rename: vi.fn<PresentationRepository['rename']>(async () => 'ok'),
+      deleteById: vi.fn<PresentationRepository['deleteById']>(async () => 'deleted'),
+      list: vi.fn<PresentationRepository['list']>(async () => PAGINA_VACIA),
+    },
+    log: { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>(() => undefined) },
   };
 }
 
@@ -111,7 +167,7 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.presentations.rename).not.toHaveBeenCalled(),
     () => expect(repos.presentations.deleteById).not.toHaveBeenCalled(),
     () => expect(repos.presentations.list).not.toHaveBeenCalled(),
-    // QC-57 R34: sin permiso no se toca el repositorio NI se registra nada en el log.
+    // QC-57 R34 / QC-74 R12: sin permiso no se toca el repositorio NI se registra nada en el log.
     () => expect(repos.log.ignoredFields).not.toHaveBeenCalled(),
   ];
 }
@@ -120,166 +176,331 @@ function afirmarQueNingunMetodoFueLlamado(repos: Repos): void {
   for (const afirmar of todosLosMetodos(repos)) afirmar();
 }
 
+type Invocacion = (repos: Repos, actor: Actor | null | undefined) => Promise<unknown>;
+
 /**
- * Tabla de los NUEVE casos de uso (design.md > 3): construirla como tabla, recorrida en
- * bucle, es lo que el prompt pide para que anadir un caso de uso manana sea trivial y
- * olvidarlo en el test sea visible -en vez de nueve bloques copiados a mano. `invocar`
- * recibe el repositorio como parametro (no capturado por closure), asi cada iteracion del
- * bucle puede montar un repositorio NUEVO por caso y el aislamiento es real.
+ * La tabla de R16 hecha codigo: los NUEVE casos de uso con el codigo EXACTO que cada uno
+ * exige. Recorrerla en bucle es lo que hace que anadir un caso de uso manana sea trivial y
+ * olvidarlo aqui, visible. `invocar` recibe el repositorio como parametro (no capturado por
+ * closure), asi cada iteracion monta un repositorio NUEVO y el aislamiento es real.
+ * `invocarConEntradaInvalida` es `null` en los tres casos que no reciben entrada validable
+ * -solo un identificador-.
  */
 const CASOS_DE_USO: ReadonlyArray<{
   readonly nombre: string;
-  readonly invocar: (repos: Repos, actor: Actor | null | undefined) => Promise<unknown>;
+  readonly permiso: PermissionCode;
+  readonly invocar: Invocacion;
+  readonly invocarConEntradaInvalida: Invocacion | null;
 }> = [
   {
     nombre: 'create-product',
+    permiso: MODIFICAR,
     invocar: (repos, actor) =>
       createCreateProduct({ products: repos.products })(PRODUCTO_VALIDO, actor),
-  },
-  {
-    nombre: 'get-product',
-    invocar: (repos, actor) => createGetProduct({ products: repos.products })('producto-1', actor),
-  },
-  {
-    nombre: 'list-products',
-    invocar: (repos, actor) =>
-      createListProducts({ products: repos.products, log: repos.log })({}, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createCreateProduct({ products: repos.products })(ENTRADA_INVALIDA, actor),
   },
   {
     nombre: 'update-product',
+    permiso: MODIFICAR,
     invocar: (repos, actor) =>
       createUpdateProduct({ products: repos.products })('producto-1', PRODUCTO_VALIDO, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createUpdateProduct({ products: repos.products })('producto-1', ENTRADA_INVALIDA, actor),
   },
   {
     nombre: 'delete-product',
-    invocar: (repos, actor) => createDeleteProduct({ products: repos.products })('producto-1', actor),
+    permiso: MODIFICAR,
+    invocar: (repos, actor) =>
+      createDeleteProduct({ products: repos.products })('producto-1', actor),
+    invocarConEntradaInvalida: null,
   },
   {
     nombre: 'create-presentation',
+    permiso: MODIFICAR,
     invocar: (repos, actor) =>
       createCreatePresentation({ presentations: repos.presentations })(PRESENTACION_VALIDA, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createCreatePresentation({ presentations: repos.presentations })(ENTRADA_INVALIDA, actor),
   },
   {
     nombre: 'update-presentation',
+    permiso: MODIFICAR,
     invocar: (repos, actor) =>
       createUpdatePresentation({ presentations: repos.presentations })(
         'presentacion-1',
         PRESENTACION_VALIDA,
         actor,
       ),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createUpdatePresentation({ presentations: repos.presentations })(
+        'presentacion-1',
+        ENTRADA_INVALIDA,
+        actor,
+      ),
   },
   {
     nombre: 'delete-presentation',
+    permiso: MODIFICAR,
     invocar: (repos, actor) =>
       createDeletePresentation({ presentations: repos.presentations })('presentacion-1', actor),
+    invocarConEntradaInvalida: null,
+  },
+  {
+    nombre: 'get-product',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) => createGetProduct({ products: repos.products })('producto-1', actor),
+    invocarConEntradaInvalida: null,
+  },
+  {
+    nombre: 'list-products',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) =>
+      createListProducts({ products: repos.products, log: repos.log })({}, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createListProducts({ products: repos.products, log: repos.log })(ENTRADA_INVALIDA, actor),
   },
   {
     nombre: 'list-presentations',
+    permiso: CONSULTAR,
     invocar: (repos, actor) =>
       createListPresentations({ presentations: repos.presentations, log: repos.log })({}, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createListPresentations({ presentations: repos.presentations, log: repos.log })(
+        ENTRADA_INVALIDA,
+        actor,
+      ),
   },
 ];
 
+const CASOS_DE_LECTURA = CASOS_DE_USO.filter((caso) => caso.permiso === CONSULTAR);
+const CASOS_DE_ESCRITURA = CASOS_DE_USO.filter((caso) => caso.permiso === MODIFICAR);
+
+/** Rechazo + ningun efecto, en una sola afirmacion reutilizable (R12, R14, R15). */
+async function esperarRechazoSinEfectos(
+  invocar: Invocacion,
+  actor: Actor | null | undefined,
+  mensaje: string,
+): Promise<void> {
+  const repos = montarReposQueFallan();
+
+  await expect(invocar(repos, actor), mensaje).rejects.toBeInstanceOf(UnauthorizedError);
+  // R15: el error de autorizacion es el del PROPIO modulo y subclase de su error raiz, que
+  // es lo que hace que los adaptadores driving lo sigan serializando con su comprobacion
+  // `error instanceof InventarioError` y con el mismo codigo estable.
+  await expect(invocar(montarReposQueFallan(), actor), mensaje).rejects.toBeInstanceOf(
+    InventarioError,
+  );
+  afirmarQueNingunMetodoFueLlamado(repos);
+}
+
+/** Concesion: no basta con «no lanzo UnauthorizedError», tiene que no lanzar NADA (R17). */
+async function esperarConcesion(
+  invocar: Invocacion,
+  actor: Actor,
+  mensaje: string,
+): Promise<void> {
+  const repos = montarReposPermisivos();
+  let capturado: unknown = null;
+
+  try {
+    await invocar(repos, actor);
+  } catch (error) {
+    capturado = error;
+  }
+
+  expect(capturado, mensaje).toBeNull();
+}
+
 /**
- * QC-52 (R25): el fixture tiene que ser entrada VALIDA. Si dejara de serlo -y con el
- * `strictObject` de R1 basta un campo de mas para que lo sea-, los casos de abajo
- * seguirian rojos... por `ValidationError`, no por `UnauthorizedError`, y el test dejaria
- * de medir que el permiso se comprueba ANTES de zod y ANTES de tocar el puerto. Este
- * ancla lo hace imposible de pasar por alto.
+ * Anclas contra el verde por vacuidad. Si la tabla se quedara corta -o el fixture dejara de
+ * ser entrada valida-, todo lo de abajo seguiria en verde midiendo otra cosa.
  */
-describe('QC-52 R25 — el fixture con el que se mide el permiso es entrada valida', () => {
-  it('PRODUCTO_VALIDO pasa createProductSchema, asi que el rechazo solo puede venir del permiso', () => {
-    expect(createProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
+describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => {
+  it('cubre los nueve casos de uso: seis de modificacion y tres de consulta', () => {
+    expect(CASOS_DE_USO).toHaveLength(9);
+    expect(CASOS_DE_ESCRITURA.map((caso) => caso.nombre)).toEqual([
+      'create-product',
+      'update-product',
+      'delete-product',
+      'create-presentation',
+      'update-presentation',
+      'delete-presentation',
+    ]);
+    expect(CASOS_DE_LECTURA.map((caso) => caso.nombre)).toEqual([
+      'get-product',
+      'list-products',
+      'list-presentations',
+    ]);
   });
 
-  it('las cinco operaciones del producto estan en la tabla que se barre', () => {
-    // R25 nombra las cinco por su nombre: crear, listar, consultar ficha, editar y dar de
-    // baja. Si alguna se cayera de `CASOS_DE_USO`, el bucle seguiria verde con cuatro.
-    const nombres = CASOS_DE_USO.map((caso) => caso.nombre);
-    expect(nombres).toEqual(
-      expect.arrayContaining([
-        'create-product',
-        'list-products',
-        'get-product',
-        'update-product',
-        'delete-product',
-      ]),
-    );
+  it('los dos codigos exigidos existen en el catalogo real de identity', () => {
+    // Derivado del catalogo, no de una copia a mano: si `PERMISSIONS` dejara de declarar
+    // uno de los dos, esto es rojo aqui y no una FK rota en el despliegue.
+    const codigos = PERMISSIONS.map((permiso) => permiso.code);
+    expect(codigos).toContain(CONSULTAR);
+    expect(codigos).toContain(MODIFICAR);
+  });
+
+  it('PRODUCTO_VALIDO pasa createProductSchema y ENTRADA_INVALIDA no', () => {
+    // QC-52 R25: si el fixture dejara de ser entrada valida -y con `strictObject` basta un
+    // campo de mas-, los rechazos de abajo seguirian rojos por `ValidationError` y este
+    // archivo dejaria de medir el permiso. El segundo `expect` ancla lo simetrico: la
+    // entrada invalida tiene que ser invalida de verdad para que R12 signifique algo.
+    expect(createProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
+    expect(createProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
   });
 });
 
-describe('R2 — rechazo de Operador', () => {
-  it('un actor con rol Operador es rechazado en los nueve casos de uso sin llamar al repositorio', async () => {
-    // Verificacion de que la tabla cubre las nueve factories reales -si un caso de uso
-    // nuevo se anade a domain/ y no se agrega aqui, este numero deja de coincidir.
-    expect(CASOS_DE_USO).toHaveLength(9);
-
-    // Repositorio NUEVO por caso: un fallo en cualquiera de los nueve queda aislado.
+describe('QC-74 R17 — concesion con el permiso exigido', () => {
+  it('cada caso de uso concede al actor cuyo conjunto contiene su codigo exacto', async () => {
     for (const caso of CASOS_DE_USO) {
-      const repos = montarRepos();
+      await esperarConcesion(
+        caso.invocar,
+        actorCon(caso.permiso),
+        `${caso.nombre} deberia conceder a un actor con ${caso.permiso}`,
+      );
+    }
+  });
 
-      await expect(
-        caso.invocar(repos, OPERADOR),
-        `${caso.nombre} deberia rechazar al Operador`,
-      ).rejects.toBeInstanceOf(UnauthorizedError);
-      afirmarQueNingunMetodoFueLlamado(repos);
+  it('concede sea cual sea el nombre del rol: solo cuenta el conjunto de permisos', async () => {
+    // El nombre del rol ya no existe en el `Actor` (R18). Lo unico que decide es la
+    // pertenencia del codigo al conjunto, aunque vengan los diez del catalogo.
+    const todos = PERMISSIONS.map((permiso) => permiso.code);
+
+    for (const caso of CASOS_DE_USO) {
+      await esperarConcesion(
+        caso.invocar,
+        { id: 'actor-con-el-catalogo-entero', permissions: todos },
+        `${caso.nombre} deberia conceder a un actor con el catalogo completo`,
+      );
     }
   });
 });
 
-describe('R3 — rechazo de actores invalidos', () => {
-  const actoresInvalidos: ReadonlyArray<{ readonly etiqueta: string; readonly actor: Actor | null | undefined }> = [
+describe('QC-74 R12/R15 — rechazo sin el permiso exigido, sin efectos y con el error del modulo', () => {
+  it('cada caso de uso rechaza con UnauthorizedError, que es un InventarioError, sin tocar ningun puerto', async () => {
+    for (const caso of CASOS_DE_USO) {
+      await esperarRechazoSinEfectos(
+        caso.invocar,
+        actorCon(),
+        `${caso.nombre} deberia rechazar a un actor sin ${caso.permiso}`,
+      );
+    }
+  });
+
+  it('rechaza por permiso ANTES de validar la entrada, incluso con entrada invalida', async () => {
+    // R12 en su forma exacta: la comprobacion va antes de zod. Si el orden se invirtiera,
+    // aqui saldria `ValidationError` -y un actor sin permiso habria averiguado algo del
+    // sistema que no tenia derecho a preguntar-.
+    const conEntrada = CASOS_DE_USO.filter((caso) => caso.invocarConEntradaInvalida !== null);
+    expect(conEntrada).toHaveLength(6);
+
+    for (const caso of conEntrada) {
+      const invocar = caso.invocarConEntradaInvalida;
+      if (invocar === null) throw new Error('inalcanzable: ya filtrado');
+
+      await esperarRechazoSinEfectos(
+        invocar,
+        actorCon(),
+        `${caso.nombre} con entrada invalida deberia rechazar por permiso, no por validacion`,
+      );
+    }
+  });
+});
+
+describe('QC-74 R13 — pertenencia exacta, sin jerarquia ni implicacion entre permisos', () => {
+  it('un actor con solo inventario.consultar es rechazado en los seis casos de escritura', async () => {
+    expect(CASOS_DE_ESCRITURA).toHaveLength(6);
+
+    for (const caso of CASOS_DE_ESCRITURA) {
+      await esperarRechazoSinEfectos(
+        caso.invocar,
+        actorCon(CONSULTAR),
+        `${caso.nombre} no debe concederse por tener ${CONSULTAR}`,
+      );
+    }
+  });
+
+  it('un actor con solo inventario.modificar es rechazado en los tres casos de lectura', async () => {
+    expect(CASOS_DE_LECTURA).toHaveLength(3);
+
+    for (const caso of CASOS_DE_LECTURA) {
+      await esperarRechazoSinEfectos(
+        caso.invocar,
+        actorCon(MODIFICAR),
+        `${caso.nombre} no debe concederse por tener ${MODIFICAR}`,
+      );
+    }
+  });
+
+  it('no hay coincidencia parcial, comodin ni normalizacion del codigo', async () => {
+    // `inventario.consultarlo` contiene al codigo como prefijo y `INVENTARIO.CONSULTAR`
+    // solo se diferencia en las mayusculas: un `startsWith`, un `trim` o un `toLowerCase`
+    // dentro de la regla dejaria pasar a alguno de estos cinco.
+    const casiPermisos = [
+      'inventario.consultarlo',
+      'INVENTARIO.CONSULTAR',
+      ' inventario.consultar',
+      'inventario',
+      '*',
+    ];
+    const consultar = CASOS_DE_LECTURA[0];
+    if (consultar === undefined) throw new Error('la tabla se quedo sin casos de lectura');
+
+    for (const casi of casiPermisos) {
+      await esperarRechazoSinEfectos(
+        consultar.invocar,
+        { id: 'actor-casi', permissions: [casi] },
+        `"${casi}" no deberia conceder ${CONSULTAR}`,
+      );
+    }
+  });
+});
+
+describe('QC-74 R14 — falla cerrado', () => {
+  const actoresInvalidos: ReadonlyArray<{
+    readonly etiqueta: string;
+    readonly actor: Actor | null | undefined;
+  }> = [
     { etiqueta: 'actor undefined', actor: undefined },
     { etiqueta: 'actor null', actor: null },
-    { etiqueta: 'roleName null', actor: { id: 'sin-rol-1', roleName: null } },
-    { etiqueta: 'roleName vacio', actor: { id: 'sin-rol-2', roleName: '' } },
-    {
-      etiqueta: 'rol desconocido, no colado por un includes parcial',
-      actor: { id: 'externo-1', roleName: 'Administradores externos' },
-    },
+    { etiqueta: 'conjunto de permisos vacio', actor: { id: 'sin-permisos-1', permissions: [] } },
+    // Un actor que llega sin el campo -una sesion vieja, un doble mal montado-: la regla
+    // tiene que rechazarlo igual, no explotar con un TypeError que nadie traduce.
+    { etiqueta: 'sin campo permissions', actor: { id: 'sin-campo-1' } as unknown as Actor },
   ];
 
-  it('un actor ausente, con rol nulo o con rol desconocido es rechazado igual que el Operador', async () => {
+  it('un actor ausente, sin conjunto de permisos o con el conjunto vacio es rechazado en los nueve', async () => {
     for (const { etiqueta, actor } of actoresInvalidos) {
       for (const caso of CASOS_DE_USO) {
-        const repos = montarRepos();
-
-        await expect(
-          caso.invocar(repos, actor),
+        await esperarRechazoSinEfectos(
+          caso.invocar,
+          actor,
           `${caso.nombre} deberia rechazar con ${etiqueta}`,
-        ).rejects.toBeInstanceOf(UnauthorizedError);
-        afirmarQueNingunMetodoFueLlamado(repos);
+        );
       }
     }
   });
 });
 
-describe('R1 — el actor entra por parametro', () => {
-  it('cada caso de uso recibe el actor por parametro y no lee ninguna sesion', async () => {
-    // El doble aqui es PERMISIVO a proposito (a diferencia de los de arriba): lo que se
-    // prueba en esta mitad no es "no llega al repositorio" (eso ya lo cierra R2), sino que
-    // el resultado depende UNICAMENTE del actor que se pasa por parametro -mismo caso de
-    // uso, mismo doble, solo cambia el argumento `actor`.
-    const products: ProductRepository = {
-      create: vi.fn<ProductRepository['create']>(async () => ({ id: 'producto-1' })),
-      findAliveById: vi.fn<ProductRepository['findAliveById']>(async () => null),
-      updateAlive: vi.fn<ProductRepository['updateAlive']>(async () => true),
-      softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(async () => true),
-      listAlive: vi.fn<ProductRepository['listAlive']>(async () => ({
-        items: [],
-        total: 0,
-        page: 1,
-        pageSize: 10,
-        totalPages: 1,
-      })),
-    };
-    const createProduct = createCreateProduct({ products });
+describe('R1 / QC-74 R18 — el actor entra por parametro y no trae nombre de rol', () => {
+  it('el resultado depende UNICAMENTE del actor que se pasa por parametro', async () => {
+    // El doble aqui es PERMISIVO a proposito: lo que se prueba en esta mitad no es "no
+    // llega al repositorio" (eso ya lo cierran los bloques de arriba), sino que el mismo
+    // caso de uso con el mismo doble da resultados distintos cambiando solo `actor`.
+    const repos = montarReposPermisivos();
+    const createProduct = createCreateProduct({ products: repos.products });
 
-    await expect(createProduct(PRODUCTO_VALIDO, ADMIN)).resolves.toEqual({ id: 'producto-1' });
-    await expect(createProduct(PRODUCTO_VALIDO, OPERADOR)).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(createProduct(PRODUCTO_VALIDO, actorCon(MODIFICAR))).resolves.toEqual({
+      id: 'producto-1',
+    });
+    await expect(createProduct(PRODUCTO_VALIDO, actorCon(CONSULTAR))).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
   });
 
-  it('ningun archivo de domain/ lee sesion, cookie ni cabecera por su cuenta', () => {
+  it('ningun archivo de domain/ lee sesion, cookie, cabecera ni nombre de rol', () => {
     const directorioDominio = path.join(process.cwd(), 'lib', 'modules', 'inventario', 'domain');
     const archivos = readdirSync(directorioDominio).filter((archivo) => archivo.endsWith('.ts'));
 
@@ -288,11 +509,19 @@ describe('R1 — el actor entra por parametro', () => {
     expect(archivos.length).toBeGreaterThan(0);
 
     const patronesProhibidos = [
-      "next/headers",
-      "cookies(",
-      "headers(",
-      "getSessionUser",
-      "lib/composition",
+      'next/headers',
+      'cookies(',
+      'headers(',
+      'getSessionUser',
+      'lib/composition',
+      // QC-74 R18: el nombre del rol no entra en este modulo, ni como campo del actor ni
+      // como comparacion. La guardia de `tests/guards/` lo vigila para los cinco modulos;
+      // esto lo ancla tambien aqui, junto al resto del contrato del actor.
+      'roleName',
+      'ROLE_ADMINISTRADOR',
+      'ROLE_OPERADOR',
+      'assertAdminRole',
+      'requireAdmin',
     ];
 
     for (const archivo of archivos) {
@@ -300,14 +529,12 @@ describe('R1 — el actor entra por parametro', () => {
       // Se quitan los comentarios de bloque y de linea antes de comparar: este mismo
       // modulo documenta la regla en prosa ("no se lee `next/headers`..."), y esa PROSA
       // no debe hacer fallar al barrido -lo que vigila el test es CODIGO, no comentarios.
-      const contenido = contenidoCrudo
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/\/\/.*$/gm, '');
+      const contenido = contenidoCrudo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
       for (const patron of patronesProhibidos) {
         expect(
           contenido.includes(patron),
-          `${archivo} no deberia contener "${patron}" fuera de un comentario (R1: el actor entra por parametro)`,
+          `${archivo} no deberia contener "${patron}" fuera de un comentario (R1, QC-74 R18)`,
         ).toBe(false);
       }
     }

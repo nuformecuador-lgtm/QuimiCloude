@@ -13,11 +13,12 @@ import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
+// QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
+// Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
+const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
 
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 

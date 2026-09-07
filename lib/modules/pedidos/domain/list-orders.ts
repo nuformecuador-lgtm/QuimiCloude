@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { toOrderView } from './get-order';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
@@ -88,8 +88,8 @@ function pruneClosedSelects(query: ListQuery): {
  * Listado paginado de pedidos con el CONTRATO GENERICO de consulta (QC-57 T13, R25, R30, R33;
  * QC-34 R34-R46), en el ORDEN EXACTO de `design.md > 1` y `> 6.4`:
  *
- *   1. `requireAdmin` PRIMERO, siempre (R33, R34, decision cerrada 1 de QC-34): antes de zod y
- *      antes de tocar el puerto.
+ *   1. `requirePermission(actor, 'pedidos.consultar')` PRIMERO, siempre (QC-74 R12, R16): antes
+ *      de zod y antes de tocar el puerto.
  *   2. zod DENTRO del caso de uso (R30). Valida la FORMA; un campo no declarado no puede hacer
  *      fallar la consulta (R5).
  *   3. `sanitizeListQuery` contra `ORDER_QUERYABLE` (R4, R5, R7, R8), mas la poda de los
@@ -124,7 +124,7 @@ export function createListOrders(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<Page<OrderSummary>> {
-    requireAdmin(actor);
+    requirePermission(actor, 'pedidos.consultar');
 
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

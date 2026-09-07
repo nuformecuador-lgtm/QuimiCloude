@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { DuplicateNameError, NotFoundError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
@@ -50,7 +50,8 @@ async function removeImageSafely(
 }
 
 /**
- * Edicion de receta (R6, R11, R13, R37, R45-R49). `requireAdmin` es la PRIMERA linea,
+ * Edicion de receta (R6, R11, R13, R37, R45-R49). `requirePermission(actor, 'recetas.modificar')` es la
+ * PRIMERA linea,
  * luego se valida la forma de `input` (`updateRecipeSchema`) y SOLO DESPUES se lee la
  * receta viva -para conocer su `imagePath` anterior y las lineas que ya tenia (R45)-,
  * respondiendo `NotFoundError` si no existe o ya esta borrada (R37). Ese orden evita
@@ -66,7 +67,7 @@ export function createUpdateRecipe(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<UpdateRecipeResult> {
-    requireAdmin(actor);
+    requirePermission(actor, 'recetas.modificar');
 
     const parsed = updateRecipeSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

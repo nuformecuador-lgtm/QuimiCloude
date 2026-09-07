@@ -2,7 +2,7 @@
 // Regla: solo reexporta de ./domain. Nada de 'use server', nada de Prisma, nada de next/*.
 // Debe poder importarse desde un componente de cliente sin arrastrar servidor (R31,
 // `design.md > 3`) -QC-22 lo hara-.
-export { requireAdmin, type Actor } from './domain/actor';
+export { requirePermission, type Actor } from './domain/actor';
 export {
   InventarioError,
   UnauthorizedError,

@@ -34,9 +34,9 @@ import {
  * EL ACTOR sale de `identity.getSessionUser()` via `@/lib/composition` (R5, decision cerrada
  * 18): ningun caso de uso lee sesion, cookie ni cabecera por su cuenta. Sin cookie de sesion
  * valida `getSessionUser` devuelve `null`, y entonces el actor que llega al caso de uso es
- * `null`: R3 lo rechaza igual que un rol desconocido, falla cerrado.
+ * `null`: el caso de uso lo rechaza igual que un actor sin el permiso, falla cerrado.
  *
- * LA ACTION NO DECIDE NADA (R5): no repite `requireAdmin` -ya es la primera linea de los seis
+ * LA ACTION NO DECIDE NADA (R5): no repite `requirePermission` -ya es la primera linea de los seis
  * casos de uso-, no comprueba estados, no evalua transiciones y no aplica ninguna otra regla.
  * Solo traduce `FormData`/argumentos a la entrada del caso de uso, y el resultado o el error
  * a un estado serializable.
@@ -97,7 +97,7 @@ function toErrorState(error: unknown): { status: 'error'; code: string; message:
 async function currentActor(): Promise<Actor | null> {
   const sessionUser = await identity.getSessionUser();
   if (sessionUser === null) return null;
-  return { id: sessionUser.id, roleName: sessionUser.roleName };
+  return { id: sessionUser.id, permissions: sessionUser.permissions };
 }
 
 function readFormString(formData: FormData, name: string): string {

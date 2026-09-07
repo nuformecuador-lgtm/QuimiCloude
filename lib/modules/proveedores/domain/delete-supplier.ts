@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError } from './errors';
 
 import type { SupplierRepository } from '../ports/supplier-repository';
@@ -24,7 +24,7 @@ export function createDeleteSupplier(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'proveedores.modificar');
 
     // false = no existe o ya estaba dado de baja: mismo caso (R24).
     const deleted = await deps.suppliers.softDeleteAlive(id, actor.id, now());

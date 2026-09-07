@@ -19,7 +19,7 @@ export abstract class UnidadesError extends Error {
   }
 }
 
-/** R41: actor sin rol Administrador, o sin actor. */
+/** QC-74 (R14, R15): actor sin el permiso exigido, sin conjunto de permisos, o sin actor. */
 export class UnauthorizedError extends UnidadesError {
   readonly code = 'unauthorized';
 

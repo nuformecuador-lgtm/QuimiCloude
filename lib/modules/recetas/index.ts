@@ -2,7 +2,7 @@
 // Solo reexporta de ./domain. Debe poder importarse desde un componente de cliente
 // sin arrastrar servidor: nada de 'use server', @prisma/client ni next/* en su cierre de
 // imports.
-export { requireAdmin, type Actor } from './domain/actor';
+export { requirePermission, type Actor } from './domain/actor';
 export {
   RecetasError,
   UnauthorizedError,

@@ -50,7 +50,16 @@ const ADMIN_SESSION_USER = {
   id: 'user-admin-1',
   username: 'ana.perez',
   displayName: 'Ana Perez',
+  // `roleName` se queda porque `SessionUser` lo conserva para pintar (display), pero la
+  // action YA NO lo lee: QC-74 (R18) construye el actor con `permissions` y nada mas.
   roleName: 'Administrador',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
+};
+
+/** El actor que la action debe construir a partir de esa sesion (QC-74, design.md > 4). */
+const ADMIN_ACTOR = {
+  id: 'user-admin-1',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
 function formDataOf(fields: Record<string, string>): FormData {
@@ -77,7 +86,7 @@ describe('createPresentationAction', () => {
 
     expect(getSessionUserMock).toHaveBeenCalledTimes(1);
     const [, actor] = createPresentationMock.mock.calls[0] as [unknown, unknown];
-    expect(actor).toEqual({ id: 'user-admin-1', roleName: 'Administrador' });
+    expect(actor).toEqual(ADMIN_ACTOR);
   });
 
   it('devuelve exito con el id creado cuando el caso de uso resuelve', async () => {
@@ -168,7 +177,7 @@ describe('updatePresentationAction', () => {
     expect(updatePresentationMock).toHaveBeenCalledWith(
       'presentation-1',
       { name: 'Bidon 20 L' },
-      { id: 'user-admin-1', roleName: 'Administrador' },
+      ADMIN_ACTOR,
     );
   });
 
@@ -233,10 +242,7 @@ describe('deletePresentationAction', () => {
       formDataOf({ id: 'presentation-1' }),
     );
 
-    expect(deletePresentationMock).toHaveBeenCalledWith('presentation-1', {
-      id: 'user-admin-1',
-      roleName: 'Administrador',
-    });
+    expect(deletePresentationMock).toHaveBeenCalledWith('presentation-1', ADMIN_ACTOR);
     expect(result).toEqual({ status: 'success' });
   });
 
@@ -277,7 +283,7 @@ describe('listPresentationsAction', () => {
     expect(getSessionUserMock).toHaveBeenCalledTimes(1);
     expect(listPresentationsMock).toHaveBeenCalledWith(
       { page: 1, pageSize: 10 },
-      { id: 'user-admin-1', roleName: 'Administrador' },
+      ADMIN_ACTOR,
     );
     expect(result).toEqual({ status: 'success', data: page });
   });

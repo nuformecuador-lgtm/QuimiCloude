@@ -11,7 +11,6 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/proveedores/domain/errors';
 import { createListCatalogLines } from '@/lib/modules/proveedores/domain/list-catalog-lines';
 import { createListSuppliers } from '@/lib/modules/proveedores/domain/list-suppliers';
@@ -25,8 +24,12 @@ import type { ListQueryLog } from '@/lib/modules/proveedores/ports/list-query-lo
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
-const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
+// QC-74: el actor ya no lleva nombre de rol (R18), lleva su conjunto de permisos (R13). El
+// autorizado tiene los dos codigos de `proveedores`; el Operador conserva su nombre porque su
+// conjunto es EXACTAMENTE el que le siembra el seed —solo `inventario.consultar`—, que no abre
+// nada de este modulo.
+const ADMIN: Actor = { id: 'admin-1', permissions: ['proveedores.consultar', 'proveedores.modificar'] };
+const OPERADOR: Actor = { id: 'operador-1', permissions: ['inventario.consultar'] };
 const SUPPLIER_ID = '22222222-2222-4222-8222-222222222222';
 
 function paginaVacia<T>(): Page<T> {

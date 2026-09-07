@@ -1,23 +1,35 @@
-import { assertAdminRole } from '@/lib/modules/identity';
+import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
-/** Actor de entrada de cada caso de uso (R1): id y rol, nada mas. */
+/**
+ * Actor de entrada de cada caso de uso: id y CONJUNTO DE PERMISOS, nada mas. QC-74 (R18)
+ * retiro el nombre del rol: ningun caso de uso ni adaptador de este modulo lee, compara ni
+ * recibe el nombre del rol —eso es display, y vive en `identity`—.
+ */
 export type Actor = {
   readonly id: string;
-  readonly roleName: string | null;
+  readonly permissions: readonly string[];
 };
 
 /**
- * Primera linea de los cinco casos de uso (R2, R3). Falla cerrado: actor ausente, rol
- * nulo, vacio o distinto del rol Administrador se rechazan igual, todos con el mismo
- * error de autorizacion, y ANTES de tocar cualquier puerto -repositorio, catalogo de
- * productos o almacenamiento de imagenes-.
+ * Primera linea de los cinco casos de uso (R12): ANTES de zod y ANTES de tocar cualquier
+ * puerto -repositorio, catalogo de productos, catalogo de unidades o almacenamiento de
+ * imagenes-.
  *
- * La comparacion es de igualdad exacta, sin `includes` ni normalizacion (R3): un rol
- * llamado "Administradores externos" no debe colarse. Delega en `assertAdminRole` de
- * `identity`, que es la unica implementacion de la regla.
+ * Falla cerrado (R14): actor ausente, sin conjunto de permisos, con el conjunto vacio o sin
+ * el codigo exigido se rechazan todos igual, con el mismo `UnauthorizedError` de ESTE modulo
+ * —subclase de `RecetasError`—, de modo que el adaptador driving lo sigue serializando con su
+ * `error instanceof RecetasError` y el mismo `code` estable (R15).
+ *
+ * La comparacion es de pertenencia EXACTA, sin normalizacion, sin coincidencia parcial y sin
+ * ninguna implicacion entre permisos (R13): `recetas.modificar` NO concede
+ * `recetas.consultar`, ni al reves. Delega en `assertPermission` de `identity`, que es la
+ * unica implementacion de la regla.
  */
-export function requireAdmin(actor: Actor | null | undefined): asserts actor is Actor {
-  assertAdminRole(actor, () => new UnauthorizedError());
+export function requirePermission(
+  actor: Actor | null | undefined,
+  permission: PermissionCode,
+): asserts actor is Actor {
+  assertPermission(actor, permission, () => new UnauthorizedError());
 }

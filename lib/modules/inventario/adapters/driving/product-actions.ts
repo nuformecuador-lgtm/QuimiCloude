@@ -35,7 +35,7 @@ import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/
  * FK de R7; QC-8 ya sustituyo ese cableado en `lib/composition`, sin que `inventario`
  * tuviera que cambiar una linea, tal como preveia D17.)
  *
- * LA ACTION NO DECIDE NADA (R31): no repite `requireAdmin` -ya es la primera linea de cada
+ * LA ACTION NO DECIDE NADA (R31): no repite `requirePermission` -ya es la primera linea de cada
  * caso de uso- ni ninguna regla de negocio. Solo traduce `FormData`/argumentos a la
  * entrada del caso de uso, y el resultado o el error del caso de uso a un estado
  * serializable.
@@ -120,7 +120,7 @@ function toErrorState(error: unknown): { status: 'error'; code: string; message:
 async function currentActor(): Promise<Actor | null> {
   const sessionUser = await identity.getSessionUser();
   if (sessionUser === null) return null;
-  return { id: sessionUser.id, roleName: sessionUser.roleName };
+  return { id: sessionUser.id, permissions: sessionUser.permissions };
 }
 
 /**

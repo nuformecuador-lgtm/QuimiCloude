@@ -1,29 +1,40 @@
-// T8 -- El test de autorizacion de los CINCO casos de uso (design.md > 4, 14, cuarto
-// aviso; tasks.md > T8; requirements.md R1, R2, R3). Es la unica red que existe para
-// R2/R3: un service test de un solo caso de uso puede seguir verde aunque `requireAdmin`
-// desaparezca de otro archivo, asi que aqui se barren los cinco, uno por uno, con dobles
-// de los CUATRO puertos -repositorio, catalogo de productos, catalogo de unidades (R50) y
-// almacenamiento- que FALLAN si se les llama.
+// QC-74 T10 — Test de autorizacion POR PERMISO de los CINCO casos de uso de `recetas`
+// (`requirements.md` R12-R18, R24; `design.md > 5`; `tasks.md > T10`).
+//
+// Sustituye al centinela por ROL de QC-54: ya no existe nombre de rol en el `Actor` (R18), asi
+// que la pregunta pasa de «es Administrador» a «su conjunto contiene el codigo exigido». Es la
+// unica red que existe para R16: un service test de un solo caso de uso puede seguir verde
+// aunque el codigo exigido en otro archivo sea el equivocado, asi que aqui se barren los cinco,
+// uno por uno, con dobles de los CUATRO puertos -repositorio, catalogo de productos, catalogo
+// de unidades y almacenamiento- que FALLAN si se les llama.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
-import { UnauthorizedError } from '@/lib/modules/recetas/domain/errors';
+import { RecetasError, UnauthorizedError } from '@/lib/modules/recetas/domain/errors';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
-import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import { PERMISSIONS } from '@/lib/modules/identity';
 import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
-const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
+/** Los dos codigos que este modulo puede exigir (R16). */
+const CONSULTAR = 'recetas.consultar';
+const MODIFICAR = 'recetas.modificar';
+
+/** Un actor con exactamente los permisos que se le pasen, y ninguno mas. */
+function actorCon(...permisos: readonly string[]): Actor {
+  return { id: 'actor-1', permissions: permisos };
+}
+
+const AHORA = new Date('2026-09-07T10:00:00.000Z');
 
 const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
@@ -33,12 +44,22 @@ const RECETA_VALIDA = {
 };
 
 /**
- * Dobles de los TRES puertos que FALLAN si cualquiera de sus metodos es llamado
- * (design.md > 14, cuarto aviso): "un doble que registre la llamada y un
- * `expect(...).not.toHaveBeenCalled()`; si el doble es permisivo, el test pasaria con la
- * autorizacion puesta despues de la consulta". `vi.fn` registra la llamada Y lanza, asi
- * que este test puede afirmar las DOS cosas: que se rechaza con `UnauthorizedError` y que
- * ningun metodo de ningun puerto se toco.
+ * Entrada que zod RECHAZARIA (`name` en blanco). Sirve para R12: si el permiso se comprobara
+ * despues de validar, un actor sin permiso recibiria `ValidationError` y sabria algo del
+ * sistema sin tener derecho a preguntarlo.
+ */
+const RECETA_INVALIDA = {
+  name: '   ',
+  description: null,
+  steps: [],
+  lines: [],
+};
+
+/**
+ * Dobles de los CUATRO puertos que FALLAN si cualquiera de sus metodos es llamado: `vi.fn`
+ * registra la llamada Y lanza, asi que el test puede afirmar las DOS cosas -que se rechaza con
+ * `UnauthorizedError` y que ningun puerto se toco (R12, R14)-. Un doble permisivo dejaria pasar
+ * una autorizacion puesta despues de la consulta.
  */
 function repositorioQueFalla(): RecipeRepository {
   const explota = () => {
@@ -57,18 +78,14 @@ function catalogoQueFalla(): ProductCatalog {
   const explota = () => {
     throw new Error('el catalogo de productos no debe ser llamado');
   };
-  return {
-    findRefs: vi.fn<ProductCatalog['findRefs']>(explota),
-  };
+  return { findRefs: vi.fn<ProductCatalog['findRefs']>(explota) };
 }
 
 function catalogoUnidadesQueFalla(): UnitCatalog {
   const explota = () => {
     throw new Error('el catalogo de unidades no debe ser llamado');
   };
-  return {
-    findRefs: vi.fn<UnitCatalog['findRefs']>(explota),
-  };
+  return { findRefs: vi.fn<UnitCatalog['findRefs']>(explota) };
 }
 
 function almacenamientoQueFalla(): RecipeImageStorage {
@@ -89,12 +106,45 @@ type Puertos = {
   readonly images: RecipeImageStorage;
 };
 
-function montarPuertos(): Puertos {
+function montarPuertosQueFallan(): Puertos {
   return {
     recipes: repositorioQueFalla(),
     products: catalogoQueFalla(),
     units: catalogoUnidadesQueFalla(),
     images: almacenamientoQueFalla(),
+  };
+}
+
+const FILA_RECETA: RecipeRow = {
+  id: 'receta-1',
+  name: 'Desengrasante 5%',
+  description: null,
+  steps: [],
+  imagePath: null,
+  createdBy: 'actor-1',
+  updatedBy: 'actor-1',
+  createdAt: AHORA,
+  updatedAt: AHORA,
+  lines: [],
+};
+
+/** Dobles PERMISIVOS, para la mitad de CONCESION: aqui el caso de uso debe llegar al puerto. */
+function montarPuertosPermisivos(): Puertos {
+  return {
+    recipes: {
+      create: vi.fn<RecipeRepository['create']>(async () => ({ id: 'receta-1' })),
+      findAliveById: vi.fn<RecipeRepository['findAliveById']>(async () => FILA_RECETA),
+      listAlive: vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 })),
+      replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(async () => 'ok'),
+      softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
+    },
+    products: { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) },
+    units: { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) },
+    images: {
+      upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/x.jpg'),
+      remove: vi.fn<RecipeImageStorage['remove']>(async () => undefined),
+      publicUrl: vi.fn<RecipeImageStorage['publicUrl']>((ruta) => `https://bucket.example/${ruta}`),
+    },
   };
 }
 
@@ -112,94 +162,210 @@ function afirmarQueNingunPuertoFueLlamado(puertos: Puertos): void {
 }
 
 /**
- * Tabla de los CINCO casos de uso (design.md > 3): construirla como tabla, recorrida en
- * bucle, es lo que hace que anadir un caso de uso manana sea trivial y olvidarlo en el
- * test sea visible.
+ * La fila R16 de este modulo: cinco casos de uso, dos codigos. Construirla como tabla,
+ * recorrida en bucle, es lo que hace que anadir un caso de uso manana sea trivial y olvidarlo
+ * en el test sea visible.
  */
 const CASOS_DE_USO: ReadonlyArray<{
   readonly nombre: string;
-  readonly invocar: (puertos: Puertos, actor: Actor | null | undefined) => Promise<unknown>;
+  readonly permiso: string;
+  readonly invocar: (
+    puertos: Puertos,
+    actor: Actor | null | undefined,
+    entrada?: unknown,
+  ) => Promise<unknown>;
 }> = [
   {
-    nombre: 'create-recipe',
+    nombre: 'getRecipe',
+    permiso: CONSULTAR,
     invocar: (puertos, actor) =>
+      createGetRecipe({
+        recipes: puertos.recipes,
+        products: puertos.products,
+        images: puertos.images,
+      })('receta-1', actor),
+  },
+  {
+    nombre: 'listRecipes',
+    permiso: CONSULTAR,
+    invocar: (puertos, actor, entrada) =>
+      createListRecipes({
+        recipes: puertos.recipes,
+        images: puertos.images,
+        // Doble mudo: este archivo comprueba el PERMISO, no el log de campos omitidos.
+        log: { ignoredFields: vi.fn() },
+        toOffsetLimit: () => ({ offset: 0, limit: 10 }),
+        buildPage: (items, total, page, pageSize) => ({
+          items,
+          total,
+          page,
+          pageSize,
+          totalPages: 1,
+        }),
+      })(entrada ?? {}, actor),
+  },
+  {
+    nombre: 'createRecipe',
+    permiso: MODIFICAR,
+    invocar: (puertos, actor, entrada) =>
       createCreateRecipe({
         recipes: puertos.recipes,
         products: puertos.products,
         units: puertos.units,
         images: puertos.images,
-      })(RECETA_VALIDA, actor),
+      })(entrada ?? RECETA_VALIDA, actor),
   },
   {
-    nombre: 'get-recipe',
-    invocar: (puertos, actor) =>
-      createGetRecipe({ recipes: puertos.recipes, products: puertos.products, images: puertos.images })(
-        'receta-1',
-        actor,
-      ),
-  },
-  {
-    nombre: 'list-recipes',
-    invocar: (puertos, actor) =>
-      createListRecipes({
-        recipes: puertos.recipes,
-        images: puertos.images,
-        // QC-57 (R6): el caso de uso gana el puerto del log de campos omitidos. Doble mudo:
-        // este archivo comprueba el PERMISO, no el log.
-        log: { ignoredFields: vi.fn() },
-        toOffsetLimit: () => ({ offset: 0, limit: 10 }),
-        buildPage: (items, total, page, pageSize) => ({ items, total, page, pageSize, totalPages: 1 }),
-      })({}, actor),
-  },
-  {
-    nombre: 'update-recipe',
-    invocar: (puertos, actor) =>
+    nombre: 'updateRecipe',
+    permiso: MODIFICAR,
+    invocar: (puertos, actor, entrada) =>
       createUpdateRecipe({
         recipes: puertos.recipes,
         products: puertos.products,
         units: puertos.units,
         images: puertos.images,
-      })('receta-1', RECETA_VALIDA, actor),
+      })('receta-1', entrada ?? RECETA_VALIDA, actor),
   },
   {
-    nombre: 'delete-recipe',
+    nombre: 'deleteRecipe',
+    permiso: MODIFICAR,
     invocar: (puertos, actor) => createDeleteRecipe({ recipes: puertos.recipes })('receta-1', actor),
   },
 ];
 
-describe('R2 — rechazo de Operador', () => {
-  it('un actor con rol Operador es rechazado en los cinco casos de uso sin llamar a ningun puerto', async () => {
-    expect(CASOS_DE_USO).toHaveLength(5);
+/** Entrada invalida por caso de uso, para R12. Los que no toman entrada no aparecen aqui. */
+const ENTRADA_INVALIDA: Readonly<Record<string, unknown>> = {
+  listRecipes: { page: -7, pageSize: 'muchas' },
+  createRecipe: RECETA_INVALIDA,
+  updateRecipe: RECETA_INVALIDA,
+};
 
+describe('QC-74 R16/R17 — cada caso de uso exige exactamente el codigo de la tabla', () => {
+  it('los dos codigos de este modulo existen en el catalogo real de `identity`', () => {
+    const codigos = PERMISSIONS.map((permiso) => permiso.code);
+    expect(codigos).toContain(CONSULTAR);
+    expect(codigos).toContain(MODIFICAR);
+  });
+
+  it('R16 — la tabla cubre los cinco casos de uso de `recetas`, cada uno con su codigo', () => {
+    expect(CASOS_DE_USO).toHaveLength(5);
+    expect(CASOS_DE_USO.map((caso) => `${caso.nombre}:${caso.permiso}`)).toEqual([
+      'getRecipe:recetas.consultar',
+      'listRecipes:recetas.consultar',
+      'createRecipe:recetas.modificar',
+      'updateRecipe:recetas.modificar',
+      'deleteRecipe:recetas.modificar',
+    ]);
+  });
+
+  it('R17 — con el codigo exacto en su conjunto, el caso de uso CONCEDE', async () => {
     for (const caso of CASOS_DE_USO) {
-      const puertos = montarPuertos();
+      const puertos = montarPuertosPermisivos();
 
       await expect(
-        caso.invocar(puertos, OPERADOR),
-        `${caso.nombre} deberia rechazar al Operador`,
+        caso.invocar(puertos, actorCon(caso.permiso)),
+        `${caso.nombre} deberia conceder con ${caso.permiso}`,
+      ).resolves.not.toThrow();
+    }
+  });
+
+  it('R17 — concede sea cual sea el resto del conjunto: el rol ya no interviene (R18)', async () => {
+    for (const caso of CASOS_DE_USO) {
+      const puertos = montarPuertosPermisivos();
+
+      await expect(
+        caso.invocar(puertos, actorCon('inventario.consultar', caso.permiso, 'pedidos.modificar')),
+        `${caso.nombre} deberia conceder con ${caso.permiso} entre otros`,
+      ).resolves.not.toThrow();
+    }
+  });
+
+  it('R16 — sin el codigo exigido se rechaza, aunque tenga los de otros modulos', async () => {
+    for (const caso of CASOS_DE_USO) {
+      const puertos = montarPuertosQueFallan();
+
+      await expect(
+        caso.invocar(
+          puertos,
+          actorCon('inventario.consultar', 'inventario.modificar', 'pedidos.modificar'),
+        ),
+        `${caso.nombre} deberia rechazar sin ${caso.permiso}`,
       ).rejects.toBeInstanceOf(UnauthorizedError);
       afirmarQueNingunPuertoFueLlamado(puertos);
     }
   });
 });
 
-describe('R3 — rechazo de actores invalidos', () => {
-  const actoresInvalidos: ReadonlyArray<{ readonly etiqueta: string; readonly actor: Actor | null | undefined }> = [
+describe('QC-74 R13 — pertenencia exacta, sin implicacion entre permisos', () => {
+  it('R13 — solo `recetas.consultar` NO abre ninguna de las tres escrituras', async () => {
+    const escrituras = CASOS_DE_USO.filter((caso) => caso.permiso === MODIFICAR);
+    expect(escrituras).toHaveLength(3);
+
+    for (const caso of escrituras) {
+      const puertos = montarPuertosQueFallan();
+
+      await expect(
+        caso.invocar(puertos, actorCon(CONSULTAR)),
+        `${caso.nombre} no deberia abrirse con ${CONSULTAR}`,
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+      afirmarQueNingunPuertoFueLlamado(puertos);
+    }
+  });
+
+  it('R13 — solo `recetas.modificar` NO abre ninguna de las dos lecturas', async () => {
+    const lecturas = CASOS_DE_USO.filter((caso) => caso.permiso === CONSULTAR);
+    expect(lecturas).toHaveLength(2);
+
+    for (const caso of lecturas) {
+      const puertos = montarPuertosQueFallan();
+
+      await expect(
+        caso.invocar(puertos, actorCon(MODIFICAR)),
+        `${caso.nombre} no deberia abrirse con ${MODIFICAR}`,
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+      afirmarQueNingunPuertoFueLlamado(puertos);
+    }
+  });
+
+  it('R13 — un prefijo o una variante del codigo no se cuela por coincidencia parcial', async () => {
+    const impostores = [
+      'recetas',
+      'recetas.',
+      'recetas.consultar.todo',
+      'RECETAS.CONSULTAR',
+      'consultar',
+    ];
+
+    for (const caso of CASOS_DE_USO) {
+      for (const impostor of impostores) {
+        const puertos = montarPuertosQueFallan();
+
+        await expect(
+          caso.invocar(puertos, actorCon(impostor)),
+          `${caso.nombre} no deberia aceptar "${impostor}"`,
+        ).rejects.toBeInstanceOf(UnauthorizedError);
+        afirmarQueNingunPuertoFueLlamado(puertos);
+      }
+    }
+  });
+});
+
+describe('QC-74 R14 — falla cerrado', () => {
+  const actoresInvalidos: ReadonlyArray<{
+    readonly etiqueta: string;
+    readonly actor: Actor | null | undefined;
+  }> = [
     { etiqueta: 'actor undefined', actor: undefined },
     { etiqueta: 'actor null', actor: null },
-    { etiqueta: 'roleName null', actor: { id: 'sin-rol-1', roleName: null } },
-    { etiqueta: 'roleName vacio', actor: { id: 'sin-rol-2', roleName: '' } },
-    {
-      etiqueta: 'rol desconocido, no colado por un includes parcial',
-      actor: { id: 'externo-1', roleName: 'Administradores externos' },
-    },
-    { etiqueta: 'rol desconocido, Fantasma', actor: { id: 'fantasma-1', roleName: 'Fantasma' } },
+    { etiqueta: 'conjunto de permisos vacio', actor: actorCon() },
+    // Un actor que llegue de un borde sin tipar puede no traer el campo: se rechaza igual.
+    { etiqueta: 'sin campo de permisos', actor: { id: 'sin-permisos-1' } as unknown as Actor },
   ];
 
-  it('un actor ausente, con rol nulo o con rol desconocido es rechazado igual que el Operador', async () => {
+  it('R14 — actor ausente, sin conjunto o con el conjunto vacio se rechaza en los cinco casos, sin efectos', async () => {
     for (const { etiqueta, actor } of actoresInvalidos) {
       for (const caso of CASOS_DE_USO) {
-        const puertos = montarPuertos();
+        const puertos = montarPuertosQueFallan();
 
         await expect(
           caso.invocar(puertos, actor),
@@ -211,40 +377,52 @@ describe('R3 — rechazo de actores invalidos', () => {
   });
 });
 
-describe('R1 — el actor entra por parametro', () => {
-  it('cada caso de uso recibe el actor por parametro y no lee ninguna sesion', async () => {
-    // El doble aqui es PERMISIVO a proposito (a diferencia de los de arriba): lo que se
-    // prueba en esta mitad no es "no llega al repositorio" (eso ya lo cierra R2), sino que
-    // el resultado depende UNICAMENTE del actor que se pasa por parametro.
-    const recipes: RecipeRepository = {
-      create: vi.fn<RecipeRepository['create']>(async () => ({ id: 'receta-1' })),
-      findAliveById: vi.fn<RecipeRepository['findAliveById']>(async () => null),
-      listAlive: vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 })),
-      replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(async () => 'ok'),
-      softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
-    };
-    const products: ProductCatalog = { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
-    const units: UnitCatalog = { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) };
-    const images: RecipeImageStorage = {
-      upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/x.jpg'),
-      remove: vi.fn<RecipeImageStorage['remove']>(async () => undefined),
-      publicUrl: vi.fn<RecipeImageStorage['publicUrl']>((path) => `https://bucket.example/${path}`),
-    };
-    const createRecipe = createCreateRecipe({ recipes, products, units, images });
+describe('QC-74 R15 — el error de autorizacion es el del propio modulo', () => {
+  it('R15 — el rechazo lanza el `UnauthorizedError` de `recetas`, que ES un `RecetasError`', async () => {
+    for (const caso of CASOS_DE_USO) {
+      const puertos = montarPuertosQueFallan();
+      const error = await caso.invocar(puertos, actorCon()).catch((e: unknown) => e);
 
-    await expect(createRecipe(RECETA_VALIDA, ADMIN)).resolves.toEqual({ id: 'receta-1' });
-    await expect(createRecipe(RECETA_VALIDA, OPERADOR)).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(error, `${caso.nombre} deberia lanzar UnauthorizedError`).toBeInstanceOf(
+        UnauthorizedError,
+      );
+      // Lo que hace que el adaptador driving NO cambie su bloque de traduccion de errores.
+      expect(error, `${caso.nombre} deberia lanzar un RecetasError`).toBeInstanceOf(RecetasError);
+      expect((error as UnauthorizedError).code).toBe('unauthorized');
+    }
+  });
+});
+
+describe('QC-74 R12 — el permiso se comprueba antes de zod y antes de todo puerto', () => {
+  it('R12 — con entrada invalida, el rechazo es por PERMISO y no por validacion', async () => {
+    for (const caso of CASOS_DE_USO) {
+      const puertos = montarPuertosQueFallan();
+      const entrada = ENTRADA_INVALIDA[caso.nombre];
+      const error = await caso.invocar(puertos, actorCon(), entrada).catch((e: unknown) => e);
+
+      // `ValidationError` tambien es `RecetasError`: la afirmacion util es la clase EXACTA.
+      expect(
+        error,
+        `${caso.nombre} con entrada invalida deberia rechazar por permiso, no por validacion`,
+      ).toBeInstanceOf(UnauthorizedError);
+      afirmarQueNingunPuertoFueLlamado(puertos);
+    }
   });
 
-  it('ningun archivo de domain/ lee sesion, cookie ni cabecera por su cuenta', () => {
+  it('R12 — ningun archivo de domain/ lee sesion, cookie ni cabecera por su cuenta', () => {
     const directorioDominio = path.join(process.cwd(), 'lib', 'modules', 'recetas', 'domain');
     const archivos = readdirSync(directorioDominio).filter((archivo) => archivo.endsWith('.ts'));
 
-    // Un barrido sobre cero archivos pasa siempre y no vigila nada: si esto llega a 0, el
-    // test de abajo es un placebo y hay que fallar aqui mismo, antes de leer nada.
+    // Un barrido sobre cero archivos pasa siempre y no vigila nada.
     expect(archivos.length).toBeGreaterThan(0);
 
-    const patronesProhibidos = ['next/headers', 'cookies(', 'headers(', 'getSessionUser', 'lib/composition'];
+    const patronesProhibidos = [
+      'next/headers',
+      'cookies(',
+      'headers(',
+      'getSessionUser',
+      'lib/composition',
+    ];
 
     for (const archivo of archivos) {
       const contenidoCrudo = readFileSync(path.join(directorioDominio, archivo), 'utf-8');
@@ -253,9 +431,33 @@ describe('R1 — el actor entra por parametro', () => {
       for (const patron of patronesProhibidos) {
         expect(
           contenido.includes(patron),
-          `${archivo} no deberia contener "${patron}" fuera de un comentario (R1: el actor entra por parametro)`,
+          `${archivo} no deberia contener "${patron}" fuera de un comentario (el actor entra por parametro)`,
         ).toBe(false);
       }
     }
+  });
+});
+
+describe('QC-74 R18 — el `Actor` de `recetas` no tiene nombre de rol', () => {
+  it('R18 — ni el tipo ni el adaptador driving nombran el rol del actor', () => {
+    const raiz = path.join(process.cwd(), 'lib', 'modules', 'recetas');
+    const rutaAcciones = path.join(raiz, 'adapters', 'driving', 'recipe-actions.ts');
+    const archivos = [path.join(raiz, 'domain', 'actor.ts'), rutaAcciones];
+
+    for (const archivo of archivos) {
+      const contenido = readFileSync(archivo, 'utf-8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/.*$/gm, '');
+
+      for (const patron of ['roleName', 'ROLE_ADMINISTRADOR', 'assertAdminRole', 'requireAdmin']) {
+        expect(
+          contenido.includes(patron),
+          `${path.basename(archivo)} no deberia contener "${patron}" (R18)`,
+        ).toBe(false);
+      }
+    }
+
+    // Y en positivo: el actor se arma con el conjunto de permisos de la sesion.
+    expect(readFileSync(rutaAcciones, 'utf-8')).toMatch(/permissions:\s*sessionUser\.permissions/);
   });
 });

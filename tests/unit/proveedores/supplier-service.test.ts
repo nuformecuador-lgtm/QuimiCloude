@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity'
 import { createCreateSupplier } from '@/lib/modules/proveedores/domain/create-supplier'
 import { createDeleteSupplier } from '@/lib/modules/proveedores/domain/delete-supplier'
 import { DuplicateNameError, NotFoundError } from '@/lib/modules/proveedores/domain/errors'
@@ -52,7 +51,11 @@ function clavesDelTipoDeps(fuente: string): readonly string[] {
   return [...bloque.matchAll(/^\s*readonly (\w+)\??:/gm)].map((m) => m[1] as string).sort()
 }
 
-const ADMIN: Actor = { id: '11111111-1111-4111-8111-111111111111', roleName: ROLE_ADMINISTRADOR }
+// QC-74 (R18): el actor no lleva nombre de rol, lleva su conjunto de permisos.
+const ADMIN: Actor = {
+  id: '11111111-1111-4111-8111-111111111111',
+  permissions: ['proveedores.consultar', 'proveedores.modificar'],
+}
 const AHORA = new Date('2026-09-03T12:00:00.000Z')
 const now = () => AHORA
 

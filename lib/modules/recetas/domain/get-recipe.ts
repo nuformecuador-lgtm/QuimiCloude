@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError } from './errors';
 import type { RecipeDetail } from './recipe-view';
 
@@ -14,8 +14,9 @@ export type GetRecipeDeps = {
 };
 
 /**
- * Detalle de una receta (R18, R24, R33, R34, R37). `requireAdmin` es la primera linea:
- * consultar tambien exige Administrador (D1), el Operador ni siquiera lee.
+ * Detalle de una receta (R18, R24, R33, R34, R37). `requirePermission(actor,
+ * 'recetas.consultar')` es la primera linea: consultar es su propio permiso y NO lo concede
+ * `recetas.modificar` (QC-74 R13).
  */
 export function createGetRecipe(
   deps: GetRecipeDeps,
@@ -24,7 +25,7 @@ export function createGetRecipe(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<RecipeDetail> {
-    requireAdmin(actor);
+    requirePermission(actor, 'recetas.consultar');
 
     const row = await deps.recipes.findAliveById(id);
     if (row === null) throw new NotFoundError();

@@ -84,7 +84,10 @@ const ADMIN_SESSION_USER = {
   id: 'user-admin-1',
   username: 'ana.perez',
   displayName: 'Ana Perez',
+  // QC-74 T8: `roleName` se queda porque es DISPLAY, pero lo que autoriza es `permissions`
+  // (R18), y es lo unico que la action baja al caso de uso.
   roleName: 'Administrador',
+  permissions: ['proveedores.consultar', 'proveedores.modificar'],
 }
 
 const SUPPLIER_ID = '33333333-3333-4333-8333-333333333333'
@@ -145,7 +148,7 @@ beforeEach(() => {
 })
 
 describe('Server Actions de proveedores — actor, forma de entrada y errores', () => {
-  it('la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el rol', async () => {
+  it('la accion toma el actor de identity.getSessionUser y no vuelve a comprobar el permiso', async () => {
     // R5, primera mitad: el actor sale de la sesion, UNA vez por invocacion, y llega al caso
     // de uso tal cual. Se comprueba en las NUEVE actions, no en una de muestra: una sola que
     // se olvidara de pasarlo dejaria el caso de uso recibiendo `undefined`.
@@ -159,7 +162,10 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
     deleteCatalogLineMock.mockResolvedValue(undefined)
     listCatalogLinesMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 })
 
-    const ESPERADO = { id: 'user-admin-1', roleName: 'Administrador' }
+    const ESPERADO = {
+      id: 'user-admin-1',
+      permissions: ['proveedores.consultar', 'proveedores.modificar'],
+    }
 
     await createSupplierAction(CREATE_SUPPLIER_INITIAL, formDataOf(VALID_SUPPLIER_FIELDS))
     expect(createSupplierMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
@@ -203,11 +209,13 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
     expect(sinSesion).toEqual({ status: 'error', code: 'unauthorized', message: expect.any(String) })
 
     // R5, segunda mitad: la action NO decide. Ningun archivo de `adapters/driving/` nombra
-    // `requireAdmin`, el rol, ni ninguna de las reglas de negocio del dominio -normalizacion
+    // la comprobacion de permiso, el rol, ni ninguna regla de negocio del dominio -normalizacion
     // del nombre, esquemas de entrada, paginacion-. Todo eso vive en el caso de uso.
     for (const file of ACTION_FILES) {
       const source = readSource(file)
-      expect(source, `${file} repite la comprobacion de rol`).not.toMatch(/requireAdmin/)
+      expect(source, `${file} repite la comprobacion de permiso`).not.toMatch(
+        /require(Admin|Permission)/,
+      )
       expect(source, `${file} incrusta el nombre del rol`).not.toMatch(/Administrador/)
       expect(source, `${file} incrusta ROLE_ADMINISTRADOR`).not.toMatch(/ROLE_ADMINISTRADOR/)
       expect(source, `${file} valida con el esquema del dominio`).not.toMatch(/Schema\b/)

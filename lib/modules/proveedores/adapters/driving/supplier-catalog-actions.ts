@@ -61,7 +61,7 @@ function toErrorState(error: unknown): { status: 'error'; code: string; message:
 async function currentActor(): Promise<Actor | null> {
   const sessionUser = await identity.getSessionUser();
   if (sessionUser === null) return null;
-  return { id: sessionUser.id, roleName: sessionUser.roleName };
+  return { id: sessionUser.id, permissions: sessionUser.permissions };
 }
 
 function readFormString(formData: FormData, name: string): string {

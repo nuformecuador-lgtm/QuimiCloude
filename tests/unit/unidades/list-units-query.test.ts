@@ -23,8 +23,12 @@ import type { UnitRef } from '@/lib/modules/unidades/domain/unit-catalog';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: 'Administrador' };
-const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
+/** QC-74 (R16, R17, R18): el actor autorizado lo es por TENER `'unidades.consultar'`, no por
+ *  llamarse Administrador —el `Actor` de `unidades` ya no tiene nombre de rol—. */
+const CON_PERMISO: Actor = { id: 'admin-1', permissions: ['unidades.consultar'] };
+
+/** El que antes era el `Operador`: ahora es «un actor con permisos de OTRO modulo» (R13, R14). */
+const SIN_PERMISO: Actor = { id: 'operador-1', permissions: ['inventario.consultar'] };
 
 const CATALOGO: readonly UnitRef[] = [
   { id: 'unit-1', name: 'Gramo', symbol: 'g' },
@@ -67,7 +71,7 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
     // tocarlo: `listUnitsAction()` sigue recibiendo un array de `UnitRef`, no una pagina.
     const { units, listUnits } = montar();
 
-    const resultado = await listUnits(undefined, ADMIN);
+    const resultado = await listUnits(undefined, CON_PERMISO);
 
     expect(resultado).toEqual(CATALOGO);
     expect(Array.isArray(resultado)).toBe(true);
@@ -82,7 +86,7 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
     // convierte la salida en una pagina.
     const { units, listUnits } = montar();
 
-    const resultado = await listUnits({ sort: { columnId: 'symbol', direction: 'desc' } }, ADMIN);
+    const resultado = await listUnits({ sort: { columnId: 'symbol', direction: 'desc' } }, CON_PERMISO);
 
     expect(isUnitPage(resultado)).toBe(false);
     expect(units.listAll).toHaveBeenCalledTimes(1);
@@ -94,7 +98,7 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
     // trae la URL y la forma de la salida sale de la forma de la entrada.
     const { units, listUnits } = montar();
 
-    const resultado = await listUnits({ page: 2 }, ADMIN);
+    const resultado = await listUnits({ page: 2 }, CON_PERMISO);
 
     expect(isUnitPage(resultado)).toBe(true);
     expect(resultado).toEqual(PAGINA);
@@ -109,7 +113,7 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
     // aqui se comprueba que el `pageSize` pedido llega entero y sin rechazarse.
     const { units, listUnits } = montar();
 
-    const resultado = await listUnits({ pageSize: 100 }, ADMIN);
+    const resultado = await listUnits({ pageSize: 100 }, CON_PERMISO);
 
     expect(isUnitPage(resultado)).toBe(true);
     expect(consultaDeLaPagina(units.listPage.mock.calls).pageSize).toBe(100);
@@ -120,7 +124,7 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
     // significa que no consulte.
     const { units, listUnits } = montar();
 
-    await listUnits({ sort: { columnId: 'name', direction: 'desc' }, search: 'litro' }, ADMIN);
+    await listUnits({ sort: { columnId: 'name', direction: 'desc' }, search: 'litro' }, CON_PERMISO);
 
     const query = consultaDelCatalogo(units.listAll.mock.calls);
     expect(query.sort).toEqual({ columnId: 'name', direction: 'desc' });
@@ -128,7 +132,7 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
   });
 });
 
-describe('list-units: autorizacion antes que todo (R33, R34)', () => {
+describe('list-units: autorizacion antes que todo (R33, R34; QC-74 R12, R13, R14, R16)', () => {
   // R34 exige probarlo DOS veces: con una consulta valida y con una que traiga campos no
   // declarados. Se afirma CONTANDO invocaciones de los dos metodos del doble, no solo mirando
   // que lanza.
@@ -145,10 +149,10 @@ describe('list-units: autorizacion antes que todo (R33, R34)', () => {
   ];
 
   for (const caso of CONSULTAS) {
-    it(`rechaza al Operador con ${caso.nombre} sin tocar el repositorio`, async () => {
+    it(`rechaza al actor con permisos de otro modulo con ${caso.nombre} sin tocar el repositorio`, async () => {
       const { units, log, listUnits } = montar();
 
-      await expect(listUnits(caso.entrada, OPERADOR)).rejects.toBeInstanceOf(UnauthorizedError);
+      await expect(listUnits(caso.entrada, SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError);
       expect(units.listAll).toHaveBeenCalledTimes(0);
       expect(units.listPage).toHaveBeenCalledTimes(0);
       expect(log.ignoredFields).toHaveBeenCalledTimes(0);
@@ -158,6 +162,30 @@ describe('list-units: autorizacion antes que todo (R33, R34)', () => {
       const { units, log, listUnits } = montar();
 
       await expect(listUnits(caso.entrada, null)).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(units.listAll).toHaveBeenCalledTimes(0);
+      expect(units.listPage).toHaveBeenCalledTimes(0);
+      expect(log.ignoredFields).toHaveBeenCalledTimes(0);
+    });
+
+    it(`rechaza al actor con el conjunto vacio con ${caso.nombre} sin tocar el repositorio`, async () => {
+      const { units, log, listUnits } = montar();
+
+      await expect(
+        listUnits(caso.entrada, { id: 'user-1', permissions: [] }),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(units.listAll).toHaveBeenCalledTimes(0);
+      expect(units.listPage).toHaveBeenCalledTimes(0);
+      expect(log.ignoredFields).toHaveBeenCalledTimes(0);
+    });
+
+    it(`rechaza al actor con un codigo PARECIDO con ${caso.nombre} sin tocar el repositorio`, async () => {
+      // La conversion de «rol Administradores externos» de QC-32: la pertenencia es EXACTA, un
+      // prefijo del codigo no concede nada (R13).
+      const { units, log, listUnits } = montar();
+
+      await expect(
+        listUnits(caso.entrada, { id: 'user-1', permissions: ['unidades.'] }),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
       expect(units.listAll).toHaveBeenCalledTimes(0);
       expect(units.listPage).toHaveBeenCalledTimes(0);
       expect(log.ignoredFields).toHaveBeenCalledTimes(0);
@@ -174,7 +202,7 @@ describe('list-units: el campo no declarado se omite, no rompe y se anota (R5, R
 
     const resultado = await listUnits(
       { sort: { columnId: 'deletedAt', direction: 'desc' } },
-      ADMIN,
+      CON_PERMISO,
     );
 
     // (a) la consulta NO falla
@@ -190,7 +218,7 @@ describe('list-units: el campo no declarado se omite, no rompe y se anota (R5, R
     // romper la consulta, pero tampoco puede aplicarse en silencio.
     const { units, log, listUnits } = montar();
 
-    await listUnits({ filters: { symbol: { kind: 'text', value: 'g' } } }, ADMIN);
+    await listUnits({ filters: { symbol: { kind: 'text', value: 'g' } } }, CON_PERMISO);
 
     expect(consultaDelCatalogo(units.listAll.mock.calls).filters).toEqual({});
     expect(log.ignoredFields).toHaveBeenCalledWith('units', ['symbol']);
@@ -207,7 +235,7 @@ describe('list-units: el campo no declarado se omite, no rompe y se anota (R5, R
         sort: { columnId: 'inventado', direction: 'asc' },
         filters: { tambienInventado: { kind: 'select', values: [VALOR_DE_FILTRO] } },
       },
-      ADMIN,
+      CON_PERMISO,
     );
 
     expect(log.ignoredFields).toHaveBeenCalledTimes(1);
@@ -221,7 +249,7 @@ describe('list-units: el campo no declarado se omite, no rompe y se anota (R5, R
   it('una consulta limpia tambien llama al log, pero con la lista vacia (R6)', async () => {
     const { log, listUnits } = montar();
 
-    await listUnits(undefined, ADMIN);
+    await listUnits(undefined, CON_PERMISO);
 
     expect(log.ignoredFields).toHaveBeenCalledWith('units', []);
   });
@@ -231,7 +259,7 @@ describe('list-units: validacion de la forma (R20, R30)', () => {
   it('una busqueda de solo espacios es ausencia de busqueda (R20)', async () => {
     const { units, listUnits } = montar();
 
-    await listUnits({ search: '   ' }, ADMIN);
+    await listUnits({ search: '   ' }, CON_PERMISO);
 
     expect(consultaDelCatalogo(units.listAll.mock.calls).search).toBe('');
   });
@@ -240,7 +268,7 @@ describe('list-units: validacion de la forma (R20, R30)', () => {
     // R30 — una pagina 0 no es un campo no declarado: la forma esta mal y se rechaza.
     const { units, log, listUnits } = montar();
 
-    await expect(listUnits({ page: 0 }, ADMIN)).rejects.toBeInstanceOf(ValidationError);
+    await expect(listUnits({ page: 0 }, CON_PERMISO)).rejects.toBeInstanceOf(ValidationError);
     expect(units.listAll).toHaveBeenCalledTimes(0);
     expect(units.listPage).toHaveBeenCalledTimes(0);
     expect(log.ignoredFields).toHaveBeenCalledTimes(0);
