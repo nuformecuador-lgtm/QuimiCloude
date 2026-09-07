@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { toast } from 'sonner';
 
@@ -209,6 +209,29 @@ function renderEditForm(recipe: RecipeDetail) {
   return render(
     <RecipeForm mode="edit" recipe={recipe} units={UNITS} initialProductPage={PRODUCT_PAGE_1} />,
   );
+}
+
+/**
+ * Lleva el desplegable del selector de ingrediente al final de su scroll, que es el gesto con el
+ * que R28 pide la página siguiente desde el cambio de mecanismo del 2026-09-07.
+ *
+ * Las tres medidas se definen a mano porque jsdom NO calcula layout: `scrollHeight`,
+ * `clientHeight` y `scrollTop` valen 0 en todo elemento, así que sin ponerlas ninguna prueba
+ * podría distinguir "al final" de "al principio". Los valores son los que un navegador mediría
+ * con la lista desplazada hasta abajo.
+ *
+ * El evento se emite tal cual y no con `user-event`: desplazar una lista no es un evento de
+ * puntero ni de teclado -lo produce el motor de scroll del navegador-, así que `user-event` no
+ * tiene API para ello. Es la misma excepción que ya se documenta para los stubs de geometría.
+ */
+function scrollAlFinalDelSelector(testId: string, altoVisible = 256) {
+  const lista = screen.getByTestId(`${testId}-popup`);
+  Object.defineProperty(lista, 'clientHeight', { value: altoVisible, configurable: true });
+  Object.defineProperty(lista, 'scrollHeight', { value: altoVisible * 3, configurable: true });
+  Object.defineProperty(lista, 'scrollTop', { value: altoVisible * 2, configurable: true });
+  act(() => {
+    lista.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
 }
 
 /** Selecciona un producto ya presente en la primera página, sin pedir otra página al backend. */
@@ -644,19 +667,30 @@ describe('R27 — añadir y quitar líneas; una receta sin ninguna se guarda', (
 });
 
 describe('R28 — el selector de producto alcanza la segunda página sin filtrar en cliente', () => {
-  it('pide la página 2 al backend y permite elegir un producto que no estaba descargado', async () => {
+  // El mecanismo cambió el 2026-09-07 (decisión humana): la página siguiente ya no se pide con un
+  // botón «Siguiente» dentro del desplegable, sino al llegar al final de su scroll. Lo que R28
+  // exige de fondo -alcanzar CUALQUIER producto del catálogo sin filtrar en cliente- se afirma
+  // igual de fuerte: la página 2 la sirve el backend y su producto se puede elegir.
+  it('anexa la página 2 al llegar al final del desplegable y permite elegir un producto que no estaba descargado', async () => {
     const user = setupUser();
     renderCreateForm();
 
     await user.click(screen.getByTestId('recipe-line-product-0'));
 
-    await user.click(screen.getByTestId('recipe-line-product-0-next'));
+    // La página 1 baja precargada por props (R49): abrir el desplegable no consulta al backend.
+    await screen.findByRole('option', { name: PRODUCT_1_NAME });
+    expect(listProductsActionMock).not.toHaveBeenCalled();
+
+    scrollAlFinalDelSelector('recipe-line-product-0');
 
     await waitFor(() =>
       expect(listProductsActionMock).toHaveBeenCalledWith({ page: 2, pageSize: MAX_PAGE_SIZE }),
     );
 
     const opcionPagina2 = await screen.findByRole('option', { name: PRODUCT_PAGE2_NAME });
+    // La página 2 se ANEXA: lo ya visible no se pierde al bajar.
+    expect(screen.getByRole('option', { name: PRODUCT_1_NAME })).toBeInTheDocument();
+
     await user.click(opcionPagina2);
 
     expect(screen.getByTestId('recipe-line-product-0')).toHaveValue(PRODUCT_PAGE2_NAME);

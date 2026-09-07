@@ -157,9 +157,22 @@ const CONTROLES_VIGILADOS = [
   'Button',
   'SelectTrigger',
   'Input',
+  'AutocompleteInput',
+  'AutocompleteItem',
   'AlertDialogAction',
   'Link',
 ] as const;
+
+/**
+ * Los que ademas fijan 16 px en SU className. Son los que el usuario LEE mientras escribe o
+ * elige: el campo de texto y cada opcion del desplegable.
+ *
+ * `AutocompleteInput` y `AutocompleteItem` entraron el 2026-09-07, cuando el selector de
+ * ingrediente paso de un desplegable escrito a mano a los primitivos de
+ * `components/ui/autocomplete.tsx`: sin anadirlos aqui, el campo mas usado de la pantalla se
+ * habria salido de la guardia del area tactil por un simple cambio de nombre de etiqueta.
+ */
+const CONTROLES_CON_FUENTE: readonly string[] = ['Input', 'AutocompleteInput', 'AutocompleteItem'];
 
 /**
  * `Link` no es un control por si mismo: solo se vigila cuando se pinta CON ASPECTO DE BOTON
@@ -708,7 +721,7 @@ describe('contrato de la ruta de recetas', () => {
 
   it('las primitivas de components/ui que usa la ruta existen y ninguna se escribio a mano', () => {
     // R48 — las primitivas vienen del CLI de shadcn/ui.
-    for (const primitiva of ['table.tsx', 'select.tsx', 'alert-dialog.tsx', 'button.tsx', 'input.tsx', 'label.tsx', 'skeleton.tsx']) {
+    for (const primitiva of ['table.tsx', 'select.tsx', 'alert-dialog.tsx', 'button.tsx', 'input.tsx', 'label.tsx', 'skeleton.tsx', 'autocomplete.tsx']) {
       expect(
         existsSync(join(RAIZ, 'components', 'ui', primitiva)),
         `falta components/ui/${primitiva}`,
@@ -780,7 +793,7 @@ describe('contrato de la ruta de recetas', () => {
             `${control} debe forzar el area tactil en SU className (min-h-11, literal o via constante local)`,
           ).toBe(true);
 
-          if (nombre === 'Input') {
+          if (CONTROLES_CON_FUENTE.includes(nombre)) {
             expect(
               llevaLaClase(className, 'text-base', constantesDeFuente),
               `${control} debe fijar 16px en SU className (text-base, literal o via constante local)`,
