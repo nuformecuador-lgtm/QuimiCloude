@@ -14,9 +14,14 @@ consecuencias de arquitectura que no son opinables:
    pertenece a una y solo una**: inventario, recetas, unidades, proveedores y pedidos.
    Ninguna consulta ni escritura de esos datos cruza la frontera de la empresa de quien
    pide, y conocer el identificador de una fila ajena no da acceso a ella. **La identidad
-   NO se parte**: usuarios, roles y tipos de documento son del sistema y se comparten —
-   «Administrador» significa lo mismo en todas. Lo que une las dos mitades es la
-   **membresia**: a que empresas pertenece cada usuario, y con que rol en cada una.
+   NO se parte**: roles y tipos de documento son del sistema y se comparten —
+   «Administrador» significa lo mismo en todas. Lo que une las dos mitades es que **cada
+   usuario pertenece a UNA empresa y tiene UN rol**: la empresa es una columna de su ficha
+   (`users.company_id`, obligatoria), no una tabla de pertenencias. Un usuario no puede
+   estar en dos empresas a la vez, y eso es deliberado (QC-47, decisiones 4 y 5). Lo que
+   SI se parte por empresa dentro de la identidad es la **unicidad**: el correo, el nombre
+   de usuario y el documento se miden dentro de la empresa, asi que dos empresas pueden
+   tener cada una su `admin`.
    - **La frontera se valida en el service.** `## Acceso a datos y autorizacion` sigue
      mandando entero: la RLS no filtra ninguna query de esta aplicacion, asi que un
      aislamiento implementado solo como policy **no cuenta como implementado**, igual que
@@ -33,8 +38,9 @@ consecuencias de arquitectura que no son opinables:
    - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
      si acaso». Lo que cambio es que multiplicar empresas dejo de ser hipotetico y paso a
      ser backlog; sigue siendo sobre-ingenieria —y el reviewer la rechaza— todo lo que no
-     esta pedido: jerarquias de empresas, empresas anidadas, permisos por empresa mas alla
-     del rol de la membresia, o un selector de empresa antes de que exista su ficha.
+     esta pedido: jerarquias de empresas, empresas anidadas, un usuario en varias empresas,
+     permisos por empresa mas alla de su rol, o un selector de empresa antes de que exista
+     su ficha.
    - **Coste que esto impone y se acepta**: cada feature de datos pasa a llevar columna de
      empresa, filtro en cada consulta, rechazo probado del acceso cruzado y su test. No es
      gratis y no es opcional.

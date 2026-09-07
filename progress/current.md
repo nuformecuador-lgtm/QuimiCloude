@@ -293,6 +293,30 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
   y QC-34 le hereda dos preguntas abiertas (si la consulta devuelve el total calculado y si la
   edicion es reemplazo completo). Se corre `/afinar-feature` antes de lanzar `spec_author`.
 
+### El flake de la suite de UI no es de paralelizacion, y casi me cuesta el gate (2026-09-04)
+
+Al cerrar QC-47 aparecieron rojos en archivos que la ficha no toca, y cambiando de archivo en cada
+corrida. **Diagnostiqué mal**: dije que era saturación por workers y que `--maxWorkers=2` lo
+curaba, apoyándome en **una** corrida verde. Repetida, volvió a fallar. Lo medido, sobre la misma
+rama y la misma máquina (12 núcleos, 3,4 GB libres): por defecto 2 archivos rojos en 114 s; con 4
+workers 1 rojo en 335 s; con 2 workers **1 rojo en 541 s**. Bajar workers multiplica por cinco el
+gate y no elimina el fallo.
+
+La causa real es la que **QC-58 ya describía bien desde el principio** y yo desestimé: el plazo de
+5 s es demasiado corto para `userEvent` en una máquina cargada. El error es siempre
+`Test timed out in 5000ms`. Lección para el arnés: **una corrida verde no es prueba de nada**
+cuando el fallo que investigas es intermitente — hay que repetir antes de concluir, y yo no lo hice
+antes de proponer un arreglo.
+
+- Escrito en `docs/verification.md > Los flakes de saturación: qué son, y qué NO los cura`, con la
+  tabla de medidas y el criterio barato para distinguirlo de un rojo de verdad (correr el archivo
+  solo).
+- **QC-58 reescrita en el board**: pasa de «el flake del formulario de productos» a la causa real,
+  con la limpieza del baseline dentro. Nuevo slug `timeout-tests-ui-bajo-carga`.
+- **El baseline pasó de 3 a 5 entradas por mi mano** (las dos de `proveedores-ui`), y eso es
+  justo el vertedero contra el que avisa su propia nota. Se retiran **todas** las de esta causa en
+  el cambio que arregle el plazo, no antes.
+
 ### QC-47 — modelo-empresa-y-membresias: acotada y sembrada (2026-09-04)
 
 - **Sembrada en `specs/QC-47-modelo-empresa-y-membresias/requirements.md`** — 15 decisiones
