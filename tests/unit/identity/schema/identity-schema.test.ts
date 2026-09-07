@@ -82,6 +82,10 @@ function parseModel(name: string): PrismaModel {
 const user = parseModel('User')
 const role = parseModel('Role')
 const documentType = parseModel('DocumentType')
+const company = parseModel('Company')
+
+/** Los modelos a los que `User` apunta con `@relation`: no son columnas escalares. */
+const USER_RELATION_TYPES = ['DocumentType', 'Role', 'Company']
 
 function field(model: PrismaModel, name: string): PrismaField {
   const found = model.fields.find((candidate) => candidate.name === name)
@@ -195,14 +199,17 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
 
     // La lista completa de columnas: si alguien anade o quita una, este test lo dice.
     const scalarNames = user.fields
-      .filter((candidate) => !candidate.isList && candidate.type !== 'DocumentType' && candidate.type !== 'Role')
+      .filter((candidate) => !candidate.isList && !USER_RELATION_TYPES.includes(candidate.type))
       .map((candidate) => candidate.name)
       .sort()
     expect(scalarNames).toEqual(
       [
         'id',
         ...BUSINESS_FIELDS.map(([name]) => name),
+        // QC-47: `roleId` NO se movio (R13) y `companyId` es LO UNICO que entro (R9). Los dos
+        // conviven en la misma fila; si alguien vuelve a sacar el rol de aqui, este test cae.
         'roleId',
+        'companyId',
         'createdAt',
         'updatedAt',
         'deletedAt',
@@ -417,5 +424,128 @@ describe('db/schema.prisma — marca de cambio de credencial obligatorio (R9, R1
       expect(declared.attributes, `User.${name} debe mapear a ${column}`).toContain(`@map("${column}")`)
     }
     expect(SEED_FIELDS).toHaveLength(1)
+  })
+})
+
+// --- QC-47 — la empresa y la columna de empresa del usuario -------------------------
+
+describe('db/schema.prisma — la empresa (QC-47)', () => {
+  it('Company es del modulo identity (R27)', () => {
+    // R27 y decision cerrada 16: la empresa cuelga del usuario y el usuario es de
+    // `identity`. Es lo que hace cumplir `tests/guards/guard-arquitectura-modulos.test.ts`
+    // cuando prohibe que otro modulo la consulte con Prisma. Se afirma sobre el schema CRUDO:
+    // `/// @module` ES un comentario, y es justo lo que se vigila.
+    expect(rawSchema.replace(/\r\n/g, '\n')).toContain('/// @module identity\nmodel Company {')
+  })
+
+  it('Company declara id uuid generado por la base, nombre, normalizado y sus tres fechas', () => {
+    // R1: UUID aleatorio generado por la BASE, ni correlativo ni derivado del nombre.
+    const id = field(company, 'id')
+    expect(id.type).toBe('String')
+    expect(id.attributes).toContain('@id')
+    expect(id.attributes).toContain('@db.Uuid')
+    expect(id.attributes).toMatch(/@default\(dbgenerated\("gen_random_uuid\(\)"\)\)/)
+
+    // R2 y R3: nombre y normalizado obligatorios, sin longitud declarada (R8).
+    for (const [name, column] of [
+      ['name', 'name'],
+      ['nameNormalized', 'name_normalized'],
+    ] as const) {
+      const declared = field(company, name)
+      expect(declared.type, `Company.${name}`).toBe('String')
+      expect(declared.isOptional, `Company.${name} no puede ser opcional`).toBe(false)
+      expect(declared.attributes).not.toMatch(/@default\(/)
+      expect(declared.attributes).not.toMatch(/@db\.(VarChar|Char)\s*\(/)
+      if (name !== column) expect(declared.attributes).toContain(`@map("${column}")`)
+    }
+
+    // R7: las dos marcas de tiempo, con `@updatedAt` de verdad.
+    expect(field(company, 'createdAt').attributes).toMatch(/@default\(now\(\)\)/)
+    expect(field(company, 'updatedAt').attributes).toContain('@updatedAt')
+
+    // R6: la baja logica nace con la tabla y nace VACIA (opcional).
+    expect(field(company, 'deletedAt').isOptional).toBe(true)
+    expect(field(company, 'deletedAt').attributes).toContain('@map("deleted_at")')
+  })
+
+  it('la unicidad del nombre de empresa NO esta en el esquema, y es deliberado (R4, R5)', () => {
+    // `companies_name_unique` es FUNCIONAL (`lower(...)`) y PARCIAL
+    // (`WHERE deleted_at IS NULL`) y Prisma no modela ninguna de las dos cosas. Si alguien
+    // "arregla" el esquema con un `@unique`, la unicidad pasa a ser TOTAL sin que nadie se
+    // entere y una empresa dada de baja quema su nombre para siempre.
+    expect(field(company, 'name').attributes).not.toMatch(/@unique/)
+    expect(field(company, 'nameNormalized').attributes).not.toMatch(/@unique/)
+    expect(company.body).not.toMatch(/@@unique\(/)
+  })
+})
+
+describe('db/schema.prisma — la columna de empresa del usuario (QC-47)', () => {
+  it('companyId es obligatorio, uuid y mapea a company_id (R9)', () => {
+    const companyId = field(user, 'companyId')
+    expect(companyId.type).toBe('String')
+    expect(companyId.isOptional, 'User.companyId no puede ser opcional (R9)').toBe(false)
+    expect(companyId.attributes).toContain('@db.Uuid')
+    expect(companyId.attributes).toContain('@map("company_id")')
+    // Obligatorio DE VERDAD: un `@default` lo rellenaria solo y R9 dejaria de significar nada.
+    expect(companyId.attributes).not.toMatch(/@default\(/)
+  })
+
+  it('la relacion User-Company va con @relation y ON DELETE RESTRICT (R10, R11)', () => {
+    const relation = field(user, 'company')
+    expect(relation.type).toBe('Company')
+    expect(relation.isOptional).toBe(false)
+    expect(relation.attributes).toMatch(/fields:\s*\[companyId\]/)
+    expect(relation.attributes).toMatch(/references:\s*\[id\]/)
+    // R11: borrar una empresa con usuarios —vivos o de baja— tiene que fallar con 23503.
+    expect(relation.attributes).toMatch(/onDelete:\s*Restrict/)
+    expect(relation.attributes).not.toMatch(/onDelete:\s*(Cascade|SetNull|SetDefault)/)
+    expect(relation.attributes).toMatch(/onUpdate:\s*Cascade/)
+    // El lado inverso existe y es lista: una empresa tiene muchos usuarios.
+    expect(company.fields.find((candidate) => candidate.name === 'users')?.isList).toBe(true)
+  })
+
+  it('companyId lleva su indice y NO lleva unicidad (R12)', () => {
+    // El indice no es redundante con los tres unicos de `users`: esos son PARCIALES y la
+    // verificacion del RESTRICT tiene que ver tambien a los usuarios dados de baja.
+    expect(user.body).toMatch(/@@index\(\[companyId\],\s*map:\s*"users_company_id_idx"\)/)
+    // Un `@unique` aqui convertiria la relacion en 1-1: una empresa, un usuario.
+    expect(field(user, 'companyId').attributes).not.toMatch(/@unique/)
+    expect(user.body).not.toMatch(/@@unique\([^)]*companyId/)
+  })
+
+  it('nadie puede estar en dos empresas: no hay modelo intermedio (R12)', () => {
+    // R12. `User` apunta a `Company` con UNA sola relacion escalar y no hay ninguna lista de
+    // empresas; y ningun modelo del esquema apunta a la vez a `User` y a `Company`, que es la
+    // forma que tendria una tabla intermedia si volviera por la puerta de atras.
+    const empresas = user.fields.filter((candidate) => candidate.type === 'Company')
+    expect(empresas).toHaveLength(1)
+    expect(empresas[0]?.isList, 'un usuario no puede declarar una LISTA de empresas').toBe(false)
+
+    const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
+      .map((match) => match[1] as string)
+      .filter((name) => name !== 'User' && name !== 'Company')
+    for (const name of modelNames) {
+      const otro = parseModel(name)
+      const apunta = (tipo: string): boolean =>
+        otro.fields.some((candidate) => candidate.type === tipo)
+      expect(
+        apunta('User') && apunta('Company'),
+        `${name} une usuario y empresa: eso reabre el modelo de muchos a muchos`,
+      ).toBe(false)
+    }
+  })
+
+  it('roles y tipos de documento NO ganan columna de empresa (R15)', () => {
+    // Decision cerrada 8: son catalogos del sistema. "Administrador" significa lo mismo en
+    // todas las empresas.
+    for (const [name, model] of [
+      ['Role', role],
+      ['DocumentType', documentType],
+    ] as const) {
+      expect(
+        model.fields.some((candidate) => /^company/i.test(candidate.name)),
+        `${name} no debe tener columna de empresa (R15)`,
+      ).toBe(false)
+    }
   })
 })

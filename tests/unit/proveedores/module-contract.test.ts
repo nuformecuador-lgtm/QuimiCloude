@@ -569,16 +569,19 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     ).toEqual(['createdBy:scalar', 'updatedBy:scalar'])
 
     // El reverso: `User` no gana ningun campo hacia la linea ni hacia el proveedor. La lista
-    // esperada es el conjunto EXACTO que QC-4 le dio.
-    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
+    // esperada es el conjunto EXACTO que tiene hoy `User`.
+    // RETENSADO 2026-09-04 (QC-47): entra `Company` -R9, `users.company_id`-. Sigue siendo
+    // igualdad EXACTA sobre el conjunto entero, no un `toContain`: cualquier relacion nueva
+    // hacia proveedores, o hacia lo que sea, pone el caso rojo igual que antes.
+    expect(relationTargets('User')).toEqual(['Company', 'DocumentType', 'Role'])
   })
 
   it('User NO gana ningun campo de relacion de vuelta hacia Supplier', () => {
     // Si `createdBy` o `updatedBy` llevaran `@relation`, `User` ganaria un campo reverso
     // (`createdSuppliers Supplier[]` o similar) y este `toEqual` completo caeria. La lista
-    // esperada es el conjunto EXACTO que QC-4 ya le dio a `User` (hacia `DocumentType` y
-    // `Role`), sin proveedores adentro.
-    expect(relationTargets('User')).toEqual(['DocumentType', 'Role'])
+    // esperada es el conjunto EXACTO que `User` tiene hoy (hacia `DocumentType`, `Role` y
+    // -desde QC-47 R9- `Company`), sin proveedores adentro.
+    expect(relationTargets('User')).toEqual(['Company', 'DocumentType', 'Role'])
     expect(relationTargets('User')).not.toContain('Supplier')
     expect(relationTargets('User')).not.toContain('SupplierCatalogLine')
   })

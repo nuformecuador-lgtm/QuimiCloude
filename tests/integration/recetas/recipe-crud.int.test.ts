@@ -36,6 +36,7 @@ import {
   replaceAliveRecipe,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination';
 
@@ -124,6 +125,17 @@ async function createTestUser(db: Db): Promise<string> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   });
+  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
+  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
+  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
+  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
+  // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de una copia
+  // escrita a mano aqui.
+  const companyName = `Empresa ${marker}`;
+  const company = await db.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  });
   const user = await db.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -136,6 +148,7 @@ async function createTestUser(db: Db): Promise<string> {
       username: `ana.${marker}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId: role.id,
+      companyId: company.id,
     },
     select: { id: true },
   });
@@ -145,11 +158,14 @@ async function createTestUser(db: Db): Promise<string> {
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { roleId: true, documentTypeCode: true },
+    select: { roleId: true, documentTypeCode: true, companyId: true },
   });
   await db.user.delete({ where: { id: userId } });
   await db.role.delete({ where: { id: user.roleId } });
   await db.documentType.delete({ where: { code: user.documentTypeCode } });
+  // La empresa efimera va DESPUES del usuario: `users_company_id_fkey` es `ON DELETE RESTRICT`
+  // (QC-47 R11), asi que borrarla antes la rechazaria la base con 23503.
+  await db.company.delete({ where: { id: user.companyId } });
 }
 
 /** Producto vivo con su propia presentacion, para usar como linea de receta. */

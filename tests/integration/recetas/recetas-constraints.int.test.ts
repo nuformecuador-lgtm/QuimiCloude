@@ -58,6 +58,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
 // ---------------------------------------------------------------------------
@@ -164,6 +165,17 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   })
+  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
+  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
+  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
+  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
+  // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de una copia
+  // escrita a mano aqui.
+  const companyName = `Empresa ${marker}`
+  const company = await tx.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  })
   const user = await tx.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -176,6 +188,7 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
       username: `ana.${marker}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId: role.id,
+      companyId: company.id,
     },
     select: { id: true },
   })

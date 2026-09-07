@@ -57,6 +57,7 @@ import {
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination'
 
@@ -105,6 +106,8 @@ let unitId: string
 let actorId: string
 let roleId: string
 let documentTypeCode: string
+/** Empresa efimera del fixture. QC-47 R9 hizo `users.company_id` obligatoria. */
+let companyId: string
 
 async function seedFixtures(): Promise<void> {
   const marca = token()
@@ -132,6 +135,19 @@ async function seedFixtures(): Promise<void> {
       select: { id: true },
     })
   ).id
+  // Empresa efimera propia de este fixture. NUNCA la empresa de instalacion: el indice
+  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
+  // `db:seed`. `name_normalized` sale de `normalizeCompanyName`, la UNICA definicion de «mismo
+  // nombre de empresa» (QC-47 R3), importada del contrato publico de `identity`.
+  companyId = (
+    await prisma.company.create({
+      data: {
+        name: `Empresa ${marca}`,
+        nameNormalized: normalizeCompanyName(`Empresa ${marca}`),
+      },
+      select: { id: true },
+    })
+  ).id
   actorId = (
     await prisma.user.create({
       data: {
@@ -145,15 +161,18 @@ async function seedFixtures(): Promise<void> {
         username: `ana.${marca}`,
         passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
         roleId,
+        companyId,
       },
       select: { id: true },
     })
   ).id
 }
 
-/** Retira las cuatro FK sembradas, en el orden que las FK permiten. */
+/** Retira las cinco FK sembradas, en el orden que las FK permiten. */
 async function dropFixtures(): Promise<void> {
   await prisma.user.delete({ where: { id: actorId } })
+  // La empresa DESPUES del usuario: `users_company_id_fkey` es `ON DELETE RESTRICT` (QC-47 R11).
+  await prisma.company.delete({ where: { id: companyId } })
   await prisma.role.delete({ where: { id: roleId } })
   await prisma.documentType.delete({ where: { code: documentTypeCode } })
   await prisma.recipe.delete({ where: { id: recipeId } })

@@ -56,7 +56,13 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
+// `normalizeCompanyName` es la UNICA definicion de <<mismo nombre de empresa>> (QC-47 R3):
+// `companies.name_normalized` se calcula con esta y con ninguna otra.
+import {
+  normalizeCompanyName,
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+} from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
@@ -104,6 +110,15 @@ const catalogLineName = `${FIXTURE_PREFIX}linea_${RUN_ID}`;
 /** Presentacion que el recorrido crea EN LINEA solo si la base no ofrece ninguna utilizable. */
 const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
 
+/**
+ * Empresa efimera de este worker. QC-47 R9 hizo `users.company_id` obligatoria, asi que el
+ * fixture necesita la suya. NUNCA la de instalacion: el indice `companies_name_unique` es
+ * GLOBAL y el nombre chocaria con el de la empresa que siembra `db:seed`.
+ */
+const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
+
+let companyId: string | null = null;
+
 /** Telefono del proveedor: el alta exige al menos un telefono o un correo. */
 const supplierPhone = '+573000000000';
 
@@ -121,6 +136,9 @@ const catalogLineCost = '12.3456';
 let reusablePresentationName: string | null = null;
 
 async function createUserWithRole(user: Credentials, roleName: string): Promise<void> {
+  if (!companyId) {
+    throw new Error('la empresa del fixture no existe: fallo el beforeAll');
+  }
   const role = await prisma.role.findUnique({ where: { name: roleName }, select: { id: true } });
   if (!role) {
     throw new Error(
@@ -143,6 +161,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
       username: user.username,
       passwordHash: await createPasswordHash(user.password),
       roleId: role.id,
+      companyId,
     },
     select: { id: true },
   });
@@ -264,6 +283,20 @@ test.beforeAll(async () => {
   await prisma.user.deleteMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
+  // Las empresas huerfanas van DESPUES de sus usuarios: `users.company_id` es
+  // `onDelete: Restrict` (QC-47 R11) y borrarlas antes lo rechazaria la base.
+  await prisma.company.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+
+  // La empresa efimera de este worker, ANTES que sus usuarios. `nameNormalized` sale de
+  // `normalizeCompanyName`, la UNICA definicion de <<mismo nombre de empresa>> (QC-47 R3).
+  companyId = (
+    await prisma.company.create({
+      data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+      select: { id: true },
+    })
+  ).id;
 
   await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);
@@ -302,7 +335,13 @@ test.afterAll(async () => {
             where: { username: { in: [adminUser.username, operatorUser.username] } },
           });
         } finally {
-          await prisma.$disconnect();
+          // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict`
+          // (QC-47 R11). Por el nombre EXACTO de ESTE worker, nunca por el prefijo.
+          try {
+            await prisma.company.deleteMany({ where: { name: companyName } });
+          } finally {
+            await prisma.$disconnect();
+          }
         }
       }
     }

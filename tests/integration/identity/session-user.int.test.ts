@@ -6,21 +6,33 @@
  * por clave primaria, el `where` con `deletedAt: null` y el `select` minimo con el join a
  * `role.name`. Mismo patron que `login.int.test.ts`: fixture propio con prefijo y `uuid`,
  * limpieza en `afterAll` dentro de `try`/`finally`, sin seed (R21 de QC-7).
+ *
+ * QC-47 (T17, T19) — `users.company_id` es obligatoria, asi que este fixture crea tambien su
+ * PROPIA empresa efimera (`qc8-session-<uuid>`) en el `beforeAll` y mete al usuario dentro;
+ * nunca la de instalacion, porque `companies_name_unique` es global. El `afterAll` barre en
+ * orden `users -> companies` (`users_company_id_fkey` es `ON DELETE RESTRICT`).
+ *
+ * EL ROL NO SE MUEVE (R13, R14): sigue saliendo de `users.role_id`, en el mismo `select` y sin
+ * ninguna consulta adicional. El caso «el rol cambiado entre dos lecturas devuelve el nuevo»
+ * ya lo demuestra, y esta ficha lo deja intacto a proposito.
  */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
-import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity';
+import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
 const sufijo = randomUUID();
 const nombreDeUsuario = `qc8_session_${sufijo}`;
+/** QC-47: nombre irrepetible de la empresa efimera de este fixture. */
+const nombreDeEmpresa = `qc8-session-${sufijo}`;
 
 let usuarioId = '';
 let rolId = '';
 let rolAlternativoId = '';
+let empresaId = '';
 
 beforeAll(async () => {
   const rol = await prisma.role.create({
@@ -35,6 +47,13 @@ beforeAll(async () => {
   });
   rolAlternativoId = rolAlternativo.id;
 
+  // QC-47: empresa PROPIA del fixture, nunca la de instalacion.
+  const empresa = await prisma.company.create({
+    data: { name: nombreDeEmpresa, nameNormalized: normalizeCompanyName(nombreDeEmpresa) },
+    select: { id: true },
+  });
+  empresaId = empresa.id;
+
   const usuario = await prisma.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -47,6 +66,7 @@ beforeAll(async () => {
       username: nombreDeUsuario,
       passwordHash: 'no-se-usa-en-este-test',
       roleId: rolId,
+      companyId: empresaId,
     },
     select: { id: true },
   });
@@ -57,7 +77,9 @@ afterAll(async () => {
   try {
     await prisma.user.deleteMany({ where: { id: usuarioId } });
   } finally {
+    // QC-47: el orden es `users -> companies`; la FK hacia la empresa es `ON DELETE RESTRICT`.
     await prisma.role.deleteMany({ where: { id: { in: [rolId, rolAlternativoId] } } });
+    await prisma.company.deleteMany({ where: { id: empresaId } });
     await prisma.$disconnect();
   }
 });

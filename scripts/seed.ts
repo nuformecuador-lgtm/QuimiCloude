@@ -36,13 +36,19 @@ async function main(): Promise<void> {
     const { identity } = await import('../lib/composition')
     const outcome = await identity.seedInitialAccess()
 
-    if (outcome.createdRoles.length > 0 || outcome.createdAdmin) {
+    if (outcome.createdRoles.length > 0 || outcome.createdAdmin || outcome.createdCompany !== null) {
       const roles =
         outcome.createdRoles.length > 0
           ? `roles creados: ${outcome.createdRoles.length} (${outcome.createdRoles.join(', ')})`
           : 'roles creados: 0'
+      // QC-47: la empresa inicial. El nombre no es un secreto (sale de una constante del
+      // dominio, `design.md > 6.1`), asi que puede ir en la linea de resumen.
+      const empresa =
+        outcome.createdCompany !== null
+          ? `empresa inicial: creada (${outcome.createdCompany})`
+          : 'empresa inicial: ya existia'
       const admin = outcome.createdAdmin ? 'usuario inicial: creado' : 'usuario inicial: ya existia'
-      console.log(`db:seed: ${roles} - ${admin}`)
+      console.log(`db:seed: ${roles} - ${empresa} - ${admin}`)
     } else {
       console.log('db:seed: nada que crear')
     }

@@ -52,6 +52,14 @@ model Role {
 
 /// Usuario del ERP. Borrado logico: `deletedAt` NULL = usuario vivo.
 ///
+/// OJO 0 — EL ROL DE UNA PERSONA VIVE EN ESTA TABLA, en `roleId`, y QC-47 NO lo mueve
+/// (R13, R14): mismo nombre, mismo tipo, `NOT NULL`, misma FK `users_role_id_fkey`
+/// (`ON DELETE RESTRICT ON UPDATE CASCADE`) y mismo indice `users_role_id_idx` que dejo
+/// QC-4. Un usuario tiene UN solo rol y pertenece a UNA sola empresa; no hay ninguna tabla
+/// intermedia entre usuario y empresa, y no debe aparecer (R12). Quien saque el rol de aqui
+/// parte en dos la verdad sobre el rol y rompe el login, la sesion y el seed, que lo leen
+/// todos de esta columna sin ninguna consulta adicional.
+///
 /// OJO — las tres unicidades de esta tabla (correo, nombre de usuario y la pareja
 /// tipo+numero de documento) NO estan aqui como `@unique`/`@@unique` y eso es
 /// deliberado: son indices unicos FUNCIONALES (`lower(...)`) y PARCIALES
@@ -62,6 +70,13 @@ model Role {
 /// `tests/unit/schema/identity-migration.test.ts` los vigila. Si alguien anade aqui
 /// un `@unique`, la unicidad deja de respetar mayusculas/minusculas y el borrado
 /// logico quema el correo y el documento para siempre.
+///
+/// OJO 2 — desde QC-47 esos tres indices llevan `company_id` COMO PRIMERA COLUMNA: el correo,
+/// el nombre de usuario y la pareja tipo+numero de documento son unicos DENTRO de la empresa,
+/// no en todo el sistema (R16, R17, R18). Dos empresas pueden tener cada una su `admin`.
+/// `users_company_id_idx` NO es redundante con ellos: los tres son PARCIALES
+/// (`WHERE deleted_at IS NULL`) y la verificacion del `RESTRICT` al borrar una empresa tiene
+/// que mirar tambien a los usuarios dados de baja.
 /// @module identity
 model User {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -75,6 +90,12 @@ model User {
   username         String
   passwordHash     String    @map("password_hash")
   roleId           String    @map("role_id") @db.Uuid
+  /// La UNICA empresa a la que pertenece esta persona (QC-47 R9). OBLIGATORIA en la base:
+  /// `NOT NULL` + `users_company_id_fkey` `ON DELETE RESTRICT ON UPDATE CASCADE` (R10, R11).
+  /// Lleva `@relation` de Prisma —y no un escalar suelto como `products.unit_id`— porque
+  /// `User` y `Company` son los dos de `identity` y no hay frontera de modulo que proteger,
+  /// asi que la FK la genera Prisma en vez de quedar como drift manual.
+  companyId        String    @map("company_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -90,10 +111,58 @@ model User {
 
   documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([roleId], map: "users_role_id_idx")
+  @@index([companyId], map: "users_company_id_idx")
   @@index([documentTypeCode], map: "users_document_type_code_idx")
   @@map("users")
+}
+
+/// Empresa del ERP (QC-47). Borrado LOGICO: `deletedAt` NULL = empresa viva (R5). Nace con
+/// la tabla y NADIE la escribe en esta ficha: no hay alta, edicion ni baja de empresas
+/// (R28), solo el modelo y la empresa inicial que crea el seed.
+///
+/// LA EMPRESA DE UNA PERSONA ES UNA COLUMNA DEL USUARIO, no una tabla intermedia:
+/// `users.company_id`, OBLIGATORIA (R9), con FK `users_company_id_fkey`
+/// `ON DELETE RESTRICT` (R10, R11). Un usuario
+/// pertenece a UNA sola empresa y no hay ninguna forma de asociarlo a una segunda (R12); el
+/// `users User[]` de abajo es solo el lado inverso de esa columna. Si algun dia hiciera falta
+/// que una persona trabaje en dos empresas, es ficha propia, migracion de datos y una decision
+/// sobre como identifica el login a quien entra (QC-48), no una relacion que se anada aqui.
+///
+/// Vive en `identity` y no en un modulo propio (design.md > 1): la empresa se referencia desde
+/// una columna del propio usuario, no desde una tabla intermedia, y partir esas dos filas en
+/// dos modulos costaria una FK escrita a mano y la transaccion unica del seed. Si algun dia
+/// nace un CRUD de empresas, la mudanza es barata MIENTRAS nadie lea `companies` desde fuera
+/// — y eso ya lo prohibe R27.
+///
+/// OJO — la unicidad del nombre NO esta aqui como `@@unique` y es deliberado, igual que en
+/// `Recipe` y `Supplier`: es un indice unico FUNCIONAL (`lower(...)`) y PARCIAL
+/// (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela ninguna de las
+/// dos cosas. Vive escrito a mano en `migration.sql` (`companies_name_unique`) y ese es el
+/// unico sitio donde existe. Si alguien "arregla" el esquema anadiendo el `@@unique`, la
+/// unicidad pasa a ser TOTAL sin que nadie se entere y una empresa dada de baja quema su
+/// nombre para siempre.
+///
+/// Es la UNICA garantia de R4: no hay `SELECT` previo por igualdad —seria una carrera, entre
+/// el `SELECT` y el `INSERT` cabe otra transaccion— y el choque se traduce del SQLSTATE
+/// `23505`, mismo criterio que `Presentation`, `Unit` y `Supplier`.
+///
+/// `nameNormalized` la calcula `normalizeCompanyName` (dominio de `identity`, funcion pura) y
+/// se persiste junto a `name` en toda escritura (R3).
+/// @module identity
+model Company {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  nameNormalized String    @map("name_normalized")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  users User[]
+
+  @@map("companies")
 }
 
 /// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo
