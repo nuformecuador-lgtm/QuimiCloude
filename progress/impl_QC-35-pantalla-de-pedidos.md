@@ -7,9 +7,10 @@
 
 ## 1. Veredicto
 
-Las 17 tasks cerradas y los 49 requisitos mapeados a un test nombrado. **Dos rojos ajenos
-heredados de `dev`** (typecheck) y **un rojo nuevo que esta feature no está autorizada a arreglar**
-(guardias de recetas de QC-25/QC-26) — los tres están detallados en §5 y **ninguno se ha tocado**.
+Las 17 tasks cerradas y los 49 requisitos mapeados a un test nombrado. Tras el merge de F2.3 y el
+ajuste de las dos guardias de recetas (seccion 5), **typecheck limpio, lint limpio, 773 tests y las
+157 aserciones de las 15 guardias en verde**. El unico rojo que queda es de otra sesion y no toca
+codigo de esta feature (seccion 5.3).
 
 ## 2. Archivos
 
@@ -168,60 +169,80 @@ $ pnpm run e2e e2e/pedidos.spec.ts
 
 Base de E2E limpia tras la corrida: cero fixtures `qc35_e2e_` y `orders` en 0.
 
-## 5. Rojos: los tres, y por que no se han tocado
+## 5. Los rojos que hubo, y como quedaron
 
-### 5.1 Dos errores de typecheck AJENOS, heredados de `dev`
+### 5.1 Dos errores de typecheck ajenos: RESUELTOS por el merge de F2.3
+
+Eran dos tests de QC-57 que creaban usuarios sin `companyId`, obligatorio desde QC-47, anticipados
+en `design.md` seccion 15.8. **No eran de esta feature.** El merge de `origin/dev` (F2.3, sin
+conflictos) trajo su arreglo. `pnpm run typecheck` ahora **no reporta ni un error**.
+
+### 5.2 Las dos guardias de recetas: AJUSTADAS por decision humana del 2026-09-07
+
+`tests/unit/recetas/scope.test.ts` y `tests/unit/recetas/module-contract.test.ts` reconocian una
+"pantalla de recetas" por que el **nombre** o el **contenido** de un archivo mencionara
+`recet|recipe` en cualquier sitio de `app/` fuera de la carpeta de formulas. Las disparo
+`recipe-picker.tsx`, el selector de receta que **R31 exige** y que el humano aprobo el 2026-09-06.
+
+**La decision, y su razon:** "pedidos tiene su propia ruta separada, con acceso solo para el
+administrador". Eso descarta mover el picker bajo la carpeta de formulas -seria poner un componente
+de pedidos bajo otra pantalla y otra superficie de permiso- y fija el criterio: **una pantalla se
+reconoce por tener RUTA PROPIA, no por mencionar una palabra**.
+
+**Que se cambio.** El criterio pasa a derivarse del arbol: un archivo pertenece a una pantalla si
+cuelga de una carpeta que declara su propio `page.tsx` (`screenRootOf`). **No hay lista blanca de
+rutas escrita a mano**: envejeceria y habria que tocarla en cada ficha, que es justo lo que esto
+evita. `app/` no cuenta como carpeta de pantalla, para que un archivo suelto en la raiz o en un
+route group siga siendo goteo. En `module-contract` se anade ademas que el consumo sea **solo del
+contrato publico** (`@/lib/modules/recetas`) o de sus **adaptadores driving por ruta exacta**, que
+es lo que manda `docs/architecture.md`.
+
+**Que sigue prohibido** -escrito en el comentario de cada guardia, con la fecha y con quien lo
+decide, para que nadie lo lea manana como permiso general-:
+
+- una **segunda pantalla de recetas**: ningun `page.tsx` ni `layout.tsx` fuera de la carpeta
+  derivada de `FORMULAS_ROUTE` puede renderizar recetas;
+- el **goteo suelto**: un archivo de recetas que no cuelgue de ninguna pantalla con ruta propia;
+- **`components/` sigue con CERO menciones**, sin aflojar: ahi no hay ruta ni ficha que respalde
+  nada;
+- **consumir el modulo por dentro**: nunca `domain/` ni `adapters/driven/`.
+
+Lo que **no** se toco: la carpeta permitida se sigue **derivando de `FORMULAS_ROUTE`**, nunca de un
+literal, y el `existsSync` de que **la pantalla de recetas siga existiendo** se queda -esta ahi para
+que la guardia no pase en verde sobre un repo sin pantalla-.
+
+**Falsabilidad comprobada**, mutando el arbol real y restaurandolo (`git status` limpio despues).
+Las cuatro prohibiciones se vieron en rojo, una a una: una segunda pantalla
+(`app/(private)/pedidos/recetas/page.tsx`), un archivo suelto
+(`app/(private)/recetas-suelto.tsx`), `components/recipe-card.tsx`, y un import de las tripas
+(`@/lib/modules/recetas/domain/recipe-name`). La comparacion se hace sobre el **codigo, no sobre la
+prosa**: la pagina de proveedores menciona recetas en un comentario y eso no es una violacion, asi
+que `scope.test.ts` gano el mismo filtro de comentarios que `module-contract.test.ts` ya tenia.
+
+Suite de recetas entera tras el ajuste: **26 archivos, 289 tests, todos verdes**. Ninguna otra
+guardia de recetas se puso roja por arrastre.
+
+### 5.3 Un rojo del GATE que no es de esta feature y no se ha tocado
 
 ```
-tests/integration/inventario/list-query-indexes.int.test.ts(77,5)
-tests/integration/pedidos/list-query-orders.int.test.ts(131,7)
-  TS2322: Property 'companyId' is missing ... required in type 'UserUncheckedCreateInput'
+./init.sh --rapido
+  X feature_list.json invalido:
+    faltan specs para features sdd en vuelo: QC-48
 ```
 
-Dos tests de QC-57 que crean usuarios sin `companyId`, obligatorio desde QC-47. Anticipados en
-`design.md`, seccion 15.8. **No son de esta feature y no se arreglan aqui**; llegan arreglados con
-el merge de F2.3. `pnpm run typecheck` no reporta **ningun tercer error**.
+El merge de F2.3 trajo un `feature_list.json` en el que **QC-48 (`tenant-en-la-sesion`) figura en
+vuelo**, pero `specs/QC-48-tenant-en-la-sesion/` **no existe en esta rama**: vive en el worktree de
+esa ficha. Es estado de **otra sesion**, no de QC-35, y editar `feature_list.json` seria improvisar
+sobre el trabajo de otro. **Se para y se avisa** (regla 6).
 
-Consecuencia operativa: `./init.sh --rapido` **aborta en el paso de typecheck** y no llega a correr
-los tests. Por eso el gate de cada tanda se corrio replicando sus pasos a mano
-(`pnpm run lint` mas `pnpm run test:rapido`), que si completan.
-
-### 5.2 Un rojo NUEVO que esta feature NO esta autorizada a arreglar - decision del humano
+Por eso el gate se corrio replicando sus pasos a mano, que es donde de verdad se mide esta feature:
 
 ```
-tests/unit/recetas/scope.test.ts
-  - la pantalla de recetas vive solo donde la declara QC-26, y en ningun otro sitio
-  AssertionError: pantalla de recetas fuera de app\(private)\produccion\formulas/:
-    app\(private)\pedidos\components\recipe-picker.tsx
-
-tests/unit/recetas/module-contract.test.ts
-  - la feature no anade ningun route handler bajo app/, y lib/modules/recetas no cambio de forma
-  AssertionError: app/(private)/pedidos/components/index.ts menciona recetas fuera de
-    app/(private)/produccion/formulas
+$ pnpm run typecheck      -> limpio, cero errores
+$ pnpm run lint           -> limpio, sin salida
+$ pnpm run test:rapido    -> Test Files 69 passed (69) | Tests 773 passed (773)
+                             guardias: Test Files 15 passed (15) | Tests 157 passed (157)
 ```
-
-**Que pasa.** Las dos guardias de QC-25/QC-26 buscan el patron `recet|recipe` en todo `app/` fuera
-de la carpeta de formulas: la primera por **nombre de archivo**, la segunda por **contenido**. El
-selector de receta con busqueda al servidor que **el humano aprobo el 2026-09-06** (R31,
-`design.md` seccion 9.1) vive necesariamente en la ruta de pedidos, asi que las dispara.
-
-**Por que no se ha tocado.** R46 es explicita: los unicos archivos heredados que esta feature puede
-modificar son los de R2, R3, R4 y R5 mas los de la tabla compartida. **Esas dos guardias no estan en
-esa lista.** Ampliarlas es una decision sobre el alcance de OTRA ficha, no un detalle de
-implementacion, asi que **se para y se escala** en vez de improvisar.
-
-**Contexto para decidir.** La propia guardia documenta el precedente: fue *invertida* el 2026-09-03
-por QC-26 -"mismo trato que recibio tests/unit/inventario/scope.test.ts cuando QC-22 trajo la
-pantalla del catalogo"- y su comentario dice que lo que protege **no es la ausencia**, sino "que la
-pantalla no apareciera por goteo, repartida por el repositorio y **sin ficha que la respalde**".
-`recipe-picker.tsx` **no es una pantalla de recetas**: es un consumidor del catalogo, respaldado por
-una ficha aprobada. La salida natural es la misma ampliacion con comentario que recibieron los
-centinelas de `app-sidebar` y `route-role-rules` en T2/T3 -tensarla, no relajarla-, pero **la decide
-el humano**.
-
-Archivos afectados en `app/(private)/pedidos/components/`: `recipe-picker.tsx` (por nombre) e
-`index.ts`, `order-columns.tsx`, `order-form.tsx`, `order-list-section.tsx`, `order-sheet.tsx`,
-`order-table.tsx` (por contenido).
 
 ## 6. Lo que el PR tiene que declarar
 
@@ -291,8 +312,11 @@ Archivos afectados en `app/(private)/pedidos/components/`: `recipe-picker.tsx` (
 
 ## 10. Pendiente antes del PR
 
-- **F2.3**: merge de `origin/dev`, que trae el arreglo de los dos errores de typecheck de 5.1.
-- **Decision humana sobre 5.2** (guardias de recetas de QC-25/QC-26).
-- **`./init.sh` completo**, una sola vez, **antes de abrir el PR, sin excepcion**. Hoy no puede
-  terminar: aborta en typecheck por 5.1.
-- El PR **no se abre aqui**: lo coordina el leader despues del reviewer.
+- **F2.3: HECHO.** `git merge origin/dev` **sin conflictos**; trajo el arreglo de los dos errores de
+  typecheck ajenos.
+- **Decision sobre las guardias de recetas: HECHA y aplicada** (seccion 5.2).
+- **Desbloquear `./init.sh`**: hoy se para en la validacion de `feature_list.json` por el spec
+  ausente de **QC-48**, que es de otra sesion (seccion 5.3). No lo arregla esta feature.
+- **`./init.sh` completo**, una sola vez, **antes de abrir el PR, sin excepcion**, cuando lo
+  anterior este resuelto.
+- El PR **no se abre aqui**: va primero el `reviewer` (F2.2) y lo coordina el leader.
