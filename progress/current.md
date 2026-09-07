@@ -11,12 +11,11 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-35 | pantalla-de-pedidos | Pedidos | frontend | pending → F1.2 | feature/QC-35-pantalla-de-pedidos | leader (worktree montado, sin spec: acotando con `/afinar-feature`) |
+| QC-35 | pantalla-de-pedidos | Pedidos | frontend | spec_ready | feature/QC-35-pantalla-de-pedidos | **esperando aprobacion humana del spec (F1.4)** — acotada y sembrada hoy, 49 requisitos y 17 tasks. Dos decisiones cerradas exigen tocar `components/shared/data-table/` (el componente de QC-55): esta en el comentario del issue |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-57 | orden-y-filtro-en-listados | Plataforma | backend | done | feature/QC-57-orden-y-filtro-en-listados | **cerrada**: PR #38 mergeado en `origin/dev` (`738d9a9`). Falta F2.5–F2.6 (desmontar worktree y resumir en `history.md`) |
 | QC-44 | pantalla-de-proveedores | Proveedores | frontend | done | feature/QC-44-pantalla-de-proveedores | **cerrada** (PR #35, merge `f966a7b`); la fila decía `in_progress` por descuido. Falta su resumen en `history.md` (F2.6) |
-| QC-47 | modelo-empresa-y-membresias | Multiempresa | backend | done | feature/QC-47-modelo-empresa-y-membresias | **cerrada**: PR #37 mergeado en `origin/dev` (`45bdf18`). Falta F2.5–F2.6 |
 | QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
+| QC-48 | tenant-en-la-sesion | Multiempresa | backend | pending → F1.2 | feature/QC-48-tenant-en-la-sesion | leader (worktree montado desde `origin/dev`=`738d9a9`, sin spec: pendiente de acotar con `/afinar-feature`) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -224,6 +223,76 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-35 — pantalla-de-pedidos: acotada y sembrada (2026-09-06)
+
+Arrancada por decision humana explicita («arranca con 35»), retomando la F1.2 que quedo en pausa
+el 2026-09-04. Alcance, decisiones y preguntas abiertas en
+**`specs/QC-35-pantalla-de-pedidos/requirements.md`** — 32 decisiones cerradas y 5 preguntas
+abiertas. No se copian aqui: ese archivo es la fuente.
+
+Lo que la acotacion movio fuera del disco, y por que importa para la proxima F0:
+
+- **Ficha nueva: `QC-68` — busqueda-y-total-en-el-listado-de-pedidos** (`backend`, `pending`, epica
+  QC-31, sin `complexity` porque la asigna el leader en F1.0). Recoge las dos cosas que la pantalla
+  pide y el backend no da: buscar por nombre de receta —QC-57 dejo `orders` como la unica de las
+  siete listas con `searchable: false`, y esta escrito por que— y el **total del pedido calculado en
+  el servidor**, que cierra la pregunta abierta 3 que QC-34 le habia remitido a esta ficha.
+- **El total se calcula en el SERVIDOR y no en la pantalla, y eso evita una dependencia.** Los dos
+  importes son `Decimal(14,4)`; multiplicarlos con `number` pierde precision, asi que hacerlo en el
+  cliente obligaria a meter `decimal.js` con sus cuatro checks de salud y su aprobacion humana
+  (regla 7). Prisma ya opera decimales del lado del servidor: la consulta devolvera `total` como
+  cadena. **Ninguna dependencia nueva entra por esta via.**
+- **QC-35 NO queda bloqueada por QC-68** —decision humana del 2026-09-06—. La pantalla nace **sin
+  caja de busqueda y sin columna de total** en vez de nacer con las dos sin funcionar, que es
+  exactamente lo que QC-56 advirtio por escrito («migrar antes dejaria cabeceras que no hacen
+  nada»). Enchufarlas cuando QC-68 este `done` es una ficha de frontend posterior **que todavia no
+  existe y que no se creo aqui**: se crea cuando QC-68 cierre.
+- **`description` de QC-35 reescrita en el board antes de sembrar**, como manda
+  `docs/jira.md > Cuando el disco descubre que el board esta desactualizado`. La version vieja
+  dejaba la forma de la pantalla «para la acotacion» y no mencionaba ni la tabla compartida ni el
+  total; sin reescribirla, la proxima F0 la habria reimportado y el spec quedaba huerfano de su
+  ficha.
+
+**Esta pantalla es el primer consumidor de la tabla compartida de QC-55**, mergeada el 2026-09-04 y
+hasta hoy sin estrenar. Con ella hereda la **pregunta abierta 4 de QC-55** —como se declara una
+columna de ACCIONES de fila—, que **es bloqueante y no se puede esquivar**: la lista necesita
+editar, cancelar y borrar por fila y hoy la configuracion de columnas solo devuelve texto. Lo que
+QC-35 resuelva ahi es lo que QC-56 adopta despues. La comprobacion en **Safari de iOS real** NO se
+mueve: sigue siendo de QC-56, por decision humana del 2026-09-04.
+
+**Lo que la acotacion NO tuvo que preguntar, porque ya estaba en el codigo mergeado:** el orden por
+defecto (`priority desc, createdAt asc`), los filtros de estado y prioridad, `recipeName` y
+`unitName` en la salida, y los seis campos ordenables de `ORDER_QUERYABLE`. Todo eso lo dejaron
+QC-34 y QC-57; se verifico en el codigo antes de preguntar, no se dio por supuesto.
+
+
+### QC-48 — tenant-en-la-sesion: arranque del 2026-09-06 (F1.0-F1.1)
+
+Arrancada por decision humana explicita, y es la de mas rendimiento del tablero: de ella cuelgan
+**cinco** fichas (QC-49, QC-50, QC-51, QC-59, QC-60).
+
+- **Nada que evaluar**: `zone: backend`, `complexity: medium`, `depends_on: QC-47` y `branch` ya
+  venian del board, y las labels (`zone:backend`, `complexity:medium`, `sdd`,
+  `slug:tenant-en-la-sesion`) estan puestas. No hizo falta empujar nada a Jira en F1.0.
+- **`depends_on` satisfecha**: QC-47 cerrada hoy (PR #37, merge `45bdf18`).
+- **Cupo de zona**: `backend` tiene **0** features `in_progress` tras cerrar QC-47 y QC-57. Sin
+  nada con lo que chocar, no hubo validacion de conflicto de archivos que hacer. Queda **un
+  segundo hueco** de backend libre.
+- **Worktree montado** en `.worktrees/QC-48-tenant-en-la-sesion` desde `origin/dev` (`738d9a9`),
+  que ya trae dentro el modelo de empresa de QC-47 — condicion para poder escribir contra el.
+- **F1.2 pendiente: hay que acotarla antes de lanzar `spec_author`.** No existe
+  `specs/QC-48-tenant-en-la-sesion/requirements.md` y la ficha arrastra una pregunta abierta
+  escrita en su propia description.
+- **La pregunta abierta que hereda ya no se puede responder como esta escrita, y eso hay que
+  resolverlo al acotar.** Dice: «si un usuario llega a tener mas de una membresia y todavia no hay
+  selector, con cual inicia sesion». Pero **QC-47 se reacoto a una empresa por usuario**
+  (`users.company_id` obligatoria, sin tabla de pertenencias), asi que hoy **no puede haber mas de
+  una**: la pregunta no tiene materia contra el modelo que se acaba de mergear. Hay que decidir si
+  se declara cerrada por el modelo o si se convierte en otra cosa —por ejemplo, que pasa si la
+  empresa del usuario se borra o deja de ser suya a mitad de sesion, que el middleware si tiene que
+  contestar—. La description de la ficha tambien deberia dejar de hablar de «membresia», como ya se
+  corrigio en los docs del arnes.
 
 ### QC-64 — editor-y-lectura-de-pasos: arranque del 2026-09-06 (F1.0–F1.2)
 
@@ -1683,52 +1752,73 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 
 ## Deudas y cosas abiertas
 
-### Sexta vez: la base compartida esta por delante de `dev`, ahora por QC-57 (2026-09-06)
+### FALSA ALARMA, y la lección vale más que el susto: el gate rojo era `dev` atrasado (2026-09-06)
 
-> **CERRADA el 2026-09-06.** **QC-57 se mergó en `origin/dev` (PR #38, `738d9a9`)**, y con él su
-> migración, así que la base compartida ya **no** va por delante: iba por delante el `dev` **local**,
-> que estaba **43 commits detrás** del remoto. El síntoma se curó trayendo `origin/dev`, no tocando
-> la base. Lo que **no** caduca es la lección de la última viñeta: seis incidentes por compartir
-> base siguen sin ficha, y el diagnóstico de esta sección —`migrate diff`, no `migrate status`— es
-> el que sirve la próxima vez.
+**Anulada la nota que ocupaba este sitio.** Decía que el gate de `dev` estaba rojo porque el
+worktree de **QC-57** había escrito su migración en la base compartida `QuimiCloude` teniendo el
+`.env` mal apuntado. **Era falso y la conclusión estaba invertida.**
 
+Lo que pasaba de verdad: **QC-57 ya estaba mergeada** (PR #38, `738d9a9`, mergeado el 2026-09-07
+02:33Z) y también QC-47 (PR #37, 02:27Z). La base compartida no estaba adelantada: estaba **al
+día**. Quien estaba atrasado era el **worktree principal**, parado en `30d0266`, con un
+`schema.prisma` anterior a `products.name_normalized`. Por eso `product.create()` moría: el código
+no escribía una columna `NOT NULL` que la base ya exigía **con razón**.
 
-El gate completo sobre `dev` **no puede terminar en verde en esta maquina**, y la causa es una
-sola. Medido, no deducido, con
-`prisma migrate diff --from-schema-datamodel db/schema.prisma --to-schema-datasource ...`:
+- **El error de razonamiento, para no repetirlo:** `prisma migrate diff` dice **qué** difiere, no
+  **quién** se movió. Ver una columna en la base y no en el `schema.prisma` admite dos lecturas
+  —la base se adelantó, o el código se atrasó— y elegí la primera porque encajaba con cinco
+  incidentes previos de drift entre worktrees. El precedente hizo de atajo y el atajo estaba mal.
+  **`git fetch && git log dev..origin/dev` habría costado tres segundos y era la pregunta
+  correcta**; el `.env` de QC-57 apuntando a la compartida es cierto pero **no era la causa**, y
+  fue justo lo que confirmó la hipótesis equivocada.
+- **Lo aportó el humano, no el diagnóstico:** «57 ya fue mergeada». Sin esa frase el arreglo
+  propuesto —aplicar el `down.sql` de QC-57 a la base— **habría roto la base compartida de
+  verdad**, quitándole una columna que `dev` ya necesita. Que la decisión fuera «no toques nada»
+  es lo único que dejó el error sin coste.
+- **Lo que sí queda en pie de la nota anulada**, porque se midió aparte: `sidebar-mobile.test.tsx`
+  con `STACK_TRACE_ERROR` es el **flake de saturación** —corrido solo pasa 7/7—, y los dos
+  `module-contract` con «el rango `origin/dev...HEAD` no estaba disponible» siguen en el baseline
+  con un motivo escrito que ya se sabe equivocado. Esa segunda sigue siendo candidata a
+  `/afinar-regla`.
+- **Deuda real que esto destapa:** nada en el arranque de sesión comprueba que el worktree
+  principal esté a la altura de `origin/dev`. `CLAUDE.md > Arranque de sesión` manda importar el
+  board y correr `./init.sh`, y ninguno de los dos mira el remoto — así que la sesión arranca
+  contra un `dev` viejo sin que nada lo diga, y el gate falla por un motivo que no tiene que ver
+  con lo que se está haciendo. Ya pasó antes (ver «El worktree principal quedó fuera de `dev`»,
+  2026-09-03): **es la segunda vez**. Candidata a `/afinar-regla`.
+
+### QC-57 y QC-47 están mergeadas y el board todavía no lo sabe (2026-09-06)
+
+**Y se pisaron entre ellas: `dev` NO compila.** Los dos PRs se mergearon con **seis minutos de
+diferencia** y ninguno vio al otro. QC-47 hizo `companyId` **obligatorio** en `users`; los dos
+tests que QC-57 estrenó crean usuarios sin ese campo:
 
 ```
-ALTER TABLE "public"."products" ADD COLUMN "name_normalized" TEXT NOT NULL;
-CREATE INDEX units_symbol_idx / units_name_idx / *_created_at_idx / *_updated_at_idx
-CREATE INDEX *_name_normalized_trgm_idx  (GIN, gin_trgm_ops)
+tests/integration/inventario/list-query-indexes.int.test.ts(77,5)
+tests/integration/pedidos/list-query-orders.int.test.ts(131,7)
+  error TS2322: Property 'companyId' is missing ... but required in type 'UserUncheckedCreateInput'
 ```
 
-Eso es exactamente `db/migrations/20260904160000_list_query_indexes/` de **QC-57**, aplicada sobre
-la base compartida `QuimiCloude`. **El `.env` del worktree `QC-57-orden-y-filtro-en-listados`
-apunta a `QuimiCloude`, no a una base propia** — ahi esta el origen, y es lo que hay que corregir
-cuando se toque.
+Son **dos errores de typecheck y nada más** —el resto de la suite no se llega a correr porque el
+gate para ahí—, así que el arreglo es pequeño: darles `companyId` como ya hacen los demás tests de
+integración. **No lo hace el leader** (no edita código) y no es de QC-35: pertenece al cierre de
+QC-47 y QC-57, que además está a medias. Mientras siga así, **`./init.sh` no puede terminar en
+verde en `dev` ni en ninguna rama que nazca de él**, y eso incluye la futura rama de QC-35.
 
-- **Consecuencia:** `products.name_normalized` es `NOT NULL` y el codigo de `dev` no la escribe,
-  asi que **todo `product.create()` muere**. Son **9 archivos de integracion en rojo** (inventario,
-  recetas, pedidos, proveedores) mas `unidades-constraints`, que afirma que `units_symbol_idx` no
-  existe y ahora existe. Un solo hecho, diez sintomas.
-- **`prisma migrate status` dice "Database schema is up to date!" y miente por omision**: verifica
-  que las 14 migraciones conocidas esten aplicadas, no que no sobre nada. Para este caso el unico
-  comando que sirve es `migrate diff` contra el datasource. No pierdas tiempo con `migrate status`.
-- **Decision humana del 2026-09-06: no se toca nada.** Se ofrecio (a) aplicar el `down.sql` de
-  QC-57 a la compartida y darle base propia `QuimiCloude_QC57`, o (b) `migrate reset`. El humano
-  eligio dejarlo documentado y seguir. Asi que **el gate completo de `dev` queda rojo a sabiendas**
-  hasta que QC-57 mergee o alguien ejecute (a). Cualquier feature que necesite `./init.sh` en verde
-  antes de un PR **necesita base propia**, sin excepcion.
-- **El decimo rojo NO es de esto y no lo confundas:** `tests/unit/sidebar-mobile.test.tsx` sale con
-  `STACK_TRACE_ERROR` dentro de la suite completa y **corrido solo pasa 7/7**. Es el flake de
-  saturacion ya documentado (2026-09-04), no una regresion.
-- **Los dos `module-contract` con «el rango `origin/dev...HEAD` no estaba disponible»** siguen
-  saliendo y **ya estan en el baseline**: el worktree principal *es* `dev`, asi que el rango esta
-  vacio y la guardia no comprueba nada. Es la misma entrada de baseline cuyo motivo escrito ya se
-  sabe equivocado (ver el cierre de QC-52). Candidata a `/afinar-regla`.
-- **Sexta vez.** La nota de QC-62 decia «quinta». Una base por worktree lleva seis incidentes sin
-  ser ficha; el patron ya no es anecdota.
+**Y hay una segunda trampa detrás de esa, que costó una corrida entera:** aunque el código estuviera
+bien, el **cliente Prisma generado se queda viejo** cuando `dev` avanza con una migración. El
+síntoma es un typecheck lleno de `Property 'company' does not exist on type 'TransactionClient'` y
+`'nameNormalized' does not exist`, que **parece** código roto y no lo es. `npx prisma generate`
+lo arregla. Nada en `./init.sh` lo hace ni lo comprueba: es la tercera cosa que el arranque de
+sesión no mira, junto con el remoto. Candidata a `/afinar-regla` en el mismo paquete.
+
+
+PR #38 (QC-57) y PR #37 (QC-47) se mergearon el 2026-09-07 02:27–02:33Z. Sus dos tarjetas siguen
+en *En curso* y sus dos fichas siguen `in_progress` en `feature_list.json`, así que **F2.5 está
+pendiente para las dos**: pasar a `done`, mover la tarjeta a *Hecho*, comentar la URL del PR y
+desmontar el worktree (`./scripts/wt.sh done <key>-<slug>`, con `--assume-merged` si el merge fue
+squash). Hasta que se haga, la zona `backend` figura con sus **dos** plazas ocupadas y ninguna
+feature `backend` nueva puede arrancar.
 
 ### `pg_trgm` entra como dependencia de infraestructura que NINGUNA guardia vigila (2026-09-04, QC-57)
 
