@@ -8,6 +8,13 @@
 
 ## Veredicto
 
+**VUELTA 2 (2026-09-07): OK.** El bloqueante 1 esta cerrado y verificado por el reviewer con el
+E2E corrido **proyecto por proyecto en aislado**; los menores 2, 3 y 4 tambien. Detalle y salida
+real en «Segunda ronda», al final de este archivo. Lo de abajo es el veredicto de la vuelta 1 y se
+conserva tal cual, que es lo que hace auditable la correccion.
+
+### Vuelta 1 (2026-09-06)
+
 **RECHAZADO** — 1 hallazgo BLOQUEANTE (el E2E de R28, rojo reproducible en Chromium en aislado),
 4 menores. Todo lo demas —esquema cerrado, contrato de QC-62, aislamiento de TipTap,
 `package.json`, no persistencia del marcado, ausencia de ruta, accesibilidad y tactil, y el
@@ -221,3 +228,100 @@ reexport rompe. `RecipeStepEditor` si tiene sentido en el barrel; la lista de ex
 
 Solo el **bloqueante 1**. Los menores 2, 3 y 4 son baratos y conviene cerrarlos en la misma
 vuelta; el menor 1 lo cierra el leader con el gate.
+
+---
+
+# Segunda ronda — 2026-09-07
+
+Commits revisados: `4878166`, `8dd3718`, `f8b273f`, sobre la base `2710063` y con
+`7ccace7` (merge de `origin/dev`) por medio. **No se re-auditó lo que la vuelta 1 dio por verde
+salvo donde el diff nuevo lo toca.**
+
+## Veredicto de la vuelta 2
+
+**OK.** Los cuatro puntos cerrados y **verificados con salida real**, no con la palabra del
+implementer. Cero hallazgos nuevos.
+
+## Salida real de esta ronda
+
+```
+$ pnpm exec vitest run tests/unit/recetas-ui/
+  Test Files  9 passed (9)    Tests  154 passed (154)
+$ pnpm run test:guardias
+  Test Files 16 passed (16)   Tests  160 passed | 4 skipped (164)   (+1 caso: el del barrel)
+$ pnpm run lint       -> limpio
+$ pnpm run typecheck  -> LIMPIO, cero errores
+
+$ pnpm exec playwright test e2e/recetas-pasos.spec.ts --project=chromium   x3 -> 1 passed, 1 passed, 1 passed
+$ pnpm exec playwright test e2e/recetas-pasos.spec.ts --project=webkit     x2 -> 1 passed, 1 passed
+$ pnpm exec playwright test e2e/recetas-pasos.spec.ts   (los dos)             -> 2 passed
+```
+
+## Bloqueante 1 — CERRADO
+
+- **Verde con cada proyecto corrido SOLO**, que es lo que la vuelta 1 no tenia: **Chromium en
+  aislado 3 de 3** (antes 5 de 5 en rojo) y **WebKit en aislado 2 de 2**. La corrida con los dos
+  proyectos a la vez tambien pasa, pero ya no es la unica que pasa, que era el problema.
+- **La espera es a la condicion, no un reloj.** El helper nuevo es
+  `pulsarBarraYEsperarFoco(boton, editable)`, que hace `boton.click()` y despues
+  `await expect(editable).toBeFocused({ timeout: 60_000 })`. `timeout` ahi es un **techo**, no una
+  pausa: si el foco llega en 20 ms, el test sigue en 20 ms. Se comprobo por `grep` que en todo
+  `e2e/recetas-pasos.spec.ts` **no hay ni un `waitForTimeout`, ni un `setTimeout`, ni un `sleep`**
+  —el unico `setTimeout` del archivo es `test.setTimeout(240_000)`, el presupuesto del caso, que ya
+  estaba—. No es un sleep con otra ropa.
+- **Ademas quita la causa en vez de taparla**: la negrilla se aplica **al final**, sobre una
+  seleccion explicita (triple clic sobre el parrafo), asi que ya no hay que apagarla despues ni
+  hay que leer `aria-pressed` —el atributo que iba un tick por detras de la marca guardada— para
+  decidir nada. Y se anade `expect(editable.locator('li strong')).toHaveCount(0)`: si la marca se
+  colara en los items, el caso se pone rojo por esa asercion y no por el `strict mode`.
+- **No se toco `recipe-step-editor.tsx`, y se confirma en el diff**: el unico codigo de produccion
+  que cambia en esta vuelta es el barrel (`index.ts`, 3 lineas menos de export) y el borrado de los
+  dos `toggle`. Ni el editor, ni el esquema, ni el asistente, ni el formulario.
+
+## menor 2 — CERRADO
+
+`docs/dependencias.md` vuelve a **LF** (`file` ya no reporta `CRLF line terminators`) y el diff
+contra `origin/dev` es **9 insertions y 0 deletions**: exactamente las nueve filas de TipTap,
+revisable linea a linea. Las nueve filas siguen ahi (`grep -c` = 9) y ninguna es `excepcion` —lo
+sostiene el caso de la guardia de aislamiento, que sigue verde—.
+
+## menor 3 — CERRADO
+
+`components/ui/toggle.tsx` y `components/ui/toggle-group.tsx` **borrados** (133 lineas menos), y un
+`grep` de `app`, `components`, `lib`, `tests` y `e2e` no devuelve **ninguna** referencia a ellos.
+No rompieron nada: unitarios, guardias, lint, typecheck y los dos E2E, todo verde despues del
+borrado.
+
+## menor 4 — CERRADO, y con guardia que lo sostiene
+
+El barrel ya **no** reexporta `RECIPE_STEP_EXTENSIONS`, y `recipe-step-editor.tsx` vuelve a ser el
+**unico consumidor** de `recipe-step-schema.ts` (por ruta relativa dentro de la carpeta). Lo
+importante es que no se quedo en quitar la linea:
+
+- `tests/guards/guard-editor-aislado.test.ts` gana el caso «el barrel de la ruta no reexporta
+  recipe-step-schema ni ningun simbolo suyo», que comprueba **las dos vias**: el modulo y, leyendo
+  los simbolos exportados **del propio esquema** (no una lista copiada a mano), que ninguno de sus
+  nombres aparezca en el barrel. Un `export *` o un renombrado tambien caen.
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts` registra la excepcion a R46 **por nombre**
+  (`FUERA_DEL_BARREL = ['recipe-step-schema.ts']`) y la comprueba en los dos sentidos: no puede
+  salir por el barrel **y** tiene que seguir existiendo, para que la excepcion no se vuelva la
+  puerta por la que dejar de exponer componentes.
+
+**Se probo que muerden**: se anadio de vuelta la linea `export { RECIPE_STEP_EXTENSIONS } from
+'./recipe-step-schema';` al barrel y los **dos** casos se pusieron rojos; el barrel se restauro
+desde la copia y `git status` quedo limpio. Ninguna de las dos guardias es decorativa.
+
+## Informacion nueva (buena) sobre lo que la vuelta 1 anoto como ajeno
+
+Tras el merge de `origin/dev` (`7ccace7`), **`pnpm run typecheck` esta completamente limpio**: los
+dos errores de `companyId` en `tests/integration/inventario/list-query-indexes.int.test.ts` y
+`tests/integration/pedidos/list-query-orders.int.test.ts` **ya no aparecen**. Se retira la reserva
+que la vuelta 1 dejaba anotada: el gate completo ya no tiene ese impedimento heredado.
+
+## Lo que sigue abierto y NO es hallazgo del reviewer
+
+- **`tasks.md > T15`** sigue sin marcar (menor 1 de la vuelta 1). Lo cierra el leader al correr
+  `./init.sh` completo, que hoy ya no tiene el impedimento del typecheck.
+- El **spec desalineado** por el borrado de los dos `toggle` (`design.md > 2.5` punto 3, ultima
+  fila de `design.md > 7` y `tasks.md > T1`, que aun nombran `toggle-group.tsx`): esta en curso con
+  `spec_author` y por eso no se cuenta aqui.

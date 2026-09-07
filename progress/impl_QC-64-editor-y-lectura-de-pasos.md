@@ -404,3 +404,82 @@ desalineado con el arbol. **Lo cambia el `spec_author`, no el `implementer`.**
 
 **T15 sigue sin marcar**: el gate completo es del leader (menor 1, que el propio reviewer deja
 fuera de esta vuelta).
+
+---
+
+# Vuelta 3 — el rojo que destapo el gate completo
+
+`tests/unit/recetas/scope.test.ts` > «alcance de QC-25: la pantalla de recetas vive solo donde la
+declara QC-26». Falla **tambien corrido solo**, en 500 ms: **no es flake, es un rojo real**, y ni
+el `implementer` ni el reviewer lo habiamos corrido — solo lo ve la suite completa.
+
+```
+AssertionError: spec E2E de recetas inesperado: recetas-pasos.spec.ts, recetas.spec.ts
+  expected [ 'recetas-pasos.spec.ts', 'recetas.spec.ts' ] to deeply equal [ 'recetas.spec.ts' ]
+```
+
+Es una **guardia de alcance de QC-25** que enumera en lista **cerrada** los specs E2E de recetas
+que pueden existir, para que la pantalla no crezca «por goteo, repartida por el repositorio y sin
+ficha que la respalde» (su propio comentario). **La guardia estaba haciendo su trabajo**: avisa de
+que el alcance de recetas creció.
+
+Aqui ese crecimiento es **legitimo y aprobado** —lo pide **R28** y el spec lo aprobo el humano en
+F1.4—, asi que la salida correcta es **actualizar la lista, no rodear la guardia**:
+
+- `'recetas-pasos.spec.ts'` entra como **literal explicito**, en el orden que devuelve `readdirSync`.
+- **Sigue siendo `toEqual` sobre una lista cerrada.** No se convirtio en `toContain`, ni en
+  `arrayContaining`, ni en un `startsWith('recetas')`, ni en un glob, ni se toco `screenPattern`,
+  ni se anadio ningun filtro de exclusion, ni hay `skip`. **Un tercer spec de recetas sin ficha
+  tiene que seguir poniendo esto en rojo**, que es lo unico que este caso protege.
+- **La razon queda escrita en el propio test**: quien lo anade (QC-64), por que requisito (R28, con
+  el recorrido descrito) y que el spec lo aprobo el humano en F1.4. Una lista de literales sin
+  razon es un vertedero al tercer cambio.
+- **Verificada mordiendo**: con un `e2e/recetas-inventado.spec.ts` temporal el caso se pone rojo
+  con el mensaje esperado. Borrado despues.
+
+## Barrido del resto de guardias enumerativas
+
+- **Las demas aserciones del mismo archivo** si se ejecutaron (el fallo era la ultima) y pasan por
+  razones correctas: los tres archivos nuevos de la ruta caen **dentro** de `recipesRouteDir`
+  derivado de `FORMULAS_ROUTE`; no hay ruta de API nueva; no se toco `adapters/driving`, ni
+  `schema.prisma`, ni se metio aritmetica de paginacion en el modulo.
+- **`inventario`, `pedidos` y `proveedores`**: sus `screenPattern` (`/product|presentation|inventario/i`,
+  `/pedidos|orders/i`, `/proveedor|supplier/i`) no casan con nada de QC-64, y sus listas E2E
+  cerradas quedan intactas.
+- **`tests/guards/`**: ninguna de las 13 guardias enumera archivos de `components/ui/`, asi que
+  borrar `toggle.tsx` y `toggle-group.tsx` (menor 3) no rompe ninguna. Las unicas referencias a
+  `ui/toggle` que quedan en el arbol son prosa en `progress/`.
+
+## Un punto fragil que NO se toca aqui, y que conviene que alguien decida
+
+La asercion de `components/` de `tests/unit/recetas/scope.test.ts` usa
+`screenPattern = /recet|recipe/i` sobre la **ruta** del archivo. `components/shared/step-reader/`
+la esquiva **por el nombre**: no dice «recipe» en ninguna parte. El verde es *sustancialmente*
+correcto —el asistente es genuinamente generico, renderiza el documento del contrato sin saber de
+recetas, y por eso QC-63 podra montarlo—, **pero lo es por accidente lexico, no porque nadie lo
+haya razonado**.
+
+Efecto practico: manana se puede meter una pieza de recetas en `components/` con solo no escribir
+«recipe» en el nombre, y la guardia calla. Las guardias hermanas resuelven casos identicos con
+**exclusion explicita por nombre mas una defensa** que comprueba que el excluido no lleva senales
+reales de la pantalla (`RecipeListSection`, `recipe-table`, `prisma.recipe`). Aqui no hay ni
+exclusion ni defensa, porque el patron nunca llego a dispararse.
+
+**No se cambia en esta ficha**: endurecerlo es una decision con ficha propia, no algo que deba
+colar en una vuelta de correccion. Queda anotado para el leader.
+
+## Verificacion de la vuelta 3
+
+```
+$ pnpm exec vitest run tests/unit/recetas/scope.test.ts
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Duration  441ms
+
+$ pnpm exec vitest run tests/unit/recetas/ tests/unit/recetas-ui/ tests/guards/
+ Test Files  42 passed (42)
+      Tests  483 passed (483)
+
+$ pnpm run typecheck   -> 0 errores
+$ pnpm run lint        -> limpio
+```
