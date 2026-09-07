@@ -1873,3 +1873,52 @@ en una columna desde QC-24.
   que QC-64 traiga el editor. Y las dos guardias gemelas de alcance de `recetas` ya no dicen lo
   mismo: una se actualizó y la otra sigue tapada por `baseline-rojos.json` con un motivo escrito que
   ya no es el que ocurre.
+
+---
+
+## QC-57 — orden-y-filtro-en-listados (cerrada el 2026-09-06, PR #38, merge `738d9a9`)
+
+`zone: backend`, `complexity: high`. Un contrato único de consulta —orden, filtros, búsqueda y
+paginación— aplicado a los **siete listados** del producto. Cada módulo declara su **lista blanca**
+de campos consultables en `domain/list-query.ts`; lo que no está declarado se poda en el dominio y
+**queda en el log** en vez de desaparecer en silencio. Búsqueda por subcadena con `pg_trgm` e
+índices GIN (vía A, cerrada por decisión), `NULLS LAST` siempre explícito y `dateRange` en UTC con
+extremos inclusivos. 126 archivos, +11.356/−504. Único cambio de esquema: la columna
+`Product.nameNormalized` y sus 35 índices, con `down.sql` reversible y sin un solo `DROP` en la
+subida.
+
+- **R1–R35 con test real, cero sin cubrir.** 21 tasks, las 21 en `[x]`.
+- **Necesitó dos rondas de review, y ninguna fue por el contrato.** La ficha en sí pasó a la
+  primera; lo que la tumbó fue **el cierre**: F2.3 estaba sin hacer contra `origin/dev` (se había
+  mergeado `dev` **local**, que iba por detrás) y la rama arrastraba **14 archivos commiteados con
+  los finales de línea cambiados a CRLF**, que inflaban el diff con ~5.900 líneas fantasma.
+- **La lección del incidente de CRLF, que el implementer dejó escrita:** comparó contra `HEAD`,
+  que ya *era* el commit roto, en vez de contra la rama base — y así **propagó** la conversión en
+  vez de arreglarla. La guardia de equivalencia nunca falló: normaliza `\r\n` antes de comparar.
+- **Hallazgo que merece ficha propia (N2):** el `switch` del adaptador es una **segunda lista
+  blanca implícita** y nada la confronta con la declarada. Hoy coinciden las siete (auditadas una a
+  una), así que no hay bug; pero el día que se añada un campo a una lista blanca y se olvide la rama
+  del adaptador, el filtro desaparece **sin fallar y sin log**, porque el log solo registra lo que
+  podó el dominio. Es el modo de fallo de la decisión cerrada 7 entrando por el otro lado.
+- **Deuda que deja en `dev`:** doce funciones `export` sin consumidor fuera de su archivo (N1) y
+  una fecha ilegible en `dateRange` que se descarta sin rastro (N3, anotado para QC-56). Y el aviso
+  operativo de que `products.name_normalized` es `NOT NULL` sin default en la base compartida:
+  cualquier rama sin el modelo se lleva un `23502` al crear un producto. El `SET DEFAULT ''` está
+  **rechazado por escrito** — cambiaría un fallo ruidoso por filas invisibles a la búsqueda.
+
+## QC-47 — modelo-empresa-y-membresias (cerrada el 2026-09-06, PR #37, merge `45bdf18`)
+
+`zone: backend`, `complexity: high`. El modelo de empresa y la pertenencia del usuario a ella:
+`users.company_id` obligatoria, un rol por usuario, `users.role_id` intacta. Reviewer en **OK con
+0 bloqueantes y 6 menores**, sobre 29 requisitos `R1`–`R29` y 24 tasks, las 24 en `[x]`.
+
+- **El nombre miente y ya se corrigió en los docs:** no hay tabla de pertenencias. El spec se
+  **reacotó** a una empresa por usuario y el modelo de muchos a muchos de la primera vuelta quedó
+  descartado sin dejar residuo (comprobado por el reviewer).
+- **Corrió contra base propia `QuimiCloude_QC47`**, con el `.env` del worktree apuntando ahí, para
+  no pelearse con el drift de la base compartida.
+- **Su informe de review estuvo a punto de perderse.** Se quedó **sin commitear** dentro del
+  worktree —no entró en el PR ni llegó a `dev`— y lo habría borrado el `wt.sh done`. Se rescató a
+  mano al cerrar la ficha. F2.4 dio el PR por bueno sin comprobar que el árbol estuviera limpio.
+- **Desbloquea la cadena de multiempresa:** QC-48 (`tenant-en-la-sesion`) y QC-61, y tras QC-48 las
+  cinco de aislamiento por empresa (QC-49, QC-50, QC-51, QC-59, QC-60).
