@@ -23,6 +23,15 @@ const SESSION_CLAIMS_SCHEMA = z.object({
   // sin consultar la base y sin suponer ningun rol por defecto. Un rol por defecto seria un rol
   // inventado, y este contenido lo escribe quien firma, no quien lee.
   role: z.string().min(1),
+  // QC-48 R6: el UUID de la empresa de la persona, y NADA MAS de ella —ni su nombre, ni su
+  // nombre normalizado, ni sus marcas de tiempo, ni su estado de baja—. Se llama `cid` y no
+  // `companyId` por la misma razon por la que existen `sub`, `iat` y `exp`: este valor viaja en
+  // cada peticion y el UUID ya cuesta 36 caracteres. `.uuid()` y no `.min(1)` a proposito, mismo
+  // criterio que `sub`: el valor acaba comparandose contra una columna `@db.Uuid`, asi que un
+  // texto sin forma de UUID tiene que morir en el borde y no en Prisma. Ausente, vacio, de un
+  // tipo que no es texto o mal formado -> `null`, sin consultar la base y sin suponer ninguna
+  // empresa por defecto (R9): una empresa por defecto seria una empresa inventada.
+  cid: z.string().uuid(),
 });
 
 /**
@@ -41,13 +50,22 @@ export type SessionClaims = {
    * nunca es frontera de autorizacion (QC-9 R29).
    */
   readonly roleName: string;
+  /**
+   * La empresa FIRMADA, no la actual: como el rol, es una foto del instante del login (QC-48 R6).
+   * Se traduce aqui de `cid` a `companyId` —en el mismo sitio donde `role` pasa a `roleName`—
+   * para que fuera del codec nadie vea la abreviatura. **No autoriza nada por si sola** (QC-48
+   * R22): quien filtra datos de negocio usa la empresa LEIDA DE LA BASE, y este valor solo sirve
+   * como material de comparacion contra la ficha del usuario (QC-48 R13, R20).
+   */
+  readonly companyId: string;
 };
 
 /**
  * Interpreta el contenido firmado ya decodificado (el JSON, no el valor completo de la cookie).
  * Devuelve `null` ante cualquier entrada invalida: JSON mal formado, campos ausentes, `sub` sin
- * forma de UUID, `iat`/`exp` que no sean enteros positivos, o un `role` ausente, vacio o que no
- * es texto (QC-9 R28). No lanza en ningun caso: un
+ * forma de UUID, `iat`/`exp` que no sean enteros positivos, un `role` ausente, vacio o que no
+ * es texto (QC-9 R28), o un `cid` ausente, vacio, que no es texto o sin forma de UUID (QC-48
+ * R9). No lanza en ningun caso: un
  * payload que no es JSON es entrada invalida, no un fallo, y el `try` que lo cubre esta acotado
  * exactamente a la linea de `JSON.parse` (R6).
  */
@@ -68,6 +86,7 @@ export function parseSessionClaims(rawJson: string): SessionClaims | null {
     issuedAt: new Date(resultado.data.iat * 1000),
     expiresAt: new Date(resultado.data.exp * 1000),
     roleName: resultado.data.role,
+    companyId: resultado.data.cid,
   };
 }
 

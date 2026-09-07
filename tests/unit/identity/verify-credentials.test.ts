@@ -46,11 +46,23 @@ const SIN_BLOQUEO: AccountLockState = { failedAttempts: 0, lockLevel: 0, lockedU
 /** QC-9 R26: el rol lo trae el PUERTO desde la base, y termina firmado dentro de la cookie. */
 const ROL_EN_LA_BASE = 'Administrador';
 
+/** QC-48 R1, R2: la empresa la trae el mismo PUERTO desde la ficha de la persona. */
+const EMPRESA_EN_LA_BASE = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
+
 const USUARIO: AuthenticatableUser = {
   id: 'usuario-1',
   passwordHash: hashDe(CONTRASENA_CORRECTA),
   roleName: ROL_EN_LA_BASE,
+  companyId: EMPRESA_EN_LA_BASE,
+  // QC-48 R3: `null` es «la empresa sigue viva» (QC-47 R6). El caso normal.
+  companyDeletedAt: null,
   ...SIN_BLOQUEO,
+};
+
+/** QC-48 R3: la misma persona, pero su empresa esta dada de baja. */
+const USUARIO_DE_EMPRESA_MUERTA: AuthenticatableUser = {
+  ...USUARIO,
+  companyDeletedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
 
 /** Un instante futuro: la cuenta esta bloqueada mientras el reloj no lo alcance. */
@@ -144,6 +156,98 @@ describe('verificacion de credenciales', () => {
     await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
 
     expect(session.startSession.mock.calls[0]?.[0]).toMatchObject({ roleName: 'Operador' });
+  });
+
+  // QC-48 R1, R2 — la empresa del ticket sale de la FICHA que devolvio el puerto, nunca de la
+  // entrada. Mismo ataque que el del rol: campos de mas colados en el `FormData` que llegan
+  // hasta aqui. El caso de uso ni los mira, porque `LoginInput` no los tiene.
+  it('el ticket emitido lleva la empresa leida de la base, no una recibida del cliente', async () => {
+    const { verifyCredentials, session } = montar();
+
+    const resultado = await verifyCredentials({
+      username: 'admin',
+      password: CONTRASENA_CORRECTA,
+      // Un cliente intentando mudarse de empresa: no existe tal entrada.
+      cid: '00000000-0000-4000-8000-000000000000',
+      companyId: '00000000-0000-4000-8000-000000000000',
+    } as never);
+
+    expect(resultado).toEqual({ ok: true });
+    expect(session.startSession.mock.calls[0]?.[0]).toMatchObject({
+      userId: USUARIO.id,
+      companyId: EMPRESA_EN_LA_BASE,
+    });
+  });
+
+  // QC-48 R1, R5 — y si la fila dice otra empresa, el ticket dice esa otra: no hay empresa
+  // fijada en el codigo ni empresa por defecto, que seria una empresa inventada.
+  it('si la base devuelve otra empresa, el ticket lleva esa otra', async () => {
+    const otraEmpresa = 'b9d4e1a7-3c25-4f80-9a6b-2e7d1c058f34';
+    const { verifyCredentials, session } = montar([{ ...USUARIO, companyId: otraEmpresa }]);
+
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(session.startSession.mock.calls[0]?.[0]).toMatchObject({ companyId: otraEmpresa });
+  });
+
+  // QC-48 R3 — credenciales CORRECTAS y empresa dada de baja: no entra, y el resultado es
+  // exactamente el mismo objeto que devuelve una contrasena incorrecta. No `toEqual`: `toBe`,
+  // porque el rechazo compartido y congelado es justamente lo que impide que este camino se
+  // distinga de los demas por un campo de mas.
+  it('una empresa dada de baja devuelve el mismo objeto de rechazo que una contrasena incorrecta', async () => {
+    const empresaMuerta = montar([USUARIO_DE_EMPRESA_MUERTA]);
+    const normal = montar();
+
+    const porEmpresa = await empresaMuerta.verifyCredentials({
+      username: 'admin',
+      password: CONTRASENA_CORRECTA,
+    });
+    const porContrasena = await normal.verifyCredentials({
+      username: 'admin',
+      password: 'incorrecta',
+    });
+
+    expect(porEmpresa).toEqual({ ok: false });
+    expect(porEmpresa).toBe(porContrasena);
+    expect(empresaMuerta.session.startSession).not.toHaveBeenCalled();
+  });
+
+  // QC-48 R3 — y ese camino NO ESCRIBE NADA: ni registra el fallo (la credencial era buena, y
+  // bloquear a alguien por una decision administrativa seria un castigo) ni reinicia los
+  // contadores (no hubo login).
+  it('una empresa dada de baja no escribe nada ni emite sesion', async () => {
+    const { verifyCredentials, attempts, session } = montar([USUARIO_DE_EMPRESA_MUERTA]);
+
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(attempts.set).not.toHaveBeenCalled();
+    expect(attempts.compareAndSet).not.toHaveBeenCalled();
+    expect(session.startSession).not.toHaveBeenCalled();
+  });
+
+  // QC-48 R4 — exactamente una verificacion de hash tambien aqui. Si el corte fuera antes del
+  // hash, este caso respondaria en microsegundos y el tiempo delataria que la cuenta existe y
+  // que su empresa esta dada de baja.
+  it('el camino de la empresa dada de baja verifica el hash una vez, igual que los otros', async () => {
+    const { verifyCredentials, hasher } = montar([USUARIO_DE_EMPRESA_MUERTA]);
+
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(hasher.verify).toHaveBeenCalledTimes(1);
+    expect(hasher.verify.mock.calls[0]?.[1]).toBe(USUARIO.passwordHash);
+  });
+
+  // QC-48 R3 — la otra cara: el corte va DESPUES del `!correcta`, asi que una contrasena mala
+  // sobre una empresa dada de baja SI cuenta para el bloqueo. Si el corte fuera antes, dar de
+  // baja una empresa seria un modo de desactivar el contador de intentos de sus usuarios.
+  it('una contrasena incorrecta sobre una empresa dada de baja si registra el fallo', async () => {
+    const { verifyCredentials, attempts } = montar([USUARIO_DE_EMPRESA_MUERTA]);
+
+    const resultado = await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    expect(resultado).toEqual({ ok: false });
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(1);
+    expect(attempts.compareAndSet.mock.calls[0]?.[0]).toBe(USUARIO.id);
   });
 
   // R2

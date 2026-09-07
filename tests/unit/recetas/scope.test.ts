@@ -112,8 +112,21 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // lista es CERRADA, un segundo spec de recetas sin ficha pone esto en rojo.
     const e2eDir = join(repoRoot, 'e2e')
     const e2eMatches = matchingFiles(e2eDir).map((absolutePath) => relative(e2eDir, absolutePath).split(sep).join('/'))
+    //
+    // AMPLIADA 2026-09-07 (QC-64, editor-y-lectura-de-pasos): la lista pasa de uno a DOS
+    // literales, y sigue siendo CERRADA -no se convierte en `toContain`, ni en un
+    // `startsWith('recetas')`, ni en un glob: un TERCER spec de recetas sin ficha tiene que
+    // seguir poniendo esto en rojo, que es justo lo unico que este caso protege-. El spec que
+    // entra lo pide R28 de `specs/QC-64-editor-y-lectura-de-pasos/requirements.md`: un E2E que
+    // recorra el camino completo en un navegador real -redactar un paso con negrilla y una
+    // lista de verificacion, guardar la receta, reabrirla y comprobar que el paso se ve igual
+    // que se guardo, y recorrer el asistente dentro de la vista previa marcando los items hasta
+    // Finalizar-. O sea: NO es crecimiento por goteo, es una ficha con su requisito, y el spec
+    // lo aprobo el humano en F1.4. El orden de los literales es el que devuelve `readdirSync`
+    // (`matchingFiles` no ordena aqui), y por eso `recetas-pasos.spec.ts` va primero.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
-      'recetas.spec.ts',
+      'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
+      'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
     ])
   })
 

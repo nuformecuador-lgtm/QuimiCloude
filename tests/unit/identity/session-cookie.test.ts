@@ -29,6 +29,8 @@ vi.mock('next/headers', () => ({
 const AHORA = new Date('2026-09-01T08:00:00.000Z');
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc7-ok';
+// QC-48 R6: desde `v3` el contenido firmado lleva tambien el UUID de la empresa.
+const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
 
 /** El `.env` del worktree trae `SESSION_SECRET`: se guarda y se restaura por test. */
 let secretoOriginal: string | undefined;
@@ -96,7 +98,7 @@ afterEach(() => {
 describe('cookie de sesion', () => {
   // R9
   it('la cookie se emite httpOnly', async () => {
-    await startSession(createSessionTicket(USER_ID, 'Administrador', AHORA));
+    await startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA));
 
     const cookie = cookieEmitida();
     expect(cookie.name).toBe(SESSION_COOKIE_NAME);
@@ -106,7 +108,7 @@ describe('cookie de sesion', () => {
   // R10
   it('sameSite lax, path / y secure solo en produccion', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    await startSession(createSessionTicket(USER_ID, 'Administrador', AHORA));
+    await startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA));
 
     const enProduccion = cookieEmitida();
     expect(enProduccion.sameSite).toBe('lax');
@@ -117,7 +119,7 @@ describe('cookie de sesion', () => {
 
     vi.stubEnv('NODE_ENV', 'development');
     setMock.mockReset();
-    await startSession(createSessionTicket(USER_ID, 'Administrador', AHORA));
+    await startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA));
 
     const fueraDeProduccion = cookieEmitida();
     expect(fueraDeProduccion.secure).toBe(false);
@@ -127,7 +129,7 @@ describe('cookie de sesion', () => {
 
   // R11
   it('maxAge y exp coinciden con la duracion', async () => {
-    const ticket = createSessionTicket(USER_ID, 'Administrador', AHORA);
+    const ticket = createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA);
     await startSession(ticket);
 
     const cookie = cookieEmitida();
@@ -141,12 +143,12 @@ describe('cookie de sesion', () => {
   });
 
   // R12
-  it('el valor va firmado con HMAC y solo lleva sub/iat/exp/role', async () => {
-    await startSession(createSessionTicket(USER_ID, 'Administrador', AHORA));
+  it('el valor va firmado con HMAC y solo lleva sub/iat/exp/role/cid', async () => {
+    await startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA));
 
     const { value } = cookieEmitida();
     const [version, encodedPayload, firma] = value.split('.');
-    expect(version).toBe('v2');
+    expect(version).toBe('v3');
 
     const esperada = createHmac('sha256', SECRETO)
       .update(`${version}.${encodedPayload}`)
@@ -154,21 +156,22 @@ describe('cookie de sesion', () => {
     expect(firma).toBe(esperada);
 
     const payload = decodificarPayload(value);
-    expect(Object.keys(payload)).toEqual(['sub', 'iat', 'exp', 'role']);
+    expect(Object.keys(payload)).toEqual(['sub', 'iat', 'exp', 'role', 'cid']);
     expect(payload.sub).toBe(USER_ID);
+    expect(payload.cid).toBe(COMPANY_ID);
     expect(value).not.toContain(SECRETO);
   });
 
   // R13
   it('sin secreto valido lanza y no escribe cookie', async () => {
     delete process.env.SESSION_SECRET;
-    await expect(startSession(createSessionTicket(USER_ID, 'Administrador', AHORA))).rejects.toThrow(
+    await expect(startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA))).rejects.toThrow(
       /SESSION_SECRET/,
     );
     expect(setMock).not.toHaveBeenCalled();
 
     process.env.SESSION_SECRET = 'corto123';
-    await expect(startSession(createSessionTicket(USER_ID, 'Administrador', AHORA))).rejects.toThrow(
+    await expect(startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA))).rejects.toThrow(
       /SESSION_SECRET/,
     );
     expect(setMock).not.toHaveBeenCalled();
@@ -182,7 +185,7 @@ describe('cookie de sesion', () => {
       vi.spyOn(console, metodo).mockImplementation(() => {}),
     );
 
-    await startSession(createSessionTicket(USER_ID, 'Administrador', AHORA));
+    await startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA));
     const { value } = cookieEmitida();
 
     // Emitir la cookie no escribe en ningun registro de salida, ni siquiera algo inocuo. La
@@ -199,7 +202,7 @@ describe('cookie de sesion', () => {
 // bloque 1 (unidades de `iat`/`exp` distintas entre quien firma y quien construye el test).
 describe('lectura y borrado de la cookie de sesion', () => {
   async function valorValidoDeCookie(): Promise<string> {
-    const ticket = createSessionTicket(USER_ID, 'Administrador', AHORA);
+    const ticket = createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA);
     await startSession(ticket);
     const { value } = cookieEmitida();
     setMock.mockClear();
@@ -223,6 +226,24 @@ describe('lectura y borrado de la cookie de sesion', () => {
     // `SESSION_SECRET` para recomputar la firma antes de comparar la version, esto
     // lanzaria (ver el test `sin SESSION_SECRET la lectura lanza...`). Que resuelva
     // `null` sin secreto en el entorno prueba que la version se descarta primero.
+    delete process.env.SESSION_SECRET;
+
+    await expect(readSessionClaims()).resolves.toBeNull();
+  });
+
+  // QC-48 R8 — un `v2` IMPECABLE (firma buena, `exp` futuro, con su rol) se resuelve como "sin
+  // sesion", y ademas SIN LEER EL SECRETO: se borra `SESSION_SECRET` del entorno antes de leer.
+  // Si `readSessionClaims` lo leyera para recomputar la firma antes de mirar la version, esto
+  // lanzaria (ver el test `sin SESSION_SECRET la lectura lanza...`); que resuelva `null` sin
+  // secreto en el entorno es la prueba de que el formato anterior muere antes de tocar nada.
+  it('un v2 impecable resuelve null, y sin leer el secreto', async () => {
+    const ahora = Math.floor(Date.now() / 1000);
+    const payloadV2 = { sub: USER_ID, iat: ahora, exp: ahora + 8 * 60 * 60, role: 'Administrador' };
+    const encodedPayload = Buffer.from(JSON.stringify(payloadV2), 'utf8').toString('base64url');
+    const signedPart = `v2.${encodedPayload}`;
+    const firma = createHmac('sha256', SECRETO).update(signedPart).digest('base64url');
+    getMock.mockReturnValue({ value: `${signedPart}.${firma}` });
+
     delete process.env.SESSION_SECRET;
 
     await expect(readSessionClaims()).resolves.toBeNull();
@@ -261,8 +282,14 @@ describe('lectura y borrado de la cookie de sesion', () => {
 
   // R6
   it('sub que no es UUID devuelve null', async () => {
-    const version = 'v2';
-    const payload = { sub: 'no-es-un-uuid', iat: 1, exp: 2, role: 'Administrador' };
+    const version = 'v3';
+    const payload = {
+      sub: 'no-es-un-uuid',
+      iat: 1,
+      exp: 2,
+      role: 'Administrador',
+      cid: COMPANY_ID,
+    };
     const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
     const signedPart = `${version}.${encodedPayload}`;
     const firma = createHmac('sha256', SECRETO).update(signedPart).digest('base64url');
@@ -302,7 +329,7 @@ describe('lectura y borrado de la cookie de sesion', () => {
 
   // El caso feliz: lo leido coincide con el ticket que se le paso a `startSession`.
   it('el valor valido emitido por startSession se lee de vuelta con los mismos datos', async () => {
-    const ticket = createSessionTicket(USER_ID, 'Administrador', AHORA);
+    const ticket = createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA);
     await startSession(ticket);
     const { value } = cookieEmitida();
     setMock.mockClear();
@@ -318,6 +345,8 @@ describe('lectura y borrado de la cookie de sesion', () => {
     expect(claims?.expiresAt.getTime()).toBe(
       Math.floor(ticket.expiresAt.getTime() / 1000) * 1000,
     );
+    // QC-48 R6 — la empresa hace el viaje entero: ticket -> cookie firmada -> claims.
+    expect(claims?.companyId).toBe(ticket.companyId);
   });
 
   // R18
@@ -337,7 +366,7 @@ describe('lectura y borrado de la cookie de sesion', () => {
   // QC-9 con R24 (`requirements.md` > Preguntas abiertas 3), donde ya habra una URL real que
   // ejercitar en Playwright.
   it('tras clearSession, una peticion sin la cookie (navegador que ya la borro) resuelve sin sesion', async () => {
-    await startSession(createSessionTicket(USER_ID, 'Administrador', AHORA));
+    await startSession(createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA));
     setMock.mockClear();
 
     // No se fuerza `getMock` a mano: `clearSession()` borra la entrada del almacen con
@@ -369,7 +398,7 @@ describe('lectura y borrado de la cookie de sesion', () => {
   // NO una regresion. Ese dia se reescribe este test (para afirmar que la copia YA NO vale), no
   // se "arregla" para que vuelva a pasar en verde.
   it('CARACTERIZACION (riesgo asumido, QC-23 lo pondra rojo): una copia del valor sigue valiendo tras cerrar sesion', async () => {
-    const ticket = createSessionTicket(USER_ID, 'Administrador', AHORA);
+    const ticket = createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, AHORA);
     await startSession(ticket);
     const { value: valorCapturado } = cookieEmitida();
     setMock.mockClear();

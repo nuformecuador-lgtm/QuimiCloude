@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { recipeStepSchema, type RecipeStepDocument } from '@/lib/modules/recetas';
+
 import {
   buildRecipePayload,
-  stepDocumentToText,
-  textToStepDocument,
   type RecipeFormState,
   type RecipeLineFormValue,
   type RecipeStepFormValue,
@@ -36,14 +36,24 @@ function line(overrides: Partial<RecipeLineFormValue> = {}): RecipeLineFormValue
   };
 }
 
+/**
+ * Paso del ESTADO del formulario. Desde QC-64 T4 el estado guarda EL DOCUMENTO del contrato, no
+ * una cadena: este helper construye el documento minimo -un parrafo con un fragmento- para los
+ * casos que solo hablan de orden o de cantidad de pasos.
+ */
 function step(text: string, key = `step-${text}`): RecipeStepFormValue {
-  return { key, text };
+  return { key, document: { blocks: [{ kind: 'paragraph', spans: [{ text }] }] } };
+}
+
+/** Paso del estado con un documento cualquiera, para los casos que si hablan de su contenido. */
+function stepDoc(document: RecipeStepDocument, key = 'step-doc'): RecipeStepFormValue {
+  return { key, document };
 }
 
 /**
- * Texto plano de cada paso del payload, aplanando sus parrafos. Se escribe aqui a mano -en vez
- * de reusar `stepDocumentToText`- para que las aserciones de ORDEN no dependan de la misma
- * funcion que otro test de este archivo esta probando.
+ * Texto plano de cada paso del payload, aplanando sus parrafos. Sirve para afirmar sobre el
+ * ORDEN de los pasos sin repetir el documento entero; nunca sustituye a una igualdad estructural
+ * cuando lo que se comprueba es el contenido.
  */
 function stepTexts(steps: readonly RecipeStepPayload[]): string[] {
   return steps.map((document) =>
@@ -132,8 +142,8 @@ describe('buildRecipePayload — la cantidad viaja como la MISMA cadena que se e
   );
 });
 
-describe('buildRecipePayload — cada paso viaja como el documento del contrato (R19)', () => {
-  it('el texto del formulario sale como un documento de un solo párrafo con un solo fragmento', () => {
+describe('buildRecipePayload — cada paso viaja como el documento del contrato (QC-64 R5)', () => {
+  it('el documento del estado sale TAL CUAL, sin proyección de texto de por medio', () => {
     const state = baseState({ steps: [step('Mezclar'), step('Comprobar', 'step-check')] });
 
     const payload = buildRecipePayload('edit', state);
@@ -145,57 +155,52 @@ describe('buildRecipePayload — cada paso viaja como el documento del contrato 
     // La clave local de React es de PRESENTACIÓN: nunca cruza al contrato.
     expect(payload.steps[0]).not.toHaveProperty('key');
     expect(payload.steps[0]).not.toHaveProperty('text');
-    // El `type` DESAPARECIÓ del contrato (R9): el puente no lo reintroduce por la puerta de atrás.
+    // El `type` DESAPARECIÓ del contrato (QC-62 R9): no vuelve por la puerta de atrás.
     expect(payload.steps[0]).not.toHaveProperty('type');
     expect(payload.steps[0]).not.toHaveProperty('body');
   });
 
-  it('el texto se proyecta TAL CUAL: ni se recorta ni se parte por los saltos de línea (R5)', () => {
+  it('R5: el paso con marcas y lista de verificación pasa recipeStepSchema y NO lleva ninguna clave que el contrato no declare', () => {
+    // El documento que produciría el editor: dos marcas combinadas sobre el mismo fragmento, un
+    // párrafo en blanco y una lista de verificación. Es lo que el estado guarda desde T4.
+    const documento: RecipeStepDocument = {
+      blocks: [
+        {
+          kind: 'paragraph',
+          spans: [{ text: 'Mezclar ' }, { text: 'despacio', bold: true, italic: true }],
+        },
+        { kind: 'paragraph', spans: [] },
+        { kind: 'checklist', items: [{ spans: [{ text: 'Balanza calibrada' }] }] },
+      ],
+    };
+
+    const payload = buildRecipePayload('edit', baseState({ steps: [stepDoc(documento)] }));
+
+    // 1. Va el MISMO documento, no una copia aplanada ni recortada.
+    expect(payload.steps).toEqual([documento]);
+
+    // 2. Lo acepta el esquema del contrato SIN ninguna limpieza posterior. `recipeStepSchema` es
+    //    `.strict()` (QC-62 R4): si `buildRecipePayload` colara una clave de más, esto sería rojo.
+    const parsed = recipeStepSchema.safeParse(payload.steps[0]);
+    expect(parsed.success).toBe(true);
+
+    // 3. Y ninguna clave extra, dicha en negativo y clave a clave: ni estado de marcado, ni tipo
+    //    de paso, ni identificador de bloque, ni versión (R5).
+    const serializado = JSON.stringify(payload.steps[0]);
+    for (const prohibida of ['checked', 'type', 'id', 'version', 'key', 'body']) {
+      expect(serializado).not.toContain(`"${prohibida}"`);
+    }
+    expect(Object.keys(payload.steps[0] as object)).toEqual(['blocks']);
+    const primero = (payload.steps[0] as RecipeStepDocument).blocks[0];
+    expect(Object.keys(primero as object).sort()).toEqual(['kind', 'spans']);
+  });
+
+  it('el texto se copia TAL CUAL: ni se recorta ni se parte por los saltos de línea (QC-62 R5)', () => {
     const payload = buildRecipePayload('edit', baseState({ steps: [step('  Mezclar\ndespacio  ')] }));
 
     expect(payload.steps).toEqual([
       { blocks: [{ kind: 'paragraph', spans: [{ text: '  Mezclar\ndespacio  ' }] }] },
     ]);
-  });
-});
-
-describe('el puente de la pantalla: ida y vuelta entre texto y documento (R19)', () => {
-  it('textToStepDocument produce un párrafo de un fragmento sin marcas', () => {
-    expect(textToStepDocument('Mezclar')).toEqual({
-      blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }],
-    });
-  });
-
-  it('stepDocumentToText concatena los fragmentos de cada párrafo y separa los párrafos con un salto de línea', () => {
-    const document: RecipeStepPayload = {
-      blocks: [
-        { kind: 'paragraph', spans: [{ text: 'Mez' }, { text: 'clar', bold: true }] },
-        { kind: 'paragraph', spans: [{ text: 'despacio' }] },
-      ],
-    };
-
-    expect(stepDocumentToText(document)).toBe('Mezclar\ndespacio');
-  });
-
-  it('un texto que pasa por textToStepDocument y vuelve por stepDocumentToText es el mismo texto', () => {
-    for (const text of ['Mezclar', '  con espacios  ', 'con\nsalto']) {
-      expect(stepDocumentToText(textToStepDocument(text))).toBe(text);
-    }
-  });
-
-  it('un párrafo sin fragmentos aplana a la línea en blanco, y la lista de verificación se pierde: el puente es lossy y se asume', () => {
-    const document: RecipeStepPayload = {
-      blocks: [
-        { kind: 'paragraph', spans: [{ text: 'Antes' }] },
-        { kind: 'paragraph', spans: [] },
-        { kind: 'checklist', items: [{ spans: [{ text: 'Comprobar' }] }] },
-        { kind: 'paragraph', spans: [{ text: 'Después' }] },
-      ],
-    };
-
-    // Los párrafos sobreviven -incluida la línea en blanco-; el checklist NO tiene
-    // representación en un `<Input>` de texto y desaparece (`design.md > 6`).
-    expect(stepDocumentToText(document)).toBe('Antes\n\nDespués');
   });
 });
 
