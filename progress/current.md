@@ -12,7 +12,9 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | in_progress | feature/QC-54-unificar-constante-rol-administrador | **spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*. **F2.1 RETENIDA**: conflicto de archivos confirmado con QC-48 (ver Evaluaciones) |
+| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | pending | feature/QC-75-menu-y-rutas-por-permiso | worktree montado (F1.0/F1.1). **`/afinar-feature` en curso** antes de lanzar `spec_author` (F1.2) |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | pending | feature/QC-58-timeout-tests-ui-bajo-carga | worktree montado el 2026-09-07 (F1.0/F1.1). Pendiente decidir si se acota con `/afinar-feature` antes de lanzar `spec_author` (F1.2) |
+| QC-45 | pantalla-de-presentaciones | Inventario | frontend | pending | feature/QC-45-pantalla-de-presentaciones | worktree montado el 2026-09-07 (F1.0/F1.1) desde `dev` LOCAL. **F1.2 en pausa**: su `description` dice que la forma de la pantalla se decide al acotar, así que se ofrece `/afinar-feature` antes de lanzar `spec_author` |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -36,6 +38,23 @@ una feature, y QC-47 introduce migración nueva sobre `users`: cuando entre en F
 antes de la primera migración, no después.
 
 
+
+La feature **QC-54 — unificar-constante-rol-administrador** se cerró el 2026-09-07 (PR #42, merge
+`fa116cd`): resumen en `progress/history.md`, tarjeta a *Finalizado*. 17 requisitos con test y
+`reviewer` **en una sola ronda** (0 mayores, 5 menores), que verificó abriendo los tests y probó
+la guardia nueva con dos mutaciones propias. Deja **una sola** definición de «es Administrador»:
+`ROLE_ADMINISTRADOR` en `identity/domain/roles.ts` y `requireAdmin` parametrizado por el error, con
+`tests/guards/guard-rol-administrador-unico.test.ts` impidiendo la reincidencia. `wt.sh done` **volvió a fallar en Windows** —desregistró el worktree pero dejó el árbol en disco por las rutas largas de pnpm—, rematado con `rm -rf` + `git worktree prune`; van seis veces y sigue sin ficha.
+
+**Desbloquea QC-74** (`modelo-de-permisos`), que nació hoy con `depends_on: QC-54` justo por esto:
+sustituir una implementación de la regla es quirúrgico, sustituir las cinco copias era el trabajo
+que esta ficha acababa de hacer. La zona `backend` queda sin ninguna feature `in_progress`.
+
+**El árbol principal está 3 adelante y 10 atrás de `origin/dev`, y con cambios sin commitear.** Los
+cierres de QC-35 y QC-48 ya están escritos en el `feature_list.json` local y **no en `origin/dev`**,
+que sigue viéndolas `in_progress`; el de QC-54 se suma ahora al mismo montón. No se reconcilió aquí
+a propósito —hay trabajo sin commitear de por medio— pero es lo primero que hay que resolver antes
+de arrancar nada: `origin/dev` y el disco local no dicen lo mismo sobre tres fichas.
 
 La feature **QC-52 — separar-producto-de-catalogo-de-proveedor** se cerró el 2026-09-04 (PR #32,
 merge `855fae6`): resumen en `progress/history.md`, worktree desmontado, rama borrada y **base
@@ -220,6 +239,151 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-76 — equivalencia y ambito de unidades (creada y acotada el 2026-09-07)
+
+**Segunda corrida el 2026-09-07: sembrada.** Las 30 decisiones cerradas y el alcance viven en
+`specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md` — esa es la fuente, aquí solo se
+enlaza. **Cero preguntas abiertas.** La acotación descubrió que el listado de unidades **ya
+existe** (`listUnits`, de QC-26 y QC-57) y que `getSessionContext()` ya trae el `companyId`
+desde QC-48, así que **el filtro empresa-o-sistema entra en QC-76** y no en QC-38: la ficha deja
+de ser solo esquema y su `complexity` sube a **high** en el board. Se cerraron además las
+preguntas abiertas **1 y 3 de QC-32** —el símbolo pasa a ser único cuando existe, con el ámbito
+del nombre; presentación y unidad no convergen—, anotado como comentario en el issue QC-32 sin
+tocar su spec. QC-38 reescrita: pierde la consulta, gana las validaciones de la equivalencia.
+
+- **Corrida de `/afinar-feature` que NO sembró `specs/`**: lo pedido no tenía ficha. QC-32
+  (`modelo-unidades`) está `done` y no se pisa, así que la extensión del modelo nació como ficha
+  nueva —**QC-76**, épica Catálogos, `zone: backend`, `complexity: medium`, *is blocked by* QC-32
+  y QC-48—. Una ficha nueva nace `pending` en Backlog y se acota en su propia corrida
+  (`/afinar-feature`), así que **las decisiones viven hoy en la `description` del issue**, no en
+  un `requirements.md`. Esa corrida está pendiente y es la que escribirá
+  `specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`.
+- **Nueve decisiones del humano**, resumidas: equivalencia como **factor decimal exacto de 4
+  decimales** (nunca `float`, heredado de QC-33) hacia la unidad de la que se deriva, **mayor que
+  cero**; derivación de **un solo nivel** (tonelada = 1.000.000 de gramos, no 1000 kilogramos);
+  **no existe campo `system`** —«de sistema» es exactamente «sin `company_id`»—, lo que **cambia
+  la petición original**, que sí pedía el campo; unidades de sistema de **solo lectura**;
+  **unicidad del nombre medida dentro de la empresa**; consulta que trae empresa **o** sistema,
+  por **un único punto de consulta** del módulo; **migración nueva**, sin editar
+  `20260903121404_units_catalog`, que ya está aplicada; y el módulo **publica la conversión pero
+  ningún consumidor la usa** todavía.
+- **Reabre la pregunta abierta 1 del dominio.** QC-14 la cerró y QC-32 la revisó diciendo «una
+  sola unidad por elemento y **sin conversiones**, la unidad es puramente anotativa». Ahora sí hay
+  conversión. Anotado en `docs/architecture.md > Preguntas abiertas del dominio`.
+- **Board actualizado ANTES de tocar disco** (`docs/jira.md`): QC-76 creada con sus labels y sus
+  links; **QC-51 (`aislamiento-por-empresa-en-unidades`) movida a Cancelado** con comentario —
+  decía que cada empresa tiene sus propias unidades y que el arrancador se siembra por empresa, y
+  la decisión fue la contraria; lo único suyo que sobrevive es la unicidad por empresa, que entra
+  en QC-76—; **QC-38** con el filtro empresa-o-sistema, el rechazo a editar o borrar unidades de
+  sistema y las validaciones de la equivalencia, y su `depends_on` ahora incluye QC-76;
+  **QC-39** con la ruta `configuracion/unidades` y las columnas de la lista.
+- **Queda abierto**: si la pantalla de presentaciones (QC-45) vive también bajo esa sección
+  Configuración; qué permiso exige ver y editar unidades (lo cierra QC-38); y si el símbolo debe
+  ser único, abierta desde QC-32.
+
+La feature **QC-74 — modelo-de-permisos** se cerró el 2026-09-07 (PR #43, merge `95b9b51`):
+resumen en `progress/history.md`, tarjeta en *Finalizado*. 24 requisitos con test y `reviewer`
+**en una sola ronda** (0 mayores, 6 menores), que probó la trazabilidad con **11 mutaciones**.
+Deja diez permisos `<modulo>.<accion>` en base, `assertPermission` encima de la única
+`assertAdminRole` que dejó QC-54, y tres guardias contra la reincidencia. **Desbloquea QC-75.**
+
+**El gate abortó dos veces sin llegar a mirar código**, las dos por el `feature_list.json` de la
+rama: nació de `origin/dev`, que no conocía el board importado ese día. Corregido en `e5b0949`
+trayendo la copia del board, no parcheando filas. Es el coste medido de tener el board importado
+solo en el árbol principal sin commitear — y **sigue sin resolverse**.
+
+**`wt.sh done` falló en Windows por séptima vez**: desregistró el worktree y dejó el árbol en
+disco. Rematado con `rm -rf` + `git worktree prune`. Sigue sin ficha.
+
+**Dos menores del reviewer salen con destino y sin ficha todavía**, los dos `/afinar-regla`: las
+guardias son ciegas a comentarios de línea con finales CRLF —deuda **heredada** de QC-54, en
+**cuatro** guardias, que muerde con `core.autocrlf=true`— y `docs/architecture.md > Dominio` sigue
+nombrando tres tablas exentas de columna de empresa cuando ya son cinco.
+
+### QC-75 — arranque del 2026-09-07 (F1.0), y la regla de partición saltada a propósito
+
+Arrancada por decisión humana explícita («arranca 75») en cuanto QC-74 pasó a `done`, que era su
+único `depends_on`. La zona `fullstack` tenía **cero** features `in_progress`. `zone: fullstack`
+venía del board; **`complexity` estaba en `null` y se evalúa aquí como `high`**, y se empujó la
+label al issue: no por número de capas sino por superficie: retira las reglas ruta-a-rol del
+middleware —una frontera de seguridad—, cambia el armado del menú en servidor, el 404 por ruta, el
+destino del login, y trae el E2E que `CHECKPOINTS.md` exige para permisos.
+
+**No se parte en backend + frontend, y `AGENTS.md > Particion de fullstack` dice que sí.** Decisión
+humana del 2026-09-07, preguntada antes de montar el worktree. El motivo: el menú filtrado y el 404
+tienen que salir de la **misma** lectura de permisos, así que partirlo deja una mitad `backend` sin
+comportamiento observable y una mitad `frontend` que no se puede verificar sola — y
+`docs/architecture.md` es explícito en que un permiso implementado solo como corte de ruta **no
+cuenta como implementado**. Hay precedente además: QC-36, QC-63 y QC-70..QC-73 siguen `fullstack`
+sin partir, o sea que la regla lleva tiempo sin aplicarse. **Que la regla escrita y la práctica no
+coincidan es materia de `/afinar-regla`**, no algo que decida cada arranque por su cuenta.
+
+**Se acota con `/afinar-feature` antes de F1.2**, también por decisión humana y por el camino que
+marca ese propio paso: la ficha difiere explícitamente una decisión al acotado —«qué pasa con un rol
+que no puede ver ninguna pantalla»— y su alcance ya creció una vez (el login deja de llevar siempre
+al dashboard). Los tres specs escritos sin acotar costaron una o dos rondas completas.
+
+Worktree desde `origin/dev` (`95b9b51`), que ya trae el merge de QC-74.
+
+### QC-74 — arranque del 2026-09-07 (F1.0)
+
+Elegida por decisión humana explícita («arranca 74»). `zone: backend`, `complexity: high` y
+`depends_on: QC-54` ya venían del board, y las labels del issue (`zone:backend`,
+`complexity:high`) estaban correctas: **no hizo falta empujar nada a Jira**. La zona `backend`
+tenía **cero** features `in_progress` al arrancar (QC-23 está en `spec_ready`, que no cuenta para
+el cupo), así que no hubo validación de conflicto que hacer.
+
+**El worktree nace de `origin/dev` (`fa116cd`), no del `dev` local.** No es un detalle: el merge de
+QC-54 —del que esta ficha depende— está **solo** en `origin/dev`; el `dev` local va 3 adelante y
+**10 atrás**, y con 61 archivos sin commitear. `wt.sh new` resuelve la base con `resolve_base`, que
+prefiere `origin/dev`, así que salió bien por construcción y no por acierto. Si alguien monta el
+worktree a mano desde el `dev` local, QC-74 nace sin la pieza que sustituye.
+
+**La semilla de `/afinar-feature` estaba sin commitear en el árbol principal** (`specs/QC-74-…/`
+sale como `??` en `git status`), así que no existía dentro del worktree recién creado: se copió a
+mano antes de lanzar `spec_author`. Mismo caso en `specs/QC-70-…/` y `specs/QC-71-…/`, que siguen
+untracked y le pasará lo mismo a quien las arranque.
+
+**Reconciliar `origin/dev` con el disco sigue pendiente** y se avisó antes de arrancar: los cierres
+de QC-35, QC-48 y QC-54 están escritos en el `feature_list.json` local y no en el remoto. F1 no
+toca código y el worktree ya está aislado, así que no bloquea la especificación — pero sí hay que
+resolverlo antes de F2.3.
+
+### QC-74 y QC-75 — permisos por módulo: dos fichas nuevas, QC-74 acotada y sembrada (2026-09-07)
+
+Nacen las dos en esta sesión (épica QC-17). **QC-74 — `modelo-de-permisos`** (`backend`,
+`complexity: high`, `depends_on: QC-54`) queda acotada con `/afinar-feature`: once decisiones
+cerradas y dos preguntas abiertas en `specs/QC-74-modelo-de-permisos/requirements.md` — no se
+releen desde aquí. **QC-75 — `menu-y-rutas-por-permiso`** (`fullstack`, sin `complexity`) nace
+`pending` en Backlog y **no se siembra**: se acota cuando le toque.
+
+**Por qué son dos y no una.** «El menú se filtra y la ruta da 404» no es implementable solo: hoy
+los cinco módulos autorizan preguntando por el nombre del rol dentro del service, y
+`docs/architecture.md` es explícito en que un permiso implementado solo como corte de ruta **no
+cuenta como implementado**. QC-74 cambia la frontera real (service), QC-75 la parte visible.
+
+**Dos cosas que se midieron y cambiaron el alcance.** La propuesta original mandaba el listado de
+rutas permitidas dentro de la cookie firmada: se descartó — duplica el mapa de URLs fuera del
+código, crece sin techo en cada petición y hereda los 8 h de envejecimiento del rol firmado
+(QC-9 R30). El set de permisos se deriva en el layout desde la base, que ya lee al usuario en cada
+render privado. Y **el permiso por empresa no se preguntó**: `docs/architecture.md > Dominio` ya lo
+lista entre lo que el reviewer rechaza como sobre-ingeniería.
+
+**Choque directo con QC-54, que está `in_progress` ahora mismo.** Los cinco `requireAdmin` que
+aquélla está unificando son exactamente lo que QC-74 sustituye por `requirePermission`. Decisión
+humana: QC-54 se termina y QC-74 va encima, con `depends_on: QC-54` escrito en el board. Sustituir
+una implementación es quirúrgico; sustituir cinco copias es el trabajo que QC-54 ya está haciendo.
+
+**QC-63 se refuerza:** su ficha ya pedía por escrito que el Operador pueda consultar recetas sin
+poder modificarlas, que es justo la granularidad elegida. Pero el Operador **no** nace con ese
+permiso: nace solo con «consultar inventario», y QC-63 abre lo suyo con su propio motivo.
+
+**Alcance que creció en QC-75 y que conviene ver antes de acotarla:** el login deja de llevar
+siempre a `/dashboard` —el dashboard pasa a exigir permiso como cualquier módulo— y lleva a la
+primera pantalla con permiso. Eso abre el caso «un rol sin ninguna pantalla», que queda **sin
+decidir a propósito** en su ficha.
+
 
 ### QC-54 — F2.0 hecha y F2.1 RETENIDA: el conflicto con QC-48 está medido (2026-09-07)
 
@@ -513,6 +677,71 @@ Arrancada por decisión humana explícita («avanza con 64»), no por el orden d
 - **F1.2 en pausa**: la propia `description` dice que la forma de la pantalla se decide al acotar,
   y QC-34 le hereda dos preguntas abiertas (si la consulta devuelve el total calculado y si la
   edicion es reemplazo completo). Se corre `/afinar-feature` antes de lanzar `spec_author`.
+
+### QC-45 — arranque del 2026-09-07 (F1.0)
+
+Arrancada por **decisión humana explícita** («arranca»), después de que **QC-76 quedara bloqueada**:
+la validación de conflicto de `AGENTS.md > Paralelismo` la para porque **QC-74 ya está tocando los
+archivos de QC-76** — `lib/modules/unidades/{domain/list-units.ts,domain/actor.ts,domain/errors.ts,index.ts}`,
+`adapters/driving/unit-actions.ts`, `db/schema.prisma` y los tres tests de `unidades`—, que es
+exactamente la superficie de esa ficha. QC-76 espera a que QC-74 pase a `done`.
+
+- **Cupo y conflicto, los dos verdes.** `frontend` tenía a QC-58 en vuelo y ninguna `in_progress`
+  formal; con QC-45 son **dos features frontend en vuelo, el máximo**. Sin intersección de archivos:
+  QC-58 vive en `vitest.config.mts` y en tests ya existentes; QC-45 crea pantalla y tests nuevos.
+  Su `depends_on` (**QC-22**) está `done`.
+- **`complexity: medium`**, evaluada aquí (venía en `null`): un solo catálogo corto, cuyas
+  operaciones **ya existen** como Server Actions de QC-20, pero con pantalla, formulario, tabla,
+  estados y sus tests — varios archivos y varias capas, no un `low` de un archivo. Escrita como
+  label `complexity:medium` en el issue.
+- **EL WORKTREE CUELGA DE `dev` LOCAL, no de `origin/dev`, y esta vez no es una preferencia.**
+  Las dos ramas están **DIVERGIDAS**: `origin/dev` tiene 10 commits que el local no tiene (todo
+  **QC-54**, la unificación de `ADMIN_ROLE_NAME`) y `dev` local tiene **11 sin pushear**, entre
+  ellos `df76e44` (**el selector de presentación usa el autocomplete y busca en el servidor**),
+  `5e66471` (el primitivo de autocomplete), `4477bd6` (el panel de formulario) y `642a2f9` (la
+  columna de imagen). Colgar la pantalla de presentaciones de `origin/dev` sería construirla sin
+  el selector de presentaciones. Se usó `wt.sh new ... --base dev`, así que **no hizo falta el
+  `git reset --hard`** que necesitó QC-58 esta mañana.
+- **Deuda que esto hereda y agrava, y ya no es solo de QC-58:** la rama cuelga de un `dev` que el
+  remoto no conoce, y además **le falta QC-54 entero**. Cuando se pushee, hay que reconciliar
+  `dev` con `origin/dev` antes de abrir el PR de esta ficha. Esta mañana la nota de QC-58 decía
+  «`dev` local va 10 por delante»; ya no es ir por delante, es **divergencia en las dos
+  direcciones**.
+
+### QC-58 — arranque del 2026-09-07 (F1.0)
+
+Arrancada por **decisión humana explícita** («arranca 58»), no por el orden de `id`: por `id` la
+primera `frontend` desbloqueada era **QC-45** (`pantalla-de-presentaciones`). Se prefiere QC-58
+porque **QC-74 termina en T18 «gate completo»** y el flake dejaría ese cierre en rojo intermitente.
+
+- **Cupo y conflicto, los dos verdes.** `frontend` tenía **cero** features `in_progress`. La única
+  `in_progress` del repo es QC-74, de zona `backend`, que toca `lib/modules/**` y `db/`: cero
+  intersección con lo que QC-58 va a tocar (`vitest.config.mts`, `tests/**`).
+- **Zona, complexity y branch ya venían evaluadas** del board (`frontend`, `medium`,
+  `feature/QC-58-timeout-tests-ui-bajo-carga`). No hizo falta empujar labels a Jira.
+- **El worktree hubo que rebasarlo, y no es un detalle.** `wt.sh new` lo creó desde `origin/dev`
+  (`fa116cd`), pero **`dev` local va 10 commits por delante y sin pushear**, y esos commits son
+  justo la superficie que esta ficha tiene que estabilizar: `5e66471` (el primitivo de
+  autocomplete y su hook de consulta paginada) y los tres refactores que pasan los selectores de
+  ingrediente, receta y presentación a ese componente (`bf9f165`, `7ac616b`, `df76e44`). Medir el
+  plazo contra un árbol sin eso sería medir el código equivocado. Se hizo `git reset --hard dev`
+  sobre la rama recién creada —local, reversible, la rama aún no tenía trabajo— y `pnpm install`.
+- **Deuda que esto abre, y hay que cerrarla antes de F2.4:** la rama cuelga de un `dev` que el
+  remoto no conoce. Mientras `dev` no se pushee, el PR hacia `dev` arrastraría los 10 commits.
+
+**Terreno medido antes de especificar** (en el worktree, sobre `df76e44`):
+
+- **224 llamadas a `userEvent.setup()` repartidas en 33 archivos.** Solo **2** pasan opciones.
+- **`tests/unit/recetas-ui/recipe-form.test.tsx:201` ya usa `{ delay: null }`.** El arreglo que la
+  ficha propone ya tiene precedente dentro del repo, aplicado a mano en un solo archivo.
+- **`tests/unit/async-autocomplete.test.tsx:248` usa `{ delay: 20 }` a propósito**, por el debounce
+  del autocomplete. Un `delay: null` global y ciego lo rompería: el arreglo **tiene que admitir
+  excepción explícita**, y eso es una decisión de acotación, no un detalle de implementación.
+- **`vitest.config.mts` no fija `testTimeout` en ningún proyecto**: el proyecto `ui` corre con el
+  default de 5000 ms, que es exactamente el número del error.
+- El proyecto `ui` es `tests/**/*.test.tsx` + `tests/ui/**/*.test.ts`, con `setupFiles:
+  ['./tests/setup.ts']`, que hoy solo importa `@testing-library/jest-dom/vitest`. Es el punto
+  natural donde un helper compartido de `userEvent` podría vivir sin tocar 33 archivos.
 
 ### El flake de la suite de UI no es de paralelizacion, y casi me cuesta el gate (2026-09-04)
 
