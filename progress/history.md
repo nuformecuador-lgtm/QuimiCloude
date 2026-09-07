@@ -1968,3 +1968,95 @@ guardia que lo comprueba por dos vías).
 feature estaba cerrada y con el worktree ya desmontado, pero `progress/current.md` seguía
 diciendo `in_progress` y F2.6 estaba sin hacer. La fila del board manda, pero el que la mueve es el
 leader: cerrar el PR no cierra la ficha.
+
+---
+
+## QC-48 — tenant-en-la-sesion (cerrada el 2026-09-07, PR #39, merge `f0163dc`)
+
+`zone: backend`, `complexity: medium`. La empresa de la persona se resuelve al autenticarse
+leyendo su propia ficha (`users.company_id`, obligatoria desde QC-47), viaja **firmada** en la
+cookie como ya viajaba el rol, y se valida en cada petición contra la base. El formato del
+contenido firmado sube a **`v3` sin compatibilidad hacia atrás**. `R1`–`R28` con test real, 14
+tasks, reviewer **APROBADO con 0 bloqueantes y 5 menores**. Suite completa al cerrar: **206/206
+archivos, 2438 tests, cero rojos**.
+
+- **Ciclo completo en un día**, de `pending` a merge: acotada con `/afinar-feature`, spec, código,
+  review y gate. Es la primera ficha del repo que hace el recorrido entero en una sesión.
+- **Lo que define esta ficha es dónde NO puso las cosas.** El middleware terminó con **diff
+  vacío**: el corte del borde lo hace el esquema `zod` del contenido firmado, así que sigue
+  decidiendo sin tocar la base — que es el diseño de QC-9 y además lo único viable en runtime
+  Edge. Y `SessionUser` no se descongeló: la empresa viaja en un tipo nuevo, `SessionContext`.
+- **Cero consultas nuevas por petición, pero un `JOIN` más.** `companyId` ya venía en la fila que
+  la sesión leía; `company.deletedAt` obliga a un `JOIN` a `companies` —por clave primaria, en la
+  ruta más caliente— y se resuelve en la misma llamada a `findFirst`, igual que ya se hacía con
+  `role.name`. El coste está escrito en el propio adaptador para que nadie lo descubra de
+  sorpresa.
+- **Tres cortes con su sitio razonado**, no puestos donde cayeran: el de «empresa dada de baja» en
+  el login va **después** del hash (cortar antes sería un oráculo de tiempo), **después** del
+  fallo de contraseña (si no, dar de baja una empresa desactivaría el contador de bloqueo) y
+  **antes** de escribir nada (no se registra fallo por una decisión administrativa que la persona
+  no puede arreglar).
+- **La empresa del `SessionContext` sale de la BASE, no de la cookie.** Tras el corte que las
+  compara los dos valores son iguales por construcción, así que la elección no cambia el valor:
+  cambia de quién es la culpa el día que dejen de serlo.
+- **Deuda que deja en `dev`:** pedir usuario y contexto en la misma petición cuesta dos lecturas
+  (aceptado por escrito, con la salida ya diseñada); `design.md > 10` cita dos rutas de test con
+  nombres viejos; y sigue abierta la heredada de QC-47 — cómo elige empresa el login el día que
+  exista una segunda, ahora que el nombre de usuario solo es único dentro de la empresa.
+- **Al desplegar caen todas las sesiones vivas**, consecuencia aceptada del `v3` sin
+  compatibilidad.
+- **Hallazgo ajeno que destapó y NO arregló:** algún test crea tipos de documento que **sobreviven
+  a su propia transacción** y ensucian la base compartida; tumbó `identity-constraints.int.test.ts`
+  en la primera corrida del gate. Se borraron las tres filas huérfanas, pero la causa sigue viva y
+  volverá. Merece ficha propia — es el sexto incidente de la familia «base compartida».
+
+## QC-64 — editor-y-lectura-de-pasos (cerrada el 2026-09-07, PR #40, merge `ba40721`)
+
+`zone: frontend`, `complexity: high`. El editor enriquecido de pasos de receta y su lectura paso a
+paso, contra el contrato cerrado que dejó QC-62. 29 archivos, +5.615/−155. Reviewer **OK en la
+vuelta 2**, tras **RECHAZAR** la primera con un bloqueante.
+
+- **El bloqueante fue un E2E, y la forma en que se detectó es la lección.** `recetas-pasos.spec.ts`
+  fallaba **5 de 5 veces** en Chromium **corrido en aislado**, y pasaba cuando los dos proyectos
+  corrían a la vez. WebKit en aislado pasaba. Un test que solo es verde acompañado no es un test
+  verde: las teclas (`ArrowRight`, `Enter`) no llegaban al área editable y la negrilla nunca se
+  apagaba, así que todo el paso salía en negrita y el localizador resolvía a dos elementos.
+- **La vuelta 2 se cerró con salida real, no con la palabra del implementer**: el reviewer
+  reprodujo el E2E 3 veces en Chromium, 2 en WebKit y 1 con los dos proyectos, más los 154 tests
+  de `recetas-ui`, las guardias, `lint` y `typecheck`. Cero hallazgos nuevos.
+- **Desbloquea QC-63** (`ejecutar-receta-operador`), que esperaba por ella.
+
+## QC-35 — pantalla-de-pedidos (cerrada el 2026-09-07, PR #41, merge `415834c`)
+
+`zone: frontend`, `complexity: high`. La pantalla de pedidos completa —lista, alta y edición en
+panel lateral, cancelación con motivo y borrado— y **el estreno de la tabla de datos compartida de
+QC-55**, que llevaba desde el 2026-09-04 mergeada sin ningún consumidor. 58 archivos, +10.309/−94.
+17/17 tasks, 49/49 requisitos trazados a test, reviewer **OK en la vuelta 2** tras **RECHAZAR** la
+primera con dos mayores.
+
+- **Los dos mayores eran del arnés, no del producto.** M1: seis tests en rojo porque los centinelas
+  de alcance seguían afirmando «ninguna pantalla consume la tabla compartida», que era justo lo que
+  esta ficha venía a dejar de ser cierto. Se invirtieron cuatro, y la inversión **no aflojó nada**:
+  dicen «pedidos es su ÚNICO consumidor», con un caso aparte que mantiene cerradas inventario y
+  producción —migrarlas sigue siendo QC-56—. M2: el gate completo se había dado por verde sin
+  correrlo.
+- **La inversión se validó falsificándola, no leyéndola.** El reviewer reprodujo **9 mutaciones**
+  restaurando el árbol tras cada una, y las nueve dieron rojo: entre ellas las dos que el
+  coordinador puso como condición —que inventario o producción importen la tabla—. Los tres
+  centinelas invertidos ganaron además aserciones anti-vacío (`consumidores > 0`), que es lo que
+  impide que un centinela invertido se muera en silencio el día que su bucle no encuentre nada.
+- **Cero dependencias nuevas**, comprobado contra la base de la rama: lo que aparece en el rango
+  (`package.json`, `pnpm-lock.yaml`, primitivas de `components/ui/`) llegó del re-merge con `dev`,
+  de QC-64 y QC-48.
+- **Nació sin buscador y sin columna de total a propósito** (decisión humana del 2026-09-06), en vez
+  de nacer con una caja que no hace nada: las dos cosas son **QC-68** (backend), y enchufarlas en la
+  pantalla es una ficha de frontend posterior que **esta ficha no creó**.
+- **Deuda que deja en `dev`:** el menor `m2` del reviewer sigue abierto —`recetas/module-contract`
+  es más estricto que su criterio, yerra del lado seguro—; P2 y P3 de QC-55 se arrastran (P2
+  comprobada formalmente: ninguna columna emite ancho, así que no se propone la tercera prop); P4 y
+  P5 de su `requirements.md` —devolución de un pedido entregado y exportación al contable— siguen
+  sin decidir y no se rellenaron con supuestos.
+- **Al cerrar apareció trabajo sin commitear en el worktree:** las 112 líneas de la segunda ronda
+  del reviewer vivían solo en el árbol de trabajo y **no entraron en el PR**. La guarda 3 de
+  `wt.sh` las retuvo en vez de borrarlas; se trajeron a `dev` en `805de89` y solo entonces se
+  desmontó. Es exactamente el caso para el que existe la guarda.

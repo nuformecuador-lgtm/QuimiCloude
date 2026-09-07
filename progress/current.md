@@ -11,10 +11,7 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-35 | pantalla-de-pedidos | Pedidos | frontend | in_progress | feature/QC-35-pantalla-de-pedidos | implementer (spec aprobado por el humano el 2026-09-07). Worktree sincronizado con `origin/dev` — venia 60 commits atras |
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-64 | editor-y-lectura-de-pasos | Recetas | frontend | in_progress | feature/QC-64-editor-y-lectura-de-pasos | implementer (spec y dependencia **aprobados por el humano el 2026-09-06**; las nueve filas de TipTap ya en `docs/dependencias.md`, commit `3c26268`. Arranca en T2) |
-| QC-48 | tenant-en-la-sesion | Multiempresa | backend | in_progress | feature/QC-48-tenant-en-la-sesion | implementer (**spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*). R1–R28, 14 tasks, sin migración y sin dependencia nueva |
 | QC-54 | unificar-constante-rol-administrador | Identidad y acceso | backend | in_progress | feature/QC-54-unificar-constante-rol-administrador | **spec aprobado por el humano el 2026-09-07**, tarjeta en *En curso*. **F2.1 RETENIDA**: conflicto de archivos confirmado con QC-48 (ver Evaluaciones) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
@@ -248,6 +245,14 @@ comería la feature que ya tiene doce tasks hechas.
 
 **Lo que desbloquea F2.1**, cualquiera de las dos: QC-48 pasa a `done`, o el humano decide asumir
 el merge a mano sobre esos dos archivos.
+
+### QC-71 — identificador-de-request: acotada y sembrada (2026-09-07)
+
+Siete decisiones cerradas y **dos preguntas abiertas** en `specs/QC-71-identificador-de-request/requirements.md` — no se releen desde aquí. `backend` → `fullstack`, `complexity: medium`, `depends_on: QC-70` sin cambios, y la `description` del board reescrita antes de sembrar. **Reabrió una fila de QC-70 cerrada ese mismo día**: el error genérico sí lleva el identificador de vuelta al navegador. Se añadió la fila sustitutoria a la tabla de QC-70 y se corrigió su `description` en el board; el resto de ese archivo no se tocó.
+
+Las dos preguntas abiertas no son pereza y conviene no rellenarlas a ojo: Next admite **un solo** `middleware` y hoy lo ocupa el portero de rutas de `identity` (QC-9), y el id tiene que cruzar del borde a la Server Action —dos ejecuciones, dos runtimes, una cabecera como único canal—. `tests/guards/guard-middleware-edge.test.ts` recorre el cierre de imports completo desde `middleware.ts` y prohíbe `node:crypto`, `crypto`, `@prisma/client` y `next/headers`: es la guardia que esta ficha va a rozar, y su modo de fallo es no verse hasta el despliegue.
+
+**QC-54 pasó a `in_progress` mientras acotaba**, desde la otra sesión de leader y por la vía buena (F1.4 aprobada, tarjeta en *En curso*) — su propia entrada, arriba, lo cuenta. El validador pasó de `in_progress=3` a `=4` sin que yo tocara ningún `status`: son 2 de `backend` y 2 de `frontend`, así que la regla de máx. 2 por zona se respeta. Refuerza el `depends_on: QC-54` que QC-70 ya lleva: ya no es una precaución, es una feature viva sobre los mismos cinco `domain/errors.ts`.
 
 ### QC-70 — errores-centralizados: nacida, acotada y sembrada (2026-09-07)
 
