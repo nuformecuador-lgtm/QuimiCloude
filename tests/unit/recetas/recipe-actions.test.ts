@@ -52,6 +52,8 @@ const ADMIN_SESSION_USER = {
   username: 'ana.perez',
   displayName: 'Ana Perez',
   roleName: 'Administrador',
+  // QC-74 (R11): la sesion trae el conjunto de permisos vigente; el actor se arma con EL.
+  permissions: ['recetas.consultar', 'recetas.modificar'],
 };
 
 const VALID_RECIPE_INPUT = {
@@ -93,7 +95,7 @@ describe('createRecipeAction — R38', () => {
     expect(resultado).toEqual({ status: 'success', id: 'receta-1' });
     expect(createRecipeMock).toHaveBeenCalledWith(
       expect.objectContaining({ name: VALID_RECIPE_INPUT.name }),
-      { id: ADMIN_SESSION_USER.id, roleName: ADMIN_SESSION_USER.roleName },
+      { id: ADMIN_SESSION_USER.id, permissions: ADMIN_SESSION_USER.permissions },
     );
   });
 

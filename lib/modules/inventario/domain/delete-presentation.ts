@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError, PresentationInUseError } from './errors';
 
 import type { PresentationRepository } from '../ports/presentation-repository';
@@ -8,7 +8,7 @@ export type DeletePresentationDeps = {
 };
 
 /**
- * Borrado de presentacion (R14, R21, R22). `requireAdmin` es la PRIMERA linea, antes de
+ * Borrado de presentacion (R14, R21, R22). `requirePermission(actor, 'inventario.modificar')` es la PRIMERA linea, antes de
  * tocar el puerto (R2, R3). No hay zod aqui: el borrado no recibe mas entrada que el
  * identificador.
  *
@@ -27,7 +27,7 @@ export function createDeletePresentation(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'inventario.modificar');
 
     const result = await deps.presentations.deleteById(id);
 

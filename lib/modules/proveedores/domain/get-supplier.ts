@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError } from './errors';
 import type { SupplierView } from './supplier-view';
 
@@ -9,8 +9,10 @@ export type GetSupplierDeps = {
 };
 
 /**
- * Ficha de un proveedor (R22, R24, R35). Consultar TAMBIEN exige `requireAdmin` (decision
- * cerrada 1): la ficha no es menos sensible que el alta.
+ * Ficha de un proveedor (R22, R24, R35). Consultar TAMBIEN exige un permiso —
+ * `proveedores.consultar`, QC-74 R16— (decision cerrada 1): la ficha no es menos sensible
+ * que el alta. Y `proveedores.modificar` NO la abre: no hay implicacion entre permisos
+ * (R13).
  *
  * La ficha NO trae las lineas del catalogo (R35, decision cerrada 5): el catalogo tiene su
  * propio listado paginado, y devolverlo aqui obligaria a traerlo entero.
@@ -22,7 +24,7 @@ export function createGetSupplier(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<SupplierView> {
-    requireAdmin(actor);
+    requirePermission(actor, 'proveedores.consultar');
 
     // null = no existe o esta dado de baja (R22, R24): el puerto ya filtro los muertos.
     const supplier = await deps.suppliers.findAliveById(id);

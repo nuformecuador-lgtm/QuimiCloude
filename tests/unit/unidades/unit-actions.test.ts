@@ -2,9 +2,13 @@
 // `@/lib/composition` igual que `recipe-actions.test.ts` de `recetas`: la action se
 // testea contra dobles, nunca contra el dominio real ni contra la sesion real.
 //
-// Cubre R41 (la action no decide nada: el rechazo por rol lo prueba `list-units.test.ts`
-// contra el dominio real) y R42 (la action traduce el error de dominio a estado
-// serializable sin relanzar, y relanza cualquier otro error).
+// Cubre R41 (la action no decide nada: el rechazo lo prueba `list-units.test.ts` contra el
+// dominio real) y R42 (la action traduce el error de dominio a estado serializable sin
+// relanzar, y relanza cualquier otro error).
+//
+// QC-74 (R15, R18): la action construye el actor con `{ id, permissions }` —el nombre del rol
+// ya no llega al modulo— y su bloque de traduccion de errores NO cambia: sigue mirando
+// `error instanceof UnidadesError`.
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -21,11 +25,22 @@ vi.mock('@/lib/composition', () => ({
   unidades: { listUnits: listUnitsMock },
 }));
 
-const ADMIN_SESSION_USER = {
+/** La sesion conserva `roleName` porque es DISPLAY (lo pinta `nav-user`), pero la action ya no
+ *  lo mira: lo que pasa al caso de uso es el conjunto de permisos (R18). */
+const SESSION_USER_CON_PERMISO = {
   id: 'user-admin-1',
   username: 'ana.perez',
   displayName: 'Ana Perez',
   roleName: 'Administrador',
+  permissions: ['unidades.consultar'],
+};
+
+/** La conversion del antiguo caso «rol Operador»: sesion valida SIN el permiso exigido. */
+const SESSION_USER_SIN_PERMISO = {
+  ...SESSION_USER_CON_PERMISO,
+  id: 'user-operador-1',
+  roleName: 'Operador',
+  permissions: ['inventario.consultar'],
 };
 
 const CATALOG = [
@@ -35,7 +50,7 @@ const CATALOG = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER);
+  getSessionUserMock.mockResolvedValue(SESSION_USER_CON_PERMISO);
 });
 
 describe('listUnitsAction', () => {
@@ -50,9 +65,11 @@ describe('listUnitsAction', () => {
     // action sigue pidiendo el CATALOGO ENTERO, o sea `undefined` de consulta, que es lo que
     // mantiene su firma -y la de las tres pantallas que la llaman- sin tocar. Cambia la forma
     // de la llamada, no lo que este caso verifica.
+    // QC-74 (R18): el actor que sale de la action es `{ id, permissions }` y NADA MAS. Que el
+    // aserto sea de igualdad ESTRICTA es lo que pone en rojo un `roleName` que vuelva.
     expect(listUnitsMock).toHaveBeenCalledWith(undefined, {
       id: 'user-admin-1',
-      roleName: 'Administrador',
+      permissions: ['unidades.consultar'],
     });
     expect(resultado).toEqual({ status: 'success', data: CATALOG });
   });
@@ -64,6 +81,21 @@ describe('listUnitsAction', () => {
     await listUnitsAction();
 
     expect(listUnitsMock).toHaveBeenCalledWith(undefined, null);
+  });
+
+  it('con sesion SIN el permiso pasa el conjunto tal cual y traduce el rechazo del dominio', async () => {
+    // La action no decide: entrega los permisos que tiene la sesion y deja que el caso de uso
+    // rechace. El estado serializado conserva el `code` estable (R15).
+    getSessionUserMock.mockResolvedValue(SESSION_USER_SIN_PERMISO);
+    listUnitsMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await listUnitsAction();
+
+    expect(listUnitsMock).toHaveBeenCalledWith(undefined, {
+      id: 'user-operador-1',
+      permissions: ['inventario.consultar'],
+    });
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
   });
 
   it('la action traduce el error de dominio a estado serializable sin relanzar', async () => {

@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { DuplicateNameError, NotFoundError, ValidationError } from './errors';
 import { updateSupplierSchema } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
@@ -31,7 +31,7 @@ export function createUpdateSupplier(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'proveedores.modificar');
 
     const parsed = updateSupplierSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

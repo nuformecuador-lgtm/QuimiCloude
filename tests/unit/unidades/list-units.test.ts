@@ -1,19 +1,28 @@
 // T7 — Caso de uso `createListUnits` (`design.md > 9`; `tasks.md > T7`).
 //
 // Cubre R40 (el listado devuelve el catalogo ordenado y pide siempre un limite
-// declarado) y R41 (sin actor, con rol desconocido o con rol distinto de Administrador
-// se rechaza SIN leer del repositorio).
+// declarado) y R41 (sin actor o sin el permiso exigido se rechaza SIN leer del repositorio).
+//
+// QC-74 (R12, R14, R15, R16, R17, R18): el rechazo ya NO es por nombre de rol —el `Actor` de
+// `unidades` ni siquiera tiene ese campo—, sino por PERTENENCIA EXACTA de `'unidades.consultar'`
+// al conjunto de permisos. Los cuatro casos de rol de QC-32 se conservan CONVERTIDOS, uno a uno:
+// rol `''` -> conjunto vacio; rol `null` -> actor `undefined` (sin conjunto de permisos); rol
+// `'Operador'` -> conjunto con otro codigo (`inventario.consultar`); rol
+// `'Administradores externos'` -> conjunto con un codigo PARECIDO (`'unidades.'`), que es el
+// mismo espiritu: no hay coincidencia parcial (R13).
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { createListUnits, MAX_UNITS } from '@/lib/modules/unidades/domain/list-units';
-import { UnauthorizedError } from '@/lib/modules/unidades/domain/errors';
+import { UnauthorizedError, UnidadesError } from '@/lib/modules/unidades/domain/errors';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
 import type { Actor } from '@/lib/modules/unidades/domain/actor';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRef } from '@/lib/modules/unidades/domain/unit-catalog';
 
-const ADMIN_ACTOR: Actor = { id: 'user-admin-1', roleName: 'Administrador' };
+/** Actor con EXACTAMENTE el permiso que exige `listUnits` (R16, R17). Su rol es irrelevante:
+ *  el tipo `Actor` ya no lo tiene (R18). */
+const ACTOR_CON_PERMISO: Actor = { id: 'user-admin-1', permissions: ['unidades.consultar'] };
 
 const CATALOG: readonly UnitRef[] = [
   { id: 'unit-1', name: 'Gramo', symbol: 'g' },
@@ -65,7 +74,7 @@ describe('createListUnits — R40', () => {
     const { units, listAll } = repositoryReturning(CATALOG);
     const listUnits = createListUnits({ units, log: LOG_MUDO });
 
-    const resultado = await listUnits(undefined, ADMIN_ACTOR);
+    const resultado = await listUnits(undefined, ACTOR_CON_PERMISO);
 
     expect(resultado).toEqual(CATALOG);
     expect(listAll).toHaveBeenCalledTimes(1);
@@ -84,7 +93,7 @@ describe('createListUnits — R40', () => {
     const { units } = repositoryReturning(reordenado);
     const listUnits = createListUnits({ units, log: LOG_MUDO });
 
-    const resultado = await listUnits(undefined, ADMIN_ACTOR);
+    const resultado = await listUnits(undefined, ACTOR_CON_PERMISO);
 
     expect(resultado).toEqual(reordenado);
     expect(resultado[0]?.name).toBe('Litro');
@@ -92,55 +101,62 @@ describe('createListUnits — R40', () => {
   });
 });
 
-describe('createListUnits — R41', () => {
-  it('sin actor se rechaza sin leer del repositorio', async () => {
-    const units = repositoryThatMustNotBeCalled();
+describe('createListUnits — R41 (QC-74: R12, R14, R15, R16, R17)', () => {
+  it('con el permiso unidades.consultar se concede y se lee del repositorio', async () => {
+    const { units, listAll } = repositoryReturning(CATALOG);
     const listUnits = createListUnits({ units, log: LOG_MUDO });
 
-    await expect(listUnits(undefined, null)).rejects.toBeInstanceOf(UnauthorizedError);
-    expect(units.listAll).not.toHaveBeenCalled();
-    expect(units.listPage).not.toHaveBeenCalled();
+    const resultado = await listUnits(undefined, { id: 'user-1', permissions: ['unidades.consultar'] });
+
+    expect(resultado).toEqual(CATALOG);
+    expect(listAll).toHaveBeenCalledTimes(1);
   });
 
-  it('con rol vacio se rechaza sin leer del repositorio', async () => {
+  /**
+   * Los cinco rechazos. Los cuatro ultimos son la CONVERSION de los cuatro casos de rol de
+   * QC-32 (`''`, `null`, `'Operador'`, `'Administradores externos'`): misma cobertura, ahora
+   * expresada sobre el conjunto de permisos (R14).
+   */
+  const SIN_PERMISO: ReadonlyArray<{ readonly nombre: string; readonly actor: Actor | null | undefined }> = [
+    { nombre: 'sin actor', actor: null },
+    { nombre: 'con conjunto de permisos vacio', actor: { id: 'user-1', permissions: [] } },
+    { nombre: 'con actor indefinido, o sea sin conjunto de permisos', actor: undefined },
+    {
+      nombre: 'con un permiso de otro modulo',
+      actor: { id: 'user-1', permissions: ['inventario.consultar'] },
+    },
+    {
+      nombre: 'con un codigo parecido que no concede: no hay coincidencia parcial',
+      actor: { id: 'user-1', permissions: ['unidades.'] },
+    },
+  ];
+
+  for (const caso of SIN_PERMISO) {
+    it(`${caso.nombre} se rechaza sin leer del repositorio`, async () => {
+      const units = repositoryThatMustNotBeCalled();
+      const listUnits = createListUnits({ units, log: LOG_MUDO });
+
+      // El `as` es solo para el caso `undefined`: la firma declara `Actor | null`, y aqui se
+      // ejercita a proposito la defensa en ejecucion de un actor ausente (R14).
+      await expect(listUnits(undefined, caso.actor as Actor | null)).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
+      expect(units.listAll).not.toHaveBeenCalled();
+      expect(units.listPage).not.toHaveBeenCalled();
+    });
+  }
+
+  it('el rechazo lanza el UnauthorizedError del modulo, que es un UnidadesError (R15)', async () => {
     const units = repositoryThatMustNotBeCalled();
     const listUnits = createListUnits({ units, log: LOG_MUDO });
 
-    await expect(listUnits(undefined, { id: 'user-1', roleName: '' })).rejects.toBeInstanceOf(UnauthorizedError);
-    expect(units.listAll).not.toHaveBeenCalled();
-    expect(units.listPage).not.toHaveBeenCalled();
-  });
-
-  it('con rol nulo se rechaza sin leer del repositorio', async () => {
-    const units = repositoryThatMustNotBeCalled();
-    const listUnits = createListUnits({ units, log: LOG_MUDO });
-
-    await expect(listUnits(undefined, { id: 'user-1', roleName: null })).rejects.toBeInstanceOf(
-      UnauthorizedError,
+    // `instanceof UnidadesError` es lo que el adaptador driving usa para serializar: si el error
+    // saliera de `identity` en vez del modulo, esta linea se pondria roja.
+    await expect(listUnits(undefined, { id: 'user-1', permissions: [] })).rejects.toBeInstanceOf(
+      UnidadesError,
     );
-    expect(units.listAll).not.toHaveBeenCalled();
-    expect(units.listPage).not.toHaveBeenCalled();
-  });
-
-  it('con rol desconocido se rechaza sin leer del repositorio', async () => {
-    const units = repositoryThatMustNotBeCalled();
-    const listUnits = createListUnits({ units, log: LOG_MUDO });
-
-    await expect(listUnits(undefined, { id: 'user-1', roleName: 'Operador' })).rejects.toBeInstanceOf(
-      UnauthorizedError,
-    );
-    expect(units.listAll).not.toHaveBeenCalled();
-    expect(units.listPage).not.toHaveBeenCalled();
-  });
-
-  it('con rol distinto de Administrador se rechaza sin leer del repositorio', async () => {
-    const units = repositoryThatMustNotBeCalled();
-    const listUnits = createListUnits({ units, log: LOG_MUDO });
-
-    await expect(
-      listUnits(undefined, { id: 'user-1', roleName: 'Administradores externos' }),
-    ).rejects.toBeInstanceOf(UnauthorizedError);
-    expect(units.listAll).not.toHaveBeenCalled();
-    expect(units.listPage).not.toHaveBeenCalled();
+    const error = await listUnits(undefined, { id: 'user-1', permissions: [] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UnauthorizedError);
+    expect((error as UnauthorizedError).code).toBe('unauthorized');
   });
 });

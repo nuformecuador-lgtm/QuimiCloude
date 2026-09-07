@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { DuplicateNameError, ValidationError } from './errors';
 import { createPresentationSchema } from './presentation-input';
 import { normalizePresentationName } from './presentation-name';
@@ -10,7 +10,7 @@ export type CreatePresentationDeps = {
 };
 
 /**
- * Alta de presentacion (R9, R11, R17, R18, R20, R37). `requireAdmin` es la PRIMERA
+ * Alta de presentacion (R9, R11, R17, R18, R20, R37). `requirePermission(actor, 'inventario.modificar')` es la PRIMERA
  * linea, antes de zod y antes de tocar el puerto (R2, R3).
  *
  * R17: el nombre y su forma normalizada se calculan juntos aqui, con
@@ -29,7 +29,7 @@ export function createCreatePresentation(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<{ id: string }> {
-    requireAdmin(actor);
+    requirePermission(actor, 'inventario.modificar');
 
     const parsed = createPresentationSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

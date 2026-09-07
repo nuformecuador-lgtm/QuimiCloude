@@ -17,4 +17,13 @@ export type SessionUser = {
   readonly username: string;
   readonly displayName: string;
   readonly roleName: string | null;
+  /**
+   * QC-74 (T8, R7, R11): los codigos de permiso vigentes del rol, resueltos en la MISMA lectura
+   * de sesion. Es el dato con el que se autoriza; `roleName` se queda al lado pero es DISPLAY
+   * —lo pinta `nav-user.tsx`— y no autoriza nada (R18).
+   *
+   * Un rol sin ninguna asignacion da `[]`, no `null`: «no tiene permisos» es una lista vacia,
+   * no un hueco, y asi quien compara nunca tiene que distinguir dos formas de lo mismo (R14).
+   */
+  readonly permissions: readonly string[];
 };

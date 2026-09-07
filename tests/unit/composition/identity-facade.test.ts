@@ -48,6 +48,10 @@ const RECORD: SessionUserRecord = {
   roleName: 'operador',
   companyId: COMPANY_ID,
   companyDeletedAt: null,
+  // QC-74 T8 (R7, R11): el record trae ya los permisos del rol. Los cortes de esta cadena no
+  // los miran —quien los mira es `assertPermission` en cada caso de uso—, asi que aqui basta
+  // con una lista no vacia que se pueda seguir hasta la proyeccion.
+  permissions: ['inventario.consultar'],
 };
 
 beforeEach(() => {

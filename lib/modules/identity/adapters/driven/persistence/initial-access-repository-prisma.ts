@@ -9,7 +9,7 @@ import type { InitialAccessRepository } from '../../../ports/initial-access-repo
 /**
  * Adaptador Prisma del puerto `InitialAccessRepository` (`design.md > 5.3`, T11). Toca
  * `role`, `user` y `company` — los tres modelos de `identity` que le tocan al seed desde
- * QC-47: nunca `documentType` (R17).
+ * QC-47 — y, desde QC-74, `permission` y `rolePermission`: nunca `documentType` (R17).
  *
  * Exporta una FABRICA y no un objeto ya construido a proposito: el test de integracion
  * necesita construirla sobre un `Prisma.TransactionClient` para poder correr el seed dos
@@ -81,6 +81,41 @@ export function createInitialAccessRepository(
         }
         throw error;
       }
+    },
+
+    async findExistingPermissionCodes(codes) {
+      if (codes.length === 0) return new Set<string>();
+      const found = await db.permission.findMany({
+        where: { code: { in: [...codes] } },
+        select: { code: true },
+      });
+      return new Set(found.map((permission) => permission.code));
+    },
+
+    async createPermissions(rows) {
+      if (rows.length === 0) return;
+      // `skipDuplicates` cubre la MISMA carrera que el `catch` de `createRole` —dos
+      // despliegues simultaneos sembrando a la vez—: se salta la fila que ya esta y
+      // nunca la reescribe. No es un `upsert`: ninguna columna de una fila existente se
+      // toca (R5, R10).
+      await db.permission.createMany({ data: [...rows], skipDuplicates: true });
+    },
+
+    async findRolePermissionCodes(roleIds) {
+      if (roleIds.length === 0) return new Set<string>();
+      const found = await db.rolePermission.findMany({
+        where: { roleId: { in: [...roleIds] } },
+        select: { roleId: true, permissionCode: true },
+      });
+      // Misma codificacion que declara el puerto: `${roleId}|${permissionCode}`.
+      return new Set(found.map((row) => `${row.roleId}|${row.permissionCode}`));
+    },
+
+    async createRolePermissions(pairs) {
+      if (pairs.length === 0) return;
+      // Misma razon que en `createPermissions`. La PK compuesta
+      // `(role_id, permission_code)` es la que hace inequivoco el duplicado.
+      await db.rolePermission.createMany({ data: [...pairs], skipDuplicates: true });
     },
 
     async createInitialAdmin(input) {

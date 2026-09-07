@@ -48,7 +48,16 @@ const ADMIN_SESSION_USER = {
   id: 'user-admin-1',
   username: 'ana.perez',
   displayName: 'Ana Perez',
+  // `roleName` se queda porque `SessionUser` lo conserva para pintar (display), pero la
+  // action YA NO lo lee: QC-74 (R18) construye el actor con `permissions` y nada mas.
   roleName: 'Administrador',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
+};
+
+/** El actor que la action debe construir a partir de esa sesion (QC-74, design.md > 4). */
+const ADMIN_ACTOR = {
+  id: 'user-admin-1',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
 function formDataOf(fields: Record<string, string>): FormData {
@@ -99,7 +108,7 @@ describe('createProductAction', () => {
     expect(getSessionUserMock).toHaveBeenCalledTimes(1);
     expect(createProductMock).toHaveBeenCalledTimes(1);
     const [, actor] = createProductMock.mock.calls[0] as [unknown, unknown];
-    expect(actor).toEqual({ id: 'user-admin-1', roleName: 'Administrador' });
+    expect(actor).toEqual(ADMIN_ACTOR);
   });
 
   it('pasa un actor null al caso de uso cuando no hay sesion (falla cerrado, R3)', async () => {
@@ -176,7 +185,7 @@ describe('updateProductAction', () => {
         stock: 10,
         unitId: '22222222-2222-4222-8222-222222222222',
       }),
-      { id: 'user-admin-1', roleName: 'Administrador' },
+      ADMIN_ACTOR,
     );
   });
 
@@ -241,10 +250,7 @@ describe('deleteProductAction', () => {
 
     const result = await deleteProductAction(MUTATION_INITIAL, formDataOf({ id: 'product-1' }));
 
-    expect(deleteProductMock).toHaveBeenCalledWith('product-1', {
-      id: 'user-admin-1',
-      roleName: 'Administrador',
-    });
+    expect(deleteProductMock).toHaveBeenCalledWith('product-1', ADMIN_ACTOR);
     expect(result).toEqual({ status: 'success' });
   });
 });
@@ -256,10 +262,7 @@ describe('getProductAction', () => {
 
     const result = await getProductAction('product-1');
 
-    expect(getProductMock).toHaveBeenCalledWith('product-1', {
-      id: 'user-admin-1',
-      roleName: 'Administrador',
-    });
+    expect(getProductMock).toHaveBeenCalledWith('product-1', ADMIN_ACTOR);
     expect(result).toEqual({ status: 'success', data: view });
   });
 
@@ -281,7 +284,7 @@ describe('listProductsAction', () => {
 
     expect(listProductsMock).toHaveBeenCalledWith(
       { page: 1, pageSize: 10 },
-      { id: 'user-admin-1', roleName: 'Administrador' },
+      ADMIN_ACTOR,
     );
     expect(result).toEqual({ status: 'success', data: page });
   });

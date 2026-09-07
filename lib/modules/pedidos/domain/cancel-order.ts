@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotCancellableError, NotFoundError, ValidationError } from './errors';
 import { cancelOrderSchema } from './order-input';
 import type { OrderStatus } from './order-classification';
@@ -42,7 +42,7 @@ export function createCancelOrder(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'pedidos.modificar');
 
     // R27: sin motivo, vacio, de solo espacios o de mas de 500 caracteres una vez recortado,
     // se rechaza AQUI, en la validacion de aplicacion, y no modifica ninguna fila. El tope

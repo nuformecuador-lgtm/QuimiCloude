@@ -1,6 +1,7 @@
 import { INITIAL_COMPANY_NAME } from './companies';
 import { normalizeCompanyName } from './company-name';
 import { DOCUMENT_TYPE_CC } from './document-type';
+import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from './permissions';
 import { ROLE_ADMINISTRADOR, SEED_ROLES } from './roles';
 
 import type { CredentialPolicyResult } from './credential-policy';
@@ -25,6 +26,16 @@ export interface SeedOutcome {
    * `scripts/seed.ts` para su linea de resumen; no es una credencial.
    */
   readonly createdCompany: string | null;
+  /**
+   * QC-74 R10: codigos del catalogo creados en ESTA corrida, vacio si ya estaban todos.
+   * Sale de restar lo que hay a `PERMISSIONS`, nunca de una lista escrita a mano.
+   */
+  readonly createdPermissions: readonly string[];
+  /**
+   * QC-74 R10: numero de asignaciones permiso-rol creadas en ESTA corrida. Es un numero y
+   * no una lista porque lo unico que hace `scripts/seed.ts` con el es resumirlo.
+   */
+  readonly createdRolePermissions: number;
 }
 
 export type SeedInitialAccessDeps = {
@@ -94,7 +105,24 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
     createdRoles.push(role.name);
   }
 
-  // 5. Si faltaAdmin: resolver la empresa inicial (reutilizandola si ya esta) y crear el
+  // 5. Permisos (QC-74, `design.md > 3`). Va DESPUES de crear los roles —una asignacion
+  // necesita el id del rol— y ANTES de crear el administrador, para que el primer usuario
+  // nazca sobre un rol que ya tiene su conjunto de permisos completo. Dos veces el mismo
+  // patron que el resto del seed: LEER que falta y CREAR exactamente eso. Sin `upsert` y
+  // sin `delete`, asi que una asignacion anadida a mano en produccion sobrevive (R10).
+  const missingPermissions = await resolveMissingPermissions(repository);
+  if (missingPermissions.length > 0) {
+    await repository.createPermissions(missingPermissions);
+  }
+  const createdPermissions = missingPermissions.map((permission) => permission.code);
+
+  const missingRolePermissions = await resolveMissingRolePermissions(repository, roleIds);
+  if (missingRolePermissions.length > 0) {
+    await repository.createRolePermissions(missingRolePermissions);
+  }
+  const createdRolePermissions = missingRolePermissions.length;
+
+  // 6. Si faltaAdmin: resolver la empresa inicial (reutilizandola si ya esta) y crear el
   // usuario con el roleId del rol Administrador (el existente o el recien creado) y los
   // marcadores fijos de esta ficha.
   let createdAdmin = false;
@@ -139,6 +167,65 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
     createdAdmin = true;
   }
 
-  // 6. Devolver el resultado.
-  return { createdRoles, createdAdmin, createdCompany };
+  // 7. Devolver el resultado.
+  return { createdRoles, createdAdmin, createdCompany, createdPermissions, createdRolePermissions };
+}
+
+/** Una fila del catalogo tal y como la escribe el puerto. */
+type PermissionRow = {
+  readonly code: string;
+  readonly module: string;
+  readonly action: string;
+  readonly description: string;
+};
+
+/**
+ * Las filas del catalogo que todavia no estan en la base. Se derivan de `PERMISSIONS`, que
+ * es el unico dueno del catalogo (R1, R2): este archivo no repite ni un codigo.
+ */
+async function resolveMissingPermissions(
+  repository: InitialAccessRepository,
+): Promise<readonly PermissionRow[]> {
+  const catalogCodes = PERMISSIONS.map((permission) => permission.code);
+  const existingCodes = await repository.findExistingPermissionCodes(catalogCodes);
+  return PERMISSIONS.filter((permission) => !existingCodes.has(permission.code)).map(
+    (permission) => ({
+      code: permission.code,
+      module: permission.module,
+      action: permission.action,
+      description: permission.description,
+    }),
+  );
+}
+
+/**
+ * Las asignaciones de `SEED_ROLE_PERMISSIONS` que todavia no estan en la base, resueltas
+ * contra los ids de los roles ya sembrados. La pertenencia se pregunta con la MISMA
+ * codificacion que declara el puerto (`${roleId}|${permissionCode}`).
+ *
+ * Si un rol nombrado en `SEED_ROLE_PERMISSIONS` no esta entre los roles sembrados, se
+ * lanza en vez de saltarselo: seria un rol al que nadie creo nunca y sus permisos se
+ * perderian en silencio en cada despliegue.
+ */
+async function resolveMissingRolePermissions(
+  repository: InitialAccessRepository,
+  roleIds: ReadonlyMap<string, string>,
+): Promise<readonly { readonly roleId: string; readonly permissionCode: string }[]> {
+  const assignments = Object.entries(SEED_ROLE_PERMISSIONS).map(([roleName, codes]) => {
+    const roleId = roleIds.get(roleName);
+    if (roleId === undefined) {
+      throw new Error(`no se pudo resolver el id del rol ${roleName} para asignarle sus permisos`);
+    }
+    return { roleId, codes };
+  });
+
+  const existingPairs = await repository.findRolePermissionCodes(
+    assignments.map((assignment) => assignment.roleId),
+  );
+
+  return assignments.flatMap(({ roleId, codes }) =>
+    codes
+      .filter((permissionCode) => !existingPairs.has(`${roleId}|${permissionCode}`))
+      .map((permissionCode) => ({ roleId, permissionCode })),
+  );
 }

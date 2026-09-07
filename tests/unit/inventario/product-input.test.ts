@@ -145,7 +145,7 @@ describe('createProductSchema', () => {
         qtyAlert: 0,
         cost: '10.0000',
       },
-      { id: 'actor-1', roleName: 'Administrador' },
+      { id: 'actor-1', permissions: ['inventario.modificar'] },
     ).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ValidationError);

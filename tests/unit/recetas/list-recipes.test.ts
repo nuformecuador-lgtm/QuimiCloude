@@ -14,7 +14,6 @@
 // alguien la sustituyera por una llamada directa a `lib/shared/pagination`, el dominio pasaria a
 // importar `lib/shared/**` y este archivo se pondria rojo antes que la guardia.
 
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { UnauthorizedError, ValidationError } from '@/lib/modules/recetas/domain/errors';
 import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
@@ -25,8 +24,11 @@ import type { ListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
 
-const ADMIN: Actor = { id: 'admin-1', roleName: ROLE_ADMINISTRADOR };
-const OPERADOR: Actor = { id: 'operador-1', roleName: 'Operador' };
+// QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
+// Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
+const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
+// QC-74 (R13): tiene `recetas.modificar` y NADA mas. Modificar NO concede consultar.
+const SIN_PERMISO_DE_CONSULTA: Actor = { id: 'sin-consulta-1', permissions: ['recetas.modificar'] };
 
 function montar() {
   const listAlive = vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 }));
@@ -101,17 +103,18 @@ describe('list-recipes: autorizacion antes que todo (R33, R34)', () => {
   ];
 
   for (const caso of CONSULTAS) {
-    it(`rechaza al Operador con ${caso.nombre} sin tocar el repositorio`, async () => {
+    it(`rechaza a quien no tiene recetas.consultar con ${caso.nombre} sin tocar el repositorio`, async () => {
       // R34 — se afirma CONTANDO invocaciones del doble, no solo mirando que lanza.
+      // QC-74 R13: el actor tiene `recetas.modificar`, que no abre la lectura.
       const { recipes, log, listRecipes } = montar();
 
-      await expect(listRecipes(caso.entrada, OPERADOR)).rejects.toBeInstanceOf(UnauthorizedError);
+      await expect(listRecipes(caso.entrada, SIN_PERMISO_DE_CONSULTA)).rejects.toBeInstanceOf(UnauthorizedError);
       expect(recipes.listAlive).toHaveBeenCalledTimes(0);
       expect(log.ignoredFields).toHaveBeenCalledTimes(0);
     });
 
     it(`rechaza al actor ausente con ${caso.nombre} sin tocar el repositorio`, async () => {
-      // R34 — sin actor es el mismo caso que con rol insuficiente.
+      // R34 — sin actor es el mismo caso que con un conjunto de permisos insuficiente.
       const { recipes, log, listRecipes } = montar();
 
       await expect(listRecipes(caso.entrada, null)).rejects.toBeInstanceOf(UnauthorizedError);

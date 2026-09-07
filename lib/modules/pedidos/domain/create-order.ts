@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import {
   DuplicateOrderNumberError,
   RecipeNotFoundError,
@@ -54,9 +54,9 @@ export type CreatedOrder = {
 /**
  * Alta de pedido (R8, R9, R10, R15, R16).
  *
- * `requireAdmin` es la PRIMERA linea, antes de `zod` y antes de tocar ningun puerto (R2,
- * R3): un actor sin permiso no dispara ni la validacion ni una sola lectura, y el test de
- * autorizacion lo demuestra con dobles que fallan si los llaman.
+ * `requirePermission(actor, 'pedidos.modificar')` es la PRIMERA linea, antes de `zod` y antes
+ * de tocar ningun puerto (QC-74 R12): un actor sin ese permiso no dispara ni la validacion ni
+ * una sola lectura, y el test de autorizacion lo demuestra con dobles que fallan si los llaman.
  *
  * R6: los DOS autores salen del actor de la sesion, jamas de la entrada -el esquema ni
  * siquiera declara esos campos-. El puerto recibe un solo `actorId` y el adaptador lo
@@ -76,7 +76,7 @@ export function createCreateOrder(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<CreatedOrder> {
-    requireAdmin(actor);
+    requirePermission(actor, 'pedidos.modificar');
 
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

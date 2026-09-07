@@ -11,7 +11,7 @@ import { UnidadesError, type Actor, type UnitRef } from '@/lib/modules/unidades'
  * igual que `recipe-actions.ts` de `recetas`: esta action no lee sesion, cookie ni
  * cabecera por su cuenta.
  *
- * ESTA ACTION NO REPITE `requireAdmin` NI DECIDE NADA (R41): solo resuelve el actor,
+ * ESTA ACTION NO REPITE `requirePermission` NI DECIDE NADA (R41): solo resuelve el actor,
  * invoca el caso de uso y traduce su error de dominio. El corte real vive en
  * `domain/list-units.ts`.
  *
@@ -36,7 +36,7 @@ function toErrorState(error: unknown): { status: 'error'; code: string; message:
 async function currentActor(): Promise<Actor | null> {
   const sessionUser = await identity.getSessionUser();
   if (sessionUser === null) return null;
-  return { id: sessionUser.id, roleName: sessionUser.roleName };
+  return { id: sessionUser.id, permissions: sessionUser.permissions };
 }
 
 /**

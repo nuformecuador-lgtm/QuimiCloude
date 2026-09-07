@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotDeletableError, NotFoundError } from './errors';
 import type { OrderStatus } from './order-classification';
 
@@ -35,7 +35,7 @@ export function createDeleteOrder(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'pedidos.modificar');
 
     // R33: no existe y ya esta borrado son el mismo caso, y el filtro `deleted_at IS NULL`
     // es del puerto (R40).

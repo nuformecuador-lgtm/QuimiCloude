@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { DuplicateNameError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
@@ -24,7 +24,8 @@ export type CreateRecipeDeps = {
 };
 
 /**
- * Alta de receta (R5, R6, R8, R17, R21, R46). `requireAdmin` es la PRIMERA linea, antes
+ * Alta de receta (R5, R6, R8, R17, R21, R46). `requirePermission(actor, 'recetas.modificar')` es la PRIMERA linea,
+ * antes
  * de zod y antes de tocar cualquier puerto (R2, R3).
  */
 export function createCreateRecipe(
@@ -36,7 +37,7 @@ export function createCreateRecipe(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<{ id: string }> {
-    requireAdmin(actor);
+    requirePermission(actor, 'recetas.modificar');
 
     const parsed = createRecipeSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

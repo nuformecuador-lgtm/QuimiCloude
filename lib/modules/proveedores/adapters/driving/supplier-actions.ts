@@ -23,10 +23,11 @@ import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/li
  * EL ACTOR sale de `identity.getSessionUser()` via `@/lib/composition` (R5, decision
  * cerrada 11): ningun caso de uso lee sesion, cookie ni cabecera por su cuenta. Sin cookie
  * de sesion valida `getSessionUser` devuelve `null`, y entonces el actor que llega al caso
- * de uso es `null`: R3 lo rechaza igual que un rol desconocido, falla cerrado.
+ * de uso es `null`: falla cerrado, igual que un actor sin el permiso exigido (QC-74 R14).
+ * El actor viaja como `{ id, permissions }` —sin nombre de rol (QC-74 R18)—.
  *
- * LA ACTION NO DECIDE NADA (R5): no repite `requireAdmin` -ya es la primera linea de los
- * nueve casos de uso- ni ninguna regla de negocio. Solo traduce `FormData`/argumentos a la
+ * LA ACTION NO DECIDE NADA (R5): no repite la comprobacion de permiso -ya es la primera
+ * linea de los nueve casos de uso- ni ninguna regla de negocio. Solo traduce `FormData`/argumentos a la
  * entrada del caso de uso, y el resultado o el error a un estado serializable.
  *
  * ERRORES (`design.md > 6.4`, R43): las clases de `ProveedoresError` se traducen a
@@ -77,7 +78,7 @@ function toErrorState(error: unknown): { status: 'error'; code: string; message:
 async function currentActor(): Promise<Actor | null> {
   const sessionUser = await identity.getSessionUser();
   if (sessionUser === null) return null;
-  return { id: sessionUser.id, roleName: sessionUser.roleName };
+  return { id: sessionUser.id, permissions: sessionUser.permissions };
 }
 
 function readFormString(formData: FormData, name: string): string {

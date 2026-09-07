@@ -183,8 +183,8 @@ describe('el cambio es ADITIVO: ninguna firma anterior de recetas cambio', () =>
     // Los simbolos que el contrato publicaba ANTES de esta task (QC-25 + QC-33). Si alguno
     // desapareciera, un consumidor ajeno se romperia sin que nada mas lo dijera.
     const anteriores = [
-      // QC-54 retiro este export a proposito (decision cerrada 1): el rol vive en `identity`.
-      'requireAdmin',
+      // QC-54 retiro el rol a `identity`; QC-74 renombro el envoltorio a `requirePermission`.
+      'requirePermission',
       'Actor',
       'RecetasError',
       'UnauthorizedError',

@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError, ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { SUPPLIER_CATALOG_LINE_QUERYABLE } from './supplier-catalog-line-queryable';
@@ -54,7 +54,7 @@ export function createListCatalogLines(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<Page<CatalogLineView>> {
-    requireAdmin(actor);
+    requirePermission(actor, 'proveedores.consultar');
 
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

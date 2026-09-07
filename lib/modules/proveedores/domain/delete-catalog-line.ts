@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError } from './errors';
 
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
@@ -33,7 +33,7 @@ export function createDeleteCatalogLine(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'proveedores.modificar');
 
     const dadaDeBaja = await deps.catalog.softDeleteAlive(id, actor.id, now());
     if (!dadaDeBaja) throw new NotFoundError();

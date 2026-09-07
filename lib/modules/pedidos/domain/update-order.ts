@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError, RecipeNotFoundError, UnitNotFoundError, ValidationError } from './errors';
 import { updateOrderSchema } from './order-input';
 import { assertTransition } from './order-transitions';
@@ -41,7 +41,7 @@ export function createUpdateOrder(
     input: unknown,
     actor: Actor | null | undefined,
   ): Promise<void> {
-    requireAdmin(actor);
+    requirePermission(actor, 'pedidos.modificar');
 
     const parsed = updateOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

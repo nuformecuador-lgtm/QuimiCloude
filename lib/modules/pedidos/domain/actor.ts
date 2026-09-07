@@ -1,39 +1,46 @@
-// El nombre del rol sale del CONTRATO PUBLICO de `identity`, que es su dueno
-// (`design.md > 2.1`): `lib/modules/identity/domain/roles.ts` es el UNICO sitio del repo
-// que escribe a mano el literal, y `identity/domain/require-admin.ts` es la UNICA
-// implementacion de la regla «el actor es Administrador» (QC-54). `pedidos` NO declara
-// ninguna constante propia de rol y NO incrusta el literal en ningun archivo (R4): delega
-// en `assertAdminRole`, igual que los demas modulos.
+// El permiso sale del CONTRATO PUBLICO de `identity`, que es su dueno (`design.md > 2`):
+// `lib/modules/identity/domain/permissions.ts` es el UNICO sitio del repo que escribe el
+// catalogo de codigos, y `identity/domain/require-permission.ts` es la UNICA implementacion
+// de la regla «el actor tiene este permiso» (QC-74). `pedidos` NO declara ninguna constante
+// propia de permiso ni de rol, y desde QC-74 NO conoce siquiera el nombre del rol (R18).
 //
 // Barrel, NUNCA ruta profunda (`docs/architecture.md > La regla de dependencias`).
-import { assertAdminRole } from '@/lib/modules/identity';
+import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
-/** Actor de entrada de cada uno de los seis casos de uso (R1): id y rol, nada mas. El
+/** Actor de entrada de cada uno de los seis casos de uso: id y CONJUNTO DE PERMISOS, nada
+ *  mas. Sin nombre de rol (QC-74 R18): en este modulo no se autoriza por rol. El
  *  dominio NO lee la sesion, ni una cookie, ni una cabecera: quien la resuelve es el
- *  adaptador driving con `identity.getSessionUser()` (R5). */
+ *  adaptador driving con `identity.getSessionUser()`. */
 export type Actor = {
   readonly id: string;
-  readonly roleName: string | null;
+  readonly permissions: readonly string[];
 };
 
 /**
- * Primera linea de los seis casos de uso (R2, R3): antes de `zod` y antes de tocar ningun
+ * Primera linea de los seis casos de uso (QC-74 R12): antes de `zod` y antes de tocar ningun
  * puerto —ni el repositorio de pedidos, ni el catalogo de recetas, ni el de unidades—.
- * Falla cerrado: actor ausente, rol nulo, vacio o desconocido se rechazan igual, todos con
- * el mismo error de autorizacion.
+ * Falla cerrado (R14): actor ausente, sin conjunto de permisos o con el conjunto vacio se
+ * rechazan igual, todos con el mismo error de autorizacion y sin revelar nada del recurso.
  *
- * La comparacion es de igualdad EXACTA, sin `includes` ni normalizacion (R3): un rol
- * llamado «Administradores externos» no debe colarse.
+ * La pertenencia es EXACTA, sin normalizacion ni implicacion entre permisos (R13):
+ * `pedidos.modificar` NO concede `pedidos.consultar`, ni al reves.
  *
- * Consultar tambien pasa por aqui (decision cerrada 1): `getOrder` y `listOrders` llaman a
- * `requireAdmin` igual que las mutaciones. El Operador ni siquiera lee.
+ * Consultar tambien pasa por aqui: `getOrder` y `listOrders` exigen `pedidos.consultar` igual
+ * que las mutaciones exigen `pedidos.modificar`.
+ *
+ * El error es el `UnauthorizedError` de ESTE modulo, subclase de `PedidosError` (R15): por eso
+ * el adaptador driving sigue serializandolo con `error instanceof PedidosError` y el mismo
+ * `code` estable, sin cambiar una linea.
  *
  * La RLS que QC-33 dejo activada y forzada en `orders` NO autoriza nada: Prisma se conecta
  * como dueno de las tablas (`docs/architecture.md > Acceso a datos y autorizacion`). Es
- * defensa en profundidad; la frontera real es esta funcion (R7).
+ * defensa en profundidad; la frontera real es esta funcion.
  */
-export function requireAdmin(actor: Actor | null | undefined): asserts actor is Actor {
-  assertAdminRole(actor, () => new UnauthorizedError());
+export function requirePermission(
+  actor: Actor | null | undefined,
+  permission: PermissionCode,
+): asserts actor is Actor {
+  assertPermission(actor, permission, () => new UnauthorizedError());
 }

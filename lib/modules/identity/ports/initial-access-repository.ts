@@ -7,6 +7,12 @@ import type { DocumentTypeCode } from '../domain/document-type';
  * `document_types`: el seed no siembra tipos de documento, la migracion de QC-4 ya lo
  * hizo (R17).
  *
+ * QC-74: el puerto gana el catalogo de permisos y las asignaciones permiso-rol. Cuatro
+ * metodos, dos de lectura y dos de creacion, y NINGUNO de `upsert`, `update` ni `delete`:
+ * el catalogo y las asignaciones solo se crean desde el seed y solo se retiran por
+ * migracion (R5, R10). Que el puerto no los ofrezca es la forma de que nadie pueda
+ * escribirlos por descuido.
+ *
  * QC-47: el puerto gana la empresa. El rol NO se mueve — sigue viviendo en
  * `users.role_id` (QC-47 R13, R14) —; lo unico que se anade es resolver la empresa
  * inicial para poder meter dentro al administrador. Sigue sin haber ni un `update` ni un
@@ -30,6 +36,36 @@ export interface InitialAccessRepository {
   findCompanyIdByNormalizedName(normalized: string): Promise<string | null>;
   /** Crea la empresa y devuelve su id (QC-47 R20). Sin `upsert`: nunca pisa una existente. */
   createCompany(input: { name: string; nameNormalized: string }): Promise<string>;
+  /**
+   * Devuelve, de los codigos pedidos, los que YA existen en `permissions` (R10). El
+   * dominio resta este conjunto del catalogo para saber que crear: nunca lee la tabla
+   * entera ni asume nada de lo que no pregunto.
+   */
+  findExistingPermissionCodes(codes: readonly string[]): Promise<ReadonlySet<string>>;
+  /**
+   * Crea las filas del catalogo que faltan, en una sola sentencia. Sin `upsert`: quien
+   * llama ya decidio que ninguna de estas existe, y una fila preexistente jamas se pisa
+   * (R5, R10).
+   */
+  createPermissions(
+    rows: readonly { code: string; module: string; action: string; description: string }[],
+  ): Promise<void>;
+  /**
+   * Devuelve las asignaciones que YA existen para los roles pedidos, codificadas como
+   * `` `${roleId}|${permissionCode}` `` — un `Set` plano de pares, no un mapa por rol:
+   * la unica pregunta que hace el dominio es «¿esta esta pareja?», y esa forma la
+   * responde en O(1) sin un segundo nivel de estructura. El separador es `|` porque no
+   * aparece ni en un uuid ni en un codigo de permiso, asi que la clave es inequivoca.
+   */
+  findRolePermissionCodes(roleIds: readonly string[]): Promise<ReadonlySet<string>>;
+  /**
+   * Crea las asignaciones permiso-rol que faltan, en una sola sentencia. Sin `upsert` y
+   * sin `delete`: una asignacion anadida a mano en produccion no se toca, y retirar una
+   * es una migracion explicita (R10, `design.md > 3`).
+   */
+  createRolePermissions(
+    pairs: readonly { roleId: string; permissionCode: string }[],
+  ): Promise<void>;
   /**
    * Crea el usuario inicial. La firma se AMPLIA respecto al `design.md > 5.1` original
    * para incluir explicitamente los marcadores personales fijos (R7): el dominio es

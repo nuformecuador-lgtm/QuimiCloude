@@ -1,4 +1,4 @@
-import { requireAdmin, type Actor } from './actor';
+import { requirePermission, type Actor } from './actor';
 import { NotFoundError } from './errors';
 import { formatOrderNumber } from './order-number';
 import type { OrderRow, OrderView } from './order-view';
@@ -58,9 +58,9 @@ export function toOrderView(
 }
 
 /**
- * Ficha de un pedido (R42). Consultar TAMBIEN exige `requireAdmin` (decision cerrada 1): el
- * Operador ni siquiera lee, y el `requireAdmin` va antes de tocar el repositorio y los dos
- * catalogos (R2).
+ * Ficha de un pedido (R42). Consultar exige `pedidos.consultar` (QC-74 R16): quien no lo tiene
+ * ni siquiera lee, y el `requirePermission` va antes de tocar el repositorio y los dos
+ * catalogos (QC-74 R12).
  */
 export function createGetOrder(
   deps: GetOrderDeps,
@@ -69,7 +69,7 @@ export function createGetOrder(
     id: string,
     actor: Actor | null | undefined,
   ): Promise<OrderView> {
-    requireAdmin(actor);
+    requirePermission(actor, 'pedidos.consultar');
 
     // null = no existe o ya esta borrado: para el dominio son el mismo caso (R33), y el
     // filtro `deleted_at IS NULL` es del puerto, no de un `if` de aqui (R40).
