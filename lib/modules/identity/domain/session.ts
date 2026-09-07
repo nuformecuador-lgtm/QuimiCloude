@@ -19,6 +19,14 @@ export type SessionTicket = {
    * consultar la base. Es una foto: no envejece bien y no pretende hacerlo (QC-9 R30, y QC-23).
    */
   readonly roleName: string;
+  /**
+   * Empresa a la que pertenece esa persona EN EL INSTANTE de emitir (QC-48 R1, R6). Sale de su
+   * propia ficha (`users.company_id`, leida por la misma consulta que autentica) y jamas de la
+   * entrada del login: la empresa no se pregunta ni se elige. Viaja firmada dentro de la cookie
+   * desde `v3` como `cid`, igual que el rol desde `v2`, y es solo el IDENTIFICADOR: nada del
+   * nombre de la empresa ni de su estado de baja.
+   */
+  readonly companyId: string;
   readonly issuedAt: Date;
   readonly expiresAt: Date;
 };
@@ -29,10 +37,16 @@ export type SessionTicket = {
  *
  * `roleName` es obligatorio y va sin valor por defecto a proposito: un rol por defecto seria un
  * rol inventado, y QC-9 R26 exige que salga de la base o que no haya sesion.
+ *
+ * `companyId` es obligatorio y va sin valor por defecto por el mismo motivo (QC-48 R5): una
+ * empresa por defecto seria una empresa inventada, y si el sistema no puede resolver una empresa
+ * para quien se autentica, lo que corresponde es no emitir sesion. Va posicional y no en un
+ * objeto para que `strict` marque uno a uno los sitios de llamada.
  */
 export function createSessionTicket(
   userId: string,
   roleName: string,
+  companyId: string,
   now: Date = new Date(),
 ): SessionTicket {
   const issuedAt = new Date(now.getTime());
@@ -40,6 +54,7 @@ export function createSessionTicket(
   return {
     userId,
     roleName,
+    companyId,
     issuedAt,
     expiresAt: new Date(issuedAt.getTime() + SESSION_DURATION_MS),
   };
