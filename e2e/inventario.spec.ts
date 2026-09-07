@@ -269,7 +269,9 @@ test.describe('catalogo de productos', () => {
     await page.getByTestId('presentation-create-submit').click();
 
     await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
-    await expect(page.getByTestId('presentation-select')).toContainText(presentationName);
+    // Desde el 2026-09-07 el selector es un campo de autocompletado, asi que lo elegido se lee
+    // en su VALOR y no en su texto contenido.
+    await expect(page.getByTestId('presentation-select')).toHaveValue(presentationName);
     await expect(
       page.getByTestId('product-field-name'),
       'crear la presentacion no puede perder lo ya escrito',

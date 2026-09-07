@@ -195,27 +195,37 @@ async function choosePresentation(page: Page): Promise<string> {
     return presentationName;
   }
 
+  // Desde el 2026-09-07 el selector es un autocomplete: se BUSCA en el servidor y, si hiciera
+  // falta, se baja hasta el final del desplegable para que anexe la pagina siguiente. Ya no hay
+  // boton «Cargar más». Se usan las dos vias reales de la pantalla, en el orden en que las usaria
+  // una persona.
   const wanted = reusablePresentationName;
-  await page.getByTestId('presentation-select').click();
+  const campo = page.getByTestId('presentation-select');
+  await campo.click();
 
   const option = page.getByTestId('presentation-option').filter({ hasText: wanted });
-  const loadMore = page.getByTestId('presentation-load-more');
+  const popup = page.getByTestId('presentation-popup');
 
-  for (;;) {
-    if ((await option.count()) > 0) {
-      await option.first().click();
-      return wanted;
+  if ((await option.count()) === 0) {
+    await campo.fill(wanted);
+  }
+
+  try {
+    await option.first().waitFor({ state: 'visible', timeout: 30_000 });
+  } catch {
+    for (let intento = 0; intento < 10 && (await option.count()) === 0; intento += 1) {
+      await popup.evaluate((lista) => {
+        lista.scrollTop = lista.scrollHeight;
+      });
+      await page.waitForTimeout(500);
     }
-    if ((await loadMore.count()) === 0 || (await loadMore.isDisabled())) {
+    if ((await option.count()) === 0) {
       throw new Error(`la presentacion "${wanted}" no aparecio en el selector`);
     }
-
-    const before = await page.getByTestId('presentation-option').count();
-    await loadMore.click();
-    await expect
-      .poll(async () => page.getByTestId('presentation-option').count(), { timeout: 60_000 })
-      .toBeGreaterThan(before);
   }
+
+  await option.first().click();
+  return wanted;
 }
 
 /**
@@ -410,7 +420,9 @@ test.describe('proveedores', () => {
     // La presentacion sale DEL SELECTOR: la que ya hubiera, o una creada con su alta en linea si
     // la base no tenia ninguna (R37, R38). La unidad se deja en «sin unidad»: es opcional (R40).
     const chosenPresentation = await choosePresentation(page);
-    await expect(page.getByTestId('presentation-select')).toContainText(chosenPresentation, {
+    // El selector es un campo de autocompletado desde el 2026-09-07: lo elegido se lee en su
+    // VALOR, no en su texto contenido.
+    await expect(page.getByTestId('presentation-select')).toHaveValue(chosenPresentation, {
       timeout: 60_000,
     });
     await expect(

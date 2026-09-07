@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
@@ -180,6 +180,7 @@ const testId = {
   panel: 'product-sheet',
   formulario: 'product-form',
   enviar: 'product-form-submit',
+  cancelarFormulario: 'product-form-cancel',
   errorFormulario: 'product-form-error',
   abrirBorrado: 'product-delete-open',
   dialogoBorrado: 'delete-product-dialog',
@@ -187,7 +188,6 @@ const testId = {
   cancelarBorrado: 'delete-product-cancel',
   confirmarBorrado: 'delete-product-confirm',
   selectorPresentacion: 'presentation-select',
-  cargarMasPresentaciones: 'presentation-load-more',
   abrirAltaPresentacion: 'presentation-create-open',
   nombrePresentacion: 'presentation-create-name',
   guardarPresentacion: 'presentation-create-submit',
@@ -400,6 +400,24 @@ afterEach(() => {
   resetViewport();
   clearSidebarStateCookie();
 });
+
+/**
+ * Lleva el desplegable del selector de presentacion al final de su scroll, que es el gesto con el
+ * que se pide la pagina siguiente desde el 2026-09-07.
+ *
+ * Las tres medidas se definen a mano porque jsdom NO calcula layout: sin ellas todo elemento mide
+ * 0 y ninguna prueba podria distinguir «al final» de «al principio». El evento se emite tal cual:
+ * desplazar no es un gesto de puntero ni de teclado, asi que `user-event` no tiene API para ello.
+ */
+function scrollAlFinalDelSelector(altoVisible = 256) {
+  const lista = screen.getByTestId('presentation-popup');
+  Object.defineProperty(lista, 'clientHeight', { value: altoVisible, configurable: true });
+  Object.defineProperty(lista, 'scrollHeight', { value: altoVisible * 3, configurable: true });
+  Object.defineProperty(lista, 'scrollTop', { value: altoVisible * 2, configurable: true });
+  act(() => {
+    lista.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+}
 
 describe('pantalla de productos — lista', () => {
   it('la pantalla de productos se renderiza dentro del armazon privado y no declara main propio', async () => {
@@ -763,7 +781,17 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // La lista sigue detras: el panel se superpone, no sustituye la pantalla.
     expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
 
+    // El panel NO se cierra ni con Escape ni con un click fuera: lleva un formulario dentro y un
+    // gesto involuntario no puede tirar lo que el usuario llevaba escrito. Solo «Cancelar» y la X.
     await user.keyboard('{Escape}');
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+
+    const velo = document.querySelector('[data-slot="sheet-overlay"]');
+    if (velo === null) throw new Error('el panel lateral no monta velo');
+    await user.click(velo);
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId(testId.cancelarFormulario));
     await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
 
     // Ni al abrir ni al cerrar se navego a ninguna parte.
@@ -989,8 +1017,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
   });
 
   it('el selector alcanza presentaciones mas alla de la primera pagina', async () => {
-    // R24 (primera mitad) — el backend no ofrece busqueda y su tope es 25 por pagina, asi que
-    // sin «Cargar más» habria presentaciones inalcanzables.
+    // R24 (primera mitad) — con el tope de 25 por pagina, sin una forma de pasar de la primera
+    // habria presentaciones inalcanzables.
+    //
+    // ENMIENDA DEL 2026-09-07: el gesto ya no es el boton «Cargar más» -que desaparecio con el
+    // desplegable-, sino llegar al FINAL DEL SCROLL del autocomplete. Lo que R24 exige se afirma
+    // igual de fuerte: la pagina 2 se pide al servidor y su presentacion queda disponible junto
+    // a la de la pagina 1.
     const user = userEvent.setup();
     listPresentationsActionMock.mockResolvedValueOnce(
       paginaDePresentaciones([PRESENTACION_A], { page: 1, totalPages: 2 }),
@@ -1003,26 +1036,28 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
+    // Cerrado no consulta nada: la primera pagina llega al abrir el desplegable.
+    expect(listPresentationsActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId(testId.selectorPresentacion));
+
     await waitFor(() =>
       expect(listPresentationsActionMock).toHaveBeenCalledWith({ page: 1, pageSize: MAX_PAGE_SIZE }),
     );
+    await waitFor(() => expect(screen.getAllByTestId('presentation-option')).toHaveLength(1));
 
-    await user.click(await screen.findByTestId(testId.cargarMasPresentaciones));
+    scrollAlFinalDelSelector();
 
     await waitFor(() =>
       expect(listPresentationsActionMock).toHaveBeenCalledWith({ page: 2, pageSize: MAX_PAGE_SIZE }),
     );
 
-    // Alcanzada la ultima pagina, ya no queda nada que cargar.
-    await waitFor(() => expect(screen.queryByTestId(testId.cargarMasPresentaciones)).toBeNull());
-
-    // Y las dos presentaciones —la de la primera pagina y la de la segunda— estan disponibles.
-    await user.click(screen.getByTestId(testId.selectorPresentacion));
-    const opciones = await screen.findAllByTestId('presentation-option');
-    expect(opciones.map((opcion) => opcion.textContent)).toEqual([
-      PRESENTACION_A.name,
-      PRESENTACION_B.name,
-    ]);
+    // Y las dos presentaciones —la de la primera pagina y la de la segunda— estan disponibles:
+    // la pagina 2 se ANEXA, no sustituye.
+    await waitFor(() => expect(screen.getAllByTestId('presentation-option')).toHaveLength(2));
+    expect(
+      screen.getAllByTestId('presentation-option').map((opcion) => opcion.textContent),
+    ).toEqual([PRESENTACION_A.name, PRESENTACION_B.name]);
   });
 
   it('permite crear una presentacion desde el formulario y la deja seleccionada sin perder lo escrito', async () => {
