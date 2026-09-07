@@ -115,10 +115,17 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
     texts,
     emptyAction,
     toolbarActions,
+    searchable,
+    defaultPinnedColumns,
   } = props;
 
   const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
-  const pinnedColumns = usePinnedColumns(tableId, columnIds);
+  /*
+    `defaultPinnedColumns` es un defecto, no una imposicion: el hook lo aplica dentro de su efecto
+    de restauracion y SOLO si no hay nada persistido para este `tableId` (QC-35 `design.md > 6.3`),
+    asi que soltar la columna sigue recordandose (R25, R26).
+  */
+  const pinnedColumns = usePinnedColumns(tableId, columnIds, defaultPinnedColumns);
 
   const columnPinningState = useMemo(
     () => toColumnPinningState(pinnedColumns.pinning),
@@ -242,6 +249,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
           texts={texts}
           onParamsChange={onParamsChange}
           toolbarActions={toolbarActions}
+          searchable={searchable}
         />
       ) : null}
 

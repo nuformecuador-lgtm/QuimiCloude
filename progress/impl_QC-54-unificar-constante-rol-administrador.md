@@ -216,3 +216,44 @@ Un literal con dos dueños se desincroniza en silencio si identity renombrara el
 ```
 
 Retirada cada linea, **VERDE** las dos veces, y `git diff --stat` de los dos archivos vacio.
+
+## F2.3 — merge de `origin/dev` con QC-35 (pantalla-de-pedidos)
+
+QC-35 se mergeo en `dev` mientras esta ficha estaba en vuelo y trae **su propia fila ruta→rol**
+para `/pedidos`, escrita contra el `ADMIN_ROLE_NAME` que QC-54 estaba retirando. Dos archivos en
+conflicto, resueltos **conservando las dos cosas**:
+
+| Archivo | Resolucion |
+| --- | --- |
+| `lib/composition/route-role-rules.ts` | **Cuatro filas**, todas con `ROLE_ADMINISTRADOR`: `INVENTORY_ROUTE`, `FORMULAS_ROUTE`, `SUPPLIERS_ROUTE` y la nueva `ORDERS_ROUTE` de QC-35. Ni un `ADMIN_ROLE_NAME` vivo |
+| `tests/unit/identity/route-role-rules.test.ts` | Se conserva **toda** la cobertura de los dos lados: el centinela pasa a exigir las cuatro filas en orden, y el caso «las filas se derivan de…» conserva **el `not.toContain` de `ORDERS_ROUTE` que anadio QC-35** y el del rol, ya unificado |
+
+**El comentario de QC-35 se reescribio, no se copio.** Decia que la fila «reutiliza el
+`ADMIN_ROLE_NAME` que este archivo ya importa del barrel de `inventario`»: despues de esta ficha eso
+es **falso**, y dejarlo seria exactamente el comentario que miente que T10 fue a limpiar (R17). Lo
+que de ese comentario **si sigue siendo cierto se conserva**: que la fila solo anade una constante
+de `lib/shared/routes` ya presente en el cierre de imports, asi que el archivo sigue cargando en el
+borde.
+
+**Ademas, dos archivos que NO estaban en conflicto pero rompian el `typecheck`:** QC-35 trajo
+`tests/unit/pedidos-ui/order-route-contract.test.ts` y
+`tests/unit/pedidos-ui/route-role-pedidos.test.ts`, los dos importando `ADMIN_ROLE_NAME` del barrel
+de `inventario` — un simbolo que ya no existe. Migrados con el mismo criterio de T9: **solo cambia
+como obtienen el nombre del rol** (import + identificador), ninguna asercion ni dato de prueba.
+
+### Verificacion del merge
+
+```
+vitest guard-middleware-edge + route-role-rules + guard-rol-administrador-unico + pedidos-ui
+                     -> Test Files  20 passed (20) · 194 passed | 3 skipped
+pnpm run typecheck   -> sin errores
+pnpm run lint        -> sin errores
+pnpm run test:json   -> Tests  2 failed | 2691 passed | 7 skipped (2700)
+comparar-baseline    -> sin rojos nuevos (2 rojos, todos en el baseline de 5); EXIT=0
+migraciones          -> todas con down.sql (el merge no toca `db/`)
+```
+
+Los 2 rojos son **los mismos dos de siempre** y por el mismo motivo ya explicado arriba
+(`recetas/module-contract` y `recetas-ui/recipe-route-contract`, que miden sobre
+`git diff origin/dev...HEAD` y caen en cualquier rama que toque `recetas` legitimamente). El
+comparador confirma que no hay ni un rojo nuevo por el merge.

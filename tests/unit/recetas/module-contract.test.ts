@@ -32,7 +32,7 @@
 
 import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, sep } from 'node:path'
+import { basename, dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
@@ -385,19 +385,95 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se
     // DERIVA de `FORMULAS_ROUTE` -nunca de un literal a mano-, igual que en
-    // `tests/unit/recetas/scope.test.ts`. Cualquier archivo de `app/` FUERA de esa carpeta
-    // que mencione recetas sigue siendo una violacion -es la mitad de la vieja asercion que
-    // SI seguia protegiendo algo real-.
+    // `tests/unit/recetas/scope.test.ts`.
+    //
+    // AJUSTADO el 2026-09-07 (QC-35), y lo decide el HUMANO. Hasta hoy esta asercion exigia
+    // que ningun archivo de `app/` fuera de la carpeta de formulas mencionara recetas. Esa
+    // regla aproximaba POR PALABRA algo que en realidad es ESTRUCTURAL, y declaraba violacion
+    // sin que nada estuviera mal en cuanto otra pantalla consumia el catalogo: la disparo el
+    // selector de receta de la pantalla de pedidos (QC-35 R31), aprobado el 2026-09-06.
+    //
+    // El criterio que la sustituye, con las palabras del humano: «pedidos tiene su propia
+    // ruta separada, con acceso solo para el administrador». Una PANTALLA se reconoce por
+    // tener RUTA PROPIA, no por mencionar una palabra. Por eso aqui NO hay lista blanca de
+    // rutas escrita a mano -envejeceria y habria que tocarla en cada ficha-: la condicion se
+    // deriva del arbol, preguntando si el archivo cuelga de una carpeta con su propio
+    // `page.tsx`. Mover el selector bajo la carpeta de formulas quedaba descartado por el
+    // mismo motivo: seria poner un componente de pedidos bajo otra pantalla y otra superficie
+    // de permiso.
+    //
+    // Que sigue PROHIBIDO, y es lo que este caso protege de verdad:
+    //   * una SEGUNDA pantalla de recetas: ningun `page.tsx` ni `layout.tsx` fuera de la
+    //     carpeta derivada de `FORMULAS_ROUTE` puede renderizar recetas;
+    //   * el goteo suelto: un archivo que mencione recetas sin colgar de ninguna pantalla con
+    //     ruta propia -y `components/`, que no tiene ruta ninguna, sigue con CERO menciones;
+    //     lo vigila `tests/unit/recetas/scope.test.ts`-;
+    //   * y consumir el modulo POR DENTRO: desde otra pantalla solo se toca el contrato
+    //     publico y los adaptadores driving, nunca `domain/` ni `adapters/driven/`.
     const routeSegments = FORMULAS_ROUTE.split('/').filter((segment) => segment.length > 0)
     const recipesRouteDir = join(repoRoot, 'app', '(private)', ...routeSegments)
-    const fueraDeSuCarpeta = sourcesIn(join(repoRoot, 'app')).filter(
+    const appDir = join(repoRoot, 'app')
+    const RECIPE_MENTION = /recet|recipe/i
+
+    /**
+     * La carpeta de la pantalla a la que pertenece el archivo, o `null` si no cuelga de
+     * ninguna. Es la condicion ESTRUCTURAL -«tener ruta propia»-, derivada del arbol: se sube
+     * desde el archivo hasta `app/` buscando el primer ancestro que declare su `page.tsx`.
+     */
+    function screenRootOf(file: string): string | null {
+      // `app/` NO cuenta como carpeta de pantalla, a proposito: un archivo suelto en la raiz
+      // o en un route group -`app/(private)/recetas-algo.tsx`- no cuelga de ninguna pantalla
+      // y no es routable, que es exactamente el goteo que este caso caza. Sin esta condicion,
+      // `app/page.tsx` haria pasar por «pantalla propia» a cualquier archivo del arbol.
+      let dir = dirname(file)
+      while (dir.startsWith(appDir) && dir !== appDir) {
+        if (existsSync(join(dir, 'page.tsx'))) return dir
+        dir = dirname(dir)
+      }
+      return null
+    }
+
+    /**
+     * Solo el contrato publico y los adaptadores driving; nunca las tripas del modulo.
+     *
+     * Se miran los especificadores que apuntan AL MODULO `recetas`, no todo lo que suene a
+     * receta: un `from './recipe-picker'` es un archivo de la propia pantalla, no un consumo
+     * del modulo, y confundirlos declararia violacion sin que nada estuviera mal. Los driving
+     * entran por su ruta exacta a proposito: es lo que manda `docs/architecture.md` y lo que
+     * el propio `lib/modules/recetas/index.ts` deja escrito.
+     */
+    const RECETAS_MODULE = 'lib/modules/recetas'
+    function consumesOnlyPublicContract(source: string): boolean {
+      return importSpecifiers(source)
+        .filter((spec) => spec.includes(RECETAS_MODULE))
+        .every(
+          (spec) =>
+            spec === '@/lib/modules/recetas' ||
+            spec.startsWith('@/lib/modules/recetas/adapters/driving/'),
+        )
+    }
+
+    const fueraDeSuCarpeta = sourcesIn(appDir).filter(
       (file) => relative(recipesRouteDir, file).startsWith(`..${sep}`),
     )
+    const violaciones: string[] = []
     for (const file of fueraDeSuCarpeta) {
-      expect(
-        read(file),
-        `${toPosix(relative(repoRoot, file))} menciona recetas fuera de ${toPosix(relative(repoRoot, recipesRouteDir))}`,
-      ).not.toMatch(/recet|recipe/i)
+      const source = read(file)
+      if (!RECIPE_MENTION.test(source)) continue
+      const nombre = toPosix(relative(repoRoot, file))
+      if (/^(page|layout)\.tsx$/.test(basename(file))) {
+        violaciones.push(`${nombre}: segunda pantalla de recetas fuera de su carpeta`)
+      } else if (screenRootOf(file) === null) {
+        violaciones.push(`${nombre}: menciona recetas sin colgar de ninguna pantalla con ruta propia`)
+      } else if (!consumesOnlyPublicContract(source)) {
+        violaciones.push(`${nombre}: consume recetas por dentro, no por su contrato publico`)
+      }
     }
+    expect(
+      violaciones,
+      `la pantalla de recetas vive en ${toPosix(relative(repoRoot, recipesRouteDir))}; ` +
+        `fuera de ahi solo se permite consumir su contrato publico desde una pantalla con ` +
+        `ruta propia: ${violaciones.join('; ')}`,
+    ).toEqual([])
   })
 })

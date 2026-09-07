@@ -15,12 +15,30 @@
 // vigila nada. Un test que no puede fallar no vigila nada.
 //
 // El arbol REAL no se toca nunca: la entrada sintetica vive solo en memoria.
+//
+// ACTUALIZADO 2026-09-07 (QC-35), y lo decide el HUMANO. Tres casos de este archivo afirmaban
+// «no hay ninguna pagina, componente ni ruta de pedidos», «ningun archivo importa el modulo
+// pedidos» y «no hay ningun spec E2E nuevo». Eso era el LIMITE DE ALCANCE de QC-34 -«la
+// pantalla es QC-35»-, no una invariante permanente: QC-35 es precisamente la ficha que la
+// construye, y su E2E lo aprobo el humano el 2026-09-06. La premisa cayo, asi que los tres se
+// INVIERTEN -no se borran, no se relajan y no se meten en ningun baseline-, que es el mismo
+// trato que ya recibieron `tests/unit/inventario/scope.test.ts` con QC-22 y
+// `tests/unit/recetas/scope.test.ts` con QC-26.
+//
+// Lo que los tres siguen protegiendo, y por eso siguen aqui: que la pantalla NO aparezca por
+// goteo. Vive EXACTAMENTE en la carpeta que deriva de `ORDERS_ROUTE` -nunca de un literal
+// escrito a mano, para que un cambio de ruta arrastre esta prueba con el mismo commit que la
+// mueve de verdad-, existe de verdad ahi, `components/` sigue sin una sola pieza de pedidos,
+// el spec E2E es una lista CERRADA de uno, y quien consume el modulo lo hace solo por su
+// contrato publico o por el driving por ruta exacta.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+
+import { ORDERS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -89,9 +107,23 @@ function entradasDe(files: readonly string[]): readonly Entrada[] {
 // Los predicados. Puros: de una lista de entradas a los nombres que INFRINGEN la regla.
 // ---------------------------------------------------------------------------------------
 
-/** R57: ninguna pagina, layout, componente ni ruta de PEDIDOS bajo `app/` o `components/`. */
-export function pantallasDePedidos(rutas: readonly string[]): readonly string[] {
-  return rutas.filter((ruta) => /^(app|components)\/.*\b(pedidos|orders)\b/i.test(ruta))
+/**
+ * R57, INVERTIDO por QC-35: la pantalla de pedidos vive en `carpetaDeLaPantalla` -derivada de
+ * `ORDERS_ROUTE`- y en NINGUN otro sitio de `app/` ni de `components/`.
+ *
+ * `components/` sigue prohibido del todo, sin aflojar: nunca empieza por la carpeta de la
+ * pantalla, asi que un `components/orders/order-form.tsx` de manana cae igual que antes. Ahi
+ * no hay ruta ni ficha que respalde nada.
+ */
+export function pantallasDePedidosFueraDeSuCarpeta(
+  rutas: readonly string[],
+  carpetaDeLaPantalla: string,
+): readonly string[] {
+  return rutas.filter(
+    (ruta) =>
+      /^(app|components)\/.*\b(pedidos|orders)\b/i.test(ruta) &&
+      !ruta.startsWith(`${carpetaDeLaPantalla}/`),
+  )
 }
 
 /** R54, R57: ningun route handler —`app/**\/route.ts`— de esta feature. Las mutaciones van
@@ -100,16 +132,43 @@ export function routeHandlersDePedidos(rutas: readonly string[]): readonly strin
   return rutas.filter((ruta) => /^app\/.*\/route\.tsx?$/.test(ruta) && /pedidos|orders/i.test(ruta))
 }
 
-/** R57: ningun spec E2E nuevo. El diferimiento esta declarado en el spec, no al final. */
+/** R57: los specs E2E de pedidos que hay. QC-35 trajo el suyo; la lista se afirma CERRADA. */
 export function specsE2eDePedidos(rutas: readonly string[]): readonly string[] {
   return rutas.filter((ruta) => /^e2e\/.*\.spec\.tsx?$/.test(ruta) && /pedidos|orders/i.test(ruta))
 }
 
-/** R57: nadie de `app/` ni de `components/` conoce todavia el modulo. */
-export function consumidoresDeUi(entradas: readonly Entrada[]): readonly string[] {
+/**
+ * R57, INVERTIDO por QC-35: quien consume el modulo desde `app/` o `components/` tiene que
+ * estar DENTRO de la carpeta de la pantalla. Fuera de ella sigue sin conocerlo nadie.
+ */
+export function consumidoresDeUiFueraDeSuCarpeta(
+  entradas: readonly Entrada[],
+  carpetaDeLaPantalla: string,
+): readonly string[] {
   return entradas
     .filter((entrada) => /@\/lib\/modules\/pedidos/.test(soloCodigo(entrada.fuente)))
+    .filter((entrada) => !entrada.nombre.startsWith(`${carpetaDeLaPantalla}/`))
     .map((entrada) => entrada.nombre)
+}
+
+/**
+ * Y por dentro de esa carpeta, el modulo se toca SOLO por su contrato publico o por sus
+ * adaptadores driving por RUTA EXACTA -que es lo que manda `docs/architecture.md` y lo que el
+ * propio `lib/modules/pedidos/index.ts` deja escrito-. Nunca `domain/`, `ports/` ni
+ * `adapters/driven/`: eso seria consumir el modulo por dentro.
+ */
+export function consumosPorDentroDelModulo(entradas: readonly Entrada[]): readonly string[] {
+  const hallazgos: string[] = []
+  for (const entrada of entradas) {
+    for (const match of soloCodigo(entrada.fuente).matchAll(/\bfrom\s+'([^']+)'/g)) {
+      const spec = match[1] as string
+      if (!spec.startsWith('@/lib/modules/pedidos')) continue
+      if (spec === '@/lib/modules/pedidos') continue
+      if (spec.startsWith('@/lib/modules/pedidos/adapters/driving/')) continue
+      hallazgos.push(`${entrada.nombre}: ${spec}`)
+    }
+  }
+  return hallazgos
 }
 
 /**
@@ -232,28 +291,54 @@ const entradasDeUi = entradasDe([
 const entradasDePedidos = entradasDe(sourcesIn(pedidosDir))
 const barrel = join(pedidosDir, 'index.ts')
 
+/**
+ * La carpeta de la pantalla, DERIVADA de `ORDERS_ROUTE` y nunca de un literal escrito a mano:
+ * asi un cambio de ruta arrastra esta prueba con el mismo commit que la mueve de verdad. El
+ * route group `(private)` no aparece en la URL, pero si en el disco.
+ */
+const carpetaDeLaPantalla = join(
+  repoRoot,
+  'app',
+  '(private)',
+  ...ORDERS_ROUTE.split('/').filter((segmento) => segmento.length > 0),
+)
+const carpetaDeLaPantallaRel = etiqueta(carpetaDeLaPantalla)
+
 describe('QC-34 — limite de alcance de la feature', () => {
-  it('no hay ninguna pagina, componente ni ruta de pedidos bajo app/ o components/ (R57)', () => {
-    // La pantalla es QC-35. Esta ficha no aporta ningun flujo navegable, y por eso su
-    // verificacion es unitaria y de integracion (decision cerrada 24).
+  it('la pantalla de pedidos vive donde la declara QC-35, y en ningun otro sitio (R57)', () => {
+    // CENTINELA INVERTIDO el 2026-09-07 (QC-35): la pantalla estaba DIFERIDA a esta ficha y ya
+    // existe. Lo que se sigue vigilando es que no aparezca por goteo, repartida por el arbol.
     expect(rutasDeUi.length).toBeGreaterThan(0)
-    expect(pantallasDePedidos(rutasDeUi)).toEqual([])
 
-    // La MISMA funcion, sobre las MISMAS rutas reales mas una sintetica, la señala.
-    expect(pantallasDePedidos([...rutasDeUi, 'app/(private)/pedidos/page.tsx'])).toEqual([
-      'app/(private)/pedidos/page.tsx',
-    ])
-    expect(pantallasDePedidos([...rutasDeUi, 'components/orders/order-form.tsx'])).toEqual([
-      'components/orders/order-form.tsx',
-    ])
+    // La pantalla EXISTE donde la declara su constante de ruta. Sin esto, el resto del caso
+    // pasaria en verde sobre un repositorio sin pantalla de pedidos: el falso verde que la
+    // inversion tiene que evitar.
+    expect(
+      existsSync(join(carpetaDeLaPantalla, 'page.tsx')),
+      `falta ${carpetaDeLaPantallaRel}/page.tsx`,
+    ).toBe(true)
 
-    // Y las cuatro carpetas que tampoco pueden existir todavia.
-    for (const ruta of [
-      join(repoRoot, 'app', 'api', 'orders'),
-      join(repoRoot, 'app', 'api', 'pedidos'),
-      join(repoRoot, 'app', '(private)', 'pedidos'),
-      join(repoRoot, 'app', '(private)', 'orders'),
-    ]) {
+    // Y no hay ni una pieza de pedidos fuera de ella.
+    expect(pantallasDePedidosFueraDeSuCarpeta(rutasDeUi, carpetaDeLaPantallaRel)).toEqual([])
+
+    // La MISMA funcion, sobre las MISMAS rutas reales mas una sintetica, la señala. Una
+    // segunda pantalla en otra ruta, y un componente suelto bajo `components/`, que sigue
+    // prohibido del todo.
+    expect(
+      pantallasDePedidosFueraDeSuCarpeta(
+        [...rutasDeUi, 'app/(private)/dashboard/pedidos-resumen.tsx'],
+        carpetaDeLaPantallaRel,
+      ),
+    ).toEqual(['app/(private)/dashboard/pedidos-resumen.tsx'])
+    expect(
+      pantallasDePedidosFueraDeSuCarpeta(
+        [...rutasDeUi, 'components/orders/order-form.tsx'],
+        carpetaDeLaPantallaRel,
+      ),
+    ).toEqual(['components/orders/order-form.tsx'])
+
+    // Las dos carpetas de API siguen sin poder existir: las mutaciones son Server Actions.
+    for (const ruta of [join(repoRoot, 'app', 'api', 'orders'), join(repoRoot, 'app', 'api', 'pedidos')]) {
       expect(existsSync(ruta), `${etiqueta(ruta)} no debe existir`).toBe(false)
     }
   })
@@ -270,27 +355,72 @@ describe('QC-34 — limite de alcance de la feature', () => {
     ])
   })
 
-  it('no hay ningun spec E2E nuevo, y el diferimiento esta declarado en el spec (R57)', () => {
+  it('el unico spec E2E de pedidos es el que trajo QC-35, y la lista es cerrada (R57)', () => {
+    // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esta ficha y el
+    // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un segundo spec de
+    // pedidos sin ficha que lo respalde vuelve a poner esto en rojo.
     expect(rutasE2e.length).toBeGreaterThan(0)
-    expect(specsE2eDePedidos(rutasE2e)).toEqual([])
-    expect(specsE2eDePedidos([...rutasE2e, 'e2e/pedidos.spec.ts'])).toEqual(['e2e/pedidos.spec.ts'])
+    expect(specsE2eDePedidos(rutasE2e)).toEqual(['e2e/pedidos.spec.ts'])
+    expect(specsE2eDePedidos([...rutasE2e, 'e2e/orders-extra.spec.ts'])).toEqual([
+      'e2e/pedidos.spec.ts',
+      'e2e/orders-extra.spec.ts',
+    ])
   })
 
-  it('ningun archivo de app/ ni de components/ importa el modulo pedidos (R57)', () => {
+  it('solo la pantalla de pedidos importa el modulo, y solo por su contrato (R57)', () => {
+    // CENTINELA INVERTIDO el 2026-09-07 (QC-35): la pantalla ya existe y es su consumidor.
+    // Fuera de su carpeta sigue sin conocerlo nadie, y por dentro solo se toca el contrato
+    // publico o el driving por ruta exacta.
     expect(entradasDeUi.length).toBeGreaterThan(0)
-    expect(consumidoresDeUi(entradasDeUi)).toEqual([])
+    expect(consumidoresDeUiFueraDeSuCarpeta(entradasDeUi, carpetaDeLaPantallaRel)).toEqual([])
+    expect(consumosPorDentroDelModulo(entradasDeUi)).toEqual([])
+
+    // La pantalla lo consume DE VERDAD: sin esto, las dos listas vacias lo serian por vacuidad.
     expect(
-      consumidoresDeUi([
-        ...entradasDeUi,
-        { nombre: '<sintetico>', fuente: "import { pedidos } from '@/lib/modules/pedidos'" },
-      ]),
+      entradasDeUi.filter((entrada) => /@\/lib\/modules\/pedidos/.test(soloCodigo(entrada.fuente)))
+        .length,
+    ).toBeGreaterThan(0)
+
+    // Un consumidor fuera de la carpeta de la pantalla lo señala.
+    expect(
+      consumidoresDeUiFueraDeSuCarpeta(
+        [
+          ...entradasDeUi,
+          { nombre: '<sintetico>', fuente: "import { x } from '@/lib/modules/pedidos'" },
+        ],
+        carpetaDeLaPantallaRel,
+      ),
     ).toEqual(['<sintetico>'])
+
+    // Y consumir el modulo POR DENTRO tambien, aunque sea desde la propia pantalla.
+    expect(
+      consumosPorDentroDelModulo([
+        {
+          nombre: '<profundo>',
+          fuente: "import { x } from '@/lib/modules/pedidos/domain/order-view'",
+        },
+      ]),
+    ).toEqual(['<profundo>: @/lib/modules/pedidos/domain/order-view'])
+    // El contrato publico y el driving por ruta exacta NO son infraccion: es como se consume.
+    expect(
+      consumosPorDentroDelModulo([
+        { nombre: '<barrel>', fuente: "import { x } from '@/lib/modules/pedidos'" },
+        {
+          nombre: '<driving>',
+          fuente: "import { y } from '@/lib/modules/pedidos/adapters/driving/order-actions'",
+        },
+      ]),
+    ).toEqual([])
+
     // Y el mismo import DENTRO de un comentario no cuenta: se vigila el codigo, no la prosa.
     expect(
-      consumidoresDeUi([
-        ...entradasDeUi,
-        { nombre: '<comentario>', fuente: '// la pantalla de @/lib/modules/pedidos es QC-35' },
-      ]),
+      consumidoresDeUiFueraDeSuCarpeta(
+        [
+          ...entradasDeUi,
+          { nombre: '<comentario>', fuente: '// la pantalla de @/lib/modules/pedidos es QC-35' },
+        ],
+        carpetaDeLaPantallaRel,
+      ),
     ).toEqual([])
   })
 
