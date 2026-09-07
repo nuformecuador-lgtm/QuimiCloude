@@ -97,6 +97,23 @@ literal suelto en el JSX), siguiendo el precedente de `SIDEBAR_TOGGLE_LABEL`.
 —`claro`, `oscuro`, `sistema`— cada una con nombre accesible propio, y DEBE indicar
 programáticamente cuál es la seleccionada.
 
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** El control de tema es un **interruptor de dos
+> estados**: un gesto alterna `claro` ⇄ `oscuro`. R14 queda sustituido por: *el control DEBE
+> alternar entre los dos modos con un solo gesto, y su nombre accesible DEBE venir de una
+> constante exportada (R13, sin cambios)*.
+>
+> `sistema` **no desaparece del modelo**: sigue siendo el valor por defecto y el punto de partida
+> —mientras nadie toque el control, la preferencia guardada es `system` y el modo sale del
+> sistema operativo, incluidos sus cambios en vivo (R17, intacto)—. Lo que desaparece es la
+> *opción elegible*.
+>
+> Coste asumido, dicho sin adornos: una vez fijado un modo, desde el control ya **no se puede
+> volver a «seguir al sistema»** (haría falta borrar la cookie de UI). D3 (`light`, `dark`,
+> `system`) sigue describiendo los valores que la cookie admite; ya no los que el menú ofrece.
+>
+> El menú y sus tres etiquetas (`THEME_OPTION_*`) se retiraron del código y del barrel, y los
+> casos de test que los leían se reescribieron sobre el gesto nuevo, cada uno con su nota.
+
 **R15.** CUANDO el usuario selecciona una opción de modo, el sistema DEBE aplicar el modo
 inmediatamente, sin recargar la página.
 
