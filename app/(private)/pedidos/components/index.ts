@@ -18,6 +18,21 @@ export {
   UNIT_NAME_COLUMN_ID,
   UNIT_PRICE_COLUMN_ID,
 } from './order-columns';
+export { OrderField, type OrderFieldProps } from './order-field';
+export {
+  ORDER_BUSINESS_FIELDS,
+  ORDER_FORM_CANCEL_TESTID,
+  ORDER_FORM_ERROR_TESTID,
+  ORDER_FORM_SUBMIT_TESTID,
+  ORDER_FORM_TESTID,
+  ORDER_PRIORITY_OPTION_TESTID,
+  ORDER_PRIORITY_SELECT_TESTID,
+  ORDER_STATUS_FIELD,
+  ORDER_STATUS_OPTION_TESTID,
+  ORDER_STATUS_SELECT_TESTID,
+  OrderForm,
+  type OrderFormProps,
+} from './order-form';
 export { OrderListEmpty } from './order-list-empty';
 export { OrderListError } from './order-list-error';
 export {
@@ -48,6 +63,22 @@ export {
   type OrderRowActionsProps,
 } from './order-row-actions';
 export {
+  ORDER_CREATE_OPEN_TESTID,
+  ORDER_SHEET_TESTID,
+  OrderRowSheetActions,
+  OrderSheet,
+  type OrderRowSheetActionsProps,
+  type OrderSheetProps,
+} from './order-sheet';
+export {
+  RECIPE_FIELD,
+  RECIPE_PICKER_TESTID,
+  RecipePicker,
+  type RecipePickerOption,
+  type RecipePickerPage,
+  type RecipePickerProps,
+} from './recipe-picker';
+export {
   ORDER_PRIORITY_FILTER_OPTIONS,
   ORDER_PRIORITY_LABELS,
   ORDER_STATUS_FILTER_OPTIONS,
@@ -56,3 +87,10 @@ export {
   OrderStatusBadge,
 } from './order-status-badge';
 export { ORDER_TABLE_ID, ORDER_TABLE_TEXTS, OrderTable, type OrderTableProps } from './order-table';
+export {
+  UNIT_FIELD,
+  UNIT_OPTION_TESTID,
+  UNIT_SELECT_TESTID,
+  UnitSelect,
+  type UnitSelectProps,
+} from './unit-select';

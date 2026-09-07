@@ -143,33 +143,33 @@ excepción**.
 
 ## T9 — Selectores de receta y de unidad `[P]` (depende de T5)
 
-- [ ] **Toca:** `app/(private)/pedidos/components/{recipe-picker.tsx,unit-select.tsx,index.ts}`.
-- [ ] `recipe-picker.tsx`: forma de `product-picker.tsx` —`Button` + `Input` del CLI, rebote,
+- [x] **Toca:** `app/(private)/pedidos/components/{recipe-picker.tsx,unit-select.tsx,index.ts}`.
+- [x] `recipe-picker.tsx`: forma de `product-picker.tsx` —`Button` + `Input` del CLI, rebote,
       paginación dentro del desplegable—, búsqueda con `listRecipesAction({ page, pageSize, search })`
       y **ni un filtrado por texto sobre los items descargados**. Primera página **por props**.
-- [ ] `unit-select.tsx`: **no controlado**, campo `unitId`, unidades **por props**, `symbol` cuando
+- [x] `unit-select.tsx`: **no controlado**, campo `unitId`, unidades **por props**, `symbol` cuando
       existe y `name` cuando no, **sin opción vacía** y **sin alta de unidad**.
-- [ ] **Hecho cuando:** hay test de que escribir dispara la action con `search` (y no recorta el array
+- [x] **Hecho cuando:** hay test de que escribir dispara la action con `search` (y no recorta el array
       en memoria), test de que se alcanza una receta que no está en la primera página, test de que el
       selector de unidad envía el id elegido, y test en negativo de que ninguno de los dos importa
       una action de creación. **R31, R32, R43.**
 
 ## T10 — Formulario y panel lateral (depende de T8, T9)
 
-- [ ] **Toca:** `app/(private)/pedidos/components/{order-field.tsx,order-form.tsx,order-sheet.tsx,
+- [x] **Toca:** `app/(private)/pedidos/components/{order-field.tsx,order-form.tsx,order-sheet.tsx,
       index.ts}`.
-- [ ] `<form action>` + `useActionState` con el literal `{ status: 'idle' }` construido aquí;
+- [x] `<form action>` + `useActionState` con el literal `{ status: 'idle' }` construido aquí;
       `updateOrderAction.bind(null, id)` en edición; validación previa con `createOrderSchema` /
       `updateOrderSchema` del **barrel** de `pedidos`.
-- [ ] Alta: los cinco campos de negocio y **nada más** —sin estado, sin motivo, sin correlativo, sin
+- [x] Alta: los cinco campos de negocio y **nada más** —sin estado, sin motivo, sin correlativo, sin
       fecha, sin autoría—, prioridad con el defecto del contrato **preseleccionado y visible**.
       Edición: precarga y **reemplazo completo** más el estado, con `EDITABLE_STATUS_VALUES` (sin
       `CANCELADO`).
-- [ ] Cantidad y precio con `type="text"` + `inputMode="decimal"`; nunca `type="number"`.
-- [ ] Traducción de errores **por `code`** según la tabla de `design.md > 8`; el panel no se cierra
+- [x] Cantidad y precio con `type="text"` + `inputMode="decimal"`; nunca `type="number"`.
+- [x] Traducción de errores **por `code`** según la tabla de `design.md > 8`; el panel no se cierra
       con error y no pierde lo escrito. Éxito: cierra, `toast.success` sobre el `<Toaster />` heredado
       (**no se monta otro**) y `router.refresh()`, conservando los parámetros de lista.
-- [ ] **Hecho cuando:** hay tests de alta, de edición precargada con reemplazo completo, de que el
+- [x] **Hecho cuando:** hay tests de alta, de edición precargada con reemplazo completo, de que el
       alta **no** ofrece selector de estado, de que la edición **no** ofrece `CANCELADO`, de que no
       hay campo de fecha de solicitud, de `recipe_not_found` pintado junto al selector de receta, de
       éxito con toast, de que al cerrar el panel la URL conserva página/orden/filtros, y de que

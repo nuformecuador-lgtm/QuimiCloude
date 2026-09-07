@@ -21,7 +21,21 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { routerMock, listOrdersActionMock, getOrderActionMock } = vi.hoisted(() => ({
+const {
+  routerMock,
+  listOrdersActionMock,
+  getOrderActionMock,
+  listRecipesActionMock,
+  listUnitsActionMock,
+} = vi.hoisted(() => ({
+  // T10: la seccion pide ademas los dos catalogos que alimentan el panel lateral de alta
+  // (`design.md > 9`). Son el borde de modulos que esta ficha no abre (R46) y se sustituyen igual
+  // que la lista: sin ellos, `listRecipesAction` intentaria leer la cookie de sesion real.
+  listRecipesActionMock: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], total: 0, page: 1, pageSize: MAX_PAGE_SIZE, totalPages: 1 },
+  })),
+  listUnitsActionMock: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -45,6 +59,14 @@ vi.mock('next/navigation', async (importOriginal) => ({
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   listOrdersAction: listOrdersActionMock,
   getOrderAction: getOrderActionMock,
+}));
+
+vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipesAction: listRecipesActionMock,
+}));
+
+vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
+  listUnitsAction: listUnitsActionMock,
 }));
 
 const testId = {
