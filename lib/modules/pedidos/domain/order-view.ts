@@ -102,13 +102,3 @@ export type OrderView = {
  */
 export type OrderSummary = OrderView;
 
-/**
- * Filtros del listado (R38): estado y prioridad, los dos OPCIONALES y COMBINABLES entre si.
- * Sin ninguno, salen todos los pedidos vivos. No hay busqueda por texto ni filtro por numero
- * correlativo (R39), y no hay filtro por «borrado»: los borrados no salen NUNCA y eso es del
- * puerto, no de estos filtros (R40).
- */
-export type OrderFilters = {
-  readonly status?: OrderStatus;
-  readonly priority?: OrderPriority;
-};

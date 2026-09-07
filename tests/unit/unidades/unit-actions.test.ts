@@ -46,7 +46,14 @@ describe('listUnitsAction', () => {
 
     expect(getSessionUserMock).toHaveBeenCalledTimes(1);
     expect(listUnitsMock).toHaveBeenCalledTimes(1);
-    expect(listUnitsMock).toHaveBeenCalledWith({ id: 'user-admin-1', roleName: 'Administrador' });
+    // QC-57: el caso de uso pasa a `listUnits(input, actor)` con la consulta OPCIONAL. La
+    // action sigue pidiendo el CATALOGO ENTERO, o sea `undefined` de consulta, que es lo que
+    // mantiene su firma -y la de las tres pantallas que la llaman- sin tocar. Cambia la forma
+    // de la llamada, no lo que este caso verifica.
+    expect(listUnitsMock).toHaveBeenCalledWith(undefined, {
+      id: 'user-admin-1',
+      roleName: 'Administrador',
+    });
     expect(resultado).toEqual({ status: 'success', data: CATALOG });
   });
 
@@ -56,7 +63,7 @@ describe('listUnitsAction', () => {
 
     await listUnitsAction();
 
-    expect(listUnitsMock).toHaveBeenCalledWith(null);
+    expect(listUnitsMock).toHaveBeenCalledWith(undefined, null);
   });
 
   it('la action traduce el error de dominio a estado serializable sin relanzar', async () => {

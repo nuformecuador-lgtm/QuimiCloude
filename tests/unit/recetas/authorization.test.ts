@@ -143,6 +143,9 @@ const CASOS_DE_USO: ReadonlyArray<{
       createListRecipes({
         recipes: puertos.recipes,
         images: puertos.images,
+        // QC-57 (R6): el caso de uso gana el puerto del log de campos omitidos. Doble mudo:
+        // este archivo comprueba el PERMISO, no el log.
+        log: { ignoredFields: vi.fn() },
         toOffsetLimit: () => ({ offset: 0, limit: 10 }),
         buildPage: (items, total, page, pageSize) => ({ items, total, page, pageSize, totalPages: 1 }),
       })({}, actor),

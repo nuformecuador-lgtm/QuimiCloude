@@ -163,7 +163,22 @@ async function createUnit(
   return unit.id
 }
 
-/** Crea un producto con su presentacion propia. `products.name` no es unico (QC-14). */
+
+/** Copia local de `normalizeProductName` (QC-57). NO se importa el original a proposito: lo
+ *  que aqui se prueba es otra cosa, y si el algoritmo real se rompiera este archivo no debe
+ *  quedar verde por arrastre. El algoritmo lo prueba
+ *  `tests/unit/inventario/product-name.test.ts`. */
+function normalizeProductNameForTest(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]/gu, '')
+}
+
+/** Crea un producto con su presentacion propia. `products.name` no es unico (QC-14).
+ *  `nameNormalized` (QC-57) es NOT NULL desde `<ts>_list_query_indexes`. */
 async function createProduct(
   tx: Prisma.TransactionClient,
   unitId: string | null = null,
@@ -177,7 +192,7 @@ async function createProduct(
     select: { id: true },
   })
   const product = await tx.product.create({
-    data: { name, presentationId: presentation.id, unitId },
+    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id, unitId },
     select: { id: true },
   })
   return product.id
@@ -222,7 +237,11 @@ type WritableColumn =
  * `INSERT` crudo. `columns` decide que se escribe: omitir una entrada es exactamente el
  * caso «falta un dato obligatorio», que la API tipada de Prisma no deja ni compilar.
  * `updated_at` se da siempre porque es NOT NULL sin DEFAULT en las tres tablas (lo rellena
- * el cliente Prisma via `@updatedAt`, no la base).
+ * el cliente Prisma via `@updatedAt`, no la base). Desde QC-57,
+ * `products.name_normalized` esta en el mismo caso y se rellena igual: si no, el rechazo que
+ * cada caso busca llegaria antes como 23502 sobre ESA columna y el test dejaria de probar la
+ * FK de unidad que dice probar. Se escribe vacia a proposito -aqui el producto es andamiaje-
+ * y no choca con nada: esa columna NO tiene indice unico (QC-14 decision cerrada 6).
  */
 function rawInsert(
   tx: Prisma.TransactionClient,
@@ -233,6 +252,10 @@ function rawInsert(
   const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
   const values = entries.map(([, value]) => value)
 
+  if (table === 'products') {
+    names.push(Prisma.raw('"name_normalized"'))
+    values.push(Prisma.sql`${''}`)
+  }
   names.push(Prisma.raw('"updated_at"'))
   values.push(Prisma.sql`CURRENT_TIMESTAMP`)
 
@@ -455,11 +478,21 @@ describe('la unidad como entidad del catalogo', () => {
       const rows = await tx.unit.findMany({ where: { symbol }, select: { id: true } })
       expect(rows.map((row) => row.id).sort()).toEqual([primera, segunda].sort())
 
-      // El porque: no hay ningun indice de la tabla que incluya la columna `symbol`.
-      const symbolIndexes = await tx.$queryRaw<{ indexname: string }[]>`
+      // El porque: ningun indice UNICO de la tabla incluye la columna `symbol`.
+      //
+      // 2026-09-04, QC-57: hasta hoy esto se afirmaba como «ningun indice, de ningun tipo,
+      // menciona `symbol`», y ya no vale: la migracion `<ts>_list_query_indexes` anade
+      // `units_symbol_idx`, un btree NO UNICO, porque el listado declara `symbol` ordenable
+      // (R21: todo campo ordenable tiene indice). Lo que R7 protege —«la identidad de la
+      // unidad es su NOMBRE», o sea que el simbolo no distingue dos unidades— NO cambia ni un
+      // apice y sigue afirmado arriba con las dos filas que comparten simbolo; lo que se
+      // ajusta es el «porque», que ahora dice exactamente lo que R7 pide y no una cota mas
+      // fuerte que nadie habia pedido. Un `@unique` sobre `symbol` seguiria poniendo esto rojo.
+      const symbolUniqueIndexes = await tx.$queryRaw<{ indexname: string }[]>`
         SELECT indexname FROM pg_indexes
-        WHERE schemaname = 'public' AND tablename = 'units' AND indexdef LIKE '%symbol%'`
-      expect(symbolIndexes).toEqual([])
+        WHERE schemaname = 'public' AND tablename = 'units'
+          AND indexdef LIKE '%symbol%' AND indexdef LIKE '%UNIQUE%'`
+      expect(symbolUniqueIndexes).toEqual([])
     })
   })
 

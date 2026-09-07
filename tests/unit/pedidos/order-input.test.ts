@@ -12,12 +12,16 @@ import { describe, expect, it } from 'vitest'
 
 import { ORDER_PRIORITY_VALUES, ORDER_STATUS_VALUES } from '@/lib/modules/pedidos'
 import {
+  createListQuerySchema,
+  sanitizeListQuery,
+} from '@/lib/modules/pedidos/domain/list-query'
+import {
   EDITABLE_STATUS_VALUES,
   cancelOrderSchema,
   createOrderSchema,
-  listOrdersSchema,
   updateOrderSchema,
 } from '@/lib/modules/pedidos/domain/order-input'
+import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 
 const RECIPE_ID = '11111111-1111-4111-8111-111111111111'
 const UNIT_ID = '22222222-2222-4222-8222-222222222222'
@@ -217,44 +221,89 @@ describe('pedidos — cancelOrderSchema (cancelacion)', () => {
   })
 })
 
-describe('pedidos — listOrdersSchema (consulta)', () => {
+// QC-57 (R25): `listOrdersSchema` DESAPARECIO y el listado pasa por el CONTRATO GENERICO. Lo
+// que aquel esquema garantizaba se sigue garantizando, y se comprueba aqui mismo sobre el
+// contrato nuevo -no se borra ningun aserto, se traslada a la forma nueva (R26)-.
+describe('pedidos — la consulta del listado, ya con el contrato generico (QC-57 R25)', () => {
+  const listQuerySchema = createListQuerySchema()
+
+  /** La consulta ya saneada contra la lista blanca de pedidos, como la ve el repositorio. */
+  function saneada(entrada: unknown): ReturnType<typeof sanitizeListQuery> {
+    const parsed = listQuerySchema.safeParse(entrada)
+    if (!parsed.success) throw new Error('la entrada no cumple la forma del contrato')
+    return sanitizeListQuery(parsed.data, ORDER_QUERYABLE)
+  }
+
   it('rechaza pagina y tamano que no sean enteros mayores o iguales a 1', () => {
-    // R36: se rechaza en el borde y no se lee del repositorio. El defecto de 10 y el tope de 25
-    // NO estan aqui: los aplica `lib/shared/pagination` en el adaptador (R35, R37).
+    // R36 (heredado, QC-34): se rechaza en el borde y no se lee del repositorio. El defecto de
+    // 10 y el tope de 25 NO estan aqui: los aplica `lib/shared/pagination` en el adaptador.
     for (const page of [0, -1, 1.5, Number.NaN]) {
-      expect(listOrdersSchema.safeParse({ page }).success, `page=${String(page)}`).toBe(false)
+      expect(listQuerySchema.safeParse({ page }).success, `page=${String(page)}`).toBe(false)
     }
     for (const pageSize of [0, -1, 2.5]) {
-      expect(listOrdersSchema.safeParse({ pageSize }).success, `pageSize=${String(pageSize)}`).toBe(
+      expect(listQuerySchema.safeParse({ pageSize }).success, `pageSize=${String(pageSize)}`).toBe(
         false,
       )
     }
-    expect(listOrdersSchema.parse({}).page).toBe(1)
-    expect(listOrdersSchema.parse({}).pageSize).toBeUndefined()
-    expect(listOrdersSchema.parse({ page: 3, pageSize: 25 })).toMatchObject({
+    expect(listQuerySchema.parse({}).page).toBe(1)
+    expect(listQuerySchema.parse({}).pageSize).toBeUndefined()
+    expect(listQuerySchema.parse({ page: 3, pageSize: 25 })).toMatchObject({
       page: 3,
       pageSize: 25,
     })
   })
 
   it('admite los dos filtros, opcionales y combinables, y CANCELADO como filtro de estado', () => {
-    // R38 y R40: los cancelados SI se consultan -para eso tienen estado propio en vez de
-    // desaparecer-; los borrados no salen nunca y eso es del puerto, no de este esquema.
-    expect(listOrdersSchema.parse({})).toMatchObject({ page: 1 })
-    expect(listOrdersSchema.parse({ status: 'CANCELADO' }).status).toBe('CANCELADO')
-    expect(listOrdersSchema.parse({ priority: 'CRITICA' }).priority).toBe('CRITICA')
-    const ambos = listOrdersSchema.parse({ status: 'EN_CURSO', priority: 'ALTA', page: 2 })
-    expect(ambos).toMatchObject({ status: 'EN_CURSO', priority: 'ALTA', page: 2 })
+    // R25 + R38/R40 heredados: estado y prioridad ahora son filtros `select` del contrato, y
+    // siguen siendo opcionales y combinables. Los cancelados SI se consultan -para eso tienen
+    // estado propio en vez de desaparecer-; los borrados no salen nunca y eso es del puerto.
+    expect(saneada({}).query.filters).toEqual({})
+
+    const soloEstado = saneada({ filters: { status: { kind: 'select', values: ['CANCELADO'] } } })
+    expect(soloEstado.query.filters).toEqual({
+      status: { kind: 'select', values: ['CANCELADO'] },
+    })
+
+    const soloPrioridad = saneada({
+      filters: { priority: { kind: 'select', values: ['CRITICA'] } },
+    })
+    expect(soloPrioridad.query.filters).toEqual({
+      priority: { kind: 'select', values: ['CRITICA'] },
+    })
+
+    const ambos = saneada({
+      page: 2,
+      filters: {
+        status: { kind: 'select', values: ['EN_CURSO'] },
+        priority: { kind: 'select', values: ['ALTA'] },
+      },
+    })
+    expect(Object.keys(ambos.query.filters).sort()).toEqual(['priority', 'status'])
+    expect(ambos.query.page).toBe(2)
+
     for (const status of ORDER_STATUS_VALUES) {
-      expect(listOrdersSchema.safeParse({ status }).success, `status=${status}`).toBe(true)
+      const una = saneada({ filters: { status: { kind: 'select', values: [status] } } })
+      expect(una.query.filters.status, `status=${status}`).toEqual({
+        kind: 'select',
+        values: [status],
+      })
     }
   })
 
-  it('rechaza un estado o una prioridad fuera del conjunto y descarta la busqueda por texto', () => {
-    // R19 y R39: sin busqueda por texto y sin filtro por numero correlativo.
-    expect(listOrdersSchema.safeParse({ status: 'ANULADO' }).success).toBe(false)
-    expect(listOrdersSchema.safeParse({ priority: 'URGENTE' }).success).toBe(false)
-    const parsed = listOrdersSchema.parse({ q: 'acido', search: 'acido', number: '2026-0000001' })
-    expect(Object.keys(parsed).sort()).toEqual(['page'])
+  it('la busqueda por texto se OMITE y se anota: `orders` no tiene columna `name`', () => {
+    // R17 + R39 heredado. Antes la busqueda moria porque el esquema no la declaraba; ahora la
+    // declara el contrato -es una sola propiedad para las siete listas- y quien la omite es la
+    // lista blanca, con `searchable: false`. La consulta NO falla: devuelve la lista como si no
+    // se hubiera buscado, y el campo omitido queda anotado para el log (R5, R6).
+    const conBusqueda = saneada({ search: 'acido' })
+    expect(conBusqueda.query.search).toBe('')
+    expect(conBusqueda.ignored).toEqual(['search'])
+
+    // Y un filtro por el numero correlativo tampoco existe: no esta declarado filtrable.
+    const porNumero = saneada({
+      filters: { orderNumber: { kind: 'text', value: '2026-0000001' } },
+    })
+    expect(porNumero.query.filters).toEqual({})
+    expect(porNumero.ignored).toEqual(['orderNumber'])
   })
 })

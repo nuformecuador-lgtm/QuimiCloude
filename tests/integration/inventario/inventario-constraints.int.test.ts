@@ -184,6 +184,7 @@ type ProductColumn = 'name' | 'stock' | 'qty_alert' | 'unit_id'
  * exactamente el caso «falta un dato obligatorio». `presentationId === null` omite la
  * columna de la FK. `updated_at` se da siempre porque es NOT NULL sin DEFAULT (lo rellena
  * el cliente Prisma via `@updatedAt`, no la base).
+ * `name_normalized` se da siempre por lo mismo (QC-57): es NOT NULL y sin DEFAULT.
  */
 function rawInsertProduct(
   tx: Prisma.TransactionClient,
@@ -198,6 +199,13 @@ function rawInsertProduct(
     names.push(Prisma.raw('"presentation_id"'))
     values.push(Prisma.sql`CAST(${presentationId} AS uuid)`)
   }
+  // `name_normalized` (QC-57) es NOT NULL sin DEFAULT: va SIEMPRE, como `updated_at`, o
+  // cualquier rechazo que este helper busque llegaria antes como 23502 sobre ESTA columna y
+  // el caso dejaria de probar lo que dice probar. Se escribe vacia a proposito: la busqueda
+  // por nombre no es lo que aqui se afirma, y `products.name_normalized` no tiene indice
+  // unico (el nombre del producto no es unico, QC-14 decision cerrada 6).
+  names.push(Prisma.raw('"name_normalized"'))
+  values.push(Prisma.sql`${''}`)
   names.push(Prisma.raw('"updated_at"'))
   values.push(Prisma.sql`CURRENT_TIMESTAMP`)
 
@@ -306,6 +314,7 @@ describe('estructura del producto', () => {
       const { id } = await tx.product.create({
         data: {
           name: 'Acido citrico monohidratado',
+          nameNormalized: normalizeForTest('Acido citrico monohidratado'),
           presentationId,
           stock: 120,
           qtyAlert: 20,
@@ -371,7 +380,7 @@ describe('estructura del producto', () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
       const { id } = await tx.product.create({
-        data: { name: 'Ficha recien abierta', presentationId },
+        data: { name: 'Ficha recien abierta', nameNormalized: normalizeForTest('Ficha recien abierta'), presentationId },
         select: { id: true },
       })
 
@@ -469,7 +478,7 @@ describe('estructura del producto', () => {
       // El CHECK rechaza el negativo, no el cero ni el valor ausente: R5 y R6 conviven
       // con R9 porque en SQL un CHECK que evalua a NULL se cumple.
       const { id } = await tx.product.create({
-        data: { name: 'Ceros y nulos', presentationId, stock: 0, qtyAlert: 0 },
+        data: { name: 'Ceros y nulos', nameNormalized: normalizeForTest('Ceros y nulos'), presentationId, stock: 0, qtyAlert: 0 },
         select: { id: true },
       })
       const zeroed = await tx.product.findUniqueOrThrow({ where: { id } })
@@ -500,7 +509,7 @@ describe('estructura del producto', () => {
         const unitId = await createUnit(tx, symbol)
         unitIds.push(unitId)
         const { id } = await tx.product.create({
-          data: { name: `Producto en ${symbol ?? 'unidad sin simbolo'}`, presentationId, unitId },
+          data: { name: `Producto en ${symbol ?? 'unidad sin simbolo'}`, nameNormalized: normalizeForTest(`Producto en ${symbol ?? 'unidad sin simbolo'}`), presentationId, unitId },
           select: { id: true },
         })
         ids.push(id)
@@ -515,7 +524,7 @@ describe('estructura del producto', () => {
       expect(new Set(unitIds).size).toBe(symbols.length)
 
       const { id: withoutUnit } = await tx.product.create({
-        data: { name: 'Sin unidad', presentationId },
+        data: { name: 'Sin unidad', nameNormalized: normalizeForTest('Sin unidad'), presentationId },
         select: { id: true },
       })
       const bare = await tx.product.findUniqueOrThrow({ where: { id: withoutUnit } })
@@ -533,6 +542,7 @@ describe('estructura del producto', () => {
       const { id } = await tx.product.create({
         data: {
           name: 'Producto vigilado',
+          nameNormalized: normalizeForTest('Producto vigilado'),
           presentationId,
           stock: 3,
           qtyAlert: 50,
@@ -591,7 +601,7 @@ describe('relacion producto - presentacion', () => {
       const ids: string[] = []
       for (const n of [1, 2, 3, 4, 5]) {
         const { id } = await tx.product.create({
-          data: { name: `Producto ${String(n)}`, presentationId },
+          data: { name: `Producto ${String(n)}`, nameNormalized: normalizeForTest(`Producto ${String(n)}`), presentationId },
           select: { id: true },
         })
         ids.push(id)
@@ -611,7 +621,7 @@ describe('relacion producto - presentacion', () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
       const { id: productId } = await tx.product.create({
-        data: { name: 'Producto asignado', presentationId, stock: 4 },
+        data: { name: 'Producto asignado', nameNormalized: normalizeForTest('Producto asignado'), presentationId, stock: 4 },
         select: { id: true },
       })
 
@@ -637,7 +647,7 @@ describe('relacion producto - presentacion', () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
       const { id: productId } = await tx.product.create({
-        data: { name: 'Producto retirado', presentationId, stock: 4 },
+        data: { name: 'Producto retirado', nameNormalized: normalizeForTest('Producto retirado'), presentationId, stock: 4 },
         select: { id: true },
       })
       const deleted = await tx.product.update({
@@ -695,17 +705,17 @@ describe('nombre del producto', () => {
       // Exactamente el mismo texto: sin indice unico, ni total ni parcial (R16). Se
       // aparta a proposito del precedente de `users`, donde esto seria 23505.
       const { id: first } = await tx.product.create({
-        data: { name: 'Sosa caustica', presentationId },
+        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica'), presentationId },
         select: { id: true },
       })
       const { id: second } = await tx.product.create({
-        data: { name: 'Sosa caustica', presentationId },
+        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica'), presentationId },
         select: { id: true },
       })
       // Y solo cambiando las mayusculas: tampoco hay indice unico funcional sobre
       // `lower(name)`, al reves que en `users`.
       const { id: third } = await tx.product.create({
-        data: { name: 'SOSA CAUSTICA', presentationId },
+        data: { name: 'SOSA CAUSTICA', nameNormalized: normalizeForTest('SOSA CAUSTICA'), presentationId },
         select: { id: true },
       })
 
@@ -734,6 +744,7 @@ describe('borrado logico y marcas de tiempo', () => {
       const { id } = await tx.product.create({
         data: {
           name: 'Producto que se retira',
+          nameNormalized: normalizeForTest('Producto que se retira'),
           presentationId,
           stock: 9,
           qtyAlert: 1,
@@ -767,7 +778,7 @@ describe('borrado logico y marcas de tiempo', () => {
       expect(presentation.updatedAt).toBeInstanceOf(Date)
 
       const created = await tx.product.create({
-        data: { name: 'Producto con marcas', presentationId: presentation.id },
+        data: { name: 'Producto con marcas', nameNormalized: normalizeForTest('Producto con marcas'), presentationId: presentation.id },
       })
       expect(created.createdAt).toBeInstanceOf(Date)
       expect(created.updatedAt).toBeInstanceOf(Date)
@@ -812,6 +823,10 @@ describe('QC-52 — censo de products tras la migracion', () => {
     'id',
     'image_path',
     'name',
+    // QC-57 (R19, R23): la columna normalizada de la BUSQUEDA del listado. La anade
+    // `20260904160000_list_query_indexes`, es NOT NULL y NO tiene indice unico -el nombre
+    // del producto no es unico, QC-14 decision cerrada 6-.
+    'name_normalized',
     'presentation_id',
     'qty_alert',
     'stock',

@@ -18,11 +18,26 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * `items`.
  *
  * **La búsqueda va al SERVIDOR, nunca al array ya descargado** (R28): escribir dispara
- * `listProductsAction({ page: 1, pageSize: MAX_PAGE_SIZE, search })` -con `search` validado por
- * `productQuerySchema` en el dominio y resuelto con un `contains` insensible a mayúsculas en el
- * adaptador-. En este archivo no hay ni un `.filter(` por texto sobre `items`: filtrar en cliente
- * solo miraría la página cargada y mentiría sobre el catálogo, que es exactamente lo que R28
- * prohíbe. El teclear se agrupa con un rebote de 250 ms para no pedir una consulta por pulsación.
+ * `listProductsAction({ page: 1, pageSize: MAX_PAGE_SIZE, search })`. En este archivo no hay ni un
+ * `.filter(` por texto sobre `items`: filtrar en cliente solo miraría la página cargada y mentiría
+ * sobre el catálogo, que es exactamente lo que R28 prohíbe. El teclear se agrupa con un rebote de
+ * 250 ms para no pedir una consulta por pulsación.
+ *
+ * **Quién valida ese `search`, desde QC-57**: `productQuerySchema` -la búsqueda propia de
+ * productos- YA NO EXISTE (QC-57 R24). `search` es ahora una clave del CONTRATO GENÉRICO de
+ * consulta de lista, el mismo de los siete listados del ERP: lo valida `createListQuerySchema()`
+ * -que le da `''` por defecto y le recorta el sobrante- y lo poda `sanitizeListQuery` contra la
+ * lista blanca `PRODUCT_QUERYABLE`, ambos dentro del caso de uso `listProducts`. La llamada de
+ * este selector no cambia de forma: `search` sigue siendo una propiedad `string`.
+ *
+ * **Y ha cambiado CÓMO se resuelve, para mejor**: ya no es un `contains` insensible a mayúsculas
+ * sobre `products.name`, sino un `contains` sobre la columna normalizada
+ * `products.name_normalized` -servida por el índice GIN de trigramas
+ * `products_name_normalized_trgm_idx`-, con el término pasado por la MISMA `normalizeProductName`
+ * que escribió esa columna (QC-57 R16, R18, R19). Como esa forma canónica quita los acentos, la
+ * búsqueda AHORA LOS IGNORA: escribir «solucion» encuentra «Solución Buffer pH 7», que antes no
+ * aparecía. Queda escrito aquí porque es comportamiento visible para quien usa el selector, y sin
+ * anotarlo nadie sabría que puede confiar en él.
  *
  * **Sin texto escrito, el desplegable sigue siendo el de siempre**: la primera página precargada y
  * sus controles de página. Con texto, la paginación se aplica al resultado de la búsqueda, y el
@@ -145,8 +160,12 @@ export function ProductPicker({
     }
 
     setLoading(true);
-    // Sin término, la consulta es EXACTAMENTE la de siempre -sin una clave `search` vacía que
-    // el esquema tendría que rechazar-; con término, viaja junto a la página.
+    // Sin término, la consulta es EXACTAMENTE la de siempre: la página completa del catálogo.
+    // La clave `search` se omite por claridad del sitio de llamada, NO porque el esquema fuera a
+    // rechazarla: con el contrato de QC-57 una búsqueda vacía o de solo espacios es AUSENCIA de
+    // búsqueda (R20) -`createListQuerySchema` le pone `''` por defecto y el adaptador no añade
+    // condición alguna-, así que mandar `search: ''` daría el mismo resultado. Con término, viaja
+    // junto a la página.
     const filtro = search === '' ? {} : { search };
     const result = await listProductsAction({ page: next, pageSize: MAX_PAGE_SIZE, ...filtro });
     setLoading(false);

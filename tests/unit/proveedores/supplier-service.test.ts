@@ -22,6 +22,7 @@ import { createUpdateSupplier } from '@/lib/modules/proveedores/domain/update-su
 
 import type { Actor } from '@/lib/modules/proveedores/domain/actor'
 import type { SupplierView } from '@/lib/modules/proveedores/domain/supplier-view'
+import type { ListQueryLog } from '@/lib/modules/proveedores/ports/list-query-log'
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -266,9 +267,16 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     // 1. Los dos casos de uso de consulta dependen SOLO del repositorio de proveedores.
     //    Mutacion que lo pone rojo: anadir `readonly catalog: SupplierCatalogRepository`
     //    a `GetSupplierDeps` o a `ListSuppliersDeps`.
-    for (const archivo of ['get-supplier.ts', 'list-suppliers.ts']) {
+    // QC-57 (R6) anade al LISTADO -y solo a el- el puerto del log de campos omitidos: sigue
+    // sin conocer el catalogo, que es lo que este caso vigila. `getSupplier` no lista, asi que
+    // no lo recibe. Cada archivo declara aqui sus dependencias EXACTAS, ni una mas.
+    const DEPS_ESPERADAS: Readonly<Record<string, readonly string[]>> = {
+      'get-supplier.ts': ['suppliers'],
+      'list-suppliers.ts': ['log', 'suppliers'],
+    }
+    for (const [archivo, esperadas] of Object.entries(DEPS_ESPERADAS)) {
       const fuente = read('domain', archivo)
-      expect(clavesDelTipoDeps(fuente), `${archivo}`).toEqual(['suppliers'])
+      expect(clavesDelTipoDeps(fuente), `${archivo}`).toEqual(esperadas)
       expect(sinComentarios(fuente), `${archivo} conoce el catalogo`).not.toMatch(/catalog/i)
     }
 
@@ -286,7 +294,12 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     const ficha = await createGetSupplier({ suppliers: repo })('sup-1', ADMIN)
     expect(Object.keys(ficha).sort()).toEqual([...new Set(camposDeLaVista)].sort())
 
-    const listado = await createListSuppliers({ suppliers: repo })({ page: 1 }, ADMIN)
+    const listado = await createListSuppliers({
+      suppliers: repo,
+      // QC-57 (R6): espia mudo del log de campos omitidos; lo que registra se prueba en
+      // `tests/unit/proveedores/list-use-cases.test.ts`.
+      log: { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() },
+    })({ page: 1 }, ADMIN)
     expect(Object.keys(listado).sort()).toEqual([
       'items',
       'page',

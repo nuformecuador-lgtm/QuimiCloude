@@ -251,14 +251,28 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
     // `ports/` o en `adapters/driven/` cae aqui.
     expect(
       sourcesIn(join(proveedoresDir, 'ports')).map((f) => toPosix(relative(proveedoresDir, f))),
-      'ports/ gano un archivo fuera de los dos puertos de QC-43',
-    ).toEqual(['ports/supplier-catalog-repository.ts', 'ports/supplier-repository.ts'])
+      'ports/ gano un archivo fuera de los puertos de QC-43 y QC-57',
+      // ACTUALIZADO 2026-09-04 (QC-57, T7): `list-query-log.ts` es el TERCER puerto del
+      // modulo -el log del campo omitido (R6)-, declarado en los CINCO modulos con listado
+      // porque el dominio no puede importar `lib/shared/**`. La afirmacion sigue siendo la
+      // lista EXACTA, que es lo que la hace falsable: un cuarto puerto cae aqui igual.
+    ).toEqual([
+      'ports/list-query-log.ts',
+      'ports/supplier-catalog-repository.ts',
+      'ports/supplier-repository.ts',
+    ])
     expect(
       sourcesIn(join(proveedoresDir, 'adapters', 'driven')).map((f) =>
         toPosix(relative(proveedoresDir, f)),
       ),
-      'adapters/driven/ gano un archivo fuera de los dos adaptadores de QC-43',
+      'adapters/driven/ gano un archivo fuera de los adaptadores de QC-43 y QC-57',
+      // ACTUALIZADO 2026-09-04 (QC-57, T17/T18): `list-query-sql.ts` traduce el contrato
+      // generico de consulta a las condiciones de Prisma y lo comparten los DOS adaptadores
+      // del modulo. Vive aqui -y no en `lib/shared/`- porque es una copia deliberada de la
+      // gemela de `inventario`: importar de otro modulo por una ruta profunda es lo que la
+      // regla de dependencias prohibe. La afirmacion sigue siendo la lista EXACTA.
     ).toEqual([
+      'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driven/persistence/supplier-catalog-line-prisma.ts',
       'adapters/driven/persistence/supplier-prisma.ts',
     ])

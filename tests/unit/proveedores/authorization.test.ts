@@ -97,10 +97,16 @@ function dobles() {
     listBySupplierAlive: explota('catalog.listBySupplierAlive'),
   }
 
+  // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion. `requireAdmin`
+  // es la PRIMERA linea de los dos listados, antes de zod y antes de sanear, asi que un actor
+  // rechazado no llega ni a saber que su consulta traia campos raros.
+  const log = { ignoredFields: explota('log.ignoredFields') }
+
   return {
     suppliers: suppliers as unknown as SupplierRepository,
     catalog: catalog as unknown as SupplierCatalogRepository,
-    espias: [...Object.values(suppliers), ...Object.values(catalog)],
+    log,
+    espias: [...Object.values(suppliers), ...Object.values(catalog), ...Object.values(log)],
   }
 }
 
@@ -140,7 +146,8 @@ const CASOS_DE_USO: readonly {
   {
     nombre: 'listSuppliers',
     archivo: 'list-suppliers.ts',
-    ejecutar: (d, actor) => createListSuppliers({ suppliers: d.suppliers })({ page: 1 }, actor),
+    ejecutar: (d, actor) =>
+      createListSuppliers({ suppliers: d.suppliers, log: d.log })({ page: 1 }, actor),
   },
   {
     nombre: 'createCatalogLine',
@@ -162,7 +169,7 @@ const CASOS_DE_USO: readonly {
     nombre: 'listCatalogLines',
     archivo: 'list-catalog-lines.ts',
     ejecutar: (d, actor) =>
-      createListCatalogLines({ catalog: d.catalog })(SUPPLIER_ID, { page: 1 }, actor),
+      createListCatalogLines({ catalog: d.catalog, log: d.log })(SUPPLIER_ID, { page: 1 }, actor),
   },
 ]
 
@@ -190,8 +197,20 @@ describe('autorizacion de los nueve casos de uso de proveedores (QC-43 T10)', ()
     // Guardia de la propia guardia: si alguien anade un decimo caso de uso al dominio y no
     // lo mete en `CASOS_DE_USO`, este test cae. Sin esto, la cobertura «de los nueve» seria
     // una promesa del comentario de cabecera y no una afirmacion ejecutable.
+    //
+    // QC-57 anadio `domain/list-query.ts`, que empieza por `list-` y NO es un caso de uso: es el
+    // contrato de consulta de lista -tipos, esquema zod y una funcion pura `sanitize`-, sin actor
+    // y sin ningun puerto que tocar, asi que no tiene autorizacion que validar. Se excluye por
+    // nombre, y no relajando el patron, para que la guardia siga cayendo con un caso de uso nuevo
+    // de verdad. Si algun dia deja de ser una excepcion, el aserto de `toHaveLength(9)` lo dira.
+    const NO_SON_CASOS_DE_USO: readonly string[] = ['list-query.ts']
+
     const factoriasEnElDominio = readdirSync(join(moduloDir, 'domain'))
-      .filter((archivo) => /^(create|update|delete|get|list)-/.test(archivo))
+      .filter(
+        (archivo) =>
+          /^(create|update|delete|get|list)-/.test(archivo) &&
+          !NO_SON_CASOS_DE_USO.includes(archivo),
+      )
       .sort()
     expect(factoriasEnElDominio).toEqual([...CASOS_DE_USO].map((c) => c.archivo).sort())
     expect(CASOS_DE_USO).toHaveLength(9)

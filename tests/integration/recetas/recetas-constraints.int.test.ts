@@ -195,6 +195,19 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
   return user.id
 }
 
+/** Copia local de `normalizeProductName` (QC-57). NO se importa el original a proposito: lo
+ *  que aqui se prueba es otra cosa, y si el algoritmo real se rompiera este archivo no debe
+ *  quedar verde por arrastre. El algoritmo lo prueba
+ *  `tests/unit/inventario/product-name.test.ts`. */
+function normalizeProductNameForTest(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]/gu, '')
+}
+
 /** Crea un producto con su presentacion propia. `products.name` no es unico (QC-14). */
 async function createProduct(
   tx: Prisma.TransactionClient,
@@ -214,7 +227,7 @@ async function createProduct(
     select: { id: true },
   })
   const product = await tx.product.create({
-    data: { name, presentationId: presentation.id },
+    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id },
     select: { id: true },
   })
   return product.id

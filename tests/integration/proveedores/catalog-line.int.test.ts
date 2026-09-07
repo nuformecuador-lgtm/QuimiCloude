@@ -50,9 +50,22 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores/domain/supplier
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
+
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento (estrategia 1)
 // ---------------------------------------------------------------------------
+
+/**
+ * QC-57: el adaptador recibe ahora el CONTRATO GENERICO de consulta. Sin orden, sin filtros y
+ * sin busqueda es exactamente la lista de siempre (R11), asi que los casos de este archivo
+ * siguen midiendo lo mismo -paginacion, total y las dos condiciones de vida- y ningun aserto
+ * se relaja.
+ */
+function consulta(partial: Partial<ListQuery> = {}): ListQuery {
+  return { page: 1, sort: null, filters: {}, search: '', ...partial };
+}
+
 
 class RollbackSignal extends Error {
   constructor() {
@@ -211,8 +224,9 @@ async function createTestUnit(db: Db): Promise<string> {
  */
 async function createTestProduct(db: Db): Promise<{ id: string; presentationId: string }> {
   const presentationId = await createTestPresentation(db);
+  const productName = `Articulo ${token()}`;
   const product = await db.product.create({
-    data: { name: `Articulo ${token()}`, presentationId },
+    data: { name: productName, nameNormalized: normalizeForTest(productName), presentationId },
     select: { id: true },
   });
   return { id: product.id, presentationId };
@@ -609,7 +623,7 @@ describe('R10, R13: alta de la linea del catalogo por el adaptador', () => {
       expect(fila.createdBy).toBe(sharedActorId);
       expect(fila.updatedBy).toBe(sharedActorId);
 
-      const page = await listCatalogLinesBySupplierAlive(supplierId, { page: 1, pageSize: 10 });
+      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }));
       if (page === 'supplier_not_found') throw new Error('el proveedor de apoyo esta dado de baja');
       expect(page.items).toHaveLength(1);
       expect(page.items[0]).toMatchObject({
@@ -858,7 +872,7 @@ describe('R21, R22: la baja de la linea es logica y ninguna consulta la devuelve
       expect(fila?.createdBy).toBe(sharedActorId);
 
       // R22: ninguna consulta del catalogo la devuelve.
-      const page = await listCatalogLinesBySupplierAlive(supplierId, { page: 1, pageSize: 10 });
+      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }));
       if (page === 'supplier_not_found') throw new Error('el proveedor de apoyo esta dado de baja');
       expect(page.items).toEqual([]);
       expect(page.total).toBe(0);
@@ -939,7 +953,7 @@ describe('R20, R22, R23: la baja del proveedor arrastra su catalogo, y R48 de QC
       expect(lineas.every((l) => l.updatedBy === sharedActorId)).toBe(true);
 
       // R22: ninguna consulta las devuelve, ni por el proveedor ni por la linea.
-      expect(await listCatalogLinesBySupplierAlive(supplierId, { page: 1, pageSize: 10 })).toBe(
+      expect(await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }))).toBe(
         'supplier_not_found',
       );
 
@@ -1057,7 +1071,7 @@ describe('R19: las dos tablas son independientes', () => {
       );
 
       // (3) Y la linea sigue viva y visible en el catalogo de su proveedor.
-      const page = await listCatalogLinesBySupplierAlive(supplierId, { page: 1, pageSize: 10 });
+      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }));
       if (page === 'supplier_not_found') throw new Error('el proveedor de apoyo esta dado de baja');
       expect(page.items.map((l) => l.id)).toEqual([created.id]);
       expect(page.items[0]?.cost).toBe('42.0000');

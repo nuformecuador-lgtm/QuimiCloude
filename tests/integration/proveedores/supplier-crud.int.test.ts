@@ -53,6 +53,7 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores/domain/supplier
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
 import type { NewSupplier, SupplierView } from '@/lib/modules/proveedores/domain/supplier-view';
 
 // ---------------------------------------------------------------------------
@@ -236,12 +237,22 @@ async function seedSuppliers(cantidad: number, actorId: string): Promise<string[
   return ids;
 }
 
+/**
+ * QC-57: el adaptador recibe ahora el CONTRATO GENERICO de consulta. Sin orden, sin filtros y
+ * sin busqueda es exactamente la lista de siempre (R11), asi que los casos de este archivo
+ * siguen midiendo lo mismo -paginacion, total y el orden por defecto- y ningun aserto
+ * se relaja.
+ */
+function consulta(partial: Partial<ListQuery> = {}): ListQuery {
+  return { page: 1, sort: null, filters: {}, search: '', ...partial };
+}
+
 /** Recorre TODAS las paginas de `listAliveSuppliers` y devuelve la union de sus items. */
 async function collectAllPages(pageSize: number): Promise<SupplierView[]> {
-  const first = await listAliveSuppliers({ page: 1, pageSize });
+  const first = await listAliveSuppliers(consulta({ pageSize }));
   const items = [...first.items];
   for (let page = 2; page <= first.totalPages; page += 1) {
-    const next = await listAliveSuppliers({ page, pageSize });
+    const next = await listAliveSuppliers(consulta({ page, pageSize }));
     items.push(...next.items);
   }
   return items;
@@ -605,7 +616,7 @@ describe('R18, R19, R21: el listado paginado contra la base', () => {
     try {
       ids = await seedSuppliers(12, sharedActorId);
 
-      const page = await listAliveSuppliers({ page: 1, pageSize: 7 });
+      const page = await listAliveSuppliers(consulta({ pageSize: 7 }));
       expect(page.items).toHaveLength(7);
       expect(page.pageSize).toBe(7);
 
@@ -627,11 +638,11 @@ describe('R18, R19, R21: el listado paginado contra la base', () => {
       ids = await seedSuppliers(26, sharedActorId);
       expect(await prisma.supplier.count({ where: { deletedAt: null } })).toBeGreaterThan(25);
 
-      const porDefecto = await listAliveSuppliers({ page: 1 });
+      const porDefecto = await listAliveSuppliers(consulta());
       expect(porDefecto.pageSize).toBe(10);
       expect(porDefecto.items).toHaveLength(10);
 
-      const pidiendoCien = await listAliveSuppliers({ page: 1, pageSize: 100 });
+      const pidiendoCien = await listAliveSuppliers(consulta({ pageSize: 100 }));
       expect(pidiendoCien.pageSize).toBe(25);
       expect(pidiendoCien.items).toHaveLength(25);
     } finally {

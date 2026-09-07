@@ -1,3 +1,4 @@
+import type { ListQuery } from '../domain/list-query';
 import type { RecipeStepView } from '../domain/recipe-view';
 
 /**
@@ -62,7 +63,17 @@ export type RecipeRow = {
 export interface RecipeRepository {
   create(data: NewRecipe, actorId: string, now: Date): Promise<{ id: string } | 'duplicate'>;
   findAliveById(id: string): Promise<RecipeRow | null>;
-  listAlive(offset: number, limit: number): Promise<{ rows: readonly RecipeRow[]; total: number }>;
+  /**
+   * QC-57 (R13, R14): ademas de la ventana, recibe el CONTRATO GENERICO ya saneado por el caso
+   * de uso -orden, filtros y busqueda-. `offset`/`limit` siguen llegando calculados desde el
+   * dominio (la aritmetica de paginacion se le inyecta, R40 de QC-26), y traducir `columnId`,
+   * filtros y busqueda a SQL es del adaptador. `total` describe el conjunto YA FILTRADO.
+   */
+  listAlive(
+    offset: number,
+    limit: number,
+    query: ListQuery,
+  ): Promise<{ rows: readonly RecipeRow[]; total: number }>;
   replaceAlive(
     id: string,
     data: NewRecipe,

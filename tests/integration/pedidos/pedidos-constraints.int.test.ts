@@ -258,7 +258,14 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     select: { id: true },
   })
   const product = await tx.product.create({
-    data: { name: 'Acido citrico monohidratado', presentationId: presentation.id },
+    // `name_normalized` (QC-57) es NOT NULL y se pasa LITERAL, sin llamar a
+    // `normalizeProductName`: mismo criterio que el resto de nombres normalizados de este
+    // archivo. Aqui el producto es solo andamiaje de la receta del pedido.
+    data: {
+      name: 'Acido citrico monohidratado',
+      nameNormalized: 'acidocitricomonohidratado',
+      presentationId: presentation.id,
+    },
     select: { id: true },
   })
   const unitId = await createUnit(tx)

@@ -17,11 +17,12 @@ import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/
  * - `delete` tambien es una mutacion de formulario (un boton con un campo oculto `id`):
  *   mismo tratamiento de `FormData` que create/update, sin campos numericos que convertir.
  * - `get`/`list` son consultas que invoca un Server/Client Component con datos que YA
- *   tiene tipados (un `id` de la URL, o `{ page, pageSize }` ya parseados a numero por
- *   quien llama): no hay formulario del que leer, asi que reciben argumentos tipados en
- *   vez de `FormData`. `listProductsAction` recibe `query: unknown` porque quien valida su
- *   forma sigue siendo `pageQuerySchema`, dentro del caso de uso (R28); esta action no
- *   repite esa validacion, solo traduce el resultado.
+ *   tiene tipados (un `id` de la URL, o una consulta de lista -`page`, `pageSize`, `sort`,
+ *   `filters`, `search`- que quien llama ya construyo desde la URL): no hay formulario del
+ *   que leer, asi que reciben argumentos tipados en vez de `FormData`. `listProductsAction`
+ *   recibe `query: unknown` porque quien valida su forma es `createListQuerySchema()`,
+ *   dentro del caso de uso (QC-57 R30); esta action no repite esa validacion, solo traduce
+ *   el resultado.
  *
  * EL ACTOR sale de `identity.getSessionUser()` via `@/lib/composition` (`design.md > 5`,
  * D17): ningun caso de uso lee sesion, cookie ni cabecera por su cuenta. Hoy
@@ -229,9 +230,12 @@ export async function getProductAction(id: string): Promise<ProductQueryResult> 
 
 /**
  * Lista paginada de productos (R23-R26, R35, R36). Consulta: argumento tipado -quien
- * llama ya tiene `{ page, pageSize }` como numeros, p. ej. parseados de la URL-. La
- * validacion del minimo y la integridad la hace `pageQuerySchema` DENTRO del caso de uso
- * (R28); esta action no la repite.
+ * llama ya tiene la consulta de lista construida, p. ej. desde la URL-. La cadena entera
+ * vive DENTRO del caso de uso (QC-57 R30) y esta action no repite ni un paso:
+ * `createListQuerySchema()` valida la FORMA, `sanitizeListQuery` poda contra
+ * `PRODUCT_QUERYABLE` -lo no declarado se omite y NO hace fallar la consulta (R5)-, el
+ * caso de uso registra los campos omitidos por el puerto `ListQueryLog` (R6) y el
+ * repositorio recibe la consulta YA SANEADA (R13).
  */
 export async function listProductsAction(query: unknown): Promise<ProductListResult> {
   const actor = await currentActor();

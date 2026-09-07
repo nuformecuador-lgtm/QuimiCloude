@@ -180,6 +180,14 @@ model Company {
 /// transaccion -- y el `PresentationRepository` no expone ningun metodo de busqueda. El
 /// mensaje al usuario sale de traducir el SQLSTATE `23505` que Postgres devuelve al chocar
 /// con este indice (`design.md > 11.4`).
+///
+/// QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda de esta tabla NO estan
+/// aqui. El GIN de trigramas `presentations_name_normalized_trgm_idx` -- que es lo que sirve una
+/// busqueda por SUBCADENA, cosa que el `@@unique` btree de abajo NO hace-- y los btree
+/// `presentations_name_idx`, `presentations_created_at_idx` y `presentations_updated_at_idx`
+/// viven escritos a mano en `db/migrations/20260904160000_list_query_indexes/migration.sql`:
+/// Prisma no modela indices GIN. Esta tabla NO tiene `deletedAt`, asi que los suyos son
+/// TOTALES, no parciales.
 /// @module inventario
 model Presentation {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -243,10 +251,27 @@ model Presentation {
 /// DRIFT para Prisma, igual que las dos FK de auditoria: toda migracion futura de `products`
 /// hay que revisarla a mano para que no la borre. Antes de QC-32 esto era `unit String?`,
 /// texto libre; ahora es una referencia al catalogo, OPCIONAL (decision cerrada 7, R10).
+///
+/// OJO 3 — `nameNormalized` la anade QC-57 (R19, R23) y es la columna contra la que BUSCA el
+/// listado, no una clave: `products.name` NO es unico (decision cerrada 6 de QC-14) y esta
+/// columna NO lleva indice unico, a diferencia de las de `presentations`, `recipes`,
+/// `suppliers`, `supplier_catalog_lines` y `units`. La calcula `normalizeProductName`
+/// (dominio de `inventario`, funcion pura) y se persiste junto a `name` en TODA escritura;
+/// no se escribe otra definicion de «mismo nombre» en el modulo. Las filas que ya existian
+/// se rellenaron con el backfill de `<ts>_list_query_indexes`.
+///
+/// OJO 4 — los indices de orden, filtro y busqueda de esta tabla NO estan aqui y es
+/// deliberado (QC-57, `design.md > 10.2`): son PARCIALES (`WHERE deleted_at IS NULL`) o GIN
+/// de trigramas, y Prisma no modela ninguna de las dos cosas —mismo caso que
+/// `recipes_name_unique` y `suppliers_name_unique`—. Viven escritos a mano en
+/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
+/// `products_name_normalized_trgm_idx`, `products_name_idx`, `products_stock_idx`,
+/// `products_qty_alert_idx`, `products_created_at_idx` y `products_updated_at_idx`.
 /// @module inventario
 model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
+  nameNormalized String    @map("name_normalized")
   presentationId String    @map("presentation_id") @db.Uuid
   stock          Int?
   qtyAlert       Int?      @map("qty_alert")
@@ -278,6 +303,13 @@ model Product {
 /// OJO 2 — la unicidad del nombre NO esta aqui como `@unique` y es deliberado: es un indice
 /// unico PARCIAL (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela
 /// indices parciales. Vive escrito a mano en `migration.sql` (`recipes_name_unique`).
+///
+/// OJO 3 — QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda tampoco estan
+/// aqui, por la misma razon que `recipes_name_unique`: son PARCIALES
+/// (`WHERE deleted_at IS NULL`) o GIN de trigramas. Escritos a mano en
+/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
+/// `recipes_name_normalized_trgm_idx`, `recipes_name_idx`, `recipes_created_at_idx` y
+/// `recipes_updated_at_idx`.
 /// @module recetas
 model Recipe {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -358,6 +390,13 @@ model RecipeLine {
 /// OJO 3 — la regla cruzada «al menos telefono o correo» (decision cerrada 7, R4) es un
 /// CHECK en la base (`suppliers_contact_required`) y Prisma NO modela CHECK: por eso las dos
 /// columnas se ven aqui como simplemente opcionales. Vive escrito a mano en `migration.sql`.
+///
+/// OJO 4 — QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda tampoco estan
+/// aqui, por la misma razon que `suppliers_name_unique`: son PARCIALES
+/// (`WHERE deleted_at IS NULL`) o GIN de trigramas. Escritos a mano en
+/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
+/// `suppliers_name_normalized_trgm_idx`, `suppliers_name_idx`, `suppliers_created_at_idx` y
+/// `suppliers_updated_at_idx`.
 /// @module proveedores
 model Supplier {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -438,6 +477,15 @@ model Supplier {
 ///
 /// `imagePath` va SIN CHECK, SIN DEFAULT y SIN indice, igual que `products.image_path`: la
 /// forma de la ruta no esta acordada en el repo y no hay flujo de subida todavia (P1).
+///
+/// OJO 5 — QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda tampoco estan
+/// aqui, por la misma razon que `supplier_catalog_lines_name_presentation_unique`: son
+/// PARCIALES (`WHERE deleted_at IS NULL`) o GIN de trigramas. Escritos a mano en
+/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
+/// `supplier_catalog_lines_name_normalized_trgm_idx` -- el unico que sirve una busqueda por
+/// SUBCADENA: en el indice unico de arriba `name_normalized` NO va en cabeza--,
+/// `supplier_catalog_lines_name_idx`, `_cost_idx`, `_min_purchase_idx`, `_delivery_time_idx`,
+/// `_created_at_idx` y `_updated_at_idx`.
 /// @module proveedores
 model SupplierCatalogLine {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -479,6 +527,14 @@ model SupplierCatalogLine {
 ///
 /// `symbol` NO tiene indice unico y es deliberado (R7, pregunta abierta 1): la identidad de la
 /// unidad es su nombre.
+///
+/// QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda NO estan aqui. El GIN
+/// de trigramas `units_name_normalized_trgm_idx` -- lo que sirve una busqueda por SUBCADENA,
+/// que el `@@unique` btree de abajo no hace-- y los btree `units_name_idx`,
+/// `units_symbol_idx` (orden, NO unicidad: sigue sin ser identidad, R7),
+/// `units_created_at_idx` y `units_updated_at_idx` viven escritos a mano en
+/// `db/migrations/20260904160000_list_query_indexes/migration.sql`. Esta tabla NO tiene
+/// `deletedAt`, asi que los suyos son TOTALES, no parciales.
 /// @module unidades
 model Unit {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -551,6 +607,14 @@ enum OrderPriority {
 ///
 /// `createdBy`/`updatedBy` son ANULABLES (decision cerrada 18, R26): NULL significa «no lo creo
 /// una persona» —una importacion, un seed—, no «se perdio el dato».
+///
+/// OJO 3 — QC-57 (`design.md > 10.2`): los indices de orden y filtro de esta tabla NO estan
+/// aqui porque son PARCIALES (`WHERE deleted_at IS NULL`) y Prisma no los modela. Escritos a
+/// mano en `db/migrations/20260904160000_list_query_indexes/migration.sql`:
+/// `orders_status_idx`, `orders_priority_idx`, `orders_created_at_idx`, `orders_quantity_idx`
+/// y `orders_unit_price_idx`. NO hay indice de busqueda: `orders` no tiene `name` y la
+/// busqueda se omite (R17). El correlativo lo ordena `orders_order_year_order_sequence_key`,
+/// que ya existia.
 /// @module pedidos
 model Order {
   id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
