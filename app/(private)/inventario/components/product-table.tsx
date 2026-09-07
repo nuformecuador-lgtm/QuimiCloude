@@ -1,117 +1,123 @@
-import { EntityImage } from '@/components/shared/entity-image';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useMemo } from 'react';
+
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  DataTable,
+  type DataTableParams,
+  type DataTableTexts,
+} from '@/components/shared/data-table';
 import type { ProductView } from '@/lib/modules/inventario';
 
 import { DeleteProductDialog } from './delete-product-dialog';
-import { PRODUCT_COLUMNS } from './product-columns';
+import { PRODUCT_DEFAULT_PINNED_COLUMNS, buildProductColumns } from './product-columns';
+import { productListHref } from './product-list-params';
 import { ProductSheet } from './product-sheet';
 
 /**
- * Tabla del catalogo (R6-R9, `design.md > 4.3`, `> 7`).
+ * Tabla del catalogo (R6-R11, `design.md > 4.3`, `> 7`).
  *
- * **Sin `'use client'`**: no tiene estado ni manejadores. Recibe los productos por props desde
- * `ProductListSection`, que es quien llama a la operacion de consulta (R30). Cada accion de fila
- * es un componente de cliente independiente con su propio disparador, asi que la tabla no
- * necesita coordinar nada.
+ * **MIGRADA A LA TABLA COMPARTIDA el 2026-09-07 (decision humana).** Antes esta ruta declaraba su
+ * propia tabla con `components/ui/table.tsx` y su propia barra de paginacion
+ * (`product-list-toolbar.tsx`, que DESAPARECE). Ahora monta `components/shared/data-table`, la
+ * misma que ya usan pedidos y recetas, importada por su barrel publico. Lo que se gana, ademas de
+ * no mantener tres tablas: orden por cabecera, filtros de rango, busqueda, fijado de columnas y
+ * un solo sitio donde se arreglan los tres.
  *
- * **R9 lo cumple el primitivo, no una clase escrita aqui**: `components/ui/table.tsx` envuelve
- * el `<table>` en un `div[data-slot=table-container]` con `overflow-x-auto`. El desbordamiento
- * horizontal lo absorbe ese envoltorio y **ningun ancestro** de la pantalla declara scroll
- * horizontal ni `100vh`, de modo que el documento no se desplaza en viewport angosto. No se
- * edita el primitivo (R29) ni se anade columna pegajosa: `position: sticky` horizontal se
- * comporta distinto en WebKit y las acciones se alcanzan con el scroll de la propia tabla.
+ * **Ahora es `'use client'`**, y antes no: la tabla compartida es interactiva -emite
+ * `onParamsChange`- y las celdas de accion montan el panel y el dialogo. El Server Component
+ * sigue siendo `ProductListSection`, que es quien pide los datos (R30); aqui solo llegan filas ya
+ * resueltas y los parametros con los que se pidieron.
+ *
+ * **Solo emite; el servidor recalcula.** `onParamsChange` entrega el `DataTableParams` completo y
+ * aqui se traduce a una navegacion con la cadena de consulta canonica. Esta pantalla **no ordena,
+ * no filtra y no busca en el cliente**: la lista vuelve a pedirse sobre el conjunto entero. El
+ * destino sale de `productListHref` (R2): ningun archivo de la ruta escribe la URL como literal.
+ *
+ * **`searchable` se queda en su defecto (`true`)**, al contrario que en pedidos:
+ * `PRODUCT_QUERYABLE.searchable` es `true` y `listProducts` resuelve la busqueda contra la columna
+ * normalizada con su indice de trigramas, asi que la caja de busqueda no miente.
+ *
+ * **`status` es SIEMPRE `'idle'`**: los tres estados de R14/R15/R16 se pintan FUERA de
+ * `<DataTable>` -cada uno con su copy y sus acciones- y el «cargando» lo aporta el `<Suspense>`
+ * de la pagina con `ProductTableSkeleton`.
+ *
+ * **El desbordamiento horizontal lo absorbe el primitivo** (R9): `components/ui/table.tsx`, que
+ * la tabla compartida usa por dentro, envuelve la tabla en un contenedor con `overflow-x-auto`.
+ * No se edita el primitivo (R29) ni se anade columna pegajosa a mano: el fijado de columnas lo
+ * ofrece la tabla compartida.
  */
+
+/** Clave de persistencia del fijado de columnas. Una sola tabla en la pantalla, un solo id. */
+export const PRODUCT_TABLE_ID = 'inventario';
+
 /**
- * Encabezado de la columna de imagen. Constante para que ningun test dependa del literal.
- *
- * La imagen es la PRIMERA columna y se declara AQUI, en la tabla, no en la lista de columnas
- * (decision humana del 2026-09-07). Motivo: esa lista es de DATOS -cada columna devuelve una
- * cadena y el test de R6/R7 la recorre-, y una miniatura es marcado. Es exactamente el mismo
- * reparto que ya tenia la columna de acciones, que tampoco esta en la lista: imagen primero,
- * datos en medio, acciones al final.
+ * Textos del componente compartido. Viven aqui -y no en el componente- porque la tabla compartida
+ * no incrusta copy de ningun dominio. Ningun test afirma sobre estos literales: los controles se
+ * localizan por rol o por `data-testid`.
  */
-export const IMAGE_COLUMN_LABEL = 'Imagen';
+export const PRODUCT_TABLE_TEXTS: DataTableTexts = {
+  empty: 'No hay productos que mostrar.',
+  loading: 'Cargando productos…',
+  error: 'No se pudo cargar el catálogo.',
+  search: 'Buscar producto',
+  filters: 'Filtros',
+  columnMenu: 'opciones de la columna',
+  previousPage: 'Página anterior',
+  nextPage: 'Página siguiente',
+  pageIndicator: (page, totalPages) => `Página ${page} de ${totalPages}`,
+  pageSize: 'Productos por página',
+  sortAscending: 'Orden ascendente',
+  sortDescending: 'Orden descendente',
+  pinColumn: 'Fijar columna',
+  unpinColumn: 'Soltar columna',
+  filterColumn: 'Filtrar columna',
+  clearFilter: 'Limpiar filtro',
+  lastWeek: 'Última semana',
+  lastMonth: 'Último mes',
+  lastYear: 'Último año',
+};
 
-/** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
-export const ACTIONS_COLUMN_LABEL = 'Acciones';
+export type ProductTableProps = {
+  /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega. */
+  readonly products: readonly ProductView[];
+  /** Los parametros vigentes, los mismos con los que se pidio la lista. */
+  readonly params: DataTableParams;
+  readonly totalPages: number;
+};
 
-export function ProductTable({ products }: { readonly products: readonly ProductView[] }) {
+export function ProductTable({ products, params, totalPages }: ProductTableProps) {
+  const router = useRouter();
+
+  // Las acciones de fila se enchufan aqui, no en la declaracion de columnas: asi esa declaracion
+  // no importa el panel ni el dialogo. `useMemo` para que la identidad del array no cambie en
+  // cada render y la tabla compartida no se reconstruya entera.
+  const columns = useMemo(
+    () =>
+      buildProductColumns({
+        rowActions: (product) => (
+          <>
+            <ProductSheet product={product} />
+            <DeleteProductDialog product={product} />
+          </>
+        ),
+      }),
+    [],
+  );
+
   return (
-    <Table data-testid="product-table">
-      <TableHeader>
-        <TableRow>
-          <TableHead scope="col" data-testid="product-column-image" className="w-14 text-left">
-            {IMAGE_COLUMN_LABEL}
-          </TableHead>
-          {PRODUCT_COLUMNS.map((column) => (
-            <TableHead
-              key={column.key}
-              data-testid={column.testId}
-              className={column.align === 'end' ? 'text-right' : 'text-left'}
-              scope="col"
-            >
-              {column.label}
-            </TableHead>
-          ))}
-          <TableHead scope="col" data-testid="product-column-actions" className="text-right">
-            {ACTIONS_COLUMN_LABEL}
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {products.map((product) => (
-          <TableRow key={product.id} data-testid="product-row">
-            {/*
-              La miniatura sale de `products.image_path`. Hoy esa columna esta vacia en todas las
-              filas -nada la llena todavia-, asi que lo que se ve es el marcador; ese caso NO es
-              un hueco: es el estado normal por ahora.
-            */}
-            <TableCell className="text-left" data-testid="product-cell-image">
-              <EntityImage
-                path={product.imagePath}
-                name={product.name}
-                testId="product-image"
-              />
-            </TableCell>
-            {PRODUCT_COLUMNS.map((column) => {
-              // La alarma es de la CELDA, no de la fila: solo se tine el valor que la dispara.
-              // `data-alert` acompana a la clase para que la condicion sea afirmable sin
-              // depender del nombre de una utilidad de Tailwind.
-              const alerted = column.alert?.(product) ?? false;
-              return (
-                <TableCell
-                  key={column.key}
-                  data-testid={`product-cell-${column.key}`}
-                  data-alert={alerted ? 'true' : undefined}
-                  className={`${
-                    column.align === 'end' ? 'text-right tabular-nums' : 'text-left'
-                  }${alerted ? ' font-semibold text-destructive' : ''}`}
-                >
-                  {column.value(product)}
-                </TableCell>
-              );
-            })}
-            {/*
-              Las acciones van en la ultima columna y se alcanzan con el scroll de la propia
-              tabla. **Siempre visibles**: nada de revelarlas con `:hover`, que en tactil no
-              existe (R31).
-            */}
-            <TableCell className="text-right" data-testid="product-cell-actions">
-              <div className="flex justify-end gap-1">
-                <ProductSheet product={product} />
-                <DeleteProductDialog product={product} />
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <DataTable
+      tableId={PRODUCT_TABLE_ID}
+      columns={columns}
+      rows={products}
+      getRowId={(product) => product.id}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => router.push(productListHref(next))}
+      status="idle"
+      texts={PRODUCT_TABLE_TEXTS}
+      defaultPinnedColumns={PRODUCT_DEFAULT_PINNED_COLUMNS}
+    />
   );
 }

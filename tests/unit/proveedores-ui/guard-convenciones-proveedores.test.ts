@@ -52,6 +52,24 @@ const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;
 /** Marca con la que esta feature firma sus commits, para separarlos de lo que llega de `dev`. */
 const MARCA_DE_LA_FEATURE = 'QC-44';
 
+/**
+ * EXCEPCION NOMBRADA Y FECHADA a R44/R49 — decision humana del **2026-09-07**: la tabla de la
+ * linea de catalogo pasa a mostrar la imagen (enmienda a R30) y para eso `inventario` tuvo que
+ * PUBLICAR la ruta de imagen del producto, que ya estaba en su tabla desde QC-52 y el modulo no
+ * exponia.
+ *
+ * Son DOS archivos nombrados uno a uno, no una carpeta: todo lo demas de `lib/modules/`, `db/`,
+ * `components/ui/` y `lib/composition/index.ts` sigue vetado para esta feature, y `package.json`
+ * no tiene excepcion ninguna.
+ *
+ * La alternativa era dejar esta guardia en rojo de forma permanente, que es peor: una guardia que
+ * siempre falla no protege nada porque nadie la mira.
+ */
+const AUTORIZADO_2026_09_07: readonly string[] = [
+  'lib/modules/inventario/domain/product-view.ts',
+  'lib/modules/inventario/adapters/driven/persistence/product-prisma.ts',
+];
+
 /** Rutas que R44, R45 y R49 declaran intocables para esta feature. */
 const INTOCABLES = {
   primitivas: 'components/ui/',
@@ -309,9 +327,10 @@ describe('convenciones de la feature de proveedores', () => {
 
     const prohibidos = tocados.filter(
       (ruta) =>
-        ruta.startsWith(INTOCABLES.modulos) ||
-        ruta.startsWith(INTOCABLES.baseDeDatos) ||
-        ruta === INTOCABLES.composicion,
+        !AUTORIZADO_2026_09_07.includes(ruta) &&
+        (ruta.startsWith(INTOCABLES.modulos) ||
+          ruta.startsWith(INTOCABLES.baseDeDatos) ||
+          ruta === INTOCABLES.composicion),
     );
 
     expect(prohibidos, `la feature toca archivos intocables: ${prohibidos.join(', ')}`).toEqual([]);

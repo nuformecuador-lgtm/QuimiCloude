@@ -29,8 +29,14 @@ import { useState } from 'react';
 /** Marcador de «sin imagen». Vive en `public/`, asi que se sirve por ruta absoluta. */
 export const MISSING_IMAGE_SRC = '/inv_not_found.png';
 
-/** Lado de la miniatura en px. Cuadrada para que ninguna fila cambie de alto segun su imagen. */
-const THUMBNAIL_SIZE = 40;
+/**
+ * Lado de la miniatura en px. Cuadrada para que ninguna fila cambie de alto segun su imagen.
+ *
+ * 60 y no 40 desde el 2026-09-07 (decision humana: «un 50% mas grande»). El numero vive aqui y
+ * la clase de Tailwind se deriva de el en el `style`, para que no haya dos sitios que declaren el
+ * tamano y puedan divergir -que es lo que pasaba con `size-10` y `width`/`height` a la vez-.
+ */
+const THUMBNAIL_SIZE = 60;
 
 export type EntityImageProps = {
   /** Ruta guardada de la imagen, o `null` si la fila no tiene. */
@@ -65,7 +71,8 @@ export function EntityImage({ path, name, testId }: EntityImageProps) {
       // El marcador cubre tambien la ruta que no resuelve (ver el docblock). `onError` se
       // desarma solo: una vez en marcador, `src` ya no vuelve a fallar.
       onError={() => setFallo(true)}
-      className="size-10 shrink-0 rounded-md border object-cover"
+      style={{ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
+      className="shrink-0 rounded-md border object-cover"
       data-testid={testId}
       data-missing={usaMarcador ? 'true' : undefined}
     />

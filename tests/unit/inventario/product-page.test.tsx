@@ -10,7 +10,11 @@ import {
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
-  PRODUCT_COLUMNS,
+  SEARCH_PARAM,
+  SORT_PARAM,
+  SORT_SEPARATOR,
+  PRODUCT_SKELETON_COLUMN_COUNT,
+  buildProductColumns,
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
 import type { SessionUser } from '@/lib/modules/identity';
@@ -162,8 +166,10 @@ const testId = {
   content: 'private-content',
   titulo: 'inventario-title',
   lista: 'product-list',
-  tabla: 'product-table',
-  fila: 'product-row',
+  // La tabla es la compartida desde el 2026-09-07: su raiz es `data-table`.
+  tabla: 'data-table',
+  // `data-table-row-<id del producto>`: la tabla compartida nombra la fila por su id.
+  fila: /^data-table-row-/,
   esqueleto: 'product-table-skeleton',
   filaEsqueleto: 'product-row-skeleton',
   vacio: 'product-list-empty',
@@ -172,10 +178,14 @@ const testId = {
   errorMensaje: 'product-list-error-message',
   errorCodigo: 'product-list-error-code',
   reintentar: 'product-list-retry',
-  tamanoPagina: 'product-page-size',
-  paginaAnterior: 'product-page-previous',
-  paginaSiguiente: 'product-page-next',
-  estadoPagina: 'product-page-status',
+  // Desde el 2026-09-07 la tabla, su paginacion y su selector de tamano los pone
+  // `components/shared/data-table`, asi que los `data-testid` son los suyos. La barra propia de
+  // la ruta (`product-list-toolbar.tsx`) desaparecio.
+  tamanoPagina: 'data-table-page-size',
+  paginaAnterior: 'data-table-previous',
+  paginaSiguiente: 'data-table-next',
+  estadoPagina: 'data-table-page-indicator',
+  busqueda: 'data-table-search',
   abrirAlta: 'product-create-open',
   abrirEdicion: 'product-edit-open',
   panel: 'product-sheet',
@@ -438,20 +448,28 @@ describe('pantalla de productos — lista', () => {
   it('la tabla presenta todas las columnas de negocio declaradas', async () => {
     // R6 — se itera la DECLARACION de columnas en vez de listar los literales uno a uno: quitar
     // una columna deja este test sin encabezado que encontrar.
+    //
+    // MIGRADO 2026-09-07: la declaracion es una FACTORIA y los `data-testid` de cabecera y celda
+    // los pone la tabla compartida (`data-table-head-<id>` / `data-table-cell-<id>`).
     const elProducto = producto();
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
 
-    for (const columna of PRODUCT_COLUMNS) {
+    const columnas = buildProductColumns({ rowActions: () => null });
+    for (const columna of columnas) {
       expect(
-        screen.getByTestId(columna.testId),
-        `falta el encabezado de «${columna.key}»`,
+        screen.getByTestId(`data-table-head-${columna.id}`),
+        `falta el encabezado de «${columna.id}»`,
       ).toBeInTheDocument();
-      expect(screen.getByTestId(`product-cell-${columna.key}`)).toHaveTextContent(
-        columna.value(elProducto),
-      );
+      expect(
+        screen.getByTestId(`data-table-cell-${columna.id}`),
+        `falta la celda de «${columna.id}»`,
+      ).toBeInTheDocument();
     }
+
+    // El esqueleto pinta tantas celdas como columnas hay: su constante no puede quedarse atras.
+    expect(PRODUCT_SKELETON_COLUMN_COUNT).toBe(columnas.length);
 
     // Las columnas de la tabla, por su clave: si alguna desaparece de la declaracion, esto se
     // pone rojo aunque la tabla siga pintando.
@@ -463,11 +481,16 @@ describe('pantalla de productos — lista', () => {
     //      modificado en esos cinco puntos y esta lista es la que dice la verdad. QC-52 (R1)
     //      va mas lejos con los tres primeros: ya no estan en `ProductView` ni en la base -son
     //      del catalogo del proveedor-, asi que aqui no pueden volver ni como columna oculta.
-    expect(PRODUCT_COLUMNS.map((columna) => columna.key)).toEqual([
+    //
+    // La imagen y las acciones se suman a las cuatro de datos: son columnas de MARCADO, la
+    // primera y la ultima.
+    expect(columnas.map((columna) => columna.id)).toEqual([
+      'image',
       'name',
       'presentationName',
       'stock',
       'qtyAlert',
+      'actions',
     ]);
   });
 
@@ -484,20 +507,23 @@ describe('pantalla de productos — lista', () => {
     expect(document.body.textContent).not.toContain(EDITOR_QUE_NO_DEBE_VERSE);
     expect(document.body.textContent).not.toContain(UNIDAD_QUE_NO_DEBE_VERSE);
 
-    for (const prohibida of ['createdBy', 'updatedBy', 'id', 'presentationId', 'unitId']) {
+    const columnas = buildProductColumns({ rowActions: () => null });
+    // `imagePath` esta en la lista de prohibidos: la imagen SE VE, pero su columna se llama
+    // `image` y pinta una miniatura. La RUTA no es una columna.
+    for (const prohibida of [
+      'createdBy',
+      'updatedBy',
+      'id',
+      'presentationId',
+      'unitId',
+      'imagePath',
+    ]) {
       expect(
-        PRODUCT_COLUMNS.some((columna) => String(columna.key) === prohibida),
+        columnas.some((columna) => String(columna.id) === prohibida),
         `«${prohibida}» no puede ser columna`,
       ).toBe(false);
-      expect(screen.queryByTestId(`product-cell-${prohibida}`)).toBeNull();
+      expect(screen.queryByTestId(`data-table-cell-${prohibida}`)).toBeNull();
     }
-
-    // `imagePath` tampoco es una columna de DATOS -la lista de columnas es de cadenas-, aunque
-    // desde el 2026-09-07 la tabla si pinte la imagen: la declara la tabla, como las acciones.
-    expect(
-      PRODUCT_COLUMNS.some((columna) => String(columna.key) === 'imagePath'),
-      '«imagePath» no puede ser columna de datos',
-    ).toBe(false);
   });
 
   it('la primera columna es la imagen del producto, y la RUTA no se pinta como texto', async () => {
@@ -516,7 +542,7 @@ describe('pantalla de productos — lista', () => {
     expect(document.body.textContent, RUTA).not.toContain(RUTA);
 
     const cabeceras = tabla.getAllByRole('columnheader');
-    expect(cabeceras[0]).toHaveAttribute('data-testid', 'product-column-image');
+    expect(cabeceras[0]).toHaveAttribute('data-testid', 'data-table-head-image');
   });
 
   it('sin ruta de imagen, la miniatura cae al marcador de `public/`', async () => {
@@ -547,8 +573,8 @@ describe('pantalla de productos — lista', () => {
     await renderPantalla();
 
     for (const campo of ['cost', 'minPurchase', 'deliveryTime']) {
-      expect(screen.queryByTestId(`product-column-${campo}`), campo).toBeNull();
-      expect(screen.queryByTestId(`product-cell-${campo}`), campo).toBeNull();
+      expect(screen.queryByTestId(`data-table-head-${campo}`), campo).toBeNull();
+      expect(screen.queryByTestId(`data-table-cell-${campo}`), campo).toBeNull();
     }
 
     await user.click(screen.getByTestId(testId.abrirEdicion));
@@ -575,7 +601,7 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    const celdas = screen.getAllByTestId('product-cell-stock');
+    const celdas = screen.getAllByTestId('product-stock');
     // Por debajo de la alerta: en rojo.
     expect(celdas[0]).toHaveAttribute('data-alert', 'true');
     // Justo en la alerta y por encima: no. La alarma salta cuando la SUPERA, no al igualarla.
@@ -585,8 +611,9 @@ describe('pantalla de productos — lista', () => {
     expect(celdas[3]).not.toHaveAttribute('data-alert');
 
     // La alerta nunca se tine a si misma: la que esta en alarma es la existencia.
-    for (const celda of screen.getAllByTestId('product-cell-qtyAlert')) {
+    for (const celda of screen.getAllByTestId('data-table-cell-qtyAlert')) {
       expect(celda).not.toHaveAttribute('data-alert');
+      expect(within(celda).queryByTestId('product-stock')).toBeNull();
     }
   });
 
@@ -594,7 +621,9 @@ describe('pantalla de productos — lista', () => {
     // R9 — el scroll horizontal es de la tabla, nunca del documento.
     await renderPantalla();
 
-    const tabla = screen.getByTestId(testId.tabla);
+    // La raiz de la tabla compartida (`data-table`) envuelve al primitivo; el contenedor con
+    // scroll es el del propio `<table>`, que es quien absorbe el desbordamiento.
+    const tabla = within(screen.getByTestId(testId.tabla)).getByRole('table');
     const envoltorio = tabla.closest('[data-slot="table-container"]');
 
     expect(envoltorio).not.toBeNull();
@@ -613,8 +642,10 @@ describe('pantalla de productos — lista', () => {
       expect(clases, `${ancestro.tagName} no debe usar 100vh`).not.toContain('100vh');
     }
 
-    // Las acciones de fila siguen siendo alcanzables dentro de la propia tabla.
-    const fila = screen.getByTestId(testId.fila);
+    // Las acciones de fila siguen siendo alcanzables dentro de la propia tabla. La tabla
+    // compartida nombra cada fila con el id del producto (`data-table-row-<id>`), asi que se
+    // localiza por patron y no por un `data-testid` fijo.
+    const fila = screen.getAllByTestId(testId.fila)[0] as HTMLElement;
     expect(within(fila).getByTestId(testId.abrirEdicion)).toBeVisible();
     expect(within(fila).getByTestId(testId.abrirBorrado)).toBeVisible();
   });
@@ -627,18 +658,26 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    expect(listProductsActionMock).toHaveBeenCalledWith({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
+    // La consulta viaja ENTERA: desde el 2026-09-07 la pantalla emite el contrato de lista
+    // completo -orden, filtros y busqueda incluidos, vacios cuando no hay-.
+    expect(listProductsActionMock).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sort: null,
+      filters: {},
+      search: '',
+    });
 
     await user.click(screen.getByTestId(testId.tamanoPagina));
 
     const opciones = await screen.findAllByRole('option');
     expect(opciones).toHaveLength(PAGE_SIZE_OPTIONS.length);
     for (const tamano of PAGE_SIZE_OPTIONS) {
-      expect(screen.getByTestId(`product-page-size-${tamano}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`data-table-page-size-${tamano}`)).toBeInTheDocument();
     }
 
     // Elegir el otro tamano NAVEGA: no hay estado local que mienta sobre la URL.
-    await user.click(screen.getByTestId(`product-page-size-${MAX_PAGE_SIZE}`));
+    await user.click(screen.getByTestId(`data-table-page-size-${MAX_PAGE_SIZE}`));
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
 
     const destino = new URLSearchParams(String(routerMock.push.mock.calls[0][0]).split('?')[1]);
@@ -682,24 +721,48 @@ describe('pantalla de productos — lista', () => {
     expect(screen.getByTestId(testId.paginaSiguiente)).toBeDisabled();
   });
 
-  it('la pantalla no ofrece busqueda ni control de orden', async () => {
-    // R13 — test **en negativo**: filtrar en cliente solo buscaria dentro de la pagina visible,
-    // y el backend no soporta ni busqueda ni orden configurable.
+  it('la pantalla SI ofrece busqueda y orden, y ninguno de los dos se resuelve en el cliente', async () => {
+    // ENMIENDA A R13 (2026-09-07, decision humana). R13 decia «ni busqueda ni orden
+    // configurable» y su test lo afirmaba en negativo. Las dos cosas existen ahora, y la razon es
+    // que el BACKEND las soporta: `PRODUCT_QUERYABLE` declara `searchable: true` y una lista de
+    // campos ordenables, y `listProducts` los resuelve contra la columna normalizada con su
+    // indice de trigramas (QC-57).
+    //
+    // Lo que R13 protegia de verdad -que no se filtre ni se ordene DENTRO de la pagina ya
+    // descargada- sigue afirmado, y por la via mas dura: cada gesto NAVEGA, y la lista se vuelve
+    // a pedir al servidor con la consulta nueva.
+    const user = userEvent.setup();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()], { total: 40 }));
+
     await renderPantalla();
 
-    expect(screen.queryAllByRole('searchbox')).toHaveLength(0);
-    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+    // 1. Hay caja de busqueda, y escribir en ella acaba navegando con el termino en la URL.
+    const busqueda = screen.getByTestId(testId.busqueda);
+    await user.type(busqueda, 'acido');
 
-    // El unico control de seleccion de la lista es el tamano de pagina.
-    const combos = screen.queryAllByRole('combobox');
-    expect(combos).toHaveLength(1);
-    expect(combos[0]).toBe(screen.getByTestId(testId.tamanoPagina));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
+    const destino = new URLSearchParams(
+      String(routerMock.push.mock.calls.at(-1)?.[0]).split('?')[1],
+    );
+    expect(destino.get(SEARCH_PARAM)).toBe('acido');
+    // Y vuelve a la primera pagina: buscar sobre la pagina 3 no puede dejar al usuario en un
+    // hueco del resultado nuevo.
+    expect(destino.get(PAGE_PARAM)).toBe('1');
 
-    // Y ningun encabezado de columna es un control: nada de ordenar pulsando el titulo.
-    for (const encabezado of screen.getAllByRole('columnheader')) {
-      expect(within(encabezado).queryAllByRole('button')).toHaveLength(0);
-      expect(within(encabezado).queryAllByRole('link')).toHaveLength(0);
-    }
+    // 2. El orden se pide desde el menu de la cabecera, y tambien navega.
+    routerMock.push.mockClear();
+    await user.click(screen.getByTestId('data-table-header-menu-name'));
+    await user.click(await screen.findByTestId('data-table-sort-asc-name'));
+
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
+    const conOrden = new URLSearchParams(
+      String(routerMock.push.mock.calls.at(-1)?.[0]).split('?')[1],
+    );
+    expect(conOrden.get(SORT_PARAM)).toBe(`name${SORT_SEPARATOR}asc`);
+
+    // 3. Y la pantalla NO reordena ni recorta lo que ya tiene: la unica fila sigue siendo la que
+    // devolvio la consulta, con el orden en el que la devolvio.
+    expect(screen.getAllByTestId(/^data-table-row-/)).toHaveLength(1);
   });
 
   it('sin productos presenta el estado vacio con la accion de crear', async () => {
@@ -731,7 +794,7 @@ describe('pantalla de productos — lista', () => {
       parseProductListParams(
         Object.fromEntries(new URLSearchParams(String(destino).split('?')[1])),
       ),
-    ).toEqual({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
+    ).toEqual({ page: 1, pageSize: DEFAULT_PAGE_SIZE, sort: null, filters: {}, search: '' });
   });
 
   it('mientras carga presenta el esqueleto en lugar de la tabla', async () => {
@@ -816,7 +879,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     await renderPantalla({ [PAGE_PARAM]: '2', [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE) });
 
-    expect(listProductsActionMock).toHaveBeenCalledWith({ page: 2, pageSize: MAX_PAGE_SIZE });
+    expect(listProductsActionMock).toHaveBeenCalledWith({ page: 2, pageSize: MAX_PAGE_SIZE, sort: null, filters: {}, search: '' });
 
     await user.click(screen.getByTestId(testId.abrirAlta));
 

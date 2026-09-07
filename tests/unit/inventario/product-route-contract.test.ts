@@ -338,13 +338,21 @@ describe('contrato de la ruta de inventario', () => {
       '.updatedBy',
       "key: 'createdBy'",
       "key: 'updatedBy'",
+      "id: 'createdBy'",
+      "id: 'updatedBy'",
       "'product-column-createdBy'",
       "'product-column-updatedBy'",
     ]);
 
-    // Y la defensa de tipos sigue en pie: `key: 'createdBy'` ni siquiera compilaria.
+    // Y la defensa de tipos sigue en pie: `id: 'createdBy'` ni siquiera compilaria.
+    //
+    // MIGRADO 2026-09-07: el archivo es `.tsx` -sus celdas devuelven marcado desde que la
+    // pantalla monta la tabla compartida- y la clave de columna se llama `id`, que es como la
+    // nombra `DataTableColumn`. Lo que se comprueba no cambia: que el tipo se DERIVE de
+    // `ProductView` excluyendo los campos prohibidos, en vez de ser una union escrita a mano que
+    // alguien amplie sin pensar.
     const columnas = fuenteSinComentarios(
-      join(COMPONENTES_PATH, 'product-columns.ts').split('\\').join('/'),
+      join(COMPONENTES_PATH, 'product-columns.tsx').split('\\').join('/'),
     );
     expect(columnas).toContain('Exclude<keyof ProductView');
     expect(columnas).toContain("'createdBy'");
