@@ -18,7 +18,7 @@
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`), `complexity: medium`. **Pendiente F1.2**: la ficha trae una pregunta abierta escrita en el board y la partición `fullstack` sin decidir, así que toca `/afinar-feature` antes del `spec_author` |
 | QC-80 | unidad-desde-la-presentacion | Inventario | fullstack | pending | feature/QC-80-unidad-desde-la-presentacion | **Nacida del chat el 2026-09-08** y creada en el board (QC-18). `complexity: medium`. **Pendiente F1.0 y F1.2**: sin worktree todavia, y trae una pregunta abierta -con que unidad se rellenan las 114 presentaciones existentes-, asi que toca `/afinar-feature` antes del `spec_author` |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **BLOQUEADA**: la unicidad de `lote` por empresa necesita `products.company_id`, que hoy no existe y que introduce QC-49. No arranca hasta que QC-49 este `done` |
-| QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: trae CINCO preguntas abiertas -entre ellas que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
+| QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; trae SIETE preguntas abiertas -entre ellas si el motivo es obligatorio al cancelar, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -297,7 +297,21 @@ sin consumidor: `convertQuantity` de QC-76, que vive con una guardia que sostien
 llama todavia. QC-82 entrega el almacenamiento y la escritura; el enganche a la pantalla del
 operador es de QC-63.
 
-**Cinco preguntas abiertas, escritas y NO rellenadas con un supuesto** (regla 6): que se guarda
+**Ampliada el mismo dia, a peticion del humano**: el enum pasa de cuatro valores a CINCO -entra
+`canceled`- y aparece un `reason` ANULABLE. No es un campo mas: convierte el registro en la unica
+fuente que sabe si una ejecucion se abandono a medias y por que.
+
+**Y tiene precedente exacto, asi que NO se inventa una forma nueva**: QC-34 ya resolvio la pareja
+cancelar+motivo en `orders`, con `cancellation_reason` anulable y el CHECK
+`orders_cancellation_reason_matches_status` -escrito a mano en la migracion- que garantiza que el
+motivo existe SI Y SOLO SI el estado es `CANCELADO`. El spec sigue ese patron o justifica por que
+no. Anotado tambien el aviso que el propio `db/schema.prisma` deja sobre `OrderStatus`: elegir
+enum en vez de tabla obliga a `ALTER TYPE ... ADD VALUE` para crecer, con el valor nuevo al final.
+
+**SIETE preguntas abiertas, escritas y NO rellenadas con un supuesto** (regla 6). Las dos que
+trajo la ampliacion: si el motivo es OBLIGATORIO al cancelar -que la columna admita vacio no dice
+nada de eso, y en `orders` si lo es-, y si el motivo sirve para algo mas que cancelar -acompanar
+un retroceso seria justo lo interesante de saber despues-. Y las cinco de origen: que se guarda
 en el paso -el documento entero, que se duplica en cada clic, o su posicion, que deja de
 significar lo mismo si se edita la receta-; que es «el tiempo» -el instante del clic o el rato
 que se estuvo en el paso, que son dos columnas distintas-; si `order_id` es obligatorio -QC-63
