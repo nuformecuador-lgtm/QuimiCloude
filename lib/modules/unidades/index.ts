@@ -20,6 +20,9 @@ export { createListUnits, MAX_UNITS } from './domain/list-units';
 export type { ListUnitsDeps } from './domain/list-units';
 export { requirePermission } from './domain/actor';
 export type { Actor } from './domain/actor';
+// QC-76 (R17, R18): el AMBITO de una consulta del catalogo. Tipo puro; lo exige el puerto de
+// listado en su firma para que ninguna lectura se ejecute sin la empresa de quien pregunta.
+export type { UnitScope } from './domain/unit-scope';
 export { UnidadesError, UnauthorizedError, ValidationError } from './domain/errors';
 
 // QC-76 (R22-R25): la conversion de una cantidad entre dos unidades que comparten unidad base.

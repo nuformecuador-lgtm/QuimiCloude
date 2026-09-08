@@ -29,14 +29,33 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  listUnits,
-  listUnitsPage,
+  listUnits as listUnitsEnAmbito,
+  listUnitsPage as listUnitsPageEnAmbito,
 } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { MAX_UNITS, normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { ListQuery } from '@/lib/modules/unidades/domain/list-query';
+import type { UnitScope } from '@/lib/modules/unidades/domain/unit-scope';
+
+/**
+ * QC-76 (R17, R18) — los dos adaptadores EXIGEN ahora el ambito de la empresa en cuyo nombre se
+ * pregunta. Este archivo no prueba el ambito —eso es `unit-repository.int.test.ts`—, sino el
+ * orden, la busqueda y la paginacion, y todas sus filas se siembran SIN empresa, o sea DE
+ * SISTEMA (`company_id` nulo, R11), que son visibles desde cualquier empresa. Por eso se fija
+ * un ambito unico para todo el archivo y se envuelven las dos lecturas: cambia la FORMA de la
+ * llamada y **ningun aserto** de este archivo (R21).
+ */
+const AMBITO: UnitScope = { companyId: '00000000-0000-4000-8000-0000000000aa' };
+
+function listUnits(limit: number, query: ListQuery) {
+  return listUnitsEnAmbito(limit, query, AMBITO);
+}
+
+function listUnitsPage(query: ListQuery) {
+  return listUnitsPageEnAmbito(query, AMBITO);
+}
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
