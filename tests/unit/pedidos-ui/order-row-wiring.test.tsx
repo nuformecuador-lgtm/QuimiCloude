@@ -62,7 +62,11 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   }),
 }));
 
-const RECETA = { id: '22222222-2222-4222-8222-222222222222', name: 'Esmalte azul' };
+const RECETA = {
+  id: '22222222-2222-4222-8222-222222222222',
+  name: 'Esmalte azul',
+  imageUrl: null,
+};
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 function pedido(status: OrderStatus): OrderSummary {

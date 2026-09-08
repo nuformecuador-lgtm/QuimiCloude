@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
+import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import type { OrderSummary } from '@/lib/modules/pedidos';
@@ -33,9 +33,12 @@ import type { RecipePickerPage } from './recipe-picker';
  * como si no se hubiera buscado. `texts.search` se entrega igual porque el contrato de textos lo
  * exige obligatorio y esta ficha no lo toca.
  *
- * **`status` es SIEMPRE `'idle'`** (alternativa Q, descartada): los tres estados de R21 se pintan
- * fuera de `<DataTable>`, con copy y acciones propias, y el «cargando» lo aporta el `<Suspense>`
- * del servidor. Aqui solo llegan filas ya resueltas.
+ * **`status` es SIEMPRE `'idle'`** (alternativa Q, descartada): el error y la lista vacia se
+ * pintan fuera de `<DataTable>`, con copy y acciones propias. El «cargando» de R21 ya no viene de
+ * remontar la pantalla -la `key` del `<Suspense>` desaparecio el 2026-09-07 porque borraba el
+ * foco del campo que se estaba escribiendo-: la navegacion va en una transicion y, mientras esta
+ * en vuelo, esta pantalla lo anuncia y atenua la tabla sin desmontarla. El `fallback` del
+ * `<Suspense>` sigue cubriendo la primera carga.
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R22): `components/ui/table.tsx` ya
  * envuelve la tabla en un contenedor con `overflow-x-auto`, asi que el documento no se desplaza y
@@ -89,23 +92,58 @@ export type OrderTableProps = {
 
 export function OrderTable({ orders, params, totalPages, recipes }: OrderTableProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(() => buildOrderColumns({ recipes }), [recipes]);
 
+  /*
+    La navegacion va DENTRO de una transicion (`startTransition`), y su `isPending` es la senal de
+    «algo esta en vuelo» mientras el servidor recalcula la lista (2026-09-07).
+
+    Esa senal NO desmonta nada: antes la daba la `key` del `<Suspense>` de la pagina, que
+    remontaba el subarbol entero en cada cambio de consulta y con el borraba el foco del campo que
+    se estaba escribiendo -escribir en la busqueda o en un filtro de texto perdia el cursor en
+    cuanto salia la peticion-. Tampoco se pasa `status="loading"` a la tabla compartida por lo
+    mismo: ese estado sustituye cabecera y filas por el esqueleto, y el foco se iria igual. Se
+    anuncia con `aria-busy` y un rotulo visible, atenuando la tabla, que sigue montada y sigue
+    aceptando teclas.
+  */
+  const navigate = (href: string) => {
+    startTransition(() => {
+      router.push(href);
+    });
+  };
+
   return (
-    <DataTable
-      tableId={ORDER_TABLE_ID}
-      columns={columns}
-      rows={orders}
-      getRowId={(order) => order.id}
-      params={params}
-      totalPages={totalPages}
-      onParamsChange={(next) => router.push(orderListHref(next))}
-      status="idle"
-      texts={ORDER_TABLE_TEXTS}
-      searchable={false}
-      defaultPinnedColumns={ORDER_DEFAULT_PINNED_COLUMNS}
-    />
+    <div
+      data-testid="order-table"
+      aria-busy={isPending}
+      className={isPending ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+    >
+      {/*
+        La senal de «en vuelo»: un rotulo visible con el texto de `ORDER_TABLE_TEXTS.loading` y la
+        tabla atenuada. Para la tecnologia de asistencia la lleva `aria-busy` en el
+        contenedor -no una segunda region viva: la zona privada tiene EXACTAMENTE una, la de
+        avisos que monta el layout privado, y varios tests lo afirman-. La tabla NO se desmonta ni
+        se bloquea: se puede seguir escribiendo en la barra de filtros mientras se recalcula.
+      */}
+      {isPending ? (
+        <p className="text-xs text-muted-foreground">{ORDER_TABLE_TEXTS.loading}</p>
+      ) : null}
+      <DataTable
+        tableId={ORDER_TABLE_ID}
+        columns={columns}
+        rows={orders}
+        getRowId={(order) => order.id}
+        params={params}
+        totalPages={totalPages}
+        onParamsChange={(next) => navigate(orderListHref(next))}
+        status="idle"
+        texts={ORDER_TABLE_TEXTS}
+        searchable={false}
+        defaultPinnedColumns={ORDER_DEFAULT_PINNED_COLUMNS}
+      />
+    </div>
   );
 }

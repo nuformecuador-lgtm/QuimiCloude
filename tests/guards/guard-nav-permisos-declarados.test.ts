@@ -85,17 +85,20 @@ const ENLACE_SIN_PERMISO = {
 } as unknown as NavLink;
 
 describe('guardia — los permisos declarados en el menu existen en el catalogo (R20)', () => {
-  it('ancla: el recorrido encuentra hoy los cinco enlaces reales del menu', () => {
+  // AMPLIADA el 2026-09-08 (QC-45 T2): el sexto enlace es «Presentaciones», unico item de la
+  // seccion «Configuración», que declara `inventario.modificar`.
+  it('ancla: el recorrido encuentra hoy los seis enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista
     // vacia y la guardia pasaria en verde sin comprobar nada. Esto lo convierte en rojo.
     const enlaces = flattenNavLinks(PRIVATE_NAV_ITEMS);
 
-    expect(enlaces).toHaveLength(5);
+    expect(enlaces).toHaveLength(6);
     expect(enlaces.map((enlace) => enlace.testId).sort()).toEqual([
       'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
+      'nav-presentaciones',
       'nav-produccion-recetas',
       'nav-proveedores',
     ]);

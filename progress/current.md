@@ -12,10 +12,10 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | in_progress | feature/QC-75-menu-y-rutas-por-permiso | **PR #44 abierto (F2.4)**, gate completo en verde. `reviewer` APROBADO 0 mayores / 3 menores. Esperando merge humano |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **spec aprobado por el humano el 2026-09-08**, tarjeta en *En curso*. `implementer` corriendo las 14 tasks (F2.1) |
-| QC-45 | pantalla-de-presentaciones | Inventario | frontend | in_progress | feature/QC-45-pantalla-de-presentaciones | **F2.2 APROBADO** (0 mayores, 7 menores, 34/36 con test). **Commiteada (`30e9e2b`), sincronizada con `origin/dev` y PUSHEADA.** F2.4 (PR) **bloqueado** por la base compartida; y sin T2/T12 no se cierra |
-| QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | in_progress | feature/QC-76-equivalencia-y-ambito-de-unidades | implementada: 11/12 tasks, **38/38 `R<n>` con test ejecutado y verde**. `reviewer` en curso (F2.2). Pendiente F2.3 (mergear `origin/dev`, que avanzó) y F2.4 |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **12/17 tasks, trabajo rescatado y commiteado el 2026-09-08** (la sesion del `implementer` murio dejando 41 archivos sin commitear). Estuvo **BLOQUEADA**: `delay: null` ponia `unit-select` rojo 6/6 por la comprobacion de `pointer-events` de los popups de Base UI. **Desbloqueada por decision humana** — se espera a que la opcion sea interactiva, sin excepciones nuevas y sin reabrir la decision n3. `implementer` cerrando T4c/T4e/T5 y reformulando R9 |
+| QC-45 | pantalla-de-presentaciones | Inventario | frontend | in_progress | feature/QC-45-pantalla-de-presentaciones | **Rondas 1-3 hechas y reviewer APROBADO** (0 mayores). **36/36 requisitos verificados**, E2E incluido. Commits `30e9e2b`, `a342465`, `4cabc05`. Gate completo corriendo; despues, **PR**. **T10 (WebKit manual) sigue pendiente y no la puede hacer un agente** |
+| QC-38 | crud-de-unidades | Catálogos | backend | in_progress | feature/QC-38-crud-de-unidades | **spec aprobado por el humano el 2026-09-08** (F1.4). 36 requisitos EARS, 24 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1) |
+| QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | pending | feature/QC-65-estado-de-cuenta-de-usuario | **F1.0 y acotación hechas el 2026-09-08**: worktree desde `origin/dev` (`5ee52fe`), `complexity: low` en Jira, spec sembrado con 12 decisiones cerradas y cero preguntas abiertas. `spec_author` corriendo (F1.2) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -241,6 +241,42 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-65 — acotada con `/afinar-feature` (2026-09-08)
+
+Alcance, 12 decisiones cerradas y cero preguntas abiertas en
+`specs/QC-65-estado-de-cuenta-de-usuario/requirements.md`. La acotación **cambió el alcance** y el
+board se actualizó primero: QC-65, QC-66 y QC-67 reescritas (el estado deja de ser un sí/no y pasa
+a cuatro valores —`active`, `pending`, `inactive`, `blocked`—, la cuenta nace `pending` y se guarda
+quién y cuándo la cambió), más dos fichas nuevas: **QC-78** (el estado manda en el acceso; unifica
+`blocked` con el bloqueo por intentos fallidos de QC-19) y **QC-79** (contraseña opcional al crear
+y enlace para establecerla; **arrastra envío de correo, dependencia nueva con aprobación humana**).
+`complexity: low` y `zone: backend` escritas como labels en Jira.
+
+### QC-45 — rondas 2 y 3, y lo que enseñaron (2026-09-08)
+
+- **Reviewer ronda 2: APROBADO**, 0 mayores y 8 menores, **36/36 requisitos con test mapeado**.
+  Tras la ronda 3, **36/36 EJECUTADOS**: el E2E, que se habia reescrito y nunca corrido, dio
+  **4 passed en chromium y webkit**. Mapeado no es verificado, y R36 era el unico que lo
+  demostraba.
+- **El spec describia un mecanismo muerto y se reformulo** (`spec_author`): R2, R4, R5, R6, R33 y
+  R36, mas diez secciones del `design.md`. **La 3.2 argumentaba POR ESCRITO EN CONTRA de usar
+  `inventario.modificar`**, que es lo que el codigo hace. Se reescribio **sin borrar el
+  razonamiento viejo**: queda en un recuadro que cita la frase, identifica la premisa que la
+  sostenia y explica por que al invertirse pasa a sostener lo contrario. La tabla de decisiones
+  cerradas no perdio ni una fila: gano tres fechadas.
+- **Hallazgo del reviewer que evita una trampa a QC-39:** QC-75 R5 exige que el permiso de un item
+  de navegacion tenga la forma `<modulo>.consultar`, y este declara `inventario.modificar` porque
+  `inventario.consultar` lo tienen Administrador **y** Operador. La eleccion es correcta pero no
+  estaba escrita; **QC-39 habria leido R5 al pie de la letra**. Anotada en el `design.md` con el
+  aviso de que QC-39 debe usar `unidades.consultar`.
+- **Cuatro textos afirmaban lo contrario del codigo** —incluidos dos comentarios que seguian
+  diciendo que el item de menu de Configuracion no existe en esta feature—. Corregidos. Al
+  verificarlos aparecio que los archivos de test heredados modificados son **siete y no seis**: el
+  propio informe del reviewer nombraba siete mientras su texto decia seis.
+- **La leccion transversal del dia, y no es sobre esta ficha:** tres veces un diagnostico rapido
+  resulto falso al medirlo —«es una regresion» (era un timeout), «son dos lineas» (eran quince
+  siembras), «lo rompe QC-45» (pasa aislado en las dos ramas)—. Lo que funciono siempre fue lo
+  mismo: **correr el caso sospechoso en `dev` limpio y comparar.**
 ### QC-45 — F2.3 (sincronización) del 2026-09-08
 
 - **Commit `30e9e2b`**: 35 archivos, 6394 inserciones. Antes de esto **las 11 tasks aprobadas
@@ -470,53 +506,27 @@ guardias son ciegas a comentarios de línea con finales CRLF —deuda **heredada
 **cuatro** guardias, que muerde con `core.autocrlf=true`— y `docs/architecture.md > Dominio` sigue
 nombrando tres tablas exentas de columna de empresa cuando ya son cinco.
 
-### QC-75 — arranque del 2026-09-07 (F1.0), y la regla de partición saltada a propósito
+### QC-75 — menu-y-rutas-por-permiso: CERRADA el 2026-09-08 (PR #44, merge `bc343cf`)
 
-Arrancada por decisión humana explícita («arranca 75») en cuanto QC-74 pasó a `done`, que era su
-único `depends_on`. La zona `fullstack` tenía **cero** features `in_progress`. `zone: fullstack`
-venía del board; **`complexity` estaba en `null` y se evalúa aquí como `high`**, y se empujó la
-label al issue: no por número de capas sino por superficie: retira las reglas ruta-a-rol del
-middleware —una frontera de seguridad—, cambia el armado del menú en servidor, el 404 por ruta, el
-destino del login, y trae el E2E que `CHECKPOINTS.md` exige para permisos.
+Resumen completo en `progress/history.md`; el detalle del arranque, el acotado y las diez
+decisiones cerradas ya no se relee desde aquí. Tarjeta a *Finalizado*, worktree desmontado y ramas
+local y remota borradas. `reviewer` **APROBADO en una sola ronda** (0 mayores, 3 menores) con siete
+mutaciones al código de producción, y `./init.sh` completo en verde antes del PR.
 
-**No se parte en backend + frontend, y `AGENTS.md > Particion de fullstack` dice que sí.** Decisión
-humana del 2026-09-07, preguntada antes de montar el worktree. El motivo: el menú filtrado y el 404
-tienen que salir de la **misma** lectura de permisos, así que partirlo deja una mitad `backend` sin
-comportamiento observable y una mitad `frontend` que no se puede verificar sola — y
-`docs/architecture.md` es explícito en que un permiso implementado solo como corte de ruta **no
-cuenta como implementado**. Hay precedente además: QC-36, QC-63 y QC-70..QC-73 siguen `fullstack`
-sin partir, o sea que la regla lleva tiempo sin aplicarse. **Que la regla escrita y la práctica no
-coincidan es materia de `/afinar-regla`**, no algo que decida cada arranque por su cuenta.
+**Lo que hereda quien siga:** los tres menores están vivos y ninguno es de esta ficha arreglar —
+**M1**, no hay guardia de fuente de que el layout privado nunca llame a `notFound()` (hoy lo
+sostienen los comentarios y el E2E; una línea en `qc75-convenciones` lo cazaría en `--rapido`);
+**M2**, operativo, `e2e/permisos.spec.ts` **depende del seed de QC-6/QC-74** para el rol `Operador`,
+así que fuera de su worktree la base tiene que estar sembrada o el E2E falla —con mensaje explícito,
+eso sí—; **M3**, `CHECKPOINTS.md > Permisos` sigue diciendo «vía `cookies()`», mecanismo que la
+página ya no toca y que el propio `dashboard-route-contract` le **prohíbe** nombrar.
 
-**Se acota con `/afinar-feature` antes de F1.2**, también por decisión humana y por el camino que
-marca ese propio paso: la ficha difiere explícitamente una decisión al acotado —«qué pasa con un rol
-que no puede ver ninguna pantalla»— y su alcance ya creció una vez (el login deja de llevar siempre
-al dashboard). Los tres specs escritos sin acotar costaron una o dos rondas completas.
+**Cierra la deuda provisional que QC-45 declaró al acotarse**: el ítem de Configuración que se
+ocultaba a mano al no Administrador queda sustituido por el menú armado en el servidor con permisos.
+El desmontaje volvió a fallar en Windows por las rutas largas de pnpm —**séptima vez**, y sigue sin
+ficha—: `wt.sh done` desregistró el worktree pero dejó el árbol en disco, rematado con `robocopy /MIR`
+contra un directorio vacío (`rm -rf` y `Remove-Item -Recurse` no bastan) más `git worktree prune`.
 
-Worktree desde `origin/dev` (`95b9b51`), que ya trae el merge de QC-74.
-
-**El spec destapó que la ficha se contradecía a sí misma.** La `description` decía que el E2E es
-«el Operador entra, ve un menú corto y **recibe 404 en inventario**», pero QC-74 siembra al Operador
-con exactamente `inventario.consultar`: inventario es justo lo único que SÍ puede ver, así que ese
-recorrido es imposible. `spec_author` no lo rellenó con un supuesto — lo dejó como pregunta abierta
-y conservó la forma del recorrido apuntando el 404 a `/pedidos` y el aterrizaje a `/inventario`. El
-humano lo confirmó al aprobar y **la descripción del board se corrigió** dejando por escrito la
-versión anterior y por qué era imposible.
-
-**Acotada con `/afinar-feature` el 2026-09-07**: cinco decisiones nuevas y cinco heredadas, y una
-sola pregunta abierta, en `specs/QC-75-menu-y-rutas-por-permiso/requirements.md` — no se releen
-desde aquí. **La semilla se escribió DENTRO del worktree**, no en el árbol principal: es la
-corrección directa de lo que pasó con QC-74, cuya semilla quedó `??` en la raíz y hubo que
-copiarla a mano al worktree antes de lanzar `spec_author`.
-
-El acotado **cambió la `description` en el board** —la frase «queda por decidir al acotar esta
-ficha qué pasa con un rol que no puede ver ninguna» dejó de ser cierta— y el cambio se reflejó en
-`feature_list.json`. Nada más se tocó en Jira: la ficha sigue `pending` en Backlog.
-
-**La costura que hubo que cerrar aparte**: el humano eligió «404 en todo, sin pantalla especial» y
-a la vez «cerrar sesión siempre disponible», y esas dos juntas dejan encerrado a quien no tenga
-ningún permiso si el 404 se pinta fuera de la zona privada. Se preguntó y se cerró: **el 404 de
-ruta privada va dentro del layout privado**, con el menú vacío pero con cerrar sesión.
 
 ### QC-74 — arranque del 2026-09-07 (F1.0)
 
@@ -2402,6 +2412,74 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### QC-58 es MÁS ANCHA de lo que dice su ficha: el plazo de 5 s, no `userEvent` (2026-09-08)
+
+**Medido, no supuesto.** Al correr `./init.sh` completo en el worktree de QC-45 salieron 6
+archivos rojos fuera del baseline. Los seis **reproducen en `dev` limpio**, sin esa rama de por
+medio, así que ninguno era de QC-45.
+
+Lo que importa es **por qué**. Uno de ellos, `tests/unit/composition/identity-facade.test.ts`,
+fallaba **los mismos 5 casos en dos corridas seguidas** y parecía una regresión determinista de la
+tanda que se mergeó en cuatro horas (QC-74, QC-75 y QC-76). No lo era: el error no es una
+aserción sino `Test timed out in 5000ms`, y **con `--testTimeout=30000` pasa 5/5**.
+
+**Y ese archivo es `|node|`: no monta UI y no usa `userEvent`.** La ficha QC-58 describe el
+problema como un flake de `userEvent` escribiendo en formularios controlados —«las teclas llegan
+intercaladas»—. Esto demuestra que la causa es **más simple y más ancha**: el plazo por defecto de
+**5 s es corto bajo carga**, con o sin `userEvent`. Quien acote QC-58 debería partir de aquí, y no
+de la hipótesis del retardo entre teclas.
+
+**La carga tiene nombre:** tres sesiones de Claude corriendo suites a la vez en la misma máquina.
+Un gate que compite con otros dos no mide el código, mide la máquina. **Los otros cinco rojos
+—`order-form`, `order-sheet`, `recipe-picker`, `data-table-filter-date`, `sidebar-mobile`—
+cambiaron entre dos corridas consecutivas**, que es la firma del flake.
+
+**Nada se añadió a `tests/baseline-rojos.json`:** un rojo que desaparece subiendo el plazo no es
+deuda de `dev`, y el propio archivo advierte contra volverse un vertedero.
+
+### QC-38 — arranque del 2026-09-08 (F1.0/F1.1)
+
+Arrancada por decisión humana explícita («arranca»), y es la ficha que se pidió al abrir la
+sesión: entonces estaba **bloqueada** por `depends_on`, y QC-76 se hizo para desbloquearla.
+
+- **Las tres dependencias, `done`**: QC-32 (el catálogo), QC-76 (equivalencia y ámbito, mergeada
+  hoy en el PR #45) y QC-74 (el modelo de permisos).
+- **Cupo y conflicto, los dos verdes.** `backend` tiene **cero** features `in_progress` —QC-23
+  sigue en `spec_ready` esperando aprobación humana—. Las tres en vuelo son QC-45 y QC-58
+  (`frontend`, el máximo de su zona) y QC-75 (`fullstack`). Sin intersección: ninguna toca
+  `lib/modules/unidades`.
+- **Zone, complexity y branch ya venían evaluadas** del board (`backend`, `medium`). Sin empujón
+  a Jira en este paso.
+- **Worktree desde `origin/dev`**, que ya contiene QC-76: esta ficha construye encima de su
+  esquema, así que colgarla de otra base sería construir sobre un modelo que no existe.
+- **El validador del gate pasó desde dentro del worktree a la primera** — es la primera ficha que
+  estrena el arreglo del arnés (`05d47f5`) que QC-76 tuvo que hacer para poder cerrarse.
+- **F1.2 sin escala en `/afinar-feature`**: el requirements está sembrado y con **cero preguntas
+  abiertas**. Además esa acotación cerró la **pregunta abierta 5 de QC-32** («¿un nombre en blanco
+  es un nombre?»), con lo que QC-32 se queda sin ninguna viva.
+
+
+### QC-76, al cerrar (2026-09-08)
+
+- **`wt.sh done` falló en Windows por OCTAVA vez.** Desregistró el worktree de git —`git worktree
+  list` ya no lo muestra— pero dejó el árbol en disco, y esta vez el `rm -rf` de remate **también
+  falló**: `Device or resource busy`, dos intentos. Queda `.worktrees/QC-76-equivalencia-y-ambito-de-unidades`
+  huérfano, sin registrar y sin trabajo dentro que perder (rama mergeada en `dev`, merge `5ee52fe`).
+  Se puede borrar a mano cuando ningún proceso lo tenga abierto. **Sigue sin ficha**, y ya es la
+  octava: `AGENTS.md > Worktrees` dice que un HOLD no bloquea el cierre, y no lo bloqueó, pero
+  esto ya no es un HOLD de la guarda sino un fallo del propio desmontaje.
+- **Cuatro archivos del baseline ya pasan** y el gate avisa de que tocaría limpiarlos:
+  `tests/unit/inventario/product-page.test.tsx`, `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx`,
+  `tests/unit/proveedores-ui/supplier-page.test.tsx` y `tests/unit/recetas/module-contract.test.ts`.
+  Un baseline que lista rojos que ya no existen deja de medir lo que dice medir.
+- **QC-77 (`aislamiento-de-la-base-en-tests-de-integracion`) sigue `pending` y sin acotar**, y esta
+  ficha la justificó sola: la base de desarrollo es compartida entre worktrees, así que aplicar una
+  migración desde una rama rompe los tests de integración de TODAS las demás hasta que esa rama
+  mergea. La sesión de QC-45 lo reportó desde el otro lado.
+- **Dos menores del reviewer salen sin cerrar**: R37 se cierra por inspección sin test directo, y
+  `docs/architecture.md > Dominio` sigue listando «unidades (QC-51)», ficha cancelada al acotar QC-76.
+
 
 ### La base de desarrollo es COMPARTIDA y ya rompió el gate de otra feature (2026-09-08)
 

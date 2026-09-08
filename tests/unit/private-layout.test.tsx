@@ -167,6 +167,32 @@ describe('layout privado', () => {
     expect(within(principal).getByTestId(CHILD_TEST_ID)).toBeInTheDocument();
   });
 
+  it('el contenido principal puede encoger, para que ninguna tabla ancha lo estire', async () => {
+    // 2026-09-07 (decision humana: «las tablas deben mantenerse dentro del contenedor principal
+    // sin scroll horizontal»). `SidebarInset` es un elemento flexible: sin `min-w-0` su ancho
+    // minimo es el de su contenido, asi que una tabla ancha lo estiraba mas alla de la ventana y
+    // el scroll horizontal se lo comia el DOCUMENTO en vez del envoltorio de la tabla.
+    //
+    // El test mira la clase y no la geometria a proposito: jsdom no hace layout, y el sintoma
+    // -un `<main>` mas ancho que la ventana- no se puede observar aqui. Lo que si se puede
+    // afirmar es la causa.
+    await renderLayout();
+
+    const principal = screen.getByTestId(testId.content);
+
+    expect(principal.className).toMatch(/(^|\s)min-w-0(\s|$)/);
+    // Y el desbordamiento lo sigue absorbiendo el envoltorio de la tabla, no el armazon: ningun
+    // ancestro del contenido declara scroll horizontal propio.
+    for (
+      let ancestro = principal.parentElement;
+      ancestro !== null && ancestro !== document.body;
+      ancestro = ancestro.parentElement
+    ) {
+      expect(ancestro.className).not.toMatch(/overflow-x-(auto|scroll)/);
+    }
+    expect(principal.className).not.toMatch(/overflow-x-(auto|scroll)/);
+  });
+
   it('el layout obtiene el usuario del proveedor de sesion y lo pasa por props', async () => {
     // R16
     await renderLayout();
@@ -201,10 +227,14 @@ describe('layout privado', () => {
     // borro T7 en QC-8, asi que esa cadena ya no podia dejar de aparecer: no vigilaba nada.
     // El riesgo vivo hoy es que un componente de cliente resuelva la sesion por su cuenta
     // llamando al punto de composicion (`@/lib/composition`) o a `getSessionUser` (R17).
+    // `components/private/logout-menu-item.tsx` salio de esta lista el 2026-09-07 porque el
+    // archivo desaparecio: el cierre de sesion dejo de ser un item del menu del pie y paso a ser
+    // un boton propio del encabezado. Entra en su lugar el archivo nuevo, que es donde vive ahora
+    // el mismo riesgo -un componente de cliente que resuelva la sesion por su cuenta-.
     const fuentes = [
       'components/private/app-sidebar.tsx',
       'components/private/nav-user.tsx',
-      'components/private/logout-menu-item.tsx',
+      'app/(private)/components/logout-button.tsx',
     ];
     const prohibidos = [
       '@/lib/composition',

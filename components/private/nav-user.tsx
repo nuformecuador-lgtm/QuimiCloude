@@ -1,20 +1,7 @@
 'use client';
 
-import { LogoutMenuItem } from '@/components/private/logout-menu-item';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from '@/components/ui/sidebar';
-import { logoutAction } from '@/lib/modules/identity/adapters/driving/logout-action';
+import { SidebarMenu, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import type { SessionUser } from '@/lib/modules/identity';
 import { getInitials } from '@/lib/shared/ui/initials';
 
@@ -23,21 +10,25 @@ type NavUserProps = {
 };
 
 /**
- * Pie de la barra lateral: identidad del usuario y menu de usuario (`design.md > 5.4`).
+ * Pie de la barra lateral: identidad del usuario (`design.md > 5.4`).
  *
- * **Los datos entran solo por props** (R16): este archivo no lee cookies, no consulta base
- * de datos, no hace peticiones de red y no importa el proveedor de sesion.
+ * **Los datos entran solo por props** (R16): este archivo no lee cookies, no consulta base de
+ * datos, no hace peticiones de red y no importa el proveedor de sesion.
  *
- * El menu contiene **solo** el cierre de sesion (D12), dentro de un `<form>` real cuya
- * accion es `logoutAction` (R19). No hay `onClick` que llame a la action a mano: eso
- * romperia el envio real y el progressive enhancement.
+ * **ENMIENDA DEL 2026-09-07 (decision humana): ya NO hay menu de usuario.** El pie abria un
+ * `DropdownMenu` cuyo unico item era cerrar sesion (D12, R19-R21 de QC-11). Ese control se movio
+ * al encabezado, junto al de tema (`app/(private)/components/logout-button.tsx`), asi que el menu
+ * se quedaba vacio: un disparador que abre una lista sin opciones no es una pantalla mas simple,
+ * es una rota. Con el desaparecen tambien `private-user-trigger` y
+ * `components/private/logout-menu-item.tsx`.
  *
- * `closeOnClick={false}` en el item es deliberado (`design.md > 10.10`): con el valor por
- * defecto el menu se cierra al pulsar y desmonta el `<form>` antes de que la action termine,
- * lo que dejaria R20 y R21 verdes en teoria y rotos en el navegador.
+ * Lo que queda es lo que este pie siempre mostro -iniciales, nombre y rol-, ahora como contenido y
+ * no como boton: **no hay nada que pulsar aqui**, y por eso no lo parece. El `<li>` del primitivo
+ * se conserva para no romper la estructura del menu de la barra lateral.
  *
- * `aria-label` explicito en el disparador porque en modo icono (R27) el nombre visible se
- * oculta: el nombre accesible tiene que sobrevivir a los dos modos.
+ * En modo icono (R27) se ocultan nombre y rol, que es lo que ese modo hace con todo texto; las
+ * iniciales siguen visibles y el nombre completo sigue disponible como `title`, para que la
+ * identidad no dependa de un texto que el modo esconde.
  */
 export function NavUser({ user }: NavUserProps) {
   const { state, isMobile } = useSidebar();
@@ -46,48 +37,32 @@ export function NavUser({ user }: NavUserProps) {
   return (
     <SidebarMenu data-testid="private-user">
       <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton
-                size="lg"
-                aria-label={user.displayName}
-                data-testid="private-user-trigger"
-              />
-            }
-          >
-            <Avatar size="sm">
-              <AvatarFallback data-testid="private-user-initials">
-                {getInitials(user.displayName)}
-              </AvatarFallback>
-            </Avatar>
-            {isIconMode ? null : (
-              <span className="flex min-w-0 flex-1 flex-col text-left leading-tight">
-                <span className="truncate text-sm" data-testid="private-user-name">
-                  {user.displayName}
-                </span>
-                {user.roleName === null ? null : (
-                  <span
-                    className="truncate text-xs text-muted-foreground"
-                    data-testid="private-user-role"
-                  >
-                    {user.roleName}
-                  </span>
-                )}
+        <div
+          className="flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left"
+          title={user.displayName}
+          data-testid="private-user-identity"
+        >
+          <Avatar size="sm">
+            <AvatarFallback data-testid="private-user-initials">
+              {getInitials(user.displayName)}
+            </AvatarFallback>
+          </Avatar>
+          {isIconMode ? null : (
+            <span className="flex min-w-0 flex-1 flex-col text-left leading-tight">
+              <span className="truncate text-sm" data-testid="private-user-name">
+                {user.displayName}
               </span>
-            )}
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            side={isMobile ? 'top' : 'right'}
-            align="end"
-            className="min-w-48"
-          >
-            <form action={logoutAction} data-testid="private-logout-form">
-              <DropdownMenuItem closeOnClick={false} nativeButton render={<LogoutMenuItem />} />
-            </form>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {user.roleName === null ? null : (
+                <span
+                  className="truncate text-xs text-muted-foreground"
+                  data-testid="private-user-role"
+                >
+                  {user.roleName}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
       </SidebarMenuItem>
     </SidebarMenu>
   );

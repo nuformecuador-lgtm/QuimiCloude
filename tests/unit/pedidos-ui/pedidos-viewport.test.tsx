@@ -190,7 +190,11 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
 }));
 
-const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul de temporada' };
+const RECETA = {
+  id: crypto.randomUUID(),
+  name: 'Esmalte azul de temporada',
+  imageUrl: null,
+};
 const UNIDAD: UnitRef = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
