@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event';
 
 import PrivateLayout from '@/app/(private)/layout';
 import type { SessionUser } from '@/lib/modules/identity';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  SEED_ROLE_PERMISSIONS,
+} from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS, PRIVATE_NAV_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
@@ -83,6 +88,10 @@ const testId = {
   proveedores: 'nav-proveedores',
   produccion: 'nav-produccion',
   recetas: 'nav-produccion-recetas',
+  // QC-45 T2: el item de la seccion «Configuración». Declara `inventario.modificar`, que es el
+  // permiso que el Operador del seed NO tiene teniendo `inventario.consultar`: por eso es el caso
+  // interesante del primer test de este archivo.
+  presentaciones: 'nav-presentaciones',
 } as const;
 
 /** Los diez codigos del catalogo de QC-74, sin escribir ninguno a mano. */
@@ -135,6 +144,11 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     // El grupo entero desaparece, no solo su hijo (R3).
     expect(screen.queryByTestId(testId.produccion)).toBeNull();
     expect(screen.queryByTestId(testId.recetas)).toBeNull();
+    // QC-45: `inventario.consultar` NO abre «Presentaciones», que exige `inventario.modificar`.
+    // Es la unica pareja del menu que comparte modulo y difiere en la accion, asi que es donde un
+    // filtrado que comparase por prefijo de modulo —o que diera por implicado `modificar` desde
+    // `consultar`— se colaria sin que nada mas se pusiera rojo.
+    expect(screen.queryByTestId(testId.presentaciones)).toBeNull();
   });
 
   it('con solo `inventario.consultar`, el control de cerrar sesion sigue presente', async () => {
@@ -163,6 +177,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.proveedores,
       testId.produccion,
       testId.recetas,
+      testId.presentaciones,
     ]) {
       expect(screen.queryByTestId(item), `${item} no debe estar en el arbol`).toBeNull();
     }
@@ -175,7 +190,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(await screen.findByTestId(testId.logoutForm)).toBeInTheDocument();
   });
 
-  it('con los diez permisos del catalogo estan los cinco items del menu', async () => {
+  it('con los diez permisos del catalogo estan los seis items del menu', async () => {
     // R4 — el filtrado quita items, nunca los inventa ni los pierde: con todo el catalogo, el
     // arbol es el de `PRIVATE_NAV_ITEMS` entero.
     await renderLayout(TODOS_LOS_PERMISOS);
@@ -186,6 +201,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.pedidos,
       testId.proveedores,
       testId.produccion,
+      testId.presentaciones,
     ]) {
       expect(screen.getByTestId(item)).toBeInTheDocument();
     }
@@ -198,7 +214,31 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(getSessionUserMock).toHaveBeenCalledTimes(1);
   });
 
-  it('ancla: el menu real tiene los cinco items que este test vigila', async () => {
+  // QC-45 T2 (R3, R4 con el mecanismo de QC-75) — el item de «Presentaciones» sobre el ARBOL
+  // RENDERIZADO, con los conjuntos de permisos que el seed asigna a cada rol, importados de
+  // `SEED_ROLE_PERMISSIONS` y nunca escritos a mano. Es el par que cierra la promesa: quien puede
+  // entrar lo ve, y quien recibiria un 404 al pulsarlo no lo ve siquiera.
+  it('con los permisos del Administrador el layout pinta el item de presentaciones', async () => {
+    const permisos = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR];
+    expect(permisos, 'el seed deberia asignar permisos al Administrador').toBeDefined();
+
+    await renderLayout(permisos ?? []);
+
+    expect(screen.getByTestId(testId.presentaciones)).toBeInTheDocument();
+  });
+
+  it('con los permisos del Operador el item de presentaciones no llega al arbol', async () => {
+    const permisos = SEED_ROLE_PERMISSIONS[ROLE_OPERADOR];
+    expect(permisos, 'el seed deberia asignar permisos al Operador').toBeDefined();
+
+    await renderLayout(permisos ?? []);
+
+    // El Operador SI ve inventario: lo que le falta es `inventario.modificar`, no el modulo.
+    expect(screen.getByTestId(testId.inventario)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.presentaciones)).toBeNull();
+  });
+
+  it('ancla: el menu real tiene los seis items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
     const testIds = PRIVATE_NAV_ITEMS.map((item) => item.testId);
@@ -209,6 +249,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.pedidos,
       testId.produccion,
       testId.proveedores,
+      testId.presentaciones,
     ]);
   });
 });

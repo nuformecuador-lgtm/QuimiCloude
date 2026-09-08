@@ -66,6 +66,25 @@ export function supplierDetailRoute(id: string): string {
  */
 export const ORDERS_ROUTE = '/pedidos';
 
+/**
+ * Pantalla del catalogo de presentaciones (QC-45, R2).
+ *
+ * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
+ * `identity` la necesitan y **no pueden depender de la navegacion**, que arrastra etiquetas,
+ * iconos y agrupacion de UI. `private-nav.ts` ya importa de este archivo, asi que la flecha no se
+ * invierte ni aparece un ciclo. Como `SUPPLIERS_ROUTE` y `ORDERS_ROUTE`, esta constante **nace**
+ * aqui —no se muda desde la navegacion—, asi que no necesita reexport de compatibilidad: nadie la
+ * importaba antes.
+ *
+ * **No se declara `CONFIGURATION_ROUTE = '/configuracion'`** (`design.md > 2`): no hay pantalla en
+ * esa URL, visitarla daria 404, y una constante de ruta que no lleva a ninguna parte es
+ * exactamente la deuda de los cinco items de QC-11 que no se quiere repetir. El segmento
+ * `configuracion` aparece **una sola vez**, dentro de esta constante; cuando llegue QC-39
+ * declarara su hermana `/configuracion/unidades`, igual que `FORMULAS_ROUTE` convive hoy con
+ * `/produccion` sin que exista una constante para el tramo intermedio.
+ */
+export const PRESENTATIONS_ROUTE = '/configuracion/presentaciones';
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
@@ -90,4 +109,8 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // QC-35 R4: la pantalla de pedidos. `(private)` no aparece en la URL, asi que sin esta fila
   // `/pedidos` se serviria SIN sesion. Una sola entrada: no hay pagina de detalle (R1).
   ORDERS_ROUTE,
+  // QC-45 R5: la pantalla de presentaciones. Sin esta fila, `(private)` no aparece en la URL y
+  // `/configuracion/presentaciones` se serviria SIN sesion. Una sola entrada: no hay pagina de
+  // detalle, y la comparacion por segmentos ya cubriria cualquier subcamino.
+  PRESENTATIONS_ROUTE,
 ] as const;

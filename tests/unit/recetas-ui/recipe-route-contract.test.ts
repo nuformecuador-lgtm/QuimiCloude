@@ -1009,6 +1009,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'LOGIN_ROUTE',
         'NEW_RECIPE_ROUTE',
         'ORDERS_ROUTE',
+        // La trae QC-45 (R2), la pantalla de presentaciones; la lista sigue cerrada a proposito: una constante nueva sin ficha vuelve a poner esto en rojo.
+        'PRESENTATIONS_ROUTE',
         'PRIVATE_ROUTE_PREFIXES',
         'SUPPLIERS_ROUTE',
         'recipeEditRoute',

@@ -20,42 +20,60 @@
 
 ## Bloque 1 — Ruta, protección y navegación (va ANTES que la página)
 
-### T1 — Constante de ruta + prefijo privado + regla ruta→rol *(depende de T0)*
+### T1 — Constante de ruta + prefijo privado + corte por permiso *(depende de T0)*
 - [x] `lib/shared/routes.ts`: `PRESENTATIONS_ROUTE = '/configuracion/presentaciones'` con su
       comentario de por qué vive ahí, y su entrada en `PRIVATE_ROUTE_PREFIXES`.
-- [x] `lib/composition/route-role-rules.ts`: fila
-      `{ prefix: PRESENTATIONS_ROUTE, roles: [ROLE_ADMINISTRADOR] }` reutilizando el import ya
-      presente.
+- [x] ~~`lib/composition/route-role-rules.ts`: fila
+      `{ prefix: PRESENTATIONS_ROUTE, roles: [ROLE_ADMINISTRADOR] }`.~~ **Hecho con el mecanismo
+      nuevo (ronda 2, 2026-09-08).** La fila llegó a escribirse en la ronda 1, pero QC-75
+      (`menu-y-rutas-por-permiso`) **borró `lib/composition/route-role-rules.ts` y el mecanismo
+      ruta→rol entero** (QC-75 R16): el middleware ya solo mira firma, caducidad y empresa. El
+      corte pasa a la propia pantalla, que abre con
+      `await requirePagePermission('inventario.modificar')` — permiso de `modificar` y no de
+      `consultar` porque administrar el catálogo de presentaciones es modificar inventario, y el
+      Operador del seed, que sólo tiene `inventario.consultar`, no debe entrar a una pantalla cuyo
+      propósito entero es escribir.
 - [x] Test `tests/unit/configuracion-ui/presentations-route-contract.test.ts`: la constante existe,
-      está en los prefijos, tiene regla de rol, `findRouteRule` la resuelve a Administrador, y
-      `guard-middleware-edge` sigue verde.
+      está en los prefijos, no está duplicada en ningún otro archivo, la pantalla exige
+      `inventario.modificar` con `requirePagePermission` **antes** de resolver `searchParams`
+      (test de fuente, con los comentarios quitados antes de juzgar) y su ítem de menú declara el
+      mismo código. `guard-middleware-edge` y `guard-pantallas-exigen-permiso` siguen verdes.
 - **Hecho cuando:** `pnpm vitest run tests/unit/configuracion-ui tests/guards` en verde y
       `PRESENTATIONS_ROUTE` no aparece duplicada en ningún otro archivo.
 - **Nota:** va antes de T5 a propósito; con `page.tsx` y sin prefijo, `guard-rutas-privadas-cubiertas`
       pone el gate en rojo.
 
-### T2 — Sección Configuración y ocultado por rol *(depende de T1)*
+### T2 — Sección Configuración y ocultado por permiso *(depende de T1)*
 
-> **NO SE IMPLEMENTA EN ESTA FICHA. Recorte de alcance, decisión humana del 2026-09-08.** QC-75
-> (`menu-y-rutas-por-permiso`) está `in_progress` y reescribe `private-nav.ts`, `layout.tsx` y las
-> reglas de ruta; T2 iría en dirección contraria (ocultado por ROL que QC-75 sustituye por ocultado
-> por PERMISO). Es hoja del grafo: nada depende de ella. **Consecuencia: la pantalla NO está
-> enlazada desde el menú.** R3 y R4 quedan sin cubrir y los hereda QC-75.
+> **SE IMPLEMENTA, con el mecanismo de QC-75 (ronda 2, 2026-09-08).** El recorte de alcance que
+> aquí figuraba —«no se implementa, QC-75 está en vuelo»— queda **levantado**: QC-75 ya está
+> mergeado en `dev`. Y el **texto original de esta task describía el apaño por ROL** (campo
+> `adminOnly` en `NavLink` y una función `visibleNavItems` aplicada en `layout.tsx`), que existía
+> sólo porque QC-75 no estaba. **Manda el mecanismo por PERMISO:** `NavLink.permission` es
+> obligatorio y `app/(private)/layout.tsx` ya filtra con
+> `filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, user.permissions)`. No se añade `adminOnly`, no
+> se escribe `visibleNavItems` y **`layout.tsx` no se toca**: no hay nada que añadirle.
 
-- [ ] `private-nav.ts`: `NAV_SECTION_CONFIGURATION`, `PRESENTATIONS_LABEL`, el ítem con
-      `icon: 'boxes'`, `testId: 'nav-presentaciones'` y `adminOnly: true`; campo opcional
-      `adminOnly` en `NavLink`; función pura `visibleNavItems`.
-- [ ] `app/(private)/layout.tsx`: aplicar `visibleNavItems(PRIVATE_NAV_ITEMS, { isAdministrator:
-      user.roleName === ROLE_ADMINISTRADOR })` al pasar los ítems a `AppSidebar`. **`AppSidebar` no
-      se toca.**
-- [ ] Test `tests/unit/configuracion-ui/private-nav-configuracion.test.ts`: hay **una** sección
-      Configuración con **un** ítem que apunta a `PRESENTATIONS_ROUTE`; ningún ítem de esa sección
-      apunta a una ruta sin `page.tsx`; con Administrador `visibleNavItems` devuelve la lista
-      **íntegra**; sin Administrador desaparecen el ítem **y** la sección
+- [x] `private-nav.ts`: `NAV_SECTION_CONFIGURATION`, `PRESENTATIONS_LABEL` y el ítem —última
+      entrada de nivel superior— con `href: PRESENTATIONS_ROUTE` (importada, nunca el literal),
+      `testId: 'nav-presentaciones'`, `icon: 'boxes'` (ya existía en `NavIconName` y en
+      `NAV_ICONS`) y `permission: 'inventario.modificar'`, el mismo código que exige la pantalla.
+      Sección con **un solo ítem** a propósito: «Unidades» llega con QC-39.
+- [x] ~~`app/(private)/layout.tsx`: aplicar `visibleNavItems(...)`.~~ **No procede:** QC-75 ya
+      filtra ahí por permiso. `AppSidebar` tampoco se toca.
+- [x] Test `tests/unit/configuracion-ui/private-nav-configuracion.test.ts`: hay **una** sección
+      Configuración con **un** ítem que apunta a `PRESENTATIONS_ROUTE` y declara
+      `inventario.modificar`; ningún ítem de esa sección apunta a una ruta sin `page.tsx`
+      (comprobado en disco); con los permisos del Administrador (`SEED_ROLE_PERMISSIONS`,
+      importados) están el ítem **y** la sección; con los del Operador desaparecen **los dos**
       (`groupNavItemsBySection` no deja encabezado huérfano).
-- [ ] Test en `tests/unit/private-layout.test.tsx` (ampliación, no reescritura): el layout pinta el
-      ítem con sesión de Administrador y no lo pinta con otro rol.
-- **Hecho cuando:** los dos tests en verde y `guard-nav-serializable` sigue verde.
+- [x] Test en `tests/unit/navegacion/private-layout-menu.test.tsx` (ampliación, no reescritura, y
+      ahí en vez de en `private-layout.test.tsx`: es el archivo que QC-75 dedicó al menú filtrado):
+      el layout pinta `nav-presentaciones` con los permisos del Administrador y **no** lo pinta con
+      los del Operador, que tiene `inventario.consultar` y no `inventario.modificar`.
+- **Hecho cuando:** los dos tests en verde y `guard-nav-serializable`,
+      `guard-nav-permisos-declarados` y `tests/unit/app-sidebar.test.tsx` siguen verdes (sus anclas
+      de cinco ítems pasan a seis).
 
 ## Bloque 2 — Parser y columnas (piezas puras, antes de la UI)
 
@@ -163,15 +181,23 @@
 ### T11 — E2E *(depende de T5-T8)*
 - [x] `e2e/presentaciones.spec.ts` con fixtures `qc45_e2e_` y `RUN_ID`: (1) login →
       la pantalla → crear presentación → verla en la lista filtrando por su nombre; (2) sesión sin
-      rol Administrador → pide la URL → acaba fuera y no ve la tabla.
+      `inventario.modificar` → pide la URL → **404 dentro del layout privado** y no ve la tabla.
+      Adaptado en la ronda 2: antes esperaba una redirección al dashboard, que era el
+      comportamiento de la regla ruta→rol que QC-75 retiró; el `login` recibe además el aterrizaje
+      esperado, porque desde QC-75 R11 el login lleva al primer ítem visible del menú y el Operador
+      aterriza en `/inventario`, no en el dashboard.
 - [x] Limpieza en `afterAll` que **tolera** `presentation_in_use` sin tumbar la suite.
 - **Hecho cuando:** `pnpm exec playwright test e2e/presentaciones.spec.ts` en verde en Chromium y
-      WebKit, sin dejar filas huérfanas.
+      WebKit, sin dejar filas huérfanas. **Cumplido el 2026-09-08 sobre el spec de la ronda 2**:
+      `--project=chromium --project=webkit` → `4 passed (47.5s)`, 0 rojos (salida en la bitácora).
 
 ### T12 — Cierre *(depende de todo)*
-- [ ] `progress/impl_QC-45-pantalla-de-presentaciones.md` con el mapa `R<n> -> test` de abajo,
-      completo y con los comandos y su salida.
-- [ ] `./init.sh` completo en verde.
+- [x] `progress/impl_QC-45-pantalla-de-presentaciones.md` con el mapa `R<n> -> test` de abajo,
+      completo y con los comandos y su salida. Ronda 2 (2026-09-08) añadida al final, con la
+      adaptación a QC-75 y la lista de requisitos desfasados.
+- [ ] `./init.sh` completo en verde. **Pendiente del cierre humano:** en la ronda 2 se corrió
+      `./init.sh --rapido` (typecheck ✓, lint ✓, todas las guardias ✓); el completo no se corrió
+      porque `tests/integration/` está rojo por una base compartida, ajeno a esta ficha.
 - **Hecho cuando:** las dos cosas, y ningún `R<n>` sin test.
 
 ## Mapa `R<n> -> test` (lo exige `CHECKPOINTS.md > Trazabilidad`)
@@ -180,10 +206,10 @@
 | --- | --- |
 | R1 | `configuracion-ui/presentation-page.test.tsx` — la página existe en la ruta derivada de la constante y no declara `main` propio |
 | R2 | `configuracion-ui/presentations-route-contract.test.ts` + `configuracion-convenciones.test.ts` (sin literales de la URL) |
-| R3 | `configuracion-ui/private-nav-configuracion.test.ts` — una sección, un ítem, sin ítems a rutas sin pantalla |
-| R4 | `configuracion-ui/private-nav-configuracion.test.ts` (`visibleNavItems`) + `tests/unit/private-layout.test.tsx` (ampliación) |
-| R5 | `tests/guards/guard-rutas-privadas-cubiertas.test.ts` + `presentations-route-contract.test.ts` |
-| R6 | `presentations-route-contract.test.ts` (`findRouteRule`) + `e2e/presentaciones.spec.ts` (recorrido 2) |
+| R3 | `configuracion-ui/private-nav-configuracion.test.ts` — una sección, un ítem, sin ítems a rutas sin pantalla + `tests/unit/app-sidebar.test.tsx` (orden exacto de `PRIVATE_NAV_ITEMS`) |
+| R4 | `configuracion-ui/private-nav-configuracion.test.ts` (`filterNavItemsByPermissions` con `SEED_ROLE_PERMISSIONS`: Administrador sí, Operador no, sin encabezado huérfano) + `tests/unit/navegacion/private-layout-menu.test.tsx` (ampliación, sobre el árbol renderizado) |
+| R5 | `tests/guards/guard-rutas-privadas-cubiertas.test.ts` + `presentations-route-contract.test.ts` (la constante está en `PRIVATE_ROUTE_PREFIXES` exactamente una vez) |
+| R6 | `presentations-route-contract.test.ts` (`page.tsx` exige `inventario.modificar` con `requirePagePermission`, antes de leer `searchParams`, y el ítem de menú declara el mismo código) + `tests/guards/guard-pantallas-exigen-permiso.test.ts` + `e2e/presentaciones.spec.ts` (recorrido 2: 404 dentro del layout privado) |
 | R7 | `presentation-page.test.tsx` — `unauthorized` pinta error y ninguna fila; la sección no lee sesión |
 | R8 | `presentation-table.test.tsx` + `configuracion-convenciones.test.ts` (no hay tabla ni paginación propias) |
 | R9 | `presentation-columns.test.tsx` — recorre la declaración; en negativo, ninguna columna prohibida |

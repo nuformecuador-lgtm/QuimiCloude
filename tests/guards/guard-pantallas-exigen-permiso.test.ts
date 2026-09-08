@@ -63,7 +63,7 @@ const CODIGOS_VALIDOS: ReadonlySet<string> = new Set(PERMISSIONS.map((permiso) =
 
 /**
  * Los comentarios explican; no ejecutan. Se quitan antes de juzgar el codigo — si no, el JSDoc de
- * cualquiera de las ocho paginas, que documenta por que el corte vive ahi y NOMBRA
+ * cualquiera de las nueve paginas, que documenta por que el corte vive ahi y NOMBRA
  * `requirePagePermission` y su codigo, bastaria para dar la guardia por satisfecha sin que la
  * llamada existiera.
  *
@@ -124,7 +124,8 @@ export type PantallaPrivada = {
 
 /**
  * Todas las pantallas (`page.tsx`) que cuelgan de `app/(private)/`, ignorando `components/` y los
- * route groups. Hoy son ocho (`design.md > 2.2`).
+ * route groups. Hoy son NUEVE: las ocho de `design.md > 2.2` mas
+ * `/configuracion/presentaciones`, que anade QC-45 y que exige `inventario.modificar`.
  */
 export function listPrivatePages(root: string): readonly PantallaPrivada[] {
   function walk(dir: string, segments: readonly string[]): readonly PantallaPrivada[] {
@@ -189,13 +190,17 @@ function describir(infracciones: readonly Infraccion[]): string {
 }
 
 /**
- * Las ocho pantallas de `design.md > 2.2`, escritas por su URL. Es el ANCLA ANTI-VACUIDAD: si el
+ * Las nueve pantallas privadas de hoy, escritas por su URL. Es el ANCLA ANTI-VACUIDAD: si el
  * barrido se rompiera —ruta de `app/(private)` cambiada, `sep` de Windows, un `readdirSync` que
  * falla en silencio— la lista se vaciaria y esta guardia pasaria en verde sin haber mirado un solo
  * archivo. Que haya que tocarla al anadir una pantalla es el precio, y es barato: obliga a mirar
  * esta guardia justo cuando hay una pantalla nueva que proteger.
  */
+// AMPLIADA el 2026-09-08 (QC-45 T1, ronda 2): las ocho de `design.md > 2.2` mas
+// `/configuracion/presentaciones`, la pantalla del catalogo de presentaciones, que exige
+// `inventario.modificar` —administrar el catalogo es modificar inventario— y no `consultar`.
 const RUTAS_ESPERADAS_HOY = [
+  '/configuracion/presentaciones',
   '/dashboard',
   '/inventario',
   '/pedidos',
@@ -207,7 +212,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las ocho pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las nueve pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);
