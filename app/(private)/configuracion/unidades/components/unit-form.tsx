@@ -169,8 +169,14 @@ function readValues(formData: FormData): FieldValues {
  *   simbolo», no «simbolo vacio», que el esquema rechazaria.
  * - `baseUnitId` y `factor` viajan **juntos o ninguno**: la equivalencia es una pareja. Sin
  *   derivacion elegida no se envia ninguna de las dos claves, que es lo que significa «unidad
- *   base». Con derivacion elegida se envia tambien el factor, aunque venga vacio: ahi el usuario
- *   SI declaro la derivacion, y quien tiene que decir que falta el factor es el dominio.
+ *   base».
+ * - Con derivacion elegida pero **factor en blanco**, la clave `factor` **tampoco se envia**. R34
+ *   es tajante: en ninguna de las tres claves viaja jamas una cadena vacia. Enviar `''` no seria
+ *   «sin factor»: el esquema del modulo lee las claves con `formData.has(clave)`, asi que la
+ *   presencia de `factor` significa «hay factor» y su valor vacio es un valor INVALIDO. Se manda
+ *   entonces la pareja incompleta —`baseUnitId` sin `factor`— y la rechaza el dominio con su
+ *   codigo, que es justo lo que R36 pide: no validar por cuenta propia, ofrecerlo bien y dejar
+ *   que el error de dominio mande.
  */
 export function buildUnitFormData(raw: FormData): FormData {
   const clean = new FormData();
@@ -182,7 +188,9 @@ export function buildUnitFormData(raw: FormData): FormData {
   const baseUnitId = readString(raw, UNIT_BASE_FIELD).trim();
   if (baseUnitId !== NO_BASE_UNIT_VALUE) {
     clean.set(UNIT_BASE_FIELD, baseUnitId);
-    clean.set(UNIT_FACTOR_FIELD, readString(raw, UNIT_FACTOR_FIELD).trim());
+
+    const factor = readString(raw, UNIT_FACTOR_FIELD).trim();
+    if (factor !== '') clean.set(UNIT_FACTOR_FIELD, factor);
   }
 
   return clean;
