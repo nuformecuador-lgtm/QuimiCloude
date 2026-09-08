@@ -574,90 +574,116 @@ leader.*
 
 Las corre el **leader**, no el implementer. Worktree
 `.worktrees/QC-58-timeout-tests-ui-bajo-carga`, rama `feature/QC-58-timeout-tests-ui-bajo-carga`,
-HEAD **`13c8d8f`** (ronda 2 incluida), árbol limpio. Comando de cada corrida, literal:
+HEAD **`69452d7`** —merge con `origin/dev` (`cacdca4`) y las tres rondas dentro—, árbol limpio.
+Comando de cada corrida, literal:
 
 ```
 ./init.sh
 ```
 
-Las cinco seguidas, sin tocar nada entre una y otra, el **2026-09-08**:
+Las cinco seguidas, sin tocar el árbol entre una y otra, el **2026-09-08**. **Cada una arranca
+después de que cierre la anterior**, y las marcas de tiempo lo demuestran:
 
-| # | Inicio | Fin | Exit | Archivos | Casos |
-|---|---|---|---|---|---|
-| 1 | 13:56:07 | 13:58:47 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
-| 2 | 13:58:47 | 14:01:26 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
-| 3 | 14:01:26 | 14:04:46 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
-| 4 | 14:04:47 | 14:08:02 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
-| 5 | 14:08:03 | 14:12:26 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
+| # | Inicio | Fin | Duración | Exit | Archivos | Casos |
+|---|---|---|---|---|---|---|
+| 1 | 15:54:05 | 15:59:09 | 5m 04s | **0** | 266 passed + 1 baselined (267) | 3346 passed \| 9 skipped (3357) |
+| 2 | 15:59:18 | 16:01:47 | 2m 29s | **0** | ídem | ídem |
+| 3 | 16:01:57 | 16:04:31 | 2m 34s | **0** | ídem | ídem |
+| 4 | 16:04:36 | 16:07:18 | 2m 42s | **0** | ídem | ídem |
+| 5 | 16:07:24 | 16:10:05 | 2m 41s | **0** | ídem | ídem |
 
 Las cinco cerraron con `== init OK ==`. **Ningún archivo de test en rojo fuera del baseline en
-ninguna de las cinco**, y ninguna trajo la colisión de correlativo de `order-repository.int.test.ts`
-(R15), así que las cinco cuentan.
+ninguna de las cinco** —el único rojo es `navegacion/private-layout-menu`, ajeno y baselined por
+`dev`—, y ninguna trajo la colisión de correlativo de `order-repository.int.test.ts` (R15), así que
+las cinco cuentan.
 
 ### Salida literal del comparador de baseline, corrida por corrida (R14)
 
-El menor 6 de la review pedía esto y tenía razón: había una salida y cuatro «ídem», y R14 pide la
-de **cada** corrida. No es del implementer —T11 la corre el leader—, así que se cierra aquí, con la
-captura de las cinco tal cual salieron, sin resumir:
+```
+########## corrida 1 — exit=0 — inicio 2026-09-08T15:54:05-05:00 — fin 2026-09-08T15:59:09-05:00
+ Test Files  1 failed | 266 passed (267)
+      Tests  2 failed | 3346 passed | 9 skipped (3357)
+--- salida literal del comparador de baseline ---
+ ELIFECYCLE  Command failed with exit code 1.
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (1 rojos, todos en el baseline de 3); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 2 — exit=0 — inicio 2026-09-08T15:59:18-05:00 — fin 2026-09-08T16:01:47-05:00
+ Test Files  1 failed | 266 passed (267)
+      Tests  2 failed | 3346 passed | 9 skipped (3357)
+--- salida literal del comparador de baseline ---
+ ELIFECYCLE  Command failed with exit code 1.
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (1 rojos, todos en el baseline de 3); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 3 — exit=0 — inicio 2026-09-08T16:01:57-05:00 — fin 2026-09-08T16:04:31-05:00
+ Test Files  1 failed | 266 passed (267)
+      Tests  2 failed | 3346 passed | 9 skipped (3357)
+--- salida literal del comparador de baseline ---
+ ELIFECYCLE  Command failed with exit code 1.
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (1 rojos, todos en el baseline de 3); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 4 — exit=0 — inicio 2026-09-08T16:04:36-05:00 — fin 2026-09-08T16:07:18-05:00
+ Test Files  1 failed | 266 passed (267)
+      Tests  2 failed | 3346 passed | 9 skipped (3357)
+--- salida literal del comparador de baseline ---
+ ELIFECYCLE  Command failed with exit code 1.
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (1 rojos, todos en el baseline de 3); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 5 — exit=0 — inicio 2026-09-08T16:07:24-05:00 — fin 2026-09-08T16:10:05-05:00
+ Test Files  1 failed | 266 passed (267)
+      Tests  2 failed | 3346 passed | 9 skipped (3357)
+--- salida literal del comparador de baseline ---
+ ELIFECYCLE  Command failed with exit code 1.
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (1 rojos, todos en el baseline de 3); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
 
-```
-########## corrida 1 — exit=0 — inicio 2026-09-08T13:56:07-05:00 — fin 2026-09-08T13:58:47-05:00
- Test Files  235 passed (235)
-      Tests  2842 passed | 7 skipped (2849)
---- salida literal del comparador de baseline ---
-aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
-  tests/unit/recetas-ui/recipe-route-contract.test.ts
-  tests/unit/recetas/module-contract.test.ts
-✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
-✓ todas las migraciones tienen down.sql
-✓ .env presente
-== init OK ==
-########## corrida 2 — exit=0 — inicio 2026-09-08T13:58:47-05:00 — fin 2026-09-08T14:01:26-05:00
- Test Files  235 passed (235)
-      Tests  2842 passed | 7 skipped (2849)
---- salida literal del comparador de baseline ---
-aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
-  tests/unit/recetas-ui/recipe-route-contract.test.ts
-  tests/unit/recetas/module-contract.test.ts
-✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
-✓ todas las migraciones tienen down.sql
-✓ .env presente
-== init OK ==
-########## corrida 3 — exit=0 — inicio 2026-09-08T14:01:26-05:00 — fin 2026-09-08T14:04:46-05:00
- Test Files  235 passed (235)
-      Tests  2842 passed | 7 skipped (2849)
---- salida literal del comparador de baseline ---
-aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
-  tests/unit/recetas-ui/recipe-route-contract.test.ts
-  tests/unit/recetas/module-contract.test.ts
-✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
-✓ todas las migraciones tienen down.sql
-✓ .env presente
-== init OK ==
-########## corrida 4 — exit=0 — inicio 2026-09-08T14:04:47-05:00 — fin 2026-09-08T14:08:02-05:00
- Test Files  235 passed (235)
-      Tests  2842 passed | 7 skipped (2849)
---- salida literal del comparador de baseline ---
-aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
-  tests/unit/recetas-ui/recipe-route-contract.test.ts
-  tests/unit/recetas/module-contract.test.ts
-✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
-✓ todas las migraciones tienen down.sql
-✓ .env presente
-== init OK ==
-########## corrida 5 — exit=0 — inicio 2026-09-08T14:08:03-05:00 — fin 2026-09-08T14:12:26-05:00
- Test Files  235 passed (235)
-      Tests  2842 passed | 7 skipped (2849)
---- salida literal del comparador de baseline ---
-aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
-  tests/unit/recetas-ui/recipe-route-contract.test.ts
-  tests/unit/recetas/module-contract.test.ts
-✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
-✓ todas las migraciones tienen down.sql
-✓ .env presente
-== init OK ==
-TODAS LAS CORRIDAS TERMINADAS
-```
+### Tres tandas anteriores que NO cuentan, y por qué se anotan igual
+
+R13 pide cinco corridas **seguidas** y sobre **un árbol que no se toca**. Tres tandas se
+descartaron por incumplir una de las dos cosas. Se anotan porque cada una enseñó algo:
+
+| Tanda | Por qué no cuenta | Qué dejó |
+|---|---|---|
+| sobre `6454043` | roja: `catalog-line-sheet` falló en la 1 y la 2 y **pasó en la 3** | el barrido de los 20 sitios de `pointer-events`. Es la prueba de que una sola corrida verde no prueba nada |
+| sobre `63bea8e` | verde, pero la ronda 2 **cambió el árbol** después | una prueba de estabilidad sólo prueba el árbol sobre el que corrió |
+| sobre `69452d7`, primer intento | **las corridas se solaparon** (1: 15:24:20–15:31:30, 2: 15:24:29–15:31:48) | no eran «seguidas», eran simultáneas: la medición no medía lo que decía |
+
+**La causa del solape, que costó tres intentos entender:** cuando el sistema mató una tanda por
+falta de memoria, mató el script pero **no a sus hijos**. Catorce procesos `node` y el bucle `bash`
+que los lanzaba siguieron corriendo gates por su cuenta durante media hora, compitiendo por la RAM
+con las tandas nuevas —y matándolas— y escribiendo sus resultados en el mismo archivo de evidencia.
+Había 2,1 GB libres de 23,8; tras matarlos, 8,6 GB, y la corrida completa bajó de **7 minutos a
+2m 30s**. El `una.sh` de la tanda buena lleva un cerrojo que aborta con `exit 2` si encuentra otro
+gate en curso, pero **el cerrojo no habría bastado**: sólo protege de invocaciones propias, no de
+procesos huérfanos sin dueño. Lo que hizo falta fue comprobar `Win32_Process` y matarlos.
+
+Deuda de arnés que esto deja, y no es pequeña: **una tanda de gate matada por el sistema deja
+procesos vivos que corrompen la siguiente medición sin avisar**. Candidata a `/afinar-regla`.
 
 ### La tanda de `63bea8e`, que estas cinco sustituyen
 
