@@ -134,7 +134,7 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
 }));
 
-const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul' };
+const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 const CANTIDAD = '12.5000';
@@ -392,7 +392,11 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
 
     await screen.findByTestId(ORDER_FORM_TESTID);
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
-    expect(screen.getByTestId('order-field-quantity')).toHaveValue(elPedido.quantity);
+    // Cadena del DOM y no `toHaveValue`: sobre el control numerico ese matcher compara
+    // `valueAsNumber`, y `12.5000` y `12.5` son el mismo numero pero no la misma cadena (R39).
+    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe(
+      elPedido.quantity,
+    );
   });
 
   it('con el pedido en estado final la accion de editar no abre ningun panel', async () => {

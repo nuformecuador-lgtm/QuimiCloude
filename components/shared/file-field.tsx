@@ -84,6 +84,13 @@ export type FileFieldProps = {
   readonly previewUrl?: string | null;
   /** Llamada a la accion de la zona vacia. */
   readonly placeholder?: string;
+  /**
+   * Imagen de marcador para la zona VACIA -sin vista previa y sin archivo elegido-. Sin ella, la
+   * zona pinta el icono de subida de siempre. La usa el campo de imagen de la receta para
+   * ensenar el mismo marcador que las tablas de inventario y de proveedores, en vez de un
+   * marcador propio (2026-09-07, decision humana).
+   */
+  readonly emptyImageSrc?: string;
   /** Validacion de dominio sobre los bytes finales (firma, cabeceras...). */
   readonly validateBytes?: (bytes: Uint8Array, type: UploadableFileType) => FileFieldValidation;
   /** Prefijo de los `data-testid`: `<prefijo>-field`, `-input`, `-error`, `-preview`, `-clear`. */
@@ -111,6 +118,7 @@ export function FileField({
   clearLabel = 'Quitar archivo',
   previewUrl = null,
   placeholder = 'Arrastra un archivo aquí o haz clic para elegirlo',
+  emptyImageSrc,
   validateBytes,
   testIdPrefix,
 }: FileFieldProps) {
@@ -247,6 +255,21 @@ export function FileField({
           />
         ) : chosen !== null ? (
           <FileIcon className="size-8 text-muted-foreground" aria-hidden />
+        ) : emptyImageSrc !== undefined ? (
+          /*
+            Marcador de la zona vacia: una imagen, no el icono. Es DECORATIVA -`alt` vacio y
+            `aria-hidden`-, porque lo que nombra al campo es su `<Label>` y lo que explica que
+            hacer es el texto de debajo; anunciarla seria ruido. `testId` propio, nunca el de la
+            vista previa: los tests afirman que `-preview` NO existe cuando no hay imagen.
+          */
+          // eslint-disable-next-line @next/next/no-img-element -- marcador local servido de `public/`, sin optimizacion propia
+          <img
+            src={emptyImageSrc}
+            alt=""
+            aria-hidden
+            className="h-28 w-28 rounded-lg border border-border object-cover"
+            data-testid={`${testIdPrefix}-empty-image`}
+          />
         ) : (
           <UploadCloudIcon
             className={`size-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`}

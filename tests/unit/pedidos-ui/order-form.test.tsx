@@ -23,6 +23,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ORDER_BUSINESS_FIELDS,
   ORDER_FORM_ERROR_TESTID,
+  ORDER_FORM_TITLE_TESTID,
+  ORDER_RECIPE_IMAGE_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   ORDER_FORM_TESTID,
   ORDER_PRIORITY_OPTION_TESTID,
@@ -36,6 +38,7 @@ import {
   RECIPE_PICKER_TESTID,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import { Sheet } from '@/components/ui/sheet';
 import {
   DEFAULT_ORDER_PRIORITY,
@@ -85,7 +88,13 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
 }));
 
-const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul' };
+const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
+/** Segunda receta, esta CON imagen: es la que prueba que el marcador se sustituye (2026-09-08). */
+const RECETA_CON_IMAGEN = {
+  id: crypto.randomUUID(),
+  name: 'Barniz mate',
+  imageUrl: 'https://ejemplo.test/barniz.png',
+};
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta (R39).
@@ -114,10 +123,10 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
 
 const onSaved = vi.fn();
 
-function renderFormulario(order?: OrderSummary) {
+function renderFormulario(order?: OrderSummary, recipes: RecipePickerPage = RECETAS) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={RECETAS} onSaved={onSaved} />
+      <OrderForm order={order} recipes={recipes} onSaved={onSaved} />
     </Sheet>,
   );
 }
@@ -126,6 +135,11 @@ function renderFormulario(order?: OrderSummary) {
 async function elegirCatalogos(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
   await user.click(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`));
+}
+
+/** El control de cantidad, tipado: sus asserts miran la CADENA del DOM, no `valueAsNumber`. */
+function cantidad(): HTMLInputElement {
+  return screen.getByTestId('order-field-quantity') as HTMLInputElement;
 }
 
 async function rellenarAlta(user: ReturnType<typeof userEvent.setup>) {
@@ -186,12 +200,15 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
     expect(enviado.get('quantity')).toBe(CANTIDAD);
   });
 
-  it('captura la cantidad con un control de TEXTO, nunca con el numerico del navegador', () => {
-    // R39 — el valor de un `type="number"` de HTML pasa por el binario de coma flotante.
+  it('captura la cantidad con el control NUMERICO del navegador, con paso libre', () => {
+    // Enmienda humana del 2026-09-08 a R39: el control es numerico. Lo que R39 protege sigue
+    // comprobado por el test de arriba, que afirma que `0.1005` llega intacta al `FormData`.
+    // `step="any"` es imprescindible: con el paso entero por defecto un decimal seria invalido.
     renderFormulario();
 
     const control = screen.getByTestId('order-field-quantity');
-    expect(control).toHaveAttribute('type', 'text');
+    expect(control).toHaveAttribute('type', 'number');
+    expect(control).toHaveAttribute('step', 'any');
     expect(control).toHaveAttribute('inputmode', 'decimal');
 
     // Y el campo de precio unitario NO existe: se fue con la columna (2026-09-07).
@@ -270,7 +287,10 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     renderFormulario(elPedido);
 
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
-    expect(screen.getByTestId('order-field-quantity')).toHaveValue(elPedido.quantity);
+    // El valor del control se lee como CADENA a proposito: `toHaveValue` sobre un control
+    // numerico devuelve `valueAsNumber`, que es justo la conversion que R39 no admite como
+    // prueba. Lo que importa es que el DOM siga guardando la cadena tal cual.
+    expect(cantidad().value).toBe(elPedido.quantity);
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
@@ -369,7 +389,7 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('duplicate_number');
     // Lo escrito sigue ahi (R34): React 19 resetea los campos no controlados al completarse la
     // action, asi que el estado de fallo los devuelve por `defaultValue`.
-    expect(screen.getByTestId('order-field-quantity')).toHaveValue('7.7777');
+    expect(cantidad().value).toBe('7.7777');
     expect(onSaved).not.toHaveBeenCalled();
   });
 
@@ -395,9 +415,57 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     expect(fuente).toContain("updateOrderSchema");
     expect(fuente).toContain("from '@/lib/modules/pedidos'");
     expect(fuente).toContain("@/lib/modules/pedidos/adapters/driving/order-actions");
-    expect(fuente).not.toContain('type="number"');
     expect(fuente).not.toContain('parseFloat(');
     expect(fuente).not.toContain('toFixed(');
     expect(fuente).not.toContain('@/lib/composition');
+  });
+});
+
+describe('la cabecera describe el pedido y el panel ensena la receta (2026-09-08)', () => {
+  // Decision humana, sin requisito EARS detras: el titulo pasa a ser `<receta> × <cantidad>` y el
+  // panel reserva un hueco para la imagen de la receta. Se afirma sobre DATOS -el nombre de la
+  // receta y la cantidad tecleada-, no sobre copy (R44).
+
+  it('el titulo pasa a nombrar la receta elegida y la cantidad tecleada', async () => {
+    const user = userEvent.setup();
+    renderFormulario();
+
+    const titulo = screen.getByTestId(ORDER_FORM_TITLE_TESTID);
+    expect(titulo.textContent).not.toContain(RECETA.name);
+
+    await rellenarAlta(user);
+
+    expect(titulo.textContent).toContain(RECETA.name);
+    expect(titulo.textContent).toContain(CANTIDAD);
+  });
+
+  it('el hueco de la imagen existe desde el principio, con el marcador comun', () => {
+    renderFormulario();
+
+    const imagen = screen.getByTestId(ORDER_RECIPE_IMAGE_TESTID);
+    expect(imagen).toHaveAttribute('data-missing', 'true');
+    expect(imagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
+  });
+
+  it('elegir una receta con imagen sustituye el marcador por ella', async () => {
+    const user = userEvent.setup();
+    renderFormulario(undefined, { items: [RECETA_CON_IMAGEN], totalPages: 1 });
+
+    await elegirCatalogos(user);
+
+    const imagen = screen.getByTestId(ORDER_RECIPE_IMAGE_TESTID);
+    expect(imagen).toHaveAttribute('src', RECETA_CON_IMAGEN.imageUrl);
+    expect(imagen).not.toHaveAttribute('data-missing');
+  });
+
+  it('y elegir una receta SIN imagen (ruta nula) deja el marcador donde estaba', async () => {
+    const user = userEvent.setup();
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    const imagen = screen.getByTestId(ORDER_RECIPE_IMAGE_TESTID);
+    expect(imagen).toHaveAttribute('data-missing', 'true');
+    expect(imagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
   });
 });

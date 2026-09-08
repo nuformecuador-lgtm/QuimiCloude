@@ -227,9 +227,8 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
       'no se emitio la cookie de sesion',
     ).toBe(true);
 
-    // --- 4. Cerrar sesion -> login. El control vive dentro del menu de usuario, asi que hay que
-    // abrirlo primero: es exactamente lo que hace una persona.
-    await page.getByTestId('private-user-trigger').click();
+    // --- 4. Cerrar sesion -> login. Desde el 2026-09-07 (decision humana) el control es un boton
+    // del encabezado, junto al de tema: un solo gesto, sin menu que abrir antes.
     await page.getByTestId('private-logout').click();
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
 

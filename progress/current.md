@@ -12,8 +12,8 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **spec aprobado por el humano el 2026-09-08**, tarjeta en *En curso*. `implementer` corriendo las 14 tasks (F2.1) |
-| QC-45 | pantalla-de-presentaciones | Inventario | frontend | in_progress | feature/QC-45-pantalla-de-presentaciones | **F2.2 APROBADO** (0 mayores, 7 menores, 34/36 con test). **Commiteada (`30e9e2b`), sincronizada con `origin/dev` y PUSHEADA.** F2.4 (PR) **bloqueado** por la base compartida; y sin T2/T12 no se cierra |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **12/17 tasks, trabajo rescatado y commiteado el 2026-09-08** (la sesion del `implementer` murio dejando 41 archivos sin commitear). Estuvo **BLOQUEADA**: `delay: null` ponia `unit-select` rojo 6/6 por la comprobacion de `pointer-events` de los popups de Base UI. **Desbloqueada por decision humana** — se espera a que la opcion sea interactiva, sin excepciones nuevas y sin reabrir la decision n3. `implementer` cerrando T4c/T4e/T5 y reformulando R9 |
+| QC-45 | pantalla-de-presentaciones | Inventario | frontend | in_progress | feature/QC-45-pantalla-de-presentaciones | **Rondas 1-3 hechas y reviewer APROBADO** (0 mayores). **36/36 requisitos verificados**, E2E incluido. Commits `30e9e2b`, `a342465`, `4cabc05`. Gate completo corriendo; despues, **PR**. **T10 (WebKit manual) sigue pendiente y no la puede hacer un agente** |
 | QC-38 | crud-de-unidades | Catálogos | backend | in_progress | feature/QC-38-crud-de-unidades | **spec aprobado por el humano el 2026-09-08** (F1.4). 36 requisitos EARS, 24 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1) |
 | QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | pending | feature/QC-65-estado-de-cuenta-de-usuario | **F1.0 hecho el 2026-09-08**: worktree montado desde `origin/dev` (`5ee52fe`), `complexity: low` evaluada y escrita en Jira. Pendiente F1.2 |
 
@@ -241,6 +241,42 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-65 — acotada con `/afinar-feature` (2026-09-08)
+
+Alcance, 12 decisiones cerradas y cero preguntas abiertas en
+`specs/QC-65-estado-de-cuenta-de-usuario/requirements.md`. La acotación **cambió el alcance** y el
+board se actualizó primero: QC-65, QC-66 y QC-67 reescritas (el estado deja de ser un sí/no y pasa
+a cuatro valores —`active`, `pending`, `inactive`, `blocked`—, la cuenta nace `pending` y se guarda
+quién y cuándo la cambió), más dos fichas nuevas: **QC-78** (el estado manda en el acceso; unifica
+`blocked` con el bloqueo por intentos fallidos de QC-19) y **QC-79** (contraseña opcional al crear
+y enlace para establecerla; **arrastra envío de correo, dependencia nueva con aprobación humana**).
+`complexity: low` y `zone: backend` escritas como labels en Jira.
+
+### QC-45 — rondas 2 y 3, y lo que enseñaron (2026-09-08)
+
+- **Reviewer ronda 2: APROBADO**, 0 mayores y 8 menores, **36/36 requisitos con test mapeado**.
+  Tras la ronda 3, **36/36 EJECUTADOS**: el E2E, que se habia reescrito y nunca corrido, dio
+  **4 passed en chromium y webkit**. Mapeado no es verificado, y R36 era el unico que lo
+  demostraba.
+- **El spec describia un mecanismo muerto y se reformulo** (`spec_author`): R2, R4, R5, R6, R33 y
+  R36, mas diez secciones del `design.md`. **La 3.2 argumentaba POR ESCRITO EN CONTRA de usar
+  `inventario.modificar`**, que es lo que el codigo hace. Se reescribio **sin borrar el
+  razonamiento viejo**: queda en un recuadro que cita la frase, identifica la premisa que la
+  sostenia y explica por que al invertirse pasa a sostener lo contrario. La tabla de decisiones
+  cerradas no perdio ni una fila: gano tres fechadas.
+- **Hallazgo del reviewer que evita una trampa a QC-39:** QC-75 R5 exige que el permiso de un item
+  de navegacion tenga la forma `<modulo>.consultar`, y este declara `inventario.modificar` porque
+  `inventario.consultar` lo tienen Administrador **y** Operador. La eleccion es correcta pero no
+  estaba escrita; **QC-39 habria leido R5 al pie de la letra**. Anotada en el `design.md` con el
+  aviso de que QC-39 debe usar `unidades.consultar`.
+- **Cuatro textos afirmaban lo contrario del codigo** —incluidos dos comentarios que seguian
+  diciendo que el item de menu de Configuracion no existe en esta feature—. Corregidos. Al
+  verificarlos aparecio que los archivos de test heredados modificados son **siete y no seis**: el
+  propio informe del reviewer nombraba siete mientras su texto decia seis.
+- **La leccion transversal del dia, y no es sobre esta ficha:** tres veces un diagnostico rapido
+  resulto falso al medirlo —«es una regresion» (era un timeout), «son dos lineas» (eran quince
+  siembras), «lo rompe QC-45» (pasa aislado en las dos ramas)—. Lo que funciono siempre fue lo
+  mismo: **correr el caso sospechoso en `dev` limpio y comparar.**
 ### QC-45 — F2.3 (sincronización) del 2026-09-08
 
 - **Commit `30e9e2b`**: 35 archivos, 6394 inserciones. Antes de esto **las 11 tasks aprobadas

@@ -903,7 +903,7 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "estado-de-cuenta-de-usuario",
-      "description": "Una cuenta de usuario puede estar habilitada o deshabilitada. Nace habilitada. Deshabilitarla no borra nada ni libera su correo, su nombre de usuario ni su numero de documento: la cuenta sigue existiendo y se puede volver a habilitar. Esta ficha solo agrega y persiste el estado de la cuenta sobre el modelo de usuarios que ya existe. Quien puede cambiar ese estado, y que pasa con una sesion ya abierta cuando la cuenta se deshabilita, van aparte.",
+      "description": "Una cuenta de usuario tiene un ESTADO, con cuatro valores en ingles: active, pending, inactive, blocked. active es que la cuenta funciona; pending es creada pero todavia no habilitada para entrar; inactive es apagada a proposito por un administrador, y es reversible; blocked es bloqueada por seguridad.\n\n--- Acotada el 2026-09-08 ---\n\nUNA CUENTA NUEVA NACE pending. Esta descripcion decia antes \"nace habilitada\": lo corrige la acotacion del 2026-09-08. Las filas que YA existen quedan active al migrar, incluido el usuario inicial del seed de QC-6, que tiene que seguir entrando.\n\nSE GUARDA EL RASTRO DEL ULTIMO CAMBIO de estado: cuando fue y quien lo hizo. Quien es opcional: vacio significa que lo hizo el sistema y no una persona.\n\nDeshabilitar una cuenta no borra nada ni libera su correo, su nombre de usuario ni su numero de documento: los indices unicos no cambian, la cuenta sigue existiendo y se puede volver a habilitar. El borrado logico (deleted_at, QC-4) sigue siendo otra cosa distinta.\n\nESTA FICHA SOLO AGREGA Y PERSISTE el estado y su rastro sobre el modelo de usuarios que ya existe: las columnas, la migracion con su down y la persistencia. Nadie lee todavia el estado para decidir nada.\n\nNO ENTRA que el estado mande en el acceso -que solo active entre al login, que el bloqueo por intentos fallidos de QC-19 pase a escribir blocked, que el desbloqueo manual limpie el contador de intentos, y que pasa con una sesion ya abierta-. Va en QC-78, bloqueada por esta. QC-65 NO toca lock_level, locked_until ni sus tests.\n\nNO ENTRAN los casos de uso que cambian el estado (QC-66) ni la pantalla (QC-67).",
       "status": "pending",
       "sdd": true,
       "complexity": "low",
@@ -918,7 +918,7 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "crud-de-usuarios",
-      "description": "Crear, consultar, editar y listar usuarios, mas habilitar y deshabilitar una cuenta. La contrasena nunca se devuelve en ninguna consulta. La pantalla va aparte.",
+      "description": "Crear, consultar, editar y listar usuarios, mas CAMBIAR EL ESTADO DE LA CUENTA. La contrasena nunca se devuelve en ninguna consulta. La pantalla va aparte.\n\n--- Acotado el 2026-09-08, al acotar QC-65 ---\n\nEL ESTADO DE LA CUENTA TIENE CUATRO VALORES -active, pending, inactive, blocked- y los crea QC-65. Esta ficha ya no habilita y deshabilita: mueve la cuenta entre los cuatro. El administrador puede moverla a cualquiera de ellos, blocked incluido, porque sacar a alguien de blocked es lo natural cuando se equivoco cinco veces de contrasena. Sacarla de blocked tiene que limpiar ademas el contador de intentos fallidos o se bloquearia sola otra vez, y ESO lo implementa QC-78, no esta.\n\nEL USUARIO QUE SE CREA NACE pending, no habilitado para entrar.\n\nNO ENTRA que la contrasena sea opcional al crear el usuario ni el enlace para establecerla: va en QC-79, bloqueada por esta.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -933,7 +933,7 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "pantalla-de-usuarios",
-      "description": "Listado y formulario de usuarios sobre la tabla de datos compartida, con la accion de habilitar y deshabilitar una cuenta. No construye backend propio: consume el CRUD de usuarios.",
+      "description": "Listado y formulario de usuarios sobre la tabla de datos compartida, con la accion de CAMBIAR EL ESTADO DE LA CUENTA entre sus cuatro valores -active, pending, inactive, blocked-, que crea QC-65. No construye backend propio: consume el CRUD de usuarios.\n\nActualizado el 2026-09-08, al acotar QC-65: esta descripcion decia \"habilitar y deshabilitar una cuenta\", que era el modelo de dos valores que la acotacion sustituyo.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -1106,6 +1106,40 @@
       "branch": "feature/QC-77-aislamiento-de-la-base-en-tests-de-integracion",
       "depends_on": null,
       "spec_path": "specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion"
+    },
+    {
+      "key": "QC-78",
+      "id": 78,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "estado-de-cuenta-en-el-acceso",
+      "description": "QC-65 crea el estado de la cuenta -active, pending, inactive, blocked- y lo persiste, pero nadie lo lee. Esta ficha es quien lo lee, y son tres cosas que caen en el mismo archivo -verify-credentials- y por eso no se parten.\n\nSOLO active ENTRA AL LOGIN. pending, inactive y blocked no entran, y las tres reciben EXACTAMENTE el mismo resultado generico que QC-7 dejo congelado: no se revela si fallo el usuario, la contrasena o el estado de la cuenta. Distinguir los casos en pantalla le confirmaria a un atacante que ese usuario existe.\n\nEL BLOQUEO POR INTENTOS FALLIDOS PASA A ESCRIBIR blocked. Decidido el 2026-09-08 al acotar QC-65: blocked y el bloqueo automatico de QC-19 son la misma cosa, no dos. Hoy ese bloqueo vive en lock_level y locked_until con escalada de tiempo y desbloqueo solo; unificarlo es reescribir ese mecanismo, con sus tests de concurrencia -el registro condicional del intento fallido, el compareAndSet que evita que un estado obsoleto borre un bloqueo vivo-. QC-65 no lo toco a proposito para no llevarse esto por delante.\n\nEL ADMINISTRADOR PUEDE SACAR UNA CUENTA DE blocked, y al hacerlo hay que limpiar el contador de intentos fallidos: si no, la cuenta se vuelve a bloquear sola al primer intento. La operacion que mueve el estado es de QC-66; la limpieza del contador es de esta ficha, que es la duena del mecanismo.\n\nQUE PASA CON UNA SESION YA ABIERTA cuando la cuenta deja de estar active. QC-65 lo dejo explicitamente fuera y aqui es donde se decide.\n\nVA DESPUES DE QC-65, que crea las columnas.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-78-estado-de-cuenta-en-el-acceso",
+      "depends_on": [
+        "QC-65"
+      ],
+      "spec_path": "specs/QC-78-estado-de-cuenta-en-el-acceso"
+    },
+    {
+      "key": "QC-79",
+      "id": 79,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "alta-sin-contrasena-y-enlace",
+      "description": "Decidida el 2026-09-08 al acotar QC-65, que cerro que la cuenta nace pending.\n\nLA CONTRASENA PASA A SER OPCIONAL AL CREAR UN USUARIO. Si el administrador la escribe, todo sigue como en QC-66. Si no la escribe, no se inventa ninguna: a la persona se le envia un enlace con el que establece su propia contrasena, y al establecerla la cuenta pasa de pending a active. Es el unico camino por el que una cuenta se activa sola; el otro sigue siendo el administrador moviendo el estado a mano desde QC-66.\n\nARRASTRA ENVIO DE CORREO, que hoy no existe en ninguna parte del ERP. Eso es una DEPENDENCIA NUEVA y no entra sin aprobacion humana: los cuatro checks de salud y su fila en docs/dependencias.md son condicion (regla 7 de CLAUDE.md). Elegir el proveedor es parte de esta ficha y se decide al acotarla, no al implementarla.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: cuanto vive el enlace, si se puede reenviar, y si sirve tambien para recuperar una contrasena olvidada -que hoy no tiene ficha- o solo para el alta.\n\nLA CONTRASENA QUE SE ESTABLECE PASA POR LA POLITICA DE QC-19, sin excepciones, y por el hashing de QC-5. El enlace no es una puerta lateral a la politica de contrasenas.\n\nVA DESPUES DE QC-66, que es quien crea usuarios.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-79-alta-sin-contrasena-y-enlace",
+      "depends_on": [
+        "QC-66"
+      ],
+      "spec_path": "specs/QC-79-alta-sin-contrasena-y-enlace"
     }
   ]
 }

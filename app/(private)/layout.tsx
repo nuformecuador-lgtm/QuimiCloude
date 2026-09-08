@@ -10,7 +10,7 @@ import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
-import { SidebarToggle, ThemeToggle } from './components';
+import { LogoutButton, SidebarToggle, ThemeToggle } from './components';
 
 /**
  * Layout compartido por toda la zona privada (R1, `design.md > 5.2`).
@@ -62,7 +62,20 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
         se anida otro: R5 exige un landmark `main` unico. Un `<header>` dentro de `<main>` es
         HTML valido y no crea landmark `banner`, que es justo lo que se quiere.
       */}
-      <SidebarInset data-testid="private-content">
+      {/*
+        `min-w-0` NO es decoracion: `SidebarInset` es un elemento flexible dentro del envoltorio
+        del panel lateral, y un elemento flexible tiene `min-width: auto`, o sea que su ancho
+        MINIMO es el de su contenido. Con una tabla ancha dentro, el contenido principal se
+        estiraba mas alla de la ventana y el scroll horizontal se lo comia el documento entero:
+        la tabla se salia del contenedor principal y arrastraba la cabecera y el resto de la
+        pantalla con ella. Con `min-w-0` el contenido puede encoger hasta el ancho disponible, y
+        el desbordamiento lo absorbe quien debe -el `div[data-slot=table-container]` del
+        primitivo, que ya declara `overflow-x-auto`-.
+
+        Se pasa por `className` desde aqui, no editando `components/ui/sidebar.tsx`: el primitivo
+        no se toca (R21, R48), y el `cn` del propio primitivo compone las dos clases.
+      */}
+      <SidebarInset data-testid="private-content" className="min-w-0">
         <header
           data-testid="private-header"
           className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4"
@@ -82,10 +95,16 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
             <SidebarToggle />
           </div>
           {/* `ml-auto` y no solo el `justify-between` del header: en escritorio el control de
-              la izquierda esta oculto y no ocupa espacio, asi que sin esto el de tema se
-              quedaria pegado al borde izquierdo. */}
-          <div className="ml-auto">
+              la izquierda esta oculto y no ocupa espacio, asi que sin esto los de la derecha se
+              quedarian pegados al borde izquierdo.
+
+              El cierre de sesion vive AQUI desde el 2026-09-07 (decision humana), junto al de
+              tema, y ya no dentro del menu del pie de la barra lateral: era el unico item de ese
+              menu, costaba dos gestos y en modo icono era el unico camino. Detalle en
+              `./components/logout-button.tsx`. */}
+          <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            <LogoutButton />
           </div>
         </header>
         {children}

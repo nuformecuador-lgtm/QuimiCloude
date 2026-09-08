@@ -65,7 +65,12 @@ async function loadFormCatalogs(): Promise<{ readonly recipes: RecipePickerPage 
     recipes:
       recipes.status === 'success'
         ? {
-            items: recipes.data.items.map((recipe) => ({ id: recipe.id, name: recipe.name })),
+            items: recipes.data.items.map((recipe) => ({
+              id: recipe.id,
+              name: recipe.name,
+              // `imageUrl` ya viene compuesta por `recetas`; aqui no se inventa ninguna URL.
+              imageUrl: recipe.imageUrl,
+            })),
             totalPages: recipes.data.totalPages,
           }
         : { items: [], totalPages: FIRST_PAGE },

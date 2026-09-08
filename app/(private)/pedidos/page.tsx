@@ -6,7 +6,6 @@ import { BRAND_LABEL, ORDERS_LABEL } from '@/lib/shared/navigation/private-nav';
 import {
   OrderListSection,
   OrderListSkeleton,
-  buildOrderListQuery,
   parseOrderListParams,
   type OrderListSearchParams,
 } from './components';
@@ -37,11 +36,10 @@ export const metadata: Metadata = {
  * filtros, que es lo que R25 exige al cerrar el panel lateral. `searchParams` es una `Promise`,
  * como pide el App Router.
  *
- * **La `key` del `<Suspense>` es lo que hace reaparecer el esqueleto en CADA cambio** de pagina,
- * orden, filtro o tamano (R21). Sin ella, Next reutiliza el limite y el usuario se queda mirando
- * el resultado anterior sin ninguna senal de que algo esta en vuelo. La `key` es la propia cadena
- * de consulta canonica: dos consultas distintas no pueden compartirla y la misma consulta no la
- * cambia.
+ * **El `<Suspense>` YA NO lleva `key`** (2026-09-07): la llevaba para que el esqueleto de R21
+ * reapareciera en cada cambio de pagina, orden, filtro o tamano, pero remontar el limite borraba
+ * la barra de filtros -y el foco del campo que se estaba escribiendo-. Esa senal la da ahora
+ * `OrderTable` mientras la navegacion esta en vuelo, sin desmontar nada.
  *
  * **Aqui no se decide ningun permiso** (R6): el corte de ruta lo hace el middleware con la regla
  * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `pedidos`.
@@ -64,10 +62,13 @@ export default async function PedidosPage({
           {ORDERS_LABEL}
         </h1>
       </div>
-      <Suspense
-        key={buildOrderListQuery(params)}
-        fallback={<OrderListSkeleton rows={params.pageSize} />}
-      >
+      {/*
+        SIN `key`: remontar este limite en cada cambio de consulta destruia la barra de filtros y
+        con ella el foco del campo en el que se estaba escribiendo. La senal de R21 la da ahora
+        `OrderTable` mientras la navegacion esta en vuelo, sin desmontar la barra; el `fallback` de
+        aqui cubre la primera carga.
+      */}
+      <Suspense fallback={<OrderListSkeleton rows={params.pageSize} />}>
         <OrderListSection params={params} />
       </Suspense>
     </div>

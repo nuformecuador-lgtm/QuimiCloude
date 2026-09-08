@@ -235,6 +235,19 @@ del navegador.
 > pantalla. Un pedido es hoy **receta + cantidad + prioridad + estado**, más su correlativo, sus
 > autores y su borrado lógico.
 >
+> **ENMIENDA DEL 2026-09-08 (decisión humana).** La cantidad **sí se captura con el control
+> numérico del navegador**: el veto de R39 a ese control queda levantado, y con él la regla
+> correspondiente de la guardia `tests/unit/pedidos-ui/pedidos-convenciones.test.ts`. El resto de
+> R39 sigue **íntegro y vigilado**: la cantidad se presenta y se envía como la cadena decimal que
+> el contrato entrega y espera, no se convierte a coma flotante, no se opera aritméticamente con
+> ella y no se reescribe —la guardia pasó a vetar también `.replace(` sobre una línea de importe—.
+> El test que afirma que `0.1005` llega intacta al `FormData` no cambió.
+>
+> En la misma decisión: el título del panel deja de ser el rótulo fijo y pasa a ser
+> `<receta> × <cantidad>` en cuanto hay receta elegida, y el panel reserva un hueco para la imagen
+> de la receta con el marcador común de la aplicación (`MISSING_IMAGE_SRC`), que se sustituye por
+> la imagen de la receta elegida siempre que su `imageUrl` no sea nula.
+
 > Los requisitos que hablan de la unidad o del precio unitario quedan **sin sujeto**; se conservan
 > escritos para que se vea qué se decidió antes y qué lo sustituyó, no porque sigan vigentes. Sus
 > tests se retiraron uno a uno, cada uno con la nota de por qué (búsquese «QC-35bis» en

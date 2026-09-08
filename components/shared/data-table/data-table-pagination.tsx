@@ -18,6 +18,21 @@ import type { DataTableParams, DataTableTexts } from './data-table-types';
  * Barra de paginacion (`design.md`, T6): anterior/siguiente, indicador de pagina y selector de
  * tamano. Solo emite `onParamsChange` con el `DataTableParams` completo (R6, R7); no consulta
  * nada ni navega (R2, R30).
+ *
+ * **Fija al fondo de la ventana** (2026-09-07, decision humana): con una pagina de 25 filas hay
+ * que recorrer la lista entera para volver a paginar, y en el movil eso es todo el gesto de una
+ * mano. `sticky bottom-0` la mantiene a la vista mientras la lista se desplaza y la devuelve a su
+ * sitio al llegar al final; NO es `fixed`, asi que sigue ocupando su hueco en el flujo y no tapa
+ * la ultima fila.
+ *
+ * Dos condiciones para que eso funcione, y las dos se cumplen aqui: el fondo es OPACO
+ * (`bg-background`) porque las filas pasan por debajo, y su `z-20` esta por encima del
+ * `z-index: 1` de las columnas fijadas (`data-table.tsx`), que si no la atravesarian. Es `z-20` y
+ * no la escala inmediatamente inferior porque una guardia del directorio
+ * (`data-table-params.test.ts`) prohibe ese literal en estas fuentes, no por jerarquia.
+ *
+ * `sticky` depende ademas de que ningun ancestro recorte con `overflow`: por eso la barra vive
+ * FUERA del `div[data-slot=table-container]`, que es el que si desplaza en horizontal.
  */
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -41,7 +56,10 @@ export function DataTablePagination({
   const isLastPage = params.page >= totalPages;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3" data-testid="data-table-pagination">
+    <div
+      className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t bg-background py-3"
+      data-testid="data-table-pagination"
+    >
       <div className="flex items-center gap-2">
         <Button
           type="button"

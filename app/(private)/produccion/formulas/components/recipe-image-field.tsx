@@ -1,5 +1,6 @@
 'use client';
 
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import { FileField } from '@/components/shared/file-field';
 import type { UploadableFileType } from '@/components/shared/file-types';
 import { MAX_IMAGE_BYTES, validateRecipeImage } from '@/lib/modules/recetas';
@@ -52,6 +53,13 @@ export function RecipeImageField({ mode, initialImageUrl, value, onChange }: Rec
       maxBytes={MAX_IMAGE_BYTES}
       testIdPrefix="recipe-image"
       placeholder="Arrastra la imagen aquí o haz clic para elegirla"
+      /*
+        El mismo marcador que las tablas de inventario y del catalogo de un proveedor
+        (`MISSING_IMAGE_SRC`, 2026-09-07): mientras la receta no tenga imagen, el campo ensena esa
+        imagen en vez del icono de subida, y la aplicacion entera dice «aqui no hay imagen» de una
+        sola manera.
+      */
+      emptyImageSrc={MISSING_IMAGE_SRC}
       clearLabel="Quitar imagen"
       // R36: en el alta no hay nada que quitar; y ya vaciada, tampoco.
       clearable={mode === 'edit' && value.kind !== 'cleared'}

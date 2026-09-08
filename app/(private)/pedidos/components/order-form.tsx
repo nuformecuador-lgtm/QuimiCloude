@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useId } from 'react';
+import { useActionState, useEffect, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,13 @@ import {
   updateOrderAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { OrderField } from './order-field';
-import { RECIPE_FIELD, RecipePicker, type RecipePickerPage } from './recipe-picker';
+import { OrderRecipeImage } from './order-recipe-image';
+import {
+  RECIPE_FIELD,
+  RecipePicker,
+  type RecipePickerOption,
+  type RecipePickerPage,
+} from './recipe-picker';
 import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from './order-status-badge';
 
 /**
@@ -98,6 +104,7 @@ export const ORDER_PRIORITY_OPTION_TESTID = 'order-priority-option';
 export const ORDER_STATUS_SELECT_TESTID = 'order-status-select';
 export const ORDER_STATUS_OPTION_TESTID = 'order-status-option';
 export const ORDER_FORM_TESTID = 'order-form';
+export const ORDER_FORM_TITLE_TESTID = 'order-form-title';
 export const ORDER_FORM_ERROR_TESTID = 'order-form-error';
 export const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
 export const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
@@ -108,6 +115,27 @@ type OrderFieldName =
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
+
+const CREATE_TITLE = 'Nuevo pedido';
+const EDIT_TITLE = 'Editar pedido';
+
+/** Separador entre receta y cantidad en el titulo. Es el signo de multiplicar, no la letra equis. */
+const TITLE_SEPARATOR = '×';
+
+/**
+ * Titulo del panel a partir de lo elegido (decision humana del 2026-09-08): `<receta> × <cantidad>`
+ * y, sin cantidad todavia, solo la receta. Devuelve `null` cuando no hay receta elegida, que es la
+ * senal de que el panel debe volver a su rotulo.
+ *
+ * La cantidad se pinta TAL CUAL se escribio: no se convierte, no se redondea y no se formatea.
+ */
+function describeOrder(recipeName: string, quantity: string): string | null {
+  const receta = recipeName.trim();
+  if (receta === '') return null;
+
+  const cantidad = quantity.trim();
+  return cantidad === '' ? receta : `${receta} ${TITLE_SEPARATOR} ${cantidad}`;
+}
 
 /**
  * Copy de los errores por campo. Se escribe aqui y no se toma de zod: sus mensajes describen el
@@ -225,6 +253,22 @@ export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
   const formErrorId = `${fieldId}-form-error`;
   const isEdit = order !== undefined;
 
+  /*
+    Solo para la CABECERA y la IMAGEN. Lo que se envia sigue saliendo del `FormData`: el id de la
+    receta del `input` oculto del selector y la cantidad del propio campo.
+
+    En la edicion el nombre se sabe desde el principio -viene en el resumen del pedido- pero la
+    imagen no: `OrderSummary` no la trae, asi que hasta que se elija una receta se ve el marcador.
+  */
+  const [recipeName, setRecipeName] = useState(order?.recipeName ?? '');
+  const [recipeImageUrl, setRecipeImageUrl] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(order?.quantity ?? '');
+
+  function chooseRecipe(option: RecipePickerOption) {
+    setRecipeName(option.name);
+    setRecipeImageUrl(option.imageUrl);
+  }
+
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
     const values = readValues(formData, isEdit);
 
@@ -291,12 +335,14 @@ export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
       `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar vive en el pie y
       `useFormStatus()` lo sigue viendo, porque el formulario es su ancestro.
 
-      `w-full` en angosto y `sm:max-w-md` a partir de ahi, y `pb-[env(safe-area-inset-bottom)]`
-      para que el pie no quede bajo la barra de gestos de iOS (R45). El desbordamiento vertical lo
-      absorbe el CUERPO, no el panel.
+      `w-full` en angosto y, a partir de `sm`, `minScreenWidth={70}`: el panel ocupa el 70% de la
+      pantalla -el minimo gana al tope `sm:max-w-md`, que sigue de suelo si alguien quita la prop-.
+      `pb-[env(safe-area-inset-bottom)]` para que el pie no quede bajo la barra de gestos de iOS
+      (R45). El desbordamiento vertical lo absorbe el CUERPO, no el panel.
     */
     <SheetContent
       side="right"
+      minScreenWidth={70}
       className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
       data-testid="order-sheet"
       isForm
@@ -304,7 +350,9 @@ export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
       footer={<FormActions />}
     >
       <SheetHeader>
-        <SheetTitle>{isEdit ? 'Editar pedido' : 'Nuevo pedido'}</SheetTitle>
+        <SheetTitle data-testid={ORDER_FORM_TITLE_TESTID}>
+          {describeOrder(recipeName, quantity) ?? (isEdit ? EDIT_TITLE : CREATE_TITLE)}
+        </SheetTitle>
         <SheetDescription>
           {isEdit
             ? 'Cambia los datos del pedido. Se guardan todos los campos.'
@@ -328,55 +376,79 @@ export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
           </div>
         ) : null}
 
-        <RecipePicker
-          initialPage={recipes}
-          defaultValue={initialValue(RECIPE_FIELD, order?.recipeId ?? '')}
-          defaultLabel={order?.recipeName ?? ''}
-          error={fieldErrors.recipeId}
-        />
-
-        {/* Cantidad: control de TEXTO con teclado decimal, jamas el numerico de HTML (R39). */}
-        <OrderField
-          name="quantity"
-          label={FIELD_LABELS.quantity}
-          required
-          inputMode="decimal"
-          defaultValue={initialValue('quantity', order?.quantity ?? '')}
-          error={fieldErrors.quantity}
-        />
-
-        {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
-        <SelectField
-          name="priority"
-          label={FIELD_LABELS.priority}
-          defaultValue={initialValue('priority', order?.priority ?? DEFAULT_ORDER_PRIORITY)}
-          options={ORDER_PRIORITY_VALUES.map((value) => ({
-            value,
-            label: ORDER_PRIORITY_LABELS[value],
-          }))}
-          triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
-          optionTestId={ORDER_PRIORITY_OPTION_TESTID}
-          error={fieldErrors.priority}
-        />
-
         {/*
-          R26 y R29: el selector de estado existe SOLO en la edicion, y ofrece exactamente
-          `EDITABLE_STATUS_VALUES` -sin `CANCELADO`, por construccion del contrato-.
+          Rejilla de 12: la imagen ocupa 3 columnas y los campos las 9 restantes, uno al lado del
+          otro y alineados por arriba. Por debajo de `sm` la rejilla es de una sola columna -en un
+          movil, 3 de 12 no da para ninguna imagen legible-, asi que la imagen queda encima.
+
+          El hueco de la imagen esta SIEMPRE, con marcador mientras no haya receta elegida o su
+          `imageUrl` sea nula, para que la columna no cambie de ancho al elegir la primera.
         */}
-        {isEdit ? (
-          <SelectField
-            name={ORDER_STATUS_FIELD}
-            label={FIELD_LABELS.status}
-            defaultValue={initialValue(ORDER_STATUS_FIELD, editableStatusOf(order))}
-            options={EDITABLE_STATUS_VALUES.map((value) => ({
-              value,
-              label: ORDER_STATUS_LABELS[value],
-            }))}
-            triggerTestId={ORDER_STATUS_SELECT_TESTID}
-            optionTestId={ORDER_STATUS_OPTION_TESTID}
-            error={fieldErrors.status}
-          />
-        ) : null}
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-3">
+            <OrderRecipeImage imageUrl={recipeImageUrl} name={recipeName} />
+          </div>
+
+          <div className="flex flex-col gap-4 sm:col-span-9">
+            <RecipePicker
+              initialPage={recipes}
+              onSelect={chooseRecipe}
+              defaultValue={initialValue(RECIPE_FIELD, order?.recipeId ?? '')}
+              defaultLabel={order?.recipeName ?? ''}
+              error={fieldErrors.recipeId}
+            />
+
+            {/*
+              Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
+              `step="any"` para que el decimal no choque contra el paso entero por defecto. El valor
+              sigue viajando como cadena en el `FormData` y sigue validandolo el esquema del contrato.
+            */}
+            <OrderField
+              name="quantity"
+              label={FIELD_LABELS.quantity}
+              required
+              type="number"
+              step="any"
+              inputMode="decimal"
+              defaultValue={initialValue('quantity', order?.quantity ?? '')}
+              onValueChange={setQuantity}
+              error={fieldErrors.quantity}
+            />
+
+            {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
+            <SelectField
+              name="priority"
+              label={FIELD_LABELS.priority}
+              defaultValue={initialValue('priority', order?.priority ?? DEFAULT_ORDER_PRIORITY)}
+              options={ORDER_PRIORITY_VALUES.map((value) => ({
+                value,
+                label: ORDER_PRIORITY_LABELS[value],
+              }))}
+              triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
+              optionTestId={ORDER_PRIORITY_OPTION_TESTID}
+              error={fieldErrors.priority}
+            />
+
+            {/*
+              R26 y R29: el selector de estado existe SOLO en la edicion, y ofrece exactamente
+              `EDITABLE_STATUS_VALUES` -sin `CANCELADO`, por construccion del contrato-.
+            */}
+            {isEdit ? (
+              <SelectField
+                name={ORDER_STATUS_FIELD}
+                label={FIELD_LABELS.status}
+                defaultValue={initialValue(ORDER_STATUS_FIELD, editableStatusOf(order))}
+                options={EDITABLE_STATUS_VALUES.map((value) => ({
+                  value,
+                  label: ORDER_STATUS_LABELS[value],
+                }))}
+                triggerTestId={ORDER_STATUS_SELECT_TESTID}
+                optionTestId={ORDER_STATUS_OPTION_TESTID}
+                error={fieldErrors.status}
+              />
+            ) : null}
+          </div>
+        </div>
       </div>
     </SheetContent>
   );

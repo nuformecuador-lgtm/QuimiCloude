@@ -75,6 +75,12 @@ export const RECIPE_PICKER_TESTID = 'recipe-picker';
 export type RecipePickerOption = {
   readonly id: string;
   readonly name: string;
+  /**
+   * Imagen de la receta, YA compuesta por el contrato de `recetas` (`imageUrl`), o `null` cuando
+   * la receta no tiene ninguna. Viaja con la opcion para que elegir una receta pueda ensenar su
+   * imagen sin una segunda consulta; quien la pinta es el formulario, no este selector.
+   */
+  readonly imageUrl: string | null;
 };
 
 /** La primera pagina del catalogo, ya cargada por el servidor (R43). */
@@ -117,6 +123,8 @@ export type RecipePickerProps = {
   readonly defaultLabel?: string;
   /** Error del campo (R34). Se pinta en linea y marca el control como invalido. */
   readonly error?: string;
+  /** Avisa de la receta elegida. Lo usa el panel para su titulo y para la imagen. */
+  readonly onSelect?: (option: RecipePickerOption) => void;
 };
 
 export function RecipePicker({
@@ -124,6 +132,7 @@ export function RecipePicker({
   defaultValue = '',
   defaultLabel = '',
   error,
+  onSelect,
 }: RecipePickerProps) {
   const errorId = useId();
   const [open, setOpen] = useState(false);
@@ -158,7 +167,11 @@ export function RecipePicker({
       }
 
       return {
-        items: result.data.items.map((item) => ({ id: item.id, name: item.name })),
+        items: result.data.items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          imageUrl: item.imageUrl,
+        })),
         page: result.data.page,
         totalPages: result.data.totalPages,
       };
@@ -191,6 +204,7 @@ export function RecipePicker({
     setSelectedName(option.name);
     setDraft(null);
     setOpen(false);
+    onSelect?.(option);
   }
 
   // Con el desplegable cerrado o sin escribir, el campo muestra lo YA elegido.

@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { EntityImage } from '@/components/shared/entity-image';
+
 import {
   Table,
   TableBody,
@@ -24,7 +26,9 @@ import { RECIPE_COLUMNS } from './recipe-columns';
  *
  * **La imagen se pinta con `imageUrl` TAL CUAL** (R18): ninguna URL se compone, deriva ni
  * concatena aqui. Sin imagen, se pinta un marcador identificable y **no** se emite un `<img>`
- * con `src` vacio.
+ * con `src` vacio. Ese marcador es `components/shared/entity-image.tsx` desde el 2026-09-07
+ * (decision humana): la MISMA imagen que ya usan el catalogo de inventario y el de un proveedor,
+ * en vez del texto «Sin imagen» que esta pantalla pintaba por su cuenta.
  *
  * **R19 lo cumple el primitivo, no una clase escrita aqui**: `components/ui/table.tsx` envuelve
  * el `<table>` en un `div[data-slot=table-container]` con `overflow-x-auto`. El desbordamiento
@@ -65,22 +69,22 @@ export function RecipeTable({ recipes }: { readonly recipes: readonly RecipeSumm
         {recipes.map((recipe) => (
           <TableRow key={recipe.id} data-testid="recipe-row">
             <TableCell data-testid="recipe-cell-image">
-              {recipe.imageUrl === null ? (
-                <span
-                  data-testid="recipe-image-placeholder"
-                  className="text-sm text-muted-foreground"
-                >
-                  Sin imagen
-                </span>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element -- direccion ya compuesta por el backend (R18), sin optimizacion propia
-                <img
-                  src={recipe.imageUrl}
-                  alt=""
-                  className="h-10 w-10 rounded object-cover"
-                  data-testid="recipe-image"
-                />
-              )}
+              {/*
+                El marcador de «sin imagen» es LA MISMA imagen que pintan el catalogo de
+                inventario y el de un proveedor (2026-09-07, decision humana): antes esta pantalla
+                decia «Sin imagen» en texto y las otras dos pintaban `MISSING_IMAGE_SRC`, tres
+                pantallas equivalentes con dos marcadores distintos. Lo aporta el componente
+                compartido, que ademas cubre la direccion que no resuelve.
+
+                El `data-testid` sigue distinguiendo los dos casos -`recipe-image` cuando hay
+                direccion, `recipe-image-placeholder` cuando no-, que es lo que R18 afirma, y el
+                componente no compone ninguna URL: recibe `recipe.imageUrl` TAL CUAL.
+              */}
+              <EntityImage
+                path={recipe.imageUrl}
+                name={recipe.name}
+                testId={recipe.imageUrl === null ? 'recipe-image-placeholder' : 'recipe-image'}
+              />
             </TableCell>
             {RECIPE_COLUMNS.map((column) => (
               <TableCell
