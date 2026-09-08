@@ -145,8 +145,9 @@ Los «2–5 flakes de saturación» de arriba tienen una firma concreta, y merec
 antes de perder una tarde: **`Test timed out in <plazo>ms`, en un test de UI que escribe con
 `userEvent`**. Hasta QC-58 ese plazo era `5000` —el default de Vitest— y ese número era
 literalmente la firma; desde QC-58 son `15000`, así que si vuelves a verlo ahora es una señal
-mucho más seria que entonces: 15 s de espera no se agotan por contención de CPU sin más. El campo controlado no llega a repintarse entre tecla y tecla cuando la máquina va
-cargada, y la prueba escribe más rápido de lo que el campo se actualiza. El síntoma clásico es que
+mucho más seria que entonces: 15 s de espera no se agotan por contención de CPU sin más. El campo
+controlado no llega a repintarse entre tecla y tecla cuando la máquina va cargada, y la prueba
+escribe más rápido de lo que el campo se actualiza. El síntoma clásico es que
 las letras salgan intercaladas —`xxxxxAxcxixdxox` donde debía salir `Acido citrico`—.
 
 **Cómo distinguirlo de un rojo de verdad**, y es barato: corre el archivo **solo**. Si pasa en

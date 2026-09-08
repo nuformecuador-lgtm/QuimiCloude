@@ -148,11 +148,30 @@ por qué es esperado.
 > que no esté en el baseline y sin aviso de «por limpiar» sobre las dos entradas que quedan.
 
 **Por qué cambia.** Esa última condición **no se puede cumplir desde un worktree**, y no por culpa
-de nada que haga esta ficha. Las dos entradas que T9 conservó fallan **en `dev`** porque uno de sus
-casos se apoya en `git diff --name-only origin/dev...HEAD`, que estando en `dev` viene vacío; en una
-rama de feature ese rango sí trae archivos, así que los dos archivos **pasan** y el comparador avisa
-«2 archivos del baseline ya pasan; toca limpiarlos». Las cinco corridas del 2026-09-08 lo trajeron
-las cinco, con `== init OK ==` y exit 0 en todas.
+de nada que haga esta ficha.
+
+> *Corregido el 2026-09-08, tras la review (menor 3). Este párrafo decía antes: «Las dos entradas
+> que T9 conservó fallan en `dev` porque uno de sus casos se apoya en `git diff --name-only
+> origin/dev...HEAD`, que estando en `dev` viene vacío». **Eso repetía la explicación que R11
+> obligó a corregir por falsa**, y valía para una de las dos entradas, no para las dos. Se anota en
+> vez de borrarse, porque el error es el mismo que R11 vino a arreglar y conviene que se vea que
+> reapareció aquí.*
+
+Las dos entradas que T9 conservó están rojas en `dev`, y cada una por su motivo —los dos escritos en
+`tests/baseline-rojos.json`, que es la versión corregida por R11—:
+
+- `tests/unit/recetas/module-contract.test.ts`: en `dev` el rango **viene vacío** y su caso falla
+  **a propósito**, con «el rango git origin/dev...HEAD no estaba disponible: este caso no ha
+  comprobado nada».
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts`: **no** por eso. Su `motivo` corregido lo
+  dice explícitamente: el rango **sí** trae archivos —los de la migración de QC-35— y el caso los ve
+  y falla sobre ellos.
+
+Lo que las une no es la causa, es la fragilidad: **las dos dependen de `git diff origin/dev...HEAD`,
+que mide cosas distintas según desde dónde se corra.** Y lo que importa para R13 es un hecho
+comprobado, no la explicación: **en esta rama las dos pasan** (el reviewer las corrió: 2 archivos,
+29 casos verdes), así que el comparador avisa «2 archivos del baseline ya pasan; toca limpiarlos».
+Las cinco corridas del 2026-09-08 lo trajeron las cinco, con `== init OK ==` y exit 0 en todas.
 
 Cumplir la condición literal exigiría borrar las dos entradas, y eso dejaría **`dev` en rojo**: es
 justo donde sí fallan. La salida limpia —que el caso del diff distinga «no hay rango» de «el rango
@@ -244,6 +263,15 @@ Datos tomados en el worktree, sobre `af5d258`. No son requisitos: son el suelo d
 
 - **224 llamadas a `userEvent.setup()` en 33 archivos.** Solo 2 pasan opciones: la excepción
   deliberada de `async-autocomplete.test.tsx:248` y el precedente de `recipe-form.test.tsx:201`.
+
+  > *Recontado el 2026-09-08 tras la review (menor 2), porque el número aparecía en tres sitios y
+  > no coincidía. Sobre el mismo `af5d258` y sobre el merge-base de esta rama (`d85b824`) el conteo
+  > da lo mismo, y no es 224: **206 llamadas a `userEvent.setup()` en 33 archivos**, más **5
+  > llamadas a la API directa (`userEvent.click(...)`, sin `setup()`) en 2 archivos**, uno de ellos
+  > —`pedidos-ui/order-row-actions.test.tsx`— fuera por completo de la lista de 33. Total real:
+  > **211 usos en 34 archivos**. El 224 no sale de ningún recuento reproducible; se anota en vez de
+  > borrarse porque los `224` de `design.md > 2` y `> 7` vienen de aquí. **Esas 5 llamadas
+  > directas son el mayor 1 de la review**: no estaban contadas, así que tampoco estaban migradas.*
 - **`vitest.config.mts` no fija `testTimeout` en ningún proyecto**: los tres corren con el default
   de 5000 ms, que es literalmente el número del error.
 - **Reparto de los tres proyectos**: `ui` 50 archivos (jsdom), `node` 156, `integration` 27 (en

@@ -58,6 +58,14 @@ export function setupUser(): UserEvent {
  * de un popup recien abierto, no solo a los que ya se han visto fallar.
  *
  * Uso: `await user.click(await esperarInteractiva(screen.getByTestId('unit-option-none')))`.
+ *
+ * **NO LE QUITES EL `waitFor` DEJANDO EL `await`.** Es tentador: en la practica la comprobacion se
+ * satisface en el primer intento, y el reviewer de QC-58 demostro que con el cuerpo reducido a
+ * `return elemento` los cinco archivos mas cargados de popups siguen pasando 61/61 -quien cierra
+ * la ventana, hoy, es el tick que regala el `await`-. O sea que esa "optimizacion" saldria VERDE y
+ * la precondicion dejaria de comprobarse sin que nadie se entere. Por eso existe
+ * `tests/unit/esperar-interactiva.test.tsx`: sus dos casos se ponen ROJOS si esta espera deja de
+ * esperar de verdad o deja de comprobar de verdad.
  */
 export async function esperarInteractiva(elemento: HTMLElement): Promise<HTMLElement> {
   await waitFor(() => expect(elemento).not.toHaveStyle({ pointerEvents: 'none' }));

@@ -3,7 +3,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { setupUser } from '../../helpers/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -78,7 +77,7 @@ function renderReader(
 }
 
 /** Marca todos los items que hay en pantalla, uno a uno. */
-async function marcarTodo(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+async function marcarTodo(user: ReturnType<typeof setupUser>): Promise<void> {
   for (const casilla of screen.queryAllByRole('checkbox')) {
     if (casilla.getAttribute('aria-checked') !== 'true') {
       await user.click(casilla);
@@ -88,7 +87,7 @@ async function marcarTodo(user: ReturnType<typeof userEvent.setup>): Promise<voi
 
 /** Pulsa Tab hasta que el foco cae en `objetivo`, o falla si no se alcanza. */
 async function tabHasta(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   objetivo: HTMLElement,
 ): Promise<void> {
   for (let intento = 0; intento < 12; intento += 1) {

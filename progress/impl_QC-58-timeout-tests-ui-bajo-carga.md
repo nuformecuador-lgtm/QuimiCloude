@@ -6,6 +6,11 @@
 
 ## Veredicto corto
 
+**Ronda 2 (2026-09-08).** El `reviewer` **RECHAZÓ** sobre `d1e966d` con 1 mayor y 7 menores.
+Atendidos: el mayor —R6 se cumplía sólo en la mitad que la guardia miraba— y los siete menores,
+salvo el 6, que es de T11 y por tanto del leader. El detalle está al final, en
+`## Ronda 2 — lo que pidió la review`. **No me autoapruebo:** vuelve a decidir el reviewer.
+
 **Actualizado el 2026-09-08, segunda tanda.** El bloqueo está **resuelto** con la decisión humana de
 ese día (salida 2 de las tres que se propusieron): T4c y T4e cerradas, y **T5 en verde**. Van
 **15 de 17 tasks**. Quedan sólo **T11** (las cinco corridas de la batería completa) y **T12**
@@ -23,7 +28,7 @@ el baseline y el rastro escrito— seguía hecho y verificado desde la primera t
 **Tercera tanda (2026-09-08).** Las cinco corridas de T11 destaparon un **tercer** archivo con la
 misma causa —`proveedores-ui/catalog-line-sheet.test.tsx`, que sólo falla con la máquina saturada—.
 Se aplicó la misma decisión y, además, **se barrieron los 33 archivos migrados** en busca del mismo
-patrón: **20 sitios en 13 archivos**. El detalle, y por qué un `--rapido` verde no bastaba para
+patrón: **21 sitios en 13 archivos**. El detalle, y por qué un `--rapido` verde no bastaba para
 verlo, está en `### El tercer archivo…` más abajo. Las tasks siguen siendo las mismas 15 de 17: T11
 vuelve a empezar y la corre el leader.
 
@@ -111,8 +116,12 @@ estén verdes**:
 | `proveedores-ui/supplier-detail-page.test.tsx` | 1 sitio (ordenar desde el menú de columna) | verde |
 | `inventario/product-page.test.tsx` | 1 sitio (ídem) | verde |
 
-**20 sitios en 13 archivos.** Los diez «verde» no son verdes por diseño: son verdes por la misma
+**21 sitios en 13 archivos.** Los diez «verde» no son verdes por diseño: son verdes por la misma
 razón por la que `catalog-line-sheet` lo era en `--rapido`.
+
+> *Corregido el 2026-09-08 tras la review (menor 1): esta bitácora decía «20 sitios» en cinco
+> sitios, y en `tasks.md > T4e`, cuando la tabla de aquí arriba suma **21** y el `grep` sobre el
+> árbol da 21. Era un error de suma, no un sitio sin arreglar; los archivos sí eran 13.*
 
 #### Una decisión mía: el helper deja de ser local
 
@@ -223,8 +232,9 @@ ni un servicio: es configuración de pruebas, un helper, una guardia y dos archi
 
 | Archivo | Qué es |
 | --- | --- |
-| `tests/helpers/user-event.ts` | La definición compartida `setupUser()` (R5). Se le mudó el comentario largo que vivía en `recipe-form.test.tsx:191-200`. **Desde la tercera tanda (2026-09-08) aloja también `esperarInteractiva()`**, la espera a que un popup de Base UI suelte `pointer-events: none`, usada en 20 sitios de 13 archivos. |
-| `tests/guards/guard-teclear-y-plazo.test.ts` | La guardia de las dos mitades (R2, R7). 4 casos. |
+| `tests/helpers/user-event.ts` | La definición compartida `setupUser()` (R5). Se le mudó el comentario largo que vivía en `recipe-form.test.tsx:191-200`. **Desde la tercera tanda (2026-09-08) aloja también `esperarInteractiva()`**, la espera a que un popup de Base UI suelte `pointer-events: none`, usada en 21 sitios de 13 archivos. |
+| `tests/guards/guard-teclear-y-plazo.test.ts` | La guardia de las dos mitades (R2, R7). 4 casos; **5 desde la ronda 2**, con el que persigue la API directa de `user-event`. |
+| `tests/unit/esperar-interactiva.test.tsx` | **Ronda 2 (menor 5).** Prueba que la espera del helper espera de verdad y comprueba de verdad: sus dos casos se ponen rojos si alguien le quita el `waitFor`. |
 
 ### Modificados de configuración y rastro (4)
 
@@ -334,9 +344,9 @@ guardia y con la prueba de que esa guardia muerde, no con un test de producto.
 | **R2** | Falla nombrando el proyecto, desde las guardias | mismo caso + «los tres proyectos conocidos siguen existiendo». **Mordida probada:** mutaciones 1, 2 y 3 de T7 | ✅ verde y muerde |
 | **R3** | El plazo rige **en ejecución**, y la sonda no se queda | Sondas de T8 (salida abajo). Los 3 archivos **borrados**, `git status` limpio | ✅ con evidencia |
 | **R4** | No tocar workers ni `fileParallelism` | `git diff vitest.config.mts`: sólo entran 3 `testTimeout` + comentarios | ✅ |
-| **R5** | Una única definición compartida, con su comentario | `tests/helpers/user-event.ts` | ✅ |
-| **R6** | Todo test la usa; nadie llama a `setup()` por su cuenta | `guard-teclear-y-plazo.test.ts` > «ningun test abre su propia sesion…» (21 archivos de guardias, 204 casos verdes en `./init.sh --rapido` del 2026-09-08) | ✅ verde — el bloqueo que arrastraba esta fila está resuelto y **sin excepciones nuevas**: siguen siendo las 3 de siempre |
-| **R7** | Falla nombrando el archivo, desde las guardias | mismo caso. **Mordida probada:** mutación 4 de T7 | ✅ verde y muerde |
+| **R5** | Una única definición compartida, con su comentario | `tests/helpers/user-event.ts` (+ `tests/unit/esperar-interactiva.test.tsx`, que prueba que la espera del helper espera y comprueba de verdad) | ✅ |
+| **R6** | Todo test la usa; nadie teclea con `userEvent` por su cuenta | `guard-teclear-y-plazo.test.ts`, **dos casos**: «ningun test abre su propia sesion…» y, desde la review, «ningun test teclea con la API directa de user-event, ni importa el paquete como valor». Cero llamadas directas en el árbol (`grep`), y las 5 que quedaban migradas a `setupUser()` | ✅ verde — **el mayor 1 de la review está cerrado**: la mitad que la guardia no miraba ya la mira, sin excepciones nuevas (siguen siendo las 3) |
+| **R7** | Falla nombrando el archivo, desde las guardias | los dos casos de arriba. **Mordida probada:** mutación 4 de T7 (sesión propia) y las **mutaciones A y B de la ronda 2** (llamada directa suelta e import renombrado), con su control negativo (`import type` no muerde) | ✅ verde y muerde por las dos vías |
 | **R8** | `async-autocomplete` conserva su retardo, declarado y listado | comentario ampliado en el archivo + `EXCEPCIONES_DECLARADAS` de la guardia + caso «el recorrido de tests/ no se ha quedado vacio», que verifica que las 3 excepciones existen | ✅ verde |
 | **R9** *(reformulado 2026-09-08)* | La migración no cambia **lo que se prueba del componente**; donde un test dependía sin decirlo del `setTimeout(0)`, espera explícitamente la precondición y **no sustituye ninguna aserción** | tabla de conteos de arriba (mismos casos por archivo, cero `skip`/`todo` nuevos) + `unit-select.test.tsx` y `data-table-pagination.test.tsx`, 17/17 en tres corridas seguidas + los 13 archivos del barrido, 199/199 en dos corridas + `./init.sh --rapido` 454/454, **el mismo conteo de casos antes y después del barrido** | ✅ verde |
 | **R10** | Fuera las 3 entradas de esta causa | `tests/baseline-rojos.json` | ✅ (retiradas) |
@@ -505,7 +515,7 @@ guardias, y **sólo** los archivos que el cambio toca o puede romper.
 
 **Aviso que hay que leer junto a esto:** este `--rapido` verde **no prueba** que el fallo de
 saturación no vuelva; ya salió verde una vez con `catalog-line-sheet` averiado. Lo que da confianza
-aquí no es la corrida, es que la ventana se cerró por construcción en los 20 sitios. Quien lo
+aquí no es la corrida, es que la ventana se cerró por construcción en los 21 sitios. Quien lo
 verifica de verdad es T11, y lo corre el leader.
 
 Salida real de T5, recortada a lo que decide (`./init.sh --rapido`, 2026-09-08):
@@ -600,15 +610,23 @@ que el criterio de las cinco corridas hace su trabajo**, que es justo lo que R13
 había arreglado en otros dos archivos, y **el `--rapido` no lo vio**: el archivo estaba en el grafo
 del diff y salió verde. Solo aflora con la batería entera saturando la máquina, y aun así de forma
 intermitente — 2 de 3. **Una corrida verde no habría probado nada; la tercera fue verde.** De ahí
-salió el barrido que cerró los 20 sitios en 13 archivos (`63bea8e`).
+salió el barrido que cerró los 21 sitios en 13 archivos (`63bea8e`).
 
 ### El aviso de «2 por limpiar» — pendiente de decisión humana
 
 Las cinco corridas traen `2 por limpiar` sobre las dos entradas que T9 conservó
 (`recipe-route-contract.test.ts` y `recetas/module-contract.test.ts`). El criterio escrito de T11
-pide las cinco **sin** ese aviso, y **ese criterio no se puede cumplir desde un worktree**: las dos
-entradas fallan *en `dev`* porque `git diff --name-only origin/dev...HEAD` está vacío, y en una rama
-de feature el rango sí trae archivos, así que **pasan**. Borrarlas dejaría `dev` en rojo.
+pide las cinco **sin** ese aviso, y **ese criterio no se puede cumplir desde un worktree**: en esta
+rama las dos entradas **pasan** (el reviewer las corrió: 2 archivos, 29 casos verdes), y borrarlas
+dejaría `dev` en rojo, que es donde sí fallan.
+
+> *Corregido el 2026-09-08 tras la review (menor 3). Este párrafo decía que «las dos entradas fallan
+> en `dev` porque `git diff --name-only origin/dev...HEAD` está vacío», que es **la explicación que
+> R11 declaró falsa** y que sólo vale para una de las dos. Según sus `motivo` corregidos:
+> `recetas/module-contract` falla en `dev` porque el rango **viene vacío** y su caso falla a
+> propósito; `recipe-route-contract` falla porque el rango **sí trae archivos** —los de QC-35— y el
+> caso falla sobre ellos. Lo que las une es la dependencia de `git diff origin/dev...HEAD`, no la
+> causa.*
 
 No es un defecto de esta ficha: es la contradicción que el propio `motivo` de las dos entradas
 documenta desde el 2026-09-04, y cuya salida limpia —que el caso del diff distinga «no hay rango» de
@@ -671,7 +689,7 @@ limpiar», que sólo se podía cumplir desde `dev`).
 - **La lección de método, que es la más cara de esta ficha:** `catalog-line-sheet.test.tsx` estaba
   en el grafo del `--rapido` y salió **verde**; solo falló con la batería entera saturando la
   máquina, y aun así 2 de 3 veces. **Para un flake de saturación, `--rapido` no prueba nada.** De
-  ahí salió el barrido que encontró **20 sitios en 13 archivos**, diez de ellos verdes por la misma
+  ahí salió el barrido que encontró **21 sitios en 13 archivos**, diez de ellos verdes por la misma
   casualidad que el que explotó.
 - **Deuda de arnés que esta ficha destapó y no le tocaba** (candidatas a `/afinar-regla`): el
   worktree se monta **sin `.env` y sin base propia**, y `wt.sh new` no los crea, así que la
@@ -681,3 +699,148 @@ limpiar», que sólo se podía cumplir desde `dev`).
   inserciones donde el cambio real eran 160.
 - **La salida limpia de las dos entradas del baseline** sigue pendiente desde el 2026-09-04, ahora
   con el criterio de R13 apuntando a ella.
+
+---
+
+## Ronda 2 — lo que pidió la review (2026-09-08)
+
+`progress/review_QC-58-timeout-tests-ui-bajo-carga.md`: **RECHAZADO**, 1 mayor y 7 menores, sobre
+`d1e966d`. Esto es lo que se hizo con cada cosa.
+
+### MAYOR 1 — R6 se cumplía sólo en la mitad que la guardia miraba
+
+**Tenía razón, y el agujero era exactamente el que R7 existe para tapar.** `userEvent.click(...)`
+sin `setup()` es la **API directa**, y no hereda `delay: null`: `defaultOptionsDirect` de
+`user-event` declara `delay: 0`, o sea que esas llamadas seguían intercalando el `setTimeout(0)`
+entre eventos que esta ficha quita. La guardia buscaba el literal `userEvent` + `.setup(`, así que
+no las veía, y mi bitácora las tenía anotadas como «deuda visible» — que no es una excepción
+aprobada, como bien dice la review.
+
+**1. Los cinco sitios migrados a `setupUser()`**, sin excepción nueva:
+
+| Archivo | Sitios | Nota |
+| --- | --- | --- |
+| `tests/unit/pedidos-ui/order-row-actions.test.tsx` | 2 (l. 112 y 137) | **no estaba en ninguna task del bloque B**: se quedó fuera de la migración entera |
+| `tests/unit/pedidos-ui/order-table.test.tsx` | 3 (l. 175, 239 y 247) | tecleaba de **las dos formas a la vez**: ya usaba `setupUser()` en la l. 218 |
+
+**2. La guardia caza ahora las dos vías.** Caso nuevo en `guard-teclear-y-plazo.test.ts`:
+«ningun test teclea con la API directa de user-event, ni importa el paquete como valor». Persigue
+**dos** señales, porque cada una tapa el hueco de la otra:
+
+- cualquier acceso `userEvent.<algo>(`, que es lo que se escribe al usar la API directa —y lo que
+  aparece si alguien pega una llamada suelta sin importar nada—;
+- cualquier **import de valor** del paquete, que caza el renombrado
+  (`import ue from ...; await ue.click(...)`), donde el nombre `userEvent` ya no aparece.
+  `import type` **sí** pasa: un tipo no teclea.
+
+**3. Probado con mutaciones** (sobre el archivo real, restauradas con `cp`, salida a archivo y `$?`
+leído sin pipe; `git status` idéntico al terminar):
+
+```
+=== MUTACION A: userEvent.click( suelto en tests/unit/sidebar-mobile.test.tsx ===
+CODIGO DE SALIDA = 1
+AssertionError: Archivos de test que usan user-event por fuera de la sesion compartida: tests/unit/sidebar-mobile.test.tsx.
+      Tests  1 failed | 4 passed (5)
+
+=== MUTACION B: import RENOMBRADO del paquete en tests/unit/login-form.test.tsx ===
+CODIGO DE SALIDA = 1
+AssertionError: Archivos de test que usan user-event por fuera de la sesion compartida: tests/unit/login-form.test.tsx.
+      Tests  1 failed | 4 passed (5)
+
+=== CONTROL: import TYPE del paquete en tests/unit/login-form.test.tsx (no debe morder) ===
+CODIGO DE SALIDA = 0
+      Tests  5 passed (5)
+```
+
+El control negativo importa tanto como las dos mutaciones: una guardia que muerde **también** a los
+`import type` obligaría a tipar peor para dejarla contenta, y ese es el camino por el que las
+guardias acaban desactivadas.
+
+**4. El barrido con el criterio nuevo, sobre el merge-base (`d85b824`) y sobre el árbol:**
+
+```
+$ git grep -n "userEvent\.[a-zA-Z]*(" d85b824 -- 'tests/**' | grep -v "userEvent\.setup("
+  -> exactamente los 5 sitios de arriba, en 2 archivos. Ninguno más.
+$ grep -rn "userEvent\." tests/    (arbol de hoy, fuera del helper y de la excepcion)
+  -> 0
+```
+
+Los **206** `userEvent.setup(` en 33 archivos, más estas **5** llamadas directas en 2 archivos
+—uno de ellos fuera de la lista de 33—, dan **211 usos en 34 archivos**. Aparecieron además tres
+archivos que importaban el paquete **sólo para tipar** (`ReturnType<typeof userEvent.setup>`), que
+la guardia nueva habría cazado: son el menor 7 y se arreglaron a la vez.
+
+### Los siete menores
+
+| # | Qué pedía | Qué se hizo |
+| --- | --- | --- |
+| 1 | La cuenta de `esperarInteractiva` son 21, no 20 | Corregido en los 6 sitios (bitácora y `tasks.md`), con la corrección anotada. El `grep` da 21 en 13 archivos |
+| 2 | El número de llamadas no cuadra: 224 vs 206 | Recontado sobre `af5d258` **y** sobre el merge-base: **206**, no 224, más las 5 directas del mayor. Anotado en `requirements.md > El terreno medido`, sin borrar el 224 del que vienen los de `design.md` |
+| 3 | La justificación de R13 repite la causa que R11 declaró falsa | Corregido en `requirements.md` **y** en el apartado «El aviso de 2 por limpiar» de esta bitácora, separando las dos entradas: `module-contract` falla porque el rango viene **vacío**; `recipe-route-contract` porque el rango **sí trae** archivos. La conclusión de R13 no se cae: lo comprobado es que en rama **las dos pasan** |
+| 4 | Veredicto del reviewer sobre las dos reformulaciones | No pedía acción: da las dos por bien hechas. Sin cambios |
+| 5 | La aserción de `esperarInteractiva` no muerde | Ver abajo |
+| 6 | R14 pide la salida del comparador de **cada** corrida y hay una literal y cuatro «ídem» | **No es mío**: las cinco corridas son T11 y las corrió el leader. Queda señalado para él; yo no puedo pegar una salida que no capturé, y **inventarla sería justo lo que R14 impide** |
+| 7 | Restos de estilo: tres archivos tipan con `typeof userEvent.setup` y una línea larga en `docs/` | Los tres pasan a `ReturnType<typeof setupUser>` y pierden el import de valor; la línea de `docs/verification.md` partida. El límite del literal en las guardias lo deja el propio reviewer fuera de esta ficha |
+
+### El menor 5, que era el de fondo: la aserción no muerde
+
+**Tenía razón en el diagnóstico.** Con el cuerpo del helper reducido a `return elemento`, los
+archivos llenos de popups siguen verdes: quien cierra la ventana, hoy, es el tick que regala el
+`await`, y la comprobación de `pointer-events` se satisface en el primer intento. Una espera cuya
+aserción nunca llega a mirar nada es una espera que alguien «optimizará» quitándole el `waitFor`,
+en verde y sin enterarse.
+
+**No cambié la forma de la espera —es la que aprobó el humano— sino que le puse una red.** Archivo
+nuevo `tests/unit/esperar-interactiva.test.tsx`, con dos casos que son las dos mitades:
+
+1. un elemento que suelta `pointer-events` **a los 50 ms**, muy por encima del tick del `await`:
+   si alguien quita el `waitFor`, el helper devuelve el elemento todavía tapado y el caso se pone
+   rojo;
+2. un elemento que **no lo suelta nunca**: la espera tiene que **rechazar**. Sin esto, un helper
+   que resolviera siempre pasaría el primer caso por casualidad del reloj.
+
+Y la mutación que lo demuestra —borrar la línea del `waitFor` del helper y correr ese archivo—:
+
+```
+CODIGO DE SALIDA = 1
+ × espera de verdad: resuelve solo DESPUES de que el elemento suelte pointer-events 104ms
+ × comprueba de verdad: si el elemento NO se libera nunca, la espera falla 7ms
+      Tests  2 failed (2)
+```
+
+El helper lleva además el aviso escrito, en el sitio donde alguien haría la «optimización».
+
+### Lo que corrí en esta ronda
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm run typecheck` · `pnpm run lint` | ✅ verdes |
+| `pnpm exec vitest run <los 5 archivos tocados + esperar-interactiva + la guardia>` | ✅ **7 archivos, 91 casos** |
+| `pnpm exec vitest run tests/guards/guard-teclear-y-plazo.test.ts` | ✅ **5/5** (eran 4: el caso nuevo es el quinto) |
+| Mutaciones A, B y el control | ✅ muerde, muerde, y no muerde de más |
+| `./init.sh --rapido` | ver abajo |
+
+Salida de `./init.sh --rapido` de la ronda 2 (`SALIDA=0`):
+
+```
+✓ typecheck paso
+✓ lint paso
+[test:rapido] tests relacionados con 35 archivo(s) del diff vs origin/dev
+ Test Files  36 passed (36)
+      Tests  465 passed (465)
+[test:rapido] todas las guardias
+ Test Files  21 passed (21)
+      Tests  205 passed | 4 skipped (209)
+✓ test:rapido paso
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
+
+Los números crecen justo en lo que se añadió y en nada más: **36 archivos y 465 casos** donde antes
+eran 34 y 454 (+`order-row-actions`, que entra por primera vez con sus 9 casos, y +`esperar-interactiva`
+con 2), y **205 casos de guardias** donde eran 204 (+ el caso nuevo de la API directa).
+
+**Y el aviso de siempre, que en esta ficha ya no es teórico:** este `--rapido` verde **no** prueba
+que no quede un flake de saturación. Lo que corresponde son las cinco corridas de `./init.sh`
+completo, y las corre el leader.

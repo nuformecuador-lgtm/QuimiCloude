@@ -90,6 +90,12 @@ de tocar nada, es lo que verifica R9.
   `tests/unit/pedidos-ui/`).
 - **Ojo:** esa carpeta tiene cambios sin commitear de otra sesión en el árbol principal. Se trabaja
   sólo en este worktree y no se revierte nada con `git checkout`.
+- **Ampliada el 2026-09-08 tras la review (mayor 1): + `order-row-actions.test.tsx`, y
+  `order-table.test.tsx` otra vez.** La lista de los 33 se hizo buscando `userEvent.setup(`, así
+  que dejó fuera a quien teclea con la **API directa** (`userEvent.click(...)`, que **no** hereda
+  `delay: null`): 2 sitios en `order-row-actions` —archivo que no aparecía en ninguna task— y 3 en
+  `order-table`, que además ya usaba `setupUser()` en la l. 218 y convivía con las dos formas. Los
+  cinco migrados, sin excepción nueva.
 - **BLOQUEADA (2026-09-08).** La migración mecánica está hecha (cero `userEvent.setup(` y 149
   casos, los mismos que antes), pero `data-table-pagination.test.tsx` pasó a fallar de forma
   **intermitente** (~1 de cada 3 en aislado) con `Unable to perform pointer interaction as the
@@ -115,7 +121,7 @@ de tocar nada, es lo que verifica R9.
   destaparon `catalog-line-sheet.test.tsx`, de esta misma carpeta, con la misma causa pero
   **visible sólo bajo la carga de la batería completa** (rojo en las corridas 1 y 2, verde en la 3;
   verde también en `--rapido`). Se le aplicó la misma espera y **se barrieron los 33 archivos
-  migrados** buscando el patrón: 20 sitios en 13 archivos, arreglados aunque estuvieran verdes.
+  migrados** buscando el patrón: 21 sitios en 13 archivos, arreglados aunque estuvieran verdes.
   `esperarInteractiva` pasó a vivir en `tests/helpers/user-event.ts` para no copiar el mismo
   comentario trece veces. Detalle en la bitácora.
 - Cubre: R6, R9.
@@ -151,6 +157,10 @@ de tocar nada, es lo que verifica R9.
   - **Plazo:** importa `vitest.config.mts` y **lee la config**, no el texto. Falla si algún
     proyecto declarado no llega a 15000 ms —nombrándolo— y falla si falta alguno de los tres
     nombres conocidos (`ui`, `node`, `integration`).
+  - **Teclear (ampliado el 2026-09-08 tras la review, mayor 1):** además del `setup(`, un segundo
+    caso persigue la **API directa** —cualquier `userEvent.<algo>(`— y cualquier **import de valor**
+    del paquete, que caza el renombrado; `import type` pasa. Sin esto, R6 sólo se cumplía en la
+    mitad que la guardia miraba.
   - **Teclear:** recorre `tests/**` buscando `userEvent.setup(`; permitidos exactamente
     `tests/helpers/user-event.ts`, `tests/unit/async-autocomplete.test.tsx` y el propio archivo de
     la guardia. Cualquier otro falla nombrándolo y diciendo qué importar.
@@ -173,6 +183,9 @@ de tocar nada, es lo que verifica R9.
 - **Hecho cuando:** las cuatro salen en rojo con mensaje que nombra lo que falla, el árbol queda
   idéntico al de antes (`git status` sin residuos) y las cuatro salidas están pegadas en la
   bitácora.
+- **Ampliada el 2026-09-08 tras la review:** dos mutaciones más para la mitad nueva de la guardia
+  —una llamada directa suelta y un import renombrado del paquete—, **más un control negativo** que
+  comprueba que un `import type` NO la hace fallar. Las tres salidas, en la bitácora.
 - Cubre: R2, R7 (la mitad que importa de los dos).
 
 ### [x] T8. Sonda de ejecución del plazo en los tres proyectos

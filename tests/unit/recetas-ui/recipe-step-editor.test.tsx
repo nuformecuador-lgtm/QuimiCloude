@@ -3,7 +3,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -143,7 +142,7 @@ async function esperarAlFocoDiferidoDelEditor(): Promise<void> {
  * un estado estable.
  */
 async function activarConElTeclado(
-  usuario: ReturnType<typeof userEvent.setup>,
+  usuario: ReturnType<typeof setupUser>,
   boton: HTMLElement,
   tecla: string,
 ): Promise<void> {

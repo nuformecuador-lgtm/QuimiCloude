@@ -1,8 +1,9 @@
 // Guardia de QC-58: las DOS mitades del arreglo de los flakes de saturacion siguen en pie.
 //
 //   1. El PLAZO: los tres proyectos de Vitest declaran `testTimeout >= 15000` (R1, R2).
-//   2. La FORMA DE TECLEAR: nadie llama a `userEvent.setup(` fuera de la definicion
-//      compartida y de la excepcion declarada (R6, R7).
+//   2. La FORMA DE TECLEAR: nadie abre su propia sesion (`userEvent.setup(`) NI teclea con la
+//      API directa (`userEvent.click(...)`, que no hereda `delay: null`) fuera de la
+//      definicion compartida y de las excepciones declaradas (R6, R7).
 //
 // Vive en `tests/guards/` a proposito. `./init.sh --rapido` selecciona por GRAFO DE IMPORTS, y
 // ningun grafo llega ni a `vitest.config.mts` ni a un archivo de test que nadie importa: sin
@@ -77,6 +78,47 @@ function proyectosDeclarados(): ProyectoLeido[] {
 
 /** La llamada cruda que esta guardia persigue por todo tests/. Partida para no autodelatarse. */
 const LLAMADA_CRUDA = 'userEvent' + '.setup('
+
+/** El paquete. Partido por el mismo motivo que el literal de arriba. */
+const PAQUETE = '@testing-library/user' + '-event'
+
+/**
+ * La OTRA via, la que la primera version de esta guardia no veia (review de QC-58, mayor 1).
+ *
+ * `userEvent.click(...)` sin `setup()` es la API DIRECTA, y no hereda `delay: null`: en
+ * `user-event`, `defaultOptionsDirect` declara `delay: 0`, o sea que sigue intercalando el
+ * `setTimeout(0)` entre eventos que esta ficha quita. Buscar solo `setup(` dejaba abierta
+ * exactamente la puerta por la que R7 existe, con otro nombre: se colaron 5 llamadas en 2
+ * archivos, uno de ellos tecleando de las dos formas a la vez.
+ *
+ * Se persiguen las dos senales, porque cada una tapa el agujero de la otra:
+ *
+ * - **Cualquier acceso `userEvent.<algo>(`**, que es lo que se escribe al usar la API directa
+ *   (y lo que aparece si alguien copia una llamada suelta de otro repo sin importar nada).
+ * - **Cualquier import de VALOR del paquete**, que caza tambien el renombrado
+ *   (`import ue from ...; await ue.click(...)`), donde el nombre `userEvent` ya no aparece.
+ *   `import type` SI pasa: un tipo no teclea.
+ */
+const ACCESO_DIRECTO = new RegExp('userEvent' + '\\.[A-Za-z]+\\s*\\(')
+const DESDE_EL_PAQUETE = new RegExp('from\\s*[\'"]' + PAQUETE + '[\'"]', 'g')
+
+/**
+ * ¿La fuente importa el paquete como VALOR (y no solo como tipo)?
+ *
+ * Para cada `from '<paquete>'` se retrocede hasta el `import` que lo abre, en vez de casar
+ * `import[\s\S]*?from '<paquete>'` de una pieza: esa forma perezosa empieza en el PRIMER
+ * `import` del archivo y se traga los de en medio, con lo que un `import type` precedido de
+ * otros imports se leeria como import de valor. Aqui hay archivos con y sin punto y coma, asi
+ * que tampoco vale cortar por `;`.
+ */
+function importaElPaqueteComoValor(fuente: string): boolean {
+  for (const encontrado of fuente.matchAll(DESDE_EL_PAQUETE)) {
+    const inicio = fuente.lastIndexOf('import', encontrado.index)
+    if (inicio === -1) continue
+    if (!/^import\s+type\b/.test(fuente.slice(inicio, encontrado.index))) return true
+  }
+  return false
+}
 
 /**
  * Excepciones POR NOMBRE, nunca por patron amplio. Son tres y cada una tiene motivo:
@@ -226,6 +268,37 @@ describe('guardia QC-58: solo hay una forma de teclear en este repo (R6/R7)', ()
         'prueba): anadelo a EXCEPCIONES_DECLARADAS de esta guardia CON SU MOTIVO escrito, y ' +
         'deja el motivo tambien en el propio archivo. El precedente es ' +
         'tests/unit/async-autocomplete.test.tsx (R8). Lo que no vale es colarla en silencio.',
+    ).toEqual([])
+  })
+
+  it('ningun test teclea con la API directa de user-event, ni importa el paquete como valor', () => {
+    const infractores = TODOS_LOS_TESTS.filter((ruta) => {
+      if (EXCEPCIONES_DECLARADAS.includes(ruta)) return false
+      const fuente = fuenteSinComentarios(ruta)
+      return ACCESO_DIRECTO.test(fuente) || importaElPaqueteComoValor(fuente)
+    }).sort()
+
+    expect(
+      infractores,
+      'Archivos de test que usan user-event por fuera de la sesion compartida: ' +
+        infractores.join(', ') +
+        '.\n' +
+        'QUE HACER: importa setupUser de tests/helpers/user-event, llama a setupUser() una vez ' +
+        'por caso y teclea con esa sesion. Si solo necesitas el TIPO, usa ' +
+        'ReturnType<typeof setupUser> o import type { UserEvent }: los tipos si pasan.\n' +
+        'POR QUE: la API directa (userEvent' +
+        '.click(...) sin setup()) NO hereda delay: null. En user-event, defaultOptionsDirect ' +
+        'declara delay: 0, o sea que sigue intercalando el setTimeout(0) entre eventos que esta ' +
+        'ficha quita: la mitad de la cura de los flakes de saturacion se pierde en silencio, y ' +
+        'sale VERDE. Esta comprobacion existe porque la primera version de la guardia solo ' +
+        'miraba ' +
+        LLAMADA_CRUDA +
+        '), y por el hueco se colaron 5 llamadas en 2 archivos -uno de ellos tecleando de las ' +
+        'dos formas a la vez- (review de QC-58, mayor 1).\n' +
+        'SI DE VERDAD NECESITAS OTRA COSA: se decide con el humano y se anade a ' +
+        'EXCEPCIONES_DECLARADAS CON SU MOTIVO, como ' +
+        'tests/unit/async-autocomplete.test.tsx (R8). Una deuda anotada en una bitacora NO es ' +
+        'una excepcion aprobada.',
     ).toEqual([])
   })
 })

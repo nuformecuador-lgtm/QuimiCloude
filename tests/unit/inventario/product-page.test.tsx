@@ -1,6 +1,5 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
-import userEvent from '@testing-library/user-event';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
@@ -359,7 +358,7 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
 
 /** Rellena el formulario abierto. Deja fuera la presentacion: la aporta su propio selector. */
 async function rellenarFormulario(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   valores: Readonly<Record<string, string>> = {},
 ) {
   const datos = { ...ALTA_VALIDA, ...valores };
@@ -372,7 +371,7 @@ async function rellenarFormulario(
 
 /** Crea una presentacion desde el propio panel y la deja seleccionada (R24). */
 async function crearPresentacionEnLinea(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   nombre = PRESENTACION_NUEVA.name,
 ) {
   await user.click(screen.getByTestId(testId.abrirAltaPresentacion));
