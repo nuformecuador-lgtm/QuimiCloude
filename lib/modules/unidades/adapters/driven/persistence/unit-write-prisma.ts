@@ -18,16 +18,41 @@ import type { UnitOwnership, UnitWriteRow, WriteOutcome } from '../../../ports/u
  * `string` para una columna `Decimal`- sin convertirlo a `number` en ningun punto.
  */
 
-/** Los cuatro indices unicos parciales que crea la migracion de QC-76, y NINGUN otro
- *  (`design.md > 7.1`, vigilado por `tests/unit/unidades/schema/unidades-schema.test.ts`). */
-const DUPLICATE_NAME_INDEXES = new Set(['units_company_name_unique', 'units_system_name_unique']);
-const DUPLICATE_SYMBOL_INDEXES = new Set([
-  'units_company_symbol_unique',
-  'units_system_symbol_unique',
-]);
+/**
+ * Columnas que protegen los cuatro indices unicos parciales que crea la migracion de QC-76
+ * (`units_company_name_unique`, `units_system_name_unique`, `units_company_symbol_unique`,
+ * `units_system_symbol_unique`; ver `db/migrations/20260907190000_units_equivalence_and_scope`).
+ *
+ * CORRECCION sobre lo que describia `design.md > 7.1`: aquel apartado comparaba
+ * `error.meta.target` contra el NOMBRE del indice (`'units_company_name_unique'`, etc.), y
+ * eso, verificado empiricamente contra Postgres real con `@prisma/client@6.19.3`, es falso:
+ * `meta.target` trae las COLUMNAS afectadas (p. ej. `["company_id","name_normalized"]`),
+ * nunca el nombre del indice. Con la comparacion original los dos `Set` de nombres jamas
+ * hacian match, el `P2002` se relanzaba sin traducir y `createUnit`/`updateUnit` con nombre o
+ * simbolo duplicado terminaban lanzando `PrismaClientKnownRequestError` en vez de
+ * `DuplicateNameError`/`DuplicateSymbolError` (R11, R12 rotos). La intencion de
+ * `design.md > 7.1` -diferenciar duplicado de nombre de duplicado de simbolo a partir del
+ * `P2002`- se conserva entera; lo que cambia es el mecanismo, para que sea el que Postgres
+ * realmente expone.
+ *
+ * Es el MISMO hallazgo que QC-25 ya documento para este mismo motor y version en
+ * `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`
+ * (`RECIPE_NAME_UNIQUE_COLUMN`/`isUniqueNameViolation`) y que tambien sigue
+ * `lib/modules/proveedores/adapters/driven/persistence/supplier-prisma.ts`: se discrimina por
+ * COLUMNA, no por indice.
+ *
+ * Las dos columnas son disjuntas -ninguna violacion real puede tocar `name_normalized` Y
+ * `symbol` a la vez, son indices distintos sobre columnas distintas-, pero si algun dia
+ * `meta.target` trajera ambas, `duplicateOutcomeOf` decide de forma determinista: `name`
+ * gana sobre `symbol` (se comprueba primero).
+ */
+const NAME_UNIQUE_COLUMN = 'name_normalized';
+const SYMBOL_UNIQUE_COLUMN = 'symbol';
 
 /** `error.meta.target` puede llegar como cadena o como array de cadenas segun la version del
- *  motor de Prisma: se normaliza a un array antes de mirarlo. */
+ *  motor de Prisma: se normaliza a un array antes de mirarlo. Si `target` no es inspeccionable
+ *  -ausente, u otro tipo- se devuelve vacio: no se asume nada (mismo criterio que
+ *  `isUniqueNameViolation` de `recipe-prisma.ts`). */
 function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
   const target = error.meta?.target;
   if (typeof target === 'string') return [target];
@@ -36,20 +61,21 @@ function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string
 }
 
 /**
- * Traduce una violacion de unicidad (`P2002`) al resultado discriminado del puerto, mirando el
- * nombre del indice en `meta.target` (`design.md > 7.1`).
+ * Traduce una violacion de unicidad (`P2002`) al resultado discriminado del puerto, mirando QUE
+ * COLUMNA dispara la violacion en `meta.target` (`design.md > 7.1`, corregido: ver el comentario
+ * de las constantes de arriba).
  *
- * Un indice que NO sea ninguno de los cuatro conocidos se RELANZA, deliberadamente: clasificarlo
- * como duplicado de nombre haria que un indice nuevo, que nadie mapeo todavia, se anunciara como
- * "ya existe ese nombre", que seria mentira y no dejaria rastro
+ * Un `target` que no incluya ninguna de las dos columnas conocidas se RELANZA, deliberadamente:
+ * clasificarlo como duplicado de nombre haria que un indice nuevo, que nadie mapeo todavia, se
+ * anunciara como "ya existe ese nombre", que seria mentira y no dejaria rastro
  * (`docs/conventions.md > Manejo de errores`).
  */
 function duplicateOutcomeOf(
   error: Prisma.PrismaClientKnownRequestError,
 ): 'duplicate_name' | 'duplicate_symbol' | null {
   const targets = targetsOf(error);
-  if (targets.some((target) => DUPLICATE_NAME_INDEXES.has(target))) return 'duplicate_name';
-  if (targets.some((target) => DUPLICATE_SYMBOL_INDEXES.has(target))) return 'duplicate_symbol';
+  if (targets.includes(NAME_UNIQUE_COLUMN)) return 'duplicate_name';
+  if (targets.includes(SYMBOL_UNIQUE_COLUMN)) return 'duplicate_symbol';
   return null;
 }
 

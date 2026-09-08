@@ -118,7 +118,7 @@
   - **Hecho cuando**: en verde, y falla si se añade a mano cualquiera de esas cosas.
     Cubre: R2, R23, R27, R31, R32, R34, R35.
 
-- [ ] **T11. Tests de integración de escritura.** (depende de T8) [P con T10]
+- [x] **T11. Tests de integración de escritura.** (depende de T8) [P con T10]
   - Toca: `tests/integration/unidades/unit-write.int.test.ts` (nuevo).
   - Contra base real: alta con y sin símbolo y con y sin derivación; nombre normalizado repetido
     **en la misma empresa** → `DuplicateNameError`, y **aceptado** en otra empresa y frente a una de
