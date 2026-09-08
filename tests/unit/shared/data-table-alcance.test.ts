@@ -13,7 +13,13 @@ import { describe, expect, it } from 'vitest'
 
 // La carpeta de la pantalla que estrena la tabla se DERIVA de esta constante, nunca de un
 // literal escrito a mano: asi un cambio de ruta arrastra esta prueba con el mismo commit.
-import { INVENTORY_ROUTE, ORDERS_ROUTE, PRESENTATIONS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes'
+import {
+  INVENTORY_ROUTE,
+  ORDERS_ROUTE,
+  PRESENTATIONS_ROUTE,
+  SUPPLIERS_ROUTE,
+  UNITS_ROUTE,
+} from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -146,15 +152,32 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   // declarado -la pantalla de presentaciones-, que se monta sobre la tabla compartida en vez de
   // dibujar la suya (QC-45 R8, R33, `design.md > 1`). Se anade la fila, no se afloja el
   // centinela: la lista sigue cerrada y la pantalla de recetas sigue fuera.
+  //
+  // AMPLIADO el 2026-09-08 (QC-39, pantalla-de-unidades): entra un QUINTO consumidor declarado
+  // -la pantalla de unidades-, y lo trae una decision cerrada, no un descuido: la fila «¿La lista
+  // usa la tabla compartida?» de `specs/QC-39-pantalla-de-unidades/requirements.md > Decisiones
+  // cerradas` (2026-09-08) dice «si, la de QC-55, por su barrel publico y sin tocar ni un archivo
+  // suyo» (QC-39 R15, R31). Se anade la fila y se TENSA el resto del centinela -el ancla de
+  // consumidores minimos sube de tres a cuatro-, nunca se afloja: la lista sigue CERRADA, la
+  // pantalla de recetas sigue fuera y una SEXTA pantalla vuelve a poner esto en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
-   * Las carpetas autorizadas a consumir la tabla compartida. Las cuatro se DERIVAN de constantes
+   * Las carpetas autorizadas a consumir la tabla compartida. Las cinco se DERIVAN de constantes
    * de ruta y nunca de un literal escrito a mano: un cambio de ruta arrastra esta prueba con el
    * mismo commit. La CUARTA -`PRESENTATIONS_ROUTE`- la trae QC-45 (R8): su pantalla consume la
    * tabla compartida por decision de diseno, asi que es un consumidor declarado, no un descuido.
+   * La QUINTA -`UNITS_ROUTE`- la trae QC-39 (R15, R31) con el mismo criterio: su lista se monta
+   * sobre la tabla compartida por decision cerrada del 2026-09-08 y sus acciones de fila van como
+   * columna normal `pinnable: false`, sin anadirle nada a `components/shared/data-table/`.
    */
-  const carpetasAutorizadas = [ORDERS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE, PRESENTATIONS_ROUTE].map((ruta) =>
+  const carpetasAutorizadas = [
+    ORDERS_ROUTE,
+    INVENTORY_ROUTE,
+    SUPPLIERS_ROUTE,
+    PRESENTATIONS_ROUTE,
+    UNITS_ROUTE,
+  ].map((ruta) =>
     join(repoRoot, 'app', '(private)', ...ruta.split('/').filter((segmento) => segmento.length > 0)),
   )
 
@@ -164,7 +187,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las cuatro pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las cinco pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -172,13 +195,15 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las cuatro pantallas autorizadas (pedidos, inventario, detalle de proveedor, presentaciones): migrar una quinta es una decision, no un descuido (R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las cinco pantallas autorizadas (pedidos, inventario, detalle de proveedor, presentaciones, unidades): migrar una sexta es una decision, no un descuido (R34)`,
         ).toBe(true)
         consumidores += 1
       }
     }
-    // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor.
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(3)
+    // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
+    // TENSA con cada alta: hoy son CINCO pantallas autorizadas, asi que se exige al menos un
+    // consumidor por pantalla (QC-39, 2026-09-08; antes eran cuatro).
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(4)
   })
 
   it('la pantalla de recetas sigue SIN consumirlo', () => {
