@@ -11,6 +11,7 @@
  *
  * Salida: un mensaje por linea en stderr y exit != 0 si algo falla. `init.sh` solo invoca.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -21,6 +22,62 @@ const EN_VUELO = ['spec_ready', 'in_progress'];
 
 const errores = [];
 const notas = [];
+
+// RAIZ DEL REPO, no el directorio actual. El gate se corre DENTRO del worktree de la
+// feature (`AGENTS.md > Worktrees`), y desde ahi `.worktrees/` NO existe: solo se ve el
+// `specs/` de la propia rama. El resultado era un rojo por la razon equivocada — «faltan
+// specs para features sdd en vuelo: QC-45 QC-75», cuyos specs estaban en disco, en los
+// worktrees hermanos — que abortaba el gate en el paso 3 antes de mirar una linea de
+// codigo. Paso tres veces: dos en QC-74 y una en QC-76 (2026-09-08), y las dos primeras se
+// anotaron como «sigue sin resolverse».
+//
+// `--git-common-dir` es lo que resuelve esto y `--show-toplevel` no: dentro de un worktree
+// enlazado, toplevel es el worktree y common-dir es el `.git` del repo principal.
+function raizDelRepo() {
+  try {
+    const comun = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (comun) return path.dirname(comun);
+  } catch {
+    /* cae al fallback */
+  }
+  // Fallback sin git: el worktree vive en `<raiz>/.worktrees/<slug>`, asi que la raiz es el
+  // ancestro que tiene `feature_list.json` y NO cuelga de `.worktrees`.
+  let dir = path.resolve('.');
+  for (let i = 0; i < 6; i++) {
+    if (existsSync(path.join(dir, FEATURE_LIST)) && path.basename(path.dirname(dir)) !== WT_DIR) return dir;
+    const padre = path.dirname(dir);
+    if (padre === dir) break;
+    dir = padre;
+  }
+  return null;
+}
+
+const RAIZ = raizDelRepo();
+const DENTRO_DE_WORKTREE = path.basename(path.dirname(path.resolve('.'))) === WT_DIR;
+
+// Fallar, no avisar. Un `warn` aqui reintroduce el agujero que este bloque cierra: el gate
+// seguiria verde habiendo validado a ciegas (`docs/verification.md > El anti-patron: la
+// validacion opcional`).
+if (RAIZ === null && DENTRO_DE_WORKTREE) {
+  errores.push('no se pudo localizar la raiz del repo desde este worktree: los specs de las features en vuelo no se pueden verificar');
+}
+
+/** Los sitios donde puede vivir el `specs/` de una feature, resueltos contra la RAIZ. */
+function basesDeSpecs() {
+  const bases = ['specs'];
+  if (RAIZ === null) return bases;
+  bases.push(path.join(RAIZ, 'specs'));
+  const wt = path.join(RAIZ, WT_DIR);
+  if (existsSync(wt)) {
+    for (const d of readdirSync(wt, { withFileTypes: true })) {
+      if (d.isDirectory()) bases.push(path.join(wt, d.name, 'specs'));
+    }
+  }
+  return bases;
+}
 
 // Identidad de una feature. El `key` del board (`QC-7`) manda; el `id` numerico es
 // SOLO el fallback para fichas que todavia no tienen issue. Antes mandaba el numerico, lo
@@ -146,20 +203,14 @@ notas.push(`regla max-${MAX_POR_ZONA}-por-zona respetada (in_progress=${enProgre
 // Se acota a "en vuelo" a proposito: las `done` pueden ser previas a la convencion y
 // `pending`/`cancelled` no la necesitan aun/ya.
 //
-// Se busca en TRES sitios, y el tercero es el que hace que esto funcione con worktrees:
-// mientras una feature esta en vuelo su spec vive en `.worktrees/<slug>/specs/...` y NO
-// llega a la raiz hasta que su PR mergea en `dev`. Buscando solo en la raiz, toda feature
-// `in_progress` daria rojo — rojo por la razon equivocada, que es peor que no mirar.
+// Se busca en el `specs/` local, en el de la RAIZ y en el de cada worktree hermano: mientras
+// una feature esta en vuelo su spec vive en `.worktrees/<slug>/specs/...` y NO llega a la
+// raiz hasta que su PR mergea en `dev`. Mirar solo la raiz daria rojo por la razon
+// equivocada, que es peor que no mirar; y mirar solo el directorio actual dejaba ciego al
+// gate corrido desde un worktree, que es como se corre siempre (ver `RAIZ` arriba).
 function tieneSpec(f) {
   if (f.spec_path && existsSync(path.join(f.spec_path, 'requirements.md'))) return true;
-  if (globRequirements('specs', f)) return true;
-  if (existsSync(WT_DIR)) {
-    for (const wt of readdirSync(WT_DIR, { withFileTypes: true })) {
-      if (!wt.isDirectory()) continue;
-      if (globRequirements(path.join(WT_DIR, wt.name, 'specs'), f)) return true;
-    }
-  }
-  return false;
+  return basesDeSpecs().some((base) => globRequirements(base, f));
 }
 
 /** Busca `<base>/<key>-*\/requirements.md` y, como fallback, `<base>/<id>-*\/`.
@@ -212,15 +263,9 @@ function buscarMarcadores(base, out) {
   }
 }
 
-// Los mismos dos sitios que el bloque 4, y por la misma razon: mientras una feature esta
-// en vuelo su spec vive en el worktree y no llega a la raiz hasta que su PR mergea.
+// Los mismos sitios que el bloque 4, contra la RAIZ y por la misma razon.
 const boardPendiente = [];
-buscarMarcadores('specs', boardPendiente);
-if (existsSync(WT_DIR)) {
-  for (const wt of readdirSync(WT_DIR, { withFileTypes: true })) {
-    if (wt.isDirectory()) buscarMarcadores(path.join(WT_DIR, wt.name, 'specs'), boardPendiente);
-  }
-}
+for (const base of basesDeSpecs()) buscarMarcadores(base, boardPendiente);
 
 if (boardPendiente.length > 0) {
   for (const p of boardPendiente) {
