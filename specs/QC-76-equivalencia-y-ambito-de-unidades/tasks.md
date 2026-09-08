@@ -140,7 +140,7 @@
   - **Hecho cuando**: las cinco comprobaciones están anotadas en `progress/impl_QC-76-*.md` con su
     salida. Cubre: R26, R35, R36, R37, R38.
 
-- [ ] **T12. Gate completo y mapa de trazabilidad.** (depende de T4, T5, T8, T9, T10, T11)
+- [x] **T12. Gate completo y mapa de trazabilidad.** (depende de T4, T5, T8, T9, T10, T11)
   - Toca: `progress/impl_QC-76-equivalencia-y-ambito-de-unidades.md`.
   - `./init.sh` completo en verde —incluidas todas las guardias— y el mapa `R1..R38 → test concreto`
     escrito, siguiendo la tabla de `design.md > 9`. Un requisito sin test es un fallo de la feature
