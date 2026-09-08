@@ -12,9 +12,8 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **12/17 tasks, trabajo rescatado y commiteado el 2026-09-08** (la sesion del `implementer` murio dejando 41 archivos sin commitear). Estuvo **BLOQUEADA**: `delay: null` ponia `unit-select` rojo 6/6 por la comprobacion de `pointer-events` de los popups de Base UI. **Desbloqueada por decision humana** — se espera a que la opcion sea interactiva, sin excepciones nuevas y sin reabrir la decision n3. `implementer` cerrando T4c/T4e/T5 y reformulando R9 |
-| QC-38 | crud-de-unidades | Catálogos | backend | in_progress | feature/QC-38-crud-de-unidades | **PR #47 abierto, esperando merge humano (F2.4→F2.5)**. Gate completo en verde SIN un solo rojo, reviewer APROBADO a la primera (0 mayores, 36/36 con 8 mutaciones) |
-| QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | spec_ready | feature/QC-65-estado-de-cuenta-de-usuario | **F1.3 hecho el 2026-09-08**: spec escrito (R1–R21, 12 decisiones cerradas cubiertas, cero preguntas abiertas, sin dependencias nuevas), tarjeta en *En revisión*. **Esperando aprobación humana (F1.4)** |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **17/17 tasks, `d1e966d`**. T11: cinco `./init.sh` completos seguidos, **las cinco exit 0** (234/234 archivos, 2839 casos). R9 y R13 reformulados conservando la redaccion anterior. `reviewer` corriendo (F2.2). Base propia `QuimiCloude_QC58` montada — el worktree venia sin `.env` |
+| QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | in_progress | feature/QC-65-estado-de-cuenta-de-usuario | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. Rama sincronizada con `origin/dev` ANTES de implementar, para no chocar con los tests del seed que QC-38 acababa de tocar. `implementer` en curso (F2.1) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 

@@ -2296,3 +2296,55 @@ las de sistema. 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abier
   QC-76 añadió a `Unit` y el typecheck cae con 41 errores en `lib/modules/unidades` y
   `tests/integration/unidades`. **Es cliente desactualizado, no código roto** — el mismo typecheck
   pasa limpio en el worktree, cuyo cliente sí se regeneró.
+
+## QC-38 — crud-de-unidades (cerrada el 2026-09-08, PR #47, merge `516e9c0`)
+
+Zona `backend`, `complexity: medium`. El catálogo de unidades deja de ser intocable: entran el
+**alta, la edición y el borrado** con su superficie de Server Actions, encima del modelo de QC-76 y
+autorizando **por permiso** con el de QC-74. 36 requisitos EARS, 24 decisiones cerradas.
+
+- **Es la ficha que abrió la sesión y no se pudo arrancar.** Estaba bloqueada por `depends_on`, y
+  QC-76 se hizo para desbloquearla; las dos cerraron el mismo día.
+- **Se creó `unidades.modificar`, y eso enmienda QC-74.** Su R2 decía «ni uno más ni uno menos» y
+  su R4 justificaba dejar `unidades` sin escritura con «no tiene escritura» — premisa que deja de
+  ser cierta justo por esta ficha. El catálogo pasa a **once**, sembrado al Administrador **junto
+  con** `unidades.consultar` (modificar no implica consultar), y **la enmienda está escrita en el
+  código**, en la cabecera del catálogo, no solo en el spec. La guardia de QC-74 sigue mordiendo
+  reanclada en once: borrar la entrada tumba **17 casos**. Descartado reutilizar `consultar` para
+  escribir, que habría roto la separación que QC-74 construyó en los otros cuatro módulos.
+- **El defecto que solo la integración podía ver.** El `design.md` mandaba traducir el `P2002` de
+  Prisma leyendo el **nombre del índice** en `meta.target`; contra Postgres real eso trae las
+  **columnas**, así que los `Set` no hacían match nunca y **R11 y R12 habrían llegado rotos a
+  producción**. Ningún test con dobles podía desmentirlo —el doble confirma la suposición falsa—.
+  Lo cazó el implementer contra la base real, lo corrigió por columna con el precedente de QC-25
+  (`recipe-prisma.ts`) **sin tocar un solo test**, y el reviewer lo confirmó revirtiéndolo: la
+  integración se puso roja exactamente en R11 y R12. El spec quedó corregido (`f10a20e`) y esos dos
+  requisitos se verifican ahora **obligatoriamente en integración**.
+- **La lección de QC-76 se aplicó de entrada y funcionó.** Aquí lo compartido era `PERMISSIONS`, y
+  pasar de diez a once ponía en rojo **seis archivos de test ajenos**. Se actualizaron **en la misma
+  tanda** que el cambio, y el reviewer verificó **con el diff** que solo cambiaron conteo y texto:
+  ningún `expect` borrado, ningún `toEqual` degradado a `toContain`, ningún caso saltado. Cero
+  rondas de rechazo, frente a la de QC-76.
+- **Reviewer APROBADO a la primera**: 0 mayores, 5 menores, los 36 requisitos verificados uno a uno
+  y **8 mutaciones al código de producción, las 8 mordieron**.
+- **Dos agujeros del gate arreglados desde aquí**, por `/afinar-regla` y entrando por esta rama
+  porque `dev` local iba 26 commits por detrás: `init.sh` no cargaba el `.env` —el veredicto del
+  gate dependía del shell que lo lanzara: 23 archivos en rojo desde uno limpio, 1 con el `.env`
+  cargado, y el rojo se leía como fallo de código porque Prisma dice «Validation Error»— y el
+  centinela de QC-75 exigía que el diff trajera su propio `private-nav.ts`, con lo que **ponía en
+  rojo el gate completo de todas las demás ramas**. Los dos con su porqué escrito.
+- **Deuda ajena descubierta y NO arreglada aquí**: `tests/unit/navegacion/private-layout-menu.test.tsx`
+  está en rojo determinista porque `ab28f97` —un cambio de UI hecho a mano en `dev`— movió el
+  disparador del menú de usuario que esperan los tests de QC-75 y QC-45. Entró al baseline con esa
+  trazabilidad. **Necesita ficha**: o el cambio de UI actualiza el test, o el test se adapta.
+- **El flake de saturación no era una puerta cerrada, era intermitente.** Se midió: tres corridas
+  completas dieron conjuntos distintos de rojos, una de ellas **cero**. La lectura primera —«ninguna
+  feature puede enseñar hoy un gate verde»— era demasiado categórica. Lo arregla QC-58, en vuelo.
+- Cierre: `./init.sh` completo en verde tras el merge de `dev` —265 archivos, `sin rojos nuevos`—,
+  con el único conflicto del merge resuelto conservando el spec escrito frente a la copia sembrada
+  que alguien había commiteado en `dev`.
+- El gate avisa de que **6 de las 7 entradas del baseline ya pasan**: el fichero describe un pasado
+  que ya no existe y toca limpiarlo cuando QC-58 cierre.
+- **Desbloquea QC-39** (`pantalla-de-unidades`), que hereda además el menor m1: un `id` malformado
+  escapa como `P2023` en vez de `NotFoundError` — sin impacto de seguridad y hoy inalcanzable
+  porque no hay pantalla.
