@@ -131,6 +131,10 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         productName: line.productName,
         quantity: line.quantity,
         unitId: line.unitId,
+        // El detalle de la receta trae la unidad de la LINEA, no la del producto: aqui no se
+        // sabe de que grupo es el ingrediente, y `null` es exactamente eso -no un olvido-.
+        // El selector de esa linea ofrece entonces el catalogo completo y no pisa `unitId`.
+        productUnitId: null,
       }),
     ),
     // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a

@@ -140,7 +140,7 @@ const testId = {
 const PROVEEDOR_ID = crypto.randomUUID();
 const LINEA_ID = crypto.randomUUID();
 const PRESENTACION = { id: crypto.randomUUID(), name: 'Tambor 200 L' };
-const UNIDAD = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+const UNIDAD = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
 
 function proveedor(): SupplierView {
   return {

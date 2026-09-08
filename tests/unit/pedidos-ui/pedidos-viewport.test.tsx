@@ -195,7 +195,7 @@ const RECETA = {
   name: 'Esmalte azul de temporada',
   imageUrl: null,
 };
-const UNIDAD: UnitRef = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+const UNIDAD: UnitRef = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 /**

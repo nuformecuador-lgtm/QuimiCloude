@@ -48,6 +48,15 @@ export {
 } from './recipe-form-state';
 export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
 export { UnitPicker, type UnitPickerProps } from './unit-picker';
+// QC-26bis: las tres reglas del selector de unidad por linea. Modulo PURO -sin React y sin
+// DOM-, como `recipe-form-state.ts`: se reexporta porque el barrel expone TODO componente de la
+// carpeta (R46) y porque asi el test que las prueba las importa por el mismo camino que la ruta.
+export {
+  compareDecimalText,
+  resolveLineUnitId,
+  smallestUnit,
+  unitsOfGroup,
+} from './unit-group';
 export { RecipeLinesField, type RecipeLinesFieldProps } from './recipe-lines-field';
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';

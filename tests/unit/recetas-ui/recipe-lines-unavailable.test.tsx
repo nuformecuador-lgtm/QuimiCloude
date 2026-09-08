@@ -51,12 +51,26 @@ function unavailableTestId(index: number): string {
 
 /** Línea con producto disponible: `productName` es una cadena no vacía. */
 function availableLine(key: string, name: string): RecipeLineFormValue {
-  return { key, productId: `product-${key}`, productName: name, quantity: '1', unitId: 'unit-1' };
+  return {
+    key,
+    productId: `product-${key}`,
+    productName: name,
+    quantity: '1',
+    unitId: 'unit-1',
+    productUnitId: null,
+  };
 }
 
 /** Línea "dada de baja": el único discriminante es `productName === null` (R53, R54). */
 function unavailableLine(key: string): RecipeLineFormValue {
-  return { key, productId: `product-${key}`, productName: null, quantity: '2.5000', unitId: 'unit-2' };
+  return {
+    key,
+    productId: `product-${key}`,
+    productName: null,
+    quantity: '2.5000',
+    unitId: 'unit-2',
+    productUnitId: null,
+  };
 }
 
 /** Componente controlado mínimo para poder observar los cambios de `lines` entre renders. */

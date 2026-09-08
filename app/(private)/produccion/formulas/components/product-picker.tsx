@@ -87,6 +87,13 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 export type ProductPickerOption = {
   readonly id: string;
   readonly name: string;
+  /**
+   * Unidad en la que se mide el producto (`products.unit_id`, ya expuesta por `ProductView`),
+   * o `null` si no declara ninguna. Viaja hasta aqui para que la linea pueda acotar su
+   * selector de unidad al grupo del ingrediente; este componente NO la usa para nada -no
+   * filtra, no ordena y no la pinta-, solo la entrega intacta en `onSelect`.
+   */
+  readonly unitId: string | null;
 };
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -158,7 +165,11 @@ export function ProductPicker({
       }
 
       return {
-        items: result.data.items.map((item) => ({ id: item.id, name: item.name })),
+        items: result.data.items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          unitId: item.unitId,
+        })),
         page: result.data.page,
         totalPages: result.data.totalPages,
       };

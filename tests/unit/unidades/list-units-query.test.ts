@@ -42,8 +42,8 @@ const SIN_PERMISO: Actor = {
 };
 
 const CATALOGO: readonly UnitRef[] = [
-  { id: 'unit-1', name: 'Gramo', symbol: 'g' },
-  { id: 'unit-2', name: 'Litro', symbol: 'L' },
+  { id: 'unit-1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null },
+  { id: 'unit-2', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
 ];
 
 const PAGINA: Page<UnitRef> = {

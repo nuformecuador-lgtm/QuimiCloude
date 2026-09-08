@@ -13,13 +13,35 @@ import {
 
 describe('toUnitRef', () => {
   it('mapea id, name y symbol tal cual', () => {
-    const ref = toUnitRef({ id: 'u-1', name: 'Litro', symbol: 'L' });
-    expect(ref).toEqual({ id: 'u-1', name: 'Litro', symbol: 'L' });
+    const ref = toUnitRef({ id: 'u-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null });
+    expect(ref).toEqual({
+      id: 'u-1',
+      name: 'Litro',
+      symbol: 'L',
+      baseUnitId: null,
+      factor: null,
+    });
   });
 
   it('conserva symbol null cuando la unidad no lo declara (R3)', () => {
-    const ref = toUnitRef({ id: 'u-1', name: 'Litro', symbol: null });
+    const ref = toUnitRef({ id: 'u-1', name: 'Litro', symbol: null, baseUnitId: null, factor: null });
     expect(ref.symbol).toBeNull();
+  });
+
+  it('la derivacion viaja entera y el factor sale como TEXTO, nunca como number (QC-26bis)', () => {
+    // El `Decimal` de Prisma no puede cruzar el contrato publico de `unidades`, y un
+    // `decimal(14,4)` no se degrada a coma flotante: `toUnitRef` lo pasa por `toString()`.
+    const ref = toUnitRef({
+      id: 'u-kg',
+      name: 'Kilogramo',
+      symbol: 'kg',
+      baseUnitId: 'u-g',
+      factor: { toString: () => '1000.0000' },
+    });
+
+    expect(ref.baseUnitId).toBe('u-g');
+    expect(ref.factor).toBe('1000.0000');
+    expect(typeof ref.factor).toBe('string');
   });
 });
 

@@ -21,8 +21,8 @@ import type { UnitRef } from '@/lib/modules/unidades';
  * existe ademas la guardia de fuente de `catalog-route-contract.test.ts`.
  */
 
-const UNIDAD_CON_SIMBOLO: UnitRef = { id: 'unit-kg', name: 'Kilogramo', symbol: 'kg' };
-const UNIDAD_SIN_SIMBOLO: UnitRef = { id: 'unit-pieza', name: 'Pieza', symbol: null };
+const UNIDAD_CON_SIMBOLO: UnitRef = { id: 'unit-kg', name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
+const UNIDAD_SIN_SIMBOLO: UnitRef = { id: 'unit-pieza', name: 'Pieza', symbol: null, baseUnitId: null, factor: null };
 const UNIDADES = [UNIDAD_CON_SIMBOLO, UNIDAD_SIN_SIMBOLO] as const;
 
 /** Monta el selector dentro de un formulario, que es su unico entorno real. */
