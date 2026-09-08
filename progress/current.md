@@ -240,6 +240,26 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-39 — acotada con `/afinar-feature` (2026-09-08)
+
+Alcance, 35 decisiones cerradas y **cero preguntas abiertas** en
+`specs/QC-39-pantalla-de-unidades/requirements.md`. Esa es la fuente; aquí no se copia la tabla.
+
+**Lo que la acotación corrigió del board**, y por eso se editó el issue antes de sembrar: la ficha
+pedía que las unidades **de sistema se distinguieran visualmente** de las de la empresa, y el humano
+decidió lo contrario — el ámbito es **manejo interno**, no hay columna que lo muestre y la única
+señal es que esa fila **no trae botones**. También quedaron cerradas las cuatro cosas que la ficha
+dejaba «para decidir al acotar»: panel lateral, sí a búsqueda/orden/paginación, los **dos** permisos
+(`unidades.consultar` **y** `unidades.modificar`, porque QC-74 decidió que modificar no implica
+consultar) y sí a E2E ligera, que cierra el diferimiento de QC-38.
+
+**El hallazgo que cambia el tamaño de la ficha y no estaba anotado en ningún sitio**: la lista tiene
+que pintar la equivalencia y saber si la unidad es de sistema, y **el contrato de lectura no trae ni
+una cosa ni la otra** — `UnitRef` es `id`/`name`/`symbol` y `UNIT_SELECT` proyecta esos tres. La
+amplía **esta ficha**, que sigue siendo `frontend` y **no se parte en dos**. Cumple de paso el
+encargo que QC-38 dejó escrito en `unit-actions.ts`: «quien abre la puerta al contrato aquí es
+QC-39».
+
 ### QC-39 — arranque del 2026-09-08 (F1.0)
 
 Arrancada por decisión humana explícita («arranca 39»). Worktree montado desde `origin/dev`
