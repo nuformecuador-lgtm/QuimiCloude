@@ -28,10 +28,14 @@ este diseño:
 | **`DataTableColumn.cell` devuelve `ReactNode`** y `emptyAction` también | `data-table-types.ts:67`, `:147` |
 | Ya hay un consumidor real con columna de acciones de fila, panel lateral y dos diálogos | `app/(private)/pedidos/components/*` |
 | `PRIVATE_ROUTE_PREFIXES` y su guardia comparan lista contra árbol de `app/(private)/` | `lib/shared/routes.ts:82-93`, `tests/guards/guard-rutas-privadas-cubiertas.test.ts` |
-| `ROUTE_ROLE_RULES` vive en `lib/composition/route-role-rules.ts` y ya tiene cuatro filas | `lib/composition/route-role-rules.ts:46-62` |
+| **`ROUTE_ROLE_RULES` ya no existe: QC-75 R16 borró `lib/composition/route-role-rules.ts`** y el middleware solo comprueba firma, caducidad y empresa | el archivo no está en el árbol; `lib/modules/identity/adapters/driving/route-guard-middleware.ts` |
+| El corte por permiso de una pantalla lo hace `requirePagePermission(code)`: `redirect(LOGIN_ROUTE)` sin sesión, `notFound()` sin el permiso | `lib/modules/identity/adapters/driving/require-page-permission.ts:48-52` |
+| El 404 de la zona privada se pinta **dentro** del layout privado | `app/(private)/not-found.tsx`, `app/(private)/layout.tsx:44-53` |
 | `SessionUser` trae `roleName: string \| null` **y** `permissions: readonly string[]` (QC-74) | `lib/modules/identity/domain/session-user.ts:15-29` |
-| `SEED_ROLE_PERMISSIONS`: el Operador **también** tiene `inventario.consultar` | `lib/modules/identity/domain/permissions.ts:105` |
-| `PRIVATE_NAV_ITEMS` es la única fuente de la navegación; `AppSidebar` solo recorre y dibuja | `lib/shared/navigation/private-nav.ts:151-206` |
+| `SEED_ROLE_PERMISSIONS`: el Administrador tiene `inventario.consultar` **e** `inventario.modificar`; el Operador tiene **solo** `inventario.consultar` | `lib/modules/identity/domain/permissions.ts:93-105` |
+| `PRIVATE_NAV_ITEMS` es la única fuente de la navegación; `AppSidebar` solo recorre y dibuja | `lib/shared/navigation/private-nav.ts` |
+| **`NavLink.permission` es OBLIGATORIO** (QC-75 R5) y una guardia rechaza un código fuera del catálogo | `private-nav.ts:133-176`, `tests/guards/guard-nav-permisos-declarados.test.ts` |
+| El layout privado **ya filtra** el menú por los permisos de la sesión, sin consultas nuevas | `app/(private)/layout.tsx:70`, `private-nav.ts:334-355` (`filterNavItemsByPermissions`) |
 | Los ítems de navegación tienen que ser **serializables** (cruzan servidor→cliente), con guardia | `private-nav.ts:94-105`, `tests/guards/guard-nav-serializable.test.ts` |
 | Primitivas presentes: `table`, `sheet`, `alert-dialog`, `select`, `input`, `label`, `button`, `sonner`, `skeleton`… | `components/ui/` (23 archivos) |
 | Playwright montado con 9 specs y sesión real utilizable | `e2e/` |
@@ -46,12 +50,10 @@ las features 4 y 10. **No hace falta correr `shadcn add`**: todas las primitivas
 
 ```
 lib/shared/routes.ts                              # EDITA: PRESENTATIONS_ROUTE + su prefijo privado
-lib/shared/navigation/private-nav.ts              # EDITA: sección Configuración, su ítem, marca `adminOnly` y el filtro puro
-lib/composition/route-role-rules.ts               # EDITA (1 fila): la regla ruta→rol
-app/(private)/layout.tsx                          # EDITA (1 expresión): filtra los ítems por rol antes de pasarlos
+lib/shared/navigation/private-nav.ts              # EDITA: sección Configuración, su ítem y el `permission` que declara
 
 app/(private)/configuracion/presentaciones/
-  page.tsx                                        # NUEVO. Server Component: metadata + searchParams + Suspense
+  page.tsx                                        # NUEVO. Server Component: requirePagePermission + metadata + searchParams + Suspense
   components/
     index.ts                                      # NUEVO. Barrel de la ruta (R29)
     presentation-list-params.ts                   # NUEVO. Parser/serializador puros de la URL (R14)
@@ -67,14 +69,16 @@ app/(private)/configuracion/presentaciones/
     delete-presentation-dialog.tsx                # NUEVO. Cliente: confirmación + error en uso (R27, R28)
 ```
 
-**Los cuatro archivos heredados que se editan son exactamente los que R33 autoriza.** Cualquier
-otro archivo ajeno que una task pida abrir es señal de **parar y avisar al leader**. En particular:
-`components/shared/data-table/**` **no se toca** (R20), y `components/ui/**` tampoco (R31).
+**Los DOS archivos heredados que se editan son exactamente los que R33 autoriza.** Cualquier otro
+archivo ajeno que una task pida abrir es señal de **parar y avisar al leader**. En particular:
+`components/shared/data-table/**` **no se toca** (R20), `components/ui/**` tampoco (R31), y
+**`app/(private)/layout.tsx` tampoco**: desde QC-75 ya filtra el menú por permisos, así que esta
+ficha no tiene nada que añadirle. `lib/composition/route-role-rules.ts` **no aparece porque ya no
+existe** (`§0`, `§4`).
 
-**Conflicto de archivos con otras features en curso:** `lib/shared/routes.ts`,
-`lib/shared/navigation/private-nav.ts`, `lib/composition/route-role-rules.ts` y
-`app/(private)/layout.tsx` son los cuatro puntos calientes. Se declaran aquí para que el leader
-pueda vigilarlos (`AGENTS.md > Paralelismo`).
+**Conflicto de archivos con otras features en curso:** `lib/shared/routes.ts` y
+`lib/shared/navigation/private-nav.ts` son los dos puntos calientes. Se declaran aquí para que el
+leader pueda vigilarlos (`AGENTS.md > Paralelismo`).
 
 ## 2. La constante de ruta (R2)
 
@@ -85,9 +89,10 @@ export const PRESENTATIONS_ROUTE = '/configuracion/presentaciones';
 
 Nace en `lib/shared/routes.ts` —como `SUPPLIERS_ROUTE` y `ORDERS_ROUTE`, y a diferencia de
 `INVENTORY_ROUTE`, que se mudó allí en QC-22—, así que **no necesita reexport de compatibilidad**:
-nadie la importaba antes. Vive ahí y no en `private-nav.ts` porque el middleware y la regla
-ruta→rol la necesitan y **no pueden depender de la navegación**, que arrastra etiquetas, iconos y
-agrupación de UI.
+nadie la importaba antes. Vive ahí y no en `private-nav.ts` porque el middleware la necesita —para
+la lista de prefijos privados— y **no puede depender de la navegación**, que arrastra etiquetas,
+iconos y agrupación de UI. (El otro consumidor histórico, la regla ruta→rol, desapareció con
+QC-75; el criterio se sostiene igual por el middleware.)
 
 **No se declara una constante `CONFIGURATION_ROUTE = '/configuracion'`.** No hay pantalla en esa
 URL: visitarla daría 404, y una constante de ruta que no lleva a ninguna parte es exactamente la
@@ -102,7 +107,7 @@ derivando** la ruta esperada de la constante (`app/(private)${PRESENTATIONS_ROUT
 afirmando que el archivo está ahí, más una guardia de fuente de que ningún archivo de la feature
 contiene el literal `'/configuracion/presentaciones'`.
 
-## 3. La sección Configuración y el ocultado por rol (R3, R4)
+## 3. La sección Configuración y el ocultado por permiso (R3, R4)
 
 ### 3.1 La sección
 
@@ -113,8 +118,8 @@ export const NAV_SECTION_CONFIGURATION = 'Configuración';
 export const PRESENTATIONS_LABEL = 'Presentaciones';
 // …dentro de PRIVATE_NAV_ITEMS, al final:
 { kind: 'link', href: PRESENTATIONS_ROUTE, label: PRESENTATIONS_LABEL,
-  testId: 'nav-presentaciones', icon: 'boxes', section: NAV_SECTION_CONFIGURATION,
-  adminOnly: true }
+  testId: 'nav-presentaciones', permission: 'inventario.modificar',
+  icon: 'boxes', section: NAV_SECTION_CONFIGURATION }
 ```
 
 - **Un ítem, no un grupo.** Un `NavGroup` con un solo hijo pinta un desplegable para llegar a una
@@ -122,72 +127,138 @@ export const PRESENTATIONS_LABEL = 'Presentaciones';
 - **`icon: 'boxes'`** ya existe en `NavIconName` y en el mapa de iconos: **no se añade ningún
   icono**, y el ítem sigue siendo serializable (el icono es una cadena, `guard-nav-serializable`).
 - **Un solo ítem** (decisión del 2026-09-07): nada de «Unidades» apuntando a 404 hasta QC-39.
+- **`permission` es un campo obligatorio del tipo `NavLink`** desde QC-75 R5: olvidarlo no produce
+  un ítem visible para todos, produce un error de compilación. Y `guard-nav-permisos-declarados`
+  se pone roja si el código no está en el catálogo de QC-74.
 
-### 3.2 El ocultado, y por qué por ROL y no por permiso
+### 3.2 El ocultado se hace POR PERMISO, y el permiso es `inventario.modificar`
 
-`NavLink` gana un campo opcional `readonly adminOnly?: boolean`, y `private-nav.ts` gana una
-función **pura**:
+**Esta sección se reescribió el 2026-09-08. Antes decía lo contrario y conviene saber por qué**
+(ver el recuadro al final): el diseño original ocultaba el ítem por **rol**, con un campo
+`adminOnly` y una función `visibleNavItems` propias de esta ficha, y **argumentaba en contra** de
+usar `inventario.modificar`. Ese apaño nunca llegó a `dev`: **QC-75 aterrizó antes**, y con él el
+menú se filtra por permiso en el servidor. El mecanismo de hoy es de QC-75; esta ficha **lo
+consume**.
 
-```ts
-export function visibleNavItems(
-  items: readonly NavItem[],
-  { isAdministrator }: { readonly isAdministrator: boolean },
-): readonly NavItem[]
-```
-
-que quita los ítems marcados cuando no se es Administrador. `app/(private)/layout.tsx` —que ya
-tiene el `SessionUser` y ya es el único que lee la sesión— la aplica antes de pasar los ítems:
+El filtrado ya existe y **no se escribe aquí**:
 
 ```tsx
-<AppSidebar user={user} navItems={visibleNavItems(PRIVATE_NAV_ITEMS, {
-  isAdministrator: user.roleName === ROLE_ADMINISTRADOR,
-})} />
+// app/(private)/layout.tsx — QC-75, ya mergeado. Esta ficha NO toca este archivo.
+const navItems = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, user.permissions);
+…
+<AppSidebar user={user} navItems={navItems} />
 ```
 
-Cuatro decisiones dentro de esto, cada una con su porqué:
+Lo único que aporta esta ficha es **el ítem y el código de permiso que declara**. Cuatro cosas que
+esto implica, cada una con su porqué:
 
-1. **El filtro vive en `private-nav.ts`, el rol se compara en el layout.** `lib/shared/**` **no
-   puede importar `lib/modules/**`** (`docs/architecture.md > La regla de dependencias`), así que
-   `ROLE_ADMINISTRADOR` no puede entrar ahí. El layout es `app/**` y sí puede importar el barrel de
-   `identity`. Resultado: la parte pura y testeable sin DOM se queda en la navegación, y el único
-   que conoce el rol sigue siendo el único que lee la sesión (R32).
-2. **`AppSidebar` no se toca.** Recorre lo que recibe; si un ítem no llega, no lo dibuja. Un
-   archivo ajeno menos que abrir.
+1. **`inventario.modificar` es el permiso correcto, no `inventario.consultar`.** Esta pantalla
+   **administra el catálogo**: el alta, la edición y el borrado viven todos en ella (R21, R22, R23,
+   R27). Entrar a una pantalla cuyo propósito entero es escribir con un permiso de solo lectura
+   sería anunciar una capacidad que no se tiene. Y es comprobable, no una suposición:
+   `SEED_ROLE_PERMISSIONS` da al Administrador `inventario.consultar` **e** `inventario.modificar`,
+   y al Operador **solo** `inventario.consultar` (`permissions.ts:93-105`). Filtrar por
+   `inventario.consultar` no ocultaría nada al Operador; filtrar por `inventario.modificar` cumple
+   exactamente lo que pide la decisión cerrada «solo el Administrador» **por la vía del permiso**,
+   que es la que el repo tiene desde QC-74/QC-75. **No se crea ningún permiso nuevo** ni se toca el
+   catálogo de QC-74.
+2. **El menú y la ruta usan LA MISMA fuente, y por eso no puede haber un enlace que rebote.** El
+   ítem declara `inventario.modificar` y la página exige `inventario.modificar` con
+   `requirePagePermission` (`§4`). Son el mismo código, contra el mismo conjunto
+   (`user.permissions`), con la misma semántica de pertenencia exacta (`assertPermission`, QC-74
+   R12). Quien ve el enlace puede entrar; quien no puede entrar no ve el enlace. El test de R4 y el
+   de R6 afirman esa igualdad **derivándola**, no repitiendo el literal en dos sitios.
 3. **La sección desaparece sola.** `groupNavItemsBySection` construye las secciones a partir de los
-   ítems que le llegan: sin el ítem no hay sección, y el encabezado «Configuración» no queda
-   huérfano. Es una propiedad del código que ya existe, y R4 la afirma como test.
-4. **Se compara el ROL (`user.roleName`), no un permiso.** Es la decisión menos obvia del diseño y
-   por eso se justifica:
-   - **Coherencia con lo que de verdad va a pasar.** Lo que deja pasar a la pantalla es
-     `ROUTE_ROLE_RULES`, que casa por **nombre de rol**. Ocultar por otro criterio produciría el
-     peor de los estados: un ítem visible que al pulsarlo rebota al dashboard.
-   - **El permiso disponible no sirve para esto.** `inventario.consultar` lo tiene **también el
-     Operador** (`SEED_ROLE_PERMISSIONS`), así que filtrar por él no ocultaría nada. Usar
-     `inventario.modificar` «porque hoy solo lo tiene el Administrador» sería adivinar: el modelo de
-     permisos existe justo para que esa correspondencia pueda cambiar sin avisar.
-   - **No es una frontera de autorización, y por eso vale.** QC-9 R29 y QC-74 R18 dicen lo mismo
-     desde dos lados: enseñar una pantalla no autoriza, y `roleName` es display. Aquí solo se decide
-     **qué se dibuja**; la autorización real siguen tomándola los cuatro casos de uso de
-     `inventario` con `requirePermission`, y esta pantalla no la repite (R7).
-   - **Es provisional a propósito**, y así queda escrito en el código: **QC-75** arma el menú entero
-     en el servidor con permisos y **sustituye** `adminOnly` y `visibleNavItems`. No se convive con
-     las dos cosas.
+   ítems que le llegan, y se aplica **después** del filtrado: sin el ítem no hay sección, y el
+   encabezado «Configuración» no queda huérfano. Es una propiedad del código que ya existe, y R4 la
+   afirma como test.
+4. **`AppSidebar` no se toca, y los ítems ocultos no viajan.** El filtrado ocurre en el Server
+   Component antes de cruzar la frontera, así que un ítem sin permiso no aparece en el HTML servido
+   —ni etiqueta, ni `href`, ni `data-testid`— en vez de ocultarse con CSS (QC-75 R2). El componente
+   recorre lo que recibe y dibuja (R32).
+
+**Excepción declarada a QC-75 R5 — léela antes de copiar este ítem.** QC-75 R5 (y su decisión
+cerrada del 2026-09-07) dice que el permiso de un ítem de navegación tiene la forma
+`<módulo>.consultar`. **Este ítem declara `inventario.modificar`, y es deliberado**: la regla de
+QC-75 existe para que no haya enlaces visibles que devuelvan 404, y aquí `inventario.consultar` la
+incumpliría —lo tienen Administrador **y** Operador, así que el Operador vería un enlace a una
+pantalla que le responde 404 (`§4`)—. `inventario.modificar` es el único permiso del catálogo que
+separa a los dos roles, y es el mismo que exige la página: el enlace y la puerta no pueden
+divergir. La forma `<módulo>.consultar` sigue siendo el caso normal —**QC-39 (Unidades) debe usar
+`unidades.consultar`** salvo que se encuentre en este mismo aprieto—; la excepción vale solo
+mientras el módulo no tenga un permiso de consulta que distinga a quien puede entrar. Ninguna
+guardia lo impide: `guard-nav-permisos-declarados` solo comprueba pertenencia al catálogo de QC-74.
+
+**Lo que esto NO es.** Sigue sin ser la frontera de autorización de los datos: QC-9 R29 y QC-74 R18
+dicen lo mismo desde dos lados —enseñar una pantalla no autoriza—. La autorización real la toman
+los cuatro casos de uso de `inventario` con `requirePermission`, y esta pantalla no la repite (R7).
+Lo que sí cambia respecto al diseño original es que ahora el menú y la puerta **coinciden**, en vez
+de ser dos criterios distintos que había que mantener sincronizados a mano.
+
+> **Rastro del razonamiento anterior — no se borra, se explica.** Hasta el 2026-09-08 esta sección
+> decía: «se compara el ROL, no un permiso», y descartaba `inventario.modificar` con este argumento
+> textual: *«usarlo porque hoy solo lo tiene el Administrador sería adivinar: el modelo de permisos
+> existe justo para que esa correspondencia pueda cambiar sin avisar»*. El argumento **se apoyaba
+> en una premisa que ya no se cumple**: en aquel momento la puerta de la ruta cortaba por **nombre
+> de rol** (`ROUTE_ROLE_RULES`), así que ocultar el menú por permiso habría creado dos criterios
+> distintos y, con ellos, el peor estado posible —un ítem visible que al pulsarlo rebota—. Al
+> borrar QC-75 el mecanismo ruta→rol (QC-75 R16) y pasar la puerta a `requirePagePermission`, la
+> premisa se invierte: **la ruta y el menú ya usan la misma fuente**, y usar `inventario.modificar`
+> no es adivinar una correspondencia rol↔permiso, es declarar **el mismo permiso en los dos
+> sitios**. Si algún día `SEED_ROLE_PERMISSIONS` cambiara y otro rol ganara `inventario.modificar`,
+> ese rol ganaría a la vez el enlace y el acceso: siguen sin poder divergir. El apaño `adminOnly` /
+> `visibleNavItems` que aquella versión describía **nunca llegó a `dev`** y no hay que buscarlo en
+> el código.
 
 ## 4. Protección de la ruta (R5, R6)
 
-Dos cosas distintas, las dos en esta ficha:
+Dos controles **distintos**, en dos capas distintas. Ninguno sustituye al otro y los dos entran en
+esta ficha:
 
-1. **`PRIVATE_ROUTE_PREFIXES` gana `PRESENTATIONS_ROUTE`.** Sin esto,
+1. **Sesión, en el borde (R5): `PRIVATE_ROUTE_PREFIXES` gana `PRESENTATIONS_ROUTE`.** Sin esto,
    `guard-rutas-privadas-cubiertas` pone el gate en rojo nombrando `/configuracion/presentaciones`
    en cuanto exista la `page.tsx` — y con razón: `(private)` no aparece en la URL, así que la
-   pantalla se serviría **sin sesión**.
-2. **`ROUTE_ROLE_RULES` gana una fila**: `{ prefix: PRESENTATIONS_ROUTE, roles: [ROLE_ADMINISTRADOR] }`,
-   reutilizando el `ROLE_ADMINISTRADOR` que ese archivo **ya importa** del barrel de `identity`. Una
-   sola fila: la búsqueda casa por segmentos y no hay página de detalle.
+   pantalla se serviría **sin sesión**. Esta lista **no distingue entre sesiones**: solo exige que
+   haya una. No es autorización.
 
-La fila solo añade una constante de `lib/shared/routes`, ya dentro del cierre de imports del
-middleware, así que `lib/composition/route-role-rules.ts` **sigue cargando en el borde**
-(`guard-middleware-edge`).
+2. **Permiso, en la página (R6): `await requirePagePermission('inventario.modificar')`** como
+   **primera** línea del componente, antes de resolver `searchParams` y antes de pintar nada:
+
+   ```tsx
+   // app/(private)/configuracion/presentaciones/page.tsx
+   export default async function PresentacionesPage({ searchParams }: …) {
+     await requirePagePermission('inventario.modificar');
+     const params = parsePresentationListParams(await searchParams);
+     …
+   ```
+
+   - Se importa de `@/lib/modules/identity/adapters/driving/require-page-permission`, que es lo que
+     `docs/architecture.md` permite a `app/**`.
+   - **Sin sesión → `redirect(LOGIN_ROUTE)`.** No es una duplicación del layout por adorno: layout
+     y página se renderizan **en paralelo** en el App Router, así que la página no puede dar por
+     hecho que el `redirect` del layout ya ocurrió.
+   - **Con sesión y sin el permiso → `notFound()`**, es decir **404**, indistinguible de una ruta
+     que no existe: no se nombra el módulo, ni el permiso, ni se confirma que la pantalla exista.
+     Y ese 404 lo pinta `app/(private)/not-found.tsx`, que por vivir en este route group se
+     renderiza **dentro del layout privado**: el usuario conserva el menú (ya filtrado) y la salida,
+     en vez de quedar encerrado en una página pelada.
+   - **No hay redirección a otra pantalla.** El diseño original mandaba rebotar al dashboard; ese
+     mecanismo desapareció (ver el aviso de abajo) y hoy rebotar sería, además, filtrar que la ruta
+     existe.
+   - El código es un `PermissionCode` del catálogo de QC-74, no una cadena: escribirlo mal **no
+     compila**. Y `tests/guards/guard-pantallas-exigen-permiso.test.ts` se pone roja si una pantalla
+     de `app/(private)/` se queda sin esta línea — que es lo que la convierte en algo más que un
+     comentario.
+
+> **Cambio de mecanismo, 2026-09-08.** La versión anterior de esta sección decía que el corte lo
+> hacía **`ROUTE_ROLE_RULES`** con una fila `{ prefix: PRESENTATIONS_ROUTE, roles:
+> [ROLE_ADMINISTRADOR] }` en `lib/composition/route-role-rules.ts`, resuelta en el middleware y con
+> **redirección** fuera de la pantalla. **QC-75 R16 borró ese archivo y el mecanismo entero**: el
+> middleware ya solo comprueba firma, caducidad y empresa. La garantía no se relajó —quien no puede,
+> no entra— pero cambian el lugar (página, no borde), la fuente (permiso, no nombre de rol) y la
+> respuesta (404, no redirección). La discusión sobre `guard-middleware-edge` que había aquí ya no
+> aplica: `require-page-permission.ts` **no entra en el cierre de imports del middleware** (QC-75
+> R18), y vivir en la misma carpeta que el guard no mete nada en el bundle del borde.
 
 ## 5. Datos: contratos, parámetros y estados
 
@@ -201,7 +272,7 @@ middleware, así que `lib/composition/route-role-rules.ts` **sigue cargando en e
 | Edición | `updatePresentationAction.bind(null, id)` → `PresentationMutationFormState` (campo `name`) |
 | Borrado | `deletePresentationAction(prevState, FormData)` con `id` en campo oculto → `PresentationMutationFormState` |
 | Estado inicial de cada formulario | **literal `{ status: 'idle' }`** tipado con el tipo exportado (un archivo `'use server'` solo puede exportar funciones async: no hay `INITIAL_STATE`) |
-| Datos de sesión | Ninguno los pide la pantalla (R7). El layout ya los obtiene para el sidebar y para R4 |
+| Datos de sesión | La pantalla **no los pide ni los pasa por props** (R7, R32): `requirePagePermission` los lee para el corte y **devuelve `void`** a propósito. El layout los obtiene aparte, para el sidebar y para el filtrado de R4 |
 | **Modelo de datos, tablas, RLS, migraciones** | **NO APLICA: cero cambios en `db/`.** El esquema de `presentations` es de QC-14/QC-20 y está mergeado. `presentations` **no lleva `deleted_at` a propósito**, para que la FK `ON DELETE RESTRICT` pueda impedir el borrado de una presentación en uso |
 | Integraciones externas / variables de entorno | **Ninguna** |
 
@@ -368,8 +439,19 @@ con los cuatro checks de `docs/architecture.md > Dependencias de terceros`; **no
 recorridos:
 
 1. **Camino del Administrador:** login → la pantalla → crear una presentación → verla en la lista.
-2. **Rechazo del no-Administrador:** sesión válida con otro rol → pide la URL → acaba fuera, sin ver
-   la tabla (R6). Este es el que `CHECKPOINTS.md` exige por tocar permisos.
+2. **Rechazo de quien no tiene el permiso:** sesión válida **sin `inventario.modificar`** (el
+   Operador del seed) → pide la URL → la respuesta es **404** y se ve el 404 de la zona privada, sin
+   la tabla (R6). Se afirma sobre el `status()` de la respuesta y sobre el marcador del 404 privado,
+   **no** sobre un `waitForURL` a otra pantalla: ya no hay redirección. Este es el que
+   `CHECKPOINTS.md` exige por tocar permisos.
+
+   Detalle que se paga si se olvida: desde QC-75 R11 el login **no lleva a todo el mundo al
+   dashboard**, aterriza en el primer ítem visible del menú. El Operador aterriza en `/inventario`,
+   así que el helper de login tiene que recibir el aterrizaje esperado en vez de darlo por hecho.
+
+   La navegación de los dos recorridos se hace **por URL**, no pulsando el ítem del menú: lo que
+   este spec afirma es el camino de la pantalla, y el filtrado del menú por permiso ya lo cubre
+   `e2e/permisos.spec.ts` con sus propios fixtures (además de los tests de R4).
 
 **Cuidado con los datos:** `presentations` es una tabla real y compartida, y **el borrado es
 físico**. Los nombres van prefijados por `RUN_ID`, los asserts filtran por ese nombre —nunca «la
@@ -390,18 +472,25 @@ justo el código que **QC-56** existe para borrar. Se usa la tabla compartida.
 devuelve `ReactNode` desde QC-35, así que la prop sería una segunda manera de hacer lo mismo, y
 además obligaría a abrir `components/shared/data-table/`, que R20 prohíbe.
 
-**C — Ocultar el ítem de Configuración por permiso (`inventario.consultar` o
-`inventario.modificar`) en vez de por rol.** Es lo que el modelo de permisos de QC-74 invita a
-hacer. **Descartada** (`§3.2`): `inventario.consultar` lo tiene también el Operador —no ocultaría
-nada— y `inventario.modificar` no es lo que la regla ruta→rol comprueba, así que el ítem podría
-quedar visible y rebotar al pulsarlo. Lo que decide el acceso es el **rol**; ocultar por otra cosa
-sería mentir sobre lo que va a pasar. Cuando QC-75 arme el menú entero con permisos, cambiará
-también la regla de ruta y las dos cosas volverán a coincidir.
+**C — Ocultar el ítem por `inventario.consultar` en vez de por `inventario.modificar`.** Es el
+permiso de lectura del mismo módulo y suena al mínimo razonable para «ver una pantalla».
+**Descartada** (`§3.2`): lo tiene **también el Operador** en `SEED_ROLE_PERMISSIONS`, así que no
+ocultaría nada, y llevaría a alguien que solo puede leer a una pantalla cuyo propósito entero es
+escribir. Se usa `inventario.modificar`, que es el mismo código que exige la página.
 
-**D — Filtrar el menú entero por permisos ya, en el servidor, en esta ficha.** Es la solución
-buena. **Descartada por alcance**: la ficha del board lo saca expresamente («Lo que NO entra») y lo
-asigna a **QC-75**. Adelantarlo aquí significaría rediseñar `PRIVATE_NAV_ITEMS`, tocar `AppSidebar`
-y sus cuatro archivos de test, y dejar a medias un modelo que QC-75 va a hacer entero.
+> **Esta alternativa decía antes lo contrario.** Hasta el 2026-09-08, C era «ocultar por permiso en
+> vez de por rol», y estaba **descartada**: la razón era que la puerta de la ruta cortaba por
+> `ROUTE_ROLE_RULES` —por **nombre de rol**—, así que ocultar por permiso habría dejado un ítem
+> visible que rebota al pulsarlo. QC-75 borró ese mecanismo y hoy la ruta corta por el **mismo**
+> permiso, con lo que el motivo del descarte desapareció y la alternativa se convirtió en la
+> decisión. Lo que sigue descartado, con motivo propio, es el permiso concreto `inventario.consultar`.
+
+**D — Filtrar el menú entero por permisos, en el servidor, en esta ficha.** Es la solución buena.
+**Descartada por alcance en su día**: la ficha del board lo sacaba expresamente («Lo que NO entra»)
+y lo asignaba a **QC-75**. **Y así fue: QC-75 ya la construyó y está mergeada**, con
+`NavLink.permission` obligatorio y `filterNavItemsByPermissions` aplicado en el layout privado. Esta
+ficha **la consume** en vez de reimplementarla, y no toca `PRIVATE_NAV_ITEMS` más allá de añadir su
+propio ítem, ni `AppSidebar`, ni el layout.
 
 **E — Colgar presentaciones de `/inventario/presentaciones` (submenú de Inventario).** Es la opción
 que QC-22 dejó escrita como pregunta abierta P1. **Descartada por decisión humana del 2026-09-07**:
@@ -410,11 +499,13 @@ Inventario para lo que se opera de verdad. Coste asumido: el usuario que busca p
 las encuentra bajo Inventario. Mitigación ya existente: el selector de presentación del formulario
 de producto permite **crear** una sin salir de allí (QC-22 R24).
 
-**F — Declarar `/configuracion` como prefijo privado y como regla ruta→rol, para que QC-39 herede
-la protección.** Ahorra dos líneas a la ficha siguiente. **Descartada**: hoy no existe ninguna
-pantalla en `/configuracion`, y proteger por adelantado un tramo vacío hace creer que hay algo
-donde no lo hay. Cada ficha declara su fila **con su test**, que es el patrón de `FORMULAS_ROUTE`
-(`/produccion/formulas`, sin nada declarado para `/produccion`).
+**F — Declarar `/configuracion` como prefijo privado, para que QC-39 herede la protección.** Ahorra
+una línea a la ficha siguiente. **Descartada**: hoy no existe ninguna pantalla en `/configuracion`,
+y proteger por adelantado un tramo vacío hace creer que hay algo donde no lo hay. Cada ficha declara
+su prefijo **con su test**, que es el patrón de `FORMULAS_ROUTE` (`/produccion/formulas`, sin nada
+declarado para `/produccion`). El permiso, además, ya no se declararía por prefijo aunque se
+quisiera: desde QC-75 lo exige cada `page.tsx` (`§4`), y por tanto **no es heredable por tramo de
+URL** en absoluto.
 
 **G — Añadir a la lista las columnas `createdAt` / `updatedAt`, «que ya vienen en la vista».**
 Están en `PresentationView` y son ordenables según la lista blanca. **Descartada por decisión
@@ -435,15 +526,21 @@ que `Suspense` resuelve solo.
 ## 12. Riesgos y cómo se mitigan
 
 1. **Duplicar layout, sidebar o tabla compartida** (el choque features 4↔10). Mitiga **T0**.
-2. **La guardia de rutas privadas pone el gate en rojo** en cuanto exista `page.tsx` sin el
-   prefijo. Por eso **T1** (constante + prefijo + regla de rol) va **antes** que la página.
+2. **Dos guardias ponen el gate en rojo** en cuanto exista `page.tsx` mal cableada:
+   `guard-rutas-privadas-cubiertas` si falta el prefijo privado, y `guard-pantallas-exigen-permiso`
+   si falta la línea de `requirePagePermission`. Por eso **T1** (constante + prefijo) va **antes**
+   que la página, y el corte por permiso es la primera línea que se escribe dentro de ella.
 3. **Tocar `components/shared/data-table/`** «para que la columna de acciones quepa mejor». Lo
    prohíbe R20 y lo vigila un test de T4 que afirma que esos archivos no cambian respecto a `dev`.
-4. **Romper la navegación de otras pantallas** al filtrar los ítems. `visibleNavItems` es puro y su
-   test cubre el caso simétrico: con rol Administrador la lista sale **idéntica** a
-   `PRIVATE_NAV_ITEMS`.
-5. **Cuatro archivos ajenos calientes** (`routes.ts`, `private-nav.ts`, `route-role-rules.ts`,
-   `layout.tsx`). Declarados en `§1` para que el leader vigile el paralelismo.
+4. **Que el ítem declare un permiso distinto del que exige la página**, dejando un enlace que
+   devuelve 404. Es el riesgo real ahora que el ocultado y la puerta son dos declaraciones separadas
+   en dos archivos. Mitiga el test de R4/R6, que afirma la **igualdad** de los dos códigos
+   derivándola en vez de repetir el literal; y `guard-nav-permisos-declarados`, que rechaza un
+   código fuera del catálogo de QC-74 (un `'inventario.modificarr'` ocultaría el ítem en silencio).
+   El caso simétrico también se cubre: con los permisos del Administrador la lista filtrada sale
+   **idéntica** a `PRIVATE_NAV_ITEMS`, así que esta ficha no oculta ítems de otras pantallas.
+5. **Dos archivos ajenos calientes** (`routes.ts`, `private-nav.ts`). Declarados en `§1` para que el
+   leader vigile el paralelismo. `layout.tsx` **ya no lo es**: esta ficha no lo toca.
 6. **El E2E ensucia una tabla compartida y el borrado es físico**: la limpieza tolera
    `presentation_in_use` (`§10`).
 7. **QC-56 (migración de productos y recetas) toca la tabla compartida en paralelo.** Esta ficha

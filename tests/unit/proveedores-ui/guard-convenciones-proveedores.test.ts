@@ -320,8 +320,9 @@ describe('convenciones de la feature de proveedores', () => {
     // R49 — los modulos se consumen solo por su contrato publico y sus adaptadores driving, ya
     // existentes. La guardia del detalle comprueba los IMPORTES; esto comprueba el CAMBIO, que es
     // lo unico que puede delatar una edicion en un archivo que la ruta ni siquiera importa.
-    // `lib/composition/route-role-rules.ts` SI se modifica: lo autoriza R6 y por eso el intocable
-    // es el barrel `index.ts`, no la carpeta entera.
+    // El intocable es el barrel `lib/composition/index.ts`, no la carpeta entera: QC-44 tuvo que
+    // modificar otro archivo de `lib/composition` (la lista ruta->rol que R6 autorizaba, retirada
+    // despues por QC-75), y esa distincion sigue siendo la razon del alcance.
     const tocados = TOCADOS_POR_LA_FEATURE;
     if (tocados === null) {
       ctx.skip(

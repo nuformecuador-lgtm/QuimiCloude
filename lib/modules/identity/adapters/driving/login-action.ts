@@ -4,6 +4,11 @@ import { redirect } from 'next/navigation';
 
 import { identity } from '@/lib/composition';
 import { RETURN_PARAM, loginInputSchema, resolveReturnPath } from '@/lib/modules/identity';
+import {
+  PRIVATE_NAV_ITEMS,
+  filterNavItemsByPermissions,
+  firstVisibleNavHref,
+} from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
@@ -83,7 +88,44 @@ export async function loginAction(
   // autenticarse. Por eso se revalida aqui con `resolveReturnPath`, aunque la pantalla de login
   // ya lo hubiera validado al pintarlo: la validacion del cliente no cuenta, y esta es la unica
   // que protege de verdad (R9, `design.md > 8`).
-  const destino = resolveReturnPath(readField(formData, RETURN_PARAM), DASHBOARD_ROUTE);
+  //
+  // QC-75 R11, R12 — el RESPALDO deja de ser siempre el dashboard: cuando no hay destino de
+  // vuelta valido se aterriza en el primer enlace del menu YA FILTRADO por los permisos de quien
+  // acaba de entrar (`design.md > 3`). El ORDEN NO CAMBIA respecto de QC-9: si el destino de
+  // vuelta es interno y valido, sigue mandando el (R13); lo unico que cambia es el respaldo.
+  //
+  // **La lectura de la sesion va DESPUES de `verifyCredentials`, y eso es lo que la hace
+  // posible**: la sesion se emite dentro de ese caso de uso (`domain/verify-credentials.ts`
+  // llama a `startSession` antes de devolver `ok: true`), y el almacen de Next refleja las
+  // escrituras pendientes dentro de la misma Server Action, asi que aqui ya se lee la sesion
+  // recien emitida.
+  //
+  // **Es una consulta extra por INICIO DE SESION, no por peticion.** R19 prohibe anadir
+  // consultas por peticion a la navegacion —el menu de cada pantalla sale de la lectura de
+  // sesion que el layout privado ya hacia—, y esto no es navegacion: ocurre una vez, al entrar.
+  // La alternativa —ampliar el resultado de `verifyCredentials` para que trajera al usuario y
+  // sus permisos— esta descartada por escrito (`design.md > 8`, alternativa nº 3): ese resultado
+  // es un contrato CONGELADO desde QC-7 (`{ ok: boolean }`, con un unico objeto de rechazo
+  // compartido para que el login no sea un oraculo), y devolver datos del usuario en el
+  // resultado del login abre la puerta a que un camino de fallo se lleve un campo de mas.
+  const user = await identity.getSessionUser();
+
+  // **`DASHBOARD_ROUTE` como ultimo respaldo cubre R12 sin inventar ninguna ruta.** Si el menu
+  // filtrado queda vacio, esa persona tampoco tiene `dashboard.consultar` —el dashboard es un
+  // item mas del menu—, asi que `/dashboard` respondera exactamente el 404 dentro del layout
+  // privado que pide la decision cerrada nº 3, con su cabecera y su control de cerrar sesion.
+  // **No es un caso feliz disfrazado**: es el mismo 404 de R7, alcanzado sin codigo nuevo. Y,
+  // explicitamente (R12): NO se devuelve al login, NO se muestra error de credenciales y NO hay
+  // pantalla de «sin acceso» — las credenciales eran correctas y decir lo contrario seria mentir.
+  // El `user === null` es defensivo (sesion ilegible justo despues de emitirse) y cae al mismo
+  // respaldo.
+  const fallback =
+    (user === null
+      ? null
+      : firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, user.permissions))) ??
+    DASHBOARD_ROUTE;
+
+  const destino = resolveReturnPath(readField(formData, RETURN_PARAM), fallback);
 
   // Fuera de todo try/catch: `redirect()` senaliza con una excepcion de control
   // (`NEXT_REDIRECT`) y tragarsela romperia R17 en silencio.

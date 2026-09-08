@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
+import { PERMISSIONS } from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
 
@@ -42,7 +43,8 @@ const CARPETA_EDICION = join(CARPETA_RUTA, '[id]');
 const PAGE_EDICION_PATH = join(CARPETA_EDICION, 'page.tsx');
 
 /** El layout privado, unico archivo heredado de la zona privada que R51 autoriza a tocar (junto
- *  con `routes.ts`, `private-nav.ts`, `route-role-rules.ts` y `lib/composition/index.ts`). */
+ *  con `routes.ts`, `private-nav.ts` y `lib/composition/index.ts`; la lista ruta->rol que tambien
+ *  se nombraba aqui se retiro en QC-75). */
 const LAYOUT_PRIVADO_PATH = join('app', '(private)', 'layout.tsx');
 
 /** El literal de la ruta, en las tres comillas en las que se puede escribir. */
@@ -361,19 +363,43 @@ describe('contrato de la ruta de recetas', () => {
   });
 
   it('la pantalla no repite la comprobacion de permiso ni decide autorizacion sobre los datos', () => {
-    // R7 — la autorizacion sobre los datos la aportan los casos de uso de `recetas`; el corte de
-    // ruta lo hace el middleware. Repetirla aqui seria una tercera regla que nadie mantiene
+    // R7 — la autorizacion sobre los datos la aportan los casos de uso de `recetas`; la pantalla
+    // solo exige el permiso de consulta con `requirePagePermission` (el caso de abajo). Comparar
+    // permisos a mano o resolver la sesion aqui seria una tercera regla que nadie mantiene
     // sincronizada.
     ningunArchivoContiene([
       'requireAdmin',
-      // QC-74: el envoltorio se llama asi desde T10; la prohibicion vale igual.
-      'requirePermission',
+      // QC-74: el envoltorio se llama asi desde T10; la prohibicion vale igual. Ojo: NO alcanza a
+      // `requirePagePermission`, que es otro identificador y es justo lo que las paginas deben
+      // llamar (QC-75 R6).
+      'requirePermission(',
       'getSessionUser',
       'ADMIN_ROLE_NAME',
       'decideRouteAccess',
-      'ROUTE_ROLE_RULES',
       'next/headers',
     ]);
+  });
+
+  // QC-75 T12 — sustituye a la afirmacion «hay una fila {prefix: FORMULAS_ROUTE,
+  // roles:[Administrador]} en la lista ruta->rol». Esa lista se retiro (QC-75 R16): quien puede ver
+  // estas pantallas lo decide el permiso que ellas mismas exigen (R6) y el que declara su item de
+  // menu (R5), que tienen que ser EL MISMO codigo. Se deriva del catalogo, no se escribe a mano.
+  it('las tres pantallas exigen recetas.consultar y el item de menu declara ese mismo permiso (QC-75 R5, R6)', () => {
+    const permiso = PERMISSIONS.find(
+      (entrada) => entrada.module === 'recetas' && entrada.action === 'consultar',
+    );
+    expect(permiso, 'el catalogo de identity deberia tener recetas.consultar').toBeDefined();
+
+    for (const pagina of [PAGE_PATH, PAGE_NUEVA_PATH, PAGE_EDICION_PATH]) {
+      expect(fuenteSinComentarios(pagina), `${pagina} deberia exigir su permiso`).toContain(
+        `requirePagePermission('${permiso?.code}')`,
+      );
+    }
+
+    const enlace = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    ).find((item): item is NavLink => item.kind === 'link' && item.href === FORMULAS_ROUTE);
+    expect(enlace?.permission).toBe(permiso?.code);
   });
 
   it('la lista no puede pintar quien creo o modifico una receta', () => {
@@ -983,6 +1009,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'LOGIN_ROUTE',
         'NEW_RECIPE_ROUTE',
         'ORDERS_ROUTE',
+        // La trae QC-45 (R2), la pantalla de presentaciones; la lista sigue cerrada a proposito: una constante nueva sin ficha vuelve a poner esto en rojo.
+        'PRESENTATIONS_ROUTE',
         'PRIVATE_ROUTE_PREFIXES',
         'SUPPLIERS_ROUTE',
         'recipeEditRoute',

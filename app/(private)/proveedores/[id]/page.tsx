@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getSupplierAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-nav';
@@ -39,13 +40,19 @@ export const metadata: Metadata = {
  * 1. `not_found` -> estado «proveedor inexistente» con vuelta a la lista y **sin catalogo** (R20):
  *    un proveedor que no existe no tiene lineas, asi que `listCatalogLinesAction` ni se llama.
  * 2. cualquier otro error, incluido `unauthorized` -> estado de error **sin ningun dato** (R7).
- *    Aqui no se decide ningun permiso: el corte de ruta lo hace el middleware con la regla
- *    ruta->rol y la autorizacion sobre los datos la aportan los casos de uso de `proveedores`.
+ *    Ese `unauthorized` lo sigue aportando el caso de uso de `proveedores` sobre los DATOS.
  * 3. exito -> datos de contacto y, debajo, el catalogo paginado (R19).
  *
  * **El `<Suspense>` YA NO lleva `key`** (2026-09-07): remontarlo en cada cambio de consulta
  * borraba la barra de filtros y el foco del campo en el que se estaba escribiendo. La senal de
  * R24 la da ahora `CatalogTable` mientras la navegacion esta en vuelo, sin desmontar la barra.
+ *
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige
+ * `proveedores.consultar` con `requirePagePermission`, **antes** de resolver `params` y de pedir
+ * ninguna de las dos lecturas; redirige al login sin sesion y responde 404 sin nombrar el modulo
+ * ni mencionar permisos. El middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan
+ * firma, caducidad y empresa. La ruta decide si se ensena la pantalla; los casos de uso deciden
+ * que datos se pueden leer.
  *
  * **El estado del catalogo vive en la cadena de consulta**, con su parser propio de esta ruta
  * (`design.md > 6.1`): asi recargar, compartir el enlace o cerrar el panel lateral conserva la
@@ -58,6 +65,8 @@ export default async function ProveedorDetallePage({
   readonly params: Promise<{ id: string }>;
   readonly searchParams: Promise<CatalogListSearchParams>;
 }) {
+  await requirePagePermission('proveedores.consultar');
+
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   // `params` es el nombre que Next da al parametro de RUTA (`[id]`), asi que los de lista se
   // llaman `listParams`: dos cosas distintas no pueden compartir nombre en el mismo alcance.

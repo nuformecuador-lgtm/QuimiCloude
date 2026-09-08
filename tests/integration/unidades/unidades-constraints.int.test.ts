@@ -49,7 +49,15 @@
  * > Acceso a datos y autorizacion`). R21 se cierra con el test estatico sobre el SQL y con
  * `tests/guards/guard-rls-force.test.ts`, no aqui: escribirlo seria un falso verde.
  *
- * Requisitos cubiertos: R1, R2, R3, R5, R6, R7, R9, R10, R11, R12, R13, R14 y R18.
+ * Requisitos cubiertos: R1, R2, R3, R5, R6, R7, R9, R10, R11, R12, R13, R14 y R18 DE QC-32,
+ * y R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R13, R14, R15 y R16 DE QC-76 (bloque final).
+ *
+ * AMPLIADO EL 2026-09-07 POR QC-76 (T5). Tres casos de QC-32 afirmaban lo que esta feature
+ * deroga y se han REESCRITO, cada uno con su nota: el del simbolo compartido (ahora es unico
+ * POR AMBITO, R15), la lista de columnas de `units` (seis -> nueve, R1/R3/R11) y la lista
+ * exacta de FK que apuntan al catalogo (cuatro -> cinco, con `units_unit_id_fkey`, R8). El
+ * helper `createUnit` dejo de usar `'kg'` como simbolo por defecto por lo mismo. Ninguna
+ * asercion se ha debilitado.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -93,6 +101,9 @@ let savepointSeq = 0
 const NOT_NULL_VIOLATION = '23502'
 const FOREIGN_KEY_VIOLATION = '23503'
 const UNIQUE_VIOLATION = '23505'
+/** QC-76: violacion de CHECK. Tambien lo levantan los `RAISE` del disparador de derivacion,
+ *  con `ERRCODE = '23514'` a proposito (`design.md > 2.4`). */
+const CHECK_VIOLATION = '23514'
 
 /**
  * SQLSTATE del error. Se lee de `meta.code` y no del texto: el mensaje de Postgres esta
@@ -146,21 +157,65 @@ function token(): string {
 }
 
 /**
- * Crea una unidad con la API tipada. El nombre lleva SIEMPRE un marcador irrepetible: el
- * indice unico `units_name_normalized_key` es total (no parcial), asi que un nombre fijo
- * chocaria contra el catalogo arrancador ya sembrado o contra otro caso de este archivo.
+ * Simbolo irrepetible derivado de un marcador.
+ *
+ * NUEVO EL 2026-09-07 (QC-76 R15, decision cerrada 28): el simbolo pasa a ser UNICO dentro de
+ * su ambito, y el catalogo arrancador ya ocupa `kg`, `g`, `L` y `mL` como unidades DE SISTEMA.
+ * Un literal fijo en un caso de sistema —que es lo que este archivo escribia hasta hoy—
+ * chocaria ahora contra el arrancador o contra otro caso, y el test se pondria rojo por una
+ * razon que no es la suya. Los casos que SI prueban el choque de simbolos lo escriben a
+ * proposito y a la vista.
+ */
+function symbolFor(marker: string): string {
+  return `u${marker.slice(0, 8)}`
+}
+
+/**
+ * Crea una unidad con la API tipada. El nombre lleva SIEMPRE un marcador irrepetible: los
+ * indices unicos de nombre son por ambito (QC-76 R14), y todas las unidades que crea este
+ * helper son DE SISTEMA salvo que se le pase empresa, asi que un nombre fijo chocaria contra
+ * el catalogo arrancador ya sembrado o contra otro caso de este archivo.
  * `nameNormalized` se pasa a mano, sin llamar a `normalizeUnitName` (ver cabecera).
+ *
+ * AMPLIADO EL 2026-09-07 POR QC-76: el simbolo por defecto ya no es `'kg'` —chocaria con el
+ * `kilogramo` de sistema del arrancador (R15)— sino uno derivado del marcador; y el helper
+ * acepta `companyId`, `baseUnitId` y `factor` para que los casos nuevos siembren unidades de
+ * empresa y derivadas sin escribir SQL crudo en el camino feliz.
  */
 async function createUnit(
   tx: Prisma.TransactionClient,
   marker: string,
-  symbol: string | null = 'kg',
+  symbol: string | null = symbolFor(marker),
+  extra: {
+    readonly companyId?: string | null
+    readonly baseUnitId?: string | null
+    readonly factor?: string | null
+  } = {},
 ): Promise<string> {
   const unit = await tx.unit.create({
-    data: { name: `Unidad ${marker}`, nameNormalized: `unidad${marker}`, symbol },
+    data: {
+      name: `Unidad ${marker}`,
+      nameNormalized: `unidad${marker}`,
+      symbol,
+      companyId: extra.companyId ?? null,
+      baseUnitId: extra.baseUnitId ?? null,
+      factor: extra.factor === undefined || extra.factor === null ? null : new Prisma.Decimal(extra.factor),
+    },
     select: { id: true },
   })
   return unit.id
+}
+
+/**
+ * Crea una empresa propia del caso. `companies` tiene borrado logico (QC-47) y su indice unico
+ * de nombre es parcial sobre las vivas, asi que el marcador evita cualquier choque.
+ */
+async function createCompany(tx: Prisma.TransactionClient, marker: string): Promise<string> {
+  const company = await tx.company.create({
+    data: { name: `Empresa ${marker}`, nameNormalized: `empresa${marker}` },
+    select: { id: true },
+  })
+  return company.id
 }
 
 
@@ -224,6 +279,7 @@ async function createLine(
 
 /** Columnas que un alta cruda puede escribir en las tablas que toca esta feature. */
 type WritableColumn =
+  | 'id'
   | 'name'
   | 'name_normalized'
   | 'symbol'
@@ -232,6 +288,10 @@ type WritableColumn =
   | 'recipe_id'
   | 'product_id'
   | 'quantity'
+  // QC-76: las tres columnas nuevas de `units`. `factor` y `unit_id` van juntos o ninguno
+  // (R2) y eso solo se puede intentar romper escribiendo una de las dos a pelo.
+  | 'company_id'
+  | 'factor'
 
 /**
  * `INSERT` crudo. `columns` decide que se escribe: omitir una entrada es exactamente el
@@ -321,7 +381,10 @@ describe('la unidad como entidad del catalogo', () => {
         data: {
           name: `Kilogramo ${marker}`,
           nameNormalized: `kilogramo${marker}`,
-          symbol: 'kg',
+          // QC-76 R15: el simbolo es unico por ambito y el arrancador ya ocupa `kg` como
+          // unidad DE SISTEMA, que es el ambito de esta. Se marca; lo que el caso afirma
+          // -que el simbolo se relee sin perdida- no cambia.
+          symbol: symbolFor(marker),
         },
         select: { id: true },
       })
@@ -332,12 +395,12 @@ describe('la unidad como entidad del catalogo', () => {
       const unit = await tx.unit.findUniqueOrThrow({ where: { id: created.id } })
       expect(unit.name).toBe(`Kilogramo ${marker}`)
       expect(unit.nameNormalized).toBe(`kilogramo${marker}`)
-      expect(unit.symbol).toBe('kg')
+      expect(unit.symbol).toBe(symbolFor(marker))
 
       // «No derivado de sus datos de negocio»: renombrarla no cambia el identificador.
       const renamed = await tx.unit.update({
         where: { id: created.id },
-        data: { name: `Kilo ${marker}`, symbol: 'Kg' },
+        data: { name: `Kilo ${marker}`, symbol: `${symbolFor(marker)}b` },
         select: { id: true },
       })
       expect(renamed.id).toBe(created.id)
@@ -346,7 +409,7 @@ describe('la unidad como entidad del catalogo', () => {
         where: { id: created.id },
         select: { name: true, symbol: true },
       })
-      expect(reread).toEqual({ name: `Kilo ${marker}`, symbol: 'Kg' })
+      expect(reread).toEqual({ name: `Kilo ${marker}`, symbol: `${symbolFor(marker)}b` })
     })
   })
 
@@ -408,7 +471,10 @@ describe('la unidad como entidad del catalogo', () => {
       const normalized = `mililitro${marker}`
 
       const { id: firstId } = await tx.unit.create({
-        data: { name: `mililitro ${marker}`, nameNormalized: normalized, symbol: 'mL' },
+        // El simbolo tambien lleva marcador (QC-76 R15): si las dos filas compartieran
+        // simbolo, el 23505 podria venir del indice del SIMBOLO y no del NOMBRE, que es lo
+        // que este caso prueba.
+        data: { name: `mililitro ${marker}`, nameNormalized: normalized, symbol: symbolFor(marker) },
         select: { id: true },
       })
 
@@ -420,7 +486,7 @@ describe('la unidad como entidad del catalogo', () => {
           rawInsert(tx, 'units', {
             name: Prisma.sql`${`MILI-LITRO ${marker}`}`,
             name_normalized: Prisma.sql`${normalized}`,
-            symbol: Prisma.sql`${'ml'}`,
+            symbol: Prisma.sql`${`${symbolFor(marker)}b`}`,
           }),
         'segunda unidad con el mismo nombre normalizado',
       )
@@ -431,7 +497,7 @@ describe('la unidad como entidad del catalogo', () => {
         where: { nameNormalized: normalized },
         select: { id: true, name: true, symbol: true },
       })
-      expect(rows).toEqual([{ id: firstId, name: `mililitro ${marker}`, symbol: 'mL' }])
+      expect(rows).toEqual([{ id: firstId, name: `mililitro ${marker}`, symbol: symbolFor(marker) }])
     })
   })
 
@@ -442,7 +508,7 @@ describe('la unidad como entidad del catalogo', () => {
       expect(name).toHaveLength(500)
 
       const { id } = await tx.unit.create({
-        data: { name, nameNormalized: name, symbol: 'x' },
+        data: { name, nameNormalized: name, symbol: symbolFor(marker) },
         select: { id: true },
       })
 
@@ -460,46 +526,59 @@ describe('la unidad como entidad del catalogo', () => {
     })
   })
 
-  it('acepta dos unidades distintas con el mismo simbolo', async () => {
+  it('acepta dos unidades con el mismo simbolo en AMBITOS distintos, y ninguna @unique de Prisma', async () => {
+    // REESCRITO EL 2026-09-07 POR QC-76, Y CAMBIA DE SENTIDO. ANTES afirmaba que dos
+    // unidades CUALESQUIERA podian compartir simbolo: QC-32 (su R7 y su pregunta abierta 1)
+    // dejo el simbolo deliberadamente SIN indice unico. LO DEROGA **R15** (decision cerrada
+    // 28, que cierra esa pregunta abierta): el simbolo es UNICO cuando existe, con el MISMO
+    // AMBITO que el nombre. Lo que SIGUE siendo cierto —y es lo que este caso conserva— es
+    // que el mismo simbolo vale en DOS AMBITOS DISTINTOS: medirlo global haria que el «kg»
+    // de sistema bloqueara el «kg» de una empresa que si puede tener su propio kilogramo.
+    // El choque DENTRO del ambito lo prueba el bloque de QC-76 al final del archivo.
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const symbol = `u${marker.slice(0, 6)}`
+      const companyId = await createCompany(tx, marker)
 
-      const { id: primera } = await tx.unit.create({
+      // Una de sistema y una de la empresa, con EL MISMO simbolo: dos ambitos distintos.
+      const { id: deSistema } = await tx.unit.create({
         data: { name: `Primera ${marker}`, nameNormalized: `primera${marker}`, symbol },
         select: { id: true },
       })
-      const { id: segunda } = await tx.unit.create({
-        data: { name: `Segunda ${marker}`, nameNormalized: `segunda${marker}`, symbol },
+      const { id: deEmpresa } = await tx.unit.create({
+        data: { name: `Segunda ${marker}`, nameNormalized: `segunda${marker}`, symbol, companyId },
         select: { id: true },
       })
 
-      // R7: la identidad de la unidad es su NOMBRE; el simbolo no distingue nada.
       const rows = await tx.unit.findMany({ where: { symbol }, select: { id: true } })
-      expect(rows.map((row) => row.id).sort()).toEqual([primera, segunda].sort())
+      expect(rows.map((row) => row.id).sort()).toEqual([deSistema, deEmpresa].sort())
 
-      // El porque: ningun indice UNICO de la tabla incluye la columna `symbol`.
-      //
-      // 2026-09-04, QC-57: hasta hoy esto se afirmaba como «ningun indice, de ningun tipo,
-      // menciona `symbol`», y ya no vale: la migracion `<ts>_list_query_indexes` anade
-      // `units_symbol_idx`, un btree NO UNICO, porque el listado declara `symbol` ordenable
-      // (R21: todo campo ordenable tiene indice). Lo que R7 protege —«la identidad de la
-      // unidad es su NOMBRE», o sea que el simbolo no distingue dos unidades— NO cambia ni un
-      // apice y sigue afirmado arriba con las dos filas que comparten simbolo; lo que se
-      // ajusta es el «porque», que ahora dice exactamente lo que R7 pide y no una cota mas
-      // fuerte que nadie habia pedido. Un `@unique` sobre `symbol` seguiria poniendo esto rojo.
-      const symbolUniqueIndexes = await tx.$queryRaw<{ indexname: string }[]>`
-        SELECT indexname FROM pg_indexes
+      // El porque, ACTUALIZADO: los indices unicos que incluyen `symbol` son los DOS
+      // PARCIALES de R15, cada uno con su mitad del ambito. Ninguno es total, y por eso las
+      // dos filas de arriba conviven. Si alguien los sustituyera por un unico indice global
+      // —o pusiera un `@unique` en el esquema Prisma, que es lo mismo pero peor porque
+      // ademas no se ve en el SQL—, este caso se pondria rojo.
+      const symbolUniqueIndexes = await tx.$queryRaw<{ indexname: string; indexdef: string }[]>`
+        SELECT indexname, indexdef FROM pg_indexes
         WHERE schemaname = 'public' AND tablename = 'units'
-          AND indexdef LIKE '%symbol%' AND indexdef LIKE '%UNIQUE%'`
-      expect(symbolUniqueIndexes).toEqual([])
+          AND indexdef LIKE '%symbol%' AND indexdef LIKE '%UNIQUE%'
+        ORDER BY indexname`
+      expect(symbolUniqueIndexes.map((index) => index.indexname)).toEqual([
+        'units_company_symbol_unique',
+        'units_system_symbol_unique',
+      ])
+      // Los dos son PARCIALES: sin su `WHERE`, la unicidad dejaria de ser por ambito.
+      for (const index of symbolUniqueIndexes) {
+        expect(index.indexdef, `${index.indexname} debe ser parcial`).toMatch(/WHERE/i)
+        expect(index.indexdef).toMatch(/symbol.*IS NOT NULL/i)
+      }
     })
   })
 
   it('created_at y updated_at se rellenan solos y updated_at cambia al modificar', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
-      const id = await createUnit(tx, marker, 'kg')
+      const id = await createUnit(tx, marker)
 
       const antes = await tx.unit.findUniqueOrThrow({
         where: { id },
@@ -509,7 +588,7 @@ describe('la unidad como entidad del catalogo', () => {
       expect(antes.updatedAt).toBeInstanceOf(Date)
 
       await sleep(20)
-      await tx.unit.update({ where: { id }, data: { symbol: 'kilo' } })
+      await tx.unit.update({ where: { id }, data: { symbol: `${symbolFor(marker)}b` } })
 
       const despues = await tx.unit.findUniqueOrThrow({
         where: { id },
@@ -525,7 +604,7 @@ describe('el uso de la unidad desde inventario y recetas', () => {
   it('acepta un producto sin unidad y otro con unidad', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
-      const unitId = await createUnit(tx, marker, 'kg')
+      const unitId = await createUnit(tx, marker)
 
       const sinUnidad = await createProduct(tx, null, 'Producto sin unidad declarada')
       const conUnidad = await createProduct(tx, unitId, 'Producto con unidad declarada')
@@ -585,7 +664,7 @@ describe('el uso de la unidad desde inventario y recetas', () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, marker)
-      const unitId = await createUnit(tx, marker, 'kg')
+      const unitId = await createUnit(tx, marker)
       const productId = await createProduct(tx, unitId)
       const presentationMarker = token()
       const presentation = await tx.presentation.create({
@@ -652,8 +731,8 @@ describe('el uso de la unidad desde inventario y recetas', () => {
   it('rechaza el borrado de una unidad usada por un producto y por una linea con SQLSTATE 23503, y permite el de una unidad libre', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
-      const unidadDeProducto = await createUnit(tx, `p${marker}`, 'kg')
-      const unidadDeLinea = await createUnit(tx, `l${marker}`, 'L')
+      const unidadDeProducto = await createUnit(tx, `p${marker}`)
+      const unidadDeLinea = await createUnit(tx, `l${marker}`)
       const unidadLibre = await createUnit(tx, `x${marker}`, null)
 
       const productId = await createProduct(tx, unidadDeProducto)
@@ -701,8 +780,8 @@ describe('el uso de la unidad desde inventario y recetas', () => {
   it('una linea puede usar una unidad distinta de la de su producto', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
-      const unidadDelProducto = await createUnit(tx, `kg${marker}`, 'kg')
-      const unidadDeLaLinea = await createUnit(tx, `g${marker}`, 'g')
+      const unidadDelProducto = await createUnit(tx, `kg${marker}`)
+      const unidadDeLaLinea = await createUnit(tx, `g${marker}`)
 
       const productId = await createProduct(tx, unidadDelProducto, 'Colorante azul')
       const recipeId = await createRecipe(tx, marker)
@@ -724,18 +803,26 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       // La cantidad se guarda tal cual: nadie la convirtio de gramos a kilogramos.
       expect(linea.quantity.toString()).toBe('0.01')
 
-      // Y no existe en el catalogo ninguna columna de factor, base ni equivalencia con la
-      // que convertir (R14): la tabla tiene exactamente estas seis columnas.
+      // ACTUALIZADO EL 2026-09-07 POR QC-76. ANTES este bloque afirmaba que la tabla tenia
+      // exactamente SEIS columnas y que NO existia «ninguna columna de factor, base ni
+      // equivalencia con la que convertir» (QC-32 R14, decision cerrada 12). LO DEROGAN R1,
+      // R3 y R11: ahora son NUEVE, y tres de ellas son justamente la equivalencia y el
+      // ambito. Lo que este caso prueba NO cambia: la unidad de la linea y la del producto
+      // siguen sin relacionarse y la cantidad se guarda TAL CUAL, sin convertir (R26: nadie
+      // llama todavia a la conversion). La lista sigue siendo EXACTA.
       const columns = await tx.$queryRaw<{ column_name: string }[]>`
         SELECT column_name FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = 'units'
         ORDER BY column_name`
       expect(columns.map((column) => column.column_name)).toEqual([
+        'company_id',
         'created_at',
+        'factor',
         'id',
         'name',
         'name_normalized',
         'symbol',
+        'unit_id',
         'updated_at',
       ])
     })
@@ -824,6 +911,20 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       // ultima porque la consulta ordena por `conname`. No se convierte en `toContain`: si
       // manana alguien anade una FK a `units` sin RESTRICT, o se pierde una de las cuatro en
       // un drift de `migrate dev`, este caso tiene que seguir siendo quien lo diga.
+      //
+      // ACTUALIZADO EL 2026-09-08 POR QC-76, Y ESTA VEZ LA LISTA SE ENCOGE Y CRECE A LA VEZ:
+      //   - SALE `orders_unit_id_fkey`. La quito la feature de `pedidos` que retiro del pedido
+      //     la unidad y el precio unitario (commit `dee47c1`, migracion
+      //     `20260907120000_orders_drop_unit_and_unit_price`), **ya mergeada en `origin/dev`**.
+      //     No es un drift ni un descuido de QC-76: `orders` ya no tiene `unit_id`, asi que
+      //     esperarla seria esperar una FK que el dominio ya no quiere. Este caso hizo
+      //     exactamente su trabajo -fue quien lo dijo- cuando la rama de QC-76, que nace de un
+      //     `dev` anterior, se corrio contra la base de desarrollo ya adelantada.
+      //   - ENTRA `units_unit_id_fkey`, la auto-referencia que trae esta ficha: la unidad de la
+      //     que deriva otra (R8). Lleva las mismas dos reglas que las demas -RESTRICT al
+      //     borrar, CASCADE al actualizar-, que es lo que hace cierto que no se pueda borrar
+      //     una unidad de la que otra deriva.
+      // Siguen siendo CUATRO, y sigue siendo una lista EXACTA.
       expect(foreignKeys).toEqual([
         {
           conname: 'products_unit_id_fkey',
@@ -843,7 +944,727 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
           confdeltype: 'r',
           confupdtype: 'c',
         },
+        // La de QC-76, y es la primera que sale de la PROPIA tabla —`units.unit_id` ->
+        // `units.id`, la unidad de la que deriva (R1)—. El RESTRICT es aqui la unica garantia
+        // de R8: no se borra una unidad de la que otra deriva. Va la ultima porque la consulta
+        // ordena por `conname`.
+        {
+          conname: 'units_unit_id_fkey',
+          referencia: 'units',
+          confdeltype: 'r',
+          confupdtype: 'c',
+        },
       ])
+    })
+  })
+})
+
+// ===========================================================================================
+// QC-76 — equivalencia entre unidades y ambito por empresa
+//
+// AÑADIDO EL 2026-09-07 (`specs/QC-76-equivalencia-y-ambito-de-unidades/`, T5). Mismo patron
+// que todo lo de arriba, sin inventar otro: transaccion que termina en ROLLBACK, savepoints
+// para poder consultar DESPUES de un rechazo, SQL crudo para lo que la base tiene que
+// rechazar —es lo unico que propaga el SQLSTATE—, marcadores irrepetibles y CERO afirmaciones
+// globales sobre la tabla.
+//
+// Cada caso afirma el SQLSTATE EXACTO y no «lanza algo»:
+//   23514 — violacion de CHECK. Incluye los `RAISE` del disparador `units_check_derivation`,
+//           que lo levantan a proposito (`design.md > 2.4`) para que un rechazo de derivacion
+//           se lea igual que un CHECK, que es lo que es.
+//   23505 — violacion de indice unico (los cuatro parciales por ambito).
+//   23503 — violacion de FK (`units_company_id_fkey`, `units_unit_id_fkey`).
+//
+// DOS TRAMPAS CONOCIDAS, y por que los casos estan escritos como estan:
+//
+//  1. La AUTO-DERIVACION de una unidad QUE YA ES PADRE no la rechaza
+//     `units_no_self_derivation_check` sino el disparador, con
+//     `units_derivation_parent_cannot_derive`: el `BEFORE` corre ANTES que el CHECK. Los dos
+//     dan 23514, pero el caso de R7 usa una unidad HOJA para que el unico rechazo posible sea
+//     el CHECK que dice probar.
+//  2. Borrar una unidad DEL CATALOGO ARRANCADOR salta por `recipe_lines_unit_id_fkey` antes
+//     que por `units_unit_id_fkey`, porque la base local tiene recetas que la usan. Por eso el
+//     caso de R8 siembra SUS PROPIAS unidades y no toca `gramo` ni ninguna otra del seed.
+//
+// Cubre R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R13, R14, R15 y R16.
+// ===========================================================================================
+
+describe('QC-76 — la equivalencia entre unidades', () => {
+  it('acepta una unidad BASE, sin unidad de la que derive y sin factor (R1)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const id = await createUnit(tx, marker)
+
+      // R1: los dos son OPCIONALES y una unidad que no declara ninguno es una unidad BASE.
+      // Es el estado en el que quedan `mililitro` y `gramo` tras la migracion (R28).
+      const unit = await tx.unit.findUniqueOrThrow({
+        where: { id },
+        select: { baseUnitId: true, factor: true, companyId: true },
+      })
+      expect(unit.baseUnitId).toBeNull()
+      expect(unit.factor).toBeNull()
+      // Y sin empresa: la ausencia de valor —y nada mas— significa «de sistema» (R11).
+      expect(unit.companyId).toBeNull()
+    })
+  })
+
+  it('acepta una unidad derivada con la pareja completa y la relee sin perdida (R1)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const base = await createUnit(tx, `base${marker}`)
+      const derivada = await createUnit(tx, `der${marker}`, symbolFor(`d${marker}`), {
+        baseUnitId: base,
+        factor: '1000.0000',
+      })
+
+      const unit = await tx.unit.findUniqueOrThrow({
+        where: { id: derivada },
+        select: { baseUnitId: true, factor: true },
+      })
+      expect(unit.baseUnitId).toBe(base)
+      expect(unit.factor?.toString()).toBe('1000')
+    })
+  })
+
+  it('rechaza la pareja incompleta en las DOS direcciones con SQLSTATE 23514 (R2)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const base = await createUnit(tx, `base${marker}`)
+
+      // Direccion 1: dice de que unidad deriva, pero no por cuanto. Media equivalencia no
+      // convierte nada. El padre es valido, HOJA y del mismo ambito, asi que el disparador
+      // pasa de largo y el unico rechazo posible es `units_derivation_pair_check`.
+      const sinFactor = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Sin factor ${marker}`}`,
+            name_normalized: Prisma.sql`${`sinfactor${marker}`}`,
+            unit_id: asUuid(base),
+          }),
+        'unidad con unidad base y sin factor',
+      )
+      expect(sinFactor).toBe(CHECK_VIOLATION)
+
+      // Direccion 2: dice el factor, pero no de que unidad deriva. Aqui el disparador ni se
+      // asoma (`NEW.unit_id` es NULL), asi que el rechazo solo puede venir del mismo CHECK.
+      const sinBase = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Sin base ${marker}`}`,
+            name_normalized: Prisma.sql`${`sinbase${marker}`}`,
+            factor: Prisma.sql`1000.0000`,
+          }),
+        'unidad con factor y sin unidad base',
+      )
+      expect(sinBase).toBe(CHECK_VIOLATION)
+
+      // «No crear ni modificar ninguna fila».
+      expect(
+        await tx.unit.findMany({
+          where: { nameNormalized: { in: [`sinfactor${marker}`, `sinbase${marker}`] } },
+          select: { id: true },
+        }),
+      ).toEqual([])
+    })
+  })
+
+  it('conserva sin perdida un factor de CUATRO decimales (R3)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const base = await createUnit(tx, `base${marker}`)
+      const derivada = await createUnit(tx, `der${marker}`, symbolFor(`d${marker}`), {
+        baseUnitId: base,
+        factor: '1234.5678',
+      })
+
+      // R3: decimal EXACTO, no coma flotante. `1234.5678` no es representable en binario: con
+      // un `double precision` esta relectura devolveria `1234.5677999999999`.
+      const unit = await tx.unit.findUniqueOrThrow({
+        where: { id: derivada },
+        select: { factor: true },
+      })
+      expect(unit.factor?.toString()).toBe('1234.5678')
+
+      // Y el crudo dice lo mismo: no es el cliente quien lo esta arreglando al leer.
+      const crudo = await tx.$queryRaw<{ factor: string }[]>`
+        SELECT "factor"::text AS factor FROM "units" WHERE "id" = ${asUuid(derivada)}`
+      expect(crudo).toEqual([{ factor: '1234.5678' }])
+
+      // El porque: la columna es `numeric(14,4)`, la misma precision que el dinero de QC-33.
+      const tipo = await tx.$queryRaw<
+        { data_type: string; numeric_precision: number; numeric_scale: number }[]
+      >`
+        SELECT data_type, numeric_precision, numeric_scale
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'units' AND column_name = 'factor'`
+      expect(tipo).toEqual([{ data_type: 'numeric', numeric_precision: 14, numeric_scale: 4 }])
+    })
+  })
+
+  it('rechaza el factor 0 y el factor -1 con SQLSTATE 23514 (R4)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const base = await createUnit(tx, `base${marker}`)
+
+      // R4: con factor cero la conversion inversa seria una division por cero; con factor
+      // negativo, una cantidad positiva se convertiria en negativa.
+      for (const [etiqueta, factor] of [
+        ['cero', '0.0000'],
+        ['negativo', '-1.0000'],
+      ] as const) {
+        const sqlState = await expectRejectedByDatabase(
+          tx,
+          () =>
+            rawInsert(tx, 'units', {
+              name: Prisma.sql`${`Factor ${etiqueta} ${marker}`}`,
+              name_normalized: Prisma.sql`${`factor${etiqueta}${marker}`}`,
+              unit_id: asUuid(base),
+              factor: Prisma.sql`CAST(${factor} AS numeric)`,
+            }),
+          `unidad con factor ${etiqueta}`,
+        )
+        expect(sqlState, `factor ${factor}`).toBe(CHECK_VIOLATION)
+        expect(
+          await tx.unit.findMany({
+            where: { nameNormalized: `factor${etiqueta}${marker}` },
+            select: { id: true },
+          }),
+        ).toEqual([])
+      }
+    })
+  })
+
+  it('acepta un factor MENOR que 1, sin normalizarlo (R5)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      // La «media garrafa» de la decision cerrada 5: la unidad base NO tiene por que ser la
+      // mas pequena de su familia, y nadie da la vuelta al factor por su cuenta.
+      const garrafa = await createUnit(tx, `garrafa${marker}`)
+      const media = await createUnit(tx, `media${marker}`, symbolFor(`m${marker}`), {
+        baseUnitId: garrafa,
+        factor: '0.5000',
+      })
+
+      const unit = await tx.unit.findUniqueOrThrow({
+        where: { id: media },
+        select: { baseUnitId: true, factor: true },
+      })
+      expect(unit.baseUnitId).toBe(garrafa)
+      expect(unit.factor?.toString()).toBe('0.5')
+      // Sin normalizar: la base sigue siendo la garrafa, no al reves.
+      const base = await tx.unit.findUniqueOrThrow({
+        where: { id: garrafa },
+        select: { baseUnitId: true, factor: true },
+      })
+      expect(base).toEqual({ baseUnitId: null, factor: null })
+    })
+  })
+
+  it('rechaza que una unidad HOJA derive de si misma con SQLSTATE 23514 (R7)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      // HOJA a proposito: si la unidad ya fuera PADRE de otra, el rechazo llegaria antes por
+      // el disparador (`units_derivation_parent_cannot_derive`, R6) y este caso dejaria de
+      // probar `units_no_self_derivation_check`, que es lo que dice probar. El `BEFORE` corre
+      // antes que el CHECK.
+      const sola = await createUnit(tx, marker)
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          tx.$executeRaw`UPDATE "units" SET "unit_id" = ${asUuid(sola)}, "factor" = 2.0000 WHERE "id" = ${asUuid(sola)}`,
+        'unidad que deriva de si misma',
+      )
+      expect(sqlState).toBe(CHECK_VIOLATION)
+
+      // «No modificar ninguna fila»: sigue siendo base.
+      const unit = await tx.unit.findUniqueOrThrow({
+        where: { id: sola },
+        select: { baseUnitId: true, factor: true },
+      })
+      expect(unit).toEqual({ baseUnitId: null, factor: null })
+    })
+  })
+
+  it('rechaza el segundo nivel de derivacion en las DOS direcciones con SQLSTATE 23514 (R6)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const base = await createUnit(tx, `base${marker}`)
+      const derivada = await createUnit(tx, `der${marker}`, symbolFor(`d${marker}`), {
+        baseUnitId: base,
+        factor: '1000.0000',
+      })
+      const otraBase = await createUnit(tx, `otra${marker}`)
+
+      // Direccion 1 — al declarar la unidad derivada: la nueva quiere derivar de `derivada`,
+      // que ya deriva de `base`. Tonelada se declara como 1.000.000 de gramos, no como 1000
+      // kilogramos (decision cerrada 6).
+      const nieta = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Nieta ${marker}`}`,
+            name_normalized: Prisma.sql`${`nieta${marker}`}`,
+            unit_id: asUuid(derivada),
+            factor: Prisma.sql`10.0000`,
+          }),
+        'unidad que deriva de una unidad ya derivada',
+      )
+      expect(nieta).toBe(CHECK_VIOLATION)
+      expect(
+        await tx.unit.findMany({ where: { nameNormalized: `nieta${marker}` }, select: { id: true } }),
+      ).toEqual([])
+
+      // Direccion 2 — al convertir en derivada una unidad de la que YA deriva alguna: `base`
+      // es padre de `derivada`, asi que no puede pasar a derivar de `otraBase`. R6 nombra
+      // explicitamente esta mitad, y sin ella la cadena de dos niveles entraria por la puerta
+      // de atras con un UPDATE.
+      const padreDerivado = await expectRejectedByDatabase(
+        tx,
+        () =>
+          tx.$executeRaw`UPDATE "units" SET "unit_id" = ${asUuid(otraBase)}, "factor" = 5.0000 WHERE "id" = ${asUuid(base)}`,
+        'unidad padre que pasa a derivar de otra',
+      )
+      expect(padreDerivado).toBe(CHECK_VIOLATION)
+
+      // Nada se movio: `base` sigue siendo base y `derivada` sigue colgando de ella.
+      expect(
+        await tx.unit.findUniqueOrThrow({
+          where: { id: base },
+          select: { baseUnitId: true, factor: true },
+        }),
+      ).toEqual({ baseUnitId: null, factor: null })
+      expect(
+        await tx.unit.findUniqueOrThrow({ where: { id: derivada }, select: { baseUnitId: true } }),
+      ).toEqual({ baseUnitId: base })
+    })
+  })
+
+  it('rechaza el borrado de una unidad de la que deriva otra con SQLSTATE 23503, y permite el de la hija (R8)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      // UNIDADES PROPIAS, nunca las del catalogo: borrar `gramo` en la base local salta por
+      // `recipe_lines_unit_id_fkey` —hay recetas que lo usan— antes que por
+      // `units_unit_id_fkey`, y el caso probaria la FK equivocada.
+      const madre = await createUnit(tx, `madre${marker}`)
+      const hija = await createUnit(tx, `hija${marker}`, symbolFor(`h${marker}`), {
+        baseUnitId: madre,
+        factor: '1000.0000',
+      })
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = ${asUuid(madre)}`,
+        'borrado de una unidad de la que deriva otra',
+      )
+      // 23503 y no 23514: lo garantiza el `ON DELETE RESTRICT` de `units_unit_id_fkey`, no una
+      // comprobacion previa al vuelo (decision cerrada 8, que extiende QC-32 D10).
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+
+      // «Conservar intactas las dos unidades y la referencia entre ellas».
+      expect(await tx.unit.findUnique({ where: { id: madre }, select: { id: true } })).not.toBeNull()
+      expect(
+        await tx.unit.findUniqueOrThrow({
+          where: { id: hija },
+          select: { baseUnitId: true, factor: true },
+        }),
+      ).toEqual({ baseUnitId: madre, factor: new Prisma.Decimal('1000.0000') })
+
+      // La otra mitad: sin hija, la madre se borra. Sin esto, el caso pasaria igual con una
+      // tabla que no deja borrar nada nunca.
+      await tx.unit.delete({ where: { id: hija } })
+      await tx.unit.delete({ where: { id: madre } })
+      expect(await tx.unit.findUnique({ where: { id: madre }, select: { id: true } })).toBeNull()
+    })
+  })
+})
+
+describe('QC-76 — el ambito por empresa', () => {
+  it('acepta que una unidad de empresa derive de una suya o de una de sistema (R9)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+
+      const deSistema = await createUnit(tx, `sis${marker}`)
+      const propia = await createUnit(tx, `pro${marker}`, symbolFor(`p${marker}`), { companyId })
+
+      const desdeLaSuya = await createUnit(tx, `a${marker}`, symbolFor(`a${marker}`), {
+        companyId,
+        baseUnitId: propia,
+        factor: '10.0000',
+      })
+      const desdeSistema = await createUnit(tx, `b${marker}`, symbolFor(`b${marker}`), {
+        companyId,
+        baseUnitId: deSistema,
+        factor: '1000.0000',
+      })
+
+      const filas = await tx.unit.findMany({
+        where: { id: { in: [desdeLaSuya, desdeSistema] } },
+        select: { id: true, companyId: true, baseUnitId: true },
+        orderBy: { nameNormalized: 'asc' },
+      })
+      expect(filas).toEqual([
+        { id: desdeLaSuya, companyId, baseUnitId: propia },
+        { id: desdeSistema, companyId, baseUnitId: deSistema },
+      ])
+    })
+  })
+
+  it('rechaza derivar de una unidad de OTRA empresa, y que una de sistema derive de una de empresa, con SQLSTATE 23514 (R9)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const empresaA = await createCompany(tx, `a${marker}`)
+      const empresaB = await createCompany(tx, `b${marker}`)
+      const deLaB = await createUnit(tx, `b${marker}`, symbolFor(`b${marker}`), {
+        companyId: empresaB,
+      })
+
+      // Derivar de una unidad de OTRA empresa romperia el aislamiento: borrar algo en una
+      // empresa afectaria a otra (decision cerrada 9).
+      const ajena = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Ajena ${marker}`}`,
+            name_normalized: Prisma.sql`${`ajena${marker}`}`,
+            company_id: asUuid(empresaA),
+            unit_id: asUuid(deLaB),
+            factor: Prisma.sql`2.0000`,
+          }),
+        'unidad de una empresa que deriva de una unidad de otra',
+      )
+      expect(ajena).toBe(CHECK_VIOLATION)
+
+      // La lectura literal de la misma decision: una unidad que vale para TODAS las empresas
+      // no puede depender de la unidad privada de una de ellas.
+      const sistemaDesdeEmpresa = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Sistema ${marker}`}`,
+            name_normalized: Prisma.sql`${`sistema${marker}`}`,
+            unit_id: asUuid(deLaB),
+            factor: Prisma.sql`2.0000`,
+          }),
+        'unidad de sistema que deriva de una unidad de empresa',
+      )
+      expect(sistemaDesdeEmpresa).toBe(CHECK_VIOLATION)
+
+      expect(
+        await tx.unit.findMany({
+          where: { nameNormalized: { in: [`ajena${marker}`, `sistema${marker}`] } },
+          select: { id: true },
+        }),
+      ).toEqual([])
+    })
+  })
+
+  it('rechaza una unidad cuya empresa no existe con SQLSTATE 23503 (R13)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const empresaFantasma = randomUUID()
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Fantasma ${marker}`}`,
+            name_normalized: Prisma.sql`${`fantasma${marker}`}`,
+            company_id: asUuid(empresaFantasma),
+          }),
+        'unidad con una empresa inexistente',
+      )
+      // 23503: lo dice `units_company_id_fkey`. El escalar sin `@relation` del esquema Prisma
+      // no impide nada por si mismo; la integridad la garantiza la FK real de la migracion.
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+      expect(
+        await tx.unit.findMany({
+          where: { nameNormalized: `fantasma${marker}` },
+          select: { id: true },
+        }),
+      ).toEqual([])
+    })
+  })
+
+  it('rechaza el mismo nombre normalizado DENTRO del ambito con SQLSTATE 23505 (R14)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+      const normalized = `kilogramo${marker}`
+
+      const { id: primera } = await tx.unit.create({
+        data: { name: `Kilogramo ${marker}`, nameNormalized: normalized, companyId, symbol: null },
+        select: { id: true },
+      })
+
+      // Dentro de la MISMA empresa: choca contra `units_company_name_unique`.
+      const enLaEmpresa = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`KILO-GRAMO ${marker}`}`,
+            name_normalized: Prisma.sql`${normalized}`,
+            company_id: asUuid(companyId),
+          }),
+        'segunda unidad con el mismo nombre normalizado en la misma empresa',
+      )
+      expect(enLaEmpresa).toBe(UNIQUE_VIOLATION)
+
+      // Y entre las de SISTEMA: choca contra `units_system_name_unique`. El indice unico es
+      // la unica garantia, no una comprobacion previa al vuelo —seria una carrera— (R14).
+      const deSistema = `sistema${marker}`
+      await tx.unit.create({
+        data: { name: `Sistema ${marker}`, nameNormalized: deSistema, symbol: null },
+        select: { id: true },
+      })
+      const entreSistema = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`SIS-TEMA ${marker}`}`,
+            name_normalized: Prisma.sql`${deSistema}`,
+          }),
+        'segunda unidad de sistema con el mismo nombre normalizado',
+      )
+      expect(entreSistema).toBe(UNIQUE_VIOLATION)
+
+      // «No crear ni modificar ninguna fila»: de la empresa sobrevive solo la primera.
+      const filas = await tx.unit.findMany({
+        where: { nameNormalized: normalized },
+        select: { id: true, name: true },
+      })
+      expect(filas).toEqual([{ id: primera, name: `Kilogramo ${marker}` }])
+    })
+  })
+
+  it('acepta el mismo nombre normalizado en DOS empresas y en una empresa frente a sistema (R14)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const empresaA = await createCompany(tx, `a${marker}`)
+      const empresaB = await createCompany(tx, `b${marker}`)
+      const normalized = `kilogramo${marker}`
+
+      // Dos empresas pueden tener cada una su «kilogramo», y una empresa puede crear el suyo
+      // aunque exista el de sistema (decision cerrada 14). Esto es lo que el indice GLOBAL de
+      // QC-32 impedia y lo que su `DROP INDEX` abre.
+      const deSistema = await tx.unit.create({
+        data: { name: `Kilogramo ${marker}`, nameNormalized: normalized, symbol: null },
+        select: { id: true },
+      })
+      const deLaA = await tx.unit.create({
+        data: {
+          name: `Kilogramo ${marker}`,
+          nameNormalized: normalized,
+          companyId: empresaA,
+          symbol: null,
+        },
+        select: { id: true },
+      })
+      const deLaB = await tx.unit.create({
+        data: {
+          name: `Kilogramo ${marker}`,
+          nameNormalized: normalized,
+          companyId: empresaB,
+          symbol: null,
+        },
+        select: { id: true },
+      })
+
+      const filas = await tx.unit.findMany({
+        where: { nameNormalized: normalized },
+        select: { id: true, companyId: true },
+      })
+      expect(filas.map((fila) => fila.id).sort()).toEqual(
+        [deSistema.id, deLaA.id, deLaB.id].sort(),
+      )
+      expect(filas.filter((fila) => fila.companyId === null)).toHaveLength(1)
+    })
+  })
+
+  it('rechaza el mismo simbolo DENTRO del ambito con SQLSTATE 23505 (R15)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+      const symbol = `s${marker.slice(0, 6)}`
+
+      await tx.unit.create({
+        data: { name: `Primera ${marker}`, nameNormalized: `primera${marker}`, symbol, companyId },
+        select: { id: true },
+      })
+
+      // Mismo simbolo, misma empresa: `units_company_symbol_unique`. El nombre es distinto a
+      // proposito, para que el 23505 solo pueda venir del indice del SIMBOLO.
+      const enLaEmpresa = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Segunda ${marker}`}`,
+            name_normalized: Prisma.sql`${`segunda${marker}`}`,
+            symbol: Prisma.sql`${symbol}`,
+            company_id: asUuid(companyId),
+          }),
+        'segunda unidad con el mismo simbolo en la misma empresa',
+      )
+      expect(enLaEmpresa).toBe(UNIQUE_VIOLATION)
+
+      // Y entre las de sistema: `units_system_symbol_unique`.
+      const symbolSistema = `t${marker.slice(0, 6)}`
+      await tx.unit.create({
+        data: {
+          name: `Sistema uno ${marker}`,
+          nameNormalized: `sistemauno${marker}`,
+          symbol: symbolSistema,
+        },
+        select: { id: true },
+      })
+      const entreSistema = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'units', {
+            name: Prisma.sql`${`Sistema dos ${marker}`}`,
+            name_normalized: Prisma.sql`${`sistemados${marker}`}`,
+            symbol: Prisma.sql`${symbolSistema}`,
+          }),
+        'segunda unidad de sistema con el mismo simbolo',
+      )
+      expect(entreSistema).toBe(UNIQUE_VIOLATION)
+    })
+  })
+
+  it('acepta VARIAS unidades sin simbolo en el mismo ambito (R15)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+
+      // «Unico CUANDO EXISTE»: el `WHERE "symbol" IS NOT NULL` de los dos indices deja tantas
+      // unidades sin simbolo como haga falta, en el mismo ambito. Sin el, la segunda de cada
+      // par chocaria y una empresa solo podria tener UNA unidad sin simbolo.
+      const sinSimboloEmpresa = [
+        await createUnit(tx, `e1${marker}`, null, { companyId }),
+        await createUnit(tx, `e2${marker}`, null, { companyId }),
+        await createUnit(tx, `e3${marker}`, null, { companyId }),
+      ]
+      const sinSimboloSistema = [
+        await createUnit(tx, `s1${marker}`, null),
+        await createUnit(tx, `s2${marker}`, null),
+      ]
+
+      const filas = await tx.unit.findMany({
+        where: { id: { in: [...sinSimboloEmpresa, ...sinSimboloSistema] } },
+        select: { id: true, symbol: true },
+      })
+      expect(filas).toHaveLength(5)
+      for (const fila of filas) expect(fila.symbol).toBeNull()
+    })
+  })
+
+  it('acepta el MISMO simbolo en dos empresas distintas (R15)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const empresaA = await createCompany(tx, `a${marker}`)
+      const empresaB = await createCompany(tx, `b${marker}`)
+      const symbol = `s${marker.slice(0, 6)}`
+
+      const deLaA = await createUnit(tx, `a${marker}`, symbol, { companyId: empresaA })
+      const deLaB = await createUnit(tx, `b${marker}`, symbol, { companyId: empresaB })
+
+      const filas = await tx.unit.findMany({ where: { symbol }, select: { id: true } })
+      expect(filas.map((fila) => fila.id).sort()).toEqual([deLaA, deLaB].sort())
+    })
+  })
+
+  it('marcar la empresa como borrada NO toca ninguna de sus unidades (R16)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+      const base = await createUnit(tx, `base${marker}`, symbolFor(`b${marker}`), { companyId })
+      const derivada = await createUnit(tx, `der${marker}`, symbolFor(`d${marker}`), {
+        companyId,
+        baseUnitId: base,
+        factor: '1000.0000',
+      })
+
+      const antes = await tx.unit.findMany({
+        where: { companyId },
+        select: { id: true, companyId: true, baseUnitId: true, factor: true },
+        orderBy: { nameNormalized: 'asc' },
+      })
+
+      // `companies` tiene borrado LOGICO (QC-47): ninguna fila desaparece de verdad, asi que
+      // el `ON DELETE RESTRICT` de `units_company_id_fkey` no llega a intervenir. Justamente
+      // por eso R16 hay que probarlo: nada impide que un dia alguien anada un `ON UPDATE` o
+      // un disparador que vacie las unidades al marcar la empresa.
+      await tx.company.update({ where: { id: companyId }, data: { deletedAt: new Date() } })
+
+      const despues = await tx.unit.findMany({
+        where: { companyId },
+        select: { id: true, companyId: true, baseUnitId: true, factor: true },
+        orderBy: { nameNormalized: 'asc' },
+      })
+      expect(despues).toEqual(antes)
+      expect(despues.map((fila) => fila.id).sort()).toEqual([base, derivada].sort())
+    })
+  })
+})
+
+describe('QC-76 — cambiar la equivalencia de una unidad en uso', () => {
+  it('permite cambiar factor y base con un producto y una linea de receta apuntando, sin invalidar nada (R10)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const enUso = await createUnit(tx, `uso${marker}`)
+      const primeraBase = await createUnit(tx, `b1${marker}`)
+      const segundaBase = await createUnit(tx, `b2${marker}`)
+
+      const productId = await createProduct(tx, enUso, 'Colorante azul')
+      const recipeId = await createRecipe(tx, marker)
+      const lineId = await createLine(tx, recipeId, productId, enUso, '0.0100')
+
+      // Primera equivalencia...
+      await tx.unit.update({
+        where: { id: enUso },
+        data: { baseUnitId: primeraBase, factor: new Prisma.Decimal('1000.0000') },
+      })
+      // ...y se cambia el factor Y la base, con la unidad ya referenciada por los dos.
+      await tx.unit.update({
+        where: { id: enUso },
+        data: { baseUnitId: segundaBase, factor: new Prisma.Decimal('0.2500') },
+      })
+
+      const unit = await tx.unit.findUniqueOrThrow({
+        where: { id: enUso },
+        select: { baseUnitId: true, factor: true },
+      })
+      expect(unit.baseUnitId).toBe(segundaBase)
+      expect(unit.factor?.toString()).toBe('0.25')
+
+      // R10: «ese cambio NO DEBE modificar ninguna cantidad ya guardada ni invalidar ninguna
+      // fila existente». El producto y la linea guardan una REFERENCIA a la unidad, no una
+      // cantidad ya convertida (decision cerrada 27, mismo criterio que QC-33 con el total del
+      // pedido): no hay nada que invalidar y la cantidad sale tal cual se escribio.
+      const producto = await tx.product.findUniqueOrThrow({
+        where: { id: productId },
+        select: { unitId: true },
+      })
+      expect(producto.unitId).toBe(enUso)
+      const linea = await tx.recipeLine.findUniqueOrThrow({
+        where: { id: lineId },
+        select: { unitId: true, quantity: true },
+      })
+      expect(linea.unitId).toBe(enUso)
+      expect(linea.quantity.toString()).toBe('0.01')
+
+      // Y se puede volver a dejar como unidad BASE: quitar la equivalencia entera tambien es
+      // un cambio legal, siempre que los dos campos se quiten JUNTOS (R2).
+      await tx.unit.update({ where: { id: enUso }, data: { baseUnitId: null, factor: null } })
+      expect(
+        await tx.unit.findUniqueOrThrow({
+          where: { id: enUso },
+          select: { baseUnitId: true, factor: true },
+        }),
+      ).toEqual({ baseUnitId: null, factor: null })
     })
   })
 })

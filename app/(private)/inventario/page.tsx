@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
@@ -40,14 +41,20 @@ export const metadata: Metadata = {
  * de «en vuelo» de R15 la da ahora `ProductTable` sin desmontar nada -rotulo y tabla atenuada
  * mientras la navegacion esta en curso-, y este `fallback` cubre la primera carga.
  *
- * **Aqui no se decide ningun permiso** (R5): el corte de ruta lo hace el middleware con la regla
- * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `inventario`.
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige
+ * `inventario.consultar` con `requirePagePermission` -antes de resolver `searchParams` y antes de
+ * pintar nada-, que redirige al login sin sesion y responde 404 sin nombrar el modulo ni
+ * mencionar permisos. El middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan
+ * firma, caducidad y empresa. La autorizacion sobre los DATOS la siguen aportando los casos de
+ * uso de `inventario`: la ruta decide si se ensena la pantalla, el service si se puede hacer.
  */
 export default async function InventarioPage({
   searchParams,
 }: {
   searchParams: Promise<ProductListSearchParams>;
 }) {
+  await requirePagePermission('inventario.consultar');
+
   const params = parseProductListParams(await searchParams);
 
   return (

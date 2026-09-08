@@ -198,7 +198,15 @@ const ALL_INDEXES = [...PARTIAL_INDEXES, ...FULL_INDEXES] as const
  */
 const PRE_EXISTING_INDEXES = [
   'presentations_name_normalized_key',
-  'units_name_normalized_key',
+  // `units_name_normalized_key` (unico GLOBAL sobre el nombre normalizado, de QC-32 R5) salio de
+  // esta lista el 2026-09-08 con QC-76. NO es un indice que se perdiera por descuido, que es
+  // justo lo que este caso vigila: la unicidad del nombre de unidad pasa a medirse POR AMBITO
+  // -dentro de la empresa, y las de sistema entre ellas- porque dos empresas pueden tener cada
+  // una su «kilogramo» (R14, decision cerrada 14). Un unico global lo impediria. Su sustituto
+  // son CUATRO indices PARCIALES, y para que este caso no pierda ni un gramo de fuerza se
+  // afirman abajo, en `UNIT_SCOPE_INDEXES`: si la migracion de QC-76 se llevara el global SIN
+  // dejar los parciales, el catalogo se quedaria sin ninguna garantia de unicidad y este
+  // archivo seguiria siendo quien lo dijera.
   'recipes_name_unique',
   'suppliers_name_unique',
   'supplier_catalog_lines_name_presentation_unique',
@@ -210,6 +218,20 @@ const PRE_EXISTING_INDEXES = [
   // `orders_unit_id_idx` (indice de la FK que QC-33 creo) cayo el 2026-09-07 con la columna
   // `orders.unit_id`, en la misma migracion.
   'orders_order_year_order_sequence_key',
+] as const
+
+/**
+ * Los CUATRO indices unicos PARCIALES con los que QC-76 sustituyo al `units_name_normalized_key`
+ * global: dos para el nombre normalizado y dos para el simbolo, cada pareja partida en «de la
+ * empresa» (`company_id IS NOT NULL`) y «de sistema» (`company_id IS NULL`). Son parciales
+ * porque en un unico normal dos `NULL` no chocan, y `UNIQUE (company_id, name_normalized)` a
+ * secas dejaria meter «kilogramo» de sistema tantas veces como se quisiera.
+ */
+const UNIT_SCOPE_INDEXES = [
+  'units_company_name_unique',
+  'units_system_name_unique',
+  'units_company_symbol_unique',
+  'units_system_symbol_unique',
 ] as const
 
 describe('QC-57 — la migracion en la base (R21, R23)', () => {
@@ -290,6 +312,22 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(perdidos, `indices anteriores que la migracion se llevo: ${perdidos.join(', ')}`).toEqual(
       [],
     )
+  })
+
+  it('la unicidad del catalogo de unidades sigue garantizada, ahora POR AMBITO (QC-76 R14, R15)', async () => {
+    // El relevo del `units_name_normalized_key` global que salio de `PRE_EXISTING_INDEXES`.
+    // Este caso es la mitad que impide que aquella retirada se lea como permiso para dejar el
+    // catalogo sin garantia: los cuatro tienen que existir, ser UNICOS y ser PARCIALES -su
+    // `WHERE` es lo que separa «de la empresa» de «de sistema», y sin el dos unidades de
+    // sistema con el mismo nombre volverian a caber, que es exactamente lo que R14 prohibe-.
+    const indexes = await readIndexes()
+
+    for (const name of UNIT_SCOPE_INDEXES) {
+      const def = indexes.get(name)
+      expect(def, `falta el indice de ambito ${name} (QC-76 R14/R15)`).toBeDefined()
+      expect(def, `${name} tiene que ser UNICO: ${def ?? ''}`).toContain('CREATE UNIQUE INDEX')
+      expect(def, `${name} tiene que ser PARCIAL, con su WHERE: ${def ?? ''}`).toContain('WHERE')
+    }
   })
 
   it('products.name_normalized no tiene ningun indice UNICO (el nombre no es unico)', async () => {

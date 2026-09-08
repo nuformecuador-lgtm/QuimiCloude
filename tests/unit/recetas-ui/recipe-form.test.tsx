@@ -21,6 +21,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 import type { ProductView } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { PERMISSIONS } from '@/lib/modules/identity';
 
 /**
  * El formulario de receta, en sus dos modos (T21, R20-R24, R26-R38;
@@ -62,6 +63,7 @@ import { FORMULAS_ROUTE } from '@/lib/shared/routes';
  */
 
 const {
+  getSessionUserMock,
   routerMock,
   createRecipeActionMock,
   updateRecipeActionMock,
@@ -69,6 +71,7 @@ const {
   listProductsActionMock,
   listUnitsActionMock,
 } = vi.hoisted(() => ({
+  getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -82,6 +85,15 @@ const {
   getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
   listProductsActionMock: vi.fn<(query: unknown) => Promise<ProductListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
+}));
+
+// QC-75 (T6): la pagina exige su permiso con `requirePagePermission`, que resuelve la sesion por
+// `@/lib/composition`. Sin este mock la pantalla responderia 404 y este archivo no mediria nada.
+// El usuario lleva el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito a mano: aqui no
+// se prueba autorizacion -eso es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, se
+// prueba lo que se ve cuando SI se puede ver.
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -454,6 +466,13 @@ let toastSuccessSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getSessionUserMock.mockResolvedValue({
+    id: 'u-test-42',
+    username: 'carla.duarte',
+    displayName: 'Carla Duarte Salas',
+    roleName: 'Administrador',
+    permissions: PERMISSIONS.map((permiso) => permiso.code),
+  });
   createRecipeActionMock.mockResolvedValue({ status: 'success', id: RECIPE_ID });
   updateRecipeActionMock.mockResolvedValue({ status: 'success' });
   listProductsActionMock.mockResolvedValue({

@@ -3,6 +3,7 @@ import {
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
+  PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
 } from '../routes';
 
@@ -69,6 +70,15 @@ export const SUPPLIERS_LABEL = 'Proveedores';
  */
 export const ORDERS_LABEL = 'Pedidos';
 
+/**
+ * Etiqueta del sidebar para la pantalla de presentaciones (QC-45, R3).
+ *
+ * `PRESENTATIONS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay
+ * codigo previo que la importara de este archivo, asi que no hay compatibilidad que sostener.
+ * Mismo criterio que `SUPPLIERS_LABEL` y `ORDERS_LABEL`.
+ */
+export const PRESENTATIONS_LABEL = 'Presentaciones';
+
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
@@ -90,6 +100,12 @@ export const BRAND_TAGLINE = 'ERP Químico';
 /** Titulos de las secciones en las que se agrupan los items de nivel superior. */
 export const NAV_SECTION_OPERATION = 'Operación';
 export const NAV_SECTION_CHAIN = 'Cadena';
+/**
+ * Seccion de configuracion del producto (QC-45, R3). Nace con **un solo item**, «Presentaciones»,
+ * y eso es lo esperado, no un olvido: su hermana «Unidades» llega con QC-39 (decision cerrada de
+ * QC-45, 2026-09-08).
+ */
+export const NAV_SECTION_CONFIGURATION = 'Configuración';
 
 /**
  * Nombre del icono de un item. **Es una cadena y no el componente a proposito.**
@@ -120,6 +136,29 @@ export type NavLink = {
   readonly label: string;
   readonly testId: string;
   /**
+   * Permiso `<modulo>.consultar` que exige este enlace para aparecer en el menu (QC-75 R5).
+   *
+   * **Es obligatorio, no opcional, a proposito.** Un enlace sin permiso seria un enlace que se
+   * ve siempre, o sea un comodin, y la decision cerrada nº 2 de QC-75 los prohibe por escrito
+   * (heredada de QC-74: no hay permiso «de cuenta» ni equivalente). Olvidarse el campo al
+   * anadir un item tiene que ser un error de compilacion, no un item visible para todos.
+   *
+   * **Por que el tipo es `string` y no `PermissionCode`:** `lib/shared/**` NO puede importar
+   * `lib/modules/**` (`docs/architecture.md > La regla de dependencias`), asi que la union de
+   * literales que `identity` define en `domain/permissions.ts` no llega hasta aqui. Bajar el
+   * catalogo a `lib/shared` para poder tiparlo seria mover el dominio de permisos fuera de su
+   * modulo; se prefiere la cadena.
+   *
+   * El hueco que esa cadena deja —un codigo mal escrito, `'pedidos.consultarr'`, que no casaria
+   * con ningun permiso real y ocultaria el item en silencio— **lo cierra una guardia, no este
+   * comentario**: `tests/guards/guard-nav-permisos-declarados.test.ts` (QC-75 R20) importa a la
+   * vez `PERMISSIONS` y `PRIVATE_NAV_ITEMS` —cruce de capas que solo `tests/` puede hacer— y se
+   * pone roja si algun enlace declara un codigo fuera del catalogo o no declara ninguno.
+   *
+   * Sigue siendo serializable (una cadena), asi que `guard-nav-serializable` sigue verde.
+   */
+  readonly permission: string;
+  /**
    * Icono del item. Solo lo llevan los de **nivel superior**: los hijos de un submenu se
    * dibujan sin icono, como en el diseno, y por eso es opcional en vez de obligatorio.
    */
@@ -136,6 +175,15 @@ export type NavLink = {
   readonly badge?: number;
 };
 
+/**
+ * Un grupo del menu.
+ *
+ * **`NavGroup` NO lleva `permission`, y es deliberado** (QC-75 R3, decision cerrada nº 4): un
+ * grupo se ve si le queda **algun hijo visible** tras filtrar, y desaparece entero —etiqueta y
+ * disparador incluidos— cuando no le queda ninguno. Darle un permiso propio crearia dos verdades
+ * sobre lo mismo: un grupo permitido con todos los hijos ocultos (un desplegable vacio que
+ * anuncia que existe algo que no puedes usar) o un grupo denegado que esconde hijos permitidos.
+ */
 export type NavGroup = {
   readonly kind: 'group';
   readonly label: string;
@@ -154,6 +202,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     href: DASHBOARD_ROUTE,
     label: 'Dashboard',
     testId: 'nav-dashboard',
+    permission: 'dashboard.consultar',
     icon: 'layout-dashboard',
     section: NAV_SECTION_OPERATION,
   },
@@ -162,6 +211,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     href: INVENTORY_ROUTE,
     label: 'Inventario',
     testId: 'nav-inventario',
+    permission: 'inventario.consultar',
     icon: 'package',
     section: NAV_SECTION_OPERATION,
   },
@@ -173,6 +223,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     href: ORDERS_ROUTE,
     label: ORDERS_LABEL,
     testId: 'nav-pedidos',
+    permission: 'pedidos.consultar',
     icon: 'clipboard-list',
     section: NAV_SECTION_OPERATION,
   },
@@ -188,6 +239,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         href: FORMULAS_ROUTE,
         label: RECIPES_LABEL,
         testId: 'nav-produccion-recetas',
+        permission: 'recetas.consultar',
         icon: 'flask-conical',
       },
     ],
@@ -200,8 +252,31 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     href: SUPPLIERS_ROUTE,
     label: SUPPLIERS_LABEL,
     testId: 'nav-proveedores',
+    permission: 'proveedores.consultar',
     icon: 'truck',
     section: NAV_SECTION_CHAIN,
+  },
+  // QC-45 R3, R4 — ULTIMA entrada de nivel superior y unica de la seccion «Configuración»: el
+  // catalogo de presentaciones no es operacion diaria ni cadena de suministro, y por eso estrena
+  // seccion propia en vez de colarse en una existente. Sigue siendo UNA sola: «Unidades» llega con
+  // QC-39. El icono `boxes` ya existe en `NavIconName` y en `NAV_ICONS`: no se anade ninguno.
+  //
+  // **El ocultado a quien no puede entrar lo hace el filtrado por PERMISO de QC-75**
+  // (`filterNavItemsByPermissions` en `app/(private)/layout.tsx`), no un campo `adminOnly`: el
+  // texto original de la T2 de QC-45 describia ese apaño por rol porque QC-75 aun no existia, y
+  // manda el mecanismo nuevo. `inventario.modificar` es el mismo codigo que exige la pantalla con
+  // `requirePagePermission`, asi que el item no puede salir en el menu de quien recibiria un 404
+  // al pulsarlo: el Operador del seed lleva `inventario.consultar` y NO este, asi que no lo ve.
+  // Al no quedarle ningun hijo visible, `groupNavItemsBySection` tampoco deja el encabezado
+  // «Configuración» huerfano.
+  {
+    kind: 'link',
+    href: PRESENTATIONS_ROUTE,
+    label: PRESENTATIONS_LABEL,
+    testId: 'nav-presentaciones',
+    permission: 'inventario.modificar',
+    icon: 'boxes',
+    section: NAV_SECTION_CONFIGURATION,
   },
 ];
 
@@ -236,4 +311,67 @@ export function groupNavItemsBySection(items: readonly NavItem[]): readonly NavS
   }
 
   return secciones;
+}
+
+/**
+ * Los items visibles para un conjunto de permisos, en el **mismo orden** (QC-75 R1, R3, R4).
+ *
+ * Reglas, exactamente las de `design.md > 1.2`:
+ *
+ * - un `NavLink` se conserva si su `permission` esta en `permissions`;
+ * - un `NavGroup` filtra sus hijos con esa misma regla y **desaparece entero** —etiqueta y
+ *   disparador incluidos— si no le queda ninguno (R3); si le queda al menos uno, se devuelve el
+ *   grupo con sus hijos filtrados;
+ * - nunca reordena, nunca mueve un item de seccion, nunca duplica y **nunca muta la entrada**:
+ *   devuelve estructuras nuevas (R4).
+ *
+ * **Vive aqui y no en `AppSidebar`** (decision cerrada nº 7, heredada de QC-11): la fuente decide
+ * y el componente dibuja. Ademas el componente es `'use client'`, asi que filtrar alli haria
+ * viajar los items ocultos en el payload servidor→cliente, que es justo lo que R2 prohibe.
+ *
+ * `groupNavItemsBySection` se aplica despues, sobre el resultado ya filtrado, sin cambios.
+ */
+export function filterNavItemsByPermissions(
+  items: readonly NavItem[],
+  permissions: readonly string[],
+): readonly NavItem[] {
+  const visible = (enlace: NavLink): boolean => permissions.includes(enlace.permission);
+
+  const resultado: NavItem[] = [];
+
+  for (const item of items) {
+    if (item.kind === 'link') {
+      if (visible(item)) resultado.push({ ...item });
+      continue;
+    }
+
+    const hijos = item.items.filter(visible).map((hijo) => ({ ...hijo }));
+    if (hijos.length === 0) continue;
+
+    resultado.push({ ...item, items: hijos });
+  }
+
+  return resultado;
+}
+
+/**
+ * El `href` del primer enlace visible del menu ya filtrado, o `null` si no queda ninguno
+ * (QC-75 R11).
+ *
+ * Recorre de arriba abajo y, al topar un grupo, entra en sus hijos por el orden en que estan
+ * declarados. Es el aterrizaje del login cuando no hay destino de vuelta valido: «la primera
+ * pantalla que esa persona puede ver» se define por el **orden del menu** (decision cerrada
+ * nº 5), sin una segunda lista de prioridad que mantener.
+ *
+ * No muta ni recorre nada mas de lo necesario: para en el primer enlace que encuentra.
+ */
+export function firstVisibleNavHref(items: readonly NavItem[]): string | null {
+  for (const item of items) {
+    if (item.kind === 'link') return item.href;
+
+    const hijo = item.items[0];
+    if (hijo !== undefined) return hijo.href;
+  }
+
+  return null;
 }

@@ -565,22 +565,47 @@ model SupplierCatalogLine {
 /// `recetas` y lo que venga lo consumen por su contrato publico `@/lib/modules/unidades`,
 /// nunca por esta tabla.
 ///
-/// NO lleva `deletedAt` a proposito (decision cerrada 11, R8), igual que `Role` y
-/// `Presentation`: el borrado logico es un UPDATE y una FK no puede bloquear un UPDATE, asi
-/// que la columna neutralizaria en silencio la unica garantia real de R13.
+/// NO lleva `deletedAt` a proposito (decision cerrada 11 de QC-32, R8; QC-76 R32 lo
+/// reafirma), igual que `Role` y `Presentation`: el borrado logico es un UPDATE y una FK no
+/// puede bloquear un UPDATE, asi que la columna neutralizaria en silencio la unica garantia
+/// real de R13 -- y, desde QC-76, tambien la del `units_unit_id_fkey`.
 ///
 /// `nameNormalized` la calcula el dominio de `unidades` (`normalizeUnitName`, funcion pura) y
-/// se persiste junto a `name` en toda escritura. El `@@unique` es la UNICA garantia de la
-/// unicidad (R5): no hay comprobacion previa por igualdad -- seria una carrera.
+/// se persiste junto a `name` en toda escritura. La unicidad la garantiza un INDICE, nunca una
+/// comprobacion previa por igualdad -- seria una carrera.
 ///
-/// `symbol` NO tiene indice unico y es deliberado (R7, pregunta abierta 1): la identidad de la
-/// unidad es su nombre.
+/// QC-76 (`design.md > 2.1` y `2.3`): AQUI NO HAY, NI DEBE HABER, NINGUN `@@unique` NI
+/// `@unique`. La unicidad del nombre normalizado y la del simbolo pasaron a ser POR AMBITO
+/// --dentro de la empresa, y las de sistema entre ellas (R14, R15)--, y eso son CUATRO indices
+/// unicos PARCIALES (`units_company_name_unique`, `units_system_name_unique`,
+/// `units_company_symbol_unique`, `units_system_symbol_unique`) que Prisma no sabe modelar.
+/// Viven escritos a mano en
+/// `db/migrations/20260907190000_units_equivalence_and_scope/migration.sql`, junto con los
+/// tres CHECK, las dos FK y el disparador `units_check_derivation`. Mismo patron que
+/// `users_email_unique` (QC-4) y `companies_name_unique` (QC-47).
+/// Volver a declarar aqui `@@unique([nameNormalized])` NO es cosmetico: el siguiente
+/// `prisma migrate dev` generaria de nuevo el indice GLOBAL `units_name_normalized_key` y la
+/// unicidad dejaria de ser por ambito EN SILENCIO --dos empresas no podrian tener cada una su
+/// «kilogramo»--, rompiendo R14 sin que nada deje de compilar. Lo vigila
+/// `tests/unit/unidades/schema/unidades-schema.test.ts`.
+///
+/// `companyId` y `baseUnitId` son ESCALARES SIN `@relation` a proposito (`design.md > 2.1`):
+/// `Company` es de `identity`, asi que ninguna consulta puede atravesar de una unidad a una
+/// empresa con un `include` --mismo criterio que `products.unit_id` (QC-32 R18)--, y la
+/// auto-referencia obligaria a declarar un lado inverso (`derived Unit[]`) que nadie consulta:
+/// la conversion se calcula en el dominio a partir de dos descriptores, nunca navegando.
+/// Las FK reales (`units_company_id_fkey`, `units_unit_id_fkey`, las dos
+/// `ON DELETE RESTRICT ON UPDATE CASCADE`) las escribe la migracion a mano.
+///
+/// `factor` dice cuantas unidades de `baseUnitId` caben en una de esta (R3): `decimal(14,4)`,
+/// exacto, nunca coma flotante, la misma precision que el dinero de QC-33. Va con `baseUnitId`
+/// JUNTOS O NINGUNO, y eso lo garantiza `units_derivation_pair_check` (R2), no el esquema.
 ///
 /// QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda NO estan aqui. El GIN
 /// de trigramas `units_name_normalized_trgm_idx` -- lo que sirve una busqueda por SUBCADENA,
-/// que el `@@unique` btree de abajo no hace-- y los btree `units_name_idx`,
-/// `units_symbol_idx` (orden, NO unicidad: sigue sin ser identidad, R7),
-/// `units_created_at_idx` y `units_updated_at_idx` viven escritos a mano en
+/// que un btree no hace-- y los btree `units_name_idx`,
+/// `units_symbol_idx` (orden, NO unicidad), `units_created_at_idx` y `units_updated_at_idx`
+/// viven escritos a mano en
 /// `db/migrations/20260904160000_list_query_indexes/migration.sql`. Esta tabla NO tiene
 /// `deletedAt`, asi que los suyos son TOTALES, no parciales.
 /// @module unidades
@@ -589,10 +614,14 @@ model Unit {
   name           String
   nameNormalized String   @map("name_normalized")
   symbol         String?
+  companyId      String?  @map("company_id") @db.Uuid
+  baseUnitId     String?  @map("unit_id") @db.Uuid
+  factor         Decimal? @db.Decimal(14, 4)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@unique([nameNormalized], map: "units_name_normalized_key")
+  @@index([companyId], map: "units_company_id_idx")
+  @@index([baseUnitId], map: "units_unit_id_idx")
   @@map("units")
 }
 

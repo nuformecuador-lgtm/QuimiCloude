@@ -18,9 +18,11 @@
  * (el motor de iOS), donde cookie y bfcache pueden comportarse distinto sin que ningun test de
  * Node lo note.
  *
- * DATOS: este spec SI depende del seed de QC-6 para el rol `Administrador` —el middleware exige
- * ese rol literal para `/inventario` (`lib/composition/route-role-rules.ts`), asi que un rol
- * inventado no sirve para demostrar R11-R13—. Lo efimero sigue siendo el USUARIO: se crea con
+ * DATOS: este spec SI depende del seed de QC-6 para el rol `Administrador`, y desde QC-75 por otro
+ * motivo: el middleware ya no exige ningun rol (esa ficha retiro la lista ruta->rol), pero
+ * `/inventario` exige el permiso `inventario.consultar` en la propia pagina, y quien lo tiene es
+ * ese rol real del seed. Con un rol inventado —sin permisos— el paso que aterriza en la pantalla
+ * recibiria un 404. Lo efimero sigue siendo el USUARIO: se crea con
  * hash real, colgado del rol `Administrador` real, y se borra al final. El rol nunca se crea ni
  * se borra aqui, porque `roles.name` es unico y es un dato compartido con produccion/seed, no un
  * fixture. La otra fila ajena de la que depende es `documentTypeCode: 'CC'`, que inserta la
@@ -43,7 +45,7 @@ import { expect, test } from '@playwright/test';
 // La UNICA definicion de «mismo nombre de empresa» (QC-47 R3), del contrato publico
 // del modulo: `companies.name_normalized` se calcula con esta y con ninguna otra.
 // `ROLE_ADMINISTRADOR` se toma del mismo barrel, como VALOR (nunca `import type`, nunca por
-// ruta profunda): es la misma regla que ya sigue `lib/composition/route-role-rules.ts`.
+// ruta profunda): `identity/domain/roles.ts` es su unica fuente y el barrel la publica (QC-54).
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
@@ -129,9 +131,10 @@ async function createTestUser(): Promise<{
 }
 
 test.beforeAll(async () => {
-  // El rol es el `Administrador` REAL sembrado por QC-6, no un fixture: el middleware exige ese
-  // nombre literal para `/inventario` (`lib/composition/route-role-rules.ts`), asi que no se crea
-  // aqui (`roles.name` es unico: crearlo lo convertiria en dato compartido con produccion/seed).
+  // El rol es el `Administrador` REAL sembrado por QC-6, no un fixture: es quien tiene
+  // `inventario.consultar`, el permiso que la pantalla exige desde QC-75, y sin el este recorrido
+  // acabaria en un 404. Por eso no se crea aqui (`roles.name` es unico: crearlo lo convertiria en
+  // dato compartido con produccion/seed).
   // Si no existe, el fallo tiene que decir exactamente que falta el seed, no un rojo generico de
   // FK al crear el usuario.
   const adminRole = await prisma.role.findUnique({

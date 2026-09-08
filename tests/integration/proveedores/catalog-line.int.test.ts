@@ -210,9 +210,15 @@ async function createTestPresentation(db: Db): Promise<string> {
 
 /** Unidad REAL de apoyo: `unit_id` es FK a `units` (R30). */
 async function createTestUnit(db: Db): Promise<string> {
-  const name = `Unidad ${token()}`;
+  const marca = token();
+  const name = `Unidad ${marca}`;
   const unit = await db.unit.create({
-    data: { name, nameNormalized: normalizeForTest(name), symbol: 'ut' },
+    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
+    // UNICO dentro del ambito cuando existe. Esta unidad se siembra SIN empresa —o sea DE
+    // SISTEMA—, asi que un `'ut'` fijo choca con `23505` en cuanto este helper se llama dos
+    // veces. Se deriva del marcador irrepetible, que es lo que ya se hacia con el nombre.
+    // Ningun aserto lee su valor.
+    data: { name, nameNormalized: normalizeForTest(name), symbol: `ut${marca}` },
     select: { id: true },
   });
   return unit.id;

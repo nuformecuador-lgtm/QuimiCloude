@@ -3,12 +3,23 @@ import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 import { UnauthorizedError } from './errors';
 
 /**
- * Actor de entrada del caso de uso (QC-74 R18): id y CONJUNTO DE PERMISOS, nada mas. El nombre
+ * Actor de entrada del caso de uso (QC-74 R18): id, EMPRESA y CONJUNTO DE PERMISOS. El nombre
  * del rol ya no viaja hasta aqui —no se lee, no se compara y no se recibe—: se autoriza por
  * permiso, nunca por rol.
+ *
+ * `companyId` (QC-76 R17, R19, R20) es la empresa de quien pregunta, y esta aqui —y no como
+ * parametro suelto de `listUnits`— porque viaja SIEMPRE junta con los permisos: como argumento
+ * separado, cada llamante nuevo podria olvidarse de pasarla o, peor, elegirla. La rellena el
+ * adaptador driving con el contexto de sesion del servidor, nunca la entrada del llamante.
+ *
+ * **La empresa SIRVE PARA FILTRAR y NO AUTORIZA POR SI SOLA** (R20, `docs/architecture.md`):
+ * que el `Actor` traiga empresa no concede ningun permiso. El permiso se comprueba APARTE y
+ * PRIMERO, con `requirePermission`, antes de zod y antes de tocar el repositorio; solo despues
+ * la empresa entra en el `where` como ambito de lectura.
  */
 export type Actor = {
   readonly id: string;
+  readonly companyId: string;
   readonly permissions: readonly string[];
 };
 

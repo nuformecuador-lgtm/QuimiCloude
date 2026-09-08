@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
@@ -39,8 +40,12 @@ export const metadata: Metadata = {
  * de tamano, no solo en la primera carga (R17). Sin ella, Next reutiliza el limite y el usuario
  * se queda mirando la pagina anterior sin ninguna senal de que algo esta en vuelo.
  *
- * **Aqui no se decide ningun permiso** (R7): el corte de ruta lo hace el middleware con la regla
- * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `proveedores`.
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige
+ * `proveedores.consultar` con `requirePagePermission` -antes de resolver `searchParams` y antes
+ * de pintar nada-, que redirige al login sin sesion y responde 404 sin nombrar el modulo ni
+ * mencionar permisos. El middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan
+ * firma, caducidad y empresa. La autorizacion sobre los DATOS la siguen aportando los casos de
+ * uso de `proveedores`.
  *
  * **El disparador del alta (`<SupplierSheet />`) va junto al titulo** (T8): es un componente de
  * cliente con su propio estado de apertura, asi que esta pagina sigue siendo un Server Component
@@ -51,6 +56,8 @@ export default async function ProveedoresPage({
 }: {
   searchParams: Promise<SupplierListSearchParams>;
 }) {
+  await requirePagePermission('proveedores.consultar');
+
   const { page, pageSize } = parseSupplierListParams(await searchParams);
 
   return (

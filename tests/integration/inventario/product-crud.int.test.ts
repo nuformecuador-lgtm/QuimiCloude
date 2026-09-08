@@ -148,10 +148,19 @@ async function createTestPresentation(db: Db, name = `Bidon ${token()}`): Promis
  * `finally`, como el resto de datos de apoyo de este archivo. El nombre lleva `token()`
  * porque `units.name_normalized` tiene indice unico.
  */
-async function createTestUnit(db: Db, symbol: string | null = 'kg'): Promise<string> {
+async function createTestUnit(db: Db, symbol?: string | null): Promise<string> {
   const name = `unidad ${token()}`;
   const unit = await db.unit.create({
-    data: { name, nameNormalized: normalizeForTest(name), symbol },
+    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
+    // UNICO dentro del ambito cuando existe, y esta unidad se siembra SIN empresa —o sea DE
+    // SISTEMA—. El defecto era el literal `'kg'`, que choca con `23505` contra el `kilogramo`
+    // del catalogo arrancador. Ahora DERIVA DEL NOMBRE, que ya lleva `token()`; quien pase un
+    // simbolo explicito —incluido `null`— sigue mandando. Ningun aserto lee su valor.
+    data: {
+      name,
+      nameNormalized: normalizeForTest(name),
+      symbol: symbol === undefined ? name : symbol,
+    },
     select: { id: true },
   });
   return unit.id;

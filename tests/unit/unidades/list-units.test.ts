@@ -20,9 +20,18 @@ import type { Actor } from '@/lib/modules/unidades/domain/actor';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRef } from '@/lib/modules/unidades/domain/unit-catalog';
 
+/** La empresa de quien pregunta (QC-76 R17). Solo se ANADE al actor: no autoriza nada por si
+ *  sola —el permiso se sigue exigiendo aparte y primero— y ningun aserto de este archivo cambia
+ *  de exigencia por ella. */
+const EMPRESA = 'company-1';
+
 /** Actor con EXACTAMENTE el permiso que exige `listUnits` (R16, R17). Su rol es irrelevante:
- *  el tipo `Actor` ya no lo tiene (R18). */
-const ACTOR_CON_PERMISO: Actor = { id: 'user-admin-1', permissions: ['unidades.consultar'] };
+ *  el tipo `Actor` ya no lo tiene (R18). Desde QC-76 lleva ademas la empresa (R17). */
+const ACTOR_CON_PERMISO: Actor = {
+  id: 'user-admin-1',
+  companyId: EMPRESA,
+  permissions: ['unidades.consultar'],
+};
 
 const CATALOG: readonly UnitRef[] = [
   { id: 'unit-1', name: 'Gramo', symbol: 'g' },
@@ -80,12 +89,18 @@ describe('createListUnits — R40', () => {
     expect(listAll).toHaveBeenCalledTimes(1);
     // La cota sigue siendo lo primero que recibe el puerto (R40); detras va la consulta ya
     // saneada, vacia porque no se pidio ninguna.
-    expect(listAll).toHaveBeenCalledWith(MAX_UNITS, {
-      page: 1,
-      sort: null,
-      filters: {},
-      search: '',
-    });
+    expect(listAll).toHaveBeenCalledWith(
+      MAX_UNITS,
+      {
+        page: 1,
+        sort: null,
+        filters: {},
+        search: '',
+      },
+      // QC-76 (R17, R18): el tercer argumento es el AMBITO, y sale de la empresa DEL ACTOR.
+      // El caso de uso solo hace de correa: no construye SQL ni conoce el `OR`.
+      { companyId: EMPRESA },
+    );
   });
 
   it('el orden que devuelve es el que da el repositorio, estable por nombre', async () => {
@@ -106,7 +121,11 @@ describe('createListUnits — R41 (QC-74: R12, R14, R15, R16, R17)', () => {
     const { units, listAll } = repositoryReturning(CATALOG);
     const listUnits = createListUnits({ units, log: LOG_MUDO });
 
-    const resultado = await listUnits(undefined, { id: 'user-1', permissions: ['unidades.consultar'] });
+    const resultado = await listUnits(undefined, {
+      id: 'user-1',
+      companyId: EMPRESA,
+      permissions: ['unidades.consultar'],
+    });
 
     expect(resultado).toEqual(CATALOG);
     expect(listAll).toHaveBeenCalledTimes(1);
@@ -119,15 +138,18 @@ describe('createListUnits — R41 (QC-74: R12, R14, R15, R16, R17)', () => {
    */
   const SIN_PERMISO: ReadonlyArray<{ readonly nombre: string; readonly actor: Actor | null | undefined }> = [
     { nombre: 'sin actor', actor: null },
-    { nombre: 'con conjunto de permisos vacio', actor: { id: 'user-1', permissions: [] } },
+    {
+      nombre: 'con conjunto de permisos vacio',
+      actor: { id: 'user-1', companyId: EMPRESA, permissions: [] },
+    },
     { nombre: 'con actor indefinido, o sea sin conjunto de permisos', actor: undefined },
     {
       nombre: 'con un permiso de otro modulo',
-      actor: { id: 'user-1', permissions: ['inventario.consultar'] },
+      actor: { id: 'user-1', companyId: EMPRESA, permissions: ['inventario.consultar'] },
     },
     {
       nombre: 'con un codigo parecido que no concede: no hay coincidencia parcial',
-      actor: { id: 'user-1', permissions: ['unidades.'] },
+      actor: { id: 'user-1', companyId: EMPRESA, permissions: ['unidades.'] },
     },
   ];
 
@@ -146,16 +168,34 @@ describe('createListUnits — R41 (QC-74: R12, R14, R15, R16, R17)', () => {
     });
   }
 
+  it('un actor CON empresa pero SIN el permiso se rechaza igual: la empresa no autoriza (QC-76 R20)', async () => {
+    // QC-76 (R20, decisiones cerradas 24 y 32): que el actor traiga `companyId` —la empresa de
+    // su sesion— no le concede nada. El corte sigue siendo la pertenencia exacta de
+    // `'unidades.consultar'` al conjunto de permisos, y sigue ocurriendo ANTES del repositorio.
+    const units = repositoryThatMustNotBeCalled();
+    const listUnits = createListUnits({ units, log: LOG_MUDO });
+
+    await expect(
+      listUnits(undefined, { id: 'user-1', companyId: EMPRESA, permissions: [] }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(units.listAll).not.toHaveBeenCalled();
+    expect(units.listPage).not.toHaveBeenCalled();
+  });
+
   it('el rechazo lanza el UnauthorizedError del modulo, que es un UnidadesError (R15)', async () => {
     const units = repositoryThatMustNotBeCalled();
     const listUnits = createListUnits({ units, log: LOG_MUDO });
 
     // `instanceof UnidadesError` es lo que el adaptador driving usa para serializar: si el error
     // saliera de `identity` en vez del modulo, esta linea se pondria roja.
-    await expect(listUnits(undefined, { id: 'user-1', permissions: [] })).rejects.toBeInstanceOf(
-      UnidadesError,
-    );
-    const error = await listUnits(undefined, { id: 'user-1', permissions: [] }).catch((e: unknown) => e);
+    await expect(
+      listUnits(undefined, { id: 'user-1', companyId: EMPRESA, permissions: [] }),
+    ).rejects.toBeInstanceOf(UnidadesError);
+    const error = await listUnits(undefined, {
+      id: 'user-1',
+      companyId: EMPRESA,
+      permissions: [],
+    }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UnauthorizedError);
     expect((error as UnauthorizedError).code).toBe('unauthorized');
   });

@@ -339,7 +339,7 @@ protegen lo que entre por PostgREST con la anon key, via que aqui no se usa.
 ### La regla
 
 1. **La autorizacion se valida en el service**, antes de tocar el repositorio. El service
-   recibe quien es el usuario y su rol; decide y, si no procede, lanza. No es "ademas de
+   recibe quien es el usuario y que permisos trae; decide y, si no procede, lanza. No es "ademas de
    RLS": es **la** frontera.
 2. **RLS se activa igual en toda tabla con datos de usuario u operacion**, y con
    `ALTER TABLE ... FORCE ROW LEVEL SECURITY`. Es defensa en profundidad para el dia que
@@ -367,27 +367,40 @@ fallan con errores que no apuntan a la causa. Es el error mas comun al montar Pr
 Supabase.
 
 ## Permisos y autenticacion
-- Las paginas (Server Components) validan permisos via `cookies()` de `next/headers`.
+- Las paginas (Server Components) exigen su permiso en el servidor, antes de leer o pintar datos.
 - `middleware.ts` intercepta las rutas privadas y **valida** la cookie de sesion: su **firma**, su
-  **caducidad** y el **rol firmado** que lleva dentro. Que la cookie exista no es sesion.
+  **caducidad** y la **empresa** del contenido firmado. Que la cookie exista no es sesion.
+- El middleware **no corta por rol**: no existe ninguna lista ruta→rol y ninguna decision del borde
+  depende del rol que viaja en la cookie. El borde tampoco **consulta la base de datos** y no va a
+  hacerlo: no conoce los permisos, y `tests/guards/guard-middleware-edge.test.ts` recorre su cierre
+  de imports y se pone roja si alguien mete ahi un repositorio o el catalogo de permisos.
 - El corte va en **los dos sentidos**: sin sesion valida en una ruta privada, redirige al login con
   la ruta pedida en `next`; con sesion valida en el login, redirige al dashboard.
 - Componentes `private/` reciben datos por props desde el Server Component padre.
 - Datos publicos: el cliente fetchea con SWR desde el navegador.
 - Datos privados (balances, PII): pre-fetch en Server Component, stream al cliente.
 
+**El corte por permiso vive en la pagina.** Cada `page.tsx` de `app/(private)/` abre con
+`requirePagePermission('<modulo>.consultar')`, antes de cualquier lectura de datos. Si el permiso
+falta, la respuesta es **404** —no 403—, con el mismo contenido que cualquier otro 404 de la zona
+privada: no nombra el modulo pedido ni menciona permisos, de modo que «no existe» y «no puedes» son
+indistinguibles para quien sondea URLs.
+
 **El layout privado sigue siendo la ultima linea de defensa.** El corte del middleware no lo
 sustituye ni lo relaja: el layout de la zona privada vuelve a leer la sesion en el servidor y
-redirige si no la hay. El middleware ahorra render y da la vuelta rapida; no es la unica puerta.
+redirige si no la hay. Ademas **filtra el menu** con los permisos de esa misma lectura, en el
+servidor: un item para el que no hay permiso no viaja en el HTML. El middleware ahorra render y da
+la vuelta rapida; no es la unica puerta.
 
-**El middleware NO es la frontera de autorizacion.** `## Acceso a datos y autorizacion` sigue
-mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol que
-viaja firmado en la cookie **no autoriza**; su unico efecto admisible es decidir si se enseña una
-pantalla. **Un permiso implementado solo como corte de ruta no cuenta como implementado**, igual
-que no cuenta uno implementado solo como policy de RLS. Ademas ese rol es una **foto del instante
-del login** y envejece hasta 8 h: un cambio de rol no llega al borde hasta que la sesion caduca, y
-el middleware puede dejar pasar a una pantalla que el service deniega. La invalidacion inmediata
-es QC-23.
+**Ni el borde ni la pagina son la frontera de autorizacion.** `## Acceso a datos y autorizacion`
+sigue mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol
+que viaja firmado en la cookie **no autoriza** nada; es un dato de presentacion (el nombre que
+pinta `nav-user`). **Un permiso implementado solo como corte de ruta no cuenta como implementado**,
+igual que no cuenta uno implementado solo como policy de RLS: el 404 de la pagina decide si se
+**enseña** una pantalla, y el service decide si se puede **hacer**. Ademas los permisos que lleva la
+sesion son una **foto del instante del login** y envejecen hasta 8 h: un cambio de permisos no llega
+a la pantalla hasta que la sesion caduca, asi que una pantalla puede pintarse para alguien a quien
+el service ya deniega. La invalidacion inmediata es QC-23.
 
 ## Server Actions vs Route Handlers
 | Caso | Usar |

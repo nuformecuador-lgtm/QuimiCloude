@@ -59,7 +59,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { normalizeUnitName } from '@/lib/modules/unidades'
+import { IncompatibleUnitsError, convertQuantity, normalizeUnitName } from '@/lib/modules/unidades'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -463,32 +463,61 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(definiciones).toEqual(['lib/modules/unidades/domain/unit-name.ts'])
   })
 
-  it('el modulo unidades no expone ninguna conversion ni factor', () => {
-    // R14: la unidad es puramente ANOTATIVA. No se convierte, no se deriva y no se compara
-    // entre unidades distintas (decision cerrada 12, `design.md > 10`). Se vigila el codigo
-    // del modulo entero, no solo el barrel: un `factor` en el adaptador tambien seria una
-    // conversion a medio construir.
-    const PROHIBIDO = /\b(factor|convert|conversion|ratio|equivalen\w*|multiplier|toBase|baseUnit)\b/i
-    expect(unidadesSources.length).toBeGreaterThan(0)
-    for (const file of unidadesSources) {
-      expect(read(file), `${etiqueta(file)} nombra una conversion o un factor`).not.toMatch(
-        PROHIBIDO,
-      )
+  it('el contrato de unidades PUBLICA la conversion, y UnitRef sigue teniendo exactamente id, name y symbol', () => {
+    // ESTE CASO ESTA INVERTIDO A PROPOSITO — 2026-09-07, QC-76.
+    //
+    // QUE AFIRMABA ANTES: «el modulo unidades no expone ninguna conversion ni factor». Venia de
+    // QC-32 (su R14, decision cerrada 12, `design.md > 10` de aquella ficha) y barria los
+    // fuentes del modulo con una expresion regular que prohibia las palabras `factor`,
+    // `convert`, `conversion`, `ratio`, `equivalen*`, `multiplier`, `toBase` y `baseUnit`.
+    //
+    // QUIEN LO DEROGA: QC-76, POR DISENO y no por descuido. **R22** obliga al contrato publico
+    // del modulo a publicar una funcion que convierta una cantidad entre dos unidades
+    // compatibles, y **R1** obliga al modelo a declarar de que unidad deriva cada una y por que
+    // factor. Las dos cosas que la regla prohibia son ahora requisitos. Las decisiones cerradas
+    // que lo mandan son la **2** («la equivalencia: unidad de la que deriva + factor») y la
+    // **18** («nadie usa la conversion todavia; el contrato la publica»), ambas del 2026-09-07.
+    //
+    // QUE SOBREVIVE, y por eso el caso se REESCRIBE en vez de borrarse: (a) que el barrel siga
+    // sin arrastrar servidor —la conversion es dominio PURO, asi que publicarla no puede meter
+    // Prisma ni `next/*` en el cierre de imports—; y (b) que `UnitRef`, el tipo con el que los
+    // demas modulos hablan de una unidad, siga teniendo EXACTAMENTE `id`, `name` y `symbol`: la
+    // equivalencia vive en la tabla y en `UnitConversion`, no se cuela en la referencia que
+    // consumen `inventario` y `recetas`.
+    const contrato = read(barrel)
+
+    // (1) R22 — la conversion se publica, y desde `./domain`: el barrel solo reexporta dominio.
+    expect(contrato).toMatch(/export \{[^}]*\bconvertQuantity\b[^}]*\} from '\.\/domain\//)
+    expect(contrato).toMatch(/export type \{[^}]*\bUnitConversion\b[^}]*\} from '\.\/domain\//)
+    expect(contrato).toMatch(/export \{[^}]*\bIncompatibleUnitsError\b[^}]*\} from '\.\/domain\//)
+
+    // Y son alcanzables de verdad, no solo una linea de texto en el barrel.
+    expect(typeof convertQuantity).toBe('function')
+    expect(typeof IncompatibleUnitsError).toBe('function')
+
+    // (2) R22 — es PURA: su archivo no importa nada de servidor ni de framework. Lo transitivo
+    //     lo vigila el caso del cierre de imports del barrel, mas abajo; esto es el archivo.
+    const conversion = read(join(unidadesDir, 'domain', 'convert-quantity.ts'))
+    for (const prohibido of ['@prisma/client', 'next/', '@/lib/shared', 'use server']) {
+      expect(
+        conversion,
+        `convert-quantity.ts nombra ${prohibido}: la conversion dejaria de ser pura`,
+      ).not.toContain(prohibido)
     }
 
-    // Y el tipo que `unidades` publica hacia fuera tiene exactamente tres campos: identidad,
-    // nombre y simbolo. Nada con lo que multiplicar.
+    // (3) SOBREVIVE de QC-32 — el tipo que `unidades` publica hacia fuera tiene exactamente
+    //     tres campos: identidad, nombre y simbolo. Ni `factor`, ni `baseUnitId`: quien
+    //     convierte usa `UnitConversion`, que es otro tipo y otra decision (`design.md > 5.1`).
     const unitCatalog = read(join(unidadesDir, 'domain', 'unit-catalog.ts'))
     const cuerpoUnitRef = /export type UnitRef = \{([^}]*)\}/.exec(unitCatalog)?.[1] ?? ''
     const campos = [...cuerpoUnitRef.matchAll(/(\w+)\s*:/g)].map((m) => m[1])
     expect(campos).toEqual(['id', 'name', 'symbol'])
 
-    // Tampoco hay una tabla de equivalencias escondida en el conjunto arrancador. Desde el
-    // 2026-09-03 el arrancador no es `domain/starter-units.ts` —retirado con el seed— sino el
-    // `INSERT` de la migracion, asi que la comprobacion se hace DONDE AHORA VIVE EL DATO: las
-    // columnas que ese INSERT rellena son exactamente el nombre, el nombre normalizado, el
-    // simbolo y la marca de modificacion. Ni `factor`, ni `base`, ni `equivalencia`: si algun
-    // dia alguien las anade al arrancador, tendra que anadirlas ahi y este test cae.
+    // (4) SOBREVIVE de QC-32 — el conjunto arrancador sigue sin tabla de equivalencias
+    //     ESCONDIDA: la migracion de QC-32 no se toca (R27) y su `INSERT` rellena exactamente
+    //     el nombre, el nombre normalizado, el simbolo y la marca de modificacion. La
+    //     equivalencia de las cuatro unidades de sistema la pone la migracion de QC-76 con un
+    //     `UPDATE` (R28), y eso lo vigila `schema/unidades-migration.test.ts`.
     const arrancadores = readdirSync(migrationsDir).filter((name) =>
       name.endsWith('_units_catalog'),
     )

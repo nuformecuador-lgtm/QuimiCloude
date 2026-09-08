@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { PERMISSIONS } from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 
@@ -41,6 +42,48 @@ const BARREL_PATH = `app/(private)${DASHBOARD_ROUTE}/components/index.ts`;
 /** Las dos fuentes de la feature que renderizan algo. */
 const FUENTES_DE_LA_PANTALLA = [PAGE_PATH, CONTENT_PATH] as const;
 
+/**
+ * El **unico** import de `lib/modules/` que `page.tsx` tiene permitido (QC-75 R6, R10).
+ *
+ * Se declara como constante y de aqui sale tanto la excepcion del caso negativo como el caso
+ * positivo: si el helper se moviera de archivo, ambos se ponen rojos a la vez en vez de quedar uno
+ * vigilando una ruta que ya no existe.
+ */
+const HELPER_PERMISO_NOMBRE = 'requirePagePermission';
+const HELPER_PERMISO_MODULO = '@/lib/modules/identity/adapters/driving/require-page-permission';
+
+/** La linea exacta del import permitido, en cualquiera de las dos comillas y con o sin `;`. */
+const IMPORT_PERMITIDO = new RegExp(
+  `^import\\s*\\{\\s*${HELPER_PERMISO_NOMBRE}\\s*\\}\\s*from\\s*['"]${HELPER_PERMISO_MODULO}['"];?$`,
+);
+
+/** Lo que R6 prohibe a la pantalla: datos, red, cookies y cualquier atajo a la composicion. */
+const PROHIBIDOS_DE_DATOS = [
+  'fetch(',
+  'cookies',
+  'prisma',
+  'supabase',
+  '@/lib/composition',
+  '@/lib/modules/',
+] as const;
+
+/**
+ * Descuenta **solo** la linea del import permitido. No se salta el archivo entero ni relaja la
+ * lista: quita esa linea y despues juzga todo lo demas con la prohibicion completa.
+ */
+function sinElImportDelHelper(codigo: string): string {
+  return codigo
+    .split('\n')
+    .filter((linea) => !IMPORT_PERMITIDO.test(linea.trim()))
+    .join('\n');
+}
+
+/** Los textos prohibidos que el codigo dado contiene. Vacio = limpio. */
+function infraccionesDeDatos(codigo: string): string[] {
+  const enMinusculas = codigo.toLowerCase();
+  return PROHIBIDOS_DE_DATOS.filter((prohibido) => enMinusculas.includes(prohibido.toLowerCase()));
+}
+
 describe('contrato de la ruta del dashboard', () => {
   it('la pagina vive en la ruta que declara DASHBOARD_ROUTE', () => {
     // R1
@@ -59,25 +102,75 @@ describe('contrato de la ruta del dashboard', () => {
     );
   });
 
-  it('la pantalla no consulta datos, red ni cookies', () => {
-    // R6
-    const prohibidos = [
-      'fetch(',
-      'cookies',
-      'prisma',
-      'supabase',
-      '@/lib/composition',
-      '@/lib/modules/',
-    ];
+  // ACOTADO por QC-75 T12 (antes: prohibicion ciega sobre las dos fuentes).
+  //
+  // QC-12 R6 afirma que esta pantalla **no consulta datos**, y sigue siendo cierto. Lo que cambio
+  // es que QC-75 R6 mete en `page.tsx` el corte por permiso: una linea que importa
+  // `requirePagePermission` de `lib/modules/identity`. Ese helper NO trae datos del dashboard:
+  // resuelve **la misma lectura de sesion que el layout privado ya hace** (R19) y decide servir,
+  // redirigir al login o responder 404. Es control de acceso, no una consulta — y tiene que vivir
+  // en la pagina porque layout y pagina se renderizan en paralelo (`design.md > 2.1`).
+  //
+  // Por eso la excepcion es de **una linea concreta**, no del archivo: se descuenta el import
+  // permitido y despues se aplica la lista entera. Saltarse `page.tsx` con un `continue` habria
+  // apagado el centinela justo donde mas facil es colar una consulta.
+  it('la pantalla no consulta datos, red ni cookies (salvo el corte por permiso de la pagina)', () => {
+    // R6 — el componente de ruta sigue con la prohibicion ENTERA: ni una excepcion.
+    expect(
+      infraccionesDeDatos(fuenteSinComentarios(CONTENT_PATH)),
+      `${CONTENT_PATH} no debe consultar datos, red, cookies ni composicion`,
+    ).toEqual([]);
 
-    for (const ruta of FUENTES_DE_LA_PANTALLA) {
-      const codigo = fuenteSinComentarios(ruta).toLowerCase();
-      for (const prohibido of prohibidos) {
-        expect(codigo, `${ruta} no debe contener «${prohibido}»`).not.toContain(
-          prohibido.toLowerCase(),
-        );
-      }
-    }
+    // Y la pagina, con la lista completa aplicada a todo lo que no sea esa unica linea.
+    expect(
+      infraccionesDeDatos(sinElImportDelHelper(fuenteSinComentarios(PAGE_PATH))),
+      `${PAGE_PATH} solo puede importar «${HELPER_PERMISO_MODULO}» de lib/modules`,
+    ).toEqual([]);
+  });
+
+  it('la pagina exige dashboard.consultar y ese import permitido existe de verdad', () => {
+    // QC-75 R6, R10 — parte POSITIVA, para que la excepcion de arriba no pueda quedar verde por
+    // vacuidad: si manana alguien borrase el corte por permiso, no habria nada que descontar y la
+    // prohibicion volveria a pasar en silencio con la pantalla desprotegida.
+    //
+    // El codigo se DERIVA del catalogo de `identity`, nunca se escribe a mano: si lo renombraran,
+    // esto se pone rojo en vez de vigilar un permiso inexistente.
+    const permiso = PERMISSIONS.find(
+      (entrada) => entrada.module === 'dashboard' && entrada.action === 'consultar',
+    );
+    expect(permiso, 'el catalogo de identity deberia tener dashboard.consultar').toBeDefined();
+
+    const codigo = fuenteSinComentarios(PAGE_PATH);
+    expect(codigo, `${PAGE_PATH} deberia exigir su permiso`).toContain(
+      `${HELPER_PERMISO_NOMBRE}('${permiso?.code}')`,
+    );
+
+    expect(
+      codigo.split('\n').filter((linea) => IMPORT_PERMITIDO.test(linea.trim())),
+      `${PAGE_PATH} deberia importar ${HELPER_PERMISO_NOMBRE} desde ${HELPER_PERMISO_MODULO}`,
+    ).toHaveLength(1);
+  });
+
+  it('la excepcion del import permitido no es un colador', () => {
+    // Fuente FABRICADA: importa el helper permitido y ademas la composicion. Si la excepcion
+    // estuviera escrita como «esta pagina queda fuera del centinela», este caso pasaria limpio.
+    const fuenteFabricada = [
+      `import { ${HELPER_PERMISO_NOMBRE} } from '${HELPER_PERMISO_MODULO}';`,
+      "import { identity } from '@/lib/composition';",
+      '',
+      'export default async function PaginaQueSeCuela() {',
+      `  await ${HELPER_PERMISO_NOMBRE}('dashboard.consultar');`,
+      '  return identity.getSessionUser();',
+      '}',
+    ].join('\n');
+
+    expect(infraccionesDeDatos(sinElImportDelHelper(fuenteFabricada))).toContain(
+      '@/lib/composition',
+    );
+
+    // Y un segundo import de `lib/modules/` tampoco se cuela por la puerta del primero.
+    const conOtroModulo = `import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';\n${fuenteFabricada}`;
+    expect(infraccionesDeDatos(sinElImportDelHelper(conOtroModulo))).toContain('@/lib/modules/');
   });
 
   it('la pantalla y su componente de ruta se renderizan en servidor', () => {
