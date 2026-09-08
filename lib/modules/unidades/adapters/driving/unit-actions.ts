@@ -1,7 +1,13 @@
 'use server';
 
 import { identity, unidades } from '@/lib/composition';
-import { UnidadesError, type Actor, type UnitRef } from '@/lib/modules/unidades';
+import {
+  UnidadesError,
+  isUnitPage,
+  type Actor,
+  type Page,
+  type UnitView,
+} from '@/lib/modules/unidades';
 
 /**
  * Server Action de lectura del catalogo de unidades (`design.md > 9`, R40-R42). Es el
@@ -20,8 +26,19 @@ import { UnidadesError, type Actor, type UnitRef } from '@/lib/modules/unidades'
  * sea de dominio se relanza (`docs/conventions.md > Manejo de errores`).
  */
 
+/**
+ * Lo que devuelve la lectura del CATALOGO ENTERO. Conserva su nombre porque es el tipo con el
+ * que ya hablan las pantallas de recetas, proveedores y pedidos (R4). Lo que cambia con QC-39
+ * es lo que trae cada unidad —`UnitView` en vez de `UnitRef`: la equivalencia y `isSystem`—, y
+ * como `UnitView` EXTIENDE `UnitRef`, quien solo lee `id`, `name` y `symbol` no se entera.
+ */
 export type UnitListResult =
-  | { status: 'success'; data: readonly UnitRef[] }
+  | { status: 'success'; data: readonly UnitView[] }
+  | { status: 'error'; code: string; message: string };
+
+/** Lo que devuelve la lectura PAGINADA (QC-39 R5): la misma union, con una `Page` dentro. */
+export type UnitPageResult =
+  | { status: 'success'; data: Page<UnitView> }
   | { status: 'error'; code: string; message: string };
 
 /** Traduce un error de dominio a estado serializable; relanza cualquier otro. */
@@ -56,22 +73,35 @@ async function currentActor(): Promise<Actor | null> {
 }
 
 /**
- * Catalogo completo de unidades (R40, R41 de QC-32).
+ * Lectura del catalogo de unidades (R40, R41 de QC-32; QC-39 R5).
  *
- * QC-57: el caso de uso pasa a `listUnits(input, actor)` con la consulta OPCIONAL
- * (`design.md > 7`). Esta action sigue pidiendo el CATALOGO ENTERO -pasa `undefined`- y por eso
- * su firma no cambia: las tres pantallas que la llaman sin argumentos (el formulario de recetas
- * y el detalle de proveedor) siguen recibiendo `readonly UnitRef[]`, que es la primera
- * sobrecarga de `ListUnits`. **Quien abra la puerta al contrato aqui es QC-39**, la ficha de la
- * pantalla de unidades: mientras no haya pantalla que emita orden, filtro o pagina, exponerlo
- * seria un parametro que nadie manda.
+ * **La consulta viaja TAL CUAL al caso de uso** y esta action no la interpreta: quien decide si
+ * la salida es el catalogo entero o una pagina es `listUnits`, mirando si la entrada trae
+ * `page`/`pageSize` (`list-units.ts`). Aqui no hay validacion, ni saneado, ni traduccion de
+ * parametros: eso ya existe en el dominio (`sanitizeListQuery`, `UNIT_QUERYABLE`) y R5 prohibe
+ * escribir una segunda copia.
+ *
+ * **Las dos sobrecargas son lo que protege a los llamantes de hoy** (R4): el formulario de
+ * recetas, el detalle de proveedor y la pantalla de pedidos invocan `listUnitsAction()` sin
+ * argumentos y siguen recibiendo `readonly UnitView[]` —un array, no una union que estrechar—.
+ * Es el mismo mecanismo que `ListUnits` ya usa en el dominio.
+ *
+ * ESTA ACTION SIGUE SIN DECIDIR NADA (R41): resuelve el actor, deja pasar la consulta y traduce
+ * el error de dominio. El permiso lo exige `list-units.ts` en su primera linea.
  */
-export async function listUnitsAction(): Promise<UnitListResult> {
+export async function listUnitsAction(): Promise<UnitListResult>;
+export async function listUnitsAction(query: unknown): Promise<UnitPageResult>;
+export async function listUnitsAction(
+  query?: unknown,
+): Promise<UnitListResult | UnitPageResult> {
   const actor = await currentActor();
 
   try {
-    const data = await unidades.listUnits(undefined, actor);
-    return { status: 'success', data };
+    const data = await unidades.listUnits(query, actor);
+    // `isUnitPage` es el discriminante que el propio modulo publica: se usa SOLO para separar
+    // las dos ramas del tipo de salida -la forma la eligio ya el caso de uso-, no para decidir
+    // nada. Sin el habria que afirmar el tipo con `as`, que es peor.
+    return isUnitPage(data) ? { status: 'success', data } : { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }

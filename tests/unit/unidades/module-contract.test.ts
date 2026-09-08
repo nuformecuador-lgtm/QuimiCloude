@@ -660,10 +660,22 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     // listado que ya estaba, mas las tres nuevas de escritura. Sigue siendo una lista EXACTA:
     // una quinta funcion exportada -o el nombre de una de estas cuatro mal escrito- la pondria
     // roja igual que antes la ponia roja una segunda funcion cualquiera.
+    //
+    // ACTUALIZADO ronda 7 (QC-39/T2): `listUnitsAction` pasa a estar SOBRECARGADA -dos
+    // declaraciones sin cuerpo mas la implementacion, `design.md > 3` de QC-39-, asi que el
+    // barrido la encuentra tres veces. Se DEDUPLICA el resultado, y solo eso: el conjunto sigue
+    // siendo exacto -una quinta funcion, o una de estas cuatro mal escrita, lo sigue poniendo
+    // rojo- y ningun aserto se relaja. Deduplicar es lo unico que hace falta para que la
+    // pregunta que este caso hace -«que funciones exporta este archivo»- siga teniendo la misma
+    // respuesta con sobrecargas que sin ellas.
     const funcionesExportadas = [
-      ...unitActionsSource.matchAll(/export\s+async\s+function\s+(\w+)/g),
-      ...unitActionsSource.matchAll(/export\s+function\s+(\w+)/g),
-    ].map((m) => m[1])
+      ...new Set(
+        [
+          ...unitActionsSource.matchAll(/export\s+async\s+function\s+(\w+)/g),
+          ...unitActionsSource.matchAll(/export\s+function\s+(\w+)/g),
+        ].map((m) => m[1]),
+      ),
+    ]
     expect(funcionesExportadas).toEqual([
       'listUnitsAction',
       'createUnitAction',
