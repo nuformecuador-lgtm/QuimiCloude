@@ -117,3 +117,24 @@ El gate (`./init.sh --rapido`) lo corre el leader; el implementer no se autoapru
 - **Pendientes:** T3 a T15.
 - **Parada obligada:** falta `tests/helpers/user-event.ts` (ver «Bloqueos y desvíos»). El Bloque 2
   en adelante es todo pantalla, y su primer test de UI no se puede escribir sin el helper.
+
+### Apuntes de la tanda 1 que no estaban en el spec
+
+- **Nombres del tipo de salida.** `design.md > 5.1` habla de `UnitCatalogResult`; se **conserva
+  `UnitListResult`**, que es el nombre que ya importan seis tests y que R4 protege, y se **añade
+  `UnitPageResult`** para la rama paginada. Es un cambio de nomenclatura del diseño, no de
+  contrato.
+- **Sin `as`:** las dos ramas de salida de `listUnitsAction` se separan con `isUnitPage(data)`, no
+  con una aserción de tipo.
+- **La contingencia de las sobrecargas queda DESCARTADA con evidencia.** El `backend_dev` no pudo
+  correr el build (el worktree venía sin dependencias). Tras instalarlas, el implementer corrió
+  `pnpm exec next build` en el worktree: `✓ Compiled successfully in 44s`, `Finished TypeScript in
+  24.8s`, doce rutas generadas. **El compilador de Server Actions acepta las declaraciones de
+  sobrecarga en un módulo `'use server'`**, así que el plan B de `design.md > 3`
+  (`listUnitsPageAction`) no se aplica y no hace falta anotarlo como desvío.
+- **Rojo heredado a tener en cuenta para la tarea diferida:**
+  `tests/unit/navegacion/private-layout-menu.test.tsx` ya está inscrito en
+  `tests/baseline-rojos.json` como deuda determinista de `dev` (`private-user-trigger`). Es uno de
+  los dos archivos que QC-58 está tocando y cuya tensión de anclas quedó diferida al final.
+- **Los `tests/integration/**` no corren en este worktree**: no hay `.env` ni `DATABASE_URL`
+  (`PrismaClientInitializationError`). No es un rojo de esta feature.
