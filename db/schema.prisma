@@ -98,6 +98,36 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+/// Estado de la cuenta de un usuario (QC-65, decisiones cerradas 1 y 2). Conjunto CERRADO en
+/// el propio esquema: anadir un quinto valor es una migracion (`ALTER TYPE ... ADD VALUE`), y
+/// el humano lo asumio a conciencia — este conjunto NO tiene que crecer sin desplegar.
+/// Se aparta del precedente de `DocumentType` (QC-4) y del catalogo `Unit` (QC-32), que son
+/// TABLAS porque debian crecer con un INSERT; sigue el de `OrderStatus` (QC-33).
+///
+/// Los valores van en INGLES y en minuscula, literalmente como los fijo la decision cerrada 1.
+/// Se apartan de `OrderStatus`/`OrderPriority`, que son MAYUSCULAS en espanol, a proposito:
+/// la decision escribe los cuatro nombres, y tener una segunda grafia («ACTIVE» en el codigo,
+/// «active» en la ficha) es exactamente la clase de traduccion silenciosa que se desincroniza.
+///
+/// QUE SIGNIFICA CADA UNO (decision cerrada 2):
+///   active   — la cuenta funciona.
+///   pending  — creada, aun no habilitada para entrar.
+///   inactive — apagada a proposito por un administrador. REVERSIBLE.
+///   blocked  — bloqueada por seguridad. Es LA MISMA COSA que el bloqueo por intentos
+///              fallidos de QC-19, pero QC-65 no los unifica: eso es QC-78.
+/// NADIE lee todavia este valor para decidir nada (R19).
+///
+/// El orden de declaracion NO significa nada aqui (a diferencia de `OrderPriority`), pero es
+/// el mismo de la decision cerrada 1 y el de `USER_ACCOUNT_STATUSES`
+/// (`lib/modules/identity/domain/account-status.ts`), que es la UNICA definicion del conjunto:
+/// asi el test puede compararlos con una igualdad ORDENADA y no con un conjunto.
+enum UserAccountStatus {
+  active
+  pending
+  inactive
+  blocked
+}
+
 /// Usuario del ERP. Borrado logico: `deletedAt` NULL = usuario vivo.
 ///
 /// OJO 0 — EL ROL DE UNA PERSONA VIVE EN ESTA TABLA, en `roleId`, y QC-47 NO lo mueve
@@ -157,6 +187,28 @@ model User {
   /// bloquea el acceso es QC-7; esta ficha solo la escribe.
   mustChangeCredential Boolean @default(false) @map("must_change_credential")
 
+  /// QC-65 (R1, R5). Estado de la cuenta. NOT NULL con `@default(pending)`: una cuenta nueva
+  /// nace PENDIENTE (decision cerrada 3), y la migracion deja en `active` a las filas que ya
+  /// existian (R6). SIN indice a proposito: hoy no hay ninguna consulta que filtre por el
+  /// (R19); el que haga falta lo anade quien estrene la consulta (QC-67).
+  accountStatus UserAccountStatus @default(pending) @map("account_status")
+
+  /// QC-65 (R8, R9). CUANDO cambio el estado por ultima vez. NOT NULL con `@default(now())`:
+  /// en una fila recien creada vale lo mismo que `createdAt`, y eso es correcto — el estado
+  /// cambio, de nada a `pending`, en ese instante.
+  accountStatusChangedAt DateTime @default(now()) @map("account_status_changed_at") @db.Timestamptz(6)
+
+  /// QC-65 (R10, R11, R12). QUIEN lo cambio. OPCIONAL: NULL significa «lo cambio el sistema,
+  /// no una persona» —el backfill de la migracion, el seed, y manana el bloqueo automatico de
+  /// QC-19 cuando QC-78 lo unifique—, nunca «se perdio el dato».
+  ///
+  /// OJO — es un ESCALAR uuid SIN `@relation`, y es deliberado (`design.md > 1.3`). La FK real
+  /// (`users_account_status_changed_by_fkey`, ON DELETE RESTRICT ON UPDATE CASCADE) vive
+  /// escrita A MANO en la migracion. Es DRIFT para Prisma: toda migracion futura de `users`
+  /// hay que revisarla a mano para que no emita su `DROP CONSTRAINT`, igual que ya pasa con
+  /// los tres indices unicos funcionales de QC-4.
+  accountStatusChangedBy String? @map("account_status_changed_by") @db.Uuid
+
   documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   company      Company      @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -164,6 +216,9 @@ model User {
   @@index([roleId], map: "users_role_id_idx")
   @@index([companyId], map: "users_company_id_idx")
   @@index([documentTypeCode], map: "users_document_type_code_idx")
+  /// QC-65 (R11, R12). El lado hijo de `users_account_status_changed_by_fkey`, que Postgres no
+  /// indexa solo: por ahi pasa la verificacion del RESTRICT en cada intento de borrado fisico.
+  @@index([accountStatusChangedBy], map: "users_account_status_changed_by_idx")
   @@map("users")
 }
 

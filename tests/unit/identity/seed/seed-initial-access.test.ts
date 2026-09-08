@@ -7,6 +7,10 @@
 // afirmar que el resto no ocurrio: un doble mal cableado que no recibe nada no debe
 // pasar en verde (`design.md > 11`, «la trampa que este repo ya piso dos veces»).
 
+import {
+  INITIAL_USER_ACCOUNT_STATUS,
+  SEED_ADMIN_ACCOUNT_STATUS,
+} from '@/lib/modules/identity/domain/account-status';
 import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
 import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
@@ -865,6 +869,40 @@ describe('seedInitialAccess', () => {
     expect(repository.permisosExistentes.size).toBe(PERMISSIONS.length);
     expect(repository.asignacionesExistentes.size).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
     expect(new Set(repository.asignacionesExistentes)).toEqual(new Set(asignacionesCompletas));
+  });
+
+  // Caso 18 (QC-65 R7) — el administrador inicial nace `active`, EXPLICITO.
+  it('el administrador inicial se crea con el estado de cuenta del seed, explicito y distinto del que nace por defecto', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    // Primero: la escritura SI ocurrio, una sola vez (un doble mal cableado no pasa en verde).
+    const creacionesDeAdmin = repository.llamadas.filter((llamada) => llamada.metodo === 'createInitialAdmin');
+    expect(creacionesDeAdmin).toHaveLength(1);
+    const input = creacionesDeAdmin[0]?.args[0] as Record<string, unknown>;
+
+    // El valor viaja en la MISMA llamada que crea al usuario —el puerto no tiene ningun
+    // metodo de actualizacion, asi que no hay forma de completarlo despues— y sale de la
+    // constante del dominio, no de un literal escrito aqui.
+    expect(input.accountStatus).toBe(SEED_ADMIN_ACCOUNT_STATUS);
+
+    // Y no es el estado con el que nace una cuenta cualquiera: si el dominio se limitara a
+    // heredar el `@default(pending)` de la columna, el administrador de instalacion quedaria
+    // fuera del sistema en cuanto QC-78 corte el login por estado (`design.md > 8`, riesgo 1).
+    expect(input.accountStatus).not.toBe(INITIAL_USER_ACCOUNT_STATUS);
+
+    // El ancla con la decision cerrada 4, y el UNICO sitio de este archivo donde se escribe el
+    // literal: si alguien cambia `SEED_ADMIN_ACCOUNT_STATUS`, este caso cae aqui.
+    expect(SEED_ADMIN_ACCOUNT_STATUS).toBe('active');
+    expect(INITIAL_USER_ACCOUNT_STATUS).toBe('pending');
+
+    // R10: quien lo cambio NO viaja. El administrador inicial lo crea el sistema, no una
+    // persona, y eso se escribe dejando la columna NULL — no pasando un id cualquiera.
+    expect(Object.keys(input)).not.toContain('accountStatusChangedBy');
   });
 
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos

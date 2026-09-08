@@ -261,6 +261,18 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         'lockLevel',
         'lockedUntil',
         'mustChangeCredential',
+        // RETENSADO 2026-09-08 (QC-65). El censo NO se afloja: sigue siendo una igualdad
+        // EXACTA -no un `toContain`-, y por eso hay que nombrar los TRES campos que QC-65
+        // anade a `users`: el estado de cuenta y el rastro de su ultimo cambio (`account_status`,
+        // `account_status_changed_at`, `account_status_changed_by`). Ninguno de los tres tiene
+        // nada que ver con la politica de credenciales de QC-19, que sigue siendo REGLA y no
+        // dato: las columnas del bloqueo (`failedLoginAttempts`, `lockLevel`, `lockedUntil`)
+        // siguen ahi arriba, intactas, y R18 de QC-65 lo exige con nombre propio.
+        // `accountStatusChangedBy` es un ESCALAR sin `@relation` (QC-65 `design.md > 1.3`), asi
+        // que NO aparece un cuarto campo de relacion en esta lista.
+        'accountStatus',
+        'accountStatusChangedAt',
+        'accountStatusChangedBy',
         'documentType',
         'role',
       ].sort(),
