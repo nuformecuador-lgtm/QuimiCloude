@@ -12,9 +12,9 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | pending | feature/QC-75-menu-y-rutas-por-permiso | **acotada y sembrada**. Lista para lanzar `spec_author` (F1.2) |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | pending | feature/QC-58-timeout-tests-ui-bajo-carga | worktree montado el 2026-09-07 (F1.0/F1.1) y **rebasado sobre `dev` unificado (`af5d258`)**: ya tiene QC-54 y QC-74. Decisión humana tomada: se acota con `/afinar-feature` antes de lanzar `spec_author` (F1.2) |
-| QC-45 | pantalla-de-presentaciones | Inventario | frontend | pending | feature/QC-45-pantalla-de-presentaciones | worktree montado el 2026-09-07 (F1.0/F1.1) desde `dev` LOCAL. **F1.2 en pausa**: su `description` dice que la forma de la pantalla se decide al acotar, así que se ofrece `/afinar-feature` antes de lanzar `spec_author` |
+| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | in_progress | feature/QC-75-menu-y-rutas-por-permiso | **spec aprobado el 2026-09-07**, tarjeta en *En curso*. `implementer` corriendo las 16 tasks (F2.1) |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **spec aprobado por el humano el 2026-09-08**, tarjeta en *En curso*. `implementer` corriendo las 14 tasks (F2.1) |
+| QC-45 | pantalla-de-presentaciones | Inventario | frontend | spec_ready | feature/QC-45-pantalla-de-presentaciones | **F1.2 hecha el 2026-09-07**: acotada, sembrada y spec escrito (36 EARS, 13 tasks, 0 preguntas abiertas nuevas). Tarjeta en *En revisión*. **Esperando aprobación humana (F1.4)** |
 | QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | in_progress | feature/QC-76-equivalencia-y-ambito-de-unidades | **spec aprobado por el humano el 2026-09-07** (F1.4). 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
@@ -416,6 +416,14 @@ que no puede ver ninguna pantalla»— y su alcance ya creció una vez (el login
 al dashboard). Los tres specs escritos sin acotar costaron una o dos rondas completas.
 
 Worktree desde `origin/dev` (`95b9b51`), que ya trae el merge de QC-74.
+
+**El spec destapó que la ficha se contradecía a sí misma.** La `description` decía que el E2E es
+«el Operador entra, ve un menú corto y **recibe 404 en inventario**», pero QC-74 siembra al Operador
+con exactamente `inventario.consultar`: inventario es justo lo único que SÍ puede ver, así que ese
+recorrido es imposible. `spec_author` no lo rellenó con un supuesto — lo dejó como pregunta abierta
+y conservó la forma del recorrido apuntando el 404 a `/pedidos` y el aterrizaje a `/inventario`. El
+humano lo confirmó al aprobar y **la descripción del board se corrigió** dejando por escrito la
+versión anterior y por qué era imposible.
 
 **Acotada con `/afinar-feature` el 2026-09-07**: cinco decisiones nuevas y cinco heredadas, y una
 sola pregunta abierta, en `specs/QC-75-menu-y-rutas-por-permiso/requirements.md` — no se releen
