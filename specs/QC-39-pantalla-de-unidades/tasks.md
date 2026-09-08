@@ -14,14 +14,14 @@
 
 ## T0 — Inventario de lo heredado (BLOQUEA todo lo demás)
 
-- [ ] Verificar en el worktree, **antes de escribir una línea**, que existen y funcionan: el layout
+- [x] Verificar en el worktree, **antes de escribir una línea**, que existen y funcionan: el layout
       privado con su `<main>` y su `<Toaster />`, `AppSidebar`, `PRIVATE_NAV_ITEMS` con la sección
       **Configuración ya creada**, `filterNavItemsByPermissions`, `requirePagePermission`,
       `components/shared/data-table/` con `cell: (row) => ReactNode`, las primitivas `table`,
       `sheet`, `alert-dialog`, `select`, `input`, `label`, `button`, `sonner`, `skeleton`, las
       **tres** Server Actions de escritura de `unidades`, `listUnitsAction`, `UNIT_QUERYABLE`,
       `isUnitPage`, `tests/helpers/viewport.ts` y Playwright.
-- [ ] Anotar en `progress/impl_QC-39-pantalla-de-unidades.md` la lista con su evidencia, y en
+- [x] Anotar en `progress/impl_QC-39-pantalla-de-unidades.md` la lista con su evidencia, y en
       particular **los archivos de `lib/modules/unidades/` que esta ficha PUEDE tocar** (los seis de
       `design.md > 1`) frente a los que no.
 - **Hecho cuando:** la nota existe y **no se ha creado ni modificado** ninguno de esos archivos.
@@ -31,19 +31,19 @@
 ## Bloque 1 — El contrato de lectura (va ANTES que todo lo demás)
 
 ### T1 — `UnitView`: el tipo y la proyección *(depende de T0)*
-- [ ] `lib/modules/unidades/domain/unit-view.ts` **NUEVO**: `UnitView = UnitRef & { baseUnitId,
+- [x] `lib/modules/unidades/domain/unit-view.ts` **NUEVO**: `UnitView = UnitRef & { baseUnitId,
       factor: string | null, isSystem: boolean }`, con el porqué de cada campo (`design.md > 2.1`).
-- [ ] `unit-prisma.ts`: `UNIT_SELECT` gana `baseUnitId`, `factor` y `companyId`; `toUnitRef` pasa a
+- [x] `unit-prisma.ts`: `UNIT_SELECT` gana `baseUnitId`, `factor` y `companyId`; `toUnitRef` pasa a
       `toUnitView` y deriva `isSystem = row.companyId === null` y `factor = row.factor?.toString() ??
       null`. **El `where`, el `orderBy`, el desempate, la búsqueda y el `count` no se tocan.**
-- [ ] `ports/unit-repository.ts` y `domain/list-units.ts`: **solo** los tipos de retorno
+- [x] `ports/unit-repository.ts` y `domain/list-units.ts`: **solo** los tipos de retorno
       (`UnitRef` → `UnitView`). El cuerpo de `createListUnits` **no cambia**.
-- [ ] `lib/modules/unidades/index.ts`: publica `type UnitView`. Nada más.
-- [ ] Test `tests/unit/unidades/unit-view-projection.test.ts`: la proyección incluye los seis campos
+- [x] `lib/modules/unidades/index.ts`: publica `type UnitView`. Nada más.
+- [x] Test `tests/unit/unidades/unit-view-projection.test.ts`: la proyección incluye los seis campos
       y **no** más; una unidad de sistema sale con `isSystem: true` y una de empresa con `false`; el
       identificador de empresa **no** aparece en la salida; una unidad base sale con `baseUnitId` y
       `factor` **ambos** `null` y una derivada con **los dos** presentes; el factor es `string`.
-- [ ] Test `tests/unit/unidades/modulo-intacto.test.ts`: comparado con la rama base, **no cambian**
+- [x] Test `tests/unit/unidades/modulo-intacto.test.ts`: comparado con la rama base, **no cambian**
       `unit-catalog-prisma.ts`, `create-unit.ts`, `update-unit.ts`, `delete-unit.ts`,
       `unit-input.ts`, `errors.ts`, `actor.ts`, `unit-queryable.ts`, `convert-quantity.ts` ni
       `db/schema.prisma`; y `UNIT_QUERYABLE` sigue siendo `{ sortable: ['name','symbol','createdAt'],
@@ -52,15 +52,15 @@
       `tests/unit/unidades/` **siguen verdes sin editarlos** salvo para tensar un ancla.
 
 ### T2 — Abrir el parámetro de `listUnitsAction` *(depende de T1)*
-- [ ] `adapters/driving/unit-actions.ts`: `listUnitsAction` acepta la consulta y la pasa **tal cual**
+- [x] `adapters/driving/unit-actions.ts`: `listUnitsAction` acepta la consulta y la pasa **tal cual**
       al caso de uso, con las dos sobrecargas de `design.md > 3`. `currentActor`, `toErrorState` y
       las tres actions de escritura **no se tocan**. Se retira el comentario que difería esto a
       QC-39 y se sustituye por lo que hace ahora.
-- [ ] Test `tests/unit/unidades/list-units-action.test.ts`: sin argumentos devuelve el catálogo
+- [x] Test `tests/unit/unidades/list-units-action.test.ts`: sin argumentos devuelve el catálogo
       (array) y llama al caso de uso con `undefined`; con `{ page, pageSize }` devuelve una página
       con `total` y `totalPages` y le pasa la consulta **sin traducir**; un error de dominio se
       traduce a `{ status:'error', code }` con el **código** de la clase; un error ajeno se relanza.
-- [ ] Test `tests/unit/unidades/consumidores-catalogo.test.tsx`: el selector de unidad del formulario
+- [x] Test `tests/unit/unidades/consumidores-catalogo.test.tsx`: el selector de unidad del formulario
       de recetas y el del detalle de proveedor **renderizan con datos de `UnitView`** y sus archivos
       **no han cambiado** respecto a la rama base (R4).
 - **Hecho cuando:** los dos tests en verde y `pnpm typecheck` en verde **sin haber editado ni un
