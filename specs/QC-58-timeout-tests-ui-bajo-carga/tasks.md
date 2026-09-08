@@ -70,12 +70,18 @@ de tocar nada, es lo que verifica R9.
 - Archivos: `tests/ui/login-form-uncontrolled-warning.test.tsx`.
 - Cubre: R6, R9.
 
-### [ ] T4c. [P] `tests/unit/shared/` — 5 archivos
+### [x] T4c. [P] `tests/unit/shared/` — 5 archivos
 - Archivos: `tests/unit/shared/data-table-filter-date.test.tsx`,
   `tests/unit/shared/data-table-filters.test.tsx`,
   `tests/unit/shared/data-table-header-menu.test.tsx`,
   `tests/unit/shared/data-table-pagination.test.tsx`,
   `tests/unit/shared/data-table-viewport.test.tsx`.
+- **DESBLOQUEADA Y CERRADA (2026-09-08).** El fallo intermitente de `data-table-pagination.test.tsx`
+  (~1 de cada 3, `pointer-events: none` sobre `data-table-page-size-<n>`) se resolvió con la
+  **decisión cerrada n.º 9**: el test espera explícitamente a que la opción deje de tener
+  `pointer-events: none` antes de pincharla (`findByTestId` + `waitFor`). **No se relajó ni se borró
+  ninguna aserción** y el archivo no salió de la migración. R9 se reformuló en `requirements.md`
+  para recoger que esto es un cambio deliberado, no un incumplimiento.
 - Cubre: R6, R9.
 
 ### [x] T4d. [P] `tests/unit/pedidos-ui/` — 8 archivos
@@ -88,21 +94,23 @@ de tocar nada, es lo que verifica R9.
   casos, los mismos que antes), pero `data-table-pagination.test.tsx` pasó a fallar de forma
   **intermitente** (~1 de cada 3 en aislado) con `Unable to perform pointer interaction as the
   element has 'pointer-events: none'` en `data-table-page-size-25`. El archivo original pasa 5/5.
-  Es la misma causa que T4e: ver el bloqueo escrito en la bitácora.
+  Es la misma causa que T4e: ver el bloqueo escrito en la bitácora. **Nota (2026-09-08):** ese
+  archivo pertenece a **T4c**, no a esta task —la nota se escribió en la casilla equivocada—, y ahí
+  queda anotado cómo se resolvió. Ningún archivo de `pedidos-ui/` estuvo afectado.
 - Cubre: R6, R9.
 
-### [ ] T4e. [P] `tests/unit/proveedores-ui/` — 5 archivos
+### [x] T4e. [P] `tests/unit/proveedores-ui/` — 5 archivos
 - Archivos: `catalog-line-sheet`, `delete-catalog-line-dialog`, `supplier-detail-page`,
   `supplier-page`, `unit-select` (todos `.test.tsx` bajo `tests/unit/proveedores-ui/`).
 - Dos de estos tres archivos rojos del baseline salen de aquí: al terminar la task se corren
   `catalog-line-sheet` y `supplier-page` **solos** y se anota el resultado, que es la línea base
   para T9. **Hecho: 50/50 en verde**, que es exactamente lo que el baseline decía de esos dos.
-- **BLOQUEADA (2026-09-08).** La migración está hecha y el conteo se conserva (147 casos), pero
-  `unit-select.test.tsx` pasó a fallar **de forma determinista, 6 de 6 corridas**, con
-  `pointer-events: none` sobre `unit-option-none`. El archivo original pasa 3/3. Esto incumple R9
-  («ninguna aserción debe relajarse, el comportamiento observable no debe cambiar») y choca con la
-  decisión cerrada n.º 3, así que **no se improvisa una salida**: el bloqueo está descrito en la
-  bitácora con las tres opciones y espera decisión humana.
+- **DESBLOQUEADA Y CERRADA (2026-09-08).** El fallo determinista de `unit-select.test.tsx`
+  (`pointer-events: none` sobre `unit-option-none` y sobre la primera `unit-option`) se resolvió con
+  la **decisión cerrada n.º 9**, igual que T4c: los dos casos que pinchan una opción esperan
+  explícitamente a que deje de tener `pointer-events: none`. **No se relajó ni se borró ninguna
+  aserción**, no se añadió ninguna excepción a la guardia y el archivo sigue migrado a `setupUser()`.
+  Conteo intacto: 9 casos antes y 9 después.
 - Cubre: R6, R9.
 
 ### [x] T4f. [P] `tests/unit/recetas-ui/` + `tests/unit/inventario/` — 6 archivos
@@ -121,11 +129,13 @@ de tocar nada, es lo que verifica R9.
 
 ## Bloque C — La guardia, y probar que muerde
 
-### [ ] T5. Cerrar la migración con un `--rapido`
+### [x] T5. Cerrar la migración con un `--rapido`
 - Dep: T1, T2, T3, T4a–T4f.
 - Archivos: ninguno (verificación).
 - **Hecho cuando:** `./init.sh --rapido` termina en verde. Si no, se arregla antes de escribir la
   guardia: una guardia escrita sobre un árbol a medias mide otra cosa.
+- **Hecho el 2026-09-08**, después de aplicar la decisión n.º 9: `SALIDA=0`, 34 archivos y 454 casos
+  del grafo del cambio en verde + las 21 guardias (204 casos). Salida pegada en la bitácora.
 
 ### [x] T6. Escribir la guardia `guard-teclear-y-plazo`
 - Dep: T5.

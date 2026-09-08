@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 
 import { DataTablePagination } from '@/components/shared/data-table/data-table-pagination';
@@ -33,6 +33,22 @@ const texts: DataTableTexts = {
   lastMonth: 'ultimo mes',
   lastYear: 'ultimo año',
 };
+
+/**
+ * Espera a que una opcion del popup sea INTERACTIVA antes de pincharla (QC-58, decision cerrada
+ * n.º 9 del 2026-09-08).
+ *
+ * El popup de Base UI entra con `pointer-events: none` y lo suelta un tick despues. Antes lo
+ * tapaba el `setTimeout(0)` que `user-event` intercalaba entre eventos; con la sesion compartida
+ * (`delay: null`) ese respiro hay que pedirlo explicito. **No se relaja ninguna comprobacion**:
+ * `user-event` sigue negandose a pinchar un elemento tapado, y esto solo espera a que deje de
+ * estarlo — la precondicion de la que el test dependia ya, sin decirlo. Sin esto el caso fallaba
+ * ~1 de cada 3 corridas, que es peor que fallar siempre.
+ */
+async function esperarInteractiva(opcion: HTMLElement): Promise<HTMLElement> {
+  await waitFor(() => expect(opcion).not.toHaveStyle({ pointerEvents: 'none' }));
+  return opcion;
+}
 
 describe('DataTablePagination', () => {
   it('deshabilita retroceder en la primera pagina', () => {
@@ -155,7 +171,8 @@ describe('DataTablePagination', () => {
     );
 
     await user.click(screen.getByTestId('data-table-page-size'));
-    await user.click(screen.getByTestId(`data-table-page-size-${otherOption}`));
+    const opcion = await screen.findByTestId(`data-table-page-size-${otherOption}`);
+    await user.click(await esperarInteractiva(opcion));
 
     expect(onParamsChange).toHaveBeenCalledTimes(1);
     expect(onParamsChange).toHaveBeenCalledWith({ ...params, page: 1, pageSize: otherOption });

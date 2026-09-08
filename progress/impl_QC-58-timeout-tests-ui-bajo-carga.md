@@ -6,17 +6,63 @@
 
 ## Veredicto corto
 
-**12 de 17 tasks cerradas. La ficha NO está lista para PR: hay un bloqueo que necesita decisión
-humana** porque choca de frente con la decisión cerrada n.º 3 y con R9. Está descrito entero en
-`## BLOQUEO` más abajo. Todo lo demás —el plazo, el helper, la guardia probada con cuatro
-mutaciones, la sonda de ejecución, el baseline y el rastro escrito— está hecho y verificado.
+**Actualizado el 2026-09-08, segunda tanda.** El bloqueo está **resuelto** con la decisión humana de
+ese día (salida 2 de las tres que se propusieron): T4c y T4e cerradas, y **T5 en verde**. Van
+**15 de 17 tasks**. Quedan sólo **T11** (las cinco corridas de la batería completa) y **T12**
+(cierre de bitácora), que **corre el leader, no el implementer**.
 
-Sin resolver el bloqueo **no tiene sentido correr T11** (las cinco corridas de la batería
-completa): se sabe de antemano que saldría roja por `unit-select.test.tsx`.
+> *Lo que decía esta sección en la primera tanda:* «12 de 17 tasks cerradas. La ficha NO está lista
+> para PR: hay un bloqueo que necesita decisión humana porque choca de frente con la decisión
+> cerrada n.º 3 y con R9. Sin resolver el bloqueo no tiene sentido correr T11: se sabe de antemano
+> que saldría roja por `unit-select.test.tsx`.» Se conserva porque el camino importa: el bloqueo
+> existió y se paró en él en vez de improvisar.
+
+Todo lo demás —el plazo, el helper, la guardia probada con cuatro mutaciones, la sonda de ejecución,
+el baseline y el rastro escrito— seguía hecho y verificado desde la primera tanda.
 
 ---
 
-## BLOQUEO (para el leader / el humano)
+## BLOQUEO — RESUELTO el 2026-09-08 (decisión humana)
+
+### Cómo se resolvió, y quién lo decidió
+
+**Lo decidió el humano el 2026-09-08**, eligiendo la **salida 2** de las tres que esta bitácora
+había propuesto: **esperar explícitamente a que la opción sea interactiva antes de pincharla**, en
+los dos archivos afectados. Queda escrito en `requirements.md > Decisiones cerradas` como la
+**novena** fila. Lo que la decisión fija:
+
+- Los dos archivos **siguen migrados** a `setupUser()`. No se saca ninguno de la migración.
+- **No se añade ninguna excepción** a `EXCEPCIONES_DECLARADAS` de la guardia: siguen siendo tres
+  (el helper, `async-autocomplete` y el propio archivo de la guardia). Pasar de 1 a 3 excepciones
+  habría erosionado justo lo que la ficha compra.
+- **No se reabre la decisión cerrada n.º 3**: `delay: null` y helper sin parámetros, intactos.
+- **No se relaja ni se borra ninguna aserción.** Se *añade* una espera a la precondición.
+
+Forma aplicada, en los dos archivos (helper local `esperarInteractiva`, con su comentario):
+
+```ts
+await user.click(disparador);
+const opcion = await screen.findByTestId('unit-option-none');
+// El popup de Base UI entra con pointer-events: none y lo suelta un tick despues. Antes lo
+// tapaba el setTimeout(0) que user-event intercalaba; con delay: null hay que pedirlo explicito.
+await waitFor(() => expect(opcion).not.toHaveStyle({ pointerEvents: 'none' }));
+await user.click(opcion);
+```
+
+`toHaveStyle` es de `jest-dom`, que el proyecto `ui` ya carga en `tests/setup.ts`: **no entra
+ninguna dependencia nueva**. En `unit-select.test.tsx` son **dos** los casos que pinchan una opción
+(la primera unidad y «sin unidad»), no uno: los dos llevan la espera.
+
+**Resultado medido** (`pnpm exec vitest run` de los dos archivos, tres corridas seguidas):
+`2 passed | 17 tests passed` en las tres. El intermitente de `data-table-pagination` no reapareció.
+
+Y **R9 se reformuló** en `requirements.md` para que esto conste como cambio deliberado y aprobado en
+vez de como incumplimiento, dejando por escrito la redacción anterior y por qué cambia
+(`requirements.md > R9 — la versión anterior y por qué cambia`).
+
+---
+
+### El problema original, tal como se describió (se conserva)
 
 ### Qué pasa
 
@@ -77,6 +123,8 @@ instante.
 
 **No he tocado ninguna de las tres.** Los dos archivos están migrados y `unit-select` está rojo,
 que es el estado que refleja fielmente el problema.
+
+*(Hasta aquí la descripción original. La elegida fue la 2; ver arriba.)*
 
 ---
 
@@ -171,9 +219,9 @@ verificable que la migración no perdió ni cambió ningún caso.
 | Bloque | Carpeta | Casos ANTES | Casos DESPUÉS | ¿Igual? |
 | --- | --- | --- | --- | --- |
 | T4a+T4b | 7 de `tests/unit/` + `tests/ui/` | **89** (89 ok) | **89** (89 ok) | sí |
-| T4c | `tests/unit/shared/` (13 archivos) | **149** (149 ok) | **149** (148 ok, 1 rojo) | conteo sí, **color no** |
+| T4c | `tests/unit/shared/` (13 archivos) | **149** (149 ok) | **149** (149 ok tras el arreglo del 2026-09-08; antes 148 ok + 1 rojo intermitente) | sí |
 | T4d | `tests/unit/pedidos-ui/` (16 archivos) | **166** (163 ok, 3 skip) | **166** (163 ok, 3 skip) | sí |
-| T4e | `tests/unit/proveedores-ui/` (12 archivos) | **147** (143 ok, 4 skip) | **147** (142 ok, 4 skip, 1 rojo) | conteo sí, **color no** |
+| T4e | `tests/unit/proveedores-ui/` (12 archivos) | **147** (143 ok, 4 skip) | **147** (143 ok, 4 skip, tras el arreglo del 2026-09-08; antes 142 ok + 1 rojo determinista) | sí |
 | T4f | 5 de `recetas-ui/` + `inventario/product-page` | **122** (122 ok) | incluido en los 450 de abajo, sin rojos | sí |
 | — | `async-autocomplete` (no migrado) | **10** (10 ok) | **10** (10 ok) | sí |
 
@@ -220,10 +268,10 @@ guardia y con la prueba de que esa guardia muerde, no con un test de producto.
 | **R3** | El plazo rige **en ejecución**, y la sonda no se queda | Sondas de T8 (salida abajo). Los 3 archivos **borrados**, `git status` limpio | ✅ con evidencia |
 | **R4** | No tocar workers ni `fileParallelism` | `git diff vitest.config.mts`: sólo entran 3 `testTimeout` + comentarios | ✅ |
 | **R5** | Una única definición compartida, con su comentario | `tests/helpers/user-event.ts` | ✅ |
-| **R6** | Todo test la usa; nadie llama a `setup()` por su cuenta | `guard-teclear-y-plazo.test.ts` > «ningun test abre su propia sesion…» | ⚠️ verde, pero ver BLOQUEO |
+| **R6** | Todo test la usa; nadie llama a `setup()` por su cuenta | `guard-teclear-y-plazo.test.ts` > «ningun test abre su propia sesion…» (21 archivos de guardias, 204 casos verdes en `./init.sh --rapido` del 2026-09-08) | ✅ verde — el bloqueo que arrastraba esta fila está resuelto y **sin excepciones nuevas**: siguen siendo las 3 de siempre |
 | **R7** | Falla nombrando el archivo, desde las guardias | mismo caso. **Mordida probada:** mutación 4 de T7 | ✅ verde y muerde |
 | **R8** | `async-autocomplete` conserva su retardo, declarado y listado | comentario ampliado en el archivo + `EXCEPCIONES_DECLARADAS` de la guardia + caso «el recorrido de tests/ no se ha quedado vacio», que verifica que las 3 excepciones existen | ✅ verde |
-| **R9** | La migración no cambia el comportamiento observable | tabla de conteos de arriba | ❌ **incumplido en 2 archivos** — es el BLOQUEO |
+| **R9** *(reformulado 2026-09-08)* | La migración no cambia **lo que se prueba del componente**; donde un test dependía sin decirlo del `setTimeout(0)`, espera explícitamente la precondición y **no sustituye ninguna aserción** | tabla de conteos de arriba (mismos casos por archivo, cero `skip`/`todo` nuevos) + `unit-select.test.tsx` y `data-table-pagination.test.tsx`, 17/17 en tres corridas seguidas + `./init.sh --rapido` 454/454 | ✅ verde |
 | **R10** | Fuera las 3 entradas de esta causa | `tests/baseline-rojos.json` | ✅ (retiradas) |
 | **R11** | Las 2 estructurales se quedan, con el motivo de `recipe-route-contract` corregido | `tests/baseline-rojos.json` | ✅ |
 | **R12** | Cada entrada con `motivo` y `desde`; comparación por archivo | `node scripts/comparar-baseline-rojos.mjs` (salida abajo) | ✅ verde |
@@ -234,7 +282,8 @@ guardia y con la prueba de que esa guardia muerde, no con un test de producto.
 | **R17** | Cero archivos de producción | comprobación de alcance de arriba | ✅ |
 | **R18** | Sin E2E, con motivo escrito | apartado «E2E» de arriba | ✅ |
 
-**Resumen: 14 de 18 con evidencia verde, 1 incumplido (R9) y 3 pendientes de T11 (R13, R14, R15).**
+**Resumen (2026-09-08, segunda tanda): 15 de 18 con evidencia verde, 0 incumplidos y 3 pendientes de
+T11 (R13, R14, R15), que corre el leader.** En la primera tanda eran 14 verdes y 1 incumplido (R9).
 
 ---
 
@@ -370,7 +419,38 @@ guardias, y **sólo** los archivos que el cambio toca o puede romper.
 | `pnpm exec vitest run tests/guards/guard-teclear-y-plazo.test.ts` | ✅ 4/4 |
 | `pnpm exec vitest run <los 33 archivos migrados>` | ⚠️ **450 casos, 449 verdes, 1 rojo** (`unit-select`) |
 | `pnpm exec vitest run _sonda-plazo` | ✅ 3/3 con 15000, ❌ 3/3 con 5000 (contrafáctico) |
-| `./init.sh --rapido` (T5) | ⏸ **no lo corrí**: con `unit-select` en rojo mide un árbol a medias, y T5 existe precisamente para no escribir la guardia sobre eso. La guardia igualmente se probó a mano con las 4 mutaciones. |
+| `./init.sh --rapido` (T5) — **primera tanda** | ⏸ **no lo corrí**: con `unit-select` en rojo mide un árbol a medias, y T5 existe precisamente para no escribir la guardia sobre eso. La guardia igualmente se probó a mano con las 4 mutaciones. |
+
+### Segunda tanda (2026-09-08, tras la decisión humana)
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm exec vitest run tests/unit/proveedores-ui/unit-select.test.tsx tests/unit/shared/data-table-pagination.test.tsx` ×3 | ✅ **2 archivos, 17 casos verdes** en las tres corridas seguidas (el intermitente no reapareció) |
+| **`./init.sh --rapido` (T5)** | ✅ **verde, `SALIDA=0`** |
+
+Salida real de T5, recortada a lo que decide (`./init.sh --rapido`, 2026-09-08):
+
+```
+✓ typecheck paso
+✓ lint paso
+-> pnpm run test:rapido
+[test:rapido] tests relacionados con 35 archivo(s) del diff vs origin/dev
+ Test Files  34 passed (34)
+      Tests  454 passed (454)
+   Duration  115.87s
+[test:rapido] todas las guardias
+ Test Files  21 passed (21)
+      Tests  204 passed | 4 skipped (208)
+   Duration  4.09s
+✓ test:rapido paso
+! modo rapido: solo los tests relacionados con tus cambios + las guardias.
+! Antes de abrir el PR corre './init.sh' sin flags.
+✓ todas las migraciones tienen down.sql
+== init OK ==
+```
+
+Los **34 archivos / 454 casos** son el grafo del cambio: los 33 migrados más el helper y la guardia.
+En la primera tanda ese mismo conjunto daba **449 verdes y 1 rojo**.
 
 Salida real de las guardias, que es lo que valida la mitad nueva del gate:
 
@@ -385,9 +465,14 @@ $ pnpm run test:guardias
 
 ## Qué falta, y en qué orden
 
-1. **Decidir el bloqueo** (arriba, tres opciones). Es humano, no mío.
-2. **T4c y T4e** quedan abiertas hasta que esa decisión se aplique.
-3. **T5**: `./init.sh --rapido` en verde.
+*Actualizado el 2026-09-08: los tres primeros puntos ya están hechos y se tachan; queda lo del
+leader.*
+
+1. ~~**Decidir el bloqueo** (arriba, tres opciones). Es humano, no mío.~~ **Hecho**: salida 2,
+   decidida por el humano el 2026-09-08.
+2. ~~**T4c y T4e** quedan abiertas hasta que esa decisión se aplique.~~ **Cerradas**, con R9
+   reformulado en `requirements.md`.
+3. ~~**T5**: `./init.sh --rapido` en verde.~~ **Verde** (salida arriba).
 4. **T11**: las cinco corridas de `./init.sh` completo, con el comando, la fecha y la salida del
    comparador de cada una (R14) — y sin contar las que traigan la colisión de correlativo de
    `order-repository.int.test.ts`, que es **QC-77** y no se arregla ni se añade al baseline aquí (R15).

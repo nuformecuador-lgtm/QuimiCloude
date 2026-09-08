@@ -76,9 +76,42 @@ DEBE conservar ese retardo, DEBE dejar escrito en el propio archivo por qué es 
 listarlo como excepción nombrada de R7, de forma que quitarlo en el futuro sea una decisión y no
 un descuido.
 
-**R9.** La migración a la definición compartida NO DEBE cambiar el comportamiento observable de
-los tests migrados: el número de casos ejecutados por archivo DEBE ser el mismo antes y después,
-ninguno DEBE quedar en `skip` ni en `todo`, y ninguna aserción DEBE relajarse.
+**R9.** *(Reformulado el 2026-09-08 durante la implementación. La redacción anterior se conserva
+íntegra abajo, en «R9 — la versión anterior y por qué cambia».)* La migración a la definición
+compartida NO DEBE cambiar **lo que los tests migrados prueban del componente**: el número de casos
+ejecutados por archivo DEBE ser el mismo antes y después, ninguno DEBE quedar en `skip` ni en
+`todo`, y ninguna aserción DEBE relajarse ni borrarse. DONDE un test dependiera sin decirlo del
+`setTimeout(0)` que `user-event` intercalaba entre eventos —hoy exactamente
+`tests/unit/proveedores-ui/unit-select.test.tsx` y `tests/unit/shared/data-table-pagination.test.tsx`,
+que pinchan una opción de un popup de Base UI mientras aún lleva `pointer-events: none`—, el test
+DEBE pasar a **esperar explícitamente esa precondición** antes de pinchar, y esa espera NO DEBE
+sustituir a ninguna comprobación existente: se añade a las que ya había.
+
+#### R9 — la versión anterior y por qué cambia
+
+**Decía, hasta el 2026-09-08:**
+
+> **R9.** La migración a la definición compartida NO DEBE cambiar el comportamiento observable de
+> los tests migrados: el número de casos ejecutados por archivo DEBE ser el mismo antes y después,
+> ninguno DEBE quedar en `skip` ni en `todo`, y ninguna aserción DEBE relajarse.
+
+**Por qué cambia.** Con esa redacción, los dos archivos de arriba quedaban marcados como
+**incumplimiento** —así lo dejó anotado la bitácora del implementer—, y no lo son. Al quitar el
+retardo entre teclas esos dos casos empezaron a fallar con `Unable to perform pointer interaction as
+the element has 'pointer-events: none'`. No es una regresión del producto ni una comprobación
+relajada: es exactamente lo contrario. La comprobación de `pointer-events` de `user-event` **siempre
+estuvo activa**, pero nunca llegaba a morder porque el `setTimeout(0)` que `user-event` intercalaba
+—una espera que nadie había pedido y que la decisión cerrada n.º 3 quita a propósito— le daba al
+popup el tick que necesitaba para volverse interactivo. Esos dos tests **pasaban por accidente**.
+
+El humano decidió el 2026-09-08 (decisión cerrada n.º 9) esperar explícitamente a esa precondición
+en vez de declarar los dos archivos como excepción. Con eso, lo que ocurre en los dos archivos deja
+de ser un incumplimiento de R9 y pasa a ser un **cambio deliberado y aprobado**: el cuerpo del test
+cambia, el comportamiento del componente que se prueba no. R9 se reescribe para decir eso —«no
+cambia lo que se prueba del componente»— en vez de «no cambia el comportamiento observable del
+test», que era una vara que confundía las dos cosas y que habría obligado a conservar una dependencia
+oculta sólo porque estaba ahí. **No se borra la versión anterior**: se anota, porque la diferencia
+entre las dos redacciones es justo la lección de esta ficha.
 
 ### El baseline de rojos
 
@@ -147,6 +180,7 @@ requisito que la hace testeable. Ninguna queda sin `R<n>`.
 | 6 | Se retiran las tres entradas de esta causa; las dos estructurales se quedan con el motivo corregido | R10, R11, R12 |
 | 7 | La `zone` sigue siendo `frontend` | R17 |
 | 8 | La colisión de correlativo es QC-77 y no entra aquí | R15 |
+| 9 | Los dos tests que dependían del retardo esperan explícitamente a que la opción sea interactiva | R9 (reformulado el 2026-09-08; ver «R9 — la versión anterior y por qué cambia») |
 
 Y dos requisitos que no salen de la tabla sino del propio alcance: **R4** (bajar los procesos de
 trabajo está descartado y medido, así que se prohíbe explícitamente para que no vuelva de tapadillo)
