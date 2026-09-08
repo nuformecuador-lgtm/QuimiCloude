@@ -85,6 +85,21 @@ export const ORDERS_ROUTE = '/pedidos';
  */
 export const PRESENTATIONS_ROUTE = '/configuracion/presentaciones';
 
+/**
+ * Pantalla del catalogo de unidades de medida (QC-39, R8). La hermana que el comentario de
+ * `PRESENTATIONS_ROUTE` ya anunciaba: el segmento `configuracion` sigue sin tener constante
+ * propia porque sigue sin haber pantalla en esa URL.
+ *
+ * **Todavia NO esta en `PRIVATE_ROUTE_PREFIXES`, y no es un olvido.** La entrada del prefijo se
+ * anade en la MISMA tanda que `app/(private)/configuracion/unidades/page.tsx` (T3 + T8 de
+ * `tasks.md`): `guard-rutas-privadas-cubiertas` compara la lista de prefijos con las carpetas que
+ * tienen `page.tsx` bajo `app/(private)/` y pone el gate en rojo en los DOS sentidos —prefijo sin
+ * pantalla y pantalla sin prefijo—, asi que las dos cosas tienen que entrar juntas. Esta
+ * constante se declara antes porque `unitListHref` deriva de ella (R8) y no puede escribir la URL
+ * como literal.
+ */
+export const UNITS_ROUTE = '/configuracion/unidades';
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
