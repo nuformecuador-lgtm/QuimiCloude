@@ -4,17 +4,9 @@ import { MoonIcon, SunIcon } from 'lucide-react';
 
 import { useFallbackThemeState, useOptionalTheme } from '@/components/shared/theme-provider';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import type { ThemePreference } from '@/lib/shared/ui/theme-state';
 
 /**
- * Nombre accesible del disparador del control de tema (R13, R23, R31).
+ * Nombre accesible del control de tema (R13, R23, R31).
  *
  * Constante de modulo y no un literal suelto en el JSX, siguiendo el mismo precedente que
  * `SIDEBAR_TOGGLE_LABEL` (`app/(private)/components/sidebar-toggle.tsx`): los tests citan la
@@ -22,39 +14,30 @@ import type { ThemePreference } from '@/lib/shared/ui/theme-state';
  */
 export const THEME_TOGGLE_LABEL = 'Cambiar tema';
 
-/** Nombre accesible de la opcion «claro» del control de tema (R14). */
-export const THEME_OPTION_LIGHT_LABEL = 'Claro';
-
-/** Nombre accesible de la opcion «oscuro» del control de tema (R14). */
-export const THEME_OPTION_DARK_LABEL = 'Oscuro';
-
-/** Nombre accesible de la opcion «sistema» del control de tema (R14). */
-export const THEME_OPTION_SYSTEM_LABEL = 'Sistema';
-
 /**
  * Control de tema del encabezado privado (R8, R13, R14, R15, R16, `design.md > 5`).
  *
- * **Por que un grupo de radio y no un boton que cicla entre modos.** Un boton que alterna
- * `claro -> oscuro -> sistema -> claro` en cada clic no deja ver las otras dos opciones sin
- * pulsarlo antes: no se descubren por exploracion. Un `DropdownMenuRadioGroup` muestra las
- * tres a la vez y ademas da gratis el «cual esta seleccionada» programatico que exige R14
- * (`aria-checked` / `role="menuitemradio"` de la primitiva) — con el boton que cicla habria
- * que fabricar esa señal a mano.
+ * **ENMIENDA DEL 2026-09-07 (decision humana): es un INTERRUPTOR de dos estados, no un menu de
+ * tres opciones.** Un clic alterna claro <-> oscuro y ya. La tercera opcion, «sistema», deja de
+ * ser algo que el usuario elige y pasa a ser el PUNTO DE PARTIDA: mientras nadie haya tocado el
+ * control, la preferencia guardada es `system` y el modo sale del sistema operativo -incluidos
+ * sus cambios en vivo, que `ThemeProvider` sigue escuchando (R17)-. El primer clic la fija.
  *
- * `useTheme()` es el de **nuestro** proveedor (`components/shared/theme-provider.tsx`), no
- * una libreria de terceros (R28, D9).
+ * Lo que se pierde, dicho sin adornos: una vez fijado un modo, desde este control **ya no se
+ * puede volver a «seguir al sistema»** (habria que borrar la cookie de UI). Es el precio de un
+ * control de un solo gesto, y es la decision que se pidio.
  *
- * Nota de API: `DropdownMenu*` son primitivas Base UI, no Radix (mismo detalle que documenta
- * `components/private/app-sidebar.tsx`): la composicion del disparador se hace con la prop
- * `render`, no con `asChild`.
+ * `useTheme()` es el de **nuestro** proveedor (`components/shared/theme-provider.tsx`), no una
+ * libreria de terceros (R28, D9).
  *
- * **Icono sol/luna sin `mounted` ni render condicional en JS.** Los dos iconos se pintan
- * siempre y se alterna su visibilidad con la variante `dark:` de Tailwind (`scale-0` /
- * `scale-100`), igual que dicta `design.md > 5`: asi el HTML de servidor y el de cliente son
- * identicos byte a byte y no hay ni discrepancia de hidratacion (R12) ni parpadeo del icono en
- * el primer fotograma. Elegir el icono en JS (por ejemplo con un `useState` + `useEffect` que
- * detecte el montaje) forzaria un segundo render solo-cliente, que es exactamente el patron
- * que R12 prohibe.
+ * **Nada de lo que se PINTA depende del modo resuelto, y no es un detalle** (R12): el marcado
+ * que sale del servidor y el que hidrata el cliente son identicos byte a byte. Los dos iconos se
+ * pintan siempre y se alterna su visibilidad con la variante `dark:` de Tailwind (`scale-0` /
+ * `scale-100`), como ya dictaba `design.md > 5`; y el nombre accesible es una constante, no una
+ * frase que cambie con el modo. El modo solo se consulta DENTRO del manejador de clic, que corre
+ * despues de hidratar: por eso este control no puede producir ni discrepancia de hidratacion ni
+ * parpadeo, que es justo lo que R12 prohibe. Un `aria-pressed` calculado en el render, o una
+ * etiqueta del tipo «cambiar a oscuro», habrian reintroducido las dos cosas.
  */
 export function ThemeToggle() {
   // `useOptionalTheme` (no `useTheme`) a proposito: ver el docblock de
@@ -68,42 +51,21 @@ export function ThemeToggle() {
   const context = useOptionalTheme();
   const fallback = useFallbackThemeState({ active: context === null });
 
-  const { preference, setPreference } = context ?? fallback;
+  const { resolved, setPreference } = context ?? fallback;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="outline"
-            className="relative size-11"
-            aria-label={THEME_TOGGLE_LABEL}
-            data-testid="theme-toggle-trigger"
-          />
-        }
-      >
-        <SunIcon aria-hidden="true" className="scale-100 transition-none dark:scale-0" />
-        <MoonIcon
-          aria-hidden="true"
-          className="absolute scale-0 transition-none dark:scale-100"
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" data-testid="theme-toggle-content">
-        <DropdownMenuRadioGroup
-          value={preference}
-          onValueChange={(value) => setPreference(value as ThemePreference)}
-        >
-          <DropdownMenuRadioItem value="light" data-testid="theme-toggle-option-light">
-            {THEME_OPTION_LIGHT_LABEL}
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark" data-testid="theme-toggle-option-dark">
-            {THEME_OPTION_DARK_LABEL}
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="system" data-testid="theme-toggle-option-system">
-            {THEME_OPTION_SYSTEM_LABEL}
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant="outline"
+      className="relative size-11"
+      aria-label={THEME_TOGGLE_LABEL}
+      data-testid="theme-toggle-trigger"
+      // El modo se lee AQUI y no en el render (ver el docblock): `resolved` es el efectivo, asi
+      // que partiendo de `system` el primer clic va al contrario de lo que el usuario esta
+      // viendo, no al contrario de una preferencia que aun no ha elegido.
+      onClick={() => setPreference(resolved === 'dark' ? 'light' : 'dark')}
+    >
+      <SunIcon aria-hidden="true" className="scale-100 transition-none dark:scale-0" />
+      <MoonIcon aria-hidden="true" className="absolute scale-0 transition-none dark:scale-100" />
+    </Button>
   );
 }

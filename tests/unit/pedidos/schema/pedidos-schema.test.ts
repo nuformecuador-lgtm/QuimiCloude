@@ -127,17 +127,17 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los QUINCE campos de `Order`, con la columna en ingles que le toca (R36). Eran catorce en
- *  QC-33; `cancellationReason` lo anade QC-34 (su R48), y es la UNICA columna que esa ficha
- *  puede anadir: la lista sigue siendo cerrada y anadir cualquier otra pone este test rojo. */
+/** Los TRECE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
+ *  QC-33 y quince con `cancellationReason` (QC-34 R48); el 2026-09-07 la decision humana quito
+ *  `unit_id` y `unit_price` de la tabla
+ *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. La lista
+ *  sigue siendo cerrada: anadir o quitar cualquier otra columna pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
   ['orderSequence', 'order_sequence'],
   ['recipeId', 'recipe_id'],
   ['quantity', 'quantity'],
-  ['unitId', 'unit_id'],
-  ['unitPrice', 'unit_price'],
   ['priority', 'priority'],
   ['status', 'status'],
   ['cancellationReason', 'cancellation_reason'], // QC-34 R48, decision cerrada 4
@@ -148,16 +148,16 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
 ]
 
-/** Las cuatro referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). */
+/** Las TRES referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Eran cuatro
+ *  hasta el 2026-09-07: `unitId` se fue con la unidad, y con ella la frontera hacia `unidades`. */
 const CROSS_MODULE_SCALARS: ReadonlyArray<readonly [string, string, boolean]> = [
   ['recipeId', 'recipe_id', false],
-  ['unitId', 'unit_id', false],
   ['createdBy', 'created_by', true],
   ['updatedBy', 'updated_by', true],
 ]
 
 describe('db/schema.prisma — modelo de pedido', () => {
-  it('Order declara id uuid propio, receta, cantidad, unidad, precio, prioridad y estado', () => {
+  it('Order declara id uuid propio, receta, cantidad, prioridad y estado', () => {
     // R1: identificador propio, estable y NO derivado de ningun dato de negocio -en particular
     // no lo es el correlativo, que es dato de negocio y vive en otras dos columnas-, mas los
     // datos del pedido.
@@ -170,7 +170,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
     // Ni el correlativo ni ningun otro dato de negocio forma parte de la clave primaria.
     expect(order.body).not.toMatch(/@@id\(/)
 
-    for (const nombre of ['recipeId', 'quantity', 'unitId', 'unitPrice', 'priority', 'status']) {
+    for (const nombre of ['recipeId', 'quantity', 'priority', 'status']) {
       expect(has(order, nombre), `falta Order.${nombre}`).toBe(true)
       expect(field(order, nombre).isOptional, `Order.${nombre} no puede ser opcional`).toBe(false)
     }
@@ -280,20 +280,16 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
   })
 
-  it('unitPrice es Decimal(14,4), obligatorio, y se llama unit_price (unitario, no total)', () => {
-    // R8 y decision cerrada 5: el precio es el de UNA unidad, no el del pedido entero, y el
-    // nombre de la columna lo dice. Decision cerrada 6: `decimal(14,4)` y obligatorio.
-    const unitPrice = field(order, 'unitPrice')
-    expect(unitPrice.type).toBe('Decimal')
-    expect(unitPrice.isOptional).toBe(false)
-    expect(unitPrice.attributes).toMatch(/@db\.Decimal\(\s*14\s*,\s*4\s*\)/)
-    expect(unitPrice.attributes).toContain('@map("unit_price")')
-    expect(unitPrice.attributes).not.toMatch(/@default\(/)
+  it('el precio unitario YA NO EXISTE en el modelo (2026-09-07)', () => {
+    // Decision humana: `unit_price` salio de `orders`. Se afirma en NEGATIVO -y no se borra el
+    // caso- para que reintroducir la columna sin decidirlo de nuevo ponga el test rojo.
+    expect(has(order, 'unitPrice')).toBe(false)
+    expect(order.body).not.toContain('unit_price')
 
-    // Los dos unicos decimales del modelo son la cantidad y el precio UNITARIO.
+    // Y el UNICO decimal que le queda al modelo es la cantidad.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['quantity', 'unitPrice'])
+    ).toEqual(['quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -325,21 +321,14 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
   })
 
-  it('unitId es uuid OBLIGATORIO y sin @relation', () => {
-    // R12 y decision cerrada 11: la unidad es referencia al catalogo de QC-32 y es obligatoria.
-    // Sin unidad, una cantidad y un precio unitario no se pueden interpretar ni sumar. Se aparta
-    // de QC-14 (unidad opcional en el producto) y sigue a QC-24.
-    const unitId = field(order, 'unitId')
-    expect(unitId.type).toBe('String')
-    expect(unitId.isOptional).toBe(false)
-    expect(unitId.attributes).toContain('@db.Uuid')
-    expect(unitId.attributes).toContain('@map("unit_id")')
-    expect(unitId.attributes).not.toMatch(/@default\(/)
-    expect(unitId.attributes).not.toMatch(/@relation/)
-    // La FK real vive escrita a mano en `migration.sql`; su indice del lado hijo, aqui.
-    expect(order.body).toMatch(/@@index\(\[unitId\],\s*map:\s*"orders_unit_id_idx"\)/)
-    // Y no queda ninguna columna `unit` de texto: la unidad es catalogo, no texto libre.
+  it('la unidad YA NO EXISTE en el modelo, ni como referencia ni como texto (2026-09-07)', () => {
+    // Decision humana: `unit_id` salio de `orders`, y con ella la FK `orders_unit_id_fkey`, su
+    // indice y la frontera de este modulo con `unidades`. En NEGATIVO a proposito: si alguien
+    // devuelve la columna -o la cuela como texto libre-, este caso lo dice.
+    expect(has(order, 'unitId')).toBe(false)
     expect(has(order, 'unit')).toBe(false)
+    expect(order.body).not.toContain('unit_id')
+    expect(order.body).not.toMatch(/@@index\(\[unitId\]/)
   })
 
   it('recipeId es uuid OBLIGATORIO y sin @relation', () => {
@@ -540,10 +529,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(owners.get('User')).toBe('identity')
   })
 
-  it('las cuatro referencias son escalares uuid SIN @relation y Recipe/Unit/User no tienen campos de vuelta', () => {
-    // R33 y decision cerrada 17: las cuatro FK son REALES pero viven escritas a mano en el SQL.
-    // Sin `@relation` en ninguno de los dos lados, NO hay `include` que atraviese de `pedidos` a
-    // `recetas`, `unidades` ni `identity` (`design.md > 8.1`).
+  it('las tres referencias son escalares uuid SIN @relation y Recipe/Unit/User no tienen campos de vuelta', () => {
+    // R33 y decision cerrada 17: las FK son REALES pero viven escritas a mano en el SQL. Sin
+    // `@relation` en ninguno de los dos lados, NO hay `include` que atraviese de `pedidos` a
+    // `recetas` ni a `identity` (`design.md > 8.1`). Eran cuatro hasta el 2026-09-07; `Unit`
+    // sigue comprobandose abajo -no puede ganar un campo de vuelta aunque ya nadie lo apunte-.
     for (const [nombre, columna, anulable] of CROSS_MODULE_SCALARS) {
       const candidate = field(order, nombre)
       expect(candidate.type, `${nombre} debe ser String`).toBe('String')
@@ -603,7 +593,6 @@ describe('db/schema.prisma — modelo de pedido', () => {
     )
     expect(indexMaps).toEqual([
       'orders_recipe_id_idx',
-      'orders_unit_id_idx',
       'orders_created_by_idx',
       'orders_updated_by_idx',
     ])

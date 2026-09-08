@@ -1,23 +1,23 @@
 import { listCatalogLinesAction } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
+import type { DataTableParams } from '@/components/shared/data-table';
 import type { UnitRef } from '@/lib/modules/unidades';
-import { supplierDetailRoute } from '@/lib/shared/routes';
 
 import { buildCatalogDirectories } from './catalog-directories';
 import { CatalogLineSheet } from './catalog-line-sheet';
 import { CatalogListEmpty } from './catalog-list-empty';
 import { CatalogListError } from './catalog-list-error';
-import { buildCatalogListQuery, type CatalogPageSize } from './catalog-list-params';
-import { CatalogListToolbar } from './catalog-list-toolbar';
+import { FIRST_PAGE, catalogListHref } from './catalog-list-params';
 import { CatalogTable } from './catalog-table';
 import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 
-/** La primera pagina, a la que vuelve el estado vacio cuando la pedida se quedo atras. */
-const FIRST_PAGE = 1;
-
 type CatalogListSectionProps = {
   readonly supplierId: string;
-  readonly page: number;
-  readonly pageSize: CatalogPageSize;
+  /**
+   * Los parametros de lista YA ACOTADOS por `parseCatalogListParams`. Se pasan ENTEROS a la
+   * operacion de consulta: `DataTableParams` es campo a campo la forma que `createListQuerySchema`
+   * espera (QC-57), asi que aqui no se traduce ni se inventa ninguna clave.
+   */
+  readonly params: DataTableParams;
   /**
    * Catalogo de unidades, pedido **una sola vez** por la pagina de detalle con `listUnitsAction()`
    * y bajado por props (R46, `design.md > 8.2`). Desde aqui viaja al panel lateral de la linea
@@ -50,11 +50,10 @@ type CatalogListSectionProps = {
  */
 export async function CatalogListSection({
   supplierId,
-  page,
-  pageSize,
+  params,
   units,
 }: CatalogListSectionProps) {
-  const result = await listCatalogLinesAction(supplierId, { page, pageSize });
+  const result = await listCatalogLinesAction(supplierId, params);
 
   if (result.status === 'error') {
     return <CatalogListError code={result.code} message={result.message} />;
@@ -67,10 +66,7 @@ export async function CatalogListSection({
       <CatalogListEmpty
         firstPageHref={
           currentPage > FIRST_PAGE
-            ? `${supplierDetailRoute(supplierId)}?${buildCatalogListQuery({
-                page: FIRST_PAGE,
-                pageSize,
-              })}`
+            ? catalogListHref(supplierId, { ...params, page: FIRST_PAGE })
             : undefined
         }
       >
@@ -90,9 +86,16 @@ export async function CatalogListSection({
       <div className="flex justify-end">
         <CatalogLineSheet supplierId={supplierId} units={units} />
       </div>
+      {/*
+        La paginacion y el tamano de pagina los pinta la tabla compartida desde el 2026-09-07:
+        `catalog-list-toolbar.tsx` desaparecio y con el la barra propia de esta ruta.
+      */}
       <CatalogTable
         lines={items}
         directories={directories}
+        params={{ ...params, page: currentPage }}
+        totalPages={totalPages}
+        supplierId={supplierId}
         /*
           Editar y dar de baja entran por el SLOT de la tabla (R26, R36): asi la tabla no importa
           ni el panel lateral ni el dialogo, no arrastra frontera de cliente y sigue sin conocer
@@ -105,7 +108,6 @@ export async function CatalogListSection({
           </>
         )}
       />
-      <CatalogListToolbar page={currentPage} pageSize={pageSize} totalPages={totalPages} />
     </div>
   );
 }

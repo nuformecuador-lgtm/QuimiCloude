@@ -1,8 +1,6 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { UnitRef } from '@/lib/modules/unidades';
-import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import { OrderListEmpty } from './order-list-empty';
@@ -47,23 +45,21 @@ type OrderListSectionProps = {
  * `orderListHref`, nunca de un literal (R2).
  */
 /**
- * Los dos catalogos que alimentan el panel lateral de alta y edicion, pedidos **una sola vez** por
- * render de la seccion y bajados al cliente **por props** (R43, `design.md > 9`): la primera
- * pagina de recetas -el selector busca las demas en el servidor (R31)- y el catalogo entero de
- * unidades. Ninguno de los dos componentes de cliente los pide por su cuenta.
+ * El catalogo que alimenta el panel lateral de alta y edicion, pedido **una sola vez** por render
+ * de la seccion y bajado al cliente **por props** (R43, `design.md > 9`): la primera pagina de
+ * recetas -el selector busca las demas en el servidor (R31)-. El componente de cliente no la pide
+ * por su cuenta.
  *
- * Si un catalogo falla, el panel se abre con ese selector vacio en vez de tumbar la lista entera:
+ * QC-35bis (2026-09-07): eran DOS. El catalogo entero de unidades bajaba tambien, para el
+ * selector de unidad del formulario; al salir la unidad del pedido, esa consulta -y con ella
+ * `listUnitsAction` en esta pantalla- desaparecio.
+ *
+ * Si el catalogo falla, el panel se abre con el selector vacio en vez de tumbar la lista entera:
  * la lista es lo que la pantalla existe para mostrar, y el alta ya rechaza en el servidor un id
- * que no exista (`recipe_not_found`, `unit_not_found`).
+ * que no exista (`recipe_not_found`).
  */
-async function loadFormCatalogs(): Promise<{
-  readonly recipes: RecipePickerPage;
-  readonly units: readonly UnitRef[];
-}> {
-  const [recipes, units] = await Promise.all([
-    listRecipesAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
-    listUnitsAction(),
-  ]);
+async function loadFormCatalogs(): Promise<{ readonly recipes: RecipePickerPage }> {
+  const recipes = await listRecipesAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE });
 
   return {
     recipes:
@@ -73,7 +69,6 @@ async function loadFormCatalogs(): Promise<{
             totalPages: recipes.data.totalPages,
           }
         : { items: [], totalPages: FIRST_PAGE },
-    units: units.status === 'success' ? units.data : [],
   };
 }
 
@@ -85,7 +80,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   }
 
   const { items, page: currentPage, totalPages } = result.data;
-  const { recipes, units } = await loadFormCatalogs();
+  const { recipes } = await loadFormCatalogs();
 
   if (items.length === 0) {
     // El slot de «crear el primer pedido» (R21) lo llena `<OrderSheet />` (T10) como `children`:
@@ -99,7 +94,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
             : undefined
         }
       >
-        <OrderSheet recipes={recipes} units={units} />
+        <OrderSheet recipes={recipes} />
       </OrderListEmpty>
     );
   }
@@ -111,7 +106,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         catalogos que el panel necesita se piden aqui, donde ya se pide la lista.
       */}
       <div className="flex justify-end">
-        <OrderSheet recipes={recipes} units={units} />
+        <OrderSheet recipes={recipes} />
       </div>
       {/*
         `order-table.tsx` es un modulo de CLIENTE —la columna de acciones declara celdas con
@@ -125,7 +120,6 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         params={params}
         totalPages={totalPages}
         recipes={recipes}
-        units={units}
       />
     </div>
   );

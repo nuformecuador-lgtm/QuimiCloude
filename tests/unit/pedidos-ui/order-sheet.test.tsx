@@ -30,8 +30,6 @@ import {
   RECIPE_PICKER_TESTID,
   SORT_PARAM,
   STATUS_PARAM,
-  UNIT_OPTION_TESTID,
-  UNIT_SELECT_TESTID,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import type { SessionUser } from '@/lib/modules/identity';
@@ -42,7 +40,6 @@ import type {
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { UnitRef } from '@/lib/modules/unidades';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
@@ -138,11 +135,9 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 }));
 
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul' };
-const UNIDAD: UnitRef = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 const CANTIDAD = '12.5000';
-const PRECIO_EXACTO = '0.1005';
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -152,9 +147,6 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     recipeId: RECETA.id,
     recipeName: RECETA.name,
     quantity: CANTIDAD,
-    unitId: UNIDAD.id,
-    unitName: UNIDAD.name,
-    unitPrice: PRECIO_EXACTO,
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
@@ -243,7 +235,9 @@ beforeEach(() => {
       totalPages: 1,
     },
   });
-  listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
+  // La pantalla de pedidos ya no pide unidades (2026-09-07). El doble sigue montado -y devuelve
+  // una lista vacia- para que una llamada que reapareciera no se apoyara en datos de verdad.
+  listUnitsActionMock.mockResolvedValue({ status: 'success', data: [] });
   createOrderActionMock.mockResolvedValue({
     status: 'success',
     id: crypto.randomUUID(),
@@ -266,10 +260,7 @@ afterEach(() => {
 async function rellenarAlta(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
   await user.click(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`));
-  await user.click(screen.getByTestId(UNIT_SELECT_TESTID));
-  await user.click((await screen.findAllByTestId(UNIT_OPTION_TESTID))[0]);
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
-  await user.type(screen.getByTestId('order-field-unitPrice'), PRECIO_EXACTO);
 }
 
 describe('panel lateral de pedidos (R25, R35, R36)', () => {
@@ -393,7 +384,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // estado final `OrderRowActions` no llega a emitir nada (R24) y el panel no se abre.
     const user = userEvent.setup();
     const elPedido = pedido();
-    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={[UNIDAD]} />);
+    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} />);
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
 
@@ -408,7 +399,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // R24 — la pantalla anticipa la regla en vez de dejar intentarlo contra el servidor.
     const user = userEvent.setup();
     render(
-      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[UNIDAD]} />,
+      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} />,
     );
 
     await user.click(screen.getByTestId('order-action-edit'));

@@ -254,8 +254,13 @@ esta pantalla **no manda ids de línea** — el esquema no los admite.
 
 **Selector de producto (R28).** `ProductPicker` carga páginas con
 `listProductsAction({ page, pageSize: MAX_PAGE_SIZE })` —**importado**, no el número 25 escrito— y
-ofrece «página anterior / siguiente» **dentro del propio desplegable**, indicando página actual y
-total. **No filtra en cliente**: la decisión lo dice y el motivo está escrito en QC-22 (un buscador
+las anexa **al llegar al final del scroll del propio desplegable** (enmienda del 2026-09-07: antes
+eran «página anterior / siguiente» con indicador de página; el requisito de fondo no cambió). Se
+compone con los primitivos de `components/ui/autocomplete.tsx` y el hook
+`hooks/use-async-paginated-options.ts`, que es quien acumula páginas, aplica el rebote y descarta
+lo obsoleto. El tamaño de página sigue siendo `MAX_PAGE_SIZE` y no el defecto de 10 del hook,
+porque la primera página baja precargada por props (R49) con ese tamaño y una página de 10 la
+dejaría inservible. **No filtra en cliente**: la decisión lo dice y el motivo está escrito en QC-22 (un buscador
 que solo mira los 25 descargados es una función que miente). El test en negativo de R28 recorre la
 fuente buscando que no haya ningún `.filter(` sobre la lista de productos por texto.
 

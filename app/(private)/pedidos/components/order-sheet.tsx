@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitRef } from '@/lib/modules/unidades';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
@@ -60,13 +59,12 @@ export type OrderSheetProps = {
   /** Primera pagina del catalogo de recetas, por props (R43). */
   readonly recipes: RecipePickerPage;
   /** Unidades existentes, por props (R43). */
-  readonly units: readonly UnitRef[];
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
 };
 
-export function OrderSheet({ order, recipes, units, open, onOpenChange }: OrderSheetProps) {
+export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetProps) {
   const [selfOpen, setSelfOpen] = useState(false);
   const router = useRouter();
   const isEdit = order !== undefined;
@@ -105,7 +103,7 @@ export function OrderSheet({ order, recipes, units, open, onOpenChange }: OrderS
           {CREATE_LABEL}
         </SheetTrigger>
       )}
-      <OrderForm order={order} recipes={recipes} units={units} onSaved={handleSaved} />
+      <OrderForm order={order} recipes={recipes} onSaved={handleSaved} />
     </Sheet>
   );
 }
@@ -113,7 +111,6 @@ export function OrderSheet({ order, recipes, units, open, onOpenChange }: OrderS
 export type OrderRowSheetActionsProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
-  readonly units: readonly UnitRef[];
 };
 
 /**
@@ -133,7 +130,7 @@ export type OrderRowSheetActionsProps = {
  * Es lo que la celda de acciones de `buildOrderColumns` renderiza por fila: sin esta pieza, los
  * tres botones de `OrderRowActions` no abririan nada.
  */
-export function OrderRowSheetActions({ order, recipes, units }: OrderRowSheetActionsProps) {
+export function OrderRowSheetActions({ order, recipes }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -149,7 +146,6 @@ export function OrderRowSheetActions({ order, recipes, units }: OrderRowSheetAct
       <OrderSheet
         order={order}
         recipes={recipes}
-        units={units}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

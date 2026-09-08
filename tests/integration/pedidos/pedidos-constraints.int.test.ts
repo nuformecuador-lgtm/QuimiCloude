@@ -20,7 +20,7 @@
  * vacia hoy, pero manana no lo estara y este archivo no puede depender de eso.
  *
  * CADA CASO SIEMBRA SUS PROPIAS FK — las CUATRO referencias del pedido (`recipe_id` ->
- * `recipes`, `unit_id` -> `units`, `created_by` / `updated_by` -> `users`) son FK REALES
+ * `recipes`, `created_by` / `updated_by` -> `users`) son FK REALES
  * aunque el esquema Prisma las declare como escalares sin `@relation` (`design.md > 4`,
  * R33). Por eso cada caso crea dentro de su propia transaccion la presentacion, el producto,
  * la unidad, la receta y el usuario que necesita: NO se depende de ningun seed ni del orden
@@ -49,7 +49,7 @@
  * explicitamente —la frontera de ano de R41 y el reinicio anual de R23—, donde el literal es
  * el punto del test.
  *
- * DECIMALES — `quantity` y `unit_price` se manejan como `Prisma.Decimal` y se comparan con
+ * DECIMALES — `quantity` se maneja como `Prisma.Decimal` y se compara con
  * `.toString()`, o contra `quantity::text` de la propia base. Convertirlos a `number`
  * reintroduciria la coma flotante binaria que `docs/architecture.md > Dominio` n.o 4 prohibe
  * y los tests dejarian de demostrar R6 y R8.
@@ -288,11 +288,9 @@ type OrderPriorityValue = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
 
 interface OrderSeed {
   readonly recipeId: string
-  readonly unitId: string
   readonly year?: number
   readonly sequence?: number
   readonly quantity?: string
-  readonly unitPrice?: string
   readonly status?: OrderStatusValue
   readonly priority?: OrderPriorityValue
   readonly createdBy?: string | null
@@ -310,9 +308,8 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
       orderYear: seed.year ?? currentUtcYear(),
       orderSequence: seed.sequence ?? nextSequence,
       recipeId: seed.recipeId,
-      unitId: seed.unitId,
+
       quantity: new Prisma.Decimal(seed.quantity ?? '10'),
-      unitPrice: new Prisma.Decimal(seed.unitPrice ?? '25'),
       status: seed.status,
       priority: seed.priority,
       createdBy: seed.createdBy ?? null,
@@ -330,8 +327,6 @@ type WritableColumn =
   | 'order_sequence'
   | 'recipe_id'
   | 'quantity'
-  | 'unit_id'
-  | 'unit_price'
   | 'priority'
   | 'status'
   | 'created_by'
@@ -385,8 +380,6 @@ function baseColumns(f: Fixtures, sequence: number): Partial<Record<WritableColu
     order_sequence: Prisma.sql`${sequence}`,
     recipe_id: asUuid(f.recipeId),
     quantity: asDecimal('10'),
-    unit_id: asUuid(f.unitId),
-    unit_price: asDecimal('25'),
   }
 }
 
@@ -423,9 +416,7 @@ describe('el pedido como fila completa', () => {
       const f = await seedFixtures(tx)
       const id = await createOrder(tx, {
         recipeId: f.recipeId,
-        unitId: f.unitId,
         quantity: '12.5000',
-        unitPrice: '3.7500',
         status: 'EN_CURSO',
         priority: 'ALTA',
         createdBy: f.userId,
@@ -434,9 +425,7 @@ describe('el pedido como fila completa', () => {
       const stored = await tx.order.findUniqueOrThrow({ where: { id } })
       expect(stored.id).toMatch(UUID_SHAPE)
       expect(stored.recipeId).toBe(f.recipeId)
-      expect(stored.unitId).toBe(f.unitId)
       expect(stored.quantity.toString()).toBe('12.5')
-      expect(stored.unitPrice.toString()).toBe('3.75')
       expect(stored.status).toBe('EN_CURSO')
       expect(stored.priority).toBe('ALTA')
       expect(stored.createdBy).toBe(f.userId)
@@ -469,22 +458,19 @@ describe('el pedido como fila completa', () => {
       'quantity',
       'recipe_id',
       'status',
-      'unit_id',
-      'unit_price',
       'updated_at',
       'updated_by',
     ])
   })
 })
 
-describe('la cantidad y el precio unitario', () => {
+describe('la cantidad', () => {
   it('guarda y relee una cantidad con cuatro decimales sin perdida', async () => {
     // R6: `decimal(14,4)`, nunca coma flotante binaria.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const id = await createOrder(tx, {
         recipeId: f.recipeId,
-        unitId: f.unitId,
         quantity: '1234567890.1234',
       })
 
@@ -498,24 +484,9 @@ describe('la cantidad y el precio unitario', () => {
     })
   })
 
-  it('guarda y relee un precio unitario con cuatro decimales sin perdida', async () => {
-    // R8: el precio es el de UNA unidad, `decimal(14,4)` y obligatorio.
-    await inRolledBackTransaction(async (tx) => {
-      const f = await seedFixtures(tx)
-      const id = await createOrder(tx, {
-        recipeId: f.recipeId,
-        unitId: f.unitId,
-        unitPrice: '9876543210.9876',
-      })
-
-      const stored = await tx.order.findUniqueOrThrow({ where: { id }, select: { unitPrice: true } })
-      expect(stored.unitPrice.toString()).toBe('9876543210.9876')
-
-      const [row] = await tx.$queryRaw<{ unit_price: string }[]>`
-        SELECT "unit_price"::text AS unit_price FROM "orders" WHERE "id" = CAST(${id} AS uuid)`
-      expect(row.unit_price).toBe('9876543210.9876')
-    })
-  })
+  // QC-35bis (2026-09-07): aqui vivia el caso gemelo del PRECIO UNITARIO con cuatro decimales.
+  // La columna `unit_price` se dropeo con la decision humana, asi que no queda decimal que
+  // comprobar aparte de la cantidad, justo encima.
 
   it('rechaza cantidad cero, negativa y ausente con SQLSTATE 23514 / 23502', async () => {
     // R7: `> 0`, ni cero ni negativa. La ausencia la para el NOT NULL, no el CHECK.
@@ -548,96 +519,21 @@ describe('la cantidad y el precio unitario', () => {
     })
   })
 
-  it('rechaza un precio negativo con 23514, acepta el precio cero y rechaza el precio ausente con 23502', async () => {
-    // R9: `>= 0` y NO `> 0`. El cero es un precio legitimo (una muestra, una reposicion sin
-    // cargo) y esa es la diferencia DELIBERADA con el CHECK de la cantidad.
-    await inRolledBackTransaction(async (tx) => {
-      const f = await seedFixtures(tx)
-
-      const negativo = await expectRejectedByDatabase(
-        tx,
-        () =>
-          rawInsertOrder(tx, {
-            ...baseColumns(f, freshSequence()),
-            unit_price: asDecimal('-0.0001'),
-          }),
-        'precio negativo',
-      )
-      expect(negativo).toBe(CHECK_VIOLATION)
-
-      const columnas = baseColumns(f, freshSequence())
-      delete columnas.unit_price
-      const ausente = await expectRejectedByDatabase(
-        tx,
-        () => rawInsertOrder(tx, columnas),
-        'precio ausente',
-      )
-      expect(ausente).toBe(NOT_NULL_VIOLATION)
-
-      const id = await createOrder(tx, {
-        recipeId: f.recipeId,
-        unitId: f.unitId,
-        unitPrice: '0',
-      })
-      const stored = await tx.order.findUniqueOrThrow({ where: { id }, select: { unitPrice: true } })
-      expect(stored.unitPrice.toString()).toBe('0')
-    })
-  })
+  // QC-35bis (2026-09-07): aqui vivia «rechaza un precio negativo con 23514, acepta el precio
+  // cero y rechaza el precio ausente con 23502». El CHECK `orders_unit_price_non_negative` y su
+  // columna se fueron en la migracion `20260907120000_orders_drop_unit_and_unit_price`, asi que
+  // el caso se quedo sin restriccion que ejercitar. El de la CANTIDAD -que es el que separa el
+  // `> 0` del `>= 0`- sigue justo encima, intacto.
 })
 
 describe('la unidad y la receta', () => {
-  it('rechaza un pedido sin unidad (23502) y con unit_id inexistente (23503)', async () => {
-    // R12: la unidad es obligatoria y tiene que existir en el catalogo.
-    await inRolledBackTransaction(async (tx) => {
-      const f = await seedFixtures(tx)
+  // QC-35bis (2026-09-07): aqui vivian los dos casos de la UNIDAD -«rechaza un pedido sin
+  // unidad (23502) y con unit_id inexistente (23503)» y «rechaza el borrado de una unidad usada
+  // por un pedido con 23503»-. La columna `unit_id` y su FK `orders_unit_id_fkey` se fueron con
+  // la decision humana, y con ellas la unica frontera de `orders` hacia `units`. Los dos casos
+  // equivalentes de la RECETA -NOT NULL, FK y ON DELETE RESTRICT- siguen debajo y son los que
+  // sostienen ahora esa clase de garantia.
 
-      const columnas = baseColumns(f, freshSequence())
-      delete columnas.unit_id
-      const sinUnidad = await expectRejectedByDatabase(
-        tx,
-        () => rawInsertOrder(tx, columnas),
-        'pedido sin unidad',
-      )
-      expect(sinUnidad).toBe(NOT_NULL_VIOLATION)
-
-      const inexistente = await expectRejectedByDatabase(
-        tx,
-        () =>
-          rawInsertOrder(tx, {
-            ...baseColumns(f, freshSequence()),
-            unit_id: asUuid(randomUUID()),
-          }),
-        'pedido con unidad inexistente',
-      )
-      expect(inexistente).toBe(FOREIGN_KEY_VIOLATION)
-    })
-  })
-
-  it('rechaza el borrado de una unidad usada por un pedido con 23503, y permite el de una unidad libre', async () => {
-    // R13: `orders_unit_id_fkey` es ON DELETE RESTRICT, y aqui es la garantia ACTIVA porque
-    // `units` no tiene borrado logico (QC-32 decision 11): un DELETE de verdad es posible.
-    await inRolledBackTransaction(async (tx) => {
-      const f = await seedFixtures(tx)
-      const orderId = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId })
-
-      const usada = await expectRejectedByDatabase(
-        tx,
-        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = CAST(${f.unitId} AS uuid)`,
-        'borrado de una unidad usada por un pedido',
-      )
-      expect(usada).toBe(FOREIGN_KEY_VIOLATION)
-
-      // La unidad y el pedido siguen intactos tras el rechazo.
-      expect(await tx.unit.count({ where: { id: f.unitId } })).toBe(1)
-      const stored = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
-      expect(stored.unitId).toBe(f.unitId)
-
-      // Una unidad que nadie usa si se puede borrar: el RESTRICT no bloquea de mas.
-      const libre = await createUnit(tx)
-      await tx.unit.delete({ where: { id: libre } })
-      expect(await tx.unit.count({ where: { id: libre } })).toBe(0)
-    })
-  })
 
   it('rechaza un pedido sin receta (23502) y con recipe_id inexistente (23503)', async () => {
     // R14: la receta es obligatoria y tiene que existir.
@@ -674,7 +570,6 @@ describe('la unidad y la receta', () => {
       const f = await seedFixtures(tx)
       const orderId = await createOrder(tx, {
         recipeId: f.recipeId,
-        unitId: f.unitId,
         quantity: '7.5000',
       })
 
@@ -774,7 +669,7 @@ describe('el estado y la prioridad', () => {
     // test es lo que demuestra que hoy la base no decide por adelantado.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      const id = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId })
+      const id = await createOrder(tx, { recipeId: f.recipeId })
 
       const entregado = await tx.order.update({
         where: { id },
@@ -853,7 +748,7 @@ describe('el correlativo por ano', () => {
       const f = await seedFixtures(tx)
       const sequence = freshSequence()
 
-      const id = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId, sequence })
+      const id = await createOrder(tx, { recipeId: f.recipeId, sequence })
 
       const duplicado = await expectRejectedByDatabase(
         tx,
@@ -883,7 +778,7 @@ describe('el correlativo por ano', () => {
       const f = await seedFixtures(tx)
       const sequence = freshSequence()
 
-      const id = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId, sequence })
+      const id = await createOrder(tx, { recipeId: f.recipeId, sequence })
       await tx.order.update({ where: { id }, data: { deletedAt: new Date() } })
 
       const borrado = await tx.order.findUniqueOrThrow({
@@ -949,10 +844,9 @@ describe('el correlativo por ano', () => {
       const f = await seedFixtures(tx)
       const primero = await createOrder(tx, {
         recipeId: f.recipeId,
-        unitId: f.unitId,
         sequence: 1,
       })
-      const quinto = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId, sequence: 5 })
+      const quinto = await createOrder(tx, { recipeId: f.recipeId, sequence: 5 })
 
       const filas = await tx.order.findMany({
         where: { id: { in: [primero, quinto] } },
@@ -1052,7 +946,7 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
     // cuando la columna tiene valor.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      const id = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId })
+      const id = await createOrder(tx, { recipeId: f.recipeId })
 
       const stored = await tx.order.findUniqueOrThrow({
         where: { id },
@@ -1070,10 +964,8 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
       const sequence = freshSequence()
       const id = await createOrder(tx, {
         recipeId: f.recipeId,
-        unitId: f.unitId,
         sequence,
         quantity: '3.2500',
-        unitPrice: '11.0100',
         priority: 'CRITICA',
         createdBy: f.userId,
       })
@@ -1085,9 +977,7 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
       expect(stored.orderYear).toBe(currentUtcYear())
       expect(stored.orderSequence).toBe(sequence)
       expect(stored.recipeId).toBe(f.recipeId)
-      expect(stored.unitId).toBe(f.unitId)
       expect(stored.quantity.toString()).toBe('3.25')
-      expect(stored.unitPrice.toString()).toBe('11.01')
       expect(stored.priority).toBe('CRITICA')
       expect(stored.createdBy).toBe(f.userId)
     })
@@ -1100,7 +990,7 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
     // `updated_at` se mantiene solo.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      const id = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId })
+      const id = await createOrder(tx, { recipeId: f.recipeId })
 
       const antes = await tx.order.findUniqueOrThrow({
         where: { id },
@@ -1135,7 +1025,6 @@ describe('el CHECK del pedido entregado', () => {
       // (a) un pedido ENTREGADO no se puede borrar.
       const entregado = await createOrder(tx, {
         recipeId: f.recipeId,
-        unitId: f.unitId,
         status: 'ENTREGADO',
       })
       const alBorrar = await expectRejectedByDatabase(
@@ -1153,7 +1042,7 @@ describe('el CHECK del pedido entregado', () => {
       expect(sigueVivo.status).toBe('ENTREGADO')
 
       // (b) un pedido ya borrado no se puede entregar.
-      const borrado = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId })
+      const borrado = await createOrder(tx, { recipeId: f.recipeId })
       await tx.order.update({ where: { id: borrado }, data: { deletedAt: new Date() } })
       const alEntregar = await expectRejectedByDatabase(
         tx,
@@ -1190,7 +1079,7 @@ describe('el CHECK del pedido entregado', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
 
-      const pendiente = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId })
+      const pendiente = await createOrder(tx, { recipeId: f.recipeId })
       const borradoPendiente = await tx.order.update({
         where: { id: pendiente },
         data: { deletedAt: new Date() },
@@ -1201,7 +1090,6 @@ describe('el CHECK del pedido entregado', () => {
 
       const enCurso = await createOrder(tx, {
         recipeId: f.recipeId,
-        unitId: f.unitId,
         status: 'EN_CURSO',
       })
       const borradoEnCurso = await tx.order.update({
@@ -1212,7 +1100,7 @@ describe('el CHECK del pedido entregado', () => {
       expect(borradoEnCurso.deletedAt).not.toBeNull()
       expect(borradoEnCurso.status).toBe('EN_CURSO')
 
-      const vivo = await createOrder(tx, { recipeId: f.recipeId, unitId: f.unitId })
+      const vivo = await createOrder(tx, { recipeId: f.recipeId })
       const entregado = await tx.order.update({
         where: { id: vivo },
         data: { status: 'ENTREGADO' },
@@ -1232,7 +1120,8 @@ describe('las cuatro fronteras que Prisma no declara', () => {
     // aqui de una vez: si una migracion futura borrara alguna por drift, este caso la caza.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      const columnas: WritableColumn[] = ['recipe_id', 'unit_id', 'created_by', 'updated_by']
+      // `unit_id` estaba en esta lista hasta el 2026-09-07: se fue con la columna.
+      const columnas: WritableColumn[] = ['recipe_id', 'created_by', 'updated_by']
 
       for (const columna of columnas) {
         const estado = await expectRejectedByDatabase(

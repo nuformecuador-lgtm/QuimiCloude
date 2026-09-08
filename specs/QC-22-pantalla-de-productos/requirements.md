@@ -68,6 +68,20 @@ alerta de cantidad, fecha de creación y fecha de actualización.
 **R7** — La lista NO DEBE mostrar el identificador ni el nombre de quien creó o modificó un
 producto.
 
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** La tabla gana una **primera columna de imagen**,
+> antes del nombre: la miniatura de `products.image_path` con la miniatura compartida
+> `components/shared/entity-image.tsx`. `ProductView` expone ahora `imagePath` —la RUTA guardada,
+> sin componer URL pública: `inventario` no tiene puerto de almacenamiento, a diferencia de
+> `recetas`—.
+>
+> Mientras nadie llene esa columna —hoy no hay forma de subir la imagen de un producto— todas las
+> filas muestran el **marcador** `public/inv_not_found.png`, que cubre los dos casos: ruta ausente
+> y ruta que no resuelve.
+>
+> R6 y R7 no se relajan: la imagen **no es una columna de datos** —su tipo de id sigue derivándose
+> de `ProductView` excluyendo lo prohibido, así que `id: 'imagePath'` no compila—, y `imagePath`
+> sigue fuera de `PRODUCT_QUERYABLE`: no se ordena ni se filtra por una ruta de archivo.
+
 **R8** — El sistema DEBE presentar el costo tal como lo entrega la operación de consulta (cadena
 decimal) y NO DEBE convertirlo a coma flotante ni operar aritméticamente con él.
 
@@ -87,6 +101,24 @@ el tope soportado, ENTONCES el sistema DEBE acotarlos a valores válidos y prese
 NO DEBE fallar ni mostrar un error.
 
 **R13** — La pantalla NO DEBE ofrecer búsqueda de productos ni control de ordenación configurable.
+
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** La pantalla **monta la tabla compartida**
+> (`components/shared/data-table`, la misma de pedidos y recetas) en lugar de su tabla y su barra
+> de paginación propias —`product-list-toolbar.tsx` **desaparece**—. Con ella:
+>
+> - **R13 se INVIERTE**: la pantalla **sí** ofrece búsqueda y orden por columna. La razón es que
+>   el backend los soporta —`PRODUCT_QUERYABLE` declara `searchable: true` y su lista de campos
+>   ordenables, y `listProducts` los resuelve contra la columna normalizada con su índice de
+>   trigramas (QC-57)—; lo que R13 protegía de verdad **sigue en pie y afirmado**: ni la búsqueda
+>   ni el orden ni los filtros se resuelven en el cliente. Cada gesto **navega** y la lista se
+>   vuelve a pedir al servidor sobre el conjunto entero. Se añaden además filtros de rango para
+>   existencia y alerta de cantidad, que la lista blanca ya declaraba.
+> - **R10 y R11 no cambian de contenido, sí de dueño**: el selector de tamaño (10 y 25, con 10 por
+>   defecto) y la paginación los pinta ahora la tabla compartida. Sus `data-testid` son los de esa
+>   tabla (`data-table-page-size`, `data-table-previous`, `data-table-next`,
+>   `data-table-page-indicator`).
+> - **R12 se amplía**: los parámetros acotados pasan de `{ page, pageSize }` al contrato de lista
+>   completo —orden, filtros y búsqueda—, y siguen sin poder producir un error.
 
 **R14** — MIENTRAS el catálogo no tenga ningún producto, el sistema DEBE presentar un estado vacío
 identificable que ofrezca la acción de crear el primer producto, en lugar de una tabla sin filas.

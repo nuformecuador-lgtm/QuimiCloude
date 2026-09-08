@@ -157,9 +157,22 @@ const CONTROLES_VIGILADOS = [
   'Button',
   'SelectTrigger',
   'Input',
+  'AutocompleteInput',
+  'AutocompleteItem',
   'AlertDialogAction',
   'Link',
 ] as const;
+
+/**
+ * Los que ademas fijan 16 px en SU className. Son los que el usuario LEE mientras escribe o
+ * elige: el campo de texto y cada opcion del desplegable.
+ *
+ * `AutocompleteInput` y `AutocompleteItem` entraron el 2026-09-07, cuando el selector de
+ * ingrediente paso de un desplegable escrito a mano a los primitivos de
+ * `components/ui/autocomplete.tsx`: sin anadirlos aqui, el campo mas usado de la pantalla se
+ * habria salido de la guardia del area tactil por un simple cambio de nombre de etiqueta.
+ */
+const CONTROLES_CON_FUENTE: readonly string[] = ['Input', 'AutocompleteInput', 'AutocompleteItem'];
 
 /**
  * `Link` no es un control por si mismo: solo se vigila cuando se pinta CON ASPECTO DE BOTON
@@ -600,13 +613,24 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260904180600_companies_and_user_company/down.sql',
     ];
 
-    // RETENSADO 2026-09-07 (QC-74), con el mismo criterio que los dos de arriba: el rango
+    // RETENSADO 2026-09-07, con el MISMO criterio que los dos retensados de arriba: el rango
     // `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
-    // posterior se NOMBRA una a una o el caso deja de vigilar nada. QC-74 introduce el catalogo
-    // de permisos: crea `permissions` y `role_permissions` -con su RLS y su `down.sql`- y nada
-    // mas (`design.md > 1.3`). Ni recetas, ni unidades, ni pedidos. Cualquier OTRO archivo de
-    // `db/` sigue poniendo el caso rojo.
-    const MIGRACION_QC74 = [
+    // posterior se NOMBRA una a una o el caso deja de vigilar nada.
+    //
+    // Aqui se nombran DOS, y no es una eleccion: las dos entraron en `dev` y las dos son
+    // legitimas. Quedarse con una sola -que es lo que proponia cada lado del conflicto del
+    // merge de QC-74- habria puesto el caso rojo por la otra.
+    //
+    //  1. La decision humana de quitar la unidad y el precio unitario del pedido, que dropea dos
+    //     columnas de `orders`. No toca recetas, ni unidades, ni ninguna otra tabla.
+    //  2. QC-74, que introduce el catalogo de permisos: crea `permissions` y `role_permissions`
+    //     -con su RLS y su `down.sql`- y nada mas (`design.md > 1.3`). Ni recetas, ni unidades,
+    //     ni pedidos.
+    //
+    // Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+    const MIGRACIONES_LEGITIMAS = [
+      'db/migrations/20260907120000_orders_drop_unit_and_unit_price/migration.sql',
+      'db/migrations/20260907120000_orders_drop_unit_and_unit_price/down.sql',
       'db/migrations/20260907183034_permissions_and_role_permissions/migration.sql',
       'db/migrations/20260907183034_permissions_and_role_permissions/down.sql',
     ];
@@ -619,7 +643,7 @@ describe('contrato de la ruta de recetas', () => {
       .filter((ruta) => ruta.startsWith('db/'))
       .filter((ruta) => !MIGRACION_QC34.includes(ruta))
       .filter((ruta) => !MIGRACION_QC47.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC74.includes(ruta));
+      .filter((ruta) => !MIGRACIONES_LEGITIMAS.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',
@@ -742,7 +766,7 @@ describe('contrato de la ruta de recetas', () => {
 
   it('las primitivas de components/ui que usa la ruta existen y ninguna se escribio a mano', () => {
     // R48 — las primitivas vienen del CLI de shadcn/ui.
-    for (const primitiva of ['table.tsx', 'select.tsx', 'alert-dialog.tsx', 'button.tsx', 'input.tsx', 'label.tsx', 'skeleton.tsx']) {
+    for (const primitiva of ['table.tsx', 'select.tsx', 'alert-dialog.tsx', 'button.tsx', 'input.tsx', 'label.tsx', 'skeleton.tsx', 'autocomplete.tsx']) {
       expect(
         existsSync(join(RAIZ, 'components', 'ui', primitiva)),
         `falta components/ui/${primitiva}`,
@@ -814,7 +838,7 @@ describe('contrato de la ruta de recetas', () => {
             `${control} debe forzar el area tactil en SU className (min-h-11, literal o via constante local)`,
           ).toBe(true);
 
-          if (nombre === 'Input') {
+          if (CONTROLES_CON_FUENTE.includes(nombre)) {
             expect(
               llevaLaClase(className, 'text-base', constantesDeFuente),
               `${control} debe fijar 16px en SU className (text-base, literal o via constante local)`,

@@ -30,12 +30,9 @@ import {
   createOrderAction,
   updateOrderAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import type { UnitRef } from '@/lib/modules/unidades';
-
 import { OrderField } from './order-field';
 import { RECIPE_FIELD, RecipePicker, type RecipePickerPage } from './recipe-picker';
 import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from './order-status-badge';
-import { UNIT_FIELD, UnitSelect } from './unit-select';
 
 /**
  * Formulario de alta y edicion de pedido (R26-R30, R33, R34, R39, R45, `design.md > 8`).
@@ -84,13 +81,14 @@ import { UNIT_FIELD, UnitSelect } from './unit-select';
  */
 
 /** Los CINCO campos de negocio, con el MISMO nombre que el adaptador driving lee del `FormData`. */
-export const ORDER_BUSINESS_FIELDS = [
-  RECIPE_FIELD,
-  'quantity',
-  UNIT_FIELD,
-  'unitPrice',
-  'priority',
-] as const;
+/**
+ * QC-35bis (decision humana del 2026-09-07): eran CINCO. La unidad y el precio unitario salieron
+ * del pedido -del formulario, del contrato del modulo y de la tabla `orders`-, asi que esta lista
+ * tiene TRES campos. Sigue siendo la unica fuente: `readValues` la recorre para armar el
+ * `FormData` que la action lee, de modo que anadir un campo aqui y no en el formulario -o al
+ * reves- no es posible sin que algo se note.
+ */
+export const ORDER_BUSINESS_FIELDS = [RECIPE_FIELD, 'quantity', 'priority'] as const;
 
 /** Campo que SOLO existe en la edicion (R26, R29). */
 export const ORDER_STATUS_FIELD = 'status';
@@ -119,15 +117,12 @@ const FIELD_TEXT = 'text-base md:text-base';
 const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
   recipeId: 'Elige una receta de la lista.',
   quantity: 'Escribe una cantidad decimal mayor que cero.',
-  unitId: 'Elige una unidad de la lista.',
-  unitPrice: 'Escribe un precio unitario decimal, cero incluido.',
   priority: 'Elige una de las prioridades disponibles.',
   status: 'Elige uno de los estados disponibles.',
 };
 
 const FIELD_LABELS = {
   quantity: 'Cantidad',
-  unitPrice: 'Precio unitario',
   priority: 'Prioridad',
   status: 'Estado',
 } as const;
@@ -139,7 +134,8 @@ const FIELD_LABELS = {
  */
 const CODE_TO_FIELD: Readonly<Record<string, OrderFieldName>> = {
   recipe_not_found: RECIPE_FIELD,
-  unit_not_found: UNIT_FIELD,
+  // `unit_not_found` ya no existe como codigo del modulo (2026-09-07): sin unidad en el pedido,
+  // no hay nada que pueda emitirlo, y mantener la entrada seria mapear un error imposible.
   invalid_transition: ORDER_STATUS_FIELD,
 };
 
@@ -220,13 +216,11 @@ export type OrderFormProps = {
   readonly order?: OrderSummary;
   /** Primera pagina del catalogo de recetas, por props (R43). */
   readonly recipes: RecipePickerPage;
-  /** Unidades existentes, por props (R43). */
-  readonly units: readonly UnitRef[];
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R35). */
   readonly onSaved: () => void;
 };
 
-export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
+export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
   const isEdit = order !== undefined;
@@ -341,7 +335,7 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
           error={fieldErrors.recipeId}
         />
 
-        {/* Cantidad y precio: control de TEXTO con teclado decimal, jamas el numerico de HTML (R39). */}
+        {/* Cantidad: control de TEXTO con teclado decimal, jamas el numerico de HTML (R39). */}
         <OrderField
           name="quantity"
           label={FIELD_LABELS.quantity}
@@ -349,21 +343,6 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
           inputMode="decimal"
           defaultValue={initialValue('quantity', order?.quantity ?? '')}
           error={fieldErrors.quantity}
-        />
-
-        <UnitSelect
-          units={units}
-          defaultValue={initialValue(UNIT_FIELD, order?.unitId ?? '')}
-          error={fieldErrors.unitId}
-        />
-
-        <OrderField
-          name="unitPrice"
-          label={FIELD_LABELS.unitPrice}
-          required
-          inputMode="decimal"
-          defaultValue={initialValue('unitPrice', order?.unitPrice ?? '')}
-          error={fieldErrors.unitPrice}
         />
 
         {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}

@@ -10,15 +10,14 @@ import type { OrderSummary } from './order-view';
 import type { Page } from './page';
 
 import type { RecipeCatalog } from '@/lib/modules/recetas';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { OrderRepository } from '../ports/order-repository';
 
+/** QC-35bis (2026-09-07): sin unidad en el pedido, `units` deja de ser dependencia del listado. */
 export type ListOrdersDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
-  readonly units: UnitCatalog;
   readonly log: ListQueryLog;
 };
 
@@ -96,10 +95,11 @@ function pruneClosedSelects(query: ListQuery): {
  *      valores de los dos `select` cerrados.
  *   4. el log de lo podado (R6).
  *   5. UNA llamada al repositorio, con la consulta YA SANEADA (R13).
- *   6. Ids DEDUPLICADOS con `Set` y UNA llamada a cada catalogo, con todos los ids de la
+ *   6. Ids DEDUPLICADOS con `Set` y UNA llamada al catalogo de recetas, con todos los ids de la
  *      pagina a la vez (R45).
  *
- * TRES consultas por pagina, tenga la pagina 1 fila o 25. El test lo demuestra CONTANDO
+ * DOS consultas por pagina -eran tres hasta el 2026-09-07, cuando la unidad salio del pedido y
+ * con ella la consulta a `unidades`-, tenga la pagina 1 fila o 25. El test lo demuestra CONTANDO
  * invocaciones: comprobar solo el resultado pasaria verde con un bucle de diez consultas.
  *
  * QC-57 R25: **`status` y `priority` dejan de ser parametros propios** y entran como filtros
@@ -138,19 +138,16 @@ export function createListOrders(
     // R45: los ids se DEDUPLICAN antes de preguntar. Diez pedidos de la misma receta son UNA
     // sola entrada, y el numero de consultas no crece con el numero de filas.
     const recipeIds = [...new Set(page.items.map((row) => row.recipeId))];
-    const unitIds = [...new Set(page.items.map((row) => row.unitId))];
 
     // R44: `findRefsIncludingDeleted` -y no una consulta de solo vivas- porque un pedido
     // conserva su receta aunque la den de baja y la fila tiene que seguir diciendo que se
     // pidio. La vigencia se exige al ESCRIBIR (R15, R25), no al leer.
     const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds);
-    const units = await deps.units.findRefs(unitIds);
 
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
-    const unitNames = new Map(units.map((unit) => [unit.id, unit.name]));
 
     return {
-      items: page.items.map((row) => toOrderView(row, recipeNames, unitNames)),
+      items: page.items.map((row) => toOrderView(row, recipeNames)),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

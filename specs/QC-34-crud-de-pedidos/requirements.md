@@ -114,6 +114,21 @@ operación en la **validación de aplicación**, antes del repositorio.
 **R18.** SI el precio unitario está ausente o es negativo, ENTONCES el sistema DEBE rechazar la
 operación en la **validación de aplicación**; y DEBE aceptar el precio **cero** (**QC-33 R9**).
 
+> **ENMIENDA DEL 2026-09-07 (decisión humana).** El pedido **YA NO TIENE unidad ni precio
+> unitario**. Las columnas `orders.unit_id` y `orders.unit_price` se dropearon —con su FK
+> `orders_unit_id_fkey`, el CHECK `orders_unit_price_non_negative` y los índices
+> `orders_unit_id_idx` y `orders_unit_price_idx`— en
+> `db/migrations/20260907120000_orders_drop_unit_and_unit_price`, y con ellas salieron del
+> esquema Prisma, del dominio de `pedidos`, de su adaptador driven, del cableado y de la
+> pantalla. Un pedido es hoy **receta + cantidad + prioridad + estado**, más su correlativo, sus
+> autores y su borrado lógico.
+>
+> Los requisitos que hablan de la unidad o del precio unitario quedan **sin sujeto**; se conservan
+> escritos para que se vea qué se decidió antes y qué lo sustituyó, no porque sigan vigentes. Sus
+> tests se retiraron uno a uno, cada uno con la nota de por qué (búsquese «QC-35bis» en
+> `tests/`). El `DROP COLUMN` **perdió los datos** de precio y unidad de los pedidos existentes:
+> el `down.sql` recrea la forma, no el contenido.
+
 **R19.** SI la prioridad o el estado recibidos no pertenecen a su conjunto cerrado, ENTONCES el
 sistema DEBE rechazar la operación en el **borde**, antes del caso de uso, y NO DEBE dejar que el
 valor llegue al repositorio.

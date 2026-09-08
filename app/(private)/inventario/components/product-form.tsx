@@ -294,8 +294,14 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         error={fieldErrors.name}
       />
 
+      {/*
+        `defaultLabel` ahorra la consulta de resolucion del selector: `ProductView` ya trae el
+        nombre de la presentacion, asi que editar un producto no vuelve a pedir la primera pagina
+        solo para saber como se llama la que ya tiene.
+      */}
       <PresentationSelect
         defaultValue={initialValue(PRESENTATION_FIELD, product?.presentationId ?? '') || undefined}
+        defaultLabel={product?.presentationName}
         error={fieldErrors.presentationId}
       />
 

@@ -7,8 +7,14 @@ import type { OrderNumber } from './order-number';
  * `ports/`- porque describen el QUE se dice, no el COMO se habla con el mundo, y es lo unico
  * que el contrato publico (`index.ts`) puede reexportar.
  *
- * Los importes viajan como CADENA decimal en las dos direcciones, nunca `number`
- * (`docs/architecture.md > Anti-patrones`): el adaptador driven los devuelve con `.toFixed(4)`.
+ * La cantidad viaja como CADENA decimal en las dos direcciones, nunca `number`
+ * (`docs/architecture.md > Anti-patrones`): el adaptador driven la devuelve con `.toFixed(4)`.
+ *
+ * **QC-35bis (2026-09-07): el pedido ya no tiene unidad ni precio unitario.** Ninguno de los
+ * tres tipos de este archivo los declara, asi que no hay forma de escribirlos ni de leerlos: la
+ * columna se fue de `orders` y el tipo se fue de aqui a la vez. `unitName` tampoco existe -no
+ * habia nada que resolver contra el catalogo de `unidades`-, y con el se cayo la unica razon
+ * por la que `pedidos` hablaba con ese modulo.
  */
 
 /**
@@ -27,17 +33,14 @@ import type { OrderNumber } from './order-number';
 export type NewOrder = {
   readonly recipeId: string;
   readonly quantity: string;
-  readonly unitId: string;
-  readonly unitPrice: string;
   readonly priority: OrderPriority;
   readonly status: EditableOrderStatus;
 };
 
 /**
  * La fila tal como la devuelve el puerto: lo que vive en `orders` y nada mas. NO trae el
- * nombre de la receta ni el de la unidad -eso lo resuelve el caso de uso con los contratos
- * publicos de `recetas` y `unidades`, con UNA consulta a cada uno por pagina (R43, R45)-, y
- * por eso este tipo no es `OrderView`.
+ * nombre de la receta -eso lo resuelve el caso de uso con el contrato publico de `recetas`, con
+ * UNA consulta por pagina (R43, R45)-, y por eso este tipo no es `OrderView`.
  *
  * `deletedAt` NO sale: ninguna consulta devuelve borrados (R40), asi que seria siempre `null`
  * y solo invitaria a filtrar en memoria lo que ya filtro el puerto.
@@ -47,8 +50,6 @@ export type OrderRow = {
   readonly number: OrderNumber;
   readonly recipeId: string;
   readonly quantity: string;
-  readonly unitId: string;
-  readonly unitPrice: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
@@ -63,7 +64,7 @@ export type OrderRow = {
  * la UNICA definicion del formato (R14, QC-33 R24); no se persiste ni se vuelve a formatear en
  * ningun otro sitio.
  *
- * `recipeName` y `unitName` son `string | null`: `null` solo si el id no vuelve del catalogo
+ * `recipeName` es `string | null`: `null` solo si el id no vuelve del catalogo
  * -una receta borrada FISICAMENTE por consola, que las FK `RESTRICT` de QC-33 hacen casi
  * imposible-. La fila SIGUE apareciendo (mismo criterio que QC-25 R18 y QC-43 R37). Una receta
  * dada de BAJA si vuelve, con su nombre (R44).
@@ -83,9 +84,6 @@ export type OrderView = {
   readonly recipeId: string;
   readonly recipeName: string | null;
   readonly quantity: string;
-  readonly unitId: string;
-  readonly unitName: string | null;
-  readonly unitPrice: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;

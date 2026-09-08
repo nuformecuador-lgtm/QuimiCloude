@@ -3,14 +3,20 @@ import userEvent from '@testing-library/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import {
-  CATALOG_COLUMNS,
   CATALOG_LIST_EMPTY_TESTID,
   CATALOG_PAGE_PARAM,
   CATALOG_PAGE_SIZE_OPTIONS,
   CATALOG_PAGE_SIZE_PARAM,
+  CATALOG_SEARCH_PARAM,
+  CATALOG_SKELETON_COLUMN_COUNT,
+  CATALOG_SORT_PARAM,
+  CATALOG_SORT_SEPARATOR,
+  EMPTY_CATALOG_DIRECTORIES,
   EMPTY_CELL,
   UNRESOLVED_CELL,
+  buildCatalogColumns,
 } from '@/app/(private)/proveedores/[id]/components';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { CatalogLineView, SupplierView } from '@/lib/modules/proveedores';
@@ -129,8 +135,11 @@ const testId = {
   noEncontrado: 'supplier-not-found',
   enlaceLista: 'supplier-not-found-link',
   lista: 'catalog-list',
-  tabla: 'catalog-table',
-  fila: 'catalog-row',
+  // Desde el 2026-09-07 la tabla, su paginacion y su selector de tamano los pone
+  // `components/shared/data-table`. La barra propia de la ruta (`catalog-list-toolbar.tsx`)
+  // desaparecio.
+  tabla: 'data-table',
+  fila: /^data-table-row-/,
   esqueleto: 'catalog-table-skeleton',
   filaEsqueleto: 'catalog-row-skeleton',
   vacio: CATALOG_LIST_EMPTY_TESTID,
@@ -139,10 +148,11 @@ const testId = {
   errorMensaje: 'catalog-list-error-message',
   errorCodigo: 'catalog-list-error-code',
   reintentar: 'catalog-list-retry',
-  tamanoPagina: 'catalog-page-size',
-  paginaAnterior: 'catalog-page-previous',
-  paginaSiguiente: 'catalog-page-next',
-  estadoPagina: 'catalog-page-status',
+  tamanoPagina: 'data-table-page-size',
+  paginaAnterior: 'data-table-previous',
+  paginaSiguiente: 'data-table-next',
+  estadoPagina: 'data-table-page-indicator',
+  busqueda: 'data-table-search',
 } as const;
 
 /**
@@ -321,6 +331,9 @@ describe('pagina de detalle — datos del proveedor (R19, R46)', () => {
     expect(listCatalogLinesActionMock).toHaveBeenCalledWith(PROVEEDOR_ID, {
       page: 1,
       pageSize: DEFAULT_PAGE_SIZE,
+      sort: null,
+      filters: {},
+      search: '',
     });
     expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
   });
@@ -481,11 +494,19 @@ describe('catalogo — los tres estados (R23, R24, R25)', () => {
 });
 
 describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
-  it('presenta las ocho columnas de negocio de la linea', async () => {
-    // R21
+  it('presenta las ocho columnas de negocio de la linea, mas imagen y acciones', async () => {
+    // R21. MIGRADO 2026-09-07: la declaracion es una FACTORIA y los `data-testid` de cabecera y
+    // celda los pone la tabla compartida (`data-table-head-<id>` / `data-table-cell-<id>`). Las
+    // ocho de negocio siguen siendo las ocho; la imagen y las acciones son columnas de MARCADO.
     await renderPantalla();
 
-    expect(CATALOG_COLUMNS.map((columna) => columna.key)).toEqual([
+    const columnas = buildCatalogColumns({
+      directories: EMPTY_CATALOG_DIRECTORIES,
+      rowActions: () => null,
+    });
+
+    expect(columnas.map((columna) => columna.id)).toEqual([
+      'image',
       'name',
       'presentationId',
       'unitId',
@@ -494,23 +515,27 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
       'deliveryTime',
       'createdAt',
       'updatedAt',
+      'actions',
     ]);
 
-    for (const columna of CATALOG_COLUMNS) {
+    for (const columna of columnas) {
       expect(
-        screen.getByTestId(columna.testId),
-        `falta el encabezado de «${columna.key}»`,
+        screen.getByTestId(`data-table-head-${columna.id}`),
+        `falta el encabezado de «${columna.id}»`,
       ).toBeInTheDocument();
     }
-    expect(screen.getByTestId('catalog-cell-name')).toHaveTextContent(linea().name);
+    expect(screen.getByTestId('data-table-cell-name')).toHaveTextContent(linea().name);
+
+    // El esqueleto pinta tantas celdas como columnas hay: su constante no puede quedarse atras.
+    expect(CATALOG_SKELETON_COLUMN_COUNT).toBe(columnas.length);
   });
 
   it('presenta la presentacion y la unidad por su NOMBRE, no por su identificador', async () => {
     // R22 (primera mitad).
     await renderPantalla();
 
-    expect(screen.getByTestId('catalog-cell-presentationId')).toHaveTextContent(PRESENTACION.name);
-    expect(screen.getByTestId('catalog-cell-unitId')).toHaveTextContent(UNIDAD.symbol);
+    expect(screen.getByTestId('data-table-cell-presentationId')).toHaveTextContent(PRESENTACION.name);
+    expect(screen.getByTestId('data-table-cell-unitId')).toHaveTextContent(UNIDAD.symbol);
     for (const identificador of [PRESENTACION.id, UNIDAD.id]) {
       expect(document.body.textContent, identificador).not.toContain(identificador);
     }
@@ -544,7 +569,7 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
 
     await renderPantalla();
 
-    const celda = screen.getByTestId('catalog-cell-unitId');
+    const celda = screen.getByTestId('data-table-cell-unitId');
     expect(celda.textContent).toBe(EMPTY_CELL);
     // Sin unidad NO es «no se pudo resolver»: el marcador de R22 no aparece.
     expect(screen.queryByTestId('catalog-unresolved-unitId')).toBeNull();
@@ -573,8 +598,8 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     await renderPantalla();
 
     // La celda contiene EXACTAMENTE la cadena, ni redondeada ni reformateada.
-    expect(screen.getByTestId('catalog-cell-cost').textContent).toBe(laLinea.cost);
-    expect(screen.getByTestId('catalog-cell-minPurchase').textContent).toBe(laLinea.minPurchase);
+    expect(screen.getByTestId('data-table-cell-cost').textContent).toBe(laLinea.cost);
+    expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe(laLinea.minPurchase);
   });
 
   it('un minimo y un tiempo de entrega ausentes pintan la marca de «sin dato»', async () => {
@@ -585,31 +610,73 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('catalog-cell-minPurchase').textContent).toBe(EMPTY_CELL);
-    expect(screen.getByTestId('catalog-cell-deliveryTime').textContent).toBe(EMPTY_CELL);
+    expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe(EMPTY_CELL);
+    expect(screen.getByTestId('data-table-cell-deliveryTime').textContent).toBe(EMPTY_CELL);
   });
 
-  it('la tabla no muestra imagen, ni identificadores, ni autoria de la linea', async () => {
-    // R30 y R12 — en negativo: son campos que la vista trae y que la decision humana deja fuera.
+  it('la tabla no muestra identificadores ni autoria de la linea', async () => {
+    // R12 — en negativo: son campos que la vista trae y que la decision humana deja fuera.
+    //
+    // ENMIENDA A R30 (2026-09-07): la imagen SI se muestra, en la primera columna, asi que
+    // `imagePath` sale de esta lista de prohibidos y tiene su propio caso justo debajo. Lo que
+    // R30 sigue prohibiendo -que el formulario pida o suba imagen- no lo toca este caso.
     await renderPantalla();
 
-    for (const clave of ['imagePath', 'createdBy', 'updatedBy', 'id', 'supplierId']) {
+    const columnas = buildCatalogColumns({
+      directories: EMPTY_CATALOG_DIRECTORIES,
+      rowActions: () => null,
+    });
+    // `imagePath` entra en la lista: la imagen SE VE, pero su columna se llama `image` y pinta una
+    // miniatura. La RUTA no es una columna.
+    for (const clave of ['createdBy', 'updatedBy', 'id', 'supplierId', 'imagePath']) {
       expect(
-        CATALOG_COLUMNS.some((columna) => String(columna.key) === clave),
+        columnas.some((columna) => String(columna.id) === clave),
         `«${clave}» no puede ser una columna`,
       ).toBe(false);
     }
 
     for (const prohibido of [
-      IMAGEN_QUE_NO_DEBE_VERSE,
       LINEA_ID_QUE_NO_DEBE_VERSE,
       AUTOR_QUE_NO_DEBE_VERSE,
       EDITOR_QUE_NO_DEBE_VERSE,
     ]) {
       expect(document.body.textContent, prohibido).not.toContain(prohibido);
     }
-    // Y ninguna imagen se pinta en la tabla.
-    expect(within(screen.getByTestId(testId.tabla)).queryAllByRole('img')).toHaveLength(0);
+  });
+
+  it('la primera columna es la imagen de la linea, y la RUTA no se pinta como texto', async () => {
+    // Enmienda a R30 del 2026-09-07. Se afirma sobre la miniatura -no sobre la lista de
+    // columnas- porque la imagen es marcado y por eso la declara la tabla, no `CATALOG_COLUMNS`.
+    await renderPantalla();
+
+    const tabla = within(screen.getByTestId(testId.tabla));
+    const miniatura = tabla.getAllByTestId('catalog-image')[0] as HTMLImageElement;
+
+    // La ruta de la fixture NO resuelve, asi que arranca en marcador; lo que nunca puede pasar
+    // es que la ruta se lea como texto en la celda.
+    expect(miniatura).toBeInTheDocument();
+    expect(miniatura).toHaveAttribute('src', IMAGEN_QUE_NO_DEBE_VERSE);
+    expect(document.body.textContent, IMAGEN_QUE_NO_DEBE_VERSE).not.toContain(
+      IMAGEN_QUE_NO_DEBE_VERSE,
+    );
+
+    // Y la columna de imagen es la PRIMERA de la cabecera.
+    const cabeceras = tabla.getAllByRole('columnheader');
+    expect(cabeceras[0]).toHaveAttribute('data-testid', 'data-table-head-image');
+  });
+
+  it('sin ruta de imagen, la miniatura cae al marcador de `public/`', async () => {
+    // El caso NORMAL hoy: nadie llena `image_path`, asi que todas las filas ensennan el marcador.
+    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea({ imagePath: null })]));
+
+    await renderPantalla();
+
+    const miniatura = within(screen.getByTestId(testId.tabla)).getAllByTestId(
+      'catalog-image',
+    )[0] as HTMLImageElement;
+
+    expect(miniatura).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(miniatura).toHaveAttribute('data-missing', 'true');
   });
 });
 
@@ -624,6 +691,9 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
     expect(listCatalogLinesActionMock).toHaveBeenCalledWith(PROVEEDOR_ID, {
       page: 1,
       pageSize: DEFAULT_PAGE_SIZE,
+      sort: null,
+      filters: {},
+      search: '',
     });
 
     await user.click(screen.getByTestId(testId.tamanoPagina));
@@ -631,7 +701,7 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
     const opciones = await screen.findAllByRole('option');
     expect(opciones).toHaveLength(CATALOG_PAGE_SIZE_OPTIONS.length);
 
-    await user.click(screen.getByTestId(`catalog-page-size-${MAX_PAGE_SIZE}`));
+    await user.click(screen.getByTestId(`data-table-page-size-${MAX_PAGE_SIZE}`));
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
 
     const destino = new URLSearchParams(String(routerMock.push.mock.calls[0][0]).split('?')[1]);
@@ -679,21 +749,44 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
     expect(screen.getByTestId(testId.paginaSiguiente)).toBeDisabled();
   });
 
-  it('el catalogo no ofrece busqueda ni control de orden', async () => {
-    // R11 — en negativo: filtrar en cliente solo buscaria dentro de la pagina visible.
+  it('el catalogo SI ofrece busqueda y orden, y ninguno se resuelve en el cliente', async () => {
+    // ENMIENDA A R11 (2026-09-07, decision humana). R11 decia «ni busqueda ni orden» y su test lo
+    // afirmaba en negativo. Las dos cosas existen ahora, y la razon es que el BACKEND las
+    // soporta: `SUPPLIER_CATALOG_LINE_QUERYABLE` declara `searchable: true` y cinco campos
+    // ordenables, y `listCatalogLines` los resuelve desde QC-57.
+    //
+    // Lo que R11 protegia de verdad -que no se busque ni se ordene DENTRO de la pagina ya
+    // descargada- sigue afirmado, y por la via mas dura: cada gesto NAVEGA y la lista se vuelve a
+    // pedir al servidor.
+    const user = userEvent.setup();
+    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea()], { total: 40 }));
+
     await renderPantalla();
 
-    expect(screen.queryAllByRole('searchbox')).toHaveLength(0);
-    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+    // 1. Buscar: el termino viaja en la URL y la pagina vuelve a la primera.
+    await user.type(screen.getByTestId(testId.busqueda), 'tambor');
 
-    const combos = screen.queryAllByRole('combobox');
-    expect(combos).toHaveLength(1);
-    expect(combos[0]).toBe(screen.getByTestId(testId.tamanoPagina));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
+    const conBusqueda = new URLSearchParams(
+      String(routerMock.push.mock.calls.at(-1)?.[0]).split('?')[1],
+    );
+    expect(conBusqueda.get(CATALOG_SEARCH_PARAM)).toBe('tambor');
+    expect(conBusqueda.get(CATALOG_PAGE_PARAM)).toBe('1');
 
-    for (const encabezado of screen.getAllByRole('columnheader')) {
-      expect(within(encabezado).queryAllByRole('button')).toHaveLength(0);
-      expect(within(encabezado).queryAllByRole('link')).toHaveLength(0);
-    }
+    // 2. Ordenar por una columna que la lista blanca declara: tambien navega.
+    routerMock.push.mockClear();
+    await user.click(screen.getByTestId('data-table-header-menu-cost'));
+    await user.click(await screen.findByTestId('data-table-sort-desc-cost'));
+
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
+    const conOrden = new URLSearchParams(
+      String(routerMock.push.mock.calls.at(-1)?.[0]).split('?')[1],
+    );
+    expect(conOrden.get(CATALOG_SORT_PARAM)).toBe(`cost${CATALOG_SORT_SEPARATOR}desc`);
+
+    // 3. Y la pantalla NO reordena ni recorta lo que ya tiene: sigue habiendo una sola fila, la
+    //    que devolvio la consulta.
+    expect(screen.getAllByTestId(testId.fila)).toHaveLength(1);
   });
 
   it('el desbordamiento lo absorbe la tabla, no el documento, en angosto y en ancho', async () => {

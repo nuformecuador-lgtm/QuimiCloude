@@ -894,6 +894,11 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
         WHERE c.contype = 'f' AND n.nspname = 'public' AND fn.nspname = 'public'
           AND ft.relname = 'units'
         ORDER BY c.conname`
+      // ACTUALIZADO EL 2026-09-07: la decision humana de quitar la unidad del pedido dropeo
+      // `orders_unit_id_fkey` con su columna, asi que la lista vuelve a TRES. Sigue siendo
+      // EXACTA y con las mismas dos reglas —RESTRICT al borrar ('r'), CASCADE al actualizar
+      // ('c')— que R13 de QC-32 exige de CUALQUIER referencia al catalogo.
+      //
       // ACTUALIZADO EL 2026-09-04 POR QC-52
       // (`specs/QC-52-separar-producto-de-catalogo-de-proveedor/`). La lista era de TRES
       // —dos originales mas `orders_unit_id_fkey`, que sumo QC-33 el 2026-09-03— y sigue

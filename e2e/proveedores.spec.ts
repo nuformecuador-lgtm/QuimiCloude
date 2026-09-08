@@ -195,27 +195,37 @@ async function choosePresentation(page: Page): Promise<string> {
     return presentationName;
   }
 
+  // Desde el 2026-09-07 el selector es un autocomplete: se BUSCA en el servidor y, si hiciera
+  // falta, se baja hasta el final del desplegable para que anexe la pagina siguiente. Ya no hay
+  // boton «Cargar más». Se usan las dos vias reales de la pantalla, en el orden en que las usaria
+  // una persona.
   const wanted = reusablePresentationName;
-  await page.getByTestId('presentation-select').click();
+  const campo = page.getByTestId('presentation-select');
+  await campo.click();
 
   const option = page.getByTestId('presentation-option').filter({ hasText: wanted });
-  const loadMore = page.getByTestId('presentation-load-more');
+  const popup = page.getByTestId('presentation-popup');
 
-  for (;;) {
-    if ((await option.count()) > 0) {
-      await option.first().click();
-      return wanted;
+  if ((await option.count()) === 0) {
+    await campo.fill(wanted);
+  }
+
+  try {
+    await option.first().waitFor({ state: 'visible', timeout: 30_000 });
+  } catch {
+    for (let intento = 0; intento < 10 && (await option.count()) === 0; intento += 1) {
+      await popup.evaluate((lista) => {
+        lista.scrollTop = lista.scrollHeight;
+      });
+      await page.waitForTimeout(500);
     }
-    if ((await loadMore.count()) === 0 || (await loadMore.isDisabled())) {
+    if ((await option.count()) === 0) {
       throw new Error(`la presentacion "${wanted}" no aparecio en el selector`);
     }
-
-    const before = await page.getByTestId('presentation-option').count();
-    await loadMore.click();
-    await expect
-      .poll(async () => page.getByTestId('presentation-option').count(), { timeout: 60_000 })
-      .toBeGreaterThan(before);
   }
+
+  await option.first().click();
+  return wanted;
 }
 
 /**
@@ -246,8 +256,10 @@ async function findSupplierRow(page: Page, name: string): Promise<Locator> {
 
 /** Lo mismo, pero sobre la lista del catalogo de la pagina de detalle. */
 async function findCatalogRow(page: Page, name: string): Promise<Locator> {
-  const row = page.getByTestId('catalog-row').filter({ hasText: name });
-  const next = page.getByTestId('catalog-page-next');
+  // Desde el 2026-09-07 el catalogo monta la tabla compartida: la fila lleva el id de la linea
+  // (`data-table-row-<id>`) y el control de pagina su `data-testid`.
+  const row = page.locator('[data-testid^="data-table-row-"]').filter({ hasText: name });
+  const next = page.getByTestId('data-table-next');
 
   for (;;) {
     if ((await row.count()) > 0) return row;
@@ -410,7 +422,9 @@ test.describe('proveedores', () => {
     // La presentacion sale DEL SELECTOR: la que ya hubiera, o una creada con su alta en linea si
     // la base no tenia ninguna (R37, R38). La unidad se deja en «sin unidad»: es opcional (R40).
     const chosenPresentation = await choosePresentation(page);
-    await expect(page.getByTestId('presentation-select')).toContainText(chosenPresentation, {
+    // El selector es un campo de autocompletado desde el 2026-09-07: lo elegido se lee en su
+    // VALOR, no en su texto contenido.
+    await expect(page.getByTestId('presentation-select')).toHaveValue(chosenPresentation, {
       timeout: 60_000,
     });
     await expect(
@@ -430,8 +444,12 @@ test.describe('proveedores', () => {
     // --- 10. Y la linea esta en la lista del catalogo, con el importe TAL CUAL se tecleo (R41).
     const catalogRow = await findCatalogRow(page, catalogLineName);
     await expect(catalogRow.first()).toBeVisible({ timeout: 60_000 });
-    await expect(catalogRow.first().getByTestId('catalog-cell-name')).toHaveText(catalogLineName);
-    await expect(catalogRow.first().getByTestId('catalog-cell-cost')).toHaveText(catalogLineCost);
+    await expect(catalogRow.first().getByTestId('data-table-cell-name')).toHaveText(
+      catalogLineName,
+    );
+    await expect(catalogRow.first().getByTestId('data-table-cell-cost')).toHaveText(
+      catalogLineCost,
+    );
 
     // Lo guardo el backend de verdad, no solo lo pinto la pantalla.
     expect(

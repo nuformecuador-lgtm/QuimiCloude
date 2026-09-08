@@ -129,30 +129,42 @@ async function login(page: Page, user: Credentials): Promise<void> {
 }
 
 /**
- * Elige en el desplegable de producto la opcion cuyo nombre es EXACTAMENTE `name`, recorriendo sus
- * paginas propias con sus controles reales. Mismo helper que `e2e/recetas.spec.ts`: la pantalla no
- * ofrece busqueda dentro del selector y fingirla seria probar otra cosa.
+ * Elige en el desplegable de producto la opcion cuyo nombre es EXACTAMENTE `name`. Mismo helper
+ * que `e2e/recetas.spec.ts`: desde el 2026-09-07 el selector busca en el servidor y pagina al
+ * llegar al final de su scroll, y eso es lo que se ejercita aqui.
  */
 async function selectProductByName(page: Page, testId: string, name: string): Promise<void> {
-  await page.getByTestId(testId).click();
+  const campo = page.getByTestId(testId);
+  await campo.click();
 
   const option = page.getByTestId(`${testId}-option`).filter({ hasText: name });
-  const next = page.getByTestId(`${testId}-next`);
-  const indicator = page.getByTestId(`${testId}-page-indicator`);
+  const popup = page.getByTestId(`${testId}-popup`);
 
-  for (;;) {
-    if ((await option.count()) > 0) {
-      await option.first().click();
-      return;
-    }
-    if ((await next.count()) === 0 || (await next.isDisabled())) {
-      throw new Error(`producto "${name}" no aparecio en ninguna pagina del selector`);
-    }
-
-    const before = await indicator.textContent();
-    await next.click();
-    await expect(indicator).not.toHaveText(before ?? '', { timeout: 60_000 });
+  // Primero, tal cual esta: si el producto vino en la pagina precargada, se elige sin escribir
+  // ni desplazar nada, que es el camino corto real del usuario.
+  if ((await option.count()) === 0) {
+    // Si no estaba, se BUSCA: el termino viaja al servidor (R28). Escribirlo no es fingir un
+    // filtrado en cliente -la pantalla no lo hace-, es usar la busqueda que la pantalla tiene.
+    await campo.fill(name);
   }
+
+  try {
+    await option.first().waitFor({ state: 'visible', timeout: 30_000 });
+  } catch {
+    // Ultimo recurso: bajar hasta el final del desplegable para que anexe las paginas
+    // siguientes, que es el gesto con el que R28 pagina desde el 2026-09-07.
+    for (let intento = 0; intento < 10 && (await option.count()) === 0; intento += 1) {
+      await popup.evaluate((lista) => {
+        lista.scrollTop = lista.scrollHeight;
+      });
+      await page.waitForTimeout(500);
+    }
+    if ((await option.count()) === 0) {
+      throw new Error(`producto "${name}" no aparecio en el selector`);
+    }
+  }
+
+  await option.first().click();
 }
 
 /**
