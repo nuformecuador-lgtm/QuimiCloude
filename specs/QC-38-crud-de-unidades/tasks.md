@@ -108,7 +108,7 @@
     (`invalid_input`); y `tests/unit/unidades/module-contract.test.ts` sigue verificando que
     `index.ts` no exporta ninguna action. Cubre: R27, R29, R30, R31, R36.
 
-- [ ] **T10. Guardias de convenciones y de límites de alcance.** (depende de T9) [P con T11]
+- [x] **T10. Guardias de convenciones y de límites de alcance.** (depende de T9) [P con T11]
   - Toca: `tests/unit/unidades/unidades-convenciones.test.ts` (nuevo),
     `tests/unit/unidades/module-contract.test.ts`.
   - Comprueba: ninguna comparación por nombre de rol en `lib/modules/unidades/**` (R2); ningún
