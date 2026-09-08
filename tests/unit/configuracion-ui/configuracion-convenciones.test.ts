@@ -593,12 +593,16 @@ describe('la feature no anade dependencias ni abre las primitivas (R31)', () => 
     expect(
       intocablesTocados([
         'lib/shared/routes.ts',
-        'lib/composition/route-role-rules.ts',
+        // Ronda 2 (2026-09-08): antes aqui figuraba `lib/composition/route-role-rules.ts`, que
+        // QC-75 BORRO junto con el mecanismo ruta->rol. Su relevo es la navegacion privada: otro
+        // archivo HEREDADO que esta feature modifica -le anade la seccion «Configuración» y su
+        // item (R33)- y que, como el manifiesto y las primitivas no, SI puede tocarse.
+        'lib/shared/navigation/private-nav.ts',
         `${CARPETA_DE_COMPONENTES}/index.ts`,
         `${CARPETA_DE_LA_RUTA}/page.tsx`,
         `${CARPETA_DE_TESTS}/configuracion-convenciones.test.ts`,
       ]),
-      'estos cinco son justo lo que la feature construye',
+      'estos cinco son justo lo que la feature construye o amplia',
     ).toEqual([]);
   });
 });

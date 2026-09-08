@@ -12,10 +12,10 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | in_progress | feature/QC-75-menu-y-rutas-por-permiso | **spec aprobado el 2026-09-07**, tarjeta en *En curso*. `implementer` corriendo las 16 tasks (F2.1) |
+| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | in_progress | feature/QC-75-menu-y-rutas-por-permiso | **PR #44 abierto (F2.4)**, gate completo en verde. `reviewer` APROBADO 0 mayores / 3 menores. Esperando merge humano |
 | QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **spec aprobado por el humano el 2026-09-08**, tarjeta en *En curso*. `implementer` corriendo las 14 tasks (F2.1) |
-| QC-45 | pantalla-de-presentaciones | Inventario | frontend | spec_ready | feature/QC-45-pantalla-de-presentaciones | **F1.2 hecha el 2026-09-07**: acotada, sembrada y spec escrito (36 EARS, 13 tasks, 0 preguntas abiertas nuevas). Tarjeta en *En revisión*. **Esperando aprobación humana (F1.4)** |
-| QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | in_progress | feature/QC-76-equivalencia-y-ambito-de-unidades | **spec aprobado por el humano el 2026-09-07** (F1.4). 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1) |
+| QC-45 | pantalla-de-presentaciones | Inventario | frontend | in_progress | feature/QC-45-pantalla-de-presentaciones | **F2.2 APROBADO** (0 mayores, 7 menores, 34/36 con test). **Commiteada (`30e9e2b`), sincronizada con `origin/dev` y PUSHEADA.** F2.4 (PR) **bloqueado** por la base compartida; y sin T2/T12 no se cierra |
+| QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | in_progress | feature/QC-76-equivalencia-y-ambito-de-unidades | implementada: 11/12 tasks, **38/38 `R<n>` con test ejecutado y verde**. `reviewer` en curso (F2.2). Pendiente F2.3 (mergear `origin/dev`, que avanzó) y F2.4 |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -241,6 +241,57 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-45 — F2.3 (sincronización) del 2026-09-08
+
+- **Commit `30e9e2b`**: 35 archivos, 6394 inserciones. Antes de esto **las 11 tasks aprobadas
+  vivían solo en el árbol de trabajo del worktree** — lo detectó el reviewer (menor 5), no el
+  implementer. Al commitear dejan además de estar **mudas las dos guardias de diff** baselineadas,
+  que comparan contra `origin/dev...HEAD`.
+- **`git merge origin/dev` limpio** —las dos ramas estaban a la par— y **`git push`**: la rama ya
+  existe en el remoto y GitHub ofrece abrir el PR.
+- **Decisión del humano del 2026-09-08 sobre la forma del PR: sale PARCIAL.** Las 11 tasks entran
+  en su PR; **T2 —el ítem del menú— va en un PR posterior**, hecho ya **por permiso** cuando QC-75
+  aterrice, que es donde iba a acabar. **QC-45 no pasa a `done` hasta ese segundo PR.**
+- **El PR sigue sin poder abrirse**, y no por esta ficha: `./init.sh` completo es requisito sin
+  excepción y está rojo por la base compartida (ver Deudas). Confirmado el 2026-09-08: la
+  migración de QC-76 **sigue sin estar en `origin/dev`** y sigue aplicada a la base.
+### QC-45 — F2.2 (review) del 2026-09-08
+
+- Informe en el worktree: `progress/review_QC-45-pantalla-de-presentaciones.md`.
+  **Veredicto APROBADO**: **0 hallazgos mayores**, 7 menores, **34 de 36 requisitos con test
+  verificado** (R3 y R4 los hereda QC-75 por el recorte de T2).
+- **Verificó, no se fió de la bitácora:** T2 no se coló a medias (`private-nav.ts` y `layout.tsx`
+  no aparecen ni en `git status` ni en `git diff dev`); `route-role-rules.ts` es **+6/-0** sin
+  reordenar; R20 intacto por dos vías. Las cuatro guardias ampliadas se **tensaron**, no se
+  debilitaron: en `data-table-alcance` los centinelas anti-falso-verde subieron de `>2` a `>3`.
+- **Suite unitaria completa: 2422 tests con solo los 2 rojos baselineados** (`recipe-route-contract`
+  y `recetas/module-contract`, los estructurales del rango git). **Cero regresiones.**
+- **CORRECCIÓN a lo que anotó el implementer: R26 NO está parcial.** El aserto positivo de «una
+  sola región de avisos» vive en `private-layout.test.tsx`, y el reviewer lo corrió y está verde.
+- **Menores que hay que atender antes de cerrar:** (1) **nada está commiteado** —`HEAD` ==
+  `origin/dev`—, lo que además deja **mudas las dos guardias de diff** baselineadas; (2) el estado
+  vacío secuestra el resultado vacío de una búsqueda y se lleva la caja de búsqueda, dejando un
+  callejón sin salida salvo editando la URL —**deuda heredada** de inventario y pedidos, candidata
+  a **QC-56**—; (3) **R33 quedó sin actualizar**: prohíbe tocar tests heredados fuera de R2-R6 y se
+  tocaron cuatro, decisión correcta pero requisito desfasado; (4) **T10 sigue pendiente** de la
+  comprobación manual en WebKit real.
+### QC-45 — F2.1 (implementación) del 2026-09-08
+
+- Bitácora en el worktree: `progress/impl_QC-45-pantalla-de-presentaciones.md`. **11 tasks**
+  (T0, T1, T3-T11). **T2 sin empezar**, anotada en su `tasks.md` con el motivo; **T12 sin marcar**.
+- **Verde donde le toca:** 324/324 en `tests/unit/configuracion-ui`, `tests/guards` y las tres
+  guardias ampliadas; y **4 E2E** (`e2e/presentaciones.spec.ts`) en Chromium y WebKit.
+- **R3 y R4 quedan sin cubrir** —la sección Configuración y el ocultado por rol— y **los hereda
+  QC-75**. **R26 queda parcial**: el aserto de «exactamente una región de avisos» vivía en
+  `private-layout.test.tsx`, congelado por el recorte; cubierto solo en negativo.
+- **`route-role-rules.ts` quedó con +6 líneas, 0 borradas y 0 reordenadas**, a propósito, para
+  que el merge con QC-75 sea limpio.
+- **Cuatro decisiones del implementer que no estaban en el spec**, todas anotadas: T1 y T5 se
+  cerraron como una sola tanda porque `guard-rutas-privadas-cubiertas` es **bidireccional** (se
+  pone roja con prefijo y sin `page.tsx`, no solo al revés), así que el criterio de hecho de T1
+  era inalcanzable en aislamiento; se **ampliaron** cuatro guardias de lista cerrada en vez de
+  silenciarlas; el título de la pantalla es constante local hasta que QC-75 cree el ítem; y hubo
+  que copiar el `.env` al worktree, que se montó sin él.
 ### QC-58 — timeout-tests-ui-bajo-carga (acotada el 2026-09-07)
 
 - El alcance y las **8 decisiones cerradas** viven en
@@ -341,6 +392,33 @@ tocar su spec. QC-38 reescrita: pierde la consulta, gana las validaciones de la 
 - **Queda abierto**: si la pantalla de presentaciones (QC-45) vive también bajo esa sección
   Configuración; qué permiso exige ver y editar unidades (lo cierra QC-38); y si el símbolo debe
   ser único, abierta desde QC-32.
+
+#### QC-76 — la base, y el gate en rojo que no era suyo (2026-09-08)
+
+**La migración de QC-76 está aplicada en la base de desarrollo** (`20260907190000_units_equivalence_and_scope`).
+Se aplicó tras una decisión del humano: la base arrastraba una unidad residual de un test
+(`24e8c214-c000-4e30-bd0b-5cd0101366aa`, «Unidad 109c4e85…») cuyo símbolo `kg` duplicaba el de
+`kilogramo` y hacía fallar con `23505` el índice único que exige R15. Verificadas **cero
+referencias** en `products.unit_id`, `recipe_lines.unit_id` y `supplier_catalog_lines.unit_id`
+antes de tocarla; el humano eligió **borrarla** frente a anularle el símbolo. Quedan las cuatro de
+sistema. El `implementer` corrió después `db:rollback` y `db:migrate` de verdad, así que el UP, el
+DOWN y el re-UP están ejercitados contra el esquema real, no en transacción deshecha.
+
+**El `./init.sh --rapido` da rojo y el rojo NO es de esta feature.** Dos corridas seguidas, sin
+tocar una línea entre medias:
+
+| Corrida | Archivos en rojo | Tests en rojo | Extra |
+| --- | --- | --- | --- |
+| 1 | 7 | 18 | `Worker exited unexpectedly` |
+| 2 | 3 | 6 | — |
+
+Los tres de la segunda son de UI —`proveedores-ui/catalog-line-sheet`, `pedidos-ui/order-sheet`,
+`pedidos-ui/order-form`— y **aislados dan 41/41 verdes**. **Cero fallos en `unidades` en las dos
+corridas.** Es el flake de UI bajo carga, que es exactamente lo que existe para arreglar **QC-58**,
+y aquí queda medido: la no-determinación entre corridas (18 → 6) es la prueba, no una impresión.
+**Mientras QC-58 no cierre, ningún gate completo de este repo puede salir verde de forma fiable**,
+y eso bloquea el F2.4 de cualquier feature, no solo el de esta.
+
 
 #### QC-76 — arranque del 2026-09-07 (F1.0/F1.1)
 
@@ -2324,6 +2402,37 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### La base de desarrollo es COMPARTIDA y ya rompió el gate de otra feature (2026-09-08)
+
+**Síntoma:** `./init.sh` completo da rojo en **14 archivos, todos de `tests/integration/`**, en el
+worktree de QC-45 — que no toca ni la base ni unidades.
+
+**Causa, verificada y no supuesta:** la migración `20260907190000_units_equivalence_and_scope`
+(de **QC-76**) **NO está en `dev`** —vive solo en su rama— pero **sí está aplicada a la base
+compartida**, y crea `units_system_symbol_unique`. Los fixtures de integración siembran
+`symbol: 'x'` fijo (`tests/integration/unidades/unidades-constraints.int.test.ts` y
+`unit-repository.int.test.ts`) porque se escribieron cuando el símbolo **no** era único. Así que
+cualquier worktree cuyo `schema.prisma` no tenga aún ese índice corre contra una base que sí lo
+tiene. **Rompe a todos: pedidos, proveedores y recetas también siembran unidades.**
+
+**Por qué importa más de lo que parece:** el arnés exige `./init.sh` completo en verde **antes de
+cada PR, sin excepción** (regla 5 de `CLAUDE.md`). Mientras esto siga así, **ninguna feature puede
+abrir PR**, y no por un fallo suyo.
+
+**Lo que NO se hizo, y con criterio:** no se añadió a `tests/baseline-rojos.json` —no es deuda de
+`dev`, es un estado transitorio de una base— ni se limpiaron filas a mano, porque tocar esa base
+rompería a las otras dos sesiones.
+
+**Salidas posibles:** que **QC-76 mergee** (entonces el esquema de `dev` coincide con la base y los
+fixtures se actualizan **en QC-76**, que es quien introduce la restricción); que aterrice **QC-77**
+(`aislamiento-de-la-base-en-tests-de-integracion`, ya en el backlog, que es exactamente esto); o
+resetear la base compartida, que rompería a quien esté a media migración. **Decisión del humano.**
+
+### El puerto 3117 de Playwright es fijo y compartido (2026-09-08)
+
+Dos E2E de worktrees distintos **se excluyen entre sí**. Además el proceso de Playwright no carga
+`.env` por su cuenta: hay que exportar las variables. Anotado al correr los E2E de QC-45.
 
 ### `docs/jira.md` documenta cinco columnas del board que ya no existen (2026-09-07, hallazgo de QC-54)
 

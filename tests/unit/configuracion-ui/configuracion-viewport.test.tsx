@@ -74,7 +74,8 @@ const AREA_TACTIL = ['min-h-11', 'min-w-11'] as const;
 /** Tamano de fuente minimo de R34: `text-base` = 1rem = 16 px, y que no baje en el breakpoint. */
 const FUENTE_DE_CAMPO = ['text-base', 'md:text-base'] as const;
 
-const { routerMock, listPresentationsActionMock } = vi.hoisted(() => ({
+const { routerMock, listPresentationsActionMock, getSessionUserMock } = vi.hoisted(() => ({
+  getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -90,6 +91,25 @@ vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => routerMock,
 }));
+
+/**
+ * QC-75: la pagina abre con `await requirePagePermission('inventario.modificar')`, que lee la
+ * sesion por `@/lib/composition`. Se mockea **el proveedor de sesion**, no `requirePagePermission`:
+ * asi el corte se ejecuta de verdad y este archivo sigue afirmando solo lo suyo -que la pantalla se
+ * usa en angosto y en ancho-. Sin esto, `cookies()` revienta fuera de una peticion real.
+ */
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+}));
+
+/** Sesion con el permiso que la pantalla exige: sin el, `requirePagePermission` haria 404. */
+const USUARIO_CON_PERMISO = {
+  id: '99999999-9999-4999-8999-999999999999',
+  username: 'admin.prueba',
+  displayName: 'Admin De Prueba',
+  roleName: 'Administrador',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
+};
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
@@ -205,6 +225,7 @@ function sinAlturaDeVentana(contexto: string): void {
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  getSessionUserMock.mockResolvedValue(USUARIO_CON_PERMISO);
   listPresentationsActionMock.mockResolvedValue(pagina([PRESENTACION, PRESENTACION_LARGA]));
 });
 

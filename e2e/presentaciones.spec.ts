@@ -8,18 +8,25 @@
  *
  * Que aporta sobre unit e integracion, que es lo unico que justifica su coste:
  *  - La cadena entera en un navegador de verdad: cookie firmada por el servidor, middleware,
- *    regla ruta->rol, Server Component de la lista, las Server Actions REALES de `inventario`
- *    (QC-20) contra Postgres y `router.refresh()`. En unit todas esas actions son dobles.
+ *    corte por permiso de la pagina, Server Component de la lista, las Server Actions REALES de
+ *    `inventario` (QC-20) contra Postgres y `router.refresh()`. En unit todas esas actions son
+ *    dobles.
  *  - La tabla compartida de QC-55 montada de verdad, con su busqueda AL SERVIDOR (R10): jsdom no
  *    ejercita la navegacion por cadena de consulta igual que un navegador.
- *  - **El corte por rol de verdad** (R6): en unit se afirma la DECISION (`findRouteRule`); aqui se
- *    afirma que el usuario acaba fuera y sin ver ni un dato.
+ *  - **El corte por permiso de verdad** (R6): en unit se afirma que `page.tsx` exige el codigo
+ *    (test de fuente); aqui se afirma el STATUS de la respuesta real y que no se ve ni un dato.
  *  - Chromium y WebKit. WebKit es el motor de iOS, y la regla multiplataforma pide ejercitarlo.
  *
- * NAVEGACION SIEMPRE POR URL (`page.goto`), nunca por el menu lateral: la seccion Configuracion
- * y su item NO existen en esta feature -decision humana del 2026-09-08: los construye QC-75-, asi
- * que un recorrido que pulsara un item del sidebar afirmaria sobre codigo que no esta escrito. La
- * URL se deriva SIEMPRE de `PRESENTATIONS_ROUTE` (R2): ningun literal `'/configuracion/...'`.
+ * NAVEGACION SIEMPRE POR URL (`page.goto`), nunca por el menu lateral: lo que este spec afirma es
+ * el camino de la pantalla, y pulsar el item del sidebar meteria en el recorrido el filtrado del
+ * menu, que ya cubre `e2e/permisos.spec.ts` con sus propios fixtures. La URL se deriva SIEMPRE de
+ * `PRESENTATIONS_ROUTE` (R2): ningun literal `'/configuracion/...'`.
+ *
+ * **RONDA 2 (2026-09-08): el recorrido 2 ya no espera una redireccion.** QC-75 borro la regla
+ * ruta->rol del borde (R16): a quien no tiene el permiso ya no se le saca al dashboard, se le
+ * responde **404 dentro del layout privado** —indistinguible de una ruta que no existe—. El assert
+ * es sobre el `status()` de la respuesta real de `goto` y sobre `private-not-found`, copiando
+ * `e2e/permisos.spec.ts`.
  *
  * DATOS: `presentations` es una tabla real y COMPARTIDA, y los dos proyectos de Playwright corren
  * a la vez. Por eso, copiando el patron ya asentado:
@@ -37,10 +44,12 @@
  * (`design.md > 10`): se avisa por consola y la limpieza sigue con el resto de las tablas. Tumbar
  * `afterAll` convertiria en rojo una suite cuyos dos recorridos pasaron.
  *
- * LO QUE ESTE SPEC NO CREA: los roles. `Administrador` y `Operador` los siembra
- * `pnpm run db:seed` (`lib/modules/identity/domain/roles.ts`), y el rol tiene que llamarse
- * EXACTAMENTE asi porque la regla ruta->rol compara por nombre. Si falta, el `beforeAll` falla
- * diciendo que hay que sembrar, en vez de dar un rojo incomprensible en mitad del recorrido.
+ * LO QUE ESTE SPEC NO CREA: los roles ni sus permisos. `Administrador` y `Operador` -y el
+ * conjunto de permisos de cada uno, QC-74- los siembra `pnpm run db:seed`
+ * (`lib/modules/identity/domain/roles.ts` y `domain/permissions.ts`). El rol tiene que llamarse
+ * EXACTAMENTE asi porque el usuario del fixture se crea buscandolo por nombre. Si falta, el
+ * `beforeAll` falla diciendo que hay que sembrar, en vez de dar un rojo incomprensible en mitad
+ * del recorrido.
  *
  * LOS `data-testid` VAN COMO CONSTANTES LOCALES y no importados de los componentes de la ruta: son
  * modulos de CLIENTE (`'use client'`, JSX, `useActionState`) y su barrel es la T9, que todavia no
@@ -64,7 +73,12 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, LOGIN_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
+import {
+  DASHBOARD_ROUTE,
+  INVENTORY_ROUTE,
+  LOGIN_ROUTE,
+  PRESENTATIONS_ROUTE,
+} from '@/lib/shared/routes';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc45_e2e_';
@@ -100,6 +114,8 @@ const FORM_SUBMIT_TESTID = 'presentation-form-submit';
 const LIST_TESTID = 'presentation-list';
 const LIST_EMPTY_TESTID = 'presentation-list-empty';
 const DATA_TABLE_TESTID = 'data-table';
+/** El 404 de la zona privada (QC-75 R8): se pinta DENTRO del layout, con su menu ya filtrado. */
+const NOT_FOUND_TESTID = 'private-not-found';
 const NAME_CELL_TESTID = 'data-table-cell-name';
 
 type Credentials = { readonly username: string; readonly password: string };
@@ -161,13 +177,20 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
   });
 }
 
-/** Entra por el formulario real y aterriza en el dashboard. */
-async function login(page: Page, user: Credentials): Promise<void> {
+/**
+ * Entra por el formulario real y aterriza donde le corresponde a ese usuario.
+ *
+ * **El destino se pasa como parametro desde QC-75 (R11)**: el login ya no lleva a todo el mundo al
+ * dashboard, sino al PRIMER item del menu que esa persona puede ver. El Administrador aterriza en
+ * `DASHBOARD_ROUTE`; el Operador, que no tiene `dashboard.consultar`, en `INVENTORY_ROUTE`. Dar
+ * por hecho el dashboard para los dos dejaba este `waitForURL` colgado hasta agotar el tiempo.
+ */
+async function login(page: Page, user: Credentials, landing: string): Promise<void> {
   await page.goto(LOGIN_ROUTE);
   await page.getByTestId('login-username').fill(user.username);
   await page.getByTestId('login-password').fill(user.password);
   await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+  await page.waitForURL((url) => url.pathname === landing, { timeout: 60_000 });
 }
 
 /**
@@ -271,7 +294,7 @@ test.describe('pantalla de presentaciones', () => {
   test('el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await login(page, adminUser, DASHBOARD_ROUTE);
 
     // --- 1. La pantalla se sirve a un Administrador (R6, la mitad que deja pasar). Se llega POR
     // URL derivada de la constante: el item de menu de Configuracion no existe en esta feature.
@@ -325,14 +348,27 @@ test.describe('pantalla de presentaciones', () => {
     ).toBe(1);
   });
 
-  test('un usuario que no es Administrador acaba fuera y no ve la tabla (R6)', async ({ page }) => {
-    await login(page, operatorUser);
+  test('un usuario sin `inventario.modificar` recibe 404 y no ve ni un dato (R6)', async ({
+    page,
+  }) => {
+    // El Operador del seed lleva `inventario.consultar` y SOLO ese, asi que aterriza en inventario
+    // (QC-75 R11) y la pantalla de presentaciones, que exige `inventario.modificar`, le esta
+    // cerrada.
+    await login(page, operatorUser, INVENTORY_ROUTE);
 
-    // Sesion valida, rol distinto: la regla ruta-rol lo saca al dashboard SIN renderizar nada de
-    // la pantalla. No es «no autenticado»: acaba en el dashboard, no en el login, y esa diferencia
-    // es justo lo que R6 pide y lo que un redirect al login enmascararia.
-    await page.goto(PRESENTATIONS_ROUTE);
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+    // Sesion valida, permiso ausente: **404, sin redireccion**. Antes de QC-75 la regla ruta->rol
+    // lo sacaba al dashboard; ahora la respuesta es indistinguible de la de una ruta que no
+    // existe, que es justo lo que evita delatar que el modulo esta ahi. No es «no autenticado»:
+    // no acaba en el login, y esa diferencia es lo que un redirect al login enmascararia.
+    const response = await page.goto(PRESENTATIONS_ROUTE);
+    expect(
+      response?.status(),
+      'una ruta privada sin permiso debe responder 404, indistinguible de una que no existe',
+    ).toBe(404);
+
+    // Y ese 404 se pinta DENTRO del layout privado (QC-75 R8): el usuario conserva su menu y su
+    // salida en vez de quedarse en una pagina pelada.
+    await expect(page.getByTestId(NOT_FOUND_TESTID)).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId(TITLE_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(DATA_TABLE_TESTID)).toHaveCount(0);

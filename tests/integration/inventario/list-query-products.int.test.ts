@@ -110,7 +110,11 @@ beforeAll(async () => {
 
   const unitName = `unidad ${token()}`;
   const unit = await prisma.unit.create({
-    data: { name: unitName, nameNormalized: normalizeForTest(unitName), symbol: 'kg' },
+    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
+    // UNICO dentro del ambito cuando existe. Esta unidad se siembra SIN empresa —o sea DE
+    // SISTEMA—, asi que un `'kg'` fijo choca con `23505` contra el `kilogramo` del catalogo
+    // arrancador. Se deriva del nombre, que ya lleva marcador. Ningun aserto lee su valor.
+    data: { name: unitName, nameNormalized: normalizeForTest(unitName), symbol: unitName },
     select: { id: true },
   });
   unitId = unit.id;

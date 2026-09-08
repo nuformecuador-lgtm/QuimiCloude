@@ -59,17 +59,21 @@ const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
  * Cada cosa que queda fuera, con su razon:
  *
  * - `lib/modules/identity/**` — el nombre del rol es SUYO: lo declara (`roles.ts`), lo siembra
- *   (`SEED_ROLES`), lo muestra y lo usa el middleware de rutas (`route-guard-middleware.ts` lee
- *   `claims.roleName`). Prohibirle `roleName` a `identity` seria prohibirle su propio dominio.
- * - `lib/composition/route-role-rules.ts` y `middleware.ts` — el corte de RUTAS por rol sigue vivo a
- *   proposito hasta QC-75 (R23): esta ficha cambia como autoriza el servicio, no como corta el
- *   middleware. `route-role-rules.ts` importa `ROLE_ADMINISTRADOR` del barrel y debe seguir
- *   haciendolo; `middleware.ts` es un cascaron que reexporta el handler de `identity`.
+ *   (`SEED_ROLES`), lo firma en la cookie y lo muestra en la cabecera. Prohibirle `roleName` a
+ *   `identity` seria prohibirle su propio dominio.
+ * - `lib/composition/**` y `middleware.ts` — cableado, no logica de negocio. `middleware.ts` es un
+ *   cascaron que reexporta el handler de `identity`.
  * - `tests/`, `e2e/`, `scripts/`, `db/` — mencionan los nombres de rol A PROPOSITO: este mismo
  *   archivo los escribe, los tests de autorizacion construyen actores, el seed los siembra.
  *
- * Las dos primeras exenciones tienen ancla mas abajo («las exenciones son las declaradas...»): si
- * alguna dejara de contener lo que se le perdona, la exencion sobra y hay que revisarla.
+ * **QC-75 se llevo el corte de rutas por rol**: la lista ruta->rol ya no existe, el middleware ya
+ * no lee `claims.roleName` y ninguna decision del borde depende del rol (R16). Aqui eso solo
+ * significa que dos anclas viejas —las que exigian que ese archivo y ese middleware SIGUIERAN
+ * nombrando el rol— se retiraron. El barrido, los cinco modulos de negocio y los patrones no
+ * cambian: lo que esta guardia vigila es el servicio, y eso sigue igual.
+ *
+ * La exencion de `identity` tiene ancla mas abajo («la exencion de identity es la declarada...»):
+ * si dejara de contener lo que se le perdona, la exencion sobra y hay que revisarla.
  */
 const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos'];
 
@@ -274,30 +278,16 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
     }
   });
 
-  // Anclas de las exenciones (`design.md > 6.2`): quedan fuera del barrido porque el rol sigue
-  // siendo suyo a proposito. Si dejaran de contener lo que se les perdona, la exencion sobra.
-  it('las exenciones son las declaradas: identity y el corte de rutas por rol siguen usando el rol', () => {
+  // Ancla de la exencion (`design.md > 6.2`): `identity` queda fuera del barrido porque el nombre
+  // del rol es suyo a proposito. Si dejara de contener lo que se le perdona, la exencion sobra.
+  it('la exencion de identity es la declarada: sigue siendo el dueño del literal del rol', () => {
     const leer = (file: string) => readFileSync(join(repoRoot, file), 'utf8');
 
-    // R23: el corte de RUTAS por rol sigue vivo hasta QC-75.
-    expect(
-      findForbiddenPatternsInSource(leer('lib/composition/route-role-rules.ts')),
-      'lib/composition/route-role-rules.ts esta exento del barrido porque ata rutas a roles ' +
-        '(R23). Si ya no menciona ningun rol, la exencion sobra: quitala de la documentacion de ' +
-        'esta guardia o revisa si QC-75 ya se la llevo.',
-    ).toContain('ROLE_ADMINISTRADOR');
-
-    // `identity` es el dueño del nombre del rol: lo declara y lo usa en el middleware de sesion.
+    // `identity` es el dueño del nombre del rol: lo declara en `roles.ts`, y desde QC-75 ese es el
+    // UNICO archivo de produccion que lo escribe (lo vigila `guard-rol-administrador-unico`).
     expect(findForbiddenPatternsInSource(leer('lib/modules/identity/domain/roles.ts'))).toContain(
       `literal del rol ${ROLE_ADMINISTRADOR}`,
     );
-    expect(
-      findForbiddenPatternsInSource(
-        leer('lib/modules/identity/adapters/driving/route-guard-middleware.ts'),
-      ),
-      'El middleware de rutas de identity lee `claims.roleName` a proposito (R23). Si dejo de ' +
-        'hacerlo, el corte por rol cambio y esta ficha decia que no cambiaba.',
-    ).toContain('roleName');
 
     // Y ninguno de esos archivos entra al barrido: la exencion es por ALCANCE, no por lista de
     // perdones sobre un barrido ancho.

@@ -254,3 +254,191 @@ excluyen (`reuseExistingServer: false`).
 2. **La comprobacion manual en un WebKit real** del scroll contenido en la tabla (T10). El E2E si
    corrio en WebKit y paso, pero eso no es la comprobacion manual que `tasks.md` pide.
 3. **El gate completo en verde** (T12), bloqueado por la migracion de QC-76 sobre la base compartida.
+
+## Ronda 2 — adaptación a QC-75 (2026-09-08)
+
+> La ronda 1 de arriba **no se toca**: queda como está, con su recorte de alcance y sus deudas. Lo
+> que sigue es lo que cambió al mergear `origin/dev`, que trae **QC-75
+> (`menu-y-rutas-por-permiso`)**, y que **levanta** el recorte de T2.
+
+### Qué cambió QC-75 debajo de esta feature
+
+1. **Borró `lib/composition/route-role-rules.ts`** y con él el mecanismo ruta→rol entero (QC-75
+   R16). El middleware ya sólo comprueba firma, caducidad y empresa: **no corta por rol**.
+2. **El corte pasa a cada `page.tsx`**: `await requirePagePermission('<codigo>')`
+   (`@/lib/modules/identity/adapters/driving/require-page-permission`), que redirige al login sin
+   sesión y hace `notFound()` —404 dentro del layout privado— si falta el permiso.
+3. **El menú se filtra en el servidor**:
+   `filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, user.permissions)` en `app/(private)/layout.tsx`,
+   con `NavLink.permission` **obligatorio**. No existe `adminOnly` ni `visibleNavItems`.
+4. **El login ya no lleva a todo el mundo al dashboard** (R11): aterriza en el primer ítem visible
+   del menú. El Operador del seed aterriza en `/inventario`.
+
+### Cómo se resolvió el conflicto del merge
+
+El merge de `origin/dev` lo resolvió el humano antes de esta ronda, **aceptando el borrado** de
+`lib/composition/route-role-rules.ts` y de `tests/unit/identity/route-role-rules.test.ts` — la
+ronda 1 había añadido a ese archivo la fila
+`{ prefix: PRESENTATIONS_ROUTE, roles: [ROLE_ADMINISTRADOR] }`, y conservarla habría sido resucitar
+un mecanismo que ya no lee nadie. Esta ronda **no commitea**: el árbol de trabajo queda con los
+cambios y el commit lo hace el humano.
+
+### Decisión de permiso (cerrada por el leader, no reabierta aquí)
+
+La pantalla y su ítem de menú exigen **`inventario.modificar`**, no `inventario.consultar`.
+Administrar el catálogo de presentaciones —alta, edición y borrado viven todos en esta pantalla
+(R21, R27)— **es modificar inventario**. El Operador del seed lleva `inventario.consultar` y sólo
+ese: con `consultar` entraría a una pantalla cuyo propósito entero es escribir. **No se creó ningún
+permiso nuevo ni se tocó `lib/modules/identity/domain/permissions.ts`.** Es además el par del menú
+que comparte módulo y difiere en la acción, así que es donde un filtrado que comparase por prefijo
+de módulo se colaría: por eso hay un caso dedicado a ello en `private-layout-menu.test.tsx`.
+
+### Archivos creados
+
+| Archivo | Qué es |
+| --- | --- |
+| `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` | **T2.** Una sola sección «Configuración» con un solo ítem, que apunta a `PRESENTATIONS_ROUTE` y declara `inventario.modificar`; ningún ítem de la sección lleva a una ruta sin `page.tsx` (comprobado en disco); con `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]` están el ítem y la sección, con los del Operador desaparecen los dos y no queda encabezado huérfano |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+| --- | --- |
+| `lib/shared/navigation/private-nav.ts` | **T2.** `NAV_SECTION_CONFIGURATION`, `PRESENTATIONS_LABEL` y el ítem `nav-presentaciones` como **última** entrada de nivel superior: `href: PRESENTATIONS_ROUTE` (importada de `../routes`, nunca el literal), `icon: 'boxes'` (ya existía en `NavIconName` y en `NAV_ICONS`), `permission: 'inventario.modificar'`. Comentario que deja escrito que la sección nace con un solo ítem a propósito («Unidades» llega con QC-39) y que el ocultado lo hace el filtrado por permiso de QC-75, no un `adminOnly`. **`AppSidebar` no se tocó** |
+| `app/(private)/configuracion/presentaciones/page.tsx` | `await requirePagePermission('inventario.modificar')` como **primera** línea del componente, antes de resolver `searchParams` y de pintar nada. `PAGE_TITLE` local sustituida por `PRESENTATIONS_LABEL` importada (cierra la deuda nº 3 de la ronda 1). JSDoc reescrito: ya no dice que el corte lo hace el middleware con la regla ruta→rol ni que T2 no se ejecuta |
+| `tests/guards/guard-pantallas-exigen-permiso.test.ts` | Ancla anti-vacuidad: `RUTAS_ESPERADAS_HOY` gana `/configuracion/presentaciones` (8 → 9 pantallas); «ocho» → «nueve» en el `it` y en los dos JSDoc |
+| `tests/guards/guard-nav-permisos-declarados.test.ts` | Ancla: `toHaveLength(5)` → `6` y la lista ordenada gana `nav-presentaciones` |
+| `tests/unit/app-sidebar.test.tsx` | Ancla: `PRIVATE_NAV_ITEMS` `toHaveLength(5)` → `6` y `nav-presentaciones` al final del orden exacto, con el comentario de ampliación en el estilo que ya usaban QC-44 y QC-35 |
+| `tests/unit/navegacion/private-layout-menu.test.tsx` | El mapa de `testId` gana `presentaciones`; el caso «con solo `inventario.consultar`» afirma además que `nav-presentaciones` es `null`; «sin ningún permiso» y «con los diez permisos» lo incluyen; el ancla pasa a seis ítems; **dos casos nuevos** con `SEED_ROLE_PERMISSIONS` importados: el layout pinta el ítem con los permisos del Administrador y no lo pinta con los del Operador |
+| `tests/unit/configuracion-ui/presentations-route-contract.test.ts` | Fuera `ROUTE_ROLE_RULES`, `findRouteRule` y el archivo borrado. Sigue afirmando la constante, su presencia única en `PRIVATE_ROUTE_PREFIXES` y la no duplicación; el consumidor que la importa pasa a ser `private-nav.ts`. Cuatro casos nuevos de fuente sobre `page.tsx` (comentarios quitados antes de juzgar, como la guardia): exige el código derivado del catálogo, la llamada va **antes** de `await searchParams`, **no** es `inventario.consultar`, y el ítem de menú declara el mismo código |
+| `tests/unit/configuracion-ui/configuracion-convenciones.test.ts` | En la lista de archivos legítimos del caso de R31, `lib/composition/route-role-rules.ts` → `lib/shared/navigation/private-nav.ts`, que es el archivo heredado que esta feature ahora modifica (R33) |
+| `tests/unit/configuracion-ui/presentation-page.test.tsx` | La página es `async` y llama a `requirePagePermission`: se mockea **el proveedor de sesión** (`@/lib/composition`), no `requirePagePermission`, así el corte se ejecuta de verdad y el archivo sigue afirmando exactamente lo mismo sobre los tres estados |
+| `tests/unit/configuracion-ui/configuracion-viewport.test.tsx` | El mismo mock, por el mismo motivo: sin él `cookies()` revienta fuera de una petición real |
+| `e2e/presentaciones.spec.ts` | Recorrido 2 adaptado: `response.status() === 404` y `private-not-found` visible, en vez del `waitForURL` al dashboard de la regla ruta→rol; cabecera reescrita. Además `login()` recibe el aterrizaje esperado, porque desde QC-75 R11 el Operador aterriza en `/inventario` y no en el dashboard —dar por hecho el dashboard dejaba el `waitForURL` colgado— |
+| `specs/QC-45-pantalla-de-presentaciones/tasks.md` | T1 y T2 reescritas al mecanismo nuevo, aviso de recorte levantado, mapa `R<n> → test` actualizado para R3–R6, T12 con su primera viñeta cerrada. **`requirements.md` NO se toca** |
+
+### Mapa `R<n> -> test` actualizado (sólo los que cambiaron)
+
+| R | Test |
+| --- | --- |
+| R3 | `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` — una sección, un ítem, destino y `testId` únicos, ninguna ruta sin `page.tsx` + `tests/unit/app-sidebar.test.tsx` (orden exacto de `PRIVATE_NAV_ITEMS`) |
+| R4 | `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` (`filterNavItemsByPermissions` con `SEED_ROLE_PERMISSIONS`: Administrador sí, Operador no, sin encabezado huérfano) + `tests/unit/navegacion/private-layout-menu.test.tsx` (sobre el árbol renderizado) |
+| R5 | `tests/guards/guard-rutas-privadas-cubiertas.test.ts` + `presentations-route-contract.test.ts` (la constante está en `PRIVATE_ROUTE_PREFIXES` exactamente una vez) |
+| R6 | `presentations-route-contract.test.ts` (la pantalla exige `inventario.modificar` antes de leer `searchParams`; el ítem declara el mismo código) + `tests/guards/guard-pantallas-exigen-permiso.test.ts` + `e2e/presentaciones.spec.ts` (recorrido 2: 404 dentro del layout privado) |
+
+### Verificación
+
+Antes del gate hubo que **regenerar el cliente de Prisma** (`pnpm exec prisma generate --schema
+db/schema.prisma`): el merge trae el esquema de QC-76 (`units.company_id`, `unit_id`, `factor`) y el
+cliente generado en este worktree era el anterior, así que `typecheck` fallaba en `unidades` por
+tipos que ya no existían. Es un artefacto local, no un cambio en el repo.
+
+```
+$ ./init.sh --rapido
+== Arnes SDD :: init (modo: rapido) ==
+✓ node v22.13.1
+✓ dependencias presentes
+✓ regla max-2-por-zona respetada (in_progress=4)
+✓ specs presentes para features sdd en vuelo
+✓ ninguna ficha sembrada esperando al board
+✓ cada spec sembrado tiene su ficha, con el mismo slug
+✓ worktrees bajo control (4 ademas del principal)
+✓ typecheck paso
+✓ lint paso
+[test:rapido] tests relacionados con 28 archivo(s) del diff vs origin/dev
+...
+ FAIL  |node| tests/unit/pedidos-ui/pedidos-convenciones.test.ts > la feature no toca lo que tiene
+ prohibido tocar (R42, R46) > no modifica los modulos, el esquema de datos ni el punto de composicion
+AssertionError: la feature toca archivos intocables:
+  db/migrations/20260907190000_units_equivalence_and_scope/down.sql,
+  db/migrations/20260907190000_units_equivalence_and_scope/migration.sql,
+  lib/modules/identity/adapters/driving/login-action.ts,
+  lib/modules/identity/adapters/driving/require-page-permission.ts,
+  lib/modules/identity/adapters/driving/route-guard-middleware.ts,
+  lib/modules/identity/domain/route-access.ts,
+  lib/modules/identity/domain/route-role-rules.ts,
+  lib/modules/identity/index.ts,
+  lib/modules/unidades/**  (13 archivos): expected [ …(17) ] to deeply equal []
+ ❯ tests/unit/pedidos-ui/pedidos-convenciones.test.ts:606:89
+
+ Test Files  1 failed | 81 passed (82)
+      Tests  1 failed | 986 passed | 4 skipped (991)
+   Duration  63.50s
+✗ 'pnpm run test:rapido' fallo
+```
+
+**El único rojo NO es de esta ficha y desaparece al commitear el merge.**
+`tests/unit/pedidos-ui/pedidos-convenciones.test.ts` (guardia de alcance de QC-35) calcula lo tocado
+como «los commits marcados `QC-35` en `origin/dev..HEAD` **más todo lo que devuelva
+`git status --porcelain`**», y ahora mismo `git status` devuelve el merge de `origin/dev` sin
+commitear: los diecisiete archivos que denuncia son **de QC-75 y QC-76**, ninguno lo tocó esta
+ronda. En cuanto el humano commitee el merge, el árbol de trabajo queda limpio y la guardia vuelve a
+verde sin cambiar una línea.
+
+Antes de commitear, y como comprobación adicional de lo que sí es nuestro:
+
+```
+$ pnpm exec vitest run tests/guards tests/unit/configuracion-ui tests/unit/navegacion tests/unit/app-sidebar.test.tsx
+ Test Files  38 passed (38)
+      Tests  424 passed (424)
+```
+
+Esa corrida ampliada deja **un segundo rojo, tambien ajeno y tambien atado al merge sin
+commitear**: `tests/unit/navegacion/qc75-convenciones.test.ts > el rango de la rama trae archivos y
+contiene el trabajo de QC-75`. Es el ancla anti-vacuidad de QC-75, que exige que
+`git diff --name-only origin/dev...HEAD` traiga `lib/shared/navigation/private-nav.ts`. Ese rango
+mira **commits**, no el árbol de trabajo, así que hoy no ve ni el merge ni la modificación de esta
+ronda; en cuanto el humano commitee, el archivo entra en el rango y el ancla vuelve a verde. No lo
+corre `./init.sh --rapido` (no es una guardia y no está entre los tests relacionados con el diff),
+por eso aparece sólo en la corrida ampliada. Ya estaba rojo antes de tocar nada en esta ronda.
+
+**El E2E NO se ejecutó** (el puerto 3117 es compartido con otros worktrees), y
+`./init.sh` completo tampoco: `tests/integration/` está rojo por una base de datos compartida, ajeno
+a esta ficha. No se tocó `tests/integration/` ni `tests/baseline-rojos.json`.
+
+### Requisitos DESFASADOS — no se reescribe `requirements.md`, lo decide el humano
+
+QC-75 dejó cuatro requisitos de esta ficha describiendo un mecanismo que ya no existe. **El código y
+los tests cumplen su INTENCIÓN**, no su letra. Se dejan aquí con una propuesta de reformulación; el
+arreglo del texto es decisión humana y no se ha tocado `requirements.md`.
+
+1. **R4 — habla de ocultar por ROL.** Dice que el ítem se oculta a quien no sea Administrador. Hoy
+   no hay ocultado por rol en ninguna parte: se oculta por **permiso**, y el filtrado lo hace el
+   layout privado con `filterNavItemsByPermissions`.
+   *Propuesta:* «Cuando la sesión no incluya el permiso `inventario.modificar`, el sistema no
+   emitirá el ítem de menú de presentaciones ni el encabezado de su sección en el HTML servido.»
+2. **R5 — enumera la lista de prefijos privados.** Sigue siendo verdad —`PRIVATE_ROUTE_PREFIXES`
+   existe y el middleware la usa para exigir sesión—, pero el texto la ata a la regla ruta→rol como
+   si fueran una sola cosa.
+   *Propuesta:* separar las dos frases: la ruta está cubierta por `PRIVATE_ROUTE_PREFIXES` (exige
+   **sesión**, en el borde) y el permiso lo exige la pantalla (exige **autorización**, en el
+   servidor). Son dos controles distintos y hoy viven en sitios distintos.
+3. **R6 — regla *ruta→rol* restringida al Administrador.** El mecanismo entero desapareció con
+   QC-75 R16.
+   *Propuesta:* «Cuando una sesión válida sin el permiso `inventario.modificar` solicite
+   `PRESENTATIONS_ROUTE`, el sistema responderá 404 sin distinguirlo de una ruta inexistente y sin
+   mencionar el módulo ni los permisos; sin sesión, redirigirá al login con el destino de vuelta.»
+4. **R33 — enumera los archivos heredados modificables citando «reglas ruta→rol».** Uno de los
+   archivos que autoriza a tocar ya no existe.
+   *Propuesta:* sustituir «`lib/composition/route-role-rules.ts` (reglas ruta→rol)» por
+   «`lib/shared/navigation/private-nav.ts` (ítem y sección del menú)», que es el archivo heredado
+   que esta feature amplía de verdad. Ya está reflejado así en el caso de R31 de
+   `configuracion-convenciones.test.ts`.
+
+### Deudas de la ronda 1 que esta ronda cierra
+
+- **«La pantalla no está enlazada desde el menú» (T2 recortada, R3 y R4 sin cubrir):** cerrada. El
+  ítem existe, está filtrado por permiso y tiene tests.
+- **«El título de la pantalla es una constante local en `page.tsx`» (decisión nº 3):** cerrada.
+  `page.tsx` importa `PRESENTATIONS_LABEL` de `private-nav.ts`, como pedía el diseño.
+- **«El E2E navega siempre por URL porque el ítem de menú no existe» (decisión nº 5):** el ítem ya
+  existe, pero el E2E **sigue navegando por URL** a propósito: lo que este spec afirma es el camino
+  de la pantalla, y el filtrado del menú ya lo cubre `e2e/permisos.spec.ts` con sus fixtures. El
+  motivo actualizado está escrito en la cabecera del spec.
+
+### Lo que sigue faltando
+
+1. **La comprobación manual en un WebKit real** del scroll contenido en la tabla (T10). Sin cambios
+   respecto a la ronda 1.
+2. **El gate completo en verde** (T12): `tests/integration/` sigue rojo por la base compartida, y
+   `pedidos-convenciones` seguirá rojo mientras el merge esté sin commitear.
+3. **Reformular R4, R5, R6 y R33** en `requirements.md`, si el humano lo aprueba.

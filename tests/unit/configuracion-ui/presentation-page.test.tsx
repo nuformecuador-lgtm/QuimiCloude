@@ -36,7 +36,8 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { routerMock, listPresentationsActionMock } = vi.hoisted(() => ({
+const { routerMock, listPresentationsActionMock, getSessionUserMock } = vi.hoisted(() => ({
+  getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -52,6 +53,26 @@ vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => routerMock,
 }));
+
+/**
+ * QC-75: la pagina abre con `await requirePagePermission('inventario.modificar')`, que lee la
+ * sesion por `@/lib/composition`. Se mockea **el proveedor de sesion**, no `requirePagePermission`:
+ * asi el corte se ejecuta de verdad -`assertPermission` incluido- y este archivo sigue afirmando
+ * exactamente lo mismo que antes sobre los tres estados de la lista. Quien vigila el corte en si
+ * es `presentations-route-contract.test.ts` y `tests/guards/guard-pantallas-exigen-permiso.test.ts`.
+ */
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+}));
+
+/** Sesion con el permiso que la pantalla exige: sin el, `requirePagePermission` haria 404. */
+const USUARIO_CON_PERMISO = {
+  id: '99999999-9999-4999-8999-999999999999',
+  username: 'admin.prueba',
+  displayName: 'Admin De Prueba',
+  roleName: 'Administrador',
+  permissions: ['inventario.consultar', 'inventario.modificar'],
+};
 
 // Dobles de escritura que FALLAN si se les llama: pintar la lista no muta nada.
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => {
@@ -156,6 +177,7 @@ beforeEach(() => {
   // El filtro de fecha de la tabla compartida usa `window.matchMedia`, que jsdom no implementa.
   // Se stubea con el helper HEREDADO (`tests/helpers/viewport.ts`), nunca con una copia local.
   setViewportWidth(WIDE_VIEWPORT);
+  getSessionUserMock.mockResolvedValue(USUARIO_CON_PERMISO);
   listPresentationsActionMock.mockResolvedValue(pagina([]));
 });
 

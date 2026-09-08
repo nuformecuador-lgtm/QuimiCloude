@@ -4,24 +4,42 @@ import { resolve } from 'node:path';
 import { redirect } from 'next/navigation';
 
 import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
+import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
+import { DASHBOARD_ROUTE, FORMULAS_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
   LOGIN_INITIAL_STATE,
   type LoginFormState,
 } from '@/lib/modules/identity/adapters/driving/login-form-state';
 
-const { verifyCredentialsMock } = vi.hoisted(() => ({
+const { verifyCredentialsMock, getSessionUserMock } = vi.hoisted(() => ({
   verifyCredentialsMock: vi.fn<(input: { username: string; password: string }) => Promise<{ ok: boolean }>>(),
+  // QC-75 T9: la action lee la sesion RECIEN EMITIDA para calcular su respaldo. El doble
+  // devuelve el usuario que cada caso necesita; por defecto, uno que lo puede consultar todo.
+  getSessionUserMock: vi.fn<() => Promise<SessionUser | null>>(),
 }));
 
 vi.mock('@/lib/composition', () => ({
-  identity: { verifyCredentials: verifyCredentialsMock },
+  identity: { verifyCredentials: verifyCredentialsMock, getSessionUser: getSessionUserMock },
 }));
 
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
+
+/** Los codigos del catalogo de QC-74, derivados y no escritos a mano. */
+const TODOS_LOS_PERMISOS: readonly string[] = PERMISSIONS.map((permiso) => permiso.code);
+
+function usuarioCon(permissions: readonly string[]): SessionUser {
+  return {
+    id: 'usuario-1',
+    username: 'ana.perez',
+    displayName: 'Ana Perez',
+    roleName: 'Operador',
+    permissions,
+  };
+}
 
 function formDataOf(fields: Record<string, string>): FormData {
   const formData = new FormData();
@@ -40,6 +58,9 @@ beforeEach(() => {
   // Doble explicito: la action se testea contra un doble, nunca contra el dominio real.
   // Por defecto rechaza; los tests que necesitan otro resultado lo sobreescriben.
   verifyCredentialsMock.mockResolvedValue({ ok: false });
+  // Por defecto quien entra lo puede consultar todo, asi los casos heredados de QC-9 —cuyo
+  // respaldo esperado es el dashboard, primer item del menu— siguen expresando lo mismo.
+  getSessionUserMock.mockResolvedValue(usuarioCon(TODOS_LOS_PERMISOS));
 });
 
 describe('loginAction', () => {
@@ -222,5 +243,119 @@ describe('loginAction', () => {
     expect(redirect).toHaveBeenCalledTimes(2);
     expect(redirect).toHaveBeenNthCalledWith(1, DASHBOARD_ROUTE);
     expect(redirect).toHaveBeenNthCalledWith(2, DASHBOARD_ROUTE);
+  });
+
+  // QC-75 T9 (R11, R12, R13) — el respaldo del login pasa a ser el primer enlace del menu YA
+  // FILTRADO por los permisos de quien entra. El orden no cambia respecto de QC-9: un destino de
+  // vuelta interno y valido sigue mandando; lo unico que cambia es el respaldo.
+  describe('respaldo por permisos (QC-75)', () => {
+    it('aterriza en inventario cuando solo puede consultar inventario y no hay destino de vuelta (R11)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      // Los permisos del rol `Operador` del seed: exactamente `inventario.consultar` (QC-74 R9).
+      getSessionUserMock.mockResolvedValue(usuarioCon(['inventario.consultar']));
+
+      await submit({ username: 'ana.perez', password: 'clave' });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith(INVENTORY_ROUTE);
+      // Y NO al dashboard, que es lo que devolvia el respaldo anterior.
+      expect(redirect).not.toHaveBeenCalledWith(DASHBOARD_ROUTE);
+    });
+
+    it('entra en el grupo del menu cuando el unico permiso cuelga de uno de sus hijos (R11)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(usuarioCon(['recetas.consultar']));
+
+      await submit({ username: 'ana.perez', password: 'clave' });
+
+      expect(redirect).toHaveBeenCalledWith(FORMULAS_ROUTE);
+    });
+
+    it('aterriza en el dashboard cuando el usuario no tiene ningun permiso (R12)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(usuarioCon([]));
+
+      await submit({ username: 'ana.perez', password: 'clave' });
+
+      // OJO: **ese destino dara 404** dentro del layout privado (R12, R7). Quien no tiene ningun
+      // permiso tampoco tiene `dashboard.consultar`, asi que `/dashboard` responde el mismo 404
+      // que cualquier otra ruta privada, con su cabecera y su control de cerrar sesion. Es lo
+      // buscado: R12 prohibe devolver al login, mostrar error de credenciales o pintar una
+      // pantalla de «sin acceso», y nada de eso ocurre aqui.
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
+    });
+
+    it('aterriza en el primer item del menu cuando tiene todos los permisos (R11)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(usuarioCon(TODOS_LOS_PERMISOS));
+
+      await submit({ username: 'ana.perez', password: 'clave' });
+
+      const primerItem = PRIVATE_NAV_ITEMS[0];
+      if (primerItem === undefined || primerItem.kind !== 'link') {
+        throw new Error('el primer item del menu deberia ser un enlace');
+      }
+
+      expect(redirect).toHaveBeenCalledWith(primerItem.href);
+      // Hoy ese primer item es el dashboard, derivado del menu y no del literal.
+      expect(primerItem.href).toBe(DASHBOARD_ROUTE);
+    });
+
+    it('el destino de vuelta interno gana al respaldo por permisos (R13, no regresion de QC-9 R8)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(usuarioCon(['inventario.consultar']));
+
+      await submit({ username: 'ana.perez', password: 'clave', next: '/pedidos?estado=abierto' });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith('/pedidos?estado=abierto');
+      expect(redirect).not.toHaveBeenCalledWith(INVENTORY_ROUTE);
+    });
+
+    // REGRESION del fallo que destapo el E2E de T14. El navegador SIEMPRE manda el campo oculto
+    // `next`: cuando no hay `?next=` viaja presente pero VACIO. Si la pagina fabricaba
+    // `/dashboard` ahi, ese valor era un destino interno valido, ganaba en `resolveReturnPath` y
+    // el respaldo por permisos quedaba muerto en todo login normal — el Operador aterrizaba en
+    // `/dashboard` y recibia un 404. Este caso es la red que impide que vuelva (R11, R12).
+    it('el campo next presente pero vacio no pisa el respaldo por permisos (R11)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(usuarioCon(['inventario.consultar']));
+
+      await submit({ username: 'ana.perez', password: 'clave', next: '' });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith(INVENTORY_ROUTE);
+      expect(redirect).not.toHaveBeenCalledWith(DASHBOARD_ROUTE);
+    });
+
+    it('descarta un destino de vuelta externo y manda el respaldo calculado (R13)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(usuarioCon(['inventario.consultar']));
+
+      await submit({ username: 'ana.perez', password: 'clave', next: 'https://evil.example' });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith(INVENTORY_ROUTE);
+    });
+
+    it('cae al dashboard si la sesion no se puede leer tras un login correcto (caso defensivo)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(null);
+
+      await submit({ username: 'ana.perez', password: 'clave' });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
+    });
+
+    it('no lee la sesion cuando las credenciales son rechazadas', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: false });
+
+      await submit({ username: 'ana.perez', password: 'clave' });
+
+      expect(getSessionUserMock).not.toHaveBeenCalled();
+      expect(redirect).not.toHaveBeenCalled();
+    });
   });
 });

@@ -74,6 +74,9 @@ const FIXTURE_GRUPO_A: NavGroup = {
       href: '/fixture/grupo-a/hijo',
       label: 'Hijo A',
       testId: 'grupo-a-hijo',
+      // QC-75 T1: `permission` es obligatorio en `NavLink`. Fixture de vista: el filtrado por
+      // permiso lo hace el layout antes de llegar aqui (decision cerrada nº 7).
+      permission: 'inventario.consultar',
     },
   ],
 };
@@ -89,6 +92,7 @@ const FIXTURE_GRUPO_B: NavGroup = {
       href: '/fixture/grupo-b/hijo',
       label: 'Hijo B',
       testId: 'grupo-b-hijo',
+      permission: 'pedidos.consultar',
     },
   ],
 };
@@ -457,7 +461,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente cinco entradas de nivel superior en orden', () => {
+  it('PRIVATE_NAV_ITEMS tiene exactamente seis entradas de nivel superior en orden', () => {
     // R5. AMPLIADO el 2026-09-04 (QC-44 T2, R4): la CUARTA entrada es la pantalla de proveedores,
     // item de nivel superior de la seccion «Cadena» -hermano del grupo de produccion, no hijo
     // suyo-. El centinela no se relaja: sigue exigiendo la lista exacta y su orden, asi que una
@@ -472,13 +476,21 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // ficha que la respalde lo vuelve a poner en rojo. El destino y la etiqueta del item nuevo
     // los afirma `tests/unit/pedidos-ui/private-nav-pedidos.test.ts` sobre `ORDERS_ROUTE` y
     // `ORDERS_LABEL`, nunca sobre el literal del copy.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(5);
+    // AMPLIADO otra vez el 2026-09-08 (QC-45 T2, R3): la entrada nueva es la pantalla de
+    // presentaciones, unico item de la seccion «Configuración» y ULTIMO del array —seccion nueva
+    // que se abre detras de las que ya habia—. El centinela no se relaja: sigue exigiendo la
+    // lista exacta y su orden, asi que una septima entrada sin ficha que la respalde lo vuelve a
+    // poner en rojo. El destino, la etiqueta y el permiso del item nuevo los afirma
+    // `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` sobre `PRESENTATIONS_ROUTE`
+    // y `PRESENTATIONS_LABEL`, nunca sobre el literal del copy.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(6);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
       'nav-produccion',
       'nav-proveedores',
+      'nav-presentaciones',
     ]);
   });
 

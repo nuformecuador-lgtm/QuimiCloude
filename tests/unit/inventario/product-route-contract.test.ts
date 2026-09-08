@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+import { PERMISSIONS } from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import { INVENTORY_ROUTE, PRIVATE_ROUTE_PREFIXES } from '@/lib/shared/routes';
 
@@ -313,17 +314,40 @@ describe('contrato de la ruta de inventario', () => {
   });
 
   it('la pantalla no repite requireAdmin ni decide autorizacion', () => {
-    // R5 — la autorizacion sobre los datos la aportan los casos de uso; el corte de ruta lo hace
-    // el middleware. Repetirla aqui seria una tercera regla que nadie mantiene sincronizada.
+    // R5 — la autorizacion sobre los datos la aportan los casos de uso; la pantalla solo exige el
+    // permiso de consulta con `requirePagePermission` (el caso de abajo). Comparar roles o
+    // resolver la sesion aqui seria una tercera regla que nadie mantiene sincronizada.
     ningunArchivoContiene([
       'requireAdmin',
       'getSessionUser',
       'ADMIN_ROLE_NAME',
       'decideRouteAccess',
-      'ROUTE_ROLE_RULES',
       'next/headers',
       'redirect(',
     ]);
+  });
+
+  // QC-75 T12 — sustituye a la afirmacion «hay una fila {prefix, roles:[Administrador]} en la
+  // lista ruta->rol». Esa lista se retiro (QC-75 R16): lo que ata esta ruta a quien puede verla
+  // ya no es un rol en el borde, sino el permiso que exige la propia pantalla (R6) y el que
+  // declara su item de menu (R5). Los dos tienen que ser EL MISMO codigo, o la pantalla saldria
+  // en el menu de quien recibe un 404 al pulsarla.
+  it('la pantalla exige inventario.consultar y su item de menu declara el mismo permiso (R5, R6)', () => {
+    // El codigo se DERIVA del catalogo de `identity`, nunca se escribe a mano: si alguien lo
+    // renombrara, esto se pone rojo en vez de quedarse vigilando un permiso inexistente.
+    const permiso = PERMISSIONS.find(
+      (entrada) => entrada.module === 'inventario' && entrada.action === 'consultar',
+    );
+    expect(permiso, 'el catalogo de identity deberia tener inventario.consultar').toBeDefined();
+
+    expect(fuenteSinComentarios(PAGE_PATH)).toContain(
+      `requirePagePermission('${permiso?.code}')`,
+    );
+
+    const enlace = PRIVATE_NAV_ITEMS.filter(
+      (item): item is NavLink => item.kind === 'link',
+    ).find((item) => item.href === INVENTORY_ROUTE);
+    expect(enlace?.permission).toBe(permiso?.code);
   });
 
   it('la tabla no puede pintar quien creo o modifico un producto', () => {

@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { RETURN_PARAM } from '@/lib/modules/identity';
 import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
 import { LOGIN_INITIAL_STATE } from '@/lib/modules/identity/adapters/driving/login-form-state';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 
 import { SubmitButton } from './submit-button';
 
@@ -17,9 +16,13 @@ const PASSWORD_ERROR_ID = 'password-error';
 
 type LoginFormProps = {
   /**
-   * Destino de vuelta ya validado por la pagina (R7, R8). Opcional con el dashboard por defecto:
-   * el formulario tambien se monta sin el —en tests y en cualquier uso futuro— y el campo oculto
-   * nunca debe viajar vacio.
+   * Destino de vuelta ya validado por la pagina (R7, R8). Opcional, y **por defecto cadena
+   * vacia** (QC-75 R11): el formulario no fabrica un destino que el usuario no pidio. Vacio es
+   * seguro porque `loginAction` revalida el campo con `resolveReturnPath`, e
+   * `isInternalPath('')` es `false` —la cadena vacia no tiene forma de ruta interna—, asi que
+   * cae al `fallback` que la action calcula: el primer enlace del menu filtrado por permisos
+   * (R11, R12). QC-9 R8/R9 no se debilita: un `?next=` interno sigue mandando y uno externo se
+   * sigue descartando; lo unico que cambia es el respaldo cuando no hay destino de vuelta.
    */
   readonly next?: string;
 };
@@ -50,7 +53,7 @@ type LoginFormProps = {
  * Action. Es lo unico que esta feature anade al formulario: sin cambio visual, sin estado nuevo y
  * sin tocar los campos no controlados, las claves de montaje, los toasts ni `SubmitButton`.
  */
-export function LoginForm({ next = DASHBOARD_ROUTE }: LoginFormProps) {
+export function LoginForm({ next = '' }: LoginFormProps) {
   const [state, formAction] = useActionState(loginAction, LOGIN_INITIAL_STATE);
 
   // Unico `useRef` del componente: memoriza que intento ya se notifico (R21).
@@ -80,7 +83,9 @@ export function LoginForm({ next = DASHBOARD_ROUTE }: LoginFormProps) {
         Campo oculto: transporta el destino de vuelta del servidor al servidor. `defaultValue`
         y no `value`, como el resto de campos del formulario, que son NO controlados. Que sea
         oculto no lo hace de fiar: `loginAction` lo revalida con `resolveReturnPath`, porque un
-        POST fabricado puede traer cualquier cosa.
+        POST fabricado puede traer cualquier cosa. Sin `?next=` viaja VACIO a proposito
+        (QC-75 R11): un valor fabricado aqui ganaria siempre y dejaria muerto el respaldo por
+        permisos que calcula la action.
       */}
       <input
         type="hidden"

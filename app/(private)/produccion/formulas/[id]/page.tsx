@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -26,7 +27,14 @@ const NOT_FOUND_MESSAGE = 'Esta receta no existe o fue borrada.';
  *
  * **`not_found`**: estado «no encontrada» identificable, con enlace a la lista, en vez de un
  * formulario vacío (R21). **`unauthorized`** (y cualquier otro código): el mismo estado de error
- * que usa la lista (R7) -aquí tampoco se decide ningún permiso-.
+ * que usa la lista (R7).
+ *
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige `recetas.consultar`
+ * -no `modificar`, por el mismo motivo que la pagina de alta- **antes** de resolver `params` y de
+ * lanzar las tres lecturas; redirige al login sin sesion y responde 404 sin nombrar el modulo ni
+ * mencionar permisos. El middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan
+ * firma, caducidad y empresa. La autorizacion sobre los DATOS la siguen aportando los casos de
+ * uso de `recetas`.
  *
  * **Éxito**: precarga el formulario con el detalle, **incluidas las líneas cuyo `productName` es
  * `null`** -producto dado de baja (R21, R53)-: `buildInitialState` de `recipe-form.tsx` las
@@ -37,6 +45,8 @@ export default async function EditarRecetaPage({
 }: {
   readonly params: Promise<{ id: string }>;
 }) {
+  await requirePagePermission('recetas.consultar');
+
   const { id } = await params;
 
   const [recipeResult, unitsResult, productsResult] = await Promise.all([

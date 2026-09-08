@@ -20,15 +20,26 @@ import type { Actor } from '@/lib/modules/unidades/domain/actor';
 import type { ListQuery } from '@/lib/modules/unidades/domain/list-query';
 import type { Page } from '@/lib/modules/unidades/domain/page';
 import type { UnitRef } from '@/lib/modules/unidades/domain/unit-catalog';
+import type { UnitScope } from '@/lib/modules/unidades/domain/unit-scope';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
 
 /** QC-74 (R16, R17, R18): el actor autorizado lo es por TENER `'unidades.consultar'`, no por
  *  llamarse Administrador —el `Actor` de `unidades` ya no tiene nombre de rol—. */
-const CON_PERMISO: Actor = { id: 'admin-1', permissions: ['unidades.consultar'] };
+const EMPRESA = 'company-1';
+
+const CON_PERMISO: Actor = {
+  id: 'admin-1',
+  companyId: EMPRESA,
+  permissions: ['unidades.consultar'],
+};
 
 /** El que antes era el `Operador`: ahora es «un actor con permisos de OTRO modulo» (R13, R14). */
-const SIN_PERMISO: Actor = { id: 'operador-1', permissions: ['inventario.consultar'] };
+const SIN_PERMISO: Actor = {
+  id: 'operador-1',
+  companyId: EMPRESA,
+  permissions: ['inventario.consultar'],
+};
 
 const CATALOGO: readonly UnitRef[] = [
   { id: 'unit-1', name: 'Gramo', symbol: 'g' },
@@ -51,15 +62,18 @@ function montar() {
   return { units, log, listUnits: createListUnits({ units, log }) };
 }
 
-/** La consulta que llego a `listAll` (segundo argumento) en la ultima llamada. */
-function consultaDelCatalogo(recibidas: readonly (readonly [number, ListQuery])[]): ListQuery {
+/** La consulta que llego a `listAll` (segundo argumento) en la ultima llamada. El tercero es el
+ *  AMBITO de QC-76, que este archivo no interroga: lo hace `list-units.test.ts`. */
+function consultaDelCatalogo(
+  recibidas: readonly (readonly [number, ListQuery, UnitScope])[],
+): ListQuery {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('listAll no fue llamado');
   return ultima[1];
 }
 
-/** La consulta que llego a `listPage` (unico argumento) en la ultima llamada. */
-function consultaDeLaPagina(recibidas: readonly (readonly [ListQuery])[]): ListQuery {
+/** La consulta que llego a `listPage` (primer argumento) en la ultima llamada. */
+function consultaDeLaPagina(recibidas: readonly (readonly [ListQuery, UnitScope])[]): ListQuery {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('listPage no fue llamado');
   return ultima[0];
@@ -78,7 +92,11 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
     expect(units.listAll).toHaveBeenCalledTimes(1);
     expect(units.listPage).toHaveBeenCalledTimes(0);
     // La cota de R40 (QC-32) sigue intacta: ninguna consulta sin limite declarado.
-    expect(units.listAll).toHaveBeenCalledWith(MAX_UNITS, expect.anything());
+    // QC-76: el tercer argumento es el AMBITO de la empresa del actor (R17). Se anade a la
+    // llamada; la cota que este caso vigila no cambia.
+    expect(units.listAll).toHaveBeenCalledWith(MAX_UNITS, expect.anything(), {
+      companyId: EMPRESA,
+    });
   });
 
   it('con una consulta SIN page ni pageSize sigue siendo el catalogo entero (R28)', async () => {
@@ -171,7 +189,7 @@ describe('list-units: autorizacion antes que todo (R33, R34; QC-74 R12, R13, R14
       const { units, log, listUnits } = montar();
 
       await expect(
-        listUnits(caso.entrada, { id: 'user-1', permissions: [] }),
+        listUnits(caso.entrada, { id: 'user-1', companyId: EMPRESA, permissions: [] }),
       ).rejects.toBeInstanceOf(UnauthorizedError);
       expect(units.listAll).toHaveBeenCalledTimes(0);
       expect(units.listPage).toHaveBeenCalledTimes(0);
@@ -184,7 +202,7 @@ describe('list-units: autorizacion antes que todo (R33, R34; QC-74 R12, R13, R14
       const { units, log, listUnits } = montar();
 
       await expect(
-        listUnits(caso.entrada, { id: 'user-1', permissions: ['unidades.'] }),
+        listUnits(caso.entrada, { id: 'user-1', companyId: EMPRESA, permissions: ['unidades.'] }),
       ).rejects.toBeInstanceOf(UnauthorizedError);
       expect(units.listAll).toHaveBeenCalledTimes(0);
       expect(units.listPage).toHaveBeenCalledTimes(0);

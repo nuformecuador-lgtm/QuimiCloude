@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import PrivateLayout from '@/app/(private)/layout';
 import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components';
 import { SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
-import type { SessionUser } from '@/lib/modules/identity';
+import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import {
   BRAND_SHORT_LABEL,
   PRIVATE_NAV_ITEMS,
@@ -38,8 +38,13 @@ const USUARIO_DEL_TEST: SessionUser = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Analista de calidad',
-  // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
-  permissions: [],
+  // QC-74 T8: `SessionUser` exige `permissions`. **Desde QC-75 T7 lleva el catalogo entero**
+  // (derivado de `PERMISSIONS`, no escrito a mano): el layout privado filtra `PRIVATE_NAV_ITEMS`
+  // con los permisos de la sesion, y este archivo prueba el ARMAZON de QC-11 —que todas las
+  // entradas del menu se dibujan y se comportan—, no el filtrado. Con la lista vacia el menu
+  // saldria vacio y estos casos dejarian de comprobar lo suyo. El filtrado tiene su propio test:
+  // `tests/unit/navegacion/private-layout-menu.test.tsx`.
+  permissions: PERMISSIONS.map((permiso) => permiso.code),
 };
 
 const { usePathnameMock, redirectMock, logoutActionMock, cookiesMock, getSessionUserMock } =

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL, ORDERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
@@ -43,8 +44,11 @@ export const metadata: Metadata = {
  * de consulta canonica: dos consultas distintas no pueden compartirla y la misma consulta no la
  * cambia.
  *
- * **Aqui no se decide ningun permiso** (R6): el corte de ruta lo hace el middleware con la regla
- * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `pedidos`.
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige `pedidos.consultar`
+ * con `requirePagePermission` -antes de resolver `searchParams` y antes de pintar nada-, que
+ * redirige al login sin sesion y responde 404 sin nombrar el modulo ni mencionar permisos. El
+ * middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan firma, caducidad y empresa.
+ * La autorizacion sobre los DATOS la siguen aportando los casos de uso de `pedidos`.
  *
  * El disparador del alta (`<OrderSheet />`) ira junto al titulo cuando T10 lo monte: es un
  * componente de cliente con su propio estado de apertura, asi que esta pagina seguira siendo un
@@ -55,6 +59,8 @@ export default async function PedidosPage({
 }: {
   searchParams: Promise<OrderListSearchParams>;
 }) {
+  await requirePagePermission('pedidos.consultar');
+
   const params = parseOrderListParams(await searchParams);
 
   return (

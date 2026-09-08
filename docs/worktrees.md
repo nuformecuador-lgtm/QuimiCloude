@@ -114,3 +114,21 @@ rojo por tareas domésticas bloquearía trabajo real y la respuesta previsible s
 ignorar el gate, que es justo lo que la regla 5 de `CLAUDE.md` intenta evitar. Pero
 tampoco puede ser invisible: en este repo lo que no sale en `./init.sh` no existe, y así
 fue como se llegó a 80 sin que nadie se enterara.
+
+### El validador mira el repo entero, no el worktree (2026-09-08)
+
+`scripts/validate-features.mjs` resuelve `specs/` y `.worktrees/*/specs` contra la **raíz del
+repo**, no contra el directorio actual, y si no puede localizarla **falla**.
+
+Antes los resolvía contra el directorio actual, y como el gate se corre **dentro** del worktree
+de la feature, desde ahí `.worktrees/` no existe: solo se veía el `specs/` de la propia rama.
+Cualquier otra feature en vuelo daba «faltan specs para features sdd en vuelo», con sus specs
+sanos en disco a un directorio de distancia, y el gate abortaba en el paso 3 **sin llegar a
+mirar código**. Como el gate completo es obligatorio antes de cada PR (regla 5 de `CLAUDE.md`),
+eso bloqueaba el F2.4 de **todas** las features a la vez, no solo el de la que lo sufría.
+
+Pasó tres veces antes de arreglarse: dos en QC-74 —anotadas en `progress/current.md` como
+«sigue sin resolverse»— y la tercera en QC-76, con QC-45 y QC-75 en vuelo.
+
+La copia del board que manda **sigue siendo la de la rama**: es la que su PR va a mergear. Lo
+que cambia es dónde busca los specs, no a quién le cree.

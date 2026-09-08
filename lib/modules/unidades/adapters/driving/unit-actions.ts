@@ -32,11 +32,27 @@ function toErrorState(error: unknown): { status: 'error'; code: string; message:
   throw error;
 }
 
-/** El actor se resuelve UNA vez por invocacion, nunca dentro del dominio. */
+/**
+ * El actor se resuelve UNA vez por invocacion, nunca dentro del dominio, y con LAS DOS CARAS
+ * de la sesion del servidor (QC-76 R19): `getSessionUser()` da el id y el conjunto de permisos,
+ * `getSessionContext()` da la EMPRESA. La empresa sale del contexto de sesion y NUNCA de la
+ * entrada del llamante: esta action no lee cookie ni cabecera, igual que hoy.
+ *
+ * **Falla cerrado**: si falta CUALQUIERA de las dos, el actor es `null`, y con actor `null`
+ * `requirePermission` rechaza en la primera linea del caso de uso, antes de tocar el
+ * repositorio. Sin contexto no hay actor, y sin actor no hay consulta.
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  const [sessionUser, sessionContext] = await Promise.all([
+    identity.getSessionUser(),
+    identity.getSessionContext(),
+  ]);
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 /**

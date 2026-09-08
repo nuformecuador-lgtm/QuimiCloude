@@ -163,11 +163,21 @@ async function createPresentation(
  */
 async function createUnit(
   tx: Prisma.TransactionClient,
-  symbol: string | null = 'kg',
+  symbol?: string | null,
 ): Promise<string> {
   const name = `unidad de prueba ${randomUUID()}`
   const unit = await tx.unit.create({
-    data: { name, nameNormalized: normalizeForTest(name), symbol },
+    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
+    // UNICO dentro del ambito cuando existe, y estas unidades se siembran SIN empresa —o sea DE
+    // SISTEMA—. El defecto era el literal `'kg'`, que choca con `23505` contra el `kilogramo`
+    // del catalogo arrancador Y contra si mismo en cuanto el helper se llama dos veces. Ahora
+    // el defecto DERIVA DEL NOMBRE, que ya es irrepetible; quien pasa un simbolo explicito
+    // —incluido `null`— sigue mandando. Ningun aserto de este archivo lee el valor del simbolo.
+    data: {
+      name,
+      nameNormalized: normalizeForTest(name),
+      symbol: symbol === undefined ? name : symbol,
+    },
     select: { id: true },
   })
   return unit.id
@@ -501,7 +511,21 @@ describe('estructura del producto', () => {
     // un texto suelto ni siquiera es un uuid.
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx)
-      const symbols = ['kg', 'KG', 'Litros', 'bidon de 20 L', 'ug/mL', null]
+      // Las cinco formas de texto que este caso quiere cubrir —minusculas, MAYUSCULAS, con
+      // espacios, con barra— mas la ausencia. Desde QC-76 R15 el simbolo es unico dentro del
+      // ambito, y `'kg'` a secas chocaria con el `kilogramo` del arrancador, asi que cada una
+      // lleva un marcador irrepetible. Las FORMAS se conservan enteras, que es lo que el caso
+      // mide; `null` sigue tal cual porque el indice es parcial y varias unidades sin simbolo
+      // en el mismo ambito siguen siendo legales.
+      const marcaSimbolo = randomUUID()
+      const symbols = [
+        `kg ${marcaSimbolo}`,
+        `KG ${marcaSimbolo}`,
+        `Litros ${marcaSimbolo}`,
+        `bidon de 20 L ${marcaSimbolo}`,
+        `ug/mL ${marcaSimbolo}`,
+        null,
+      ]
 
       const unitIds: string[] = []
       const ids: string[] = []
