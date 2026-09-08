@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { RETURN_PARAM, resolveReturnPath } from '@/lib/modules/identity';
-import { DASHBOARD_ROUTE, FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
+import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 
 import { LoginBackground, LoginForm } from './components';
 
@@ -29,10 +29,11 @@ type SearchParams = Record<string, string | string[] | undefined>;
  * rutas la acepta.
  *
  * `searchParams` es **opcional**. Next siempre la pasa, pero la pantalla tiene que tolerar que no
- * llegue: entrar al login directamente, sin `?next=`, es un camino real y el destino por defecto
- * es el dashboard. Nada se debilita por ello — `resolveReturnPath` ya cae al dashboard ante un
- * candidato ausente o invalido, y la validacion que protege de verdad es la que `loginAction`
- * repite sobre el `FormData` (R9), porque un POST fabricado no pasa por esta pagina.
+ * llegue: entrar al login directamente, sin `?next=`, es un camino real y en ese caso **no hay
+ * destino de vuelta**. La pagina no fabrica ninguno — entrega cadena vacia y deja que
+ * `loginAction` calcule el respaldo (QC-75 R11, R12: el primer enlace del menu ya filtrado por
+ * permisos). La validacion que protege de verdad es la que `loginAction` repite sobre el
+ * `FormData` (R9), porque un POST fabricado no pasa por esta pagina.
  */
 type LoginPageProps = {
   readonly searchParams?: Promise<SearchParams>;
@@ -50,18 +51,32 @@ type LoginPageProps = {
  * QC-9 R7/R8 (`design.md > 8`, paso 2): cuando los parametros llegan, lee el destino de vuelta que
  * el middleware puso en la URL (`?next=...`) y se lo entrega al formulario, que lo lleva en un
  * campo oculto hasta la Server Action.
+ *
+ * QC-75 R11/R12: la pagina **solo transporta** el destino que trajo la URL. Si no hay ninguno
+ * valido entrega cadena vacia, y no el dashboard. Es seguro: `resolveReturnPath('', fallback)`
+ * devuelve el `fallback` —`isInternalPath('')` es `false`, la cadena vacia no tiene forma de ruta
+ * interna—, asi que QC-9 R8/R9 no se debilita: un `?next=` valido sigue mandando y uno externo o
+ * mal formado se sigue descartando. Lo unico que cambia es **cual es el respaldo cuando no hay
+ * destino de vuelta**: ya no es siempre el dashboard, lo calcula `loginAction` como el primer
+ * enlace del menu filtrado por permisos. Fabricar aqui `/dashboard` dejaba ese respaldo muerto en
+ * todo login normal y mandaba a un 404 a quien no puede ver el dashboard.
  */
 export default function LoginPage({
   searchParams,
 }: LoginPageProps): ReactElement | Promise<ReactElement> {
   if (!searchParams) {
-    return pantallaDeLogin(DASHBOARD_ROUTE);
+    return pantallaDeLogin('');
   }
 
   return pantallaConDestinoDeVuelta(searchParams);
 }
 
-/** Espera los parametros y saca de ellos el destino de vuelta ya saneado. */
+/**
+ * Espera los parametros y saca de ellos el destino de vuelta ya saneado.
+ *
+ * El `fallback` es cadena vacia a proposito (QC-75 R11): sin `?next=` valido la pagina no inventa
+ * destino, y el campo oculto viaja vacio para que el respaldo lo calcule `loginAction`.
+ */
 async function pantallaConDestinoDeVuelta(
   searchParams: Promise<SearchParams>,
 ): Promise<ReactElement> {
@@ -69,10 +84,7 @@ async function pantallaConDestinoDeVuelta(
   const candidato = params[RETURN_PARAM];
 
   return pantallaDeLogin(
-    resolveReturnPath(
-      typeof candidato === 'string' ? candidato : undefined,
-      DASHBOARD_ROUTE,
-    ),
+    resolveReturnPath(typeof candidato === 'string' ? candidato : undefined, ''),
   );
 }
 

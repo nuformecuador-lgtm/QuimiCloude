@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
 import DashboardPage, { metadata } from '@/app/(private)/dashboard/page';
+import { PERMISSIONS } from '@/lib/modules/identity';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
@@ -67,6 +68,13 @@ const USUARIO_DEL_TEST = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Analista de calidad',
+  // QC-75 (T6): las pantallas privadas exigen `<modulo>.consultar` con `requirePagePermission`
+  // antes de pintar nada, asi que un usuario sin permisos aqui daria 404 en vez de la pantalla
+  // que este archivo mide. Se le da el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito
+  // a mano: este archivo no prueba autorizacion -eso es
+  // `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, prueba lo que se ve cuando SI se
+  // puede ver, y con el catalogo entero el menu filtrado tampoco pierde ningun item.
+  permissions: PERMISSIONS.map((permiso) => permiso.code),
 };
 
 const testId = {
@@ -86,7 +94,10 @@ const LANDMARKS_VIGILADOS = ['region', 'banner', 'contentinfo'] as const;
 
 /** Monta el layout privado envolviendo la pantalla real, como hace el App Router. */
 async function renderDashboardEnLayout() {
-  return render(await PrivateLayout({ children: <DashboardPage /> }));
+  // `DashboardPage` es `async` desde QC-75 (exige `dashboard.consultar` antes de pintar), asi
+  // que se INVOCA y se pasa su arbol ya resuelto: React no renderiza un componente `async` en el
+  // cliente, que es donde jsdom monta el arbol.
+  return render(await PrivateLayout({ children: await DashboardPage() }));
 }
 
 /** Monta el layout privado con un hijo neutro: la linea base contra la que compara R4. */

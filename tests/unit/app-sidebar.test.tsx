@@ -74,6 +74,9 @@ const FIXTURE_GRUPO_A: NavGroup = {
       href: '/fixture/grupo-a/hijo',
       label: 'Hijo A',
       testId: 'grupo-a-hijo',
+      // QC-75 T1: `permission` es obligatorio en `NavLink`. Fixture de vista: el filtrado por
+      // permiso lo hace el layout antes de llegar aqui (decision cerrada nº 7).
+      permission: 'inventario.consultar',
     },
   ],
 };
@@ -89,6 +92,7 @@ const FIXTURE_GRUPO_B: NavGroup = {
       href: '/fixture/grupo-b/hijo',
       label: 'Hijo B',
       testId: 'grupo-b-hijo',
+      permission: 'pedidos.consultar',
     },
   ],
 };

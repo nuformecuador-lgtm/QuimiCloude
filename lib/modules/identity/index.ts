@@ -49,9 +49,3 @@ export {
   isInternalPath,
   resolveReturnPath,
 } from './domain/return-path';
-// La LISTA de reglas ya no sale de aqui: es CABLEADO y vive en `lib/composition/route-role-rules.ts`
-// (el dominio no puede importar `lib/shared`, que es lo que exige nombrar una ruta). El rol sale
-// de `identity/domain/roles.ts`, que este barrel ya publica; la lista solo sigue en
-// `lib/composition` por `lib/shared/routes`. El contrato sigue exponiendo el tipo y la busqueda,
-// que si son dominio.
-export { findRouteRule, type RouteRoleRule } from './domain/route-role-rules';

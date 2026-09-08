@@ -594,8 +594,9 @@ describe('la feature no toca lo que tiene prohibido tocar (R42, R46)', () => {
 
   it('no modifica los modulos, el esquema de datos ni el punto de composicion', (ctx) => {
     // R46 — los modulos se consumen solo por su contrato publico y sus adaptadores driving.
-    // `lib/composition/route-role-rules.ts` SI se modifica: lo autoriza R5, y por eso el
-    // intocable es el barrel `index.ts` y no la carpeta entera.
+    // El intocable es el barrel `lib/composition/index.ts` y no la carpeta entera: QC-35 tuvo que
+    // modificar otro archivo de `lib/composition` (la lista ruta->rol que R5 autorizaba, retirada
+    // despues por QC-75), y esa distincion sigue siendo la razon del alcance.
     if (TOCADOS_POR_LA_FEATURE === null) {
       ctx.skip('el rango git origin/dev..HEAD no tiene commits de esta feature');
       return;
@@ -621,13 +622,12 @@ describe('la feature no toca lo que tiene prohibido tocar (R42, R46)', () => {
 
     expect(
       intocablesTocados([
-        'lib/composition/route-role-rules.ts',
         'lib/shared/routes.ts',
         'lib/shared/navigation/private-nav.ts',
         'components/shared/data-table/data-table.tsx',
         `${CARPETA_DE_LA_RUTA}/page.tsx`,
       ]),
-      'R5 y design.md > 6 autorizan estos cinco',
+      'R5 y design.md > 6 autorizan estos cuatro',
     ).toEqual([]);
   });
 });
