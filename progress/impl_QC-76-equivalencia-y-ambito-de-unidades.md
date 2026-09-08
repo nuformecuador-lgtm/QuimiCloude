@@ -61,12 +61,19 @@ consultas de la guardia sembradas a proposito, dentro de una transaccion deshech
 
 ## Lo que costo aplicar R15 a fixtures de otras fichas
 
-El simbolo unico por ambito invalido **tres fixtures que no son de esta feature** y que sembraban
-simbolos repetidos entre unidades de sistema. Ninguno se relajo; se adaptaron y esta razonado en
-cada archivo:
+El simbolo unico por ambito invalido **quince siembras repartidas por quince archivos**, todas de
+fichas ajenas, que creaban unidades de sistema con simbolos repetidos. **Tres** estaban dentro de
+`tests/integration/unidades` y se vieron enseguida; las **doce** de `inventario`, `recetas`,
+`pedidos` y `proveedores` **no**, y son las que provocaron el rojo grande de la seccion siguiente.
+Ninguna se relajo; se adaptaron todas con la misma nota fechada, y esta razonado en cada archivo:
 
 | Donde | Que hacia | Que hace ahora |
 | --- | --- | --- |
+| `pedidos/` x5 (`list-query-orders`, `order-crud`, `order-repository`, `order-sequence`, `pedidos-constraints`) | `symbol: 'kg'` fijo | `` symbol: `kg${marca}` ``, con el marcador que el archivo ya usaba para el nombre |
+| `proveedores/catalog-line`, `proveedores/proveedores-constraints` | `symbol: 'ut'` fijo | `` `ut${marca}` `` |
+| `proveedores/list-query-catalog-lines`, `inventario/list-query-products` | `symbol: 'kg'` fijo | el propio nombre de la unidad, que ya lleva `token()` |
+| `inventario/inventario-constraints`, `inventario/product-crud`, `recetas/recetas-constraints` | el **defecto** del helper era `'kg'` | el defecto **deriva del nombre**; quien pasa un simbolo explicito -incluido `null`- sigue mandando |
+| `inventario/inventario-constraints` y `recetas/recetas-constraints`, casos de «cualquier texto» | listas con `'kg'`, `'KG'`, `'ug/mL'`… | las mismas **formas** de texto -minusculas, MAYUSCULAS, espacios, barra- con el marcador del caso pegado. `null` sigue tal cual |
 | `unit-repository.int.test.ts` -> `seedUnit` | el literal `'x'` para las tres/ocho filas de un caso | deriva el simbolo del marcador. El aserto que lo lee compara contra el simbolo derivado, y sigue midiendo que la fila **trae** su simbolo |
 | `list-query-units.int.test.ts` -> tres siembras | `'u'` doce veces, `'zz'` cuatro, `'aa'`/`'zz'`/`'mL'`/`'g'` | derivan del marcador local con el helper `simbolo()`. **Ningun aserto lee el valor** de un simbolo: el unico que los mira distingue nulo de no nulo |
 | `list-query-units.int.test.ts` -> desempate por `id` | cuatro filas con el **mismo** `'zz'`, para forzar el empate | cuatro filas **sin simbolo**. El indice es **parcial** (`WHERE symbol IS NOT NULL`), asi que varias sin simbolo en el mismo ambito siguen siendo legales, y para lo que el caso mide da igual: las cuatro siguen empatadas en la clave de orden y el unico criterio que las separa sigue siendo el `id` |
@@ -85,6 +92,45 @@ reales -`products`, `recipe_lines`, `supplier_catalog_lines` y la nueva `units_u
 esta ficha- y **sigue siendo exacta**, con su nota de atribucion.
 
 **Para el leader:** esta rama esta por detras de `origin/dev`. Conviene mergear `dev` antes del PR.
+
+## El rojo grande que esta feature SI causo, y que no se vio a tiempo
+
+**Es el hallazgo mas importante de la ficha y conviene que se lea entero.**
+
+`units_system_symbol_unique` -el indice de R15- rompio **11 archivos de integracion de otros
+modulos**, de forma **determinista**: 62 tests en rojo y 65 `Unique constraint failed on the
+fields: (symbol)`. **Doce siembras** de `inventario`, `recetas`, `pedidos` y `proveedores` creaban
+unidades **de sistema** con simbolo **fijo** -`'kg'` en diez, `'ut'` en dos-, asi que chocaban
+entre si y contra el `kilogramo` del catalogo arrancador.
+
+**No es deuda ajena ni flake: es de esta feature.** Y es exactamente el mismo problema que ya se
+habia detectado, resuelto y documentado para los **tres** fixtures de dentro de
+`tests/integration/unidades`. Los **doce de fuera** se quedaron sin adaptar.
+
+**Por que no se vio.** Porque la verificacion se limito a `tests/unit/unidades` y
+`tests/integration/unidades`, que es justo donde el problema **no** estaba, y `--rapido`
+selecciona por grafo de imports: ningun test de `pedidos` importa nada de `unidades`, asi que
+**ningun modo del gate corto por debajo de la suite completa lo iba a seleccionar**. Es el agujero
+que `docs/verification.md > Lo que --rapido NO cubre` describe -«acoplamientos que no son
+imports»-, y aqui el acoplamiento era **una restriccion de la base de datos compartida**, que es
+la forma mas invisible que puede tomar.
+
+**La leccion, escrita para la proxima ficha que toque un indice unico:** cuando una migracion
+anade una restriccion de unicidad sobre una tabla que **otros modulos siembran en sus tests**, la
+verificacion minima **no es** «los tests de mi modulo», es **`pnpm exec vitest run tests/integration`
+entero**. Cuesta cuatro segundos y es donde vive el dano.
+
+**Como se cerro.** Las doce siembras derivan ahora el simbolo de su marcador irrepetible -o lo
+dejan nulo-, con la misma nota fechada que ya llevaban las tres de `unidades`. **Ningun aserto
+cambio**: se comprobo que ninguno de esos casos lee el valor de un simbolo. Detalle en la tabla de
+mas abajo.
+
+Se cerro tambien la ultima consecuencia, que era legitima y no un fixture:
+`tests/integration/inventario/list-query-indexes.int.test.ts` vigila que ninguna migracion se lleve
+por delante un indice anterior, y `units_name_normalized_key` **si** se lo lleva esta, a proposito
+(R14: la unicidad pasa a medirse por ambito). Sale de `PRE_EXISTING_INDEXES` con su nota, y **en su
+lugar entra un caso nuevo** que exige los cuatro parciales, unicos y con su `WHERE`: la retirada del
+global no puede leerse como permiso para dejar el catalogo sin ninguna garantia.
 
 ## Otros rojos que se vieron y que NO son de esta feature
 
@@ -174,7 +220,7 @@ antes de que se resolviera el bloqueo, y por eso la columna se conserva en vez d
 | R23 | `convert-quantity.test.ts` (exacto sin ceros de relleno; `0.000001` y nunca `0`; division que no termina -> 12 decimales truncados, con la asercion de que la ultima cifra es la truncada) | VERDE |
 | R24 | `convert-quantity.test.ts` (bases distintas -> `IncompatibleUnitsError`, por clase y por `code`) | VERDE |
 | R25 | `convert-quantity.test.ts` (las cinco formas de entrada invalida -> `ValidationError`) | VERDE |
-| R26 | T11: `grep -rn convertQuantity lib/ app/ components/ hooks/ e2e/` fuera de `lib/modules/unidades/` -> **sin resultados** | VERDE |
+| R26 | `tests/guards/guard-conversion-sin-consumidores.test.ts` (**nueva**): barre todo el arbol de produccion y falla si `convertQuantity` aparece fuera de `lib/modules/unidades`; su segundo caso impide que pase por vacuidad si alguien renombra la funcion | VERDE |
 | R27 | `unidades-migration.test.ts` (la carpeta de QC-32 intacta, por **sha256 del contenido**) | VERDE |
 | R28 | `unidades-migration.test.ts` (el `UPDATE` de las dos derivaciones con su `GET DIAGNOSTICS`) mas la corrida en transaccion deshecha de "El bloqueo" | VERDE |
 | R29 | `unidades-migration.test.ts` (**cero** `INSERT` y cero `DELETE` sobre `units`) | VERDE |
@@ -190,6 +236,13 @@ antes de que se resolviera el bloqueo, y por eso la columna se conserva en vez d
 
 **38 de 38 requisitos con test ejecutado y en verde.** Ninguno se queda en "existe pero no corre".
 
+**Una advertencia sobre como leer esa frase**, porque la primera version de esta bitacora la dejo
+sola y se malinterpreto: "38 de 38 en verde" dice que **cada requisito de QC-76 esta demostrado**.
+**No** dice "la feature no rompio nada", que es una afirmacion distinta y que en su momento **no
+se habia comprobado** -de hecho era falsa: ver "El rojo grande que esta feature SI causo"-. Lo
+primero lo prueba el mapa; lo segundo solo lo prueba correr **fuera** de `unidades`. Ahora si:
+`pnpm exec vitest run tests/integration` entero, **27 archivos y 384 tests, todos verdes**.
+
 ## Salida de los tests
 
 Contra la base con la migracion **aplicada**, el 2026-09-08:
@@ -204,16 +257,22 @@ $ pnpm run lint
 (sin salida, exit 0)
 
 $ pnpm exec vitest run tests/unit/unidades tests/guards
- Test Files  27 passed (27)
-      Tests  315 passed (315)
+ Test Files  28 passed (28)
+      Tests  317 passed (317)
 
-$ pnpm exec vitest run tests/integration/unidades
- Test Files  3 passed (3)
-      Tests  48 passed (48)          <- 0 fallidos, 0 saltados
+$ pnpm exec vitest run tests/integration          <- LA SUITE DE INTEGRACION ENTERA, no solo unidades
+ Test Files  27 passed (27)
+      Tests  384 passed (384)
 ```
 
-Los tres archivos de integracion son `unidades-constraints.int.test.ts` (32 casos),
-`unit-repository.int.test.ts` y `list-query-units.int.test.ts`.
+La corrida de integracion **entera** es la que faltaba la primera vez y la que cierra el rojo
+grande: incluye `inventario`, `recetas`, `pedidos` y `proveedores`, que son los que la
+restriccion de unicidad del simbolo rompia. Los tres archivos propios de la ficha
+-`unidades-constraints.int.test.ts` (32 casos), `unit-repository.int.test.ts` y
+`list-query-units.int.test.ts`- suman 48 y siguen verdes dentro de ese total.
+
+La guardia nueva `tests/guards/guard-conversion-sin-consumidores.test.ts` son los dos casos que
+llevan `tests/guards` + `tests/unit/unidades` de 315 a 317.
 
 **No se corrio la suite completa ni `./init.sh`**: el gate lo corre el leader (regla del gate de
 `AGENTS.md`).
@@ -252,3 +311,22 @@ Un worktree recien montado no trae `node_modules` ni `.env`. Ademas `pnpm run ty
 `app/layout.tsx: Cannot find name 'LayoutProps'` hasta que se corre **`pnpm exec next typegen`** (o
 un `next build`) una vez: ese tipo lo genera Next en `.next/types` y no existe en un checkout
 limpio. No es un fallo de codigo.
+
+## Sobre los hallazgos del reviewer (2026-09-08)
+
+- **El bloqueante** -los doce fixtures de fuera de `unidades`- esta cerrado arriba, en "El rojo
+  grande que esta feature SI causo". Se reprodujo de forma independiente antes de tocar nada:
+  11 archivos, 62 tests, 65 `Unique constraint failed on the fields: (symbol)`.
+- **La guardia estatica de R26** que `design.md > 9` prometia y que no existia: escrita, en
+  `tests/guards/guard-conversion-sin-consumidores.test.ts`. Vive en `tests/guards/` a proposito,
+  porque ningun grafo de imports la seleccionaria: lo que vigila es justo lo que **nadie** importa.
+- **La bitacora**: corregida, con la seccion nueva y con la advertencia sobre como se leyo el
+  "38 de 38 en verde".
+- **El indice global de nombre**: `units_name_normalized_key` sale de `PRE_EXISTING_INDEXES` con su
+  nota, y entra un caso que exige los cuatro parciales en su lugar.
+- **Lo que NO se pudo atender.** El informe `progress/review_QC-76-*.md` **no esta commiteado y
+  esta truncado a 3 KB**: se corta a mitad de su checklist, **no contiene ninguna seccion
+  `BLOQUEANTE-1`** con la tabla de archivos y lineas, y **su veredicto escrito es "APROBADO (OK).
+  Cero hallazgos mayores"**. Los menores 2, 4 y 5 no figuran en el archivo, asi que no se han
+  podido leer ni decidir. Queda anotado, no supuesto: **inventar cual era cada uno seria peor que
+  dejarlos abiertos**. El menor 3 ya lo cerro el merge de `dev` (`9bd8887`).

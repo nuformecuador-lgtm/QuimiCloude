@@ -266,11 +266,21 @@ async function createRecipe(tx: Prisma.TransactionClient, seed: RecipeSeed): Pro
  */
 async function createUnit(
   tx: Prisma.TransactionClient,
-  symbol: string | null = 'kg',
+  symbol?: string | null,
 ): Promise<string> {
   const marca = token()
   const unit = await tx.unit.create({
-    data: { name: `unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol },
+    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
+    // UNICO dentro del ambito cuando existe, y estas unidades se siembran SIN empresa —o sea DE
+    // SISTEMA—. El defecto era el literal `'kg'`, que choca con `23505` contra el `kilogramo`
+    // del catalogo arrancador Y contra si mismo en cuanto el helper se llama dos veces en el
+    // mismo caso. Ahora DERIVA DEL MARCADOR, que ya es irrepetible; quien pase un simbolo
+    // explicito —incluido `null`— sigue mandando. Ningun aserto lee el valor del simbolo.
+    data: {
+      name: `unidad ${marca}`,
+      nameNormalized: `unidad${marca}`,
+      symbol: symbol === undefined ? `unidad ${marca}` : symbol,
+    },
     select: { id: true },
   })
   return unit.id
@@ -865,10 +875,25 @@ describe('estructura de la linea de receta', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
 
-      const symbols = ['kg', 'gotas por litro', 'ug/mL', 'cucharadas soperas', null]
+      // Las cuatro formas de texto que este caso quiere cubrir —una corta, dos con espacios,
+      // una con barra y mayusculas— mas la ausencia. Desde QC-76 R15 el simbolo es unico dentro
+      // del ambito, y `'kg'` a secas chocaria con el `kilogramo` del arrancador, asi que cada
+      // una lleva el marcador del caso. Las FORMAS se conservan enteras, que es lo que se mide;
+      // `null` sigue tal cual porque el indice es parcial y varias unidades sin simbolo en el
+      // mismo ambito siguen siendo legales.
+      const symbols = [
+        `kg ${marker}`,
+        `gotas por litro ${marker}`,
+        `ug/mL ${marker}`,
+        `cucharadas soperas ${marker}`,
+        null,
+      ]
       for (const symbol of symbols) {
         const unidadDeLaLinea = await createUnit(tx, symbol)
-        const unidadDelProducto = await createUnit(tx, 'kg')
+        // Sin simbolo explicito: el helper lo deriva, asi que las cinco unidades de producto
+        // que crea este bucle ya no comparten `'kg'` entre ellas. Lo que el caso necesita
+        // sigue siendo lo mismo: que sea una unidad DISTINTA de la de la linea.
+        const unidadDelProducto = await createUnit(tx)
         // El producto declara una unidad DISTINTA de la de su linea: nada las relaciona.
         const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`)
         await tx.product.update({
