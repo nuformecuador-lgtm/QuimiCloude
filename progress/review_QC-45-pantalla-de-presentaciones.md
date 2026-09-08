@@ -220,3 +220,151 @@ directa del recorte de T2 y estan escritos como tal en `tasks.md`, en la bitacor
 - **`e2e/presentaciones.spec.ts` re-ejecutado**: el puerto 3117 de Playwright es fijo y compartido
   entre los tres worktrees vivos (`reuseExistingServer: false`); lanzarlo habria tumbado el trabajo
   de QC-75 y QC-76. Se reviso el codigo del spec, que es correcto y deriva la URL de la constante.
+
+---
+
+# Ronda 2 — 2026-09-08 (tras el merge de `origin/dev` con QC-74, QC-75 y QC-76)
+
+> Revisor: agente `reviewer`, dentro del mismo worktree, rama
+> `feature/QC-45-pantalla-de-presentaciones`, sobre `HEAD = a342465` mas tres archivos sin
+> commitear (`requirements.md`, `design.md`, `tests/baseline-rojos.json`). **La ronda 1 de arriba no
+> se toca.** No se edito ni una linea de codigo ni de spec. `./init.sh` NO se re-ejecuto: por
+> instruccion del leader, que ya lo corrio en verde (`== init OK ==`).
+
+## Veredicto de la ronda 2
+
+**OK (aprobado)** — 0 hallazgos mayores, 8 menores. **36 de 36 requisitos con test mapeado**; 35 de
+36 con test **ejecutado por el revisor** (el que falta es R36: su unico test es el E2E, que se
+reescribio en esta ronda y **no se ha corrido**, ver menor 1).
+
+**Condiciones de cierre que siguen abiertas** (no bloquean el trabajo revisado, si el paso a
+`done`): correr `e2e/presentaciones.spec.ts` en Chromium y WebKit, y la comprobacion manual de T10.
+
+## Checklist de la ronda 2
+
+- [x] **Trazabilidad completa.** R3 y R4, que la ronda 1 dejaba sin cubrir, **ya tienen test**:
+      `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` (seccion unica, item unico,
+      permiso, ningun item a ruta sin `page.tsx` comprobado EN DISCO, y el filtrado con
+      `SEED_ROLE_PERMISSIONS` importados: Administrador si, Operador no, sin encabezado huerfano) y
+      la ampliacion de `tests/unit/navegacion/private-layout-menu.test.tsx` sobre el arbol
+      renderizado. Los dos llevan ancla anti-vacuidad (se afirma que el Operador del seed NO tiene
+      `inventario.modificar`, asi que el caso negativo no puede volverse vacio en silencio).
+- [x] **R2 y R36 reformulados siguen alineados con `tasks.md`.** R2 solo pierde el consumidor
+      «regla ruta-rol», que ya no existe; lo que queda —constante unica, item de menu, prefijos
+      privados, sin literales— es exactamente lo que afirma `presentations-route-contract.test.ts`,
+      incluida la comprobacion de que ningun archivo de `lib/`, `app/` ni `components/` incrusta la
+      URL. R36 pasa a exigir 404 dentro del layout privado y **`tasks.md` T11 ya dice eso**. Unico
+      desfase encontrado: la fila R4 de la tabla de `tasks.md` (menor 4).
+- [x] **El spec reformulado describe lo que el codigo hace.** Recorridas las diez secciones tocadas
+      (0, 1, 2, 3, 3.2, 4, 5.1, 10, 11 y 12): **no queda ni una contradiccion**. El 3.2, que antes
+      argumentaba por escrito EN CONTRA de `inventario.modificar`, hoy lo defiende y conserva el
+      razonamiento viejo en un recuadro marcado como rastro historico, explicando que la premisa
+      —la ruta cortaba por nombre de rol— desaparecio con QC-75 R16. Igual la alternativa C del 11,
+      que se reescribe como «consultar en vez de modificar» y explica el cambio de signo. El 4
+      describe `requirePagePermission` tal cual es —redirect al login sin sesion, `notFound()` sin
+      permiso, devuelve `void` a proposito—, comprobado contra
+      `lib/modules/identity/adapters/driving/require-page-permission.ts`.
+- [x] **`inventario.modificar` es el permiso correcto**, comprobado contra `SEED_ROLE_PERMISSIONS`
+      y no contra los comentarios: esta en el catalogo cerrado de diez permisos, el Administrador lo
+      tiene y el Operador **solo** tiene `inventario.consultar`. Con `consultar` el item no se
+      ocultaria a nadie.
+- [x] **El item del menu y la pantalla exigen EL MISMO permiso, y hay test que lo ata sin repetir el
+      literal**: `presentations-route-contract.test.ts` lee el `permission` del item de
+      `PRIVATE_NAV_ITEMS` y exige que la fuente de `page.tsx` contenga
+      `requirePagePermission(<ese mismo codigo>)`, con los comentarios quitados antes de juzgar —el
+      JSDoc de la pagina nombra la llamada, asi que sin eso la prosa bastaria—. Riesgo del 12
+      cubierto.
+- [x] **`app/(private)/layout.tsx` sigue sin tocarse.** El diff `origin/dev...HEAD` (37 archivos) no
+      lo lista, ni `components/**`, ni `package.json`, ni `db/**`.
+- [x] **Las dos guardias de QC-75 pasan y muerden.** Corridas por el revisor:
+      `guard-pantallas-exigen-permiso` (ancla de NUEVE pantallas, con `/configuracion/presentaciones`
+      dentro, y casos sinteticos que disparan con una pantalla sin la llamada, con un codigo fuera
+      del catalogo y con la llamada solo mencionada en un comentario) y
+      `guard-nav-permisos-declarados` (ancla de SEIS enlaces, con `nav-presentaciones`, y sus
+      sinteticos `pedidos.consultarr` y «sin permiso»). Las dos se **ampliaron tensandolas**: las
+      anclas suben de ocho a nueve y de cinco a seis, y siguen siendo listas exactas. Igual
+      `app-sidebar.test.tsx`, que pasa a `toHaveLength(6)` conservando el orden exacto.
+- [x] **La tabla de decisiones cerradas: nada editado ni borrado.** El diff de `requirements.md` en
+      esa tabla es **solo de lineas anadidas**: tres filas nuevas al final, fechadas 2026-09-08, y
+      las 25 previas intactas. Las tres se declaran «matiza la fila del 2026-09-07, que no se toca»
+      y **no la contradicen**: «solo el Administrador» sigue siendo cierto por la via del permiso
+      —es lo que dice el seed—, la proteccion de la ruta «entra igual» cambiando de mecanismo, y la
+      eleccion de `inventario.modificar` se justifica con `SEED_ROLE_PERMISSIONS` y no con una
+      suposicion.
+- [x] **Verificacion ejecutable de la ronda 2** (corrida por el revisor, no copiada de la bitacora):
+      `configuracion-ui` + `navegacion` + las tres guardias de ruta y menu + `app-sidebar` +
+      `private-layout` -> **21 archivos, 260 tests, 0 rojos**. Y `tests/unit/pedidos-ui` completo ->
+      **16 archivos, 165 tests, 0 rojos**.
+- [x] **Aislamiento por empresa, dependencias, secretos, capas y multiplataforma:** sin cambios
+      respecto a la ronda 1. La ronda 2 no toca `db/schema.prisma` —lo que cambio ahi viene de QC-76
+      por el merge—, no toca `package.json`, no anade consultas y no toca la UI de la pantalla.
+- [x] **`feature_list.json` ya dice `in_progress` para QC-45** (menor 6 de la ronda 1, resuelto).
+- [~] **Tasks todas `[x]`:** 33 marcadas, **2 sin marcar** — la comprobacion manual de T10 y el
+      `./init.sh` completo de T12, que el leader ya corrio en verde. Ver menores 1 y 7.
+
+## Hallazgos de la ronda 2
+
+### Mayores
+
+**Ninguno.**
+
+### Menores
+
+1. **menor — R36 tiene test mapeado pero NO ejecutado, y T11 esta marcada `[x]` contra un «hecho
+   cuando» que exige verde en Chromium y WebKit.** El recorrido 2 del E2E se reescribio entero en
+   esta ronda —ya no espera redireccion: afirma `status() === 404`, el testid `private-not-found` y
+   cuatro ausencias— y el helper de login recibe ahora el aterrizaje esperado (`INVENTORY_ROUTE`
+   para el Operador, por QC-75 R11). Leido entero: es correcto y coherente con
+   `require-page-permission.ts`. Pero **nunca se ha ejecutado en esta forma**, y es la unica
+   verificacion de R36 y la unica prueba del 404 real. Se subsana con una corrida; hasta entonces
+   T11 no deberia estar marcada.
+2. **menor — el item del menu declara `inventario.modificar`, y QC-75 R5 dice literalmente que el
+   permiso de un enlace tiene «la forma `<modulo>.consultar`»** (y su decision cerrada del
+   2026-09-07: «por que permiso se filtra cada item del menu? Por `<modulo>.consultar`»). La
+   eleccion de QC-45 es **la correcta** —con `consultar` habria un enlace visible que devuelve 404,
+   justo lo que QC-75 queria evitar— y ninguna guardia lo impide: la de QC-75 solo comprueba
+   pertenencia al catalogo. Pero la desviacion respecto a un spec **ya mergeado** no queda anotada
+   en ningun sitio: ni en el `design.md` de QC-45, que cita QC-75 R5 solo para decir que el campo es
+   obligatorio, ni en el de QC-75. La ficha siguiente (QC-39, «Unidades», con `unidades.consultar`)
+   leera R5 al pie de la letra sin saber que ya hay una excepcion. Basta una linea.
+3. **menor — la entrada nueva de `tests/baseline-rojos.json` es honesta en el fondo, pero sus cifras
+   no cuadran.** Comprobado por el revisor: `tests/unit/pedidos-ui/order-sheet.test.tsx` **pasa en
+   aislado (7/7)** y tambien con toda su carpeta (165/165), y **QC-45 no lo toca** —el ultimo cambio
+   del archivo es el commit de QC-75 que llego por el merge, y `git status` de esta ficha solo lista
+   tres archivos, ninguno ese—. O sea: la entrada **no tapa un fallo propio**. Ahora bien, el motivo
+   escrito dice «aislado da **36/36** verde» y «los **3 casos** que caen son los de guardado
+   rechazado», y el archivo tiene **7 casos** y **uno solo** con ese nombre, aqui, en `origin/dev` y
+   en `e265021`. La medida citada no es reproducible tal como esta escrita, y el valor entero de ese
+   archivo es que cada entrada se pueda auditar. Corregir las cifras o volver a medir.
+4. **menor — la fila R4 del mapa `R<n> -> test` de `tasks.md` quedo desfasada por la reformulacion
+   del spec.** Sigue diciendo «el texto de R4 habla de ROL y esta desfasado desde QC-75; estos tests
+   afirman su intencion con el mecanismo por permiso». R4 ya no habla de rol: habla de
+   `inventario.modificar` y del filtrado en servidor. Es lo que la nota anunciaba que habria que
+   hacer, hecho; solo falta borrarla.
+5. **menor — dos comentarios de codigo quedaron congelados en la ronda 1.**
+   `tests/unit/configuracion-ui/private-nav-configuracion.test.ts`, lineas 1-10 («R4 esta escrito en
+   requirements.md en terminos de ROL... el texto de R4 queda por reformular y es decision del
+   humano») y `e2e/presentaciones.spec.ts:300` («el item de menu de Configuracion **no existe en
+   esta feature**»). Los dos afirman hoy algo falso. No cambian ningun aserto, pero son la clase de
+   comentario por el que el siguiente que abra el archivo se cree la version vieja.
+6. **menor — R33 sigue autorizando «dos» archivos heredados y se modificaron ademas SEIS archivos de
+   test heredados.** Reincidencia del menor 4 de la ronda 1, esta vez con la oportunidad delante: el
+   requisito **se reescribio** en esta ronda y siguio sin contemplar las guardias de lista cerrada.
+   Los seis —`guard-pantallas-exigen-permiso`, `guard-nav-permisos-declarados`,
+   `app-sidebar.test.tsx`, `navegacion/private-layout-menu.test.tsx`, `inventario/scope.test.ts`,
+   `shared/data-table-alcance.test.ts` y `recetas-ui/recipe-route-contract.test.ts`— se ampliaron
+   **tensandose**, que es su punto de extension por diseno; lo que falta es que R33 lo diga.
+7. **menor — T10 sigue pendiente de la comprobacion manual en un WebKit real.** Sin cambios respecto
+   a la ronda 1 y correctamente sin marcar. Se anota para que no se pierda en el cierre.
+8. **menor — el menor 1 de la ronda 1 sigue vivo tal cual:** el estado vacio se come el resultado
+   vacio de una BUSQUEDA y con el la caja de busqueda (`presentation-list-section.tsx`). No lo
+   estrena esta ficha —mismo codigo que inventario y pedidos— y su sitio sigue siendo QC-56.
+
+## Lo que la ronda 2 NO evaluo, y por que
+
+- **`./init.sh` completo:** por instruccion del leader, que ya lo corrio en verde en este worktree
+  (`== init OK ==`, 0 rojos, los del baseline verdes en esa corrida).
+- **`e2e/presentaciones.spec.ts` ejecutado:** el puerto 3117 de Playwright es fijo y compartido
+  entre worktrees. Se leyo entero (ver menor 1).
+- **La bitacora `progress/impl_*.md`:** la corrige el leader; su lista de «requisitos por
+  reformular» ya no aplica.

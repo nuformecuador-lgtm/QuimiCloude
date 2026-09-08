@@ -391,38 +391,33 @@ ronda; en cuanto el humano commitee, el archivo entra en el rango y el ancla vue
 corre `./init.sh --rapido` (no es una guardia y no está entre los tests relacionados con el diff),
 por eso aparece sólo en la corrida ampliada. Ya estaba rojo antes de tocar nada en esta ronda.
 
-**El E2E NO se ejecutó** (el puerto 3117 es compartido con otros worktrees), y
-`./init.sh` completo tampoco: `tests/integration/` está rojo por una base de datos compartida, ajeno
-a esta ficha. No se tocó `tests/integration/` ni `tests/baseline-rojos.json`.
+**El E2E NO se ejecutó en esta ronda** (el puerto 3117 es compartido con otros worktrees) —**se
+corrió después, ver «Ronda 3» al final: verde en los dos navegadores**—, y `./init.sh` completo
+tampoco: `tests/integration/` está rojo por una base de datos compartida, ajeno a esta ficha. No se
+tocó `tests/integration/` ni `tests/baseline-rojos.json`.
 
-### Requisitos DESFASADOS — no se reescribe `requirements.md`, lo decide el humano
+### Requisitos que estaban DESFASADOS — YA REFORMULADOS (2026-09-08)
 
 QC-75 dejó cuatro requisitos de esta ficha describiendo un mecanismo que ya no existe. **El código y
-los tests cumplen su INTENCIÓN**, no su letra. Se dejan aquí con una propuesta de reformulación; el
-arreglo del texto es decisión humana y no se ha tocado `requirements.md`.
+los tests cumplían su INTENCIÓN**, no su letra. Esta sección proponía la reformulación y la dejaba
+en manos del humano; **el humano la aprobó y `spec_author` reescribió los cuatro**. Se conserva el
+registro de qué cambió y contra qué texto vive hoy cada uno:
 
-1. **R4 — habla de ocultar por ROL.** Dice que el ítem se oculta a quien no sea Administrador. Hoy
-   no hay ocultado por rol en ninguna parte: se oculta por **permiso**, y el filtrado lo hace el
-   layout privado con `filterNavItemsByPermissions`.
-   *Propuesta:* «Cuando la sesión no incluya el permiso `inventario.modificar`, el sistema no
-   emitirá el ítem de menú de presentaciones ni el encabezado de su sección en el HTML servido.»
-2. **R5 — enumera la lista de prefijos privados.** Sigue siendo verdad —`PRIVATE_ROUTE_PREFIXES`
-   existe y el middleware la usa para exigir sesión—, pero el texto la ata a la regla ruta→rol como
-   si fueran una sola cosa.
-   *Propuesta:* separar las dos frases: la ruta está cubierta por `PRIVATE_ROUTE_PREFIXES` (exige
-   **sesión**, en el borde) y el permiso lo exige la pantalla (exige **autorización**, en el
-   servidor). Son dos controles distintos y hoy viven en sitios distintos.
-3. **R6 — regla *ruta→rol* restringida al Administrador.** El mecanismo entero desapareció con
-   QC-75 R16.
-   *Propuesta:* «Cuando una sesión válida sin el permiso `inventario.modificar` solicite
-   `PRESENTATIONS_ROUTE`, el sistema responderá 404 sin distinguirlo de una ruta inexistente y sin
-   mencionar el módulo ni los permisos; sin sesión, redirigirá al login con el destino de vuelta.»
-4. **R33 — enumera los archivos heredados modificables citando «reglas ruta→rol».** Uno de los
-   archivos que autoriza a tocar ya no existe.
-   *Propuesta:* sustituir «`lib/composition/route-role-rules.ts` (reglas ruta→rol)» por
-   «`lib/shared/navigation/private-nav.ts` (ítem y sección del menú)», que es el archivo heredado
-   que esta feature amplía de verdad. Ya está reflejado así en el caso de R31 de
-   `configuracion-convenciones.test.ts`.
+1. **R4 — hablaba de ocultar por ROL.** Reformulado: hoy exige `inventario.modificar`, el mismo que
+   la pantalla, decidido **en el servidor** y sin emitir el ítem ni el encabezado de la sección a
+   quien no lo tenga. Tests: `CU/private-nav-configuracion.test.ts` + `navegacion/private-layout-menu.test.tsx`.
+2. **R5 — ataba los prefijos privados a la regla ruta→rol.** Reformulado: R5 garantiza **sesión** en
+   el borde y dice explícitamente que NO es el control de autorización, que es R6.
+3. **R6 — regla *ruta→rol* restringida al Administrador.** Reformulado: sesión válida sin
+   `inventario.modificar` recibe **404 dentro del layout privado**, indistinguible de una ruta
+   inexistente; sin sesión, redirección al login. Ejecutado de verdad en el E2E (ronda 3).
+4. **R33 — enumeraba archivos heredados citando «reglas ruta→rol».** Reformulado en dos pasos: la
+   ronda 2 sustituyó el archivo desaparecido por `lib/shared/navigation/private-nav.ts`, y el
+   2026-09-08 se **ajustó la cuenta** para contemplar los **siete** tests heredados de lista cerrada
+   que esta ficha amplía tensándolos (los dos guards de QC-75, `app-sidebar`,
+   `navegacion/private-layout-menu`, `inventario/scope`, `shared/data-table-alcance` y
+   `recetas-ui/recipe-route-contract`). La regla no cambia: seguir siendo lista cerrada y nunca
+   relajar un aserto.
 
 ### Deudas de la ronda 1 que esta ronda cierra
 
@@ -441,4 +436,66 @@ arreglo del texto es decisión humana y no se ha tocado `requirements.md`.
    respecto a la ronda 1.
 2. **El gate completo en verde** (T12): `tests/integration/` sigue rojo por la base compartida, y
    `pedidos-convenciones` seguirá rojo mientras el merge esté sin commitear.
-3. **Reformular R4, R5, R6 y R33** en `requirements.md`, si el humano lo aprueba.
+3. ~~Reformular R4, R5, R6 y R33~~ — **hecho** (ver la sección anterior).
+
+## Ronda 3 — el E2E ejecutado y los textos desfasados corregidos (2026-09-08)
+
+Tanda corta de cierre, sin cambios de comportamiento: **cero líneas de código de producción**.
+
+### 1. El E2E de la ronda 2, ejecutado por fin (R36, R6 — T11)
+
+El spec se **reescribió** en la ronda 2 (404 + `private-not-found`, aterrizaje del login en
+`/inventario` por QC-75 R11) y nunca se había corrido en esa forma: R36 era el único de los 36
+requisitos con test mapeado pero **no ejecutado**. Ya no.
+
+Playwright no carga `.env` por su cuenta (el repo no usa `dotenv`), así que se exportan primero:
+
+```
+$ set -a && . ./.env && set +a && pnpm exec playwright test e2e/presentaciones.spec.ts \
+    --project=chromium --project=webkit
+
+Running 4 tests using 4 workers
+  ✓  1 [chromium] › e2e\presentaciones.spec.ts:294:7 › pantalla de presentaciones › el Administrador
+        entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre
+        (R36) (10.3s)
+  ✓  3 [chromium] › e2e\presentaciones.spec.ts:351:7 › pantalla de presentaciones › un usuario sin
+        `inventario.modificar` recibe 404 y no ve ni un dato (R6) (10.5s)
+  ✓  4 [webkit]   › e2e\presentaciones.spec.ts:351:7 › pantalla de presentaciones › un usuario sin
+        `inventario.modificar` recibe 404 y no ve ni un dato (R6) (12.6s)
+  ✓  2 [webkit]   › e2e\presentaciones.spec.ts:294:7 › pantalla de presentaciones › el Administrador
+        entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre
+        (R36) (12.8s)
+
+  4 passed (47.5s)
+```
+
+**Verde en Chromium y en WebKit, 0 rojos**, con `afterAll` limpiando sin dejar huérfanas. El «hecho
+cuando» de T11 queda cumplido de verdad y **R36 pasa a ejecutado**: 36 de 36 requisitos con test
+corrido. El puerto 3117 estaba libre (ningún otro worktree lanzando E2E).
+
+### 2. Excepción a QC-75 R5, anotada donde se busca
+
+`design.md > 3.2` gana un párrafo propio: el ítem declara **`inventario.modificar`** y no
+`<módulo>.consultar` como pide QC-75 R5, **a propósito** —`inventario.consultar` lo tienen
+Administrador y Operador, así que sería un enlace visible que responde 404, justo lo que QC-75
+quería evitar—. Se deja dicho que el caso normal sigue siendo `<módulo>.consultar` y que **QC-39
+(Unidades) debe usar `unidades.consultar`** salvo que se encuentre en el mismo aprieto. Antes esta
+desviación no estaba escrita en ningún sitio y la siguiente ficha iba a leer R5 al pie de la letra.
+
+### 3. Textos que afirmaban lo contrario del código
+
+| Dónde | Decía | Dice |
+| --- | --- | --- |
+| `tasks.md`, fila R4 del mapa | «el texto de R4 habla de ROL y está desfasado» | nota borrada: R4 ya se reformuló |
+| `tests/unit/configuracion-ui/private-nav-configuracion.test.ts`, cabecera | «el texto de R4 queda por reformular y es decisión del humano» | R4 ya pide `inventario.modificar` en el servidor; se explica el mecanismo, no una deuda |
+| `e2e/presentaciones.spec.ts:300` | «el ítem de menú de Configuración no existe en esta feature» | el ítem **sí** existe (T2); el spec navega por URL **a propósito** |
+| `requirements.md`, R33 | «los únicos archivos heredados modificables son **dos**» sin contemplar los tests | se mantiene la regla y se añaden los **siete** tests heredados de lista cerrada que se amplían tensándolos |
+| esta bitácora | «R4, R5, R6 y R33 están sin reformular» | los cuatro están reformulados |
+
+**Cuenta corregida:** el reviewer decía «seis» archivos de test heredados modificados; son **siete**
+(`git diff --name-status origin/dev...HEAD -- tests/ | grep -v '^A'`). Su propia lista ya nombraba
+siete. R33 se escribió con la cifra real.
+
+No se tocó `app/(private)/layout.tsx`, `components/`, `db/`, `package.json` ni
+`tests/baseline-rojos.json`. Ninguna dependencia nueva. La tabla «Decisiones cerradas (no reabrir)»
+de `requirements.md` no se editó.

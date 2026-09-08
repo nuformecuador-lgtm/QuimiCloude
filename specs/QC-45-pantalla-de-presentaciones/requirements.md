@@ -14,6 +14,15 @@
 > productos y recetas a la tabla compartida → **QC-56**. Tocar los casos de uso de `inventario` →
 > **nada: ya están construidos**.
 >
+> **Corrección del 2026-09-08 sobre la línea anterior, no reapertura del alcance.** QC-75 **ya
+> aterrizó** mientras esta ficha se construía: el filtrado del menú entero por permiso está hecho y
+> mergeado (`filterNavItemsByPermissions` + `NavLink.permission` obligatorio), y con él desapareció
+> el ocultado a mano que esta ficha iba a dejar — nunca llegó a existir en `dev`. Lo que **sigue
+> siendo de esta ficha**, y volvió a ella en la ronda 2 de implementación con su test, es **R3 y
+> R4**: declarar la sección Configuración, su único ítem y el permiso que ese ítem exige, para que
+> el mecanismo de QC-75 lo oculte a quien no lo tenga. Esta ficha **consume** ese mecanismo; no lo
+> construye ni lo modifica.
+>
 > *Sembrado por `/afinar-feature` el 2026-09-07. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
 > reescribe: su trabajo aquí es `## Requisitos (EARS)`.*
@@ -37,29 +46,41 @@ privado existente** y sin declarar armazón propio: NO DEBE declarar un `main`, 
 lateral, ni una cabecera propias.
 
 **R2** — La URL de la pantalla DEBE estar declarada en **una sola** constante exportada, y todo
-consumidor —el ítem de navegación, la lista de prefijos privados, la regla ruta→rol y cualquier
-destino de navegación de la propia pantalla— DEBE derivarse de esa misma constante. Ningún archivo
-de producto DEBE incrustar la URL como literal.
+consumidor —el ítem de navegación, la lista de prefijos privados y cualquier destino de navegación
+de la propia pantalla— DEBE derivarse de esa misma constante. Ningún archivo de producto DEBE
+incrustar la URL como literal.
 
 **R3** — La navegación privada DEBE ganar una sección **Configuración** que contenga **exactamente
 un** ítem, el de presentaciones, apuntando a la constante de R2. El sistema NO DEBE añadir en esa
 sección ningún ítem que apunte a una ruta sin pantalla.
 
-**R4** — MIENTRAS la sesión no tenga el rol Administrador, el sistema NO DEBE presentar el ítem de
-presentaciones ni el encabezado de la sección Configuración; MIENTRAS la sesión tenga el rol
-Administrador, DEBE presentar los dos. La decisión DEBE tomarse en el servidor a partir de los
-datos de sesión que el layout privado ya obtiene, y el componente de navegación NO DEBE obtener
-esos datos por su cuenta.
+**R4** — El ítem de presentaciones DEBE declarar el permiso `inventario.modificar`, que es **el
+mismo** que exige la pantalla (R6). MIENTRAS la sesión no incluya ese permiso, el sistema NO DEBE
+emitir el ítem de presentaciones ni el encabezado de la sección Configuración en el HTML servido
+—ni etiqueta, ni destino, ni identificador de test—; MIENTRAS la sesión lo incluya, DEBE emitir los
+dos. La decisión DEBE tomarse **en el servidor**, a partir de los datos de sesión que el layout
+privado ya obtiene y sin añadir ninguna consulta; el componente de navegación NO DEBE obtener esos
+datos por su cuenta, NO DEBE recibir los ítems ocultos y NO DEBE ocultarlos con estilos.
+
+> *El mecanismo de filtrado —`filterNavItemsByPermissions` aplicado en el layout privado— es de
+> QC-75 y está mergeado. Esta ficha lo **consume**: aporta el ítem y el permiso que declara, y no
+> modifica el filtrado ni el componente de navegación (R33).*
 
 ### Protección y autorización
 
 **R5** — La URL de la pantalla DEBE quedar cubierta por la lista declarada de prefijos de ruta
 privada, de modo que una petición sin sesión válida sea redirigida al login antes de renderizarla.
+Esa cobertura garantiza **sesión, no autorización**: no distingue entre sesiones y NO DEBE tomarse
+como el control que decide quién puede ver la pantalla, que es R6. Ambas garantías DEBEN existir a
+la vez; ninguna sustituye a la otra.
 
-**R6** — El sistema DEBE declarar una regla ruta→rol que restrinja la pantalla al rol
-Administrador. MIENTRAS la sesión tenga un rol distinto de Administrador, el sistema DEBE
-redirigirla fuera de la pantalla sin renderizar su contenido; MIENTRAS tenga el rol Administrador,
-DEBE permitir el acceso.
+**R6** — La pantalla DEBE exigir el permiso `inventario.modificar` **antes** de resolver sus
+parámetros de lista y antes de renderizar nada. SI la petición no tiene sesión válida, ENTONCES el
+sistema DEBE redirigirla al login. SI la sesión es válida pero no incluye ese permiso, ENTONCES el
+sistema DEBE responder **404**, indistinguible de una ruta que no existe —sin nombrar el módulo, el
+permiso ni la existencia de la pantalla—, renderizado **dentro del layout privado** para que el
+usuario conserve menú y salida; y NO DEBE redirigirlo a otra pantalla ni presentar ningún dato del
+catálogo. MIENTRAS la sesión incluya el permiso, DEBE permitir el acceso.
 
 **R7** — La pantalla NO DEBE tomar ninguna decisión de autorización sobre los datos ni repetir la
 que ya toman las operaciones del catálogo: toda lectura y toda escritura DEBEN pasar por esas
@@ -185,8 +206,19 @@ base de datos, ni obtener esos datos por su cuenta.
 
 **R33** — El sistema NO DEBE re-crear ni duplicar el layout privado, la barra lateral, la región de
 avisos, las primitivas ya instaladas, la tabla compartida ni las utilidades de test: los hereda.
-Los únicos archivos heredados que esta feature puede modificar son los que exigen R2 (constante de
-ruta), R3 y R4 (navegación privada y su filtrado), R5 (prefijos privados) y R6 (reglas ruta→rol).
+Tampoco DEBE re-crear ni modificar el filtrado del menú por permisos ni el corte por permiso de
+página, que son de QC-75 y también se heredan. Los únicos archivos heredados que esta feature puede
+modificar son **dos**: el que declara las rutas compartidas y la lista de prefijos privados (R2,
+R5) y `lib/shared/navigation/private-nav.ts`, donde viven la sección, su ítem y el permiso que ese
+ítem declara (R3, R4). R6 NO autoriza modificar ningún archivo heredado: la exigencia de permiso se
+declara **en la propia página**. Aparte de esos dos, y sin ampliar la regla, esta feature DEBE
+ampliar los **siete** tests heredados de lista CERRADA cuyo punto de extensión por diseño es que
+cada consumidor nuevo se dé de alta en ellos —`tests/guards/guard-pantallas-exigen-permiso`,
+`tests/guards/guard-nav-permisos-declarados`, `tests/unit/app-sidebar.test.tsx`,
+`tests/unit/navegacion/private-layout-menu.test.tsx`, `tests/unit/inventario/scope.test.ts`,
+`tests/unit/shared/data-table-alcance.test.ts` y
+`tests/unit/recetas-ui/recipe-route-contract.test.ts`—, y esa ampliación DEBE **tensarlos**: subir
+el ancla o la lista exacta, nunca relajar un aserto ni convertir una lista cerrada en abierta.
 
 **R34** — La pantalla DEBE ser utilizable en viewport angosto y en viewport ancho: NO DEBE usar
 `100vh` como alto de pantalla, NO DEBE depender de `:hover` como única vía para descubrir o activar
@@ -198,7 +230,8 @@ tener un tamaño de fuente de al menos 16 px. NO DEBE declararse ninguna excepci
 
 **R36** — El sistema DEBE quedar cubierto por una prueba de extremo a extremo que recorra login →
 la pantalla → alta de una presentación → verla en la lista, y por otra que compruebe que una sesión
-sin el rol Administrador no llega a la pantalla.
+válida **sin el permiso `inventario.modificar`** no llega a la pantalla: recibe 404 dentro del
+layout privado y no ve la tabla (R6).
 
 ## Preguntas abiertas
 
@@ -252,3 +285,6 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). **Ninguna bloquea.**
 | 2026-09-07 | Multiplataforma | Se valida contra angosto y ancho con `tests/helpers/viewport.ts`. **Ninguna excepción de escritorio.** El desbordamiento se resuelve con scroll horizontal **contenido en la tabla**, nunca del `body` (**QC-11**, **QC-22**) |
 | 2026-09-07 | Base heredada | **shadcn/ui, Vitest, layout privado, sidebar, `<Toaster />` y la tabla compartida de QC-55 están montados y NO se re-crean.** El choque entre las features 4 y 10 ya ocurrió una vez en este repo; la T0 de `specs/11-*/tasks.md` existe para que no se repita |
 | 2026-09-07 | Librería nueva | **Ninguna.** Todo lo que hace falta está aprobado y montado |
+| 2026-09-08 | ¿Un no-Administrador ve el ítem de Configuración? (**matiza** la fila «¿Un no-Administrador ve el ítem de Configuración?» del 2026-09-07; esa fila **no se toca**) | **Sigue siendo «no: se oculta», y el mecanismo provisional que aquella fila anunciaba ya no hace falta: QC-75 aterrizó antes de que esta ficha terminara.** El ocultado a mano por rol —`adminOnly` + `visibleNavItems`— **nunca llegó a `dev`**; lo hace `filterNavItemsByPermissions` en el layout privado, con el `permission` que cada `NavLink` declara **obligatoriamente**. El ítem declara **`inventario.modificar`**. La fila del 2026-09-07 decía «no se convive con las dos cosas», y así es: **solo existe el mecanismo de QC-75**. Cubierto por **R4** |
+| 2026-09-08 | Protección de la ruta (**matiza** la fila «Protección de la ruta» del 2026-09-07; esa fila **no se toca**) | **Entra igual, pero con el mecanismo de QC-75, que borró `lib/composition/route-role-rules.ts` (QC-75 R16).** Ya no hay regla ruta→rol ni redirección: la página exige su permiso con `requirePagePermission('inventario.modificar')` y quien tiene sesión pero no el permiso recibe **404 dentro del layout privado**. Lo que **no** cambia: `PRIVATE_ROUTE_PREFIXES` sigue cubriendo la ruta —eso garantiza **sesión**, en el borde— y su guardia sigue poniendo el gate en rojo si una pantalla de `app/(private)/` se queda sin prefijo. Dos controles distintos, ninguno sustituye al otro. Cubierto por **R5** (sesión) y **R6** (permiso) |
+| 2026-09-08 | ¿Qué permiso exige la pantalla, ahora que se corta por permiso y no por rol? | **`inventario.modificar`, no `inventario.consultar`.** Administrar el catálogo —alta, edición y borrado viven **todos** aquí (R21, R27)— es modificar inventario. El Operador del seed lleva `inventario.consultar` y solo ese: con `consultar` entraría a una pantalla cuyo propósito entero es escribir. Comprobable en `SEED_ROLE_PERMISSIONS`: lo tiene el Administrador y no el Operador, así que la garantía de la fila «¿Quién puede?» del 2026-09-07 se mantiene. **No se creó ningún permiso nuevo** ni se tocó el catálogo de QC-74. Es el **mismo código** que declara el ítem del menú, así que nadie ve un enlace que le devolvería 404. Cubierto por **R4** y **R6** |

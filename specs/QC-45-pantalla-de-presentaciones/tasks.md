@@ -188,7 +188,8 @@
       aterriza en `/inventario`, no en el dashboard.
 - [x] Limpieza en `afterAll` que **tolera** `presentation_in_use` sin tumbar la suite.
 - **Hecho cuando:** `pnpm exec playwright test e2e/presentaciones.spec.ts` en verde en Chromium y
-      WebKit, sin dejar filas huérfanas.
+      WebKit, sin dejar filas huérfanas. **Cumplido el 2026-09-08 sobre el spec de la ronda 2**:
+      `--project=chromium --project=webkit` → `4 passed (47.5s)`, 0 rojos (salida en la bitácora).
 
 ### T12 — Cierre *(depende de todo)*
 - [x] `progress/impl_QC-45-pantalla-de-presentaciones.md` con el mapa `R<n> -> test` de abajo,
@@ -206,7 +207,7 @@
 | R1 | `configuracion-ui/presentation-page.test.tsx` — la página existe en la ruta derivada de la constante y no declara `main` propio |
 | R2 | `configuracion-ui/presentations-route-contract.test.ts` + `configuracion-convenciones.test.ts` (sin literales de la URL) |
 | R3 | `configuracion-ui/private-nav-configuracion.test.ts` — una sección, un ítem, sin ítems a rutas sin pantalla + `tests/unit/app-sidebar.test.tsx` (orden exacto de `PRIVATE_NAV_ITEMS`) |
-| R4 | `configuracion-ui/private-nav-configuracion.test.ts` (`filterNavItemsByPermissions` con `SEED_ROLE_PERMISSIONS`: Administrador sí, Operador no, sin encabezado huérfano) + `tests/unit/navegacion/private-layout-menu.test.tsx` (ampliación, sobre el árbol renderizado). **El texto de R4 habla de ROL y está desfasado desde QC-75; estos tests afirman su intención con el mecanismo por permiso** |
+| R4 | `configuracion-ui/private-nav-configuracion.test.ts` (`filterNavItemsByPermissions` con `SEED_ROLE_PERMISSIONS`: Administrador sí, Operador no, sin encabezado huérfano) + `tests/unit/navegacion/private-layout-menu.test.tsx` (ampliación, sobre el árbol renderizado) |
 | R5 | `tests/guards/guard-rutas-privadas-cubiertas.test.ts` + `presentations-route-contract.test.ts` (la constante está en `PRIVATE_ROUTE_PREFIXES` exactamente una vez) |
 | R6 | `presentations-route-contract.test.ts` (`page.tsx` exige `inventario.modificar` con `requirePagePermission`, antes de leer `searchParams`, y el ítem de menú declara el mismo código) + `tests/guards/guard-pantallas-exigen-permiso.test.ts` + `e2e/presentaciones.spec.ts` (recorrido 2: 404 dentro del layout privado) |
 | R7 | `presentation-page.test.tsx` — `unauthorized` pinta error y ninguna fila; la sección no lee sesión |

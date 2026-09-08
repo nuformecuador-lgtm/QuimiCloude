@@ -20,6 +20,10 @@
     "tests/unit/proveedores-ui/supplier-page.test.tsx": {
       "motivo": "Mismo flake de userEvent bajo carga que product-page.test.tsx, en la pantalla de proveedores que QC-44 acaba de mergear: pasa en aislado y falla de forma intermitente en la suite completa, con un caso distinto cada vez. VERIFICADO EN dev (commit 82c1379), SIN la rama de QC-47 de por medio, que no toca UI ni proveedores: la suite unit completa da 16 rojos entre estos dos archivos, y correr LOS DOS SOLOS da 50/50 verde. Es de QC-44. La ficha del arreglo es QC-58, que hoy solo nombra el formulario de productos: hay que ampliarla a esta clase de fallo o abrir ficha hermana, y RETIRAR estas dos entradas en el mismo cambio que lo arregle.",
       "desde": "2026-09-04"
+    },
+    "tests/unit/pedidos-ui/order-sheet.test.tsx": {
+      "motivo": "Flake de carga, no fallo propio, MEDIDO el 2026-09-08 desde el worktree de QC-45. Cae SOLO dentro de la suite completa y pasa aislado: 7/7 en aislado y 165/165 corriendo toda su carpeta, tanto en dev (e265021) como en la rama de QC-45. El ultimo cambio del archivo viene de QC-75 en dev, no de QC-45, y en dev limpio la suite tambien lo tumba: NO lo introduce esta feature. Mismo motivo por el que product-page.test.tsx esta aqui desde el 2026-09-04. Dato nuevo que AMPLIA la ficha del arreglo (QC-58): subir el plazo de 5s a 30s baja los rojos de la suite completa de 9 archivos a 2, asi que el plazo es la mayor parte del problema pero no todo. Y el flake NO es exclusivo de userEvent: tests/unit/composition/identity-facade.test.ts es |node|, no monta UI, y tambien expiraba a los 5s (pasa 5/5 con 30s). La hipotesis actual de QC-58 -el retardo entre teclas de userEvent- se queda corta. RETIRAR esta entrada en el mismo cambio que arregle QC-58.",
+      "desde": "2026-09-08"
     }
   }
 }

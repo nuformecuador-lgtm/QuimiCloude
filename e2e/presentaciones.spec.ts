@@ -297,7 +297,8 @@ test.describe('pantalla de presentaciones', () => {
     await login(page, adminUser, DASHBOARD_ROUTE);
 
     // --- 1. La pantalla se sirve a un Administrador (R6, la mitad que deja pasar). Se llega POR
-    // URL derivada de la constante: el item de menu de Configuracion no existe en esta feature.
+    // URL derivada de la constante. El item de menu de Configuracion SI existe (T2), pero aqui no
+    // se pulsa a proposito: meteria el filtrado del menu en el recorrido (ver cabecera).
     const listUrl = presentationsUrl(presentationName);
     await page.goto(listUrl);
     await expect(page.getByTestId(TITLE_TESTID)).toBeVisible({ timeout: 60_000 });

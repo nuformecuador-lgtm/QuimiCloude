@@ -1,13 +1,10 @@
-// QC-45 T2 — La seccion «Configuración» del menu privado y su unico item (R3, y la INTENCION de
-// R4 con el mecanismo de QC-75).
+// QC-45 T2 — La seccion «Configuración» del menu privado y su unico item (R3, R4).
 //
-// **R4 esta escrito en `requirements.md` en terminos de ROL** («el item se oculta a quien no sea
-// Administrador»). QC-75 (`menu-y-rutas-por-permiso`) retiro el ocultado por rol y lo sustituyo
-// por ocultado por PERMISO: el layout privado filtra `PRIVATE_NAV_ITEMS` con los permisos de la
-// sesion (`filterNavItemsByPermissions`) y `NavLink.permission` es obligatorio. Lo que este
-// archivo afirma es la intencion de R4 —quien no puede entrar no ve el enlace— con el mecanismo
-// que hoy existe; el texto de R4 queda por reformular y es decision del humano (ver
-// `progress/impl_QC-45-pantalla-de-presentaciones.md > Ronda 2`).
+// El ocultado es por PERMISO, no por rol: QC-75 (`menu-y-rutas-por-permiso`) retiro el ocultado
+// por rol y el layout privado filtra `PRIVATE_NAV_ITEMS` con los permisos de la sesion
+// (`filterNavItemsByPermissions`), con `NavLink.permission` obligatorio. R4 se reformulo en esa
+// clave el 2026-09-08 y hoy pide exactamente esto: `inventario.modificar`, decidido en el
+// servidor, sin emitir el item ni el encabezado a quien no lo tiene.
 //
 // Se ITERA `PRIVATE_NAV_ITEMS` y se afirma sobre `PRESENTATIONS_ROUTE`, `PRESENTATIONS_LABEL` y
 // el `testId`, **nunca sobre el literal del copy** (R35). Sin DOM: lo que esta task promete es la
