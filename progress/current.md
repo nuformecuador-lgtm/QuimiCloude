@@ -14,7 +14,7 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **17/17 tasks, `d1e966d`**. T11: cinco `./init.sh` completos seguidos, **las cinco exit 0** (234/234 archivos, 2839 casos). R9 y R13 reformulados conservando la redaccion anterior. `reviewer` corriendo (F2.2). Base propia `QuimiCloude_QC58` montada — el worktree venia sin `.env` |
 | QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | in_progress | feature/QC-65-estado-de-cuenta-de-usuario | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. Rama sincronizada con `origin/dev` ANTES de implementar, para no chocar con los tests del seed que QC-38 acababa de tocar. `implementer` en curso (F2.1) |
-| QC-39 | pantalla-de-unidades | Catálogos | frontend | spec_ready | feature/QC-39-pantalla-de-unidades | **F1.3 hecho el 2026-09-08**: acotada con `/afinar-feature` (35 decisiones cerradas, cero preguntas abiertas) y spec escrito — **50 requisitos EARS**, `design.md` y `tasks.md`, sin dependencias nuevas. Tarjeta en *Spec en revisión*. **Esperando aprobación humana (F1.4)** |
+| QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **Spec aprobado por el humano el 2026-09-08** (F1.4). 50 requisitos EARS, 35 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1). **Conflicto acotado con QC-58**: la tarea que amplía `app-sidebar.test.tsx` y `private-layout-menu.test.tsx` va **al final**, cuando QC-58 esté `done` |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`), `complexity: medium`. **Pendiente F1.2**: la ficha trae una pregunta abierta escrita en el board y la partición `fullstack` sin decidir, así que toca `/afinar-feature` antes del `spec_author` |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
@@ -240,6 +240,24 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-39 — F2.0: el conflicto con QC-58, medido y acotado (2026-09-08)
+
+La validación de `AGENTS.md > Paralelismo` **falló**: el `tasks.md` de QC-39 y el diff de QC-58 se
+cruzan en **dos archivos**, `tests/unit/app-sidebar.test.tsx` y
+`tests/unit/navegacion/private-layout-menu.test.tsx`. No es una corazonada: se calculó la
+intersección real entre los 31 archivos que el spec declara y los 50 del diff de QC-58.
+
+**Qué hace cada una ahí.** QC-58 cambia `userEvent.setup()` por `setupUser()` —18 líneas entre los
+dos, mecánicas y ya commiteadas—. QC-39 quiere **ampliarlos** para tensar sus anclas de seis ítems a
+siete. El peligro concreto, y tiene nombre: **si los tests nuevos de QC-39 llaman a
+`userEvent.setup()`, revierten a QC-58 en silencio** al mergearse las dos.
+
+**Decisión humana**: arranca igual, y **la única tarea que toca esos dos archivos se deja para el
+final**, cuando QC-58 esté `done`. R9 y R10 no pierden trazabilidad —su test principal es
+`private-nav-unidades.test.ts`, que es archivo nuevo—, y los otros 29 archivos de la ficha no rozan
+a QC-58. Al `implementer` se le dio la instrucción explícita de usar `setupUser()` del helper y
+nunca `userEvent.setup()`.
 
 ### QC-63 — arranque del 2026-09-08 (F1.0)
 
