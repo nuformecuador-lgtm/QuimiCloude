@@ -72,11 +72,11 @@
 ## Bloque 2 — Ruta, protección y navegación (va ANTES que la página)
 
 ### T3 — Constante de ruta + prefijo privado + corte por permiso *(depende de T0)*
-- [ ] `lib/shared/routes.ts`: `UNITS_ROUTE = '/configuracion/unidades'` —la hermana que el
+- [x] `lib/shared/routes.ts`: `UNITS_ROUTE = '/configuracion/unidades'` —la hermana que el
       comentario de `PRESENTATIONS_ROUTE` ya anuncia— y su entrada en `PRIVATE_ROUTE_PREFIXES`.
-- [ ] `tests/guards/guard-pantallas-exigen-permiso.test.ts`: **tensar** `RUTAS_ESPERADAS_HOY` de
+- [x] `tests/guards/guard-pantallas-exigen-permiso.test.ts`: **tensar** `RUTAS_ESPERADAS_HOY` de
       nueve a **diez** rutas, añadiendo `/configuracion/unidades`. Sin relajar ningún aserto.
-- [ ] Test `tests/unit/configuracion-ui/units-route-contract.test.ts`: la constante existe, está en
+- [x] Test `tests/unit/configuracion-ui/units-route-contract.test.ts`: la constante existe, está en
       los prefijos **exactamente una vez**, no está duplicada en ningún otro archivo, y la página
       exige **los dos** permisos con `requirePagePermission` **antes** de resolver `searchParams`
       (test de fuente, con los comentarios quitados antes de juzgar).
@@ -86,18 +86,18 @@
       `guard-rutas-privadas-cubiertas` pone el gate en rojo.
 
 ### T4 — El ítem de Unidades en la sección Configuración *(depende de T3)*
-- [ ] `private-nav.ts`: `UNITS_LABEL` y el ítem —`href: UNITS_ROUTE` importada, `testId:
+- [x] `private-nav.ts`: `UNITS_LABEL` y el ítem —`href: UNITS_ROUTE` importada, `testId:
       'nav-unidades'`, `permission: 'unidades.consultar'`, `icon` de los **ya declarados** en
       `NavIconName`, `section: NAV_SECTION_CONFIGURATION`—, **junto** al de presentaciones y sin
       tocarlo. No se crea sección, no se toca `NavLink`, no se toca
       `filterNavItemsByPermissions`, no se toca `AppSidebar`, no se toca `layout.tsx`.
-- [ ] Test `tests/unit/configuracion-ui/private-nav-unidades.test.ts`: hay **una** sección
+- [x] Test `tests/unit/configuracion-ui/private-nav-unidades.test.ts`: hay **una** sección
       Configuración con **dos** ítems; el nuevo apunta a `UNITS_ROUTE` y su `permission` está
       **contenido en el conjunto que exige la página** (derivado de la fuente de `page.tsx`, no
       repetido como literal); con los permisos del Administrador (`SEED_ROLE_PERMISSIONS`
       importados) se ven los dos ítems, con los del Operador **ninguno** y la sección desaparece
       entera; ningún ítem de la sección apunta a una ruta sin `page.tsx` (comprobado en disco).
-- [ ] Test `tests/unit/configuracion-ui/permisos-unidades-coherentes.test.ts` (**el ancla de R11**):
+- [x] Test `tests/unit/configuracion-ui/permisos-unidades-coherentes.test.ts` (**el ancla de R11**):
       ningún rol de `SEED_ROLE_PERMISSIONS` tiene **exactamente uno** de `unidades.consultar` /
       `unidades.modificar`; el caso sintético contrario dispara.
 - [ ] Ampliar `tests/unit/app-sidebar.test.tsx` y `tests/unit/navegacion/private-layout-menu.test.tsx`
@@ -109,19 +109,19 @@
 ## Bloque 3 — Piezas puras (antes de la UI)
 
 ### T5 [P] — `unit-list-params.ts` *(depende de T3)*
-- [ ] `parseUnitListParams`, `buildUnitListQuery`, `unitListHref`, con `page`, `pageSize`, `sort` y
+- [x] `parseUnitListParams`, `buildUnitListQuery`, `unitListHref`, con `page`, `pageSize`, `sort` y
       `q`; `filters` **siempre `{}`**; campo de orden validado contra `UNIT_QUERYABLE.sortable`
       **importado**; `pageSize` contra `PAGE_SIZE_OPTIONS` y `DEFAULT_PAGE_SIZE` importados.
-- [ ] Test `tests/unit/configuracion-ui/unit-list-params.test.ts`: entradas basura (`'abc'`, `'0'`,
+- [x] Test `tests/unit/configuracion-ui/unit-list-params.test.ts`: entradas basura (`'abc'`, `'0'`,
       `'-3'`, `'1.5'`, `'1e3'`, arrays, `pageSize=1000`, `sort=equivalencia:asc`,
       `sort=name:arriba`, `filters` inventados) producen siempre parámetros válidos y **nunca**
       lanzan; `parse(build(p))` devuelve `p`; `unitListHref` deriva de `UNITS_ROUTE`.
 - **Hecho cuando:** el test en verde, sin montar DOM.
 
 ### T6 [P] — `unit-equivalence.ts` *(depende de T1)*
-- [ ] `formatFactor`, `unitLabel`, `formatUnitEquivalence` y la constante del marcador neutro
+- [x] `formatFactor`, `unitLabel`, `formatUnitEquivalence` y la constante del marcador neutro
       (`design.md > 4`).
-- [ ] Test `tests/unit/configuracion-ui/unit-equivalence.test.ts`: `'1000.0000' -> '1000'`,
+- [x] Test `tests/unit/configuracion-ui/unit-equivalence.test.ts`: `'1000.0000' -> '1000'`,
       `'0.5000' -> '0.5'`, `'1.2340' -> '1.234'`; una derivada con base resuelta produce la frase
       completa; una **base** produce el guion; una derivada **sin base resuelta** produce el marcador
       neutro y **no lanza**; una unidad sin símbolo se nombra por su nombre; en ningún camino se
@@ -129,18 +129,18 @@
 - **Hecho cuando:** el test en verde, sin montar DOM.
 
 ### T7 [P] — `unit-columns.tsx` + `unit-row-actions.tsx` *(depende de T1, T6)*
-- [ ] Las **cuatro** columnas de `design.md > 9`; acciones como columna normal (`pinnable: false`,
+- [x] Las **cuatro** columnas de `design.md > 9`; acciones como columna normal (`pinnable: false`,
       sin `sortable`, sin `filter`).
-- [ ] `UnitRowActions` devuelve **nada** cuando `unit.isSystem`; en el resto, editar y borrar
+- [x] `UnitRowActions` devuelve **nada** cuando `unit.isSystem`; en el resto, editar y borrar
       siempre visibles, `min-h-11 min-w-11`, con nombre accesible que incluye el nombre de la unidad.
-- [ ] Test `tests/unit/configuracion-ui/unit-columns.test.tsx`: recorre la declaración y afirma que
+- [x] Test `tests/unit/configuracion-ui/unit-columns.test.tsx`: recorre la declaración y afirma que
       hay exactamente cuatro columnas, que ninguna expone `id`, `companyId`, ámbito, `baseUnitId`
       suelto, `factor` suelto, `nameNormalized`, marcas de tiempo ni autoría; que solo `name` y
       `symbol` son ordenables; que la de equivalencia **no** ordena ni filtra y la de acciones
       tampoco; los dos botones existen y son alcanzables por rol ARIA en una fila de empresa; en una
       fila **de sistema** la celda no contiene **ningún** `button`, ningún `data-testid` de acción,
       ningún elemento `disabled` y ninguna insignia.
-- [ ] Test `tests/unit/configuracion-ui/data-table-intacta-unidades.test.ts`: ningún archivo de
+- [x] Test `tests/unit/configuracion-ui/data-table-intacta-unidades.test.ts`: ningún archivo de
       `components/shared/data-table/` ni de `components/ui/` fue modificado por esta feature
       (comparación con la rama base), y el barrel compartido no expone ninguna prop nueva de
       acciones de fila.
@@ -149,19 +149,19 @@
 ## Bloque 4 — Página, sección y estados
 
 ### T8 — `page.tsx` + `unit-list-section.tsx` + los tres estados *(depende de T2, T3, T5, T6)*
-- [ ] `app/(private)/configuracion/unidades/page.tsx`: Server Component; **primeras** líneas
+- [x] `app/(private)/configuracion/unidades/page.tsx`: Server Component; **primeras** líneas
       `await requirePagePermission('unidades.consultar')` y `await
       requirePagePermission('unidades.modificar')`; `searchParams`; `<Suspense key={buildUnitListQuery(params)}>`;
       sin `main` ni armazón propio; título y metadata desde `UNITS_LABEL` y `BRAND_LABEL`
       importados.
-- [ ] Sección `async` con las **dos** lecturas de `design.md > 5.3` (`Promise.all`), el índice de
+- [x] Sección `async` con las **dos** lecturas de `design.md > 5.3` (`Promise.all`), el índice de
       bases y la lista de unidades base para el selector; despacha a error / vacío / tabla; **no lee
       sesión ni repite autorización**; si la segunda lectura falla, pinta la lista igual con índice
       vacío.
-- [ ] `unit-list-skeleton.tsx`, `unit-list-empty.tsx` (**de búsqueda sin resultados**: sin «crear la
+- [x] `unit-list-skeleton.tsx`, `unit-list-empty.tsx` (**de búsqueda sin resultados**: sin «crear la
       primera», con limpiar término y con enlace a la primera página) y `unit-list-error.tsx`
       (mensaje + reintento).
-- [ ] Test `tests/unit/configuracion-ui/unit-page.test.tsx`: la página existe en la ruta **derivada**
+- [x] Test `tests/unit/configuracion-ui/unit-page.test.tsx`: la página existe en la ruta **derivada**
       de la constante; renderiza sin declarar `main`; sin sesión redirige y sin **cada uno** de los
       dos permisos responde 404 (los dos casos, por separado); con `status:'error'` sale el estado de
       error y **ninguna fila**; con `code:'unauthorized'` ídem; con `items: []` sale el vacío de
@@ -172,7 +172,7 @@
       `guard-pantallas-exigen-permiso` siguen verdes.
 
 ### T9 — `unit-table.tsx` *(depende de T7, T8)*
-- [ ] Monta `<DataTable>` del barrel compartido con `tableId`, columnas, `getRowId`, `params`,
+- [x] Monta `<DataTable>` del barrel compartido con `tableId`, columnas, `getRowId`, `params`,
       `totalPages`, `status="idle"`, textos propios —la caja de búsqueda dice **por nombre**— y
       `onParamsChange -> router.push(unitListHref(next))`. **`searchable` ausente** (= `true`).
 - [ ] Test `tests/unit/configuracion-ui/unit-table.test.tsx`: cambiar página, tamaño (10/25), orden
@@ -186,16 +186,16 @@
 ## Bloque 5 — Escrituras
 
 ### T10 [P] — `unit-sheet.tsx` + `unit-form.tsx` *(depende de T8)*
-- [ ] Panel lateral único para alta y edición; disparador de barra y disparador de fila; edición
+- [x] Panel lateral único para alta y edición; disparador de barra y disparador de fila; edición
       precargada con los **cuatro** valores y `updateUnitAction.bind(null, id)`.
-- [ ] Los **cuatro** campos; selector de «deriva de» con solo unidades base, opción «ninguna» y
+- [x] Los **cuatro** campos; selector de «deriva de» con solo unidades base, opción «ninguna» y
       **sin** la propia unidad editada; factor como texto con `inputMode="decimal"`.
-- [ ] **Ausente ≠ vacío** (`design.md > 8`): cuando no se declara símbolo o no se declara derivación,
+- [x] **Ausente ≠ vacío** (`design.md > 8`): cuando no se declara símbolo o no se declara derivación,
       esas claves **no se envían**.
-- [ ] Errores por **código**: `duplicate_name` → nombre, `duplicate_symbol` → símbolo,
+- [x] Errores por **código**: `duplicate_name` → nombre, `duplicate_symbol` → símbolo,
       `invalid_derivation` → selector, el resto → región de error. Panel abierto, sin perder lo
       escrito.
-- [ ] Éxito: cerrar, `toast.success`, `router.refresh()`, sin perder los parámetros de la URL.
+- [x] Éxito: cerrar, `toast.success`, `router.refresh()`, sin perder los parámetros de la URL.
 - [ ] Test `tests/unit/configuracion-ui/unit-sheet.test.tsx`: abrir por crear y por editar no navega
       a otra URL ni monta diálogo centrado; la edición llega precargada con los cuatro valores; el
       selector no ofrece derivadas ni la propia unidad y sí ofrece las bases de sistema; **el
@@ -206,7 +206,7 @@
 - **Hecho cuando:** el test en verde.
 
 ### T11 [P] — `delete-unit-dialog.tsx` *(depende de T7)*
-- [ ] `alert-dialog` que nombra la unidad, advierte que no se puede deshacer, con `<form>` e `id`
+- [x] `alert-dialog` que nombra la unidad, advierte que no se puede deshacer, con `<form>` e `id`
       oculto dentro del contenido.
 - [ ] Test `tests/unit/configuracion-ui/delete-unit-dialog.test.tsx`: mientras no se confirma **no se
       invoca** la action (espía); el nombre aparece en el mensaje; al confirmar se invoca; con
@@ -216,7 +216,7 @@
 - **Hecho cuando:** el test en verde.
 
 ### T12 — Barrel de la ruta y convenciones *(depende de T7-T11)*
-- [ ] `components/index.ts` exporta todos los componentes de la ruta; `page.tsx` importa por el
+- [x] `components/index.ts` exporta todos los componentes de la ruta; `page.tsx` importa por el
       barrel.
 - [ ] Test `tests/unit/configuracion-ui/unidades-convenciones.test.ts`: todos los componentes viven
       en `components/` y salen del barrel, sin imports profundos; ningún archivo de la ruta contiene

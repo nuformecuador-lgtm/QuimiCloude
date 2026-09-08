@@ -138,3 +138,115 @@ El gate (`./init.sh --rapido`) lo corre el leader; el implementer no se autoapru
   los dos archivos que QC-58 está tocando y cuya tensión de anclas quedó diferida al final.
 - **Los `tests/integration/**` no corren en este worktree**: no hay `.env` ni `DATABASE_URL`
   (`PrismaClientInitializationError`). No es un rojo de esta feature.
+
+## Tanda 2 — Ruta, menú, piezas puras, columnas y pantalla (T3, T4, T5, T6, T7, T8)
+
+Delegada en `frontend_dev` en cuatro turnos encadenados. Commits: `4180675`, `781928d`, `d26d3fe`,
+`ee5fd6b` (T5, T6) · `0a5759d`, `99489cb`, `54d0365`, `a3924f9` (T7, T8) · `8064c9a`, `68022fe`
+(T3, T4) · `82b04c9`, `f7d1efc`, `9f5bb2e`, `714e63d` (correcciones).
+
+### Archivos nuevos de la pantalla
+
+`app/(private)/configuracion/unidades/page.tsx` y, bajo `components/`: `index.ts`, `unit-labels.ts`,
+`unit-list-params.ts`, `unit-equivalence.ts`, `unit-columns.tsx`, `unit-row-actions.tsx`,
+`unit-table.tsx`, `unit-sheet.tsx`, `unit-form.tsx`, `delete-unit-dialog.tsx`,
+`unit-list-section.tsx`, `unit-list-skeleton.tsx`, `unit-list-empty.tsx`, `unit-list-error.tsx`.
+
+### Archivos ajenos tocados (contra la lista cerrada de `design.md > 1`)
+
+- `lib/shared/routes.ts` — `UNITS_ROUTE` + su entrada en `PRIVATE_ROUTE_PREFIXES` (R8, R13). **Autorizado.**
+- `lib/shared/navigation/private-nav.ts` — `UNITS_LABEL` + el ítem de Unidades (R9, R10). **Autorizado.**
+- Ningún otro. `components/shared/data-table/**`, `components/ui/**`, `app/(private)/layout.tsx`,
+  `AppSidebar` y `db/**` siguen intactos, y hay tests que lo afirman.
+
+### Tests nuevos
+
+`configuracion-ui/unit-list-params.test.ts`, `unit-equivalence.test.ts`, `unit-columns.test.tsx`,
+`data-table-intacta-unidades.test.ts`, `unit-page.test.tsx`, `units-route-contract.test.ts`,
+`private-nav-unidades.test.ts`, `permisos-unidades-coherentes.test.ts`.
+
+### Anclas heredadas TENSADAS (nunca relajadas, R47)
+
+1. `tests/guards/guard-pantallas-exigen-permiso.test.ts` — `RUTAS_ESPERADAS_HOY` de 9 a **10** rutas.
+2. `tests/guards/guard-nav-permisos-declarados.test.ts` — de 6 a **7** enlaces, con `nav-unidades`.
+3. `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` — la sección Configuración pasa de
+   1 ítem a **2**, conservando que la sección es UNA y que presentaciones sigue primero.
+4. `tests/unit/unidades/unidades-convenciones.test.ts` — el ancla de QC-38 «ninguna ficha de unidades
+   abre flujo navegable» **queda relevada por QC-39, que es justo la ficha que lo abre**. No se borra:
+   pasa a exigir que haya **exactamente un** ítem de unidades, a `UNITS_ROUTE` importada, con
+   `unidades.consultar` y en Configuración, **más** un caso nuevo que afirma que
+   `lib/modules/unidades/**` sigue sin declarar navegación por su cuenta. Es más exigente que antes.
+
+### Un centinela ajeno arreglado, no silenciado
+
+`tests/unit/navegacion/qc75-convenciones.test.ts` se autolimitaba a «la rama de QC-75» detectándola
+por `lib/shared/navigation/private-nav.ts`, **que toca toda ficha que añade un ítem de menú**. Con el
+ítem de Unidades puesto, el centinela creía que ésta era la rama de QC-75 y denunciaba como
+«backend intocable» los dos archivos de dominio que R1–R6 autorizan expresamente. Es el **segundo**
+episodio de la misma clase —el primero lo sufrió QC-38 y está documentado en el propio archivo—.
+Se endureció la **precondición** (ahora exige también algún archivo de
+`specs/QC-75-menu-y-rutas-por-permiso/` en el rango, que solo aparece en los tres commits de esa
+rama); **ningún aserto se tocó** y en la rama real de QC-75 el centinela aplica exactamente igual.
+
+### Correcciones de conformidad detectadas por el implementer
+
+- **R34.** `buildUnitFormData` enviaba `factor` como cadena vacía cuando el usuario declaraba
+  derivación y dejaba el factor en blanco. R34 es tajante —«NUNCA una cadena vacía en esas tres
+  claves»—, así que ahora la clave **no viaja** y la pareja incompleta la rechaza el dominio con su
+  código, que es lo que R36 quiere. Corregido en `f7d1efc`.
+
+### Decisiones tomadas que no estaban en el spec
+
+1. **`createUnitColumns(baseIndex, baseUnits)`** en vez de una constante suelta: `DataTableColumn.cell`
+   recibe solo la fila y la equivalencia necesita el índice de bases. El cierre resuelve el problema
+   **sin añadir ninguna prop a la tabla compartida** (R31). Se exporta `UNIT_COLUMNS` para que el test
+   recorra la declaración.
+2. **Icono del ítem: `flask-conical`.** `NavIconName` es cerrado y no se puede ampliar sin tocar el
+   mecanismo de QC-75 (R9). De los nombres disponibles, un matraz es lo más cercano a un instrumento
+   de medida. Cambiarlo es una línea.
+3. **`unitLabel` trata un símbolo en blanco como ausente** y cae al nombre: el diseño solo contempla
+   `null`, pero `'   '` produciría la frase rota `1  = 1000 gr`.
+4. **`formatUnitEquivalence` devuelve el marcador neutro** también si llega `baseUnitId` sin `factor`
+   o al revés. El dominio garantiza que van juntos; esta capa presenta lo que recibe y no rompe la
+   fila si la invariante se violara.
+5. **El estado vacío no monta ningún disparador de alta**, ni siquiera genérico, para cumplir R24 al
+   pie de la letra. El alta vive sobre la tabla.
+6. **`UNITS_LABEL` vive en `private-nav.ts`** y `components/unit-labels.ts` es un re-export de una
+   línea: un solo literal en todo el repo.
+
+### Verificación de la tanda (corrida por el implementer, en el worktree)
+
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin salida — verde)
+
+$ pnpm lint
+> eslint
+(sin salida — verde)
+
+$ pnpm exec vitest run tests/unit/configuracion-ui tests/guards tests/unit/unidades \
+    tests/unit/navegacion tests/unit/app-sidebar.test.tsx
+ Test Files  2 failed | 66 passed (68)
+      Tests  4 failed | 839 passed | 2 skipped (845)
+```
+
+**Los cuatro rojos, uno por uno, y ninguno es una regresión:**
+
+| Rojo | Qué es |
+| --- | --- |
+| `private-layout-menu.test.tsx` — «con solo `inventario.consultar`, el control de cerrar sesión sigue presente» | **Deuda ajena inscrita en `tests/baseline-rojos.json`** desde 2026-09-08 (`getByTestId(userTrigger)`). No es de QC-39 |
+| `private-layout-menu.test.tsx` — «sin ningún permiso, el menú queda sin ítems…» | **La misma deuda de baseline**, segundo caso |
+| `private-layout-menu.test.tsx` — «ancla: el menú real tiene los seis ítems…» | **La tensión 6→7 DIFERIDA por orden del leader**: archivo intersección con QC-58 |
+| `app-sidebar.test.tsx` — «`PRIVATE_NAV_ITEMS` tiene exactamente seis entradas…» | **La misma tensión 6→7 diferida**, en el segundo archivo intersección con QC-58 |
+
+## Estado al cerrar la tanda 2
+
+- **Hechas:** T0, T1, T2, T3, T4 (salvo su cuarto bullet, diferido), T5, T6, T7, T8, **más el código
+  de producción de T9, T10, T11 y T12** —sin él, `page.tsx` no compila: la sección monta la tabla y
+  las acciones de fila montan el panel y el diálogo—.
+- **Pendientes por el bloqueo del helper:** los **tests** de T9 (`unit-table.test.tsx`), T10
+  (`unit-sheet.test.tsx`), T11 (`delete-unit-dialog.test.tsx`), T12
+  (`unidades-convenciones.test.ts` de la ruta) y T13 (`unidades-viewport.test.tsx`).
+- **Pendientes sin bloqueo:** T14 (E2E, Playwright no usa `user-event`) y T15 (cierre).
+- **Diferido hasta que QC-58 esté `done`:** el cuarto bullet de T4.
