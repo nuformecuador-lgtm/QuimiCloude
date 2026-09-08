@@ -140,7 +140,16 @@ const testId = {
 const PROVEEDOR_ID = crypto.randomUUID();
 const LINEA_ID = crypto.randomUUID();
 const PRESENTACION = { id: crypto.randomUUID(), name: 'Tambor 200 L' };
-const UNIDAD = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+// QC-39 (T1): el listado devuelve `UnitView`; el fixture se completa con sus tres campos
+// nuevos y ningun aserto de este archivo cambia de exigencia.
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Kilogramo',
+  symbol: 'kg',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
 
 function proveedor(): SupplierView {
   return {

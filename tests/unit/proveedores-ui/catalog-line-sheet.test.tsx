@@ -165,7 +165,16 @@ const LINEA_ID = crypto.randomUUID();
 
 const PRESENTACION = { id: crypto.randomUUID(), name: 'Tambor 200 L' };
 const PRESENTACION_NUEVA = { id: crypto.randomUUID(), name: 'Saco 25 kg' };
-const UNIDAD = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+// QC-39 (T1): el listado devuelve `UnitView`; el fixture se completa con sus tres campos
+// nuevos y ningun aserto de este archivo cambia de exigencia.
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Kilogramo',
+  symbol: 'kg',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
 
 /**
  * Los campos de texto de un alta valida. **Los importes llevan cuatro decimales a proposito**: son

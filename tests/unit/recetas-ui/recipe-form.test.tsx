@@ -17,7 +17,7 @@ import type {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { ProductListResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
-import type { UnitRef } from '@/lib/modules/unidades';
+import type { UnitView } from '@/lib/modules/unidades';
 import type { ProductView } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
@@ -142,10 +142,19 @@ const UNIT_LITRO_ID = '44444444-4444-4444-8444-444444444444';
 const UNIT_GRAMO_ID = '55555555-5555-4555-8555-555555555555';
 const RECIPE_ID = '66666666-6666-4666-8666-666666666666';
 
-const UNITS: readonly UnitRef[] = [
-  { id: UNIT_LITRO_ID, name: 'Litro', symbol: 'L' },
+// QC-39 (T1): el listado devuelve `UnitView` -equivalencia y `isSystem` incluidos-. El
+// selector sigue tipado con `UnitRef` y no se entera: `UnitView` lo extiende (R4).
+const UNITS: readonly UnitView[] = [
+  { id: UNIT_LITRO_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
   // Unidad SIN símbolo: el selector debe presentar su nombre (R30).
-  { id: UNIT_GRAMO_ID, name: 'Gramo', symbol: null },
+  {
+    id: UNIT_GRAMO_ID,
+    name: 'Gramo',
+    symbol: null,
+    baseUnitId: null,
+    factor: null,
+    isSystem: true,
+  },
 ];
 
 const PRODUCT_1_NAME = 'Ácido cítrico';
