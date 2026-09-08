@@ -22,7 +22,7 @@
 // | `components/ui/` sin tocar y `package.json` sin cambios  | AQUI, sobre el DIFF (R42)         |
 // | `lib/modules/**`, `db/**`, `lib/composition/index.ts`    | AQUI, sobre el DIFF (R46)         |
 // | lo heredado no se re-crea ni se duplica                  | AQUI (R47)                        |
-// | conversiones de importe y `type="number"`                | AQUI (R39)                        |
+// | conversiones de importe a coma flotante                  | AQUI (R39)                        |
 //
 // **Como esta escrito: detector puro + barrido real + caso negativo.** Una guardia que solo mira
 // el arbol de hoy es indistinguible de una guardia rota: pasa igual estando vacia. Aqui cada
@@ -248,8 +248,15 @@ function importesProhibidosDeCliente(fuente: string): string[] {
 }
 
 /**
- * R39 — Aritmetica de coma flotante sobre el importe, y captura con el control numerico del
- * navegador.
+ * R39 — Aritmetica de coma flotante sobre el importe.
+ *
+ * **ENMIENDA DEL 2026-09-08 (decision humana): el veto al control numerico del navegador SALE de
+ * esta guardia.** La cantidad se captura ahora con el control numerico, asi que mantener la regla
+ * dejaria la guardia en rojo permanente -y una guardia que siempre falla no protege nada porque
+ * nadie la mira-. Lo que R39 protege de fondo SIGUE vigilado aqui: el importe no se convierte a
+ * coma flotante ni se opera aritmeticamente con el en ningun archivo de la ruta, que es donde el
+ * decimal se corrompe de verdad. El valor del control numerico llega igual como cadena al
+ * `FormData` y lo valida el esquema del contrato.
  *
  * Tres reglas, con distinto alcance a proposito:
  *   - `parseFloat(` y `.toFixed(`: **prohibidos en toda la ruta**. No hay ni un uso legitimo:
@@ -257,8 +264,9 @@ function importesProhibidosDeCliente(fuente: string): string[] {
  *   - `Number(`: prohibido **en una linea que nombre cantidad o precio**. Acotado porque
  *     `order-list-params.ts` lo usa legitimamente para la pagina y el tamano de pagina, que son
  *     enteros de la cadena de consulta y no importes.
- *   - `type="number"`: prohibido en toda la ruta. El valor de un input numerico de HTML pasa por
- *     el binario de coma flotante, asi que `0.1005` deja de ser `0.1005`.
+ *   - `.replace(` sobre una linea de importe: prohibido en toda la ruta. Reescribir el decimal
+ *     -cambiar el separador, recortar ceros- es la otra forma de dejar de enviar lo que se
+ *     escribio, y es la que queda al alcance de la mano ahora que el control es numerico.
  *
  * `Number(` lleva `\b` por delante para no confundirse con `formatOrderNumber(`, que es
  * justamente la funcion del contrato que R10 obliga a usar.
@@ -277,8 +285,8 @@ function conversionesDeImporte(fuente: string): string[] {
       if (/\bNumber\s*\(/.test(linea) && CAMPOS_DE_IMPORTE.test(linea)) {
         violaciones.push(`${numero}: Number( sobre un importe`);
       }
-      if (/type\s*=\s*['"{]?\s*['"]?number['"]/.test(linea)) {
-        violaciones.push(`${numero}: type="number"`);
+      if (/\.replace\s*\(/.test(linea) && CAMPOS_DE_IMPORTE.test(linea)) {
+        violaciones.push(`${numero}: .replace( sobre un importe`);
       }
     });
 
@@ -527,7 +535,7 @@ describe('los componentes de cliente reciben los datos, no los buscan (R43)', ()
 });
 
 describe('los importes viajan como cadena decimal (R39)', () => {
-  it('la ruta no convierte a coma flotante ni captura con el control numerico', () => {
+  it('la ruta no convierte el importe a coma flotante ni lo reescribe', () => {
     const culpables = FUENTES_DE_LA_RUTA.flatMap((archivo) =>
       conversionesDeImporte(leer(archivo)).map((detalle) => `${archivo}:${detalle}`),
     );
@@ -539,13 +547,14 @@ describe('los importes viajan como cadena decimal (R39)', () => {
     expect(conversionesDeImporte('const q = parseFloat(order.quantity);')).not.toEqual([]);
     expect(conversionesDeImporte('const p = Number(order.unitPrice);')).not.toEqual([]);
     expect(conversionesDeImporte('const t = subtotal.toFixed(4);')).not.toEqual([]);
-    expect(conversionesDeImporte('<Input name="quantity" type="number" />')).not.toEqual([]);
+    expect(conversionesDeImporte("const q = quantity.replace(',', '.');")).not.toEqual([]);
 
-    // Legitimo: el entero de la pagina, el correlativo del contrato y el control de texto.
+    // Legitimo: el entero de la pagina, el correlativo del contrato y el control numerico, que
+    // desde el 2026-09-08 es el de la cantidad y entrega su valor como cadena (ver el docblock).
     expect(conversionesDeImporte('const value = Number(raw);')).toEqual([]);
     expect(conversionesDeImporte('cell: (order) => formatOrderNumber(order.number),')).toEqual([]);
     expect(
-      conversionesDeImporte('<Input name="quantity" type="text" inputMode="decimal" />'),
+      conversionesDeImporte('<Input name="quantity" type="number" step="any" />'),
     ).toEqual([]);
   });
 });
@@ -594,8 +603,9 @@ describe('la feature no toca lo que tiene prohibido tocar (R42, R46)', () => {
 
   it('no modifica los modulos, el esquema de datos ni el punto de composicion', (ctx) => {
     // R46 — los modulos se consumen solo por su contrato publico y sus adaptadores driving.
-    // `lib/composition/route-role-rules.ts` SI se modifica: lo autoriza R5, y por eso el
-    // intocable es el barrel `index.ts` y no la carpeta entera.
+    // El intocable es el barrel `lib/composition/index.ts` y no la carpeta entera: QC-35 tuvo que
+    // modificar otro archivo de `lib/composition` (la lista ruta->rol que R5 autorizaba, retirada
+    // despues por QC-75), y esa distincion sigue siendo la razon del alcance.
     if (TOCADOS_POR_LA_FEATURE === null) {
       ctx.skip('el rango git origin/dev..HEAD no tiene commits de esta feature');
       return;
@@ -621,13 +631,12 @@ describe('la feature no toca lo que tiene prohibido tocar (R42, R46)', () => {
 
     expect(
       intocablesTocados([
-        'lib/composition/route-role-rules.ts',
         'lib/shared/routes.ts',
         'lib/shared/navigation/private-nav.ts',
         'components/shared/data-table/data-table.tsx',
         `${CARPETA_DE_LA_RUTA}/page.tsx`,
       ]),
-      'R5 y design.md > 6 autorizan estos cinco',
+      'R5 y design.md > 6 autorizan estos cuatro',
     ).toEqual([]);
   });
 });

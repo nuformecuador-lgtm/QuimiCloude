@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useTransition } from 'react';
 
 import {
   DataTable,
@@ -9,10 +9,13 @@ import {
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import type { CatalogLineView } from '@/lib/modules/proveedores';
+import type { UnitRef } from '@/lib/modules/unidades';
 
+import { CatalogLineSheet } from './catalog-line-sheet';
 import { CATALOG_DEFAULT_PINNED_COLUMNS, buildCatalogColumns } from './catalog-columns';
 import type { CatalogDirectories } from './catalog-directories';
 import { catalogListHref } from './catalog-list-params';
+import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 
 /**
  * Tabla del catalogo de un proveedor (R12, R13, R21, R22, R30, R41, R48; `design.md > 6`).
@@ -25,7 +28,14 @@ import { catalogListHref } from './catalog-list-params';
  * **Ahora es `'use client'`**, y antes no: la tabla compartida es interactiva -emite
  * `onParamsChange`-. El Server Component sigue siendo `CatalogListSection`, que es quien pide los
  * datos y quien construye los diccionarios UNA vez (R22, R46); aqui solo llegan filas ya
- * resueltas, los diccionarios y los parametros con los que se pidieron.
+ * resueltas, los diccionarios, las unidades y los parametros con los que se pidieron.
+ *
+ * **Las acciones de fila NO son un slot** (correccion del 2026-09-07): esta tabla monta ella
+ * misma `CatalogLineSheet` y `DeleteCatalogLineDialog`. El diseno original las recibia como
+ * `rowActions`, una funcion que `CatalogListSection` construia; pero esa seccion es un Server
+ * Component y una funcion no cruza la frontera servidor->cliente, asi que la pantalla reventaba
+ * con «Functions cannot be passed directly to Client Components». De la seccion bajan datos
+ * (`supplierId`, `units`), no comportamiento.
  *
  * **Solo emite; el servidor recalcula.** `onParamsChange` entrega el `DataTableParams` completo y
  * aqui se traduce a una navegacion con la cadena de consulta canonica. Esta pantalla **no ordena,
@@ -36,9 +46,12 @@ import { catalogListHref } from './catalog-list-params';
  * **`searchable` se queda en su defecto (`true`)**: `SUPPLIER_CATALOG_LINE_QUERYABLE.searchable`
  * es `true` y `listCatalogLines` resuelve la busqueda, asi que la caja no miente.
  *
- * **`status` es SIEMPRE `'idle'`**: los tres estados de R23/R24/R25 se pintan FUERA de
- * `<DataTable>` -cada uno con su copy y sus acciones- y el «cargando» lo aporta el `<Suspense>`
- * de la pagina con `CatalogTableSkeleton`.
+ * **`status` es SIEMPRE `'idle'`**: el error y el catalogo vacio se pintan FUERA de
+ * `<DataTable>`, cada uno con su copy y sus acciones (R23, R25). El «cargando» de R24 ya no viene
+ * de remontar la pantalla -la `key` del `<Suspense>` desaparecio el 2026-09-07 porque borraba el
+ * foco del campo que se estaba escribiendo-: la navegacion va en una transicion y, mientras esta
+ * en vuelo, esta pantalla lo anuncia y atenua la tabla sin desmontarla. El `fallback` del
+ * `<Suspense>` sigue cubriendo la primera carga con `CatalogTableSkeleton`.
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R13): `components/ui/table.tsx`, que
  * la tabla compartida usa por dentro, envuelve la tabla en un contenedor con `overflow-x-auto`.
@@ -85,11 +98,11 @@ export type CatalogTableProps = {
   /** Proveedor al que pertenece el catalogo: de el sale el destino de cada navegacion. */
   readonly supplierId: string;
   /**
-   * Acciones de la fila (editar, dar de baja). Sigue siendo un **slot** (R26, R36): la tabla no
-   * importa el panel lateral ni el dialogo -los enchufa `CatalogListSection`- y por eso no conoce
-   * su API. Las acciones estan SIEMPRE visibles: nada detras de `:hover` (R48).
+   * Catalogo de unidades que necesita el panel lateral de la linea, pedido UNA vez por la pagina
+   * de detalle y bajado por props (R46). Es un dato, no un comportamiento: cruza la frontera
+   * servidor->cliente sin problema.
    */
-  readonly rowActions: (line: CatalogLineView) => ReactNode;
+  readonly units: readonly UnitRef[];
 };
 
 export function CatalogTable({
@@ -98,27 +111,80 @@ export function CatalogTable({
   params,
   totalPages,
   supplierId,
-  rowActions,
+  units,
 }: CatalogTableProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
+  /*
+    Las acciones de fila se montan AQUI, en el cliente, y no llegan como `slot` desde
+    `CatalogListSection`: esa seccion es un Server Component, y una funcion no cruza la frontera
+    servidor->cliente («Functions cannot be passed directly to Client Components»). Con el slot,
+    la pantalla del proveedor reventaba al pintarse. Lo que baja de la seccion son datos
+    -`supplierId` y `units`-, y esta tabla los enchufa al panel y al dialogo, igual que hace
+    `product-table.tsx` en inventario. Las acciones siguen SIEMPRE visibles: nada tras `:hover`
+    (R48).
+  */
   const columns = useMemo(
-    () => buildCatalogColumns({ directories, rowActions }),
-    [directories, rowActions],
+    () =>
+      buildCatalogColumns({
+        directories,
+        rowActions: (line) => (
+          <>
+            <CatalogLineSheet supplierId={supplierId} units={units} line={line} />
+            <DeleteCatalogLineDialog line={line} />
+          </>
+        ),
+      }),
+    [directories, supplierId, units],
   );
 
+  /*
+    La navegacion va DENTRO de una transicion (`startTransition`), y su `isPending` es la senal de
+    «algo esta en vuelo» mientras el servidor recalcula la lista (2026-09-07).
+
+    Esa senal NO desmonta nada: antes la daba la `key` del `<Suspense>` de la pagina, que
+    remontaba el subarbol entero en cada cambio de consulta y con el borraba el foco del campo que
+    se estaba escribiendo -escribir en la busqueda o en un filtro de texto perdia el cursor en
+    cuanto salia la peticion-. Tampoco se pasa `status="loading"` a la tabla compartida por lo
+    mismo: ese estado sustituye cabecera y filas por el esqueleto, y el foco se iria igual. Se
+    anuncia con `aria-busy` y un rotulo visible, atenuando la tabla, que sigue montada y sigue
+    aceptando teclas.
+  */
+  const navigate = (href: string) => {
+    startTransition(() => {
+      router.push(href);
+    });
+  };
+
   return (
-    <DataTable
-      tableId={CATALOG_TABLE_ID}
-      columns={columns}
-      rows={lines}
-      getRowId={(line) => line.id}
-      params={params}
-      totalPages={totalPages}
-      onParamsChange={(next) => router.push(catalogListHref(supplierId, next))}
-      status="idle"
-      texts={CATALOG_TABLE_TEXTS}
-      defaultPinnedColumns={CATALOG_DEFAULT_PINNED_COLUMNS}
-    />
+    <div
+      data-testid="catalog-table"
+      aria-busy={isPending}
+      className={isPending ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+    >
+      {/*
+        La senal de «en vuelo»: un rotulo visible con el texto de `CATALOG_TABLE_TEXTS.loading` y la
+        tabla atenuada. Para la tecnologia de asistencia la lleva `aria-busy` en el
+        contenedor -no una segunda region viva: la zona privada tiene EXACTAMENTE una, la de
+        avisos que monta el layout privado, y varios tests lo afirman-. La tabla NO se desmonta ni
+        se bloquea: se puede seguir escribiendo en la barra de filtros mientras se recalcula.
+      */}
+      {isPending ? (
+        <p className="text-xs text-muted-foreground">{CATALOG_TABLE_TEXTS.loading}</p>
+      ) : null}
+      <DataTable
+        tableId={CATALOG_TABLE_ID}
+        columns={columns}
+        rows={lines}
+        getRowId={(line) => line.id}
+        params={params}
+        totalPages={totalPages}
+        onParamsChange={(next) => navigate(catalogListHref(supplierId, next))}
+        status="idle"
+        texts={CATALOG_TABLE_TEXTS}
+        defaultPinnedColumns={CATALOG_DEFAULT_PINNED_COLUMNS}
+      />
+    </div>
   );
 }

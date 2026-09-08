@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
@@ -42,8 +43,11 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
  * de tamano, no solo en la primera carga (R16). Sin ella, Next reutiliza el limite y el usuario
  * se queda mirando la pagina anterior sin ninguna senal de que algo esta en vuelo.
  *
- * **Aqui no se decide ningun permiso** (R7): el corte de ruta lo hace el middleware con la regla
- * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `recetas`.
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige `recetas.consultar`
+ * con `requirePagePermission` -antes de resolver `searchParams` y antes de pintar nada-, que
+ * redirige al login sin sesion y responde 404 sin nombrar el modulo ni mencionar permisos. El
+ * middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan firma, caducidad y empresa.
+ * La autorizacion sobre los DATOS la siguen aportando los casos de uso de `recetas`.
  *
  * **Crear NAVEGA a su pagina propia** (R20): nunca abre un `sheet` ni un dialogo modal. Y por eso
  * la accion es un `<Link>` real pintado con `buttonVariants`, NO el primitivo `Button` con
@@ -55,6 +59,8 @@ export default async function FormulasPage({
 }: {
   searchParams: Promise<RecipeListSearchParams>;
 }) {
+  await requirePagePermission('recetas.consultar');
+
   const { page, pageSize } = parseRecipeListParams(await searchParams);
 
   return (

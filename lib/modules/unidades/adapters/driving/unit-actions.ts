@@ -32,11 +32,27 @@ function toErrorState(error: unknown): { status: 'error'; code: string; message:
   throw error;
 }
 
-/** El actor se resuelve UNA vez por invocacion, nunca dentro del dominio. */
+/**
+ * El actor se resuelve UNA vez por invocacion, nunca dentro del dominio, y con LAS DOS CARAS
+ * de la sesion del servidor (QC-76 R19): `getSessionUser()` da el id y el conjunto de permisos,
+ * `getSessionContext()` da la EMPRESA. La empresa sale del contexto de sesion y NUNCA de la
+ * entrada del llamante: esta action no lee cookie ni cabecera, igual que hoy.
+ *
+ * **Falla cerrado**: si falta CUALQUIERA de las dos, el actor es `null`, y con actor `null`
+ * `requirePermission` rechaza en la primera linea del caso de uso, antes de tocar el
+ * repositorio. Sin contexto no hay actor, y sin actor no hay consulta.
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  const [sessionUser, sessionContext] = await Promise.all([
+    identity.getSessionUser(),
+    identity.getSessionContext(),
+  ]);
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 /**
@@ -56,6 +72,100 @@ export async function listUnitsAction(): Promise<UnitListResult> {
   try {
     const data = await unidades.listUnits(undefined, actor);
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------
+// QC-38 (T9, `design.md > 8`, R27, R29, R30, R31, R36). Tres Server Actions NUEVAS, alta,
+// edicion y borrado. `listUnitsAction`, `currentActor` y `toErrorState` de arriba NO se
+// reescriben: las tres nuevas los reutilizan tal cual.
+//
+// NINGUNA de las tres se reexporta desde `index.ts` (R31): el barrel tiene que poder
+// importarse desde un componente de cliente, y un 'use server' en su cierre de imports lo
+// romperia (cabecera de `index.ts`).
+// ---------------------------------------------------------------------------------------
+
+export type CreateUnitFormState =
+  | { status: 'idle' }
+  | { status: 'success'; id: string }
+  | { status: 'error'; code: string; message: string };
+
+export type UnitMutationFormState =
+  | { status: 'idle' }
+  | { status: 'success' }
+  | { status: 'error'; code: string; message: string };
+
+/**
+ * COMO SE LEE `FormData` SIN QUE R36 SE COMA A R10. Un campo que el formulario no envia y uno
+ * que envia vacio llegan igual a `FormData.get`: cadena vacia. Como el simbolo vacio SE
+ * RECHAZA (R36) pero el simbolo AUSENTE es legal (R10), la distincion se hace con
+ * `formData.has(key)`, NUNCA con el valor:
+ *   - si la clave NO esta -> el candidato lleva `undefined` ("no lo declaro"), y el esquema lo
+ *     acepta;
+ *   - si la clave SI esta -> va TAL CUAL llego, sin recortar ni convertir, y el esquema decide
+ *     (vacio -> `invalid_input`).
+ * Lo mismo para `baseUnitId` y `factor`, donde "ausente" significa unidad base (R17) y NO
+ * entrada invalida. Si en vez de `formData.has(...)` se mirara el valor, un simbolo que el
+ * formulario no manda y uno que manda vacio serian indistinguibles y R36 se comeria a R10.
+ */
+function candidateFromFormData(formData: FormData): unknown {
+  return {
+    name: formData.get('name'),
+    symbol: formData.has('symbol') ? formData.get('symbol') : undefined,
+    baseUnitId: formData.has('baseUnitId') ? formData.get('baseUnitId') : undefined,
+    factor: formData.has('factor') ? formData.get('factor') : undefined,
+  };
+}
+
+/**
+ * Alta de unidad (R27, R28, R36). El actor lo resuelve esta action con `currentActor()`, igual
+ * que `listUnitsAction`; el dominio no lee sesion, cookie ni cabecera (R29).
+ */
+export async function createUnitAction(
+  _prevState: CreateUnitFormState,
+  formData: FormData,
+): Promise<CreateUnitFormState> {
+  const actor = await currentActor();
+
+  try {
+    const { id } = await unidades.createUnit(candidateFromFormData(formData), actor);
+    return { status: 'success', id };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Edicion de unidad (R27, R28, R36): `id` llega por PARAMETRO -no por `FormData`-, tal como
+ *  exige `design.md > 8`; el actor y la lectura de `FormData` son los mismos que en el alta. */
+export async function updateUnitAction(
+  id: string,
+  _prevState: UnitMutationFormState,
+  formData: FormData,
+): Promise<UnitMutationFormState> {
+  const actor = await currentActor();
+
+  try {
+    await unidades.updateUnit(id, candidateFromFormData(formData), actor);
+    return { status: 'success' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Borrado de unidad (R27): `id` viaja como campo OCULTO de `FormData` (`design.md > 8`), no
+ *  hay entrada que validar con zod -el dominio no espera forma alguna, solo un identificador-. */
+export async function deleteUnitAction(
+  _prevState: UnitMutationFormState,
+  formData: FormData,
+): Promise<UnitMutationFormState> {
+  const actor = await currentActor();
+  const id = String(formData.get('id') ?? '');
+
+  try {
+    await unidades.deleteUnit(id, actor);
+    return { status: 'success' };
   } catch (error) {
     return toErrorState(error);
   }

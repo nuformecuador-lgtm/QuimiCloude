@@ -2,10 +2,18 @@
 //
 // Todo lo que esta tanda promete es invisible renderizando: que la URL viva en UNA constante,
 // que el detalle se derive de ella, que el prefijo privado la cubra y que la regla ruta->rol la
-// restrinja al Administrador. Por eso este archivo mezcla dos clases de asercion, las dos sin DOM:
+// exija el permiso de consultar proveedores. Por eso este archivo mezcla dos clases de asercion,
+// las dos sin DOM:
 //   - guardias de fuente y de arbol (el literal no se incrusta, los consumidores derivan);
 //   - decisiones puras de `decideRouteAccess` con las constantes REALES, mismo patron que
-//     `tests/unit/identity/route-access.test.ts` para `INVENTORY_ROUTE` y `FORMULAS_ROUTE`.
+//     `tests/unit/identity/route-access.test.ts`.
+//
+// **QC-75 T12 sustituyo la afirmacion por ROL.** Hasta entonces aqui se afirmaba que
+// la lista ruta->rol del borde tenia una fila `{prefix: SUPPLIERS_ROUTE, roles: [Administrador]}`;
+// esa lista se retiro entera (QC-75 R16). Lo que ata hoy esta ruta a quien puede verla es el permiso que
+// exige la propia pantalla (R6 de QC-75) y el que declara su item de menu (R5), que tienen que
+// ser EL MISMO codigo. Lo que no cambia: sin sesion se sigue redirigiendo al login, y con sesion
+// valida la ruta pasa el borde sea cual sea el rol.
 //
 // Los asserts de navegacion ITERAN `PRIVATE_NAV_ITEMS` y afirman sobre `SUPPLIERS_ROUTE`,
 // `SUPPLIERS_LABEL` y el `testId`, **nunca sobre el literal del copy** (R47, decision cerrada del
@@ -17,14 +25,12 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-// La lista real de reglas es CABLEADO y vive en `lib/composition/` (QC-22).
-import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules'
 import {
   decideRouteAccess,
   type RouteAccessInput,
   type RouteAccessSession,
 } from '@/lib/modules/identity/domain/route-access'
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity'
+import { PERMISSIONS } from '@/lib/modules/identity'
 import {
   PRIVATE_NAV_ITEMS,
   SUPPLIERS_LABEL,
@@ -125,8 +131,8 @@ describe('la ruta de proveedores se declara una sola vez (R2, R3)', () => {
     ).toEqual([])
   })
 
-  it('nadie redeclara la constante: private-nav y la regla ruta->rol la IMPORTAN (R2)', () => {
-    for (const ruta of ['lib/shared/navigation/private-nav.ts', 'lib/composition/route-role-rules.ts']) {
+  it('nadie redeclara la constante: private-nav la IMPORTA (R2)', () => {
+    for (const ruta of ['lib/shared/navigation/private-nav.ts']) {
       const codigo = fuenteSinComentarios(ruta)
       expect(codigo, `${ruta} no puede redeclarar SUPPLIERS_ROUTE`).not.toContain(
         'const SUPPLIERS_ROUTE =',
@@ -194,40 +200,49 @@ describe('la navegacion privada lleva a proveedores (R4, R47)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// T3 — La regla ruta->rol, con las constantes REALES (R6)
+// T3 (reescrito por QC-75 T12) — El permiso de la pantalla, con las constantes REALES
 // ---------------------------------------------------------------------------
 //
-// Mismo patron que los bloques de inventario y de recetas de
-// `tests/unit/identity/route-access.test.ts`: entrada y salida son objetos planos, sin Next, sin
-// cookies y sin base de datos.
+// Mismo patron que `tests/unit/identity/route-access.test.ts`: entrada y salida son objetos
+// planos, sin Next, sin cookies y sin base de datos.
 
 const SUB = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40'
 const ID_PROVEEDOR = '22222222-2222-4222-8222-222222222222'
 const ANONIMO: RouteAccessSession = { kind: 'anonymous' }
-const OPERADOR: RouteAccessSession = { kind: 'authenticated', sub: SUB, roleName: 'Operador' }
-const ADMIN: RouteAccessSession = {
-  kind: 'authenticated',
-  sub: SUB,
-  roleName: ROLE_ADMINISTRADOR,
-}
+const CON_SESION: RouteAccessSession = { kind: 'authenticated', sub: SUB }
+
+/** Las pantallas, derivadas de la constante: el route group `(private)` no aporta segmento. */
+const PAGE_PATH = `app/(private)${SUPPLIERS_ROUTE}/page.tsx`
+const PAGE_DETALLE_PATH = `app/(private)${SUPPLIERS_ROUTE}/[id]/page.tsx`
 
 const REAL = {
   pathname: SUPPLIERS_ROUTE,
   search: '',
   session: ANONIMO,
   privatePrefixes: PRIVATE_ROUTE_PREFIXES,
-  rules: ROUTE_ROLE_RULES,
   routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
 } as const satisfies RouteAccessInput
 
 const RUTAS_DE_PROVEEDORES = [SUPPLIERS_ROUTE, supplierDetailRoute(ID_PROVEEDOR)] as const
 
 describe('la pantalla de proveedores con las constantes reales (R5, R6)', () => {
-  it('la regla se deriva de SUPPLIERS_ROUTE y restringe al Administrador (R6)', () => {
-    expect(ROUTE_ROLE_RULES).toContainEqual({
-      prefix: SUPPLIERS_ROUTE,
-      roles: [ROLE_ADMINISTRADOR],
-    })
+  // Sustituye a la fila {prefix, roles:[Administrador]} de la lista ruta->rol (QC-75 R16). El codigo
+  // se DERIVA del catalogo de `identity`, nunca se escribe a mano: si alguien lo renombrara, esto
+  // se pone rojo en vez de quedarse vigilando un permiso inexistente.
+  it('la lista y el detalle exigen proveedores.consultar, y el item de menu declara ese mismo permiso (QC-75 R5, R6)', () => {
+    const permiso = PERMISSIONS.find(
+      (entrada) => entrada.module === 'proveedores' && entrada.action === 'consultar',
+    )
+    expect(permiso, 'el catalogo de identity deberia tener proveedores.consultar').toBeDefined()
+
+    for (const ruta of [PAGE_PATH, PAGE_DETALLE_PATH]) {
+      expect(fuenteSinComentarios(ruta), `${ruta} deberia exigir su permiso`).toContain(
+        `requirePagePermission('${permiso?.code}')`,
+      )
+    }
+
+    const enlace = NAV_APLANADO.find((item) => item.href === SUPPLIERS_ROUTE)
+    expect(enlace?.permission).toBe(permiso?.code)
   })
 
   it.each([
@@ -249,38 +264,28 @@ describe('la pantalla de proveedores con las constantes reales (R5, R6)', () => 
     ).toEqual({ kind: 'allow' })
   })
 
-  it('deja pasar al Administrador en la lista y en el detalle (R6)', () => {
+  // QC-75 R16 — el borde ya no corta por rol: con sesion valida, la lista y el detalle pasan. A
+  // quien no tenga `proveedores.consultar` lo corta el 404 de la pagina, no una redireccion.
+  it('con sesion valida, la lista y el detalle pasan el borde (QC-75 R16)', () => {
     for (const ruta of RUTAS_DE_PROVEEDORES) {
-      expect(decideRouteAccess({ ...REAL, pathname: ruta, session: ADMIN })).toEqual({
+      expect(decideRouteAccess({ ...REAL, pathname: ruta, session: CON_SESION })).toEqual({
         kind: 'allow',
       })
     }
   })
 
-  it('a un rol distinto de Administrador lo saca con motivo forbidden, no al login (R6)', () => {
-    // «No autorizado» no es «no autenticado»: mandarlo al login le pediria unas credenciales que
-    // ya tiene. El motivo `forbidden` distingue un caso del otro.
-    for (const ruta of RUTAS_DE_PROVEEDORES) {
-      expect(decideRouteAccess({ ...REAL, pathname: ruta, session: OPERADOR })).toEqual({
-        kind: 'redirect',
-        to: DASHBOARD_ROUTE,
-        reason: 'forbidden',
-      })
-    }
-  })
-
-  it('las reglas de inventario y de recetas siguen en pie: se añadio una fila, no se sustituyo (R6)', () => {
+  it('las rutas de inventario y de recetas siguen siendo privadas: se anadio un prefijo, no se sustituyo (R5)', () => {
     for (const ruta of [INVENTORY_ROUTE, FORMULAS_ROUTE]) {
-      expect(decideRouteAccess({ ...REAL, pathname: ruta, session: OPERADOR })).toEqual({
+      expect(decideRouteAccess({ ...REAL, pathname: ruta, session: ANONIMO })).toEqual({
         kind: 'redirect',
-        to: DASHBOARD_ROUTE,
-        reason: 'forbidden',
+        to: `${LOGIN_ROUTE}?next=${encodeURIComponent(ruta)}`,
+        reason: 'unauthenticated',
       })
     }
   })
 
-  it('el resto del area privada no se cierra de rebote (R6)', () => {
-    expect(decideRouteAccess({ ...REAL, pathname: DASHBOARD_ROUTE, session: OPERADOR })).toEqual({
+  it('el resto del area privada no se cierra de rebote (R5)', () => {
+    expect(decideRouteAccess({ ...REAL, pathname: DASHBOARD_ROUTE, session: CON_SESION })).toEqual({
       kind: 'allow',
     })
   })

@@ -38,12 +38,16 @@ const testId = {
 } as const;
 
 const PRIMERA_PAGINA = [
-  { id: crypto.randomUUID(), name: 'Esmalte azul' },
-  { id: crypto.randomUUID(), name: 'Barniz mate' },
+  { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null },
+  { id: crypto.randomUUID(), name: 'Barniz mate', imageUrl: null },
 ] as const;
 
 /** Receta que NO esta en la primera pagina: solo se alcanza pidiendo mas al servidor (R31). */
-const RECETA_LEJANA = { id: crypto.randomUUID(), name: 'Disolvente universal' } as const;
+const RECETA_LEJANA = {
+  id: crypto.randomUUID(),
+  name: 'Disolvente universal',
+  imageUrl: null,
+} as const;
 
 const INITIAL_PAGE: RecipePickerPage = { items: PRIMERA_PAGINA, totalPages: 2 };
 

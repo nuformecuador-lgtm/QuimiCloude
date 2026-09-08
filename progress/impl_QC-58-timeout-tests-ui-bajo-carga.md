@@ -920,3 +920,77 @@ con 2), y **205 casos de guardias** donde eran 204 (+ el caso nuevo de la API di
 **Y el aviso de siempre, que en esta ficha ya no es teórico:** este `--rapido` verde **no** prueba
 que no quede un flake de saturación. Lo que corresponde son las cinco corridas de `./init.sh`
 completo, y las corre el leader.
+
+---
+
+## F2.3 — el merge con `origin/dev` (2026-09-08)
+
+`origin/dev` avanzó mucho mientras esta ficha estaba en vuelo: QC-45 (PR #46), QC-38 (PR #47), un
+lote de ajustes de UI decididos a mano (`ab28f97`) y el `chore(arnes)` que hace que el gate cargue
+el `.env`. **Cuatro conflictos**, todos del mismo tipo: mi lado cambió *cómo se teclea* y `dev`
+cambió *qué prueba* el test.
+
+| Archivo | Bloques | Qué elegí, y por qué |
+| --- | --- | --- |
+| `tests/baseline-rojos.json` | 1 | **Mis dos estructurales + la entrada nueva de `dev`, y una cuarta retirada.** Ver abajo |
+| `tests/unit/nav-user.test.tsx` | 4 | **`dev` entero.** No es un choque de forma: `ab28f97` **sacó el menú de usuario y el cierre de sesión del pie** y los llevó al encabezado, así que los cuatro bloques míos probaban comportamiento que ya no existe. Reaplicar mi forma de teclear encima no tenía dónde: el archivo se queda sin `userEvent` |
+| `tests/unit/pedidos-ui/order-form.test.tsx` | 1 | **Contenido de `dev` + mi forma.** Entra su helper `cantidad()`, y `rellenarAlta` se tipa con `ReturnType<typeof setupUser>` en vez del `typeof userEvent.setup` que traía |
+| `tests/unit/sidebar-desktop.test.tsx` | 1 | **Contenido de `dev` + mi forma.** Su caso reescrito de R27 («el cierre de sesión sigue alcanzable, ahora desde el encabezado») con `setupUser()` en vez de `userEvent.setup()` |
+
+### El baseline, que era el delicado
+
+`dev` trae en `a6454b3` una entrada nueva, y en el bloque en conflicto había **cinco**. Resolución:
+
+- **Se conserva `tests/unit/navegacion/private-layout-menu.test.tsx`** (la nueva). Es **legítima**:
+  tiene `motivo` y `desde` (R12), y su causa **no es la de esta ficha** — es determinista, falla
+  igual en aislado, y falla porque `ab28f97` movió el disparador del menú de usuario y el test lo
+  sigue buscando donde estaba. Lo comprobé corriéndolo: 2 de 8, siempre los mismos dos, con
+  `Unable to find an element by: [data-testid="private-user-trigger"]`. Nada que ver con el plazo ni
+  con `pointer-events`.
+- **Se retiran las tres de R10**, como manda la ficha.
+- **Y se retira una cuarta: `tests/unit/pedidos-ui/order-sheet.test.tsx`**, que `dev` añadió el
+  2026-09-08 desde el worktree de QC-45. **Decisión mía, y la señalo porque va más allá de la letra
+  de R10**, que nombra tres archivos: su propio `motivo` dice literalmente «**RETIRAR esta entrada
+  en el mismo cambio que arregle QC-58**», su causa es exactamente el flake de saturación que esta
+  ficha cura, y el archivo lleva desde `63bea8e` con la espera de `esperarInteractiva` puesta y pasó
+  las cinco corridas completas de T11 en verde. Dejarla habría sido tapar un rojo ya curado: el
+  baseline diría que ese archivo puede fallar cuando ya no falla. **Si el leader prefiere lo
+  contrario, es una línea.**
+
+El archivo queda con **tres** entradas, las tres con `motivo` y `desde` (R12), y es JSON válido.
+
+### La guardia mordió lo que llegó, que era lo esperable
+
+`dev` trajo **7 archivos de test nuevos o retocados que tecleaban a la vieja usanza**, y la mitad
+nueva de la guardia —la de la ronda 2— los cazó a todos:
+
+| Archivo llegado de `dev` | Qué traía |
+| --- | --- |
+| `tests/unit/configuracion-ui/presentation-sheet.test.tsx` | 11 `userEvent.setup()` + 1 `ReturnType<typeof userEvent.setup>` |
+| `tests/unit/configuracion-ui/delete-presentation-dialog.test.tsx` | 4 `userEvent.setup()` |
+| `tests/unit/configuracion-ui/configuracion-viewport.test.tsx` | 2 `userEvent.setup()` |
+| `tests/unit/configuracion-ui/presentation-table.test.tsx` | **6 llamadas a la API directa** (`userEvent.click(...)`) |
+| `tests/unit/logout-button.test.tsx` | 4 `userEvent.setup()` |
+| `tests/unit/navegacion/private-layout-menu.test.tsx` | 2 `userEvent.setup()` |
+| `tests/unit/pedidos-ui/order-form.test.tsx` | 3 `userEvent.setup()` en casos nuevos que entraron **sin conflicto** |
+
+Los 32 sitios migrados a `setupUser()`. Y uno de ellos era además del otro patrón: en
+`presentation-table.test.tsx`, «elegir otro tamaño» pincha la opción del popup **inmediatamente
+después de abrirlo**, así que lleva `esperarInteractiva` — es la bomba de relojería de la tercera
+tanda, recién llegada de otra ficha.
+
+**Esto es lo que la ficha compra, visto en vivo:** sin la mitad nueva de la guardia, las 6 llamadas
+directas de `presentation-table` habrían entrado en silencio, porque la versión vieja sólo miraba
+`userEvent` + `.setup(`.
+
+### Dos rojos que aparecieron durante el merge y NO son míos
+
+- `tests/unit/navegacion/private-layout-menu.test.tsx` (2 casos): es justo la entrada nueva del
+  baseline. Ajeno y determinista.
+- `configuracion-ui/data-table-intacta.test.ts` y `configuracion-ui/configuracion-convenciones.test.ts`
+  (1 caso cada uno): las guardias de alcance de QC-45 comparan contra el rango `dev...HEAD` **y el
+  árbol de trabajo**, así que **con el merge a medias** veían los archivos que entraban de `dev`
+  (`components/ui/sheet.tsx`, `components/shared/data-table/data-table-pagination.tsx`) como si los
+  hubiera tocado esta rama. Es el mismo defecto estructural que ya tienen las dos entradas del
+  baseline de `recetas`. Al cerrar el merge desaparece —el `dev` local ya contiene `ab28f97`—; queda
+  comprobado abajo con el `--rapido`. **No se toca nada de QC-45 ni se añade nada al baseline.**

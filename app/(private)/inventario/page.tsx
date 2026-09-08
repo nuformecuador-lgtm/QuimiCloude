@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
-  buildProductListQuery,
   parseProductListParams,
   ProductListSection,
   ProductSheet,
@@ -36,18 +36,25 @@ export const metadata: Metadata = {
  * recargar, compartir el enlace o volver con «atras» conserva la pagina, que es lo que R17 exige
  * al cerrar el panel lateral.
  *
- * **La `key` del `<Suspense>` es lo que hace reaparecer el esqueleto en CADA cambio** de pagina o
- * de tamano, no solo en la primera carga (R15). Sin ella, Next reutiliza el limite y el usuario
- * se queda mirando la pagina anterior sin ninguna senal de que algo esta en vuelo.
+ * **El `<Suspense>` YA NO lleva `key`** (2026-09-07): remontar el limite en cada cambio de
+ * consulta era lo que borraba el foco del campo de busqueda y de los filtros de texto. La senal
+ * de «en vuelo» de R15 la da ahora `ProductTable` sin desmontar nada -rotulo y tabla atenuada
+ * mientras la navegacion esta en curso-, y este `fallback` cubre la primera carga.
  *
- * **Aqui no se decide ningun permiso** (R5): el corte de ruta lo hace el middleware con la regla
- * ruta->rol, y la autorizacion sobre los datos la aportan los casos de uso de `inventario`.
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige
+ * `inventario.consultar` con `requirePagePermission` -antes de resolver `searchParams` y antes de
+ * pintar nada-, que redirige al login sin sesion y responde 404 sin nombrar el modulo ni
+ * mencionar permisos. El middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan
+ * firma, caducidad y empresa. La autorizacion sobre los DATOS la siguen aportando los casos de
+ * uso de `inventario`: la ruta decide si se ensena la pantalla, el service si se puede hacer.
  */
 export default async function InventarioPage({
   searchParams,
 }: {
   searchParams: Promise<ProductListSearchParams>;
 }) {
+  await requirePagePermission('inventario.consultar');
+
   const params = parseProductListParams(await searchParams);
 
   return (
@@ -59,14 +66,15 @@ export default async function InventarioPage({
         <ProductSheet />
       </div>
       {/*
-        La `key` lleva la cadena de consulta CANONICA y no solo pagina y tamano: desde el
-        2026-09-07 la lista tambien ordena, filtra y busca, y el esqueleto tiene que reaparecer en
-        cualquiera de esos cambios (R15).
+        SIN `key`: este limite NO se vuelve a montar en cada cambio de consulta. La llevaba (la
+        cadena canonica) para que el esqueleto reapareciera en cada cambio, pero remontar el
+        subarbol DESTRUYE la barra de filtros y con ella el foco: escribir en la busqueda perdia
+        el cursor en cuanto salia la peticion. La senal de R15 sigue apareciendo en cada
+        cambio, ahora desde dentro: `ProductTable` navega en una transicion y, mientras esta en
+        vuelo, anuncia y atenua la tabla SIN desmontarla. El `fallback` de aqui sigue cubriendo la
+        primera carga.
       */}
-      <Suspense
-        key={buildProductListQuery(params)}
-        fallback={<ProductTableSkeleton rows={params.pageSize} />}
-      >
+      <Suspense fallback={<ProductTableSkeleton rows={params.pageSize} />}>
         <ProductListSection params={params} />
       </Suspense>
     </div>

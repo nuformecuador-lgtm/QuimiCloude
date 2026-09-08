@@ -6,11 +6,14 @@ import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { identity } from '@/lib/composition';
-import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
+import {
+  filterNavItemsByPermissions,
+  PRIVATE_NAV_ITEMS,
+} from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
-import { SidebarToggle, ThemeToggle } from './components';
+import { LogoutButton, SidebarToggle, ThemeToggle } from './components';
 
 /**
  * Layout compartido por toda la zona privada (R1, `design.md > 5.2`).
@@ -32,6 +35,23 @@ import { SidebarToggle, ThemeToggle } from './components';
  * la zona publica (`richColors`) y **no** se promueve al root layout: hoy son dos zonas con
  * armazones distintos y promoverlo obligaria a tocar un tercer archivo sin necesidad.
  *
+ * Este layout SI arma la navegacion con los permisos de la sesion (QC-75 R1, R2, R19): filtra
+ * `PRIVATE_NAV_ITEMS` con `user.permissions` **antes** de pasarselo a `AppSidebar`, de modo que
+ * un item sin permiso no aparece en el HTML servido —ni etiqueta, ni `href`, ni `data-testid`— en
+ * vez de ocultarse con CSS. `AppSidebar` no se toca: la fuente decide y el componente dibuja
+ * (decision cerrada nº 7, heredada de QC-11). Y **no anade ninguna consulta** (R19): los permisos
+ * llegan en la MISMA lectura de sesion que ya existia.
+ *
+ * Este layout tambien es el que envuelve el 404 de la zona privada (QC-75 R8): `notFound()`
+ * lanzado desde una `page.tsx` lo pinta `app/(private)/not-found.tsx`, que por vivir en este
+ * route group se renderiza DENTRO de este armazon —menu filtrado, cabecera y cerrar sesion
+ * presentes—.
+ *
+ * **Este layout NO debe llamar nunca a `notFound()`.** Un `notFound()` lanzado en un layout hace
+ * fallar ese layout, asi que responderia el limite de ARRIBA y el 404 saldria pelado, sin menu ni
+ * boton de salir: quien no tenga ningun permiso quedaria encerrado. El corte por permiso va en
+ * cada pagina (`requirePagePermission`), no aqui. Motivo completo en `app/(private)/not-found.tsx`.
+ *
  * El route group no crea ninguna URL (D11): no hay `page.tsx` y la primera pantalla privada
  * la trae la feature 9. Es lo esperado, no un archivo que falte.
  */
@@ -45,6 +65,10 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
   // (su estado inicial es `useState(defaultOpen)`), asi que la persistencia entre recargas
   // solo existe si el servidor le pasa el estado guardado. Es cookie de UI, no de sesion
   // (`lib/utils/sidebar-state.ts`, `design.md > 5.5`).
+  // QC-75 R1, R2, R19: el menu se arma en el servidor con los permisos de esta misma lectura de
+  // sesion. Cero consultas nuevas.
+  const navItems = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, user.permissions);
+
   const cookieStore = await cookies();
   const defaultOpen = readSidebarOpenState(cookieStore.get(SIDEBAR_STATE_COOKIE)?.value);
 
@@ -56,13 +80,26 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
       defaultOpen={defaultOpen}
       style={{ '--sidebar-width': '17rem', '--sidebar-width-icon': '4.875rem' } as CSSProperties}
     >
-      <AppSidebar user={user} navItems={PRIVATE_NAV_ITEMS} />
+      <AppSidebar user={user} navItems={navItems} />
       {/*
         `SidebarInset` **es** el `<main>` (lo renderiza el propio primitivo), asi que aqui no
         se anida otro: R5 exige un landmark `main` unico. Un `<header>` dentro de `<main>` es
         HTML valido y no crea landmark `banner`, que es justo lo que se quiere.
       */}
-      <SidebarInset data-testid="private-content">
+      {/*
+        `min-w-0` NO es decoracion: `SidebarInset` es un elemento flexible dentro del envoltorio
+        del panel lateral, y un elemento flexible tiene `min-width: auto`, o sea que su ancho
+        MINIMO es el de su contenido. Con una tabla ancha dentro, el contenido principal se
+        estiraba mas alla de la ventana y el scroll horizontal se lo comia el documento entero:
+        la tabla se salia del contenedor principal y arrastraba la cabecera y el resto de la
+        pantalla con ella. Con `min-w-0` el contenido puede encoger hasta el ancho disponible, y
+        el desbordamiento lo absorbe quien debe -el `div[data-slot=table-container]` del
+        primitivo, que ya declara `overflow-x-auto`-.
+
+        Se pasa por `className` desde aqui, no editando `components/ui/sidebar.tsx`: el primitivo
+        no se toca (R21, R48), y el `cn` del propio primitivo compone las dos clases.
+      */}
+      <SidebarInset data-testid="private-content" className="min-w-0">
         <header
           data-testid="private-header"
           className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4"
@@ -82,10 +119,16 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
             <SidebarToggle />
           </div>
           {/* `ml-auto` y no solo el `justify-between` del header: en escritorio el control de
-              la izquierda esta oculto y no ocupa espacio, asi que sin esto el de tema se
-              quedaria pegado al borde izquierdo. */}
-          <div className="ml-auto">
+              la izquierda esta oculto y no ocupa espacio, asi que sin esto los de la derecha se
+              quedarian pegados al borde izquierdo.
+
+              El cierre de sesion vive AQUI desde el 2026-09-07 (decision humana), junto al de
+              tema, y ya no dentro del menu del pie de la barra lateral: era el unico item de ese
+              menu, costaba dos gestos y en modo icono era el unico camino. Detalle en
+              `./components/logout-button.tsx`. */}
+          <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            <LogoutButton />
           </div>
         </header>
         {children}

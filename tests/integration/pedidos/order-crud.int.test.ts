@@ -161,7 +161,12 @@ interface Fixtures {
 async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   const marca = token()
   const unit = await tx.unit.create({
-    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: 'kg' },
+    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
+    // UNICO dentro del ambito cuando existe. Esta unidad se siembra SIN empresa —o sea DE
+    // SISTEMA—, asi que un `'kg'` fijo choca con `23505` contra el `kilogramo` del catalogo
+    // arrancador y contra el de cualquier otro fixture. Se deriva del marcador irrepetible,
+    // que es lo que este archivo ya hacia con el nombre. Ningun aserto lee su valor.
+    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
     select: { id: true },
   })
   const recipe = await tx.recipe.create({

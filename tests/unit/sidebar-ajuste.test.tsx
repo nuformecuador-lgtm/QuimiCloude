@@ -80,6 +80,9 @@ const NAV_MINIMA: readonly NavItem[] = [
     href: '/uno',
     label: 'Uno',
     testId: 'nav-uno',
+    // QC-75 T1: `permission` es obligatorio en `NavLink`. En una fixture de vista da igual
+    // cual sea: este archivo no filtra nada, solo dibuja lo que le pasan.
+    permission: 'inventario.consultar',
     icon: 'layout-dashboard',
     section: 'Seccion',
     badge: 7,
@@ -89,6 +92,7 @@ const NAV_MINIMA: readonly NavItem[] = [
     href: '/dos',
     label: 'Dos',
     testId: 'nav-dos',
+    permission: 'pedidos.consultar',
     icon: 'layout-dashboard',
     section: 'Seccion',
   },
@@ -198,7 +202,13 @@ describe('barra lateral: ajuste al diseno', () => {
 
   it('un item sin seccion se dibuja igual, sin titulo, y no desaparece', () => {
     const sinSeccion: readonly NavItem[] = [
-      { kind: 'link', href: '/suelto', label: 'Suelto', testId: 'nav-suelto' },
+      {
+        kind: 'link',
+        href: '/suelto',
+        label: 'Suelto',
+        testId: 'nav-suelto',
+        permission: 'inventario.consultar',
+      },
     ];
 
     renderSidebar(sinSeccion);

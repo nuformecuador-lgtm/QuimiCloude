@@ -29,14 +29,33 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  listUnits,
-  listUnitsPage,
+  listUnits as listUnitsEnAmbito,
+  listUnitsPage as listUnitsPageEnAmbito,
 } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { MAX_UNITS, normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { ListQuery } from '@/lib/modules/unidades/domain/list-query';
+import type { UnitScope } from '@/lib/modules/unidades/domain/unit-scope';
+
+/**
+ * QC-76 (R17, R18) — los dos adaptadores EXIGEN ahora el ambito de la empresa en cuyo nombre se
+ * pregunta. Este archivo no prueba el ambito —eso es `unit-repository.int.test.ts`—, sino el
+ * orden, la busqueda y la paginacion, y todas sus filas se siembran SIN empresa, o sea DE
+ * SISTEMA (`company_id` nulo, R11), que son visibles desde cualquier empresa. Por eso se fija
+ * un ambito unico para todo el archivo y se envuelven las dos lecturas: cambia la FORMA de la
+ * llamada y **ningun aserto** de este archivo (R21).
+ */
+const AMBITO: UnitScope = { companyId: '00000000-0000-4000-8000-0000000000aa' };
+
+function listUnits(limit: number, query: ListQuery) {
+  return listUnitsEnAmbito(limit, query, AMBITO);
+}
+
+function listUnitsPage(query: ListQuery) {
+  return listUnitsPageEnAmbito(query, AMBITO);
+}
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -51,6 +70,21 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
 }
 
 type Semilla = { readonly name: string; readonly symbol?: string | null };
+
+/**
+ * QC-76 (R15, decision cerrada 28): el simbolo pasa a ser UNICO dentro del ambito cuando existe,
+ * y estas filas se siembran SIN empresa -o sea de sistema-, asi que compiten todas contra
+ * `units_system_symbol_unique`. Los literales cortos y repetidos que este archivo usaba
+ * -`'u'` doce veces, `'zz'` cuatro- ahora chocarian con `23505` **en el `beforeAll`**, y el
+ * archivo entero se saltaria sin haber comprobado nada, que es el peor rojo posible.
+ *
+ * Se derivan del marcador local para que sigan siendo irrepetibles. **Ningun aserto de este
+ * archivo lee el VALOR de un simbolo**: el unico que los mira (el de los nulos al final)
+ * distingue nulo de no nulo, y eso no cambia.
+ */
+function simbolo(local: string, sufijo: string): string {
+  return `s${local.slice(0, 8)}${sufijo}`;
+}
 
 async function sembrar(semillas: readonly Semilla[]): Promise<void> {
   for (const semilla of semillas) {
@@ -79,7 +113,11 @@ describe('el orden y la busqueda se aplican sobre el CONJUNTO COMPLETO y antes d
   );
 
   beforeAll(async () => {
-    await sembrar(NOMBRES.map((name) => ({ name, symbol: 'u' })));
+    // El simbolo es indiferente para este bloque -ordena y busca por NOMBRE-, pero tiene que
+    // ser irrepetible desde QC-76 R15: doce filas de sistema con `'u'` no caben.
+    await sembrar(
+      NOMBRES.map((name, i) => ({ name, symbol: simbolo(LOCAL, String(i).padStart(2, '0')) })),
+    );
   });
 
   it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
@@ -151,14 +189,19 @@ describe('desempate estable por identificador (R10)', () => {
   const LOCAL = token();
 
   beforeAll(async () => {
-    await sembrar(
-      [1, 2, 3, 4].map((n) => ({ name: `${MARCA} ${LOCAL} ${String(n)}`, symbol: 'zz' })),
-    );
+    // El empate se construye ahora con el simbolo AUSENTE, no con cuatro `'zz'` iguales.
+    // QC-76 R15 prohibe repetir un simbolo dentro del ambito, pero **varias unidades sin
+    // simbolo en el mismo ambito siguen siendo legales** (el indice es parcial, con
+    // `WHERE symbol IS NOT NULL`), y para lo que este caso mide da exactamente igual: las
+    // cuatro filas siguen EMPATADAS en la clave de orden -`nulls: 'last'` las deja a todas en
+    // el mismo escalon- y el unico criterio que puede separarlas sigue siendo el `id`.
+    await sembrar([1, 2, 3, 4].map((n) => ({ name: `${MARCA} ${LOCAL} ${String(n)}`, symbol: null })));
   });
 
-  it('cuatro filas con el MISMO simbolo no se repiten ni se pierden entre paginas', async () => {
-    // R10 — `symbol` no es unico: sin el desempate por `id`, dos filas empatadas pueden
-    // intercambiarse entre consultas y una acabaria saliendo dos veces —o ninguna—.
+  it('cuatro filas empatadas en el simbolo no se repiten ni se pierden entre paginas', async () => {
+    // R10 — el simbolo no separa estas cuatro filas: sin el desempate por `id`, dos filas
+    // empatadas pueden intercambiarse entre consultas y una acabaria saliendo dos veces
+    // —o ninguna—.
     const vistos: string[] = [];
     for (const page of [1, 2]) {
       const pagina = await listUnitsPage(
@@ -183,8 +226,8 @@ describe('los nulos van SIEMPRE al final, en las DOS direcciones (decision cerra
 
   beforeAll(async () => {
     await sembrar([
-      { name: `${MARCA} ${LOCAL} a`, symbol: 'aa' },
-      { name: `${MARCA} ${LOCAL} b`, symbol: 'zz' },
+      { name: `${MARCA} ${LOCAL} a`, symbol: simbolo(LOCAL, 'aa') },
+      { name: `${MARCA} ${LOCAL} b`, symbol: simbolo(LOCAL, 'zz') },
       { name: `${MARCA} ${LOCAL} c`, symbol: null },
       { name: `${MARCA} ${LOCAL} d`, symbol: null },
     ]);
@@ -211,8 +254,8 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
 
   beforeAll(async () => {
     await sembrar([
-      { name: `Mililitro ácido ${MARCA} ${LOCAL}`, symbol: 'mL' },
-      { name: `Gramo ${MARCA} ${LOCAL}`, symbol: 'g' },
+      { name: `Mililitro ácido ${MARCA} ${LOCAL}`, symbol: simbolo(LOCAL, 'mL') },
+      { name: `Gramo ${MARCA} ${LOCAL}`, symbol: simbolo(LOCAL, 'g') },
     ]);
   });
 

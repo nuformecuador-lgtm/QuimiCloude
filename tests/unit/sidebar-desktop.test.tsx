@@ -4,7 +4,7 @@ import { setupUser } from '../helpers/user-event';
 import PrivateLayout from '@/app/(private)/layout';
 import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components';
 import { SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
-import type { SessionUser } from '@/lib/modules/identity';
+import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import {
   BRAND_SHORT_LABEL,
   PRIVATE_NAV_ITEMS,
@@ -38,8 +38,13 @@ const USUARIO_DEL_TEST: SessionUser = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Analista de calidad',
-  // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
-  permissions: [],
+  // QC-74 T8: `SessionUser` exige `permissions`. **Desde QC-75 T7 lleva el catalogo entero**
+  // (derivado de `PERMISSIONS`, no escrito a mano): el layout privado filtra `PRIVATE_NAV_ITEMS`
+  // con los permisos de la sesion, y este archivo prueba el ARMAZON de QC-11 —que todas las
+  // entradas del menu se dibujan y se comportan—, no el filtrado. Con la lista vacia el menu
+  // saldria vacio y estos casos dejarian de comprobar lo suyo. El filtrado tiene su propio test:
+  // `tests/unit/navegacion/private-layout-menu.test.tsx`.
+  permissions: PERMISSIONS.map((permiso) => permiso.code),
 };
 
 const { usePathnameMock, redirectMock, logoutActionMock, cookiesMock, getSessionUserMock } =
@@ -269,24 +274,26 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     }
   });
 
-  it('en modo icono el pie sigue ofreciendo el menu de usuario y el cierre de sesion', async () => {
-    // R27
+  it('en modo icono el cierre de sesion sigue alcanzable, ahora desde el encabezado', async () => {
+    // R27, con la enmienda del 2026-09-07 (decision humana). Antes este caso abria el menu del
+    // pie, que en modo icono era el UNICO camino al cierre de sesion; hoy no hay menu que abrir
+    // -el control es un boton del encabezado- y lo que R27 protege sigue en pie: colapsar la
+    // barra no puede dejar a nadie sin poder salir.
     const user = setupUser();
     await renderLayout();
 
     await alternarBarra(user, 'collapsed');
 
-    const disparador = screen.getByTestId(testId.userTrigger);
-    expect(disparador).toHaveAccessibleName();
-    expect(disparador).toHaveAttribute('aria-haspopup', 'menu');
-    expect(disparador).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId(testId.userTrigger)).toBeNull();
 
-    await user.click(disparador);
+    const formulario = screen.getByTestId(testId.logoutForm);
+    const control = screen.getByTestId(testId.logout);
 
-    await waitFor(() => expect(disparador).toHaveAttribute('aria-expanded', 'true'));
-    const formulario = await screen.findByTestId(testId.logoutForm);
     expect(formulario.tagName).toBe('FORM');
-    expect(formulario).toContainElement(screen.getByTestId(testId.logout));
+    expect(formulario).toContainElement(control);
+    expect(control).toHaveAccessibleName();
+    // Y esta en el encabezado, no en el pie de la barra: es lo que hace que sobreviva al colapso.
+    expect(screen.getByTestId('private-header')).toContainElement(control);
   });
 
   it('el modo colapsado se conserva al volver a montar el layout', async () => {

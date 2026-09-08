@@ -42,6 +42,13 @@ type RecipeListToolbarProps = {
  * **La URL no se escribe a mano**: el camino sale de `usePathname()` y la consulta de
  * `buildRecipeListQuery`, la misma funcion que el parser de la pagina sabe leer (R3: ningun
  * archivo de la feature incrusta el literal de la ruta).
+ *
+ * **Fija al fondo de la ventana** (2026-09-07, decision humana), con el mismo criterio que la
+ * barra de paginacion de la tabla compartida -esta pantalla NO se ha migrado a ella (R34): solo
+ * comparte la decision de producto, ni una linea de codigo-. La barra va DEBAJO de la tabla, asi
+ * que sin `sticky` hay que recorrer la lista entera para volver a paginar. El fondo es opaco
+ * porque las filas pasan por debajo, y `sticky` -no `fixed`- conserva su hueco en el flujo, asi
+ * que no tapa la ultima fila.
  */
 export function RecipeListToolbar({ page, pageSize, totalPages }: RecipeListToolbarProps) {
   const router = useRouter();
@@ -56,7 +63,7 @@ export function RecipeListToolbar({ page, pageSize, totalPages }: RecipeListTool
 
   return (
     <div
-      className="flex flex-wrap items-center justify-between gap-3"
+      className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t bg-background py-3"
       data-testid="recipe-list-toolbar"
     >
       <div className="flex items-center gap-2">

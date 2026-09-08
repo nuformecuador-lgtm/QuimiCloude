@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import { DashboardContent } from './components';
@@ -17,9 +18,13 @@ export const metadata: Metadata = {
  * Por eso la marca del titulo tambien llega importada (`BRAND_LABEL`), nunca escrita a mano
  * (R5).
  *
- * **Esta pantalla no esta protegida, y eso es conocido y aceptado** (R8): no valida sesion ni
- * el acceso a la ruta, asi que hoy es alcanzable sin autenticacion. La guardia de sesion es el
- * alcance de QC-13. No es un hallazgo del reviewer ni un agujero introducido aqui.
+ * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea del componente exige
+ * `dashboard.consultar` con `requirePagePermission`, que redirige al login si no hay sesion y
+ * responde 404 -sin nombrar el modulo ni mencionar permisos- si la sesion no lleva ese codigo.
+ * Va antes de renderizar nada, no despues. Lo que decia esta nota hasta QC-75 -«esta pantalla no
+ * esta protegida»- dejo de ser cierto: la sesion la exige el middleware desde QC-13 y el permiso
+ * lo exige esta llamada. El middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan
+ * firma, caducidad y empresa.
  *
  * **Esta feature no toca el item «Dashboard» de la barra lateral** (decision humana del
  * 2026-09-02): lo reconecta QC-13. El item ya apunta a la misma constante que ubica esta
@@ -28,8 +33,13 @@ export const metadata: Metadata = {
  * Server Component sin datos (R6, R7): ni consultas, ni red, ni props de sesion. El contenedor
  * exterior es un `<div>` y **no** un `<main>` (R4): `SidebarInset` del layout privado ya es el
  * `<main>` y R5 de QC-11 exige que sea unico.
+ *
+ * Es `async` desde QC-75 porque `requirePagePermission` lo es. Sigue siendo un Server Component
+ * sin datos propios.
  */
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  await requirePagePermission('dashboard.consultar');
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <h1 data-testid="dashboard-title" className="text-2xl font-semibold">

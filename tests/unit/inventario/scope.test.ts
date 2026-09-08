@@ -38,6 +38,15 @@
 // `createPresentationAction`. Se excluye por nombre y motivo, con la misma defensa extra que la
 // exclusion de recetas: el archivo tiene que existir y no puede llevar senal de pantalla. El
 // motivo entero, dentro del caso.
+//
+// **2026-09-07 (QC-45, pantalla-de-presentaciones):** cuarta vez, mismo tipo de ajuste -FALSO
+// POSITIVO del barrido por NOMBRE-. QC-45 monta la pantalla del catalogo de PRESENTACIONES bajo
+// `PRESENTATIONS_ROUTE`; sus once componentes se llaman `presentation-*.tsx` y casan con
+// `screenPattern` por la palabra «presentation». No son una segunda pantalla del catalogo de
+// PRODUCTOS: son otra entidad del mismo modulo `inventario`, consumidora nueva y legitima
+// aprobada por el humano el 2026-09-07. Se excluye esa carpeta por nombre y motivo, con una
+// defensa extra AUN MAS estrecha que las anteriores -dentro de la exclusion solo se perdona lo
+// que casa por «presentation»-. El detalle, dentro del caso.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
@@ -45,7 +54,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { FORMULAS_ROUTE } from '@/lib/shared/routes'
+import { FORMULAS_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -168,8 +177,27 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     const RECIPES_ROUTE_DIR = join('(private)', ...FORMULAS_ROUTE.split('/').filter((s) => s.length > 0))
       .split(sep)
       .join('/')
+    // ACTUALIZADO 2026-09-07 (QC-45, pantalla-de-presentaciones): TERCERA exclusion de carpeta, y
+    // otra vez un FALSO POSITIVO del barrido por NOMBRE. QC-45 monta la pantalla del catalogo de
+    // PRESENTACIONES bajo `PRESENTATIONS_ROUTE` (`/configuracion/presentaciones`, derivada de
+    // `@/lib/shared/routes` y nunca de un literal a mano). Sus archivos casan con `screenPattern`
+    // solo porque se llaman `presentation-*.tsx`: son OTRA entidad -el catalogo de envases-, una
+    // consumidora nueva y legitima del modulo `inventario` aprobada por el HUMANO el 2026-09-07
+    // (QC-45 R6, `design.md > 1`), no una segunda pantalla del catalogo de PRODUCTOS, que es lo
+    // que esta guardia de QC-20 vigila. Se excluye la carpeta por nombre y motivo, con la misma
+    // defensa extra que las otras dos exclusiones -abajo-, y lo que quede FUERA de las tres
+    // sigue teniendo que estar vacio.
+    const PRESENTATIONS_ROUTE_DIR = join(
+      '(private)',
+      ...PRESENTATIONS_ROUTE.split('/').filter((s) => s.length > 0),
+    )
+      .split(sep)
+      .join('/')
     const fueraDeSuCarpeta = appMatches.filter(
-      (relPath) => !relPath.startsWith(`${CATALOG_ROUTE_DIR}/`) && !relPath.startsWith(`${RECIPES_ROUTE_DIR}/`),
+      (relPath) =>
+        !relPath.startsWith(`${CATALOG_ROUTE_DIR}/`) &&
+        !relPath.startsWith(`${RECIPES_ROUTE_DIR}/`) &&
+        !relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`),
     )
     expect(
       fueraDeSuCarpeta,
@@ -192,6 +220,31 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     expect(
       filtracionesDeCatalogo,
       `pantalla de catalogo escondida bajo la ruta de recetas: ${filtracionesDeCatalogo.join(', ')}`,
+    ).toEqual([])
+
+    // Misma defensa extra para la exclusion de QC-45, y ESTRECHADA un paso mas: bajo la ruta de
+    // presentaciones solo se perdona lo que casa con `screenPattern` POR LA PALABRA
+    // «presentation». Un archivo que casase por «product» o por «inventario», un `page.tsx` de
+    // productos, o cualquier fuente que declare `ProductListSection`/`product-table` sigue
+    // poniendo esto en rojo: la exclusion no es una puerta trasera para meter la pantalla de
+    // productos bajo `/configuracion`. Y la carpeta tiene que existir: si QC-45 desapareciera,
+    // la exclusion sobra y hay que borrarla.
+    const dentroDePresentaciones = appMatches.filter((relPath) =>
+      relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`),
+    )
+    expect(
+      dentroDePresentaciones.length,
+      `la pantalla de presentaciones de QC-45 no aparece bajo app/${PRESENTATIONS_ROUTE_DIR}/`,
+    ).toBeGreaterThan(0)
+    const filtracionesEnPresentaciones = dentroDePresentaciones.filter((relPath) => {
+      if (/\/page\.tsx$/.test(relPath)) return true
+      if (/product|inventario/i.test(relPath)) return true
+      const source = readFileSync(join(repoRoot, 'app', relPath), 'utf8')
+      return /ProductListSection|product-table/.test(source)
+    })
+    expect(
+      filtracionesEnPresentaciones,
+      `pantalla de catalogo de productos escondida bajo la ruta de presentaciones: ${filtracionesEnPresentaciones.join(', ')}`,
     ).toEqual([])
 
     // Esta mitad de R34 sigue INTACTA y en negativo: QC-22 monto sus piezas dentro de la

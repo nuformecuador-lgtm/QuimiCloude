@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
+import { useMemo, useTransition } from 'react';
 
 import {
   DataTable,
@@ -39,9 +39,13 @@ import { ProductSheet } from './product-sheet';
  * `PRODUCT_QUERYABLE.searchable` es `true` y `listProducts` resuelve la busqueda contra la columna
  * normalizada con su indice de trigramas, asi que la caja de busqueda no miente.
  *
- * **`status` es SIEMPRE `'idle'`**: los tres estados de R14/R15/R16 se pintan FUERA de
- * `<DataTable>` -cada uno con su copy y sus acciones- y el «cargando» lo aporta el `<Suspense>`
- * de la pagina con `ProductTableSkeleton`.
+ * **`status` sigue siendo SIEMPRE `'idle'`**, y el «cargando» de R15 ya NO viene de remontar la
+ * pantalla: la `key` del `<Suspense>` de la pagina desaparecio (2026-09-07) porque remontaba la
+ * tabla entera en cada cambio de consulta y borraba el foco del campo de busqueda o de filtro que
+ * se estaba escribiendo. Ahora la navegacion va en una transicion y, mientras esta en vuelo, esta
+ * pantalla lo anuncia con `aria-busy` y un rotulo, y atenua la tabla, sin desmontarla. El error
+ * y el vacio siguen pintandose FUERA de `<DataTable>` (R14, R16), y el `fallback` del
+ * `<Suspense>` cubre la primera carga con `ProductTableSkeleton`.
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R9): `components/ui/table.tsx`, que
  * la tabla compartida usa por dentro, envuelve la tabla en un contenedor con `overflow-x-auto`.
@@ -89,6 +93,7 @@ export type ProductTableProps = {
 
 export function ProductTable({ products, params, totalPages }: ProductTableProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   // Las acciones de fila se enchufan aqui, no en la declaracion de columnas: asi esa declaracion
   // no importa el panel ni el dialogo. `useMemo` para que la identidad del array no cambie en
@@ -106,18 +111,52 @@ export function ProductTable({ products, params, totalPages }: ProductTableProps
     [],
   );
 
+  /*
+    La navegacion va DENTRO de una transicion (`startTransition`), y su `isPending` es la senal de
+    «algo esta en vuelo» mientras el servidor recalcula la lista (2026-09-07).
+
+    Esa senal NO desmonta nada: antes la daba la `key` del `<Suspense>` de la pagina, que
+    remontaba el subarbol entero en cada cambio de consulta y con el borraba el foco del campo que
+    se estaba escribiendo -escribir en la busqueda o en un filtro de texto perdia el cursor en
+    cuanto salia la peticion-. Tampoco se pasa `status="loading"` a la tabla compartida por lo
+    mismo: ese estado sustituye cabecera y filas por el esqueleto, y el foco se iria igual. Se
+    anuncia con `aria-busy` y un rotulo visible, atenuando la tabla, que sigue montada y sigue
+    aceptando teclas.
+  */
+  const navigate = (href: string) => {
+    startTransition(() => {
+      router.push(href);
+    });
+  };
+
   return (
-    <DataTable
-      tableId={PRODUCT_TABLE_ID}
-      columns={columns}
-      rows={products}
-      getRowId={(product) => product.id}
-      params={params}
-      totalPages={totalPages}
-      onParamsChange={(next) => router.push(productListHref(next))}
-      status="idle"
-      texts={PRODUCT_TABLE_TEXTS}
-      defaultPinnedColumns={PRODUCT_DEFAULT_PINNED_COLUMNS}
-    />
+    <div
+      data-testid="product-table"
+      aria-busy={isPending}
+      className={isPending ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+    >
+      {/*
+        La senal de «en vuelo»: un rotulo visible con el texto de `PRODUCT_TABLE_TEXTS.loading`
+        y la tabla atenuada. Para la tecnologia de asistencia la lleva `aria-busy` en el
+        contenedor -no una segunda region viva: la zona privada tiene EXACTAMENTE una, la de
+        avisos que monta el layout privado, y varios tests lo afirman-. La tabla NO se desmonta ni
+        se bloquea: se puede seguir escribiendo en la barra de filtros mientras se recalcula.
+      */}
+      {isPending ? (
+        <p className="text-xs text-muted-foreground">{PRODUCT_TABLE_TEXTS.loading}</p>
+      ) : null}
+      <DataTable
+        tableId={PRODUCT_TABLE_ID}
+        columns={columns}
+        rows={products}
+        getRowId={(product) => product.id}
+        params={params}
+        totalPages={totalPages}
+        onParamsChange={(next) => navigate(productListHref(next))}
+        status="idle"
+        texts={PRODUCT_TABLE_TEXTS}
+        defaultPinnedColumns={PRODUCT_DEFAULT_PINNED_COLUMNS}
+      />
+    </div>
   );
 }

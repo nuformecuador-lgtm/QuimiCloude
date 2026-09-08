@@ -1,27 +1,19 @@
-// QC-9 T13/T13-bis — El portero: traduccion `NextRequest` -> decision -> `NextResponse`
-// (R2, R3, R4, R5, R7, R10, R11, R12, R13, R18, R26, R27, R30).
+// QC-9 T13/T13-bis · QC-75 T11 — El portero: traduccion `NextRequest` -> decision ->
+// `NextResponse` (R16, R17, R18).
 //
 // Las peticiones se construyen A MANO con `NextRequest` real: no se levanta Next, no hay servidor
 // y no hay red. La cookie se firma con el codec de verdad, asi que lo que se ejercita es la cadena
 // completa —firma, version, caducidad y decision— y no un doble que ya diga que si.
 //
-// Lo unico que se sustituye es `ROUTE_ROLE_RULES`: las reglas ruta→rol se ejercitan aqui con
-// reglas SINTETICAS, igual que en `route-access.test.ts`, para que lo que se afirme sea la
-// TRADUCCION que hace el adaptador y no el contenido de la lista real. La lista real —que desde
-// QC-22 tiene su primera fila— se afirma en `route-role-rules.test.ts` y en `route-access.test.ts`.
+// **QC-75 retiro la lista ruta→rol.** Con ella se fue el `vi.mock` que la sustituia y todos los
+// casos que afirmaban «este rol entra y este otro no»: el middleware ya no lee `roleName` y
+// ninguna de sus decisiones depende del rol (R16). En su lugar hay un bloque que afirma lo
+// contrario —una ruta privada con sesion valida pasa, sea cual sea el rol—, que es lo que se
+// pondria rojo si alguien reintrodujera el corte.
 //
-// QC-22 (2026-09-03) movio esa lista dos veces: de `domain/route-role-rules.ts` a
-// `adapters/driving/`, y de ahi a `lib/composition/route-role-rules.ts`, donde vive hoy. Nombrar
-// la ruta exige `lib/shared/routes` —vetado al dominio— y nombrar el rol exige el barrel de
-// `inventario` **como valor** —reservado a `lib/composition`—. El doble se pone sobre ESE modulo,
-// no sobre el barrel de `identity`, que nunca exporto la lista.
-//
-// **El doble aplica de verdad**, y se comprueba sin fe: las reglas sinteticas de abajo usan el
-// prefijo `/dashboard/productos`, que la lista REAL no cubre (su unica fila es `/inventario`). Si
-// `vi.mock` dejase de interceptar —por un especificador que ya no resuelve, por ejemplo—,
-// `middleware` veria la lista real, `/dashboard/productos` no casaria con ninguna regla, el
-// Operador pasaria y los dos casos de rol insuficiente se pondrian rojos. Comprobado el
-// 2026-09-03 apuntando el `vi.mock` a una ruta inexistente: caen esos dos y solo esos dos.
+// Lo que NO cambio y se sigue afirmando aqui: firma, version, caducidad, el esquema del contenido
+// firmado (la empresa incluida), el fallo cerrado sin `SESSION_SECRET`, que no se toca la cookie
+// y que no se importa nada que consulte la base (R17, R18).
 
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
@@ -36,17 +28,6 @@ import {
   buildSessionValue,
 } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { createSessionTicket } from '@/lib/modules/identity/domain/session';
-import type { RouteRoleRule } from '@/lib/modules/identity/domain/route-role-rules';
-
-// Caja mutable: `middleware` lee `ROUTE_ROLE_RULES` en cada llamada, asi que un getter permite
-// cambiar las reglas por test sin volver a importar el modulo.
-const { reglas } = vi.hoisted(() => ({ reglas: { actuales: [] as RouteRoleRule[] } }));
-
-vi.mock('@/lib/composition/route-role-rules', () => ({
-  get ROUTE_ROLE_RULES() {
-    return reglas.actuales;
-  },
-}));
 
 const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc9-ok';
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
@@ -109,7 +90,6 @@ function dejaPasar(response: Response): boolean {
 }
 
 beforeEach(() => {
-  reglas.actuales = [];
   secretoOriginal = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = SECRETO;
 });
@@ -121,7 +101,7 @@ afterEach(() => {
 });
 
 describe('middleware de rutas privadas', () => {
-  it('redirige al login con la ruta pedida cuando no hay cookie en una ruta privada (R2, R7)', async () => {
+  it('redirige al login con la ruta pedida cuando no hay cookie en una ruta privada (R17)', async () => {
     const response = await middleware(peticion('/dashboard/reportes?desde=ayer'));
 
     expect(response.status).toBe(307);
@@ -242,20 +222,57 @@ describe('middleware de rutas privadas', () => {
     expect(fuente).not.toContain('@prisma/client');
   });
 
-  it('evalua las reglas ruta→rol con el rol FIRMADO en la cookie, sin consultar nada (R12, R13, R26)', async () => {
-    reglas.actuales = [{ prefix: '/dashboard/productos', roles: ['Administrador'] }];
+  it('no lee el rol del contenido firmado ni nombra ninguna lista ruta→rol (R16)', () => {
+    const fuente = readFileSync(resolve(process.cwd(), ADAPTADOR), 'utf8');
 
-    const permitido = await middleware(
-      peticion('/dashboard/productos', await cookieFirmada('Administrador')),
-    );
-    const denegado = await middleware(
-      peticion('/dashboard/productos', await cookieFirmada('Operador')),
-    );
+    expect(fuente).not.toContain('claims.roleName');
+    expect(fuente).not.toContain('route-role-rules');
+    expect(fuente).not.toMatch(/\brules\b/);
+  });
+});
 
-    expect(dejaPasar(permitido)).toBe(true);
-    // «No autorizado» no es «no autenticado»: al dashboard, nunca al login (R13).
-    expect(denegado.status).toBe(307);
-    expect(destino(denegado)).toBe('/dashboard');
+// ---------------------------------------------------------------------------
+// QC-75 T11 — una ruta privada con sesion valida pasa, sea cual sea el rol (R16)
+// ---------------------------------------------------------------------------
+//
+// Este bloque sustituye a los que cortaban por rol. La cookie se firma con DOS roles distintos y
+// se afirma el MISMO resultado en cada ruta privada real: si alguien volviera a colar un corte
+// por rol en el borde, las dos columnas dejarian de coincidir y esto se pondria rojo.
+//
+// Que pase por aqui no autoriza nada: quien no tenga el permiso de esa pantalla recibe su 404 en
+// la pagina (`requirePagePermission`), y el corte sobre los datos lo pone el service.
+describe('el rol firmado ya no decide nada en el borde (R16)', () => {
+  const RUTAS_PRIVADAS = [
+    '/dashboard',
+    '/inventario',
+    '/inventario/nuevo',
+    '/pedidos',
+    '/proveedores',
+    '/produccion/formulas',
+  ] as const;
+
+  it.each(RUTAS_PRIVADAS)('deja pasar %s tanto al Administrador como al Operador', async (ruta) => {
+    const comoAdministrador = await middleware(peticion(ruta, await cookieFirmada('Administrador')));
+    const comoOperador = await middleware(peticion(ruta, await cookieFirmada('Operador')));
+
+    expect(dejaPasar(comoAdministrador)).toBe(true);
+    expect(dejaPasar(comoOperador)).toBe(true);
+  });
+
+  it('toma la misma decision con un rol que no existe en el seed', async () => {
+    const response = await middleware(peticion('/inventario', await cookieFirmada('Vendedor')));
+
+    expect(dejaPasar(response)).toBe(true);
+  });
+
+  // Y lo que si sigue cortando, para que el bloque no diga «todo pasa»: sin sesion, al login.
+  it('pero sin sesion esas mismas rutas siguen redirigiendo al login (R17)', async () => {
+    for (const ruta of RUTAS_PRIVADAS) {
+      const response = await middleware(peticion(ruta));
+
+      expect(response.status).toBe(307);
+      expect(destino(response)).toBe(`/login?next=${encodeURIComponent(ruta)}`);
+    }
   });
 });
 
@@ -270,7 +287,8 @@ describe('middleware de rutas privadas', () => {
 // contra el esquema: afirman la CONSECUENCIA visible en la ruta, que es lo que R10 pide.
 //
 // Y la otra mitad: la empresa entra en la sesion pero NO entra en la decision de ruta (R12). El
-// dia que alguien añada una regla ruta→empresa, el tercer test de aqui se pone rojo.
+// dia que alguien haga depender una redireccion de la empresa firmada, el tercer test de aqui se
+// pone rojo.
 describe('la empresa firmada y el portero de rutas (QC-48)', () => {
   it('redirige al login con la ruta pedida cuando el contenido firmado no lleva empresa (R10)', async () => {
     // Firma buena, `exp` en el futuro, version vigente y rol correcto: lo unico que falta es
@@ -300,79 +318,42 @@ describe('la empresa firmada y el portero de rutas (QC-48)', () => {
   });
 
   it('toma la MISMA decision para dos sesiones identicas salvo por su empresa (R12)', async () => {
-    reglas.actuales = [{ prefix: '/dashboard/productos', roles: ['Administrador'] }];
-    const ruta = '/dashboard/productos?pagina=2';
+    const privada = '/dashboard/reportes?pagina=2';
 
-    const permitidoA = await middleware(
-      peticion(ruta, await cookieFirmada('Administrador', new Date(), COMPANY_ID)),
+    const conSesionA = await middleware(
+      peticion(privada, await cookieFirmada('Administrador', new Date(), COMPANY_ID)),
     );
-    const permitidoB = await middleware(
-      peticion(ruta, await cookieFirmada('Administrador', new Date(), OTRA_EMPRESA)),
+    const conSesionB = await middleware(
+      peticion(privada, await cookieFirmada('Administrador', new Date(), OTRA_EMPRESA)),
     );
-    const denegadoA = await middleware(
-      peticion(ruta, await cookieFirmada('Operador', new Date(), COMPANY_ID)),
+    // Y el mismo par en el otro camino, el que si redirige, para que la igualdad no se cumpla
+    // solo porque «todo pasa».
+    const enLoginA = await middleware(
+      peticion('/login', await cookieFirmada('Administrador', new Date(), COMPANY_ID)),
     );
-    const denegadoB = await middleware(
-      peticion(ruta, await cookieFirmada('Operador', new Date(), OTRA_EMPRESA)),
+    const enLoginB = await middleware(
+      peticion('/login', await cookieFirmada('Administrador', new Date(), OTRA_EMPRESA)),
     );
 
-    expect(dejaPasar(permitidoA)).toBe(true);
-    expect(dejaPasar(permitidoB)).toBe(dejaPasar(permitidoA));
-    expect(denegadoB.status).toBe(denegadoA.status);
-    expect(destino(denegadoB)).toBe(destino(denegadoA));
+    expect(dejaPasar(conSesionA)).toBe(true);
+    expect(dejaPasar(conSesionB)).toBe(dejaPasar(conSesionA));
+    expect(enLoginB.status).toBe(enLoginA.status);
+    expect(destino(enLoginB)).toBe(destino(enLoginA));
   });
 
-  it('sigue decidiendo por el rol firmado exactamente como antes de esta feature (R23)', async () => {
-    reglas.actuales = [{ prefix: '/dashboard/productos', roles: ['Administrador'] }];
-
-    // Mismo origen que en QC-9 —el contenido firmado, sin consultar la base— y misma clave dentro
-    // del payload: `role`. Que ahora viaje ademas `cid` no cambia ninguna de las dos cosas.
-    const operador = await middleware(
-      peticion('/dashboard/productos', cookieConPayload({ role: 'Operador', cid: OTRA_EMPRESA })),
-    );
-    const administrador = await middleware(
-      peticion(
-        '/dashboard/productos',
-        cookieConPayload({ role: 'Administrador', cid: OTRA_EMPRESA }),
-      ),
-    );
-    // Y la ausencia de rol sigue siendo anonima (QC-9 R28), no un rol por defecto.
+  it('la ausencia de rol en el contenido firmado sigue siendo anonima, no un rol por defecto (R28 de QC-9)', async () => {
+    // El rol ya no decide nada en el borde (QC-75 R16), pero el ESQUEMA del contenido firmado no
+    // se toco: un payload sin `role` no es una sesion valida, y por eso acaba en el login. Que
+    // esto siga rojo el dia que alguien afloje el esquema es justamente el punto.
     const sinRol = await middleware(
-      peticion('/dashboard/productos', cookieConPayload({ cid: COMPANY_ID })),
+      peticion('/dashboard/reportes', cookieConPayload({ cid: COMPANY_ID })),
+    );
+    const conRol = await middleware(
+      peticion('/dashboard/reportes', cookieConPayload({ role: 'Operador', cid: OTRA_EMPRESA })),
     );
 
-    expect(dejaPasar(administrador)).toBe(true);
-    expect(operador.status).toBe(307);
-    expect(destino(operador)).toBe('/dashboard');
     expect(sinRol.status).toBe(307);
-    expect(destino(sinRol)).toBe('/login?next=%2Fdashboard%2Fproductos');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// CARACTERIZACION — el rol firmado envejece. Esto NO es una virtud (R30, D17)
-// ---------------------------------------------------------------------------
-//
-// Lo que este bloque fija es un LIMITE CONOCIDO, no un comportamiento deseable: mientras no
-// exista la revocacion de sesiones (QC-23), el rol que viaja en la cookie es una foto del
-// instante del login y vale hasta 8 h. Un ascenso no surte efecto en el borde hasta que la
-// sesion caduca, y esta ficha no lo simula: reemitir la cookie al leerla violaria R5.
-//
-// **QC-23 pondra este test rojo A PROPOSITO**, igual que QC-8 hizo con su R21. Cuando eso pase,
-// no se parchea el test: se borra y se escribe el que afirme la invalidacion inmediata.
-//
-// El corte real sigue estando en el service (R29): que el borde deje pasar —o corte— no
-// autoriza ni desautoriza nada sobre los datos.
-describe('limite conocido: el rol firmado no se entera de un cambio de rol (R30)', () => {
-  it('corta al Operador ascendido a Administrador hasta que caduque su sesion, porque el borde no consulta la base', async () => {
-    reglas.actuales = [{ prefix: '/dashboard/productos', roles: ['Administrador'] }];
-    // La base ya dice `Administrador`; la cookie, emitida antes del ascenso, dice `Operador`.
-    // El middleware decide con la cookie porque no tiene base a la que preguntar (R4).
-    const cookieDeAntesDelAscenso = await cookieFirmada('Operador');
-
-    const response = await middleware(peticion('/dashboard/productos', cookieDeAntesDelAscenso));
-
-    expect(response.status).toBe(307);
-    expect(destino(response)).toBe('/dashboard');
+    expect(destino(sinRol)).toBe('/login?next=%2Fdashboard%2Freportes');
+    expect(dejaPasar(conRol)).toBe(true);
   });
 });

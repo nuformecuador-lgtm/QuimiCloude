@@ -32,7 +32,7 @@ import {
   STATUS_PARAM,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
-import type { SessionUser } from '@/lib/modules/identity';
+import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type {
   CreateOrderFormState,
@@ -53,8 +53,13 @@ const USUARIO_DEL_TEST: SessionUser = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Administrador',
-  // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
-  permissions: [],
+  // QC-75 (T6): las pantallas privadas exigen `<modulo>.consultar` con `requirePagePermission`
+  // antes de pintar nada, asi que un usuario sin permisos aqui daria 404 en vez de la pantalla
+  // que este archivo mide. Se le da el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito
+  // a mano: este archivo no prueba autorizacion -eso es
+  // `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, prueba lo que se ve cuando SI se
+  // puede ver, y con el catalogo entero el menu filtrado tampoco pierde ningun item.
+  permissions: PERMISSIONS.map((permiso) => permiso.code),
 };
 
 const {
@@ -134,7 +139,7 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
 }));
 
-const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul' };
+const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 const CANTIDAD = '12.5000';
@@ -392,7 +397,11 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
 
     await screen.findByTestId(ORDER_FORM_TESTID);
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
-    expect(screen.getByTestId('order-field-quantity')).toHaveValue(elPedido.quantity);
+    // Cadena del DOM y no `toHaveValue`: sobre el control numerico ese matcher compara
+    // `valueAsNumber`, y `12.5000` y `12.5` son el mismo numero pero no la misma cadena (R39).
+    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe(
+      elPedido.quantity,
+    );
   });
 
   it('con el pedido en estado final la accion de editar no abre ningun panel', async () => {

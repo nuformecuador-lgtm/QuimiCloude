@@ -5,27 +5,31 @@
 // la caducidad: eso vive en `domain/` y se ejercita sin Next (R20). Si aqui aparece un `if` sobre
 // rutas, esta en el archivo equivocado.
 //
-// **R29 — esto NO es la frontera de autorizacion, y hace falta decirlo aqui porque un rol dentro
-// de una cookie invita justo al error contrario.** El middleware solo decide `allow` o `redirect`:
-// si se enseña una pantalla o no. La autorizacion sobre datos y operaciones se valida en el
-// service, antes de tocar el repositorio (`docs/architecture.md > Acceso a datos y autorizacion`).
-// Un permiso implementado solo como corte de ruta no cuenta como implementado.
+// **Esto NO es la frontera de autorizacion, y desde QC-75 ni siquiera lo aparenta.** El
+// middleware solo decide `allow` o `redirect` a partir de la SESION: firma, caducidad y empresa.
+// Ya no lee ningun rol ni ningun permiso (QC-75 R16): el corte por permiso vive en cada pantalla,
+// que abre con `requirePagePermission('<modulo>.consultar')`, y no puede vivir aqui porque
+// resolver un permiso exige consultar la base, que es justo lo que el borde tiene prohibido
+// (QC-75 R18). La autorizacion sobre datos y operaciones se valida en el service, antes de tocar
+// el repositorio (`docs/architecture.md > Acceso a datos y autorizacion`). Un permiso
+// implementado solo como corte de ruta no cuenta como implementado.
+//
+// **`/login` con sesion viva sigue redirigiendo a `DASHBOARD_ROUTE`** (`design.md > 3`, R17): el
+// borde no conoce los permisos y no va a conocerlos (R18). Para quien no tenga
+// `dashboard.consultar` eso acaba en el 404 del layout privado, con su menu a la izquierda para
+// seguir. Resolverlo aqui exigiria una consulta en el borde, que es lo prohibido.
 //
 // Lo que este archivo NO puede hacer, y por que:
 // - **No toca la cookie (R5).** Solo `NextResponse.next()` y `NextResponse.redirect()`. Ni
 //   `cookies.set` ni `cookies.delete`, nunca: la sesion dura 8 h absolutas desde su emision y
 //   renovarla al leerla las convertiria en deslizantes sin que nadie lo decidiera.
-// - **No toca la base (R4).** No importa `@/lib/composition` (que cablea Prisma) ni ningun
-//   repositorio: solo `@/lib/composition/edge`. El rol con el que decide sale del contenido
-//   FIRMADO de la cookie (R26), no de una consulta.
+// - **No toca la base (R4 de QC-9, R18 de QC-75).** No importa `@/lib/composition` (que cablea
+//   Prisma) ni ningun repositorio: solo `@/lib/composition/edge`. Todo lo que decide sale del
+//   contenido FIRMADO de la cookie, no de una consulta.
 
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { identityEdge } from '@/lib/composition/edge';
-// La LISTA de reglas ruta→rol es CABLEADO y vive en `lib/composition` desde el 2026-09-03
-// (ver la cabecera de ese archivo): el dominio no puede nombrar rutas y este adaptador no puede
-// importar el barrel de `inventario` como valor. Sigue habiendo un solo punto de composicion.
-import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
 import {
   decideRouteAccess,
   isSessionExpired,
@@ -67,9 +71,10 @@ async function readSession(rawValue: string | undefined, now: Date): Promise<Rou
 
   if (claims === null || isSessionExpired(claims, now)) return { kind: 'anonymous' };
 
-  // D15: el rol sale del contenido FIRMADO. El borde no consulta la base (R4, R26). Envejece
-  // hasta 8 h (R30) y su invalidacion inmediata es QC-23.
-  return { kind: 'authenticated', sub: claims.sub, roleName: claims.roleName };
+  // Hay sesion valida, y eso es TODO lo que el borde necesita saber. El contenido firmado sigue
+  // trayendo `roleName` —la cookie es de QC-8/QC-9 y la cabecera lo pinta como nombre visible—,
+  // pero aqui no se lee: ninguna decision del middleware depende del rol (QC-75 R16).
+  return { kind: 'authenticated', sub: claims.sub };
 }
 
 /**
@@ -85,7 +90,6 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     search: request.nextUrl.search,
     session,
     privatePrefixes: PRIVATE_ROUTE_PREFIXES,
-    rules: ROUTE_ROLE_RULES,
     routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
   });
 

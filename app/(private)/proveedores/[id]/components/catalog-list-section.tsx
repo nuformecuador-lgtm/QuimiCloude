@@ -8,7 +8,6 @@ import { CatalogListEmpty } from './catalog-list-empty';
 import { CatalogListError } from './catalog-list-error';
 import { FIRST_PAGE, catalogListHref } from './catalog-list-params';
 import { CatalogTable } from './catalog-table';
-import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 
 type CatalogListSectionProps = {
   readonly supplierId: string;
@@ -90,23 +89,21 @@ export async function CatalogListSection({
         La paginacion y el tamano de pagina los pinta la tabla compartida desde el 2026-09-07:
         `catalog-list-toolbar.tsx` desaparecio y con el la barra propia de esta ruta.
       */}
+      {/*
+        Editar y dar de baja las monta la propia tabla (correccion del 2026-09-07). Entraban por
+        un SLOT `rowActions` para que la tabla no conociera el panel ni el dialogo, pero esta
+        seccion es un Server Component y una funcion NO cruza la frontera servidor->cliente:
+        la pantalla reventaba con «Functions cannot be passed directly to Client Components».
+        Desde aqui bajan datos -`supplierId` y `units`-, nunca comportamiento. Las acciones
+        siguen SIEMPRE visibles: nada detras de `:hover` (R48).
+      */}
       <CatalogTable
         lines={items}
         directories={directories}
         params={{ ...params, page: currentPage }}
         totalPages={totalPages}
         supplierId={supplierId}
-        /*
-          Editar y dar de baja entran por el SLOT de la tabla (R26, R36): asi la tabla no importa
-          ni el panel lateral ni el dialogo, no arrastra frontera de cliente y sigue sin conocer
-          su API. Las acciones estan SIEMPRE visibles: nada detras de `:hover` (R48).
-        */
-        rowActions={(line) => (
-          <>
-            <CatalogLineSheet supplierId={supplierId} units={units} line={line} />
-            <DeleteCatalogLineDialog line={line} />
-          </>
-        )}
+        units={units}
       />
     </div>
   );
