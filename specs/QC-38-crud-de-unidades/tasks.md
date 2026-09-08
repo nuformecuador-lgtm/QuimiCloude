@@ -137,7 +137,7 @@
 
 ## Fase D — Cierre
 
-- [ ] **T12. Trazabilidad y gate completo.** (depende de T3, T10, T11)
+- [x] **T12. Trazabilidad y gate completo.** (depende de T3, T10, T11)
   - Toca: `progress/impl_QC-38-crud-de-unidades.md`.
   - El mapa `R<n> → test` real —el archivo y el nombre del caso, no la intención—, contrastado
     contra `design.md > 12`. Los **36** requisitos, sin hueco (regla 4 de `CLAUDE.md`,
@@ -145,7 +145,7 @@
   - **Hecho cuando**: `./init.sh` completo en verde antes del PR, y ningún `R<n>` sin test.
     Cubre: la trazabilidad de R1–R36.
 
-- [ ] **T13. E2E: diferido, y escrito.** (depende de T12)
+- [x] **T13. E2E: diferido, y escrito.** (depende de T12)
   - Toca: `progress/impl_QC-38-crud-de-unidades.md` (sección de verificación).
   - **No se escribe ningún `.spec.ts`.** Se deja anotado el motivo —esta ficha no tiene pantalla ni
     flujo navegable que visitar; lo decide **QC-39**— tal y como lo fija la decisión cerrada 21.
