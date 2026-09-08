@@ -574,7 +574,7 @@ leader.*
 
 Las corre el **leader**, no el implementer. Worktree
 `.worktrees/QC-58-timeout-tests-ui-bajo-carga`, rama `feature/QC-58-timeout-tests-ui-bajo-carga`,
-HEAD `63bea8e`, árbol limpio. Comando de cada corrida, literal:
+HEAD **`13c8d8f`** (ronda 2 incluida), árbol limpio. Comando de cada corrida, literal:
 
 ```
 ./init.sh
@@ -582,19 +582,92 @@ HEAD `63bea8e`, árbol limpio. Comando de cada corrida, literal:
 
 Las cinco seguidas, sin tocar nada entre una y otra, el **2026-09-08**:
 
-| # | Inicio | Fin | Exit | Archivos | Casos | Comparador de baseline |
-|---|---|---|---|---|---|---|
-| 1 | 12:59:32 | 13:01:45 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | `sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar` |
-| 2 | 13:01:45 | 13:04:23 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
-| 3 | 13:04:23 | 13:07:22 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
-| 4 | 13:07:22 | 13:09:29 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
-| 5 | 13:09:29 | 13:11:37 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
+| # | Inicio | Fin | Exit | Archivos | Casos |
+|---|---|---|---|---|---|
+| 1 | 13:56:07 | 13:58:47 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
+| 2 | 13:58:47 | 14:01:26 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
+| 3 | 14:01:26 | 14:04:46 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
+| 4 | 14:04:47 | 14:08:02 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
+| 5 | 14:08:03 | 14:12:26 | **0** | 235 passed (235) | 2842 passed \| 7 skipped (2849) |
 
 Las cinco cerraron con `== init OK ==`. **Ningún archivo de test en rojo fuera del baseline en
 ninguna de las cinco**, y ninguna trajo la colisión de correlativo de `order-repository.int.test.ts`
 (R15), así que las cinco cuentan.
 
-### La tanda anterior, que NO cuenta, y por qué se anota igual
+### Salida literal del comparador de baseline, corrida por corrida (R14)
+
+El menor 6 de la review pedía esto y tenía razón: había una salida y cuatro «ídem», y R14 pide la
+de **cada** corrida. No es del implementer —T11 la corre el leader—, así que se cierra aquí, con la
+captura de las cinco tal cual salieron, sin resumir:
+
+```
+########## corrida 1 — exit=0 — inicio 2026-09-08T13:56:07-05:00 — fin 2026-09-08T13:58:47-05:00
+ Test Files  235 passed (235)
+      Tests  2842 passed | 7 skipped (2849)
+--- salida literal del comparador de baseline ---
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 2 — exit=0 — inicio 2026-09-08T13:58:47-05:00 — fin 2026-09-08T14:01:26-05:00
+ Test Files  235 passed (235)
+      Tests  2842 passed | 7 skipped (2849)
+--- salida literal del comparador de baseline ---
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 3 — exit=0 — inicio 2026-09-08T14:01:26-05:00 — fin 2026-09-08T14:04:46-05:00
+ Test Files  235 passed (235)
+      Tests  2842 passed | 7 skipped (2849)
+--- salida literal del comparador de baseline ---
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 4 — exit=0 — inicio 2026-09-08T14:04:47-05:00 — fin 2026-09-08T14:08:02-05:00
+ Test Files  235 passed (235)
+      Tests  2842 passed | 7 skipped (2849)
+--- salida literal del comparador de baseline ---
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+########## corrida 5 — exit=0 — inicio 2026-09-08T14:08:03-05:00 — fin 2026-09-08T14:12:26-05:00
+ Test Files  235 passed (235)
+      Tests  2842 passed | 7 skipped (2849)
+--- salida literal del comparador de baseline ---
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+TODAS LAS CORRIDAS TERMINADAS
+```
+
+### La tanda de `63bea8e`, que estas cinco sustituyen
+
+Hubo cinco corridas verdes sobre `63bea8e`, antes de la ronda 2. **No valen como prueba de R13**:
+la ronda 2 cambió el árbol —cinco sitios más al helper, la guardia que ve la API directa, el test
+nuevo del helper de espera—, y una prueba de estabilidad sólo prueba el árbol sobre el que corrió.
+Se anota para que no parezca que se perdieron: los conteos de entonces eran 234 archivos / 2839
+casos, y hoy son 235 / 2842 por los casos que la ronda 2 añade.
+
+### La tanda de `6454043`, que NO cuenta, y por qué se anota igual
 
 Antes de `63bea8e` se lanzó esta misma secuencia sobre `6454043`. **Se anota porque es la prueba de
 que el criterio de las cinco corridas hace su trabajo**, que es justo lo que R13 defiende:
@@ -612,7 +685,7 @@ del diff y salió verde. Solo aflora con la batería entera saturando la máquin
 intermitente — 2 de 3. **Una corrida verde no habría probado nada; la tercera fue verde.** De ahí
 salió el barrido que cerró los 21 sitios en 13 archivos (`63bea8e`).
 
-### El aviso de «2 por limpiar» — pendiente de decisión humana
+### El aviso de «2 por limpiar» — decidido el 2026-09-08
 
 Las cinco corridas traen `2 por limpiar` sobre las dos entradas que T9 conservó
 (`recipe-route-contract.test.ts` y `recetas/module-contract.test.ts`). El criterio escrito de T11
@@ -631,7 +704,10 @@ dejaría `dev` en rojo, que es donde sí fallan.
 No es un defecto de esta ficha: es la contradicción que el propio `motivo` de las dos entradas
 documenta desde el 2026-09-04, y cuya salida limpia —que el caso del diff distinga «no hay rango» de
 «el rango trae cosas»— sigue pendiente y **fuera del alcance declarado aquí** (R17 prohíbe tocar
-`lib/`, y estos archivos son de `recetas`). Queda anotado para el humano y para el `reviewer`.
+`lib/`, y estos archivos son de `recetas`). **Decidido por el humano el 2026-09-08**: se reformula el criterio de R13 —el aviso sobre esas
+dos entradas es esperado en rama y no invalida la corrida— en vez de meter en esta ficha un
+arreglo de `recetas` que R17 le prohíbe tocar. La redacción anterior de R13 y el motivo quedan
+escritos en `requirements.md > R13 — la versión anterior y por qué cambia`.
 
 
 ---
