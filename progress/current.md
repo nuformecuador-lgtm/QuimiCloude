@@ -14,7 +14,8 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **17/17 tasks, `d1e966d`**. T11: cinco `./init.sh` completos seguidos, **las cinco exit 0** (234/234 archivos, 2839 casos). R9 y R13 reformulados conservando la redaccion anterior. `reviewer` corriendo (F2.2). Base propia `QuimiCloude_QC58` montada — el worktree venia sin `.env` |
 | QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | in_progress | feature/QC-65-estado-de-cuenta-de-usuario | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. Rama sincronizada con `origin/dev` ANTES de implementar, para no chocar con los tests del seed que QC-38 acababa de tocar. `implementer` en curso (F2.1) |
-| QC-39 | pantalla-de-unidades | Catálogos | frontend | pending | feature/QC-39-pantalla-de-unidades | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`, con el merge del #47 dentro), `complexity: medium` evaluada y escrita en Jira. **Pendiente F1.2**: la ficha arrastra preguntas abiertas, así que toca `/afinar-feature` antes del `spec_author` |
+| QC-39 | pantalla-de-unidades | Catálogos | frontend | spec_ready | feature/QC-39-pantalla-de-unidades | **F1.3 hecho el 2026-09-08**: acotada con `/afinar-feature` (35 decisiones cerradas, cero preguntas abiertas) y spec escrito — **50 requisitos EARS**, `design.md` y `tasks.md`, sin dependencias nuevas. Tarjeta en *Spec en revisión*. **Esperando aprobación humana (F1.4)** |
+| QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`), `complexity: medium`. **Pendiente F1.2**: la ficha trae una pregunta abierta escrita en el board y la partición `fullstack` sin decidir, así que toca `/afinar-feature` antes del `spec_author` |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -239,6 +240,45 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-63 — arranque del 2026-09-08 (F1.0)
+
+Arrancada por decisión humana explícita («63»). Worktree montado desde `origin/dev` (`516e9c0`).
+`zone: fullstack` venía del board; **`complexity` evaluada aquí como `medium`** y escrita como
+label en Jira: son dos capas y varios archivos, con condiciones de verdad, pero sin integración
+externa ni webhooks que la lleven a `high`.
+
+**Lo que QC-62 y QC-64 le dejan hecho, y es lo que abarata la mitad frontend.**
+`components/shared/step-reader/step-reader.tsx` recibe **todo por props** y su propia cabecera
+dice literalmente que «**QC-63 podrá montarlo en la ruta del Operador pasándole otro `onFinish`
+sin tocar una línea de aquí**». No lee datos, no importa `lib/composition`, ni Server Actions, ni
+`next/navigation`, y un test de fuente lo afirma. La ficha monta el componente; no lo reescribe.
+
+**Lo que sí es trabajo de backend real, medido en el código.** El Operador nace con **exactamente
+un permiso**: `SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] = ['inventario.consultar']` en
+`identity/domain/permissions.ts`. Las dos pantallas de recetas cortan con
+`requirePagePermission('recetas.consultar')`, y QC-74 decidió que **no hay implicación entre
+permisos**: hoy el Operador recibe 404 en cualquier receta. Abrirle la lectura es tocar el
+catálogo de permisos y/o el seed, no pintar una pantalla.
+
+**Dos cosas quedan sin decidir y por eso no se lanza `spec_author` todavía:**
+
+1. **La pregunta abierta que trae la propia ficha del board**: si el bloqueo de *Siguiente* —que
+   en QC-62 impide avanzar mientras queden elementos sin marcar— necesita **una vía de escape con
+   motivo escrito** cuando lo use un operario en turno. Registrar quién marcó qué y cuándo está
+   fuera de alcance y eso sí está escrito.
+2. **Si se parte en dos.** `AGENTS.md > Partición de fullstack` dice que una feature `fullstack`
+   se parte en `backend` + `frontend` con `depends_on`. Aquí eso tiene un coste concreto: la zona
+   `frontend` está **llena** (QC-58 y QC-39), así que la mitad frontend quedaría en cola detrás de
+   dos fichas, mientras que como `fullstack` la zona está **vacía** y arranca ya. El precedente de
+   QC-39 —que amplió un contrato de lectura y **no se partió**— apunta en la misma dirección. Se
+   cierra al acotar, no aquí.
+
+**Aviso de conflicto de archivos con el árbol principal.** `dev` local tiene sin commitear 27
+archivos modificados y dos nuevos (`app/(private)/produccion/formulas/components/unit-group.ts` y
+su test) que se autodescriben como «QC-26bis». Caen en `produccion/formulas/`, que es exactamente
+donde trabaja esta ficha. No es conflicto de zona —no hay ninguna feature registrada que los
+reclame— pero sí de archivos, y hay que resolver a quién pertenecen antes de F2.
 
 ### QC-39 — acotada con `/afinar-feature` (2026-09-08)
 
