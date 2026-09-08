@@ -18,7 +18,7 @@
 > **T1 ya no existe**: era «confirmar P1 con el humano», y el humano la cerró el 2026-09-08. La
 > numeración del resto **no se toca** para no invalidar las dependencias ya escritas.
 
-- [ ] **T2. El catálogo de permisos gana `unidades.modificar`.**
+- [x] **T2. El catálogo de permisos gana `unidades.modificar`.**
   - Toca: `lib/modules/identity/domain/permissions.ts`.
   - Una entrada nueva en `PERMISSIONS` con `code`, `module`, `action` y `description`
     (`design.md > 2`), y `'unidades.modificar'` en `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]`
@@ -30,7 +30,7 @@
   - **Hecho cuando**: `pnpm typecheck` en verde, `PermissionCode` incluye el código nuevo y
     `PERMISSIONS.length === 11`. Cubre: R2, R4, R5.
 
-- [ ] **T3. Actualizar los seis tests ajenos que cuentan diez permisos.** (depende de T2)
+- [x] **T3. Actualizar los seis tests ajenos que cuentan diez permisos.** (depende de T2)
   - Toca: `tests/guards/guard-permisos-sembrados.test.ts`,
     `tests/guards/guard-nav-permisos-declarados.test.ts`,
     `tests/unit/navegacion/qc75-convenciones.test.ts`, `tests/unit/identity/permissions.test.ts`,
@@ -44,7 +44,7 @@
 
 ## Fase B — Dominio
 
-- [ ] **T4. Errores nuevos.** (depende de T2) [P con T5]
+- [x] **T4. Errores nuevos.** (depende de T2) [P con T5]
   - Toca: `lib/modules/unidades/domain/errors.ts`.
   - Las seis clases de `design.md > 4`, todas extendiendo `UnidadesError` con su `code` estable:
     `NotFoundError`, `SystemUnitError`, `DuplicateNameError`, `DuplicateSymbolError`,
@@ -53,7 +53,7 @@
   - **Hecho cuando**: `pnpm typecheck` en verde y un test comprueba que los seis códigos son
     distintos entre sí y de los tres existentes. Cubre: R30.
 
-- [ ] **T5. Esquemas zod de alta y edición.** (depende de T2) [P con T4]
+- [x] **T5. Esquemas zod de alta y edición.** (depende de T2) [P con T4]
   - Toca: `lib/modules/unidades/domain/unit-input.ts` (nuevo).
   - Un **único** esquema para los dos casos de uso (R18): nombre con `trim`, 1..60 y rechazo si
     `normalizeUnitName(name) === ''`; símbolo **opcional**, ≤ 10, y **rechazado si viene vacío o
@@ -66,7 +66,7 @@
     símbolo— `undefined` (acepta), `''` y `'   '` (rechazan, y **no** producen `null`).
     Cubre: R8, R9, R10, R13, R14, R17, R28, R36.
 
-- [ ] **T6. Puerto de escritura.** (depende de T4)
+- [x] **T6. Puerto de escritura.** (depende de T4)
   - Toca: `lib/modules/unidades/ports/unit-write-repository.ts` (nuevo).
   - Los cinco métodos y los tres tipos de `design.md > 5`, con `companyId` como **argumento propio**
     de `create` y **fuera** de `UnitWriteRow`. `ports/unit-repository.ts` **no se toca**.

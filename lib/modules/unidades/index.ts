@@ -24,6 +24,17 @@ export type { Actor } from './domain/actor';
 // listado en su firma para que ninguna lectura se ejecute sin la empresa de quien pregunta.
 export type { UnitScope } from './domain/unit-scope';
 export { UnidadesError, UnauthorizedError, ValidationError } from './domain/errors';
+// QC-38 (R30): los seis errores de negocio de las escrituras (alta, edicion y borrado). Mismo
+// patron que los tres anteriores: `code` estable, y el adaptador driving los traduce sin mirar
+// el texto (`docs/conventions.md > Manejo de errores`).
+export {
+  NotFoundError,
+  SystemUnitError,
+  DuplicateNameError,
+  DuplicateSymbolError,
+  InvalidDerivationError,
+  UnitInUseError,
+} from './domain/errors';
 
 // QC-76 (R22-R25): la conversion de una cantidad entre dos unidades que comparten unidad base.
 // Es dominio PURO —sin base de datos, sin framework y sin estado—, asi que publicarla no
