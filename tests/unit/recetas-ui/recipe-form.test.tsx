@@ -1233,8 +1233,10 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
     // la bloquea (R15, R18).
     await user.click(within(modal).getByTestId('step-reader-finish'));
 
-    await waitFor(() => expect(screen.queryByTestId('recipe-form-preview')).toBeNull());
-    expect(screen.queryByTestId('step-reader')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByTestId('recipe-form-preview')).toBeNull();
+      expect(screen.queryByTestId('step-reader')).toBeNull();
+    });
 
     // R22: cerrar por Finalizar tampoco guarda ni navega, y el formulario sigue entero.
     esperarQueNoSeInvocoNingunaAccion();

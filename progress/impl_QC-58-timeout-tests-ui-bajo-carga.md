@@ -1030,3 +1030,85 @@ TestingLibraryElementError: Unable to find an element by: [data-testid="private-
 donde sale**, que lo decide quien movió el control (`ab28f97`), y tocar el componente lo prohíbe
 R17. Las salidas que veo, para el leader: dejarlo así y confiar en el gate completo —que es quien
 mira el baseline—, o abrir la ficha que esa entrada pide desde el 2026-09-08.
+
+---
+
+## La tercera familia de fallo: aserciones FUERA de la espera (2026-09-08, T11)
+
+Las corridas completas de T11 tumbaron `tests/unit/login-form.test.tsx > deja el campo de
+contrasena vacio tras un intento rechazado`, intermitente y sólo con la máquina cargada:
+
+```
+Error: expect(element).toHaveValue()
+Expected the element to have value: ""
+Received: "clave-secreta"
+ ❯ tests/unit/login-form.test.tsx:266:49
+```
+
+### ¿Lo introdujo la migración? La evidencia dice que no, y no puedo cerrarlo del todo
+
+Repetí la técnica de las otras dos veces: poner encima la versión de `origin/dev` —sin migrar— y
+correr las dos bajo carga.
+
+| Versión | Carga | Corridas | Fallos |
+| --- | --- | --- | --- |
+| `origin/dev` (sin migrar) | 4 procesos del archivo en paralelo | 12 | **0** |
+| la mía (`setupUser()`) | ídem | 12 | **0** |
+| `origin/dev` (sin migrar) | 6 del archivo + `proveedores-ui` + `pedidos-ui` de fondo | 18 | **0** |
+| la mía (`setupUser()`) | ídem | 18 | **0** |
+
+**36 corridas por versión y ni un fallo en ninguna de las dos: no reproduje el flake**, así que la
+comparación **no es concluyente** y lo digo tal cual en vez de venderla como prueba. Mi carga no
+llega a la del gate completo (el leader lo vio con 35 procesos node de otras sesiones).
+
+Lo que sí se puede afirmar es el **mecanismo**, y ese no pasa por `delay: null`: el usuario se
+restaura desde el estado de la action y la contraseña la limpia el **reset del formulario de React
+19**; son dos efectos distintos que no tienen por qué caer en el mismo commit. La espera vigilaba
+el primero y la aserción del segundo estaba **fuera**, así que el caso pasaba o fallaba según cuál
+llegara antes. Todo eso ocurre **después** de teclear, que es lo único que `delay: null` cambia.
+
+**Conclusión, con su límite escrito: no hay evidencia de que la migración lo introdujera, y el
+mecanismo dice que no puede; pero no lo reproduje, así que no puedo cerrarlo con una medida.** No
+lo cuento como incumplimiento de R9 —y si alguien lo reproduce con la versión de `dev` migrada
+frente a la sin migrar, esta conclusión se cae y hay que decirlo—.
+
+### El arreglo, y que sigue pudiendo fallar
+
+Las dos condiciones pasan **dentro de la misma espera**, con lo que el caso deja de depender de en
+qué orden lleguen. **No se relajó ni se borró ninguna aserción**: las dos siguen comprobándose y
+ahora las dos tienen que cumplirse **a la vez**. Probado con una mutación —afirmar que la
+contraseña conserva un valor que nunca tendrá—:
+
+```
+MUTACION (la contrasena NUNCA se limpia) -> CODIGO DE SALIDA = 1
+ × deja el campo de contrasena vacio tras un intento rechazado 1189ms
+Error: expect(element).toHaveValue(NO-SE-LIMPIA)
+```
+
+### El barrido de esta tercera forma
+
+Buscada por script en los archivos que usan `setupUser()`: `await waitFor(...)` sobre el DOM
+seguido, sin línea en blanco, de aserciones **fuera** de la espera sobre **otro** elemento.
+**14 sitios en 7 archivos.** Arreglados los **6 de la misma forma exacta** que el que falló:
+
+| Archivo | Sitios | Qué esperaba / qué afirmaba fuera |
+| --- | --- | --- |
+| `login-form.test.tsx` | 1 | espera el **usuario** restaurado, afirma la **contraseña** vacía |
+| `pedidos-ui/order-form.test.tsx` | 2 | espera el **mensaje** del selector, afirma `aria-invalid` del selector y la **ausencia** del aviso de formulario |
+| `sidebar-mobile.test.tsx` | 2 | espera que el **panel** cierre, afirma `aria-expanded` del **disparador** |
+| `recetas-ui/recipe-form.test.tsx` | 1 | espera que la **vista previa** se vaya, afirma que el **lector de pasos** ya no está |
+
+**Los otros 8 los dejo sin tocar, a propósito**, porque no son la misma forma: en
+`async-autocomplete` (5), `recipe-picker` (2) y `product-page` (1) lo que se afirma fuera es el
+**mismo conjunto** que la espera acaba de comprobar —las opciones de una lista que ya está pintada—,
+no un segundo efecto que pueda llegar más tarde. Quedan listados aquí por si el leader quiere
+ampliar el alcance; meterlos habría sido tocar ocho sitios más sin un mecanismo que lo justifique.
+
+**Nota de método, la tercera de esta ficha:** las tres familias —`pointer-events`, la API directa y
+esto— se anunciaron con **un solo caso rojo**, y las tres veces el barrido encontró más. Lo que
+todavía no tiene guardia es esta tercera: un `waitFor` con aserciones sueltas detrás no es
+distinguible por texto de uno legítimo, así que no la he intentado escribir.
+
+`./init.sh --rapido` tras este arreglo: **40 de 41 archivos y 519 de 521 casos**, con typecheck y
+lint verdes. El único rojo sigue siendo `navegacion/private-layout-menu` (ajeno, baselined, con su
+explicación en el apartado del merge): mismo estado que antes de tocar nada.

@@ -262,8 +262,16 @@ describe('pantalla de login', () => {
 
     await fillAndSubmit(user);
 
-    await waitFor(() => expect(screen.getByTestId(testId.username)).toHaveValue('ana.perez'));
-    expect(screen.getByTestId(testId.password)).toHaveValue('');
+    // Las DOS condiciones dentro de la MISMA espera (QC-58, T11): el usuario se restaura desde el
+    // estado de la action y la contrasena la limpia el reset del form de React 19, y eso NO tiene
+    // por que caer en el mismo commit. Afirmar la segunda FUERA de la espera hacia que el caso
+    // pasara o fallara segun cual llegase antes: verde en aislado, rojo con la maquina cargada.
+    // Ninguna asercion se relaja: si la contrasena no se limpia nunca, la espera se agota y el
+    // caso sigue fallando.
+    await waitFor(() => {
+      expect(screen.getByTestId(testId.username)).toHaveValue('ana.perez');
+      expect(screen.getByTestId(testId.password)).toHaveValue('');
+    });
   });
 
   it('el toast de error se anuncia por region live sin mover el foco', async () => {

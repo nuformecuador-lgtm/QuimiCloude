@@ -335,11 +335,14 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    await waitFor(() =>
-      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument(),
-    );
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-    expect(screen.getByTestId(RECIPE_PICKER_TESTID)).toHaveAttribute('aria-invalid', 'true');
+    // Las tres condiciones del DOM, en la misma espera (QC-58, T11): el mensaje, la ausencia de
+    // aviso de formulario y el `aria-invalid` cambian en la misma interaccion pero no tienen por
+    // que caer en el mismo commit.
+    await waitFor(() => {
+      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument();
+      expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+      expect(screen.getByTestId(RECIPE_PICKER_TESTID)).toHaveAttribute('aria-invalid', 'true');
+    });
     expect(onSaved).not.toHaveBeenCalled();
   });
 

@@ -239,8 +239,12 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
     const simple = primerEnlaceSimple();
     await user.click(within(dialogoSimple).getByTestId(simple.testId));
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    // Cierre del panel y estado del disparador, en la misma espera (QC-58, T11): son dos efectos
+    // de la misma interaccion y no tienen por que caer en el mismo commit.
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    });
 
     // Caso 2: hijo de submenu, expandiendo antes el submenu.
     const dialogoGrupo = await abrirPanel(user);
@@ -255,8 +259,10 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
     }
     await user.click(await screen.findByTestId(primerHijo.testId));
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    });
   });
 
   it('en viewport angosto no se aplica el modo icono', async () => {
