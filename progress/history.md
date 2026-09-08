@@ -2241,3 +2241,58 @@ las de sistema. 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abier
 - **Cierra la deuda provisional de QC-45**: el item de Configuración que se ocultaba a mano al no
   Administrador queda sustituido por el menú filtrado por permisos en el servidor.
 - **Cerrada el 2026-09-08**: PR #44 mergeado (merge del board a *Finalizado* y comentario con la URL en el issue). Worktree ya desmontado; la ficha pasa a `done` en `feature_list.json`.
+
+
+## QC-45 — pantalla-de-presentaciones (cerrada el 2026-09-08, PR #46, merge `fb144c8`)
+
+- El catálogo de presentaciones deja de vivir solo dentro del selector de productos y tiene pantalla
+  propia en **`/configuracion/presentaciones`**: lista paginada con búsqueda y orden por nombre, alta
+  y edición en un **panel lateral único** de un solo campo, y borrado con `alert-dialog` que nombra la
+  presentación. Server Component que lee `searchParams` y despacha a los estados de carga / vacío /
+  error. **Nace además la sección CONFIGURACIÓN de la navegación privada**, que no existía, y lo hace
+  con **un solo ítem** —no se añadió Unidades apuntando a un 404, que era repetir la deuda de QC-11—.
+- **Monta la tabla compartida de QC-55, no una tercera copia del esqueleto de productos**, y de paso
+  **resuelve la pregunta abierta 4 de QC-55**: la columna de acciones de fila se declara como columna
+  normal (`pinnable: false`), con los botones siempre visibles y `min-h-11 min-w-11`. **QC-56 hereda
+  esa respuesta.** Ni un archivo de `components/shared/data-table/` fue tocado, y hay guardia que lo
+  afirma.
+- Requisitos cubiertos: **R1–R36**, los 36 con test mapeado y **los 36 ejecutados**. `reviewer`
+  **APROBADO** en las dos rondas que revisó (0 mayores; 7 menores en la ronda 1, 8 en la ronda 2).
+  Tres rondas de implementación: `30e9e2b` (la pantalla), `a342465` (corte por permiso + menú),
+  `4cabc05` (el spec deja de describir el mecanismo que QC-75 borró). 40 archivos, +6719 / −355.
+- **La ficha se implementó mientras QC-75 le cambiaba el suelo debajo.** Nació con un ítem de menú
+  que se ocultaba a mano al no Administrador —provisional a propósito— y con una fila en
+  `route-role-rules.ts`; QC-75 borró ese mecanismo entero. La ronda 2 la readaptó: la página corta con
+  `requirePagePermission(...)` y quien no puede pasar recibe **404**, no un redirigido.
+- **Excepción declarada a QC-75 R5, y escrita donde se busca** (`design.md > 3.2`): el ítem declara
+  **`inventario.modificar`** en vez de `<módulo>.consultar`, porque `inventario.consultar` lo tiene
+  también el Operador y el enlace sería visible con 404 detrás —justo lo que QC-75 evitaba—. Queda
+  dicho que el caso normal sigue siendo `<módulo>.consultar` y que **QC-39 debe usar
+  `unidades.consultar`** salvo que caiga en el mismo aprieto.
+- **Sólo dos archivos de producción heredados modificados** (`lib/shared/routes.ts` y
+  `lib/composition/route-role-rules.ts`, este último +6 líneas y 0 borradas a propósito, para que el
+  merge con QC-75 fuese limpio) y **siete tests heredados de lista cerrada ampliados** en vez de
+  silenciados — la excepción de `inventario/scope.test.ts` se dejó **más estrecha** que las dos que ya
+  existían. R33 se reescribió con la cifra real después de que el reviewer contase seis.
+- E2E en `e2e/presentaciones.spec.ts`, **verde en Chromium y WebKit** (`4 passed (47.5s)`, 0 rojos,
+  `afterAll` sin dejar filas huérfanas): el Administrador entra, crea y filtra; quien no tiene permiso
+  recibe 404 y no ve ni un dato. Navega **siempre por URL** a propósito, y el motivo está en la
+  cabecera del spec.
+- **Deuda viva, y no la puede cerrar un agente: T10**, la comprobación manual del scroll contenido en
+  la tabla en un **WebKit real**. El E2E corrió en WebKit y pasó, pero eso no es lo que T10 pide.
+- **El gate completo nunca llegó a correr antes del PR** —`tests/integration/` estaba rojo por la
+  migración de QC-76 sobre la base compartida—, así que la ficha se mergeó con `--rapido`. Se corrió
+  **en el cierre**, desde el worktree: typecheck ✓, lint ✓, las siete validaciones del arnés ✓,
+  **3145 tests verdes de 3177**. **Ninguno de los 23 rojos es de esta ficha**: 17 son el flake de
+  carga que el baseline ya documenta (`catalog-line-sheet`, `supplier-page`); 2 son **ese mismo
+  flake sin entrada propia** (`identity-facade`, `login-form-uncontrolled-warning`), medido —los dos
+  pasan **9/9 corridos aislados**—; y los 4 restantes son el **artefacto de correr el gate sobre una
+  rama ya mergeada**: las auto-comprobaciones de `configuracion-convenciones`, `data-table-intacta`,
+  `module-contract` y `recipe-route-contract` exigen que `dev...HEAD` devuelva archivos, y con la
+  rama dentro de `dev` ese rango es **vacío**. Es la guardia impidiendo un verde por vacuidad, que es
+  justo para lo que se escribió, no una regresión.
+- **El árbol principal no pudo correr el gate**: `prisma generate` falla con `EPERM` porque otro
+  proceso tiene tomado `query_engine-windows.dll.node`, así que su cliente sigue sin los campos que
+  QC-76 añadió a `Unit` y el typecheck cae con 41 errores en `lib/modules/unidades` y
+  `tests/integration/unidades`. **Es cliente desactualizado, no código roto** — el mismo typecheck
+  pasa limpio en el worktree, cuyo cliente sí se regeneró.
