@@ -18,23 +18,52 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
-import { UnauthorizedError } from '@/lib/modules/unidades';
+import {
+  createUnitAction,
+  deleteUnitAction,
+  listUnitsAction,
+  updateUnitAction,
+} from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import {
+  DuplicateNameError,
+  DuplicateSymbolError,
+  InvalidDerivationError,
+  NotFoundError,
+  SystemUnitError,
+  UnauthorizedError,
+  UnitInUseError,
+  ValidationError,
+} from '@/lib/modules/unidades';
 import { createListUnits } from '@/lib/modules/unidades/domain/list-units';
 
 import type { Actor } from '@/lib/modules/unidades/domain/actor';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
 
-const { listUnitsMock, getSessionUserMock, getSessionContextMock } = vi.hoisted(() => ({
+const {
+  listUnitsMock,
+  createUnitMock,
+  updateUnitMock,
+  deleteUnitMock,
+  getSessionUserMock,
+  getSessionContextMock,
+} = vi.hoisted(() => ({
   listUnitsMock: vi.fn(),
+  createUnitMock: vi.fn(),
+  updateUnitMock: vi.fn(),
+  deleteUnitMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
 }));
 
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
-  unidades: { listUnits: listUnitsMock },
+  unidades: {
+    listUnits: listUnitsMock,
+    createUnit: createUnitMock,
+    updateUnit: updateUnitMock,
+    deleteUnit: deleteUnitMock,
+  },
 }));
 
 /** La sesion conserva `roleName` porque es DISPLAY (lo pinta `nav-user`), pero la action ya no
@@ -228,4 +257,233 @@ describe('listUnitsAction — la empresa sale del contexto de sesion (QC-76 R19)
       expect(units.listPage).not.toHaveBeenCalled();
     });
   }
+});
+
+/**
+ * QC-38 (T9, `design.md > 8`, R27, R29, R30, R31, R36). Las tres Server Actions NUEVAS:
+ * `createUnitAction`, `updateUnitAction`, `deleteUnitAction`. Se testean contra dobles de
+ * `@/lib/composition`, igual que `listUnitsAction`.
+ */
+describe('createUnitAction / updateUnitAction / deleteUnitAction', () => {
+  const ACTOR_ESPERADO: Actor = {
+    id: 'user-admin-1',
+    companyId: 'company-1',
+    permissions: ['unidades.consultar'],
+  };
+
+  function formData(fields: Record<string, string>): FormData {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(fields)) data.set(key, value);
+    return data;
+  }
+
+  describe('sesion y contexto ausentes (R29): el actor llega null, sin tocar el repositorio', () => {
+    it('createUnitAction: sin sesion invoca el caso de uso con actor null', async () => {
+      getSessionUserMock.mockResolvedValue(null);
+      getSessionContextMock.mockResolvedValue(null);
+      createUnitMock.mockRejectedValue(new UnauthorizedError());
+
+      const resultado = await createUnitAction(
+        { status: 'idle' },
+        formData({ name: 'Kilogramo' }),
+      );
+
+      expect(createUnitMock).toHaveBeenCalledWith(expect.anything(), null);
+      expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    });
+
+    it('updateUnitAction: sin contexto de sesion invoca el caso de uso con actor null', async () => {
+      getSessionUserMock.mockResolvedValue({
+        id: 'user-admin-1',
+        permissions: ['unidades.consultar'],
+      });
+      getSessionContextMock.mockResolvedValue(null);
+      updateUnitMock.mockRejectedValue(new UnauthorizedError());
+
+      const resultado = await updateUnitAction(
+        'unit-1',
+        { status: 'idle' },
+        formData({ name: 'Kilogramo' }),
+      );
+
+      expect(updateUnitMock).toHaveBeenCalledWith('unit-1', expect.anything(), null);
+      expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    });
+
+    it('deleteUnitAction: sin sesion ni contexto invoca el caso de uso con actor null', async () => {
+      getSessionUserMock.mockResolvedValue(null);
+      getSessionContextMock.mockResolvedValue(null);
+      deleteUnitMock.mockRejectedValue(new UnauthorizedError());
+
+      const resultado = await deleteUnitAction({ status: 'idle' }, formData({ id: 'unit-1' }));
+
+      expect(deleteUnitMock).toHaveBeenCalledWith('unit-1', null);
+      expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    });
+  });
+
+  describe('con sesion completa, resuelve el actor y lo pasa al caso de uso', () => {
+    beforeEach(() => {
+      getSessionUserMock.mockResolvedValue({
+        id: 'user-admin-1',
+        permissions: ['unidades.consultar'],
+      });
+      getSessionContextMock.mockResolvedValue({ companyId: 'company-1' });
+    });
+
+    it('createUnitAction: alta valida devuelve success con el id', async () => {
+      createUnitMock.mockResolvedValue({ id: 'unit-nueva' });
+
+      const resultado = await createUnitAction(
+        { status: 'idle' },
+        formData({ name: 'Kilogramo' }),
+      );
+
+      expect(createUnitMock).toHaveBeenCalledWith(
+        { name: 'Kilogramo', symbol: undefined, baseUnitId: undefined, factor: undefined },
+        ACTOR_ESPERADO,
+      );
+      expect(resultado).toEqual({ status: 'success', id: 'unit-nueva' });
+    });
+
+    it('updateUnitAction: edicion valida devuelve success', async () => {
+      updateUnitMock.mockResolvedValue(undefined);
+
+      const resultado = await updateUnitAction(
+        'unit-1',
+        { status: 'idle' },
+        formData({ name: 'Kilogramo' }),
+      );
+
+      expect(updateUnitMock).toHaveBeenCalledWith(
+        'unit-1',
+        { name: 'Kilogramo', symbol: undefined, baseUnitId: undefined, factor: undefined },
+        ACTOR_ESPERADO,
+      );
+      expect(resultado).toEqual({ status: 'success' });
+    });
+
+    it('deleteUnitAction: borrado valido devuelve success', async () => {
+      deleteUnitMock.mockResolvedValue(undefined);
+
+      const resultado = await deleteUnitAction({ status: 'idle' }, formData({ id: 'unit-1' }));
+
+      expect(deleteUnitMock).toHaveBeenCalledWith('unit-1', ACTOR_ESPERADO);
+      expect(resultado).toEqual({ status: 'success' });
+    });
+
+    // R30: cada clase de error de dominio se traduce a su `code` estable, nunca al texto.
+    const CASOS_DE_ERROR: ReadonlyArray<{ readonly error: Error; readonly code: string }> = [
+      { error: new ValidationError(), code: 'invalid_input' },
+      { error: new NotFoundError(), code: 'not_found' },
+      { error: new SystemUnitError(), code: 'system_unit' },
+      { error: new DuplicateNameError(), code: 'duplicate_name' },
+      { error: new DuplicateSymbolError(), code: 'duplicate_symbol' },
+      { error: new InvalidDerivationError(), code: 'invalid_derivation' },
+      { error: new UnitInUseError(), code: 'unit_in_use' },
+      { error: new UnauthorizedError(), code: 'unauthorized' },
+    ];
+
+    for (const caso of CASOS_DE_ERROR) {
+      it(`createUnitAction traduce ${caso.error.constructor.name} a { code: '${caso.code}' }`, async () => {
+        createUnitMock.mockRejectedValue(caso.error);
+
+        const resultado = await createUnitAction(
+          { status: 'idle' },
+          formData({ name: 'Kilogramo' }),
+        );
+
+        expect(resultado).toMatchObject({ status: 'error', code: caso.code });
+      });
+
+      it(`updateUnitAction traduce ${caso.error.constructor.name} a { code: '${caso.code}' }`, async () => {
+        updateUnitMock.mockRejectedValue(caso.error);
+
+        const resultado = await updateUnitAction(
+          'unit-1',
+          { status: 'idle' },
+          formData({ name: 'Kilogramo' }),
+        );
+
+        expect(resultado).toMatchObject({ status: 'error', code: caso.code });
+      });
+
+      it(`deleteUnitAction traduce ${caso.error.constructor.name} a { code: '${caso.code}' }`, async () => {
+        deleteUnitMock.mockRejectedValue(caso.error);
+
+        const resultado = await deleteUnitAction({ status: 'idle' }, formData({ id: 'unit-1' }));
+
+        expect(resultado).toMatchObject({ status: 'error', code: caso.code });
+      });
+    }
+
+    // R30: un error que NO es de dominio se relanza, nunca se traduce.
+    it('createUnitAction relanza un error que no es de dominio', async () => {
+      createUnitMock.mockRejectedValue(new TypeError('fallo inesperado'));
+
+      await expect(
+        createUnitAction({ status: 'idle' }, formData({ name: 'Kilogramo' })),
+      ).rejects.toThrow('fallo inesperado');
+    });
+
+    it('updateUnitAction relanza un error que no es de dominio', async () => {
+      updateUnitMock.mockRejectedValue(new TypeError('fallo inesperado'));
+
+      await expect(
+        updateUnitAction('unit-1', { status: 'idle' }, formData({ name: 'Kilogramo' })),
+      ).rejects.toThrow('fallo inesperado');
+    });
+
+    it('deleteUnitAction relanza un error que no es de dominio', async () => {
+      deleteUnitMock.mockRejectedValue(new TypeError('fallo inesperado'));
+
+      await expect(
+        deleteUnitAction({ status: 'idle' }, formData({ id: 'unit-1' })),
+      ).rejects.toThrow('fallo inesperado');
+    });
+  });
+
+  /**
+   * R36 en el borde: `formData.has('symbol')` distingue la clave AUSENTE (legal, R10) de la
+   * clave PRESENTE pero vacia (rechazada, R36). Sin `has(...)`, `FormData.get` devuelve `null`
+   * en el primer caso y `''` en el segundo, pero un `?? ''` los confundiria: es justo lo que
+   * este par de casos demuestra.
+   */
+  describe('FormData: clave `symbol` ausente frente a clave presente y vacia (R36 vs R10)', () => {
+    beforeEach(() => {
+      getSessionUserMock.mockResolvedValue({
+        id: 'user-admin-1',
+        permissions: ['unidades.consultar'],
+      });
+      getSessionContextMock.mockResolvedValue({ companyId: 'company-1' });
+    });
+
+    it('sin la clave symbol, el candidato lleva symbol: undefined (pasa al caso de uso)', async () => {
+      createUnitMock.mockResolvedValue({ id: 'unit-nueva' });
+      const data = new FormData();
+      data.set('name', 'Kilogramo');
+
+      await createUnitAction({ status: 'idle' }, data);
+
+      expect(createUnitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ symbol: undefined }),
+        ACTOR_ESPERADO,
+      );
+    });
+
+    it('con la clave symbol vacia, el candidato lleva symbol: "" y el dominio rechaza invalid_input', async () => {
+      createUnitMock.mockRejectedValue(new ValidationError());
+      const data = new FormData();
+      data.set('name', 'Kilogramo');
+      data.set('symbol', '');
+
+      const resultado = await createUnitAction({ status: 'idle' }, data);
+
+      expect(createUnitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ symbol: '' }),
+        ACTOR_ESPERADO,
+      );
+      expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    });
+  });
 });

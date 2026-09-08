@@ -68,9 +68,23 @@ import {
   listUnits,
   listUnitsPage,
 } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
+import {
+  create as createUnitRow,
+  deleteById as deleteUnitById,
+  findOwnership as findUnitOwnership,
+  hasDerivedUnits,
+  update as updateUnitRow,
+} from '@/lib/modules/unidades/adapters/driven/persistence/unit-write-prisma';
 import type { ListQueryLog as UnidadesListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
-import { createListUnits, type UnitCatalog } from '@/lib/modules/unidades';
+import type { UnitWriteRepository } from '@/lib/modules/unidades/ports/unit-write-repository';
+import {
+  createCreateUnit,
+  createDeleteUnit,
+  createListUnits,
+  createUpdateUnit,
+  type UnitCatalog,
+} from '@/lib/modules/unidades';
 import {
   createCreateRecipe,
   createDeleteRecipe,
@@ -414,10 +428,26 @@ const unitRepository: UnitRepository = { listAll: listUnits, listPage: listUnits
 /** QC-57 (T7, R6): la misma implementacion unica del log, vista por el puerto de `unidades`. */
 const unidadesListQueryLog: UnidadesListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
-/** Fachada del modulo `unidades` ya cableada (R40-R42). Es lo que consume la Server
- *  Action de listado (`adapters/driving/unit-actions.ts`). */
+/** `UnitWriteRepository` cableado con el adaptador driven DE UNIDADES (QC-38, `design.md > 8`):
+ *  los tres casos de uso de escritura solo conocen el TIPO `UnitWriteRepository`, nunca esta
+ *  implementacion. */
+const unitWriteRepository: UnitWriteRepository = {
+  findOwnership: findUnitOwnership,
+  hasDerivedUnits,
+  create: createUnitRow,
+  update: updateUnitRow,
+  deleteById: deleteUnitById,
+};
+
+/** Fachada del modulo `unidades` ya cableada (R40-R42, y QC-38 R6, R7, R11-R26 para las tres
+ *  fabricas nuevas). Es lo que consumen las cuatro Server Actions de
+ *  `adapters/driving/unit-actions.ts`. */
 export const unidades = {
-  listUnits: createListUnits({ units: unitRepository, log: unidadesListQueryLog }),} as const;
+  listUnits: createListUnits({ units: unitRepository, log: unidadesListQueryLog }),
+  createUnit: createCreateUnit({ units: unitWriteRepository }),
+  updateUnit: createUpdateUnit({ units: unitWriteRepository }),
+  deleteUnit: createDeleteUnit({ units: unitWriteRepository }),
+} as const;
 
 
 // ---------------------------------------------------------------------------------------

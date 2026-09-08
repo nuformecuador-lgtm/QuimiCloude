@@ -87,7 +87,7 @@
 
 ## Fase C — Persistencia y superficie
 
-- [ ] **T8. Adaptador Prisma de escritura.** (depende de T6)
+- [x] **T8. Adaptador Prisma de escritura.** (depende de T6)
   - Toca: `lib/modules/unidades/adapters/driven/persistence/unit-write-prisma.ts` (nuevo).
   - `updateMany`/`deleteMany` para distinguir «no existe» sin depender de `P2025`; el mapeo de
     `meta.target` de `design.md > 7.1`, con **relanzado** del índice desconocido; `P2003` →
@@ -95,7 +95,7 @@
   - **Hecho cuando**: `pnpm typecheck` y `pnpm lint` en verde y el archivo es el único del módulo,
     junto a los dos existentes, que importa `@prisma/client`. Cubre: R11, R12, R23, R24.
 
-- [ ] **T9. Server Actions y cableado.** (depende de T7, T8)
+- [x] **T9. Server Actions y cableado.** (depende de T7, T8)
   - Toca: `lib/modules/unidades/adapters/driving/unit-actions.ts` (se **añaden** tres funciones y
     dos tipos de estado; `listUnitsAction`, `currentActor` y `toErrorState` no se reescriben),
     `lib/composition/index.ts` (bloque `unidades`, ampliado sin reordenar lo de arriba).
