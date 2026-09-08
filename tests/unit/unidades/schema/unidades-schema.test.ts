@@ -19,7 +19,30 @@
 //
 // Cubre R1, R2, R3, R4 (la columna persistida; la funcion la cubre `unit-name.test.ts`), R5
 // (el `@@unique` del esquema; el indice unico real lo cubre `unidades-migration.test.ts`), R6,
-// R7, R8, R9, R10, R11, R14, R15, R18 y R20.
+// R7, R8, R9, R10, R11, R14, R15, R18 y R20 DE QC-32.
+//
+// ---------------------------------------------------------------------------------------
+// ACTUALIZADO EL 2026-09-07 POR QC-76 (`specs/QC-76-equivalencia-y-ambito-de-unidades/`, T4).
+//
+// CINCO casos de este archivo afirmaban lo CONTRARIO de lo que QC-76 decide y estaban en
+// rojo. NO se han borrado ni relajado: se han reescrito para afirmar lo nuevo, y cada uno
+// lleva escrito QUE afirmaba antes, QUE requisito lo deroga y POR QUE. No se borra historia,
+// se explica. Los cinco son:
+//
+//   1. «Unit declara id uuid propio, nombre y simbolo»  -> la tabla tiene NUEVE columnas, no
+//      seis (R1, R3, R11).
+//   2. «... con su @@unique»                            -> SIN ningun `@@unique` (R14).
+//   3. «no hay @unique ni indice sobre symbol»          -> el simbolo SI es unico, pero por
+//      indices PARCIALES en el SQL (R15, decision cerrada 28, que cierra la pregunta abierta
+//      1 de QC-32).
+//   4. «Unit no declara factor, base ni equivalencia»   -> los declara, opcionales, y NO hay
+//      bandera de sistema (R1, R3, R11, R12, decision cerrada 11).
+//   5. «la tabla y sus columnas mapean a snake_case»    -> la lista exacta de indices cambia
+//      (R31).
+//
+// Cubre ademas, de QC-76: R1, R3, R11, R12, R14 y R15 (su mitad de esquema: que la unicidad
+// NO esta aqui), R31 y R32.
+// ---------------------------------------------------------------------------------------
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -108,12 +131,21 @@ const unit = parseModel('Unit')
 const product = parseModel('Product')
 const recipeLine = parseModel('RecipeLine')
 
-/** Cada campo de `Unit`, con la columna en ingles que le toca (R20). */
+/**
+ * Cada campo de `Unit`, con la columna en ingles que le toca (QC-32 R20, QC-76 R31).
+ *
+ * ACTUALIZADO EL 2026-09-07 POR QC-76 (`specs/QC-76-equivalencia-y-ambito-de-unidades/`):
+ * la lista era de SEIS y sigue siendo EXACTA; ahora son NUEVE. Las tres nuevas las trae la
+ * equivalencia entre unidades y el ambito por empresa (R1, R3, R11).
+ */
 const UNIT_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['name', 'name'],
   ['nameNormalized', 'name_normalized'],
   ['symbol', 'symbol'],
+  ['companyId', 'company_id'],
+  ['baseUnitId', 'unit_id'],
+  ['factor', 'factor'],
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
 ]
@@ -139,6 +171,12 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
     expect(field(unit, 'name').type).toBe('String')
     expect(field(unit, 'symbol').type).toBe('String')
 
+    // REESCRITO EL 2026-09-07 POR QC-76. ANTES afirmaba que la tabla tenia EXACTAMENTE seis
+    // columnas —`id`, `name`, `name_normalized`, `symbol`, `created_at`, `updated_at`—, que
+    // era la forma que dejo QC-32. LO DEROGAN R1 (equivalencia: de que unidad deriva y por
+    // que factor), R3 (el factor, `decimal(14,4)`) y R11 (la empresa duena, opcional): son
+    // tres columnas mas, y `UNIT_COLUMNS` las nombra arriba. Lo que NO cambia es que la
+    // lista sea EXACTA: sigue siendo este caso quien avisa si alguien anade o quita una.
     // La forma completa de la tabla: si alguien anade o quita una columna, este test lo dice.
     expect([...unit.fields].map((candidate) => candidate.name).sort()).toEqual(
       UNIT_COLUMNS.map(([name]) => name).sort(),
@@ -170,13 +208,26 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
     expect(symbol.attributes).not.toMatch(/@map\("name"\)/)
   })
 
-  it('Unit declara name_normalized obligatorio junto al nombre original, con su @@unique', () => {
-    // R4 y R5 en su parte de esquema (decision cerrada 5): el nombre normalizado se PERSISTE
-    // en su propia COLUMNA, al lado del original, y la unicidad es un `@@unique` sobre esa
-    // columna —no una comparacion previa al vuelo, que seria una carrera—. La unica
+  it('Unit declara name_normalized obligatorio junto al nombre original, SIN ningun @@unique', () => {
+    // QC-32 R4 y R5 en su parte de esquema (decision cerrada 5): el nombre normalizado se
+    // PERSISTE en su propia COLUMNA, al lado del original. Eso NO cambia. La unica
     // definicion de la normalizacion la publica el contrato del modulo (`normalizeUnitName`)
-    // y eso lo comprueba `module-contract.test.ts`; el indice unico REAL en el SQL lo
+    // y eso lo comprueba `module-contract.test.ts`; los indices unicos REALES en el SQL los
     // comprueba `unidades-migration.test.ts`.
+    //
+    // REESCRITO EL 2026-09-07 POR QC-76. ANTES este caso exigia
+    // `@@unique([nameNormalized], map: "units_name_normalized_key")` en el modelo: la
+    // unicidad del nombre era GLOBAL (QC-32 R5) y Prisma sabia modelarla. LO DEROGA **R14**
+    // (decision cerrada 14): la unicidad pasa a ser POR AMBITO —dentro de la empresa, y las
+    // de sistema entre ellas—, o sea CUATRO indices unicos PARCIALES que Prisma NO sabe
+    // modelar y que viven escritos a mano en
+    // `db/migrations/20260907190000_units_equivalence_and_scope/migration.sql`.
+    //
+    // POR QUE SE AFIRMA LA AUSENCIA EN POSITIVO, y no se borra el caso: si alguien vuelve a
+    // poner un `@unique`/`@@unique` aqui, el esquema sigue validando, el cliente sigue
+    // compilando y el siguiente `prisma migrate dev` genera un indice unico GLOBAL que rompe
+    // R14 EN SILENCIO —dos empresas dejarian de poder tener cada una su «kilogramo»—. Este
+    // caso es el unico sitio del repo que se entera.
     const nameNormalized = field(unit, 'nameNormalized')
     expect(nameNormalized.type).toBe('String')
     expect(nameNormalized.isOptional).toBe(false)
@@ -187,11 +238,30 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
     expect(nameNormalized.attributes).not.toMatch(/dbgenerated/)
     expect(has(unit, 'name')).toBe(true)
 
-    // El `@@unique` es TOTAL, no parcial: sin `deleted_at` (R8) no hay filas muertas que
-    // liberen el nombre, asi que Prisma si puede modelarlo aqui (a diferencia de `recipes`).
-    expect(unit.body).toMatch(
-      /@@unique\(\[nameNormalized\],\s*map:\s*"units_name_normalized_key"\)/,
-    )
+    // Ningun `@@unique` en el bloque, ni sobre `nameNormalized` ni sobre nada mas (R14).
+    expect(unit.body).not.toMatch(/@@unique\(/)
+    expect(unit.body).not.toMatch(/units_name_normalized_key/)
+    // Ni ningun `@unique` de campo, que es la otra forma de decir lo mismo.
+    for (const candidate of unit.fields) {
+      expect(candidate.attributes, `Unit.${candidate.name} no debe llevar @unique`).not.toMatch(
+        /@unique/,
+      )
+    }
+
+    // Y el modelo lleva ENCIMA el aviso que explica por que no esta (`design.md > 2.1`,
+    // T1 de `tasks.md`): sin el, la ausencia se lee como olvido y alguien la «arregla».
+    const preamble = rawSchema.slice(0, rawSchema.indexOf('model Unit {')).split('\n')
+    const docBlock: string[] = []
+    for (let index = preamble.length - 1; index >= 0; index -= 1) {
+      const line = (preamble[index] ?? '').trim()
+      if (line.length === 0 && docBlock.length === 0) continue
+      if (!line.startsWith('///')) break
+      docBlock.unshift(line)
+    }
+    const unitComment = docBlock.join('\n')
+    expect(unitComment).toMatch(/parcial/i)
+    expect(unitComment).toMatch(/@unique/)
+    expect(unitComment).toMatch(/units_equivalence_and_scope/)
   })
 
   it('name y symbol son TEXT, sin varchar ni limite declarado', () => {
@@ -213,17 +283,37 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
     expect(unit.body).not.toMatch(/length/i)
   })
 
-  it('no hay @unique ni indice sobre symbol', () => {
-    // R7 y pregunta abierta 1, en su forma de AUSENCIA deliberada: la identidad de la unidad
-    // es su NOMBRE. Dos unidades distintas pueden compartir simbolo. Anadir el indice despues
-    // es aditivo y barato (el catalogo son cinco a veinte filas); quitarlo, no.
+  it('el simbolo es unico POR AMBITO en el SQL, y por eso NO lleva @unique en el esquema', () => {
+    // REESCRITO EL 2026-09-07 POR QC-76, Y ESTE CAMBIA DE SENTIDO. ANTES afirmaba que el
+    // simbolo NO era unico en ninguna parte: QC-32 lo dejo deliberadamente sin indice (su R7
+    // y su pregunta abierta 1) porque «la identidad de la unidad es su NOMBRE». LO DEROGA
+    // **R15** (decision cerrada 28, que cierra esa misma pregunta abierta 1): el simbolo SI
+    // es unico ahora, CUANDO EXISTE —sigue siendo opcional— y con el MISMO AMBITO que el
+    // nombre.
+    //
+    // EL MATIZ QUE DEJA ESTE CASO ESCRITO: que sea unico NO significa que aqui haya un
+    // `@unique`. La unicidad son dos indices PARCIALES —`units_company_symbol_unique` y
+    // `units_system_symbol_unique`, los dos con su `WHERE ... "symbol" IS NOT NULL`— que
+    // viven en `migration.sql` y que comprueba `unidades-migration.test.ts`. Un `@unique`
+    // aqui seria unicidad GLOBAL del simbolo: el «kg» de sistema bloquearia el «kg» de una
+    // empresa que si puede tener su propio kilogramo (decision cerrada 28), y ademas dejaria
+    // fuera la mitad «cuando existe». Por eso la ausencia se sigue afirmando en positivo,
+    // pero por una razon distinta de la de QC-32.
     expect(field(unit, 'symbol').attributes).not.toMatch(/@unique/)
     expect(unit.body).not.toMatch(/@@unique\([^)]*symbol/)
     expect(unit.body).not.toMatch(/@@index\([^)]*symbol/)
-    // El unico `@@unique` del modelo es el del nombre normalizado, y no hay ningun `@@index`.
-    expect([...unit.body.matchAll(/@@unique\(/g)]).toHaveLength(1)
-    expect([...unit.body.matchAll(/@@index\(/g)]).toHaveLength(0)
-    // Ningun otro campo lleva `@unique` suelto: la identidad no se reparte.
+
+    // NINGUN `@@unique` en el modelo (R14, R15). Los CUATRO unicos son parciales y viven en
+    // el SQL; ver el caso del nombre normalizado, que explica por que volver a poner uno
+    // aqui rompe el ambito en silencio.
+    expect([...unit.body.matchAll(/@@unique\(/g)]).toHaveLength(0)
+    // Y exactamente los DOS `@@index` de las FK que anade QC-76 (`design.md > 2.1`): el lado
+    // hijo de una FK no se indexa solo, y por ahi pasa la verificacion de los dos RESTRICT.
+    // NO son unicos: `@@index`, no `@@unique`.
+    expect([...unit.body.matchAll(/@@index\(/g)]).toHaveLength(2)
+    expect(unit.body).toMatch(/@@index\(\[companyId\],\s*map:\s*"units_company_id_idx"\)/)
+    expect(unit.body).toMatch(/@@index\(\[baseUnitId\],\s*map:\s*"units_unit_id_idx"\)/)
+    // Ningun campo lleva `@unique` suelto: la identidad no se reparte, y ya no es global.
     for (const candidate of unit.fields) {
       expect(candidate.attributes, `Unit.${candidate.name} no debe llevar @unique`).not.toMatch(
         /@unique/,
@@ -232,7 +322,13 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
   })
 
   it('Unit no declara deletedAt', () => {
-    // R8 y decision cerrada 11, afirmado en positivo para que nadie anada la columna «por
+    // REAFIRMADO EL 2026-09-07 POR QC-76 **R32** (decision cerrada 21), que no deroga nada:
+    // dice lo mismo que QC-32 y por una razon MAS. Ahora `units` tiene ademas
+    // `units_unit_id_fkey` con `ON DELETE RESTRICT`, que es la unica garantia real de que no
+    // se borra una unidad de la que otra deriva (R8): un `deleted_at` la neutralizaria en
+    // silencio, porque un borrado logico es un UPDATE y ninguna FK reacciona a un UPDATE.
+    //
+    // QC-32 R8 y decision cerrada 11, afirmado en positivo para que nadie anada la columna «por
     // simetria» con `Product` o con `Recipe`: el borrado logico es un UPDATE y NINGUNA FK
     // reacciona a un UPDATE, asi que `deleted_at` neutralizaria en silencio el
     // `ON DELETE RESTRICT` que es la unica garantia real de R13.
@@ -264,15 +360,86 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
     expect(updatedAt.attributes).toContain('@db.Timestamptz(6)')
   })
 
-  it('Unit no declara factor, base ni equivalencia', () => {
-    // R14 y decision cerrada 12: NO hay conversion entre unidades y no la va a haber. La
-    // unidad es puramente anotativa. Una columna de factor o de unidad base invitaria a
-    // derivar cantidades, que es exactamente lo que este ERP no hace.
+  it('Unit declara companyId, baseUnitId y factor OPCIONALES, y ninguna bandera de sistema', () => {
+    // REESCRITO EL 2026-09-07 POR QC-76, Y ESTE TAMBIEN CAMBIA DE SENTIDO. ANTES afirmaba
+    // que `Unit` NO declaraba «factor, base ni equivalencia» y que ninguna columna era
+    // numerica: QC-32 (su R14 y su decision cerrada 12) fijo que la unidad era PURAMENTE
+    // ANOTATIVA y que no habria conversion «y no la va a haber». LO DEROGAN **R1** (cada
+    // unidad puede declarar de que unidad deriva y por que factor, los dos OPCIONALES),
+    // **R3** (el factor, decimal exacto de cuatro decimales) y **R11** (la empresa duena, en
+    // columna opcional). La conversion la calcula el dominio a partir de dos descriptores
+    // (`design.md > 5`), no navegando: por eso las dos referencias son escalares.
+    //
+    // Lo que este caso conserva de QC-32 es la MITAD NEGATIVA, y sigue mandando: no hay
+    // ningun modelo de conversion aparte, y —esto lo suma QC-76— no hay ninguna bandera de
+    // sistema.
+
+    // `companyId`: la empresa duena. OPCIONAL, y la AUSENCIA DE VALOR —y nada mas— significa
+    // «unidad de sistema» (R11).
+    const companyId = field(unit, 'companyId')
+    expect(companyId.type).toBe('String')
+    expect(companyId.isOptional).toBe(true)
+    expect(companyId.attributes).toContain('@map("company_id")')
+    expect(companyId.attributes).toContain('@db.Uuid')
+    expect(companyId.attributes).not.toMatch(/@default\(/)
+    // Escalar SIN `@relation` (`design.md > 2.1`): `Company` es de `identity`, asi que
+    // ninguna consulta puede atravesar de una unidad a una empresa con un `include`.
+    expect(companyId.attributes).not.toMatch(/@relation/)
+
+    // `baseUnitId`: de que unidad deriva. OPCIONAL (R1), y mapea a `unit_id`, que es el
+    // nombre que fija la decision cerrada 2. Tambien escalar, sin auto-relacion.
+    const baseUnitId = field(unit, 'baseUnitId')
+    expect(baseUnitId.type).toBe('String')
+    expect(baseUnitId.isOptional).toBe(true)
+    expect(baseUnitId.attributes).toContain('@map("unit_id")')
+    expect(baseUnitId.attributes).toContain('@db.Uuid')
+    expect(baseUnitId.attributes).not.toMatch(/@default\(/)
+    expect(baseUnitId.attributes).not.toMatch(/@relation/)
+
+    // `factor`: cuantas unidades de la apuntada caben en una de esta (R3). DECIMAL EXACTO de
+    // cuatro decimales, NUNCA coma flotante: un `Float` aqui haria que 0.1 no fuera 0.1.
+    const factor = field(unit, 'factor')
+    expect(factor.type).toBe('Decimal')
+    expect(factor.isOptional).toBe(true)
+    expect(factor.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
+    expect(factor.attributes).not.toMatch(/@db\.(Float|Double|Real)/)
+    expect(factor.attributes).not.toMatch(/@default\(/)
+    // No lleva `@map`: la columna ya se llama `factor` (R31, ingles).
+    expect(factor.attributes).not.toMatch(/@map\("/)
+
+    // «Juntos o ninguno» (R2) NO se declara aqui y no puede: lo garantiza
+    // `units_derivation_pair_check` en el SQL, y lo prueba
+    // `tests/integration/unidades/unidades-constraints.int.test.ts`.
+
+    // NINGUNA columna ni bandera de sistema (R12, decision cerrada 11). «De sistema»
+    // significa EXACTAMENTE «sin company_id»: dos campos que dicen casi lo mismo acaban
+    // contradiciendose y entonces nadie sabe interpretar la fila. La peticion original SI
+    // pedia un `system` con default `false`; el humano lo rechazo por escrito.
     for (const forbidden of [
-      'factor',
-      'base',
-      'baseUnit',
-      'baseUnitId',
+      'system',
+      'isSystem',
+      'sistema',
+      'esSistema',
+      'global',
+      'isGlobal',
+      'shared',
+      'isShared',
+      'builtIn',
+      'isBuiltIn',
+      'scope',
+      'ownerType',
+    ]) {
+      expect(has(unit, forbidden), `Unit.${forbidden} no debe existir`).toBe(false)
+    }
+    expect(unit.body).not.toMatch(/\bsystem\b/i)
+    // Ningun booleano en la tabla: cualquier bandera nueva tendria que pasar por aqui.
+    for (const candidate of unit.fields) {
+      expect(candidate.type, `Unit.${candidate.name} no puede ser Boolean`).not.toBe('Boolean')
+    }
+
+    // La conversion NO se guarda en ninguna columna (R23) ni se modela como entidad aparte:
+    // la equivalencia son DOS columnas en la propia unidad y nada mas.
+    for (const forbidden of [
       'conversion',
       'conversionFactor',
       'ratio',
@@ -283,13 +450,6 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
     ]) {
       expect(has(unit, forbidden), `Unit.${forbidden} no debe existir`).toBe(false)
     }
-    // Ninguna columna numerica: las seis son texto, uuid y marcas de tiempo.
-    for (const candidate of unit.fields) {
-      for (const numerico of ['Decimal', 'Float', 'Int', 'BigInt'] as const) {
-        expect(candidate.type, `Unit.${candidate.name} no puede ser ${numerico}`).not.toBe(numerico)
-      }
-    }
-    // Y ningun modelo de conversion en todo el esquema.
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -404,7 +564,15 @@ describe('db/schema.prisma — la unidad del producto y la de la linea de receta
   })
 
   it('la tabla y sus columnas mapean a snake_case en ingles', () => {
-    // R20 y decision cerrada 16: tabla, columnas e indices en ingles y `snake_case`.
+    // QC-32 R20 y decision cerrada 16, que QC-76 **R31** reafirma para todo lo que crea esta
+    // feature: tabla, columnas e indices en ingles y `snake_case`.
+    //
+    // REESCRITO EL 2026-09-07 POR QC-76: la lista de indices esperados empezaba por
+    // `units_name_normalized_key`, el `@@unique` GLOBAL de QC-32, y se leia de los
+    // `@@unique(... map:)` del modelo. Ese indice ya no esta —lo DEROGA R14, ver el caso del
+    // nombre normalizado— y en su lugar `Unit` declara DOS `@@index` de FK. Los cuatro unicos
+    // parciales que lo sustituyen NO se pueden leer desde aqui: viven en el SQL, y su idioma
+    // lo vigila `unidades-migration.test.ts`.
     expect(unit.body).toContain('@@map("units")')
 
     const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
@@ -420,16 +588,18 @@ describe('db/schema.prisma — la unidad del producto y la de la linea de receta
       expect(candidate.attributes, `falta @map en Unit.${candidate.name}`).toMatch(/@map\("/)
     }
 
-    // El indice unico y los dos indices de FK que crea esta feature, tambien en ingles.
+    // Los indices que el modelo declara, tambien en ingles. Lista EXACTA: si alguien anade
+    // uno con nombre en espanol, o vuelve a colar un `@@unique`, este caso lo dice.
     const indexNames = [
-      ...unit.body.matchAll(/@@unique\([^)]*map:\s*"([^"]+)"/g),
+      ...unit.body.matchAll(/@@(?:unique|index)\([^)]*map:\s*"([^"]+)"/g),
       ...product.body.matchAll(/@@index\(\[unitId\][^)]*map:\s*"([^"]+)"/g),
       ...recipeLine.body.matchAll(/@@index\(\[unitId\][^)]*map:\s*"([^"]+)"/g),
     ]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
     expect(indexNames).toEqual([
-      'units_name_normalized_key',
+      'units_company_id_idx',
+      'units_unit_id_idx',
       'products_unit_id_idx',
       'recipe_lines_unit_id_idx',
     ])
