@@ -121,13 +121,14 @@ describe('guardia — ningun permiso declarado se queda sin rol (R19, R21)', () 
 
   // Anclas contra el verde por vacuidad: sin ellas, un catalogo vaciado por accidente dejaria los
   // dos casos de arriba en verde sin haber comparado nada.
-  it('el catalogo real no esta vacio y tiene exactamente diez permisos', () => {
+  it('el catalogo real no esta vacio y tiene exactamente once permisos', () => {
     expect(PERMISSIONS.length).toBeGreaterThan(0)
     expect(
       PERMISSIONS.length,
-      'El catalogo es cerrado y tiene diez entradas (R2). Si esta ficha lo cambia a proposito, ' +
-        'actualiza este numero; si no, alguien borro o duplico una fila de PERMISSIONS.',
-    ).toBe(10)
+      'El catalogo es cerrado y tiene once entradas (QC-74 R2, enmendado por QC-38). Si esta ' +
+        'ficha lo cambia a proposito, actualiza este numero; si no, alguien borro o duplico una ' +
+        'fila de PERMISSIONS.',
+    ).toBe(11)
 
     const codigos = PERMISSIONS.map((entry) => entry.code)
     expect(new Set(codigos).size, `Hay codigos repetidos en PERMISSIONS: ${codigos.join(', ')}`).toBe(

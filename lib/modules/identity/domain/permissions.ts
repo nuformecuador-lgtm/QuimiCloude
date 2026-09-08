@@ -5,11 +5,17 @@
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from './roles';
 
 /**
- * El catalogo cerrado: diez permisos, ni uno mas ni uno menos (R2). El codigo tiene la forma
- * `<modulo>.<accion>`, con modulo y accion en español y en minusculas, siguiendo los nombres de
- * modulo del repositorio (R1). Un modulo con escritura declara `consultar` y `modificar`, y
- * `modificar` cubre tambien el borrado (R3); un modulo sin escritura declara solo `consultar`
- * (R4: `dashboard` y `unidades`). NINGUNA entrada lleva campo de empresa (R6).
+ * El catalogo cerrado: once permisos, ni uno mas ni uno menos (QC-74 R2, enmendado por QC-38). El
+ * codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en español y en minusculas,
+ * siguiendo los nombres de modulo del repositorio (R1). Un modulo con escritura declara `consultar`
+ * y `modificar`, y `modificar` cubre tambien el borrado (R3); un modulo sin escritura declara solo
+ * `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva campo de empresa (R6).
+ *
+ * **Esto enmienda QC-74 R2** («exactamente diez permisos, ni uno mas ni uno menos»). QC-74 R4 dejo
+ * a `unidades` sin escritura justificandolo con «no tiene escritura»; QC-38 es justamente la ficha
+ * que se la da, asi que esa premisa dejo de ser cierta y el catalogo gana `unidades.modificar`
+ * (QC-38 decision cerrada 23, habilitada por QC-76 decision cerrada 24: «si el permiso debe
+ * cambiar, lo decide QC-38»).
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -49,6 +55,12 @@ export const PERMISSIONS = [
     module: 'unidades',
     action: 'consultar',
     description: 'Consultar las unidades de medida.',
+  },
+  {
+    code: 'unidades.modificar',
+    module: 'unidades',
+    action: 'modificar',
+    description: 'Crear, editar y borrar unidades de medida.',
   },
   {
     code: 'proveedores.consultar',
@@ -97,6 +109,7 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'recetas.consultar',
     'recetas.modificar',
     'unidades.consultar',
+    'unidades.modificar',
     'proveedores.consultar',
     'proveedores.modificar',
     'pedidos.consultar',
