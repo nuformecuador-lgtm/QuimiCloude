@@ -107,6 +107,29 @@ run_if() {
   ok "$1 paso"
 }
 
+# 6.b El `.env`, ANTES de los tests. La integracion se conecta a Postgres con `DATABASE_URL` y
+# nadie la carga por ella: `prisma.config.ts` solo la carga para el CLI de Prisma, y Vitest no lee
+# `.env` en este proyecto. Sin esto el veredicto del gate depende del shell que lo lance: el
+# 2026-09-08 la MISMA rama dio 23 archivos y 32 tests en rojo desde un shell limpio, y 1 archivo y
+# 2 tests con el `.env` cargado. Un gate cuyo resultado cambia con quien lo invoca no es una
+# verificacion (`docs/verification.md`).
+#
+# Si `DATABASE_URL` YA viene del entorno, manda ella y el archivo no se toca: quien apunta a otra
+# base a proposito no debe verse pisado por el `.env` del repo.
+#
+# Ojo: la comprobacion de que el `.env` existe vive mas abajo, DESPUES de los tests. Se queda ahi
+# -es un aviso de inicializacion, no una precondicion- pero por eso esta carga no puede colgar de
+# ella.
+if [ -n "${DATABASE_URL:-}" ]; then
+  ok "DATABASE_URL viene del entorno; no se carga el .env"
+elif [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+  ok ".env cargado en el entorno del gate"
+fi
+
 if [ -f package.json ]; then
   run_if typecheck
   run_if lint
