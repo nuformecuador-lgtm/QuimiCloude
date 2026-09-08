@@ -14,6 +14,7 @@
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **17/17 tasks, `d1e966d`**. T11: cinco `./init.sh` completos seguidos, **las cinco exit 0** (234/234 archivos, 2839 casos). R9 y R13 reformulados conservando la redaccion anterior. `reviewer` corriendo (F2.2). Base propia `QuimiCloude_QC58` montada — el worktree venia sin `.env` |
 | QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | in_progress | feature/QC-65-estado-de-cuenta-de-usuario | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. Rama sincronizada con `origin/dev` ANTES de implementar, para no chocar con los tests del seed que QC-38 acababa de tocar. `implementer` en curso (F2.1) |
+| QC-39 | pantalla-de-unidades | Catálogos | frontend | pending | feature/QC-39-pantalla-de-unidades | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`, con el merge del #47 dentro), `complexity: medium` evaluada y escrita en Jira. **Pendiente F1.2**: la ficha arrastra preguntas abiertas, así que toca `/afinar-feature` antes del `spec_author` |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -239,6 +240,35 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-39 — arranque del 2026-09-08 (F1.0)
+
+Arrancada por decisión humana explícita («arranca 39»). Worktree montado desde `origin/dev`
+(`516e9c0`), que **ya trae el merge del PR #47**: la ficha nació creyéndose bloqueada por QC-38 y no
+lo está —el merge entró mientras se montaba—. `zone: frontend` venía del board; **`complexity`
+evaluada aquí como `medium`** y escrita como label en Jira: son varias capas y varios archivos
+(página, tabla, panel lateral, diálogo de borrado, más el paso de parámetros por la Server Action),
+con condiciones de verdad —unidad de sistema vs. de empresa— y no un archivo suelto.
+
+**Lo que QC-45 le deja resuelto y no se vuelve a decidir**: la familia de pantallas de Configuración
+(tabla compartida de QC-55, búsqueda y orden de QC-57, panel lateral, E2E ligera), la sección
+`CONFIGURACION` del menú ya creada con su ítem, y **la columna de acciones de fila** —la pregunta
+abierta 4 de QC-55—, que se declara como columna normal con `pinnable: false`.
+
+**El encargo que QC-38 le dejó escrito en el código, y es el hallazgo de este arranque.**
+`listUnitsAction()` no acepta argumentos: pide el catálogo entero y su comentario dice literalmente
+que **«quien abra la puerta al contrato aquí es QC-39»**, porque mientras no hubiera pantalla que
+emitiera orden, filtro o página, exponerlo era un parámetro que nadie mandaba. El caso de uso
+`listUnits(input, actor)` **ya** admite la consulta y devuelve `readonly UnitRef[] | Page<UnitRef>`,
+así que el trabajo es el paso de parámetros por el adaptador, no lógica nueva. **Ojo al alcance**:
+eso toca `lib/modules/unidades/adapters/driving/unit-actions.ts`, que no es UI. La ficha sigue siendo
+`frontend`, pero conviene que el spec lo declare en vez de que aparezca a mitad de la implementación.
+
+**Preguntas abiertas que la ficha arrastra y que `/afinar-feature` debería cerrar antes del spec:**
+una ruta o dos, formulario en modal o en página, si hace falta E2E, **qué permiso corta la pantalla**
+(el board dice «depende del permiso que cierre el CRUD de unidades», y QC-45 sentó el precedente de
+declarar `inventario.modificar` con su motivo escrito), **cómo se pinta la equivalencia**
+(«1 kg = 1000 gr») y **cómo se distingue visualmente una unidad de sistema** cuando no ofrece editar
+ni borrar.
 ### QC-65 — acotada con `/afinar-feature` (2026-09-08)
 
 Alcance, 12 decisiones cerradas y cero preguntas abiertas en
