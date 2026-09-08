@@ -320,3 +320,70 @@ leyera `accountStatus` puso en rojo la lista cerrada de R19. `pnpm typecheck`, `
 
 **Solo ese archivo.** `tests/unit/configuracion-ui/data-table-intacta.test.ts` de QC-45 lleva la
 misma bomba y **NO se toco**: es de otra ficha y queda anotada como deuda del arnes.
+
+## Segundo ajuste tras el gate completo — dos guardias ajenas que median de mas
+
+El `./init.sh` completo del leader saco **2 archivos fuera del baseline, los dos disparados por
+esta ficha**. Los dos se **retensaron, no se relajaron**, con el mismo criterio de las otras dos.
+
+### 1. `tests/unit/unidades/unidades-convenciones.test.ts` (R32 de QC-38, ya en `dev`)
+
+Caian dos casos: *`db/schema.prisma` no cambia respecto de `origin/dev`* y *no se anade ninguna
+carpeta nueva bajo `db/migrations/`*. Con QC-38 ya mergeada, su guardia de alcance **mordia a
+cualquier rama que tocara `db/`**, tuviera o no que ver con unidades — el mismo patron que
+`tests/baseline-rojos.json` documenta para la R44 de QC-26.
+
+Se aplico **la cura que ya existe en el repo** (commit `7cd478b`, «el centinela de QC-75 solo
+muerde en su rama»), leida antes de escribir para no inventar una tercera forma: una constante
+`ARCHIVO_CENTRAL`, un `esLaRamaDeQC38`, y `ctx.skip(...)` con mensaje que dice explicitamente que
+**este caso NO ha comprobado nada**. Fuera de la rama de QC-38: **mudo, nunca verde**. Dentro:
+vigila igual. Si el rango git no resuelve, sigue siendo **rojo**.
+
+**El centinela elegido es `lib/modules/unidades/adapters/driving/unit-actions.ts`**, y la eleccion
+importa: ahi viven las tres Server Actions de escritura de QC-38, o sea la ficha entera, y **su
+propia guardia lo nombra** (R27 y R31), asi que un rename lo rompe ruidosamente en vez de dejarlo
+mudo en silencio. Se **descartaron** `db/schema.prisma` y `db/migrations/**` por lo obvio —es
+justo lo que las otras fichas tambien tocan, no distingue nada— y el puerto interno, porque
+ningun requisito lo nombra y seria peor ancla.
+
+### 2. `tests/unit/pedidos/schema/pedidos-schema.test.ts` (QC-33)
+
+`expect(enumNames).toEqual(['OrderStatus','OrderPriority'])` afirmaba sobre **la lista GLOBAL de
+enums del esquema**, no sobre los de pedidos: `UserAccountStatus` la rompio, y la habria roto el
+siguiente enum legitimo de cualquier modulo. **No se anadio `UserAccountStatus` a la lista** —eso
+dejaba la guardia igual de fragil y encima mintiendo sobre lo que mide—: se **acoto el sujeto**.
+
+Ahora un enum es de pedidos si **algun campo de un modelo cuyo dueno es `/// @module pedidos` lo
+declara como TIPO**, derivado en dos pasos del esquema real. Es defendible porque usa la misma
+fuente de verdad que ya obliga `docs/architecture.md` —todo modelo lleva su `@module`— y que ya
+usa el caso de R31 de ese mismo archivo: **no hay lista que mantener**. Lo que no se perdio:
+`OrderStatus` sigue siendo exactamente `PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO` y
+`OrderPriority` exactamente `BAJA, MEDIA, ALTA, CRITICA`, las dos con igualdad **ordenada**
+—el orden de la prioridad es una escala y significa algo—. Dos anclas anti-vacuidad nuevas: que
+el parseo encuentre algun enum, y que algun modelo declare `@module pedidos`.
+
+### Demostrado corriendo, no razonando
+
+- **(a)** En esta rama: `2 passed | 38 passed | 2 skipped (40)`. Los dos skipped son exactamente
+  los de R32, con su motivo impreso. **Ninguno verde.**
+- **(b)** La guardia de QC-38 **sigue vigilando en su rama**: con un commit temporal que tocaba
+  `unit-actions.ts`, los dos casos se pusieron **rojos** nombrando `db/schema.prisma` y las dos
+  rutas de la migracion. Revertido; `HEAD` de vuelta en `9485fb1`.
+- **(c)** La de pedidos **sigue mordiendo**, con tres mutaciones del esquema, las tres rojas y las
+  tres revertidas: reordenar `OrderPriority`, meter un tercer enum **de pedidos** tipando
+  `Order.priority`, y anadir un quinto valor a `OrderStatus`. `db/schema.prisma` quedo **byte a
+  byte igual** (mismo blob antes y despues).
+- `pnpm typecheck`, `pnpm lint` y `pnpm exec vitest related --run` sobre los dos archivos: verde.
+  Cero `toContain` nuevos en el diff; la unica mencion de `UserAccountStatus` en el test de
+  pedidos es un **comentario** que explica el porque, no una entrada en ninguna lista.
+
+### Deuda ajena encontrada de paso — NO tocada, para el leader
+
+`archivosCambiadosDesdeDev()` de `unidades-convenciones.test.ts` (~lineas 110-115) **mutila las
+rutas de los archivos modificados sin commitear**: hace `linea.trim()` y despues `linea.slice(3)`.
+Como `git status --porcelain` devuelve `" M ruta"`, el `trim()` se come el espacio inicial y el
+`slice(3)` recorta tres caracteres de mas: `"M ruta"` acaba como `"ta"`. Con los no-rastreados
+(`"?? ruta"`) si funciona. **Efecto:** la parte «morder antes de commitear» de R32/R34 no ve las
+modificaciones de archivos ya rastreados. Es un defecto **preexistente de QC-38**, se descubrio
+al montar la simulacion (b), y **no se arreglo a proposito**: es cambio de comportamiento de otra
+ficha y no estaba en el mandato. Queda anotado para que el leader decida.

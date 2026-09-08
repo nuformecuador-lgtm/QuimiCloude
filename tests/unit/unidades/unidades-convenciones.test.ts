@@ -274,10 +274,41 @@ describe('R23 — el catalogo de unidades sigue sin borrado logico', () => {
 });
 
 describe('R32 — esta ficha no toca db/schema.prisma ni anade ninguna migracion', () => {
+  // ESTA GUARDIA SOLO APLICA EN LA RAMA DE QC-38. R32 es una regla sobre el ALCANCE de ESTA
+  // ficha -«el CRUD de unidades se hace sin tocar la base»-, no una prohibicion general de que
+  // nadie en el repo toque `db/`. El sujeto de la medicion es el diff `origin/dev...HEAD`, que en
+  // otra rama es el diff de OTRA feature: ahi los dos casos de abajo no miden a QC-38, miden a un
+  // desconocido, y el veredicto no significa nada.
+  //
+  // Antes esto no se distinguia, y con QC-38 ya mergeada en `dev` el efecto fue que R32 mordia a
+  // cualquier rama que tocara `db/` -visto desde QC-65 el 2026-09-08, que anade una columna de
+  // estado de cuenta y su migracion con permiso del humano-: dos casos rojos por trabajo ajeno y
+  // legitimo. Como el gate completo es obligatorio antes de cada PR (regla 5 de `CLAUDE.md`), un
+  // centinela sin dueno bloquea el cierre de todo el repo.
+  //
+  // El centinela es `unit-actions.ts`, el archivo donde viven las tres Server Actions de
+  // escritura de QC-38: es la superficie que R27 y R31 nombran, ninguna rama puede implementar
+  // esta ficha sin tocarlo, y ninguna otra ficha tiene motivo para hacerlo. No sirve de centinela
+  // nada de `db/` -esquema o migracion-, que es justo lo que las otras fichas tambien tocan.
+  //
+  // Fuera de la rama de QC-38 estos dos casos quedan MUDOS (`skipped`), nunca verdes: un verde
+  // diria «comprobado» sin haber mirado nada, que es el anti-patron de la «validacion opcional»
+  // de `docs/verification.md`. Dentro de su rama vigilan exactamente igual que antes.
+  const ARCHIVO_CENTRAL = 'lib/modules/unidades/adapters/driving/unit-actions.ts';
+  const cambiadosDeLaRama = archivosCambiadosDesdeDev();
+  const esLaRamaDeQC38 = cambiadosDeLaRama !== null && cambiadosDeLaRama.includes(ARCHIVO_CENTRAL);
+
   it('db/schema.prisma no cambia respecto de origin/dev', (ctx) => {
     const cambiados = archivosCambiadosDesdeDev();
     if (cambiados === null) {
       ctx.skip('el rango git origin/dev...HEAD no esta disponible: este caso no comprobo nada');
+      return;
+    }
+    if (!esLaRamaDeQC38) {
+      ctx.skip(
+        'el rango trae archivos pero ninguno es `' + ARCHIVO_CENTRAL + '`: esta NO es la rama de ' +
+          'QC-38, asi que R32 no le aplica y este caso NO ha comprobado nada.',
+      );
       return;
     }
 
@@ -290,6 +321,13 @@ describe('R32 — esta ficha no toca db/schema.prisma ni anade ninguna migracion
     const cambiados = archivosCambiadosDesdeDev();
     if (cambiados === null) {
       ctx.skip('el rango git origin/dev...HEAD no esta disponible: este caso no comprobo nada');
+      return;
+    }
+    if (!esLaRamaDeQC38) {
+      ctx.skip(
+        'el rango trae archivos pero ninguno es `' + ARCHIVO_CENTRAL + '`: esta NO es la rama de ' +
+          'QC-38, asi que R32 no le aplica y este caso NO ha comprobado nada.',
+      );
       return;
     }
 
