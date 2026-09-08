@@ -16,6 +16,9 @@
 | QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | in_progress | feature/QC-65-estado-de-cuenta-de-usuario | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. Rama sincronizada con `origin/dev` ANTES de implementar, para no chocar con los tests del seed que QC-38 acababa de tocar. `implementer` en curso (F2.1) |
 | QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **Spec aprobado por el humano el 2026-09-08** (F1.4). 50 requisitos EARS, 35 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1). **Conflicto acotado con QC-58**: la tarea que amplía `app-sidebar.test.tsx` y `private-layout-menu.test.tsx` va **al final**, cuando QC-58 esté `done` |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`), `complexity: medium`. **Pendiente F1.2**: la ficha trae una pregunta abierta escrita en el board y la partición `fullstack` sin decidir, así que toca `/afinar-feature` antes del `spec_author` |
+| QC-80 | unidad-desde-la-presentacion | Inventario | fullstack | pending | feature/QC-80-unidad-desde-la-presentacion | **Nacida del chat el 2026-09-08** y creada en el board (QC-18). `complexity: medium`. **Pendiente F1.0 y F1.2**: sin worktree todavia, y trae una pregunta abierta -con que unidad se rellenan las 114 presentaciones existentes-, asi que toca `/afinar-feature` antes del `spec_author` |
+| QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **BLOQUEADA**: la unicidad de `lote` por empresa necesita `products.company_id`, que hoy no existe y que introduce QC-49. No arranca hasta que QC-49 este `done` |
+| QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: trae CINCO preguntas abiertas -entre ellas que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -240,6 +243,91 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+
+### QC-80 y QC-81 — dos fichas nuevas nacidas del chat, y una regla saltada (2026-09-08)
+
+**De donde vienen.** El humano pidio en el chat, en un solo mensaje: quitar `unit_id` de
+`products`, anadir `purchase_date` y `lote`, tomar la unidad desde `presentationId` y hacer ese
+campo obligatorio. No es una ficha: son dos, y una de ellas depende de QC-49.
+
+**Lo que se comprobo contra la base ANTES de decidir nada** (y que cambio el alcance):
+
+- `products.unit_id` esta VACIA en las 6 filas vivas. Quitarla no pierde ningun dato y no
+  necesita backfill. Ese era el riesgo grande y no existe.
+- `presentations` NO tiene columna de unidad: no es «mover» la unidad, es CREARLA alli.
+- La derivacion que el formulario de recetas necesita YA existe y es correcta: litro->mililitro y
+  kilogramo->gramo, las dos con factor 1000. Lo que faltaba no era el dato, era que saliera del
+  modulo.
+- `presentationId` YA es obligatorio: `NOT NULL` en base y `z.string().uuid()` -sin `nullish`- en
+  `createProductSchema`. La cuarta peticion del humano ya estaba hecha; se le dijo y la omitio.
+- **`products` NO tiene `company_id`.** Solo lo tienen `users` y `units`. La constraint unica
+  `(company_id, lote)` que el humano pidio NO SE PUEDE CONSTRUIR hoy, y esa columna es
+  exactamente QC-49, que ya existe como ficha `pending`. Por eso QC-81 nace bloqueada por QC-49
+  en el board y en el JSON, en vez de hacer QC-49 de contrabando dentro de otra ficha.
+
+**Particion.** QC-80 (`fullstack`) es la unidad en la presentacion; QC-81 (`backend`) es el lote
+y la fecha de compra. Se parten porque sus dependencias son distintas: QC-80 no depende de nada y
+QC-81 no puede cerrarse antes que QC-49. Juntas obligarian a esperar a QC-49 para entregar algo
+que no la necesita.
+
+**Preguntas abiertas, escritas y NO rellenadas con un supuesto** (regla 6): con que unidad se
+rellenan las 114 presentaciones existentes en el backfill de QC-80, y que forma exacta tiene el
+correlativo de `lote` -entero formateado, prefijo, serie por empresa o global- mas el valor de las
+filas ya existentes en QC-81. Las dos columnas acaban `NOT NULL`, asi que el backfill necesita un
+valor DECIDIDO. Toca `/afinar-feature` en las dos antes de F1.2.
+
+### QC-82 — el registro de ejecucion, que QC-63 habia dejado fuera (2026-09-08)
+
+**De donde viene.** El humano pidio en el chat una tabla de logs con `time`, `order_id`,
+`clicked_by`, `step` (jsonb) y una accion de cuatro valores (`back`, `next`, `start`, `finish`).
+
+**No es una idea suelta: es un hueco YA DECLARADO.** La description de QC-63 dice literalmente
+que «registrar quien marco que y cuando sigue fuera de alcance», y los cuatro valores de la
+accion son exactamente los controles que QC-62 ya construyo -Anterior, Siguiente, Finalizar- mas
+el arranque. Por eso la ficha nace enlazada a QC-63 y con esa frase citada dentro.
+
+**Lo que ya esta en su sitio** (comprobado en `db/schema.prisma`): `orders` existe con su modelo
+completo (QC-33/QC-34) y `users` tambien, asi que `order_id` y `clicked_by` tienen destino real;
+los pasos de receta ya son documentos jsonb desde QC-62/QC-64, asi que `step` no inventa un
+formato nuevo.
+
+**Por que NO depende de QC-63.** Es un modelo, y en este repo los modelos van antes que sus
+pantallas (`QC-24 -> QC-25 -> QC-26`). Ademas hay precedente exacto de entregar algo publicado y
+sin consumidor: `convertQuantity` de QC-76, que vive con una guardia que sostiene que nadie la
+llama todavia. QC-82 entrega el almacenamiento y la escritura; el enganche a la pantalla del
+operador es de QC-63.
+
+**Cinco preguntas abiertas, escritas y NO rellenadas con un supuesto** (regla 6): que se guarda
+en el paso -el documento entero, que se duplica en cada clic, o su posicion, que deja de
+significar lo mismo si se edita la receta-; que es «el tiempo» -el instante del clic o el rato
+que se estuvo en el paso, que son dos columnas distintas-; si `order_id` es obligatorio -QC-63
+permite abrir una receta por su propia direccion, sin pedido-; cuanto se conserva; y si se acota
+por empresa -`orders` tampoco tiene empresa: eso es QC-60-.
+
+### DEUDA: la feature del selector de unidad por grupo se hizo sin ficha y sobre `dev`
+
+El 2026-09-08, antes de estas dos fichas, el humano pidio en el chat el cambio del formulario de
+recetas -cantidad a `type="number"`, unidades acotadas al grupo del ingrediente, preseleccion de
+la mas pequena, campo deshabilitado sin ingrediente- y, preguntado explicitamente, eligio
+**«directo, sin spec»** y luego **«commitear en dev tal cual»**. Esta en `6cb4ae6`.
+
+Lo que eso salto, dicho sin adornos:
+
+1. **Sin ficha y sin SDD**, con `"sdd": true` siendo la norma del repo. No hay `requirements.md`
+   ni trazabilidad `R<n>`->test para ese cambio; los 25 casos nuevos existen y pasan, pero
+   ninguno esta mapeado a un requisito numerado.
+2. **Sin worktree y sobre `dev` en el arbol principal**, contra `AGENTS.md > Worktrees` («nadie
+   hace checkout en el»). Sin rama de feature y sin PR.
+3. **Cambio de contrato de modulo sin spec**: `UnitRef` gano `baseUnitId` y `factor`. Es el tipo
+   que `unidades` publica hacia fuera y lo consumen `recetas`, `inventario` y `proveedores`.
+4. **Se retiro una guardia de fuente** -la que vetaba el literal `type="number"` en la ruta de
+   recetas- que sostenia una decision cerrada (R29). Se retiro con su motivo escrito en el test y
+   el fondo de R29 sigue afirmado, pero una guardia retirada sin ficha es deuda.
+
+Ninguna de las cuatro se descubrio despues: las cuatro se le dijeron al humano en el momento y
+las aprobo. Queda anotado aqui para que no se lea manana como un descuido, y para que quien toque
+`UnitRef` o `unit-group.ts` sepa que no hay spec detras que consultar.
+
 
 ### QC-39 — F2.0: el conflicto con QC-58, medido y acotado (2026-09-08)
 

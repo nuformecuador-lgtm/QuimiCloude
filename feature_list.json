@@ -1140,6 +1140,53 @@
         "QC-66"
       ],
       "spec_path": "specs/QC-79-alta-sin-contrasena-y-enlace"
+    },
+    {
+      "key": "QC-80",
+      "id": 80,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "unidad-desde-la-presentacion",
+      "description": "La unidad deja de declararse producto a producto y pasa a ser una propiedad de la presentacion: toda presentacion tiene una unidad, obligatoria, y cada producto hereda la de la suya. El producto ya no guarda unidad propia.\n\nQuien da de alta o edita una presentacion elige su unidad y no puede dejarla vacia. Las presentaciones que ya existen quedan todas con una unidad asignada, sin que nadie tenga que repasarlas a mano.\n\nCon esto, el selector de unidad de una linea de receta empieza a acotarse de verdad al grupo del ingrediente: hoy ningun producto declara unidad, asi que ofrece siempre el catalogo entero.\n\nDECISIONES YA CERRADAS CON EL HUMANO EL 2026-09-08:\n- La columna de unidad del producto se elimina. Hoy esta vacia en todas las filas vivas (6 de 6 con unit_id NULL, comprobado contra la base), asi que no se pierde ningun dato ni hace falta rescatarlo.\n- La unidad de la presentacion es obligatoria.\n- La presentacion ya era obligatoria en el producto -NOT NULL en base y z.string().uuid() en zod, sin nullish- y sigue igual: no se toca.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: con que unidad se rellenan las 114 presentaciones que ya existen. Son todas de semilla, pero el backfill de una columna que acaba NOT NULL necesita un valor decidido, no elegido por el implementador.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "fullstack",
+      "branch": "feature/QC-80-unidad-desde-la-presentacion",
+      "depends_on": null,
+      "spec_path": "specs/QC-80-unidad-desde-la-presentacion"
+    },
+    {
+      "key": "QC-81",
+      "id": 81,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "lote-y-fecha-de-compra",
+      "description": "Cada producto registra el lote al que pertenece y la fecha en que se compro.\n\nEl lote es un texto correlativo ascendente. Si quien da de alta el producto no lo escribe, el sistema se lo asigna solo, continuando la serie. Dos productos de la misma empresa no pueden compartir lote; dos empresas distintas si pueden repetirlo entre ellas.\n\nLa fecha de compra es obligatoria. Si no viene informada al dar de alta, queda la fecha del dia.\n\nDECISIONES YA CERRADAS CON EL HUMANO EL 2026-09-08:\n- El lote lo genera el backend cuando el front no lo manda, nunca el front por su cuenta.\n- La unicidad del lote es POR EMPRESA, no global.\n- La fecha de compra no admite vacio y su valor por defecto es la fecha actual.\n\nDEPENDE DE QC-49 Y NO ES NEGOCIABLE: `products` NO TIENE HOY `company_id` -solo lo tienen `users` y `units`-, asi que la constraint unica por empresa no se puede construir. Esa columna la introduce el aislamiento por empresa en inventario. Meterla aqui seria hacer QC-49 de contrabando dentro de otra ficha.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: la forma exacta del correlativo -si es un entero formateado, si lleva prefijo, si la serie es por empresa o global- y que valor reciben las filas que ya existen en el backfill de una columna que acaba NOT NULL.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-81-lote-y-fecha-de-compra",
+      "depends_on": [
+        "QC-49"
+      ],
+      "spec_path": "specs/QC-81-lote-y-fecha-de-compra"
+    },
+    {
+      "key": "QC-82",
+      "id": 82,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "registro-de-ejecucion-de-receta",
+      "description": "Queda constancia de como se ejecuto una receta en planta: cada vez que alguien arranca, avanza, retrocede o termina, se guarda una anotacion con el momento, el pedido, quien lo hizo, en que paso estaba y que accion fue. Las acciones posibles son CUATRO y ninguna mas: arrancar, avanzar, retroceder y finalizar.\n\nCon esto se puede reconstruir despues el recorrido completo de una ejecucion: quien la llevo, cuanto tardo entre paso y paso, y si hubo que volver atras.\n\nES LA PIEZA QUE QC-63 DEJO FUERA A PROPOSITO: su ficha dice literalmente que «registrar quien marco que y cuando sigue fuera de alcance». Los controles que disparan estas acciones -Anterior, Siguiente, Finalizar- ya existen desde QC-62.\n\nEsta ficha entrega el ALMACENAMIENTO y la operacion de escritura. Engancharla a la pantalla del operador es de QC-63, que hoy esta `pending`; mientras tanto el registro queda construido y SIN CONSUMIDOR, igual que se hizo con `convertQuantity` en QC-76 -que se publico sin llamantes y con una guardia que lo sostiene-. Por eso NO depende de QC-63: es un modelo, y en este repo los modelos van antes que sus pantallas (QC-24 -> QC-25 -> QC-26).\n\nLO QUE YA ESTA EN SU SITIO: `orders` existe (QC-33/QC-34) y `users` tambien, asi que las dos referencias tienen destino real; los pasos de receta ya son documentos jsonb (QC-62, QC-64).\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n- QUE SE GUARDA EN EL PASO. El documento entero -que se duplica en cada clic y crece rapido- o su posicion -barata, pero deja de significar lo mismo si luego se edita la receta-. Es decision de negocio, no de implementacion.\n- QUE ES «EL TIEMPO». El instante del clic, o cuanto se estuvo en ese paso antes de moverse. Son dos columnas distintas y no responden lo mismo.\n- SI EL PEDIDO ES OBLIGATORIO. QC-63 permite al operador abrir una receta por su propia direccion, que no tiene por que venir de un pedido.\n- CUANTO SE CONSERVA: auditoria que no se borra nunca, o purga.\n- SI SE ACOTA POR EMPRESA. `orders` tampoco tiene empresa todavia: eso es QC-60.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-82-registro-de-ejecucion-de-receta",
+      "depends_on": null,
+      "spec_path": "specs/QC-82-registro-de-ejecucion-de-receta"
     }
   ]
 }
