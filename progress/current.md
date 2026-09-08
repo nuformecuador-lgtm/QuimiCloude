@@ -12,10 +12,10 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | pending | feature/QC-75-menu-y-rutas-por-permiso | worktree montado (F1.0/F1.1). **`/afinar-feature` en curso** antes de lanzar `spec_author` (F1.2) |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | pending | feature/QC-58-timeout-tests-ui-bajo-carga | worktree montado el 2026-09-07 (F1.0/F1.1) y **rebasado sobre `dev` unificado (`af5d258`)**: ya tiene QC-54 y QC-74. Decisión humana tomada: se acota con `/afinar-feature` antes de lanzar `spec_author` (F1.2) |
-| QC-45 | pantalla-de-presentaciones | Inventario | frontend | pending | feature/QC-45-pantalla-de-presentaciones | worktree montado el 2026-09-07 (F1.0/F1.1) desde `dev` LOCAL. **F1.2 en pausa**: su `description` dice que la forma de la pantalla se decide al acotar, así que se ofrece `/afinar-feature` antes de lanzar `spec_author` |
-| QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | spec_ready | feature/QC-76-equivalencia-y-ambito-de-unidades | **esperando aprobación humana del spec (F1.4)**. 38 requisitos EARS, `design.md` y `tasks.md` en el worktree. Una pregunta abierta que abrió `spec_author` (escala de la conversión) |
+| QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | in_progress | feature/QC-75-menu-y-rutas-por-permiso | **spec aprobado el 2026-09-07**, tarjeta en *En curso*. `implementer` corriendo las 16 tasks (F2.1) |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **spec aprobado por el humano el 2026-09-08**, tarjeta en *En curso*. `implementer` corriendo las 14 tasks (F2.1) |
+| QC-45 | pantalla-de-presentaciones | Inventario | frontend | spec_ready | feature/QC-45-pantalla-de-presentaciones | **F1.2 hecha el 2026-09-07**: acotada, sembrada y spec escrito (36 EARS, 13 tasks, 0 preguntas abiertas nuevas). Tarjeta en *En revisión*. **Esperando aprobación humana (F1.4)** |
+| QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | in_progress | feature/QC-76-equivalencia-y-ambito-de-unidades | **spec aprobado por el humano el 2026-09-07** (F1.4). 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1) |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -241,6 +241,65 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 
+### QC-58 — timeout-tests-ui-bajo-carga (acotada el 2026-09-07)
+
+- El alcance y las **8 decisiones cerradas** viven en
+  `specs/QC-58-timeout-tests-ui-bajo-carga/requirements.md`. Esa es la fuente; aquí no se copia
+  la tabla. **Cero preguntas abiertas.**
+- **Lo que la acotación corrigió de la ficha**, y son tres cosas: el arreglo va a **los tres**
+  proyectos de Vitest y no solo a `ui` —el gate tumbó `composition/identity-facade`, del proyecto
+  `node`, que no teclea nada—; el plazo tiene **número** (de 5000 a 15000 ms); y la prueba tiene
+  **criterio verificable** (cinco corridas seguidas de la batería completa, las cinco verdes,
+  heredando de `docs/verification.md` que una corrida verde no prueba nada).
+- **Board actualizado antes de sembrar (Paso 5):** `description` de QC-58 reescrita con esas tres
+  correcciones, y **QC-77 creada** (`zone:backend`, parent QC-16 Plataforma, sin `complexity` —la
+  asigna el leader en F1.0—) para la colisión de correlativo en la base de integración, que salió
+  de QC-58 a propósito: es estado residual, no plazo.
+- `zone` **sigue `frontend`** aunque toque la config de los tres proyectos: `fullstack` dispararía
+  la partición en dos fichas, que no tiene sentido para un arreglo de configuración.
+
+
+### QC-45 — pantalla-de-presentaciones (acotada el 2026-09-07)
+
+- El alcance y las **25 decisiones cerradas** viven en
+  `specs/QC-45-pantalla-de-presentaciones/requirements.md` — esa es la fuente, aquí solo se
+  enlaza. Quedan **2 preguntas abiertas**, ninguna bloqueante.
+- **Cinco decisiones del humano**: la pantalla vive en **`configuracion/presentaciones`** y
+  **esta ficha crea la sección Configuración**, con un solo ítem; el ítem **se oculta** a quien
+  no es Administrador, a mano y **provisionalmente**; la lista usa la **tabla compartida de
+  QC-55**; **busca y ordena** por nombre; y la **E2E ligera sí entra**.
+- **Dos precedentes de QC-22 dejan de valer, y por eso se preguntó.** QC-57 está `done` y cubre
+  presentaciones, así que «el backend solo acepta `page` y `pageSize`» ya no es cierto; y QC-55
+  entregó la tabla compartida, así que copiar el esqueleto sería la tercera copia.
+- **Board actualizado antes de tocar disco**: `description` de **QC-45** con las cinco
+  decisiones; **QC-39** corregida —la sección Configuración ya no la crea ella—; y **QC-75** con
+  el encargo de retirar el ocultado a mano. En QC-75 fue **comentario y no `description`**: la
+  otra sesión la estaba editando en paralelo y sobrescribirla le habría borrado un párrafo.
+- **Riesgo escrito, no diferido en silencio:** la pregunta abierta 4 de QC-55 —cómo se declara
+  una columna de acciones de fila— sigue viva, y esta pantalla necesita editar y borrar por fila.
+  Si al construir no está resuelta, **la resuelve esta ficha** y QC-56 hereda la respuesta.
+- **Su worktree cuelga de `642a2f9`**, anterior al merge de QC-54 + QC-74 (`af5d258`). Antes de
+  implementar hay que rebasarlo o le faltará el modelo de permisos.
+### QC-38 — crud-de-unidades (acotada el 2026-09-07)
+
+- El alcance y las **22 decisiones cerradas** viven en
+  `specs/QC-38-crud-de-unidades/requirements.md` — esa es la fuente, aquí solo se enlaza.
+  **Cero preguntas abiertas.**
+- **Cuatro decisiones del humano**: autoriza **por permiso** (modelo de QC-74, no un
+  `requireAdmin` nuevo); **consultar sigue siendo solo del Administrador**, se conserva lo de
+  QC-32 y no se abre al Operador; **60 caracteres el nombre y 10 el símbolo**, solo en la
+  validación y sin migración; y la edición es **reemplazo completo**.
+- **Cierra la pregunta abierta 5 de QC-32.** Con ella, las tres de QC-32 quedan cerradas: la 1 y
+  la 3 al acotar QC-76, la 5 aquí. Anotado como comentario en el issue; su spec no se toca.
+- **Board actualizado antes de tocar disco**: `complexity: medium` (se aparta del precedente —
+  QC-20 y QC-25, los dos CRUD hermanos, son `high` — porque son tres casos de uso sobre un
+  catálogo de un solo campo, sin migración propia y con la lectura ya construida);
+  `depends_on` gana **QC-74** con su link *is blocked by*; `description` con las cuatro
+  decisiones.
+- **Contexto de la corrida:** se acotó QC-38 y no QC-39 porque QC-39 está a tres fichas de
+  distancia (QC-76 → QC-38 → QC-39) y la pantalla no tendría qué consumir. Y se hizo con el árbol
+  principal ocupado por otra sesión: hubo que esperar a que cerrara su merge de `origin/dev`
+  (`af5d258`, QC-54 + QC-74) porque `feature_list.json` estaba en conflicto.
 ### QC-76 — equivalencia y ambito de unidades (creada y acotada el 2026-09-07)
 
 **Segunda corrida el 2026-09-07: sembrada.** Las 30 decisiones cerradas y el alcance viven en
@@ -357,6 +416,29 @@ que no puede ver ninguna pantalla»— y su alcance ya creció una vez (el login
 al dashboard). Los tres specs escritos sin acotar costaron una o dos rondas completas.
 
 Worktree desde `origin/dev` (`95b9b51`), que ya trae el merge de QC-74.
+
+**El spec destapó que la ficha se contradecía a sí misma.** La `description` decía que el E2E es
+«el Operador entra, ve un menú corto y **recibe 404 en inventario**», pero QC-74 siembra al Operador
+con exactamente `inventario.consultar`: inventario es justo lo único que SÍ puede ver, así que ese
+recorrido es imposible. `spec_author` no lo rellenó con un supuesto — lo dejó como pregunta abierta
+y conservó la forma del recorrido apuntando el 404 a `/pedidos` y el aterrizaje a `/inventario`. El
+humano lo confirmó al aprobar y **la descripción del board se corrigió** dejando por escrito la
+versión anterior y por qué era imposible.
+
+**Acotada con `/afinar-feature` el 2026-09-07**: cinco decisiones nuevas y cinco heredadas, y una
+sola pregunta abierta, en `specs/QC-75-menu-y-rutas-por-permiso/requirements.md` — no se releen
+desde aquí. **La semilla se escribió DENTRO del worktree**, no en el árbol principal: es la
+corrección directa de lo que pasó con QC-74, cuya semilla quedó `??` en la raíz y hubo que
+copiarla a mano al worktree antes de lanzar `spec_author`.
+
+El acotado **cambió la `description` en el board** —la frase «queda por decidir al acotar esta
+ficha qué pasa con un rol que no puede ver ninguna» dejó de ser cierta— y el cambio se reflejó en
+`feature_list.json`. Nada más se tocó en Jira: la ficha sigue `pending` en Backlog.
+
+**La costura que hubo que cerrar aparte**: el humano eligió «404 en todo, sin pantalla especial» y
+a la vez «cerrar sesión siempre disponible», y esas dos juntas dejan encerrado a quien no tenga
+ningún permiso si el 404 se pinta fuera de la zona privada. Se preguntó y se cerró: **el 404 de
+ruta privada va dentro del layout privado**, con el menú vacío pero con cerrar sesión.
 
 ### QC-74 — arranque del 2026-09-07 (F1.0)
 
