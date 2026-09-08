@@ -36,6 +36,16 @@ export {
   UnitInUseError,
 } from './domain/errors';
 
+// QC-38 (R1): los TRES casos de uso de escritura -alta, edicion y borrado-. Solo las fabricas
+// y sus tipos de deps: NUNCA una Server Action ('use server' no puede ser alcanzable desde
+// este barrel, que un componente de cliente tiene que poder importar).
+export { createCreateUnit } from './domain/create-unit';
+export type { CreateUnitDeps } from './domain/create-unit';
+export { createUpdateUnit } from './domain/update-unit';
+export type { UpdateUnitDeps } from './domain/update-unit';
+export { createDeleteUnit } from './domain/delete-unit';
+export type { DeleteUnitDeps } from './domain/delete-unit';
+
 // QC-76 (R22-R25): la conversion de una cantidad entre dos unidades que comparten unidad base.
 // Es dominio PURO —sin base de datos, sin framework y sin estado—, asi que publicarla no
 // arrastra nada de servidor al barrel. NADIE la llama todavia (R26, decision cerrada 18): el

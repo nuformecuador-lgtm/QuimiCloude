@@ -73,7 +73,7 @@
   - **Hecho cuando**: `pnpm typecheck` en verde y un `UnitWriteRow` con `companyId` **no compila**.
     Cubre: R7, R19.
 
-- [ ] **T7. Los tres casos de uso.** (depende de T5, T6)
+- [x] **T7. Los tres casos de uso.** (depende de T5, T6)
   - Toca: `lib/modules/unidades/domain/create-unit.ts`, `update-unit.ts`, `delete-unit.ts` (nuevos);
     `lib/modules/unidades/index.ts` (reexporta las tres fábricas y sus tipos de deps, **nunca** una
     action).
