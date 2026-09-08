@@ -45,7 +45,11 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // R15 — el catalogo cerrado, sin comodines
 // ---------------------------------------------------------------------------------------------
 
-/** Los diez codigos de QC-74, escritos a mano A PROPOSITO: son el contrato que R15 congela. */
+/**
+ * Los once codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que R15 congela.
+ * Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`, enmendando
+ * QC-74 R2 (ver `lib/modules/identity/domain/permissions.ts`).
+ */
 export const CODIGOS_QC74 = [
   'dashboard.consultar',
   'inventario.consultar',
@@ -53,6 +57,7 @@ export const CODIGOS_QC74 = [
   'recetas.consultar',
   'recetas.modificar',
   'unidades.consultar',
+  'unidades.modificar',
   'proveedores.consultar',
   'proveedores.modificar',
   'pedidos.consultar',
@@ -106,8 +111,8 @@ export function comodinesDe(permisos: readonly PermisoLeido[]): string[] {
 describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', () => {
   const catalogo: readonly PermisoLeido[] = PERMISSIONS;
 
-  it('tiene exactamente diez codigos, los diez de QC-74', () => {
-    expect(catalogo).toHaveLength(10);
+  it('tiene exactamente once codigos, los once del catalogo', () => {
+    expect(catalogo).toHaveLength(11);
     expect(catalogo.map((permiso) => permiso.code).sort()).toEqual([...CODIGOS_QC74].sort());
   });
 

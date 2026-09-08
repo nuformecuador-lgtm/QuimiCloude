@@ -11,8 +11,10 @@ import {
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity'
 
-/** Los diez codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
- *  catalogo cambia, este test tiene que cambiar tambien, que es justamente lo que se quiere. */
+/** Los once codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
+ *  catalogo cambia, este test tiene que cambiar tambien, que es justamente lo que se quiere.
+ *  Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`,
+ *  enmendando QC-74 R2 (ver `lib/modules/identity/domain/permissions.ts`). */
 const CODIGOS_DEL_REQUISITO = [
   'dashboard.consultar',
   'inventario.consultar',
@@ -20,6 +22,7 @@ const CODIGOS_DEL_REQUISITO = [
   'recetas.consultar',
   'recetas.modificar',
   'unidades.consultar',
+  'unidades.modificar',
   'proveedores.consultar',
   'proveedores.modificar',
   'pedidos.consultar',
@@ -29,9 +32,10 @@ const CODIGOS_DEL_REQUISITO = [
 /** Los nombres de modulo del repositorio (R1). */
 const MODULOS = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos', 'dashboard']
 
-/** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
-const MODULOS_CON_ESCRITURA = ['inventario', 'recetas', 'proveedores', 'pedidos']
-const MODULOS_SIN_ESCRITURA = ['dashboard', 'unidades']
+/** Modulos con casos de uso de escritura (R3) y sin ellos (R4). `unidades` paso a tener
+ *  escritura con QC-38, asi que ya no esta entre los que solo consultan. */
+const MODULOS_CON_ESCRITURA = ['inventario', 'recetas', 'proveedores', 'pedidos', 'unidades']
+const MODULOS_SIN_ESCRITURA = ['dashboard']
 
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
 
@@ -50,9 +54,9 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     }
   })
 
-  it('R2: contiene exactamente los diez codigos del requisito, ni uno mas ni uno menos', () => {
+  it('R2: contiene exactamente los once codigos del requisito, ni uno mas ni uno menos', () => {
     expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
-    expect(new Set(codigos).size).toBe(10)
+    expect(new Set(codigos).size).toBe(11)
   })
 
   it('R2: cada entrada trae descripcion no vacia', () => {
@@ -69,7 +73,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     }
   })
 
-  it('R4: `dashboard` y `unidades` declaran UNICAMENTE consultar', () => {
+  it('R4: `dashboard` declara UNICAMENTE consultar', () => {
     for (const modulo of MODULOS_SIN_ESCRITURA) {
       const acciones = PERMISSIONS.filter((p) => p.module === modulo).map((p) => p.action)
 
@@ -85,12 +89,12 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
 })
 
 describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
-  it('R8: el Administrador tiene los diez permisos, escritos uno a uno', () => {
+  it('R8: el Administrador tiene los once permisos, escritos uno a uno', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_REQUISITO])
   })
 
   it('R8: no hay comodin ni regla implicita en el conjunto del Administrador', () => {
-    // La decision 2 del humano (2026-09-07) prohibe el comodin: los diez van escritos uno a uno.
+    // La decision 2 del humano (2026-09-07) prohibe el comodin: los once van escritos uno a uno.
     // Este caso vigila las dos formas en las que un comodin se colaria por la puerta de atras.
     for (const codigo of SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []) {
       // 1. Ningun codigo asignado es un comodin ni lo contiene ('*', 'inventario.*', 'todo'...).
@@ -103,6 +107,17 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
 
   it('R9: el Operador tiene exactamente un permiso: inventario.consultar', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual(['inventario.consultar'])
+  })
+
+  it('QC-38 R4: el Administrador tiene unidades.modificar Y unidades.consultar, escritos uno a uno', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('unidades.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('unidades.modificar')
+  })
+
+  it('QC-38 R4: el Operador sigue teniendo exactamente inventario.consultar, ninguno de unidades', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual(['inventario.consultar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.modificar')
   })
 
   it('R6: el seed asigna permisos SOLO a roles, sin ninguna clave de empresa', () => {
