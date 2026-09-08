@@ -18,7 +18,7 @@
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`), `complexity: medium`. **Pendiente F1.2**: la ficha trae una pregunta abierta escrita en el board y la partición `fullstack` sin decidir, así que toca `/afinar-feature` antes del `spec_author` |
 | QC-80 | unidad-desde-la-presentacion | Inventario | fullstack | pending | feature/QC-80-unidad-desde-la-presentacion | **Nacida del chat el 2026-09-08** y creada en el board (QC-18). `complexity: medium`. **Pendiente F1.0 y F1.2**: sin worktree todavia, y trae una pregunta abierta -con que unidad se rellenan las 114 presentaciones existentes-, asi que toca `/afinar-feature` antes del `spec_author` |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **BLOQUEADA**: la unicidad de `lote` por empresa necesita `products.company_id`, que hoy no existe y que introduce QC-49. No arranca hasta que QC-49 este `done` |
-| QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; trae SIETE preguntas abiertas -entre ellas si el motivo es obligatorio al cancelar, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
+| QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -308,10 +308,18 @@ motivo existe SI Y SOLO SI el estado es `CANCELADO`. El spec sigue ese patron o 
 no. Anotado tambien el aviso que el propio `db/schema.prisma` deja sobre `OrderStatus`: elegir
 enum en vez de tabla obliga a `ALTER TYPE ... ADD VALUE` para crecer, con el valor nuevo al final.
 
-**SIETE preguntas abiertas, escritas y NO rellenadas con un supuesto** (regla 6). Las dos que
-trajo la ampliacion: si el motivo es OBLIGATORIO al cancelar -que la columna admita vacio no dice
-nada de eso, y en `orders` si lo es-, y si el motivo sirve para algo mas que cancelar -acompanar
-un retroceso seria justo lo interesante de saber despues-. Y las cinco de origen: que se guarda
+**Una de las dos preguntas nuevas se cerro en el acto**: CANCELAR SIN MOTIVO NO SE PUEDE. La
+columna sigue admitiendo vacio -la mayoria de las acciones no lo necesitan-, pero con la accion
+`canceled` el motivo es obligatorio.
+
+**Y se anoto el alcance exacto de esa decision, que es MEDIA REGLA Y NO ENTERA**: lo cerrado es
+que al cancelar HACE FALTA, no que en las demas acciones este PROHIBIDO. El CHECK de `orders` es
+«si y solo si» y NO se puede copiar tal cual mientras siga abierto si un retroceso puede llevar
+motivo. Escribirlo como «si y solo si» ahora seria inventar la mitad que nadie contesto.
+
+**Quedan SEIS preguntas abiertas** (regla 6). La que sobrevive de la ampliacion: si el motivo
+sirve para algo mas que cancelar -acompanar un retroceso seria justo lo interesante de saber
+despues-, de la que depende la forma del CHECK. Y las cinco de origen: que se guarda
 en el paso -el documento entero, que se duplica en cada clic, o su posicion, que deja de
 significar lo mismo si se edita la receta-; que es «el tiempo» -el instante del clic o el rato
 que se estuvo en el paso, que son dos columnas distintas-; si `order_id` es obligatorio -QC-63
