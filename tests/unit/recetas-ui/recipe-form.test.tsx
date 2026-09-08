@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { UserEvent } from '@testing-library/user-event';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
@@ -228,13 +228,13 @@ function scrollAlFinalDelSelector(testId: string, altoVisible = 256) {
 /** Selecciona un producto ya presente en la primera página, sin pedir otra página al backend. */
 async function chooseProductForLine(user: UserEvent, index: number, productName: string) {
   await user.click(screen.getByTestId(`recipe-line-product-${index}`));
-  await user.click(await screen.findByRole('option', { name: productName }));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: productName })));
 }
 
 /** Selecciona una unidad del catálogo por su etiqueta visible (símbolo o, en su ausencia, nombre). */
 async function chooseUnitForLine(user: UserEvent, index: number, unitLabel: string) {
   await user.click(screen.getByTestId(`recipe-line-unit-${index}`));
-  await user.click(await screen.findByRole('option', { name: unitLabel }));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: unitLabel })));
 }
 
 /** Añade una línea completa y válida en la posición `index` (siguiente hueco libre). */

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { setupUser } from '../../helpers/user-event'
+import { esperarInteractiva, setupUser } from '../../helpers/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataTableFilters } from '@/components/shared/data-table/data-table-filters'
@@ -133,7 +133,7 @@ describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue
     // fecha) montados en el arbol -es un artefacto del entorno de pruebas, no del navegador
     // real-; un `click` sintetico simple si lo abre de forma fiable.
     fireEvent.click(screen.getByTestId('data-table-filter-estado'))
-    await user.click(screen.getByTestId('data-table-filter-option-estado-activo'))
+    await user.click(await esperarInteractiva(screen.getByTestId('data-table-filter-option-estado-activo')))
 
     const ultima = onParamsChange.mock.calls.at(-1)?.[0] as DataTableParams
     expect(ultima.filters.estado).toEqual({ kind: 'select', values: ['activo'] })
@@ -144,7 +144,7 @@ describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue
     const { onParamsChange } = renderFilters()
 
     await user.click(screen.getByTestId('data-table-filter-date-creado'))
-    await user.click(screen.getByTestId('data-table-date-last-week'))
+    await user.click(await esperarInteractiva(screen.getByTestId('data-table-date-last-week')))
 
     const ultima = onParamsChange.mock.calls.at(-1)?.[0] as DataTableParams
     expect(ultima.filters.creado?.kind).toBe('dateRange')

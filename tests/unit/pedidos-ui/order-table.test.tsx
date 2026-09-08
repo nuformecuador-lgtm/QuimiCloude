@@ -8,7 +8,7 @@
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -221,7 +221,9 @@ describe('cambiar orden, filtro o pagina navega con la consulta esperada (R15, R
     // `fireEvent.click` para abrir el menu de Base UI en jsdom, como ya hace la suite de QC-55.
     fireEvent.click(screen.getByTestId(`data-table-filter-${STATUS_COLUMN_ID}`));
     await user.click(
-      screen.getByTestId(`data-table-filter-option-${STATUS_COLUMN_ID}-CANCELADO`),
+      await esperarInteractiva(
+        screen.getByTestId(`data-table-filter-option-${STATUS_COLUMN_ID}-CANCELADO`),
+      ),
     );
 
     const esperado = buildOrderListQuery({

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { render, screen } from '@testing-library/react'
-import { setupUser } from '../../helpers/user-event'
+import { esperarInteractiva, setupUser } from '../../helpers/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -201,7 +201,7 @@ describe('DataTableFilterDate: atajos emitidos desde el control montado', () => 
     )
 
     await openPopover(user)
-    await user.click(screen.getByTestId(testId))
+    await user.click(await esperarInteractiva(screen.getByTestId(testId)))
 
     const esperado = computeDateShortcutRange(kind)
     const esperadoValue: DataTableFilterValue = {
@@ -235,7 +235,7 @@ describe('DataTableFilterDate: atajos emitidos desde el control montado', () => 
     render(<Harness />)
 
     await openPopover(user)
-    await user.click(screen.getByTestId('data-table-date-last-week'))
+    await user.click(await esperarInteractiva(screen.getByTestId('data-table-date-last-week')))
 
     const esperado = computeDateShortcutRange('lastWeek')
     const botonInicio = getDayButton(formatDateLocalISO(esperado.from))
@@ -288,7 +288,7 @@ describe('DataTableFilterDate: seleccion manual del rango en el calendario', () 
     // nuevo tras el primer clic: al ser `value` controlado, el cambio de rango re-renderiza el
     // grid del calendario y una referencia capturada antes del primer clic puede quedar
     // desmontada.
-    await user.click(getDayButton('2026-06-10'))
+    await user.click(await esperarInteractiva(getDayButton('2026-06-10')))
     await user.click(getDayButton('2026-06-20'))
 
     const ultimaLlamada = onChangeSpy.mock.calls.at(-1)?.[0]

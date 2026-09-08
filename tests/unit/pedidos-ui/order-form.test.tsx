@@ -16,7 +16,7 @@
 // **Ningun assert sobre copy** (R44): controles y regiones por `data-testid` o por rol ARIA.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -125,7 +125,7 @@ function renderFormulario(order?: OrderSummary) {
 /** Elige la receta, que es el unico campo que no se escribe a mano (la unidad se fue en 2026-09-07). */
 async function elegirCatalogos(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
-  await user.click(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`));
+  await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
 }
 
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {

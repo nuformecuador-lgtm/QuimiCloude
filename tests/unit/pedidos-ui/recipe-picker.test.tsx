@@ -8,7 +8,7 @@
 // **Ningun assert sobre copy** (R44): todo se localiza por `data-testid` y por rol accesible.
 
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -167,7 +167,7 @@ describe('selector de receta (R31, R43)', () => {
     const lejana = opciones[opciones.length - 1] as HTMLElement;
     expect(lejana).toHaveAttribute('data-recipe-id', RECETA_LEJANA.id);
 
-    await user.click(lejana);
+    await user.click(await esperarInteractiva(lejana));
 
     expect(loQueSeEnviaria().get(RECIPE_FIELD)).toBe(RECETA_LEJANA.id);
   });

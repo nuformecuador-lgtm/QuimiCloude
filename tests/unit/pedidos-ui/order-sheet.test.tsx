@@ -11,7 +11,7 @@
 // **Ningun assert sobre copy** (R44).
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -259,7 +259,7 @@ afterEach(() => {
 
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
-  await user.click(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`));
+  await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 

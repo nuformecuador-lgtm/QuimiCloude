@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import userEvent from '@testing-library/user-event';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import PrivateLayout from '@/app/(private)/layout';
@@ -755,7 +755,7 @@ describe('pantalla de productos — lista', () => {
     // 2. El orden se pide desde el menu de la cabecera, y tambien navega.
     routerMock.push.mockClear();
     await user.click(screen.getByTestId('data-table-header-menu-name'));
-    await user.click(await screen.findByTestId('data-table-sort-asc-name'));
+    await user.click(await esperarInteractiva(await screen.findByTestId('data-table-sort-asc-name')));
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
     const conOrden = new URLSearchParams(

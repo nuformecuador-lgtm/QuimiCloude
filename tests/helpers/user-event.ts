@@ -12,6 +12,8 @@
  * `tests/guards/guard-teclear-y-plazo.test.ts`, no como parametro abierto.
  */
 
+import { waitFor } from '@testing-library/react';
+import { expect } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 
@@ -34,4 +36,30 @@ import type { UserEvent } from '@testing-library/user-event';
  */
 export function setupUser(): UserEvent {
   return userEvent.setup({ delay: null });
+}
+
+/**
+ * Espera a que un elemento de un popup de Base UI sea INTERACTIVO antes de pincharlo
+ * (QC-58, decision cerrada n.º 9 del 2026-09-08).
+ *
+ * Los popups de Base UI -`Select`, `Menu`, `Popover`- entran con `pointer-events: none` y lo
+ * sueltan un tick despues. Antes lo tapaba el `setTimeout(0)` que `user-event` intercalaba entre
+ * eventos; con `setupUser()` (`delay: null`) ese respiro hay que pedirlo EXPLICITO. Sin esto,
+ * `user.click` sobre una opcion recien abierta falla con
+ * «Unable to perform pointer interaction as the element has pointer-events: none».
+ *
+ * **No relaja ninguna comprobacion**: `user-event` sigue negandose a pinchar un elemento tapado,
+ * y esto solo espera a que deje de estarlo -la precondicion de la que el test ya dependia sin
+ * decirlo-.
+ *
+ * **Bajo carga aflora donde en aislado no**: el tercer archivo afectado
+ * (`proveedores-ui/catalog-line-sheet.test.tsx`) salio verde en `./init.sh --rapido` y rojo en dos
+ * de las cinco corridas de la bateria completa. Por eso se aplica a TODO clic sobre el contenido
+ * de un popup recien abierto, no solo a los que ya se han visto fallar.
+ *
+ * Uso: `await user.click(await esperarInteractiva(screen.getByTestId('unit-option-none')))`.
+ */
+export async function esperarInteractiva(elemento: HTMLElement): Promise<HTMLElement> {
+  await waitFor(() => expect(elemento).not.toHaveStyle({ pointerEvents: 'none' }));
+  return elemento;
 }

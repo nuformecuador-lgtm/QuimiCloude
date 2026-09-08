@@ -111,6 +111,13 @@ de tocar nada, es lo que verifica R9.
   explícitamente a que deje de tener `pointer-events: none`. **No se relajó ni se borró ninguna
   aserción**, no se añadió ninguna excepción a la guardia y el archivo sigue migrado a `setupUser()`.
   Conteo intacto: 9 casos antes y 9 después.
+- **Reabierta y vuelta a cerrar el 2026-09-08 (tercera tanda).** Las cinco corridas de T11
+  destaparon `catalog-line-sheet.test.tsx`, de esta misma carpeta, con la misma causa pero
+  **visible sólo bajo la carga de la batería completa** (rojo en las corridas 1 y 2, verde en la 3;
+  verde también en `--rapido`). Se le aplicó la misma espera y **se barrieron los 33 archivos
+  migrados** buscando el patrón: 20 sitios en 13 archivos, arreglados aunque estuvieran verdes.
+  `esperarInteractiva` pasó a vivir en `tests/helpers/user-event.ts` para no copiar el mismo
+  comentario trece veces. Detalle en la bitácora.
 - Cubre: R6, R9.
 
 ### [x] T4f. [P] `tests/unit/recetas-ui/` + `tests/unit/inventario/` — 6 archivos

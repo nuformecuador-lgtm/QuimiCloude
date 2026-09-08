@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
@@ -314,13 +314,13 @@ async function rellenarFormulario(
 /** Elige la primera presentacion de la lista (R37). */
 async function elegirPresentacion(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(testId.selectorPresentacion));
-  await user.click((await screen.findAllByTestId(testId.opcionPresentacion))[0]);
+  await user.click(await esperarInteractiva((await screen.findAllByTestId(testId.opcionPresentacion))[0]));
 }
 
 /** Elige la primera unidad de la lista (R40). */
 async function elegirUnidad(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(testId.selectorUnidad));
-  await user.click((await screen.findAllByTestId(testId.opcionUnidad))[0]);
+  await user.click(await esperarInteractiva((await screen.findAllByTestId(testId.opcionUnidad))[0]));
 }
 
 /** Lo que el formulario enviaria como presentacion: el campo oculto que monta el primitivo. */

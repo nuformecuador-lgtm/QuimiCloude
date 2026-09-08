@@ -20,6 +20,13 @@ ese día (salida 2 de las tres que se propusieron): T4c y T4e cerradas, y **T5 e
 Todo lo demás —el plazo, el helper, la guardia probada con cuatro mutaciones, la sonda de ejecución,
 el baseline y el rastro escrito— seguía hecho y verificado desde la primera tanda.
 
+**Tercera tanda (2026-09-08).** Las cinco corridas de T11 destaparon un **tercer** archivo con la
+misma causa —`proveedores-ui/catalog-line-sheet.test.tsx`, que sólo falla con la máquina saturada—.
+Se aplicó la misma decisión y, además, **se barrieron los 33 archivos migrados** en busca del mismo
+patrón: **20 sitios en 13 archivos**. El detalle, y por qué un `--rapido` verde no bastaba para
+verlo, está en `### El tercer archivo…` más abajo. Las tasks siguen siendo las mismas 15 de 17: T11
+vuelve a empezar y la corre el leader.
+
 ---
 
 ## BLOQUEO — RESUELTO el 2026-09-08 (decisión humana)
@@ -38,23 +45,83 @@ los dos archivos afectados. Queda escrito en `requirements.md > Decisiones cerra
 - **No se reabre la decisión cerrada n.º 3**: `delay: null` y helper sin parámetros, intactos.
 - **No se relaja ni se borra ninguna aserción.** Se *añade* una espera a la precondición.
 
-Forma aplicada, en los dos archivos (helper local `esperarInteractiva`, con su comentario):
+Forma aplicada: `esperarInteractiva(elemento)`, que espera a que el elemento deje de tener
+`pointer-events: none` y lo devuelve, de modo que se encaja dentro del `click` que ya había:
 
 ```ts
 await user.click(disparador);
-const opcion = await screen.findByTestId('unit-option-none');
-// El popup de Base UI entra con pointer-events: none y lo suelta un tick despues. Antes lo
-// tapaba el setTimeout(0) que user-event intercalaba; con delay: null hay que pedirlo explicito.
-await waitFor(() => expect(opcion).not.toHaveStyle({ pointerEvents: 'none' }));
-await user.click(opcion);
+await user.click(await esperarInteractiva(await screen.findByTestId('unit-option-none')));
 ```
 
 `toHaveStyle` es de `jest-dom`, que el proyecto `ui` ya carga en `tests/setup.ts`: **no entra
 ninguna dependencia nueva**. En `unit-select.test.tsx` son **dos** los casos que pinchan una opción
 (la primera unidad y «sin unidad»), no uno: los dos llevan la espera.
 
-**Resultado medido** (`pnpm exec vitest run` de los dos archivos, tres corridas seguidas):
-`2 passed | 17 tests passed` en las tres. El intermitente de `data-table-pagination` no reapareció.
+**Resultado medido de la primera pasada** (`pnpm exec vitest run` de los dos archivos, tres corridas
+seguidas): `2 passed | 17 tests passed` en las tres. El intermitente de `data-table-pagination` no
+reapareció.
+
+### El tercer archivo, y por qué sólo se vio con la batería completa (2026-09-08, tercera tanda)
+
+**Lección de método, y es la que esta ficha existe para dejar escrita:** un `--rapido` verde **no
+descarta** este fallo. Las cinco corridas de T11 destaparon un tercero con la misma causa:
+
+```
+tests/unit/proveedores-ui/catalog-line-sheet.test.tsx
+  «linea de catalogo — alta (R29, R37, R38, R41, R43)»
+  > «captura los campos de negocio y los envia por la operacion de alta, con el proveedor oculto»
+Error: Unable to perform pointer interaction as the element has `pointer-events: none`:
+DIV(testId=unit-option)
+  ❯ assertPointerEvents .../utils/pointer/cssPointerEvents.js:45:15
+```
+
+Falló en las corridas **1 y 2** de `./init.sh` completo y pasó en la 3. Ese archivo **sí** estaba en
+el grafo de mi `--rapido`, y el `--rapido` salió verde: con la máquina saturada por la batería
+entera, el popup tarda más en soltar `pointer-events` y la ventana se abre. Es exactamente el
+fenómeno de saturación que la ficha ataca, visto desde dentro de la propia ficha.
+
+Consecuencia de método, para el siguiente: **la ausencia de este fallo no se puede medir con
+`--rapido` ni con corridas en aislado.** O se corre la batería completa, o se elimina la ventana por
+construcción. Se hizo lo segundo.
+
+Y consecuencia práctica: ese archivo es **uno de los tres que T9 retiró del baseline** (R10)
+atribuyendo su rojo a esta misma causa. Dejarlo así habría sido lo peor de las dos opciones —fuera
+del baseline y rojo—, así que R10 depende de este arreglo.
+
+#### El barrido: se arreglaron 13 archivos, no sólo el que falló
+
+En vez de esperar a que cada bomba explote a razón de una corrida de T11 (~3 min) cada una, se
+barrieron los 33 archivos migrados buscando el patrón entero —un `click` sobre el contenido de un
+popup de Base UI (`Select`, `Menu`, `Popover`) recién abierto— y se les puso la espera **aunque hoy
+estén verdes**:
+
+| Archivo | Dónde | Estado antes |
+| --- | --- | --- |
+| `proveedores-ui/unit-select.test.tsx` | 2 sitios (`unit-option`, `unit-option-none`) | ❌ rojo determinista |
+| `shared/data-table-pagination.test.tsx` | 1 sitio (`data-table-page-size-<n>`) | ❌ rojo ~1 de cada 3 |
+| `proveedores-ui/catalog-line-sheet.test.tsx` | 2 sitios (`elegirPresentacion`, `elegirUnidad`) | ❌ **rojo sólo bajo carga** |
+| `shared/data-table-header-menu.test.tsx` | 3 sitios (sort, pin, abrir filtro) | verde |
+| `shared/data-table-filters.test.tsx` | 2 sitios (opción de select, atajo de fecha) | verde |
+| `shared/data-table-filter-date.test.tsx` | 3 sitios (atajos y primer día del calendario) | verde |
+| `pedidos-ui/order-form.test.tsx` | 1 sitio (opción del selector de receta) | verde |
+| `pedidos-ui/order-sheet.test.tsx` | 1 sitio (ídem) | verde |
+| `pedidos-ui/order-table.test.tsx` | 1 sitio (opción del filtro de estado) | verde |
+| `pedidos-ui/recipe-picker.test.tsx` | 1 sitio (receta de la 2.ª página) | verde |
+| `recetas-ui/recipe-form.test.tsx` | 2 sitios (producto y unidad de la línea) | verde |
+| `proveedores-ui/supplier-detail-page.test.tsx` | 1 sitio (ordenar desde el menú de columna) | verde |
+| `inventario/product-page.test.tsx` | 1 sitio (ídem) | verde |
+
+**20 sitios en 13 archivos.** Los diez «verde» no son verdes por diseño: son verdes por la misma
+razón por la que `catalog-line-sheet` lo era en `--rapido`.
+
+#### Una decisión mía: el helper deja de ser local
+
+Con tres archivos, un helper local por archivo era razonable. Con **trece**, copiar trece veces el
+mismo comentario de diez líneas es literalmente el antipatrón que esta ficha vino a matar —las 206
+llamadas sueltas sin un sitio donde estuviera escrito el criterio—. Así que `esperarInteractiva`
+vive **junto a `setupUser()`**, en `tests/helpers/user-event.ts`, que ya es el sitio donde este repo
+explica `delay: null` y `pointer-events`. **No es un archivo nuevo ni una dependencia nueva**, y
+revertirlo a locales es mecánico si el reviewer lo prefiere.
 
 Y **R9 se reformuló** en `requirements.md` para que esto conste como cambio deliberado y aprobado en
 vez de como incumplimiento, dejando por escrito la redacción anterior y por qué cambia
@@ -156,7 +223,7 @@ ni un servicio: es configuración de pruebas, un helper, una guardia y dos archi
 
 | Archivo | Qué es |
 | --- | --- |
-| `tests/helpers/user-event.ts` | La definición compartida `setupUser()` (R5). Se le mudó el comentario largo que vivía en `recipe-form.test.tsx:191-200`. |
+| `tests/helpers/user-event.ts` | La definición compartida `setupUser()` (R5). Se le mudó el comentario largo que vivía en `recipe-form.test.tsx:191-200`. **Desde la tercera tanda (2026-09-08) aloja también `esperarInteractiva()`**, la espera a que un popup de Base UI suelte `pointer-events: none`, usada en 20 sitios de 13 archivos. |
 | `tests/guards/guard-teclear-y-plazo.test.ts` | La guardia de las dos mitades (R2, R7). 4 casos. |
 
 ### Modificados de configuración y rastro (4)
@@ -271,7 +338,7 @@ guardia y con la prueba de que esa guardia muerde, no con un test de producto.
 | **R6** | Todo test la usa; nadie llama a `setup()` por su cuenta | `guard-teclear-y-plazo.test.ts` > «ningun test abre su propia sesion…» (21 archivos de guardias, 204 casos verdes en `./init.sh --rapido` del 2026-09-08) | ✅ verde — el bloqueo que arrastraba esta fila está resuelto y **sin excepciones nuevas**: siguen siendo las 3 de siempre |
 | **R7** | Falla nombrando el archivo, desde las guardias | mismo caso. **Mordida probada:** mutación 4 de T7 | ✅ verde y muerde |
 | **R8** | `async-autocomplete` conserva su retardo, declarado y listado | comentario ampliado en el archivo + `EXCEPCIONES_DECLARADAS` de la guardia + caso «el recorrido de tests/ no se ha quedado vacio», que verifica que las 3 excepciones existen | ✅ verde |
-| **R9** *(reformulado 2026-09-08)* | La migración no cambia **lo que se prueba del componente**; donde un test dependía sin decirlo del `setTimeout(0)`, espera explícitamente la precondición y **no sustituye ninguna aserción** | tabla de conteos de arriba (mismos casos por archivo, cero `skip`/`todo` nuevos) + `unit-select.test.tsx` y `data-table-pagination.test.tsx`, 17/17 en tres corridas seguidas + `./init.sh --rapido` 454/454 | ✅ verde |
+| **R9** *(reformulado 2026-09-08)* | La migración no cambia **lo que se prueba del componente**; donde un test dependía sin decirlo del `setTimeout(0)`, espera explícitamente la precondición y **no sustituye ninguna aserción** | tabla de conteos de arriba (mismos casos por archivo, cero `skip`/`todo` nuevos) + `unit-select.test.tsx` y `data-table-pagination.test.tsx`, 17/17 en tres corridas seguidas + los 13 archivos del barrido, 199/199 en dos corridas + `./init.sh --rapido` 454/454, **el mismo conteo de casos antes y después del barrido** | ✅ verde |
 | **R10** | Fuera las 3 entradas de esta causa | `tests/baseline-rojos.json` | ✅ (retiradas) |
 | **R11** | Las 2 estructurales se quedan, con el motivo de `recipe-route-contract` corregido | `tests/baseline-rojos.json` | ✅ |
 | **R12** | Cada entrada con `motivo` y `desde`; comparación por archivo | `node scripts/comparar-baseline-rojos.mjs` (salida abajo) | ✅ verde |
@@ -427,6 +494,19 @@ guardias, y **sólo** los archivos que el cambio toca o puede romper.
 | --- | --- |
 | `pnpm exec vitest run tests/unit/proveedores-ui/unit-select.test.tsx tests/unit/shared/data-table-pagination.test.tsx` ×3 | ✅ **2 archivos, 17 casos verdes** en las tres corridas seguidas (el intermitente no reapareció) |
 | **`./init.sh --rapido` (T5)** | ✅ **verde, `SALIDA=0`** |
+
+### Tercera tanda (2026-09-08, el tercer archivo que destapó T11)
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm exec vitest run <los 13 archivos del barrido>` ×2 | ✅ **13 archivos, 199 casos verdes** en las dos corridas |
+| `pnpm run typecheck` · `pnpm run lint` | ✅ verdes |
+| **`./init.sh --rapido`** | ✅ **verde, `SALIDA=0`** — 34 archivos / **454 casos** (el mismo conteo que antes del barrido: no se añadió ni se quitó ningún caso, R9) + 21 guardias / 204 casos |
+
+**Aviso que hay que leer junto a esto:** este `--rapido` verde **no prueba** que el fallo de
+saturación no vuelva; ya salió verde una vez con `catalog-line-sheet` averiado. Lo que da confianza
+aquí no es la corrida, es que la ventana se cerró por construcción en los 20 sitios. Quien lo
+verifica de verdad es T11, y lo corre el leader.
 
 Salida real de T5, recortada a lo que decide (`./init.sh --rapido`, 2026-09-08):
 

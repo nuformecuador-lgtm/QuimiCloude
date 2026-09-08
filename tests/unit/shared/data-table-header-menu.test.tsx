@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { setupUser } from '../../helpers/user-event'
+import { esperarInteractiva, setupUser } from '../../helpers/user-event'
 
 import {
   DataTableHeaderCell,
@@ -185,7 +185,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
     )
 
     await usuario.click(screen.getByTestId('data-table-header-menu-nombre'))
-    await usuario.click(await screen.findByTestId('data-table-sort-desc-nombre'))
+    await usuario.click(await esperarInteractiva(await screen.findByTestId('data-table-sort-desc-nombre')))
 
     expect(onSortChange).toHaveBeenCalledExactlyOnceWith({ columnId: 'nombre', direction: 'desc' })
   })
@@ -235,7 +235,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
     )
 
     await usuario.click(screen.getByTestId('data-table-header-menu-nombre'))
-    await usuario.click(await screen.findByTestId('data-table-pin-nombre'))
+    await usuario.click(await esperarInteractiva(await screen.findByTestId('data-table-pin-nombre')))
 
     expect(onTogglePin).toHaveBeenCalledOnce()
 
@@ -300,7 +300,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
     )
 
     await usuario.click(screen.getByTestId('data-table-header-menu-nombre'))
-    await usuario.click(await screen.findByTestId('data-table-filter-open-nombre'))
+    await usuario.click(await esperarInteractiva(await screen.findByTestId('data-table-filter-open-nombre')))
 
     expect(onOpenFilter).toHaveBeenCalledOnce()
 

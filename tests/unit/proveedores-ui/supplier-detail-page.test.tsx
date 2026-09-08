@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
@@ -776,7 +776,7 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
     // 2. Ordenar por una columna que la lista blanca declara: tambien navega.
     routerMock.push.mockClear();
     await user.click(screen.getByTestId('data-table-header-menu-cost'));
-    await user.click(await screen.findByTestId('data-table-sort-desc-cost'));
+    await user.click(await esperarInteractiva(await screen.findByTestId('data-table-sort-desc-cost')));
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
     const conOrden = new URLSearchParams(
