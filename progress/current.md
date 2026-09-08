@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | in_progress | feature/QC-75-menu-y-rutas-por-permiso | **spec aprobado el 2026-09-07**, tarjeta en *En curso*. `implementer` corriendo las 16 tasks (F2.1) |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | spec_ready | feature/QC-58-timeout-tests-ui-bajo-carga | **F1.3 hecha**: acotada, sembrada y con spec escrito (18 requisitos, 14 tasks, commit `3db9b44` pusheado). Tarjeta en *En revisión*. **Esperando aprobación humana del spec (F1.4)** — la aprobación es mover la tarjeta a *En curso* |
+| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **spec aprobado por el humano el 2026-09-08**, tarjeta en *En curso*. `implementer` corriendo las 14 tasks (F2.1) |
 | QC-45 | pantalla-de-presentaciones | Inventario | frontend | spec_ready | feature/QC-45-pantalla-de-presentaciones | **F1.2 hecha el 2026-09-07**: acotada, sembrada y spec escrito (36 EARS, 13 tasks, 0 preguntas abiertas nuevas). Tarjeta en *En revisión*. **Esperando aprobación humana (F1.4)** |
 | QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | in_progress | feature/QC-76-equivalencia-y-ambito-de-unidades | **spec aprobado por el humano el 2026-09-07** (F1.4). 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1) |
 
