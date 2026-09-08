@@ -906,13 +906,21 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       // ultima porque la consulta ordena por `conname`. No se convierte en `toContain`: si
       // manana alguien anade una FK a `units` sin RESTRICT, o se pierde una de las cuatro en
       // un drift de `migrate dev`, este caso tiene que seguir siendo quien lo diga.
+      //
+      // ACTUALIZADO EL 2026-09-08 POR QC-76, Y ESTA VEZ LA LISTA SE ENCOGE Y CRECE A LA VEZ:
+      //   - SALE `orders_unit_id_fkey`. La quito la feature de `pedidos` que retiro del pedido
+      //     la unidad y el precio unitario (commit `dee47c1`, migracion
+      //     `20260907120000_orders_drop_unit_and_unit_price`), **ya mergeada en `origin/dev`**.
+      //     No es un drift ni un descuido de QC-76: `orders` ya no tiene `unit_id`, asi que
+      //     esperarla seria esperar una FK que el dominio ya no quiere. Este caso hizo
+      //     exactamente su trabajo -fue quien lo dijo- cuando la rama de QC-76, que nace de un
+      //     `dev` anterior, se corrio contra la base de desarrollo ya adelantada.
+      //   - ENTRA `units_unit_id_fkey`, la auto-referencia que trae esta ficha: la unidad de la
+      //     que deriva otra (R8). Lleva las mismas dos reglas que las demas -RESTRICT al
+      //     borrar, CASCADE al actualizar-, que es lo que hace cierto que no se pueda borrar
+      //     una unidad de la que otra deriva.
+      // Siguen siendo CUATRO, y sigue siendo una lista EXACTA.
       expect(foreignKeys).toEqual([
-        {
-          conname: 'orders_unit_id_fkey',
-          referencia: 'units',
-          confdeltype: 'r',
-          confupdtype: 'c',
-        },
         {
           conname: 'products_unit_id_fkey',
           referencia: 'units',
@@ -931,11 +939,10 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
           confdeltype: 'r',
           confupdtype: 'c',
         },
-        // ACTUALIZADO EL 2026-09-07 POR QC-76: la QUINTA, y es la primera que sale de la
-        // PROPIA tabla —`units.unit_id` -> `units.id`, la unidad de la que deriva (R1)—. Con
-        // las mismas dos reglas que las otras cuatro: RESTRICT al borrar ('r'), CASCADE al
-        // actualizar ('c'). El RESTRICT es aqui la unica garantia de R8: no se borra una
-        // unidad de la que otra deriva. Va la ultima porque la consulta ordena por `conname`.
+        // La de QC-76, y es la primera que sale de la PROPIA tabla —`units.unit_id` ->
+        // `units.id`, la unidad de la que deriva (R1)—. El RESTRICT es aqui la unica garantia
+        // de R8: no se borra una unidad de la que otra deriva. Va la ultima porque la consulta
+        // ordena por `conname`.
         {
           conname: 'units_unit_id_fkey',
           referencia: 'units',

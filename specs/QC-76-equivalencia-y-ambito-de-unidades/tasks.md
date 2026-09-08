@@ -22,7 +22,7 @@
   - **Hecho cuando**: `pnpm prisma validate` pasa, `pnpm typecheck` en verde y el modelo conserva su
     `/// @module unidades`. Cubre: R1, R3, R11, R12, R31, R32.
 
-- [ ] **T2. Migración nueva: `migration.sql` (UP).** (depende de T1)
+- [x] **T2. Migración nueva: `migration.sql` (UP).** (depende de T1)
   - Toca: `db/migrations/<timestamp>_units_equivalence_and_scope/migration.sql` (nueva carpeta).
   - `pnpm run db:migrate:create` para generar el esqueleto, y **completar a mano** en el orden de
     `design.md > 3.1`: columnas → los tres `CHECK` y las dos FK `ON DELETE RESTRICT` → los dos
@@ -34,7 +34,7 @@
     `SELECT name, unit_id, factor, company_id FROM units` devuelve las cuatro filas de R28.
     Cubre: R2, R4, R5, R6, R7, R8, R9, R13, R14, R15, R27, R28, R29, R30, R31.
 
-- [ ] **T3. `down.sql` con su guardia de datos.** (depende de T2)
+- [x] **T3. `down.sql` con su guardia de datos.** (depende de T2)
   - Toca: la misma carpeta de migración.
   - Aborta primero si hay alguna unidad con empresa o alguna derivada que no sean las dos que dejó el
     UP (R34); después revierte exactamente el UP y **recrea `units_name_normalized_key` global**,
@@ -55,7 +55,7 @@
   - **Hecho cuando**: los dos archivos están en verde y fallan si se borra cualquiera de esos objetos
     del SQL. Cubre: R3, R11, R12, R27, R29, R30, R31, R32, R33.
 
-- [ ] **T5. Tests de integración de las restricciones.** (depende de T3) [P con T4]
+- [x] **T5. Tests de integración de las restricciones.** (depende de T3) [P con T4]
   - Toca: `tests/integration/unidades/unidades-constraints.int.test.ts`.
   - Un caso por regla, con `INSERT`/`UPDATE`/`DELETE` directos: pareja incompleta; factor `0`, `-1` y
     `0.5000`; cuatro decimales que vuelven intactos; auto-referencia; dos niveles en las dos
@@ -110,7 +110,7 @@
   - **Hecho cuando**: todos verdes y los nombres describen el comportamiento
     (`docs/conventions.md > Tests`). Cubre: R23, R24, R25.
 
-- [ ] **T9. Tests del filtro de empresa.** (depende de T6) [P con T8, T10]
+- [x] **T9. Tests del filtro de empresa.** (depende de T6) [P con T8, T10]
   - Toca: `tests/unit/unidades/unit-prisma-where.test.ts` (nuevo),
     `tests/integration/unidades/unit-repository.int.test.ts`,
     `tests/unit/unidades/unit-actions.test.ts`, `tests/unit/unidades/list-units.test.ts`.
@@ -149,15 +149,25 @@
 
 ## Estado de la implementación (2026-09-08)
 
-Ocho de las doce cerradas. Las cuatro abiertas lo están **por el mismo motivo, y ninguna por
-código que falte**: la migración de esta feature **no está aplicada** en la base de desarrollo, y
-aplicarla no lo autoriza el arnés. Detalle, comando y error exacto en
-`progress/impl_QC-76-equivalencia-y-ambito-de-unidades.md > El bloqueo`.
+**Once de las doce cerradas.** La única abierta es **T12**, que es del leader por definición: el
+gate completo no lo corre el implementer.
 
-| Task | Estado | Por qué |
+El bloqueo que tuvo esta feature durante su primera mitad —la migración sin aplicar en la base de
+desarrollo, porque una unidad residual de un test duplicaba el símbolo `kg` y hacía fallar
+`units_system_symbol_unique`— **está resuelto**: el humano autorizó borrar esa fila y la migración
+se aplicó el 2026-09-08. Cómo se resolvió, y lo que se ejecutó después, en
+`progress/impl_QC-76-equivalencia-y-ambito-de-unidades.md > El bloqueo, y cómo se resolvió`.
+
+| Task | Estado | Evidencia |
 | --- | --- | --- |
-| T2 | escrita, **sin aplicar** | El `migration.sql` está completo y commiteado, y su UP/DOWN/re-UP se ejercitó entero contra el esquema real dentro de una transacción deshecha. Lo que falta es el `pnpm run db:migrate` de verdad |
-| T3 | escrita, **sin aplicar** | Igual que T2: el `down.sql` y sus dos guardias se ejercitaron en transacción deshecha, pero no con `pnpm run db:rollback` |
-| T5 | **escrita, sin ejecutar** | 32 casos con su SQLSTATE esperado. `vitest` los deja en rojo con `The column 'existe' does not exist in the current database`: faltan las columnas de la migración |
-| T9 | **parcial** | La mitad unitaria (`unit-prisma-where.test.ts`, `unit-actions.test.ts`) está verde. La de integración (`unit-repository.int.test.ts`) está escrita y falla por lo mismo |
-| T12 | pendiente del leader | El gate completo lo corre el leader, y no puede salir verde mientras T5 y T9 no se ejecuten |
+| T2 | **cerrada** | `pnpm run db:migrate` aplicó `20260907190000_units_equivalence_and_scope` sin error, y el `SELECT` devuelve las cuatro filas de R28: litro→mililitro 1000.0000, kilogramo→gramo 1000.0000, las cuatro sin empresa |
+| T3 | **cerrada** | `pnpm run db:rollback` de verdad: el esquema volvió a las seis columnas originales, con `units_name_normalized_key` global restaurado, sin disparador, sin función, sin los cuatro parciales, RLS activada y forzada, y las cuatro unidades intactas. `pnpm run db:migrate` volvió a aplicarla después |
+| T5 | **cerrada** | `unidades-constraints.int.test.ts`: 32 casos, todos verdes contra la base migrada |
+| T9 | **cerrada** | La mitad unitaria y la de integración, las dos verdes. `tests/integration/unidades` completo: 3 archivos, **48 tests, 0 saltados** |
+| T12 | del leader | El gate completo (`./init.sh`) lo corre el leader |
+
+Tres fixtures **de otras fichas** hubo que adaptarlos porque R15 —el símbolo único por ámbito—
+los invalidó: sembraban símbolos repetidos entre unidades de sistema (`'x'` tres veces, `'u'` doce,
+`'zz'` cuatro) y desde esta migración chocan con `23505`. Se derivan del marcador y **ningún aserto
+cambia**; el caso del desempate por `id` pasa a empatar con el símbolo **ausente**, que sigue siendo
+legal porque el índice es parcial. Está razonado en cada archivo.

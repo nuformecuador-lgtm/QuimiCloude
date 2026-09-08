@@ -74,11 +74,24 @@ function token(): string {
 
 /**
  * Siembra una unidad con nombre marcado. `nameNormalized` deriva del marcador porque su
- * indice unico es TOTAL: un nombre fijo chocaria con el catalogo arrancador o con otro caso.
+ * indice unico es por AMBITO (QC-76 R14) y estas filas se siembran SIN empresa, o sea de
+ * sistema: un nombre fijo chocaria con el catalogo arrancador o con otro caso.
+ *
+ * **El SIMBOLO tambien deriva del marcador, y desde QC-76 no es opcional que lo haga.** Antes
+ * era el literal `'x'` para las tres filas de un mismo caso, y podia serlo porque `symbol` no
+ * tenia ningun indice (QC-32 lo dejo a proposito sin el, su pregunta abierta 1). QC-76 la
+ * cierra: el simbolo es UNICO dentro del ambito cuando existe (R15, decision cerrada 28), y
+ * `units_system_symbol_unique` rechaza con 23505 la segunda fila de sistema que repita `'x'`.
+ * El fallo NO seria del comportamiento que estos casos miden -la cota y el orden-, sino del
+ * fixture, que es la peor forma de tener un test rojo.
  */
 async function seedUnit(name: string, marker: string, suffix: string): Promise<string> {
   const unit = await prisma.unit.create({
-    data: { name, nameNormalized: `${marker}${suffix}`, symbol: 'x' },
+    data: {
+      name,
+      nameNormalized: `${marker}${suffix}`,
+      symbol: `x${marker.slice(0, 8)}${suffix}`,
+    },
     select: { id: true },
   })
   return unit.id
@@ -186,7 +199,10 @@ describe('listUnits — R40: el orden', () => {
       // Y cada fila trae los tres campos que R40 pide, no un id suelto.
       const first = own[0]
       expect(first?.id).toMatch(/^[0-9a-f-]{36}$/u)
-      expect(first?.symbol).toBe('x')
+      // El simbolo esperado es el que sembro `seedUnit`, ahora derivado del marcador para no
+      // chocar contra `units_system_symbol_unique` (QC-76 R15). Se sigue afirmando que la fila
+      // TRAE su simbolo -que es lo que este caso mide-, no que valga un literal concreto.
+      expect(first?.symbol).toBe(`x${marker.slice(0, 8)}01`)
     } finally {
       await deleteUnits(ids)
     }
