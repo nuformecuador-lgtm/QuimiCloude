@@ -80,8 +80,14 @@ const CHILD_TEST_ID = 'pantalla-de-prueba';
 const testId = {
   sidebar: 'private-sidebar',
   user: 'private-user',
-  userTrigger: 'private-user-trigger',
+  // ENMIENDA DEL 2026-09-07 (decision humana, ver `components/private/nav-user.tsx`): el pie
+  // dejo de abrir un `DropdownMenu` cuyo unico item era cerrar sesion, y ese control se movio al
+  // encabezado (`app/(private)/components/logout-button.tsx`). Con el desaparecio
+  // `private-user-trigger`, asi que aqui NO se pulsa nada: el control ya esta en el arbol.
+  logout: 'private-logout',
   logoutForm: 'private-logout-form',
+  // Se conserva a proposito, para afirmar que sigue SIN existir.
+  userTriggerRetirado: 'private-user-trigger',
   dashboard: 'nav-dashboard',
   inventario: 'nav-inventario',
   pedidos: 'nav-pedidos',
@@ -94,7 +100,8 @@ const testId = {
   presentaciones: 'nav-presentaciones',
 } as const;
 
-/** Los diez codigos del catalogo de QC-74, sin escribir ninguno a mano. */
+/** Los codigos del catalogo de QC-74, sin escribir ninguno a mano. QC-38 lo dejo en ONCE al
+ *  anadir `unidades.modificar`, por eso se derivan y no se cuentan. */
 const TODOS_LOS_PERMISOS: readonly string[] = PERMISSIONS.map((permiso) => permiso.code);
 
 function sessionUser(permissions: readonly string[]): SessionUser {
@@ -153,18 +160,19 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
   it('con solo `inventario.consultar`, el control de cerrar sesion sigue presente', async () => {
     // R14 — cerrar sesion no exige ningun permiso del catalogo.
-    const usuario = userEvent.setup();
     await renderLayout(['inventario.consultar']);
 
     expect(screen.getByTestId(testId.user)).toBeInTheDocument();
 
-    await usuario.click(screen.getByTestId(testId.userTrigger));
-    expect(await screen.findByTestId(testId.logoutForm)).toBeInTheDocument();
+    // Sin pulsar: el control vive en el encabezado desde la enmienda del 2026-09-07, no detras de
+    // un menu. Se afirma tambien que el disparador retirado NO volvio.
+    expect(screen.queryByTestId(testId.userTriggerRetirado)).toBeNull();
+    expect(screen.getByTestId(testId.logout)).toBeInTheDocument();
+    expect(screen.getByTestId(testId.logoutForm)).toBeInTheDocument();
   });
 
-  it('sin ningun permiso, el menu queda sin items y el pie con cerrar sesion sigue ahi', async () => {
+  it('sin ningun permiso, el menu queda sin items y la salida sigue ahi', async () => {
     // R9, R14 — nadie se queda encerrado: menu vacio, pero salida presente.
-    const usuario = userEvent.setup();
     await renderLayout([]);
 
     const navegacion = screen.getByRole('navigation', { name: PRIVATE_NAV_LABEL });
@@ -182,15 +190,17 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       expect(screen.queryByTestId(item), `${item} no debe estar en el arbol`).toBeNull();
     }
 
-    // La barra lateral sigue montada y el pie tambien: es la unica salida que le queda.
+    // La barra lateral sigue montada y el pie tambien, y la salida esta en el encabezado: es lo
+    // unico que le queda a quien no tiene ningun permiso.
     expect(screen.getByTestId(testId.sidebar)).toBeInTheDocument();
     expect(screen.getByTestId(testId.user)).toBeInTheDocument();
 
-    await usuario.click(screen.getByTestId(testId.userTrigger));
-    expect(await screen.findByTestId(testId.logoutForm)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.userTriggerRetirado)).toBeNull();
+    expect(screen.getByTestId(testId.logout)).toBeInTheDocument();
+    expect(screen.getByTestId(testId.logoutForm)).toBeInTheDocument();
   });
 
-  it('con los diez permisos del catalogo estan los seis items del menu', async () => {
+  it('con el catalogo entero de permisos estan los seis items del menu', async () => {
     // R4 — el filtrado quita items, nunca los inventa ni los pierde: con todo el catalogo, el
     // arbol es el de `PRIVATE_NAV_ITEMS` entero.
     await renderLayout(TODOS_LOS_PERMISOS);
