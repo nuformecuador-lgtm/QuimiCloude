@@ -250,3 +250,12 @@ $ pnpm exec vitest run tests/unit/configuracion-ui tests/guards tests/unit/unida
   (`unidades-convenciones.test.ts` de la ruta) y T13 (`unidades-viewport.test.tsx`).
 - **Pendientes sin bloqueo:** T14 (E2E, Playwright no usa `user-event`) y T15 (cierre).
 - **Diferido hasta que QC-58 esté `done`:** el cuarto bullet de T4.
+
+## Nota explícita para el reviewer — R34 sin cobertura, y por qué
+
+**La corrección de que `factor` no viaje como cadena vacía está sin cobertura hasta que exista el
+test de T10** (`tests/unit/configuracion-ui/unit-sheet.test.tsx`), que es el que ancla R34 espiando
+el `FormData` enviado. No es un descuido: el test de T10 exige simular interacción de usuario y está
+**bloqueado a la espera de `setupUser()`** (`tests/helpers/user-event.ts`, que sale de QC-58 y aún
+no está en `dev`). El código de producción ya cumple R34; lo que falta es el ancla que impida que
+alguien lo desande.
