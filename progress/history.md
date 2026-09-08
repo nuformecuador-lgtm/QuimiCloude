@@ -2195,3 +2195,49 @@ las de sistema. 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abier
   Dominio` sigue listando «unidades (QC-51)», ficha cancelada al acotar ésta.
 - **Desbloquea QC-38** (`crud-de-unidades`: alta, edición y borrado encima de esto), y tras ella
   QC-39.
+
+## QC-75 — menu-y-rutas-por-permiso (cerrada el 2026-09-08, PR #44, merge `bc343cf`)
+
+- La zona privada deja de enseñar lo que no se puede usar. El menú lateral se arma **en el
+  servidor** filtrando `PRIVATE_NAV_ITEMS` por `<modulo>.consultar` de quien entra (grupo sin hijos
+  visibles desaparece entero); las **ocho** páginas privadas cortan con
+  `requirePagePermission(...)` **antes de leer datos**, y quien no tiene permiso recibe **404**, no
+  un redirigido. El 404 se pinta en `app/(private)/not-found.tsx`, **dentro** del layout privado:
+  menú vacío pero con cerrar sesión alcanzable, así que nadie queda encerrado. El login deja de
+  llevar siempre al dashboard: va a la primera pantalla visible de esa persona.
+- Del middleware sale la lista de reglas ruta-a-rol: queda solo con lo que puede comprobar sin base
+  —firma, caducidad y empresa—. **Una sola verdad sobre quién entra a qué, y vive donde sí se lee la
+  base.** El coste aceptado: la petición sin permiso llega al servidor, sobre la lectura de sesión
+  que el layout ya hacía en cada render (R19 la fija en **una sola** por render).
+- Requisitos cubiertos: **R1–R22**, los 22 con test verificado abriendo el archivo, no contra el
+  mapa. 16/16 tasks. `reviewer` **APROBADO en una sola ronda**: 0 mayores, 3 menores, con **siete
+  mutaciones** al código de producción, las siete cazadas. `./init.sh` completo en verde antes del
+  PR. 66 archivos, +5081 / −967.
+- **Un bug real que destapó el E2E, no el diseño**: `login/page.tsx` fabricaba `DASHBOARD_ROUTE`
+  como respaldo y `LoginForm` lo traía como valor por defecto, así que el campo oculto `next`
+  viajaba con `/dashboard` en **todo** login sin `?next=` y ganaba dentro de `loginAction` — R11
+  quedaba muerto en el navegador aunque el unitario pasara. Arreglado con cadena vacía en ambos
+  puntos, y la red de regresión se puso en **las dos capas** (`login-action` con el `next` presente
+  pero vacío, `login-form` con el campo oculto vacío). QC-9 R8/R9 no se debilitó.
+- **Relajación acotada del centinela de QC-12**: `dashboard-route-contract` tenía prohibido a
+  `page.tsx` tocar composition, y ahora debe importar el helper del corte. Se descuenta **solo** ese
+  import, con regexp anclada a línea completa cuya ruta sale de las mismas constantes que el caso
+  positivo, y la lista entera de prohibidos se aplica a lo que queda. Cerrada por los dos lados: hay
+  caso que se pone rojo si el import desaparece, para que la excepción no quede verde por vacuidad.
+- Guardias nuevas que impiden la reincidencia: `guard-nav-permisos-declarados` (todo enlace del menú
+  declara un permiso **del catálogo**, sin comodín), `guard-pantallas-exigen-permiso` (una página
+  privada nueva sin corte pone el gate rojo con nombre de archivo) y `qc75-convenciones`, que además
+  afirma contra el merge-base que la ficha **no tocó** esquema, migraciones, seed, el dominio de los
+  cinco módulos ni `package.json`. Sin backend propio y sin librería nueva.
+- **El E2E de permisos que `CHECKPOINTS.md` exigía ya existe**: `e2e/permisos.spec.ts` — el Operador
+  entra, aterriza en inventario, ve el menú recortado y recibe 404 al pedir `/pedidos` por URL.
+- Menores vivos, ninguno bloqueante: **M1**, que el layout nunca llame a `notFound()` lo sostienen
+  hoy los comentarios y el E2E, y una línea en `qc75-convenciones` lo cazaría en `--rapido` en vez
+  de en el test más caro; **M2**, operativo: `permisos.spec.ts` depende del seed de QC-6/QC-74 para
+  el rol `Operador`, así que fuera del worktree la base tiene que estar sembrada (falla con mensaje
+  explícito); **M3**, `CHECKPOINTS.md > Permisos` sigue diciendo «vía `cookies()`», mecanismo que la
+  página ya no toca y que el propio centinela le **prohíbe** nombrar — prosa desfasada, no de esta
+  ficha.
+- **Cierra la deuda provisional de QC-45**: el item de Configuración que se ocultaba a mano al no
+  Administrador queda sustituido por el menú filtrado por permisos en el servidor.
+- **Cerrada el 2026-09-08**: PR #44 mergeado (merge del board a *Finalizado* y comentario con la URL en el issue). Worktree ya desmontado; la ficha pasa a `done` en `feature_list.json`.
