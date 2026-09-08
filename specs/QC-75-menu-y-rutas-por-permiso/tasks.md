@@ -145,7 +145,7 @@
 
 ## Cierre
 
-- [ ] **T16. Bitácora y trazabilidad** — depende de todas
+- [x] **T16. Bitácora y trazabilidad** — depende de todas
   - Toca: `progress/impl_QC-75-menu-y-rutas-por-permiso.md`.
   - Hecho: contiene el mapa `R1..R22 -> test` completo (`CHECKPOINTS.md > Trazabilidad`), el comando
     y la salida de cada verde, y `./init.sh` completo en verde pegado antes del PR.
