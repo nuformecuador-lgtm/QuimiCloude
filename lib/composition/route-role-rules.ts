@@ -25,6 +25,7 @@ import {
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
+  PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
 } from '@/lib/shared/routes';
 
@@ -59,4 +60,9 @@ export const ROUTE_ROLE_RULES: readonly RouteRoleRule[] = [
   // veces por dos puertas. La fila solo anade una constante de `lib/shared/routes`, ya en el
   // cierre de imports, asi que este archivo sigue cargando en el BORDE (`guard-middleware-edge`).
   { prefix: ORDERS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
+  // QC-45 R6 — la pantalla de presentaciones, solo Administrador. UNA sola fila: la busqueda
+  // casa por segmentos y no hay pagina de detalle. Reutiliza el `ROLE_ADMINISTRADOR` que este
+  // archivo ya importa del barrel de `identity`, y solo anade una constante de
+  // `lib/shared/routes` ya presente en el cierre de imports: sigue cargando en el BORDE.
+  { prefix: PRESENTATIONS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
 ];

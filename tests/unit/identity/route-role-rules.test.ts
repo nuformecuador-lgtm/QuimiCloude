@@ -15,6 +15,7 @@ import {
   INVENTORY_ROUTE,
   NEW_RECIPE_ROUTE,
   ORDERS_ROUTE,
+  PRESENTATIONS_ROUTE,
   recipeEditRoute,
   SUPPLIERS_ROUTE,
   supplierDetailRoute,
@@ -74,7 +75,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   // `INVENTORY_ROUTE` y `FORMULAS_ROUTE` de `lib/shared/routes` —que el dominio no puede
   // importar—. El rol ya no es motivo: `ROLE_ADMINISTRADOR` sale del barrel de `identity`,
   // igual que en cualquier otro consumidor.
-  it('declara exactamente cuatro reglas, en orden: inventario, recetas, proveedores y pedidos, las cuatro solo Administrador (R4, R6)', () => {
+  it('declara exactamente cinco reglas, en orden: inventario, recetas, proveedores, pedidos y presentaciones, las cinco solo Administrador (R4, R6)', () => {
     // AMPLIADO otra vez el 2026-09-04 (QC-44 T3, R6): la TERCERA fila es la pantalla de
     // proveedores. El centinela no se relaja: sigue exigiendo la lista EXACTA y COMPLETA, en el
     // orden real, asi que una cuarta regla sin ficha que la respalde vuelve a ponerlo en rojo.
@@ -86,6 +87,13 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
       // pedidos. El centinela sigue exigiendo la lista EXACTA y COMPLETA, en el orden real, asi
       // que una quinta regla sin ficha que la respalde vuelve a ponerlo en rojo.
       { prefix: ORDERS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
+      // AMPLIADO otra vez el 2026-09-07 (QC-45 T3, R6): la QUINTA fila es la pantalla de
+      // presentaciones — el catalogo de envases vive bajo `/configuracion` y, como las otras
+      // cuatro, solo la abre el Administrador. La ruta se nombra con `PRESENTATIONS_ROUTE` de
+      // `@/lib/shared/routes`, nunca con el literal. El centinela sigue exigiendo la lista
+      // EXACTA y COMPLETA, en el orden real, asi que una sexta regla sin ficha que la respalde
+      // vuelve a ponerlo en rojo.
+      { prefix: PRESENTATIONS_ROUTE, roles: [ROLE_ADMINISTRADOR] },
     ]);
   });
 
@@ -137,7 +145,7 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
   });
 
   // R2 — la fila se deriva de la constante unica de ruta; el literal no se reescribe aqui.
-  it('las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE, ORDERS_ROUTE y ROLE_ADMINISTRADOR, no de literales propios', () => {
+  it('las filas se derivan de INVENTORY_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE, ORDERS_ROUTE, PRESENTATIONS_ROUTE y ROLE_ADMINISTRADOR, no de literales propios', () => {
     const fuente = readFileSync('lib/composition/route-role-rules.ts', 'utf8')
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -148,6 +156,8 @@ describe('ROUTE_ROLE_RULES — la lista real', () => {
     expect(fuente).not.toContain(`'${FORMULAS_ROUTE}'`);
     expect(fuente).not.toContain(`'${SUPPLIERS_ROUTE}'`);
     expect(fuente).not.toContain(`'${ORDERS_ROUTE}'`);
+    // QC-45 R6/R2 — la fila de presentaciones tambien se deriva de la constante unica de ruta.
+    expect(fuente).not.toContain(`'${PRESENTATIONS_ROUTE}'`);
     expect(fuente).not.toContain(`'${ROLE_ADMINISTRADOR}'`);
   });
 });
