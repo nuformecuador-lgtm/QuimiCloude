@@ -12,7 +12,7 @@
 
 ## Fase A — Esquema y base de datos
 
-- [ ] **T1. `db/schema.prisma`: `model Unit` gana `companyId`, `baseUnitId` y `factor`.**
+- [x] **T1. `db/schema.prisma`: `model Unit` gana `companyId`, `baseUnitId` y `factor`.**
   - Toca: `db/schema.prisma`.
   - Las tres columnas **opcionales**, `factor` como `Decimal? @db.Decimal(14,4)`, `companyId` y
     `baseUnitId` como **escalares sin `@relation`** (`design.md > 2.1`). Los dos `@@index`
@@ -43,7 +43,7 @@
     diff de `\d units`— y volver a aplicar T2 funciona; y con una unidad de empresa creada a mano el
     rollback **falla con su mensaje** y no borra nada. Cubre: R33, R34.
 
-- [ ] **T4. Tests de esquema y de migración.** (depende de T3) [P con T5]
+- [x] **T4. Tests de esquema y de migración.** (depende de T3) [P con T5]
   - Toca: `tests/unit/unidades/schema/unidades-schema.test.ts`,
     `tests/unit/unidades/schema/unidades-migration.test.ts`.
   - Esquema: las tres columnas con su tipo y su opcionalidad, `units` **sin** `deleted_at`, **sin**
@@ -68,7 +68,7 @@
 
 ## Fase B — El ámbito en el listado
 
-- [ ] **T6. `Actor` gana `companyId` y el listado lo propaga hasta el `where`.** (depende de T1)
+- [x] **T6. `Actor` gana `companyId` y el listado lo propaga hasta el `where`.** (depende de T1)
   - Toca: `lib/modules/unidades/domain/actor.ts`, `domain/unit-scope.ts` (nuevo),
     `domain/list-units.ts`, `ports/unit-repository.ts`,
     `adapters/driven/persistence/unit-prisma.ts`, `adapters/driving/unit-actions.ts`,
@@ -84,7 +84,7 @@
   - **Hecho cuando**: `pnpm typecheck` en verde y quitar el `scope` de cualquier llamada **no
     compila**. Cubre: R17, R18, R19, R20, R21, R36.
 
-- [ ] **T7. La conversión, en el dominio.** (depende de T1) [P con T6]
+- [x] **T7. La conversión, en el dominio.** (depende de T1) [P con T6]
   - Toca: `lib/modules/unidades/domain/convert-quantity.ts` (nuevo), `domain/errors.ts`
     (`IncompatibleUnitsError`), `lib/modules/unidades/index.ts`.
   - Función **pura**, decimales como texto, aritmética con `BigInt` sobre enteros escalados, base
@@ -99,7 +99,7 @@
 
 ## Fase C — Verificación
 
-- [ ] **T8. Tests unitarios de la conversión.** (depende de T7) [P con T9, T10]
+- [x] **T8. Tests unitarios de la conversión.** (depende de T7) [P con T9, T10]
   - Toca: `tests/unit/unidades/domain/convert-quantity.test.ts` (nuevo).
   - Casos: unidad consigo misma; derivada → su base (1 litro = `1000` mililitros); base → derivada;
     dos derivadas de la misma base; factor menor que 1 (media garrafa); resultado muy pequeño
@@ -121,7 +121,7 @@
   - **Hecho cuando**: todos verdes y el test de integración falla si se borra el `OR`.
     Cubre: R17, R18, R19.
 
-- [ ] **T10. Los tests que ya existen siguen verdes sin relajar expectativas.** (depende de T6)
+- [x] **T10. Los tests que ya existen siguen verdes sin relajar expectativas.** (depende de T6)
     [P con T8, T9]
   - Toca: `tests/unit/unidades/list-units.test.ts`, `list-units-query.test.ts`,
     `unit-actions.test.ts`, `module-contract.test.ts` y los fixtures de actor que hayan cambiado de
@@ -131,7 +131,7 @@
   - **Hecho cuando**: el diff de esos archivos no borra ni afloja ninguna aserción previa.
     Cubre: R20, R21.
 
-- [ ] **T11. Cierre de límites de alcance.** (depende de T6, T7)
+- [x] **T11. Cierre de límites de alcance.** (depende de T6, T7)
   - Toca: nada de producción; comprobación sobre el árbol.
   - `rg convertQuantity lib/ app/ components/` no devuelve nada fuera de `lib/modules/unidades`
     (R26); no hay adaptador driving nuevo, ni ruta, ni pantalla (R35); `findUnitRefs` sigue sin
@@ -146,3 +146,18 @@
     escrito, siguiendo la tabla de `design.md > 9`. Un requisito sin test es un fallo de la feature
     (regla 4 de `CLAUDE.md`).
   - **Hecho cuando**: gate verde y las 38 filas del mapa apuntan a un test que existe y se ejecuta.
+
+## Estado de la implementación (2026-09-08)
+
+Ocho de las doce cerradas. Las cuatro abiertas lo están **por el mismo motivo, y ninguna por
+código que falte**: la migración de esta feature **no está aplicada** en la base de desarrollo, y
+aplicarla no lo autoriza el arnés. Detalle, comando y error exacto en
+`progress/impl_QC-76-equivalencia-y-ambito-de-unidades.md > El bloqueo`.
+
+| Task | Estado | Por qué |
+| --- | --- | --- |
+| T2 | escrita, **sin aplicar** | El `migration.sql` está completo y commiteado, y su UP/DOWN/re-UP se ejercitó entero contra el esquema real dentro de una transacción deshecha. Lo que falta es el `pnpm run db:migrate` de verdad |
+| T3 | escrita, **sin aplicar** | Igual que T2: el `down.sql` y sus dos guardias se ejercitaron en transacción deshecha, pero no con `pnpm run db:rollback` |
+| T5 | **escrita, sin ejecutar** | 32 casos con su SQLSTATE esperado. `vitest` los deja en rojo con `The column 'existe' does not exist in the current database`: faltan las columnas de la migración |
+| T9 | **parcial** | La mitad unitaria (`unit-prisma-where.test.ts`, `unit-actions.test.ts`) está verde. La de integración (`unit-repository.int.test.ts`) está escrita y falla por lo mismo |
+| T12 | pendiente del leader | El gate completo lo corre el leader, y no puede salir verde mientras T5 y T9 no se ejecuten |
