@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 
 import { DataTablePagination } from '@/components/shared/data-table/data-table-pagination';
 import { PAGE_SIZE_OPTIONS, createDefaultParams } from '@/components/shared/data-table/data-table-params';
@@ -66,7 +66,7 @@ describe('DataTablePagination', () => {
   });
 
   it('avanzar emite page + 1 sin tocar el resto de parametros', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const params = { ...createDefaultParams(), page: 2, search: 'sosa' };
     const onParamsChange = vi.fn();
 
@@ -86,7 +86,7 @@ describe('DataTablePagination', () => {
   });
 
   it('retroceder emite page - 1 sin tocar el resto de parametros', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const params = { ...createDefaultParams(), page: 2, search: 'sosa' };
     const onParamsChange = vi.fn();
 
@@ -119,7 +119,7 @@ describe('DataTablePagination', () => {
   });
 
   it('el selector de tamano ofrece exactamente las opciones de PAGE_SIZE_OPTIONS', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(
       <DataTablePagination
@@ -140,7 +140,7 @@ describe('DataTablePagination', () => {
   });
 
   it('cambiar el tamano de pagina emite page: 1 con el nuevo tamano', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const params = { ...createDefaultParams(), page: 3 };
     const onParamsChange = vi.fn();
     const otherOption = PAGE_SIZE_OPTIONS.find((option) => option !== params.pageSize)!;

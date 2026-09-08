@@ -155,8 +155,9 @@ diagnóstico fallido). **R18** deja el E2E diferido con su motivo.
 
 ## Preguntas abiertas
 
-**Ninguna.** Las seis que había al acotar las cerró el humano el 2026-09-07 y están en la tabla de
-abajo.
+**Ninguna.** Las que había al acotar las cerró el humano el 2026-09-07 y están en la tabla de
+abajo. La novena la cerró el 2026-09-08, ya durante la implementación: la migración destapó dos
+tests que dependían sin saberlo del retardo entre teclas.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -170,6 +171,7 @@ abajo.
 | 2026-09-07 | ¿Qué se lleva del baseline? | **Las tres de esta causa**: `unit/inventario/product-page`, `unit/proveedores-ui/catalog-line-sheet` y `unit/proveedores-ui/supplier-page`. Las dos estructurales se quedan, **con su motivo corregido**: el de `recipe-route-contract` hoy **miente**, porque falla por la migración de QC-35 que aparece en el diff, no por el rango de git vacío que dice su nota |
 | 2026-09-07 | ¿Cambia la `zone`? | **No, sigue `frontend`**, aunque ahora toque la configuración de los tres proyectos. Cambiarla a `fullstack` dispararía la partición en dos fichas (`AGENTS.md > Particion de fullstack`), que no tiene sentido para un arreglo de configuración |
 | 2026-09-07 | ¿La colisión de correlativo entra aquí? | **No: es QC-77.** `order-repository.int.test.ts` falla con «Ya existe la llave (order_year, order_sequence)», y eso es **estado residual** en la base compartida, no plazo. Son causas distintas y mezclarlas haría que ninguna de las dos se pueda dar por probada |
+| 2026-09-08 | Quitar el retardo deja dos tests en rojo porque el popup aún no es interactivo. ¿Qué se hace? | **Se espera explícitamente a que la opción sea interactiva antes de pincharla**, en `proveedores-ui/unit-select.test.tsx` y `shared/data-table-pagination.test.tsx`. **No se relaja ninguna aserción**: se pide de forma explícita el mismo respiro que antes se obtenía por accidente del `setTimeout(0)` que `user-event` intercalaba. Se descartan las dos salidas por excepción —sacarlos de la migración, o listarlos en la guardia— porque pasarían de 1 a 3 excepciones y erosionarían justo lo que esta ficha compra: que exista **una** forma de teclear. **Se acepta a cambio que estos dos archivos excedan el «cambio mecánico de una línea» del bloque B**, y que R9 se lea sobre el comportamiento del componente, no sobre el cuerpo literal del test |
 
 ### El terreno medido antes de especificar (2026-09-07)
 

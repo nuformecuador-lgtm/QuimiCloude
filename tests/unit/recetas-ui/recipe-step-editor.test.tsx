@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
@@ -290,7 +291,7 @@ describe('RecipeStepEditor', () => {
 
   describe('R6 — el marcado no se edita, se lee', () => {
     it('R6: el checkbox de un item de la lista de verificacion no cambia de estado al pulsarlo dentro del editor', async () => {
-      const usuario = userEvent.setup();
+      const usuario = setupUser();
       const editable = await montar({
         blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Balanza calibrada' }] }] }],
       });
@@ -412,7 +413,7 @@ describe('RecipeStepEditor', () => {
 
   describe('R27 — operable enteramente por teclado', () => {
     it('R27: los tres botones de la barra son alcanzables por tabulador y se activan sin raton, y aria-pressed refleja el estado', async () => {
-      const usuario = userEvent.setup();
+      const usuario = setupUser();
       await montar();
 
       const negrilla = screen.getByRole('button', { name: 'Negrilla' });

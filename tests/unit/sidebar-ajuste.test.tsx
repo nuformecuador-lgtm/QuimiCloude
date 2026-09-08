@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
@@ -159,7 +159,7 @@ describe('barra lateral: ajuste al diseno', () => {
   });
 
   it('la pastilla del borde apunta al panel y alterna su estado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderSidebar(NAV_MINIMA);
 
     const pastilla = screen.getByTestId('private-sidebar-edge-toggle');

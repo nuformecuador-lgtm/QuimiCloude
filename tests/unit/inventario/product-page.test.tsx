@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import PrivateLayout from '@/app/(private)/layout';
@@ -569,7 +570,7 @@ describe('pantalla de productos — lista', () => {
     // que la edicion conservaba el costo; ese campo se fue con la columna, asi que lo que se
     // afirma ahora es la ausencia completa: ni columna, ni celda, ni campo oculto, ni ningun
     // valor derivado de los tres.
-    const user = userEvent.setup();
+    const user = setupUser();
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
@@ -655,7 +656,7 @@ describe('pantalla de productos — lista', () => {
   it('el selector de tamano de pagina ofrece 10 y 25 y usa 10 por defecto', async () => {
     // R10 — el defecto se observa en lo que se le PIDE al backend, que es quien decide la
     // consulta; las dos opciones, en el selector.
-    const user = userEvent.setup();
+    const user = setupUser();
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()], { total: 40 }));
 
     await renderPantalla();
@@ -689,7 +690,7 @@ describe('pantalla de productos — lista', () => {
 
   it('permite avanzar y retroceder de pagina e indica la pagina actual y el total', async () => {
     // R11
-    const user = userEvent.setup();
+    const user = setupUser();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([producto()], { page: 2, total: 30, totalPages: 3 }),
     );
@@ -733,7 +734,7 @@ describe('pantalla de productos — lista', () => {
     // Lo que R13 protegia de verdad -que no se filtre ni se ordene DENTRO de la pagina ya
     // descargada- sigue afirmado, y por la via mas dura: cada gesto NAVEGA, y la lista se vuelve
     // a pedir al servidor con la consulta nueva.
-    const user = userEvent.setup();
+    const user = setupUser();
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()], { total: 40 }));
 
     await renderPantalla();
@@ -816,7 +817,7 @@ describe('pantalla de productos — lista', () => {
 
   it('un error de la consulta presenta el estado de error con reintento y no una tabla vacia', async () => {
     // R16
-    const user = userEvent.setup();
+    const user = setupUser();
     listProductsActionMock.mockResolvedValue({
       status: 'error',
       code: 'invalid_input',
@@ -874,7 +875,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
   it('crear abre un panel lateral sobre la lista, sin navegar ni perder la pagina', async () => {
     // R17 — panel lateral, no pagina completa ni dialogo centrado. Abrirlo y cerrarlo no cambia
     // la URL, asi que la lista de detras conserva pagina y tamano.
-    const user = userEvent.setup();
+    const user = setupUser();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([producto()], { page: 2, pageSize: MAX_PAGE_SIZE, total: 60 }),
     );
@@ -912,7 +913,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
   it('la edicion precarga los valores actuales y envia el reemplazo completo', async () => {
     // R19
-    const user = userEvent.setup();
+    const user = setupUser();
     const elProducto = producto({ name: 'Sosa cáustica' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
@@ -967,7 +968,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
   it('un guardado rechazado por un campo muestra el error en linea y no cierra el panel', async () => {
     // R20 (primera mitad) — el error identifica campo, asi que va junto al campo. Y no se llega
     // siquiera a llamar a la operacion: la validacion previa usa el mismo esquema del servidor.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
@@ -1000,7 +1001,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
   it('un guardado rechazado por la operacion muestra el error del formulario y conserva lo escrito', async () => {
     // R20 (segunda mitad) — `unauthorized` no identifica campo: va a la region de error del
     // formulario, el panel sigue abierto y lo escrito sigue ahi.
-    const user = userEvent.setup();
+    const user = setupUser();
     createProductActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -1033,7 +1034,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
   it('un guardado con exito cierra el panel, avisa por toast y refresca la lista', async () => {
     // R21 — y R18: el alta sale por la Server Action del catalogo, con los campos de negocio.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
@@ -1063,7 +1064,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     //      boton sin tipo dentro de el lo ENVIA, y pedir ayuda guardaria el producto-;
     //   2. que tenga nombre accesible propio, porque su contenido es un icono;
     //   3. que el texto de la ayuda no este en el documento hasta que se pide.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
@@ -1098,7 +1099,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     //
     // Lo que se vigila aqui es que la ausencia siga siendo intencionada: ni un campo de texto que
     // reviva la premisa caida, ni un hueco donde alguien teclee un UUID a mano.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
@@ -1134,7 +1135,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // desplegable-, sino llegar al FINAL DEL SCROLL del autocomplete. Lo que R24 exige se afirma
     // igual de fuerte: la pagina 2 se pide al servidor y su presentacion queda disponible junto
     // a la de la pagina 1.
-    const user = userEvent.setup();
+    const user = setupUser();
     listPresentationsActionMock.mockResolvedValueOnce(
       paginaDePresentaciones([PRESENTACION_A], { page: 1, totalPages: 2 }),
     );
@@ -1174,7 +1175,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // R24 (segunda mitad) — un producto no puede existir sin presentacion, y esta pantalla ya no
     // trae el catalogo de presentaciones: sin esto, una base sin presentaciones deja el alta
     // muerta.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
@@ -1197,7 +1198,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
   it('el borrado pide confirmacion nombrando el producto y sin confirmar no invoca la operacion', async () => {
     // R26
-    const user = userEvent.setup();
+    const user = setupUser();
     const elProducto = producto({ name: 'Peróxido de hidrógeno' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
@@ -1225,7 +1226,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
   it('un borrado con exito cierra el dialogo, avisa por toast y refresca la lista', async () => {
     // R21 aplicado al borrado (R26 remata en R21).
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirBorrado));

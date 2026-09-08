@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 
 import { fireEvent, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { setupUser } from '../../helpers/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataTable } from '@/components/shared/data-table/data-table'
@@ -174,7 +174,7 @@ describe.each([
     })
 
     it('se abre y un atajo emite su rango', async () => {
-      const usuario = userEvent.setup()
+      const usuario = setupUser()
       const { onParamsChange } = renderTabla()
 
       const disparadorFecha = screen.getByTestId('data-table-filter-date-creado')

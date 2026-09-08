@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { setupUser } from '../../helpers/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -51,7 +51,7 @@ const texts: DataTableTexts = {
 /** Fecha del sistema fijada para que los tres atajos den un resultado determinista. */
 const SYSTEM_DATE = new Date(2026, 5, 15) // 2026-06-15 (mes 0-index: junio)
 
-async function openPopover(user: ReturnType<typeof userEvent.setup>, columnId = 'creado') {
+async function openPopover(user: ReturnType<typeof setupUser>, columnId = 'creado') {
   await user.click(screen.getByTestId(`data-table-filter-date-${columnId}`))
 }
 
@@ -193,7 +193,7 @@ describe('DataTableFilterDate: atajos emitidos desde el control montado', () => 
     ['lastMonth', 'data-table-date-last-month'],
     ['lastYear', 'data-table-date-last-year'],
   ] as const)('activar el atajo "%s" emite el rango con from/to en YYYY-MM-DD', async (kind, testId) => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const onChange = vi.fn()
 
     render(
@@ -215,7 +215,7 @@ describe('DataTableFilterDate: atajos emitidos desde el control montado', () => 
   })
 
   it('el rango del atajo activado queda seleccionado y visible en el calendario (R18)', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
 
     function Harness() {
       const [value, setValue] = useState<Extract<DataTableFilterValue, { kind: 'dateRange' }> | undefined>(
@@ -259,7 +259,7 @@ describe('DataTableFilterDate: seleccion manual del rango en el calendario', () 
   })
 
   it('elegir dos dias en el calendario (controlado) emite el rango completo', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const onChangeSpy = vi.fn<(next: DataTableFilterValue | null) => void>()
 
     function Harness() {

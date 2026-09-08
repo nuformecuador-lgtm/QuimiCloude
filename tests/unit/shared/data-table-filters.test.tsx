@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { setupUser } from '../../helpers/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataTableFilters } from '@/components/shared/data-table/data-table-filters'
@@ -101,7 +101,7 @@ describe('DataTableFilters: solo aparecen las columnas que declaran filter (R15)
 
 describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue emitido (R16)', () => {
   it('forma "text": escribir en el campo emite { kind: "text", value }', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const { onParamsChange, params } = renderFilters()
 
     // Sin rebote (a diferencia de la busqueda global, R17): cada pulsacion emite de inmediato.
@@ -115,7 +115,7 @@ describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue
   })
 
   it('forma "numberRange": min y max emiten { kind: "numberRange", min, max }', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const { onParamsChange } = renderFilters()
 
     await user.type(screen.getByTestId('data-table-filter-min-cantidad'), '5')
@@ -125,7 +125,7 @@ describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue
   })
 
   it('forma "select": marcar una opcion emite { kind: "select", values }', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const { onParamsChange } = renderFilters()
 
     // `fireEvent.click` (no `userEvent.click`): el menu de Base UI, en jsdom, no abre con la
@@ -140,7 +140,7 @@ describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue
   })
 
   it('forma "dateRange": un atajo del filtro de fecha emite { kind: "dateRange", from, to }', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const { onParamsChange } = renderFilters()
 
     await user.click(screen.getByTestId('data-table-filter-date-creado'))
@@ -157,7 +157,7 @@ describe('DataTableFilters: un test por forma, afirmando el DataTableFilterValue
 
 describe('DataTableFilters: limpiar SACA la clave del objeto en vez de emitirla vacia (R16)', () => {
   it('el boton de limpiar de un filtro activo saca su clave de `filters`', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const conFiltro = withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'acido' })
     const { onParamsChange } = renderFilters({ params: conFiltro })
 
@@ -170,7 +170,7 @@ describe('DataTableFilters: limpiar SACA la clave del objeto en vez de emitirla 
   })
 
   it('limpiar un filtro no toca los demas filtros activos', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const conDos = withFilter(
       withFilter(createDefaultParams(), 'nombre', { kind: 'text', value: 'acido' }),
       'cantidad',

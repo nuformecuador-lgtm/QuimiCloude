@@ -126,7 +126,10 @@ de test rojo que no estuviera ya en `tests/baseline-rojos.json`**.
 saber que la deuda es de `dev` y no tuya. Y síémbralo con pocas entradas: si nace con cincuenta,
 nadie lo va a limpiar nunca.
 
-> **Estado en QuimiCloude (2026-09-04):** el baseline tiene **cinco** entradas. Dos son por el
+> **Estado en QuimiCloude (2026-09-08):** el baseline tiene **dos** entradas. Eran cinco hasta
+> QC-58, que retiró las tres que estaban ahí por los flakes de saturación —`inventario/product-page`,
+> `proveedores-ui/catalog-line-sheet` y `proveedores-ui/supplier-page`— en el mismo cambio que
+> arregló la causa (ver la sección siguiente). Las dos que quedan son por el
 > mismo motivo estructural: `tests/unit/recetas-ui/recipe-route-contract.test.ts` y
 > `tests/unit/recetas/module-contract.test.ts` contienen guardias que se apoyan en
 > `git diff --name-only origin/dev...HEAD` y que, estando en `dev`, no tienen rango que mirar
@@ -136,11 +139,13 @@ nadie lo va a limpiar nunca.
 > que el caso del diff se salte explícitamente cuando el rango no existe y que estas dos
 > entradas desaparezcan.
 
-### Los flakes de saturación: qué son, y qué NO los cura (2026-09-04)
+### Los flakes de saturación: qué son, qué NO los cura, y cómo se curaron (2026-09-04, arreglado en QC-58 el 2026-09-08)
 
 Los «2–5 flakes de saturación» de arriba tienen una firma concreta, y merece la pena reconocerla
-antes de perder una tarde: **`Test timed out in 5000ms`, en un test de UI que escribe con
-`userEvent`**. El campo controlado no llega a repintarse entre tecla y tecla cuando la máquina va
+antes de perder una tarde: **`Test timed out in <plazo>ms`, en un test de UI que escribe con
+`userEvent`**. Hasta QC-58 ese plazo era `5000` —el default de Vitest— y ese número era
+literalmente la firma; desde QC-58 son `15000`, así que si vuelves a verlo ahora es una señal
+mucho más seria que entonces: 15 s de espera no se agotan por contención de CPU sin más. El campo controlado no llega a repintarse entre tecla y tecla cuando la máquina va
 cargada, y la prueba escribe más rápido de lo que el campo se actualiza. El síntoma clásico es que
 las letras salgan intercaladas —`xxxxxAxcxixdxox` donde debía salir `Acido citrico`—.
 
@@ -164,11 +169,42 @@ Queda escrito para que el siguiente no recorra el mismo callejón: el límite mu
 el tiempo del gate y no elimina el fallo, porque la causa no es cuántos procesos hay sino que el
 plazo de 5 s es demasiado corto para `userEvent` en una máquina cargada.
 
-**El arreglo de verdad es de código y tiene ficha propia** —subir el `testTimeout` del proyecto de
-UI, o quitar el retardo entre teclas de `userEvent`—. Hasta que entre, estos archivos viven en el
-baseline, y ahí está el coste: **el baseline se está usando para tapar un problema que no es suyo
-y crece con cada feature**, que es exactamente lo que su propia nota advierte que no debe pasar.
-Sus entradas por esta causa se retiran **todas** en el mismo cambio que arregle el plazo.
+**El arreglo entró en QC-58 (2026-09-08), y fueron las dos cosas a la vez**, porque eran dos
+causas y no una:
+
+- **El plazo.** `testTimeout: 15_000` declarado **dentro del bloque `test` de cada uno de los tres
+  proyectos** (`ui`, `node`, `integration`), nunca en la raíz de `vitest.config.mts`: es opción por
+  proyecto y confiar en la herencia es una apuesta que sale verde si la pierdes. Y a los tres, no
+  sólo a `ui`: el mismo día falló `composition/identity-facade`, del proyecto `node`, que **no
+  teclea nada** y murió cargando el barril de `@/lib/composition`. La causa es contención de CPU y
+  no distingue de proyecto. Lo único que cuesta es que un test colgado de verdad tarda 15 s en
+  reportarse en vez de 5.
+- **La forma de teclear.** Una sola definición compartida, `setupUser()` en
+  `tests/helpers/user-event.ts`, con `delay: null`. Antes había 206 llamadas sueltas a
+  `userEvent.setup()` repartidas por 33 archivos; lo que se compró no fue quitar código duplicado
+  —es una línea— sino que exista **un** sitio donde está escrito cómo se teclea en este repo, en
+  vez de que la llamada 207 volviera a nacer mal sin que nadie lo decidiera. `delay: null` quita
+  sólo la espera artificial entre eventos: la secuencia que recibe el DOM es idéntica y **no se
+  relaja ninguna** comprobación de `user-event`, incluida la de `pointer-events`.
+
+Las dos mitades las vigila `tests/guards/guard-teclear-y-plazo.test.ts`, que vive en las guardias
+a propósito: ningún grafo de imports seleccionaría ni la configuración ni un test que nadie
+importa. La guardia lee la **configuración resuelta**, no el texto del archivo —un `testTimeout`
+escrito en un comentario o en la raíz satisface a un regex y no cambia nada—, y se probó con
+cuatro mutaciones del archivo real, no sólo con su caso verde.
+
+Que el número esté escrito no prueba que rija: se comprobó además **en ejecución**, con una sonda
+temporal por proyecto (un test de 7000 ms, por encima del plazo viejo y por debajo del nuevo). Los
+tres pasaron con 15000 y los tres murieron con `Test timed out in 5000ms` al volver a bajarlo. Las
+sondas **no se quedaron** en la batería: pagar ~21 s de reloj en cada corrida para siempre, a
+cambio de algo que sólo puede cambiar si alguien toca la config —y eso ya lo vigila la guardia—,
+es mal negocio. Cómo repetirlas está en `progress/impl_QC-58-timeout-tests-ui-bajo-carga.md`.
+
+**Sus tres entradas del baseline se retiraron en ese mismo cambio**, que es lo que hace que el
+arreglo cuente: si la causa se arregla y las entradas se quedan, el gate sigue ciego sobre esos
+archivos y nadie se entera. Ahí estaba el coste mientras duró: **el baseline se estaba usando para
+tapar un problema que no era suyo y crecía con cada feature**, que es exactamente lo que su propia
+nota advierte que no debe pasar.
 
 ## Cuando lo que verificas es el gate mismo
 

@@ -8,6 +8,7 @@
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -214,7 +215,7 @@ describe('cambiar orden, filtro o pagina navega con la consulta esperada (R15, R
   });
 
   it('marcar un valor del filtro de estado pide la lista de nuevo con ese filtro', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const params = montar();
 
     // `fireEvent.click` para abrir el menu de Base UI en jsdom, como ya hace la suite de QC-55.

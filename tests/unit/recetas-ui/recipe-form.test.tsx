@@ -1,5 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent, { type UserEvent } from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
+
+import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
@@ -106,14 +108,16 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 /**
  * Margen de tiempo (review de QC-26, MAYOR 1). Estos casos montan el formulario entero y lo
  * conducen con decenas de interacciones reales de `user-event` sobre selectores con popup; en
- * aislado los mas largos rondaban 1,7-1,9 s contra el `testTimeout` por defecto de 5000 ms, y
+ * aislado los mas largos rondaban 1,7-1,9 s contra el `testTimeout` que por entonces era el de
+ * Vitest por defecto, 5000 ms (desde QC-58 los tres proyectos declaran 15000 ms), y
  * ese margen de 2,7x NO aguantaba la paralelizacion de la suite completa: R30 y R31 expiraban
  * de forma reproducible.
  *
  * Se corrigen las DOS causas, sin tocar ni una asercion:
  *
- * 1) `setupUser()` (mas abajo) elimina la espera artificial entre eventos, que era la mitad del
- *    coste. Los eventos que se emiten son EXACTAMENTE los mismos.
+ * 1) `setupUser()` elimina la espera artificial entre eventos, que era la mitad del coste. Los
+ *    eventos que se emiten son EXACTAMENTE los mismos. Desde QC-58 ya no se define aqui: vive
+ *    en `tests/helpers/user-event.ts` y lo usa todo el repo. Este archivo fue el precedente.
  * 2) Este `testTimeout` da margen de sobra para la carga de la suite entera. No es un parche
  *    para un test lento: es el reconocimiento de que un test de formulario completo con popups
  *    no se mide con el mismo cronometro que uno de funcion pura.
@@ -186,20 +190,6 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     lines: [lineView()],
     ...overrides,
   };
-}
-
-/**
- * `userEvent.setup()` con `delay: null` (review de QC-26, MAYOR 1). Por defecto `user-event`
- * intercala un `setTimeout(0)` entre CADA evento -por cada tecla, por cada movimiento de
- * puntero-, y en estos casos eso son cientos de saltos al event loop. `delay: null` quita solo
- * esa espera artificial: la secuencia de eventos que recibe el DOM es identica (mismos
- * `pointerdown`/`mousedown`/`focus`/`keydown`/`input`...), y siguen activas TODAS las
- * comprobaciones de `user-event` -incluida la de `pointer-events`, que es la que impide
- * "hacer clic" en un control tapado o deshabilitado-. No se relaja nada: solo se deja de
- * esperar a nada.
- */
-function setupUser(): UserEvent {
-  return userEvent.setup({ delay: null });
 }
 
 function renderCreateForm() {

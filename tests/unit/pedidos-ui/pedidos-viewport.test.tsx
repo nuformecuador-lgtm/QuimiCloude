@@ -49,7 +49,7 @@
 // decision es del humano—, y P2 se **arrastra** tal como esta escrita, sin cambiar de estado.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -424,7 +424,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // 16 px es el umbral por debajo del cual Safari en iOS hace zoom al enfocar el campo, y ese
     // zoom deja la pantalla desplazada a mano. Se comprueba en los DOS anchos: `md:text-base`
     // esta justamente para que el campo no vuelva a 14 px en el breakpoint de escritorio.
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderPantalla();
 
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));

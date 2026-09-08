@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 import { toast } from 'sonner';
 
 import LoginPage from '@/app/(public)/login/page';
@@ -78,7 +78,7 @@ function pendingAction() {
 }
 
 async function fillAndSubmit(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   credentials: { username: string; password: string } = {
     username: 'ana.perez',
     password: 'clave-secreta',
@@ -142,7 +142,7 @@ describe('pantalla de login', () => {
   });
 
   it('activar la etiqueta enfoca su campo', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<LoginForm />);
 
     const usuario = screen.getByTestId(testId.username);
@@ -163,7 +163,7 @@ describe('pantalla de login', () => {
   });
 
   it('deshabilita el boton mientras el envio esta en curso', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const enCurso = pendingAction();
     render(<LoginForm />);
 
@@ -175,7 +175,7 @@ describe('pantalla de login', () => {
   });
 
   it('marca aria-busy mientras el envio esta en curso', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const enCurso = pendingAction();
     render(<LoginForm />);
 
@@ -189,7 +189,7 @@ describe('pantalla de login', () => {
   });
 
   it('rehabilita el boton cuando el envio termina con error', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const enCurso = pendingAction();
     render(<LoginForm />);
 
@@ -203,7 +203,7 @@ describe('pantalla de login', () => {
   });
 
   it('muestra el error de campo inline, marca aria-invalid y lo vincula con aria-describedby', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue(
       invalidState('intento-1', {
         username: REQUIRED_FIELD_ERROR,
@@ -233,7 +233,7 @@ describe('pantalla de login', () => {
   });
 
   it('emite un toast de error cuando las credenciales no son aceptadas', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue(errorState('intento-1'));
     render(<LoginForm />);
 
@@ -246,7 +246,7 @@ describe('pantalla de login', () => {
   });
 
   it('conserva el usuario escrito tras un intento rechazado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue(errorState('intento-1', 'ana.perez'));
     render(<LoginForm />);
 
@@ -256,7 +256,7 @@ describe('pantalla de login', () => {
   });
 
   it('deja el campo de contrasena vacio tras un intento rechazado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue(errorState('intento-1', 'ana.perez'));
     render(<LoginForm />);
 
@@ -267,7 +267,7 @@ describe('pantalla de login', () => {
   });
 
   it('el toast de error se anuncia por region live sin mover el foco', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue(errorState('intento-1'));
     render(
       <>
@@ -293,7 +293,7 @@ describe('pantalla de login', () => {
   });
 
   it('envia el formulario al pulsar Enter dentro de un campo', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<LoginForm />);
 
     await user.type(screen.getByTestId(testId.username), 'ana.perez');
@@ -313,7 +313,7 @@ describe('pantalla de login', () => {
   });
 
   it('no reemite el toast en un re-render del mismo intento', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue(errorState('intento-1'));
     const { rerender } = render(<LoginForm />);
 
@@ -328,7 +328,7 @@ describe('pantalla de login', () => {
   });
 
   it('emite un toast nuevo por cada intento rechazado, aunque la entrada sea identica', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock
       .mockResolvedValueOnce(errorState('intento-1'))
       .mockResolvedValueOnce(errorState('intento-2'));
@@ -347,7 +347,7 @@ describe('pantalla de login', () => {
   });
 
   it('muestra el enlace de recuperacion apuntando a FORGOT_PASSWORD_ROUTE y accesible por teclado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLoginPage();
 
     const enlace = screen.getByTestId(testId.forgotPassword);
@@ -402,7 +402,7 @@ describe('destino de vuelta (QC-9 R7, R8, R9)', () => {
   });
 
   it('el campo oculto viaja en el FormData que recibe la Server Action', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLoginPage({ next: '/dashboard/reportes' });
 
     await fillAndSubmit(user);

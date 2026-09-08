@@ -8,7 +8,7 @@
 // **Ningun assert sobre copy** (R44): todo se localiza por `data-testid` y por rol accesible.
 
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -112,7 +112,7 @@ afterEach(() => {
 describe('selector de receta (R31, R43)', () => {
   it('escribir dispara la operacion de listado de recetas CON el termino de busqueda', async () => {
     // R31 — la busqueda la resuelve el servidor.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPicker();
 
     await user.type(screen.getByTestId(testId.campo), 'disol');
@@ -128,7 +128,7 @@ describe('selector de receta (R31, R43)', () => {
   it('NO recorta por texto la coleccion ya descargada: pinta lo que devuelve el servidor', async () => {
     // R31 en negativo — con un filtrado en cliente, «zzz» dejaria la lista vacia. Aqui la lista
     // muestra exactamente lo que devolvio la operacion, que es la unica fuente de verdad.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPicker();
 
     await user.type(screen.getByTestId(testId.campo), 'zzz');
@@ -145,7 +145,7 @@ describe('selector de receta (R31, R43)', () => {
     // R31 — «debe permitir alcanzar cualquier receta existente, aunque haya mas de las que caben
     // en una consulta»: la paginacion vive DENTRO del desplegable. Desde el 2026-09-07 el gesto
     // que pide la pagina siguiente es llegar al FINAL DE SU SCROLL, no pulsar «Siguiente».
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPicker();
 
     await user.click(screen.getByTestId(testId.campo));

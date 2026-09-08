@@ -12,7 +12,7 @@ alguna acaba necesitándolo, es señal de que el alcance se rompió: se para y s
 
 ## Bloque A — Configuración y helper
 
-### [ ] T1. `testTimeout: 15_000` en los tres proyectos de Vitest
+### [x] T1. `testTimeout: 15_000` en los tres proyectos de Vitest
 - Dep: ninguna.
 - Archivos: `vitest.config.mts`.
 - Dentro del bloque `test` de **cada** proyecto (`ui`, `node`, `integration`), nunca en la raíz
@@ -23,7 +23,7 @@ alguna acaba necesitándolo, es señal de que el alcance se rompió: se para y s
   `pnpm test tests/guards` sigue corriendo sin error de configuración.
 - Cubre: R1, R4.
 
-### [ ] T2. [P] Crear el helper compartido de escritura
+### [x] T2. [P] Crear el helper compartido de escritura
 - Dep: ninguna.
 - Archivos: `tests/helpers/user-event.ts` (nuevo).
 - `setupUser(): UserEvent` sobre `userEvent.setup({ delay: null })`, **sin parámetros**
@@ -34,7 +34,7 @@ alguna acaba necesitándolo, es señal de que el alcance se rompió: se para y s
   como suite por ningún proyecto (no lleva `.test.`).
 - Cubre: R5.
 
-### [ ] T3. [P] Declarar la excepción del rebote en `async-autocomplete`
+### [x] T3. [P] Declarar la excepción del rebote en `async-autocomplete`
 - Dep: ninguna (independiente de T2; se puede hacer antes o después).
 - Archivos: `tests/unit/async-autocomplete.test.tsx`.
 - Conserva su `userEvent.setup({ delay: 20 })`. Sólo se amplía el comentario para dejar dicho que
@@ -58,7 +58,7 @@ de tocar nada, es lo que verifica R9.
 > El conteo exacto de llamadas se reconfirma con un `grep` al empezar cada task; lo que fija el
 > criterio no es el número sino que queden **cero** fuera del helper y de la excepción de T3.
 
-### [ ] T4a. [P] `tests/unit/` (raíz) — 7 archivos
+### [x] T4a. [P] `tests/unit/` (raíz) — 7 archivos
 - Archivos: `tests/unit/app-sidebar.test.tsx`, `tests/unit/credential-field.test.tsx`,
   `tests/unit/login-form.test.tsx`, `tests/unit/nav-user.test.tsx`,
   `tests/unit/sidebar-ajuste.test.tsx`, `tests/unit/sidebar-desktop.test.tsx`,
@@ -66,7 +66,7 @@ de tocar nada, es lo que verifica R9.
 - **`tests/unit/async-autocomplete.test.tsx` NO entra aquí**: es la excepción de T3.
 - Cubre: R6, R9.
 
-### [ ] T4b. [P] `tests/ui/` — 1 archivo
+### [x] T4b. [P] `tests/ui/` — 1 archivo
 - Archivos: `tests/ui/login-form-uncontrolled-warning.test.tsx`.
 - Cubre: R6, R9.
 
@@ -78,12 +78,17 @@ de tocar nada, es lo que verifica R9.
   `tests/unit/shared/data-table-viewport.test.tsx`.
 - Cubre: R6, R9.
 
-### [ ] T4d. [P] `tests/unit/pedidos-ui/` — 8 archivos
+### [x] T4d. [P] `tests/unit/pedidos-ui/` — 8 archivos
 - Archivos: `cancel-order-dialog`, `delete-order-dialog`, `order-form`, `order-row-wiring`,
   `order-sheet`, `order-table`, `pedidos-viewport`, `recipe-picker` (todos `.test.tsx` bajo
   `tests/unit/pedidos-ui/`).
 - **Ojo:** esa carpeta tiene cambios sin commitear de otra sesión en el árbol principal. Se trabaja
   sólo en este worktree y no se revierte nada con `git checkout`.
+- **BLOQUEADA (2026-09-08).** La migración mecánica está hecha (cero `userEvent.setup(` y 149
+  casos, los mismos que antes), pero `data-table-pagination.test.tsx` pasó a fallar de forma
+  **intermitente** (~1 de cada 3 en aislado) con `Unable to perform pointer interaction as the
+  element has 'pointer-events: none'` en `data-table-page-size-25`. El archivo original pasa 5/5.
+  Es la misma causa que T4e: ver el bloqueo escrito en la bitácora.
 - Cubre: R6, R9.
 
 ### [ ] T4e. [P] `tests/unit/proveedores-ui/` — 5 archivos
@@ -91,10 +96,16 @@ de tocar nada, es lo que verifica R9.
   `supplier-page`, `unit-select` (todos `.test.tsx` bajo `tests/unit/proveedores-ui/`).
 - Dos de estos tres archivos rojos del baseline salen de aquí: al terminar la task se corren
   `catalog-line-sheet` y `supplier-page` **solos** y se anota el resultado, que es la línea base
-  para T9.
+  para T9. **Hecho: 50/50 en verde**, que es exactamente lo que el baseline decía de esos dos.
+- **BLOQUEADA (2026-09-08).** La migración está hecha y el conteo se conserva (147 casos), pero
+  `unit-select.test.tsx` pasó a fallar **de forma determinista, 6 de 6 corridas**, con
+  `pointer-events: none` sobre `unit-option-none`. El archivo original pasa 3/3. Esto incumple R9
+  («ninguna aserción debe relajarse, el comportamiento observable no debe cambiar») y choca con la
+  decisión cerrada n.º 3, así que **no se improvisa una salida**: el bloqueo está descrito en la
+  bitácora con las tres opciones y espera decisión humana.
 - Cubre: R6, R9.
 
-### [ ] T4f. [P] `tests/unit/recetas-ui/` + `tests/unit/inventario/` — 6 archivos
+### [x] T4f. [P] `tests/unit/recetas-ui/` + `tests/unit/inventario/` — 6 archivos
 - Archivos: `tests/unit/recetas-ui/recipe-form.test.tsx`,
   `tests/unit/recetas-ui/recipe-lines-unavailable.test.tsx`,
   `tests/unit/recetas-ui/recipe-page.test.tsx`,
@@ -116,7 +127,7 @@ de tocar nada, es lo que verifica R9.
 - **Hecho cuando:** `./init.sh --rapido` termina en verde. Si no, se arregla antes de escribir la
   guardia: una guardia escrita sobre un árbol a medias mide otra cosa.
 
-### [ ] T6. Escribir la guardia `guard-teclear-y-plazo`
+### [x] T6. Escribir la guardia `guard-teclear-y-plazo`
 - Dep: T5.
 - Archivos: `tests/guards/guard-teclear-y-plazo.test.ts` (nuevo).
 - Dos mitades (`design.md > 3`):
@@ -132,7 +143,7 @@ de tocar nada, es lo que verifica R9.
   sola en `./init.sh --rapido`).
 - Cubre: R2, R7.
 
-### [ ] T7. Probar que la guardia MUERDE
+### [x] T7. Probar que la guardia MUERDE
 - Dep: T6. **Bloqueante: sin esta task, T6 no cuenta como hecha.**
 - Archivos: ninguno de forma permanente (se muta y se restaura).
 - Las cuatro mutaciones de `design.md > 3.3`, una a una: quitar `testTimeout` de `node`; bajarlo a
@@ -147,7 +158,7 @@ de tocar nada, es lo que verifica R9.
   bitácora.
 - Cubre: R2, R7 (la mitad que importa de los dos).
 
-### [ ] T8. Sonda de ejecución del plazo en los tres proyectos
+### [x] T8. Sonda de ejecución del plazo en los tres proyectos
 - Dep: T1. Puede ir en paralelo con T6/T7 si no se cruzan archivos.
 - Archivos: tres archivos **temporales** (`tests/unit/_sonda-plazo.test.tsx`,
   `tests/_sonda-plazo.test.ts`, `tests/integration/_sonda-plazo.int.test.ts`), que se **borran** al
@@ -162,7 +173,7 @@ de tocar nada, es lo que verifica R9.
 
 ## Bloque D — Baseline y rastro escrito
 
-### [ ] T9. Limpiar y corregir `tests/baseline-rojos.json`
+### [x] T9. Limpiar y corregir `tests/baseline-rojos.json`
 - Dep: T5 (la migración tiene que estar dentro; si no, se retiran entradas de un rojo aún vivo).
 - Archivos: `tests/baseline-rojos.json`.
 - Retirar las **tres** de esta causa: `tests/unit/inventario/product-page.test.tsx`,
@@ -177,7 +188,7 @@ de tocar nada, es lo que verifica R9.
   `node scripts/comparar-baseline-rojos.mjs` sobre un reporte de corrida no protesta por formato.
 - Cubre: R10, R11, R12.
 
-### [ ] T10. [P] Actualizar `docs/verification.md`
+### [x] T10. [P] Actualizar `docs/verification.md`
 - Dep: T9.
 - Archivos: `docs/verification.md`.
 - Dos sitios (`design.md > 6`): el cierre de `> Los flakes de saturación`, que pasa de «tiene ficha

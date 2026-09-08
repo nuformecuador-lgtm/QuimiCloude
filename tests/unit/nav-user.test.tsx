@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 
 import { NavUser } from '@/components/private/nav-user';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -70,7 +70,7 @@ function pendingLogout() {
   };
 }
 
-async function openUserMenu(user: ReturnType<typeof userEvent.setup>) {
+async function openUserMenu(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(testId.trigger));
   return screen.findByTestId(testId.logoutForm);
 }
@@ -123,7 +123,7 @@ describe('pie de usuario de la barra lateral privada', () => {
 
   it('el pie ofrece un menu desplegable con disparador accesible por teclado que declara que abre un menu', async () => {
     // R17
-    const user = userEvent.setup();
+    const user = setupUser();
     const sesion = sessionUser();
     renderNavUser(sesion);
 
@@ -146,7 +146,7 @@ describe('pie de usuario de la barra lateral privada', () => {
 
   it('Escape cierra el menu de usuario y devuelve el foco a su disparador', async () => {
     // R18
-    const user = userEvent.setup();
+    const user = setupUser();
     renderNavUser();
 
     const disparador = screen.getByTestId(testId.trigger);
@@ -162,7 +162,7 @@ describe('pie de usuario de la barra lateral privada', () => {
 
   it('el cierre de sesion vive dentro de un form real cuya accion es logoutAction', async () => {
     // R19 + R20 (el envio real del form es lo que invoca la action; no hay `onClick`).
-    const user = userEvent.setup();
+    const user = setupUser();
     renderNavUser();
 
     const formulario = await openUserMenu(user);
@@ -179,7 +179,7 @@ describe('pie de usuario de la barra lateral privada', () => {
 
   it('invoca la accion de cierre de sesion exactamente una vez por activacion', async () => {
     // R20
-    const user = userEvent.setup();
+    const user = setupUser();
     const enCurso = pendingLogout();
     renderNavUser();
 
@@ -198,7 +198,7 @@ describe('pie de usuario de la barra lateral privada', () => {
 
   it('deshabilita el control mientras el cierre de sesion esta en curso', async () => {
     // R21
-    const user = userEvent.setup();
+    const user = setupUser();
     const enCurso = pendingLogout();
     renderNavUser();
 

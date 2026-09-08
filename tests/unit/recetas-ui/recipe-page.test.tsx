@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import PrivateLayout from '@/app/(private)/layout';
@@ -356,7 +356,7 @@ describe('pantalla de recetas — lista', () => {
   it('el selector de tamano ofrece 10 y 25 y usa 10 por defecto', async () => {
     // R11 — el defecto se observa en lo que se le PIDE al backend; las dos opciones, en el
     // selector.
-    const user = userEvent.setup();
+    const user = setupUser();
     listRecipesActionMock.mockResolvedValue(paginaDeRecetas([receta()], { total: 40 }));
 
     await renderPantalla();
@@ -382,7 +382,7 @@ describe('pantalla de recetas — lista', () => {
 
   it('permite avanzar y retroceder e indica la pagina actual y el total', async () => {
     // R12
-    const user = userEvent.setup();
+    const user = setupUser();
     listRecipesActionMock.mockResolvedValue(
       paginaDeRecetas([receta()], { page: 2, total: 30, totalPages: 3 }),
     );
@@ -491,7 +491,7 @@ describe('pantalla de recetas — lista', () => {
 
   it('un error de la consulta presenta el estado de error con reintento y no una lista vacia', async () => {
     // R17
-    const user = userEvent.setup();
+    const user = setupUser();
     listRecipesActionMock.mockResolvedValue({
       status: 'error',
       code: 'invalid_input',
@@ -627,7 +627,7 @@ describe('pantalla de recetas — borrado', () => {
   it('el borrado pide confirmacion nombrando la receta y sin confirmar no invoca la operacion', async () => {
     // R39 — el criterio de honestidad exige comprobar que SIN confirmar la operacion NO se
     // llama, no solo que el dialogo aparece.
-    const user = userEvent.setup();
+    const user = setupUser();
     const laReceta = receta({ name: 'Ácido peracético' });
     listRecipesActionMock.mockResolvedValue(paginaDeRecetas([laReceta]));
 
@@ -654,7 +654,7 @@ describe('pantalla de recetas — borrado', () => {
 
   it('un borrado con exito cierra el dialogo, avisa por toast y refresca la lista', async () => {
     // R24
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirBorrado));
@@ -668,7 +668,7 @@ describe('pantalla de recetas — borrado', () => {
 
   it('un borrado rechazado muestra el error en el dialogo y no navega ni refresca', async () => {
     // R39 — el rechazo se ve, el dialogo sigue abierto y no hay exito falso.
-    const user = userEvent.setup();
+    const user = setupUser();
     deleteRecipeActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
