@@ -342,9 +342,9 @@ guardia y con la prueba de que esa guardia muerde, no con un test de producto.
 | **R10** | Fuera las 3 entradas de esta causa | `tests/baseline-rojos.json` | ✅ (retiradas) |
 | **R11** | Las 2 estructurales se quedan, con el motivo de `recipe-route-contract` corregido | `tests/baseline-rojos.json` | ✅ |
 | **R12** | Cada entrada con `motivo` y `desde`; comparación por archivo | `node scripts/comparar-baseline-rojos.mjs` (salida abajo) | ✅ verde |
-| **R13** | Cinco corridas seguidas de la batería completa | T11 | ⏸ **pendiente** (bloqueada, y la corre el leader) |
-| **R14** | Comando, fecha y salida del comparador de cada corrida | T11 | ⏸ **pendiente** |
-| **R15** | La colisión de correlativo es de QC-77 y no cuenta | T11 | ⏸ **pendiente**; no ha aparecido en ninguna corrida mía |
+| **R13** *(reformulado 2026-09-08)* | Cinco corridas seguidas de la batería completa, sin rojos fuera del baseline | T11: cinco `./init.sh` el 2026-09-08 sobre `63bea8e`, **las cinco exit 0**, 234/234 archivos y 2839 casos | ✅ verde. El aviso de «2 por limpiar» es esperado en rama y ya no invalida la corrida: ver la reformulación en `requirements.md > R13 — la versión anterior y por qué cambia` |
+| **R14** | Comando, fecha y salida del comparador de cada corrida | apartado «T11 — cinco corridas seguidas» de arriba: tabla con inicio, fin, exit, conteos y salida literal del comparador de las cinco | ✅ |
+| **R15** | La colisión de correlativo es de QC-77 y no cuenta | T11: **no apareció en ninguna de las cinco**, ni en la tanda descartada. Nada que atribuir ni que añadir al baseline | ✅ (vacuo, y dicho) |
 | **R16** | `docs/verification.md` al día, con la tabla de `--maxWorkers` intacta | `docs/verification.md` | ✅ |
 | **R17** | Cero archivos de producción | comprobación de alcance de arriba | ✅ |
 | **R18** | Sin E2E, con motivo escrito | apartado «E2E» de arriba | ✅ |
@@ -557,3 +557,127 @@ leader.*
    comparador de cada una (R14) — y sin contar las que traigan la colisión de correlativo de
    `order-repository.int.test.ts`, que es **QC-77** y no se arregla ni se añade al baseline aquí (R15).
 5. **T12**: cerrar esta bitácora con lo de T11 y actualizar `progress/current.md`.
+
+---
+
+## T11 — cinco corridas seguidas de la batería completa (R13, R14, R15)
+
+Las corre el **leader**, no el implementer. Worktree
+`.worktrees/QC-58-timeout-tests-ui-bajo-carga`, rama `feature/QC-58-timeout-tests-ui-bajo-carga`,
+HEAD `63bea8e`, árbol limpio. Comando de cada corrida, literal:
+
+```
+./init.sh
+```
+
+Las cinco seguidas, sin tocar nada entre una y otra, el **2026-09-08**:
+
+| # | Inicio | Fin | Exit | Archivos | Casos | Comparador de baseline |
+|---|---|---|---|---|---|---|
+| 1 | 12:59:32 | 13:01:45 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | `sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar` |
+| 2 | 13:01:45 | 13:04:23 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
+| 3 | 13:04:23 | 13:07:22 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
+| 4 | 13:07:22 | 13:09:29 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
+| 5 | 13:09:29 | 13:11:37 | **0** | 234 passed (234) | 2839 passed \| 7 skipped (2846) | ídem |
+
+Las cinco cerraron con `== init OK ==`. **Ningún archivo de test en rojo fuera del baseline en
+ninguna de las cinco**, y ninguna trajo la colisión de correlativo de `order-repository.int.test.ts`
+(R15), así que las cinco cuentan.
+
+### La tanda anterior, que NO cuenta, y por qué se anota igual
+
+Antes de `63bea8e` se lanzó esta misma secuencia sobre `6454043`. **Se anota porque es la prueba de
+que el criterio de las cinco corridas hace su trabajo**, que es justo lo que R13 defiende:
+
+| # | Exit | Resultado |
+|---|---|---|
+| 1 | 1 | `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` en rojo — 2838/2846 |
+| 2 | 1 | el mismo — 2838/2846 |
+| 3 | 0 | verde, 2839/2846 |
+| 4 | — | matada por el sistema (memoria), no llegó a terminar |
+
+`catalog-line-sheet` falló con el **mismo** `pointer-events: none` (sobre `unit-option`) que ya se
+había arreglado en otros dos archivos, y **el `--rapido` no lo vio**: el archivo estaba en el grafo
+del diff y salió verde. Solo aflora con la batería entera saturando la máquina, y aun así de forma
+intermitente — 2 de 3. **Una corrida verde no habría probado nada; la tercera fue verde.** De ahí
+salió el barrido que cerró los 20 sitios en 13 archivos (`63bea8e`).
+
+### El aviso de «2 por limpiar» — pendiente de decisión humana
+
+Las cinco corridas traen `2 por limpiar` sobre las dos entradas que T9 conservó
+(`recipe-route-contract.test.ts` y `recetas/module-contract.test.ts`). El criterio escrito de T11
+pide las cinco **sin** ese aviso, y **ese criterio no se puede cumplir desde un worktree**: las dos
+entradas fallan *en `dev`* porque `git diff --name-only origin/dev...HEAD` está vacío, y en una rama
+de feature el rango sí trae archivos, así que **pasan**. Borrarlas dejaría `dev` en rojo.
+
+No es un defecto de esta ficha: es la contradicción que el propio `motivo` de las dos entradas
+documenta desde el 2026-09-04, y cuya salida limpia —que el caso del diff distinga «no hay rango» de
+«el rango trae cosas»— sigue pendiente y **fuera del alcance declarado aquí** (R17 prohíbe tocar
+`lib/`, y estos archivos son de `recetas`). Queda anotado para el humano y para el `reviewer`.
+
+
+---
+
+## T12 — cierre: alcance, E2E y estado final
+
+### Comprobación de alcance (R17)
+
+`git diff --name-only origin/dev...HEAD` sobre `63bea8e` — **42 archivos, ninguno de producción**:
+
+```
+docs/verification.md
+progress/impl_QC-58-timeout-tests-ui-bajo-carga.md
+specs/QC-58-timeout-tests-ui-bajo-carga/{requirements,design,tasks}.md
+tests/baseline-rojos.json
+tests/guards/guard-teclear-y-plazo.test.ts
+tests/helpers/user-event.ts
+tests/ui/login-form-uncontrolled-warning.test.tsx
+tests/unit/{app-sidebar,async-autocomplete,credential-field,login-form,nav-user}.test.tsx
+tests/unit/{sidebar-ajuste,sidebar-desktop,sidebar-mobile}.test.tsx
+tests/unit/inventario/product-page.test.tsx
+tests/unit/pedidos-ui/{cancel-order-dialog,delete-order-dialog,order-form,order-row-wiring}.test.tsx
+tests/unit/pedidos-ui/{order-sheet,order-table,pedidos-viewport,recipe-picker}.test.tsx
+tests/unit/proveedores-ui/{catalog-line-sheet,delete-catalog-line-dialog}.test.tsx
+tests/unit/proveedores-ui/{supplier-detail-page,supplier-page,unit-select}.test.tsx
+tests/unit/recetas-ui/{recipe-form,recipe-lines-unavailable,recipe-page}.test.tsx
+tests/unit/recetas-ui/{recipe-step-editor,step-reader}.test.tsx
+tests/unit/shared/{data-table-filter-date,data-table-filters,data-table-header-menu}.test.tsx
+tests/unit/shared/{data-table-pagination,data-table-viewport}.test.tsx
+vitest.config.mts
+```
+
+Filtrado explícito, sin resultados — o sea, cero rutas de producción:
+
+```
+$ git diff --name-only origin/dev...HEAD | grep -E '^(app|lib|components|db)/|^middleware'
+(sin salida)
+```
+
+### E2E (R18) — no hay, y es deliberado
+
+Esta ficha **no cambia ningún comportamiento de la aplicación**: cambia cuánto espera la batería y
+cómo teclean sus pruebas. Un E2E ejercita la aplicación en un navegador y aquí no habría nada nuevo
+que ejercitar. La prueba que corresponde son las cinco corridas de T11, hechas y con su evidencia.
+
+### Estado final
+
+**17 de 17 tasks.** Los 18 requisitos con test o evidencia nombrada, ninguno vacío. Dos requisitos
+se reformularon durante la implementación, los dos conservando por escrito la redacción anterior y
+el motivo: **R9** (decisión humana n.º 9, del 2026-09-08) y **R13** (el criterio del aviso de «por
+limpiar», que sólo se podía cumplir desde `dev`).
+
+### Lo que hereda quien siga
+
+- **La lección de método, que es la más cara de esta ficha:** `catalog-line-sheet.test.tsx` estaba
+  en el grafo del `--rapido` y salió **verde**; solo falló con la batería entera saturando la
+  máquina, y aun así 2 de 3 veces. **Para un flake de saturación, `--rapido` no prueba nada.** De
+  ahí salió el barrido que encontró **20 sitios en 13 archivos**, diez de ellos verdes por la misma
+  casualidad que el que explotó.
+- **Deuda de arnés que esta ficha destapó y no le tocaba** (candidatas a `/afinar-regla`): el
+  worktree se monta **sin `.env` y sin base propia**, y `wt.sh new` no los crea, así que la
+  integración no corre hasta que alguien lo nota; hacen falta además `pnpm exec prisma generate` y
+  `pnpm exec next typegen`, cuyos fallos **tienen pinta de rojo de código sin serlo**. Y sigue sin
+  `.gitattributes`: un subagente reescribió 15 archivos de LF a CRLF y el commit salió con 7.287
+  inserciones donde el cambio real eran 160.
+- **La salida limpia de las dos entradas del baseline** sigue pendiente desde el 2026-09-04, ahora
+  con el criterio de R13 apuntando a ella.

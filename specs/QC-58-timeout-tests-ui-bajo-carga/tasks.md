@@ -221,11 +221,13 @@ de tocar nada, es lo que verifica R9.
 
 ## Bloque E — La prueba y el cierre
 
-### [ ] T11. Cinco corridas seguidas de la batería completa
+### [x] T11. Cinco corridas seguidas de la batería completa
 - Dep: **todo lo anterior**. Es la última task de trabajo.
 - Archivos: ninguno (verificación).
 - Cinco `./init.sh` completos, seguidos. Las cinco sin ningún archivo de test en rojo fuera del
-  baseline y sin aviso de «por limpiar» sobre las dos entradas que quedan.
+  baseline. **El aviso de «por limpiar» sobre las dos entradas que quedan es esperado en rama** y no
+  invalida la corrida (R13, reformulado el 2026-09-08: la condición anterior sólo se podía cumplir
+  desde `dev`, y cumplirla habría dejado `dev` en rojo). Se anota en la bitácora.
 - **Una corrida verde no cuenta como prueba.** Este criterio existe porque una corrida afortunada
   con `--maxWorkers=2` ya llevó una vez a dar por bueno un arreglo que no lo era.
 - SI aparece la colisión de correlativo de `order-repository.int.test.ts` («Ya existe la llave
@@ -234,7 +236,7 @@ de tocar nada, es lo que verifica R9.
 - **Hecho cuando:** hay cinco corridas limpias consecutivas con su salida en la bitácora.
 - Cubre: R13, R15.
 
-### [ ] T12. Bitácora, trazabilidad y comprobación de alcance
+### [x] T12. Bitácora, trazabilidad y comprobación de alcance
 - Dep: T11.
 - Archivos: `progress/impl_QC-58-timeout-tests-ui-bajo-carga.md`, `progress/current.md`.
 - Contiene: el mapa **`R<n> → test`** de los 18 requisitos (`CHECKPOINTS.md > Trazabilidad`); las

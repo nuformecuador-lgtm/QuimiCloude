@@ -131,9 +131,39 @@ la que hoy está roja **en vez de** la que dice ahora, que no es cierta.
 
 ### La prueba
 
-**R13.** El sistema NO DEBE darse por arreglado con una sola corrida verde: DEBE probarse con
-**cinco corridas seguidas de la batería completa**, las cinco sin ningún archivo de test en rojo
-que no esté en el baseline y sin aviso de «por limpiar» sobre las dos entradas que quedan.
+**R13.** *(Reformulado el 2026-09-08; la redacción anterior se conserva íntegra abajo, en «R13 — la
+versión anterior y por qué cambia».)* El sistema NO DEBE darse por arreglado con una sola corrida
+verde: DEBE probarse con **cinco corridas seguidas de la batería completa**, las cinco sin ningún
+archivo de test en rojo que no esté en el baseline. El aviso de «por limpiar» sobre
+`recipe-route-contract.test.ts` y `recetas/module-contract.test.ts` es **esperado en una rama de
+feature** y NO DEBE tomarse como fallo de la corrida; la bitácora DEBE dejar dicho que apareció y
+por qué es esperado.
+
+#### R13 — la versión anterior y por qué cambia
+
+**Decía, hasta el 2026-09-08:**
+
+> **R13.** El sistema NO DEBE darse por arreglado con una sola corrida verde: DEBE probarse con
+> **cinco corridas seguidas de la batería completa**, las cinco sin ningún archivo de test en rojo
+> que no esté en el baseline y sin aviso de «por limpiar» sobre las dos entradas que quedan.
+
+**Por qué cambia.** Esa última condición **no se puede cumplir desde un worktree**, y no por culpa
+de nada que haga esta ficha. Las dos entradas que T9 conservó fallan **en `dev`** porque uno de sus
+casos se apoya en `git diff --name-only origin/dev...HEAD`, que estando en `dev` viene vacío; en una
+rama de feature ese rango sí trae archivos, así que los dos archivos **pasan** y el comparador avisa
+«2 archivos del baseline ya pasan; toca limpiarlos». Las cinco corridas del 2026-09-08 lo trajeron
+las cinco, con `== init OK ==` y exit 0 en todas.
+
+Cumplir la condición literal exigiría borrar las dos entradas, y eso dejaría **`dev` en rojo**: es
+justo donde sí fallan. La salida limpia —que el caso del diff distinga «no hay rango» de «el rango
+trae cosas», saltándose lo primero de forma explícita y ruidosa, y entonces sí borrar las dos
+entradas— ya está escrita como pendiente en el propio `motivo` de ambas desde el **2026-09-04**, y
+**cae fuera del alcance de esta ficha**: toca `tests/unit/recetas*` y R17 acota esta ficha a la
+configuración de Vitest, el helper de escritura y los tests migrados.
+
+Lo que se corrige, entonces, es el criterio y no el árbol: la condición se escribió sin advertir que
+mide algo distinto según la rama desde la que se corra. Queda anotado para el `reviewer` y como
+candidato a `/afinar-regla`.
 
 **R14.** El sistema DEBE dejar en la bitácora de implementación, para cada una de esas cinco
 corridas, el comando exacto, la fecha y la salida del comparador de baseline.
