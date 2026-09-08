@@ -47,6 +47,7 @@ export {
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_FORM_TITLE_TESTID,
   ORDER_PRIORITY_OPTION_TESTID,
   ORDER_PRIORITY_SELECT_TESTID,
   ORDER_STATUS_FIELD,
@@ -56,6 +57,11 @@ export {
   type OrderFormProps,
 } from './order-form';
 export { OrderListEmpty } from './order-list-empty';
+export {
+  ORDER_RECIPE_IMAGE_TESTID,
+  OrderRecipeImage,
+  type OrderRecipeImageProps,
+} from './order-recipe-image';
 export { OrderListError } from './order-list-error';
 export {
   CREATED_AT_COLUMN_ID,

@@ -232,7 +232,7 @@ async function findLiveAdmin(tx: Prisma.TransactionClient) {
   });
 }
 
-/** Los diez codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
+/** Los once codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
 const CODIGOS_DEL_CATALOGO = PERMISSIONS.map((permission) => permission.code).slice().sort();
 
 /** Los codigos que el seed asigna a un rol, ordenados, tal como los declara el dominio. */
@@ -240,7 +240,7 @@ function codigosSembradosDe(roleName: string): readonly string[] {
   return [...(SEED_ROLE_PERMISSIONS[roleName] ?? [])].sort();
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar (hoy: diez + una = once). */
+/** Numero total de asignaciones que el seed tiene que dejar (hoy: once + una = doce). */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -642,7 +642,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
   });
 
   // Caso 10 (QC-74 R7, R8, R9, R10): el catalogo y las asignaciones, contra base real.
-  it('la primera corrida deja el catalogo completo, el Administrador con los diez permisos y el Operador solo con inventario.consultar; la segunda no cambia ningun conteo', async () => {
+  it('la primera corrida deja el catalogo completo, el Administrador con los once permisos y el Operador solo con inventario.consultar; la segunda no cambia ningun conteo', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       expect(await tx.permission.count()).toBe(0);
@@ -657,16 +657,16 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         credentials: fakeCredentialsProvider,
       });
 
-      // Primero: la corrida SI creo el catalogo entero y las once asignaciones.
+      // Primero: la corrida SI creo el catalogo entero y las doce asignaciones.
       expect(first.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
-      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(11);
+      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(12);
       expect(first.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
       // Y la base lo confirma: las filas de `permissions` son exactamente las del catalogo.
       const catalogoEnBase = await tx.permission.findMany({ orderBy: { code: 'asc' } });
       expect(catalogoEnBase.map((permission) => permission.code)).toEqual(CODIGOS_DEL_CATALOGO);
 
-      // R8: el Administrador tiene los diez, escritos uno a uno — sin comodin ni regla
+      // R8: el Administrador tiene los once, escritos uno a uno — sin comodin ni regla
       // implicita: se leen de `role_permissions`, no de su nombre de rol.
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
       expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);

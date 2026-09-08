@@ -45,7 +45,11 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // R15 — el catalogo cerrado, sin comodines
 // ---------------------------------------------------------------------------------------------
 
-/** Los diez codigos de QC-74, escritos a mano A PROPOSITO: son el contrato que R15 congela. */
+/**
+ * Los once codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que R15 congela.
+ * Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`, enmendando
+ * QC-74 R2 (ver `lib/modules/identity/domain/permissions.ts`).
+ */
 export const CODIGOS_QC74 = [
   'dashboard.consultar',
   'inventario.consultar',
@@ -53,6 +57,7 @@ export const CODIGOS_QC74 = [
   'recetas.consultar',
   'recetas.modificar',
   'unidades.consultar',
+  'unidades.modificar',
   'proveedores.consultar',
   'proveedores.modificar',
   'pedidos.consultar',
@@ -106,8 +111,8 @@ export function comodinesDe(permisos: readonly PermisoLeido[]): string[] {
 describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', () => {
   const catalogo: readonly PermisoLeido[] = PERMISSIONS;
 
-  it('tiene exactamente diez codigos, los diez de QC-74', () => {
-    expect(catalogo).toHaveLength(10);
+  it('tiene exactamente once codigos, los once del catalogo', () => {
+    expect(catalogo).toHaveLength(11);
     expect(catalogo.map((permiso) => permiso.code).sort()).toEqual([...CODIGOS_QC74].sort());
   });
 
@@ -264,6 +269,18 @@ function mergeBaseConDev(): string | null {
 describe('QC-75 R22 — esta ficha no anade backend', () => {
   const archivos = archivosDeLaRama();
 
+  // ESTA GUARDIA SOLO APLICA EN LA RAMA DE QC-75. Su archivo central en el rango es lo que dice
+  // «esta ES la rama de QC-75»; en cualquier otra no hay nada que medir, porque las reglas de
+  // abajo son sobre el alcance de ESTA ficha y no sobre el de las demas.
+  //
+  // Antes esto era un FALLO en vez de un salto, y el efecto era que el centinela ponia en rojo el
+  // gate completo de TODAS las demas ramas -visto desde QC-38 el 2026-09-08: dos casos rojos, uno
+  // por no encontrar `private-nav.ts` en el diff y otro marcando como «intocable» el catalogo de
+  // permisos, que QC-38 amplia con permiso del humano-. Como el gate completo es obligatorio antes
+  // de cada PR (regla 5 de `CLAUDE.md`), bloqueaba el F2.4 de todo el repo.
+  const ARCHIVO_CENTRAL = 'lib/shared/navigation/private-nav.ts';
+  const esLaRamaDeQC75 = archivos !== null && archivos.includes(ARCHIVO_CENTRAL);
+
   // ANCLA ANTI-VACUIDAD. Sin esto, un rango roto —o una corrida desde `dev`— dejaria los tres
   // casos de abajo en verde sin haber mirado nada, que es el anti-patron de la «validacion
   // opcional» de `docs/verification.md`. Aqui el rango se mide una vez y se afirma que trae
@@ -277,17 +294,29 @@ describe('QC-75 R22 — esta ficha no anade backend', () => {
       return;
     }
 
+    if (!esLaRamaDeQC75) {
+      ctx.skip(
+        'el rango trae archivos pero ninguno es `' + ARCHIVO_CENTRAL + '`: esta NO es la rama de ' +
+          'QC-75, asi que la guardia no aplica y este caso NO ha comprobado nada.',
+      );
+      return;
+    }
+
     expect(archivos.length).toBeGreaterThan(0);
     expect(
       archivos,
       'el rango existe pero no trae el archivo central de QC-75: probablemente esta midiendo ' +
         'otra cosa, asi que lo que digan los casos de R22 no vale.',
-    ).toContain('lib/shared/navigation/private-nav.ts');
+    ).toContain(ARCHIVO_CENTRAL);
   });
 
   it('no toca el esquema, las migraciones, el seed ni el dominio de los cinco modulos de negocio', (ctx) => {
     if (archivos === null) {
       ctx.skip('el rango git origin/dev...HEAD no esta disponible: este caso NO ha comprobado nada.');
+      return;
+    }
+    if (!esLaRamaDeQC75) {
+      ctx.skip('el rango no trae el archivo central de QC-75: esta NO es su rama y R22 no le aplica.');
       return;
     }
 

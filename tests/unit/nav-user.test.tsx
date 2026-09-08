@@ -1,5 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { cleanup, render, screen, within } from '@testing-library/react';
 
 import { NavUser } from '@/components/private/nav-user';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -8,26 +7,31 @@ import { getInitials } from '@/lib/shared/ui/initials';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
 
-const { logoutActionMock } = vi.hoisted(() => ({
-  logoutActionMock: vi.fn<() => Promise<void>>(),
-}));
+/**
+ * Pie de usuario de la barra lateral privada (R14, R15 de QC-11).
+ *
+ * **ENMIENDA DEL 2026-09-07 (decision humana): el pie ya no abre ningun menu.** Los casos de
+ * R17-R21 -disparador que declara `aria-haspopup`, Escape que cierra, el `<form>` del cierre de
+ * sesion, la unica invocacion por activacion y el control deshabilitado mientras corre- vivian
+ * aqui porque el cierre de sesion era el unico item del menu de este pie. El control se movio al
+ * encabezado, junto al de tema, asi que esos casos **no se han borrado: se mudaron enteros** a
+ * `tests/unit/logout-button.test.tsx`, que los afirma sobre el boton nuevo.
+ *
+ * Lo que queda aqui es la identidad, mas el caso EN NEGATIVO de que este pie ya no ofrece ni menu
+ * ni cierre de sesion: sin el, el dia que alguien reponga el menu nadie se entera.
+ *
+ * Los asserts van sobre roles ARIA, `data-testid` y constantes exportadas, nunca sobre literales
+ * de copy.
+ */
 
-// Se mockea la action para (a) contar invocaciones (R20) y, sobre todo, (b) poder dejar la
-// promesa PENDIENTE: es la unica forma de observar el estado deshabilitado (R21).
-vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
-  logoutAction: logoutActionMock,
-}));
-
-// Los asserts van sobre roles ARIA, `data-testid` y constantes exportadas, nunca sobre
-// literales de copy.
 const testId = {
   user: 'private-user',
-  trigger: 'private-user-trigger',
+  identity: 'private-user-identity',
   initials: 'private-user-initials',
   name: 'private-user-name',
   role: 'private-user-role',
-  logoutForm: 'private-logout-form',
   logout: 'private-logout',
+  trigger: 'private-user-trigger',
 } as const;
 
 /** `SessionUser` construido en el test: nunca el valor de relleno del stub. */
@@ -52,32 +56,7 @@ function renderNavUser(user: SessionUser = sessionUser()) {
   );
 }
 
-/** Deja la action colgada y devuelve el resolvedor, para observar el estado «en curso». */
-function pendingLogout() {
-  let resolver!: () => void;
-  logoutActionMock.mockImplementation(
-    () =>
-      new Promise<void>((resolve) => {
-        resolver = () => resolve();
-      }),
-  );
-  return {
-    resolve: async () => {
-      await act(async () => {
-        resolver();
-      });
-    },
-  };
-}
-
-async function openUserMenu(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByTestId(testId.trigger));
-  return screen.findByTestId(testId.logoutForm);
-}
-
 beforeEach(() => {
-  vi.clearAllMocks();
-  logoutActionMock.mockResolvedValue(undefined);
   // jsdom no trae `matchMedia`: hay que fijar el ancho ANTES de montar nada.
   setViewportWidth(WIDE_VIEWPORT);
 });
@@ -88,7 +67,7 @@ afterEach(() => {
 });
 
 describe('pie de usuario de la barra lateral privada', () => {
-  it('muestra nombre y rol recibidos por props', async () => {
+  it('muestra nombre y rol recibidos por props', () => {
     // R14
     const user = sessionUser();
     renderNavUser(user);
@@ -106,8 +85,8 @@ describe('pie de usuario de la barra lateral privada', () => {
 
     expect(screen.getByTestId(testId.name)).toHaveTextContent(user.displayName);
     expect(screen.queryByTestId(testId.role)).toBeNull();
-    // El pie sigue en pie: el disparador conserva su nombre accesible.
-    expect(screen.getByTestId(testId.trigger)).toHaveAccessibleName(user.displayName);
+    // El pie sigue en pie: el nombre completo sigue disponible aunque no haya rol que pintar.
+    expect(screen.getByTestId(testId.identity)).toHaveAttribute('title', user.displayName);
   });
 
   it('muestra las iniciales derivadas del nombre visible', () => {
@@ -121,101 +100,17 @@ describe('pie de usuario de la barra lateral privada', () => {
     expect(screen.getByTestId(testId.initials)).toHaveTextContent(esperado);
   });
 
-  it('el pie ofrece un menu desplegable con disparador accesible por teclado que declara que abre un menu', async () => {
-    // R17
-    const user = userEvent.setup();
-    const sesion = sessionUser();
-    renderNavUser(sesion);
-
-    const disparador = screen.getByTestId(testId.trigger);
-
-    expect(disparador).toHaveAccessibleName(sesion.displayName);
-    expect(disparador).toHaveAttribute('aria-haspopup', 'menu');
-    expect(disparador).toHaveAttribute('aria-expanded', 'false');
-
-    // Alcanzable con teclado: es el primer control del pie.
-    await user.tab();
-    expect(disparador).toHaveFocus();
-
-    // Y se abre con teclado, no solo con raton.
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => expect(disparador).toHaveAttribute('aria-expanded', 'true'));
-    expect(await screen.findByRole('menu')).toBeInTheDocument();
-  });
-
-  it('Escape cierra el menu de usuario y devuelve el foco a su disparador', async () => {
-    // R18
-    const user = userEvent.setup();
+  it('el pie NO ofrece menu de usuario ni cierre de sesion: son del encabezado', () => {
+    // Enmienda del 2026-09-07 (decision humana), en negativo. El cierre de sesion se afirma en
+    // `logout-button.test.tsx`; aqui se afirma que NO esta -y que no queda un disparador que abra
+    // una lista vacia, que es lo que pasaria si alguien moviera el control y olvidara el menu-.
     renderNavUser();
 
-    const disparador = screen.getByTestId(testId.trigger);
-    await openUserMenu(user);
-    expect(disparador).toHaveAttribute('aria-expanded', 'true');
+    const pie = screen.getByTestId(testId.user);
 
-    await user.keyboard('{Escape}');
-
-    await waitFor(() => expect(screen.queryByTestId(testId.logout)).toBeNull());
-    expect(disparador).toHaveAttribute('aria-expanded', 'false');
-    expect(disparador).toHaveFocus();
-  });
-
-  it('el cierre de sesion vive dentro de un form real cuya accion es logoutAction', async () => {
-    // R19 + R20 (el envio real del form es lo que invoca la action; no hay `onClick`).
-    const user = userEvent.setup();
-    renderNavUser();
-
-    const formulario = await openUserMenu(user);
-    const control = screen.getByTestId(testId.logout);
-
-    expect(formulario.tagName).toBe('FORM');
-    expect(formulario).toContainElement(control);
-    expect(control).toHaveAccessibleName();
-
-    await user.click(control);
-
-    await waitFor(() => expect(logoutActionMock).toHaveBeenCalledTimes(1));
-  });
-
-  it('invoca la accion de cierre de sesion exactamente una vez por activacion', async () => {
-    // R20
-    const user = userEvent.setup();
-    const enCurso = pendingLogout();
-    renderNavUser();
-
-    await openUserMenu(user);
-    const control = screen.getByTestId(testId.logout);
-
-    await user.click(control);
-    await waitFor(() => expect(logoutActionMock).toHaveBeenCalledTimes(1));
-
-    // Segunda activacion con el cierre todavia en curso: no dispara otra invocacion.
-    await user.click(screen.getByTestId(testId.logout));
-    expect(logoutActionMock).toHaveBeenCalledTimes(1);
-
-    await enCurso.resolve();
-  });
-
-  it('deshabilita el control mientras el cierre de sesion esta en curso', async () => {
-    // R21
-    const user = userEvent.setup();
-    const enCurso = pendingLogout();
-    renderNavUser();
-
-    await openUserMenu(user);
-    const control = screen.getByTestId(testId.logout);
-
-    expect(control).toBeEnabled();
-    expect(control).toHaveAttribute('aria-busy', 'false');
-
-    await user.click(control);
-
-    await waitFor(() => expect(screen.getByTestId(testId.logout)).toBeDisabled());
-    expect(screen.getByTestId(testId.logout)).toHaveAttribute('aria-busy', 'true');
-
-    await enCurso.resolve();
-
-    await waitFor(() => expect(screen.getByTestId(testId.logout)).toBeEnabled());
-    expect(screen.getByTestId(testId.logout)).toHaveAttribute('aria-busy', 'false');
+    expect(screen.queryByTestId(testId.trigger)).toBeNull();
+    expect(screen.queryByTestId(testId.logout)).toBeNull();
+    expect(within(pie).queryByRole('button')).toBeNull();
+    expect(pie.querySelector('[aria-haspopup="menu"]')).toBeNull();
   });
 });

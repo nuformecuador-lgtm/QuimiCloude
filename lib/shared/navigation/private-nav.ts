@@ -3,6 +3,7 @@ import {
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
+  PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
 } from '../routes';
 
@@ -69,6 +70,15 @@ export const SUPPLIERS_LABEL = 'Proveedores';
  */
 export const ORDERS_LABEL = 'Pedidos';
 
+/**
+ * Etiqueta del sidebar para la pantalla de presentaciones (QC-45, R3).
+ *
+ * `PRESENTATIONS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay
+ * codigo previo que la importara de este archivo, asi que no hay compatibilidad que sostener.
+ * Mismo criterio que `SUPPLIERS_LABEL` y `ORDERS_LABEL`.
+ */
+export const PRESENTATIONS_LABEL = 'Presentaciones';
+
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
@@ -90,6 +100,12 @@ export const BRAND_TAGLINE = 'ERP Químico';
 /** Titulos de las secciones en las que se agrupan los items de nivel superior. */
 export const NAV_SECTION_OPERATION = 'Operación';
 export const NAV_SECTION_CHAIN = 'Cadena';
+/**
+ * Seccion de configuracion del producto (QC-45, R3). Nace con **un solo item**, «Presentaciones»,
+ * y eso es lo esperado, no un olvido: su hermana «Unidades» llega con QC-39 (decision cerrada de
+ * QC-45, 2026-09-08).
+ */
+export const NAV_SECTION_CONFIGURATION = 'Configuración';
 
 /**
  * Nombre del icono de un item. **Es una cadena y no el componente a proposito.**
@@ -239,6 +255,28 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     permission: 'proveedores.consultar',
     icon: 'truck',
     section: NAV_SECTION_CHAIN,
+  },
+  // QC-45 R3, R4 — ULTIMA entrada de nivel superior y unica de la seccion «Configuración»: el
+  // catalogo de presentaciones no es operacion diaria ni cadena de suministro, y por eso estrena
+  // seccion propia en vez de colarse en una existente. Sigue siendo UNA sola: «Unidades» llega con
+  // QC-39. El icono `boxes` ya existe en `NavIconName` y en `NAV_ICONS`: no se anade ninguno.
+  //
+  // **El ocultado a quien no puede entrar lo hace el filtrado por PERMISO de QC-75**
+  // (`filterNavItemsByPermissions` en `app/(private)/layout.tsx`), no un campo `adminOnly`: el
+  // texto original de la T2 de QC-45 describia ese apaño por rol porque QC-75 aun no existia, y
+  // manda el mecanismo nuevo. `inventario.modificar` es el mismo codigo que exige la pantalla con
+  // `requirePagePermission`, asi que el item no puede salir en el menu de quien recibiria un 404
+  // al pulsarlo: el Operador del seed lleva `inventario.consultar` y NO este, asi que no lo ve.
+  // Al no quedarle ningun hijo visible, `groupNavItemsBySection` tampoco deja el encabezado
+  // «Configuración» huerfano.
+  {
+    kind: 'link',
+    href: PRESENTATIONS_ROUTE,
+    label: PRESENTATIONS_LABEL,
+    testId: 'nav-presentaciones',
+    permission: 'inventario.modificar',
+    icon: 'boxes',
+    section: NAV_SECTION_CONFIGURATION,
   },
 ];
 

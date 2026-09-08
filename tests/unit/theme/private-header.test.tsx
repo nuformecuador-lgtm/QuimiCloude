@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
+import { LOGOUT_LABEL } from '@/app/(private)/components/logout-button';
 import { THEME_TOGGLE_LABEL } from '@/app/(private)/components/theme-toggle';
 import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components/sidebar-toggle';
 import type { SessionUser } from '@/lib/modules/identity';
@@ -110,6 +111,20 @@ describe('encabezado privado con el control de tema', () => {
 
     expect(encabezado).toContainElement(sidebarToggle);
     expect(encabezado).toContainElement(themeToggle);
+  });
+
+  it('el cierre de sesion es vecino del control de tema en el encabezado', async () => {
+    // Enmienda del 2026-09-07 (decision humana): el control salio del menu del pie de la barra
+    // lateral -donde costaba dos gestos- y paso a ser un boton del encabezado, junto al de tema.
+    await renderLayout();
+
+    const encabezado = screen.getByTestId('private-header');
+    const themeToggle = screen.getByRole('button', { name: THEME_TOGGLE_LABEL });
+    const logout = screen.getByRole('button', { name: LOGOUT_LABEL });
+
+    expect(encabezado).toContainElement(logout);
+    // Vecinos de verdad: mismo contenedor, no dos esquinas distintas del encabezado.
+    expect(logout.closest('form')?.parentElement).toBe(themeToggle.parentElement);
   });
 
   it('conserva un unico landmark main y el nombre accesible del SidebarToggle', async () => {

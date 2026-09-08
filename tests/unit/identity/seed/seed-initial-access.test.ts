@@ -187,7 +187,7 @@ const ROLES_YA_SEMBRADOS: ReadonlyMap<string, string> = new Map(
   SEED_ROLES.map((role, index) => [role.name, `rol-${index}`]),
 );
 
-/** Los diez codigos del catalogo, tal y como los veria una base ya sembrada. */
+/** Los once codigos del catalogo, tal y como los veria una base ya sembrada. */
 const TODOS_LOS_CODIGOS_DEL_CATALOGO: ReadonlySet<string> = new Set(
   PERMISSIONS.map((permission) => permission.code),
 );
@@ -203,7 +203,7 @@ function asignacionesDelSeed(rolesPorNombre: ReadonlyMap<string, string>): Reado
   return pares;
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar (hoy: diez + una = once). */
+/** Numero total de asignaciones que el seed tiene que dejar (hoy: once + una = doce). */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -687,7 +687,7 @@ describe('seedInitialAccess', () => {
   // ---------------------------------------------------------------------------------
 
   // Caso 14 (QC-74 R8, R9, R10)
-  it('sobre una base vacia crea los diez permisos del catalogo y las once asignaciones del seed', async () => {
+  it('sobre una base vacia crea los once permisos del catalogo y las doce asignaciones del seed', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -715,7 +715,7 @@ describe('seedInitialAccess', () => {
     );
     expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
 
-    // Luego: las asignaciones, las once (diez del Administrador + una del Operador).
+    // Luego: las asignaciones, las doce (once del Administrador + una del Operador).
     const creacionesDeAsignaciones = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'createRolePermissions',
     );
@@ -724,7 +724,7 @@ describe('seedInitialAccess', () => {
       roleId: string;
       permissionCode: string;
     }[];
-    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(11);
+    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(12);
     expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED);
     expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
@@ -741,7 +741,7 @@ describe('seedInitialAccess', () => {
     const codigosDelAdministrador = paresCreados
       .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
       .map((par) => par.permissionCode);
-    expect(codigosDelAdministrador).toHaveLength(10);
+    expect(codigosDelAdministrador).toHaveLength(11);
     expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
     expect(
       paresCreados
@@ -816,7 +816,7 @@ describe('seedInitialAccess', () => {
 
     const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
-    // Primero: SI se crearon las que faltaban — las diez del Administrador.
+    // Primero: SI se crearon las que faltaban — las once del Administrador.
     const creaciones = repository.llamadas.filter((llamada) => llamada.metodo === 'createRolePermissions');
     expect(creaciones).toHaveLength(1);
     const paresCreados = creaciones[0]?.args[0] as readonly { roleId: string; permissionCode: string }[];

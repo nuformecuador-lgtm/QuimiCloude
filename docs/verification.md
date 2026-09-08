@@ -98,6 +98,13 @@ pnpm exec vitest related --run $(git diff --name-only origin/dev...HEAD)   # tre
   que un test de RLS signifique algo tiene que ejercitar la via que RLS protege.
 - Verifica migraciones aplicando y revirtiendo en un entorno de prueba: `down.sql` es
   convencion propia, nadie lo prueba por ti.
+- **Los tests de integración necesitan `DATABASE_URL`, y el gate la carga él.** Nadie más lo
+  hace: `prisma.config.ts` solo carga el `.env` para el CLI de Prisma, y Vitest no lo lee en
+  este proyecto. Desde el 2026-09-08 `init.sh` lo carga antes de correr los tests, salvo que
+  `DATABASE_URL` ya venga del entorno, en cuyo caso manda ésa. Antes de eso el veredicto del
+  gate dependía del shell: la misma rama daba **23 archivos y 32 tests en rojo** desde un shell
+  limpio y **1 archivo y 2 tests** con el `.env` cargado, y el rojo no decía «falta una
+  variable» sino «Validation Error» de Prisma, que se lee como un fallo de código.
 
 ## Rojos heredados: la pregunta es «¿rompí algo YO?»
 

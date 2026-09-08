@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 
 // La carpeta de la pantalla que estrena la tabla se DERIVA de esta constante, nunca de un
 // literal escrito a mano: asi un cambio de ruta arrastra esta prueba con el mismo commit.
-import { INVENTORY_ROUTE, ORDERS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes'
+import { INVENTORY_ROUTE, ORDERS_ROUTE, PRESENTATIONS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -140,15 +140,21 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   //
   // La inversion NO es «ya puede importarlo cualquiera», que seria tirar el centinela: la lista
   // de consumidores es CERRADA y se declara aqui. La pantalla de recetas sigue SIN tocarlo, y
-  // meter `data-table` en una cuarta pantalla vuelve a poner esto en rojo.
+  // meter `data-table` en una quinta pantalla vuelve a poner esto en rojo.
+  //
+  // AMPLIADO el 2026-09-07 (QC-45, pantalla-de-presentaciones): entra un CUARTO consumidor
+  // declarado -la pantalla de presentaciones-, que se monta sobre la tabla compartida en vez de
+  // dibujar la suya (QC-45 R8, R33, `design.md > 1`). Se anade la fila, no se afloja el
+  // centinela: la lista sigue cerrada y la pantalla de recetas sigue fuera.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
-   * Las carpetas autorizadas a consumir la tabla compartida. Las tres se DERIVAN de constantes de
-   * ruta y nunca de un literal escrito a mano: un cambio de ruta arrastra esta prueba con el
-   * mismo commit.
+   * Las carpetas autorizadas a consumir la tabla compartida. Las cuatro se DERIVAN de constantes
+   * de ruta y nunca de un literal escrito a mano: un cambio de ruta arrastra esta prueba con el
+   * mismo commit. La CUARTA -`PRESENTATIONS_ROUTE`- la trae QC-45 (R8): su pantalla consume la
+   * tabla compartida por decision de diseno, asi que es un consumidor declarado, no un descuido.
    */
-  const carpetasAutorizadas = [ORDERS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE].map((ruta) =>
+  const carpetasAutorizadas = [ORDERS_ROUTE, INVENTORY_ROUTE, SUPPLIERS_ROUTE, PRESENTATIONS_ROUTE].map((ruta) =>
     join(repoRoot, 'app', '(private)', ...ruta.split('/').filter((segmento) => segmento.length > 0)),
   )
 
@@ -158,7 +164,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las tres pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las cuatro pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -166,13 +172,13 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las tres pantallas autorizadas (pedidos, inventario, detalle de proveedor): migrar una cuarta es una decision, no un descuido (R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las cuatro pantallas autorizadas (pedidos, inventario, detalle de proveedor, presentaciones): migrar una quinta es una decision, no un descuido (R34)`,
         ).toBe(true)
         consumidores += 1
       }
     }
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor.
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(2)
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(3)
   })
 
   it('la pantalla de recetas sigue SIN consumirlo', () => {
@@ -289,16 +295,20 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   //
   // La lista sigue siendo CERRADA: en cuanto el E2E de recetas -o uno nuevo- referencie
   // `data-table`, esto vuelve a ponerse rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos tres', () => {
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuatro', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos tres E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cuatro E2E pueden referenciar la tabla compartida (R36)').toEqual([
       'e2e/inventario.spec.ts',
       'e2e/pedidos.spec.ts',
+      // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
+      // la pantalla de presentaciones la consume (QC-45 R8, R36). La lista sigue CERRADA: un
+      // quinto spec que referencie `data-table` vuelve a ponerla en rojo.
+      'e2e/presentaciones.spec.ts',
       'e2e/proveedores.spec.ts',
     ])
   })

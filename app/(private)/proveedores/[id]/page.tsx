@@ -12,7 +12,6 @@ import {
   CatalogTableSkeleton,
   SupplierDetailHeader,
   SupplierNotFound,
-  buildCatalogListQuery,
   parseCatalogListParams,
   type CatalogListSearchParams,
 } from './components';
@@ -44,9 +43,9 @@ export const metadata: Metadata = {
  *    Ese `unauthorized` lo sigue aportando el caso de uso de `proveedores` sobre los DATOS.
  * 3. exito -> datos de contacto y, debajo, el catalogo paginado (R19).
  *
- * **La `key` del `<Suspense>` es lo que hace reaparecer el esqueleto en CADA cambio** de pagina o
- * de tamano, no solo en la primera carga (R24). Sin ella, Next reutiliza el limite y el usuario se
- * queda mirando la pagina anterior sin ninguna senal de que algo esta en vuelo.
+ * **El `<Suspense>` YA NO lleva `key`** (2026-09-07): remontarlo en cada cambio de consulta
+ * borraba la barra de filtros y el foco del campo en el que se estaba escribiendo. La senal de
+ * R24 la da ahora `CatalogTable` mientras la navegacion esta en vuelo, sin desmontar la barra.
  *
  * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige
  * `proveedores.consultar` con `requirePagePermission`, **antes** de resolver `params` y de pedir
@@ -102,14 +101,11 @@ export default async function ProveedorDetallePage({
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <SupplierDetailHeader supplier={supplierResult.data} />
       {/*
-        La `key` lleva la cadena de consulta CANONICA y no solo pagina y tamano: desde el
-        2026-09-07 la lista tambien ordena, filtra y busca, y el esqueleto tiene que reaparecer en
-        cualquiera de esos cambios (R24).
+        SIN `key`: este limite no se remonta en cada cambio de consulta -eso destruia la barra de
+        filtros y con ella el foco-. La senal de R24 llega desde dentro de `CatalogTable` mientras
+        la navegacion esta en vuelo; el `fallback` cubre la primera carga.
       */}
-      <Suspense
-        key={buildCatalogListQuery(listParams)}
-        fallback={<CatalogTableSkeleton rows={listParams.pageSize} />}
-      >
+      <Suspense fallback={<CatalogTableSkeleton rows={listParams.pageSize} />}>
         <CatalogListSection
           supplierId={supplierResult.data.id}
           params={listParams}
