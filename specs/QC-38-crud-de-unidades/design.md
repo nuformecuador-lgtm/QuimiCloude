@@ -276,21 +276,43 @@ propósito, con destino QC-50).
 
 ### 7.1 Cómo se distingue el nombre duplicado del símbolo duplicado
 
-Prisma expone `P2002` para toda violación de unicidad, y el índice concreto en
-`error.meta.target`. `units` tiene **exactamente cuatro** índices únicos, los cuatro parciales y los
-cuatro con nombre propio (§1), y el esquema Prisma no declara ninguno más —lo vigila
-`tests/unit/unidades/schema/unidades-schema.test.ts`—:
+Prisma expone `P2002` para toda violación de unicidad, y lo que hay que mirar para saber **cuál** de
+los cuatro índices saltó es `error.meta.target`.
 
-| `meta.target` | Resultado del puerto |
-| --- | --- |
-| `units_company_name_unique`, `units_system_name_unique` | `'duplicate_name'` |
-| `units_company_symbol_unique`, `units_system_symbol_unique` | `'duplicate_symbol'` |
-| cualquier otro | **se relanza** |
+**`meta.target` trae las COLUMNAS afectadas, NUNCA el nombre del índice.** Esto no es una
+suposición: es lo que QC-25 verificó empíricamente contra Postgres real y dejó escrito en
+`lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts` (constante
+`RECIPE_NAME_UNIQUE_COLUMN` y `isUniqueNameViolation`), donde el `target` de un índice único parcial
+escrito a mano sale `['name_normalized']`. **Se discrimina por columna, con ese mismo patrón.**
 
-Relanzar el caso desconocido, en vez de clasificarlo como duplicado de nombre, es deliberado: un
-índice único nuevo que nadie mapeara aparecería como «ya existe ese nombre», que es mentira y no
-deja rastro. Es el mismo criterio que `docs/conventions.md` aplica a los errores que no son de
-dominio.
+Los cuatro índices únicos de `units` (§1) reparten sus columnas sin solaparse, así que una sola
+columna decide en cada caso:
+
+| Columna presente en `meta.target` | Índice(s) de los que puede venir | Resultado del puerto |
+| --- | --- | --- |
+| `name_normalized` | `units_company_name_unique`, `units_system_name_unique` | `'duplicate_name'` |
+| `symbol` | `units_company_symbol_unique`, `units_system_symbol_unique` | `'duplicate_symbol'` |
+| cualquier otra, o `target` ausente | — | **se relanza** |
+
+`company_id` **no discrimina** y no se mira: aparece en dos de los cuatro índices, uno de nombre y
+uno de símbolo. `target` puede llegar como cadena o como array —las dos formas se contemplan, igual
+que en `recipe-prisma.ts`—, y se resuelve con una comprobación de pertenencia, no con una igualdad
+contra el objeto entero.
+
+Relanzar el caso desconocido —columna no reconocida, o `meta.target` ausente— en vez de clasificarlo
+como duplicado de nombre es deliberado y se conserva entero: un índice único nuevo que nadie mapeara
+aparecería como «ya existe ese nombre», que es mentira y no deja rastro. Mejor relanzar el error
+crudo que traducirlo mal; es el mismo criterio conservador de `recipe-prisma.ts` y el que
+`docs/conventions.md` aplica a los errores que no son de dominio.
+
+> **Por qué esto estaba mal escrito, y por qué importa más allá de esta ficha.** La primera versión
+> de este apartado mandaba comparar `meta.target` contra los **nombres de los cuatro índices**.
+> Contra Postgres real eso **no hace match nunca**, así que R11 y R12 habrían quedado rotos en
+> producción devolviendo un error genérico en vez del suyo. **Ningún test con dobles puede desmentir
+> una creencia sobre la forma de un error del conector**: el doble devuelve exactamente lo que se le
+> diga, así que confirma la suposición equivocada. Sólo lo caza un test de **integración contra la
+> base de verdad** (T11). De ahí que R11 y R12 se verifiquen en integración y no sólo con dobles
+> (§12), y que la casa ya tuviera el dato verificado desde QC-25 en vez de volver a suponerlo.
 
 `P2003` (violación de FK) al borrar sólo puede venir de las tres `ON DELETE RESTRICT` que apuntan a
 `units`, así que se traduce a `'in_use'` sin ambigüedad (R24).
@@ -394,10 +416,13 @@ factor no se opera aquí (convertir es de QC-76 y ya está hecho).
 2. **`tests/integration` entero, no sólo `unidades`** (aviso de QC-76). Aunque esta ficha **no**
    añade ninguna restricción a `units` (R32, §3), el precedente manda: T10 lo verifica de forma
    explícita antes del PR.
-3. **`meta.target` de Prisma** para índices creados a mano. Si en alguna versión dejara de traer el
-   nombre del índice, la distinción nombre/símbolo del §7.1 caería al caso «se relanza» y el usuario
-   vería un error genérico en vez de uno concreto —feo, pero **nunca** un mensaje falso—. Se cubre
-   con un test de integración por cada uno de los dos choques, no con un test unitario del mapeo.
+3. **`meta.target` de Prisma** para índices creados a mano. Se discrimina **por columna** (§7.1),
+   que es la forma verificada contra Postgres real desde QC-25. Si en alguna versión dejara de traer
+   las columnas, la distinción nombre/símbolo caería al caso «se relanza» y el usuario vería un error
+   genérico en vez de uno concreto —feo, pero **nunca** un mensaje falso—. **Este riesgo no se cubre
+   con un test unitario del mapeo**: un doble devuelve la forma que se le diga y confirmaría
+   cualquier suposición, incluida una falsa. Se cubre con un test de **integración** por cada uno de
+   los dos choques (T11).
 4. **El símbolo vacío llega por `FormData` como el ausente.** Es el único punto donde R36 y R10
    pueden confundirse, y por eso la distinción está escrita en §8 (`formData.has`) y tiene su propio
    caso de test en T9, además del del esquema en T5.
@@ -416,8 +441,8 @@ factor no se opera aquí (convertir es de QC-76 y ya está hecho).
 | R8 | `''`, `'   '` y `'---'` → `ValidationError`; `'  kilo  '` se guarda como `'kilo'` | `tests/unit/unidades/create-unit.test.ts` |
 | R9 | 60 acepta, 61 rechaza; el esquema Prisma no gana ninguna restricción de longitud | `tests/unit/unidades/create-unit.test.ts`, `tests/unit/unidades/schema/unidades-schema.test.ts` |
 | R10 | Sin símbolo acepta; 10 acepta, 11 rechaza | `tests/unit/unidades/create-unit.test.ts` |
-| R11 | Mismo nombre normalizado en la misma empresa → `DuplicateNameError`; en otra empresa y frente a una de sistema → se acepta | `tests/integration/unidades/unit-write.int.test.ts` |
-| R12 | Mismo símbolo en la misma empresa → `DuplicateSymbolError`; dos sin símbolo conviven | `tests/integration/unidades/unit-write.int.test.ts` |
+| R11 | Mismo nombre normalizado en la misma empresa → `DuplicateNameError`; en otra empresa y frente a una de sistema → se acepta. **Obligatoriamente en integración**: el `P2002` real es lo único que prueba que la discriminación por columna (§7.1) acierta; con dobles no se puede verificar | `tests/integration/unidades/unit-write.int.test.ts` |
+| R12 | Mismo símbolo en la misma empresa → `DuplicateSymbolError`, **no** `DuplicateNameError`; dos sin símbolo conviven. **Obligatoriamente en integración**, por lo mismo que R11 | `tests/integration/unidades/unit-write.int.test.ts` |
 | R13 | Base sin factor y factor sin base → `ValidationError`; ninguno de los dos → acepta | `tests/unit/unidades/create-unit.test.ts` |
 | R14 | `0`, `-1`, `abc`, `1.00001` → rechazo; `0.5` acepta y se guarda `0.5000` | `tests/unit/unidades/create-unit.test.ts` + integración |
 | R15 | Base que a su vez deriva, auto-referencia y «ya soy base de alguien» → `InvalidDerivationError` | `tests/unit/unidades/update-unit.test.ts` |

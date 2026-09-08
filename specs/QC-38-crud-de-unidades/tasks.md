@@ -90,10 +90,17 @@
 - [x] **T8. Adaptador Prisma de escritura.** (depende de T6)
   - Toca: `lib/modules/unidades/adapters/driven/persistence/unit-write-prisma.ts` (nuevo).
   - `updateMany`/`deleteMany` para distinguir «no existe» sin depender de `P2025`; el mapeo de
-    `meta.target` de `design.md > 7.1`, con **relanzado** del índice desconocido; `P2003` →
-    `'in_use'`. `unit-prisma.ts` y `unit-catalog-prisma.ts` **no se tocan** (R33, QC-76 R36).
-  - **Hecho cuando**: `pnpm typecheck` y `pnpm lint` en verde y el archivo es el único del módulo,
-    junto a los dos existentes, que importa `@prisma/client`. Cubre: R11, R12, R23, R24.
+    `P2002` de `design.md > 7.1`, que discrimina **por COLUMNA de `meta.target`**
+    (`name_normalized` → `'duplicate_name'`, `symbol` → `'duplicate_symbol'`) y **nunca por el
+    nombre del índice**, siguiendo el patrón ya verificado contra Postgres real en
+    `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts` (QC-25); con **relanzado** de
+    la columna desconocida o del `target` ausente; `P2003` → `'in_use'`. `unit-prisma.ts` y
+    `unit-catalog-prisma.ts` **no se tocan** (R33, QC-76 R36).
+  - **Ojo**: `pnpm typecheck`, `pnpm lint` y los unitarios con dobles **no pueden validar este
+    mapeo** —un doble devuelve la forma que se le diga—. Lo valida T11 y sólo T11.
+  - **Hecho cuando**: `pnpm typecheck` y `pnpm lint` en verde, el archivo es el único del módulo,
+    junto a los dos existentes, que importa `@prisma/client`, **y T11 está en verde**.
+    Cubre: R11, R12, R23, R24.
 
 - [x] **T9. Server Actions y cableado.** (depende de T7, T8)
   - Toca: `lib/modules/unidades/adapters/driving/unit-actions.ts` (se **añaden** tres funciones y
@@ -122,7 +129,9 @@
   - Toca: `tests/integration/unidades/unit-write.int.test.ts` (nuevo).
   - Contra base real: alta con y sin símbolo y con y sin derivación; nombre normalizado repetido
     **en la misma empresa** → `DuplicateNameError`, y **aceptado** en otra empresa y frente a una de
-    sistema (R11); símbolo repetido → `DuplicateSymbolError`, y dos sin símbolo conviven (R12);
+    sistema (R11); símbolo repetido → `DuplicateSymbolError` **y no `DuplicateNameError`**, y dos sin
+    símbolo conviven (R12) —estos dos casos son los que prueban que la discriminación por columna de
+    `design.md > 7.1` acierta contra el `P2002` real, y **son los únicos que pueden hacerlo**—;
     edición que borra símbolo y derivación (R17); edición que **no** cambia `company_id` (R19);
     cambiar base y factor de una unidad referenciada por un producto y por una línea de receta, y
     comprobar que esas filas siguen intactas (R20); borrado que deja cero filas (R23); borrado
