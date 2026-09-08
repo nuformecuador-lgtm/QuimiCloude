@@ -994,3 +994,39 @@ directas de `presentation-table` habrían entrado en silencio, porque la versió
   hubiera tocado esta rama. Es el mismo defecto estructural que ya tienen las dos entradas del
   baseline de `recetas`. Al cerrar el merge desaparece —el `dev` local ya contiene `ab28f97`—; queda
   comprobado abajo con el `--rapido`. **No se toca nada de QC-45 ni se añade nada al baseline.**
+
+### El `--rapido` de después del merge: 40 de 41, y el 41 no es mío
+
+```
+✓ .env cargado en el entorno del gate
+✓ typecheck paso
+✓ lint paso
+ Test Files  1 failed | 40 passed (41)
+      Tests  2 failed | 519 passed (521)
+✗ 'pnpm run test:rapido' fallo
+```
+
+Las dos guardias de QC-45 que caían con el merge a medias **pasan** al cerrarlo, como estaba
+previsto. El único rojo es `tests/unit/navegacion/private-layout-menu.test.tsx`, y hay que decir
+tres cosas de él, porque es la única cosa que no puedo dejar verde:
+
+1. **Está en el baseline** (entrada de `a6454b3`, la que este merge conserva). O sea: para el gate
+   completo, que sí compara contra el baseline, no es un rojo nuevo.
+2. **`--rapido` no consulta el baseline** —sólo lo hace `./init.sh` completo—, así que en cuanto un
+   archivo baselined entra en el grafo, el rápido se pone rojo. Y entra en el grafo **porque lo
+   toqué**: traía 2 `userEvent.setup()` y la guardia obliga a migrarlos.
+3. **Mi cambio no tiene nada que ver con su fallo.** Comprobado poniendo la versión de `origin/dev`
+   encima y corriéndola:
+
+```
+$ git show origin/dev:tests/unit/navegacion/private-layout-menu.test.tsx > <el archivo>
+$ pnpm exec vitest run <el archivo>            # y restaurado desde copia despues
+CODIGO DE SALIDA = 1
+TestingLibraryElementError: Unable to find an element by: [data-testid="private-user-trigger"]
+      Tests  2 failed | 6 passed (8)           <- exactamente lo mismo que con mi version
+```
+
+**No lo arreglo, y no es pereza:** su propia entrada del baseline dice que **no se arregla ahí
+donde sale**, que lo decide quien movió el control (`ab28f97`), y tocar el componente lo prohíbe
+R17. Las salidas que veo, para el leader: dejarlo así y confiar en el gate completo —que es quien
+mira el baseline—, o abrir la ficha que esa entrada pide desde el 2026-09-08.
