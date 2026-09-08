@@ -15,7 +15,6 @@
 | QC-75 | menu-y-rutas-por-permiso | Identidad y acceso | fullstack | in_progress | feature/QC-75-menu-y-rutas-por-permiso | **PR #44 abierto (F2.4)**, gate completo en verde. `reviewer` APROBADO 0 mayores / 3 menores. Esperando merge humano |
 | QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **spec aprobado por el humano el 2026-09-08**, tarjeta en *En curso*. `implementer` corriendo las 14 tasks (F2.1) |
 | QC-45 | pantalla-de-presentaciones | Inventario | frontend | in_progress | feature/QC-45-pantalla-de-presentaciones | **F2.2 APROBADO** (0 mayores, 7 menores, 34/36 con test). **Commiteada (`30e9e2b`), sincronizada con `origin/dev` y PUSHEADA.** F2.4 (PR) **bloqueado** por la base compartida; y sin T2/T12 no se cierra |
-| QC-76 | equivalencia-y-ambito-de-unidades | Catálogos | backend | in_progress | feature/QC-76-equivalencia-y-ambito-de-unidades | implementada: 11/12 tasks, **38/38 `R<n>` con test ejecutado y verde**. `reviewer` en curso (F2.2). Pendiente F2.3 (mergear `origin/dev`, que avanzó) y F2.4 |
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -2402,6 +2401,27 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### QC-76, al cerrar (2026-09-08)
+
+- **`wt.sh done` falló en Windows por OCTAVA vez.** Desregistró el worktree de git —`git worktree
+  list` ya no lo muestra— pero dejó el árbol en disco, y esta vez el `rm -rf` de remate **también
+  falló**: `Device or resource busy`, dos intentos. Queda `.worktrees/QC-76-equivalencia-y-ambito-de-unidades`
+  huérfano, sin registrar y sin trabajo dentro que perder (rama mergeada en `dev`, merge `5ee52fe`).
+  Se puede borrar a mano cuando ningún proceso lo tenga abierto. **Sigue sin ficha**, y ya es la
+  octava: `AGENTS.md > Worktrees` dice que un HOLD no bloquea el cierre, y no lo bloqueó, pero
+  esto ya no es un HOLD de la guarda sino un fallo del propio desmontaje.
+- **Cuatro archivos del baseline ya pasan** y el gate avisa de que tocaría limpiarlos:
+  `tests/unit/inventario/product-page.test.tsx`, `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx`,
+  `tests/unit/proveedores-ui/supplier-page.test.tsx` y `tests/unit/recetas/module-contract.test.ts`.
+  Un baseline que lista rojos que ya no existen deja de medir lo que dice medir.
+- **QC-77 (`aislamiento-de-la-base-en-tests-de-integracion`) sigue `pending` y sin acotar**, y esta
+  ficha la justificó sola: la base de desarrollo es compartida entre worktrees, así que aplicar una
+  migración desde una rama rompe los tests de integración de TODAS las demás hasta que esa rama
+  mergea. La sesión de QC-45 lo reportó desde el otro lado.
+- **Dos menores del reviewer salen sin cerrar**: R37 se cierra por inspección sin test directo, y
+  `docs/architecture.md > Dominio` sigue listando «unidades (QC-51)», ficha cancelada al acotar QC-76.
+
 
 ### La base de desarrollo es COMPARTIDA y ya rompió el gate de otra feature (2026-09-08)
 

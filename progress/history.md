@@ -2135,3 +2135,63 @@ primera con dos mayores.
   rematado con `rm -rf` + `git worktree prune`. Van **siete** veces y sigue sin ficha.
 - **Desbloquea QC-75** (`menu-y-rutas-por-permiso`): el menú filtrado, el 404 por ruta, el destino
   del login y el E2E que esta ficha difirió.
+
+## QC-76 — equivalencia-y-ambito-de-unidades (cerrada el 2026-09-08, PR #45, merge `5ee52fe`)
+
+Zona `backend`, `complexity: high`. El catálogo de unidades de QC-32 gana la **equivalencia**
+—de qué unidad deriva cada una y por qué factor— y el **ámbito por empresa**; el módulo publica
+la conversión en su contrato y el listado que ya existía pasa a devolver las de la empresa **más**
+las de sistema. 38 requisitos EARS, 33 decisiones cerradas, cero preguntas abiertas.
+
+- **Se especificó sin descubrir nada escribiendo.** `/afinar-feature` había sembrado el
+  `requirements.md` con el alcance y 30 decisiones cerradas ANTES del spec, así que `spec_author`
+  solo escribió los EARS, el `design.md` y el `tasks.md`. Las tres decisiones que faltaban las
+  cerró el humano en el hilo, sin reabrir ninguna de las anteriores: **truncar a 12 decimales**
+  cuando la división de la conversión no termina (nunca hacia arriba, en una constante con
+  nombre); autorizar por el permiso **`unidades.consultar`** y no por el `ADMIN_ROLE_NAME` que
+  retiró QC-54; y dejar **`findRefs` sin filtro de empresa**, única excepción a R18, con destino
+  QC-50.
+- **«De sistema» es exactamente «sin `company_id`»**: no se creó el campo `system` que pedía la
+  petición original. Dos campos que dicen casi lo mismo acaban contradiciéndose.
+- **El reviewer rechazó en la ronda 1, y tenía razón**: el índice único de símbolo (R15) dejaba
+  **11 archivos de test de otros módulos en rojo determinista** —65 choques de
+  `Unique constraint failed on the fields: (symbol)`—, porque **doce fixtures** de `inventario`,
+  `recetas`, `pedidos` y `proveedores` sembraban unidades de sistema con símbolo fijo `'kg'`/`'ut'`.
+  Era el mismo problema que el implementer ya había resuelto para los tres fixtures de dentro de
+  `unidades`; se quedaron los doce de fuera. Se arregló de raíz —símbolo derivado del marcador
+  irrepetible— y el reviewer verificó **con el diff, no de palabra**, que no se tocó ni un aserto:
+  cero líneas con `expect(` eliminadas o modificadas, solo 3 añadidas. Ronda 2: **APROBADO, 0
+  mayores**, con 3 mutaciones al código de producción, las tres cazadas.
+- **La lección de método, y es de los dos**: quedó oculto porque el implementer corrió solo
+  `tests/unit/unidades` y `tests/integration/unidades`, y el leader se quedó en `--rapido`, que no
+  selecciona los tests de integración de otros módulos. El «38 de 38 en verde» era cierto para
+  `unidades` y se leyó como «la feature no rompió nada», que era justo lo que nadie había
+  comprobado. Una feature que añade una restricción a una tabla compartida se verifica con
+  `tests/integration` **entero**, no con lo suyo.
+- **La base de desarrollo bloqueó la mitad del trabajo.** Arrastraba una unidad residual de un test
+  cuyo símbolo `kg` duplicaba el de `kilogramo` y hacía fallar el índice nuevo con `23505`. Se
+  verificaron **cero referencias** desde `products`, `recipe_lines` y `supplier_catalog_lines`
+  antes de tocarla, y el humano eligió borrarla frente a anularle el símbolo. Después, el UP, el
+  DOWN y el re-UP se ejercitaron **de verdad** (`db:rollback` + `db:migrate`), no en transacción
+  deshecha.
+- **El gate volvió a abortar en el paso 3 sin mirar código, y esta vez se arregló la causa.** El
+  validador resolvía `specs/` y `.worktrees/*/specs` contra el directorio actual, y desde dentro
+  de un worktree `.worktrees/` no existe: cualquier otra feature en vuelo daba «faltan specs»
+  con sus specs sanos a un directorio de distancia. **Bloqueaba el F2.4 de todas las features a la
+  vez.** Van tres veces —dos en QC-74, anotadas como «sigue sin resolverse»—. Entró por
+  `/afinar-regla` como `chore(arnes)` `05d47f5`: resolución contra la raíz del repo, fallo si no
+  la encuentra, y guardia que muerde.
+- **El informe del reviewer apareció sobrescrito** por una versión «APROBADO, cero mayores» que no
+  era suya y que se llevó por delante tres menores. Se detectó porque el implementer no lo pudo
+  leer, y el reviewer lo reescribió entero con un aviso de integridad. No cambió el trabajo: el
+  bloqueante ya se había reproducido de forma independiente.
+- **El implementer murió una vez por corte de stream** (watchdog a los 600s sin emitir), con dos
+  commits ya en la rama. Se reanudó sin perder nada. Es la misma causa que documenta
+  `AGENTS.md > Regla del gate`: esperas largas en primer plano.
+- Cierre: `./init.sh` **completo** desde el worktree en verde —exit 0, `== init OK ==`, 236/237
+  archivos, **2919 tests**, único rojo en el baseline—. El gate avisa además de que **4 archivos
+  del baseline ya pasan** y tocaría limpiarlos: queda como deuda, no es de esta ficha.
+- Menores vivos: **R37** se cierra por inspección sin test directo, y `docs/architecture.md >
+  Dominio` sigue listando «unidades (QC-51)», ficha cancelada al acotar ésta.
+- **Desbloquea QC-38** (`crud-de-unidades`: alta, edición y borrado encima de esto), y tras ella
+  QC-39.
