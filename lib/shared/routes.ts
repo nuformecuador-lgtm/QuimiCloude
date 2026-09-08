@@ -90,13 +90,16 @@ export const PRESENTATIONS_ROUTE = '/configuracion/presentaciones';
  * `PRESENTATIONS_ROUTE` ya anunciaba: el segmento `configuracion` sigue sin tener constante
  * propia porque sigue sin haber pantalla en esa URL.
  *
- * **Todavia NO esta en `PRIVATE_ROUTE_PREFIXES`, y no es un olvido.** La entrada del prefijo se
- * anade en la MISMA tanda que `app/(private)/configuracion/unidades/page.tsx` (T3 + T8 de
- * `tasks.md`): `guard-rutas-privadas-cubiertas` compara la lista de prefijos con las carpetas que
- * tienen `page.tsx` bajo `app/(private)/` y pone el gate en rojo en los DOS sentidos —prefijo sin
- * pantalla y pantalla sin prefijo—, asi que las dos cosas tienen que entrar juntas. Esta
- * constante se declara antes porque `unitListHref` deriva de ella (R8) y no puede escribir la URL
- * como literal.
+ * **Ya esta en `PRIVATE_ROUTE_PREFIXES`** (R13), donde entro junto con
+ * `app/(private)/configuracion/unidades/page.tsx`: `guard-rutas-privadas-cubiertas` compara la
+ * lista de prefijos con las carpetas que tienen `page.tsx` bajo `app/(private)/` y pone el gate en
+ * rojo en los DOS sentidos —prefijo sin pantalla y pantalla sin prefijo—, asi que las dos cosas
+ * tenian que entrar juntas. Esa fila garantiza **sesion, no autorizacion**: quien decide si esta
+ * pantalla se ve son los dos `requirePagePermission` de su `page.tsx` (R12), y ninguna de las dos
+ * garantias sustituye a la otra.
+ *
+ * Ademas, `unitListHref` deriva de esta constante (R8): la URL no se escribe como literal en
+ * ningun archivo de producto.
  */
 export const UNITS_ROUTE = '/configuracion/unidades';
 
@@ -128,4 +131,9 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // `/configuracion/presentaciones` se serviria SIN sesion. Una sola entrada: no hay pagina de
   // detalle, y la comparacion por segmentos ya cubriria cualquier subcamino.
   PRESENTATIONS_ROUTE,
+  // QC-39 R13: la pantalla de unidades. Sin esta fila, `(private)` no aparece en la URL y
+  // `/configuracion/unidades` se serviria SIN sesion. Una sola entrada: no hay pagina de detalle,
+  // y la comparacion por segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso lo
+  // exige la propia pantalla (R12).
+  UNITS_ROUTE,
 ] as const;

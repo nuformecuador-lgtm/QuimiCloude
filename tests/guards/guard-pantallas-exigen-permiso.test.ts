@@ -190,7 +190,7 @@ function describir(infracciones: readonly Infraccion[]): string {
 }
 
 /**
- * Las nueve pantallas privadas de hoy, escritas por su URL. Es el ANCLA ANTI-VACUIDAD: si el
+ * Las diez pantallas privadas de hoy, escritas por su URL. Es el ANCLA ANTI-VACUIDAD: si el
  * barrido se rompiera —ruta de `app/(private)` cambiada, `sep` de Windows, un `readdirSync` que
  * falla en silencio— la lista se vaciaria y esta guardia pasaria en verde sin haber mirado un solo
  * archivo. Que haya que tocarla al anadir una pantalla es el precio, y es barato: obliga a mirar
@@ -199,8 +199,15 @@ function describir(infracciones: readonly Infraccion[]): string {
 // AMPLIADA el 2026-09-08 (QC-45 T1, ronda 2): las ocho de `design.md > 2.2` mas
 // `/configuracion/presentaciones`, la pantalla del catalogo de presentaciones, que exige
 // `inventario.modificar` —administrar el catalogo es modificar inventario— y no `consultar`.
+//
+// TENSADA el 2026-09-08 (QC-39 T3): de nueve a DIEZ, con `/configuracion/unidades`, la pantalla
+// del catalogo de unidades de medida. Es la unica que llama a `requirePagePermission` DOS veces
+// —`unidades.consultar` y `unidades.modificar` (QC-39 R12)—, y el barrido de abajo la valida igual
+// porque recorre TODOS los codigos que encuentra en el archivo, no solo el primero. El ancla se
+// SUBE, nunca se relaja: ni un aserto de esta guardia cambia.
 const RUTAS_ESPERADAS_HOY = [
   '/configuracion/presentaciones',
+  '/configuracion/unidades',
   '/dashboard',
   '/inventario',
   '/pedidos',
@@ -212,7 +219,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las nueve pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las diez pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);
