@@ -10,6 +10,7 @@ import { normalizedSearchCondition } from './list-query-sql';
 import type { ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { UnitRef } from '../../../domain/unit-catalog';
+import type { UnitScope } from '../../../domain/unit-scope';
 
 /**
  * Implementa `UnitRepository` (`ports/unit-repository.ts`) con Prisma: las DOS lecturas del
@@ -89,10 +90,37 @@ export function unitOrderBy(sort: ListSort | null): Prisma.UnitOrderByWithRelati
  * **Ningun filtro**: `UNIT_QUERYABLE.filterable` esta vacio a proposito (no es un olvido), asi
  * que `sanitizeListQuery` poda cualquier filtro que llegue y aqui no queda nada que traducir.
  * Tampoco hay `deletedAt`: `units` no tiene borrado logico.
+ *
+ * **El `scope` es OBLIGATORIO en la firma** (QC-76 R18): un `where` del listado no se puede
+ * construir sin la empresa en cuyo nombre se pregunta, asi que la consulta futura que se olvide
+ * del filtro no compila, en vez de pasar verde y ensenar unidades ajenas. El ambito se compone
+ * con la busqueda mediante `AND` -nunca fundiendo las dos en el mismo objeto-: `OR` y
+ * `nameNormalized` al mismo nivel dejarian que un termino de busqueda ampliara lo visible.
  */
-export function buildUnitWhere(query: ListQuery): Prisma.UnitWhereInput {
+/**
+ * **La UNICA definicion del ambito «de la empresa O de sistema»** (QC-76 R18, decision cerrada
+ * 15). Una unidad es de sistema exactamente cuando su `company_id` es NULO (R11, R12): no hay
+ * bandera que mirar, y por eso la condicion es un `OR` de dos igualdades y no un booleano.
+ *
+ * Se ESCRIBE AQUI UNA VEZ y se EXPORTA a proposito: toda consulta del listado la compone, y
+ * quien anada una consulta nueva la reutiliza en vez de escribir un segundo `OR` que manana
+ * puede divergir y ensenarle a una empresa lo que no es suyo.
+ *
+ * **Quien la va a reutilizar y por que no lo hace ya**: `findUnitRefs`
+ * (`unit-catalog-prisma.ts`) se queda SIN ambito en esta ficha, por decision cerrada del humano
+ * del 2026-09-07 (R36, decision cerrada 33). Es la unica excepcion explicita a R18 y tiene
+ * destino nombrado: **QC-50**, la ficha que aisla `recetas` —su unico llamante— por empresa.
+ * Cuando llegue, acota su consulta con ESTA funcion; hasta entonces el aislamiento del catalogo
+ * completo vive donde esta escrito, en el listado.
+ */
+export function companyScopeWhere(scope: UnitScope): Prisma.UnitWhereInput {
+  return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
+}
+
+export function buildUnitWhere(query: ListQuery, scope: UnitScope): Prisma.UnitWhereInput {
   const search = normalizedSearchCondition(query.search, normalizeUnitName);
-  return search === null ? {} : { nameNormalized: search };
+  const scoped = companyScopeWhere(scope);
+  return search === null ? scoped : { AND: [scoped, { nameNormalized: search }] };
 }
 
 /**
@@ -100,9 +128,13 @@ export function buildUnitWhere(query: ListQuery): Prisma.UnitWhereInput {
  * -ninguna consulta sin cota-, con el orden y la busqueda del contrato aplicados. Sin `count`:
  * este modo no devuelve `total` porque no hay ventana, y contar seria una consulta de mas.
  */
-export async function listUnits(limit: number, query: ListQuery): Promise<readonly UnitRef[]> {
+export async function listUnits(
+  limit: number,
+  query: ListQuery,
+  scope: UnitScope,
+): Promise<readonly UnitRef[]> {
   const rows = await prisma.unit.findMany({
-    where: buildUnitWhere(query),
+    where: buildUnitWhere(query, scope),
     orderBy: unitOrderBy(query.sort),
     select: UNIT_SELECT,
     take: limit,
@@ -118,11 +150,14 @@ export async function listUnits(limit: number, query: ListQuery): Promise<readon
  * dejaria un `pageSize` y un `totalPages` mentirosos aunque el `LIMIT` de SQL fuera correcto.
  *
  * ORDEN Y BUSQUEDA VAN AL MOTOR, nunca a la pagina ya traida (R13), y `total` sale de un `count`
- * con el MISMO `where` que el `findMany` (R14) -literalmente la misma constante-.
+ * con el MISMO `where` que el `findMany` (R14) -literalmente la misma constante-. Desde QC-76
+ * ese `where` incluye el AMBITO, y compartir el objeto es justo lo que hace que el `total`
+ * cuente SOLO lo visible para la empresa (R17): un `count` con su propio `where` contaria
+ * tambien las unidades ajenas y la paginacion mentiria.
  */
-export async function listUnitsPage(query: ListQuery): Promise<Page<UnitRef>> {
+export async function listUnitsPage(query: ListQuery, scope: UnitScope): Promise<Page<UnitRef>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildUnitWhere(query);
+  const where = buildUnitWhere(query, scope);
 
   const [rows, total] = await Promise.all([
     prisma.unit.findMany({

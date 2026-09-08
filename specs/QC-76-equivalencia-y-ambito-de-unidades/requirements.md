@@ -21,7 +21,244 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí son tres cosas y ninguna más:
+
+1. la **capa de persistencia** —el esquema Prisma (`db/schema.prisma`) más la base Postgres con la
+   migración nueva de esta feature aplicada—;
+2. el **módulo `unidades`** tal y como existe hoy: su contrato público (`index.ts`), su único caso
+   de uso (`domain/list-units.ts`), su puerto de listado, su adaptador Prisma y su Server Action;
+3. la **frontera** de ese listado con `identity`, de donde sale la empresa de quien pregunta
+   (`getSessionContext()`, QC-48).
+
+**No hay alta, edición ni borrado de unidades en esta ficha** (decisión cerrada 1, van a QC-38), así
+que ningún requisito describe un formulario ni un caso de uso de escritura. Cuando un requisito dice
+«SI se intenta persistir … ENTONCES el sistema DEBE rechazar **en la propia base de datos**», habla
+de la garantía que deja la migración: es lo que se prueba con un `INSERT`/`UPDATE` directo en la base
+de test, no con una llamada a un service que todavía no existe.
+
+### Equivalencia entre unidades
+
+**R1.** El sistema DEBE permitir que cada unidad declare **de qué unidad deriva** y **por qué
+factor**, DEBE tratar los dos como opcionales, y DEBE aceptar una unidad que no declare ninguno de
+los dos (unidad **base**).
+
+**R2.** SI se intenta persistir una unidad que declare la unidad de la que deriva **sin** factor, o
+un factor **sin** unidad de la que deriva, ENTONCES el sistema DEBE rechazar la operación en la
+propia base de datos y NO DEBE crear ni modificar ninguna fila.
+
+**R3.** El sistema DEBE persistir el factor como **decimal exacto de cuatro decimales** y NO DEBE
+usar coma flotante para esa columna; DEBE conservar sin pérdida un factor escrito con cuatro
+decimales y DEBE rechazar en la propia base de datos —o truncar nunca en silencio— un valor que no
+quepa en esa precisión.
+
+**R4.** SI se intenta persistir una unidad con factor **menor o igual que cero**, ENTONCES el
+sistema DEBE rechazar la operación en la propia base de datos y NO DEBE crear ni modificar ninguna
+fila.
+
+**R5.** El sistema DEBE aceptar **cualquier factor mayor que cero**, incluidos los menores que 1
+(por ejemplo `0.5000`), sin rechazarlos, sin normalizarlos y sin exigir que la unidad apuntada sea
+la más pequeña de su familia.
+
+**R6.** SI se intenta persistir un estado en el que una unidad derive de otra que **a su vez
+deriva** de una tercera —tanto al declarar la unidad derivada como al convertir en derivada una
+unidad de la que ya deriva alguna—, ENTONCES el sistema DEBE rechazar la operación en la propia base
+de datos y NO DEBE crear ni modificar ninguna fila: la derivación es de **un solo nivel**.
+
+**R7.** SI se intenta persistir una unidad que declare derivar **de sí misma**, ENTONCES el sistema
+DEBE rechazar la operación en la propia base de datos y NO DEBE crear ni modificar ninguna fila.
+
+**R8.** SI se intenta **eliminar** una unidad de la que deriva al menos otra unidad, ENTONCES el
+sistema DEBE rechazar el borrado en la propia base de datos y DEBE conservar intactas las dos
+unidades y la referencia entre ellas.
+
+**R9.** El sistema DEBE permitir que una unidad de una empresa derive de otra unidad **de esa misma
+empresa** o de una unidad **de sistema**; SI se intenta persistir una unidad que derive de una
+unidad **de otra empresa**, ENTONCES el sistema DEBE rechazar la operación en la propia base de
+datos y NO DEBE crear ni modificar ninguna fila.
+
+**R10.** El sistema DEBE permitir **cambiar** la unidad de la que deriva una unidad, o su factor,
+aunque esa unidad ya esté referenciada por un producto o por una línea de receta, y ese cambio NO
+DEBE modificar ninguna cantidad ya guardada ni invalidar ninguna fila existente.
+
+### Ámbito por empresa
+
+**R11.** El sistema DEBE persistir, para cada unidad, la **empresa** a la que pertenece en una
+columna **opcional**, y la **ausencia de valor** en esa columna —y nada más— DEBE significar que la
+unidad es **de sistema**.
+
+**R12.** El sistema NO DEBE declarar en el catálogo de unidades ninguna otra columna, bandera ni
+valor que marque una unidad como «de sistema».
+
+**R13.** SI se intenta persistir una unidad cuya empresa no corresponda a ninguna empresa existente,
+ENTONCES el sistema DEBE rechazar la operación en la propia base de datos y NO DEBE crear ni
+modificar ninguna fila.
+
+**R14.** SI se intenta persistir una unidad cuyo **nombre normalizado** coincida con el de otra
+unidad **de la misma empresa**, o —siendo las dos de sistema— con el de otra unidad de sistema,
+ENTONCES el sistema DEBE rechazar la operación en la propia base de datos, contra un índice único y
+no contra una comprobación previa al vuelo; y DEBE **aceptar** el mismo nombre normalizado en dos
+empresas distintas, y en una empresa frente a una unidad de sistema. El nombre normalizado DEBE
+seguir siendo el que produce la **única definición** de la normalización que publica el contrato del
+módulo (QC-32 R4).
+
+**R15.** SI se intenta persistir una unidad **con símbolo** cuyo símbolo coincida con el de otra
+unidad del **mismo ámbito** —la misma empresa, o el conjunto de las de sistema—, ENTONCES el sistema
+DEBE rechazar la operación en la propia base de datos; y DEBE seguir aceptando unidades **sin
+símbolo**, incluidas varias sin símbolo en el mismo ámbito, y el mismo símbolo en dos ámbitos
+distintos.
+
+**R16.** CUANDO una empresa queda marcada como borrada, el sistema NO DEBE borrar, vaciar ni alterar
+ninguna unidad de esa empresa.
+
+### El listado de unidades
+
+**R17.** CUANDO se consulta el listado de unidades en nombre de una empresa, el sistema DEBE
+devolver **exactamente** las unidades de esa empresa **más** las unidades de sistema, y NO DEBE
+devolver ninguna unidad de otra empresa; esto DEBE cumplirse en los **dos** modos del listado —el
+catálogo completo y la página—, y en el modo paginado el recuento total DEBE contar solo las
+unidades visibles para esa empresa.
+
+**R18.** El sistema DEBE definir la condición de ámbito «de la empresa **o** de sistema» **una sola
+vez** dentro del módulo `unidades`, DEBE construir a partir de esa definición **toda** consulta del
+listado, y NO DEBE permitir que una consulta del listado se ejecute sin recibir la empresa en cuyo
+nombre se pregunta.
+
+**R19.** CUANDO se invoca el listado desde su adaptador driving, la empresa DEBE salir del
+**contexto de sesión del servidor** y nunca de la entrada del llamante; SI no hay contexto de sesión,
+ENTONCES el sistema DEBE rechazar la operación sin consultar el repositorio.
+
+**R20.** El sistema DEBE seguir exigiendo, **antes** de validar la entrada y antes de tocar el
+repositorio, el permiso de consulta de unidades —que hoy tiene únicamente el rol **Administrador**—
+validado **en el service**, y DEBE rechazar por igual al actor ausente, al que no trae conjunto de
+permisos, al que lo trae vacío y al que no trae ese código exacto. Que la empresa viaje en la sesión
+NO DEBE autorizar por sí sola.
+
+**R21.** El sistema NO DEBE cambiar el orden por defecto, la búsqueda, el filtrado ni la paginación
+que el listado ya tenía, ni la forma de su resultado para quien lo llama sin consulta.
+
+### La conversión
+
+**R22.** El **contrato público** del módulo `unidades` DEBE publicar una función que convierta una
+cantidad de una unidad a otra, y esa función DEBE ser **pura**: sin acceso a base de datos, sin
+framework y sin estado.
+
+**R23.** CUANDO se convierte una cantidad entre dos unidades que **comparten unidad base** —incluido
+el caso de una unidad consigo misma y el de una unidad base con una derivada suya—, el sistema DEBE
+devolver la cantidad equivalente según los factores declarados, NO DEBE redondearla a ninguna escala
+de presentación y NO DEBE guardarla en ninguna columna. En concreto: SI la división termina,
+ENTONCES el resultado DEBE ser **exacto**, con todas sus cifras y sin ceros de relleno; SI la
+división **no termina** —el factor de destino tiene algún divisor distinto de 2 y de 5—, ENTONCES el
+sistema DEBE calcularlo con una **escala interna fija de 12 decimales, truncando** y nunca
+redondeando hacia arriba, y esa escala DEBE estar declarada en **una única constante con nombre**
+documentada en el contrato, no repartida por el cálculo.
+
+**R24.** SI las dos unidades **no comparten unidad base**, ENTONCES el sistema DEBE fallar con un
+error de dominio distinguible del resto y NO DEBE devolver ninguna cantidad.
+
+**R25.** SI la cantidad recibida o alguno de los factores no es un decimal válido, o el factor no es
+mayor que cero, o una unidad declara unidad base sin factor —o factor sin unidad base—, ENTONCES el
+sistema DEBE fallar con un error de dominio y NO DEBE devolver ninguna cantidad.
+
+**R26.** El sistema NO DEBE introducir en `inventario`, `recetas` ni `pedidos` ninguna llamada a la
+conversión, ni convertir cantidades en ninguna consulta o escritura existente: la unidad sigue
+siendo anotativa para todos ellos.
+
+### Esquema, migración y seguridad
+
+**R27.** El sistema DEBE introducir los cambios de esquema de esta feature en una **migración
+nueva** y NO DEBE modificar el contenido de la migración ya aplicada `20260903121404_units_catalog`.
+
+**R28.** CUANDO se aplica la migración de esta feature, las **cuatro** unidades existentes DEBEN
+quedar así: `litro` derivando de `mililitro` con factor 1000, `kilogramo` derivando de `gramo` con
+factor 1000, `mililitro` y `gramo` sin derivación, y las cuatro **sin empresa**.
+
+**R29.** La migración de esta feature NO DEBE crear ninguna unidad nueva ni eliminar ninguna
+existente: al terminar, el catálogo DEBE tener exactamente esas cuatro unidades.
+
+**R30.** CUANDO termina la migración de esta feature, la tabla de unidades DEBE tener
+`ROW LEVEL SECURITY` **activada y forzada** (`FORCE ROW LEVEL SECURITY`).
+
+**R31.** El sistema DEBE nombrar en **inglés** la columna, los índices, las restricciones y
+cualquier otro objeto de base de datos que cree o renombre esta feature.
+
+**R32.** El sistema NO DEBE declarar ninguna marca de borrado lógico en el catálogo de unidades: la
+tabla NO DEBE ganar columna `deleted_at` ni equivalente.
+
+**R33.** La migración de esta feature DEBE traer su `down.sql`, y CUANDO se revierte, el esquema
+DEBE quedar exactamente como estaba antes de aplicarla —sin columna, índice, restricción ni
+disparador residual, con el índice único de nombre anterior restaurado y con la RLS activada y
+forzada—, y las cuatro unidades DEBEN seguir existiendo.
+
+**R34.** SI al revertir la migración existe alguna unidad con empresa, o alguna unidad derivada que
+no sea una de las dos que dejó la propia migración, ENTONCES el sistema DEBE **abortar la reversión
+completa** y NO DEBE descartar ese dato en silencio.
+
+### Límites de alcance
+
+**R35.** El sistema NO DEBE incluir en esta feature ninguna operación de alta, edición o borrado de
+unidades, ningún rechazo de aplicación a editar o borrar una unidad de sistema, ni ruta, pantalla o
+adaptador driving nuevo que las exponga; por lo tanto esta feature NO aporta ningún flujo navegable
+que un test E2E pueda visitar.
+
+**R36.** El sistema NO DEBE cambiar en esta feature la resolución de referencias de unidad que
+consumen otros módulos (`UnitCatalog.findRefs`) ni a sus llamantes: acotar por empresa lo que lee
+`recetas` pertenece a la ficha que aísle ese módulo (QC-50, deuda registrada en
+`docs/architecture.md > Dominio`).
+
+**R37.** El sistema NO DEBE relacionar el catálogo de unidades con el de presentaciones ni fundirlos:
+siguen siendo dos entidades separadas.
+
+**R38.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el requisito
+que la hace testeable. Ninguna queda sin `R<n>`.
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Qué gana el catálogo: equivalencia y ámbito, nada más | R1, R11, R35 |
+| 2 | La equivalencia: unidad de la que deriva + factor, juntos o ninguno | R1, R2 |
+| 3 | Decimal exacto de cuatro decimales, nunca coma flotante | R3 |
+| 4 | Ni cero ni negativo | R4 |
+| 5 | Puede ser menor que 1; convertir depende solo de compartir base | R5, R23, R24 |
+| 6 | Un solo nivel de derivación | R6 |
+| 7 | Ninguna unidad deriva de sí misma | R7 |
+| 8 | No se borra una unidad de la que otra deriva (`ON DELETE RESTRICT`) | R8 |
+| 9 | Una unidad de empresa deriva de una suya o de una de sistema | R9 |
+| 10 | `company_id` opcional; sin él, unidad de sistema | R11, R13 |
+| 11 | No hay campo `system` | R12 |
+| 12 | Las de sistema solo se leen; el rechazo lo implementa QC-38 | R17, R35 |
+| 13 | Las de sistema son las cuatro de la migración de QC-32 | R28, R29 |
+| 14 | Unicidad del nombre normalizado dentro del ámbito | R14 |
+| 15 | La consulta trae las de la empresa más las de sistema, filtro en un único punto | R17, R18 |
+| 16 | El filtro entra aquí, sobre el `listUnits` que ya existe, con el `companyId` de la sesión | R17, R19, R21 |
+| 17 | La conversión no redondea y no se guarda | R23 |
+| 18 | Nadie usa la conversión todavía; el contrato la publica | R22, R26 |
+| 19 | Migración nueva que actualiza las cuatro filas, sin tocar la ya aplicada | R27, R28 |
+| 20 | La migración no añade unidades | R29 |
+| 21 | Sin `deleted_at` en el catálogo | R32 |
+| 22 | Identificadores de la base en inglés | R31 |
+| 23 | RLS activada y forzada; UP más `down.sql` que revierte al esquema exacto | R30, R33, R34 |
+| 24 | Permisos: los de hoy, solo Administrador, en el service, falla cerrado | R20 |
+| 25 | E2E diferido con motivo | R35 |
+| 26 | Ninguna librería nueva | R38 |
+| 27 | Se puede cambiar la base o el factor de una unidad ya en uso | R10 |
+| 28 | El símbolo es único cuando existe, con el mismo ámbito que el nombre | R15 |
+| 29 | Las unidades de una empresa borrada no se tocan | R16 |
+| 30 | Presentación y unidad no convergen | R37 |
+| 31 | Escala del resultado cuando la división no termina: 12 decimales, truncando | R22, R23 |
+| 32 | «Solo Administrador» se lee hoy por el permiso `unidades.consultar`, no por `ADMIN_ROLE_NAME` | R20 |
+| 33 | `findRefs` se queda sin filtro de empresa; su ámbito es QC-50 | R36, R18 (la excepción es a este requisito: R18 rige el **listado**, y R36 nombra lo que queda fuera y dónde va) |
+
+> **Cómo leer las filas 24 y 32 juntas.** La 24 fija el comportamiento —los permisos de hoy, solo
+> Administrador, validado en el service y fallando cerrado— y **sigue cerrada tal cual**. La 32,
+> cerrada por el humano el 2026-09-07, dice **por dónde se pregunta** sobre el código que hay en la
+> rama: `ADMIN_ROLE_NAME` ya no existe (QC-54 lo retiró, QC-74 pasó la autorización a permisos), así
+> que `listUnits` exige `unidades.consultar` y ese código lo tiene en el seed **únicamente** el rol
+> Administrador (`lib/modules/identity/domain/permissions.ts`). Por eso R20 está escrito sobre el
+> permiso y no sobre el nombre del rol: mismo comportamiento, mecanismo actual.
 
 ## Preguntas abiertas
 
@@ -29,6 +266,10 @@ _Pendiente: los escribe spec_author (F1.2)._
 están en la tabla de abajo (cuatro últimas filas). Dos de ellas —el símbolo único y la
 convergencia de presentación con unidad— cerraron además **las preguntas abiertas 1 y 3 de
 QC-32**, vivas desde el 2026-09-02; queda anotado en el issue QC-32, cuyo spec no se toca.
+
+`spec_author` abrió una quinta el 2026-09-07 al escribir los requisitos —qué escala tiene el
+resultado de convertir cuando la división no termina— y **el humano la cerró ese mismo día**: es la
+**última fila** de la tabla de abajo y vive en R23. No queda ninguna abierta.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -64,3 +305,6 @@ QC-32**, vivas desde el 2026-09-02; queda anotado en el issue QC-32, cuyo spec n
 | 2026-09-07 | ¿El símbolo debe ser único? | **Sí.** Único **cuando existe** —sigue siendo **opcional**— y con el **mismo ámbito que el nombre**: dentro de la empresa, y las de sistema entre ellas. Medirlo distinto haría que el «kg» de sistema bloqueara el «kg» de una empresa que sí puede tener su propio kilogramo. **Cierra la pregunta abierta 1 de QC-32**, que dejó el símbolo sin índice a propósito |
 | 2026-09-07 | ¿Qué pasa con las unidades de una empresa que se borra? | **Nada.** `companies` tiene borrado lógico (**QC-47**), así que ninguna fila desaparece de verdad y las unidades de esa empresa se quedan como están |
 | 2026-09-07 | ¿Convergen presentación y unidad? | **No: son entidades separadas** y no convergen. **Cierra la pregunta abierta 3 de QC-32** |
+| 2026-09-07 | ¿Qué escala tiene el resultado de la conversión cuando la división no termina? | **12 decimales, truncando** —nunca redondeando hacia arriba—, en una **constante con nombre** documentada en el contrato. Cuando la división **sí** termina, el resultado sale **exacto**, con todas sus cifras: eso no cambia. No se falla y no se expone el resultado como par exacto. Los 12 salen de que la escala máxima que guarda hoy cualquier columna del ERP son **4** decimales (`decimal(14,4)`, **QC-33**), así que dejan **ocho dígitos de margen** por debajo de lo que cualquier consumidor vaya a mostrar. **Cierra la pregunta abierta que `spec_author` levantó al escribir los requisitos**: «no redondea» no estaba definido para un factor de destino con algún divisor distinto de 2 y de 5 —un `3.0000` produce un decimal periódico— |
+| 2026-09-07 | ¿Cómo se lee hoy «solo Administrador», si `ADMIN_ROLE_NAME` ya no existe? | **Por el permiso `unidades.consultar`**, que en el seed tiene **únicamente** el rol Administrador (`lib/modules/identity/domain/permissions.ts`). El símbolo `ADMIN_ROLE_NAME` que nombra la decisión 24 lo retiró **QC-54**, y **QC-74** cambió la autorización de «nombre de rol» a **permiso**. El comportamiento es **el mismo** —los permisos de hoy, validados en el service y fallando cerrado—; lo único que cambia es **por dónde se pregunta**. La decisión 24 **no se reescribe**: sigue cerrada tal cual, y esta fila dice cómo se lee sobre el código que hay en la rama |
+| 2026-09-07 | ¿`UnitCatalog.findRefs` gana también el filtro por empresa? | **No: se queda sin filtro, fuera del alcance.** Acotarlo obligaría a tocar `recetas`, que es quien lo llama y que se aísla en **QC-50** (deuda registrada en `docs/architecture.md > Dominio`); esta ficha no abre ese módulo. Es una **excepción explícita** a «el filtro vive en un único punto de consulta del módulo», y por eso queda **escrita y con destino nombrado** en vez de quedar como olvido: quien cierre QC-50 reutiliza la definición del ámbito que esta ficha deja exportada, sin escribir un segundo filtro |

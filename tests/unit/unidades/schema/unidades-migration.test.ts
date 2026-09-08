@@ -29,7 +29,32 @@
 // Cubre R5, R8, R10 y R11 (su parte de SQL), R12, R13, R18, R20, R21, R22, R23, R24, R25 y R26
 // (su primera mitad: que el nombre normalizado persistido coincide con la unica definicion de
 // R4; la mitad negativa —que no hay seed de aplicacion— la cubre `module-contract.test.ts`).
+//
+// ---------------------------------------------------------------------------------------
+// AMPLIADO EL 2026-09-07 POR QC-76 (`specs/QC-76-equivalencia-y-ambito-de-unidades/`, T4).
+//
+// NADA DE LO DE ARRIBA SE TOCA: la migracion de QC-32 esta APLICADA y su contenido no puede
+// cambiar (QC-76 R27), asi que sus predicados y sus casos siguen exactamente como estaban. Lo
+// que se anade son DOS bloques al final del archivo:
+//
+//   1. un caso que vigila que la carpeta `20260903121404_units_catalog` sigue INTACTA byte a
+//      byte (R27), comparando el CONTENIDO —no la fecha— contra su huella; y
+//   2. la seccion de la migracion NUEVA `20260907190000_units_equivalence_and_scope`: los
+//      cuatro indices unicos parciales, los tres CHECK, las dos FK con RESTRICT, el DROP del
+//      unico global ANTES de los parciales, la funcion y el disparador, el UPDATE de las
+//      cuatro filas, CERO `INSERT`/`DELETE` sobre `units`, el cierre en `ENABLE` + `FORCE`,
+//      el idioma de los identificadores, y el `down.sql` con su guardia de datos y el indice
+//      global restaurado.
+//
+// Mismo patron que arriba: cada afirmacion es un PREDICADO PURO que recibe el texto SQL, y
+// cada uno se aplica dos veces —al SQL real y a una copia MUTADA EN MEMORIA que borra el
+// objeto que vigila—. El archivo en disco NO se toca nunca. Cubre de QC-76: R27, R28, R29,
+// R30, R31, R33 y R34, mas la mitad de SQL de R2, R4, R5, R6, R7, R8, R9, R13, R14 y R15
+// (que la restriccion EXISTE en el archivo; que MUERDE en la base lo prueba
+// `tests/integration/unidades/unidades-constraints.int.test.ts`).
+// ---------------------------------------------------------------------------------------
 
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -926,5 +951,700 @@ describe('down.sql — reversion exacta', () => {
       expect(droppedTables(down), `el DOWN no debe dropear ${ajena}`).not.toContain(ajena)
     }
     expect(down.filter((statement) => /^DROP TABLE/i.test(statement))).toHaveLength(1)
+  })
+})
+
+// ===========================================================================================
+// QC-76 — la migracion de la equivalencia y el ambito
+// ===========================================================================================
+
+/**
+ * La carpeta NUEVA, localizada por PATRON y no por su timestamp: si se regenera con otra
+ * marca de tiempo, el test tiene que seguir apuntando a ella (mismo criterio que arriba).
+ */
+const equivalenceDirs = readdirSync(migrationsDir).filter((name) =>
+  name.endsWith('_units_equivalence_and_scope'),
+)
+expect(
+  equivalenceDirs,
+  'debe existir exactamente una migracion *_units_equivalence_and_scope',
+).toHaveLength(1)
+const equivalenceDir = join(migrationsDir, equivalenceDirs[0] as string)
+
+const qc76UpSource = readFileSync(join(equivalenceDir, 'migration.sql'), 'utf8')
+const qc76DownSource = readFileSync(join(equivalenceDir, 'down.sql'), 'utf8')
+const qc76Up = statements(qc76UpSource)
+const qc76Down = statements(qc76DownSource)
+
+/**
+ * Huella del CONTENIDO de un archivo, con los finales de linea normalizados a `\n`.
+ *
+ * Se normaliza porque un `git config core.autocrlf` distinto en otra maquina cambiaria los
+ * bytes sin que nadie haya editado nada, y este test tiene que fallar por lo que dice que
+ * vigila —el contenido— y por nada mas.
+ */
+function contentDigest(path: string): string {
+  return createHash('sha256')
+    .update(readFileSync(path, 'utf8').replace(/\r\n/gu, '\n'))
+    .digest('hex')
+}
+
+/**
+ * QC-76 R27. La migracion de QC-32 esta APLICADA: su checksum vive en `_prisma_migrations` y
+ * editarla obligaria a reconstruir la base de desarrollo, que tiene datos reales. Estas dos
+ * huellas se calcularon el 2026-09-07 sobre los archivos tal y como los dejo QC-32.
+ *
+ * SI ESTE CASO SE PONE ROJO NO SE ACTUALIZA LA HUELLA: se revierte el archivo. Cambiarla es
+ * exactamente lo que R27 prohibe, y el numero de aqui es el unico sitio del repo que lo nota.
+ */
+const UNITS_CATALOG_DIGESTS: ReadonlyArray<readonly [string, string]> = [
+  ['migration.sql', 'c8b90544b912c229a84459a4487fd6b0459750e3215bf72734edcb5a6543e2bd'],
+  ['down.sql', 'bf9b7559c717f20dfcccd6ed57b9b4a6a3f2d037af3ed2daccf0b495e08543bf'],
+]
+
+/** Los cuatro indices unicos PARCIALES, con las columnas y el `WHERE` que los hace parciales. */
+const PARTIAL_UNIQUE_INDEXES: ReadonlyArray<{
+  readonly name: string
+  readonly columns: readonly string[]
+  readonly where: readonly string[]
+}> = [
+  {
+    name: 'units_company_name_unique',
+    columns: ['company_id', 'name_normalized'],
+    where: ['"company_id" IS NOT NULL'],
+  },
+  {
+    name: 'units_system_name_unique',
+    columns: ['name_normalized'],
+    where: ['"company_id" IS NULL'],
+  },
+  {
+    name: 'units_company_symbol_unique',
+    columns: ['company_id', 'symbol'],
+    where: ['"company_id" IS NOT NULL', '"symbol" IS NOT NULL'],
+  },
+  {
+    name: 'units_system_symbol_unique',
+    columns: ['symbol'],
+    where: ['"company_id" IS NULL', '"symbol" IS NOT NULL'],
+  },
+]
+
+/**
+ * R14 y R15. ¿Estan los CUATRO indices unicos parciales, cada uno una sola vez, sobre `units`,
+ * con sus columnas y con su `WHERE`?
+ *
+ * El `WHERE` es lo que los hace por AMBITO: sin el, `UNIQUE (company_id, name_normalized)` a
+ * secas dejaria meter «kilogramo» de sistema tantas veces como se quiera —dos `NULL` no chocan
+ * en un indice unico normal— y `UNIQUE (name_normalized)` volveria a ser el global de QC-32.
+ */
+export function hasTheFourPartialUniqueIndexes(sql: string): boolean {
+  const source = statements(sql)
+  return PARTIAL_UNIQUE_INDEXES.every(({ name, columns, where }) => {
+    const found = source.filter((statement) =>
+      new RegExp(`^CREATE UNIQUE INDEX "?${name}"? ON "?units"?`, 'i').test(statement),
+    )
+    if (found.length !== 1) return false
+    const statement = found[0] as string
+    const corte = statement.toUpperCase().indexOf(' WHERE ')
+    if (corte === -1) return false
+    const declared = statement.slice(0, corte)
+    const filter = statement.slice(corte)
+    return (
+      columns.every((column) => declared.includes(`"${column}"`)) &&
+      where.every((condition) => filter.includes(condition))
+    )
+  })
+}
+
+/** Los tres CHECK de una sola fila, con el predicado que cada uno tiene que decir. */
+const ROW_CHECKS: ReadonlyArray<readonly [string, RegExp]> = [
+  // R2: la pareja va junta o ninguna.
+  ['units_derivation_pair_check', /\(\s*"unit_id" IS NULL\s*\)\s*=\s*\(\s*"factor" IS NULL\s*\)/i],
+  // R4 y R5: cualquier factor mayor que cero, y ninguno menor o igual.
+  ['units_factor_positive_check', /"factor" IS NULL OR "factor" > 0/i],
+  // R7: nadie deriva de si mismo.
+  ['units_no_self_derivation_check', /"unit_id" IS NULL OR "unit_id" <> "id"/i],
+]
+
+/** R2, R4, R5, R7. ¿Estan los TRES `CHECK`, cada uno una sola vez y diciendo su predicado? */
+export function hasTheThreeRowChecks(sql: string): boolean {
+  const source = statements(sql)
+  return ROW_CHECKS.every(([constraint, predicate]) => {
+    const found = source.filter((statement) =>
+      new RegExp(`ADD CONSTRAINT "?${constraint}"? CHECK`, 'i').test(statement),
+    )
+    if (found.length !== 1) return false
+    return predicate.test(found[0] as string)
+  })
+}
+
+/** Las dos FK que anade QC-76 a `units`, con la columna y la tabla a la que apuntan. */
+const NEW_UNIT_FOREIGN_KEYS: ReadonlyArray<readonly [string, string, string]> = [
+  // R13: la empresa tiene que existir.
+  ['units_company_id_fkey', 'company_id', 'companies'],
+  // R8: no se borra una unidad de la que otra deriva.
+  ['units_unit_id_fkey', 'unit_id', 'units'],
+]
+
+/**
+ * R8 y R13. ¿Estan las DOS FK nuevas sobre `units`, apuntando a donde deben y con
+ * `ON DELETE RESTRICT`?
+ *
+ * `RESTRICT` es la UNICA garantia real de R8 —de ahi que R32 prohiba `deleted_at` en esta
+ * tabla: un borrado logico es un UPDATE y ninguna FK reacciona a un UPDATE—. Y NUNCA
+ * `ON DELETE SET NULL`: dejaria la fila hija con `factor` y sin `unit_id`, violando ademas
+ * `units_derivation_pair_check`.
+ */
+export function bothNewForeignKeysRestrict(sql: string): boolean {
+  const source = statements(sql)
+  return NEW_UNIT_FOREIGN_KEYS.every(([constraint, column, target]) => {
+    const found = source.filter((statement) =>
+      new RegExp(`ADD CONSTRAINT "?${constraint}"?`, 'i').test(statement),
+    )
+    if (found.length !== 1) return false
+    const statement = found[0] as string
+    return (
+      /^ALTER TABLE "?units"?/i.test(statement) &&
+      new RegExp(`FOREIGN KEY \\(\\s*"?${column}"?\\s*\\)`, 'i').test(statement) &&
+      new RegExp(`REFERENCES "?${target}"?\\s*\\(\\s*"?id"?\\s*\\)`, 'i').test(statement) &&
+      isRestrictOnDelete(statement)
+    )
+  })
+}
+
+/**
+ * R14. ¿Cae el indice unico GLOBAL de QC-32, y cae ANTES de crear los parciales?
+ *
+ * EL ORDEN ES LA MITAD DEL REQUISITO: si `units_name_normalized_key` siguiera vivo, dos
+ * empresas no podrian tener cada una su «kilogramo» por mucho indice parcial que se cree.
+ */
+export function dropsTheGlobalIndexBeforeThePartials(sql: string): boolean {
+  const ejecutable = stripSqlComments(sql)
+  const drop = ejecutable.search(/DROP INDEX "?units_name_normalized_key"?/i)
+  if (drop === -1) return false
+  return PARTIAL_UNIQUE_INDEXES.every(({ name }) => {
+    const create = ejecutable.search(new RegExp(`CREATE UNIQUE INDEX "?${name}"?`, 'i'))
+    return create !== -1 && drop < create
+  })
+}
+
+/**
+ * R6 y R9. ¿Estan la funcion y el disparador de derivacion, con sus cinco ramas?
+ *
+ * Ni un CHECK ni una FK pueden mirar OTRA fila, y «la unidad de la que derivo no deriva de
+ * nadie» y «la unidad de la que derivo es mia o de sistema» son predicados sobre la fila
+ * PADRE. El disparador es `BEFORE`, asi que la fila no llega a escribirse, y cada `RAISE`
+ * lleva su `ERRCODE = '23514'` para que el test de integracion distinga CUAL salto.
+ */
+export function hasTheDerivationTrigger(sql: string): boolean {
+  const ejecutable = stripSqlComments(sql)
+  const funcion = /CREATE (?:OR REPLACE )?FUNCTION units_check_derivation\(\)/i.test(ejecutable)
+  const disparador =
+    /CREATE TRIGGER "?units_check_derivation_trigger"?[\s\S]*?BEFORE INSERT OR UPDATE ON "?units"?[\s\S]*?EXECUTE (?:FUNCTION|PROCEDURE) units_check_derivation\(\)/i.test(
+      ejecutable,
+    )
+  const ramas = [
+    'units_derivation_single_level',
+    'units_derivation_foreign_company',
+    'units_derivation_system_from_company',
+    'units_derivation_parent_cannot_derive',
+    'units_derivation_children_scope',
+  ].every((rama) => ejecutable.includes(rama))
+  const errcode = (ejecutable.match(/ERRCODE = '23514'/gi) ?? []).length >= 5
+  return funcion && disparador && ramas && errcode
+}
+
+/**
+ * R28. ¿Actualiza el UP las cuatro filas del catalogo: `litro -> mililitro` y
+ * `kilogramo -> gramo` con factor 1000, y las cuatro sin empresa?
+ *
+ * Las filas se buscan por `name_normalized` y NUNCA por id: los uuid los genero
+ * `gen_random_uuid()` en QC-32 y son distintos en cada base. `mililitro` y `gramo` se quedan
+ * sin derivacion, que es lo que R28 pide para ellas.
+ */
+export function updatesTheFourStarterRows(sql: string): boolean {
+  const ejecutable = stripSqlComments(sql).replace(/\s+/gu, ' ')
+  const sinEmpresa = /UPDATE "units" SET "company_id" = NULL/i.test(ejecutable)
+  const derivaciones: ReadonlyArray<readonly [string, string]> = [
+    ['litro', 'mililitro'],
+    ['kilogramo', 'gramo'],
+  ]
+  return (
+    sinEmpresa &&
+    derivaciones.every(([derived, base]) =>
+      new RegExp(
+        `UPDATE "units" AS derived SET "unit_id" = base\\."id", "factor" = 1000\\.0000 FROM "units" AS base WHERE derived\\."name_normalized" = '${derived}' AND base\\."name_normalized" = '${base}'`,
+        'i',
+      ).test(ejecutable),
+    ) &&
+    // Y el UPDATE aborta si no toca EXACTAMENTE una fila (`design.md > 3.2`): sin esta
+    // comprobacion, la RLS forzada podria dejarlo en cero filas EN SILENCIO.
+    /GET DIAGNOSTICS/i.test(ejecutable) &&
+    (ejecutable.match(/RAISE EXCEPTION 'QC-76:/gi) ?? []).length >= 2
+  )
+}
+
+/** R29. ¿No hay NINGUN `INSERT` ni NINGUN `DELETE` sobre `units`? */
+export function createsAndDeletesNoUnits(sql: string): boolean {
+  const ejecutable = stripSqlComments(sql)
+  return (
+    !/\bINSERT\s+INTO\s+"?units"?/i.test(ejecutable) &&
+    !/\bDELETE\s+FROM\s+"?units"?/i.test(ejecutable)
+  )
+}
+
+/** R30. ¿Termina el archivo con `ENABLE` y `FORCE ROW LEVEL SECURITY` sobre `units`? */
+export function endsWithRlsEnabledAndForced(sql: string): boolean {
+  const source = statements(sql)
+  const dosUltimas = source.slice(-2)
+  return (
+    hasRlsEnabledAndForced(sql, 'units') &&
+    /^ALTER TABLE "?units"? ENABLE ROW LEVEL SECURITY$/i.test(dosUltimas[0] ?? '') &&
+    /^ALTER TABLE "?units"? FORCE ROW LEVEL SECURITY$/i.test(dosUltimas[1] ?? '')
+  )
+}
+
+/**
+ * R34. ¿Empieza el DOWN con su guardia de datos, ANTES de cualquier `DROP`, contando las
+ * unidades con empresa y las derivaciones que no dejo el propio UP, y abortando si hay alguna?
+ *
+ * Sin ella el DOWN haria dos cosas irreparables en silencio: convertir las unidades PRIVADAS
+ * de cada empresa en unidades DE SISTEMA visibles para todas, y tirar cualquier equivalencia
+ * declarada despues de aplicar la migracion.
+ */
+export function downStartsWithDataGuard(sql: string): boolean {
+  const guard = firstGuardBlock(sql)
+  if (guard === null) return false
+  const aborta = /RAISE\s+EXCEPTION/i.test(guard.body)
+  const cuentaEmpresas = /count\(\*\)[\s\S]*?FROM "units"[\s\S]*?"company_id" IS NOT NULL/i.test(
+    guard.body,
+  )
+  const cuentaDerivaciones = /count\(\*\)[\s\S]*?"unit_id" IS NOT NULL/i.test(guard.body)
+  const primerCambio = firstSchemaChangeIndex(sql)
+  const primerDrop = stripSqlComments(sql).search(
+    /\bDROP\s+(TABLE|INDEX|COLUMN|CONSTRAINT|TRIGGER|FUNCTION)\b/i,
+  )
+  const vaLaPrimera =
+    primerCambio !== -1 &&
+    guard.index < primerCambio &&
+    primerDrop !== -1 &&
+    guard.index < primerDrop
+  return aborta && cuentaEmpresas && cuentaDerivaciones && vaLaPrimera
+}
+
+/**
+ * R33. ¿Deja el DOWN el esquema EXACTO anterior? Los cuatro parciales caen, el unico GLOBAL de
+ * QC-32 vuelve, y no queda residuo: ni CHECK, ni FK, ni indices de FK, ni columnas, ni funcion,
+ * ni disparador.
+ */
+export function downRestoresThePreviousSchema(sql: string): boolean {
+  const source = statements(sql)
+  const ejecutable = stripSqlComments(sql)
+  const caenLosParciales = PARTIAL_UNIQUE_INDEXES.every(({ name }) =>
+    source.some((statement) => new RegExp(`^DROP INDEX "?${name}"?$`, 'i').test(statement)),
+  )
+  const vuelveElGlobal = source.some((statement) =>
+    /^CREATE UNIQUE INDEX "?units_name_normalized_key"? ON "?units"?\s*\(\s*"?name_normalized"?\s*\)$/i.test(
+      statement,
+    ),
+  )
+  const caenLosChecks = ROW_CHECKS.every(([constraint]) =>
+    source.some((statement) =>
+      new RegExp(`DROP CONSTRAINT "?${constraint}"?`, 'i').test(statement),
+    ),
+  )
+  const caenLasFks = NEW_UNIT_FOREIGN_KEYS.every(([constraint]) =>
+    source.some((statement) =>
+      new RegExp(`DROP CONSTRAINT "?${constraint}"?`, 'i').test(statement),
+    ),
+  )
+  const caenLosIndices = ['units_company_id_idx', 'units_unit_id_idx'].every((index) =>
+    source.some((statement) => new RegExp(`^DROP INDEX "?${index}"?$`, 'i').test(statement)),
+  )
+  const caenLasColumnas = ['company_id', 'unit_id', 'factor'].every((column) =>
+    new RegExp(`DROP COLUMN "${column}"`, 'i').test(ejecutable),
+  )
+  const caeElDisparador =
+    /DROP TRIGGER "?units_check_derivation_trigger"? ON "?units"?/i.test(ejecutable) &&
+    /DROP FUNCTION units_check_derivation\(\)/i.test(ejecutable)
+  return (
+    caenLosParciales &&
+    vuelveElGlobal &&
+    caenLosChecks &&
+    caenLasFks &&
+    caenLosIndices &&
+    caenLasColumnas &&
+    caeElDisparador
+  )
+}
+
+/**
+ * Identificadores que crea la migracion de QC-76: los de `createdIdentifiers` (columnas,
+ * restricciones e indices) mas la funcion y el disparador, que aquel no mira porque QC-32 no
+ * creaba ninguno.
+ *
+ * Las columnas se vuelven a recorrer con `matchAll` porque `createdIdentifiers` se queda con
+ * el PRIMER `ADD COLUMN` de cada sentencia, y esta migracion anade las tres en un solo
+ * `ALTER TABLE` (`design.md > 3.1`): con el original, `unit_id` y `factor` no pasarian por la
+ * guardia de idioma.
+ */
+export function createdIdentifiersWithRoutines(sql: string): readonly string[] {
+  const ejecutable = stripSqlComments(sql)
+  const nombres = new Set<string>(createdIdentifiers(sql))
+  for (const match of ejecutable.matchAll(/ADD COLUMN\s+"(\w+)"/gi)) {
+    nombres.add(match[1] as string)
+  }
+  for (const match of ejecutable.matchAll(/CREATE (?:OR REPLACE )?FUNCTION\s+"?(\w+)"?\s*\(/gi)) {
+    nombres.add(match[1] as string)
+  }
+  for (const match of ejecutable.matchAll(/CREATE TRIGGER\s+"?(\w+)"?/gi)) {
+    nombres.add(match[1] as string)
+  }
+  return [...nombres]
+}
+
+/**
+ * Vocabulario ingles admitido para los identificadores de QC-76 (R31). Extiende el de QC-32 en
+ * vez de sustituirlo, y sigue siendo una lista CERRADA a proposito: un identificador nuevo
+ * obliga a pasar por aqui, y uno en espanol (`unidad`, `empresa`, `simbolo`) no encuentra sus
+ * piezas y cae.
+ */
+const VOCABULARIO_INGLES_QC76 = new Set([
+  ...VOCABULARIO_INGLES,
+  'cannot',
+  'check',
+  'children',
+  'company',
+  'derivation',
+  'derive',
+  'factor',
+  'foreign',
+  'level',
+  'no',
+  'pair',
+  'parent',
+  'positive',
+  'scope',
+  'self',
+  'single',
+  'system',
+  'trigger',
+  'unique',
+])
+
+/** ¿El identificador es snake_case ASCII y todas sus piezas son palabras inglesas? (R31) */
+export function isEnglishSnakeCaseQC76(identifier: string): boolean {
+  if (!/^[a-z][a-z0-9_]*$/.test(identifier)) return false
+  return identifier.split('_').every((pieza) => VOCABULARIO_INGLES_QC76.has(pieza))
+}
+
+// --- Los casos -----------------------------------------------------------------------------
+
+describe('QC-76 R27 — la migracion de QC-32 sigue intacta', () => {
+  it('el contenido de units_catalog no ha cambiado (huella del CONTENIDO, no la fecha)', () => {
+    // R27. Esa migracion ESTA APLICADA: su checksum vive en `_prisma_migrations` y editarla
+    // obligaria a reconstruir la base de desarrollo, que tiene datos reales. Se compara el
+    // CONTENIDO —no el nombre de la carpeta ni su fecha, que no prueban nada— con los finales
+    // de linea normalizados, para que un `core.autocrlf` distinto no lo tina de rojo por algo
+    // que nadie ha editado.
+    //
+    // Si esto se pone rojo, la respuesta NO es actualizar la huella: es revertir el archivo.
+    for (const [file, digest] of UNITS_CATALOG_DIGESTS) {
+      expect(contentDigest(join(migrationDir, file)), `${file} de QC-32 ha cambiado`).toBe(digest)
+    }
+    // Y la carpeta no gana ni pierde archivos: un tercer `.sql` colado ahi cambiaria lo que se
+    // aplica sin cambiar ninguna de las dos huellas.
+    expect([...readdirSync(migrationDir)].sort()).toEqual(['down.sql', 'migration.sql'])
+
+    // Los cambios de QC-76 viven en OTRA carpeta, y no es la misma.
+    expect(equivalenceDir).not.toBe(migrationDir)
+  })
+
+  it('la huella cae ante un solo cambio en el archivo', () => {
+    // El caso de arriba no vale nada si la huella no distingue. Se comprueba sobre una copia
+    // EN MEMORIA: el archivo en disco no se toca.
+    const original = readFileSync(join(migrationDir, 'migration.sql'), 'utf8')
+    const mutado = original.replace('RESTRICT', 'CASCADE')
+    expect(mutado, 'la mutacion tiene que cambiar algo').not.toBe(original)
+    const huellaMutada = createHash('sha256').update(mutado.replace(/\r\n/gu, '\n')).digest('hex')
+    expect(huellaMutada).not.toBe(UNITS_CATALOG_DIGESTS[0]?.[1])
+  })
+})
+
+describe('QC-76 migration.sql — restricciones, indices y disparador', () => {
+  it('anade las tres columnas nuevas, opcionales y en ingles', () => {
+    // R1, R3, R11, R31. Las tres OPCIONALES: una unidad puede no derivar de nadie (base) y
+    // puede no tener empresa (de sistema). Y ninguna lleva `DEFAULT`: un default en
+    // `company_id` inventaria duenos.
+    const alter = qc76Up.filter((statement) => /^ALTER TABLE "?units"? ADD COLUMN/i.test(statement))
+    expect(alter).toHaveLength(1)
+    const statement = alter[0] as string
+    expect(statement).toMatch(/ADD COLUMN "company_id" UUID/i)
+    expect(statement).toMatch(/ADD COLUMN "unit_id" UUID/i)
+    expect(statement).toMatch(/ADD COLUMN "factor" DECIMAL\(14,4\)/i)
+    expect(statement).not.toMatch(/NOT NULL/i)
+    expect(statement).not.toMatch(/DEFAULT/i)
+    // Ni coma flotante para el factor (R3): un `DOUBLE PRECISION` haria que 0.1 no fuera 0.1.
+    expect(statement).not.toMatch(/FLOAT|DOUBLE|REAL/i)
+    // Ninguna marca de borrado logico (R32) ni bandera de sistema (R12).
+    expect(statement).not.toMatch(/deleted/i)
+    expect(statement).not.toMatch(/system/i)
+  })
+
+  it('declara los tres CHECK, las dos FK con ON DELETE RESTRICT y los dos indices de FK', () => {
+    // R2, R4, R5, R7 (los CHECK), R8 y R13 (las FK). Los dos indices porque Postgres NO indexa
+    // el lado hijo de una FK y por ahi pasa la verificacion de cada RESTRICT.
+    expect(hasTheThreeRowChecks(qc76UpSource)).toBe(true)
+    expect(bothNewForeignKeysRestrict(qc76UpSource)).toBe(true)
+    for (const index of ['units_company_id_idx', 'units_unit_id_idx']) {
+      expect(qc76Up, `falta ${index}`).toContainEqual(
+        expect.stringMatching(new RegExp(`^CREATE INDEX "${index}" ON "units"`, 'i')),
+      )
+    }
+    // NO son unicos: un `CREATE UNIQUE INDEX` sobre `company_id` dejaria una unidad por
+    // empresa.
+    expect(qc76UpSource).not.toMatch(/CREATE UNIQUE INDEX "units_company_id_idx"/i)
+  })
+
+  it('los predicados de CHECK y FK caen si se quita un CHECK o si un RESTRICT pasa a CASCADE', () => {
+    // Un test que no puede fallar no vigila nada. Se muta EN MEMORIA; el disco no se toca.
+    expect(hasTheThreeRowChecks(qc76UpSource.replace('units_factor_positive_check', 'x'))).toBe(
+      false,
+    )
+    expect(hasTheThreeRowChecks(qc76UpSource.replace('"unit_id" <> "id"', '"unit_id" = "id"'))).toBe(
+      false,
+    )
+    expect(
+      bothNewForeignKeysRestrict(qc76UpSource.replace(/ON DELETE RESTRICT/g, 'ON DELETE CASCADE')),
+    ).toBe(false)
+    expect(bothNewForeignKeysRestrict(qc76UpSource.replace('units_unit_id_fkey', 'x'))).toBe(false)
+  })
+
+  it('crea los cuatro indices unicos parciales, con su WHERE, despues de tirar el global', () => {
+    // R14 y R15. La unicidad pasa a ser POR AMBITO: dentro de la empresa, y las de sistema
+    // entre ellas. El simbolo, solo CUANDO EXISTE (decision cerrada 28).
+    expect(hasTheFourPartialUniqueIndexes(qc76UpSource)).toBe(true)
+    expect(dropsTheGlobalIndexBeforeThePartials(qc76UpSource)).toBe(true)
+    // Y no queda ningun otro indice unico sobre `units` que no sea uno de los cuatro.
+    const unicos = qc76Up
+      .map((statement) => /^CREATE UNIQUE INDEX "([^"]+)" ON "units"/i.exec(statement))
+      .filter((match): match is RegExpExecArray => match !== null)
+      .map((match) => match[1] as string)
+      .sort()
+    expect(unicos).toEqual([...PARTIAL_UNIQUE_INDEXES].map(({ name }) => name).sort())
+  })
+
+  it('los predicados de los parciales caen si se borra un indice, su WHERE o el DROP del global', () => {
+    expect(
+      hasTheFourPartialUniqueIndexes(qc76UpSource.replace('units_system_symbol_unique', 'x')),
+    ).toBe(false)
+    expect(
+      hasTheFourPartialUniqueIndexes(
+        qc76UpSource.replace(
+          'ON "units" ("name_normalized") WHERE "company_id" IS NULL',
+          'ON "units" ("name_normalized")',
+        ),
+      ),
+    ).toBe(false)
+    expect(
+      dropsTheGlobalIndexBeforeThePartials(
+        qc76UpSource.replace('DROP INDEX "units_name_normalized_key";', ''),
+      ),
+    ).toBe(false)
+  })
+
+  it('declara la funcion y el disparador de derivacion, con sus cinco ramas', () => {
+    // R6 y R9: lo que necesita mirar OTRA fila no cabe en un CHECK. `BEFORE`, asi que la fila
+    // no llega a escribirse, y cada rama con su `ERRCODE = '23514'` para que el test de
+    // integracion distinga cual salto.
+    expect(hasTheDerivationTrigger(qc76UpSource)).toBe(true)
+    expect(qc76UpSource).toMatch(/BEFORE INSERT OR UPDATE ON "units"/i)
+    expect(qc76UpSource).toMatch(/FOR EACH ROW/i)
+    expect(qc76UpSource).toMatch(/LANGUAGE plpgsql/i)
+  })
+
+  it('el predicado del disparador cae si se quita el trigger o una de sus ramas', () => {
+    expect(
+      hasTheDerivationTrigger(
+        qc76UpSource.replace(/CREATE TRIGGER[\s\S]*?units_check_derivation\(\);/i, ''),
+      ),
+    ).toBe(false)
+    expect(hasTheDerivationTrigger(qc76UpSource.replace('units_derivation_single_level', 'x'))).toBe(
+      false,
+    )
+    expect(
+      hasTheDerivationTrigger(qc76UpSource.replace(/ERRCODE = '23514'/g, "ERRCODE = 'P0001'")),
+    ).toBe(false)
+  })
+})
+
+describe('QC-76 migration.sql — los datos y la RLS', () => {
+  it('actualiza las cuatro filas de R28 y no crea ni borra ninguna unidad', () => {
+    // R28: `litro -> mililitro` y `kilogramo -> gramo`, las dos con factor 1000, y las cuatro
+    // SIN empresa. R29: ni un `INSERT` ni un `DELETE` sobre `units` —«unidad» sigue fuera del
+    // arrancador, como la dejo QC-32—.
+    expect(updatesTheFourStarterRows(qc76UpSource)).toBe(true)
+    expect(createsAndDeletesNoUnits(qc76UpSource)).toBe(true)
+    // `mililitro` y `gramo` se quedan sin derivacion: NO hay ningun UPDATE que las nombre como
+    // fila actualizada. Solo aparecen como la BASE a la que apuntan las otras dos.
+    expect(qc76UpSource).not.toMatch(/derived\."name_normalized" = 'mililitro'/i)
+    expect(qc76UpSource).not.toMatch(/derived\."name_normalized" = 'gramo'/i)
+  })
+
+  it('los predicados de datos caen si se quita un UPDATE, su guardia, o si se cuela un INSERT', () => {
+    expect(
+      updatesTheFourStarterRows(
+        qc76UpSource.replace(
+          'derived."name_normalized" = \'kilogramo\'',
+          'derived."name_normalized" = \'x\'',
+        ),
+      ),
+    ).toBe(false)
+    expect(updatesTheFourStarterRows(qc76UpSource.replace(/GET DIAGNOSTICS/g, 'SELECT 1 --'))).toBe(
+      false,
+    )
+    expect(
+      createsAndDeletesNoUnits(`${qc76UpSource}\nINSERT INTO "units" ("name") VALUES ('unidad');`),
+    ).toBe(false)
+    expect(
+      createsAndDeletesNoUnits(`${qc76UpSource}\nDELETE FROM "units" WHERE "id" IS NOT NULL;`),
+    ).toBe(false)
+  })
+
+  it('el UPDATE va entre el parentesis NO FORCE / FORCE y el archivo termina en ENABLE + FORCE', () => {
+    // R30 y `design.md > 3.2`: `units` ya esta `FORCE ROW LEVEL SECURITY` SIN NINGUNA POLICY
+    // desde QC-32, y `FORCE` deniega tambien al dueno de la tabla, que es con quien se conecta
+    // Prisma. Sin abrir el parentesis, el UPDATE de R28 afectaria a CERO filas en silencio.
+    const ejecutable = stripSqlComments(qc76UpSource)
+    const noForce = ejecutable.search(/ALTER TABLE "units" NO FORCE ROW LEVEL SECURITY/i)
+    const update = ejecutable.search(/UPDATE "units"/i)
+    const enable = ejecutable.search(/ALTER TABLE "units" ENABLE ROW LEVEL SECURITY/i)
+    expect(noForce).toBeGreaterThan(-1)
+    expect(noForce).toBeLessThan(update)
+    expect(update).toBeLessThan(enable)
+
+    // Y el archivo CIERRA con las dos: la tabla no se queda sin forzar (R30).
+    expect(endsWithRlsEnabledAndForced(qc76UpSource)).toBe(true)
+    expect(hasRlsEnabledAndForced(qc76UpSource, 'units')).toBe(true)
+    // Sin policies: deny-by-default. La RLS es defensa en profundidad, NO la frontera de
+    // autorizacion (`docs/architecture.md > Acceso a datos y autorizacion`).
+    expect(ejecutable).not.toMatch(/CREATE POLICY/i)
+  })
+
+  it('el predicado de RLS cae si falta el FORCE o si deja de ser lo ultimo del archivo', () => {
+    expect(
+      endsWithRlsEnabledAndForced(
+        qc76UpSource.replace('ALTER TABLE "units" FORCE ROW LEVEL SECURITY;', ''),
+      ),
+    ).toBe(false)
+    expect(
+      endsWithRlsEnabledAndForced(
+        `${qc76UpSource}\nALTER TABLE "units" ADD COLUMN "system" BOOLEAN;`,
+      ),
+    ).toBe(false)
+  })
+
+  it('todos los identificadores que crea la migracion estan en ingles', () => {
+    // R31, heredado de QC-4. Lista cerrada de vocabulario: un identificador en espanol no
+    // encuentra sus piezas y cae.
+    const identificadores = createdIdentifiersWithRoutines(qc76UpSource)
+    expect(identificadores.length).toBeGreaterThan(0)
+    for (const identificador of identificadores) {
+      expect(
+        isEnglishSnakeCaseQC76(identificador),
+        `identificador no ingles: ${identificador}`,
+      ).toBe(true)
+    }
+    // Y estan los que tienen que estar, sin sobrar ninguno.
+    expect([...identificadores].sort()).toEqual(
+      [
+        'company_id',
+        'factor',
+        'unit_id',
+        'units_check_derivation',
+        'units_check_derivation_trigger',
+        'units_company_id_fkey',
+        'units_company_id_idx',
+        'units_company_name_unique',
+        'units_company_symbol_unique',
+        'units_derivation_pair_check',
+        'units_factor_positive_check',
+        'units_no_self_derivation_check',
+        'units_system_name_unique',
+        'units_system_symbol_unique',
+        'units_unit_id_fkey',
+        'units_unit_id_idx',
+      ].sort(),
+    )
+  })
+
+  it('la guardia de idioma cae con un identificador en espanol', () => {
+    expect(isEnglishSnakeCaseQC76('units_empresa_idx')).toBe(false)
+    expect(isEnglishSnakeCaseQC76('unidades_factor_check')).toBe(false)
+    expect(isEnglishSnakeCaseQC76('units_simbolo_unique')).toBe(false)
+    expect(isEnglishSnakeCaseQC76('units_company_name_unique')).toBe(true)
+  })
+})
+
+describe('QC-76 down.sql — existe, guarda el dato y revierte al esquema anterior', () => {
+  it('el DOWN empieza con su guardia de datos, antes de cualquier DROP', () => {
+    // R34. Fallar antes que perder el dato: si hay una unidad con empresa o una derivada que
+    // no dejo el propio UP, la reversion se detiene ENTERA y no descarta nada en silencio.
+    expect(downStartsWithDataGuard(qc76DownSource)).toBe(true)
+    // Las dos unicas derivaciones que este DOWN acepta descartar son las de R28.
+    expect(qc76DownSource).toMatch(/litro/)
+    expect(qc76DownSource).toMatch(/kilogramo/)
+  })
+
+  it('el predicado de la guardia cae si se quita el bloque, su RAISE o si un DROP se le adelanta', () => {
+    const sinGuardia = qc76DownSource.replace(/DO \$\$[\s\S]*?\$\$;/, '')
+    expect(downStartsWithDataGuard(sinGuardia)).toBe(false)
+    const sinRaise = qc76DownSource.replace(/RAISE\s+EXCEPTION/g, 'RAISE NOTICE')
+    expect(downStartsWithDataGuard(sinRaise)).toBe(false)
+    const guardiaTarde = `DROP TRIGGER "units_check_derivation_trigger" ON "units";\n${qc76DownSource}`
+    expect(downStartsWithDataGuard(guardiaTarde)).toBe(false)
+  })
+
+  it('revierte exactamente el UP y recrea el indice unico global de QC-32', () => {
+    // R33: sin columna, indice, restriccion ni disparador residual, con
+    // `units_name_normalized_key` restaurado. Sin el, el catalogo quedaria sin NINGUNA
+    // garantia de unicidad, que no es «el esquema anterior» sino uno peor.
+    expect(downRestoresThePreviousSchema(qc76DownSource)).toBe(true)
+    // Y NO borra ninguna fila: las cuatro unidades siguen ahi (R33).
+    expect(createsAndDeletesNoUnits(qc76DownSource)).toBe(true)
+    expect(qc76Down.filter((statement) => /^DROP TABLE/i.test(statement))).toHaveLength(0)
+    // Ni toca ninguna tabla ajena.
+    for (const ajena of [
+      'users',
+      'roles',
+      'companies',
+      'products',
+      'recipe_lines',
+      'presentations',
+    ]) {
+      expect(droppedTables(qc76Down), `el DOWN no debe dropear ${ajena}`).not.toContain(ajena)
+    }
+    // La RLS se queda activada y forzada, que es como estaba antes del UP (R33, R30).
+    expect(endsWithRlsEnabledAndForced(qc76DownSource)).toBe(true)
+  })
+
+  it('el predicado de reversion cae si se olvida el indice global, una columna o el disparador', () => {
+    expect(
+      downRestoresThePreviousSchema(
+        qc76DownSource.replace(
+          'CREATE UNIQUE INDEX "units_name_normalized_key" ON "units"("name_normalized");',
+          '',
+        ),
+      ),
+    ).toBe(false)
+    expect(downRestoresThePreviousSchema(qc76DownSource.replace('DROP COLUMN "factor",', ''))).toBe(
+      false,
+    )
+    expect(
+      downRestoresThePreviousSchema(
+        qc76DownSource.replace('DROP FUNCTION units_check_derivation()', ''),
+      ),
+    ).toBe(false)
   })
 })

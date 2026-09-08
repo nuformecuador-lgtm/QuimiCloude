@@ -77,7 +77,8 @@ function requestsPagination(input: unknown): boolean {
 
 /**
  * Caso de uso de listado de unidades con el CONTRATO GENERICO de consulta y la **pagina
- * OPCIONAL** (QC-57 R27, R28, R29, R30, R33, R34; `design.md > 7`).
+ * OPCIONAL** (QC-57 R27, R28, R29, R30, R33, R34; `design.md > 7`), acotado al AMBITO de la
+ * empresa de quien pregunta (QC-76 R17, R18, R20).
  *
  * Los cinco pasos van en ESTE orden y el orden es el requisito (`design.md > 1`):
  *
@@ -90,7 +91,8 @@ function requestsPagination(input: unknown): boolean {
  *      fallar la consulta (R5).
  *   3. `sanitizeListQuery` contra `UNIT_QUERYABLE` (R4, R5, R7, R8).
  *   4. el log de lo podado (R6).
- *   5. el repositorio, con la consulta YA SANEADA (R13).
+ *   5. el repositorio, con la consulta YA SANEADA (R13) y el AMBITO de la empresa del actor
+ *      (QC-76 R17): las unidades de esa empresa MAS las de sistema, nunca las de otra.
  *
  * **Sin consulta se comporta EXACTAMENTE como hoy** (R28): `listAll(MAX_UNITS, ...)` y el
  * catalogo entero. El orden, el filtro y la busqueda SI se aplican si vienen, tambien en ese
@@ -113,7 +115,15 @@ export function createListUnits(deps: ListUnitsDeps): ListUnits {
     const { query, ignored } = sanitizeListQuery(parsed.data, UNIT_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    return paginated ? deps.units.listPage(query) : deps.units.listAll(MAX_UNITS, query);
+    // QC-76 (R17, R18): el caso de uso solo hace de CORREA. Traduce la empresa del actor a
+    // ambito de lectura y se lo entrega al puerto; ni construye SQL ni conoce el `OR` de
+    // «empresa o sistema», que vive una sola vez en el adaptador. Y el permiso YA se exigio en
+    // la primera linea: la empresa filtra, no autoriza (R20).
+    const scope = { companyId: actor.companyId };
+
+    return paginated
+      ? deps.units.listPage(query, scope)
+      : deps.units.listAll(MAX_UNITS, query, scope);
   }
 
   return listUnits;

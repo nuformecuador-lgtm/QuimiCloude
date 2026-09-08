@@ -227,7 +227,12 @@ async function createPresentation(tx: Prisma.TransactionClient): Promise<string>
 async function createUnit(tx: Prisma.TransactionClient): Promise<string> {
   const marca = token()
   const unit = await tx.unit.create({
-    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: 'ut' },
+    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
+    // UNICO dentro del ambito cuando existe. Esta unidad se siembra SIN empresa —o sea DE
+    // SISTEMA—, asi que un `'ut'` fijo choca con `23505` en cuanto este helper se llama dos
+    // veces. Se deriva del marcador irrepetible, que es lo que ya se hacia con el nombre.
+    // Ningun aserto lee su valor.
+    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `ut${marca}` },
     select: { id: true },
   })
   return unit.id
