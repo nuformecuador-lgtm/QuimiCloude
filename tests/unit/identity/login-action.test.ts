@@ -313,6 +313,22 @@ describe('loginAction', () => {
       expect(redirect).not.toHaveBeenCalledWith(INVENTORY_ROUTE);
     });
 
+    // REGRESION del fallo que destapo el E2E de T14. El navegador SIEMPRE manda el campo oculto
+    // `next`: cuando no hay `?next=` viaja presente pero VACIO. Si la pagina fabricaba
+    // `/dashboard` ahi, ese valor era un destino interno valido, ganaba en `resolveReturnPath` y
+    // el respaldo por permisos quedaba muerto en todo login normal — el Operador aterrizaba en
+    // `/dashboard` y recibia un 404. Este caso es la red que impide que vuelva (R11, R12).
+    it('el campo next presente pero vacio no pisa el respaldo por permisos (R11)', async () => {
+      verifyCredentialsMock.mockResolvedValue({ ok: true });
+      getSessionUserMock.mockResolvedValue(usuarioCon(['inventario.consultar']));
+
+      await submit({ username: 'ana.perez', password: 'clave', next: '' });
+
+      expect(redirect).toHaveBeenCalledTimes(1);
+      expect(redirect).toHaveBeenCalledWith(INVENTORY_ROUTE);
+      expect(redirect).not.toHaveBeenCalledWith(DASHBOARD_ROUTE);
+    });
+
     it('descarta un destino de vuelta externo y manda el respaldo calculado (R13)', async () => {
       verifyCredentialsMock.mockResolvedValue({ ok: true });
       getSessionUserMock.mockResolvedValue(usuarioCon(['inventario.consultar']));

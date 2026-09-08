@@ -84,7 +84,7 @@
 
 ## Tanda 4 — la retirada del corte por rol
 
-- [ ] **T10. Borrar la lista y el gancho** (R16) — depende de T6 (el corte nuevo tiene que existir antes)
+- [x] **T10. Borrar la lista y el gancho** (R16) — depende de T6 (el corte nuevo tiene que existir antes)
   - Toca: borra `lib/composition/route-role-rules.ts` y
     `lib/modules/identity/domain/route-role-rules.ts`; borra
     `tests/unit/identity/route-role-rules.test.ts`; quita los dos exports del barrel
@@ -92,7 +92,7 @@
   - Hecho: `rg ROUTE_ROLE_RULES` no devuelve ningún archivo de producción; `typecheck` señala
     exactamente los consumidores que quedan (los de T11).
 
-- [ ] **T11. Simplificar la decisión de ruta y el middleware** (R16, R17, R18) — depende de T10
+- [x] **T11. Simplificar la decisión de ruta y el middleware** (R16, R17, R18) — depende de T10
   - Toca: `lib/modules/identity/domain/route-access.ts`,
     `lib/modules/identity/adapters/driving/route-guard-middleware.ts`,
     `tests/unit/identity/route-access.test.ts`, `tests/unit/identity/route-guard-middleware.test.ts`.
@@ -103,7 +103,7 @@
     `allow` sea cual sea el rol** (R16); sesión caducada → tratada como anónima. Y
     `tests/guards/guard-middleware-edge.test.ts` sigue verde sin tocarse (R18).
 
-- [ ] **T12. Los centinelas y contratos que nombran la lista** (R16) — depende de T11
+- [x] **T12. Los centinelas y contratos que nombran la lista** (R16) — depende de T11
   - Toca: `tests/guards/guard-autorizacion-por-permiso.test.ts` (quita las dos anclas de la exención
     y su prosa), `tests/guards/guard-rol-administrador-unico.test.ts` (solo prosa),
     `tests/unit/inventario/product-route-contract.test.ts`,
@@ -128,7 +128,7 @@
 
 ## Tanda 5 — la prueba de verdad
 
-- [ ] **T14. E2E del Operador** (R21) — depende de T6, T7, T9, T11
+- [x] **T14. E2E del Operador** (R21) — depende de T6, T7, T9, T11
   - Toca: `e2e/permisos.spec.ts` (nuevo).
   - Fixture con el patrón de `e2e/session.spec.ts`: prefijo `qc75_e2e_`, empresa efímera propia,
     limpieza defensiva por edad, y el rol **`Operador` real del seed** (si no existe, fallo explícito
@@ -136,7 +136,7 @@
   - Hecho: `pnpm run e2e` verde en Chromium y WebKit; el paso del 404 afirma `response.status() ===
     404` **y** la presencia del control de cerrar sesión.
 
-- [ ] **T15. [P] Ausencia de comodín y de backend nuevo** (R15, R22)
+- [x] **T15. [P] Ausencia de comodín y de backend nuevo** (R15, R22)
   - Toca: `tests/unit/navegacion/qc75-convenciones.test.ts` (nuevo).
   - Hecho: afirma que `PERMISSIONS` sigue teniendo diez códigos y ninguno de módulo `cuenta`/
     comodín; que `db/schema.prisma`, `db/migrations/**`, el seed y `lib/modules/*/domain/**` de los

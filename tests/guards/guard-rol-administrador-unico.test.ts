@@ -18,9 +18,16 @@
 // mas los `.ts`/`.tsx` de PRIMER NIVEL de la raiz, con `.worktrees` en `IGNORED_DIRS`. `tests/`,
 // `e2e/`, `scripts/` y `db/` quedan fuera del barrido: mencionan el literal a proposito (el
 // centinela de `pedidos`, este mismo archivo, `e2e/session.spec.ts`, etc). Se barre el conjunto de
-// produccion entero -no solo `lib/modules`- porque `lib/composition/route-role-rules.ts` -- el
-// tercer consumidor de antes de QC-54 -- vive fuera de `lib/modules`, y porque una pagina que
-// escriba el rol a mano es exactamente la misma deuda.
+// produccion entero -no solo `lib/modules`- porque un consumidor del rol puede vivir fuera de
+// `lib/modules` (hasta QC-75 lo hacia `lib/composition/route-role-rules.ts`, la lista ruta->rol
+// que esa ficha retiro), y porque una pagina que escriba el rol a mano es exactamente la misma
+// deuda.
+//
+// **QC-75 no afloja esta guardia, la deja mas estrecha.** Al irse esa lista, el unico dueño del
+// literal en produccion es `lib/modules/identity/domain/roles.ts` -- mas la excepcion nombrada del
+// seed, que no es un rol sino un nombre de pila. Ningun exento sobraba por ese borrado: aquella
+// lista importaba `ROLE_ADMINISTRADOR` del barrel, no declaraba el literal, asi que nunca estuvo
+// en `EXENTOS`.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, join, sep } from 'node:path'

@@ -11,9 +11,8 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { ROUTE_ROLE_RULES } from '@/lib/composition/route-role-rules';
-import { findRouteRule } from '@/lib/modules/identity/domain/route-role-rules';
-import { ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import { PERMISSIONS } from '@/lib/modules/identity';
+import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import {
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
@@ -46,11 +45,8 @@ describe('la ruta de pedidos se declara una sola vez (R2)', () => {
     expect(funcionesDePedido.map(([nombre]) => nombre)).toEqual([]);
   });
 
-  it('nadie redeclara la constante: private-nav y la regla ruta->rol la IMPORTAN (R2)', () => {
-    for (const ruta of [
-      'lib/shared/navigation/private-nav.ts',
-      'lib/composition/route-role-rules.ts',
-    ]) {
+  it('nadie redeclara la constante: private-nav la IMPORTA (R2)', () => {
+    for (const ruta of ['lib/shared/navigation/private-nav.ts']) {
       const codigo = fuenteSinComentarios(ruta);
       expect(codigo, `${ruta} no puede redeclarar ORDERS_ROUTE`).not.toContain(
         'const ORDERS_ROUTE =',
@@ -74,9 +70,24 @@ describe('el prefijo privado cubre la pantalla de pedidos (R4)', () => {
     }
   });
 
-  it('existe la fila ruta->rol de pedidos y casa por segmentos con la constante (R4, R5)', () => {
-    expect(findRouteRule(ROUTE_ROLE_RULES, ORDERS_ROUTE)?.roles).toEqual([ROLE_ADMINISTRADOR]);
-    expect(findRouteRule(ROUTE_ROLE_RULES, `${ORDERS_ROUTE}X`)).toBeNull();
+  // QC-75 T12 — sustituye a «existe la fila {prefix: ORDERS_ROUTE, roles:[Administrador]} en la
+  // lista ruta->rol». Esa lista se retiro (QC-75 R16): quien puede ver esta pantalla lo decide
+  // el permiso que ella misma exige (R6) y el que declara su item de menu (R5), que tienen que
+  // ser EL MISMO codigo. El codigo se DERIVA del catalogo de `identity`, no se escribe a mano.
+  it('la pantalla exige pedidos.consultar y su item de menu declara ese mismo permiso (QC-75 R5, R6)', () => {
+    const permiso = PERMISSIONS.find(
+      (entrada) => entrada.module === 'pedidos' && entrada.action === 'consultar',
+    );
+    expect(permiso, 'el catalogo de identity deberia tener pedidos.consultar').toBeDefined();
+
+    expect(fuenteSinComentarios(`app/(private)${ORDERS_ROUTE}/page.tsx`)).toContain(
+      `requirePagePermission('${permiso?.code}')`,
+    );
+
+    const enlace = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    ).find((item: NavLink) => item.href === ORDERS_ROUTE);
+    expect(enlace?.permission).toBe(permiso?.code);
   });
 });
 
@@ -84,8 +95,8 @@ describe('el prefijo privado cubre la pantalla de pedidos (R4)', () => {
 //
 // El nombre de la carpeta es el UNICO punto donde la URL aparece como texto, y lo obliga el
 // framework. Por eso la ruta esperada se DERIVA de `ORDERS_ROUTE` en vez de escribirse: si alguien
-// moviera la constante sin mover la carpeta —o al reves— este test lo dice, y ni el middleware ni
-// la regla ruta->rol protegerian la pantalla real.
+// moviera la constante sin mover la carpeta —o al reves— este test lo dice, y ni el prefijo
+// privado ni el permiso que exige la pagina protegerian la pantalla real.
 describe('la pantalla vive donde dice la constante (R1, R40)', () => {
   const CARPETA_DE_LA_RUTA = `app/(private)${ORDERS_ROUTE}`;
 

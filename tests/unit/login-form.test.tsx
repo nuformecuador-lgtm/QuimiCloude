@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import LoginPage from '@/app/(public)/login/page';
 import { LoginForm } from '@/app/(public)/login/components';
 import { Toaster } from '@/components/ui/sonner';
-import { DASHBOARD_ROUTE, FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
+import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
   REQUIRED_FIELD_ERROR,
@@ -383,22 +383,31 @@ describe('destino de vuelta (QC-9 R7, R8, R9)', () => {
     expect(screen.getByTestId(testId.form)).toContainElement(oculto);
   });
 
-  it('sin parametro de vuelta el campo oculto lleva el dashboard', async () => {
+  // QC-75 R11/R12: la pagina NO fabrica un destino de vuelta que el usuario no pidio. Sin
+  // `?next=` valido el campo oculto viaja VACIO, y el respaldo lo calcula `loginAction` como el
+  // primer enlace del menu filtrado por permisos. Fabricar `/dashboard` aqui ganaba siempre en
+  // `resolveReturnPath` y mandaba a un 404 a quien no puede ver el dashboard.
+  it('sin parametro de vuelta el campo oculto viaja vacio', async () => {
     await renderLoginPage();
 
-    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
+    expect(screen.getByTestId(testId.next)).toHaveValue('');
   });
 
-  it('descarta un destino externo y cae al dashboard', async () => {
+  // QC-75 R11/R12: descartar sigue siendo descartar (QC-9 R9), pero lo que queda es vacio, no
+  // el dashboard: el externo nunca viaja.
+  it('descarta un destino externo y el campo oculto queda vacio', async () => {
     await renderLoginPage({ next: 'https://evil.example/robo' });
 
-    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
+    const oculto = screen.getByTestId(testId.next);
+    expect(oculto).toHaveValue('');
+    expect(oculto).not.toHaveValue('https://evil.example/robo');
   });
 
+  // QC-75 R11/R12: idem para el parametro repetido.
   it('descarta un parametro repetido, que llega como lista y no como texto', async () => {
     await renderLoginPage({ next: ['/dashboard/reportes', 'https://evil.example'] });
 
-    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
+    expect(screen.getByTestId(testId.next)).toHaveValue('');
   });
 
   it('el campo oculto viaja en el FormData que recibe la Server Action', async () => {
@@ -429,9 +438,17 @@ describe('destino de vuelta (QC-9 R7, R8, R9)', () => {
     expect(within(form).getByTestId(testId.password)).toBeVisible();
   });
 
-  it('el formulario montado sin destino de vuelta lleva el dashboard en el campo oculto', () => {
+  // QC-75 R11/R12: el valor por defecto de la prop tambien es vacio, por el mismo motivo.
+  it('el formulario montado sin destino de vuelta lleva el campo oculto vacio', () => {
     render(<LoginForm />);
 
-    expect(screen.getByTestId(testId.next)).toHaveValue(DASHBOARD_ROUTE);
+    expect(screen.getByTestId(testId.next)).toHaveValue('');
+  });
+
+  // QC-75 R11/R12: un `?next=` interno sigue mandando — QC-9 R8 intacto.
+  it('con un destino de vuelta interno el campo oculto lleva ese valor', async () => {
+    await renderLoginPage({ next: '/inventario?pagina=2' });
+
+    expect(screen.getByTestId(testId.next)).toHaveValue('/inventario?pagina=2');
   });
 });
