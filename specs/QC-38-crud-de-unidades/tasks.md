@@ -1,35 +1,34 @@
 # QC-38 — crud-de-unidades · tasks.md
 
-> Requisitos en `requirements.md` (R1–R35), diseño en `design.md`. `[P]` = paralelizable con la
+> Requisitos en `requirements.md` (R1–R36), diseño en `design.md`. `[P]` = paralelizable con la
 > tarea indicada. Cada tarea dice **qué archivos toca** y **cuándo está hecha**. Nada se marca sin
 > que su criterio se cumpla; el cierre de tanda es `./init.sh --rapido` y el cierre de feature
 > `./init.sh` completo (regla 5 de `CLAUDE.md`).
 >
-> **Dos preguntas abiertas antes de empezar** (`requirements.md > Preguntas abiertas`):
-> **P1** —confirmar `unidades.modificar` como permiso once, que enmienda QC-74 R2— **bloquea T2**, y
-> con ella todo lo demás, porque el literal del permiso entra en los tres casos de uso.
-> **P2** —símbolo vacío o en blanco— **no bloquea nada**: ninguna tarea lo implementa y R10 sólo
-> cubre lo que está cerrado. Si el humano la cierra, entra como tarea nueva al final, sin renumerar.
+> **Sin preguntas abiertas.** Las dos que `spec_author` levantó las **cerró el humano el
+> 2026-09-08** y son las decisiones **23** y **24** de `requirements.md`: se crea
+> `unidades.modificar` —el catálogo pasa a once, enmendando **QC-74 R2**— y el **símbolo vacío o en
+> blanco se rechaza**. Las dos entran aquí como trabajo firme, no como posición por defecto.
 >
 > **Esta ficha no trae migración** (R32). Si alguna tarea acaba proponiendo una, es señal de que se
 > salió del alcance: parar y preguntar.
 
 ## Fase A — El permiso
 
-- [ ] **T1. Confirmar P1 con el humano.** (bloquea T2)
-  - Toca: nada. Es el gate de `spec_ready`.
-  - **Hecho cuando**: hay respuesta escrita sobre el código del permiso de escritura de `unidades` y
-    sobre la enmienda a QC-74 R2. Si el código elegido no es `unidades.modificar`, se sustituye el
-    literal en `design.md > 2` y en las tareas; los requisitos **no** se renumeran.
+> **T1 ya no existe**: era «confirmar P1 con el humano», y el humano la cerró el 2026-09-08. La
+> numeración del resto **no se toca** para no invalidar las dependencias ya escritas.
 
-- [ ] **T2. El catálogo de permisos gana `unidades.modificar`.** (depende de T1)
+- [ ] **T2. El catálogo de permisos gana `unidades.modificar`.**
   - Toca: `lib/modules/identity/domain/permissions.ts`.
   - Una entrada nueva en `PERMISSIONS` con `code`, `module`, `action` y `description`
-    (`design.md > 2`), y `'unidades.modificar'` en `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]`.
-    **Nada** para `ROLE_OPERADOR`. El comentario de cabecera que dice «diez permisos» y el que
-    nombra a `unidades` como módulo sin escritura se actualizan: si no, mienten.
-  - **Hecho cuando**: `pnpm typecheck` en verde y `PermissionCode` incluye el código nuevo.
-    Cubre: R2, R4, R5.
+    (`design.md > 2`), y `'unidades.modificar'` en `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]`
+    **junto a `'unidades.consultar'`, que ya está**: QC-74 decidió que `modificar` **no implica**
+    `consultar` y que el seed los escribe **los dos, uno a uno**, así que aquí se **suma**, no se
+    sustituye. **Nada** para `ROLE_OPERADOR`. El comentario de cabecera que dice «diez permisos» y el
+    que nombra a `unidades` como módulo sin escritura se actualizan: si no, mienten. El comentario
+    nuevo DEBE dejar escrito que **esto enmienda QC-74 R2** y por qué (decisión cerrada 23).
+  - **Hecho cuando**: `pnpm typecheck` en verde, `PermissionCode` incluye el código nuevo y
+    `PERMISSIONS.length === 11`. Cubre: R2, R4, R5.
 
 - [ ] **T3. Actualizar los seis tests ajenos que cuentan diez permisos.** (depende de T2)
   - Toca: `tests/guards/guard-permisos-sembrados.test.ts`,
@@ -57,12 +56,15 @@
 - [ ] **T5. Esquemas zod de alta y edición.** (depende de T2) [P con T4]
   - Toca: `lib/modules/unidades/domain/unit-input.ts` (nuevo).
   - Un **único** esquema para los dos casos de uso (R18): nombre con `trim`, 1..60 y rechazo si
-    `normalizeUnitName(name) === ''`; símbolo opcional ≤ 10; `baseUnitId`/`factor` con `superRefine`
-    de «los dos o ninguno»; factor como **cadena** contra `^\d{1,10}(\.\d{1,4})?$` y `> 0`
-    (`design.md > 3.1`). **Sin `.partial()`**: no existe la edición parcial.
+    `normalizeUnitName(name) === ''`; símbolo **opcional**, ≤ 10, y **rechazado si viene vacío o
+    solo con espacios** (R36, decisión cerrada 24) —**no** se recorta a `null`: mandar símbolo
+    obliga a que tenga contenido, y **no** mandarlo sigue siendo legal—; `baseUnitId`/`factor` con
+    `superRefine` de «los dos o ninguno»; factor como **cadena** contra `^\d{1,10}(\.\d{1,4})?$` y
+    `> 0` (`design.md > 3.1`). **Sin `.partial()`**: no existe la edición parcial.
   - **Hecho cuando**: `tests/unit/unidades/unit-input.test.ts` cubre la tabla de casos de R8, R9,
-    R10, R13 y R14, incluidos `'---'`, `'  kilo  '`, `0.5`, `0`, `-1` y `1.00001`.
-    Cubre: R8, R9, R10, R13, R14, R17, R28.
+    R10, R13, R14 y R36, incluidos `'---'`, `'  kilo  '`, `0.5`, `0`, `-1`, `1.00001`, y —para el
+    símbolo— `undefined` (acepta), `''` y `'   '` (rechazan, y **no** producen `null`).
+    Cubre: R8, R9, R10, R13, R14, R17, R28, R36.
 
 - [ ] **T6. Puerto de escritura.** (depende de T4)
   - Toca: `lib/modules/unidades/ports/unit-write-repository.ts` (nuevo).
@@ -81,7 +83,7 @@
   - **Hecho cuando**: `tests/unit/unidades/create-unit.test.ts`, `update-unit.test.ts`,
     `delete-unit.test.ts` y `unit-write-permissions.test.ts` en verde, con dobles del puerto que
     **registran si fueron llamados**: los casos de rechazo prueban que el puerto de escritura **no**
-    se tocó. Cubre: R1, R3, R6, R7, R8–R19, R21, R22, R25, R26, R28.
+    se tocó. Cubre: R1, R3, R6, R7, R8–R19, R21, R22, R25, R26, R28, R36.
 
 ## Fase C — Persistencia y superficie
 
@@ -97,10 +99,14 @@
   - Toca: `lib/modules/unidades/adapters/driving/unit-actions.ts` (se **añaden** tres funciones y
     dos tipos de estado; `listUnitsAction`, `currentActor` y `toErrorState` no se reescriben),
     `lib/composition/index.ts` (bloque `unidades`, ampliado sin reordenar lo de arriba).
+  - Las actions leen `FormData` distinguiendo **clave ausente** de **clave vacía** con
+    `formData.has(...)` (`design.md > 8`): sin esa distinción, un símbolo que el formulario no manda
+    y uno que manda vacío llegarían igual y R36 se comería a R10.
   - **Hecho cuando**: `tests/unit/unidades/unit-actions.test.ts` cubre sesión ausente, contexto
-    ausente, traducción de cada error de dominio a su `code`, y el relanzado de un error que no es
-    de dominio; y `tests/unit/unidades/module-contract.test.ts` sigue verificando que `index.ts` no
-    exporta ninguna action. Cubre: R27, R29, R30, R31.
+    ausente, traducción de cada error de dominio a su `code`, el relanzado de un error que no es de
+    dominio, y el caso `FormData` **sin** clave `symbol` (pasa) frente a **con** `symbol` vacío
+    (`invalid_input`); y `tests/unit/unidades/module-contract.test.ts` sigue verificando que
+    `index.ts` no exporta ninguna action. Cubre: R27, R29, R30, R31, R36.
 
 - [ ] **T10. Guardias de convenciones y de límites de alcance.** (depende de T9) [P con T11]
   - Toca: `tests/unit/unidades/unidades-convenciones.test.ts` (nuevo),
@@ -134,10 +140,10 @@
 - [ ] **T12. Trazabilidad y gate completo.** (depende de T3, T10, T11)
   - Toca: `progress/impl_QC-38-crud-de-unidades.md`.
   - El mapa `R<n> → test` real —el archivo y el nombre del caso, no la intención—, contrastado
-    contra `design.md > 12`. Los 35 requisitos, sin hueco (regla 4 de `CLAUDE.md`,
+    contra `design.md > 12`. Los **36** requisitos, sin hueco (regla 4 de `CLAUDE.md`,
     `CHECKPOINTS.md > Trazabilidad`).
   - **Hecho cuando**: `./init.sh` completo en verde antes del PR, y ningún `R<n>` sin test.
-    Cubre: la trazabilidad de R1–R35.
+    Cubre: la trazabilidad de R1–R36.
 
 - [ ] **T13. E2E: diferido, y escrito.** (depende de T12)
   - Toca: `progress/impl_QC-38-crud-de-unidades.md` (sección de verificación).

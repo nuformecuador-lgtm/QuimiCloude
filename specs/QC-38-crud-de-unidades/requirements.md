@@ -44,8 +44,8 @@ unidades —**alta**, **edición** y **borrado**— y NO DEBE añadir ni modific
 **consulta**.
 
 **R2.** El sistema DEBE autorizar los tres casos de uso **por permiso**, contra el catálogo cerrado
-de `identity` (QC-74), usando el permiso de **escritura** del módulo `unidades`, y NO DEBE comparar
-en ningún punto contra el nombre de un rol ni contra ninguna constante que lo represente.
+de `identity` (QC-74), exigiendo el código **`unidades.modificar`**, y NO DEBE comparar en ningún
+punto contra el nombre de un rol ni contra ninguna constante que lo represente.
 
 **R3.** El sistema DEBE comprobar el permiso **en el service**, como **primera línea** de cada uno de
 los tres casos de uso, **antes** de validar la entrada con zod y **antes** de tocar el repositorio; y
@@ -53,15 +53,16 @@ DEBE rechazar por igual, con el mismo error de autorización, al actor **ausente
 conjunto de permisos, al que lo trae **vacío** y al que no trae **ese código exacto** —sin
 normalización, sin coincidencia parcial y sin implicación entre permisos—.
 
-**R4.** El sistema DEBE conceder el permiso de escritura de unidades **únicamente** al rol
-`Administrador` en el seed de roles, y NO DEBE concedérselo al rol `Operador`; y NO DEBE cambiar
-quién puede **consultar** unidades: el permiso `unidades.consultar` DEBE seguir siendo el mismo y
-seguir estando asignado únicamente al `Administrador`.
+**R4.** El sistema DEBE conceder `unidades.modificar` **únicamente** al rol `Administrador` en el
+seed de roles, y DEBE dárselo **junto con** `unidades.consultar`, escritos los dos uno a uno: tener
+`unidades.modificar` NO DEBE implicar por sí solo poder consultar. El sistema NO DEBE concedérselo
+al rol `Operador`, y NO DEBE cambiar quién puede **consultar** unidades: `unidades.consultar` DEBE
+seguir siendo el mismo y seguir estando asignado únicamente al `Administrador`.
 
-**R5.** MIENTRAS exista el permiso de escritura, el sistema DEBE tratarlo como un permiso más del
-catálogo cerrado —con la forma `<modulo>.<accion>`, su módulo, su acción y su descripción—, DEBE
-crearlo por el **seed** y NO DEBE ofrecer ninguna vía de aplicación que edite el catálogo de
-permisos.
+**R5.** El catálogo cerrado de permisos DEBE pasar a contener **once** permisos —los diez de QC-74
+más `unidades.modificar`—, y el sistema DEBE tratar el nuevo como un permiso más: con la forma
+`<modulo>.<accion>`, su módulo, su acción y su descripción; DEBE crearlo por el **seed**, de forma
+idempotente; y NO DEBE ofrecer ninguna vía de aplicación que edite el catálogo de permisos.
 
 ### El alta
 
@@ -86,7 +87,8 @@ de longitud a la columna ni ninguna migración.
 **R10.** El sistema DEBE tratar el símbolo como **opcional** y DEBE aceptar una unidad **sin
 símbolo**; SI el símbolo recibido supera **10 caracteres**, ENTONCES el sistema DEBE rechazar la
 operación sin escribir ninguna fila, y DEBE aceptar uno de exactamente 10. Ese límite DEBE vivir
-**solo en la validación**, sin restricción en la columna y sin migración.
+**solo en la validación**, sin restricción en la columna y sin migración. El símbolo **vacío o en
+blanco** lo cubre R36.
 
 **R11.** SI el nombre **normalizado** de la unidad que se intenta escribir coincide con el de otra
 unidad **de la misma empresa**, ENTONCES el sistema DEBE rechazar la operación con un error de
@@ -133,8 +135,8 @@ y sin factor, el sistema DEBE dejar la unidad **sin derivación** (unidad base).
 interpretar la ausencia de un campo como «no lo toques».
 
 **R18.** CUANDO se edita una unidad, el sistema DEBE aplicar **las mismas** reglas de validación que
-en el alta (R8, R9, R10, R11, R12, R13, R14, R15, R16), y NO DEBE tener un segundo juego de reglas
-distinto para editar.
+en el alta (R8, R9, R10, R11, R12, R13, R14, R15, R16, R36), y NO DEBE tener un segundo juego de
+reglas distinto para editar.
 
 **R19.** CUANDO se edita una unidad, el sistema NO DEBE cambiar la **empresa** a la que pertenece: la
 empresa no es un campo editable y no DEBE poder llegar desde la entrada del llamante.
@@ -212,6 +214,17 @@ pueda visitar.
 **R35.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
 requisitos anteriores.
 
+### Añadido al cerrarse las preguntas abiertas (2026-09-08)
+
+Se numera al final para **no renumerar** nada de lo anterior. Es el hueco que R10 dejaba a propósito
+mientras la pregunta seguía abierta.
+
+**R36.** SI la entrada declara símbolo y ese símbolo está **vacío** o es **solo espacios**, ENTONCES
+el sistema DEBE rechazar la operación con un error de **entrada inválida**, NO DEBE escribir ninguna
+fila, y NO DEBE convertirlo en «sin símbolo»: no lo DEBE guardar como vacío ni como ausente. El
+sistema DEBE seguir aceptando la entrada que **no declara símbolo** (R10), y esta regla DEBE
+aplicarse por igual en el alta y en la edición (R18).
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el requisito
@@ -241,6 +254,8 @@ que la hace testeable. Ninguna queda sin `R<n>`.
 | 20 | Módulo `unidades` hexagonal; los driving no pasan por el barrel; identificadores de DB en inglés | R31, R32 |
 | 21 | E2E diferido con motivo; lo decide QC-39 | R34 |
 | 22 | Ninguna librería nueva | R35 |
+| 23 | Se crea `unidades.modificar`; el catálogo pasa a once y se siembra junto a `unidades.consultar`; enmienda QC-74 R2 | R2, R4, R5 |
+| 24 | El símbolo vacío o en blanco se rechaza; no se convierte en `NULL`; sigue siendo opcional | R36, R10, R18 |
 
 ## Preguntas abiertas
 
@@ -251,39 +266,10 @@ nombre?»—, que esa ficha dejó escrita apuntando aquí. Con ella, las tres pr
 QC-32 quedan cerradas: la 1 y la 3 el mismo día al acotar QC-76, y la 5 aquí. Anotado como
 comentario en el issue QC-32, cuyo spec no se toca.
 
-### Abiertas por `spec_author` al escribir los requisitos (2026-09-08)
-
-Las dos salen de leer el código de la rama, no de reabrir nada de la tabla. Ninguna bloquea la
-escritura del spec; las dos deberían cerrarse **antes** de implementar.
-
-**P1 — ¿Se confirma `unidades.modificar` como permiso número once del catálogo de QC-74?**
-La decisión cerrada 2 dice «por permiso, con el modelo que dejó QC-74», pero **ese permiso no
-existe hoy**: `lib/modules/identity/domain/permissions.ts` declara diez códigos y `unidades` es
-uno de los dos módulos que sólo tiene `consultar`, porque hasta ahora no tenía escritura
-(QC-74 R4). Aplicando la convención de QC-74 —`<modulo>.<accion>`, y `modificar` cubre también el
-borrado (R3)— el código deducible es **`unidades.modificar`**, asignado **sólo al Administrador**
-en `SEED_ROLE_PERMISSIONS`, y es lo que asumen R2, R4 y R5. Lo que hay que confirmar no es el
-nombre sino **la enmienda**: QC-74 **R2** dice «exactamente estos diez permisos, ni uno más ni uno
-menos», y pasar a once toca cuatro archivos de test ajenos a esta feature
-(`tests/guards/guard-permisos-sembrados.test.ts`, `tests/guards/guard-nav-permisos-declarados.test.ts`,
-`tests/unit/navegacion/qc75-convenciones.test.ts`, `tests/unit/identity/permissions.test.ts`) más
-`tests/unit/identity/seed/seed-initial-access.test.ts` y
-`tests/integration/identity/identity-seed.int.test.ts`. QC-76 dejó escrito que **quien decide el
-permiso es QC-38** (su decisión cerrada 24: «si el permiso debe cambiar, lo decide QC-38»), así que
-la enmienda cae dentro del alcance; hace falta el visto bueno humano porque cambia un catálogo
-declarado cerrado en otra ficha. Si el humano prefiere otro código, cambia **sólo el literal**: los
-requisitos no se renumeran.
-
-**P2 — Símbolo vacío o en blanco: ¿se rechaza, o se guarda como «sin símbolo»?**
-La decisión cerrada 7 resuelve el caso para el **nombre** —se recorta, y vacío o normalizado-vacío
-se rechaza— y su motivo es que no llegue al índice único. El símbolo tiene **exactamente el mismo
-problema**: `units_company_symbol_unique` es parcial sobre `symbol IS NOT NULL`, así que una cadena
-vacía **sí** cuenta como valor y dos unidades con símbolo `''` chocarían y se anunciarían como
-«símbolo duplicado», que es justo el «ya existe» falso que la decisión 7 quiere evitar. Las dos
-lecturas razonables son (a) recortar y, si queda vacío, **tratarlo como símbolo ausente** (`null`),
-o (b) rechazarlo como entrada inválida. **No la deduzco**: la tabla habla del nombre y no del
-símbolo. R10 cubre lo que sí está cerrado —opcionalidad y largo máximo— y deja este caso fuera a
-propósito. Hasta que se cierre, `tasks.md` no marca ninguna tarea que lo implemente.
+`spec_author` abrió dos el 2026-09-08 al escribir los requisitos —el código del permiso de
+escritura, que no existía en el catálogo de QC-74, y qué hacer con un símbolo vacío o en blanco— y
+**el humano las cerró ese mismo día**: son las **dos últimas filas** de la tabla de abajo y viven en
+R2, R4, R5 y R36. No queda ninguna abierta.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -311,3 +297,5 @@ propósito. Hasta que se cierre, `tasks.md` no marca ninguna tarea que lo implem
 | 2026-09-07 | Módulo y fronteras | Módulo **`unidades`**, hexagonal (**QC-15**). Los adaptadores driving **no pasan por el barrel** —el contrato público tiene que poder importarse desde un componente de cliente— y ningún otro módulo entra por su tabla ni por su repositorio. Identificadores de la DB en **inglés** (**QC-4**) |
 | 2026-09-07 | ¿E2E? | **Diferido con motivo**: esta ficha no tiene pantalla ni flujo navegable que visitar. Lo decide **QC-39**. Heredado de **QC-32** y mismo criterio que **QC-20 D4** |
 | 2026-09-07 | Librería nueva | **Ninguna.** Son casos de uso, validación con zod —ya aprobada— y aritmética propia. Regla 7 de `CLAUDE.md` sin propuesta que abrir |
+| 2026-09-08 | ¿Cuál es el permiso de escritura, si `unidades` no tiene ninguno? | **Se crea `unidades.modificar`** y el catálogo de permisos pasa a **once**. Se siembra al rol **Administrador** **junto con `unidades.consultar`**: **QC-74 decidió que `modificar` NO implica `consultar`** y que el seed los da **los dos**, escritos uno a uno. **Esto enmienda QC-74 R2** —«exactamente estos diez permisos, ni uno más ni uno menos»—, y se dice con esas palabras y no disimulado: QC-74 **R4** dejó a `unidades` sin escritura justificándolo con «no tiene escritura», y **esta ficha es justamente la que se la da**, así que la premisa de aquella decisión deja de ser cierta. Lo habilita además **QC-76 D24** («si el permiso debe cambiar, lo decide QC-38»). **Descartado** reutilizar `unidades.consultar` para escribir: rompería la separación `consultar`/`modificar` que QC-74 construyó a propósito en los otros cuatro módulos. Los **seis** archivos de test ajenos que afirman «diez» se actualizan **en la misma tanda** que el cambio, nunca al final. **Cierra la pregunta abierta 1 de `spec_author`** |
+| 2026-09-08 | Símbolo vacío o en blanco | **Se rechaza**, igual que el nombre vacío de la decisión 7, y **no se convierte en `NULL`**: si se manda símbolo, tiene que tener contenido. El símbolo **sigue siendo opcional** —**no** mandarlo es legal—; lo que se rechaza es mandarlo vacío o solo con espacios. El motivo es el mismo que allí: `units_company_symbol_unique` es un índice parcial sobre `symbol IS NOT NULL`, así que una cadena vacía **sí** cuenta como valor y dos unidades con `''` chocarían y se anunciarían como «símbolo duplicado», un «ya existe» falso. **Descartado** recortarlo y guardarlo como símbolo ausente: convertiría en silencio una entrada que el usuario escribió mal en una unidad sin símbolo, sin decírselo. **Cierra la pregunta abierta 2 de `spec_author`** |

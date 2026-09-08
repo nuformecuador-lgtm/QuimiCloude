@@ -1,7 +1,11 @@
 # QC-38 — crud-de-unidades · design.md
 
-> Requisitos en `requirements.md` (R1–R35). Alcance y decisiones cerradas: los fijó el humano al
+> Requisitos en `requirements.md` (R1–R36). Alcance y decisiones cerradas: los fijó el humano al
 > acotar y **no se reabren aquí**. Este archivo dice **cómo**, no **qué**.
+>
+> **Sin preguntas abiertas.** Las dos que `spec_author` levantó al escribir los requisitos —el
+> código del permiso de escritura y el símbolo vacío— **las cerró el humano el 2026-09-08** y son las
+> dos últimas filas de la tabla de decisiones. Este archivo las trata como requisitos firmes.
 
 ## 1. Estado de partida (lo que ya hay en esta rama)
 
@@ -37,8 +41,8 @@ los códigos de Prisma a resultados discriminados, tres Server Actions, y **un p
 
 QC-74 dejó un catálogo cerrado de **diez** permisos en
 `lib/modules/identity/domain/permissions.ts`, y `unidades` es uno de los dos módulos que sólo tiene
-`consultar` «porque no tiene escritura» (su R4). Esta ficha **le da escritura**, así que el catálogo
-gana una fila:
+`consultar` «porque no tiene escritura» (su R4). Esta ficha **le da escritura**, así que la premisa
+de aquella decisión deja de ser cierta y el catálogo gana una fila (decisión cerrada 23):
 
 ```ts
 {
@@ -49,16 +53,25 @@ gana una fila:
 }
 ```
 
-y `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]` gana `'unidades.modificar'`. El `Operador` **no**
-(R4). Es todo: `PermissionCode` es una unión derivada del array, así que
+y `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]` gana `'unidades.modificar'` **junto a
+`'unidades.consultar'`, que ya estaba**: QC-74 decidió que `modificar` **no implica** `consultar` y
+que el seed los escribe **los dos, uno a uno** (su R8), así que aquí no se sustituye ni se deriva
+nada —se suma el código nuevo a la lista—. El `Operador` **no** lo recibe (R4). Es todo:
+`PermissionCode` es una unión derivada del array, así que
 `requirePermission(actor, 'unidades.modificar')` compila sin tocar nada más, y el seed
 (`seed-initial-access.ts`) deriva las filas que faltan de `PERMISSIONS` —no repite ni un código—,
-así que es **idempotente** y la corrida siguiente crea la fila y su asignación sin migración.
+así que es **idempotente** y la corrida siguiente crea la fila y su asignación sin migración (R5).
 
-**Esto enmienda QC-74 R2** («exactamente estos diez, ni uno más ni uno menos»). La enmienda cae
-dentro del alcance porque QC-76 la delegó explícitamente (su decisión cerrada 24: «si el permiso
-debe cambiar, lo decide QC-38»), pero **está abierta como P1** en `requirements.md` y necesita el
-visto bueno humano en el gate de `spec_ready`: cambia un catálogo declarado cerrado en otra ficha.
+**Esto enmienda QC-74 R2** —«exactamente estos diez permisos, ni uno más ni uno menos»—, y queda
+escrito con esas palabras y no disimulado. El motivo es que **QC-74 R4 dejó a `unidades` sin
+escritura justificándolo con «no tiene escritura», y esta ficha es justamente la que se la da**: la
+premisa de aquella decisión deja de ser cierta. Lo habilita además QC-76, que delegó el punto
+explícitamente (su decisión cerrada 24: «si el permiso debe cambiar, lo decide QC-38»).
+
+**Alternativa descartada:** reutilizar `unidades.consultar` también para escribir, y no tocar el
+catálogo. Rompería la separación `consultar`/`modificar` que QC-74 construyó a propósito en los
+otros cuatro módulos con escritura, y dejaría a cualquiera que hoy puede **ver** unidades pudiendo
+**borrarlas**.
 
 **Ripple, medido, no estimado.** Pasar de diez a once pone en rojo estos archivos, que no son de
 esta feature:
@@ -170,7 +183,8 @@ Archivos nuevos en `domain/`: `create-unit.ts`, `update-unit.ts`, `delete-unit.t
    puerto (R3).
 2. `createUnitSchema.safeParse(input)` → `ValidationError` (R28). El esquema hace, en este orden:
    `trim` del nombre, largo 1..60, y **rechaza si `normalizeUnitName(name) === ''`** (R8, R9);
-   símbolo opcional con largo ≤ 10 (R10); `baseUnitId`/`factor` con `superRefine` que exige
+   símbolo **opcional** con largo ≤ 10 (R10) y **rechazado si viene vacío o solo con espacios**
+   (R36: no se recorta a `null`, se rechaza); `baseUnitId`/`factor` con `superRefine` que exige
    **los dos o ninguno** (R13) y el factor `> 0` con la forma de §3.1 (R14).
 3. **Equivalencia**, si viene `baseUnitId` (§6.4).
 4. `nameNormalized = normalizeUnitName(name)` — la **única** definición, la que publica el contrato
@@ -303,9 +317,14 @@ deleteUnitAction(prevState, formData): Promise<UnitMutationFormState>
 ```
 
 `FormData` porque son mutaciones de formulario (QC-22), exactamente la forma que consumirá QC-39.
-Campos: `name`, `symbol`, `baseUnitId`, `factor`; y `id` como campo oculto en el borrado. Los
-campos ausentes se leen como cadena vacía y el esquema los convierte a `null` donde corresponde
-—salvo el símbolo vacío, que es la **pregunta abierta P2** y por eso no tiene tarea—.
+Campos: `name`, `symbol`, `baseUnitId`, `factor`; y `id` como campo oculto en el borrado.
+
+**Cómo se lee `FormData` sin chocar con R36.** Un campo que el formulario no envía y uno que envía
+vacío llegan igual: cadena vacía. Como el símbolo vacío **se rechaza** (R36) pero el símbolo
+**ausente es legal** (R10), la action distingue los dos con `formData.has('symbol')`, no con el
+valor: si la clave **no está**, el candidato lleva `symbol: undefined` —«no lo declaro»—; si **está**,
+va tal cual llegó, y el esquema decide. Lo mismo para `baseUnitId` y `factor`, donde «ausente»
+significa unidad base (R17) y no entrada inválida.
 
 **Ninguna de las tres se reexporta desde `index.ts`** (R31): el barrel tiene que poder importarse
 desde un componente de cliente, y un `'use server'` en su cierre de imports lo rompería. El comentario
@@ -371,7 +390,7 @@ factor no se opera aquí (convertir es de QC-76 y ya está hecho).
 
 1. **El catálogo de permisos es compartido** (§2). Es el único punto donde esta ficha toca algo de
    otro módulo, y ya se sabe qué seis archivos de test caen. Mitigación: se actualizan en la misma
-   tanda (T2), y T10 corre el gate completo.
+   tanda (T3), y T12 corre el gate completo.
 2. **`tests/integration` entero, no sólo `unidades`** (aviso de QC-76). Aunque esta ficha **no**
    añade ninguna restricción a `units` (R32, §3), el precedente manda: T10 lo verifica de forma
    explícita antes del PR.
@@ -379,8 +398,9 @@ factor no se opera aquí (convertir es de QC-76 y ya está hecho).
    nombre del índice, la distinción nombre/símbolo del §7.1 caería al caso «se relanza» y el usuario
    vería un error genérico en vez de uno concreto —feo, pero **nunca** un mensaje falso—. Se cubre
    con un test de integración por cada uno de los dos choques, no con un test unitario del mapeo.
-4. **P2 sin cerrar** (símbolo vacío). Mientras siga abierta, el comportamiento de `symbol: ''` no
-   está definido y ninguna tarea lo implementa. No bloquea el resto del spec.
+4. **El símbolo vacío llega por `FormData` como el ausente.** Es el único punto donde R36 y R10
+   pueden confundirse, y por eso la distinción está escrita en §8 (`formData.has`) y tiene su propio
+   caso de test en T9, además del del esquema en T5.
 
 ## 12. Mapa `R<n> → verificación`
 
@@ -389,8 +409,8 @@ factor no se opera aquí (convertir es de QC-76 y ya está hecho).
 | R1 | El módulo exporta tres casos de uso de escritura y ninguno de consulta nuevo | `tests/unit/unidades/module-contract.test.ts` |
 | R2 | Los tres exigen `'unidades.modificar'`; ninguna comparación por nombre de rol en el módulo | `tests/unit/unidades/unit-write-permissions.test.ts` + guardia de convenciones |
 | R3 | Actor `null`, sin `permissions`, con conjunto vacío y sin el código → `UnauthorizedError`, y el repositorio **no** se llama | `tests/unit/unidades/unit-write-permissions.test.ts` |
-| R4 | `SEED_ROLE_PERMISSIONS`: Administrador tiene `unidades.modificar`, Operador no; `unidades.consultar` intacto | `tests/unit/identity/permissions.test.ts` |
-| R5 | El catálogo declara el permiso con su forma `<modulo>.<accion>`; el seed lo crea y es idempotente | `tests/guards/guard-permisos-sembrados.test.ts`, `tests/integration/identity/identity-seed.int.test.ts` |
+| R4 | `SEED_ROLE_PERMISSIONS`: el Administrador tiene `unidades.modificar` **y** `unidades.consultar`, escritos uno a uno; el Operador ninguno de los dos | `tests/unit/identity/permissions.test.ts` |
+| R5 | El catálogo tiene **once** entradas, la nueva con su forma `<modulo>.<accion>`; el seed la crea y la segunda corrida no cambia ningún conteo | `tests/guards/guard-permisos-sembrados.test.ts`, `tests/integration/identity/identity-seed.int.test.ts` |
 | R6 | Alta válida → una fila y su id | `tests/integration/unidades/unit-write.int.test.ts` |
 | R7 | La fila creada lleva `company_id` del actor; `create` no acepta empresa por la entrada | `tests/unit/unidades/create-unit.test.ts` + integración |
 | R8 | `''`, `'   '` y `'---'` → `ValidationError`; `'  kilo  '` se guarda como `'kilo'` | `tests/unit/unidades/create-unit.test.ts` |
@@ -421,3 +441,4 @@ factor no se opera aquí (convertir es de QC-76 y ya está hecho).
 | R33 | La firma, el orden por defecto, la búsqueda y la paginación de `listUnits` no cambian | `tests/unit/unidades/list-units.test.ts` (existente, sigue verde sin tocar) |
 | R34 | No hay ruta, pantalla ni item de menú de unidades; ningún `.spec.ts` nuevo | `tests/unit/navegacion/qc75-convenciones.test.ts` |
 | R35 | `package.json` sin dependencias nuevas | `tests/guards/guard-dependencias-aprobadas.test.ts` |
+| R36 | `symbol: ''` y `symbol: '   '` → `ValidationError` en alta y en edición, y **no** se guardan como `null`; `symbol` ausente sigue aceptándose; por `FormData`, la clave ausente y la clave vacía dan resultados distintos | `tests/unit/unidades/unit-input.test.ts`, `tests/unit/unidades/update-unit.test.ts`, `tests/unit/unidades/unit-actions.test.ts` |
