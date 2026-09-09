@@ -18,7 +18,7 @@ import { UnauthorizedError, UnidadesError } from '@/lib/modules/unidades/domain/
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
 import type { Actor } from '@/lib/modules/unidades/domain/actor';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
-import type { UnitRef } from '@/lib/modules/unidades/domain/unit-catalog';
+import type { UnitView } from '@/lib/modules/unidades/domain/unit-view';
 
 /** La empresa de quien pregunta (QC-76 R17). Solo se ANADE al actor: no autoriza nada por si
  *  sola —el permiso se sigue exigiendo aparte y primero— y ningun aserto de este archivo cambia
@@ -33,9 +33,20 @@ const ACTOR_CON_PERMISO: Actor = {
   permissions: ['unidades.consultar'],
 };
 
-const CATALOG: readonly UnitRef[] = [
-  { id: 'unit-1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null },
-  { id: 'unit-2', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
+/* QC-39 (T1): el puerto de listado devuelve `UnitView` -los tres campos de siempre MAS la
+ *  equivalencia y `isSystem`-, asi que los fixtures de este archivo llevan los seis campos. Es
+ *  la forma de los dobles lo que cambia; **ningun aserto de este archivo cambia de exigencia**,
+ *  y las comparaciones siguen siendo de igualdad estricta contra el fixture entero. */
+const CATALOG: readonly UnitView[] = [
+  { id: 'unit-1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null, isSystem: true },
+  {
+    id: 'unit-2',
+    name: 'Litro',
+    symbol: 'L',
+    baseUnitId: null,
+    factor: null,
+    isSystem: false,
+  },
 ];
 
 /**
@@ -62,7 +73,7 @@ function repositoryThatMustNotBeCalled(): UnitRepository {
 
 /** Doble del puerto que devuelve el catalogo dado. `listPage` no se usa en este archivo: el
  *  modo catalogo -sin consulta- no lo toca nunca, y que falle lo deja demostrado. */
-function repositoryReturning(catalog: readonly UnitRef[]): {
+function repositoryReturning(catalog: readonly UnitView[]): {
   units: UnitRepository;
   listAll: UnitRepository['listAll'];
 } {
@@ -104,7 +115,7 @@ describe('createListUnits — R40', () => {
   });
 
   it('el orden que devuelve es el que da el repositorio, estable por nombre', async () => {
-    const reordenado: readonly UnitRef[] = [...CATALOG].reverse();
+    const reordenado: readonly UnitView[] = [...CATALOG].reverse();
     const { units } = repositoryReturning(reordenado);
     const listUnits = createListUnits({ units, log: LOG_MUDO });
 

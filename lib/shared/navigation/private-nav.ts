@@ -5,6 +5,7 @@ import {
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
+  UNITS_ROUTE,
 } from '../routes';
 
 /**
@@ -79,6 +80,20 @@ export const ORDERS_LABEL = 'Pedidos';
  */
 export const PRESENTATIONS_LABEL = 'Presentaciones';
 
+/**
+ * Etiqueta del sidebar para la pantalla de unidades de medida (QC-39, R9).
+ *
+ * `UNITS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay codigo
+ * previo que la importara de este archivo, asi que no hay compatibilidad que sostener. Mismo
+ * criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL` y `PRESENTATIONS_LABEL`.
+ *
+ * **Es la UNICA copia de este texto** y por eso vive aqui: el titulo y la metadata de la pantalla
+ * salen de esta misma constante —`app/(private)/configuracion/unidades/components/unit-labels.ts`
+ * la reexporta para sus consumidores de la ruta—, porque el nombre de la pantalla y el de su
+ * enlace son el mismo dato.
+ */
+export const UNITS_LABEL = 'Unidades';
+
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
@@ -101,9 +116,9 @@ export const BRAND_TAGLINE = 'ERP Químico';
 export const NAV_SECTION_OPERATION = 'Operación';
 export const NAV_SECTION_CHAIN = 'Cadena';
 /**
- * Seccion de configuracion del producto (QC-45, R3). Nace con **un solo item**, «Presentaciones»,
- * y eso es lo esperado, no un olvido: su hermana «Unidades» llega con QC-39 (decision cerrada de
- * QC-45, 2026-09-08).
+ * Seccion de configuracion del producto (QC-45, R3). Nacio con **un solo item**,
+ * «Presentaciones», y QC-39 le anadio su hermana «Unidades» (QC-39 R9): la seccion NO se crea de
+ * nuevo, no se renombra y no se reordena su primer item.
  */
 export const NAV_SECTION_CONFIGURATION = 'Configuración';
 
@@ -276,6 +291,33 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     testId: 'nav-presentaciones',
     permission: 'inventario.modificar',
     icon: 'boxes',
+    section: NAV_SECTION_CONFIGURATION,
+  },
+  // QC-39 R9, R10 — SEGUNDO item de la seccion «Configuración», junto al de presentaciones y sin
+  // tocarlo: la seccion ya existia y esta ficha solo se da de alta en ella.
+  //
+  // **El permiso es `unidades.consultar`, uno de los DOS que exige la pantalla**
+  // (`specs/QC-39-pantalla-de-unidades/design.md > 6`). `NavLink.permission` es UNA cadena —y
+  // convertirlo en lista significaria reescribir el tipo, `filterNavItemsByPermissions` y su
+  // guardia, que R9 y R47 prohiben tocar—, asi que se declara el que sigue la forma normal
+  // `<modulo>.consultar` de QC-75 R5. **Aqui NO aplica la excepcion de QC-45**, que declaro
+  // `inventario.modificar` porque el Operador lleva `inventario.consultar` y habria visto un
+  // enlace que rebota: `unidades.consultar` no lo tiene nadie salvo el Administrador
+  // (`SEED_ROLE_PERMISSIONS`), que tambien tiene `unidades.modificar`, asi que nadie ve un enlace
+  // que le daria 404. Que eso siga siendo cierto lo vigila
+  // `tests/unit/configuracion-ui/permisos-unidades-coherentes.test.ts` (R11): se pone rojo el dia
+  // que un rol reciba exactamente uno de los dos.
+  //
+  // El icono `flask-conical` ya existe en `NavIconName` y en `NAV_ICONS`: **no se anade ninguno**.
+  // Se reutiliza a proposito —un matraz es un instrumento de MEDIDA, que es de lo que habla esta
+  // pantalla— y no colisiona dentro de la seccion, donde el otro item lleva `boxes`.
+  {
+    kind: 'link',
+    href: UNITS_ROUTE,
+    label: UNITS_LABEL,
+    testId: 'nav-unidades',
+    permission: 'unidades.consultar',
+    icon: 'flask-conical',
     section: NAV_SECTION_CONFIGURATION,
   },
 ];

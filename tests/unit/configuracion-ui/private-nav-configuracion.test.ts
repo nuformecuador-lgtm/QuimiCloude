@@ -57,15 +57,19 @@ function paginaDe(href: string): string {
   return join(RAIZ, 'app', '(private)', ...href.split('/').filter(Boolean), 'page.tsx');
 }
 
-describe('la seccion Configuración existe una sola vez y tiene un unico item (R3)', () => {
-  it('hay exactamente UNA seccion Configuración y lleva exactamente UN item', () => {
+describe('la seccion Configuración existe una sola vez y su item sigue en pie (R3)', () => {
+  it('hay exactamente UNA seccion Configuración y su primer item es el de presentaciones', () => {
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
       (seccion) => seccion.label === NAV_SECTION_CONFIGURATION,
     );
 
     expect(secciones).toHaveLength(1);
-    // UNO a proposito, no un olvido: «Unidades» llega con QC-39 (decision cerrada de QC-45).
-    expect(secciones[0]?.items).toHaveLength(1);
+    // ANCLA TENSADA el 2026-09-08 (QC-39 T4), no relajada: la seccion nacio con UN item y ahora
+    // lleva DOS, porque «Unidades» llego con QC-39 —la decision cerrada de QC-45 lo anunciaba—.
+    // Lo que esta task promete y sigue vigente es que la seccion es UNA y que su item **no se
+    // sustituyo ni se reordeno**: sigue existiendo y sigue siendo el PRIMERO.
+    expect(secciones[0]?.items).toHaveLength(2);
+    expect((secciones[0]?.items[0] as NavLink | undefined)?.href).toBe(PRESENTATIONS_ROUTE);
   });
 
   it('ese item apunta a PRESENTATIONS_ROUTE y declara inventario.modificar (R3, R4)', () => {
