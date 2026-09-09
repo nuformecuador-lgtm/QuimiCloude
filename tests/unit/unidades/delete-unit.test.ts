@@ -2,12 +2,12 @@
 //
 // Cubre R24 ('in_use' -> UnitInUseError, y NINGUNA consulta de uso previa: se afirma que
 // `hasDerivedUnits` no se llamo), R25 (unidad de sistema -> SystemUnitError sin llamar a
-// `deleteById`), R26 (unidad inexistente o de otra empresa -> NotFoundError).
+// `deleteById`), R26 (unidad inexistente o de otra empresa -> UnitNotFoundError).
 
 import { describe, expect, it, vi } from 'vitest'
 
 import { createDeleteUnit } from '@/lib/modules/unidades/domain/delete-unit'
-import { NotFoundError, SystemUnitError, UnitInUseError } from '@/lib/modules/unidades/domain/errors'
+import { SystemUnitError, UnitInUseError, UnitNotFoundError } from '@/lib/modules/unidades/domain/errors'
 import type { Actor } from '@/lib/modules/unidades/domain/actor'
 import type {
   UnitOwnership,
@@ -49,21 +49,21 @@ describe('deleteUnit — pertenencia (R25, R26)', () => {
     expect(units.deleteById).not.toHaveBeenCalled()
   })
 
-  it('R26: unidad inexistente -> NotFoundError', async () => {
+  it('R26: unidad inexistente -> UnitNotFoundError', async () => {
     const units = repository({ ownership: null })
     const deleteUnit = createDeleteUnit({ units })
 
-    await expect(deleteUnit(UNIT_ID, ACTOR)).rejects.toBeInstanceOf(NotFoundError)
+    await expect(deleteUnit(UNIT_ID, ACTOR)).rejects.toBeInstanceOf(UnitNotFoundError)
     expect(units.deleteById).not.toHaveBeenCalled()
   })
 
-  it('R26: unidad de otra empresa -> NotFoundError', async () => {
+  it('R26: unidad de otra empresa -> UnitNotFoundError', async () => {
     const units = repository({
       ownership: { id: UNIT_ID, companyId: 'otra-empresa', baseUnitId: null },
     })
     const deleteUnit = createDeleteUnit({ units })
 
-    await expect(deleteUnit(UNIT_ID, ACTOR)).rejects.toBeInstanceOf(NotFoundError)
+    await expect(deleteUnit(UNIT_ID, ACTOR)).rejects.toBeInstanceOf(UnitNotFoundError)
     expect(units.deleteById).not.toHaveBeenCalled()
   })
 })
@@ -82,11 +82,11 @@ describe('deleteUnit — borrado (R24)', () => {
     expect(units.hasDerivedUnits).not.toHaveBeenCalled()
   })
 
-  it("'not_found' -> NotFoundError", async () => {
+  it("'not_found' -> UnitNotFoundError", async () => {
     const units = repository({ ownership: UNIDAD_PROPIA, deleteOutcome: 'not_found' })
     const deleteUnit = createDeleteUnit({ units })
 
-    await expect(deleteUnit(UNIT_ID, ACTOR)).rejects.toBeInstanceOf(NotFoundError)
+    await expect(deleteUnit(UNIT_ID, ACTOR)).rejects.toBeInstanceOf(UnitNotFoundError)
   })
 
   it('borrado exitoso no lanza y llama a deleteById una vez', async () => {

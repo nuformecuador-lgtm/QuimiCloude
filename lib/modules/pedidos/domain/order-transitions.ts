@@ -43,8 +43,10 @@ export function isAllowedTransition(from: OrderStatus, to: OrderStatus): boolean
  */
 export function assertTransition(from: OrderStatus, to: OrderStatus): void {
   if (!isAllowedTransition(from, to)) {
-    throw new InvalidTransitionError(
-      `Un pedido en estado ${from} no puede pasar a ${to}.`,
-    );
+    // QC-70 (R7, R28): el mensaje sale del catalogo -«El pedido no admite ese cambio de
+    // estado.»- y los dos estados concretos viajan como DIAGNOSTICO, que va al registro del
+    // servidor y nunca al navegador. Antes se incrustaban en el texto, y eso obligaba a que
+    // la frase viviera aqui en vez de en el catalogo.
+    throw new InvalidTransitionError(`de ${from} a ${to}`);
   }
 }

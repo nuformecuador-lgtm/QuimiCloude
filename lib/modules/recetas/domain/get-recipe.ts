@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { RecipeNotFoundError } from './errors';
 import type { RecipeDetail } from './recipe-view';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
@@ -28,7 +28,7 @@ export function createGetRecipe(
     requirePermission(actor, 'recetas.consultar');
 
     const row = await deps.recipes.findAliveById(id);
-    if (row === null) throw new NotFoundError();
+    if (row === null) throw new RecipeNotFoundError();
 
     // R18: se pide `findRefs` sobre TODAS las lineas -incluida la de un producto de baja,
     // que sale con `productName: null`-. Es el uso que DECORA, distinto del que VALIDA en

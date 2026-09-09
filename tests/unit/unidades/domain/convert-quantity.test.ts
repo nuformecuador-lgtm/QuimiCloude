@@ -12,9 +12,16 @@
 //
 // Los factores se escriben con cuatro decimales (`1000.0000`) porque asi salen de la columna
 // `decimal(14,4)` que declara R3: el texto que la funcion recibira en produccion.
+//
+// QC-70 (R7, R28, R29): los cuatro sitios que fallan aqui llevaban el dato variable —los ids
+// de las dos unidades, el factor, el texto que no parsea— INCRUSTADO en el mensaje. Ahora el
+// mensaje sale del catalogo y es siempre el mismo, y el dato viaja en `diagnostic`, que va al
+// registro del servidor y nunca al navegador. Lo que estos casos comprueban de mas: que el
+// dato NO esta en `message` y SI esta en `diagnostic`.
 
 import { describe, expect, it } from 'vitest';
 
+import { errorMessage } from '@/lib/modules/errores';
 import {
   convertQuantity,
   IncompatibleUnitsError,
@@ -23,6 +30,21 @@ import {
 } from '@/lib/modules/unidades';
 import type { UnitConversion } from '@/lib/modules/unidades';
 import { CONVERSION_SCALE } from '@/lib/modules/unidades/domain/convert-quantity';
+
+/**
+ * Captura el error de dominio que lanza `fn`, para poder mirar su `message` y su
+ * `diagnostic` por separado (QC-70 R28). Falla si no lanza: un caso que no lanza no puede
+ * pasar por descuido.
+ */
+function capturar(fn: () => unknown): UnidadesError {
+  try {
+    fn();
+  } catch (error) {
+    if (error instanceof UnidadesError) return error;
+    throw error;
+  }
+  throw new Error('se esperaba un UnidadesError y no se lanzo ninguno');
+}
 
 /** Familia del volumen: `mililitro` es base; `litro` y `centilitro` derivan de ella. */
 const mililitro: UnitConversion = { id: 'ml', baseUnitId: null, factor: null };
@@ -147,6 +169,24 @@ describe('convertQuantity, cuando las dos unidades no comparten unidad base', ()
     expect(() => convertQuantity('1', litro, tonelada)).toThrow(IncompatibleUnitsError);
     expect(() => convertQuantity('1', mililitro, tonelada)).toThrow(IncompatibleUnitsError);
   });
+
+  it('QC-70 (R28, R29): los ids de las dos unidades van al diagnostico, NUNCA al mensaje', () => {
+    // Ids largos a proposito: los de arriba son de UNA letra (`l`, `g`) y un `not.toContain`
+    // sobre ellos pasaria o fallaria por casualidad segun las letras del mensaje.
+    const origen: UnitConversion = { id: 'unit-litro-0001', baseUnitId: null, factor: null };
+    const destino: UnitConversion = { id: 'unit-gramo-0002', baseUnitId: null, factor: null };
+
+    const error = capturar(() => convertQuantity('1', origen, destino));
+
+    // Lo que ve el navegador: el texto del catalogo para `incompatible_units`, y nada mas.
+    expect(error.message).toBe(errorMessage('incompatible_units'));
+    expect(error.message).not.toContain(origen.id);
+    expect(error.message).not.toContain(destino.id);
+
+    // Lo que ve el log: cuales eran las dos unidades.
+    expect(error.diagnostic).toContain(origen.id);
+    expect(error.diagnostic).toContain(destino.id);
+  });
 });
 
 describe('convertQuantity, cuando la entrada no es valida', () => {
@@ -187,6 +227,34 @@ describe('convertQuantity, cuando la entrada no es valida', () => {
 
     expect(() => convertQuantity('1', sinBase, mililitro)).toThrow(ValidationError);
     expect(() => convertQuantity('1', mililitro, sinBase)).toThrow(ValidationError);
+  });
+
+  it('QC-70 (R28, R29): el factor invalido va al diagnostico, NUNCA al mensaje', () => {
+    const factorCero: UnitConversion = { id: 'x', baseUnitId: 'ml', factor: '0.0000' };
+    const factorRoto: UnitConversion = { id: 'y', baseUnitId: 'ml', factor: 'mil' };
+
+    const porCero = capturar(() => convertQuantity('1', factorCero, mililitro));
+    expect(porCero.message).toBe(errorMessage('invalid_input'));
+    expect(porCero.message).not.toContain('0.0000');
+    expect(porCero.diagnostic).toContain('0.0000');
+
+    const porFormato = capturar(() => convertQuantity('1', factorRoto, mililitro));
+    expect(porFormato.message).toBe(errorMessage('invalid_input'));
+    expect(porFormato.message).not.toContain('mil');
+    expect(porFormato.diagnostic).toContain('mil');
+
+    // Y la cantidad, por el mismo camino: el texto que no parsea es diagnostico.
+    const porCantidad = capturar(() => convertQuantity('1,5', litro, mililitro));
+    expect(porCantidad.message).toBe(errorMessage('invalid_input'));
+    expect(porCantidad.message).not.toContain('1,5');
+    expect(porCantidad.diagnostic).toContain('1,5');
+
+    // La pareja incompleta no lleva dato variable, pero su explicacion tambien es
+    // diagnostico: el mensaje sigue siendo el generico del catalogo.
+    const sinFactor: UnitConversion = { id: 'z', baseUnitId: 'ml', factor: null };
+    const porPareja = capturar(() => convertQuantity('1', sinFactor, mililitro));
+    expect(porPareja.message).toBe(errorMessage('invalid_input'));
+    expect(porPareja.diagnostic).toContain('la unidad de origen');
   });
 
   it('valida la entrada antes de comparar las bases: la entrada rota manda sobre el ambito', () => {

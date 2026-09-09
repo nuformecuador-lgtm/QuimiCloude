@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { ProductNotFoundError } from './errors';
 
 import type { ProductRepository } from '../ports/product-repository';
 
@@ -29,6 +29,6 @@ export function createDeleteProduct(
     // R14: `false` significa que el producto no existe o ya estaba borrado
     // (`softDeleteAlive` tambien filtra `deleted_at IS NULL`, R16).
     const deleted = await deps.products.softDeleteAlive(id, actor.id, now());
-    if (!deleted) throw new NotFoundError();
+    if (!deleted) throw new ProductNotFoundError();
   };
 }

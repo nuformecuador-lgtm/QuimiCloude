@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateNameError, ValidationError } from './errors';
+import { SupplierDuplicateNameError, ValidationError } from './errors';
 import { createSupplierSchema } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
 
@@ -51,7 +51,7 @@ export function createCreateSupplier(
 
     // R15: el duplicado llega como resultado discriminado del puerto -lo tradujo el
     // adaptador desde el 23505 del indice unico parcial-, nunca como excepcion de Prisma.
-    if (result === 'duplicate') throw new DuplicateNameError();
+    if (result === 'duplicate') throw new SupplierDuplicateNameError();
 
     return result;
   };

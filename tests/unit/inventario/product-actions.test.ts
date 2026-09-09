@@ -15,7 +15,12 @@ import {
   type CreateProductFormState,
   type ProductMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
-import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/inventario';
+import { errorMessage } from '@/lib/modules/errores';
+import {
+  ProductNotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/modules/inventario';
 
 const {
   createProductMock,
@@ -146,12 +151,31 @@ describe('createProductAction', () => {
     });
   });
 
-  it('relanza un error que no es de dominio, sin traducirlo', async () => {
-    createProductMock.mockRejectedValue(new Error('fallo de infraestructura'));
+  // QC-70 (R12, R13): antes este caso fijaba el RELANZADO (`rejects.toThrow`). La decision
+  // cerrada del 2026-09-08 lo cambia: el error ajeno a la familia se traduce a `unexpected`
+  // con el mensaje neutro del catalogo, y el detalle real va al log del servidor y solo ahi.
+  // Por eso el caso no solo mira el codigo: comprueba que NINGUN campo del estado -ni el
+  // serializado entero- contiene el texto del error original.
+  it('devuelve el estado generico, sin filtrar el error que no es de dominio (R12, R13)', async () => {
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ajeno = new Error('fallo de infraestructura');
+    createProductMock.mockRejectedValue(ajeno);
 
-    await expect(
-      createProductAction(CREATE_INITIAL, formDataOf(VALID_PRODUCT_FIELDS)),
-    ).rejects.toThrow('fallo de infraestructura');
+    const result = await createProductAction(CREATE_INITIAL, formDataOf(VALID_PRODUCT_FIELDS));
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    });
+    expect(JSON.stringify(result)).not.toContain('fallo de infraestructura');
+    for (const value of Object.values(result)) {
+      expect(String(value)).not.toContain('fallo de infraestructura');
+    }
+    // R14: el detalle si llega al registro del servidor, que es el unico sitio donde aparece.
+    expect(logSpy).toHaveBeenCalledWith(expect.objectContaining({ cause: ajeno }));
+
+    logSpy.mockRestore();
   });
 });
 
@@ -189,8 +213,8 @@ describe('updateProductAction', () => {
     );
   });
 
-  it('traduce not_found a su code estable', async () => {
-    updateProductMock.mockRejectedValue(new NotFoundError());
+  it('traduce product_not_found a su code estable (QC-70 R17)', async () => {
+    updateProductMock.mockRejectedValue(new ProductNotFoundError());
 
     const result = await updateProductAction(
       'no-existe',
@@ -198,7 +222,7 @@ describe('updateProductAction', () => {
       formDataOf(VALID_PRODUCT_FIELDS),
     );
 
-    expect(result).toEqual({ status: 'error', code: 'not_found', message: expect.any(String) });
+    expect(result).toEqual({ status: 'error', code: 'product_not_found', message: expect.any(String) });
   });
 });
 
@@ -266,12 +290,12 @@ describe('getProductAction', () => {
     expect(result).toEqual({ status: 'success', data: view });
   });
 
-  it('traduce not_found sin filtrar la excepcion', async () => {
-    getProductMock.mockRejectedValue(new NotFoundError());
+  it('traduce product_not_found sin filtrar la excepcion (QC-70 R17)', async () => {
+    getProductMock.mockRejectedValue(new ProductNotFoundError());
 
     const result = await getProductAction('no-existe');
 
-    expect(result).toEqual({ status: 'error', code: 'not_found', message: expect.any(String) });
+    expect(result).toEqual({ status: 'error', code: 'product_not_found', message: expect.any(String) });
   });
 });
 

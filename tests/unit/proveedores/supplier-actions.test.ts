@@ -33,10 +33,12 @@ import {
   type CatalogLineMutationFormState,
   type CreateCatalogLineFormState,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions'
+import { errorMessage } from '@/lib/modules/errores'
 import {
+  CatalogLineNotFoundError,
   DuplicateCatalogLineError,
-  DuplicateNameError,
-  NotFoundError,
+  SupplierDuplicateNameError,
+  SupplierNotFoundError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/proveedores'
@@ -400,12 +402,15 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
 
   it('traduce cada error de dominio a status error con el code estable de la clase, nunca con el texto', async () => {
     // R43. Los `code` se afirman como LITERALES escritos aqui: si alguien renombra
-    // `duplicate_name` a `nombre_duplicado`, este test cae aunque el codigo siga
+    // `supplier_duplicate_name` a `nombre_duplicado`, este test cae aunque el codigo siga
     // "funcionando" -que es justo lo que R43 protege, porque QC-44 decide por el `code`-.
+    //
+    // QC-70 (R17, R18) parte el antiguo `not_found` en `supplier_not_found` y
+    // `catalog_line_not_found`, y `duplicate_name` pasa a `supplier_duplicate_name`.
     const CASOS = [
       { error: new UnauthorizedError(), code: 'unauthorized' },
-      { error: new NotFoundError(), code: 'not_found' },
-      { error: new DuplicateNameError(), code: 'duplicate_name' },
+      { error: new SupplierNotFoundError(), code: 'supplier_not_found' },
+      { error: new SupplierDuplicateNameError(), code: 'supplier_duplicate_name' },
       { error: new ValidationError(), code: 'invalid_input' },
     ] as const
 
@@ -428,40 +433,70 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
     // porque el caso sigue existiendo y solo cambia la clave que lo dispara.
     for (const caso of [
       { error: new DuplicateCatalogLineError(), code: 'duplicate_catalog_line' },
+      // QC-70 (R17): la linea que no existe tiene su PROPIO codigo, distinto del del
+      // proveedor que no existe. Es el caso que obligo a partir el antiguo `not_found`.
+      { error: new CatalogLineNotFoundError(), code: 'catalog_line_not_found' },
     ] as const) {
       createCatalogLineMock.mockRejectedValueOnce(caso.error)
       const result = await createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(VALID_LINE_FIELDS))
       expect(result).toEqual({ status: 'error', code: caso.code, message: caso.error.message })
     }
 
-    // El `code` NO sale del texto ni del nombre de la clase: un mensaje distinto -otro
-    // idioma, por ejemplo- no cambia el `code`.
-    createSupplierMock.mockRejectedValueOnce(new DuplicateNameError('Supplier name already taken.'))
+    // El `code` NO sale del texto ni del nombre de la clase. QC-70 (R7) lo lleva un paso
+    // mas alla: el mensaje YA NO SE PUEDE pasar desde el sitio que lanza, y lo unico que la
+    // clase acepta como segundo dato es el DIAGNOSTICO, que va al registro del servidor y
+    // nunca al navegador (R28, R29). Con un diagnostico puesto, el `code` sigue siendo el
+    // suyo y el `message` sigue siendo el del catalogo.
+    createSupplierMock.mockRejectedValueOnce(
+      new SupplierDuplicateNameError('nombre normalizado ya usado por sup-7'),
+    )
     const traducido = await createSupplierAction(
       CREATE_SUPPLIER_INITIAL,
       formDataOf(VALID_SUPPLIER_FIELDS),
     )
     expect(traducido).toEqual({
       status: 'error',
-      code: 'duplicate_name',
-      message: 'Supplier name already taken.',
+      code: 'supplier_duplicate_name',
+      message: errorMessage('supplier_duplicate_name'),
     })
+    expect(JSON.stringify(traducido)).not.toContain('sup-7')
 
-    // Lo que NO es error de dominio se RELANZA, no se traga ni se disfraza de
-    // `invalid_input`: un fallo de conexion tiene que romper, no devolver un formulario en
-    // rojo que el usuario reintentaria en vano (`docs/conventions.md`, nada de `catch`
-    // vacios).
+    // Lo que NO es error de dominio ya no se relanza: QC-70 (R12, decision cerrada del
+    // 2026-09-08) lo traduce al codigo generico `unexpected` con su mensaje neutro, para
+    // que la pantalla siga en pie en vez de caer en la de error del framework. Lo que NO
+    // cambia es que el detalle interno -aqui, el texto del fallo de conexion- se queda en
+    // el registro del servidor y NO viaja al navegador (R13): ningun campo del estado lo
+    // contiene. Este caso sustituye al `rejects.toBe(ajeno)` que fijaba el relanzado.
     const ajeno = new Error('connection terminated unexpectedly')
+    const SIN_FILTRACION = (estado: object): void => {
+      for (const valor of Object.values(estado)) {
+        expect(String(valor).toLowerCase()).not.toContain('connection terminated unexpectedly')
+      }
+    }
+
     createSupplierMock.mockRejectedValueOnce(ajeno)
-    await expect(
-      createSupplierAction(CREATE_SUPPLIER_INITIAL, formDataOf(VALID_SUPPLIER_FIELDS)),
-    ).rejects.toBe(ajeno)
+    const altaConAjeno = await createSupplierAction(
+      CREATE_SUPPLIER_INITIAL,
+      formDataOf(VALID_SUPPLIER_FIELDS),
+    )
+    expect(altaConAjeno).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    })
+    SIN_FILTRACION(altaConAjeno)
 
     listSuppliersMock.mockRejectedValueOnce(ajeno)
-    await expect(listSuppliersAction({ page: 1 })).rejects.toBe(ajeno)
+    const listaConAjeno = await listSuppliersAction({ page: 1 })
+    expect(listaConAjeno).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    })
+    SIN_FILTRACION(listaConAjeno)
 
     // Y ningun `catch` de las dos actions descarta el error sin traducirlo ni propagarlo:
-    // todos pasan por `toErrorState`, que relanza lo que no reconoce.
+    // todos pasan por `toErrorState`, la unica implementacion del traductor (R10).
     for (const file of ACTION_FILES) {
       const source = readSource(file)
       const catches = [...source.matchAll(/catch\s*\(([^)]*)\)\s*\{([^}]*)\}/g)]

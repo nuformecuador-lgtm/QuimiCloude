@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotDeletableError, NotFoundError } from './errors';
+import { NotDeletableError, OrderNotFoundError } from './errors';
 import type { OrderStatus } from './order-classification';
 
 import type { OrderRepository } from '../ports/order-repository';
@@ -40,7 +40,7 @@ export function createDeleteOrder(
     // R33: no existe y ya esta borrado son el mismo caso, y el filtro `deleted_at IS NULL`
     // es del puerto (R40).
     const row = await deps.orders.findAliveById(id);
-    if (row === null) throw new NotFoundError();
+    if (row === null) throw new OrderNotFoundError();
 
     // R32, con `code` PROPIO (`not_deletable`), distinto del de la edicion rechazada. Se lee
     // la fila ANTES de escribir precisamente para poder distinguir «no existe» de «no se
@@ -49,6 +49,6 @@ export function createDeleteOrder(
 
     // R6: el borrado tambien registra al actor como autor de la ultima modificacion.
     const result = await deps.orders.softDeleteAlive(id, actor.id, now());
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new OrderNotFoundError();
   };
 }

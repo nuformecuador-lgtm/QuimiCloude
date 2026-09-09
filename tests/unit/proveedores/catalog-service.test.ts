@@ -24,8 +24,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { createCreateCatalogLine } from '@/lib/modules/proveedores/domain/create-catalog-line'
 import { createDeleteCatalogLine } from '@/lib/modules/proveedores/domain/delete-catalog-line'
 import {
+  CatalogLineNotFoundError,
   DuplicateCatalogLineError,
-  NotFoundError,
+  SupplierNotFoundError,
   ValidationError,
 } from '@/lib/modules/proveedores/domain/errors'
 import { createListCatalogLines } from '@/lib/modules/proveedores/domain/list-catalog-lines'
@@ -247,7 +248,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     const sinProveedor = makeCatalog({ create: vi.fn(async () => 'supplier_not_found' as const) })
     await expect(
       createCreateCatalogLine({ catalog: sinProveedor.repo, now })(ALTA_VALIDA, ADMIN),
-    ).rejects.toBeInstanceOf(NotFoundError)
+    ).rejects.toBeInstanceOf(SupplierNotFoundError)
   })
 
   it('la edicion reemplaza los siete campos y no puede cambiar el proveedor', async () => {
@@ -315,7 +316,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     const vacio = makeCatalog({ replaceAlive: vi.fn(async () => 'not_found' as const) })
     await expect(
       createUpdateCatalogLine({ catalog: vacio.repo, now })('linea-x', CAMPOS_VALIDOS, ADMIN),
-    ).rejects.toBeInstanceOf(NotFoundError)
+    ).rejects.toBeInstanceOf(CatalogLineNotFoundError)
   })
 
   it('la baja de la linea es logica, sella al actor y al instante, y no encuentra la de un proveedor dado de baja', async () => {
@@ -333,7 +334,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     const vacio = makeCatalog({ softDeleteAlive: vi.fn(async () => false) })
     await expect(
       createDeleteCatalogLine({ catalog: vacio.repo, now })('linea-x', ADMIN),
-    ).rejects.toBeInstanceOf(NotFoundError)
+    ).rejects.toBeInstanceOf(CatalogLineNotFoundError)
   })
 
   it('el catalogo se consulta con su propio listado paginado, sin resolver nada de otro modulo', async () => {
@@ -393,7 +394,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
 
     await expect(
       createListCatalogLines({ catalog: repo, log: logMudo() })(SUPPLIER_ID, { page: 1 }, ADMIN),
-    ).rejects.toBeInstanceOf(NotFoundError)
+    ).rejects.toBeInstanceOf(SupplierNotFoundError)
 
     // Y una consulta de pagina invalida es entrada invalida, no una pagina vacia.
     const otro = makeCatalog()

@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateNameError, ValidationError } from './errors';
+import { PresentationDuplicateNameError, ValidationError } from './errors';
 import { createPresentationSchema } from './presentation-input';
 import { normalizePresentationName } from './presentation-name';
 
@@ -20,7 +20,8 @@ export type CreatePresentationDeps = {
  * R18/R20: el puerto puede devolver `'duplicate'` aunque no haya ninguna comprobacion
  * previa que lo anticipe -es el indice unico de la base el que cierra la carrera entre
  * dos altas simultaneas (design.md > 7, § 11.4)-, y este caso de uso SIEMPRE traduce esa
- * respuesta a `DuplicateNameError`, nunca la ignora ni confia en que zod ya lo filtro.
+ * respuesta a `PresentationDuplicateNameError`, nunca la ignora ni confia en que zod ya
+ * lo filtro.
  */
 export function createCreatePresentation(
   deps: CreatePresentationDeps,
@@ -36,7 +37,7 @@ export function createCreatePresentation(
 
     const nameNormalized = normalizePresentationName(parsed.data.name);
     const result = await deps.presentations.create(parsed.data.name, nameNormalized);
-    if (result === 'duplicate') throw new DuplicateNameError();
+    if (result === 'duplicate') throw new PresentationDuplicateNameError();
 
     return result;
   };

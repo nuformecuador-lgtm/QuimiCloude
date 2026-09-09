@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { SupplierNotFoundError } from './errors';
 
 import type { SupplierRepository } from '../ports/supplier-repository';
 
@@ -28,6 +28,6 @@ export function createDeleteSupplier(
 
     // false = no existe o ya estaba dado de baja: mismo caso (R24).
     const deleted = await deps.suppliers.softDeleteAlive(id, actor.id, now());
-    if (!deleted) throw new NotFoundError();
+    if (!deleted) throw new SupplierNotFoundError();
   };
 }

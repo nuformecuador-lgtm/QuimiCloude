@@ -6,7 +6,7 @@
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
-import { DuplicateNameError, NotFoundError } from '@/lib/modules/recetas/domain/errors';
+import { RecipeDuplicateNameError, RecipeNotFoundError } from '@/lib/modules/recetas/domain/errors';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
@@ -164,7 +164,7 @@ describe('R8 — nombre duplicado', () => {
     const images = montarAlmacenamiento();
     const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
-    await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toBeInstanceOf(DuplicateNameError);
+    await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toBeInstanceOf(RecipeDuplicateNameError);
   });
 });
 
@@ -389,7 +389,7 @@ describe('R36 — excluye las recetas borradas', () => {
     const images = montarAlmacenamiento();
     const getRecipe = createGetRecipe({ recipes, products, images });
 
-    await expect(getRecipe('borrada', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getRecipe('borrada', ADMIN)).rejects.toBeInstanceOf(RecipeNotFoundError);
     expect(recipes.findAliveById).toHaveBeenCalledWith('borrada');
   });
 });
@@ -407,9 +407,9 @@ describe('R37 — no encontrado', () => {
     const getRecipe = createGetRecipe({ recipes, products, images });
     const deleteRecipe = createDeleteRecipe({ recipes, now: () => AHORA });
 
-    await expect(getRecipe('x', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getRecipe('x', ADMIN)).rejects.toBeInstanceOf(RecipeNotFoundError);
     // `deleteRecipe` no tiene entrada que validar antes: llama a `softDeleteAlive`
     // directamente, y con el doble devolviendo `'not_found'` ya rechaza ahi.
-    await expect(deleteRecipe('x', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteRecipe('x', ADMIN)).rejects.toBeInstanceOf(RecipeNotFoundError);
   });
 });

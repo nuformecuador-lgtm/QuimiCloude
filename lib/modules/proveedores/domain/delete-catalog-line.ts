@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { CatalogLineNotFoundError } from './errors';
 
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
@@ -36,6 +36,6 @@ export function createDeleteCatalogLine(
     requirePermission(actor, 'proveedores.modificar');
 
     const dadaDeBaja = await deps.catalog.softDeleteAlive(id, actor.id, now());
-    if (!dadaDeBaja) throw new NotFoundError();
+    if (!dadaDeBaja) throw new CatalogLineNotFoundError();
   };
 }

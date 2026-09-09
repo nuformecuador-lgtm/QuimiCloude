@@ -1,6 +1,7 @@
 'use server';
 
 import { identity, inventario } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
   InventarioError,
   type Actor,
@@ -21,21 +22,24 @@ import {
  * - `list` recibe `query: unknown` como argumento tipado: es una consulta, no un
  *   formulario, y `createListQuerySchema()` valida su forma DENTRO del caso de uso
  *   (QC-57 R30).
+ *
+ * QC-70 (R10, R12): la copia de `toErrorState` que este archivo llevaba -identica byte a
+ * byte a la de `product-actions.ts`- desaparecio; ver alli el razonamiento completo.
  */
 
 export type CreatePresentationFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 export type PresentationMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 export type PresentationListResult =
   | { status: 'success'; data: Page<PresentationView> }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 const MISSING_ID_ERROR = 'Falta el identificador de la presentacion.';
 
@@ -44,13 +48,8 @@ function readFormString(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-/** Traduce un error de dominio a estado serializable; relanza cualquier otro (`docs/conventions.md`). */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof InventarioError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/** El traductor UNICO (R10), parametrizado por la base de este modulo. Ver `product-actions.ts`. */
+const toErrorState = createErrorStateTranslator(InventarioError);
 
 /** El actor que exige R1/D17: se resuelve UNA vez por invocacion (ver `product-actions.ts`). */
 async function currentActor(): Promise<Actor | null> {

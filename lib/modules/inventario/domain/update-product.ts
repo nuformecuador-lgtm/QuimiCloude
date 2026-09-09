@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError, ValidationError } from './errors';
+import { ProductNotFoundError, ValidationError } from './errors';
 import { updateProductSchema } from './product-input';
 
 import type { ProductRepository } from '../ports/product-repository';
@@ -36,6 +36,6 @@ export function createUpdateProduct(
     // borrado (`findAliveById`/`updateAlive` filtran `deleted_at IS NULL` en el
     // puerto, R16). El dominio nunca ve un SQLSTATE: solo traduce el booleano.
     const updated = await deps.products.updateAlive(id, parsed.data, actor.id, now());
-    if (!updated) throw new NotFoundError();
+    if (!updated) throw new ProductNotFoundError();
   };
 }

@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateNameError, NotFoundError, ValidationError } from './errors';
+import { SupplierDuplicateNameError, SupplierNotFoundError, ValidationError } from './errors';
 import { updateSupplierSchema } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
 
@@ -45,7 +45,7 @@ export function createUpdateSupplier(
 
     // R24: no existe y ya esta dado de baja son el mismo caso; el filtro
     // deleted_at IS NULL vive en el puerto (R22), no en un if de aqui.
-    if (result === 'not_found') throw new NotFoundError();
-    if (result === 'duplicate') throw new DuplicateNameError();
+    if (result === 'not_found') throw new SupplierNotFoundError();
+    if (result === 'duplicate') throw new SupplierDuplicateNameError();
   };
 }

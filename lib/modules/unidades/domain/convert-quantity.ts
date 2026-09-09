@@ -10,6 +10,11 @@
 // no puede importar el `Decimal` de `@prisma/client`
 // (`docs/architecture.md > Anti-patrones`). La aritmetica va con `BigInt` sobre enteros
 // escalados, sin ninguna dependencia nueva (R38, decision cerrada 26).
+//
+// QC-70 (R7, R28): los cuatro sitios que fallan aqui llevan un DATO VARIABLE -el texto que no
+// parsea, el factor, los ids de las dos unidades-. Ese dato ya no se incrusta en el mensaje
+// (el mensaje sale del catalogo y es siempre el mismo) sino que viaja como DIAGNOSTICO, que
+// va al registro del servidor y nunca al navegador.
 import { IncompatibleUnitsError, ValidationError } from './errors'
 import type { UnitId } from './unit-catalog'
 
@@ -62,7 +67,8 @@ const DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/
 
 function parseDecimal(raw: string, subject: string): DecimalValue {
   if (!DECIMAL_PATTERN.test(raw)) {
-    throw new ValidationError(`${subject} no es un decimal valido: ${JSON.stringify(raw)}.`)
+    // El texto que no parsea es DIAGNOSTICO (R28): al log, nunca al navegador.
+    throw new ValidationError(`${subject} no es un decimal valido: ${JSON.stringify(raw)}`)
   }
   const [integerPart = '', fractionPart = ''] = raw.split('.')
   return { unscaled: BigInt(`${integerPart}${fractionPart}`), scale: fractionPart.length }
@@ -96,7 +102,7 @@ function effectiveBaseId(unit: UnitConversion): UnitId {
 function effectiveFactor(unit: UnitConversion, subject: string): DecimalValue {
   if ((unit.baseUnitId === null) !== (unit.factor === null)) {
     throw new ValidationError(
-      `${subject} declara la unidad de la que deriva sin factor, o el factor sin unidad de la que deriva.`,
+      `${subject} declara la unidad de la que deriva sin factor, o el factor sin unidad de la que deriva`,
     )
   }
   if (unit.factor === null) {
@@ -104,7 +110,7 @@ function effectiveFactor(unit: UnitConversion, subject: string): DecimalValue {
   }
   const factor = parseDecimal(unit.factor, `El factor de ${subject}`)
   if (factor.unscaled <= ZERO) {
-    throw new ValidationError(`El factor de ${subject} debe ser mayor que cero: ${unit.factor}.`)
+    throw new ValidationError(`el factor de ${subject} no es mayor que cero: ${unit.factor}`)
   }
   return factor
 }
@@ -189,9 +195,10 @@ export function convertQuantity(
   const toFactor = effectiveFactor(to, 'la unidad de destino')
 
   if (effectiveBaseId(from) !== effectiveBaseId(to)) {
-    throw new IncompatibleUnitsError(
-      `Las unidades ${from.id} y ${to.id} no comparten unidad base: no son convertibles.`,
-    )
+    // Los ids de las dos unidades son DIAGNOSTICO (R28, R29): el navegador ve el mensaje del
+    // catalogo -«Las dos unidades no comparten unidad base: no son convertibles.»- y el log
+    // recibe ademas cuales eran.
+    throw new IncompatibleUnitsError(`no se puede convertir ${from.id} a ${to.id}`)
   }
 
   // quantity * factorFrom / factorTo, con las escalas llevadas a enteros:

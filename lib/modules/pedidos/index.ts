@@ -34,11 +34,16 @@ export { requirePermission } from './domain/actor';
 export type { Actor } from './domain/actor';
 
 /** Los errores, con su `code` ESTABLE. El adaptador driving traduce por el `code`, nunca por
- *  el texto (R56), y para eso necesita la clase base y el `instanceof`. */
+ *  el texto (R56), y para eso necesita la clase base y el `instanceof`.
+ *
+ *  QC-70: el `code` sale del catalogo unico (`@/lib/modules/errores`) y `NotFoundError` paso a
+ *  llamarse `OrderNotFoundError` con codigo `order_not_found` (R17): `not_found` significaba
+ *  cinco cosas distintas y un codigo con UN mensaje no puede decir a la vez «el pedido» y «la
+ *  receta». */
 export {
   PedidosError,
   UnauthorizedError,
-  NotFoundError,
+  OrderNotFoundError,
   RecipeNotFoundError,
   InvalidTransitionError,
   NotCancellableError,

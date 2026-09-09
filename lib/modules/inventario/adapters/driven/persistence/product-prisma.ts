@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import { NotFoundError, ValidationError } from '../../../domain/errors';
+import { ProductNotFoundError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
 
 import {
@@ -88,7 +88,7 @@ export function toProductView(row: ProductRow): ProductView {
  * Clasifica, de forma PURA, el nombre de la restriccion (`meta.field_name` de un
  * `PrismaClientKnownRequestError` `P2003`) segun la columna que la disparo
  * (`design.md > 7`: "23503 al crear/editar un producto (autor o presentacion
- * inexistente) se traduce a NotFoundError/ValidationError segun la columna"). Se afirma
+ * inexistente) se traduce a ProductNotFoundError/ValidationError segun la columna"). Se afirma
  * sobre el contenido de `meta`, nunca sobre el texto del mensaje (en espanol en esta
  * maquina, `design.md > 12`).
  *
@@ -96,7 +96,13 @@ export function toProductView(row: ProductRow): ProductView {
  * existencia solo la base puede garantizar: se trata como entrada invalida
  * (`ValidationError`). `created_by`/`updated_by` no son entrada del formulario -son el
  * actor de sesion-, y su ausencia como usuario real es "el autor no existe"
- * (`NotFoundError`), que es la lectura literal de R7.
+ * (`ProductNotFoundError`), que es la lectura literal de R7.
+ *
+ * QC-70 (R17): este era el quinto sitio de lanzamiento del antiguo `NotFoundError`, y la
+ * tabla de `design.md > 4.1` lo asigna a `ProductNotFoundError` -no a un codigo propio del
+ * autor-: el catalogo no abre una entrada para un caso que ninguna pantalla distingue, y
+ * quien necesita el detalle real (que fallo la FK del autor) lo tiene en el log, nunca en
+ * el navegador (R13, R29).
  */
 export function classifyForeignKeyViolation(fieldName: string): 'presentation' | 'actor' | 'unknown' {
   if (fieldName.includes('presentation_id')) return 'presentation';
@@ -125,7 +131,7 @@ function translateForeignKeyViolation(error: Prisma.PrismaClientKnownRequestErro
     case 'presentation':
       throw new ValidationError();
     case 'actor':
-      throw new NotFoundError();
+      throw new ProductNotFoundError();
     default:
       throw error;
   }

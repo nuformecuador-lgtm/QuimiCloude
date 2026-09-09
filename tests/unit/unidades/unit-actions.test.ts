@@ -4,7 +4,15 @@
 //
 // Cubre R41 (la action no decide nada: el rechazo lo prueba `list-units.test.ts` contra el
 // dominio real) y R42 (la action traduce el error de dominio a estado serializable sin
-// relanzar, y relanza cualquier otro error).
+// relanzar).
+//
+// QC-70 (R7, R12, R13): dos cosas cambian aqui y ninguna se relaja. (a) El mensaje ya NO se
+// pasa al construir el error: sale del catalogo, asi que el caso que fijaba un texto propio
+// ahora fija `errorMessage(code)` y el texto que se le pasaba viaja como DIAGNOSTICO, que no
+// puede aparecer en el estado. (b) El error que NO es de dominio ya no se RELANZA -los cuatro
+// casos que fijaban `rejects.toThrow(...)` se reescriben-: se devuelve como `unexpected` con
+// su mensaje neutro, y ademas se comprueba que NINGUN campo del estado arrastra el texto del
+// error original.
 //
 // QC-74 (R15, R18): la action construye el actor con `{ id, permissions }` —el nombre del rol
 // ya no llega al modulo— y su bloque de traduccion de errores NO cambia: sigue mirando
@@ -25,16 +33,17 @@ import {
   updateUnitAction,
 } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import {
-  DuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
-  NotFoundError,
   SystemUnitError,
   UnauthorizedError,
+  UnitDuplicateNameError,
   UnitInUseError,
+  UnitNotFoundError,
   ValidationError,
 } from '@/lib/modules/unidades';
 import { createListUnits } from '@/lib/modules/unidades/domain/list-units';
+import { errorMessage } from '@/lib/modules/errores';
 
 import type { Actor } from '@/lib/modules/unidades/domain/actor';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
@@ -91,6 +100,16 @@ const SESSION_CONTEXT = {
   companyId: 'company-1',
   roleName: 'Administrador',
 };
+
+/**
+ * QC-70 (R13, R29): el detalle interno —el texto del error ajeno, el diagnostico de un error
+ * de dominio— no puede aparecer en NINGUN campo del estado que cruza al navegador. Se
+ * comprueba sobre el objeto serializado ENTERO, no campo a campo, para que un campo nuevo no
+ * se cuele sin que este aserto se entere.
+ */
+function noFiltra(estado: unknown, texto: string): boolean {
+  return !JSON.stringify(estado).includes(texto);
+}
 
 const CATALOG = [
   { id: 'unit-1', name: 'Gramo', symbol: 'g' },
@@ -154,19 +173,40 @@ describe('listUnitsAction', () => {
     expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
   });
 
-  it('la action traduce el error de dominio a estado serializable sin relanzar', async () => {
+  it('la action traduce el error de dominio a estado serializable sin relanzar, con el mensaje del catalogo', async () => {
+    // QC-70 (R7, R28): lo que antes era un mensaje a medida ahora es el DIAGNOSTICO. El
+    // estado lleva el texto que el catalogo da para el codigo, y el diagnostico no cruza.
     const dominioError = new UnauthorizedError('sin permiso');
     listUnitsMock.mockRejectedValue(dominioError);
 
     const resultado = await listUnitsAction();
 
-    expect(resultado).toEqual({ status: 'error', code: 'unauthorized', message: 'sin permiso' });
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+    expect(noFiltra(resultado, 'sin permiso')).toBe(true);
   });
 
-  it('un error que no es de dominio se relanza y no se traduce', async () => {
-    listUnitsMock.mockRejectedValue(new Error('fallo de infraestructura'));
+  it('un error que no es de dominio se traduce a `unexpected` y no filtra su texto', async () => {
+    // QC-70 (R12, R13, R14): antes esto era `rejects.toThrow('fallo de infraestructura')`.
+    // Ahora la action devuelve estado, el navegador ve el mensaje neutro y el error original
+    // va al registro del servidor, que es el unico sitio donde ese texto aparece.
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ajeno = new Error('fallo de infraestructura');
+    listUnitsMock.mockRejectedValue(ajeno);
 
-    await expect(listUnitsAction()).rejects.toThrow('fallo de infraestructura');
+    const resultado = await listUnitsAction();
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    });
+    expect(noFiltra(resultado, 'fallo de infraestructura')).toBe(true);
+    expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+    log.mockRestore();
   });
 });
 
@@ -375,9 +415,9 @@ describe('createUnitAction / updateUnitAction / deleteUnitAction', () => {
     // R30: cada clase de error de dominio se traduce a su `code` estable, nunca al texto.
     const CASOS_DE_ERROR: ReadonlyArray<{ readonly error: Error; readonly code: string }> = [
       { error: new ValidationError(), code: 'invalid_input' },
-      { error: new NotFoundError(), code: 'not_found' },
+      { error: new UnitNotFoundError(), code: 'unit_not_found' },
       { error: new SystemUnitError(), code: 'system_unit' },
-      { error: new DuplicateNameError(), code: 'duplicate_name' },
+      { error: new UnitDuplicateNameError(), code: 'unit_duplicate_name' },
       { error: new DuplicateSymbolError(), code: 'duplicate_symbol' },
       { error: new InvalidDerivationError(), code: 'invalid_derivation' },
       { error: new UnitInUseError(), code: 'unit_in_use' },
@@ -417,29 +457,60 @@ describe('createUnitAction / updateUnitAction / deleteUnitAction', () => {
       });
     }
 
-    // R30: un error que NO es de dominio se relanza, nunca se traduce.
-    it('createUnitAction relanza un error que no es de dominio', async () => {
-      createUnitMock.mockRejectedValue(new TypeError('fallo inesperado'));
+    // R30 + QC-70 (R12, R13, R14): un error que NO es de dominio ya no se relanza —eso dejaba
+    // al navegador en la pantalla de error del framework—, se traduce a `unexpected` con
+    // mensaje neutro. Lo que estos tres casos fijan ahora, ademas del estado: que el texto del
+    // error original NO aparece en ningun campo del estado y SI llega al registro.
+    const ESTADO_INESPERADO = {
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    };
 
-      await expect(
-        createUnitAction({ status: 'idle' }, formData({ name: 'Kilogramo' })),
-      ).rejects.toThrow('fallo inesperado');
+    it('createUnitAction traduce a `unexpected` un error que no es de dominio, sin filtrar su texto', async () => {
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const ajeno = new TypeError('fallo inesperado');
+      createUnitMock.mockRejectedValue(ajeno);
+
+      const resultado = await createUnitAction(
+        { status: 'idle' },
+        formData({ name: 'Kilogramo' }),
+      );
+
+      expect(resultado).toEqual(ESTADO_INESPERADO);
+      expect(noFiltra(resultado, 'fallo inesperado')).toBe(true);
+      expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+      log.mockRestore();
     });
 
-    it('updateUnitAction relanza un error que no es de dominio', async () => {
-      updateUnitMock.mockRejectedValue(new TypeError('fallo inesperado'));
+    it('updateUnitAction traduce a `unexpected` un error que no es de dominio, sin filtrar su texto', async () => {
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const ajeno = new TypeError('fallo inesperado');
+      updateUnitMock.mockRejectedValue(ajeno);
 
-      await expect(
-        updateUnitAction('unit-1', { status: 'idle' }, formData({ name: 'Kilogramo' })),
-      ).rejects.toThrow('fallo inesperado');
+      const resultado = await updateUnitAction(
+        'unit-1',
+        { status: 'idle' },
+        formData({ name: 'Kilogramo' }),
+      );
+
+      expect(resultado).toEqual(ESTADO_INESPERADO);
+      expect(noFiltra(resultado, 'fallo inesperado')).toBe(true);
+      expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+      log.mockRestore();
     });
 
-    it('deleteUnitAction relanza un error que no es de dominio', async () => {
-      deleteUnitMock.mockRejectedValue(new TypeError('fallo inesperado'));
+    it('deleteUnitAction traduce a `unexpected` un error que no es de dominio, sin filtrar su texto', async () => {
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const ajeno = new TypeError('fallo inesperado');
+      deleteUnitMock.mockRejectedValue(ajeno);
 
-      await expect(
-        deleteUnitAction({ status: 'idle' }, formData({ id: 'unit-1' })),
-      ).rejects.toThrow('fallo inesperado');
+      const resultado = await deleteUnitAction({ status: 'idle' }, formData({ id: 'unit-1' }));
+
+      expect(resultado).toEqual(ESTADO_INESPERADO);
+      expect(noFiltra(resultado, 'fallo inesperado')).toBe(true);
+      expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+      log.mockRestore();
     });
   });
 

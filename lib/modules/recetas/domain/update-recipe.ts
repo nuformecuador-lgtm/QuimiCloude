@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateNameError, NotFoundError, ValidationError } from './errors';
+import { RecipeDuplicateNameError, RecipeNotFoundError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
 
@@ -54,7 +54,7 @@ async function removeImageSafely(
  * PRIMERA linea,
  * luego se valida la forma de `input` (`updateRecipeSchema`) y SOLO DESPUES se lee la
  * receta viva -para conocer su `imagePath` anterior y las lineas que ya tenia (R45)-,
- * respondiendo `NotFoundError` si no existe o ya esta borrada (R37). Ese orden evita
+ * respondiendo `RecipeNotFoundError` si no existe o ya esta borrada (R37). Ese orden evita
  * gastar una consulta a la base cuando el cuerpo de la peticion ya es invalido.
  */
 export function createUpdateRecipe(
@@ -74,7 +74,7 @@ export function createUpdateRecipe(
     const data = parsed.data;
 
     const existing = await deps.recipes.findAliveById(id);
-    if (existing === null) throw new NotFoundError();
+    if (existing === null) throw new RecipeNotFoundError();
 
     // R45, R46 (`design.md > 6`): diferencia de conjuntos. Solo se valida contra el
     // catalogo la linea NUEVA -la que no estaba ya en la receta-; la preexistente se
@@ -137,8 +137,8 @@ export function createUpdateRecipe(
     // R11, R12, R13: la conciliacion de las lineas y la transaccion viven en el
     // adaptador (`design.md > 8`), no aqui.
     const result = await deps.recipes.replaceAlive(id, newRecipe, actor.id, now());
-    if (result === 'not_found') throw new NotFoundError();
-    if (result === 'duplicate') throw new DuplicateNameError();
+    if (result === 'not_found') throw new RecipeNotFoundError();
+    if (result === 'duplicate') throw new RecipeDuplicateNameError();
 
     // R26, R47, R48, R49: el borrado va DESPUES de que la base confirme, usa el MISMO
     // `remove` en los DOS caminos (reemplazar y quitar), y si falla NO revierte la

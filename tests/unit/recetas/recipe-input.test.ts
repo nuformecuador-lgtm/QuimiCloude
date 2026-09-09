@@ -94,7 +94,7 @@ describe('createRecipeSchema — nombre invalido al normalizar (R9)', () => {
     const result = createRecipeSchema.safeParse({ ...RECETA_VALIDA, name: '---' });
     expect(result.success).toBe(false);
     if (!result.success) {
-      // Debe ser un fallo de zod (invalid_input desde el borde), no un DuplicateNameError
+      // Debe ser un fallo de zod (invalid_input desde el borde), no un RecipeDuplicateNameError
       // del dominio: este esquema no conoce la base y no puede lanzar ese error.
       const issue = result.error.issues[0];
       expect(issue.code).toBe('custom');

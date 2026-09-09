@@ -6,8 +6,8 @@ export { requirePermission, type Actor } from './domain/actor';
 export {
   RecetasError,
   UnauthorizedError,
-  NotFoundError,
-  DuplicateNameError,
+  RecipeNotFoundError,
+  RecipeDuplicateNameError,
   ValidationError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
