@@ -7,7 +7,7 @@
 // `data-testid` del componente compartido y por constantes exportadas.
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -169,9 +169,10 @@ describe('la caja de busqueda NO existe (R20)', () => {
   });
 
   it('ninguna navegacion de la tabla escribe un termino de busqueda en la URL', async () => {
+    const user = setupUser();
     montar();
 
-    await userEvent.click(screen.getByTestId('data-table-next'));
+    await user.click(screen.getByTestId('data-table-next'));
 
     expect(ultimoDestino()).not.toContain('search');
   });
@@ -214,13 +215,15 @@ describe('cambiar orden, filtro o pagina navega con la consulta esperada (R15, R
   });
 
   it('marcar un valor del filtro de estado pide la lista de nuevo con ese filtro', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const params = montar();
 
     // `fireEvent.click` para abrir el menu de Base UI en jsdom, como ya hace la suite de QC-55.
     fireEvent.click(screen.getByTestId(`data-table-filter-${STATUS_COLUMN_ID}`));
     await user.click(
-      screen.getByTestId(`data-table-filter-option-${STATUS_COLUMN_ID}-CANCELADO`),
+      await esperarInteractiva(
+        screen.getByTestId(`data-table-filter-option-${STATUS_COLUMN_ID}-CANCELADO`),
+      ),
     );
 
     const esperado = buildOrderListQuery({
@@ -231,17 +234,19 @@ describe('cambiar orden, filtro o pagina navega con la consulta esperada (R15, R
   });
 
   it('avanzar de pagina pide la lista de nuevo con la pagina siguiente', async () => {
+    const user = setupUser();
     const params = montar({ page: 1 }, 3);
 
-    await userEvent.click(screen.getByTestId('data-table-next'));
+    await user.click(screen.getByTestId('data-table-next'));
 
     expect(ultimoDestino()).toBe(`${ORDERS_ROUTE}?${buildOrderListQuery({ ...params, page: 2 })}`);
   });
 
   it('el destino sale SIEMPRE de la constante de ruta (R2)', async () => {
+    const user = setupUser();
     montar();
 
-    await userEvent.click(screen.getByTestId('data-table-next'));
+    await user.click(screen.getByTestId('data-table-next'));
 
     expect(ultimoDestino().startsWith(`${ORDERS_ROUTE}?`)).toBe(true);
   });

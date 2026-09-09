@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { esperarInteractiva, setupUser } from '../../helpers/user-event'
 
 import {
   DataTableHeaderCell,
@@ -69,7 +69,7 @@ function renderCelda(props: {
 describe('DataTableHeaderCell: orden por teclado y aria-sort', () => {
   it('activar la cabecera con teclado emite el orden ascendente cuando no habia orden previo', async () => {
     // R12, R14.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     const onSortChange = vi.fn()
     renderCelda({ column: columnaOrdenableConFiltro(), sort: null, onSortChange })
 
@@ -81,7 +81,7 @@ describe('DataTableHeaderCell: orden por teclado y aria-sort', () => {
 
   it('una columna sin sortable no ofrece boton de orden y no emite nada al interactuar', async () => {
     // R14.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     const onSortChange = vi.fn()
     const columnaNoOrdenable: DataTableColumn<FilaDePrueba> = {
       id: 'descripcion',
@@ -126,7 +126,7 @@ describe('DataTableHeaderCell: orden por teclado y aria-sort', () => {
 
   it('alterna descendente -> ascendente al reactivar una cabecera ya en orden descendente', async () => {
     // R12: la alternancia no vuelve a "sin orden".
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     const onSortChange = vi.fn()
     renderCelda({
       column: columnaOrdenableConFiltro(),
@@ -144,7 +144,7 @@ describe('DataTableHeaderCell: orden por teclado y aria-sort', () => {
 describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
   it('el disparador cumple el objetivo tactil minimo y se abre por teclado', async () => {
     // R27.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     render(
       <DataTableHeaderMenu
         column={columnaOrdenableConFiltro()}
@@ -170,7 +170,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
 
   it('ordenar ascendente y descendente emiten el orden esperado y solo aparecen si la columna es sortable', async () => {
     // R12, R14.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     const onSortChange = vi.fn()
     render(
       <DataTableHeaderMenu
@@ -185,14 +185,14 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
     )
 
     await usuario.click(screen.getByTestId('data-table-header-menu-nombre'))
-    await usuario.click(await screen.findByTestId('data-table-sort-desc-nombre'))
+    await usuario.click(await esperarInteractiva(await screen.findByTestId('data-table-sort-desc-nombre')))
 
     expect(onSortChange).toHaveBeenCalledExactlyOnceWith({ columnId: 'nombre', direction: 'desc' })
   })
 
   it('una columna sin sortable no ofrece las acciones de orden en el menu', async () => {
     // R14.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     const columnaNoOrdenable: DataTableColumn<FilaDePrueba> = {
       id: 'descripcion',
       label: 'Descripcion',
@@ -220,7 +220,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
 
   it('fijar emite onTogglePin y una columna pinnable:false no ofrece la accion de fijar', async () => {
     // R23.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     const onTogglePin = vi.fn()
     render(
       <DataTableHeaderMenu
@@ -235,7 +235,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
     )
 
     await usuario.click(screen.getByTestId('data-table-header-menu-nombre'))
-    await usuario.click(await screen.findByTestId('data-table-pin-nombre'))
+    await usuario.click(await esperarInteractiva(await screen.findByTestId('data-table-pin-nombre')))
 
     expect(onTogglePin).toHaveBeenCalledOnce()
 
@@ -264,7 +264,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
 
   it('una columna fijada ofrece "soltar" en vez de "fijar"', async () => {
     // R23.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     render(
       <DataTableHeaderMenu
         column={columnaOrdenableConFiltro()}
@@ -285,7 +285,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
 
   it('abrir el filtro emite onOpenFilter y una columna sin filter no ofrece la accion', async () => {
     // R15.
-    const usuario = userEvent.setup()
+    const usuario = setupUser()
     const onOpenFilter = vi.fn()
     render(
       <DataTableHeaderMenu
@@ -300,7 +300,7 @@ describe('DataTableHeaderMenu: disparador, acciones y tamano tactil', () => {
     )
 
     await usuario.click(screen.getByTestId('data-table-header-menu-nombre'))
-    await usuario.click(await screen.findByTestId('data-table-filter-open-nombre'))
+    await usuario.click(await esperarInteractiva(await screen.findByTestId('data-table-filter-open-nombre')))
 
     expect(onOpenFilter).toHaveBeenCalledOnce()
 

@@ -16,7 +16,7 @@
 // **Ningun assert sobre copy** (R44): controles y regiones por `data-testid` o por rol ARIA.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -132,9 +132,9 @@ function renderFormulario(order?: OrderSummary, recipes: RecipePickerPage = RECE
 }
 
 /** Elige la receta, que es el unico campo que no se escribe a mano (la unidad se fue en 2026-09-07). */
-async function elegirCatalogos(user: ReturnType<typeof userEvent.setup>) {
+async function elegirCatalogos(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
-  await user.click(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`));
+  await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
 }
 
 /** El control de cantidad, tipado: sus asserts miran la CADENA del DOM, no `valueAsNumber`. */
@@ -142,7 +142,7 @@ function cantidad(): HTMLInputElement {
   return screen.getByTestId('order-field-quantity') as HTMLInputElement;
 }
 
-async function rellenarAlta(user: ReturnType<typeof userEvent.setup>) {
+async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await elegirCatalogos(user);
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
@@ -166,7 +166,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
     // R26, R33 — el `FormData` lleva exactamente los nombres que el adaptador driving lee. Eran
     // cinco hasta el 2026-09-07, cuando la unidad y el precio unitario salieron del pedido; la
     // lista sigue derivandose de `ORDER_BUSINESS_FIELDS`, no de literales sueltos.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario();
 
     await rellenarAlta(user);
@@ -188,7 +188,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
   it('la cantidad escrita como «0.1005» llega a la operacion COMO ESA MISMA CADENA', async () => {
     // R39 — ni `Number`, ni `parseFloat`, ni `toFixed`, ni `type="number"`: el decimal es texto de
     // punta a punta y una conversion a coma flotante binaria no lo devolveria intacto.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario();
 
     await rellenarAlta(user);
@@ -218,7 +218,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
   it('presenta la prioridad por defecto del contrato PRESELECCIONADA y visible', async () => {
     // R27 — «no implicita»: el campo emite siempre un valor valido, porque para el adaptador
     // driving una prioridad VACIA es error y no ausencia.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario();
 
     await rellenarAlta(user);
@@ -231,7 +231,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
 
   it('ofrece las CUATRO prioridades que publica el contrato', async () => {
     // R27 — el conjunto se deriva de `ORDER_PRIORITY_VALUES`, no se escribe a mano.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario();
 
     await user.click(screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID));
@@ -242,7 +242,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
 
   it('el alta NO ofrece selector de estado', async () => {
     // R26, R29 en negativo — el alta nace `PENDIENTE` y lo pone el caso de uso.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario();
 
     expect(screen.queryByTestId(ORDER_STATUS_SELECT_TESTID)).toBeNull();
@@ -282,7 +282,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
 describe('formulario de edicion de pedido (R28, R29, R34)', () => {
   it('precarga los valores actuales y envia el REEMPLAZO COMPLETO mas el estado', async () => {
     // R28 — no hay envio por campos sueltos: se manda todo el conjunto de negocio y el estado.
-    const user = userEvent.setup();
+    const user = setupUser();
     const elPedido = pedido();
     renderFormulario(elPedido);
 
@@ -311,7 +311,7 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
   it('el selector de estado ofrece los editables del contrato y NUNCA «CANCELADO»', async () => {
     // R29 — `EDITABLE_STATUS_VALUES` excluye `CANCELADO` por construccion. El unico camino a
     // cancelado es `cancelOrderAction`, y el doble de esa action falla si se le llama.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario(pedido());
 
     await user.click(screen.getByTestId(ORDER_STATUS_SELECT_TESTID));
@@ -325,7 +325,7 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
 
   it('«recipe_not_found» se pinta junto al SELECTOR DE RECETA, no en la region del formulario', async () => {
     // R34 — se decide por el `code` estable, nunca por el texto del mensaje.
-    const user = userEvent.setup();
+    const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
       code: 'recipe_not_found',
@@ -335,11 +335,14 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    await waitFor(() =>
-      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument(),
-    );
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-    expect(screen.getByTestId(RECIPE_PICKER_TESTID)).toHaveAttribute('aria-invalid', 'true');
+    // Las tres condiciones del DOM, en la misma espera (QC-58, T11): el mensaje, la ausencia de
+    // aviso de formulario y el `aria-invalid` cambian en la misma interaccion pero no tienen por
+    // que caer en el mismo commit.
+    await waitFor(() => {
+      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument();
+      expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+      expect(screen.getByTestId(RECIPE_PICKER_TESTID)).toHaveAttribute('aria-invalid', 'true');
+    });
     expect(onSaved).not.toHaveBeenCalled();
   });
 
@@ -349,7 +352,7 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     // QC-35bis (2026-09-07): este caso comprobaba TAMBIEN que «unit_not_found» iba al selector de
     // unidad. Ese codigo ya no lo emite nadie -la unidad salio del pedido, y con ella
     // `UnitNotFoundError`-, asi que la mitad que sobrevive es la de la transicion.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -371,7 +374,7 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
   it('un codigo que no senala campo va a la region de aviso del formulario y no pierde lo escrito', async () => {
     // R34 — `duplicate_number`, `not_found` y `unauthorized` no identifican campo. Y un rechazo
     // NO cierra el panel ni vacia el formulario.
-    const user = userEvent.setup();
+    const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
       code: 'duplicate_number',
@@ -396,7 +399,7 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
   it('una cantidad que el ESQUEMA del contrato rechaza no llega a la operacion', async () => {
     // R33 — la validacion previa usa el mismo esquema que valida el servidor: no hay segunda copia
     // de la regla «la cantidad es mayor que cero».
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario(pedido({ quantity: '0' }));
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
@@ -427,7 +430,7 @@ describe('la cabecera describe el pedido y el panel ensena la receta (2026-09-08
   // receta y la cantidad tecleada-, no sobre copy (R44).
 
   it('el titulo pasa a nombrar la receta elegida y la cantidad tecleada', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario();
 
     const titulo = screen.getByTestId(ORDER_FORM_TITLE_TESTID);
@@ -448,7 +451,7 @@ describe('la cabecera describe el pedido y el panel ensena la receta (2026-09-08
   });
 
   it('elegir una receta con imagen sustituye el marcador por ella', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario(undefined, { items: [RECETA_CON_IMAGEN], totalPages: 1 });
 
     await elegirCatalogos(user);
@@ -459,7 +462,7 @@ describe('la cabecera describe el pedido y el panel ensena la receta (2026-09-08
   });
 
   it('y elegir una receta SIN imagen (ruta nula) deja el marcador donde estaba', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderFormulario();
 
     await elegirCatalogos(user);

@@ -44,7 +44,12 @@ import {
   createInitialAccessRepository,
   withInitialAccessTransaction,
 } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
-import { INITIAL_COMPANY_NAME, normalizeCompanyName } from '@/lib/modules/identity';
+import {
+  INITIAL_COMPANY_NAME,
+  INITIAL_USER_ACCOUNT_STATUS,
+  SEED_ADMIN_ACCOUNT_STATUS,
+  normalizeCompanyName,
+} from '@/lib/modules/identity';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
@@ -696,6 +701,44 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(await tx.permission.findMany({ orderBy: { code: 'asc' } })).toEqual(catalogoEnBase);
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
       expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(['inventario.consultar']);
+    });
+  });
+
+  // Caso 11 (QC-65 R7, R10): el estado de cuenta del administrador inicial, contra Postgres
+  // REAL. El unitario de `tests/unit/identity/seed/seed-initial-access.test.ts` afirma que el
+  // dominio PASA el valor; este afirma que llega a la fila. Es el riesgo n.o 1 de
+  // `design.md > 8`: si el seed heredara el `@default(pending)` de la columna, hoy no se
+  // notaria nada y el sistema se cerraria sobre si mismo cuando QC-78 corte el login.
+  it('el administrador que crea el seed queda en la base con el estado del seed y sin autor del cambio', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+
+      const outcome = await seedInitialAccess({
+        repository: createInitialAccessRepository(tx),
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+
+      // Primero: el administrador SI se creo (un caso que no crea nada no prueba nada).
+      expect(outcome.createdAdmin).toBe(true);
+      const admin = await findLiveAdmin(tx);
+      expect(admin).not.toBeNull();
+      if (admin === null) throw new Error('inalcanzable');
+
+      // R7: `active`, y el valor sale de la constante del dominio, no de un literal de aqui.
+      expect(admin.accountStatus).toBe(SEED_ADMIN_ACCOUNT_STATUS);
+      // Y NO es el estado con el que nace una cuenta cualquiera: si el seed dejara actuar al
+      // `@default(pending)` de la columna, esta linea seria la unica que lo delataria.
+      expect(admin.accountStatus).not.toBe(INITIAL_USER_ACCOUNT_STATUS);
+
+      // R10: el autor queda NULL — lo creo el SISTEMA, no una persona. NULL aqui significa
+      // eso y nunca «se perdio el dato».
+      expect(admin.accountStatusChangedBy).toBeNull();
+
+      // R8, R9: el instante se rellena solo y es el del alta.
+      expect(admin.accountStatusChangedAt).toBeInstanceOf(Date);
+      expect(admin.accountStatusChangedAt.getTime()).toBe(admin.createdAt.getTime());
     });
   });
 });

@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
@@ -499,7 +499,7 @@ describe('catalogo — los tres estados (R23, R24, R25)', () => {
 
   it('si el catalogo falla se presenta el error con reintento, no una tabla vacia', async () => {
     // R25 — confundir «fallo» con «no hay nada» es justo lo que R25 prohibe.
-    const user = userEvent.setup();
+    const user = setupUser();
     listCatalogLinesActionMock.mockResolvedValue({
       status: 'error',
       code: 'invalid_input',
@@ -711,7 +711,7 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
 describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', () => {
   it('ofrece exactamente dos tamanos de pagina y cambiarlos navega a la primera', async () => {
     // R8 — el defecto se observa en lo que se le PIDE al backend; las dos opciones, en el selector.
-    const user = userEvent.setup();
+    const user = setupUser();
     listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea()], { total: 40 }));
 
     await renderPantalla();
@@ -739,7 +739,7 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
 
   it('permite avanzar y retroceder de pagina e indica la pagina actual y el total', async () => {
     // R9
-    const user = userEvent.setup();
+    const user = setupUser();
     listCatalogLinesActionMock.mockResolvedValue(
       paginaDeLineas([linea()], { page: 2, total: 30, totalPages: 3 }),
     );
@@ -786,7 +786,7 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
     // Lo que R11 protegia de verdad -que no se busque ni se ordene DENTRO de la pagina ya
     // descargada- sigue afirmado, y por la via mas dura: cada gesto NAVEGA y la lista se vuelve a
     // pedir al servidor.
-    const user = userEvent.setup();
+    const user = setupUser();
     listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea()], { total: 40 }));
 
     await renderPantalla();
@@ -804,7 +804,7 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
     // 2. Ordenar por una columna que la lista blanca declara: tambien navega.
     routerMock.push.mockClear();
     await user.click(screen.getByTestId('data-table-header-menu-cost'));
-    await user.click(await screen.findByTestId('data-table-sort-desc-cost'));
+    await user.click(await esperarInteractiva(await screen.findByTestId('data-table-sort-desc-cost')));
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
     const conOrden = new URLSearchParams(

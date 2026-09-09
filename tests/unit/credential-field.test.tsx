@@ -12,7 +12,7 @@
 import { useState } from 'react';
 
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 
 import { CredentialField } from '@/components/shared/credential-field';
 import type { CredentialRuleState } from '@/components/shared/credential-requirements';
@@ -52,7 +52,7 @@ function TestForm({ breachedState, onOwnRulesMetChange }: TestFormProps) {
 
 describe('CredentialField — el bloqueo del envio es parcial (design.md > 4)', () => {
   it('mientras falte alguna de las seis el control de envio esta deshabilitado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<TestForm />);
 
     const input = screen.getByLabelText('Contrasena nueva');
@@ -64,7 +64,7 @@ describe('CredentialField — el bloqueo del envio es parcial (design.md > 4)', 
   });
 
   it('con las seis en verde el envio se habilita aunque la septima siga neutra', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<TestForm />);
 
     const input = screen.getByLabelText('Contrasena nueva');
@@ -78,7 +78,7 @@ describe('CredentialField — el bloqueo del envio es parcial (design.md > 4)', 
   });
 
   it('tras el rechazo por filtrada las seis siguen en verde y el envio sigue habilitado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const { rerender } = render(<TestForm />);
 
     const input = screen.getByLabelText('Contrasena nueva');
@@ -104,7 +104,7 @@ describe('CredentialField — el bloqueo del envio es parcial (design.md > 4)', 
 
 describe('CredentialField — aviso al formulario consumidor (R10)', () => {
   it('avisa al montar y solo cuando cambia si las seis se cumplen', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const onOwnRulesMetChange = vi.fn();
 
     render(<TestForm onOwnRulesMetChange={onOwnRulesMetChange} />);
@@ -142,7 +142,7 @@ describe('CredentialField — sin red mientras se escribe (R6)', () => {
       throw new Error('no deberia llamarse a fetch');
     });
 
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<TestForm />);
 
     const input = screen.getByLabelText('Contrasena nueva');
@@ -176,7 +176,7 @@ describe('CredentialField — el veredicto del servidor solo entra por props (R1
     conVeredicto.unmount();
 
     // Sin ese prop, nunca sale incumplida por su cuenta, ni escribiendo.
-    const user = userEvent.setup();
+    const user = setupUser();
     const sinVeredicto = render(<TestForm />);
     const input = sinVeredicto.getByLabelText('Contrasena nueva');
     await user.type(input, CANDIDATA_QUE_CUMPLE_LAS_SEIS);
@@ -193,7 +193,7 @@ describe('CredentialField — todo el flujo corre en jsdom, sin red, sin navegad
     expect(typeof window).toBe('object');
     expect(typeof document).toBe('object');
 
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<TestForm />);
 
     const input = screen.getByLabelText('Contrasena nueva');
