@@ -9,9 +9,6 @@
 // compartida**, nunca contra literales escritos aqui (R49): si manana el catalogo declara otro
 // campo ordenable, este test lo acepta sin tocarse, y si alguien reescribiera la lista a mano en
 // la pantalla, dejaria de casar.
-//
-// Se importa por ruta al archivo y no por el barrel de la ruta porque el barrel lo cierra T12: es
-// el unico punto en el que este test se aparta de su hermano de presentaciones.
 
 import { describe, expect, it } from 'vitest';
 
@@ -23,7 +20,7 @@ import {
   buildUnitListQuery,
   parseUnitListParams,
   unitListHref,
-} from '@/app/(private)/configuracion/unidades/components/unit-list-params';
+} from '@/app/(private)/configuracion/unidades/components';
 import { PAGE_SIZE_OPTIONS, type DataTableParams } from '@/components/shared/data-table';
 import { UNIT_QUERYABLE } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';

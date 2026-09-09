@@ -8,8 +8,6 @@
 // en ningun punto del camino (R1). Es la unica forma barata de vigilar una invariante que no se ve
 // en el resultado —`'1000.0000'` y una conversion aritmetica dan el mismo `'1000'`— y que se
 // romperia el dia que alguien «arregle» el formateo con aritmetica.
-//
-// Se importa por ruta al archivo y no por el barrel de la ruta porque el barrel lo cierra T12.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +19,7 @@ import {
   formatFactor,
   formatUnitEquivalence,
   unitLabel,
-} from '@/app/(private)/configuracion/unidades/components/unit-equivalence';
+} from '@/app/(private)/configuracion/unidades/components';
 import type { UnitView } from '@/lib/modules/unidades';
 
 const RAIZ = join(__dirname, '..', '..', '..');
