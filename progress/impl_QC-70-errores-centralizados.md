@@ -170,3 +170,48 @@ sea trivial.
   («El producto solicitado no existe.») no es exacto para ese caso. Ninguna pantalla distingue
   hoy los dos, y abrir un codigo para algo que nadie muestra habria sido inventar. Queda dicho.
 - `tests/unit/navegacion/private-layout-menu.test.tsx` esta rojo en `dev`.
+
+## Deuda de arnés que esta ficha destapó (y que no le tocaba)
+
+El **gate completo** salió rojo con dos archivos que `--rapido` no selecciona, y **ninguno es un
+fallo de QC-70**: son centinelas de alcance de otras fichas que miden
+`git diff origin/dev...HEAD` sin comprobar que están en **su** rama, así que declaran intocable lo
+que otras fichas sí tocan con permiso del humano. Como el gate completo es obligatorio antes de
+cada PR (regla 5 de `CLAUDE.md`), un centinela sin dueño bloquea el cierre de todo el repo.
+
+Arreglados en el commit `d88c60b`, **aparte** de los de QC-70, aplicando el precedente exacto de
+`7cd478b` («el centinela de QC-75 solo muerde en su rama»):
+
+| Guardia | Ficha | Qué le mordía a QC-70 |
+|---|---|---|
+| `tests/unit/identity/account-status-scope.test.ts` | QC-65 | R20 exige que el diff no toque `app/`. QC-70 toca once archivos de `app/` por decisión cerrada: 18 rutas «prohibidas» que no lo eran. |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | QC-38 | R34 exige que `e2e/` no gane ningún `.spec.ts`. QC-70 añade `e2e/errores.spec.ts` porque su R33 lo pide. |
+
+Además, **el centinela de QC-38 se retensó**: un archivo solo no identificaba su rama, porque
+QC-70 sustituye la copia de `toErrorState` de **los siete** adaptadores driving del repo,
+`unit-actions.ts` incluido. La guardia se creía en la rama de QC-38 estando en la de QC-70. Ahora
+exige también `ports/unit-write-repository.ts`.
+
+En su propia rama ninguna de las dos cambia de comportamiento, y no se afirma: se prueba con casos
+sintéticos sobre funciones puras (`infraccionesDeAlcance`, `nuevosSpecsE2e`, `esRamaDeQC38`,
+`esLaRamaDeQC65`), en los dos sentidos.
+
+**No se tocó `tests/baseline-rojos.json`**: listar un archivo ahí lo apaga **entero** para el
+comparador y en todas las ramas, incluidas sus comprobaciones legítimas. El propio baseline
+documenta ese coste desde el 2026-09-04.
+
+### El tamaño real del patrón: cinco guardias, quedan dos
+
+| # | Guardia | Ficha | Estado |
+|---|---|---|---|
+| 1 | `tests/unit/navegacion/qc75-convenciones.test.ts` | QC-75 | arreglada en `7cd478b` |
+| 2 | `tests/unit/identity/account-status-scope.test.ts` | QC-65 | arreglada en `d88c60b` |
+| 3 | `tests/unit/unidades/unidades-convenciones.test.ts` | QC-38 | arreglada en `d88c60b` (R32 ya lo estaba; R34 no, y el centinela se retensó) |
+| 4 | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | QC-26 | **sin arreglar** — apagada entera en el baseline desde el 2026-09-04 |
+| 5 | `tests/unit/recetas/module-contract.test.ts` | QC-26 | **sin arreglar** — apagada entera en el baseline desde el 2026-09-04 |
+
+Las dos que quedan son de QC-26, ya pagan el coste de estar apagadas enteras, y **el propio
+baseline nombra la salida limpia como pendiente**: que el caso del diff distinga «no hay rango» de
+«el rango trae cosas de otra ficha», y borrar la entrada. **No se arreglaron aquí**: son deuda de
+otra ficha y la decisión es del leader. Un síntoma más de lo mismo: QC-70 tuvo que retensar la
+número 4 con una lista nombrada (`RENOMBRADO_DE_COMENTARIOS_QC70`) por dos comentarios.
