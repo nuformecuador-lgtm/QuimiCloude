@@ -32,6 +32,9 @@ export type UnitPickerProps = {
   readonly label: string;
   readonly error?: string;
   readonly testId: string;
+  /** `true` cuando la linea todavia no tiene ingrediente: sin ingrediente no hay grupo de
+   *  unidades que ofrecer, asi que el campo no se deja tocar (QC-26bis). */
+  readonly disabled?: boolean;
 };
 
 /** `symbol` cuando existe; `name` en caso contrario (R30). */
@@ -39,7 +42,15 @@ function unitLabel(unit: UnitRef): string {
   return unit.symbol ?? unit.name;
 }
 
-export function UnitPicker({ units, value, onChange, label, error, testId }: UnitPickerProps) {
+export function UnitPicker({
+  units,
+  value,
+  onChange,
+  label,
+  error,
+  testId,
+  disabled = false,
+}: UnitPickerProps) {
   const errorId = `${testId}-error`;
 
   return (
@@ -48,9 +59,11 @@ export function UnitPicker({ units, value, onChange, label, error, testId }: Uni
         value={value === '' ? null : value}
         onValueChange={(next) => onChange(next ?? '')}
         items={units.map((unit) => ({ label: unitLabel(unit), value: unit.id }))}
+        disabled={disabled}
       >
         <SelectTrigger
           aria-label={label}
+          disabled={disabled}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
           className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}

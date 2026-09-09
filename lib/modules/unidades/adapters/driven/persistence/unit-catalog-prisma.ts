@@ -17,11 +17,23 @@ type UnitCatalogRow = {
   readonly id: string;
   readonly name: string;
   readonly symbol: string | null;
+  /** `Decimal` de Prisma o cualquier cosa con `toString()`: este adaptador no importa el tipo
+   *  de Prisma para no arrastrarlo al test, que llama a `toUnitRef` con filas planas. */
+  readonly baseUnitId: string | null;
+  readonly factor: { toString(): string } | null;
 };
 
-/** Fila de Prisma -> `UnitRef` del contrato publico. Funcion pura, testeable sin base. */
+/** Fila de Prisma -> `UnitRef` del contrato publico. Funcion pura, testeable sin base.
+ *  `factor` sale como TEXTO por la misma razon que en `unit-prisma.ts`: un decimal no se
+ *  degrada a `number` ni cruza el contrato como `Decimal`. */
 export function toUnitRef(row: UnitCatalogRow): UnitRef {
-  return { id: row.id, name: row.name, symbol: row.symbol };
+  return {
+    id: row.id,
+    name: row.name,
+    symbol: row.symbol,
+    baseUnitId: row.baseUnitId,
+    factor: row.factor === null ? null : row.factor.toString(),
+  };
 }
 
 export async function findUnitRefs(ids: readonly UnitId[]): Promise<readonly UnitRef[]> {
@@ -29,7 +41,7 @@ export async function findUnitRefs(ids: readonly UnitId[]): Promise<readonly Uni
 
   const rows = await prisma.unit.findMany({
     where: { id: { in: [...ids] } },
-    select: { id: true, name: true, symbol: true },
+    select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
   });
 
   return rows.map(toUnitRef);

@@ -9,6 +9,15 @@ export type UnitRef = {
   readonly id: UnitId;
   readonly name: string;
   readonly symbol: string | null;
+  /** Unidad de la que deriva, o `null` si esta ES una unidad base. Va SIEMPRE junto a `factor`:
+   *  los dos o ninguno (R2 de `convert-quantity.ts`). Publicarlo es lo que permite a quien
+   *  pinta saber que dos unidades pertenecen al mismo grupo -misma base efectiva
+   *  (`baseUnitId ?? id`)- sin tocar la tabla ni repetir el criterio de convertibilidad. */
+  readonly baseUnitId: UnitId | null;
+  /** Cuantas unidades de la apuntada caben en una de esta, o `null` si es base -que equivale a
+   *  `1`-. Viaja como TEXTO, nunca `number`: es un `decimal(14,4)` y no cabe en coma flotante
+   *  sin riesgo de redondeo, el mismo criterio que `UnitConversion['factor']`. */
+  readonly factor: string | null;
 };
 
 /** Servicio que `unidades` ofrece a los demas modulos (`docs/architecture.md > Dominio` n.o 2:

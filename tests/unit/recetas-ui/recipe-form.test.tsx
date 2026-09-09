@@ -147,16 +147,24 @@ const UNIT_GRAMO_ID = '55555555-5555-4555-8555-555555555555';
 const RECIPE_ID = '66666666-6666-4666-8666-666666666666';
 
 const UNITS: readonly UnitRef[] = [
-  { id: UNIT_LITRO_ID, name: 'Litro', symbol: 'L' },
+  // Dos unidades BASE de grupos distintos: ninguna deriva de la otra, así que los productos de
+  // este archivo -que no declaran unidad- ven el catálogo completo (QC-26bis).
+  { id: UNIT_LITRO_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
   // Unidad SIN símbolo: el selector debe presentar su nombre (R30).
-  { id: UNIT_GRAMO_ID, name: 'Gramo', symbol: null },
+  { id: UNIT_GRAMO_ID, name: 'Gramo', symbol: null, baseUnitId: null, factor: null },
 ];
 
 const PRODUCT_1_NAME = 'Ácido cítrico';
 const PRODUCT_2_NAME = 'Sosa cáustica';
 const PRODUCT_PAGE2_NAME = 'Glicerina de página 2';
 
-const PRODUCT_PAGE_1 = { items: [{ id: PRODUCT_1_ID, name: PRODUCT_1_NAME }, { id: PRODUCT_2_ID, name: PRODUCT_2_NAME }], totalPages: 2 };
+const PRODUCT_PAGE_1 = {
+  items: [
+    { id: PRODUCT_1_ID, name: PRODUCT_1_NAME, unitId: null },
+    { id: PRODUCT_2_ID, name: PRODUCT_2_NAME, unitId: null },
+  ],
+  totalPages: 2,
+};
 
 function productView(overrides: Partial<ProductView> = {}): ProductView {
   return {
@@ -533,7 +541,11 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     // no sobre `value`, que un `contenteditable` no tiene.
     expect(areaDePaso(0)).toHaveTextContent('Paso uno');
     expect(areaDePaso(1)).toHaveTextContent('Paso dos');
-    expect(screen.getByTestId('recipe-line-quantity-0')).toHaveValue('3.2500');
+    // El campo es `type="number"` desde el 2026-09-08, y `toHaveValue` lee entonces
+    // `valueAsNumber`: `'3.2500'` se compara como `3.25`. Es una lectura del DOM, NO una
+    // conversion del dato -el `expect` del payload de mas abajo sigue exigiendo la cadena
+    // `'3.2500'` intacta, que es lo que R29 protege de verdad-.
+    expect(screen.getByTestId('recipe-line-quantity-0')).toHaveValue(3.25);
     // Producto dado de baja (R53): la línea se conserva y se marca, no se descarta.
     expect(screen.getByTestId('recipe-line-unavailable-0')).toBeInTheDocument();
 

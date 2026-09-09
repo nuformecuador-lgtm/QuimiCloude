@@ -529,7 +529,10 @@ describe('contrato de la ruta de recetas', () => {
       }
     }
 
-    ningunArchivoContiene(['type="number"']);
+    // El control PASO A SER `type="number"` por decision humana del 2026-09-08, asi que este
+    // test ya no veta ese literal. Lo que R29 protege de verdad NO cambio y se sigue afirmando
+    // arriba: la cantidad no se parsea, no se redondea y no pasa por coma flotante en ningun
+    // punto de la ruta. Cambio el widget, no el tipo del dato.
   });
 
   it('la pantalla obtiene las unidades solo por listUnitsAction y ninguna operacion de escritura de unidades entra en esta feature', () => {

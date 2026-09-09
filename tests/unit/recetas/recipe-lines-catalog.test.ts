@@ -38,7 +38,7 @@ const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', unitI
 function montarCatalogoUnidades(): UnitCatalog {
   return {
     findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
-      ids.map((id) => ({ id, name: 'Unidad', symbol: null })),
+      ids.map((id) => ({ id, name: 'Unidad', symbol: null, baseUnitId: null, factor: null })),
     ),
   };
 }

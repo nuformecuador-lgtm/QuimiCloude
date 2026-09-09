@@ -179,7 +179,7 @@ const LINEA_ID_QUE_NO_DEBE_VERSE = 'LINEA-ID-NO-VISIBLE';
 const IMAGEN_QUE_NO_DEBE_VERSE = 'IMAGEN-DE-LA-LINEA-NO-VISIBLE';
 
 const PRESENTACION = { id: 'PRESENTACION-ID-NO-VISIBLE', name: 'Tambor 200 L' };
-const UNIDAD = { id: 'UNIDAD-ID-NO-VISIBLE', name: 'Kilogramo', symbol: 'kg' };
+const UNIDAD = { id: 'UNIDAD-ID-NO-VISIBLE', name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
 
 function proveedor(overrides: Partial<SupplierView> = {}): SupplierView {
   return {
