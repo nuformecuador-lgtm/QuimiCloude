@@ -15,7 +15,7 @@
 | QC-70 | errores-centralizados | Plataforma | fullstack | in_progress | feature/QC-70-errores-centralizados | **Spec APROBADO por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. 33 requisitos EARS, 16 tasks, cero preguntas abiertas. **No se parte** en backend+frontend por decision humana: abrir los codigos por caso obliga a tocar catalogo y pantallas a la vez. `implementer` en curso (F2.1). **Choque con QC-39**: renombra `duplicate_name`/`not_found` de unidades, y como los archivos no existen en `dev` el merge sale limpio y falla EN PANTALLA, no en el gate |
 | QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **Spec aprobado por el humano el 2026-09-08** (F1.4). 50 requisitos EARS, 35 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1). **Conflicto acotado con QC-58**: la tarea que amplía `app-sidebar.test.tsx` y `private-layout-menu.test.tsx` va **al final**, cuando QC-58 esté `done` |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
-| QC-83 | modelo-de-grupos-de-trabajo | Identidad y acceso | backend | in_progress | feature/QC-83-modelo-de-grupos-de-trabajo | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. **Se desbloqueó**: el PR #48 de QC-65 se mergeó y la rama quedó sincronizada con `origin/dev` (`c640c7a`) ANTES de implementar. **Base propia `QuimiCloude_QC83` creada y `.env` del worktree apuntando a ella** — el worktree venía sin `.env`, igual que QC-58. `implementer` en curso (F2.1) |
+| QC-83 | modelo-de-grupos-de-trabajo | Identidad y acceso | backend | in_progress | feature/QC-83-modelo-de-grupos-de-trabajo | **12/12 tasks, 28/28 requisitos con test**, commits `97d369e`, `9d0b008`, `f0ba094`. Rama sincronizada con `origin/dev` (`c640c7a`) ANTES de implementar y **base propia `QuimiCloude_QC83`** creada (el worktree venía sin `.env`). `reviewer` corriendo (F2.2). **Destapó 10 E2E rojos que ya estaban en `dev` y no son suyos** — candidatos a ficha propia |
 | QC-78 | estado-de-cuenta-en-el-acceso | Identidad y acceso | backend | spec_ready | feature/QC-78-estado-de-cuenta-en-el-acceso | **Spec escrito (F1.3), tarjeta en *Spec en revisión*: esperando aprobación humana (F1.4)**. 28 requisitos EARS sobre las 13 decisiones que cerró `/afinar-feature`, cero preguntas abiertas, tabla de cobertura decisión → requisito. **Sin worktree a propósito** — se monta en F2.0. **El choque con QC-83 se cayó**: su `tasks.md` no declara `db/schema.prisma`, `db/migrations/`, `lib/composition/` ni `identity/index.ts` (R26 lo exige), así que arranca sin esperarla |
 | QC-80 | unidad-desde-la-presentacion | Inventario | fullstack | pending | feature/QC-80-unidad-desde-la-presentacion | **Nacida del chat el 2026-09-08** y creada en el board (QC-18). `complexity: medium`. **Pendiente F1.0 y F1.2**: sin worktree todavia, y trae una pregunta abierta -con que unidad se rellenan las 114 presentaciones existentes-, asi que toca `/afinar-feature` antes del `spec_author` |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **BLOQUEADA**: la unicidad de `lote` por empresa necesita `products.company_id`, que hoy no existe y que introduce QC-49. No arranca hasta que QC-49 este `done` |
@@ -2687,6 +2687,42 @@ Tests nuevos impiden que esa allowlist se convierta en un agujero: el mismo iden
 `db/`, `scripts/` o cualquier otro archivo de `lib/` sigue dando rojo.
 
 ## Deudas y cosas abiertas
+
+### El árbol principal quedó al día y empujado (2026-09-08)
+
+`dev` iba **15 adelante y 18 atrás** de `origin/dev` y por eso su gate daba rojos que ya
+estaban arreglados río arriba. Mergeado (`8b21c42`) y **empujado**: `d26d09e..5c08470`, 18
+commits. `./init.sh` completo en verde — **272 archivos, 3414 verdes, 0 rojos**.
+
+**Tres cosas que el merge destapó y que no le tocaban a nadie en particular:**
+
+- **`scripts/test-rapido.mjs` NO consulta `tests/baseline-rojos.json`.** Un rojo baselineado
+  tumba `./init.sh --rapido` aunque el gate completo lo perdone, así que el modo rápido puede
+  decir «rojo» donde el completo dice «verde». Se descubrió porque `catalog-line-sheet` tumbó
+  una tanda de tablero que no toca una línea de código. **Candidato a `/afinar-regla`.**
+- **QC-77 confirmada con evidencia, no con sospecha.** El gate cayó en
+  `identity-constraints.int.test.ts` porque `document_types` tenía **8 filas**
+  `DOC<hex> | Tipo de documento de prueba` de otra corrida de integración, contra el caso «el
+  catálogo arranca solo con CC». Al ir a borrarlas **ya no estaban**: es una carrera entre
+  corridas sobre la base compartida, no suciedad permanente. Con la base limpia el archivo da
+  **47/47**. Eso es exactamente lo que QC-77 existe para arreglar.
+- **La guardia de QC-58 mordió el primer día que pudo.** Al juntar las dos ramas cazó
+  `tests/unit/recetas-ui/recipe-line-unit-group.test.tsx`, nacido en `dev` local después de que
+  QC-58 se ramificara y abriendo su propia sesión de `user-event`: literalmente «la llamada
+  número 207 que vuelve a nacer mal». Migrado a `setupUser()` como dicta su propio mensaje.
+
+**El aviso del gate sobre dos entradas del baseline que ya pasan** —`recipe-route-contract` y
+`module-contract`— **no se limpia y no es pereza**: sus guardias se apoyan en
+`git diff origin/dev...HEAD`, así que pasan estando en `dev` y muerden en las ramas de feature.
+Retirarlas pondría roja toda rama que salga de aquí. Se limpian cuando el caso del diff distinga
+«no hay rango» de «el rango trae cosas», que es la corrección que sus propios motivos dejan
+pendiente.
+
+**`prisma generate` volvió a caer con `EPERM`** sobre `query_engine-windows.dll.node`. Esta vez
+se identificó al culpable: **el `npm run dev` de Next arrancado a las 12:34** sobre este mismo
+directorio, no una sesión huérfana. Parándolo, `generate` tarda 731 ms. Vale la pena que la
+ficha del arnés que recoja esto lo diga: **antes de culpar al cliente Prisma, mirar si hay un
+`next dev` vivo.**
 
 ### El flake de saturación ya no es una molestia: es una puerta cerrada (2026-09-08)
 
