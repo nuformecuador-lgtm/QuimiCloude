@@ -106,7 +106,7 @@
 
 ## Tanda C — Las garantías contra Postgres real
 
-### [ ] T8. Tests de integración de constraints
+### [x] T8. Tests de integración de constraints
 - **Archivos:** `tests/integration/identity/work-groups-constraints.int.test.ts`.
 - **Qué, cada caso dentro de una transacción que acaba en `ROLLBACK`**, con **dos** empresas
   efímeras propias creadas en el `beforeAll` (nunca la de instalación:
@@ -131,7 +131,7 @@
 - **Hecho cuando:** los casos de R14 y R15 fallan si alguien convierte las FK compuestas en simples.
 - **Depende de:** T7.
 
-### [ ] T9. `[P]` No-regresión: nada de lo que ya existe cambia
+### [x] T9. `[P]` No-regresión: nada de lo que ya existe cambia
 Es un requisito con nombre (R23, R27, decisión cerrada 16), no una consecuencia.
 
 - **Qué:** `git diff` de la rama **no** toca `app/`, `components/`, `middleware.ts`,
@@ -144,12 +144,12 @@ Es un requisito con nombre (R23, R27, decisión cerrada 16), no una consecuencia
   nuevo.**
 - **Depende de:** T7. Paralelizable con T8.
 
-### [ ] T10. `[P]` Verificar que no entró ninguna dependencia
+### [x] T10. `[P]` Verificar que no entró ninguna dependencia
 - **Hecho cuando:** el diff de la rama sobre `package.json` y `pnpm-lock.yaml` está **vacío** (R28),
   y `tests/guards/guard-dependencias-aprobadas.test.ts` en verde.
 - **Depende de:** T7. Paralelizable con T8 y T9.
 
-### [ ] T11. Bitácora y mapa de trazabilidad
+### [x] T11. Bitácora y mapa de trazabilidad
 - **Archivos:** `progress/impl_QC-83-modelo-de-grupos-de-trabajo.md`.
 - **Qué:** el mapa `R1..R28 -> test concreto` **sin hueco** (`CHECKPOINTS.md > Trazabilidad`),
   nombrando archivo **y** título de test; la nota de T9 si hubo que retensar alguna guardia ajena; y
@@ -158,7 +158,7 @@ Es un requisito con nombre (R23, R27, decisión cerrada 16), no una consecuencia
   caiga al mutar lo que vigila.
 - **Depende de:** T8, T9, T10.
 
-### [ ] T12. Cierre de feature
+### [x] T12. Cierre de feature
 - **Hecho cuando:** `./init.sh` **completo** en verde (regla 5 de `CLAUDE.md`: obligatorio antes del
   PR, sin excepción) y la migración aplicada **y revertida y reaplicada** al menos una vez sobre la
   base del worktree.
