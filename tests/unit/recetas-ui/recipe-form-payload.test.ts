@@ -32,6 +32,7 @@ function line(overrides: Partial<RecipeLineFormValue> = {}): RecipeLineFormValue
     productName: 'Producto uno',
     quantity: '1.0000',
     unitId: 'unit-1',
+    productUnitId: null,
     ...overrides,
   };
 }

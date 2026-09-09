@@ -35,6 +35,9 @@ const UNIT_SELECT = {
   id: true,
   name: true,
   symbol: true,
+  // QC-26bis: la DERIVACION viaja en `UnitRef` desde que el formulario de recetas necesita
+  // agrupar las unidades por su base efectiva. Se leen aqui porque el listado ya es la unica
+  // lectura del catalogo completo: pedirlas no anade ninguna consulta.
   baseUnitId: true,
   factor: true,
   companyId: true,

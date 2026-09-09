@@ -213,6 +213,7 @@ model User {
   role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   company      Company      @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
   @@index([companyId], map: "users_company_id_idx")
   @@index([documentTypeCode], map: "users_document_type_code_idx")
@@ -263,9 +264,116 @@ model Company {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  users User[]
+  users      User[]
+  workGroups WorkGroup[]
 
   @@map("companies")
+}
+
+/// Grupo de trabajo (QC-83): un conjunto de personas con nombre —«Turno noche», «Planta 2»—
+/// dentro de UNA empresa. Vive en `identity` porque un grupo es un conjunto de personas y las
+/// personas ya viven aqui (Alcance de la ficha, design.md > 9.5).
+///
+/// Borrado LOGICO: `deletedAt` NULL = grupo vivo (R7). Nace con la tabla y NADIE la escribe en
+/// esta ficha: no hay alta, edicion, baja ni lectura de grupos (R27) — eso es QC-84.
+///
+/// OJO — la unicidad del nombre NO esta aqui como `@@unique` y es deliberado (R4, R5, R6),
+/// igual que en `Company`, `Recipe`, `Supplier` y `Unit`: `work_groups_name_unique` es un
+/// indice COMPUESTO con `company_id`, FUNCIONAL (`lower(...)`) y PARCIAL
+/// (`WHERE deleted_at IS NULL`), y Prisma no modela ninguna de las tres cosas. Vive escrito a
+/// mano en el `migration.sql` de esta ficha y ese es el unico sitio donde existe. Si alguien
+/// "arregla" el esquema anadiendo `@@unique([companyId, nameNormalized])`, la unicidad pasa a
+/// ser TOTAL sin que nadie se entere —R6 muerto, y sin ningun error— y un grupo dado de baja
+/// quema su nombre para siempre (riesgo 3 de `design.md > 8`).
+///
+/// Es la UNICA garantia de R4: no hay `SELECT` previo por igualdad —seria una carrera— y el
+/// choque se traduce del SQLSTATE `23505`.
+///
+/// `nameNormalized` la calcula `normalizeWorkGroupName` (dominio de `identity`, funcion pura,
+/// la UNICA definicion de «mismo nombre de grupo») y se persiste junto a `name` (R3).
+///
+/// `companyId` SI lleva `@relation` —a diferencia de las FK de `WorkGroupMember`— por la razon
+/// exacta que QC-47 escribio para `users.company_id`: `WorkGroup` y `Company` son los dos de
+/// `identity`, no hay frontera de modulo que proteger, y asi la FK la genera Prisma en vez de
+/// quedar como drift manual. `ON DELETE RESTRICT` (R10): borrar una empresa con grupos —vivos
+/// o de baja— falla con `23503`.
+///
+/// `work_groups_company_id_idx` NO es redundante con el unico del nombre: ese es PARCIAL, y la
+/// verificacion del RESTRICT tiene que ver tambien los grupos dados de baja.
+/// `work_groups_id_company_id_key` es unico TRIVIALMENTE —`id` ya es la PK— y no lo pide
+/// ningun requisito de negocio: existe para que la FK compuesta de `work_group_members` tenga
+/// a donde apuntar (una FK compuesta exige una restriccion unica en el padre, o `42830`). Se
+/// declara aqui para que NO sea drift.
+/// @module identity
+model WorkGroup {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  nameNormalized String    @map("name_normalized")
+  companyId      String    @map("company_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([id, companyId], map: "work_groups_id_company_id_key")
+  @@index([companyId], map: "work_groups_company_id_idx")
+  @@map("work_groups")
+}
+
+/// Pertenencia de una persona a un grupo de trabajo (QC-83). PK compuesta
+/// `(work_group_id, user_id)`: la misma persona no puede estar dos veces en el mismo grupo
+/// (R16), y el indice de la PK cubre la consulta caliente «quienes estan en este grupo».
+/// `work_group_members_user_id_idx` sirve el sentido inverso, «en que grupos esta esta
+/// persona», que la PK no cubre. Mismo patron que `RolePermission` (QC-74).
+///
+/// OJO 1 — las DOS FK de esta tabla son COMPUESTAS y llevan `company_id`, y por eso NINGUNA de
+/// las tres columnas de referencia declara `@relation`:
+///   ("work_group_id","company_id") -> work_groups("id","company_id")  ON DELETE CASCADE
+///   ("user_id","company_id")       -> users("id","company_id")        ON DELETE RESTRICT
+/// La fila declara UNA empresa y esa empresa tiene que ser a la vez la del grupo Y la de la
+/// persona: como la igualdad es transitiva, grupo y persona son de la misma empresa POR
+/// CONSTRUCCION, sin ningun estado intermedio (R13, R14, R15, decision cerrada 1). No es una
+/// comprobacion que alguien pueda olvidarse de llamar; es la definicion de la tabla, y por eso
+/// no la puede saltar un seed, un script ni un bug de manana.
+/// Aqui NO aplica el argumento habitual del repo (evitar que un `include` cruce de modulo):
+/// los tres padres son de `identity`. La razon es otra (`design.md > 2.2`): son FK COMPUESTAS
+/// que COMPARTEN la columna `company_id`, no hay ninguna FK compuesta en este esquema y que
+/// Prisma admita dos relaciones reutilizando el mismo escalar es un DESCONOCIDO — regla 6 de
+/// `CLAUDE.md`: no se apuesta. Van escritas A MANO en el `migration.sql`.
+/// LO QUE ESO CUESTA, y se acepta: las dos FK son DRIFT para Prisma. Toda migracion futura que
+/// toque esta tabla va a emitir su `DROP CONSTRAINT` y HAY QUE BORRARLO A MANO del SQL
+/// generado, igual que ya pasa con las FK de `orders`, `products` y `recipe_lines` (riesgo 2
+/// de `design.md > 8`). Si alguien las simplifica a `FOREIGN KEY ("user_id")
+/// REFERENCES "users"("id")`, todo sigue verde y la decision cerrada 1 deja de existir: lo
+/// unico que se pone rojo es el test de esquema de la ficha.
+///
+/// OJO 2 — NO hay `deleted_at`, y es un requisito con nombre (R18, decision cerrada 4): sacar
+/// a una persona del grupo BORRA la fila. Es la EXCEPCION EXPLICITA al borrado logico de QC-4,
+/// y se escribe porque en la misma migracion es facil confundirla: el `deleted_at` es del
+/// GRUPO, no de la pertenencia. La pertenencia no es una transaccion, es una relacion viva; el
+/// historico que importa —quien era responsable de un pedido— lo congela QC-86 al asignar y no
+/// lee esta tabla. Anadir aqui `deleted_at` «por coherencia» rompe ademas la PK —
+/// `(work_group_id, user_id)` dejaria de ser unico al haber filas muertas— y obliga a TODA
+/// lectura de miembros, para siempre, a acordarse de filtrar (riesgo 4 de `design.md > 8`).
+/// Consecuencia contraintuitiva y buscada: dar de baja un grupo (R21) o una persona (R20) NO
+/// borra ninguna pertenencia —ninguna FK reacciona a un `UPDATE`—; quien filtra al leer es
+/// QC-84.
+///
+/// `createdAt`/`updatedAt` van igual (R11) aunque la fila nunca se actualice: una pertenencia
+/// se crea o se borra, no se edita. `updatedAt` es NOT NULL SIN default de base —lo rellena
+/// `@updatedAt` del cliente—, asi que un `INSERT` crudo que no la ponga falla.
+/// @module identity
+model WorkGroupMember {
+  workGroupId String   @map("work_group_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([workGroupId, userId], map: "work_group_members_pkey")
+  @@index([userId], map: "work_group_members_user_id_idx")
+  @@map("work_group_members")
 }
 
 /// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo

@@ -559,13 +559,19 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       ).not.toContain(prohibido)
     }
 
-    // (3) SOBREVIVE de QC-32 — el tipo que `unidades` publica hacia fuera tiene exactamente
-    //     tres campos: identidad, nombre y simbolo. Ni `factor`, ni `baseUnitId`: quien
-    //     convierte usa `UnitConversion`, que es otro tipo y otra decision (`design.md > 5.1`).
+    // (3) `UnitRef` tiene exactamente CINCO campos desde QC-26bis (2026-09-08): a los tres de
+    //     QC-32 -identidad, nombre y simbolo- se sumaron `baseUnitId` y `factor`, porque el
+    //     formulario de recetas necesita agrupar las unidades por su base efectiva y ese dato
+    //     no salia del modulo por ningun sitio. La lista sigue siendo CERRADA y se afirma
+    //     entera: lo que este test protege es que el tipo no crezca por descuido.
+    //
+    //     `UnitConversion` NO se funde con este tipo y sigue siendo otro tipo y otra decision
+    //     (`design.md > 5.1`): describe lo que hace falta para CONVERTIR -sin nombre ni
+    //     simbolo-, mientras que `UnitRef` describe lo que otro modulo sabe de una unidad.
     const unitCatalog = read(join(unidadesDir, 'domain', 'unit-catalog.ts'))
-    const cuerpoUnitRef = /export type UnitRef = \{([^}]*)\}/.exec(unitCatalog)?.[1] ?? ''
-    const campos = [...cuerpoUnitRef.matchAll(/(\w+)\s*:/g)].map((m) => m[1])
-    expect(campos).toEqual(['id', 'name', 'symbol'])
+    const cuerpoUnitRef = /export type UnitRef = \{([\s\S]*?)\n\};/.exec(unitCatalog)?.[1] ?? ''
+    const campos = [...cuerpoUnitRef.matchAll(/^\s*readonly (\w+)\s*:/gm)].map((m) => m[1])
+    expect(campos).toEqual(['id', 'name', 'symbol', 'baseUnitId', 'factor'])
 
     // (4) SOBREVIVE de QC-32 — el conjunto arrancador sigue sin tabla de equivalencias
     //     ESCONDIDA: la migracion de QC-32 no se toca (R27) y su `INSERT` rellena exactamente

@@ -47,6 +47,18 @@ export type RecipeLineFormValue = {
   readonly productName: string | null;
   readonly quantity: string;
   readonly unitId: string;
+  /**
+   * Unidad en la que se mide el INGREDIENTE elegido (no la de la linea), o `null` si no se
+   * sabe. Es de PRESENTACION pura -acota el selector de unidad al grupo del ingrediente- y
+   * `buildRecipePayload` la descarta igual que `key` y `productName`: el contrato de receta no
+   * la declara.
+   *
+   * Es `null` en dos casos legitimos, y en ambos el selector ofrece el catalogo completo: el
+   * producto no declara unidad (`products.unit_id` es anulable), y la linea viene de la
+   * precarga de edicion -el detalle de la receta trae `unitId` de la LINEA, nunca la del
+   * producto-.
+   */
+  readonly productUnitId: string | null;
 };
 
 /**
