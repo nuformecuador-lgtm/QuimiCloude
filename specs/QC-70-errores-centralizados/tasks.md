@@ -24,7 +24,7 @@ actualiza los dos literales. Las dos features tocan además `lib/modules/unidade
 
 ## Bloque A — El catálogo (nada depende de nada)
 
-### T1 · Módulo `errores`: códigos, claves y mensajes
+### [x] T1 · Módulo `errores`: códigos, claves y mensajes
 **Depende de:** nada.
 **Toca:**
 - `lib/modules/errores/index.ts` (nuevo)
@@ -41,7 +41,7 @@ los siete `*_not_found` (R17) y los cuatro `*_duplicate_name` (R18), que los tre
 congelados siguen con su valor (R19), y que ningún código de `identity` aparece (R25). Un caso
 con `@ts-expect-error` fija que un código inventado no compila (R2). `./init.sh --rapido` verde.
 
-### T2 · El traductor único
+### [x] T2 · El traductor único
 **Depende de:** T1.
 **Toca:**
 - `lib/modules/errores/domain/error-state.ts` (nuevo)
@@ -59,7 +59,7 @@ estado**: con un error de dominio que lleva `diagnostic: 'de PENDIENTE a ENTREGA
 recibe y `JSON.stringify(state)` **no** contiene esa cadena, y `Object.keys(state)` está contenido
 en `['status','code','message','reference']` (R28, R29). `./init.sh --rapido` verde.
 
-### T3 · La guardia del catálogo
+### [x] T3 · La guardia del catálogo
 **Depende de:** T1, T2.
 **Toca:**
 - `tests/guards/guard-catalogo-de-errores.test.ts` (nuevo)
@@ -86,7 +86,7 @@ Cada task migra un módulo entero: base, clases, sitios de lanzamiento, barrel, 
 driving y sus tests. **No comparten ningún archivo entre sí**, así que las cinco son `[P]` una
 vez cerrado T2.
 
-### T4 [P] · `inventario`
+### [x] T4 [P] · `inventario`
 **Depende de:** T2.
 **Toca:**
 - `lib/modules/inventario/domain/errors.ts`
@@ -105,7 +105,7 @@ no acepta mensaje (R7), las **dos** copias de `toErrorState` han desaparecido y 
 nuevo y el estado `unexpected` donde antes esperaban `rejects.toBe(ajeno)` (R12, ver pregunta
 abierta 3). `./init.sh --rapido` verde.
 
-### T5 [P] · `pedidos`
+### [x] T5 [P] · `pedidos`
 **Depende de:** T2.
 **Toca:**
 - `lib/modules/pedidos/domain/errors.ts`
@@ -121,7 +121,7 @@ texto con `from`/`to` sino que los pasa como **diagnóstico** (R7, R28) —y su 
 `toErrorState` ha desaparecido, y
 `INVALID_INPUT_CODE` sale del catálogo en vez de ser un literal local. `./init.sh --rapido` verde.
 
-### T6 [P] · `proveedores`
+### [x] T6 [P] · `proveedores`
 **Depende de:** T2.
 **Toca:**
 - `lib/modules/proveedores/domain/errors.ts`
@@ -138,7 +138,7 @@ texto con `from`/`to` sino que los pasa como **diagnóstico** (R7, R28) —y su 
 los dos de línea—, `DuplicateNameError` es `SupplierDuplicateNameError`, y las **dos** copias de
 `toErrorState` han desaparecido. `./init.sh --rapido` verde.
 
-### T7 [P] · `recetas`
+### [x] T7 [P] · `recetas`
 **Depende de:** T2.
 **Toca:**
 - `lib/modules/recetas/domain/errors.ts`
@@ -152,7 +152,7 @@ los dos de línea—, `DuplicateNameError` es `SupplierDuplicateNameError`, y la
 compartido con `pedidos`), `DuplicateNameError` es `RecipeDuplicateNameError`, y la copia de
 `toErrorState` ha desaparecido. `./init.sh --rapido` verde.
 
-### T8 [P] · `unidades`
+### [x] T8 [P] · `unidades`
 **Depende de:** T2.
 **Toca:**
 - `lib/modules/unidades/domain/errors.ts`
@@ -171,7 +171,7 @@ el progreso los dos literales renombrados** (`duplicate_name → unit_duplicate_
 `not_found → unit_not_found`) para que el leader los tenga a mano en el merge.
 `./init.sh --rapido` verde.
 
-### T9 · Desmarcar el caso real de la guardia
+### [x] T9 · Desmarcar el caso real de la guardia
 **Depende de:** T3, T4, T5, T6, T7, T8.
 **Toca:**
 - `tests/guards/guard-catalogo-de-errores.test.ts`
@@ -187,7 +187,7 @@ de error admite `message`, y no hay entradas huérfanas. `./init.sh --rapido` ve
 Cada task toca archivos de una sola ruta; son `[P]` entre sí una vez cerrada la task del módulo
 del que dependen.
 
-### T10 [P] · Proveedores
+### [x] T10 [P] · Proveedores
 **Depende de:** T6.
 **Toca:**
 - `app/(private)/proveedores/[id]/page.tsx`
@@ -203,7 +203,7 @@ su frase; los literales salen del catálogo, no de constantes locales (R20, R21)
 propio** (R32). La validación propia del formulario —campo requerido, `Revisa los campos
 marcados`— **se queda como está** (R31).
 
-### T11 [P] · Recetas
+### [x] T11 [P] · Recetas
 **Depende de:** T7.
 **Toca:**
 - `app/(private)/produccion/formulas/[id]/page.tsx`
@@ -213,7 +213,7 @@ marcados`— **se queda como está** (R31).
 **Hecho cuando:** la página compara `recipe_not_found` y el formulario compara
 `recipe_duplicate_name` y `recipe_not_found`.
 
-### T12 [P] · Presentaciones e inventario
+### [x] T12 [P] · Presentaciones e inventario
 **Depende de:** T4.
 **Toca:**
 - `app/(private)/configuracion/presentaciones/components/presentation-form.tsx`
@@ -228,7 +228,7 @@ compara `presentation_duplicate_name` **y pinta el `message` del back en vez de 
 `DUPLICATE_NAME_MESSAGE` propio** (R32), `PRESENTATION_IN_USE_CODE` y los `INVALID_INPUT_CODE`
 locales salen del catálogo. La validación propia de los formularios no se toca (R31).
 
-### T13 [P] · Pedidos
+### [x] T13 [P] · Pedidos
 **Depende de:** T5.
 **Toca:**
 - `app/(private)/pedidos/components/order-form.tsx`
@@ -242,7 +242,7 @@ locales salen del catálogo. La validación propia de los formularios no se toca
 
 ## Bloque D — Cierre
 
-### T14 · Barrido de literales sueltos
+### [x] T14 · Barrido de literales sueltos
 **Depende de:** T10, T11, T12, T13.
 **Toca:** lo que aparezca (se espera que nada).
 
