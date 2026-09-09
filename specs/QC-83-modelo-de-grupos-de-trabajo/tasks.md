@@ -53,7 +53,7 @@
 
 ## Tanda B — La migración
 
-### [ ] T4. `[DB]` El `migration.sql` (UP)
+### [x] T4. `[DB]` El `migration.sql` (UP)
 - **Archivos:** `db/migrations/<ts>_work_groups_and_members/migration.sql`.
 - **Qué:** los ocho pasos de `design.md > 3.1`, **en ese orden**, incluidos los dos índices únicos
   auxiliares del paso 4 (sin ellos la FK compuesta falla con `42830`) y las dos FK compuestas del
@@ -66,7 +66,7 @@
   dos FK **con `company_id` dentro**.
 - **Depende de:** T3.
 
-### [ ] T5. `[DB]` El `down.sql` (DOWN)
+### [x] T5. `[DB]` El `down.sql` (DOWN)
 - **Archivos:** `db/migrations/<ts>_work_groups_and_members/down.sql`.
 - **Qué:** los tres pasos de `design.md > 3.3`, en ese orden, **sin `CASCADE`** en ningún `DROP
   TABLE`. No toca `companies`, no toca `pgcrypto` y toca `users` **en una sola línea**.
@@ -76,7 +76,7 @@
   real, no leído.** Después se vuelve a aplicar el UP para seguir trabajando.
 - **Depende de:** T4.
 
-### [ ] T6. `[DB]` Test de esquema y de migración
+### [x] T6. `[DB]` Test de esquema y de migración
 - **Archivos:** `tests/unit/identity/schema/work-groups-migration.test.ts` (nuevo) y, si hace falta
   retensarlo, `tests/unit/identity/schema/identity-schema.test.ts`.
 - **Qué, como mínimo** (`design.md > 6`):
@@ -97,7 +97,7 @@
 - **Hecho cuando:** cada aserción cae al mutar el archivo que vigila.
 - **Depende de:** T5.
 
-### [ ] T7. Cierre de tanda B
+### [x] T7. Cierre de tanda B
 - **Hecho cuando:** `./init.sh --rapido` en verde, incluida
   `tests/guards/guard-rls-force.test.ts`, que descubre las tablas nuevas leyendo el SQL.
 - **Depende de:** T6.
