@@ -580,3 +580,52 @@ deuda de `dev`.
   **sin marcar y a la espera**.
 - **T15, segundo bullet: `./init.sh` completo en verde.** Lo corre el leader; el implementer no se
   autoaprueba.
+
+## Cierre de revisión — los tres menores atendidos y los cinco que NO se tocan
+
+El reviewer **aprobó** la ficha con **0 mayores y 8 menores**
+(`progress/review_QC-39-pantalla-de-unidades.md`). Se atienden **tres** antes del PR.
+
+### Atendidos
+
+- **Menor 2 — CRLF.** `tests/unit/identity/account-status-scope.test.ts` se había reescrito con
+  finales de línea CRLF, y el diff mostraba **605 líneas para un cambio real de 101**, justo en el
+  archivo que había que leer con lupa. Devuelto a **LF** conservando el cambio: el diff baja a
+  **101 inserciones / 18 borrados**, exactamente lo que el reviewer midió. Es la deuda de
+  `.gitattributes` que el repo arrastra desde QC-52 mordiendo otra vez.
+  **Comprobado además que ningún otro archivo de esta rama tiene el problema.** Los dos que quedan
+  en CRLF —`tests/unit/identity/schema/account-status-{migration,schema}.test.ts`— llegaron así
+  **desde `dev` con QC-65** (commit `9485fb1`) y **no los toca esta ficha**: normalizarlos aquí
+  metería ruido ajeno en el PR.
+- **Menor 1 — casillas de `tasks.md`.** Tildado el bullet de **T15** («`./init.sh` completo en
+  verde»), que el leader corrió con resultado `== init OK ==`, exit 0, 287 archivos y 3615 tests,
+  con un único rojo inscrito en el baseline. **T13 se queda sin marcar a propósito** (ver abajo).
+- **Menor 8 — ternario de ramas idénticas** en `listUnitsAction` (`unit-actions.ts`). Simplificado.
+
+### La parte manual de T13, dicho sin ambigüedad
+
+**La comprobación manual en un WebKit real del scroll contenido en la tabla NO se ha hecho, y por
+eso su casilla sigue SIN marcar.** `tasks.md` avisa de que «no es una casilla que se marque sola».
+Lo que sí existe es su cobertura automatizada en jsdom
+(`configuracion-ui/unidades-viewport.test.tsx`: `overflow-x-auto` en el envoltorio de la tabla y
+ningún ancestro que lo declare, en 375 px y en 1280 px) y la corrida real del E2E en WebKit, que
+recorre la pantalla sin incidencias. **Ninguna de las dos sustituye a mirarlo con los ojos en un
+navegador real.** Queda como deuda explícita, anotada también por el leader en
+`progress/current.md > Deudas`.
+
+### Los cinco menores heredados que NO se tocan, y por qué
+
+- **Menor 3 — el hueco de R11** (ningún test compara el catálogo de permisos del **código** con el
+  de la **base**; ver «HUECO DE VERIFICACIÓN REAL» más arriba): **merece ficha propia y no es de
+  esta ficha cerrarlo**. QC-39 es `frontend` y no toca `db/` ni el seed.
+- **Menor 4 — los centinelas de alcance permanentemente inertes**: **merece ficha propia y no es de
+  esta ficha cerrarlo**. Es el patrón de fondo detrás de los dos centinelas que esta ficha tuvo que
+  acotar; arreglarlo bien es una regla del arnés, no un parche por rama.
+- **Menores 5, 6 y 7** — mejoras de **redacción de tests ajenos** que **no cambian ninguna
+  garantía**. Tocarlos aquí sería ruido en el PR sin ganancia de cobertura.
+
+### Respuesta del reviewer que queda registrada
+
+**La limpieza de las dos entradas del baseline que ya pasan NO entra en esta ficha, y borrarlas
+ahora ROMPERÍA el gate**: esos casos fallan solo cuando la suite corre desde `dev`, con el rango
+vacío, y pasan en rama de feature. Va junto con el **menor 4** en esa ficha propia.
