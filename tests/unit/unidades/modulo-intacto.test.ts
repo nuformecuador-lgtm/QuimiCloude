@@ -6,11 +6,21 @@
 // uso, puerto de escritura, esquema de entrada, error de dominio, comprobacion de permiso ni
 // migracion) y R6 (la lista blanca de consulta del catalogo no se amplia).
 //
-// COMO SE COMPRUEBA: contra la RAMA BASE de la feature, con `git diff --name-only <base> --
-// <rutas>`. El diff se hace contra el arbol de trabajo -no contra `HEAD`-, asi que una
-// modificacion sin commitear tambien cae. Si el commit base no esta disponible en el repositorio
-// donde corre la suite, el caso se SALTA de forma explicita y ruidosa con `ctx.skip(...)`, que
-// es el criterio ya escrito en `unidades-convenciones.test.ts`: no pasa en silencio.
+// COMO SE COMPRUEBA: contra la BASE DE FUSION con `origin/dev`, calculada en cada ejecucion con
+// `git merge-base origin/dev HEAD`, y con `git diff --name-only <base> -- <rutas>`. El diff se
+// hace contra el arbol de trabajo -no contra `HEAD`-, asi que una modificacion sin commitear
+// tambien cae. Si el rango no esta disponible (sin remoto, clon superficial), el caso se SALTA de
+// forma explicita y ruidosa con `ctx.skip(...)`, diciendo que NO ha comprobado nada: mismo criterio
+// que `unidades-convenciones.test.ts` y que `mergeBaseConDev()` en
+// `tests/unit/navegacion/qc75-convenciones.test.ts`, de donde se copia el idioma.
+//
+// POR QUE MERGE-BASE Y NO UN COMMIT FIJADO A MANO. Hasta el 2026-09-08 la base era el literal
+// `516e9c0` -la punta de `origin/dev` al montar el worktree-. Al mergear `origin/dev` en esta rama
+// la comparacion empezo a atribuir a QC-39 cambios AJENOS que el merge trajo: `db/schema.prisma`,
+// que modifico QC-65, salio senalado como «intocable modificado» por esta ficha. Era un falso
+// positivo de la MEDICION, no una infraccion, y la lista de intocables no se toco por ello. La
+// base de fusion mide solo lo que ESTA rama anade sobre el tronco, y sigue siendo correcta despues
+// de cualquier merge futuro.
 //
 // La segunda mitad no depende de git: `UNIT_QUERYABLE` se afirma sobre la CONSTANTE IMPORTADA,
 // que es lo que de verdad usan el caso de uso y la pantalla.
@@ -45,13 +55,6 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
 /**
- * La RAMA BASE de esta feature: `origin/dev` en el momento de montar el worktree
- * (`feature/QC-39-pantalla-de-unidades`). Es un commit, no una referencia movil, para que el
- * criterio no cambie por debajo si `origin/dev` avanza mientras la rama esta viva.
- */
-const RAMA_BASE = '516e9c0';
-
-/**
  * Los archivos INTOCABLES. No es una lista de «los que no hemos tocado»: es la lista de los que
  * `design.md > 1` declara fuera del bisturi. Los SEIS que esta ficha si puede tocar
  * -`domain/unit-view.ts`, `domain/list-units.ts`, `ports/unit-repository.ts`,
@@ -75,24 +78,34 @@ function git(args: readonly string[]): string {
   return execFileSync('git', [...args], { cwd: repoRoot, encoding: 'utf8' });
 }
 
-/** `true` si el commit base esta disponible aqui; si no, los casos que dependen de el se saltan. */
-function baseDisponible(): boolean {
+/**
+ * La base de fusion entre `origin/dev` y la punta de esta rama, o `null` si el rango no esta
+ * disponible aqui (sin remoto, clon superficial). Mismo helper que `mergeBaseConDev()` en
+ * `tests/unit/navegacion/qc75-convenciones.test.ts`, incluido su manejo del caso sin rango:
+ * devuelve `null` y quien lo llama SALTA en voz alta en vez de pasar en verde.
+ */
+function mergeBaseConDev(): string | null {
   try {
-    git(['rev-parse', '--verify', `${RAMA_BASE}^{commit}`]);
-    return true;
+    return git(['merge-base', 'origin/dev', 'HEAD']).trim();
   } catch {
-    return false;
+    return null;
   }
 }
 
+/** El texto del salto, para que los dos casos digan lo mismo: no han comprobado nada. */
+const SIN_RANGO =
+  'no se pudo calcular `git merge-base origin/dev HEAD` (sin remoto, o rango no disponible): ' +
+  'este caso NO ha comprobado nada.';
+
 describe('QC-39 no toca lo que no puede tocar (R3)', () => {
-  it('ninguno de los archivos intocables del modulo cambia respecto a la rama base', (ctx) => {
-    if (!baseDisponible()) {
-      ctx.skip(`el commit base ${RAMA_BASE} no esta disponible: no se puede comparar el diff`);
+  it('ninguno de los archivos intocables del modulo cambia respecto a la base de fusion', (ctx) => {
+    const base = mergeBaseConDev();
+    if (base === null) {
+      ctx.skip(SIN_RANGO);
       return;
     }
 
-    const cambiados = git(['diff', '--name-only', RAMA_BASE, '--', ...INTOCABLES])
+    const cambiados = git(['diff', '--name-only', base, '--', ...INTOCABLES])
       .split('\n')
       .map((linea) => linea.trim())
       .filter((linea) => linea !== '');
@@ -102,8 +115,9 @@ describe('QC-39 no toca lo que no puede tocar (R3)', () => {
   });
 
   it('el detector muerde: comparando un archivo que SI cambio, el diff no sale vacio', (ctx) => {
-    if (!baseDisponible()) {
-      ctx.skip(`el commit base ${RAMA_BASE} no esta disponible: no se puede comparar el diff`);
+    const base = mergeBaseConDev();
+    if (base === null) {
+      ctx.skip(SIN_RANGO);
       return;
     }
 
@@ -113,7 +127,7 @@ describe('QC-39 no toca lo que no puede tocar (R3)', () => {
     const cambiados = git([
       'diff',
       '--name-only',
-      RAMA_BASE,
+      base,
       '--',
       'lib/modules/unidades/adapters/driven/persistence/unit-prisma.ts',
     ]);
