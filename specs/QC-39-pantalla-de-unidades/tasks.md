@@ -100,7 +100,7 @@
 - [x] Test `tests/unit/configuracion-ui/permisos-unidades-coherentes.test.ts` (**el ancla de R11**):
       ningún rol de `SEED_ROLE_PERMISSIONS` tiene **exactamente uno** de `unidades.consultar` /
       `unidades.modificar`; el caso sintético contrario dispara.
-- [ ] Ampliar `tests/unit/app-sidebar.test.tsx` y `tests/unit/navegacion/private-layout-menu.test.tsx`
+- [x] Ampliar `tests/unit/app-sidebar.test.tsx` y `tests/unit/navegacion/private-layout-menu.test.tsx`
       **tensando** sus anclas (de seis ítems a siete; el layout pinta `nav-unidades` con los permisos
       del Administrador y no con los del Operador).
 - **Hecho cuando:** los tres tests en verde y `guard-nav-serializable` y
@@ -175,7 +175,7 @@
 - [x] Monta `<DataTable>` del barrel compartido con `tableId`, columnas, `getRowId`, `params`,
       `totalPages`, `status="idle"`, textos propios —la caja de búsqueda dice **por nombre**— y
       `onParamsChange -> router.push(unitListHref(next))`. **`searchable` ausente** (= `true`).
-- [ ] Test `tests/unit/configuracion-ui/unit-table.test.tsx`: cambiar página, tamaño (10/25), orden
+- [x] Test `tests/unit/configuracion-ui/unit-table.test.tsx`: cambiar página, tamaño (10/25), orden
       de nombre y de símbolo, y término de búsqueda **navega** a la URL esperada; ordenar por
       equivalencia **no se ofrece**; no hay ningún control de filtro; el indicador de página y el
       selector de tamaño son los de la tabla compartida (`data-table-*`); las filas se pintan en el
@@ -196,7 +196,7 @@
       `invalid_derivation` → selector, el resto → región de error. Panel abierto, sin perder lo
       escrito.
 - [x] Éxito: cerrar, `toast.success`, `router.refresh()`, sin perder los parámetros de la URL.
-- [ ] Test `tests/unit/configuracion-ui/unit-sheet.test.tsx`: abrir por crear y por editar no navega
+- [x] Test `tests/unit/configuracion-ui/unit-sheet.test.tsx`: abrir por crear y por editar no navega
       a otra URL ni monta diálogo centrado; la edición llega precargada con los cuatro valores; el
       selector no ofrece derivadas ni la propia unidad y sí ofrece las bases de sistema; **el
       `FormData` enviado no tiene las claves `symbol`, `baseUnitId` ni `factor` cuando el usuario no
@@ -208,7 +208,7 @@
 ### T11 [P] — `delete-unit-dialog.tsx` *(depende de T7)*
 - [x] `alert-dialog` que nombra la unidad, advierte que no se puede deshacer, con `<form>` e `id`
       oculto dentro del contenido.
-- [ ] Test `tests/unit/configuracion-ui/delete-unit-dialog.test.tsx`: mientras no se confirma **no se
+- [x] Test `tests/unit/configuracion-ui/delete-unit-dialog.test.tsx`: mientras no se confirma **no se
       invoca** la action (espía); el nombre aparece en el mensaje; al confirmar se invoca; con
       `unit_in_use` el error se pinta **dentro** del diálogo, que sigue abierto, y la fila sigue en
       la lista; con `system_unit` y con `unauthorized` ocurre lo mismo, distinguiéndolos por el
@@ -218,7 +218,7 @@
 ### T12 — Barrel de la ruta y convenciones *(depende de T7-T11)*
 - [x] `components/index.ts` exporta todos los componentes de la ruta; `page.tsx` importa por el
       barrel.
-- [ ] Test `tests/unit/configuracion-ui/unidades-convenciones.test.ts`: todos los componentes viven
+- [x] Test `tests/unit/configuracion-ui/unidades-convenciones.test.ts`: todos los componentes viven
       en `components/` y salen del barrel, sin imports profundos; ningún archivo de la ruta contiene
       el literal `'/configuracion/unidades'`; ningún `fetch` a rutas propias; ningún import de
       `lib/composition`, del cliente de base de datos ni de `lib/modules/unidades/domain/**` desde
@@ -230,7 +230,7 @@
 ## Bloque 6 — Plataforma y extremo a extremo
 
 ### T13 — Multiplataforma *(depende de T9, T10, T11)*
-- [ ] Test `tests/unit/configuracion-ui/unidades-viewport.test.tsx` con `tests/helpers/viewport.ts`:
+- [x] Test `tests/unit/configuracion-ui/unidades-viewport.test.tsx` con `tests/helpers/viewport.ts`:
       lista de **cuatro** columnas, panel y diálogo utilizables en angosto y en ancho; sin `100vh`;
       los botones de fila están en el DOM y visibles sin `:hover`; controles ≥ 44×44 px; inputs con
       fuente ≥ 16 px; el contenedor con `overflow-x-auto` es el envoltorio de la tabla y ningún

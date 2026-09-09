@@ -408,3 +408,175 @@ en verde con la grieta abierta en producción de pruebas.
 un hueco de verificación real y **no es de esta ficha cerrarlo** —QC-39 es `frontend` y no toca
 `db/` ni el seed—, pero conviene que el reviewer lo vea y que alguien le abra ficha: hoy, un
 despliegue sin sembrar deja el menú y las páginas discrepando sin que nada se ponga rojo.
+
+## Tanda 4 — F2.3 (merge con `origin/dev`) y el remate (T4 bullet 4, T9-T13)
+
+### El merge, sin conflictos y con la comprobación explícita
+
+`git fetch origin dev` + `git merge origin/dev` produjo el commit de merge `7c15374`, **sin un solo
+conflicto**. Los cinco archivos que se esperaban ambiguos —donde la tanda 1 ensanchó fixtures y
+QC-58 sustituyó `userEvent.setup()` por `setupUser()`— los resolvió git solo, porque eran líneas
+distintas del mismo archivo.
+
+**Comprobación explícita pedida por el leader, hecha y verde:** en esos cinco archivos
+(`pedidos-ui/pedidos-viewport`, `proveedores-ui/catalog-line-sheet`,
+`proveedores-ui/delete-catalog-line-dialog`, `proveedores-ui/supplier-detail-page` y
+`recetas-ui/recipe-form`) **no queda ni una llamada a `userEvent.setup()`** y los cinco usan
+`setupUser()`. No se ha revertido nada de QC-58 en silencio.
+
+El merge **trajo trabajo ajeno de QC-65** (estado de cuenta de usuario, con migración y cambio de
+`db/schema.prisma`), lo que obligó a **regenerar el cliente de Prisma** en el worktree
+(`pnpm exec prisma generate`): sin eso, `pnpm typecheck` salía rojo con `TS2339: Property
+accountStatus does not exist` en tests de integración **que no son de esta ficha**.
+
+### Trabajo cerrado en esta tanda
+
+- **T4, cuarto bullet (ya sin motivo para diferirlo):** anclas tensadas de **seis a siete** en
+  `tests/unit/app-sidebar.test.tsx` y `tests/unit/navegacion/private-layout-menu.test.tsx`, con
+  `nav-unidades` en su posición y sin reordenar nada. El segundo añade además lo que T4 pedía: el
+  layout pinta `nav-unidades` con los permisos del Administrador y **no** con los del Operador.
+- **T9, T10, T11** — los tres tests de interacción, **con `setupUser()` y `esperarInteractiva()`**
+  del helper de QC-58. **Cero apariciones de `userEvent.setup()`** en todo lo que escribió esta
+  ficha.
+- **T12 y T13** — convenciones de la ruta y multiplataforma (16 casos, a 375 px y a 1280 px).
+
+### R34 — la deuda queda CERRADA
+
+El ancla que faltaba existe: `unit-sheet.test.tsx` espía el `FormData` que sale de la pantalla
+(`vi.mock` de las actions; el `FormData` real es el segundo argumento de la llamada) y afirma
+`has(clave) === false` en los **tres** casos, incluido el que se corrigió a mitad de ficha:
+
+1. sin símbolo declarado, la clave `symbol` **no viaja**;
+2. sin derivación declarada, **ninguna** de las dos claves de la equivalencia viaja;
+3. **con derivación declarada y factor en blanco, viaja `baseUnitId` y NO viaja `factor`**.
+
+Además: con los cuatro campos declarados, las claves enviadas son **exactamente** las cuatro de
+negocio y ninguna vale la cadena vacía. **Ningún test destapó un fallo de la pantalla**: el código
+pasó los tres casos tal cual estaba.
+
+### Dos desviaciones propias que los tests nuevos destaparon, y su corrección
+
+1. **`modulo-intacto.test.ts` medía contra un commit fijado a mano** (`516e9c0`). Tras el merge
+   atribuía a QC-39 el `db/schema.prisma` que trajo **QC-65**. Corregido: ahora calcula la base con
+   `git merge-base origin/dev HEAD`, así que mide **solo lo que esta rama añade** y seguirá siendo
+   correcto tras cualquier merge futuro. **La lista de intocables y todos los asertos, intactos.**
+2. **Dos tests importaban por ruta profunda**, saltándose el barrel: `unit-equivalence.test.ts` y
+   `unit-list-params.test.ts`. Se escribieron **antes** de que el barrel existiera y lo dejaron
+   anotado en su cabecera; ahora existe. Los caza la guardia de T12, que es de esta misma ficha.
+   Corregidos los dos imports (R43), sin tocar producción ni relajar el detector.
+
+### Un TERCER centinela ajeno acotado, y esto ya es un patrón
+
+`tests/unit/identity/account-status-scope.test.ts`, recién llegado con QC-65, vigila el alcance de
+**su** ficha (ni ruta, ni Server Action, ni pantalla) comparando `dev...HEAD` **sin comprobar en
+ningún momento que la rama medida sea la suya**. Mergeado en `dev`, mide **cualquier** rama: QC-39,
+cuyo trabajo entero es construir una pantalla, aparecía con 16 «infracciones» que son exactamente lo
+que su spec manda construir.
+
+Se acotó la **precondición** con señal conjuntiva —archivo central **más** carpeta de spec de
+QC-65—, dejando `skipped` **ruidoso** («este caso NO ha comprobado nada») fuera de su rama, y se
+cambió el rango del `dev` local —que iba 18 commits por detrás— a la base de fusión con
+`origin/dev`. **Ningún aserto tocado; en la rama de QC-65 aplica exactamente igual.**
+
+**Es el tercer episodio de la misma clase en este repo**: QC-38 lo sufrió, QC-75 lo dejó documentado
+en su propio archivo, y esta ficha ha tenido que acotar **dos** (`qc75-convenciones` y
+`account-status-scope`). El patrón —un centinela de alcance de ficha que se autolimita mal, o no se
+autolimita, y muerde a la siguiente rama— **merece una regla del arnés**, no un parche por ficha.
+Queda señalado para el reviewer y para `/afinar-regla`.
+
+## Mapa `R<n> -> test` (completo, R1 a R50) — ningún requisito sin test
+
+| R | Test que lo ancla | Estado |
+| --- | --- | --- |
+| R1 | `unidades/unit-view-projection.test.ts` | verde |
+| R2 | `unidades/unit-view-projection.test.ts` | verde |
+| R3 | `unidades/modulo-intacto.test.ts` | verde |
+| R4 | `unidades/consumidores-catalogo.test.tsx` + `pnpm typecheck` | verde |
+| R5 | `unidades/list-units-action.test.ts` | verde |
+| R6 | `unidades/modulo-intacto.test.ts` + los heredados de `list-units` | verde |
+| R7 | `configuracion-ui/unit-page.test.tsx` | verde |
+| R8 | `configuracion-ui/units-route-contract.test.ts` + `unidades-convenciones.test.ts` | verde |
+| R9 | `configuracion-ui/private-nav-unidades.test.ts` + `app-sidebar.test.tsx` (ancla tensada) | verde |
+| R10 | `configuracion-ui/private-nav-unidades.test.ts` + `navegacion/private-layout-menu.test.tsx` | verde |
+| R11 | `configuracion-ui/permisos-unidades-coherentes.test.ts` | verde |
+| R12 | `units-route-contract.test.ts` + `unit-page.test.tsx` + `guard-pantallas-exigen-permiso` + `e2e/unidades.spec.ts` | verde |
+| R13 | `guard-rutas-privadas-cubiertas` + `units-route-contract.test.ts` | verde |
+| R14 | `configuracion-ui/unit-page.test.tsx` | verde |
+| R15 | `configuracion-ui/unit-table.test.tsx` + `unidades-convenciones.test.ts` | verde |
+| R16 | `configuracion-ui/unit-columns.test.tsx` | verde |
+| R17 | `configuracion-ui/unit-equivalence.test.ts` | verde |
+| R18 | `configuracion-ui/unit-table.test.tsx` | verde |
+| R19 | `unit-columns.test.tsx` + `unit-table.test.tsx` + `unit-list-params.test.ts` | verde |
+| R20 | `unit-list-params.test.ts` + `unit-table.test.tsx` | verde |
+| R21 | `unit-table.test.tsx` + `unit-list-params.test.ts` | verde |
+| R22 | `configuracion-ui/unit-table.test.tsx` | verde |
+| R23 | `configuracion-ui/unit-list-params.test.ts` | verde |
+| R24 | `configuracion-ui/unit-page.test.tsx` | verde |
+| R25 | `configuracion-ui/unit-page.test.tsx` | verde |
+| R26 | `configuracion-ui/unit-page.test.tsx` | verde |
+| R27 | `configuracion-ui/unidades-viewport.test.tsx` | verde |
+| R28 | `configuracion-ui/unit-columns.test.tsx` | verde |
+| R29 | `configuracion-ui/unit-columns.test.tsx` | verde |
+| R30 | `delete-unit-dialog.test.tsx` + `unidades-convenciones.test.ts` | verde |
+| R31 | `configuracion-ui/data-table-intacta-unidades.test.ts` | verde |
+| R32 | `configuracion-ui/unit-sheet.test.tsx` | verde |
+| R33 | `configuracion-ui/unit-sheet.test.tsx` | verde |
+| R34 | `configuracion-ui/unit-sheet.test.tsx` (espía del `FormData`, los tres casos) | verde |
+| R35 | `configuracion-ui/unit-sheet.test.tsx` | verde |
+| R36 | `configuracion-ui/unit-sheet.test.tsx` | verde |
+| R37 | `configuracion-ui/unit-sheet.test.tsx` | verde |
+| R38 | `unit-sheet.test.tsx` + `delete-unit-dialog.test.tsx` | verde |
+| R39 | `tests/unit/private-layout.test.tsx` (heredado) | verde |
+| R40 | `configuracion-ui/delete-unit-dialog.test.tsx` | verde |
+| R41 | `configuracion-ui/delete-unit-dialog.test.tsx` | verde |
+| R42 | `configuracion-ui/delete-unit-dialog.test.tsx` | verde |
+| R43 | `configuracion-ui/unidades-convenciones.test.ts` | verde |
+| R44 | `configuracion-ui/unidades-convenciones.test.ts` | verde |
+| R45 | `guard-dependencias-aprobadas` + `unidades-convenciones.test.ts` + `data-table-intacta-unidades.test.ts` | verde |
+| R46 | `configuracion-ui/unidades-convenciones.test.ts` | verde |
+| R47 | `modulo-intacto.test.ts` + `data-table-intacta-unidades.test.ts` + la nota de T0 + las anclas tensadas | verde |
+| R48 | `configuracion-ui/unidades-viewport.test.tsx` | verde |
+| R49 | `configuracion-ui/unidades-convenciones.test.ts` | verde |
+| R50 | `e2e/unidades.spec.ts` (corrida verde en Chromium y WebKit) | verde |
+
+## Verificación final del implementer (el gate completo lo corre el leader)
+
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin salida — verde)
+
+$ pnpm lint
+> eslint
+(sin salida — verde)
+
+$ pnpm exec vitest run tests/unit tests/guards
+ Test Files  1 failed | 256 passed (257)
+      Tests  2 failed | 3203 passed | 12 skipped (3217)
+```
+
+**Los dos únicos rojos son deuda ajena de `dev` inscrita en `tests/baseline-rojos.json`**:
+`private-layout-menu.test.tsx`, casos «con solo inventario.consultar, el control de cerrar sesión
+sigue presente» y «sin ningún permiso, el menú queda sin ítems y el pie con cerrar sesión sigue
+ahí», los dos cayendo en `getByTestId('private-user-trigger')` porque un cambio de UI commiteado
+directamente en `dev` (`ab28f97`) movió el componente. **No son de QC-39** y su ficha está
+pendiente.
+
+Las **tres** anclas de seis a siete que sí eran de esta ficha —`app-sidebar`,
+`private-layout-menu` y `guard-nav-permisos-declarados`— están **tensadas y verdes**.
+
+**Deuda menor heredada, anotada y no tocada:** el caso «sin ningún permiso» de
+`private-layout-menu.test.tsx` mantiene una lista de ítems que no nombra `nav-unidades`. Es uno de
+los dos rojos de baseline y se dejó intacto a propósito; conviene recogerlo cuando se cierre esa
+deuda de `dev`.
+
+## Lo que queda pendiente y NO puede cerrar el implementer
+
+- **T13, segundo bullet: la comprobación manual en un WebKit real** del scroll contenido en la
+  tabla. `tasks.md` avisa de que «no es una casilla que se marque sola». El test automatizado de
+  viewport la cubre en jsdom —`overflow-x-auto` en el envoltorio de la tabla y ningún ancestro que
+  lo declare—, pero la comprobación en navegador real **exige levantar servidor, y ese reparto es
+  del leader** (el subagente que intentó ejecutar Playwright murió por watchdog de stream). Queda
+  **sin marcar y a la espera**.
+- **T15, segundo bullet: `./init.sh` completo en verde.** Lo corre el leader; el implementer no se
+  autoaprueba.
