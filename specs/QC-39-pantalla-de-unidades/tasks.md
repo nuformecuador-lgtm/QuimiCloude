@@ -241,12 +241,12 @@
 - **Hecho cuando:** el test en verde y la comprobación manual anotada.
 
 ### T14 — E2E *(depende de T8-T11)*
-- [ ] `e2e/unidades.spec.ts` con fixtures `qc39_e2e_` y `RUN_ID`: (1) login → la pantalla → crear una
+- [x] `e2e/unidades.spec.ts` con fixtures `qc39_e2e_` y `RUN_ID`: (1) login → la pantalla → crear una
       unidad **derivada** de una base existente → verla en la lista **con su equivalencia armada**;
       (2) sesión válida sin los permisos de unidades → pide la URL → **404 dentro del layout
       privado** y no ve la tabla. Navegación **por URL**, no pulsando el ítem del menú. El helper de
       login recibe el aterrizaje esperado (desde QC-75 R11 el login lleva al primer ítem visible).
-- [ ] Limpieza en `afterAll` que borra **primero las derivadas** y **tolera** `unit_in_use` sin
+- [x] Limpieza en `afterAll` que borra **primero las derivadas** y **tolera** `unit_in_use` sin
       tumbar la suite.
 - **Hecho cuando:** `pnpm exec playwright test e2e/unidades.spec.ts` en verde en Chromium y WebKit,
       sin dejar filas huérfanas. Cierra el diferimiento que QC-38 dejó apuntando a esta ficha.

@@ -259,3 +259,93 @@ el `FormData` enviado. No es un descuido: el test de T10 exige simular interacci
 **bloqueado a la espera de `setupUser()`** (`tests/helpers/user-event.ts`, que sale de QC-58 y aún
 no está en `dev`). El código de producción ya cumple R34; lo que falta es el ancla que impida que
 alguien lo desande.
+
+## Tanda 3 — Listas cerradas heredadas y E2E (T14)
+
+Commits: `a7e4ab5` (dos listas cerradas), `8df4083` (E2E + tercera lista), `0ed6a1f` (relevo del
+ancla de E2E de QC-38).
+
+### Tres listas cerradas heredadas, ampliadas TENSÁNDOLAS (R47)
+
+1. `tests/unit/shared/data-table-alcance.test.ts` — **consumidores** de la tabla compartida (R34 de
+   QC-55): la pantalla de unidades entra como **quinta**, con la carpeta **derivada de `UNITS_ROUTE`
+   importada** y no de un literal. Tensado: el caso pasa de «cuatro» a «cinco», el mensaje de fallo
+   dice ahora que migrar una **sexta** es una decisión, y el ancla anti-falso-verde sube de
+   `toBeGreaterThan(3)` a `toBeGreaterThan(4)`. El caso «recetas sigue SIN consumirlo» intacto.
+2. `tests/unit/recetas-ui/recipe-route-contract.test.ts` — **exports de `lib/shared/routes.ts`**
+   (QC-64 R12): entra `UNITS_ROUTE` en su posición del `.sort()`. La garantía que el caso protege
+   —el asistente de lectura de QC-64 sigue sin ruta propia— no se toca: el patrón se sigue aplicando
+   a todas las declaraciones y la comparación sigue siendo de igualdad exacta.
+3. `tests/unit/shared/data-table-alcance.test.ts` — **specs de E2E que referencian `data-table`**
+   (R36): entra `e2e/unidades.spec.ts` como quinto, **en el mismo commit que crea el archivo**, para
+   que la lista no apunte ni un minuto a algo inexistente.
+
+### Un segundo ancla de QC-38 relevada
+
+`tests/unit/unidades/unidades-convenciones.test.ts` afirmaba «`e2e/` no gana ningún `.spec.ts` nuevo
+respecto de `origin/dev`». Lo escribió QC-38 al **diferir el E2E apuntando a QC-39**, que es esta
+ficha. No se borra: el `toEqual([])` pasa a `toEqual(['e2e/unidades.spec.ts'])` —cero lo pone rojo y
+dos también—, **más** un caso nuevo que exige que ese spec derive la URL de `UNITS_ROUTE` y declare
+los **dos** casos que R50 pide, **más** su caso negativo. Es más exigente que antes.
+
+### T14 — `e2e/unidades.spec.ts` (489 líneas)
+
+**Recorrido 1 (R50):** login como Administrador con aterrizaje explícito → `page.goto` con la URL
+derivada de `UNITS_ROUTE` y `q` acotada al prefijo del worker → alta en el panel lateral de una
+unidad **derivada de una base existente** → verificación **en Postgres** (`baseUnitId`, factor por
+`Decimal.equals`, `symbol` **nulo**) → la fila en la lista y su **equivalencia armada**
+(`1 <derivada> = 1000 <base>`) leída de `data-table-cell-equivalence`.
+
+**Recorrido 2 (R12):** login como Operador → `page.goto(UNITS_ROUTE)` → `status() === 404` →
+`private-not-found` visible → `toHaveCount(0)` sobre el título, la tabla, la lista, el vacío y el
+disparador de alta.
+
+**Decisiones del E2E que no estaban en el spec:**
+- **La unidad base se siembra por Prisma, no por la interfaz.** El estado vacío de esta pantalla no
+  ofrece «crear la primera» (R24), así que con la búsqueda puesta y cero filas no habría disparador
+  de alta. Sembrarla deja una fila —y con ella el disparador— y hace que el recorrido pruebe lo que
+  R50 nombra: derivada **de una base existente**.
+- **El `RUN_ID` va ANTES del sufijo** (`qc39_e2e_<RUN_ID>_base` / `_derivada`): la búsqueda va contra
+  `nameNormalized` y la normalización elimina los `_`, así que el término normaliza a
+  `qc39e2e<RUNID>` y es prefijo de ambos. Con el sufijo en medio no casaría.
+- **Ninguna de las dos unidades declara símbolo**: `symbol` admite 10 caracteres y no cabe el
+  `RUN_ID`. Sin símbolo, la frase se compone con los nombres, que sí son únicos por worker — y de
+  paso ejercita el degradado de `unitLabel`.
+- **Limpieza** con helper que tolera el rechazo: en `beforeAll` barre huérfanas de más de una hora y
+  en `afterAll` las de este worker, **siempre derivadas primero**, cada paso en su `finally`.
+- **Cobertura lateral de R34:** el recorrido 1 afirma en base de datos que
+  `symbol === null` —«un símbolo no declarado no debe guardarse como cadena vacía»—. No sustituye al
+  test de T10, pero cubre el mismo riesgo por el otro extremo.
+
+**Riesgo señalado para quien ejecute Playwright:** el clic sobre el trigger del `Select` y su opción
+en el portal. `e2e/permisos.spec.ts` documenta que en **WebKit** el overlay de `next dev`
+(`<nextjs-portal>`) llegó a interceptar punteros. Si sale un timeout de actionability ahí, la salida
+correcta es **teclado** (`focus()` + flechas + `Enter`), **nunca `{ force: true }`**.
+
+### Reparto de la ejecución del E2E
+
+**El spec está escrito y commiteado; Playwright NO lo ha corrido nadie todavía.** El subagente tenía
+**prohibido** ejecutarlo: el intento anterior de esta misma tarea murió por watchdog de stream a los
+600 s, que es la causa que documenta `AGENTS.md > Regla del gate`. Lo corre el leader en Chromium y
+WebKit. **El criterio de hecho de T14 no está cumplido hasta que esa corrida salga verde.**
+
+### Verificación de la tanda (corrida por el implementer, en el worktree)
+
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin salida — verde)
+
+$ pnpm lint
+> eslint
+(sin salida — verde)
+
+$ pnpm exec vitest run tests/unit/shared tests/unit/recetas-ui tests/unit/configuracion-ui \
+    tests/guards tests/unit/unidades tests/unit/navegacion tests/unit/app-sidebar.test.tsx
+ Test Files  2 failed | 88 passed (90)
+      Tests  4 failed | 1145 passed | 2 skipped (1151)
+```
+
+Los **cuatro** rojos son los mismos de la tanda 2 y ninguno es regresión: los **dos de baseline** de
+`private-layout-menu` (el `userTrigger`) y las **dos anclas 6→7 DIFERIDAS** por orden del leader
+(`private-layout-menu` y `app-sidebar`, intersección con QC-58).
