@@ -11,7 +11,7 @@
 // **Ningun assert sobre copy** (R44).
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -262,16 +262,16 @@ afterEach(() => {
   clearSidebarStateCookie();
 });
 
-async function rellenarAlta(user: ReturnType<typeof userEvent.setup>) {
+async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
-  await user.click(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`));
+  await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 
 describe('panel lateral de pedidos (R25, R35, R36)', () => {
   it('el alta se abre en un panel lateral SOBRE la lista, sin navegar a otra URL', async () => {
     // R25 — ni dialogo modal centrado ni pagina aparte, y ninguna navegacion.
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderPantalla();
 
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
@@ -288,7 +288,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // R25 (segunda mitad) — el estado de lista vive en la cadena de consulta y el panel no navega,
     // asi que abrir y cerrar no puede perderlo. Se comprueba en negativo sobre el router: ninguna
     // navegacion ocurre, ni al abrir ni al cerrar.
-    const user = userEvent.setup();
+    const user = setupUser();
     const consulta: Consulta = {
       [PAGE_PARAM]: '2',
       [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE),
@@ -325,7 +325,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
 
   it('un alta con exito cierra el panel, avisa por toast y refresca la lista', async () => {
     // R35 — cerrar + aviso emergente + lista al dia sin recargar la pantalla.
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderPantalla();
 
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
@@ -345,7 +345,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
 
   it('un guardado rechazado NO cierra el panel', async () => {
     // R34 — el panel sigue abierto y no se avisa de un exito que no ocurrio.
-    const user = userEvent.setup();
+    const user = setupUser();
     createOrderActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -371,7 +371,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // el layout privado ya monta. `sonner` solo pinta el `<ol data-sonner-toaster>` cuando hay un
     // toast en cola; lo que si esta siempre montado es su `<section aria-live>` con
     // `role="region"` (mismo criterio que `tests/unit/private-layout.test.tsx`).
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderPantalla();
 
     expect(screen.getAllByRole('region')).toHaveLength(1);
@@ -387,7 +387,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
   it('la accion de editar de la fila abre el panel con el pedido precargado', async () => {
     // R25, R28 — `onEdit` de `OrderRowActions` (T8) cableado al panel lateral. Con el pedido en
     // estado final `OrderRowActions` no llega a emitir nada (R24) y el panel no se abre.
-    const user = userEvent.setup();
+    const user = setupUser();
     const elPedido = pedido();
     render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} />);
 
@@ -406,7 +406,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
 
   it('con el pedido en estado final la accion de editar no abre ningun panel', async () => {
     // R24 — la pantalla anticipa la regla en vez de dejar intentarlo contra el servidor.
-    const user = userEvent.setup();
+    const user = setupUser();
     render(
       <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} />,
     );

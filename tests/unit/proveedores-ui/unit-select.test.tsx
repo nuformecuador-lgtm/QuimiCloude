@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 import {
   NO_UNIT_VALUE,
@@ -46,7 +46,7 @@ afterEach(() => {
 describe('selector de unidad de la linea (R40, R46)', () => {
   it('ofrece unicamente las unidades existentes mas la opcion explicita «sin unidad»', async () => {
     // R40 — ni texto libre, ni unidades inventadas.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderSelector();
 
     await user.click(screen.getByTestId('unit-select'));
@@ -59,7 +59,7 @@ describe('selector de unidad de la linea (R40, R46)', () => {
 
   it('muestra el simbolo cuando existe y el nombre cuando no', async () => {
     // `design.md > 8.2`, mismo criterio que QC-26.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderSelector();
 
     await user.click(screen.getByTestId('unit-select'));
@@ -79,24 +79,26 @@ describe('selector de unidad de la linea (R40, R46)', () => {
 
   it('al elegir una unidad, el formulario envia SU identificador', async () => {
     // R40 — se envia el id, nunca la etiqueta que se ve.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderSelector();
 
     await user.click(screen.getByTestId('unit-select'));
-    await user.click(screen.getAllByTestId('unit-option')[0]);
+    const [primera] = await screen.findAllByTestId('unit-option');
+    await user.click(await esperarInteractiva(primera));
 
     expect(loQueSeEnviaria().get(UNIT_FIELD)).toBe(UNIDAD_CON_SIMBOLO.id);
   });
 
   it('elegir «sin unidad» despues de haber elegido una vuelve a enviar cadena vacia', async () => {
     // R40 — quitar la unidad tiene que ser posible, no solo no ponerla nunca.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderSelector({ defaultValue: UNIDAD_CON_SIMBOLO.id });
 
     expect(loQueSeEnviaria().get(UNIT_FIELD)).toBe(UNIDAD_CON_SIMBOLO.id);
 
     await user.click(screen.getByTestId('unit-select'));
-    await user.click(screen.getByTestId('unit-option-none'));
+    const sinUnidad = await screen.findByTestId('unit-option-none');
+    await user.click(await esperarInteractiva(sinUnidad));
 
     expect(loQueSeEnviaria().get(UNIT_FIELD)).toBe(NO_UNIT_VALUE);
   });
@@ -118,7 +120,7 @@ describe('selector de unidad de la linea (R40, R46)', () => {
 
   it('no ofrece ninguna forma de crear una unidad ni de escribir uno libre', async () => {
     // R40 en negativo — crear unidades es QC-38/QC-39, no esta pantalla.
-    const user = userEvent.setup();
+    const user = setupUser();
     renderSelector();
 
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);

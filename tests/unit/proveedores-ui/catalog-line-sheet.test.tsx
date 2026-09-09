@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
@@ -300,20 +300,20 @@ async function renderPantalla(searchParams: Consulta = {}) {
 }
 
 /** Abre el panel de alta y espera a que el formulario este montado. */
-async function abrirAlta(user: ReturnType<typeof userEvent.setup>) {
+async function abrirAlta(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(testId.abrirAlta));
   await screen.findByTestId(testId.formulario);
 }
 
 /** Abre el panel de edicion de la primera fila. */
-async function abrirEdicion(user: ReturnType<typeof userEvent.setup>) {
+async function abrirEdicion(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getAllByTestId(testId.abrirEdicion)[0]);
   await screen.findByTestId(testId.formulario);
 }
 
 /** Rellena los campos de texto. Vacia primero: el panel puede venir precargado (edicion). */
 async function rellenarFormulario(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   valores: Readonly<Record<string, string>> = {},
 ) {
   for (const [campo, valor] of Object.entries({ ...ALTA_VALIDA, ...valores })) {
@@ -324,15 +324,15 @@ async function rellenarFormulario(
 }
 
 /** Elige la primera presentacion de la lista (R37). */
-async function elegirPresentacion(user: ReturnType<typeof userEvent.setup>) {
+async function elegirPresentacion(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(testId.selectorPresentacion));
-  await user.click((await screen.findAllByTestId(testId.opcionPresentacion))[0]);
+  await user.click(await esperarInteractiva((await screen.findAllByTestId(testId.opcionPresentacion))[0]));
 }
 
 /** Elige la primera unidad de la lista (R40). */
-async function elegirUnidad(user: ReturnType<typeof userEvent.setup>) {
+async function elegirUnidad(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(testId.selectorUnidad));
-  await user.click((await screen.findAllByTestId(testId.opcionUnidad))[0]);
+  await user.click(await esperarInteractiva((await screen.findAllByTestId(testId.opcionUnidad))[0]));
 }
 
 /** Lo que el formulario enviaria como presentacion: el campo oculto que monta el primitivo. */
@@ -372,7 +372,7 @@ describe('linea de catalogo — el panel lateral (R26)', () => {
     // R26 — panel lateral, NO dialogo modal centrado y NO otra URL. Al cerrarse se vuelve al
     // catalogo con la MISMA pagina y el MISMO tamano: sale gratis porque el estado de lista vive
     // en la cadena de consulta, asi que no hay ni una consulta de mas ni una navegacion.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -403,7 +403,7 @@ describe('linea de catalogo — el panel lateral (R26)', () => {
 
   it('el estado vacio del catalogo ofrece anadir la primera linea y abre el mismo panel', async () => {
     // R23 (su accion) + R26 — sin ni una linea, lo unico util es anadir la primera.
-    const user = userEvent.setup();
+    const user = setupUser();
     listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([], { total: 0 }));
 
     await renderPantalla();
@@ -419,7 +419,7 @@ describe('linea de catalogo — lo que el formulario NO ofrece (R29, R30)', () =
   it('no ofrece ningun campo ni selector de articulo del inventario', async () => {
     // R29 en negativo — QC-52 borro esa columna del modelo y del contrato: no hay donde
     // guardarla, y el esquema es `strictObject`, asi que colarla daria `invalid_input`.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -444,7 +444,7 @@ describe('linea de catalogo — lo que el formulario NO ofrece (R29, R30)', () =
   it('no pide ninguna imagen ni ofrece subirla, y no la emite al guardar', async () => {
     // R30 — la columna existe desde QC-52 y nadie la llena (`P1`). El adaptador ya trata su
     // ausencia como ausencia, asi que el campo simplemente no viaja.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -466,7 +466,7 @@ describe('linea de catalogo — lo que el formulario NO ofrece (R29, R30)', () =
 describe('linea de catalogo — alta (R29, R37, R38, R41, R43)', () => {
   it('captura los campos de negocio y los envia por la operacion de alta, con el proveedor oculto', async () => {
     // R29, R43 — la mutacion sale por la Server Action del modulo; ningun `fetch` a rutas propias.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -495,7 +495,7 @@ describe('linea de catalogo — alta (R29, R37, R38, R41, R43)', () => {
   it('la presentacion es obligatoria y se puede alcanzar y crear desde el propio formulario', async () => {
     // R37, R38 — sin presentacion no se llama a la operacion; y cuando la que hace falta no
     // existe, se crea sin salir del panel, queda seleccionada y no se pierde lo ya escrito.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -527,7 +527,7 @@ describe('linea de catalogo — alta (R29, R37, R38, R41, R43)', () => {
 
   it('la unidad es opcional: sin elegirla, la linea se guarda sin unidad', async () => {
     // R40 apoyada en R29 — «sin unidad» viaja como vacio y el adaptador lo trata como ausencia.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -542,7 +542,7 @@ describe('linea de catalogo — alta (R29, R37, R38, R41, R43)', () => {
   it('el costo y el minimo viajan como la MISMA cadena que se escribio, y no son controles numericos', async () => {
     // R41 — `0.1005` es exactamente el valor que una conversion a coma flotante no devuelve
     // intacto. Se comprueba lo que llega a la action, no lo que se ve.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -570,7 +570,7 @@ describe('linea de catalogo — edicion (R31, R46)', () => {
     // R31, R46 — los datos de la linea llegan al panel POR PROPS desde la seccion del catalogo:
     // abrirlo no dispara ninguna lectura extra, y el reemplazo viaja con todos los campos aunque
     // solo se cambie uno.
-    const user = userEvent.setup();
+    const user = setupUser();
     const laLinea = linea();
 
     await renderPantalla();
@@ -608,7 +608,7 @@ describe('linea de catalogo — edicion (R31, R46)', () => {
   it('no ofrece cambiar el proveedor de la linea', async () => {
     // R31 en negativo — el proveedor es lo unico que la edicion no puede cambiar, y no porque un
     // `if` lo filtre: `updateCatalogLineSchema` no tiene ese campo.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirEdicion(user);
@@ -623,7 +623,7 @@ describe('linea de catalogo — edicion (R31, R46)', () => {
 
   it('una linea sin unidad y sin minimo se precarga sin inventar valores', async () => {
     // R31 — los dos son opcionales en el contrato (QC-52) y `null` no puede romper la precarga.
-    const user = userEvent.setup();
+    const user = setupUser();
     listCatalogLinesActionMock.mockResolvedValue(
       paginaDeLineas([linea({ unitId: null, minPurchase: null, deliveryTime: null })]),
     );
@@ -642,7 +642,7 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
     // R32 (primera mitad) — el error identifica la pareja nombre + presentacion, asi que va JUNTO
     // al nombre. Y se decide por el `code` estable, nunca por el texto: el mensaje del fixture no
     // se parece a «duplicado».
-    const user = userEvent.setup();
+    const user = setupUser();
     createCatalogLineActionMock.mockResolvedValue({
       status: 'error',
       code: 'duplicate_catalog_line',
@@ -677,7 +677,7 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
 
   it('un unauthorized se pinta en la region de error del formulario y conserva lo escrito', async () => {
     // R32 (segunda mitad) — `unauthorized` no identifica campo: va a la region `role="alert"`.
-    const user = userEvent.setup();
+    const user = setupUser();
     createCatalogLineActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -709,7 +709,7 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
   it('un not_found ofrece volver a la lista desde la region de error del formulario', async () => {
     // R32 — la linea dejo de existir mientras el panel estaba abierto. El destino se deriva de
     // `SUPPLIERS_ROUTE` (R2), nunca de un literal.
-    const user = userEvent.setup();
+    const user = setupUser();
     updateCatalogLineActionMock.mockResolvedValue({
       status: 'error',
       code: 'not_found',
@@ -731,7 +731,7 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
     // R45 — el formulario valida con `createCatalogLineSchema`, el mismo que el servidor: el
     // costo cero se corta aqui, sin reescribir la regla y sin ninguna libreria de formularios. El
     // assert compara contra el propio esquema, no contra un copy.
-    const user = userEvent.setup();
+    const user = setupUser();
     const costoCero = {
       supplierId: PROVEEDOR_ID,
       name: ALTA_VALIDA.name,
@@ -758,7 +758,7 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
     // que aqui el control numerico del navegador es correcto: no hay importe que proteger. Un
     // valor con decimales se corta antes de llamar a la operacion, y si aun asi llegara, la
     // conversion del formulario lo rechazaria sin convertirlo en `NaN`.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -782,7 +782,7 @@ describe('linea de catalogo — exito y plataforma (R33, R34, R48)', () => {
   it('un guardado con exito cierra el panel, avisa por toast y refresca el catalogo', async () => {
     // R33 — `router.refresh()` vuelve a ejecutar el Server Component del catalogo con la MISMA
     // URL. Sin `revalidatePath`: exigiria abrir el adaptador driving de QC-43 (R49).
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -802,7 +802,7 @@ describe('linea de catalogo — exito y plataforma (R33, R34, R48)', () => {
 
   it('la pantalla no monta ninguna region de avisos propia', async () => {
     // R34 en negativo — la region la monta el layout privado y NO se monta una segunda.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
@@ -816,7 +816,7 @@ describe('linea de catalogo — exito y plataforma (R33, R34, R48)', () => {
     // ningun alto de pantalla en unidades que iOS calcula mal.
     for (const ancho of [NARROW_VIEWPORT, WIDE_VIEWPORT]) {
       setViewportWidth(ancho);
-      const user = userEvent.setup();
+      const user = setupUser();
 
       await renderPantalla();
       await abrirAlta(user);
@@ -848,7 +848,7 @@ describe('linea de catalogo — los siete campos declarados (R29)', () => {
   it('el formulario cubre los siete campos de negocio, con la imagen declarada como ausente', async () => {
     // R29 + R30 — los seis que se capturan estan presentes y el septimo, la ruta de imagen, es una
     // ausencia DECIDIDA (`requirements.md > P1`), no un campo que alguien olvido cablear.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);

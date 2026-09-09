@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
@@ -242,7 +242,7 @@ async function renderPantalla() {
 }
 
 /** Abre el dialogo de baja de la primera fila del catalogo. */
-async function abrirBaja(user: ReturnType<typeof userEvent.setup>) {
+async function abrirBaja(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getAllByTestId(testId.abrirBaja)[0]);
   return screen.findByTestId(testId.dialogo);
 }
@@ -275,7 +275,7 @@ describe('baja de una linea de catalogo — sin confirmar (R36)', () => {
   it('cada fila ofrece la baja y abrir el dialogo NO invoca la operacion', async () => {
     // R36 — el doble FALLA si se le llama: una invocacion prematura tiene que reventar el test,
     // no limitarse a no incrementar un contador.
-    const user = userEvent.setup();
+    const user = setupUser();
     deleteCatalogLineActionMock.mockImplementation(() => {
       throw new Error('la baja se invoco SIN confirmacion');
     });
@@ -293,7 +293,7 @@ describe('baja de una linea de catalogo — sin confirmar (R36)', () => {
 
   it('cancelar cierra el dialogo sin invocar la operacion ni refrescar', async () => {
     // R36 — MIENTRAS el usuario no confirme, no se invoca nada.
-    const user = userEvent.setup();
+    const user = setupUser();
     deleteCatalogLineActionMock.mockImplementation(() => {
       throw new Error('la baja se invoco tras CANCELAR');
     });
@@ -311,7 +311,7 @@ describe('baja de una linea de catalogo — sin confirmar (R36)', () => {
 
   it('cerrar con Escape tampoco invoca la operacion', async () => {
     // R36 — la unica via a la operacion es el boton de confirmar.
-    const user = userEvent.setup();
+    const user = setupUser();
     deleteCatalogLineActionMock.mockImplementation(() => {
       throw new Error('la baja se invoco al cerrar con Escape');
     });
@@ -330,7 +330,7 @@ describe('baja de una linea de catalogo — al confirmar (R36, R33)', () => {
   it('invoca la baja con el id en campo oculto, cierra, avisa por toast y refresca la lista', async () => {
     // R36 (segunda mitad) + R33 — el `id` viaja oculto, que es la forma que la action espera, y
     // por eso no necesita `bind`. El refresco vuelve a ejecutar el Server Component del catalogo.
-    const user = userEvent.setup();
+    const user = setupUser();
     const laLinea = linea();
 
     await renderPantalla();
@@ -353,7 +353,7 @@ describe('baja de una linea de catalogo — al confirmar (R36, R33)', () => {
 
   it('una baja rechazada mantiene el dialogo abierto con el mensaje a la vista', async () => {
     // R33 en negativo — cerrar el dialogo dejaria al usuario creyendo que la linea se dio de baja.
-    const user = userEvent.setup();
+    const user = setupUser();
     deleteCatalogLineActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -376,7 +376,7 @@ describe('baja de una linea de catalogo — al confirmar (R36, R33)', () => {
   it('la baja de una linea nombra SOLO esa linea y no promete arrastrar nada', async () => {
     // R36 — a diferencia de la baja de un proveedor (R35), la de una linea no arrastra nada: la
     // linea es la hoja del arbol. El aviso de arrastre de la otra pantalla no puede aparecer aqui.
-    const user = userEvent.setup();
+    const user = setupUser();
     const otra = linea({ id: crypto.randomUUID(), name: 'Hipoclorito de sodio' });
     listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea(), otra]));
 
@@ -397,7 +397,7 @@ describe('baja de una linea de catalogo — accesibilidad y plataforma (R47, R48
     // los tres controles miden al menos 44x44 px a los dos lados del breakpoint.
     for (const ancho of [NARROW_VIEWPORT, WIDE_VIEWPORT]) {
       setViewportWidth(ancho);
-      const user = userEvent.setup();
+      const user = setupUser();
 
       await renderPantalla();
 

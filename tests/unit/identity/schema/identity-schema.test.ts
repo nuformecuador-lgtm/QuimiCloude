@@ -190,6 +190,25 @@ const SEED_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['mustChangeCredential', 'must_change_credential'],
 ]
 
+/**
+ * QC-65 / R1, R8, R10 — el estado de la cuenta y el rastro de su ULTIMO cambio, con su columna
+ * en la base. Estado actual sobre la propia fila, no historico: solo se guarda el ultimo cambio
+ * (R13, decision cerrada 5), igual que `LOCKOUT_FIELDS` y por el mismo motivo.
+ *
+ * ANADIDO EL 2026-09-08 (QC-65) PARA RETENSAR ESTA GUARDIA, no para relajarla: el censo de
+ * escalares de `User` de mas abajo sigue siendo una igualdad EXACTA y estos tres nombres entran
+ * en el, en su propio bloque, al estilo de `LOCKOUT_FIELDS`. Las columnas del bloqueo de QC-19
+ * NO se tocan (QC-65 R18) y siguen viviendo en su bloque de arriba.
+ *
+ * El contrato completo del estado —el `enum`, los defaults, el `@db.` y la FK a mano— lo vigila
+ * `tests/unit/identity/schema/account-status-schema.test.ts`; aqui solo entra el censo.
+ */
+const ACCOUNT_STATUS_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ['accountStatus', 'account_status'],
+  ['accountStatusChangedAt', 'account_status_changed_at'],
+  ['accountStatusChangedBy', 'account_status_changed_by'],
+]
+
 describe('db/schema.prisma — modelo de usuarios y roles', () => {
   it('el modelo User declara los nueve datos del usuario', () => {
     for (const [name] of BUSINESS_FIELDS) {
@@ -215,6 +234,10 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
         'deletedAt',
         ...LOCKOUT_FIELDS.map(([name]) => name),
         ...SEED_FIELDS.map(([name]) => name),
+        // QC-65: las tres columnas del estado de cuenta. La igualdad sigue siendo EXACTA -no
+        // se cambio por ningun `toContain`-: si alguien anade una cuarta columna de estado, o
+        // quita una de estas, este caso cae, que es justo lo que la guardia existe para hacer.
+        ...ACCOUNT_STATUS_FIELDS.map(([name]) => name),
       ].sort(),
     )
 

@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 import type { MockInstance } from 'vitest';
 
 import { LoginForm } from '@/app/(public)/login/components';
@@ -67,7 +67,7 @@ describe('campo de usuario no controlado', () => {
   // porque, por la deduplicacion descrita arriba, solo el primer test del archivo puede
   // observar el aviso: partirlo en dos daria un segundo test que jamas podria fallar.
   it('no avisa por cambiar el defaultValue en intentos rechazados sucesivos', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock
       .mockResolvedValueOnce({
         status: 'error',
@@ -100,7 +100,7 @@ describe('campo de usuario no controlado', () => {
   });
 
   it('el remontaje no roba el foco al enviar con el boton', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue({
       status: 'error',
       attemptId: 'intento-1',
@@ -120,7 +120,7 @@ describe('campo de usuario no controlado', () => {
   });
 
   it('el remontaje no roba el foco al enviar con Enter desde la contrasena', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock.mockResolvedValue({
       status: 'error',
       attemptId: 'intento-1',
@@ -139,7 +139,7 @@ describe('campo de usuario no controlado', () => {
   });
 
   it('un reintento con el mismo usuario no remonta y conserva el foco en el campo', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     loginActionMock
       .mockResolvedValueOnce({
         status: 'error',

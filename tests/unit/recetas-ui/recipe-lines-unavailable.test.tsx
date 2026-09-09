@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -125,7 +125,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
   });
 
   it('(c) al quitar una de las dos líneas de baja, data-count pasa a 1', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     render(
       <Harness
         initialLines={[unavailableLine('l1'), unavailableLine('l2'), availableLine('l3', 'Glicerina')]}
@@ -140,7 +140,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
   });
 
   it('(d) al quitar la última línea de baja, el aviso desaparece del DOM', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<Harness initialLines={[unavailableLine('l1'), availableLine('l2', 'Glicerina')]} />);
 
     expect(screen.getByTestId(NOTICE_TEST_ID)).toBeInTheDocument();

@@ -9,7 +9,7 @@
 // afirma que aparece; el uuid se afirma en negativo, que es lo que importa.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -132,7 +132,7 @@ describe('mientras el usuario no confirme no se invoca el borrado (R27)', () => 
   });
 
   it('volver atras cierra sin borrar nada', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     montar();
 
     await user.click(screen.getByTestId(DELETE_PRESENTATION_DISMISS_TESTID));
@@ -146,7 +146,7 @@ describe('mientras el usuario no confirme no se invoca el borrado (R27)', () => 
 
 describe('al confirmar se invoca el borrado y se aplica R25', () => {
   it('llama a la action con el `id` y luego cierra, avisa y refresca la misma URL', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const la = montar();
 
     await user.click(screen.getByTestId(DELETE_PRESENTATION_CONFIRM_TESTID));
@@ -165,7 +165,7 @@ describe('al confirmar se invoca el borrado y se aplica R25', () => {
 
 describe('`presentation_in_use` se pinta DENTRO del dialogo, que sigue abierto (R28)', () => {
   it('la region de error lleva el codigo estable y el dialogo no se cierra', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const mensajeDelServidor = 'La presentacion tiene productos asignados y no se puede borrar.';
     deletePresentationActionMock.mockResolvedValue({
       status: 'error',
@@ -191,7 +191,7 @@ describe('`presentation_in_use` se pinta DENTRO del dialogo, que sigue abierto (
   });
 
   it('cualquier otro codigo se pinta igual: decide el codigo, nunca el texto', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     deletePresentationActionMock.mockResolvedValue({
       status: 'error',
       code: 'not_found',

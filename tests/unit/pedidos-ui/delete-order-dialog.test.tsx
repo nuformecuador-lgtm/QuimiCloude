@@ -7,7 +7,7 @@
 // negativo, y es lo que importa, es que el identificador tecnico **no** aparece.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -135,7 +135,7 @@ describe('mientras el usuario no confirme no se invoca el borrado (R38)', () => 
   });
 
   it('volver atras cierra sin borrar nada', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     montar();
 
     await user.click(screen.getByTestId(DELETE_ORDER_DISMISS_TESTID));
@@ -148,7 +148,7 @@ describe('mientras el usuario no confirme no se invoca el borrado (R38)', () => 
 
 describe('al confirmar se invoca el borrado y se aplica R35', () => {
   it('llama a `deleteOrderAction` con el `id` y luego cierra, avisa y refresca', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const elPedido = montar();
 
     await user.click(screen.getByTestId(DELETE_ORDER_CONFIRM_TESTID));
@@ -167,7 +167,7 @@ describe('al confirmar se invoca el borrado y se aplica R35', () => {
 
 describe('`not_deletable` se pinta en la region del DIALOGO (R34)', () => {
   it('el dialogo sigue abierto con su region de error y el codigo estable', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     deleteOrderActionMock.mockResolvedValue({
       status: 'error',
       code: 'not_deletable',

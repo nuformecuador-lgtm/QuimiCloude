@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 
 import PrivateLayout from '@/app/(private)/layout';
 import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components';
@@ -157,7 +157,7 @@ function primerGrupo(): NavGroup {
 
 /** Activa el control unico de colapso y espera al estado pedido. */
 async function alternarBarra(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   esperado: 'expanded' | 'collapsed',
 ) {
   await user.click(screen.getByTestId(testId.toggle));
@@ -209,7 +209,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
 
   it('activar el control alterna a modo icono y muestra la marca corta', async () => {
     // R24 (y R4 se conserva en los dos modos)
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     const control = screen.getByTestId(testId.toggle);
@@ -236,7 +236,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
 
   it('en modo icono cada entrada conserva su nombre accesible', async () => {
     // R25
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     await alternarBarra(user, 'collapsed');
@@ -250,7 +250,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
 
   it('en modo icono los hijos de un submenu siguen siendo alcanzables desde su control', async () => {
     // R26
-    const user = userEvent.setup();
+    const user = setupUser();
     const grupo = primerGrupo();
     await renderLayout();
 
@@ -279,7 +279,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     // pie, que en modo icono era el UNICO camino al cierre de sesion; hoy no hay menu que abrir
     // -el control es un boton del encabezado- y lo que R27 protege sigue en pie: colapsar la
     // barra no puede dejar a nadie sin poder salir.
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     await alternarBarra(user, 'collapsed');
@@ -298,7 +298,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
 
   it('el modo colapsado se conserva al volver a montar el layout', async () => {
     // R28
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     expect(panelDeEscritorio()).toHaveAttribute('data-state', 'expanded');
@@ -324,7 +324,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
 
   it('el modo expandido se conserva al volver a montar el layout', async () => {
     // R28 (el simetrico: partiendo de colapsado y expandiendo)
-    const user = userEvent.setup();
+    const user = setupUser();
     cookiesMock.mockResolvedValue({
       get: (name: string) =>
         name === SIDEBAR_STATE_COOKIE ? { name, value: 'false' } : undefined,

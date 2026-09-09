@@ -362,11 +362,47 @@ describe('db/schema.prisma — modelo de pedido', () => {
     ])
     expect(parseEnum('OrderPriority')).toEqual(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'])
 
-    // Los dos unicos enum del esquema son los que crea esta feature.
-    const enumNames = [...schema.matchAll(/^enum\s+(\w+)\s*\{/gm)]
-      .map((match) => match[1])
-      .filter((name): name is string => name !== undefined)
-    expect(enumNames).toEqual(['OrderStatus', 'OrderPriority'])
+    // Los dos unicos enum DE PEDIDOS son los que crea esta feature.
+    //
+    // Antes esto afirmaba sobre la lista GLOBAL de enums del esquema
+    // (`expect(enumNames).toEqual(['OrderStatus', 'OrderPriority'])`), y ese sujeto era mas ancho
+    // que el requisito: R16 habla del conjunto cerrado de estado y prioridad DEL PEDIDO, no de
+    // que pedidos sea el unico modulo del ERP autorizado a declarar un enum. El primer enum
+    // legitimo de otro modulo la ponia roja sin que nada de pedidos hubiera cambiado -paso el
+    // 2026-09-08 con `UserAccountStatus` (QC-65, modulo identity)- y el siguiente la volveria a
+    // poner. Anadir el enum ajeno a la lista era peor: deja la guardia igual de fragil y encima
+    // midiendo algo que no es suyo.
+    //
+    // COMO SE DERIVA el conjunto, sin lista escrita a mano: un enum es «de pedidos» si algun
+    // campo de un modelo cuyo dueno es `/// @module pedidos` lo declara como TIPO. Es la misma
+    // fuente de verdad que usa el caso de R31 y la que exige `docs/architecture.md` (todo modelo
+    // nuevo lleva su `@module`), asi que no hay nada que mantener a mano: si pedidos gana un
+    // modelo, entra solo; si otro modulo declara un enum, no entra nunca. Un enum declarado y no
+    // usado por ningun campo de pedidos no es de pedidos —no tipa ninguna columna suya—, y en
+    // cambio un tercer enum que SI tipe un campo de `Order` pone este caso rojo, que es
+    // exactamente lo que R16 quiere impedir.
+    const enumNames = new Set(
+      [...schema.matchAll(/^enum\s+(\w+)\s*\{/gm)]
+        .map((match) => match[1])
+        .filter((name): name is string => name !== undefined),
+    )
+    expect(enumNames.size, 'el esquema no declara ningun enum: el parseo esta roto').toBeGreaterThan(0)
+
+    const pedidosModels = [...rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)]
+      .filter((match) => match[1] === 'pedidos')
+      .map((match) => match[2])
+      .filter((modelName): modelName is string => modelName !== undefined)
+    expect(pedidosModels, 'ningun modelo declara /// @module pedidos').not.toEqual([])
+
+    const enumsDePedidos = [
+      ...new Set(
+        pedidosModels
+          .flatMap((modelName) => parseModel(modelName).fields)
+          .map((candidate) => candidate.type)
+          .filter((type) => enumNames.has(type)),
+      ),
+    ].sort()
+    expect(enumsDePedidos).toEqual(['OrderPriority', 'OrderStatus'])
 
     // Y las dos columnas los usan: el conjunto cerrado esta en el TIPO, no en un CHECK ni en un
     // catalogo de filas (se aparta a proposito de `DocumentType`, QC-4).

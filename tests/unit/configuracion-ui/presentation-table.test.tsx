@@ -9,7 +9,7 @@
 // hubiera escrito su propia tabla o su propia barra de paginacion, no existirian.
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -159,9 +159,10 @@ describe('las filas se pintan en el orden en que llegan (R10, R11)', () => {
 
 describe('cambiar pagina navega con la consulta esperada (R13)', () => {
   it('avanzar de pagina pide la lista de nuevo con la pagina siguiente', async () => {
+    const user = setupUser();
     const params = montar({ page: 1 }, 3);
 
-    await userEvent.click(screen.getByTestId('data-table-next'));
+    await user.click(screen.getByTestId('data-table-next'));
 
     expect(ultimoDestino()).toBe(
       `${PRESENTATIONS_ROUTE}?${buildPresentationListQuery({ ...params, page: 2 })}`,
@@ -169,9 +170,10 @@ describe('cambiar pagina navega con la consulta esperada (R13)', () => {
   });
 
   it('retroceder de pagina pide la lista de nuevo con la pagina anterior', async () => {
+    const user = setupUser();
     const params = montar({ page: 3 }, 3);
 
-    await userEvent.click(screen.getByTestId('data-table-previous'));
+    await user.click(screen.getByTestId('data-table-previous'));
 
     expect(ultimoDestino()).toBe(
       `${PRESENTATIONS_ROUTE}?${buildPresentationListQuery({ ...params, page: 2 })}`,
@@ -179,9 +181,10 @@ describe('cambiar pagina navega con la consulta esperada (R13)', () => {
   });
 
   it('el destino sale SIEMPRE de la constante de ruta (R2)', async () => {
+    const user = setupUser();
     montar();
 
-    await userEvent.click(screen.getByTestId('data-table-next'));
+    await user.click(screen.getByTestId('data-table-next'));
 
     expect(ultimoDestino().startsWith(`${PRESENTATIONS_ROUTE}?`)).toBe(true);
   });
@@ -189,9 +192,10 @@ describe('cambiar pagina navega con la consulta esperada (R13)', () => {
 
 describe('el tamano de pagina ofrece 10 y 25 y recarga la lista (R12)', () => {
   it('las opciones son exactamente las del componente compartido', async () => {
+    const user = setupUser();
     montar();
 
-    await userEvent.click(screen.getByTestId('data-table-page-size'));
+    await user.click(screen.getByTestId('data-table-page-size'));
 
     expect(await screen.findAllByRole('option')).toHaveLength(PAGE_SIZE_OPTIONS.length);
     for (const tamano of PAGE_SIZE_OPTIONS) {
@@ -200,11 +204,15 @@ describe('el tamano de pagina ofrece 10 y 25 y recarga la lista (R12)', () => {
   });
 
   it('elegir otro tamano navega con ese tamano y vuelve a la primera pagina', async () => {
+    const user = setupUser();
     const params = montar({ page: 3 }, 3);
     const otro = PAGE_SIZE_OPTIONS.find((option) => option !== params.pageSize)!;
 
-    await userEvent.click(screen.getByTestId('data-table-page-size'));
-    await userEvent.click(screen.getByTestId(`data-table-page-size-${otro}`));
+    await user.click(screen.getByTestId('data-table-page-size'));
+    // Popup de Base UI recien abierto: se espera a que suelte `pointer-events: none` (QC-58).
+    await user.click(
+      await esperarInteractiva(screen.getByTestId(`data-table-page-size-${otro}`)),
+    );
 
     expect(ultimoDestino()).toBe(
       `${PRESENTATIONS_ROUTE}?${buildPresentationListQuery({ ...params, page: 1, pageSize: otro })}`,

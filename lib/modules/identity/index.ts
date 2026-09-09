@@ -25,6 +25,15 @@ export { assertPermission, type PermissionBearer } from './domain/require-permis
 // literal del nombre de la empresa inicial (R20). Dominio puro: no arrastran servidor ni Prisma.
 export { normalizeCompanyName } from './domain/company-name';
 export { INITIAL_COMPANY_NAME } from './domain/companies';
+// QC-65 T1 — la UNICA definicion del conjunto cerrado de estados de cuenta (R3) y los dos
+// estados con nombre: el de una cuenta nueva (R5) y el del administrador del seed (R7). Dominio
+// puro: no arrastra servidor ni Prisma. NADIE lee todavia el estado para decidir nada (R19).
+export {
+  INITIAL_USER_ACCOUNT_STATUS,
+  SEED_ADMIN_ACCOUNT_STATUS,
+  USER_ACCOUNT_STATUSES,
+  type UserAccountStatus,
+} from './domain/account-status';
 export { seedInitialAccess, type SeedOutcome } from './domain/seed-initial-access';
 export { createResolveSessionUser } from './domain/resolve-session-user';
 // QC-48 T8 — La cadena unica de cortes y lo que expone al servidor. Dominio puro: no arrastra

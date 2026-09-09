@@ -128,6 +128,15 @@ export function createInitialAccessRepository(
           data: {
             roleId: input.roleId,
             companyId: input.companyId,
+            // QC-65 R7: una columna mas del MISMO `user.create`, en la misma sentencia y la
+            // misma transaccion que el rol y la empresa. No hay ningun instante en el que la
+            // fila exista sin estado, y el valor no depende del `@default(pending)` de la
+            // columna: si alguien lo quitara del esquema, el administrador seguiria naciendo
+            // con el estado que decidio el dominio.
+            accountStatus: input.accountStatus,
+            // `accountStatusChangedBy` NO se escribe: queda NULL, que significa «lo puso el
+            // sistema, no una persona» (R10). `accountStatusChangedAt` lo rellena el
+            // `@default(now())` de la columna, y en una fila recien creada eso es correcto (R9).
             username: input.username,
             email: input.email,
             passwordHash: input.passwordHash,

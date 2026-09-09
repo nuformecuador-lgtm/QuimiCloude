@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -69,14 +69,14 @@ function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
   );
 }
 
-async function elegirIngrediente(user: ReturnType<typeof userEvent.setup>, nombre: string) {
+async function elegirIngrediente(user: ReturnType<typeof setupUser>, nombre: string) {
   await user.click(screen.getByTestId('recipe-line-product-0'));
   await user.click(await screen.findByRole('option', { name: nombre }));
 }
 
 /** Etiquetas de las opciones que ofrece el selector de unidad de la línea 0. */
 async function opcionesDeUnidad(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
 ): Promise<string[]> {
   await user.click(screen.getByTestId('recipe-line-unit-0'));
   const opciones = await screen.findAllByTestId('recipe-line-unit-0-option');
@@ -91,7 +91,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
   });
 
   it('al elegir ingrediente, el campo se habilita', async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     render(<Harness />);
 
     await elegirIngrediente(user, SOSA.name);
@@ -100,7 +100,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
   });
 
   it('solo ofrece las unidades del GRUPO del ingrediente: un producto en kg lista kg y g', async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     render(<Harness />);
 
     await elegirIngrediente(user, SOSA.name);
@@ -109,7 +109,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
   });
 
   it('un ingrediente de otra magnitud ofrece OTRO grupo, y ninguna unidad de masa', async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     render(<Harness />);
 
     await elegirIngrediente(user, AGUA.name);
@@ -120,7 +120,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
   });
 
   it('preselecciona la unidad MÁS PEQUEÑA del grupo, no la primera del catálogo', async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     render(<Harness />);
 
     await elegirIngrediente(user, SOSA.name);
@@ -131,7 +131,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
   });
 
   it('cambiar a un ingrediente del MISMO grupo NO pisa la unidad ya elegida', async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     render(<Harness initialLines={[]} />);
 
     await elegirIngrediente(user, SOSA.name);
@@ -146,7 +146,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
   });
 
   it('cambiar a un ingrediente de OTRO grupo sí cambia la unidad a la más pequeña del nuevo', async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     render(<Harness />);
 
     await elegirIngrediente(user, SOSA.name);
@@ -158,7 +158,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
   });
 
   it('un ingrediente SIN unidad ofrece el catálogo completo, no una lista vacía', async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     render(<Harness />);
 
     await elegirIngrediente(user, COLORANTE.name);

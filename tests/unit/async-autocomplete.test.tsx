@@ -245,6 +245,20 @@ describe('AsyncAutocomplete — consulta paginada de 10 en 10', () => {
     // ejercita con la escritura REAL de `user-event` -20 ms entre teclas, mas rapido que una
     // persona- contra un rebote de 250 ms, y se afirma sobre el termino que llego al servidor:
     // el de la palabra COMPLETA, no el de ningun prefijo.
+    //
+    // EXCEPCION DELIBERADA a la forma compartida de teclear (QC-58, R8). El resto del repo usa
+    // `setupUser()` de `tests/helpers/user-event`, que teclea con `delay: null`. Aqui NO se
+    // puede: los 20 ms entre teclas no son un detalle de implementacion del test, son el
+    // SUJETO de la prueba -sin retardo real no hay nada que rebotar y el caso pasaria sin
+    // comprobar lo que dice comprobar-.
+    //
+    // Esta excepcion esta listada POR NOMBRE en `tests/guards/guard-teclear-y-plazo.test.ts`,
+    // que es la guardia que prohibe `userEvent.setup(` en el resto de `tests/`. O sea: quitar
+    // este retardo obliga a borrarlo tambien de la guardia, y por tanto a que sea una decision
+    // y no un descuido de un cambio global.
+    //
+    // Tampoco se reescribe con relojes falsos: como interactuan los timers falsos con
+    // `user-event` es trabajo de diagnostico que QC-58 no tiene presupuestado (`design.md > 8f`).
     const user = userEvent.setup({ delay: 20 });
     const { peticiones, fetchPage } = crearServidor();
 

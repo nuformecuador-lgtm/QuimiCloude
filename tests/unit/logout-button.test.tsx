@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 
 import { LOGOUT_LABEL, LogoutButton } from '@/app/(private)/components/logout-button';
 
@@ -60,7 +60,7 @@ afterEach(() => {
 describe('cierre de sesion del encabezado privado', () => {
   it('el control vive dentro de un form real cuya accion es logoutAction', async () => {
     // R19 + R20 (el envio real del form es lo que invoca la action; no hay `onClick`).
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<LogoutButton />);
 
     const formulario = screen.getByTestId(testId.form);
@@ -79,7 +79,7 @@ describe('cierre de sesion del encabezado privado', () => {
   it('es alcanzable con el teclado y se activa con el', async () => {
     // R17 aplicado al control nuevo: ya no hay menu que abrir, asi que el propio boton es el que
     // tiene que estar en el orden de tabulacion y responder a la tecla.
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<LogoutButton />);
 
     await user.tab();
@@ -93,7 +93,7 @@ describe('cierre de sesion del encabezado privado', () => {
 
   it('invoca la accion de cierre de sesion exactamente una vez por activacion', async () => {
     // R20
-    const user = userEvent.setup();
+    const user = setupUser();
     const enCurso = pendingLogout();
     render(<LogoutButton />);
 
@@ -109,7 +109,7 @@ describe('cierre de sesion del encabezado privado', () => {
 
   it('deshabilita el control mientras el cierre de sesion esta en curso', async () => {
     // R21
-    const user = userEvent.setup();
+    const user = setupUser();
     const enCurso = pendingLogout();
     render(<LogoutButton />);
 
