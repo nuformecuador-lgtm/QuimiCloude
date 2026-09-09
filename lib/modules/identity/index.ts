@@ -25,6 +25,11 @@ export { assertPermission, type PermissionBearer } from './domain/require-permis
 // literal del nombre de la empresa inicial (R20). Dominio puro: no arrastran servidor ni Prisma.
 export { normalizeCompanyName } from './domain/company-name';
 export { INITIAL_COMPANY_NAME } from './domain/companies';
+// QC-83 T1 — El grupo de trabajo: la UNICA definicion de «mismo nombre de grupo» (R3), la que
+// calcula la columna `work_groups.name_normalized` y la que usara QC-84 para no inventarse una
+// segunda. Dominio puro. `normalizeKey` —el cuerpo que comparte con `normalizeCompanyName`— es
+// INTERNO al modulo y NO se exporta a proposito (`design.md > 4`).
+export { normalizeWorkGroupName } from './domain/work-group-name';
 // QC-65 T1 — la UNICA definicion del conjunto cerrado de estados de cuenta (R3) y los dos
 // estados con nombre: el de una cuenta nueva (R5) y el del administrador del seed (R7). Dominio
 // puro: no arrastra servidor ni Prisma. NADIE lee todavia el estado para decidir nada (R19).
