@@ -47,7 +47,12 @@ import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { prisma } from '@/lib/shared/db/prisma'
-import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity'
+import {
+  DOCUMENT_TYPE_CC,
+  INITIAL_USER_ACCOUNT_STATUS,
+  USER_ACCOUNT_STATUSES,
+  normalizeCompanyName,
+} from '@/lib/modules/identity'
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento
@@ -1561,6 +1566,496 @@ describe('unicidad DENTRO de la empresa', () => {
       })
       expect(filas).toHaveLength(2)
       expect(filas.filter((fila) => fila.deletedAt === null).map((fila) => fila.id)).toEqual([nuevo])
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// QC-65 (T13) — EL ESTADO DE CUENTA, contra Postgres real.
+// ---------------------------------------------------------------------------
+//
+// Mismo aislamiento que todo el archivo: cada caso dentro de una transaccion que termina en
+// ROLLBACK, y toda operacion que se espera que la base rechace envuelta en un SAVEPOINT para
+// poder seguir consultando despues del error.
+//
+// Los tests unitarios de `tests/unit/identity/schema/*` leen el ESQUEMA y el SQL. Estos leen
+// la BASE: R2 y R11 son garantias de Postgres, no comprobaciones de codigo (R2 lo dice con
+// todas las letras), y afirmar sobre el texto de una migracion no demuestra que el tipo y la
+// FK existan de verdad en la base sobre la que corre la app.
+
+/** SQLSTATE `invalid_text_representation`: el valor no pertenece al tipo enumerado (R2). */
+const INVALID_TEXT_REPRESENTATION = '22P02'
+
+/** Nombre de columna admisible para interpolar cruda en un `INSERT`. */
+const SAFE_COLUMN_NAME = /^[a-z_][a-z0-9_]*$/
+
+/**
+ * `INSERT INTO users` crudo CON columnas extra ademas de las nueve de negocio. Existe porque
+ * `rawInsertUser` (arriba) solo sabe de `REQUIRED_USER_COLUMNS`, y los dos casos que miden una
+ * garantia de la BASE necesitan escribir columnas de QC-65 con su cast explicito:
+ *
+ *   - un `account_status` fuera del conjunto no se puede expresar con la API tipada de Prisma
+ *     (no compilaria, que es justo lo que R2 NO quiere probar: R2 es de la base);
+ *   - y con SQL crudo el error de Postgres llega literal, con su SQLSTATE.
+ *
+ * No se toca `rawInsertUser` a proposito: lo usan los casos de QC-4 y QC-47 y su firma es suya.
+ */
+async function rawInsertUserWithColumns(
+  tx: Prisma.TransactionClient,
+  seed: UserSeed,
+  roleId: string,
+  extra: Readonly<Record<string, Prisma.Sql>>,
+): Promise<number> {
+  const entries = Object.entries(userSqlValues(seed)) as [string, Prisma.Sql][]
+  const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
+  const values = entries.map(([, value]) => value)
+
+  names.push(Prisma.raw('"role_id"'))
+  values.push(Prisma.sql`CAST(${roleId} AS uuid)`)
+  names.push(Prisma.raw('"company_id"'))
+  values.push(Prisma.sql`CAST(${seed.companyId ?? (await defaultCompanyId(tx))} AS uuid)`)
+  names.push(Prisma.raw('"updated_at"'))
+  values.push(Prisma.sql`CURRENT_TIMESTAMP`)
+
+  for (const [name, value] of Object.entries(extra)) {
+    if (!SAFE_COLUMN_NAME.test(name)) throw new Error(`nombre de columna inesperado: ${name}`)
+    names.push(Prisma.raw(`"${name}"`))
+    values.push(value)
+  }
+
+  return tx.$executeRaw`INSERT INTO "users" (${Prisma.join(names)}) VALUES (${Prisma.join(values)})`
+}
+
+/**
+ * Holgura de la cota temporal de R9. La columna tiene `DEFAULT CURRENT_TIMESTAMP` en la base y
+ * `@default(now())` en el esquema, y hoy quien lo rellena es el cliente Prisma: la cota se mide
+ * contra el reloj de Node. La holgura existe para que el caso siga siendo honesto —y no
+ * intermitente— si algun dia lo rellenara el reloj del SERVIDOR, que dentro de una transaccion
+ * vale el instante en que esta empezo. Lo que el caso afirma sin holgura ninguna es lo que de
+ * verdad importa: que el instante NO esta ausente y que es EL MISMO del alta.
+ */
+const TOLERANCIA_DE_RELOJ_MS = 60_000
+
+describe('el estado de cuenta del usuario', () => {
+  it('acepta los cuatro valores del conjunto y rechaza cualquier otro sin dejar la fila', async () => {
+    // R1, R2 — la garantia es del TIPO de Postgres, no de una comprobacion previa en codigo.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+
+      // Primero: los cuatro valores del dominio SI se aceptan, uno a uno. La lista no se
+      // escribe aqui: se importa de `@/lib/modules/identity`, que es su unica definicion (R3).
+      // Si el tipo de la base y la constante divergieran, este bucle se pondria rojo.
+      expect(USER_ACCOUNT_STATUSES.length).toBeGreaterThan(0)
+      for (const [posicion, estado] of USER_ACCOUNT_STATUSES.entries()) {
+        const { id } = await createUser(tx, roleId, {
+          email: `estado.${estado}@example.com`,
+          username: `estado.${estado}`,
+          documentNumber: `90000000${posicion}`,
+        })
+        const guardado = await tx.user.update({
+          where: { id },
+          data: { accountStatus: estado },
+          select: { accountStatus: true },
+        })
+        expect(guardado.accountStatus).toBe(estado)
+      }
+
+      // Luego: un valor fuera del conjunto lo rechaza la BASE, con `22P02`.
+      const valorInventado = 'suspendido'
+      expect(USER_ACCOUNT_STATUSES as readonly string[]).not.toContain(valorInventado)
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUserWithColumns(
+            tx,
+            {
+              email: 'suspendido@example.com',
+              username: 'usuario.suspendido',
+              documentNumber: '910000001',
+            },
+            roleId,
+            { account_status: Prisma.sql`CAST(${valorInventado} AS "UserAccountStatus")` },
+          ),
+        'usuario con un estado de cuenta fuera del conjunto cerrado',
+      )
+      expect(sqlState).toBe(INVALID_TEXT_REPRESENTATION)
+
+      // Y la fila NO quedo guardada.
+      expect(await tx.user.findFirst({ where: { username: 'usuario.suspendido' } })).toBeNull()
+    })
+  })
+
+  it('un alta que no dice nada del estado nace en el estado inicial y con el instante del alta', async () => {
+    // R5, R8, R9, R10 — el `@default(pending)` y el `@default(now())` de las columnas.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+
+      const antes = new Date()
+
+      // El alta NO menciona ninguna de las tres columnas: es exactamente el caso de R5.
+      const { id } = await createUser(tx, roleId, {
+        email: 'nace.sin.estado@example.com',
+        username: 'nace.sin.estado',
+        documentNumber: '920000001',
+      })
+
+      const despues = new Date()
+
+      const fila = await tx.user.findUniqueOrThrow({
+        where: { id },
+        select: {
+          accountStatus: true,
+          accountStatusChangedAt: true,
+          accountStatusChangedBy: true,
+          createdAt: true,
+        },
+      })
+
+      // R5: `pending`, y el valor esperado sale de la constante del dominio.
+      expect(fila.accountStatus).toBe(INITIAL_USER_ACCOUNT_STATUS)
+      // R8, R9: el instante nunca esta ausente y cae dentro del alta.
+      expect(fila.accountStatusChangedAt.getTime()).toBeGreaterThanOrEqual(
+        antes.getTime() - TOLERANCIA_DE_RELOJ_MS,
+      )
+      expect(fila.accountStatusChangedAt.getTime()).toBeLessThanOrEqual(
+        despues.getTime() + TOLERANCIA_DE_RELOJ_MS,
+      )
+      expect(fila.accountStatusChangedAt.getTime()).toBe(fila.createdAt.getTime())
+      // R10: sin autor. El sistema, no una persona.
+      expect(fila.accountStatusChangedBy).toBeNull()
+    })
+  })
+
+  it('rechaza un autor del cambio que no existe y solo acepta el id de un usuario real', async () => {
+    // R11 — `users_account_status_changed_by_fkey`.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+
+      const idInventado = randomUUID()
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUserWithColumns(
+            tx,
+            {
+              email: 'autor.inventado@example.com',
+              username: 'autor.inventado',
+              documentNumber: '930000001',
+            },
+            roleId,
+            { account_status_changed_by: Prisma.sql`CAST(${idInventado} AS uuid)` },
+          ),
+        'usuario cuyo autor del ultimo cambio de estado no existe',
+      )
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+      expect(await tx.user.findFirst({ where: { username: 'autor.inventado' } })).toBeNull()
+
+      // Y el camino feliz, para que el caso no pase en verde por una razon equivocada: con el
+      // id de un usuario que SI existe, la misma escritura entra.
+      const { id: autorReal } = await createUser(tx, roleId, {
+        email: 'autor.real@example.com',
+        username: 'autor.real',
+        documentNumber: '930000002',
+      })
+      const { id: cambiado } = await createUser(tx, roleId, {
+        email: 'cambiado@example.com',
+        username: 'cambiado',
+        documentNumber: '930000003',
+      })
+      const guardado = await tx.user.update({
+        where: { id: cambiado },
+        data: { accountStatus: 'inactive', accountStatusChangedBy: autorReal },
+        select: { accountStatusChangedBy: true },
+      })
+      expect(guardado.accountStatusChangedBy).toBe(autorReal)
+    })
+  })
+
+  it('impide el borrado FISICO de un usuario que figura como autor del ultimo cambio de estado', async () => {
+    // R12 — la FK es `ON DELETE RESTRICT`, nunca CASCADE ni SET NULL: perder el rastro en
+    // silencio al borrar seria peor que no tenerlo.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+
+      const { id: autor } = await createUser(tx, roleId, {
+        email: 'admin.que.cambia@example.com',
+        username: 'admin.que.cambia',
+        documentNumber: '940000001',
+      })
+      const { id: afectado } = await createUser(tx, roleId, {
+        email: 'afectado@example.com',
+        username: 'afectado',
+        documentNumber: '940000002',
+      })
+      await tx.user.update({
+        where: { id: afectado },
+        data: { accountStatus: 'inactive', accountStatusChangedBy: autor },
+      })
+
+      // El `DELETE` va CRUDO por lo mismo que las altas que se espera que fallen (cabecera del
+      // archivo): asi llega el SQLSTATE de Postgres. `tx.user.delete` lo envuelve en el `P2003`
+      // de Prisma y el caso dejaria de afirmar sobre la violacion concreta.
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "users" WHERE "id" = CAST(${autor} AS uuid)`,
+        'borrado fisico del usuario que figura como autor de un cambio de estado',
+      )
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+
+      // El autor sigue ahi, y el rastro del cambio tambien.
+      expect(await tx.user.findUnique({ where: { id: autor }, select: { id: true } })).not.toBeNull()
+      const rastro = await tx.user.findUniqueOrThrow({
+        where: { id: afectado },
+        select: { accountStatusChangedBy: true },
+      })
+      expect(rastro.accountStatusChangedBy).toBe(autor)
+
+      // Y el borrado LOGICO del autor si se puede: R12 habla del fisico, y el borrado de este
+      // repo es logico (QC-4). Sin esta mitad, el caso podria estar describiendo un candado
+      // que no es el que se quiso poner.
+      const marcado = await softDelete(tx, autor)
+      expect(marcado).toBeInstanceOf(Date)
+    })
+  })
+
+  it('admite cualquiera de los cuatro valores como siguiente de cualquier otro, blocked a active incluido', async () => {
+    // R14 — el modelo NO restringe transiciones: ni maquina de estados, ni CHECK de
+    // transicion, ni disparador que compare el valor viejo con el nuevo. Se recorren TODOS
+    // los pares ordenados (dieciseis con los cuatro valores de hoy), no solo el par de la
+    // decision cerrada 8: un CHECK que prohibiera cualquier otra transicion caeria aqui.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const { id } = await createUser(tx, roleId, {
+        email: 'transiciones@example.com',
+        username: 'transiciones',
+        documentNumber: '950000001',
+      })
+
+      const paresProbados: string[] = []
+      for (const desde of USER_ACCOUNT_STATUSES) {
+        for (const hasta of USER_ACCOUNT_STATUSES) {
+          await tx.user.update({ where: { id }, data: { accountStatus: desde } })
+          const despues = await tx.user.update({
+            where: { id },
+            data: { accountStatus: hasta },
+            select: { accountStatus: true },
+          })
+          expect(despues.accountStatus).toBe(hasta)
+          paresProbados.push(`${desde}->${hasta}`)
+        }
+      }
+
+      // Se probaron TODOS los pares, no una muestra: el numero sale de la lista del dominio.
+      expect(paresProbados).toHaveLength(USER_ACCOUNT_STATUSES.length ** 2)
+      // Y el par que nombra la decision cerrada 8, dicho aparte para que se lea en el diff.
+      expect(paresProbados).toContain('blocked->active')
+    })
+  })
+
+  it('una cuenta inactive sigue ocupando su correo, su nombre de usuario y su documento en su empresa', async () => {
+    // R15 — el corazon de la decision cerrada 9. Los tres indices unicos NO cambian: siguen
+    // midiendose dentro de la empresa y solo sobre las filas vivas, y el estado de cuenta NO
+    // participa en ninguno. Si alguien metiera `account_status` en cualquiera de los tres,
+    // los tres rechazos de abajo dejarian de ocurrir —el segundo usuario nace `pending`, o
+    // sea con un estado DISTINTO del `inactive` del primero— y este caso caeria.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const empresaA = await createCompany(tx, 'empresa-estado-a')
+      const empresaB = await createCompany(tx, 'empresa-estado-b')
+      const seed = {
+        email: 'Ana.Perez@Example.com',
+        username: 'anaperez',
+        documentNumber: '1030555777',
+      }
+
+      const { id: apagada } = await createUser(tx, roleId, { ...seed, companyId: empresaA })
+      const filaApagada = await tx.user.update({
+        where: { id: apagada },
+        data: { accountStatus: 'inactive' },
+        select: { accountStatus: true, deletedAt: true },
+      })
+      // La cuenta esta apagada y VIVA: deshabilitar no es borrar (R16).
+      expect(filaApagada.accountStatus).toBe('inactive')
+      expect(filaApagada.deletedAt).toBeNull()
+      // Y el segundo usuario nacera con OTRO estado, que es lo que hace concluyente al caso.
+      expect(INITIAL_USER_ACCOUNT_STATUS).not.toBe('inactive')
+
+      // 1. El correo sigue ocupado en la MISMA empresa.
+      const porCorreo = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: seed.email,
+              username: 'otro.username',
+              documentNumber: '960000001',
+            }),
+            roleId,
+            empresaA,
+          ),
+        'correo ocupado por una cuenta inactive de la misma empresa',
+      )
+      expect(porCorreo).toBe(UNIQUE_VIOLATION)
+
+      // 2. El nombre de usuario, tambien.
+      const porUsuario = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: 'otro.correo@example.com',
+              username: seed.username,
+              documentNumber: '960000002',
+            }),
+            roleId,
+            empresaA,
+          ),
+        'nombre de usuario ocupado por una cuenta inactive de la misma empresa',
+      )
+      expect(porUsuario).toBe(UNIQUE_VIOLATION)
+
+      // 3. Y el documento.
+      const porDocumento = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: 'tercero@example.com',
+              username: 'tercero',
+              documentNumber: seed.documentNumber,
+            }),
+            roleId,
+            empresaA,
+          ),
+        'documento ocupado por una cuenta inactive de la misma empresa',
+      )
+      expect(porDocumento).toBe(UNIQUE_VIOLATION)
+
+      // Y en OTRA empresa los tres valores siguen libres: la unicidad es por empresa (QC-47) y
+      // el estado no le anade ni le quita nada.
+      const { id: enB } = await createUser(tx, roleId, { ...seed, companyId: empresaB })
+      expect(enB).not.toBe(apagada)
+
+      const filas = await tx.user.findMany({
+        where: { companyId: { in: [empresaA, empresaB] } },
+        select: { id: true, companyId: true, accountStatus: true },
+      })
+      expect(filas.map((fila) => fila.id).sort()).toEqual([apagada, enB].sort())
+      // La de la empresa B nacio con el estado inicial: nadie le contagio el `inactive`.
+      expect(filas.find((fila) => fila.id === enB)?.accountStatus).toBe(INITIAL_USER_ACCOUNT_STATUS)
+    })
+  })
+
+  it('el estado de cuenta y el borrado logico son independientes: ninguno mueve al otro', async () => {
+    // R16 — `deleted_at` es de QC-4 y esta ficha no lo lee ni lo escribe; ningun valor del
+    // estado implica ni excluye estar dado de baja.
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const { id } = await createUser(tx, roleId, {
+        email: 'independientes@example.com',
+        username: 'independientes',
+        documentNumber: '970000001',
+      })
+
+      // Mitad 1: cambiar el estado NO toca `deleted_at`.
+      const trasCambiarEstado = await tx.user.update({
+        where: { id },
+        data: { accountStatus: 'blocked' },
+        select: { accountStatus: true, deletedAt: true },
+      })
+      expect(trasCambiarEstado.accountStatus).toBe('blocked')
+      expect(trasCambiarEstado.deletedAt).toBeNull()
+
+      // Mitad 2: dar de baja logicamente NO cambia el estado ni su rastro.
+      const antesDeLaBaja = await tx.user.findUniqueOrThrow({
+        where: { id },
+        select: { accountStatus: true, accountStatusChangedAt: true, accountStatusChangedBy: true },
+      })
+      await softDelete(tx, id)
+      const trasLaBaja = await tx.user.findUniqueOrThrow({
+        where: { id },
+        select: {
+          accountStatus: true,
+          accountStatusChangedAt: true,
+          accountStatusChangedBy: true,
+          deletedAt: true,
+        },
+      })
+      expect(trasLaBaja.deletedAt).not.toBeNull()
+      expect(trasLaBaja.accountStatus).toBe(antesDeLaBaja.accountStatus)
+      expect(trasLaBaja.accountStatusChangedAt.getTime()).toBe(
+        antesDeLaBaja.accountStatusChangedAt.getTime(),
+      )
+      expect(trasLaBaja.accountStatusChangedBy).toBe(antesDeLaBaja.accountStatusChangedBy)
+
+      // Mitad 3: y sobre una fila YA dada de baja el estado se sigue pudiendo mover, sin que
+      // la baja se levante. Son dos ejes que no se cruzan.
+      const trasCambiarloBorrado = await tx.user.update({
+        where: { id },
+        data: { accountStatus: 'active' },
+        select: { accountStatus: true, deletedAt: true },
+      })
+      expect(trasCambiarloBorrado.accountStatus).toBe('active')
+      expect(trasCambiarloBorrado.deletedAt).toEqual(trasLaBaja.deletedAt)
+    })
+  })
+
+  it('solo guarda el ULTIMO cambio: escribir un estado nuevo sustituye el rastro anterior', async () => {
+    // R13 — no hay historial. Dos cambios seguidos dejan UNA fila con el ultimo rastro, y el
+    // esquema no gana ninguna tabla que los acumule (eso lo vigila el test estatico del
+    // esquema; aqui se comprueba el efecto sobre la fila).
+    await inRolledBackTransaction(async (tx) => {
+      const roleId = await createRole(tx)
+      const { id: primerAutor } = await createUser(tx, roleId, {
+        email: 'primer.autor@example.com',
+        username: 'primer.autor',
+        documentNumber: '980000001',
+      })
+      const { id: segundoAutor } = await createUser(tx, roleId, {
+        email: 'segundo.autor@example.com',
+        username: 'segundo.autor',
+        documentNumber: '980000002',
+      })
+      const { id } = await createUser(tx, roleId, {
+        email: 'con.dos.cambios@example.com',
+        username: 'con.dos.cambios',
+        documentNumber: '980000003',
+      })
+
+      await tx.user.update({
+        where: { id },
+        data: {
+          accountStatus: 'inactive',
+          accountStatusChangedBy: primerAutor,
+          accountStatusChangedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      })
+      await tx.user.update({
+        where: { id },
+        data: {
+          accountStatus: 'active',
+          accountStatusChangedBy: segundoAutor,
+          accountStatusChangedAt: new Date('2026-02-02T00:00:00.000Z'),
+        },
+      })
+
+      const fila = await tx.user.findUniqueOrThrow({
+        where: { id },
+        select: {
+          accountStatus: true,
+          accountStatusChangedAt: true,
+          accountStatusChangedBy: true,
+        },
+      })
+      expect(fila.accountStatus).toBe('active')
+      expect(fila.accountStatusChangedBy).toBe(segundoAutor)
+      expect(fila.accountStatusChangedAt.toISOString()).toBe('2026-02-02T00:00:00.000Z')
+
+      // Del primer cambio no queda nada en ninguna parte de la fila.
+      expect(fila.accountStatusChangedBy).not.toBe(primerAutor)
     })
   })
 })

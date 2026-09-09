@@ -1,3 +1,4 @@
+import type { UserAccountStatus } from '../domain/account-status';
 import type { DocumentTypeCode } from '../domain/document-type';
 
 /**
@@ -76,10 +77,20 @@ export interface InitialAccessRepository {
    * usuario, y llegan juntas a esta unica llamada. La implementacion tiene que
    * escribirlas en una sola sentencia: no puede existir ningun instante en el que quede
    * una persona sin empresa o sin rol.
+   *
+   * QC-65 R7: `accountStatus` es OBLIGATORIO, no opcional. El administrador inicial no
+   * puede heredar el `@default(pending)` de la columna —quedaria fuera del sistema en
+   * cuanto QC-78 corte el login por estado, y hoy no se notaria—, y un puerto que
+   * permitiera omitirlo devolveria ese agujero por la puerta de atras
+   * (`design.md > 4`). Quien decide el valor es el dominio, no el adaptador.
+   *
+   * `accountStatusChangedBy` NO esta en la firma a proposito: el administrador inicial lo
+   * crea el SISTEMA, no una persona, y eso se escribe dejando la columna NULL (R10).
    */
   createInitialAdmin(input: {
     roleId: string;
     companyId: string;
+    accountStatus: UserAccountStatus;
     username: string;
     email: string;
     passwordHash: string;

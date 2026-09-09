@@ -20,7 +20,106 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Notación EARS (`docs/specs.md`). Cada `R<n>` tiene que poder caer con un test; el mapa
+> `R<n> -> test` lo escribe el implementer en `progress/impl_QC-65-...md`
+> (`CHECKPOINTS.md > Trazabilidad`).
+>
+> Cómo leer los requisitos que dicen «no»: R18–R21 son de ALCANCE, y son requisitos de pleno
+> derecho, no comentarios. Son la mitad de la ficha —lo que QC-65 escribe es poco; lo que NO
+> puede tocar es lo que la hace segura— y se testean como los demás, con guardias que caen si
+> alguien cruza la frontera.
+
+### El dato
+
+**R1.** El sistema DEBE persistir, para cada usuario, un **estado de cuenta** cuyo valor
+pertenece al conjunto cerrado `active`, `pending`, `inactive`, `blocked`, y que nunca está
+ausente.
+
+**R2.** SI se intenta escribir un usuario con un estado de cuenta fuera de ese conjunto,
+ENTONCES el sistema DEBE rechazar la escritura y no dejar la fila guardada. La garantía es de
+la base de datos, no de una comprobación previa en código.
+
+**R3.** El sistema DEBE declarar el conjunto de los cuatro valores —y el significado de cada
+uno, tal cual lo fija la tabla de decisiones cerradas— en **un solo lugar** del dominio del
+módulo `identity`, y toda otra representación del conjunto (el esquema Prisma y el tipo de
+Postgres) DEBE coincidir con esa declaración exactamente: mismos cuatro valores, misma grafía.
+
+**R4.** El sistema DEBE nombrar en **inglés** y `snake_case` las columnas nuevas de `users`, y
+en inglés los valores del conjunto cerrado.
+
+### Cómo nace y qué pasa con lo que ya existe
+
+**R5.** CUANDO se crea un usuario sin indicar su estado de cuenta, el sistema DEBE dejarlo en
+`pending`.
+
+**R6.** CUANDO se aplica la migración de esta feature sobre una base que ya tiene usuarios, el
+sistema DEBE dejar en `active` **todas** las filas existentes, incluidas las que están dadas
+de baja lógicamente (`deleted_at` no nulo).
+
+**R7.** CUANDO el seed de acceso inicial crea el usuario administrador inicial, el sistema DEBE
+dejarlo en `active` **de forma explícita**, sin depender del valor por defecto de la columna.
+
+### El rastro del último cambio
+
+**R8.** El sistema DEBE persistir, junto al estado, el **instante del último cambio** de ese
+estado. Ese instante nunca está ausente.
+
+**R9.** CUANDO se crea un usuario sin indicar ese instante, el sistema DEBE fijarlo en el
+momento de la creación; y CUANDO se aplica la migración, el sistema DEBE fijarlo, para cada
+fila existente, en el momento en que la migración se aplica.
+
+**R10.** El sistema DEBE persistir, junto al estado, una referencia **opcional** al usuario que
+hizo el último cambio. SI esa referencia está vacía, ENTONCES significa que el cambio lo hizo
+el sistema y no una persona; nunca significa «el dato se perdió».
+
+**R11.** SI la referencia al autor del último cambio apunta a un usuario que no existe, ENTONCES
+el sistema DEBE rechazar la escritura.
+
+**R12.** MIENTRAS exista una fila que referencie a un usuario como autor del último cambio de
+estado, el sistema DEBE impedir el borrado **físico** de ese usuario.
+
+**R13.** El sistema DEBE guardar **solo el último** cambio: no existe tabla, columna ni registro
+adicional con cambios anteriores de estado, y escribir un estado nuevo sustituye el rastro
+anterior en vez de acumularlo.
+
+### Lo que el modelo NO decide
+
+**R14.** El sistema DEBE admitir cualquiera de los cuatro valores como valor siguiente de
+cualquier otro: el modelo NO restringe transiciones. No hay máquina de estados, ni `CHECK` de
+transición, ni disparador que compare el valor viejo con el nuevo. En particular, pasar de
+`blocked` a `active` es una escritura como cualquier otra.
+
+**R15.** El sistema DEBE conservar sin ningún cambio las tres unicidades de `users` —correo,
+nombre de usuario y la pareja tipo+número de documento—, que siguen midiéndose dentro de la
+empresa y solo sobre las filas vivas (`deleted_at IS NULL`). El estado de cuenta NO participa en
+ninguna de las tres: MIENTRAS una cuenta esté en `inactive` (o en `pending`, o en `blocked`),
+sigue ocupando su correo, su nombre de usuario y su documento.
+
+**R16.** El estado de cuenta y el borrado lógico DEBEN ser **independientes**: esta feature no
+lee ni escribe `deleted_at`, ningún valor del estado implica ni excluye estar dado de baja, y
+ninguna consulta de las que ya existen cambia por el estado.
+
+### Migración
+
+**R17.** La migración DEBE ser **aditiva y reversible**: añade el tipo y las tres columnas sin
+tocar ninguna otra columna, índice, restricción ni el RLS ya activo y forzado sobre `users`, y
+su `down.sql` deja `users` y el catálogo de tipos de Postgres exactamente como estaban antes
+—mismas columnas, mismos índices, mismas restricciones, sin el tipo nuevo huérfano—.
+
+### Alcance (lo que esta ficha NO hace)
+
+**R18.** Esta feature NO DEBE modificar el mecanismo de bloqueo por intentos fallidos de QC-19:
+`failed_login_attempts`, `lock_level` y `locked_until` conservan sus columnas, sus valores y su
+semántica, y `verify-credentials` y sus tests quedan intactos.
+
+**R19.** Ningún código de producción DEBE **leer** el estado de cuenta para decidir nada: no hay
+corte de acceso por estado, ni lectura desde el login, la sesión, el middleware o la UI. El
+estado se escribe y se guarda; quien lo lea llega en QC-78.
+
+**R20.** Esta feature NO DEBE añadir ningún caso de uso de cambio de estado (QC-66), ningún
+adaptador driving, ninguna ruta, ninguna Server Action y ninguna pantalla (QC-67).
+
+**R21.** Esta feature NO DEBE añadir ninguna dependencia a `package.json`.
 
 ## Preguntas abiertas
 

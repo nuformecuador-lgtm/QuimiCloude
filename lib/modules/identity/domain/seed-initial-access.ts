@@ -1,3 +1,4 @@
+import { SEED_ADMIN_ACCOUNT_STATUS } from './account-status';
 import { INITIAL_COMPANY_NAME } from './companies';
 import { normalizeCompanyName } from './company-name';
 import { DOCUMENT_TYPE_CC } from './document-type';
@@ -154,6 +155,12 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
     await repository.createInitialAdmin({
       roleId: administradorRoleId,
       companyId,
+      // QC-65 R7: el estado va EXPLICITO y sale de la unica constante del dominio que lo
+      // nombra (`SEED_ADMIN_ACCOUNT_STATUS`), nunca de un literal repetido aqui ni del
+      // `@default(pending)` de la columna. El administrador de instalacion tiene que poder
+      // entrar (decision cerrada 4), y heredar el default lo dejaria `pending`.
+      // `accountStatusChangedBy` no se pasa: lo puso el sistema, no una persona (R10).
+      accountStatus: SEED_ADMIN_ACCOUNT_STATUS,
       username: hashedAdmin.username,
       email: hashedAdmin.email,
       passwordHash: hashedAdmin.passwordHash,
