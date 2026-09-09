@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 
 import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -245,7 +245,7 @@ describe('barra lateral privada', () => {
 
   it('un item con hijos se renderiza como control de expansion, no como enlace, y es activable por teclado', async () => {
     // R9
-    const user = userEvent.setup();
+    const user = setupUser();
     const grupo = primerGrupo();
     renderSidebar();
 
@@ -280,7 +280,7 @@ describe('barra lateral privada', () => {
 
   it('el submenu colapsado expone aria-expanded=false y no expone sus hijos; expandido los expone', async () => {
     // R10
-    const user = userEvent.setup();
+    const user = setupUser();
     const grupo = primerGrupo();
     renderSidebar();
 
@@ -303,7 +303,7 @@ describe('barra lateral privada', () => {
 
   it('activar el control del submenu alterna entre expandido y colapsado', async () => {
     // R11
-    const user = userEvent.setup();
+    const user = setupUser();
     const grupo = primerGrupo();
     const primerHijo = grupo.items[0];
     if (!primerHijo) {
@@ -342,7 +342,7 @@ describe('barra lateral privada', () => {
 
   it('los destinos de la marca y de todas las entradas salen de las constantes exportadas', async () => {
     // R13
-    const user = userEvent.setup();
+    const user = setupUser();
     renderSidebar();
 
     // Los hijos solo existen en el DOM cuando su submenu esta abierto: se abren todos.
@@ -384,7 +384,7 @@ describe('barra lateral privada', () => {
     // R5 — QC-26 T23. El item nace en el barrel `private-nav.ts` (T3) ya migrado; aqui se
     // afirma sobre el DOM real: un solo item apunta a `FORMULAS_ROUTE`, con el testId nuevo, y
     // el testId viejo (`nav-produccion-formulas`) ya no existe en ningun sitio del arbol.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     const itemsDeRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
       item.kind === 'group' ? item.items : [item],

@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { StepReader } from '@/components/shared/step-reader';
@@ -77,7 +77,7 @@ function renderReader(
 }
 
 /** Marca todos los items que hay en pantalla, uno a uno. */
-async function marcarTodo(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+async function marcarTodo(user: ReturnType<typeof setupUser>): Promise<void> {
   for (const casilla of screen.queryAllByRole('checkbox')) {
     if (casilla.getAttribute('aria-checked') !== 'true') {
       await user.click(casilla);
@@ -87,7 +87,7 @@ async function marcarTodo(user: ReturnType<typeof userEvent.setup>): Promise<voi
 
 /** Pulsa Tab hasta que el foco cae en `objetivo`, o falla si no se alcanza. */
 async function tabHasta(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   objetivo: HTMLElement,
 ): Promise<void> {
   for (let intento = 0; intento < 12; intento += 1) {
@@ -140,7 +140,7 @@ describe('StepReader — R14: un solo paso por pantalla, con su posicion', () =>
 
 describe('StepReader — R15: Anterior, Siguiente y Finalizar en el ultimo paso', () => {
   it('avanza y retrocede entre pasos con Siguiente y Anterior', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
     await marcarTodo(user);
 
@@ -153,7 +153,7 @@ describe('StepReader — R15: Anterior, Siguiente y Finalizar en el ultimo paso'
   });
 
   it('en el ultimo paso ofrece Finalizar y ya NO ofrece Siguiente', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const onFinish = vi.fn();
     renderReader(TRES_PASOS, onFinish);
 
@@ -170,7 +170,7 @@ describe('StepReader — R15: Anterior, Siguiente y Finalizar en el ultimo paso'
   });
 
   it('en el primer paso, Anterior no permite retroceder', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     const anterior = screen.getByTestId('step-reader-previous');
@@ -183,7 +183,7 @@ describe('StepReader — R15: Anterior, Siguiente y Finalizar en el ultimo paso'
 
 describe('StepReader — R16: marcar, desmarcar y conservar al ir y volver', () => {
   it('marca y desmarca un item de la lista de verificacion', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     const item = screen.getByRole('checkbox', { name: ITEM_1 });
@@ -197,7 +197,7 @@ describe('StepReader — R16: marcar, desmarcar y conservar al ir y volver', () 
   });
 
   it('conserva lo marcado al ir al paso siguiente y volver', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     await marcarTodo(user);
@@ -229,7 +229,7 @@ describe('StepReader — R17: bloqueo con el motivo en texto visible', () => {
   });
 
   it('actualiza el numero de pendientes y libera el boton al marcar el ultimo', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     await user.click(screen.getByRole('checkbox', { name: ITEM_1 }));
@@ -244,7 +244,7 @@ describe('StepReader — R17: bloqueo con el motivo en texto visible', () => {
   });
 
   it('tambien bloquea Finalizar en el ultimo paso', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     await marcarTodo(user);
@@ -260,7 +260,7 @@ describe('StepReader — R17: bloqueo con el motivo en texto visible', () => {
 
 describe('StepReader — R18: un paso sin items avanza sin accion previa', () => {
   it('no bloquea el avance cuando el paso no tiene lista de verificacion', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     await marcarTodo(user);
@@ -275,7 +275,7 @@ describe('StepReader — R18: un paso sin items avanza sin accion previa', () =>
 
 describe('StepReader — R19: el marcado no sobrevive al desmontaje', () => {
   it('al remontar el asistente todos los items vuelven sin marcar', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const { unmount } = renderReader();
 
     await marcarTodo(user);
@@ -333,7 +333,7 @@ describe('StepReader — R21: sin pasos, estado vacio y sin navegacion', () => {
 
 describe('StepReader — R27: operable por teclado y cambio de paso anunciado', () => {
   it('permite marcar un item y avanzar sin tocar el raton', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     for (const nombre of [ITEM_1, ITEM_2]) {
@@ -354,7 +354,7 @@ describe('StepReader — R27: operable por teclado y cambio de paso anunciado', 
   });
 
   it('anuncia el paso actual en una region `aria-live="polite"`', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderReader();
 
     const region = screen.getByTestId('step-reader-position');

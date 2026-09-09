@@ -33,7 +33,7 @@
 // publico de la tabla compartida o por constantes exportadas del barrel de la ruta.
 
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -403,7 +403,7 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
     // 16 px es el umbral por debajo del cual Safari en iOS hace zoom al enfocar el campo, y ese
     // zoom deja la pantalla desplazada a mano. Se comprueba en los DOS anchos: `md:text-base`
     // esta justamente para que el campo no vuelva a 14 px en el breakpoint de escritorio.
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderPantalla();
 
     await user.click(screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID));
@@ -436,7 +436,7 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
   });
 
   it('el dialogo de borrado es utilizable y sus dos acciones miden 44x44 px (R34)', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${PRESENTACION.id}`);

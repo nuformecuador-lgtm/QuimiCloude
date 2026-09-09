@@ -1,5 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent, { type UserEvent } from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
+
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
@@ -118,14 +120,16 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 /**
  * Margen de tiempo (review de QC-26, MAYOR 1). Estos casos montan el formulario entero y lo
  * conducen con decenas de interacciones reales de `user-event` sobre selectores con popup; en
- * aislado los mas largos rondaban 1,7-1,9 s contra el `testTimeout` por defecto de 5000 ms, y
+ * aislado los mas largos rondaban 1,7-1,9 s contra el `testTimeout` que por entonces era el de
+ * Vitest por defecto, 5000 ms (desde QC-58 los tres proyectos declaran 15000 ms), y
  * ese margen de 2,7x NO aguantaba la paralelizacion de la suite completa: R30 y R31 expiraban
  * de forma reproducible.
  *
  * Se corrigen las DOS causas, sin tocar ni una asercion:
  *
- * 1) `setupUser()` (mas abajo) elimina la espera artificial entre eventos, que era la mitad del
- *    coste. Los eventos que se emiten son EXACTAMENTE los mismos.
+ * 1) `setupUser()` elimina la espera artificial entre eventos, que era la mitad del coste. Los
+ *    eventos que se emiten son EXACTAMENTE los mismos. Desde QC-58 ya no se define aqui: vive
+ *    en `tests/helpers/user-event.ts` y lo usa todo el repo. Este archivo fue el precedente.
  * 2) Este `testTimeout` da margen de sobra para la carga de la suite entera. No es un parche
  *    para un test lento: es el reconocimiento de que un test de formulario completo con popups
  *    no se mide con el mismo cronometro que uno de funcion pura.
@@ -200,20 +204,6 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
   };
 }
 
-/**
- * `userEvent.setup()` con `delay: null` (review de QC-26, MAYOR 1). Por defecto `user-event`
- * intercala un `setTimeout(0)` entre CADA evento -por cada tecla, por cada movimiento de
- * puntero-, y en estos casos eso son cientos de saltos al event loop. `delay: null` quita solo
- * esa espera artificial: la secuencia de eventos que recibe el DOM es identica (mismos
- * `pointerdown`/`mousedown`/`focus`/`keydown`/`input`...), y siguen activas TODAS las
- * comprobaciones de `user-event` -incluida la de `pointer-events`, que es la que impide
- * "hacer clic" en un control tapado o deshabilitado-. No se relaja nada: solo se deja de
- * esperar a nada.
- */
-function setupUser(): UserEvent {
-  return userEvent.setup({ delay: null });
-}
-
 function renderCreateForm() {
   return render(<RecipeForm mode="create" units={UNITS} initialProductPage={PRODUCT_PAGE_1} />);
 }
@@ -250,13 +240,13 @@ function scrollAlFinalDelSelector(testId: string, altoVisible = 256) {
 /** Selecciona un producto ya presente en la primera página, sin pedir otra página al backend. */
 async function chooseProductForLine(user: UserEvent, index: number, productName: string) {
   await user.click(screen.getByTestId(`recipe-line-product-${index}`));
-  await user.click(await screen.findByRole('option', { name: productName }));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: productName })));
 }
 
 /** Selecciona una unidad del catálogo por su etiqueta visible (símbolo o, en su ausencia, nombre). */
 async function chooseUnitForLine(user: UserEvent, index: number, unitLabel: string) {
   await user.click(screen.getByTestId(`recipe-line-unit-${index}`));
-  await user.click(await screen.findByRole('option', { name: unitLabel }));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: unitLabel })));
 }
 
 /** Añade una línea completa y válida en la posición `index` (siguiente hueco libre). */
@@ -1243,8 +1233,10 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
     // la bloquea (R15, R18).
     await user.click(within(modal).getByTestId('step-reader-finish'));
 
-    await waitFor(() => expect(screen.queryByTestId('recipe-form-preview')).toBeNull());
-    expect(screen.queryByTestId('step-reader')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByTestId('recipe-form-preview')).toBeNull();
+      expect(screen.queryByTestId('step-reader')).toBeNull();
+    });
 
     // R22: cerrar por Finalizar tampoco guarda ni navega, y el formulario sigue entero.
     esperarQueNoSeInvocoNingunaAccion();

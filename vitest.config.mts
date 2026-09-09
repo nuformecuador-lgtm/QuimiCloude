@@ -39,6 +39,11 @@ export default defineConfig({
           name: 'ui',
           environment: 'jsdom',
           globals: true,
+          // Ver `docs/verification.md > Los flakes de saturacion`. 15 s, no los 5 s por
+          // defecto, y POR PROYECTO: `testTimeout` es opcion de proyecto y escribirlo una
+          // sola vez en la raiz seria una apuesta sobre la herencia que sale verde si
+          // pierdes. Lo vigila `tests/guards/guard-teclear-y-plazo.test.ts` (QC-58, R1).
+          testTimeout: 15_000,
           setupFiles: ['./tests/setup.ts'],
           include: ['tests/**/*.test.tsx', 'tests/ui/**/*.test.ts'],
           exclude,
@@ -50,6 +55,11 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           globals: true,
+          // Mismo plazo que `ui`, y no es copia por inercia: el fallo se midio tambien aqui
+          // (`composition/identity-facade`, que no teclea nada, murio en
+          // `await import('@/lib/composition')`). La causa es contencion de CPU y no
+          // distingue de proyecto. Ver `docs/verification.md > Los flakes de saturacion`.
+          testTimeout: 15_000,
           include: ['tests/**/*.test.ts'],
           exclude: [...exclude, 'tests/ui/**', 'tests/integration/**'],
         },
@@ -60,6 +70,9 @@ export default defineConfig({
           name: 'integration',
           environment: 'node',
           globals: true,
+          // Mismo plazo que los otros dos. Ver `docs/verification.md > Los flakes de
+          // saturacion` (QC-58, R1).
+          testTimeout: 15_000,
           include: ['tests/integration/**/*.test.ts'],
           exclude,
           // Los de integracion no se aislan entre si: pegan contra UNA base real y

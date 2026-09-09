@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 
 import PrivateLayout from '@/app/(private)/layout';
 import type { SessionUser } from '@/lib/modules/identity';
@@ -153,7 +153,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
   it('con solo `inventario.consultar`, el control de cerrar sesion sigue presente', async () => {
     // R14 — cerrar sesion no exige ningun permiso del catalogo.
-    const usuario = userEvent.setup();
+    const usuario = setupUser();
     await renderLayout(['inventario.consultar']);
 
     expect(screen.getByTestId(testId.user)).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
   it('sin ningun permiso, el menu queda sin items y el pie con cerrar sesion sigue ahi', async () => {
     // R9, R14 — nadie se queda encerrado: menu vacio, pero salida presente.
-    const usuario = userEvent.setup();
+    const usuario = setupUser();
     await renderLayout([]);
 
     const navegacion = screen.getByRole('navigation', { name: PRIVATE_NAV_LABEL });
