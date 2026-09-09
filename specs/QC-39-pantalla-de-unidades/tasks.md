@@ -255,7 +255,7 @@
 - [x] `progress/impl_QC-39-pantalla-de-unidades.md` con el mapa `R<n> -> test` de abajo, completo,
       con los comandos y su salida, y con la lista final de archivos ajenos tocados frente a la de
       `design.md > 1`.
-- [ ] `./init.sh` completo en verde.
+- [x] `./init.sh` completo en verde.
 - **Hecho cuando:** las dos cosas, y ningún `R<n>` sin test.
 
 ## Mapa `R<n> -> test` (lo exige `CHECKPOINTS.md > Trazabilidad`)
