@@ -320,21 +320,34 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   //
   // La lista sigue siendo CERRADA: en cuanto el E2E de recetas -o uno nuevo- referencie
   // `data-table`, esto vuelve a ponerse rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cuatro', () => {
+  //
+  // AMPLIADA POR TERCERA VEZ el 2026-09-08 (QC-39, pantalla-de-unidades): entra la QUINTA entrada,
+  // `e2e/unidades.spec.ts`, y la trae la misma decision cerrada que dio de alta a la pantalla de
+  // unidades como consumidora de la tabla compartida (QC-39 R15, R31,
+  // `specs/QC-39-pantalla-de-unidades/requirements.md > Decisiones cerradas`, 2026-09-08): su E2E
+  // -exigido por QC-39 R50- localiza `data-table-cell-name`, `data-table-cell-equivalence` y
+  // `data-table-row-<id>` porque la lista que recorre ES la tabla compartida. Se anade la fila y se
+  // TENSA el centinela -el ancla pasa de cuatro entradas a cinco-, nunca se afloja: la lista sigue
+  // CERRADA, el E2E de recetas sigue fuera y un SEXTO spec que referencie `data-table` vuelve a
+  // ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cinco', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos cuatro E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cinco E2E pueden referenciar la tabla compartida (R36)').toEqual([
       'e2e/inventario.spec.ts',
       'e2e/pedidos.spec.ts',
       // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
       // la pantalla de presentaciones la consume (QC-45 R8, R36). La lista sigue CERRADA: un
-      // quinto spec que referencie `data-table` vuelve a ponerla en rojo.
+      // sexto spec que referencie `data-table` vuelve a ponerla en rojo.
       'e2e/presentaciones.spec.ts',
       'e2e/proveedores.spec.ts',
+      // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
+      // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).
+      'e2e/unidades.spec.ts',
     ])
   })
 })
