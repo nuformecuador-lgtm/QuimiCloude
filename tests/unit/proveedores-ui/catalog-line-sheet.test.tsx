@@ -658,6 +658,8 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
     await waitFor(() => expect(createCatalogLineActionMock).toHaveBeenCalledTimes(1));
 
     const errorDeCampo = await screen.findByTestId('catalog-error-name');
+    // QC-70 R32: el mensaje del back, tal cual, sin sustituirlo por uno propio del formulario.
+    expect(errorDeCampo).toHaveTextContent('MENSAJE-DEL-SERVIDOR-QUE-NADIE-INTERPRETA');
     const campo = screen.getByTestId('catalog-field-name');
     expect(campo).toHaveAttribute('aria-invalid', 'true');
     expect(campo).toHaveAttribute('aria-describedby', errorDeCampo.id);
@@ -706,14 +708,17 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
     expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 
-  it('un not_found ofrece volver a la lista desde la region de error del formulario', async () => {
-    // R32 — la linea dejo de existir mientras el panel estaba abierto. El destino se deriva de
+  it('un catalog_line_not_found ofrece volver a la lista desde la region de error del formulario', async () => {
+    // R32 — la LINEA dejo de existir mientras el panel estaba abierto. El destino se deriva de
     // `SUPPLIERS_ROUTE` (R2), nunca de un literal.
+    //
+    // QC-70 R20: el codigo es el ABIERTO por caso. En la edicion el «no existe» que puede llegar
+    // es el de la linea, y trae SU frase; el del proveedor tiene la suya (el caso de abajo).
     const user = setupUser();
     updateCatalogLineActionMock.mockResolvedValue({
       status: 'error',
-      code: 'not_found',
-      message: 'No existe.',
+      code: 'catalog_line_not_found',
+      message: 'La linea de catalogo solicitada no existe.',
     });
 
     await renderPantalla();
@@ -725,6 +730,41 @@ describe('linea de catalogo — errores por codigo estable (R32, R45)', () => {
     const vuelta = await screen.findByTestId('catalog-line-form-back-to-list');
     expect(vuelta.getAttribute('href')).toBe(SUPPLIERS_ROUTE);
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(testId.errorFormulario)).getByTestId(
+        'catalog-line-form-error-message',
+      ),
+    ).toHaveTextContent('La linea de catalogo solicitada no existe.');
+  });
+
+  it('un supplier_not_found del ALTA ofrece la misma vuelta, pero con SU propia frase', async () => {
+    // QC-70 R20, R32, `design.md > 4.3` (nota sobre el 3) — este formulario recibe DOS codigos de
+    // «no existe» distintos: en el alta el que llega es el del PROVEEDOR. Antes de la apertura por
+    // caso los dos eran `not_found` y la pantalla pintaba la misma frase para las dos situaciones.
+    const user = setupUser();
+    createCatalogLineActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'supplier_not_found',
+      message: 'El proveedor solicitado no existe.',
+    });
+
+    await renderPantalla();
+    await abrirAlta(user);
+    await elegirPresentacion(user);
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createCatalogLineActionMock).toHaveBeenCalledTimes(1));
+
+    const vuelta = await screen.findByTestId('catalog-line-form-back-to-list');
+    expect(vuelta.getAttribute('href')).toBe(SUPPLIERS_ROUTE);
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+    // La frase es la del proveedor, NO la de la linea: ese es el cambio que la apertura permite.
+    expect(
+      within(screen.getByTestId(testId.errorFormulario)).getByTestId(
+        'catalog-line-form-error-message',
+      ),
+    ).toHaveTextContent('El proveedor solicitado no existe.');
   });
 
   it('la validacion previa aplica el MISMO esquema del contrato publico y ni llama a la operacion', async () => {

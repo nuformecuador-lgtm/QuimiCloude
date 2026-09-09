@@ -45,7 +45,6 @@ const MAX_LIST_HEIGHT = 256;
 /** Margen para pedir la pagina siguiente antes de tocar el fondo, en px. */
 const SCROLL_THRESHOLD = 48;
 
-const DUPLICATE_NAME_MESSAGE = 'Ya existe una presentación con ese nombre.';
 const INVALID_NAME_MESSAGE = 'Escribe un nombre de presentación válido.';
 const PLACEHOLDER = 'Busca una presentación por su nombre';
 const EMPTY_LABEL = 'Ninguna presentación coincide con la búsqueda.';
@@ -254,9 +253,11 @@ export function PresentationSelect({
     setCreatePending(false);
 
     if (result.status === 'error') {
-      // `duplicate_name` SI identifica un campo, asi que se pinta junto al nombre y no en la
-      // region de error del formulario (R20).
-      setCreateError(result.code === 'duplicate_name' ? DUPLICATE_NAME_MESSAGE : result.message);
+      // `presentation_duplicate_name` SI identifica un campo, asi que se pinta junto al nombre y
+      // no en la region de error del formulario (R20). QC-70: el codigo es el abierto por caso
+      // concreto, y el texto es SIEMPRE el que devuelve el back -el del catalogo-, no una frase
+      // propia para ese mismo caso (R32). Lo que sigue decidiendo el codigo es DONDE se pinta.
+      setCreateError(result.message);
       return;
     }
 

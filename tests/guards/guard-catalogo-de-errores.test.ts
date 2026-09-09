@@ -628,21 +628,16 @@ describe('guardia del catalogo de errores (QC-70 T3)', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // El repositorio real, para las comprobaciones que la MIGRACION todavia no ha cerrado.
+  // El repositorio real. DESMARCADO EN T9, una vez cerrada la migracion de T4-T8 y T10-T13.
   //
-  // Hoy sale ROJO a proposito y esta esperado: los cinco modulos siguen declarando
-  // `not_found` y `duplicate_name`, los siete adaptadores driving siguen con su copia de
-  // `toErrorState`, los constructores siguen admitiendo `message`, y el catalogo tiene
-  // entradas que ninguna clase emite todavia. Es exactamente lo que T4-T8 arreglan.
-  //
-  // Medido el 2026-09-08 quitando el `.skip`: 9 codigos fuera del catalogo, 14 archivos con
-  // traductor propio, 36 constructores con `message`, 10 entradas huerfanas y 8 comparaciones
-  // contra un generico en la UI. O sea que estas cinco MUERDEN sobre el arbol real; lo que
-  // falta no es la regla, es la migracion.
-  //
-  // SE DESMARCA EN T9, que es la task que existe para eso.
+  // Estas cinco estuvieron en `.skip` mientras la migracion corria, y no por comodidad: medido
+  // el 2026-09-08 con el arbol de entonces, mordian 9 codigos fuera del catalogo, 14 archivos
+  // con traductor propio, 36 constructores con `message`, 10 entradas huerfanas y 8
+  // comparaciones contra un generico en la UI. Que hoy salgan verdes es la prueba de que la
+  // migracion se cerro entera, no de que la regla sea floja: las mismas funciones puras que
+  // aqui salen limpias muerden arriba con entradas sinteticas.
   // ---------------------------------------------------------------------------
-  describe.skip('el repositorio real, tras la migracion (se desmarca en T9)', () => {
+  describe('el repositorio real, tras la migracion (T9)', () => {
     it('ningun modulo declara un codigo fuera del catalogo (R22)', () => {
       expect(findCodeOutsideCatalogFindings(errorFiles, CATALOG_CODES)).toEqual([])
     })

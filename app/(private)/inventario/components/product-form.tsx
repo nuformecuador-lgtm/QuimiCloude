@@ -15,6 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { createProductSchema, type ProductView } from '@/lib/modules/inventario';
 import {
   createProductAction,
@@ -85,7 +86,7 @@ type ProductFormState =
   | {
       status: 'error';
       /** Codigo estable de la operacion, o `invalid_input` cuando el rechazo es de la validacion previa. */
-      code: string;
+      code: ErrorCode;
       /** Mensaje para la region de error del formulario. Vacio si todos los errores son de campo. */
       message: string;
       fieldErrors: FieldErrors;
@@ -94,7 +95,14 @@ type ProductFormState =
 
 const INITIAL_STATE: ProductFormState = { status: 'idle' };
 
-const INVALID_INPUT_CODE = 'invalid_input';
+/**
+ * QC-70 (R21): el codigo que este formulario FABRICA cuando la entrada ni llega a formarse sale
+ * del catalogo y se tipa con `ErrorCode`, la union cerrada. Su valor no cambia.
+ *
+ * El mensaje de al lado NO sale del catalogo y se queda como esta (R31, `design.md > 6 bis`): es
+ * el texto de una comprobacion PROPIA del formulario, no de un error que emita el back.
+ */
+const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 function readString(formData: FormData, name: string): string {
@@ -206,7 +214,7 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         : await updateProductAction(product.id, { status: 'idle' }, formData);
 
     if (result.status === 'error') {
-      // `invalid_input`, `not_found` y `unauthorized` NO identifican campo: van a la region de
+      // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la region de
       // error del formulario, que es lo que R20 pide para ese caso.
       return {
         status: 'error',

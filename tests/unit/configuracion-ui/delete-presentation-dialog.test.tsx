@@ -164,6 +164,14 @@ describe('al confirmar se invoca el borrado y se aplica R25', () => {
 });
 
 describe('`presentation_in_use` se pinta DENTRO del dialogo, que sigue abierto (R28)', () => {
+  it('el codigo del rechazo por FK es el del catalogo y conserva su valor', () => {
+    // QC-70 R19, R20 — `presentation_in_use` ya era inequivoco, asi que NO se renombra; lo que
+    // cambia es que el literal sale del catalogo y esta tipado con `ErrorCode`. Se fija el valor
+    // aqui para que un renombrado silencioso no deje al dialogo comparando contra una palabra
+    // muerta.
+    expect(PRESENTATION_IN_USE_CODE).toBe('presentation_in_use');
+  });
+
   it('la region de error lleva el codigo estable y el dialogo no se cierra', async () => {
     const user = setupUser();
     const mensajeDelServidor = 'La presentacion tiene productos asignados y no se puede borrar.';
@@ -191,18 +199,20 @@ describe('`presentation_in_use` se pinta DENTRO del dialogo, que sigue abierto (
   });
 
   it('cualquier otro codigo se pinta igual: decide el codigo, nunca el texto', async () => {
+    // QC-70 R20 — el `not_found` generico ya no existe: el caso concreto de esta pantalla es
+    // `presentation_not_found`, que es lo que emite el borrado cuando la presentacion se fue.
     const user = setupUser();
     deletePresentationActionMock.mockResolvedValue({
       status: 'error',
-      code: 'not_found',
-      message: 'No existe.',
+      code: 'presentation_not_found',
+      message: 'La presentacion solicitada no existe.',
     });
     montar();
 
     await user.click(screen.getByTestId(DELETE_PRESENTATION_CONFIRM_TESTID));
 
     const region = await screen.findByTestId(DELETE_PRESENTATION_ERROR_TESTID);
-    expect(region).toHaveAttribute('data-code', 'not_found');
+    expect(region).toHaveAttribute('data-code', 'presentation_not_found');
     expect(seCerro()).toBe(false);
     expect(toastExito).not.toHaveBeenCalled();
   });

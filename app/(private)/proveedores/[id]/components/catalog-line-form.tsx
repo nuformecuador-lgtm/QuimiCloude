@@ -15,6 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import type { ErrorCode } from '@/lib/modules/errores';
 import {
   createCatalogLineSchema,
   updateCatalogLineSchema,
@@ -92,7 +93,7 @@ type CatalogLineFormState =
   | {
       status: 'error';
       /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: string;
+      code: ErrorCode;
       message: string;
       fieldErrors: FieldErrors;
       values: FieldValues;
@@ -100,14 +101,26 @@ type CatalogLineFormState =
 
 const INITIAL_STATE: CatalogLineFormState = { status: 'idle' };
 
-/** Codigos estables de `proveedores/domain/errors.ts` que este formulario distingue. */
-const DUPLICATE_CATALOG_LINE_CODE = 'duplicate_catalog_line';
-const INVALID_INPUT_CODE = 'invalid_input';
-const NOT_FOUND_CODE = 'not_found';
+/**
+ * Codigos estables que este formulario distingue. Salen del catalogo cerrado de
+ * `lib/modules/errores` (R20, R21): `satisfies ErrorCode` conserva el literal para comparar y a
+ * la vez obliga a que exista alli, de modo que uno mal escrito no compila (R2).
+ *
+ * **Este archivo es el motivo por el que la apertura por caso hacia falta** (`design.md > 4.3`,
+ * nota sobre el 3). Hasta QC-70 recibia UN solo `not_found` que significaba dos cosas -la linea
+ * no existe (editar/borrar) o el PROVEEDOR no existe (alta)- y pintaba la misma frase para las
+ * dos. Ahora son dos codigos con dos mensajes de catalogo, y el formulario trata **los dos**.
+ */
+const DUPLICATE_CATALOG_LINE_CODE = 'duplicate_catalog_line' satisfies ErrorCode;
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
+/** La linea dejo de existir: solo puede llegar desde la edicion o el borrado. */
+const CATALOG_LINE_NOT_FOUND_CODE = 'catalog_line_not_found' satisfies ErrorCode;
+/** El proveedor dejo de existir: es el que llega al ALTA de una linea. */
+const SUPPLIER_NOT_FOUND_CODE = 'supplier_not_found' satisfies ErrorCode;
 
+// Texto de la validacion PROPIA del formulario. R31 lo deja intacto: el catalogo manda sobre lo
+// que emite el back, no sobre lo que el formulario comprueba por su cuenta.
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
-const DUPLICATE_CATALOG_LINE_MESSAGE =
-  'Ya existe una línea de este proveedor con ese nombre y esa presentación.';
 const BACK_TO_LIST_LABEL = 'Volver a la lista de proveedores';
 
 /**
@@ -276,13 +289,14 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
           La traduccion es por `code`, NUNCA por texto (R32, `design.md > 7`): el mensaje que
           devuelve la operacion se pinta, pero quien decide DONDE se pinta es el codigo estable.
           `duplicate_catalog_line` SI identifica campo -la pareja nombre + presentacion-, y se
-          pinta junto al nombre. `invalid_input`, `not_found` y `unauthorized` no senalan
+          pinta junto al nombre. `invalid_input`, los dos «no existe» y `unauthorized` no senalan
           ninguno: van a la region de error del formulario.
+
+          QC-70 (R32): la frase que se pinta es la DEL BACK, no un texto propio para ese mismo
+          codigo. Antes habia aqui un `DUPLICATE_CATALOG_LINE_MESSAGE` local que tapaba la del
+          catalogo.
         */
-        fieldErrors:
-          result.code === DUPLICATE_CATALOG_LINE_CODE
-            ? { name: DUPLICATE_CATALOG_LINE_MESSAGE }
-            : {},
+        fieldErrors: result.code === DUPLICATE_CATALOG_LINE_CODE ? { name: result.message } : {},
         values,
       };
     }
@@ -305,7 +319,16 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
     values?.[field] ?? fromLine;
 
   const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
-  const isMissing = state.status === 'error' && state.code === NOT_FOUND_CODE;
+  /*
+    Los DOS «no existe» dejan al panel sin nada que guardar, asi que los dos ofrecen la vuelta a
+    la lista (R20, `design.md > 4.3` nota sobre el 3). Se comprueban por separado y no con un
+    unico codigo generico **porque cada uno trae su propia frase del catalogo** -«La linea de
+    catalogo solicitada no existe.» y «El proveedor solicitado no existe.»-, que es exactamente
+    lo que la pantalla no podia distinguir antes de QC-70.
+  */
+  const isMissing =
+    state.status === 'error' &&
+    (state.code === CATALOG_LINE_NOT_FOUND_CODE || state.code === SUPPLIER_NOT_FOUND_CODE);
   const isEdit = line !== undefined;
 
   // `deliveryTime` es un entero en el contrato; se precarga como texto sin operar con el.
@@ -365,8 +388,10 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
               {state.code}
             </p>
             {isMissing ? (
-              // `not_found`: la linea o el proveedor dejaron de existir mientras el panel estaba
-              // abierto. El destino sale de la constante de ruta, nunca de un literal (R2).
+              // `catalog_line_not_found` o `supplier_not_found`: la linea o el proveedor dejaron
+              // de existir mientras el panel estaba abierto. Cual de las dos cosas paso lo dice
+              // el mensaje del catalogo, arriba. El destino sale de la constante de ruta, nunca
+              // de un literal (R2).
               <Link
                 href={SUPPLIERS_ROUTE}
                 className={`${TOUCH_TARGET} inline-flex items-center underline underline-offset-4`}

@@ -617,6 +617,25 @@ describe('contrato de la ruta de recetas', () => {
       'lib/modules/recetas/adapters/driving/recipe-actions.ts',
     ];
 
+    // RETENSADO 2026-09-08 (QC-70 T14), con el MISMO criterio que los retensados de QC-34 y
+    // QC-74 de arriba: el rango `origin/dev...HEAD` mide la rama que corre el gate, asi que
+    // cada cambio legitimo posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
+    //
+    // QC-70 centraliza el catalogo de errores y, por decision cerrada, MIGRA los cinco modulos:
+    // `recetas` incluido. Los siete archivos que toca ya estan nombrados arriba —los cinco casos
+    // de uso, `errors.ts`, `recipe-actions.ts` e `index.ts`, todos en las listas de QC-34 y
+    // QC-74—, asi que aqui solo hace falta UNO mas.
+    //
+    // Y ese uno **no cambia una linea de codigo**: `recipe-prisma.ts` sigue congelado en su
+    // comportamiento —la misma traduccion de `P2002`, el mismo `RECIPE_NAME_UNIQUE_COLUMN`, la
+    // misma consulta—. Lo unico que cambia son DOS COMENTARIOS que nombraban
+    // `DuplicateNameError`, clase que QC-70 renombro a `RecipeDuplicateNameError`. La
+    // alternativa era dejar en el repositorio el nombre de una clase que ya no existe, que es
+    // peor: un comentario que miente envejece igual que el codigo y nadie lo compila.
+    const RENOMBRADO_DE_COMENTARIOS_QC70 = [
+      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+    ];
+
     // POR QUE `db/` cambia: QC-34 decision cerrada 3 anade el cuarto estado `CANCELADO`, y eso
     // es una migracion del tipo enumerado (R48, R49, R50) con su columna de motivo. La carpeta
     // de migracion es EXACTAMENTE UNA y esta nombrada; el esquema solo gana la columna nueva.
@@ -664,7 +683,8 @@ describe('contrato de la ruta de recetas', () => {
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
       .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta))
-      .filter((ruta) => !AUTORIZACION_POR_PERMISO_QC74.includes(ruta));
+      .filter((ruta) => !AUTORIZACION_POR_PERMISO_QC74.includes(ruta))
+      .filter((ruta) => !RENOMBRADO_DE_COMENTARIOS_QC70.includes(ruta));
     const tocaDb = diff
       .filter((ruta) => ruta.startsWith('db/'))
       .filter((ruta) => !MIGRACION_QC34.includes(ruta))

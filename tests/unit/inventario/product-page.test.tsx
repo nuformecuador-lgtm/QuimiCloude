@@ -209,6 +209,7 @@ const testId = {
   abrirAltaPresentacion: 'presentation-create-open',
   nombrePresentacion: 'presentation-create-name',
   guardarPresentacion: 'presentation-create-submit',
+  errorAltaPresentacion: 'presentation-create-error',
 } as const;
 
 /** Ids de presentacion: `createProductSchema` exige UUID, asi que se generan de verdad. */
@@ -1198,6 +1199,33 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
         control.getAttribute('type') === 'number' ? Number(valor) : valor,
       );
     }
+  });
+
+  it('un nombre de presentacion repetido pinta el mensaje DEL BACK, no un texto propio', async () => {
+    // QC-70 R32 — el selector comparaba el codigo generico y sustituia el mensaje por una frase
+    // suya. Ahora el codigo es el abierto por caso concreto (`presentation_duplicate_name`, R20) y
+    // el texto que se pinta es el que devuelve la operacion, que sale del catalogo: dos frases
+    // para el mismo caso es justo lo que la ficha quita.
+    const user = setupUser();
+    const mensajeDelCatalogo = 'Ya existe una presentacion con un nombre equivalente.';
+    createPresentationActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'presentation_duplicate_name',
+      message: mensajeDelCatalogo,
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+    await crearPresentacionEnLinea(user);
+
+    const error = await screen.findByTestId(testId.errorAltaPresentacion);
+    expect(error).toHaveTextContent(mensajeDelCatalogo);
+    // El campo del alta en linea queda marcado y descrito por su error, y nada se selecciona.
+    const campo = screen.getByTestId(testId.nombrePresentacion);
+    expect(campo).toHaveAttribute('aria-invalid', 'true');
+    expect(campo).toHaveAttribute('aria-describedby', error.id);
+    expect(presentacionSeleccionada()).toBe('');
   });
 
   it('el borrado pide confirmacion nombrando el producto y sin confirmar no invoca la operacion', async () => {
