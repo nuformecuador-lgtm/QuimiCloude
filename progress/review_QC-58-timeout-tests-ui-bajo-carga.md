@@ -226,3 +226,13 @@ comparador de la primera. Es suficiente para creerlo, pero la letra de R14 pedí
   `typecheck` (exit 0), `lint` (exit 0), `test:guardias` (204 casos, exit 0), las cinco mutaciones
   y los archivos concretos que necesitaba.
 - **No corrí la batería de integración**: ninguna task la toca y R15 quedó vacuo.
+
+---
+
+# Ronda 2 — 2026-09-08
+
+> HEAD `ef99a19`, arbol limpio al empezar y al cerrar. Rango nuevo desde `d1e966d`: `13c8d8f` (mayor 1 + menores), `cacdca4` (merge con `origin/dev`, 205 archivos), `665c647`, `69452d7` (tercera familia) y `ef99a19` (T11 definitivo). **No se edito ningun archivo de codigo**: las tres mutaciones nuevas se hicieron sobre copia (`cp`) y se restauraron; `git status --porcelain` vacio al terminar.
+
+## Veredicto de la ronda 2
+
+**OK** — **0 mayores**, 6 menores nuevos. El mayor 1 de la ronda 1 esta **cerrado y verificado con mutaciones propias**; los siete menores estan cerrados o eran veredictos sin accion.
