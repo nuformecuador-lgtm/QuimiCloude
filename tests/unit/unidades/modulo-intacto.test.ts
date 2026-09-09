@@ -97,6 +97,21 @@ const SIN_RANGO =
   'no se pudo calcular `git merge-base origin/dev HEAD` (sin remoto, o rango no disponible): ' +
   'este caso NO ha comprobado nada.';
 
+/** El archivo que declara el contrato que otros modulos consumen. Ruta en formato git -barras-,
+ *  porque se usa tanto en `git show` como -partida- en `join`. */
+const UNIT_CATALOG = 'lib/modules/unidades/domain/unit-catalog.ts';
+
+/** La declaracion de `UnitRef` tal cual esta escrita, desde `export type UnitRef = {` hasta el
+ *  `};` que la cierra. Se compara TEXTO contra TEXTO -no una lista de campos- para que tambien
+ *  muerda un cambio de tipo o de opcionalidad, no solo un campo de mas o de menos. */
+function declaracionDeUnitRef(fuente: string): string {
+  const desde = fuente.indexOf('export type UnitRef = {');
+  if (desde === -1) return '';
+  const hasta = fuente.indexOf('};', desde);
+  if (hasta === -1) return '';
+  return fuente.slice(desde, hasta + 2);
+}
+
 describe('QC-39 no toca lo que no puede tocar (R3)', () => {
   it('ninguno de los archivos intocables del modulo cambia respecto a la base de fusion', (ctx) => {
     const base = mergeBaseConDev();
@@ -135,18 +150,38 @@ describe('QC-39 no toca lo que no puede tocar (R3)', () => {
     expect(cambiados).toContain('unit-prisma.ts');
   });
 
-  it('`UnitRef` sigue teniendo exactamente tres campos: la ampliacion vive en `UnitView` (R3)', () => {
-    // No basta con que `unit-catalog.ts` no cambie: lo que R3 protege es la FORMA del tipo que
-    // otro modulo consume. Se afirma sobre la fuente, con el mismo criterio que
-    // `module-contract.test.ts`.
-    const fuente = readFileSync(
-      join(repoRoot, 'lib', 'modules', 'unidades', 'domain', 'unit-catalog.ts'),
-      'utf8',
-    );
-    const cuerpo = /export type UnitRef = \{([^}]*)\}/.exec(fuente)?.[1] ?? '';
-    const campos = [...cuerpo.matchAll(/(\w+)\s*:/g)].map((m) => m[1]);
+  it('esta rama no toca la declaracion de `UnitRef`: la ampliacion vive en `UnitView` (R3)', (ctx) => {
+    // R3 no dice «`UnitRef` tiene N campos»: dice que ESTA FICHA no cambia el tipo con el que
+    // otro modulo resuelve identificadores conocidos. Son dos cosas distintas, y afirmar la
+    // primera acusaba en falso en cuanto OTRA rama ensanchaba el tipo por su cuenta: al mergear
+    // `origin/dev` llegaron `baseUnitId` y `factor` -QC-25/QC-83-, que QC-39 no puso. Asi que se
+    // afirma sobre el CAMBIO: la declaracion de `UnitRef` en la base de fusion y la del arbol de
+    // trabajo son la MISMA. Si esta ficha la tocara -un campo mas, uno menos, otro tipo-, esto
+    // muerde; si la toco el tronco, no es asunto de QC-39.
+    const base = mergeBaseConDev();
+    if (base === null) {
+      ctx.skip(SIN_RANGO);
+      return;
+    }
 
-    expect(campos).toEqual(['id', 'name', 'symbol']);
+    const enLaBase = declaracionDeUnitRef(git(['show', `${base}:${UNIT_CATALOG}`]));
+    const enElArbol = declaracionDeUnitRef(
+      readFileSync(join(repoRoot, ...UNIT_CATALOG.split('/')), 'utf8'),
+    );
+
+    // Que no sea vacuo: si el extractor dejara de encontrar la declaracion, dos cadenas vacias
+    // serian iguales y esto pasaria sin comprobar nada.
+    expect(enElArbol, 'no se encontro la declaracion de `UnitRef` en el arbol de trabajo').toContain(
+      'readonly id',
+    );
+    expect(enLaBase, 'no se encontro la declaracion de `UnitRef` en la base de fusion').toContain(
+      'readonly id',
+    );
+
+    expect(
+      enElArbol,
+      'QC-39 modifico la declaracion de `UnitRef`, que R3 declara fuera de la ampliacion',
+    ).toBe(enLaBase);
   });
 });
 
