@@ -220,14 +220,9 @@ async function createProduct(
   //      misma transaccion (p. ej. tres seguidas en «una receta con tres lineas»), y la
   //      segunda chocaria contra el indice unico. Se marca con `token()`, que es
   //      irrepetible y de solo letras y digitos, asi que sobrevive a la normalizacion.
-  // Se mantiene lo que el helper prometia: cada producto con su presentacion propia.
-  const marca = token()
-  const presentation = await tx.presentation.create({
-    data: { name: `Bidon 20 L ${marca}`, nameNormalized: `bidon20l${marca}` },
-    select: { id: true },
-  })
+  // Sin presentacion desde el 2026-09-09: la presentacion se mudo a `product_batches`.
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id },
+    data: { name, nameNormalized: normalizeProductNameForTest(name) },
     select: { id: true },
   })
   return product.id

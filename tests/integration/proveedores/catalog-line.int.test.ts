@@ -226,16 +226,16 @@ async function createTestUnit(db: Db): Promise<string> {
 
 /**
  * Articulo REAL del inventario. La linea del catalogo ya NO lo referencia (R9): solo sirve
- * para el caso de R19, que demuestra que las dos tablas son independientes.
+ * para el caso de R19, que demuestra que las dos tablas son independientes. Sin presentacion
+ * desde el 2026-09-09.
  */
-async function createTestProduct(db: Db): Promise<{ id: string; presentationId: string }> {
-  const presentationId = await createTestPresentation(db);
+async function createTestProduct(db: Db): Promise<{ id: string }> {
   const productName = `Articulo ${token()}`;
   const product = await db.product.create({
-    data: { name: productName, nameNormalized: normalizeForTest(productName), presentationId },
+    data: { name: productName, nameNormalized: normalizeForTest(productName) },
     select: { id: true },
   });
-  return { id: product.id, presentationId };
+  return { id: product.id };
 }
 
 /** Proveedor REAL de apoyo, vivo o dado de baja. */
@@ -1085,7 +1085,6 @@ describe('R19: las dos tablas son independientes', () => {
       await prisma.supplierCatalogLine.deleteMany({ where: { supplierId } });
       await prisma.supplier.delete({ where: { id: supplierId } });
       await prisma.product.deleteMany({ where: { id: producto.id } });
-      await prisma.presentation.delete({ where: { id: producto.presentationId } });
       await prisma.presentation.delete({ where: { id: presentationId } });
     }
   });

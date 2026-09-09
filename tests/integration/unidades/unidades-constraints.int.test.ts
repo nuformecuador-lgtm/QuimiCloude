@@ -239,15 +239,8 @@ async function createProduct(
   unitId: string | null = null,
   name = 'Acido citrico monohidratado',
 ): Promise<string> {
-  // `presentations.name_normalized` es NOT NULL con indice unico (QC-20 R17, R20), y este
-  // helper se llama varias veces en la misma transaccion: el marcador evita el choque.
-  const marca = token()
-  const presentation = await tx.presentation.create({
-    data: { name: `Bidon 20 L ${marca}`, nameNormalized: `bidon20l${marca}` },
-    select: { id: true },
-  })
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id, unitId },
+    data: { name, nameNormalized: normalizeProductNameForTest(name), unitId },
     select: { id: true },
   })
   return product.id
@@ -283,7 +276,6 @@ type WritableColumn =
   | 'name'
   | 'name_normalized'
   | 'symbol'
-  | 'presentation_id'
   | 'unit_id'
   | 'recipe_id'
   | 'product_id'
@@ -666,14 +658,6 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       const recipeId = await createRecipe(tx, marker)
       const unitId = await createUnit(tx, marker)
       const productId = await createProduct(tx, unitId)
-      const presentationMarker = token()
-      const presentation = await tx.presentation.create({
-        data: {
-          name: `Bidon 20 L ${presentationMarker}`,
-          nameNormalized: `bidon20l${presentationMarker}`,
-        },
-        select: { id: true },
-      })
       const inventada = randomUUID()
 
       // R12 en el alta de producto. Crudo: por la API tipada Prisma traduciria el
@@ -683,7 +667,6 @@ describe('el uso de la unidad desde inventario y recetas', () => {
         () =>
           rawInsert(tx, 'products', {
             name: Prisma.sql`${`Producto con unidad fantasma ${marker}`}`,
-            presentation_id: asUuid(presentation.id),
             unit_id: asUuid(inventada),
           }),
         'producto con unit_id inexistente',
@@ -714,11 +697,11 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       expect(edicionConUnidadFantasma).toBe(FOREIGN_KEY_VIOLATION)
 
       // «No crear ni modificar ninguna fila»: ninguno de los tres intentos dejo rastro.
-      const productosDeLaPresentacion = await tx.product.findMany({
-        where: { presentationId: presentation.id },
+      const productosDelIntento = await tx.product.findMany({
+        where: { name: `Producto con unidad fantasma ${marker}` },
         select: { id: true },
       })
-      expect(productosDeLaPresentacion).toEqual([])
+      expect(productosDelIntento).toEqual([])
       expect(await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } })).toEqual([])
       const producto = await tx.product.findUniqueOrThrow({
         where: { id: productId },
@@ -835,21 +818,12 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, marker)
       const productId = await createProduct(tx)
-      const presentationMarker = token()
-      const presentation = await tx.presentation.create({
-        data: {
-          name: `Bidon 20 L ${presentationMarker}`,
-          nameNormalized: `bidon20l${presentationMarker}`,
-        },
-        select: { id: true },
-      })
 
       const unidadFantasmaEnProducto = await expectRejectedByDatabase(
         tx,
         () =>
           rawInsert(tx, 'products', {
             name: Prisma.sql`${`Producto ${marker}`}`,
-            presentation_id: asUuid(presentation.id),
             unit_id: asUuid(randomUUID()),
           }),
         'producto con unit_id inventado',

@@ -112,8 +112,8 @@ describe('sanitize contra la lista blanca', () => {
   it('deja intacta una consulta que solo pide campos declarados', () => {
     // R1, R3 — el nombre del campo de la base es el identificador, sin traduccion.
     const entrada = query({
-      sort: { columnId: 'presentationName', direction: 'asc' },
-      filters: { presentationId: { kind: 'select', values: ['p1'] } },
+      sort: { columnId: 'name', direction: 'asc' },
+      filters: { unitId: { kind: 'select', values: ['u1'] } },
       search: 'sosa',
     });
 

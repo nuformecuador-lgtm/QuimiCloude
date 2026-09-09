@@ -25,7 +25,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * ser un autocomplete que busca productos EXISTENTES en el servidor (`listProductsAction` con
  * `search`). Sigue siendo TEXTO LIBRE: si lo escrito no coincide con ningun producto, ese nombre
  * se guarda tal cual. Si se elige un producto existente, el componente avisa por `onSelect` y el
- * formulario autocompleta la presentacion y la alerta de cantidad.
+ * formulario autocompleta la alerta de cantidad.
  *
  * **Mismo motor que los otros dos selectores del ERP** (`components/ui/autocomplete.tsx` +
  * `useAsyncPaginatedOptions`): la busqueda la resuelve el SERVIDOR -nunca se recorta en memoria-,
@@ -43,8 +43,6 @@ export const PRODUCT_NAME_FIELD = 'name';
 export type ProductNameOption = {
   readonly id: string;
   readonly name: string;
-  readonly presentationId: string;
-  readonly presentationName: string;
   readonly qtyAlert: number | null;
 };
 
@@ -100,8 +98,6 @@ export function ProductNamePicker({
       items: result.data.items.map((item) => ({
         id: item.id,
         name: item.name,
-        presentationId: item.presentationId,
-        presentationName: item.presentationName,
         qtyAlert: item.qtyAlert,
       })),
       page: result.data.page,

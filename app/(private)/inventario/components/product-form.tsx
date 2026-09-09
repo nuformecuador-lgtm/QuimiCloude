@@ -3,10 +3,6 @@
 import { useActionState, useEffect, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import {
-  PRESENTATION_FIELD,
-  PresentationSelect,
-} from '@/components/shared/presentation-select';
 import { Button } from '@/components/ui/button';
 import {
   SheetClose,
@@ -27,7 +23,7 @@ import { ProductNamePicker, type ProductNameOption } from './product-name-picker
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
- * Campos de texto del producto. `presentationId` no esta aqui: lo aporta su propio selector (T8).
+ * Campos de texto del producto.
  *
  * **La unidad tampoco esta**, y no por descuido: ver el comentario del formulario mas abajo.
  *
@@ -40,15 +36,11 @@ const TEXT_FIELDS = ['name'] as const;
 /** Campos enteros. `FormData` solo entrega cadenas, asi que se convierten antes de validar. */
 const INT_FIELDS = ['stock', 'qtyAlert'] as const;
 
-type ProductFieldName =
-  | (typeof TEXT_FIELDS)[number]
-  | (typeof INT_FIELDS)[number]
-  | typeof PRESENTATION_FIELD;
+type ProductFieldName = (typeof TEXT_FIELDS)[number] | (typeof INT_FIELDS)[number];
 
 const ALL_FIELDS: readonly ProductFieldName[] = [
   ...TEXT_FIELDS,
   ...INT_FIELDS,
-  PRESENTATION_FIELD,
 ];
 
 /**
@@ -57,14 +49,12 @@ const ALL_FIELDS: readonly ProductFieldName[] = [
  */
 const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   name: 'Escribe un nombre de 1 a 120 caracteres.',
-  presentationId: 'Elige una presentación.',
   stock: 'Debe ser un número entero de 0 o más.',
   qtyAlert: 'Debe ser un número entero de 0 o más.',
 };
 
 const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
-  presentationId: 'Presentación',
   stock: 'Existencia',
   qtyAlert: 'Alerta de cantidad',
 };
@@ -162,19 +152,15 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
 
   /**
    * Autocompletado al elegir un producto existente (decision humana del 2026-09-09): solo
-   * presentacion y alerta de cantidad. La existencia la escribe el usuario -es el inventario
-   * ACTUAL del producto nuevo, no el del elegido-.
+   * alerta de cantidad. La existencia la escribe el usuario -es el inventario ACTUAL del
+   * producto nuevo, no el del elegido-.
    */
   const [template, setTemplate] = useState<{
-    readonly presentationId: string;
-    readonly presentationName: string;
     readonly qtyAlert: string;
   } | null>(null);
 
   function applyTemplate(option: ProductNameOption) {
     setTemplate({
-      presentationId: option.presentationId,
-      presentationName: option.presentationName,
       qtyAlert: option.qtyAlert === null ? '' : String(option.qtyAlert),
     });
   }
@@ -193,9 +179,11 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
       if (parsed !== undefined) numbers[field] = parsed;
     }
 
+    // Costos: el costo de compra NO es un campo de inventario (R5, QC-52). Solo se registra en
+    // los lotes, y la ficha que recoja lotes anadira el campo cuando toque.
+
     const candidate = {
       name: values.name,
-      presentationId: values.presentationId,
       ...numbers,
     };
 
@@ -327,22 +315,8 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         />
       )}
 
-      {/*
-        `defaultLabel` ahorra la consulta de resolucion del selector: `ProductView` ya trae el
-        nombre de la presentacion, asi que editar un producto no vuelve a pedir la primera pagina
-        solo para saber como se llama la que ya tiene. En el alta, al elegir un producto existente,
-        `template` aporta el id y el nombre y la `key` fuerza el remontaje para que el selector
-        arranque con ellos.
-      */}
-      <PresentationSelect
-        key={template === null ? product?.presentationId ?? 'none' : template.presentationId}
-        defaultValue={
-          initialValue(PRESENTATION_FIELD, template?.presentationId ?? product?.presentationId ?? '') ||
-          undefined
-        }
-        defaultLabel={template?.presentationName ?? product?.presentationName}
-        error={fieldErrors.presentationId}
-      />
+      {/* La presentacion se mudo a `product_batches` (2026-09-09): el producto ya no la tiene;
+        la lleva el LOTE. El alta no la pide: la ficha que cargue lotes la pedira ahi. */}
 
       <ProductField
         name="stock"

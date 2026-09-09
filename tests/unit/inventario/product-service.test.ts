@@ -27,7 +27,6 @@ const AHORA = new Date('2026-09-02T10:00:00.000Z');
  *  del 2026-09-03 los volvio obligatorios en `createProductSchema`. */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  presentationId: '11111111-1111-4111-8111-111111111111',
   stock: 0,
   qtyAlert: 0,
 };
@@ -36,20 +35,11 @@ const VISTA_PRODUCTO: ProductView = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  presentationId: '11111111-1111-4111-8111-111111111111',
-  presentationName: 'Bidon 20 L',
   stock: 0,
   qtyAlert: null,
-  // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
-  // este fixture decia -un producto SIN unidad declarada, que sigue siendo valido porque la
-  // unidad del producto sigue siendo OPCIONAL (QC-14 R5, QC-32 R10)-; solo cambia el campo
-  // que lo expresa: `unit: null` (texto ausente) pasa a `unitId: null` (sin referencia al
-  // catalogo).
   unitId: null,
   createdAt: AHORA,
   updatedAt: AHORA,
-  createdBy: 'admin-1',
-  updatedBy: 'admin-1',
 };
 
 /**
@@ -86,50 +76,6 @@ describe('R5 — alta de producto', () => {
   });
 });
 
-describe(
-  'R6 — autoria de creacion y de modificacion',
-  () => {
-    it('guarda al actor como autor de creacion y de modificacion al crear, y solo como autor de modificacion al editar y al borrar', async () => {
-      const products = montarRepositorio();
-      const createProduct = createCreateProduct({ products, now: () => AHORA });
-      const updateProduct = createUpdateProduct({ products, now: () => AHORA });
-      const deleteProduct = createDeleteProduct({ products, now: () => AHORA });
-
-      await createProduct(PRODUCTO_VALIDO, ADMIN);
-      // El puerto solo expone un `actorId` en `create`: el service NO distingue "autor de
-      // creacion" de "autor de modificacion" en su firma -es la propia semantica de
-      // `create` (frente a `updateAlive`) la que dice cual es cual (design.md > 2.1).
-      expect(products.create).toHaveBeenCalledWith(
-        expect.objectContaining({ name: PRODUCTO_VALIDO.name }),
-        ADMIN.id,
-        AHORA,
-      );
-
-      await updateProduct('producto-1', PRODUCTO_VALIDO, ADMIN);
-      expect(products.updateAlive).toHaveBeenCalledWith(
-        'producto-1',
-        expect.objectContaining({ name: PRODUCTO_VALIDO.name }),
-        ADMIN.id,
-        AHORA,
-      );
-
-      await deleteProduct('producto-1', ADMIN);
-      expect(products.softDeleteAlive).toHaveBeenCalledWith('producto-1', ADMIN.id, AHORA);
-
-      // HONESTIDAD SOBRE R6 (ver la nota del prompt y la bitacora de progress/): esto NO
-      // demuestra que `created_by` sobreviva intacto tras un `updateAlive`, porque el
-      // puerto `ProductRepository.updateAlive` ni siquiera expone `createdBy` en su firma
-      // -el doble no tiene forma de "olvidarlo" ni de "recordarlo"-. Lo que se cierra aqui
-      // es la mitad que SI vive en el dominio: que `create` recibe el actor como autor y
-      // que `updateAlive`/`softDeleteAlive` reciben el mismo actor como autor de la
-      // ultima modificacion, con el instante inyectado. La conservacion REAL de
-      // `created_by` a traves de un `UPDATE` la cierran el adaptador Prisma (T9, que
-      // debe escribir un `UPDATE` que toque solo `updated_by`) y el test de integracion
-      // contra Postgres real (T14, `product-crud.int.test.ts`), no este archivo.
-    });
-  },
-);
-
 describe('R12 — nombres duplicados', () => {
   it('acepta dos productos con el mismo nombre', async () => {
     const products = montarRepositorio();
@@ -151,8 +97,8 @@ describe('R13 — existencia recibida al editar', () => {
 
     await updateProduct('producto-1', { ...PRODUCTO_VALIDO, stock: 37 }, ADMIN);
 
-    const [, datos]: [string, NewProduct, string, Date] = (
-      products.updateAlive as unknown as { mock: { calls: [string, NewProduct, string, Date][] } }
+    const [, datos]: [string, NewProduct, Date] = (
+      products.updateAlive as unknown as { mock: { calls: [string, NewProduct, Date][] } }
     ).mock.calls[0];
     expect(datos.stock).toBe(37);
   });
@@ -188,7 +134,7 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
 
     await deleteProduct('producto-1', ADMIN);
 
-    expect(products.softDeleteAlive).toHaveBeenCalledWith('producto-1', ADMIN.id, AHORA);
+    expect(products.softDeleteAlive).toHaveBeenCalledWith('producto-1', AHORA);
     // El dominio no tiene ningun otro metodo de borrado que llamar: no hay `delete` a
     // secas en el puerto (D5), asi que "borrado logico" es la unica via posible aqui.
   });

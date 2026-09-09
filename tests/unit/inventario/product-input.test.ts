@@ -21,7 +21,7 @@ const REQUERIDOS = { stock: 0, qtyAlert: 0 } as const;
 describe('createProductSchema', () => {
   it('rechaza el nombre vacio o de solo espacios y recorta los extremos del nombre valido', () => {
     // R9
-    const base = { name: '', presentationId: '11111111-1111-4111-8111-111111111111', ...REQUERIDOS };
+    const base = { name: '', ...REQUERIDOS };
 
     expect(createProductSchema.safeParse(base).success).toBe(false);
     expect(
@@ -39,14 +39,12 @@ describe('createProductSchema', () => {
     expect(
       createProductSchema.safeParse({
         name: productName121,
-        presentationId: '11111111-1111-4111-8111-111111111111',
         ...REQUERIDOS,
       }).success,
     ).toBe(false);
     expect(
       createProductSchema.safeParse({
         name: productName120,
-        presentationId: '11111111-1111-4111-8111-111111111111',
         ...REQUERIDOS,
       }).success,
     ).toBe(true);
@@ -98,7 +96,6 @@ describe('createProductSchema', () => {
     // R1
     const valida = {
       name: 'Producto',
-      presentationId: '11111111-1111-4111-8111-111111111111',
       ...REQUERIDOS,
     };
 
@@ -140,7 +137,6 @@ describe('createProductSchema', () => {
     const error = await createProduct(
       {
         name: 'Producto',
-        presentationId: '11111111-1111-4111-8111-111111111111',
         stock: 0,
         qtyAlert: 0,
         cost: '10.0000',
@@ -165,7 +161,6 @@ describe('createProductSchema', () => {
     // eso se prueba en `tests/integration/unidades/unidades-constraints.int.test.ts`.
     const base = {
       name: 'Producto',
-      presentationId: '11111111-1111-4111-8111-111111111111',
       ...REQUERIDOS,
     };
 
@@ -188,7 +183,6 @@ describe('createProductSchema', () => {
     // aplicacion acepta. Ni ausente, ni nulo, ni negativo, ni con decimales.
     const soloObligatoriosDeAntes = {
       name: 'Producto',
-      presentationId: '11111111-1111-4111-8111-111111111111',
     };
 
     expect(createProductSchema.safeParse(soloObligatoriosDeAntes).success).toBe(false);

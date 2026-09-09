@@ -407,7 +407,7 @@ model Presentation {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  products Product[]
+  batches ProductBatch[]
 
   @@unique([nameNormalized], map: "presentations_name_normalized_key")
   @@map("presentations")
@@ -436,19 +436,17 @@ model Presentation {
 /// `name` NO tiene indice unico, y es deliberado (decision cerrada 6, R16): dos productos
 /// pueden llamarse igual. Se aparta a proposito del precedente de `users`.
 ///
-/// `createdBy`/`updatedBy` (QC-20, design.md > 2.1) son campos ESCALARES, sin `@relation`
-/// de Prisma: es deliberado. Declarar la relacion obligaria a anadir un campo de vuelta en
-/// `User` —que es de `identity`— y habilitaria `include: { createdByUser: true }` desde el
-/// adaptador de `inventario`, una lectura de `users` desde otro modulo que la guardia de
-/// arquitectura no detecta (busca la cadena `prisma.user`). Con el campo escalar, el ORM no
-/// puede atravesar hacia `users` ni por accidente. La FK real vive escrita a mano en el SQL
-/// de la migracion de QC-20 (`products_created_by_fkey`, `products_updated_by_fkey`) y por
-/// eso es DRIFT para Prisma: toda migracion futura de `products` hay que revisarla a mano
-/// para que no la borre (mismo trato que los CHECK y el RLS de QC-14).
+/// La presentacion (`presentationId`) VIVIA aqui y se MUDO a `ProductBatch` el 2026-09-09:
+/// el producto -catalogo- ya no declara en que presentacion viene; lo hace cada lote. Con ella
+/// se fueron `products_presentation_id_fkey` y `products_presentation_id_idx` (la migracion
+/// `<ts>_product_batches` las DROPPEA junto con su columna).
 ///
-/// Son anulables a proposito: `products` ya tenia filas cuando se anadieron estas columnas
-/// y no existe un «usuario del sistema» al que apuntar en el backfill. La garantia de R6 —
-/// todo alta y toda edicion registran al actor— es del service, no del esquema.
+/// La auditoria `createdBy`/`updatedBy` VIVIA aqui (QC-20, design.md > 2.1) y se MUDO a
+/// `ProductBatch` el 2026-09-09: el autor ya no se registra sobre el producto (catalogo) sino
+/// sobre el lote, que es la unidad de inventario que se mueve y vence. Con ellas se fueron
+/// `products_created_by_fkey` y `products_updated_by_fkey` (la migracion
+/// `<ts>_product_batches` las DROPPEA junto con sus columnas). El producto ya no tiene, por
+/// tanto, ningun rastro de autoria: quien lo creo o lo edito se sabe por sus lotes.
 ///
 /// OJO 2 — `unitId` (QC-32, decision cerrada 13, R10, R18) es ese mismo criterio aplicado a
 /// la frontera con el modulo `unidades`: es un campo ESCALAR uuid SIN `@relation`, y es
@@ -483,7 +481,6 @@ model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
   nameNormalized String    @map("name_normalized")
-  presentationId String    @map("presentation_id") @db.Uuid
   stock          Int?
   qtyAlert       Int?      @map("qty_alert")
   unitId         String?   @map("unit_id") @db.Uuid
@@ -491,14 +488,76 @@ model Product {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
-  createdBy      String?   @map("created_by") @db.Uuid
-  updatedBy      String?   @map("updated_by") @db.Uuid
 
-  presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  batches ProductBatch[]
 
-  @@index([presentationId], map: "products_presentation_id_idx")
   @@index([unitId], map: "products_unit_id_idx")
   @@map("products")
+}
+
+/// Lote de un producto del inventario (2026-09-09). Un producto puede tener VARIOS lotes
+/// (1:N), cada uno con su propia existencia (`stock`), su numero de lote (`lot`, OPCIONAL) y
+/// su fecha de vencimiento (`expiryDate`, OPCIONAL). Es la unidad sobre la que se lleva la
+/// autoria: `createdBy`/`updatedBy` se mudaron AQUI desde `products`.
+///
+/// OJO — `createdBy`/`updatedBy` son FK REALES a `users` declaradas como ESCALARES SIN
+/// `@relation` a proposito, igual que las que tuvo `products` (QC-20 design.md > 2.1) y las
+/// de `recipes`/`suppliers`/`orders`: con `@relation`, el cliente Prisma habilitaria
+/// `include: { createdByUser: true }` desde `inventario` —una lectura de `users` de otro
+/// modulo que ninguna guardia detecta, porque no es un import ni un `prisma.user`—. Las FK
+/// viven escritas a mano en la migracion `<ts>_product_batches`
+/// (`product_batches_created_by_fkey`, `product_batches_updated_by_fkey`) y son DRIFT para
+/// Prisma: toda migracion futura de `product_batches` hay que revisarla a mano. Son anulables
+/// por el mismo motivo que las de `products`: NULL significa «no lo creo una persona», no «se
+/// perdio el dato».
+///
+/// `productId` SI lleva `@relation` —a diferencia de `recipe_lines.product_id`— porque
+/// `Product` y `ProductBatch` son los dos de `inventario`: no hay frontera de modulo que
+/// proteger, asi que la FK la genera Prisma en vez de quedar como drift. `ON DELETE RESTRICT`
+/// (mismo criterio que tenia `products.presentation_id`): el borrado de producto es LOGICO y
+/// nunca dispara esta FK en operacion normal, pero un borrado fisico con lotes vivos debe ser
+/// ruidoso, no arrastrarlos en silencio.
+///
+/// `presentationId` SI lleva `@relation` por la misma razon: `ProductBatch` y `Presentation`
+/// son los dos de `inventario`. Es NOT NULL sin `@default` (decision 2026-09-09): todo lote
+/// declara su presentacion, que es la que se mudo aqui desde `products`.
+///
+/// `stock` es NOT NULL sin `@default`: un lote nace con su cantidad, la ausencia no es un
+/// valor valido (a diferencia de `products.stock`, que conserva su propia columna anulable).
+/// El CHECK `product_batches_stock_non_negative` (escrito a mano en la migracion) replica el
+/// de `products_stock_non_negative`: un lote no puede tener existencia negativa.
+///
+/// `unitCost` es el coste unitario del lote: `Decimal(14,4)` NOT NULL (misma precision que el
+/// dinero de QC-33), nunca coma flotante (`docs/architecture.md > Dominio` n.º 4). El CHECK
+/// `product_batches_unit_cost_positive` (escrito a mano en la migracion, mismo patron que
+/// `supplier_catalog_lines_cost_positive` de QC-43) lo exige `> 0`. NO hay columna de coste
+/// TOTAL a proposito, igual que en pedidos: `totalCost` es `stock * unitCost` y se calcula al
+/// leer, para que no pueda contradecir a sus factores.
+///
+/// `lot` y `expiryDate` son OPCIONALES: no todo lote lleva numero ni fecha de vencimiento.
+/// `expiryDate` es `@db.Date` (fecha sin hora), como `users.birth_date`.
+/// @module inventario
+model ProductBatch {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId      String    @map("product_id") @db.Uuid
+  presentationId String    @map("presentation_id") @db.Uuid
+  stock          Int
+  unitCost       Decimal   @map("unit_cost") @db.Decimal(14, 4)
+  lot            String?   @map("lot")
+  expiryDate     DateTime? @map("expiry_date") @db.Date
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([productId], map: "product_batches_product_id_idx")
+  @@index([presentationId], map: "product_batches_presentation_id_idx")
+  @@index([createdBy], map: "product_batches_created_by_idx")
+  @@index([updatedBy], map: "product_batches_updated_by_idx")
+  @@map("product_batches")
 }
 
 /// Receta (formula) del ERP quimico. Borrado LOGICO: `deletedAt` NULL = receta viva.

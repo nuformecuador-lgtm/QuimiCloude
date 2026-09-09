@@ -17,20 +17,40 @@ type ProductCatalogRow = {
   readonly id: string;
   readonly name: string;
   readonly unitId: string | null;
+  readonly stock: number | null;
 };
 
 /** Fila de Prisma -> `ProductRef` del contrato publico. Funcion pura, testeable sin base. */
 export function toProductRef(row: ProductCatalogRow): ProductRef {
-  return { id: row.id, name: row.name, unitId: row.unitId };
+  return {
+    id: row.id,
+    name: row.name,
+    unitId: row.unitId,
+    stock: row.stock,
+  };
 }
 
 export async function findProductRefs(ids: readonly ProductId[]): Promise<readonly ProductRef[]> {
   if (ids.length === 0) return [];
 
+  // Sin JOIN desde el 2026-09-09: la presentacion se mudo a `product_batches`, asi que una
+  // referencia de producto ya no la expone.
   const rows = await prisma.product.findMany({
     where: { id: { in: [...ids] }, deletedAt: null },
-    select: { id: true, name: true, unitId: true },
+    select: {
+      id: true,
+      name: true,
+      unitId: true,
+      stock: true,
+    },
   });
 
-  return rows.map(toProductRef);
+  return rows.map((row) =>
+    toProductRef({
+      id: row.id,
+      name: row.name,
+      unitId: row.unitId,
+      stock: row.stock,
+    }),
+  );
 }

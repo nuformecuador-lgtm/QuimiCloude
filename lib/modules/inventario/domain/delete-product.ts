@@ -10,10 +10,9 @@ export type DeleteProductDeps = {
 };
 
 /**
- * Borrado de producto (R6, R14, R15, R16). Logico y sin restaurar (D5): usa
- * `softDeleteAlive`, nunca un borrado fisico. El actor queda registrado como autor de
- * la ultima modificacion, sin tocar el autor de creacion (R6) -misma nota que en
- * `update-product.ts` sobre el alcance real de esa garantia-.
+ * Borrado de producto (R14, R15, R16). Logico y sin restaurar (D5): usa
+ * `softDeleteAlive`, nunca un borrado fisico. La autoria ya no se registra aqui: se mudo al
+ * lote (`ProductBatch`) el 2026-09-09, asi que el actor solo sirve para el permiso.
  */
 export function createDeleteProduct(
   deps: DeleteProductDeps,
@@ -28,7 +27,7 @@ export function createDeleteProduct(
 
     // R14: `false` significa que el producto no existe o ya estaba borrado
     // (`softDeleteAlive` tambien filtra `deleted_at IS NULL`, R16).
-    const deleted = await deps.products.softDeleteAlive(id, actor.id, now());
+    const deleted = await deps.products.softDeleteAlive(id, now());
     if (!deleted) throw new NotFoundError();
   };
 }

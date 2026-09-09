@@ -73,7 +73,6 @@ const MUTATION_INITIAL: ProductMutationFormState = { status: 'idle' };
 
 const VALID_PRODUCT_FIELDS = {
   name: 'Bidon 20 L',
-  presentationId: '11111111-1111-4111-8111-111111111111',
   stock: '10',
   qtyAlert: '2',
   // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El formulario ya no
@@ -206,8 +205,9 @@ describe('updateProductAction', () => {
 // del `FormData`. Se prueba con el caso hostil -un `FormData` que SI los trae, como lo
 // enviaria un formulario viejo cacheado o un `curl`-: el candidato que llega al caso de
 // uso no puede contenerlos, porque si los leyera el `strictObject` rechazaria un alta que
-// deberia funcionar.
-describe('los tres campos que el producto perdio no cruzan la Server Action', () => {
+// deberia funcionar. `presentationId` entro al mismo club el 2026-09-09, al mudarse la
+// presentacion a `product_batches`.
+describe('los campos que el producto perdio no cruzan la Server Action', () => {
   it('no los lee del FormData aunque vengan, ni al crear ni al editar', async () => {
     createProductMock.mockResolvedValue({ id: 'product-1' });
     updateProductMock.mockResolvedValue(undefined);
@@ -217,6 +217,7 @@ describe('los tres campos que el producto perdio no cruzan la Server Action', ()
       cost: '12.5000',
       minPurchase: '1',
       deliveryTime: '3',
+      presentationId: '11111111-1111-4111-8111-111111111111',
     });
 
     await createProductAction(CREATE_INITIAL, conSobras);
@@ -228,11 +229,12 @@ describe('los tres campos que el producto perdio no cruzan la Server Action', ()
         unknown
       >;
       // Ancla: si `candidato` no fuera el argumento correcto (o fuera `undefined`), los
-      // tres `not.toContain` pasarian por vacio y el test no mediria nada.
+      // `not.toContain` pasarian por vacio y el test no mediria nada.
       expect(Object.keys(candidato)).toContain('name');
       expect(Object.keys(candidato)).not.toContain('cost');
       expect(Object.keys(candidato)).not.toContain('minPurchase');
       expect(Object.keys(candidato)).not.toContain('deliveryTime');
+      expect(Object.keys(candidato)).not.toContain('presentationId');
     }
   });
 });

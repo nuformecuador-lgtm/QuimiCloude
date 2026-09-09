@@ -116,25 +116,15 @@ function normalizeProductNameForTest(name: string): string {
 }
 
 async function createTestProduct(db: Db, name = `Producto ${token()}`): Promise<string> {
-  const marker = token();
-  const presentation = await db.presentation.create({
-    data: { name: `Presentacion ${marker}`, nameNormalized: `presentacion${marker}` },
-    select: { id: true },
-  });
   const product = await db.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id },
+    data: { name, nameNormalized: normalizeProductNameForTest(name) },
     select: { id: true },
   });
   return product.id;
 }
 
 async function deleteTestProduct(db: Db, productId: string): Promise<void> {
-  const product = await db.product.findUniqueOrThrow({
-    where: { id: productId },
-    select: { presentationId: true },
-  });
   await db.product.delete({ where: { id: productId } });
-  await db.presentation.delete({ where: { id: product.presentationId } });
 }
 
 async function createTestRecipe(db: Db, name = `Receta ${token()}`): Promise<string> {

@@ -142,7 +142,6 @@ function buildProductCandidate(formData: FormData): unknown | typeof INVALID_NUM
 
   return {
     name: readFormString(formData, 'name'),
-    presentationId: readFormString(formData, 'presentationId'),
     stock,
     qtyAlert,
     unitId: readOptionalFormString(formData, 'unitId'),

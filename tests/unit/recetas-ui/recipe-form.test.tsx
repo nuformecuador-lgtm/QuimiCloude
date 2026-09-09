@@ -180,15 +180,11 @@ function productView(overrides: Partial<ProductView> = {}): ProductView {
     id: PRODUCT_PAGE2_ID,
     name: PRODUCT_PAGE2_NAME,
     imagePath: null,
-    presentationId: 'presentation-1',
-    presentationName: 'Bidón',
     stock: 10,
     qtyAlert: null,
     unitId: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-    createdBy: null,
-    updatedBy: null,
     ...overrides,
   };
 }
@@ -200,6 +196,7 @@ function lineView(overrides: Partial<RecipeLineView> = {}): RecipeLineView {
     productName: PRODUCT_1_NAME,
     quantity: '1.0000',
     unitId: UNIT_LITRO_ID,
+    productStock: 10,
     ...overrides,
   };
 }

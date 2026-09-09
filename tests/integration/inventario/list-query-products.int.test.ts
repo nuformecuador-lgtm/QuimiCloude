@@ -10,12 +10,12 @@
  *
  * AISLAMIENTO: `listAliveProducts` llama al cliente Prisma GLOBAL, no a un `tx` inyectado, asi
  * que una transaccion que se deshace NO lo envuelve (esta explicado con detalle en la cabecera de
- * `product-crud.int.test.ts`). Se crean filas REALES y se borran en el `afterAll` por la
- * presentacion que las agrupa.
+ * `product-crud.int.test.ts`). Se crean filas REALES y se borran en el `afterAll` por la unidad
+ * que las agrupa.
  *
- * NINGUNA AFIRMACION GLOBAL sobre el catalogo: todos los casos acotan por la presentacion
- * sembrada —que ademas es un filtro `select` declarado (R4), asi que el propio acotado ejercita
- * el contrato—. Una base con mas productos cargados no puede volver rojo este archivo.
+ * NINGUNA AFIRMACION GLOBAL sobre el catalogo: todos los casos acotan por la unidad sembrada —que
+ * ademas es un filtro `select` declarado (R4), asi que el propio acotado ejercita el contrato—.
+ * Una base con mas productos cargados no puede volver rojo este archivo.
  *
  * Cubre R7, R10, R13, R14, R15, R16, R18, R29 y la decision cerrada de los nulos.
  */
@@ -34,7 +34,7 @@ function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
-/** Normalizacion de los datos de APOYO (presentacion, unidad), que tienen la suya propia. */
+/** Normalizacion de los datos de APOYO (unidad), que tiene la suya propia. */
 function normalizeForTest(name: string): string {
   return name
     .trim()
@@ -44,16 +44,16 @@ function normalizeForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '');
 }
 
-let presentationId: string;
-let otherPresentationId: string;
 let unitId: string;
 
 /**
  * Acota TODA consulta de este archivo a las filas sembradas aqui. Es un filtro `select` real
  * del contrato (`PRODUCT_QUERYABLE`), no un truco del test: acotar y ejercitar son lo mismo.
+ * Antes acotaba por `presentationId`; desde el 2026-09-09 (la presentacion se mudo a
+ * `product_batches`) acota por la `unitId` sembrada, que todo producto de este archivo lleva.
  */
 function soloLasMias(): Record<string, ListFilterValue> {
-  return { presentationId: { kind: 'select', values: [presentationId] } };
+  return { unitId: { kind: 'select', values: [unitId] } };
 }
 
 function consulta(partial: Partial<ListQuery> = {}): ListQuery {
@@ -72,7 +72,6 @@ type Semilla = {
   readonly qtyAlert?: number | null;
   readonly createdAt?: Date;
   readonly deletedAt?: Date | null;
-  readonly presentation?: 'propia' | 'otra';
 };
 
 async function sembrar(semillas: readonly Semilla[]): Promise<void> {
@@ -81,7 +80,6 @@ async function sembrar(semillas: readonly Semilla[]): Promise<void> {
       data: {
         name: semilla.name,
         nameNormalized: normalizeProductName(semilla.name),
-        presentationId: semilla.presentation === 'otra' ? otherPresentationId : presentationId,
         unitId,
         stock: semilla.stock ?? null,
         qtyAlert: semilla.qtyAlert ?? null,
@@ -94,20 +92,6 @@ async function sembrar(semillas: readonly Semilla[]): Promise<void> {
 }
 
 beforeAll(async () => {
-  const presentationName = `Bidon ${token()}`;
-  const presentation = await prisma.presentation.create({
-    data: { name: presentationName, nameNormalized: normalizeForTest(presentationName) },
-    select: { id: true },
-  });
-  presentationId = presentation.id;
-
-  const otherName = `Bidon ${token()}`;
-  const other = await prisma.presentation.create({
-    data: { name: otherName, nameNormalized: normalizeForTest(otherName) },
-    select: { id: true },
-  });
-  otherPresentationId = other.id;
-
   const unitName = `unidad ${token()}`;
   const unit = await prisma.unit.create({
     // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
@@ -121,12 +105,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.product.deleteMany({
-    where: { presentationId: { in: [presentationId, otherPresentationId] } },
-  });
-  await prisma.presentation.deleteMany({
-    where: { id: { in: [presentationId, otherPresentationId] } },
-  });
+  await prisma.product.deleteMany({ where: { unitId } });
   await prisma.unit.deleteMany({ where: { id: unitId } });
   await prisma.$disconnect();
 });
@@ -200,26 +179,6 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE);
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
-  });
-
-  it('ordenar por un campo de la presentacion atraviesa la relacion (R10)', async () => {
-    // R10 — `presentationName` no es una columna de `products`: se ordena por el `name` de la
-    // presentacion unida. Con las dos presentaciones sembradas, el orden por ese campo tiene
-    // que agrupar por presentacion.
-    await sembrar([{ name: `${PREFIJO} otra`, stock: 1, presentation: 'otra' }]);
-
-    const pagina = await listAliveProducts({
-      page: 1,
-      pageSize: 25,
-      sort: { columnId: 'presentationName', direction: 'asc' },
-      filters: {
-        presentationId: { kind: 'select', values: [presentationId, otherPresentationId] },
-      },
-      search: '',
-    });
-
-    const nombresDePresentacion = pagina.items.map((p) => p.presentationName);
-    expect([...nombresDePresentacion].sort()).toEqual(nombresDePresentacion);
   });
 });
 

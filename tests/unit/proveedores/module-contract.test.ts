@@ -498,9 +498,11 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // el que caeria si alguien reintrodujera el vinculo: Prisma exigiria el campo reverso en
     // `Product` (`supplierCatalogLines SupplierCatalogLine[]`) y este `toEqual` completo —no
     // un `not.toContain` suelto— caeria en el instante en que apareciera. La lista esperada
-    // es el conjunto EXACTO de relaciones que QC-14/QC-20 le dieron a `Product` (hacia
-    // `Presentation`), sin proveedores adentro.
-    expect(relationTargets('Product')).toEqual(['Presentation'])
+    // es el conjunto EXACTO de relaciones que tiene `Product` hoy: hacia `ProductBatch`
+    // desde el 2026-09-09, cuando la presentacion y la auditoria se mudaron a
+    // `product_batches` (la relacion hacia `Presentation` se fue con la columna
+    // `products.presentation_id`); sin proveedores adentro.
+    expect(relationTargets('Product')).toEqual(['ProductBatch'])
     expect(relationTargets('Product')).not.toContain('SupplierCatalogLine')
     expect(relationTargets('Product')).not.toContain('Supplier')
   })

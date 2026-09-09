@@ -53,7 +53,6 @@ const unitIdSchema = z.string().uuid();
  */
 export const createProductSchema = z.strictObject({
   name: productNameSchema,
-  presentationId: z.string().uuid(),
   stock: nonNegativeIntSchema,
   qtyAlert: nonNegativeIntSchema,
   unitId: unitIdSchema.nullish(),

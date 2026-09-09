@@ -13,10 +13,10 @@ import type { NewProduct, ProductView } from '../domain/product-view';
  * (Grupo C).
  */
 export interface ProductRepository {
-  create(data: NewProduct, actorId: string, now: Date): Promise<{ id: string }>;
+  create(data: NewProduct, now: Date): Promise<{ id: string }>;
   findAliveById(id: string): Promise<ProductView | null>;
-  updateAlive(id: string, data: NewProduct, actorId: string, now: Date): Promise<boolean>;
-  softDeleteAlive(id: string, actorId: string, now: Date): Promise<boolean>;
+  updateAlive(id: string, data: NewProduct, now: Date): Promise<boolean>;
+  softDeleteAlive(id: string, now: Date): Promise<boolean>;
   /** QC-57 (R24): recibe el CONTRATO GENERICO ya saneado por el caso de uso, no la
    *  consulta cruda del llamante. Traducir `columnId`/filtros a SQL es del adaptador. */
   listAlive(query: ListQuery): Promise<Page<ProductView>>;

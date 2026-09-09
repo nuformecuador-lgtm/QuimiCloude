@@ -35,9 +35,8 @@ export function createCreateProduct(
     const parsed = createProductSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
-    // R6: al crear, el actor queda registrado como autor de creacion Y de modificacion.
-    // El puerto solo recibe un `actorId`; es su adaptador (T9) el que lo escribe en las
-    // dos columnas `created_by`/`updated_by` (design.md > 2.1).
-    return deps.products.create(parsed.data, actor.id, now());
+    // La autoria ya no se registra sobre el producto: se mudo al lote (`ProductBatch`) el
+    // 2026-09-09. El actor se usa SOLO para el permiso, no viaja al puerto.
+    return deps.products.create(parsed.data, now());
   };
 }

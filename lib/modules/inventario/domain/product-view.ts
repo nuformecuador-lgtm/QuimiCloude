@@ -12,22 +12,22 @@ import type { UnitId } from '@/lib/modules/unidades';
  * 6.1`, `7`).
  *
  * QC-52 (R1, R2): sin `cost`, `minPurchase` ni `deliveryTime` -son del catalogo del
- * proveedor-. Lo que queda es lo que la cosa ES (`name`, `presentationId`, `unitId`) y lo
- * que HAY de ella (`stock`, `qtyAlert`), con la misma forma y la misma opcionalidad de
- * antes.
+ * proveedor-. 2026-09-09: sin `presentationId` -la presentacion se mudo al lote
+ * (`ProductBatch`)-. Lo que queda es lo que la cosa ES (`name`, `unitId`) y lo que HAY de
+ * ella (`stock`, `qtyAlert`), con la misma forma y la misma opcionalidad de antes.
  */
 export type NewProduct = {
   readonly name: string;
-  readonly presentationId: string;
   readonly stock?: number | null;
   readonly qtyAlert?: number | null;
   readonly unitId?: UnitId | null;
 };
 
 /**
- * Salida de una consulta de producto (`design.md > 6.1`). `createdBy`/`updatedBy` son
- * IDENTIFICADORES, no nombres (D20, R8): este modulo no consulta el modelo `User` ni
- * resuelve ningun nombre de autor.
+ * Salida de una consulta de producto (`design.md > 6.1`). Sin `createdBy`/`updatedBy` ni
+ * `presentationId`/`presentationName` desde el 2026-09-09: la autoria y la presentacion se
+ * mudaron a `ProductBatch` (el lote), asi que el producto -catalogo- ya no expone quien lo
+ * creo/edito ni en que presentacion viene.
  */
 export type ProductView = {
   readonly id: string;
@@ -43,13 +43,9 @@ export type ProductView = {
    * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
-  readonly presentationId: string;
-  readonly presentationName: string;
   readonly stock: number | null;
   readonly qtyAlert: number | null;
   readonly unitId: UnitId | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
-  readonly createdBy: string | null;
-  readonly updatedBy: string | null;
 };
