@@ -664,6 +664,24 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260907183034_permissions_and_role_permissions/down.sql',
     ];
 
+    // RETENSADO 2026-09-08 (QC-83), con el MISMO criterio que los tres retensados de arriba: el
+    // rango `origin/dev...HEAD` mide la rama que corre el gate, no la de QC-34, asi que cada
+    // migracion legitima posterior se NOMBRA una a una o el caso deja de vigilar nada.
+    //
+    // POR QUE `db/` cambia aqui: QC-83 crea `work_groups` y `work_group_members` en el modulo
+    // `identity`, con su `down.sql`. No toca recetas, ni unidades, ni pedidos.
+    //
+    // La UNICA modificacion sobre una tabla preexistente es el indice unico
+    // `users_id_company_id_key` que anade a `users` -la clave que las nuevas tablas necesitan para
+    // referenciar al miembro dentro de su empresa-, aprobado por el humano (R23). Ninguna columna
+    // de `users` cambia: ni se anade, ni se dropea, ni se altera.
+    //
+    // Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+    const MIGRACION_QC83 = [
+      'db/migrations/20260908210000_work_groups_and_members/migration.sql',
+      'db/migrations/20260908210000_work_groups_and_members/down.sql',
+    ];
+
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
       .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta))
@@ -672,7 +690,8 @@ describe('contrato de la ruta de recetas', () => {
       .filter((ruta) => ruta.startsWith('db/'))
       .filter((ruta) => !MIGRACION_QC34.includes(ruta))
       .filter((ruta) => !MIGRACION_QC47.includes(ruta))
-      .filter((ruta) => !MIGRACIONES_LEGITIMAS.includes(ruta));
+      .filter((ruta) => !MIGRACIONES_LEGITIMAS.includes(ruta))
+      .filter((ruta) => !MIGRACION_QC83.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',

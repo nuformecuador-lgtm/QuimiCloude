@@ -533,7 +533,20 @@ describe('db/schema.prisma — la columna de empresa del usuario (QC-47)', () =>
     expect(user.body).toMatch(/@@index\(\[companyId\],\s*map:\s*"users_company_id_idx"\)/)
     // Un `@unique` aqui convertiria la relacion en 1-1: una empresa, un usuario.
     expect(field(user, 'companyId').attributes).not.toMatch(/@unique/)
-    expect(user.body).not.toMatch(/@@unique\([^)]*companyId/)
+
+    // RETENSADO POR QC-83 (R23). Antes esto era un `not.toMatch(/@@unique\([^)]*companyId/)`,
+    // o sea "ningun `@@unique` puede nombrar `companyId`". QC-83 anade UNO —y el humano lo
+    // aprobo explicitamente— para que la FK compuesta de `work_group_members` tenga a donde
+    // apuntar (una FK compuesta exige restriccion unica en el padre, o `42830`). Ese `@@unique`
+    // NO reabre R12: `id` ya es la PK, asi que `(id, company_id)` es unico TRIVIALMENTE y no
+    // puede rechazar ninguna fila que hoy se acepte ni volver 1-1 la relacion.
+    // La lista se enumera ENTERA en vez de negar un patron: asi cualquier `@@unique` NUEVO que
+    // nombre `companyId` —`[companyId]`, `[companyId, email]`, o el mismo con otro `map`— cae
+    // aqui, que es MAS de lo que vigilaba la version anterior.
+    const uniquesConEmpresa = [...user.body.matchAll(/@@unique\(([^\n]*)\)/g)]
+      .map((match) => (match[1] as string).trim())
+      .filter((args) => /\bcompanyId\b/.test(args))
+    expect(uniquesConEmpresa).toEqual(['[id, companyId], map: "users_id_company_id_key"'])
   })
 
   it('nadie puede estar en dos empresas: no hay modelo intermedio (R12)', () => {
