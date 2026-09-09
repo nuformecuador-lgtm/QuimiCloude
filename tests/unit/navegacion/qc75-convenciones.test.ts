@@ -269,17 +269,37 @@ function mergeBaseConDev(): string | null {
 describe('QC-75 R22 — esta ficha no anade backend', () => {
   const archivos = archivosDeLaRama();
 
-  // ESTA GUARDIA SOLO APLICA EN LA RAMA DE QC-75. Su archivo central en el rango es lo que dice
-  // «esta ES la rama de QC-75»; en cualquier otra no hay nada que medir, porque las reglas de
-  // abajo son sobre el alcance de ESTA ficha y no sobre el de las demas.
+  // ESTA GUARDIA SOLO APLICA EN LA RAMA DE QC-75. En cualquier otra no hay nada que medir, porque
+  // las reglas de abajo son sobre el alcance de ESTA ficha y no sobre el de las demas.
   //
   // Antes esto era un FALLO en vez de un salto, y el efecto era que el centinela ponia en rojo el
   // gate completo de TODAS las demas ramas -visto desde QC-38 el 2026-09-08: dos casos rojos, uno
   // por no encontrar `private-nav.ts` en el diff y otro marcando como «intocable» el catalogo de
   // permisos, que QC-38 amplia con permiso del humano-. Como el gate completo es obligatorio antes
   // de cada PR (regla 5 de `CLAUDE.md`), bloqueaba el F2.4 de todo el repo.
+  //
+  // SEGUNDO EPISODIO DE LA MISMA CLASE, y por eso la precondicion se endurece aqui. Hasta ahora la
+  // senal era SOLO `private-nav.ts` en el rango, y eso no identifica una rama: ese archivo es el
+  // registro COMPARTIDO del menu, asi que lo toca toda ficha que anade un item. Lo descubrio QC-39
+  // el 2026-09-08 al anadir el item de Unidades: el centinela creyo que la rama de QC-39 era la de
+  // QC-75 y fallo senalando como «intocables» `lib/modules/unidades/domain/list-units.ts` y
+  // `unit-view.ts`, que el spec de QC-39 autoriza por escrito (R1-R6 y `design.md > 1`). Un salto
+  // ya no basta: si la deteccion miente, el salto se convierte en un rojo ajeno.
+  //
+  // La senal pasa a ser CONJUNTIVA: el archivo central MAS la carpeta de spec de la propia ficha.
+  // La carpeta de spec discrimina de verdad porque nace y vive dentro del rango de QC-75 -sus tres
+  // archivos se escribieron en los commits de esa rama, junto al cambio de `private-nav.ts`- y no
+  // aparece jamas en el rango de ninguna otra ficha, que trae la SUYA. No se usa este mismo archivo
+  // de test como senal justamente porque otras fichas lo enmiendan al chocar con el, como esta.
+  //
+  // Esto ENDURECE la precondicion, no relaja la comprobacion: en la rama real de QC-75 ambas senales
+  // estan presentes y los casos de abajo corren exactamente igual y con la misma severidad.
   const ARCHIVO_CENTRAL = 'lib/shared/navigation/private-nav.ts';
-  const esLaRamaDeQC75 = archivos !== null && archivos.includes(ARCHIVO_CENTRAL);
+  const CARPETA_SPEC = 'specs/QC-75-menu-y-rutas-por-permiso/';
+  const traeElArchivoCentral = archivos !== null && archivos.includes(ARCHIVO_CENTRAL);
+  const traeLaCarpetaSpec =
+    archivos !== null && archivos.some((archivo) => archivo.startsWith(CARPETA_SPEC));
+  const esLaRamaDeQC75 = traeElArchivoCentral && traeLaCarpetaSpec;
 
   // ANCLA ANTI-VACUIDAD. Sin esto, un rango roto —o una corrida desde `dev`— dejaria los tres
   // casos de abajo en verde sin haber mirado nada, que es el anti-patron de la «validacion
@@ -296,8 +316,10 @@ describe('QC-75 R22 — esta ficha no anade backend', () => {
 
     if (!esLaRamaDeQC75) {
       ctx.skip(
-        'el rango trae archivos pero ninguno es `' + ARCHIVO_CENTRAL + '`: esta NO es la rama de ' +
-          'QC-75, asi que la guardia no aplica y este caso NO ha comprobado nada.',
+        'el rango trae archivos pero no trae a la vez `' + ARCHIVO_CENTRAL + '` y `' + CARPETA_SPEC +
+          '`: esta NO es la rama de QC-75 -tocar solo el registro compartido del menu lo hace ' +
+          'cualquier ficha que anade un item-, asi que la guardia no aplica y este caso NO ha ' +
+          'comprobado nada.',
       );
       return;
     }
@@ -316,7 +338,10 @@ describe('QC-75 R22 — esta ficha no anade backend', () => {
       return;
     }
     if (!esLaRamaDeQC75) {
-      ctx.skip('el rango no trae el archivo central de QC-75: esta NO es su rama y R22 no le aplica.');
+      ctx.skip(
+        'el rango no trae a la vez el archivo central y la carpeta de spec de QC-75: esta NO es ' +
+          'su rama y R22 no le aplica.',
+      );
       return;
     }
 

@@ -76,7 +76,7 @@ import type {
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { UnitRef } from '@/lib/modules/unidades';
+import type { UnitView } from '@/lib/modules/unidades';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
@@ -195,7 +195,16 @@ const RECETA = {
   name: 'Esmalte azul de temporada',
   imageUrl: null,
 };
-const UNIDAD: UnitRef = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
+// QC-39 (T1): el listado devuelve `UnitView` -equivalencia y `isSystem` incluidos-. Lo que
+// cambia es la forma del fixture; ningun aserto de este archivo cambia de exigencia.
+const UNIDAD: UnitView = {
+  id: crypto.randomUUID(),
+  name: 'Kilogramo',
+  symbol: 'kg',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 /**

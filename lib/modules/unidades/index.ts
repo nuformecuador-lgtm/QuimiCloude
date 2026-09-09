@@ -61,6 +61,12 @@ export { IncompatibleUnitsError } from './domain/errors';
 // devuelve el catalogo entero; con `page` o `pageSize`, una `Page<UnitRef>`-. Son SOLO tipos y
 // una funcion pura: el barrel no gana nada de servidor por publicarlos, y es lo que QC-39
 // necesita para pintar la pantalla sin conocer el adaptador.
+// QC-39 (R1, R2): la VISTA de unidad, o sea lo que el LISTADO devuelve por cada fila: los tres
+// campos de `UnitRef` mas la equivalencia (`baseUnitId`, `factor` como TEXTO decimal) y
+// `isSystem`. Es un tipo aparte y NO un `UnitRef` mas gordo: `UnitRef` sigue siendo lo que otro
+// modulo sabe de una unidad -y lo que devuelve `UnitCatalog.findRefs`-, y como `UnitView` lo
+// extiende, quien esta tipado con `UnitRef` sigue compilando sin estrechar nada (R3, R4).
+export type { UnitView } from './domain/unit-view';
 export { isUnitPage } from './domain/list-units';
 export type { ListUnits, UnitListResult } from './domain/list-units';
 export type { Page } from './domain/page';
