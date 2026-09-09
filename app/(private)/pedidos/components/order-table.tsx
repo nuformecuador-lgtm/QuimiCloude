@@ -5,6 +5,7 @@ import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import type { OrderSummary } from '@/lib/modules/pedidos';
+import type { UnitView } from '@/lib/modules/unidades';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
 import { orderListHref } from './order-list-params';
@@ -88,14 +89,15 @@ export type OrderTableProps = {
    * Los pide una sola vez el Server Component de la seccion y bajan por props (R43).
    */
   readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitView[];
 };
 
-export function OrderTable({ orders, params, totalPages, recipes }: OrderTableProps) {
+export function OrderTable({ orders, params, totalPages, recipes, units }: OrderTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
-  const columns = useMemo(() => buildOrderColumns({ recipes }), [recipes]);
+  const columns = useMemo(() => buildOrderColumns({ recipes, units }), [recipes, units]);
 
   /*
     La navegacion va DENTRO de una transicion (`startTransition`), y su `isPending` es la senal de

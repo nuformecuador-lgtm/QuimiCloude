@@ -15,7 +15,7 @@
 //
 // **Ningun assert sobre copy** (R44): controles y regiones por `data-testid` o por rol ARIA.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +24,10 @@ import {
   ORDER_BUSINESS_FIELDS,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_TITLE_TESTID,
+  ORDER_INGREDIENTS_EMPTY_TESTID,
+  ORDER_INGREDIENTS_ERROR_TESTID,
+  ORDER_INGREDIENTS_TABLE_TESTID,
+  ORDER_INGREDIENTS_TESTID,
   ORDER_RECIPE_IMAGE_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   ORDER_FORM_TESTID,
@@ -51,28 +55,39 @@ import type {
   CreateOrderFormState,
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import type { RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import type {
+  RecipeListResult,
+  RecipeQueryResult,
+} from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import type { RecipeDetail } from '@/lib/modules/recetas';
+import type { UnitView } from '@/lib/modules/unidades';
 
-const { createOrderActionMock, updateOrderActionMock, prohibida, listRecipesActionMock } =
-  vi.hoisted(() => {
-    const noDebeInvocarse = (nombre: string) => () => {
-      throw new Error(`${nombre} no debe invocarse desde el formulario`);
-    };
-    return {
-      createOrderActionMock:
-        vi.fn<(prev: CreateOrderFormState, data: FormData) => Promise<CreateOrderFormState>>(),
-      updateOrderActionMock:
-        vi.fn<
-          (
-            id: string,
-            prev: OrderMutationFormState,
-            data: FormData,
-          ) => Promise<OrderMutationFormState>
-        >(),
-      prohibida: noDebeInvocarse,
-      listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
-    };
-  });
+const {
+  createOrderActionMock,
+  updateOrderActionMock,
+  prohibida,
+  listRecipesActionMock,
+  getRecipeActionMock,
+} = vi.hoisted(() => {
+  const noDebeInvocarse = (nombre: string) => () => {
+    throw new Error(`${nombre} no debe invocarse desde el formulario`);
+  };
+  return {
+    createOrderActionMock:
+      vi.fn<(prev: CreateOrderFormState, data: FormData) => Promise<CreateOrderFormState>>(),
+    updateOrderActionMock:
+      vi.fn<
+        (
+          id: string,
+          prev: OrderMutationFormState,
+          data: FormData,
+        ) => Promise<OrderMutationFormState>
+      >(),
+    prohibida: noDebeInvocarse,
+    listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
+    getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+  };
+});
 
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   createOrderAction: createOrderActionMock,
@@ -86,6 +101,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
+  getRecipeAction: getRecipeActionMock,
 }));
 
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
@@ -101,6 +117,39 @@ const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
  *  Desde el 2026-09-07 la cantidad es el UNICO decimal del pedido, asi que es ella la que lleva
  *  el valor dificil. */
 const CANTIDAD = '0.1005';
+
+/** Catalogo de unidades que resuelve la unidad de los ingredientes (R43). */
+const UNIDADES: readonly UnitView[] = [
+  { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
+];
+
+/** Linea del detalle de la receta elegida, con los datos del producto ya unidos. */
+const LINEA_INGREDIENTE = {
+  id: 'linea-1',
+  productId: crypto.randomUUID(),
+  productName: 'Sosa cáustica',
+  quantity: '2.0000',
+  unitId: 'u-litro',
+  productStock: 40,
+};
+
+/** Detalle de la receta que devuelve `getRecipeAction` (el JOIN con `products` lo hace `recetas`). */
+function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
+  return {
+    id: RECETA.id,
+    name: RECETA.name,
+    description: null,
+    imageUrl: null,
+    stepCount: 0,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    createdBy: null,
+    updatedBy: null,
+    steps: [],
+    lines: [LINEA_INGREDIENTE],
+    ...overrides,
+  };
+}
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -126,7 +175,7 @@ const onSaved = vi.fn();
 function renderFormulario(order?: OrderSummary, recipes: RecipePickerPage = RECETAS) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={recipes} onSaved={onSaved} />
+      <OrderForm order={order} recipes={recipes} units={UNIDADES} onSaved={onSaved} />
     </Sheet>,
   );
 }
@@ -155,6 +204,7 @@ beforeEach(() => {
     numberText: formatOrderNumber({ year: 2026, sequence: 43 }),
   });
   updateOrderActionMock.mockResolvedValue({ status: 'success' });
+  getRecipeActionMock.mockResolvedValue({ status: 'success', data: recetaDetalle() });
 });
 
 afterEach(() => {
@@ -504,5 +554,124 @@ describe('la eleccion de receta gobierna Guardar (2026-09-09)', () => {
     expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
     expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID).textContent).not.toContain(RECETA.name);
     expect(createOrderActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('los ingredientes de la receta elegida (2026-09-09)', () => {
+  // El JOIN con `products` lo hace el detalle de `recetas` (`getRecipeAction`); aqui se
+  // comprueba que al elegir receta se pide y que la tabla pinta los datos del producto.
+
+  it('sin receta elegida la tabla de ingredientes no se monta', () => {
+    renderFormulario();
+
+    expect(screen.queryByTestId(ORDER_INGREDIENTS_TESTID)).toBeNull();
+    expect(getRecipeActionMock).not.toHaveBeenCalled();
+  });
+
+  it('elegir una receta pide su detalle y pinta la tabla con los datos de los productos', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenCalledWith(RECETA.id));
+    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+
+    expect(within(tabla).getByTestId('order-ingredient-product')).toHaveTextContent(
+      LINEA_INGREDIENTE.productName,
+    );
+    expect(within(tabla).getByTestId('order-ingredient-quantity')).toHaveTextContent(
+      LINEA_INGREDIENTE.quantity,
+    );
+    // La unidad llega como id y se resuelve con el catalogo de unidades bajado por props (R43).
+    expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
+    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
+      String(LINEA_INGREDIENTE.productStock),
+    );
+  });
+
+  it('la edicion pide el detalle de la receta YA elegida al montar el panel', async () => {
+    renderFormulario(pedido());
+
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenCalledWith(RECETA.id));
+    expect(await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID)).toBeInTheDocument();
+  });
+
+  it('una receta sin ingredientes se dice, no se pinta una tabla vacia', async () => {
+    const user = setupUser();
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recetaDetalle({ lines: [] }),
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    expect(await screen.findByTestId(ORDER_INGREDIENTS_EMPTY_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_INGREDIENTS_TABLE_TESTID)).toBeNull();
+  });
+
+  it('la «cantidad requerida» parte de 0 y el «restante» la descuenta del stock', async () => {
+    // 2026-09-09: la columna calcula `cantidad de la linea × cantidad del pedido`, con decimal
+    // EXACTO (`multiplyDecimal`), y sin cantidad escrita vale 0; el restante es `stock − requerida`
+    // (`subtractDecimal`) y sin cantidad escrita coincide con el stock.
+    const user = setupUser();
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    const requerida = within(tabla).getByTestId('order-ingredient-required');
+    const restante = within(tabla).getByTestId('order-ingredient-remaining');
+    expect(requerida).toHaveTextContent('0');
+    expect(restante).toHaveTextContent('40');
+
+    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
+
+    // 2.0000 × 0.1005 = 0.20100 -> «0.201»; restante = 40 − 0.201 = 39.799, sin resaltar.
+    await waitFor(() => expect(requerida).toHaveTextContent('0.201'));
+    expect(restante).toHaveTextContent('39.799');
+    expect(restante.firstChild).not.toHaveClass('text-destructive');
+  });
+
+  it('un restante negativo se resalta en rojo', async () => {
+    // 2026-09-09: el pedido pide mas de lo que hay, el restante baja de cero y la celda se
+    // pinta con `text-destructive` sobre fondo suave.
+    const user = setupUser();
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 0.2 }] }),
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    const restante = within(tabla).getByTestId('order-ingredient-remaining');
+    expect(restante).toHaveTextContent('0.2');
+
+    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
+
+    // 0.2 − 0.201 = −0.001, resaltado.
+    await waitFor(() => expect(restante).toHaveTextContent('-0.001'));
+    expect(restante.firstElementChild).toHaveClass('text-destructive');
+  });
+
+  it('si el detalle falla, la tabla se sustituye por el estado de error de los ingredientes', async () => {
+    const user = setupUser();
+    getRecipeActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'not_found',
+      message: 'La receta no existe.',
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    const error = await screen.findByTestId(ORDER_INGREDIENTS_ERROR_TESTID);
+    expect(error).toHaveAttribute('role', 'alert');
+    expect(error).toHaveTextContent('La receta no existe.');
+    // El fallo del detalle no convierte el panel en un fallo del formulario.
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
   });
 });

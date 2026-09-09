@@ -1,6 +1,8 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import type { UnitView } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import { OrderListEmpty } from './order-list-empty';
@@ -47,19 +49,27 @@ type OrderListSectionProps = {
 /**
  * El catalogo que alimenta el panel lateral de alta y edicion, pedido **una sola vez** por render
  * de la seccion y bajado al cliente **por props** (R43, `design.md > 9`): la primera pagina de
- * recetas -el selector busca las demas en el servidor (R31)-. El componente de cliente no la pide
- * por su cuenta.
+ * recetas -el selector busca las demas en el servidor (R31)- y las unidades -que resuelven la
+ * unidad de los ingredientes que muestra el panel-. El componente de cliente no las pide por su
+ * cuenta.
  *
- * QC-35bis (2026-09-07): eran DOS. El catalogo entero de unidades bajaba tambien, para el
- * selector de unidad del formulario; al salir la unidad del pedido, esa consulta -y con ella
- * `listUnitsAction` en esta pantalla- desaparecio.
+ * QC-35bis (2026-09-07): eran DOS y quedaron en uno -el catalogo de unidades dejo de bajar
+ * cuando la unidad salio del pedido-. El 2026-09-09 vuelven a ser DOS: el panel muestra ahora los
+ * ingredientes de la receta y necesita resolver su unidad.
  *
- * Si el catalogo falla, el panel se abre con el selector vacio en vez de tumbar la lista entera:
- * la lista es lo que la pantalla existe para mostrar, y el alta ya rechaza en el servidor un id
- * que no exista (`recipe_not_found`).
+ * Si algun catalogo falla, el panel se abre con el selector vacio -o la unidad de los
+ * ingredientes sin resolver- en vez de tumbar la lista entera: la lista es lo que la pantalla
+ * existe para mostrar, y el alta ya rechaza en el servidor un id que no exista
+ * (`recipe_not_found`).
  */
-async function loadFormCatalogs(): Promise<{ readonly recipes: RecipePickerPage }> {
-  const recipes = await listRecipesAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE });
+async function loadFormCatalogs(): Promise<{
+  readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitView[];
+}> {
+  const [recipes, units] = await Promise.all([
+    listRecipesAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+    listUnitsAction(),
+  ]);
 
   return {
     recipes:
@@ -74,6 +84,7 @@ async function loadFormCatalogs(): Promise<{ readonly recipes: RecipePickerPage 
             totalPages: recipes.data.totalPages,
           }
         : { items: [], totalPages: FIRST_PAGE },
+    units: units.status === 'success' ? units.data : [],
   };
 }
 
@@ -85,7 +96,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   }
 
   const { items, page: currentPage, totalPages } = result.data;
-  const { recipes } = await loadFormCatalogs();
+  const { recipes, units } = await loadFormCatalogs();
 
   if (items.length === 0) {
     // El slot de «crear el primer pedido» (R21) lo llena `<OrderSheet />` (T10) como `children`:
@@ -99,7 +110,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
             : undefined
         }
       >
-        <OrderSheet recipes={recipes} />
+        <OrderSheet recipes={recipes} units={units} />
       </OrderListEmpty>
     );
   }
@@ -111,7 +122,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         catalogos que el panel necesita se piden aqui, donde ya se pide la lista.
       */}
       <div className="flex justify-end">
-        <OrderSheet recipes={recipes} />
+        <OrderSheet recipes={recipes} units={units} />
       </div>
       {/*
         `order-table.tsx` es un modulo de CLIENTE —la columna de acciones declara celdas con
@@ -125,6 +136,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         params={params}
         totalPages={totalPages}
         recipes={recipes}
+        units={units}
       />
     </div>
   );

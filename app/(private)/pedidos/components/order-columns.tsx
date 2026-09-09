@@ -2,6 +2,7 @@
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
+import type { UnitView } from '@/lib/modules/unidades';
 
 import {
   CREATED_AT_COLUMN_ID,
@@ -103,6 +104,7 @@ function formatRequestDate(value: Date): string {
  */
 export type OrderColumnsDeps = {
   readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitView[];
 };
 
 /**
@@ -114,6 +116,7 @@ export type OrderColumnsDeps = {
  */
 export function buildOrderColumns({
   recipes,
+  units,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -181,7 +184,7 @@ export function buildOrderColumns({
       // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
       // `pinnable: false` para que el usuario no pueda fijarla y tapar la del correlativo.
       pinnable: false,
-      cell: (order) => <OrderRowSheetActions order={order} recipes={recipes} />,
+      cell: (order) => <OrderRowSheetActions order={order} recipes={recipes} units={units} />,
     },
   ];
 }
