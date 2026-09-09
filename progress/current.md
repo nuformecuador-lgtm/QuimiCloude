@@ -12,13 +12,41 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-58 | timeout-tests-ui-bajo-carga | Inventario | frontend | in_progress | feature/QC-58-timeout-tests-ui-bajo-carga | **17/17 tasks, `d1e966d`**. T11: cinco `./init.sh` completos seguidos, **las cinco exit 0** (234/234 archivos, 2839 casos). R9 y R13 reformulados conservando la redaccion anterior. `reviewer` corriendo (F2.2). Base propia `QuimiCloude_QC58` montada — el worktree venia sin `.env` |
-| QC-65 | estado-de-cuenta-de-usuario | Identidad y acceso | backend | in_progress | feature/QC-65-estado-de-cuenta-de-usuario | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. Rama sincronizada con `origin/dev` ANTES de implementar, para no chocar con los tests del seed que QC-38 acababa de tocar. `implementer` en curso (F2.1) |
+| QC-70 | errores-centralizados | Plataforma | fullstack | pending | feature/QC-70-errores-centralizados | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`d26d09e`), con `.env`, base propia `QuimiCloude_QC70` migrada y sembrada, e `install`/`generate`/`typegen` corridos de entrada — los cuatro gaps de montaje que costaron una hora en QC-58. `zone` y `complexity: high` ya venian del board. Trae `requirements.md` sembrado por `/afinar-feature` (2026-09-07). **Pendiente F1.2** |
 | QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **Spec aprobado por el humano el 2026-09-08** (F1.4). 50 requisitos EARS, 35 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1). **Conflicto acotado con QC-58**: la tarea que amplía `app-sidebar.test.tsx` y `private-layout-menu.test.tsx` va **al final**, cuando QC-58 esté `done` |
-| QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`516e9c0`), `complexity: medium`. **Pendiente F1.2**: la ficha trae una pregunta abierta escrita en el board y la partición `fullstack` sin decidir, así que toca `/afinar-feature` antes del `spec_author` |
+| QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
+| QC-83 | modelo-de-grupos-de-trabajo | Identidad y acceso | backend | in_progress | feature/QC-83-modelo-de-grupos-de-trabajo | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. **Se desbloqueó**: el PR #48 de QC-65 se mergeó y la rama quedó sincronizada con `origin/dev` (`c640c7a`) ANTES de implementar. **Base propia `QuimiCloude_QC83` creada y `.env` del worktree apuntando a ella** — el worktree venía sin `.env`, igual que QC-58. `implementer` en curso (F2.1) |
 | QC-80 | unidad-desde-la-presentacion | Inventario | fullstack | pending | feature/QC-80-unidad-desde-la-presentacion | **Nacida del chat el 2026-09-08** y creada en el board (QC-18). `complexity: medium`. **Pendiente F1.0 y F1.2**: sin worktree todavia, y trae una pregunta abierta -con que unidad se rellenan las 114 presentaciones existentes-, asi que toca `/afinar-feature` antes del `spec_author` |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **BLOQUEADA**: la unicidad de `lote` por empresa necesita `products.company_id`, que hoy no existe y que introduce QC-49. No arranca hasta que QC-49 este `done` |
 | QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
+
+### QC-65 — estado-de-cuenta-de-usuario: CERRADA el 2026-09-08 (PR #48, merge `c640c7a`)
+
+Resumen completo en `progress/history.md`. Tarjeta a *Finalizado* con la URL del PR comentada en el
+issue, ficha a `done`, worktree desmontado y rama borrada en local y en `origin`. 21 requisitos con
+test **verificado abriendo el caso**, `reviewer` **APROBADO a la primera** (0 mayores, 5 menores) y
+`./init.sh` completo en verde (3378 tests, 2 rojos y los dos en el baseline).
+
+**Desbloquea QC-66** (`crud-de-usuarios`) y **QC-78** (`estado-de-cuenta-en-el-acceso`). La zona
+`backend` queda con QC-83 sola en `in_progress`, así que admite una feature más.
+
+**Dos deudas suyas que el leader tiene que decidir, las dos escritas en `history.md`:**
+
+- **Dos guardias de alcance con la misma bomba de relojería** —`account-status-scope.test.ts` y
+  `configuracion-ui/data-table-intacta.test.ts` (QC-45)—: exigen `tocados.length > 0` sobre
+  `git diff dev...HEAD` ∪ `git status`, y una vez mergeada la ficha **sobre `dev` limpio ese
+  conjunto es vacío**. Hoy la de QC-45 pasa solo porque el árbol principal está sucio.
+  **Ficha de arnés.**
+- **El backfill de RLS pasa por la razón equivocada** (superusuario con `BYPASSRLS` en local) y
+  aquí **no hay `SET NOT NULL` que delate el fallo**: fuera de local podría dejar a todos los
+  usuarios en `pending` en silencio, y solo se vería cuando **QC-78** corte el login. **Decisión
+  humana antes del primer despliegue no local.**
+
+**Séptima vez que `wt.sh done` falla en Windows**: desregistró el worktree pero dejó el árbol en
+disco por las rutas largas de `pnpm`. Rematado con `rm -rf` + `git worktree prune`. Sigue sin ficha.
+
+**Queda un worktree huérfano en disco**: `.worktrees/QC-76-equivalencia-y-ambito-de-unidades`, ya
+desregistrado de git pero con el árbol puesto. No se borró aquí porque no es de esta ficha.
 
 ### QC-47 — arranque del 2026-09-04 (F1.0)
 
@@ -243,6 +271,106 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+### QC-83 — acotada con `/afinar-feature` (2026-09-08)
+### QC-39 — el E2E destapó que la base compartida iba sin sembrar (2026-09-08)
+
+El E2E de QC-39 salió **rojo la primera vez**: los dos recorridos del Administrador caían igual en
+Chromium y en WebKit. El snapshot de Playwright lo resolvió sin depurar nada: la página había
+pintado **«No encontramos esta página»** —el 404 del layout privado— a un usuario **Administrador**
+que **sí veía el enlace de Unidades en el menú**.
+
+**La causa, medida contra la base:** el catálogo de permisos tenía **10 filas y `unidades.modificar`
+no estaba**. QC-38 lo crea y lo siembra al Administrador —el catálogo debe tener **once**—, pero
+**la base compartida no se había vuelto a sembrar desde que QC-38 se mergeó**. `pnpm run db:seed`
+—idempotente desde QC-6— lo arregló con una sola línea de salida: `permisos creados: 1
+(unidades.modificar) - asignaciones permiso-rol creadas: 1 - empresa inicial: ya existia - usuario
+inicial: ya existia`. Después, **4 passed (23.0s), exit 0**, en los dos navegadores.
+
+**El hueco de verificación que esto destapa, y no es de QC-39 cerrarlo.** El fallo reprodujo en un
+navegador real la grieta exacta que **R11 predice** —enlace visible, 404 al pulsarlo—, porque el
+ítem declara `unidades.consultar` y la página exige además `unidades.modificar`. Pero R11 compara
+contra `SEED_ROLE_PERMISSIONS`, que es la **constante del código** y tenía los once. La **base**
+tenía diez. **Ningún test del repo compara el catálogo de permisos del código con el de la base**,
+así que una ficha que añade un permiso puede mergearse y dejar todos los entornos existentes
+funcionando de menos sin que nada se ponga rojo. Candidato claro a `/afinar-regla`, o a ficha nueva.
+
+**Van seis veces que el estado de la base compartida bloquea una feature ajena**, y esta vez no fue
+drift de migración sino **seed sin correr**. La cura conocida —una base propia por worktree— no
+cubre este caso: una base propia recién creada tendría el mismo problema si nadie la siembra. Lo que
+falta es que *algo* avise de que el catálogo del código y el de la base no coinciden.
+
+**Nota operativa para quien corra E2E aquí:** Playwright no carga `.env` por su cuenta —hay que
+exportar antes—, el puerto del `webServer` es el **3117** (libre; el 3000 lo tiene el `next dev` del
+humano), y el riesgo que el `implementer` anticipó del `Select` en WebKit **no se materializó**: no
+hizo falta salida por teclado.
+
+
+Alcance, **17 decisiones cerradas** y **cero preguntas abiertas** en
+`specs/QC-83-modelo-de-grupos-de-trabajo/requirements.md` (en su worktree). Esa es la fuente;
+aquí no se copia la tabla. **El board no necesitó ni una edición**: los cuatro campos seguían
+diciendo la verdad y las tres fichas del «Lo que NO entra» ya existían.
+
+Trece de las diecisiete son **heredadas y citadas** de QC-4, QC-14, QC-20, QC-32 y sobre todo
+**QC-47**, que es el N:M más parecido. Las cuatro nuevas son las que la ficha del board no cubría
+y **las cuatro acaban en la migración**: la pertenencia lleva **también `company_id`** y la BASE
+rechaza la fila cruzada —sin eso, alguien de otra empresa dentro de «Turno noche» recibiría
+**pedidos ajenos** en cuanto QC-88 liste por responsable—; una persona dada de baja o `inactive`
+**sigue en sus grupos** y filtra quien lee (eso es QC-84); un grupo **puede estar vacío**; y sacar
+a alguien de un grupo **borra la fila de verdad** — la excepción explícita al borrado lógico de
+QC-4, porque el histórico que importa ya queda congelado en QC-86 al asignar.
+
+**El `deleted_at` es del GRUPO, no de la pertenencia.** Son dos decisiones distintas que en la
+misma migración es fácil confundir, y por eso está escrita como fila propia.
+
+### QC-83 — arranque del 2026-09-08 (F1.0), con la implementación bloqueada
+
+Arrancada por decisión humana explícita («comienza 83»), la primera de las seis fichas que creó la
+acotación de QC-63. Worktree montado desde `origin/dev` (`516e9c0`). `zone: backend` venía del
+board; **`complexity` evaluada aquí como `medium`**: dos tablas nuevas —el grupo y su N:M con
+personas—, una migración, el puerto, el repositorio y la composición, con condiciones de verdad
+(nombre único **dentro de la empresa**, y borrar un grupo ya usado sin dejar un pedido sin
+responsables). **No es `high` como QC-47**: aquella retrofiteaba `users` con una columna `NOT NULL`
+sobre filas existentes; esta solo añade tablas nuevas.
+
+**LA IMPLEMENTACIÓN NO ARRANCA, y está medido, no supuesto.** QC-65 (`backend`, `in_progress`)
+tiene ahora mismo sin commitear `db/schema.prisma`, `lib/modules/identity/index.ts`,
+`identity/domain/seed-initial-access.ts`, `identity/ports/initial-access-repository.ts` y su
+adaptador de persistencia, **más una migración viva** (`20260908190002_user_account_status`).
+QC-83 cae exactamente en esos archivos: es la intersección que `AGENTS.md > Paralelismo` punto 3
+bloquea. **El spec sí se escribe** —no toca código—, igual que se decidió para QC-47 frente a
+QC-34. La espera es corta: el `reviewer` de QC-65 ya dio **OK con 0 bloqueantes**, así que va
+camino del PR.
+
+**Y cuando entre en F2, base propia `QuimiCloude_QC83` ANTES de la primera migración, no después.**
+Van seis veces que el drift de base entre worktrees bloquea una feature, y esta introduce
+migración nueva mientras QC-65 tiene otra en vuelo sobre la misma zona del esquema.
+
+### QC-63 — acotada con `/afinar-feature` (2026-09-08)
+
+Alcance, 12 decisiones cerradas y **cero preguntas abiertas** en
+`specs/QC-63-ejecutar-receta-operador/requirements.md`. Esa es la fuente; aquí no se copia la tabla.
+
+**La acotación dio la vuelta a la ficha y por eso se reescribió el issue entero antes de sembrar.**
+El board decía «abrir la lectura de recetas al Operador». Es al revés: el Operador **no navega
+recetas**, ve **sus pedidos asignados** y ejecuta la receta de uno. El permiso no es `recetas.*`
+sino de un **módulo nuevo de asignación** — y el hallazgo que lo cierra es que `recetas.consultar`
+corta hoy **las dos** pantallas, incluida `formulas/[id]/page.tsx`, que es el **formulario de
+edición**: dárselo al Operador le abría justo lo que la ficha prohíbe.
+
+**Seis fichas nuevas en el board** (paso 5 del comando), con épica, labels y «is blocked by»:
+**QC-83** modelo de grupos de trabajo → **QC-84** su CRUD → **QC-85** su pantalla (épica Identidad
+y acceso); **QC-86** modelo de asignación de pedidos → **QC-87** asignar responsables → **QC-88**
+listado de pedidos asignados (épica Pedidos). **QC-63 queda bloqueada por QC-88** y no arranca:
+su worktree se desmonta.
+
+**Dos decisiones que valen más que la ficha.** (1) **Las cantidades NO se escalan**: escalar solo
+las líneas sería peor que no escalar, porque los pasos de QC-62 son texto libre y un «90 L» escrito
+dentro de un párrafo no se puede multiplicar sin adivinar — la pantalla mostraría 225 L en la lista
+y 90 L en el paso que el operario lee. Se muestra el **factor** y nada más. (2) **Esta ficha
+estrena la conversión entre unidades de QC-76**, que hasta hoy no usaba nadie: el operario puede
+ver la misma línea en litros o mililitros. Anotado en `docs/architecture.md > Preguntas abiertas
+del dominio > 1`.
+
 
 ### QC-80 y QC-81 — dos fichas nuevas nacidas del chat, y una regla saltada (2026-09-08)
 
