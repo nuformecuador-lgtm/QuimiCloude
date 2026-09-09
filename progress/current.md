@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-70 | errores-centralizados | Plataforma | fullstack | in_progress | feature/QC-70-errores-centralizados | **Spec APROBADO por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. 33 requisitos EARS, 16 tasks, cero preguntas abiertas. **No se parte** en backend+frontend por decision humana: abrir los codigos por caso obliga a tocar catalogo y pantallas a la vez. `implementer` en curso (F2.1). **Choque con QC-39**: renombra `duplicate_name`/`not_found` de unidades, y como los archivos no existen en `dev` el merge sale limpio y falla EN PANTALLA, no en el gate |
-| QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **PR #51 abierto el 2026-09-08, esperando merge humano (F2.4→F2.5)**. `reviewer` **APROBADO** (0 mayores, 8 menores; tres atendidos). 50/50 requisitos con test, E2E verde en Chromium y WebKit, `./init.sh` completo en verde. **T13 (WebKit manual) sin hacer y ningún agente puede hacerla** |
+| QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **PR #51 abierto y en `MERGEABLE`, esperando merge humano (F2.4→F2.5)**. `reviewer` **APROBADO** (0 mayores, 8 menores; tres atendidos). 50/50 requisitos con test, E2E verde en Chromium y WebKit, `./init.sh` completo con **cero rojos** tras sincronizar con `dev`. **T13 (WebKit manual) sin hacer y ningún agente puede hacerla** |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
 | QC-83 | modelo-de-grupos-de-trabajo | Identidad y acceso | backend | in_progress | feature/QC-83-modelo-de-grupos-de-trabajo | **PR [#50] abierto, `./init.sh` completo en `== init OK ==`** (273 archivos, 3451 tests; único rojo en baseline). 12/12 tasks, 28/28 requisitos con test, `reviewer` APROBADO en una ronda (0 mayores, 4 menores, 18 mutaciones). **Esperando merge humano** → luego F2.5/F2.6 |
 | QC-78 | estado-de-cuenta-en-el-acceso | Identidad y acceso | backend | spec_ready | feature/QC-78-estado-de-cuenta-en-el-acceso | **Spec escrito (F1.3), tarjeta en *Spec en revisión*: esperando aprobación humana (F1.4)**. 28 requisitos EARS sobre las 13 decisiones que cerró `/afinar-feature`, cero preguntas abiertas, tabla de cobertura decisión → requisito. **Sin worktree a propósito** — se monta en F2.0. **El choque con QC-83 se cayó**: su `tasks.md` no declara `db/schema.prisma`, `db/migrations/`, `lib/composition/` ni `identity/index.ts` (R26 lo exige), así que arranca sin esperarla |
@@ -273,6 +273,62 @@ uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculo
 
 ## Evaluaciones
 ### QC-78 — acotada con `/afinar-feature` (2026-09-08)
+### QC-39 — el merge con `dev`, y la lección de la base fijada a mano (2026-09-08)
+
+Con el PR #51 ya abierto, `origin/dev` avanzó **26 commits** y GitHub marcó el PR `CONFLICTING`. La
+sincronización trajo **nueve conflictos**, y los nueve eran **el mismo**: `dev` traía
+**`b97380c — feat(recetas): la unidad de una linea se acota al grupo de su ingrediente`**, que
+**ensanchó `UnitRef` con `baseUnitId` y `factor` por su cuenta**, para agrupar unidades por su base
+efectiva. Es **media ampliación de la que hacía QC-39**, hecha por otra rama y por otro motivo. Era
+la colisión anunciada: cuando esta sesión arrancó QC-39, ese trabajo estaba **sin commitear** en el
+árbol principal y quedó advertido que habría que reconciliar si aterrizaba antes.
+
+En **ocho** de los nueve, la rama era superconjunto estricto —los mismos campos más `isSystem`— y se
+conservó. En **dos** —`unit-prisma.ts` y `recipe-form.test.tsx`— `dev` aportaba contenido propio y
+no solo forma, así que **se fusionaron los dos lados**: el comentario `QC-26bis` que explica por qué
+la derivación viaja en `UnitRef` habría desaparecido al quedarse con un solo lado, y era la única
+explicación de una decisión ajena.
+
+**El merge dejó dos guardias de la propia ficha en rojo, y las dos acusaban en falso:**
+
+1. `modulo-intacto.test.ts` afirmaba «`UnitRef` sigue teniendo exactamente **tres** campos». Pasó a
+   tener cinco y **no los puso QC-39**. El aserto estaba escrito como propiedad **del tipo** cuando
+   R3 habla de una propiedad **del cambio**: lo primero lo rompe cualquiera, lo segundo solo esta
+   ficha. Reescrito para comparar el bloque `export type UnitRef` entre la base de fusión y el árbol
+   —**más estricto que el anterior**: muerde también un cambio de tipo, de opcionalidad o de
+   `readonly`—, con aserto de no vacuidad.
+2. `consumidores-catalogo.test.tsx` fijaba `RAMA_BASE = '516e9c0'` **a mano**, y un commit escrito a
+   mano deja de ser «la rama base» en cuanto hay un merge: acusaba a la ficha de tocar **nueve
+   archivos** de `produccion/formulas` que llegaron por el merge. Medido: contra `516e9c0` salen los
+   nueve; contra `git merge-base origin/dev HEAD`, **ninguno**. Es el mismo bug que su archivo
+   hermano ya tenía arreglado.
+
+**Van tres veces en esta sola ficha que un centinela con la base fijada a mano miente en cuanto la
+rama se sincroniza. La base se calcula, no se escribe.** Junto con los dos centinelas de alcance que
+hubo que acotar, son **cinco episodios** de la misma familia en una feature: guardias que miden el
+cambio y se equivocan de rango o de sujeto. Es material de `/afinar-regla`, y ya no por acumulación
+de anécdotas sino por patrón medido.
+
+**`UnitView` se adelgazó a `UnitRef & { isSystem }`** (decisión del `implementer`, razonada y en
+commit aparte): con `UnitRef` ya trayendo la equivalencia, redeclararla obligaba a mantener la misma
+verdad en dos sitios, y si `UnitRef` estrechara un día uno de los dos tipos la intersección lo
+estrecharía **en silencio**. Lo que la redundancia parecía proteger lo protege ahora un test
+—`unit-view-projection.test.ts` afirma los seis campos— en vez de una copia. Es desviación de
+`design.md > 2.1`, escrito cuando `UnitRef` tenía tres campos; contrato idéntico, anotada para el
+reviewer.
+
+**Un matiz de R3 que quedó anotado y NO se editó** por ser fila de decisiones cerradas: leído en
+presente, R3 hoy es falso como descripción del mundo —`UnitRef` tiene cinco campos y los puso otra
+ficha— y sigue siendo verdadero como restricción sobre *esta* ficha, que es lo que siempre quiso
+decir. Sin explicitar el sujeto, el siguiente que lo lea volverá a escribir el aserto como propiedad
+del tipo, que es exactamente lo que acaba de pasar.
+
+**Cierre:** `./init.sh` completo con **cero rojos** —ni siquiera los del baseline, que `dev` ya
+saldó—, `== init OK ==`, exit 0. PR #51 en `MERGEABLE` / `CLEAN`. Durante la verificación hubo que
+aplicar **otra** migración ajena sin aplicar (`work_groups_and_members`, de QC-83) y **regenerar el
+cliente de Prisma por tercera vez**: el test de QC-83, eso sí, falla con un mensaje que dice
+exactamente qué comando correr, que es como deberían fallar todos.
+
 
 Alcance, **13 decisiones cerradas** y **cero preguntas abiertas** en
 `specs/QC-78-estado-de-cuenta-en-el-acceso/requirements.md`. Esa es la fuente; aquí no se copia la
