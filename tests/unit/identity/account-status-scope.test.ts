@@ -149,10 +149,65 @@ const PIEZAS_DE_QC19 = [
  * Nada mas se relaja: en una rama con cambios reales los tres casos vigilan exactamente igual que
  * antes, con las mismas listas cerradas y las mismas igualdades.
  */
+/**
+ * EL ARCHIVO CENTRAL DE QC-65. Es el dominio que DECLARA el estado de cuenta: ninguna rama puede
+ * implementar esta ficha sin tocarlo, y ninguna otra ficha tiene motivo para hacerlo. Que aparezca
+ * en el rango es lo que dice «esta ES la rama de QC-65».
+ */
+const ARCHIVO_CENTRAL = 'lib/modules/identity/domain/account-status.ts';
+
+/** Puro y exportado para poder ejercitarlo con listas sinteticas, en los dos sentidos. */
+export function esLaRamaDeQC65(tocados: readonly string[]): boolean {
+  return tocados.includes(ARCHIVO_CENTRAL);
+}
+
+/**
+ * Las infracciones de alcance de R20 sobre una lista de archivos. Funcion PURA y exportada: los
+ * casos de abajo la ejercitan contra el arbol real -donde debe salir vacia- y contra listas
+ * sinteticas -donde debe morder-. Una guardia que solo se ejercita contra el arbol real no
+ * demuestra que pueda fallar.
+ */
+export function infraccionesDeAlcance(tocados: readonly string[]): readonly string[] {
+  return tocados.filter(
+    (archivo) =>
+      archivo.startsWith('app/') ||
+      archivo.startsWith('components/') ||
+      archivo.startsWith('hooks/') ||
+      archivo === 'middleware.ts' ||
+      /^lib\/modules\/[^/]+\/adapters\/driving\//.test(archivo),
+  );
+}
+
+/**
+ * ESTOS CASOS SOLO APLICAN EN LA RAMA DE QC-65 (anadido el 2026-09-08).
+ *
+ * Antes bastaba con que el rango NO estuviera vacio, y el efecto era que este centinela ponia en
+ * ROJO el gate completo de cualquier otra rama de feature: sus reglas son sobre el alcance de
+ * ESTA ficha -«QC-65 no toca `app/`, `components/` ni `hooks/`»- y las declaraban intocables para
+ * todo el mundo. Visto desde QC-70 el 2026-09-08, que toca once archivos de `app/` **con permiso
+ * explicito del humano** y sacaba 18 rutas «prohibidas» que no lo eran. Como el gate completo es
+ * obligatorio antes de cada PR (regla 5 de `CLAUDE.md`), bloqueaba el cierre de todo el repo.
+ *
+ * MISMO ARREGLO Y MISMA FORMA que `tests/unit/navegacion/qc75-convenciones.test.ts`, commit
+ * `7cd478b`. En la rama de QC-65 el comportamiento NO cambia: el archivo central esta en el rango
+ * y los tres casos vigilan exactamente igual que antes, con las mismas listas cerradas.
+ *
+ * Fuera de su rama quedan MUDOS (`skipped`), nunca verdes: un verde diria «he revisado el diff y
+ * no cruza ninguna frontera» sin haber mirado nada, que es el anti-patron de la «validacion
+ * opcional» de `docs/verification.md`.
+ */
 function tocadosOMudo(ctx: Pick<TestContext, 'skip'>): readonly string[] {
   const tocados = archivosTocados();
   if (tocados.length === 0) {
     ctx.skip('la rama no toca ningun archivo respecto de `dev`: no hay diff que revisar');
+  }
+  if (!esLaRamaDeQC65(tocados)) {
+    ctx.skip(
+      'el rango trae archivos pero ninguno es `' +
+        ARCHIVO_CENTRAL +
+        '`: esta NO es la rama de QC-65, asi que su alcance no le aplica y este caso NO ha ' +
+        'comprobado nada.',
+    );
   }
   return tocados;
 }
@@ -230,15 +285,7 @@ describe('R20 — ni caso de uso de cambio, ni adaptador driving, ni ruta, ni Se
     // Si la rama no toca nada, este caso queda mudo (`skipped`) en vez de afirmar en vacuo.
     const tocados = tocadosOMudo(ctx);
 
-    const prohibidos = tocados.filter(
-      (archivo) =>
-        archivo.startsWith('app/') ||
-        archivo.startsWith('components/') ||
-        archivo.startsWith('hooks/') ||
-        archivo === 'middleware.ts' ||
-        /^lib\/modules\/[^/]+\/adapters\/driving\//.test(archivo),
-    );
-    expect(prohibidos).toEqual([]);
+    expect(infraccionesDeAlcance(tocados)).toEqual([]);
   });
 
   it('el modulo identity no gana ningun archivo driving que nombre el estado', () => {
@@ -257,5 +304,63 @@ describe('R21 — ninguna dependencia nueva', () => {
     expect(tocados.filter((archivo) => archivo === 'package.json' || archivo === 'pnpm-lock.yaml')).toEqual(
       [],
     );
+  });
+});
+
+/**
+ * QUE ESTE CENTINELA SIGA MORDIENDO EN SU PROPIA RAMA (anadido el 2026-09-08, con el arreglo del
+ * salto de arriba).
+ *
+ * Una guardia que se salta siempre no protege nada, y seria peor que el problema que el salto
+ * arregla. Estos casos ejercitan las dos funciones puras con listas SINTETICAS, sin depender de
+ * en que rama corra el gate: la deteccion de rama en los dos sentidos, y las infracciones de R20
+ * con y sin violacion.
+ */
+describe('el salto no vacia la guardia: en la rama de QC-65 sigue mordiendo', () => {
+  const RAMA_DE_QC65 = [
+    'lib/modules/identity/domain/account-status.ts',
+    'lib/modules/identity/index.ts',
+  ];
+
+  it('reconoce la rama de QC-65 por su archivo central, y NO reconoce otra', () => {
+    expect(esLaRamaDeQC65(RAMA_DE_QC65)).toBe(true);
+    // El diff real de QC-70: toca `app/` y un adaptador driving, pero NO el archivo central.
+    expect(
+      esLaRamaDeQC65([
+        'app/(private)/proveedores/[id]/page.tsx',
+        'lib/modules/unidades/adapters/driving/unit-actions.ts',
+      ]),
+    ).toBe(false);
+  });
+
+  it('dentro de su rama, R20 MUERDE con una pantalla, un componente, un hook o un driving', () => {
+    const infractora = [...RAMA_DE_QC65, 'app/(private)/cuentas/page.tsx'];
+    expect(esLaRamaDeQC65(infractora)).toBe(true);
+    expect(infraccionesDeAlcance(infractora)).toEqual(['app/(private)/cuentas/page.tsx']);
+
+    expect(infraccionesDeAlcance([...RAMA_DE_QC65, 'components/shared/estado-cuenta.tsx'])).toEqual([
+      'components/shared/estado-cuenta.tsx',
+    ]);
+    expect(infraccionesDeAlcance([...RAMA_DE_QC65, 'hooks/use-estado-cuenta.ts'])).toEqual([
+      'hooks/use-estado-cuenta.ts',
+    ]);
+    expect(infraccionesDeAlcance([...RAMA_DE_QC65, 'middleware.ts'])).toEqual(['middleware.ts']);
+    expect(
+      infraccionesDeAlcance([
+        ...RAMA_DE_QC65,
+        'lib/modules/identity/adapters/driving/account-status-actions.ts',
+      ]),
+    ).toEqual(['lib/modules/identity/adapters/driving/account-status-actions.ts']);
+  });
+
+  it('y no muerde con el alcance legitimo de QC-65', () => {
+    expect(
+      infraccionesDeAlcance([
+        ...RAMA_DE_QC65,
+        'lib/modules/identity/ports/initial-access-repository.ts',
+        'lib/modules/identity/domain/seed-initial-access.ts',
+        'db/schema.prisma',
+      ]),
+    ).toEqual([]);
   });
 });

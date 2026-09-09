@@ -294,9 +294,13 @@ describe('R32 — esta ficha no toca db/schema.prisma ni anade ninguna migracion
   // Fuera de la rama de QC-38 estos dos casos quedan MUDOS (`skipped`), nunca verdes: un verde
   // diria «comprobado» sin haber mirado nada, que es el anti-patron de la «validacion opcional»
   // de `docs/verification.md`. Dentro de su rama vigilan exactamente igual que antes.
-  const ARCHIVO_CENTRAL = 'lib/modules/unidades/adapters/driving/unit-actions.ts';
-  const cambiadosDeLaRama = archivosCambiadosDesdeDev();
-  const esLaRamaDeQC38 = cambiadosDeLaRama !== null && cambiadosDeLaRama.includes(ARCHIVO_CENTRAL);
+  //
+  // RETENSADO 2026-09-08, y no es un adorno: un archivo solo NO identificaba la rama. QC-70
+  // -catalogo unico de errores- sustituye la copia de `toErrorState` de LOS SIETE adaptadores
+  // driving del repo, `unit-actions.ts` incluido, asi que con un unico centinela esta guardia
+  // creia estar en la rama de QC-38 estando en la de QC-70. Hacen falta LOS DOS: el puerto de
+  // escritura es creacion propia de QC-38 y ninguna ficha transversal tiene motivo para tocarlo.
+  // Los tres viven en ambito de MODULO (ver arriba de este archivo): R34 los usa tambien.
 
   it('db/schema.prisma no cambia respecto de origin/dev', (ctx) => {
     const cambiados = archivosCambiadosDesdeDev();
@@ -377,6 +381,28 @@ describe('R35 — ninguna dependencia nueva en package.json', () => {
 // R34 — ninguna pantalla, ruta ni item de menu de unidades; ningun .spec.ts nuevo en e2e/.
 // -------------------------------------------------------------------------------------------
 
+/**
+ * LOS ARCHIVOS CENTRALES DE QC-38, en ambito de modulo porque los usan R32 y R34. El porque
+ * detallado esta en el comentario largo de R32, mas abajo.
+ */
+const ARCHIVOS_CENTRALES = [
+  'lib/modules/unidades/adapters/driving/unit-actions.ts',
+  'lib/modules/unidades/ports/unit-write-repository.ts',
+] as const;
+const ARCHIVO_CENTRAL = ARCHIVOS_CENTRALES.join('` y `');
+
+/** Puro, para poder ejercitarlo con rangos sinteticos en los dos sentidos. */
+function esRamaDeQC38(cambiados: readonly string[] | null): boolean {
+  return cambiados !== null && ARCHIVOS_CENTRALES.every((archivo) => cambiados.includes(archivo));
+}
+
+const esLaRamaDeQC38 = esRamaDeQC38(archivosCambiadosDesdeDev());
+
+/** Los `.spec.ts` de `e2e/` que trae un rango. Puro y ejercitado en los dos sentidos mas abajo. */
+function nuevosSpecsE2e(cambiados: readonly string[]): readonly string[] {
+  return cambiados.filter((ruta) => ruta.startsWith('e2e/') && ruta.endsWith('.spec.ts'));
+}
+
 describe('R34 — esta ficha no abre ningun flujo navegable', () => {
   it('no existe ninguna pantalla de unidades bajo app/(private)/', () => {
     for (const ruta of [
@@ -401,8 +427,44 @@ describe('R34 — esta ficha no abre ningun flujo navegable', () => {
       ctx.skip('el rango git origin/dev...HEAD no esta disponible: este caso no comprobo nada');
       return;
     }
+    // MISMO SALTO que los dos casos de R32 (anadido el 2026-09-08): «esta ficha no abre ningun
+    // flujo navegable» es una regla sobre el alcance de QC-38, no sobre el de las demas. Sin el,
+    // este caso ponia en ROJO el gate completo de cualquier rama que anadiera un E2E con permiso
+    // del humano -visto desde QC-70, cuyo `e2e/errores.spec.ts` lo exige su R33-.
+    if (!esLaRamaDeQC38) {
+      ctx.skip(
+        'el rango trae archivos pero no `' + ARCHIVO_CENTRAL + '`: esta NO es la rama de ' +
+          'QC-38, asi que R34 no le aplica y este caso NO ha comprobado nada.',
+      );
+      return;
+    }
 
-    const nuevosSpecs = cambiados.filter((ruta) => ruta.startsWith('e2e/') && ruta.endsWith('.spec.ts'));
-    expect(nuevosSpecs, `nuevos .spec.ts bajo e2e/: ${nuevosSpecs.join(', ')}`).toEqual([]);
+    expect(nuevosSpecsE2e(cambiados), `nuevos .spec.ts bajo e2e/: ${nuevosSpecsE2e(cambiados).join(', ')}`).toEqual([]);
+  });
+
+  // Que el salto de arriba no vacie la guardia: una que se salta siempre no protege nada. Se
+  // ejercita la deteccion de rama en los dos sentidos y el detector de specs con y sin violacion,
+  // sin depender de en que rama corra el gate.
+  it('y dentro de la rama de QC-38 la guardia de e2e/ MUERDE', () => {
+    const ramaDeQC38 = [...ARCHIVOS_CENTRALES, 'lib/modules/unidades/domain/create-unit.ts'];
+    expect(esRamaDeQC38(ramaDeQC38)).toBe(true);
+    // El diff real de QC-70: toca `unit-actions.ts` -uno de los siete adaptadores driving que
+    // migra- pero NO el puerto de escritura. Con un solo centinela esto daba `true`.
+    expect(
+      esRamaDeQC38([
+        'lib/modules/unidades/adapters/driving/unit-actions.ts',
+        'lib/modules/errores/index.ts',
+        'e2e/errores.spec.ts',
+      ]),
+    ).toBe(false);
+    expect(esRamaDeQC38(null)).toBe(false);
+
+    expect(nuevosSpecsE2e([...ramaDeQC38, 'e2e/unidades.spec.ts'])).toEqual(['e2e/unidades.spec.ts']);
+    expect(nuevosSpecsE2e([...ramaDeQC38, 'e2e/session.spec.ts', 'e2e/otra.spec.ts'])).toEqual([
+      'e2e/session.spec.ts',
+      'e2e/otra.spec.ts',
+    ]);
+    // Y no muerde con lo que NO es un spec de e2e.
+    expect(nuevosSpecsE2e([...ramaDeQC38, 'e2e/helpers/datos.ts', 'tests/unit/unidades/x.test.ts'])).toEqual([]);
   });
 });
