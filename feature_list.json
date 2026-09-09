@@ -790,7 +790,7 @@
       "epic_name": "Inventario",
       "name": "timeout-tests-ui-bajo-carga",
       "description": "Los tests de UI que escriben en un formulario con userEvent fallan de forma intermitente cuando se corre la bateria completa, y pasan siempre cuando se corre solo el archivo. Falla un caso distinto en cada corrida y un archivo distinto en cada corrida, asi que no es un fallo de una regla concreta ni de una pantalla concreta.\n\nEl error es siempre el mismo: \"Test timed out in 5000ms\". El campo controlado no llega a repintarse entre tecla y tecla cuando la maquina va cargada, y la prueba escribe mas rapido de lo que el campo se actualiza. El sintoma visible es que las letras salgan intercaladas -sale \"xxxxxAxcxixdxox\" donde deberia salir \"Acido citrico\"-. Una persona escribiendo a mano no lo provocaria, pero la prueba si, y eso basta para dejar el gate en rojo por algo que no esta roto.\n\nEsta ficha nacio el 2026-09-04 nombrando solo el formulario de productos y diciendo que los demas archivos de prueba no entraban. Se reescribe el mismo dia porque eso describia mal el problema: al cerrar QC-47 aparecieron los mismos timeouts en la pantalla de proveedores (catalog-line-sheet, supplier-page), en el aviso de campo no controlado del login y en la barra lateral movil. Son cuatro features distintas y una sola causa.\n\nQue NO lo cura, medido y escrito en docs/verification.md para que nadie lo repita: bajar los workers de vitest. En una maquina de 12 nucleos con 3.4 GB libres, la corrida por defecto deja 2 archivos rojos en 114 s; con 4 workers deja 1 rojo en 335 s; con 2 workers deja 1 rojo en 541 s. Multiplica por cinco el tiempo del gate y no elimina el fallo, porque la causa no es cuantos procesos hay sino que el plazo de 5 s es demasiado corto para userEvent bajo carga.\n\nQue entra: dejar la suite de UI estable bajo carga, atacando el plazo y la forma de escribir de las pruebas -subir el testTimeout del proyecto de UI, quitar el retardo entre teclas de userEvent, o lo que la investigacion demuestre-, y demostrarlo corriendo la bateria completa varias veces seguidas. Y RETIRAR de tests/baseline-rojos.json, en el mismo cambio, TODAS las entradas que estan ahi por esta causa: hoy son product-page.test.tsx, proveedores-ui/catalog-line-sheet.test.tsx y proveedores-ui/supplier-page.test.tsx. Un archivo del baseline que ya pasa es aviso, no rojo, y la lista no puede volverse un vertedero.\n\nQue NO entra: rehacer ninguna pantalla ni sus reglas. Tampoco entran las dos entradas del baseline que estan por el motivo estructural del rango de git (recetas-ui/recipe-route-contract y recetas/module-contract), que son otro problema.\n\n--- Reescrito el 2026-09-07, al acotar la ficha con /afinar-feature ---\n\nEL ALCANCE ERA DEMASIADO ESTRECHO EN UN PUNTO Y VAGO EN OTROS DOS. Lo corrige esta seccion; el resto de arriba sigue vigente.\n\nNO ES SOLO EL PROYECTO DE UI, SON LOS TRES. La ficha decia \"subir el testTimeout del proyecto de UI\". El gate completo corrido en dev el 2026-09-07 tumbo ademas tests/unit/composition/identity-facade.test.ts, que vive en el proyecto NODE -156 archivos, no los 50 de ui-, NO TECLEA NADA, y murio con el mismo \"Test timed out in 5000ms\" cargando el barril de composicion, que arrastra los cinco modulos y el cliente de Prisma. La causa es contencion de CPU y no distingue de proyecto: el plazo sube en ui, node e integration.\n\nEL NUMERO ES 15000 ms, desde los 5000 de hoy. El coste aceptado, y es el unico: un test colgado de verdad tarda 15 s en reportarse en vez de 5.\n\nLA FORMA DE TECLEAR TIENE UNA SOLA DEFINICION. Hoy hay 224 llamadas a userEvent.setup() repartidas en 33 archivos y solo 2 pasan opciones. Entra un helper compartido que teclea sin retardo entre teclas, importado desde esos 33 archivos. No se gana evitar tocarlos -hay que tocarlos, con un cambio mecanico de una linea cada uno-: se gana que exista UN sitio donde esta escrito como se teclea en este repo, en vez de 224 llamadas sueltas donde la 225 volvera a nacer mal. Promueve a compartido el precedente que ya existe a mano en tests/unit/recetas-ui/recipe-form.test.tsx:201.\n\nCON UNA EXCEPCION DECLARADA: tests/unit/async-autocomplete.test.tsx conserva su retardo real (delay: 20), que esta puesto A PROPOSITO para probar el debounce del autocomplete. Se pide explicitamente y queda declarado. NO se reescribe con relojes falsos: eso es trabajo de diagnostico que esta ficha no tiene.\n\nQUE CUENTA COMO PRUEBA: CINCO CORRIDAS SEGUIDAS de la bateria completa, las cinco verdes. La ficha decia \"varias veces\" y sin numero el reviewer no puede verificar nada. Hereda el criterio de docs/verification.md (2026-09-04): una corrida verde no es prueba cuando el fallo es intermitente. Es exactamente la leccion que costo el diagnostico fallido de los workers.\n\nEL BASELINE. Se retiran las TRES entradas de esta causa: inventario/product-page, proveedores-ui/catalog-line-sheet y proveedores-ui/supplier-page. Las dos estructurales (recetas-ui/recipe-route-contract y recetas/module-contract) NO se retiran -son otro problema- pero SI se corrige su motivo: el de recipe-route-contract hoy miente, porque falla por la migracion de QC-35 que aparece en el diff, no por el rango de git vacio que dice su nota.\n\nLA ZONE SIGUE SIENDO frontend, aunque ahora toque la config de los tres proyectos. Cambiarla a fullstack disparia la particion en dos fichas, que no tiene sentido para un arreglo de configuracion.\n\nQUE SALE DE AQUI: la colision de correlativo en la base de integracion (order-repository.int.test.ts falla con \"Ya existe la llave (order_year, order_sequence)\"). Es otra enfermedad -estado residual, no plazo- y tiene ficha propia: QC-77.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
@@ -878,7 +878,8 @@
       "branch": "feature/QC-63-ejecutar-receta-operador",
       "depends_on": [
         "QC-62",
-        "QC-64"
+        "QC-64",
+        "QC-88"
       ],
       "spec_path": "specs/QC-63-ejecutar-receta-operador"
     },
@@ -904,7 +905,7 @@
       "epic_name": "Identidad y acceso",
       "name": "estado-de-cuenta-de-usuario",
       "description": "Una cuenta de usuario tiene un ESTADO, con cuatro valores en ingles: active, pending, inactive, blocked. active es que la cuenta funciona; pending es creada pero todavia no habilitada para entrar; inactive es apagada a proposito por un administrador, y es reversible; blocked es bloqueada por seguridad.\n\n--- Acotada el 2026-09-08 ---\n\nUNA CUENTA NUEVA NACE pending. Esta descripcion decia antes \"nace habilitada\": lo corrige la acotacion del 2026-09-08. Las filas que YA existen quedan active al migrar, incluido el usuario inicial del seed de QC-6, que tiene que seguir entrando.\n\nSE GUARDA EL RASTRO DEL ULTIMO CAMBIO de estado: cuando fue y quien lo hizo. Quien es opcional: vacio significa que lo hizo el sistema y no una persona.\n\nDeshabilitar una cuenta no borra nada ni libera su correo, su nombre de usuario ni su numero de documento: los indices unicos no cambian, la cuenta sigue existiendo y se puede volver a habilitar. El borrado logico (deleted_at, QC-4) sigue siendo otra cosa distinta.\n\nESTA FICHA SOLO AGREGA Y PERSISTE el estado y su rastro sobre el modelo de usuarios que ya existe: las columnas, la migracion con su down y la persistencia. Nadie lee todavia el estado para decidir nada.\n\nNO ENTRA que el estado mande en el acceso -que solo active entre al login, que el bloqueo por intentos fallidos de QC-19 pase a escribir blocked, que el desbloqueo manual limpie el contador de intentos, y que pasa con una sesion ya abierta-. Va en QC-78, bloqueada por esta. QC-65 NO toca lock_level, locked_until ni sus tests.\n\nNO ENTRAN los casos de uso que cambian el estado (QC-66) ni la pantalla (QC-67).",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "low",
       "zone": "backend",
@@ -981,7 +982,7 @@
       "epic_name": "Plataforma",
       "name": "errores-centralizados",
       "description": "Hoy la traduccion de errores esta duplicada: cinco modulos (inventario, pedidos, proveedores, recetas, unidades) declaran cada uno su propia familia de errores, y SIETE adaptadores driving llevan copiada la misma funcion toErrorState que la convierte en { status: 'error', code, message }. Los codigos ya son estables y ya los consumen siete pantallas; lo que no existe es un sitio unico donde vivan el codigo y su mensaje.\n\nEsta ficha crea ese sitio: un catalogo unico donde cada codigo tiene UN mensaje, una sola implementacion del traductor, y los cinco modulos migrados.\n\nEL CODIGO SIGUE SIENDO UNA PALABRA ESTABLE (duplicate_name), no un numero: siete pantallas ya deciden por el y en un log se lee solo. El catalogo pasa a ser CERRADO -el codigo deja de ser texto cualquiera y pasa a ser la lista, asi que uno mal escrito rompe el typecheck- y entra una GUARDIA EJECUTABLE que da rojo si un modulo declara errores fuera de el.\n\nLOS CODIGOS SE ABREN POR CASO CONCRETO. Hoy not_found significa cinco cosas distintas segun quien lo lance, y un codigo con un solo mensaje no puede decir a la vez «el pedido» y «la receta». El catalogo nace con una entrada por caso, y las pantallas que hoy comparan contra el codigo generico se actualizan: por eso la zona es fullstack y no backend.\n\nLAS CINCO FAMILIAS DE ERROR POR MODULO NO DESAPARECEN. Cada modulo conserva la suya y toma de ahi el codigo y el mensaje. Un unico tipo compartido no puede heredar de cinco bases a la vez y caeria fuera de los siete catch que hoy funcionan; es la misma razon por la que QC-54 lo descarto el 2026-09-07.\n\nEL MENSAJE SALE SIEMPRE DEL CATALOGO, y el catalogo mapea el codigo a una clave estable y la clave a su texto, con el espanol como unico idioma cargado. Eso es «preparado para traducir» POR FORMA: no entra ninguna libreria ni ninguna dependencia nueva.\n\nLO QUE REVIENTA Y NO ESTA EN EL CATALOGO (un fallo de base de datos, un bug) sale como un codigo generico con mensaje neutro. El detalle real va al log del servidor y nunca al navegador: un mensaje de Prisma en pantalla filtra nombres de tablas y a veces datos.\n\nESE CODIGO GENERICO SI LLEVA UNA REFERENCIA PARA BUSCARLO, y es el identificador de peticion que aporta QC-71 (decidido el 2026-09-07 al acotar esa ficha, revisando lo que QC-70 habia cerrado ese mismo dia). QC-70 deja el hueco en la forma del error; QC-71 lo rellena. Lo que no sale sigue sin salir: lo unico que se anade es el identificador.\n\nNO ENTRA el identificador de peticion ni lo que se escribe en los logs: eso es QC-71, que depende de esta.\n\nNO ENTRA la internacionalizacion de la aplicacion: QC-70 deja las claves, y resolverlas contra archivos de idioma -y elegir la libreria- es una decision de toda la aplicacion que hoy no esta tomada en ningun sitio. Va en ficha propia.\n\nNO ENTRA identity: no tiene familia de errores que migrar, y su login devuelve A PROPOSITO un mensaje generico que no revela si fallo el usuario o la contrasena (QC-7).\n\nNO ENTRA ningun cambio en db/: ni migracion, ni esquema, ni seed. No hay tabla de errores.\n\nVA DESPUES DE QC-54, que esta sembrada y con worktree montado y cuya decision cerrada parametriza requireAdmin por una fabrica que recibe el UnauthorizedError de cada modulo: QC-70 toca esos mismos cinco domain/errors.ts.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -1113,10 +1114,10 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "estado-de-cuenta-en-el-acceso",
-      "description": "QC-65 crea el estado de la cuenta -active, pending, inactive, blocked- y lo persiste, pero nadie lo lee. Esta ficha es quien lo lee, y son tres cosas que caen en el mismo archivo -verify-credentials- y por eso no se parten.\n\nSOLO active ENTRA AL LOGIN. pending, inactive y blocked no entran, y las tres reciben EXACTAMENTE el mismo resultado generico que QC-7 dejo congelado: no se revela si fallo el usuario, la contrasena o el estado de la cuenta. Distinguir los casos en pantalla le confirmaria a un atacante que ese usuario existe.\n\nEL BLOQUEO POR INTENTOS FALLIDOS PASA A ESCRIBIR blocked. Decidido el 2026-09-08 al acotar QC-65: blocked y el bloqueo automatico de QC-19 son la misma cosa, no dos. Hoy ese bloqueo vive en lock_level y locked_until con escalada de tiempo y desbloqueo solo; unificarlo es reescribir ese mecanismo, con sus tests de concurrencia -el registro condicional del intento fallido, el compareAndSet que evita que un estado obsoleto borre un bloqueo vivo-. QC-65 no lo toco a proposito para no llevarse esto por delante.\n\nEL ADMINISTRADOR PUEDE SACAR UNA CUENTA DE blocked, y al hacerlo hay que limpiar el contador de intentos fallidos: si no, la cuenta se vuelve a bloquear sola al primer intento. La operacion que mueve el estado es de QC-66; la limpieza del contador es de esta ficha, que es la duena del mecanismo.\n\nQUE PASA CON UNA SESION YA ABIERTA cuando la cuenta deja de estar active. QC-65 lo dejo explicitamente fuera y aqui es donde se decide.\n\nVA DESPUES DE QC-65, que crea las columnas.",
-      "status": "pending",
+      "description": "QC-65 crea el estado de la cuenta -active, pending, inactive, blocked- y lo persiste, pero nadie lo lee. Esta ficha es quien lo lee, y son tres cosas que caen en el mismo archivo -verify-credentials- y por eso no se parten.\n\nSOLO active ENTRA AL LOGIN. pending, inactive y blocked no entran, y las tres reciben EXACTAMENTE el mismo resultado generico que QC-7 dejo congelado: no se revela si fallo el usuario, la contrasena o el estado de la cuenta. Distinguir los casos en pantalla le confirmaria a un atacante que ese usuario existe.\n\nEL BLOQUEO POR INTENTOS FALLIDOS PASA A ESCRIBIR blocked. Decidido el 2026-09-08 al acotar QC-65: blocked y el bloqueo automatico de QC-19 son la misma cosa, no dos. Hoy ese bloqueo vive en lock_level y locked_until con escalada de tiempo y desbloqueo solo; unificarlo es reescribir ese mecanismo, con sus tests de concurrencia -el registro condicional del intento fallido, el compareAndSet que evita que un estado obsoleto borre un bloqueo vivo-. QC-65 no lo toco a proposito para no llevarse esto por delante.\n\nEL ADMINISTRADOR PUEDE SACAR UNA CUENTA DE blocked, y al hacerlo hay que limpiar el contador de intentos fallidos: si no, la cuenta se vuelve a bloquear sola al primer intento. La operacion que mueve el estado es de QC-66; la limpieza del contador es de esta ficha, que es la duena del mecanismo.\n\nQUE PASA CON UNA SESION YA ABIERTA cuando la cuenta deja de estar active. QC-65 lo dejo explicitamente fuera y aqui es donde se decide.\n\nVA DESPUES DE QC-65, que crea las columnas.\n\n--- Acotada el 2026-09-08 ---\n\nEL BLOQUEO POR INTENTOS SIGUE CADUCANDO SOLO. No se vuelve permanente: se conservan los plazos de QC-19 -1, 5, 15 y 60 minutos segun reincidencia- y la cuenta vuelve sola a active al vencer. Se marca blocked mientras dura. Un administrador puede adelantar la reactivacion, pero nadie queda fuera esperando a que lo atiendan.\n\nBLOCKED CON PLAZO ES AUTOMATICO; BLOCKED SIN PLAZO LO PUSO UNA PERSONA y no caduca nunca. Es lo que los distingue, y no necesita ningun dato nuevo: usa locked_until, que ya existe.\n\nEL ESTADO CADUCADO SE CORRIGE AL LEERLO. Un unico sitio traduce «blocked con el plazo vencido» a «active», y todos los lectores pasan por ahi: la ficha nunca se le ensena bloqueada a nadie cuando ya no lo esta. NO hay tarea programada -este ERP no tiene ninguna y esta ficha no la introduce-.\n\nUNA SESION YA ABIERTA SE CORTA EN LA SIGUIENTE NAVEGACION. La resolucion de sesion ya relee la ficha en cada peticion y ya corta por baja logica (QC-8 R11) y por empresa muerta (QC-48 R14, R15): esto es un corte mas en la misma lista, con cero consultas nuevas. NO se usa el sello por usuario de QC-23 -eso la haria dependencia y todavia no esta construida-.\n\nPENDING E INACTIVE NO SUMAN INTENTOS FALLIDOS: ese camino no escribe nada, igual que hoy con una empresa dada de baja. Castigar a alguien por una decision administrativa que no puede arreglar seria injusto, y la cuenta no entra igual. Se asume a conciencia que quien pruebe contrasenas contra una cuenta no activa no se topa con un bloqueo.\n\nEL DESBLOQUEO ADMINISTRATIVO limpia el contador de intentos Y el nivel de escalada, los dos a cero, mas el plazo. Heredado de QC-19 R27.\n\nNO ANADE NINGUNA COLUMNA NI MIGRACION. failed_login_attempts, lock_level y locked_until siguen donde estan; account_status lo creo QC-65. Esta ficha cambia quien escribe y quien lee lo que ya existe.\n\nLLEVA E2E: se amplian e2e/login.spec.ts -una cuenta que no esta active no entra y ve el mismo mensaje de siempre- y e2e/session.spec.ts -una sesion abierta cuya cuenta se desactiva-.\n\nEl estado se comprueba SIEMPRE DESPUES de verificar el hash, nunca antes, y devuelve el mismo resultado congelado que los demas rechazos (QC-7 R2, R3, R28, R29).",
+      "status": "spec_ready",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "backend",
       "branch": "feature/QC-78-estado-de-cuenta-en-el-acceso",
       "depends_on": [
@@ -1187,6 +1188,109 @@
       "branch": "feature/QC-82-registro-de-ejecucion-de-receta",
       "depends_on": null,
       "spec_path": "specs/QC-82-registro-de-ejecucion-de-receta"
+    },
+    {
+      "key": "QC-83",
+      "id": 83,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "modelo-de-grupos-de-trabajo",
+      "description": "Un grupo de trabajo es un conjunto de personas con nombre -\"Turno noche\", \"Planta 2\"- que existe para poder asignarles trabajo de golpe en vez de una por una. Esta ficha es SOLO el modelo: la tabla del grupo, la tabla N:M que lo une con las personas, y la migracion. Vive en el modulo de identidad, junto a usuarios, roles y permisos, porque un grupo es un conjunto de personas y las personas ya viven ahi. El grupo pertenece a UNA empresa, como la persona (QC-47). Una persona puede estar en varios grupos y un grupo tiene varias personas. El nombre del grupo es unico dentro de la empresa. Lo que NO entra: los casos de uso de alta, edicion y borrado van en QC-84; la pantalla, en QC-85. Asignar un pedido a un grupo NO entra aqui: eso es QC-86, que consume esta tabla y no la define. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-83-modelo-de-grupos-de-trabajo",
+      "depends_on": [
+        "QC-47"
+      ],
+      "spec_path": "specs/QC-83-modelo-de-grupos-de-trabajo"
+    },
+    {
+      "key": "QC-84",
+      "id": 84,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "crud-de-grupos-de-trabajo",
+      "description": "Los casos de uso de un grupo de trabajo: crear uno con su nombre, listar los de la empresa, ver quienes lo componen, cambiar su nombre, meter y sacar personas, y borrarlo. Todo limitado a la empresa de quien pide. El nombre es unico dentro de la empresa y se rechaza el duplicado diciendolo. Sacar a una persona de un grupo NO la borra ni la desactiva. Borrar un grupo que ya fue usado para asignar un pedido no puede dejar ese pedido sin responsables: el modulo de asignacion guarda a las personas, no al grupo vivo, asi que el borrado no arrastra trabajo ya asignado, y esta ficha lo tiene que demostrar con un test. Que permiso corta cada operacion sigue el patron de QC-74: consultar para leer, modificar para escribir, sin implicacion entre ellos. Lo que NO entra: el modelo y la migracion (QC-83); la pantalla (QC-85). Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-84-crud-de-grupos-de-trabajo",
+      "depends_on": [
+        "QC-83"
+      ],
+      "spec_path": "specs/QC-84-crud-de-grupos-de-trabajo"
+    },
+    {
+      "key": "QC-85",
+      "id": 85,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "pantalla-de-grupos-de-trabajo",
+      "description": "La pantalla donde el Administrador ve los grupos de trabajo de su empresa, crea uno, le cambia el nombre, mete y saca personas, y lo borra con confirmacion. Cada grupo muestra cuantas personas tiene y quienes son. Se decide al acotar si es una pantalla propia o una seccion dentro de la pantalla de usuarios (QC-67), que todavia no esta especificada. Las dos opciones son razonables y la decision cambia la ficha, asi que no se da por supuesta aqui. Reutiliza lo que ya existe y no lo vuelve a montar: la tabla de datos compartida (QC-55), busqueda y orden (QC-57), el panel lateral y el dialogo de borrado del patron de QC-45, y el corte por permiso de pantalla de QC-75. Lo que NO entra: el modelo (QC-83) ni los casos de uso (QC-84). Asignar trabajo a un grupo se hace desde la pantalla de pedidos, en QC-87. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-85-pantalla-de-grupos-de-trabajo",
+      "depends_on": [
+        "QC-84"
+      ],
+      "spec_path": "specs/QC-85-pantalla-de-grupos-de-trabajo"
+    },
+    {
+      "key": "QC-86",
+      "id": 86,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "modelo-de-asignacion-de-pedidos",
+      "description": "Un pedido pasa a tener responsables: las personas encargadas de prepararlo. Esta ficha es el modulo nuevo de asignacion y su modelo: la tabla N:M que une pedido con persona, y la migracion. LA ASIGNACION SE CONGELA. Se puede asignar marcando personas sueltas, eligiendo uno o varios grupos de trabajo, o mezclando las dos cosas -dos equipos, o un equipo mas dos personas sueltas-. Cuando se elige un grupo, el pedido guarda LAS PERSONAS QUE ESE GRUPO TENIA EN ESE MOMENTO, mas la marca de que vinieron de ese grupo y su nombre, para poder mostrarlo. Sacar a alguien de un grupo manana NO le quita un pedido que ya estaba ejecutando, y meter a alguien no le hace aparecer pedidos viejos. EL MODULO TRAE DOS PERMISOS, como todos los demas (QC-74): consultar -ver los pedidos que tengo asignados- y modificar -asignar y desasignar-. El Operador nace con consultar. No se le da acceso a recetas: hoy el permiso de consultar recetas abre tambien el listado y el formulario de edicion. Lo que NO entra: la pantalla de asignar (QC-87), el listado del Operador (QC-88) y ejecutar la receta (QC-63). Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-86-modelo-de-asignacion-de-pedidos",
+      "depends_on": [
+        "QC-83"
+      ],
+      "spec_path": "specs/QC-86-modelo-de-asignacion-de-pedidos"
+    },
+    {
+      "key": "QC-87",
+      "id": 87,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "asignar-responsables-a-un-pedido",
+      "description": "Desde la pantalla de pedidos, el Administrador asigna quien prepara cada pedido: marca personas sueltas, elige uno o varios grupos de trabajo, o mezcla las dos cosas. Y puede desasignar. El listado de pedidos y el detalle muestran a los responsables como un grupo de avatares. Cuando la asignacion vino de un grupo de trabajo, se muestra el NOMBRE DEL GRUPO junto a los avatares de sus personas, no solo las caras sueltas: quien mira el tablero tiene que poder distinguir \"Turno noche\" de cinco personas elegidas a mano. Un pedido cancelado no admite asignacion nueva. Que pasa con la asignacion de un pedido ya entregado se decide al acotar. Reutiliza la tabla de datos compartida (QC-55) y la pantalla de pedidos de QC-35, que no se rehace. Lo que NO entra: la tabla de asignacion (QC-86), que esta ficha consume. El listado del Operador va en QC-88. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-87-asignar-responsables-a-un-pedido",
+      "depends_on": [
+        "QC-86",
+        "QC-84"
+      ],
+      "spec_path": "specs/QC-87-asignar-responsables-a-un-pedido"
+    },
+    {
+      "key": "QC-88",
+      "id": 88,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "listado-de-pedidos-asignados",
+      "description": "La lista de trabajo del Operador: los pedidos que tiene asignados, para entrar a prepararlos. Es su pantalla de entrada, con su item de menu, cortada por el permiso de consultar del modulo de asignacion. SOLO LOS EJECUTABLES. Se muestran los pedidos en estado PENDIENTE y EN_CURSO. Los ENTREGADO y los CANCELADO no aparecen: es una lista de trabajo, no un historial, y nadie tiene que archivarlos a mano. Cada fila muestra el numero del pedido, el nombre de la receta, la cantidad, la prioridad, el estado, y los DEMAS responsables como grupo de avatares -con el nombre del grupo de trabajo cuando la asignacion vino de uno-, para que el operario sepa con quien comparte el pedido antes de empezar. UN PEDIDO YA EN CURSO ESTA BLOQUEADO PARA LOS DEMAS. Si otro responsable ya lo abrio y esta preparandolo, el pedido se ve pero no se puede entrar a ejecutar, y se dice quien lo tiene. Evita que dos personas preparen la misma mezcla a la vez. Reutiliza la tabla de datos compartida (QC-55) y busqueda y orden (QC-57). Lo que NO entra: ejecutar la receta paso a paso, que es QC-63 y empieza donde esta lista termina. Asignar, en QC-87. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-88-listado-de-pedidos-asignados",
+      "depends_on": [
+        "QC-86"
+      ],
+      "spec_path": "specs/QC-88-listado-de-pedidos-asignados"
     }
   ]
 }

@@ -12,10 +12,11 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
-| QC-70 | errores-centralizados | Plataforma | fullstack | pending | feature/QC-70-errores-centralizados | **F1.0 hecho el 2026-09-08**: worktree desde `origin/dev` (`d26d09e`), con `.env`, base propia `QuimiCloude_QC70` migrada y sembrada, e `install`/`generate`/`typegen` corridos de entrada — los cuatro gaps de montaje que costaron una hora en QC-58. `zone` y `complexity: high` ya venian del board. Trae `requirements.md` sembrado por `/afinar-feature` (2026-09-07). **Pendiente F1.2** |
+| QC-70 | errores-centralizados | Plataforma | fullstack | in_progress | feature/QC-70-errores-centralizados | **Spec APROBADO por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. 33 requisitos EARS, 16 tasks, cero preguntas abiertas. **No se parte** en backend+frontend por decision humana: abrir los codigos por caso obliga a tocar catalogo y pantallas a la vez. `implementer` en curso (F2.1). **Choque con QC-39**: renombra `duplicate_name`/`not_found` de unidades, y como los archivos no existen en `dev` el merge sale limpio y falla EN PANTALLA, no en el gate |
 | QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **Spec aprobado por el humano el 2026-09-08** (F1.4). 50 requisitos EARS, 35 decisiones cerradas, cero preguntas abiertas. `implementer` en curso (F2.1). **Conflicto acotado con QC-58**: la tarea que amplía `app-sidebar.test.tsx` y `private-layout-menu.test.tsx` va **al final**, cuando QC-58 esté `done` |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
 | QC-83 | modelo-de-grupos-de-trabajo | Identidad y acceso | backend | in_progress | feature/QC-83-modelo-de-grupos-de-trabajo | **Spec aprobado por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. **Se desbloqueó**: el PR #48 de QC-65 se mergeó y la rama quedó sincronizada con `origin/dev` (`c640c7a`) ANTES de implementar. **Base propia `QuimiCloude_QC83` creada y `.env` del worktree apuntando a ella** — el worktree venía sin `.env`, igual que QC-58. `implementer` en curso (F2.1) |
+| QC-78 | estado-de-cuenta-en-el-acceso | Identidad y acceso | backend | spec_ready | feature/QC-78-estado-de-cuenta-en-el-acceso | **Spec escrito (F1.3), tarjeta en *Spec en revisión*: esperando aprobación humana (F1.4)**. 28 requisitos EARS sobre las 13 decisiones que cerró `/afinar-feature`, cero preguntas abiertas, tabla de cobertura decisión → requisito. **Sin worktree a propósito** — se monta en F2.0. **El choque con QC-83 se cayó**: su `tasks.md` no declara `db/schema.prisma`, `db/migrations/`, `lib/composition/` ni `identity/index.ts` (R26 lo exige), así que arranca sin esperarla |
 | QC-80 | unidad-desde-la-presentacion | Inventario | fullstack | pending | feature/QC-80-unidad-desde-la-presentacion | **Nacida del chat el 2026-09-08** y creada en el board (QC-18). `complexity: medium`. **Pendiente F1.0 y F1.2**: sin worktree todavia, y trae una pregunta abierta -con que unidad se rellenan las 114 presentaciones existentes-, asi que toca `/afinar-feature` antes del `spec_author` |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **BLOQUEADA**: la unicidad de `lote` por empresa necesita `products.company_id`, que hoy no existe y que introduce QC-49. No arranca hasta que QC-49 este `done` |
 | QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
@@ -271,6 +272,26 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+### QC-78 — acotada con `/afinar-feature` (2026-09-08)
+
+Alcance, **13 decisiones cerradas** y **cero preguntas abiertas** en
+`specs/QC-78-estado-de-cuenta-en-el-acceso/requirements.md`. Esa es la fuente; aquí no se copia la
+tabla. `complexity: medium` y la `description` acotada escritas en el board **antes** de sembrar.
+
+**Lo que la acotación cambió, y es lo que evita la ronda dos:** el bloqueo por intentos **no se vuelve
+permanente** —se conservan los plazos de QC-19 y la cuenta vuelve sola a `active`—; `blocked` **con**
+plazo es automático y **sin** plazo lo puso una persona, que es lo que los distingue sin añadir ningún
+dato; la sesión ya abierta se corta **en la siguiente navegación**, como un corte más en la cadena que
+ya relee la ficha en cada petición (QC-8 R11, QC-48 R14/R15), **sin usar el sello de QC-23** ni
+convertirla en dependencia; y `pending`/`inactive` **no suman intentos fallidos**, heredando el
+precedente de la empresa dada de baja.
+
+**Consecuencia de paralelismo, medida y no supuesta: la ficha NO añade columnas ni migración**, así que
+el choque con QC-83 —`db/schema.prisma`, `db/migrations/`, `lib/composition/`— **desaparece**. Queda la
+intersección en `lib/modules/identity/index.ts` y `tests/unit/identity/schema/identity-schema.test.ts`,
+que son adiciones a un barril y a un test de esquema; **lo confirma el `tasks.md` en F1.2**, que es
+contra lo que se valida el conflicto. Si se confirma, QC-78 arranca sin esperar a QC-83.
+
 ### QC-83 — acotada con `/afinar-feature` (2026-09-08)
 ### QC-39 — el E2E destapó que la base compartida iba sin sembrar (2026-09-08)
 
