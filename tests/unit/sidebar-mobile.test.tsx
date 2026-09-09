@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../helpers/user-event';
 
 import PrivateLayout from '@/app/(private)/layout';
 import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components';
@@ -122,7 +122,7 @@ function primerGrupo(): NavGroup {
   return grupo;
 }
 
-async function abrirPanel(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+async function abrirPanel(user: ReturnType<typeof setupUser>): Promise<HTMLElement> {
   await user.click(screen.getByTestId(testId.toggle));
   return screen.findByRole('dialog');
 }
@@ -164,7 +164,7 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
 
   it('al abrir en viewport angosto muestra un dialogo modal y mueve el foco dentro', async () => {
     // R30
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     const dialogo = await abrirPanel(user);
@@ -197,7 +197,7 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
 
   it('el control refleja el estado con aria-expanded y referencia el panel con aria-controls', async () => {
     // R31
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     const control = screen.getByTestId(testId.toggle);
@@ -216,7 +216,7 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
 
   it('Escape cierra el panel superpuesto y devuelve el foco al control de apertura', async () => {
     // R32
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     const control = screen.getByTestId(testId.toggle);
@@ -231,7 +231,7 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
 
   it('activar un enlace, simple o de submenu, cierra el panel superpuesto', async () => {
     // R33 — los dos casos, porque el cierre lo tiene que hacer tambien el hijo de submenu.
-    const user = userEvent.setup();
+    const user = setupUser();
     await renderLayout();
 
     // Caso 1: enlace simple.
@@ -239,8 +239,12 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
     const simple = primerEnlaceSimple();
     await user.click(within(dialogoSimple).getByTestId(simple.testId));
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    // Cierre del panel y estado del disparador, en la misma espera (QC-58, T11): son dos efectos
+    // de la misma interaccion y no tienen por que caer en el mismo commit.
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    });
 
     // Caso 2: hijo de submenu, expandiendo antes el submenu.
     const dialogoGrupo = await abrirPanel(user);
@@ -255,15 +259,17 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
     }
     await user.click(await screen.findByTestId(primerHijo.testId));
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
+    });
   });
 
   it('en viewport angosto no se aplica el modo icono', async () => {
     // R34 — y se parte de la cookie de escritorio en modo icono (`sidebar_state=false`)
     // precisamente para fijar que en angosto ese estado se ignora: es lo que impide
     // romper R34 mezclando los dos mecanismos.
-    const user = userEvent.setup();
+    const user = setupUser();
     cookiesMock.mockResolvedValue({
       get: (name: string) =>
         name === SIDEBAR_STATE_COOKIE ? { name, value: 'false' } : undefined,

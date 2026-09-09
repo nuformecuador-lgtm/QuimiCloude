@@ -9,7 +9,7 @@
 // exportado o por rol accesible.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -111,7 +111,7 @@ afterEach(() => {
 
 describe('mientras el motivo este vacio no se invoca la cancelacion (R37)', () => {
   it('el boton de confirmar esta deshabilitado y pulsarlo no llama a `cancelOrderAction`', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     montar();
 
     const confirmar = screen.getByTestId(CANCEL_ORDER_CONFIRM_TESTID);
@@ -124,7 +124,7 @@ describe('mientras el motivo este vacio no se invoca la cancelacion (R37)', () =
 
   it('un motivo de solo espacios tampoco habilita la confirmacion ni invoca nada', async () => {
     // El motivo se mide RECORTADO, igual que lo mide `cancelOrderSchema` del contrato.
-    const user = userEvent.setup();
+    const user = setupUser();
     montar();
 
     await user.type(screen.getByTestId(CANCEL_ORDER_REASON_TESTID), '   ');
@@ -147,7 +147,7 @@ describe('mientras el motivo este vacio no se invoca la cancelacion (R37)', () =
 
 describe('con motivo se invoca la cancelacion, y ninguna otra operacion (R37)', () => {
   it('llama a `cancelOrderAction` con el `id` del pedido y el motivo escrito', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const elPedido = montar();
 
     expect(screen.getByTestId(CANCEL_ORDER_ID_TESTID)).toHaveValue(elPedido.id);
@@ -166,7 +166,7 @@ describe('con motivo se invoca la cancelacion, y ninguna otra operacion (R37)', 
 
 describe('`not_cancellable` se pinta en la region del DIALOGO (R34)', () => {
   it('el dialogo sigue abierto, con su region de error y el codigo estable', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     cancelOrderActionMock.mockResolvedValue({
       status: 'error',
       code: 'not_cancellable',
@@ -193,7 +193,7 @@ describe('`not_cancellable` se pinta en la region del DIALOGO (R34)', () => {
 
 describe('el exito aplica R35', () => {
   it('cierra el dialogo, avisa por toast y refresca la lista sin navegar', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     montar();
 
     await user.type(screen.getByTestId(CANCEL_ORDER_REASON_TESTID), MOTIVO);

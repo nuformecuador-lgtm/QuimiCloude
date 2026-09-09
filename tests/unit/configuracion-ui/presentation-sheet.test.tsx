@@ -13,7 +13,7 @@
 // como constante o constantes importadas del contrato.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -124,7 +124,7 @@ afterEach(() => {
 });
 
 /** Abre el alta y espera al formulario. */
-async function abrirAlta(user: ReturnType<typeof userEvent.setup>) {
+async function abrirAlta(user: ReturnType<typeof setupUser>) {
   render(<PresentationSheet />);
   await user.click(screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID));
   return screen.findByTestId(PRESENTATION_FORM_TESTID);
@@ -133,7 +133,7 @@ async function abrirAlta(user: ReturnType<typeof userEvent.setup>) {
 describe('panel lateral de presentaciones (R21-R25)', () => {
   it('el alta se abre en un panel lateral, sin navegar y sin dialogo modal centrado', async () => {
     // R21 — ni pagina aparte ni modal centrado, y ninguna navegacion.
-    const user = userEvent.setup();
+    const user = setupUser();
     await abrirAlta(user);
 
     const panel = screen.getByTestId(PRESENTATION_SHEET_TESTID);
@@ -152,7 +152,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
   it('cerrar el panel no navega: los parametros de lista de la URL siguen intactos', async () => {
     // R21 (segunda mitad) — el estado de lista vive en la cadena de consulta y el panel no la
     // toca, asi que abrir y cerrar no puede perderlo. Se comprueba en negativo sobre el router.
-    const user = userEvent.setup();
+    const user = setupUser();
     await abrirAlta(user);
 
     await user.click(screen.getByTestId(PRESENTATION_FORM_CANCEL_TESTID));
@@ -166,7 +166,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
 
   it('la edicion abre el MISMO panel lateral, precargado con el nombre actual', async () => {
     // R21, R23 — el disparador de fila abre el panel controlado; sin abrirlo no hay formulario.
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<FilaConPanel presentation={PRESENTACION} />);
 
     expect(screen.queryByTestId(PRESENTATION_FORM_TESTID)).toBeNull();
@@ -185,7 +185,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
   it('la edicion envia el reemplazo completo con el id ligado a la operacion', async () => {
     // R23 — `updatePresentationAction.bind(null, id)`: el id viaja como primer argumento y el
     // nombre entero en el `FormData`.
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<FilaConPanel presentation={PRESENTACION} />);
     await user.click(screen.getByTestId(ROW_EDIT_TESTID));
     await screen.findByTestId(PRESENTATION_FORM_TESTID);
@@ -204,7 +204,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
 
   it('el formulario no captura ningun campo distinto de `name`', async () => {
     // R22 — en negativo: ni id visible, ni marcas de tiempo, ni autoria, ni nombre normalizado.
-    const user = userEvent.setup();
+    const user = setupUser();
     const formulario = await abrirAlta(user);
 
     const nombres = [...formulario.querySelectorAll<HTMLElement>('input, select, textarea')]
@@ -216,7 +216,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
 
   it('un rechazo por nombre duplicado se pinta JUNTO AL CAMPO sin cerrar ni perder lo escrito', async () => {
     // R24 — el sitio lo decide el `code` estable, nunca el texto del mensaje.
-    const user = userEvent.setup();
+    const user = setupUser();
     createPresentationActionMock.mockResolvedValue({
       status: 'error',
       code: DUPLICATE_NAME_CODE,
@@ -246,7 +246,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
 
   it('un rechazo sin campo senalado va a la region de error del formulario', async () => {
     // R24 — `invalid_input` no identifica ningun campo: se pinta en la region `role="alert"`.
-    const user = userEvent.setup();
+    const user = setupUser();
     createPresentationActionMock.mockResolvedValue({
       status: 'error',
       code: INVALID_INPUT_CODE,
@@ -275,7 +275,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
   it('un nombre sin ningun caracter valido no llega a la operacion y se marca en el campo', async () => {
     // R24 — la validacion previa usa el MISMO esquema del contrato publico (su `refine` rechaza
     // «---»), asi que ni se invoca la Server Action.
-    const user = userEvent.setup();
+    const user = setupUser();
     await abrirAlta(user);
 
     await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), '---');
@@ -288,7 +288,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
 
   it('un alta con exito cierra el panel, avisa por toast y refresca la lista', async () => {
     // R25 — cerrar + aviso emergente + lista al dia sin recargar y sin perder los parametros.
-    const user = userEvent.setup();
+    const user = setupUser();
     await abrirAlta(user);
 
     await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
@@ -308,7 +308,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
 
   it('una edicion con exito cierra el panel, avisa por toast y refresca la lista', async () => {
     // R25 — mismo cierre para el otro modo del panel.
-    const user = userEvent.setup();
+    const user = setupUser();
     render(<FilaConPanel presentation={PRESENTACION} />);
     await user.click(screen.getByTestId(ROW_EDIT_TESTID));
     await screen.findByTestId(PRESENTATION_FORM_TESTID);
@@ -324,7 +324,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
 
   it('el panel no monta ninguna region de avisos propia', async () => {
     // R26 — en negativo: la unica la monta el layout privado, y aqui no hay ninguna.
-    const user = userEvent.setup();
+    const user = setupUser();
     await abrirAlta(user);
 
     expect(document.querySelectorAll('[aria-live]')).toHaveLength(0);

@@ -9,7 +9,7 @@
 // accesible, y el motivo visible se afirma por identificador, no por su texto.
 
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -106,10 +106,11 @@ describe('las tres acciones estan SIEMPRE visibles (R23, R45)', () => {
   });
 
   it('con el pedido abierto, pulsar una accion emite su enganche con la fila recibida por props (R43)', async () => {
+    const user = setupUser();
     const onEdit = vi.fn();
     render(<OrderRowActions order={pedido('EN_CURSO')} onEdit={onEdit} />);
 
-    await userEvent.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-action-edit'));
 
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onEdit).toHaveBeenCalledWith(pedido('EN_CURSO'));
@@ -120,6 +121,7 @@ describe('con el pedido en estado final las tres acciones estan deshabilitadas (
   it.each(['ENTREGADO', 'CANCELADO'] as const)(
     'con un pedido %s: los tres controles `disabled`, el motivo visible y ninguna operacion invocada',
     async (status) => {
+      const user = setupUser();
       const enganches = enganchesQueFallan();
       render(<OrderRowActions order={pedido(status)} {...enganches} />);
 
@@ -134,7 +136,7 @@ describe('con el pedido en estado final las tres acciones estan deshabilitadas (
 
       // Pulsar no abre nada: los dobles lanzarian si se les llamara.
       for (const testId of CONTROLES) {
-        await userEvent.click(screen.getByTestId(testId));
+        await user.click(screen.getByTestId(testId));
       }
       expect(enganches.onEdit).not.toHaveBeenCalled();
       expect(enganches.onCancel).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import PrivateLayout from '@/app/(private)/layout';
@@ -185,7 +185,7 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
 
 /** Rellena el formulario abierto. Vacia primero: el panel puede venir precargado (edicion). */
 async function rellenarFormulario(
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   valores: Readonly<Record<string, string>> = {},
 ) {
   const datos = { ...ALTA_VALIDA, ...valores };
@@ -443,7 +443,7 @@ describe('pantalla de proveedores — lista', () => {
   it('el selector de tamano de pagina ofrece 10 y 25, usa 10 por defecto y al cambiar recarga', async () => {
     // R8 — el defecto se observa en lo que se le PIDE al backend, que es quien decide la
     // consulta; las dos opciones, en el selector; y cambiarlo NAVEGA, no guarda estado local.
-    const user = userEvent.setup();
+    const user = setupUser();
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([proveedor()], { total: 40 }));
 
     await renderPantalla();
@@ -470,7 +470,7 @@ describe('pantalla de proveedores — lista', () => {
 
   it('permite avanzar y retroceder de pagina e indica la pagina actual y el total', async () => {
     // R9
-    const user = userEvent.setup();
+    const user = setupUser();
     listSuppliersActionMock.mockResolvedValue(
       paginaDeProveedores([proveedor()], { page: 2, total: 30, totalPages: 3 }),
     );
@@ -605,7 +605,7 @@ describe('pantalla de proveedores — los tres estados', () => {
 
   it('un error de la consulta presenta el estado de error con reintento y NO una tabla vacia', async () => {
     // R18 — confundir «fallo» con «no hay nada» es justo lo que este requisito impide.
-    const user = userEvent.setup();
+    const user = setupUser();
     listSuppliersActionMock.mockResolvedValue({
       status: 'error',
       code: 'invalid_input',
@@ -656,7 +656,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     // R26 — panel lateral, NO dialogo modal centrado y NO otra URL. Y al cerrarse se vuelve a la
     // lista con la MISMA pagina y el MISMO tamano: sale gratis porque el estado de lista vive en
     // la cadena de consulta, asi que no hay ni una consulta de mas ni una navegacion.
-    const user = userEvent.setup();
+    const user = setupUser();
     listSuppliersActionMock.mockResolvedValue(
       paginaDeProveedores([proveedor()], { page: 2, pageSize: MAX_PAGE_SIZE, total: 60 }),
     );
@@ -694,7 +694,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
 
   it('el estado vacio ofrece crear el primer proveedor y abre el mismo panel', async () => {
     // R16 (su accion) + R26 — sin ni un proveedor, lo unico util es dar de alta el primero.
-    const user = userEvent.setup();
+    const user = setupUser();
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([], { total: 0 }));
 
     await renderPantalla();
@@ -707,7 +707,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
 
   it('el alta captura nombre, telefono y correo y los envia por la operacion de alta', async () => {
     // R27, R43 — la mutacion sale por la Server Action del modulo; ningun `fetch` a rutas propias.
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
@@ -730,7 +730,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     // R28, R46 — los datos del proveedor llegan al panel POR PROPS desde la seccion de lista: no
     // se vuelve a consultar nada para abrirlo, y el reemplazo viaja con los TRES campos aunque
     // solo se cambie uno.
-    const user = userEvent.setup();
+    const user = setupUser();
     const elProveedor = proveedor({ name: 'Químicos del Sur' });
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
 
@@ -772,7 +772,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
   it('un duplicate_name se pinta junto al campo nombre, sin cerrar el panel ni perder lo escrito', async () => {
     // R32 (primera mitad) — el error identifica campo, asi que va JUNTO al campo. Y se decide por
     // el `code` estable, nunca por el texto: el mensaje del fixture no se parece a «duplicado».
-    const user = userEvent.setup();
+    const user = setupUser();
     createSupplierActionMock.mockResolvedValue({
       status: 'error',
       code: 'duplicate_name',
@@ -809,7 +809,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
   it('un unauthorized se pinta en la region de error del formulario y conserva lo escrito', async () => {
     // R32 (segunda mitad) — `unauthorized` no identifica campo: va a la region `role="alert"` del
     // formulario. El panel sigue abierto y lo escrito sigue ahi.
-    const user = userEvent.setup();
+    const user = setupUser();
     createSupplierActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -842,7 +842,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
   it('un not_found ofrece volver a la lista desde la region de error del formulario', async () => {
     // R32 — el proveedor dejo de existir mientras el panel estaba abierto. El destino se deriva
     // de `SUPPLIERS_ROUTE` (R2), nunca de un literal.
-    const user = userEvent.setup();
+    const user = setupUser();
     updateSupplierActionMock.mockResolvedValue({
       status: 'error',
       code: 'not_found',
@@ -865,7 +865,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     // R45 — el formulario valida con `createSupplierSchema`, el mismo que el servidor: la regla
     // cruzada «telefono o correo, al menos uno» se corta aqui, sin reescribirla y sin ninguna
     // libreria de formularios. El assert compara contra el propio esquema, no contra un copy.
-    const user = userEvent.setup();
+    const user = setupUser();
     const sinContacto = { name: ALTA_VALIDA.name, phone: '', email: '' };
 
     expect(createSupplierSchema.safeParse(sinContacto).success).toBe(false);
@@ -889,7 +889,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
 
   it('un guardado con exito cierra el panel, avisa por toast y refresca la lista', async () => {
     // R33
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
@@ -915,7 +915,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     // `sonner` solo pinta el `<ol data-sonner-toaster>` cuando hay algun toast en cola; lo que si
     // esta siempre montado es su `<section aria-live>` con `role="region"` (mismo criterio que
     // `tests/unit/private-layout.test.tsx`).
-    const user = userEvent.setup();
+    const user = setupUser();
 
     await renderPantalla();
 
@@ -934,7 +934,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     // area tactil de 44x44 px, en los dos anchos y sin excepcion de escritorio.
     for (const ancho of [NARROW_VIEWPORT, WIDE_VIEWPORT]) {
       setViewportWidth(ancho);
-      const user = userEvent.setup();
+      const user = setupUser();
 
       await renderPantalla();
 
@@ -972,7 +972,7 @@ describe('pantalla de proveedores — baja con aviso de arrastre', () => {
     // R35, R47 — el doble FALLA si se le llama: no basta con no haberlo visto llamado, se
     // comprueba que ninguna via lo dispara. El aviso del arrastre se afirma por `data-testid`,
     // no por su copy; el nombre del proveedor es dato del fixture.
-    const user = userEvent.setup();
+    const user = setupUser();
     const elProveedor = proveedor({ name: 'Reactivos del Golfo' });
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
     deleteSupplierActionMock.mockImplementation(() => {
@@ -997,7 +997,7 @@ describe('pantalla de proveedores — baja con aviso de arrastre', () => {
   it('al confirmar invoca la baja con el id oculto, cierra, avisa por toast y refresca', async () => {
     // R35 (segunda mitad) + R33 — el `id` viaja en un campo oculto, que es la forma que
     // `deleteSupplierAction` espera; no hace falta `bind`.
-    const user = userEvent.setup();
+    const user = setupUser();
     const elProveedor = proveedor({ name: 'Reactivos del Golfo' });
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
 
@@ -1016,7 +1016,7 @@ describe('pantalla de proveedores — baja con aviso de arrastre', () => {
 
   it('una baja rechazada mantiene el dialogo abierto con el mensaje a la vista', async () => {
     // R32 aplicado a la baja: cerrar el dialogo dejaria al usuario creyendo que se dio de baja.
-    const user = userEvent.setup();
+    const user = setupUser();
     deleteSupplierActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',

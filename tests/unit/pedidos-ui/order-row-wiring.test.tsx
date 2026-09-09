@@ -10,7 +10,7 @@
 // invoca ninguna operacion.
 
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -133,7 +133,7 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
   });
 
   it('pulsar editar abre el panel lateral con el pedido precargado', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     montarLista();
 
     await user.click(screen.getByTestId('order-action-edit'));
@@ -144,7 +144,7 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
   });
 
   it('pulsar cancelar abre el dialogo de motivo, y solo ese', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     montarLista();
 
     await user.click(screen.getByTestId('order-action-cancel'));
@@ -155,7 +155,7 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
   });
 
   it('pulsar borrar abre la confirmacion, y solo esa', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     montarLista();
 
     await user.click(screen.getByTestId('order-action-delete'));
@@ -169,7 +169,7 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
 describe('con el pedido en estado final ninguna de las tres abre nada (R24)', () => {
   for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
     it(`estado ${status}: los tres controles deshabilitados y ningun panel ni dialogo montado`, async () => {
-      const user = userEvent.setup();
+      const user = setupUser();
       montarLista(status);
 
       for (const testId of ['order-action-edit', 'order-action-cancel', 'order-action-delete']) {
