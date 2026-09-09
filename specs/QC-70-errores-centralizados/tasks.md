@@ -250,7 +250,7 @@ locales salen del catálogo. La validación propia de los formularios no se toca
 `components/**`, `hooks/**` y `lib/**` no devuelve ninguna comparación viva, y el caso 7 de la
 guardia lo fija para el futuro (R20).
 
-### T15 · El E2E del error inesperado
+### [x] T15 · El E2E del error inesperado
 **Depende de:** T14.
 **Toca:**
 - `e2e/errores.spec.ts` (nuevo)
@@ -262,7 +262,7 @@ diagnóstico (R33, R13). **Primero se confirma que el camino elegido llega de ve
 (`design.md > 6 ter`); si ninguno alcanzable desde el navegador lo hace, **se para y se dice**, y
 no se añade ningún `throw` de mentira en producción para que el caso pase.
 
-### T16 · Trazabilidad y gate completo
+### [x] T16 · Trazabilidad y gate completo
 **Depende de:** T15.
 **Toca:**
 - `progress/impl_QC-70-errores-centralizados.md`
