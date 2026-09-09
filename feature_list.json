@@ -878,7 +878,8 @@
       "branch": "feature/QC-63-ejecutar-receta-operador",
       "depends_on": [
         "QC-62",
-        "QC-64"
+        "QC-64",
+        "QC-88"
       ],
       "spec_path": "specs/QC-63-ejecutar-receta-operador"
     },
@@ -1140,6 +1141,109 @@
         "QC-66"
       ],
       "spec_path": "specs/QC-79-alta-sin-contrasena-y-enlace"
+    },
+    {
+      "key": "QC-83",
+      "id": 83,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "modelo-de-grupos-de-trabajo",
+      "description": "Un grupo de trabajo es un conjunto de personas con nombre -\"Turno noche\", \"Planta 2\"- que existe para poder asignarles trabajo de golpe en vez de una por una. Esta ficha es SOLO el modelo: la tabla del grupo, la tabla N:M que lo une con las personas, y la migracion. Vive en el modulo de identidad, junto a usuarios, roles y permisos, porque un grupo es un conjunto de personas y las personas ya viven ahi. El grupo pertenece a UNA empresa, como la persona (QC-47). Una persona puede estar en varios grupos y un grupo tiene varias personas. El nombre del grupo es unico dentro de la empresa. Lo que NO entra: los casos de uso de alta, edicion y borrado van en QC-84; la pantalla, en QC-85. Asignar un pedido a un grupo NO entra aqui: eso es QC-86, que consume esta tabla y no la define. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-83-modelo-de-grupos-de-trabajo",
+      "depends_on": [
+        "QC-47"
+      ],
+      "spec_path": "specs/QC-83-modelo-de-grupos-de-trabajo"
+    },
+    {
+      "key": "QC-84",
+      "id": 84,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "crud-de-grupos-de-trabajo",
+      "description": "Los casos de uso de un grupo de trabajo: crear uno con su nombre, listar los de la empresa, ver quienes lo componen, cambiar su nombre, meter y sacar personas, y borrarlo. Todo limitado a la empresa de quien pide. El nombre es unico dentro de la empresa y se rechaza el duplicado diciendolo. Sacar a una persona de un grupo NO la borra ni la desactiva. Borrar un grupo que ya fue usado para asignar un pedido no puede dejar ese pedido sin responsables: el modulo de asignacion guarda a las personas, no al grupo vivo, asi que el borrado no arrastra trabajo ya asignado, y esta ficha lo tiene que demostrar con un test. Que permiso corta cada operacion sigue el patron de QC-74: consultar para leer, modificar para escribir, sin implicacion entre ellos. Lo que NO entra: el modelo y la migracion (QC-83); la pantalla (QC-85). Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-84-crud-de-grupos-de-trabajo",
+      "depends_on": [
+        "QC-83"
+      ],
+      "spec_path": "specs/QC-84-crud-de-grupos-de-trabajo"
+    },
+    {
+      "key": "QC-85",
+      "id": 85,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "pantalla-de-grupos-de-trabajo",
+      "description": "La pantalla donde el Administrador ve los grupos de trabajo de su empresa, crea uno, le cambia el nombre, mete y saca personas, y lo borra con confirmacion. Cada grupo muestra cuantas personas tiene y quienes son. Se decide al acotar si es una pantalla propia o una seccion dentro de la pantalla de usuarios (QC-67), que todavia no esta especificada. Las dos opciones son razonables y la decision cambia la ficha, asi que no se da por supuesta aqui. Reutiliza lo que ya existe y no lo vuelve a montar: la tabla de datos compartida (QC-55), busqueda y orden (QC-57), el panel lateral y el dialogo de borrado del patron de QC-45, y el corte por permiso de pantalla de QC-75. Lo que NO entra: el modelo (QC-83) ni los casos de uso (QC-84). Asignar trabajo a un grupo se hace desde la pantalla de pedidos, en QC-87. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-85-pantalla-de-grupos-de-trabajo",
+      "depends_on": [
+        "QC-84"
+      ],
+      "spec_path": "specs/QC-85-pantalla-de-grupos-de-trabajo"
+    },
+    {
+      "key": "QC-86",
+      "id": 86,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "modelo-de-asignacion-de-pedidos",
+      "description": "Un pedido pasa a tener responsables: las personas encargadas de prepararlo. Esta ficha es el modulo nuevo de asignacion y su modelo: la tabla N:M que une pedido con persona, y la migracion. LA ASIGNACION SE CONGELA. Se puede asignar marcando personas sueltas, eligiendo uno o varios grupos de trabajo, o mezclando las dos cosas -dos equipos, o un equipo mas dos personas sueltas-. Cuando se elige un grupo, el pedido guarda LAS PERSONAS QUE ESE GRUPO TENIA EN ESE MOMENTO, mas la marca de que vinieron de ese grupo y su nombre, para poder mostrarlo. Sacar a alguien de un grupo manana NO le quita un pedido que ya estaba ejecutando, y meter a alguien no le hace aparecer pedidos viejos. EL MODULO TRAE DOS PERMISOS, como todos los demas (QC-74): consultar -ver los pedidos que tengo asignados- y modificar -asignar y desasignar-. El Operador nace con consultar. No se le da acceso a recetas: hoy el permiso de consultar recetas abre tambien el listado y el formulario de edicion. Lo que NO entra: la pantalla de asignar (QC-87), el listado del Operador (QC-88) y ejecutar la receta (QC-63). Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-86-modelo-de-asignacion-de-pedidos",
+      "depends_on": [
+        "QC-83"
+      ],
+      "spec_path": "specs/QC-86-modelo-de-asignacion-de-pedidos"
+    },
+    {
+      "key": "QC-87",
+      "id": 87,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "asignar-responsables-a-un-pedido",
+      "description": "Desde la pantalla de pedidos, el Administrador asigna quien prepara cada pedido: marca personas sueltas, elige uno o varios grupos de trabajo, o mezcla las dos cosas. Y puede desasignar. El listado de pedidos y el detalle muestran a los responsables como un grupo de avatares. Cuando la asignacion vino de un grupo de trabajo, se muestra el NOMBRE DEL GRUPO junto a los avatares de sus personas, no solo las caras sueltas: quien mira el tablero tiene que poder distinguir \"Turno noche\" de cinco personas elegidas a mano. Un pedido cancelado no admite asignacion nueva. Que pasa con la asignacion de un pedido ya entregado se decide al acotar. Reutiliza la tabla de datos compartida (QC-55) y la pantalla de pedidos de QC-35, que no se rehace. Lo que NO entra: la tabla de asignacion (QC-86), que esta ficha consume. El listado del Operador va en QC-88. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-87-asignar-responsables-a-un-pedido",
+      "depends_on": [
+        "QC-86",
+        "QC-84"
+      ],
+      "spec_path": "specs/QC-87-asignar-responsables-a-un-pedido"
+    },
+    {
+      "key": "QC-88",
+      "id": 88,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "listado-de-pedidos-asignados",
+      "description": "La lista de trabajo del Operador: los pedidos que tiene asignados, para entrar a prepararlos. Es su pantalla de entrada, con su item de menu, cortada por el permiso de consultar del modulo de asignacion. SOLO LOS EJECUTABLES. Se muestran los pedidos en estado PENDIENTE y EN_CURSO. Los ENTREGADO y los CANCELADO no aparecen: es una lista de trabajo, no un historial, y nadie tiene que archivarlos a mano. Cada fila muestra el numero del pedido, el nombre de la receta, la cantidad, la prioridad, el estado, y los DEMAS responsables como grupo de avatares -con el nombre del grupo de trabajo cuando la asignacion vino de uno-, para que el operario sepa con quien comparte el pedido antes de empezar. UN PEDIDO YA EN CURSO ESTA BLOQUEADO PARA LOS DEMAS. Si otro responsable ya lo abrio y esta preparandolo, el pedido se ve pero no se puede entrar a ejecutar, y se dice quien lo tiene. Evita que dos personas preparen la misma mezcla a la vez. Reutiliza la tabla de datos compartida (QC-55) y busqueda y orden (QC-57). Lo que NO entra: ejecutar la receta paso a paso, que es QC-63 y empieza donde esta lista termina. Asignar, en QC-87. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-88-listado-de-pedidos-asignados",
+      "depends_on": [
+        "QC-86"
+      ],
+      "spec_path": "specs/QC-88-listado-de-pedidos-asignados"
     }
   ]
 }
