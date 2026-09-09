@@ -629,3 +629,87 @@ navegador real.** Queda como deuda explícita, anotada también por el leader en
 **La limpieza de las dos entradas del baseline que ya pasan NO entra en esta ficha, y borrarlas
 ahora ROMPERÍA el gate**: esos casos fallan solo cuando la suite corre desde `dev`, con el rango
 vacío, y pasan en rama de feature. Va junto con el **menor 4** en esa ficha propia.
+
+## Segundo merge con `origin/dev` (`e31c608`) — dos guardias que acusaban en falso
+
+`dev` avanzó 26 commits y trajo **`b97380c — feat(recetas): la unidad de una linea se acota al grupo
+de su ingrediente`**, que **ensanchó `UnitRef` con `baseUnitId` y `factor` por su cuenta**: media
+ampliación de la que hacía esta ficha, hecha por otra rama y por otro motivo. El leader resolvió los
+nueve conflictos (ocho conservando HEAD, dos fusionando ambos lados para no perder el comentario
+`QC-26bis`). Ese merge dejó **dos guardias de QC-39 acusando en falso**, y las dos eran problemas
+distintos.
+
+### 1. `modulo-intacto.test.ts` — el aserto medía la forma del tipo, no el cambio
+
+Afirmaba «`UnitRef` sigue teniendo exactamente tres campos». Dejó de ser cierto —tiene cinco— **y no
+los puso QC-39**. La intención de R3 seguía siendo correcta; lo que estaba mal escrito era el
+aserto. Ahora afirma **que el diff de esta rama no toca la declaración de `UnitRef`**, comparando el
+bloque `export type UnitRef = { … }` entre la **base de fusión** y el árbol de trabajo.
+
+**El aserto nuevo es MÁS estricto que el viejo, no menos:** compara texto contra texto, así que
+muerde también un cambio de tipo, de opcionalidad o de `readonly`, no solo un campo de más o de
+menos. Lleva además un aserto de **no vacuidad** para que dos cadenas vacías —extractor roto,
+archivo renombrado— no pasen en verde, y conserva el salto ruidoso cuando no hay rango.
+
+### 2. `consumidores-catalogo.test.tsx` — el mismo bug del hermano, sin arreglar
+
+Fijaba `RAMA_BASE = '516e9c0'` **a mano**, y un commit fijado deja de ser «la rama base» en cuanto
+hay un merge: acusaba a la ficha de modificar **nueve archivos de `app/(private)/produccion/formulas/`**
+que llegaron por el merge. Medido: contra `516e9c0` salen los nueve; contra la base de fusión
+(`9d20152`), **ninguno**. Sustituido por `git merge-base origin/dev HEAD`, con el mismo criterio de
+salto ruidoso. **Lo que el caso afirma no cambió** (R4): sigue comparando el árbol entero de las dos
+pantallas consumidoras.
+
+**Las dos son la misma lección, y ya van tres veces en esta ficha:** un centinela que fija su base a
+mano miente en cuanto la rama se sincroniza. La base se calcula, no se escribe.
+
+### `UnitView` adelgazado — la decisión, tomada y razonada
+
+Con `UnitRef` trayendo ya `baseUnitId` y `factor`, `UnitView` los **redeclaraba con tipos idénticos**
+(verificado campo a campo). **Se adelgaza a `UnitRef & { isSystem }`**, en commit aparte (`633beb4`).
+
+**Por qué se adelgaza y no se deja:** dos declaraciones del mismo campo obligan a mantener la misma
+verdad en dos sitios, y si algún día `UnitRef` estrechara uno de los dos tipos, la intersección lo
+estrecharía **en silencio** aquí. Con una sola declaración, ese cambio se ve donde ocurre.
+
+**Qué protege la parte que ya no se declara:** si alguien retirara `baseUnitId` o `factor` de
+`UnitRef`, `UnitView` los perdería sin avisar. Lo caza
+`tests/unit/unidades/unit-view-projection.test.ts`, que afirma los **seis** campos de la proyección.
+El vínculo está escrito en el comentario del propio tipo, no solo aquí. La documentación de los dos
+campos —factor como **texto decimal, nunca `number`**; `baseUnitId` y `factor` **los dos o
+ninguno**— no se perdió: se reubicó en la cabecera del archivo.
+
+Es una **desviación de `design.md > 2.1`**, que describía `UnitView` con los tres campos. El diseño
+se escribió cuando `UnitRef` tenía tres; hoy el mismo tipo se expresa con `UnitRef & { isSystem }`.
+**Contrato idéntico, expresión más corta.** Queda para que el reviewer lo case contra el diseño.
+
+### Un matiz de redacción de R3 que NO se toca, y que el reviewer debería valorar
+
+R3 dice «El sistema NO DEBE cambiar el tipo ni la proyección con los que otros módulos resuelven
+identificadores conocidos de unidad». **Leído literalmente y en presente, hoy es falso como
+descripción del mundo**: `UnitRef` ya tiene cinco campos, y los puso otra ficha. Sigue siendo
+verdadero como **restricción sobre esta ficha**, que es lo que siempre quiso decir.
+
+El matiz sería explicitar el sujeto: «**QC-39** no debe cambiar el tipo…». Es redacción, no alcance.
+**No se ha tocado `requirements.md` porque es fila de decisiones cerradas.** Se anota aquí porque sin
+ese matiz la próxima persona que lea R3 volverá a escribir el aserto como propiedad del tipo y
+volverá a acusar en falso al siguiente merge — que es exactamente lo que acaba de pasar.
+
+### Verificación tras los tres commits
+
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin salida — verde)
+
+$ pnpm lint
+> eslint
+(sin salida — verde)
+
+$ pnpm exec vitest run tests/unit tests/guards
+ Test Files  261 passed (261)
+      Tests  3272 passed | 12 skipped (3284)
+```
+
+**Cero rojos.** Los dos de baseline que arrastraba `private-layout-menu.test.tsx` también pasan tras
+este merge. Comprobado además que **ningún archivo del rango quedó en CRLF**.
