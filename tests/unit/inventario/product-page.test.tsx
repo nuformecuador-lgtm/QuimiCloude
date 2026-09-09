@@ -1061,6 +1061,33 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('elegir un producto existente autocompleta presentacion y alerta de cantidad, no la existencia', async () => {
+    // Decision humana del 2026-09-09: en el alta el nombre es un autocomplete que busca productos
+    // existentes; al elegir uno se autocompletan presentacion y alerta de cantidad. La existencia
+    // NO se copia: es el inventario actual del producto nuevo, que escribe el usuario.
+    const user = setupUser();
+    const existente = producto({ name: 'Sosa cáustica perlas', qtyAlert: 7 });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([existente]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId('product-field-name'));
+    await user.click(
+      await esperarInteractiva(await screen.findByRole('option', { name: existente.name })),
+    );
+
+    // El nombre queda fijado al del producto elegido.
+    expect(screen.getByTestId('product-field-name')).toHaveValue(existente.name);
+    // La presentacion se autocompleta.
+    await waitFor(() => expect(presentacionSeleccionada()).toBe(existente.presentationId));
+    // La alerta de cantidad se autocompleta.
+    expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue(existente.qtyAlert);
+    // La existencia NO se autocompleta: sigue vacia para que la escriba el usuario.
+    expect((screen.getByTestId('product-field-stock') as HTMLInputElement).value).toBe('');
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:
@@ -1114,10 +1141,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.queryByTestId('product-field-unitId')).toBeNull();
     expect(formulario.textContent).not.toContain('Unidad');
 
-    // El unico control de conjunto cerrado del formulario sigue siendo la presentacion (R24).
+    // El unico control de conjunto cerrado del formulario sigue siendo la presentacion (R24). El
+    // nombre paso a ser un autocomplete de texto libre que busca productos existentes, asi que el
+    // formulario tiene DOS combobox: el nombre y la presentacion.
     const combos = within(formulario).getAllByRole('combobox');
-    expect(combos).toHaveLength(1);
-    expect(combos[0]).toBe(screen.getByTestId(testId.selectorPresentacion));
+    expect(combos).toHaveLength(2);
+    expect(combos).toContain(screen.getByTestId('product-field-name'));
+    expect(combos).toContain(screen.getByTestId(testId.selectorPresentacion));
 
     await crearPresentacionEnLinea(user);
     await rellenarFormulario(user);

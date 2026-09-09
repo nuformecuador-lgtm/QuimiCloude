@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useId } from 'react';
+import { useActionState, useEffect, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import {
@@ -22,6 +22,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
 import { ProductField } from './product-field';
+import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -159,6 +160,25 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
+  /**
+   * Autocompletado al elegir un producto existente (decision humana del 2026-09-09): solo
+   * presentacion y alerta de cantidad. La existencia la escribe el usuario -es el inventario
+   * ACTUAL del producto nuevo, no el del elegido-.
+   */
+  const [template, setTemplate] = useState<{
+    readonly presentationId: string;
+    readonly presentationName: string;
+    readonly qtyAlert: string;
+  } | null>(null);
+
+  function applyTemplate(option: ProductNameOption) {
+    setTemplate({
+      presentationId: option.presentationId,
+      presentationName: option.presentationName,
+      qtyAlert: option.qtyAlert === null ? '' : String(option.qtyAlert),
+    });
+  }
+
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
     const values = readValues(formData);
     const fieldErrors: FieldErrors = {};
@@ -285,23 +305,42 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         </div>
       ) : null}
 
-      <ProductField
-        name="name"
-        label={FIELD_LABELS.name}
-        type="text"
-        required
-        defaultValue={initialValue('name', product?.name ?? '')}
-        error={fieldErrors.name}
-      />
+      {/*
+        En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
+        autocompletan presentacion y alerta (decision humana del 2026-09-09). En la EDICION el
+        nombre sigue siendo un campo de texto plano: no hay otro producto del que copiar nada.
+      */}
+      {isEdit ? (
+        <ProductField
+          name="name"
+          label={FIELD_LABELS.name}
+          type="text"
+          required
+          defaultValue={initialValue('name', product?.name ?? '')}
+          error={fieldErrors.name}
+        />
+      ) : (
+        <ProductNamePicker
+          defaultValue={initialValue('name', '')}
+          error={fieldErrors.name}
+          onSelect={applyTemplate}
+        />
+      )}
 
       {/*
         `defaultLabel` ahorra la consulta de resolucion del selector: `ProductView` ya trae el
         nombre de la presentacion, asi que editar un producto no vuelve a pedir la primera pagina
-        solo para saber como se llama la que ya tiene.
+        solo para saber como se llama la que ya tiene. En el alta, al elegir un producto existente,
+        `template` aporta el id y el nombre y la `key` fuerza el remontaje para que el selector
+        arranque con ellos.
       */}
       <PresentationSelect
-        defaultValue={initialValue(PRESENTATION_FIELD, product?.presentationId ?? '') || undefined}
-        defaultLabel={product?.presentationName}
+        key={template === null ? product?.presentationId ?? 'none' : template.presentationId}
+        defaultValue={
+          initialValue(PRESENTATION_FIELD, template?.presentationId ?? product?.presentationId ?? '') ||
+          undefined
+        }
+        defaultLabel={template?.presentationName ?? product?.presentationName}
         error={fieldErrors.presentationId}
       />
 
@@ -337,7 +376,7 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         type="number"
         required
         helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
-        defaultValue={initialValue('qtyAlert', product?.qtyAlert?.toString() ?? '')}
+        defaultValue={initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert?.toString() ?? '')}
         error={fieldErrors.qtyAlert}
       />
 
