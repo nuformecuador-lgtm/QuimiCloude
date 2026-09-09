@@ -252,7 +252,7 @@
       sin dejar filas huérfanas. Cierra el diferimiento que QC-38 dejó apuntando a esta ficha.
 
 ### T15 — Cierre *(depende de todo)*
-- [ ] `progress/impl_QC-39-pantalla-de-unidades.md` con el mapa `R<n> -> test` de abajo, completo,
+- [x] `progress/impl_QC-39-pantalla-de-unidades.md` con el mapa `R<n> -> test` de abajo, completo,
       con los comandos y su salida, y con la lista final de archivos ajenos tocados frente a la de
       `design.md > 1`.
 - [ ] `./init.sh` completo en verde.
