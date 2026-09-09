@@ -47,9 +47,6 @@ function findRepoRoot(startDir: string): string {
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
-/** La rama base de la feature, el mismo commit que usa `modulo-intacto.test.ts`. */
-const RAMA_BASE = '516e9c0';
-
 /** Las dos pantallas que hoy piden el catalogo completo (`design.md > 0`). */
 const PANTALLAS_CONSUMIDORAS = ['app/(private)/produccion/formulas', 'app/(private)/proveedores'];
 
@@ -75,12 +72,19 @@ function git(args: readonly string[]): string {
   return execFileSync('git', [...args], { cwd: repoRoot, encoding: 'utf8' });
 }
 
-function baseDisponible(): boolean {
+/** La BASE DE FUSION con `origin/dev`, calculada en cada ejecucion -el mismo mecanismo que usa
+ *  `modulo-intacto.test.ts`-. Aqui habia un commit fijado a mano (`516e9c0`, la punta de
+ *  `origin/dev` al montar el worktree). Un commit fijado deja de ser «la rama base» en cuanto
+ *  hay un merge: al mergear `origin/dev` en esta rama, la comparacion empezo a atribuir a QC-39
+ *  los nueve archivos de `produccion/formulas/` que trajo el merge. Era un falso positivo de la
+ *  MEDICION -`git diff --name-only origin/dev...HEAD` no lista ninguno-, no una infraccion de R4.
+ *  Devuelve `null` si el rango no esta disponible (sin remoto, clon superficial); quien lo llama
+ *  SALTA en voz alta en vez de pasar en verde. */
+function mergeBaseConDev(): string | null {
   try {
-    git(['rev-parse', '--verify', `${RAMA_BASE}^{commit}`]);
-    return true;
+    return git(['merge-base', 'origin/dev', 'HEAD']).trim();
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -137,16 +141,20 @@ describe('el selector del detalle de proveedor renderiza con datos de UnitView (
 });
 
 describe('sus archivos NO cambian con esta ficha (R4, R47)', () => {
-  it('ni el formulario de recetas ni el detalle de proveedor se tocan respecto a la rama base', (ctx) => {
-    if (!baseDisponible()) {
-      ctx.skip(`el commit base ${RAMA_BASE} no esta disponible: no se puede comparar el diff`);
+  it('ni el formulario de recetas ni el detalle de proveedor se tocan respecto a la base de fusion', (ctx) => {
+    const base = mergeBaseConDev();
+    if (base === null) {
+      ctx.skip(
+        'no se pudo calcular `git merge-base origin/dev HEAD` (sin remoto, o rango no ' +
+          'disponible): este caso NO ha comprobado nada.',
+      );
       return;
     }
 
     // Se compara el ARBOL ENTERO de las dos pantallas, no solo los dos selectores: lo que R4
     // promete es que estos consumidores no pagan la ampliacion, y retocar su pagina o su
     // formulario para que compile seria pagarla.
-    const cambiados = git(['diff', '--name-only', RAMA_BASE, '--', ...PANTALLAS_CONSUMIDORAS])
+    const cambiados = git(['diff', '--name-only', base, '--', ...PANTALLAS_CONSUMIDORAS])
       .split('\n')
       .map((linea) => linea.trim())
       .filter((linea) => linea !== '');
