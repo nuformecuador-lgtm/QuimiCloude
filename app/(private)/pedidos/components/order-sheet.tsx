@@ -27,6 +27,13 @@ import type { RecipePickerPage } from './recipe-picker';
  * el formulario se crea de cero en cada apertura, asi que la edicion siempre precarga los valores
  * actuales del pedido (R28) y un intento fallido anterior no deja restos.
  *
+ * **La limpieza por apertura NO se deja al antojo del desmontaje** (2026-09-09): `OrderForm`
+ * lleva una `key` que cambia en CADA apertura, de modo que aunque el cierre y la reapertura
+ * ocurran dentro de la ventana de desmontaje del portal -su animacion de salida no habia acabado
+ * cuando se vuelve a abrir- el formulario es una instancia nueva. Sin esto, el alta siguiente
+ * podia heredar la receta y la cantidad del pedido anterior y se guardaba «crema 1» con el rótulo
+ * del pedido viejo.
+ *
  * **El panel lo pinta `OrderForm`, no este archivo.** Desde que el panel entero es un `<form>`
  * (`SheetContent isForm`), la cabecera, el cuerpo y el pie con el boton de guardar son partes del
  * mismo formulario, y quien tiene la `action` es `OrderForm`. Aqui quedan el disparador, el
@@ -66,6 +73,8 @@ export type OrderSheetProps = {
 
 export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetProps) {
   const [selfOpen, setSelfOpen] = useState(false);
+  /** Instancia del formulario: cambia en cada apertura para que arranque SIEMPRE vacio (2026-09-09). */
+  const [openKey, setOpenKey] = useState(0);
   const router = useRouter();
   const isEdit = order !== undefined;
   const isControlled = open !== undefined;
@@ -73,6 +82,10 @@ export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetPro
 
   const changeOpen = useCallback(
     (next: boolean) => {
+      // Cada APERTURA es un formulario nuevo: la `key` avanza en el sentido que abre. Cerrar no
+      // toca nada -depende de `isOpen` cambiaria la identidad de este callback y con ella la de
+      // `handleSaved`, disparando dos veces el efecto de exito del formulario-.
+      if (next) setOpenKey((key) => key + 1);
       if (!isControlled) setSelfOpen(next);
       onOpenChange?.(next);
     },
@@ -103,7 +116,12 @@ export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetPro
           {CREATE_LABEL}
         </SheetTrigger>
       )}
-      <OrderForm order={order} recipes={recipes} onSaved={handleSaved} />
+      <OrderForm
+        key={openKey}
+        order={order}
+        recipes={recipes}
+        onSaved={handleSaved}
+      />
     </Sheet>
   );
 }

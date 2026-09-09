@@ -472,3 +472,37 @@ describe('la cabecera describe el pedido y el panel ensena la receta (2026-09-08
     expect(imagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
   });
 });
+
+describe('la eleccion de receta gobierna Guardar (2026-09-09)', () => {
+  // Decision humana: «crema 1» no puede guardarse con el campo diciendo «crema 1a». Guardar solo
+  // se habilita con una receta ELEGIDA de la lista; editar el campo retira la eleccion, deja el id
+  // oculto vacio y vuelve a deshabilitar Guardar. Se afirma sobre el atributo del boton y sobre el
+  // `input` oculto del selector (R44; sin asserts de copy).
+
+  it('en el alta, Guardar esta deshabilitado hasta elegir una receta', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
+
+    await rellenarAlta(user);
+
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
+  });
+
+  it('editar el campo tras elegir retira la receta y vuelve a bloquear Guardar', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    await rellenarAlta(user);
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
+
+    // Lo que el selector ya no guarda: el id viaja vacio y el titulo y el boton vuelven al inicio.
+    await user.type(screen.getByTestId(RECIPE_PICKER_TESTID), 'a');
+
+    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue('');
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID).textContent).not.toContain(RECETA.name);
+    expect(createOrderActionMock).not.toHaveBeenCalled();
+  });
+});

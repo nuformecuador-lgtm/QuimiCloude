@@ -23,6 +23,7 @@ import {
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_FORM_TITLE_TESTID,
   ORDER_SHEET_TESTID,
   OrderRowSheetActions,
   PAGE_PARAM,
@@ -415,5 +416,30 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
     expect(updateOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('reabrir el alta arranca VACIO: el label del pedido anterior no hereda', async () => {
+    // Decision humana del 2026-09-09: cada apertura es una instancia nueva de formulario. Aunque
+    // cerrar y volver a abrir ocurra dentro de la ventana de desmontaje del portal -o el portal se
+    // quedase montado-, el alta siguiente no puede mostrar la receta ni la cantidad del anterior.
+    const user = setupUser();
+    await renderPantalla();
+
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(ORDER_FORM_TESTID);
+    await rellenarAlta(user);
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
+
+    await user.click(screen.getByTestId(ORDER_FORM_CANCEL_TESTID));
+    await waitFor(() => expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull());
+
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(ORDER_FORM_TESTID);
+
+    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue('');
+    // El control numerico: se lee la CADENA del DOM, no `toHaveValue` (que compara `valueAsNumber`).
+    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('');
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID).textContent).not.toContain(RECETA.name);
   });
 });
