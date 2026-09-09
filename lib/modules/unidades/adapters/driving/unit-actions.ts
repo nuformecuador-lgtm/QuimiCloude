@@ -3,7 +3,6 @@
 import { identity, unidades } from '@/lib/composition';
 import {
   UnidadesError,
-  isUnitPage,
   type Actor,
   type Page,
   type UnitView,
@@ -91,17 +90,25 @@ async function currentActor(): Promise<Actor | null> {
  */
 export async function listUnitsAction(): Promise<UnitListResult>;
 export async function listUnitsAction(query: unknown): Promise<UnitPageResult>;
+// La firma de IMPLEMENTACION -que ningun llamante ve- declara `data` como la union entera, y no
+// como `UnitListResult | UnitPageResult`. Es a proposito: la forma de `data` la eligio el caso
+// de uso segun la consulta, y aqui no hay nada que decidir ni que estrechar. Si el retorno fuera
+// la union de los dos ESTADOS, `{ status: 'success', data }` no compilaria -un `data` que puede
+// ser array o pagina no encaja en ninguna de las dos ramas por separado-, y la salida seria un
+// `as` o un condicional con las dos ramas identicas. Las SOBRECARGAS de arriba son las que
+// mandan de puertas afuera (R4): sin argumentos se sigue devolviendo `UnitListResult`, con
+// consulta `UnitPageResult`, y quien llama no ve union alguna que estrechar.
 export async function listUnitsAction(
   query?: unknown,
-): Promise<UnitListResult | UnitPageResult> {
+): Promise<
+  | { status: 'success'; data: readonly UnitView[] | Page<UnitView> }
+  | { status: 'error'; code: string; message: string }
+> {
   const actor = await currentActor();
 
   try {
     const data = await unidades.listUnits(query, actor);
-    // `isUnitPage` es el discriminante que el propio modulo publica: se usa SOLO para separar
-    // las dos ramas del tipo de salida -la forma la eligio ya el caso de uso-, no para decidir
-    // nada. Sin el habria que afirmar el tipo con `as`, que es peor.
-    return isUnitPage(data) ? { status: 'success', data } : { status: 'success', data };
+    return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }
