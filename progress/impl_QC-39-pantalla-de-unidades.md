@@ -324,10 +324,10 @@ correcta es **teclado** (`focus()` + flechas + `Enter`), **nunca `{ force: true 
 
 ### Reparto de la ejecución del E2E
 
-**El spec está escrito y commiteado; Playwright NO lo ha corrido nadie todavía.** El subagente tenía
-**prohibido** ejecutarlo: el intento anterior de esta misma tarea murió por watchdog de stream a los
-600 s, que es la causa que documenta `AGENTS.md > Regla del gate`. Lo corre el leader en Chromium y
-WebKit. **El criterio de hecho de T14 no está cumplido hasta que esa corrida salga verde.**
+El spec lo **escribió** un subagente, que tenía **prohibido** ejecutarlo: el intento anterior de esta
+misma tarea murió por watchdog de stream a los 600 s, que es la causa que documenta
+`AGENTS.md > Regla del gate`. **Playwright lo corrió el leader**, en Chromium y WebKit. La salida
+real está más abajo, en «T14 — la corrida de Playwright».
 
 ### Verificación de la tanda (corrida por el implementer, en el worktree)
 
@@ -349,3 +349,62 @@ $ pnpm exec vitest run tests/unit/shared tests/unit/recetas-ui tests/unit/config
 Los **cuatro** rojos son los mismos de la tanda 2 y ninguno es regresión: los **dos de baseline** de
 `private-layout-menu` (el `userTrigger`) y las **dos anclas 6→7 DIFERIDAS** por orden del leader
 (`private-layout-menu` y `app-sidebar`, intersección con QC-58).
+
+## T14 — la corrida de Playwright (ejecutada por el leader)
+
+**Verde en los dos navegadores. El criterio de hecho de T14 queda cumplido.**
+
+```
+$ set -a && . ./.env && set +a && pnpm exec playwright test e2e/unidades.spec.ts \
+    --project=chromium --project=webkit
+
+Running 4 tests using 4 workers
+  ✓  4 [chromium] › unidades.spec.ts:459:7 › una sesion valida sin los permisos de unidades
+        recibe 404 dentro del layout privado y no ve la tabla (R12) (10.5s)
+  ✓  2 [webkit]   › unidades.spec.ts:459:7 › (R12) (12.1s)
+  ✓  1 [chromium] › unidades.spec.ts:363:7 › el Administrador entra por la URL, da de alta una
+        unidad derivada y la ve en la lista con su equivalencia armada (R50) (12.7s)
+  ✓  3 [webkit]   › unidades.spec.ts:363:7 › (R50) (15.1s)
+
+  4 passed (23.0s)
+```
+
+**El riesgo del `Select` en WebKit NO se materializó.** Se anticipó que el overlay de `next dev`
+(`<nextjs-portal>`) pudiera interceptar punteros, como documenta `e2e/permisos.spec.ts`; pasó sin
+tocar nada, así que **no** hizo falta la salida por teclado. Queda anotado por si reaparece: la
+solución correcta sería `focus()` + flechas + `Enter`, **nunca `{ force: true }`**.
+
+### La primera corrida fue roja, y no era de esta ficha
+
+`2 passed, 2 failed`: los dos recorridos del Administrador caían igual en ambos navegadores, con
+`getByTestId('unidades-title')` no encontrado. El snapshot de Playwright resolvió el caso: la página
+había pintado el **404 del layout privado** a un usuario **Administrador** que sí veía el enlace de
+Unidades en el menú.
+
+**Causa, medida contra la base y no supuesta:** el catálogo de permisos de la base tenía **10 filas
+y `unidades.modificar` no estaba**. QC-38 lo crea y lo siembra al Administrador —el catálogo debe
+tener once—, pero **la base compartida no se había vuelto a sembrar desde que QC-38 se mergeó**. El
+leader corrió `pnpm run db:seed`, idempotente desde QC-6, con esta salida:
+
+```
+permisos creados: 1 (unidades.modificar) - asignaciones permiso-rol creadas: 1 -
+empresa inicial: ya existia - usuario inicial: ya existia
+```
+
+Nada más se tocó, y con eso los cuatro casos pasaron. **No hubo ningún cambio de código**: el fallo
+no era del spec de E2E ni de la pantalla.
+
+### HUECO DE VERIFICACIÓN REAL, para el reviewer
+
+Ese rojo **reprodujo en un navegador real la grieta que R11 predice**: enlace visible y 404 al
+pulsarlo, porque el ítem del menú declara `unidades.consultar` y la página exige además
+`unidades.modificar` (`design.md > 6`).
+
+Y aquí está lo importante: **R11 comprueba la coherencia contra `SEED_ROLE_PERMISSIONS`, que es la
+constante del código —y tenía los once—, mientras que la base tenía diez.** El ancla de R11 estaba
+en verde con la grieta abierta en producción de pruebas.
+
+**Ningún test del repo compara el catálogo de permisos del código con el de la base de datos.** Es
+un hueco de verificación real y **no es de esta ficha cerrarlo** —QC-39 es `frontend` y no toca
+`db/` ni el seed—, pero conviene que el reviewer lo vea y que alguien le abra ficha: hoy, un
+despliegue sin sembrar deja el menú y las páginas discrepando sin que nada se ponga rojo.
