@@ -38,8 +38,8 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 }));
 
 const PRESENTACION = { id: 'pres-1', name: 'Tambor 200 L' };
-const UNIDAD_CON_SIMBOLO = { id: 'unit-1', name: 'Kilogramo', symbol: 'kg' };
-const UNIDAD_SIN_SIMBOLO = { id: 'unit-2', name: 'Pieza', symbol: null };
+const UNIDAD_CON_SIMBOLO = { id: 'unit-1', name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
+const UNIDAD_SIN_SIMBOLO = { id: 'unit-2', name: 'Pieza', symbol: null, baseUnitId: null, factor: null };
 
 /** El catalogo de unidades tal como lo baja la pagina de detalle por props (R46). */
 const UNIDADES = [UNIDAD_CON_SIMBOLO, UNIDAD_SIN_SIMBOLO];

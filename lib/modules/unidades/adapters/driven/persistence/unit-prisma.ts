@@ -23,12 +23,29 @@ import type { UnitScope } from '../../../domain/unit-scope';
  * adaptador es de otro puerto y no se toca.
  */
 
-const UNIT_SELECT = { id: true, name: true, symbol: true } satisfies Prisma.UnitSelect;
+const UNIT_SELECT = {
+  id: true,
+  name: true,
+  symbol: true,
+  // QC-26bis: la DERIVACION viaja en `UnitRef` desde que el formulario de recetas necesita
+  // agrupar las unidades por su base efectiva. Se leen aqui porque el listado ya es la unica
+  // lectura del catalogo completo: pedirlas no anade ninguna consulta.
+  baseUnitId: true,
+  factor: true,
+} satisfies Prisma.UnitSelect;
 
 type UnitRow = Prisma.UnitGetPayload<{ select: typeof UNIT_SELECT }>;
 
+/** Fila de Prisma -> `UnitRef`. El `Decimal` de Prisma sale como TEXTO: el contrato publico de
+ *  `unidades` no expone `Decimal` a nadie y un decimal no se degrada a `number`. */
 function toUnitRef(row: UnitRow): UnitRef {
-  return { id: row.id, name: row.name, symbol: row.symbol };
+  return {
+    id: row.id,
+    name: row.name,
+    symbol: row.symbol,
+    baseUnitId: row.baseUnitId,
+    factor: row.factor === null ? null : row.factor.toString(),
+  };
 }
 
 /**

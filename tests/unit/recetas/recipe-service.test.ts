@@ -58,7 +58,7 @@ const FILA_RECETA: RecipeRow = {
 
 const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unitId: null };
 
-const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L' };
+const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
 
 function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepository {
   return {
@@ -83,7 +83,13 @@ function montarCatalogo(overrides: Partial<ProductCatalog> = {}): ProductCatalog
 function montarCatalogoUnidades(overrides: Partial<UnitCatalog> = {}): UnitCatalog {
   return {
     findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
-      ids.map((id) => ({ id, name: UNIDAD_REF.name, symbol: UNIDAD_REF.symbol })),
+      ids.map((id) => ({
+        id,
+        name: UNIDAD_REF.name,
+        symbol: UNIDAD_REF.symbol,
+        baseUnitId: null,
+        factor: null,
+      })),
     ),
     ...overrides,
   };

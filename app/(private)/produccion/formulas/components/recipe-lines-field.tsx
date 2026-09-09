@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { ProductPicker, type ProductPickerOption } from './product-picker';
+import { resolveLineUnitId, unitsOfGroup } from './unit-group';
 import { UnitPicker } from './unit-picker';
 import {
   createLocalKey,
@@ -37,10 +38,27 @@ import {
  * quita esa línea -y si era la última, reaparece el fantasma, así que nunca se queda la pantalla
  * sin filas- y el `+` deja la fila donde está y añade otra vacía debajo.
  *
- * **La cantidad es SIEMPRE `type="text"` con `inputMode="decimal"`** (R29): nunca `type="number"`,
- * que pasaría el valor por el binario de coma flotante del navegador. Esta pantalla no convierte
- * la cantidad a número en ningún punto -ni con `parseFloat(` ni con `Number(` ni con `toFixed(`-;
- * `buildRecipePayload` la copia tal cual.
+ * **La cantidad es `type="number"` con `step="any"`** (R29, revisada por decisión humana del
+ * 2026-09-08). Antes era `type="text"` con `inputMode="decimal"`; el humano pidió el control
+ * numérico a conciencia, asumiendo sus dos costes conocidos: en locales con coma decimal el
+ * navegador puede rechazar la coma, y la rueda del ratón sobre el campo enfocado cambia el
+ * valor. Lo que NO cambia es el fondo de R29: **el valor sigue viajando como CADENA** -se lee
+ * de `event.target.value`, se guarda tal cual en el estado y `buildRecipePayload` lo copia sin
+ * tocarlo-. Esta pantalla sigue sin convertir la cantidad a número en ningún punto: ni
+ * `parseFloat(`, ni `Number(`, ni `toFixed(`. Cambió el widget, no el tipo del dato.
+ *
+ * **El selector de unidad depende del INGREDIENTE de su línea** (QC-26bis, decisión humana del
+ * 2026-09-08), y las tres reglas viven en `unit-group.ts` -puro y probado sin DOM-:
+ * - sin ingrediente elegido, el campo va **deshabilitado**: no hay grupo que ofrecer;
+ * - con ingrediente, la lista se acota a las unidades del **mismo grupo** que la suya -misma
+ *   base efectiva, el mismo criterio de convertibilidad del dominio de `unidades`-, así que un
+ *   producto en kg ofrece kg y g y nada más;
+ * - al elegir ingrediente se preselecciona la unidad **más pequeña** del grupo, salvo que la ya
+ *   elegida sea de ese mismo grupo: entonces se mantiene.
+ *
+ * Cuando el ingrediente no declara unidad -o la línea viene de la precarga de edición, que no
+ * trae la del producto- el grupo es el **catálogo completo**: no se recorta una lista a partir
+ * de un dato que no se tiene.
  *
  * **Producto dado de baja (R53, R54, `design.md > 6.1`, decisión cerrada del 2026-09-03):** el
  * ÚNICO discriminante es `line.productName === null`. Cuando lo es:
@@ -74,6 +92,7 @@ const GHOST_LINE: RecipeLineFormValue = {
   productName: '',
   quantity: '',
   unitId: '',
+  productUnitId: null,
 };
 const FIELD_TEXT = 'text-base';
 
@@ -113,7 +132,14 @@ export function RecipeLinesField({
 
   /** Fila vacía recién creada, ya con su clave local. */
   function blankLine(): RecipeLineFormValue {
-    return { key: createLocalKey('line'), productId: '', productName: '', quantity: '', unitId: '' };
+    return {
+      key: createLocalKey('line'),
+      productId: '',
+      productName: '',
+      quantity: '',
+      unitId: '',
+      productUnitId: null,
+    };
   }
 
   /** `true` si lo que se está pintando es el fantasma y no una línea real de `lines`. */
@@ -192,7 +218,15 @@ export function RecipeLinesField({
                   label={productPickerLabel(line.productName)}
                   ariaLabel={`Ingrediente de la línea ${index + 1}`}
                   onSelect={(option: ProductPickerOption) =>
-                    updateLine(index, { productId: option.id, productName: option.name })
+                    updateLine(index, {
+                      productId: option.id,
+                      productName: option.name,
+                      productUnitId: option.unitId,
+                      // La unidad se recalcula EN EL MISMO parche que el ingrediente: si la ya
+                      // elegida es de su grupo se mantiene, y si no, se cambia a la mas
+                      // pequena del grupo nuevo (`unit-group.ts`).
+                      unitId: resolveLineUnitId(units, option.unitId, line.unitId),
+                    })
                   }
                   error={lineErrors?.productId}
                   testId={`recipe-line-product-${index}`}
@@ -207,8 +241,9 @@ export function RecipeLinesField({
                 </Label>
                 <Input
                   id={`recipe-line-quantity-input-${index}`}
-                  type="text"
-                  inputMode="decimal"
+                  type="number"
+                  step="any"
+                  min="0"
                   value={line.quantity}
                   onChange={(event) => updateLine(index, { quantity: event.target.value })}
                   className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
@@ -230,12 +265,13 @@ export function RecipeLinesField({
               <div className="flex flex-col gap-1">
                 <Label className="text-sm">Unidad</Label>
                 <UnitPicker
-                  units={units}
+                  units={unitsOfGroup(units, line.productUnitId)}
                   value={line.unitId}
                   onChange={(unitId) => updateLine(index, { unitId })}
-                  label="Elegir unidad"
+                  label={line.productId === '' ? 'Elige un ingrediente' : 'Elegir unidad'}
                   error={lineErrors?.unitId}
                   testId={`recipe-line-unit-${index}`}
+                  disabled={line.productId === ''}
                 />
               </div>
 

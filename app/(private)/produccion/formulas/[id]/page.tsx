@@ -114,7 +114,11 @@ export default async function EditarRecetaPage({
         recipe={recipeResult.data}
         units={unitsResult.data}
         initialProductPage={{
-          items: productsResult.data.items.map((item) => ({ id: item.id, name: item.name })),
+          items: productsResult.data.items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            unitId: item.unitId,
+          })),
           totalPages: productsResult.data.totalPages,
         }}
       />

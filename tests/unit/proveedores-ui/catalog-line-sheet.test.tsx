@@ -165,7 +165,7 @@ const LINEA_ID = crypto.randomUUID();
 
 const PRESENTACION = { id: crypto.randomUUID(), name: 'Tambor 200 L' };
 const PRESENTACION_NUEVA = { id: crypto.randomUUID(), name: 'Saco 25 kg' };
-const UNIDAD = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+const UNIDAD = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
 
 /**
  * Los campos de texto de un alta valida. **Los importes llevan cuatro decimales a proposito**: son
