@@ -248,7 +248,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 
 ## Bloque 5 — Integración y cierre
 
-### T16 — Integración: el CRUD contra Postgres real
+### [x] T16 — Integración: el CRUD contra Postgres real
 - **Depende de**: T13, T15.
 - **Qué**: alta con empresa heredada, los tres duplicados **por empresa**, paginación 10/25, búsqueda,
   filtro por estado, orden estable con dos homónimos, aislamiento entre empresas, exclusión del propio
