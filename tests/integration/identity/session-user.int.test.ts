@@ -82,6 +82,10 @@ beforeAll(async () => {
       passwordHash: 'no-se-usa-en-este-test',
       roleId: rolId,
       companyId: empresaId,
+      // QC-78 (T12): el estado se escribe EXPLICITO y no se deja al `@default(pending)` de la
+      // columna. Este fixture representa la cuenta corriente que si tiene sesion, y dejarla
+      // `pending` haria que los casos heredados dependieran de un valor que nadie eligio.
+      accountStatus: 'active',
     },
     select: { id: true },
   });
@@ -150,6 +154,9 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       // no lleva `orderBy` —el adaptador no ordena a proposito— y el orden de `role_permissions`
       // lo decide Postgres; el `toHaveLength` de abajo cierra la puerta a que sobre alguno.
       permissions: expect.arrayContaining([CODIGO_CONSULTAR, CODIGO_MODIFICAR]),
+      // QC-78 R20: el estado de cuenta y el plazo de bloqueo, en la misma fila.
+      accountStatus: 'active',
+      lockedUntil: null,
     });
     expect(resultado?.permissions).toHaveLength(2);
   });
@@ -233,6 +240,34 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       expect(resultado?.companyDeletedAt).toEqual(bajada);
     } finally {
       await prisma.company.update({ where: { id: empresaId }, data: { deletedAt: null } });
+    }
+  });
+
+  // QC-78 (T12, R20, R21) — el estado de cuenta y el plazo salen de la FILA REAL, crudos, y salen
+  // en la MISMA unica consulta: las dos son columnas de `users`, asi que ni un `JOIN` mas ni una
+  // segunda ida a la base. La fila se pone `blocked` con plazo a proposito: el adaptador la
+  // devuelve igualmente —no filtra por estado, el corte es del dominio— y devuelve los dos valores
+  // tal y como estan escritos, sin traducir nada.
+  it('trae accountStatus y lockedUntil de la fila real en la misma unica consulta', async () => {
+    const plazo = new Date('2026-09-01T10:30:00.000Z');
+    await prisma.user.update({
+      where: { id: usuarioId },
+      data: { accountStatus: 'blocked', lockedUntil: plazo },
+    });
+    const espia = vi.spyOn(prisma.user, 'findFirst');
+
+    try {
+      const resultado = await findActiveSessionUserById(usuarioId);
+
+      expect(resultado?.accountStatus).toBe('blocked');
+      expect(resultado?.lockedUntil).toEqual(plazo);
+      expect(espia).toHaveBeenCalledTimes(1);
+    } finally {
+      espia.mockRestore();
+      await prisma.user.update({
+        where: { id: usuarioId },
+        data: { accountStatus: 'active', lockedUntil: null },
+      });
     }
   });
 
