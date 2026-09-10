@@ -1,7 +1,7 @@
 'use server';
 
 import { identity, observabilidad, proveedores } from '@/lib/composition';
-import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { ProveedoresError, type Actor, type CatalogLineView, type Page } from '@/lib/modules/proveedores';
 
 /**

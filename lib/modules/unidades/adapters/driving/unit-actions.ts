@@ -1,7 +1,7 @@
 'use server';
 
 import { identity, observabilidad, unidades } from '@/lib/composition';
-import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
   UnidadesError,
   type Actor,
