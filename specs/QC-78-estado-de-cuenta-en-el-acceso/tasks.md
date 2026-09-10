@@ -244,7 +244,7 @@ qué está verificado y qué no. No se corre la suite E2E entera ni `./init.sh`.
       *Hecho cuando:* no queda ningún `R<n>` sin test y ningún test citado que no verifique lo que
       dice.
 
-- [ ] **T19. Reparar los ocho E2E que R1 rompe.** (dep: T5, T14) — *añadida el 2026-09-10 por la
+- [x] **T19. Reparar los ocho E2E que R1 rompe.** (dep: T5, T14) — *añadida el 2026-09-10 por la
       ampliación de alcance aprobada por el humano; ver el bloque de ampliación de arriba.*
       Archivos: `e2e/inventario.spec.ts`, `e2e/pedidos.spec.ts`, `e2e/permisos.spec.ts`,
       `e2e/presentaciones.spec.ts`, `e2e/proveedores.spec.ts`, `e2e/recetas.spec.ts`,

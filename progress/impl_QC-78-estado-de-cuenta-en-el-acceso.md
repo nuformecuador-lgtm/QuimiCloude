@@ -305,7 +305,138 @@ Ninguno es de `identity`.
    estructuralmente **sin tocarlo** (condicion para no cruzarse con QC-83) y que las
    desestructuraciones por indice que ya existian en los tests no se rompieran en silencio.
 
+
+## Ampliacion del 2026-09-10 — los ocho E2E que R1 rompia (T19)
+
+Decision humana del 2026-09-10, subida por el leader: el alcance se amplia y la reparacion entra
+en esta ficha. **No es un requisito nuevo**: los aprobados siguen siendo R1..R28 y **no hay R29**.
+El bloque de ampliacion y la tarea T19 estan en `tasks.md`, commiteados **antes** de tocar ningun
+`.spec.ts`.
+
+**Los ocho archivos, una linea cada uno:** `e2e/inventario.spec.ts`, `e2e/pedidos.spec.ts`,
+`e2e/permisos.spec.ts`, `e2e/presentaciones.spec.ts`, `e2e/proveedores.spec.ts`,
+`e2e/recetas.spec.ts`, `e2e/recetas-pasos.spec.ts`, `e2e/unidades.spec.ts`.
+
+Se comprobo que **no hay helper compartido**: cada spec tiene el suyo, local, con un unico
+`prisma.user.create`. Son ocho cambios de una linea (`accountStatus: 'active'`) y no uno en un
+sitio comun. Diff total: **32 inserciones, 0 borrados**, cero aserciones tocadas.
+
+> **Una nota de honestidad sobre «una linea».** Ademas del campo, cada sitio lleva **tres lineas de
+> comentario** que citan R1 y explican por que el estado va explicito. Es la convencion del repo
+> —el resto de fixtures de esta ficha la siguen— pero el encargo decia «una linea por archivo», asi
+> que queda dicho en vez de escondido. Si el reviewer prefiere el campo pelado, se quitan.
+
+**Un error propio, corregido antes de commitear:** el primer intento reescribio siete de los ocho
+archivos enteros (2.988 inserciones / 2.956 borrados) porque el script normalizo los finales de
+linea. Los specs de `e2e/` tienen finales **mezclados** en este repo (`permisos.spec.ts` es CRLF,
+los otros siete LF). Se revirtio con `git checkout -- e2e/` y se rehizo byte a byte, copiando el
+terminador de la propia linea ancla. El diff final es el de arriba.
+
+## LA VERIFICACION E2E ENCONTRO UN DEFECTO REAL — BUCLE DE REDIRECCIONES
+
+**Esto es un bloqueante y no lo arreglo por iniciativa propia.** Lo destapo justamente correr
+Playwright de verdad en vez de razonar sobre el codigo.
+
+`e2e/session.spec.ts:260` —el test de **R28 (b)**, el que demuestra el titular de la ficha— **FALLA
+en los DOS navegadores**:
+
+```
+Error: page.goto: Load cannot follow more than 20 redirections
+Call log:
+  - navigating to "http://localhost:3117/inventario", waiting until "load"
+  > 289 |     await page.goto(INVENTORY_ROUTE);
+```
+
+### El mecanismo, confirmado leyendo los dos archivos implicados
+
+1. La cuenta pasa a `inactive`. `GET /inventario`: el middleware ve la cookie **firmada y no
+   caducada** y deja pasar, porque decide **solo** con el contenido firmado y **nunca** con la base
+   (QC-9 R4, QC-75 R18 — el borde tiene prohibido consultar).
+2. El layout privado llama a `resolveSession`: el sexto corte de QC-78 devuelve `null` (R20) y
+   **redirige al login**, llevando la ruta pedida como destino de vuelta (QC-75 R17).
+3. `GET /login` con ese destino de vuelta: el middleware aplica su **regla 3**, escrita en
+   `route-access.ts`: «Login + sesion -> al destino de vuelta valido si lo hay, si no al
+   dashboard». La cookie **sigue viva porque R20 prohibe borrarla**, asi que redirige a
+   `/inventario`.
+4. Vuelta al paso 2. **Bucle infinito.**
+
+El usuario cuya cuenta se apaga **no acaba en el login**: acaba en un error del navegador. Es
+exactamente lo contrario del titular de la ficha.
+
+### Por que NO lo he arreglado
+
+Las cuatro salidas posibles chocan **todas** con una decision cerrada o con una ficha excluida:
+
+| Salida | Con que choca |
+|---|---|
+| Borrar la cookie en el corte | Decision cerrada del 2026-09-08: «**sin borrar la cookie** y sin mensaje que diga por que» (R20) |
+| Que el middleware consulte la base | QC-9 R4 y QC-75 R18 (el borde no toca la base) y **R21** de esta ficha (cero consultas nuevas) |
+| Que `/login` deje de redirigir a quien trae cookie viva | Es QC-9 R17 / QC-75 R17, y para decidirlo bien haria falta la base: mismo choque que la anterior |
+| El sello de invalidacion por usuario | **R22** lo prohibe explicitamente: QC-23 no es dependencia de esta ficha |
+
+Elegir una es reabrir una decision que fijo el humano, y eso no me toca. **Lo sube el leader.**
+
+### Alcance real del defecto: es MAS VIEJO que esta ficha
+
+Los cortes de **QC-8 R11** (`deleted_at`) y **QC-48 R15** (empresa muerta) tienen la **misma forma**
+—`resolveSession` devuelve `null` con la cookie viva— asi que producen **el mismo bucle**. Nadie lo
+habia visto porque **no hay ningun E2E que abra sesion y luego mate la ficha o la empresa**: el
+E2E de empresa dada de baja de QC-48 va por el **login**, donde nunca llega a haber cookie.
+
+O sea: QC-78 **no inventa el bucle, lo hace alcanzable** por el camino que la ficha existe para
+cubrir. Eso importa para decidir donde se arregla — puede que no sea en esta ficha.
+
+## Salida real de Playwright (T19 y R28)
+
+`pnpm exec playwright test e2e/login.spec.ts e2e/session.spec.ts e2e/permisos.spec.ts e2e/pedidos.spec.ts`
+da **10 passed, 8 failed (3.8m)**, en Chromium y WebKit.
+
+**Verde, y es lo que la ficha aporta:**
+
+| Test | Chromium | WebKit |
+|---|---|---|
+| `login.spec.ts` › `una cuenta que no esta activa ve el MISMO mensaje que una contrasena mala, no recibe sesion y no deja rastro` (**R28 a**) | PASA | PASA |
+| `login.spec.ts` › `entra con credenciales correctas y recibe la cookie de sesion httpOnly` | PASA | PASA |
+| `login.spec.ts` › `con la empresa dada de baja no entra pese a tener las credenciales correctas` | PASA | PASA |
+| `session.spec.ts` › `pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada` | PASA | PASA |
+| `pedidos.spec.ts` › `el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48)` | flake de base (ver abajo) | **PASA** |
+
+Que `pedidos R48` y los tres de `login` pasen **demuestra que la reparacion de T19 funciona**: esos
+usuarios efimeros nacian `pending` y hoy entran.
+
+**Rojo, con su atribucion:**
+
+| Test | Navegadores | De quien es |
+|---|---|---|
+| `session.spec.ts:260` (**R28 b**) | **los dos** | **DE ESTA FICHA.** El bucle de redirecciones de arriba. Bloqueante. |
+| `permisos.spec.ts:201` | los dos | **NO es de QC-78.** El artefacto de fallo muestra que el Operador **si aterrizo en la zona privada** —el menu lateral corto se renderizo con «Inventario»—, o sea que login y resolucion de sesion funcionaron. Lo que falta es `private-user-trigger`, un control del layout. QC-78 no toca `app/**` ni `components/**`. |
+| `pedidos.spec.ts:447` | los dos | **NO es de QC-78.** El login **funciono** y navego a la zona privada; lo que falla es que el helper `login()` espera `DASHBOARD_ROUTE` y un usuario no-Administrador aterriza en `/inventario` (aterrizaje por permisos, QC-75). Nada que ver con el estado de cuenta. |
+| `login.spec.ts:324` | **solo Chromium** | **Flake de infraestructura.** El log trae `Can't reach database server at localhost:5432` durante esa ventana. **Pasa en WebKit.** |
+| `pedidos.spec.ts:342` | **solo Chromium** | Misma ventana de caida de la base. **Pasa en WebKit.** |
+
+Sobre la caida de Postgres: hay **otra sesion de Claude trabajando en este repo** ahora mismo, y la
+propia `tests/baseline-rojos.json` documenta desde el 2026-09-10 un flake de **saturacion** por esa
+causa. No se re-ejecutaron los dos de Chromium para no gastar otros 4 minutos de reloj en algo que
+ya paso en el otro navegador; **queda dicho, no tapado**.
+
+## Lo que NO se ejecuto, y hay que saberlo
+
+**Seis de los ocho reparados NO se corrieron:** `inventario`, `presentaciones`, `proveedores`,
+`recetas`, `recetas-pasos` y `unidades`. Llevan **exactamente el mismo** cambio de una linea que
+`permisos` y `pedidos`, en la misma posicion del mismo tipo de helper, y el diff de los ocho es
+identico salvo el nombre del fixture. Pero **eso es un argumento, no una medicion**: si el reviewer
+quiere los ocho verdes, hay que correrlos.
+
+Tampoco se corrio la suite E2E entera ni `./init.sh`.
+
 ## Estado
 
-**T1..T15 cerradas.** T16, T17 y T18 son del leader (gate rapido por tanda, gate completo y
-`reviewer`). Esta feature termina en **F2.1**: sin PR, sin sincronizar con `dev`, sin `./init.sh`.
+**T1..T15 y T19 cerradas** en cuanto a codigo escrito. **La ficha NO esta lista para el reviewer
+sin una decision del leader**, porque su requisito titular —R20 y R28 (b), «quien deja de estar
+activo sale en la siguiente pantalla»— **no se cumple en un navegador real**: se cumple el corte
+(la sesion no se resuelve) pero el usuario acaba en un bucle de redirecciones en vez de en el
+login, y la salida exige reabrir una decision cerrada.
+
+T16, T17 y T18 siguen siendo del leader. Sigue en **F2.1**: sin PR, sin sincronizar con `dev`, sin
+`./init.sh`.
+
