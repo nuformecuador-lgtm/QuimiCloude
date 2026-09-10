@@ -145,9 +145,10 @@ function leer(ruta: string): string {
  * Los otros dos sitios permitidos, `db/schema.prisma` y el `migration.sql`, no son TypeScript y
  * quedan fuera de estas carpetas; se comprueban aparte, mas abajo.
  *
- * Se compara con IGUALDAD, nunca con `toContain`: la lista tiene que quedarse quieta. NADIE lee
- * todavia el estado para decidir nada —ni el login, ni la sesion, ni el middleware, ni la UI—;
- * quien lo lea llega en QC-78 y esta lista es la conversacion que tendra que abrir.
+ * Se compara con IGUALDAD, nunca con `toContain`: la lista tiene que quedarse quieta. La lista
+ * CRECE cuando una ficha nueva empieza legitimamente a nombrar el estado, y cada entrada se
+ * NOMBRA UNA A UNA con el motivo de su grupo (ver el bloque RETENSADO de abajo); nunca se
+ * sustituye por un `toContain` ni por un filtro que excluya una carpeta entera.
  */
 const SITIOS_PERMITIDOS = [
   'lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts',
@@ -155,6 +156,52 @@ const SITIOS_PERMITIDOS = [
   'lib/modules/identity/domain/seed-initial-access.ts',
   'lib/modules/identity/index.ts',
   'lib/modules/identity/ports/initial-access-repository.ts',
+
+  // RETENSADO 2026-09-10 (QC-66, crud-de-usuarios). Hasta hoy esta lista tenia CINCO entradas y
+  // su premisa era «NADIE lee todavia el estado para decidir nada; quien lo lea llega en QC-78 y
+  // esta lista es la conversacion que tendra que abrir». **QC-66 es precisamente la ficha que
+  // empieza a leer y a escribir el estado de cuenta**, asi que la premisa caduco POR DISENO, no
+  // por defecto: el alta lo fija en `pending` (R13), el listado filtra por el (R29), la fila y la
+  // ficha lo devuelven (R31, R32) y hay un caso de uso entero dedicado a moverlo (R25, R26).
+  //
+  // El centinela se RETENSA, no se borra ni se afloja. Lo que protegia de verdad no era la
+  // ausencia: era que el estado no apareciese por GOTEO, repartido por el repositorio y sin ficha
+  // que lo respalde. Eso sigue vigente y es lo que se vigila ahora: la lista sigue siendo CERRADA
+  // y comparada con IGUALDAD, asi que cualquier archivo FUERA de ella pone el caso rojo igual que
+  // antes. Mismo trato que recibieron los cinco retensados de
+  // `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
+  //
+  // Los cambios son ADITIVOS y van en su propio bloque rotulado a proposito: **QC-78 («el estado
+  // de cuenta en el acceso») esta `in_progress` en otra sesion** y va a anadir SUS sitios a esta
+  // misma lista. Nada de lo que habia arriba se reordena ni se reformatea, para que el merge de
+  // QC-78 sea un anadido al lado de este bloque y no un conflicto en la misma linea.
+  //
+  // GRUPO 1 — el CONTRATO de los seis casos de uso de QC-66 (`domain/` y `ports/`). El estado es
+  // parte de lo que declaran: el alta lo escribe (R13), la entrada lo excluye a proposito y lo
+  // dice (R20), el campo consultable lo declara (R29), los dos tipos de salida lo llevan (R31,
+  // R32), y moverlo es un caso de uso con su puerto (R25, R26).
+  'lib/modules/identity/domain/create-user.ts',
+  'lib/modules/identity/domain/set-user-account-status.ts',
+  'lib/modules/identity/domain/user-input.ts',
+  'lib/modules/identity/domain/user-queryable.ts',
+  'lib/modules/identity/domain/user-view.ts',
+  'lib/modules/identity/ports/user-admin-repository.ts',
+
+  // GRUPO 2 — los dos adaptadores driven de persistencia, que ESCRIBEN y FILTRAN la columna:
+  // `user-admin-prisma.ts` la enumera en su `select` y la actualiza al mover el estado, y
+  // `list-query-sql.ts` la traduce a la clausula del filtro del listado (R29).
+  'lib/modules/identity/adapters/driven/persistence/list-query-sql.ts',
+  'lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts',
+
+  // GRUPO 3 — el adaptador driving, que TRADUCE la mutacion: la Server Action lee
+  // `accountStatus` del `FormData` y se lo pasa al caso de uso (R40). Lo nombra de forma
+  // funcional y no se puede quitar sin quitar la operacion.
+  'lib/modules/identity/adapters/driving/user-actions.ts',
+
+  // GRUPO 4 — el punto de composicion, y aqui NO HAY ALTERNATIVA: la clave de la fachada se
+  // llama `setUserAccountStatus`. El nombre lo fija `design.md > 11` y lo exige R25, asi que
+  // `lib/composition/index.ts` nombra el estado por su NOMBRE DE CLAVE, no porque lea la columna.
+  'lib/composition/index.ts',
 ] as const;
 
 /** Las dos piezas de QC-19 que esta ficha declara intocables (R18). */
@@ -266,8 +313,8 @@ describe('R18 — el bloqueo por intentos fallidos de QC-19 no se toca', () => {
   });
 });
 
-describe('R19 — nadie lee todavia el estado de cuenta', () => {
-  it('los archivos de produccion que nombran el estado son EXACTAMENTE los cinco permitidos', () => {
+describe('R19 — el estado de cuenta se nombra EXACTAMENTE donde su ficha lo declara, y en ningun otro sitio', () => {
+  it('los archivos de produccion que nombran el estado son EXACTAMENTE los de la lista cerrada', () => {
     const archivos = archivosDeProduccion();
     // Primero: el barrido encontro arbol de verdad. Un `readdir` que devolviera poco dejaria
     // la igualdad de abajo en verde por la razon equivocada.
@@ -324,11 +371,21 @@ describe('R20 — ni caso de uso de cambio, ni adaptador driving, ni ruta, ni Se
     expect(prohibidos).toEqual([]);
   });
 
-  it('el modulo identity no gana ningun archivo driving que nombre el estado', () => {
+  it('el unico adaptador driving que nombra el estado es el que declara su ficha', () => {
     // El complemento del caso anterior sobre el ARBOL: aunque el diff no lo delatara (por
     // ejemplo si `dev` avanzara), ningun driving puede nombrar el estado. Se deriva de la
     // lista cerrada, no de una segunda lista escrita a mano.
-    const drivings = SITIOS_PERMITIDOS.filter((archivo) => archivo.includes('/adapters/driving/'));
+    //
+    // RETENSADO 2026-09-10 (QC-66), forzado por el retensado de `SITIOS_PERMITIDOS`: este caso se
+    // DERIVA de esa lista, asi que anadirle el driving de QC-66 lo ponia rojo por construccion.
+    // La premisa vieja —«ningun driving, ni Server Action»— era el alcance de QC-65, y caduco con
+    // la ficha que SI trae las Server Actions (QC-66 R40). La excepcion se NOMBRA una a una y la
+    // igualdad sigue siendo exacta: un SEGUNDO driving que nombre el estado —o una ruta API
+    // disfrazada— sigue poniendo este caso rojo igual que antes.
+    const DRIVING_DE_QC66 = ['lib/modules/identity/adapters/driving/user-actions.ts'] as const;
+    const drivings = SITIOS_PERMITIDOS.filter(
+      (archivo) => archivo.includes('/adapters/driving/'),
+    ).filter((archivo) => !(DRIVING_DE_QC66 as readonly string[]).includes(archivo));
     expect(drivings).toEqual([]);
   });
 });

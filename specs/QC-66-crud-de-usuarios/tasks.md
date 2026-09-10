@@ -268,7 +268,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Hecho cuando**: pasa de forma repetible (se corre tres veces seguidas) y el caso simétrico no
   rechaza.
 
-### T18 — [P] El test de alcance
+### [x] T18 — [P] El test de alcance
 - **Depende de**: T13, T14.
 - **Qué**: cero diff en `db/schema.prisma`; ninguna migración de esta feature que nombre los tres
   índices únicos; ninguna mención a `failed_login_attempts`, `lock_level` ni `locked_until` en los
