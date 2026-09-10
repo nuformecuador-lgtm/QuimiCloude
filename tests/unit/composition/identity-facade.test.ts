@@ -113,3 +113,40 @@ describe('identity.getSessionContext (fachada cableada)', () => {
     expect(await identity.getSessionUser()).toBeNull();
   });
 });
+
+// QC-66 T15 (R42) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no reformatea
+// ninguna de las fixtures ni de los casos de arriba (el archivo lo comparte con QC-78).
+//
+// Lo que se afirma es el CABLEADO, no el dominio: que la fachada ya construida expone las seis
+// claves de la administracion de usuarios y que son invocables. Si alguien se dejara una factory
+// sin cablear, o se la llevara a otro sitio que no sea `lib/composition`, esto se pone rojo.
+describe('identity — los seis casos de uso de usuarios (fachada cableada)', () => {
+  const CLAVES_DE_USUARIOS = [
+    'createUser',
+    'getUser',
+    'listUsers',
+    'updateUser',
+    'deleteUser',
+    'setUserAccountStatus',
+  ] as const;
+
+  it('expone las seis claves y todas son funciones', async () => {
+    const { identity } = await import('@/lib/composition');
+
+    for (const clave of CLAVES_DE_USUARIOS) {
+      expect(typeof identity[clave]).toBe('function');
+    }
+  });
+
+  it('sin romper las claves que ya tenia la fachada', async () => {
+    // El bloque nuevo se SUMA: `verifyCredentials`, la politica, el hasher, el seed y las dos
+    // caras de la sesion siguen ahi. Anadir un modulo al punto de composicion no reemplaza nada.
+    const { identity } = await import('@/lib/composition');
+
+    expect(typeof identity.verifyCredentials).toBe('function');
+    expect(typeof identity.checkCredentialPolicy).toBe('function');
+    expect(typeof identity.seedInitialAccess).toBe('function');
+    expect(typeof identity.getSessionUser).toBe('function');
+    expect(typeof identity.getSessionContext).toBe('function');
+  });
+});

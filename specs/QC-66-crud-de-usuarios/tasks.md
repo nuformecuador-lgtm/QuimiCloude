@@ -232,7 +232,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Hecho cuando**: el test cubre los seis caminos y demuestra que sin una de las dos caras de la
   sesión el resultado es `unauthorized` sin tocar el puerto.
 
-### T15 — El contrato del módulo y el punto de composición
+### [x] T15 — El contrato del módulo y el punto de composición
 - **Depende de**: T10, T12, T13.
 - **Qué**: el barrel reexporta tipos, esquemas, errores y las **seis factories**, solo de `./domain`
   (ningún `'use server'`, ningún Prisma en su cierre transitivo); la fachada `identity` de
