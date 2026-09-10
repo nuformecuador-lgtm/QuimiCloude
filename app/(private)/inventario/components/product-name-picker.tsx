@@ -44,6 +44,16 @@ export type ProductNameOption = {
   readonly id: string;
   readonly name: string;
   readonly qtyAlert: number | null;
+  /**
+   * Presentacion del producto elegido, para que el alta la autocomplete (2026-09-10).
+   *
+   * **Opcionales porque hoy nunca vienen**: `listProductsAction` devuelve `ProductView`, que desde
+   * el 2026-09-09 ya no lleva presentacion -se mudo al lote-. En cuanto la consulta traiga la del
+   * ultimo lote, se rellenan aqui y el formulario ya sabe que hacer con ellas: no hay nada mas que
+   * cambiar del lado del selector.
+   */
+  readonly presentationId?: string;
+  readonly presentationName?: string;
 };
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';

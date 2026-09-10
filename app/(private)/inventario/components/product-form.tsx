@@ -18,6 +18,8 @@ import {
   updateProductAction,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
+import { PresentationSelect } from '@/components/shared/presentation-select';
+
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 
@@ -37,11 +39,25 @@ const TEXT_FIELDS = ['name'] as const;
 /** Campos enteros. `FormData` solo entrega cadenas, asi que se convierten antes de validar. */
 const INT_FIELDS = ['stock', 'qtyAlert'] as const;
 
-type ProductFieldName = (typeof TEXT_FIELDS)[number] | (typeof INT_FIELDS)[number];
+/**
+ * Campos del PRIMER LOTE del producto (`product_batches`), que el alta pide junto al producto.
+ *
+ * **Hoy son SOLO front (decision humana del 2026-09-10)**: se pintan, se validan en el cliente y
+ * se conservan tras un rechazo, pero NO viajan a ninguna operacion -`createProductSchema` no los
+ * conoce y la action solo lee los campos del producto, asi que los ignora-. El alta del lote
+ * entra despues; cuando entre, estos nombres son los que la operacion tiene que leer.
+ */
+const BATCH_FIELDS = ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate'] as const;
+
+type ProductFieldName =
+  | (typeof TEXT_FIELDS)[number]
+  | (typeof INT_FIELDS)[number]
+  | (typeof BATCH_FIELDS)[number];
 
 const ALL_FIELDS: readonly ProductFieldName[] = [
   ...TEXT_FIELDS,
   ...INT_FIELDS,
+  ...BATCH_FIELDS,
 ];
 
 /**
@@ -52,12 +68,25 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   name: 'Escribe un nombre de 1 a 120 caracteres.',
   stock: 'Debe ser un número entero de 0 o más.',
   qtyAlert: 'Debe ser un número entero de 0 o más.',
+  presentationId: 'Elige una presentación.',
+  unitCost: 'Debe ser un importe de 0 o más, con hasta 4 decimales.',
+  totalCost: 'Debe ser un importe de 0 o más, con hasta 4 decimales.',
+  lot: 'Escribe un lote de 1 a 60 caracteres.',
+  expiryDate: 'Escribe una fecha válida.',
 };
+
+/** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
+const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario o el costo total; basta con uno.';
 
 const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
   stock: 'Existencia',
   qtyAlert: 'Alerta de cantidad',
+  presentationId: 'Presentación',
+  unitCost: 'Costo unitario',
+  totalCost: 'Costo total',
+  lot: 'Lote',
+  expiryDate: 'Fecha de expiración',
 };
 
 type FieldErrors = Partial<Record<ProductFieldName, string>>;
@@ -122,6 +151,22 @@ function parseInteger(raw: string): number | undefined | 'invalid' {
   return Number(trimmed);
 }
 
+/**
+ * Valida un importe escrito. **Se queda en cadena a proposito**: un costo no pasa por el binario
+ * de coma flotante -por eso el campo tampoco es `type="number"`-. `''` es "campo omitido";
+ * cualquier otra cosa que no sea un decimal de 0 o mas con hasta 4 decimales -los que guarda
+ * `product_batches.unit_cost`- es un error de ESE campo.
+ */
+function parseDecimal(raw: string): string | undefined | 'invalid' {
+  const trimmed = raw.trim();
+  if (trimmed === '') return undefined;
+  if (!/^\d+(\.\d{1,4})?$/.test(trimmed)) return 'invalid';
+  return trimmed;
+}
+
+/** Largo maximo del lote. Mismo criterio que el resto de los textos cortos de la pantalla. */
+const LOT_MAX_LENGTH = 60;
+
 type ProductFormProps = {
   /** Producto que se edita. Ausente en el alta (R19). */
   readonly product?: ProductView;
@@ -159,17 +204,27 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
   const formErrorId = `${fieldId}-form-error`;
 
   /**
-   * Autocompletado al elegir un producto existente (decision humana del 2026-09-09): solo
-   * alerta de cantidad. La existencia la escribe el usuario -es el inventario ACTUAL del
-   * producto nuevo, no el del elegido-.
+   * Autocompletado al elegir un producto existente (decision humana del 2026-09-09, ampliada el
+   * 2026-09-10 con la presentacion): alerta de cantidad y presentacion. La existencia y los
+   * costos los escribe el usuario -son los del lote que esta dando de alta, no los del producto
+   * elegido-.
+   *
+   * **La presentacion llega vacia mientras el alta siga sin back**: `listProductsAction` devuelve
+   * `ProductView`, que desde el 2026-09-09 ya no la lleva -se mudo al lote-. El hilo esta puesto
+   * de punta a punta y el selector se rellena solo en cuanto la consulta traiga la presentacion
+   * del ultimo lote; hasta entonces el campo queda en blanco y se elige a mano.
    */
   const [template, setTemplate] = useState<{
     readonly qtyAlert: string;
+    readonly presentationId: string;
+    readonly presentationName: string;
   } | null>(null);
 
   function applyTemplate(option: ProductNameOption) {
     setTemplate({
       qtyAlert: option.qtyAlert === null ? '' : String(option.qtyAlert),
+      presentationId: option.presentationId ?? '',
+      presentationName: option.presentationName ?? '',
     });
   }
 
@@ -187,8 +242,34 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
       if (parsed !== undefined) numbers[field] = parsed;
     }
 
-    // Costos: el costo de compra NO es un campo de inventario (R5, QC-52). Solo se registra en
-    // los lotes, y la ficha que recoja lotes anadira el campo cuando toque.
+    // Campos del primer lote. Solo se piden en el ALTA y solo se validan aqui: no entran en el
+    // candidato del producto -el esquema no los conoce- y por tanto no viajan a la operacion.
+    if (product === undefined) {
+      if (values.presentationId.trim() === '') {
+        fieldErrors.presentationId = FIELD_MESSAGES.presentationId;
+      }
+
+      const unitCost = parseDecimal(values.unitCost);
+      const totalCost = parseDecimal(values.totalCost);
+
+      if (unitCost === 'invalid') fieldErrors.unitCost = FIELD_MESSAGES.unitCost;
+      if (totalCost === 'invalid') fieldErrors.totalCost = FIELD_MESSAGES.totalCost;
+
+      // Uno de los dos costos es obligatorio; cualquiera sirve, y los dos a la vez tambien.
+      if (unitCost === undefined && totalCost === undefined) {
+        fieldErrors.unitCost = COST_REQUIRED_MESSAGE;
+        fieldErrors.totalCost = COST_REQUIRED_MESSAGE;
+      }
+
+      if (values.lot.trim().length > LOT_MAX_LENGTH) {
+        fieldErrors.lot = FIELD_MESSAGES.lot;
+      }
+
+      const expiryDate = values.expiryDate.trim();
+      if (expiryDate !== '' && Number.isNaN(Date.parse(expiryDate))) {
+        fieldErrors.expiryDate = FIELD_MESSAGES.expiryDate;
+      }
+    }
 
     const candidate = {
       name: values.name,
@@ -323,8 +404,25 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         />
       )}
 
-      {/* La presentacion se mudo a `product_batches` (2026-09-09): el producto ya no la tiene;
-        la lleva el LOTE. El alta no la pide: la ficha que cargue lotes la pedira ahi. */}
+      {/*
+        Presentacion (obligatoria en el alta, 2026-09-10). La presentacion es del LOTE, no del
+        producto (2026-09-09), asi que solo se pide al dar de alta: en la EDICION el producto no
+        tiene ninguna que cambiar. Se reusa el selector compartido -mismo control que proveedores,
+        con su alta en linea-.
+
+        `key`: el selector fija su valor inicial al montarse, asi que elegir un producto existente
+        -o recuperar lo escrito tras un rechazo- lo remonta con el valor nuevo. El campo sigue sin
+        estar controlado, igual que `ProductField`.
+      */}
+      {isEdit ? null : (
+        <PresentationSelect
+          key={`${initialValue('presentationId', '')}-${template?.presentationId ?? ''}`}
+          defaultValue={initialValue('presentationId', template?.presentationId ?? '')}
+          defaultLabel={template?.presentationName ?? ''}
+          error={fieldErrors.presentationId}
+          helper="La presentación en la que llega este lote (bidón de 20 L, saco de 25 kg…). Si no está en la lista, créala aquí mismo sin salir del panel."
+        />
+      )}
 
       <ProductField
         name="stock"
@@ -361,6 +459,56 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         defaultValue={initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert?.toString() ?? '')}
         error={fieldErrors.qtyAlert}
       />
+
+      {/*
+        Resto del primer lote (2026-09-10). Solo en el ALTA, y todos opcionales salvo la regla del
+        par de costos: tiene que venir el unitario O el total, y basta con uno.
+
+        Los dos costos son `type="text"` con teclado decimal, NO `type="number"`: un importe no
+        pasa por el binario de coma flotante -es la misma razon por la que el dominio lo mueve
+        como cadena decimal-.
+      */}
+      {isEdit ? null : (
+        <>
+          <ProductField
+            name="unitCost"
+            label={FIELD_LABELS.unitCost}
+            type="text"
+            inputMode="decimal"
+            helper="Lo que cuesta UNA unidad de este lote. Escribe este o el costo total: con uno basta, y el otro se deduce con la existencia."
+            defaultValue={initialValue('unitCost', '')}
+            error={fieldErrors.unitCost}
+          />
+
+          <ProductField
+            name="totalCost"
+            label={FIELD_LABELS.totalCost}
+            type="text"
+            inputMode="decimal"
+            helper="Lo que costó el lote COMPLETO. Escribe este o el costo unitario: con uno basta, y el otro se deduce con la existencia."
+            defaultValue={initialValue('totalCost', '')}
+            error={fieldErrors.totalCost}
+          />
+
+          <ProductField
+            name="lot"
+            label={FIELD_LABELS.lot}
+            type="text"
+            helper="El identificador del lote que trae el proveedor, tal cual viene en el envase. Opcional: déjalo vacío si el envase no lo trae."
+            defaultValue={initialValue('lot', '')}
+            error={fieldErrors.lot}
+          />
+
+          <ProductField
+            name="expiryDate"
+            label={FIELD_LABELS.expiryDate}
+            type="date"
+            helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
+            defaultValue={initialValue('expiryDate', '')}
+            error={fieldErrors.expiryDate}
+          />
+        </>
+      )}
 
       </div>
     </SheetContent>
