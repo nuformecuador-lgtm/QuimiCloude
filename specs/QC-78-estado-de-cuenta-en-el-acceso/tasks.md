@@ -38,6 +38,48 @@ editarlo.
 **Bitácora:** `progress/impl_QC-78-estado-de-cuenta-en-el-acceso.md`, `progress/current.md`
 (los escribe el implementer / el leader, no son código).
 
+### Ampliación del 2026-09-10 — los ocho E2E que R1 rompe (aprobada por el humano)
+
+> **Decisión humana explícita del 2026-09-10**, subida por el leader. El implementer paró al
+> encontrarlos, como manda la regla de más abajo, y el humano aprobó ampliar el alcance en vez de
+> aplazarlo a otra ficha. **No es un requisito nuevo:** los requisitos aprobados siguen siendo
+> R1..R28 y esta ampliación **no añade ningún R29**. Es una **reparación colateral** de la que R1
+> es causa directa, documentada aquí y solo aquí.
+
+Se añaden a la lista declarada estos ocho archivos:
+
+20. `e2e/inventario.spec.ts`
+21. `e2e/pedidos.spec.ts`
+22. `e2e/permisos.spec.ts`
+23. `e2e/presentaciones.spec.ts`
+24. `e2e/proveedores.spec.ts`
+25. `e2e/recetas.spec.ts`
+26. `e2e/recetas-pasos.spec.ts`
+27. `e2e/unidades.spec.ts`
+
+**Por qué entran.** Los ocho crean su usuario efímero con `prisma.user.create` **sin**
+`accountStatus`, o sea `pending` por el `@default(pending)` de la columna que dejó QC-65, y
+después **entran por el formulario real de login**. Desde **R1**, `pending` no entra: los ocho
+dejan de pasar por causa directa de esta ficha, no por deuda propia.
+
+**Qué se toca, y nada más.** **Una línea por archivo**: `accountStatus: 'active'` en su sitio de
+creación. Se comprobó que **no hay helper compartido** —cada spec tiene el suyo, local, con un
+único `prisma.user.create`—, así que son ocho cambios de una línea y no uno en un sitio común.
+Prohibido aprovechar el paso para refactorizar, limpiar o tocar una sola aserción.
+
+**Por qué se repara AQUÍ y no en una ficha posterior.** `./init.sh` **no corre Playwright** (no
+hay ninguna invocación de `playwright` ni de `pnpm e2e` en el script). O sea que **el gate no
+cazaría esta rotura**: la feature podría cerrarse en verde, mergearse, y los ocho specs quedarían
+rotos en `dev` sin que nada lo señalara hasta que alguien corriera los E2E a mano. Dejarlo para
+después sería fiar a la memoria una rotura que el arnés no puede ver.
+
+**Verificación acordada con el leader** (evidencia real, no razonamiento): se corren con Playwright
+`e2e/login.spec.ts` y `e2e/session.spec.ts` (los de R28) **más `e2e/permisos.spec.ts` y
+`e2e/pedidos.spec.ts`**, que son los dos de los ocho que más dependen de entrar de verdad. La
+salida va a la bitácora. De los **seis restantes** se deja escrito en la bitácora que llevan el
+**mismo** cambio de una línea y que **no** se ejecutaron, para que el reviewer sepa exactamente
+qué está verificado y qué no. No se corre la suite E2E entera ni `./init.sh`.
+
 **Archivos que esta ficha NO toca, y es intencional:**
 
 - `db/schema.prisma` y `db/migrations/**` — R26: ni columna, ni enum, ni migración.
@@ -201,6 +243,17 @@ editarlo.
       (la lección de QC-45 y QC-65), más la salida real de los tests.
       *Hecho cuando:* no queda ningún `R<n>` sin test y ningún test citado que no verifique lo que
       dice.
+
+- [ ] **T19. Reparar los ocho E2E que R1 rompe.** (dep: T5, T14) — *añadida el 2026-09-10 por la
+      ampliación de alcance aprobada por el humano; ver el bloque de ampliación de arriba.*
+      Archivos: `e2e/inventario.spec.ts`, `e2e/pedidos.spec.ts`, `e2e/permisos.spec.ts`,
+      `e2e/presentaciones.spec.ts`, `e2e/proveedores.spec.ts`, `e2e/recetas.spec.ts`,
+      `e2e/recetas-pasos.spec.ts`, `e2e/unidades.spec.ts`.
+      `accountStatus: 'active'` en el único `prisma.user.create` de cada uno. **Una línea por
+      archivo y nada más**: ni refactor, ni limpieza de paso, ni tocar aserciones.
+      *Hecho cuando:* los ocho llevan el cambio, y `login`, `session`, `permisos` y `pedidos`
+      pasan con Playwright con la salida pegada en la bitácora; de los seis restantes queda
+      escrito en la bitácora que NO se ejecutaron.
 
 - [ ] **T16. Gate rápido de cada tanda — *las corre el leader*.**
       `./init.sh --rapido` al cerrar cada una de las tandas 1 a 4.
