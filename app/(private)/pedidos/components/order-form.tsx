@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useId, useState } from 'react';
+import { useActionState, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,12 @@ import {
   updateOrderAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { ErrorCode } from '@/lib/modules/errores';
+import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import type { RecipeLineView } from '@/lib/modules/recetas';
+import type { UnitView } from '@/lib/modules/unidades';
 import { OrderField } from './order-field';
+import { OrderIngredientsTable } from './order-ingredients-table';
 import { OrderRecipeImage } from './order-recipe-image';
 import {
   RECIPE_FIELD,
@@ -85,6 +90,13 @@ import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from './order-status-badge
  * rechazo no cierra el panel ni pierde lo escrito: React 19 resetea los campos no controlados de
  * un `<form action>` al completarse la action, asi que el estado de fallo devuelve los valores
  * escritos y cada campo los recupera por `defaultValue`.
+ *
+ * **Los INGREDIENTES de la receta elegida se muestran en el propio panel** (2026-09-09): al
+ * elegir una receta -o al abrir la edicion, donde ya viene elegida- se pide su detalle
+ * (`getRecipeAction`) y se pinta la tabla con los datos de los productos. El JOIN con `products`
+ * lo hace el detalle de `recetas`; la unidad se resuelve aqui con el catalogo que baja por props
+ * (R43). El id de la receta elegida viaja igual por el `FormData`; la tabla no anade ningun campo
+ * al envio.
  */
 
 /** Los CINCO campos de negocio, con el MISMO nombre que el adaptador driving lee del `FormData`. */
@@ -256,29 +268,112 @@ export type OrderFormProps = {
   readonly order?: OrderSummary;
   /** Primera pagina del catalogo de recetas, por props (R43). */
   readonly recipes: RecipePickerPage;
+  /**
+   * Catalogo de unidades, por props (R43): resuelve la unidad de cada ingrediente de la
+   * receta elegida. `recetas` no resuelve unidades (R50), asi que lo hace esta pantalla.
+   */
+  readonly units: readonly UnitView[];
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R35). */
   readonly onSaved: () => void;
 };
 
-export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
+export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
   const isEdit = order !== undefined;
 
   /*
-    Solo para la CABECERA y la IMAGEN. Lo que se envia sigue saliendo del `FormData`: el id de la
-    receta del `input` oculto del selector y la cantidad del propio campo.
+    Eleccion VIGENTE de receta: con ella se pintan la CABECERA, la IMAGEN y la tabla de
+    ingredientes, y decide si Guardar esta habilitado. Lo que se ENVIA sigue saliendo del
+    `FormData` -el id de la receta del `input` oculto del selector y la cantidad del propio campo-;
+    este estado es solo el reflejo en pantalla de esa eleccion.
 
-    En la edicion el nombre se sabe desde el principio -viene en el resumen del pedido- pero la
-    imagen no: `OrderSummary` no la trae, asi que hasta que se elija una receta se ve el marcador.
+    La pone `onSelect` cuando se elige una opcion de la lista, y el propio selector la RETIRA con
+    `null` cuando lo escrito deja de coincidir con lo elegido (decision humana del 2026-09-09): la
+    receta «crema 1» no puede guardarse con el campo diciendo «crema 1a». En la edicion el nombre
+    se sabe desde el principio -viene en el resumen del pedido- pero la imagen no: `OrderSummary`
+    no la trae, asi que hasta que se elija una receta se ve el marcador.
   */
-  const [recipeName, setRecipeName] = useState(order?.recipeName ?? '');
-  const [recipeImageUrl, setRecipeImageUrl] = useState<string | null>(null);
+  const [recipe, setRecipe] = useState<RecipePickerOption | null>(
+    order === undefined
+      ? null
+      : { id: order.recipeId, name: order.recipeName ?? '', imageUrl: null },
+  );
   const [quantity, setQuantity] = useState(order?.quantity ?? '');
 
-  function chooseRecipe(option: RecipePickerOption) {
-    setRecipeName(option.name);
-    setRecipeImageUrl(option.imageUrl);
+  const recipeName = recipe?.name ?? '';
+  const recipeImageUrl = recipe?.imageUrl ?? null;
+  /** Id de la receta elegida: decide si la tabla de ingredientes se monta. */
+  const recipeId = recipe?.id ?? '';
+  /** Guardar solo se habilita con una receta elegida: sin receta no hay pedido (decision 2026-09-09). */
+  const canSave = recipe !== null;
+
+  /*
+    Los ingredientes de la receta elegida. Se piden al SERVIDOR al elegir receta -en el alta- o al
+    montar el panel -en la edicion, donde la receta ya viene elegida-: el detalle de `recetas` hace
+    el JOIN con `products` (`ProductCatalog.findRefs`) y trae por linea el nombre, el stock y la
+    presentacion del producto, mas la cantidad y la unidad de la linea.
+
+    `ingredientsRequestRef` descarta la respuesta de una receta ya superada: elegir A y luego B no
+    debe dejar que la linea de A pise a la de B cuando llegue la respuesta mas lenta. Es el mismo
+    problema de carreras que ya resuelve el hook del selector de recetas, aqui a mano porque esta
+    consulta la dispara un gesto puntual y no hay motor compartido que la cubra.
+  */
+  const [ingredients, setIngredients] = useState<readonly RecipeLineView[]>([]);
+  // En la edicion la receta ya viene elegida al montar el panel: la carga inicial SIEMPRE arranca
+  // en vuelo, asi que el estado arranca en `true` y el efecto no tiene que pintarlo a posteriori.
+  const [ingredientsLoading, setIngredientsLoading] = useState(isEdit);
+  const [ingredientsError, setIngredientsError] = useState<string | null>(null);
+  const ingredientsRequestRef = useRef(0);
+
+  /**
+   * Aplica el detalle de una receta al estado, SOLO si sigue siendo la receta elegida: el de una
+   * eleccion anterior, si llega despues, se descarta. Es la unica funcion que escribe el estado de
+   * los ingredientes, y siempre se invoca DENTRO de un callback `.then` -nunca sincrono desde el
+   * efecto (`react-hooks/set-state-in-effect`)-.
+   */
+  const applyIngredientsResult = useCallback(
+    (requestId: number, result: RecipeQueryResult) => {
+      if (requestId !== ingredientsRequestRef.current) return;
+
+      setIngredientsLoading(false);
+      if (result.status === 'error') {
+        setIngredients([]);
+        setIngredientsError(result.message);
+        return;
+      }
+      setIngredients(result.data.lines);
+      setIngredientsError(null);
+    },
+    [],
+  );
+
+  /** Pide el detalle de una receta y deja su resultado en `applyIngredientsResult`. */
+  const loadIngredients = useCallback(
+    (selectedId: string) => {
+      const requestId = ++ingredientsRequestRef.current;
+      void getRecipeAction(selectedId).then((result) => applyIngredientsResult(requestId, result));
+    },
+    [applyIngredientsResult],
+  );
+
+  /** La edicion arranca con la receta ya elegida: sus ingredientes se piden al montar. */
+  useEffect(() => {
+    if (order?.recipeId) void loadIngredients(order.recipeId);
+  }, [loadIngredients, order?.recipeId]);
+
+  /** `null` = el selector retiro la eleccion (lo escrito deja de coincidir): se apaga todo. */
+  function chooseRecipe(option: RecipePickerOption | null) {
+    if (option === null) {
+      setRecipe(null);
+      setIngredients([]);
+      setIngredientsError(null);
+      return;
+    }
+    setRecipe({ id: option.id, name: option.name, imageUrl: option.imageUrl });
+    setIngredientsLoading(true);
+    setIngredientsError(null);
+    loadIngredients(option.id);
   }
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
@@ -359,7 +454,7 @@ export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
       data-testid="order-sheet"
       isForm
       formProps={{ action: formAction, 'data-testid': ORDER_FORM_TESTID }}
-      footer={<FormActions />}
+      footer={<FormActions canSave={canSave} />}
     >
       <SheetHeader>
         <SheetTitle data-testid={ORDER_FORM_TITLE_TESTID}>
@@ -461,6 +556,21 @@ export function OrderForm({ order, recipes, onSaved }: OrderFormProps) {
             ) : null}
           </div>
         </div>
+
+        {/*
+          Los ingredientes de la receta elegida: se montan solo con receta elegida -en la edicion
+          ya lo esta al abrir el panel-. El JOIN con `products` lo hace el detalle de `recetas`;
+          aqui se pinta la tabla con los datos que ya vienen resueltos.
+        */}
+        {recipeId === '' ? null : (
+          <OrderIngredientsTable
+            lines={ingredients}
+            units={units}
+            quantity={quantity}
+            loading={ingredientsLoading}
+            error={ingredientsError}
+          />
+        )}
       </div>
     </SheetContent>
   );
@@ -537,7 +647,7 @@ function SelectField({
  * Cierra por el primitivo (`SheetClose`), asi que no necesita saber nada del estado de apertura,
  * y al no navegar la URL conserva pagina, tamano, orden y filtros (R25).
  */
-function FormActions() {
+function FormActions({ canSave }: { canSave: boolean }) {
   return (
     <>
       <SheetClose
@@ -552,7 +662,7 @@ function FormActions() {
       >
         Cancelar
       </SheetClose>
-      <SaveButton />
+      <SaveButton canSave={canSave} />
     </>
   );
 }
@@ -561,15 +671,19 @@ function FormActions() {
  * Boton de envio. Componente aparte por una necesidad tecnica: `useFormStatus()` solo lee el
  * estado del `<form>` ANCESTRO, asi que dentro del componente que renderiza el `<form>`
  * devolveria siempre `pending: false` y el boton no se deshabilitaria nunca.
+ *
+ * Esta deshabilitado mientras no hay una receta ELEGIDA (decision humana del 2026-09-09) y
+ * mientras la action esta en vuelo. Sin receta valida no tiene sentido llamar a la operacion: el
+ * esquema del contrato la rechazaria igual, pero el boton le dice al usuario lo que le espera.
  */
-function SaveButton() {
+function SaveButton({ canSave }: { canSave: boolean }) {
   const { pending } = useFormStatus();
 
   return (
     <Button
       type="submit"
       className={TOUCH_TARGET}
-      disabled={pending}
+      disabled={pending || !canSave}
       aria-busy={pending}
       data-testid={ORDER_FORM_SUBMIT_TESTID}
     >

@@ -62,6 +62,14 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
  * que lo elegido tiene que estar en el `FormData`, no en estado de React. Lo que se ve es el
  * combobox de busqueda; lo que se envia es el id.
  *
+ * **Escribir otra cosa RETIRA la eleccion** (decision humana del 2026-09-09). El campo de busqueda
+ * es texto libre y un pedido solo puede referenciar recetas del catalogo (R31), asi que el id que
+ * viaja tiene que ser EL QUE SE LEE en pantalla: si se eligio «crema 1» y el campo termina diciendo
+ * «crema 1a», guardar enviaria un id que nadie eligio. Por eso, en cuanto lo escrito deja de
+ * coincidir exactamente con el nombre elegido, el selector vacia su eleccion (el `input` oculto
+ * queda sin id) y avisa para arriba con `null`: el formulario desactiva Guardar hasta que se vuelva
+ * a elegir una opcion de la lista.
+ *
  * **Ninguna operacion de ALTA de recetas se importa aqui** (R32 por analogia y decision cerrada
  * del selector de unidad): este selector solo elige entre las existentes.
  */
@@ -123,8 +131,12 @@ export type RecipePickerProps = {
   readonly defaultLabel?: string;
   /** Error del campo (R34). Se pinta en linea y marca el control como invalido. */
   readonly error?: string;
-  /** Avisa de la receta elegida. Lo usa el panel para su titulo y para la imagen. */
-  readonly onSelect?: (option: RecipePickerOption) => void;
+  /**
+   * Avisa al formulario del estado de la eleccion. `null` = el campo ya no guarda una receta
+   * elegida: se retiro (al editar lo escrito) o nunca llego a haberla. Lo usa el panel para el
+   * titulo, la imagen y para deshabilitar Guardar.
+   */
+  readonly onSelect?: (option: RecipePickerOption | null) => void;
 };
 
 export function RecipePicker({
@@ -207,6 +219,22 @@ export function RecipePicker({
     onSelect?.(option);
   }
 
+  /**
+   * Lo escrito en el campo. Es la segunda fuente del `displayValue` (ver abajo) y, si deja de
+   * coincidir con el nombre elegido, RETIRA la eleccion: el `input` oculto queda sin id y se avisa
+   * con `null` para que Guardar se deshabilite (decision humana del 2026-09-09). Asi el id que
+   * viaja y lo que se lee en pantalla nunca pueden divergir.
+   */
+  function handleValueChange(next: string) {
+    setDraft(next);
+
+    if (selectedName !== '' && next.trim() !== selectedName) {
+      setSelectedId('');
+      setSelectedName('');
+      onSelect?.(null);
+    }
+  }
+
   // Con el desplegable cerrado o sin escribir, el campo muestra lo YA elegido.
   const displayValue = draft ?? selectedName;
   const cargando = isLoading || isLoadingMore;
@@ -234,7 +262,7 @@ export function RecipePicker({
         mode="none"
         itemToStringValue={(option: RecipePickerOption) => option.name}
         value={displayValue}
-        onValueChange={setDraft}
+        onValueChange={handleValueChange}
         open={open}
         onOpenChange={setOpen}
         openOnInputClick

@@ -41,10 +41,9 @@ function actorCon(...permissions: readonly PermissionCode[]): Actor {
 
 /** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
  *  del 2026-09-03 los volvio obligatorios en `createProductSchema`; `minPurchase` se fue
- *  con QC-52 (R1), y dejarlo habria convertido este fixture en entrada INVALIDA. */
+ *  con QC-52 (R1), y `presentationId` con la mudanza a `product_batches` (2026-09-09). */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  presentationId: '11111111-1111-4111-8111-111111111111',
   stock: 0,
   qtyAlert: 0,
 };
@@ -119,19 +118,12 @@ function montarReposQueFallan(): Repos {
 const PRODUCTO_EN_BASE = {
   id: 'producto-1',
   name: 'Acido sulfurico',
-  // `imagePath` entro en `ProductView` el 2026-09-07 (columna de imagen del producto), despues
-  // de que QC-74 reescribiera este archivo en otra rama. Los dos lados tocaron lineas distintas,
-  // asi que el merge no dio conflicto y el fixture quedo incompleto: lo caza el typecheck.
   imagePath: null,
-  presentationId: '11111111-1111-4111-8111-111111111111',
-  presentationName: 'Bidon 20 L',
   stock: 0,
   qtyAlert: 0,
   unitId: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-  createdBy: null,
-  updatedBy: null,
 };
 
 const PAGINA_VACIA = { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 };

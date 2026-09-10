@@ -238,10 +238,9 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
   return user.id
 }
 
-/** Todo lo que un pedido necesita al otro lado de sus cuatro FK, mas el producto y la
- *  presentacion que dan contexto real a la receta. */
+/** Todo lo que un pedido necesita al otro lado de sus cuatro FK, mas el producto que da
+ *  contexto real a la receta. */
 interface Fixtures {
-  readonly presentationId: string
   readonly productId: string
   readonly unitId: string
   readonly recipeId: string
@@ -249,8 +248,8 @@ interface Fixtures {
 }
 
 /**
- * Siembra, DENTRO de la transaccion del caso, la presentacion, el producto, la unidad, la
- * receta y el usuario (`tasks.md > T9`). Nada de esto viene de un seed.
+ * Siembra, DENTRO de la transaccion del caso, el producto, la unidad, la receta y el usuario
+ * (`tasks.md > T9`). Nada de esto viene de un seed.
  *
  * OJO — la receta se crea SIN lineas a proposito. Asi, en el caso de R15, lo UNICO que puede
  * bloquear su borrado fisico es el pedido: si la receta tuviera lineas, el `23503` podria
@@ -258,10 +257,6 @@ interface Fixtures {
  */
 async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   const marca = token()
-  const presentation = await tx.presentation.create({
-    data: { name: `Bidon 20 L ${marca}`, nameNormalized: `bidon20l${marca}` },
-    select: { id: true },
-  })
   const product = await tx.product.create({
     // `name_normalized` (QC-57) es NOT NULL y se pasa LITERAL, sin llamar a
     // `normalizeProductName`: mismo criterio que el resto de nombres normalizados de este
@@ -269,7 +264,6 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     data: {
       name: 'Acido citrico monohidratado',
       nameNormalized: 'acidocitricomonohidratado',
-      presentationId: presentation.id,
     },
     select: { id: true },
   })
@@ -280,7 +274,6 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   })
   const userId = await createUser(tx)
   return {
-    presentationId: presentation.id,
     productId: product.id,
     unitId,
     recipeId: recipe.id,

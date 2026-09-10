@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderSummary } from '@/lib/modules/pedidos';
+import type { UnitView } from '@/lib/modules/unidades';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
@@ -26,6 +27,13 @@ import type { RecipePickerPage } from './recipe-picker';
  * **El contenido se monta solo cuando el panel esta abierto** (lo hace el portal del primitivo):
  * el formulario se crea de cero en cada apertura, asi que la edicion siempre precarga los valores
  * actuales del pedido (R28) y un intento fallido anterior no deja restos.
+ *
+ * **La limpieza por apertura NO se deja al antojo del desmontaje** (2026-09-09): `OrderForm`
+ * lleva una `key` que cambia en CADA apertura, de modo que aunque el cierre y la reapertura
+ * ocurran dentro de la ventana de desmontaje del portal -su animacion de salida no habia acabado
+ * cuando se vuelve a abrir- el formulario es una instancia nueva. Sin esto, el alta siguiente
+ * podia heredar la receta y la cantidad del pedido anterior y se guardaba «crema 1» con el rótulo
+ * del pedido viejo.
  *
  * **El panel lo pinta `OrderForm`, no este archivo.** Desde que el panel entero es un `<form>`
  * (`SheetContent isForm`), la cabecera, el cuerpo y el pie con el boton de guardar son partes del
@@ -58,14 +66,17 @@ export type OrderSheetProps = {
   readonly order?: OrderSummary;
   /** Primera pagina del catalogo de recetas, por props (R43). */
   readonly recipes: RecipePickerPage;
-  /** Unidades existentes, por props (R43). */
+  /** Catalogo de unidades, por props (R43): resuelve la unidad de los ingredientes. */
+  readonly units: readonly UnitView[];
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
 };
 
-export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetProps) {
+export function OrderSheet({ order, recipes, units, open, onOpenChange }: OrderSheetProps) {
   const [selfOpen, setSelfOpen] = useState(false);
+  /** Instancia del formulario: cambia en cada apertura para que arranque SIEMPRE vacio (2026-09-09). */
+  const [openKey, setOpenKey] = useState(0);
   const router = useRouter();
   const isEdit = order !== undefined;
   const isControlled = open !== undefined;
@@ -73,6 +84,10 @@ export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetPro
 
   const changeOpen = useCallback(
     (next: boolean) => {
+      // Cada APERTURA es un formulario nuevo: la `key` avanza en el sentido que abre. Cerrar no
+      // toca nada -depende de `isOpen` cambiaria la identidad de este callback y con ella la de
+      // `handleSaved`, disparando dos veces el efecto de exito del formulario-.
+      if (next) setOpenKey((key) => key + 1);
       if (!isControlled) setSelfOpen(next);
       onOpenChange?.(next);
     },
@@ -103,7 +118,13 @@ export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetPro
           {CREATE_LABEL}
         </SheetTrigger>
       )}
-      <OrderForm order={order} recipes={recipes} onSaved={handleSaved} />
+      <OrderForm
+        key={openKey}
+        order={order}
+        recipes={recipes}
+        units={units}
+        onSaved={handleSaved}
+      />
     </Sheet>
   );
 }
@@ -111,6 +132,7 @@ export function OrderSheet({ order, recipes, open, onOpenChange }: OrderSheetPro
 export type OrderRowSheetActionsProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitView[];
 };
 
 /**
@@ -130,7 +152,7 @@ export type OrderRowSheetActionsProps = {
  * Es lo que la celda de acciones de `buildOrderColumns` renderiza por fila: sin esta pieza, los
  * tres botones de `OrderRowActions` no abririan nada.
  */
-export function OrderRowSheetActions({ order, recipes }: OrderRowSheetActionsProps) {
+export function OrderRowSheetActions({ order, recipes, units }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -146,6 +168,7 @@ export function OrderRowSheetActions({ order, recipes }: OrderRowSheetActionsPro
       <OrderSheet
         order={order}
         recipes={recipes}
+        units={units}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

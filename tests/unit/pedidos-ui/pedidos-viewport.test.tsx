@@ -75,7 +75,7 @@ import type {
   OrderListResult,
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import type { RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import type { RecipeListResult, RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
@@ -123,6 +123,7 @@ const {
   updateOrderActionMock,
   listRecipesActionMock,
   listUnitsActionMock,
+  getRecipeActionMock,
 } = vi.hoisted(() => ({
   usePathnameMock: vi.fn<() => string>(),
   redirectMock: vi.fn<(ruta: string) => never>(),
@@ -146,6 +147,7 @@ const {
     >(),
   listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
+  getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -184,6 +186,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
+  getRecipeAction: getRecipeActionMock,
 }));
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
@@ -321,6 +324,24 @@ beforeEach(() => {
     },
   });
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
+  // El panel de edicion pide el detalle de la receta para los ingredientes: por defecto una
+  // receta sin lineas, que es lo unico que este archivo necesita.
+  getRecipeActionMock.mockResolvedValue({
+    status: 'success',
+    data: {
+      id: RECETA.id,
+      name: RECETA.name,
+      description: null,
+      imageUrl: null,
+      stepCount: 0,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      steps: [],
+      lines: [],
+    },
+  });
   clearSidebarStateCookie();
 });
 
@@ -502,7 +523,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
   it('P2 — ninguna columna declara ancho y ninguna celda recibe uno en linea', async () => {
     // Primera mitad: la CONFIGURACION. Si una columna declarase `size`, la libreria si tendria un
     // ancho que imponer, y los 150 px por defecto dejarian de ser inertes.
-    const columnas = buildOrderColumns({ recipes: RECETAS });
+    const columnas = buildOrderColumns({ recipes: RECETAS, units: [] });
     expect(columnas).toHaveLength(8);
 
     for (const columna of columnas) {

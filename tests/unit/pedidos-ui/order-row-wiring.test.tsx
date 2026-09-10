@@ -60,6 +60,24 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: vi.fn(() => {
     throw new Error('listRecipesAction no debe invocarse: la primera pagina llega por props');
   }),
+  // El panel de edicion pide el detalle de la receta al montar (los ingredientes). Resuelve
+  // vacio: abrir el panel no debe invocar una operacion, pero el fetch del detalle si ocurre.
+  getRecipeAction: vi.fn(async (id: string) => ({
+    status: 'success' as const,
+    data: {
+      id,
+      name: 'Esmalte azul',
+      description: null,
+      imageUrl: null,
+      stepCount: 0,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      steps: [],
+      lines: [],
+    },
+  })),
 }));
 
 const RECETA = {
@@ -68,6 +86,10 @@ const RECETA = {
   imageUrl: null,
 };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
+
+const UNIDADES = [
+  { id: 'u-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
+];
 
 function pedido(status: OrderStatus): OrderSummary {
   return {
@@ -103,6 +125,7 @@ function montarLista(status: OrderStatus = 'PENDIENTE') {
       params={PARAMS}
       totalPages={1}
       recipes={RECETAS}
+      units={UNIDADES}
     />,
   );
 }

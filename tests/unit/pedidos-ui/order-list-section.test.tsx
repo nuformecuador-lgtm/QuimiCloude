@@ -63,6 +63,24 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
+  // El panel de edicion monta `OrderForm` por fila y su efecto pide el detalle de la receta para
+  // los ingredientes: sin este doble, la llamada iria a la sesion real (R43).
+  getRecipeAction: vi.fn(async (id: string) => ({
+    status: 'success' as const,
+    data: {
+      id,
+      name: 'Receta',
+      description: null,
+      imageUrl: null,
+      stepCount: 0,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      steps: [],
+      lines: [],
+    },
+  })),
 }));
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({

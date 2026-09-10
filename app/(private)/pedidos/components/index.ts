@@ -41,6 +41,7 @@ export {
   type OrderColumnsDeps,
 } from './order-columns';
 export { OrderField, type OrderFieldProps } from './order-field';
+export { multiplyDecimal, subtractDecimal } from './order-decimal';
 export {
   ORDER_BUSINESS_FIELDS,
   ORDER_FORM_CANCEL_TESTID,
@@ -57,6 +58,15 @@ export {
   type OrderFormProps,
 } from './order-form';
 export { OrderListEmpty } from './order-list-empty';
+export {
+  ORDER_INGREDIENTS_EMPTY_TESTID,
+  ORDER_INGREDIENTS_ERROR_TESTID,
+  ORDER_INGREDIENTS_LOADING_TESTID,
+  ORDER_INGREDIENTS_TABLE_TESTID,
+  ORDER_INGREDIENTS_TESTID,
+  OrderIngredientsTable,
+  type OrderIngredientsTableProps,
+} from './order-ingredients-table';
 export {
   ORDER_RECIPE_IMAGE_TESTID,
   OrderRecipeImage,

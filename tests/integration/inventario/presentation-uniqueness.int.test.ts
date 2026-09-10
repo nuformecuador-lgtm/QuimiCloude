@@ -2,7 +2,8 @@
  * Tests de integracion de QC-20 (crud-de-productos) que verifican las DOS garantias que
  * viven en Postgres, no en el servicio (design.md > 2.2, R20, R21, R22): el indice unico
  * sobre `presentations.name_normalized` y el `ON DELETE RESTRICT` de
- * `products_presentation_id_fkey`.
+ * `product_batches_presentation_id_fkey` (la presentacion se mudo de `products` a
+ * `product_batches` el 2026-09-09).
  *
  * AISLAMIENTO — mismo patron que `inventario-constraints.int.test.ts` y
  * `product-crud.int.test.ts`: cada `it` corre dentro de `prisma.$transaction` interactiva
@@ -120,16 +121,21 @@ async function createPresentation(
   return presentation.id;
 }
 
-async function createProductFor(
+/** Producto + lote con la presentacion dada. El lote es quien referencia la presentacion. */
+async function createBatchFor(
   tx: Prisma.TransactionClient,
   presentationId: string,
   name = `Producto ${token()}`,
-): Promise<string> {
+): Promise<{ productId: string; batchId: string }> {
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeForTest(name), presentationId },
+    data: { name, nameNormalized: normalizeForTest(name) },
     select: { id: true },
   });
-  return product.id;
+  const batch = await tx.productBatch.create({
+    data: { productId: product.id, presentationId, stock: 10, unitCost: '1.0000' },
+    select: { id: true },
+  });
+  return { productId: product.id, batchId: batch.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -166,12 +172,12 @@ beforeAll(async () => {
     SELECT c.conname FROM pg_constraint c
     JOIN pg_class t ON t.oid = c.conrelid
     JOIN pg_namespace n ON n.oid = t.relnamespace
-    WHERE c.conname = 'products_presentation_id_fkey' AND c.contype = 'f'
+    WHERE c.conname = 'product_batches_presentation_id_fkey' AND c.contype = 'f'
       AND n.nspname = 'public'`;
   if (fk.length !== 1) {
     throw new Error(
-      'la base de pruebas no tiene la FK "products_presentation_id_fkey" (migracion de ' +
-        'QC-14 no aplicada). Corre `pnpm run db:migrate`.',
+      'la base de pruebas no tiene la FK "product_batches_presentation_id_fkey" (migracion de ' +
+        'product_batches no aplicada). Corre `pnpm run db:migrate`.',
     );
   }
 });
@@ -212,46 +218,40 @@ describe('R20: el indice unico es la garantia real de la unicidad', () => {
 });
 
 describe('R21: el borrado de una presentacion en uso queda bloqueado', () => {
-  it('rechaza con SQLSTATE 23503 borrar una presentacion con productos asignados, incluidos los borrados logicamente', async () => {
+  it('rechaza con SQLSTATE 23503 borrar una presentacion con lotes asignados', async () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx, `Tambor 200 L ${token()}`);
-      const productId = await createProductFor(tx, presentationId);
-
-      // El producto se borra LOGICAMENTE antes de intentar el borrado de la presentacion:
-      // la FK no mira `deleted_at`, asi que sigue contando como asignado (R21 lo dice con
-      // todas las letras: "incluidos los productos borrados logicamente").
-      await tx.product.update({ where: { id: productId }, data: { deletedAt: new Date() } });
+      const { batchId } = await createBatchFor(tx, presentationId);
 
       const presentationBefore = await tx.presentation.findUniqueOrThrow({
         where: { id: presentationId },
       });
-      const productBefore = await tx.product.findUniqueOrThrow({ where: { id: productId } });
+      const batchBefore = await tx.productBatch.findUniqueOrThrow({ where: { id: batchId } });
 
       const sqlState = await expectRejectedByDatabase(
         tx,
         () => tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${presentationId} AS uuid)`,
-        'borrado de una presentacion con un producto asignado y borrado logicamente',
+        'borrado de una presentacion con un lote asignado',
       );
       expect(sqlState).toBe(FOREIGN_KEY_VIOLATION);
 
-      // «Conservar la presentacion y sus productos sin modificar»: se relee TRAS el
-      // rechazo, dentro de la misma transaccion (el SAVEPOINT deja todo lo demas vivo).
+      // «Conservar la presentacion y sus lotes sin modificar»: se relee TRAS el rechazo,
+      // dentro de la misma transaccion (el SAVEPOINT deja todo lo demas vivo).
       const presentationAfter = await tx.presentation.findUniqueOrThrow({
         where: { id: presentationId },
       });
       expect(presentationAfter).toEqual(presentationBefore);
-      const productAfter = await tx.product.findUniqueOrThrow({ where: { id: productId } });
-      expect(productAfter).toEqual(productBefore);
-      expect(productAfter.deletedAt).not.toBeNull();
+      const batchAfter = await tx.productBatch.findUniqueOrThrow({ where: { id: batchId } });
+      expect(batchAfter).toEqual(batchBefore);
     });
   });
 });
 
-describe('R22: el borrado de una presentacion sin productos es fisico', () => {
-  it('borra fisicamente la presentacion sin productos asignados', async () => {
+describe('R22: el borrado de una presentacion sin lotes es fisico', () => {
+  it('borra fisicamente la presentacion sin lotes asignados', async () => {
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx, `Presentacion huerfana ${token()}`);
-      expect(await tx.product.count({ where: { presentationId } })).toBe(0);
+      expect(await tx.productBatch.count({ where: { presentationId } })).toBe(0);
 
       const affected = await tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${presentationId} AS uuid)`;
       expect(affected).toBe(1);
@@ -307,27 +307,27 @@ describe('mutacion de esquema: sin el constraint, el requisito deja de cumplirse
     expect(indexAfter).toHaveLength(1);
   });
 
-  it('sin ON DELETE RESTRICT, borrar una presentacion con productos asignados deja de estar bloqueado (R21)', async () => {
+  it('sin ON DELETE RESTRICT, borrar una presentacion con lotes asignados deja de estar bloqueado (R21)', async () => {
     let sawDeleteSucceed = false;
 
     await inRolledBackTransaction(async (tx) => {
       const presentationId = await createPresentation(tx, `Sin restrict ${token()}`);
-      const productId = await createProductFor(tx, presentationId);
+      const { batchId } = await createBatchFor(tx, presentationId);
 
       await tx.$executeRawUnsafe(
-        'ALTER TABLE "products" DROP CONSTRAINT "products_presentation_id_fkey"',
+        'ALTER TABLE "product_batches" DROP CONSTRAINT "product_batches_presentation_id_fkey"',
       );
 
-      // Con la FK fuera, el DELETE que R21 exige que se rechace ahora se acepta: el
-      // producto queda con un `presentation_id` que ya no apunta a ninguna fila viva
-      // (huerfano), y eso es justo lo que la restriccion existe para impedir.
+      // Con la FK fuera, el DELETE que R21 exige que se rechace ahora se acepta: el lote
+      // queda con un `presentation_id` que ya no apunta a ninguna fila viva (huerfano), y
+      // eso es justo lo que la restriccion existe para impedir.
       const affected = await tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${presentationId} AS uuid)`;
       sawDeleteSucceed = affected === 1;
 
       const presentationAfter = await tx.presentation.findUnique({ where: { id: presentationId } });
       expect(presentationAfter).toBeNull();
-      const productAfter = await tx.product.findUniqueOrThrow({ where: { id: productId } });
-      expect(productAfter.presentationId).toBe(presentationId);
+      const batchAfter = await tx.productBatch.findUniqueOrThrow({ where: { id: batchId } });
+      expect(batchAfter.presentationId).toBe(presentationId);
       // La transaccion entera termina en ROLLBACK: ni el DELETE ni el ALTER sobreviven.
     });
 
@@ -339,10 +339,10 @@ describe('mutacion de esquema: sin el constraint, el requisito deja de cumplirse
       SELECT c.conname, c.confdeltype AS "deleteAction" FROM pg_constraint c
       JOIN pg_class t ON t.oid = c.conrelid
       JOIN pg_namespace n ON n.oid = t.relnamespace
-      WHERE c.conname = 'products_presentation_id_fkey' AND c.contype = 'f'
+      WHERE c.conname = 'product_batches_presentation_id_fkey' AND c.contype = 'f'
         AND n.nspname = 'public'`;
     expect(fkAfter).toHaveLength(1);
-    // 'r' = RESTRICT, la accion original de la migracion de QC-14.
+    // 'r' = RESTRICT, la accion original de la migracion de product_batches.
     expect(fkAfter[0]?.deleteAction).toBe('r');
   });
 });

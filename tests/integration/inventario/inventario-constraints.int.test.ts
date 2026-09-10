@@ -74,7 +74,6 @@ let savepointSeq = 0
 
 /** SQLSTATE de Postgres relevantes aqui. Son estables y NO dependen del idioma. */
 const NOT_NULL_VIOLATION = '23502'
-const FOREIGN_KEY_VIOLATION = '23503'
 const CHECK_VIOLATION = '23514'
 
 /**
@@ -138,21 +137,6 @@ function normalizeForTest(name: string): string {
 }
 
 /**
- * Crea una presentacion. El nombre NO es unico (decision cerrada del humano), asi que no
- * hace falta aleatorizarlo como se hacia con `roles.name` en `identity`.
- */
-async function createPresentation(
-  tx: Prisma.TransactionClient,
-  name = 'Bidon 20 L',
-): Promise<string> {
-  const presentation = await tx.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name) },
-    select: { id: true },
-  })
-  return presentation.id
-}
-
-/**
  * Crea una unidad REAL dentro de la transaccion del test y devuelve su identificador.
  *
  * 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Donde estos tests
@@ -191,24 +175,18 @@ type ProductColumn = 'name' | 'stock' | 'qty_alert' | 'unit_id'
 
 /**
  * `INSERT INTO products` crudo. `columns` decide que se escribe: omitir una entrada es
- * exactamente el caso «falta un dato obligatorio». `presentationId === null` omite la
- * columna de la FK. `updated_at` se da siempre porque es NOT NULL sin DEFAULT (lo rellena
- * el cliente Prisma via `@updatedAt`, no la base).
+ * exactamente el caso «falta un dato obligatorio». `updated_at` se da siempre porque es
+ * NOT NULL sin DEFAULT (lo rellena el cliente Prisma via `@updatedAt`, no la base).
  * `name_normalized` se da siempre por lo mismo (QC-57): es NOT NULL y sin DEFAULT.
  */
 function rawInsertProduct(
   tx: Prisma.TransactionClient,
   columns: Partial<Record<ProductColumn, Prisma.Sql>>,
-  presentationId: string | null,
 ): Promise<number> {
   const entries = Object.entries(columns) as [ProductColumn, Prisma.Sql][]
   const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
   const values = entries.map(([, value]) => value)
 
-  if (presentationId !== null) {
-    names.push(Prisma.raw('"presentation_id"'))
-    values.push(Prisma.sql`CAST(${presentationId} AS uuid)`)
-  }
   // `name_normalized` (QC-57) es NOT NULL sin DEFAULT: va SIEMPRE, como `updated_at`, o
   // cualquier rechazo que este helper busque llegaria antes como 23502 sobre ESTA columna y
   // el caso dejaria de probar lo que dice probar. Se escribe vacia a proposito: la busqueda
@@ -316,16 +294,14 @@ describe('estructura de la presentacion', () => {
 describe('estructura del producto', () => {
   it('crea un producto con todos sus datos y los relee sin perdida', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El octavo dato
-      // sigue siendo la unidad de medida (R3 de QC-14 intacto); lo que cambia es que hoy
-      // es una referencia a `units` y hay que crear la unidad de verdad.
+      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El dato sigue
+      // siendo la unidad de medida (R3 de QC-14 intacto); lo que cambia es que hoy es una
+      // referencia a `units` y hay que crear la unidad de verdad.
       const unitId = await createUnit(tx)
       const { id } = await tx.product.create({
         data: {
           name: 'Acido citrico monohidratado',
           nameNormalized: normalizeForTest('Acido citrico monohidratado'),
-          presentationId,
           stock: 120,
           qtyAlert: 20,
           unitId,
@@ -333,11 +309,10 @@ describe('estructura del producto', () => {
         select: { id: true },
       })
 
-      // R3: los ocho datos viven en la MISMA fila de la MISMA tabla; no hay entidad
-      // separada de «elemento de inventario» que haya que juntar con un join.
+      // R3: los datos viven en la MISMA fila de la MISMA tabla; no hay entidad separada de
+      // «elemento de inventario» que haya que juntar con un join.
       const product = await tx.product.findUniqueOrThrow({ where: { id } })
       expect(product.name).toBe('Acido citrico monohidratado')
-      expect(product.presentationId).toBe(presentationId)
       expect(product.stock).toBe(120)
       expect(product.qtyAlert).toBe(20)
       expect(product.unitId).toBe(unitId)
@@ -346,40 +321,25 @@ describe('estructura del producto', () => {
     })
   })
 
-  it('rechaza el alta si falta el nombre o la presentacion', async () => {
+  it('rechaza el alta si falta el nombre', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
       // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La unidad se usa
       // aqui, igual que antes, solo como MARCA para reconocer despues la fila que el alta
-      // rechazada habria escrito. Antes la marca era el texto 'kg-sin-nombre'; ahora es el
-      // id de una unidad creada para este test, porque `unit_id` tiene FK real.
+      // rechazada habria escrito, porque `unit_id` tiene FK real.
       const unitId = await createUnit(tx)
 
       // Sin nombre: la unica columna obligatoria omitida es `name`.
       const withoutName = await expectRejectedByDatabase(
         tx,
-        () =>
-          rawInsertProduct(
-            tx,
-            { unit_id: Prisma.sql`CAST(${unitId} AS uuid)` },
-            presentationId,
-          ),
+        () => rawInsertProduct(tx, { unit_id: Prisma.sql`CAST(${unitId} AS uuid)` }),
         'alta de producto sin nombre',
       )
       expect(withoutName).toBe(NOT_NULL_VIOLATION)
 
-      // Sin presentacion: la unica columna obligatoria omitida es `presentation_id`.
-      const withoutPresentation = await expectRejectedByDatabase(
-        tx,
-        () => rawInsertProduct(tx, { name: Prisma.sql`${'Sin presentacion'}` }, null),
-        'alta de producto sin presentacion',
-      )
-      expect(withoutPresentation).toBe(NOT_NULL_VIOLATION)
-
       // R4 «no crear ninguna fila»: se busca lo que cada intento habria escrito, no el
       // total de la tabla.
       const survivors = await tx.product.findMany({
-        where: { OR: [{ unitId }, { name: 'Sin presentacion' }] },
+        where: { unitId },
         select: { id: true },
       })
       expect(survivors).toEqual([])
@@ -388,9 +348,8 @@ describe('estructura del producto', () => {
 
   it('acepta un producto sin existencia, cantidad de alerta ni unidad, y los devuelve como ausencia de valor', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
       const { id } = await tx.product.create({
-        data: { name: 'Ficha recien abierta', nameNormalized: normalizeForTest('Ficha recien abierta'), presentationId },
+        data: { name: 'Ficha recien abierta', nameNormalized: normalizeForTest('Ficha recien abierta') },
         select: { id: true },
       })
 
@@ -429,14 +388,12 @@ describe('estructura del producto', () => {
       // Y en la practica: lo que se guarda no conserva parte decimal. Se escribe con SQL
       // crudo porque la API tipada de Prisma exige un `number` entero y no dejaria
       // expresar el caso.
-      const presentationId = await createPresentation(tx)
       await rawInsertProduct(
         tx,
         { name: Prisma.sql`${'Con parte decimal'}`, stock: Prisma.sql`${'7.4'}::numeric` },
-        presentationId,
       )
       const stored = await tx.product.findFirstOrThrow({
-        where: { name: 'Con parte decimal', presentationId },
+        where: { name: 'Con parte decimal' },
         select: { stock: true },
       })
       expect(stored.stock).not.toBeNull()
@@ -455,7 +412,6 @@ describe('estructura del producto', () => {
     // `min_purchase` se fueron CON su columna -Postgres se lleva el CHECK que solo menciona
     // la columna borrada- y los dos que quedan tienen que seguir mordiendo igual.
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
       const negatives: readonly [ProductColumn, Prisma.Sql][] = [
         ['stock', Prisma.sql`${-1}`],
         ['qty_alert', Prisma.sql`${-1}`],
@@ -472,7 +428,7 @@ describe('estructura del producto', () => {
         // CHECK que salta es el de esa columna y no otro.
         const sqlState = await expectRejectedByDatabase(
           tx,
-          () => rawInsertProduct(tx, columns, presentationId),
+          () => rawInsertProduct(tx, columns),
           `alta de producto con ${column} negativo`,
         )
         expect(sqlState, `columna "${column}"`).toBe(CHECK_VIOLATION)
@@ -488,7 +444,7 @@ describe('estructura del producto', () => {
       // El CHECK rechaza el negativo, no el cero ni el valor ausente: R5 y R6 conviven
       // con R9 porque en SQL un CHECK que evalua a NULL se cumple.
       const { id } = await tx.product.create({
-        data: { name: 'Ceros y nulos', nameNormalized: normalizeForTest('Ceros y nulos'), presentationId, stock: 0, qtyAlert: 0 },
+        data: { name: 'Ceros y nulos', nameNormalized: normalizeForTest('Ceros y nulos'), stock: 0, qtyAlert: 0 },
         select: { id: true },
       })
       const zeroed = await tx.product.findUniqueOrThrow({ where: { id } })
@@ -510,7 +466,6 @@ describe('estructura del producto', () => {
     // Lo unico que ya no se puede probar es «cualquier texto»: hoy la columna es una FK y
     // un texto suelto ni siquiera es un uuid.
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
       // Las cinco formas de texto que este caso quiere cubrir —minusculas, MAYUSCULAS, con
       // espacios, con barra— mas la ausencia. Desde QC-76 R15 el simbolo es unico dentro del
       // ambito, y `'kg'` a secas chocaria con el `kilogramo` del arrancador, asi que cada una
@@ -533,7 +488,7 @@ describe('estructura del producto', () => {
         const unitId = await createUnit(tx, symbol)
         unitIds.push(unitId)
         const { id } = await tx.product.create({
-          data: { name: `Producto en ${symbol ?? 'unidad sin simbolo'}`, nameNormalized: normalizeForTest(`Producto en ${symbol ?? 'unidad sin simbolo'}`), presentationId, unitId },
+          data: { name: `Producto en ${symbol ?? 'unidad sin simbolo'}`, nameNormalized: normalizeForTest(`Producto en ${symbol ?? 'unidad sin simbolo'}`), unitId },
           select: { id: true },
         })
         ids.push(id)
@@ -548,7 +503,7 @@ describe('estructura del producto', () => {
       expect(new Set(unitIds).size).toBe(symbols.length)
 
       const { id: withoutUnit } = await tx.product.create({
-        data: { name: 'Sin unidad', nameNormalized: normalizeForTest('Sin unidad'), presentationId },
+        data: { name: 'Sin unidad', nameNormalized: normalizeForTest('Sin unidad') },
         select: { id: true },
       })
       const bare = await tx.product.findUniqueOrThrow({ where: { id: withoutUnit } })
@@ -558,7 +513,6 @@ describe('estructura del producto', () => {
 
   it('guardar una cantidad de alerta por debajo de la existencia no cambia ninguna otra columna', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
       // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La fila sigue
       // teniendo TODAS sus columnas rellenas, que es lo que este caso necesita para poder
       // afirmar despues que ninguna cambio; solo cambia la forma de la unidad.
@@ -567,7 +521,6 @@ describe('estructura del producto', () => {
         data: {
           name: 'Producto vigilado',
           nameNormalized: normalizeForTest('Producto vigilado'),
-          presentationId,
           stock: 3,
           qtyAlert: 50,
           unitId,
@@ -591,155 +544,27 @@ describe('estructura del producto', () => {
   })
 })
 
-describe('relacion producto - presentacion', () => {
-  it('rechaza un producto sin presentacion o con una presentacion inexistente', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      // Sin presentacion: `presentation_id` omitido, `name` presente.
-      const withoutPresentation = await expectRejectedByDatabase(
-        tx,
-        () => rawInsertProduct(tx, { name: Prisma.sql`${'Huerfano'}` }, null),
-        'alta de producto sin presentacion',
-      )
-      expect(withoutPresentation).toBe(NOT_NULL_VIOLATION)
-
-      // Con una presentacion inexistente: la unica FK de la tabla es la de presentacion,
-      // asi que el 23503 solo puede venir de ella.
-      const missingPresentation = await expectRejectedByDatabase(
-        tx,
-        () => rawInsertProduct(tx, { name: Prisma.sql`${'Huerfano'}` }, randomUUID()),
-        'alta de producto con una presentacion inexistente',
-      )
-      expect(missingPresentation).toBe(FOREIGN_KEY_VIOLATION)
-
-      const survivors = await tx.product.findMany({
-        where: { name: 'Huerfano' },
-        select: { id: true },
-      })
-      expect(survivors).toEqual([])
-    })
-  })
-
-  it('acepta varios productos con la misma presentacion', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx, 'Tambor 200 L')
-      const ids: string[] = []
-      for (const n of [1, 2, 3, 4, 5]) {
-        const { id } = await tx.product.create({
-          data: { name: `Producto ${String(n)}`, nameNormalized: normalizeForTest(`Producto ${String(n)}`), presentationId },
-          select: { id: true },
-        })
-        ids.push(id)
-      }
-
-      // R13: la presentacion es compartida; `presentation_id` no lleva unicidad.
-      const shared = await tx.product.findMany({
-        where: { id: { in: ids } },
-        select: { id: true, presentationId: true },
-      })
-      expect(shared).toHaveLength(5)
-      expect(shared.every((row) => row.presentationId === presentationId)).toBe(true)
-    })
-  })
-
-  it('rechaza borrar una presentacion con productos asignados', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
-      const { id: productId } = await tx.product.create({
-        data: { name: 'Producto asignado', nameNormalized: normalizeForTest('Producto asignado'), presentationId, stock: 4 },
-        select: { id: true },
-      })
-
-      const sqlState = await expectRejectedByDatabase(
-        tx,
-        () =>
-          tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${presentationId} AS uuid)`,
-        'borrado de una presentacion con productos asignados',
-      )
-      // `ON DELETE RESTRICT` de `products_presentation_id_fkey`.
-      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
-
-      // R14: se conservan la presentacion y su producto, sin modificar.
-      expect(await tx.presentation.findUnique({ where: { id: presentationId } })).not.toBeNull()
-      const product = await tx.product.findUniqueOrThrow({ where: { id: productId } })
-      expect(product.presentationId).toBe(presentationId)
-      expect(product.stock).toBe(4)
-      expect(product.deletedAt).toBeNull()
-    })
-  })
-
-  it('rechaza borrar una presentacion cuyo unico producto esta borrado logicamente', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
-      const { id: productId } = await tx.product.create({
-        data: { name: 'Producto retirado', nameNormalized: normalizeForTest('Producto retirado'), presentationId, stock: 4 },
-        select: { id: true },
-      })
-      const deleted = await tx.product.update({
-        where: { id: productId },
-        data: { deletedAt: new Date() },
-      })
-      expect(deleted.deletedAt).not.toBeNull()
-
-      const presentationBefore = await tx.presentation.findUniqueOrThrow({
-        where: { id: presentationId },
-      })
-      const productBefore = await tx.product.findUniqueOrThrow({ where: { id: productId } })
-
-      // La FK no sabe nada de `deleted_at`: un producto borrado logicamente SIGUE
-      // contando como asignado, y eso es deliberado (R14 lo dice con todas las letras).
-      // Es tambien el motivo por el que `presentations` no lleva `deleted_at`
-      // (design.md > 2.1): a un UPDATE no lo puede frenar ninguna FK.
-      const sqlState = await expectRejectedByDatabase(
-        tx,
-        () =>
-          tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${presentationId} AS uuid)`,
-        'borrado de una presentacion cuyo unico producto esta borrado logicamente',
-      )
-      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
-
-      // Despues del rechazo, las dos filas siguen ahi y ninguna cambio.
-      const presentationAfter = await tx.presentation.findUniqueOrThrow({
-        where: { id: presentationId },
-      })
-      expect(presentationAfter).toEqual(presentationBefore)
-      const productAfter = await tx.product.findUniqueOrThrow({ where: { id: productId } })
-      expect(productAfter).toEqual(productBefore)
-      expect(productAfter.deletedAt).not.toBeNull()
-    })
-  })
-
-  it('permite borrar una presentacion sin productos asignados', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx, 'Presentacion huerfana')
-      expect(await tx.product.count({ where: { presentationId } })).toBe(0)
-
-      await tx.presentation.delete({ where: { id: presentationId } })
-
-      // R15: se afirma sobre ESA fila por su id, no sobre el total de la tabla.
-      expect(await tx.presentation.findUnique({ where: { id: presentationId } })).toBeNull()
-    })
-  })
-})
+// La relacion producto -> presentacion se MUDA a `product_batches` el 2026-09-09: los casos
+// que antes ejercitaban `products_presentation_id_fkey` (R13, R14, R15) viven ahora en
+// `presentation-uniqueness.int.test.ts`, contra `product_batches_presentation_id_fkey`.
 
 describe('nombre del producto', () => {
   it('acepta dos productos con el mismo nombre, y tambien con distintas mayusculas', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
-
       // Exactamente el mismo texto: sin indice unico, ni total ni parcial (R16). Se
       // aparta a proposito del precedente de `users`, donde esto seria 23505.
       const { id: first } = await tx.product.create({
-        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica'), presentationId },
+        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica') },
         select: { id: true },
       })
       const { id: second } = await tx.product.create({
-        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica'), presentationId },
+        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica') },
         select: { id: true },
       })
       // Y solo cambiando las mayusculas: tampoco hay indice unico funcional sobre
       // `lower(name)`, al reves que en `users`.
       const { id: third } = await tx.product.create({
-        data: { name: 'SOSA CAUSTICA', nameNormalized: normalizeForTest('SOSA CAUSTICA'), presentationId },
+        data: { name: 'SOSA CAUSTICA', nameNormalized: normalizeForTest('SOSA CAUSTICA') },
         select: { id: true },
       })
 
@@ -760,7 +585,6 @@ describe('nombre del producto', () => {
 describe('borrado logico y marcas de tiempo', () => {
   it('el borrado logico conserva la fila del producto y marca deleted_at', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx)
       // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Igual que arriba:
       // la fila nace completa para que R17 pueda comprobar que el borrado logico no pierde
       // NINGUN dato, la unidad incluida.
@@ -769,7 +593,6 @@ describe('borrado logico y marcas de tiempo', () => {
         data: {
           name: 'Producto que se retira',
           nameNormalized: normalizeForTest('Producto que se retira'),
-          presentationId,
           stock: 9,
           qtyAlert: 1,
           unitId,
@@ -802,7 +625,7 @@ describe('borrado logico y marcas de tiempo', () => {
       expect(presentation.updatedAt).toBeInstanceOf(Date)
 
       const created = await tx.product.create({
-        data: { name: 'Producto con marcas', nameNormalized: normalizeForTest('Producto con marcas'), presentationId: presentation.id },
+        data: { name: 'Producto con marcas', nameNormalized: normalizeForTest('Producto con marcas') },
       })
       expect(created.createdAt).toBeInstanceOf(Date)
       expect(created.updatedAt).toBeInstanceOf(Date)
@@ -839,10 +662,10 @@ describe('borrado logico y marcas de tiempo', () => {
  * Estos casos NO abren transaccion ni escriben nada: solo leen catalogo.
  */
 describe('QC-52 — censo de products tras la migracion', () => {
-  /** Columnas exactas que `products` debe tener despues de la migracion (R1, R2, R4). */
+  /** Columnas exactas que `products` debe tener tras las migraciones (R1, R2, R4 y la
+   * mudanza a `product_batches` del 2026-09-09). */
   const COLUMNAS_ESPERADAS = [
     'created_at',
-    'created_by',
     'deleted_at',
     'id',
     'image_path',
@@ -851,12 +674,10 @@ describe('QC-52 — censo de products tras la migracion', () => {
     // `20260904160000_list_query_indexes`, es NOT NULL y NO tiene indice unico -el nombre
     // del producto no es unico, QC-14 decision cerrada 6-.
     'name_normalized',
-    'presentation_id',
     'qty_alert',
     'stock',
     'unit_id',
     'updated_at',
-    'updated_by',
   ] as const
 
   /** Las tres que la migracion se llevo y que no pueden volver por ninguna via (R1). */
@@ -894,20 +715,18 @@ describe('QC-52 — censo de products tras la migracion', () => {
     expect(row?.column_default).toBeNull()
   })
 
-  it('conserva las cuatro claves foraneas: presentacion, unidad y las dos de autoria', async () => {
-    // R3. Son las que `prisma migrate dev` propone borrar en CADA generacion, porque
-    // `unit_id`, `created_by` y `updated_by` son escalares sin `@relation` y el esquema no
-    // las conoce. Si una auditoria del SQL bajara la guardia, este caso lo dice.
+  it('conserva la unica clave foranea que le queda: la de la unidad', async () => {
+    // La presentacion y la autoria se mudaron a `product_batches` el 2026-09-09, asi que
+    // `products` solo conserva `products_unit_id_fkey` —un escalar sin `@relation` que
+    // `prisma migrate dev` propone borrar en cada generacion—. Si una auditoria del SQL
+    // bajara la guardia, este caso lo dice.
     const rows = await prisma.$queryRaw<{ conname: string; confrelid: string }[]>`
       SELECT c.conname, c.confrelid::regclass::text AS confrelid
       FROM pg_constraint c
       WHERE c.conrelid = 'public.products'::regclass AND c.contype = 'f'
       ORDER BY c.conname`
     expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([
-      ['products_created_by_fkey', 'users'],
-      ['products_presentation_id_fkey', 'presentations'],
       ['products_unit_id_fkey', 'units'],
-      ['products_updated_by_fkey', 'users'],
     ])
   })
 

@@ -96,26 +96,20 @@ async function seedUnit(
   return unit.id
 }
 
-/** Presentacion + producto, con o sin unidad. `presentations.name_normalized` es UNICO: lleva
- *  el marcador. */
+/** Producto, con o sin unidad. Sin presentacion desde el 2026-09-09. */
 async function createProduct(
   marker: string,
   unitId: string | null,
-): Promise<{ readonly productId: string; readonly presentationId: string }> {
-  const presentation = await prisma.presentation.create({
-    data: { name: `Bidon 20 L ${marker}`, nameNormalized: `bidon20l${marker}` },
-    select: { id: true },
-  })
+): Promise<{ readonly productId: string }> {
   const product = await prisma.product.create({
     data: {
       name: `Producto ${marker}`,
       nameNormalized: `producto${marker}`,
-      presentationId: presentation.id,
       unitId,
     },
     select: { id: true },
   })
-  return { productId: product.id, presentationId: presentation.id }
+  return { productId: product.id }
 }
 
 /** Receta viva, vacia. */
@@ -576,16 +570,13 @@ describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no t
       )
       seeded.units = [...(seeded.units ?? []), unitId]
 
-      const { productId, presentationId } = await createProduct(`prod${marker}`, unitId)
+      const { productId } = await createProduct(`prod${marker}`, unitId)
       seeded.products = [productId]
-      seeded.presentations = [presentationId]
 
       const recipeId = await createRecipe(`rec${marker}`)
       seeded.recipes = [recipeId]
-      const { productId: productoDeLaLinea, presentationId: presentacionDeLaLinea } =
-        await createProduct(`linea${marker}`, null)
+      const { productId: productoDeLaLinea } = await createProduct(`linea${marker}`, null)
       seeded.products = [...(seeded.products ?? []), productoDeLaLinea]
-      seeded.presentations = [...(seeded.presentations ?? []), presentacionDeLaLinea]
       const lineId = await createLine(recipeId, productoDeLaLinea, unitId, '3.5000')
       seeded.recipeLines = [lineId]
 
@@ -659,9 +650,8 @@ describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas 
       const { id: unitId } = await unidades.createUnit({ name: `Usada por producto ${marker}` }, actor)
       seeded.units = [unitId]
 
-      const { productId, presentationId } = await createProduct(`prod${marker}`, unitId)
+      const { productId } = await createProduct(`prod${marker}`, unitId)
       seeded.products = [productId]
-      seeded.presentations = [presentationId]
 
       await expect(unidades.deleteUnit(unitId, actor)).rejects.toBeInstanceOf(UnitInUseError)
 
@@ -694,9 +684,8 @@ describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas 
       const { id: unitId } = await unidades.createUnit({ name: `Usada por linea ${marker}` }, actor)
       seeded.units = [unitId]
 
-      const { productId, presentationId } = await createProduct(`prod${marker}`, null)
+      const { productId } = await createProduct(`prod${marker}`, null)
       seeded.products = [productId]
-      seeded.presentations = [presentationId]
       const recipeId = await createRecipe(`rec${marker}`)
       seeded.recipes = [recipeId]
       const lineId = await createLine(recipeId, productId, unitId)

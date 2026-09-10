@@ -30,6 +30,12 @@ export type RecipeSummary = {
  * -mismo criterio que en el borde (`design.md > 2`)-. `unitId` es la REFERENCIA al
  * catalogo de `unidades` (R50): este modulo no resuelve nombre ni simbolo, solo pasa el
  * identificador tal cual.
+ *
+ * `productStock` sale del MISMO `ProductCatalog.findRefs` y es `null` en la misma situacion
+ * que `productName` -producto dado de baja-: sin producto no hay existencia que traer. La
+ * presentacion YA NO viaja aqui: se mudo de `products` a `product_batches` el 2026-09-09, y
+ * una linea de receta referencia un PRODUCTO, no un lote, asi que no tiene presentacion que
+ * mostrar.
  */
 export type RecipeLineView = {
   readonly id: string;
@@ -37,6 +43,8 @@ export type RecipeLineView = {
   readonly productName: string | null;
   readonly quantity: string;
   readonly unitId: string;
+  /** Existencia del producto en unidades, `null` cuando no declara stock. */
+  readonly productStock: number | null;
 };
 
 /** Detalle de una receta (D14, R33): el resumen mas los pasos y las lineas completas. */

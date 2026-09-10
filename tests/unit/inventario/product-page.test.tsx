@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
@@ -212,18 +212,11 @@ const testId = {
   errorAltaPresentacion: 'presentation-create-error',
 } as const;
 
-/** Ids de presentacion: `createProductSchema` exige UUID, asi que se generan de verdad. */
+/** Ids de presentacion del fixture: las presentaciones siguen existiendo como catalogo (QC-45),
+ * aunque el producto ya no las declare (se mudaron a `product_batches` el 2026-09-09). */
 const PRESENTACION_A = { id: crypto.randomUUID(), name: 'Bidón 20 L' };
 const PRESENTACION_B = { id: crypto.randomUUID(), name: 'Saco 25 kg' };
 const PRESENTACION_NUEVA = { id: crypto.randomUUID(), name: 'Garrafa 5 L' };
-
-/**
- * Ids de autoria del fixture. Son cadenas **inconfundibles** a proposito: el test en negativo de
- * R7 busca su ausencia en todo el documento, y con un id realista no distinguiria entre «no se
- * muestra» y «se muestra pero parece otra cosa».
- */
-const AUTOR_QUE_NO_DEBE_VERSE = 'AUTOR-CREADOR-NO-VISIBLE';
-const EDITOR_QUE_NO_DEBE_VERSE = 'AUTOR-EDITOR-NO-VISIBLE';
 
 /**
  * Id de unidad del fixture, **tambien inconfundible y tambien invisible**. Desde el merge de
@@ -240,15 +233,11 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
     imagePath: null,
-    presentationId: PRESENTACION_A.id,
-    presentationName: PRESENTACION_A.name,
     stock: 42,
     qtyAlert: 5,
     unitId: UNIDAD_QUE_NO_DEBE_VERSE,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
-    createdBy: AUTOR_QUE_NO_DEBE_VERSE,
-    updatedBy: EDITOR_QUE_NO_DEBE_VERSE,
     ...overrides,
   };
 }
@@ -362,7 +351,7 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
   qtyAlert: '1',
 };
 
-/** Rellena el formulario abierto. Deja fuera la presentacion: la aporta su propio selector. */
+/** Rellena el formulario abierto. Deja fuera la presentacion -ya no es del producto-. */
 async function rellenarFormulario(
   user: ReturnType<typeof setupUser>,
   valores: Readonly<Record<string, string>> = {},
@@ -373,23 +362,6 @@ async function rellenarFormulario(
     await user.clear(control);
     if (valor !== '') await user.type(control, valor);
   }
-}
-
-/** Crea una presentacion desde el propio panel y la deja seleccionada (R24). */
-async function crearPresentacionEnLinea(
-  user: ReturnType<typeof setupUser>,
-  nombre = PRESENTACION_NUEVA.name,
-) {
-  await user.click(screen.getByTestId(testId.abrirAltaPresentacion));
-  await user.type(screen.getByTestId(testId.nombrePresentacion), nombre);
-  await user.click(screen.getByTestId(testId.guardarPresentacion));
-  await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalled());
-}
-
-/** Valor que el formulario enviara como presentacion: el campo oculto que monta el primitivo. */
-function presentacionSeleccionada(): string | null {
-  const oculto = document.querySelector<HTMLInputElement>('input[name="presentationId"]');
-  return oculto === null ? null : oculto.value;
 }
 
 let toastExito: ReturnType<typeof vi.spyOn>;
@@ -420,24 +392,6 @@ afterEach(() => {
   resetViewport();
   clearSidebarStateCookie();
 });
-
-/**
- * Lleva el desplegable del selector de presentacion al final de su scroll, que es el gesto con el
- * que se pide la pagina siguiente desde el 2026-09-07.
- *
- * Las tres medidas se definen a mano porque jsdom NO calcula layout: sin ellas todo elemento mide
- * 0 y ninguna prueba podria distinguir «al final» de «al principio». El evento se emite tal cual:
- * desplazar no es un gesto de puntero ni de teclado, asi que `user-event` no tiene API para ello.
- */
-function scrollAlFinalDelSelector(altoVisible = 256) {
-  const lista = screen.getByTestId('presentation-popup');
-  Object.defineProperty(lista, 'clientHeight', { value: altoVisible, configurable: true });
-  Object.defineProperty(lista, 'scrollHeight', { value: altoVisible * 3, configurable: true });
-  Object.defineProperty(lista, 'scrollTop', { value: altoVisible * 2, configurable: true });
-  act(() => {
-    lista.dispatchEvent(new Event('scroll', { bubbles: true }));
-  });
-}
 
 describe('pantalla de productos — lista', () => {
   it('la pantalla de productos se renderiza dentro del armazon privado y no declara main propio', async () => {
@@ -495,37 +449,26 @@ describe('pantalla de productos — lista', () => {
     expect(columnas.map((columna) => columna.id)).toEqual([
       'image',
       'name',
-      'presentationName',
       'stock',
       'qtyAlert',
       'actions',
     ]);
   });
 
-  it('la tabla no muestra createdBy, updatedBy ni el id de la unidad', async () => {
-    // R7 — test **en negativo**: los ids de autoria estan en los datos y no pueden llegar a la
-    // pantalla. Anadir una columna que los pinte pone esto rojo.
+  it('la tabla no muestra el id de la unidad', async () => {
+    // Test **en negativo**: el id de unidad esta en los datos y no puede llegar a la pantalla.
     //
-    // `unitId` se vigila igual desde el 2026-09-03: no lo pide R7, lo pide la decision de sacar
+    // `unitId` se vigila desde el 2026-09-03: no lo pide R7, lo pide la decision de sacar
     // la unidad de la pantalla tras el merge de QC-32. Mientras nadie sepa resolver ese id a un
     // nombre, la unica forma de "mostrar la unidad" seria pintar el UUID, y eso no se hace.
     await renderPantalla();
 
-    expect(document.body.textContent).not.toContain(AUTOR_QUE_NO_DEBE_VERSE);
-    expect(document.body.textContent).not.toContain(EDITOR_QUE_NO_DEBE_VERSE);
     expect(document.body.textContent).not.toContain(UNIDAD_QUE_NO_DEBE_VERSE);
 
     const columnas = buildProductColumns({ rowActions: () => null });
     // `imagePath` esta en la lista de prohibidos: la imagen SE VE, pero su columna se llama
     // `image` y pinta una miniatura. La RUTA no es una columna.
-    for (const prohibida of [
-      'createdBy',
-      'updatedBy',
-      'id',
-      'presentationId',
-      'unitId',
-      'imagePath',
-    ]) {
+    for (const prohibida of ['id', 'unitId', 'imagePath']) {
       expect(
         columnas.some((columna) => String(columna.id) === prohibida),
         `«${prohibida}» no puede ser columna`,
@@ -947,7 +890,6 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
       expect(screen.queryByTestId(`product-hidden-${campo}`), campo).toBeNull();
     }
-    expect(presentacionSeleccionada()).toBe(elProducto.presentationId);
 
     // Se cambia un solo campo y se envia: el reemplazo viaja COMPLETO, con los demas incluidos.
     await user.clear(screen.getByTestId('product-field-name'));
@@ -959,7 +901,6 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const [id, , enviado] = updateProductActionMock.mock.calls[0];
     expect(id).toBe(elProducto.id);
     expect(enviado.get('name')).toBe('Sosa cáustica perlas');
-    expect(enviado.get('presentationId')).toBe(elProducto.presentationId);
     for (const [campo, valor] of Object.entries(precargado)) {
       if (campo === 'name') continue;
       expect(enviado.get(campo), `${campo} debe viajar en el reemplazo`).toBe(valor);
@@ -984,7 +925,6 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // el MISMO esquema del servidor: 120 caracteres como maximo. Lo que R20 vigila -el error va
     // junto a SU campo, la operacion ni se llama y el panel sigue abierto- no cambia.
     const nombreLargo = 'x'.repeat(121);
-    await crearPresentacionEnLinea(user);
     await rellenarFormulario(user, { name: nombreLargo });
     await user.click(screen.getByTestId(testId.enviar));
 
@@ -1017,7 +957,6 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
-    await crearPresentacionEnLinea(user);
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));
 
@@ -1045,14 +984,12 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
-    await crearPresentacionEnLinea(user);
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));
 
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
 
     const enviado = createProductActionMock.mock.calls[0][1];
-    expect(enviado.get('presentationId')).toBe(PRESENTACION_NUEVA.id);
     for (const [campo, valor] of Object.entries(ALTA_VALIDA)) {
       expect(enviado.get(campo), campo).toBe(valor);
     }
@@ -1060,6 +997,32 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
     expect(toastExito).toHaveBeenCalledTimes(1);
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('elegir un producto existente autocompleta la alerta de cantidad, no la existencia', async () => {
+    // Decision humana del 2026-09-09: en el alta el nombre es un autocomplete que busca productos
+    // existentes; al elegir uno se autocompleta la alerta de cantidad. La existencia NO se copia:
+    // es el inventario actual del producto nuevo, que escribe el usuario. (La presentacion ya no
+    // es del producto: se mudo a `product_batches`.)
+    const user = setupUser();
+    const existente = producto({ name: 'Sosa cáustica perlas', qtyAlert: 7 });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([existente]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId('product-field-name'));
+    await user.click(
+      await esperarInteractiva(await screen.findByRole('option', { name: existente.name })),
+    );
+
+    // El nombre queda fijado al del producto elegido.
+    expect(screen.getByTestId('product-field-name')).toHaveValue(existente.name);
+    // La alerta de cantidad se autocompleta.
+    expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue(existente.qtyAlert);
+    // La existencia NO se autocompleta: sigue vacia para que la escriba el usuario.
+    expect((screen.getByTestId('product-field-stock') as HTMLInputElement).value).toBe('');
   });
 
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
@@ -1115,12 +1078,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.queryByTestId('product-field-unitId')).toBeNull();
     expect(formulario.textContent).not.toContain('Unidad');
 
-    // El unico control de conjunto cerrado del formulario sigue siendo la presentacion (R24).
+    // El unico combobox del formulario es el nombre, que paso a ser un autocomplete de texto
+    // libre que busca productos existentes. La presentacion ya no esta -se mudo a
+    // `product_batches` el 2026-09-09-, asi que no hay selector de presentacion.
     const combos = within(formulario).getAllByRole('combobox');
     expect(combos).toHaveLength(1);
-    expect(combos[0]).toBe(screen.getByTestId(testId.selectorPresentacion));
+    expect(combos).toContain(screen.getByTestId('product-field-name'));
 
-    await crearPresentacionEnLinea(user);
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));
 
@@ -1132,101 +1096,15 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(enviado.get('unitId')).toBeNull();
   });
 
-  it('el selector alcanza presentaciones mas alla de la primera pagina', async () => {
-    // R24 (primera mitad) — con el tope de 25 por pagina, sin una forma de pasar de la primera
-    // habria presentaciones inalcanzables.
-    //
-    // ENMIENDA DEL 2026-09-07: el gesto ya no es el boton «Cargar más» -que desaparecio con el
-    // desplegable-, sino llegar al FINAL DEL SCROLL del autocomplete. Lo que R24 exige se afirma
-    // igual de fuerte: la pagina 2 se pide al servidor y su presentacion queda disponible junto
-    // a la de la pagina 1.
-    const user = setupUser();
-    listPresentationsActionMock.mockResolvedValueOnce(
-      paginaDePresentaciones([PRESENTACION_A], { page: 1, totalPages: 2 }),
-    );
-    listPresentationsActionMock.mockResolvedValueOnce(
-      paginaDePresentaciones([PRESENTACION_B], { page: 2, totalPages: 2 }),
-    );
-
-    await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirAlta));
-    await screen.findByTestId(testId.formulario);
-
-    // Cerrado no consulta nada: la primera pagina llega al abrir el desplegable.
-    expect(listPresentationsActionMock).not.toHaveBeenCalled();
-
-    await user.click(screen.getByTestId(testId.selectorPresentacion));
-
-    await waitFor(() =>
-      expect(listPresentationsActionMock).toHaveBeenCalledWith({ page: 1, pageSize: MAX_PAGE_SIZE }),
-    );
-    await waitFor(() => expect(screen.getAllByTestId('presentation-option')).toHaveLength(1));
-
-    scrollAlFinalDelSelector();
-
-    await waitFor(() =>
-      expect(listPresentationsActionMock).toHaveBeenCalledWith({ page: 2, pageSize: MAX_PAGE_SIZE }),
-    );
-
-    // Y las dos presentaciones —la de la primera pagina y la de la segunda— estan disponibles:
-    // la pagina 2 se ANEXA, no sustituye.
-    await waitFor(() => expect(screen.getAllByTestId('presentation-option')).toHaveLength(2));
-    expect(
-      screen.getAllByTestId('presentation-option').map((opcion) => opcion.textContent),
-    ).toEqual([PRESENTACION_A.name, PRESENTACION_B.name]);
-  });
-
-  it('permite crear una presentacion desde el formulario y la deja seleccionada sin perder lo escrito', async () => {
-    // R24 (segunda mitad) — un producto no puede existir sin presentacion, y esta pantalla ya no
-    // trae el catalogo de presentaciones: sin esto, una base sin presentaciones deja el alta
-    // muerta.
-    const user = setupUser();
-
-    await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirAlta));
-    await screen.findByTestId(testId.formulario);
-
-    // Se escribe ANTES de crear la presentacion: lo escrito no puede perderse por el camino.
-    await rellenarFormulario(user);
-    await crearPresentacionEnLinea(user);
-
-    expect(createPresentationActionMock.mock.calls[0][1].get('name')).toBe(PRESENTACION_NUEVA.name);
-    await waitFor(() => expect(presentacionSeleccionada()).toBe(PRESENTACION_NUEVA.id));
-
-    for (const [campo, valor] of Object.entries(ALTA_VALIDA)) {
-      const control = screen.getByTestId(`product-field-${campo}`);
-      expect(control, `${campo} no puede perder lo escrito`).toHaveValue(
-        control.getAttribute('type') === 'number' ? Number(valor) : valor,
-      );
-    }
-  });
-
-  it('un nombre de presentacion repetido pinta el mensaje DEL BACK, no un texto propio', async () => {
-    // QC-70 R32 — el selector comparaba el codigo generico y sustituia el mensaje por una frase
-    // suya. Ahora el codigo es el abierto por caso concreto (`presentation_duplicate_name`, R20) y
-    // el texto que se pinta es el que devuelve la operacion, que sale del catalogo: dos frases
-    // para el mismo caso es justo lo que la ficha quita.
-    const user = setupUser();
-    const mensajeDelCatalogo = 'Ya existe una presentacion con un nombre equivalente.';
-    createPresentationActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'presentation_duplicate_name',
-      message: mensajeDelCatalogo,
-    });
-
-    await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirAlta));
-    await screen.findByTestId(testId.formulario);
-    await crearPresentacionEnLinea(user);
-
-    const error = await screen.findByTestId(testId.errorAltaPresentacion);
-    expect(error).toHaveTextContent(mensajeDelCatalogo);
-    // El campo del alta en linea queda marcado y descrito por su error, y nada se selecciona.
-    const campo = screen.getByTestId(testId.nombrePresentacion);
-    expect(campo).toHaveAttribute('aria-invalid', 'true');
-    expect(campo).toHaveAttribute('aria-describedby', error.id);
-    expect(presentacionSeleccionada()).toBe('');
-  });
+  // QC-70 R32 — AQUI vivia el caso «un nombre de presentacion repetido pinta el mensaje DEL BACK,
+  // no un texto propio», junto a los dos de R24 sobre el selector de presentaciones. Los tres se
+  // van con `dev` (2026-09-09): la presentacion se mudo de `products` a `product_batches` y este
+  // formulario ya no tiene selector de presentacion ni alta en linea, asi que no queda gesto que
+  // ejercitar. NO se pierde cobertura de R32: el componente que la ficha corrigio
+  // -`components/shared/presentation-select.tsx`- sigue vivo y en uso desde
+  // `proveedores/[id]/components/catalog-line-form.tsx`, y su caso equivalente esta en
+  // `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` > «linea de catalogo — errores por
+  // codigo estable (R32, R45)».
 
   it('el borrado pide confirmacion nombrando el producto y sin confirmar no invoca la operacion', async () => {
     // R26

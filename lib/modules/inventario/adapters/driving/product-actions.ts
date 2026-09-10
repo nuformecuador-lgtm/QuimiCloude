@@ -1,7 +1,7 @@
 'use server';
 
 import { identity, inventario } from '@/lib/composition';
-import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
+import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
 
 /**
@@ -81,6 +81,15 @@ export type ProductListResult =
 const NUMERIC_FIELD_ERROR = 'Uno o mas campos numericos no son un numero valido.';
 const MISSING_ID_ERROR = 'Falta el identificador del producto.';
 
+/**
+ * QC-70 (R21): el codigo que fabrican los tres rechazos DE ESTA ACTION -los que no vienen de una
+ * clase de error de dominio- sale del CATALOGO y se tipa con `ErrorCode`, en vez de repetirse como
+ * literal suelto en tres sitios. Era el unico de los siete adaptadores driving que quedaba sin
+ * hacerlo; el valor no cambia. Con `ErrorState` en los tipos de retorno el compilador ya cazaba un
+ * codigo mal escrito, asi que esto no tapa un agujero: unifica el idioma con los otros seis.
+ */
+const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
+
 /** Sentinela de conversion fallida: distinto de `undefined` (campo ausente, valido) y de cualquier numero real. */
 const INVALID_NUMBER = Symbol('invalid-number');
 
@@ -145,7 +154,6 @@ function buildProductCandidate(formData: FormData): unknown | typeof INVALID_NUM
 
   return {
     name: readFormString(formData, 'name'),
-    presentationId: readFormString(formData, 'presentationId'),
     stock,
     qtyAlert,
     unitId: readOptionalFormString(formData, 'unitId'),
@@ -161,7 +169,7 @@ export async function createProductAction(
 
   const candidate = buildProductCandidate(formData);
   if (candidate === INVALID_NUMBER) {
-    return { status: 'error', code: 'invalid_input', message: NUMERIC_FIELD_ERROR };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
   }
 
   const actor = await currentActor();
@@ -184,7 +192,7 @@ export async function updateProductAction(
 
   const candidate = buildProductCandidate(formData);
   if (candidate === INVALID_NUMBER) {
-    return { status: 'error', code: 'invalid_input', message: NUMERIC_FIELD_ERROR };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
   }
 
   const actor = await currentActor();
@@ -206,7 +214,7 @@ export async function deleteProductAction(
 
   const id = readFormString(formData, 'id');
   if (id === '') {
-    return { status: 'error', code: 'invalid_input', message: MISSING_ID_ERROR };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: MISSING_ID_ERROR };
   }
 
   const actor = await currentActor();

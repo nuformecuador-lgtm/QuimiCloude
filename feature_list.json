@@ -504,7 +504,7 @@
       "epic_name": "Catalogos",
       "name": "pantalla-de-unidades",
       "description": "La pantalla del catalogo de unidades de medida dentro del layout privado: la lista, el formulario de alta y edicion, y el borrado. Las operaciones ya existen y las expone el CRUD de unidades como Server Actions: esta ficha es la capa visual y sus estados (vacio, cargando, error), incluyendo el error de no poder borrar una unidad que esta en uso. La forma de la pantalla -una ruta o dos, formulario en modal o en pagina, busqueda y orden- se decide al acotar esta ficha, y ahi tambien se decide si hace falta prueba de extremo a extremo. Quien la ve depende del permiso que cierre el CRUD de unidades.\n\n--- Anadido el 2026-09-07, al acotar QC-76 (equivalencia y ambito por empresa) ---\n\nDonde vive ya no se decide al acotar: la pantalla es el item configuracion/unidades, dentro de una seccion CONFIGURACION de la navegacion privada que hoy no existe y que crea esta ficha. La lista muestra NOMBRE, SIMBOLO Y EQUIVALENCIA (por ejemplo \"1 kg = 1000 gr\"). Las unidades DE SISTEMA -las que valen para todas las empresas- se distinguen visualmente de las de la empresa y NO OFRECEN EDITAR NI BORRAR, porque el service las rechaza.\n\nQueda abierto si la pantalla de presentaciones (QC-45) debe vivir tambien bajo esa seccion Configuracion.\n\n--- Corregido el 2026-09-07, al acotar QC-45 ---\n\nLA SECCION CONFIGURACION NO LA CREA ESTA FICHA: la crea QC-45 (pantalla de presentaciones), que llega antes y nace con un solo item. QC-39 anade su item de Unidades a una seccion que ya existe. QC-45 deja tambien el precedente de esta familia de pantallas: tabla compartida de QC-55, busqueda y orden de QC-57, panel lateral y E2E ligera.\n\n--- Acotada el 2026-09-08 ---\n\nLa lista muestra NOMBRE, SIMBOLO Y EQUIVALENCIA en una columna con la FRASE ARMADA (\"1 kg = 1000 gr\"); las unidades base muestran un guion. NO HAY COLUMNA DE AMBITO: que una unidad sea de sistema o de la empresa es MANEJO INTERNO y no se muestra. Esto CORRIGE el bloque del 2026-09-07, que pedia distinguirlas visualmente. Lo unico que se ve es que una unidad de sistema NO TRAE BOTONES de editar ni borrar, porque el service los rechaza.\n\nLa pantalla exige unidades.consultar Y unidades.modificar, los dos, y el item del menu declara lo mismo: QC-74 decidio que modificar NO implica consultar, asi que cortar solo por uno deja una grieta. SI HAY BUSQUEDA (por nombre), ORDEN Y PAGINACION de 10/25, lo que obliga a ABRIR EL PARAMETRO de listUnitsAction, que hoy no acepta ninguno: es el encargo que QC-38 dejo escrito en el codigo apuntando a esta ficha. Alta y edicion en PANEL LATERAL, borrado con dialogo de confirmacion. SI HAY E2E LIGERA (login, entrar, crear una unidad derivada, verla con su equivalencia, y el rechazo de quien no tiene permiso), que cierra el diferimiento de QC-38.\n\nESTA FICHA AMPLIA LO QUE DEVUELVE LA CONSULTA -la unidad de la que deriva, el factor y si es de sistema-, que hoy no viaja: UnitRef es solo id, nombre y simbolo. Sin eso la lista no puede pintar lo que se le pide. Sigue siendo zone frontend y NO SE PARTE EN DOS: es proyeccion y tipo de lectura, no logica nueva.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
@@ -919,10 +919,10 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "crud-de-usuarios",
-      "description": "Crear, consultar, editar y listar usuarios, mas CAMBIAR EL ESTADO DE LA CUENTA. La contrasena nunca se devuelve en ninguna consulta. La pantalla va aparte.\n\n--- Acotado el 2026-09-08, al acotar QC-65 ---\n\nEL ESTADO DE LA CUENTA TIENE CUATRO VALORES -active, pending, inactive, blocked- y los crea QC-65. Esta ficha ya no habilita y deshabilita: mueve la cuenta entre los cuatro. El administrador puede moverla a cualquiera de ellos, blocked incluido, porque sacar a alguien de blocked es lo natural cuando se equivoco cinco veces de contrasena. Sacarla de blocked tiene que limpiar ademas el contador de intentos fallidos o se bloquearia sola otra vez, y ESO lo implementa QC-78, no esta.\n\nEL USUARIO QUE SE CREA NACE pending, no habilitado para entrar.\n\nNO ENTRA que la contrasena sea opcional al crear el usuario ni el enlace para establecerla: va en QC-79, bloqueada por esta.",
+      "description": "Crear, consultar, editar y listar usuarios, mas CAMBIAR EL ESTADO DE LA CUENTA. La contrasena nunca se devuelve en ninguna consulta. La pantalla va aparte.\n\n--- Acotado el 2026-09-08, al acotar QC-65 ---\n\nEL ESTADO DE LA CUENTA TIENE CUATRO VALORES -active, pending, inactive, blocked- y los crea QC-65. Esta ficha ya no habilita y deshabilita: mueve la cuenta entre los cuatro. El administrador puede moverla a cualquiera de ellos, blocked incluido, porque sacar a alguien de blocked es lo natural cuando se equivoco cinco veces de contrasena. Sacarla de blocked tiene que limpiar ademas el contador de intentos fallidos o se bloquearia sola otra vez, y ESO lo implementa QC-78, no esta.\n\nEL USUARIO QUE SE CREA NACE pending, no habilitado para entrar.\n\nNO ENTRA que la contrasena sea opcional al crear el usuario ni el enlace para establecerla: va en QC-79, bloqueada por esta.\nAcotado el 2026-09-10:\n\nENTRA EL BORRADO LOGICO. La tarjeta enumeraba crear, consultar, editar, listar y mover el estado; se suma borrar, con deleted_at. Un usuario borrado no se recupera, no sale en el listado y no se puede editar ni cambiarle el estado, y su correo, su nombre de usuario y su documento quedan libres para otra persona de la misma empresa.\n\nLA CONTRASENA LA GENERA EL SISTEMA AL AZAR Y NO SE MUESTRA A NADIE. Se guarda ya transformada y no se devuelve en ninguna respuesta. CONSECUENCIA ACEPTADA: esta ficha NO DA ACCESO A NADIE. Quien entra es quien establece su contrasena por el enlace de QC-79. El usuario nace con la marca de cambiar la contrasena la primera vez que entre.\n\nHACEN FALTA DOS PERMISOS NUEVOS, usuarios.consultar y usuarios.modificar, y el catalogo cerrado pasa de once a trece con su migracion y su seed al rol Administrador.\n\nDOS GUARDAS: el administrador no puede cambiar su propio estado ni su propio rol ni borrarse, y ninguna operacion puede dejar a la empresa sin al menos un administrador en active. EL ACTOR NO SE VE A SI MISMO: ni en el listado ni pidiendo su ficha por identificador.\n\nEL LISTADO NACE ABIERTO: paginado 10/25, busqueda por nombre, correo o usuario, filtro opcional por estado y orden por apellidos y nombres, para que la pantalla no tenga que reabrir la firma despues.\n\nNO ENTRA restablecer la contrasena de otra persona: ficha nueva, bloqueada por QC-79.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "backend",
       "branch": "feature/QC-66-crud-de-usuarios",
       "depends_on": "QC-65",
@@ -1196,7 +1196,7 @@
       "epic_name": "Identidad y acceso",
       "name": "modelo-de-grupos-de-trabajo",
       "description": "Un grupo de trabajo es un conjunto de personas con nombre -\"Turno noche\", \"Planta 2\"- que existe para poder asignarles trabajo de golpe en vez de una por una. Esta ficha es SOLO el modelo: la tabla del grupo, la tabla N:M que lo une con las personas, y la migracion. Vive en el modulo de identidad, junto a usuarios, roles y permisos, porque un grupo es un conjunto de personas y las personas ya viven ahi. El grupo pertenece a UNA empresa, como la persona (QC-47). Una persona puede estar en varios grupos y un grupo tiene varias personas. El nombre del grupo es unico dentro de la empresa. Lo que NO entra: los casos de uso de alta, edicion y borrado van en QC-84; la pantalla, en QC-85. Asignar un pedido a un grupo NO entra aqui: eso es QC-86, que consume esta tabla y no la define. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1291,6 +1291,21 @@
         "QC-86"
       ],
       "spec_path": "specs/QC-88-listado-de-pedidos-asignados"
+    },
+    {
+      "key": "QC-89",
+      "id": 89,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "restablecer-contrasena-de-otro",
+      "description": "Un administrador tiene que poder devolverle el acceso a alguien que olvido su contrasena, sin conocerla ni elegirsela.\n\nNace el 2026-09-10 al acotar QC-66 con /afinar-feature. QC-66 decidio que la contrasena del alta la GENERA EL SISTEMA AL AZAR y NO SE MUESTRA A NADIE, asi que no hay ninguna via por la que un administrador pueda dar acceso escribiendo una contrasena. Quedo un hueco real: la persona que la olvida.\n\nNO ES NINGUNA DE LAS FICHAS QUE YA EXISTEN. QC-36 es cambiar MI contrasena, sabiendola. QC-79 es el ALTA sin contrasena y su enlace para establecerla. Esta es la tercera: una cuenta que ya existe y ya se usaba, cuya duena perdio el acceso.\n\nSe apoya en QC-79 y no reinventa nada: el enlace de un solo uso, su caducidad y el envio de correo los monta QC-79 -con la dependencia nueva y su aprobacion humana-, y esta ficha los reutiliza. Por eso va detras.\n\nLo que hay que decidir al acotarla, y no se decide aqui: si lo dispara el administrador o la propia persona desde la pantalla de entrar; si el restablecimiento mueve el estado de la cuenta; si invalida las sesiones abiertas de esa persona; y que permiso lo corta.\n\nLa pantalla va aparte.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-89-restablecer-contrasena-de-otro",
+      "depends_on": "QC-79",
+      "spec_path": "specs/QC-89-restablecer-contrasena-de-otro"
     }
   ]
 }

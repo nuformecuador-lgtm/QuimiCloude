@@ -14,15 +14,8 @@
 import type { ListQueryable } from './list-query';
 
 export const PRODUCT_QUERYABLE: ListQueryable = {
-  /**
-   * `presentationName` NO es una columna de `products`: es un JOIN a `presentations`, que el
-   * adaptador traduce a `orderBy: { presentation: { name: dir } }`. Se declara ordenable porque
-   * la pantalla ya muestra esa columna; **no** es filtrable por texto -para eso esta
-   * `presentationId`, que es un `select` y usa el indice que ya existe-.
-   */
-  sortable: ['name', 'presentationName', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
+  sortable: ['name', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
   filterable: {
-    presentationId: 'select',
     unitId: 'select',
     stock: 'numberRange',
     qtyAlert: 'numberRange',

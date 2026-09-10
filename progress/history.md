@@ -2475,3 +2475,103 @@ autorizando **por permiso** con el de QC-74. 36 requisitos EARS, 24 decisiones c
   real eran 160.
 - Nota de rescate: la ficha llegó a esta sesión **con 41 archivos sin commitear** en su worktree,
   huérfanos de una sesión anterior que murió. Se commitearon antes de tocar nada.
+
+## QC-83 — modelo-de-grupos-de-trabajo (cerrada el 2026-09-10, PR #50, merge `9d20152`)
+
+- El modelo de los grupos de trabajo y nada más: `work_groups`, la N:M `work_group_members`, su
+  migración con `down.sql`, y dos funciones puras de dominio (`normalizeKey`, `work-group-name`).
+  Vive en el módulo `identity` porque un grupo es un conjunto de personas. **Sin service, sin
+  Server Action, sin pantalla**: el CRUD es QC-84, la pantalla QC-85 y la asignación de pedidos
+  QC-86, que consumen esta tabla y no la definen.
+- Requisitos cubiertos: **R1–R28**, los 28 con test concreto y **verificados abriendo el test, no
+  la tabla**. 12/12 tasks. `reviewer` **APROBADO en una sola ronda** (0 mayores, 4 menores) tras
+  aplicar y revertir **18 mutaciones** propias.
+- **La decisión que sostiene la ficha: la coherencia de empresa la impone Postgres, no la
+  aplicación.** Dos claves foráneas **compuestas** —`(company_id, group_id)` y
+  `(company_id, user_id)`— hacen imposible que una pertenencia cruce empresas. El reviewer lo
+  demostró en negativo: al romperlas caen **exactamente los seis tests** que las protegen y ninguno
+  más. Se descartó el trigger (design 9.1) argumentando contra el precedente
+  `units_check_derivation`.
+- `deleted_at` es del **grupo**, no de la pertenencia: sacar a alguien de un grupo lo borra de
+  verdad y no deja rastro. El nombre es único por empresa **entre los vivos**, así que el nombre de
+  un grupo dado de baja se puede reutilizar.
+- `down.sql` **verificado contra Postgres real**, no creído: `db:rollback` + snapshot +
+  `db:migrate` + snapshot deja el esquema idéntico y **cero filas perdidas**.
+- El refactor `normalizeCompanyName` → `normalizeKey` es de **comportamiento nulo**, y lo sostiene
+  un test de QC-47 que no cambió. `normalizeKey` **no sale por el barrel**, con test que lo afirma.
+- Verificación: `./init.sh` **completo en `== init OK ==`** (273 archivos, 3451 tests; el único
+  rojo, en el baseline). RLS `ENABLE`+`FORCE` en las dos tablas, comprobado en `pg_class`. Cero
+  dependencias nuevas: el diff sobre `package.json` y `pnpm-lock.yaml` está **vacío**.
+- **Desbloquea QC-84, QC-85 y QC-86**, y con ellas destraba la cadena que dejó bloqueada QC-63
+  (`ejecutar-receta-operador`), que depende de QC-88.
+
+**Cuatro deudas que deja escritas, ninguna de su código:**
+
+- **El gate no mira dos guardias que esta ficha acaba de retensar.** `recipe-route-contract.test.ts`
+  y `recetas/module-contract.test.ts` están en `baseline-rojos.json` por una razón estructural que
+  su propia nota llama «coste aceptado», y eso **apaga el archivo entero**, incluida la guardia de
+  QC-34 que QC-83 endureció. Higiene ajena, pero con filo. **Candidata a `/afinar-regla`.**
+- **Seis archivos del baseline ya pasan** y el comparador lo avisa: `product-page.test.tsx`,
+  `order-sheet.test.tsx`, `catalog-line-sheet.test.tsx`, `supplier-page.test.tsx` y los dos de
+  arriba.
+- **`product-crud.int.test.ts` cayó en la PRIMERA corrida de la suite completa y no está en el
+  baseline.** Es flake de carga y no regresión —pasa aislado 7/7, `tests/integration` entera pasa
+  dos veces, y la segunda corrida completa sale exit 0—, y **entró al baseline el 2026-09-10 por decisión
+  humana**, con motivo y `desde`, en vez de dejar que la corrida buena tapara la mala. Es la primera
+  entrada de clase «flake de saturación» que sobrevive a QC-58, y la más cara: apaga para el
+  comparador los 6 casos de CRUD de inventario contra Postgres real. **Se retira en cuanto la suite
+  completa pase tres veces seguidas con el archivo dentro.**
+- **R27 es el único requisito cuya evidencia es un `git diff` a mano.** Nada afirma «cero archivos
+  bajo `app/`» de forma ejecutable. Es el mismo criterio que aceptó QC-47 en su R28, así que el
+  reviewer no lo elevó; conviene saberlo antes de citar este mapa como precedente.
+
+**Octava vez que `wt.sh done` falla en Windows**: desregistró el worktree pero dejó el árbol en
+disco por las rutas largas de `pnpm` (`fatal: ... is not a working tree`). Rematado con `rm -rf` +
+`git worktree prune`. Van ocho y **sigue sin ficha de arnés**.
+
+## 2026-09-09 — QC-39-pantalla-de-unidades
+
+- El catálogo de unidades de medida deja de ser administrable solo por migración: pantalla
+  propia en `/configuracion/unidades`, segundo ítem de la sección Configuración que creó
+  QC-45. Lista con búsqueda por nombre, orden y paginación de 10/25 sobre la tabla
+  compartida de QC-55 (quinta pantalla en montarla, sin tocar un solo archivo suyo), alta y
+  edición en panel lateral, y borrado con diálogo de confirmación. La equivalencia se pinta
+  como frase armada («1 kg = 1000 gr») y las unidades base muestran un guion.
+- Requisitos cubiertos: R1–R50, los 50 con test y verificados por el `reviewer` abriendo los
+  archivos, no contra el mapa de esta bitácora. PR #51, merge commit `2f98b8f`.
+  `reviewer` **APROBADO en una ronda** (0 mayores, 8 menores, tres atendidos en la rama).
+  `./init.sh` completo en `== init OK ==` (287 archivos, 3615 tests, único rojo en el
+  baseline) y E2E `e2e/unidades.spec.ts` con 4 passed en **Chromium y WebKit**, lo que cierra
+  el diferimiento que QC-38 dejó apuntando aquí.
+- Decisiones: **no hay columna de ámbito** —que una unidad sea de sistema o de la empresa es
+  manejo interno—; lo único visible es que una unidad de sistema no trae botones de editar ni
+  borrar. `UnitView` es un **tipo nuevo que extiende `UnitRef`**, no un ensanchamiento:
+  ensanchar habría arrastrado `UnitCatalog.findRefs` y el módulo de recetas, que quedan
+  intactos. `listUnitsAction` gana **sobrecargas** para aceptar la consulta, de modo que
+  recetas y proveedores compilan sin cambios. `companyId` entra al `select` pero **no sale
+  hacia el cliente**: el ámbito viaja derivado como «es de sistema».
+- Tests ajenos tocados, todos **tensando**: `data-table-alcance` sube de `>3` a `>4`
+  consumidores, `recipe-route-contract` gana la constante de ruta manteniendo la igualdad
+  exacta, y dos anclas de QC-38 en `unidades-convenciones` quedan más exigentes. Además dos
+  centinelas de alcance ajenos (`qc75-convenciones` y `account-status-scope`) se acotaron
+  endureciendo su **precondición**, sin tocar un solo aserto.
+- Deuda que deja, y no es de esta ficha cerrarla:
+  - **T13 sin hacer y ningún agente puede hacerla**: mirar con los ojos el scroll contenido
+    de la tabla en un WebKit real. La cobertura en jsdom y la corrida E2E en WebKit no
+    sustituyen esa comprobación.
+  - **Ningún test compara el catálogo de permisos del código con el de la base.** R11 estaba
+    verde contra `SEED_ROLE_PERMISSIONS` mientras la base real no tenía `unidades.modificar`,
+    y eso produjo un **404 real** a un Administrador que sí veía el enlace. Merece ficha propia.
+  - Los dos centinelas acotados quedan **permanentemente inertes** en sus casos de cambio:
+    tercer episodio de esta clase (QC-38 lo sufrió, QC-75 lo documentó, QC-39 acotó dos).
+    Pide **regla del arnés**, no parche por ficha.
+  - El gate avisa de **2 entradas del baseline que ya pasan**, y borrarlas hoy rompería el
+    gate: fallan solo al correr desde `dev`, con el rango vacío.
+- Estado de la base compartida: durante la verificación hubo que **sembrar**
+  (`unidades.modificar` no existía desde el merge de QC-38) y **aplicar la migración
+  `user_account_status`** de QC-65, que estaba mergeada sin aplicar. Ninguna era de esta ficha;
+  quedan hechas.
+- **Octava vez que `wt.sh done` falla en Windows**: desregistró el worktree pero dejó el árbol
+  en disco por las rutas largas de `pnpm`, y `rm -rf`/`Remove-Item` tampoco pudieron con él.
+  Rematado con un **espejo `robocopy /MIR` desde un directorio vacío** y luego borrado, que sí
+  vacía rutas de más de 260 caracteres. Sigue sin ficha, y ahora hay remedio conocido.

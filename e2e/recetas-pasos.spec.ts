@@ -37,7 +37,6 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { normalizePresentationName } from '@/lib/modules/inventario/domain/presentation-name';
 import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
@@ -71,7 +70,6 @@ const adminUser: Credentials = {
   password: `Qc64-Admin-${RUN_ID.slice(0, 12)}`,
 };
 
-const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
 const productName = `${FIXTURE_PREFIX}producto_${RUN_ID}`;
 const recipeName = `${FIXTURE_PREFIX}receta_${RUN_ID}`;
 const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
@@ -82,7 +80,6 @@ const ITEM_1_TEXT = `Verificar temperatura ${RUN_ID.slice(0, 8)}`;
 const ITEM_2_TEXT = `Verificar presion ${RUN_ID.slice(0, 8)}`;
 
 let companyId: string | null = null;
-let adminUserId: string | null = null;
 
 async function createAdmin(user: Credentials): Promise<string> {
   if (!companyId) {
@@ -262,20 +259,15 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  adminUserId = await createAdmin(adminUser);
+  await createAdmin(adminUser);
 
-  // Producto y presentacion de FIXTURE (no por la UI): el recorrido de esta feature es el EDITOR,
-  // no la pantalla de inventario, que ya tiene su propio E2E (QC-22).
-  const presentation = await prisma.presentation.create({
-    data: { name: presentationName, nameNormalized: normalizePresentationName(presentationName) },
-    select: { id: true },
-  });
+  // Producto de FIXTURE (no por la UI): el recorrido de esta feature es el EDITOR, no la pantalla
+  // de inventario, que ya tiene su propio E2E (QC-22). Sin presentacion desde el 2026-09-09: la
+  // presentacion se mudo a `product_batches`.
   await prisma.product.create({
     data: {
       name: productName,
       nameNormalized: normalizeProductName(productName),
-      presentationId: presentation.id,
-      createdBy: adminUserId,
     },
   });
 });
@@ -291,16 +283,12 @@ test.afterAll(async () => {
       await prisma.product.deleteMany({ where: { name: productName } });
     } finally {
       try {
-        await prisma.presentation.deleteMany({ where: { name: presentationName } });
+        await prisma.user.deleteMany({ where: { username: adminUser.username } });
       } finally {
         try {
-          await prisma.user.deleteMany({ where: { username: adminUser.username } });
+          await prisma.company.deleteMany({ where: { name: companyName } });
         } finally {
-          try {
-            await prisma.company.deleteMany({ where: { name: companyName } });
-          } finally {
-            await prisma.$disconnect();
-          }
+          await prisma.$disconnect();
         }
       }
     }

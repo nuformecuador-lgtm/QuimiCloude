@@ -24,6 +24,11 @@ export {
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { ProductField } from './product-field';
 export { ProductForm } from './product-form';
+export {
+  PRODUCT_NAME_FIELD,
+  ProductNamePicker,
+  type ProductNameOption,
+} from './product-name-picker';
 export { ProductListEmpty } from './product-list-empty';
 export { ProductListError } from './product-list-error';
 export {

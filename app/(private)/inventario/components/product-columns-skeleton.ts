@@ -12,4 +12,4 @@
  * Archivo aparte -y sin `'use client'`- justamente para poder importarse desde el servidor sin
  * tocar la declaracion de columnas.
  */
-export const PRODUCT_SKELETON_COLUMN_COUNT = 6;
+export const PRODUCT_SKELETON_COLUMN_COUNT = 5;

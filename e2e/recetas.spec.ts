@@ -58,7 +58,6 @@ import {
   ROLE_OPERADOR,
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { normalizePresentationName } from '@/lib/modules/inventario/domain/presentation-name';
 import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
 import { prisma } from '@/lib/shared/db/prisma';
 import { DASHBOARD_ROUTE, FORMULAS_ROUTE, LOGIN_ROUTE, NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
@@ -93,7 +92,6 @@ const operatorUser: Credentials = {
 };
 
 /** Nombres de los datos de catalogo que este spec crea como fixture (no por la UI). */
-const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
 const productName = `${FIXTURE_PREFIX}producto_${RUN_ID}`;
 
 /** Nombre de la receta que el recorrido del Administrador da de alta POR LA UI. */
@@ -107,8 +105,6 @@ const recipeName = `${FIXTURE_PREFIX}receta_${RUN_ID}`;
 const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
 
 let companyId: string | null = null;
-
-let adminUserId: string | null = null;
 
 async function createUserWithRole(user: Credentials, roleName: string): Promise<string> {
   if (!companyId) {
@@ -255,24 +251,19 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  adminUserId = await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
+  await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);
 
-  // Producto y presentacion de FIXTURE (no por la UI): lo que R52 pide es una linea con «producto
-  // de fixture», y crearlo aqui deja el recorrido del Administrador centrado en la pantalla de
-  // recetas, no en la de inventario -que ya tiene su propio E2E (QC-22).
-  const presentation = await prisma.presentation.create({
-    data: { name: presentationName, nameNormalized: normalizePresentationName(presentationName) },
-    select: { id: true },
-  });
+  // Producto de FIXTURE (no por la UI): lo que R52 pide es una linea con «producto de fixture»,
+  // y crearlo aqui deja el recorrido del Administrador centrado en la pantalla de recetas, no en
+  // la de inventario -que ya tiene su propio E2E (QC-22). Sin presentacion desde el 2026-09-09:
+  // la presentacion se mudo a `product_batches`.
   await prisma.product.create({
     // `name_normalized` (QC-57) es NOT NULL: el fixture la escribe con la MISMA funcion del
-    // dominio que usa la app, igual que la presentacion de arriba con la suya.
+    // dominio que usa la app.
     data: {
       name: productName,
       nameNormalized: normalizeProductName(productName),
-      presentationId: presentation.id,
-      createdBy: adminUserId,
     },
   });
 });
@@ -297,20 +288,16 @@ test.afterAll(async () => {
       await prisma.product.deleteMany({ where: { name: productName } });
     } finally {
       try {
-        await prisma.presentation.deleteMany({ where: { name: presentationName } });
+        await prisma.user.deleteMany({
+          where: { username: { in: [adminUser.username, operatorUser.username] } },
+        });
       } finally {
+        // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict`
+        // (QC-47 R11). Por el nombre EXACTO de ESTE worker, nunca por el prefijo.
         try {
-          await prisma.user.deleteMany({
-            where: { username: { in: [adminUser.username, operatorUser.username] } },
-          });
+          await prisma.company.deleteMany({ where: { name: companyName } });
         } finally {
-          // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict`
-          // (QC-47 R11). Por el nombre EXACTO de ESTE worker, nunca por el prefijo.
-          try {
-            await prisma.company.deleteMany({ where: { name: companyName } });
-          } finally {
-            await prisma.$disconnect();
-          }
+          await prisma.$disconnect();
         }
       }
     }

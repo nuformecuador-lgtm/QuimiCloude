@@ -36,6 +36,7 @@ export function createGetRecipe(
     const productIds = row.lines.map((line) => line.productId);
     const refs = productIds.length > 0 ? await deps.products.findRefs(productIds) : [];
     const namesById = new Map(refs.map((ref) => [ref.id, ref.name]));
+    const stocksById = new Map(refs.map((ref) => [ref.id, ref.stock]));
 
     return {
       id: row.id,
@@ -55,6 +56,7 @@ export function createGetRecipe(
         productName: namesById.get(line.productId) ?? null,
         quantity: line.quantity,
         unitId: line.unitId,
+        productStock: stocksById.get(line.productId) ?? null,
       })),
     };
   };

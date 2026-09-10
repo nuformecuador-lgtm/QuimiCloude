@@ -1,12 +1,8 @@
 'use client';
 
-import { useActionState, useEffect, useId } from 'react';
+import { useActionState, useEffect, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import {
-  PRESENTATION_FIELD,
-  PresentationSelect,
-} from '@/components/shared/presentation-select';
 import { Button } from '@/components/ui/button';
 import {
   SheetClose,
@@ -23,11 +19,12 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
 import { ProductField } from './product-field';
+import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
- * Campos de texto del producto. `presentationId` no esta aqui: lo aporta su propio selector (T8).
+ * Campos de texto del producto.
  *
  * **La unidad tampoco esta**, y no por descuido: ver el comentario del formulario mas abajo.
  *
@@ -40,15 +37,11 @@ const TEXT_FIELDS = ['name'] as const;
 /** Campos enteros. `FormData` solo entrega cadenas, asi que se convierten antes de validar. */
 const INT_FIELDS = ['stock', 'qtyAlert'] as const;
 
-type ProductFieldName =
-  | (typeof TEXT_FIELDS)[number]
-  | (typeof INT_FIELDS)[number]
-  | typeof PRESENTATION_FIELD;
+type ProductFieldName = (typeof TEXT_FIELDS)[number] | (typeof INT_FIELDS)[number];
 
 const ALL_FIELDS: readonly ProductFieldName[] = [
   ...TEXT_FIELDS,
   ...INT_FIELDS,
-  PRESENTATION_FIELD,
 ];
 
 /**
@@ -57,14 +50,12 @@ const ALL_FIELDS: readonly ProductFieldName[] = [
  */
 const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   name: 'Escribe un nombre de 1 a 120 caracteres.',
-  presentationId: 'Elige una presentación.',
   stock: 'Debe ser un número entero de 0 o más.',
   qtyAlert: 'Debe ser un número entero de 0 o más.',
 };
 
 const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
-  presentationId: 'Presentación',
   stock: 'Existencia',
   qtyAlert: 'Alerta de cantidad',
 };
@@ -167,6 +158,21 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
+  /**
+   * Autocompletado al elegir un producto existente (decision humana del 2026-09-09): solo
+   * alerta de cantidad. La existencia la escribe el usuario -es el inventario ACTUAL del
+   * producto nuevo, no el del elegido-.
+   */
+  const [template, setTemplate] = useState<{
+    readonly qtyAlert: string;
+  } | null>(null);
+
+  function applyTemplate(option: ProductNameOption) {
+    setTemplate({
+      qtyAlert: option.qtyAlert === null ? '' : String(option.qtyAlert),
+    });
+  }
+
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
     const values = readValues(formData);
     const fieldErrors: FieldErrors = {};
@@ -181,9 +187,11 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
       if (parsed !== undefined) numbers[field] = parsed;
     }
 
+    // Costos: el costo de compra NO es un campo de inventario (R5, QC-52). Solo se registra en
+    // los lotes, y la ficha que recoja lotes anadira el campo cuando toque.
+
     const candidate = {
       name: values.name,
-      presentationId: values.presentationId,
       ...numbers,
     };
 
@@ -293,25 +301,30 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         </div>
       ) : null}
 
-      <ProductField
-        name="name"
-        label={FIELD_LABELS.name}
-        type="text"
-        required
-        defaultValue={initialValue('name', product?.name ?? '')}
-        error={fieldErrors.name}
-      />
-
       {/*
-        `defaultLabel` ahorra la consulta de resolucion del selector: `ProductView` ya trae el
-        nombre de la presentacion, asi que editar un producto no vuelve a pedir la primera pagina
-        solo para saber como se llama la que ya tiene.
+        En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
+        autocompletan presentacion y alerta (decision humana del 2026-09-09). En la EDICION el
+        nombre sigue siendo un campo de texto plano: no hay otro producto del que copiar nada.
       */}
-      <PresentationSelect
-        defaultValue={initialValue(PRESENTATION_FIELD, product?.presentationId ?? '') || undefined}
-        defaultLabel={product?.presentationName}
-        error={fieldErrors.presentationId}
-      />
+      {isEdit ? (
+        <ProductField
+          name="name"
+          label={FIELD_LABELS.name}
+          type="text"
+          required
+          defaultValue={initialValue('name', product?.name ?? '')}
+          error={fieldErrors.name}
+        />
+      ) : (
+        <ProductNamePicker
+          defaultValue={initialValue('name', '')}
+          error={fieldErrors.name}
+          onSelect={applyTemplate}
+        />
+      )}
+
+      {/* La presentacion se mudo a `product_batches` (2026-09-09): el producto ya no la tiene;
+        la lleva el LOTE. El alta no la pide: la ficha que cargue lotes la pedira ahi. */}
 
       <ProductField
         name="stock"
@@ -345,7 +358,7 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         type="number"
         required
         helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
-        defaultValue={initialValue('qtyAlert', product?.qtyAlert?.toString() ?? '')}
+        defaultValue={initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert?.toString() ?? '')}
         error={fieldErrors.qtyAlert}
       />
 

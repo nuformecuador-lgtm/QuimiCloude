@@ -56,7 +56,10 @@ const FILA_RECETA: RecipeRow = {
   lines: [{ id: 'linea-1', productId: LINEA_VALIDA.productId, quantity: '10.5000', unitId: UNIT_ID }],
 };
 
-const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unitId: null };
+// dev anadio `stock` a `ProductRef` el 2026-09-09 (`419f01e`) y no actualizo estos dobles.
+// `null` es «no declara existencia», que es lo que el fixture decia ya por omision: el valor
+// no cambia el comportamiento de ningun caso, solo satisface el tipo.
+const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unitId: null, stock: null };
 
 const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
 

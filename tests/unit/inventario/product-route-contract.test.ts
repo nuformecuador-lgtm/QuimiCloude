@@ -350,13 +350,11 @@ describe('contrato de la ruta de inventario', () => {
     expect(enlace?.permission).toBe(permiso?.code);
   });
 
-  it('la tabla no puede pintar quien creo o modifico un producto', () => {
-    // R7 — test **en negativo** sobre la fuente: el dato existe en `ProductView` y esta a un
-    // caracter de distancia de aparecer en la pantalla.
-    //
-    // Lo prohibido es **leerlo o declararlo como columna**, no nombrarlo: la declaracion de
-    // columnas nombra los dos campos justamente para EXCLUIRLOS del tipo, y una prohibicion
-    // ciega borraria esa defensa al primer cambio, que es como mueren las guardias.
+  it('la tabla no puede pintar quien creo o modifico un producto, ni su presentacion', () => {
+    // Test **en negativo** sobre la fuente. La autoria y la presentacion se mudaron a
+    // `product_batches` el 2026-09-09, asi que ya no existen en `ProductView` y no pueden
+    // pintarse por ninguna via. La prohibicion se mantiene como guardia: si alguien las
+    // reintroduce, el dato aparece y esto se rompe.
     ningunArchivoContiene([
       '.createdBy',
       '.updatedBy',
@@ -368,19 +366,15 @@ describe('contrato de la ruta de inventario', () => {
       "'product-column-updatedBy'",
     ]);
 
-    // Y la defensa de tipos sigue en pie: `id: 'createdBy'` ni siquiera compilaria.
-    //
-    // MIGRADO 2026-09-07: el archivo es `.tsx` -sus celdas devuelven marcado desde que la
-    // pantalla monta la tabla compartida- y la clave de columna se llama `id`, que es como la
-    // nombra `DataTableColumn`. Lo que se comprueba no cambia: que el tipo se DERIVE de
-    // `ProductView` excluyendo los campos prohibidos, en vez de ser una union escrita a mano que
-    // alguien amplie sin pensar.
+    // Y la defensa de tipos sigue en pie: el tipo de columna se DERIVA de `ProductView`
+    // excluyendo los campos prohibidos, en vez de ser una union escrita a mano que alguien
+    // amplie sin pensar.
     const columnas = fuenteSinComentarios(
       join(COMPONENTES_PATH, 'product-columns.tsx').split('\\').join('/'),
     );
     expect(columnas).toContain('Exclude<keyof ProductView');
-    expect(columnas).toContain("'createdBy'");
-    expect(columnas).toContain("'updatedBy'");
+    expect(columnas).toContain("'unitId'");
+    expect(columnas).toContain("'imagePath'");
   });
 
   it('el costo, la compra minima y el tiempo de entrega no se nombran en ningun archivo de la ruta', () => {

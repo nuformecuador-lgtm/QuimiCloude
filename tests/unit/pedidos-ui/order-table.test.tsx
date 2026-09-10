@@ -53,6 +53,31 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
   };
 });
 
+// El panel de edicion monta `OrderForm` en cada fila y su efecto pide el detalle de la receta
+// para los ingredientes: sin este doble, la llamada iria a la sesion real (R43).
+vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipesAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
+  })),
+  getRecipeAction: vi.fn(async (id: string) => ({
+    status: 'success' as const,
+    data: {
+      id,
+      name: 'Receta',
+      description: null,
+      imageUrl: null,
+      stepCount: 0,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      steps: [],
+      lines: [],
+    },
+  })),
+}));
+
 function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
     id,
@@ -95,6 +120,7 @@ function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
  * ningun caso de este archivo abre el panel, y lo que se comprueba aqui es la lista.
  */
 const RECETAS = { items: [], totalPages: 1 };
+const UNIDADES = [] as const;
 
 function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
   const params = parametros(overrides);
@@ -104,6 +130,7 @@ function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
       params={params}
       totalPages={totalPages}
       recipes={RECETAS}
+      units={UNIDADES}
     />,
   );
   return params;

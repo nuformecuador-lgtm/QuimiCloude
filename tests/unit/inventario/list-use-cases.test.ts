@@ -218,7 +218,7 @@ describe('list-products: lo que llega al repositorio (R11, R13, R15, R20, R24, R
       {
         filters: {
           stock: { kind: 'numberRange', min: 5, max: null },
-          presentationId: { kind: 'select', values: ['p1', 'p2'] },
+          unitId: { kind: 'select', values: ['u1', 'u2'] },
         },
       },
       ADMIN,
@@ -226,7 +226,7 @@ describe('list-products: lo que llega al repositorio (R11, R13, R15, R20, R24, R
 
     expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual({
       stock: { kind: 'numberRange', min: 5, max: null },
-      presentationId: { kind: 'select', values: ['p1', 'p2'] },
+      unitId: { kind: 'select', values: ['u1', 'u2'] },
     });
   });
 

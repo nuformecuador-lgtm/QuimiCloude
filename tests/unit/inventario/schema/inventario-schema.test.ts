@@ -88,6 +88,7 @@ function parseModel(name: string): PrismaModel {
 
 const presentation = parseModel('Presentation')
 const product = parseModel('Product')
+const productBatch = parseModel('ProductBatch')
 
 function field(model: PrismaModel, name: string): PrismaField {
   const found = model.fields.find((candidate) => candidate.name === name)
@@ -203,7 +204,6 @@ function expectUnitCatalogIsNotAnEnum(): void {
  *  `DROP COLUMN` legitimos de esta ficha. */
 const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['name', 'name'],
-  ['presentationId', 'presentation_id'],
   ['stock', 'stock'],
   ['qtyAlert', 'qty_alert'],
   ['unitId', 'unit_id'],
@@ -256,31 +256,24 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('el esquema declara exactamente dos modelos nuevos: Presentation y Product', () => {
     // R3: una sola entidad de producto. Ninguna tabla separada de «elemento de inventario».
     //
-    // ACOTADO EL 2026-09-02 POR QC-24 (`specs/QC-24-modelo-recetas/`). Este caso enumeraba
-    // los modelos del esquema ENTERO y exigia que fueran exactamente los cinco que habia el
-    // dia que se escribio. Eso no es lo que R3 pide —R3 habla de la entidad de producto— y
-    // convertia en rojo a cualquier feature posterior que anadiera un modelo: QC-24 anadio
-    // `Recipe` y `RecipeLine`, que son de `recetas` y no tienen nada que ver con esta ficha.
-    // Un test que se rompe cuando llega la feature siguiente estaba midiendo el repo, no su
-    // feature. Se acota a lo que QC-14 garantiza SOBRE SI MISMA: cuantos modelos declara
-    // `inventario`, que los de `identity` siguen ahi sin adoptar, y que la entidad separada
-    // que la decision cerrada 1 fusiono no existe en ninguna parte del esquema. No se relaja
-    // ninguna de esas tres: se relaja el censo global, que no era un requisito.
+    // ACOTADO EL 2026-09-09: la presentacion y la autoria se mudaron de `products` a
+    // `product_batches`, que es un TERCER modelo de `inventario`. Lo que R3 protegia —que la
+    // entidad separada «elemento de inventario» no exista— sigue intacto.
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
       .sort()
 
     // Los modelos que declara `inventario`, leidos de su `/// @module` (mismo criterio que
-    // el caso de R20). Son DOS: la unica entidad de producto y su catalogo de presentacion.
+    // el caso de R20). Son TRES: la entidad de producto, su catalogo de presentacion y el lote.
     const inventarioModels = [
       ...rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g),
     ]
       .filter(([, moduleName]) => moduleName === 'inventario')
       .map(([, , modelName]) => modelName)
       .sort()
-    expect(inventarioModels).toEqual(['Presentation', 'Product'])
-    expect(inventarioModels).toHaveLength(2)
+    expect(inventarioModels).toEqual(['Presentation', 'Product', 'ProductBatch'])
+    expect(inventarioModels).toHaveLength(3)
 
     // Los tres de `identity` siguen existiendo: esta feature no los toco ni los absorbio.
     for (const owned of ['DocumentType', 'Role', 'User']) {
@@ -295,12 +288,13 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
   })
 
   it('Product declara sus datos de negocio en una sola tabla, sin los tres que QC-52 le quito', () => {
-    // R3 de QC-14, acotado por QC-52 R1 y R2: nombre, presentacion, existencia, cantidad de
-    // alerta, unidad y ruta de imagen. Los seis, en `products`, y ninguno mas.
+    // R3 de QC-14, acotado por QC-52 R1 y R2: nombre, existencia, cantidad de alerta, unidad
+    // y ruta de imagen. Sin presentacion ni autoria, que se mudaron a `product_batches` el
+    // 2026-09-09.
     for (const [name] of PRODUCT_BUSINESS_FIELDS) {
       expect(has(product, name), `falta el campo Product.${name}`).toBe(true)
     }
-    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(6)
+    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(5)
 
     // QC-52 R1: los tres no pueden volver al modelo por descuido. Se afirma en negativo y
     // por separado del censo de abajo, para que el motivo quede escrito.
@@ -310,9 +304,12 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       )
     }
 
+    // La presentacion y la autoria tampoco pueden volver: se mudaron al lote.
+    for (const name of ['presentationId', 'presentation', 'createdBy', 'updatedBy']) {
+      expect(has(product, name), `Product.${name} se mudo a ProductBatch`).toBe(false)
+    }
+
     // La lista completa de columnas: si alguien anade o quita una, este test lo dice.
-    // `createdBy`/`updatedBy` los anade QC-20 (design.md > 2.1, R6, R7): campos ESCALARES
-    // a proposito, sin `@relation`, para que el ORM no pueda atravesar hacia `users`.
     const scalarNames = product.fields
       .filter((candidate) => !candidate.isList && candidate.type !== 'Presentation')
       .map((candidate) => candidate.name)
@@ -329,48 +326,78 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         'createdAt',
         'updatedAt',
         'deletedAt',
-        'createdBy',
-        'updatedBy',
       ].sort(),
     )
     expect(product.body).toContain('@@map("products")')
   })
 
-  it('createdBy y updatedBy (QC-20) son escalares, UUID, anulables y sin @relation', () => {
-    // design.md > 2.1 a: SIN `@relation` de Prisma. Es lo que impide
-    // `include: { createdByUser: true }` desde el adaptador de `inventario` -una lectura de
-    // `users` desde otro modulo que la guardia de arquitectura no ve, porque busca la
-    // cadena `prisma.user`-. design.md > 2.1 b: anulables, porque no hay backfill posible.
+  it('ProductBatch declara la presentacion, el stock, el coste y la autoria mudados desde products', () => {
+    // La presentacion, la autoria, el stock y el coste viven ahora en el LOTE, no en el
+    // producto (2026-09-09). Lo que se comprueba es la FORMA del modelo nuevo.
+    const productId = field(productBatch, 'productId')
+    expect(productId.type).toBe('String')
+    expect(productId.isOptional).toBe(false)
+    expect(productId.attributes).toContain('@db.Uuid')
+
+    const presentationId = field(productBatch, 'presentationId')
+    expect(presentationId.type).toBe('String')
+    expect(presentationId.isOptional).toBe(false)
+    expect(presentationId.attributes).toContain('@db.Uuid')
+    expect(presentationId.attributes).toContain('@map("presentation_id")')
+
+    const stock = field(productBatch, 'stock')
+    expect(stock.type).toBe('Int')
+    expect(stock.isOptional).toBe(false)
+
+    const unitCost = field(productBatch, 'unitCost')
+    expect(unitCost.type).toBe('Decimal')
+    expect(unitCost.isOptional).toBe(false)
+    expect(unitCost.attributes).toContain('@map("unit_cost")')
+    expect(unitCost.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
+
+    const lot = field(productBatch, 'lot')
+    expect(lot.type).toBe('String')
+    expect(lot.isOptional).toBe(true)
+    expect(lot.attributes).toContain('@map("lot")')
+
+    const expiryDate = field(productBatch, 'expiryDate')
+    expect(expiryDate.type).toBe('DateTime')
+    expect(expiryDate.isOptional).toBe(true)
+    expect(expiryDate.attributes).toContain('@map("expiry_date")')
+    expect(expiryDate.attributes).toContain('@db.Date')
+
     for (const name of ['createdBy', 'updatedBy'] as const) {
-      const candidate = field(product, name)
-      expect(candidate.type, `Product.${name} debe ser String`).toBe('String')
-      expect(candidate.isOptional, `Product.${name} debe ser anulable`).toBe(true)
+      const candidate = field(productBatch, name)
+      expect(candidate.type, `ProductBatch.${name} debe ser String`).toBe('String')
+      expect(candidate.isOptional, `ProductBatch.${name} debe ser anulable`).toBe(true)
       expect(candidate.attributes).toContain('@db.Uuid')
       expect(candidate.attributes).not.toMatch(/@default\(/)
     }
-    expect(field(product, 'createdBy').attributes).toContain('@map("created_by")')
-    expect(field(product, 'updatedBy').attributes).toContain('@map("updated_by")')
+    expect(field(productBatch, 'createdBy').attributes).toContain('@map("created_by")')
+    expect(field(productBatch, 'updatedBy').attributes).toContain('@map("updated_by")')
 
     // Ninguna relacion Prisma hacia `User` en todo el modelo: la FK real vive escrita a
     // mano en el SQL de la migracion, no en el esquema.
-    expect(product.body).not.toMatch(/@relation\([^)]*fields:\s*\[created_by\]/i)
-    expect(product.body).not.toMatch(/@relation\([^)]*fields:\s*\[updated_by\]/i)
-    expect(product.body).not.toMatch(/\bUser\b/)
+    expect(productBatch.body).not.toMatch(/\bUser\b/)
+
+    // La relacion con Product y Presentation SI lleva @relation (ambas son de inventario).
+    expect(productBatch.body).toMatch(/product\s+Product\s+@relation\(/)
+    expect(productBatch.body).toMatch(/presentation\s+Presentation\s+@relation\(/)
+
+    expect(productBatch.body).toContain('@@map("product_batches")')
+    expect(productBatch.body).toMatch(/@@index\(\[productId\],\s*map:\s*"product_batches_product_id_idx"\)/)
+    expect(productBatch.body).toMatch(/@@index\(\[presentationId\],\s*map:\s*"product_batches_presentation_id_idx"\)/)
+    expect(productBatch.body).toMatch(/@@index\(\[createdBy\],\s*map:\s*"product_batches_created_by_idx"\)/)
+    expect(productBatch.body).toMatch(/@@index\(\[updatedBy\],\s*map:\s*"product_batches_updated_by_idx"\)/)
   })
 
-  it('name y presentationId son obligatorios y sin default', () => {
-    // R4: sin nombre o sin presentacion no hay fila. Obligatorio de verdad: un `@default`
-    // rellenaria el hueco en silencio y el rechazo no ocurriria nunca.
-    for (const name of ['name', 'presentationId'] as const) {
-      const candidate = field(product, name)
-      expect(candidate.isOptional, `Product.${name} no puede ser opcional`).toBe(false)
-      expect(candidate.attributes, `Product.${name} no debe tener @default`).not.toMatch(
-        /@default\(/,
-      )
-    }
-    expect(field(product, 'name').type).toBe('String')
-    expect(field(product, 'presentationId').type).toBe('String')
-    expect(field(product, 'presentationId').attributes).toContain('@db.Uuid')
+  it('name es obligatorio y sin default', () => {
+    // R4: sin nombre no hay fila. Obligatorio de verdad: un `@default` rellenaria el hueco
+    // en silencio y el rechazo no ocurriria nunca.
+    const candidate = field(product, 'name')
+    expect(candidate.isOptional, 'Product.name no puede ser opcional').toBe(false)
+    expect(candidate.attributes, 'Product.name no debe tener @default').not.toMatch(/@default\(/)
+    expect(candidate.type).toBe('String')
   })
 
   it('stock, qtyAlert, unitId e imagePath son opcionales', () => {
@@ -497,14 +524,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(generated.map((candidate) => candidate.name)).toEqual(['id'])
   })
 
-  it('la relacion Product-Presentation es obligatoria', () => {
-    // R12: exactamente una presentacion por producto, y la FK garantiza que existe.
-    const presentationId = field(product, 'presentationId')
+  it('la relacion ProductBatch-Presentation es obligatoria', () => {
+    // La presentacion es del LOTE desde el 2026-09-09: exactamente una por lote, y la FK
+    // garantiza que existe.
+    const presentationId = field(productBatch, 'presentationId')
     expect(presentationId.isOptional).toBe(false)
     expect(presentationId.attributes).toContain('@db.Uuid')
     expect(presentationId.attributes).toContain('@map("presentation_id")')
 
-    const relation = field(product, 'presentation')
+    const relation = field(productBatch, 'presentation')
     expect(relation.type).toBe('Presentation')
     expect(relation.isOptional).toBe(false)
     expect(relation.isList).toBe(false)
@@ -514,28 +542,25 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
   })
 
   it('presentationId no tiene restriccion de unicidad', () => {
-    // R13: una presentacion la comparten productos ilimitados. Un `@unique` aqui
-    // convertiria la relacion en 1-1 y romperia R13 en silencio.
-    expect(field(product, 'presentationId').attributes).not.toMatch(/@unique/)
-    expect(product.body).not.toMatch(/@@unique\([^)]*presentationId/)
-    expect(field(presentation, 'products').isList).toBe(true)
-    expect(field(presentation, 'products').type).toBe('Product')
+    // Una presentacion la comparten lotes ilimitados. Un `@unique` aqui convertiria la
+    // relacion en 1-1 y romperia la comparticion en silencio.
+    expect(field(productBatch, 'presentationId').attributes).not.toMatch(/@unique/)
+    expect(productBatch.body).not.toMatch(/@@unique\([^)]*presentationId/)
+    expect(field(presentation, 'batches').isList).toBe(true)
+    expect(field(presentation, 'batches').type).toBe('ProductBatch')
     // El indice del lado hijo existe, pero NO es unico: Postgres no lo crea solo.
-    expect(product.body).toMatch(
-      /@@index\(\[presentationId\],\s*map:\s*"products_presentation_id_idx"\)/,
+    expect(productBatch.body).toMatch(
+      /@@index\(\[presentationId\],\s*map:\s*"product_batches_presentation_id_idx"\)/,
     )
   })
 
-  it('la relacion Product-Presentation declara onDelete Restrict', () => {
-    // R14: borrar una presentacion con productos —vivos o borrados logicamente— se
-    // rechaza en la base. `Cascade` o `SetNull` la incumplirian sin ruido.
-    const relation = field(product, 'presentation')
+  it('la relacion ProductBatch-Presentation declara onDelete Restrict', () => {
+    // Borrar una presentacion con lotes asignados se rechaza en la base. `Cascade` o
+    // `SetNull` la incumplirian sin ruido.
+    const relation = field(productBatch, 'presentation')
     expect(relation.attributes).toMatch(/onDelete:\s*Restrict/)
     expect(relation.attributes).not.toMatch(/onDelete:\s*(Cascade|SetNull|SetDefault|NoAction)/)
     expect(relation.attributes).toMatch(/onUpdate:\s*Cascade/)
-    // Lo que sostiene «incluidos los productos borrados logicamente»: el borrado logico
-    // es un UPDATE, la fila sigue ahi y la FK sigue apuntando a la presentacion.
-    expect(has(product, 'deletedAt')).toBe(true)
     expect(has(presentation, 'deletedAt')).toBe(false)
   })
 
@@ -615,14 +640,12 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     const indexMaps = [...product.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g)].map(
       (match) => match[1],
     )
-    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
-    // este caso vigila —que TODO indice de `products` este en ingles y que la lista sea
-    // cerrada, para que anadir uno a escondidas ponga el test rojo—; solo se suma el indice
-    // de la FK nueva `products_unit_id_idx` (QC-32 R20).
-    expect(indexMaps).toEqual(['products_presentation_id_idx', 'products_unit_id_idx'])
+    // 2026-09-09: la presentacion se mudo a `product_batches`, asi que `products` conserva
+    // SOLO el indice de la FK de unidad (`products_unit_id_idx`, QC-32 R20).
+    expect(indexMaps).toEqual(['products_unit_id_idx'])
   })
 
-  it('los dos modelos declaran /// @module inventario', () => {
+  it('los tres modelos declaran /// @module inventario', () => {
     // R20: modulo propietario declarado en el esquema. Se lee el texto CRUDO porque
     // `stripComments` se lleva justamente lo que aqui hay que comprobar.
     const owners = new Map<string, string>()
@@ -633,12 +656,13 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     }
     expect(owners.get('Presentation')).toBe('inventario')
     expect(owners.get('Product')).toBe('inventario')
+    expect(owners.get('ProductBatch')).toBe('inventario')
 
     const inventarioModels = [...owners.entries()]
       .filter(([, moduleName]) => moduleName === 'inventario')
       .map(([modelName]) => modelName)
       .sort()
-    expect(inventarioModels).toEqual(['Presentation', 'Product'])
+    expect(inventarioModels).toEqual(['Presentation', 'Product', 'ProductBatch'])
     // Los modelos de `identity` siguen siendo de `identity`: esta feature no los adopta.
     expect(owners.get('User')).toBe('identity')
     expect(owners.get('Role')).toBe('identity')

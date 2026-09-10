@@ -184,6 +184,25 @@ describe('selector de receta (R31, R43)', () => {
     expect(screen.getByTestId(testId.campo)).toHaveValue(RECETA_LEJANA.name);
   });
 
+  it('escribir algo distinto de lo elegido RETIRA la eleccion y avisa con null', async () => {
+    // Decision humana del 2026-09-09: el id que viaja tiene que ser exactamente lo que se lee. Si
+    // el campo termina diciendo «crema 1a», la receta «crema 1» no puede guardarse, y el id oculto
+    // tiene que dejarlo claro: queda vacio y el formulario se entera por `onSelect(null)`.
+    const user = setupUser();
+    const onSelect = vi.fn();
+    renderPicker({
+      defaultValue: RECETA_LEJANA.id,
+      defaultLabel: RECETA_LEJANA.name,
+      onSelect,
+    });
+    expect(loQueSeEnviaria().get(RECIPE_FIELD)).toBe(RECETA_LEJANA.id);
+
+    await user.type(screen.getByTestId(testId.campo), 'a');
+
+    expect(loQueSeEnviaria().get(RECIPE_FIELD)).toBe('');
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
   it('no importa ninguna operacion de creacion de recetas ni filtra por texto en memoria', () => {
     // R31, R32 por analogia — guardia de FUENTE: el selector solo elige entre las existentes, y
     // un `.filter(` en este archivo es exactamente por donde volveria el filtrado en cliente.

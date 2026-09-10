@@ -190,28 +190,18 @@ function normalizeProductNameForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '')
 }
 
-/** Producto vivo con su propia presentacion, para usar como linea de receta. */
+/** Producto vivo, para usar como linea de receta. Sin presentacion desde el 2026-09-09. */
 async function createTestProduct(db: Db, name = `Producto ${token()}`): Promise<string> {
-  const marker = token();
-  const presentation = await db.presentation.create({
-    data: { name: `Presentacion ${marker}`, nameNormalized: `presentacion${marker}` },
-    select: { id: true },
-  });
   const product = await db.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name), presentationId: presentation.id },
+    data: { name, nameNormalized: normalizeProductNameForTest(name) },
     select: { id: true },
   });
   return product.id;
 }
 
-/** Borra un producto de prueba y su presentacion, en ese orden (FK). */
+/** Borra un producto de prueba. */
 async function deleteTestProduct(db: Db, productId: string): Promise<void> {
-  const product = await db.product.findUniqueOrThrow({
-    where: { id: productId },
-    select: { presentationId: true },
-  });
   await db.product.delete({ where: { id: productId } });
-  await db.presentation.delete({ where: { id: product.presentationId } });
 }
 
 function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {

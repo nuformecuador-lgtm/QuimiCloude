@@ -28,7 +28,6 @@ import { randomUUID } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizeProductName } from '@/lib/modules/inventario'
 import {
   createProduct,
@@ -36,83 +35,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { Prisma } from '@prisma/client'
-
-type Db = Prisma.TransactionClient
-
 function token(): string {
   return randomUUID().replace(/-/gu, '')
-}
-
-/** Copia local de la normalizacion, para los datos de APOYO (presentacion, unidad). */
-function normalizeForTest(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[^a-z0-9]/gu, '')
-}
-
-async function createTestPresentation(db: Db): Promise<string> {
-  const name = `Bidon ${token()}`
-  const presentation = await db.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name) },
-    select: { id: true },
-  })
-  return presentation.id
-}
-
-/** Usuario REAL: `created_by`/`updated_by` son FK a `users` (escritas a mano, QC-20). */
-async function createTestUser(db: Db): Promise<string> {
-  const marker = token()
-  const documentType = await db.documentType.create({
-    data: { code: `DOC${marker.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
-    select: { code: true },
-  })
-  const role = await db.role.create({
-    data: { name: `rol-${marker}`, description: 'Rol de prueba' },
-    select: { id: true },
-  })
-  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
-  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
-  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
-  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
-  // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de la copia
-  // local `normalizeForTest`, que es solo para los datos de apoyo.
-  const companyName = `Empresa ${marker}`
-  const company = await db.company.create({
-    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
-    select: { id: true },
-  })
-  const user = await db.user.create({
-    data: {
-      firstNames: 'Ana Maria',
-      lastNames: 'Perez Gomez',
-      birthDate: new Date('1990-05-17T00:00:00.000Z'),
-      email: `ana.${marker}@quimicloude.test`,
-      phone: '+57 300 111 2233',
-      documentTypeCode: documentType.code,
-      documentNumber: marker.slice(0, 12),
-      username: `ana.${marker}`,
-      passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
-      roleId: role.id,
-      companyId: company.id,
-    },
-    select: { id: true },
-  })
-  return user.id
-}
-
-async function deleteTestUser(db: Db, userId: string): Promise<void> {
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { roleId: true, documentTypeCode: true, companyId: true },
-  })
-  await db.user.delete({ where: { id: userId } })
-  await db.role.delete({ where: { id: user.roleId } })
-  await db.documentType.delete({ where: { code: user.documentTypeCode } })
-  await db.company.delete({ where: { id: user.companyId } })
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +134,10 @@ const PRE_EXISTING_INDEXES = [
   'recipes_name_unique',
   'suppliers_name_unique',
   'supplier_catalog_lines_name_presentation_unique',
-  'products_presentation_id_idx',
+  // `products_presentation_id_idx` cayo el 2026-09-09 con la columna `products.presentation_id`,
+  // en la misma migracion que creo `product_batches`: la presentacion se mudo al lote, y el
+  // lado hijo de la FK ya no es `products` sino `product_batches` (cuyo indice, tambien
+  // del lado hijo, esta arriba en `PARTIAL_INDEXES`).
   'products_unit_id_idx',
   'supplier_catalog_lines_presentation_id_idx',
   'supplier_catalog_lines_unit_id_idx',
@@ -370,19 +297,13 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
 describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion (R19, R23)', () => {
   it('la escribe al crear y la RECALCULA al editar, con la misma definicion del dominio', async () => {
     let productId: string | null = null
-    let presentationId: string | null = null
-    let actorId: string | null = null
     try {
-      presentationId = await createTestPresentation(prisma)
-      actorId = await createTestUser(prisma)
-
       // Nombre con acentos, mayusculas y signos: los tres caminos que la normalizacion tiene
       // que aplanar. Es el ejemplo literal de la decision cerrada 9 («solucion» encuentra
       // «Solución Buffer pH 7»).
       const nombreAlta = `Solución Buffer pH 7 ${token()}`
       const created = await createProduct(
-        { name: nombreAlta, presentationId, stock: 3, qtyAlert: 1, unitId: null },
-        actorId,
+        { name: nombreAlta, stock: 3, qtyAlert: 1, unitId: null },
         new Date('2026-01-01T00:00:00Z'),
       )
       productId = created.id
@@ -400,8 +321,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreEdicion = `Hipoclorito de sodio 5% ${token()}`
       const ok = await updateAliveProduct(
         created.id,
-        { name: nombreEdicion, presentationId, stock: 3, qtyAlert: 1, unitId: null },
-        actorId,
+        { name: nombreEdicion, stock: 3, qtyAlert: 1, unitId: null },
         new Date('2026-01-02T00:00:00Z'),
       )
       expect(ok).toBe(true)
@@ -417,8 +337,6 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       expect(trasEdicion.nameNormalized).not.toBe(trasAlta.nameNormalized)
     } finally {
       if (productId !== null) await prisma.product.delete({ where: { id: productId } })
-      if (presentationId !== null) await prisma.presentation.delete({ where: { id: presentationId } })
-      if (actorId !== null) await deleteTestUser(prisma, actorId)
     }
   })
 
@@ -427,18 +345,13 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
     // contra la base real: si alguien anadiera el indice unico «por simetria» con las otras
     // cinco tablas, este caso lo caza con un 23505 en vez de descubrirse en produccion.
     let ids: string[] = []
-    let presentationId: string | null = null
-    let actorId: string | null = null
     try {
-      presentationId = await createTestPresentation(prisma)
-      actorId = await createTestUser(prisma)
       const nombre = `Sosa caustica ${token()}`
-      const data = { name: nombre, presentationId, stock: null, qtyAlert: null, unitId: null }
+      const data = { name: nombre, stock: null, qtyAlert: null, unitId: null }
 
-      const primero = await createProduct(data, actorId, new Date('2026-01-01T00:00:00Z'))
+      const primero = await createProduct(data, new Date('2026-01-01T00:00:00Z'))
       const segundo = await createProduct(
         { ...data, name: nombre.toUpperCase() },
-        actorId,
         new Date('2026-01-01T00:00:00Z'),
       )
       ids = [primero.id, segundo.id]
@@ -451,8 +364,6 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       expect(new Set(rows.map((row) => row.nameNormalized)).size).toBe(1)
     } finally {
       if (ids.length > 0) await prisma.product.deleteMany({ where: { id: { in: ids } } })
-      if (presentationId !== null) await prisma.presentation.delete({ where: { id: presentationId } })
-      if (actorId !== null) await deleteTestUser(prisma, actorId)
     }
   })
 })

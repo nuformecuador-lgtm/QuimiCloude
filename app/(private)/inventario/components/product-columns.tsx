@@ -35,25 +35,24 @@ import type { ProductView } from '@/lib/modules/inventario';
 export const EMPTY_CELL = '—';
 
 /**
- * Campos de `ProductView` que la decision del 2026-09-03 deja FUERA de la tabla (R7):
- * el identificador tecnico, el id de la presentacion -se muestra su nombre- y los dos ids de
- * autoria, que el backend guarda como identificadores y nadie resuelve a nombres (QC-20, D20).
+ * Campos de `ProductView` que la decision del 2026-09-03 (y la del 2026-09-09) deja FUERA de
+ * la tabla: el identificador tecnico y el id de la unidad -un UUID que nadie resuelve a nombre-.
  *
- * `unitId` esta aqui por una razon distinta y posterior: el merge de QC-32 (`modelo-unidades`)
+ * `unitId` esta aqui por una razon posterior: el merge de QC-32 (`modelo-unidades`)
  * convirtio la unidad en catalogo, asi que `ProductView` ya no trae el texto `unit` sino la clave
  * foranea `unitId`. Pintar ese UUID seria peor que no mostrar nada.
  *
  * `imagePath` tambien esta fuera, y es el mismo criterio: la RUTA no se pinta como texto. La
  * imagen se ve -es la primera columna desde el 2026-09-07-, pero su columna se llama `image` y
  * pinta una miniatura, no la cadena.
+ *
+ * La presentacion y la autoria ya no estan en `ProductView` (se mudaron a `product_batches` el
+ * 2026-09-09), asi que no hay que ocultarlas: no existen en el tipo.
  */
 type HiddenProductField =
   | 'id'
-  | 'presentationId'
   | 'unitId'
-  | 'imagePath'
-  | 'createdBy'
-  | 'updatedBy';
+  | 'imagePath';
 
 /** Id de la columna de la miniatura. No es un campo de `ProductView`: es marcado. */
 export const IMAGE_COLUMN_ID = 'image';
@@ -160,15 +159,6 @@ export function buildProductColumns({ rowActions }: ProductColumnsDeps): readonl
       align: 'start',
       sortable: true,
       cell: (product) => product.name,
-    },
-    {
-      id: 'presentationName',
-      label: 'Presentación',
-      align: 'start',
-      // `presentationName` NO es una columna de `products`: es un JOIN a `presentations` que el
-      // adaptador traduce. Es ordenable porque la lista blanca lo declara.
-      sortable: true,
-      cell: (product) => product.presentationName,
     },
     {
       id: 'stock',

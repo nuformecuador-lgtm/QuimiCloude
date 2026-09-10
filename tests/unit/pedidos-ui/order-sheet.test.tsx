@@ -23,6 +23,7 @@ import {
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_FORM_TITLE_TESTID,
   ORDER_SHEET_TESTID,
   OrderRowSheetActions,
   PAGE_PARAM,
@@ -39,8 +40,9 @@ import type {
   OrderListResult,
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import type { RecipeListResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import type { RecipeListResult, RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import type { UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
@@ -74,6 +76,7 @@ const {
   updateOrderActionMock,
   listRecipesActionMock,
   listUnitsActionMock,
+  getRecipeActionMock,
 } = vi.hoisted(() => ({
   usePathnameMock: vi.fn<() => string>(),
   redirectMock: vi.fn<(ruta: string) => never>(),
@@ -97,6 +100,7 @@ const {
     >(),
   listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
+  getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -133,6 +137,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
+  getRecipeAction: getRecipeActionMock,
 }));
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
@@ -141,6 +146,10 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
+
+const UNIDADES: readonly UnitView[] = [
+  { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
+];
 
 const CANTIDAD = '12.5000';
 
@@ -240,9 +249,26 @@ beforeEach(() => {
       totalPages: 1,
     },
   });
-  // La pantalla de pedidos ya no pide unidades (2026-09-07). El doble sigue montado -y devuelve
-  // una lista vacia- para que una llamada que reapareciera no se apoyara en datos de verdad.
+  // La pantalla de pedidos pide unidades de nuevo desde el 2026-09-09: el panel muestra los
+  // ingredientes de la receta y resuelve con ellas la unidad de cada linea. El doble devuelve
+  // una lista vacia: ningun caso de este archivo afirma sobre la unidad de un ingrediente.
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: [] });
+  getRecipeActionMock.mockResolvedValue({
+    status: 'success',
+    data: {
+      id: RECETA.id,
+      name: RECETA.name,
+      description: null,
+      imageUrl: null,
+      stepCount: 0,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      steps: [],
+      lines: [],
+    },
+  });
   createOrderActionMock.mockResolvedValue({
     status: 'success',
     id: crypto.randomUUID(),
@@ -389,7 +415,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // estado final `OrderRowActions` no llega a emitir nada (R24) y el panel no se abre.
     const user = setupUser();
     const elPedido = pedido();
-    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} />);
+    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={UNIDADES} />);
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
 
@@ -404,16 +430,41 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     );
   });
 
-  it('con el pedido en estado final la accion de editar no abre ningun panel', async () => {
+it('con el pedido en estado final la accion de editar no abre ningun panel', async () => {
     // R24 — la pantalla anticipa la regla en vez de dejar intentarlo contra el servidor.
     const user = setupUser();
     render(
-      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} />,
+      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} />,
     );
 
     await user.click(screen.getByTestId('order-action-edit'));
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
     expect(updateOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('reabrir el alta arranca VACIO: el label del pedido anterior no hereda', async () => {
+    // Decision humana del 2026-09-09: cada apertura es una instancia nueva de formulario. Aunque
+    // cerrar y volver a abrir ocurra dentro de la ventana de desmontaje del portal -o el portal se
+    // quedase montado-, el alta siguiente no puede mostrar la receta ni la cantidad del anterior.
+    const user = setupUser();
+    await renderPantalla();
+
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(ORDER_FORM_TESTID);
+    await rellenarAlta(user);
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
+
+    await user.click(screen.getByTestId(ORDER_FORM_CANCEL_TESTID));
+    await waitFor(() => expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull());
+
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(ORDER_FORM_TESTID);
+
+    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue('');
+    // El control numerico: se lee la CADENA del DOM, no `toHaveValue` (que compara `valueAsNumber`).
+    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('');
+    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID).textContent).not.toContain(RECETA.name);
   });
 });

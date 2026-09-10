@@ -11,11 +11,10 @@ export type UpdateProductDeps = {
 };
 
 /**
- * Edicion de producto (R6, R9, R10, R11, R13, R14). Reemplazo completo, `stock`
- * incluido, y se guarda TAL CUAL, sin derivarlo ni recalcularlo (D3, R13). El autor
- * queda registrado SOLO como autor de la ultima modificacion (R6): el puerto no expone
- * `createdBy` en `updateAlive`, asi que conservar el autor de creacion es cosa del
- * adaptador (T9), no de este archivo.
+ * Edicion de producto (R9, R10, R11, R13, R14). Reemplazo completo, `stock`
+ * incluido, y se guarda TAL CUAL, sin derivarlo ni recalcularlo (D3, R13). La autoria ya
+ * no se registra aqui: se mudo al lote (`ProductBatch`) el 2026-09-09, asi que el actor
+ * solo sirve para el permiso.
  */
 export function createUpdateProduct(
   deps: UpdateProductDeps,
@@ -35,7 +34,10 @@ export function createUpdateProduct(
     // R14: `updateAlive` devuelve `false` cuando el producto no existe o ya esta
     // borrado (`findAliveById`/`updateAlive` filtran `deleted_at IS NULL` en el
     // puerto, R16). El dominio nunca ve un SQLSTATE: solo traduce el booleano.
-    const updated = await deps.products.updateAlive(id, parsed.data, actor.id, now());
+    // Misma reconciliacion que en `delete-product.ts`: la firma es la de `dev` -sin `actor.id`,
+    // porque la autoria vive ahora en el lote- y el error es el de QC-70, `ProductNotFoundError`
+    // con su codigo propio del catalogo unico (R17).
+    const updated = await deps.products.updateAlive(id, parsed.data, now());
     if (!updated) throw new ProductNotFoundError();
   };
 }
