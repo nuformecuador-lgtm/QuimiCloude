@@ -471,18 +471,18 @@ pero para **añadir** casos, no para arreglar los que ya hay.
       *Hecho cuando:* el archivo pasa entero **y** se demuestra que la guardia sigue mordiendo,
       añadiendo una constante ficticia a `lib/shared/routes.ts`, viéndola en rojo y quitándola.
 
-- [ ] **T16. Gate rápido de cada tanda — *las corre el leader*.**
+- [~] **T16. Gate rápido de cada tanda — *las corre el leader*.** **NO se cumplió como está escrita, y se deja dicho en vez de marcarla.** El leader no corrió `--rapido` por tanda: corrió el gate **completo** dos veces al cerrar la feature (2026-09-10). Cubre más, pero no es lo que la task pedía, y marcarla `[x]` convertiría este archivo en un documento que afirma verificaciones que nadie hizo.
       `./init.sh --rapido` al cerrar cada una de las tandas 1 a **5** (la 5 se añadió el
       2026-09-10).
       *Hecho cuando:* `exit 0` en cada tanda, con la salida anotada en la bitácora.
 
-- [ ] **T17. Gate completo — *las corre el leader*.** (dep: T15, T16, T26)
+- [x] **T17. Gate completo — *las corre el leader*.** (dep: T15, T16, T26)
       `./init.sh` completo para cerrar la feature y **otra vez antes de abrir el PR, sin
       excepción**.
       *Hecho cuando:* `exit 0`, sin ningún archivo de test rojo que no estuviera ya en
       `tests/baseline-rojos.json`.
 
-- [ ] **T18. Revisión y puerta humana — *la gestiona el leader*.** (dep: T17)
+- [~] **T18. Revisión y puerta humana — *la gestiona el leader*.** (dep: T17) **Mitad hecha:** `reviewer` APROBADO el 2026-09-10 (0 mayores, 7 menores, 9 mutaciones), los siete atendidos o decididos. Queda la otra mitad —tarjeta a *Finalizado*, `feature_list.json` y `progress/current.md`—, que es F2.5 y solo se puede hacer **después** del merge humano del PR.
       `reviewer` sobre el conjunto; trazabilidad completa como criterio bloqueante. Después,
       tarjeta, `feature_list.json` y `progress/current.md`.
       *Hecho cuando:* el reviewer aprueba con 0 bloqueantes y el estado queda registrado en disco.

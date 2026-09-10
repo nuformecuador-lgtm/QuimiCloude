@@ -726,3 +726,79 @@ el merge no ha tocado.
 **T1–T15 y T19–T29 cerradas.** Rama sincronizada con `origin/dev` y typecheck limpio. T16, T17 y
 T18 siguen siendo del leader. **F2.3 hecha**: sin PR y sin `./init.sh`, que son F2.4.
 
+
+---
+
+## Tanda 7 — cierre del leader (2026-09-10)
+
+> La escribe el **leader**, no el implementer: su agente murió por límite de sesión justo después
+> de commitear `f2c786b` y antes de documentarlo. El árbol quedó limpio y no se perdió trabajo.
+
+### El primer `./init.sh` completo dio `== init OK ==` y era FALSO VERDE
+
+Corrida 1 (17:30): `1 failed | 3884 passed`, y el único rojo era
+`tests/unit/recetas-ui/recipe-route-contract.test.ts`, **que está en el baseline**. El comparador
+dijo «sin rojos nuevos» y el gate salió `exit 0`.
+
+**Pero el caso que caía no era el que el baseline documenta.** Aislado:
+
+```
+× lib/shared/routes.ts no gana ninguna constante para el asistente y publica exactamente las de hoy
++   "LOGIN_ROUTE_SESSION_ENDED",
++   "SESSION_ENDED_PARAM",
+Tests  1 failed | 24 passed (25)
+```
+
+Es **`QC-64 R12`**, la guardia que impide que `lib/shared/routes.ts` gane constantes, y la rompió
+**T20 de esta ficha**. La entrada del baseline cubre un caso estructural **distinto** (el del rango
+`git diff`), pero listar un archivo **lo apaga entero**: por eso una regresión introducida hoy
+salió declarada verde.
+
+**Es la primera vez que este coste se cobra de verdad.** La propia nota del baseline lo anunciaba
+—«al estar listado aquí, el archivo ENTERO queda ignorado por el comparador»— y el cierre de QC-83
+lo dejó como ficha de arnés pendiente. Ya no es un riesgo aceptado: es un caso medido.
+
+### Lo que se hizo, y cómo se verificó
+
+`f2c786b` añade las dos constantes a la lista esperada **sin relajar la aserción**: sigue siendo
+igualdad exacta, no `toContain` ni subconjunto. El comentario explica por qué son legítimas (no son
+una ruta del asistente, que es lo que R12 protege) y por qué viven en `routes.ts` y no en el barrel
+de `identity` (lo declara QC-66, en curso: tocarlo convertiría dos fichas paralelizables en un
+conflicto).
+
+**Mordida demostrada por el leader**, porque el implementer no llegó a hacerlo:
+
+```
+$ printf 'export const RUTA_FICTICIA_DE_MUTACION = "/mutacion";' >> lib/shared/routes.ts
+× ...publica exactamente las de hoy   +   "RUTA_FICTICIA_DE_MUTACION"
+  Tests  1 failed | 24 passed (25)
+$ git checkout -- lib/shared/routes.ts
+  Tests  25 passed (25)
+```
+
+El archivo llevaba **apagado desde el 2026-09-04** y ahora pasa entero.
+
+### Verificación final
+
+```
+./init.sh (completo, corrida 2, 17:52)  -> == init OK ==, exit 0
+                                           Test Files  299 passed (299)
+                                           Tests  3885 passed | 18 skipped (3903)
+                                           sin rojos nuevos (0 rojos)
+playwright e2e/session.spec.ts          -> 6 passed (58.2s), chromium Y webkit
+```
+
+**Cero rojos**, así que esta vez no hay nada que el baseline pueda estar tapando.
+
+El E2E se corrió **después** del merge con `dev`, a propósito: la medición anterior (tanda 5) era
+sobre código que el merge no tocó, pero «no lo tocó» es un argumento y no una corrida, y el bucle es
+justo lo que esta ficha existe para arreglar. Los dos cortes verificados en navegador —cuenta no
+activa y ficha dada de baja— salen «en una sola redirección».
+
+### Aviso sobre el baseline, para que nadie lo vacíe de un tirón
+
+El comparador avisa de **5 archivos del baseline que ya pasan**. Cuatro son **estructurales**: sus
+casos comparan contra `git diff origin/dev...HEAD`, así que **pasan en una rama y caen en `dev`**,
+donde el rango está vacío. Que pasen aquí es lo esperado; borrarlos dejaría `dev` en rojo. El
+quinto, `product-crud.int.test.ts`, entró hoy y su motivo pide **tres** corridas seguidas: van dos.
+
