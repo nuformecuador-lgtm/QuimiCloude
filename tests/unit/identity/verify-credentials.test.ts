@@ -13,6 +13,8 @@ import {
   nextLockState,
   type AccountLockState,
 } from '@/lib/modules/identity/domain/account-lock';
+import type { UserAccountStatus } from '@/lib/modules/identity/domain/account-status';
+import { clearedLockState } from '@/lib/modules/identity/domain/effective-account-status';
 import type { SessionTicket } from '@/lib/modules/identity/domain/session';
 import { evaluateCredentialRules } from '@/lib/modules/identity/domain/credential-policy';
 import {
@@ -56,8 +58,16 @@ const USUARIO: AuthenticatableUser = {
   companyId: EMPRESA_EN_LA_BASE,
   // QC-48 R3: `null` es «la empresa sigue viva» (QC-47 R6). El caso normal.
   companyDeletedAt: null,
+  // QC-78 R1: el estado ALMACENADO. `active` es el unico que entra, y es el caso normal de
+  // todos los fixtures de este archivo que esperan un login que funciona.
+  accountStatus: 'active',
   ...SIN_BLOQUEO,
 };
+
+/** QC-78 R1 — la misma persona con el estado que sea, para los cortes de esta ficha. */
+function conEstado(accountStatus: UserAccountStatus): AuthenticatableUser {
+  return { ...USUARIO, accountStatus };
+}
 
 /** QC-48 R3: la misma persona, pero su empresa esta dada de baja. */
 const USUARIO_DE_EMPRESA_MUERTA: AuthenticatableUser = {
@@ -91,9 +101,19 @@ function montar(usuarios: readonly AuthenticatableUser[] = [USUARIO], nombre = '
           esperado: AccountLockState,
           siguiente: AccountLockState,
           now: Date,
+          // QC-78 R18: el estado de cuenta LEIDO, que entra en el predicado de la escritura.
+          estadoCuentaEsperado: UserAccountStatus,
+          // QC-78 R13, R17: el que corresponde escribir; `null` = no tocar la columna.
+          estadoCuenta: UserAccountStatus | null,
         ) => Promise<boolean>
       >(async () => true),
-    set: vi.fn<(userId: string, estado: AccountLockState) => Promise<void>>(async () => {}),
+    set: vi.fn<
+      (
+        userId: string,
+        estado: AccountLockState,
+        estadoCuenta: UserAccountStatus | null,
+      ) => Promise<void>
+    >(async () => {}),
   };
   const hasher = {
     hash: vi.fn(async (texto: string) => hashDe(texto)),
@@ -459,11 +479,12 @@ describe('verificacion de credenciales', () => {
     await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
 
     // El exito escribe INCONDICIONALMENTE: su estado es todo ceros y no depende del previo.
-    expect(attempts.set).toHaveBeenCalledWith(USUARIO.id, {
-      failedAttempts: 0,
-      lockLevel: 0,
-      lockedUntil: null,
-    });
+    expect(attempts.set).toHaveBeenCalledWith(
+      USUARIO.id,
+      { failedAttempts: 0, lockLevel: 0, lockedUntil: null },
+      // QC-78 R17: la fila ya estaba `active`, asi que el estado no cambia y no se escribe.
+      null,
+    );
     expect(attempts.compareAndSet).not.toHaveBeenCalled();
 
     // El orden importa: primero se deja la cuenta limpia y solo despues se emite la sesion.
@@ -497,6 +518,10 @@ describe('verificacion de credenciales', () => {
       // El cuarto argumento es el instante del intento: sin el, la base no podria rechazar la
       // escritura cuando la fila esta bloqueada (ver el test del reloj, mas abajo).
       expect.any(Date),
+      // QC-78 R18: el estado de cuenta leido va en el predicado. QC-78 R17: este fallo no
+      // consuma bloqueo, asi que el estado no cambia y no se escribe.
+      'active',
+      null,
     );
   });
 
@@ -701,5 +726,329 @@ describe('verificacion de credenciales', () => {
     ]) {
       expect(FUENTE_DE_VERIFY_CREDENTIALS, rastro).not.toContain(rastro);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-78 — EL ESTADO DE CUENTA MANDA EN EL LOGIN.
+//
+// Todo lo de aqui abajo se prueba con puertos falsos y objetos planos, que es donde vive la
+// decision: el corte lo hace el dominio, no un `WHERE`. Los dobles registran QUE se invoco y con
+// que argumentos, porque media ficha es «este camino NO escribe nada».
+// ---------------------------------------------------------------------------------------------
+describe('QC-78 — el estado de cuenta manda en el login', () => {
+  /** Los tres estados que NO entran, cada uno por su motivo (R1). */
+  const bloqueadaConPlazoVigente: AuthenticatableUser = {
+    ...USUARIO,
+    accountStatus: 'blocked',
+    lockLevel: 1,
+    lockedUntil: bloqueadaHasta(),
+  };
+
+  // R1, R4
+  it.each([
+    ['pending', conEstado('pending')],
+    ['inactive', conEstado('inactive')],
+    ['blocked con plazo vigente', bloqueadaConPlazoVigente],
+  ] as const)(
+    'una cuenta %s no entra ni con la contrasena correcta, y no se emite sesion',
+    async (_nombre, usuario) => {
+      const { verifyCredentials, session } = montar([usuario]);
+
+      const resultado = await verifyCredentials({
+        username: 'admin',
+        password: CONTRASENA_CORRECTA,
+      });
+
+      expect(resultado).toEqual({ ok: false });
+      // R4: ni con la credencial buena se emite sesion ni se escribe cookie.
+      expect(session.startSession).not.toHaveBeenCalled();
+    },
+  );
+
+  // R3 — la identidad REFERENCIAL, no la igualdad estructural: `toBe`, no `toEqual`.
+  it('el rechazo por estado es la MISMA INSTANCIA que el de contrasena mala y el de usuario inexistente', async () => {
+    const noActiva = montar([conEstado('inactive')]);
+    const normal = montar();
+
+    const porEstado = await noActiva.verifyCredentials({
+      username: 'admin',
+      password: CONTRASENA_CORRECTA,
+    });
+    const porContrasena = await normal.verifyCredentials({
+      username: 'admin',
+      password: 'incorrecta',
+    });
+    const porInexistente = await normal.verifyCredentials({
+      username: 'no.existe',
+      password: CONTRASENA_CORRECTA,
+    });
+
+    expect(porEstado).toBe(porContrasena);
+    expect(porContrasena).toBe(porInexistente);
+    // Y no lleva NI UN CAMPO de mas por el que distinguir los tres estados entre si ni del resto:
+    // un `reason`, un codigo o un mensaje convertirian el login en un oraculo de existencia.
+    expect(Object.keys(porEstado)).toEqual(['ok']);
+  });
+
+  // R3 — los TRES estados no-`active` devuelven tambien la misma instancia entre ellos.
+  it('los tres estados no activos devuelven exactamente el mismo objeto', async () => {
+    const resultados = await Promise.all(
+      [conEstado('pending'), conEstado('inactive'), bloqueadaConPlazoVigente].map((usuario) =>
+        montar([usuario]).verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA }),
+      ),
+    );
+
+    expect(resultados[0]).toBe(resultados[1]);
+    expect(resultados[1]).toBe(resultados[2]);
+  });
+
+  // R2 — el conteo. Si el corte por estado se adelantara al hash, este numero seria 0.
+  it.each([
+    ['pending', conEstado('pending')],
+    ['inactive', conEstado('inactive')],
+    ['blocked con plazo vigente', bloqueadaConPlazoVigente],
+    ['active', USUARIO],
+  ] as const)('el camino %s verifica el hash exactamente una vez', async (_nombre, usuario) => {
+    const { verifyCredentials, hasher } = montar([usuario]);
+
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(hasher.verify).toHaveBeenCalledTimes(1);
+    expect(hasher.verify.mock.calls[0]?.[1]).toBe(USUARIO.passwordHash);
+  });
+
+  // R2 — y el ORDEN, que es lo que el conteo por si solo no demuestra. Se congela la
+  // verificacion de hash y se comprueba que el caso de uso NO ha respondido todavia: si el corte
+  // por estado fuera antes, respondería en microsegundos sin esperar a bcrypt, y el tiempo de
+  // respuesta delataria que esa cuenta existe y no esta activa.
+  it('el corte por estado ocurre DESPUES de la verificacion de hash, no antes', async () => {
+    let liberar: (correcta: boolean) => void = () => {};
+    const hashEnCurso = new Promise<boolean>((resolve) => {
+      liberar = resolve;
+    });
+    const { verifyCredentials, hasher } = montar([conEstado('inactive')]);
+    hasher.verify.mockImplementationOnce(() => hashEnCurso);
+
+    let respondio = false;
+    const intento = verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA }).then(
+      (resultado) => {
+        respondio = true;
+        return resultado;
+      },
+    );
+
+    // Se dejan correr las microtareas: lo unico que puede quedar pendiente es el hash.
+    for (let vuelta = 0; vuelta < 20; vuelta += 1) await Promise.resolve();
+
+    expect(hasher.verify).toHaveBeenCalledTimes(1);
+    expect(respondio).toBe(false);
+
+    liberar(true);
+    await expect(intento).resolves.toEqual({ ok: false });
+    // Y sigue siendo UNA sola verificacion: el corte no la repite.
+    expect(hasher.verify).toHaveBeenCalledTimes(1);
+  });
+
+  // R5, R6 — el camino que NO escribe nada. Es la diferencia deliberada con el corte de empresa
+  // de QC-48, que va despues del `!correcta` y por tanto SI deja que el fallo cuente.
+  it.each(['pending', 'inactive'] as const)(
+    'una cuenta %s no escribe ninguna columna, ni con contrasena correcta ni con incorrecta',
+    async (estado) => {
+      const { verifyCredentials, attempts } = montar([conEstado(estado)]);
+
+      await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+      await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+      // Ni contador, ni nivel, ni plazo, ni estado, ni rastro: castigar a alguien por una
+      // decision administrativa que no puede arreglar seria injusto, y la cuenta no entra igual.
+      expect(attempts.compareAndSet).toHaveBeenCalledTimes(0);
+      expect(attempts.set).toHaveBeenCalledTimes(0);
+    },
+  );
+
+  // R13 — el quinto fallo consuma el bloqueo y ESCRIBE el estado, en la misma operacion.
+  it('el quinto fallo escribe blocked junto con el plazo, y sin autor', async () => {
+    const casiBloqueado: AuthenticatableUser = { ...USUARIO, failedAttempts: 4 };
+    const { verifyCredentials, attempts } = montar([casiBloqueado]);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(1);
+    const llamada = attempts.compareAndSet.mock.calls[0];
+    // El TERCER argumento es el estado de bloqueo que calculo la politica: hay plazo.
+    expect(llamada?.[2]?.lockLevel).toBe(1);
+    expect(llamada?.[2]?.lockedUntil).toBeInstanceOf(Date);
+    // Y el ULTIMO es el estado de cuenta que corresponde escribir: `blocked`, en la MISMA
+    // operacion (R13), no en una segunda escritura.
+    expect(llamada?.[5]).toBe('blocked');
+    // SIN AUTOR: el puerto no recibe ninguno porque no lo hay -esto lo hace el sistema, no una
+    // persona- y el adaptador deja `account_status_changed_by` vacio. Que la columna quede a
+    // null se demuestra contra Postgres en `tests/integration/identity/login.int.test.ts`.
+    expect(llamada).toHaveLength(6);
+  });
+
+  // R14 — la politica de escalada de QC-19 no cambia: los plazos siguen saliendo de
+  // `LOCK_DURATIONS_MS` y de ella se DERIVA el estado, sin duplicar la politica.
+  it.each([0, 1, 2, 3])(
+    'el bloqueo desde el nivel %i conserva el plazo que declara LOCK_DURATIONS_MS',
+    async (nivelPrevio) => {
+      const casiBloqueado: AuthenticatableUser = {
+        ...USUARIO,
+        failedAttempts: 4,
+        lockLevel: nivelPrevio,
+      };
+      const { verifyCredentials, attempts } = montar([casiBloqueado]);
+
+      await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+      const [, , siguiente, now, , estadoCuenta] = attempts.compareAndSet.mock.calls[0] ?? [];
+      expect(siguiente?.lockLevel).toBe(nivelPrevio + 1);
+      expect(siguiente?.lockedUntil?.getTime()).toBe(
+        (now?.getTime() ?? 0) + (LOCK_DURATIONS_MS[nivelPrevio] ?? -1),
+      );
+      expect(estadoCuenta).toBe('blocked');
+    },
+  );
+
+  // R15 — la barrera contra la combinacion imposible. `blocked` + plazo vacio significa
+  // «bloqueada por una persona» (R9) y no caduca jamas: ninguna escritura automatica puede
+  // crearla por accidente.
+  it('un fallo suelto sobre una fila blocked con el plazo ya vencido la devuelve a active', async () => {
+    const bloqueoCumplido: AuthenticatableUser = {
+      ...USUARIO,
+      accountStatus: 'blocked',
+      failedAttempts: 0,
+      lockLevel: 1,
+      lockedUntil: new Date(Date.now() - 60_000),
+    };
+    const { verifyCredentials, attempts } = montar([bloqueoCumplido]);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    const [, , siguiente, , estadoCuentaEsperado, estadoCuenta] =
+      attempts.compareAndSet.mock.calls[0] ?? [];
+    // El fallo no consuma bloqueo nuevo: el plazo queda vacio...
+    expect(siguiente?.lockedUntil).toBeNull();
+    // ...y por eso el estado tiene que volver a `active`, no quedarse en `blocked`.
+    expect(estadoCuentaEsperado).toBe('blocked');
+    expect(estadoCuenta).toBe('active');
+    // La combinacion prohibida, dicha por su nombre: nunca `blocked` con el plazo vacio.
+    expect(estadoCuenta === 'blocked' && siguiente?.lockedUntil === null).toBe(false);
+  });
+
+  // R16 — el ingreso correcto sobre un bloqueo ya cumplido.
+  it('un login correcto sobre una cuenta blocked vencida reinicia contador y nivel y la deja active', async () => {
+    const bloqueoCumplido: AuthenticatableUser = {
+      ...USUARIO,
+      accountStatus: 'blocked',
+      failedAttempts: 3,
+      lockLevel: 2,
+      lockedUntil: new Date(Date.now() - 60_000),
+    };
+    const { verifyCredentials, attempts, session } = montar([bloqueoCumplido]);
+
+    const resultado = await verifyCredentials({
+      username: 'admin',
+      password: CONTRASENA_CORRECTA,
+    });
+
+    expect(resultado).toEqual({ ok: true });
+    expect(session.startSession).toHaveBeenCalledTimes(1);
+    expect(attempts.set).toHaveBeenCalledWith(
+      USUARIO.id,
+      { failedAttempts: 0, lockLevel: 0, lockedUntil: null },
+      'active',
+    );
+  });
+
+  // R17 — la marca de ultimo cambio tiene que seguir significando «cambio real». Si cada intento
+  // reescribiera la columna con el mismo valor, pasaria a significar «ultimo intento de login».
+  it('no se escribe el estado cuando no cambia: ni en el exito ni en un fallo suelto', async () => {
+    const { verifyCredentials, attempts } = montar();
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(attempts.compareAndSet.mock.calls[0]?.[5]).toBeNull();
+    expect(attempts.set.mock.calls[0]?.[2]).toBeNull();
+  });
+
+  // R18 — el estado leido entra en el predicado, y el reintento condiciona sobre el FRESCO.
+  it('el CAS que pierde la carrera se recalcula sobre el estado de cuenta fresco', async () => {
+    const visto: AuthenticatableUser = { ...USUARIO, failedAttempts: 0 };
+    // Mientras corria bcrypt, la fila cambio de estado: la bloqueo la politica y el plazo ya
+    // vencio. Sigue siendo efectivamente `active` (R8), asi que el registro continua.
+    const fresco: AuthenticatableUser = {
+      ...USUARIO,
+      accountStatus: 'blocked',
+      failedAttempts: 3,
+      lockLevel: 1,
+      lockedUntil: new Date(Date.now() - 60_000),
+    };
+    const { verifyCredentials, users, attempts } = montar([visto]);
+
+    attempts.compareAndSet.mockResolvedValueOnce(false);
+    users.findActiveByUsername.mockResolvedValueOnce(visto).mockResolvedValueOnce(fresco);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(2);
+    // La primera vuelta condiciona sobre lo que leyo entonces...
+    expect(attempts.compareAndSet.mock.calls[0]?.[4]).toBe('active');
+    // ...y la segunda sobre lo que leyo AL RELEER, no sobre la copia que quedo obsoleta.
+    expect(attempts.compareAndSet.mock.calls[1]?.[4]).toBe('blocked');
+    // Y lo que se escribe se recalcula sobre ese estado fresco (R15).
+    expect(attempts.compareAndSet.mock.calls[1]?.[5]).toBe('active');
+    expect(attempts.compareAndSet.mock.calls[1]?.[1]).toMatchObject({
+      failedAttempts: 3,
+      lockLevel: 1,
+    });
+  });
+
+  // R19 — y si al releer ya no esta efectivamente `active`, se abandona sin escribir mas.
+  it.each([
+    ['inactive', { ...USUARIO, accountStatus: 'inactive' } as AuthenticatableUser],
+    [
+      'blocked con plazo futuro',
+      {
+        ...USUARIO,
+        accountStatus: 'blocked',
+        lockLevel: 1,
+        lockedUntil: bloqueadaHasta(),
+      } as AuthenticatableUser,
+    ],
+  ])('si al releer la fila fresca esta %s, se abandona sin escribir', async (_nombre, fresco) => {
+    const { verifyCredentials, users, attempts } = montar();
+
+    attempts.compareAndSet.mockResolvedValueOnce(false);
+    users.findActiveByUsername.mockResolvedValueOnce(USUARIO).mockResolvedValueOnce(fresco);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    // Se releyo, se vio que la cuenta ya no esta activa y no hubo segunda escritura: registrar
+    // el intento pisaria una decision tomada por otro camino.
+    expect(users.findActiveByUsername).toHaveBeenCalledTimes(2);
+    expect(attempts.compareAndSet).toHaveBeenCalledTimes(1);
+    expect(attempts.set).not.toHaveBeenCalled();
+  });
+
+  // R25 — el mecanismo del desbloqueo administrativo, visto desde el login: tras aplicarlo, el
+  // siguiente fallo cuenta como el PRIMERO de una serie nueva. Sin limpiar contador y nivel, la
+  // cuenta se volveria a bloquear al primer intento y con la duracion escalada del nivel viejo.
+  it('tras clearedLockState el siguiente fallo cuenta como el primero y no rebloquea', async () => {
+    const desbloqueada: AuthenticatableUser = {
+      ...USUARIO,
+      accountStatus: 'active',
+      ...clearedLockState(),
+    };
+    const { verifyCredentials, attempts } = montar([desbloqueada]);
+
+    await verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    const [, , siguiente, , , estadoCuenta] = attempts.compareAndSet.mock.calls[0] ?? [];
+    expect(siguiente).toEqual({ failedAttempts: 1, lockLevel: 0, lockedUntil: null });
+    // No vuelve a bloquear: ni plazo, ni estado que escribir.
+    expect(estadoCuenta).toBeNull();
   });
 });
