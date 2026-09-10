@@ -1055,6 +1055,15 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'PRESENTATIONS_ROUTE',
         'PRIVATE_ROUTE_PREFIXES',
         'SUPPLIERS_ROUTE',
+        // La trae QC-39 (R8) el 2026-09-08, la pantalla de unidades: es la ruta de UNA PANTALLA
+        // real -con su `app/(private)/configuracion/unidades/page.tsx` en disco- y vive aqui
+        // porque la lista de prefijos privados (R13) y el item de navegacion (R9, R10) tienen que
+        // derivarse de la misma constante. Nada que ver con el asistente de lectura: `UNITS_ROUTE`
+        // no encaja en el patron `alude` de arriba, que se sigue aplicando a TODAS las
+        // declaraciones del archivo, asi que la garantia de R12 -el asistente no gana ruta propia-
+        // queda intacta. La lista sigue CERRADA: una constante mas sin ficha que la respalde
+        // vuelve a poner esto en rojo.
+        'UNITS_ROUTE',
         'recipeEditRoute',
         'supplierDetailRoute',
       ].sort(),

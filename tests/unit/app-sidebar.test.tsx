@@ -461,7 +461,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente seis entradas de nivel superior en orden', () => {
+  it('PRIVATE_NAV_ITEMS tiene exactamente siete entradas de nivel superior en orden', () => {
     // R5. AMPLIADO el 2026-09-04 (QC-44 T2, R4): la CUARTA entrada es la pantalla de proveedores,
     // item de nivel superior de la seccion «Cadena» -hermano del grupo de produccion, no hijo
     // suyo-. El centinela no se relaja: sigue exigiendo la lista exacta y su orden, asi que una
@@ -483,7 +483,15 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // poner en rojo. El destino, la etiqueta y el permiso del item nuevo los afirma
     // `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` sobre `PRESENTATIONS_ROUTE`
     // y `PRESENTATIONS_LABEL`, nunca sobre el literal del copy.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(6);
+    // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): la entrada nueva es la pantalla de unidades,
+    // SEGUNDO item de la seccion «Configuración» que QC-45 ya habia abierto -no se crea seccion
+    // ninguna- y ULTIMO del array, detras de presentaciones, al que no se toca ni se reordena. El
+    // ancla se TENSA, nunca se afloja (R47): sube de seis a siete y sigue exigiendo la lista
+    // exacta y su orden, asi que una octava entrada sin ficha que la respalde lo vuelve a poner en
+    // rojo. El destino, la etiqueta y el permiso del item nuevo los afirma
+    // `tests/unit/configuracion-ui/private-nav-unidades.test.ts` sobre `UNITS_ROUTE` y
+    // `UNITS_LABEL`, nunca sobre el literal del copy.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(7);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
       'nav-inventario',
@@ -491,6 +499,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
       'nav-produccion',
       'nav-proveedores',
       'nav-presentaciones',
+      'nav-unidades',
     ]);
   });
 

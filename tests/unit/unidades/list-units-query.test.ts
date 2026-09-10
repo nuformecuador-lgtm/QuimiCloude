@@ -6,7 +6,7 @@
 //
 // EL CASO CENTRAL DE ESTA FICHA es la union discriminada POR LA FORMA DE LA ENTRADA: sin
 // parametros, el catalogo entero -y el selector de unidad del formulario de recetas no se
-// entera-; con `page` o `pageSize`, una `Page<UnitRef>`. Se comprueban las dos, y ademas que el
+// entera-; con `page` o `pageSize`, una `Page<UnitView>`. Se comprueban las dos, y ademas que el
 // orden, el filtro y la busqueda SI se aplican en el modo catalogo: «sin paginar» no es «sin
 // consultar».
 //
@@ -19,7 +19,7 @@ import { UnauthorizedError, ValidationError } from '@/lib/modules/unidades/domai
 import type { Actor } from '@/lib/modules/unidades/domain/actor';
 import type { ListQuery } from '@/lib/modules/unidades/domain/list-query';
 import type { Page } from '@/lib/modules/unidades/domain/page';
-import type { UnitRef } from '@/lib/modules/unidades/domain/unit-catalog';
+import type { UnitView } from '@/lib/modules/unidades/domain/unit-view';
 import type { UnitScope } from '@/lib/modules/unidades/domain/unit-scope';
 import type { ListQueryLog } from '@/lib/modules/unidades/ports/list-query-log';
 import type { UnitRepository } from '@/lib/modules/unidades/ports/unit-repository';
@@ -41,12 +41,23 @@ const SIN_PERMISO: Actor = {
   permissions: ['inventario.consultar'],
 };
 
-const CATALOGO: readonly UnitRef[] = [
-  { id: 'unit-1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null },
-  { id: 'unit-2', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
+/* QC-39 (T1): el puerto de listado devuelve `UnitView` -los tres campos de siempre MAS la
+ *  equivalencia y `isSystem`-, asi que los fixtures de este archivo llevan los seis campos. Es
+ *  la forma de los dobles lo que cambia; **ningun aserto de este archivo cambia de exigencia**,
+ *  y las comparaciones siguen siendo de igualdad estricta contra el fixture entero. */
+const CATALOGO: readonly UnitView[] = [
+  { id: 'unit-1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null, isSystem: true },
+  {
+    id: 'unit-2',
+    name: 'Litro',
+    symbol: 'L',
+    baseUnitId: 'unit-1',
+    factor: '1000.0000',
+    isSystem: false,
+  },
 ];
 
-const PAGINA: Page<UnitRef> = {
+const PAGINA: Page<UnitView> = {
   items: CATALOGO,
   total: 2,
   page: 1,
@@ -82,7 +93,8 @@ function consultaDeLaPagina(recibidas: readonly (readonly [ListQuery, UnitScope]
 describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
   it('SIN PARAMETROS devuelve el catalogo entero, acotado y sin paginar (R28)', async () => {
     // R28 — es lo que mantiene verde el selector de unidad del formulario de recetas sin
-    // tocarlo: `listUnitsAction()` sigue recibiendo un array de `UnitRef`, no una pagina.
+    // tocarlo: `listUnitsAction()` sigue recibiendo un ARRAY -de `UnitView` desde QC-39-, no
+    // una pagina.
     const { units, listUnits } = montar();
 
     const resultado = await listUnits(undefined, CON_PERMISO);
@@ -111,7 +123,7 @@ describe('list-units: la pagina es OPCIONAL (R27, R28, R29)', () => {
     expect(units.listPage).toHaveBeenCalledTimes(0);
   });
 
-  it('con page devuelve una Page<UnitRef> (R27, R29)', async () => {
+  it('con page devuelve una Page<UnitView> (R27, R29)', async () => {
     // R27 + R29 — el otro lado de la union discriminada. QC-39 no elige metodo: manda lo que
     // trae la URL y la forma de la salida sale de la forma de la entrada.
     const { units, listUnits } = montar();

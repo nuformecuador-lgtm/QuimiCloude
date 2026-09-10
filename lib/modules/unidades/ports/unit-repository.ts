@@ -1,7 +1,7 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
-import type { UnitRef } from '../domain/unit-catalog';
 import type { UnitScope } from '../domain/unit-scope';
+import type { UnitView } from '../domain/unit-view';
 
 /**
  * Puerto de lectura del catalogo de unidades (`design.md > 9` de QC-32, R40; QC-57 R27-R29). A
@@ -25,12 +25,12 @@ export interface UnitRepository {
    * empresa en cuyo nombre se pregunta. Que este en la firma —y no dentro del adaptador— es lo
    * que hace que una implementacion o una llamada que se olvide del ambito NO COMPILE.
    */
-  listAll(limit: number, query: ListQuery, scope: UnitScope): Promise<readonly UnitRef[]>;
+  listAll(limit: number, query: ListQuery, scope: UnitScope): Promise<readonly UnitView[]>;
   /**
    * Una PAGINA del catalogo (R29): el defecto 10 y el tope 25 los aplica el adaptador con
    * `lib/shared/pagination`, acotando en vez de rechazar. `total` y `totalPages` describen el
    * conjunto YA FILTRADO (R14) y, desde QC-76, tambien YA ACOTADO AL AMBITO: el recuento cuenta
    * solo lo visible para esa empresa (R17).
    */
-  listPage(query: ListQuery, scope: UnitScope): Promise<Page<UnitRef>>;
+  listPage(query: ListQuery, scope: UnitScope): Promise<Page<UnitView>>;
 }

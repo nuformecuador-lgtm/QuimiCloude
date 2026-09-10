@@ -13,9 +13,11 @@
 // **Si el rango git no esta disponible, este archivo FALLA RUIDOSAMENTE**, no se salta y no pasa
 // en silencio (misma leccion y mismo patron que `tests/unit/configuracion-ui/data-table-intacta.test.ts`):
 // una guardia que se auto-desactiva cuando no puede mirar es indistinguible de una guardia rota.
-// La unica excepcion —y no es una excepcion a ese principio, sino su otra cara— es que la rama no
-// haya tocado NADA: ahi los casos que miran el CAMBIO quedan `skipped`, nunca verdes. Ver
-// `tocadosOMudo()` mas abajo: «no puedo mirar» es rojo; «no hay nada que mirar» es mudo.
+// Las unicas excepciones —y no son excepciones a ese principio, sino su otra cara— son que la rama
+// NO SEA LA DE QC-65 (sus reglas de alcance no le aplican a otra ficha) o que no haya tocado NADA:
+// ahi los casos que miran el CAMBIO quedan `skipped` y lo dicen en voz alta, nunca verdes. Ver
+// `tocadosOMudo()` y `esLaRamaDeQC65()` mas abajo: «no puedo mirar» es rojo; «esto no es lo mio» y
+// «no hay nada que mirar» son mudos y ruidosos.
 
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -25,11 +27,35 @@ import { describe, expect, it, type TestContext } from 'vitest';
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
-/** El rango contra el que se compara. `dev` es la rama de la que sale el worktree. */
-const RANGO = 'dev...HEAD';
+/**
+ * El rango contra el que se compara: la BASE DE FUSION con `origin/dev`, calculada en cada
+ * ejecucion con `git merge-base origin/dev HEAD`.
+ *
+ * Antes era el literal `dev...HEAD`, y eso media la rama equivocada: el `dev` LOCAL de este repo
+ * va por detras del remoto —18 commits, visto el 2026-09-08—, asi que el rango arrastraba trabajo
+ * AJENO ya mergeado y se lo atribuia a la rama en curso. La base de fusion con `origin/dev` mide
+ * solo lo que ESTA rama anade sobre el tronco, y sigue siendo correcta despues de cualquier merge.
+ * Es el mismo idioma que ya usan `tests/unit/navegacion/qc75-convenciones.test.ts` y
+ * `tests/unit/unidades/modulo-intacto.test.ts`, de donde se copia.
+ */
+const RANGO = 'git merge-base origin/dev HEAD';
 
 function git(comando: string): string {
   return execSync(comando, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+}
+
+/**
+ * La base de fusion con `origin/dev`, o `null` si el rango no esta disponible aqui (sin remoto,
+ * clon superficial). Mismo helper que `mergeBaseConDev()` en `qc75-convenciones.test.ts`: devuelve
+ * `null` y quien lo llama decide. Aqui, quien lo llama LANZA —ver `archivosTocados()`—, porque la
+ * doctrina de este archivo es que «no puedo mirar» es rojo.
+ */
+function baseDeFusionConDev(): string | null {
+  try {
+    return git('git merge-base origin/dev HEAD').trim();
+  } catch {
+    return null;
+  }
 }
 
 function aPosix(ruta: string): string {
@@ -37,17 +63,19 @@ function aPosix(ruta: string): string {
 }
 
 /**
- * Archivos que esta rama ha tocado respecto de `dev`: los del rango MAS los del arbol de
- * trabajo, para que la guardia muerda antes incluso de commitear. Lanza —a proposito— si el
- * rango no se puede calcular.
+ * Archivos que esta rama ha tocado respecto de la base de fusion con `origin/dev`: los del rango
+ * MAS los del arbol de trabajo, para que la guardia muerda antes incluso de commitear. Lanza
+ * —a proposito— si el rango no se puede calcular.
  */
 function archivosTocados(): readonly string[] {
   let delRango: string;
   try {
-    delRango = git(`git diff --name-only ${RANGO}`);
+    const base = baseDeFusionConDev();
+    if (base === null) throw new Error('`git merge-base origin/dev HEAD` no resolvio');
+    delRango = git(`git diff --name-only ${base}`);
   } catch (error) {
     throw new Error(
-      `No se pudo calcular el diff \`${RANGO}\`, asi que R18/R20/R21 NO se han comprobado. ` +
+      `No se pudo calcular el diff contra \`${RANGO}\`, asi que R18/R20/R21 NO se han comprobado. ` +
         'Esta guardia falla en vez de pasar en silencio. ' +
         `Causa: ${String(error)}`,
     );
@@ -136,12 +164,19 @@ const PIEZAS_DE_QC19 = [
 ] as const;
 
 /**
- * El caso degenerado: la rama no ha tocado NADA respecto de `dev`. Ocurre en cuanto QC-65 se
- * mergea y alguien corre esta guardia sobre `dev` con el arbol limpio. Entonces no hay diff que
- * inspeccionar, y los tres casos que miran el CAMBIO (R18, R20, R21) se declaran `skipped` en
- * vez de verdes: un verde afirmaria «he revisado el diff y no cruza ninguna frontera», que seria
- * falso, y ese falso verde es justo lo que taparia el dia que la guardia deje de mirar de verdad.
- * `skipped` dice lo unico cierto: no habia nada que revisar.
+ * Los dos casos en que los tres casos que miran el CAMBIO (R18, R20, R21) quedan MUDOS:
+ *
+ *   1. LA RAMA NO ES LA DE QC-65 (ver `esLaRamaDeQC65()` mas abajo). Estas reglas son el alcance
+ *      de esa ficha; aplicarlas a otra rama no mide nada, solo pone en rojo trabajo legitimo ajeno.
+ *   2. EL CASO DEGENERADO: la rama no ha tocado NADA respecto de la base de fusion con
+ *      `origin/dev`. Ocurre en cuanto QC-65 se
+ *      mergea y alguien corre esta guardia sobre `dev` con el arbol limpio: no hay diff que
+ *      inspeccionar.
+ *
+ * En ambos, los tres casos se declaran `skipped` en vez de verdes: un verde afirmaria «he revisado
+ * el diff de QC-65 y no cruza ninguna frontera», que seria falso, y ese falso verde es justo lo que
+ * taparia el dia que la guardia deje de mirar de verdad. El salto dice lo unico cierto: que ese
+ * caso NO ha comprobado nada.
  *
  * Esto NO contradice la cabecera de este archivo, porque son dos situaciones distintas:
  *   - «NO PUEDO mirar» (el rango git no resuelve) sigue siendo ROJO — lo lanza `archivosTocados()`;
@@ -149,18 +184,6 @@ const PIEZAS_DE_QC19 = [
  * Nada mas se relaja: en una rama con cambios reales los tres casos vigilan exactamente igual que
  * antes, con las mismas listas cerradas y las mismas igualdades.
  */
-/**
- * EL ARCHIVO CENTRAL DE QC-65. Es el dominio que DECLARA el estado de cuenta: ninguna rama puede
- * implementar esta ficha sin tocarlo, y ninguna otra ficha tiene motivo para hacerlo. Que aparezca
- * en el rango es lo que dice «esta ES la rama de QC-65».
- */
-const ARCHIVO_CENTRAL = 'lib/modules/identity/domain/account-status.ts';
-
-/** Puro y exportado para poder ejercitarlo con listas sinteticas, en los dos sentidos. */
-export function esLaRamaDeQC65(tocados: readonly string[]): boolean {
-  return tocados.includes(ARCHIVO_CENTRAL);
-}
-
 /**
  * Las infracciones de alcance de R20 sobre una lista de archivos. Funcion PURA y exportada: los
  * casos de abajo la ejercitan contra el arbol real -donde debe salir vacia- y contra listas
@@ -198,22 +221,62 @@ export function infraccionesDeAlcance(tocados: readonly string[]): readonly stri
  */
 function tocadosOMudo(ctx: Pick<TestContext, 'skip'>): readonly string[] {
   const tocados = archivosTocados();
-  if (tocados.length === 0) {
-    ctx.skip('la rama no toca ningun archivo respecto de `dev`: no hay diff que revisar');
-  }
   if (!esLaRamaDeQC65(tocados)) {
     ctx.skip(
-      'el rango trae archivos pero ninguno es `' +
-        ARCHIVO_CENTRAL +
-        '`: esta NO es la rama de QC-65, asi que su alcance no le aplica y este caso NO ha ' +
-        'comprobado nada.',
+      'el rango no trae a la vez `' +
+        ARCHIVO_CENTRAL_DE_QC65 +
+        '` y `' +
+        CARPETA_SPEC_DE_QC65 +
+        '`: esta NO es la rama de QC-65, asi que este caso NO ha comprobado nada. ' +
+        'R18/R20/R21 son el alcance de ESA ficha y no le aplican a ninguna otra.',
+    );
+  }
+  if (tocados.length === 0) {
+    ctx.skip(
+      'la rama no toca ningun archivo respecto de la base de fusion con `origin/dev`: no hay ' +
+        'diff que revisar, asi que este caso NO ha comprobado nada',
     );
   }
   return tocados;
 }
 
+/**
+ * LA PRECONDICION DE RAMA. Esta guardia SOLO aplica en la rama de QC-65: R18, R20 y R21 hablan del
+ * alcance de ESA ficha —«ni caso de uso de cambio, ni adaptador driving, ni ruta, ni Server Action,
+ * ni pantalla»—, no del de las demas.
+ *
+ * Por que cambia: el centinela nunca comprobo QUE RAMA estaba midiendo. Mientras QC-65 vivia en su
+ * worktree eso no se notaba; en cuanto se mergeo en `dev`, empezo a medir CUALQUIER rama con las
+ * reglas de alcance de QC-65. Lo descubrio QC-39 el 2026-09-08 al construir su pantalla: es una
+ * ficha `frontend` cuyo trabajo entero es crear `app/(private)/configuracion/unidades/`, y sus 16
+ * archivos salieron listados como infractores de R20. Ninguno lo era: son exactamente lo que su
+ * spec manda construir.
+ *
+ * TERCER EPISODIO DE LA MISMA CLASE en este repo, tras `tests/unit/navegacion/qc75-convenciones.test.ts`
+ * y el de QC-38: un centinela de alcance escrito por una ficha que, ya mergeada, pone en rojo el
+ * gate de todas las ramas siguientes. De ahi que la senal se elija CONJUNTIVA y copiando el patron
+ * ya usado alli.
+ *
+ * La senal: el archivo central del dominio del estado MAS la carpeta de spec de la propia ficha.
+ * La carpeta de spec discrimina de verdad porque nace y vive dentro del rango de QC-65 y no aparece
+ * jamas en el rango de ninguna otra ficha, que trae la SUYA. No se usa este archivo de test como
+ * senal, justamente porque otras fichas lo enmiendan al chocar con el, como esta.
+ *
+ * Esto ENDURECE la precondicion, no relaja la comprobacion: en la rama real de QC-65 ambas senales
+ * estan presentes y los casos de abajo corren exactamente igual y con la misma severidad.
+ */
+const ARCHIVO_CENTRAL_DE_QC65 = 'lib/modules/identity/domain/account-status.ts';
+const CARPETA_SPEC_DE_QC65 = 'specs/QC-65-estado-de-cuenta-de-usuario/';
+
+export function esLaRamaDeQC65(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC65) &&
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC65))
+  );
+}
+
 describe('el rango git esta disponible: la guardia puede mirar de verdad', () => {
-  it(`\`git diff --name-only ${RANGO}\` resuelve; si no, este archivo falla ruidosamente`, () => {
+  it(`\`${RANGO}\` resuelve; si no, este archivo falla ruidosamente`, () => {
     expect(() => archivosTocados()).not.toThrow();
   });
 });
@@ -320,17 +383,21 @@ describe('el salto no vacia la guardia: en la rama de QC-65 sigue mordiendo', ()
   const RAMA_DE_QC65 = [
     'lib/modules/identity/domain/account-status.ts',
     'lib/modules/identity/index.ts',
+    'specs/QC-65-estado-de-cuenta-de-usuario/requirements.md',
   ];
 
-  it('reconoce la rama de QC-65 por su archivo central, y NO reconoce otra', () => {
+  it('reconoce la rama de QC-65 por sus DOS senales, y NO reconoce otra', () => {
     expect(esLaRamaDeQC65(RAMA_DE_QC65)).toBe(true);
-    // El diff real de QC-70: toca `app/` y un adaptador driving, pero NO el archivo central.
+    // El diff real de QC-70: toca `app/` y un adaptador driving, pero ninguna de las dos senales.
     expect(
       esLaRamaDeQC65([
         'app/(private)/proveedores/[id]/page.tsx',
         'lib/modules/unidades/adapters/driving/unit-actions.ts',
       ]),
     ).toBe(false);
+    // Y la senal es CONJUNTIVA: con el archivo central solo -que otra ficha podria rozar- no basta.
+    expect(esLaRamaDeQC65(['lib/modules/identity/domain/account-status.ts'])).toBe(false);
+    expect(esLaRamaDeQC65(['specs/QC-65-estado-de-cuenta-de-usuario/design.md'])).toBe(false);
   });
 
   it('dentro de su rama, R20 MUERDE con una pantalla, un componente, un hook o un driving', () => {

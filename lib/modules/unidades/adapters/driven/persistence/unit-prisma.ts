@@ -9,8 +9,8 @@ import { normalizedSearchCondition } from './list-query-sql';
 
 import type { ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
-import type { UnitRef } from '../../../domain/unit-catalog';
 import type { UnitScope } from '../../../domain/unit-scope';
+import type { UnitView } from '../../../domain/unit-view';
 
 /**
  * Implementa `UnitRepository` (`ports/unit-repository.ts`) con Prisma: las DOS lecturas del
@@ -23,6 +23,14 @@ import type { UnitScope } from '../../../domain/unit-scope';
  * adaptador es de otro puerto y no se toca.
  */
 
+/**
+ * Proyeccion del listado (QC-39 R1, R2; `design.md > 2.2`). A los tres campos de siempre se
+ * suman `baseUnitId` y `factor` -la EQUIVALENCIA, que la pantalla pinta- y `companyId`, que
+ * entra en el `select` pero **NO sale**: se consume aqui para derivar `isSystem` y no cruza la
+ * frontera hacia el cliente (R2). Nada mas cambia en este archivo: el `where` del ambito, la
+ * busqueda por `nameNormalized`, el `orderBy` con su desempate y el `count` compartido se
+ * quedan literalmente iguales (R6).
+ */
 const UNIT_SELECT = {
   id: true,
   name: true,
@@ -32,19 +40,29 @@ const UNIT_SELECT = {
   // lectura del catalogo completo: pedirlas no anade ninguna consulta.
   baseUnitId: true,
   factor: true,
+  companyId: true,
 } satisfies Prisma.UnitSelect;
 
 type UnitRow = Prisma.UnitGetPayload<{ select: typeof UNIT_SELECT }>;
 
-/** Fila de Prisma -> `UnitRef`. El `Decimal` de Prisma sale como TEXTO: el contrato publico de
- *  `unidades` no expone `Decimal` a nadie y un decimal no se degrada a `number`. */
-function toUnitRef(row: UnitRow): UnitRef {
+/**
+ * Fila -> `UnitView` (QC-39 R1, R2).
+ *
+ * Dos derivaciones y ninguna decision mas:
+ *   - `isSystem = row.companyId === null`, la MISMA definicion de «de sistema» que usan las
+ *     escrituras del modulo; el identificador de empresa se queda aqui.
+ *   - `factor` sale del `Decimal` de Prisma con `.toString()`, o sea como TEXTO decimal y nunca
+ *     como coma flotante (R1). La canonicalizacion visible -quitar los ceros de relleno de
+ *     `1000.0000`- es de quien lo pinta, no de la proyeccion.
+ */
+function toUnitView(row: UnitRow): UnitView {
   return {
     id: row.id,
     name: row.name,
     symbol: row.symbol,
     baseUnitId: row.baseUnitId,
-    factor: row.factor === null ? null : row.factor.toString(),
+    factor: row.factor?.toString() ?? null,
+    isSystem: row.companyId === null,
   };
 }
 
@@ -149,7 +167,7 @@ export async function listUnits(
   limit: number,
   query: ListQuery,
   scope: UnitScope,
-): Promise<readonly UnitRef[]> {
+): Promise<readonly UnitView[]> {
   const rows = await prisma.unit.findMany({
     where: buildUnitWhere(query, scope),
     orderBy: unitOrderBy(query.sort),
@@ -157,7 +175,7 @@ export async function listUnits(
     take: limit,
   });
 
-  return rows.map(toUnitRef);
+  return rows.map(toUnitView);
 }
 
 /**
@@ -172,7 +190,7 @@ export async function listUnits(
  * cuente SOLO lo visible para la empresa (R17): un `count` con su propio `where` contaria
  * tambien las unidades ajenas y la paginacion mentiria.
  */
-export async function listUnitsPage(query: ListQuery, scope: UnitScope): Promise<Page<UnitRef>> {
+export async function listUnitsPage(query: ListQuery, scope: UnitScope): Promise<Page<UnitView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
   const where = buildUnitWhere(query, scope);
 
@@ -187,5 +205,5 @@ export async function listUnitsPage(query: ListQuery, scope: UnitScope): Promise
     prisma.unit.count({ where }),
   ]);
 
-  return buildPage(rows.map(toUnitRef), total, query.page, limit);
+  return buildPage(rows.map(toUnitView), total, query.page, limit);
 }

@@ -27,6 +27,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import {
+  NAV_SECTION_CONFIGURATION,
+  PRIVATE_NAV_ITEMS,
+  type NavLink,
+} from '@/lib/shared/navigation/private-nav';
+import { UNITS_ROUTE } from '@/lib/shared/routes';
+
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). Mismo
  *  ayudante que `module-contract.test.ts`, replicado a proposito: no hay un `lib/shared` de
  *  tests del que importarlo sin crear un acoplamiento nuevo entre dos archivos de guardia. */
@@ -378,7 +385,9 @@ describe('R35 — ninguna dependencia nueva en package.json', () => {
 });
 
 // -------------------------------------------------------------------------------------------
-// R34 — ninguna pantalla, ruta ni item de menu de unidades; ningun .spec.ts nuevo en e2e/.
+// R34 — anclas de QC-38 relevadas por QC-39 el 2026-09-08 (R47: tensar, nunca aflojar): el MODULO
+// sigue sin abrir flujo navegable, y el item de menu y el unico spec e2e quedan fijados en su
+// forma exacta.
 // -------------------------------------------------------------------------------------------
 
 /**
@@ -403,6 +412,33 @@ function nuevosSpecsE2e(cambiados: readonly string[]): readonly string[] {
   return cambiados.filter((ruta) => ruta.startsWith('e2e/') && ruta.endsWith('.spec.ts'));
 }
 
+/** Las ocho formas en que un archivo del MODULO abriria flujo navegable por su cuenta: importar o
+ *  nombrar la navegacion privada, tipar un item de menu, declarar una constante de ruta de
+ *  pantalla, escribir un destino o un identificador de item, o navegar. El modulo es dominio y
+ *  adaptadores: la pantalla la abren `app/` y `lib/shared/navigation/`, nunca `lib/modules/**`. */
+function declaracionesDeNavegacion(fuente: string): string[] {
+  const codigo = sinComentarios(fuente);
+  const patrones: readonly [RegExp, string][] = [
+    [/\blib\/shared\/navigation\b/, 'lib/shared/navigation'],
+    [/\bPRIVATE_NAV_ITEMS\b/, 'PRIVATE_NAV_ITEMS'],
+    [/\bNavLink\b/, 'NavLink'],
+    [/\bNavItem\b/, 'NavItem'],
+    [/\b[A-Z][A-Z0-9_]*_ROUTE\s*=/, 'declaracion de ruta de pantalla'],
+    [/\bhref\b/, 'href'],
+    [/\btestId\b/, 'testId'],
+    [/\bredirect\b/, 'redirect'],
+  ];
+  return patrones.filter(([patron]) => patron.test(codigo)).map(([, nombre]) => nombre);
+}
+
+/** Cuantos casos `test(...)` declara una fuente de Playwright. Cuenta solo la llamada DIRECTA:
+ *  `test.describe(`, `test.beforeAll(`, `test.setTimeout(` y demas ayudantes llevan punto delante
+ *  del parentesis y no son recorridos. Funcion pura: se ejercita contra el spec real y contra
+ *  fuentes sinteticas donde debe morder. */
+function casosTest(fuente: string): number {
+  return [...fuente.matchAll(/(^|[^.\w$])test\s*\(/g)].length;
+}
+
 describe('R34 — esta ficha no abre ningun flujo navegable', () => {
   it('no existe ninguna pantalla de unidades bajo app/(private)/', () => {
     for (const ruta of [
@@ -413,15 +449,78 @@ describe('R34 — esta ficha no abre ningun flujo navegable', () => {
     }
   });
 
-  it('ningun archivo de navegacion privada declara un item de menu de unidades', () => {
-    const nav = join(repoRoot, 'lib', 'shared', 'navigation', 'private-nav.ts');
-    if (!existsSync(nav)) return;
+  // El ancla la puso QC-38 (T10) el 2026-09-08 con la pregunta contraria —«la navegacion privada
+  // NO nombra unidades»— porque aquella ficha era el CRUD y no abria pantalla. **QC-39 es
+  // justamente la ficha que la abre** (`specs/QC-39-pantalla-de-unidades/requirements.md > R9,
+  // R10`), asi que ese enunciado ya no describe la realidad y dejarlo pasaria por relajar la
+  // guardia. R47 manda TENSARLA, nunca aflojarla ni borrarla: el caso releva la pregunta el
+  // 2026-09-08 y afirma mas, no menos. Antes se pedia «cero items»; ahora se pide **EXACTAMENTE
+  // uno**, con su destino derivado de la constante IMPORTADA, su permiso y su seccion. Que no
+  // aparezca un segundo item de unidades sigue prohibido, y ademas se fija la forma del unico
+  // que hay.
+  it('la navegacion privada declara EXACTAMENTE un item de unidades, a UNITS_ROUTE, con unidades.consultar y en Configuración', () => {
+    const items: readonly NavLink[] = PRIVATE_NAV_ITEMS.flatMap((item) =>
+      item.kind === 'group' ? item.items : [item],
+    );
 
-    const fuente = sinComentarios(leer(nav));
-    expect(fuente, 'la navegacion privada nombra unidades').not.toMatch(/\bunidades\b/i);
+    const deUnidades = items.filter((item) => item.href === UNITS_ROUTE);
+    expect(deUnidades, `items que apuntan a ${UNITS_ROUTE}`).toHaveLength(1);
+
+    const unidades = deUnidades[0] as NavLink;
+    expect(unidades.permission).toBe('unidades.consultar');
+    expect(unidades.section).toBe(NAV_SECTION_CONFIGURATION);
+
+    // El `href` sale de la constante, no de un literal escrito en la navegacion (R8 de QC-39).
+    const nav = join(repoRoot, 'lib', 'shared', 'navigation', 'private-nav.ts');
+    const fuenteNav = sinComentarios(leer(nav));
+    expect(fuenteNav, 'la navegacion no importa UNITS_ROUTE').toMatch(/\bUNITS_ROUTE\b/);
+    expect(fuenteNav, 'la navegacion incrusta la URL como literal').not.toContain(UNITS_ROUTE);
   });
 
-  it('e2e/ no gana ningun archivo .spec.ts nuevo respecto de origin/dev', (ctx) => {
+  // Y lo que el ancla original protegia de verdad SIGUE protegido, ahora explicito: el MODULO no
+  // abre flujo navegable por su cuenta. Quien lo abre es `app/` mas `lib/shared/navigation/`; si
+  // manana una ruta de pantalla, un item de menu o un import de la navegacion se colaran dentro
+  // de `lib/modules/unidades/**`, esto se pone rojo.
+  it('ningun archivo de lib/modules/unidades declara navegacion, ruta de pantalla ni item de menu', () => {
+    expect(unidadesSources.length, 'el barrido no encontro fuentes de unidades').toBeGreaterThan(5);
+
+    const culpables = unidadesSources.flatMap((file) =>
+      declaracionesDeNavegacion(leer(file)).map((patron) => `${etiqueta(file)}: ${patron}`),
+    );
+
+    expect(culpables, culpables.join(', ')).toEqual([]);
+  });
+
+  it('y la guardia de navegacion en el modulo MUERDE ante cada forma prohibida, sin morder a lo legitimo', () => {
+    expect(declaracionesDeNavegacion(`import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';`)).toEqual(
+      expect.arrayContaining(['lib/shared/navigation', 'PRIVATE_NAV_ITEMS']),
+    );
+    expect(declaracionesDeNavegacion(`const item: NavLink = { kind: 'link' };`)).toContain('NavLink');
+    expect(declaracionesDeNavegacion(`export const UNIT_SCREEN_ROUTE = '/una/ruta';`)).toContain(
+      'declaracion de ruta de pantalla',
+    );
+    expect(declaracionesDeNavegacion(`const destino = { href: '/x', testId: 'nav-unidades' };`)).toEqual(
+      expect.arrayContaining(['href', 'testId']),
+    );
+    expect(declaracionesDeNavegacion(`redirect(UNITS_ROUTE);`)).toContain('redirect');
+
+    // Legitimo: el modulo hace su trabajo de dominio y no habla de pantallas.
+    expect(declaracionesDeNavegacion(`export async function listUnitsAction(query: UnitListQuery) {}`)).toEqual([]);
+    // Ni muerde en un comentario, que ya se filtra.
+    expect(declaracionesDeNavegacion(`// el item de menu vive en private-nav.ts, no aqui`)).toEqual([]);
+  });
+
+  // Segunda ancla relevada, mismo criterio que la del menu unos casos mas arriba. La puso QC-38
+  // (T10) el 2026-09-08 preguntando «e2e/ no gana ningun .spec.ts nuevo», porque aquella ficha era
+  // el CRUD y dejo el recorrido de extremo a extremo DIFERIDO, apuntando por nombre a QC-39.
+  // **QC-39 (T14, R50) es quien lo escribe**, asi que el 2026-09-08 releva la pregunta: el ancla no
+  // se borra ni se afloja —R47 manda TENSARLA—, cambia de enunciado y afirma MAS. Antes se pedia
+  // «cero specs nuevos»; ahora se pide **EXACTAMENTE uno**, y ademas que sea `e2e/unidades.spec.ts`
+  // y que cubra los DOS recorridos de R50. Un segundo spec inesperado lo pone rojo igual que antes
+  // lo ponia rojo el primero, y borrar uno de los dos recorridos tambien. Se afirma sobre la forma
+  // del archivo —la constante de ruta importada y el numero de casos `test(...)`—, nunca sobre
+  // textos de interfaz, que son copy y cambian sin que cambie el contrato.
+  it('e2e/ gana EXACTAMENTE un .spec.ts nuevo respecto de origin/dev, y es el de unidades', (ctx) => {
     const cambiados = archivosCambiadosDesdeDev();
     if (cambiados === null) {
       ctx.skip('el rango git origin/dev...HEAD no esta disponible: este caso no comprobo nada');
@@ -439,7 +538,28 @@ describe('R34 — esta ficha no abre ningun flujo navegable', () => {
       return;
     }
 
-    expect(nuevosSpecsE2e(cambiados), `nuevos .spec.ts bajo e2e/: ${nuevosSpecsE2e(cambiados).join(', ')}`).toEqual([]);
+    expect(nuevosSpecsE2e(cambiados), `nuevos .spec.ts bajo e2e/: ${nuevosSpecsE2e(cambiados).join(', ')}`).toEqual([
+      'e2e/unidades.spec.ts',
+    ]);
+  });
+
+  it('e2e/unidades.spec.ts deriva la URL de UNITS_ROUTE y declara los DOS casos que R50 exige', () => {
+    const spec = join(repoRoot, 'e2e', 'unidades.spec.ts');
+    expect(existsSync(spec), `${etiqueta(spec)} debe existir`).toBe(true);
+
+    const codigo = sinComentarios(leer(spec));
+    expect(codigo, 'el spec no nombra UNITS_ROUTE: estaria incrustando la URL a mano').toMatch(
+      /\bUNITS_ROUTE\b/,
+    );
+    // `test.describe(`, `test.beforeAll(` y compania no cuentan: solo la llamada directa `test(`.
+    expect(casosTest(codigo), 'el spec no declara exactamente dos casos test(...)').toBe(2);
+  });
+
+  it('y el contador de casos MUERDE si el spec pierde un recorrido o gana uno de mas', () => {
+    expect(casosTest(`test('alta', async () => {});\ntest('404', async () => {});`)).toBe(2);
+    expect(casosTest(`test.describe('x', () => { test('solo uno', async () => {}); });`)).toBe(1);
+    // Los ayudantes de Playwright no son casos y no deben inflar la cuenta.
+    expect(casosTest(`test.beforeAll(async () => {});\ntest.setTimeout(1000);`)).toBe(0);
   });
 
   // Que el salto de arriba no vacie la guardia: una que se salta siempre no protege nada. Se

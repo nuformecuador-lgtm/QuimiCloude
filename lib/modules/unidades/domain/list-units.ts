@@ -4,7 +4,7 @@ import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { UNIT_QUERYABLE } from './unit-queryable';
 
 import type { Page } from './page';
-import type { UnitRef } from './unit-catalog';
+import type { UnitView } from './unit-view';
 
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { UnitRepository } from '../ports/unit-repository';
@@ -33,8 +33,8 @@ export type ListUnitsDeps = {
  * Lo que devuelve el listado de unidades: **una union DISCRIMINADA POR LA FORMA DE LA ENTRADA**
  * (R27, R28, `design.md > 7`).
  *
- *   - sin `page` ni `pageSize` -> el CATALOGO ENTERO, `readonly UnitRef[]`, como hoy;
- *   - con `page` o `pageSize` -> una `Page<UnitRef>`.
+ *   - sin `page` ni `pageSize` -> el CATALOGO ENTERO, `readonly UnitView[]`, como hoy;
+ *   - con `page` o `pageSize` -> una `Page<UnitView>`.
  *
  * **No son dos metodos**, y eso es la decision: dos metodos obligarian a QC-39 a elegir cual
  * llamar segun lo que traiga la URL, que es justo la decision que este contrato quita de encima
@@ -45,10 +45,10 @@ export type ListUnitsDeps = {
  * consulta -las tres pantallas que hoy hacen `listUnitsAction()`- recibe el array, no la union,
  * y no tiene que estrechar nada.
  */
-export type UnitListResult = readonly UnitRef[] | Page<UnitRef>;
+export type UnitListResult = readonly UnitView[] | Page<UnitView>;
 
 /** Estrecha la union de `UnitListResult` al caso paginado. Es el discriminante en ejecucion. */
-export function isUnitPage(result: UnitListResult): result is Page<UnitRef> {
+export function isUnitPage(result: UnitListResult): result is Page<UnitView> {
   return !Array.isArray(result);
 }
 
@@ -59,7 +59,7 @@ export function isUnitPage(result: UnitListResult): result is Page<UnitRef> {
  * selector de unidad del formulario de recetas no se entera de esta ficha-.
  */
 export type ListUnits = {
-  (input: null | undefined, actor: Actor | null): Promise<readonly UnitRef[]>;
+  (input: null | undefined, actor: Actor | null): Promise<readonly UnitView[]>;
   (input: unknown, actor: Actor | null): Promise<UnitListResult>;
 };
 
@@ -102,7 +102,7 @@ function requestsPagination(input: unknown): boolean {
  * condicion de vida que aplicar, y no se inventa una que la tabla no tiene.
  */
 export function createListUnits(deps: ListUnitsDeps): ListUnits {
-  function listUnits(input: null | undefined, actor: Actor | null): Promise<readonly UnitRef[]>;
+  function listUnits(input: null | undefined, actor: Actor | null): Promise<readonly UnitView[]>;
   function listUnits(input: unknown, actor: Actor | null): Promise<UnitListResult>;
   async function listUnits(input: unknown, actor: Actor | null): Promise<UnitListResult> {
     requirePermission(actor, 'unidades.consultar');
