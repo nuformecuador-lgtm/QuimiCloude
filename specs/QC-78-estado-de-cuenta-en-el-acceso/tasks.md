@@ -127,6 +127,34 @@ test.
     **igual** con la marca y sin ella. No cabía en ninguno de los 40 anteriores —es el único que
     renderiza la pantalla pública— y por eso se declara aquí en vez de colarse en un archivo
     ajeno. **No toca `app/(public)/login/page.tsx`**, que sigue fuera del alcance: solo lo lee.
+42. `tests/unit/recetas-ui/recipe-route-contract.test.ts` — añadido el 2026-09-10 tras el gate de
+    F2.4. Ver el bloque de ampliación de abajo.
+
+### Ampliación del 2026-09-10 (F2.4) — la guardia de rutas que T20 invalida
+
+> **Lo que la obliga.** El centinela de **QC-64 R12** (`el asistente de lectura no tiene ruta
+> propia`) afirma, con **igualdad exacta**, la lista de constantes que exporta
+> `lib/shared/routes.ts`. **T20 le añadió dos** —`SESSION_ENDED_PARAM` y
+> `LOGIN_ROUTE_SESSION_ENDED`, R29 y R30—, así que la lista dejó de coincidir y el caso cae:
+> `1 failed | 24 passed` al correrlo aislado. Es una **regresión real de esta ficha**, no una
+> incompatibilidad de terceros.
+
+**Por qué no se vio antes.** `tests/unit/recetas-ui/recipe-route-contract.test.ts` está en
+`tests/baseline-rojos.json` desde el 2026-09-04 por un motivo **estructural distinto** (el del
+rango `git diff`), y estar listado **apaga el archivo entero** para el comparador del gate. Por eso
+`./init.sh` terminó en `== init OK ==`: un **falso verde**. La entrada del baseline **no se toca**
+—es deuda de arnés anterior a esta ficha y la levanta el leader aparte—.
+
+**Qué se toca, y qué no.** Solo la lista esperada de ese caso, más el comentario que justifica las
+dos entradas nuevas. **La aserción sigue siendo `toEqual` sobre la lista exacta**: ni `toContain`,
+ni subconjunto, ni ordenación laxa. Su valor es justamente que cualquier constante nueva la
+despierte, y ese valor se conserva íntegro. Es la misma puerta por la que ya pasaron `ORDERS_ROUTE`
+(QC-35), `PRESENTATIONS_ROUTE` (QC-45) y `UNITS_ROUTE` (QC-39), cada una con su comentario.
+
+**Por qué se repara aquí.** Dejarla fuera significa dejar **una guardia ajena rota** por un cambio
+propio, escondida detrás de una entrada de baseline que existe por otra cosa. Y R12 no se
+debilita: ninguna de las dos constantes encaja en el patrón `alude`, que se sigue aplicando a
+todas las declaraciones del archivo, y ninguna apunta a una URL del asistente.
 
 Los cuatro últimos (37–40) entran **solo** porque comparan el destino del `redirect` con
 `LOGIN_ROUTE`: es un cambio de una línea por archivo, a la constante nueva. Prohibido aprovechar
@@ -433,6 +461,15 @@ pero para **añadir** casos, no para arreglar los que ya hay.
       Una nota en el primer bloque de ampliación de cada archivo remitiendo al que manda: **R29 y
       R30 sí existen**. Cosmético, pero quien lee de arriba abajo se creía lo contrario.
       *Hecho cuando:* los dos sitios llevan la nota y dicen cuál manda.
+
+- [x] **T30. La guardia de rutas de QC-64 R12, que T20 invalidó.** (F2.4)
+      Archivos: `tests/unit/recetas-ui/recipe-route-contract.test.ts` (nº 42).
+      Añadir `SESSION_ENDED_PARAM` y `LOGIN_ROUTE_SESSION_ENDED` a la lista esperada, **cada una
+      con el comentario que dice por qué es legítima**: no son rutas del asistente de lectura
+      —que es lo que R12 existe para impedir— sino el parámetro y el destino del corte de sesión
+      de QC-78. **Prohibido relajar la aserción**: sigue siendo `toEqual` sobre la lista exacta.
+      *Hecho cuando:* el archivo pasa entero **y** se demuestra que la guardia sigue mordiendo,
+      añadiendo una constante ficticia a `lib/shared/routes.ts`, viéndola en rojo y quitándola.
 
 - [ ] **T16. Gate rápido de cada tanda — *las corre el leader*.**
       `./init.sh --rapido` al cerrar cada una de las tandas 1 a **5** (la 5 se añadió el
