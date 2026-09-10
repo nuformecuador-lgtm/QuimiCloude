@@ -13,9 +13,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createCreateUnit } from '@/lib/modules/unidades/domain/create-unit'
 import {
-  DuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
+  UnitDuplicateNameError,
   ValidationError,
 } from '@/lib/modules/unidades/domain/errors'
 import type { Actor } from '@/lib/modules/unidades/domain/actor'
@@ -239,12 +239,12 @@ describe('createUnit — equivalencia (R13, R14)', () => {
 })
 
 describe('createUnit — traduccion de duplicados', () => {
-  it("'duplicate_name' -> DuplicateNameError", async () => {
+  it("'duplicate_name' -> UnitDuplicateNameError", async () => {
     const units = repository({ outcome: 'duplicate_name' })
     const createUnit = createCreateUnit({ units })
 
     await expect(createUnit({ name: 'Kilogramo' }, ACTOR)).rejects.toBeInstanceOf(
-      DuplicateNameError,
+      UnitDuplicateNameError,
     )
   })
 

@@ -209,6 +209,7 @@ const testId = {
   abrirAltaPresentacion: 'presentation-create-open',
   nombrePresentacion: 'presentation-create-name',
   guardarPresentacion: 'presentation-create-submit',
+  errorAltaPresentacion: 'presentation-create-error',
 } as const;
 
 /** Ids de presentacion del fixture: las presentaciones siguen existiendo como catalogo (QC-45),
@@ -1094,6 +1095,16 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(enviado.get('unit')).toBeNull();
     expect(enviado.get('unitId')).toBeNull();
   });
+
+  // QC-70 R32 — AQUI vivia el caso «un nombre de presentacion repetido pinta el mensaje DEL BACK,
+  // no un texto propio», junto a los dos de R24 sobre el selector de presentaciones. Los tres se
+  // van con `dev` (2026-09-09): la presentacion se mudo de `products` a `product_batches` y este
+  // formulario ya no tiene selector de presentacion ni alta en linea, asi que no queda gesto que
+  // ejercitar. NO se pierde cobertura de R32: el componente que la ficha corrigio
+  // -`components/shared/presentation-select.tsx`- sigue vivo y en uso desde
+  // `proveedores/[id]/components/catalog-line-form.tsx`, y su caso equivalente esta en
+  // `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` > «linea de catalogo — errores por
+  // codigo estable (R32, R45)».
 
   it('el borrado pide confirmacion nombrando el producto y sin confirmar no invoca la operacion', async () => {
     // R26

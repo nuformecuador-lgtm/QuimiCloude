@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError, ValidationError } from './errors';
+import { ProductNotFoundError, ValidationError } from './errors';
 import { updateProductSchema } from './product-input';
 
 import type { ProductRepository } from '../ports/product-repository';
@@ -34,7 +34,10 @@ export function createUpdateProduct(
     // R14: `updateAlive` devuelve `false` cuando el producto no existe o ya esta
     // borrado (`findAliveById`/`updateAlive` filtran `deleted_at IS NULL` en el
     // puerto, R16). El dominio nunca ve un SQLSTATE: solo traduce el booleano.
+    // Misma reconciliacion que en `delete-product.ts`: la firma es la de `dev` -sin `actor.id`,
+    // porque la autoria vive ahora en el lote- y el error es el de QC-70, `ProductNotFoundError`
+    // con su codigo propio del catalogo unico (R17).
     const updated = await deps.products.updateAlive(id, parsed.data, now());
-    if (!updated) throw new NotFoundError();
+    if (!updated) throw new ProductNotFoundError();
   };
 }

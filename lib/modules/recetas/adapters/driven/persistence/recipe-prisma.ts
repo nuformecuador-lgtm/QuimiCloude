@@ -128,14 +128,14 @@ function sqlStateOf(error: unknown): string | null {
  *  nombre del indice-. Es la UNICA columna cuya violacion cuenta como "nombre duplicado"
  *  (R10); el otro unico de esta feature -`(recipe_id, product_id)` de `recipe_lines`
  *  (R16), verificado con el mismo metodo y cuyo `target` sale `['recipe_id',
- *  'product_id']`- es un dato distinto y jamas debe traducirse a `DuplicateNameError`. */
+ *  'product_id']`- es un dato distinto y jamas debe traducirse a `RecipeDuplicateNameError`. */
 const RECIPE_NAME_UNIQUE_COLUMN = 'name_normalized';
 
 /**
  * `P2002` SOLO cuenta como "nombre duplicado" cuando la columna que dispara la violacion
  * es la de `recipes` (`design.md > 7.3`, R10). Antes de esta correccion (hallazgo menor-5
  * de review QC-25) CUALQUIER `P2002`/`23505` -incluido el de
- * `recipe_lines_recipe_id_product_id_key`- se traducia a `DuplicateNameError`; hoy ese
+ * `recipe_lines_recipe_id_product_id_key`- se traducia a `RecipeDuplicateNameError`; hoy ese
  * caso es inalcanzable en la practica porque zod rechaza antes las lineas repetidas
  * (R16), pero traducirlo mal seria incorrecto si algun dia dejara de serlo.
  *

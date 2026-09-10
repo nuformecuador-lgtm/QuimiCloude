@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   cancelOrderAction,
@@ -79,7 +80,17 @@ const CONFIRM_LABEL = 'Cancelar el pedido';
 const CONFIRM_PENDING_LABEL = 'Cancelando…';
 const DISMISS_LABEL = 'Volver';
 const CANCEL_SUCCESS = 'Pedido cancelado.';
-const INVALID_INPUT_CODE = 'invalid_input';
+/**
+ * QC-70 (R21): el codigo que este dialogo FABRICA cuando su validacion previa rechaza el motivo
+ * sale del catalogo -tipado `ErrorCode`, la union cerrada-, no de un literal escrito aqui. El
+ * valor no cambia.
+ *
+ * Lo que NO sale del catalogo es `REASON_REQUIRED`: es el texto de una comprobacion PROPIA del
+ * formulario, y esta ficha no toca la validacion del front (R31, `design.md > 6 bis`). Lo que
+ * manda el catalogo es el mensaje de los errores que emite el back, y esos llegan ya resueltos
+ * en `result.message`.
+ */
+const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
 const REASON_REQUIRED = 'Escribe el motivo de la cancelación.';
 
 const INITIAL_STATE: OrderMutationFormState = { status: 'idle' };

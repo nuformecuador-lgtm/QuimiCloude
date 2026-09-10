@@ -5,15 +5,32 @@
  * `InventarioError` de `inventario`). Nada de `catch` vacios
  * (`docs/conventions.md > Manejo de errores`).
  *
+ * QC-70 (R6, R7, R8): el `code` ya NO es un `string` cualquiera sino un `ErrorCode` del
+ * catalogo unico (`@/lib/modules/errores`), y el MENSAJE sale de ese catalogo a partir del
+ * codigo. Ningun sitio que lanza puede pasar un texto: si pudiera, la frase volveria a vivir
+ * en cinco archivos, que es justo lo que la ficha quita. El catalogo se importa por el BARREL
+ * de otro modulo, que es lo unico que `domain/**` puede importar de fuera
+ * (`docs/architecture.md > La regla de dependencias`).
+ *
  * `Object.setPrototypeOf` es necesario porque TypeScript, al compilar a un target que no
  * soporta nativamente extender `Error`, rompe la cadena de prototipos y `instanceof` deja
  * de funcionar sin este ajuste.
  */
-export abstract class UnidadesError extends Error {
-  abstract readonly code: string;
+import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
 
-  constructor(message: string) {
-    super(message);
+export abstract class UnidadesError extends Error {
+  abstract readonly code: ErrorCode;
+
+  /**
+   * QC-70 (R28, R29): el dato variable que ayuda a diagnosticar —ids de unidad, el factor—.
+   * Va al REGISTRO DEL SERVIDOR y solo ahi: no es el mensaje, no se muestra y el traductor
+   * unico no lo copia al estado que cruza al navegador.
+   */
+  readonly diagnostic?: string;
+
+  constructor(code: ErrorCode, diagnostic?: string) {
+    super(errorMessage(code)); // R7: el mensaje NO se pasa desde fuera.
+    this.diagnostic = diagnostic;
     this.name = new.target.name;
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -23,8 +40,8 @@ export abstract class UnidadesError extends Error {
 export class UnauthorizedError extends UnidadesError {
   readonly code = 'unauthorized';
 
-  constructor(message = 'El actor no tiene permiso para realizar esta operacion.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('unauthorized', diagnostic);
   }
 }
 
@@ -40,8 +57,8 @@ export class UnauthorizedError extends UnidadesError {
 export class ValidationError extends UnidadesError {
   readonly code = 'invalid_input';
 
-  constructor(message = 'La entrada recibida no es valida.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('invalid_input', diagnostic);
   }
 }
 
@@ -55,8 +72,8 @@ export class ValidationError extends UnidadesError {
 export class IncompatibleUnitsError extends UnidadesError {
   readonly code = 'incompatible_units';
 
-  constructor(message = 'Las dos unidades no comparten unidad base: no son convertibles.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('incompatible_units', diagnostic);
   }
 }
 
@@ -68,12 +85,16 @@ export class IncompatibleUnitsError extends UnidadesError {
  * actor de la empresa A un oraculo de existencia sobre datos de la empresa B. `unauthorized`
  * queda SOLO para cuando falta el permiso `unidades.modificar` (R3), nunca para el ambito de
  * los datos.
+ *
+ * QC-70 (R17): se llamaba `NotFoundError` con el codigo generico `not_found`, que significaba
+ * cinco cosas distintas segun quien lo lanzara. Ahora es `unit_not_found`, un codigo con UN
+ * mensaje.
  */
-export class NotFoundError extends UnidadesError {
-  readonly code = 'not_found';
+export class UnitNotFoundError extends UnidadesError {
+  readonly code = 'unit_not_found';
 
-  constructor(message = 'La unidad no existe.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('unit_not_found', diagnostic);
   }
 }
 
@@ -87,8 +108,8 @@ export class NotFoundError extends UnidadesError {
 export class SystemUnitError extends UnidadesError {
   readonly code = 'system_unit';
 
-  constructor(message = 'Las unidades de sistema no se pueden editar ni borrar.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('system_unit', diagnostic);
   }
 }
 
@@ -97,25 +118,30 @@ export class SystemUnitError extends UnidadesError {
  * equivalente de sistema) por `name_normalized`. Se lanza al traducir el `'duplicate_name'`
  * que devuelve `UnitWriteRepository`, nunca desde un `SELECT` previo -entre un `SELECT` y un
  * `INSERT` cabe otra transaccion, asi que la garantia real es el indice unico.
+ *
+ * QC-70 (R18): se llamaba `DuplicateNameError` con el codigo generico `duplicate_name`, que
+ * compartian cuatro modulos con mensajes distintos. Ahora es `unit_duplicate_name`. Ojo: el
+ * `'duplicate_name'` que sigue apareciendo en `create-unit.ts` y `update-unit.ts` es el
+ * RESULTADO DISCRIMINADO del puerto, no un codigo de error, y no se toca.
  */
-export class DuplicateNameError extends UnidadesError {
-  readonly code = 'duplicate_name';
+export class UnitDuplicateNameError extends UnidadesError {
+  readonly code = 'unit_duplicate_name';
 
-  constructor(message = 'Ya existe una unidad con ese nombre.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('unit_duplicate_name', diagnostic);
   }
 }
 
 /**
- * QC-38 (R12): igual que `DuplicateNameError` pero para `units_company_symbol_unique` (o su
+ * QC-38 (R12): igual que `UnitDuplicateNameError` pero para `units_company_symbol_unique` (o su
  * equivalente de sistema), que es un indice **parcial** sobre `symbol IS NOT NULL` -por eso el
  * simbolo ausente nunca choca, y el vacio se rechaza antes en zod (R36).
  */
 export class DuplicateSymbolError extends UnidadesError {
   readonly code = 'duplicate_symbol';
 
-  constructor(message = 'Ya existe una unidad con ese simbolo.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('duplicate_symbol', diagnostic);
   }
 }
 
@@ -129,8 +155,8 @@ export class DuplicateSymbolError extends UnidadesError {
 export class InvalidDerivationError extends UnidadesError {
   readonly code = 'invalid_derivation';
 
-  constructor(message = 'La unidad base declarada no es valida.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('invalid_derivation', diagnostic);
   }
 }
 
@@ -142,7 +168,7 @@ export class InvalidDerivationError extends UnidadesError {
 export class UnitInUseError extends UnidadesError {
   readonly code = 'unit_in_use';
 
-  constructor(message = 'La unidad esta en uso y no se puede borrar.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('unit_in_use', diagnostic);
   }
 }

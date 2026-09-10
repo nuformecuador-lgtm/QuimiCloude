@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotCancellableError, NotFoundError, ValidationError } from './errors';
+import { NotCancellableError, OrderNotFoundError, ValidationError } from './errors';
 import { cancelOrderSchema } from './order-input';
 import type { OrderStatus } from './order-classification';
 
@@ -52,7 +52,7 @@ export function createCancelOrder(
     const { reason } = parsed.data;
 
     const row = await deps.orders.findAliveById(id);
-    if (row === null) throw new NotFoundError();
+    if (row === null) throw new OrderNotFoundError();
 
     // R28, con `code` PROPIO: `not_cancellable` no es `invalid_transition` ni `not_deletable`,
     // porque QC-35 tiene que poder decir tres frases distintas sin leer el mensaje (R56).
@@ -60,6 +60,6 @@ export function createCancelOrder(
 
     // R6: el actor queda como autor de la ultima modificacion, sin tocar el de creacion.
     const result = await deps.orders.cancelAlive(id, reason, actor.id, now());
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new OrderNotFoundError();
   };
 }

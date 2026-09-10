@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError, RecipeNotFoundError, ValidationError } from './errors';
+import { OrderNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
 import { updateOrderSchema } from './order-input';
 import { assertTransition } from './order-transitions';
 
@@ -51,7 +51,7 @@ export function createUpdateOrder(
     // si viviera en el `where`, «no existe» y «esta entregado» devolverian lo mismo y el
     // usuario recibiria `not_found` ante un pedido que esta viendo en pantalla.
     const row = await deps.orders.findAliveById(id);
-    if (row === null) throw new NotFoundError();
+    if (row === null) throw new OrderNotFoundError();
 
     // R21 y R22 caen sobre la MISMA tabla y no hay dos verdades: `ENTREGADO` y `CANCELADO`
     // tienen la lista de destinos VACIA, asi que un pedido final no admite NINGUNA edicion,
@@ -72,6 +72,6 @@ export function createUpdateOrder(
 
     // La fila pudo borrarse entre el `SELECT` y el `UPDATE`: el puerto vuelve a filtrar por
     // vivos y el caso de uso responde lo mismo que arriba (R33).
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new OrderNotFoundError();
   };
 }

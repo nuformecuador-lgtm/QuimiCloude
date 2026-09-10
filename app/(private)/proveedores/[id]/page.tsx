@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import type { ErrorCode } from '@/lib/modules/errores';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getSupplierAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -21,6 +22,13 @@ export const metadata: Metadata = {
 };
 
 /**
+ * El unico codigo que esta pagina distingue del resto (R20). `satisfies` y no una anotacion:
+ * conserva el tipo literal para la comparacion y a la vez obliga a que el codigo siga estando
+ * en el catalogo cerrado de `lib/modules/errores`, asi que escribirlo mal no compila (R2).
+ */
+const SUPPLIER_NOT_FOUND_CODE = 'supplier_not_found' satisfies ErrorCode;
+
+/**
  * Pagina de detalle de un proveedor (R1, R7, R19, R20, R24, `design.md > 6.1`).
  *
  * **La ubicacion sale de `supplierDetailRoute`** (`lib/shared/routes.ts`): el nombre de las
@@ -37,8 +45,10 @@ export const metadata: Metadata = {
  * lateral de la linea (R46, `design.md > 8.2`), nunca las pide un componente de cliente- y
  * despacha:
  *
- * 1. `not_found` -> estado «proveedor inexistente» con vuelta a la lista y **sin catalogo** (R20):
- *    un proveedor que no existe no tiene lineas, asi que `listCatalogLinesAction` ni se llama.
+ * 1. `supplier_not_found` -> estado «proveedor inexistente» con vuelta a la lista y **sin
+ *    catalogo** (R20): un proveedor que no existe no tiene lineas, asi que
+ *    `listCatalogLinesAction` ni se llama. QC-70 (R20) abrio el antiguo `not_found` generico por
+ *    caso concreto: aqui el unico que puede llegar es el del PROVEEDOR.
  * 2. cualquier otro error, incluido `unauthorized` -> estado de error **sin ningun dato** (R7).
  *    Ese `unauthorized` lo sigue aportando el caso de uso de `proveedores` sobre los DATOS.
  * 3. exito -> datos de contacto y, debajo, el catalogo paginado (R19).
@@ -77,7 +87,7 @@ export default async function ProveedorDetallePage({
   if (supplierResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        {supplierResult.code === 'not_found' ? (
+        {supplierResult.code === SUPPLIER_NOT_FOUND_CODE ? (
           <SupplierNotFound />
         ) : (
           <CatalogListError code={supplierResult.code} message={supplierResult.message} />

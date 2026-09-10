@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import type { ErrorCode } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import {
   deletePresentationAction,
@@ -57,8 +58,15 @@ export const DELETE_PRESENTATION_ID_TESTID = 'delete-presentation-id';
 /** Nombre del campo del `FormData` que lee el adaptador driving (`presentation-actions.ts`). */
 export const DELETE_PRESENTATION_ID_FIELD = 'id';
 
-/** Codigo estable del rechazo por FK; por el se decide, nunca por el texto (R28). */
-export const PRESENTATION_IN_USE_CODE = 'presentation_in_use';
+/**
+ * Codigo estable del rechazo por FK; por el se decide, nunca por el texto (R28).
+ *
+ * QC-70 (R20): el VALOR no cambia -R19 lo congela, ya era inequivoco-, pero el literal deja de
+ * estar suelto y queda tipado con `ErrorCode`, la union cerrada del catalogo: si el codigo
+ * desapareciera o se renombrara, esto rompe el typecheck en vez de comparar contra una palabra
+ * que ya no emite nadie.
+ */
+export const PRESENTATION_IN_USE_CODE: ErrorCode = 'presentation_in_use';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 

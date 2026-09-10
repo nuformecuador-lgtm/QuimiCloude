@@ -1,6 +1,7 @@
 'use server';
 
 import { identity, proveedores } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorCode } from '@/lib/modules/errores';
 import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/lib/modules/proveedores';
 
 /**
@@ -32,8 +33,12 @@ import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/li
  *
  * ERRORES (`design.md > 6.4`, R43): las clases de `ProveedoresError` se traducen a
  * `{ status: 'error', code, message }` con el `code` ESTABLE de la clase -nunca el texto-.
- * Cualquier error que NO sea de dominio se RELANZA: nada de `catch` vacios
- * (`docs/conventions.md`).
+ * QC-70 (R10) sustituye la copia local de `toErrorState` por el traductor UNICO del modulo
+ * `errores`, y con el cambia lo que ocurre con un error AJENO a la familia: antes se
+ * RELANZABA -y la pantalla se caia con la de error del framework-, ahora vuelve como
+ * `unexpected` con un mensaje neutro, mientras el detalle real -traza, SQL, nombres de
+ * tabla- va solo al registro del servidor (R12, R13, R14). Sigue sin haber `catch` vacios
+ * (`docs/conventions.md`): el error se traduce, no se descarta.
  *
  * SIN `revalidatePath` (`design.md > 9`): esta ficha no crea ninguna pantalla (R47) y
  * adivinar la ruta de QC-44 seria inventarla. QC-44 decide que revalida.
@@ -43,21 +48,21 @@ import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/li
 export type CreateSupplierFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 /** Estado compartido por edicion y baja: ninguna de las dos devuelve datos. */
 export type SupplierMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type SupplierQueryResult =
   | { status: 'success'; data: SupplierView }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type SupplierListResult =
   | { status: 'success'; data: Page<SupplierView> }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
 // exportar funciones async (restriccion real de Next.js). Quien consuma estas actions
@@ -66,13 +71,11 @@ export type SupplierListResult =
 /** Copy provisional, en una constante para que ningun test dependa del literal. */
 const MISSING_ID_ERROR = 'Falta el identificador del proveedor.';
 
-/** Traduce un error de dominio a estado serializable; relanza cualquier otro. */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof ProveedoresError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/**
+ * El traductor UNICO (R10): una sola implementacion para los siete adaptadores driving,
+ * parametrizada por la clase base de este modulo. Ya no se escribe aqui.
+ */
+const toErrorState = createErrorStateTranslator(ProveedoresError);
 
 /** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

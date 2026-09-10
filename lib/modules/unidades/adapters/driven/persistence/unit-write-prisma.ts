@@ -30,7 +30,7 @@ import type { UnitOwnership, UnitWriteRow, WriteOutcome } from '../../../ports/u
  * nunca el nombre del indice. Con la comparacion original los dos `Set` de nombres jamas
  * hacian match, el `P2002` se relanzaba sin traducir y `createUnit`/`updateUnit` con nombre o
  * simbolo duplicado terminaban lanzando `PrismaClientKnownRequestError` en vez de
- * `DuplicateNameError`/`DuplicateSymbolError` (R11, R12 rotos). La intencion de
+ * `UnitDuplicateNameError`/`DuplicateSymbolError` (R11, R12 rotos). La intencion de
  * `design.md > 7.1` -diferenciar duplicado de nombre de duplicado de simbolo a partir del
  * `P2002`- se conserva entera; lo que cambia es el mecanismo, para que sea el que Postgres
  * realmente expone.
@@ -161,7 +161,7 @@ export async function deleteById(id: string): Promise<'deleted' | 'not_found' | 
 /**
  * SIN `companyScopeWhere` (`design.md > 7`): la comparacion de empresa la hace el SERVICE,
  * porque necesita distinguir "de sistema" (-> `SystemUnitError`) de "de otra empresa" (->
- * `NotFoundError`), y un `where` que fundiera los dos casos devolveria `null` para ambos y
+ * `UnitNotFoundError`), y un `where` que fundiera los dos casos devolveria `null` para ambos y
  * perderia R21.
  */
 export async function findOwnership(id: string): Promise<UnitOwnership | null> {

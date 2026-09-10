@@ -20,6 +20,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import type { ErrorCode } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 import {
   createUnitAction,
@@ -56,10 +57,15 @@ import { formatFactor, unitLabel } from './unit-equivalence';
  * ninguna, y nunca la propia unidad que se edita (R36). La pantalla **no valida** la derivacion:
  * la ofrece bien y deja que el error de dominio mande.
  *
- * **Los errores se reparten por `code` ESTABLE, jamas por el texto** (R37): `duplicate_name` junto
- * al nombre, `duplicate_symbol` junto al simbolo, `invalid_derivation` junto al selector, y todo
- * lo demas —`invalid_input`, `not_found`, `system_unit`, `unauthorized`— en la region
+ * **Los errores se reparten por `code` ESTABLE, jamas por el texto** (R37): `unit_duplicate_name`
+ * junto al nombre, `duplicate_symbol` junto al simbolo, `invalid_derivation` junto al selector, y
+ * todo lo demas —`invalid_input`, `unit_not_found`, `system_unit`, `unauthorized`— en la region
  * `role="alert"` del formulario. Un rechazo **no cierra el panel** y no pierde lo escrito.
+ *
+ * QC-70 (R17, R18, R21): los codigos que esta pantalla reparte salen del CATALOGO UNICO y su
+ * mapa esta tipado con `ErrorCode`. Antes era `Record<string, ...>` con `duplicate_name` escrito
+ * a mano, y ese es exactamente el fallo que no se ve: renombrado el codigo en el dominio, el mapa
+ * dejaba de encontrarlo, el typecheck seguia verde y el mensaje se caia a la region generica.
  */
 
 /** Los nombres del `FormData` que lee el adaptador driving (`unit-actions.ts`). */
@@ -121,11 +127,15 @@ const FIELD_LABELS: Readonly<Record<UnitFieldName, string>> = {
 
 /**
  * Donde se pinta cada `code` estable de `unidades/domain/errors.ts` (R37). Los que NO estan aqui
- * —`invalid_input`, `not_found`, `system_unit`, `unauthorized`— van a la region `role="alert"` del
- * formulario. `unit_in_use` no puede llegar: solo lo emite el borrado, que vive en su dialogo.
+ * —`invalid_input`, `unit_not_found`, `system_unit`, `unauthorized`— van a la region `role="alert"`
+ * del formulario. `unit_in_use` no puede llegar: solo lo emite el borrado, que vive en su dialogo.
+ *
+ * Las claves son del CATALOGO UNICO (QC-70 R21): el tipo es `ErrorCode`, asi que un codigo mal
+ * escrito -o retirado del catalogo- rompe el typecheck aqui mismo en vez de caer callado al
+ * mensaje por defecto. Mismo mapa y mismo tipo que `presentation-form.tsx`.
  */
-const CODE_TO_FIELD: Readonly<Record<string, UnitFieldName>> = {
-  duplicate_name: UNIT_NAME_FIELD,
+const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, UnitFieldName>>> = {
+  unit_duplicate_name: UNIT_NAME_FIELD,
   duplicate_symbol: UNIT_SYMBOL_FIELD,
   invalid_derivation: UNIT_BASE_FIELD,
 };
@@ -141,7 +151,7 @@ type UnitFormState =
   | {
       status: 'error';
       /** Codigo ESTABLE de la operacion. Es lo que decide DONDE se pinta el mensaje. */
-      code: string;
+      code: ErrorCode;
       message: string;
       fieldErrors: FieldErrors;
       values: FieldValues;
@@ -206,7 +216,7 @@ export function buildUnitFormData(raw: FormData): FormData {
 async function submit(
   unitId: string | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: string; message: string }> {
+): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
   if (unitId === undefined) {
     const result = await createUnitAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };

@@ -1,0 +1,214 @@
+// QC-70 T1 — el catalogo unico de errores (R1-R5, R16-R19, R25).
+//
+// Lo que aqui se prueba NO es comportamiento de una funcion: es la FORMA del catalogo. El
+// sistema de tipos ya impide que falte una clave o un texto (`satisfies` en `error-catalog.ts`)
+// y que un codigo inventado compile (R2, con su caso de `@ts-expect-error` mas abajo); lo que
+// el compilador NO puede decir es que dos codigos no compartan frase (R4), que ninguno se
+// llame `not_found` (R16) o que ninguno venga de `identity` (R25). Eso se comprueba aqui.
+
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+import {
+  ERROR_CODES,
+  ERROR_MESSAGE_KEY,
+  ERROR_MESSAGES_ES,
+  errorMessage,
+  UNEXPECTED_ERROR_CODE,
+  type ErrorCode,
+} from '@/lib/modules/errores'
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+
+const moduleFiles = [
+  'lib/modules/errores/index.ts',
+  'lib/modules/errores/domain/error-codes.ts',
+  'lib/modules/errores/domain/error-catalog.ts',
+  'lib/modules/errores/domain/error-message.ts',
+]
+
+function readModuleFile(relPath: string): string {
+  return readFileSync(join(repoRoot, relPath), 'utf8')
+}
+
+describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
+  describe('R1 — un codigo, una clave, un texto', () => {
+    it('las 25 entradas de design.md > 3 estan, y cada codigo tiene exactamente una clave', () => {
+      expect(ERROR_CODES).toHaveLength(25)
+      expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
+      expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
+    })
+
+    it('cada clave tiene exactamente un texto y ninguna clave sobra ni falta', () => {
+      const claves = ERROR_CODES.map((code) => ERROR_MESSAGE_KEY[code])
+      expect(new Set(claves).size).toBe(claves.length)
+      expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
+    })
+
+    it('errorMessage devuelve el texto del catalogo para los 25 codigos', () => {
+      for (const code of ERROR_CODES) {
+        expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
+        expect(errorMessage(code).trim().length).toBeGreaterThan(0)
+      }
+      expect(errorMessage('incompatible_units')).toBe(
+        'Las dos unidades no comparten unidad base: no son convertibles.',
+      )
+      expect(errorMessage(UNEXPECTED_ERROR_CODE)).toBe(
+        'Ocurrio un error inesperado. Intentalo de nuevo.',
+      )
+    })
+  })
+
+  describe('R2 — el catalogo es cerrado: un codigo de fuera NO compila', () => {
+    it('un codigo inventado y uno de los genericos borrados son error de tipos', () => {
+      // @ts-expect-error un codigo que no esta en ERROR_CODES no es un ErrorCode (R2).
+      const inventado: ErrorCode = 'codigo_que_no_existe'
+      // @ts-expect-error `not_found` se borro del catalogo al abrirlo por caso (R16).
+      const generico: ErrorCode = 'not_found'
+      // @ts-expect-error errorMessage tampoco acepta un codigo de fuera de la lista (R2).
+      const mensaje: string = errorMessage('duplicate_name')
+
+      // Lo que prueba R2 son las TRES directivas de arriba: si el tipo dejara de ser cerrado,
+      // los `@ts-expect-error` se quedarian sin error y `pnpm run typecheck` se pondria rojo.
+      expect([inventado, generico, mensaje]).toHaveLength(3)
+    })
+
+    it('ERROR_CODES es una tupla de literales, no un string[] mutable', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toMatch(/export const ERROR_CODES = \[[\s\S]*\] as const;/)
+    })
+  })
+
+  describe('R3 — palabra estable, nunca un numero', () => {
+    it('los 25 codigos casan la forma en minusculas con guion bajo y ninguno es numerico', () => {
+      for (const code of ERROR_CODES) {
+        expect(code, `codigo con forma invalida: ${code}`).toMatch(/^[a-z][a-z_]*$/)
+        expect(Number.isNaN(Number(code)), `codigo numerico: ${code}`).toBe(true)
+      }
+    })
+  })
+
+  describe('R4 — dos codigos no pueden compartir texto', () => {
+    it('no hay ningun texto repetido en el catalogo', () => {
+      const textos = ERROR_CODES.map((code) => errorMessage(code))
+      const repetidos = textos.filter((texto, indice) => textos.indexOf(texto) !== indice)
+      expect(repetidos).toEqual([])
+    })
+  })
+
+  describe('R5 — codigo -> clave -> texto, sin ninguna dependencia', () => {
+    it('cada clave es estable y deriva del codigo', () => {
+      for (const code of ERROR_CODES) {
+        expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
+      }
+    })
+
+    it('el modulo no importa ningun paquete: solo sus propios archivos', () => {
+      for (const file of moduleFiles) {
+        const especificadores = [...readModuleFile(file).matchAll(/from\s+'([^']+)'/g)].map(
+          (match) => match[1] as string,
+        )
+        for (const especificador of especificadores) {
+          expect(especificador, `${file} importa el paquete ${especificador}`).toMatch(/^\.\//)
+        }
+      }
+    })
+  })
+
+  describe('R16 — los genericos ya no existen', () => {
+    it('ni not_found ni duplicate_name estan en el catalogo', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).not.toContain('not_found')
+      expect(codigos).not.toContain('duplicate_name')
+      const claves: readonly string[] = Object.values(ERROR_MESSAGE_KEY)
+      expect(claves).not.toContain('errors.not_found')
+      expect(claves).not.toContain('errors.duplicate_name')
+    })
+  })
+
+  describe('R17 — cada caso de «no existe» tiene su codigo', () => {
+    it('los siete codigos de no encontrado estan en el catalogo', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      for (const code of [
+        'product_not_found',
+        'presentation_not_found',
+        'order_not_found',
+        'supplier_not_found',
+        'catalog_line_not_found',
+        'recipe_not_found',
+        'unit_not_found',
+      ]) {
+        expect(codigos, `falta ${code}`).toContain(code)
+      }
+    })
+  })
+
+  describe('R18 — cada caso de «nombre repetido» tiene su codigo', () => {
+    it('los cuatro codigos de nombre duplicado estan en el catalogo', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      for (const code of [
+        'presentation_duplicate_name',
+        'supplier_duplicate_name',
+        'recipe_duplicate_name',
+        'unit_duplicate_name',
+      ]) {
+        expect(codigos, `falta ${code}`).toContain(code)
+      }
+    })
+  })
+
+  describe('R19 — los codigos inequivocos no se renombran', () => {
+    it('los trece codigos congelados conservan su valor', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      for (const code of [
+        'unauthorized',
+        'invalid_input',
+        'presentation_in_use',
+        'invalid_transition',
+        'not_cancellable',
+        'not_deletable',
+        'duplicate_number',
+        'duplicate_catalog_line',
+        'duplicate_symbol',
+        'system_unit',
+        'invalid_derivation',
+        'unit_in_use',
+        'incompatible_units',
+      ]) {
+        expect(codigos, `falta el codigo congelado ${code}`).toContain(code)
+      }
+    })
+  })
+
+  describe('R25 — identity se queda fuera', () => {
+    it('ningun codigo del catalogo pertenece a identity', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      for (const ajeno of [
+        'invalid_credentials',
+        'account_locked',
+        'account_disabled',
+        'session_expired',
+        'weak_password',
+        'duplicate_username',
+        'duplicate_email',
+        'duplicate_document',
+      ]) {
+        expect(codigos, `codigo de identity en el catalogo: ${ajeno}`).not.toContain(ajeno)
+      }
+      for (const code of ERROR_CODES) {
+        expect(code, `codigo con vocabulario de identity: ${code}`).not.toMatch(
+          /credential|password|session|login|account|username/,
+        )
+      }
+    })
+
+    it('el modulo errores no importa identity ni lo nombra', () => {
+      for (const file of moduleFiles) {
+        expect(readModuleFile(file)).not.toMatch(/lib\/modules\/identity/)
+      }
+    })
+  })
+})

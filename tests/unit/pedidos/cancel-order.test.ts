@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createCancelOrder } from '@/lib/modules/pedidos/domain/cancel-order'
 import {
   NotCancellableError,
-  NotFoundError,
+  OrderNotFoundError,
   ValidationError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
@@ -172,23 +172,23 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
     expect(d.cancelAlive).not.toHaveBeenCalled()
   })
 
-  it('cancelar un pedido inexistente o ya borrado responde not_found (R33)', async () => {
+  it('cancelar un pedido inexistente o ya borrado responde order_not_found (R33)', async () => {
     const d = dobles({ fila: null })
 
     expect(
       await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
-    ).toBe('not_found')
+    ).toBe('order_not_found')
     expect(d.cancelAlive).not.toHaveBeenCalled()
     await expect(
       createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN),
-    ).rejects.toBeInstanceOf(NotFoundError)
+    ).rejects.toBeInstanceOf(OrderNotFoundError)
   })
 
-  it('si la fila desaparece entre la lectura y la escritura, responde not_found (R33)', async () => {
+  it('si la fila desaparece entre la lectura y la escritura, responde order_not_found (R33)', async () => {
     const d = dobles({ fila: fila('PENDIENTE'), cancelacion: 'not_found' })
 
     expect(
       await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
-    ).toBe('not_found')
+    ).toBe('order_not_found')
   })
 })

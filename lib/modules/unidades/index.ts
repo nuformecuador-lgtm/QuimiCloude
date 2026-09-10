@@ -28,9 +28,9 @@ export { UnidadesError, UnauthorizedError, ValidationError } from './domain/erro
 // patron que los tres anteriores: `code` estable, y el adaptador driving los traduce sin mirar
 // el texto (`docs/conventions.md > Manejo de errores`).
 export {
-  NotFoundError,
+  UnitNotFoundError,
   SystemUnitError,
-  DuplicateNameError,
+  UnitDuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
   UnitInUseError,

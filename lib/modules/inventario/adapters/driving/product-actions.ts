@@ -1,6 +1,7 @@
 'use server';
 
 import { identity, inventario } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
 
 /**
@@ -40,31 +41,34 @@ import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/
  * entrada del caso de uso, y el resultado o el error del caso de uso a un estado
  * serializable.
  *
- * ERRORES (`design.md > 6.4`): las clases de `InventarioError` se traducen a
- * `{ status: 'error', code, message }` con el `code` ESTABLE de la clase -nunca el texto-,
- * mismo patron que `LoginFormState` de `identity`. Cualquier error que NO sea de dominio
- * se relanza: nada de `catch` vacios (`docs/conventions.md`).
+ * ERRORES (`design.md > 6.4`, y QC-70 `design.md > 4.2`): las clases de `InventarioError`
+ * se traducen a `{ status: 'error', code, message }` con el `code` ESTABLE de la clase
+ * -nunca el texto- y el mensaje del CATALOGO. La traduccion ya no se escribe aqui: la hace
+ * el traductor unico de `@/lib/modules/errores` (R10). Cualquier error que NO sea de dominio
+ * deja de relanzarse y pasa a devolverse como `unexpected` con mensaje neutro (R12): el
+ * detalle real -traza, SQL, nombres de tabla- va al log del servidor y nunca al navegador
+ * (R13, R14). Nada de `catch` vacios (`docs/conventions.md`).
  */
 
 /** Estado del alta: unico caso que devuelve datos ademas de exito/fracaso (el id creado). */
 export type CreateProductFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 /** Estado compartido por edicion y borrado: ninguna de las dos devuelve datos. */
 export type ProductMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 export type ProductQueryResult =
   | { status: 'success'; data: ProductView }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 export type ProductListResult =
   | { status: 'success'; data: Page<ProductView> }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo
 // puede exportar funciones async (restriccion real de Next.js sobre las Server Actions).
@@ -76,6 +80,15 @@ export type ProductListResult =
 /** Copy provisional (mismo criterio que S4 de `identity`), constante para que ningun test dependa del literal. */
 const NUMERIC_FIELD_ERROR = 'Uno o mas campos numericos no son un numero valido.';
 const MISSING_ID_ERROR = 'Falta el identificador del producto.';
+
+/**
+ * QC-70 (R21): el codigo que fabrican los tres rechazos DE ESTA ACTION -los que no vienen de una
+ * clase de error de dominio- sale del CATALOGO y se tipa con `ErrorCode`, en vez de repetirse como
+ * literal suelto en tres sitios. Era el unico de los siete adaptadores driving que quedaba sin
+ * hacerlo; el valor no cambia. Con `ErrorState` en los tipos de retorno el compilador ya cazaba un
+ * codigo mal escrito, asi que esto no tapa un agujero: unifica el idioma con los otros seis.
+ */
+const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
 
 /** Sentinela de conversion fallida: distinto de `undefined` (campo ausente, valido) y de cualquier numero real. */
 const INVALID_NUMBER = Symbol('invalid-number');
@@ -108,13 +121,12 @@ function readOptionalFormInt(
   return Number(trimmed);
 }
 
-/** Traduce un error de dominio a estado serializable; relanza cualquier otro (`docs/conventions.md`). */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof InventarioError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/**
+ * QC-70 (R10, R12): la copia local de `toErrorState` desaparecio. Queda UNA implementacion,
+ * en `@/lib/modules/errores`, parametrizada por la clase base de este modulo -mismo patron
+ * con el que QC-54 parametriza `requirePermission` por el `UnauthorizedError` de cada modulo-.
+ */
+const toErrorState = createErrorStateTranslator(InventarioError);
 
 /** El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {
@@ -157,7 +169,7 @@ export async function createProductAction(
 
   const candidate = buildProductCandidate(formData);
   if (candidate === INVALID_NUMBER) {
-    return { status: 'error', code: 'invalid_input', message: NUMERIC_FIELD_ERROR };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
   }
 
   const actor = await currentActor();
@@ -180,7 +192,7 @@ export async function updateProductAction(
 
   const candidate = buildProductCandidate(formData);
   if (candidate === INVALID_NUMBER) {
-    return { status: 'error', code: 'invalid_input', message: NUMERIC_FIELD_ERROR };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
   }
 
   const actor = await currentActor();
@@ -202,7 +214,7 @@ export async function deleteProductAction(
 
   const id = readFormString(formData, 'id');
   if (id === '') {
-    return { status: 'error', code: 'invalid_input', message: MISSING_ID_ERROR };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: MISSING_ID_ERROR };
   }
 
   const actor = await currentActor();

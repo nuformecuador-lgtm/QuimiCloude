@@ -29,6 +29,7 @@ import {
   UnitRowActions,
   deleteUnitLabel,
 } from '@/app/(private)/configuracion/unidades/components';
+import type { ErrorCode } from '@/lib/modules/errores';
 import {
   SystemUnitError,
   UnauthorizedError,
@@ -195,7 +196,7 @@ describe('al confirmar se invoca el borrado y se aplica R38', () => {
 
 describe('los rechazos se pintan DENTRO del dialogo, que sigue abierto (R41, R42)', () => {
   /** Confirma un borrado que la operacion rechaza con el codigo dado. */
-  async function rechazoCon(code: string, message: string) {
+  async function rechazoCon(code: ErrorCode, message: string) {
     const user = setupUser();
     deleteUnitActionMock.mockResolvedValue({ status: 'error', code, message });
     montar();

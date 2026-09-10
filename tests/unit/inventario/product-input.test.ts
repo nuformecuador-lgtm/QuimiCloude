@@ -78,7 +78,7 @@ describe('createProductSchema', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       // El error tiene que distinguirse de un duplicado: aqui es un fallo de zod
-      // (invalid_input), nunca un `DuplicateNameError` del dominio -este esquema no
+      // (invalid_input), nunca un `PresentationDuplicateNameError` del dominio -este esquema no
       // conoce la base y no puede lanzar ese error-.
       const issue = result.error.issues[0];
       expect(issue.code).toBe('custom');

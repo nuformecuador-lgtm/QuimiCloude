@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { SupplierNotFoundError } from './errors';
 import type { SupplierView } from './supplier-view';
 
 import type { SupplierRepository } from '../ports/supplier-repository';
@@ -28,7 +28,7 @@ export function createGetSupplier(
 
     // null = no existe o esta dado de baja (R22, R24): el puerto ya filtro los muertos.
     const supplier = await deps.suppliers.findAliveById(id);
-    if (supplier === null) throw new NotFoundError();
+    if (supplier === null) throw new SupplierNotFoundError();
     return supplier;
   };
 }

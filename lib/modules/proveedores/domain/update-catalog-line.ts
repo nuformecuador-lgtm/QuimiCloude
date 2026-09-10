@@ -1,6 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { updateCatalogLineSchema } from './catalog-line-input';
-import { DuplicateCatalogLineError, NotFoundError, ValidationError } from './errors';
+import { CatalogLineNotFoundError, DuplicateCatalogLineError, ValidationError } from './errors';
 
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
@@ -68,6 +68,6 @@ export function createUpdateCatalogLine(
     // R23: `'not_found'` llega igual con la linea inexistente, con la ya dada de baja y con
     // la de un proveedor dado de baja. Lo decide el puerto -es quien define «vivo»-, no un
     // `if` de aqui.
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new CatalogLineNotFoundError();
   };
 }

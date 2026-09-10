@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { createRecipeSchema, updateRecipeSchema, type RecipeDetail } from '@/lib/modules/recetas';
 import {
   createRecipeAction,
@@ -63,10 +64,16 @@ import {
  * reescritos aquí- alimentan los errores por campo, por línea (R31) y por paso. El servidor
  * revalida igual: el cliente nunca es la frontera.
  *
- * **Errores de la operación (R23)**: `duplicate_name` va junto al campo nombre; `not_found` se
- * presenta con un enlace a la lista; cualquier otro código (`invalid_input`, `unauthorized`, …) va
- * en la región `role="alert"` del formulario. Ninguno navega fuera del formulario ni pierde lo que
- * el usuario había escrito.
+ * **Errores de la operación (R23)**: `recipe_duplicate_name` va junto al campo nombre;
+ * `recipe_not_found` se presenta con un enlace a la lista; cualquier otro código (`invalid_input`,
+ * `unauthorized`, …) va en la región `role="alert"` del formulario. Ninguno navega fuera del
+ * formulario ni pierde lo que el usuario había escrito.
+ *
+ * QC-70 (R20, R21, R32): los dos códigos que se comparan son los ABIERTOS por caso -los genéricos
+ * `duplicate_name` y `not_found` ya no existen en el catálogo-, el código está tipado con
+ * `ErrorCode` -un literal mal escrito no compila- y el texto que se pinta cuando el error viene de
+ * la operación es SIEMPRE su `message`. Lo que el formulario valida por su cuenta no se toca
+ * (R31): `INVALID_INPUT_MESSAGE` sigue siendo suyo; del catálogo sale solo el código.
  *
  * **Éxito (R24)**: navega a la lista, `toast.success(...)` -con el `<Toaster/>` que el layout
  * privado YA monta, nunca uno propio (R25)- y `router.refresh()` para que la lista salga puesta al
@@ -83,6 +90,12 @@ const PREVIEW_DESCRIPTION =
 
 const SAVE_SUCCESS_CREATE = 'Receta creada.';
 const SAVE_SUCCESS_EDIT = 'Receta actualizada.';
+/**
+ * QC-70 (R21): el código que el formulario FABRICA para su propio rechazo sale del catálogo
+ * -`satisfies` conserva el literal y a la vez obliga a que siga estando en la lista cerrada-. El
+ * mensaje NO: es la frase que el formulario escribe para su propia validación y R31 la congela.
+ */
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const INVALID_INPUT_MESSAGE = 'Revisa los campos marcados.';
 
 export type RecipeFormProductPage = {
@@ -111,7 +124,7 @@ type FieldErrors = {
   readonly steps?: RecipeStepErrors;
 };
 
-type SaveError = { readonly code: string; readonly message: string };
+type SaveError = { readonly code: ErrorCode; readonly message: string };
 
 function buildInitialState(props: RecipeFormProps): RecipeFormState {
   if (props.mode === 'create') {
@@ -180,7 +193,7 @@ export function RecipeForm(props: RecipeFormProps) {
       // que el usuario tiene que ver -no un silencio-, así que también alimenta la región de error
       // general con el código estable `invalid_input`, igual que si lo hubiera rechazado el
       // servidor.
-      setSaveError({ code: 'invalid_input', message: INVALID_INPUT_MESSAGE });
+      setSaveError({ code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE });
       return;
     }
 
@@ -193,8 +206,9 @@ export function RecipeForm(props: RecipeFormProps) {
           : await createRecipeAction(parsed.data);
 
       if (result.status === 'error') {
-        if (result.code === 'duplicate_name') {
-          // `duplicate_name` SÍ identifica un campo (R23): junto al nombre, no en la región general.
+        if (result.code === 'recipe_duplicate_name') {
+          // `recipe_duplicate_name` SÍ identifica un campo (R23): junto al nombre, no en la región
+          // general. Se pinta el `message` de la operación, nunca un texto propio (QC-70 R32).
           setFieldErrors((previous) => ({ ...previous, name: result.message }));
           return;
         }
@@ -217,7 +231,7 @@ export function RecipeForm(props: RecipeFormProps) {
         handleSubmit();
       }}
     >
-      {saveError === null ? null : saveError.code === 'not_found' ? (
+      {saveError === null ? null : saveError.code === 'recipe_not_found' ? (
         <div role="alert" data-testid="recipe-form-not-found" className="rounded-lg border p-3 text-sm">
           <p data-testid="recipe-form-not-found-message">{saveError.message}</p>
           <Link href={FORMULAS_ROUTE} className="underline" data-testid="recipe-form-not-found-link">

@@ -12,6 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import type { ErrorCode } from '@/lib/modules/errores';
 import {
   createSupplierSchema,
   updateSupplierSchema,
@@ -69,7 +70,7 @@ type SupplierFormState =
   | {
       status: 'error';
       /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: string;
+      code: ErrorCode;
       /** Mensaje para la region de error del formulario. Sin uso si todos los errores son de campo. */
       message: string;
       fieldErrors: FieldErrors;
@@ -78,14 +79,20 @@ type SupplierFormState =
 
 const INITIAL_STATE: SupplierFormState = { status: 'idle' };
 
-/** Codigos estables de `proveedores/domain/errors.ts` que este formulario distingue. */
-const DUPLICATE_NAME_CODE = 'duplicate_name';
-const INVALID_INPUT_CODE = 'invalid_input';
-const NOT_FOUND_CODE = 'not_found';
+/**
+ * Codigos estables que este formulario distingue. QC-70 (R20, R21) los abrio por caso concreto
+ * -`duplicate_name` y `not_found` significaban cuatro y cinco cosas distintas- y los saca del
+ * catalogo cerrado: `satisfies ErrorCode` conserva el literal para comparar y a la vez obliga a
+ * que el codigo exista en `lib/modules/errores`, de modo que uno mal escrito no compila (R2).
+ */
+const DUPLICATE_NAME_CODE = 'supplier_duplicate_name' satisfies ErrorCode;
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
+const NOT_FOUND_CODE = 'supplier_not_found' satisfies ErrorCode;
 
+// Textos de la validacion PROPIA del formulario. R31 los deja intactos: el catalogo manda sobre
+// lo que emite el back, no sobre lo que el formulario comprueba por su cuenta.
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 const CONTACT_REQUIRED_MESSAGE = 'Indica al menos un teléfono o un correo electrónico.';
-const DUPLICATE_NAME_MESSAGE = 'Ya existe un proveedor con ese nombre.';
 const BACK_TO_LIST_LABEL = 'Volver a la lista de proveedores';
 
 function readString(formData: FormData, name: string): string {
@@ -114,7 +121,7 @@ function readValues(formData: FormData): FieldValues {
 async function submit(
   supplier: SupplierView | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: string; message: string }> {
+): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
   if (supplier === undefined) {
     const result = await createSupplierAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };
@@ -205,10 +212,14 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
         status: 'error',
         code: result.code,
         message: result.message,
-        // `duplicate_name` SI identifica campo -el nombre-, asi que se pinta junto a el. Los
-        // demas codigos (`invalid_input`, `not_found`, `unauthorized`) no senalan ninguno y van
-        // a la region de error del formulario (`design.md > 7`).
-        fieldErrors: result.code === DUPLICATE_NAME_CODE ? { name: DUPLICATE_NAME_MESSAGE } : {},
+        // `supplier_duplicate_name` SI identifica campo -el nombre-, asi que se pinta junto a el.
+        // Los demas codigos (`invalid_input`, `supplier_not_found`, `unauthorized`) no senalan
+        // ninguno y van a la region de error del formulario (`design.md > 7`).
+        //
+        // QC-70 (R32): lo que se pinta es el MENSAJE DEL BACK, no un texto propio para ese mismo
+        // caso. El formulario decide DONDE va la frase; el catalogo decide CUAL es. Antes habia
+        // aqui un `DUPLICATE_NAME_MESSAGE` local que tapaba la del catalogo.
+        fieldErrors: result.code === DUPLICATE_NAME_CODE ? { name: result.message } : {},
         values,
       };
     }
@@ -275,9 +286,9 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
               {state.code}
             </p>
             {isMissing ? (
-              // `not_found`: el proveedor dejo de existir mientras el panel estaba abierto, asi
-              // que lo unico util que queda es volver a la lista (`design.md > 7`). El destino
-              // sale de la constante de ruta, nunca de un literal (R2).
+              // `supplier_not_found`: el proveedor dejo de existir mientras el panel estaba
+              // abierto, asi que lo unico util que queda es volver a la lista (`design.md > 7`).
+              // El destino sale de la constante de ruta, nunca de un literal (R2).
               <Link
                 href={SUPPLIERS_ROUTE}
                 className={`${TOUCH_TARGET} inline-flex items-center underline underline-offset-4`}

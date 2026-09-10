@@ -5,7 +5,7 @@
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeleteProduct } from '@/lib/modules/inventario/domain/delete-product';
-import { NotFoundError, ValidationError } from '@/lib/modules/inventario/domain/errors';
+import { ProductNotFoundError, ValidationError } from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
@@ -112,7 +112,7 @@ describe('R14 — no encontrado al editar o al borrar', () => {
     const updateProduct = createUpdateProduct({ products, now: () => AHORA });
 
     await expect(updateProduct('inexistente', PRODUCTO_VALIDO, ADMIN)).rejects.toBeInstanceOf(
-      NotFoundError,
+      ProductNotFoundError,
     );
   });
 
@@ -122,7 +122,7 @@ describe('R14 — no encontrado al editar o al borrar', () => {
     });
     const deleteProduct = createDeleteProduct({ products, now: () => AHORA });
 
-    await expect(deleteProduct('inexistente', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteProduct('inexistente', ADMIN)).rejects.toBeInstanceOf(ProductNotFoundError);
   });
 });
 
@@ -145,7 +145,7 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
     });
     const getProduct = createGetProduct({ products });
 
-    await expect(getProduct('borrado', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getProduct('borrado', ADMIN)).rejects.toBeInstanceOf(ProductNotFoundError);
     expect(products.findAliveById).toHaveBeenCalledWith('borrado');
   });
 });
