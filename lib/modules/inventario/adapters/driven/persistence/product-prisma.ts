@@ -3,6 +3,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
+// Este adaptador ya no importa NINGUN error de dominio, y es correcto: el 2026-09-09 la autoria
+// y la presentacion se fueron de `products` a `product_batches`, asi que aqui no queda ninguna
+// clave foranea que traducir. Lo que QC-70 renombro en este archivo -el antiguo `NotFoundError`
+// del autor inexistente a `ProductNotFoundError` (R17)- desaparecio con la columna que lo
+// disparaba: el renombrado sigue vivo en `update-product.ts` y `delete-product.ts`, que son los
+// sitios que de verdad lo lanzan.
 import { normalizeProductName } from '../../../domain/product-name';
 
 import {

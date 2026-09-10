@@ -659,9 +659,13 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
 
   it('si el detalle falla, la tabla se sustituye por el estado de error de los ingredientes', async () => {
     const user = setupUser();
+    // QC-70 R17 — el codigo es `recipe_not_found`, no el `not_found` generico que la ficha
+    // retiro: `getRecipeAction` declara su `code` como `ErrorCode`, la union CERRADA del
+    // catalogo, asi que el codigo viejo ni siquiera compila. Es el mismo que compara
+    // `app/(private)/produccion/formulas/[id]/page.tsx`.
     getRecipeActionMock.mockResolvedValue({
       status: 'error',
-      code: 'not_found',
+      code: 'recipe_not_found',
       message: 'La receta no existe.',
     });
     renderFormulario();

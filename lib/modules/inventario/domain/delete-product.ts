@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { ProductNotFoundError } from './errors';
 
 import type { ProductRepository } from '../ports/product-repository';
 
@@ -27,7 +27,11 @@ export function createDeleteProduct(
 
     // R14: `false` significa que el producto no existe o ya estaba borrado
     // (`softDeleteAlive` tambien filtra `deleted_at IS NULL`, R16).
+    // La firma es la de `dev` (la autoria se mudo al lote el 2026-09-09, asi que ya no viaja el
+    // `actor.id`) y el error es el de QC-70 (R17): `ProductNotFoundError`, con el codigo
+    // `product_not_found` del catalogo unico, en vez del `NotFoundError` generico que compartian
+    // cinco modulos con mensajes distintos.
     const deleted = await deps.products.softDeleteAlive(id, now());
-    if (!deleted) throw new NotFoundError();
+    if (!deleted) throw new ProductNotFoundError();
   };
 }

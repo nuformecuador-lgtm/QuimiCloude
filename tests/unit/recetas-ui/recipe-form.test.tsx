@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
 import { RecipeForm } from '@/app/(private)/produccion/formulas/components';
+import { errorMessage } from '@/lib/modules/errores';
 import {
   MAX_IMAGE_BYTES,
   type RecipeDetail,
@@ -565,10 +566,12 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
   });
 
   it('una receta inexistente presenta el estado de «no encontrada», no un formulario vacío', async () => {
+    // QC-70 (R20): el código abierto por caso, `recipe_not_found`. (R32): la página pinta el
+    // `message` que devuelve la operación -el del catálogo-, no una frase propia para ese código.
     getRecipeActionMock.mockResolvedValue({
       status: 'error',
-      code: 'not_found',
-      message: 'Esta receta no existe o fue borrada.',
+      code: 'recipe_not_found',
+      message: errorMessage('recipe_not_found'),
     });
 
     const tree = await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) });
@@ -576,6 +579,9 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
 
     const notFound = screen.getByTestId('recipe-not-found');
     expect(notFound).toHaveAttribute('role', 'alert');
+    expect(screen.getByTestId('recipe-not-found-message')).toHaveTextContent(
+      errorMessage('recipe_not_found'),
+    );
     expect(screen.queryByTestId('recipe-form')).toBeNull();
     expect(getRecipeActionMock).toHaveBeenCalledWith(RECIPE_ID);
   });
@@ -639,6 +645,29 @@ describe('R23 — un guardado rechazado no navega, no pierde lo escrito y muestr
 
     // Lo escrito NO se pierde: sigue en el campo, no se limpió al rechazar.
     expect(screen.getByTestId('recipe-field-name')).toHaveValue('Nombre editado a mano');
+  });
+});
+
+describe('R23 (QC-70 R20, R32) — el nombre repetido llega con su código abierto', () => {
+  it('un nombre repetido se presenta junto al campo nombre con el mensaje del back', async () => {
+    // QC-70 (R20): el formulario compara `recipe_duplicate_name`, el código abierto por caso.
+    // (R32): junto al campo va el `message` de la operación, no un texto propio del formulario.
+    const user = setupUser();
+    updateRecipeActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'recipe_duplicate_name',
+      message: errorMessage('recipe_duplicate_name'),
+    });
+    renderEditForm(recipeDetail());
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    const error = await screen.findByTestId('recipe-error-name');
+    expect(error).toHaveTextContent(errorMessage('recipe_duplicate_name'));
+    // No cae en la región general ni en el estado de «no encontrada».
+    expect(screen.queryByTestId('recipe-form-error')).toBeNull();
+    expect(screen.queryByTestId('recipe-form-not-found')).toBeNull();
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 });
 

@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import {
   NotDeletableError,
-  NotFoundError,
+  OrderNotFoundError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
 
@@ -108,17 +108,21 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     expect(d.softDeleteAlive).not.toHaveBeenCalled()
   })
 
-  it('borrar un pedido inexistente o ya borrado responde not_found (R33)', async () => {
+  it('borrar un pedido inexistente o ya borrado responde order_not_found (R33)', async () => {
     const d = dobles({ fila: null })
 
-    expect(await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN))).toBe('not_found')
+    expect(await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN))).toBe(
+      'order_not_found',
+    )
     expect(d.softDeleteAlive).not.toHaveBeenCalled()
-    await expect(createDeleteOrder(d)(ORDER_ID, ADMIN)).rejects.toBeInstanceOf(NotFoundError)
+    await expect(createDeleteOrder(d)(ORDER_ID, ADMIN)).rejects.toBeInstanceOf(OrderNotFoundError)
   })
 
-  it('si la fila desaparece entre la lectura y la escritura, responde not_found (R33)', async () => {
+  it('si la fila desaparece entre la lectura y la escritura, responde order_not_found (R33)', async () => {
     const d = dobles({ fila: fila('PENDIENTE'), borrado: 'not_found' })
 
-    expect(await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN))).toBe('not_found')
+    expect(await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN))).toBe(
+      'order_not_found',
+    )
   })
 })

@@ -30,7 +30,10 @@ const UNIT_ID = '44444444-4444-4444-8444-444444444444';
 const LINEA_VIEJA = { productId: PRODUCTO_VIEJO, quantity: '10.0000', unitId: UNIT_ID };
 const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, quantity: '2.0000', unitId: UNIT_ID };
 
-const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', unitId: null };
+// dev anadio `stock` a `ProductRef` el 2026-09-09 (`419f01e`) y no actualizo estos dobles.
+// `null` es «no declara existencia», que es lo que el fixture decia ya por omision: el valor
+// no cambia el comportamiento de ningun caso, solo satisface el tipo.
+const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', unitId: null, stock: null };
 
 /** Doble de `UnitCatalog` (R50): por defecto resuelve como existentes TODOS los `unitId`
  *  pedidos -este archivo prueba R45/R46 sobre `productId`, no R50, asi que el doble no
@@ -154,7 +157,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
     const products: ProductCatalog = {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         REF_NUEVO,
-        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null },
+        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null, stock: null },
       ]),
     };
     const images = montarAlmacenamiento();
@@ -183,7 +186,16 @@ describe('R18 — productName del detalle sigue pidiendose sobre TODAS las linea
 
     expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_VIEJO]);
     expect(detalle.lines).toEqual([
-      { id: 'linea-1', productId: PRODUCTO_VIEJO, productName: null, quantity: '10.0000', unitId: UNIT_ID },
+      // El producto no vino de `findRefs`, asi que NO hay nada que decorar: `productName` y
+      // `productStock` -el campo que dev anadio el 2026-09-09- salen los dos en `null`.
+      {
+        id: 'linea-1',
+        productId: PRODUCTO_VIEJO,
+        productName: null,
+        quantity: '10.0000',
+        unitId: UNIT_ID,
+        productStock: null,
+      },
     ]);
   });
 });

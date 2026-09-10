@@ -402,7 +402,7 @@ describe('pagina de detalle — proveedor inexistente y no autorizado (R20, R7)'
     // R20
     getSupplierActionMock.mockResolvedValue({
       status: 'error',
-      code: 'not_found',
+      code: 'supplier_not_found',
       message: 'El proveedor no existe.',
     });
 

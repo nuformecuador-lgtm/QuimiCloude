@@ -1,6 +1,7 @@
 'use server';
 
 import { identity, recetas } from '@/lib/composition';
+import { createErrorStateTranslator, errorMessage, type ErrorCode } from '@/lib/modules/errores';
 import {
   createRecipeSchema,
   updateRecipeSchema,
@@ -33,8 +34,10 @@ import {
  * valida y traduce.
  *
  * ERRORES: las clases de `RecetasError` se traducen a `{ status: 'error', code, message }`
- * con el `code` ESTABLE de la clase, nunca el texto. Cualquier error que NO sea de
- * dominio se relanza (`docs/conventions.md > Manejo de errores`).
+ * con el `code` ESTABLE de la clase y el mensaje del CATALOGO, nunca el texto del error.
+ * QC-70 (R10) sustituyo la copia local de `toErrorState` por el traductor unico, y (R12)
+ * cambio el relanzado del error ajeno por el codigo generico `unexpected` con mensaje
+ * neutro: el detalle real va al log del servidor y nunca al navegador (R13, R14).
  *
  * ADVERTENCIAS DE ALMACENAMIENTO (R49): `recetas.updateRecipe` puede devolver
  * `warnings` -un borrado de imagen que fallo, con su contexto (`design.md > 9.3`)-. Esta
@@ -46,35 +49,39 @@ import {
 export type CreateRecipeFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type UpdateRecipeFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type DeleteRecipeFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type RecipeQueryResult =
   | { status: 'success'; data: RecipeDetail }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type RecipeListResult =
   | { status: 'success'; data: Page<RecipeSummary> }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
-const INVALID_INPUT_MESSAGE = 'La entrada recibida no es valida.';
+/**
+ * QC-70 (R21, R32): el codigo y el mensaje de la entrada invalida que rechaza el borde
+ * salen del catalogo, no de un literal local. El texto es el mismo que ya se escribia aqui.
+ */
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
+const INVALID_INPUT_MESSAGE = errorMessage(INVALID_INPUT_CODE);
 
-/** Traduce un error de dominio a estado serializable; relanza cualquier otro (`docs/conventions.md`). */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof RecetasError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/**
+ * QC-70 (R10): el traductor UNICO, parametrizado por la clase base del modulo. Ya no hay
+ * copia local: la implementacion vive en `@/lib/modules/errores` y la guardia del catalogo
+ * (caso 2) da rojo si alguien vuelve a escribir la suya aqui.
+ */
+const toErrorState = createErrorStateTranslator(RecetasError);
 
 /** El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {
@@ -99,7 +106,7 @@ function logStorageWarning(warning: { operation: string; path: string; message: 
 export async function createRecipeAction(input: unknown): Promise<CreateRecipeFormState> {
   const parsed = createRecipeSchema.safeParse(input);
   if (!parsed.success) {
-    return { status: 'error', code: 'invalid_input', message: INVALID_INPUT_MESSAGE };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE };
   }
 
   const actor = await currentActor();
@@ -116,7 +123,7 @@ export async function createRecipeAction(input: unknown): Promise<CreateRecipeFo
 export async function updateRecipeAction(id: string, input: unknown): Promise<UpdateRecipeFormState> {
   const parsed = updateRecipeSchema.safeParse(input);
   if (!parsed.success) {
-    return { status: 'error', code: 'invalid_input', message: INVALID_INPUT_MESSAGE };
+    return { status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE };
   }
 
   const actor = await currentActor();

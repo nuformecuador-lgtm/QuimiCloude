@@ -30,6 +30,7 @@ import {
   createOrderAction,
   updateOrderAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeLineView } from '@/lib/modules/recetas';
@@ -169,17 +170,28 @@ const FIELD_LABELS = {
 
 /**
  * Donde se pinta cada `code` estable de `pedidos/domain/errors.ts` (`design.md > 8`). Los codigos
- * que NO estan aqui -`not_found`, `duplicate_number`, `unauthorized`, `invalid_input` sin campo
- * senalado- van a la region `role="alert"` del formulario.
+ * que NO estan aqui -`order_not_found`, `duplicate_number`, `unauthorized`, `invalid_input` sin
+ * campo senalado- van a la region `role="alert"` del formulario.
+ *
+ * QC-70 (R20): las claves se tipan con `ErrorCode`, la union CERRADA del catalogo. **Ningun valor
+ * cambia** -los dos codigos que esta pantalla mapea ya eran inequivocos y R19 los congela-; lo que
+ * cambia es que una clave mal escrita, o un codigo que el catalogo no declare, deja de compilar.
+ * `Partial` porque el mapa es deliberadamente incompleto: solo los codigos que senalan UN campo.
  */
-const CODE_TO_FIELD: Readonly<Record<string, OrderFieldName>> = {
+const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
   recipe_not_found: RECIPE_FIELD,
   // `unit_not_found` ya no existe como codigo del modulo (2026-09-07): sin unidad en el pedido,
   // no hay nada que pueda emitirlo, y mantener la entrada seria mapear un error imposible.
   invalid_transition: ORDER_STATUS_FIELD,
 };
 
-const INVALID_INPUT_CODE = 'invalid_input';
+/**
+ * QC-70 (R21): el codigo que este formulario FABRICA cuando su propia validacion previa rechaza
+ * la entrada sale del catalogo -tipado `ErrorCode`-, en vez de ser un literal suelto. El valor no
+ * cambia. El MENSAJE que lo acompana (`FORM_ERROR_MESSAGE`) es del formulario y se queda: la
+ * validacion del front no se toca (R31, `design.md > 6 bis`).
+ */
+const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 type FieldErrors = Partial<Record<OrderFieldName, string>>;
@@ -198,7 +210,7 @@ type OrderFormState =
   | {
       status: 'error';
       /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: string;
+      code: ErrorCode;
       message: string;
       fieldErrors: FieldErrors;
       values: FieldValues;
@@ -230,7 +242,7 @@ function readValues(formData: FormData, isEdit: boolean): FieldValues {
 async function submit(
   order: OrderSummary | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: string; message: string }> {
+): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
   if (order === undefined) {
     const result = await createOrderAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };

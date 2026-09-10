@@ -18,7 +18,8 @@ import {
   listRecipesAction,
   updateRecipeAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import { NotFoundError, UnauthorizedError } from '@/lib/modules/recetas';
+import { RecipeNotFoundError, UnauthorizedError } from '@/lib/modules/recetas';
+import { errorMessage } from '@/lib/modules/errores';
 
 const {
   createRecipeMock,
@@ -150,12 +151,14 @@ describe('updateRecipeAction — R38, R47-R49', () => {
 });
 
 describe('deleteRecipeAction, getRecipeAction, listRecipesAction — traduccion de errores', () => {
-  it('deleteRecipeAction traduce NotFoundError a su code estable', async () => {
-    deleteRecipeMock.mockRejectedValue(new NotFoundError());
+  it('deleteRecipeAction traduce RecipeNotFoundError a su code estable', async () => {
+    deleteRecipeMock.mockRejectedValue(new RecipeNotFoundError());
 
     const resultado = await deleteRecipeAction('receta-inexistente');
 
-    expect(resultado).toEqual({ status: 'error', code: 'not_found', message: expect.any(String) });
+    // QC-70 (R17): el codigo generico `not_found` desaparecio; el caso concreto de receta
+    // es `recipe_not_found`, la misma entrada del catalogo que emite `pedidos`.
+    expect(resultado).toEqual({ status: 'error', code: 'recipe_not_found', message: expect.any(String) });
   });
 
   it('getRecipeAction devuelve los datos del caso de uso en exito', async () => {
@@ -174,10 +177,32 @@ describe('deleteRecipeAction, getRecipeAction, listRecipesAction — traduccion 
     expect(listRecipesMock).toHaveBeenCalledWith({ page: 2 }, expect.anything());
   });
 
-  it('relanza un error que no es de dominio, sin tragarselo', async () => {
+  // QC-70 (R12, R13): antes de esta ficha la action RELANZABA el error ajeno, y este caso lo
+  // fijaba con `rejects.toThrow('fallo de infraestructura')`. La decision cerrada del
+  // 2026-09-08 lo cambia: se traduce al codigo generico con mensaje neutro del catalogo, y el
+  // detalle real solo va al log del servidor. Lo que el caso sigue fijando -que el error NO se
+  // traga en silencio y que el texto interno no llega a quien llama- se comprueba igual, ahora
+  // sobre el estado devuelto.
+  it('un error que no es de dominio se traduce a `unexpected` sin filtrar el detalle interno', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     deleteRecipeMock.mockRejectedValue(new Error('fallo de infraestructura'));
 
-    await expect(deleteRecipeAction('receta-1')).rejects.toThrow('fallo de infraestructura');
+    const resultado = await deleteRecipeAction('receta-1');
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    });
+    // Ningun campo del estado -ni el mensaje, ni uno anadido por descuido- lleva el texto
+    // interno del error original (R13).
+    for (const valor of Object.values(resultado)) {
+      expect(String(valor)).not.toContain('fallo de infraestructura');
+    }
+    expect(JSON.stringify(resultado)).not.toContain('fallo de infraestructura');
+    // No se traga: el error original llega al registro del servidor (R14).
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 });
 

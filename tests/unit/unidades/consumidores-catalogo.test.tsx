@@ -140,6 +140,33 @@ describe('el selector del detalle de proveedor renderiza con datos de UnitView (
   });
 });
 
+/**
+ * LAS DOS SENALES DE LA RAMA DE QC-39: el tipo que la ficha CREA y su carpeta de spec. Mismo
+ * detector, mismo idioma y mismo motivo que en `modulo-intacto.test.ts` —donde esta el comentario
+ * largo—: R4 es una regla sobre el ALCANCE de QC-39, no una prohibicion general de que nadie toque
+ * las pantallas de recetas y proveedores. Con QC-39 ya en `dev`, este caso acusaba a QC-70 de
+ * «modificar pantallas ajenas» por sustituir en ellas la copia local de `toErrorState`, que es
+ * justo lo que su spec le manda hacer.
+ */
+const ARCHIVO_CENTRAL_DE_QC39 = 'lib/modules/unidades/domain/unit-view.ts';
+const CARPETA_SPEC_DE_QC39 = 'specs/QC-39-pantalla-de-unidades/';
+
+/** Puro y exportado para poder ejercitarlo con listas sinteticas, en los dos sentidos. */
+export function esLaRamaDeQC39(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC39) &&
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC39))
+  );
+}
+
+/** Todo lo que esta rama anade sobre el tronco, en rutas de git. */
+function tocadosDesde(base: string): readonly string[] {
+  return git(['diff', '--name-only', base])
+    .split('\n')
+    .map((linea) => linea.trim())
+    .filter((linea) => linea !== '');
+}
+
 describe('sus archivos NO cambian con esta ficha (R4, R47)', () => {
   it('ni el formulario de recetas ni el detalle de proveedor se tocan respecto a la base de fusion', (ctx) => {
     const base = mergeBaseConDev();
@@ -147,6 +174,17 @@ describe('sus archivos NO cambian con esta ficha (R4, R47)', () => {
       ctx.skip(
         'no se pudo calcular `git merge-base origin/dev HEAD` (sin remoto, o rango no ' +
           'disponible): este caso NO ha comprobado nada.',
+      );
+      return;
+    }
+    if (!esLaRamaDeQC39(tocadosDesde(base))) {
+      ctx.skip(
+        'el rango trae archivos pero no `' +
+          ARCHIVO_CENTRAL_DE_QC39 +
+          '` junto a `' +
+          CARPETA_SPEC_DE_QC39 +
+          '`: esta NO es la rama de QC-39, asi que su alcance no le aplica y este caso NO ha ' +
+          'comprobado nada.',
       );
       return;
     }
@@ -160,5 +198,23 @@ describe('sus archivos NO cambian con esta ficha (R4, R47)', () => {
       .filter((linea) => linea !== '');
 
     expect(cambiados, `QC-39 modifico pantallas ajenas: ${cambiados.join(', ')}`).toEqual([]);
+  });
+
+  // Que el salto de arriba no vacie la guardia: se ejercita el detector de rama en los dos
+  // sentidos con listas sinteticas, sin depender de en que rama corra el gate.
+  it('y el detector de la rama de QC-39 MUERDE en los dos sentidos', () => {
+    expect(
+      esLaRamaDeQC39([ARCHIVO_CENTRAL_DE_QC39, 'specs/QC-39-pantalla-de-unidades/tasks.md']),
+    ).toBe(true);
+    // El diff real de QC-70: toca las dos pantallas consumidoras, pero ninguna de las dos senales.
+    expect(
+      esLaRamaDeQC39([
+        'app/(private)/produccion/formulas/components/recipe-form.tsx',
+        'lib/modules/errores/index.ts',
+      ]),
+    ).toBe(false);
+    expect(esLaRamaDeQC39([ARCHIVO_CENTRAL_DE_QC39])).toBe(false);
+    expect(esLaRamaDeQC39(['specs/QC-39-pantalla-de-unidades/design.md'])).toBe(false);
+    expect(esLaRamaDeQC39([])).toBe(false);
   });
 });

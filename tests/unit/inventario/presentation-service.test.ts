@@ -5,15 +5,15 @@
 // presentation-uniqueness.int.test.ts`): el indice unico y el `ON DELETE RESTRICT` son
 // garantias de la base, no de este archivo. Lo que los tests de aqui demuestran es la
 // TRADUCCION que hace el servicio del resultado discriminado que devuelve el puerto
-// ('duplicate' -> DuplicateNameError, 'in_use' -> PresentationInUseError, 'deleted' -> exito,
-// 'not_found' -> NotFoundError) usando dobles, nunca una base real. No se afirma aqui que R20,
+// ('duplicate' -> PresentationDuplicateNameError, 'in_use' -> PresentationInUseError, 'deleted' -> exito,
+// 'not_found' -> PresentationNotFoundError) usando dobles, nunca una base real. No se afirma aqui que R20,
 // R21 o R22 queden cerrados por este archivo.
 
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createDeletePresentation } from '@/lib/modules/inventario/domain/delete-presentation';
 import {
-  DuplicateNameError,
-  NotFoundError,
+  PresentationDuplicateNameError,
+  PresentationNotFoundError,
   PresentationInUseError,
   UnauthorizedError,
   ValidationError,
@@ -109,11 +109,11 @@ describe('create-presentation', () => {
     const createPresentation = createCreatePresentation({ presentations });
 
     await expect(createPresentation({ name: 'Bidon 20 L' }, ADMIN)).rejects.toThrow(
-      DuplicateNameError,
+      PresentationDuplicateNameError,
     );
   });
 
-  it("un 'duplicate' devuelto por el puerto se traduce a DuplicateNameError aunque la comprobacion previa hubiera pasado", async () => {
+  it("un 'duplicate' devuelto por el puerto se traduce a PresentationDuplicateNameError aunque la comprobacion previa hubiera pasado", async () => {
     // No hay ninguna comprobacion previa en el propio caso de uso -por diseno, § 11.4-,
     // asi que esto ejercita exactamente lo mismo que el caso anterior desde el lado del
     // renombrado: el servicio nunca ignora un 'duplicate' del puerto.
@@ -123,7 +123,7 @@ describe('create-presentation', () => {
 
     await expect(
       updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L' }, ADMIN),
-    ).rejects.toThrow(DuplicateNameError);
+    ).rejects.toThrow(PresentationDuplicateNameError);
   });
 
   it('rechaza el nombre invalido antes de llamar al puerto', async () => {
@@ -148,7 +148,7 @@ describe('update-presentation', () => {
 
     await expect(
       updatePresentation('inexistente', { name: 'Bidon 20 L' }, ADMIN),
-    ).rejects.toThrow(NotFoundError);
+    ).rejects.toThrow(PresentationNotFoundError);
   });
 
   it('rechaza la entrada invalida antes de llamar al puerto', async () => {
@@ -193,7 +193,7 @@ describe('delete-presentation', () => {
     const presentations = montarRepositorio({ deleteById });
     const deletePresentation = createDeletePresentation({ presentations });
 
-    await expect(deletePresentation('inexistente', ADMIN)).rejects.toThrow(NotFoundError);
+    await expect(deletePresentation('inexistente', ADMIN)).rejects.toThrow(PresentationNotFoundError);
   });
 });
 

@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError, ValidationError } from './errors';
+import { SupplierNotFoundError, ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { SUPPLIER_CATALOG_LINE_QUERYABLE } from './supplier-catalog-line-queryable';
 
@@ -63,7 +63,7 @@ export function createListCatalogLines(
     deps.log.ignoredFields(LIST_NAME, ignored);
 
     const page = await deps.catalog.listBySupplierAlive(supplierId, query);
-    if (page === 'supplier_not_found') throw new NotFoundError();
+    if (page === 'supplier_not_found') throw new SupplierNotFoundError();
 
     return page;
   };

@@ -769,13 +769,17 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     expect(createSupplierActionMock).not.toHaveBeenCalled();
   });
 
-  it('un duplicate_name se pinta junto al campo nombre, sin cerrar el panel ni perder lo escrito', async () => {
+  it('un supplier_duplicate_name se pinta junto al campo nombre, sin cerrar el panel ni perder lo escrito', async () => {
     // R32 (primera mitad) — el error identifica campo, asi que va JUNTO al campo. Y se decide por
     // el `code` estable, nunca por el texto: el mensaje del fixture no se parece a «duplicado».
+    //
+    // QC-70 R20: el codigo es el ABIERTO por caso (`supplier_duplicate_name`); el generico
+    // `duplicate_name` ya no existe en el catalogo. QC-70 R32: la frase que se pinta es la que
+    // llega del back, no un texto propio del formulario para ese mismo codigo.
     const user = setupUser();
     createSupplierActionMock.mockResolvedValue({
       status: 'error',
-      code: 'duplicate_name',
+      code: 'supplier_duplicate_name',
       message: 'MENSAJE-DEL-SERVIDOR-QUE-NADIE-INTERPRETA',
     });
 
@@ -789,6 +793,8 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     await waitFor(() => expect(createSupplierActionMock).toHaveBeenCalledTimes(1));
 
     const errorDeCampo = await screen.findByTestId('supplier-error-name');
+    // QC-70 R32: el mensaje del back, tal cual, sin sustituirlo por uno propio.
+    expect(errorDeCampo).toHaveTextContent('MENSAJE-DEL-SERVIDOR-QUE-NADIE-INTERPRETA');
     expect(screen.getByTestId('supplier-field-name')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByTestId('supplier-field-name')).toHaveAttribute(
       'aria-describedby',
@@ -839,13 +845,15 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
     expect(screen.getByTestId('supplier-field-name')).toHaveValue(ALTA_VALIDA.name);
   });
 
-  it('un not_found ofrece volver a la lista desde la region de error del formulario', async () => {
+  it('un supplier_not_found ofrece volver a la lista desde la region de error del formulario', async () => {
     // R32 — el proveedor dejo de existir mientras el panel estaba abierto. El destino se deriva
     // de `SUPPLIERS_ROUTE` (R2), nunca de un literal.
+    //
+    // QC-70 R20: el codigo es el ABIERTO por caso (`supplier_not_found`).
     const user = setupUser();
     updateSupplierActionMock.mockResolvedValue({
       status: 'error',
-      code: 'not_found',
+      code: 'supplier_not_found',
       message: 'No existe.',
     });
 

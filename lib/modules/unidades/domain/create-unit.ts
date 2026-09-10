@@ -1,8 +1,8 @@
 import { requirePermission, type Actor } from './actor';
 import {
-  DuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
+  UnitDuplicateNameError,
   ValidationError,
 } from './errors';
 import { createUnitSchema } from './unit-input';
@@ -99,7 +99,7 @@ export function createCreateUnit(
     };
 
     const result = await deps.units.create(actor.companyId, row);
-    if (result === 'duplicate_name') throw new DuplicateNameError();
+    if (result === 'duplicate_name') throw new UnitDuplicateNameError();
     if (result === 'duplicate_symbol') throw new DuplicateSymbolError();
 
     return result;

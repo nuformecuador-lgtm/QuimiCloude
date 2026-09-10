@@ -14,7 +14,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createCreateSupplier } from '@/lib/modules/proveedores/domain/create-supplier'
 import { createDeleteSupplier } from '@/lib/modules/proveedores/domain/delete-supplier'
-import { DuplicateNameError, NotFoundError } from '@/lib/modules/proveedores/domain/errors'
+import {
+  SupplierDuplicateNameError,
+  SupplierNotFoundError,
+} from '@/lib/modules/proveedores/domain/errors'
 import { createGetSupplier } from '@/lib/modules/proveedores/domain/get-supplier'
 import { createListSuppliers } from '@/lib/modules/proveedores/domain/list-suppliers'
 import { createUpdateSupplier } from '@/lib/modules/proveedores/domain/update-supplier'
@@ -182,12 +185,12 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
 
   it('traduce el duplicado del puerto a error de nombre repetido sin crear ni modificar nada', async () => {
     // R15. El adaptador tradujo el 23505 del indice unico parcial a un resultado
-    // discriminado; el dominio lo convierte en `DuplicateNameError` y no intenta ninguna
-    // segunda escritura.
+    // discriminado; el dominio lo convierte en `SupplierDuplicateNameError` y no intenta
+    // ninguna segunda escritura.
     const alta = makeSuppliers({ create: vi.fn(async () => 'duplicate' as const) })
     await expect(
       createCreateSupplier({ suppliers: alta.repo, now })(ENTRADA_VALIDA, ADMIN),
-    ).rejects.toBeInstanceOf(DuplicateNameError)
+    ).rejects.toBeInstanceOf(SupplierDuplicateNameError)
     expect(alta.spies.updateAlive).not.toHaveBeenCalled()
     expect(alta.spies.softDeleteAlive).not.toHaveBeenCalled()
 
@@ -197,8 +200,8 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
       ENTRADA_VALIDA,
       ADMIN,
     ).catch((error: unknown) => error)
-    expect(fallo).toBeInstanceOf(DuplicateNameError)
-    expect((fallo as DuplicateNameError).code).toBe('duplicate_name')
+    expect(fallo).toBeInstanceOf(SupplierDuplicateNameError)
+    expect((fallo as SupplierDuplicateNameError).code).toBe('supplier_duplicate_name')
     expect(edicion.spies.create).not.toHaveBeenCalled()
   })
 
@@ -208,19 +211,19 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     const consulta = makeSuppliers({ findAliveById: vi.fn(async () => null) })
     await expect(
       createGetSupplier({ suppliers: consulta.repo })('sup-x', ADMIN),
-    ).rejects.toBeInstanceOf(NotFoundError)
+    ).rejects.toBeInstanceOf(SupplierNotFoundError)
 
     const edicion = makeSuppliers({ updateAlive: vi.fn(async () => 'not_found' as const) })
     await expect(
       createUpdateSupplier({ suppliers: edicion.repo, now })('sup-x', ENTRADA_VALIDA, ADMIN),
-    ).rejects.toBeInstanceOf(NotFoundError)
+    ).rejects.toBeInstanceOf(SupplierNotFoundError)
 
     const baja = makeSuppliers({ softDeleteAlive: vi.fn(async () => false) })
     const fallo = await createDeleteSupplier({ suppliers: baja.repo, now })('sup-x', ADMIN).catch(
       (error: unknown) => error,
     )
-    expect(fallo).toBeInstanceOf(NotFoundError)
-    expect((fallo as NotFoundError).code).toBe('not_found')
+    expect(fallo).toBeInstanceOf(SupplierNotFoundError)
+    expect((fallo as SupplierNotFoundError).code).toBe('supplier_not_found')
     expect(baja.spies.create).not.toHaveBeenCalled()
     expect(baja.spies.updateAlive).not.toHaveBeenCalled()
   })

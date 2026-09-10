@@ -35,9 +35,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { unidades } from '@/lib/composition'
 import {
-  DuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
+  UnitDuplicateNameError,
   UnitInUseError,
 } from '@/lib/modules/unidades'
 import { prisma } from '@/lib/shared/db/prisma'
@@ -267,7 +267,7 @@ describe('createUnit — R6, R7: alta con y sin simbolo, con y sin derivacion', 
 })
 
 describe('createUnit — R11: unicidad del nombre normalizado, por empresa', () => {
-  it('rechaza el mismo nombre normalizado en la MISMA empresa con DuplicateNameError', async () => {
+  it('rechaza el mismo nombre normalizado en la MISMA empresa con UnitDuplicateNameError', async () => {
     const marker = token()
     const companyId = await createCompany(`comp${marker}`)
     const actor = actorFor(companyId)
@@ -280,7 +280,7 @@ describe('createUnit — R11: unicidad del nombre normalizado, por empresa', () 
       // Nombre distinto en superficie -mayusculas y guion-, mismo normalizado.
       await expect(
         unidades.createUnit({ name: `KILOGRAMO ${marker}` }, actor),
-      ).rejects.toBeInstanceOf(DuplicateNameError)
+      ).rejects.toBeInstanceOf(UnitDuplicateNameError)
 
       // No se escribio ninguna fila nueva: solo sobrevive la primera.
       const rows = await prisma.unit.findMany({

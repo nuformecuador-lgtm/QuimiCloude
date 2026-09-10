@@ -8,24 +8,24 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  DuplicateNameError,
   DuplicateSymbolError,
   IncompatibleUnitsError,
   InvalidDerivationError,
-  NotFoundError,
   SystemUnitError,
   UnauthorizedError,
   UnidadesError,
+  UnitDuplicateNameError,
   UnitInUseError,
+  UnitNotFoundError,
   ValidationError,
 } from '@/lib/modules/unidades'
 
 describe('lib/modules/unidades — errores de dominio', () => {
   it('las seis clases nuevas son instancias de UnidadesError, con su code estable', () => {
     const nuevas: readonly [string, UnidadesError][] = [
-      ['not_found', new NotFoundError()],
+      ['unit_not_found', new UnitNotFoundError()],
       ['system_unit', new SystemUnitError()],
-      ['duplicate_name', new DuplicateNameError()],
+      ['unit_duplicate_name', new UnitDuplicateNameError()],
       ['duplicate_symbol', new DuplicateSymbolError()],
       ['invalid_derivation', new InvalidDerivationError()],
       ['unit_in_use', new UnitInUseError()],
@@ -45,9 +45,9 @@ describe('lib/modules/unidades — errores de dominio', () => {
       // IncompatibleUnitsError ya existia antes de esta ficha; se incluye para completar los
       // nueve codigos que hoy conviven en el modulo.
       new IncompatibleUnitsError().code,
-      new NotFoundError().code,
+      new UnitNotFoundError().code,
       new SystemUnitError().code,
-      new DuplicateNameError().code,
+      new UnitDuplicateNameError().code,
       new DuplicateSymbolError().code,
       new InvalidDerivationError().code,
       new UnitInUseError().code,

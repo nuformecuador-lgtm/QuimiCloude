@@ -3,11 +3,16 @@
 // Debe poder importarse desde un componente de cliente sin arrastrar servidor (R31,
 // `design.md > 3`) -QC-22 lo hara-.
 export { requirePermission, type Actor } from './domain/actor';
+// QC-70 (R17, R18): `NotFoundError` se abrio en `ProductNotFoundError` y
+// `PresentationNotFoundError`, y `DuplicateNameError` paso a `PresentationDuplicateNameError`.
+// El codigo generico no podia tener UN mensaje que dijera a la vez «el producto» y «la
+// presentacion», que es lo que el catalogo unico exige (`design.md > 3`, `> 4.1`).
 export {
   InventarioError,
   UnauthorizedError,
-  NotFoundError,
-  DuplicateNameError,
+  ProductNotFoundError,
+  PresentationNotFoundError,
+  PresentationDuplicateNameError,
   PresentationInUseError,
   ValidationError,
 } from './domain/errors';

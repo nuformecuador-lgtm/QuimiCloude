@@ -2,6 +2,11 @@
 
 import { identity, pedidos } from '@/lib/composition';
 import {
+  createErrorStateTranslator,
+  type ErrorCode,
+  type ErrorState,
+} from '@/lib/modules/errores';
+import {
   PedidosError,
   type Actor,
   type OrderSummary,
@@ -41,9 +46,16 @@ import {
  * Solo traduce `FormData`/argumentos a la entrada del caso de uso, y el resultado o el error
  * a un estado serializable.
  *
- * ERRORES (R56): las clases de `PedidosError` se traducen a `{ status: 'error', code, message }`
- * con el `code` ESTABLE de la clase -NUNCA el texto del mensaje-. Cualquier error que no sea
- * de dominio se RELANZA: nada de `catch` vacios (`docs/conventions.md`).
+ * ERRORES (R56, y QC-70 R10-R14): las clases de `PedidosError` se traducen a
+ * `{ status: 'error', code, message }` con el `code` ESTABLE de la clase -NUNCA el texto del
+ * mensaje-, y el mensaje sale del CATALOGO. La traduccion no se escribe aqui: es
+ * `createErrorStateTranslator`, la unica implementacion del repositorio.
+ *
+ * QC-70 CAMBIA el trato del error AJENO: antes se RELANZABA -y reventaba la pantalla con la
+ * pagina de error del framework, a veces con un mensaje de Prisma dentro-. Ahora se devuelve
+ * como `unexpected` con mensaje neutro y el error original se entrega al registro del servidor,
+ * que es el unico sitio donde ese detalle aparece (R12, R13, R14). Sigue sin haber ningun
+ * `catch` vacio (`docs/conventions.md`): el error no se traga, se registra.
  *
  * SIN `revalidatePath` y SIN ningun route handler (`design.md > 9`, R54): esta ficha no crea
  * ninguna pantalla (R57), asi que no hay ruta que revalidar y adivinar la de QC-35 seria
@@ -55,21 +67,21 @@ import {
 export type CreateOrderFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string; numberText: string }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 /** Estado compartido por edicion, cancelacion y borrado: ninguna de las tres devuelve datos. */
 export type OrderMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 export type OrderQueryResult =
   | { status: 'success'; data: OrderView }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 export type OrderListResult =
   | { status: 'success'; data: Page<OrderSummary> }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
 // exportar funciones async (restriccion real de Next.js). Quien consuma estas actions (QC-35)
@@ -79,19 +91,24 @@ export type OrderListResult =
 const MISSING_ID_ERROR = 'Falta el identificador del pedido.';
 
 /**
- * `code` de la entrada que ni siquiera llega a formarse. Es el MISMO literal que publica
+ * `code` de la entrada que ni siquiera llega a formarse. Es el MISMO codigo que publica
  * `ValidationError` del dominio, y no una segunda taxonomia: quien consuma estas actions
  * decide por el `code` y no puede tener que conocer dos para el mismo caso.
+ *
+ * QC-70 (R21): sale del CATALOGO -tipado `ErrorCode`- en vez de ser un literal escrito aqui,
+ * asi que renombrarlo en el catalogo rompe el typecheck en vez de dejar esta linea mintiendo.
+ * El MENSAJE que lo acompana (`MISSING_ID_ERROR`) es de esta action, no del catalogo: es su
+ * propia comprobacion de entrada, y R31 no la migra.
  */
-const INVALID_INPUT_CODE = 'invalid_input';
+const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
 
-/** Traduce un error de dominio a estado serializable; relanza cualquier otro (R56). */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof PedidosError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/**
+ * QC-70 (R10): la UNICA implementacion del traductor vive en `@/lib/modules/errores`. Aqui
+ * solo se ata a la clase base de ESTE modulo, igual que QC-54 parametriza `requireAdmin` por
+ * el `UnauthorizedError` de cada modulo. La copia que este archivo llevaba -una de siete
+ * identicas, byte a byte- desaparecio con esta ficha.
+ */
+const toErrorState = createErrorStateTranslator(PedidosError);
 
 /** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

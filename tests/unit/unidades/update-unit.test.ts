@@ -10,11 +10,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createUpdateUnit } from '@/lib/modules/unidades/domain/update-unit'
 import {
-  DuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
-  NotFoundError,
   SystemUnitError,
+  UnitDuplicateNameError,
+  UnitNotFoundError,
   ValidationError,
 } from '@/lib/modules/unidades/domain/errors'
 import type { Actor } from '@/lib/modules/unidades/domain/actor'
@@ -74,24 +74,24 @@ describe('updateUnit — pertenencia (R21, R22)', () => {
     expect(units.update).not.toHaveBeenCalled()
   })
 
-  it('R22: unidad inexistente -> NotFoundError', async () => {
+  it('R22: unidad inexistente -> UnitNotFoundError', async () => {
     const units = repository({ ownerships: {} })
     const updateUnit = createUpdateUnit({ units })
 
     await expect(updateUnit(UNIT_ID, { name: 'Kilo' }, ACTOR)).rejects.toBeInstanceOf(
-      NotFoundError,
+      UnitNotFoundError,
     )
     expect(units.update).not.toHaveBeenCalled()
   })
 
-  it('R22: unidad de otra empresa -> NotFoundError', async () => {
+  it('R22: unidad de otra empresa -> UnitNotFoundError', async () => {
     const units = repository({
       ownerships: { [UNIT_ID]: { id: UNIT_ID, companyId: 'otra-empresa', baseUnitId: null } },
     })
     const updateUnit = createUpdateUnit({ units })
 
     await expect(updateUnit(UNIT_ID, { name: 'Kilo' }, ACTOR)).rejects.toBeInstanceOf(
-      NotFoundError,
+      UnitNotFoundError,
     )
     expect(units.update).not.toHaveBeenCalled()
   })
@@ -285,16 +285,16 @@ describe('updateUnit — la tabla de R8-R14 tambien aplica a la edicion (R18)', 
 })
 
 describe('updateUnit — traduccion de resultados del puerto', () => {
-  it("'not_found' -> NotFoundError", async () => {
+  it("'not_found' -> UnitNotFoundError", async () => {
     const units = repository({ ownerships: { [UNIT_ID]: UNIDAD_PROPIA }, outcome: 'not_found' })
     const updateUnit = createUpdateUnit({ units })
 
     await expect(updateUnit(UNIT_ID, { name: 'Kilo' }, ACTOR)).rejects.toBeInstanceOf(
-      NotFoundError,
+      UnitNotFoundError,
     )
   })
 
-  it("'duplicate_name' -> DuplicateNameError", async () => {
+  it("'duplicate_name' -> UnitDuplicateNameError", async () => {
     const units = repository({
       ownerships: { [UNIT_ID]: UNIDAD_PROPIA },
       outcome: 'duplicate_name',
@@ -302,7 +302,7 @@ describe('updateUnit — traduccion de resultados del puerto', () => {
     const updateUnit = createUpdateUnit({ units })
 
     await expect(updateUnit(UNIT_ID, { name: 'Kilo' }, ACTOR)).rejects.toBeInstanceOf(
-      DuplicateNameError,
+      UnitDuplicateNameError,
     )
   })
 

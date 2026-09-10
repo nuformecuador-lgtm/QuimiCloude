@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { RecipeNotFoundError } from './errors';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
 
@@ -27,6 +27,6 @@ export function createDeleteRecipe(
     requirePermission(actor, 'recetas.modificar');
 
     const result = await deps.recipes.softDeleteAlive(id, actor.id, now());
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new RecipeNotFoundError();
   };
 }
