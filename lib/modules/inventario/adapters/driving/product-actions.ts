@@ -1,6 +1,6 @@
 'use server';
 
-import { identity, inventario } from '@/lib/composition';
+import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
 
@@ -88,7 +88,7 @@ const MISSING_ID_ERROR = 'Falta el identificador del producto.';
  * hacerlo; el valor no cambia. Con `ErrorState` en los tipos de retorno el compilador ya cazaba un
  * codigo mal escrito, asi que esto no tapa un agujero: unifica el idioma con los otros seis.
  */
-const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 
 /** Sentinela de conversion fallida: distinto de `undefined` (campo ausente, valido) y de cualquier numero real. */
 const INVALID_NUMBER = Symbol('invalid-number');
@@ -126,7 +126,7 @@ function readOptionalFormInt(
  * en `@/lib/modules/errores`, parametrizada por la clase base de este modulo -mismo patron
  * con el que QC-54 parametriza `requirePermission` por el `UnauthorizedError` de cada modulo-.
  */
-const toErrorState = createErrorStateTranslator(InventarioError);
+const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
 
 /** El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

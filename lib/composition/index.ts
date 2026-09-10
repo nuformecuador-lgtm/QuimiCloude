@@ -155,6 +155,8 @@ import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import { readRequestIdHeader } from '@/lib/modules/observabilidad/adapters/driven/request-id-headers';
+import type { RequestIdHeaderReader } from '@/lib/modules/errores';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -511,4 +513,24 @@ export const pedidos = {
   updateOrder: createUpdateOrder({ orders: orderRepository, recipes: recipeCatalog }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// `observabilidad` (QC-71, T7). Bloque NUEVO al final, mismo criterio que los anteriores: no
+// reordena ni reformatea nada de lo de arriba. Su import vive al final del bloque de imports.
+//
+// Es el UNICO sitio del repo donde la lectura de la cabecera se ata a su implementacion. El
+// traductor de `errores` la recibe por parametro y no conoce `next/headers` (R9, y
+// `docs/architecture.md > Punto unico de composicion`): sin este cableado, el dominio tendria
+// que importar el framework, que es exactamente lo que la regla de dependencias prohibe.
+//
+// La fachada del BORDE (`newRequestId`) NO esta aqui, sino en `lib/composition/edge.ts`: este
+// archivo cablea Prisma y el borde no puede cargarlo (R3). Son dos mitades del mismo punto de
+// composicion, no dos puntos.
+// ---------------------------------------------------------------------------------------
+
+/** Fachada del modulo `observabilidad` ya cableada. La consumen los siete adaptadores driving,
+ *  que se la pasan al traductor unico de errores (`createErrorStateTranslator`). */
+export const observabilidad = {
+  readRequestIdHeader: readRequestIdHeader satisfies RequestIdHeaderReader,
 } as const;

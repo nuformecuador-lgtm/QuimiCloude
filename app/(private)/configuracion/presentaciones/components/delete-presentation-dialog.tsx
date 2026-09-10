@@ -66,7 +66,9 @@ export const DELETE_PRESENTATION_ID_FIELD = 'id';
  * desapareciera o se renombrara, esto rompe el typecheck en vez de comparar contra una palabra
  * que ya no emite nadie.
  */
-export const PRESENTATION_IN_USE_CODE: ErrorCode = 'presentation_in_use';
+// QC-71 (R16): `satisfies` en vez de anotacion, mismo motivo que en `cancel-order-dialog`: el
+// tipo ancho arrastraria el codigo generico, que desde esta ficha exige `reference`.
+export const PRESENTATION_IN_USE_CODE = 'presentation_in_use' satisfies ErrorCode;
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 

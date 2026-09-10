@@ -1,7 +1,7 @@
 'use server';
 
-import { identity, unidades } from '@/lib/composition';
-import { createErrorStateTranslator, type ErrorCode } from '@/lib/modules/errores';
+import { identity, observabilidad, unidades } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   UnidadesError,
   type Actor,
@@ -38,19 +38,19 @@ import {
  */
 export type UnitListResult =
   | { status: 'success'; data: readonly UnitView[] }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 /** Lo que devuelve la lectura PAGINADA (QC-39 R5): la misma union, con una `Page` dentro. */
 export type UnitPageResult =
   | { status: 'success'; data: Page<UnitView> }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 /**
  * Traduce un error de dominio a estado serializable y cualquier otro a `unexpected`. Es la
  * UNICA implementacion, parametrizada por la clase base de este modulo (R10): la guardia del
  * catalogo da rojo si alguien vuelve a declarar aqui una `function toErrorState`.
  */
-const toErrorState = createErrorStateTranslator(UnidadesError);
+const toErrorState = createErrorStateTranslator(UnidadesError, observabilidad.readRequestIdHeader);
 
 /**
  * El actor se resuelve UNA vez por invocacion, nunca dentro del dominio, y con LAS DOS CARAS
@@ -106,7 +106,7 @@ export async function listUnitsAction(
   query?: unknown,
 ): Promise<
   | { status: 'success'; data: readonly UnitView[] | Page<UnitView> }
-  | { status: 'error'; code: ErrorCode; message: string }
+  | ErrorState
 > {
   const actor = await currentActor();
 
@@ -131,12 +131,12 @@ export async function listUnitsAction(
 export type CreateUnitFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type UnitMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 /**
  * COMO SE LEE `FormData` SIN QUE R36 SE COMA A R10. Un campo que el formulario no envia y uno

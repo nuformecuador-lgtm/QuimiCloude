@@ -43,7 +43,12 @@ import {
   UnitSheet,
   formatFactor,
 } from '@/app/(private)/configuracion/unidades/components';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+
+// QC-71 (R15, R16): los codigos que estos casos pintan son los CATALOGADOS. El generico ya no
+// cabe en esta forma de estado -exige `reference`-, y por eso se excluye del tipo del parametro
+// en vez de dejarlo pasar con un cast.
+type CodigoCatalogado = Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>;
 import {
   UnitDuplicateNameError,
   DuplicateSymbolError,
@@ -411,7 +416,7 @@ describe('ausente NO es vacio: el `FormData` espiado (R34)', () => {
 
 describe('cada codigo de error pinta donde le toca (R37)', () => {
   /** Alta que falla con el codigo dado, con los cuatro campos escritos. */
-  async function altaQueFalla(user: ReturnType<typeof setupUser>, code: ErrorCode, message: string) {
+  async function altaQueFalla(user: ReturnType<typeof setupUser>, code: CodigoCatalogado, message: string) {
     createUnitActionMock.mockResolvedValue({ status: 'error', code, message });
     await abrirAlta(user);
 

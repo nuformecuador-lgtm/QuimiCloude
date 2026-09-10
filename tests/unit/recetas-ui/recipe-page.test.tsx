@@ -111,7 +111,16 @@ vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
 
 vi.mock('next/headers', () => ({ cookies: cookiesMock }));
 
+// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
+// del identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el
+// modulo ni siquiera carga; con ella, el estado del error inesperado vuelve con ESE id.
+const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  return { REQUEST_ID_DE_PRUEBA: id, readRequestIdHeaderMock: vi.fn(async () => id) };
+});
+
 vi.mock('@/lib/composition', () => ({
+  observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
 }));
 

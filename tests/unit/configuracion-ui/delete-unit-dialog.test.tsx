@@ -29,7 +29,12 @@ import {
   UnitRowActions,
   deleteUnitLabel,
 } from '@/app/(private)/configuracion/unidades/components';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+
+// QC-71 (R15, R16): los codigos que estos casos pintan son los CATALOGADOS. El generico ya no
+// cabe en esta forma de estado -exige `reference`-, y por eso se excluye del tipo del parametro
+// en vez de dejarlo pasar con un cast.
+type CodigoCatalogado = Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>;
 import {
   SystemUnitError,
   UnauthorizedError,
@@ -196,7 +201,7 @@ describe('al confirmar se invoca el borrado y se aplica R38', () => {
 
 describe('los rechazos se pintan DENTRO del dialogo, que sigue abierto (R41, R42)', () => {
   /** Confirma un borrado que la operacion rechaza con el codigo dado. */
-  async function rechazoCon(code: ErrorCode, message: string) {
+  async function rechazoCon(code: CodigoCatalogado, message: string) {
     const user = setupUser();
     deleteUnitActionMock.mockResolvedValue({ status: 'error', code, message });
     montar();

@@ -27,9 +27,34 @@
 //   Prisma) ni ningun repositorio: solo `@/lib/composition/edge`. Todo lo que decide sale del
 //   contenido FIRMADO de la cookie, no de una consulta.
 
+// QC-71 T4 — EL IDENTIFICADOR DE PETICION SE ENGANCHA AQUI (`design.md > 1`, R4, R5, R6).
+//
+// Por que aqui y no en `middleware.ts`: la raiz es un cascaron con una linea de reexport y el
+// `matcher`, y `tests/unit/middleware-root-contract.test.ts` exige por TEXTO que no haya ninguna
+// decision en ella. Encadenar dos middlewares alli seria reabrir el contrato de QC-9 desde una
+// ficha de plataforma, e inventar un punto de composicion que la tabla de dependencias no
+// autoriza en `lib/composition`. Este adaptador, en cambio, no gana ninguna REGLA: gana un
+// cableado. Como se genera el id y como se llama la cabecera viven en el modulo
+// `observabilidad`, no aqui.
+//
+// **El id va en la cabecera de PETICION y NUNCA en la de respuesta (R6).** `NextResponse.next({
+// request: { headers } })` reescribe la peticion que llega AL SERVIDOR, que es lo unico que
+// permite a la Server Action leerlo con `headers()`. Ponerlo en `response.headers` lo mandaria
+// al NAVEGADOR —expondria un dato interno en cada peticion, incluidas las publicas— y ademas la
+// accion no lo veria nunca. Ese es el error clasico, y `tests/unit/identity/route-guard-request-id.test.ts`
+// lo ancla afirmando que `response.headers.get('x-request-id')` es `null`.
+//
+// Se usa `set` y no `append`: si el cliente manda su propio `x-request-id`, su valor se
+// SUSTITUYE (R5). Lo que entra por el navegador es entrada del usuario y no puede acabar en una
+// linea de log sin validar.
+//
+// El camino `redirect` NO lleva id a proposito (`design.md > 2`): cuando el portero redirige no
+// corre nada despues en el servidor, asi que nadie leeria esa cabecera. No se inventa un canal
+// que nadie lee.
+
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { identityEdge } from '@/lib/composition/edge';
+import { identityEdge, observabilidadEdge } from '@/lib/composition/edge';
 import {
   decideRouteAccess,
   isSessionExpired,
@@ -93,7 +118,15 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
   });
 
-  return decision.kind === 'allow'
-    ? NextResponse.next()
-    : NextResponse.redirect(new URL(decision.to, request.nextUrl));
+  if (decision.kind !== 'allow') {
+    return NextResponse.redirect(new URL(decision.to, request.nextUrl));
+  }
+
+  // Camino `allow`: la peticion sigue hacia el servidor con su identificador propio (R4). Se
+  // clona la cabecera entrante para no mutar la de la `NextRequest`, y `set` sobrescribe el
+  // valor que hubiera puesto el cliente (R5).
+  const headers = new Headers(request.headers);
+  headers.set(observabilidadEdge.requestIdHeader, observabilidadEdge.newRequestId());
+
+  return NextResponse.next({ request: { headers } });
 }

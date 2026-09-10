@@ -207,6 +207,11 @@ describe('guardia: el middleware carga en el borde', () => {
     expect(files).toContain('lib/modules/identity/adapters/driving/route-guard-middleware.ts')
     expect(files).toContain('lib/composition/edge.ts')
     expect(files).toContain('lib/modules/identity/adapters/driven/session/session-token.ts')
+    // QC-71 T5: y llega tambien al generador del identificador de peticion, que es el segundo
+    // candidato a importar `node:crypto` y el que esta ficha anadio al cierre. Que aparezca aqui
+    // es lo que demuestra que el recorrido lo MIRA: si no entrase, el `findings` vacio de arriba
+    // no diria nada sobre el.
+    expect(files).toContain('lib/modules/observabilidad/domain/request-id.ts')
     // Y NO llega a la composicion Node, que es la que cablea Prisma.
     expect(files).not.toContain('lib/composition/index.ts')
   })

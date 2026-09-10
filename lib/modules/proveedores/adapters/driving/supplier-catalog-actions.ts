@@ -1,7 +1,7 @@
 'use server';
 
-import { identity, proveedores } from '@/lib/composition';
-import { createErrorStateTranslator, type ErrorCode } from '@/lib/modules/errores';
+import { identity, observabilidad, proveedores } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { ProveedoresError, type Actor, type CatalogLineView, type Page } from '@/lib/modules/proveedores';
 
 /**
@@ -33,16 +33,16 @@ import { ProveedoresError, type Actor, type CatalogLineView, type Page } from '@
 export type CreateCatalogLineFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type CatalogLineMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type CatalogLineListResult =
   | { status: 'success'; data: Page<CatalogLineView> }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 const NUMERIC_FIELD_ERROR = 'El tiempo de entrega no es un numero entero valido.';
 const MISSING_ID_ERROR = 'Falta el identificador de la linea del catalogo.';
@@ -55,7 +55,7 @@ const INVALID_NUMBER = Symbol('invalid-number');
  * que vivia aqui: un error ajeno a la familia ya no se relanza, vuelve como `unexpected`
  * con mensaje neutro y su detalle se queda en el registro del servidor (R12, R13, R14).
  */
-const toErrorState = createErrorStateTranslator(ProveedoresError);
+const toErrorState = createErrorStateTranslator(ProveedoresError, observabilidad.readRequestIdHeader);
 
 /** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

@@ -90,7 +90,10 @@ const CANCEL_SUCCESS = 'Pedido cancelado.';
  * manda el catalogo es el mensaje de los errores que emite el back, y esos llegan ya resueltos
  * en `result.message`.
  */
-const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
+// QC-71 (R16): `satisfies` en vez de anotacion. Con `ErrorState` ya partido en dos ramas, un
+// `ErrorCode` ancho incluiria el codigo generico, que exige `reference`, y este rechazo previo no
+// tiene ninguno que dar. El literal conserva su tipo y sigue obligado a estar en el catalogo.
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const REASON_REQUIRED = 'Escribe el motivo de la cancelación.';
 
 const INITIAL_STATE: OrderMutationFormState = { status: 'idle' };
