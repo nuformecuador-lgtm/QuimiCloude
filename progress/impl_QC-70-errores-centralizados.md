@@ -368,3 +368,162 @@ se cubrió en la implementación original de la ficha.
    no se hizo aquí.
 3. **Ninguna ambigüedad quedó sin resolver.** Los dos conflictos tenían las dos intenciones
    compatibles y ambas se conservan; no hubo ningún caso de «una versión u otra, pero no las dos».
+
+---
+
+## F2.3 (segunda ronda) — `dev` se movió otra vez (2026-09-10)
+
+Commits: `97b4e65` (el merge) y `d364405` (la deuda de `dev` que el merge destapó).
+
+El PR #52 seguía en `CONFLICTING`: mientras corría la primera ronda, `dev` avanzó **ocho
+commits**, y esta vez el choque no fue en unidades sino en **inventario y pedidos**. Lo que trae
+`dev`, y que manda sobre lo que había:
+
+- **la autoría y la presentación se mudan de `products` a `product_batches`** (`419f01e`), con su
+  migración `20260909120000_product_batches`;
+- el formulario de pedido gana la **tabla de ingredientes** con requerida/restante (`df259e7`);
+- el alta de producto pasa a **autocomplete** (`78a96f3`).
+
+### Los cinco conflictos: qué se conservó de cada lado
+
+| Ruta | De `dev` se conserva | De QC-70 se conserva |
+|---|---|---|
+| `inventario/domain/update-product.ts` | la firma **sin `actor.id`** (la autoría vive ahora en el lote) | el error renombrado: `ProductNotFoundError` en vez del `NotFoundError` genérico (R17) |
+| `inventario/domain/delete-product.ts` | ídem | ídem |
+| `inventario/adapters/driven/persistence/product-prisma.ts` | **todo**: `classifyForeignKeyViolation`, `translateForeignKeyViolation` y sus tres llamadas desaparecen con las columnas que las disparaban | nada que conservar **aquí**, y es correcto: lo que QC-70 renombró en este archivo era el `NotFoundError` del autor inexistente, y ese camino ya no existe. El renombrado sigue vivo en los dos casos de uso, que son quienes de verdad lo lanzan |
+| `pedidos/components/order-form.tsx` | `getRecipeAction`, `RecipeQueryResult`, `RecipeLineView`, `UnitView` | `import type { ErrorCode }` — **unión de los dos bloques de imports**, no elección |
+| `tests/unit/inventario/product-page.test.tsx` | **todo**: se van los tres casos del selector de presentaciones | ver abajo |
+
+**El único que merecía pensarse** es el último. Entre los tres casos que `dev` borra hay uno de
+QC-70 (R32): «un nombre de presentación repetido pinta el mensaje DEL BACK, no un texto propio».
+No se puede conservar —el formulario de producto ya no tiene selector de presentación ni alta en
+línea, así que no queda gesto que ejercitar— pero **tampoco se pierde cobertura**, y eso se
+verificó antes de borrarlo, no se supuso:
+
+- el componente que QC-70 corrigió, `components/shared/presentation-select.tsx`, **sigue vivo** y
+  en uso desde `proveedores/[id]/components/catalog-line-form.tsx`;
+- su caso equivalente vive en `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` >
+  «linea de catalogo — errores por codigo estable (R32, R45)», que afirma explícitamente
+  «QC-70 R32: el mensaje del back, tal cual, sin sustituirlo por uno propio del formulario».
+
+Queda un comentario en el sitio del borrado apuntando ahí, para que nadie tenga que repetir la
+comprobación.
+
+### El barrido del patrón invisible: **no volvió a aparecer**
+
+La lección de la primera ronda (`unit-form.tsx` con `Record<string, …>` y la clave vieja: typecheck
+verde, pantalla rota) se aplicó como barrido activo, no solo sobre los cinco archivos en conflicto
+sino sobre **todo `app/` y `components/`**:
+
+| Barrido | Resultado |
+|---|---|
+| todo `Record<string, …>` | 17 apariciones, **ninguna indexada por código de error** (son `searchParams`, filtros de tabla, índices por id) |
+| todo indexado o comparado por `.code` | 12 sitios. Los tres `CODE_TO_FIELD[result.code]` —presentaciones, unidades, pedidos— ya usan `Partial<Record<ErrorCode, …>>`; las nueve comparaciones `=== …` lo hacen contra constantes tipadas o literales que TypeScript verifica porque el `code` de origen es `ErrorCode` |
+| todo literal de código del catálogo | 18 apariciones, **todas** con `: ErrorCode` o `satisfies ErrorCode` |
+| los códigos genéricos que QC-70 retiró (`not_found`, `duplicate_name`) | 13 apariciones, **todas** son el *outcome del repositorio*, no el código de error — la distinción que `unidades/domain/errors.ts` ya documenta |
+| los componentes nuevos de `dev` (`order-ingredients-table`, `product-name-picker`, `product-field`, `order-field`) | **no tocan códigos**: solo pintan `result.message`, que sale del catálogo |
+
+**Conclusión honesta: en las pantallas no había ningún fallo invisible esta vez.** Y hay una razón
+estructural, no suerte: QC-70 ya había tipado con `ErrorCode` el `code` de los siete adaptadores
+driving, así que el compilador cubre estos caminos.
+
+**Lo que sí apareció fue el mismo error del lado contrario, y el compilador lo cazó**: un caso
+NUEVO de `dev` en `tests/unit/pedidos-ui/order-form.test.tsx:664` devolvía el código genérico
+`'not_found'`. En `dev` compilaba porque allí el `code` de `getRecipeAction` era `string`; aquí, con
+`ErrorCode`, es error de tipos. Pasa a `recipe_not_found` (el mismo que ya compara
+`formulas/[id]/page.tsx`). **Esto es exactamente lo que la ficha existe para conseguir**: el
+renombrado rompe la compilación en vez de romper la pantalla en silencio.
+
+De paso, `inventario/adapters/driving/product-actions.ts` era el único de los siete adaptadores
+driving que aún escribía `'invalid_input'` como literal suelto, tres veces. Pasa a la constante
+tipada (R21). **No tapaba ningún agujero** —su tipo de retorno es `ErrorState`, así que el
+compilador ya lo verificaba—: unifica el idioma con los otros seis.
+
+### Lo que el merge destapó, y no era del merge
+
+| Qué | Diagnóstico | Qué se hizo |
+|---|---|---|
+| 12 suites de integración en rojo con `Null constraint violation on (presentation_id)` | La base de este worktree tenía **sin aplicar** la migración `20260909120000_product_batches` que trae `dev` | `prisma migrate deploy`. Las 10 suites de inventario y recetas pasan a 107/107. No es un cambio de archivos |
+| `tests/unit/recetas/{recipe-lines-catalog,recipe-service}.test.ts`: 4 errores de tipos y 2 `toEqual` | `419f01e` añadió `stock` a `ProductRef` y `productStock` a `RecipeLineView` **y no actualizó estos dobles**. Ninguna de las dos ramas toca esos archivos, por eso el merge no los marcó en conflicto | Los fixtures declaran `stock: null` y las dos aserciones exhaustivas esperan `productStock`, derivado del fixture. **Es deuda de `dev`**, pero entra por el merge y sin ella la rama no compila |
+| 4 casos de UI en rojo en la corrida de las 15:35 (`product-page`, `order-sheet`, `catalog-line-sheet`) | **El flake de saturación de QC-58.** No se dio por intermitente sin comprobarlo: los tres archivos pasan **aislados, 57/57 en 46 s**, y la corrida completa siguiente salió con 0 fallos. Esa corrida tardó 428 s con 1487 s de `import`, contra 304 s de la buena | Nada: **no se añadió al baseline**. La entrada de baseline de esa clase (`product-crud.int.test.ts`) la puso el humano por decisión explícita, y esa decisión no es mía |
+
+### Guardias de alcance ajenas: van **siete**, y `dev` eligió el otro camino
+
+En esta ronda **no apareció ninguna guardia nueva** acusando a QC-70. Pero hay que anotar algo del
+lado de `dev`: su commit `c870825` metió en `tests/baseline-rojos.json` **las dos guardias de QC-39
+que la primera ronda arregló con centinela de rama** (`modulo-intacto.test.ts`,
+`unidades-convenciones.test.ts`). Son dos soluciones distintas al mismo problema, y no chocan
+—apagar el archivo para el comparador y hacer que el caso salte son compatibles—, pero el efecto
+combinado es que el gate ahora avisa de **5 archivos del baseline que ya pasan**. Cuatro de ellos
+pasan **gracias a los arreglos de esta rama**.
+
+| # | Guardia | Ficha | Estado |
+|---|---|---|---|
+| 1 | `tests/unit/navegacion/qc75-convenciones.test.ts` | QC-75 | arreglada en `7cd478b` |
+| 2 | `tests/unit/identity/account-status-scope.test.ts` | QC-65 | arreglada en `d88c60b` |
+| 3 | `tests/unit/unidades/unidades-convenciones.test.ts` | QC-38 / QC-39 | arreglada en `d88c60b` + `8bcfe2c`; **`dev` además la puso en el baseline** |
+| 4 | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | QC-26 | sin arreglar — en el baseline |
+| 5 | `tests/unit/recetas/module-contract.test.ts` | QC-26 | sin arreglar — en el baseline |
+| 6 | `tests/unit/unidades/modulo-intacto.test.ts` | QC-39 | arreglada en `dfedb97`; **`dev` además la puso en el baseline** |
+| 7 | `tests/unit/unidades/consumidores-catalogo.test.tsx` | QC-39 | arreglada en `dfedb97` |
+
+### Archivos tocados en la segunda ronda
+
+Producción (5):
+
+- `lib/modules/inventario/domain/update-product.ts`, `delete-product.ts` — firma de `dev` + error de QC-70
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` — versión de `dev`, con nota de por qué el renombrado de QC-70 ya no aplica aquí
+- `lib/modules/inventario/adapters/driving/product-actions.ts` — `INVALID_INPUT_CODE: ErrorCode` (R21)
+- `app/(private)/pedidos/components/order-form.tsx` — unión de imports
+
+Tests (4):
+
+- `tests/unit/inventario/product-page.test.tsx` — versión de `dev` + nota de dónde vive ahora R32
+- `tests/unit/pedidos-ui/order-form.test.tsx` — `'not_found'` → `'recipe_not_found'`
+- `tests/unit/recetas/recipe-lines-catalog.test.ts`, `recipe-service.test.ts` — `stock` / `productStock`
+
+Base de datos: `prisma migrate deploy` sobre `QuimiCloude_QC70`.
+
+### `./init.sh` completo
+
+```
+== Arnes SDD :: init (modo: completo) ==
+✓ node v22.13.1
+✓ dependencias presentes
+✓ regla max-2-por-zona respetada (in_progress=1)
+✓ worktrees bajo control (4 ademas del principal)
+✓ typecheck paso
+✓ lint paso
+
+ Test Files  296 passed (296)
+      Tests  3777 passed | 18 skipped (3795)
+   Duration  304.20s
+
+aviso: 5 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/integration/inventario/product-crud.int.test.ts
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+  tests/unit/unidades/modulo-intacto.test.ts
+  tests/unit/unidades/unidades-convenciones.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
+
+**0 rojos**, 296 archivos, 3777 casos verdes.
+
+### Abierto tras la segunda ronda
+
+1. **Push hecho** (autorizado por el humano). **NO se abrió PR**: el #52 ya existe.
+2. **El baseline tiene 5 entradas que ya pasan**, cuatro de ellas gracias a esta rama. Limpiarlo es
+   la salida que el propio archivo nombra como pendiente, pero **retirar entradas del baseline es
+   decisión del leader**: no se tocó.
+3. **Deuda de `dev` absorbida, no devuelta**: los dos dobles de `recetas` que `419f01e` dejó sin
+   actualizar se arreglaron aquí porque bloqueaban el typecheck. Conviene que el leader sepa que ese
+   arreglo viaja dentro del PR de QC-70 sin ser de QC-70 — y que había cambios sin commitear sobre
+   esos mismos dos archivos en el worktree principal, así que puede haber otra sesión arreglándolos
+   en paralelo.
+4. **Ninguna ambigüedad quedó sin resolver.** El único conflicto que exigía juicio —los tres casos
+   borrados de `product-page.test.tsx`, uno de ellos de QC-70— se cerró comprobando que la cobertura
+   de R32 sigue existiendo en otro archivo, no suponiéndolo.
