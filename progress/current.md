@@ -13,13 +13,74 @@
 |---|---|---|---|---|---|---|
 | QC-23 | registro-de-sesiones | Identidad y acceso | backend | spec_ready | feature/QC-23-registro-de-sesiones | esperando aprobación humana del spec (F1.4) |
 | QC-70 | errores-centralizados | Plataforma | fullstack | in_progress | feature/QC-70-errores-centralizados | **Spec APROBADO por el humano el 2026-09-08** (F1.4), tarjeta en *En curso*. 33 requisitos EARS, 16 tasks, cero preguntas abiertas. **No se parte** en backend+frontend por decision humana: abrir los codigos por caso obliga a tocar catalogo y pantallas a la vez. `implementer` en curso (F2.1). **Choque con QC-39**: renombra `duplicate_name`/`not_found` de unidades, y como los archivos no existen en `dev` el merge sale limpio y falla EN PANTALLA, no en el gate |
-| QC-39 | pantalla-de-unidades | Catálogos | frontend | in_progress | feature/QC-39-pantalla-de-unidades | **PR #51 abierto y en `MERGEABLE`, esperando merge humano (F2.4→F2.5)**. `reviewer` **APROBADO** (0 mayores, 8 menores; tres atendidos). 50/50 requisitos con test, E2E verde en Chromium y WebKit, `./init.sh` completo con **cero rojos** tras sincronizar con `dev`. **T13 (WebKit manual) sin hacer y ningún agente puede hacerla** |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
-| QC-83 | modelo-de-grupos-de-trabajo | Identidad y acceso | backend | in_progress | feature/QC-83-modelo-de-grupos-de-trabajo | **PR [#50] abierto, `./init.sh` completo en `== init OK ==`** (273 archivos, 3451 tests; único rojo en baseline). 12/12 tasks, 28/28 requisitos con test, `reviewer` APROBADO en una ronda (0 mayores, 4 menores, 18 mutaciones). **Esperando merge humano** → luego F2.5/F2.6 |
 | QC-78 | estado-de-cuenta-en-el-acceso | Identidad y acceso | backend | spec_ready | feature/QC-78-estado-de-cuenta-en-el-acceso | **Spec escrito (F1.3), tarjeta en *Spec en revisión*: esperando aprobación humana (F1.4)**. 28 requisitos EARS sobre las 13 decisiones que cerró `/afinar-feature`, cero preguntas abiertas, tabla de cobertura decisión → requisito. **Sin worktree a propósito** — se monta en F2.0. **El choque con QC-83 se cayó**: su `tasks.md` no declara `db/schema.prisma`, `db/migrations/`, `lib/composition/` ni `identity/index.ts` (R26 lo exige), así que arranca sin esperarla |
 | QC-80 | unidad-desde-la-presentacion | Inventario | fullstack | pending | feature/QC-80-unidad-desde-la-presentacion | **Nacida del chat el 2026-09-08** y creada en el board (QC-18). `complexity: medium`. **Pendiente F1.0 y F1.2**: sin worktree todavia, y trae una pregunta abierta -con que unidad se rellenan las 114 presentaciones existentes-, asi que toca `/afinar-feature` antes del `spec_author` |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **BLOQUEADA**: la unicidad de `lote` por empresa necesita `products.company_id`, que hoy no existe y que introduce QC-49. No arranca hasta que QC-49 este `done` |
 | QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
+| QC-66 | crud-de-usuarios | Identidad y acceso | backend | pending | feature/QC-66-crud-de-usuarios | **Arrancada por decisión humana explícita («arranca con 66») el 2026-09-10** y **ACOTADA con `/afinar-feature` el mismo día**. `complexity: medium` escrita como label en el board. Las **17 decisiones cerradas** y las **2 preguntas abiertas** viven en `specs/QC-66-crud-de-usuarios/requirements.md`; no se copian aquí. La acotación **cambió el alcance y tocó el board primero**: `description` reescrita y **QC-89** creada. **Sin worktree a propósito** — se monta en F2.0. **Siguiente paso: `spec_author` (F1.2)** |
+
+### QC-39 — pantalla-de-unidades: CERRADA el 2026-09-10 (PR #51, merge `2f98b8f`)
+
+Resumen completo en `progress/history.md`. Tarjeta a *Finalizado* con la URL del PR comentada en el
+issue, ficha a `done` y worktree desmontado. 50/50 requisitos con test **verificados abriendo el
+archivo**, `reviewer` **APROBADO en una ronda** (0 mayores, 8 menores; tres atendidos), `./init.sh`
+completo en `== init OK ==` (3615 tests, único rojo en el baseline) y E2E verde en **Chromium y
+WebKit**, lo que cierra el diferimiento que QC-38 dejó apuntando aquí.
+
+La zona `frontend` queda **sin ninguna feature `in_progress`**: admite dos.
+
+**La rama `feature/QC-39-pantalla-de-unidades` sigue viva en `origin`.** Local borrada; el borrado
+remoto lo bloqueó el clasificador de permisos de esta sesión. Está mergeada en `dev`, así que no hay
+nada que perder: lo remata el humano con `! git push origin --delete feature/QC-39-pantalla-de-unidades`.
+
+**Tres deudas suyas que el leader tiene que decidir, las tres escritas en `history.md`:**
+
+- **T13 sin hacer y ningún agente puede hacerla**: mirar con los ojos el scroll contenido de la tabla
+  en un **WebKit real**. jsdom y la corrida E2E en WebKit no la sustituyen. **Decisión humana.**
+- **Ningún test compara el catálogo de permisos del código con el de la base.** R11 estaba verde
+  contra `SEED_ROLE_PERMISSIONS` mientras la base real no tenía `unidades.modificar`, y eso produjo
+  un **404 real** a un Administrador que sí veía el enlace. **Merece ficha propia.**
+- **Tercer episodio de centinelas de alcance que muerden a ramas ajenas** (QC-38 lo sufrió, QC-75 lo
+  documentó, QC-39 acotó dos, y los dos quedan permanentemente inertes). Pide **regla del arnés**, no
+  parche por ficha. Se suma a las dos guardias con bomba de relojería que dejó QC-65.
+
+**Novena vez que `wt.sh done` falla en Windows**, y esta vez ni `rm -rf` ni `Remove-Item -Recurse`
+pudieron con el árbol: las rutas de `pnpm` pasan de 260 caracteres. **Remedio que sí funciona y
+conviene que herede la ficha de arnés**: espejar un directorio vacío encima con
+`robocopy <vacio> <worktree> /MIR` y luego borrar el directorio ya vacío.
+
+**Queda un worktree huérfano en disco**: `.worktrees/QC-76-equivalencia-y-ambito-de-unidades`, ya
+desregistrado de git pero con el árbol puesto. No se borra aquí porque no es de esta ficha.
+
+### QC-83 — modelo-de-grupos-de-trabajo: CERRADA el 2026-09-10 (PR #50, merge `9d20152`)
+
+Resumen completo en `progress/history.md`. Tarjeta a *Finalizado* con la URL del PR comentada en el
+issue, ficha a `done`, worktree desmontado y rama borrada en local y en `origin`. 28 requisitos con
+test **verificados abriendo el test**, `reviewer` **APROBADO a la primera** (0 mayores, 4 menores,
+18 mutaciones) y `./init.sh` completo en `== init OK ==` (3451 tests, único rojo en el baseline).
+
+**Desbloquea QC-84** (CRUD de grupos), **QC-85** (pantalla) y **QC-86** (asignar pedido a grupo);
+con ellas se destraba la cadena de QC-63. La zona `backend` queda **sin ninguna feature
+`in_progress`**: admite dos.
+
+**Tres deudas suyas que el leader tiene que decidir, las tres escritas en `history.md`:**
+
+- **El gate no mira dos guardias que esta ficha retensó**: `recipe-route-contract.test.ts` y
+  `recetas/module-contract.test.ts` están en `baseline-rojos.json` por una razón estructural, y eso
+  apaga el archivo entero, incluida la guardia de QC-34. **Ficha de arnés.**
+- **`product-crud.int.test.ts` ya está en el baseline**, añadido el 2026-09-10 por decisión humana
+  con motivo y `desde`. Flake de carga (material de QC-58), no regresión. El coste está escrito en la
+  entrada: el archivo entero —sus 6 casos de CRUD contra Postgres real— queda apagado para el
+  comparador. **Se retira en cuanto la suite completa pase tres veces seguidas con el archivo dentro.**
+- **Seis archivos del baseline ya pasan** y el comparador lo avisa. Higiene pendiente.
+
+**Octava vez que `wt.sh done` falla en Windows**: desregistró el worktree pero dejó el árbol en
+disco por las rutas largas de `pnpm`. Rematado con `rm -rf` + `git worktree prune`. Sigue sin ficha.
+
+**Dos worktrees huérfanos en disco**, los dos ya desregistrados de git pero con el árbol puesto:
+`.worktrees/QC-76-equivalencia-y-ambito-de-unidades` y `.worktrees/QC-39-pantalla-de-unidades`. No
+se borran aquí porque no son de esta ficha.
 
 ### QC-65 — estado-de-cuenta-de-usuario: CERRADA el 2026-09-08 (PR #48, merge `c640c7a`)
 
@@ -272,6 +333,74 @@ respuesta uniforme en contenido y en tiempo hay que disenarla **una vez** — re
 uniformidad sobre un login ya mergeado es exactamente como se cuelan los oraculos.
 
 ## Evaluaciones
+### QC-66 — acotada con `/afinar-feature` (2026-09-10)
+
+Alcance, **17 decisiones cerradas** y **2 preguntas abiertas** en
+`specs/QC-66-crud-de-usuarios/requirements.md`. No se copian aquí.
+
+La acotación **cambió el alcance y el board se actualizó primero**: entra el **borrado lógico**, la
+contraseña del alta **la genera el sistema y no se muestra a nadie** —así que **esta ficha no da
+acceso a nadie** y el acceso real llega con QC-79—, nacen **dos permisos** (`usuarios.consultar`,
+`usuarios.modificar`) que llevan el catálogo de **once a trece**, y el listado **nace abierto**
+(paginación, búsqueda, filtro por estado) para no repetir la historia de QC-38 → QC-39. Más **dos
+guardas** contra encerrarse fuera y la regla de que **el actor no se ve a sí mismo**, ni en el
+listado ni por identificador.
+
+**Ficha nueva: QC-89 — restablecer la contraseña de otra persona.** La destapó la decisión de la
+contraseña invisible: no es QC-36 (cambiar la mía, sabiéndola) ni QC-79 (el alta), sino la cuenta
+que ya se usaba y cuya dueña perdió el acceso. Creada completa —`parent: QC-17`, labels `sdd`,
+`slug:`, `zone:backend`, **is blocked by QC-79**— y **sin sembrar**: se acota cuando le toque.
+
+**Dos enmiendas a QC-74 quedan escritas, no disimuladas**: el catálogo pasa a trece (segunda vez
+que se amplía, después de QC-38) y `usuarios` es **el primer `<modulo>` de un permiso que no es una
+carpeta de `lib/modules/`** —los usuarios viven en `identity`, pero `identidad.consultar` no dice
+qué se consulta—.
+
+### QC-66 — arranque del 2026-09-10 (F1.0), pendiente de acotar
+
+Arrancada por **decisión humana explícita** («arranca con 66»), no por el orden de `id`.
+
+**F0 corrido de verdad, y el board no movió nada.** Se leyeron los 77 issues de `QC` con
+`issuetype != Epic` y se comparó campo a campo contra `feature_list.json`: **cero divergencias** en
+`status`, `zone`, `complexity`, `slug`, `epic` y `depends_on`. No se diffearon las `description`
+completas de las 77 —habría hecho circular 466 KB por el chat, que es justo lo que prohíbe la
+regla 3—; sí la de QC-66, que coincide con el disco. El único ajuste del JSON en esta sesión es el
+`complexity` de abajo; los dos `status` a `done` de QC-39 y QC-83 ya venían sin commitear de la
+sesión que los cerró, y sus filas de *Features en curso* siguen diciendo `in_progress`: **es F2.6 sin
+hacer de esa sesión**, no de esta.
+
+**Evaluación:** `zone: backend` ya venía del board (la pantalla es QC-67, ficha aparte, así que **no
+se parte** en backend+frontend). `complexity: medium` asignada aquí y **escrita como label en el
+issue**: son cinco casos de uso sobre el módulo de identidad —crear, consultar, editar, listar y
+mover el estado de la cuenta entre los cuatro valores de QC-65— con validación, aislamiento por
+empresa y autoría del cambio, pero **sin integración externa ni webhook**, que es lo que separaría
+`medium` de `high`.
+
+**Cupo y conflicto de archivos:** la zona `backend` tiene **cero** features `in_progress` (QC-83 se
+cerró; QC-23 y QC-78 están en `spec_ready`, que no cuenta), así que no hubo validación de
+intersección de archivos que hacer. `./init.sh` lo confirma: `in_progress=1` en todo el repo, y es
+QC-70 (`fullstack`).
+
+**Todas sus dependencias están `done`:** QC-65 (los cuatro estados y quién/cuándo los cambió), QC-47
+(`users.company_id`), QC-48 (la empresa sale de la sesión), QC-74/QC-75 (permisos), QC-5 (hash) y
+QC-19 (política de contraseñas). No hay nada esperando.
+
+**Sin worktree todavía, a propósito.** Se sigue el precedente de QC-78: acotar y escribir el spec no
+necesitan árbol, y el repo arrastra tres directorios huérfanos en `.worktrees/` ya desregistrados de
+git. Se monta en F2.0, con la aprobación del spec.
+
+**Lo que bloqueaba el avance (F1.2) — RESUELTO el mismo dia, ver el bloque «QC-66 — acotada» de arriba:**
+La ficha llega con decisiones sin cerrar, y una de ellas **no está en la `description` sino en un
+comentario del issue** del 2026-09-06: *el usuario nuevo hereda la empresa del administrador que lo
+crea*, decidida al acotar QC-48 y que **esta ficha implementa**. Un `spec_author` que solo lea
+`feature_list.json` no la vería. Además quedan abiertos, entre otros: qué permiso corta cada
+operación (QC-74 decidió que `modificar` no implica `consultar`), qué campos se pueden editar y
+cuáles no (correo, usuario y la pareja tipo+número de documento son únicos **por empresa** desde
+QC-47), qué devuelve el listado y si lleva búsqueda/orden/paginación como pidió QC-39, si el
+administrador puede cambiarse el estado a sí mismo, y qué pasa con las sesiones abiertas de un
+usuario que pasa a `inactive` o `blocked`.
+
+
 ### QC-78 — acotada con `/afinar-feature` (2026-09-08)
 ### QC-39 — el merge con `dev`, y la lección de la base fijada a mano (2026-09-08)
 
