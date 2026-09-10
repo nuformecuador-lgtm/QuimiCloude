@@ -46,6 +46,12 @@ editarlo.
 > aplazarlo a otra ficha. **No es un requisito nuevo:** los requisitos aprobados siguen siendo
 > R1..R28 y esta ampliación **no añade ningún R29**. Es una **reparación colateral** de la que R1
 > es causa directa, documentada aquí y solo aquí.
+>
+> ⚠️ **CADUCADO EN PARTE, ese mismo día. Manda el bloque de más abajo** («Ampliación del
+> 2026-09-10 — la marca de sesión cortada»): **R29 y R30 SÍ existen**. Se aprobaron *después* de
+> escribir este párrafo, cuando el E2E de R28 (b) destapó el bucle de redirecciones. Lo que sigue
+> siendo cierto aquí es lo demás: los ocho E2E son una reparación colateral de R1 y no traen
+> requisito propio. (Nota añadida tras el review de F2.2, menor 7.)
 
 Se añaden a la lista declarada estos ocho archivos:
 
@@ -116,6 +122,11 @@ test.
 38. `tests/unit/sidebar-mobile.test.tsx` — ídem
 39. `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` — ídem, para `requirePagePermission`
 40. `tests/unit/configuracion-ui/unit-page.test.tsx` — ídem
+41. `tests/unit/identity/login-page-marca.test.tsx` — **NUEVO**, añadido el 2026-09-10 tras el
+    review de F2.2 (menor 3): la segunda mitad de R30 (a), que la pantalla de login se renderiza
+    **igual** con la marca y sin ella. No cabía en ninguno de los 40 anteriores —es el único que
+    renderiza la pantalla pública— y por eso se declara aquí en vez de colarse en un archivo
+    ajeno. **No toca `app/(public)/login/page.tsx`**, que sigue fuera del alcance: solo lo lee.
 
 Los cuatro últimos (37–40) entran **solo** porque comparan el destino del `redirect` con
 `LOGIN_ROUTE`: es un cambio de una línea por archivo, a la constante nueva. Prohibido aprovechar
@@ -390,6 +401,38 @@ pero para **añadir** casos, no para arreglar los que ya hay.
       Dos filas nuevas (R29, R30) con archivo y nombre del caso, **verificadas abriendo el caso**,
       más una nota de por qué la lista de archivos declarados cambió el 2026-09-10.
       *Hecho cuando:* las 30 filas están y ninguna cita un test que no verifique lo que dice.
+
+## Tanda 6 — los tres menores del review de F2.2 — añadida el 2026-09-10
+
+> Del `reviewer` (0 mayores, 7 menores). Aquí solo entran **tres**: el menor 2 espera decisión
+> humana y **no se toca**, el 4 queda documentado a propósito, y el 5 y el 6 son del leader.
+
+- [x] **T27. Atar el ORDEN de R5, que ningún test sujetaba.** (menor 1)
+      Archivos: `tests/unit/identity/verify-credentials.test.ts`,
+      `specs/QC-78-estado-de-cuenta-en-el-acceso/design.md`.
+      La mutación M3 del reviewer —mover el corte por estado debajo de `registrarFallo`— dejaba
+      los 56 casos en verde, porque `registrarFallo` lleva su propio corte y R6 se conserva: R5
+      es una propiedad del **orden del código**, no del comportamiento. Se ata sobre el fuente,
+      con el idioma que ya usa ese archivo para QC-19 R17, fijando la secuencia entera. Y se
+      corrige la frase falsa de `design.md > 11`, riesgo 1.
+      *Hecho cuando:* el caso **cae** con la mutación M3 aplicada y pasa al revertirla, demostrado
+      con las dos salidas en la bitácora.
+
+- [x] **T28. La segunda mitad de R30 (a), con test propio.** (menor 3)
+      Archivos: `tests/unit/identity/login-page-marca.test.tsx` (nuevo, nº 41).
+      Renderiza la pantalla de login con la marca y sin ella y compara el marcado, con un **caso
+      de control** que demuestra que la comparación sabe detectar diferencias (el destino de
+      vuelta sí cambia el marcado). Sin ese control, dos cadenas iguales por la razón equivocada
+      pasarían en verde.
+      *Hecho cuando:* los tres casos pasan y el mapa de trazabilidad deja de apoyarse solo en el
+      argumento estructural.
+
+- [x] **T29. Las dos afirmaciones caducas.** (menor 7)
+      Archivos: `specs/QC-78-estado-de-cuenta-en-el-acceso/tasks.md`,
+      `progress/impl_QC-78-estado-de-cuenta-en-el-acceso.md`.
+      Una nota en el primer bloque de ampliación de cada archivo remitiendo al que manda: **R29 y
+      R30 sí existen**. Cosmético, pero quien lee de arriba abajo se creía lo contrario.
+      *Hecho cuando:* los dos sitios llevan la nota y dicen cuál manda.
 
 - [ ] **T16. Gate rápido de cada tanda — *las corre el leader*.**
       `./init.sh --rapido` al cerrar cada una de las tandas 1 a **5** (la 5 se añadió el

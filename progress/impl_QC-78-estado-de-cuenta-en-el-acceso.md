@@ -310,6 +310,12 @@ Ninguno es de `identity`.
 
 Decision humana del 2026-09-10, subida por el leader: el alcance se amplia y la reparacion entra
 en esta ficha. **No es un requisito nuevo**: los aprobados siguen siendo R1..R28 y **no hay R29**.
+
+> ⚠️ **CADUCADO EN PARTE ese mismo dia. Manda la seccion «Tanda 5 — la marca de sesion cortada»
+> de mas abajo: R29 y R30 SI existen.** Se aprobaron *despues* de escribir este parrafo, cuando el
+> E2E de R28 (b) destapo el bucle de redirecciones. Lo que sigue siendo cierto aqui es lo demas:
+> los ocho E2E fueron una reparacion colateral de R1 y no trajeron requisito propio. (Nota anadida
+> tras el review de F2.2, menor 7.)
 El bloque de ampliacion y la tarea T19 estan en `tasks.md`, commiteados **antes** de tocar ningun
 `.spec.ts`.
 

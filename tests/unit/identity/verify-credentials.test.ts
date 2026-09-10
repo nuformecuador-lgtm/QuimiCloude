@@ -1051,4 +1051,82 @@ describe('QC-78 — el estado de cuenta manda en el login', () => {
     // No vuelve a bloquear: ni plazo, ni estado que escribir.
     expect(estadoCuenta).toBeNull();
   });
+
+  // -------------------------------------------------------------------------------------------
+  // R5 — EL ORDEN, y por que este caso mira el FUENTE en vez del comportamiento.
+  //
+  // El review de F2.2 aplico la mutacion que R5 prohibe por su nombre —mover el corte por estado
+  // DEBAJO del bloque que llama a `registrarFallo`, o sea «uniformizarlo» con el corte de empresa
+  // de QC-48— y los 56 casos de este archivo siguieron VERDES. No fue un descuido de los tests:
+  // es que esa mutacion **no tiene efecto observable**. `registrarFallo` lleva su propio corte por
+  // estado efectivo al principio del bucle, calculado sobre los MISMOS valores (`visto` es
+  // `usuario`), asi que con el orden invertido se entra en la funcion y se sale sin escribir. R6
+  // —«no se escribe nada»— se conserva, y R6 es lo unico que los dobles pueden ver.
+  //
+  // O sea: R5 no es una propiedad del COMPORTAMIENTO, es una propiedad del ORDEN DEL CODIGO. Y una
+  // propiedad del fuente se afirma sobre el fuente, que es lo que ya hace en este mismo archivo el
+  // caso «verifyCredentials no recibe ni llama a la politica» (QC-19 R17). Escribir aqui un test
+  // de comportamiento que no cae con la mutacion seria peor que no tener ninguno: daria por atado
+  // lo que no lo esta.
+  //
+  // Lo que se fija es la SECUENCIA COMPLETA de los tres cortes, porque los tres son decisiones con
+  // requisito y los tres son «faciles de arreglar» por accidente en una refactorizacion:
+  //   hash (R2)  <  corte por estado (R5)  <  !correcta  <  corte de empresa (QC-48)
+  // -------------------------------------------------------------------------------------------
+  it('el corte por estado va DESPUES del hash y ANTES de registrar el fallo, y el de empresa despues', () => {
+    // Cada ancla es una linea real del archivo. Si alguna deja de existir tal cual, el test cae
+    // por el `toBeGreaterThan(-1)` en vez de pasar en vacio comparando dos `-1`.
+    const anclas = {
+      hash: 'const correcta = await deps.hasher.verify(',
+      corteDeEstado: 'if (effectiveAccountStatus(usuario, now) !== ACTIVO) return REJECTED;',
+      contrasenaMala: 'if (!correcta) {',
+      registroDelFallo: 'await registrarFallo(usuario, usuarioNormalizado, now);',
+      corteDeEmpresa: 'if (usuario.companyDeletedAt !== null) return REJECTED;',
+    } as const;
+
+    const posicion: Record<keyof typeof anclas, number> = {
+      hash: -1,
+      corteDeEstado: -1,
+      contrasenaMala: -1,
+      registroDelFallo: -1,
+      corteDeEmpresa: -1,
+    };
+
+    for (const [nombre, ancla] of Object.entries(anclas) as [keyof typeof anclas, string][]) {
+      const indice = FUENTE_DE_VERIFY_CREDENTIALS.indexOf(ancla);
+      expect(indice, `el ancla \`${ancla}\` ya no existe en el fuente: actualiza este test`).toBeGreaterThan(-1);
+      // Y aparece UNA sola vez: con dos copias, comparar posiciones no significaria nada.
+      expect(
+        FUENTE_DE_VERIFY_CREDENTIALS.indexOf(ancla, indice + 1),
+        `el ancla \`${ancla}\` aparece mas de una vez`,
+      ).toBe(-1);
+      posicion[nombre] = indice;
+    }
+
+    // R2 — el hash se gasta ANTES de mirar el estado. Al reves, el rechazo por estado responderia
+    // en microsegundos y el tiempo de respuesta delataria que esa cuenta existe (QC-7 R29).
+    expect(
+      posicion.hash,
+      'el corte por estado NO puede ir antes de la verificacion de hash (R2)',
+    ).toBeLessThan(posicion.corteDeEstado);
+
+    // R5 — ESTA es la linea que la mutacion del review rompia. El corte por estado va antes del
+    // `if (!correcta)`, o sea antes de que el camino de fallo pueda llegar a escribir: por eso
+    // `pending` e `inactive` no suman intentos (R6).
+    expect(
+      posicion.corteDeEstado,
+      'el corte por estado tiene que ir ANTES del `if (!correcta)` (R5): si se mueve debajo, ' +
+        '`pending` e `inactive` entran en el camino de registro del intento fallido',
+    ).toBeLessThan(posicion.contrasenaMala);
+    expect(posicion.corteDeEstado).toBeLessThan(posicion.registroDelFallo);
+
+    // La ASIMETRIA con QC-48, deliberada y anotada en el propio archivo: el corte de empresa va
+    // DESPUES del `!correcta` para que una contrasena mala sobre una empresa muerta SI cuente.
+    // Sin esta linea, «uniformizar» los dos cortes en la direccion contraria —subir el de
+    // empresa— tampoco lo cazaria nadie.
+    expect(
+      posicion.contrasenaMala,
+      'el corte de empresa tiene que seguir DESPUES del `if (!correcta)` (QC-48)',
+    ).toBeLessThan(posicion.corteDeEmpresa);
+  });
 });

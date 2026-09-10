@@ -399,6 +399,25 @@ sirve: el navegador no la propaga en la redirección que él mismo sigue.
 1. **La asimetría de los dos cortes** (estado antes del `!correcta`, empresa después) es fácil de
    «arreglar» por accidente en una refactorización futura. Mitigación: el comentario del archivo lo
    explica y hay test para cada uno de los dos órdenes.
+
+   > **Corregido el 2026-09-10, tras el review de F2.2 (menor 1).** La frase de arriba era **falsa
+   > para el corte de estado**. El reviewer aplicó exactamente esa refactorización —mover el corte
+   > por estado debajo del bloque de `registrarFallo`— y los 56 casos de
+   > `verify-credentials.test.ts` siguieron **verdes**.
+   >
+   > No era un descuido de los tests: **la mutación no tiene efecto observable**. `registrarFallo`
+   > lleva su propio corte por estado efectivo al principio del bucle, calculado sobre los mismos
+   > valores, así que con el orden invertido se entra en la función y se sale sin escribir nada.
+   > R6 —«ese camino no escribe nada»— se conserva, y R6 es lo único que unos puertos falsos
+   > pueden ver. **R5 no es una propiedad del comportamiento: es una propiedad del orden del
+   > código.**
+   >
+   > Por eso se ata donde se puede atar, sobre el fuente, con el mismo idioma que ya usa en ese
+   > archivo el caso de QC-19 R17: `el corte por estado va DESPUES del hash y ANTES de registrar
+   > el fallo, y el de empresa despues` fija la secuencia entera —hash (R2) < corte de estado
+   > (R5) < `!correcta` < corte de empresa (QC-48)— y **cae con la mutación del reviewer**,
+   > demostrado aplicándola y revirtiéndola. Un test de comportamiento que no cayera con ella
+   > sería peor que ninguno: daría por atado lo que no lo está.
 2. **`blocked` con plazo vacío es ambiguo por construcción**: significa «lo puso una persona». R15
    es la única barrera que impide que una escritura automática cree esa combinación por error, y por
    eso tiene test propio con el caso «fila en `blocked` vencido + un fallo que no consuma bloqueo».
