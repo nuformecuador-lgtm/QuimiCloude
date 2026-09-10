@@ -440,3 +440,146 @@ login, y la salida exige reabrir una decision cerrada.
 T16, T17 y T18 siguen siendo del leader. Sigue en **F2.1**: sin PR, sin sincronizar con `dev`, sin
 `./init.sh`.
 
+---
+
+## Tanda 5 — la marca de sesion cortada (R29, R30), 2026-09-10
+
+El spec cambio despues de F2.1: el humano aprobo la salida por **marca en la redireccion** y
+`spec_author` escribio R29 y R30. **R1–R28 no se tocaron**, ni su codigo ni sus tests. La lista de
+archivos declarados paso a 40 y `design.md > 10` describe el mecanismo.
+
+### Que se escribio
+
+| Archivo | Cambio |
+|---|---|
+| `lib/shared/routes.ts` | `SESSION_ENDED_PARAM = 'sesion'` y `LOGIN_ROUTE_SESSION_ENDED`, derivada de `LOGIN_ROUTE`. |
+| `lib/modules/identity/domain/route-access.ts` | Campo **opcional** `sessionEndedParam`, helper `traeMarcaDeSesionCortada` (comprueba PRESENCIA con `URLSearchParams.has`, no valor) y la condicion previa en la regla 3. |
+| `lib/modules/identity/adapters/driving/route-guard-middleware.ts` | Pasa `sessionEndedParam: SESSION_ENDED_PARAM`. Sigue sin tocar base ni cookie. |
+| `app/(private)/layout.tsx` | `redirect(LOGIN_ROUTE_SESSION_ENDED)`. |
+| `lib/modules/identity/adapters/driving/require-page-permission.ts` | Idem. **No basta con el layout**: layout y pagina se renderizan en la misma peticion y cualquiera puede ganar el `redirect`. |
+
+`logout-action.ts`, `lib/modules/identity/index.ts` y `lib/composition/index.ts` **no se tocan**.
+El literal vive en `lib/shared/routes.ts` justamente para que la interseccion con QC-66 —que
+declara `identity/index.ts`— siga vacia.
+
+**El literal aparece UNA sola vez** en todo el arbol de produccion; comprobado con `grep` sobre
+`lib`, `app`, `components` y `middleware.ts`.
+
+### Por que la marca no es un agujero (R30 b)
+
+Se lee **dentro** del `if` del paso 3, que solo se evalua cuando `pathname === routes.login`. Los
+pasos 1, 2 y 4 no la ven. Consecuencia, y esta demostrada en negativo con tests, no afirmada:
+alguien con sesion legitima que escriba `?sesion=fin` a mano en una ruta privada obtiene la
+**misma** decision que sin ella, y un anonimo que la escriba **no gana acceso a nada**.
+
+**Un residuo, encontrado y no tapado.** `buildLoginRedirect` codifica `pathname + search` entero,
+asi que un anonimo que pida `/dashboard?sesion=fin` acaba con
+`to: '/login?next=%2Fdashboard%3Fsesion%3Dfin'`: la marca viaja **dentro** del destino de vuelta,
+aunque no como parametro del login. Lo importante es que **no vuelve a disparar R29 en el salto
+siguiente**, y hay un test que cierra ese circulo: ese login, pedido despues con sesion valida,
+sigue redirigiendo (`already-authenticated`). El residuo es cosmetico —tras autenticarse el
+usuario aterriza en `/dashboard?sesion=fin`, un parametro que nadie lee— y queda anotado por si el
+diseno lo quiere limpio.
+
+### Mapa `R29, R30 → test`
+
+Verificado **abriendo cada caso**. `RA` = `tests/unit/identity/route-access.test.ts`,
+`RGM` = `tests/unit/identity/route-guard-middleware.test.ts`.
+
+| R | Archivo | Caso |
+|---|---|---|
+| R29 | `RA` | `sirve el login a una sesion valida que llega con la marca, en vez de devolverla a la zona privada` |
+| R29 | `RA` | `sin la marca, el login con sesion valida sigue redirigiendo al dashboard` (**la regla 3 sigue intacta**: sin este caso, el arreglo podria haberse comido la regla entera) |
+| R29 | `RA` | `sin la marca, el login con sesion valida y destino de vuelta sigue redirigiendo ahi` |
+| R29 | `RA` | `con la marca gana la marca aunque la query traiga tambien un destino de vuelta valido` |
+| R29 | `RA` | `basta con que la marca este presente (%s) para no redirigir, sea cual sea su valor` (`it.each`: `?sesion=fin`, `?sesion=`, `?sesion`, `?sesion=loquesea`) |
+| R29 | `RA` | `el login sin sesion se sigue sirviendo igual, traiga o no la marca` |
+| R29 | `RGM` | `sirve /login con la marca aunque la cookie firmada siga siendo valida` |
+| R29 | `RGM` | `sin la marca, /login con la misma cookie valida sigue redirigiendo al dashboard` |
+| R29 | `RGM` | `el nombre de la marca sale de la constante compartida, no de un literal en el adaptador` |
+| R29 | `e2e/session.spec.ts` | `una sesion abierta cuya cuenta deja de estar activa no llega a la siguiente pantalla privada y acaba en el login` (con el contador de redirecciones) |
+| R29 | `e2e/session.spec.ts` | `una sesion abierta cuya ficha se da de baja tampoco rebota: sale al login en una sola redireccion` (**corte PREEXISTENTE**, QC-8 R11) |
+| R30 (a) | `e2e/session.spec.ts` | `una sesion abierta cuya ficha se da de baja tampoco rebota...` compara la query final contra `LOGIN_ROUTE_SESSION_ENDED`: **la marca del corte por baja logica es la MISMA** que la del corte por estado |
+| R30 (a) | `RA` | La decision no lleva motivo: `traeMarcaDeSesionCortada` mira presencia y el resultado es `allow` a secas, sin campo que distinga cual de los tres cortes fue |
+| R30 (b) | `RA` | `una ruta privada con la marca se decide identicamente a la misma sin ella (con sesion)` (`toEqual` contra la llamada sin marca, no contra un literal) |
+| R30 (b) | `RA` | `una ruta privada con la marca sigue mandando al login a un anonimo, igual que sin ella` — **la marca NO deja entrar a nadie** |
+| R30 (b) | `RA` | `una ruta publica con la marca se sirve igual que sin ella` |
+| R30 (b) | `RA` | `la marca no altera la decision de %s ni para el anonimo ni para la sesion valida` (`it.each` sobre cuatro caminos, compara `.kind`) |
+| R30 (b) | `RA` | `la marca no queda como parametro del login al que se redirige una ruta privada` (y cierra el circulo: ese login con sesion valida **sigue** redirigiendo) |
+| R30 (b) | `RGM` | `la marca no deja entrar a un anonimo en una ruta privada` |
+| R30 (b) | `RGM` | `la marca en una ruta privada con cookie valida se decide igual que sin ella: pasa` |
+| — | `RA` | `la regla 3 dispara aunque la query traiga el texto de la marca` y `con destino de vuelta y el texto de la marca, sigue ganando el destino de vuelta`: la red del campo **opcional**, que protege a los cinco tests de otras zonas que construyen un `RouteAccessInput` literal |
+
+**Con las 28 anteriores, las 30 filas del mapa estan cubiertas.**
+
+### Evidencia de que el test del adaptador muerde
+
+Borrada la linea `sessionEndedParam: SESSION_ENDED_PARAM` de
+`route-guard-middleware.ts` (dejando el comentario, para que el fallo fuera solo por la linea):
+
+```
+❯ tests/unit/identity/route-guard-middleware.test.ts (28 tests | 2 failed)
+  × sirve /login con la marca aunque la cookie firmada siga siendo valida
+    AssertionError: expected false to be true
+  × el nombre de la marca sale de la constante compartida, no de un literal en el adaptador
+ Tests  2 failed | 26 passed (28)
+```
+
+Linea **revertida** y verificada con `git diff`. Tras revertir: `28 passed (28)`.
+
+### Salida real de Playwright
+
+**`e2e/session.spec.ts`, los dos navegadores — EL QUE DESTAPO EL BUCLE:**
+
+```
+✓ [chromium] session.spec.ts:289 una sesion abierta cuya cuenta deja de estar activa ... (29.1s)
+✓ [chromium] session.spec.ts:352 una sesion abierta cuya ficha se da de baja tampoco rebota (28.9s)
+✓ [chromium] session.spec.ts:241 pide una pantalla privada sin sesion, entra, ... (30.7s)
+✓ [webkit]   session.spec.ts:289 una sesion abierta cuya cuenta deja de estar activa ... (30.2s)
+✓ [webkit]   session.spec.ts:352 una sesion abierta cuya ficha se da de baja tampoco rebota (30.9s)
+✓ [webkit]   session.spec.ts:241 pide una pantalla privada sin sesion, entra, ... (31.2s)
+
+6 passed (46.7s)          EXIT=0
+```
+
+El bucle esta muerto: el mismo paso que antes reventaba con
+`Load cannot follow more than 20 redirections` ahora resuelve en **una sola** redireccion de
+documento, en los dos navegadores, y para **dos** cortes distintos.
+
+### Un error propio en el primer intento del contador, y su correccion
+
+La primera version del contador sumaba **toda** respuesta con estado 300-399. `next dev` sirve los
+chunks de `_next/static` con **304 Not Modified**, que cae en ese rango: el contador dio 15, 20 y
+29 «redirecciones» de JavaScript, y **pasaba o fallaba segun lo que el navegador tuviera en
+cache** —chromium paso una vez, webkit no—. Un test que depende de la cache no mide nada. Ahora
+`contarRedireccionesDeNavegacion` filtra a `resourceType() === 'document'` y excluye 304, con el
+porque escrito en el helper. **El fallo era del test, no del producto.**
+
+### Los seis E2E de T19 que faltaban por correr, ya ejecutados
+
+`inventario`, `presentaciones`, `proveedores`, `recetas`, `recetas-pasos` y `unidades`, en los dos
+navegadores: **17 passed, 11 failed (5.0m)**.
+
+**Verde** (o sea: la reparacion de T19 funciona, esos usuarios entran): los dos de
+`presentaciones`, el alta de `proveedores`, el alta de `recetas`, `recetas-pasos`, y los **dos** de
+`unidades` —incluido `una sesion valida sin los permisos de unidades recibe 404 dentro del layout
+privado`, que ejercita `requirePagePermission` con sesion viva y demuestra que la marca **no**
+rompio ese camino—.
+
+**Rojo, y ninguno es de QC-78:**
+
+| Test | Navegadores | Atribucion |
+|---|---|---|
+| `inventario:310`, `proveedores:467`, `recetas:368` (y `pedidos:447` de la tanda anterior) — todos `un usuario que no es Administrador acaba fuera` | los dos | El helper `login()` de esos specs espera aterrizar en `DASHBOARD_ROUTE`, y el log dice `navigated to /inventario`. La causa esta en `login-action.ts`: desde **QC-75 R12** el destino tras login es `firstVisibleNavHref(...)`, o sea la primera pantalla del menu que esa persona puede ver — para un Operador, `/inventario`. **`login-action.ts` y `lib/shared/navigation/` NO estan en el diff de QC-78** (comprobado con `git diff --name-only` contra la base de fusion: cero archivos). La expectativa de esos specs quedo obsoleta con QC-75; T19 solo la destapo al permitir que esos usuarios lleguen a entrar. |
+| `inventario:249` (el alta de producto del Administrador) | los dos | `locator.click` expira esperando `presentation-create-open`: es la UI de inventario, que QC-78 no toca (`app/**` y `components/**` estan fuera de su alcance declarado). Ademas el arbol principal tiene trabajo de inventario sin commitear (`product-field.tsx`, `presentation-select.tsx`). |
+
+**Limite declarado, para que el reviewer sepa exactamente que se midio:** los cuatro rojos de
+«no es Administrador» y el de `inventario:249` **no** se ejecutaron sobre la base de fusion para
+confirmar que ya fallaban alli. La atribucion se apoya en el diff (los archivos causantes no estan
+tocados) y en el mensaje del log, no en una corrida comparativa.
+
+### Estado
+
+**T1–T15 y T19–T26 cerradas.** T16, T17 y T18 siguen siendo del leader. Sigue en **F2.1**: sin PR,
+sin sincronizar con `dev`, sin `./init.sh`.
+

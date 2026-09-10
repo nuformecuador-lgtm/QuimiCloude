@@ -385,7 +385,7 @@ pero para **añadir** casos, no para arreglar los que ya hay.
       *Hecho cuando:* pasan en los dos navegadores con la salida real pegada en la bitácora, y se
       deja escrito qué corte preexistente se ejercitó.
 
-- [ ] **T26. Ampliar el mapa `R<n> → test` y la bitácora.** (dep: T24, T25)
+- [x] **T26. Ampliar el mapa `R<n> → test` y la bitácora.** (dep: T24, T25)
       Archivos: `progress/impl_QC-78-estado-de-cuenta-en-el-acceso.md`.
       Dos filas nuevas (R29, R30) con archivo y nombre del caso, **verificadas abriendo el caso**,
       más una nota de por qué la lista de archivos declarados cambió el 2026-09-10.
