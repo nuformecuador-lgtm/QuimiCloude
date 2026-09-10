@@ -350,13 +350,45 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
   qtyAlert: '1',
 };
 
-/** Rellena el formulario abierto. Deja fuera la presentacion -ya no es del producto-. */
+/**
+ * Campos del PRIMER LOTE que el alta pide desde el 2026-09-10. Solo el costo esta aqui: es el
+ * unico obligatorio de los cinco -y basta con el unitario O el total-. La presentacion se elige
+ * en su selector, no se teclea, y el lote y la caducidad son opcionales.
+ */
+const LOTE_VALIDO: Readonly<Record<string, string>> = {
+  unitCost: '12.5000',
+};
+
+/** Elige la primera presentacion del catalogo en el selector del alta. */
+async function elegirPresentacion(user: ReturnType<typeof setupUser>, nombre = PRESENTACION_A.name) {
+  await user.click(screen.getByTestId('presentation-select'));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: nombre })));
+  // El desplegable se cierra al elegir: hasta que no se va, su capa se come los clicks de lo
+  // que hay debajo -incluido el boton de guardar-.
+  await waitFor(() => expect(screen.queryByTestId('presentation-popup')).toBeNull());
+}
+
+/**
+ * Rellena el formulario abierto. En el ALTA cubre ademas lo minimo del primer lote -presentacion
+ * y costo-, que desde el 2026-09-10 son obligatorios; en la EDICION esos campos no existen y el
+ * helper no los toca.
+ */
 async function rellenarFormulario(
   user: ReturnType<typeof setupUser>,
   valores: Readonly<Record<string, string>> = {},
 ) {
   const datos = { ...ALTA_VALIDA, ...valores };
   for (const [campo, valor] of Object.entries(datos)) {
+    const control = screen.getByTestId(`product-field-${campo}`);
+    await user.clear(control);
+    if (valor !== '') await user.type(control, valor);
+  }
+
+  if (screen.queryByTestId('presentation-select') === null) return;
+
+  await elegirPresentacion(user);
+  for (const campo of Object.keys(LOTE_VALIDO)) {
+    const valor = valores[campo] ?? LOTE_VALIDO[campo] ?? '';
     const control = screen.getByTestId(`product-field-${campo}`);
     await user.clear(control);
     if (valor !== '') await user.type(control, valor);
@@ -1024,6 +1056,66 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect((screen.getByTestId('product-field-stock') as HTMLInputElement).value).toBe('');
   });
 
+  it('el alta pide el primer lote: presentacion obligatoria y uno de los dos costos', async () => {
+    // Decision humana del 2026-09-10 — el alta captura ademas el PRIMER LOTE: presentacion
+    // obligatoria, costo unitario O total (basta con uno), y lote y caducidad opcionales.
+    // Todavia SIN back: nada de esto viaja a ninguna operacion, pero la pantalla ya lo exige.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    for (const [campo, valor] of Object.entries(ALTA_VALIDA)) {
+      await user.type(screen.getByTestId(`product-field-${campo}`), valor);
+    }
+
+    // Sin presentacion no se guarda: el campo espejo del selector es `required`, asi que el
+    // envio ni siquiera empieza -misma barrera nativa que tenia antes el desplegable-.
+    await user.click(screen.getByTestId(testId.enviar));
+    expect(createProductActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+
+    // Con presentacion pero sin ningun costo: se rechaza sin llamar a la operacion, y la falta
+    // se dice en LOS DOS campos, porque cualquiera de ellos la resuelve.
+    await elegirPresentacion(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    expect(await screen.findByTestId('product-error-unitCost')).toHaveTextContent('basta con uno');
+    expect(screen.getByTestId('product-error-totalCost')).toHaveTextContent('basta con uno');
+    expect(createProductActionMock).not.toHaveBeenCalled();
+
+    // Lote y caducidad son opcionales: estan en pantalla y el alta pasa con los dos vacios.
+    expect((screen.getByTestId('product-field-lot') as HTMLInputElement).value).toBe('');
+    expect(screen.getByTestId('product-field-expiryDate')).toHaveAttribute('type', 'date');
+
+    // Con SOLO el costo total -sin el unitario- ya no hay ningun error de campo.
+    await user.type(screen.getByTestId('product-field-totalCost'), '150.00');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    // El alta salio adelante: ni un error de campo queda, y el panel se cierra.
+    await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
+    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
+    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
+  });
+
+  it('la edicion no pide nada del lote: ni presentacion, ni costos, ni caducidad', async () => {
+    // El lote es del ALTA. Al editar un producto no hay lote que cambiar, asi que ninguno de los
+    // cinco campos se pinta -y por tanto no hay obligacion de costo que bloquee el guardado-.
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    for (const campo of ['unitCost', 'totalCost', 'lot', 'expiryDate']) {
+      expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
+    }
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:
@@ -1080,9 +1172,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // El unico combobox del formulario es el nombre, que paso a ser un autocomplete de texto
     // libre que busca productos existentes. La presentacion ya no esta -se mudo a
     // `product_batches` el 2026-09-09-, asi que no hay selector de presentacion.
+    // Los comboboxes del formulario son dos: el nombre -autocomplete de texto libre que busca
+    // productos existentes- y la presentacion, que volvio al alta el 2026-09-10 como campo del
+    // primer LOTE (no del producto). Ninguno de los dos es una unidad.
     const combos = within(formulario).getAllByRole('combobox');
-    expect(combos).toHaveLength(1);
+    expect(combos).toHaveLength(2);
     expect(combos).toContain(screen.getByTestId('product-field-name'));
+    expect(combos).toContain(screen.getByTestId('presentation-select'));
 
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));

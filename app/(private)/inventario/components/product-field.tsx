@@ -18,7 +18,7 @@ type ProductFieldProps = {
   /** Etiqueta visible. Es tambien la que nombra al disparador de la ayuda. */
   readonly label: string;
   /** Tipo del `<input>`. `number` es el unico que ademas fija `inputMode`, `min` y `step`. */
-  readonly type: 'text' | 'number';
+  readonly type: 'text' | 'number' | 'date';
   /** Validacion del navegador. El servidor revalida igual: el cliente nunca es la frontera. */
   readonly required?: boolean;
   /**
