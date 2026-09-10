@@ -97,6 +97,74 @@ const SIN_RANGO =
   'no se pudo calcular `git merge-base origin/dev HEAD` (sin remoto, o rango no disponible): ' +
   'este caso NO ha comprobado nada.';
 
+/**
+ * ESTA GUARDIA SOLO APLICA EN LA RAMA DE QC-39, y el 2026-09-09 hubo que decirlo.
+ *
+ * R3 es una regla sobre el ALCANCE de ESTA ficha —«la pantalla de unidades se hace sin tocar los
+ * casos de uso, los errores ni el esquema»—, no una prohibicion general de que nadie en el repo
+ * toque `domain/errors.ts`. El sujeto de la medicion es el diff `merge-base(origin/dev, HEAD)` con
+ * el arbol, que en OTRA rama es el diff de OTRA feature: ahi los dos casos de abajo no miden a
+ * QC-39, miden a un desconocido, y el veredicto no significa nada.
+ *
+ * Con QC-39 ya mergeada en `dev` el efecto fue doble y los dos rojos eran falsos:
+ *   - `ninguno de los intocables cambia` senalaba `errors.ts`, `create-unit.ts`, `update-unit.ts`,
+ *     `delete-unit.ts` y `convert-quantity.ts`, que toca QC-70 —el catalogo unico de errores— con
+ *     permiso de su propio spec;
+ *   - `el detector muerde` fallaba por lo contrario: `unit-prisma.ts` ya NO aparece en el diff,
+ *     porque el cambio de QC-39 esta en el tronco y la base de fusion lo da por comun.
+ * Ese segundo rojo es la prueba de que la medicion, fuera de su rama, no vale: el centinela de
+ * vacuidad tampoco puede funcionar.
+ *
+ * Mismo remedio y mismo idioma que `unidades-convenciones.test.ts` (R32, R34) y que
+ * `tests/unit/identity/account-status-scope.test.ts` (QC-65): fuera de su rama los casos quedan
+ * MUDOS (`skipped`), nunca verdes —un verde diria «comprobado» sin haber mirado nada, el
+ * anti-patron de la «validacion opcional» de `docs/verification.md`—, y el detector de rama se
+ * ejercita aparte en los dos sentidos para que el salto no vacie la guardia.
+ *
+ * DOS SENALES, no una: el tipo que QC-39 CREA —`unit-view.ts`, ninguna rama implementa esta ficha
+ * sin el— mas su carpeta de spec. Con una sola, cualquier rama que rozara el tipo se haria pasar
+ * por QC-39.
+ */
+const ARCHIVO_CENTRAL_DE_QC39 = 'lib/modules/unidades/domain/unit-view.ts';
+const CARPETA_SPEC_DE_QC39 = 'specs/QC-39-pantalla-de-unidades/';
+
+/** Puro y exportado para poder ejercitarlo con listas sinteticas, en los dos sentidos. */
+export function esLaRamaDeQC39(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC39) &&
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC39))
+  );
+}
+
+/** Todo lo que esta rama anade sobre el tronco, en rutas de git. */
+function tocadosDesde(base: string): readonly string[] {
+  return git(['diff', '--name-only', base])
+    .split('\n')
+    .map((linea) => linea.trim())
+    .filter((linea) => linea !== '');
+}
+
+/** La base de fusion, o `null` habiendo SALTADO ya en voz alta: sin rango o fuera de la rama. */
+function baseDeQC39OMuda(ctx: { readonly skip: (nota: string) => void }): string | null {
+  const base = mergeBaseConDev();
+  if (base === null) {
+    ctx.skip(SIN_RANGO);
+    return null;
+  }
+  if (!esLaRamaDeQC39(tocadosDesde(base))) {
+    ctx.skip(
+      'el rango trae archivos pero no `' +
+        ARCHIVO_CENTRAL_DE_QC39 +
+        '` junto a `' +
+        CARPETA_SPEC_DE_QC39 +
+        '`: esta NO es la rama de QC-39, asi que su alcance no le aplica y este caso NO ha ' +
+        'comprobado nada.',
+    );
+    return null;
+  }
+  return base;
+}
+
 /** El archivo que declara el contrato que otros modulos consumen. Ruta en formato git -barras-,
  *  porque se usa tanto en `git show` como -partida- en `join`. */
 const UNIT_CATALOG = 'lib/modules/unidades/domain/unit-catalog.ts';
@@ -114,11 +182,8 @@ function declaracionDeUnitRef(fuente: string): string {
 
 describe('QC-39 no toca lo que no puede tocar (R3)', () => {
   it('ninguno de los archivos intocables del modulo cambia respecto a la base de fusion', (ctx) => {
-    const base = mergeBaseConDev();
-    if (base === null) {
-      ctx.skip(SIN_RANGO);
-      return;
-    }
+    const base = baseDeQC39OMuda(ctx);
+    if (base === null) return;
 
     const cambiados = git(['diff', '--name-only', base, '--', ...INTOCABLES])
       .split('\n')
@@ -130,11 +195,8 @@ describe('QC-39 no toca lo que no puede tocar (R3)', () => {
   });
 
   it('el detector muerde: comparando un archivo que SI cambio, el diff no sale vacio', (ctx) => {
-    const base = mergeBaseConDev();
-    if (base === null) {
-      ctx.skip(SIN_RANGO);
-      return;
-    }
+    const base = baseDeQC39OMuda(ctx);
+    if (base === null) return;
 
     // El caso simetrico, para que «lista vacia» no pueda serlo por vacuidad -por ejemplo porque
     // el `--` estuviera mal puesto y git no mirara nada-. `unit-prisma.ts` SI es de los seis que
@@ -182,6 +244,33 @@ describe('QC-39 no toca lo que no puede tocar (R3)', () => {
       enElArbol,
       'QC-39 modifico la declaracion de `UnitRef`, que R3 declara fuera de la ampliacion',
     ).toBe(enLaBase);
+  });
+
+  // Que el salto de arriba no vacie la guardia: una que se salta siempre no protege nada. El
+  // detector de rama se ejercita con listas sinteticas en los DOS sentidos, sin depender de en
+  // que rama corra el gate.
+  it('y el detector de la rama de QC-39 MUERDE en los dos sentidos', () => {
+    expect(
+      esLaRamaDeQC39([
+        ARCHIVO_CENTRAL_DE_QC39,
+        'specs/QC-39-pantalla-de-unidades/requirements.md',
+        'app/(private)/configuracion/unidades/page.tsx',
+      ]),
+    ).toBe(true);
+
+    // El diff real de QC-70: toca el modulo `unidades` entero —incluidos sus errores— pero no
+    // crea `unit-view.ts` ni trae la carpeta de spec de QC-39.
+    expect(
+      esLaRamaDeQC39([
+        'lib/modules/unidades/domain/errors.ts',
+        'lib/modules/errores/index.ts',
+        'specs/QC-70-errores-centralizados/requirements.md',
+      ]),
+    ).toBe(false);
+    // Una sola de las dos senales no basta, ni en un sentido ni en el otro.
+    expect(esLaRamaDeQC39([ARCHIVO_CENTRAL_DE_QC39])).toBe(false);
+    expect(esLaRamaDeQC39(['specs/QC-39-pantalla-de-unidades/design.md'])).toBe(false);
+    expect(esLaRamaDeQC39([])).toBe(false);
   });
 });
 

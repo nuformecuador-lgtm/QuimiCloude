@@ -215,3 +215,156 @@ baseline nombra la salida limpia como pendiente**: que el caso del diff distinga
 «el rango trae cosas de otra ficha», y borrar la entrada. **No se arreglaron aquí**: son deuda de
 otra ficha y la decisión es del leader. Un síntoma más de lo mismo: QC-70 tuvo que retensar la
 número 4 con una lista nombrada (`RENOMBRADO_DE_COMENTARIOS_QC70`) por dos comentarios.
+
+---
+
+## F2.3 — Cierre de la sincronización con `dev` (2026-09-10)
+
+Commits: `8bcfe2c` (cierre del merge) y el de esta tanda (los rojos que el merge destapó).
+
+La feature ya estaba implementada (T1–T16) y **aprobada por el reviewer** (0 mayores, 6 menores,
+`e516f31`). Lo único pendiente era cerrar el `git merge origin/dev` que quedó a medias, con dos
+rutas en `UU` y el árbol de trabajo ya resuelto a mano y sin `git add`.
+
+El riesgo estaba declarado en `progress/current.md` antes de empezar: QC-70 **renombra** los
+códigos de error de `unidades` y QC-39 (pantalla de unidades, PR #51) toca los mismos archivos, así
+que **el merge podía salir limpio y fallar en pantalla, no en el gate**. Pasó exactamente eso, en un
+sitio, y se arregló.
+
+### Los dos conflictos `UU`: qué se conservó de cada lado
+
+Verificado etapa a etapa contra `git show :1:` (base), `:2:` (QC-70) y `:3:` (`origin/dev`).
+
+| Ruta | De QC-39 (`origin/dev`) se conserva | De QC-70 se conserva |
+|---|---|---|
+| `lib/modules/unidades/adapters/driving/unit-actions.ts` | las dos sobrecargas de `listUnitsAction`, `UnitView`, `Page<UnitView>`, `UnitPageResult` y las tres actions de escritura | `createErrorStateTranslator(UnidadesError)` en vez de la copia local de `toErrorState`, y `ErrorCode` en **todos** los estados de error |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | las anclas de R34 **retensadas** por QC-39: exactamente un item de menú a `UNITS_ROUTE` y exactamente un `.spec.ts` nuevo en `e2e/`, el de unidades | la detección de rama de **dos** centinelas (`esRamaDeQC38`) y el salto de R32/R34 fuera de la rama de QC-38 |
+
+La resolución del árbol era correcta en lo esencial y se completó con dos cosas:
+
+- `unit-actions.ts` conservaba `code: string` en la **firma de implementación** de la sobrecarga.
+  Era el último `code: string` de los siete adaptadores driving del repo. Pasa a `ErrorCode`.
+- Barrido completo del árbol en busca de marcadores `<<<<<<<` / `>>>>>>>`: **0 resultados**.
+
+### El fallo que el gate NO habría visto (y que era el riesgo declarado)
+
+`app/(private)/configuracion/unidades/components/unit-form.tsx` reparte los errores por campo con un
+mapa `code → campo`. Venía de `dev` con la clave tipada como `string` y el valor `duplicate_name`.
+QC-70 (R18) renombró ese código a `unit_duplicate_name`. Con la clave `string`, el typecheck seguía
+**verde** y el mapa simplemente dejaba de encontrarlo: el «ya existe una unidad con ese nombre»
+dejaba de aparecer junto al campo del nombre y se caía a la región genérica `role="alert"`. Fallo de
+pantalla, invisible para el compilador.
+
+Arreglado copiando el patrón que la pantalla hermana ya tenía desde QC-70
+(`presentation-form.tsx`): el mapa pasa a `Readonly<Partial<Record<ErrorCode, UnitFieldName>>>`, con
+lo que **un código mal escrito o retirado del catálogo rompe el typecheck ahí mismo**. Mismo trato
+para `UNIT_IN_USE_CODE` en `delete-unit-dialog.tsx`, ahora anotado con `ErrorCode`.
+
+Los otros códigos del mapa —`duplicate_symbol`, `invalid_derivation`— y el `unit_in_use` del diálogo
+de borrado están en el catálogo con ese mismo nombre: no cambian.
+
+### Los tres archivos de test que el merge dejó en rojo
+
+El primer `./init.sh` completo tras cerrar el merge dio **3 archivos rojos / 5 casos**. Ninguno era
+deuda de baseline; los tres son consecuencia directa del merge y se arreglaron.
+
+| Archivo | Casos | Qué pasaba | Arreglo |
+|---|---|---|---|
+| `tests/unit/unidades/list-units-action.test.ts` | 2 | Afirmaba el comportamiento **anterior** a QC-70: mensaje = el texto pasado a la clase, y error ajeno al dominio **se relanza** | Se afirma el comportamiento nuevo (R12, R13, R14): mensaje = `errorMessage(code)`, el texto pasado a la clase es diagnóstico y va al registro, y el error ajeno se traduce a `unexpected` sin filtrar su texto |
+| `tests/unit/unidades/modulo-intacto.test.ts` | 2 | Guardia de alcance de QC-39 midiendo `merge-base(origin/dev, HEAD)` **sin comprobar que está en su rama**: acusaba a QC-70 de tocar `errors.ts`, `create-unit.ts`, `update-unit.ts`, `delete-unit.ts` y `convert-quantity.ts`. Y su propio centinela de vacuidad fallaba por lo contrario: `unit-prisma.ts` ya no aparece en el diff porque el cambio de QC-39 está en el tronco | Detección de rama de **dos señales** (`esLaRamaDeQC39`) y salto explícito fuera de ella |
+| `tests/unit/unidades/consumidores-catalogo.test.tsx` | 1 | Lo mismo con R4: acusaba a QC-70 de «modificar pantallas ajenas» (recetas y proveedores) por sustituir en ellas la copia local de `toErrorState`, que es justo lo que su spec le manda | Misma detección de rama y mismo salto |
+
+En los dos últimos se aplicó **el precedente exacto** que esta misma ficha ya había establecido para
+QC-75 (`7cd478b`), QC-65 y QC-38 (`d88c60b`): fuera de su rama los casos quedan **mudos**
+(`skipped`), nunca verdes, y el detector de rama se ejercita aparte con listas sintéticas en los dos
+sentidos, para que el salto no vacíe la guardia. Las **dos señales** —`domain/unit-view.ts`, que
+QC-39 crea, más su carpeta de spec— son las mismas que ya se usan para QC-65: con una sola,
+cualquier rama que rozara el tipo se haría pasar por QC-39.
+
+**No se tocó `tests/baseline-rojos.json`.** Los tres rojos eran de esta rama, no deuda ajena.
+
+### El patrón, actualizado: siete guardias, quedan dos
+
+| # | Guardia | Ficha | Estado |
+|---|---|---|---|
+| 1 | `tests/unit/navegacion/qc75-convenciones.test.ts` | QC-75 | arreglada en `7cd478b` |
+| 2 | `tests/unit/identity/account-status-scope.test.ts` | QC-65 | arreglada en `d88c60b` |
+| 3 | `tests/unit/unidades/unidades-convenciones.test.ts` | QC-38 | arreglada en `d88c60b` |
+| 4 | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | QC-26 | **sin arreglar** — apagada entera en el baseline |
+| 5 | `tests/unit/recetas/module-contract.test.ts` | QC-26 | **sin arreglar** — apagada entera en el baseline |
+| 6 | `tests/unit/unidades/modulo-intacto.test.ts` | QC-39 | arreglada en F2.3 |
+| 7 | `tests/unit/unidades/consumidores-catalogo.test.tsx` | QC-39 | arreglada en F2.3 |
+
+Las dos de QC-26 siguen siendo deuda de otra ficha y su decisión es del leader.
+
+### Archivos tocados en F2.3
+
+Producción (3):
+
+- `lib/modules/unidades/adapters/driving/unit-actions.ts` — conflicto resuelto + `ErrorCode` en la firma de implementación
+- `app/(private)/configuracion/unidades/components/unit-form.tsx` — `CODE_TO_FIELD` tipado con `ErrorCode` y `unit_duplicate_name`
+- `app/(private)/configuracion/unidades/components/delete-unit-dialog.tsx` — `UNIT_IN_USE_CODE: ErrorCode`
+
+Tests (7):
+
+- `tests/unit/unidades/unidades-convenciones.test.ts` — conflicto resuelto
+- `tests/unit/unidades/list-units-action.test.ts` — al comportamiento de QC-70
+- `tests/unit/unidades/modulo-intacto.test.ts` — centinela de rama de QC-39
+- `tests/unit/unidades/consumidores-catalogo.test.tsx` — centinela de rama de QC-39
+- `tests/unit/configuracion-ui/unit-sheet.test.tsx` — `UnitDuplicateNameError`, `ErrorCode`
+- `tests/unit/configuracion-ui/delete-unit-dialog.test.tsx` — `ErrorCode`
+- `tests/unit/identity/account-status-scope.test.ts` — el merge dejó `esLaRamaDeQC65` declarada dos veces; se conserva la de dos señales
+
+### Mapa `R<n> → test` de lo tocado en F2.3
+
+| Requisito | Test que lo fija |
+|---|---|
+| R10 (traductor único, sin copia local en `unit-actions.ts`) | `tests/unit/errores/catalogo-unico.test.ts` (guardia del catálogo) + `tests/unit/unidades/unit-actions.test.ts` |
+| R12, R13, R14 (error ajeno → `unexpected`, detalle solo al registro) | `tests/unit/unidades/list-units-action.test.ts` › «un error AJENO al dominio se traduce a `unexpected` y no filtra su texto»; `tests/unit/unidades/unit-actions.test.ts` › los tres casos `unexpected` |
+| R17 (`unit_not_found`) | `tests/unit/unidades/errors.test.ts`; `tests/unit/unidades/unit-actions.test.ts` |
+| R18 (`unit_duplicate_name`) | `tests/unit/unidades/errors.test.ts`; `tests/unit/configuracion-ui/unit-sheet.test.tsx` › «`duplicate_name` va junto al campo del nombre», que ahora toma el código de `new UnitDuplicateNameError().code` y por eso muerde si el mapa de la pantalla se queda atrás |
+| R21 (los códigos de pantalla salen del catálogo y están tipados) | `tests/unit/configuracion-ui/unit-sheet.test.tsx`, `tests/unit/configuracion-ui/delete-unit-dialog.test.tsx`, y el `typecheck` del gate sobre `Partial<Record<ErrorCode, …>>` |
+| QC-39 R3, R4 (alcance de la pantalla de unidades) | `tests/unit/unidades/modulo-intacto.test.ts`, `tests/unit/unidades/consumidores-catalogo.test.tsx` — mudos fuera de su rama, con el detector ejercitado en los dos sentidos |
+
+### `./init.sh` completo (obligatorio antes del PR, regla 5)
+
+```
+== Arnes SDD :: init (modo: completo) ==
+✓ node v22.13.1
+✓ dependencias presentes
+✓ regla max-2-por-zona respetada (in_progress=3)
+✓ specs presentes para features sdd en vuelo
+✓ worktrees bajo control (3 ademas del principal)
+✓ typecheck paso
+✓ lint paso
+
+ Test Files  295 passed (295)
+      Tests  3773 passed | 18 skipped (3791)
+   Duration  177.34s
+
+aviso: 2 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 2); 2 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
+
+**0 rojos.** Los 18 saltos son los `ctx.skip` ruidosos de las guardias de alcance de otras fichas,
+que es su comportamiento correcto fuera de su rama.
+
+E2E no entra en `./init.sh` (Playwright corre aparte con `pnpm run test:e2e`); `e2e/errores.spec.ts`
+se cubrió en la implementación original de la ficha.
+
+### Abierto
+
+1. **`git push` y el PR no se han hecho.** Los autoriza el humano. La rama está lista: merge cerrado
+   y gate completo en verde.
+2. **Aviso del gate, no error:** dos archivos del baseline ya pasan
+   (`recipe-route-contract.test.ts`, `module-contract.test.ts`, las guardias 4 y 5 de la tabla).
+   Limpiar `tests/baseline-rojos.json` es la salida limpia que el propio baseline nombra como
+   pendiente desde el 2026-09-04, pero es **deuda de QC-26** y la decisión de tocarla es del leader:
+   no se hizo aquí.
+3. **Ninguna ambigüedad quedó sin resolver.** Los dos conflictos tenían las dos intenciones
+   compatibles y ambas se conservan; no hubo ningún caso de «una versión u otra, pero no las dos».
