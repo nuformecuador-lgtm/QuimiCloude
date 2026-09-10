@@ -63,7 +63,7 @@ editarlo.
 
 ## Tanda 1 — el dominio nuevo, aislado
 
-- [ ] **T1. Sincronizar con `dev` y leer lo que dejó QC-65.**
+- [x] **T1. Sincronizar con `dev` y leer lo que dejó QC-65.**
       Archivos: ninguno (solo lectura).
       Abrir `lib/modules/identity/domain/account-status.ts` en la rama y anotar en la bitácora los
       **nombres reales** de sus constantes y de su tipo. `design.md > 0` los referencia por su
@@ -71,7 +71,7 @@ editarlo.
       *Hecho cuando:* la bitácora lista los símbolos exportados y confirma que las tres columnas
       de QC-65 existen en `db/schema.prisma` (solo lectura del esquema).
 
-- [ ] **T2. `effective-account-status.ts` — el estado efectivo y sus dos compañeras.** (dep: T1)
+- [x] **T2. `effective-account-status.ts` — el estado efectivo y sus dos compañeras.** (dep: T1)
       Archivos: `lib/modules/identity/domain/effective-account-status.ts` (nuevo).
       `effectiveAccountStatus`, `accountStatusAfterAttempt` y `clearedLockState` según
       `design.md > 1`. Dominio puro: `now` por parámetro, sin `next/*`, sin Prisma, sin
@@ -79,7 +79,7 @@ editarlo.
       `account-lock.ts`; no reimplementa la comparación de plazos.
       *Hecho cuando:* `pnpm run typecheck` limpio y el archivo no importa nada prohibido.
 
-- [ ] **T3. Tests del dominio nuevo.** (dep: T2)
+- [x] **T3. Tests del dominio nuevo.** (dep: T2)
       Archivos: `tests/unit/identity/effective-account-status.test.ts` (nuevo).
       Un caso por fila de la tabla de `design.md > 1` (R7–R12), los tres desenlaces de
       `accountStatusAfterAttempt` (R13, R15, R17), la derivación desde `nextLockState` sin
@@ -90,7 +90,7 @@ editarlo.
 
 ## Tanda 2 — el corte en el login
 
-- [ ] **T4. Ampliar los puertos del login.** (dep: T2)
+- [x] **T4. Ampliar los puertos del login.** (dep: T2)
       Archivos: `lib/modules/identity/ports/user-credentials-reader.ts`,
       `lib/modules/identity/ports/login-attempt-recorder.ts`.
       `AuthenticatableUser` gana `accountStatus` (valor crudo, no cocinado); `compareAndSet` y
@@ -99,7 +99,7 @@ editarlo.
       *Hecho cuando:* typecheck señala exactamente los puntos que faltan por actualizar (adaptador
       y tests) y ninguno fuera de la lista declarada.
 
-- [ ] **T5. El corte por estado en `verify-credentials.ts`.** (dep: T4)
+- [x] **T5. El corte por estado en `verify-credentials.ts`.** (dep: T4)
       Archivos: `lib/modules/identity/domain/verify-credentials.ts`.
       Paso 6 de `design.md > 2`: sustituir el `if (isLocked(...))` por el corte de estado
       efectivo, **después** del hash y **antes** del `!correcta`, devolviendo la misma instancia
@@ -109,7 +109,7 @@ editarlo.
       motivo.
       *Hecho cuando:* typecheck limpio y el archivo sigue sin importar Prisma ni framework.
 
-- [ ] **T6. Tests del login.** (dep: T5)
+- [x] **T6. Tests del login.** (dep: T5)
       Archivos: `tests/unit/identity/verify-credentials.test.ts`.
       Casos: `pending`, `inactive` y `blocked` vigente rechazan (R1) sin emitir sesión con
       contraseña **correcta** (R4); el rechazo es la **misma instancia** que el de usuario
@@ -124,7 +124,7 @@ editarlo.
       escribir (R19); tras `clearedLockState` el siguiente fallo cuenta como el primero (R25).
       *Hecho cuando:* R1–R6, R13–R19 y R25 tienen test nombrado por comportamiento y pasan.
 
-- [ ] **T7. El adaptador de credenciales.** (dep: T4)
+- [x] **T7. El adaptador de credenciales.** (dep: T4)
       Archivos:
       `lib/modules/identity/adapters/driven/persistence/user-credentials-prisma.ts`.
       `SELECT` con `u.account_status` (sin tocar el `WHERE` ni el `JOIN`); `compareAndSet` con el
@@ -133,14 +133,14 @@ editarlo.
       evita el ABA queda intacto.
       *Hecho cuando:* typecheck limpio y el diff no altera ninguna línea del predicado de rango.
 
-- [ ] **T8. Integración del login contra la base.** (dep: T7)
+- [x] **T8. Integración del login contra la base.** (dep: T7)
       Archivos: `tests/integration/identity/login.int.test.ts`.
       Que el CAS **no** aplica cuando el estado de cuenta cambió entre lectura y escritura (R18) y
       que el quinto fallo deja la fila en `blocked` con plazo y sin autor (R13).
       *Hecho cuando:* pasan con `DATABASE_URL` cargada por el gate; si el entorno no lo permite,
       se anota como límite conocido en la bitácora, no se borra el caso.
 
-- [ ] **T9. Guardia de alcance de QC-65: comprobar si muerde.** (dep: T5, T7)
+- [x] **T9. Guardia de alcance de QC-65: comprobar si muerde.** (dep: T5, T7)
       Archivos: `tests/unit/identity/account-status-scope.test.ts` (posible diff).
       Correr la guardia con los lectores nuevos ya escritos. Si los rechaza, **ampliar su lista
       con los archivos que este spec autoriza**, uno por uno y con el requisito que lo justifica
@@ -150,7 +150,7 @@ editarlo.
 
 ## Tanda 3 — el corte en la sesión
 
-- [ ] **T10. `SessionUserRecord` y su adaptador.** [P con T5–T9] (dep: T2)
+- [x] **T10. `SessionUserRecord` y su adaptador.** [P con T5–T9] (dep: T2)
       Archivos: `lib/modules/identity/ports/session-user-reader.ts`,
       `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts`.
       El record gana `accountStatus` y `lockedUntil`; el `select` los añade en el **mismo**
@@ -158,13 +158,13 @@ editarlo.
       uno ni otro es PII).
       *Hecho cuando:* typecheck limpio y sigue habiendo exactamente una consulta.
 
-- [ ] **T11. El sexto corte en `resolve-session.ts`.** (dep: T10)
+- [x] **T11. El sexto corte en `resolve-session.ts`.** (dep: T10)
       Archivos: `lib/modules/identity/domain/resolve-session.ts`.
       `if` propio detrás del corte de empresa no viva, con la misma salida `null` y sin borrar
       cookie. Nada de escrituras, nada de sellos de QC-23.
       *Hecho cuando:* typecheck limpio y ningún puerto de escritura entra en este archivo.
 
-- [ ] **T12. Tests de la sesión.** (dep: T11)
+- [x] **T12. Tests de la sesión.** (dep: T11)
       Archivos: `tests/unit/identity/resolve-session.test.ts`,
       `tests/unit/identity/resolve-session-user.test.ts` (fixtures),
       `tests/unit/composition/identity-facade.test.ts` (fixtures),
@@ -177,7 +177,7 @@ editarlo.
 
 ## Tanda 4 — guardias, E2E y cierre
 
-- [ ] **T13. Guardia de alcance de la ficha.** [P con T14] (dep: T5, T11)
+- [x] **T13. Guardia de alcance de la ficha.** [P con T14] (dep: T5, T11)
       Archivos: `tests/unit/identity/qc78-alcance.test.ts` (nuevo).
       Afirma sobre el diff de la rama: cero cambios en `db/schema.prisma` y `db/migrations/`
       (R26), cero cambios en `package.json` (R27) y ningún cron, `setInterval` o route handler
@@ -187,7 +187,7 @@ editarlo.
       *Hecho cuando:* se demuestra que **muerde**, con una mutación temporal por cada uno de sus
       tres motivos de fallo, las tres revertidas.
 
-- [ ] **T14. E2E.** [P con T13] (dep: T5, T11)
+- [x] **T14. E2E.** [P con T13] (dep: T5, T11)
       Archivos: `e2e/login.spec.ts`, `e2e/session.spec.ts`.
       `login.spec.ts`: una cuenta que no está `active` no entra y ve **el mismo** mensaje que una
       contraseña mala. `session.spec.ts`: una sesión abierta cuya cuenta deja de estar `active` no
@@ -195,7 +195,7 @@ editarlo.
       *Hecho cuando:* los dos flujos pasan de extremo a extremo, y el de login compara el texto
       con el del caso de contraseña incorrecta en vez de con un literal copiado.
 
-- [ ] **T15. Mapa `R<n> → test` y bitácora.** (dep: T3, T6, T8, T12, T13, T14)
+- [x] **T15. Mapa `R<n> → test` y bitácora.** (dep: T3, T6, T8, T12, T13, T14)
       Archivos: `progress/impl_QC-78-estado-de-cuenta-en-el-acceso.md`.
       Las 28 filas, cada una con el archivo y el nombre del caso, **verificadas abriendo el caso**
       (la lección de QC-45 y QC-65), más la salida real de los tests.
