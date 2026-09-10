@@ -220,7 +220,7 @@ número 4 con una lista nombrada (`RENOMBRADO_DE_COMENTARIOS_QC70`) por dos come
 
 ## F2.3 — Cierre de la sincronización con `dev` (2026-09-10)
 
-Commits: `8bcfe2c` (cierre del merge) y el de esta tanda (los rojos que el merge destapó).
+Commits: `8bcfe2c` (cierre del merge) y `dfedb97` (los rojos que el merge destapó).
 
 La feature ya estaba implementada (T1–T16) y **aprobada por el reviewer** (0 mayores, 6 menores,
 `e516f31`). Lo único pendiente era cerrar el `git merge origin/dev` que quedó a medias, con dos
@@ -292,8 +292,8 @@ cualquier rama que rozara el tipo se haría pasar por QC-39.
 | 3 | `tests/unit/unidades/unidades-convenciones.test.ts` | QC-38 | arreglada en `d88c60b` |
 | 4 | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | QC-26 | **sin arreglar** — apagada entera en el baseline |
 | 5 | `tests/unit/recetas/module-contract.test.ts` | QC-26 | **sin arreglar** — apagada entera en el baseline |
-| 6 | `tests/unit/unidades/modulo-intacto.test.ts` | QC-39 | arreglada en F2.3 |
-| 7 | `tests/unit/unidades/consumidores-catalogo.test.tsx` | QC-39 | arreglada en F2.3 |
+| 6 | `tests/unit/unidades/modulo-intacto.test.ts` | QC-39 | arreglada en `dfedb97` |
+| 7 | `tests/unit/unidades/consumidores-catalogo.test.tsx` | QC-39 | arreglada en `dfedb97` |
 
 Las dos de QC-26 siguen siendo deuda de otra ficha y su decisión es del leader.
 
