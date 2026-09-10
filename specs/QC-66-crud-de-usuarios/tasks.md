@@ -278,7 +278,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Cubre**: R38, R43, R45, R46, R47.
 - **Hecho cuando**: pasa y cada aserción se pone roja al violarla a mano.
 
-### T19 — Ciclo real de migración
+### [x] T19 — Ciclo real de migración
 - **Depende de**: T4, T16.
 - **Qué**: `pnpm run db:migrate` → `pnpm run db:rollback` → `pnpm run db:migrate`, comprobando entre
   medias que el catálogo vuelve a **once** entradas y que las dos asignaciones del `Administrador`
@@ -288,7 +288,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Cubre**: R44.
 - **Hecho cuando**: las tres órdenes terminan en verde y la salida está en la bitácora.
 
-### T20 — Trazabilidad y cierre
+### [x] T20 — Trazabilidad y cierre
 - **Depende de**: todas las anteriores.
 - **Qué**: escribir el mapa **`R1…R49 → test`** en `progress/impl_QC-66-crud-de-usuarios.md`
   (`CHECKPOINTS.md > Trazabilidad`), anotar el estado de **P1, P2 y P3** (qué sigue abierto y por qué;

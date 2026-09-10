@@ -414,6 +414,609 @@ pnpm exec vitest run guard
 
 ---
 
+## Tanda 3-6 — del puerto al cierre (T9-T19)
+
+A partir de aqui el trabajo fue **en serie, un `backend_dev` a la vez**: la tanda con tres
+subagentes en paralelo toco el limite de sesion de la API (429) y se llevo por delante a dos.
+Nada se perdio —lo terminado estaba en disco— pero el cambio de modo es deliberado.
+
+### T9 — los dos puertos (+ un tercero que el diseno no tenia) · R15, R16, R17, R33, R34, R35
+
+`lib/modules/identity/ports/{user-admin-repository,initial-credential-factory,list-query-log}.ts`.
+
+Tres propiedades del puerto de datos son el requisito y no un estilo:
+
+1. **`…AliveInCompany` y `excludeUserId` obligatorios.** Los filtros `deleted_at IS NULL` (R34),
+   `company_id = ?` (R33) y la exclusion del actor (R35) viven en el **puerto**, no en el dominio,
+   asi que ningun caso de uso —ni uno escrito manana— puede olvidarlos. Como parametro **opcional**,
+   un llamante nuevo se olvidaria y el actor reapareceria en su propio listado.
+2. **No hay NINGUNA busqueda por correo, usuario ni documento, y es deliberado** (R17). La unicidad
+   la garantizan solo los tres indices de QC-47. Un `SELECT` previo al `INSERT` es una carrera y no
+   aporta nada que el resultado `'email' | 'username' | 'document'` no de ya: **sin metodo de
+   busqueda, esa comprobacion previa ni siquiera es expresable.**
+3. **`create` no lleva parametro de autor del cambio de estado** (R49, decision 18), y el comentario
+   dice que no existe **para que nadie lo rellene con el actor por reflejo**. R49 deja de ser una
+   promesa y pasa a ser una propiedad del tipo.
+
+`InitialCredentialFactory.createCredentialHash()` devuelve **solo el hash**: la credencial en claro
+no cruza el puerto, asi que ningun caso de uso, ningun resultado y ningun error puede filtrarla
+(R15, R16). El nombre acaba en `Hash` porque `guard-password-never-plaintext` lo exige — **se adapta
+el nombre, no la guardia**.
+
+**HUECO DEL DISENO, cerrado por precedente unanime.** `design.md > 7` y `> 11` **no mencionan el
+puerto del log de campos omitidos**, y hace falta: `sanitizeListQuery` devuelve `{ query, ignored }`
+y **los cinco modulos con listado, sin excepcion**, tienen su `ports/list-query-log.ts` y llaman
+`ignoredFields` en su caso de uso. Es **QC-57 R6**, no una decision nueva de esta ficha. Se creo
+como sexta copia y se cableo a la **misma** implementacion compartida.
+
+### T10 — los seis casos de uso · R1-R5, R13, R19, R21, R22, R25, R26, R34-R37, R39, R49
+
+`lib/modules/identity/domain/{create-user,get-user,list-users,update-user,delete-user,set-user-account-status}.ts`.
+
+El orden de los pasos **es** el requisito: `requirePermission` primero, antes de zod y antes de
+cualquier puerto (R1); zod dentro del caso de uso (R18); las guardas; el puerto, y su resultado
+discriminado traducido al error de dominio. Si validara primero, un actor **sin permiso** con una
+entrada rota recibiria `invalid_input` y sabria algo del sistema sin derecho a preguntarlo.
+
+Firmas, con el **actor primero** siguiendo `design.md > 8.1` (y apartandose del `(input, actor)` de
+`proveedores`, por coherencia interna del modulo):
+
+```
+createCreateUser({ users, credentials, now? })  -> (actor, input: unknown) => Promise<{ id }>
+createGetUser({ users })                        -> (actor, id) => Promise<UserDetail>
+createListUsers({ users, log })                 -> (actor, input: unknown) => Promise<Page<UserRow>>
+createUpdateUser({ users, now? })               -> (actor, id, input: unknown) => Promise<void>
+createDeleteUser({ users, now? })               -> (actor, id) => Promise<void>
+createSetUserAccountStatus({ users, now? })     -> (actor, id, input: unknown) => Promise<void>
+```
+
+`usuarios.consultar` en `getUser` y `listUsers`; `usuarios.modificar` en los cuatro de escritura.
+Cero literales `'Administrador'`, cero `console.*`, cero menciones a los contadores de QC-19.
+
+**`birthDate` sin depender de la zona horaria.** El esquema devuelve la fecha civil `YYYY-MM-DD` y
+el puerto pide `Date`: `toBirthDate` la ancla en **UTC explicito** (`T00:00:00.000Z`), porque
+cualquier variante con hora local daria el dia anterior al oeste de Greenwich. Vive en un solo
+sitio e importada por la edicion: dos copias es como el alta y la edicion acaban guardando dias
+distintos.
+
+**DESVIO DEL DISENO, medido y aceptado.** `updateAliveInCompany` gana `'last_administrator'` en su
+union de resultados, que `design.md > 7` no le pone. Motivo: **R19 es reemplazo completo** y el
+`roleId` es uno de los nueve campos, asi que el cambio de rol **no es separable** de la edicion;
+pedirlo por `applyGuardedChange` serian dos escrituras y dos transacciones sobre la misma fila.
+Consecuencia: `GuardedChange` tiene **dos** variantes y no tres, y el tercer cambio guardado viaja
+por `updateAliveInCompany` **reutilizando el mismo bloqueo, escrito en un solo sitio del
+adaptador** — que es lo que el «un metodo y no tres» de `> 9.3` protege de verdad. La alternativa
+—dejar la firma literal— habria dejado **R22 sin implementar en la edicion, en silencio**.
+
+Nota del reviewer, anotada por T11: `design.md > 9.3` dice que el nombre del rol «viaja al adaptador
+como argumento», y eso se cumple en `applyGuardedChange` pero **no** en `updateAliveInCompany`,
+cuya firma quedo con cuatro argumentos; ahi el adaptador importa `ROLE_ADMINISTRADOR`. **R24 se
+sigue cumpliendo** (constante importada, cero literales), pero el test de R24 solo puede afirmar la
+constante en una de las dos rutas.
+
+### T11 — los tres tests de dominio · 44 casos
+
+`tests/unit/identity/usuarios/{authorization,user-service,admin-guards}.test.ts`.
+
+Lo que hace que el archivo de autorizacion valga: los dobles de los **tres** puertos **lanzan si los
+llaman** **y ademas** se afirma `not.toHaveBeenCalled()` sobre **cada** metodo en **los seis** casos
+de uso. Un doble permisivo dejaria pasar una autorizacion puesta **despues** de la consulta, que es
+exactamente el defecto que ese archivo existe para cazar. Y un caso que es la diferencia entre
+autorizar de verdad y un `if` decorativo: actor sin permiso **mas** entrada basura da
+`unauthorized`, no `invalid_input`; y con permiso, esa misma basura **si** da `invalid_input`.
+
+R49 se afirma de **tres** formas a la vez: longitud exacta de cinco argumentos, busqueda recursiva
+de `actor.id` en cada uno, y la firma del puerto sin campo de autor. Mas el simetrico: mover el
+estado **si** escribe `changedBy: actor.id`.
+
+### T12 — la fabrica de credencial inicial · R15, R16, R47
+
+`lib/modules/identity/adapters/driven/security/initial-credential-factory-crypto.ts` y su test.
+
+`createRandomCredentialHash({ hasher, checkCredentialPolicy })`, `INITIAL_CREDENTIAL_LENGTH = 24`,
+`MAX_CREDENTIAL_ATTEMPTS = 8`. `randomInt` de `node:crypto` —runtime, **no dependencia**— que da
+enteros **sin sesgo de modulo**, cuatro alfabetos con al menos uno de cada, y **mezcla
+Fisher-Yates**: sin la mezcla la posicion del simbolo seria predecible. `CREDENTIAL_MIN_LENGTH` y
+`CREDENTIAL_MAX_LENGTH` se **importan**, y hay un invariante que lanza si 24 se saliera del rango.
+
+**El problema difícil de esta task era probar 1.000 candidatas contra la politica sin que la
+credencial salga del adaptador**, y se resolvio bien: un doble del `PasswordHasher` que **captura**
+lo que recibe. El adaptador ya le entrega la candidata al hasher en produccion —no puede hashear sin
+ella—, asi que el test observa un punto que **ya existia** y **no se expuso nada «solo para el
+test»** (`buildCandidate` y `pickCharacter` no se exportan). Sobre las 1.000 capturadas se aplica la
+funcion **real** del dominio, `evaluateCredentialRules`, con ancla anti-vacuidad `toHaveLength(1000)`.
+
+**Sensibilidad verificada de verdad**: se comento `shuffleInPlace` y **solo** el caso de la mezcla se
+puso rojo. El error de agotamiento va **sin `cause`** a proposito, porque lo unico que habria que
+adjuntar ahi es la credencial; nombra las **reglas** incumplidas y se afirma que ninguna de las 8
+candidatas rechazadas aparece ni en el `message` ni en `{message, stack, cause}` serializado.
+
+### T13 — el adaptador Prisma, con la transaccion de la guarda · R17, R22, R23, R27-R31, R33, R34, R37
+
+`lib/modules/identity/adapters/driven/persistence/{user-admin-prisma,list-query-sql}.ts`. El segundo
+**si hizo falta**, como en `proveedores` y `unidades`, y es una replica minima: solo `selectCondition`
+e `insensitiveContainsCondition`. No se replicaron los de rango porque `USER_QUERYABLE` no declara
+ninguna columna de rango y serian codigo muerto.
+
+#### EL HALLAZGO DE LA FEATURE: `design.md > 6.4` esta MAL, y el codigo implementa lo que dice la base
+
+Medido contra `QuimiCloude_QC66` con `@prisma/client@6.19.3`:
+
+| Indice | `error.meta.target` real |
+| --- | --- |
+| `users_email_unique` | `["company_id","lower(email)"]` |
+| `users_username_unique` | `["company_id","lower(username)"]` |
+| `users_document_unique` | `["company_id","document_type_code","document_number"]` |
+
+Los dos indices **funcionales** anuncian la **EXPRESION**, no el nombre pelado de la columna. El
+diseno dice «trae las columnas afectadas»: acierta para el documento y **falla para los otros dos**.
+Una comparacion por igualdad contra `'email'` **no habria hecho match jamas**, y el alta habria
+devuelto un error sin traducir en vez de `duplicate_email`. **Es el mismo defecto que QC-38 encontro
+solo con integracion, una vuelta de tuerca mas adelante.** La traduccion compara por **subcadena**
+con marcas disjuntas (`'email'`, `'username'`, `'document_number'`), verificada por la via del
+`INSERT` **y** del `UPDATE`; un `target` que no encaje con ninguna **se relanza**, nunca se disfraza.
+
+**Segundo hallazgo, que limita lo que esta ficha puede prometer:** `P2003` llega con
+`meta = { modelName: 'User', constraint: null }` — **el nombre de la restriccion no viene**, asi que
+«rol inexistente» y «tipo de documento inexistente» son **indistinguibles** en este motor. Las dos se
+funden en `'role_not_found'`, que cumple R18 (rechazar sin escribir ninguna fila), pero si QC-67
+quisiera mensajes distintos **hay que reabrir el puerto**. Anotado en el codigo.
+
+#### La transaccion de la guarda (R22, R23)
+
+El `SELECT … FOR UPDATE` vive en **un solo sitio**, `lockActiveAdministratorIds`, y lo reutilizan
+`applyGuardedChange` **y** `updateAliveInCompany`:
+
+```sql
+SELECT "id" FROM "users"
+WHERE "company_id" = $1::uuid
+  AND "role_id" = (SELECT "id" FROM "roles" WHERE "name" = $2)
+  AND "account_status" = $3::"UserAccountStatus"
+  AND "deleted_at" IS NULL
+FOR UPDATE
+```
+
+En `$queryRaw` dentro del `$transaction` interactivo (Prisma no expresa `FOR UPDATE`), aislamiento
+**READ COMMITTED**, sin `SERIALIZABLE` y sin bucle de reintentos por `40001`.
+
+Dos casos que el diseno no explicita y el adaptador decide bien: si el objetivo **no esta** en el
+conjunto, la escritura solo puede ampliarlo, asi que se sigue (y el `count === 0` da el
+`not_found`); y si el conjunto **ya estaba vacio**, **no se aborta** — R22 protege «que el ultimo no
+deje de serlo», no «que aparezca uno», y abortar dejaria congelada toda operacion en una empresa sin
+administrador activo.
+
+#### El listado
+Orden por defecto `last_names, first_names, id`; con `sort` del cliente, la columna pedida **mas
+`id ASC` como ultimo desempate**, y el `default` del `switch` cae al orden por defecto (no se confia
+en que el llamante saneara). Busqueda `ILIKE` sobre **cuatro** columnas. Filtro de estado multivalor
+y **acotado al conjunto cerrado de QC-65** — esto **no es prudencia**: `sanitizeListQuery` valida la
+forma pero **no los valores**, y un `in: ['bogus']` contra la columna enum lanza
+`PrismaClientValidationError`, medido. Lo que no es un estado se descarta; si no queda ninguno el
+filtro se **omite** y salen los cuatro. Tres lecturas, las tres con `select` **enumerado**.
+
+### T14 — las seis Server Actions · R6, R16, R40, R41
+
+`lib/modules/identity/adapters/driving/user-actions.ts` y su test (79 casos).
+
+`FormData` en las cuatro mutaciones, argumentos tipados en las dos consultas. Lo mejor de su diseno
+es lo que **no** hace: los campos viajan **tal cual** los entrega `FormData` —ni un `trim`, ni una
+conversion, ni un valor por defecto—, porque cada uno seria **una regla de negocio escrita por
+segunda vez en el borde**; quien rechaza un `null` o una cadena en blanco es `createUserSchema`.
+
+El actor sale de las **dos caras** de la sesion resueltas en paralelo, y **falla cerrado**: si falta
+cualquiera de las dos el actor es `null` y `requirePermission` rechaza en la primera linea del caso
+de uso. No se adivina, no se rellena y no se lanza un error distinto desde el borde.
+
+Los errores se traducen por el **`code` estable** de la clase, nunca por el texto, y lo que no es un
+`IdentityError` se **relanza**. Sin `revalidatePath`, con el motivo escrito: esta ficha no crea
+ninguna ruta (R46), asi que no hay nada que revalidar y escribir la de QC-67 seria inventarla. Las
+seis actions **no** se reexportan del barrel: un `'use server'` en su cierre transitivo romperia a
+cualquier componente de cliente que lo importe.
+
+No exporto ninguna constante de estado inicial porque un `'use server'` **solo puede exportar
+funciones async**; QC-67 construira su `{ status: 'idle' }`.
+
+### T15 — el contrato del modulo y el punto unico de composicion · R42
+
+`lib/modules/identity/index.ts`, `lib/composition/index.ts`,
+`tests/unit/composition/identity-facade.test.ts`. **192 inserciones y CERO deleciones** en los tres
+—verificado con `git diff --numstat`—, que era la condicion de tocar los dos ultimos con **QC-78
+`in_progress`**: nada preexistente se reordeno ni se reformateo.
+
+El barrel reexporta **solo de `./domain/`**: ni `ports/`, ni `adapters/`, ni driving. Sigue
+importable desde un componente de cliente y `guard-arquitectura-modulos` lo verifica
+transitivamente.
+
+`passwordHasher` y `checkCredentialPolicy` se **reutilizan**: dos cableados del hasher serian dos
+costes de bcrypt que pueden divergir. El `ListQueryLog` se ata a la **misma** implementacion
+compartida que los otros cinco modulos.
+
+**Un detalle que habria sido un fallo en ejecucion y no en compilacion:** las constantes del
+cableado van **antes** de `export const identity`, no en un bloque al final como hacen `recetas` y
+`pedidos`. Ese `export` se evalua en su linea, asi que declararlas despues las dejaria en **zona
+muerta** y daria `ReferenceError` al importar la composicion. Entraron completas entre dos bloques
+existentes, sin mover nada.
+
+### T16 — el CRUD contra Postgres real · 36 casos
+
+`tests/integration/identity/user-crud.int.test.ts`. Ejercita los **cinco** metodos del adaptador
+directamente, no la fachada.
+
+Tres decisiones que hacen que el archivo pruebe algo:
+
+- **R49 se lee de la FILA CRUDA** con `$queryRaw` sobre `account_status_changed_by`. Mirar la ficha
+  habria sido **verde por vacuidad**, porque esa columna **no existe** en `UserDetail`. Y lleva su
+  **contraste**: al **mover** el estado si se escribe el autor, asi que el nulo del alta no significa
+  que esa columna no se escriba nunca.
+- **R17 trae el caso que lo hace valioso**: los mismos correo, usuario y documento **en otra empresa
+  SI se crean**. Eso es lo que demuestra que los tres indices de QC-47 son **por empresa** y no
+  globales — sin el, el test pasaria igual con indices globales. Mas los casos insensibles a
+  mayusculas, porque los indices comparan `lower(...)`.
+- **R30 recorre TODAS las paginas** con `pageSize` pequeno y dos homonimos, y afirma que la union es
+  **exactamente** el conjunto y **sin repetidos**. Comprobar solo la primera pagina no habria
+  probado el desempate.
+
+Mas R38 con su contraste —los tres identificadores estan OCUPADOS mientras vive y LIBRES en cuanto
+se borra— y el caso sutil que pidio T13: un **duplicado capturado dentro del `$transaction` de
+`updateAliveInCompany`** no escapa como error y deja la fila intacta.
+
+**El aislamiento se eligio con un motivo tecnico, no por inercia**: **no** `$transaction` +
+rollback, porque las cinco funciones hablan con el cliente Prisma **global**, asi que una llamada
+dentro de una transaccion del test correria en **otra conexion del pool** —aislamiento ilusorio— y
+los dos metodos que abren su propia transaccion con `SELECT … FOR UPDATE` se quedarian **esperando
+el bloqueo del propio test**. Construccion y limpieza propias, con `afterAll` que afirma que no
+quedo ninguna empresa creada.
+
+### T17 — la carrera del ultimo administrador · R22, R23, R24 · 16 casos
+
+`tests/integration/identity/last-administrator.int.test.ts`. **El riesgo real de la feature.**
+
+**Demuestra las dos conexiones en vez de afirmarlas**: dos `PrismaClient`, dos instancias distintas
+del adaptador de produccion, y dos transacciones que **se solapan con una barrera** y comparan su
+`pg_backend_pid()`. Si compartieran una sola conexion la segunda no podria ni empezar y el caso
+**moriria en el plazo** en lugar de comparar dos numeros — que es exactamente la trampa de un
+`Promise.all` sobre el mismo pool, y por la que un test de concurrencia sale verde sin haber probado
+nada.
+
+R23 en **tres corridas seguidas**, porque una carrera que pasa una vez de tres no esta cerrada: dos
+conexiones apagan dos administradores activos distintos a la vez, al menos una responde
+`last_administrator`, y la empresa conserva >= 1 administrador en `active` **leido de la base**.
+
+El caso **simetrico**, sin el cual un adaptador que rechazase **siempre** pasaria el anterior: con
+**tres** administradores activos, los dos apagados simultaneos terminan **los dos** en `ok`.
+
+Mas R22 operacion por operacion sobre el unico administrador activo —los tres estados de destino, el
+cambio de rol y el borrado—, los tres simetricos con dos administradores, y los dos casos que **no**
+deben rechazarse porque no sacan a nadie del conjunto: de `active` a `active`, y el rol **al mismo**
+rol administrador.
+
+**Ningun deadlock y ningun timeout** en las tres corridas. `adminRoleName` sale de
+`ROLE_ADMINISTRADOR` importado (R24) y `guard-rol-administrador-unico` sigue verde.
+
+### T18 — el alcance, con sensibilidad demostrada, y el NOVENO ripple · R16, R24, R38, R43, R45-R48
+
+`tests/unit/identity/usuarios/scope.test.ts` (nuevo, 8 casos) y
+`tests/unit/identity/account-status-scope.test.ts` (+64/-7).
+
+**Las 8 aserciones tienen sensibilidad DEMOSTRADA, no afirmada**: 10 sondas que alteran produccion a
+mano, se ponen rojas **con su mensaje propio**, y se revierten en el mismo paso. **Ninguna quedo sin
+poder ponerse roja.** Una incluye crear una **segunda** carpeta de migracion, y otra comprueba la
+mitad de `lib/composition/index.ts` **solo sobre las lineas que esta rama anade**, porque el archivo
+es compartido y mirarlo entero acusaria en falso.
+
+El ancla de no-vacuidad afirma que **esta rama cambia algo**, nunca que un archivo de **otra** ficha
+este en el diff. Es la diferencia exacta con los dos de `unidades` que estan rojos en toda rama que
+no sea la suya. **Riesgo residual conocido, el mismo de los cinco retensados de
+`recipe-route-contract.test.ts`**: una vez mergeada a `dev` con arbol limpio, el diff es vacio y
+estos casos se ponen rojos. Es el patron que el repo ya usa; queda dicho.
+
+**El noveno archivo ajeno del ripple.** `account-status-scope.test.ts` es la guarda de **QC-65** cuyo
+caso se llamaba «R19 — nadie lee todavia el estado de cuenta», con `toEqual` contra cinco sitios
+permitidos. **QC-66 es precisamente la ficha que empieza a leerlo y escribirlo**, asi que esa
+premisa **caduca aqui por diseno**. Se **retensa, no se afloja**: los **diez** sitios nuevos
+nombrados uno a uno en un bloque rotulado `RETENSADO 2026-09-10 (QC-66)` y agrupados por motivo —el
+contrato de los seis casos de uso; los dos que escriben y filtran la columna; el driving que traduce
+la mutacion; y `lib/composition/index.ts`, **sin alternativa**, porque la clave se llama
+`setUserAccountStatus` y el nombre lo fija `design.md > 11`—. El `toEqual` sigue siendo **igualdad
+exacta**; las 7 lineas borradas son el parrafo caduco y dos titulos que ya mentian: **ni un
+`expect` perdido** (R48).
+
+El `backend_dev` se vio obligado a retensar **un tercer caso** del mismo archivo —«el modulo
+identity no gana ningun archivo driving que nombre el estado»—, porque **deriva** de
+`SITIOS_PERMITIDOS` y anadir el driving lo ponia rojo por construccion. Se retenso con el mismo
+criterio: excepcion nombrada una a una, igualdad exacta intacta. Los otros **cinco** casos y los
+**tres** saltados quedan como estaban. **Bloque aditivo y separado a proposito**, para que lo de
+QC-78 entre al lado y no como conflicto en la misma linea.
+
+### T19 — el ciclo real de migracion · R44
+
+`prisma migrate deploy` -> `tsx scripts/db-rollback.ts` -> `prisma migrate deploy`, contra
+`QuimiCloude_QC66`. Salida real:
+
+```
+1. ESTADO INICIAL
+   permissions=13 usuarios.*=2 role_permissions=14 asign_admin_usuarios=2
+   migr_qc66=1 migr_total=23 migr_fallidas=0
+
+2. ROLLBACK
+   db:rollback: aplicando down.sql de 20260910120000_user_permissions_catalog y borrando su
+                fila de _prisma_migrations
+   db:rollback: 20260910120000_user_permissions_catalog revertida.
+
+3. ESTADO TRAS ROLLBACK
+   permissions=11 usuarios.*=0 role_permissions=12 asign_admin_usuarios=0
+   migr_qc66=0 migr_total=22 migr_fallidas=0
+
+4. MIGRATE DE NUEVO
+   The following migration(s) have been applied:
+     20260910120000_user_permissions_catalog/migration.sql
+   All migrations have been successfully applied.
+
+5. ESTADO FINAL
+   permissions=13 usuarios.*=2 role_permissions=14 asign_admin_usuarios=2
+   migr_qc66=1 migr_total=23 migr_fallidas=0
+
+prisma migrate status -> 23 migrations found / Database schema is up to date!
+```
+
+**El catalogo vuelve a ONCE entradas y las dos asignaciones del `Administrador` desaparecen**, sin
+tocar ninguna otra fila: R44 verificado en su forma real, no con un test que lee texto.
+`_prisma_migrations` queda coherente (22 -> 23, cero fallidas).
+
+**Y este ciclo da el dato que el alta en base virgen NO podia dar.** Al re-aplicar, el rol
+`Administrador` **ya existe**, asi que el `INSERT … SELECT` de `role_permissions` **si inserta sus
+dos filas** (12 -> 14). El camino de base virgen inserta cero ahi y las siembra el seed; este es el
+camino de **una instalacion ya en marcha**, que es exactamente el que justifica que esta migracion
+exista (`design.md > 3.1`). **Los dos caminos quedan ejercitados.**
+
+Despues del ciclo, los siete archivos de integracion de `identity`: `161 passed`.
+
+---
+
 ## Mapa de trazabilidad `R<n> -> test`
 
-(T20)
+`CHECKPOINTS.md > Trazabilidad`: **cada uno de los 49 requisitos** con el test concreto que lo
+cubre. Los requisitos de alcance **R38-R48 tambien van con su guardia**, porque son requisitos de
+pleno derecho y no comentarios (`requirements.md`, cabecera de la seccion de alcance).
+
+Rutas abreviadas: `U/` = `tests/unit/`, `U/iu/` = `tests/unit/identity/usuarios/`,
+`I/` = `tests/integration/identity/`, `G/` = `tests/guards/`.
+
+### Autorizacion y actor (R1-R7)
+
+| R | Test |
+| --- | --- |
+| R1 | `U/iu/authorization.test.ts > R1 — cada caso de uso avanza con EXACTAMENTE el codigo de su fila y con ningun otro` **y** `> R1 — el permiso se comprueba ANTES de zod: con entrada invalida el rechazo sigue siendo unauthorized` |
+| R2 | `U/iu/authorization.test.ts > R2 — falla cerrado: actor ausente, sin conjunto, con el conjunto vacio y con un conjunto que no es una lista` (6 actores x 6 casos de uso) **y** `> R2 — la pertenencia es EXACTA: ni el prefijo, ni otra caja, ni un codigo parecido conceden nada` |
+| R3 | `U/iu/authorization.test.ts > R3 — solo usuarios.modificar no abre la ficha ni el listado, igual que no traer ninguno` **y** `> R3 — solo usuarios.consultar no abre ninguna de las cuatro escrituras` |
+| R4 | `U/iu/authorization.test.ts > R4 — el rol del actor no participa: un Actor sin ningun campo de rol autoriza igual` **y** `> R4 — ningun archivo nuevo de la feature incrusta el literal del rol administrador`; ademas `U/iu/scope.test.ts > R24 — ningun archivo nuevo de la feature escribe a mano el nombre del rol administrador` |
+| R5 | `U/iu/authorization.test.ts > R5 — el actor entra por parametro y el dominio no lee sesion, cookie ni cabecera` |
+| R6 | `U/iu/user-actions.test.ts` — los seis caminos con la fachada doblada, y los **dos** casos de sesion incompleta (sin `getSessionUser` y sin `getSessionContext`, por separado) que dan `unauthorized` sin tocar el caso de uso |
+| R7 | `G/guard-rls-force.test.ts` (guardia existente, verificada intacta en T18). **Un test de RLS escrito con Prisma saldria verde pase lo que pase** —se conecta como dueno de las tablas—, asi que R7 lo cierra la guardia estatica y **no** se escribe un test que mentiria (`design.md > 14`) |
+
+### El catalogo de permisos (R8-R12)
+
+| R | Test |
+| --- | --- |
+| R8 | `U/identity/permissions.test.ts > R2: contiene exactamente los trece codigos del requisito, ni uno mas ni uno menos` **y** `U/identity/schema/user-permissions-migration.test.ts` (los dos codigos y sus descripciones comparados contra `PERMISSIONS` **importado**) |
+| R9 | `U/identity/permissions.test.ts > QC-66 R9: el Administrador tiene usuarios.consultar Y usuarios.modificar, escritos uno a uno` **y** `> QC-66 R9: el Operador no recibe ninguno de los dos permisos de usuarios`; ademas `G/guard-permisos-sembrados.test.ts` |
+| R10 | `U/identity/seed/seed-initial-access.test.ts` (la segunda corrida no cambia ningun conteo) **y** `I/identity-seed.int.test.ts` (idempotencia contra Postgres real) |
+| R11 | `U/identity/schema/user-permissions-migration.test.ts > las DOS sentencias que insertan llevan ON CONFLICT ... DO NOTHING, y cae si falta una` (con **sensibilidad verificada en disco**) **y** T19, que reaplica la migracion sin fallar |
+| R12 | `U/identity/permissions.test.ts > R1` con `'usuarios'` sumado a `MODULOS` y a `MODULOS_CON_ESCRITURA`, **y** `U/navegacion/qc75-convenciones.test.ts > los modulos son exactamente los cinco de negocio mas dashboard y usuarios`. La enmienda a **QC-74 R1** esta escrita con esas palabras en `lib/modules/identity/domain/permissions.ts` |
+
+### Alta (R13-R18)
+
+| R | Test |
+| --- | --- |
+| R13 | `U/iu/user-service.test.ts > R13 — persiste con el rol indicado, el estado pending y el instante, y devuelve el identificador` **y** `> R13 — la marca de cambio de credencial es INVARIANTE del puerto, no un argumento que el dominio elija`; contra base real en `I/user-crud.int.test.ts > R13 — la fila nace con la empresa del argumento, el rol pedido, pending, must_change_credential en verdadero y el instante del cambio de estado` |
+| R14 | `U/iu/user-service.test.ts > R14 — la empresa sale del actor: el esquema RECHAZA un companyId en la entrada` **y** `> R14 — la empresa que llega al puerto es la del actor y de ningun otro sitio`; ademas `U/iu/user-input.test.ts` |
+| R15 | `U/iu/credential-factory.test.ts` (1.000 candidatas cumplen `evaluateCredentialRules`, el largo es 24 y esta entre los dos limites **importados**) **y** `U/iu/user-service.test.ts > R15, R16 — el hash es el que devolvio la fabrica, y el resultado no trae NADA mas que el identificador` |
+| R16 | `U/iu/credential-factory.test.ts` (el devuelto es un hash bcrypt y **no** la candidata; el error de agotamiento **no** la contiene ni en `message` ni en `{message, stack, cause}`; cero `console.*` en el adaptador) **+** `U/iu/user-service.test.ts > R15, R16 ...` (claves exactas del resultado) **+** `U/iu/user-actions.test.ts` (el estado serializado no lleva credencial ni hash) **+** `U/iu/scope.test.ts > R16 — ni el adaptador de credencial, ni los seis casos de uso, ni las Server Actions escriben en consola` **+** `G/guard-password-never-plaintext.test.ts` |
+| R17 | `U/iu/user-service.test.ts > R17 — los tres duplicados del puerto se traducen a su error y no se crea ninguna fila` **y** `> R17 — el puerto no expone NINGUNA busqueda previa por correo, usuario o documento`; contra base real, los **siete** casos de `I/user-crud.int.test.ts > R17 — correo, nombre de usuario y pareja tipo+numero de documento son unicos DENTRO de la empresa`, incluido `EL CASO QUE LO HACE VALIOSO — los MISMOS correo, nombre de usuario y documento en OTRA empresa SI se crean`, mas los **cuatro** de `> R17 en la EDICION — el duplicado capturado dentro del $transaction de updateAliveInCompany no escapa como error y deja la fila intacta` |
+| R18 | `U/iu/user-input.test.ts` (los tres esquemas `strictObject`) **y** `U/iu/user-service.test.ts > R18 — una entrada invalida se rechaza con invalid_input sin tocar el puerto` **y** `> R18 — un rol inexistente se rechaza con role_not_found sin escribir ninguna fila` |
+
+### Edicion (R19-R20)
+
+| R | Test |
+| --- | --- |
+| R19 | `U/iu/user-service.test.ts > R19 — la edicion manda los NUEVE campos al puerto: reemplazo completo` **y** `> R19 — una entrada PARCIAL no vale: no existe edicion campo a campo` |
+| R20 | `U/iu/user-service.test.ts > R20 — el esquema de edicion no admite empresa, estado, hash, marca de credencial ni contadores` (9 campos prohibidos) **y** `U/iu/user-input.test.ts` |
+
+### Las dos guardas del administrador (R21-R24)
+
+| R | Test |
+| --- | --- |
+| R21 | `U/iu/admin-guards.test.ts > R21 — rechaza mover su propio estado de cuenta con self_operation y no modifica ninguna fila`, `> R21 — rechaza editarse a si mismo, lo que incluye escribirse el propio rol con self_operation y no modifica ninguna fila`, `> R21 — rechaza borrarse a si mismo con self_operation y no modifica ninguna fila`, **y el contraste** `> R21 — la misma operacion sobre OTRO identificador si llega al puerto` |
+| R22 | `U/iu/admin-guards.test.ts > R22 —` los **tres** casos (mover el estado, cambiar el rol, borrar) traducen `'last_administrator'`; contra base real, `I/last-administrator.int.test.ts > R22 — el UNICO administrador activo de la empresa no puede dejar de serlo` (los tres estados de destino, el cambio de rol y el borrado) **mas los simetricos** `> R22 (simetrico) — con DOS administradores activos las tres operaciones pasan` y los dos casos que **no** deben rechazarse |
+| **R23** | **`I/last-administrator.int.test.ts > R23 — corrida 1/2/3: dos conexiones apagando dos administradores distintos a la vez, al menos una falla con last_administrator y la empresa conserva >= 1 administrador en active`**, con `> R23 — las dos conexiones son reales y distintas: dos pg_backend_pid() solapados y dos instancias del adaptador` que **lo demuestra**, y `> R23 (simetrico) — con TRES administradores activos, dos apagados simultaneos terminan LOS DOS en ok` que impide el verde por rechazar siempre. **Un test con dobles no tiene la carrera y no se acepto como prueba** (`design.md > 9.3`) |
+| R24 | `U/iu/admin-guards.test.ts > R24 — el nombre que viaja al puerto es EXACTAMENTE la constante importada de domain/roles` **y** `> R24 — ningun archivo nuevo de la feature escribe el literal del rol a mano`; ademas `I/last-administrator.int.test.ts > R24 — ...`, `U/iu/scope.test.ts > R24 — ...` y `G/guard-rol-administrador-unico.test.ts` |
+
+### Estado de cuenta (R25-R26)
+
+| R | Test |
+| --- | --- |
+| R25 | `U/iu/user-service.test.ts > R25, R26 — mover el estado escribe el nuevo valor, el instante y el actor como autor, para los CUATRO valores`; contra base real, `I/user-crud.int.test.ts > R49 (contraste) — al MOVER el estado si se escribe el autor, asi que el NULO del alta no es que la columna no se escriba nunca` |
+| R26 | `U/iu/user-service.test.ts > R25, R26 — ... para los CUATRO valores` **y** `> R26 — un estado fuera del conjunto cerrado se rechaza con invalid_input sin tocar el puerto`; ademas `I/last-administrator.int.test.ts` recorre `pending`, `inactive` y `blocked` como destinos |
+
+### Consulta (R27-R36)
+
+| R | Test |
+| --- | --- |
+| R27 | `I/user-crud.int.test.ts > R27 — el tamano de pagina efectivo: defecto 10, tope 25, y el total describe el conjunto ya filtrado` (tres casos, incluido `pedir 100 devuelve pageSize 25 y NO un error: el tope se ACOTA`); en dominio, `U/iu/user-service.test.ts > R27 — devuelve la pagina del puerto tal cual: el defecto de 10 y el tope de 25 son del adaptador` y `> R27 — los pasos suenan en orden: primero el log de lo omitido, despues el puerto con la consulta saneada`; mas `U/pagination.test.ts` (existente) |
+| R28 | `I/user-crud.int.test.ts > R28 — encuentra por nombres, por apellidos, por correo y por nombre de usuario; y sin texto devuelve todo el ambito` **y** `> R28 — es INSENSIBLE a mayusculas en las cuatro columnas`; en dominio, `U/iu/user-service.test.ts > R28, R29 — la busqueda y el filtro por estado declarados llegan al puerto sin tocarse` |
+| R29 | `I/user-crud.int.test.ts > R29 — cuando se indica, devuelve solo los estados pedidos; cuando NO se indica, salen los cuatro` |
+| R30 | `I/user-crud.int.test.ts > R30 — con DOS homonimos en la misma empresa, la union de todas las paginas es EXACTAMENTE el conjunto esperado y sin repetidos` **y** `> R30 — el recorrido es igual de completo cuando el orden lo pide el cliente: id ASC se conserva como ultimo desempate` |
+| R31 | `I/user-crud.int.test.ts > R31 — la fila del listado tiene EXACTAMENTE las seis claves de UserRow` (con `Object.keys(...).sort()` exacto **y** la lista nombrada de claves prohibidas) |
+| R32 | `I/user-crud.int.test.ts > R31 — la ficha por identificador tiene EXACTAMENTE las quince claves de UserDetail`; ademas `U/iu/user-input.test.ts` fija las claves de los dos tipos con `Record<keyof T, true>`, asi que una clave de mas o de menos es **error de compilacion** |
+| R33 | `I/user-crud.int.test.ts > R33 — todo esta acotado a la empresa: un identificador ajeno responde «no encontrado» y no se modifica ninguna fila` (cinco casos, cada uno comparando la fila cruda antes y despues); en dominio, `U/iu/user-service.test.ts > R33 — la empresa del actor viaja a las CINCO operaciones del puerto que la reciben` |
+| R34 | `I/user-crud.int.test.ts > R34 — un usuario borrado no sale en el listado y su ficha es null` **y** `> R34 — editarlo, borrarlo otra vez y moverle el estado responden not_found SIN modificar ninguna fila`; en dominio, `U/iu/user-service.test.ts > R33, R34 — el usuario de otra empresa o ya borrado responde not_found en las cuatro operaciones por identificador` |
+| R35 | `I/user-crud.int.test.ts > R35 — excludeUserId saca al actor de su propia consulta, en la primera pagina y en todas` **y** `> R35 — tambien queda fuera del total, no solo de la pagina`; en dominio, `U/iu/user-service.test.ts > R35 — el listado excluye al propio actor y la ficha de su propio identificador no llega al puerto` |
+| R36 | `G/guard-contrato-listados.test.ts`, ahora con **seis** modulos y sus dos bloques de equivalencia —de comportamiento y de texto—: es lo que garantiza que declarar un campo consultable mas **no cambia la forma de la consulta** y que QC-67 no tenga que reabrirla |
+
+### Borrado logico (R37-R39)
+
+| R | Test |
+| --- | --- |
+| R37 | `I/user-crud.int.test.ts > R37 — borrar conserva la fila COMPLETA y solo marca deleted_at (leido de la fila cruda)`; en dominio, `U/iu/user-service.test.ts > R37 — borrar pide un cambio guardado de tipo delete, y el puerto no tiene ningun borrado fisico` |
+| R38 | `I/user-crud.int.test.ts > R38 — los tres estan OCUPADOS mientras vive y LIBRES en cuanto se borra: es lo que justifica que los indices de QC-47 sean parciales` **y** `U/iu/scope.test.ts > R38 — ninguna migracion de esta feature nombra los tres indices unicos de QC-47 ni toca ningun indice` (con sensibilidad: un `DROP INDEX "users_email_unique"` la pone roja) |
+| R39 | `U/iu/user-service.test.ts > R39 — no hay recuperacion ni listado de borrados, ni por el puerto ni por la puerta del filtro` (claves del puerto **y** `USER_QUERYABLE` sin `deletedAt` en `sortable` ni en `filterable`) |
+
+### Frontera, modulo y errores (R40-R42)
+
+| R | Test |
+| --- | --- |
+| R40 | `U/iu/user-actions.test.ts` — `FormData` **de verdad** en las cuatro mutaciones y argumentos tipados en las dos consultas; ademas `U/iu/scope.test.ts > R46 — ...` confirma que no hay ningun route handler bajo `app/` |
+| R41 | `U/iu/errors.test.ts` (los nueve `code` afirmados **por clase**, nunca por el texto, y todas derivando de `IdentityError`) **y** `U/iu/user-actions.test.ts` (la traduccion a `{ status: 'error', code, message }` por el `code`, y que lo que no es de dominio se relanza) |
+| R42 | `G/guard-arquitectura-modulos.test.ts` (verifica transitivamente que el barrel no arrastra `'use server'`, `next/*` ni `@prisma/client`) **y** `U/composition/identity-facade.test.ts` (las seis claves cableadas en el **unico** punto de composicion) |
+
+### Alcance — R38-R48 son requisitos de pleno derecho, y cada uno lleva su guardia
+
+| R | Test |
+| --- | --- |
+| R43 | `U/iu/scope.test.ts > R43 — el diff de la rama no toca db/schema.prisma` **y** `> R43 — la unica migracion de la rama es la del catalogo, y no lleva ni un ALTER, CREATE ni DROP`. **Sensibilidad demostrada**: un comentario en `db/schema.prisma`, un `ALTER TABLE` en el UP, y una **segunda** carpeta de migracion ponen cada caso rojo. Ademas `U/identity/schema/user-permissions-migration.test.ts` afirma la ausencia de sentencias de esquema por lectura del SQL |
+| R44 | `U/identity/schema/user-permissions-migration.test.ts > el orden es el inverso del UP, y cae si se invierte` (**sensibilidad verificada en disco**) **y, sobre todo, T19**: el ciclo real `migrate -> rollback -> migrate`, con el catalogo volviendo a **once** entradas y **doce** asignaciones, y `_prisma_migrations` coherente. La salida esta pegada arriba |
+| R45 | `U/iu/scope.test.ts > R45 — ningun archivo de produccion de la feature lee ni escribe los tres contadores de bloqueo de QC-19`. **Sensibilidad demostrada** con `lockLevel` en el adaptador Prisma **y** con `lockedUntil` en una **linea nueva** de `lib/composition/index.ts` (el archivo es compartido, asi que solo se miran las lineas que esta rama anade) |
+| R46 | `U/iu/scope.test.ts > R46 — la rama no anade nada bajo app/, components/ ni e2e/, ni ningun adaptador de navegacion`. **Sensibilidad demostrada** creando `app/__sensibilidad-t18.ts`. El E2E se difiere a **QC-67 con motivo** y **declarado en el diseno, no al final** (`design.md > 14`, decision 17) |
+| R47 | `U/iu/scope.test.ts > R47 — la rama no toca package.json ni pnpm-lock.yaml` (**sensibilidad demostrada** con un solo `\n` en `package.json`) **y** `G/guard-dependencias-aprobadas.test.ts` |
+| R48 | Los **nueve** archivos ajenos actualizados **en la misma tanda que su cambio**, todos verdes y **sin que ninguna expectativa se elimine ni se debilite**: `G/guard-permisos-sembrados.test.ts`, `G/guard-nav-permisos-declarados.test.ts`, `U/navegacion/qc75-convenciones.test.ts`, `U/identity/permissions.test.ts`, `U/identity/seed/seed-initial-access.test.ts`, `I/identity-seed.int.test.ts`, `G/guard-contrato-listados.test.ts`, `U/recetas-ui/recipe-route-contract.test.ts` y `U/identity/account-status-scope.test.ts`. **La prueba de que no se debilito nada**: en la tanda 1 el diff de `tests/` borra exactamente **6** lineas con `expect(`, y las seis son la misma asercion con el numero nuevo; en T18, las 7 lineas borradas son un parrafo caduco y dos titulos que mentian. Y dos archivos **ganan** casos: `permissions.test.ts` (+2) y el propio `scope.test.ts` (+8) |
+
+### El autor del estado con el que nace la cuenta
+
+| R | Test |
+| --- | --- |
+| **R49** | `I/user-crud.int.test.ts > R49 — account_status_changed_by queda NULO en la fila: el pending inicial no se atribuye a ninguna persona`, **leido de la FILA CRUDA** con `$queryRaw` —mirar `UserDetail` habria sido verde por vacuidad, porque esa columna no existe ahi—, **con su contraste** `> R49 (contraste) — al MOVER el estado si se escribe el autor, asi que el NULO del alta no es que la columna no se escriba nunca`. En dominio, `U/iu/user-service.test.ts > R49 — el alta NO pasa ningun autor del cambio de estado: cinco argumentos y ninguno es el actor`, que lo afirma de **tres** formas: longitud exacta de cinco argumentos, busqueda **recursiva** de `actor.id` en cada uno, y la firma del puerto sin campo de autor. Y la garantia estructural: **`create` no tiene parametro de autor**, asi que R49 es una propiedad del tipo y no una promesa |
+
+**Los 49 requisitos tienen test nombrado. Ninguno queda sin cubrir.**
+
+---
+
+## Preguntas abiertas al cerrar la implementacion
+
+**P1 — nadie le dice a la persona que tiene cuenta. SIGUE ABIERTA.** No se cerro implementando y no
+cambia ningun archivo de esta feature: es orden de trabajo entre fichas (hacer **QC-79**
+inmediatamente detras) o un requisito nuevo, y eso lo decide el humano (regla 6 de `CLAUDE.md`). La
+consecuencia esta aceptada y escrita en el board: esta ficha crea la cuenta y **nadie puede entrar**.
+
+**P2 — qué pasa con una sesion abierta cuando cambia el rol o el nombre de usuario. SIGUE ABIERTA.**
+Tampoco la toca nada de lo implementado: la invalidacion de sesiones vive en **QC-23** y el estado de
+cuenta en el acceso en **QC-78**, y **ninguna de las dos habla del rol**. Hoy una sesion viva podria
+seguir operando con los permisos del rol anterior hasta que caduque.
+
+**P3 — ¿puede el actor editar sus propios datos que no son el rol? SIGUE ABIERTA, y hay que leer
+esto.** `update-user.ts` **rechaza** con `SelfOperationError` cuando el objetivo es el propio actor.
+El motivo escrito en el archivo es **solo R21**: la edicion es **reemplazo completo** y el `roleId` es
+uno de los nueve campos, asi que editar la propia fila **es**, inevitablemente, escribirse el propio
+rol — no hay forma de pedir «los otros ocho».
+
+**No existe una opcion neutra**: permitirlo habria sido decidir P3 en el otro sentido. Se eligio la
+lectura que el **texto de R21 sostiene**, y el archivo lo dice con todas las letras, con el coste del
+cambio escrito: si el humano cierra P3 en «tampoco se edita a si mismo», es **una clausula mas en ese
+mismo sitio**; si la cierra en «puede editarse todo menos el rol», cambia **esa linea** —habria que
+comparar el rol pedido contra el actual— y su caso de test. Mientras siga abierta, el actor tampoco
+puede **llegar** a su propia ficha, y eso es consecuencia de **R35**, no una decision sobre P3.
+
+**P4 — CERRADA** el 2026-09-10 al aprobar el spec. Es la decision 18 y la escribe **R49**, cubierta
+arriba.
+
+---
+
+## Lo que el reviewer tiene que mirar de frente
+
+### 1. El `design.md` quedo desactualizado en cuatro puntos, y el codigo implementa lo correcto
+
+Ninguno se arreglo en el spec —esta aprobado y no se reabre—, pero **los cuatro quedan escritos aqui
+y en el codigo**:
+
+1. **`> 6.4` dice que `meta.target` trae «las columnas afectadas».** Falso para los dos indices
+   **funcionales**: traen la **expresion** (`lower(email)`, `lower(username)`). Una comparacion por
+   igualdad no habria hecho match jamas. Medido contra la base; el adaptador lo corrige y lo explica.
+2. **`> 2` fila 6 dice que en `identity-seed.int.test.ts` «no hay numero literal que cambiar».** Si lo
+   habia: `expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(12)`, y estaba rojo.
+3. **`> 2` midio SEIS archivos ajenos y `> 8.1` declaro un septimo. Fueron NUEVE**, mas un septimo
+   caso rojo dentro del tercero. Los dos que faltaban: `recipe-route-contract.test.ts` (exige nombrar
+   cada migracion nueva de `db/`) y `account-status-scope.test.ts` (la guarda de QC-65 cuya premisa
+   caduca con esta ficha).
+4. **`> 7` y `> 11` no mencionan el puerto del log de campos omitidos**, que los cinco modulos con
+   listado tienen sin excepcion (QC-57 R6). Y **`> 1` dice tres archivos nuevos en `adapters/`: son
+   cuatro** (`list-query-sql.ts` entro con el contrato de lista).
+
+### 2. Dos desvios del diseno, medidos y con su motivo
+
+- **`updateAliveInCompany` gana `'last_administrator'`** (`> 7` no se lo pone). R19 es reemplazo
+  completo, asi que el cambio de rol no es separable de la edicion; dejar la firma literal habria
+  dejado **R22 sin implementar en la edicion, en silencio**. El bloqueo sigue en **un solo sitio**.
+  Consecuencia: `GuardedChange` tiene **dos** variantes y no tres.
+- **`page.ts` no es byte a byte** ninguna de las cinco copias, porque **las cinco ya divergen de
+  verdad**; se partio de `unidades`, que es el caso exacto de `identity`. El `type Page<T>` si es
+  identico caracter a caracter en los seis.
+
+### 3. La declaracion de archivos compartidos del spec esta INCOMPLETA
+
+`tasks.md` declara **un** solape de tests con QC-78: `tests/unit/composition/identity-facade.test.ts`.
+**Son dos**: tambien `tests/unit/identity/account-status-scope.test.ts`, que QC-78 va a tocar porque
+su ficha es «el estado de cuenta en el acceso». Los dos se escribieron **de forma aditiva y
+rotulada** —cero deleciones en el primero; bloque separado en el segundo— para que el merge de QC-78
+entre al lado y no como conflicto en la misma linea. **De produccion no hay ningun archivo en comun.**
+
+### 4. Rojos ajenos que NO son de esta feature, medidos antes de escribir una linea
+
+El gate completo los va a ver. **Ninguno lo causa QC-66:**
+
+| Rojo | Por qué, y por qué no es mio |
+| --- | --- |
+| `app/layout.tsx(43,56) TS2304 LayoutProps` | tipo que genera `next build`; ausente en un worktree recien montado |
+| `U/recetas/recipe-lines-catalog.test.ts`, `U/recetas/recipe-service.test.ts` (`ProductRef.stock`) | es el arreglo en vuelo que el worktree principal tiene **sin commitear** en esos mismos dos archivos |
+| `U/unidades/modulo-intacto.test.ts` | exige que `unit-prisma.ts` este en el diff contra `origin/dev`: **solo cierto en la rama de QC-39**. Rojo en `dev` y en toda rama de feature |
+| `U/unidades/unidades-convenciones.test.ts` | exige un `e2e/unidades.spec.ts` nuevo: **solo cierto en la rama de QC-76/QC-38** |
+
+Los dos ultimos son un **hallazgo del arnes**, no de esta ficha: son anclas de no-vacuidad que
+afirman sobre el diff de **su propia** feature, asi que no pueden estar verdes en ninguna otra rama.
+Se dejaron **intactos** a proposito (regla 6: no se arregla por supuesto lo que no es de esta ficha).
+El `scope.test.ts` de T18 **no** repite ese error: su ancla afirma que **esta** rama cambia algo.
+
+### 5. Deuda declarada, no silenciada
+
+- La cabecera de las **seis** copias de `list-query.ts` sigue diciendo «duplicado a proposito en los
+  cinco modulos». Corregirlo obliga a editar las **cinco copias ajenas** (la guardia compara texto: o
+  las seis o ninguna), fuera del alcance de esta ficha. **La guardia si quedo en «seis»**, que es
+  donde vive el ancla.
+- **`P2003` llega con `constraint: null`**, asi que «rol inexistente» y «tipo de documento
+  inexistente» son **indistinguibles** en este motor y se funden en `role_not_found`. Cumple R18,
+  pero si QC-67 quiere mensajes distintos **hay que reabrir el puerto**.
+- `toBirthDate` vive exportada desde `create-user.ts`; su sitio natural seria un `domain/birth-date.ts`
+  que `tasks.md` no declara.
+- **Riesgo conocido del patron de anclas contra el diff**: una vez esta rama este en `dev` con arbol
+  limpio, los casos de `scope.test.ts` que miran el diff veran un diff vacio y se pondran rojos. Es
+  el **mismo** riesgo que ya tienen los cinco retensados de `recipe-route-contract.test.ts`; se sigue
+  el patron del repo, y queda dicho en vez de descubierto.
+
+### 6. Montaje del entorno, para quien repita esto
+
+El worktree venia **sin `node_modules` y sin `.env`** (solo dos de los cinco activos los tenian).
+Ademas, **la convencion real es una base por feature** (`QuimiCloude_QC<n>`): copiar el `.env` de otro
+worktree trae su `DATABASE_URL`, y eso hizo que la migracion se aplicara sobre la base de **QC-78**
+antes de detectarlo. Revertido entero y verificado (11 permisos, 12 asignaciones, cero rastro en
+`_prisma_migrations`); la base de esta feature es **`QuimiCloude_QC66`**.
+
+---
+
+## Estado final
+
+| | |
+| --- | --- |
+| Tasks cerradas | **20 de 20** (T0-T20) |
+| Requisitos con test nombrado | **49 de 49** |
+| Commits | 9, uno por tanda o task logica |
+| Archivos ajenos del ripple | **9**, todos verdes y sin ninguna expectativa debilitada (R48) |
+| Dependencias nuevas | **0** (R47) |
+| Preguntas abiertas | **P1, P2 y P3 siguen abiertas**; P4 cerrada por el humano y escrita por R49 |
+| E2E | **diferida a QC-67 con motivo**, declarado en el diseno y no al final (R46) |
+
+`typecheck` y `eslint` en la linea base exacta, sin ganar ni un archivo rojo. Las **26 guardias**
+verdes. `tests/unit/identity/` **721 passed | 3 skipped**. `tests/integration/identity/`
+**161 passed**.
+
+**El gate (`./init.sh --rapido` por tanda y `./init.sh` completo antes del PR) lo corre el leader: no
+me autoapruebo, y la suite completa no se corrio desde aqui a proposito** (regla del gate de
+`AGENTS.md`). Quedan para el leader la sincronizacion con `origin/dev` (**F2.3** — `origin/dev` se
+movio a `192842a` mientras esto se escribia) y el PR (**F2.4**).
