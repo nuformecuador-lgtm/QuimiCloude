@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { OrderNotFoundError } from './errors';
 import { formatOrderNumber } from './order-number';
 import type { OrderRow, OrderView } from './order-view';
 
@@ -75,7 +75,7 @@ export function createGetOrder(
     // null = no existe o ya esta borrado: para el dominio son el mismo caso (R33), y el
     // filtro `deleted_at IS NULL` es del puerto, no de un `if` de aqui (R40).
     const row = await deps.orders.findAliveById(id);
-    if (row === null) throw new NotFoundError();
+    if (row === null) throw new OrderNotFoundError();
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId]);
 

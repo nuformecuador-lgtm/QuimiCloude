@@ -2,7 +2,7 @@
 // igual que `product-actions.test.ts`, pero afirma lo que es PROPIO de presentacion, no un
 // calco: presentacion no convierte numeros (solo tiene `name`, T18/AVISO PRINCIPAL de la
 // tanda), y en cambio tiene dos errores de dominio que producto no tiene:
-// `DuplicateNameError` (R18) y `PresentationInUseError` (R21) al borrar con productos
+// `PresentationDuplicateNameError` (R18) y `PresentationInUseError` (R21) al borrar con productos
 // asignados. Tambien afirma la distincion de R37/D22: un nombre que normaliza a vacio se
 // rechaza como entrada invalida, no como duplicado.
 
@@ -14,10 +14,11 @@ import {
   type CreatePresentationFormState,
   type PresentationMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import { errorMessage } from '@/lib/modules/errores';
 import {
-  DuplicateNameError,
-  NotFoundError,
+  PresentationDuplicateNameError,
   PresentationInUseError,
+  PresentationNotFoundError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/inventario';
@@ -97,21 +98,21 @@ describe('createPresentationAction', () => {
     expect(result).toEqual({ status: 'success', id: 'presentation-42' });
   });
 
-  it('traduce DuplicateNameError a su code estable (R18): a diferencia de producto, el nombre de presentacion es unico', async () => {
-    createPresentationMock.mockRejectedValue(new DuplicateNameError());
+  it('traduce PresentationDuplicateNameError a su code estable (R18): a diferencia de producto, el nombre de presentacion es unico', async () => {
+    createPresentationMock.mockRejectedValue(new PresentationDuplicateNameError());
 
     const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
 
     expect(result).toEqual({
       status: 'error',
-      code: 'duplicate_name',
+      code: 'presentation_duplicate_name',
       message: expect.any(String),
     });
   });
 
   it('traduce ValidationError con invalid_input, no con duplicate_name, cuando el nombre normaliza a vacio (R37, D22)', async () => {
     // "---" no tiene ningun caracter valido tras normalizar: el dominio lo rechaza como
-    // ValidationError, NUNCA como DuplicateNameError, aunque exista otra presentacion con
+    // ValidationError, NUNCA como PresentationDuplicateNameError, aunque exista otra presentacion con
     // el mismo nombre normalizado vacio. Es la distincion de R37/D22 que solo aplica aqui.
     createPresentationMock.mockRejectedValue(new ValidationError());
 
@@ -122,7 +123,7 @@ describe('createPresentationAction', () => {
       code: 'invalid_input',
       message: expect.any(String),
     });
-    expect(result.status === 'error' && result.code).not.toBe('duplicate_name');
+    expect(result.status === 'error' && result.code).not.toBe('presentation_duplicate_name');
   });
 
   // La action no valida `name` por su cuenta: la validacion vive en
@@ -144,12 +145,31 @@ describe('createPresentationAction', () => {
     });
   });
 
-  it('relanza un error que no es de dominio, sin traducirlo (docs/conventions.md)', async () => {
-    createPresentationMock.mockRejectedValue(new Error('fallo de infraestructura'));
+  // QC-70 (R12, R13): antes este caso fijaba el RELANZADO (`rejects.toThrow`). La decision
+  // cerrada del 2026-09-08 lo cambia: el error ajeno a la familia se traduce a `unexpected`
+  // con el mensaje neutro del catalogo, y el detalle real va al log del servidor y solo ahi.
+  // Por eso el caso no solo mira el codigo: comprueba que NINGUN campo del estado -ni el
+  // serializado entero- contiene el texto del error original.
+  it('devuelve el estado generico, sin filtrar el error que no es de dominio (R12, R13)', async () => {
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ajeno = new Error('fallo de infraestructura');
+    createPresentationMock.mockRejectedValue(ajeno);
 
-    await expect(
-      createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' })),
-    ).rejects.toThrow('fallo de infraestructura');
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    });
+    expect(JSON.stringify(result)).not.toContain('fallo de infraestructura');
+    for (const value of Object.values(result)) {
+      expect(String(value)).not.toContain('fallo de infraestructura');
+    }
+    // R14: el detalle si llega al registro del servidor, que es el unico sitio donde aparece.
+    expect(logSpy).toHaveBeenCalledWith(expect.objectContaining({ cause: ajeno }));
+
+    logSpy.mockRestore();
   });
 
   it('traduce unauthorized cuando no hay sesion (falla cerrado, R3)', async () => {
@@ -181,8 +201,8 @@ describe('updatePresentationAction', () => {
     );
   });
 
-  it('traduce DuplicateNameError al renombrar con un nombre normalizado ya usado por otra fila (R18)', async () => {
-    updatePresentationMock.mockRejectedValue(new DuplicateNameError());
+  it('traduce PresentationDuplicateNameError al renombrar con un nombre normalizado ya usado por otra fila (R18)', async () => {
+    updatePresentationMock.mockRejectedValue(new PresentationDuplicateNameError());
 
     const result = await updatePresentationAction(
       'presentation-1',
@@ -192,13 +212,13 @@ describe('updatePresentationAction', () => {
 
     expect(result).toEqual({
       status: 'error',
-      code: 'duplicate_name',
+      code: 'presentation_duplicate_name',
       message: expect.any(String),
     });
   });
 
   it('traduce not_found a su code estable (R14)', async () => {
-    updatePresentationMock.mockRejectedValue(new NotFoundError());
+    updatePresentationMock.mockRejectedValue(new PresentationNotFoundError());
 
     const result = await updatePresentationAction(
       'no-existe',
@@ -206,7 +226,7 @@ describe('updatePresentationAction', () => {
       formDataOf({ name: 'Bidon' }),
     );
 
-    expect(result).toEqual({ status: 'error', code: 'not_found', message: expect.any(String) });
+    expect(result).toEqual({ status: 'error', code: 'presentation_not_found', message: expect.any(String) });
   });
 
   it('devuelve exito cuando el caso de uso resuelve', async () => {
@@ -262,14 +282,14 @@ describe('deletePresentationAction', () => {
   });
 
   it('traduce not_found a su code estable (R14)', async () => {
-    deletePresentationMock.mockRejectedValue(new NotFoundError());
+    deletePresentationMock.mockRejectedValue(new PresentationNotFoundError());
 
     const result = await deletePresentationAction(
       MUTATION_INITIAL,
       formDataOf({ id: 'no-existe' }),
     );
 
-    expect(result).toEqual({ status: 'error', code: 'not_found', message: expect.any(String) });
+    expect(result).toEqual({ status: 'error', code: 'presentation_not_found', message: expect.any(String) });
   });
 });
 

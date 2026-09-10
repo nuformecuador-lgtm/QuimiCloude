@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { ProductNotFoundError } from './errors';
 import type { ProductView } from './product-view';
 
 import type { ProductRepository } from '../ports/product-repository';
@@ -24,7 +24,7 @@ export function createGetProduct(
     requirePermission(actor, 'inventario.consultar');
 
     const product = await deps.products.findAliveById(id);
-    if (product === null) throw new NotFoundError();
+    if (product === null) throw new ProductNotFoundError();
 
     return product;
   };

@@ -43,8 +43,9 @@ import {
   UnitSheet,
   formatFactor,
 } from '@/app/(private)/configuracion/unidades/components';
+import type { ErrorCode } from '@/lib/modules/errores';
 import {
-  DuplicateNameError,
+  UnitDuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
   ValidationError,
@@ -90,7 +91,7 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 }));
 
 /** Codigos ESTABLES del dominio, tomados de las clases de error y no escritos a mano (R37). */
-const DUPLICATE_NAME_CODE = new DuplicateNameError().code;
+const DUPLICATE_NAME_CODE = new UnitDuplicateNameError().code;
 const DUPLICATE_SYMBOL_CODE = new DuplicateSymbolError().code;
 const INVALID_DERIVATION_CODE = new InvalidDerivationError().code;
 const INVALID_INPUT_CODE = new ValidationError().code;
@@ -410,7 +411,7 @@ describe('ausente NO es vacio: el `FormData` espiado (R34)', () => {
 
 describe('cada codigo de error pinta donde le toca (R37)', () => {
   /** Alta que falla con el codigo dado, con los cuatro campos escritos. */
-  async function altaQueFalla(user: ReturnType<typeof setupUser>, code: string, message: string) {
+  async function altaQueFalla(user: ReturnType<typeof setupUser>, code: ErrorCode, message: string) {
     createUnitActionMock.mockResolvedValue({ status: 'error', code, message });
     await abrirAlta(user);
 

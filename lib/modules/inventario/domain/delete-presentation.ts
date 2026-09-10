@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError, PresentationInUseError } from './errors';
+import { PresentationInUseError, PresentationNotFoundError } from './errors';
 
 import type { PresentationRepository } from '../ports/presentation-repository';
 
@@ -31,7 +31,7 @@ export function createDeletePresentation(
 
     const result = await deps.presentations.deleteById(id);
 
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new PresentationNotFoundError();
     if (result === 'in_use') throw new PresentationInUseError();
   };
 }

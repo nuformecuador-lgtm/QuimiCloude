@@ -1,6 +1,7 @@
 'use server';
 
 import { identity, unidades } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorCode } from '@/lib/modules/errores';
 import {
   UnidadesError,
   type Actor,
@@ -21,8 +22,12 @@ import {
  * `domain/list-units.ts`.
  *
  * ERRORES: las clases de `UnidadesError` se traducen a `{ status: 'error', code,
- * message }` con el `code` ESTABLE de la clase, nunca el texto. Cualquier error que NO
- * sea de dominio se relanza (`docs/conventions.md > Manejo de errores`).
+ * message }` con el `code` ESTABLE de la clase, nunca el texto.
+ *
+ * QC-70 (R10, R12): la traduccion ya NO se escribe aqui —era una de las siete copias byte a
+ * byte— sino que la fabrica el traductor unico del modulo `errores`. Y un error que NO es de
+ * dominio ya no se RELANZA: se devuelve como `unexpected` con su mensaje neutro, y el detalle
+ * real (traza, SQL, nombres de tabla) va al registro del servidor y solo ahi (R13, R14).
  */
 
 /**
@@ -33,20 +38,19 @@ import {
  */
 export type UnitListResult =
   | { status: 'success'; data: readonly UnitView[] }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 /** Lo que devuelve la lectura PAGINADA (QC-39 R5): la misma union, con una `Page` dentro. */
 export type UnitPageResult =
   | { status: 'success'; data: Page<UnitView> }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
-/** Traduce un error de dominio a estado serializable; relanza cualquier otro. */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof UnidadesError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/**
+ * Traduce un error de dominio a estado serializable y cualquier otro a `unexpected`. Es la
+ * UNICA implementacion, parametrizada por la clase base de este modulo (R10): la guardia del
+ * catalogo da rojo si alguien vuelve a declarar aqui una `function toErrorState`.
+ */
+const toErrorState = createErrorStateTranslator(UnidadesError);
 
 /**
  * El actor se resuelve UNA vez por invocacion, nunca dentro del dominio, y con LAS DOS CARAS
@@ -102,7 +106,7 @@ export async function listUnitsAction(
   query?: unknown,
 ): Promise<
   | { status: 'success'; data: readonly UnitView[] | Page<UnitView> }
-  | { status: 'error'; code: string; message: string }
+  | { status: 'error'; code: ErrorCode; message: string }
 > {
   const actor = await currentActor();
 
@@ -127,12 +131,12 @@ export async function listUnitsAction(
 export type CreateUnitFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type UnitMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 /**
  * COMO SE LEE `FormData` SIN QUE R36 SE COMA A R10. Un campo que el formulario no envia y uno

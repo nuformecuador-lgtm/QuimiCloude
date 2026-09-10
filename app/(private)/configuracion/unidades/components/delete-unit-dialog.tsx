@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import type { ErrorCode } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 import {
   deleteUnitAction,
@@ -59,8 +60,14 @@ export const DELETE_UNIT_ID_TESTID = 'delete-unit-id';
 /** Nombre del campo del `FormData` que lee el adaptador driving (`unit-actions.ts`). */
 export const DELETE_UNIT_ID_FIELD = 'id';
 
-/** Codigo estable del rechazo por FK; por el se decide, nunca por el texto (R41, R42). */
-export const UNIT_IN_USE_CODE = 'unit_in_use';
+/**
+ * Codigo estable del rechazo por FK; por el se decide, nunca por el texto (R41, R42).
+ *
+ * QC-70 (R21): queda tipado con `ErrorCode`, la union cerrada del catalogo unico. Si el codigo se
+ * renombra o se retira, esto rompe el typecheck en vez de dejar de coincidir en silencio y mandar
+ * el mensaje a la region generica. Igual que `PRESENTATION_IN_USE_CODE`.
+ */
+export const UNIT_IN_USE_CODE: ErrorCode = 'unit_in_use';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 

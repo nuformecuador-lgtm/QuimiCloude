@@ -1,5 +1,9 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateNameError, NotFoundError, ValidationError } from './errors';
+import {
+  PresentationDuplicateNameError,
+  PresentationNotFoundError,
+  ValidationError,
+} from './errors';
 import { updatePresentationSchema } from './presentation-input';
 import { normalizePresentationName } from './presentation-name';
 
@@ -19,7 +23,7 @@ export type UpdatePresentationDeps = {
  *
  * R18/R20: `rename` puede devolver `'duplicate'` aunque no exista ninguna comprobacion
  * previa por `nameNormalized`; el indice unico de la base es la garantia real (design.md
- * > 7, § 11.4), y aqui se traduce SIEMPRE a `DuplicateNameError`.
+ * > 7, § 11.4), y aqui se traduce SIEMPRE a `PresentationDuplicateNameError`.
  */
 export function createUpdatePresentation(
   deps: UpdatePresentationDeps,
@@ -37,7 +41,7 @@ export function createUpdatePresentation(
     const nameNormalized = normalizePresentationName(parsed.data.name);
     const result = await deps.presentations.rename(id, parsed.data.name, nameNormalized);
 
-    if (result === 'not_found') throw new NotFoundError();
-    if (result === 'duplicate') throw new DuplicateNameError();
+    if (result === 'not_found') throw new PresentationNotFoundError();
+    if (result === 'duplicate') throw new PresentationDuplicateNameError();
   };
 }

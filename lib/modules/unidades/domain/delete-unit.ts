@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError, SystemUnitError, UnitInUseError } from './errors';
+import { SystemUnitError, UnitInUseError, UnitNotFoundError } from './errors';
 
 import type { UnitWriteRepository } from '../ports/unit-write-repository';
 
@@ -13,11 +13,11 @@ export type DeleteUnitDeps = {
  *   1. `requirePermission(actor, 'unidades.modificar')` — PRIMERA linea. Sin zod: la entrada
  *      es un identificador, no hay forma que validar.
  *   2. `findOwnership(id)`:
- *        - `null` o de otra empresa -> `NotFoundError` (R26);
+ *        - `null` o de otra empresa -> `UnitNotFoundError` (R26);
  *        - `companyId === null` -> `SystemUnitError` (R25), EN EL SERVICE y ANTES de intentar
  *          ningun borrado.
  *   3. `units.deleteById(id)` -> `'in_use'` -> `UnitInUseError` (R24); `'not_found'` ->
- *      `NotFoundError`.
+ *      `UnitNotFoundError`.
  *
  * FISICO, no logico (R23): `units` no tiene `deleted_at`.
  *
@@ -37,12 +37,12 @@ export function createDeleteUnit(
     requirePermission(actor, 'unidades.modificar');
 
     const ownership = await deps.units.findOwnership(id);
-    if (ownership === null) throw new NotFoundError();
+    if (ownership === null) throw new UnitNotFoundError();
     if (ownership.companyId === null) throw new SystemUnitError();
-    if (ownership.companyId !== actor.companyId) throw new NotFoundError();
+    if (ownership.companyId !== actor.companyId) throw new UnitNotFoundError();
 
     const result = await deps.units.deleteById(id);
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new UnitNotFoundError();
     if (result === 'in_use') throw new UnitInUseError();
   };
 }

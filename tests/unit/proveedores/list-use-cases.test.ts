@@ -11,7 +11,11 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/proveedores/domain/errors';
+import {
+  SupplierNotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/modules/proveedores/domain/errors';
 import { createListCatalogLines } from '@/lib/modules/proveedores/domain/list-catalog-lines';
 import { createListSuppliers } from '@/lib/modules/proveedores/domain/list-suppliers';
 
@@ -313,7 +317,7 @@ describe('list-catalog-lines: mismo contrato, y las DOS condiciones de vida sigu
     const { listCatalogLines } = montarCatalogo('supplier_not_found');
 
     await expect(listCatalogLines(SUPPLIER_ID, { page: 1 }, ADMIN)).rejects.toBeInstanceOf(
-      NotFoundError,
+      SupplierNotFoundError,
     );
   });
 

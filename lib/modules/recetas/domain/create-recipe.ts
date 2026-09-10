@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateNameError, ValidationError } from './errors';
+import { RecipeDuplicateNameError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
 
@@ -87,7 +87,7 @@ export function createCreateRecipe(
 
     // R8: el puerto traduce el `23505` del indice unico parcial a `'duplicate'`.
     const result = await deps.recipes.create(newRecipe, actor.id, now());
-    if (result === 'duplicate') throw new DuplicateNameError();
+    if (result === 'duplicate') throw new RecipeDuplicateNameError();
 
     return result;
   };

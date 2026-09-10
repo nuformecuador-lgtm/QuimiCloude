@@ -6,7 +6,7 @@
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
-import { DuplicateNameError, NotFoundError } from '@/lib/modules/recetas/domain/errors';
+import { RecipeDuplicateNameError, RecipeNotFoundError } from '@/lib/modules/recetas/domain/errors';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
@@ -56,7 +56,10 @@ const FILA_RECETA: RecipeRow = {
   lines: [{ id: 'linea-1', productId: LINEA_VALIDA.productId, quantity: '10.5000', unitId: UNIT_ID }],
 };
 
-const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unitId: null };
+// dev anadio `stock` a `ProductRef` el 2026-09-09 (`419f01e`) y no actualizo estos dobles.
+// `null` es «no declara existencia», que es lo que el fixture decia ya por omision: el valor
+// no cambia el comportamiento de ningun caso, solo satisface el tipo.
+const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unitId: null, stock: null };
 
 const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
 
@@ -170,7 +173,7 @@ describe('R8 — nombre duplicado', () => {
     const images = montarAlmacenamiento();
     const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
-    await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toBeInstanceOf(DuplicateNameError);
+    await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toBeInstanceOf(RecipeDuplicateNameError);
   });
 });
 
@@ -365,6 +368,10 @@ describe('R33 — la lista no trae lineas, el detalle si', () => {
         productName: PRODUCTO_REF.name,
         quantity: '10.5000',
         unitId: UNIT_ID,
+        // dev anadio `productStock` a `RecipeLineView` el 2026-09-09 (`419f01e`): el detalle lo
+        // decora junto al nombre, del mismo `ProductRef`. `toEqual` es exhaustivo, asi que el
+        // campo tiene que estar. Sale de `PRODUCTO_REF`, no escrito a mano.
+        productStock: PRODUCTO_REF.stock,
       },
     ]);
   });
@@ -395,7 +402,7 @@ describe('R36 — excluye las recetas borradas', () => {
     const images = montarAlmacenamiento();
     const getRecipe = createGetRecipe({ recipes, products, images });
 
-    await expect(getRecipe('borrada', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getRecipe('borrada', ADMIN)).rejects.toBeInstanceOf(RecipeNotFoundError);
     expect(recipes.findAliveById).toHaveBeenCalledWith('borrada');
   });
 });
@@ -413,9 +420,9 @@ describe('R37 — no encontrado', () => {
     const getRecipe = createGetRecipe({ recipes, products, images });
     const deleteRecipe = createDeleteRecipe({ recipes, now: () => AHORA });
 
-    await expect(getRecipe('x', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getRecipe('x', ADMIN)).rejects.toBeInstanceOf(RecipeNotFoundError);
     // `deleteRecipe` no tiene entrada que validar antes: llama a `softDeleteAlive`
     // directamente, y con el doble devolviendo `'not_found'` ya rechaza ahi.
-    await expect(deleteRecipe('x', ADMIN)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(deleteRecipe('x', ADMIN)).rejects.toBeInstanceOf(RecipeNotFoundError);
   });
 });

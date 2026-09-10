@@ -1,11 +1,11 @@
 import { requirePermission, type Actor } from './actor';
 import { assertValidDerivation } from './create-unit';
 import {
-  DuplicateNameError,
   DuplicateSymbolError,
   InvalidDerivationError,
-  NotFoundError,
   SystemUnitError,
+  UnitDuplicateNameError,
+  UnitNotFoundError,
   ValidationError,
 } from './errors';
 import { updateUnitSchema } from './unit-input';
@@ -24,11 +24,11 @@ export type UpdateUnitDeps = {
  *   2. `updateUnitSchema.safeParse(input)` — el MISMO esquema que el alta (R18): reemplazo
  *      completo de los cuatro campos, sin `.partial()`.
  *   3. `findOwnership(id)`:
- *        - `null` -> `NotFoundError` (R22);
+ *        - `null` -> `UnitNotFoundError` (R22);
  *        - `companyId === null` -> `SystemUnitError` (R21, EN EL SERVICE: ninguna restriccion
  *          de la base ni ninguna policy de RLS lo impide,
  *          `docs/architecture.md > Acceso a datos y autorizacion`);
- *        - `companyId !== actor.companyId` -> `NotFoundError` (R22): «de otra empresa» se
+ *        - `companyId !== actor.companyId` -> `UnitNotFoundError` (R22): «de otra empresa» se
  *          responde igual que «no existe», nunca con `UnauthorizedError` — distinguirlos seria
  *          un oraculo de existencia sobre datos ajenos.
  *   4. Equivalencia (`assertValidDerivation`, compartida con el alta) MAS las dos
@@ -37,7 +37,7 @@ export type UpdateUnitDeps = {
  *          `currentId = id`;
  *        - «ya soy base de alguien» (`hasDerivedUnits(id)`) — una unidad que ya es base no
  *          puede convertirse en derivada sin dejar huerfana a la que dependia de ella.
- *   5. `units.update(id, row)` -> `'not_found'` -> `NotFoundError`; los dos `duplicate_*` ->
+ *   5. `units.update(id, row)` -> `'not_found'` -> `UnitNotFoundError`; los dos `duplicate_*` ->
  *      su error.
  *   6. Un simbolo AUSENTE BORRA el simbolo (`null`, R36); `baseUnitId`/`factor` ausentes dejan
  *      la unidad BASE (R17). `companyId` NO viaja en `UnitWriteRow` (R19): el `UPDATE` no
@@ -57,9 +57,9 @@ export function createUpdateUnit(
     if (!parsed.success) throw new ValidationError();
 
     const ownership = await deps.units.findOwnership(id);
-    if (ownership === null) throw new NotFoundError();
+    if (ownership === null) throw new UnitNotFoundError();
     if (ownership.companyId === null) throw new SystemUnitError();
-    if (ownership.companyId !== actor.companyId) throw new NotFoundError();
+    if (ownership.companyId !== actor.companyId) throw new UnitNotFoundError();
 
     const { name, symbol, baseUnitId, factor } = parsed.data;
 
@@ -83,8 +83,8 @@ export function createUpdateUnit(
     };
 
     const result = await deps.units.update(id, row);
-    if (result === 'not_found') throw new NotFoundError();
-    if (result === 'duplicate_name') throw new DuplicateNameError();
+    if (result === 'not_found') throw new UnitNotFoundError();
+    if (result === 'duplicate_name') throw new UnitDuplicateNameError();
     if (result === 'duplicate_symbol') throw new DuplicateSymbolError();
   };
 }

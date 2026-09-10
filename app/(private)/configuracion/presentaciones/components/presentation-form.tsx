@@ -13,6 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import type { ErrorCode } from '@/lib/modules/errores';
 import {
   createPresentationSchema,
   updatePresentationSchema,
@@ -52,8 +53,9 @@ import {
  * caso de uso de QC-20 sustituye el nombre.
  *
  * **R24 — la traduccion de errores es por `code` estable, NUNCA por texto**: el mensaje que
- * devuelve la operacion se pinta, pero quien decide DONDE se pinta es el codigo. `duplicate_name`
- * va junto al campo; `invalid_input`, `not_found` y `unauthorized` van a la region `role="alert"`
+ * devuelve la operacion se pinta, pero quien decide DONDE se pinta es el codigo.
+ * `presentation_duplicate_name` va junto al campo; `invalid_input`, `presentation_not_found` y
+ * `unauthorized` van a la region `role="alert"`
  * del formulario. Un rechazo no cierra el panel ni pierde lo escrito: React 19 resetea los campos
  * no controlados de un `<form action>` al completarse la action, asi que el estado de fallo
  * devuelve los valores escritos y el campo los recupera por `defaultValue`.
@@ -102,15 +104,20 @@ const FIELD_LABELS: Readonly<Record<PresentationFieldName, string>> = {
 
 /**
  * Donde se pinta cada `code` estable de `inventario/domain/errors.ts` (`design.md > 7`). Los
- * codigos que NO estan aqui -`invalid_input`, `not_found`, `unauthorized`- van a la region
- * `role="alert"` del formulario. `presentation_in_use` no puede llegar hasta aqui: solo lo emite
- * el borrado, que vive en su propio dialogo.
+ * codigos que NO estan aqui -`invalid_input`, `presentation_not_found`, `unauthorized`- van a la
+ * region `role="alert"` del formulario. `presentation_in_use` no puede llegar hasta aqui: solo lo
+ * emite el borrado, que vive en su propio dialogo.
+ *
+ * QC-70 (R20): la clave es `presentation_duplicate_name`, el codigo abierto por caso concreto, y
+ * el tipo es `ErrorCode`, asi que un codigo mal escrito -o retirado del catalogo- rompe el
+ * typecheck aqui mismo en vez de caer callado al mensaje por defecto.
  */
-const CODE_TO_FIELD: Readonly<Record<string, PresentationFieldName>> = {
-  duplicate_name: PRESENTATION_NAME_FIELD,
+const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, PresentationFieldName>>> = {
+  presentation_duplicate_name: PRESENTATION_NAME_FIELD,
 };
 
-const INVALID_INPUT_CODE = 'invalid_input';
+/** QC-70 (R21): el codigo que fabrica la validacion previa sale del catalogo, no de un literal suelto. */
+const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 type FieldErrors = Partial<Record<PresentationFieldName, string>>;
@@ -129,7 +136,7 @@ type PresentationFormState =
   | {
       status: 'error';
       /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: string;
+      code: ErrorCode;
       message: string;
       fieldErrors: FieldErrors;
       values: FieldValues;
@@ -157,7 +164,7 @@ function readValues(formData: FormData): FieldValues {
 async function submit(
   presentationId: string | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: string; message: string }> {
+): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
   if (presentationId === undefined) {
     const result = await createPresentationAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };

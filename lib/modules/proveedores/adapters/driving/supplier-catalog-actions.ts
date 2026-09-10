@@ -1,6 +1,7 @@
 'use server';
 
 import { identity, proveedores } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorCode } from '@/lib/modules/errores';
 import { ProveedoresError, type Actor, type CatalogLineView, type Page } from '@/lib/modules/proveedores';
 
 /**
@@ -32,16 +33,16 @@ import { ProveedoresError, type Actor, type CatalogLineView, type Page } from '@
 export type CreateCatalogLineFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type CatalogLineMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 export type CatalogLineListResult =
   | { status: 'success'; data: Page<CatalogLineView> }
-  | { status: 'error'; code: string; message: string };
+  | { status: 'error'; code: ErrorCode; message: string };
 
 const NUMERIC_FIELD_ERROR = 'El tiempo de entrega no es un numero entero valido.';
 const MISSING_ID_ERROR = 'Falta el identificador de la linea del catalogo.';
@@ -49,13 +50,12 @@ const MISSING_ID_ERROR = 'Falta el identificador de la linea del catalogo.';
 /** Sentinela de conversion fallida: distinto de `undefined` (campo omitido) y de todo numero. */
 const INVALID_NUMBER = Symbol('invalid-number');
 
-/** Traduce un error de dominio a estado serializable; relanza cualquier otro. */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof ProveedoresError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/**
+ * El traductor UNICO (R10), el mismo que usa `supplier-actions.ts`. QC-70 borra la copia
+ * que vivia aqui: un error ajeno a la familia ya no se relanza, vuelve como `unexpected`
+ * con mensaje neutro y su detalle se queda en el registro del servidor (R12, R13, R14).
+ */
+const toErrorState = createErrorStateTranslator(ProveedoresError);
 
 /** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

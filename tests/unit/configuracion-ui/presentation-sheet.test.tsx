@@ -32,7 +32,7 @@ import {
   PresentationSheet,
   type PresentationSheetTarget,
 } from '@/app/(private)/configuracion/presentaciones/components';
-import { DuplicateNameError, ValidationError } from '@/lib/modules/inventario';
+import { PresentationDuplicateNameError, ValidationError } from '@/lib/modules/inventario';
 import type {
   CreatePresentationFormState,
   PresentationMutationFormState,
@@ -79,8 +79,15 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   }),
 }));
 
-/** Codigos ESTABLES del dominio, tomados de las clases de error y no escritos a mano (R24). */
-const DUPLICATE_NAME_CODE = new DuplicateNameError().code;
+/**
+ * Codigos ESTABLES del dominio, tomados de las clases de error y no escritos a mano (R24).
+ *
+ * QC-70 (R20): el codigo del nombre repetido se abrio por caso concreto y ahora vale
+ * `presentation_duplicate_name`; la clase que lo declara pasa a llamarse
+ * `PresentationDuplicateNameError`. Se sigue leyendo de la clase y no de un literal, asi que si el
+ * catalogo lo volviera a mover, esta suite se entera sin tocarla.
+ */
+const PRESENTATION_DUPLICATE_NAME_CODE = new PresentationDuplicateNameError().code;
 const INVALID_INPUT_CODE = new ValidationError().code;
 
 const NOMBRE_ESCRITO = 'Bidón 20 L';
@@ -214,12 +221,18 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
     expect(nombres).toEqual([PRESENTATION_NAME_FIELD]);
   });
 
+  it('el codigo del nombre repetido es el abierto por caso concreto, no el generico', () => {
+    // QC-70 R20 — la pantalla compara contra `presentation_duplicate_name`. Si alguien devolviera
+    // el codigo generico de antes, el error dejaria de ir junto al campo y nadie se enteraria.
+    expect(PRESENTATION_DUPLICATE_NAME_CODE).toBe('presentation_duplicate_name');
+  });
+
   it('un rechazo por nombre duplicado se pinta JUNTO AL CAMPO sin cerrar ni perder lo escrito', async () => {
     // R24 — el sitio lo decide el `code` estable, nunca el texto del mensaje.
     const user = setupUser();
     createPresentationActionMock.mockResolvedValue({
       status: 'error',
-      code: DUPLICATE_NAME_CODE,
+      code: PRESENTATION_DUPLICATE_NAME_CODE,
       message: 'Ya existe una presentacion con un nombre equivalente.',
     });
     await abrirAlta(user);

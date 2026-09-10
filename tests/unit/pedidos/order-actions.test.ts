@@ -18,12 +18,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { errorMessage, UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores'
 import {
   DuplicateOrderNumberError,
   InvalidTransitionError,
   NotCancellableError,
   NotDeletableError,
-  NotFoundError,
+  OrderNotFoundError,
   RecipeNotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -364,7 +365,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // -que es justo lo que R56 protege, porque QC-35 decide por el `code`-.
     const CASOS = [
       { error: new UnauthorizedError(), code: 'unauthorized' },
-      { error: new NotFoundError(), code: 'not_found' },
+      { error: new OrderNotFoundError(), code: 'order_not_found' },
       { error: new RecipeNotFoundError(), code: 'recipe_not_found' },
       { error: new InvalidTransitionError(), code: 'invalid_transition' },
       { error: new NotCancellableError(), code: 'not_cancellable' },
@@ -397,15 +398,19 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS)),
     ).toMatchObject({ status: 'error', code: 'invalid_transition' })
 
-    // El `code` NO sale del texto ni del nombre de la clase: un mensaje distinto -otro idioma,
-    // por ejemplo- no cambia el `code`. Esta es la asercion que separa «traduce por el code»
-    // de «traduce por el mensaje».
-    createOrderMock.mockRejectedValueOnce(new RecipeNotFoundError('Recipe is discontinued.'))
-    expect(await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))).toEqual({
+    // El `code` NO sale del texto ni del nombre de la clase. Desde QC-70 el mensaje tampoco
+    // se puede pasar al construir el error (R7): lo unico que admite el constructor es el
+    // DIAGNOSTICO, que va al log y NUNCA al estado (R28, R29). Con un error construido con
+    // diagnostico, el `code` y el `message` siguen siendo los del catalogo y el diagnostico
+    // no aparece por ningun campo.
+    createOrderMock.mockRejectedValueOnce(new RecipeNotFoundError('receta 42 dada de baja'))
+    const conDiagnostico = await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
+    expect(conDiagnostico).toEqual({
       status: 'error',
       code: 'recipe_not_found',
-      message: 'Recipe is discontinued.',
+      message: errorMessage('recipe_not_found'),
     })
+    expect(JSON.stringify(conDiagnostico)).not.toContain('receta 42 dada de baja')
 
     // Y el codigo fuente NO decide por el texto: ninguna comparacion contra un mensaje.
     const source = readActionsSource()
@@ -413,43 +418,73 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       /error\.message\s*(===|==|\.includes|\.startsWith|\.match)/,
     )
     expect(source, 'la traduccion mira el nombre de la clase').not.toMatch(/error\.name/)
-    expect(source, 'la traduccion deberia usar el code de la clase').toMatch(/code: error\.code/)
+    // QC-70 (R10): la traduccion ya no se escribe aqui. Este archivo ATA el traductor unico a
+    // la clase base del modulo y no vuelve a declarar el suyo, que es lo que R23 protege.
+    expect(source, 'el adaptador deberia usar el traductor unico').toMatch(
+      /const toErrorState = createErrorStateTranslator\(PedidosError\)/,
+    )
+    expect(source, 'el adaptador vuelve a declarar su propio traductor').not.toMatch(
+      /function toErrorState\s*\(/,
+    )
   })
 
-  it('lo que no es un error de dominio se RELANZA, nunca se traga', async () => {
-    // R56, segunda mitad: nada de `catch` vacios (`docs/conventions.md`). Un fallo de red o de
-    // la base tiene que subir; convertirlo en `{ status: 'error' }` lo escondería detras de un
-    // mensaje de formulario y nadie volveria a verlo.
-    const ajeno = new Error('la conexion con la base se cayo')
+  it('lo que no es un error de dominio se devuelve como unexpected, sin una brizna del detalle', async () => {
+    // QC-70 (R12, R13). Hasta esta ficha estos seis casos fijaban `rejects.toBe(ajeno)`: el
+    // error ajeno subia y reventaba la pantalla con la pagina de error del framework, a veces
+    // con el mensaje de Prisma dentro. La decision cerrada del 2026-09-08 lo cambia: se
+    // devuelve el codigo generico con mensaje neutro y el original va al log. Lo que NO se
+    // relaja es lo que estos casos ya fijaban -que el error no se traga en silencio, que las
+    // SEIS actions se comportan igual y que ningun `catch` queda vacio-, y se anade lo que la
+    // ficha estrena: que el texto del error ajeno no cruza por NINGUN campo del estado.
+    const DETALLE = 'la conexion con la base se cayo'
+    const ajeno = new Error(DETALLE)
+    const NEUTRO = {
+      status: 'error',
+      code: UNEXPECTED_ERROR_CODE,
+      message: errorMessage(UNEXPECTED_ERROR_CODE),
+    }
+
+    /** El detalle interno no puede aparecer en NINGUN campo, no solo en `message` (R13). */
+    function sinDetalle(estado: unknown, nombre: string): void {
+      expect(estado, nombre).toEqual(NEUTRO)
+      expect(JSON.stringify(estado), `${nombre}: el estado filtra el detalle`).not.toContain(
+        DETALLE,
+      )
+    }
 
     createOrderMock.mockRejectedValueOnce(ajeno)
-    await expect(createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))).rejects.toBe(
-      ajeno,
+    sinDetalle(
+      await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS)),
+      'createOrderAction',
     )
 
     getOrderMock.mockRejectedValueOnce(ajeno)
-    await expect(getOrderAction(ORDER_ID)).rejects.toBe(ajeno)
+    sinDetalle(await getOrderAction(ORDER_ID), 'getOrderAction')
 
     listOrdersMock.mockRejectedValueOnce(ajeno)
-    await expect(listOrdersAction({ page: 1 })).rejects.toBe(ajeno)
+    sinDetalle(await listOrdersAction({ page: 1 }), 'listOrdersAction')
 
     updateOrderMock.mockRejectedValueOnce(ajeno)
-    await expect(
-      updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS)),
-    ).rejects.toBe(ajeno)
+    sinDetalle(
+      await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS)),
+      'updateOrderAction',
+    )
 
     cancelOrderMock.mockRejectedValueOnce(ajeno)
-    await expect(
-      cancelOrderAction(MUTATION_INITIAL, formDataOf({ id: ORDER_ID, reason: 'x' })),
-    ).rejects.toBe(ajeno)
+    sinDetalle(
+      await cancelOrderAction(MUTATION_INITIAL, formDataOf({ id: ORDER_ID, reason: 'x' })),
+      'cancelOrderAction',
+    )
 
     deleteOrderMock.mockRejectedValueOnce(ajeno)
-    await expect(deleteOrderAction(MUTATION_INITIAL, formDataOf({ id: ORDER_ID }))).rejects.toBe(
-      ajeno,
+    sinDetalle(
+      await deleteOrderAction(MUTATION_INITIAL, formDataOf({ id: ORDER_ID })),
+      'deleteOrderAction',
     )
 
     // Y no hay ni un `catch` que se quede callado: los seis `catch` del archivo devuelven
-    // `toErrorState`, que o traduce o relanza.
+    // `toErrorState`, que o traduce el error de dominio o registra el ajeno y devuelve el
+    // codigo generico. Ninguno se lo traga sin dejar rastro.
     const source = readActionsSource()
     const catches = source.match(/catch\s*\(/g) ?? []
     const traducciones = source.match(/return toErrorState\(error\)/g) ?? []

@@ -1,6 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { createCatalogLineSchema } from './catalog-line-input';
-import { DuplicateCatalogLineError, NotFoundError, ValidationError } from './errors';
+import { DuplicateCatalogLineError, SupplierNotFoundError, ValidationError } from './errors';
 
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
@@ -67,7 +67,7 @@ export function createCreateCatalogLine(
     // R23: no hay proveedor VIVO con ese id -ni inexistente ni dado de baja-. Los dos casos
     // son «no encontrado» para el dominio: no se inventa un `code` nuevo para algo que el
     // usuario ya lee igual (R32).
-    if (result === 'supplier_not_found') throw new NotFoundError();
+    if (result === 'supplier_not_found') throw new SupplierNotFoundError();
 
     return result;
   };

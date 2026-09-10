@@ -13,6 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { errorMessage } from '@/lib/modules/errores';
 import { UnauthorizedError, ValidationError } from '@/lib/modules/unidades';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 
@@ -155,18 +156,46 @@ describe('listUnitsAction con parametros de lista: una pagina (R5)', () => {
   });
 });
 
+// QC-70 (R10, R12, R13, R14) cambia las DOS mitades de este bloque, y la ficha entera existe
+// para eso. El `code` estable sigue mandando —esa es la parte de QC-39 que no se toca—, pero:
+//   - el MENSAJE ya no es el texto que se le paso a la clase. Ese texto es ahora el DIAGNOSTICO,
+//     que va al registro del servidor y solo ahi; el mensaje al navegador lo pone el catalogo
+//     unico, `errorMessage(code)`. Se afirma contra la funcion, no contra una copia del texto.
+//   - un error AJENO al dominio ya NO se relanza. Relanzar dejaba al navegador en la pantalla de
+//     error del framework y con la traza a la vista. Ahora se traduce a `unexpected` con mensaje
+//     neutro, y el error original viaja al registro entero y a ningun campo del estado.
 describe('errores: por el codigo estable de la clase, nunca por el texto', () => {
   it('un error de dominio se traduce a { status: error, code } con el codigo de la clase', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     listUnitsMock.mockRejectedValue(new UnauthorizedError('sin permiso'));
 
     const resultado = await listUnitsAction({ page: 1 });
 
-    expect(resultado).toEqual({ status: 'error', code: 'unauthorized', message: 'sin permiso' });
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+    // El texto que se le paso a la clase es diagnostico: al registro, nunca al estado.
+    expect(JSON.stringify(resultado)).not.toContain('sin permiso');
+    expect(log).toHaveBeenCalledWith({ code: 'unauthorized', diagnostic: 'sin permiso' });
+    log.mockRestore();
   });
 
-  it('un error AJENO al dominio se relanza y no se traduce', async () => {
-    listUnitsMock.mockRejectedValue(new Error('fallo de infraestructura'));
+  it('un error AJENO al dominio se traduce a `unexpected` y no filtra su texto', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ajeno = new Error('fallo de infraestructura');
+    listUnitsMock.mockRejectedValue(ajeno);
 
-    await expect(listUnitsAction({ page: 1 })).rejects.toThrow('fallo de infraestructura');
+    const resultado = await listUnitsAction({ page: 1 });
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    });
+    expect(JSON.stringify(resultado)).not.toContain('fallo de infraestructura');
+    expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+    log.mockRestore();
   });
 });

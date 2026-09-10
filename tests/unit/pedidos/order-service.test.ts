@@ -15,7 +15,7 @@ import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
 import {
   DuplicateOrderNumberError,
   InvalidTransitionError,
-  NotFoundError,
+  OrderNotFoundError,
   RecipeNotFoundError,
   ValidationError,
   type PedidosError,
@@ -279,11 +279,13 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     expect(vista.cancellationReason).toBe('El cliente anulo el pedido')
   })
 
-  it('un pedido inexistente o ya borrado responde not_found (R33, R40)', async () => {
+  it('un pedido inexistente o ya borrado responde order_not_found (R33, R40)', async () => {
     const d = dobles({ fila: null })
 
-    expect(await codigoDelFallo(() => createGetOrder(d)(ORDER_ID, ADMIN))).toBe('not_found')
-    await expect(createGetOrder(d)(ORDER_ID, ADMIN)).rejects.toBeInstanceOf(NotFoundError)
+    expect(await codigoDelFallo(() => createGetOrder(d)(ORDER_ID, ADMIN))).toBe(
+      'order_not_found',
+    )
+    await expect(createGetOrder(d)(ORDER_ID, ADMIN)).rejects.toBeInstanceOf(OrderNotFoundError)
   })
 })
 
@@ -428,20 +430,20 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
   // pedido, y la excepcion de R25 -la receta de baja se acepta si no cambia- sigue con su test
   // intacto justo encima.
 
-  it('editar un pedido inexistente o ya borrado responde not_found (R33)', async () => {
+  it('editar un pedido inexistente o ya borrado responde order_not_found (R33)', async () => {
     const d = dobles({ fila: null })
 
     expect(await codigoDelFallo(() => createUpdateOrder(d)(ORDER_ID, EDICION, ADMIN))).toBe(
-      'not_found',
+      'order_not_found',
     )
     expect(d.updateAlive).not.toHaveBeenCalled()
   })
 
-  it('si la fila desaparece entre la lectura y la escritura, tambien responde not_found (R33)', async () => {
+  it('si la fila desaparece entre la lectura y la escritura, tambien responde order_not_found (R33)', async () => {
     const d = dobles({ fila: fila(), edicion: 'not_found' })
 
     expect(await codigoDelFallo(() => createUpdateOrder(d)(ORDER_ID, EDICION, ADMIN))).toBe(
-      'not_found',
+      'order_not_found',
     )
   })
 })

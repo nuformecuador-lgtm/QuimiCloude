@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { errorMessage } from '@/lib/modules/errores'
 import { ORDER_STATUS_VALUES, type OrderStatus } from '@/lib/modules/pedidos'
 import { InvalidTransitionError } from '@/lib/modules/pedidos/domain/errors'
 import {
@@ -92,9 +93,15 @@ describe('pedidos — transiciones de estado en la edicion', () => {
     }
   })
 
-  it('el error lleva el code estable invalid_transition y nombra los dos estados', () => {
-    // R56: quien traduce el error decide por el `code`, nunca por el texto. Se comprueba que
-    // el `code` es el de `design.md > 7.5` y que el mensaje da contexto -no que se lea-.
+  it('el error lleva el code estable invalid_transition, el mensaje del catalogo, y los dos estados SOLO en el diagnostico', () => {
+    // R56: quien traduce el error decide por el `code`, nunca por el texto.
+    //
+    // QC-70 (R7, R28) cambia DONDE viven los dos estados. Antes se incrustaban en el mensaje
+    // -«Un pedido en estado ENTREGADO no puede pasar a PENDIENTE.»-, y eso obligaba a que la
+    // frase viviera en este archivo de dominio en vez de en el catalogo. Ahora el mensaje es
+    // el del catalogo, siempre el mismo, y `from`/`to` viajan en el DIAGNOSTICO, que va al
+    // registro del servidor y nunca al navegador (R29). Lo que se afirma aqui es justamente
+    // ese reparto: en el mensaje NO estan, en el diagnostico SI.
     let capturado: unknown
     try {
       assertTransition('ENTREGADO', 'PENDIENTE')
@@ -102,8 +109,14 @@ describe('pedidos — transiciones de estado en la edicion', () => {
       capturado = error
     }
     expect(capturado).toBeInstanceOf(InvalidTransitionError)
-    expect((capturado as InvalidTransitionError).code).toBe('invalid_transition')
-    expect((capturado as InvalidTransitionError).message).toContain('ENTREGADO')
-    expect((capturado as InvalidTransitionError).message).toContain('PENDIENTE')
+    const error = capturado as InvalidTransitionError
+
+    expect(error.code).toBe('invalid_transition')
+    expect(error.message).toBe(errorMessage('invalid_transition'))
+    expect(error.message, 'el estado de origen se cuela en el mensaje').not.toContain('ENTREGADO')
+    expect(error.message, 'el estado de destino se cuela en el mensaje').not.toContain('PENDIENTE')
+
+    expect(error.diagnostic).toContain('ENTREGADO')
+    expect(error.diagnostic).toContain('PENDIENTE')
   })
 })

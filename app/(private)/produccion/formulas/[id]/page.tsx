@@ -16,7 +16,6 @@ export const metadata: Metadata = {
 };
 
 const FIRST_PAGE = 1;
-const NOT_FOUND_MESSAGE = 'Esta receta no existe o fue borrada.';
 
 /**
  * Página de edición de una receta (R2, R6, R21; `design.md > 5`).
@@ -25,9 +24,13 @@ const NOT_FOUND_MESSAGE = 'Esta receta no existe o fue borrada.';
  * a esta misma receta). Llama a `getRecipeAction(id)` y a las mismas dos consultas que la página
  * de alta -unidades y primera página de productos-, todas en paralelo.
  *
- * **`not_found`**: estado «no encontrada» identificable, con enlace a la lista, en vez de un
- * formulario vacío (R21). **`unauthorized`** (y cualquier otro código): el mismo estado de error
- * que usa la lista (R7).
+ * **`recipe_not_found`**: estado «no encontrada» identificable, con enlace a la lista, en vez de
+ * un formulario vacío (R21). **`unauthorized`** (y cualquier otro código): el mismo estado de
+ * error que usa la lista (R7).
+ *
+ * QC-70 (R20, R32): el código que se compara es el ABIERTO por caso -`recipe_not_found`, no el
+ * genérico `not_found` que ya no existe en el catálogo-, y el texto que se pinta es el `message`
+ * que devuelve la operación: esta página ya no escribe una frase propia para ese mismo código.
  *
  * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige `recetas.consultar`
  * -no `modificar`, por el mismo motivo que la pagina de alta- **antes** de resolver `params` y de
@@ -56,7 +59,7 @@ export default async function EditarRecetaPage({
   ]);
 
   if (recipeResult.status === 'error') {
-    if (recipeResult.code === 'not_found') {
+    if (recipeResult.code === 'recipe_not_found') {
       return (
         <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
           <div
@@ -65,7 +68,7 @@ export default async function EditarRecetaPage({
             className="flex flex-col items-start gap-3 rounded-lg border border-destructive/40 p-4"
           >
             <p className="text-sm font-medium" data-testid="recipe-not-found-message">
-              {NOT_FOUND_MESSAGE}
+              {recipeResult.message}
             </p>
             <Link
               href={FORMULAS_ROUTE}
