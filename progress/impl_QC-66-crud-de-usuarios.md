@@ -1020,3 +1020,144 @@ verdes. `tests/unit/identity/` **721 passed | 3 skipped**. `tests/integration/id
 me autoapruebo, y la suite completa no se corrio desde aqui a proposito** (regla del gate de
 `AGENTS.md`). Quedan para el leader la sincronizacion con `origin/dev` (**F2.3** — `origin/dev` se
 movio a `192842a` mientras esto se escribia) y el PR (**F2.4**).
+
+---
+
+## F2.3 — sincronizacion con `origin/dev` (2026-09-10)
+
+`git fetch origin dev` + `git merge origin/dev` sobre `feature/QC-66-crud-de-usuarios`.
+Base: `c870825` -> `origin/dev` en **`192842a`** (entro **QC-70, errores centralizados**).
+**116 archivos, +5217/-657.**
+
+### Conflictos: NINGUNO
+
+Git mezclo solo. Los **dos** archivos que estaban en las dos ramas se auto-resolvieron por zonas
+disjuntas, y **ese resultado es consecuencia directa de haberlos escrito de forma aditiva**:
+
+| Archivo | Lo que traia `dev` | Lo que traia esta rama | Resultado |
+| --- | --- | --- | --- |
+| `tests/unit/identity/account-status-scope.test.ts` | QC-70 extrae `infraccionesDeAlcance` como funcion pura y exporta `esLaRamaDeQC65`, y anade tres casos sinteticos al final para que el centinela siga mordiendo en su propia rama | el bloque `RETENSADO 2026-09-10 (QC-66)` con los diez sitios nuevos en `SITIOS_PERMITIDOS`, y dos titulos corregidos | auto-merge limpio: las zonas no se tocan |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | `RENOMBRADO_DE_COMENTARIOS_QC70` y su filtro en `tocaRecetas` | `MIGRACION_QC66` y su filtro en `tocaDb` | auto-merge limpio: **cada uno anadio su bloque y su filtro a una cadena distinta** |
+
+Los dos pasan despues del merge. No se reescribio **nada** de lo que trajo `dev`.
+
+### Los cuatro rojos ajenos: TRES APAGADOS, uno queda y no lo apaga ningun merge
+
+| Rojo | Despues del merge |
+| --- | --- |
+| `tests/unit/recetas/recipe-lines-catalog.test.ts` (`ProductRef.stock`, 2 diagnosticos) | **APAGADO.** `dev` traia el arreglo |
+| `tests/unit/recetas/recipe-service.test.ts` (`ProductRef.stock`) | **APAGADO** |
+| `app/layout.tsx(43,56) TS2304 LayoutProps` | **SIGUE**, y **no es arreglable por merge**: `LayoutProps` es un tipo que **genera `next build`** en `.next/types`, y un worktree recien montado no lo tiene. Se apaga corriendo `next build` (o `next dev`) una vez, no con codigo |
+
+Y los dos que estaban rojos **por su propio diseno** en toda rama que no fuese la suya:
+
+| | Despues del merge |
+| --- | --- |
+| `tests/unit/unidades/modulo-intacto.test.ts` | **VERDE.** `dev` lo arreglo (+109 lineas) con el mismo patron que QC-70 aplico al centinela de QC-65: **mudo fuera de su rama**, nunca verde, y con casos sinteticos para que siga mordiendo dentro |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | **VERDE**, por el mismo arreglo (+72) |
+
+O sea: **el hallazgo del arnes que anote en T18 ya estaba visto y arreglado en `dev`**, y por el mismo
+camino que yo describi. Queda como confirmacion, no como deuda.
+
+### Medicion despues del merge
+
+```
+pnpm run typecheck  -> 1 solo error: app/layout.tsx(43,56) LayoutProps   (de 4 archivos a 1)
+pnpm exec eslint .  -> sin salida (limpio)
+
+tests/unit/identity/ + tests/unit/composition/ + recipe-route-contract
++ unidades/modulo-intacto + unidades/unidades-convenciones
+  -> Test Files  49 passed (49)   |  Tests  778 passed | 8 skipped (786)
+
+tests/unit/recetas/ + tests/integration/identity/
+  -> Test Files  27 passed (27)   |  Tests  361 passed (361)
+
+pnpm exec vitest run guard
+  -> Test Files  1 failed | 26 passed (27)  |  Tests  3 failed | 269 passed | 4 skipped
+```
+
+La suite completa **no** se corrio: el gate lo corre el leader (F2.4).
+
+### HALLAZGO QUE BLOQUEA EL GATE Y QUE NO DECIDO YO: QC-70 invalida la capa de errores de esta ficha
+
+El merge **compila y no rompe ningun test**, pero deja **tres casos rojos** en una guardia **nueva**
+que `dev` acaba de traer: `tests/guards/guard-catalogo-de-errores.test.ts`. No es ruido: es QC-70
+diciendo que la forma en que esta ficha hace los errores **ya no es la del repositorio**.
+
+QC-70 creo `lib/modules/errores/` —`error-catalog.ts`, `error-codes.ts`, `error-message.ts`,
+`error-state.ts`— y **migro los cinco modulos** a un catalogo unico. `identity` seria el sexto, y
+esta ficha escribio su jerarquia de errores **copiando el patron de `unidades` ANTES de esa
+migracion** (T3, el 2026-09-10 por la manana). Lo tres casos rojos, con su texto literal:
+
+**1. R22 — siete codigos fuera del catalogo unico:**
+```
+lib/modules/identity/domain/errors.ts: el codigo 'not_found' no esta en el catalogo (R22)
+lib/modules/identity/domain/errors.ts: el codigo 'duplicate_email' no esta en el catalogo (R22)
+lib/modules/identity/domain/errors.ts: el codigo 'duplicate_username' no esta en el catalogo (R22)
+lib/modules/identity/domain/errors.ts: el codigo 'duplicate_document' no esta en el catalogo (R22)
+lib/modules/identity/domain/errors.ts: el codigo 'role_not_found' no esta en el catalogo (R22)
+lib/modules/identity/domain/errors.ts: el codigo 'self_operation' no esta en el catalogo (R22)
+lib/modules/identity/domain/errors.ts: el codigo 'last_administrator' no esta en el catalogo (R22)
+```
+Los otros **dos** —`unauthorized` e `invalid_input`— **si** estan en el catalogo y ya cumplen.
+
+**2. R23 — la traduccion propia del driving:**
+```
+lib/modules/identity/adapters/driving/user-actions.ts: vuelve a declarar 'toErrorState' como
+  funcion propia (R23)
+lib/modules/identity/adapters/driving/user-actions.ts: traduce un error a
+  { status: 'error', ... } por su cuenta (R23)
+```
+QC-70 tiene **un** traductor unico y prohibe que cada modulo escriba el suyo.
+
+**3. R24 — los diez constructores admiten un mensaje.** El patron nuevo es
+`constructor(code: ErrorCode, diagnostic?: string)` con `super(errorMessage(code))`: **el mensaje
+sale del catalogo y nadie puede pasar un texto**, porque si pudiera la frase volveria a vivir en
+seis archivos, que es justo lo que QC-70 quita. Ademas el patron nuevo anade `diagnostic`, que va
+**solo al registro del servidor** y que el traductor unico **no** copia al estado que cruza al
+navegador (QC-70 R28, R29).
+
+#### Por qué NO lo migro por mi cuenta
+
+Porque **no es un arreglo mecanico: cambia los `code` que el spec aprobado fija**.
+**QC-70 R16 prohibe expresamente el codigo generico `not_found`** y exige uno por caso concreto —de
+ahi `product_not_found`, `supplier_not_found`, `unit_not_found`…—. Asi que conformarse **obliga a
+renombrar** al menos `not_found` (a algo como `user_not_found`), y probablemente los tres duplicados,
+para seguir la convencion del catalogo. Y esos literales **estan escritos en `design.md > 6.4`**, que
+esta **aprobado por el humano y no se reabre**, y son **el contrato que QC-67 va a consumir** para
+decidir qué mensaje muestra. Elegir los nombres nuevos por mi cuenta seria decidir por el humano
+(regla 6 de `CLAUDE.md`) y cambiar un contrato entre dos fichas sin que nadie lo apruebe.
+
+#### Lo que costaria, medido, para que se decida rapido
+
+| Qué | Archivos |
+| --- | --- |
+| Anadir los 7 codigos **y sus mensajes** al catalogo unico | `lib/modules/errores/domain/error-catalog.ts` (+ `error-codes.ts` si la union es explicita) — **es un archivo de OTRA ficha** |
+| Reescribir la jerarquia al patron nuevo (`ErrorCode`, `errorMessage(code)`, `diagnostic`, sin parametro de mensaje) | `lib/modules/identity/domain/errors.ts` |
+| Quitar el traductor propio y usar el unico de QC-70 | `lib/modules/identity/adapters/driving/user-actions.ts` |
+| Ajustar los tests que afirman los `code` y la traduccion | `tests/unit/identity/usuarios/errors.test.ts`, `tests/unit/identity/usuarios/user-actions.test.ts` |
+| Si se renombran codigos, actualizar el mapa de trazabilidad | este archivo |
+
+**Nada de eso toca el dominio, los puertos, el adaptador Prisma ni las migraciones**: los seis casos
+de uso lanzan las **clases**, no los literales, asi que R1-R5, R13-R39 y R49 no se mueven. El golpe
+es **la capa de errores y su traduccion**, que es R41 y su mitad de R40.
+
+#### Tres salidas, y la eleccion no es mia
+
+1. **Migrar dentro de esta ficha**, con el humano decidiendo los nombres nuevos (`user_not_found`,
+   `user_duplicate_email`…). El gate queda verde y QC-67 recibe el contrato definitivo.
+2. **Una ficha propia de migracion** (`identity` al catalogo de QC-70), como QC-70 hizo con los cinco.
+   Deja el gate **rojo** mientras exista, y el gate completo es obligatorio antes de cada PR (regla 5),
+   asi que esto **bloquearia el cierre de todo el repo** — el mismo problema que QC-70 describe en el
+   comentario del centinela de QC-65.
+3. **Que la guardia excluya `identity` temporalmente.** **No lo recomiendo y no lo haria sin orden
+   explicita**: es debilitar una guardia recien puesta, que es exactamente lo que R48 prohibe en el
+   sentido contrario.
+
+**Mi lectura, para que sirva de insumo y no de decision: la (1).** El coste medido son cinco archivos
+y ningun cambio de dominio, y es lo unico que deja el gate verde sin aflojar nada. Pero **los nombres
+de los codigos los tiene que decir el humano**, porque son el contrato de QC-67 y estan escritos en un
+spec aprobado.
+
+**Estado de la rama: sincronizada y empujada, pero NO verde en el gate completo** por estos tres
+casos. No me autoapruebo y no abro el PR (F2.4 es del leader).
