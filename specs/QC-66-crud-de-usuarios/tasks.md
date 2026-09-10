@@ -159,7 +159,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 
 ## Bloque 3 — Dominio: los seis casos de uso
 
-### T9 — El puerto de datos y el puerto de credencial
+### [x] T9 — El puerto de datos y el puerto de credencial
 - **Depende de**: T6, T8.
 - **Qué**: `UserAdminRepository` (con `…AliveInCompany`, `excludeUserId` obligatorio, resultados
   discriminados y `applyGuardedChange`) y `InitialCredentialFactory` que devuelve **solo el hash**.
@@ -169,7 +169,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Hecho cuando**: `typecheck` pasa y ningún método del puerto permite omitir la empresa, el hash o
   el usuario a excluir.
 
-### T10 — Los seis casos de uso, con la autorización en la primera línea
+### [x] T10 — Los seis casos de uso, con la autorización en la primera línea
 - **Depende de**: T9.
 - **Qué**: `create-user`, `get-user`, `list-users`, `update-user`, `delete-user`,
   `set-user-account-status`, cada uno factory `createXxx(deps)`, con `requirePermission` **antes** de
@@ -181,7 +181,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
   pasa autor del cambio de estado; solo mover el estado lo escribe).
 - **Hecho cuando**: pasan los tres tests de T11 y `typecheck`/`lint` están verdes.
 
-### T11 — [P] Los tests de dominio: autorización, servicio y guardas
+### [x] T11 — [P] Los tests de dominio: autorización, servicio y guardas
 - **Depende de**: T10.
 - **Qué**: tres archivos. El de autorización usa **dobles que lanzan si los llaman**, para demostrar
   que no se llega al repositorio; el de guardas cubre las tres operaciones sobre uno mismo y el
@@ -196,7 +196,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 
 ## Bloque 4 — Adaptadores
 
-### T12 — La fábrica de credencial inicial: `node:crypto` + política de QC-19
+### [x] T12 — La fábrica de credencial inicial: `node:crypto` + política de QC-19
 - **Depende de**: T9.
 - **Qué**: `randomInt`, 24 caracteres con al menos uno de cada alfabeto, mezcla Fisher–Yates,
   verificación contra la **política completa** (reglas propias + lista de filtradas) con reintento
@@ -209,7 +209,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
   que el valor devuelto es un hash bcrypt y no la candidata, y
   `tests/guards/guard-password-never-plaintext.test.ts` sigue verde.
 
-### T13 — El adaptador Prisma, con la transacción de la guarda
+### [x] T13 — El adaptador Prisma, con la transacción de la guarda
 - **Depende de**: T9.
 - **Qué**: implementación de los cinco métodos; `select` con **columnas enumeradas** (nunca un
   `findMany` sin `select`); `toOffsetLimit`/`buildPage` de `lib/shared/pagination`; orden
