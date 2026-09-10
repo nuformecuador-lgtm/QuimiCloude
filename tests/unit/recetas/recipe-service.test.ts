@@ -368,6 +368,10 @@ describe('R33 — la lista no trae lineas, el detalle si', () => {
         productName: PRODUCTO_REF.name,
         quantity: '10.5000',
         unitId: UNIT_ID,
+        // dev anadio `productStock` a `RecipeLineView` el 2026-09-09 (`419f01e`): el detalle lo
+        // decora junto al nombre, del mismo `ProductRef`. `toEqual` es exhaustivo, asi que el
+        // campo tiene que estar. Sale de `PRODUCTO_REF`, no escrito a mano.
+        productStock: PRODUCTO_REF.stock,
       },
     ]);
   });

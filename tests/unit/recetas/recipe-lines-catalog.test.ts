@@ -186,7 +186,16 @@ describe('R18 — productName del detalle sigue pidiendose sobre TODAS las linea
 
     expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_VIEJO]);
     expect(detalle.lines).toEqual([
-      { id: 'linea-1', productId: PRODUCTO_VIEJO, productName: null, quantity: '10.0000', unitId: UNIT_ID },
+      // El producto no vino de `findRefs`, asi que NO hay nada que decorar: `productName` y
+      // `productStock` -el campo que dev anadio el 2026-09-09- salen los dos en `null`.
+      {
+        id: 'linea-1',
+        productId: PRODUCTO_VIEJO,
+        productName: null,
+        quantity: '10.0000',
+        unitId: UNIT_ID,
+        productStock: null,
+      },
     ]);
   });
 });
