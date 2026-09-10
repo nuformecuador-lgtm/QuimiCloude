@@ -56,7 +56,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
 import { prisma } from '@/lib/shared/db/prisma';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
@@ -208,6 +208,35 @@ test.afterAll(async () => {
 // con coste 10 tarda a proposito. Un timeout corto aqui produce rojos que no son del codigo.
 test.setTimeout(180_000);
 
+/**
+ * Cuenta las redirecciones de NAVEGACION que ocurren mientras corre `navegar` (QC-78 R29).
+ *
+ * Solo `resourceType() === 'document'` y **sin 304**, y las dos exclusiones son a base de haber
+ * fallado: `next dev` responde los chunks de `_next/static` con **304 Not Modified**, que cae de
+ * lleno en el rango 300-399. Contar toda respuesta 3xx daba 15, 20 o 29 «redirecciones» de
+ * JavaScript segun lo que el navegador tuviera ya en cache — y pasaba o fallaba por la cache, no
+ * por el producto. Lo que R29 mide es cuantas veces rebota el DOCUMENTO, que es lo unico que el
+ * usuario sufre.
+ */
+async function contarRedireccionesDeNavegacion(
+  page: import('@playwright/test').Page,
+  navegar: () => Promise<void>,
+): Promise<string[]> {
+  const saltos: string[] = [];
+  const contar = (respuesta: import('@playwright/test').Response) => {
+    const esDocumento = respuesta.request().resourceType() === 'document';
+    const esRedireccion = respuesta.status() >= 300 && respuesta.status() < 400;
+    if (esDocumento && esRedireccion && respuesta.status() !== 304) saltos.push(respuesta.url());
+  };
+  page.on('response', contar);
+  try {
+    await navegar();
+  } finally {
+    page.off('response', contar);
+  }
+  return saltos;
+}
+
 test.describe('ciclo de sesion sobre una ruta privada', () => {
   test('pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada', async ({
     page,
@@ -286,10 +315,24 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
     // --- 3. La siguiente pantalla privada ya no se abre. Se vuelve a pedir `/inventario` —una
     // peticion NUEVA— en vez de otra ruta privada cualquiera porque las demas exigen permisos
     // propios (QC-75) y un 404 por permiso se confundiria con el corte que aqui se quiere probar.
-    await page.goto(INVENTORY_ROUTE);
-    await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    //
+    // QC-78 R29 — se cuentan las redirecciones ANTES de navegar. Este mismo paso murio con
+    // `Load cannot follow more than 20 redirections` cuando el corte redirigia al login pelado:
+    // el borde veia la cookie viva y devolvia a la zona privada, el layout volvia a cortar, y
+    // asi sin fin. Contar es lo unico que distingue «acaba en el login» de «acaba en el login
+    // despues de rebotar»: sin esto, un bucle de 19 saltos pasaria el test.
+    const redirecciones = await contarRedireccionesDeNavegacion(page, async () => {
+      await page.goto(INVENTORY_ROUTE);
+      await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    });
     await expect(page.getByTestId('inventario-title')).toHaveCount(0);
     await expect(page.getByTestId('private-user-name')).toHaveCount(0);
+
+    // UNA sola: la de `/inventario` al login. Ni una mas (R29).
+    expect(
+      redirecciones,
+      `la salida al login debe costar UNA redireccion y costo ${redirecciones.length}: ${redirecciones.join(' -> ')}`,
+    ).toHaveLength(1);
 
     // --- 4. La cookie NO se borro. Lo fija la decision cerrada del 2026-09-08 («sale en la
     // siguiente navegacion», sin borrar la cookie y sin mensaje que diga por que): el corte lo
@@ -304,5 +347,50 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
     // cuenta existe ni de en que estado esta (misma discrecion que R3 impone en el login).
     await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 60_000 });
     await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+  });
+
+  test('una sesion abierta cuya ficha se da de baja tampoco rebota: sale al login en una sola redireccion', async ({
+    page,
+  }) => {
+    // QC-78 R29 sobre un corte PREEXISTENTE: la baja logica de QC-8 R11 (`users.deleted_at`).
+    //
+    // Por que existe este test y no basta con el de arriba: el bucle NO era del corte por estado.
+    // `resolveSession` devuelve `null` por TRES caminos —baja logica (QC-8 R11), empresa no viva
+    // (QC-48 R15) y estado de cuenta (QC-78 R20)— y los tres salen por el MISMO `redirect`, asi
+    // que los tres rebotaban igual. El defecto era anterior a esta ficha; QC-78 solo lo hizo
+    // alcanzable. Si la marca se hubiera puesto solo en el camino del estado, estos otros dos
+    // seguirian rotos y nadie se enteraria: no habia ningun E2E que abriera sesion y matara la
+    // ficha despues. Este es ese E2E.
+    const { username, password } = await createTestUser('r29baja');
+
+    await page.goto(INVENTORY_ROUTE);
+    await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    await page.getByTestId('login-username').fill(username);
+    await page.getByTestId('login-password').fill(password);
+    await page.getByTestId('login-submit').click();
+    await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+
+    // La ficha se da de baja POR FUERA. `deleted_at` con valor es el unico criterio de QC-8 R11,
+    // y el `where` del lector de sesion lo aplica, asi que la resolucion devuelve `null` sin que
+    // el estado de cuenta tenga nada que ver: esta cuenta sigue `active`.
+    await prisma.user.updateMany({ where: { username }, data: { deletedAt: new Date() } });
+
+    const redirecciones = await contarRedireccionesDeNavegacion(page, async () => {
+      await page.goto(INVENTORY_ROUTE);
+      await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    });
+    await expect(page.getByTestId('inventario-title')).toHaveCount(0);
+
+    expect(
+      redirecciones,
+      `la salida al login debe costar UNA redireccion y costo ${redirecciones.length}: ${redirecciones.join(' -> ')}`,
+    ).toHaveLength(1);
+
+    // Y la marca es la MISMA que la del corte por estado: opaca, no dice cual de los tres fue
+    // (R30 a). Se compara con la constante, no con un literal copiado.
+    expect(new URL(page.url()).search).toBe(
+      LOGIN_ROUTE_SESSION_ENDED.slice(LOGIN_ROUTE_SESSION_ENDED.indexOf('?')),
+    );
   });
 });

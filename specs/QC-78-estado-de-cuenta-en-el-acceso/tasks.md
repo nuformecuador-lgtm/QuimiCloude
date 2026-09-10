@@ -1,6 +1,7 @@
 # QC-78 — estado-de-cuenta-en-el-acceso · tasks.md
 
-> Cubre `requirements.md` R1–R28 con el diseño de `design.md`. Zona `backend`, módulo `identity`.
+> Cubre `requirements.md` R1–R30 con el diseño de `design.md`. Zona `backend`, módulo `identity`
+> (R29 y R30, del 2026-09-10, alcanzan además `lib/shared/routes.ts` y el layout privado).
 > `[P]` = paralelizable con las tareas marcadas igual **de la misma tanda**.
 
 ## Archivos que declara esta ficha (lista completa)
@@ -80,17 +81,74 @@ salida va a la bitácora. De los **seis restantes** se deja escrito en la bitác
 **mismo** cambio de una línea y que **no** se ejecutaron, para que el reviewer sepa exactamente
 qué está verificado y qué no. No se corre la suite E2E entera ni `./init.sh`.
 
+### Ampliación del 2026-09-10 (2) — el corte del bucle de redirecciones (R29, R30)
+
+> **Requisitos nuevos aprobados por el humano el 2026-09-10**: R29 y R30. A diferencia de la
+> ampliación anterior —que era reparación colateral sin requisito—, esta **sí** añade requisitos, y
+> por eso cambia la lista declarada **y** la lista de «archivos que esta ficha NO toca». El porqué
+> del defecto y el descarte de las otras tres salidas están en
+> `requirements.md > Ampliación del 2026-09-10`; el cómo, en `design.md > 10`.
+
+Se añaden a la lista declarada estos **trece** archivos (28–40): cinco de producción y ocho de
+test.
+
+**Producción, dentro de `lib/` (4):**
+
+28. `lib/shared/routes.ts` — las dos constantes de la marca (`design.md > 10.1`)
+29. `lib/modules/identity/domain/route-access.ts` — la regla 3 no dispara con la marca (R29, R30)
+30. `lib/modules/identity/adapters/driving/route-guard-middleware.ts` — **una línea**: pasa el
+    nombre del parámetro al dominio
+31. `lib/modules/identity/adapters/driving/require-page-permission.ts` — su `redirect` al login
+    también lleva la marca (`design.md > 10.3`)
+
+**Producción, fuera de `lib/` (1):**
+
+32. `app/(private)/layout.tsx` — su `redirect` al login lleva la marca
+
+**Tests (8):**
+
+33. `tests/unit/identity/route-access.test.ts`
+34. `tests/unit/identity/route-guard-middleware.test.ts`
+35. `tests/unit/identity/require-page-permission.test.ts`
+36. `tests/unit/private-layout.test.tsx`
+37. `tests/unit/sidebar-desktop.test.tsx` — **una línea**: afirma el destino exacto del `redirect`
+    del layout sin sesión (`toHaveBeenCalledWith(LOGIN_ROUTE)`), que cambia
+38. `tests/unit/sidebar-mobile.test.tsx` — ídem
+39. `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` — ídem, para `requirePagePermission`
+40. `tests/unit/configuracion-ui/unit-page.test.tsx` — ídem
+
+Los cuatro últimos (37–40) entran **solo** porque comparan el destino del `redirect` con
+`LOGIN_ROUTE`: es un cambio de una línea por archivo, a la constante nueva. Prohibido aprovechar
+para tocar nada más de esos archivos.
+
+**Los cinco archivos que construyen un `RouteAccessInput` literal NO entran** —los contratos de
+ruta de proveedores, pedidos, recetas, inventario y el de identity— porque el campo nuevo del
+input es **opcional** justamente para eso (`design.md > 10.2`). `route-access.test.ts` sí entra,
+pero para **añadir** casos, no para arreglar los que ya hay.
+
 **Archivos que esta ficha NO toca, y es intencional:**
 
 - `db/schema.prisma` y `db/migrations/**` — R26: ni columna, ni enum, ni migración.
 - `lib/composition/index.ts` — el cableado es por nombre de función y las firmas cambian a la vez
-  en puerto y adaptador (`design.md > 4`).
+  en puerto y adaptador (`design.md > 4`). **Sigue sin tocarse el 2026-09-10**: la marca vive en
+  `lib/shared/routes.ts` y no pasa por el cableado.
 - `lib/modules/identity/index.ts` — el dominio nuevo no lo consume nadie fuera del módulo; quien
-  lo saque al contrato es QC-66 (`design.md > 6`).
+  lo saque al contrato es QC-66 (`design.md > 6`). **Sigue sin tocarse el 2026-09-10**: la
+  constante de la marca es de rutas, no de dominio, y publicar en este contrato chocaría con
+  QC-66, que lo declara (`design.md > 10.1`).
 - `lib/modules/identity/domain/account-lock.ts` — la política de escalada no se toca (R14).
 - `lib/modules/identity/domain/account-status.ts` — el catálogo de QC-65 se lee, no se modifica.
-- `lib/modules/identity/adapters/driving/**`, `app/**`, `components/**`, `middleware.ts` — el caso
-  de uso conserva nombre y firma.
+- ~~`lib/modules/identity/adapters/driving/**`, `app/**`~~ — **corregido el 2026-09-10.** Esta
+  exclusión se escribió el 2026-09-08 cuando la ficha terminaba en R28: el caso de uso del login
+  conserva nombre y firma, así que nada de fuera del dominio tenía que cambiar. R29 la deroga en
+  parte, porque el bucle **solo** se puede cortar donde se emite la redirección y donde se decide
+  el acceso: entran `require-page-permission.ts`, `route-guard-middleware.ts` y
+  `app/(private)/layout.tsx`, y **nada más** de esos dos árboles. Siguen fuera
+  `logout-action.ts` (cierra la sesión de verdad: no hay bucle, `design.md > 10.3`),
+  `login-action.ts`, `app/(public)/login/page.tsx` (ignora los parámetros que no conoce, así que
+  la pantalla ya cumple R30 (a) sin cambios) y el resto de `app/**`.
+- `middleware.ts` (raíz) — sigue sin decisiones: solo reexporta el handler y declara el `matcher`.
+- `components/**` — nada de UI cambia.
 - `package.json` y `docs/dependencias.md` — R27.
 - `tests/unit/identity/schema/identity-schema.test.ts` — no hay cambio de esquema que afirmar.
 
@@ -100,6 +158,13 @@ qué está verificado y qué no. No se corre la suite E2E entera ni `./init.sh`.
 > intersección con la lista de arriba es vacía**, así que QC-78 puede arrancar sin esperarla
 > (`AGENTS.md > Paralelismo`). Si durante la implementación apareciera la necesidad de tocar
 > cualquiera de esos cinco, **se para y lo decide el leader**: no se toca por iniciativa propia.
+
+> **Paralelismo con QC-66 (`crud-de-usuarios`, `backend`, en curso), revisado el 2026-09-10.**
+> QC-66 declara `lib/composition/index.ts` y `lib/modules/identity/index.ts`. La ampliación de R29
+> y R30 **no toca ninguno de los dos** —es lo que decidió dónde vive la constante de la marca,
+> `design.md > 10.1`—, así que la intersección sigue siendo **vacía**. Si al implementar apareciera
+> la necesidad de exportar algo por cualquiera de esos dos archivos, **se para y lo decide el
+> leader**.
 
 ---
 
@@ -255,11 +320,83 @@ qué está verificado y qué no. No se corre la suite E2E entera ni `./init.sh`.
       pasan con Playwright con la salida pegada en la bitácora; de los seis restantes queda
       escrito en la bitácora que NO se ejecutaron.
 
+## Tanda 5 — el corte del bucle de redirecciones (R29, R30) — añadida el 2026-09-10
+
+> Toda esta tanda sale de `design.md > 10`. **No se toca nada del código de R1–R28**: ya está
+> implementado y en verde.
+
+- [x] **T20. Las dos constantes de la marca.** (dep: ninguna)
+      Archivos: `lib/shared/routes.ts`.
+      `SESSION_ENDED_PARAM` y `LOGIN_ROUTE_SESSION_ENDED`, derivada de `LOGIN_ROUTE`, con el
+      comentario que deje escrito **por qué el texto es el mismo para los tres cortes** (R30 a) y
+      que la URL no dice el motivo.
+      *Hecho cuando:* `pnpm run typecheck` limpio y el literal de la marca aparece **una sola vez**
+      en todo el repo (se comprueba buscándolo).
+
+- [x] **T21. La regla 3 deja de disparar con la marca.** (dep: T20)
+      Archivos: `lib/modules/identity/domain/route-access.ts`.
+      Campo **opcional** `sessionEndedParam` en `RouteAccessInput` y la condición previa del paso
+      3, con el comentario de por qué existe (servidor y borde se contradicen; sin esto, bucle).
+      Dominio puro: sigue sin importar `next/*`, ni `lib/shared`, ni base.
+      *Hecho cuando:* typecheck limpio, los cinco archivos que construyen un `RouteAccessInput`
+      literal **no** necesitan cambio, y el guardia de arquitectura sigue en verde.
+
+- [x] **T22. El adaptador declara la marca.** [P con T23] (dep: T21)
+      Archivos: `lib/modules/identity/adapters/driving/route-guard-middleware.ts`,
+      `tests/unit/identity/route-guard-middleware.test.ts`.
+      Una línea: `sessionEndedParam: SESSION_ENDED_PARAM` en la llamada a `decideRouteAccess`. El
+      test afirma que el adaptador **la pasa** —esa es la red que compensa que el campo sea
+      opcional— y que una petición a `/login` con marca y cookie válida se resuelve en `next()`.
+      *Hecho cuando:* el test falla si se borra esa línea (se demuestra borrándola y revirtiendo),
+      y `tests/guards/guard-middleware-edge.test.ts` sigue verde.
+
+- [x] **T23. Las dos salidas del servidor emiten la marca.** [P con T22] (dep: T20)
+      Archivos: `app/(private)/layout.tsx`,
+      `lib/modules/identity/adapters/driving/require-page-permission.ts`.
+      `redirect(LOGIN_ROUTE_SESSION_ENDED)` en los dos, con el comentario de por qué **no basta**
+      con el layout. `logout-action.ts` **no se toca**.
+      *Hecho cuando:* typecheck limpio y ninguno de los dos archivos gana lógica nueva más allá
+      del destino del `redirect`.
+
+- [x] **T24. Tests unitarios de R29 y R30.** (dep: T21, T23)
+      Archivos: `tests/unit/identity/route-access.test.ts`,
+      `tests/unit/identity/require-page-permission.test.ts`, `tests/unit/private-layout.test.tsx`,
+      `tests/unit/sidebar-desktop.test.tsx`, `tests/unit/sidebar-mobile.test.tsx`,
+      `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`,
+      `tests/unit/configuracion-ui/unit-page.test.tsx`.
+      Casos nuevos en `route-access.test.ts`: login + sesión válida + marca → `allow` (R29); login
+      + sesión válida **sin** marca → sigue redirigiendo como siempre (regla 3 intacta); **ruta
+      privada** con la marca en la query → decisión **idéntica** a la misma sin marca, tanto con
+      sesión como sin ella (R30 b); la marca no convierte una sesión ausente en válida (R30 b); la
+      marca no viaja en el destino de vuelta. En los cinco archivos de UI/permisos: **una línea**
+      cada uno, la constante nueva en la aserción del destino.
+      *Hecho cuando:* R29 y R30 tienen cada uno al menos un test nombrado por comportamiento, los
+      cinco de una línea pasan sin ningún otro cambio, y ningún test existente cambia de
+      significado.
+
+- [x] **T25. E2E: el bucle, de punta a punta y para los tres cortes.** (dep: T22, T23, T24)
+      Archivos: `e2e/session.spec.ts`.
+      El caso de R28 (b) —el que descubrió el defecto— vuelve a correr y **pasa** en los dos
+      navegadores: acaba en la pantalla de login, sin `Load cannot follow more than 20
+      redirections`. Se añade la comprobación de que la navegación termina **en una sola**
+      redirección, y se cubre además **al menos uno** de los dos cortes preexistentes (baja lógica
+      de QC-8 R11 o empresa no viva de QC-48 R15), que es lo que demuestra que R29 los cubre a los
+      tres y no solo al de estado.
+      *Hecho cuando:* pasan en los dos navegadores con la salida real pegada en la bitácora, y se
+      deja escrito qué corte preexistente se ejercitó.
+
+- [ ] **T26. Ampliar el mapa `R<n> → test` y la bitácora.** (dep: T24, T25)
+      Archivos: `progress/impl_QC-78-estado-de-cuenta-en-el-acceso.md`.
+      Dos filas nuevas (R29, R30) con archivo y nombre del caso, **verificadas abriendo el caso**,
+      más una nota de por qué la lista de archivos declarados cambió el 2026-09-10.
+      *Hecho cuando:* las 30 filas están y ninguna cita un test que no verifique lo que dice.
+
 - [ ] **T16. Gate rápido de cada tanda — *las corre el leader*.**
-      `./init.sh --rapido` al cerrar cada una de las tandas 1 a 4.
+      `./init.sh --rapido` al cerrar cada una de las tandas 1 a **5** (la 5 se añadió el
+      2026-09-10).
       *Hecho cuando:* `exit 0` en cada tanda, con la salida anotada en la bitácora.
 
-- [ ] **T17. Gate completo — *las corre el leader*.** (dep: T15, T16)
+- [ ] **T17. Gate completo — *las corre el leader*.** (dep: T15, T16, T26)
       `./init.sh` completo para cerrar la feature y **otra vez antes de abrir el PR, sin
       excepción**.
       *Hecho cuando:* `exit 0`, sin ningún archivo de test rojo que no estuviera ya en

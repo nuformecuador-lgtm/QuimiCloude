@@ -3,7 +3,8 @@
 > Zona: `backend` · depends_on: `QC-65` (cerrada, PR #48, merge `c640c7a`) ·
 > Rama: `feature/QC-78-estado-de-cuenta-en-el-acceso`
 >
-> Cubre `requirements.md` R1–R28. Módulo `identity`, arquitectura hexagonal de
+> Cubre `requirements.md` R1–R28, más R29 y R30 (ampliación del 2026-09-10, sección 10). Módulo
+> `identity`, arquitectura hexagonal de
 > `docs/architecture.md`: el dominio no conoce Prisma, `next/*` ni `lib/shared/**`, y nada de
 > fuera del módulo importa por ruta profunda.
 
@@ -272,10 +273,128 @@ cada familia de pruebas, que es lo que decide el reparto de tareas:
 | R13, R17, R18 (predicado y trío de columnas) | `tests/unit/identity/verify-credentials.test.ts` + los tests del adaptador que ya existan; el CAS contra Postgres real es integración y hereda el límite conocido del repo |
 | R23, R26, R27 | guardia de alcance de la ficha: sin cron, sin diff en `db/`, sin diff en `package.json` |
 | R28 | `e2e/login.spec.ts`, `e2e/session.spec.ts` |
+| R29, R30 (regla 3 con marca, y que la marca no altera las reglas 1, 2 y 4) | `tests/unit/identity/route-access.test.ts` |
+| R29 (el adaptador declara la marca; sigue sin tocar base ni cookie) | `tests/unit/identity/route-guard-middleware.test.ts` |
+| R29 (las dos salidas del servidor redirigen **con** marca) | `tests/unit/private-layout.test.tsx`, `tests/unit/identity/require-page-permission.test.ts` |
+| R29, R30 (una sola redirección de punta a punta, para los tres cortes) | `e2e/session.spec.ts` |
 
 Nivel de gate: `./init.sh --rapido` por tanda; `./init.sh` completo para cerrar y **antes del PR**.
 
-## 10. Riesgos y costes aceptados
+## 10. La marca de sesión cortada: cómo se rompe el bucle (R29, R30) — 2026-09-10
+
+Contexto y descarte de las otras tres salidas: `requirements.md > Ampliación del 2026-09-10`. Aquí
+va **cómo** se implementa la elegida.
+
+### 10.1 Dónde vive el literal, y por qué no en el contrato del módulo
+
+**`lib/shared/routes.ts`** gana dos constantes y nada más:
+
+```ts
+/** Nombre del parámetro que marca «este login viene de un corte de sesión» (QC-78 R29, R30). */
+export const SESSION_ENDED_PARAM = 'sesion';
+
+/** El destino al que redirige el servidor cuando la sesión se cortó. Un solo texto para los TRES
+ *  cortes (QC-8 R11, QC-48 R15, QC-78 R20): la marca no dice por qué (R30 a). */
+export const LOGIN_ROUTE_SESSION_ENDED = `${LOGIN_ROUTE}?${SESSION_ENDED_PARAM}=fin`;
+```
+
+Es el mismo patrón que ya usa `PRIVATE_ROUTE_PREFIXES`: una constante de rutas que vive en
+`lib/shared/routes.ts` y **entra al dominio como parámetro**, porque el dominio tiene prohibido
+importar `lib/shared` (lo hace cumplir `tests/guards/guard-arquitectura-modulos.test.ts`). Los dos
+consumidores de producto —el layout privado y `requirePagePermission`— ya importan de ese archivo.
+
+El valor es `fin` y no `cuenta-bloqueada`, `inactivo` ni nada parecido: R30 (a) exige un texto
+único para los tres cortes. Y la pantalla de login **no se toca**: hoy solo lee `next` de la
+cadena de consulta e ignora cualquier otro parámetro, así que renderiza exactamente igual con
+marca y sin ella (R30 a, segunda mitad), sin escribir una línea.
+
+#### Alternativa descartada — publicar el literal por `lib/modules/identity/index.ts`
+
+Sería el sitio «natural» si la marca fuera un concepto de dominio, como lo es `RETURN_PARAM`.
+Descartada por dos motivos: es una constante de **ruta** (vive donde `LOGIN_ROUTE`, del que se
+deriva), y **`lib/modules/identity/index.ts` lo declara QC-66 (`crud-de-usuarios`), hoy en curso**
+— tocarlo convertiría dos fichas paralelizables en un conflicto de archivos. Lo mismo vale para
+`lib/composition/index.ts`, que esta ficha sigue sin tocar. Con el literal en `lib/shared/routes.ts`
+la intersección con QC-66 queda **vacía**.
+
+### 10.2 La regla 3 del dominio deja de disparar con la marca
+
+`lib/modules/identity/domain/route-access.ts`:
+
+```ts
+export type RouteAccessInput = {
+  // …lo de siempre…
+  /** Nombre del parámetro que marca un login que viene de un corte de sesión (R29). OPCIONAL a
+   *  propósito: ver más abajo. */
+  readonly sessionEndedParam?: string;
+};
+```
+
+y el paso 3 gana una condición previa:
+
+```ts
+// 3 — El login con sesión válida no se sirve… SALVO que traiga la marca de sesión cortada
+// (QC-78 R29): la cookie sigue firmada y viva, pero el servidor acaba de decidir con la base que
+// esa sesión ya no vale. Sin esta excepción, servidor y borde se contradicen en cada salto y la
+// navegación entra en un bucle de redirecciones.
+if (esLogin && session.kind === 'authenticated' && !traeMarcaDeSesionCortada(search, input)) {
+  …
+}
+```
+
+`traeMarcaDeSesionCortada` comprueba **presencia** del parámetro (`URLSearchParams.has`), no su
+valor: el valor lo fija un único sitio (`LOGIN_ROUTE_SESSION_ENDED`) y comparar también el texto
+solo añadiría un segundo literal que mantener sincronizado.
+
+**El campo es opcional, y esto es una decisión con coste.** Hacerlo obligatorio rompía el
+typecheck de cinco archivos de test de otras zonas que construyen un `RouteAccessInput` literal
+(`tests/unit/proveedores/supplier-route-contract.test.ts`,
+`tests/unit/pedidos-ui/permiso-ruta-pedidos.test.ts`, `tests/unit/recetas-ui/recipe-route-contract.test.ts`,
+`tests/unit/inventario/product-route-contract.test.ts` y el propio de identity), y esta ampliación
+es quirúrgica. Sin marca declarada, el comportamiento es **el de hoy** (regla 3 dispara siempre),
+así que ningún test existente cambia de significado. El riesgo de que el adaptador «olvide»
+pasarla se cierra con un test explícito sobre el adaptador (T22), no con la confianza.
+
+**Por qué esto cumple R30 (b).** La marca entra en **una sola** condición, y esa condición está
+dentro del `if` del paso 3, que solo se evalúa cuando `pathname === routes.login`. Los pasos 1, 2 y
+4 no la leen: una ruta privada con `?sesion=fin` se decide exactamente igual que sin ella —el
+anónimo sigue yendo al login (paso 2) y la sesión válida sigue pasando (paso 4)—. La marca no toca
+la cookie, no se guarda en ningún sitio y no viaja en el `next` (la redirección del corte lleva
+**solo** la marca, sin destino de vuelta, igual que hoy lleva solo `LOGIN_ROUTE`), así que su
+efecto muere con la petición que la lleva. Lo peor que puede conseguir alguien con sesión legítima
+escribiendo la URL a mano es ver el formulario público de login: no cambia ninguna otra decisión.
+
+### 10.3 Las dos salidas del servidor
+
+Los **dos** puntos que redirigen al login por no haber sesión resuelta pasan de `LOGIN_ROUTE` a
+`LOGIN_ROUTE_SESSION_ENDED`:
+
+- `app/(private)/layout.tsx` — `if (user === null) redirect(LOGIN_ROUTE_SESSION_ENDED);`
+- `lib/modules/identity/adapters/driving/require-page-permission.ts` — misma línea. **No basta con
+  el layout**: layout y página se renderizan en la misma petición y cualquiera de los dos puede
+  ganar el `redirect`; si la página lo emitiera sin marca, el bucle seguiría vivo por ese camino.
+
+Ninguno de los dos distingue **por qué** falló la resolución: los dos reciben `null`, que es
+justamente lo que hace que la marca sea la misma para los tres cortes sin esfuerzo (R30 a). Y
+ninguno de los dos toca la cookie (R29).
+
+**`logout-action.ts` NO cambia.** Ahí la sesión se cierra de verdad —la cookie se borra—, el borde
+ve un anónimo y la regla 3 ni siquiera se plantea: no hay bucle que romper y añadir la marca solo
+ensuciaría la URL de un cierre de sesión normal.
+
+`lib/modules/identity/adapters/driving/route-guard-middleware.ts` gana **una línea**: pasar
+`sessionEndedParam: SESSION_ENDED_PARAM` en la llamada a `decideRouteAccess`. Sigue sin tocar la
+base y sin tocar la cookie, así que `guard-middleware-edge` no tiene nada nuevo que reprochar.
+
+### 10.4 Alternativa descartada — marcar con una cabecera o una cookie en vez de con la URL
+
+Una cookie efímera («acabo de cortarte») la leería el borde sin ensuciar la URL. Descartada por
+dos motivos: **escribe estado**, y el corte vive en un layout, que en el App Router no puede
+escribir cookies durante el render; y una cookie sobrevive a la petición, con lo que violaría
+R30 (b) —su efecto tiene que agotarse en el salto que la lleva—. Una cabecera de petición tampoco
+sirve: el navegador no la propaga en la redirección que él mismo sigue.
+
+## 11. Riesgos y costes aceptados
 
 1. **La asimetría de los dos cortes** (estado antes del `!correcta`, empresa después) es fácil de
    «arreglar» por accidente en una refactorización futura. Mitigación: el comentario del archivo lo

@@ -138,6 +138,42 @@
   siempre, y (b) que una sesión abierta cuya cuenta deja de estar `active` deja de tener sesión
   en la siguiente pantalla que abre.
 
+### El corte de sesión no puede acabar en un bucle (ampliación del 2026-09-10)
+
+> Vocabulario añadido:
+> - **cortes de sesión que dependen de la ficha**: los tres cortes de la resolución de sesión que
+>   solo se pueden decidir consultando la base — baja lógica (**QC-8 R11**), empresa no viva
+>   (**QC-48 R15**) y estado efectivo distinto de `active` (**R20** de esta ficha). Los tres
+>   resuelven «no hay sesión» y salen por el mismo `redirect` al login.
+> - **marca de sesión cortada**: el dato que la redirección al login lleva consigo para que la
+>   decisión de acceso a rutas sepa que ese login **sí se tiene que servir**.
+>
+> El porqué de estos dos requisitos, y las tres salidas que se descartaron, están en
+> `## Ampliación del 2026-09-10`, más abajo.
+
+- **R29.** CUANDO el servidor de la zona privada redirija al login porque la resolución de sesión
+  no devolvió sesión por **cualquiera** de los cortes que dependen de la ficha —los tres, no solo
+  el de estado—, el sistema DEBE incluir la marca de sesión cortada en esa redirección, y la
+  decisión de acceso a rutas NO DEBE devolver a la zona privada una petición del login que traiga
+  la marca, aunque la cookie firmada siga resolviendo como sesión válida. La navegación DEBE
+  terminar sirviendo la pantalla de login **con una sola redirección** y NUNCA DEBE encadenar más
+  de una. Todo ello sin borrar ni modificar la cookie de sesión, sin ninguna consulta a la base
+  desde el borde y sin depender de ningún sello de invalidación por usuario (QC-23).
+- **R30.** La marca de sesión cortada DEBE cumplir a la vez estas dos propiedades:
+  - **(a) Opaca.** DEBE ser **exactamente el mismo texto** para los tres cortes, NO DEBE llevar
+    código, motivo, estado de cuenta ni nada que permita distinguir un corte de otro, y la
+    pantalla de login DEBE renderizarse **igual** con la marca y sin ella: ni mensaje, ni aviso,
+    ni cambio visible alguno.
+  - **(b) De un solo sentido.** La marca NO DEBE alterar ninguna decisión de acceso distinta de la
+    del login descrita en R29: una petición a una ruta privada que la lleve en su cadena de
+    consulta DEBE decidirse **exactamente igual** que la misma petición sin ella, y la marca NUNCA
+    DEBE hacer que una sesión válida se trate como anónima ni que una sesión ausente se trate como
+    válida. Además NO DEBE persistirse (ni en cookie, ni en la sesión, ni en el destino de vuelta)
+    ni propagarse a la navegación siguiente: su efecto DEBE agotarse en la petición que la lleva.
+    Consecuencia verificable, y es lo que la hace inofensiva: para alguien con sesión legítima que
+    escriba la URL a mano, el **único** efecto posible es ver la pantalla pública de login en esa
+    única petición, sin ganar ni perder acceso a nada.
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas (no reabrir)` queda cubierta por al menos un requisito:
@@ -158,6 +194,49 @@ Cada fila de `## Decisiones cerradas (no reabrir)` queda cubierta por al menos u
 | ¿Hace falta E2E? | R28 |
 | ¿Librería nueva? | R27 |
 | Idioma y convenciones del esquema | R26 (no se añade persistencia, así que no hay identificador nuevo que nombrar) |
+| ¿Qué le pasa a quien ya está dentro? — que la salida **llegue** al login y no rebote (ampliación del 2026-09-10) | R29, R30 |
+
+## Ampliación del 2026-09-10 — el corte de sesión rebotaba en un bucle
+
+**Qué se descubrió.** Una cuenta que deja de estar `active` no acababa en el login: el navegador
+moría con `Load cannot follow more than 20 redirections`.
+
+**Cómo.** Falló el **E2E de R28 (b)** (`e2e/session.spec.ts`) **en los dos navegadores** durante
+F2.1, con los 28 requisitos ya implementados y en verde en el resto del gate. No es un fallo del
+test: el test hace exactamente lo que R28 (b) pide y el producto no lo cumplía.
+
+**El mecanismo, comprobado en las tres piezas.**
+
+1. La cookie sigue viva y firmada, así que `route-guard-middleware.ts` la resuelve como
+   `authenticated` y deja pasar. **No puede saber más**: el borde tiene prohibido consultar la
+   base (QC-9 R4, QC-75 R18).
+2. El layout privado sí consulta: la resolución de sesión devuelve «no hay sesión» por el corte y
+   el layout redirige al login (`app/(private)/layout.tsx`). Lo mismo hace
+   `requirePagePermission` cuando es la página la que llega primero.
+3. El middleware ve `/login` **con sesión válida** y aplica la regla 3 de
+   `lib/modules/identity/domain/route-access.ts` («el login con sesión no se sirve, se aterriza
+   donde el usuario quería ir»), devolviéndolo a la zona privada.
+4. Vuelta al paso 2.
+
+**Es preexistente, y eso amplía el alcance del requisito.** El corte de esta ficha (R20) es el
+**sexto** de una lista donde ya estaban el de **baja lógica (QC-8 R11)** y el de **empresa no viva
+(QC-48 R15)**. Los tres devuelven «no hay sesión» y salen por el mismo `redirect`, así que **los
+tres producen el mismo bucle**. QC-78 no lo introduce: lo hace alcanzable por el camino que R28
+(b) existe para cubrir. Por eso R29 cubre **los tres cortes** y no solo el de estado; arreglar uno
+y dejar dos sería dejar el defecto vivo con otro disparador.
+
+**La salida elegida (decisión humana del 2026-09-10): una marca en la redirección.** El servidor
+redirige al login con una marca y la regla 3 del dominio **no dispara** cuando esa marca está
+presente. Se eligió porque es la única de las cuatro que **no choca con ninguna decisión cerrada**:
+no borra la cookie, no consulta la base en el borde y no usa el sello por usuario de QC-23.
+
+**Las tres salidas descartadas, cada una con aquello contra lo que chocaba:**
+
+| Salida | Por qué se descartó |
+|---|---|
+| **Borrar la cookie de sesión en el corte** (un cierre de sesión implícito): sin cookie, el borde ve un anónimo y sirve el login. | Choca con la **decisión cerrada del 2026-09-08** («por el mismo camino de salida que los cortes ya existentes… **sin borrar la cookie** y sin mensaje que diga por qué») y con **R20**, que la repite. Además obligaría a mover el corte fuera del render: un layout o una página no pueden escribir cookies durante el render en el App Router, solo pueden hacerlo una Server Action o un Route Handler. |
+| **Comprobar el estado en el borde**, dentro del middleware, para que no deje pasar a la zona privada. | Choca con **QC-9 R4** y **QC-75 R18** —el borde decide **sin tocar la base**, y lo hace cumplir `tests/guards/guard-middleware-edge.test.ts`— y con **R21** de esta ficha, que prohíbe consultas nuevas por petición. Sería además la consulta más caliente de toda la aplicación. |
+| **Usar el sello por usuario de QC-23** para que el borde sepa, sin consultar la base, que esa sesión está muerta. | Choca con la **decisión cerrada del 2026-09-08** («¿Se usa el sello por usuario de QC-23? **No**») y con **R22**. QC-23 está en `spec_ready`: usarla aquí la convertiría en dependencia de una ficha que declara expresamente no depender de ella. |
 
 ## Preguntas abiertas
 
