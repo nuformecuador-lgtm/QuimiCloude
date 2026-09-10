@@ -112,7 +112,7 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   it('el catalogo importado no esta vacio: la lista contra la que se compara es real', () => {
     // Segunda anti-vacuidad: con `CODIGOS_VALIDOS` vacio la regla diria que TODO es invalido, y
     // con la comparacion invertida diria que todo vale. Se ancla el tamaño del catalogo cerrado.
-    expect(CODIGOS_VALIDOS).toHaveLength(11);
+    expect(CODIGOS_VALIDOS).toHaveLength(13);
     expect(CODIGOS_VALIDOS).toContain('inventario.consultar');
   });
 
