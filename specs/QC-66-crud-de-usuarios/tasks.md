@@ -221,7 +221,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Cubre**: R17, R22, R23, R27–R31, R33, R34, R37, R38.
 - **Hecho cuando**: pasan los dos tests de integración de T16 y T17.
 
-### T14 — Las seis Server Actions
+### [x] T14 — Las seis Server Actions
 - **Depende de**: T10, T15.
 - **Qué**: `'use server'`; `FormData` en las cuatro mutaciones, argumentos tipados en las dos
   consultas; actor de las **dos caras** de la sesión vía `@/lib/composition`; traducción del error por
