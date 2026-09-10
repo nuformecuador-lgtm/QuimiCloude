@@ -168,11 +168,56 @@
     del login descrita en R29: una petición a una ruta privada que la lleve en su cadena de
     consulta DEBE decidirse **exactamente igual** que la misma petición sin ella, y la marca NUNCA
     DEBE hacer que una sesión válida se trate como anónima ni que una sesión ausente se trate como
-    válida. Además NO DEBE persistirse (ni en cookie, ni en la sesión, ni en el destino de vuelta)
-    ni propagarse a la navegación siguiente: su efecto DEBE agotarse en la petición que la lleva.
-    Consecuencia verificable, y es lo que la hace inofensiva: para alguien con sesión legítima que
-    escriba la URL a mano, el **único** efecto posible es ver la pantalla pública de login en esa
-    única petición, sin ganar ni perder acceso a nada.
+    válida. Además NO DEBE persistirse **ni en cookie ni en la sesión**, y la redirección al login
+    que emiten los cortes de sesión NO DEBE llevar destino de vuelta: DEBE llevar **solo** la marca,
+    de modo que el sistema nunca fabrique por su cuenta una URL que arrastre la marca a la
+    navegación siguiente. Consecuencia verificable, y es lo que la hace inofensiva: para alguien con
+    sesión legítima que escriba la URL a mano, el **único** efecto posible es ver la pantalla pública
+    de login en esa única petición, sin ganar ni perder acceso a nada.
+
+    > **Límite conocido y CONDICIÓN DE SEGURIDAD — leer antes de tocar la marca.**
+    >
+    > La marca **sí puede acabar en el destino de vuelta**, y no por el camino del corte: por el del
+    > anónimo. Cuando alguien sin sesión pide una ruta privada, el sistema empaqueta como destino de
+    > vuelta el camino **más la cadena de consulta entera**. Si esa persona escribe
+    > `/dashboard?sesion=fin`, acaba en `/login?next=%2Fdashboard%3Fsesion%3Dfin` y, tras
+    > autenticarse, aterriza en `/dashboard?sesion=fin`. Ahí la marca **persiste en el destino de
+    > vuelta y se propaga a la navegación siguiente**.
+    >
+    > Hoy eso es **inerte, y solo por una razón: nadie lee la marca fuera de la regla del login**
+    > descrita en R29, que únicamente se evalúa cuando el camino pedido es exactamente `/login`. En
+    > cualquier otra ruta el parámetro no lo mira nadie. **Esa es la condición de la que depende toda
+    > la inocuidad**, y la sostiene R30 (a): el login se renderiza igual con marca y sin ella. Esa
+    > garantía tiene test propio —`tests/unit/identity/login-page-marca.test.tsx`, con caso de
+    > control que demuestra que la comparación sabe ver una diferencia cuando la hay—.
+    >
+    > **Advertencia.** Si alguien conecta alguna vez la marca a algo **visible** —el aviso «tu sesión
+    > caducó», que es lo más natural que le pidan a esta pantalla—, esto **deja de ser cosmético**:
+    > un tercero puede enviar un enlace `/dashboard?sesion=fin` y provocar un mensaje falso de sesión
+    > caída que empuje a reintroducir credenciales en una pantalla legítima. Quien vaya a hacer eso
+    > **tiene que volver a este requisito primero** y reconsiderar si el empaquetado del destino de
+    > vuelta debe limpiar el parámetro de la marca antes de guardarlo.
+
+    > **Acotado el 2026-09-10, tras el review de F2.2 (menor 2).**
+    >
+    > *Qué decía antes:* que la marca «NO DEBE persistirse (ni en cookie, ni en la sesión, **ni en el
+    > destino de vuelta**) ni propagarse a la navegación siguiente».
+    >
+    > *Por qué era inexacto:* el `reviewer` confirmó por ejecución el camino del anónimo descrito
+    > arriba —`/dashboard?sesion=fin` → `/login?next=%2Fdashboard%3Fsesion%3Dfin` → de vuelta a
+    > `/dashboard?sesion=fin`—. La redacción amplia **no fue un error de nadie**: se escribió antes
+    > de saber que el empaquetado del destino de vuelta se lleva la cadena de consulta entera.
+    >
+    > *Decisión humana:* **se acota el texto, no se toca el código.** El requisito queda fijado en la
+    > propiedad que el sistema sí garantiza y que es la que protege algo: la redirección del corte no
+    > lleva destino de vuelta, la marca no altera ninguna otra decisión de acceso y no se persiste en
+    > cookie ni en sesión.
+    >
+    > *Alternativa descartada:* hacer que el empaquetado del destino de vuelta elimine el parámetro
+    > de la marca. Descartada porque esa función la usan los tres cortes **y** el camino del anónimo,
+    > y cambiarla por un caso que el propio usuario tiene que provocarse es más riesgo que beneficio.
+    > La advertencia de arriba es la contrapartida de esta decisión: si la premisa cambia, se
+    > reconsidera.
 
 ### Cobertura de las decisiones cerradas
 

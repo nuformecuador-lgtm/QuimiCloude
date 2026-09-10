@@ -275,8 +275,14 @@ cada familia de pruebas, que es lo que decide el reparto de tareas:
 | R28 | `e2e/login.spec.ts`, `e2e/session.spec.ts` |
 | R29, R30 (regla 3 con marca, y que la marca no altera las reglas 1, 2 y 4) | `tests/unit/identity/route-access.test.ts` |
 | R29 (el adaptador declara la marca; sigue sin tocar base ni cookie) | `tests/unit/identity/route-guard-middleware.test.ts` |
-| R29 (las dos salidas del servidor redirigen **con** marca) | `tests/unit/private-layout.test.tsx`, `tests/unit/identity/require-page-permission.test.ts` |
+| R29, R30 (b) (las dos salidas del servidor redirigen **con** marca y **sin destino de vuelta**) | `tests/unit/private-layout.test.tsx`, `tests/unit/identity/require-page-permission.test.ts` |
+| R30 (a) (el login se renderiza **igual** con marca y sin ella, con caso de control) | `tests/unit/identity/login-page-marca.test.tsx` |
 | R29, R30 (una sola redirección de punta a punta, para los tres cortes) | `e2e/session.spec.ts` |
+
+> **R30 (b) se verifica acotado (2026-09-10, menor 2 del review).** Lo que los tests atan es: la
+> redirección del corte no lleva destino de vuelta, la marca no altera las reglas 1, 2 y 4, y no se
+> persiste en cookie ni en sesión. **No** se afirma que la marca no pueda acabar dentro de un `next`:
+> por el camino del anónimo sí puede, y el porqué —y la advertencia que lo acompaña— están en 10.2.
 
 Nivel de gate: `./init.sh --rapido` por tanda; `./init.sh` completo para cerrar y **antes del PR**.
 
@@ -359,10 +365,56 @@ pasarla se cierra con un test explícito sobre el adaptador (T22), no con la con
 dentro del `if` del paso 3, que solo se evalúa cuando `pathname === routes.login`. Los pasos 1, 2 y
 4 no la leen: una ruta privada con `?sesion=fin` se decide exactamente igual que sin ella —el
 anónimo sigue yendo al login (paso 2) y la sesión válida sigue pasando (paso 4)—. La marca no toca
-la cookie, no se guarda en ningún sitio y no viaja en el `next` (la redirección del corte lleva
-**solo** la marca, sin destino de vuelta, igual que hoy lleva solo `LOGIN_ROUTE`), así que su
-efecto muere con la petición que la lleva. Lo peor que puede conseguir alguien con sesión legítima
+la cookie y no se guarda en ningún sitio. Lo peor que puede conseguir alguien con sesión legítima
 escribiendo la URL a mano es ver el formulario público de login: no cambia ninguna otra decisión.
+
+**La marca y el `next`: las dos cosas, sin suavizar.** Hay que decirlas por separado porque son
+distintas:
+
+- **Por el camino del corte, la marca NO viaja en el `next`.** El layout y `requirePagePermission`
+  redirigen a `LOGIN_ROUTE_SESSION_ENDED`, que lleva **solo** la marca, sin destino de vuelta, igual
+  que hoy `LOGIN_ROUTE` va pelado. Eso es lo que R30 (b) exige y lo que está atado por test
+  (`tests/unit/private-layout.test.tsx`, `tests/unit/identity/require-page-permission.test.ts`).
+- **Por el camino del anónimo, la marca SÍ puede acabar en el destino de vuelta.**
+  `buildLoginRedirect` empaqueta camino **más cadena de consulta entera**, así que un anónimo que
+  pida `/dashboard?sesion=fin` acaba en `/login?next=%2Fdashboard%3Fsesion%3Dfin` y, tras
+  autenticarse, aterriza en `/dashboard?sesion=fin`. Verificado por ejecución en el review de F2.2.
+  El test `la marca no queda como parametro del login al que se redirige una ruta privada`
+  (`tests/unit/identity/route-access.test.ts`) deja esto **escrito**: comprueba que la marca no queda
+  como parámetro de primer nivel del login y luego afirma que ese login con sesión válida redirige a
+  `/dashboard?sesion=fin`.
+
+**Por qué hoy es inerte, y de qué depende.** Solo por una razón: **nadie lee la marca fuera de la
+regla 3**, y la regla 3 únicamente se evalúa cuando `pathname === routes.login`. En cualquier otra
+ruta el parámetro es un texto que nadie mira. **Esa es la condición de la que depende todo.** Lo que
+la sostiene es **R30 (a)** —la pantalla de login se renderiza igual con marca y sin ella—, y esa
+garantía tiene test propio: `tests/unit/identity/login-page-marca.test.tsx`, con un caso de control
+que demuestra que la comparación de marcado sabe ver una diferencia cuando la hay.
+
+**Advertencia, y no es una nota al pie.** Si alguien conecta alguna vez la marca a algo **visible**
+—el aviso «tu sesión caducó», que es lo más natural que le pidan a esta pantalla—, esto **deja de ser
+cosmético**: un tercero **sí puede enviar un enlace** `/dashboard?sesion=fin` y provocar un mensaje
+falso de sesión caída que empuje a reintroducir credenciales en una pantalla legítima. Hoy el usuario
+tiene que escribirse la URL él mismo; con un aviso visible, no. **Quien vaya a hacer eso tiene que
+volver a esta sección primero** y reconsiderar si `buildLoginRedirect` debe limpiar el parámetro de
+la marca de la cadena que empaqueta. Es una condición de seguridad, no una preferencia de estilo.
+
+> **Corregido el 2026-09-10, tras el review de F2.2 (menor 2).**
+>
+> *Qué decía antes:* «la marca no viaja en el `next`», sin matiz.
+>
+> *Por qué era inexacto:* es cierto para la redirección del corte y **falso** para el camino del
+> anónimo, por cómo empaqueta `buildLoginRedirect`. Lo encontró el `reviewer` en F2.2 (menor 2) y lo
+> confirmó ejecutando. **La redacción amplia no fue un error de nadie**: se escribió antes de saber
+> que `buildLoginRedirect` se lleva la cadena de consulta entera.
+>
+> *Decisión humana:* **se acota el texto de R30 (b) y de esta sección; no se toca
+> `buildLoginRedirect`.**
+>
+> *Alternativa descartada:* hacer que `buildLoginRedirect` elimine el parámetro de la marca antes de
+> empaquetar. Descartada porque esa función la usan los tres cortes **y** el camino del anónimo, y
+> tocarla por un caso que el propio usuario tiene que provocarse es más riesgo que beneficio. La
+> advertencia de arriba es la contrapartida: si la marca pasa a ser visible, se reconsidera.
 
 ### 10.3 Las dos salidas del servidor
 
