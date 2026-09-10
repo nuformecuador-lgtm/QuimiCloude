@@ -246,3 +246,233 @@ $ pnpm run test:guardias  -> Test Files 28 passed (28) | Tests 290 passed | 4 sk
 $ pnpm exec vitest run tests/unit/{errores,observabilidad,unidades,pedidos,inventario,proveedores,recetas,configuracion-ui}
                           -> Test Files 162 passed (162) | Tests 2135 passed | 13 skipped (2148)
 ```
+
+---
+
+## TANDA C — T8, T9 (la vuelta al navegador)
+
+### El componente
+`components/shared/unexpected-error-notice.tsx` — `UnexpectedErrorNotice`, con
+`UNEXPECTED_ERROR_NOTICE_TESTID`, `..._MESSAGE_TESTID`, `..._REFERENCE_TESTID` y
+`UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL = 'Código para soporte:'`. Texto estatico, `select-all
+break-all font-mono` en el uuid, **sin boton de copiar** (`design.md > 6` lo deja fuera), sin
+`:hover` como unica via, sin `100vh`, **sin dependencia nueva**. `components/shared/` no tiene
+barrel: no hay donde registrarlo.
+
+Ayudante de test compartido: `tests/helpers/identificador-de-request.ts` (`REFERENCIA_DEL_CASO`,
+`errorInesperado()`, `esperarSinIdentificador()`, que afirma en negativo sobre el nodo, la etiqueta,
+el uuid del caso y **cualquier** uuid).
+
+### La lista cerrada de superficies (T9)
+
+Criterio de entrada: **componentes que pintan al usuario el `message` de un `ErrorState` devuelto
+por una Server Action**. R17 no distingue lectura de mutacion, y una consulta fallida tambien puede
+traer el codigo generico, asi que entran las tres superficies de cada pantalla —formulario, dialogo
+y **lista**— y no solo las mutaciones. Son **24 componentes** en las siete pantallas (inventario,
+pedidos, proveedores, catalogo de proveedor, presentaciones, unidades, formulas), mas **3
+`page.tsx`** (`produccion/formulas/nueva`, `produccion/formulas/[id]`, `proveedores/[id]`) que
+entraron **porque el compilador los delato** al cerrar el prop de los `*ListError` — el efecto que
+`design.md > 9` predijo.
+
+**Fuera, con motivo:** los cuatro *pickers* (`product-name-picker`, `recipe-picker`,
+`product-picker`, `presentation-select`) y la tabla de ingredientes de `order-form`, que no pintan
+region de error: mueren en un canal auxiliar tipado `string` (`AsyncAutocomplete`), y cambiar ese
+contrato no esta en la lista de archivos de la ficha. Tambien fuera `data-table-states.tsx` (su
+`status` no es un `ErrorState`) y los `*-list-empty` / `*-not-found`.
+
+### Como llega el `reference` hasta la pantalla
+Seis formularios copiaban el error **campo a campo** a su estado local
+(`{ status:'error'; code; message; fieldErrors; values }`) y esa copia **perdia el identificador**.
+Pasan a guardar la union entera: `{ status:'error'; serverError: ErrorState; fieldErrors; values }`.
+En `recipe-form` `type SaveError = ErrorState`; en `delete-recipe-dialog`,
+`useState<ErrorState | null>`. **Ningun `reference?`, ningun `as`, ningun `any`, ningun
+`'reference' in state`**: el estrechamiento es siempre por `code`.
+
+Dos efectos de tipos, resueltos sin cast: el `submit(...)` de cuatro formularios devuelve ahora
+`{ status:'success' } | ErrorState`; y `const INVALID_INPUT_CODE: ErrorCode = 'invalid_input'` pasa
+a `satisfies ErrorCode` (la anotacion ancha no compila dentro de la union, porque incluye el
+generico, que exige `reference`).
+
+### Guardia ajena respetada
+`configuracion-convenciones.test.ts` y `unidades-convenciones.test.ts` prohiben `ByText` en
+`tests/unit/configuracion-ui/**`. **No se relajaron**: esos seis casos afirman con
+`getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)` + `toHaveTextContent(uuid)`, que sigue
+probando que el uuid esta **renderizado como texto**. En las otras cinco pantallas se usa
+`getByText(uuid)`.
+
+### Que muerde, comprobado por mutacion (revertida)
+1. El componente pinta la etiqueta y un uuid tambien para el catalogado ->
+   `unexpected-error-notice.test.tsx > pinta su mensaje, y NINGUN identificador` **rojo**.
+2. `delete-order-dialog.tsx` renderiza el aviso incondicionalmente ->
+   `delete-order-dialog.test.tsx > un error del catalogo no ensena identificador ninguno` **rojo**.
+
+### Verificacion de la tanda (salida real)
+```
+$ pnpm run typecheck   -> sin salida, exit 0
+$ pnpm run lint        -> sin salida, exit 0 (0 errores, 0 warnings)
+$ pnpm run test:guardias -> Test Files 28 passed (28) | Tests 290 passed | 4 skipped (294)
+$ pnpm exec vitest run tests/unit/{shared-ui,inventario,pedidos-ui,configuracion-ui,proveedores-ui,recetas-ui}
+  Test Files  87 passed (87) | Tests  1182 passed | 7 skipped (1189)   (antes: 1138 -> +50 casos)
+```
+
+---
+
+## T10 — LA COMPROBACION MANUAL DEL CRUCE, EJECUTADA (R21)
+
+**Se hizo de verdad, sobre `next build` + `next start`.** Es lo que sustituye al E2E que la decision
+cerrada difiere, y sin ella la ficha no cierra.
+
+### Como se provoco el error inesperado, y por que asi
+`design.md > 3.4` sugeria apuntar `DATABASE_URL` a un puerto muerto. **No sirve para este cruce**:
+Prisma lee la URL al arrancar el proceso, y con la base caida no se puede ni llegar a una pantalla
+autenticada para disparar la accion. Lo que se hizo en su lugar prueba **exactamente la misma
+propiedad y de forma mas directa**: una **sonda temporal** en la pagina publica de login
+—`/login` esta **dentro** del `matcher` del middleware— que llama al traductor unico con un
+`TypeError` sintetico y pinta el `reference` que devuelve. Asi la cadena que se comprueba es la
+completa: middleware del borde -> cabecera de **peticion** reescrita -> `headers()` en el runtime
+Node -> traductor -> identificador en el HTML que recibe el navegador.
+
+Comandos: `pnpm exec next build` (no `pnpm build`, que ademas corre `prisma migrate deploy` y el
+seed contra la base compartida) y `pnpm exec next start -p 3717`, con el `.env` cargado.
+
+### La evidencia — las dos cadenas, iguales
+
+**(1) Lo que recibe el navegador**, de `curl http://localhost:3717/login`:
+```
+<p data-qc71-reference="true">75919411-5818-4a1b-9886-7c8b7ebdd491</p>
+```
+
+**(2) La linea del log del servidor**, en la salida de `next start`:
+```
+[error] requestId=75919411-5818-4a1b-9886-7c8b7ebdd491 origen=borde code=unexpected error=TypeError: QC-71 T10 comprobacion manual del cruce
+TypeError: QC-71 T10 comprobacion manual del cruce
+    at q (...\.next\server\chunks\ssr\[root-of-the-server]__0cs4gma._.js:1:3122)
+    ...
+```
+
+**Son el mismo uuid** (R13) y la linea dice **`origen=borde`** (R8): el identificador que la
+pantalla ensena nacio en el middleware y cruzo al runtime Node por la cabecera de peticion. **El
+mecanismo de `NextResponse.next({ request })` funciona en un build de produccion real de
+next@16.3.0**, que es justo lo que ningun test unitario puede afirmar.
+
+**(3) R6 en produccion:** las cabeceras de esa misma respuesta HTTP **no** traen `x-request-id`:
+```
+$ curl -D - http://localhost:3717/login | grep -i x-request-id   -> (nada)
+HTTP/1.1 200 OK
+```
+
+**La sonda se retiro** y el arbol quedo limpio (`git status --porcelain` vacio). No queda ni una
+linea de ella en el codigo: el archivo se restauro desde copia, no con `git checkout`.
+
+---
+
+## T11 — TRAZABILIDAD: los 21 requisitos, cada uno a un test ejecutado
+
+Los nombres son los archivos reales de esta rama. Confirma y sustituye la tabla provisional de
+`requirements.md`.
+
+| R | Test que lo cubre (archivo → caso) |
+|---|---|
+| R1 | `tests/unit/observabilidad/request-id.test.ts` → «dos llamadas seguidas devuelven valores distintos» y «cien llamadas seguidas no repiten ninguno»; `tests/unit/identity/route-guard-request-id.test.ts` → «cada peticion recibe el suyo» |
+| R2 | `tests/unit/observabilidad/request-id.test.ts` → «devuelve un UUID canonico de 36 caracteres», «no hay ninguna declaracion `import`…» y «usa el global `crypto.randomUUID`…» (con su caso rojo: el detector dispara sobre un fuente con import) |
+| R3 | `tests/guards/guard-middleware-edge.test.ts` (existente, **no relajado**: `FORBIDDEN_PACKAGES` y `FORBIDDEN_INTERNAL_FILES` intactos) → el cierre de imports desde `middleware.ts`, mas la asercion **anadida** de que ese cierre alcanza `lib/modules/observabilidad/domain/request-id.ts` |
+| R4 | `tests/unit/identity/route-guard-request-id.test.ts` → «la peticion sigue hacia el servidor con `x-request-id` en sus cabeceras reescritas» y «no reescribe la peticion vaciandola» |
+| R5 | idem → «sustituye el `x-request-id` entrante por uno nuevo» y «lo sustituye, no lo acumula: es `set` y no `append`» |
+| R6 | idem → «la respuesta del camino que deja pasar no lleva la cabecera `x-request-id`», mas los dos casos del redirect. **Y la comprobacion manual (3) sobre el servidor real** |
+| R7 | `tests/unit/observabilidad/error-state.test.ts` → «el identificador que resuelve es el de la cabecera, no uno nuevo» |
+| R8 | idem → «genera uno nuevo y lo marca como respaldo», «una cabecera VACIA cuenta como ausente» y «dos invocaciones sin cabecera no comparten identificador» |
+| R9 | `tests/guards/guard-identificador-de-request.test.ts` → «ningun `domain/` ni `ports/` de los modulos de negocio menciona el identificador» y «ninguno de los ocho modulos declara un puerto para el identificador», los dos con su caso rojo sintetico; mas `tests/guards/guard-arquitectura-modulos.test.ts` (existente) |
+| R10 | `tests/unit/observabilidad/error-state.test.ts` → «un solo `console.error`, con los cuatro campos y la traza del error» y «un valor lanzado que no es `Error` tambien deja su linea» |
+| R11 | idem → «el camino feliz no escribe ninguna linea», «un error DEL CATALOGO (sin diagnostico) no escribe ninguna linea» y «el error del catalogo tampoco lee la cabecera» |
+| R12 | idem → «del error solo salen nombre, mensaje y traza» (afirma sobre el texto completo de la linea) |
+| R13 | idem → «coinciden con cabecera y coinciden sin ella». **Y la comprobacion manual (1) vs (2)** |
+| R14 | idem → «el estado inesperado son cuatro campos y ninguno filtra nada»; mas `tests/unit/errores/to-error-state.test.ts` |
+| R15 | idem → «ni como campo, ni al serializar, ni con cabecera presente» |
+| R16 | `tests/unit/observabilidad/error-state-types.test-d.ts` (lo compila `tsc`, **no** vitest) + `tests/unit/observabilidad/error-state-types.test.ts` (5 casos, 4 de ellos «muerde») + **la mutacion de la tanda B, con la salida real de `tsc` pegada arriba** |
+| R17 | `tests/unit/shared-ui/unexpected-error-notice.test.tsx` + un caso por pantalla en los 17 archivos de UI listados en la tanda C |
+| R18 | idem, en negativo (`esperarSinIdentificador()`), con su mutacion en dos niveles |
+| R19 | `tests/guards/guard-identificador-de-request.test.ts` → «`db/` no gana ni una migracion ni una mencion al identificador», con su rojo |
+| R20 | idem → «`package.json` no gana ninguna dependencia, ni una libreria de identificadores», con su rojo; mas `tests/guards/guard-dependencias-aprobadas.test.ts` (existente) |
+| R21 | idem → «no hay ningun archivo nuevo en `e2e/` y existe el test que lo sustituye», mas el **centinela de version de `next`** («la version de next es la que se verifico a mano»), mas **T10 ejecutada y pegada arriba** |
+
+**Ningun requisito queda sin test ejecutado.**
+
+---
+
+## T11 — EL GATE COMPLETO (`./init.sh`), salida real
+
+Corrido sobre el arbol final, con la sonda de T10 ya retirada y el arbol limpio.
+
+```
+== Arnes SDD :: init (modo: completo) ==
+✓ node v22.x · dependencias presentes
+✓ feature_list.json valido
+-> pnpm run typecheck
+✓ typecheck paso
+-> pnpm run lint
+✓ lint paso
+-> pnpm run test:json
+
+ Test Files  302 passed (302)
+      Tests  3883 passed | 18 skipped (3901)
+   Duration  124.95s
+
+aviso: 5 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/integration/inventario/product-crud.int.test.ts
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+  tests/unit/unidades/modulo-intacto.test.ts
+  tests/unit/unidades/unidades-convenciones.test.ts
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==            (exit 0)
+```
+
+**302 archivos, 3883 tests, cero rojos, exit 0.**
+
+Sobre el aviso de los 5 del baseline: **no se tocan aqui, y no es descuido.** Cuatro de los cinco
+fallan **en `dev`** porque sus guardias se apoyan en `git diff origin/dev...HEAD` y alli el rango
+esta vacio; en una rama de feature el rango si existe y por eso pasan. Limpiar la lista desde aqui
+las pondria rojas en `dev` en cuanto esta rama se mergee. El quinto
+(`product-crud.int.test.ts`) es el flake de saturacion que documenta su propio `motivo`. La salida
+limpia de las cinco es la que ya esta escrita en `docs/verification.md` y en cada `motivo`, y es
+otra ficha.
+
+### Un rojo que aparecio en la primera pasada del gate, y era nuestro
+`tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` cayo con
+`No "observabilidad" export is defined on the "@/lib/composition" mock`: llega a
+`presentation-actions.ts` a traves de `components/shared/presentation-select.tsx`, y su doble de la
+composicion no tenia la lectura de la cabecera que T7 anadio. **Se completo el doble** —una entrada
+`observabilidad.readRequestIdHeader` que devuelve `null`— y **no se relajo ninguna asercion**: esa
+pantalla prueba el corte por permiso y no llega a invocar el traductor. Es exactamente el tipo de
+acoplamiento que `docs/verification.md` avisa que `--rapido` no ve y el completo si.
+
+---
+
+## Lo que queda ABIERTO, para el humano
+
+1. **R11 contra R28 de QC-70 — la unica decision de diseno que tome yo y que el humano puede
+   revertir.** R11 dice «ninguna linea de log ... ni al traducir un error que **si** esta en el
+   catalogo», pero QC-70 **ya** escribe una linea para el catalogado que trae `diagnostic`, y su
+   test lo exige. Cumplir R11 literalmente era borrar una funcion de QC-70 y aflojar su test.
+   **Lo implementado:** el camino catalogado no produce **ninguna** linea de QC-71 —ni identificador,
+   ni lectura de cabecera— y el camino feliz y el catalogado sin diagnostico no producen **ninguna**
+   llamada a `console.*`; la linea de diagnostico de QC-70 sigue intacta. Si el humano prefiere lo
+   contrario, es un cambio de una linea en `error-state.ts` y un caso en dos tests.
+2. **La lectura acotada de R9.** Literal, R9 prohibiria el identificador en `lib/modules/*/domain/**`
+   — pero el propio `design.md > 1` coloca `newRequestId` en `observabilidad/domain/` y el traductor
+   vive en `errores/domain/`. La guardia barre los **seis modulos de negocio** y deja fuera a
+   `errores` y `observabilidad`, sus dos duenos legitimos. Ningun puerto nuevo en ninguno de los
+   ocho, que es la mitad de R9 que si se puede leer literal.
+3. **El campo se llama `reference` y no `requestId`.** Es el nombre que QC-70 dejo reservado y que
+   su guardia fija por texto; `design.md > 4` marcaba su fragmento como «forma, no nombres
+   definitivos».
+4. **Los cuatro *pickers* y la tabla de ingredientes no ensenan identificador**, porque su canal de
+   error esta tipado `string` (`AsyncAutocomplete`) y el `ErrorState` muere antes de llegar. No es
+   un olvido: cambiar ese contrato no esta en la lista de archivos de la ficha. **Es candidato a
+   ficha propia** si se quiere R17 tambien ahi.
+5. **`d9fe0ed` mezcla dos tandas**, una verificada (A) y otra que se commiteo sin verificar (B)
+   porque un limite de la API corto al subagente. B quedo verificada despues, sobre el arbol ya
+   commiteado; la limpieza que hizo falta esta en `3d8f872`.
+6. **No se abrio PR y no se hizo push**, como manda la instruccion: eso lo autoriza el humano.

@@ -69,6 +69,11 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+  // QC-71 (T7): los adaptadores driving piden a la composicion la LECTURA de la cabecera del
+  // identificador para pasarsela al traductor unico. Sin ella en el doble, el modulo ni carga.
+  // Devuelve `null` -sin cabecera- porque esta pantalla no ejercita ningun error inesperado:
+  // lo que prueba es el corte por permiso, y el traductor no llega a invocarse.
+  observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({

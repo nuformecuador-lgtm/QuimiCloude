@@ -153,3 +153,30 @@
 - **Hecho:** `./init.sh` completo con salida pegada, sin ningún archivo rojo fuera de
   `tests/baseline-rojos.json`, y la tabla `R1..R21 → test` completa en la bitácora
   (`docs/verification.md`). Un requisito sin test es un fallo de la feature.
+
+---
+
+## Estado de las tasks (lo cierra el implementer, F2.1)
+
+Las 11, hechas. Evidencia, mapa `R<n>` -> test y salida real del gate en
+`progress/impl_QC-71-identificador-de-request.md`.
+
+- [x] **T1** — los cinco nombres de QC-70 fijados con ruta y linea. **La parada NO se disparo**:
+      todo error no catalogado pasa por un unico punto (`error-state.ts:69-74` antes del cambio).
+      Salieron cinco hallazgos que el spec no podia conocer, cada uno con su decision.
+- [x] **T2** — `lib/modules/observabilidad/domain/request-id.ts` (cero `import`) y su barrel.
+- [x] **T3** — `observabilidadEdge` en `lib/composition/edge.ts`.
+- [x] **T4** — el id se engancha en `route-guard-middleware.ts`. `middleware.ts` **no se toco**.
+- [x] **T5** — `guard-middleware-edge` **ampliada, no relajada**; `guard-identificador-de-request`
+      nueva, con el centinela de version de `next` y cada comprobacion con su caso rojo.
+- [x] **T6** — `ErrorState` es una **union cerrada**. R16 probado por mutacion en los dos sentidos.
+- [x] **T7** — el traductor resuelve el id (cabecera o respaldo con `origen=respaldo`), escribe
+      **una** linea con el formato de `design.md > 5` y devuelve `reference`.
+- [x] **T8** — `components/shared/unexpected-error-notice.tsx` + su test.
+- [x] **T9** — adoptado en las siete pantallas, 24 componentes de UI + 3 `page.tsx` que delato el
+      compilador. Lista cerrada y motivos de exclusion, en la bitacora.
+- [x] **T10** — **comprobacion manual EJECUTADA** sobre `next build` + `next start`: el uuid que
+      pinta la pantalla y el de la linea del log son el mismo, y la linea dice `origen=borde`.
+      Las dos cadenas, pegadas en la bitacora. La sonda temporal se retiro.
+- [x] **T11** — `./init.sh` completo en verde: **302 archivos, 3883 tests, 0 rojos, exit 0**.
+      Los 21 requisitos mapeados a un test ejecutado.
