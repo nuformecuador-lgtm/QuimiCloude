@@ -268,6 +268,152 @@ rojos por contencion de la base con otra suite de integracion en paralelo. Solo,
 
 ---
 
+## Tanda 2 — actor, contrato de lista, esquemas y el OCTAVO archivo del ripple (T6-T8)
+
+Dos `backend_dev` en paralelo, sin un solo archivo en comun: uno con T6 + el octavo ripple, otro
+con T7 -> T8.
+
+### El octavo archivo ajeno del ripple, que el `design.md` no habia medido · R48
+
+`design.md > 2` midio **seis** archivos ajenos y `> 8.1` declaro un **septimo**
+(`guard-contrato-listados`, que es de T7). Al commitear la tanda 1 aparecio un **octavo**, rojo por
+la migracion de T4:
+
+```
+FAIL tests/unit/recetas-ui/recipe-route-contract.test.ts
+     > la feature no toca lib/modules/recetas ni db/
+AssertionError: ningun archivo de db/ fuera de la migracion de cancelacion de QC-34
+deberia estar en el diff: expected [ ...(2) ] to deeply equal []
+```
+
+Ese caso compara `git diff --name-only origin/dev...HEAD` y exige que **toda** migracion legitima
+posterior se **NOMBRE una a una**, o deja de vigilar nada. El archivo ya tiene **cinco** bloques asi
+(`MIGRACION_QC34`, `MIGRACION_QC47`, `MIGRACIONES_LEGITIMAS`, `MIGRACION_QC83` y la ampliacion de
+recetas de QC-74), cada uno con su comentario `RETENSADO <fecha> (<ficha>)`. Se anade el sexto,
+`MIGRACION_QC66`, con el mismo criterio declarado y el porque propio: es una migracion de **DATOS**
+que solo inserta dos filas en `permissions` y sus dos asignaciones, **no crea, modifica ni borra
+ninguna columna, tabla, indice, restriccion ni tipo** (R43) y **no toca los tres indices unicos de
+`users`** de QC-47 (R38). Mas su filtro en la cadena de `tocaDb`. **Nada mas de ese archivo se
+toco**: ni `tocaRecetas`, ni ningun otro caso, ni ningun `expect`.
+
+Las dos rutas se verificaron contra la salida real de
+`git diff --name-only origin/dev...HEAD` filtrada por `db/`: son esas dos y **solo** esas dos.
+
+Aviso que deja el `backend_dev`, y que conviene tener presente: ese caso **volvera a ponerse rojo
+por su propio diseno** si esta rama gana **otro** archivo bajo `db/`. No hay ninguno previsto —el
+diseno declara `db/schema.prisma` intacto y una sola carpeta de migracion—, pero si apareciera, el
+bloque **se amplia, no se relaja**.
+
+### T6 — `Actor` y `requirePermission` del modulo · R2, R3, R5
+
+`lib/modules/identity/domain/actor.ts` (nuevo, **unico** archivo de produccion de la task).
+
+Copia literal del `actor.ts` de `unidades` con la unica adaptacion de `design.md > 5.1`. Los **tres**
+imports salen del propio `domain/` —`./permissions`, `./require-permission`, `./errors`— y ninguno
+del barrel: un modulo que se importa a si mismo por su barrel crea un **ciclo**. Esta escrito en la
+cabecera del archivo, con el aviso de que si alguien lo arregla cambiando esas dos lineas al barrel
+lo rompe, porque es el error facil al copiar el precedente.
+
+Cero `next/*`, cero `react*`, cero `@prisma/client`, cero `@/lib/shared/**`, cero adaptadores (R42).
+
+`vitest related --run lib/modules/identity/domain/actor.ts` devuelve `No test files found`, y es
+**correcto**: el test de autorizacion es **T11** y nada importa todavia `actor.ts` (el barrel es T15
+y los casos de uso T10). No es un hueco de trazabilidad: `tasks.md > Trazabilidad` asigna R1-R5 a
+T6, T10 **y T11**.
+
+### T7 — el contrato de lista, sexta copia, y la guardia de los «cinco modulos» · R36
+
+`lib/modules/identity/domain/{list-query,page,user-queryable}.ts` (nuevos) y
+`tests/guards/guard-contrato-listados.test.ts`.
+
+- **`list-query.ts` es byte a byte** el de `proveedores` **salvo dos lineas**, las unicas que nombran
+  el modulo (L1 y el `Contrato de consulta de lista del modulo ...` de L3). Verificado con `diff`:
+  devuelve exactamente esos dos hunks. Se comprobo antes que las cinco copias preexistentes son
+  identicas tras `textoComparable` (mismo md5), asi que la sexta entra sin friccion.
+- **`page.ts` NO es byte a byte, y con motivo medido.** No esta cubierto por ninguna guardia y las
+  cinco copias existentes **ya divergen de verdad**: `unidades` no tiene `pageQuerySchema` ni importa
+  `zod`; las otras cuatro si. Se partio de **`unidades`**, que es el caso exacto de `identity`: el
+  listado entra por el contrato generico (`page`/`pageSize` de `ListQuery`), asi que **no hay
+  `pageQuerySchema`** y el archivo no importa nada. El `type Page<T>` es identico caracter a caracter
+  en los seis.
+- `user-queryable.ts` con la lista blanca de `design.md > 8.1`: seis campos ordenables,
+  `accountStatus` como filtro `select` (R29), `searchable: true` (R28). **`deletedAt` no esta en
+  ninguna de las dos listas** y `NEVER_QUERYABLE` lo bloquea ademas por su cuenta (R34, R39).
+- La guardia pasa a **seis**: `import * as identity`, la entrada en `MODULOS`, y el numeral corregido
+  en **20 ocurrencias** (cabecera L1-L14, comentario de `MODULOS`, el `describe` y los titulos de
+  todos los `it` de los tres bloques). `Test Files 1 passed | Tests 20 passed`.
+- El docblock de `MODULOS` se **reescribio** en vez de sustituir la palabra, porque la cita literal
+  («`design.md > 1`: siete listas en cinco carpetas») era **falsa** al traducirla a seis. Ahora dice
+  que QC-57 nacio con cinco y que QC-66 anade la sexta, citando `design.md > 8.1`.
+- **Ninguna expectativa eliminada ni debilitada** (R48): los tres bloques siguen enteros, incluidos
+  los sinteticos anti-vacuidad.
+
+**Deuda declarada, no silenciada.** La cabecera de las **seis** copias de `list-query.ts` sigue
+diciendo que el archivo esta «duplicado a proposito en los cinco modulos». Corregirlo exigiria editar
+las **cinco copias ajenas** —la guardia compara texto: o las seis o ninguna—, y eso esta fuera del
+alcance declarado de esta ficha. La guardia si quedo en «seis», que es donde vive el ancla. Queda
+anotado aqui a proposito, no silenciado.
+
+### T8 — los esquemas de entrada y los tipos de salida · R14, R18, R20, R31, R32
+
+`lib/modules/identity/domain/{user-input,user-view}.ts` (nuevos) y
+`tests/unit/identity/usuarios/user-input.test.ts` (nuevo). Patron del precedente
+`proveedores/domain/supplier-input.ts` + su test.
+
+Los tres esquemas son `strictObject`, que es **el requisito y no un detalle**: mandar un campo que no
+esta **falla** en vez de ignorarse en silencio. Lo que NO esta, con su requisito: `companyId` (R14),
+**cualquier** campo de contrasena (R15, R16), `accountStatus` en el alta (R13),
+`mustChangeCredential` (R13) y los tres contadores de QC-19 (R45).
+
+`setAccountStatusSchema` **importa** `USER_ACCOUNT_STATUSES` de QC-65: el enum no se reescribe y
+admite los cuatro valores (R26).
+
+Claves **exactas** de salida, fijadas en el test:
+
+```
+UserRow    = { id, displayName, username, email, roleName, accountStatus }            // 6
+UserDetail = { id, firstNames, lastNames, birthDate, email, phone, documentTypeCode,
+               documentNumber, username, roleId, roleName, accountStatus,
+               accountStatusChangedAt, createdAt, updatedAt }                          // 15
+```
+
+El test las fija **y su orden** con `Record<keyof UserRow, true>` / `Record<keyof UserDetail, true>`,
+asi que una clave de mas o de menos es error de **compilacion** ademas de test rojo; y comprueba que
+ninguna de las dos lleva `passwordHash`, `password`, `mustChangeCredential`, `failedLoginAttempts`,
+`lockLevel`, `lockedUntil`, `companyId`, `deletedAt` ni `accountStatusChangedBy` (R31, R32, R45).
+
+**Dos decisiones de forma que el `backend_dev` deja escritas, y son correctas:**
+
+- `documentTypeCode` en la **salida** es `string` y no la union cerrada, porque el conjunto lo manda
+  la tabla `document_types`; en la **entrada** si se exige la union (`DOCUMENT_TYPE_CODES`).
+- `birthDate` se valida con `z.iso.date()` y el esquema **devuelve el `YYYY-MM-DD`**, que es lo que
+  emite un `<input type="date">` y lo que llega por `FormData`. El puerto de `design.md > 7` pide
+  `NewUser.birthDate: Date`, asi que **la conversion es de T10**, y queda escrita como comentario en
+  `user-input.ts` para que el agente de T9/T10 no la descubra por sorpresa. No se metio en el borde
+  para no decidir ahi la representacion de persistencia.
+
+### Verificacion de la tanda 2
+
+```
+pnpm run typecheck   -> la linea base exacta, cero errores en los ocho archivos nuevos
+pnpm exec eslint .   -> sin salida (limpio)
+
+pnpm exec vitest run tests/unit/recetas-ui/recipe-route-contract.test.ts
+  Test Files  1 passed (1)    Tests  25 passed (25)      <- el octavo ripple, VERDE
+pnpm exec vitest run tests/guards/guard-contrato-listados.test.ts
+  Test Files  1 passed (1)    Tests  20 passed (20)      <- el septimo, con seis modulos
+pnpm exec vitest run tests/unit/identity/usuarios/user-input.test.ts
+  Test Files  1 passed (1)    Tests  12 passed (12)
+pnpm exec vitest related --run lib/modules/identity/domain/{list-query,page,user-queryable,user-input,user-view}.ts
+  Test Files  2 passed (2)    Tests  32 passed (32)
+pnpm exec vitest run guard
+  Test Files 25 passed (25)   Tests  232 passed | 4 skipped (236)   <- TODAS las guardias
+```
+
+**Tasks cerradas en la tanda 2: T6, T7, T8.**
+
+---
+
 ## Mapa de trazabilidad `R<n> -> test`
 
 (T20)

@@ -682,6 +682,23 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260908210000_work_groups_and_members/down.sql',
     ];
 
+    // RETENSADO 2026-09-10 (QC-66), con el MISMO criterio que los cuatro retensados de arriba: el
+    // rango `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
+    // posterior se NOMBRA una a una o el caso deja de vigilar nada.
+    //
+    // POR QUE `db/` cambia aqui: QC-66 lleva el catalogo de permisos de once a trece, y su
+    // migracion es de DATOS. Solo INSERTA dos filas en `permissions` (`usuarios.consultar` y
+    // `usuarios.modificar`) y sus dos asignaciones en `role_permissions` para el `Administrador`.
+    // NO crea, modifica ni borra ninguna columna, tabla, indice, restriccion ni tipo (R43), y NO
+    // toca los tres indices unicos de `users` de QC-47 (R38). Ni recetas, ni unidades, ni pedidos.
+    // `db/schema.prisma` no esta en la lista porque esta ficha no lo toca.
+    //
+    // Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+    const MIGRACION_QC66 = [
+      'db/migrations/20260910120000_user_permissions_catalog/migration.sql',
+      'db/migrations/20260910120000_user_permissions_catalog/down.sql',
+    ];
+
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
       .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta))
@@ -691,7 +708,8 @@ describe('contrato de la ruta de recetas', () => {
       .filter((ruta) => !MIGRACION_QC34.includes(ruta))
       .filter((ruta) => !MIGRACION_QC47.includes(ruta))
       .filter((ruta) => !MIGRACIONES_LEGITIMAS.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC83.includes(ruta));
+      .filter((ruta) => !MIGRACION_QC83.includes(ruta))
+      .filter((ruta) => !MIGRACION_QC66.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',

@@ -124,7 +124,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 
 ## Bloque 2 — Dominio: contrato, actor y entrada
 
-### T6 — [P] `Actor` y `requirePermission` del módulo
+### [x] T6 — [P] `Actor` y `requirePermission` del módulo
 - **Depende de**: T3.
 - **Qué**: `Actor { id, companyId, permissions }` y `requirePermission` delegando en
   `assertPermission`, importado por **ruta relativa del propio dominio** (`design.md > 5.1`).
@@ -132,7 +132,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Cubre**: R2, R3, R5.
 - **Hecho cuando**: `typecheck` pasa y ningún import del archivo sale del propio `domain/`.
 
-### T7 — El contrato de lista, sexta copia, y la guardia de los «cinco módulos»
+### [x] T7 — El contrato de lista, sexta copia, y la guardia de los «cinco módulos»
 - **Depende de**: T0.
 - **Qué**: copiar **verbatim** `list-query.ts` y `page.ts` a `identity/domain/` (solo cambia el
   nombre del módulo en los comentarios), escribir `user-queryable.ts` con la lista blanca de
@@ -144,7 +144,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Hecho cuando**: la guardia pasa con seis módulos, incluidos sus bloques de equivalencia de
   comportamiento **y** de texto.
 
-### T8 — [P] Los esquemas de entrada y los tipos de salida
+### [x] T8 — [P] Los esquemas de entrada y los tipos de salida
 - **Depende de**: T3, T7.
 - **Qué**: `createUserSchema`, `updateUserSchema`, `setAccountStatusSchema` (`strictObject`, sin
   empresa, sin contraseña, sin estado en el alta, sin contadores) y `UserRow` / `UserDetail` con sus
