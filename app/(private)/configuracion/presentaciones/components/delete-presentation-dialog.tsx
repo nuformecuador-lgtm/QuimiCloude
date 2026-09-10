@@ -14,7 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import {
   deletePresentationAction,
@@ -125,7 +126,16 @@ export function DeletePresentationDialog({
             data-testid={DELETE_PRESENTATION_ERROR_TESTID}
             data-code={error.code}
           >
-            <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            {/*
+              QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+              identificador de la peticion. El CATALOGADO -`presentation_in_use` entre otros- se
+              pinta como siempre y sin identificador.
+            */}
+            {error.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={error} />
+            ) : (
+              <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            )}
           </div>
         )}
 

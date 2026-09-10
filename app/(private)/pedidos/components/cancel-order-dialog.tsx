@@ -14,8 +14,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Textarea } from '@/components/ui/textarea';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   cancelOrderAction,
@@ -195,7 +196,16 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
               data-testid={CANCEL_ORDER_ERROR_TESTID}
               data-code={error.code}
             >
-              <p data-testid="cancel-order-error-message">{error.message}</p>
+              {/*
+                QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade
+                el identificador de la peticion. El CATALOGADO -`not_cancellable` entre otros- se
+                pinta como siempre y sin identificador.
+              */}
+              {error.code === UNEXPECTED_ERROR_CODE ? (
+                <UnexpectedErrorNotice state={error} />
+              ) : (
+                <p data-testid="cancel-order-error-message">{error.message}</p>
+              )}
             </div>
           )}
 

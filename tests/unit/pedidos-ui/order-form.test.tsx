@@ -16,6 +16,11 @@
 // **Ningun assert sobre copy** (R44): controles y regiones por `data-testid` o por rol ARIA.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,6 +48,10 @@ import {
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
 import { Sheet } from '@/components/ui/sheet';
 import {
   DEFAULT_ORDER_PRIORITY,
@@ -677,5 +686,47 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     expect(error).toHaveTextContent('La receta no existe.');
     // El fallo del detalle no convierte el panel en un fallo del formulario.
     expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+  });
+});
+
+/**
+ * QC-71 T9 — R17 y R18 en el formulario de pedido.
+ *
+ * El formulario guarda el estado de error de la operacion ENTERO (`serverError`), y esta pareja de
+ * casos es la que lo demuestra: la copia campo a campo que habia antes dejaba el identificador por
+ * el camino sin que ningun test se enterara.
+ */
+describe('formulario de pedido — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValue(errorInesperado());
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
+    expect(region).toHaveAttribute('role', 'alert');
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'duplicate_number',
+      message: 'Ese correlativo ya existe.',
+    });
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
+    expect(within(region).getByTestId('order-form-error-code')).toHaveTextContent(
+      'duplicate_number',
+    );
+    esperarSinIdentificador();
   });
 });

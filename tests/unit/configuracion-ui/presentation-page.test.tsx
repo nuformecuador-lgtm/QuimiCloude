@@ -11,7 +11,7 @@
 // **Los tres estados se distinguen por `data-testid` DISTINTOS** (R35), nunca por copy: el copy
 // cambia sin avisar y un assert sobre el no dice nada sobre la exclusividad de los estados.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
@@ -34,6 +34,15 @@ import type { PresentationView } from '@/lib/modules/inventario';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { routerMock, listPresentationsActionMock, getSessionUserMock } = vi.hoisted(() => ({
@@ -361,5 +370,38 @@ describe('una sola llamada de lectura por pantalla (R7, R30)', () => {
       pageSize: MAX_PAGE_SIZE,
       search: 'saco',
     });
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el estado de error de la lista de presentaciones. */
+describe('lista de presentaciones — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    listPresentationsActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+
+    const region = await screen.findByTestId(PRESENTATION_LIST_ERROR_TESTID);
+
+    // Identificado por `data-testid`, nunca por su texto: lo prohibe la convencion de esta
+    // pantalla. `toHaveTextContent` sigue probando que el identificador esta RENDERIZADO como
+    // texto y no escondido en un atributo (R17).
+    const referencia = within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID);
+    expect(referencia).toHaveTextContent(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+    expect(referencia).toHaveTextContent(REFERENCIA_DEL_CASO);
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    listPresentationsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(PRESENTATION_LIST_ERROR_CODE_TESTID)).toHaveTextContent(
+      'unauthorized',
+    );
+    esperarSinIdentificador();
   });
 });

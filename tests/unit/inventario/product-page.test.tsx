@@ -7,6 +7,12 @@ import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+  UNEXPECTED_ERROR_NOTICE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import { UNEXPECTED_ERROR_CODE, errorMessage } from '@/lib/modules/errores';
+import {
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
@@ -31,6 +37,11 @@ import type {
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import {
   NARROW_VIEWPORT,
   WIDE_VIEWPORT,
@@ -1146,5 +1157,122 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await waitFor(() => expect(screen.queryByTestId(testId.dialogoBorrado)).toBeNull());
     expect(toastExito).toHaveBeenCalledTimes(1);
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * QC-71 T9 — R17 y R18 en la pantalla de inventario.
+ *
+ * Las tres superficies que pintan un error de una Server Action se prueban con la misma pareja de
+ * casos: con el error INESPERADO se ve el identificador **como texto**, y con un error DEL
+ * CATALOGO no se ve ninguno. El uuid del caso es inconfundible, y la asercion negativa es sobre el
+ * uuid, sobre la etiqueta y sobre el `data-testid` del aviso: si el identificador se colara por
+ * cualquiera de las tres vias, el caso se pone rojo.
+ *
+ * Nada se identifica por copy tecleado a mano: los `data-testid` y la etiqueta se IMPORTAN del
+ * componente compartido, y el mensaje sale de `errorMessage(...)`, o sea del catalogo.
+ */
+describe('pantalla de productos — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('la lista con el error inesperado ensena el identificador como texto y con su etiqueta', async () => {
+    listProductsActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+
+    const aviso = screen.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID);
+    expect(within(aviso).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(aviso).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+    // El mensaje sigue siendo el neutro del catalogo: el identificador no lo sustituye.
+    expect(aviso).toHaveTextContent(errorMessage(UNEXPECTED_ERROR_CODE));
+  });
+
+  it('la lista con un error del catalogo no ensena identificador ninguno', async () => {
+    listProductsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
+    esperarSinIdentificador();
+  });
+
+  it('el formulario conserva el identificador que devolvio la operacion', async () => {
+    // Es el caso que caza la copia campo a campo: el formulario guarda el estado de error ENTERO.
+    const user = setupUser();
+    createProductActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+
+    const region = await screen.findByTestId(testId.errorFormulario);
+    expect(region).toHaveAttribute('role', 'alert');
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('el formulario con un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    createProductActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+
+    const region = await screen.findByTestId(testId.errorFormulario);
+    expect(within(region).getByTestId('product-form-error-code')).toHaveTextContent('unauthorized');
+    esperarSinIdentificador();
+  });
+
+  it('el dialogo de borrado ensena el identificador del error inesperado', async () => {
+    const user = setupUser();
+    deleteProductActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await screen.findByTestId(testId.dialogoBorrado);
+    await user.click(screen.getByTestId(testId.confirmarBorrado));
+
+    const region = await screen.findByTestId('delete-product-error');
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('el dialogo de borrado con un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    deleteProductActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await screen.findByTestId(testId.dialogoBorrado);
+    await user.click(screen.getByTestId(testId.confirmarBorrado));
+
+    const region = await screen.findByTestId('delete-product-error');
+    expect(region).toHaveTextContent('No autorizado.');
+    esperarSinIdentificador();
   });
 });

@@ -166,3 +166,83 @@ generate` y `pnpm exec next typegen` (este ultimo porque sin los tipos de ruta g
 **peticion** reescrita, sustituye al del cliente, no vuelve al navegador, y las tres guardias del
 borde muerden. Listo para el bloque 2.
 
+
+---
+
+## TANDA B — T6, T7 (el tipo cerrado y el traductor)
+
+> **Nota de proceso, y no es un detalle.** El subagente que escribio esta tanda se corto por un
+> limite de la API **antes de verificar nada**, y su trabajo a medio terminar entro dentro del
+> commit `d9fe0ed` que el leader hizo para no perder la tanda A. O sea que `d9fe0ed` mezcla una
+> tanda verificada (A) con una sin verificar (B). La verificacion de B se hizo **despues**, sobre
+> el arbol ya commiteado, y esta abajo con su salida real; la limpieza que hizo falta va en
+> `3d8f872`. Queda escrito porque el reviewer va a ver dos tandas en un commit.
+
+### Archivos creados
+- `lib/modules/observabilidad/adapters/driven/request-id-headers.ts` — `readRequestIdHeader()`:
+  `(await headers()).get(REQUEST_ID_HEADER)`. Vive en un **driven** y no en el traductor porque el
+  dominio no puede importar `next/*`. **No entra en el cierre del borde** (el barrel solo reexporta
+  `./domain`), asi que R3 sigue en pie.
+- `tests/unit/observabilidad/error-state.test.ts` — R7, R8, R10, R11, R12, R13, R14, R15.
+- `tests/unit/observabilidad/error-state-types.test-d.ts` — las dos formas prohibidas de R16, cada
+  una con su `@ts-expect-error`. **Vitest no ejecuta este archivo** (`vitest.config.mts` incluye
+  `tests/**/*.test.ts`, y `*.test-d.ts` no casa): su mordisco entero lo da `tsc`, que si lo compila
+  porque `tsconfig.json` incluye `**/*.ts`. Esta escrito en su cabecera.
+- `tests/unit/observabilidad/error-state-types.test.ts` — el que si corre vitest: vigila por texto
+  que la declaracion siga siendo una union de dos ramas con `reference` **solo** en la del generico
+  y **sin `?`**, y que las dos construcciones prohibidas sigan en el `.test-d.ts` y sigan marcadas.
+  Sin el, borrar el `.test-d.ts` entero saldria en verde.
+
+### Archivos modificados
+- `lib/modules/errores/domain/error-state.ts` — `ErrorState` pasa de objeto con `reference?: string`
+  a **union cerrada**; el traductor pasa a `async`, resuelve el identificador (cabecera, o respaldo
+  con `origen=respaldo`), escribe **una** linea con el formato de `design.md > 5` y devuelve
+  `reference`. `ErrorLogEntry` se parte tambien en dos formas.
+- `lib/composition/index.ts` — fachada `observabilidad` con `readRequestIdHeader`. **Ningun puerto
+  nuevo** (R9).
+- `lib/modules/errores/index.ts` — publica lo nuevo.
+- Los **siete** adaptadores driving — reciben la lectura desde `@/lib/composition` y sus ramas de
+  error inline (`{ status:'error'; code: ErrorCode; message: string }`) pasan a ser `ErrorState`,
+  que es lo que hace que el `reference` llegue de verdad hasta la pantalla.
+- `tests/guards/guard-catalogo-de-errores.test.ts` (caso 8) — **endurecido, no relajado**: su
+  extractor entiende la union, sigue exigiendo que el conjunto de campos sea exactamente
+  `status/code/message/reference`, y gana dos exigencias nuevas (`reference` solo en la rama del
+  generico, y no opcional), cada una con su caso rojo.
+- `tests/unit/errores/to-error-state.test.ts` y los tests de los adaptadores — adaptados a la
+  fabrica `async` y al tipo cerrado. La unica asercion que **cambia de sentido** es la de
+  «R15 — QC-70 no la rellena»: ahora el camino inesperado si trae `reference` y el catalogado
+  sigue sin ella, que es exactamente lo que QC-71 vino a hacer.
+
+### R16 probado POR MUTACION, en los dos sentidos (salida real de `tsc`)
+
+Quitando los `@ts-expect-error` del `.test-d.ts` —o sea, afirmando que las dos formas prohibidas
+compilan—:
+
+```
+tests/unit/observabilidad/error-state-types.test-d.ts(25,14): error TS2322: Type '{ status: "error"; code: "unexpected"; message: string; }' is not assignable to type 'ErrorState'.
+tests/unit/observabilidad/error-state-types.test-d.ts(42,3): error TS2353: Object literal may only specify known properties, and 'reference' does not exist in type '{ status: "error"; code: "unauthorized" | ... 16 more ... | "incompatible_units"; message: string; }'.
+```
+
+Y al reves, reabriendo el tipo a `{ status:'error'; code: ErrorCode; message: string; reference?: string }`
+—el opcional que QC-70 dejo y que esta ficha cierra—:
+
+```
+tests/unit/observabilidad/error-state-types.test-d.ts(28,1): error TS2578: Unused '@ts-expect-error' directive.
+tests/unit/observabilidad/error-state-types.test-d.ts(47,3): error TS2578: Unused '@ts-expect-error' directive.
+tests/unit/observabilidad/error-state-types.test-d.ts(77,41): error TS2344: Type '{ reference: string; }' does not satisfy the constraint '"Expected: ..., Actual: never"'.
+tests/unit/observabilidad/error-state-types.test-d.ts(78,59): error TS2344: Type 'string' does not satisfy the constraint '"Expected: string, Actual: never"'.
+tests/unit/observabilidad/error-state.test.ts(94,3): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+```
+
+El arbol se restauro tras cada mutacion (`git status` limpio). **R16 queda cerrado: las dos formas
+prohibidas rompen el typecheck, y volver a abrir el tipo tambien lo rompe.**
+
+### Verificacion de la tanda (salida real)
+
+```
+$ pnpm run typecheck      -> sin salida, exit 0
+$ pnpm run lint           -> sin salida, exit 0 (los 4 avisos de imports muertos, limpiados en 3d8f872)
+$ pnpm run test:guardias  -> Test Files 28 passed (28) | Tests 290 passed | 4 skipped (294)
+$ pnpm exec vitest run tests/unit/{errores,observabilidad,unidades,pedidos,inventario,proveedores,recetas,configuracion-ui}
+                          -> Test Files 162 passed (162) | Tests 2135 passed | 13 skipped (2148)
+```
