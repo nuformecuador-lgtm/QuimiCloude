@@ -589,3 +589,140 @@ tocados) y en el mensaje del log, no en una corrida comparativa.
 **T1–T15 y T19–T26 cerradas.** T16, T17 y T18 siguen siendo del leader. Sigue en **F2.1**: sin PR,
 sin sincronizar con `dev`, sin `./init.sh`.
 
+---
+
+## Tanda 6 — tres menores del review de F2.2, y la sincronizacion con `dev` (F2.3)
+
+El `reviewer` aprobo la ficha: **0 mayores, 7 menores**, con 9 mutaciones aplicadas y revertidas
+(`progress/review_QC-78-estado-de-cuenta-en-el-acceso.md`). De los siete, aqui entran **tres**. El
+**menor 2** (la marca dentro del destino de vuelta) espera decision humana y **no se toco**; el
+**menor 4** (que solo dos de los tres cortes tengan E2E) queda documentado a proposito; los
+**menores 5 y 6** son del leader.
+
+### T27 — menor 1: R5 no lo ataba ningun test, y por que el test es del FUENTE
+
+El reviewer aplico la mutacion **M3** —mover el corte por estado **debajo** del bloque que llama a
+`registrarFallo`, que es literalmente la «uniformizacion» contra la que R5 avisa por su nombre— y
+`verify-credentials.test.ts` se quedo en **56 passed (56)**.
+
+**No era un descuido de los tests: esa mutacion no tiene efecto observable.** `registrarFallo`
+lleva **su propio** corte por estado efectivo al principio del bucle, calculado sobre los MISMOS
+valores (`visto` es `usuario`), asi que con el orden invertido se entra en la funcion y se sale sin
+escribir nada. R6 —«ese camino no escribe nada»— se conserva, y R6 es lo unico que unos puertos
+falsos pueden ver.
+
+O sea: **R5 no es una propiedad del comportamiento, es una propiedad del orden del codigo.** Se ata
+donde se puede atar, sobre el fuente, con el mismo idioma que ese archivo ya usa para QC-19 R17
+(`FUENTE_DE_VERIFY_CREDENTIALS` + `readFileSync`). Escribir un test de comportamiento que no cayera
+con M3 habria sido **peor que no tener ninguno**: daria por atado lo que no lo esta.
+
+El caso nuevo fija la **secuencia entera**, no solo el punto de R5, porque los tres ordenes son
+decisiones con requisito y los tres son «faciles de arreglar» por accidente:
+
+```
+hash (R2)  <  corte por estado (R5)  <  !correcta  <  corte de empresa (QC-48)
+```
+
+Cada ancla se comprueba ademas **presente y unica**: si una linea deja de existir tal cual, el caso
+cae por el `toBeGreaterThan(-1)` en vez de pasar en vacio comparando dos `-1`.
+
+**Evidencia de que muerde, con la mutacion del reviewer.** Aplicada M3 byte a byte (mover la linea
+del corte debajo del bloque de `registrarFallo`):
+
+```
+× el corte por estado va DESPUES del hash y ANTES de registrar el fallo, y el de empresa despues
+AssertionError: el corte por estado tiene que ir ANTES del `if (!correcta)` (R5): si se mueve
+debajo, `pending` e `inactive` entran en el camino de registro del intento fallido:
+expected 11444 to be less than 11332
+ Tests  1 failed | 56 passed (57)
+```
+
+Revertida con `git checkout --` y confirmada: **`57 passed (57)`**. Es exactamente la mutacion que
+antes dejaba 56/56 en verde.
+
+**Y `design.md > 11`, riesgo 1, queda corregido.** Afirmaba «hay test para cada uno de los dos
+ordenes» y para el corte de estado **era falso**. Ahora lleva el bloque que explica por que la
+mutacion no era observable y donde se ata de verdad.
+
+### T28 — menor 3: la segunda mitad de R30 (a), con test propio
+
+R30 (a) pide que la pantalla de login se renderice **igual** con la marca y sin ella. Eso se
+sostenia con (a) un argumento estructural y (b) la ausencia de toast en el E2E. Ninguna de las dos
+es la **igualdad** que pide el requisito.
+
+Se intento el test antes de decidir que no se podia, y **si se puede**: `tests/unit/identity/login-page-marca.test.tsx`
+(archivo **41** de la lista declarada) renderiza `LoginPage` con la marca y sin ella y compara el
+marcado. Tres casos:
+
+| Caso | Que ata |
+|---|---|
+| `el marcado con la marca es identico al marcado sin ella` | La igualdad literal, mas un `length > 100` y un `toContain('data-login="screen"')` para que comparar dos cadenas vacias no pase por la razon equivocada |
+| `tampoco cambia con otro valor de la marca, ni con la marca sin valor` | `fin`, `''` y `loquesea`: la pantalla ignora el valor, no solo el que usa la constante |
+| `el destino de vuelta SI cambia el marcado: la comparacion detecta diferencias` | **EL CONTROL.** Sin el, los dos casos de arriba no valdrian nada: hay que demostrar que la comparacion sabe ver una diferencia cuando la hay |
+
+Por que el requisito importa y no es celo: la marca viaja en la barra de direcciones, a la vista.
+Si algun dia se usara para pintar «tu sesion ha caducado» o «cuenta inactiva», la URL pasaria a
+distinguir **por que** no hay sesion — el oraculo que R3 lleva toda la ficha evitando.
+
+`app/(public)/login/page.tsx` **no se toca**: el test solo lo lee.
+
+### T29 — menor 7: las dos afirmaciones caducas
+
+El primer bloque de ampliacion de `tasks.md` y la primera mitad de esta bitacora decian «no hay
+R29». Era cierto al escribirse y el segundo bloque lo deroga, pero convivian sin nota. Los dos
+llevan ahora una advertencia que remite al bloque que manda.
+
+## F2.3 — sincronizacion con `dev`
+
+```
+$ git fetch origin dev && git merge origin/dev
+17 commits nuevos, entre ellos el merge de QC-70 (errores-centralizados, PR #52)
+116 files changed, 5217 insertions(+), 657 deletions(-)
+Merge: 74e6a94        SIN CONFLICTOS
+```
+
+**Conflictos: ninguno.** Se predijo antes de mezclar con `comm -12` sobre los dos diffs contra la
+base de fusion: de los 41 archivos de esta ficha y los 116 de `dev`, la interseccion era **un solo
+archivo**, `tests/unit/identity/account-status-scope.test.ts` —la guardia de QC-65, que `dev` toco
+en `d88c60b` («los centinelas de QC-65 y QC-38 solo muerden en su rama») y que esta ficha amplio en
+T9—. Git lo resolvio solo y se **inspecciono a mano** porque era el unico sitio donde un
+auto-merge silencioso podia hacer dano: sobreviven las dos cosas, la `SITIOS_PERMITIDOS` de 13
+entradas y la `PIEZAS_DE_QC19` reducida a `account-lock.ts` de QC-78, junto con la precondicion de
+rama de `dev`. La guardia pasa.
+
+**Los codigos de error que renombra QC-70 no rozaron esta ficha**: `identity` no consume el
+catalogo de errores y ninguno de los 41 archivos declarados aparece en el diff de QC-70 salvo el
+mencionado. No hubo que decidir nada ambiguo.
+
+### El typecheck heredado: RESUELTO por el merge
+
+```
+$ pnpm typecheck
+(sin salida)     exit 0
+```
+
+Los **tres** errores de `tests/unit/recetas/*` (`ProductRef.stock`) que la rama arrastraba desde
+`dev` y que dejaban `./init.sh` en rojo **han desaparecido**: los arreglo QC-70 en `d364405` («los
+dobles de recetas absorben el productStock que trae dev»). El **menor 5** del review, que era la
+unica condicion de cierre pendiente y no era de esta ficha, **queda cerrado por la sincronizacion**.
+
+### Verificacion despues del merge
+
+```
+$ pnpm typecheck                                    exit 0, sin salida
+$ pnpm lint                                         exit 0, sin salida
+$ pnpm exec vitest run guard                        26 archivos, 268 passed | 4 skipped
+$ pnpm exec vitest run <unitarios de la ficha>      49 archivos, 772 passed | 5 skipped
+$ pnpm exec vitest run tests/integration/identity/   5 archivos, 113 passed
+```
+
+**Cero rojos.** No se corrio la suite completa ni `./init.sh`: eso es F2.4 y lo corre el leader.
+Los E2E tampoco se re-ejecutaron tras el merge — la ultima corrida medida de `e2e/session.spec.ts`
+es la de la tanda 5 (**6 passed, exit 0, los dos navegadores**), sobre el codigo de esta ficha, que
+el merge no ha tocado.
+
+## Estado
+
+**T1–T15 y T19–T29 cerradas.** Rama sincronizada con `origin/dev` y typecheck limpio. T16, T17 y
+T18 siguen siendo del leader. **F2.3 hecha**: sin PR y sin `./init.sh`, que son F2.4.
+
