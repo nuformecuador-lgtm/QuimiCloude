@@ -258,7 +258,7 @@ declara sus 8 archivos y declara no tocar `db/schema.prisma`, `db/migrations/`, 
 - **Cubre**: R13, R17, R27–R31, R33, R34, R35, R37, R38, **R49**.
 - **Hecho cuando**: pasa, y el `beforeAll` falla con un mensaje claro si falta la migración de T4.
 
-### T17 — Integración: la carrera del último administrador
+### [x] T17 — Integración: la carrera del último administrador
 - **Depende de**: T13.
 - **Qué**: **dos conexiones de verdad** apagando dos administradores activos distintos de la misma
   empresa a la vez; se afirma que una falla con `last_administrator` y que al final queda ≥ 1
