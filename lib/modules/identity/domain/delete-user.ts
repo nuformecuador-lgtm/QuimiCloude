@@ -1,6 +1,6 @@
 // lib/modules/identity/domain/delete-user.ts
 import { requirePermission, type Actor } from './actor';
-import { LastAdministratorError, NotFoundError, SelfOperationError } from './errors';
+import { LastAdministratorError, SelfOperationError, UserNotFoundError } from './errors';
 import { ROLE_ADMINISTRADOR } from './roles';
 
 import type { UserAdminRepository } from '../ports/user-admin-repository';
@@ -56,7 +56,7 @@ export function createDeleteUser(
 
     if (outcome === 'ok') return;
     // R33, R34: no existe, esta borrado ya, o es de otra empresa son el MISMO caso.
-    if (outcome === 'not_found') throw new NotFoundError();
+    if (outcome === 'not_found') throw new UserNotFoundError();
     throw new LastAdministratorError();
   };
 }

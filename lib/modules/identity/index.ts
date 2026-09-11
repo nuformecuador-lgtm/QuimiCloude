@@ -85,7 +85,7 @@ export { requirePermission, type Actor } from './domain/actor';
 export {
   IdentityError,
   UnauthorizedError,
-  NotFoundError,
+  UserNotFoundError,
   DuplicateEmailError,
   DuplicateUsernameError,
   DuplicateDocumentError,

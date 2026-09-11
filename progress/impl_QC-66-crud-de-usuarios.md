@@ -1185,7 +1185,7 @@ cerraron asi, y **no se rediscuten**:
 | Clase | `code` |
 | --- | --- |
 | `UnauthorizedError` | `unauthorized` |
-| `NotFoundError` | `user_not_found` |
+| `UserNotFoundError` | `user_not_found` |
 | `DuplicateEmailError` | `duplicate_email` |
 | `DuplicateUsernameError` | `duplicate_username` |
 | `DuplicateDocumentError` | `duplicate_document` |
@@ -1320,12 +1320,48 @@ gana al final un bloque fechado `## 16. Correcciones durante la implementacion (
 **cinco** divergencias, una linea cada una. `requirements.md`, su tabla de decisiones y sus **49**
 requisitos **no se tocaron**.
 
-### Una pregunta de consistencia que NO decido, y paso al leader
+### El nombre de clase: `NotFoundError` -> `UserNotFoundError` (decidido por el leader)
 
-**`NotFoundError` conserva su nombre de clase aunque su codigo ya sea `user_not_found`.** El humano
-decidio los **codigos**, y dijo «un solo literal del contrato»: los nombres de clase no se
-mencionaron, asi que no se tocaron. Pero los otros cinco modulos **si** renombraron la clase
-(`UnitNotFoundError`, `OrderNotFoundError`, `SupplierNotFoundError`…), asi que `identity` queda como
-el unico con una clase generica. Alinearla a `UserNotFoundError` toca `domain/errors.ts`, el barrel,
-los casos de uso que la lanzan y cuatro tests. **Es cosmetico y reversible; lo decide el leader o el
-humano, no yo.**
+**ESTO ES UN RENOMBRADO DE CLASE, NO DE CODIGO. El `code` sigue siendo `user_not_found` y el
+contrato que consume QC-67 queda EXACTAMENTE IGUAL.** Se dice asi de explicito para que nadie lo
+lea manana como un cambio de contrato: lo unico que cambio del contrato en toda esta migracion fue
+`not_found` -> `user_not_found`, y eso lo decidio el humano; el nombre de la clase **no cruza
+ninguna frontera**.
+
+Lo decidio el **leader**, sin molestar al humano y con el criterio correcto: el humano decide los
+**codigos** —que es lo que ve QC-67—, y un nombre de clase es interno, mecanico y reversible. Los
+otros cinco modulos ya renombraron el suyo (`UnitNotFoundError`, `OrderNotFoundError`,
+`SupplierNotFoundError`…), asi que dejar `identity` como el unico con una clase generica era la
+inconsistencia que el proximo que pasara tendria que preguntar.
+
+**23 ocurrencias en 8 archivos**: `domain/errors.ts` (la declaracion y su docblock), `index.ts` (el
+reexport), los cuatro casos de uso que la lanzan (`get-user` con dos, `update-user`, `delete-user`,
+`set-user-account-status`) y dos tests (`errors.test.ts`, `user-actions.test.ts`).
+
+**La unica trampa del renombrado, y se esquivo:** `RoleNotFoundError` **contiene** la subcadena
+`NotFoundError`, asi que un reemplazo global lo habria convertido en `RoleUserNotFoundError`,
+rompiendo el codigo **y** el contrato. Se uso limite de palabra (`NotFoundError`, que no
+coincide entre la `e` y la `N` de `RoleNotFoundError`) y se verifico en las dos direcciones:
+`grep -rn "RoleUserNotFoundError"` **vacio**, y el conteo de `RoleNotFoundError` **identico** antes
+y despues en los seis archivos que lo usan.
+
+Nada resulto no-mecanico. Lo unico que merecia una mirada: en `errors.test.ts` el nombre vivia
+tambien como **cadena** (`{ clase: 'NotFoundError' }`) indexando un record del propio archivo —se
+renombraron los dos lados—. Ningun `error.name` se afirma sobre esta clase, ninguna guardia compara
+el nombre como cadena, y la unica lista congelada de nombres exportados por cadena es de `recetas`.
+
+El docblock de la clase decia «la CLASE conserva su nombre: lo que cambio es el literal del
+contrato, no la jerarquia», que tras esto **mentia**: se reescribio citando el nombre anterior, el
+motivo y que el `code` no cambia. Mismo criterio con el que QC-70 toco `recipe-prisma.ts` al
+renombrar su `DuplicateNameError`.
+
+### Verificacion tras el renombrado
+
+```
+pnpm run typecheck  -> 1 solo error: app/layout.tsx(43,56) LayoutProps (del leader)
+pnpm exec eslint .  -> sin salida (limpio)
+pnpm exec vitest run guard
+  -> Test Files  27 passed (27)   |   Tests  272 passed | 4 skipped (276)   <-- sigue en CERO rojos
+tests/unit/identity/ + tests/unit/composition/ + tests/unit/errores/ + tests/integration/identity/
+  -> Test Files  55 passed (55)   |   Tests  921 passed | 3 skipped (924)
+```

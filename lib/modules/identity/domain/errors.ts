@@ -54,7 +54,7 @@ export abstract class IdentityError extends Error {
  * `usuarios.consultar` ni al reves.
  *
  * `unauthorized` queda SOLO para el permiso que falta: el AMBITO de los datos —otra empresa,
- * borrado, yo mismo— se responde con `NotFoundError`. Ver la nota de abajo.
+ * borrado, yo mismo— se responde con `UserNotFoundError`. Ver la nota de abajo.
  */
 export class UnauthorizedError extends IdentityError {
   readonly code = 'unauthorized';
@@ -75,13 +75,19 @@ export class UnauthorizedError extends IdentityError {
  * «de otra empresa» responda no-encontrado y **no** `unauthorized`.
  *
  * QC-70 (R17), el 2026-09-10: su codigo era el generico `not_found`, que significaba cinco cosas
- * distintas segun quien lo lanzara; ahora es `user_not_found`, un codigo con UN mensaje. La CLASE
- * conserva su nombre: lo que cambio es el literal del contrato, no la jerarquia. Ojo: los
+ * distintas segun quien lo lanzara; ahora es `user_not_found`, un codigo con UN mensaje.
+ *
+ * QC-66, el 2026-09-10: la CLASE se llamaba `NotFoundError` y era la ultima generica de la
+ * aplicacion —los otros cinco modulos ya tienen la suya con nombre propio (`UnitNotFoundError`,
+ * `OrderNotFoundError`, `SupplierNotFoundError`…)—, asi que pasa a `UserNotFoundError`. El `code`
+ * NO cambio: sigue siendo `user_not_found`, y el contrato con QC-67 queda exactamente igual.
+ *
+ * Ojo: los
  * `'not_found'` que siguen apareciendo en `delete-user.ts`, `update-user.ts` y
  * `set-user-account-status.ts` son el RESULTADO DISCRIMINADO del puerto, no un codigo de error, y
  * no se tocan.
  */
-export class NotFoundError extends IdentityError {
+export class UserNotFoundError extends IdentityError {
   readonly code = 'user_not_found';
 
   constructor(diagnostic?: string) {

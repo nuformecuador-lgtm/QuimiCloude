@@ -37,7 +37,7 @@ import {
   DuplicateEmailError,
   DuplicateUsernameError,
   LastAdministratorError,
-  NotFoundError,
+  UserNotFoundError,
   RoleNotFoundError,
   SelfOperationError,
   UnauthorizedError,
@@ -434,7 +434,7 @@ describe('R6 — falta la SEGUNDA cara: hay getSessionUser pero no getSessionCon
 describe('R41 — traduccion de errores de dominio por su code estable', () => {
   const LOS_NUEVE: ReadonlyArray<{ readonly error: Error; readonly code: ErrorCode }> = [
     { error: new UnauthorizedError(), code: 'unauthorized' },
-    { error: new NotFoundError(), code: 'user_not_found' },
+    { error: new UserNotFoundError(), code: 'user_not_found' },
     { error: new DuplicateEmailError(), code: 'duplicate_email' },
     { error: new DuplicateUsernameError(), code: 'duplicate_username' },
     { error: new DuplicateDocumentError(), code: 'duplicate_document' },
@@ -512,7 +512,7 @@ describe('R41 — traduccion de errores de dominio por su code estable', () => {
   // reconocible y se comprueba que no aparece en ninguna parte del estado.
   it('el mensaje sale del catalogo por el code, y el diagnostico NO cruza al navegador', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-    getUserMock.mockRejectedValue(new NotFoundError('user-id=user-2 empresa=otra'));
+    getUserMock.mockRejectedValue(new UserNotFoundError('user-id=user-2 empresa=otra'));
 
     const resultado = await getUserAction('user-2');
 

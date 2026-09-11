@@ -3,9 +3,9 @@ import { requirePermission, type Actor } from './actor';
 import { throwDuplicate, toBirthDate } from './create-user';
 import {
   LastAdministratorError,
-  NotFoundError,
   RoleNotFoundError,
   SelfOperationError,
+  UserNotFoundError,
   ValidationError,
 } from './errors';
 import { updateUserSchema } from './user-input';
@@ -77,7 +77,7 @@ export function createUpdateUser(
     if (result === 'ok') return;
     // R33, R34: no existe, esta borrado o es de otra empresa son el MISMO caso, y el filtro vive en el
     // puerto (`…AliveInCompany`), no en un `if` de aqui.
-    if (result === 'not_found') throw new NotFoundError();
+    if (result === 'not_found') throw new UserNotFoundError();
     // R22: el adaptador aborto DENTRO de su transaccion, asi que no se escribio nada.
     if (result === 'last_administrator') throw new LastAdministratorError();
     if (result === 'role_not_found') throw new RoleNotFoundError();

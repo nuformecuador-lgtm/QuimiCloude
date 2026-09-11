@@ -10,7 +10,7 @@
 // estilo que `tests/unit/unidades/errors.test.ts`.
 //
 // QC-70, aplicado a `identity` el 2026-09-10: los nueve `code` son ahora `ErrorCode` del CATALOGO
-// UNICO y `NotFoundError` declara `user_not_found` en vez del generico `not_found` (enmienda a
+// UNICO y `UserNotFoundError` declara `user_not_found` en vez del generico `not_found` (enmienda a
 // QC-70 R25, aprobada por el humano). Con el patron nuevo hay dos cosas mas que SI son afirmables
 // sin mirar el texto: que NINGUN constructor acepta un mensaje —la unica cosa que admiten es el
 // `diagnostic`, que no se muestra— y que el mensaje sale del catalogo por su codigo.
@@ -27,7 +27,7 @@ import {
   DuplicateUsernameError,
   IdentityError,
   LastAdministratorError,
-  NotFoundError,
+  UserNotFoundError,
   RoleNotFoundError,
   SelfOperationError,
   UnauthorizedError,
@@ -38,7 +38,7 @@ import {
 // aqui sin cambiarlo alla (o al reves) rompe este archivo, que es la idea.
 const CASOS: readonly { readonly clase: string; readonly error: IdentityError; readonly code: ErrorCode }[] = [
   { clase: 'UnauthorizedError', error: new UnauthorizedError(), code: 'unauthorized' },
-  { clase: 'NotFoundError', error: new NotFoundError(), code: 'user_not_found' },
+  { clase: 'UserNotFoundError', error: new UserNotFoundError(), code: 'user_not_found' },
   { clase: 'DuplicateEmailError', error: new DuplicateEmailError(), code: 'duplicate_email' },
   { clase: 'DuplicateUsernameError', error: new DuplicateUsernameError(), code: 'duplicate_username' },
   { clase: 'DuplicateDocumentError', error: new DuplicateDocumentError(), code: 'duplicate_document' },
@@ -55,7 +55,7 @@ const CASOS: readonly { readonly clase: string; readonly error: IdentityError; r
  */
 const CLASES: Readonly<Record<string, new (diagnostic?: string) => IdentityError>> = {
   UnauthorizedError,
-  NotFoundError,
+  UserNotFoundError,
   DuplicateEmailError,
   DuplicateUsernameError,
   DuplicateDocumentError,
@@ -93,14 +93,14 @@ describe('lib/modules/identity — errores de dominio', () => {
   // `design.md > 6.4`: «de otra empresa» y «soy yo» responden no-encontrado y NO `unauthorized`,
   // para no dar un oraculo de existencia sobre datos ajenos. `unauthorized` es SOLO el permiso.
   it('user_not_found y unauthorized son codigos distintos: el ambito de los datos no se confunde con el permiso', () => {
-    expect(new NotFoundError().code).not.toBe(new UnauthorizedError().code);
+    expect(new UserNotFoundError().code).not.toBe(new UnauthorizedError().code);
   });
 
   // `design.md > 6.4`: `self_operation` SI se distingue de `user_not_found` a proposito, para que
   // QC-67 pueda decir «no puedes cambiar tu propio rol» sin mentir.
   it('self_operation no comparte code con user_not_found', () => {
     expect(new SelfOperationError().code).toBe('self_operation');
-    expect(new SelfOperationError().code).not.toBe(new NotFoundError().code);
+    expect(new SelfOperationError().code).not.toBe(new UserNotFoundError().code);
   });
 
   // `name` sale de la clase concreta (`new.target.name`), igual que en `unidades`: una traza
@@ -146,6 +146,6 @@ describe('lib/modules/identity — errores de dominio', () => {
   // Y sin diagnostico, el campo no existe: el traductor unico solo registra cuando hay algo que
   // registrar (R28).
   it('sin diagnostico, el campo queda sin definir', () => {
-    expect(new NotFoundError().diagnostic).toBeUndefined();
+    expect(new UserNotFoundError().diagnostic).toBeUndefined();
   });
 });

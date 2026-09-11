@@ -1,6 +1,6 @@
 // lib/modules/identity/domain/get-user.ts
 import { requirePermission, type Actor } from './actor';
-import { NotFoundError } from './errors';
+import { UserNotFoundError } from './errors';
 
 import type { UserDetail } from './user-view';
 
@@ -41,10 +41,10 @@ export function createGetUser(
 
     // R35: el actor no se ve a si mismo ni pidiendo su propio identificador. Va ANTES del puerto: no
     // se consulta lo que no se va a devolver.
-    if (id === actor.id) throw new NotFoundError();
+    if (id === actor.id) throw new UserNotFoundError();
 
     const user = await deps.users.findAliveInCompany(actor.companyId, id);
-    if (user === null) throw new NotFoundError();
+    if (user === null) throw new UserNotFoundError();
     return user;
   };
 }

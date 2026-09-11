@@ -2,8 +2,8 @@
 import { requirePermission, type Actor } from './actor';
 import {
   LastAdministratorError,
-  NotFoundError,
   SelfOperationError,
+  UserNotFoundError,
   ValidationError,
 } from './errors';
 import { ROLE_ADMINISTRADOR } from './roles';
@@ -72,7 +72,7 @@ export function createSetUserAccountStatus(
 
     if (outcome === 'ok') return;
     // R33, R34: no existe, esta borrado o es de otra empresa son el MISMO caso.
-    if (outcome === 'not_found') throw new NotFoundError();
+    if (outcome === 'not_found') throw new UserNotFoundError();
     throw new LastAdministratorError();
   };
 }
