@@ -9,6 +9,15 @@
 // afirma que aparece; el uuid se afirma en negativo, que es lo que importa.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -215,5 +224,41 @@ describe('`presentation_in_use` se pinta DENTRO del dialogo, que sigue abierto (
     expect(region).toHaveAttribute('data-code', 'presentation_not_found');
     expect(seCerro()).toBe(false);
     expect(toastExito).not.toHaveBeenCalled();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el dialogo de borrado de presentacion. */
+describe('el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    deletePresentationActionMock.mockResolvedValue(errorInesperado());
+    montar();
+
+    await user.click(screen.getByTestId(DELETE_PRESENTATION_CONFIRM_TESTID));
+
+    const region = await screen.findByTestId(DELETE_PRESENTATION_ERROR_TESTID);
+    const referencia = screen.getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID);
+    expect(region).toContainElement(referencia);
+    expect(referencia).toHaveTextContent(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+    // El uuid se afirma por el `data-testid` del aviso: la convencion de esta pantalla
+    // prohibe identificar un nodo por su texto. `toHaveTextContent` sigue probando que el
+    // identificador esta RENDERIZADO como texto y no escondido en un atributo (R17).
+    expect(referencia).toHaveTextContent(REFERENCIA_DEL_CASO);
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    deletePresentationActionMock.mockResolvedValue({
+      status: 'error',
+      code: PRESENTATION_IN_USE_CODE,
+      message: 'La presentación está en uso.',
+    });
+    montar();
+
+    await user.click(screen.getByTestId(DELETE_PRESENTATION_CONFIRM_TESTID));
+
+    const region = await screen.findByTestId(DELETE_PRESENTATION_ERROR_TESTID);
+    expect(region).toHaveAttribute('data-code', PRESENTATION_IN_USE_CODE);
+    esperarSinIdentificador();
   });
 });

@@ -16,5 +16,10 @@ export type { ErrorMessageKey } from './domain/error-catalog';
 // QC-70 T2 (R10): la UNICA implementacion del traductor de error de dominio a estado
 // serializable, y la forma CERRADA de ese estado. Los siete adaptadores driving la consumen
 // desde aqui; ninguno vuelve a escribir la suya.
+// QC-71 T7 (R7, R9, R16): `ErrorState` pasa a ser una UNION cerrada —el identificador es
+// obligatorio en la rama del error inesperado e inexpresable en las catalogadas—, y la fabrica
+// recibe la LECTURA de la cabecera como parametro. `RequestIdHeaderReader` es el tipo de esa
+// funcion, y se publica para que `lib/composition` pueda tipar el cableado sin que el dominio
+// declare ningun puerto nuevo.
 export { createErrorStateTranslator } from './domain/error-state';
-export type { ErrorState } from './domain/error-state';
+export type { ErrorState, RequestIdHeaderReader } from './domain/error-state';

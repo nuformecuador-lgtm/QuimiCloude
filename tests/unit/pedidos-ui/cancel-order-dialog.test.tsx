@@ -9,6 +9,15 @@
 // exportado o por rol accesible.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -205,5 +214,40 @@ describe('el exito aplica R35', () => {
     expect(routerMock.push).not.toHaveBeenCalled();
     expect(routerMock.replace).not.toHaveBeenCalled();
     expect(screen.queryByTestId(CANCEL_ORDER_ERROR_TESTID)).toBeNull();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el dialogo de cancelacion de pedido. */
+describe('el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    cancelOrderActionMock.mockResolvedValue(errorInesperado());
+    montar();
+
+    await user.type(screen.getByTestId(CANCEL_ORDER_REASON_TESTID), MOTIVO);
+    await user.click(screen.getByTestId(CANCEL_ORDER_CONFIRM_TESTID));
+
+    const region = await screen.findByTestId(CANCEL_ORDER_ERROR_TESTID);
+    const referencia = screen.getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID);
+    expect(region).toContainElement(referencia);
+    expect(referencia).toHaveTextContent(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+    expect(screen.getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    cancelOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'not_cancellable',
+      message: 'Este pedido ya no se puede cancelar.',
+    });
+    montar();
+
+    await user.type(screen.getByTestId(CANCEL_ORDER_REASON_TESTID), MOTIVO);
+    await user.click(screen.getByTestId(CANCEL_ORDER_CONFIRM_TESTID));
+
+    const region = await screen.findByTestId(CANCEL_ORDER_ERROR_TESTID);
+    expect(region).toHaveAttribute('data-code', 'not_cancellable');
+    esperarSinIdentificador();
   });
 });

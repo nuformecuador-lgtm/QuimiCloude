@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 import {
   createUnitAction,
@@ -150,9 +151,14 @@ type UnitFormState =
   | { status: 'success' }
   | {
       status: 'error';
-      /** Codigo ESTABLE de la operacion. Es lo que decide DONDE se pinta el mensaje. */
-      code: ErrorCode;
-      message: string;
+      /**
+       * El error de la operacion TAL CUAL. Su `code` es lo que decide DONDE se pinta el mensaje.
+       *
+       * **QC-71 (R17): entero, no copiado campo a campo.** La copia de `code` y `message` perdia
+       * el `reference` del error inesperado; un `reference?: string` local reabriria el agujero
+       * por el otro lado. Se guarda la union cerrada y el render estrecha por `code`.
+       */
+      serverError: ErrorState;
       fieldErrors: FieldErrors;
       values: FieldValues;
     };
@@ -216,7 +222,7 @@ export function buildUnitFormData(raw: FormData): FormData {
 async function submit(
   unitId: string | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
+): Promise<{ status: 'success' } | ErrorState> {
   if (unitId === undefined) {
     const result = await createUnitAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };
@@ -252,8 +258,7 @@ export function UnitForm({ unit, baseUnits, onSaved }: UnitFormProps) {
       const field = CODE_TO_FIELD[result.code];
       return {
         status: 'error',
-        code: result.code,
-        message: result.message,
+        serverError: result,
         fieldErrors: field === undefined ? {} : { [field]: result.message },
         values,
       };
@@ -271,7 +276,14 @@ export function UnitForm({ unit, baseUnits, onSaved }: UnitFormProps) {
 
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
   const values = state.status === 'error' ? state.values : undefined;
-  const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
+  /*
+    Es el ERROR, no un booleano: asi el render estrecha por `code` y le pide el identificador al
+    inesperado sin ningun `as` (QC-71 R17, R18).
+  */
+  const formError =
+    state.status === 'error' && Object.keys(fieldErrors).length === 0
+      ? state.serverError
+      : undefined;
 
   /**
    * Valores iniciales: lo escrito en el intento fallido; si no, los de la unidad que se edita
@@ -306,20 +318,29 @@ export function UnitForm({ unit, baseUnits, onSaved }: UnitFormProps) {
       </SheetHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {showFormError ? (
+        {formError === undefined ? null : (
           // Region de error del formulario (R37): aqui van los rechazos que no senalan campo.
+          //
+          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
           <div
             role="alert"
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
             data-testid={UNIT_FORM_ERROR_TESTID}
           >
-            <p>{state.message}</p>
-            <p className="text-xs" data-testid={UNIT_FORM_ERROR_CODE_TESTID}>
-              {state.code}
-            </p>
+            {formError.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={formError} />
+            ) : (
+              <>
+                <p>{formError.message}</p>
+                <p className="text-xs" data-testid={UNIT_FORM_ERROR_CODE_TESTID}>
+                  {formError.code}
+                </p>
+              </>
+            )}
           </div>
-        ) : null}
+        )}
 
         <UnitTextField
           id={`${fieldId}-${UNIT_NAME_FIELD}`}

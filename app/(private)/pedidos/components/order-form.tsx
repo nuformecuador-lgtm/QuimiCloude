@@ -3,6 +3,7 @@
 import { useActionState, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -30,7 +31,7 @@ import {
   createOrderAction,
   updateOrderAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeLineView } from '@/lib/modules/recetas';
@@ -190,8 +191,13 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
  * la entrada sale del catalogo -tipado `ErrorCode`-, en vez de ser un literal suelto. El valor no
  * cambia. El MENSAJE que lo acompana (`FORM_ERROR_MESSAGE`) es del formulario y se queda: la
  * validacion del front no se toca (R31, `design.md > 6 bis`).
+ *
+ * QC-71 (R16, R18): `satisfies` en vez de anotacion, para que el tipo se quede en el literal y
+ * pueda construir la rama CATALOGADA de `ErrorState`. Con `: ErrorCode` el tipo incluiria el
+ * codigo generico y este literal exigiria un `reference` que aqui no existe: el rechazo lo
+ * fabrica el formulario, no el servidor.
  */
-const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 type FieldErrors = Partial<Record<OrderFieldName, string>>;
@@ -209,9 +215,15 @@ type OrderFormState =
   | { status: 'success' }
   | {
       status: 'error';
-      /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: ErrorCode;
-      message: string;
+      /**
+       * El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion
+       * previa.
+       *
+       * **QC-71 (R17): entero, no copiado campo a campo.** La copia de `code` y `message` perdia
+       * el `reference` del error inesperado; un `reference?: string` local reabriria el agujero
+       * por el otro lado. Se guarda la union cerrada y el render estrecha por `code`.
+       */
+      serverError: ErrorState;
       fieldErrors: FieldErrors;
       values: FieldValues;
     };
@@ -242,7 +254,7 @@ function readValues(formData: FormData, isEdit: boolean): FieldValues {
 async function submit(
   order: OrderSummary | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
+): Promise<{ status: 'success' } | ErrorState> {
   if (order === undefined) {
     const result = await createOrderAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };
@@ -397,8 +409,7 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
       // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
       return {
         status: 'error',
-        code: INVALID_INPUT_CODE,
-        message: FORM_ERROR_MESSAGE,
+        serverError: { status: 'error', code: INVALID_INPUT_CODE, message: FORM_ERROR_MESSAGE },
         fieldErrors,
         values,
       };
@@ -411,8 +422,7 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
       const field = CODE_TO_FIELD[result.code];
       return {
         status: 'error',
-        code: result.code,
-        message: result.message,
+        serverError: result,
         fieldErrors: field === undefined ? {} : { [field]: result.message },
         values,
       };
@@ -435,7 +445,14 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
   const initialValue = (field: OrderFieldName, fromOrder: string): string =>
     values?.[field] ?? fromOrder;
 
-  const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
+  /*
+    Es el ERROR, no un booleano: asi el render estrecha por `code` y le pide el identificador al
+    inesperado sin ningun `as` (QC-71 R17, R18).
+  */
+  const formError =
+    state.status === 'error' && Object.keys(fieldErrors).length === 0
+      ? state.serverError
+      : undefined;
 
   return (
     /*
@@ -468,20 +485,29 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
       </SheetHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {showFormError ? (
+        {formError === undefined ? null : (
           // Region de error del formulario (R34): aqui van los rechazos que no senalan campo.
+          //
+          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
           <div
             role="alert"
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
             data-testid={ORDER_FORM_ERROR_TESTID}
           >
-            <p data-testid="order-form-error-message">{state.message}</p>
-            <p className="text-xs" data-testid="order-form-error-code">
-              {state.code}
-            </p>
+            {formError.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={formError} />
+            ) : (
+              <>
+                <p data-testid="order-form-error-message">{formError.message}</p>
+                <p className="text-xs" data-testid="order-form-error-code">
+                  {formError.code}
+                </p>
+              </>
+            )}
           </div>
-        ) : null}
+        )}
 
         {/*
           Rejilla de 12: la imagen ocupa 3 columnas y los campos las 9 restantes, uno al lado del

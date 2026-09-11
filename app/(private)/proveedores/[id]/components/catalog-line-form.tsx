@@ -5,6 +5,7 @@ import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   createCatalogLineSchema,
   updateCatalogLineSchema,
@@ -85,16 +86,22 @@ type FieldValues = Record<CatalogFieldName, string>;
  * Estado del formulario. **No es el estado que devuelve la action**: anade los errores por campo
  * de la validacion previa y los valores escritos. A la action se le pasa siempre el literal
  * `{ status: 'idle' }` -un archivo `'use server'` no puede exportar constantes, y las actions de
- * `proveedores` lo dejaron escrito- y su `code` y `message` se recogen tal cual.
+ * `proveedores` lo dejaron escrito- y su estado de error se recoge ENTERO.
  */
 type CatalogLineFormState =
   | { status: 'idle' }
   | { status: 'success' }
   | {
       status: 'error';
-      /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: ErrorCode;
-      message: string;
+      /**
+       * El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion
+       * previa.
+       *
+       * **QC-71 (R17): entero, no copiado campo a campo.** La copia de `code` y `message` perdia
+       * el `reference` del error inesperado; un `reference?: string` local reabriria el agujero
+       * por el otro lado. Se guarda la union cerrada y el render estrecha por `code`.
+       */
+      serverError: ErrorState;
       fieldErrors: FieldErrors;
       values: FieldValues;
     };
@@ -262,8 +269,7 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
       // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
       return {
         status: 'error',
-        code: INVALID_INPUT_CODE,
-        message: FORM_ERROR_MESSAGE,
+        serverError: { status: 'error', code: INVALID_INPUT_CODE, message: FORM_ERROR_MESSAGE },
         fieldErrors,
         values,
       };
@@ -283,8 +289,7 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
     if (result.status === 'error') {
       return {
         status: 'error',
-        code: result.code,
-        message: result.message,
+        serverError: result,
         /*
           La traduccion es por `code`, NUNCA por texto (R32, `design.md > 7`): el mensaje que
           devuelve la operacion se pinta, pero quien decide DONDE se pinta es el codigo estable.
@@ -318,7 +323,14 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
   const initialValue = (field: CatalogFieldName, fromLine: string): string =>
     values?.[field] ?? fromLine;
 
-  const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
+  /*
+    Es el ERROR, no un booleano: asi el render estrecha por `code` y le pide el identificador al
+    inesperado sin ningun `as` (QC-71 R17, R18).
+  */
+  const formError =
+    state.status === 'error' && Object.keys(fieldErrors).length === 0
+      ? state.serverError
+      : undefined;
   /*
     Los DOS «no existe» dejan al panel sin nada que guardar, asi que los dos ofrecen la vuelta a
     la lista (R20, `design.md > 4.3` nota sobre el 3). Se comprueban por separado y no con un
@@ -328,7 +340,8 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
   */
   const isMissing =
     state.status === 'error' &&
-    (state.code === CATALOG_LINE_NOT_FOUND_CODE || state.code === SUPPLIER_NOT_FOUND_CODE);
+    (state.serverError.code === CATALOG_LINE_NOT_FOUND_CODE ||
+      state.serverError.code === SUPPLIER_NOT_FOUND_CODE);
   const isEdit = line !== undefined;
 
   // `deliveryTime` es un entero en el contrato; se precarga como texto sin operar con el.
@@ -375,18 +388,27 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
           />
         )}
 
-        {showFormError ? (
+        {formError === undefined ? null : (
           // Region de error del formulario (R32): aqui van los rechazos que no senalan campo.
+          //
+          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
           <div
             role="alert"
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
             data-testid="catalog-line-form-error"
           >
-            <p data-testid="catalog-line-form-error-message">{state.message}</p>
-            <p className="text-xs" data-testid="catalog-line-form-error-code">
-              {state.code}
-            </p>
+            {formError.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={formError} />
+            ) : (
+              <>
+                <p data-testid="catalog-line-form-error-message">{formError.message}</p>
+                <p className="text-xs" data-testid="catalog-line-form-error-code">
+                  {formError.code}
+                </p>
+              </>
+            )}
             {isMissing ? (
               // `catalog_line_not_found` o `supplier_not_found`: la linea o el proveedor dejaron
               // de existir mientras el panel estaba abierto. Cual de las dos cosas paso lo dice
@@ -401,7 +423,7 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
               </Link>
             ) : null}
           </div>
-        ) : null}
+        )}
 
         <CatalogField
           name="name"

@@ -43,7 +43,7 @@ export async function SupplierListSection({ page, pageSize }: SupplierListSectio
   const result = await listSuppliersAction({ page, pageSize });
 
   if (result.status === 'error') {
-    return <SupplierListError code={result.code} message={result.message} />;
+    return <SupplierListError error={result} />;
   }
 
   const { items, page: currentPage, totalPages } = result.data;

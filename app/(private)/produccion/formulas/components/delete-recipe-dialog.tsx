@@ -16,7 +16,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
+import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { deleteRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeSummary } from '@/lib/modules/recetas';
 
@@ -42,7 +44,12 @@ const DELETE_SUCCESS = 'Receta borrada.';
  */
 export function DeleteRecipeDialog({ recipe }: { readonly recipe: RecipeSummary }) {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<{ code: string; message: string } | null>(null);
+  /*
+    El error, ENTERO. QC-71 (R17): era `{ code, message }` copiado a mano, y esa copia perdia el
+    `reference` del error inesperado. Un `reference?: string` local reabriria el agujero por el
+    otro lado, asi que se guarda la union cerrada y el render estrecha por `code`.
+  */
+  const [error, setError] = useState<ErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -50,7 +57,7 @@ export function DeleteRecipeDialog({ recipe }: { readonly recipe: RecipeSummary 
     startTransition(async () => {
       const result = await deleteRecipeAction(recipe.id);
       if (result.status === 'error') {
-        setError({ code: result.code, message: result.message });
+        setError(result);
         return;
       }
       setError(null);
@@ -88,7 +95,15 @@ export function DeleteRecipeDialog({ recipe }: { readonly recipe: RecipeSummary 
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {error === null ? null : (
+        {/*
+          QC-71 (R17, R18): el INESPERADO lo pinta el componente compartido -que necesita un
+          contenedor de bloque-; el CATALOGADO, exactamente como siempre y sin identificador.
+        */}
+        {error === null ? null : error.code === UNEXPECTED_ERROR_CODE ? (
+          <div role="alert" className="text-sm text-destructive" data-testid="delete-recipe-error">
+            <UnexpectedErrorNotice state={error} />
+          </div>
+        ) : (
           <p role="alert" className="text-sm text-destructive" data-testid="delete-recipe-error">
             {error.message}
           </p>

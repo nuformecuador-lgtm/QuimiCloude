@@ -36,7 +36,7 @@ export async function ProductListSection({ params }: ProductListSectionProps) {
   const result = await listProductsAction(params);
 
   if (result.status === 'error') {
-    return <ProductListError code={result.code} message={result.message} />;
+    return <ProductListError error={result} />;
   }
 
   const { items, page: currentPage, totalPages } = result.data;
