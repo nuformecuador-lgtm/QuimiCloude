@@ -194,7 +194,19 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // `guard-dependencias-aprobadas.test.ts`. Aqui se afirma lo especifico de esta ficha: que el
 // conteo no se movio y que nadie colo una libreria de identificadores. `crypto.randomUUID()` es
 // un global; no hay nada que instalar.
-export const DEPENDENCIAS_ESPERADAS = 30
+/**
+ * OJO — este total es un NUMERO MAGICO y ya mordio a quien no debia. La guardia nacio con QC-71
+ * para afirmar «QC-71 no anade ninguna dependencia» (R20), pero lo codifico como un total
+ * absoluto del repositorio, asi que **cualquier feature posterior que anada una dependencia
+ * APROBADA la rompe sin haber hecho nada mal**. La primera fue QC-79 el 2026-09-11, al instalar
+ * `resend` con aprobacion humana en F1.4 y su fila en `docs/dependencias.md`: 30 -> 31.
+ *
+ * Lo que SI sigue vigilando de verdad es `FRAGMENTOS_PROHIBIDOS`, que es la mitad que afirma algo
+ * sobre QC-71 y no sobre el resto del repo. La salida limpia -material de `/afinar-regla`- es que
+ * este caso compare contra las dependencias de `origin/dev` en el merge-base, o que se apoye en
+ * el registro de `docs/dependencias.md`, en vez de contra una constante escrita a mano.
+ */
+export const DEPENDENCIAS_ESPERADAS = 31
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** Fragmentos que delatan una libreria de identificadores o de criptografia. */

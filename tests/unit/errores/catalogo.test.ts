@@ -32,17 +32,25 @@ const moduleFiles = [
   'lib/modules/errores/domain/error-message.ts',
 ]
 
+/**
+ * QC-79: los codigos que hablan del enlace de ACTIVACION de una cuenta. Rozan el vocabulario de la
+ * autenticacion sin serlo, y por eso se declaran aqui uno a uno en vez de relajar el filtro.
+ */
+const CODIGOS_DE_ACTIVACION: readonly ErrorCode[] = ['credential_link_invalid']
+
 function readModuleFile(relPath: string): string {
   return readFileSync(join(repoRoot, relPath), 'utf8')
 }
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 32 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 34 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // 25 de `design.md > 3` + los SIETE de la administracion de usuarios que entraron el
-      // 2026-09-10 con la enmienda a R25 (QC-66). Sigue siendo un conteo LITERAL a proposito: un
-      // codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(32)
+      // 2026-09-10 con la enmienda a R25 (QC-66) + los DOS de QC-79 (el enlace invalido y la
+      // cuenta que ya no esta pendiente), que se apoyan en esa misma enmienda y no redactan
+      // ninguna nueva. Sigue siendo un conteo LITERAL a proposito: un codigo nuevo que nadie
+      // anote aqui pone esta linea en rojo.
+      expect(ERROR_CODES).toHaveLength(34)
       expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
@@ -53,7 +61,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 32 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 34 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
@@ -193,6 +201,13 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   // administracion de usuarios con fallos distinguibles, asi que esos SIETE codigos entran. Lo que
   // R25 protegia de verdad sigue en pie y es lo que se comprueba aqui: la AUTENTICACION no entra,
   // el rechazo del login sigue siendo generico y el modulo `errores` no depende de nadie.
+  //
+  // QC-79, el 2026-09-11: el conjunto de codigos AJENOS de abajo y el resto de la comprobacion NO
+  // cambian. Lo que cambia es el filtro por VOCABULARIO, que era un proxy escrito cuando ninguna
+  // palabra del catalogo rozaba la de la autenticacion: `credential_link_invalid` (R22) contiene
+  // `credential` y NO es autenticacion —es el enlace de ACTIVACION de una cuenta, una superficie
+  // publica sin sesion que no emite ninguna ni dice nada del login—. Se declara como excepcion
+  // NOMBRADA, no se borra el filtro, y el caso de mas abajo la acota a esa unica entrada.
   describe('R25 (enmendado) — la autenticacion se queda fuera, la administracion de usuarios entra', () => {
     it('ningun codigo del catalogo sale del login ni de la sesion', () => {
       const codigos: readonly string[] = ERROR_CODES
@@ -206,9 +221,24 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
         expect(codigos, `codigo de autenticacion en el catalogo: ${ajeno}`).not.toContain(ajeno)
       }
       for (const code of ERROR_CODES) {
+        if (CODIGOS_DE_ACTIVACION.includes(code)) continue
         expect(code, `codigo con vocabulario de autenticacion: ${code}`).not.toMatch(
           /credential|password|session|login|account/,
         )
+      }
+    })
+
+    // La excepcion de arriba, acotada y demostrada: es UNA sola, esta en el catalogo, y lo que la
+    // justifica —que no salga del login— se comprueba, no se promete.
+    it('la unica excepcion al vocabulario es el enlace de activacion de QC-79, y sigue sin ser autenticacion', () => {
+      const codigos: readonly string[] = ERROR_CODES
+
+      expect(CODIGOS_DE_ACTIVACION).toEqual(['credential_link_invalid'])
+      for (const code of CODIGOS_DE_ACTIVACION) {
+        expect(codigos, `la excepcion ${code} ya no esta en el catalogo`).toContain(code)
+        // Habla del ENLACE, no de una credencial que alguien presenta para entrar: la palabra
+        // `credential` va siempre acompanada de `link`.
+        expect(code).toMatch(/^credential_link_/)
       }
     })
 
@@ -225,6 +255,28 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       ]) {
         expect(codigos, `falta el codigo de usuarios ${code}`).toContain(code)
       }
+    })
+
+    // QC-79 (R34): las DOS entradas nuevas bajo el mismo encabezado de `identity`, sin ninguna
+    // enmienda nueva al catalogo cerrado: se apoyan en la de QC-66 que ya esta arriba.
+    it('los dos codigos de QC-79 estan, con su clave y su texto propios', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      for (const code of ['credential_link_invalid', 'user_not_pending'] as const) {
+        expect(codigos, `falta el codigo de QC-79 ${code}`).toContain(code)
+        expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
+        expect(errorMessage(code).trim().length).toBeGreaterThan(0)
+      }
+      // R22: la respuesta del enlace invalido es UNA y no nombra ninguno de los seis casos, para
+      // no convertir el enlace en un oraculo sobre si una cuenta existe o en que estado esta.
+      const enlace = errorMessage('credential_link_invalid')
+      for (const filtracion of ['caduc', 'expir', 'consumid', 'usado', 'sustitu', 'borrad', 'activ', 'existe']) {
+        expect(enlace.toLowerCase(), `el texto del enlace invalido revela un caso: ${filtracion}`).not.toContain(
+          filtracion,
+        )
+      }
+      // Y son distinguibles entre si y de los de QC-66 (R4, ya cubierto globalmente arriba).
+      expect(errorMessage('user_not_pending')).not.toBe(enlace)
+      expect(errorMessage('user_not_pending')).not.toBe(errorMessage('user_not_found'))
     })
 
     it('el modulo errores no importa identity ni lo nombra', () => {

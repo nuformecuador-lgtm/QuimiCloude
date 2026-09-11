@@ -589,7 +589,15 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // RETENSADO 2026-09-04 (QC-47): entra `Company` -R9, `users.company_id`-. Sigue siendo
     // igualdad EXACTA sobre el conjunto entero, no un `toContain`: cualquier relacion nueva
     // hacia proveedores, o hacia lo que sea, pone el caso rojo igual que antes.
-    expect(relationTargets('User')).toEqual(['Company', 'DocumentType', 'Role'])
+    // RETENSADO 2026-09-11 (QC-79): entra `CredentialSetupToken` -R11, el lado inverso de
+    // `credential_setup_tokens.user_id`, que Prisma EXIGE para el `@relation` del enlace-.
+    // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    expect(relationTargets('User')).toEqual([
+      'Company',
+      'CredentialSetupToken',
+      'DocumentType',
+      'Role',
+    ])
   })
 
   it('User NO gana ningun campo de relacion de vuelta hacia Supplier', () => {
@@ -597,7 +605,15 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // (`createdSuppliers Supplier[]` o similar) y este `toEqual` completo caeria. La lista
     // esperada es el conjunto EXACTO que `User` tiene hoy (hacia `DocumentType`, `Role` y
     // -desde QC-47 R9- `Company`), sin proveedores adentro.
-    expect(relationTargets('User')).toEqual(['Company', 'DocumentType', 'Role'])
+    // RETENSADO 2026-09-11 (QC-79): entra `CredentialSetupToken` -R11, el lado inverso de
+    // `credential_setup_tokens.user_id`, que Prisma EXIGE para el `@relation` del enlace-.
+    // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    expect(relationTargets('User')).toEqual([
+      'Company',
+      'CredentialSetupToken',
+      'DocumentType',
+      'Role',
+    ])
     expect(relationTargets('User')).not.toContain('Supplier')
     expect(relationTargets('User')).not.toContain('SupplierCatalogLine')
   })
