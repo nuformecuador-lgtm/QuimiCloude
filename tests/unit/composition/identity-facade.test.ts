@@ -154,3 +154,27 @@ describe('identity — los seis casos de uso de usuarios (fachada cableada)', ()
     expect(typeof identity.getSessionContext).toBe('function');
   });
 });
+
+// QC-94 T8 (R16) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no reformatea
+// ninguna de las fixtures ni de los casos de arriba.
+//
+// Lo que se afirma es el CABLEADO, no el dominio: que la fachada ya construida expone la consulta
+// del catalogo de roles y que las claves de arriba siguen ahi. Si alguien dejara `createListRoles`
+// sin cablear, o se lo llevara a otro sitio que no sea `lib/composition`, esto se pone rojo.
+describe('identity — la consulta del catalogo de roles (fachada cableada)', () => {
+  it('expone listRoles y es una funcion', async () => {
+    const { identity } = await import('@/lib/composition');
+
+    expect(typeof identity.listRoles).toBe('function');
+  });
+
+  it('sin romper las claves que ya tenia la fachada', async () => {
+    // La clave nueva se SUMA al final del objeto: cablear un caso de uso mas no reemplaza nada.
+    const { identity } = await import('@/lib/composition');
+
+    expect(typeof identity.getSessionUser).toBe('function');
+    expect(typeof identity.getSessionContext).toBe('function');
+    expect(typeof identity.listUsers).toBe('function');
+    expect(typeof identity.createUser).toBe('function');
+  });
+});
