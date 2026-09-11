@@ -336,3 +336,58 @@ E2E con Playwright (`pnpm exec playwright test e2e/usuarios.spec.ts`):
   ajena** a esta ficha —ninguna de las cinco es suya— y no se toco: limpiarlas es su propia
   decision, no un efecto colateral de esta.
 
+
+## F2.3 — Sincronizacion con `dev` (dos veces, porque `dev` avanzo dos veces)
+
+### Primera, contra `f783e06` (QC-80 dentro)
+
+Merge **sin conflictos**, y aun asi con un rojo: `usuarios-convenciones` acusaba a esta ficha de
+abrir `db/`, y los tres archivos eran la migracion `20260911120000_presentation_unit` de QC-80,
+llegada por el propio merge. **La causa era el rango de los centinelas**, que comparaban contra un
+SHA congelado con dos puntos —arbol contra arbol—, asi que se tragaban lo que `dev` aportaba. Se
+corrigio **contra que se compara** (ahora `git merge-base` contra `origin/dev`), nunca **que se
+exige**. `data-table-intacta-usuarios.test.ts` tenia el mismo defecto y pasaba de casualidad —QC-80
+no toco la tabla compartida—; se arreglo tambien.
+
+### Segunda, contra `30c06c7` (QC-86 dentro)
+
+Merge **sin conflictos** otra vez. Migracion `20260911120000_order_assignments` aplicada a la base
+propia `QuimiCloude_QC67` y cliente regenerado antes de verificar nada.
+
+**Las tres listas cerradas que solapaban, verificadas contra la FUENTE y no solo contra el numero:**
+
+| Lista | Ancla | Realidad | Veredicto |
+| --- | --- | --- | --- |
+| `guard-nav-permisos-declarados` — enlaces del menu | 8 | 8 enlaces `kind: 'link'` reales, y los 8 `testId` coinciden uno a uno | correcta: QC-86 **no** anadio item de menu, asi que el octavo sigue siendo el mio |
+| `guard-nav-permisos-declarados` — catalogo de permisos | 15 | 15 codigos reales | correcta: sube de 13 a 15 por los dos permisos de QC-86 |
+| `guard-identificador-de-request` — E2E | 14 | 14 specs reales en `e2e/` | correcta, con `usuarios.spec.ts` dentro |
+| `guard-identificador-de-request` — migraciones | 25 | 25 migraciones reales | correcta, con las de QC-80 y QC-86 |
+| `recipe-route-contract` — exports de `routes.ts` | — | `USERS_ROUTE` presente; QC-86 no anadio constante de ruta | correcta |
+
+**R37 comprobado por fuera**, que es ademas la prueba de que el arreglo del merge-base funciona:
+`git diff origin/dev...HEAD` sobre `lib/modules/identity`, `db` y `package.json` sale **vacio**, y
+el merge-base de los centinelas resuelve a `30c06c7`, el `dev` nuevo, sin tocar una linea.
+
+`tests/baseline-rojos.json` quedo **identico** al de `dev` (5 entradas): el merge no perdio nada.
+
+### Un rojo AJENO que el gate va a encontrar, y que no es de esta ficha
+
+`tests/guards/guard-validador-ve-worktrees-hermanos.test.ts` falla de forma **determinista** (3 de
+3 corridas), y **no lo causa esta rama**: el archivo y `scripts/validate-features.mjs` son
+**identicos** a los de `origin/dev` —QC-86 no los toco y esta ficha tampoco—, y el test monta su
+propio repo sintetico en un directorio temporal.
+
+**La causa es del entorno, y esta fechada.** `validate-features.mjs` resuelve la raiz del repo con
+`git rev-parse --git-common-dir` **desde el directorio actual**. Hoy a las **12:41** aparecio un
+repositorio git **vacio** (cero commits, rama `master`) en `C:\Users\Cristian`, el directorio
+personal. Desde entonces, esa llamada **desde cualquier directorio temporal** devuelve
+`C:/Users/Cristian/.git`, asi que el validador cree que la raiz del repo es el directorio personal
+y busca los specs en `C:/Users/Cristian/specs` y `C:/Users/Cristian/.worktrees/`, **que no
+existen** -> «faltan specs para features sdd en vuelo: QC-9».
+
+La cronologia lo confirma: el gate completo de esta rama paso **verde a las 12:34** con esta misma
+guardia dentro; el repositorio intruso nacio a las **12:41**; el rojo aparece a las **12:55**.
+
+**No se toca**, ni la guardia ni el validador ni el repositorio del directorio personal: borrar algo
+fuera del proyecto es decision humana, hay sesiones en paralelo y no es deuda de esta ficha. Queda
+reportado.
