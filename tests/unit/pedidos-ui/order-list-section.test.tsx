@@ -10,7 +10,7 @@
 // **Los tres estados se distinguen por `data-testid` DISTINTOS** (R44), nunca por copy: el copy
 // cambia sin avisar y un assert sobre el no dice nada sobre la exclusividad de los estados.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OrderListSection, OrderListSkeleton } from '@/app/(private)/pedidos/components';
@@ -19,6 +19,16 @@ import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderListResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+  UNEXPECTED_ERROR_NOTICE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const {
@@ -274,5 +284,33 @@ describe('una sola llamada de lectura por pantalla (R7, R41)', () => {
     ]);
     // Nunca la ficha por fila (alternativa M, descartada).
     expect(getOrderActionMock).not.toHaveBeenCalled();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el estado de error de la lista de pedidos. */
+describe('lista de pedidos — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    listOrdersActionMock.mockResolvedValue(errorInesperado());
+
+    render(await OrderListSection({ params: parametros() }));
+
+    const aviso = screen.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID);
+    expect(within(aviso).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(aviso).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    listOrdersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
+    esperarSinIdentificador();
   });
 });

@@ -1,6 +1,11 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import type { UserEvent } from '@testing-library/user-event';
 
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificador-de-request';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
@@ -1327,5 +1332,40 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
     esperarQueNoSeInvocoNingunaAccion();
     expect(screen.getByTestId('recipe-field-name')).toHaveValue('Receta con vista previa');
     expect(areaDePaso(0)).toHaveTextContent('Mezclar despacio');
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el formulario de receta. */
+describe('formulario de receta — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    updateRecipeActionMock.mockResolvedValue(errorInesperado());
+    renderEditForm(recipeDetail());
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    const region = await screen.findByTestId('recipe-form-error');
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    updateRecipeActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado para editar esta receta.',
+    });
+    renderEditForm(recipeDetail());
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    const region = await screen.findByTestId('recipe-form-error');
+    expect(within(region).getByTestId('recipe-form-error-code')).toHaveTextContent('unauthorized');
+    expect(screen.queryByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeNull();
+    expect(screen.queryByText(REFERENCIA_DEL_CASO)).toBeNull();
+    expect(document.body.textContent ?? '').not.toContain(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
   });
 });

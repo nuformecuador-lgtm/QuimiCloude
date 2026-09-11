@@ -1,6 +1,6 @@
 'use server';
 
-import { identity, inventario } from '@/lib/composition';
+import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
   InventarioError,
@@ -54,7 +54,7 @@ function readFormString(formData: FormData, name: string): string {
 }
 
 /** El traductor UNICO (R10), parametrizado por la base de este modulo. Ver `product-actions.ts`. */
-const toErrorState = createErrorStateTranslator(InventarioError);
+const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
 
 /** El actor que exige R1/D17: se resuelve UNA vez por invocacion (ver `product-actions.ts`). */
 async function currentActor(): Promise<Actor | null> {

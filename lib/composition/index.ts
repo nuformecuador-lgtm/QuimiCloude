@@ -158,6 +158,8 @@ import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import { readRequestIdHeader } from '@/lib/modules/observabilidad/adapters/driven/request-id-headers';
+import type { RequestIdHeaderReader } from '@/lib/modules/errores';
 // QC-66 T15 — la administracion de usuarios. Las SEIS factories salen del CONTRATO del modulo
 // (`@/lib/modules/identity`, solo dominio) y los dos puertos que cablean, de `ports/`; el adaptador
 // driving de T14 NO se importa desde aqui (la flecha va driving -> composicion).
@@ -180,6 +182,12 @@ import { createRandomCredentialHash } from '@/lib/modules/identity/adapters/driv
 import type { InitialCredentialFactory } from '@/lib/modules/identity/ports/initial-credential-factory';
 import type { ListQueryLog as IdentityListQueryLog } from '@/lib/modules/identity/ports/list-query-log';
 import type { UserAdminRepository } from '@/lib/modules/identity/ports/user-admin-repository';
+// QC-94 T8 — la consulta del catalogo de roles. La factory sale del CONTRATO del modulo
+// (`@/lib/modules/identity`, solo dominio), el puerto de `ports/` y la implementacion del adaptador
+// driven; el adaptador driving de T9 NO se importa desde aqui (la flecha va driving -> composicion).
+import { createListRoles } from '@/lib/modules/identity';
+import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
+import type { RoleCatalogRepository } from '@/lib/modules/identity/ports/role-catalog-repository';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -245,6 +253,13 @@ const initialCredentialFactory: InitialCredentialFactory = {
     createRandomCredentialHash({ hasher: passwordHasher, checkCredentialPolicy }),
 };
 
+/**
+ * QC-94 T8 (`design.md > 5`) — `RoleCatalogRepository` cableado con el adaptador driven de
+ * `identity`. UN solo metodo y de SOLO LECTURA: el caso de uso solo conoce el TIPO, nunca esta
+ * implementacion, y escribir un rol no es expresable a traves de este puerto (R17).
+ */
+const roleCatalogRepository: RoleCatalogRepository = { listAll: listAllRoles };
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -293,6 +308,12 @@ export const identity = {
   updateUser: createUpdateUser({ users: userAdminRepository }),
   deleteUser: createDeleteUser({ users: userAdminRepository }),
   setUserAccountStatus: createSetUserAccountStatus({ users: userAdminRepository }),
+  // QC-94 T8 (`design.md > 5`) — la consulta del catalogo de roles, la pieza que le falta a QC-67
+  // para pintar el selector. Clave NUEVA al FINAL del objeto: ninguna de las de arriba se toca.
+  //
+  // El ACTOR tampoco se resuelve aqui (R5): lo construye la Server Action de T9 con las dos caras
+  // de la sesion. Y no se le pasa ninguna empresa: el catalogo es GLOBAL (R11).
+  listRoles: createListRoles({ roles: roleCatalogRepository }),
 } as const;
 
 /**
@@ -597,4 +618,24 @@ export const pedidos = {
   updateOrder: createUpdateOrder({ orders: orderRepository, recipes: recipeCatalog }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// `observabilidad` (QC-71, T7). Bloque NUEVO al final, mismo criterio que los anteriores: no
+// reordena ni reformatea nada de lo de arriba. Su import vive al final del bloque de imports.
+//
+// Es el UNICO sitio del repo donde la lectura de la cabecera se ata a su implementacion. El
+// traductor de `errores` la recibe por parametro y no conoce `next/headers` (R9, y
+// `docs/architecture.md > Punto unico de composicion`): sin este cableado, el dominio tendria
+// que importar el framework, que es exactamente lo que la regla de dependencias prohibe.
+//
+// La fachada del BORDE (`newRequestId`) NO esta aqui, sino en `lib/composition/edge.ts`: este
+// archivo cablea Prisma y el borde no puede cargarlo (R3). Son dos mitades del mismo punto de
+// composicion, no dos puntos.
+// ---------------------------------------------------------------------------------------
+
+/** Fachada del modulo `observabilidad` ya cableada. La consumen los siete adaptadores driving,
+ *  que se la pasan al traductor unico de errores (`createErrorStateTranslator`). */
+export const observabilidad = {
+  readRequestIdHeader: readRequestIdHeader satisfies RequestIdHeaderReader,
 } as const;

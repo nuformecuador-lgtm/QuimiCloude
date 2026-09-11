@@ -16,7 +16,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
+import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { CatalogLineView } from '@/lib/modules/proveedores';
 import {
   deleteCatalogLineAction,
@@ -89,7 +91,19 @@ export function DeleteCatalogLineDialog({ line }: { readonly line: CatalogLineVi
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {state.status === 'error' ? (
+        {/*
+          QC-71 (R17, R18): el INESPERADO lo pinta el componente compartido -que necesita un
+          contenedor de bloque-; el CATALOGADO, exactamente como siempre y sin identificador.
+        */}
+        {state.status !== 'error' ? null : state.code === UNEXPECTED_ERROR_CODE ? (
+          <div
+            role="alert"
+            className="text-sm text-destructive"
+            data-testid="delete-catalog-line-error"
+          >
+            <UnexpectedErrorNotice state={state} />
+          </div>
+        ) : (
           <p
             role="alert"
             className="text-sm text-destructive"
@@ -97,7 +111,7 @@ export function DeleteCatalogLineDialog({ line }: { readonly line: CatalogLineVi
           >
             {state.message}
           </p>
-        ) : null}
+        )}
 
         <form action={formAction}>
           <input

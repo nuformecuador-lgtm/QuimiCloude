@@ -61,13 +61,13 @@ export async function PresentationListSection({ params }: PresentationListSectio
   ]);
 
   if (result.status === 'error') {
-    return <PresentationListError code={result.code} message={result.message} />;
+    return <PresentationListError error={result} />;
   }
 
   // R19: el catalogo de unidades no es un adorno de esta pantalla —es el campo obligatorio del
   // formulario—, asi que su fallo tumba la pantalla entera en vez de abrir un panel inservible.
   if (unitsResult.status === 'error') {
-    return <PresentationListError code={unitsResult.code} message={unitsResult.message} />;
+    return <PresentationListError error={unitsResult} />;
   }
 
   const units = unitsResult.data;

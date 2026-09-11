@@ -240,47 +240,108 @@ export function findForbiddenGenericComparisonFindings(file: SourceFile): readon
 
 export const ERROR_STATE_FIELDS = ['status', 'code', 'message', 'reference'] as const
 
-/** Los campos declarados en `type ErrorState = { ... }`, leidos del fuente. */
-export function extractErrorStateFields(source: string): readonly string[] | null {
-  const inicio = /type\s+ErrorState\s*=\s*\{/.exec(source)
+/**
+ * **QC-71 (R16) RELLENO EL HUECO QUE QC-70 DEJO ABIERTO, Y ESO ENDURECE ESTA GUARDIA EN VEZ DE
+ * AFLOJARLA.** Hasta esta ficha `ErrorState` era un objeto plano con `reference?: string`, un
+ * hueco reservado que QC-70 nunca rellenaba; el parser de aqui buscaba `type ErrorState = {` y
+ * daba por buena esa forma. Ahora el tipo es una UNION de dos ramas —el identificador es
+ * OBLIGATORIO en la del codigo generico e INEXPRESABLE en las catalogadas—, asi que el parser
+ * lee ramas en vez de un solo cuerpo.
+ *
+ * Lo que la guardia ya exigia se conserva entero: el conjunto de campos de las DOS ramas es
+ * exactamente `status/code/message/reference`, ni uno mas —un `diagnostic` aqui manda el dato
+ * variable al navegador (R30)— ni uno menos. Y gana dos exigencias que antes no se podian
+ * escribir:
+ *   1. `reference` aparece **solo** en la rama del codigo generico (R15: el error del catalogo
+ *      no lleva identificador);
+ *   2. `reference` **no** es opcional (R16: un `?` devolveria exactamente el fallo que QC-71
+ *      viene a cerrar, y lo haria en verde).
+ */
+export type ErrorStateBranch = { readonly fields: readonly string[]; readonly source: string }
+
+/**
+ * Las ramas de la declaracion de `ErrorState`, leidas del fuente. Una sola rama —el objeto
+ * plano de QC-70— tambien se lee: es lo que permite que el caso rojo de la regresion muerda.
+ */
+export function extractErrorStateBranches(source: string): readonly ErrorStateBranch[] | null {
+  const inicio = /type\s+ErrorState\s*=/.exec(source)
   if (!inicio) return null
+  const desde = (inicio.index ?? 0) + inicio[0].length
+  const branches: ErrorStateBranch[] = []
   let profundidad = 0
-  let fin = -1
-  for (let i = (inicio.index ?? 0) + inicio[0].length - 1; i < source.length; i += 1) {
+  let comienzo = -1
+  for (let i = desde; i < source.length; i += 1) {
     const caracter = source[i]
-    if (caracter === '{') profundidad += 1
+    if (caracter === '{') {
+      if (profundidad === 0) comienzo = i + 1
+      profundidad += 1
+    }
     if (caracter === '}') {
       profundidad -= 1
-      if (profundidad === 0) {
-        fin = i
-        break
+      if (profundidad === 0 && comienzo !== -1) {
+        branches.push({ fields: [], source: source.slice(comienzo, i) })
+        comienzo = -1
+        // La union sigue solo si lo siguiente que hay es otro '|'; si no, la declaracion acabo.
+        if (!/^\s*\|/.test(source.slice(i + 1))) break
       }
     }
   }
-  if (fin === -1) return null
-  const cuerpo = source
-    .slice((inicio.index ?? 0) + inicio[0].length, fin)
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .split('\n')
-    .map((linea) => linea.replace(/\/\/.*$/, ''))
-    .join('\n')
-  return [...cuerpo.matchAll(/(\w+)\s*\??\s*:/g)].map((match) => match[1] as string)
+  if (branches.length === 0) return null
+  return branches.map((branch) => {
+    const cuerpo = branch.source
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .split('\n')
+      .map((linea) => linea.replace(/\/\/.*$/, ''))
+      .join('\n')
+    return {
+      source: cuerpo,
+      fields: [...cuerpo.matchAll(/(\w+)\s*\??\s*:/g)].map((match) => match[1] as string),
+    }
+  })
+}
+
+/** Los campos declarados por el tipo, con las dos ramas juntas y sin repetir. */
+export function extractErrorStateFields(source: string): readonly string[] | null {
+  const branches = extractErrorStateBranches(source)
+  if (branches === null) return null
+  const campos: string[] = []
+  for (const branch of branches) {
+    for (const campo of branch.fields) if (!campos.includes(campo)) campos.push(campo)
+  }
+  return campos
 }
 
 /**
- * La DECLARACION del tipo —no una instancia— tiene exactamente los cuatro campos (R30). Se lee
- * del archivo para que muerda el dia que alguien lo DECLARE, sin necesidad de que llegue a
- * ejecutarse ni de que un objeto concreto lo lleve.
+ * La DECLARACION del tipo —no una instancia— tiene exactamente los cuatro campos (R30), y el
+ * identificador vive donde le toca y como le toca (QC-71 R15, R16). Se lee del archivo para que
+ * muerda el dia que alguien lo DECLARE, sin necesidad de que llegue a ejecutarse ni de que un
+ * objeto concreto lo lleve.
  */
 export function findErrorStateShapeFindings(relPath: string, source: string): readonly string[] {
-  const campos = extractErrorStateFields(source)
-  if (campos === null) return [`${relPath}: no se encontro la declaracion de 'type ErrorState' (R30)`]
+  const branches = extractErrorStateBranches(source)
+  if (branches === null) return [`${relPath}: no se encontro la declaracion de 'type ErrorState' (R30)`]
+  const campos = extractErrorStateFields(source) ?? []
   const declarados: readonly string[] = ERROR_STATE_FIELDS
   const findings = campos
     .filter((campo) => !declarados.includes(campo))
     .map((campo) => `${relPath}: el tipo ErrorState declara el campo '${campo}', fuera de ${declarados.join('/')} (R30)`)
   const faltan = declarados.filter((campo) => !campos.includes(campo))
-  return [...findings, ...faltan.map((campo) => `${relPath}: el tipo ErrorState ya no declara '${campo}' (R30)`)]
+  findings.push(...faltan.map((campo) => `${relPath}: el tipo ErrorState ya no declara '${campo}' (R30)`))
+
+  // QC-71 (R15, R16): donde vive el identificador, y como.
+  const conReferencia = branches.filter((branch) => branch.fields.includes('reference'))
+  if (conReferencia.length > 1) {
+    findings.push(`${relPath}: 'reference' se declara en ${conReferencia.length} ramas, y solo puede vivir en la del codigo generico (QC-71 R15)`)
+  }
+  for (const branch of conReferencia) {
+    if (/\breference\s*\?\s*:/.test(branch.source)) {
+      findings.push(`${relPath}: 'reference' esta declarado OPCIONAL, que es el fallo que QC-71 cierra (QC-71 R16)`)
+    }
+    if (!/code\s*:\s*typeof UNEXPECTED_ERROR_CODE/.test(branch.source)) {
+      findings.push(`${relPath}: la rama que declara 'reference' no es la del codigo generico (QC-71 R15)`)
+    }
+  }
+  return findings
 }
 
 // ---------------------------------------------------------------------------
@@ -509,30 +570,29 @@ describe('guardia del catalogo de errores (QC-70 T3)', () => {
     })
   })
 
-  describe('caso 8 — forma cerrada de ErrorState (R30)', () => {
+  describe('caso 8 — forma cerrada de ErrorState (R30 + QC-71 R15, R16)', () => {
+    // Los fixtures pasan a la forma NUEVA: la union de dos ramas que dejo QC-71. La de QC-70
+    // —objeto plano con `reference?: string`— se conserva mas abajo, pero como CASO ROJO: era el
+    // hueco, y desde esta ficha volver a el es una regresion, no el estado bueno.
     const TIPO_LIMPIO = [
-      'export type ErrorState = {',
-      "  status: 'error'",
-      '  code: ErrorCode',
-      '  message: string',
-      '  /** Hueco de QC-71. */',
-      '  reference?: string',
-      '}',
+      'export type ErrorState =',
+      "  | { status: 'error'; code: Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>; message: string }",
+      "  | { status: 'error'; code: typeof UNEXPECTED_ERROR_CODE; message: string; reference: string }",
     ].join('\n')
 
     it('muerde: la DECLARACION del tipo gana un campo de diagnostico', () => {
-      const conDiagnostico = TIPO_LIMPIO.replace('  reference?: string', '  reference?: string\n  diagnostic: string')
+      const conDiagnostico = TIPO_LIMPIO.replace('message: string; reference: string }', 'message: string; reference: string; diagnostic: string }')
       expect(findErrorStateShapeFindings(TRANSLATOR_FILE, conDiagnostico)).toEqual([
         `${TRANSLATOR_FILE}: el tipo ErrorState declara el campo 'diagnostic', fuera de status/code/message/reference (R30)`,
       ])
     })
 
     it('muerde tambien: cualquier otro campo de mas, y un campo declarado que desaparece', () => {
-      const conExtra = TIPO_LIMPIO.replace('  message: string', '  message: string\n  cause: unknown')
+      const conExtra = TIPO_LIMPIO.replace("code: Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>; message: string }", "code: Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>; message: string; cause: unknown }")
       expect(findErrorStateShapeFindings(TRANSLATOR_FILE, conExtra)).toEqual([
         `${TRANSLATOR_FILE}: el tipo ErrorState declara el campo 'cause', fuera de status/code/message/reference (R30)`,
       ])
-      const sinReferencia = TIPO_LIMPIO.replace('  reference?: string', '')
+      const sinReferencia = TIPO_LIMPIO.replace('; reference: string }', ' }')
       expect(findErrorStateShapeFindings(TRANSLATOR_FILE, sinReferencia)).toEqual([
         `${TRANSLATOR_FILE}: el tipo ErrorState ya no declara 'reference' (R30)`,
       ])
@@ -541,14 +601,50 @@ describe('guardia del catalogo de errores (QC-70 T3)', () => {
       ])
     })
 
-    it('limpio: los cuatro campos declarados y ninguno mas', () => {
+    it('muerde (QC-71 R15): `reference` se cuela tambien en la rama catalogada', () => {
+      const enLasDos = TIPO_LIMPIO.replace(
+        "code: Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>; message: string }",
+        "code: Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>; message: string; reference: string }",
+      )
+      expect(findErrorStateShapeFindings(TRANSLATOR_FILE, enLasDos)).toEqual([
+        `${TRANSLATOR_FILE}: 'reference' se declara en 2 ramas, y solo puede vivir en la del codigo generico (QC-71 R15)`,
+        `${TRANSLATOR_FILE}: la rama que declara 'reference' no es la del codigo generico (QC-71 R15)`,
+      ])
+    })
+
+    it('muerde (QC-71 R16): `reference` vuelve a ser opcional', () => {
+      const opcional = TIPO_LIMPIO.replace('reference: string }', 'reference?: string }')
+      expect(findErrorStateShapeFindings(TRANSLATOR_FILE, opcional)).toEqual([
+        `${TRANSLATOR_FILE}: 'reference' esta declarado OPCIONAL, que es el fallo que QC-71 cierra (QC-71 R16)`,
+      ])
+    })
+
+    it('muerde (QC-71 R16): se vuelve al objeto plano de QC-70, con el hueco opcional', () => {
+      const comoQC70 = [
+        'export type ErrorState = {',
+        "  status: 'error'",
+        '  code: ErrorCode',
+        '  message: string',
+        '  /** Hueco de QC-71. */',
+        '  reference?: string',
+        '}',
+      ].join('\n')
+      expect(findErrorStateShapeFindings(TRANSLATOR_FILE, comoQC70)).toEqual([
+        `${TRANSLATOR_FILE}: 'reference' esta declarado OPCIONAL, que es el fallo que QC-71 cierra (QC-71 R16)`,
+        `${TRANSLATOR_FILE}: la rama que declara 'reference' no es la del codigo generico (QC-71 R15)`,
+      ])
+    })
+
+    it('limpio: los cuatro campos declarados, ninguno mas, y la referencia donde le toca', () => {
       expect(findErrorStateShapeFindings(TRANSLATOR_FILE, TIPO_LIMPIO)).toEqual([])
       expect(extractErrorStateFields(TIPO_LIMPIO)).toEqual(['status', 'code', 'message', 'reference'])
+      expect(extractErrorStateBranches(TIPO_LIMPIO)).toHaveLength(2)
     })
 
     it('el repositorio real: ErrorState declara exactamente status, code, message y reference', () => {
       const source = readFileSync(join(repoRoot, TRANSLATOR_FILE), 'utf8')
       expect(extractErrorStateFields(source)).toEqual([...ERROR_STATE_FIELDS])
+      expect(extractErrorStateBranches(source)).toHaveLength(2)
       expect(findErrorStateShapeFindings(TRANSLATOR_FILE, source)).toEqual([])
     })
   })

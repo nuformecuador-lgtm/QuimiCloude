@@ -37,7 +37,16 @@ const {
   getSessionUserMock: vi.fn(),
 }));
 
+// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
+// del identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el
+// modulo ni siquiera carga; con ella, el estado del error inesperado vuelve con ESE id.
+const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  return { REQUEST_ID_DE_PRUEBA: id, readRequestIdHeaderMock: vi.fn(async () => id) };
+});
+
 vi.mock('@/lib/composition', () => ({
+  observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock },
   inventario: {
     createPresentation: createPresentationMock,
@@ -164,13 +173,24 @@ describe('createPresentationAction', () => {
       status: 'error',
       code: 'unexpected',
       message: errorMessage('unexpected'),
+      // QC-71 (R13): el estado del error INESPERADO vuelve con el identificador de la
+      // peticion —el mismo que se escribio en la linea del registro—, y su ausencia ya no
+      // compila (R16). El catalogado sigue sin el (R15).
+      reference: REQUEST_ID_DE_PRUEBA,
     });
     expect(JSON.stringify(result)).not.toContain('fallo de infraestructura');
     for (const value of Object.values(result)) {
       expect(String(value)).not.toContain('fallo de infraestructura');
     }
     // R14: el detalle si llega al registro del servidor, que es el unico sitio donde aparece.
-    expect(logSpy).toHaveBeenCalledWith(expect.objectContaining({ cause: ajeno }));
+    // QC-71 (R10, R12): la linea del registro deja de ser el objeto de QC-70 y pasa a ser UNA
+    // linea de texto con el identificador, el origen, el codigo y el detalle del error —nombre,
+    // mensaje y traza, y nada mas—. Lo que este caso fijaba NO se relaja: el texto del error
+    // original sigue llegando entero al registro, y solo ahi.
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`[error] requestId=${REQUEST_ID_DE_PRUEBA} origen=borde code=unexpected error=${ajeno.name}: ${ajeno.message}`),
+    );
 
     logSpy.mockRestore();
   });

@@ -83,7 +83,7 @@ export default async function EditarRecetaPage({
     }
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError code={recipeResult.code} message={recipeResult.message} />
+        <RecipeListError error={recipeResult} />
       </div>
     );
   }
@@ -91,7 +91,7 @@ export default async function EditarRecetaPage({
   if (unitsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError code={unitsResult.code} message={unitsResult.message} />
+        <RecipeListError error={unitsResult} />
       </div>
     );
   }
@@ -99,7 +99,7 @@ export default async function EditarRecetaPage({
   if (productsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError code={productsResult.code} message={productsResult.message} />
+        <RecipeListError error={productsResult} />
       </div>
     );
   }

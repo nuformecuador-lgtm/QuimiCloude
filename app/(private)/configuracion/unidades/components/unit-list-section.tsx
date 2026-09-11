@@ -64,7 +64,7 @@ export async function UnitListSection({ params }: UnitListSectionProps) {
   ]);
 
   if (pageResult.status === 'error') {
-    return <UnitListError code={pageResult.code} message={pageResult.message} />;
+    return <UnitListError error={pageResult} />;
   }
 
   // El degradado declarado: sin catalogo, indice vacio y selector sin opciones. La lista se pinta.

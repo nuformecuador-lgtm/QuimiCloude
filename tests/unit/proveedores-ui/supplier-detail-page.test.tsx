@@ -1,4 +1,9 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificador-de-request';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
@@ -845,5 +850,35 @@ describe('catalogo — paginacion, orden y viewport (R8, R9, R11, R13, R48)', ()
 
       cleanup();
     }
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el estado de error del catalogo del proveedor. */
+describe('catalogo del proveedor — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    listCatalogLinesActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+
+    const region = await screen.findByTestId(testId.error);
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    listCatalogLinesActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
+    expect(screen.queryByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeNull();
+    expect(screen.queryByText(REFERENCIA_DEL_CASO)).toBeNull();
+    expect(document.body.textContent ?? '').not.toContain(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
   });
 });

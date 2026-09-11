@@ -5,7 +5,7 @@
 // un CICLO—. Si alguien lo "arregla" cambiando estas dos lineas al barrel, lo rompe: no se toca.
 // Ningun import de este archivo sale de `domain/`.
 import type { PermissionCode } from './permissions';
-import { assertPermission } from './require-permission';
+import { assertAnyPermission, assertPermission } from './require-permission';
 
 import { UnauthorizedError } from './errors';
 
@@ -47,4 +47,23 @@ export function requirePermission(
   permission: PermissionCode,
 ): asserts actor is Actor {
   assertPermission(actor, permission, () => new UnauthorizedError());
+}
+
+/**
+ * QC-94 (R1, R2, R3) — hermana de `requirePermission` para la consulta del catalogo de roles, que
+ * autoriza con CUALQUIERA de dos codigos: `usuarios.consultar` O `usuarios.modificar`. Basta uno;
+ * no se exigen los dos y ninguno se deriva del otro.
+ *
+ * Misma firma de asercion, mismo `UnauthorizedError` de ESTE modulo y el mismo fallo cerrado que
+ * su hermana (actor ausente, sin conjunto de permisos, conjunto vacio, conjunto que no es un array
+ * o sin ninguno de los codigos), porque delega en `assertAnyPermission`, que comparte cuerpo con
+ * `assertPermission`: la pertenencia sigue teniendo UNA sola implementacion (QC-74 R12).
+ *
+ * La lista de codigos es una TUPLA NO VACIA: `requireAnyPermission(actor, [])` no compila.
+ */
+export function requireAnyPermission(
+  actor: Actor | null | undefined,
+  permissions: readonly [PermissionCode, ...PermissionCode[]],
+): asserts actor is Actor {
+  assertAnyPermission(actor, permissions, () => new UnauthorizedError());
 }

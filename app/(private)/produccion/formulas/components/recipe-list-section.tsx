@@ -34,7 +34,7 @@ export async function RecipeListSection({ page, pageSize }: RecipeListSectionPro
   const result = await listRecipesAction({ page, pageSize });
 
   if (result.status === 'error') {
-    return <RecipeListError code={result.code} message={result.message} />;
+    return <RecipeListError error={result} />;
   }
 
   const { items, page: currentPage, totalPages } = result.data;

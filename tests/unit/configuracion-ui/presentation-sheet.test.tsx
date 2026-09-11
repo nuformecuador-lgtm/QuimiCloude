@@ -12,7 +12,17 @@
 // **Ningun assert sobre literales de copy** (R35): todo va por rol ARIA, `data-testid` exportado
 // como constante o constantes importadas del contrato.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import type { ErrorState } from '@/lib/modules/errores';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -518,5 +528,53 @@ describe('QC-80 — la unidad de la presentacion (R15, R16, R17, R18)', () => {
       UNIDAD_LITRO.id,
     );
     expect(toastExito).not.toHaveBeenCalled();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el formulario de presentacion. */
+describe('formulario de presentacion — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  /** Un alta que la operacion rechaza con el estado dado. */
+  async function altaQueFalla(user: ReturnType<typeof setupUser>, estado: ErrorState) {
+    createPresentationActionMock.mockResolvedValue(estado);
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    // QC-80 (R10, R17) volvio la unidad OBLIGATORIA y la valida el MISMO esquema en cliente, asi
+    // que sin elegirla el envio ni siquiera llega a la operacion y este helper se quedaria
+    // esperando una llamada que no ocurre. Elegir unidad no es el sujeto de estos dos casos -lo es
+    // el identificador del error inesperado-, es solo lo que hace falta para alcanzarlo.
+    await elegirUnidad(user, 0);
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
+  }
+
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    await altaQueFalla(user, errorInesperado());
+
+    const region = await screen.findByTestId(PRESENTATION_FORM_ERROR_TESTID);
+
+    // Identificado por `data-testid`, nunca por su texto: lo prohibe la convencion de esta
+    // pantalla. `toHaveTextContent` sigue probando que el identificador esta RENDERIZADO como
+    // texto y no escondido en un atributo (R17).
+    const referencia = within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID);
+    expect(referencia).toHaveTextContent(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+    expect(referencia).toHaveTextContent(REFERENCIA_DEL_CASO);
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    await altaQueFalla(user, {
+      status: 'error',
+      code: INVALID_INPUT_CODE,
+      message: 'La entrada recibida no es valida.',
+    });
+
+    const region = await screen.findByTestId(PRESENTATION_FORM_ERROR_TESTID);
+    expect(within(region).getByTestId(PRESENTATION_FORM_ERROR_CODE_TESTID)).toHaveTextContent(
+      INVALID_INPUT_CODE,
+    );
+    esperarSinIdentificador();
   });
 });

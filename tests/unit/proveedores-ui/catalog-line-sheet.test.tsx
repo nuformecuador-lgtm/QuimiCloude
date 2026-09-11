@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificador-de-request';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
@@ -11,6 +12,10 @@ import {
   PRESENTATION_UNIT_OPTION_TESTID,
   PRESENTATION_UNIT_SELECT_TESTID,
 } from '@/components/shared/presentation-unit-select';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
 import type {
   CreatePresentationFormState,
   PresentationListResult,
@@ -947,5 +952,54 @@ describe('linea de catalogo — los siete campos declarados (R29)', () => {
     }
     expect(document.querySelector('[name="imagePath"]')).toBeNull();
     expect(CAMPOS_DE_NEGOCIO).toHaveLength(7);
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el formulario de linea de catalogo. */
+describe('linea de catalogo — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    createCatalogLineActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await abrirAlta(user);
+    await elegirPresentacion(user);
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createCatalogLineActionMock).toHaveBeenCalledTimes(1));
+
+    const region = await screen.findByTestId(testId.errorFormulario);
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    createCatalogLineActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await abrirAlta(user);
+    await elegirPresentacion(user);
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createCatalogLineActionMock).toHaveBeenCalledTimes(1));
+
+    const region = await screen.findByTestId(testId.errorFormulario);
+    expect(within(region).getByTestId('catalog-line-form-error-code')).toHaveTextContent(
+      'unauthorized',
+    );
+    expect(screen.queryByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeNull();
+    expect(screen.queryByText(REFERENCIA_DEL_CASO)).toBeNull();
+    expect(document.body.textContent ?? '').not.toContain(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
   });
 });
