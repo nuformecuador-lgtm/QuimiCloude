@@ -1006,6 +1006,30 @@ const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['updatedBy', 'updated_by'],
 ]
 
+/**
+ * La UNICA carpeta de migracion ajena que estos dos casos toleran, NOMBRADA una a una.
+ *
+ * RETENSADO 2026-09-11 (QC-86), con el mismo criterio que los retensados de
+ * `recipe-route-contract` (bloques `MIGRACION_QC83`/`MIGRACION_QC66`/`MIGRACION_QC86`) y
+ * `guard-identificador-de-request` (`MIGRACIONES_ESPERADAS`): el rango se mide contra la rama que
+ * corre el gate, asi que cada migracion legitima posterior se NOMBRA o el caso deja de vigilar
+ * nada.
+ *
+ * POR QUE `db/migrations/` gana una carpeta aqui: QC-86 (`modelo-de-asignacion-de-pedidos`) crea
+ * la tabla `order_assignments` -la asignacion de responsables a un pedido, en el modulo nuevo
+ * `asignaciones`- con su `down.sql`, e inserta en el catalogo los dos permisos del modulo. NO
+ * toca `product_batches`, ni `products`, ni `presentations`, ni ninguna otra tabla de inventario:
+ * su UP no ejecuta un solo DDL sobre ninguna tabla preexistente, y eso lo vigila
+ * `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`, no este archivo.
+ *
+ * ESTO NO AFLOJA R29, y por eso es una excepcion NOMINAL y no un `toBeGreaterThanOrEqual`: lo que
+ * R29 exige es que **QC-90** no anada ninguna migracion, y sigue sin anadir ninguna. Los dos
+ * `toEqual([])` de abajo siguen intactos, y **cualquier** carpeta que no sea exactamente esta
+ * -incluida la de QC-81, que es la que R29 nombra como «esto es otra ficha»- los vuelve a poner
+ * rojos.
+ */
+const MIGRACION_QC86 = '20260911120000_order_assignments'
+
 describe('QC-90 R29 — esta ficha no anade ninguna migracion ni ninguna columna', () => {
   const base = mergeBaseConDev()
 
@@ -1031,6 +1055,9 @@ describe('QC-90 R29 — esta ficha no anade ninguna migracion ni ninguna columna
 
     const migracionesAgregadas = agregados
       .filter((archivo) => archivo.startsWith('db/migrations/'))
+      // Excepcion NOMINAL de QC-86 (ver `MIGRACION_QC86`): se descuenta esa carpeta y SOLO esa.
+      // Un archivo bajo cualquier otra carpeta de `db/migrations/` sigue cayendo aqui.
+      .filter((archivo) => !archivo.startsWith(`db/migrations/${MIGRACION_QC86}/`))
       .sort()
     expect(
       migracionesAgregadas,
@@ -1068,7 +1095,23 @@ describe('QC-90 R29 — esta ficha no anade ninguna migracion ni ninguna columna
     expect(enDisco).toContain('20260909120000_product_batches')
 
     const previas = new Set(enBase)
-    const nuevas = enDisco.filter((carpeta) => !previas.has(carpeta))
+    // Excepcion NOMINAL de QC-86 (ver `MIGRACION_QC86`): se descuenta esa carpeta y SOLO esa.
+    const nuevas = enDisco.filter(
+      (carpeta) => !previas.has(carpeta) && carpeta !== MIGRACION_QC86,
+    )
+
+    // La excepcion es NOMINAL, y se demuestra: si manana apareciera otra carpeta -la de QC-81, por
+    // ejemplo, que es la que R29 nombra como «esto es otra ficha»-, el filtro de arriba NO se la
+    // traga. Sin este caso, `MIGRACION_QC86` podria degenerar en «cualquier carpeta nueva vale»
+    // sin que nada se pusiera rojo.
+    const intruso = '20260912000000_batch_sequence'
+    expect(
+      [...enDisco, intruso].filter(
+        (carpeta) => !previas.has(carpeta) && carpeta !== MIGRACION_QC86,
+      ),
+      'la excepcion de QC-86 tiene que ser nominal: otra carpeta de migracion sigue cayendo',
+    ).toEqual([intruso])
+
     expect(
       nuevas,
       `R29: db/migrations/ gano carpetas que no estan en el merge-base con dev (${nuevas.join(', ')}). ` +

@@ -368,3 +368,65 @@ vitest related --run sobre los 7 fuentes que el merge toco
 
 **Sin conflictos, sin nada ambiguo que preguntar y sin ningun rojo.** El flake de jsdom de
 `product-page.test.tsx` tampoco aparecio en esta corrida.
+
+## 9. El SEPTIMO archivo: el que afirmaba el VACIO, no una lista blanca
+
+Lo caza el `./init.sh` completo del leader, despues del merge. **Dos** casos del bloque
+`QC-90 R29 - esta ficha no anade ninguna migracion ni ninguna columna`, en
+`tests/unit/inventario/schema/inventario-schema.test.ts`:
+
+| Caso | Que mide | Como fallaba |
+| --- | --- | --- |
+| `el rango de la rama no agrega ningun archivo bajo db/migrations/` | el RANGO DE COMMITS contra el merge-base | `+ "20260911120000_order_assignments"` contra `toEqual([])` |
+| `db/migrations/ no gana ninguna carpeta respecto del merge-base, incluido lo no commiteado` | el ARBOL DE TRABAJO, para cazar la migracion recien creada y aun sin commitear | idem |
+
+**Por que se me escapo, dicho sin adornos.** Mi barrido buscaba el patron equivocado. Busque
+`origin/dev...` en `tests/` -que es como `tasks.md` describe la familia- y luego "listas blancas a
+las que anadir la migracion". Este archivo falla en las dos cosas: **(a)** no usa `origin/dev...`
+sino `git merge-base origin/dev HEAD`, asi que mi grep no lo trajo; y **(b)** no tiene ninguna
+lista blanca donde meter un nombre, porque **afirma el vacio absoluto**. El patron real no era
+"listas blancas": era **cualquier test que mida la rama contra git**.
+
+**Lo que se hizo, y por que NO afloja nada.** Una constante `MIGRACION_QC86` con el nombre exacto
+de la carpeta, descontada en los dos casos, y **los dos `toEqual([])` intactos**. No entro ningun
+`toBeGreaterThanOrEqual`, ningun `toContain` invertido y no se borro ningun caso: lo que R29
+vigila -que **QC-90** no meta migraciones- lo sigue vigilando, y **cualquier** carpeta que no sea
+exactamente la de esta ficha vuelve a ponerlos rojos.
+
+La excepcion es **nominal, y se demuestra en el propio archivo**: el segundo caso lleva ahora una
+asercion que mete una carpeta intrusa sintetica y comprueba que el filtro **no se la traga**. Sin
+ella, `MIGRACION_QC86` podria degenerar con el tiempo en "cualquier carpeta nueva vale" sin que
+nada se pusiera rojo.
+
+**Prueba de mutacion:** se cambio el valor de `MIGRACION_QC86` a otro nombre y **los dos casos
+cayeron** (`2 failed | 22 passed`). Restaurado, `24 passed (24)` **sin un solo skip**: los dos
+casos se ejecutan de verdad en esta rama, no pasan por salto.
+
+### 9.a El barrido bueno, con el universo correcto
+
+Se rehizo el barrido sobre el patron real -**todo test que consulte git**, sea con
+`origin/dev...`, con `git diff` o con `merge-base`-, que son **18 archivos**. Ejecutados todos:
+
+```
+pnpm exec vitest run <los 18 tests que consultan git>
+  Test Files  18 passed (18)
+       Tests  228 passed | 31 skipped (259)
+```
+
+**No hay octavo.** Los 31 saltos son por diseno: cada uno de esos casos salta -ruidosamente y
+diciendo por que- cuando la rama que corre no es la suya o cuando el rango esta vacio, que es
+justo lo contrario de un verde vacuo. El de inventario NO saltaba, y por eso mordio.
+
+Los 18, para que el reviewer no tenga que reconstruir la lista: `guard-identificador-de-request`,
+`configuracion-convenciones`, `data-table-intacta`, `data-table-intacta-unidades`,
+`identity/account-status-scope`, `identity/qc78-alcance`, `identity/roles/scope`,
+`identity/usuarios/scope`, `inventario/schema/inventario-schema`, `navegacion/qc75-convenciones`,
+`pedidos-ui/pedidos-convenciones`, `proveedores-ui/guard-convenciones-proveedores`,
+`proveedores-ui/guard-herencia-armazon-privado`, `recetas/module-contract`,
+`recetas-ui/recipe-route-contract`, `unidades/consumidores-catalogo`, `unidades/modulo-intacto` y
+`unidades/unidades-convenciones`.
+
+**Recuento final de tests ajenos tocados por esta ficha: NUEVE**, en tres familias -seis del numero
+exacto del catalogo (seccion 2.a), dos de lista blanca de rutas (2.b), uno del vacio sobre
+`db/migrations/` (esta seccion)-, mas el retensado del merge (seccion 8.a). En los diez, el
+criterio fue el mismo: **subir el numero o nombrar la excepcion, nunca relajar la asercion.**
