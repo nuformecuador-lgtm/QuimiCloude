@@ -10,14 +10,22 @@
  *
  * AISLAMIENTO: `listAliveProducts` llama al cliente Prisma GLOBAL, no a un `tx` inyectado, asi
  * que una transaccion que se deshace NO lo envuelve (esta explicado con detalle en la cabecera de
- * `product-crud.int.test.ts`). Se crean filas REALES y se borran en el `afterAll` por la unidad
- * que las agrupa.
+ * `product-crud.int.test.ts`). Se crean filas REALES y se borran en el `afterAll` POR SU
+ * IDENTIFICADOR EXACTO, nunca por rango ni por nombre.
  *
- * NINGUNA AFIRMACION GLOBAL sobre el catalogo: todos los casos acotan por la unidad sembrada —que
- * ademas es un filtro `select` declarado (R4), asi que el propio acotado ejercita el contrato—.
- * Una base con mas productos cargados no puede volver rojo este archivo.
+ * NINGUNA AFIRMACION GLOBAL sobre el catalogo: todos los casos acotan por el MARCADOR DEL
+ * ARCHIVO, que `token()` mete en el nombre de toda fila sembrada y que entra por `search` —la
+ * busqueda es parte del contrato (R16, R18), asi que el propio acotado lo ejercita—. Una base con
+ * mas productos cargados no puede volver rojo este archivo.
  *
- * Cubre R7, R10, R13, R14, R15, R16, R18, R29 y la decision cerrada de los nulos.
+ * ACOTADO CAMBIADO EL 2026-09-11 POR QC-80 (R21): hasta hoy se acotaba con el filtro `select`
+ * `unitId`, que era una columna de `products`. La columna ya no existe y el filtro salio de
+ * `PRODUCT_QUERYABLE`, asi que pasarlo seria pasar un filtro desconocido —que `sanitize` omite en
+ * silencio (R5)— y el archivo entero habria dejado de acotar sin que nada se pusiera rojo. El
+ * marcador en el nombre acota igual de fuerte y no depende de ninguna columna que pueda irse.
+ *
+ * Cubre R7, R10, R13, R14, R15, R16, R18, R29 y la decision cerrada de los nulos de QC-57, y
+ * R22 y R23 de QC-80 (la unidad DERIVADA del lote mas reciente).
  */
 import { randomUUID } from 'node:crypto';
 
@@ -30,11 +38,18 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { ListFilterValue, ListQuery } from '@/lib/modules/inventario/domain/list-query';
 
+/**
+ * Marcador irrepetible de ESTE ARCHIVO, en minusculas y solo alfanumerico para que sobreviva
+ * intacto a `normalizeProductName`. Va dentro de CADA `token()`, y por tanto dentro del nombre
+ * de cada fila sembrada aqui: es lo que permite acotar toda consulta a lo que este archivo puso.
+ */
+const MARCA_DEL_ARCHIVO = `m${randomUUID().replace(/-/gu, '').slice(0, 12)}`;
+
 function token(): string {
-  return randomUUID().replace(/-/gu, '');
+  return `${MARCA_DEL_ARCHIVO}${randomUUID().replace(/-/gu, '')}`;
 }
 
-/** Normalizacion de los datos de APOYO (unidad), que tiene la suya propia. */
+/** Normalizacion de los datos de APOYO (unidades y presentaciones), que tienen la suya propia. */
 function normalizeForTest(name: string): string {
   return name
     .trim()
@@ -44,24 +59,20 @@ function normalizeForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '');
 }
 
-let unitId: string;
-
-/**
- * Acota TODA consulta de este archivo a las filas sembradas aqui. Es un filtro `select` real
- * del contrato (`PRODUCT_QUERYABLE`), no un truco del test: acotar y ejercitar son lo mismo.
- * Antes acotaba por `presentationId`; desde el 2026-09-09 (la presentacion se mudo a
- * `product_batches`) acota por la `unitId` sembrada, que todo producto de este archivo lleva.
- */
-function soloLasMias(): Record<string, ListFilterValue> {
-  return { unitId: { kind: 'select', values: [unitId] } };
-}
+/** Identificadores de todo lo sembrado, para borrarlo por `id` EXACTO en el `afterAll`. */
+const productosSembrados: string[] = [];
+const lotesSembrados: string[] = [];
+const presentacionesSembradas: string[] = [];
+const unidadesSembradas: string[] = [];
 
 function consulta(partial: Partial<ListQuery> = {}): ListQuery {
   return {
     page: 1,
     sort: null,
-    filters: soloLasMias(),
-    search: '',
+    filters: {},
+    // El acotado del archivo: la busqueda por el marcador deja EXACTAMENTE las filas sembradas
+    // aqui. Quien lo sobrescriba acota por su cuenta, y lo dice en su caso.
+    search: MARCA_DEL_ARCHIVO,
     ...partial,
   };
 }
@@ -74,13 +85,13 @@ type Semilla = {
   readonly deletedAt?: Date | null;
 };
 
-async function sembrar(semillas: readonly Semilla[]): Promise<void> {
+async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]> {
+  const ids: string[] = [];
   for (const semilla of semillas) {
-    await prisma.product.create({
+    const { id } = await prisma.product.create({
       data: {
         name: semilla.name,
         nameNormalized: normalizeProductName(semilla.name),
-        unitId,
         stock: semilla.stock ?? null,
         qtyAlert: semilla.qtyAlert ?? null,
         deletedAt: semilla.deletedAt ?? null,
@@ -88,25 +99,58 @@ async function sembrar(semillas: readonly Semilla[]): Promise<void> {
       },
       select: { id: true },
     });
+    ids.push(id);
+    productosSembrados.push(id);
   }
+  return ids;
 }
 
-beforeAll(async () => {
-  const unitName = `unidad ${token()}`;
-  const unit = await prisma.unit.create({
-    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
-    // UNICO dentro del ambito cuando existe. Esta unidad se siembra SIN empresa —o sea DE
-    // SISTEMA—, asi que un `'kg'` fijo choca con `23505` contra el `kilogramo` del catalogo
-    // arrancador. Se deriva del nombre, que ya lleva marcador. Ningun aserto lee su valor.
-    data: { name: unitName, nameNormalized: normalizeForTest(unitName), symbol: unitName },
+/** Unidad de apoyo. SIN empresa -de sistema-, con simbolo derivado del nombre: desde QC-76 (R15)
+ *  el simbolo es unico dentro del ambito y un `'kg'` fijo chocaria con el catalogo arrancador. */
+async function sembrarUnidad(): Promise<string> {
+  const name = `unidad ${token()}`;
+  const { id } = await prisma.unit.create({
+    data: { name, nameNormalized: normalizeForTest(name), symbol: name },
     select: { id: true },
   });
-  unitId = unit.id;
-});
+  unidadesSembradas.push(id);
+  return id;
+}
+
+/** Presentacion de apoyo CON su unidad (QC-80 R1: `presentations.unit_id` es NOT NULL). */
+async function sembrarPresentacion(unitId: string): Promise<string> {
+  const name = `presentacion ${token()}`;
+  const { id } = await prisma.presentation.create({
+    data: { name, nameNormalized: normalizeForTest(name), unitId },
+    select: { id: true },
+  });
+  presentacionesSembradas.push(id);
+  return id;
+}
+
+/** Lote de apoyo con `createdAt` EXPLICITO: es la columna por la que QC-80 (R22) decide cual es
+ *  el lote «mas reciente», asi que dejarla al reloj haria el caso dependiente del orden de
+ *  insercion. */
+async function sembrarLote(
+  productId: string,
+  presentationId: string,
+  createdAt: Date,
+): Promise<string> {
+  const { id } = await prisma.productBatch.create({
+    data: { productId, presentationId, stock: 1, unitCost: '1.0000', createdAt },
+    select: { id: true },
+  });
+  lotesSembrados.push(id);
+  return id;
+}
 
 afterAll(async () => {
-  await prisma.product.deleteMany({ where: { unitId } });
-  await prisma.unit.deleteMany({ where: { id: unitId } });
+  // Por `id` EXACTO y en el orden que exigen las FK (todas ON DELETE RESTRICT): lotes ->
+  // productos -> presentaciones -> unidades.
+  await prisma.productBatch.deleteMany({ where: { id: { in: lotesSembrados } } });
+  await prisma.product.deleteMany({ where: { id: { in: productosSembrados } } });
+  await prisma.presentation.deleteMany({ where: { id: { in: presentacionesSembradas } } });
+  await prisma.unit.deleteMany({ where: { id: { in: unidadesSembradas } } });
   await prisma.$disconnect();
 });
 
@@ -145,7 +189,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
       consulta({
         page: 1,
         pageSize: 5,
-        filters: { ...soloLasMias(), stock: { kind: 'numberRange', min: 12, max: 12 } },
+        filters: { stock: { kind: 'numberRange', min: 12, max: 12 } },
       }),
     );
 
@@ -161,7 +205,6 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
       consulta({
         pageSize: 25,
         filters: {
-          ...soloLasMias(),
           stock: { kind: 'numberRange', min: 5, max: 12 },
           qtyAlert: { kind: 'numberRange', min: 5, max: 12 },
         },
@@ -196,7 +239,7 @@ describe('desempate estable por identificador (R10)', () => {
           page,
           pageSize: 2,
           sort: { columnId: 'stock', direction: 'asc' },
-          filters: { ...soloLasMias(), stock: { kind: 'numberRange', min: 7, max: 7 } },
+          filters: { stock: { kind: 'numberRange', min: 7, max: 7 } },
         }),
       );
       vistos.push(...pagina.items.map((p) => p.id));
@@ -221,10 +264,9 @@ describe('los nulos van SIEMPRE al final, en las DOS direcciones (decision cerra
     ]);
   });
 
-  const soloEstas = (): Record<string, ListFilterValue> => ({
-    ...soloLasMias(),
-    // Sin acotar mas: la busqueda por el token deja exactamente estas cuatro filas.
-  });
+  // Sin filtros: la busqueda por el token de este describe -que ademas lleva dentro el marcador
+  // del archivo- deja exactamente estas cuatro filas.
+  const soloEstas = (): Record<string, ListFilterValue> => ({});
 
   for (const direction of ['asc', 'desc'] as const) {
     it(`en ${direction}, las filas sin existencia registrada salen las ultimas`, async () => {
@@ -252,26 +294,35 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
   it('buscar «solucion» encuentra «Solución Buffer pH 7»', async () => {
     // R18 — el termino se normaliza con la MISMA funcion que escribio `name_normalized`
     // (`normalizeProductName`), asi que buscar y comparar no discrepan (R19).
+    // El marcador va DELANTE del nombre y DELANTE del termino buscado: asi el caso sigue
+    // acotado a sus dos filas -es un `toEqual` con `total` 1- sin dejar de ser lo que prueba,
+    // porque lo que se busca sigue escribiendose sin acentos y en minusculas y el nombre
+    // guardado los lleva.
     const marca = token();
     await sembrar([
-      { name: `Solución Buffer pH 7 ${marca}`, stock: 1 },
-      { name: `Agua destilada ${marca}`, stock: 1 },
+      { name: `${marca} Solución Buffer pH 7`, stock: 1 },
+      { name: `${marca} Agua destilada`, stock: 1 },
     ]);
 
-    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: `solucion buffer` }));
+    const pagina = await listAliveProducts(
+      consulta({ pageSize: 25, search: `${marca} solucion buffer` }),
+    );
 
-    expect(pagina.items.map((p) => p.name)).toEqual([`Solución Buffer pH 7 ${marca}`]);
+    expect(pagina.items.map((p) => p.name)).toEqual([`${marca} Solución Buffer pH 7`]);
     expect(pagina.total).toBe(1);
   });
 
   it('la busqueda es por SUBCADENA: una palabra del medio encuentra el nombre compuesto', async () => {
     // R16 + decision cerrada de `pg_trgm` (via A): bajar a prefijo habria roto esto en silencio.
+    // Aqui el termino NO puede llevar el marcador delante: seria un prefijo, y lo que el caso
+    // prueba es justamente que valga una palabra DEL MEDIO. Por eso el acotado lo hace el propio
+    // termino -`de sodio 5` es especifico- y el aserto es `toContain`, no una igualdad.
     const marca = token();
-    await sembrar([{ name: `Hipoclorito de sodio 5% ${marca}`, stock: 1 }]);
+    await sembrar([{ name: `${marca} Hipoclorito de sodio 5%`, stock: 1 }]);
 
-    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: 'sodio' }));
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: 'de sodio 5' }));
 
-    expect(pagina.items.map((p) => p.name)).toContain(`Hipoclorito de sodio 5% ${marca}`);
+    expect(pagina.items.map((p) => p.name)).toContain(`${marca} Hipoclorito de sodio 5%`);
   });
 });
 
@@ -287,7 +338,7 @@ describe('el borrado logico no sale del listado, filtre lo que filtre (R7)', () 
     const pagina = await listAliveProducts(
       consulta({
         pageSize: 25,
-        filters: { ...soloLasMias(), stock: { kind: 'numberRange', min: 42, max: 42 } },
+        filters: { stock: { kind: 'numberRange', min: 42, max: 42 } },
       }),
     );
 
@@ -314,7 +365,7 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
     const pagina = await listAliveProducts(
       consulta({
         pageSize: 25,
-        filters: { ...soloLasMias(), createdAt: { kind: 'dateRange', from: DIA, to: DIA } },
+        filters: { createdAt: { kind: 'dateRange', from: DIA, to: DIA } },
       }),
     );
 
@@ -322,5 +373,48 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
       [`${marca} borde final`, `${marca} borde inicial`].sort(),
     );
     expect(pagina.total).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-80 (T13) — la unidad DERIVADA del lote mas reciente, contra la base
+// ---------------------------------------------------------------------------
+
+describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente (R22, R23)', () => {
+  it('un producto con DOS lotes de presentaciones distintas devuelve la unidad del MAS RECIENTE (R22)', async () => {
+    // R22 — la derivacion es `created_at DESC`, desempatando por `id DESC`. El lote VIEJO se
+    // inserta EL ULTIMO a proposito: si el adaptador ordenara por orden de insercion, o se
+    // olvidara del `orderBy`, este caso lo diria.
+    const marca = `Derivada ${token()}`;
+    const [productId] = await sembrar([{ name: `${marca} con lotes`, stock: 5 }]);
+    if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
+
+    const unidadVieja = await sembrarUnidad();
+    const unidadReciente = await sembrarUnidad();
+    const presentacionVieja = await sembrarPresentacion(unidadVieja);
+    const presentacionReciente = await sembrarPresentacion(unidadReciente);
+
+    await sembrarLote(productId, presentacionReciente, new Date('2031-05-02T00:00:00.000Z'));
+    await sembrarLote(productId, presentacionVieja, new Date('2031-05-01T00:00:00.000Z'));
+
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }));
+
+    expect(pagina.items).toHaveLength(1);
+    expect(pagina.items[0]?.latestBatchUnitId).toBe(unidadReciente);
+    // Y no es la otra: sin esto, un adaptador que devolviera siempre la primera unidad que
+    // encuentra pasaria la mitad de las veces.
+    expect(pagina.items[0]?.latestBatchUnitId).not.toBe(unidadVieja);
+  });
+
+  it('un producto SIN ningun lote devuelve null, y no desaparece del listado (R23)', async () => {
+    // R23 — «ninguna» es `null`, y el producto se sigue listando: sin lote no hay dato con el
+    // que acotar, pero eso no lo saca del catalogo ni bloquea nada.
+    const marca = `Sin lotes ${token()}`;
+    await sembrar([{ name: `${marca} recien dado de alta`, stock: null }]);
+
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }));
+
+    expect(pagina.items).toHaveLength(1);
+    expect(pagina.items[0]?.latestBatchUnitId).toBeNull();
   });
 });

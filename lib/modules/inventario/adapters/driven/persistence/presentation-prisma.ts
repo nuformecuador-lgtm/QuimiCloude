@@ -14,6 +14,7 @@ import {
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { PresentationView } from '../../../domain/presentation-view';
+import type { PresentationData } from '../../../ports/presentation-repository';
 
 /**
  * Implementa los cuatro metodos de `PresentationRepository` (`design.md > 7`, T10). Unico
@@ -25,16 +26,27 @@ import type { PresentationView } from '../../../domain/presentation-view';
  *
  * El dominio nunca ve un codigo de Postgres: aqui se traduce el SQLSTATE a los
  * resultados discriminados del puerto. `23505` (indice unico
- * `presentations_name_normalized_key`) -> `'duplicate'`; `23503` (la FK
- * `products_presentation_id_fkey` con `ON DELETE RESTRICT`) al borrar -> `'in_use'`.
+ * `presentations_name_normalized_key`) -> `'duplicate'`.
+ *
+ * QC-80: el `23503` (violacion de FK) llega ahora desde DOS sitios distintos y se traduce
+ * **por funcion, nunca con un `catch` comun**:
+ * - al BORRAR lo dispara `product_batches_presentation_id_fkey` (`ON DELETE RESTRICT`) ->
+ *   `'in_use'`. **No** `products_presentation_id_fkey`, que es lo que este comentario decia
+ *   hasta hoy: esa FK dejo de existir cuando QC-90 mudo la presentacion de `products` a
+ *   `product_batches`.
+ * - al CREAR o REEMPLAZAR solo puede venir de `presentations_unit_id_fkey`, o sea «esa
+ *   unidad no existe» -> `'invalid_unit'` (R13).
+ * Un `catch` compartido tendria que adivinar cual de las dos es, y adivinaria mal el dia
+ * que aparezca una tercera FK.
  *
  * Prisma no expone el SQLSTATE crudo en `PrismaClientKnownRequestError`: expone SU
  * PROPIO codigo (`P2002` para violacion de unicidad, `P2003` para violacion de FK), que es
  * el equivalente estable de esos dos SQLSTATE para quien usa el cliente tipado -el
  * SQLSTATE original queda en `error.meta`, pero no hace falta leerlo para distinguir estos
- * dos casos, que es lo unico que exige el puerto-. `isUniqueNameViolation` e
- * `isPresentationForeignKeyViolation` afirman sobre `error.code`, nunca sobre el texto del
- * mensaje (en esta maquina Postgres responde en espanol, `design.md > 12`).
+ * dos casos, que es lo unico que exige el puerto-. `isUniqueNameViolation`,
+ * `isPresentationInUseViolation` e `isUnitForeignKeyViolation` afirman sobre `error.code`,
+ * nunca sobre el texto del mensaje (en esta maquina Postgres responde en espanol,
+ * `design.md > 12`).
  */
 
 /** R18, R20: `error.code === 'P2002'` es la unica violacion de unicidad posible aqui -el
@@ -43,70 +55,109 @@ export function isUniqueNameViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
-/** R21: `error.code === 'P2003'` al borrar solo puede venir de `products_presentation_id_fkey`
- * (`ON DELETE RESTRICT`), la unica FK que referencia `presentations`. */
-export function isPresentationForeignKeyViolation(error: unknown): boolean {
+/** R21: `error.code === 'P2003'` **al borrar** solo puede venir de
+ * `product_batches_presentation_id_fkey` (`ON DELETE RESTRICT`), la unica FK que apunta HACIA
+ * `presentations` desde QC-90. Se lee: «esta presentacion esta en uso». */
+export function isPresentationInUseViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
 }
 
-const presentationSelect = {
+/** QC-80 (R13): `error.code === 'P2003'` **al crear o al reemplazar** solo puede venir de
+ * `presentations_unit_id_fkey`, la unica FK que sale DE `presentations`. Se lee: «esa unidad
+ * no existe en el catalogo». Es una funcion distinta de `isPresentationInUseViolation` aunque
+ * hoy las dos miren el mismo codigo: lo que cambia no es el codigo, es lo que significa segun
+ * la operacion, y separarlas es lo que impide que un `catch` comun lo confunda. */
+export function isUnitForeignKeyViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
+}
+
+/** QC-80 (R15): `unitId` entra en el `select` porque entra en el contrato de salida. Se
+ *  exporta para que su test pueda afirmar la columna como dato y no como texto.
+ *  `PRESENTATION_QUERYABLE` **no** gana `unitId`: no se ordena ni se filtra por un uuid que
+ *  nadie pinta. */
+export const presentationSelect = {
   id: true,
   name: true,
   nameNormalized: true,
+  unitId: true,
   createdAt: true,
   updatedAt: true,
 } as const;
 
-/** R17: `name` y `nameNormalized` llegan YA calculados por el dominio -este adaptador no
- * normaliza nada, `normalizePresentationName` es del dominio- y se escriben juntos, en la
- * misma escritura. */
+/** Fila de `presentationSelect` -> `PresentationView` (QC-80 R15). Pura y exportada, mismo
+ *  criterio que `toProductView`: es lo unico del mapeo que se puede probar sin base. No
+ *  reinterpreta nada; el `unitId` sale tal cual de la columna. */
+export function toPresentationView(row: {
+  id: string;
+  name: string;
+  nameNormalized: string;
+  unitId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): PresentationView {
+  return {
+    id: row.id,
+    name: row.name,
+    nameNormalized: row.nameNormalized,
+    unitId: row.unitId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/** R17, QC-80 (R11): `name` y `nameNormalized` llegan YA calculados por el dominio -este
+ * adaptador no normaliza nada, `normalizePresentationName` es del dominio- y se escriben
+ * junto a `unitId` en la MISMA escritura: no hay ningun camino que cree una presentacion sin
+ * unidad. Aqui `P2003` es SIEMPRE `presentations_unit_id_fkey` (R13). */
 export async function createPresentation(
-  name: string,
-  nameNormalized: string,
-): Promise<{ id: string } | 'duplicate'> {
+  data: PresentationData,
+): Promise<{ id: string } | 'duplicate' | 'invalid_unit'> {
   try {
     const created = await prisma.presentation.create({
-      data: { name, nameNormalized },
+      data: { name: data.name, nameNormalized: data.nameNormalized, unitId: data.unitId },
       select: { id: true },
     });
     return { id: created.id };
   } catch (error) {
     if (isUniqueNameViolation(error)) return 'duplicate';
+    if (isUnitForeignKeyViolation(error)) return 'invalid_unit';
     throw error;
   }
 }
 
-/** R17, R18: reemplaza `name` y `nameNormalized` juntos. `updateMany` (no `update`) para
- * poder distinguir "no existe" (`count === 0`) de una excepcion de Prisma, sin depender de
- * `P2025`. */
-export async function renamePresentation(
+/** R17, R18, QC-80 (R12): reemplaza `name`, `nameNormalized` y `unitId` juntos -reemplazo
+ * completo: la unidad anterior NO se conserva-. `updateMany` (no `update`) para poder
+ * distinguir "no existe" (`count === 0`) de una excepcion de Prisma, sin depender de `P2025`.
+ * Aqui `P2003` es SIEMPRE `presentations_unit_id_fkey` (R13), nunca «en uso»: un `UPDATE` de
+ * `presentations` no puede violar la FK que apunta HACIA ella. */
+export async function replacePresentation(
   id: string,
-  name: string,
-  nameNormalized: string,
-): Promise<'ok' | 'not_found' | 'duplicate'> {
+  data: PresentationData,
+): Promise<'ok' | 'not_found' | 'duplicate' | 'invalid_unit'> {
   try {
     const result = await prisma.presentation.updateMany({
       where: { id },
-      data: { name, nameNormalized },
+      data: { name: data.name, nameNormalized: data.nameNormalized, unitId: data.unitId },
     });
     return result.count === 0 ? 'not_found' : 'ok';
   } catch (error) {
     if (isUniqueNameViolation(error)) return 'duplicate';
+    if (isUnitForeignKeyViolation(error)) return 'invalid_unit';
     throw error;
   }
 }
 
 /** R22: borrado FISICO (D6) -`presentations` no tiene `deleted_at`, y no se le anade aqui
  * (`design.md > 11.5`)-. `deleteMany` (no `delete`) para distinguir "no existe" de una
- * violacion de FK sin depender de `P2025`. R21: la FK bloquea aunque los productos
- * asignados esten borrados logicamente, porque `ON DELETE RESTRICT` mira las filas
- * fisicas de `products`, no su `deleted_at`. */
+ * violacion de FK sin depender de `P2025`. R21: la FK bloquea aunque los productos duenos de
+ * esos lotes esten borrados logicamente, porque `ON DELETE RESTRICT` mira las filas fisicas
+ * de `product_batches`, no el `deleted_at` de su producto. */
 export async function deletePresentationById(id: string): Promise<'deleted' | 'not_found' | 'in_use'> {
   try {
     const result = await prisma.presentation.deleteMany({ where: { id } });
     return result.count === 0 ? 'not_found' : 'deleted';
   } catch (error) {
-    if (isPresentationForeignKeyViolation(error)) return 'in_use';
+    if (isPresentationInUseViolation(error)) return 'in_use';
     throw error;
   }
 }
@@ -234,5 +285,5 @@ export async function listPresentations(query: ListQuery): Promise<Page<Presenta
     prisma.presentation.count({ where }),
   ]);
 
-  return buildPage(items, total, query.page, limit);
+  return buildPage(items.map(toPresentationView), total, query.page, limit);
 }

@@ -30,8 +30,8 @@ export {
 } from './delete-presentation-dialog';
 export {
   ACTIONS_COLUMN_ID,
-  PRESENTATION_COLUMNS,
   PRESENTATION_COLUMN_COUNT,
+  buildPresentationColumns,
 } from './presentation-columns';
 export {
   PRESENTATION_BUSINESS_FIELDS,
@@ -107,3 +107,17 @@ export {
   PresentationTable,
   type PresentationTableProps,
 } from './presentation-table';
+// `PresentationUnitSelect` ya no es propio de esta ruta: QC-80 (T10) lo promovio a
+// `components/shared/` porque el alta rapida de `components/shared/presentation-select.tsx`
+// tambien tiene que pedir la unidad (R11), y un componente compartido no puede importar de
+// `app/` sin invertir las capas. Se reexporta aqui para que la ruta lo siga consumiendo por su
+// barrel, sin cambiar ni un consumidor.
+export {
+  PRESENTATION_UNIT_ERROR_TESTID,
+  PRESENTATION_UNIT_FIELD,
+  PRESENTATION_UNIT_LABEL,
+  PRESENTATION_UNIT_OPTION_TESTID,
+  PRESENTATION_UNIT_PLACEHOLDER,
+  PRESENTATION_UNIT_SELECT_TESTID,
+  PresentationUnitSelect,
+} from '@/components/shared/presentation-unit-select';

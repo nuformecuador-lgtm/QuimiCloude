@@ -109,7 +109,7 @@ export function createCreateProduct(
 
     if (existente !== null) {
       // 5a. R17: se le agrega el lote a ESE producto y NO se crea otro. R18: el candidato
-      //     del producto -nombre, existencia, alerta, unidad- NO VIAJA; lo que no se pasa
+      //     del producto -nombre, existencia, alerta- NO VIAJA; lo que no se pasa
       //     no se puede escribir por accidente.
       const agregado = await deps.products.addBatchToAlive(existente, batch, instante);
 
@@ -132,11 +132,14 @@ export function createCreateProduct(
     //     cerrada del 2026-09-10). R21 -las dos escrituras en una transaccion- es del
     //     adaptador: el puerto ofrece UNA operacion, no dos, justo para que el dominio no
     //     pueda dejar la mitad escrita.
+    //     QC-80 (R21): el producto NO declara unidad y por eso aqui no se escribe ninguna.
+    //     La unidad no se perdio: la declara la PRESENTACION del lote (`presentations.unit_id`,
+    //     NOT NULL) y la del producto se DERIVA de la presentacion de su lote MAS RECIENTE al
+    //     leer (R22), o es «ninguna» si todavia no tiene lotes (R23). No hay nada que copiar.
     const producto: NewProduct = {
       name: entrada.name,
       stock: entrada.stock,
       qtyAlert: entrada.qtyAlert,
-      unitId: entrada.unitId ?? null,
     };
 
     const creado = await deps.products.createWithFirstBatch(producto, batch, instante);

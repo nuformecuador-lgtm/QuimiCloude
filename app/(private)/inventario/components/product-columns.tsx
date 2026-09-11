@@ -38,9 +38,12 @@ export const EMPTY_CELL = '—';
  * Campos de `ProductView` que la decision del 2026-09-03 (y la del 2026-09-09) deja FUERA de
  * la tabla: el identificador tecnico y el id de la unidad -un UUID que nadie resuelve a nombre-.
  *
- * `unitId` esta aqui por una razon posterior: el merge de QC-32 (`modelo-unidades`)
- * convirtio la unidad en catalogo, asi que `ProductView` ya no trae el texto `unit` sino la clave
- * foranea `unitId`. Pintar ese UUID seria peor que no mostrar nada.
+ * `latestBatchUnitId` esta aqui por una razon posterior, y bajo ese nombre desde QC-80: el merge
+ * de QC-32 (`modelo-unidades`) convirtio la unidad en catalogo -asi que `ProductView` dejo de
+ * traer el texto `unit` y paso a traer una clave foranea-, y QC-80 (R21, R22) le quito la columna
+ * al producto y la dejo DERIVADA de la presentacion de su lote mas reciente. Cambio el nombre y
+ * cambio el origen; lo que NO cambio es el motivo de ocultarla: sigue siendo un UUID que esta
+ * pantalla no sabe resolver a nombre, y pintarlo seria peor que no mostrar nada.
  *
  * `imagePath` tambien esta fuera, y es el mismo criterio: la RUTA no se pinta como texto. La
  * imagen se ve -es la primera columna desde el 2026-09-07-, pero su columna se llama `image` y
@@ -51,7 +54,7 @@ export const EMPTY_CELL = '—';
  */
 type HiddenProductField =
   | 'id'
-  | 'unitId'
+  | 'latestBatchUnitId'
   | 'imagePath';
 
 /** Id de la columna de la miniatura. No es un campo de `ProductView`: es marcado. */

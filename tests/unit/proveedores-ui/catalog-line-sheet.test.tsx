@@ -7,6 +7,12 @@ import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
 import { CATALOG_LIST_EMPTY_TESTID, SUPPLIER_FIELD } from '@/app/(private)/proveedores/[id]/components';
 import { PRESENTATION_FIELD } from '@/components/shared/presentation-select';
 import {
+  PRESENTATION_UNIT_ERROR_TESTID,
+  PRESENTATION_UNIT_FIELD,
+  PRESENTATION_UNIT_OPTION_TESTID,
+  PRESENTATION_UNIT_SELECT_TESTID,
+} from '@/components/shared/presentation-unit-select';
+import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
 } from '@/components/shared/unexpected-error-notice';
@@ -159,6 +165,9 @@ const testId = {
   abrirAltaPresentacion: 'presentation-create-open',
   nombrePresentacion: 'presentation-create-name',
   guardarPresentacion: 'presentation-create-submit',
+  unidadDePresentacion: PRESENTATION_UNIT_SELECT_TESTID,
+  opcionUnidadDePresentacion: PRESENTATION_UNIT_OPTION_TESTID,
+  errorUnidadDePresentacion: PRESENTATION_UNIT_ERROR_TESTID,
   selectorUnidad: 'unit-select',
   opcionUnidad: 'unit-option',
   opcionSinUnidad: 'unit-option-none',
@@ -262,6 +271,9 @@ function paginaDePresentaciones(): PresentationListResult {
         {
           ...PRESENTACION,
           nameNormalized: 'tambor 200 l',
+          // QC-80 (R15): `PresentationView` declara su unidad. Un uuid cualquiera: esta
+          // pantalla no la pinta -la unidad de la LINEA de catalogo es propia (R26)-.
+          unitId: '11111111-1111-4111-8111-111111111111',
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
           updatedAt: new Date('2026-01-01T00:00:00.000Z'),
         },
@@ -347,6 +359,17 @@ async function elegirPresentacion(user: ReturnType<typeof setupUser>) {
 async function elegirUnidad(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(testId.selectorUnidad));
   await user.click(await esperarInteractiva((await screen.findAllByTestId(testId.opcionUnidad))[0]));
+}
+
+/**
+ * Elige la primera unidad en el alta rapida de presentacion (QC-80 R11). Es OTRO selector que el
+ * de la linea (`testId.selectorUnidad`): aquel declara la unidad de la LINEA de catalogo.
+ */
+async function elegirUnidadDePresentacion(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId(testId.unidadDePresentacion));
+  await user.click(
+    await esperarInteractiva((await screen.findAllByTestId(testId.opcionUnidadDePresentacion))[0]),
+  );
 }
 
 /** Lo que el formulario enviaria como presentacion: el campo oculto que monta el primitivo. */
@@ -525,18 +548,34 @@ describe('linea de catalogo — alta (R29, R37, R38, R41, R43)', () => {
 
     await user.click(screen.getByTestId(testId.abrirAltaPresentacion));
     await user.type(screen.getByTestId(testId.nombrePresentacion), PRESENTACION_NUEVA.name);
+
+    // QC-80 (R17): con el nombre escrito pero SIN unidad, el alta no sale del navegador -la
+    // validacion previa usa el mismo esquema que el servidor- y el fallo se pinta junto al campo.
+    await user.click(screen.getByTestId(testId.guardarPresentacion));
+    expect(await screen.findByTestId(testId.errorUnidadDePresentacion)).toBeInTheDocument();
+    expect(createPresentationActionMock).not.toHaveBeenCalled();
+
+    await elegirUnidadDePresentacion(user);
     await user.click(screen.getByTestId(testId.guardarPresentacion));
 
     await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
+    // QC-80 (R11): la unidad VIAJA en el mismo envio que crea la presentacion. Este es el camino
+    // que R11 prohibe que exista sin unidad.
+    expect(createPresentationActionMock.mock.calls[0][1].get(PRESENTATION_UNIT_FIELD)).toBe(
+      UNIDAD.id,
+    );
     await waitFor(() => expect(presentacionSeleccionada()).toBe(PRESENTACION_NUEVA.id));
     // Lo ya escrito sigue donde estaba (R38).
     expect(screen.getByTestId('catalog-field-name')).toHaveValue(ALTA_VALIDA.name);
 
     await user.click(screen.getByTestId(testId.enviar));
     await waitFor(() => expect(createCatalogLineActionMock).toHaveBeenCalledTimes(1));
-    expect(createCatalogLineActionMock.mock.calls[0][1].get(PRESENTATION_FIELD)).toBe(
-      PRESENTACION_NUEVA.id,
-    );
+    const enviado = createCatalogLineActionMock.mock.calls[0][1];
+    expect(enviado.get(PRESENTATION_FIELD)).toBe(PRESENTACION_NUEVA.id);
+    // La unidad de la PRESENTACION no se cuela en el envio de la LINEA: el selector embebido no
+    // aporta ningun campo al formulario anfitrion, que sigue teniendo UN solo `unitId` -el suyo,
+    // vacio porque nadie lo eligio (R40)-.
+    expect(enviado.getAll(PRESENTATION_UNIT_FIELD)).toEqual(['']);
   });
 
   it('la unidad es opcional: sin elegirla, la linea se guarda sin unidad', async () => {

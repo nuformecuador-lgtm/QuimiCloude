@@ -61,10 +61,18 @@ export function compareDecimalText(a: string, b: string): number {
  * Las unidades del grupo de `unitId`: las que comparten su base efectiva, incluida ella misma.
  *
  * **Cuando `unitId` es `null` o no esta en el catalogo, se devuelve el CATALOGO COMPLETO**
- * (decision del humano del 2026-09-08). Es el caso del producto sin unidad -`products.unit_id`
- * es anulable- y el de una linea precargada en edicion, donde el detalle de la receta no trae
- * la unidad del producto: en ninguno de los dos se sabe de que magnitud se esta hablando, y
- * recortar la lista a partir de un dato que no se tiene esconderia unidades legitimas.
+ * (decision del humano del 2026-09-08, reconfirmada el 2026-09-11 por QC-80 R23). Es el caso
+ * del producto del que todavia no se sabe en que se mide y el de una linea precargada en
+ * edicion, donde el detalle de la receta no trae la unidad del producto: en ninguno de los dos
+ * se sabe de que magnitud se esta hablando, y recortar la lista a partir de un dato que no se
+ * tiene esconderia unidades legitimas.
+ *
+ * **De donde viene ese `null`, desde QC-80 (R22, R23):** la unidad de un ingrediente se deriva
+ * de la PRESENTACION DE SU LOTE MAS RECIENTE (`ProductView.latestBatchUnitId`), ya no de
+ * `products.unit_id` -esa columna se elimino: el producto no declara unidad-. Asi que `null`
+ * quiere decir **«este producto todavia no tiene ningun lote»**, y nunca «no se pudo leer».
+ * **Esta funcion no cambio ni una linea por eso**: lo que ya hacia con `null` es exactamente
+ * lo que R23 pide -catalogo entero, sin bloquear la linea ni impedir guardar la receta-.
  */
 export function unitsOfGroup(
   units: readonly UnitRef[],

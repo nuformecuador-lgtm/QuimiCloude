@@ -137,13 +137,19 @@ async function currentActor(): Promise<Actor | null> {
 }
 
 /**
- * Los CUATRO campos del producto, leidos del `FormData`. Devuelve `INVALID_NUMBER` si algun
- * campo numerico no es un entero -es la senal para que la action rechace sin tocar el caso
- * de uso-.
+ * Los TRES campos del producto, leidos del `FormData` -eran cuatro hasta QC-80-. Devuelve
+ * `INVALID_NUMBER` si algun campo numerico no es un entero -es la senal para que la action
+ * rechace sin tocar el caso de uso-.
  *
  * QC-52 (R1, R5): NO se lee `cost`, `minPurchase` ni `deliveryTime` del `FormData`. Y si
  * alguien los enviara de todos modos, no llegarian aqui como campo del candidato: el
  * esquema es `strictObject` y el caso de uso los rechaza con `invalid_input`.
+ *
+ * QC-80 (R21): TAMPOCO se lee `unitId`, y por el mismo motivo elevado a la enesima: ya no
+ * existe la columna. Que el formulario no lo pinte no bastaba -bastaba con que alguien lo
+ * colara en el `FormData`-; que la action no lo LEA lo hace estructuralmente imposible, y si
+ * llegara de todos modos el `strictObject` del esquema lo rechaza con `invalid_input` en vez
+ * de ignorarlo en silencio.
  */
 function buildProductFields(formData: FormData): Record<string, unknown> | typeof INVALID_NUMBER {
   const stock = readOptionalFormInt(formData, 'stock');
@@ -157,7 +163,6 @@ function buildProductFields(formData: FormData): Record<string, unknown> | typeo
     name: readFormString(formData, 'name'),
     stock,
     qtyAlert,
-    unitId: readOptionalFormString(formData, 'unitId'),
   };
 }
 

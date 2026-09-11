@@ -308,6 +308,219 @@ function ningunArchivoContiene(prohibidos: readonly string[], fuentes = FUENTES_
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// R44 — «la feature no toca lib/modules/recetas ni db/», como PREDICADO PURO.
+//
+// Las listas y el filtro vivian DENTRO del `it`, y eso dejaba la guardia sin forma de fallar a
+// voluntad: el unico modo de ejercitarla era tener un rango `origin/dev...HEAD` con commits, y en
+// una rama recien abierta ese rango devuelve cero archivos y el caso se declara no-concluyente.
+// Una guardia que no se puede poner roja a mano no vigila nada. Extraido a funcion exportada -que
+// es como estan escritas las demas guardias de este repo- se puede comprobar contra la lista real
+// de archivos de la rama sin comitear nada.
+// ---------------------------------------------------------------------------------------------
+
+// RETENSADO 2026-09-04 (QC-34). Las dos listas permitidas dejan de estar VACIAS y pasan a
+// tener entradas NOMBRADAS UNA A UNA. No es un aflojamiento: la premisa vieja -«esta rama
+// no cambia nada de `recetas` ni de `db/`»- cayo por dos requisitos de QC-34, y lo que
+// este caso protegia de verdad -que nada MAS se toque por la puerta de atras- sigue
+// vigilado, porque cualquier archivo fuera de estas listas pone el caso rojo.
+//
+// POR QUE `recetas` cambia: QC-34 R43/R44 necesitan el nombre de la receta de un pedido,
+// incluida la dada de BAJA, y QC-33 R32 le prohibe a `pedidos` consultar `prisma.recipe`
+// -exige que «todo lo que sepa de una receta le llegue por los contratos publicos, que
+// DEBEN publicarlo»-. Publicar eso es, por definicion, trabajo DENTRO de `recetas`. Es el
+// mismo criterio y las mismas tres rutas que ya se anotaron en
+// `tests/unit/recetas/module-contract.test.ts`. El repositorio, los casos de uso, la
+// Server Action y el adaptador de almacenamiento de QC-25 siguen CONGELADOS.
+const AMPLIACION_RECETAS_QC34 = [
+  // El barrel gana DOS reexportaciones de tipo (`RecipeCatalog`, `RecipeRef`).
+  'lib/modules/recetas/index.ts',
+  // El contrato de catalogo, que ya existia con `RecipeId` desde QC-33, gana los dos tipos.
+  'lib/modules/recetas/domain/recipe-catalog.ts',
+  // Y su implementacion, adaptador driven NUEVO -no toca `recipe-prisma.ts`-.
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+];
+
+// RETENSADO 2026-09-07 (QC-74 T10), con el mismo criterio que los dos retensados de abajo:
+// el rango `origin/dev...HEAD` mide la rama que corre el gate, no la de QC-34, asi que cada
+// cambio legitimo posterior se NOMBRA uno a uno o el caso deja de vigilar nada. QC-74
+// sustituye la pregunta de autorizacion —«es Administrador»— por «tiene este permiso» en los
+// CINCO casos de uso de `recetas` (R12, R16, R18). Son exactamente estos siete archivos: el
+// envoltorio del actor, los cinco casos de uso y el adaptador driving que arma el actor con
+// `permissions`. El repositorio, el adaptador de almacenamiento y el catalogo siguen
+// congelados, y `index.ts` ya estaba nombrado arriba (QC-74 solo renombra un export suyo).
+const AUTORIZACION_POR_PERMISO_QC74 = [
+  'lib/modules/recetas/domain/actor.ts',
+  'lib/modules/recetas/domain/errors.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/list-recipes.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/domain/delete-recipe.ts',
+  'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+];
+
+// RETENSADO 2026-09-08 (QC-70 T14), con el MISMO criterio que los retensados de QC-34 y
+// QC-74 de arriba: el rango `origin/dev...HEAD` mide la rama que corre el gate, asi que
+// cada cambio legitimo posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
+//
+// QC-70 centraliza el catalogo de errores y, por decision cerrada, MIGRA los cinco modulos:
+// `recetas` incluido. Los siete archivos que toca ya estan nombrados arriba —los cinco casos
+// de uso, `errors.ts`, `recipe-actions.ts` e `index.ts`, todos en las listas de QC-34 y
+// QC-74—, asi que aqui solo hace falta UNO mas.
+//
+// Y ese uno **no cambia una linea de codigo**: `recipe-prisma.ts` sigue congelado en su
+// comportamiento —la misma traduccion de `P2002`, el mismo `RECIPE_NAME_UNIQUE_COLUMN`, la
+// misma consulta—. Lo unico que cambia son DOS COMENTARIOS que nombraban
+// `DuplicateNameError`, clase que QC-70 renombro a `RecipeDuplicateNameError`. La
+// alternativa era dejar en el repositorio el nombre de una clase que ya no existe, que es
+// peor: un comentario que miente envejece igual que el codigo y nadie lo compila.
+const RENOMBRADO_DE_COMENTARIOS_QC70 = [
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// POR QUE `db/` cambia: QC-34 decision cerrada 3 anade el cuarto estado `CANCELADO`, y eso
+// es una migracion del tipo enumerado (R48, R49, R50) con su columna de motivo. La carpeta
+// de migracion es EXACTAMENTE UNA y esta nombrada; el esquema solo gana la columna nueva.
+// Ninguna otra migracion, ningun otro archivo de `db/`.
+const MIGRACION_QC34 = [
+  'db/schema.prisma',
+  'db/migrations/20260904135210_order_cancellation/migration.sql',
+  'db/migrations/20260904135210_order_cancellation/down.sql',
+];
+
+// RETENSADO 2026-09-04 (QC-47), con el mismo criterio que el retensado de QC-34 de arriba
+// y por la misma razon: QC-34 esta MERGEADA en `dev`, asi que el rango `origin/dev...HEAD`
+// ya no mide la rama de QC-34 sino la rama que este corriendo el gate. La premisa que este
+// caso protege -«por la puerta de atras no se toca `db/` ni `recetas`»- se mantiene solo si
+// cada migracion legitima posterior se NOMBRA una a una. La de QC-47 crea `companies` y la
+// columna `users.company_id`: nada de recetas, nada de unidades. Cualquier OTRO archivo de
+// `db/` sigue poniendo el caso rojo.
+const MIGRACION_QC47 = [
+  'db/migrations/20260904180600_companies_and_user_company/migration.sql',
+  'db/migrations/20260904180600_companies_and_user_company/down.sql',
+];
+
+// RETENSADO 2026-09-07, con el MISMO criterio que los dos retensados de arriba: el rango
+// `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
+// posterior se NOMBRA una a una o el caso deja de vigilar nada.
+//
+// Aqui se nombran DOS, y no es una eleccion: las dos entraron en `dev` y las dos son
+// legitimas. Quedarse con una sola -que es lo que proponia cada lado del conflicto del
+// merge de QC-74- habria puesto el caso rojo por la otra.
+//
+//  1. La decision humana de quitar la unidad y el precio unitario del pedido, que dropea dos
+//     columnas de `orders`. No toca recetas, ni unidades, ni ninguna otra tabla.
+//  2. QC-74, que introduce el catalogo de permisos: crea `permissions` y `role_permissions`
+//     -con su RLS y su `down.sql`- y nada mas (`design.md > 1.3`). Ni recetas, ni unidades,
+//     ni pedidos.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACIONES_LEGITIMAS = [
+  'db/migrations/20260907120000_orders_drop_unit_and_unit_price/migration.sql',
+  'db/migrations/20260907120000_orders_drop_unit_and_unit_price/down.sql',
+  'db/migrations/20260907183034_permissions_and_role_permissions/migration.sql',
+  'db/migrations/20260907183034_permissions_and_role_permissions/down.sql',
+];
+
+// RETENSADO 2026-09-08 (QC-83), con el MISMO criterio que los tres retensados de arriba: el
+// rango `origin/dev...HEAD` mide la rama que corre el gate, no la de QC-34, asi que cada
+// migracion legitima posterior se NOMBRA una a una o el caso deja de vigilar nada.
+//
+// POR QUE `db/` cambia aqui: QC-83 crea `work_groups` y `work_group_members` en el modulo
+// `identity`, con su `down.sql`. No toca recetas, ni unidades, ni pedidos.
+//
+// La UNICA modificacion sobre una tabla preexistente es el indice unico
+// `users_id_company_id_key` que anade a `users` -la clave que las nuevas tablas necesitan para
+// referenciar al miembro dentro de su empresa-, aprobado por el humano (R23). Ninguna columna
+// de `users` cambia: ni se anade, ni se dropea, ni se altera.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACION_QC83 = [
+  'db/migrations/20260908210000_work_groups_and_members/migration.sql',
+  'db/migrations/20260908210000_work_groups_and_members/down.sql',
+];
+
+// RETENSADO 2026-09-10 (QC-66), con el MISMO criterio que los cuatro retensados de arriba: el
+// rango `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
+// posterior se NOMBRA una a una o el caso deja de vigilar nada.
+//
+// POR QUE `db/` cambia aqui: QC-66 lleva el catalogo de permisos de once a trece, y su
+// migracion es de DATOS. Solo INSERTA dos filas en `permissions` (`usuarios.consultar` y
+// `usuarios.modificar`) y sus dos asignaciones en `role_permissions` para el `Administrador`.
+// NO crea, modifica ni borra ninguna columna, tabla, indice, restriccion ni tipo (R43), y NO
+// toca los tres indices unicos de `users` de QC-47 (R38). Ni recetas, ni unidades, ni pedidos.
+// `db/schema.prisma` no esta en la lista porque esta ficha no lo toca.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACION_QC66 = [
+  'db/migrations/20260910120000_user_permissions_catalog/migration.sql',
+  'db/migrations/20260910120000_user_permissions_catalog/down.sql',
+];
+
+// RETENSADO 2026-09-11 (QC-80), con el MISMO criterio que los cinco retensados de arriba: el
+// rango `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
+// posterior se NOMBRA una a una o el caso deja de vigilar nada.
+//
+// POR QUE `db/` cambia aqui: QC-80 mueve la unidad de medida de sitio. La PRESENTACION gana
+// una columna de unidad OBLIGATORIA —la unidad describe el envase, que es donde el dato vive
+// de verdad (R1)— y el PRODUCTO pierde la suya, porque pasa a derivarla de su presentacion en
+// vez de declararla por su cuenta (R7). Mover una columna de una tabla a otra es una migracion
+// de esquema por definicion: no hay forma de hacerlo sin tocar `db/`. Son EXACTAMENTE los dos
+// archivos de UNA carpeta de migracion, con su `down.sql` como manda el arnes.
+// `db/schema.prisma` no se repite aqui: ya esta nombrado en `MIGRACION_QC34`.
+//
+// Y POR QUE ESTO NO ES TOCAR `lib/modules/recetas`: las dos tablas que cambian —`presentations`
+// y `products`— son del modulo `inventario` (`/// @module inventario` en el esquema), y toda la
+// logica de QC-80 vive en `lib/modules/inventario`. `recetas` sigue leyendo la unidad por donde
+// siempre: el contrato publico de `inventario` y `listUnitsAction` de `unidades` (R43). Ni un
+// archivo de `lib/modules/recetas/` entra en el diff de esta rama, y el filtro de `tocaRecetas`
+// de abajo lo sigue exigiendo sin excepcion nueva.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACION_QC80 = [
+  'db/migrations/20260911120000_presentation_unit/migration.sql',
+  'db/migrations/20260911120000_presentation_unit/down.sql',
+];
+
+/** Toda ruta de `lib/modules/recetas/` cuyo cambio esta aprobado y nombrado por una ficha. */
+export const RECETAS_PERMITIDAS: readonly string[] = [
+  ...AMPLIACION_RECETAS_QC34,
+  ...AUTORIZACION_POR_PERMISO_QC74,
+  ...RENOMBRADO_DE_COMENTARIOS_QC70,
+];
+
+/** Toda ruta de `db/` cuyo cambio esta aprobado y nombrado por una ficha. */
+export const DB_PERMITIDAS: readonly string[] = [
+  ...MIGRACION_QC34,
+  ...MIGRACION_QC47,
+  ...MIGRACIONES_LEGITIMAS,
+  ...MIGRACION_QC83,
+  ...MIGRACION_QC66,
+  ...MIGRACION_QC80,
+];
+
+/**
+ * Los archivos del diff que violan R44: los de `lib/modules/recetas/` y los de `db/` que NINGUNA
+ * ficha ha nombrado. Predicado PURO sobre una lista de rutas -en separadores de posix, como las
+ * devuelve `git diff --name-only`-, para poder ejercitarlo con cualquier lista y no solo con la
+ * que el rango git tenga a bien devolver.
+ */
+export function fueraDelAlcanceDeLaRama(
+  diff: readonly string[],
+  permitidas: { recetas?: readonly string[]; db?: readonly string[] } = {},
+): { tocaRecetas: string[]; tocaDb: string[] } {
+  const recetas = permitidas.recetas ?? RECETAS_PERMITIDAS;
+  const db = permitidas.db ?? DB_PERMITIDAS;
+
+  return {
+    tocaRecetas: diff
+      .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
+      .filter((ruta) => !recetas.includes(ruta)),
+    tocaDb: diff.filter((ruta) => ruta.startsWith('db/')).filter((ruta) => !db.includes(ruta)),
+  };
+}
+
 describe('contrato de la ruta de recetas', () => {
   it('las tres rutas existen donde las ubican FORMULAS_ROUTE, NEW_RECIPE_ROUTE y recipeEditRoute', () => {
     // R3 — las tres rutas esperadas se DERIVAN de la constante, no se escriben a mano.
@@ -579,164 +792,19 @@ describe('contrato de la ruta de recetas', () => {
       'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
     ).toBeGreaterThan(0);
 
-    // RETENSADO 2026-09-04 (QC-34). Las dos listas permitidas dejan de estar VACIAS y pasan a
-    // tener entradas NOMBRADAS UNA A UNA. No es un aflojamiento: la premisa vieja -«esta rama
-    // no cambia nada de `recetas` ni de `db/`»- cayo por dos requisitos de QC-34, y lo que
-    // este caso protegia de verdad -que nada MAS se toque por la puerta de atras- sigue
-    // vigilado, porque cualquier archivo fuera de estas listas pone el caso rojo.
-    //
-    // POR QUE `recetas` cambia: QC-34 R43/R44 necesitan el nombre de la receta de un pedido,
-    // incluida la dada de BAJA, y QC-33 R32 le prohibe a `pedidos` consultar `prisma.recipe`
-    // -exige que «todo lo que sepa de una receta le llegue por los contratos publicos, que
-    // DEBEN publicarlo»-. Publicar eso es, por definicion, trabajo DENTRO de `recetas`. Es el
-    // mismo criterio y las mismas tres rutas que ya se anotaron en
-    // `tests/unit/recetas/module-contract.test.ts`. El repositorio, los casos de uso, la
-    // Server Action y el adaptador de almacenamiento de QC-25 siguen CONGELADOS.
-    const AMPLIACION_RECETAS_QC34 = [
-      // El barrel gana DOS reexportaciones de tipo (`RecipeCatalog`, `RecipeRef`).
-      'lib/modules/recetas/index.ts',
-      // El contrato de catalogo, que ya existia con `RecipeId` desde QC-33, gana los dos tipos.
-      'lib/modules/recetas/domain/recipe-catalog.ts',
-      // Y su implementacion, adaptador driven NUEVO -no toca `recipe-prisma.ts`-.
-      'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
-    ];
+    // Las listas de rutas permitidas -una por ficha, nombradas una a una- y el filtro viven
+    // ahora a nivel de modulo, en `fueraDelAlcanceDeLaRama`. El motivo esta escrito alli: dentro
+    // del `it` la guardia solo se podia ejercitar teniendo commits en la rama, y en una rama
+    // recien abierta eso significa no comprobar nada. El criterio no cambia ni un apice.
+    const { tocaRecetas, tocaDb } = fueraDelAlcanceDeLaRama(diff);
 
-    // RETENSADO 2026-09-07 (QC-74 T10), con el mismo criterio que los dos retensados de abajo:
-    // el rango `origin/dev...HEAD` mide la rama que corre el gate, no la de QC-34, asi que cada
-    // cambio legitimo posterior se NOMBRA uno a uno o el caso deja de vigilar nada. QC-74
-    // sustituye la pregunta de autorizacion —«es Administrador»— por «tiene este permiso» en los
-    // CINCO casos de uso de `recetas` (R12, R16, R18). Son exactamente estos siete archivos: el
-    // envoltorio del actor, los cinco casos de uso y el adaptador driving que arma el actor con
-    // `permissions`. El repositorio, el adaptador de almacenamiento y el catalogo siguen
-    // congelados, y `index.ts` ya estaba nombrado arriba (QC-74 solo renombra un export suyo).
-    const AUTORIZACION_POR_PERMISO_QC74 = [
-      'lib/modules/recetas/domain/actor.ts',
-      'lib/modules/recetas/domain/errors.ts',
-      'lib/modules/recetas/domain/get-recipe.ts',
-      'lib/modules/recetas/domain/list-recipes.ts',
-      'lib/modules/recetas/domain/create-recipe.ts',
-      'lib/modules/recetas/domain/update-recipe.ts',
-      'lib/modules/recetas/domain/delete-recipe.ts',
-      'lib/modules/recetas/adapters/driving/recipe-actions.ts',
-    ];
-
-    // RETENSADO 2026-09-08 (QC-70 T14), con el MISMO criterio que los retensados de QC-34 y
-    // QC-74 de arriba: el rango `origin/dev...HEAD` mide la rama que corre el gate, asi que
-    // cada cambio legitimo posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
-    //
-    // QC-70 centraliza el catalogo de errores y, por decision cerrada, MIGRA los cinco modulos:
-    // `recetas` incluido. Los siete archivos que toca ya estan nombrados arriba —los cinco casos
-    // de uso, `errors.ts`, `recipe-actions.ts` e `index.ts`, todos en las listas de QC-34 y
-    // QC-74—, asi que aqui solo hace falta UNO mas.
-    //
-    // Y ese uno **no cambia una linea de codigo**: `recipe-prisma.ts` sigue congelado en su
-    // comportamiento —la misma traduccion de `P2002`, el mismo `RECIPE_NAME_UNIQUE_COLUMN`, la
-    // misma consulta—. Lo unico que cambia son DOS COMENTARIOS que nombraban
-    // `DuplicateNameError`, clase que QC-70 renombro a `RecipeDuplicateNameError`. La
-    // alternativa era dejar en el repositorio el nombre de una clase que ya no existe, que es
-    // peor: un comentario que miente envejece igual que el codigo y nadie lo compila.
-    const RENOMBRADO_DE_COMENTARIOS_QC70 = [
-      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
-    ];
-
-    // POR QUE `db/` cambia: QC-34 decision cerrada 3 anade el cuarto estado `CANCELADO`, y eso
-    // es una migracion del tipo enumerado (R48, R49, R50) con su columna de motivo. La carpeta
-    // de migracion es EXACTAMENTE UNA y esta nombrada; el esquema solo gana la columna nueva.
-    // Ninguna otra migracion, ningun otro archivo de `db/`.
-    const MIGRACION_QC34 = [
-      'db/schema.prisma',
-      'db/migrations/20260904135210_order_cancellation/migration.sql',
-      'db/migrations/20260904135210_order_cancellation/down.sql',
-    ];
-
-    // RETENSADO 2026-09-04 (QC-47), con el mismo criterio que el retensado de QC-34 de arriba
-    // y por la misma razon: QC-34 esta MERGEADA en `dev`, asi que el rango `origin/dev...HEAD`
-    // ya no mide la rama de QC-34 sino la rama que este corriendo el gate. La premisa que este
-    // caso protege -«por la puerta de atras no se toca `db/` ni `recetas`»- se mantiene solo si
-    // cada migracion legitima posterior se NOMBRA una a una. La de QC-47 crea `companies` y la
-    // columna `users.company_id`: nada de recetas, nada de unidades. Cualquier OTRO archivo de
-    // `db/` sigue poniendo el caso rojo.
-    const MIGRACION_QC47 = [
-      'db/migrations/20260904180600_companies_and_user_company/migration.sql',
-      'db/migrations/20260904180600_companies_and_user_company/down.sql',
-    ];
-
-    // RETENSADO 2026-09-07, con el MISMO criterio que los dos retensados de arriba: el rango
-    // `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
-    // posterior se NOMBRA una a una o el caso deja de vigilar nada.
-    //
-    // Aqui se nombran DOS, y no es una eleccion: las dos entraron en `dev` y las dos son
-    // legitimas. Quedarse con una sola -que es lo que proponia cada lado del conflicto del
-    // merge de QC-74- habria puesto el caso rojo por la otra.
-    //
-    //  1. La decision humana de quitar la unidad y el precio unitario del pedido, que dropea dos
-    //     columnas de `orders`. No toca recetas, ni unidades, ni ninguna otra tabla.
-    //  2. QC-74, que introduce el catalogo de permisos: crea `permissions` y `role_permissions`
-    //     -con su RLS y su `down.sql`- y nada mas (`design.md > 1.3`). Ni recetas, ni unidades,
-    //     ni pedidos.
-    //
-    // Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
-    const MIGRACIONES_LEGITIMAS = [
-      'db/migrations/20260907120000_orders_drop_unit_and_unit_price/migration.sql',
-      'db/migrations/20260907120000_orders_drop_unit_and_unit_price/down.sql',
-      'db/migrations/20260907183034_permissions_and_role_permissions/migration.sql',
-      'db/migrations/20260907183034_permissions_and_role_permissions/down.sql',
-    ];
-
-    // RETENSADO 2026-09-08 (QC-83), con el MISMO criterio que los tres retensados de arriba: el
-    // rango `origin/dev...HEAD` mide la rama que corre el gate, no la de QC-34, asi que cada
-    // migracion legitima posterior se NOMBRA una a una o el caso deja de vigilar nada.
-    //
-    // POR QUE `db/` cambia aqui: QC-83 crea `work_groups` y `work_group_members` en el modulo
-    // `identity`, con su `down.sql`. No toca recetas, ni unidades, ni pedidos.
-    //
-    // La UNICA modificacion sobre una tabla preexistente es el indice unico
-    // `users_id_company_id_key` que anade a `users` -la clave que las nuevas tablas necesitan para
-    // referenciar al miembro dentro de su empresa-, aprobado por el humano (R23). Ninguna columna
-    // de `users` cambia: ni se anade, ni se dropea, ni se altera.
-    //
-    // Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
-    const MIGRACION_QC83 = [
-      'db/migrations/20260908210000_work_groups_and_members/migration.sql',
-      'db/migrations/20260908210000_work_groups_and_members/down.sql',
-    ];
-
-    // RETENSADO 2026-09-10 (QC-66), con el MISMO criterio que los cuatro retensados de arriba: el
-    // rango `origin/dev...HEAD` mide la rama que corre el gate, asi que cada migracion legitima
-    // posterior se NOMBRA una a una o el caso deja de vigilar nada.
-    //
-    // POR QUE `db/` cambia aqui: QC-66 lleva el catalogo de permisos de once a trece, y su
-    // migracion es de DATOS. Solo INSERTA dos filas en `permissions` (`usuarios.consultar` y
-    // `usuarios.modificar`) y sus dos asignaciones en `role_permissions` para el `Administrador`.
-    // NO crea, modifica ni borra ninguna columna, tabla, indice, restriccion ni tipo (R43), y NO
-    // toca los tres indices unicos de `users` de QC-47 (R38). Ni recetas, ni unidades, ni pedidos.
-    // `db/schema.prisma` no esta en la lista porque esta ficha no lo toca.
-    //
-    // Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
-    const MIGRACION_QC66 = [
-      'db/migrations/20260910120000_user_permissions_catalog/migration.sql',
-      'db/migrations/20260910120000_user_permissions_catalog/down.sql',
-    ];
-
-    const tocaRecetas = diff
-      .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
-      .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta))
-      .filter((ruta) => !AUTORIZACION_POR_PERMISO_QC74.includes(ruta))
-      .filter((ruta) => !RENOMBRADO_DE_COMENTARIOS_QC70.includes(ruta));
-    const tocaDb = diff
-      .filter((ruta) => ruta.startsWith('db/'))
-      .filter((ruta) => !MIGRACION_QC34.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC47.includes(ruta))
-      .filter((ruta) => !MIGRACIONES_LEGITIMAS.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC83.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC66.includes(ruta));
     expect(
       tocaRecetas,
-      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',
+      'ningun archivo de lib/modules/recetas/ fuera de las ampliaciones nombradas deberia estar en el diff',
     ).toEqual([]);
     expect(
       tocaDb,
-      'ningun archivo de db/ fuera de la migracion de cancelacion de QC-34 deberia estar en el diff',
+      'ningun archivo de db/ fuera de las migraciones nombradas deberia estar en el diff',
     ).toEqual([]);
   });
 

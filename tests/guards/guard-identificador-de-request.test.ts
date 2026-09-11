@@ -155,6 +155,12 @@ export const MIGRACIONES_ESPERADAS = [
   '20260909120000_product_batches',
   // Llega con la sincronizacion con dev: es de QC-66 (catalogo de permisos), no de esta ficha.
   '20260910120000_user_permissions_catalog',
+  // Igual que la de arriba, pero por el otro lado del merge: es de QC-80 (la presentacion gana
+  // unidad obligatoria y el producto pierde la suya, R1 y R7), no de QC-71. Se anade aqui porque
+  // es justo lo que pide el mensaje de `hallazgosDeMigraciones`: la ficha que trae la migracion
+  // actualiza esta lista. Sigue sin persistir ningun identificador de peticion: su SQL no nombra
+  // ninguno de `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
+  '20260911120000_presentation_unit',
 ] as const
 
 export function hallazgosDeMigraciones(

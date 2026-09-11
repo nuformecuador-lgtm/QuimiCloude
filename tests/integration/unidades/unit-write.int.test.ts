@@ -96,20 +96,27 @@ async function seedUnit(
   return unit.id
 }
 
-/** Producto, con o sin unidad. Sin presentacion desde el 2026-09-09. */
-async function createProduct(
-  marker: string,
-  unitId: string | null,
-): Promise<{ readonly productId: string }> {
+/** Producto. Sin presentacion desde el 2026-09-09 y SIN UNIDAD desde QC-80 (R7, R21): la
+ *  declara la presentacion, y la del producto se deriva de la del lote mas reciente (R22). */
+async function createProduct(marker: string): Promise<{ readonly productId: string }> {
   const product = await prisma.product.create({
     data: {
       name: `Producto ${marker}`,
       nameNormalized: `producto${marker}`,
-      unitId,
     },
     select: { id: true },
   })
   return { productId: product.id }
+}
+
+/** Presentacion CON su unidad (QC-80 R1: `presentations.unit_id` es NOT NULL con FK a
+ *  `units`, ON DELETE RESTRICT). Es la referencia al catalogo que antes traia el producto. */
+async function createPresentation(marker: string, unitId: string): Promise<string> {
+  const presentation = await prisma.presentation.create({
+    data: { name: `Presentacion ${marker}`, nameNormalized: `presentacion${marker}`, unitId },
+    select: { id: true },
+  })
+  return presentation.id
 }
 
 /** Receta viva, vacia. */
@@ -570,12 +577,13 @@ describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no t
       )
       seeded.units = [...(seeded.units ?? []), unitId]
 
-      const { productId } = await createProduct(`prod${marker}`, unitId)
-      seeded.products = [productId]
+      // TRASLADADO EL 2026-09-11 POR QC-80 (R1): quien apunta a la unidad es la PRESENTACION.
+      const presentationId = await createPresentation(`pres${marker}`, unitId)
+      seeded.presentations = [presentationId]
 
       const recipeId = await createRecipe(`rec${marker}`)
       seeded.recipes = [recipeId]
-      const { productId: productoDeLaLinea } = await createProduct(`linea${marker}`, null)
+      const { productId: productoDeLaLinea } = await createProduct(`linea${marker}`)
       seeded.products = [...(seeded.products ?? []), productoDeLaLinea]
       const lineId = await createLine(recipeId, productoDeLaLinea, unitId, '3.5000')
       seeded.recipeLines = [lineId]
@@ -599,12 +607,13 @@ describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no t
       expect(unit.baseUnitId).toBe(baseNueva)
       expect(unit.factor?.toString()).toBe('2000')
 
-      // El producto y la linea SIGUEN apuntando a la misma unidad, con sus cantidades intactas.
-      const product = await prisma.product.findUniqueOrThrow({
-        where: { id: productId },
+      // La presentacion y la linea SIGUEN apuntando a la misma unidad, con sus cantidades
+      // intactas.
+      const presentation = await prisma.presentation.findUniqueOrThrow({
+        where: { id: presentationId },
         select: { unitId: true },
       })
-      expect(product.unitId).toBe(unitId)
+      expect(presentation.unitId).toBe(unitId)
 
       const line = await prisma.recipeLine.findUniqueOrThrow({
         where: { id: lineId },
@@ -640,28 +649,32 @@ describe('deleteUnit — R23: borrado FISICO, cero filas', () => {
 })
 
 describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas intactas', () => {
-  it('rechaza borrar una unidad usada por un PRODUCTO, y la deja intacta', async () => {
+  it('rechaza borrar una unidad usada por una PRESENTACION, y la deja intacta', async () => {
     const marker = token()
     const companyId = await createCompany(`comp${marker}`)
     const actor = actorFor(companyId)
     const seeded: Seeded = { companies: [companyId], units: [], products: [], presentations: [] }
 
     try {
-      const { id: unitId } = await unidades.createUnit({ name: `Usada por producto ${marker}` }, actor)
+      // TRASLADADO EL 2026-09-11 POR QC-80 (R2): quien referencia la unidad y bloquea su
+      // borrado ya no es `products.unit_id` -columna eliminada (R7)- sino
+      // `presentations.unit_id`, con el mismo ON DELETE RESTRICT. R24 de QC-76 -el borrado en
+      // uso devuelve `UnitInUseError` y no toca nada- se afirma igual, sobre el sujeto nuevo.
+      const { id: unitId } = await unidades.createUnit({ name: `Usada por presentacion ${marker}` }, actor)
       seeded.units = [unitId]
 
-      const { productId } = await createProduct(`prod${marker}`, unitId)
-      seeded.products = [productId]
+      const presentationId = await createPresentation(`pres${marker}`, unitId)
+      seeded.presentations = [presentationId]
 
       await expect(unidades.deleteUnit(unitId, actor)).rejects.toBeInstanceOf(UnitInUseError)
 
-      // Intactas: la unidad sigue ahi, y el producto sigue apuntandola.
+      // Intactas: la unidad sigue ahi, y la presentacion sigue apuntandola.
       expect(await prisma.unit.findUnique({ where: { id: unitId } })).not.toBeNull()
-      const product = await prisma.product.findUniqueOrThrow({
-        where: { id: productId },
+      const presentation = await prisma.presentation.findUniqueOrThrow({
+        where: { id: presentationId },
         select: { unitId: true },
       })
-      expect(product.unitId).toBe(unitId)
+      expect(presentation.unitId).toBe(unitId)
     } finally {
       await cleanup(seeded)
     }
@@ -684,7 +697,7 @@ describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas 
       const { id: unitId } = await unidades.createUnit({ name: `Usada por linea ${marker}` }, actor)
       seeded.units = [unitId]
 
-      const { productId } = await createProduct(`prod${marker}`, null)
+      const { productId } = await createProduct(`prod${marker}`)
       seeded.products = [productId]
       const recipeId = await createRecipe(`rec${marker}`)
       seeded.recipes = [recipeId]

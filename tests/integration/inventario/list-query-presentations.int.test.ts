@@ -34,6 +34,22 @@ function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: typeof prisma): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
 const creadas: string[] = [];
 
 async function sembrar(nombres: readonly string[], createdAt?: Date): Promise<void> {
@@ -42,6 +58,7 @@ async function sembrar(nombres: readonly string[], createdAt?: Date): Promise<vo
       data: {
         name,
         nameNormalized: normalizePresentationName(name),
+        unitId: await unidadDeSistema(prisma),
         ...(createdAt === undefined ? {} : { createdAt }),
       },
       select: { id: true },

@@ -13,14 +13,14 @@ import type { UnitId } from '@/lib/modules/unidades';
  *
  * QC-52 (R1, R2): sin `cost`, `minPurchase` ni `deliveryTime` -son del catalogo del
  * proveedor-. 2026-09-09: sin `presentationId` -la presentacion se mudo al lote
- * (`ProductBatch`)-. Lo que queda es lo que la cosa ES (`name`, `unitId`) y lo que HAY de
- * ella (`stock`, `qtyAlert`), con la misma forma y la misma opcionalidad de antes.
+ * (`ProductBatch`)-. QC-80 (R21): sin `unitId` -la unidad la declara la PRESENTACION, y la
+ * del producto se DERIVA del lote mas reciente; no hay nada que escribir aqui-. Lo que queda
+ * es lo que la cosa ES (`name`) y lo que HAY de ella (`stock`, `qtyAlert`).
  */
 export type NewProduct = {
   readonly name: string;
   readonly stock?: number | null;
   readonly qtyAlert?: number | null;
-  readonly unitId?: UnitId | null;
 };
 
 /**
@@ -45,7 +45,21 @@ export type ProductView = {
   readonly imagePath: string | null;
   readonly stock: number | null;
   readonly qtyAlert: number | null;
-  readonly unitId: UnitId | null;
+  /**
+   * Unidad DERIVADA del producto: la de la presentacion de su lote MAS RECIENTE -creacion
+   * descendente, desempatando por identificador descendente-, o `null` si el producto todavia
+   * no tiene ningun lote (QC-80, R22, R23).
+   *
+   * SE LLAMA ASI Y NO `unitId` A PROPOSITO. Hasta QC-80 este campo era la columna
+   * `products.unit_id`, que ya no existe; dejarle el nombre viejo con un significado nuevo
+   * habria sido un cambio invisible para el compilador y para quien lee. El nombre dice DE
+   * DONDE sale el dato, y el typecheck obliga a visitar cada consumidor.
+   *
+   * Es un dato de LECTURA: no se envia al dar de alta ni al editar (`NewProduct` no lo lleva),
+   * y no se ordena ni se filtra por el (`PRODUCT_QUERYABLE`), porque no es una columna de
+   * `products` sino el resultado de mirar otro lado.
+   */
+  readonly latestBatchUnitId: UnitId | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };

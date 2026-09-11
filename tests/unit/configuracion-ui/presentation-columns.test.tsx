@@ -22,14 +22,15 @@ import {
   NAME_COLUMN_ID,
   PRESENTATION_ACTION_DELETE_TESTID,
   PRESENTATION_ACTION_EDIT_TESTID,
-  PRESENTATION_COLUMNS,
   PRESENTATION_COLUMN_COUNT,
   PRESENTATION_ROW_ACTIONS_TESTID,
   PRESENTATION_SKELETON_COLUMN_COUNT,
+  buildPresentationColumns,
   deletePresentationLabel,
   editPresentationLabel,
 } from '@/app/(private)/configuracion/presentaciones/components';
 import { PRESENTATION_QUERYABLE, type PresentationView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 // El panel de edicion y el dialogo de borrado que la celda de acciones monta usan `useRouter`
 // para refrescar la lista tras una escritura (R25). En jsdom no hay App Router montado, asi que
@@ -62,6 +63,21 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   };
 });
 
+
+/** Unidades del catalogo, tal cual bajarian desde `listUnitsAction()` (QC-80 R16). */
+const UNIDADES: readonly UnitRef[] = [
+  { id: 'unit-kg', name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null },
+  { id: 'unit-l', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
+];
+const UNIDAD_ACTUAL = UNIDADES[0]!.id;
+
+/**
+ * QC-80: las columnas pasan a construirse con `buildPresentationColumns(units)` porque la celda
+ * de acciones monta el panel de edicion, que necesita el catalogo. Se arma UNA vez aqui y todos
+ * los casos la recorren igual que antes: lo que vigila R9 -«exactamente dos columnas»- no cambia.
+ */
+const PRESENTATION_COLUMNS = buildPresentationColumns(UNIDADES);
+
 const PRESENTATION_ID = '11111111-1111-4111-8111-111111111111';
 
 function presentacion(overrides: Partial<PresentationView> = {}): PresentationView {
@@ -69,6 +85,7 @@ function presentacion(overrides: Partial<PresentationView> = {}): PresentationVi
     id: PRESENTATION_ID,
     name: 'Bidón 20 L',
     nameNormalized: 'bidon 20 l',
+    unitId: UNIDAD_ACTUAL,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-02-20T10:00:00.000Z'),
     ...overrides,
@@ -87,6 +104,15 @@ afterEach(() => {
 });
 
 describe('las columnas declaradas son exactamente DOS (R9)', () => {
+  it('la unidad NO gana columna: solo se ve abriendo el panel (QC-80, `design.md > 5`)', () => {
+    // En negativo y a proposito: pintarla abriria una pregunta que nadie hizo (¿el nombre?, ¿el
+    // simbolo?, ¿resuelto contra que catalogo?). Coste aceptado y escrito en el diseno.
+    const ids = buildPresentationColumns(UNIDADES).map((column) => column.id);
+
+    expect(ids).not.toContain('unitId');
+    expect(ids).not.toContain('unit');
+  });
+
   it('en positivo: nombre y acciones, en el orden de `design.md > 6`', () => {
     expect(PRESENTATION_COLUMNS.map((column) => column.id)).toEqual([
       NAME_COLUMN_ID,

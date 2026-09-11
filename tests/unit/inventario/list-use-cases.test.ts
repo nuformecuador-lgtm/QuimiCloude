@@ -59,7 +59,7 @@ function montarPresentaciones() {
   const list = vi.fn<PresentationRepository['list']>(async () => paginaVacia<PresentationView>());
   const presentations = {
     create: vi.fn<PresentationRepository['create']>(),
-    rename: vi.fn<PresentationRepository['rename']>(),
+    replace: vi.fn<PresentationRepository['replace']>(),
     deleteById: vi.fn<PresentationRepository['deleteById']>(),
     list,
   } satisfies PresentationRepository;
@@ -222,8 +222,11 @@ describe('list-products: lo que llega al repositorio (R11, R13, R15, R20, R24, R
     await listProducts(
       {
         filters: {
+          // Los dos filtros son de `PRODUCT_QUERYABLE`. El segundo era `unitId` hasta QC-80
+          // (R21): dejo de estar declarado -`products.unit_id` no existe-, asi que un caso de
+          // «llegan intactos» no puede apoyarse en el, o mediria la omision en vez del paso.
           stock: { kind: 'numberRange', min: 5, max: null },
-          unitId: { kind: 'select', values: ['u1', 'u2'] },
+          qtyAlert: { kind: 'numberRange', min: null, max: 3 },
         },
       },
       ADMIN,
@@ -231,7 +234,7 @@ describe('list-products: lo que llega al repositorio (R11, R13, R15, R20, R24, R
 
     expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual({
       stock: { kind: 'numberRange', min: 5, max: null },
-      unitId: { kind: 'select', values: ['u1', 'u2'] },
+      qtyAlert: { kind: 'numberRange', min: null, max: 3 },
     });
   });
 

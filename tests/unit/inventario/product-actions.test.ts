@@ -92,12 +92,14 @@ const VALID_PRODUCT_FIELDS = {
   name: 'Bidon 20 L',
   stock: '10',
   qtyAlert: '2',
-  // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El formulario ya no
-  // envia `unit: 'litro'` (texto libre) sino `unitId`, el identificador de la unidad elegida
-  // del catalogo. Cambia el NOMBRE y la FORMA del campo del `FormData`, no lo que este
-  // fixture representa: un alta valida con todos los campos rellenos.
-  unitId: '22222222-2222-4222-8222-222222222222',
+  // QC-80 (R21): AQUI estaba `unitId`. El producto dejo de declarar unidad -la columna
+  // `products.unit_id` ya no existe-, asi que un alta valida con TODOS los campos rellenos son
+  // exactamente estos tres. Que la unidad no llegue al caso de uso NI AUNQUE alguien la meta en
+  // el `FormData` tiene su propio caso, abajo.
 };
+
+/** Un `FormData` manipulado: nadie lo pinta, pero el borde no puede fiarse de eso (R21). */
+const UNIDAD_COLADA = { unitId: '22222222-2222-4222-8222-222222222222' };
 
 /**
  * QC-90 (R25): los CINCO campos del lote que el panel de alta hace viajar. Se declaran
@@ -235,14 +237,9 @@ describe('updateProductAction', () => {
 
     expect(updateProductMock).toHaveBeenCalledWith(
       'product-1',
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se anade `unitId`
-      // a la asercion para que el campo nuevo SIGA MORDIENDO: la Server Action tiene que
-      // leerlo del `FormData` con su nombre nuevo y pasarlo al caso de uso tal cual, sin
-      // interpretarlo (la unidad sigue siendo anotativa, QC-32 R14).
       expect.objectContaining({
         name: 'Bidon 20 L',
         stock: 10,
-        unitId: '22222222-2222-4222-8222-222222222222',
       }),
       ADMIN_ACTOR,
     );
@@ -388,7 +385,6 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
       name: 'Bidon 20 L',
       stock: 10,
       qtyAlert: 2,
-      unitId: '22222222-2222-4222-8222-222222222222',
       presentationId: '11111111-1111-4111-8111-111111111111',
       unitCost: '12.3456',
       totalCost: '123.4560',
@@ -482,11 +478,39 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
       name: 'Bidon 20 L',
       stock: 10,
       qtyAlert: 2,
-      unitId: '22222222-2222-4222-8222-222222222222',
     });
     for (const campo of Object.keys(VALID_BATCH_FIELDS)) {
       expect(Object.keys(candidato)).not.toContain(campo);
     }
+  });
+
+  it('ni el alta ni la edicion leen `unitId` del FormData, aunque venga (QC-80, R21)', async () => {
+    // R21 — «en ningun punto del camino», y este punto es el `FormData`. Que el formulario ya
+    // no pinte el campo NO basta: un `FormData` se construye a mano, y hasta QC-80 esta action
+    // leia `unitId` con `readOptionalFormString`. Lo que se exige es que no lo LEA, de modo que
+    // el candidato no pueda llevarlo ni por accidente.
+    //
+    // Importa que el candidato salga SIN la clave y no que el caso de uso lo rechace despues:
+    // `createProductWithFirstBatchSchema` y `updateProductSchema` son `strictObject`, asi que
+    // colarlo aqui no seria un campo ignorado sino cada alta y cada edicion muertas con
+    // `invalid_input`.
+    createProductMock.mockResolvedValue({ id: 'producto-1' });
+    updateProductMock.mockResolvedValue(undefined);
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, ...UNIDAD_COLADA }),
+    );
+    await updateProductAction(
+      'product-1',
+      MUTATION_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...UNIDAD_COLADA }),
+    );
+
+    const [candidatoAlta] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    const [, candidatoEdicion] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
+    expect(Object.keys(candidatoAlta)).not.toContain('unitId');
+    expect(Object.keys(candidatoEdicion)).not.toContain('unitId');
   });
 
   it('no convierte ningun importe a numero de coma flotante en el codigo fuente (R4)', () => {

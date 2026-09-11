@@ -59,7 +59,8 @@ const FILA_RECETA: RecipeRow = {
 // dev anadio `stock` a `ProductRef` el 2026-09-09 (`419f01e`) y no actualizo estos dobles.
 // `null` es «no declara existencia», que es lo que el fixture decia ya por omision: el valor
 // no cambia el comportamiento de ningun caso, solo satisface el tipo.
-const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', unitId: null, stock: null };
+// QC-80 (R21): `ProductRef` ya no lleva unidad -nadie la consumia-, asi que el doble tampoco.
+const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', stock: null };
 
 const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
 

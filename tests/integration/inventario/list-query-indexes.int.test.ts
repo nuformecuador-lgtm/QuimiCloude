@@ -138,7 +138,13 @@ const PRE_EXISTING_INDEXES = [
   // en la misma migracion que creo `product_batches`: la presentacion se mudo al lote, y el
   // lado hijo de la FK ya no es `products` sino `product_batches` (cuyo indice, tambien
   // del lado hijo, esta arriba en `PARTIAL_INDEXES`).
-  'products_unit_id_idx',
+  // `products_unit_id_idx` salio de esta lista el 2026-09-11 con QC-80, y NO por descuido -que
+  // es justo lo que este caso vigila-: la ficha elimina la columna `products.unit_id` entera
+  // (R7), y Postgres se lleva el indice con ella. El producto deja de declarar unidad y la
+  // deriva de la presentacion de su lote mas reciente (R22). Su RELEVO es
+  // `presentations_unit_id_idx` (R3), que se afirma abajo en su propio caso: si la migracion se
+  // hubiera llevado el de `products` SIN crear el de `presentations`, la FK nueva se quedaria sin
+  // indice y este archivo seguiria siendo quien lo dijera.
   'supplier_catalog_lines_presentation_id_idx',
   'supplier_catalog_lines_unit_id_idx',
   'orders_recipe_id_idx',
@@ -241,6 +247,17 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     )
   })
 
+  it('el indice de la unidad de la presentacion existe y va sobre unit_id (QC-80 R3)', async () => {
+    // El relevo del `products_unit_id_idx` que salio de `PRE_EXISTING_INDEXES`. Es el indice del
+    // lado hijo de `presentations_unit_id_fkey`: sin el, cada borrado de unidad tendria que
+    // recorrer `presentations` entera para comprobar el RESTRICT.
+    const indexes = await readIndexes()
+    const def = indexes.get('presentations_unit_id_idx')
+    expect(def, 'falta presentations_unit_id_idx').toBeDefined()
+    expect(def).toContain('unit_id')
+    expect(def, 'no es unico: varias presentaciones comparten unidad').not.toContain('UNIQUE')
+  })
+
   it('la unicidad del catalogo de unidades sigue garantizada, ahora POR AMBITO (QC-76 R14, R15)', async () => {
     // El relevo del `units_name_normalized_key` global que salio de `PRE_EXISTING_INDEXES`.
     // Este caso es la mitad que impide que aquella retirada se lea como permiso para dejar el
@@ -303,7 +320,8 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       // «Solución Buffer pH 7»).
       const nombreAlta = `Solución Buffer pH 7 ${token()}`
       const created = await createProduct(
-        { name: nombreAlta, stock: 3, qtyAlert: 1, unitId: null },
+        // QC-80 (R21): `NewProduct` ya no lleva unidad; el producto no la declara.
+        { name: nombreAlta, stock: 3, qtyAlert: 1 },
         new Date('2026-01-01T00:00:00Z'),
       )
       productId = created.id
@@ -321,7 +339,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreEdicion = `Hipoclorito de sodio 5% ${token()}`
       const ok = await updateAliveProduct(
         created.id,
-        { name: nombreEdicion, stock: 3, qtyAlert: 1, unitId: null },
+        { name: nombreEdicion, stock: 3, qtyAlert: 1 },
         new Date('2026-01-02T00:00:00Z'),
       )
       expect(ok).toBe(true)
