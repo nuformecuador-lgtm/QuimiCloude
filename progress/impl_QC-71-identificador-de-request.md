@@ -752,3 +752,64 @@ rojo, en cualquiera de las tres escrituras—. Es candidato a ficha propia y exi
 contrato `error` de `AsyncAutocomplete`, que fue la **Opción A descartada** por el humano.
 
 **Sigue sin abrirse PR y sin hacerse push.** Eso lo autoriza el humano.
+
+---
+
+# F2.3 — sincronización con `dev` antes del PR (2026-09-10)
+
+`dev` se movió **17 commits** mientras se cerraba la ronda 3: entró **QC-78**
+(`estado-de-cuenta-en-el-acceso`, PR #53). Merge de `origin/dev` en la rama, commit `dd7cbd2`.
+
+## El conflicto: uno, y de imports
+
+`tests/unit/configuracion-ui/unit-page.test.tsx`. QC-78 cambió el destino de redirección que ese
+archivo espera (`LOGIN_ROUTE` -> `LOGIN_ROUTE_SESSION_ENDED`) y QC-71 había añadido ahí los
+símbolos de R17/R18. **Resuelto conservando las dos intenciones**: se queda el nombre de QC-78
+—que es el que usa el cuerpo del archivo, en el `expect(redirectMock)`— y se quedan los tres
+imports de QC-71. Ninguna aserción de ninguna de las dos fichas se tocó.
+
+## La revisión a mano del cruce, que es lo que un merge limpio NO garantiza
+
+El precedente pesa: en QC-70 el merge con QC-39 salió **limpio y rompió en pantalla**, y en la
+ronda 1 de esta ficha un test de permisos llegaba a `presentation-actions` por una ruta indirecta
+que `--rapido` no veía. Así que se revisó a mano, no por fe.
+
+**Hallazgo: QC-78 SÍ tocó `route-guard-middleware.ts` —12 líneas—, pese a declararlo en su lista de
+«archivos que NO toca»** (es la declaración sobre la que `design.md > 8` justificó arrancar en
+paralelo). Lo que añadió:
+
+- un parámetro más a `decideRouteAccess` (`sessionEndedParam: SESSION_ENDED_PARAM`) y su import;
+- nada en el camino **`allow`**, que es exactamente donde vive la generación del identificador.
+
+**Comprobado leyendo el archivo mergeado, no el diff:** el id se sigue generando, se sigue
+escribiendo con `set` —no `append`— sobre una **copia** de las cabeceras de **petición**, y se
+sigue devolviendo con `NextResponse.next({ request: { headers } })`. R4, R5 y R6 intactos.
+
+**`lib/composition/edge.ts` y `lib/composition/index.ts`: QC-78 no los tocó** (`git diff` vacío),
+así que ni el cableado del borde ni el del lector de la cabecera se movieron. El resto de QC-78
+—`require-page-permission`, `resolve-session`, `verify-credentials`, dos puertos y dos adaptadores
+driven de persistencia— **no está en el camino del identificador**.
+
+Lo único que cambia de verdad para esta ficha es que QC-78 añade una regla más que **redirige**
+(sesión terminada), o sea que el camino `allow` es ahora un poco más estrecho. Eso no afecta a R4:
+el id se pone cuando se deja pasar, y cuando se redirige no hay nada corriendo después en el
+servidor que lo lea (`design.md > 2`).
+
+## La guardia de superficies aplanadas, después del merge
+
+Sigue diciendo la verdad: **6 aplanados, los 6 de la lista**. QC-78 no trajo ninguna superficie
+nueva que aplane un `ErrorState` a `string` —su `toast.error(state.message)` del login no lo es:
+el login de `identity` no pasa por el traductor de `errores` (QC-70 R25), y el detector ya lo
+descartaba explícitamente por no discriminar con `status === 'error'`—.
+
+## El gate completo tras el merge (`./init.sh`), salida real
+
+```
+ Test Files  305 passed (305)
+      Tests  3995 passed | 22 skipped (4017)
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+== init OK ==            (exit 0)
+```
+
+**305 archivos, 3995 tests, cero rojos, exit 0.** El salto desde 3891 son los tests que trae QC-78.
+Los 5 avisos del baseline son los de siempre y **no se tocan**, por el motivo ya escrito.
