@@ -24,11 +24,21 @@ const ADMIN: Actor = {
 const AHORA = new Date('2026-09-02T10:00:00.000Z');
 
 /** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
- *  del 2026-09-03 los volvio obligatorios en `createProductSchema`. */
+ *  del 2026-09-03 los volvio obligatorios en `createProductSchema`. Sigue sirviendo tal
+ *  cual a la EDICION, que no conoce el lote (QC-90 R26). */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
   stock: 0,
   qtyAlert: 0,
+};
+
+/** QC-90 (R1): el ALTA siempre crea su primer lote, asi que su entrada valida minima lleva
+ *  ademas presentacion y uno de los dos costos. Los casos propios de QC-90 -derivacion,
+ *  producto ya existente, autoria del lote- viven en `create-product.test.ts`. */
+const ALTA_VALIDA = {
+  ...PRODUCTO_VALIDO,
+  presentationId: '11111111-1111-4111-8111-111111111111',
+  unitCost: '10.0000',
 };
 
 const VISTA_PRODUCTO: ProductView = {
@@ -60,6 +70,16 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
       pageSize: 10,
       totalPages: 1,
     })),
+    // QC-90 (T4): los tres metodos del alta con primer lote. Por defecto NO hay producto
+    // vivo homonimo, asi que el alta cae al camino de creacion (R16).
+    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
+    createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
+      id: 'producto-1',
+      batchId: 'lote-1',
+    })),
+    addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
+      batchId: 'lote-1',
+    })),
     ...overrides,
   };
 }
@@ -69,10 +89,13 @@ describe('R5 — alta de producto', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    const resultado = await createProduct(PRODUCTO_VALIDO, ADMIN);
+    const resultado = await createProduct(ALTA_VALIDA, ADMIN);
 
     expect(resultado).toEqual({ id: 'producto-1' });
-    expect(products.create).toHaveBeenCalledTimes(1);
+    // QC-90 (R1): el alta pasa por `createWithFirstBatch`, no por `create`. `create` sigue
+    // en el puerto para otros usos, pero el alta ya no puede escribir un producto sin lote.
+    expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
+    expect(products.create).not.toHaveBeenCalled();
   });
 });
 
@@ -81,12 +104,18 @@ describe('R12 — nombres duplicados', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await createProduct(PRODUCTO_VALIDO, ADMIN);
-    await createProduct(PRODUCTO_VALIDO, ADMIN);
+    await createProduct(ALTA_VALIDA, ADMIN);
+    await createProduct(ALTA_VALIDA, ADMIN);
 
     // Ninguna comprobacion de unicidad de nombre (D14): dos altas identicas, dos llamadas
     // al puerto, ninguna rechazada.
-    expect(products.create).toHaveBeenCalledTimes(2);
+    //
+    // QC-90 acota lo que este caso mide, y conviene decirlo: quien decide si hay homonimo
+    // es el PUERTO (`findAliveIdByName`), y aqui devuelve `null` -no hay producto vivo con
+    // ese nombre-. Lo que sigue vigente es que el DOMINIO no rechaza por nombre repetido;
+    // con un producto vivo homonimo, el alta agrega lote en vez de crear (R17), y eso se
+    // prueba en `create-product.test.ts`.
+    expect(products.createWithFirstBatch).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -150,15 +179,25 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
   });
 });
 
+/** QC-90: «no toca el puerto» ya no es una sola llamada. El alta puede pasar por tres
+ *  metodos distintos, y afirmar solo sobre `create` dejaria verde un alta que consulto por
+ *  nombre o escribio un lote pese al rechazo. */
+function afirmarPuertoIntacto(products: ProductRepository): void {
+  expect(products.create).not.toHaveBeenCalled();
+  expect(products.findAliveIdByName).not.toHaveBeenCalled();
+  expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  expect(products.addBatchToAlive).not.toHaveBeenCalled();
+}
+
 describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
   it('R9 — nombre vacio', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await expect(
-      createProduct({ ...PRODUCTO_VALIDO, name: '   ' }, ADMIN),
-    ).rejects.toBeInstanceOf(ValidationError);
-    expect(products.create).not.toHaveBeenCalled();
+    await expect(createProduct({ ...ALTA_VALIDA, name: '   ' }, ADMIN)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    afirmarPuertoIntacto(products);
   });
 
   // QC-52 R1 deroga QC-14 R10 en lo que este caso medía: el tiempo de entrega ya no es
@@ -169,11 +208,11 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     for (const sobra of [{ cost: '10.0000' }, { minPurchase: 0 }, { deliveryTime: 3 }]) {
-      await expect(
-        createProduct({ ...PRODUCTO_VALIDO, ...sobra }, ADMIN),
-      ).rejects.toBeInstanceOf(ValidationError);
+      await expect(createProduct({ ...ALTA_VALIDA, ...sobra }, ADMIN)).rejects.toBeInstanceOf(
+        ValidationError,
+      );
     }
-    expect(products.create).not.toHaveBeenCalled();
+    afirmarPuertoIntacto(products);
   });
 
   it('R11 — nombre de mas de 120 caracteres', async () => {
@@ -181,9 +220,9 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await expect(
-      createProduct({ ...PRODUCTO_VALIDO, name: 'x'.repeat(121) }, ADMIN),
+      createProduct({ ...ALTA_VALIDA, name: 'x'.repeat(121) }, ADMIN),
     ).rejects.toBeInstanceOf(ValidationError);
-    expect(products.create).not.toHaveBeenCalled();
+    afirmarPuertoIntacto(products);
   });
 });
 
