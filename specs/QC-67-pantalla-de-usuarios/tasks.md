@@ -59,31 +59,31 @@
 
 ### T4 [P] — `user-list-params.ts` *(depende de T1)*
 
-- [ ] Parser y serializador puros: `page`, `pageSize` (contra `PAGE_SIZE_OPTIONS`), `sort` (contra
+- [x] Parser y serializador puros: `page`, `pageSize` (contra `PAGE_SIZE_OPTIONS`), `sort` (contra
       `USER_QUERYABLE.sortable` **importado**), `status` (multivalor, contra `USER_ACCOUNT_STATUSES`
       **importado**), `q`. `userListHref` derivado de `USERS_ROUTE`.
-- [ ] Tests: `parse(build(p)) === p`; página 0 / negativa / `'1e3'` → primera página; tamaño 7 →
+- [x] Tests: `parse(build(p)) === p`; página 0 / negativa / `'1e3'` → primera página; tamaño 7 →
       10; campo de orden no declarado → sin orden; `status=pending,marciano` → solo `pending`;
       `status=marciano` → sin filtro; ninguna entrada produce error.
 - **Hecho cuando**: la suite del parser pasa sin montar la pantalla. **(R13, R14, R16, R17)**
 
 ### T5 [P] — `user-labels.ts` *(depende de T0)*
 
-- [ ] Etiquetas de los cuatro estados en un `Record<UserAccountStatus, string>` (typecheck como
+- [x] Etiquetas de los cuatro estados en un `Record<UserAccountStatus, string>` (typecheck como
       garantía), opciones del filtro derivadas de `USER_ACCOUNT_STATUSES`, nombres accesibles de las
       acciones de fila compuestos con el nombre del usuario, y `toDateInputValue(date)` en **UTC**.
-- [ ] Tests: hay etiqueta para los cuatro estados y para ninguno más; `toDateInputValue` devuelve
+- [x] Tests: hay etiqueta para los cuatro estados y para ninguno más; `toDateInputValue` devuelve
       `YYYY-MM-DD` y **no** resta un día en husos negativos.
 - **Hecho cuando**: los tests pasan. **(R20, R26 formato de fecha)**
 
 ### T6 [P] — `user-columns.tsx` + `user-row-actions.tsx` *(depende de T5)*
 
-- [ ] Seis columnas exactas (cinco de datos + acciones con `pinnable: false`); `sortable` solo en
+- [x] Seis columnas exactas (cinco de datos + acciones con `pinnable: false`); `sortable` solo en
       las que declara `USER_QUERYABLE.sortable`; `filter: 'select'` solo en `accountStatus`.
-- [ ] `UserRowActions`: con `canModify === false` devuelve **`null`** (celda vacía, sin botones
+- [x] `UserRowActions`: con `canModify === false` devuelve **`null`** (celda vacía, sin botones
       deshabilitados ni explicación); con `true`, tres acciones siempre en el DOM, cada una con
       nombre accesible que nombra al usuario, y objetivo táctil de 44×44.
-- [ ] Tests: las claves de columna son exactamente las seis; no aparece `id`, ni ningún campo de
+- [x] Tests: las claves de columna son exactamente las seis; no aparece `id`, ni ningún campo de
       credencial, ni `companyId`; `displayName` y `roleName` **no** son ordenables; sin `canModify`
       la celda no emite nada.
 - **Hecho cuando**: los dos tests pasan. **(R10, R13, R14, R15, R6 mitad cliente)**

@@ -27,7 +27,81 @@ Ninguna dependencia nueva, ninguna migracion, ningun archivo de `lib/modules/ide
 
 ## Archivos creados / modificados
 
-(se rellena por tandas)
+### Bloque 1 — T1, T2, T3 (commit `066edea`)
+
+**Creados**
+
+- `app/(private)/configuracion/usuarios/page.tsx`
+- `tests/unit/configuracion-ui/usuarios-route-contract.test.ts`
+- `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`
+- `tests/unit/configuracion-ui/usuarios-page.test.tsx`
+
+**Modificados (producto)** — los dos archivos ajenos que R39 permite, mas el mapa de iconos
+que el `Record<NavIconName, LucideIcon>` obliga a completar:
+
+- `lib/shared/routes.ts` — `USERS_ROUTE` + su fila en `PRIVATE_ROUTE_PREFIXES`, en el mismo commit
+- `lib/shared/navigation/private-nav.ts` — `USERS_LABEL`, `'users'` en `NavIconName` y el TERCER
+  item de `NAV_SECTION_CONFIGURATION`, al final del array
+- `lib/shared/navigation/nav-icons.ts` — la fila `users: Users` (sin ella no compila).
+  `lucide-react` ya estaba instalado y aprobado: **ninguna dependencia nueva**
+
+**Tests heredados de lista CERRADA, TENSADOS y nunca relajados (R39)** — en los siete sube el
+ancla **y** ademas se nombra la entrada nueva:
+
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts` (10 -> 11 pantallas privadas)
+- `tests/guards/guard-nav-permisos-declarados.test.ts` (7 -> 8 enlaces, con `nav-usuarios`)
+- `tests/unit/app-sidebar.test.tsx` (7 -> 8, lista exacta y en orden)
+- `tests/unit/navegacion/private-layout-menu.test.tsx` (7 -> 8)
+- `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` (2 -> 3 items)
+- `tests/unit/configuracion-ui/private-nav-unidades.test.ts` (2 -> 3, y ademas **fija** que
+  unidades sigue siendo el segundo: se tensa con un aserto nuevo, no solo con el contador)
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts` (lista cerrada de exports de `routes.ts`)
+
+**Nota de diseno que el reviewer debe mirar.** `canModify` se resuelve con `assertPermission` y
+**nunca** con un `permissions.includes(...)` a mano (QC-74 R12: una sola implementacion de «el
+actor tiene este permiso»). Como `assertPermission` siempre lanza lo que devuelve su `onDenied`,
+la pagina le pasa una instancia centinela y la reconoce **por identidad** al atraparla; cualquier
+otro error se relanza intacto. El `data-can-modify` del contenedor es **provisional** y
+desaparece en T7, cuando el booleano viaje a `<UserListSection>` por props (R8).
+
+### Bloque 2 — T4, T5, T6
+
+**Creados**
+
+- `app/(private)/configuracion/usuarios/components/user-list-params.ts` — parser y serializador
+  PUROS (sin DOM, sin React, sin `next/*`). `sort` se valida contra `USER_QUERYABLE.sortable`
+  **importado** y `status` contra `USER_ACCOUNT_STATUSES` **importado**, nunca copias. Los valores
+  desconocidos del filtro se descartan uno a uno y una lista vacia es «sin filtro» (R17).
+  `userListHref` deriva de `USERS_ROUTE`: ningun literal de URL (R1)
+- `app/(private)/configuracion/usuarios/components/user-labels.ts` — `Record<UserAccountStatus,
+  string>` (un quinto estado rompe el typecheck, no pinta un hueco), opciones del filtro derivadas
+  de recorrer `USER_ACCOUNT_STATUSES`, y `toDateInputValue` en **UTC** con el patron ya vigente en
+  cuatro pantallas del repo, de modo que un huso negativo no resta un dia (R20, R26)
+- `app/(private)/configuracion/usuarios/components/user-columns.tsx` — las SEIS columnas exactas.
+  `sortable` **se lee** de la lista blanca (`USER_QUERYABLE.sortable.includes(id)`), no se copia:
+  hoy deja ordenables `username`, `email` y `accountStatus`, y NO `displayName` (es una
+  composicion) ni `roleName` (no esta en la lista). `filter: 'select'` solo en `accountStatus`;
+  ningun filtro por rol (R10, R13, R14, R15, R20)
+- `app/(private)/configuracion/usuarios/components/user-row-actions.tsx` — con `canModify ===
+  false` devuelve **`null`**: la celda no emite NADA, ni botones deshabilitados ni explicacion
+  (R6). Con `true`, las tres acciones siempre en el DOM, con nombre accesible que nombra al
+  usuario y objetivo tactil 44x44, nunca detras de `:hover` (R40)
+- `app/(private)/configuracion/usuarios/components/index.ts` — barrel PARCIAL; lo cierra T13
+- `tests/unit/configuracion-ui/user-list-params.test.ts`, `user-labels.test.ts`,
+  `user-columns.test.tsx`, `user-row-actions.test.tsx`
+
+**Modificados**
+
+- `app/(private)/configuracion/usuarios/page.tsx` — dos lineas: el `<h1>` pasa a usar
+  `USERS_TITLE_TESTID` importado **del barrel**, en vez de un literal
+- `tests/unit/configuracion-ui/usuarios-page.test.tsx` — usa esa constante y anade un caso
+
+**Nota de diseno que el reviewer debe mirar.** `UserRowActions` recibe los manejadores por props
+(`onEdit`, `onDelete`, `onStatusChange`) en vez de montar el panel y los dialogos dentro de la
+fila, que es lo que hace `unit-row-actions.tsx`. **Se aparta del precedente a proposito**: el
+dueno del estado pasa a ser la tabla, que monta **una** instancia de cada panel para toda la
+pagina en lugar de 10 o 25. Los manejadores son opcionales hoy y T9-T11 los enchufan sin
+reescribir el componente.
 
 ## Mapa `R<n> -> test`
 

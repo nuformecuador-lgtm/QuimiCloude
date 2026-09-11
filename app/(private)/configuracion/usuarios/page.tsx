@@ -5,6 +5,8 @@ import { assertPermission } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL, USERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
+import { USERS_TITLE_TESTID } from './components';
+
 export const metadata: Metadata = {
   title: `${USERS_LABEL} · ${BRAND_LABEL}`,
 };
@@ -84,7 +86,7 @@ export default async function UsuariosPage() {
        tiene la sesion— y desaparece en T7, cuando el booleano viaje a <UserListSection>. */
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6" data-can-modify={String(canModify)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 data-testid="usuarios-title" className="text-2xl font-semibold">
+        <h1 data-testid={USERS_TITLE_TESTID} className="text-2xl font-semibold">
           {USERS_LABEL}
         </h1>
       </div>

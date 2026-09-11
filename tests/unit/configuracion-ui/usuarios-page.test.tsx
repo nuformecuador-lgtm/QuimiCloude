@@ -9,15 +9,17 @@
 // ejecuta de verdad —`assertPermission` incluido— y lo unico sustituido es de donde sale la sesion.
 //
 // **Nada se afirma por copy** (R41): la cabecera se busca por su ROL ARIA —`heading` de nivel 1—
-// y los permisos se derivan del catalogo de `identity`. No se consulta por `data-testid` con un
-// literal a mano: la convencion de esta carpeta exige que el identificador salga de una constante
-// exportada, y la del titulo nace con la seccion de lista en T7.
+// y los permisos se derivan del catalogo de `identity`. El `data-testid` del titulo tampoco se
+// escribe a mano: desde T5 sale de `USERS_TITLE_TESTID`, la constante que declara `user-labels.ts`
+// y que la propia pagina usa, importada **por el barrel de la ruta** y nunca por ruta profunda
+// (R38).
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { USERS_TITLE_TESTID } from '@/app/(private)/configuracion/usuarios/components';
 import UsuariosPage from '@/app/(private)/configuracion/usuarios/page';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { LOGIN_ROUTE_SESSION_ENDED, USERS_ROUTE } from '@/lib/shared/routes';
@@ -151,6 +153,17 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+  });
+
+  it('el titulo se identifica por la constante exportada, no por un literal (R41)', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_CONSULTA]));
+
+    render(await UsuariosPage());
+
+    expect(screen.getByRole('heading', { level: 1 })).toBe(screen.getByTestId(USERS_TITLE_TESTID));
+    // Y la pagina NO escribe el identificador a mano: lo importa del barrel de la ruta (R38).
+    expect(fuenteDeLaPagina()).not.toContain(`"${USERS_TITLE_TESTID}"`);
+    expect(fuenteDeLaPagina()).toContain('USERS_TITLE_TESTID');
   });
 
   it('el corte es UNO SOLO y es el de consultar: `modificar` no cierra la pantalla', async () => {
