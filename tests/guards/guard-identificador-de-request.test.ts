@@ -91,6 +91,11 @@ export const E2E_ESPERADOS = [
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
+  // QC-67 T15: la E2E de la pantalla de usuarios (R42). Se da de alta AQUI porque esta lista es
+  // CERRADA y su punto de extension por diseno es justamente este: el ancla no se relaja —el
+  // archivo se nombra— y la decision de QC-71 R21 sigue intacta, porque este E2E no prueba el
+  // identificador de peticion sino el alta de un usuario y el 404 de quien no puede consultarlos.
+  'usuarios.spec.ts',
 ] as const
 
 /** El test de unidad que R21 exige a cambio del E2E diferido. */
