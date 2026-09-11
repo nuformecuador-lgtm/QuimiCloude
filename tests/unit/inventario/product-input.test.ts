@@ -131,6 +131,11 @@ describe('createProductSchema', () => {
       updateAlive: vi.fn(),
       softDeleteAlive: vi.fn(),
       listAlive: vi.fn(),
+      // QC-90 (T4): los tres metodos del alta con primer lote. Estan aqui porque el doble
+      // tiene que cumplir el puerto ENTERO; ninguno debe llegar a llamarse en este caso.
+      findAliveIdByName: vi.fn(),
+      createWithFirstBatch: vi.fn(),
+      addBatchToAlive: vi.fn(),
     };
     const createProduct = createCreateProduct({ products });
 
@@ -147,6 +152,11 @@ describe('createProductSchema', () => {
     expect(error).toBeInstanceOf(ValidationError);
     expect((error as ValidationError).code).toBe('invalid_input');
     expect(products.create).not.toHaveBeenCalled();
+    // QC-90: el alta ya no pasa por `create`, asi que «no toca el puerto» tambien tiene
+    // que afirmarse sobre los metodos por los que ahora SI pasaria.
+    expect(products.findAliveIdByName).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
   });
 
   it('acepta la unidad ausente y exige que la presente sea una referencia con forma de uuid', () => {

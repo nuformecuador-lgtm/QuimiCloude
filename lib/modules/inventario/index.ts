@@ -49,6 +49,18 @@ export {
   type CreateProductInput,
   type UpdateProductInput,
 } from './domain/product-input';
+// QC-90 (R24, R27): el esquema del alta CON su primer lote. Se publica porque lo usan los
+// DOS lados -el formulario de cliente y el caso de uso-, y ese es justo el motivo de que este
+// barrel tenga que seguir siendo client-safe: no arrastra `next/*`, ni `'use server'`, ni
+// Prisma. `createProductSchema` sigue publicandose aparte: es el de la edicion (R26).
+export {
+  PRODUCT_BATCH_LOT_MAX_LENGTH,
+  createProductWithFirstBatchSchema,
+  type CreateProductWithFirstBatchInput,
+} from './domain/product-batch-input';
+// Solo el TIPO del lote que se escribe (R30): el contrato no expone -ni expondra en esta
+// ficha- ninguna operacion de listar, editar ni borrar lotes.
+export { type NewProductBatch } from './domain/product-batch';
 export { type NewProduct, type ProductView } from './domain/product-view';
 export { type PresentationView } from './domain/presentation-view';
 

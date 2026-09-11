@@ -18,7 +18,7 @@ type ProductFieldProps = {
   /** Etiqueta visible. Es tambien la que nombra al disparador de la ayuda. */
   readonly label: string;
   /** Tipo del `<input>`. `number` es el unico que ademas fija `inputMode`, `min` y `step`. */
-  readonly type: 'text' | 'number';
+  readonly type: 'text' | 'number' | 'date';
   /** Validacion del navegador. El servidor revalida igual: el cliente nunca es la frontera. */
   readonly required?: boolean;
   /**
@@ -82,7 +82,14 @@ export function ProductField({
                 <button
                   type="button"
                   aria-label={`Qué es ${label}`}
-                  className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  // 44x44 DE VERDAD, no `size-6`: `docs/architecture.md > Componentes > Regla:
+                  // multiplataforma` exige ese objetivo tactil minimo. Este disparador es gemelo
+                  // del de `PresentationSelect` y vive en el MISMO panel, asi que sube con el
+                  // -dos iconos de ayuda contiguos con tamanos distintos serian peor que ninguno-.
+                  // Crece el blanco de toque; el icono dibujado sigue en `size-4` y queda centrado,
+                  // pegado a la etiqueta dentro del `flex items-center gap-1.5` del padre.
+                  // `shrink-0` impide que el flex le recorte los 44 px de ancho.
+                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
                   data-testid={`product-helper-${name}`}
                 />
               }

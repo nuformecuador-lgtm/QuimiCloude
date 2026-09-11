@@ -386,7 +386,22 @@ describe('contrato de la ruta de inventario', () => {
     // (`docs/verification.md > Que NO cuenta`). Lo que se afirma ahora es EN POSITIVO: la
     // pantalla no los menciona por ninguna via -ni campo, ni oculto, ni columna, ni valor
     // derivado-, que es exactamente lo que R5 y R6 piden.
-    ningunArchivoContiene(['cost', 'minPurchase', 'deliveryTime']);
+    // ACOTADO OTRA VEZ EL 2026-09-10: el alta gano el costo del primer LOTE (`unitCost` y
+    // `totalCost`, campos de `product_batches`), asi que la palabra `cost` vuelve a aparecer en
+    // la ruta -y debe poder aparecer-. Lo que R5 y R6 prohiben no es la palabra: es que el
+    // PRODUCTO vuelva a tener costo. Por eso se prohiben los identificadores exactos de aquel
+    // campo -`cost` a secas, en cualquiera de las formas en que un campo se nombra aqui- y no la
+    // subcadena, que hoy daria un falso positivo sobre el costo del lote.
+    ningunArchivoContiene([
+      "'cost'",
+      '"cost"',
+      '`cost`',
+      '.cost',
+      'product-field-cost',
+      'product-hidden-cost',
+      'minPurchase',
+      'deliveryTime',
+    ]);
 
     // Y sigue sin haber conversion a coma flotante de ningun importe en esta capa.
     ningunArchivoContiene(['parseFloat(', 'toFixed(', 'Number.parseFloat(']);

@@ -37,6 +37,14 @@ export const ERROR_MESSAGE_KEY = {
   invalid_derivation: 'errors.invalid_derivation',
   unit_in_use: 'errors.unit_in_use',
   incompatible_units: 'errors.incompatible_units',
+  // `identity` (QC-66): la administracion de usuarios, sexta familia del catalogo.
+  user_not_found: 'errors.user_not_found',
+  duplicate_email: 'errors.duplicate_email',
+  duplicate_username: 'errors.duplicate_username',
+  duplicate_document: 'errors.duplicate_document',
+  role_not_found: 'errors.role_not_found',
+  self_operation: 'errors.self_operation',
+  last_administrator: 'errors.last_administrator',
 } as const satisfies Record<ErrorCode, string>;
 
 /** La union cerrada de las claves estables (R1, R5). */
@@ -80,4 +88,11 @@ export const ERROR_MESSAGES_ES = {
   'errors.invalid_derivation': 'La unidad base declarada no es valida.',
   'errors.unit_in_use': 'La unidad esta en uso y no se puede borrar.',
   'errors.incompatible_units': 'Las dos unidades no comparten unidad base: no son convertibles.',
+  'errors.user_not_found': 'El usuario solicitado no existe.',
+  'errors.duplicate_email': 'Ya existe un usuario con ese correo en la empresa.',
+  'errors.duplicate_username': 'Ya existe un usuario con ese nombre de usuario en la empresa.',
+  'errors.duplicate_document': 'Ya existe un usuario con ese documento en la empresa.',
+  'errors.role_not_found': 'El rol indicado no existe.',
+  'errors.self_operation': 'No puedes realizar esta operacion sobre tu propia cuenta.',
+  'errors.last_administrator': 'La empresa quedaria sin ningun administrador activo.',
 } as const satisfies Record<ErrorMessageKey, string>;

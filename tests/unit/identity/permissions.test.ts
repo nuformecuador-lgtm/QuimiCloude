@@ -11,10 +11,11 @@ import {
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity'
 
-/** Los once codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
+/** Los trece codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
  *  catalogo cambia, este test tiene que cambiar tambien, que es justamente lo que se quiere.
  *  Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`,
- *  enmendando QC-74 R2 (ver `lib/modules/identity/domain/permissions.ts`). */
+ *  enmendando QC-74 R2; QC-66 sumo los dos de `usuarios` (su R8), enmendando QC-74 R1 (ver
+ *  `lib/modules/identity/domain/permissions.ts`). */
 const CODIGOS_DEL_REQUISITO = [
   'dashboard.consultar',
   'inventario.consultar',
@@ -27,14 +28,36 @@ const CODIGOS_DEL_REQUISITO = [
   'proveedores.modificar',
   'pedidos.consultar',
   'pedidos.modificar',
+  'usuarios.consultar',
+  'usuarios.modificar',
 ] as const
 
-/** Los nombres de modulo del repositorio (R1). */
-const MODULOS = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos', 'dashboard']
+/** Los nombres de modulo del repositorio (R1), mas `usuarios`. `usuarios` NO es una carpeta de
+ *  `lib/modules/` -los usuarios viven dentro de `identity`- y vale igual como `<modulo>` porque el
+ *  codigo lo lee una persona: es la SEGUNDA enmienda a QC-74 R1, la de la decision cerrada 2 de
+ *  QC-66 (su R12), escrita en `lib/modules/identity/domain/permissions.ts`. */
+const MODULOS = [
+  'inventario',
+  'recetas',
+  'unidades',
+  'proveedores',
+  'pedidos',
+  'dashboard',
+  'usuarios',
+]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). `unidades` paso a tener
- *  escritura con QC-38, asi que ya no esta entre los que solo consultan. */
-const MODULOS_CON_ESCRITURA = ['inventario', 'recetas', 'proveedores', 'pedidos', 'unidades']
+ *  escritura con QC-38, asi que ya no esta entre los que solo consultan; `usuarios` nace con
+ *  escritura en QC-66 -alta, edicion, borrado y estado de cuenta, todos bajo `usuarios.modificar`-,
+ *  y entra aqui por la misma enmienda de la decision 2. */
+const MODULOS_CON_ESCRITURA = [
+  'inventario',
+  'recetas',
+  'proveedores',
+  'pedidos',
+  'unidades',
+  'usuarios',
+]
 const MODULOS_SIN_ESCRITURA = ['dashboard']
 
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
@@ -54,9 +77,9 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     }
   })
 
-  it('R2: contiene exactamente los once codigos del requisito, ni uno mas ni uno menos', () => {
+  it('R2: contiene exactamente los trece codigos del requisito, ni uno mas ni uno menos', () => {
     expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
-    expect(new Set(codigos).size).toBe(11)
+    expect(new Set(codigos).size).toBe(13)
   })
 
   it('R2: cada entrada trae descripcion no vacia', () => {
@@ -89,7 +112,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
 })
 
 describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
-  it('R8: el Administrador tiene los once permisos, escritos uno a uno', () => {
+  it('R8: el Administrador tiene los trece permisos, escritos uno a uno', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_REQUISITO])
   })
 
@@ -118,6 +141,17 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual(['inventario.consultar'])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.consultar')
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.modificar')
+  })
+
+  it('QC-66 R9: el Administrador tiene usuarios.consultar Y usuarios.modificar, escritos uno a uno', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('usuarios.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('usuarios.modificar')
+  })
+
+  it('QC-66 R9: el Operador no recibe ninguno de los dos permisos de usuarios', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual(['inventario.consultar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.modificar')
   })
 
   it('R6: el seed asigna permisos SOLO a roles, sin ninguna clave de empresa', () => {

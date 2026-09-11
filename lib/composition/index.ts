@@ -46,7 +46,10 @@ import {
 } from '@/lib/modules/inventario';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import {
+  addBatchToAlive,
   createProduct,
+  createWithFirstBatch,
+  findAliveIdByName,
   findAliveProductById,
   listAliveProducts,
   softDeleteAliveProduct,
@@ -157,6 +160,28 @@ import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/d
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import { readRequestIdHeader } from '@/lib/modules/observabilidad/adapters/driven/request-id-headers';
 import type { RequestIdHeaderReader } from '@/lib/modules/errores';
+// QC-66 T15 — la administracion de usuarios. Las SEIS factories salen del CONTRATO del modulo
+// (`@/lib/modules/identity`, solo dominio) y los dos puertos que cablean, de `ports/`; el adaptador
+// driving de T14 NO se importa desde aqui (la flecha va driving -> composicion).
+import {
+  createCreateUser,
+  createDeleteUser,
+  createGetUser,
+  createListUsers,
+  createSetUserAccountStatus,
+  createUpdateUser,
+} from '@/lib/modules/identity';
+import {
+  applyGuardedChange,
+  create as createUserRow,
+  findAliveInCompany,
+  listAliveInCompany,
+  updateAliveInCompany,
+} from '@/lib/modules/identity/adapters/driven/persistence/user-admin-prisma';
+import { createRandomCredentialHash } from '@/lib/modules/identity/adapters/driven/security/initial-credential-factory-crypto';
+import type { InitialCredentialFactory } from '@/lib/modules/identity/ports/initial-credential-factory';
+import type { ListQueryLog as IdentityListQueryLog } from '@/lib/modules/identity/ports/list-query-log';
+import type { UserAdminRepository } from '@/lib/modules/identity/ports/user-admin-repository';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -181,6 +206,45 @@ const sessionProvider: SessionProvider = {
   // R19: `null` en exactamente los mismos casos que `getSessionUser`, por construccion.
   getSessionContext: async () => (await resolveSession())?.context ?? null,
   endSession: clearSession,
+};
+
+// ---------------------------------------------------------------------------------------
+// QC-66 T15 (`design.md > 11`) — el cableado de la administracion de usuarios. Va AQUI, y no
+// en un bloque al final del archivo, por una razon de ejecucion y no de gusto: el objeto
+// `identity` de abajo se evalua en su propia linea, asi que una constante declarada despues
+// estaria en su zona muerta. No se reordena ni se reformatea NADA de lo de arriba ni de lo de
+// abajo: esto se inserta entero entre dos bloques existentes.
+// ---------------------------------------------------------------------------------------
+
+/** QC-57 (T7, R6): la MISMA implementacion unica de `lib/shared/observability/list-query-log.ts`
+ *  que cablean los otros cinco modulos con listado, vista por el puerto que declara `identity`.
+ *  Seis puertos con la misma forma, una sola implementacion. */
+const identityListQueryLog: IdentityListQueryLog = { ignoredFields: logIgnoredListQueryFields };
+
+/** `UserAdminRepository` cableado con el adaptador driven de `identity` (`design.md > 11`): los
+ *  seis casos de uso solo conocen el TIPO, nunca esta implementacion. `create` llega renombrada
+ *  porque el adaptador la exporta con el nombre del metodo del puerto. */
+const userAdminRepository: UserAdminRepository = {
+  create: createUserRow,
+  findAliveInCompany,
+  listAliveInCompany,
+  updateAliveInCompany,
+  applyGuardedChange,
+};
+
+/**
+ * `InitialCredentialFactory` cableado con el adaptador de `node:crypto` (R15, R16,
+ * `design.md > 4.1`). Devuelve SOLO el hash: la credencial en claro no existe fuera del cuerpo
+ * del adaptador.
+ *
+ * `passwordHasher` y `checkCredentialPolicy` se REUTILIZAN de arriba, los que ya cablearon QC-5 y
+ * QC-19: no se construye un segundo hasher ni una segunda politica —dos cableados del hasher
+ * serian dos costes de bcrypt que pueden divergir, mismo criterio con el que QC-19 dejo una sola
+ * instancia de la politica—.
+ */
+const initialCredentialFactory: InitialCredentialFactory = {
+  createCredentialHash: () =>
+    createRandomCredentialHash({ hasher: passwordHasher, checkCredentialPolicy }),
 };
 
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
@@ -215,6 +279,22 @@ export const identity = {
         checkCredentialPolicy,
       }),
     ),
+  // QC-66 T15 (`design.md > 11`) — los SEIS casos de uso de la administracion de usuarios, ya
+  // cableados. Claves NUEVAS al final del objeto: ninguna de las de arriba se toca.
+  //
+  // El ACTOR NO se resuelve aqui, mismo criterio que los otros cinco modulos (R5): cada caso de
+  // uso lo recibe por parametro, y quien lo construye con las dos caras de la sesion
+  // -`getSessionUser` y `getSessionContext`, arriba en este mismo objeto- es la Server Action de
+  // T14 (R6). `lib/composition` no conoce cookies ni sesion; solo ata puerto -> adaptador.
+  createUser: createCreateUser({
+    users: userAdminRepository,
+    credentials: initialCredentialFactory,
+  }),
+  getUser: createGetUser({ users: userAdminRepository }),
+  listUsers: createListUsers({ users: userAdminRepository, log: identityListQueryLog }),
+  updateUser: createUpdateUser({ users: userAdminRepository }),
+  deleteUser: createDeleteUser({ users: userAdminRepository }),
+  setUserAccountStatus: createSetUserAccountStatus({ users: userAdminRepository }),
 } as const;
 
 /**
@@ -234,6 +314,12 @@ const productRepository: ProductRepository = {
   updateAlive: updateAliveProduct,
   softDeleteAlive: softDeleteAliveProduct,
   listAlive: listAliveProducts,
+  // QC-90 (T7, `design.md > 7`): las tres del alta con su primer lote. Nada mas cambia aqui
+  // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
+  // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
+  findAliveIdByName,
+  createWithFirstBatch,
+  addBatchToAlive,
 };
 
 const presentationRepository: PresentationRepository = {

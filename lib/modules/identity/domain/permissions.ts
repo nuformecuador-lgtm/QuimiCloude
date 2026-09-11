@@ -5,17 +5,26 @@
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from './roles';
 
 /**
- * El catalogo cerrado: once permisos, ni uno mas ni uno menos (QC-74 R2, enmendado por QC-38). El
- * codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en español y en minusculas,
- * siguiendo los nombres de modulo del repositorio (R1). Un modulo con escritura declara `consultar`
- * y `modificar`, y `modificar` cubre tambien el borrado (R3); un modulo sin escritura declara solo
- * `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva campo de empresa (R6).
+ * El catalogo cerrado: trece permisos, ni uno mas ni uno menos (QC-74 R2, enmendado por QC-38 y
+ * por QC-66). El codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en español y en
+ * minusculas, siguiendo los nombres de modulo del repositorio (R1). Un modulo con escritura
+ * declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un modulo sin
+ * escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva campo de
+ * empresa (R6).
  *
  * **Esto enmienda QC-74 R2** («exactamente diez permisos, ni uno mas ni uno menos»). QC-74 R4 dejo
  * a `unidades` sin escritura justificandolo con «no tiene escritura»; QC-38 es justamente la ficha
  * que se la da, asi que esa premisa dejo de ser cierta y el catalogo gana `unidades.modificar`
  * (QC-38 decision cerrada 23, habilitada por QC-76 decision cerrada 24: «si el permiso debe
  * cambiar, lo decide QC-38»).
+ *
+ * **Esto enmienda QC-74 R1** («siguiendo los nombres de modulo del repositorio»). QC-66 suma
+ * `usuarios.consultar` y `usuarios.modificar`, y `usuarios` NO es ninguna carpeta de
+ * `lib/modules/`: los usuarios viven dentro de `identity` y ahi se quedan (el modelo `User` es
+ * `/// @module identity`). Vale igual como `<modulo>` porque el codigo lo lee una persona y
+ * `identidad.consultar` no dice QUE se consulta (QC-66 decision cerrada 2, R12). Es la SEGUNDA
+ * enmienda al catalogo de QC-74, despues de la de QC-38, y se dice con estas palabras en vez de
+ * disimularla.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -86,6 +95,19 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Crear, editar, anular y borrar pedidos.',
   },
+  {
+    code: 'usuarios.consultar',
+    module: 'usuarios',
+    action: 'consultar',
+    description: 'Consultar los usuarios de la empresa.',
+  },
+  {
+    code: 'usuarios.modificar',
+    module: 'usuarios',
+    action: 'modificar',
+    description:
+      'Crear, editar, borrar y cambiar el estado de cuenta de los usuarios de la empresa.',
+  },
 ] as const;
 
 /**
@@ -114,6 +136,8 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'proveedores.modificar',
     'pedidos.consultar',
     'pedidos.modificar',
+    'usuarios.consultar',
+    'usuarios.modificar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar'],
 };

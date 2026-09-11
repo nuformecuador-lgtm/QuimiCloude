@@ -51,12 +51,23 @@ const unitIdSchema = z.string().uuid();
  * ignorar el campo de mas es peor que rechazarlo, porque quien lo envia cree haber
  * guardado un costo que nunca se guardo.
  */
-export const createProductSchema = z.strictObject({
+/**
+ * Los CUATRO campos del producto, declarados UNA vez (QC-90, T3). El alta con primer lote
+ * (`product-batch-input.ts`) los reutiliza tal cual en vez de copiarlos: dos listas
+ * paralelas divergen en cuanto alguien anade un campo a una sola de ellas. Es el mismo
+ * precedente que `catalogLineFieldsShape` de `proveedores/domain/catalog-line-input.ts`.
+ *
+ * Extraer la constante NO cambia `createProductSchema`, que sigue siendo el esquema de la
+ * EDICION y no conoce ningun campo de lote (QC-90 R26).
+ */
+export const productFieldsShape = {
   name: productNameSchema,
   stock: nonNegativeIntSchema,
   qtyAlert: nonNegativeIntSchema,
   unitId: unitIdSchema.nullish(),
-});
+} as const;
+
+export const createProductSchema = z.strictObject({ ...productFieldsShape });
 
 /**
  * La edicion es REEMPLAZO COMPLETO, no `PATCH` por campos sueltos (§ 11.7, D3, R13): el

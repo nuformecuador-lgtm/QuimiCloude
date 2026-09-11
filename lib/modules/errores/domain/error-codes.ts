@@ -10,8 +10,25 @@
  * dos ultimas rompe el typecheck por los `satisfies` de ese archivo.
  *
  * NO contiene `not_found` ni `duplicate_name` (R16): cada caso concreto de «no existe» y de
- * «nombre repetido» tiene el suyo (R17, R18). Tampoco contiene ningun codigo de `identity`
- * (R25): su login devuelve a proposito un mensaje generico que fija QC-7.
+ * «nombre repetido» tiene el suyo (R17, R18).
+ *
+ * **Esto enmienda QC-70 R25** («el catalogo no contiene ningun codigo de `identity`»). La PREMISA
+ * de R25 —que `identity` solo devuelve el rechazo GENERICO del login— CADUCO con QC-66, que anade
+ * seis casos de uso de administracion de usuarios con sus propios fallos distinguibles: el usuario
+ * que no existe, los tres duplicados (correo, nombre de usuario, documento), el rol inexistente, la
+ * operacion sobre la propia cuenta y la ultima cuenta de administrador. Cada uno necesita UN
+ * mensaje propio, y el sitio donde vive un mensaje de error en este repositorio es este catalogo.
+ * Asi que `identity` pasa a ser el SEXTO modulo del catalogo, con los siete codigos de abajo.
+ *
+ * **El rechazo generico del login de QC-7 NO cambia**: sigue siendo generico a proposito —no dice
+ * si fallo el usuario o la contrasena— y esta enmienda no lo toca ni lo roza. Lo que entra aqui es
+ * la ADMINISTRACION de usuarios, no la autenticacion. Aprobado por el humano el 2026-09-10; es la
+ * tercera enmienda a un catalogo cerrado de este repositorio, despues de las dos que QC-38 y QC-66
+ * hicieron al catalogo de permisos de QC-74, y se dice con estas palabras en vez de disimularla.
+ *
+ * (Este archivo sigue sin IMPORTAR nada del modulo de los usuarios, y por eso la cita de arriba es
+ * por ficha y no por ruta: el catalogo no depende de ningun modulo, son los modulos los que
+ * dependen de el.)
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -39,6 +56,14 @@ export const ERROR_CODES = [
   'invalid_derivation',
   'unit_in_use',
   'incompatible_units',
+  // `identity` (QC-66): la administracion de usuarios. Ver la enmienda a R25 en la cabecera.
+  'user_not_found',
+  'duplicate_email',
+  'duplicate_username',
+  'duplicate_document',
+  'role_not_found',
+  'self_operation',
+  'last_administrator',
 ] as const;
 
 /** La union cerrada de los codigos declarados arriba (R2). */

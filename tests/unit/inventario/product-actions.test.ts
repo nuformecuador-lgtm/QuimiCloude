@@ -6,6 +6,9 @@
 // de `identity.getSessionUser()` (`design.md > 5`, D17) y que cada error de dominio se
 // traduce a su `code` estable sin filtrar la excepcion cruda (`design.md > 6.4`).
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   createProductAction,
   deleteProductAction,
@@ -94,6 +97,19 @@ const VALID_PRODUCT_FIELDS = {
   // del catalogo. Cambia el NOMBRE y la FORMA del campo del `FormData`, no lo que este
   // fixture representa: un alta valida con todos los campos rellenos.
   unitId: '22222222-2222-4222-8222-222222222222',
+};
+
+/**
+ * QC-90 (R25): los CINCO campos del lote que el panel de alta hace viajar. Se declaran
+ * aparte de `VALID_PRODUCT_FIELDS` porque la EDICION no los envia (R26) y sus casos siguen
+ * usando solo el fixture del producto.
+ */
+const VALID_BATCH_FIELDS = {
+  presentationId: '11111111-1111-4111-8111-111111111111',
+  unitCost: '12.3456',
+  totalCost: '123.4560',
+  lot: 'L-2026-001',
+  expiryDate: '2027-01-31',
 };
 
 beforeEach(() => {
@@ -261,7 +277,6 @@ describe('los campos que el producto perdio no cruzan la Server Action', () => {
       cost: '12.5000',
       minPurchase: '1',
       deliveryTime: '3',
-      presentationId: '11111111-1111-4111-8111-111111111111',
     });
 
     await createProductAction(CREATE_INITIAL, conSobras);
@@ -278,9 +293,13 @@ describe('los campos que el producto perdio no cruzan la Server Action', () => {
       expect(Object.keys(candidato)).not.toContain('cost');
       expect(Object.keys(candidato)).not.toContain('minPurchase');
       expect(Object.keys(candidato)).not.toContain('deliveryTime');
-      expect(Object.keys(candidato)).not.toContain('presentationId');
     }
   });
+
+  // `presentationId` estuvo en esta lista desde el 2026-09-09, cuando la presentacion se
+  // mudo de `products` a `product_batches` y el producto dejo de tenerla. QC-90 (R25) la
+  // saca de aqui: el ALTA vuelve a enviarla, pero como campo DEL LOTE, no del producto. La
+  // edicion sigue sin enviarla, y eso lo fija el caso de R26 mas abajo.
 });
 
 describe('deleteProductAction', () => {
@@ -345,5 +364,172 @@ describe('listProductsAction', () => {
       code: 'invalid_input',
       message: expect.any(String),
     });
+  });
+});
+
+/**
+ * QC-90 — el primer lote cruza la Server Action (T9). Cubre **R25** por el lado servidor
+ * -los cinco campos escritos en el panel viajan al caso de uso-, **R26** por el lado de la
+ * action -la edicion no envia ninguno- y **R4** -ningun importe pasa por coma flotante-.
+ */
+describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
+  it('hace llegar los cinco campos del lote al caso de uso, tal cual, como cadenas (R25)', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }),
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    // `toEqual` sobre el objeto EXACTO, no `objectContaining`: el esquema del alta es
+    // `strictObject`, asi que un campo de mas no seria un detalle sino un `invalid_input`.
+    expect(candidato).toEqual({
+      name: 'Bidon 20 L',
+      stock: 10,
+      qtyAlert: 2,
+      unitId: '22222222-2222-4222-8222-222222222222',
+      presentationId: '11111111-1111-4111-8111-111111111111',
+      unitCost: '12.3456',
+      totalCost: '123.4560',
+      lot: 'L-2026-001',
+      expiryDate: '2027-01-31',
+    });
+  });
+
+  it('pasa los importes como cadena, con sus decimales intactos, y nunca como number (R4)', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({
+        ...VALID_PRODUCT_FIELDS,
+        ...VALID_BATCH_FIELDS,
+        // Cuatro decimales, que es la precision exacta de `decimal(14,4)`, y un total con
+        // ceros a la derecha: convertirlo a numero los perderia y el valor que se guarda
+        // dejaria de ser el que se escribio.
+        unitCost: '1234.5678',
+        totalCost: '9.8700',
+      }),
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(typeof candidato.unitCost).toBe('string');
+    expect(typeof candidato.totalCost).toBe('string');
+    expect(candidato.unitCost).toBe('1234.5678');
+    expect(candidato.totalCost).toBe('9.8700');
+  });
+
+  it('hace llegar un campo del lote vacio como ausente, no como cadena vacia (R12)', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({
+        ...VALID_PRODUCT_FIELDS,
+        ...VALID_BATCH_FIELDS,
+        // El panel envia los campos SIEMPRE, vacios incluidos: un `<input>` sin escribir
+        // viaja como ''. El esquema los admite `nullish()`, asi que `undefined` es valido y
+        // una cadena vacia seria `invalid_input`.
+        lot: '',
+        expiryDate: '',
+        totalCost: '   ',
+      }),
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato.lot).toBeUndefined();
+    expect(candidato.expiryDate).toBeUndefined();
+    expect(candidato.totalCost).toBeUndefined();
+    // Ausentes de verdad, no presentes con '': el ancla evita que `toBeUndefined` pase por
+    // una clave que ni siquiera se estuviera leyendo.
+    expect(candidato.presentationId).toBe('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('no repite el permiso ni ninguna regla: traduce el rechazo del caso de uso y ya', async () => {
+    // La autorizacion es la PRIMERA linea del caso de uso (R23, criterio de QC-20). Con un
+    // doble que lanza `UnauthorizedError`, la action tiene que devolver el estado del
+    // catalogo sin comprobar nada por su cuenta: si repitiera el permiso, el actor de la
+    // sesion -que SI tiene `inventario.modificar`- pasaria y el caso de uso ni se llamaria.
+    createProductMock.mockRejectedValue(new UnauthorizedError());
+
+    const result = await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }),
+    );
+
+    expect(createProductMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+  });
+
+  it('la edicion no envia ningun campo de lote aunque el FormData los traiga (R26)', async () => {
+    updateProductMock.mockResolvedValue(undefined);
+
+    await updateProductAction(
+      'product-1',
+      MUTATION_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }),
+    );
+
+    const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
+    // `updateProductSchema` es `strictObject` y NO conoce el lote: si el candidato de la
+    // edicion ganara estos cinco campos, cada edicion moriria con `invalid_input`.
+    expect(candidato).toEqual({
+      name: 'Bidon 20 L',
+      stock: 10,
+      qtyAlert: 2,
+      unitId: '22222222-2222-4222-8222-222222222222',
+    });
+    for (const campo of Object.keys(VALID_BATCH_FIELDS)) {
+      expect(Object.keys(candidato)).not.toContain(campo);
+    }
+  });
+
+  it('no convierte ningun importe a numero de coma flotante en el codigo fuente (R4)', () => {
+    // Comprobacion sobre el TEXTO del archivo, con el mismo patron que
+    // `tests/unit/inventario/unit-cost.test.ts`: una conversion intermedia daria el mismo
+    // resultado en los casos de arriba y aun asi seria exactamente lo que R4 prohibe.
+    const fuente = readFileSync(
+      join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'lib',
+        'modules',
+        'inventario',
+        'adapters',
+        'driving',
+        'product-actions.ts',
+      ),
+      'utf8',
+    );
+
+    // Los comentarios se quitan primero: este archivo NOMBRA las funciones prohibidas al
+    // explicar por que no las usa sobre los importes, y sin esto el barrido se cazaria a si
+    // mismo.
+    const codigo = fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+    for (const prohibido of ['parseFloat', 'parseInt', 'toFixed', 'Number.parse']) {
+      expect(codigo.includes(prohibido), `product-actions.ts no puede usar ${prohibido}`).toBe(
+        false,
+      );
+    }
+
+    // `Number(` SI aparece, una sola vez: la conversion de `stock`/`qtyAlert`, que son
+    // enteros y no importes. Si alguien envolviera un costo, serian dos.
+    expect(codigo.match(/Number\(/g) ?? []).toHaveLength(1);
+    expect(codigo).toContain('return Number(trimmed);');
+
+    // Y ninguna linea de codigo que mencione un importe puede convertirlo ni tratarlo como
+    // entero.
+    for (const linea of codigo.split('\n')) {
+      if (!linea.includes('unitCost') && !linea.includes('totalCost')) continue;
+      expect(linea).not.toMatch(/Number\(|parseFloat|readOptionalFormInt/);
+    }
   });
 });

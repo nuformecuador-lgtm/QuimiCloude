@@ -148,6 +148,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20260908190002_user_account_status',
   '20260908210000_work_groups_and_members',
   '20260909120000_product_batches',
+  // Llega con la sincronizacion con dev: es de QC-66 (catalogo de permisos), no de esta ficha.
+  '20260910120000_user_permissions_catalog',
 ] as const
 
 export function hallazgosDeMigraciones(
