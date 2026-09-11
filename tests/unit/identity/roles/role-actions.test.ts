@@ -14,6 +14,12 @@
 //     CODIGO —se demuestra mutando el texto del mensaje y viendo que el resultado no cambia—, y un
 //     error ajeno al dominio sale como `unexpected` sin filtrar su texto.
 //
+// QC-71, mergeado en esta rama: el traductor unico pasa a recibir el LECTOR de la cabecera del
+// identificador de peticion, asi que el doble de `@/lib/composition` incluye `observabilidad`, y
+// el estado del error INESPERADO vuelve ademas con `reference` y la linea del registro con el
+// mismo identificador. Los diez casos y su intencion no cambian: se sigue decidiendo por el
+// `code` y NUNCA por el texto del mensaje.
+//
 // La fachada `@/lib/composition` se dobla con `vi.mock`, igual que
 // `tests/unit/identity/usuarios/user-actions.test.ts`: la action se prueba contra dobles, nunca
 // contra la sesion real. Que la autorizacion rechace de verdad lo prueba
@@ -37,7 +43,17 @@ const { getSessionUserMock, getSessionContextMock, listRolesMock } = vi.hoisted(
   listRolesMock: vi.fn(),
 }));
 
+// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera del
+// identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el modulo ni
+// siquiera carga; con ella, el estado del error inesperado vuelve con ESE id. Mismo doble que
+// `tests/unit/identity/usuarios/user-actions.test.ts`.
+const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  return { REQUEST_ID_DE_PRUEBA: id, readRequestIdHeaderMock: vi.fn(async () => id) };
+});
+
 vi.mock('@/lib/composition', () => ({
+  observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: {
     getSessionUser: getSessionUserMock,
     getSessionContext: getSessionContextMock,
@@ -237,9 +253,21 @@ describe('R14 — los errores se traducen por su `code`', () => {
       status: 'error',
       code: 'unexpected',
       message: errorMessage('unexpected'),
+      // QC-71 (R13): el estado del error INESPERADO vuelve con el identificador de la peticion
+      // —el mismo que se escribio en la linea del registro—, y su ausencia ya no compila (R16).
+      // El catalogado (`unauthorized`, arriba) sigue sin el (R15).
+      reference: REQUEST_ID_DE_PRUEBA,
     });
     expect(JSON.stringify(resultado)).not.toContain('la base de datos no responde');
-    expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+    // QC-71 (R10, R12): la linea del registro deja de ser el objeto de QC-70 y pasa a ser UNA
+    // linea de texto con el identificador, el origen, el codigo y el detalle. Lo que este caso
+    // fijaba NO se relaja: el texto original sigue llegando entero al registro, y solo ahi.
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `[error] requestId=${REQUEST_ID_DE_PRUEBA} origen=borde code=unexpected error=${ajeno.name}: ${ajeno.message}`,
+      ),
+    );
     log.mockRestore();
   });
 });

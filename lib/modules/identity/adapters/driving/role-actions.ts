@@ -1,6 +1,6 @@
 'use server';
 
-import { identity } from '@/lib/composition';
+import { identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { IdentityError, type Actor, type RoleOption } from '@/lib/modules/identity';
 
@@ -27,6 +27,11 @@ import { IdentityError, type Actor, type RoleOption } from '@/lib/modules/identi
  * encontrado» —un catalogo vacio es una lista vacia, no un error— ni entrada que validar.
  * Ningun `catch` descarta un error (`docs/conventions.md > Manejo de errores`).
  *
+ * QC-71: el traductor unico recibe ademas el LECTOR DE LA CABECERA del identificador de peticion,
+ * que esta action pide a la composicion igual que los otros ocho adaptadores driving. Solo el
+ * error INESPERADO viaja con `reference` —el mismo identificador que se escribe en la linea del
+ * registro del servidor—; el catalogado (`unauthorized`) sigue sin el.
+ *
  * SIN `revalidatePath` (`design.md > 6`): esta ficha no crea ninguna ruta (R18), y escribir la de
  * QC-67 seria inventarla (regla 6 de `CLAUDE.md`).
  *
@@ -45,7 +50,7 @@ export type RoleOptionsResult =
  * `unexpected`. Es la MISMA implementacion unica de QC-70, parametrizada por la clase base de
  * este modulo: aqui no se escribe ninguna segunda `function toErrorState`.
  */
-const toErrorState = createErrorStateTranslator(IdentityError);
+const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.readRequestIdHeader);
 
 /**
  * El actor se resuelve UNA vez por invocacion, nunca dentro del dominio (R5), y con LAS DOS CARAS
