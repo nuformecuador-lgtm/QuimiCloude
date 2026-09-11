@@ -36,7 +36,7 @@ import {
 import UnidadesPage from '@/app/(private)/configuracion/unidades/page';
 import type { Page, UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { LOGIN_ROUTE, UNITS_ROUTE } from '@/lib/shared/routes';
+import { LOGIN_ROUTE_SESSION_ENDED, UNITS_ROUTE } from '@/lib/shared/routes';
 import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
@@ -280,7 +280,7 @@ describe('el corte por permiso ocurre ANTES de leer nada (R12)', () => {
 
     await expect(arbolDeLaPantalla()).rejects.toThrow();
 
-    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE);
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(listUnitsActionMock).not.toHaveBeenCalled();
     expect(accesoAParametros).not.toHaveBeenCalled();

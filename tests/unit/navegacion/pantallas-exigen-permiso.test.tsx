@@ -9,7 +9,7 @@ import FormulasPage from '@/app/(private)/produccion/formulas/page';
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
 import ProveedoresPage from '@/app/(private)/proveedores/page';
 import type { PermissionCode, SessionUser } from '@/lib/modules/identity';
-import { LOGIN_ROUTE } from '@/lib/shared/routes';
+import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 
 /**
  * T6 (QC-75) — las ocho pantallas de `app/(private)/` exigen su permiso ANTES de leer o pintar
@@ -279,7 +279,7 @@ describe('las ocho pantallas privadas exigen su permiso antes de leer o pintar (
 
     await expect(invocar()).rejects.toThrow('NEXT_REDIRECT');
 
-    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE);
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(lecturasOcurridas()).toEqual([]);
   });

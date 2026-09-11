@@ -1049,11 +1049,32 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'FORMULAS_ROUTE',
         'INVENTORY_ROUTE',
         'LOGIN_ROUTE',
+        // Las dos las trae QC-78 (R29, R30) el 2026-09-10, y entran por la puerta de siempre:
+        // «pasar por aqui y por quien la revise». NO son una ruta —ni del asistente de lectura ni
+        // de ninguna pantalla—: son el NOMBRE del parametro que marca «este login viene de un
+        // corte de sesion» y el DESTINO al que redirige el servidor cuando corta, derivado de
+        // `LOGIN_ROUTE`. Existen para romper un bucle de redirecciones: el borde no puede
+        // consultar la base (QC-9 R4, QC-75 R18), asi que veia la cookie viva y devolvia a la zona
+        // privada mientras el layout, que si consulta, devolvia al login.
+        //
+        // Viven en este archivo y no en el contrato de `identity` por dos motivos: son constantes
+        // de RUTA —`LOGIN_ROUTE_SESSION_ENDED` se deriva de `LOGIN_ROUTE`, que ya esta aqui— y
+        // `lib/modules/identity/index.ts` lo declara QC-66, en curso, con lo que tocarlo
+        // convertiria dos fichas paralelizables en un conflicto (`QC-78 design.md > 10.1`).
+        //
+        // R12 queda INTACTO: ninguna de las dos encaja en el patron `alude` de arriba, que se
+        // sigue aplicando a TODAS las declaraciones del archivo, y ninguna apunta a una URL del
+        // asistente. Y la lista sigue CERRADA con igualdad exacta: una constante mas sin ficha que
+        // la respalde vuelve a poner esto en rojo, que es justo para lo que sirve.
+        'LOGIN_ROUTE_SESSION_ENDED',
         'NEW_RECIPE_ROUTE',
         'ORDERS_ROUTE',
         // La trae QC-45 (R2), la pantalla de presentaciones; la lista sigue cerrada a proposito: una constante nueva sin ficha vuelve a poner esto en rojo.
         'PRESENTATIONS_ROUTE',
         'PRIVATE_ROUTE_PREFIXES',
+        // La segunda de QC-78 (R29, R30): el nombre del parametro. Ver el comentario largo de
+        // `LOGIN_ROUTE_SESSION_ENDED` mas arriba, del que este valor es la mitad.
+        'SESSION_ENDED_PARAM',
         'SUPPLIERS_ROUTE',
         // La trae QC-39 (R8) el 2026-09-08, la pantalla de unidades: es la ruta de UNA PANTALLA
         // real -con su `app/(private)/configuracion/unidades/page.tsx` en disco- y vive aqui

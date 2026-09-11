@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { AccountLockState } from '../../../domain/account-lock';
+import type { UserAccountStatus } from '../../../domain/account-status';
 import type { AuthenticatableUser } from '../../../ports/user-credentials-reader';
 
 // Implementa dos puertos del modulo `identity`:
@@ -19,6 +20,7 @@ type FilaCredenciales = {
   role_name: string;
   company_id: string;
   company_deleted_at: Date | null;
+  account_status: UserAccountStatus;
 };
 
 /**
@@ -61,12 +63,22 @@ type FilaCredenciales = {
  * QC-47 (R9, R10, R11), asi que todo usuario vivo tiene empresa. Si un dia no la tuviera, la
  * persona no se encontraria —y no entraria— en vez de emitirse una sesion con un rol o una
  * empresa inventados (QC-48 R5).
+ *
+ * QC-78 (R1) — el `SELECT` gana `u.account_status`, otra COLUMNA MAS de la fila de `users` que
+ * esta consulta ya lee: no cuesta ni un `JOIN` ni una lectura mas. Y el `WHERE` NO se toca: aqui
+ * no hay `AND u.account_status = 'active'`, exactamente por el mismo motivo escrito arriba para
+ * la empresa dada de baja. El corte por estado es del DOMINIO (`verify-credentials.ts`, R1),
+ * porque ese camino tiene que gastar igualmente su verificacion de hash (R2) y porque una regla
+ * de acceso escondida en un `WHERE` solo se puede afirmar contra Postgres, no con objetos planos.
+ * El valor sale CRUDO: traducir «lo que dice la columna» a «lo que significa ahora» es tarea de
+ * `effectiveAccountStatus`, que es el unico sitio donde vive esa regla (R7).
  */
 export async function findActiveByUsername(username: string): Promise<AuthenticatableUser | null> {
   const filas = await prisma.$queryRaw<FilaCredenciales[]>`
     SELECT u.id, u.password_hash, u.failed_login_attempts, u.lock_level, u.locked_until,
            r.name AS role_name,
-           u.company_id, c.deleted_at AS company_deleted_at
+           u.company_id, c.deleted_at AS company_deleted_at,
+           u.account_status
     FROM users u
     JOIN roles r ON r.id = u.role_id
     JOIN companies c ON c.id = u.company_id
@@ -87,7 +99,31 @@ export async function findActiveByUsername(username: string): Promise<Authentica
     roleName: fila.role_name,
     companyId: fila.company_id,
     companyDeletedAt: fila.company_deleted_at === null ? null : new Date(fila.company_deleted_at),
+    // El enum de Postgres llega como cadena por el raw: se afirma contra la union de literales
+    // que declara el dominio, que es la unica definicion del conjunto (QC-65 R3).
+    accountStatus: fila.account_status as UserAccountStatus,
   };
+}
+
+/**
+ * El TRIO de columnas de estado de cuenta, listo para esparcir dentro de un `data` (QC-78 R13,
+ * R17). Vive en una sola funcion porque las dos escrituras -la condicional del fallo y la
+ * incondicional del exito- tienen que tratarlo EXACTAMENTE igual: si una de las dos olvidara el
+ * rastro, o lo escribiera cuando no hay cambio, la marca de ultimo cambio dejaria de significar
+ * lo que dice su nombre.
+ *
+ * `null` devuelve un objeto VACIO, y eso es lo que implementa «no tocar la columna ni su rastro»
+ * (R17): esparcir nada dentro del `data` es exactamente no incluir esas columnas en el UPDATE.
+ *
+ * `accountStatusChangedBy: null` es deliberado y explicito: vacio = lo hizo el SISTEMA (QC-65).
+ * Este es el camino automatico de la politica de intentos; no hay persona a la que atribuirselo.
+ */
+function columnasDeEstado(
+  estadoCuenta: UserAccountStatus | null,
+  now: Date,
+): { accountStatus?: UserAccountStatus; accountStatusChangedAt?: Date; accountStatusChangedBy?: null } {
+  if (estadoCuenta === null) return {};
+  return { accountStatus: estadoCuenta, accountStatusChangedAt: now, accountStatusChangedBy: null };
 }
 
 /**
@@ -120,24 +156,46 @@ export async function findActiveByUsername(username: string): Promise<Authentica
  *
  * `updateMany` y no `update` porque el `where` lleva columnas que no son clave; como `id` si es
  * la primaria, el conjunto afectado es de 0 o 1 filas.
+ *
+ * QC-78 (R18) — el `where` gana ademas `accountStatus: estadoCuentaEsperado`: el estado de cuenta
+ * LEIDO entra en el predicado. Es la misma enfermedad que el contador y la misma cura: entre la
+ * lectura y esta escritura hay ~110 ms de bcrypt, tiempo de sobra para que un administrador
+ * desactive, bloquee o desbloquee la cuenta por otro camino, y sin esta condicion el registro de
+ * un intento fallido sobrescribiria esa decision en silencio. Al no aplicar, el dominio relee y
+ * recalcula. Va por IGUALDAD y no por rango porque el estado es un enum sin orden ni caducidad:
+ * el unico plazo que caduca es `locked_until`, y de ese se ocupa el predicado de rango de abajo.
+ *
+ * QC-78 (R13, R17) — el `data` gana el TRIO de columnas de estado, pero SOLO cuando hay estado
+ * que escribir. El spread condicional no es un adorno: `estadoCuenta === null` significa «el
+ * estado no cambia» (lo decidio `accountStatusAfterAttempt` en el dominio) y entonces la columna
+ * y su rastro no se tocan (R17), para que `account_status_changed_at` siga significando «ultimo
+ * cambio real» y no «ultimo intento de login». Cuando si hay cambio, el rastro se escribe EN LA
+ * MISMA operacion: `accountStatusChangedAt: now` -el instante del intento, el mismo reloj con el
+ * que el dominio decidio- y `accountStatusChangedBy: null`, o sea SIN AUTOR, que es como QC-65
+ * dejo dicho «lo hizo el sistema» (R13). No hay parametro de autor porque no hay autor: este es
+ * el camino automatico de la politica de intentos.
  */
 export async function compareAndSetLoginAttempt(
   userId: string,
   esperado: AccountLockState,
   siguiente: AccountLockState,
   now: Date,
+  estadoCuentaEsperado: UserAccountStatus,
+  estadoCuenta: UserAccountStatus | null,
 ): Promise<boolean> {
   const { count } = await prisma.user.updateMany({
     where: {
       id: userId,
       failedLoginAttempts: esperado.failedAttempts,
       lockLevel: esperado.lockLevel,
+      accountStatus: estadoCuentaEsperado,
       OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
     },
     data: {
       failedLoginAttempts: siguiente.failedAttempts,
       lockLevel: siguiente.lockLevel,
       lockedUntil: siguiente.lockedUntil,
+      ...columnasDeEstado(estadoCuenta, now),
     },
   });
 
@@ -151,13 +209,26 @@ export async function compareAndSetLoginAttempt(
  * Aqui si va la API tipada por clave primaria: no necesita el indice funcional y asi el
  * compilador vigila los nombres de las columnas.
  */
-export async function setLoginAttempt(userId: string, estado: AccountLockState): Promise<void> {
+export async function setLoginAttempt(
+  userId: string,
+  estado: AccountLockState,
+  estadoCuenta: UserAccountStatus | null,
+): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
     data: {
       failedLoginAttempts: estado.failedAttempts,
       lockLevel: estado.lockLevel,
       lockedUntil: estado.lockedUntil,
+      // Mismo tratamiento condicional que en el CAS (QC-78 R16, R17): el camino de exito solo
+      // toca el estado cuando de verdad cambia -devolver a `active` una cuenta que venia de
+      // `blocked` con el plazo ya cumplido-, y en el caso normal (`null`) no escribe ni la
+      // columna ni su rastro.
+      // El instante: `set` no recibe reloj del dominio (el exito no tiene predicado que evaluar
+      // contra un plazo), asi que se toma aqui. Es el instante de la ESCRITURA, a microsegundos
+      // del intento que la provoco, y R13 pide «el instante del intento»: la diferencia no es
+      // observable y no vale un parametro mas en el puerto.
+      ...columnasDeEstado(estadoCuenta, new Date()),
     },
   });
 }

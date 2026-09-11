@@ -9,6 +9,7 @@
 // conservan en el mismo orden y con el mismo comentario.
 
 import { buildDisplayName } from './display-name';
+import { effectiveAccountStatus } from './effective-account-status';
 import { isSessionExpired } from './session-claims';
 
 import type { SessionReader } from '../ports/session-reader';
@@ -62,9 +63,27 @@ export function createResolveSession(
     // y su `R<n>` (`design.md > 4.2`).
     if (record.companyDeletedAt !== null) return null;
 
-    // 6. Compone las dos proyecciones. Salir por `null` en cualquiera de los cinco cortes es el
-    // MISMO camino de salida de siempre: el layout privado redirige al login y no se borra
-    // ninguna cookie (R16, `design.md > 4.3`).
+    // 6. QC-78 R20 — el estado EFECTIVO de la cuenta ya no es `active`: sin sesion. Va detras del
+    // paso 3 porque necesita la fila, y con `if` propio y no combinado con el anterior: cada
+    // corte tiene su test y su `R<n>`.
+    //
+    // Pasa por `effectiveAccountStatus` y NUNCA por `record.accountStatus !== 'active'` a pelo
+    // (alternativa descartada en `design.md > 5`): comparar la columna dejaria fuera de la
+    // aplicacion a quien tiene un bloqueo YA VENCIDO hasta que volviera a hacer login, y romperia
+    // R7 —la traduccion existiria en un sitio y su ausencia en otro, que es la misma enfermedad
+    // que tener dos definiciones—.
+    //
+    // Cero consultas nuevas y cero escrituras (R21): el estado y el plazo vienen en la MISMA fila
+    // que el paso 3 ya leyo, y una ficha con el plazo vencido se corrige en el camino de
+    // ESCRITURA del login (R15, R16), no al leerla. Tampoco se consulta ningun sello ni registro
+    // de invalidacion de sesiones por usuario (R22): QC-23 no es dependencia de esta ficha, y se
+    // decide solo con la ficha que esta resolucion ya relee en cada peticion. Y ninguna tarea
+    // programada ni proceso de fondo corrige estados vencidos (R23).
+    if (effectiveAccountStatus(record, now) !== 'active') return null;
+
+    // 7. Compone las dos proyecciones. Salir por `null` en cualquiera de los seis cortes es el
+    // MISMO camino de salida de siempre: el layout privado redirige al login, no se borra
+    // ninguna cookie y no hay mensaje que diga por que (R16, QC-78 R20, `design.md > 4.3`).
     return {
       user: {
         id: record.id,

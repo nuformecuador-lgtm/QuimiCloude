@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 
 type UsuarioDeSesion = { readonly id: string; readonly permissions: readonly string[] };
 
@@ -51,7 +52,7 @@ describe('requirePagePermission', () => {
     await expect(requirePagePermission('inventario.consultar')).rejects.toThrow('NEXT_REDIRECT');
 
     expect(redirectMock).toHaveBeenCalledTimes(1);
-    expect(redirectMock).toHaveBeenCalledWith('/login');
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
     expect(notFoundMock).not.toHaveBeenCalled();
   });
 

@@ -3,10 +3,21 @@
 // aqui y no alli: los DOS cortes nuevos —empresa que no casa y empresa muerta—, su ORDEN respecto
 // a los que ya existian, y que la empresa expuesta sale de la base.
 // Cubre R14, R15, R16, R17, R19, R20, R21, R22.
+//
+// QC-78 T12 — se anade el SEXTO corte, el del estado de cuenta, con sus propios casos: la cuenta
+// que deja de estar `active` pierde la sesion en la siguiente resolucion (R20), el bloqueo YA
+// VENCIDO la conserva (R7, R8 vistos desde la sesion), el corte no cuesta ninguna consulta ni
+// escribe nada (R21) y no depende de ningun sello de invalidacion de sesiones (R22). Los
+// requisitos citados en los comentarios que ya estaban son los de QC-48; los nuevos van siempre
+// con el prefijo `QC-78`.
+
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { createResolveSession } from '@/lib/modules/identity/domain/resolve-session';
 
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
+import type { ResolveSessionDeps } from '@/lib/modules/identity/domain/resolve-session';
 import type { SessionReader } from '@/lib/modules/identity/ports/session-reader';
 import type {
   SessionUserReader,
@@ -48,7 +59,16 @@ const RECORD: SessionUserRecord = {
   // los miran —quien los mira es `assertPermission` en cada caso de uso—, asi que aqui basta
   // con una lista no vacia que se pueda seguir hasta la proyeccion.
   permissions: ['inventario.consultar'],
+  // QC-78 T10 (R20): el record trae ahora el estado de cuenta y el plazo de bloqueo, crudos. La
+  // cuenta corriente es `active` sin plazo; los casos que no lo son se derivan con `...RECORD`.
+  accountStatus: 'active',
+  lockedUntil: null,
 };
+
+/** QC-78: un plazo de bloqueo todavia vigente respecto de `AHORA`. */
+const PLAZO_FUTURO = new Date('2026-09-01T10:30:00.000Z');
+/** QC-78: un plazo de bloqueo YA VENCIDO respecto de `AHORA`. Este es el caso interesante. */
+const PLAZO_VENCIDO = new Date('2026-09-01T09:30:00.000Z');
 
 function fakeSessionReader(claims: SessionClaims | null): SessionReader {
   return { readClaims: vi.fn().mockResolvedValue(claims) };
@@ -180,5 +200,179 @@ describe('createResolveSession', () => {
     expect(Object.keys(resultado?.context ?? {}).sort()).toEqual(
       ['companyId', 'roleName', 'userId'].sort(),
     );
+  });
+});
+
+// ================================================================================================
+// QC-78 T12 — el SEXTO corte: el estado de cuenta.
+// ================================================================================================
+
+/**
+ * El fuente del caso de uso, leido tal cual. Hay requisitos —R21 «cero escrituras» y R22 «ningun
+ * sello de invalidacion»— que hablan de lo que el archivo NO hace; eso no se puede afirmar
+ * ejercitando el resultado, porque una ausencia no produce salida. Se afirma sobre el texto, con
+ * los comentarios quitados para no confundir lo que el archivo EXPLICA con lo que EJECUTA.
+ */
+const FUENTE_RESOLVE_SESSION = readFileSync(
+  resolve(process.cwd(), 'lib/modules/identity/domain/resolve-session.ts'),
+  'utf8',
+);
+
+const CODIGO_SIN_COMENTARIOS = FUENTE_RESOLVE_SESSION.replace(/\/\*[\s\S]*?\*\//g, '').replace(
+  /\/\/.*$/gm,
+  '',
+);
+
+describe('createResolveSession — corte por estado de cuenta (QC-78)', () => {
+  // QC-78 R20 — `pending`: la cuenta creada y aun no habilitada no sostiene una sesion abierta.
+  it('una cuenta que pasa a pending deja de tener sesion en la siguiente resolucion', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({ ...RECORD, accountStatus: 'pending' });
+    const resolveSession = createResolveSession({ session, users });
+
+    await expect(resolveSession(AHORA)).resolves.toBeNull();
+  });
+
+  // QC-78 R20 — `inactive`: apagada a proposito por un administrador.
+  it('una cuenta que pasa a inactive deja de tener sesion en la siguiente resolucion', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({ ...RECORD, accountStatus: 'inactive' });
+    const resolveSession = createResolveSession({ session, users });
+
+    await expect(resolveSession(AHORA)).resolves.toBeNull();
+  });
+
+  // QC-78 R20, R10 — `blocked` con el plazo todavia vigente.
+  it('una cuenta blocked con el plazo todavia futuro deja de tener sesion', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({
+      ...RECORD,
+      accountStatus: 'blocked',
+      lockedUntil: PLAZO_FUTURO,
+    });
+    const resolveSession = createResolveSession({ session, users });
+
+    await expect(resolveSession(AHORA)).resolves.toBeNull();
+  });
+
+  // QC-78 R11 visto desde la sesion — la fila que la politica de intentos de QC-19 bloqueo antes
+  // de que esta ficha unificara las dos cosas: dice `active` y tiene plazo futuro. Tampoco entra.
+  it('una cuenta active con lockedUntil futuro deja de tener sesion', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({ ...RECORD, accountStatus: 'active', lockedUntil: PLAZO_FUTURO });
+    const resolveSession = createResolveSession({ session, users });
+
+    await expect(resolveSession(AHORA)).resolves.toBeNull();
+  });
+
+  // QC-78 R7, R8 vistos desde la sesion — ESTE es el caso que demuestra por que el corte no puede
+  // comparar `record.accountStatus !== 'active'` a pelo: la columna dice `blocked`, pero el plazo
+  // ya vencio, asi que el estado EFECTIVO es `active` y la sesion sigue en pie, con su proyeccion
+  // entera. Comparar la columna dejaria a esta persona fuera hasta que volviera a hacer login.
+  it('una cuenta blocked con el plazo ya vencido conserva la sesion y la proyeccion completa', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({
+      ...RECORD,
+      accountStatus: 'blocked',
+      lockedUntil: PLAZO_VENCIDO,
+    });
+    const resolveSession = createResolveSession({ session, users });
+
+    const resultado = await resolveSession(AHORA);
+
+    expect(resultado).toEqual({
+      user: {
+        id: SUB,
+        username: 'ana.perez',
+        displayName: 'Ana Perez',
+        roleName: 'operador',
+        permissions: ['inventario.consultar'],
+      },
+      context: {
+        userId: SUB,
+        companyId: COMPANY_ID,
+        roleName: 'operador',
+      },
+    });
+  });
+
+  // QC-78 R20 — el corte nuevo convive con los que ya estaban: una ficha que a la vez tiene la
+  // empresa muerta y el estado `inactive` sigue resolviendo `null`, sin excepcion ni camino nuevo.
+  it('con la empresa muerta y ademas el estado inactive sigue resolviendo null', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({
+      ...RECORD,
+      companyDeletedAt: EMPRESA_DADA_DE_BAJA,
+      accountStatus: 'inactive',
+    });
+    const resolveSession = createResolveSession({ session, users });
+
+    await expect(resolveSession(AHORA)).resolves.toBeNull();
+  });
+
+  // QC-78 — el ORDEN, de forma OBSERVABLE y sin tocar el codigo de produccion: el estado viaja en
+  // un `get` que cuenta sus lecturas. Con la empresa muerta, el corte 5 sale antes y el estado NO
+  // llega a leerse; con la empresa viva, si. Los dos casos van juntos a proposito: sin el segundo,
+  // el `not.toHaveBeenCalled()` del primero se cumpliria tambien si el getter no funcionara.
+  it('con la empresa muerta el estado de cuenta ni se lee: el corte 6 va detras del 5', async () => {
+    const leerEstadoConEmpresaMuerta = vi.fn(() => 'inactive' as const);
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({
+      ...RECORD,
+      companyDeletedAt: EMPRESA_DADA_DE_BAJA,
+      get accountStatus() {
+        return leerEstadoConEmpresaMuerta();
+      },
+    });
+    const resolveSession = createResolveSession({ session, users });
+
+    await expect(resolveSession(AHORA)).resolves.toBeNull();
+    expect(leerEstadoConEmpresaMuerta).not.toHaveBeenCalled();
+
+    const leerEstadoConEmpresaViva = vi.fn(() => 'inactive' as const);
+    const usersEmpresaViva = fakeUserReader({
+      ...RECORD,
+      get accountStatus() {
+        return leerEstadoConEmpresaViva();
+      },
+    });
+
+    await expect(
+      createResolveSession({ session, users: usersEmpresaViva })(AHORA),
+    ).resolves.toBeNull();
+    expect(leerEstadoConEmpresaViva).toHaveBeenCalled();
+  });
+
+  // QC-78 R21 — cero consultas nuevas: el camino cortado por estado hace EXACTAMENTE la misma
+  // unica lectura que el camino feliz. El estado y el plazo venian ya en esa fila.
+  it('el camino cortado por estado consulta al lector exactamente una vez', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader({ ...RECORD, accountStatus: 'inactive' });
+    const resolveSession = createResolveSession({ session, users });
+
+    const resultado = await resolveSession(AHORA);
+
+    expect(resultado).toBeNull();
+    expect(users.findActiveById).toHaveBeenCalledTimes(1);
+  });
+
+  // QC-78 R21 — cero escrituras: las dependencias de la resolucion son DOS lectores y nada mas.
+  // El `Record` exhaustivo es la mitad que muerde en tiempo de compilacion —una clave nueva en
+  // `ResolveSessionDeps` deja de tipar— y el `Object.keys` la que muerde al ejecutar.
+  it('sus dependencias son dos lectores y ningun puerto de escritura', () => {
+    const clavesExhaustivas: Record<keyof ResolveSessionDeps, true> = { session: true, users: true };
+
+    expect(Object.keys(clavesExhaustivas).sort()).toEqual(['session', 'users']);
+
+    // Y el codigo que se ejecuta no nombra ninguna primitiva de escritura: ni registrar un
+    // intento, ni guardar, ni actualizar. Una ficha con el plazo vencido se corrige en el camino
+    // de ESCRITURA del login (R15, R16), no al leerla.
+    expect(CODIGO_SIN_COMENTARIOS).not.toMatch(/Recorder|Writer|\.save|\.update|\.create|\.record/);
+  });
+
+  // QC-78 R22 — el corte se decide SOLO con la ficha que la resolucion ya relee. Ni sello por
+  // usuario, ni registro de invalidacion de sesiones, ni nada de QC-23: sigue sin ser dependencia.
+  it('no depende de ningun sello ni registro de invalidacion de sesiones', () => {
+    expect(CODIGO_SIN_COMENTARIOS).not.toMatch(/invalidat|sello|stamp|validFrom|revok|QC-23/i);
   });
 });

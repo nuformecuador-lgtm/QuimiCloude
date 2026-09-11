@@ -41,6 +41,19 @@ export type RouteAccessInput = {
   /** Prefijos de URL privados declarados (`design.md > 7`). Entran como parametro (R20). */
   readonly privatePrefixes: readonly string[];
   readonly routes: { readonly login: string; readonly dashboard: string };
+  /**
+   * Nombre del parametro que marca un login que viene de un corte de sesion (QC-78 R29). Entra
+   * como parametro, igual que `privatePrefixes` y `routes`, porque el literal vive en
+   * `lib/shared/routes.ts` y el dominio tiene prohibido importar `lib/shared`.
+   *
+   * **OPCIONAL a proposito, y es una decision con coste** (`design.md > 10.2`): hacerlo
+   * obligatorio rompia el typecheck de cinco archivos de test de otras zonas que construyen un
+   * `RouteAccessInput` literal, y esta ampliacion es quirurgica. Sin marca declarada el
+   * comportamiento es EL DE HOY —la regla 3 dispara siempre—, asi que ningun test existente
+   * cambia de significado. Que el adaptador no se olvide de pasarla no se fia de la confianza:
+   * lo afirma un test propio sobre el adaptador.
+   */
+  readonly sessionEndedParam?: string;
 };
 
 /**
@@ -57,6 +70,19 @@ const ALLOW: RouteAccessDecision = { kind: 'allow' };
 
 function isUnderPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/**
+ * Si la cadena de consulta trae la marca de sesion cortada (QC-78 R29).
+ *
+ * Comprueba PRESENCIA y no valor: el valor lo fija un unico sitio
+ * (`LOGIN_ROUTE_SESSION_ENDED`), y comparar tambien el texto solo anadiria un segundo literal
+ * que mantener sincronizado. Sin marca declarada devuelve `false`, o sea el comportamiento de
+ * siempre.
+ */
+function traeMarcaDeSesionCortada(search: string, sessionEndedParam: string | undefined): boolean {
+  if (sessionEndedParam === undefined) return false;
+  return new URLSearchParams(search).has(sessionEndedParam);
 }
 
 /** El destino de vuelta que trae la cadena de consulta, ya validado como interno (R9). */
@@ -76,7 +102,7 @@ function returnPathFromSearch(search: string, fallback: string): string {
  *    (QC-75 R16). Quien no tenga el permiso de esa pantalla recibe su 404 en la pagina.
  */
 export function decideRouteAccess(input: RouteAccessInput): RouteAccessDecision {
-  const { pathname, search, session, privatePrefixes, routes } = input;
+  const { pathname, search, session, privatePrefixes, routes, sessionEndedParam } = input;
 
   const esPrivada = privatePrefixes.some((prefijo) => isUnderPrefix(pathname, prefijo));
   const esLogin = pathname === routes.login;
@@ -97,7 +123,19 @@ export function decideRouteAccess(input: RouteAccessInput): RouteAccessDecision 
   // trae destino de vuelta, en el dashboard (R17). Ese respaldo no mira permisos porque el borde
   // no puede: quien no tenga `dashboard.consultar` recibira alli el 404 del layout privado, con
   // su menu a la izquierda para seguir (`design.md > 3`, R18).
-  if (esLogin && session.kind === 'authenticated') {
+  //
+  // SALVO que traiga la marca de sesion cortada (QC-78 R29). Entonces la cookie sigue firmada y
+  // viva —el borde no puede saber otra cosa, tiene prohibido consultar la base— pero el servidor
+  // ACABA DE DECIDIR con la base que esa sesion ya no vale, por cualquiera de los tres cortes.
+  // Sin esta excepcion el borde devuelve a la zona privada, el layout vuelve a cortar y a
+  // redirigir, y la navegacion entra en un BUCLE: se midio, y el navegador muere con
+  // `Load cannot follow more than 20 redirections`.
+  //
+  // La marca se lee AQUI DENTRO y en ningun otro sitio: este `if` solo se evalua cuando el camino
+  // es el login, asi que los pasos 1, 2 y 4 no la ven. Una ruta privada que la lleve en su query
+  // se decide EXACTAMENTE igual que sin ella, y la marca no convierte una sesion ausente en
+  // valida ni al reves (R30 b).
+  if (esLogin && session.kind === 'authenticated' && !traeMarcaDeSesionCortada(search, sessionEndedParam)) {
     return {
       kind: 'redirect',
       to: returnPathFromSearch(search, routes.dashboard),

@@ -109,6 +109,10 @@ async function createAdmin(user: Credentials): Promise<string> {
       passwordHash: await createPasswordHash(user.password),
       roleId: role.id,
       companyId,
+      // QC-78 R1: explicito, no por defecto. La columna es `@default(pending)` y desde
+      // esa ficha `pending` no entra por el login, asi que este usuario efimero no
+      // llegaria a la pantalla que este spec ejercita.
+      accountStatus: 'active',
     },
     select: { id: true },
   });

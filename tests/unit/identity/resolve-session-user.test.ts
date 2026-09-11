@@ -52,6 +52,10 @@ const RECORD: SessionUserRecord = {
   // proposito en un orden que no es el alfabetico y con dos modulos distintos: asi un `sort()`
   // o una deduplicacion metida de contrabando en el camino se ve en el `toEqual`.
   permissions: ['recetas.modificar', 'inventario.consultar'],
+  // QC-78 T10: el record trae ahora el estado de cuenta y el plazo de bloqueo crudos. Aqui una
+  // cuenta corriente: `active` y sin plazo, o sea la que si tiene sesion.
+  accountStatus: 'active',
+  lockedUntil: null,
 };
 
 /** QC-74 T8 (R14): un rol al que nadie asigno nada. «Sin permisos» es `[]`, no un hueco. */

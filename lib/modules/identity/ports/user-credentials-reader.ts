@@ -1,4 +1,5 @@
 import type { AccountLockState } from '../domain/account-lock';
+import type { UserAccountStatus } from '../domain/account-status';
 
 /**
  * Lo minimo que el dominio necesita para decidir si unas credenciales entran: el id, el hash
@@ -20,6 +21,18 @@ import type { AccountLockState } from '../domain/account-lock';
  * una regla de dominio, y cocinarla al otro lado del puerto la mudaria fuera del unico sitio
  * donde se puede probar con objetos planos. La marca no es un dato de la empresa que se exponga
  * a nadie: no viaja firmada (R6) y no sale de aqui.
+ *
+ * QC-78 (R1) — y el **estado de cuenta**, el valor que persiste QC-65 en `users.account_status`.
+ * Desde esta ficha el estado manda en el login: solo una cuenta cuyo estado EFECTIVO sea `active`
+ * entra. Sale de la MISMA consulta que ya autentica —es una columna de `users`, la misma fila—,
+ * asi que no cuesta ni una lectura mas (R21).
+ *
+ * Se trae el valor CRUDO y no un booleano ya cocinado del tipo `estaActiva`, por el mismo motivo
+ * que ya esta escrito arriba para `companyDeletedAt`: «activa» no es lo que dice la columna, es
+ * una regla de dominio que combina el estado almacenado con el plazo `lockedUntil`
+ * (`effectiveAccountStatus`, R7). Cocinarla al otro lado del puerto la mudaria fuera del unico
+ * sitio donde se prueba con objetos planos, y la dejaria escrita dos veces —una por cada
+ * adaptador que lee una fila de usuario—, que es justo lo que R7 prohibe.
  */
 export type AuthenticatableUser = {
   readonly id: string;
@@ -28,6 +41,12 @@ export type AuthenticatableUser = {
   readonly companyId: string;
   /** `null` = la empresa sigue viva (QC-47 R6: `companies.deleted_at IS NULL`). */
   readonly companyDeletedAt: Date | null;
+  /**
+   * QC-78 R1 — el estado ALMACENADO, tal cual esta en la columna. Lo que significa en el instante
+   * del intento lo traduce `effectiveAccountStatus` junto con `lockedUntil` (que llega por
+   * `AccountLockState`), y esa traduccion es del dominio, no del puerto.
+   */
+  readonly accountStatus: UserAccountStatus;
 } & AccountLockState;
 
 export interface UserCredentialsReader {
