@@ -257,3 +257,172 @@ Ninguno de los tres es un defecto de implementacion. Lo implementado es solido: 
 importar nada, viaja en la cabecera de **peticion**, no vuelve al navegador, se resuelve en el
 unico punto que traduce errores, deja **una** linea sin PII, y el tipo cerrado convierte en error
 de compilacion los dos olvidos que importan. Lo que falla es el contrato escrito, en dos sitios.
+
+---
+---
+
+# RONDA 2 — revision de `c9f7967` (2026-09-10)
+
+> Revisado sobre `c9f7967` ("ronda 2 - enmiendas del spec y la guardia que cierra el agujero de
+> R17"), arbol limpio al empezar y al terminar. Las cuatro mutaciones que se describen abajo se
+> revirtieron con `cp` desde copia y `git status --porcelain` quedo vacio.
+>
+> **La ronda 1 no se reescribe**: queda arriba tal cual, con su RECHAZADO y sus dos mayores.
+
+## VEREDICTO RONDA 2: **APROBADO**
+
+**0 mayores, 2 menores.** Los 2 mayores y los 4 menores de la ronda 1 estan atendidos. La guardia
+nueva **mordio en las dos mutaciones** que le hizo el reviewer, y **no se puso roja** cuando debia
+quedarse verde. Los dos menores de esta ronda no bloquean, pero **el primero hay que arreglarlo
+antes del PR**: es un estropicio de dos lineas en el propio `requirements.md`.
+
+---
+
+## 1. Gate, recorrido por el reviewer - CONFIRMADO
+
+`./init.sh` completo, exit 0:
+
+    Test Files  302 passed (302)
+         Tests  3889 passed | 18 skipped (3907)
+    tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+    == init OK ==
+
+**3889 = 3883 + 6**, exactamente los 6 casos nuevos que declara la bitacora (5 de la guardia de
+R17 + 1 el de R11 rehecho). El numero cuadra y la cuenta cierra.
+
+**Ninguna linea de produccion tocada**, verificado con `git diff --stat afe9daf..c9f7967`: solo
+`specs/.../requirements.md`, `progress/*` y **dos** archivos de test
+(`tests/guards/guard-identificador-de-request.test.ts`,
+`tests/unit/observabilidad/error-state.test.ts`). Es lo que el humano decidio y es lo que se hizo.
+
+---
+
+## 2. La guardia de R17: mordida por el reviewer, en los dos desenlaces
+
+No se acepto la palabra del implementer. Cuatro mutaciones **sobre archivos reales del repo**,
+corriendo la guardia de verdad:
+
+### Mutacion A - una superficie SEXTA que aplana -> **ROJA**, nombrando el archivo
+Inyectado en `app/(private)/pedidos/components/order-list-section.tsx` (archivo real, **no** en la
+lista) un cargador con `if (resultado.status === 'error') { throw new Error(resultado.message) }`:
+
+    x las superficies que aplanan un ErrorState a string son las declaradas, y solo esas (R17)
+    AssertionError: expected [ Array(1) ] to deeply equal []
+    + "app/(private)/pedidos/components/order-list-section.tsx: aplana un ErrorState a string con
+       'throw-new-error' y NO esta en SUPERFICIES_QUE_APLANAN. Ahi el `reference` de R13/R17 se
+       pierde en silencio: ... Anadirla sin motivo no es decidir, es callar el aviso."
+
+**Muerde de punta a punta**: barrido del disco + detector + comparacion con la lista. El mensaje
+nombra el archivo y dice que hacer. `Tests 1 failed | 20 passed`.
+
+### Mutacion B - una entrada de la lista que YA NO aplana -> **ROJA**
+Cambiado `setIngredientsError(result.message)` por otra cosa en
+`app/(private)/pedidos/components/order-form.tsx` (entrada declarada de la lista):
+
+    + "app/(private)/pedidos/components/order-form.tsx: la lista dice que aplana con
+       'set-estado-string' y ya NO lo hace. Si se arreglo, borra su entrada de
+       SUPERFICIES_QUE_APLANAN: una lista con entradas muertas deja de decir la verdad..."
+
+**Los dos sentidos funcionan.** La lista no puede pudrirse en silencio, que era exactamente el
+riesgo. Sin este segundo desenlace la guardia habria sido decorativa a medio plazo.
+
+### Mutacion C - desplazamiento de 41 lineas -> **SIGUE VERDE**
+Insertadas 41 lineas de comentario justo encima del aplanado de `order-form.tsx`:
+`Test Files 1 passed (1) | Tests 21 passed (21)`. **Clava por archivo + idioma + conteo, no por
+numero de linea**, tal como afirma. Una guardia que se pone roja porque alguien anadio un
+comentario arriba se ignora a la semana; esta no lo hace.
+
+### El verde no puede ser vacio - CONFIRMADO
+`expect(archivos.length).toBeGreaterThan(100)` antes del `toEqual([])`, y el barrido real
+encuentra **147 `.tsx`**. Si la ruta se escribiera mal o la carpeta se moviera, `listarDirectorio`
+devuelve `[]` (tiene el `catch`) y el conteo reventaria antes de llegar al verde. Mismo seguro que
+el barrido de R9, y con margen real (147 vs 100). Ademas el detector tiene su propio caso
+sintetico con los dos idiomas **y** el falso positivo de `file-field.tsx` (`{ ok, message }` de
+una validacion local), que efectivamente **no** se caza.
+
+---
+
+## 3. Las cinco enmiendas del spec, leidas
+
+| R | Que dice ahora | Juicio |
+|---|---|---|
+| **R11** | Acota a "ninguna linea de log **de esta ficha**" y **cede explicitamente ante R28/R29 de QC-70**, citando archivo y linea del requisito de la otra ficha, con "Manda QC-70" y "No reabrir". Anota ademas el `console.warn` de QC-9 como fuera de alcance | **Correcta.** Dice lo que el humano decidio (Opcion A) y no se pasa de acotada: sigue exigiendo que el camino catalogado no produzca **ninguna** linea de QC-71, no lea la cabecera y no resuelva identificador. Lo unico que cede es la linea de diagnostico ajena |
+| **R17** | Acota a "**una superficie que pinta la region de error de la pantalla**", nombra las cinco superficies excluidas, declara la Opcion A **descartada** y remite a la guardia de lista cerrada | **Correcta y NO tautologica.** El riesgo real era que "superficie que pinta la region de error" se volviera circular -seria "las que muestran el id, muestran el id"-. **No lo es, porque la guardia enumera las excluidas y pone roja la sexta**: la frontera la fija una lista concreta en disco, no la definicion. Esa es la mitad que evita la tautologia, y esta |
+| **R9** | Nombra los seis modulos de negocio que barre y los dos duenos (`errores`, `observabilidad`) que quedan fuera, y mantiene "ningun puerto nuevo" sobre **los ocho** | **Correcta.** Requisito y guardia dicen ya lo mismo, y queda escrito por que la redaccion anterior prohibia el propio `design.md > 1` |
+| **R13** | Nombra el simbolo `reference` y cita el hueco que QC-70 dejo reservado | Correcta |
+| **R16** | Nombra `reference` y anade "Nada de `reference?: string`" | Correcta, y ademas refuerza: ahora el requisito dice explicitamente lo que la guardia del catalogo comprueba |
+
+Cada enmienda lleva **fecha (2026-09-10), numero de hallazgo y motivo dentro del propio
+requisito**, que es como se debe hacer: quien lea R11 dentro de seis meses no tiene que ir a
+buscar por que cede.
+
+## 4. El caso vacuo de R11 (menor 4 de la ronda 1) - ARREGLADO
+`error-state.test.ts`: el caso pasa de construir el traductor y no invocarlo a **montar el `catch`
+de una accion real y ejecutar una operacion que resuelve**, afirmando (a) el resultado de exito,
+(b) que la lectura de la cabecera **no se llamo** y (c) cero llamadas a los cinco `console.*`. Ya
+no es vacuo: prueba lo que R11 dice.
+
+---
+
+## Hallazgos de la RONDA 2
+
+### MENOR 1 - la insercion de las enmiendas estropeo la cabecera de `requirements.md` (arreglar antes del PR)
+El bloque de enmiendas se metio **dentro** de la frase final del sembrado, partiendo un `code
+span`. Hoy el archivo dice, literalmente:
+
+- **linea 35:** `> reescribe: su trabajo aquí es ` + backtick + `## Enmiendas del 2026-09-10
+  (revisión F2.2)` - la frase del sembrado queda **cortada a medias** y con el backtick sin cerrar.
+- **linea 51:** `## Requisitos (EARS)` + backtick + `._` - un **encabezado fantasma** con la cola
+  de la frase original pegada.
+- **linea 53:** `## Requisitos (EARS)` - el de verdad. **Hay dos.**
+- Efecto de render: la seccion de enmiendas **se queda sin titulo propio**, porque su encabezado
+  vive dentro del blockquote del sembrado.
+
+**No es un cambio de contenido del sembrado** - el Alcance, "Lo que NO entra" y la tabla de
+"Decisiones cerradas" estan intactos, verificado en el diff -, o sea que no se reabrio nada: es un
+reemplazo de cadena mal hecho. Pero deja el documento que hace de contrato con una frase rota y un
+encabezado duplicado.
+
+**Arreglo:** restaurar la frase del sembrado en la linea 35, borrar la linea 51 y poner
+`## Enmiendas del 2026-09-10 (revisión F2.2)` como encabezado real del bloque, fuera del
+blockquote. Dos minutos, cero riesgo.
+
+### MENOR 2 - el detector tiene un punto ciego: el idioma DESESTRUCTURADO pasa en verde
+Comprobado por el reviewer (mutacion D, sobre `order-list-section.tsx`):
+
+    const { status, message, data } = await listOrdersAction({ pagina });
+    if (status === 'error') {
+      throw new Error(message);       // <- una SEXTA superficie, mismo agujero
+    }
+
+Resultado: `Tests 21 passed (21)`. **Verde.** Los dos patrones exigen `<id>.message` con un `<id>`
+que ademas se discrimine como `<id>.status === 'error'`; con el resultado desestructurado no hay
+`<id>.` que emparejar.
+
+**Por que es menor y no mayor:** (a) el comentario del codigo es honesto y acota su alcance - "los
+dos idiomas, tal como aparecen HOY en el codigo (leidos, no supuestos)" -; (b) **ninguna** de las
+147 superficies del repo usa hoy la forma desestructurada, asi que no hay agujero abierto, solo un
+agujero posible; (c) la mutacion A demuestra que el caso realista - el que copiaria alguien
+mirando los cinco pickers que ya existen - **si** se caza.
+
+**Recomendacion (no bloquea):** anadir un tercer patron o, mas barato y mas robusto, un caso que
+afirme que en `app/**` y `components/**` no hay ningun
+`const { ... status ... message ... } = await <algo>Action(`. Anotarlo como limitacion conocida en
+la cabecera de la guardia ya seria mejor que nada.
+
+---
+
+## Los checkpoints que siguen pendientes de cierre (no son hallazgos)
+
+- [ ] Entrada en `progress/history.md`.
+- [ ] Worktree desmontado (`./scripts/wt.sh done QC-71-identificador-de-request`).
+- [ ] `./init.sh` completo **otra vez antes del PR** (regla 5), despues de arreglar el menor 1.
+
+## Lo que necesita al humano
+
+**Nada que decidir.** Las dos decisiones que la ronda 1 le traslado estan tomadas, escritas en
+`requirements.md` con fecha y motivo, y aplicadas tal como se decidieron. Los dos menores de esta
+ronda los cierra el implementer sin consultar: el primero es un arreglo de formato de dos lineas,
+el segundo es una mejora opcional de la guardia.
+
+**Veredicto: APROBADO**, con el menor 1 a arreglar antes de abrir el PR.
