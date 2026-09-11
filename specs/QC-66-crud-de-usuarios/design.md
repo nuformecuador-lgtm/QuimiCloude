@@ -758,3 +758,29 @@ decisiones y la escribe **R49**; el efecto en este diseño está en § 7.
 Una más, propia y menor: **el listado no ofrece filtro por rol**. La decisión 11 enumera búsqueda y
 filtro por estado, y nada más; añadirlo después es una línea en `USER_QUERYABLE` y no cambia la firma
 (R36), que es precisamente para lo que se eligió el contrato abierto.
+
+---
+
+## 16. Correcciones durante la implementación (2026-09-10)
+
+Este diseño está **aprobado** y no se reescribe. Se anota aquí, al final, en qué se separó el código
+de lo que dicen las secciones de arriba, y **manda el código**:
+
+1. **`not_found` → `user_not_found`** (§ 6.4, fila 2): el código entró al **catálogo único de
+   errores de QC-70** (`lib/modules/errores`), donde `not_found` está prohibido por R16, así que
+   `NotFoundError` —que **conserva su nombre de clase**— declara `user_not_found`. **Esto enmienda
+   QC-70 R25** («el catálogo no contiene ningún código de `identity`»), cuya premisa caducó con esta
+   ficha; **aprobado por el humano el 2026-09-10**. Los otros **ocho** códigos de § 6.4 no cambian, y
+   el rechazo genérico del login de QC-7 tampoco.
+2. **§ 6.4 se queda corto con `meta.target`**: los dos índices **funcionales** (`users_email_unique`,
+   `users_document_unique`) traen en el `P2002` la **EXPRESIÓN** (`["company_id","lower(email)"]`), no
+   los nombres de columna, así que una comparación por igualdad habría dejado el alta **sin traducir**
+   el duplicado; el adaptador compara por **subcadena** con marcas disjuntas.
+3. **§ 2, fila 6 se equivoca**: en `tests/integration/identity/identity-seed.int.test.ts` **sí** había
+   un literal del total de asignaciones del seed —`expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(12)`—
+   y estaba rojo al añadir los dos permisos nuevos.
+4. **El ripple fueron NUEVE archivos ajenos, no seis** (y un séptimo caso rojo dentro del tercero):
+   los dos que faltaban en la lista son `tests/unit/recetas-ui/recipe-route-contract.test.ts` y
+   `tests/unit/identity/account-status-scope.test.ts`.
+5. **§ 7 y § 11 no mencionan el puerto del registro de campos omitidos** (`ListQueryLog`, QC-57 R6),
+   que los cinco módulos con listado tienen **sin excepción**: se creó como **sexta copia**.

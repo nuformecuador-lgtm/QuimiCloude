@@ -12,7 +12,13 @@
 //     consultas.
 //   - **R41**: cada uno de los NUEVE errores de `design.md > 6.4` se traduce a
 //     `{ status: 'error', code, message }` por su `code` ESTABLE, **nunca** por el texto del
-//     mensaje; y un error que no es de dominio se RELANZA en vez de descartarse.
+//     mensaje; y un error que no es de dominio no se descarta.
+//
+// QC-70, aplicado a `identity` el 2026-09-10: la traduccion la hace el traductor UNICO
+// (`createErrorStateTranslator`), `not_found` pasa a ser `user_not_found` (enmienda a QC-70 R25) y
+// un error AJENO al dominio ya NO se relanza —el caso que fijaba `rejects.toThrow(...)` se
+// reescribe—: se devuelve como `unexpected` con mensaje neutro y el texto original va al registro
+// del servidor, que es el unico sitio donde aparece (R12, R13, R14).
 //   - **R16**: el ESTADO SERIALIZADO del alta no contiene ninguna credencial ni ningun hash, y se
 //     afirma sobre el objeto COMPLETO (sus claves exactas y su serializacion entera), no sobre una
 //     clave suelta.
@@ -25,6 +31,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
 import {
   DuplicateDocumentError,
   DuplicateEmailError,
@@ -425,9 +432,9 @@ describe('R6 — falta la SEGUNDA cara: hay getSessionUser pero no getSessionCon
 // ---------------------------------------------------------------------------------------------
 
 describe('R41 — traduccion de errores de dominio por su code estable', () => {
-  const LOS_NUEVE: ReadonlyArray<{ readonly error: Error; readonly code: string }> = [
+  const LOS_NUEVE: ReadonlyArray<{ readonly error: Error; readonly code: ErrorCode }> = [
     { error: new UnauthorizedError(), code: 'unauthorized' },
-    { error: new NotFoundError(), code: 'not_found' },
+    { error: new NotFoundError(), code: 'user_not_found' },
     { error: new DuplicateEmailError(), code: 'duplicate_email' },
     { error: new DuplicateUsernameError(), code: 'duplicate_username' },
     { error: new DuplicateDocumentError(), code: 'duplicate_document' },
@@ -499,24 +506,48 @@ describe('R41 — traduccion de errores de dominio por su code estable', () => {
     }
   }
 
-  it('el mensaje viaja tal cual lo trae el error de dominio, y el code manda', async () => {
-    getUserMock.mockRejectedValue(new NotFoundError('El usuario no existe.'));
+  // QC-70 (R7, R11): el mensaje ya NO viaja «tal cual lo trae el error» —nadie puede pasarle uno—
+  // sino que sale del CATALOGO por el codigo, y el estado serializado son EXACTAMENTE esos tres
+  // campos. El `diagnostic` que el dominio puede llevar NO cruza (R29, R30): se pasa uno
+  // reconocible y se comprueba que no aparece en ninguna parte del estado.
+  it('el mensaje sale del catalogo por el code, y el diagnostico NO cruza al navegador', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    getUserMock.mockRejectedValue(new NotFoundError('user-id=user-2 empresa=otra'));
 
     const resultado = await getUserAction('user-2');
 
     expect(resultado).toEqual({
       status: 'error',
-      code: 'not_found',
-      message: 'El usuario no existe.',
+      code: 'user_not_found',
+      message: errorMessage('user_not_found'),
     });
+    expect(JSON.stringify(resultado)).not.toContain('user-id=user-2');
+    // El diagnostico va al REGISTRO DEL SERVIDOR, que es el unico sitio donde aparece (R28).
+    expect(log).toHaveBeenCalledWith({
+      code: 'user_not_found',
+      diagnostic: 'user-id=user-2 empresa=otra',
+    });
+    log.mockRestore();
   });
 
-  it('un error que NO es de dominio se RELANZA y no se descarta ni se traduce', async () => {
-    createUserMock.mockRejectedValue(new Error('fallo de infraestructura'));
+  it('un error que NO es de dominio se traduce a `unexpected` y no filtra su texto', async () => {
+    // QC-70 (R12, R13, R14): antes esto era `rejects.toThrow('fallo de infraestructura')`. Ahora la
+    // action devuelve estado, el navegador ve el mensaje neutro y el error original va al registro
+    // del servidor. Sigue sin descartarse: lo que cambia es por donde sale.
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ajeno = new Error('fallo de infraestructura');
+    createUserMock.mockRejectedValue(ajeno);
 
-    await expect(
-      createUserAction({ status: 'idle' }, formData(CAMPOS_DEL_FORMULARIO)),
-    ).rejects.toThrow('fallo de infraestructura');
+    const resultado = await createUserAction({ status: 'idle' }, formData(CAMPOS_DEL_FORMULARIO));
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+    });
+    expect(JSON.stringify(resultado)).not.toContain('fallo de infraestructura');
+    expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+    log.mockRestore();
   });
 });
 

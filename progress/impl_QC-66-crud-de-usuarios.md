@@ -922,7 +922,12 @@ arriba.
 
 ## Lo que el reviewer tiene que mirar de frente
 
-### 1. El `design.md` quedo desactualizado en cuatro puntos, y el codigo implementa lo correcto
+### 1. El `design.md` quedo desactualizado en CINCO puntos, y el codigo implementa lo correcto
+
+> Los cuatro de abajo, **mas un quinto que llego en F2.3b**: el renombrado de `not_found` a
+> `user_not_found` al entrar `identity` al catalogo unico de QC-70. Los **cinco** estan ahora
+> anotados tambien en el propio `design.md`, en su bloque `## 16` del final, que es **lo unico** que
+> se le anadio: nada de lo aprobado se reescribio.
 
 Ninguno se arreglo en el spec —esta aprobado y no se reabre—, pero **los cuatro quedan escritos aqui
 y en el codigo**:
@@ -1007,19 +1012,19 @@ antes de detectarlo. Revertido entero y verificado (11 permisos, 12 asignaciones
 | Tasks cerradas | **20 de 20** (T0-T20) |
 | Requisitos con test nombrado | **49 de 49** |
 | Commits | 9, uno por tanda o task logica |
-| Archivos ajenos del ripple | **9**, todos verdes y sin ninguna expectativa debilitada (R48) |
+| Archivos ajenos del ripple | **10**, todos verdes y sin ninguna expectativa debilitada (R48). El decimo, `tests/unit/errores/catalogo.test.ts`, entro en **F2.3b** |
 | Dependencias nuevas | **0** (R47) |
 | Preguntas abiertas | **P1, P2 y P3 siguen abiertas**; P4 cerrada por el humano y escrita por R49 |
 | E2E | **diferida a QC-67 con motivo**, declarado en el diseno y no al final (R46) |
 
-`typecheck` y `eslint` en la linea base exacta, sin ganar ni un archivo rojo. Las **26 guardias**
-verdes. `tests/unit/identity/` **721 passed | 3 skipped**. `tests/integration/identity/`
-**161 passed**.
+> **Esta tabla es de antes de F2.3 y F2.3b. El estado vigente esta al final del archivo**: tras
+> sincronizar con `dev` y migrar la capa de errores al catalogo de QC-70, el ripple pasa a **10**
+> archivos, las guardias a **27 archivos y CERO rojos**, y el unico rojo que queda es
+> `app/layout.tsx` (`LayoutProps`), que es del leader y no lo apaga ningun merge.
 
 **El gate (`./init.sh --rapido` por tanda y `./init.sh` completo antes del PR) lo corre el leader: no
 me autoapruebo, y la suite completa no se corrio desde aqui a proposito** (regla del gate de
-`AGENTS.md`). Quedan para el leader la sincronizacion con `origin/dev` (**F2.3** — `origin/dev` se
-movio a `192842a` mientras esto se escribia) y el PR (**F2.4**).
+`AGENTS.md`). El PR es **F2.4**, del leader.
 
 ---
 
@@ -1161,3 +1166,166 @@ spec aprobado.
 
 **Estado de la rama: sincronizada y empujada, pero NO verde en el gate completo** por estos tres
 casos. No me autoapruebo y no abro el PR (F2.4 es del leader).
+
+---
+
+## F2.3b — `identity` entra al catalogo unico de QC-70 (2026-09-10)
+
+Decidido por el **humano** hoy, tras el hallazgo de F2.3. Las dos preguntas que quedaban abiertas se
+cerraron asi, y **no se rediscuten**:
+
+1. **`identity` entra al catalogo unico, y eso ENMIENDA QC-70 R25.**
+2. **`not_found` pasa a `user_not_found`; los otros ocho codigos no se tocan.** Un solo literal del
+   contrato cambia.
+
+### EL CONTRATO DE ERRORES PARA QC-67 — los nueve codigos, definitivos
+
+**Esta es la lista que la pantalla de QC-67 consume. No se adivina y no cambia sin reabrir esto.**
+
+| Clase | `code` |
+| --- | --- |
+| `UnauthorizedError` | `unauthorized` |
+| `NotFoundError` | `user_not_found` |
+| `DuplicateEmailError` | `duplicate_email` |
+| `DuplicateUsernameError` | `duplicate_username` |
+| `DuplicateDocumentError` | `duplicate_document` |
+| `RoleNotFoundError` | `role_not_found` |
+| `SelfOperationError` | `self_operation` |
+| `LastAdministratorError` | `last_administrator` |
+| `ValidationError` | `invalid_input` |
+
+`unauthorized` e `invalid_input` **ya estaban** en el catalogo de QC-70 y no se duplicaron. Los otros
+**siete** entraron en los tres sitios que exige QC-70 —`ERROR_CODES`, `ERROR_MESSAGE_KEY` y
+`ERROR_MESSAGES_ES`—, y olvidar cualquiera de los dos ultimos rompe el typecheck por sus `satisfies`.
+
+**El mensaje ya NO lo pone quien lanza**: sale del catalogo a partir del codigo, asi que QC-67 puede
+mostrar el `message` que llega o decidir el suyo por el `code`, pero **no hay dos frases posibles para
+el mismo fallo**.
+
+### La enmienda a QC-70 R25, escrita y no disimulada
+
+En la cabecera de `lib/modules/errores/domain/error-codes.ts`, donde antes decia «tampoco contiene
+ningun codigo de `identity` (R25)», ahora dice —resumido— que **esto enmienda QC-70 R25**, que **la
+premisa de R25 caduco con QC-66** —que anade seis casos de uso de administracion con fallos
+distinguibles, y cada uno necesita un mensaje propio—, y que `identity` pasa a ser el **sexto** modulo
+del catalogo. Mas la frase que acota el alcance: **el rechazo generico del login de QC-7 NO cambia**,
+sigue siendo generico a proposito —no dice si fallo el usuario o la contrasena— y esta enmienda **no
+lo toca ni lo roza**; lo que entra es la **administracion** de usuarios, no la **autenticacion**.
+
+Es la **tercera** enmienda a un catalogo cerrado de este repositorio, despues de las dos que QC-38 y
+QC-66 hicieron al de permisos de QC-74, y se escribio con el **mismo registro** que esas dos, que
+estan en `lib/modules/identity/domain/permissions.ts`.
+
+**Detalle de arquitectura que no es adorno:** la cita de la enmienda es **por ficha y no por ruta**,
+porque `tests/unit/errores/catalogo.test.ts` exige que ningun archivo de `errores` contenga la cadena
+`lib/modules/identity`. **El catalogo no depende de ningun modulo; son los modulos los que dependen
+de el**, y esa regla sigue vigente y verde.
+
+### Lo que cambio, archivo por archivo
+
+| Archivo | Qué |
+| --- | --- |
+| `lib/modules/errores/domain/error-codes.ts` | los siete codigos en `ERROR_CODES` + la enmienda a R25 en la cabecera |
+| `lib/modules/errores/domain/error-catalog.ts` | siete claves en `ERROR_MESSAGE_KEY` y siete textos en `ERROR_MESSAGES_ES` |
+| `lib/modules/identity/domain/errors.ts` | las **diez** clases al patron de `unidades`: `code: ErrorCode`, `super(errorMessage(code))`, `diagnostic?`, y **ningun constructor admite un mensaje** |
+| `lib/modules/identity/adapters/driving/user-actions.ts` | fuera el traductor propio; `createErrorStateTranslator(IdentityError)`, el unico del repo |
+| `tests/unit/identity/usuarios/{errors,user-actions,user-service}.test.ts` | el codigo esperado donde era `not_found` |
+| `tests/unit/errores/catalogo.test.ts` | **el DECIMO archivo ajeno del ripple** (ver abajo) |
+| `specs/QC-66-crud-de-usuarios/design.md` | **solo se ANOTA**: bloque nuevo al final, `## 16. Correcciones durante la implementacion` |
+
+Los siete mensajes, en español y al tono del catalogo: «El usuario solicitado no existe.», «Ya existe
+un usuario con ese correo / nombre de usuario / documento en la empresa.», «El rol indicado no
+existe.», «No puedes realizar esta operacion sobre tu propia cuenta.» —que **no nombra** estado, rol
+ni borrado, porque cubre **los tres** de la decision 9(a)— y «La empresa quedaria sin ningun
+administrador activo.»
+
+### El DECIMO archivo ajeno del ripple: `tests/unit/errores/catalogo.test.ts`
+
+Es de **QC-70** y estaba fuera de la lista de archivos que se podian tocar, pero **la enmienda lo
+ponia rojo por construccion**: tenia el conteo literal `toHaveLength(25)` y un caso llamado
+«R25 — identity se queda fuera» que **prohibia explicitamente** `duplicate_email`,
+`duplicate_username` y `duplicate_document`. **No habia forma de dejarlo verde sin revertir la
+decision del humano**, asi que se retensa con el mismo criterio que los otros nueve:
+
+- El conteo pasa de `25` a `32` y **sigue siendo literal**: un codigo nuevo que nadie anote ahi pone
+  esa linea en rojo.
+- El caso de R25 pasa a vigilar **lo que R25 protegia de verdad**: que **la autenticacion** no entre.
+  Los cinco codigos de login y sesion siguen prohibidos y el regex de vocabulario conserva
+  `credential|password|session|login|account`. **Solo sale `username`**, porque
+  `duplicate_username` es un codigo legitimo de la administracion, y salen los tres `duplicate_*`
+  de la lista de prohibidos.
+- **Y gana un caso nuevo** que exige que los **siete** codigos de usuarios **si** esten.
+- El titulo pasa a `R25 (enmendado) — la autenticacion se queda fuera, la administracion de usuarios
+  entra`, porque el anterior ya **mentia**.
+
+**Balance del diff: -3 codigos prohibidos y -1 token del regex, +1 caso con 7 aserciones.** Es un
+retensado, no un aflojamiento; ninguna expectativa se elimino y el conteo sigue cerrado.
+
+### Una consecuencia de QC-70 que cambia comportamiento, y hay que decirla
+
+En las seis Server Actions, **un error ajeno al dominio ya no se relanza**: el traductor unico
+devuelve `unexpected` con mensaje neutro y manda la causa al **registro del servidor**. No era
+evitable —es lo que hace `createErrorStateTranslator`— y es **lo mismo que QC-70 hizo en los otros
+cinco modulos**.
+
+**No contradice R41** («ningun `catch` que descarte un error sin manejarlo ni propagarlo con
+contexto»): el error **no se descarta**, se propaga **al log con su causa**, que es donde QC-70 decidio
+que vive el detalle (sus R13, R14). Lo que no cruza al navegador es el detalle, y eso es
+deliberado. El test que fijaba `rejects.toThrow(...)` se reescribio para afirmar **el estado completo
+y la entrada del log**, sin perder aserciones.
+
+### Verificacion de la migracion
+
+```
+pnpm exec vitest run guard
+  ANTES:   Test Files  1 failed | 26 passed (27)
+           Tests  3 failed | 269 passed | 4 skipped
+           (R22: 7 codigos fuera del catalogo · R23: 2 hallazgos de traductor propio
+            · R24: 10 constructores con mensaje)
+  DESPUES: Test Files  27 passed (27)
+           Tests  272 passed | 4 skipped (276)        <-- CERO ROJOS
+
+pnpm run typecheck  -> 1 solo error: app/layout.tsx(43,56) LayoutProps (ajeno, del leader)
+pnpm exec eslint .  -> sin salida (limpio)
+
+tests/unit/identity/ + tests/unit/composition/ + tests/unit/errores/ + tests/integration/identity/
+  -> Test Files  55 passed (55)   |   Tests  921 passed | 3 skipped (924)
+```
+
+`tests/unit/errores/` paso de `3 failed | 21 passed` a **25 passed**. La suite completa **no** se
+corrio: el gate es del leader.
+
+### `'not_found'`: los dos papeles del mismo literal
+
+Era la trampa de esta migracion y se resolvio distinguiendolos:
+
+- **Renombrados como `code` de error: 8 ocurrencias en 4 archivos** (`domain/errors.ts`, y los tres
+  tests de `usuarios/`).
+- **CONSERVADOS porque son resultados discriminados del PUERTO: 18 ocurrencias.**
+  `GuardedOutcome = 'ok' | 'not_found' | 'last_administrator'`, los `return` del adaptador Prisma, los
+  `if (outcome === 'not_found')` de los tres casos de uso guardados, y los `expect(outcome)` del test
+  de integracion. **No son codigos de error: son el contrato interno del repositorio**, y renombrarlos
+  habria sido un cambio que nadie pidio.
+- **`role_not_found`: 0 tocados.** Los `'not_found'` de los otros cinco modulos: **0 tocados.**
+
+### El login de QC-7: intacto
+
+`verify-credentials.ts`, `resolve-session*.ts` y todo lo que cuelga del login **no se tocaron**.
+Ningun codigo de autenticacion entro al catalogo y sus tests pasan sin cambios.
+
+### El `design.md` se ANOTO, no se reescribio
+
+`specs/QC-66-crud-de-usuarios/design.md` esta aprobado, asi que **nada de lo que habia se cambio**:
+gana al final un bloque fechado `## 16. Correcciones durante la implementacion (2026-09-10)` con las
+**cinco** divergencias, una linea cada una. `requirements.md`, su tabla de decisiones y sus **49**
+requisitos **no se tocaron**.
+
+### Una pregunta de consistencia que NO decido, y paso al leader
+
+**`NotFoundError` conserva su nombre de clase aunque su codigo ya sea `user_not_found`.** El humano
+decidio los **codigos**, y dijo «un solo literal del contrato»: los nombres de clase no se
+mencionaron, asi que no se tocaron. Pero los otros cinco modulos **si** renombraron la clase
+(`UnitNotFoundError`, `OrderNotFoundError`, `SupplierNotFoundError`…), asi que `identity` queda como
+el unico con una clase generica. Alinearla a `UserNotFoundError` toca `domain/errors.ts`, el barrel,
+los casos de uso que la lanzan y cuatro tests. **Es cosmetico y reversible; lo decide el leader o el
+humano, no yo.**

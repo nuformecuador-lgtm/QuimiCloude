@@ -476,29 +476,29 @@ describe('ambito de empresa, borrados y el propio actor (R33, R34, R35, R37, R39
     ]);
   });
 
-  it('R33, R34 — el usuario de otra empresa o ya borrado responde `not_found` en las cuatro operaciones por identificador', async () => {
+  it('R33, R34 — el usuario de otra empresa o ya borrado responde `user_not_found` en las cuatro operaciones por identificador', async () => {
     // El puerto dice `null` / `'not_found'` -sus metodos son `…AliveInCompany`, asi que el
     // `deleted_at IS NULL` y el `company_id = ?` son SUYOS y ningun caso de uso puede
     // olvidarlos- y el dominio lo traduce al mismo error en los cuatro: distinguirlos
     // convertiria la ficha en un oraculo de existencia sobre datos ajenos.
     const ficha = montar({ find: null });
-    expect(await codeDeFallo(ficha.getUser(ACTOR, TARGET_ID))).toBe('not_found');
+    expect(await codeDeFallo(ficha.getUser(ACTOR, TARGET_ID))).toBe('user_not_found');
 
     const edicion = montar({ update: 'not_found' });
     expect(await codeDeFallo(edicion.updateUser(ACTOR, TARGET_ID, ENTRADA_USUARIO))).toBe(
-      'not_found',
+      'user_not_found',
     );
 
     const borrado = montar({ guarded: 'not_found' });
-    expect(await codeDeFallo(borrado.deleteUser(ACTOR, TARGET_ID))).toBe('not_found');
+    expect(await codeDeFallo(borrado.deleteUser(ACTOR, TARGET_ID))).toBe('user_not_found');
 
     const estado = montar({ guarded: 'not_found' });
     expect(
       await codeDeFallo(estado.setUserAccountStatus(ACTOR, TARGET_ID, { accountStatus: 'active' })),
-    ).toBe('not_found');
+    ).toBe('user_not_found');
 
     // R34: «sin modificar ninguna fila». Cada caso pidio UNA operacion, la que el puerto
-    // rechazo, y ninguna otra escritura sono detras del `not_found`.
+    // rechazo, y ninguna otra escritura sono detras del no-encontrado.
     expect(ficha.users.create).not.toHaveBeenCalled();
     expect(ficha.users.updateAliveInCompany).not.toHaveBeenCalled();
     expect(ficha.users.applyGuardedChange).not.toHaveBeenCalled();
@@ -518,7 +518,7 @@ describe('ambito de empresa, borrados y el propio actor (R33, R34, R35, R37, R39
     // se olvidaria y el actor reapareceria en su propio listado.
     expect(d.users.listAliveInCompany.mock.calls[0][1]).toBe(ACTOR_ID);
 
-    expect(await codeDeFallo(d.getUser(ACTOR, ACTOR_ID))).toBe('not_found');
+    expect(await codeDeFallo(d.getUser(ACTOR, ACTOR_ID))).toBe('user_not_found');
     // Y no se consulta lo que no se va a devolver: la comprobacion va ANTES del puerto.
     expect(d.users.findAliveInCompany).not.toHaveBeenCalled();
   });

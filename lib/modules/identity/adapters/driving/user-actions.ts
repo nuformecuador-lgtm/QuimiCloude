@@ -1,6 +1,7 @@
 'use server';
 
 import { identity } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
   IdentityError,
   type Actor,
@@ -38,13 +39,18 @@ import {
  * ERRORES (`design.md > 6.4`, R41): las clases de `IdentityError` se traducen a
  * `{ status: 'error', code, message }` con el `code` ESTABLE de la clase, **nunca** el texto
  * del mensaje —el mensaje puede cambiar de redaccion o de idioma sin romper a QC-67—.
- * Cualquier error que NO sea de dominio se RELANZA: nada de `catch` que descarte un error
+ *
+ * QC-70 (R10, R12), aplicado aqui el 2026-09-10: la traduccion ya NO se escribe en este archivo
+ * —era una septima copia byte a byte— sino que la fabrica el traductor UNICO del modulo `errores`.
+ * Y un error que NO es de dominio ya no se RELANZA: se devuelve como `unexpected` con su mensaje
+ * neutro, y el detalle real (traza, SQL, nombres de tabla) va al registro del servidor y solo ahi
+ * (R13, R14). Nada de `catch` que descarte un error
  * (`docs/conventions.md > Manejo de errores`).
  *
  * R16 — LA CREDENCIAL NO SALE POR AQUI TAMPOCO. El estado que devuelve el alta es
  * `{ status: 'success'; id }` y nada mas: la contraseña generada no la ve esta action (el
  * caso de uso solo recibe su hash del puerto), no viaja en ningun mensaje de error —los
- * mensajes son los textos fijos de `domain/errors.ts`— y no se escribe en ninguna traza:
+ * mensajes son los textos fijos del catalogo unico de QC-70— y no se escribe en ninguna traza:
  * **este archivo no tiene ningun `console.*`**.
  *
  * SIN `revalidatePath` (`design.md > 10`): esta ficha no crea ninguna pantalla, pagina ni
@@ -60,35 +66,35 @@ import {
 export type CreateUserFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 /** Estado compartido por edicion, borrado y movimiento de estado: ninguno devuelve datos. */
 export type UserMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 /** Lo que devuelve la FICHA individual (R32): `UserDetail` no lleva credencial por TIPO. */
 export type UserDetailResult =
   | { status: 'success'; data: UserDetail }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 /** Lo que devuelve el LISTADO (R27, R31): una `Page` de filas sin ningun dato de credencial. */
 export type UserListResult =
   | { status: 'success'; data: Page<UserRow> }
-  | { status: 'error'; code: string; message: string };
+  | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
 // exportar funciones async (restriccion real de Next.js), asi que quien las consuma (QC-67)
 // construye el literal `{ status: 'idle' }` con los tipos de arriba.
 
-/** Traduce un error de dominio a estado serializable POR SU `code`; relanza cualquier otro. */
-function toErrorState(error: unknown): { status: 'error'; code: string; message: string } {
-  if (error instanceof IdentityError) {
-    return { status: 'error', code: error.code, message: error.message };
-  }
-  throw error;
-}
+/**
+ * Traduce un error de dominio a estado serializable POR SU `code`, y cualquier otro a
+ * `unexpected`. Es la UNICA implementacion, parametrizada por la clase base de este modulo
+ * (QC-70 R10): la guardia del catalogo da rojo si alguien vuelve a declarar aqui una
+ * `function toErrorState`.
+ */
+const toErrorState = createErrorStateTranslator(IdentityError);
 
 /**
  * El actor se resuelve UNA vez por invocacion, nunca dentro del dominio (R5), y con LAS DOS
@@ -146,7 +152,7 @@ function userCandidateFromFormData(formData: FormData): unknown {
 /**
  * El identificador del usuario objetivo cuando viaja como campo OCULTO del formulario, igual
  * que en `deleteUnitAction`. Un `id` ausente llega como cadena vacia y se pasa al caso de uso
- * **sin juzgarlo**: el dominio responde `not_found` porque ninguna fila viva de la empresa lo
+ * **sin juzgarlo**: el dominio responde `user_not_found` porque ninguna fila viva de la empresa lo
  * tiene. Devolver aqui un error distinto seria decidir en el borde.
  */
 function readTargetId(formData: FormData): string {
@@ -240,7 +246,7 @@ export async function setUserAccountStatusAction(
 
 /**
  * FICHA individual por identificador (R32, R40). Consulta: argumento ya tipado, no `FormData`.
- * Que un usuario de otra empresa, uno borrado o el propio actor respondan `not_found` (R33,
+ * Que un usuario de otra empresa, uno borrado o el propio actor respondan `user_not_found` (R33,
  * R34, R35) lo decide `get-user.ts`: esta action solo traduce.
  */
 export async function getUserAction(id: string): Promise<UserDetailResult> {

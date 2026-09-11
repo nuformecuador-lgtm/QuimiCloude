@@ -14,14 +14,34 @@
  * al compilar a un target que no soporta nativamente extender `Error`, rompe la cadena de
  * prototipos y `instanceof` deja de funcionar sin el ajuste.
  *
+ * QC-70 (R6, R7, R8), aplicado a `identity` el 2026-09-10: el `code` ya NO es un `string`
+ * cualquiera sino un `ErrorCode` del catalogo unico (`@/lib/modules/errores`), y el MENSAJE sale
+ * de ese catalogo a partir del codigo. **Ningun constructor admite un texto** (R24): si pudiera,
+ * la frase volveria a vivir en seis archivos, que es justo lo que QC-70 quita. Lo que un sitio que
+ * lanza SI puede pasar es el `diagnostic`: el dato variable que ayuda a diagnosticar, que va al
+ * REGISTRO DEL SERVIDOR y solo ahi (R28, R29). Esto ENMIENDA QC-70 R25; el motivo, en la cabecera
+ * de `lib/modules/errores/domain/error-codes.ts`.
+ *
  * Dominio puro (R42): este archivo no importa framework, Prisma, `lib/shared/**`,
- * `lib/composition` ni las tripas de otro modulo.
+ * `lib/composition` ni las tripas de otro modulo. El catalogo entra por el BARREL de otro
+ * modulo, que es lo unico que `domain/**` puede importar de fuera
+ * (`docs/architecture.md > La regla de dependencias`).
  */
-export abstract class IdentityError extends Error {
-  abstract readonly code: string;
+import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
 
-  constructor(message: string) {
-    super(message);
+export abstract class IdentityError extends Error {
+  abstract readonly code: ErrorCode;
+
+  /**
+   * QC-70 (R28, R29): el dato variable que ayuda a diagnosticar —un identificador, el indice
+   * que choco—. Va al REGISTRO DEL SERVIDOR y solo ahi: no es el mensaje, no se muestra y el
+   * traductor unico no lo copia al estado que cruza al navegador.
+   */
+  readonly diagnostic?: string;
+
+  constructor(code: ErrorCode, diagnostic?: string) {
+    super(errorMessage(code)); // R7: el mensaje NO se pasa desde fuera.
+    this.diagnostic = diagnostic;
     this.name = new.target.name;
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -39,8 +59,8 @@ export abstract class IdentityError extends Error {
 export class UnauthorizedError extends IdentityError {
   readonly code = 'unauthorized';
 
-  constructor(message = 'El actor no tiene permiso para realizar esta operacion.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('unauthorized', diagnostic);
   }
 }
 
@@ -52,13 +72,20 @@ export class UnauthorizedError extends IdentityError {
  * de «existe pero no es de tu empresa» convertiria la ficha en un **oraculo de existencia**
  * sobre datos ajenos —un actor de la empresa A podria sondear identificadores de la empresa B
  * y saber cuales son reales—. Es el criterio que ya fijaron QC-38 y QC-43, y la razon de que
- * «de otra empresa» responda `not_found` y **no** `unauthorized`.
+ * «de otra empresa» responda no-encontrado y **no** `unauthorized`.
+ *
+ * QC-70 (R17), el 2026-09-10: su codigo era el generico `not_found`, que significaba cinco cosas
+ * distintas segun quien lo lanzara; ahora es `user_not_found`, un codigo con UN mensaje. La CLASE
+ * conserva su nombre: lo que cambio es el literal del contrato, no la jerarquia. Ojo: los
+ * `'not_found'` que siguen apareciendo en `delete-user.ts`, `update-user.ts` y
+ * `set-user-account-status.ts` son el RESULTADO DISCRIMINADO del puerto, no un codigo de error, y
+ * no se tocan.
  */
 export class NotFoundError extends IdentityError {
-  readonly code = 'not_found';
+  readonly code = 'user_not_found';
 
-  constructor(message = 'El usuario solicitado no existe.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('user_not_found', diagnostic);
   }
 }
 
@@ -71,8 +98,8 @@ export class NotFoundError extends IdentityError {
 export class DuplicateEmailError extends IdentityError {
   readonly code = 'duplicate_email';
 
-  constructor(message = 'Ya existe un usuario con ese correo en la empresa.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('duplicate_email', diagnostic);
   }
 }
 
@@ -80,8 +107,8 @@ export class DuplicateEmailError extends IdentityError {
 export class DuplicateUsernameError extends IdentityError {
   readonly code = 'duplicate_username';
 
-  constructor(message = 'Ya existe un usuario con ese nombre de usuario en la empresa.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('duplicate_username', diagnostic);
   }
 }
 
@@ -93,8 +120,8 @@ export class DuplicateUsernameError extends IdentityError {
 export class DuplicateDocumentError extends IdentityError {
   readonly code = 'duplicate_document';
 
-  constructor(message = 'Ya existe un usuario con ese documento en la empresa.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('duplicate_document', diagnostic);
   }
 }
 
@@ -107,8 +134,8 @@ export class DuplicateDocumentError extends IdentityError {
 export class RoleNotFoundError extends IdentityError {
   readonly code = 'role_not_found';
 
-  constructor(message = 'El rol indicado no existe.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('role_not_found', diagnostic);
   }
 }
 
@@ -116,18 +143,21 @@ export class RoleNotFoundError extends IdentityError {
  * R21: el objetivo de **mover el estado de cuenta**, de **cambiar el rol** o de **borrar** es
  * el propio actor. Primera de las dos guardas del administrador (decision cerrada 9a).
  *
- * **`self_operation` SI es distinto de `not_found`, y a proposito** (`design.md > 6.4`): la
+ * **`self_operation` SI es distinto de `user_not_found`, y a proposito** (`design.md > 6.4`): la
  * pantalla de QC-67 tiene que poder decir «no puedes cambiar tu propio rol» sin mentir. Aqui
  * no hay oraculo que proteger —el actor no descubre nada que no sepa ya sobre su propia
- * fila—, mientras que responder `not_found` obligaria a la pantalla a inventar una
- * explicacion falsa. Que la CONSULTA de la propia ficha siga respondiendo `not_found` (R35)
+ * fila—, mientras que responder no-encontrado obligaria a la pantalla a inventar una
+ * explicacion falsa. Que la CONSULTA de la propia ficha siga respondiendo `user_not_found` (R35)
  * no contradice esto: ahi el actor simplemente esta fuera de su propio ambito de consulta.
+ *
+ * Su texto del catalogo cubre los TRES casos de la decision 9(a) —estado, rol y borrado— y por eso
+ * no nombra ninguno de ellos en particular.
  */
 export class SelfOperationError extends IdentityError {
   readonly code = 'self_operation';
 
-  constructor(message = 'No se puede realizar esta operacion sobre la propia cuenta.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('self_operation', diagnostic);
   }
 }
 
@@ -143,8 +173,8 @@ export class SelfOperationError extends IdentityError {
 export class LastAdministratorError extends IdentityError {
   readonly code = 'last_administrator';
 
-  constructor(message = 'La empresa quedaria sin ningun administrador activo.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('last_administrator', diagnostic);
   }
 }
 
@@ -159,7 +189,7 @@ export class LastAdministratorError extends IdentityError {
 export class ValidationError extends IdentityError {
   readonly code = 'invalid_input';
 
-  constructor(message = 'La entrada recibida no es valida.') {
-    super(message);
+  constructor(diagnostic?: string) {
+    super('invalid_input', diagnostic);
   }
 }
