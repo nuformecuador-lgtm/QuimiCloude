@@ -206,9 +206,15 @@ function quitarComentariosSql(fuente: string): string {
 // el caso de R45 los comprueba uno por uno.
 // ---------------------------------------------------------------------------------------------
 
-/** Los TRECE archivos nuevos de `domain/` (R42: los seis casos de uso viven aqui). */
+/** Los CATORCE archivos nuevos de `domain/` (R42: los seis casos de uso viven aqui). */
 const DOMAIN_NUEVO = [
   'lib/modules/identity/domain/actor.ts',
+  // menor-10 del review: este archivo nacio al mover `toBirthDate` fuera de `create-user.ts`
+  // (menor-7) y se quedo FUERA de esta lista, con el ancla congelada en 20 mientras el disco
+  // tenia 21. El defecto no era el numero: era que NADIE lo vigilaba y el ancla pasaba en verde
+  // ignorandolo -el mismo patron que costo MAYOR-1-. Entra aqui para que las comprobaciones de
+  // R45, R16 y R24 lo recorran como a los demas.
+  'lib/modules/identity/domain/birth-date.ts',
   'lib/modules/identity/domain/create-user.ts',
   'lib/modules/identity/domain/delete-user.ts',
   'lib/modules/identity/domain/errors.ts',
@@ -238,7 +244,7 @@ const ADAPTERS_NUEVOS = [
   'lib/modules/identity/adapters/driving/user-actions.ts',
 ] as const;
 
-/** Los VEINTE archivos de produccion que esta feature CREA. */
+/** Los VEINTIUN archivos de produccion que esta feature CREA. */
 const ARCHIVOS_NUEVOS_DE_LA_FEATURE = [
   ...DOMAIN_NUEVO,
   ...PORTS_NUEVOS,
@@ -604,7 +610,7 @@ describe('alcance de QC-66 (crud-de-usuarios) — CONTENIDO: muerde siempre, tam
     // ANCLA DE LA LISTA: los veinte archivos nombrados EXISTEN y tienen contenido. Un nombre mal
     // escrito, o un archivo vacio, dejaria el bucle pasando por la razon equivocada.
     expect(ARCHIVOS_NUEVOS_DE_LA_FEATURE.length, 'la lista de archivos de la feature esta vacia').toBe(
-      20,
+      21,
     );
     for (const archivo of ARCHIVOS_NUEVOS_DE_LA_FEATURE) {
       expect(existsSync(join(RAIZ, archivo)), `${archivo} no existe en el disco`).toBe(true);

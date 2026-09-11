@@ -1747,3 +1747,69 @@ pnpm exec vitest run tests/unit/identity/ tests/unit/composition/ tests/unit/err
 
 Tres archivos y 104 tests mas que antes del merge, todos verdes: son los que trajo QC-78. La suite
 completa **no** se corrio: el gate completo y el PR son del leader.
+
+### menor-10 — `birth-date.ts` pasa a estar VIGILADO (no solo contado)
+
+El archivo que nacio al arreglar **menor-7** —mover `toBirthDate` fuera de `create-user.ts`— se quedo
+**fuera de `DOMAIN_NUEVO`**, con el ancla congelada en `toBe(20)` mientras el disco tenia **21**.
+
+**El defecto no era el numero: era que NADIE lo vigilaba**, y el ancla pasaba **en verde**
+ignorandolo. Es el mismo patron que costo **MAYOR-1** y el del hallazgo de la sonda 2: una guardia
+que parece verde **porque mira el sitio equivocado**. Arreglarlo ahora costo una linea; dentro de tres
+fichas habria costado una ronda.
+
+Entra en `DOMAIN_NUEVO` (que pasa de trece a **catorce**), el ancla sube a **21**, y el comentario
+deja escrito **por que** estaba fuera, para que no se lea como un despiste de conteo.
+
+**La comprobacion no fue que el numero cuadre, fue que el archivo esta vigilado.** Cinco sondas sobre
+**ese** archivo:
+
+```
+0. con el archivo dentro y el ancla en 21          Tests  16 passed (16)
+
+A. BORRADO del disco
+   x R45 ... AssertionError: lib/modules/identity/domain/birth-date.ts no existe en el disco:
+           expected false to be true
+   x R24 (mismo motivo)                            2 failed | 14 passed
+B. restaurado                                      Tests  16 passed (16)
+
+C. `console.log("sonda")` dentro del archivo       Tests  16 passed (16)   <-- NO muerde, y es CORRECTO
+D. `export const sonda = 'Administrador'`
+   x R24 ... Lo escriben a mano:
+           lib/modules/identity/domain/birth-date.ts                      1 failed | 15 passed
+E. `export const sonda = { lockLevel: 0 }`
+   x R45 ... QC-66 toca el mecanismo de bloqueo de QC-19/QC-78, y R45 se lo prohibe:
+           lib/modules/identity/domain/birth-date.ts: lockLevel           1 failed | 15 passed
+
+F. verde final                                     Tests  16 passed (16)
+arbol: limpio
+```
+
+**La sonda C merece explicacion, porque un «no muerde» hay que justificarlo o es un agujero.** R16 no
+recorre `DOMAIN_NUEVO`: recorre una lista **deliberadamente mas estrecha** —el adaptador de credencial,
+los **seis** casos de uso y las Server Actions—, porque lo que R16 protege es **el camino de la
+credencial generada**, no «que nadie escriba en consola en ningun sitio». `birth-date.ts` **no esta en
+ese camino**, asi que que R16 no lo cubra es **por diseno y no un descuido**. No se amplio esa lista:
+hacerlo cambiaria lo que ese caso afirma, y el encargo era una linea, no aprovechar el viaje.
+
+Resultado: el archivo esta vigilado por **tres** comprobaciones —que **existe**, R45 y R24— y las dos
+ultimas **muerden sobre el**, demostrado. Guardias: **27 archivos, 277 tests, cero rojos**.
+
+### MAYOR-2 (del segundo review) — NO se toca aqui, y el motivo es de alcance
+
+El `reviewer` encontro que al mover una cuenta de `blocked` a `active` a mano **no se limpia
+`locked_until`**, asi que por **QC-78 R11** el estado efectivo sigue siendo `blocked`: **el desbloqueo
+no surte efecto**, y encima el listado muestra `active` — el dato equivocado **en la direccion
+peligrosa**. QC-78 publico el mecanismo (`clearedLockState()`) diciendo que la operacion manual es de
+QC-66, y **ningun codigo de produccion lo llama**: **dos specs aprobados se reparten el trabajo de
+forma que nadie lo hace.**
+
+**Esta ficha no puede repararlo sin violar su propia R45** —que le prohibe escribir `locked_until` y
+esta en un spec **aprobado**—, asi que no se toca por iniciativa propia (regla 6). **El leader lo lleva
+al humano como deuda.** Si se decide hacerlo aqui, hara falta pedirlo explicitamente, y lo que cambia
+es R45, no el codigo.
+
+Es, de paso, la confirmacion de la frontera que esta bitacora ya declaraba en F2.3 (segunda ronda):
+ahi se dijo que el listado devuelve el **crudo** y no el **efectivo**, y que un `blocked` con plazo
+vencido se mostraria mal. MAYOR-2 es **la misma grieta por el otro lado** —el `active` manual que no
+desbloquea—, y ahora esta nombrada por el reviewer con su requisito.
