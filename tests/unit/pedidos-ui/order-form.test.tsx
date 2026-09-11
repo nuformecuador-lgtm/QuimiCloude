@@ -6,8 +6,9 @@
 //
 // **Lo que se afirma del envio es el `FormData`**, no el estado de React: el formulario es no
 // controlado (R33) y lo unico que importa es que cada campo llegue a la operacion con el nombre y
-// el valor que el adaptador driving lee. R39 se comprueba exactamente asi: `0.1005` tiene que
-// llegar **como esa misma cadena**, y ninguna conversion a coma flotante la devolveria intacta.
+// el valor que el adaptador driving lee. R39 se comprueba exactamente asi, con la enmienda del
+// 2026-09-09: al soltar el foco la cantidad se coloca a DOS decimales, y es ESE valor el que
+// llega en el `FormData`; nada de aritmetica de coma flotante en el camino.
 //
 // **Los tests en negativo (R26, R29, R30) son el nucleo de esta ficha**: que el alta no ofrezca
 // estado, que la edicion no ofrezca `CANCELADO` y que no haya campo de fecha de solicitud es justo
@@ -235,9 +236,33 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
     expect(updateOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('la cantidad escrita como «0.1005» llega a la operacion COMO ESA MISMA CADENA', async () => {
-    // R39 — ni `Number`, ni `parseFloat`, ni `toFixed`, ni `type="number"`: el decimal es texto de
-    // punta a punta y una conversion a coma flotante binaria no lo devolveria intacto.
+  it('al salir del campo, la cantidad se coloca a DOS decimales y sin ceros finales', async () => {
+    // Decision humana del 2026-09-09 (enmienda a R39): al soltar el foco el valor se coloca a dos
+    // decimales y se afeitan los ceros finales. «25.00» y «25.0» se muestran como «25»; «25.3» y
+    // «25.08» conservan sus decimales. El valor colocado es el que queda en el campo y el que
+    // viaja al enviar: al pinchar Guardar, el campo pierde el foco ANTES del submit.
+    const user = setupUser();
+    renderFormulario();
+
+    const control = cantidad();
+    for (const [escrito, colocado] of [
+      ['25.00', '25'],
+      ['25.0', '25'],
+      ['25.3', '25.3'],
+      ['25.08', '25.08'],
+      ['0.1005', '0.1'],
+    ] as const) {
+      await user.clear(control);
+      await user.type(control, escrito);
+      await user.tab();
+
+      expect(control.value, `«${escrito}» deberia quedar como «${colocado}»`).toBe(colocado);
+    }
+  });
+
+  it('el enviar colocado a dos decimales: «0.1005» viaja como «0.1» en el FormData', async () => {
+    // El click en Guardar hace perder el foco al campo de cantidad: el valor se coloca antes del
+    // submit y es ESE el que llega a la operacion.
     const user = setupUser();
     renderFormulario();
 
@@ -247,7 +272,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
 
     const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.get('quantity')).toBe(CANTIDAD);
+    expect(enviado.get('quantity')).toBe('0.1');
   });
 
   it('captura la cantidad con el control NUMERICO del navegador, con paso libre', () => {
@@ -441,8 +466,10 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     expect(region).toHaveAttribute('role', 'alert');
     expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('duplicate_number');
     // Lo escrito sigue ahi (R34): React 19 resetea los campos no controlados al completarse la
-    // action, asi que el estado de fallo los devuelve por `defaultValue`.
-    expect(cantidad().value).toBe('7.7777');
+    // action, asi que el estado de fallo los devuelve por `defaultValue`. Al pinchar Guardar el
+    // campo perdió el foco antes del submit, asi que el valor devuelto es el COLOCADO a dos
+    // decimales (enmienda del 2026-09-09 a R39).
+    expect(cantidad().value).toBe('7.78');
     expect(onSaved).not.toHaveBeenCalled();
   });
 

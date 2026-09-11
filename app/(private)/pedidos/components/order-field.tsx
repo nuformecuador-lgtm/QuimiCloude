@@ -8,6 +8,12 @@ import { Label } from '@/components/ui/label';
 /**
  * Un campo de texto del formulario de pedido: etiqueta, control y error en linea (R34, R45).
  *
+ * **Al soltar el foco, el valor se redondea a `roundDecimals`** si esa prop esta presente -la
+ * CANTIDAD la usa con 2, decision humana de 2026-09-09-. El redondeo coloca el valor donde la
+ * pantalla lo muestra; lo que se ENVIA sigue siendo el `FormData`, con el valor ya colocado.
+ * Quitar los ceros finales (y el punto cuando no queda nada) hace que «25.0» y «25.00» se
+ * muestren como «25», y que «25.3» y «25.08» conserven sus decimales.
+ *
  * **El `type` es de texto POR DEFECTO** (R39, `design.md > 10`): los importes de este modulo son
  * CADENA decimal de punta a punta, y el teclado adecuado en movil se ofrece con `inputMode`, que
  * es presentacion y no validacion.
@@ -39,6 +45,40 @@ const TOUCH_TARGET = 'min-h-11';
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R45 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
 
+/**
+ * Redondea UN DECIMAL TEXTO a `decimals` lugares y afeita los ceros finales: «25.0», «25.00» y
+ * «25.08» a 2 decimales quedan «25», «25» y «25.08». La entrada invalida y la vacia vuelven tal
+ * cual -el campo no es la frontera de validacion, el esquema del contrato lo es-, y un valor sin
+ * decimales (o con menos de los pedidos) no se toca.
+ */
+export function roundDecimalText(raw: string, decimals: number): string {
+  const text = raw.trim();
+  if (text === '' || text === '.') return text;
+
+  const dot = text.indexOf('.');
+  if (dot === -1) return text;
+
+  const intPart = text.slice(0, dot);
+  const fracPart = text.slice(dot + 1);
+  if (fracPart.length <= decimals) return text;
+
+  const whole = BigInt(intPart === '' ? '0' : intPart);
+  const keep = fracPart.slice(0, decimals).padEnd(decimals, '0');
+  const firstCut = fracPart[decimals] ?? '0';
+  const needsCarry = firstCut >= '5';
+
+  let scaled = whole * BigInt(10 ** decimals) + BigInt(keep);
+  if (needsCarry) scaled += BigInt(1);
+
+  let digits = scaled.toString().padStart(decimals + 1, '0');
+  const int = digits.slice(0, -decimals);
+  digits = digits.slice(-decimals);
+
+  let result = int === '' ? '' : int;
+  result += digits === '' ? '' : `.${digits.replace(/0+$/, '')}`;
+  return result === '' ? '0' : result;
+}
+
 export type OrderFieldProps = {
   /** Nombre del campo en el `FormData`. De el salen tambien los `data-testid`. */
   readonly name: string;
@@ -63,6 +103,13 @@ export type OrderFieldProps = {
    * espia para quien necesite reflejar el valor en otro sitio, como el titulo del panel.
    */
   readonly onValueChange?: (value: string) => void;
+  /**
+   * Decimales a los que se redondea al soltar el foco. El valor se coloca en el campo y se avisa
+   * con `onValueChange`. Afeita los ceros finales y, cuando no queda ninguno, el punto decimal:
+   * «25.00» y «25.0» se muestran como «25», «25.3» y «25.08» conservan sus decimales. Ausente,
+   * el campo no redondea nada.
+   */
+  readonly roundDecimals?: number;
 };
 
 export function OrderField({
@@ -75,6 +122,7 @@ export function OrderField({
   type = 'text',
   step,
   onValueChange,
+  roundDecimals,
 }: OrderFieldProps) {
   const fieldId = useId();
   const inputId = `${fieldId}-${name}`;
@@ -98,6 +146,16 @@ export function OrderField({
           onValueChange === undefined
             ? undefined
             : (event) => onValueChange(event.currentTarget.value)
+        }
+        onBlur={
+          roundDecimals === undefined
+            ? undefined
+            : (event) => {
+                const rounded = roundDecimalText(event.currentTarget.value ?? '', roundDecimals);
+                if (rounded === event.currentTarget.value) return;
+                event.currentTarget.value = rounded;
+                onValueChange?.(rounded);
+              }
         }
         className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
         aria-invalid={error === undefined ? undefined : true}
