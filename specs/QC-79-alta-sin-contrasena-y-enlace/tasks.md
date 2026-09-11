@@ -226,7 +226,7 @@
       `pnpm run db:migrate`») si la tabla no existe.
       *(Depende de T6, T12, T13, T14.)*
 
-- [ ] **T21 — El E2E del camino completo.** — **R12, R41**
+- [x] **T21 — El E2E del camino completo.** — **R12, R41**
       `e2e/establecer-contrasena.spec.ts` con `MAIL_TRANSPORT=outbox`: alta **sin** contraseña →
       leer el enlace del buzón → establecer la contraseña → **entrar** con ella al dashboard →
       reabrir el mismo enlace y comprobar que **ya no sirve**.
@@ -234,7 +234,7 @@
       dos corridas seguidas.
       *(Depende de T19, T20.)*
 
-- [ ] **T22 — Test de alcance y frontera.** — **R5, R13, R31, R32, R39, R40**
+- [x] **T22 — Test de alcance y frontera.** — **R5, R13, R31, R32, R39, R40**
       `scope.test.ts`: ningún `console.*` en los archivos que tocan el secreto; ningún archivo de la
       feature bajo `app/(private)/`; ningún route handler, cron ni cola; ninguna mención a
       `failed_login_attempts`/`lock_level`/`locked_until`; ninguna operación que emita enlace sin
