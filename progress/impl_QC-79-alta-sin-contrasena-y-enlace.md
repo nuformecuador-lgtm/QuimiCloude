@@ -200,3 +200,122 @@ Los 8 del diseno se confirmaron. Los **cuatro novenos**, todos rotos por el camb
 | 10 | `tests/integration/identity/user-crud.int.test.ts` | el hash falso pasa a la union discriminada |
 | 11 | `tests/unit/proveedores/module-contract.test.ts` + `tests/unit/identity/credential-policy-contract.test.ts` + `tests/unit/identity/schema/account-status-schema.test.ts` | censos **exactos** de los campos y relaciones de `User`, retensados por la relacion inversa que Prisma exige |
 | 12 | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | el centinela de `lib/shared/routes.ts`, que esta escrito **para** que toda ruta nueva pase por el |
+
+---
+
+# Cierre — base propia, T6 ejecutada y los censos ajenos resueltos (2026-09-11)
+
+El humano decidio **base propia para el worktree** (`QuimiCloude_QC79`, como QC-90). Eso desbloquea
+lo que la seccion «T6 — BLOQUEADA» dejaba en el aire: **esa seccion queda superada por esta**.
+
+## T6 — CERRADA
+
+24 migraciones aplicadas, incluida `20260911155021_credential_setup_tokens`, y el seed corrido
+(2 roles, 11 permisos, 14 asignaciones, empresa y usuario inicial).
+
+**Los `[BLOQUEADO]` del mapa `R<n> -> test` ya no lo estan**: la integracion **se ejecuta de verdad**.
+
+```
+pnpm exec vitest run tests/integration/identity/
+Test Files  8 passed (8)
+     Tests  180 passed (180)
+```
+
+Con eso, **R4, R9, R11, R12, R19, R20, R21, R22, R37** pasan de «escrito» a **verificado contra
+Postgres real**, que era el agujero que dejaba el bloqueo.
+
+## El unico rojo propio, y por que era superficial
+
+`credential-setup.int.test.ts`, caso «R11 — un segundo enlace VIVO ... lo rechaza el indice parcial
+con `23505`». **El comportamiento era correcto** —Postgres rechaza el segundo enlace vivo y queda
+exactamente uno—; lo que fallaba era la asercion, que exigia el **nombre del indice** dentro de
+`meta`. **No era regresion.**
+
+Medido sobre esta base, el mismo choque por los dos caminos:
+
+| Camino | `code` | `meta` |
+| --- | --- | --- |
+| `$executeRaw` | `P2010` | `{ code: '23505', message: 'Ya existe la llave (user_id)=(...)' }` — **localizado al espanol** |
+| Cliente tipado (el de produccion) | `P2002` | `{ modelName: 'CredentialSetupToken', target: ['user_id'] }` |
+
+**Prisma no expone el nombre del indice por ningun campo estable.** Asi que la asercion se ancla
+donde si es invariante: el **SQLSTATE `23505`**, y que la **columna senalada es `user_id`**.
+
+Lo que impide que el caso degenere en «algo fallo»: un **caso discriminante nuevo** provoca el choque
+contra el **otro** indice unico de la tabla —el mismo `token_digest` para otro usuario sin enlace
+vivo— y comprueba que ahi `meta.target` sale **`['token_digest']`** y **no** `['user_id']`. O sea que
+la asercion **distingue de verdad** el indice parcial de R11 de cualquier otro duplicado. Verificado
+corriendolo, no supuesto. `ONE_LIVE_INDEX` **no quedo huerfana**: el `beforeAll` la sigue usando
+contra `pg_indexes`, donde el nombre si es un identificador legitimo de la base.
+
+## Los censos ajenos: dos se actualizan, seis van al baseline
+
+Criterio del humano: **el censo cuyo propio mensaje invita a actualizarlo se actualiza; el resto va
+al baseline.**
+
+**Actualizados** (comportamiento previsto, no relajacion; ninguna igualdad debilitada):
+
+- `tests/guards/guard-identificador-de-request.test.ts` — **solo** `MIGRACIONES_ESPERADAS` y
+  `E2E_ESPERADOS`, cada una con su linea diciendo que QC-79 la actualiza y por que. Su propio mensaje
+  dice «si esta migracion es de otra ficha, **esa ficha actualiza esta lista**».
+  `DEPENDENCIAS_ESPERADAS` (31) y `FRAGMENTOS_PROHIBIDOS` **sin tocar**.
+- `tests/unit/identity/account-status-scope.test.ts` (QC-65 R19) — **NO fue al baseline, y es una
+  decision**: no es un censo del diff de rama, es un censo del **arbol** con lista cerrada, y su
+  propio comentario dice «IGUALDAD, no `toContain`: **cualquier archivo nuevo que lo nombre pone esto
+  en rojo**». Esta escrito **para** que un archivo nuevo pase por revision. Meterlo al baseline
+  habria **apagado una guardia viva de QC-65 por archivos NUESTROS**, que es justo lo que el baseline
+  no debe hacer. Se anadieron a `SITIOS_PERMITIDOS`, con su comentario, los dos archivos que lo
+  nombran **legitimamente**: el puerto del enlace (`user_not_pending` es uno de sus resultados
+  discriminados, R15/R22) y su adaptador Prisma (exige `pending` para emitir y escribe `active` al
+  consumir, R19). **Comprobado leyendolos: ninguno lee ni escribe el estado donde no deba**, y el
+  dominio de QC-79 no aparece en el censo.
+
+**Al baseline** (`tests/baseline-rojos.json`, 5 -> **9** entradas), cuatro nuevas y dos **ampliadas**:
+
+| Archivo | Cae por |
+| --- | --- |
+| `tests/unit/configuracion-ui/configuracion-convenciones.test.ts` | `resend` |
+| `tests/unit/configuracion-ui/unidades-convenciones.test.ts` | `resend` |
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | `resend` |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` | la migracion del enlace |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | **ampliada**: su motivo estaba desfasado, hoy cae por la migracion de QC-79 y no por la de QC-35 |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | **ampliada**: su motivo **ya no era cierto** — el caso del `.spec.ts` hoy sale `skipped` y lo que falla es R35 por `resend` |
+
+Todas son la **misma especie**: la guardia quiso afirmar «**MI** ficha no anade dependencia /
+migracion / ruta / `.spec.ts`» pero lo implemento como **censo del diff de rama**, no acotado a su
+propia ficha, asi que se pone roja con **cualquier** feature posterior que anada algo **legitimo y
+aprobado** — aqui `resend`, con aprobacion humana en F1.4, y la migracion de la tabla del enlace.
+Cada motivo lleva su **coste aceptado** —listarla apaga el archivo **entero** para el comparador,
+con los casos concretos que se pierden enumerados— y su **salida limpia**: acotar el caso a su propia
+ficha o compararlo contra el merge-base de **su** rama, en vez de censar el arbol.
+
+**Ningun rojo resulto ser regresion de QC-79.**
+
+## Estado del gate
+
+```
+./init.sh --rapido
+✓ typecheck paso
+✓ lint paso
+Test Files  5 failed | 227 passed (232)
+     Tests  7 failed | 3379 passed | 15 skipped (3401)
+```
+
+Los **5 archivos rojos son EXACTAMENTE archivos del baseline** —`configuracion-convenciones`,
+`configuracion-ui/unidades-convenciones`, `qc75-convenciones`, `recipe-route-contract`,
+`unidades/unidades-convenciones`—. **Cero rojos nuevos.**
+
+**`--rapido` no puede salir en verde aqui, y no es un fallo de esta feature: es como esta construido
+el gate.** `init.sh` solo compara contra `tests/baseline-rojos.json` en el modo **completo** (la rama
+`else`, con `test:json` + `scripts/comparar-baseline-rojos.mjs`); en modo rapido corre
+`pnpm run test:rapido` a secas y **no consulta el baseline**. Mientras el baseline tenga una sola
+entrada que el grafo de imports seleccione, `--rapido` terminara en rojo por deuda **ajena**. La
+comprobacion que de verdad responde si rompi algo yo es el **comparador del gate completo**, y ese
+lo corre el leader (T24).
+
+## Tasks
+
+**T6 cerrada.** **T23 cerrada**: `vitest related --run` corrido sobre los archivos de produccion
+tocados en cada tanda, los doce archivos ajenos reales atendidos **sin debilitar ninguna
+expectativa**, y los rojos restantes clasificados uno a uno. Lo que **no** se afirma aqui es la
+corrida de la suite entera con el comparador: eso es **T24 y es del leader**.

@@ -91,6 +91,11 @@ export const E2E_ESPERADOS = [
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
+  // QC-79 («alta sin contrasena y enlace») actualiza esta lista, que es el comportamiento que el
+  // propio mensaje de `hallazgosDeE2e` pide: su E2E cubre el flujo del enlace de establecer
+  // contrasena, no el cruce de QC-71, y sin esta linea el gate de QC-79 se pondria rojo por un
+  // archivo legitimo de otra ficha.
+  'establecer-contrasena.spec.ts',
 ] as const
 
 /** El test de unidad que R21 exige a cambio del E2E diferido. */
@@ -150,6 +155,11 @@ export const MIGRACIONES_ESPERADAS = [
   '20260909120000_product_batches',
   // Llega con la sincronizacion con dev: es de QC-66 (catalogo de permisos), no de esta ficha.
   '20260910120000_user_permissions_catalog',
+  // QC-79 («alta sin contrasena y enlace») actualiza esta lista, que es exactamente lo que pide
+  // el mensaje de `hallazgosDeMigraciones` («si esta migracion es de otra ficha, esa ficha
+  // actualiza esta lista»): la tabla del enlace de establecer contrasena es suya, no de QC-71,
+  // que sigue sin persistir el identificador de peticion (R19 intacto).
+  '20260911155021_credential_setup_tokens',
 ] as const
 
 export function hallazgosDeMigraciones(

@@ -242,7 +242,7 @@
       **Hecho cuando:** el archivo pasa y `guard-arquitectura-modulos.test.ts` sigue verde.
       *(Depende de T19.)*
 
-- [~] **T23 — Cerrar el ripple ajeno de `design.md > 2`.**
+- [x] **T23 — Cerrar el ripple ajeno de `design.md > 2`.**
       Correr `pnpm exec vitest related --run` sobre todos los archivos de producción tocados y
       atender lo que salga rojo **sin debilitar ninguna expectativa**. Si aparece un archivo que
       `design.md > 2` no lista, se anota en la bitácora como el «noveno archivo» (precedente QC-66).

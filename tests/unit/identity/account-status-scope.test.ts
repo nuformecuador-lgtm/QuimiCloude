@@ -230,6 +230,34 @@ const SITIOS_PERMITIDOS = [
   // llama `setUserAccountStatus`. El nombre lo fija `design.md > 11` y lo exige R25, asi que
   // `lib/composition/index.ts` nombra el estado por su NOMBRE DE CLAVE, no porque lea la columna.
   'lib/composition/index.ts',
+
+  // RETENSADO 2026-09-11 (QC-79, alta-sin-contrasena-y-enlace). Mismo trato que los bloques de
+  // QC-78 y QC-66: la lista CRECE con lo que un spec aprobado autoriza y la comparacion sigue
+  // siendo una IGUALDAD, asi que cualquier archivo fuera de ella sigue poniendo el caso rojo.
+  // Este bloque va aparte y es ADITIVO para que no choque con los anteriores en el merge.
+  //
+  // El enlace de establecer contrasena de QC-79 nombra el estado de cuenta en los DOS extremos de
+  // su ciclo, y no puede no nombrarlo: la EMISION solo procede si el usuario sigue en `pending`
+  // —R15, y esa condicion es lo que hace que el enlace no se pueda emitir contra una cuenta ajena
+  // o ya activa— y el CONSUMO mueve la cuenta a `active` en la misma transaccion que escribe la
+  // credencial (R19, R22), con `account_status_changed_by = NULL` porque lo cambia el sistema y no
+  // una persona (QC-65 R10).
+  //
+  // Ninguno de los dos es `driving`: el caso hermano «el unico adaptador driving que nombra el
+  // estado es el que declara su ficha» sigue derivandose de esta lista y sigue en verde, porque
+  // ninguna de estas dos rutas contiene `/adapters/driving/`. Y ningun archivo de `domain/` de
+  // QC-79 entra aqui: el dominio nunca ve la columna, solo los resultados discriminados del
+  // puerto (`IssueOutcome`, `ApplyOutcome`), que es justo lo que R7 pide.
+
+  // QC-79 R15, R22 — el PUERTO del enlace: `user_not_pending` es uno de sus resultados
+  // discriminados y su contrato deja escrita la condicion `account_status = 'pending'` con la que
+  // el adaptador acota la emision. Declararlo es nombrar el estado.
+  'lib/modules/identity/ports/credential-setup-link-repository.ts',
+  // QC-79 R15, R19, R22 — el adaptador driven que lo IMPLEMENTA: lee `accountStatus` para exigir
+  // `pending` antes de emitir, y en el consumo escribe `account_status = 'active'` con su rastro,
+  // condicionado a que la cuenta siga viva y en `pending`. Es el unico sitio de la ficha que toca
+  // la columna.
+  'lib/modules/identity/adapters/driven/persistence/credential-setup-link-prisma.ts',
 ] as const;
 
 /**
