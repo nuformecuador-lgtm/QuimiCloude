@@ -288,17 +288,19 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
   });
 
   it('la exigencia del permiso precede a cualquier lectura de la URL', async () => {
-    // Hoy la pantalla aun no resuelve `searchParams` —eso llega con el parser de T4—, asi que el
-    // caso se escribe condicionado: en cuanto exista esa lectura, el orden queda vigilado sin
-    // tocar este archivo.
+    // Desde T4 la pantalla SI resuelve `searchParams`, asi que el caso es incondicional: exige que
+    // esa lectura exista y que el corte la preceda. Condicionarlo a que aparezca —como se escribio
+    // en T3, cuando aun no existia— dejaba un aserto que un simple renombrado podia apagar en
+    // silencio, sin un solo rojo. Si algun dia la pagina deja de resolver la URL, que se entere
+    // este archivo.
     const fuente = fuenteDeLaPagina();
     const lectura = fuente.indexOf('await searchParams');
 
-    if (lectura >= 0) {
-      const corte = fuente.indexOf(`requirePagePermission('${PERMISO_DE_CONSULTA}')`);
-      expect(corte).toBeGreaterThanOrEqual(0);
-      expect(corte, 'el permiso se exige DESPUES de leer la URL').toBeLessThan(lectura);
-    }
+    expect(lectura, 'la pagina tiene que resolver `searchParams`').toBeGreaterThanOrEqual(0);
+
+    const corte = fuente.indexOf(`requirePagePermission('${PERMISO_DE_CONSULTA}')`);
+    expect(corte).toBeGreaterThanOrEqual(0);
+    expect(corte, 'el permiso se exige DESPUES de leer la URL').toBeLessThan(lectura);
 
     // Y es la PRIMERA sentencia del cuerpo: nada se resuelve antes que el corte.
     const cuerpo = fuente.slice(fuente.indexOf('export default async function'));
