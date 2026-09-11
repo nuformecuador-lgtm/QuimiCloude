@@ -141,3 +141,16 @@ export {
   createSetUserAccountStatus,
   type SetUserAccountStatusDeps,
 } from './domain/set-user-account-status';
+
+// ---------------------------------------------------------------------------------------
+// QC-94 T1 — La consulta del catalogo de roles (R15). Bloque NUEVO al final: no reordena ni
+// reformatea ninguna de las lineas de arriba.
+//
+// Solo simbolos de `./domain`. En particular NO se reexporta `adapters/driving/role-actions`:
+// QC-67 lo importa por su ruta exacta, y pasarlo por aqui meteria `'use server'` en el cierre
+// transitivo del contrato.
+// ---------------------------------------------------------------------------------------
+
+// La forma de exigir CUALQUIERA de varios permisos alternativos (R1, R3). `assertAnyPermission`,
+// su cuerpo compartido, se queda dentro del modulo: quien autoriza pasa por aqui.
+export { requireAnyPermission } from './domain/actor';
