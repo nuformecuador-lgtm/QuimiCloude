@@ -85,3 +85,118 @@ Reason: [Production Deploy]
 El SQL de la migracion y de su `down.sql` **si** esta verificado, pero **estaticamente** (T4, 28
 casos con mutaciones de sensibilidad). Eso no sustituye al ciclo real: el test lee texto, el ciclo
 prueba que funciona.
+
+## Trazabilidad — `R<n> -> test`
+
+Los **41** requisitos, cada uno a un archivo de test **concreto** (`CHECKPOINTS.md > Trazabilidad`).
+Rutas relativas a la raiz del repositorio. `[BLOQUEADO]` marca los que estan **escritos pero no se
+han podido EJECUTAR** por la denegacion de T6 (ver la seccion de T6): su cobertura existe en disco,
+su evidencia ejecutable no.
+
+| R | Test que lo cubre |
+| --- | --- |
+| R1 | `tests/unit/identity/usuarios/user-input.test.ts` (el campo opcional es el unico nuevo, no se recorta, `updateUserSchema` lo rechaza) + `tests/unit/identity/credencial/create-user-credential.test.ts` (`''` ≡ ausencia, `'   '` no) |
+| R2 | `tests/unit/identity/credencial/create-user-credential.test.ts` (politica ANTES de escribir; debil => ni fila, ni enlace, ni correo, con las reglas incumplidas) |
+| R3 | `tests/unit/identity/credencial/create-user-credential.test.ts` (con contrasena: nace en `pending`, `mail === 'not_needed'`, ningun enlace ni correo) |
+| R4 | `tests/unit/identity/credencial/create-user-credential.test.ts` (`{ kind: 'none' }`, nada al azar) + `tests/integration/identity/credential-setup.int.test.ts` **[BLOQUEADO]** (el centinela no verifica con ninguna contrasena) |
+| R5 | `tests/unit/identity/credencial/scope.test.ts` (cero `console.*`) + `tests/unit/identity/usuarios/user-actions.test.ts` (la serializacion entera sin ninguna palabra de credencial) |
+| R6 | `tests/unit/identity/credencial/create-user-credential.test.ts` + `tests/unit/identity/usuarios/authorization.test.ts` (dobles que fallan si los llaman) |
+| R7 | `tests/unit/identity/credencial/create-user-credential.test.ts` (orden `create -> secrets -> issue -> mail`) |
+| R8 | `tests/unit/identity/credencial/link-lifetime.test.ts` (7 dias y los dos bordes del instante exacto) |
+| R9 | `tests/unit/identity/credencial/secret-factory.test.ts` (huella reproducible, el secreto no aparece en ella) + `tests/integration/identity/credential-setup.int.test.ts` **[BLOQUEADO]** (la columna guarda la huella; ninguna fila contiene el secreto) |
+| R10 | `tests/unit/identity/credencial/secret-factory.test.ts` (32 bytes, 43 caracteres base64url, dos llamadas distintas) |
+| R11 | `tests/unit/identity/schema/credential-setup-migration.test.ts` (el indice unico **parcial** con su `WHERE`) + `tests/unit/identity/credencial/credential-setup-link-prisma.test.ts` (`23505` => `'superseded'`) + `tests/integration/identity/credential-setup.int.test.ts` **[BLOQUEADO]** (dos emisiones concurrentes => un solo enlace vivo) |
+| R12 | `tests/unit/identity/credencial/credential-setup-link-prisma.test.ts` (compare-and-set; segundo uso rechazado) + `e2e/establecer-contrasena.spec.ts` **[BLOQUEADO]** (reabrir el enlace ya no sirve) |
+| R13 | `tests/unit/identity/credencial/mailer-resend.test.ts` (el registro no lleva URL, ni secreto, ni destinatario) + `tests/unit/identity/credencial/scope.test.ts` |
+| R14 | `tests/unit/identity/credencial/resend-link.test.ts` (permiso primera linea, falla cerrado) + `tests/unit/identity/credencial/credential-setup-actions.test.ts` |
+| R15 | `tests/unit/identity/credencial/resend-link.test.ts` (`user_not_found` vs `user_not_pending`) + `tests/unit/identity/credencial/credential-setup-link-prisma.test.ts` (ambito por `company_id`) |
+| R16 | `tests/unit/identity/credencial/resend-link.test.ts` (los 7 dias cuentan desde el reenvio) |
+| R17 | `tests/unit/identity-ui/set-credential-form.test.tsx` |
+| R18 | `tests/unit/identity/credencial/set-credential-with-link.test.ts` (sin actor, sin sesion) + `tests/unit/identity/credencial/credential-setup-actions.test.ts` (la publica no resuelve actor) |
+| R19 | `tests/unit/identity/credencial/set-credential-with-link.test.ts` + `tests/integration/identity/credential-setup.int.test.ts` **[BLOQUEADO]** (las cuatro escrituras, con el autor en `NULL`) |
+| R20 | `tests/integration/identity/credential-setup.int.test.ts` **[BLOQUEADO]** (dos usos concurrentes: gana exactamente uno) |
+| R21 | `tests/unit/identity/credencial/set-credential-with-link.test.ts` (claves exactas del argumento: la marca no se toca) + `tests/integration/identity/credential-setup.int.test.ts` **[BLOQUEADO]** |
+| R22 | `tests/unit/identity/credencial/set-credential-with-link.test.ts` (los **seis** rechazos, indistinguibles: mismo `code` y mismo mensaje) + `tests/unit/errores/catalogo.test.ts` (el texto no revela ningun caso) |
+| R23 | `tests/unit/identity/credencial/set-credential-with-link.test.ts` (rechazo por politica: no se consume el enlace) |
+| R24 | `tests/unit/identity-ui/set-credential-form.test.tsx` (no pinta ningun dato del usuario) |
+| R25 | `tests/unit/identity-ui/set-credential-form.test.tsx` (`dvh` y no `100vh`, 16 px, 44 px, el mostrar/ocultar es un boton) |
+| R26 | `tests/guards/guard-arquitectura-modulos.test.ts` + `tests/unit/composition/identity-facade.test.ts` |
+| R27 | `tests/guards/guard-envio-de-correo.test.ts` (un solo import de `resend` en todo el arbol, con su caso de sensibilidad) |
+| R28 | `tests/unit/identity/credencial/mail-config.test.ts` (lectura en la invocacion; el error nombra las que faltan sin ningun valor) |
+| R29 | `tests/unit/identity/credencial/mailer-resend.test.ts` (el correo no lleva ninguna contrasena) |
+| R30 | `tests/unit/identity/credencial/create-user-credential.test.ts` (correo fallido => usuario creado, `mail === 'failed'`) + `tests/unit/identity/usuarios/user-actions.test.ts` (las cinco variantes) |
+| R31 | `tests/unit/identity/credencial/scope.test.ts` (ningun route handler, cron ni cola; ningun reintento) |
+| R32 | `tests/unit/identity/credencial/scope.test.ts` (el barrel sin `'use server'` ni adaptador `driving`) + `tests/guards/guard-arquitectura-modulos.test.ts` |
+| R33 | `tests/unit/identity/credencial/credential-setup-actions.test.ts` (`FormData` en las dos) |
+| R34 | `tests/unit/identity/usuarios/errors.test.ts` + `tests/unit/errores/catalogo.test.ts` + `tests/guards/guard-catalogo-de-errores.test.ts` + `tests/unit/identity/credencial/credential-setup-actions.test.ts` (traductor unico; el `unexpected` con su `reference`) |
+| R35 | `tests/unit/identity/schema/credential-setup-migration.test.ts` (RLS `ENABLE` **y** `FORCE`, sin policies, con sus mutaciones de sensibilidad) |
+| R36 | `tests/unit/identity/schema/credential-setup-migration.test.ts` (el `down.sql` es el inverso exacto). **El ciclo real de T6 NO se ha podido ejecutar** — ver la seccion de T6 |
+| R37 | `tests/unit/identity/schema/credential-setup-migration.test.ts` (el UP no toca `users` ni los tres indices de QC-47) + `tests/integration/identity/credential-setup.int.test.ts` **[BLOQUEADO]** (la tabla no tiene `company_id`) |
+| R38 | `tests/guards/guard-dependencias-aprobadas.test.ts` + `tests/guards/guard-envio-de-correo.test.ts` |
+| R39 | `tests/unit/identity/credencial/scope.test.ts` (los **unicos** dos que emiten enlace son el alta y el reenvio autorizado) |
+| R40 | `tests/unit/identity/credencial/scope.test.ts` (ningun archivo bajo `app/(private)/`; ninguna mencion a `failed_login_attempts`/`lock_level`/`locked_until`) |
+| R41 | `e2e/establecer-contrasena.spec.ts` **[BLOQUEADO]** (alta sin contrasena -> enlace -> establecerla -> **entrar** -> la cuenta en `active`) |
+
+**Cobertura: R1–R41 sin huecos, 41 de 41.** Seis de ellos (**R20** entero, y las mitades de
+integracion/E2E de **R4, R9, R11, R12, R19, R21, R36, R37, R41**) dependen de la ejecucion
+bloqueada de T6.
+
+## Estado del gate al cerrar la ultima tanda
+
+`./init.sh --rapido`:
+
+```
+✓ typecheck paso
+✓ lint paso
+Test Files  8 failed | 224 passed (232)
+     Tests  10 failed | 3361 passed | 29 skipped (3400)
+✗ 'pnpm run test:rapido' fallo
+```
+
+**typecheck y lint en verde. Los 10 rojos son AJENOS, ninguno es de un archivo de esta feature**
+salvo el de integracion, que es la consecuencia directa del bloqueo de T6.
+
+| Archivo rojo | Causa | En `tests/baseline-rojos.json` |
+| --- | --- | --- |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | la migracion en `db/` | **SI** — no bloquea |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | `resend` en `package.json` | **SI** — no bloquea |
+| `tests/guards/guard-identificador-de-request.test.ts` (2 casos) | la migracion nueva y el `.spec.ts` nuevo de `e2e/` | **NO** — bloquea |
+| `tests/unit/configuracion-ui/configuracion-convenciones.test.ts` (2 casos) | `resend` en `package.json` | **NO** — bloquea |
+| `tests/unit/configuracion-ui/unidades-convenciones.test.ts` (2 casos) | `resend` en `package.json` | **NO** — bloquea |
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | `resend` en `package.json` | **NO** — bloquea |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` (2 casos) | la migracion nueva | **NO** — bloquea |
+| `tests/unit/identity/account-status-scope.test.ts` | los dos archivos nuevos del enlace nombran el estado | **NO** — bloquea |
+| `tests/integration/identity/credential-setup.int.test.ts` | **la tabla no existe: T6 bloqueada** | **NO** — bloquea |
+| `tests/integration/identity/identity-constraints.int.test.ts` | base compartida con residuos (`document_types` con 27 filas) | **NO** — bloquea |
+
+**Todos son de la MISMA especie salvo los dos ultimos**: tests de **otras fichas** que afirman «esta
+ficha no anade X» implementados como un **censo del worktree o del diff de rama**, no acotados a su
+propia ficha. Se ponen rojos con **cualquier** feature posterior que anada una migracion, una
+dependencia o un `.spec.ts`. `tests/baseline-rojos.json` ya documenta esa especie —cinco entradas,
+todas con el mismo diagnostico «estructural»— y esta feature destapa seis mas.
+
+**Ninguno se ha tocado.** Dos de ellos —`MIGRACIONES_ESPERADAS` y `E2E_ESPERADOS` de
+`guard-identificador-de-request.test.ts`— traen en su **propio mensaje de fallo** la instruccion «si
+esta migracion es de otra ficha, **esa ficha actualiza esta lista**», o sea que actualizarlos seria
+su comportamiento previsto y no una relajacion. **Pero el leader dijo expresamente que ese archivo no
+se vuelve a tocar**, asi que la decision es suya y no se ha improvisado.
+
+## T23 y T24 — no cerradas
+
+- **T23** pedia `pnpm test` completo en verde. No se alcanza sin resolver los ocho rojos ajenos de
+  arriba y sin desbloquear T6. Lo que **si** se hizo: `vitest related --run` sobre los archivos de
+  produccion tocados, en cada tanda, y de ahi salieron los **novenos archivos** (abajo).
+- **T24** pedia `./init.sh` completo. Lo corre el leader antes del PR (regla 5 de `CLAUDE.md`), y hoy
+  fallaria por lo de arriba.
+
+### Archivos ajenos REALES: **12**, no los 8 que midio `design.md > 2`
+
+Los 8 del diseno se confirmaron. Los **cuatro novenos**, todos rotos por el cambio de firma de
+`create` o por la ruta nueva, y todos cerrados **sin debilitar ninguna expectativa**:
+
+| # | Archivo | Que fue |
+| --- | --- | --- |
+| 9 | `tests/unit/identity/usuarios/authorization.test.ts` | el doble explosivo pasa de 1 a 7 metodos |
+| 10 | `tests/integration/identity/user-crud.int.test.ts` | el hash falso pasa a la union discriminada |
+| 11 | `tests/unit/proveedores/module-contract.test.ts` + `tests/unit/identity/credential-policy-contract.test.ts` + `tests/unit/identity/schema/account-status-schema.test.ts` | censos **exactos** de los campos y relaciones de `User`, retensados por la relacion inversa que Prisma exige |
+| 12 | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | el centinela de `lib/shared/routes.ts`, que esta escrito **para** que toda ruta nueva pase por el |

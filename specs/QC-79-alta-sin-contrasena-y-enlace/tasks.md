@@ -72,7 +72,7 @@
       que el mensaje de error nombra las que faltan y no contiene ningún valor.
       *(Depende de T1.)*
 
-- [ ] **T6 — Ciclo real de migración.** — **R36**
+- [~] **T6 — Ciclo real de migración.** — **R36**
       `pnpm run db:migrate` → `pnpm run db:rollback` → `pnpm run db:migrate`.
       **Hecho cuando:** la salida de los tres comandos está pegada en la bitácora y
       `_prisma_migrations` queda coherente.
@@ -242,7 +242,7 @@
       **Hecho cuando:** el archivo pasa y `guard-arquitectura-modulos.test.ts` sigue verde.
       *(Depende de T19.)*
 
-- [ ] **T23 — Cerrar el ripple ajeno de `design.md > 2`.**
+- [~] **T23 — Cerrar el ripple ajeno de `design.md > 2`.**
       Correr `pnpm exec vitest related --run` sobre todos los archivos de producción tocados y
       atender lo que salga rojo **sin debilitar ninguna expectativa**. Si aparece un archivo que
       `design.md > 2` no lista, se anota en la bitácora como el «noveno archivo» (precedente QC-66).
@@ -250,7 +250,7 @@
       fueron **de verdad**.
       *(Depende de T22.)*
 
-- [ ] **T24 — Gate completo y bitácora.**
+- [~] **T24 — Gate completo y bitácora.**
       `./init.sh` entero. Escribir `progress/impl_QC-79-alta-sin-contrasena-y-enlace.md` con el mapa
       **`R<n> → test`** (`CHECKPOINTS.md > Trazabilidad`), la salida del ciclo de T6, el número real
       de archivos ajenos y cualquier punto donde el código se apartó del diseño.
