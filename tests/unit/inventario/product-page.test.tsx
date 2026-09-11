@@ -1117,6 +1117,179 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     }
   });
 
+  it('el alta rechaza un costo de 0 en SU campo y no llama a la operacion', async () => {
+    // QC-90 R27 y R5 — `product_batches.unit_cost` lleva `CHECK (unit_cost > 0)` desde el
+    // 2026-09-09 y este panel aceptaba el `0`: era deuda declarada en `requirements.md`. Ahora el
+    // panel rechaza con el MISMO criterio que el servidor, porque valida con el MISMO esquema
+    // (`createProductWithFirstBatchSchema`), y el cero se descarta sobre la CADENA -sin pasar por
+    // coma flotante-, asi que sus tres escrituras valen igual.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+
+    for (const cero of ['0', '0.0', '0.0000']) {
+      const campo = screen.getByTestId('product-field-unitCost');
+      await user.clear(campo);
+      await user.type(campo, cero);
+      await user.click(screen.getByTestId(testId.enviar));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('product-error-unitCost'), cero).toBeInTheDocument(),
+      );
+      // El rechazo es del importe, no del par de costos ni de la existencia: nadie mas se marca.
+      expect(screen.queryByTestId('product-error-totalCost'), cero).toBeNull();
+      expect(screen.queryByTestId('product-error-stock'), cero).toBeNull();
+      expect(screen.getByTestId('product-field-unitCost'), cero).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+    }
+
+    expect(createProductActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+  });
+
+  it('el alta rechaza en su campo un importe con mas de 4 decimales o escrito con coma', async () => {
+    // QC-90 R4 — la forma admitida es la EXACTA de `decimal(14,4)`: hasta 4 decimales y con
+    // punto. La coma es el error mas comun de un teclado en castellano, y no se "arregla" en
+    // silencio: se rechaza, en el campo que la trae.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { unitCost: '12.34567' });
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(screen.getByTestId('product-error-unitCost')).toBeInTheDocument());
+    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
+
+    // Ahora el otro importe, y con coma: el rechazo se muda al campo que la trae.
+    await user.clear(screen.getByTestId('product-field-unitCost'));
+    await user.type(screen.getByTestId('product-field-totalCost'), '150,00');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(screen.getByTestId('product-error-totalCost')).toBeInTheDocument());
+    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
+
+    expect(createProductActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+  });
+
+  it('con solo costo total y existencia 0 el rechazo se pinta en el campo de la EXISTENCIA', async () => {
+    // QC-90 R8 — el caso que justifica que el esquema sea COMPARTIDO. No hay costo unitario
+    // posible (`total / 0`) y la columna es NOT NULL, asi que lo que hay que corregir es la
+    // EXISTENCIA, no el costo: el `superRefine` cuelga el issue de `['stock']` y el formulario,
+    // que ya reparte por `issue.path[0]`, lo pinta ahi sin una sola linea de reparto nueva.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { stock: '0', unitCost: '', totalCost: '150.00' });
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(screen.getByTestId('product-error-stock')).toBeInTheDocument());
+    expect(screen.getByTestId('product-field-stock')).toHaveAttribute('aria-invalid', 'true');
+    // Y NO en los costos: el total escrito esta bien, y marcarlo mandaria a corregir lo que no es.
+    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
+    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
+    expect(createProductActionMock).not.toHaveBeenCalled();
+
+    // Corregir la existencia -lo que el mensaje pide- basta para que el mismo alta salga adelante.
+    await user.clear(screen.getByTestId('product-field-stock'));
+    await user.type(screen.getByTestId('product-field-stock'), '3');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('el alta hace viajar los CINCO campos del primer lote en el FormData', async () => {
+    // QC-90 R25 — hasta hoy los cinco se pintaban y se validaban, pero la operacion no los veia.
+    // Van en el `FormData` porque estan en el DOM del `<form>`; lo que se vigila aqui es que
+    // ninguno se quede fuera y que los importes lleguen COMO CADENA, sin normalizar ni convertir.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { lot: 'LT-4471' });
+    await user.type(screen.getByTestId('product-field-expiryDate'), '2027-03-15');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+
+    const enviado = createProductActionMock.mock.calls[0][1];
+    for (const campo of ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate']) {
+      expect(enviado.has(campo), `${campo} debe viajar en el alta`).toBe(true);
+    }
+    expect(enviado.get('presentationId')).toBe(PRESENTACION_A.id);
+    expect(enviado.get('unitCost')).toBe(LOTE_VALIDO.unitCost);
+    expect(enviado.get('lot')).toBe('LT-4471');
+    expect(enviado.get('expiryDate')).toBe('2027-03-15');
+    // El costo total no se escribio: viaja vacio, que es "campo omitido", no un cero.
+    expect(enviado.get('totalCost')).toBe('');
+  });
+
+  it('la edicion no envia ningun campo del lote', async () => {
+    // QC-90 R26 — la edicion no crea ni cambia lotes, asi que no pinta los cinco campos y
+    // tampoco los envia: valida con `createProductSchema`, que ni los conoce.
+    const user = setupUser();
+    const elProducto = producto({ name: 'Sosa cáustica' });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateProductActionMock).toHaveBeenCalledTimes(1));
+
+    const [, , enviado] = updateProductActionMock.mock.calls[0];
+    for (const campo of ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate']) {
+      expect(enviado.get(campo), `${campo} no debe viajar en la edicion`).toBeNull();
+    }
+    expect(createProductActionMock).not.toHaveBeenCalled();
+  });
+
+  it('un rechazo del servidor deja el panel abierto y conserva los cinco campos del lote', async () => {
+    // QC-90 R28 — el rechazo llega de la operacion (no de la validacion previa), asi que va a la
+    // region de error del formulario; lo que no puede pasar es que se lleve por delante lo
+    // escrito en el lote, que es donde mas hay que teclear de todo el panel.
+    const user = setupUser();
+    createProductActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'invalid_input',
+      message: 'Entrada no valida.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { totalCost: '150.0000', lot: 'LT-4471' });
+    await user.type(screen.getByTestId('product-field-expiryDate'), '2027-03-15');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    await screen.findByTestId(testId.errorFormulario);
+
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-value')).toHaveValue(PRESENTACION_A.id);
+    expect(screen.getByTestId('product-field-unitCost')).toHaveValue(LOTE_VALIDO.unitCost);
+    expect(screen.getByTestId('product-field-totalCost')).toHaveValue('150.0000');
+    expect(screen.getByTestId('product-field-lot')).toHaveValue('LT-4471');
+    expect(screen.getByTestId('product-field-expiryDate')).toHaveValue('2027-03-15');
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:

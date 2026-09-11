@@ -13,6 +13,7 @@
 //
 // Cubre R1, R3, R4, R5, R6, R7, R8, R10, R11, R12, R13, R14, R16, R17, R18, R19, R20, R23.
 
+import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -897,5 +898,238 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     ]) {
       expect(existsSync(route), `${route} no debe existir en esta feature`).toBe(false)
     }
+  })
+})
+
+// =======================================================================================
+// T12 (QC-90, alta-del-primer-lote) — R29: ESTA FICHA NO ANADE NINGUNA MIGRACION.
+//
+// QC-90 escribe en `product_batches`, que YA EXISTE desde `20260909120000_product_batches`
+// (2026-09-09). R29 lo dice en negativo: ni una columna, ni un indice, ni una policy, ni una
+// carpeta nueva bajo `db/migrations/`. La unica migracion que existiria -el correlativo del
+// lote y su unicidad por empresa- es QC-81, otra ficha.
+//
+// SOBRE EL CASO QUE MIRA EL RANGO DE GIT, y es lo importante de este bloque:
+// `docs/verification.md > Rojos heredados` documenta CUATRO archivos de
+// `tests/baseline-rojos.json` cuya unica deuda es exactamente esta clase de guardia -colgada
+// de un `git diff` contra `origin/dev`- que FALLA cuando el rango no esta disponible o cuando
+// trae cosas ajenas. Cada uno de esos cuatro `motivo` dice literalmente que la correccion
+// pendiente es que el caso «se salte explicita y ruidosamente cuando el rango no esta
+// disponible». Aqui se hace eso desde el primer dia:
+//
+//   - se compara contra el MERGE-BASE con `origin/dev` y con TRES PUNTOS
+//     (`<merge-base>...HEAD`), no contra la punta de `dev`: asi lo que se mide es lo que ESTA
+//     RAMA agrega, no lo que `dev` avanzo por su cuenta -que es justo lo que ensucia a los
+//     cuatro del baseline-;
+//   - si no hay merge-base (sin remoto, clon superficial, worktree sin `origin/dev`) el caso
+//     se SALTA con motivo, no falla y no pasa en silencio;
+//   - si el rango existe pero esta VACIO -corriendo desde `dev`, o rama ya mergeada- tampoco
+//     hay nada que medir: se SALTA con motivo. Devolver «cero migraciones agregadas» ahi seria
+//     verde vacuo, que es el otro fallo posible y el mas dificil de ver.
+//
+// El censo de carpetas contra el merge-base (segundo caso) NO depende de que haya commits: se
+// compara el ARBOL DE TRABAJO con el merge-base, asi que caza tambien una migracion nueva
+// todavia sin commitear. Solo se salta si no hay merge-base.
+//
+// Cubre R29.
+// =======================================================================================
+
+/** El merge-base con `origin/dev`, o `null` si el rango no esta disponible. */
+function mergeBaseConDev(): string | null {
+  try {
+    const salida = execSync('git merge-base origin/dev HEAD', {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return salida.length > 0 ? salida : null
+  } catch {
+    return null
+  }
+}
+
+/** Archivos AGREGADOS por esta rama respecto del merge-base, o `null` si no se pudo medir. */
+function archivosAgregadosEnLaRama(base: string): readonly string[] | null {
+  try {
+    const salida = execSync(`git diff --name-only --diff-filter=A ${base}...HEAD`, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 8 * 1024 * 1024,
+    })
+    const archivos = salida
+      .split('\n')
+      .map((linea) => linea.trim())
+      .filter((linea) => linea.length > 0)
+    return archivos.length > 0 ? archivos : null
+  } catch {
+    return null
+  }
+}
+
+/** Nombres de las carpetas de `db/migrations/` en una revision dada, o `null` si no se pudo. */
+function carpetasDeMigracionEn(revision: string): readonly string[] | null {
+  try {
+    const salida = execSync(`git ls-tree --name-only ${revision}:db/migrations`, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    const nombres = salida
+      .split('\n')
+      .map((linea) => linea.trim().replace(/\/$/, ''))
+      .filter((linea) => linea.length > 0 && linea !== 'migration_lock.toml')
+      .sort()
+    return nombres.length > 0 ? nombres : null
+  } catch {
+    return null
+  }
+}
+
+/** Nombres de las carpetas de `db/migrations/` tal como estan en el arbol de trabajo. */
+function carpetasDeMigracionEnDisco(): readonly string[] {
+  return readdirSync(join(repoRoot, 'db', 'migrations'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+}
+
+/** Las columnas que `20260909120000_product_batches` le dio al lote, con su nombre en la base. */
+const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+  ['productId', 'product_id'],
+  ['presentationId', 'presentation_id'],
+  ['stock', 'stock'],
+  ['unitCost', 'unit_cost'],
+  ['lot', 'lot'],
+  ['expiryDate', 'expiry_date'],
+  ['createdBy', 'created_by'],
+  ['updatedBy', 'updated_by'],
+]
+
+describe('QC-90 R29 — esta ficha no anade ninguna migracion ni ninguna columna', () => {
+  const base = mergeBaseConDev()
+
+  it('el rango de la rama no agrega ningun archivo bajo db/migrations/', (ctx) => {
+    if (base === null) {
+      ctx.skip(
+        'no hay merge-base con `origin/dev` (sin remoto, clon superficial o worktree sin esa ' +
+          'referencia): este caso NO ha comprobado nada. No se falla adrede a proposito -es ' +
+          'justo la deuda que documenta `docs/verification.md > Rojos heredados` para los ' +
+          'cuatro archivos del baseline-, pero tampoco pasa en silencio: queda constancia aqui.',
+      )
+      return
+    }
+    const agregados = archivosAgregadosEnLaRama(base)
+    if (agregados === null) {
+      ctx.skip(
+        `el rango git ${base}...HEAD no trae ningun archivo agregado (corriendo desde \`dev\`, ` +
+          'o rama ya mergeada): este caso NO ha comprobado nada. Verde vacuo seria peor que ' +
+          'este salto, porque «cero migraciones agregadas» sonaria a comprobacion y no lo es.',
+      )
+      return
+    }
+
+    const migracionesAgregadas = agregados
+      .filter((archivo) => archivo.startsWith('db/migrations/'))
+      .sort()
+    expect(
+      migracionesAgregadas,
+      'R29: esta rama agrega archivos bajo db/migrations/ y QC-90 no anade ninguna migracion ' +
+        `(${migracionesAgregadas.join(', ')}). El correlativo del lote y su unicidad por empresa ` +
+        'son QC-81, no esta ficha.',
+    ).toEqual([])
+  })
+
+  it('db/migrations/ no gana ninguna carpeta respecto del merge-base, incluido lo no commiteado', (ctx) => {
+    // Censo ARBOL DE TRABAJO contra merge-base: caza tambien la migracion recien creada con
+    // `prisma migrate dev --create-only` que todavia no esta en ningun commit -que es
+    // exactamente el momento en que R29 se violaria sin que el diff de commits lo viera-.
+    if (base === null) {
+      ctx.skip(
+        'no hay merge-base con `origin/dev`: este caso NO ha comprobado nada (ver el motivo ' +
+          'largo en la cabecera del bloque T12).',
+      )
+      return
+    }
+    const enBase = carpetasDeMigracionEn(base)
+    if (enBase === null) {
+      ctx.skip(
+        `no se pudo leer db/migrations en ${base}: este caso NO ha comprobado nada.`,
+      )
+      return
+    }
+    const enDisco = carpetasDeMigracionEnDisco()
+    expect(
+      enDisco.length,
+      'el censo de db/migrations en disco salio vacio: sin sujeto no se vigila nada',
+    ).toBeGreaterThan(0)
+    // Ancla: la migracion sobre la que ESCRIBE esta ficha tiene que existir en las dos puntas.
+    expect(enBase).toContain('20260909120000_product_batches')
+    expect(enDisco).toContain('20260909120000_product_batches')
+
+    const previas = new Set(enBase)
+    const nuevas = enDisco.filter((carpeta) => !previas.has(carpeta))
+    expect(
+      nuevas,
+      `R29: db/migrations/ gano carpetas que no estan en el merge-base con dev (${nuevas.join(', ')}). ` +
+        'QC-90 escribe en `product_batches`, que ya existe: no anade columna, ni indice, ni policy, ' +
+        'ni migracion.',
+    ).toEqual([])
+  })
+
+  it('ProductBatch conserva las columnas que le dio 20260909120000_product_batches', () => {
+    // R29 en positivo: el modelo no pierde nada Y no gana nada. La forma detallada de cada
+    // columna la comprueba el caso «ProductBatch declara la presentacion, el stock, el coste y
+    // la autoria mudados desde products»; aqui se vigila el CONJUNTO, que es lo que una
+    // migracion cambiaria.
+    for (const [nombre, columna] of PRODUCT_BATCH_COLUMNS) {
+      const candidate = field(productBatch, nombre)
+      expect(candidate, `ProductBatch.${nombre} debe seguir declarado`).toBeDefined()
+      if (nombre !== columna) {
+        expect(candidate.attributes, `ProductBatch.${nombre} mapea a ${columna}`).toContain(
+          `@map("${columna}")`,
+        )
+      }
+    }
+    expect(field(productBatch, 'unitCost').attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
+    expect(field(productBatch, 'lot').isOptional, 'lot sigue siendo anulable').toBe(true)
+    expect(field(productBatch, 'expiryDate').isOptional, 'expiry_date sigue anulable').toBe(true)
+    expect(field(productBatch, 'expiryDate').attributes).toContain('@db.Date')
+
+    // Igualdad EXACTA de escalares: una columna DE MAS es una migracion, y R29 la prohibe.
+    const escalares = productBatch.fields
+      .filter((candidate) => !['Product', 'Presentation'].includes(candidate.type))
+      .map((candidate) => candidate.name)
+      .sort()
+    expect(
+      escalares,
+      'ProductBatch gano o perdio columnas: cualquiera de las dos cosas necesita migracion (R29)',
+    ).toEqual(
+      ['id', ...PRODUCT_BATCH_COLUMNS.map(([nombre]) => nombre), 'createdAt', 'updatedAt'].sort(),
+    )
+  })
+
+  it('la migracion de product_batches conserva sus dos CHECK y su RLS ENABLE+FORCE sin policies', () => {
+    // R29 dice «tal como la dejo 20260909120000_product_batches, con su RLS activado y forzado
+    // y sin policies». Se lee el SQL: Prisma no modela ni CHECK ni RLS, asi que si alguien los
+    // toca no hay tipo ni cliente generado que se entere.
+    const sql = readFileSync(
+      join(repoRoot, 'db', 'migrations', '20260909120000_product_batches', 'migration.sql'),
+      'utf8',
+    )
+    expect(sql).toMatch(
+      /ADD CONSTRAINT "product_batches_stock_non_negative" CHECK \("stock" >= 0\)/,
+    )
+    expect(sql).toMatch(
+      /ADD CONSTRAINT "product_batches_unit_cost_positive" CHECK \("unit_cost" > 0\)/,
+    )
+    expect(sql).toMatch(/ALTER TABLE "product_batches" ENABLE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/ALTER TABLE "product_batches" FORCE ROW LEVEL SECURITY/)
+    // Sin policies: deny-by-default. La autorizacion real vive en el caso de uso
+    // (`docs/architecture.md > Acceso a datos y autorizacion`), la RLS es defensa en
+    // profundidad -y una policy aqui, ademas, seria una migracion que R29 no admite-.
+    expect(sql, 'la migracion de product_batches no declara ninguna policy').not.toMatch(
+      /CREATE POLICY/i,
+    )
   })
 })

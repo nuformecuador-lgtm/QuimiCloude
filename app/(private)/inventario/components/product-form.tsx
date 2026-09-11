@@ -12,7 +12,11 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import type { ErrorCode } from '@/lib/modules/errores';
-import { createProductSchema, type ProductView } from '@/lib/modules/inventario';
+import {
+  createProductSchema,
+  createProductWithFirstBatchSchema,
+  type ProductView,
+} from '@/lib/modules/inventario';
 import {
   createProductAction,
   updateProductAction,
@@ -42,10 +46,13 @@ const INT_FIELDS = ['stock', 'qtyAlert'] as const;
 /**
  * Campos del PRIMER LOTE del producto (`product_batches`), que el alta pide junto al producto.
  *
- * **Hoy son SOLO front (decision humana del 2026-09-10)**: se pintan, se validan en el cliente y
- * se conservan tras un rechazo, pero NO viajan a ninguna operacion -`createProductSchema` no los
- * conoce y la action solo lee los campos del producto, asi que los ignora-. El alta del lote
- * entra despues; cuando entre, estos nombres son los que la operacion tiene que leer.
+ * **QC-90 (R25): desde ahora VIAJAN.** Estan en el DOM del `<form>`, asi que ya iban en el
+ * `FormData`; lo que faltaba era que la validacion previa los mirara y que la operacion los
+ * leyera. Los dos huecos los cierra el MISMO objeto: `createProductWithFirstBatchSchema`, que
+ * valida el cliente aqui y revalida el caso de uso en el servidor (R24, R27).
+ *
+ * **Solo en el ALTA** (R26): la edicion no pinta ninguno de los cinco, no los envia y valida
+ * con `createProductSchema`, que ni los conoce.
  */
 const BATCH_FIELDS = ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate'] as const;
 
@@ -69,8 +76,11 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   stock: 'Debe ser un número entero de 0 o más.',
   qtyAlert: 'Debe ser un número entero de 0 o más.',
   presentationId: 'Elige una presentación.',
-  unitCost: 'Debe ser un importe de 0 o más, con hasta 4 decimales.',
-  totalCost: 'Debe ser un importe de 0 o más, con hasta 4 decimales.',
+  // QC-90 (R27, R5): «mayor que 0», no «0 o mas». La columna `product_batches.unit_cost` lleva
+  // `CHECK (unit_cost > 0)` desde el 2026-09-09 y este panel aceptaba el `0`: era deuda declarada
+  // en `requirements.md`. El criterio del panel es ahora el mismo que el del servidor.
+  unitCost: 'Debe ser un importe mayor que 0, con hasta 4 decimales.',
+  totalCost: 'Debe ser un importe mayor que 0, con hasta 4 decimales.',
   lot: 'Escribe un lote de 1 a 60 caracteres.',
   expiryDate: 'Escribe una fecha válida.',
 };
@@ -152,20 +162,37 @@ function parseInteger(raw: string): number | undefined | 'invalid' {
 }
 
 /**
- * Valida un importe escrito. **Se queda en cadena a proposito**: un costo no pasa por el binario
- * de coma flotante -por eso el campo tampoco es `type="number"`-. `''` es "campo omitido";
- * cualquier otra cosa que no sea un decimal de 0 o mas con hasta 4 decimales -los que guarda
- * `product_batches.unit_cost`- es un error de ESE campo.
+ * Campo de texto OPCIONAL del lote. Una cadena vacia -o de solo espacios- es "campo omitido", que
+ * es lo que el esquema admite como `nullish`; el resto viaja **tal cual, sin convertir**.
+ *
+ * Los dos importes pasan por aqui y **siguen siendo cadena** (R4): un costo no toca el binario de
+ * coma flotante en ningun punto del camino, y por eso su campo tampoco es `type="number"`.
  */
-function parseDecimal(raw: string): string | undefined | 'invalid' {
-  const trimmed = raw.trim();
-  if (trimmed === '') return undefined;
-  if (!/^\d+(\.\d{1,4})?$/.test(trimmed)) return 'invalid';
-  return trimmed;
+function readOptionalText(raw: string): string | undefined {
+  return raw.trim() === '' ? undefined : raw;
 }
 
-/** Largo maximo del lote. Mismo criterio que el resto de los textos cortos de la pantalla. */
-const LOT_MAX_LENGTH = 60;
+/**
+ * Copy de un rechazo. Los issues de forma -longitud, patron, uuid, entero- se dicen con el copy
+ * de ESTE archivo, porque el de zod esta en ingles y describe el esquema. Los CRUZADOS del costo
+ * llegan como `code: 'custom'` desde el esquema compartido, ya en castellano y ya colgados de su
+ * campo (R8: el de «solo total sin existencia» cuelga de `stock`), asi que se muestran tal cual.
+ *
+ * La unica excepcion es R11 -no viene ningun costo-: el esquema cuelga ese issue de los DOS
+ * campos de costo y aqui tiene copy propio, porque decir «basta con uno» es lo que resuelve el
+ * problema. Se reconoce por que los dos costos venian vacios, no por el texto del issue.
+ */
+function fieldMessage(
+  field: ProductFieldName,
+  issue: { readonly code: string; readonly message: string },
+  faltanLosDosCostos: boolean,
+): string {
+  if (issue.code !== 'custom') return FIELD_MESSAGES[field];
+  if (faltanLosDosCostos && (field === 'unitCost' || field === 'totalCost')) {
+    return COST_REQUIRED_MESSAGE;
+  }
+  return issue.message;
+}
 
 type ProductFormProps = {
   /** Producto que se edita. Ausente en el alta (R19). */
@@ -184,10 +211,14 @@ type ProductFormProps = {
  * (Los nombres de los dos paquetes descartados no se escriben aqui, para que una guardia de
  * fuente que los busque no encuentre un falso positivo.)
  *
- * **La validacion previa usa el MISMO esquema que valida el servidor** (`createProductSchema`,
- * importado del contrato publico de `inventario`, que es client-safe): asi los mensajes por campo
- * salen de la misma regla, sin reescribir ninguna. El servidor revalida igual; el cliente nunca
- * es la frontera.
+ * **La validacion previa usa el MISMO esquema que valida el servidor**, importado del contrato
+ * publico de `inventario`, que es client-safe: `createProductWithFirstBatchSchema` en el ALTA
+ * -producto + primer lote, QC-90 R25- y `createProductSchema` en la EDICION, que no conoce el
+ * lote (R26). Asi los mensajes por campo salen de la misma regla, sin reescribir ninguna, y un
+ * rechazo cae en el MISMO campo en los dos lados: es lo que hace que R8 -«solo costo total con
+ * existencia 0»- se pinte en el campo de la EXISTENCIA sin una linea de reparto propia, porque el
+ * esquema cuelga ese issue de `['stock']`. El servidor revalida igual; el cliente nunca es la
+ * frontera.
  *
  * **R19 — la edicion es reemplazo completo**: el formulario precarga todos los valores actuales y
  * envia todos los campos, porque `updateProductSchema` es el mismo esquema del alta. No hay envio
@@ -242,51 +273,51 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
       if (parsed !== undefined) numbers[field] = parsed;
     }
 
-    // Campos del primer lote. Solo se piden en el ALTA y solo se validan aqui: no entran en el
-    // candidato del producto -el esquema no los conoce- y por tanto no viajan a la operacion.
-    if (product === undefined) {
-      if (values.presentationId.trim() === '') {
-        fieldErrors.presentationId = FIELD_MESSAGES.presentationId;
-      }
+    const isCreate = product === undefined;
+    const unitCost = readOptionalText(values.unitCost);
+    const totalCost = readOptionalText(values.totalCost);
 
-      const unitCost = parseDecimal(values.unitCost);
-      const totalCost = parseDecimal(values.totalCost);
+    /*
+      EXACTAMENTE las claves del esquema, ni una mas (R24): los dos esquemas son `strictObject`,
+      y en zod v4 una clave de sobra sale como un issue `unrecognized_keys` con `path: []` -la
+      lista va en `issue.keys`-, o sea sin campo donde pintarse. Por eso los importes viajan
+      aunque esten vacios, como `undefined`: `undefined` es "campo omitido" para un `nullish`,
+      mientras que la clave de un campo inventado seria un rechazo mudo.
 
-      if (unitCost === 'invalid') fieldErrors.unitCost = FIELD_MESSAGES.unitCost;
-      if (totalCost === 'invalid') fieldErrors.totalCost = FIELD_MESSAGES.totalCost;
+      Dos constructores y no uno con campos condicionales, porque son dos contratos distintos:
+      el alta valida producto + primer lote (R25) y la edicion NO conoce el lote (R26).
+    */
+    const parsed = isCreate
+      ? createProductWithFirstBatchSchema.safeParse({
+          name: values.name,
+          ...numbers,
+          presentationId: values.presentationId,
+          unitCost,
+          totalCost,
+          lot: readOptionalText(values.lot),
+          expiryDate: readOptionalText(values.expiryDate),
+        })
+      : createProductSchema.safeParse({
+          name: values.name,
+          ...numbers,
+        });
 
-      // Uno de los dos costos es obligatorio; cualquiera sirve, y los dos a la vez tambien.
-      if (unitCost === undefined && totalCost === undefined) {
-        fieldErrors.unitCost = COST_REQUIRED_MESSAGE;
-        fieldErrors.totalCost = COST_REQUIRED_MESSAGE;
-      }
-
-      if (values.lot.trim().length > LOT_MAX_LENGTH) {
-        fieldErrors.lot = FIELD_MESSAGES.lot;
-      }
-
-      const expiryDate = values.expiryDate.trim();
-      if (expiryDate !== '' && Number.isNaN(Date.parse(expiryDate))) {
-        fieldErrors.expiryDate = FIELD_MESSAGES.expiryDate;
-      }
-    }
-
-    const candidate = {
-      name: values.name,
-      ...numbers,
-    };
-
-    const parsed = createProductSchema.safeParse(candidate);
     if (!parsed.success) {
+      const faltanLosDosCostos = isCreate && unitCost === undefined && totalCost === undefined;
+
       for (const issue of parsed.error.issues) {
         const field = String(issue.path[0] ?? '') as ProductFieldName;
         if (field in FIELD_MESSAGES && fieldErrors[field] === undefined) {
-          fieldErrors[field] = FIELD_MESSAGES[field];
+          fieldErrors[field] = fieldMessage(field, issue, faltanLosDosCostos);
         }
       }
     }
 
-    if (Object.keys(fieldErrors).length > 0) {
+    // `!parsed.success` ademas del recuento: un rechazo cuyo issue no señale ningun campo de la
+    // pantalla -el `unrecognized_keys` de arriba es el unico que hoy podria- no puede acabar
+    // llamando a la operacion en silencio. Sin campo que marcar, se pinta en la region del
+    // formulario, que es justo para lo que esta.
+    if (!parsed.success || Object.keys(fieldErrors).length > 0) {
       // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
       return {
         status: 'error',
