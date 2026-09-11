@@ -31,12 +31,19 @@ export type AddWorkGroupMemberDeps = {
  * motivo, y `null` cuando no lo es**; no compara con ningun estado «bueno» a mano, que es
  * exactamente lo que QC-78 R7 pone en una sola funcion y lo que el test de alcance (T17) vigila.
  *
+ * **Se EXPORTA porque `list-work-group-members.ts` la usa para decidir quien SALE en la lista**
+ * (R19): una persona se ve cuando su estado efectivo no es motivo de ocultacion. Asi el «por que no
+ * se ve» de R31 y el «quien se ve» de R19 salen literalmente de la MISMA expresion y no pueden
+ * divergir —que es lo que `design.md > 5.1` pide—. Vive en este archivo, y no en uno nuevo, porque
+ * es aqui donde nace el `MemberBlockReason` que el error necesita; mismo reparto que
+ * `throwDuplicate`, exportada por `create-user.ts` y consumida por `update-user.ts`.
+ *
  * Los tres casos del `switch` son, por construccion, los tres valores de `MemberBlockReason`: el
  * tipo de retorno lo comprueba en tiempo de compilacion, asi que si manana el catalogo de estados
  * de cuenta creciera, esta funcion **no compilaria** en vez de clasificar en silencio el estado
  * nuevo como «se ve».
  */
-function blockReasonOf(status: UserAccountStatus): MemberBlockReason | null {
+export function blockReasonOf(status: UserAccountStatus): MemberBlockReason | null {
   switch (status) {
     case 'pending':
     case 'inactive':
