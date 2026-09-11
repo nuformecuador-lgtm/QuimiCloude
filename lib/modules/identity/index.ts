@@ -154,3 +154,10 @@ export {
 // La forma de exigir CUALQUIERA de varios permisos alternativos (R1, R3). `assertAnyPermission`,
 // su cuerpo compartido, se queda dentro del modulo: quien autoriza pasa por aqui.
 export { requireAnyPermission } from './domain/actor';
+
+// QC-94 T10 — La salida de la consulta y su caso de uso, SOLO de `./domain` (R15, R16). El tipo
+// `ListRolesDeps` viaja con la factory: quien la cablea es `lib/composition`, y sin el tipo no
+// podria declarar la dependencia. El PUERTO (`ports/role-catalog-repository.ts`) y el adaptador
+// driven NO se reexportan: los ve solo el punto de composicion.
+export type { RoleOption } from './domain/role-view';
+export { createListRoles, type ListRolesDeps } from './domain/list-roles';
