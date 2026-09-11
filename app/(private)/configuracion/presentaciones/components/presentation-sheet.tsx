@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import { PresentationForm, type PresentationSheetTarget } from './presentation-form';
 
@@ -34,6 +35,12 @@ import { PresentationForm, type PresentationSheetTarget } from './presentation-f
  * `lib/modules/inventario/adapters/driving/`, que R30 prohibe; quien decide que se revalida es la
  * pantalla (`design.md > 5.4`).
  *
+ * **QC-80 (R16, R19): las unidades ATRAVIESAN el panel, no nacen aqui.** Este componente no las
+ * consulta; las recibe de quien lo monta -la seccion de lista, que las pidio una sola vez- y se
+ * las entrega al formulario. Si el catalogo fallo, la seccion **no monta este panel** en ninguno
+ * de sus tres sitios (cabecera, «crear la primera» y fila), asi que no existe el camino de abrir
+ * un formulario con el selector vacio.
+ *
  * **Dos modos de apertura, un solo panel.** Sin `open`, el panel trae su propio disparador y su
  * propio estado -es el alta, y es lo que la seccion pone en la cabecera de la lista y lo que el
  * estado vacio recibe como `children` para «crear la primera»-. Con `open`/`onOpenChange`, el
@@ -58,6 +65,8 @@ const UPDATE_SUCCESS = 'Presentación actualizada.';
 export type PresentationSheetProps = {
   /** Presentacion que se edita. Ausente en el alta (R22). */
   readonly presentation?: PresentationSheetTarget;
+  /** Catalogo entero de unidades (QC-80 R16). Llega por props y baja tal cual al formulario. */
+  readonly units: readonly UnitRef[];
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
@@ -65,6 +74,7 @@ export type PresentationSheetProps = {
 
 export function PresentationSheet({
   presentation,
+  units,
   open,
   onOpenChange,
 }: PresentationSheetProps) {
@@ -106,7 +116,7 @@ export function PresentationSheet({
           {CREATE_LABEL}
         </SheetTrigger>
       )}
-      <PresentationForm presentation={presentation} onSaved={handleSaved} />
+      <PresentationForm presentation={presentation} units={units} onSaved={handleSaved} />
     </Sheet>
   );
 }

@@ -33,7 +33,8 @@ const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, quantity: '2.0000', unitId: UNI
 // dev anadio `stock` a `ProductRef` el 2026-09-09 (`419f01e`) y no actualizo estos dobles.
 // `null` es «no declara existencia», que es lo que el fixture decia ya por omision: el valor
 // no cambia el comportamiento de ningun caso, solo satisface el tipo.
-const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', unitId: null, stock: null };
+// QC-80 (R21): `ProductRef` ya no lleva unidad -nadie la consumia-, asi que el doble tampoco.
+const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', stock: null };
 
 /** Doble de `UnitCatalog` (R50): por defecto resuelve como existentes TODOS los `unitId`
  *  pedidos -este archivo prueba R45/R46 sobre `productId`, no R50, asi que el doble no

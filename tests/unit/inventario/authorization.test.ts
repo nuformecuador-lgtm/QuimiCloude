@@ -58,7 +58,13 @@ const PRODUCTO_VALIDO_CON_LOTE = {
   unitCost: '10.0000',
 };
 
-const PRESENTACION_VALIDA = { name: 'Bidon 20 L' };
+/** QC-80 (R10): la unidad es obligatoria en el alta y en la edicion, asi que la entrada
+ *  valida minima la lleva. Es un uuid cualquiera: aqui no hay base, y lo que este archivo
+ *  afirma es el ORDEN -permiso antes que zod-, no la existencia de la unidad. */
+const PRESENTACION_VALIDA = {
+  name: 'Bidon 20 L',
+  unitId: '11111111-1111-4111-8111-111111111111',
+};
 
 /** Entrada que zod rechaza sin dudarlo: es la que demuestra R12 -el permiso se mira ANTES
  *  de validar-. */
@@ -97,7 +103,7 @@ function repositorioPresentacionQueFalla(): PresentationRepository {
   };
   return {
     create: vi.fn<PresentationRepository['create']>(explota),
-    rename: vi.fn<PresentationRepository['rename']>(explota),
+    replace: vi.fn<PresentationRepository['replace']>(explota),
     deleteById: vi.fn<PresentationRepository['deleteById']>(explota),
     list: vi.fn<PresentationRepository['list']>(explota),
   };
@@ -136,7 +142,9 @@ const PRODUCTO_EN_BASE = {
   imagePath: null,
   stock: 0,
   qtyAlert: 0,
-  unitId: null,
+  // QC-80 (R21, R22): el producto ya no declara unidad; la derivada del lote mas reciente es
+  // `latestBatchUnitId`, y este doble no tiene lotes.
+  latestBatchUnitId: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -168,7 +176,7 @@ function montarReposPermisivos(): Repos {
     },
     presentations: {
       create: vi.fn<PresentationRepository['create']>(async () => ({ id: 'presentacion-1' })),
-      rename: vi.fn<PresentationRepository['rename']>(async () => 'ok'),
+      replace: vi.fn<PresentationRepository['replace']>(async () => 'ok'),
       deleteById: vi.fn<PresentationRepository['deleteById']>(async () => 'deleted'),
       list: vi.fn<PresentationRepository['list']>(async () => PAGINA_VACIA),
     },
@@ -189,7 +197,7 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.products.createWithFirstBatch).not.toHaveBeenCalled(),
     () => expect(repos.products.addBatchToAlive).not.toHaveBeenCalled(),
     () => expect(repos.presentations.create).not.toHaveBeenCalled(),
-    () => expect(repos.presentations.rename).not.toHaveBeenCalled(),
+    () => expect(repos.presentations.replace).not.toHaveBeenCalled(),
     () => expect(repos.presentations.deleteById).not.toHaveBeenCalled(),
     () => expect(repos.presentations.list).not.toHaveBeenCalled(),
     // QC-57 R34 / QC-74 R12: sin permiso no se toca el repositorio NI se registra nada en el log.

@@ -1,5 +1,6 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listPresentationsAction } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 
 import { PresentationListEmpty } from './presentation-list-empty';
 import { PresentationListError } from './presentation-list-error';
@@ -15,6 +16,19 @@ import { PresentationTable } from './presentation-table';
  * renderizados. Es la parte que la pagina envuelve en `<Suspense>`, de modo que el esqueleto de
  * R16 aparece solo mientras esta consulta esta en vuelo —sin un estado de carga escrito a mano y
  * sin carreras entre peticiones—.
+ *
+ * **DOS lecturas, en `Promise.all` porque son independientes** (QC-80 R16, `design.md > 5`):
+ * `listPresentationsAction(params)` trae la pagina que se pinta y `listUnitsAction()` trae el
+ * catalogo ENTERO de unidades, **una sola vez por pantalla**, que baja por props hasta el
+ * formulario -que no consulta nada-. Es el patron de la pantalla de detalle de proveedor
+ * (QC-44 R46) y el de `unit-list-section.tsx`.
+ *
+ * **QC-80 R19 — si el catalogo de unidades falla, NO se monta NINGUN `PresentationSheet`**: ni el
+ * de la cabecera, ni el de «crear la primera», ni el de la fila. Se pinta `PresentationListError`
+ * y punto. Un formulario con el selector vacio seria PEOR que el error: dejaria al usuario delante
+ * de un campo obligatorio imposible de rellenar. Es al reves que en `unit-list-section.tsx`, donde
+ * el catalogo secundario solo alimenta una columna informativa y su fallo se degrada; aqui
+ * alimenta un campo `NOT NULL` del que depende poder guardar.
  *
  * **Una sola llamada a `listPresentationsAction`**, con los parametros **enteros y sin traducir**:
  * `DataTableParams` es campo a campo la misma forma que `ListQuery` (`design.md > 5.2`), y
@@ -41,11 +55,22 @@ export type PresentationListSectionProps = {
 };
 
 export async function PresentationListSection({ params }: PresentationListSectionProps) {
-  const result = await listPresentationsAction(params);
+  const [result, unitsResult] = await Promise.all([
+    listPresentationsAction(params),
+    listUnitsAction(),
+  ]);
 
   if (result.status === 'error') {
     return <PresentationListError error={result} />;
   }
+
+  // R19: el catalogo de unidades no es un adorno de esta pantalla —es el campo obligatorio del
+  // formulario—, asi que su fallo tumba la pantalla entera en vez de abrir un panel inservible.
+  if (unitsResult.status === 'error') {
+    return <PresentationListError error={unitsResult} />;
+  }
+
+  const units = unitsResult.data;
 
   const { items, page: currentPage, totalPages } = result.data;
 
@@ -61,7 +86,7 @@ export async function PresentationListSection({ params }: PresentationListSectio
             : undefined
         }
       >
-        <PresentationSheet />
+        <PresentationSheet units={units} />
       </PresentationListEmpty>
     );
   }
@@ -70,7 +95,7 @@ export async function PresentationListSection({ params }: PresentationListSectio
     <div className="flex flex-col gap-4" data-testid={PRESENTATION_LIST_TESTID}>
       {/* El disparador del alta (R21). Vive junto a la lista, no en la pagina. */}
       <div className="flex justify-end">
-        <PresentationSheet />
+        <PresentationSheet units={units} />
       </div>
       {/*
         `presentation-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda
@@ -78,7 +103,12 @@ export async function PresentationListSection({ params }: PresentationListSectio
         serializables: las filas, los parametros vigentes y el total de paginas. La tabla recibe
         `status: 'idle'` siempre: los tres estados se pintan FUERA de `<DataTable>`.
       */}
-      <PresentationTable presentations={items} params={params} totalPages={totalPages} />
+      <PresentationTable
+        presentations={items}
+        params={params}
+        totalPages={totalPages}
+        units={units}
+      />
     </div>
   );
 }

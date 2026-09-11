@@ -59,7 +59,7 @@ import {
   createPresentation,
   deletePresentationById,
   listPresentations,
-  renamePresentation,
+  replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
@@ -343,7 +343,7 @@ const productRepository: ProductRepository = {
 
 const presentationRepository: PresentationRepository = {
   create: createPresentation,
-  rename: renamePresentation,
+  replace: replacePresentation,
   deleteById: deletePresentationById,
   list: listPresentations,
 };

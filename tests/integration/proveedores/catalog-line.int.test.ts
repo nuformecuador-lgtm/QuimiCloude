@@ -198,11 +198,27 @@ async function deleteTestUser(db: Db, userId: string): Promise<void> {
   await db.company.delete({ where: { id: user.companyId } });
 }
 
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: Db): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
 /** Presentacion REAL de apoyo: `presentation_id` es FK a `presentations` (R30). */
 async function createTestPresentation(db: Db): Promise<string> {
   const name = `Bidon ${token()}`;
   const presentation = await db.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name) },
+    data: { name, nameNormalized: normalizeForTest(name), unitId: await unidadDeSistema(db) },
     select: { id: true },
   });
   return presentation.id;

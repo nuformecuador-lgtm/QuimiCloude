@@ -9,6 +9,11 @@
  *   - `nameNormalized`: es el COMO se busca, no un campo que se pida. La busqueda entra por
  *     `search`, no por un filtro de texto sobre la columna normalizada.
  *   - `imagePath`: no se ordena ni se filtra por una ruta de archivo.
+ *   - `unitId` (QC-80, R21): dejo de existir como columna de `products`, asi que no queda nada
+ *     que mirar. Filtrar por la unidad DERIVADA -la de la presentacion del lote mas reciente-
+ *     seria un `where` anidado sobre ese lote: otra consulta, que nadie pidio. Quitarlo es un
+ *     cambio de contrato del listado, y por eso lo vigilan `tests/unit/inventario/list-query.test.ts`
+ *     y `tests/guards/guard-contrato-listados.test.ts`.
  */
 
 import type { ListQueryable } from './list-query';
@@ -16,7 +21,6 @@ import type { ListQueryable } from './list-query';
 export const PRODUCT_QUERYABLE: ListQueryable = {
   sortable: ['name', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
   filterable: {
-    unitId: 'select',
     stock: 'numberRange',
     qtyAlert: 'numberRange',
     createdAt: 'dateRange',

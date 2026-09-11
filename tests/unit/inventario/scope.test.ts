@@ -262,10 +262,21 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // permite tocar-. Se excluye por nombre y motivo, no se afloja `screenPattern` ni se vacia
     // la lista de matches: cualquier OTRO archivo de catalogo bajo `components/` sigue poniendo
     // esto en rojo.
-    const SELECTOR_PROMOVIDO = 'shared/presentation-select.tsx'
+    //
+    // ACTUALIZADO 2026-09-11 (QC-80, unidad-desde-la-presentacion): un SEGUNDO archivo entra en la
+    // misma exclusion y por el mismo motivo. El alta rapida del selector de arriba pasa a pedir la
+    // unidad (R10, R11), asi que reusa el selector de unidad de la presentacion, que estaba en la
+    // ruta de presentaciones; dejarlo alli obligaria a que `components/shared/` importara de
+    // `app/`. Promovido a `components/shared/presentation-unit-select.tsx`, casa con
+    // `screenPattern` tambien por la palabra «presentation» y tampoco es una pantalla: solo pinta
+    // un `Select` con las unidades que le bajan POR PROPS, sin consultar ninguna operacion.
+    const SELECTORES_PROMOVIDOS = [
+      'shared/presentation-select.tsx',
+      'shared/presentation-unit-select.tsx',
+    ] as const
     const componentMatches = matchingFiles(join(repoRoot, 'components'))
     const componentesDeCatalogo = componentMatches.filter(
-      (relPath) => relPath !== SELECTOR_PROMOVIDO,
+      (relPath) => !(SELECTORES_PROMOVIDOS as readonly string[]).includes(relPath),
     )
     expect(
       componentesDeCatalogo,
@@ -277,18 +288,20 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // que borrarla- y no puede llevar ninguna senal REAL de pantalla de catalogo
     // (`ProductListSection` o una tabla de productos). Si manana alguien convierte ese archivo
     // en una pantalla para esquivar esta guardia, esto cae aunque la exclusion lo deje pasar.
-    expect(
-      componentMatches,
-      `el selector promovido por QC-44 no esta donde dice la exclusion: ${componentMatches.join(', ')}`,
-    ).toContain(SELECTOR_PROMOVIDO)
-    const fuenteDelSelector = readFileSync(
-      join(repoRoot, 'components', ...SELECTOR_PROMOVIDO.split('/')),
-      'utf8',
-    )
-    expect(
-      /ProductListSection|product-table/.test(fuenteDelSelector),
-      `${SELECTOR_PROMOVIDO} no puede ser una pantalla de catalogo`,
-    ).toBe(false)
+    for (const promovido of SELECTORES_PROMOVIDOS) {
+      expect(
+        componentMatches,
+        `selector promovido que no esta donde dice la exclusion: ${componentMatches.join(', ')}`,
+      ).toContain(promovido)
+      const fuenteDelSelector = readFileSync(
+        join(repoRoot, 'components', ...promovido.split('/')),
+        'utf8',
+      )
+      expect(
+        /ProductListSection|product-table/.test(fuenteDelSelector),
+        `${promovido} no puede ser una pantalla de catalogo`,
+      ).toBe(false)
+    }
 
     // El E2E del catalogo dejo de estar diferido (D4 de QC-20 queda superada por QC-22), pero
     // la lista es CERRADA: un segundo spec de catalogo sin ficha pone esto en rojo.

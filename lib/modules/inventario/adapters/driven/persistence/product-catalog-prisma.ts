@@ -16,7 +16,6 @@ import type { ProductId, ProductRef } from '../../../domain/product-catalog';
 type ProductCatalogRow = {
   readonly id: string;
   readonly name: string;
-  readonly unitId: string | null;
   readonly stock: number | null;
 };
 
@@ -25,7 +24,6 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
   return {
     id: row.id,
     name: row.name,
-    unitId: row.unitId,
     stock: row.stock,
   };
 }
@@ -34,13 +32,14 @@ export async function findProductRefs(ids: readonly ProductId[]): Promise<readon
   if (ids.length === 0) return [];
 
   // Sin JOIN desde el 2026-09-09: la presentacion se mudo a `product_batches`, asi que una
-  // referencia de producto ya no la expone.
+  // referencia de producto ya no la expone. Y sin `unit_id` desde QC-80 (R21): la columna
+  // desaparecio de `products` y `ProductRef` no la sustituye por la unidad derivada del lote,
+  // porque el unico llamante -`recetas`- nunca la consumio.
   const rows = await prisma.product.findMany({
     where: { id: { in: [...ids] }, deletedAt: null },
     select: {
       id: true,
       name: true,
-      unitId: true,
       stock: true,
     },
   });
@@ -49,7 +48,6 @@ export async function findProductRefs(ids: readonly ProductId[]): Promise<readon
     toProductRef({
       id: row.id,
       name: row.name,
-      unitId: row.unitId,
       stock: row.stock,
     }),
   );

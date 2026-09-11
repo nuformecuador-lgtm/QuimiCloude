@@ -9,8 +9,21 @@
 // La presentacion y la autoria se mudaron a `product_batches` el 2026-09-09, asi que este
 // archivo ya no prueba ni el `join` a `presentations` ni la clasificacion de la FK de
 // autoria: ninguna de las dos vive ya en `products`.
+//
+// QC-80 (R21, R22, R23): `products.unit_id` tampoco vive ya ahi. La unidad de un producto se
+// DERIVA de la presentacion de su lote mas reciente, asi que este archivo prueba dos cosas que
+// antes eran una sola: el MAPEO (`toProductView` con un lote, con varios y sin ninguno) y el
+// CRITERIO con el que el motor elige ese lote (`PRODUCT_SELECT`, afirmado como dato).
 
-import { toProductView } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import {
+  PRODUCT_SELECT,
+  toProductView,
+} from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+
+/** Un lote tal como lo devuelve `LATEST_BATCH_UNIT`: solo la unidad de su presentacion. */
+function lote(unitId: string) {
+  return { presentation: { unitId } };
+}
 
 describe('toProductView', () => {
   const filaBase = {
@@ -21,9 +34,10 @@ describe('toProductView', () => {
     imagePath: null,
     stock: 10,
     qtyAlert: 5,
-    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La fila que devuelve
-    // Prisma ya no trae `unit: 'L'` (texto) sino `unit_id`, la referencia a `units`.
-    unitId: 'u-1',
+    // QC-80 (R22): la fila YA NO trae `unit_id` -esa columna desaparecio de `products`-. Trae
+    // `batches`, que el `select` acota al lote MAS RECIENTE y, de el, a la unidad de su
+    // presentacion. El fixture base tiene un lote: el caso sin ninguno esta mas abajo.
+    batches: [lote('u-1')],
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
   };
@@ -59,16 +73,59 @@ describe('toProductView', () => {
     expect(Object.keys(vista)).not.toContain('updatedBy');
   });
 
-  it('mapea la unidad como referencia al catalogo, sin resolver nombre ni simbolo', () => {
-    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La vista lleva el
-    // IDENTIFICADOR, no el nombre resuelto -resolverlo obligaria a `inventario` a leer la
-    // tabla de `unidades`, que es justo lo que la frontera de modulo prohibe-.
+  it('deriva la unidad de la presentacion del lote, sin resolver nombre ni simbolo (R22)', () => {
+    // R22 — la vista lleva el IDENTIFICADOR de la unidad, no el nombre resuelto: resolverlo
+    // obligaria a `inventario` a leer la tabla de `unidades`, que es justo lo que la frontera de
+    // modulo prohibe. Lo que cambio en QC-80 es de DONDE sale -de `products.unit_id`, que ya no
+    // existe, a la presentacion del lote-, no que siga siendo una referencia.
     const vista = toProductView(filaBase);
-    expect(vista.unitId).toBe('u-1');
+    expect(vista.latestBatchUnitId).toBe('u-1');
+    // El nombre viejo no sobrevive con otro significado: se renombro a proposito.
+    expect(Object.keys(vista)).not.toContain('unitId');
   });
 
-  it('mapea una unidad ausente como null, no como cadena vacia', () => {
-    const vista = toProductView({ ...filaBase, unitId: null });
-    expect(vista.unitId).toBeNull();
+  it('con VARIOS lotes se queda con el primero, que es el mas reciente del `orderBy` (R22)', () => {
+    // R22 — ELEGIR ES TRABAJO DEL MOTOR. El `select` pide `take: 1` con `created_at DESC, id
+    // DESC`, asi que a este mapeo llega UN solo lote y es el que gana; si el mapeo se pusiera a
+    // ordenar aqui habria DOS definiciones de «mas reciente» y podrian discrepar.
+    //
+    // Que el criterio del motor sea el correcto se afirma como DATO en el bloque de abajo
+    // (`PRODUCT_SELECT`), y contra Postgres de verdad en el test de integracion.
+    const vista = toProductView({ ...filaBase, batches: [lote('u-nueva'), lote('u-vieja')] });
+    expect(vista.latestBatchUnitId).toBe('u-nueva');
+  });
+
+  it('sin ningun lote la unidad derivada es null, no una cadena vacia (R23)', () => {
+    // R23 — «todavia no se ha comprado», no «sin unidad». Aguas abajo ese `null` es lo que hace
+    // que la linea de receta ofrezca el CATALOGO ENTERO (`unitsOfGroup`) en vez de quedarse
+    // bloqueada: se escriben recetas antes de comprar el ingrediente.
+    const vista = toProductView({ ...filaBase, batches: [] });
+    expect(vista.latestBatchUnitId).toBeNull();
+  });
+});
+
+describe('PRODUCT_SELECT: como se elige el lote mas reciente (R22)', () => {
+  // Se afirma sobre el OBJETO que viaja a Prisma, no sobre el texto del archivo: una asercion
+  // sobre el fuente pasaria igual con el criterio equivocado -y no se puede probar contra la
+  // base en un test unitario-. Es la unica parte de la derivacion que no vive en `toProductView`.
+
+  it('pide UN solo lote, el de creacion mas reciente, desempatando por id descendente', () => {
+    expect(PRODUCT_SELECT.batches.take).toBe(1);
+    // El desempate por `id` NO es adorno: no hay fecha de compra todavia (es QC-81) y el alta
+    // con primer lote escribe producto y lote con un UNICO `now`, asi que dos lotes pueden
+    // compartir `created_at` al milisegundo. Sin segundo criterio, la misma consulta podria
+    // devolver una unidad distinta cada vez.
+    expect(PRODUCT_SELECT.batches.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+  });
+
+  it('del lote lee SOLO el `unitId` de su presentacion: no entra en `units`', () => {
+    // La travesia `ProductBatch -> Presentation` es INTERNA a `inventario` (los dos modelos son
+    // suyos). `units` es de `unidades` y se resuelve por su contrato publico, nunca con un
+    // `include` que ninguna guardia de imports detectaria.
+    expect(PRODUCT_SELECT.batches.select).toEqual({ presentation: { select: { unitId: true } } });
+  });
+
+  it('el producto ya no selecciona ninguna columna de unidad (R21)', () => {
+    expect(Object.keys(PRODUCT_SELECT)).not.toContain('unitId');
   });
 });

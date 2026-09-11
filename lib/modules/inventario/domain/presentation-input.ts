@@ -22,11 +22,25 @@ const presentationNameSchema = z
     message: 'El nombre de la presentacion no contiene ningun caracter valido.',
   });
 
+/**
+ * QC-80 (R10): la unidad de la presentacion es OBLIGATORIA, sin `default` y sin `nullish`.
+ * La columna `presentations.unit_id` es `NOT NULL`: un esquema que aceptara la ausencia
+ * estaria prometiendo un estado que la base rechaza. `uuid()` porque lo que viaja es el
+ * identificador de una fila de `units`, nunca su nombre ni su simbolo.
+ *
+ * Este mismo objeto lo usa el formulario de cliente para su validacion previa (R17), asi
+ * que el error cae con `issue.path[0] === 'unitId'`, que es lo que la pantalla ya sabe
+ * mapear a un campo.
+ */
+const presentationUnitIdSchema = z.string().uuid();
+
 export const createPresentationSchema = z.object({
   name: presentationNameSchema,
+  unitId: presentationUnitIdSchema,
 });
 
-/** Reemplazo completo, igual que el producto (§ 11.7). */
+/** Reemplazo completo, igual que el producto (§ 11.7). QC-80 (R12): la edicion reemplaza
+ *  nombre Y unidad, asi que es literalmente el mismo esquema que el alta. */
 export const updatePresentationSchema = createPresentationSchema;
 
 export type CreatePresentationInput = z.infer<typeof createPresentationSchema>;
