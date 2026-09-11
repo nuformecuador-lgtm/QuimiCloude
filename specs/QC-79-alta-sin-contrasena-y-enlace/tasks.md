@@ -185,7 +185,7 @@
 
 ## Fase 6 — Composición y frontera
 
-- [ ] **T17 — Cablear los tres puertos y elegir el transporte.** — **R26, R32**
+- [x] **T17 — Cablear los tres puertos y elegir el transporte.** — **R26, R32**
       `lib/composition/index.ts`: repositorio del enlace, fábrica del secreto y **el mailer según
       `MAIL_TRANSPORT`** (`resend` por defecto); reutilizar `passwordHasher` y
       `checkCredentialPolicy` ya cableados, **sin crear segundos**; añadir las dos factories nuevas a
@@ -194,7 +194,7 @@
       nuevas y `guard-arquitectura-modulos.test.ts` sigue verde.
       *(Depende de T13, T14, T16.)*
 
-- [ ] **T18 — Las dos Server Actions nuevas y el estado del alta.** — **R14, R18, R30, R33, R34**
+- [x] **T18 — Las dos Server Actions nuevas y el estado del alta.** — **R14, R18, R30, R33, R34**
       `adapters/driving/credential-setup-actions.ts` con `FormData` en las dos; la pública **no
       resuelve actor**; la de reenvío lo resuelve de las dos caras de la sesión. `user-actions.ts`:
       `CreateUserFormState` gana `mail` en `success` y la variante `invalid_credential`. Traducción

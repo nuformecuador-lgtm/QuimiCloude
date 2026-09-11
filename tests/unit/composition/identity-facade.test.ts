@@ -154,3 +154,65 @@ describe('identity — los seis casos de uso de usuarios (fachada cableada)', ()
     expect(typeof identity.getSessionContext).toBe('function');
   });
 });
+
+// QC-79 T17 (R26, R32) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no
+// reformatea ninguna fixture ni ningun caso de arriba (el archivo lo comparten QC-48, QC-78 y
+// QC-66).
+//
+// Lo que se afirma es el CABLEADO, no el dominio: que la fachada ya construida expone las DOS
+// claves nuevas del enlace de credencial y que son invocables. Si alguien dejara una factory sin
+// cablear —o se llevara el cableado fuera de `lib/composition`— esto se pone rojo.
+describe('identity — el enlace para establecer la contrasena (fachada cableada)', () => {
+  const CLAVES_DEL_ENLACE = ['setCredentialWithLink', 'issueCredentialSetupLink'] as const;
+
+  it('expone las dos claves nuevas y las dos son funciones', async () => {
+    const { identity } = await import('@/lib/composition');
+
+    for (const clave of CLAVES_DEL_ENLACE) {
+      expect(typeof identity[clave]).toBe('function');
+    }
+  });
+
+  it('sin romper las claves que ya tenia la fachada', async () => {
+    // El bloque nuevo se SUMA: las seis de usuarios, la politica, el hasher, el seed y las dos
+    // caras de la sesion siguen ahi. Anadir dos casos de uso no reemplaza nada.
+    const { identity } = await import('@/lib/composition');
+
+    for (const clave of [
+      'createUser',
+      'getUser',
+      'listUsers',
+      'updateUser',
+      'deleteUser',
+      'setUserAccountStatus',
+      'checkCredentialPolicy',
+      'seedInitialAccess',
+      'getSessionUser',
+      'getSessionContext',
+    ] as const) {
+      expect(typeof identity[clave]).toBe('function');
+    }
+  });
+
+  it('el caso de uso PUBLICO se cablea SIN actor: su firma recibe solo la entrada (R18)', async () => {
+    // R18 escrito en el cableado: `setCredentialWithLink` es el unico caso de uso del modulo con
+    // un solo parametro. Si alguien le anadiera un actor —o una lectura de sesion— para «reusar»
+    // el patron de las seis de QC-66, esta linea se pondria roja.
+    const { identity } = await import('@/lib/composition');
+
+    expect(identity.setCredentialWithLink.length).toBe(1);
+    // El reenvio SI lleva actor por parametro, y es la otra mitad del contraste (R14).
+    expect(identity.issueCredentialSetupLink.length).toBe(2);
+  });
+
+  // NO hay aqui ningun caso que reimporte `lib/composition` con `MAIL_TRANSPORT` roto para
+  // demostrar que el transporte se elige EN LA INVOCACION (R28, `design.md > 9.2`). Se escribio,
+  // se midio y se quito: un `vi.resetModules()` seguido de un segundo `import('@/lib/composition')`
+  // vuelve a transformar el grafo entero del repo (~7 s en este arbol) y dejaba este archivo al
+  // borde del tiempo limite cuando la suite corre entera, que es como se fabrica un flake.
+  //
+  // Lo que ese caso queria afirmar ya esta cubierto sin pagar ese precio, y en dos sitios: este
+  // archivo IMPORTA la fachada sin ninguna variable de correo definida -si la eleccion se hiciera
+  // al importar, los once casos de aqui estarian rojos-, y `mail-config.test.ts` prueba
+  // `readMailTransportFromEnv()` por su cuenta, incluido el valor por defecto y el invalido.
+});

@@ -117,7 +117,10 @@ describe('la fabrica del secreto — cumple el puerto', () => {
   it('la funcion encaja en `CredentialSetupSecretFactory` sin adaptacion ninguna', () => {
     // Es lo que `lib/composition` hara en T17: atar el puerto a esta funcion. Si la forma del
     // retorno cambiara, este cableado deja de compilar.
-    const factory: CredentialSetupSecretFactory = { create: createCredentialSetupSecret };
+    const factory: CredentialSetupSecretFactory = {
+      create: createCredentialSetupSecret,
+      digestOf: digestOfCredentialSetupSecret,
+    };
 
     const emitido = factory.create();
 

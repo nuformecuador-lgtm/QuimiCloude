@@ -33,6 +33,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
 import {
+  CredentialPolicyRejectedError,
   DuplicateDocumentError,
   DuplicateEmailError,
   DuplicateUsernameError,
@@ -201,7 +202,7 @@ beforeEach(() => {
 
 describe('las seis Server Actions con sesion completa (R6, R40)', () => {
   it('createUserAction lee los nueve campos del FormData y devuelve el id creado', async () => {
-    createUserMock.mockResolvedValue({ id: 'user-nuevo' });
+    createUserMock.mockResolvedValue({ id: 'user-nuevo', mail: 'not_needed' });
 
     const resultado = await createUserAction(
       { status: 'idle' },
@@ -209,10 +210,20 @@ describe('las seis Server Actions con sesion completa (R6, R40)', () => {
     );
 
     // Los campos viajan TAL CUAL: la action no recorta, no convierte y no rellena nada. Y el
-    // candidato NO lleva `companyId`, ni contrasena, ni `accountStatus` (R14, R15, R16, R13):
-    // que el aserto sea de igualdad ESTRICTA es lo que pondria en rojo un campo de mas.
-    expect(createUserMock).toHaveBeenCalledWith(ACTOR_ESPERADO, CAMPOS_DEL_FORMULARIO);
-    expect(resultado).toEqual({ status: 'success', id: 'user-nuevo' });
+    // candidato NO lleva `companyId`, ni `accountStatus`, ni ningun hash (R14, R16, R13): que el
+    // aserto sea de igualdad ESTRICTA es lo que pondria en rojo un campo de mas.
+    //
+    // ENMENDADO por QC-79 R1: al candidato se le suma el DECIMO campo, `credential`, que es
+    // OPCIONAL. El formulario de este caso no lo manda, asi que llega como la cadena vacia -que
+    // R1 obliga a tratar IGUAL que la ausencia- y quien la interpreta es el DOMINIO, no la
+    // action. La expectativa no se debilita: sigue siendo igualdad estricta del objeto entero.
+    expect(createUserMock).toHaveBeenCalledWith(ACTOR_ESPERADO, {
+      ...CAMPOS_DEL_FORMULARIO,
+      credential: '',
+    });
+    // ENMENDADO por QC-79 R30: el exito del alta dice ademas COMO ACABO EL CORREO. Sin
+    // contrasena escrita no hubo enlace que enviar, y eso es `'not_needed'` (R3).
+    expect(resultado).toEqual({ status: 'success', id: 'user-nuevo', mail: 'not_needed' });
   });
 
   it('updateUserAction recibe el id por parametro y los nueve campos por FormData', async () => {
@@ -608,8 +619,8 @@ describe('R41 — traduccion de errores de dominio por su code estable', () => {
 // ---------------------------------------------------------------------------------------------
 
 describe('R16 — el estado serializado del alta no lleva credencial ni hash', () => {
-  it('el estado de exito tiene EXACTAMENTE las claves status e id, y nada mas', async () => {
-    createUserMock.mockResolvedValue({ id: 'user-nuevo' });
+  it('el estado de exito tiene EXACTAMENTE las claves status, id y mail, y nada mas', async () => {
+    createUserMock.mockResolvedValue({ id: 'user-nuevo', mail: 'sent' });
 
     const resultado = await createUserAction(
       { status: 'idle' },
@@ -618,12 +629,18 @@ describe('R16 — el estado serializado del alta no lleva credencial ni hash', (
 
     // Las claves EXACTAS, no «faltan algunas»: un `password` o un `credentialHash` que alguien
     // añadiera al estado pondria esta linea en rojo aunque el resto del test siguiera verde.
-    expect(Object.keys(resultado).sort()).toEqual(['id', 'status']);
-    expect(resultado).toEqual({ status: 'success', id: 'user-nuevo' });
+    //
+    // ENMENDADO por QC-79 R30: la tercera clave es `mail`, y es un valor CERRADO
+    // (`'sent' | 'failed' | 'not_needed'`), no un texto libre: `design.md > 4.7` punto 2 pide que
+    // el tipo no tenga ningun hueco donde colar el secreto ni la contrasena, y este aserto es esa
+    // frase escrita como test. La expectativa no se debilita: se afirma sobre las claves EXACTAS
+    // y sobre el objeto ENTERO, igual que antes.
+    expect(Object.keys(resultado).sort()).toEqual(['id', 'mail', 'status']);
+    expect(resultado).toEqual({ status: 'success', id: 'user-nuevo', mail: 'sent' });
   });
 
   it('la serializacion ENTERA del estado no contiene ninguna palabra de credencial', async () => {
-    createUserMock.mockResolvedValue({ id: 'user-nuevo' });
+    createUserMock.mockResolvedValue({ id: 'user-nuevo', mail: 'failed' });
 
     const resultado = await createUserAction(
       { status: 'idle' },
@@ -650,11 +667,17 @@ describe('R16 — el estado serializado del alta no lleva credencial ni hash', (
     expect(JSON.stringify(resultado)).not.toMatch(/password|contrase|credential|hash|\$2[aby]\$/i);
   });
 
-  it('el candidato que la action manda al caso de uso no incluye ningun campo de credencial', async () => {
+  it('el candidato que la action manda al caso de uso no incluye ningun campo de hash', async () => {
     // El otro extremo del mismo requisito: ni entra ni sale. Aunque el formulario mandase un
-    // `password`, la action no lo lee (los nueve campos estan enumerados) y `strictObject` lo
-    // rechazaria si llegase.
-    createUserMock.mockResolvedValue({ id: 'user-nuevo' });
+    // `password` o un `passwordHash`, la action no los lee -los campos estan ENUMERADOS- y
+    // `strictObject` los rechazaria si llegasen.
+    //
+    // ENMENDADO por QC-79 R1: el candidato lleva ahora DIEZ claves, porque `credential` es un
+    // campo legitimo del alta desde esta ficha. Lo que este caso sigue prohibiendo -y es lo que
+    // le daba valor- es que se cuele CUALQUIER OTRA: un `password`, un `passwordHash`, un
+    // `companyId` o un `accountStatus`. La lista esperada se escribe explicita para que un campo
+    // de mas se vea, y las dos claves de hash se comprueban ausentes una por una.
+    createUserMock.mockResolvedValue({ id: 'user-nuevo', mail: 'not_needed' });
 
     await createUserAction(
       { status: 'idle' },
@@ -663,7 +686,153 @@ describe('R16 — el estado serializado del alta no lleva credencial ni hash', (
 
     const candidato = createUserMock.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(Object.keys(candidato).sort()).toEqual(
-      Object.keys(CAMPOS_DEL_FORMULARIO).sort(),
+      [...Object.keys(CAMPOS_DEL_FORMULARIO), 'credential'].sort(),
     );
+    expect(candidato.password).toBeUndefined();
+    expect(candidato.passwordHash).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-79 T18 (R2, R30) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no reformatea
+// ningun caso de arriba salvo los tres que la enmienda obliga (marcados con «ENMENDADO por
+// QC-79»).
+//
+// `CreateUserFormState` pasa de TRES variantes a CINCO (`design.md > 5.3`). Aqui se recorren las
+// cinco, porque un estado que el tipo admite y que nadie ejerce es un estado que la pantalla de
+// QC-67 descubrira en produccion.
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-79 R30 — las CINCO variantes de CreateUserFormState', () => {
+  it('1/5 `idle` es el estado de partida y la action lo recibe sin mirarlo', async () => {
+    // El estado previo es un parametro que la action IGNORA por completo: quien decide es el
+    // caso de uso. Se le pasa `idle` y el resultado no depende de el.
+    createUserMock.mockResolvedValue({ id: 'user-nuevo', mail: 'not_needed' });
+
+    const desdeIdle = await createUserAction({ status: 'idle' }, formData(CAMPOS_DEL_FORMULARIO));
+    const desdeError = await createUserAction(
+      { status: 'error', code: 'unauthorized', message: 'lo que sea' },
+      formData(CAMPOS_DEL_FORMULARIO),
+    );
+
+    expect(desdeIdle).toEqual(desdeError);
+  });
+
+  const LOS_TRES_CORREOS = ['sent', 'failed', 'not_needed'] as const;
+
+  for (const mail of LOS_TRES_CORREOS) {
+    it(`2/5 \`success\` propaga mail='${mail}' TAL CUAL lo devuelve el caso de uso`, async () => {
+      // R30: distinguir `'sent'` de `'failed'` ES el requisito -con `'failed'` el usuario quedo
+      // creado igual, en `pending`, con su enlace vivo, y QC-67 ofrece el reenvio de R14-, y
+      // `'not_needed'` es la rama en la que el administrador escribio la contrasena (R3). La
+      // action NO traduce ninguno de los tres ni decide nada con ellos: los pasa.
+      createUserMock.mockResolvedValue({ id: 'user-nuevo', mail });
+
+      const resultado = await createUserAction(
+        { status: 'idle' },
+        formData(CAMPOS_DEL_FORMULARIO),
+      );
+
+      expect(resultado).toEqual({ status: 'success', id: 'user-nuevo', mail });
+    });
+  }
+
+  it('2/5 un fallo de correo NO es un fallo del alta: el estado sigue siendo `success`', async () => {
+    // R30 literal: «el sistema NO DEBE deshacer la creacion ni devolver un fallo del alta por esta
+    // causa». Si alguien convirtiera `'failed'` en un `ErrorState`, esta linea se pondria roja.
+    createUserMock.mockResolvedValue({ id: 'user-nuevo', mail: 'failed' });
+
+    const resultado = await createUserAction(
+      { status: 'idle' },
+      formData(CAMPOS_DEL_FORMULARIO),
+    );
+
+    expect(resultado).toMatchObject({ status: 'success' });
+    expect(resultado).not.toMatchObject({ status: 'error' });
+  });
+
+  it('3/5 `invalid_credential` devuelve las REGLAS INCUMPLIDAS, no un ErrorState', async () => {
+    // R2 y `design.md > 11.3`: las reglas son datos que la persona necesita para corregir, y el
+    // unico hueco de `ErrorState` para datos variables es el `diagnostic`, que QC-70 R29 manda al
+    // registro del servidor y prohibe serializar al navegador. Por eso es variante propia.
+    createUserMock.mockRejectedValue(new CredentialPolicyRejectedError(['min_length', 'no_digit']));
+
+    const resultado = await createUserAction(
+      { status: 'idle' },
+      formData({ ...CAMPOS_DEL_FORMULARIO, credential: 'corta' }),
+    );
+
+    expect(resultado).toEqual({ status: 'invalid_credential', unmet: ['min_length', 'no_digit'] });
+    // No tiene `code` ni `message`: no paso por el catalogo, y no debia.
+    expect(Object.keys(resultado).sort()).toEqual(['status', 'unmet']);
+  });
+
+  it('3/5 `unmet` son CODIGOS de regla: la candidata no viaja en el estado (R5)', async () => {
+    createUserMock.mockRejectedValue(new CredentialPolicyRejectedError(['breached']));
+
+    const resultado = await createUserAction(
+      { status: 'idle' },
+      formData({ ...CAMPOS_DEL_FORMULARIO, credential: 'Secreta-Reconocible-123' }),
+    );
+
+    expect(JSON.stringify(resultado)).not.toContain('Secreta-Reconocible-123');
+  });
+
+  it('4/5 y 5/5 `error`: el catalogado sin reference, el inesperado con el suyo (R34)', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    createUserMock.mockRejectedValue(new DuplicateEmailError());
+    const catalogado = await createUserAction(
+      { status: 'idle' },
+      formData(CAMPOS_DEL_FORMULARIO),
+    );
+    expect(catalogado).toEqual({
+      status: 'error',
+      code: 'duplicate_email',
+      message: errorMessage('duplicate_email'),
+    });
+
+    createUserMock.mockRejectedValue(new Error('el proveedor de correo no responde'));
+    const inesperado = await createUserAction(
+      { status: 'idle' },
+      formData(CAMPOS_DEL_FORMULARIO),
+    );
+    expect(inesperado).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+      // QC-71 R13: el inesperado conserva su identificador de peticion; el catalogado sigue sin el.
+      reference: REQUEST_ID_DE_PRUEBA,
+    });
+    log.mockRestore();
+  });
+
+  it('la contrasena que escribe el administrador viaja TAL CUAL, sin normalizar (QC-19 R10)', async () => {
+    // Un espacio al final es PARTE de la contrasena: si la action hiciera `trim`, se guardaria una
+    // distinta de la que se escribio. Y la cadena vacia se pasa SIN convertirla: quien trata `''`
+    // como «no la escribio» es el dominio (R1), en UN solo sitio.
+    createUserMock.mockResolvedValue({ id: 'user-nuevo', mail: 'not_needed' });
+
+    await createUserAction(
+      { status: 'idle' },
+      formData({ ...CAMPOS_DEL_FORMULARIO, credential: 'Con-Espacio-9 ' }),
+    );
+
+    const candidato = createUserMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(candidato.credential).toBe('Con-Espacio-9 ');
+  });
+
+  it('la EDICION no gana ningun campo de credencial: `updateUserSchema` lo omite', async () => {
+    // El helper del candidato lo comparten el alta y la edicion. `credential` se monta SOLO en el
+    // alta: anadirlo al helper haria fallar toda edicion con `invalid_input`.
+    updateUserMock.mockResolvedValue(undefined);
+
+    await updateUserAction(
+      'user-2',
+      { status: 'idle' },
+      formData({ ...CAMPOS_DEL_FORMULARIO, credential: 'Una-Contrasena-9' }),
+    );
+
+    expect(updateUserMock).toHaveBeenCalledWith(ACTOR_ESPERADO, 'user-2', CAMPOS_DEL_FORMULARIO);
   });
 });

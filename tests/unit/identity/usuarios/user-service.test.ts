@@ -204,6 +204,9 @@ function montar(resultados: Resultados = {}) {
       orden.push('secrets.create');
       return { secret: SECRETO, digest: HUELLA };
     }),
+    // T18: el puerto gano `digestOf` en T13 (lo usa el caso de uso PUBLICO, no el alta). El doble
+    // lo completa para cumplir el contrato entero; ninguna expectativa de este archivo cambia.
+    digestOf: vi.fn<CredentialSetupSecretFactory['digestOf']>(() => HUELLA),
   } satisfies CredentialSetupSecretFactory;
 
   const links = {
