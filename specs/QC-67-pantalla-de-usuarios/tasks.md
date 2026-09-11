@@ -157,35 +157,35 @@
 
 ### T13 — Barrel y convenciones *(depende de T6–T12)*
 
-- [ ] `components/index.ts` reexporta todos los componentes de la ruta; `page.tsx` importa **solo**
+- [x] `components/index.ts` reexporta todos los componentes de la ruta; `page.tsx` importa **solo**
       por el barrel; en la carpeta de la ruta solo quedan archivos del App Router.
-- [ ] Test `usuarios-convenciones.test.ts`: sin componentes sueltos, sin imports por ruta profunda,
+- [x] Test `usuarios-convenciones.test.ts`: sin componentes sueltos, sin imports por ruta profunda,
       sin `fetch` a rutas propias, sin import de las actions desde `@/lib/modules/identity`, sin
       `lib/composition` ni cliente de base de datos en archivos `'use client'`.
-- [ ] `git diff --stat` no toca `lib/modules/identity/**`, `db/**` ni `package.json`.
+- [x] `git diff --stat` no toca `lib/modules/identity/**`, `db/**` ni `package.json`.
 - **Hecho cuando**: pasa y las guardias de arquitectura siguen verdes. **(R37, R38, R39, R41)**
 
 ### T14 — Multiplataforma *(depende de T8, T9, T10, T11)*
 
-- [ ] Test `usuarios-viewport.test.tsx` en angosto y ancho con `tests/helpers/viewport.ts`: sin
+- [x] Test `usuarios-viewport.test.tsx` en angosto y ancho con `tests/helpers/viewport.ts`: sin
       `100vh`, objetivos ≥ 44×44, campos ≥ 16 px, acciones en el DOM sin `:hover`, scroll horizontal
       contenido en la tabla.
 - **Hecho cuando**: pasa en los dos anchos, sin excepción declarada. **(R21, R40)**
 
 ### T15 — E2E *(depende de T8–T12)*
 
-- [ ] `e2e/usuarios.spec.ts`: login → pantalla → **crear un usuario** → verlo en la lista con estado
+- [x] `e2e/usuarios.spec.ts`: login → pantalla → **crear un usuario** → verlo en la lista con estado
       `pending`.
-- [ ] Segundo caso: sesión válida **sin `usuarios.consultar`** → **404 dentro del layout privado**,
+- [x] Segundo caso: sesión válida **sin `usuarios.consultar`** → **404 dentro del layout privado**,
       sin tabla y sin nombrar el módulo.
 - **Hecho cuando**: los dos pasan con Playwright. Cierra la E2E que QC-66 difirió aquí. **(R42)**
 
 ### T16 — Cierre *(depende de todo)*
 
-- [ ] `./init.sh` completo en verde.
-- [ ] `progress/impl_QC-67-pantalla-de-usuarios.md` con el mapa `R<n> -> test` de abajo, relleno con
+- [x] `./init.sh` completo en verde.
+- [x] `progress/impl_QC-67-pantalla-de-usuarios.md` con el mapa `R<n> -> test` de abajo, relleno con
       los nombres reales de archivo.
-- [ ] Entrada en `progress/history.md`.
+- [x] Entrada en `progress/history.md`.
 
 ## Mapa `R<n> -> test` (lo exige `CHECKPOINTS.md > Trazabilidad`)
 

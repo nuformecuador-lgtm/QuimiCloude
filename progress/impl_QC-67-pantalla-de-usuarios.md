@@ -200,10 +200,139 @@ reescribir el componente.
 **Ninguna primitiva de shadcn instalada**: `sheet`, `alert-dialog`, `select`, `input`, `label`,
 `button` y `skeleton` ya estaban. Cero dependencias nuevas.
 
+### Bloque 5 — T13, T14, T15
+
+**Creados**
+
+- `tests/unit/configuracion-ui/usuarios-convenciones.test.ts` — afirma sobre la FUENTE: sin
+  componentes sueltos, sin rutas profundas, sin `fetch` a rutas propias, actions **por su ruta
+  exacta** y nunca desde el barrel del modulo, `{ status: 'idle' }` construido aqui, ningun
+  `'use client'` importa `lib/composition` ni la base, **ningun dato de credencial** en la ruta, y
+  un solo `<Toaster />` en la zona privada. Ata por test que la feature no abre
+  `lib/modules/identity/**`, `db/**` ni `package.json`, **con caso anti-vacuidad** que comprueba
+  que el detector muerde (R8, R29, R35, R36, R37, R38)
+- `tests/unit/configuracion-ui/usuarios-viewport.test.tsx` — 27 casos en los **dos** anchos (375 y
+  1280 px): sin alto de ventana, objetivos >= 44x44, campos >= 16 px en todos los anchos, acciones
+  en el DOM sin `:hover`, scroll horizontal **contenido en la tabla**, sin excepcion de escritorio
+  (R21, R40)
+- `e2e/usuarios.spec.ts` — los dos recorridos de R42, verdes en **Chromium y WebKit**
+
+**Listas CERRADAS tensadas fuera de la carpeta de la feature (R39)** — todas suben el ancla **y**
+nombran la entrada nueva; ninguna relaja el criterio, que sigue siendo `toEqual`:
+
+- `tests/guards/guard-identificador-de-request.test.ts` — `E2E_ESPERADOS`, de 13 a 14
+- `tests/unit/shared/data-table-alcance.test.ts` — dos anclas: consumidores autorizados de la
+  tabla compartida (5 -> 6) y specs E2E que la referencian (5 -> 6). **La primera ya estaba en
+  rojo desde el bloque 2** y no se detecto entonces porque las tandas solo corrian
+  `configuracion-ui` y `guards`: la caza el gate completo, que es justo para lo que existe
+- `tests/unit/identity/account-status-scope.test.ts` — `SITIOS_PERMITIDOS`, bloque rotulado propio
+  con las **cinco** entradas de QC-67, cada una con el requisito que la autoriza, al estilo de los
+  bloques que ya dejaron QC-78 y QC-66
+
+**Los dos rojos que dio el gate, y su diagnostico.**
+
+1. `account-status-scope` — **rojo legitimo**. La pantalla nombra el estado de cuenta porque es
+   exactamente lo que su spec le manda: etiquetarlo, filtrarlo, pintarlo y moverlo. Se resolvio
+   dando de alta los cinco archivos en la lista cerrada, **sin tocar produccion**.
+2. `usuarios-viewport` — **falso positivo del propio detector**, no de la UI. El `100vh` que veia
+   era `--available-height`, una **variable de medida** que el posicionador de **Base UI** siembra
+   al abrir el selector (`useAnchorPositioning.js`), y que `components/ui/select.tsx` consume como
+   `max-h-(--available-height)`: un **techo**, no una altura. Verificado ademas por `grep`: ningun
+   archivo de la ruta escribe `100vh`, `h-screen` ni `min-h-screen`. El helper paso de buscar la
+   **subcadena** `100vh` a mirar **declaraciones de altura reales** (`height` / `min-height` /
+   `max-height`), ignorando las propiedades personalizadas, **con siete casos anti-vacuidad** que
+   demuestran que sigue mordiendo. Se tenso en **precision**, no se aflojo en severidad.
+
 ## Mapa `R<n> -> test`
 
-(se rellena al cierre, con los nombres reales de archivo)
+| R | Test real |
+| --- | --- |
+| R1 | `usuarios-route-contract.test.ts` — la pagina vive en la ruta DERIVADA de `USERS_ROUTE`, no en un literal |
+| R2 | `private-nav-usuarios.test.ts` — tercer item, orden intacto, seccion no duplicada ni renombrada |
+| R3 | `private-nav-usuarios.test.ts` + `usuarios-page.test.tsx` — item y pagina exigen el MISMO codigo; sin el permiso el item no se emite |
+| R4 | `usuarios-page.test.tsx` — sin sesion redirige al login; con sesion sin permiso `notFound()`; con permiso renderiza |
+| R5 | `usuarios-route-contract.test.ts` + `guard-rutas-privadas-cubiertas` |
+| R6 | `user-row-actions.test.tsx` + `user-table.test.tsx` + `usuarios-page.test.tsx` — sin `usuarios.modificar` no se emite NINGUNA escritura (ni disparador, ni panel, ni dialogos); con el, las cuatro |
+| R7 | `user-list-section.test.tsx` — `unauthorized` produce estado de error SIN un solo dato |
+| R8 | `usuarios-convenciones.test.ts` — ningun `'use client'` importa composicion ni base de datos |
+| R9 | `data-table-intacta-usuarios.test.ts` + `user-table.test.tsx` |
+| R10 | `user-columns.test.tsx` — las SEIS claves exactas |
+| R11 | `user-list-section.test.tsx` + `e2e/usuarios.spec.ts` — no se anade fila del actor ni aviso de ausencia |
+| R12 | `user-table.test.tsx` — cambiar el termino NAVEGA, no filtra en cliente |
+| R13 | `user-list-params.test.ts` + `user-columns.test.tsx` — filtro multivalor y UNICO |
+| R14 | `user-columns.test.tsx` — ordenables LEIDAS de `USER_QUERYABLE.sortable` |
+| R15 | `user-list-params.test.ts` — ancla contra el contrato: la lista blanca no se amplia |
+| R16 | `user-table.test.tsx` — 10/25 y paginacion |
+| R17 | `user-list-params.test.ts` — ninguna entrada produce error |
+| R18 | `user-list-empty.test.tsx` |
+| R19 | `user-list-section.test.tsx` — cargando, y error con el mensaje devuelto y reintentar |
+| R20 | `user-columns.test.tsx` + `user-labels.test.ts` — se pinta el estado ALMACENADO; no se lee `lockedUntil` |
+| R21 | `usuarios-viewport.test.tsx` — scroll horizontal contenido en la tabla |
+| R22 | `user-sheet.test.tsx` — panel lateral; al cerrar, misma URL |
+| R23 | `user-form.test.tsx` — exactamente NUEVE nombres en el `FormData` |
+| R24 | `user-form.test.tsx` + `user-list-section.test.tsx` — opciones desde `listRolesAction`; fallo -> degradado, sin opciones inventadas |
+| R25 | `user-form.test.tsx` — tipo de documento desde `DOCUMENT_TYPE_CODES` |
+| R26 | `user-sheet.test.tsx` — precarga con `getUserAction`, tres estados del panel, reemplazo completo |
+| R27 | `user-form.test.tsx` — reparto por `code`, panel abierto, valores conservados |
+| R28 | `user-sheet.test.tsx` — toast neutro, sin credencial ni enlace |
+| R29 | `user-sheet.test.tsx` + `usuarios-convenciones.test.ts` — refresco sin cambiar URL; UN solo `<Toaster />` |
+| R30 | `delete-user-dialog.test.tsx` — nombra al usuario; sin confirmar no invoca |
+| R31 | `delete-user-dialog.test.tsx` — `self_operation` y `last_administrator` DENTRO del dialogo, fila intacta |
+| R32 | `user-status-dialog.test.tsx` — una accion, cuatro valores, confirmacion |
+| R33 | `user-status-dialog.test.tsx` — rechazo dentro, estado de la fila intacto |
+| R34 | `user-status-dialog.test.tsx` — `blocked -> active` se ofrece igual; no se tocan contadores |
+| R35 | `user-form.test.tsx` + `user-columns.test.tsx` + `usuarios-convenciones.test.ts` — ningun dato de credencial en props ni en el envio |
+| R36 | `usuarios-convenciones.test.ts` — imports por ruta exacta, `{status:'idle'}` local, sin `fetch` |
+| R37 | `usuarios-convenciones.test.ts` — sin cambios en `identity`, `db/` ni `package.json`, con anti-vacuidad |
+| R38 | `usuarios-convenciones.test.ts` — barrel y ausencia de rutas profundas |
+| R39 | `usuarios-convenciones.test.ts` + las listas cerradas tensadas y verdes |
+| R40 | `usuarios-viewport.test.tsx` — los dos anchos, con anti-vacuidad del detector |
+| R41 | Las guardias de convencion barren toda `tests/unit/configuracion-ui/` y prohiben identificar por copy: los 17 archivos de test de esta ficha pasan bajo ellas |
+| R42 | `e2e/usuarios.spec.ts` — alta + `pending`, y 404 sin permiso, en Chromium y WebKit |
+
+Todos los archivos de la tabla viven en `tests/unit/configuracion-ui/`, salvo `e2e/usuarios.spec.ts`
+y las guardias de `tests/guards/`. **Los 42 requisitos tienen test; ninguno queda sin anclar.**
+
 
 ## Salida de los tests
 
-(se rellena al cierre)
+`./init.sh` **completo**, tercera corrida, 2026-09-11:
+
+```
+Test Files  346 passed (346)
+     Tests  4704 passed | 31 skipped (4735)
+  Duration  172.91s
+aviso: 5 archivo(s) del baseline ya pasan; toca limpiarlos
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
+
+E2E con Playwright (`pnpm exec playwright test e2e/usuarios.spec.ts`):
+
+```
+✓ [chromium] sin `usuarios.consultar` recibe 404 dentro del layout privado y no ve la tabla (10.4s)
+✓ [chromium] da de alta un usuario y lo ve en la lista con estado pending           (12.7s)
+✓ [webkit]   sin `usuarios.consultar` recibe 404 ...                                (13.5s)
+✓ [webkit]   da de alta un usuario ...                                              (17.2s)
+4 passed (24.9s)
+```
+
+**Dos avisos honestos sobre las corridas del gate.**
+
+- Hicieron falta **tres** corridas completas. La primera y la segunda cayeron con **un solo rojo**
+  cada una, y las dos veces fue `tests/unit/inventario/product-page.test.tsx`, un archivo que esta
+  ficha **no toca**. No es regresion, y no se da por bueno a ojo: (a) el archivo pasa AISLADO,
+  42/42 en 30 s; (b) el fallo **cambio de linea** entre corridas —1096 y luego 1509—, que es firma
+  de plazo agotado y no de rotura determinista; (c) `git diff` confirma que el rango de esta rama
+  no toca `app/(private)/inventario`, `lib/modules/inventario` ni `tests/unit/inventario`; (d) la
+  tercera corrida completa salio limpia con el archivo dentro; (e) hay sesiones en paralelo en
+  otros worktrees compitiendo por CPU. Es **el flake de saturacion que documenta QC-58**.
+  **NO se anadio al baseline**: apagaria un archivo ajeno entero, y esa decision es humana y
+  explicita —asi se tomo la de `product-crud.int.test.ts` el 2026-09-10—. Queda **para que el
+  humano decida**.
+- El gate avisa de que **5 entradas del baseline ya pasan y toca limpiarlas**. Es **deuda previa y
+  ajena** a esta ficha —ninguna de las cinco es suya— y no se toco: limpiarlas es su propia
+  decision, no un efecto colateral de esta.
+

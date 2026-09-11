@@ -13,8 +13,10 @@
 // `user-list-params.ts` —es la clave de `DataTableParams.filters`— y se publica solo desde ahi,
 // aunque `user-columns.tsx` tambien lo use.
 //
-// **Barrel PARCIAL a proposito**: hoy existen las piezas de T4 a T8. T13 lo cierra con el panel
-// lateral y los dos dialogos de las escrituras.
+// **Barrel COMPLETO desde T13**: republica los TRECE componentes de la ruta —las piezas de T4 a
+// T8 y las tres escrituras de T9 a T11— y ningun nombre publico se queda fuera.
+// `usuarios-convenciones.test.ts` lo ata por los dos lados: que cada archivo aparezca aqui y que
+// cada nombre exportado por ellos este republicado.
 export {
   ACCOUNT_STATUS_COLUMN_ID,
   FILTER_SEPARATOR,
