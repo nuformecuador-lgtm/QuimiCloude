@@ -38,10 +38,18 @@ export type AddWorkGroupMemberDeps = {
  * es aqui donde nace el `MemberBlockReason` que el error necesita; mismo reparto que
  * `throwDuplicate`, exportada por `create-user.ts` y consumida por `update-user.ts`.
  *
- * Los tres casos del `switch` son, por construccion, los tres valores de `MemberBlockReason`: el
- * tipo de retorno lo comprueba en tiempo de compilacion, asi que si manana el catalogo de estados
- * de cuenta creciera, esta funcion **no compilaria** en vez de clasificar en silencio el estado
- * nuevo como «se ve».
+ * El `switch` es EXHAUSTIVO sobre `UserAccountStatus`, y eso es el requisito, no el estilo: los
+ * CUATRO estados se enumeran uno a uno y el caso inalcanzable se cierra asignando a `never`. Si
+ * manana el catalogo de estados creciera, esta funcion **no compila** —el estado nuevo no seria
+ * asignable a `never`— en vez de clasificarlo **en silencio** como «se ve», que es la forma de
+ * fallo que importa aqui: un estado nuevo que nadie clasifico apareceria en la lista de miembros
+ * (R19) y ademas elegiria el `code` equivocado al meter a quien ya pertenece (R31).
+ *
+ * **Antes esto era un `default: return null`, y era una promesa incumplida**: el comentario decia
+ * «no compilaria» y el codigo hacia exactamente lo contrario. El comportamiento de HOY no cambia
+ * —`'active'` sigue devolviendo `null`, que es lo que R19 pide—; lo que cambia es que ahora la
+ * garantia es verdadera. Hallazgo menor del reviewer de QC-84, arreglado cumpliendo la promesa en
+ * vez de rebajandola.
  */
 export function blockReasonOf(status: UserAccountStatus): MemberBlockReason | null {
   switch (status) {
@@ -49,8 +57,13 @@ export function blockReasonOf(status: UserAccountStatus): MemberBlockReason | nu
     case 'inactive':
     case 'blocked':
       return status;
-    default:
+    case 'active':
+      // La unica cuenta que SE VE (R19). No es un «resto»: esta enumerada a proposito.
       return null;
+    default: {
+      const noClasificado: never = status;
+      return noClasificado;
+    }
   }
 }
 
