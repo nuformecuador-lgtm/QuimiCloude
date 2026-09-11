@@ -28,8 +28,10 @@
 // pasa igual de verde si el detector esta roto: el caso negativo es lo unico que demuestra que
 // muerde.
 //
-// **Si el commit base no esta disponible, las comprobaciones que dependen de el FALLAN
-// RUIDOSAMENTE**, nunca se saltan: una guardia que se auto-desactiva cuando no puede mirar es
+// **La base del diff se calcula con `git merge-base` en cada ejecucion**, no con un SHA congelado
+// —el porque, en el comentario de `REFERENCIAS_DE_DEV`—. Si NINGUNA referencia de `dev` esta
+// disponible, las comprobaciones que dependen de ella se saltan con `ctx.skip(...)` y el motivo
+// escrito, jamas en verde silencioso: una guardia que se auto-desactiva sin decirlo es
 // indistinguible de una guardia rota.
 
 import { execFileSync } from 'node:child_process';
@@ -116,11 +118,22 @@ const INTOCABLES = ['lib/modules/identity', 'db', 'package.json'] as const;
 const MANIFIESTO = 'package.json';
 
 /**
- * La RAMA BASE de esta feature: el commit de `dev` del que nacio el worktree. Es un commit y no
- * una referencia movil, para que el criterio no cambie por debajo si `dev` avanza mientras la
- * rama esta viva. La misma que usa `data-table-intacta-usuarios.test.ts`.
+ * Las referencias que nombran la rama de integracion, en orden de preferencia. La base contra la
+ * que se mide esta feature es el **merge-base** entre `dev` y `HEAD`, calculado en CADA ejecucion.
+ *
+ * Aqui vivio un SHA congelado (`5e84433`, el `dev` del que nacio el worktree) justificado con que
+ * «asi el criterio no cambia por debajo si `dev` avanza». El argumento era falso y el efecto, el
+ * contrario: `git diff <sha> -- <rutas>` (DOS puntos) compara arbol contra arbol, de modo que en
+ * cuanto la rama se sincronizo con `dev` el rango se trago todo lo que `dev` traia —la migracion
+ * `20260911120000_presentation_unit`, que es de QC-80— y se lo atribuyo a esta feature. R37 se
+ * puso roja sin que la feature hubiera abierto un solo intocable. Esto se corrigio tras esa
+ * sincronizacion real, no por gusto: el SHA congelado estaba MAL.
+ *
+ * El merge-base conserva —y refuerza— la propiedad que aquel comentario buscaba: la pregunta pasa
+ * a ser «que anade MI rama sobre el `dev` ACTUAL», que es justo lo que R37 quiere saber, y el
+ * criterio no se afloja porque `dev` avance, porque lo que `dev` aporta nunca cuenta como mio.
  */
-const RAMA_BASE = '5e84433';
+const REFERENCIAS_DE_DEV = ['origin/dev', 'dev'] as const;
 
 // --------------------------------------------------------------------------------------------
 // Utilidades de lectura
@@ -357,11 +370,35 @@ function git(args: readonly string[]): string {
 }
 
 /**
- * Los archivos que la feature toca bajo `rutas`, contra el ARBOL DE TRABAJO —no contra `HEAD`—,
- * asi que una modificacion sin commitear tambien cae.
+ * El merge-base entre la primera referencia de `dev` disponible y `HEAD`, o `null` si no hay
+ * ninguna a mano. `null` NO es verde: quien depende de la base se salta con el motivo escrito.
  */
-function tocadosBajo(rutas: readonly string[]): string[] {
-  return git(['diff', '--name-only', RAMA_BASE, '--', ...rutas])
+function baseDeLaRama(): string | null {
+  for (const referencia of REFERENCIAS_DE_DEV) {
+    try {
+      return git(['merge-base', referencia, 'HEAD']).trim();
+    } catch {
+      // Esa referencia no existe aqui: se prueba la siguiente.
+    }
+  }
+  return null;
+}
+
+/** Se calcula una sola vez: el grafo no se mueve mientras corre la suite. */
+const BASE_DE_LA_RAMA = baseDeLaRama();
+
+/** El motivo que se escribe cuando no hay base: un salto explicito, nunca un verde silencioso. */
+const SIN_BASE =
+  `ninguna de las referencias ${REFERENCIAS_DE_DEV.join(', ')} esta disponible: no se puede ` +
+  'calcular el merge-base, asi que esta guardia NO ha comprobado nada';
+
+/**
+ * Los archivos que la feature toca bajo `rutas`, contra el ARBOL DE TRABAJO —no contra `HEAD`—,
+ * asi que una modificacion sin commitear tambien cae. Por eso el merge-base se pasa como commit
+ * suelto en vez de escribir `origin/dev...HEAD`: la forma de tres puntos solo mira commits.
+ */
+function tocadosBajo(base: string, rutas: readonly string[]): string[] {
+  return git(['diff', '--name-only', base, '--', ...rutas])
     .split('\n')
     .map((linea) => aPosix(linea.trim()))
     .filter((linea) => linea !== '');
@@ -672,42 +709,63 @@ describe('en la zona privada hay EXACTAMENTE un `<Toaster />` (R29)', () => {
 // --------------------------------------------------------------------------------------------
 
 describe('la feature no abre `identity`, `db/` ni `package.json` (R37)', () => {
-  it(`el commit base ${RAMA_BASE} resuelve; si no, esta guardia falla ruidosamente`, () => {
-    expect(() => git(['rev-parse', '--verify', `${RAMA_BASE}^{commit}`])).not.toThrow();
+  it('el merge-base con `dev` resuelve a un commit; si no hay `dev`, el caso se salta', (ctx) => {
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
+      return;
+    }
+
+    expect(() => git(['rev-parse', '--verify', `${BASE_DE_LA_RAMA}^{commit}`])).not.toThrow();
   });
 
-  it('ninguno de los tres intocables aparece en el diff contra la rama base', () => {
-    const tocados = tocadosBajo(INTOCABLES);
+  it('ninguno de los tres intocables aparece en lo que ESTA rama anade sobre `dev`', (ctx) => {
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
+      return;
+    }
+
+    const tocados = tocadosBajo(BASE_DE_LA_RAMA, INTOCABLES);
 
     expect(tocados, `la feature toca intocables: ${tocados.join(', ')}`).toEqual([]);
   });
 
-  it('el detector muerde: comparando la carpeta de la pantalla, el diff NO sale vacio', () => {
-    // Sin esto, «ningun intocable tocado» podria serlo por vacuidad: un rango mal formado o un
-    // `git diff` que fallara en silencio darian la misma lista vacia.
-    expect(tocadosBajo([CARPETA_DE_LA_RUTA])).not.toEqual([]);
+  it('el detector muerde: comparando la carpeta de la pantalla, el diff NO sale vacio', (ctx) => {
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
+      return;
+    }
+
+    // Sin esto, «ningun intocable tocado» podria serlo por vacuidad: un rango mal calculado o un
+    // `git diff` que fallara en silencio darian la misma lista vacia, y el caso de R37 pasaria en
+    // verde sin mirar nada. La carpeta de la pantalla SI cambia respecto del merge-base.
+    expect(tocadosBajo(BASE_DE_LA_RAMA, [CARPETA_DE_LA_RUTA])).not.toEqual([]);
   });
 
-  it('y `package.json` sigue siendo el de la rama base, entrada por entrada', () => {
+  it('y `package.json` sigue siendo el del merge-base, entrada por entrada', (ctx) => {
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
+      return;
+    }
+
     let enLaBase: {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
     try {
-      enLaBase = JSON.parse(git(['show', `${RAMA_BASE}:${MANIFIESTO}`]));
+      enLaBase = JSON.parse(git(['show', `${BASE_DE_LA_RAMA}:${MANIFIESTO}`]));
     } catch (error) {
       throw new Error(
-        `No se pudo leer \`${RAMA_BASE}:${MANIFIESTO}\`, asi que R37 NO se ha comprobado. Esta ` +
-          `guardia falla en vez de pasar en silencio. Causa: ${String(error)}`,
+        `No se pudo leer \`${BASE_DE_LA_RAMA}:${MANIFIESTO}\`, asi que R37 NO se ha comprobado. ` +
+          `Esta guardia falla en vez de pasar en silencio. Causa: ${String(error)}`,
       );
     }
 
     const aqui = JSON.parse(leer(MANIFIESTO)) as typeof enLaBase;
 
-    expect(aqui.dependencies ?? {}, 'las dependencias no son las de la rama base').toEqual(
+    expect(aqui.dependencies ?? {}, 'las dependencias no son las del merge-base').toEqual(
       enLaBase.dependencies ?? {},
     );
-    expect(aqui.devDependencies ?? {}, 'las de desarrollo no son las de la rama base').toEqual(
+    expect(aqui.devDependencies ?? {}, 'las de desarrollo no son las del merge-base').toEqual(
       enLaBase.devDependencies ?? {},
     );
   });
