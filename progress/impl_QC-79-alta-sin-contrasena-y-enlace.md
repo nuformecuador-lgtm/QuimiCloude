@@ -382,3 +382,97 @@ nunca se lanza —fallar ruidosamente ahi es lo que `design.md > 9.2` pide, y el
 de por defecto—; n.º 7 ya cerrado arriba; n.º 8 observacion sobre el secreto en el **camino** de la
 URL —la mitigacion real es el `no-referrer`, el uso unico, los 7 dias y la huella, no la frase de
 `design.md > 4.4`, que **no debe reusarse como si fuera una garantia**—.
+
+---
+
+# F2.3 — Sincronizacion con `dev` (2026-09-11)
+
+`dev` avanzo **41 commits**: entraron **QC-67** (`pantalla-de-usuarios`), **QC-86**, **QC-80** y
+**QC-94**. `git merge origin/dev` dio **7 conflictos**, exactamente los previstos.
+
+## Los siete conflictos, y por que los siete se resuelven igual
+
+**Los siete son de la misma clase**: las dos ramas **anaden al final del mismo bloque**, asi que la
+resolucion correcta es **quedarse con las dos** y no elegir. Se comprobo uno a uno, no se asumio.
+
+| # | Archivo | Que chocaba | Resolucion |
+| --- | --- | --- | --- |
+| 1 | `lib/shared/routes.ts` | QC-79 anade `CREDENTIAL_SETUP_ROUTE` + `credentialSetupRoute`; QC-67 anade `USERS_ROUTE` | Las dos. **`USERS_ROUTE` va primero** porque su propio texto dice que es «la TERCERA hermana» de `PRESENTATIONS_ROUTE` y `UNITS_ROUTE`. Hubo que **reconstruir un abre-comentario**: el conflicto arrancaba a mitad de un comentario compartido |
+| 2 | `lib/modules/identity/index.ts` | Bloque de contrato de QC-79 vs. el de QC-94 (`listRoles`) | Los dos. **Verificado R32**: el barrel **no** reexporta ningun adaptador `driving` |
+| 3 | `lib/composition/index.ts` | Dos hunks: imports y claves de fachada, de QC-79 y de QC-94 | Los dos, en los dos hunks |
+| 4 | `tests/unit/composition/identity-facade.test.ts` | Dos `describe` nuevos al final | Los dos. **El cierre final era compartido**: dejarlos sin mas habria **anidado** el segundo dentro del primero. Se cierra el nuestro explicitamente |
+| 5 | `tests/guards/guard-identificador-de-request.test.ts` | Dos hunks: `E2E_ESPERADOS` (el spec de QC-79 vs. el de QC-67) y `MIGRACIONES_ESPERADAS` (la del enlace vs. las de QC-86 y QC-80) | Los dos, en los dos hunks. Las dos listas son **cerradas** y su punto de extension es ese |
+| 6 | `tests/unit/identity/account-status-scope.test.ts` | Bloque aditivo de QC-79 (2 archivos) vs. el de QC-67 (5) | Los dos. La comparacion **ordena**, asi que el orden no importa, y sigue siendo una igualdad |
+| 7 | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | `credentialSetupRoute` vs. `USERS_ROUTE` en la lista cerrada de exports | Los dos |
+
+**Nada quedo ambiguo**, asi que no hubo que parar a preguntar y `progress/current.md > Conflictos
+pendientes` no gana ninguna fila.
+
+De paso se corrigio, en el bloque de contrato de QC-79, la **misma cita falsa a QC-70 R31** que el
+menor n.º 3 acababa de arreglar en el `design.md` y en `credential-rejected.ts`.
+
+## El ripple de verdad NO estaba en los conflictos
+
+`git merge` resolvio limpio `app/(private)/configuracion/usuarios/**` —QC-79 no lo toca—, y ahi
+estaba el problema. **QC-67 pinta el alta cuya firma cambio esta ficha.**
+
+**Mitad visible** (`typecheck` en rojo, mecanica): `tests/unit/configuracion-ui/user-form.test.tsx` y
+`user-sheet.test.tsx` construian el estado de exito sin el `mail` que R30 anadio. Se les pone
+`mail: 'sent'`, que es lo que simulan: esa pantalla **no tiene campo de contrasena**, asi que su alta
+va **siempre** por la rama del enlace.
+
+**Mitad invisible, que compilaba y estaba rota.** `user-form.tsx > submit` trataba **todo lo que no
+fuera error** como exito. Con la variante nueva `invalid_credential`, un alta **rechazada por la
+politica** —sin crear ninguna fila, sin enlace y sin correo (R2)— se le habria presentado a la
+persona como **«usuario creado»**, cerrando la hoja y disparando `onSaved()`. **Un fallo silencioso
+presentado como exito**, que es justo lo que un merge que compila esconde.
+
+Hoy esa pantalla **no puede provocarlo** (no manda credencial), pero el **tipo ya lo admitia**. Ahora
+`submit` **discrimina en positivo** —el exito es exito, el error es error, y **cualquier otra cosa NO
+se reporta como exito**— y `invalid_credential` cae en el error de formulario que la pantalla ya sabe
+pintar. Queda escrito en el codigo que **la version buena es pintar las reglas incumplidas junto al
+campo, y que eso es trabajo de QC-67**: el generico es una degradacion consciente, mejor que una
+mentira.
+
+### Hueco de QC-67 contra R30 que se deja SIN implementar, para decision del humano
+
+**La pantalla ignora `mail` por completo.** Si el envio falla, el usuario queda creado, en `pending`
+y con su enlace vivo, y la pantalla dice «usuario creado» sin mas: **nadie se entera de que la
+persona no recibio nada, y nadie le ofrece el reenvio**. R30 existe precisamente para que QC-67
+pudiera ofrecerlo (R14). **No se ha inventado UI**: ni aviso, ni pantalla de reenvio, ni campo de
+contrasena.
+
+## Base de datos
+
+El merge trajo **dos migraciones** de `dev` —`20260911120000_order_assignments` (QC-86) y
+`20260911120000_presentation_unit` (QC-80)—, con marca de tiempo **anterior** a la del enlace.
+Aplicadas sobre `QuimiCloude_QC79` sin incidencia: «All migrations have been successfully applied».
+
+## Gate completo, despues del merge
+
+```
+== init OK ==
+Tests  9 failed | 5216 passed | 31 skipped (5256)
+tests: sin rojos nuevos (6 rojos, todos en el baseline de 9); 3 por limpiar
+todas las migraciones tienen down.sql
+```
+
+La **primera** corrida tras el merge dejo **un** rojo fuera del baseline:
+`tests/unit/configuracion-ui/usuarios-convenciones.test.ts`, que **llego con el merge** y es de
+**QC-67**. Misma especie que las demas: su R37 afirma «**MI** ficha no abre `identity`, `db/` ni
+`package.json`» —cierto para QC-67— pero lo implemento como **censo del diff de la RAMA**, asi que en
+la rama de cualquier otra feature con derecho a esas zonas ve los archivos ajenos y se pone rojo.
+Aqui censa 25 rutas de QC-79 —que toca `identity/**` y `db/` **porque es su spec aprobado**— y el
+`resend` aprobado en F1.4. **No tapa ninguna regresion.** Entrada al baseline con su coste aceptado
+—los 21 casos del archivo que si valen, enumerados— y su salida limpia.
+
+**Limpieza:** el comparador avisa de entradas del baseline que **ya pasan**. Se retiro
+`tests/unit/inventario/schema/inventario-schema.test.ts`, que **la anadio esta ficha hoy** y que tras
+el merge pasa (27/27): la justificacion con la que entro ya no se sostiene, y dejarla seria un
+agujero propio. El baseline queda en **9**.
+
+**Las otras tres NO se retiran, y es deliberado**: `product-crud.int.test.ts` es el flake de
+saturacion y **su propia nota exige tres corridas completas verdes seguidas** antes de retirarla —hay
+una—; `recetas/module-contract.test.ts` y `unidades/modulo-intacto.test.ts` son estructurales de
+fichas ajenas y pasan hoy porque el **merge-base se movio**, asi que pueden volver a caer. Retirarlas
+es trabajo de quien las escribio. **Queda anotado como deuda visible**, no escondida.
