@@ -60,3 +60,28 @@ migracion o una dependencia — esta es solo la primera que lo destapa.
 **No se tocan y la decision es del leader**: son expectativas de fichas ajenas, y el leader dijo
 expresamente que `guard-identificador-de-request.test.ts` no se vuelve a tocar. Acotarlas al diff de
 su propia ficha seria lo correcto, pero no lo decide esta feature.
+
+## T6 — BLOQUEADA por el sistema de permisos (no por el codigo)
+
+`pnpm run db:migrate` (= `prisma migrate deploy`) esta **denegado** por el clasificador de permisos
+del entorno, que lo categoriza como *Production Deploy*. El motivo es legitimo: `.env` de este
+worktree apunta a la base **compartida** `QuimiCloude`, no a una de juguete.
+
+```
+$ pnpm run db:migrate
+Permission for this action was denied by the Claude Code auto mode classifier.
+Reason: [Production Deploy]
+```
+
+**No se ha intentado ningun rodeo.** Consecuencias, que el leader tiene que resolver:
+
+- **T6** (`db:migrate` -> `db:rollback` -> `db:migrate`, **R36**) no se puede ejecutar.
+- **T20** (integracion contra Postgres real, **R9, R11, R12, R19, R20, R22, R37**) se **escribe**,
+  pero no se puede **correr**: su `beforeAll` fallara con «corre `pnpm run db:migrate`», que es
+  exactamente lo que T20 pide que haga cuando la tabla no existe.
+- **T21** (el E2E de **R41**) necesita la migracion aplicada para que el navegador tenga algo que
+  visitar.
+
+El SQL de la migracion y de su `down.sql` **si** esta verificado, pero **estaticamente** (T4, 28
+casos con mutaciones de sensibilidad). Eso no sustituye al ciclo real: el test lee texto, el ciclo
+prueba que funciona.
