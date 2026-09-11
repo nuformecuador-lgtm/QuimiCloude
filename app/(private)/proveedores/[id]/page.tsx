@@ -90,7 +90,7 @@ export default async function ProveedorDetallePage({
         {supplierResult.code === SUPPLIER_NOT_FOUND_CODE ? (
           <SupplierNotFound />
         ) : (
-          <CatalogListError code={supplierResult.code} message={supplierResult.message} />
+          <CatalogListError error={supplierResult} />
         )}
       </div>
     );
@@ -102,7 +102,7 @@ export default async function ProveedorDetallePage({
     // da la pagina de edicion de receta al mismo fallo.
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <CatalogListError code={unitsResult.code} message={unitsResult.message} />
+        <CatalogListError error={unitsResult} />
       </div>
     );
   }

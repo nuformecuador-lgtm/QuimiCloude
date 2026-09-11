@@ -1,7 +1,12 @@
 'use server';
 
-import { identity, recetas } from '@/lib/composition';
-import { createErrorStateTranslator, errorMessage, type ErrorCode } from '@/lib/modules/errores';
+import { identity, observabilidad, recetas } from '@/lib/composition';
+import {
+  createErrorStateTranslator,
+  errorMessage,
+  type ErrorCode,
+  type ErrorState,
+} from '@/lib/modules/errores';
 import {
   createRecipeSchema,
   updateRecipeSchema,
@@ -49,25 +54,25 @@ import {
 export type CreateRecipeFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type UpdateRecipeFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type DeleteRecipeFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type RecipeQueryResult =
   | { status: 'success'; data: RecipeDetail }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type RecipeListResult =
   | { status: 'success'; data: Page<RecipeSummary> }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 /**
  * QC-70 (R21, R32): el codigo y el mensaje de la entrada invalida que rechaza el borde
@@ -81,7 +86,7 @@ const INVALID_INPUT_MESSAGE = errorMessage(INVALID_INPUT_CODE);
  * copia local: la implementacion vive en `@/lib/modules/errores` y la guardia del catalogo
  * (caso 2) da rojo si alguien vuelve a escribir la suya aqui.
  */
-const toErrorState = createErrorStateTranslator(RecetasError);
+const toErrorState = createErrorStateTranslator(RecetasError, observabilidad.readRequestIdHeader);
 
 /** El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

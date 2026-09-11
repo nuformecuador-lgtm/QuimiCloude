@@ -20,6 +20,7 @@ import {
   verifySessionValue,
 } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import type { SessionTokenVerifier } from '@/lib/modules/identity/ports/session-token-verifier';
+import { REQUEST_ID_HEADER, newRequestId } from '@/lib/modules/observabilidad';
 
 /**
  * El verificador de la cookie tal y como lo ve el borde. `readSessionSecret()` se llama DENTRO de
@@ -34,3 +35,17 @@ const sessionTokenVerifier: SessionTokenVerifier = {
 
 /** Fachada edge-safe del modulo `identity`. Hoy la consume solo el middleware. */
 export const identityEdge = { sessionTokenVerifier } as const;
+
+/**
+ * Fachada edge-safe del modulo `observabilidad` (QC-71 T3). La consume el mismo adaptador
+ * driving que ya ocupa el middleware: el borde no conoce `lib/modules/observabilidad/domain/**`,
+ * conoce esta fachada.
+ *
+ * No arrastra nada: `newRequestId` usa el global `crypto.randomUUID()` y su archivo no declara
+ * ningun `import` (R2, R3). Por eso ampliar este archivo no acerca ni un paquete prohibido al
+ * cierre del borde, y `guard-middleware-edge` lo sigue demostrando sin que haya que tocarla.
+ */
+export const observabilidadEdge = {
+  newRequestId,
+  requestIdHeader: REQUEST_ID_HEADER,
+} as const;

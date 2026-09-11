@@ -14,7 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import {
   deletePresentationAction,
@@ -66,7 +67,9 @@ export const DELETE_PRESENTATION_ID_FIELD = 'id';
  * desapareciera o se renombrara, esto rompe el typecheck en vez de comparar contra una palabra
  * que ya no emite nadie.
  */
-export const PRESENTATION_IN_USE_CODE: ErrorCode = 'presentation_in_use';
+// QC-71 (R16): `satisfies` en vez de anotacion, mismo motivo que en `cancel-order-dialog`: el
+// tipo ancho arrastraria el codigo generico, que desde esta ficha exige `reference`.
+export const PRESENTATION_IN_USE_CODE = 'presentation_in_use' satisfies ErrorCode;
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -123,7 +126,16 @@ export function DeletePresentationDialog({
             data-testid={DELETE_PRESENTATION_ERROR_TESTID}
             data-code={error.code}
           >
-            <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            {/*
+              QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+              identificador de la peticion. El CATALOGADO -`presentation_in_use` entre otros- se
+              pinta como siempre y sin identificador.
+            */}
+            {error.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={error} />
+            ) : (
+              <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            )}
           </div>
         )}
 

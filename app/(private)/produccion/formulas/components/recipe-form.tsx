@@ -6,6 +6,7 @@ import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { StepReader } from '@/components/shared/step-reader';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { createRecipeSchema, updateRecipeSchema, type RecipeDetail } from '@/lib/modules/recetas';
 import {
   createRecipeAction,
@@ -124,7 +125,15 @@ type FieldErrors = {
   readonly steps?: RecipeStepErrors;
 };
 
-type SaveError = { readonly code: ErrorCode; readonly message: string };
+/**
+ * El error general del formulario, ENTERO.
+ *
+ * **QC-71 (R17): era `{ code, message }` copiado a mano, y esa copia perdia el `reference` del
+ * error inesperado.** Un `reference?: string` aqui reabriria el agujero por el otro lado -deja
+ * construir un inesperado sin identificador-, asi que lo que se guarda es la union cerrada de
+ * `lib/modules/errores` y el render estrecha por `code`.
+ */
+type SaveError = ErrorState;
 
 function buildInitialState(props: RecipeFormProps): RecipeFormState {
   if (props.mode === 'create') {
@@ -193,7 +202,7 @@ export function RecipeForm(props: RecipeFormProps) {
       // que el usuario tiene que ver -no un silencio-, así que también alimenta la región de error
       // general con el código estable `invalid_input`, igual que si lo hubiera rechazado el
       // servidor.
-      setSaveError({ code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE });
+      setSaveError({ status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE });
       return;
     }
 
@@ -212,7 +221,8 @@ export function RecipeForm(props: RecipeFormProps) {
           setFieldErrors((previous) => ({ ...previous, name: result.message }));
           return;
         }
-        setSaveError({ code: result.code, message: result.message });
+        // El estado de la operacion, TAL CUAL: copiarlo campo a campo tiraba el identificador.
+        setSaveError(result);
         return;
       }
 
@@ -239,15 +249,23 @@ export function RecipeForm(props: RecipeFormProps) {
           </Link>
         </div>
       ) : (
+        // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+        // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
         <div
           role="alert"
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
           data-testid="recipe-form-error"
         >
-          <p data-testid="recipe-form-error-message">{saveError.message}</p>
-          <p className="text-xs" data-testid="recipe-form-error-code">
-            {saveError.code}
-          </p>
+          {saveError.code === UNEXPECTED_ERROR_CODE ? (
+            <UnexpectedErrorNotice state={saveError} />
+          ) : (
+            <>
+              <p data-testid="recipe-form-error-message">{saveError.message}</p>
+              <p className="text-xs" data-testid="recipe-form-error-code">
+                {saveError.code}
+              </p>
+            </>
+          )}
         </div>
       )}
 

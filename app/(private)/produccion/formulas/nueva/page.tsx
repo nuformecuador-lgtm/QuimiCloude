@@ -48,7 +48,7 @@ export default async function NuevaRecetaPage() {
   if (unitsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError code={unitsResult.code} message={unitsResult.message} />
+        <RecipeListError error={unitsResult} />
       </div>
     );
   }
@@ -56,7 +56,7 @@ export default async function NuevaRecetaPage() {
   if (productsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError code={productsResult.code} message={productsResult.message} />
+        <RecipeListError error={productsResult} />
       </div>
     );
   }

@@ -65,7 +65,16 @@ const {
   getSessionContextMock: vi.fn(),
 }));
 
+// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
+// del identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el
+// modulo ni siquiera carga; con ella, el estado del error inesperado vuelve con ESE id.
+const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  return { REQUEST_ID_DE_PRUEBA: id, readRequestIdHeaderMock: vi.fn(async () => id) };
+});
+
 vi.mock('@/lib/composition', () => ({
+  observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
   unidades: {
     listUnits: listUnitsMock,
@@ -203,9 +212,19 @@ describe('listUnitsAction', () => {
       status: 'error',
       code: 'unexpected',
       message: errorMessage('unexpected'),
+      // QC-71 (R13): el estado del error INESPERADO vuelve con el identificador de la
+      // peticion —el mismo que se escribio en la linea del registro—, y su ausencia ya no
+      // compila (R16). El catalogado sigue sin el (R15).
+      reference: REQUEST_ID_DE_PRUEBA,
     });
     expect(noFiltra(resultado, 'fallo de infraestructura')).toBe(true);
-    expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+    // QC-71 (R10, R12): la linea del registro pasa a ser UNA linea de texto con el
+    // identificador, el origen, el codigo y el detalle del error. El texto del error original
+    // sigue llegando entero al registro, que es lo que este caso fijaba.
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining(`[error] requestId=${REQUEST_ID_DE_PRUEBA} origen=borde code=unexpected error=${ajeno.name}: ${ajeno.message}`),
+    );
     log.mockRestore();
   });
 });
@@ -465,6 +484,9 @@ describe('createUnitAction / updateUnitAction / deleteUnitAction', () => {
       status: 'error',
       code: 'unexpected',
       message: errorMessage('unexpected'),
+      // QC-71 (R13): el estado inesperado vuelve con el identificador de la peticion, el mismo
+      // que la linea del registro. Sin el no compilaria (R16).
+      reference: REQUEST_ID_DE_PRUEBA,
     };
 
     it('createUnitAction traduce a `unexpected` un error que no es de dominio, sin filtrar su texto', async () => {
@@ -479,7 +501,14 @@ describe('createUnitAction / updateUnitAction / deleteUnitAction', () => {
 
       expect(resultado).toEqual(ESTADO_INESPERADO);
       expect(noFiltra(resultado, 'fallo inesperado')).toBe(true);
-      expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+      // QC-71 (R10, R12): la linea del registro deja de ser el objeto de QC-70 y pasa a ser UNA
+      // linea de texto con el identificador, el origen, el codigo y el detalle del error —nombre,
+      // mensaje y traza, y nada mas—. Lo que este caso fijaba NO se relaja: el texto del error
+      // original sigue llegando entero al registro, y solo ahi.
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining(`[error] requestId=${REQUEST_ID_DE_PRUEBA} origen=borde code=unexpected error=${ajeno.name}: ${ajeno.message}`),
+      );
       log.mockRestore();
     });
 
@@ -496,7 +525,14 @@ describe('createUnitAction / updateUnitAction / deleteUnitAction', () => {
 
       expect(resultado).toEqual(ESTADO_INESPERADO);
       expect(noFiltra(resultado, 'fallo inesperado')).toBe(true);
-      expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+      // QC-71 (R10, R12): la linea del registro deja de ser el objeto de QC-70 y pasa a ser UNA
+      // linea de texto con el identificador, el origen, el codigo y el detalle del error —nombre,
+      // mensaje y traza, y nada mas—. Lo que este caso fijaba NO se relaja: el texto del error
+      // original sigue llegando entero al registro, y solo ahi.
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining(`[error] requestId=${REQUEST_ID_DE_PRUEBA} origen=borde code=unexpected error=${ajeno.name}: ${ajeno.message}`),
+      );
       log.mockRestore();
     });
 
@@ -509,7 +545,14 @@ describe('createUnitAction / updateUnitAction / deleteUnitAction', () => {
 
       expect(resultado).toEqual(ESTADO_INESPERADO);
       expect(noFiltra(resultado, 'fallo inesperado')).toBe(true);
-      expect(log).toHaveBeenCalledWith({ code: 'unexpected', cause: ajeno });
+      // QC-71 (R10, R12): la linea del registro deja de ser el objeto de QC-70 y pasa a ser UNA
+      // linea de texto con el identificador, el origen, el codigo y el detalle del error —nombre,
+      // mensaje y traza, y nada mas—. Lo que este caso fijaba NO se relaja: el texto del error
+      // original sigue llegando entero al registro, y solo ahi.
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith(
+        expect.stringContaining(`[error] requestId=${REQUEST_ID_DE_PRUEBA} origen=borde code=unexpected error=${ajeno.name}: ${ajeno.message}`),
+      );
       log.mockRestore();
     });
   });

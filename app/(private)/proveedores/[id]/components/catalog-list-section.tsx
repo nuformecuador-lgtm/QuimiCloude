@@ -55,7 +55,7 @@ export async function CatalogListSection({
   const result = await listCatalogLinesAction(supplierId, params);
 
   if (result.status === 'error') {
-    return <CatalogListError code={result.code} message={result.message} />;
+    return <CatalogListError error={result} />;
   }
 
   const { items, page: currentPage, totalPages } = result.data;
