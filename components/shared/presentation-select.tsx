@@ -1,7 +1,7 @@
 'use client';
 
-import { Loader2Icon } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { CircleAlertIcon, Loader2Icon } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import {
   Autocomplete,
@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
@@ -66,6 +67,13 @@ type PresentationSelectProps = {
   readonly defaultLabel?: string;
   /** Mensaje de error del campo, si el formulario lo tiene (R20). */
   readonly error?: string;
+  /**
+   * Ayuda del campo. Si viene, la etiqueta gana un icono de admiracion y lo que se pase aqui
+   * es lo que sale en el tooltip al pasar por encima o al enfocarlo con el teclado. Si no
+   * viene, no se pinta ningun icono: es el mismo trato que da `ProductField`, y la prop es
+   * ADITIVA -ninguno de los dos consumidores de hoy tiene que cambiar-.
+   */
+  readonly helper?: ReactNode;
 };
 
 /**
@@ -87,6 +95,10 @@ type PresentationSelectProps = {
  * Lo que NO cambia: el campo del formulario (`presentationId`), el alta en linea con todo su
  * bloque y sus `data-testid`, el mensaje de error de campo y la API del componente, que solo
  * GANA una prop opcional (`defaultLabel`).
+ *
+ * **La ayuda de la etiqueta es opcional** (`helper`, QC-90): quien use el selector puede explicar
+ * que es una presentacion sin que el componente decida el copy. Sin `helper` no se pinta nada
+ * nuevo, asi que la prop no obliga a mover ninguno de los dos consumidores.
  *
  * **Vive en `components/shared/` desde QC-44**: dos pantallas -inventario y proveedores- lo
  * necesitan igual, que es la condicion que `docs/architecture.md > Regla: sin sobre-ingenieria`
@@ -132,6 +144,7 @@ export function PresentationSelect({
   defaultValue,
   defaultLabel,
   error,
+  helper,
 }: PresentationSelectProps) {
   const labelId = useId();
   const inputId = useId();
@@ -300,9 +313,39 @@ export function PresentationSelect({
 
   return (
     <div className="flex flex-col gap-2">
-      <span id={labelId} className="text-sm font-medium">
-        Presentación
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span id={labelId} className="text-sm font-medium">
+          Presentación
+        </span>
+        {helper === undefined ? null : (
+          // El disparador es un boton de verdad -alcanzable con el teclado-, y su `type="button"`
+          // NO es un detalle: este selector vive dentro del formulario de producto, y un boton sin
+          // tipo dentro de un `<form>` lo ENVIA -pedir ayuda guardaria el producto-.
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Qué es Presentación"
+                  // 44x44 DE VERDAD, no `size-6`: `docs/architecture.md > Componentes > Regla:
+                  // multiplataforma` exige ese objetivo tactil minimo y el `design.md` de QC-90
+                  // no declara excepcion. Se usa la constante que este mismo archivo ya define
+                  // arriba, en vez de reescribir las clases. Crece el BLANCO DE TOQUE del boton
+                  // -que es lo que busca el dedo-; el icono dibujado sigue en `size-4`, y
+                  // `items-center justify-center` lo mantiene pegado a la etiqueta dentro del
+                  // `flex items-center gap-1.5` del padre. `shrink-0` impide que el flex le
+                  // recorte los 44 px de ancho en pantallas estrechas.
+                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  data-testid="presentation-helper"
+                />
+              }
+            >
+              <CircleAlertIcon className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent data-testid="presentation-helper-text">{helper}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
 
       {/*
         Campo espejo: lo que VIAJA en el `FormData` es el id, no el texto que se ve. Se pinta
