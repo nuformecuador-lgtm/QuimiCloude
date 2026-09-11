@@ -944,3 +944,100 @@ model Order {
   @@index([updatedBy], map: "orders_updated_by_idx")
   @@map("orders")
 }
+
+/// Asignacion de un pedido a una persona responsable (QC-86). PK compuesta
+/// `(order_id, user_id)`: la misma persona no puede estar dos veces en el mismo pedido, VENGA
+/// POR DONDE VENGA —marcada suelta, dentro de un grupo o dentro de un segundo grupo— (R3, R5,
+/// decision cerrada 3, «gana el primero que la trajo»). El indice de la PK cubre ademas la
+/// consulta caliente «quienes son los responsables de este pedido» y, por su prefijo
+/// `order_id`, el barrido de un pedido entero. Mismo patron que `WorkGroupMember` (QC-83) y
+/// `RolePermission` (QC-74).
+/// `order_assignments_user_id_idx` sirve el sentido inverso, «que pedidos tengo asignados»
+/// (QC-88, R22), que la PK no cubre; `order_assignments_work_group_id_idx` sirve la
+/// verificacion del RESTRICT hacia `work_groups` (R10) y el «quitar este grupo de este pedido»
+/// de QC-87 (R17). NO hay indice por `company_id` y es deliberado: nadie consulta asignaciones
+/// por empresa, y las dos verificaciones de RESTRICT entran por `user_id` y `work_group_id`.
+/// NO hay `id` propio: la identidad de la fila es `(order_id, user_id)` y nadie la referencia
+/// desde fuera.
+///
+/// OJO 1 — las TRES FK y el CHECK de esta tabla van escritos A MANO en el `migration.sql`, y
+/// por eso NINGUNA columna declara `@relation`:
+///   ("order_id")                -> orders("id")                        ON DELETE RESTRICT
+///   ("user_id","company_id")    -> users("id","company_id")            ON DELETE RESTRICT
+///   ("work_group_id","company_id") -> work_groups("id","company_id")   ON DELETE RESTRICT
+///   CHECK `order_assignments_work_group_name_matches_group` (R7)
+/// Aqui valen los DOS argumentos del repo a la vez: dos de los tres padres son de OTROS
+/// modulos (`pedidos`, `identity`), asi que un `include` de Prisma podria atravesar la frontera
+/// sin que ninguna guardia de imports lo viera —es la misma nota que `Order` lleva escrita para
+/// sus tres FK—; y dos de las FK son COMPUESTAS y COMPARTEN `company_id`, que Prisma no modela
+/// (mismo caso que `WorkGroupMember`).
+/// LO QUE ESO CUESTA, y se acepta: las tres FK y el CHECK son DRIFT para Prisma. Toda migracion
+/// futura que toque `order_assignments` va a emitir `DROP CONSTRAINT` sobre ellos y HAY QUE
+/// BORRARLO A MANO del SQL generado, igual que ya se hace con `orders`, `products`,
+/// `recipe_lines` y `work_group_members` (riesgo 5 de `design.md > 8`). Lo unico que se pone
+/// rojo si desaparecen es el test de esquema de la ficha.
+///
+/// OJO 2 — las DOS FK hacia `identity` (`users`, `work_groups`) son COMPUESTAS y llevan
+/// `company_id` (decision cerrada 6, R11, R12). La fila declara UNA empresa y esa empresa tiene
+/// que ser a la vez la de la persona Y —si hay grupo— la del grupo: como la igualdad es
+/// transitiva, persona y grupo son de la misma empresa POR CONSTRUCCION, sin ningun estado
+/// intermedio. Apuntan a `users_id_company_id_key` y `work_groups_id_company_id_key`, que YA
+/// EXISTEN desde QC-83 —sin ellas la migracion fallaria con `42830`—. Si alguien las simplifica
+/// a `FOREIGN KEY ("user_id") REFERENCES "users"("id")`, el esquema valida, el cliente compila,
+/// todo sigue verde y la coherencia de empresa (R11) DEJA DE EXISTIR EN SILENCIO hasta que
+/// QC-88 liste pedidos ajenos (riesgo 1 de `design.md > 8`). La FK del pedido, en cambio, es
+/// SIMPLE a proposito: `orders` no tiene `company_id` —eso es la epica QC-46— y esta ficha NO
+/// se lo anade (R14).
+///
+/// OJO 3 — `MATCH SIMPLE` (el de Postgres por defecto) ES A PROPOSITO en la FK del grupo, y NO
+/// se escribe `MATCH FULL`. `MATCH SIMPLE` no verifica nada si alguna columna referenciante es
+/// NULL, que es justo lo que se quiere: una asignacion suelta tiene `work_group_id IS NULL`, la
+/// FK no se evalua y la fila se acepta (R13). `MATCH FULL` MATARIA R13, porque exigiria que las
+/// dos columnas fueran NULL a la vez y `company_id` es NOT NULL: NINGUNA asignacion suelta
+/// podria existir (riesgo 2 de `design.md > 8`). El test de esquema comprueba que la cadena no
+/// aparece en el SQL.
+///
+/// OJO 4 — `workGroupName` es un SNAPSHOT: el nombre que el grupo tenia EN EL INSTANTE DE
+/// ASIGNAR (R6, R8, decision cerrada 7), no una desnormalizacion que un `JOIN` pueda sustituir.
+/// Un `JOIN` a `work_groups` devolveria el nombre DE HOY, y el requisito es el de ENTONCES:
+/// renombrar el grupo manana no puede cambiar quien figuraba como responsable de un pedido ya
+/// en ejecucion (riesgo 3 de `design.md > 8`). Va `TEXT` sin longitud, como su origen
+/// `work_groups.name` (QC-83 R2): poner aqui un tope que el origen no tiene convertiria un
+/// renombrado legitimo en un error de asignacion. `workGroupId` y `workGroupName` van JUNTOS O
+/// NINGUNO, y eso no es una convencion amable: lo garantiza el CHECK
+/// `order_assignments_work_group_name_matches_group` (R7), no el esquema. La marca de «vino de
+/// un grupo» NO es una columna aparte: es `work_group_id IS NOT NULL`.
+///
+/// OJO 5 — NO hay `deleted_at`, y es un requisito con nombre (R15, decision cerrada 5): sacar a
+/// alguien de un pedido BORRA la fila. Es la EXCEPCION EXPLICITA al borrado logico de
+/// `docs/architecture.md > Anti-patrones`, heredada de QC-83, y se escribe porque en la misma
+/// migracion es facil confundirla: el `deleted_at` es del PEDIDO, no de la asignacion. El
+/// historico que importa es el CONGELADO —quien era responsable, con el nombre del grupo tal
+/// como era—, no quien estuvo asignado veinte minutos por error. Anadir aqui `deleted_at` «por
+/// coherencia con el resto del repo» rompe ademas la PK —`(order_id, user_id)` dejaria de ser
+/// unico al haber filas muertas—, obliga a degradarla a un indice unico PARCIAL y obliga a TODA
+/// lectura de responsables, para siempre, a acordarse de filtrar: la que se olvide una vez
+/// ensena un pedido a alguien a quien ya se lo quitaron, y esa lectura es la de QC-88, que
+/// decide que ve un Operador (riesgo 4 de `design.md > 8`).
+/// Consecuencia contraintuitiva y buscada: dar de baja el pedido (R19) o la persona (R21) NO
+/// borra ninguna asignacion —ninguna FK reacciona a un `UPDATE`—; quien filtra al leer es QC-88.
+///
+/// `createdAt`/`updatedAt` van igual (R23, decision cerrada 13) aunque la fila casi nunca se
+/// actualice. `updatedAt` es NOT NULL SIN default de base —lo rellena `@updatedAt` del
+/// cliente—, asi que un `INSERT` crudo que no la ponga falla. Misma nota que QC-4, QC-47 y
+/// QC-83.
+/// @module asignaciones
+model OrderAssignment {
+  orderId       String   @map("order_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  workGroupId   String?  @map("work_group_id") @db.Uuid
+  workGroupName String?  @map("work_group_name")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([orderId, userId], map: "order_assignments_pkey")
+  @@index([userId], map: "order_assignments_user_id_idx")
+  @@index([workGroupId], map: "order_assignments_work_group_id_idx")
+  @@map("order_assignments")
+}

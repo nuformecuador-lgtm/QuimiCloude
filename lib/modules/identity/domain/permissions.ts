@@ -5,12 +5,12 @@
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from './roles';
 
 /**
- * El catalogo cerrado: trece permisos, ni uno mas ni uno menos (QC-74 R2, enmendado por QC-38 y
- * por QC-66). El codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en español y en
- * minusculas, siguiendo los nombres de modulo del repositorio (R1). Un modulo con escritura
- * declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un modulo sin
- * escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva campo de
- * empresa (R6).
+ * El catalogo cerrado: quince permisos, ni uno mas ni uno menos (QC-74 R2, enmendado por QC-38,
+ * por QC-66 y por QC-86). El codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en
+ * español y en minusculas, siguiendo los nombres de modulo del repositorio (R1). Un modulo con
+ * escritura declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un
+ * modulo sin escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva
+ * campo de empresa (R6).
  *
  * **Esto enmienda QC-74 R2** («exactamente diez permisos, ni uno mas ni uno menos»). QC-74 R4 dejo
  * a `unidades` sin escritura justificandolo con «no tiene escritura»; QC-38 es justamente la ficha
@@ -25,6 +25,13 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from './roles';
  * `identidad.consultar` no dice QUE se consulta (QC-66 decision cerrada 2, R12). Es la SEGUNDA
  * enmienda al catalogo de QC-74, despues de la de QC-38, y se dice con estas palabras en vez de
  * disimularla.
+ *
+ * **Esto vuelve a enmendar QC-74 R2**, y es la TERCERA enmienda al catalogo: QC-74 R2 dijo
+ * «exactamente diez permisos», QC-38 lo llevo a once, QC-66 a trece y **QC-86 a quince**. QC-86
+ * suma `asignaciones.consultar` y `asignaciones.modificar` (QC-86 R25). A diferencia de `usuarios`,
+ * `asignaciones` SI es una carpeta real de `lib/modules/`, asi que estas dos entradas cumplen QC-74
+ * R1 al pie de la letra; lo unico que tienen en comun con las de QC-66 es que su permiso vive
+ * centralizado aqui, en `identity`, como el de todos los demas modulos.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -108,6 +115,18 @@ export const PERMISSIONS = [
     description:
       'Crear, editar, borrar y cambiar el estado de cuenta de los usuarios de la empresa.',
   },
+  {
+    code: 'asignaciones.consultar',
+    module: 'asignaciones',
+    action: 'consultar',
+    description: 'Consultar los pedidos asignados.',
+  },
+  {
+    code: 'asignaciones.modificar',
+    module: 'asignaciones',
+    action: 'modificar',
+    description: 'Asignar y desasignar responsables de un pedido.',
+  },
 ] as const;
 
 /**
@@ -120,7 +139,9 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
 /**
  * Los permisos que el seed asigna a cada rol, ESCRITOS UNO A UNO (decision 2026-09-07 nº2). Sin
  * comodin y sin derivarlos de `PERMISSIONS`: el Administrador pasa por la MISMA ruta de permiso
- * que cualquier otro rol (R8), y el Operador nace con exactamente uno (R9). Las claves salen de
+ * que cualquier otro rol (R8), y el Operador nace con exactamente los que se le escriben aqui
+ * —QC-74 R9 decia «uno»; QC-86 R26 le suma `asignaciones.consultar` y pasan a ser DOS, y ni uno
+ * mas: al Operador NO se le da `recetas.consultar` ni ningun otro (QC-86 R27)—. Las claves salen de
  * `./roles`, nunca del literal. Sin empresa: el permiso cuelga del rol y de nada mas (R6).
  */
 export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionCode[]>> = {
@@ -138,6 +159,8 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'pedidos.modificar',
     'usuarios.consultar',
     'usuarios.modificar',
+    'asignaciones.consultar',
+    'asignaciones.modificar',
   ],
-  [ROLE_OPERADOR]: ['inventario.consultar'],
+  [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
 };

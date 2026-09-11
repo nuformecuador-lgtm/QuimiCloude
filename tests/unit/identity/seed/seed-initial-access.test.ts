@@ -691,7 +691,7 @@ describe('seedInitialAccess', () => {
   // ---------------------------------------------------------------------------------
 
   // Caso 14 (QC-74 R8, R9, R10)
-  it('sobre una base vacia crea los trece permisos del catalogo y las catorce asignaciones del seed', async () => {
+  it('sobre una base vacia crea los quince permisos del catalogo y las diecisiete asignaciones del seed', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -719,7 +719,7 @@ describe('seedInitialAccess', () => {
     );
     expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
 
-    // Luego: las asignaciones, las catorce (trece del Administrador + una del Operador).
+    // Luego: las asignaciones, las diecisiete (quince del Administrador + dos del Operador).
     const creacionesDeAsignaciones = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'createRolePermissions',
     );
@@ -728,7 +728,7 @@ describe('seedInitialAccess', () => {
       roleId: string;
       permissionCode: string;
     }[];
-    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(14);
+    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(17);
     expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED);
     expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
@@ -745,13 +745,15 @@ describe('seedInitialAccess', () => {
     const codigosDelAdministrador = paresCreados
       .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
       .map((par) => par.permissionCode);
-    expect(codigosDelAdministrador).toHaveLength(13);
+    expect(codigosDelAdministrador).toHaveLength(15);
     expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
+    // QC-74 R9 le daba UNO; QC-86 R26 le suma `asignaciones.consultar` y son DOS, y ni uno mas
+    // (QC-86 R27). El orden es el de `SEED_ROLE_PERMISSIONS`, que es como el seed los recorre.
     expect(
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
         .map((par) => par.permissionCode),
-    ).toEqual(['inventario.consultar']);
+    ).toEqual(['inventario.consultar', 'asignaciones.consultar']);
 
     // Y el orden del algoritmo: los roles ANTES que los permisos, y los permisos ANTES
     // que el administrador (`design.md > 3`). Sin ese orden, una asignacion no tendria

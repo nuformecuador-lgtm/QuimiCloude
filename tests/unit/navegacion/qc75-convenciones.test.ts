@@ -18,7 +18,7 @@
 // `require-page-permission.ts`, el barrel, `route-access.ts` al retirar el corte por rol (R16)—,
 // asi que `identity` NO entra entero en la lista de intocables. Lo que R22 protege no es el modulo
 // de autenticacion: es (a) el MODELO DE PERMISOS de QC-74 —esquema, migraciones, catalogo y
-// seed— y (b) los casos de uso de los CINCO MODULOS DE NEGOCIO. Por eso la lista congelada nombra
+// seed— y (b) los casos de uso de los MODULOS DE NEGOCIO. Por eso la lista congelada nombra
 // archivos concretos de `identity` (el catalogo y el seed) en vez de la carpeta entera.
 //
 // Sobre la dependencia nueva: este archivo comprueba que `package.json` no GANO claves respecto
@@ -46,10 +46,11 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Los trece codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que R15 congela.
+ * Los quince codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que R15 congela.
  * Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`, enmendando
- * QC-74 R2; QC-66 sumo `usuarios.consultar` y `usuarios.modificar`, enmendando QC-74 R1 (las dos
- * enmiendas estan escritas en `lib/modules/identity/domain/permissions.ts`).
+ * QC-74 R2; QC-66 sumo `usuarios.consultar` y `usuarios.modificar`, enmendando QC-74 R1; QC-86 suma
+ * `asignaciones.consultar` y `asignaciones.modificar` (su R25), volviendo a enmendar QC-74 R2 (las
+ * tres enmiendas estan escritas en `lib/modules/identity/domain/permissions.ts`).
  */
 export const CODIGOS_QC74 = [
   'dashboard.consultar',
@@ -65,15 +66,18 @@ export const CODIGOS_QC74 = [
   'pedidos.modificar',
   'usuarios.consultar',
   'usuarios.modificar',
+  'asignaciones.consultar',
+  'asignaciones.modificar',
 ] as const;
 
-/** Los cinco modulos de negocio del ERP. */
+/** Los seis modulos de negocio del ERP. Eran cinco hasta que QC-86 sumo `asignaciones`. */
 export const MODULOS_DE_NEGOCIO = [
   'inventario',
   'recetas',
   'proveedores',
   'pedidos',
   'unidades',
+  'asignaciones',
 ] as const;
 
 /**
@@ -114,8 +118,8 @@ export function comodinesDe(permisos: readonly PermisoLeido[]): string[] {
 describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', () => {
   const catalogo: readonly PermisoLeido[] = PERMISSIONS;
 
-  it('tiene exactamente trece codigos, los trece del catalogo', () => {
-    expect(catalogo).toHaveLength(13);
+  it('tiene exactamente quince codigos, los quince del catalogo', () => {
+    expect(catalogo).toHaveLength(15);
     expect(catalogo.map((permiso) => permiso.code).sort()).toEqual([...CODIGOS_QC74].sort());
   });
 
@@ -130,12 +134,13 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     ).toEqual([]);
   });
 
-  it('los modulos son exactamente los cinco de negocio mas dashboard y usuarios', () => {
+  it('los modulos son exactamente los seis de negocio mas dashboard y usuarios', () => {
     const modulos = [...new Set(catalogo.map((permiso) => permiso.module))].sort();
-    // `unidades` ya esta entre los cinco de negocio; el catalogo suma `dashboard`, que es una
-    // pantalla y no un modulo del ERP (QC-74 R4: solo `consultar`), y `usuarios`, que NO es
-    // ninguna carpeta de `lib/modules/` -los usuarios viven dentro de `identity`-: es la segunda
-    // enmienda a QC-74 R1, la de la decision cerrada 2 de QC-66 (su R12).
+    // `unidades` ya esta entre los de negocio, y `asignaciones` entro ahi con QC-86; el catalogo
+    // suma `dashboard`, que es una pantalla y no un modulo del ERP (QC-74 R4: solo `consultar`),
+    // y `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
+    // `identity`-: es la segunda enmienda a QC-74 R1, la de la decision cerrada 2 de QC-66 (su
+    // R12).
     const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios'])].sort();
     expect(modulos).toEqual(esperados);
     expect(modulos).toContain('unidades');
@@ -179,7 +184,7 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
  *     literales que siembra (`permissions.ts` con el catalogo y `SEED_ROLE_PERMISSIONS`,
  *     `roles.ts` con `SEED_ROLES`). Estos cuatro son los UNICOS archivos de `identity` que entran
  *     aqui: el resto del modulo SI cambia en esta ficha (ver la cabecera);
- *   * `lib/modules/<m>/domain/**` de los cinco modulos de negocio — sus casos de uso.
+ *   * `lib/modules/<m>/domain/**` de los seis modulos de negocio — sus casos de uso.
  */
 export const RUTAS_CONGELADAS: readonly string[] = [
   'db/schema.prisma',
@@ -337,7 +342,7 @@ describe('QC-75 R22 — esta ficha no anade backend', () => {
     ).toContain(ARCHIVO_CENTRAL);
   });
 
-  it('no toca el esquema, las migraciones, el seed ni el dominio de los cinco modulos de negocio', (ctx) => {
+  it('no toca el esquema, las migraciones, el seed ni el dominio de los seis modulos de negocio', (ctx) => {
     if (archivos === null) {
       ctx.skip('el rango git origin/dev...HEAD no esta disponible: este caso NO ha comprobado nada.');
       return;
