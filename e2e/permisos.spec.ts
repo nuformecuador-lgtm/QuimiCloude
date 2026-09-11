@@ -127,6 +127,10 @@ async function createOperatorUser(): Promise<{ username: string; password: strin
       passwordHash: await createPasswordHash(password),
       roleId,
       companyId,
+      // QC-78 R1: explicito, no por defecto. La columna es `@default(pending)` y desde
+      // esa ficha `pending` no entra por el login, asi que este usuario efimero no
+      // llegaria a la pantalla que este spec ejercita.
+      accountStatus: 'active',
     },
     select: { id: true },
   });

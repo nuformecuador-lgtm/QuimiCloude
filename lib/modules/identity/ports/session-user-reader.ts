@@ -1,3 +1,5 @@
+import type { UserAccountStatus } from '../domain/account-status';
+
 /**
  * Datos minimos del usuario activo que hacen falta para resolver el `SessionUser`
  * (`design.md > 4.5`). Nada de credenciales ni de PII fuera de lo que la sesion muestra:
@@ -35,6 +37,27 @@ export type SessionUserRecord = {
    * invisible en la ruta mas caliente de la aplicacion.
    */
   readonly permissions: readonly string[];
+  /**
+   * QC-78 (T10, R20, R21): el estado ALMACENADO de la cuenta, tal y como esta HOY en
+   * `users.account_status`. Es una columna de `users`, o sea la MISMA fila que ya se leia.
+   */
+  readonly accountStatus: UserAccountStatus;
+  /**
+   * QC-78 (T10, R7, R8, R11): el plazo de bloqueo crudo, tambien columna de `users`.
+   *
+   * Los dos campos viajan CRUDOS y no como un `estaActiva` ya cocinado, por el mismo argumento
+   * que ya esta escrito arriba para `companyDeletedAt`: «activa» es una regla de dominio
+   * —`effectiveAccountStatus`— y cocinarla al otro lado del puerto la mudaria fuera del unico
+   * sitio donde se prueba con objetos planos. Sin `lockedUntil` no se podria aplicar esa regla
+   * en la sesion y habria que duplicar aqui la traduccion del plazo, que es justo lo que R7
+   * prohibe.
+   *
+   * COSTE DECLARADO (`design.md > 3`): el `select` de la sesion deja de ser tan estrecho como lo
+   * dejo QC-8 R14 —salen de la base un enum mas y una marca de tiempo mas—. **Ninguno de los dos
+   * es PII** y ninguno se registra en ningun log; mismo coste que QC-48 acepto por escrito para
+   * `companyDeletedAt`. Y no cuesta ninguna consulta: los dos salen del mismo `findFirst`.
+   */
+  readonly lockedUntil: Date | null;
 };
 
 /**

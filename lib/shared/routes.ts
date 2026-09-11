@@ -3,6 +3,29 @@ export const DASHBOARD_ROUTE = '/dashboard';
 export const LOGIN_ROUTE = '/login';
 
 /**
+ * Nombre del parametro que marca «este login viene de un corte de sesion» (QC-78 R29, R30).
+ *
+ * Existe para romper un BUCLE, no para informar de nada. El servidor corta la sesion consultando
+ * la base; el borde no puede consultarla (QC-9 R4, QC-75 R18) y sigue viendo la cookie firmada y
+ * viva, asi que devolvia al usuario a la zona privada y el layout lo devolvia al login, sin fin.
+ * Con la marca, la regla 3 de `route-access.ts` no dispara y la navegacion termina en el login.
+ */
+export const SESSION_ENDED_PARAM = 'sesion';
+
+/**
+ * Destino al que redirige el servidor cuando la sesion se corto. **Un solo texto para los TRES
+ * cortes** —baja logica (QC-8 R11), empresa no viva (QC-48 R15) y estado de cuenta (QC-78 R20)—:
+ * la marca es OPACA y la URL no dice por que (R30 a). Ni codigo, ni motivo, ni estado.
+ *
+ * El valor es `fin` y no `cuenta-bloqueada` ni `inactivo` a proposito: cualquiera de esos
+ * convertiria la barra de direcciones en el oraculo que R3 lleva toda la ficha evitando.
+ *
+ * La pantalla de login no lo lee: hoy solo mira el destino de vuelta e ignora el resto de la
+ * cadena de consulta, asi que se renderiza EXACTAMENTE igual con marca y sin ella (R30 a).
+ */
+export const LOGIN_ROUTE_SESSION_ENDED = `${LOGIN_ROUTE}?${SESSION_ENDED_PARAM}=fin`;
+
+/**
  * Pantalla de productos del catalogo (QC-22, R2).
  *
  * Vive aqui y no en `navigation/private-nav.ts` —donde nacio como placeholder— porque el

@@ -26,6 +26,7 @@ import {
   NEW_RECIPE_ROUTE,
   ORDERS_ROUTE,
   PRIVATE_ROUTE_PREFIXES,
+  SESSION_ENDED_PARAM,
   SUPPLIERS_ROUTE,
   recipeEditRoute,
 } from '@/lib/shared/routes';
@@ -296,5 +297,220 @@ describe('decideRouteAccess — R20: se ejercita sin Next, sin cookies y sin bas
     for (const especificador of especificadores) {
       expect(especificador.startsWith('./')).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-78 T24 — la marca de sesion cortada (R29, R30 b)
+// ---------------------------------------------------------------------------
+//
+// El nombre de la marca ENTRA COMO PARAMETRO, igual que los prefijos y las rutas: el literal vive
+// en `lib/shared/routes.ts` y el dominio tiene prohibido importarlo. Aqui se usa el nombre real
+// (`SESSION_ENDED_PARAM`) y no uno inventado, porque lo que estos casos afirman es la politica
+// que el adaptador cablea de verdad; que el adaptador lo pase es cosa de su propio test.
+
+const MARCA = SESSION_ENDED_PARAM;
+const CON_MARCA = `?${MARCA}=fin`;
+
+/** Como `decidir`, pero con la marca DECLARADA, que es como la cablea el adaptador. */
+function decidirConMarcaDeclarada(overrides: Partial<RouteAccessInput> = {}): RouteAccessDecision {
+  return decidir({ sessionEndedParam: MARCA, ...overrides });
+}
+
+describe('decideRouteAccess — R29: el login con la marca se sirve en vez de rebotar', () => {
+  // El caso que rompe el bucle. La cookie sigue firmada y viva —el borde no puede saber otra
+  // cosa—, pero el servidor ACABA DE DECIDIR con la base que esa sesion ya no vale. Sin esto, el
+  // borde devuelve a la zona privada, el layout vuelve a cortar, y el navegador muere en el
+  // vigesimo salto.
+  it('sirve el login a una sesion valida que llega con la marca, en vez de devolverla a la zona privada', () => {
+    expect(
+      decidirConMarcaDeclarada({ pathname: '/login', search: CON_MARCA, session: CON_SESION }),
+    ).toEqual({ kind: 'allow' });
+  });
+
+  // Y la otra mitad, que es la que impide que el arreglo se coma la regla entera: SIN marca, el
+  // login con sesion valida sigue redirigiendo exactamente como siempre.
+  it('sin la marca, el login con sesion valida sigue redirigiendo al dashboard', () => {
+    expect(decidirConMarcaDeclarada({ pathname: '/login', session: CON_SESION })).toEqual({
+      kind: 'redirect',
+      to: '/dashboard',
+      reason: 'already-authenticated',
+    });
+  });
+
+  it('sin la marca, el login con sesion valida y destino de vuelta sigue redirigiendo ahi', () => {
+    expect(
+      decidirConMarcaDeclarada({
+        pathname: '/login',
+        search: '?next=%2Fdashboard%2Freportes',
+        session: CON_SESION,
+      }),
+    ).toEqual({
+      kind: 'redirect',
+      to: '/dashboard/reportes',
+      reason: 'already-authenticated',
+    });
+  });
+
+  // Si el destino de vuelta ganara, el usuario volveria a la zona privada de la que el servidor
+  // acaba de echarlo: el bucle otra vez. La marca gana.
+  it('con la marca gana la marca aunque la query traiga tambien un destino de vuelta valido', () => {
+    expect(
+      decidirConMarcaDeclarada({
+        pathname: '/login',
+        search: `?next=%2Fdashboard%2Freportes&${MARCA}=fin`,
+        session: CON_SESION,
+      }),
+    ).toEqual({ kind: 'allow' });
+  });
+
+  // Se comprueba PRESENCIA y no valor: el valor lo fija un unico sitio
+  // (`LOGIN_ROUTE_SESSION_ENDED`) y comparar tambien el texto solo anadiria un segundo literal
+  // que mantener sincronizado. Que `?sesion=` vacio tambien sirva es la consecuencia buscada.
+  it.each([[`?${MARCA}=fin`], [`?${MARCA}=`], [`?${MARCA}`], [`?${MARCA}=loquesea`]])(
+    'basta con que la marca este presente (%s) para no redirigir, sea cual sea su valor',
+    (search) => {
+      expect(
+        decidirConMarcaDeclarada({ pathname: '/login', search, session: CON_SESION }),
+      ).toEqual({ kind: 'allow' });
+    },
+  );
+
+  // R30 (a) por el lado de la decision: la marca es UNA sola y no lleva motivo. Si alguien
+  // intentara distinguir los tres cortes con un valor distinto por corte, la decision no lo
+  // notaria —y este caso deja escrito que no debe notarlo.
+  it('el login sin sesion se sigue sirviendo igual, traiga o no la marca', () => {
+    expect(
+      decidirConMarcaDeclarada({ pathname: '/login', search: CON_MARCA, session: ANONIMO }),
+    ).toEqual(decidirConMarcaDeclarada({ pathname: '/login', session: ANONIMO }));
+  });
+});
+
+// R30 (b) se demuestra EN NEGATIVO: no se afirma «la marca no hace nada», se compara cada
+// decision con la MISMA peticion sin marca y se exige igualdad. Un literal escrito a mano no
+// demostraria lo mismo: pasaria igual si ambas ramas cambiaran a la vez.
+describe('decideRouteAccess — R30 (b): la marca es de un solo sentido', () => {
+  it('una ruta privada con la marca se decide identicamente a la misma sin ella (con sesion)', () => {
+    const conMarca = decidirConMarcaDeclarada({
+      pathname: '/dashboard',
+      search: CON_MARCA,
+      session: CON_SESION,
+    });
+
+    expect(conMarca).toEqual(decidirConMarcaDeclarada({ pathname: '/dashboard', session: CON_SESION }));
+    expect(conMarca).toEqual({ kind: 'allow' });
+  });
+
+  // El caso que importa de verdad: la marca NO deja entrar a un anonimo. Quien la escriba a mano
+  // en una ruta privada sigue acabando en el login con su destino de vuelta.
+  it('una ruta privada con la marca sigue mandando al login a un anonimo, igual que sin ella', () => {
+    const conMarca = decidirConMarcaDeclarada({
+      pathname: '/dashboard/reportes',
+      search: CON_MARCA,
+      session: ANONIMO,
+    });
+    const sinMarca = decidirConMarcaDeclarada({
+      pathname: '/dashboard/reportes',
+      session: ANONIMO,
+    });
+
+    expect(conMarca.kind).toBe('redirect');
+    expect(conMarca).toEqual({
+      kind: 'redirect',
+      to: '/login?next=%2Fdashboard%2Freportes%3Fsesion%3Dfin',
+      reason: 'unauthenticated',
+    });
+    // La unica diferencia con la peticion sin marca es el destino de vuelta, que arrastra la query
+    // pedida tal cual (R7); el TIPO de decision y el motivo son los mismos.
+    expect(conMarca.kind).toBe(sinMarca.kind);
+    expect(conMarca.kind === 'redirect' && conMarca.reason).toBe(
+      sinMarca.kind === 'redirect' && sinMarca.reason,
+    );
+  });
+
+  it('una ruta publica con la marca se sirve igual que sin ella', () => {
+    for (const session of [ANONIMO, CON_SESION]) {
+      expect(decidirConMarcaDeclarada({ pathname: '/', search: CON_MARCA, session })).toEqual(
+        decidirConMarcaDeclarada({ pathname: '/', session }),
+      );
+      expect(decidirConMarcaDeclarada({ pathname: '/', search: CON_MARCA, session })).toEqual({
+        kind: 'allow',
+      });
+    }
+  });
+
+  // La marca no convierte una sesion ausente en valida ni una valida en ausente. Se recorren los
+  // dos `kind` sobre rutas publicas y privadas: la decision entera debe coincidir. El login queda
+  // fuera a proposito — es el UNICO sitio donde R29 dice que la marca cambia algo, y esta cubierto
+  // arriba.
+  it.each([['/'], ['/dashboards-publicos'], ['/dashboard'], ['/dashboard/reportes/costos']])(
+    'la marca no altera la decision de %s ni para el anonimo ni para la sesion valida',
+    (pathname) => {
+      for (const session of [ANONIMO, CON_SESION]) {
+        const conMarca = decidirConMarcaDeclarada({ pathname, search: CON_MARCA, session });
+        const sinMarca = decidirConMarcaDeclarada({ pathname, session });
+
+        expect(conMarca.kind).toBe(sinMarca.kind);
+      }
+    },
+  );
+
+  // No persiste ni se propaga: cuando el paso 2 construye el redirect al login para una ruta
+  // privada pedida con la marca, esa marca NO queda como parametro del login. `buildLoginRedirect`
+  // codifica `pathname + search` ENTERO dentro de `next`, asi que el texto `sesion` sobrevive
+  // percent-encoded dentro del destino de vuelta, pero NO como parametro propio de la URL del
+  // login — y por tanto no dispara la excepcion de R29 en el salto siguiente. Eso es lo que este
+  // caso ata: la vuelta de tuerca es el segundo `expect`, que mete el login resultante otra vez
+  // por la decision y comprueba que sigue redirigiendo como siempre.
+  it('la marca no queda como parametro del login al que se redirige una ruta privada', () => {
+    const decision = decidirConMarcaDeclarada({
+      pathname: '/dashboard',
+      search: CON_MARCA,
+      session: ANONIMO,
+    });
+    if (decision.kind !== 'redirect') throw new Error('se esperaba una redireccion al login');
+
+    const [camino = '', query = ''] = decision.to.split('?');
+    expect(camino).toBe('/login');
+    expect(new URLSearchParams(query).has(MARCA)).toBe(false);
+
+    // Y la comprobacion que cierra el circulo: ese login, pedido despues con sesion valida, NO se
+    // sirve — sigue redirigiendo al destino de vuelta, porque la marca no llego a el.
+    expect(
+      decidirConMarcaDeclarada({ pathname: camino, search: `?${query}`, session: CON_SESION }),
+    ).toEqual({
+      kind: 'redirect',
+      to: '/dashboard?sesion=fin',
+      reason: 'already-authenticated',
+    });
+  });
+});
+
+// El campo `sessionEndedParam` es OPCIONAL a proposito (`design.md > 10.2`): hacerlo obligatorio
+// rompia el typecheck de cinco archivos de test de otras zonas que construyen un
+// `RouteAccessInput` literal. El precio es que sin declararla la marca no existe, y esa decision
+// necesita su propia red: si alguien "simplificara" leyendo el literal dentro del dominio, este
+// bloque se pondria rojo.
+describe('decideRouteAccess — sin marca declarada, el comportamiento es el de siempre', () => {
+  it('la regla 3 dispara aunque la query traiga el texto de la marca', () => {
+    expect(decidir({ pathname: '/login', search: CON_MARCA, session: CON_SESION })).toEqual({
+      kind: 'redirect',
+      to: '/dashboard',
+      reason: 'already-authenticated',
+    });
+  });
+
+  it('con destino de vuelta y el texto de la marca, sigue ganando el destino de vuelta', () => {
+    expect(
+      decidir({
+        pathname: '/login',
+        search: `?next=%2Fdashboard%2Freportes&${MARCA}=fin`,
+        session: CON_SESION,
+      }),
+    ).toEqual({
+      kind: 'redirect',
+      to: '/dashboard/reportes',
+      reason: 'already-authenticated',
+    });
   });
 });

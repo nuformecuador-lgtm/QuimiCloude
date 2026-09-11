@@ -10,7 +10,7 @@ import {
   filterNavItemsByPermissions,
   PRIVATE_NAV_ITEMS,
 } from '@/lib/shared/navigation/private-nav';
-import { LOGIN_ROUTE } from '@/lib/shared/routes';
+import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import { LogoutButton, SidebarToggle, ThemeToggle } from './components';
@@ -58,7 +58,12 @@ import { LogoutButton, SidebarToggle, ThemeToggle } from './components';
 export default async function PrivateLayout({ children }: { children: ReactNode }) {
   const user = await identity.getSessionUser();
   if (user === null) {
-    redirect(LOGIN_ROUTE);
+    // QC-78 R29 — con LA MARCA de sesion cortada, no a `LOGIN_ROUTE` pelado. La cookie sigue
+    // firmada y viva, asi que sin marca el middleware nos devolveria aqui (su regla 3) y esto
+    // volveria a redirigir: bucle. Este `redirect` NO distingue por que fallo la resolucion
+    // —recibe `null` para los tres cortes— y por eso la marca sale igual para los tres (R30 a).
+    // No se toca la cookie: cortar no es cerrar sesion.
+    redirect(LOGIN_ROUTE_SESSION_ENDED);
   }
 
   // R28: el `SidebarProvider` **escribe** la cookie de preferencia de UI pero nunca la lee

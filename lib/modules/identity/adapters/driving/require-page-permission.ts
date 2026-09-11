@@ -14,7 +14,7 @@ import { notFound, redirect } from 'next/navigation';
 
 import { identity } from '@/lib/composition';
 import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
-import { LOGIN_ROUTE } from '@/lib/shared/routes';
+import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 
 /**
  * Exige `permission` para servir la pantalla actual: sin sesion redirige al login, y con sesion
@@ -47,6 +47,10 @@ import { LOGIN_ROUTE } from '@/lib/shared/routes';
  */
 export async function requirePagePermission(permission: PermissionCode): Promise<void> {
   const user = await identity.getSessionUser();
-  if (user === null) redirect(LOGIN_ROUTE);
+  // QC-78 R29 — con LA MARCA, igual que el layout privado, y **no basta con arreglar alli**:
+  // layout y pagina se renderizan en la MISMA peticion y cualquiera de los dos puede ganar el
+  // `redirect`. Si esta linea saliera sin marca, el bucle de redirecciones seguiria vivo por el
+  // camino de la pagina y solo se notaria en las pantallas que exigen permiso.
+  if (user === null) redirect(LOGIN_ROUTE_SESSION_ENDED);
   assertPermission(user, permission, () => notFound());
 }

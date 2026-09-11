@@ -35,7 +35,12 @@ import {
   isSessionExpired,
   type RouteAccessSession,
 } from '@/lib/modules/identity';
-import { DASHBOARD_ROUTE, LOGIN_ROUTE, PRIVATE_ROUTE_PREFIXES } from '@/lib/shared/routes';
+import {
+  DASHBOARD_ROUTE,
+  LOGIN_ROUTE,
+  PRIVATE_ROUTE_PREFIXES,
+  SESSION_ENDED_PARAM,
+} from '@/lib/shared/routes';
 
 /**
  * Lee la sesion del valor crudo de la cookie y la traduce al estado que espera el dominio.
@@ -91,6 +96,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     session,
     privatePrefixes: PRIVATE_ROUTE_PREFIXES,
     routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
+    // QC-78 R29 — el nombre de la marca entra como parametro, igual que los prefijos y las rutas:
+    // el literal vive en `lib/shared/routes.ts` y el dominio no puede importarlo. Sin esta linea
+    // el campo queda `undefined`, la regla 3 dispara siempre y el bucle vuelve; por eso hay un
+    // test que la vigila en vez de confiar en que nadie la borre.
+    sessionEndedParam: SESSION_ENDED_PARAM,
   });
 
   return decision.kind === 'allow'

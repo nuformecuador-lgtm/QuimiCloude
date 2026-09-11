@@ -135,6 +135,21 @@ function montarLogin(): {
   return { verificar, sesion };
 }
 
+/**
+ * QC-78 (R13) — el estado de cuenta y su rastro, tal como quedan en la fila. Se lee aparte de
+ * `leerBloqueo()` para no tocar las igualdades exactas que ya afirman los casos de QC-19.
+ */
+function leerEstado(): Promise<{
+  accountStatus: string;
+  accountStatusChangedAt: Date;
+  accountStatusChangedBy: string | null;
+}> {
+  return prisma.user.findUniqueOrThrow({
+    where: { id: usuarioId },
+    select: { accountStatus: true, accountStatusChangedAt: true, accountStatusChangedBy: true },
+  });
+}
+
 /** Las tres columnas de bloqueo tal como estan en la fila ahora mismo (R30). */
 function leerBloqueo(): Promise<{
   failedLoginAttempts: number;
@@ -182,6 +197,10 @@ beforeAll(async () => {
       passwordHash: await createPasswordHash(CLAVE_CORRECTA),
       roleId: rolId,
       companyId: empresaId,
+      // QC-78 R1 — EXPLICITO y no por defecto: la columna nace `pending` (QC-65) y desde esta
+      // ficha `pending` NO entra al login. Quien tiene que poder entrar se crea `active`; los
+      // casos que prueban lo contrario cambian el estado ellos mismos.
+      accountStatus: 'active',
     },
     select: { id: true },
   });
@@ -212,6 +231,10 @@ beforeAll(async () => {
       passwordHash: await createPasswordHash(CLAVE_CORRECTA),
       roleId: rolId,
       companyId: empresaMuertaId,
+      // QC-78 R1 — igual que el anterior: lo que este usuario demuestra es el corte por EMPRESA
+      // (QC-48), y ese corte va despues del hash y despues del `!correcta`. Si naciera `pending`,
+      // cortaria antes el estado y el caso dejaria de medir lo que dice medir.
+      accountStatus: 'active',
     },
     select: { id: true },
   });
@@ -238,7 +261,17 @@ afterAll(async () => {
 beforeEach(async () => {
   await prisma.user.update({
     where: { id: usuarioId },
-    data: { failedLoginAttempts: 0, lockLevel: 0, lockedUntil: null },
+    data: {
+      failedLoginAttempts: 0,
+      lockLevel: 0,
+      lockedUntil: null,
+      // QC-78 R13 — el estado tambien se restaura: los casos que bloquean la cuenta ahora dejan
+      // `account_status = blocked` escrito, y sin esto el siguiente `it` arrancaria con una fila
+      // bloqueada Y sin plazo, que es justo la combinacion que R9 lee como bloqueo administrativo
+      // eterno. El orden de los tests tiene que seguir sin importar.
+      accountStatus: 'active',
+      accountStatusChangedBy: null,
+    },
   });
 });
 
@@ -534,6 +567,9 @@ describe('login contra Postgres real', () => {
       // Un fallo calculado sobre esa copia vieja: anularia el bloqueo que hay ahora en la fila.
       { failedAttempts: 1, lockLevel: 1, lockedUntil: null },
       new Date(),
+      // QC-78 R18: el estado de cuenta leido (la fila sigue `active`) y el que se escribiria.
+      'active',
+      null,
     );
 
     expect(aplico).toBe(false);
@@ -620,5 +656,89 @@ describe('login contra Postgres real', () => {
       lockLevel: 1,
       lockedUntil: finDelBloqueo,
     });
+  });
+
+  // --- QC-78: el estado de cuenta, contra la base ------------------------------------------
+
+  // R18 — el CAS incluye el estado de cuenta LEIDO en su predicado. Se fabrica la carrera exacta
+  // llamando al ADAPTADOR: se lee la fila, alguien la cambia por fuera -un administrador la
+  // desactiva mientras corria bcrypt- y la escritura que llega tarde ya no puede aplicar. Solo
+  // se puede demostrar contra Postgres: lo que se mide es el `where` del `updateMany`.
+  it('el CAS no aplica si el estado de cuenta cambio entre la lectura y la escritura', TIEMPO_HOLGADO, async () => {
+    // Lo que el intento leyo: la fila entera, con su estado.
+    const leido = await findActiveByUsername(nombreDeUsuario);
+    expect(leido?.accountStatus).toBe('active');
+
+    // Y lo que pasa mientras corre bcrypt: otro camino cambia el estado.
+    await prisma.user.update({ where: { id: usuarioId }, data: { accountStatus: 'inactive' } });
+
+    const aplico = await compareAndSetLoginAttempt(
+      usuarioId,
+      { failedAttempts: 0, lockLevel: 0, lockedUntil: null },
+      { failedAttempts: 1, lockLevel: 0, lockedUntil: null },
+      new Date(),
+      // El estado ESPERADO es el que se leyo, que ya no es el que hay.
+      leido?.accountStatus ?? 'active',
+      null,
+    );
+
+    expect(aplico).toBe(false);
+    // La fila no se movio: ni el contador del intento, ni el estado que puso el otro camino.
+    expect(await leerBloqueo()).toEqual({
+      failedLoginAttempts: 0,
+      lockLevel: 0,
+      lockedUntil: null,
+    });
+    expect((await leerEstado()).accountStatus).toBe('inactive');
+  });
+
+  // R13 — el bloqueo por intentos se escribe COMO ESTADO, en la misma operacion, con el instante
+  // del intento y SIN autor. Que la columna de autor quede vacia («lo hizo el sistema») solo se
+  // puede afirmar mirando la fila.
+  it('el quinto fallo deja la fila en blocked, con plazo y sin autor', TIEMPO_HOLGADO, async () => {
+    const { verificar, sesion } = montarLogin();
+    const antes = Date.now();
+
+    for (let intento = 0; intento < 5; intento += 1) {
+      expect(await verificar({ username: nombreDeUsuario, password: CLAVE_INCORRECTA })).toEqual({
+        ok: false,
+      });
+    }
+
+    const bloqueo = await leerBloqueo();
+    const estado = await leerEstado();
+
+    // El plazo sigue estando: `blocked` CON plazo es el bloqueo automatico, que caduca solo. La
+    // combinacion `blocked` sin plazo significa otra cosa (R9) y aqui no puede aparecer (R15).
+    expect(bloqueo.lockedUntil).not.toBeNull();
+    expect(bloqueo.lockedUntil?.getTime()).toBeGreaterThan(antes);
+    expect(estado.accountStatus).toBe('blocked');
+    // El rastro: el instante del intento...
+    expect(estado.accountStatusChangedAt.getTime()).toBeGreaterThanOrEqual(antes);
+    // ...y vacio en el autor, que es como QC-65 dice «lo hizo el sistema».
+    expect(estado.accountStatusChangedBy).toBeNull();
+    expect(sesion.tickets).toHaveLength(0);
+  });
+
+  // R1 — y la consecuencia: esa cuenta ya no entra ni con la contrasena correcta, sin que nadie
+  // mire `locked_until` desde el dominio. Se prueba con el estado puesto a mano, que es lo que
+  // hara QC-66 cuando un administrador desactive a alguien.
+  it('una cuenta pending o inactive no entra contra la base ni con la contrasena correcta', TIEMPO_HOLGADO, async () => {
+    for (const estado of ['pending', 'inactive'] as const) {
+      await prisma.user.update({ where: { id: usuarioId }, data: { accountStatus: estado } });
+
+      const { verificar, sesion } = montarLogin();
+
+      expect(await verificar({ username: nombreDeUsuario, password: CLAVE_CORRECTA })).toEqual({
+        ok: false,
+      });
+      expect(sesion.tickets).toHaveLength(0);
+      // R6: y no se movio ni una columna de la fila.
+      expect(await leerBloqueo()).toEqual({
+        failedLoginAttempts: 0,
+        lockLevel: 0,
+        lockedUntil: null,
+      });
+    }
   });
 });

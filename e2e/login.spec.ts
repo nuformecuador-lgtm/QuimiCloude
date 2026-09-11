@@ -32,11 +32,11 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // La UNICA definicion de «mismo nombre de empresa» (QC-47 R3), del contrato publico
 // del modulo: `companies.name_normalized` se calcula con esta y con ninguna otra.
-import { normalizeCompanyName } from '@/lib/modules/identity';
+import { normalizeCompanyName, type UserAccountStatus } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 // El nombre de la cookie lo declara el codec del valor de sesion (QC-9 T4), no el adaptador de
 // transporte: un solo dueño por simbolo.
@@ -75,13 +75,25 @@ let companyId: string | null = null;
 let deletedCompanyId: string | null = null;
 
 /**
+ * Estado de cuenta con el que nace el usuario del fixture y, si el caso lo pide, el plazo de
+ * bloqueo. Desde QC-78 el estado manda en el login (R1), y la columna tiene `@default(pending)`
+ * en `db/schema.prisma`: por eso TODO usuario que deba poder entrar lo lleva EXPLICITO.
+ */
+type AccountState = { accountStatus: UserAccountStatus; lockedUntil?: Date };
+
+/** Lo que necesita un usuario para poder entrar. Nunca implicito: el default de la columna no lo es. */
+const ACTIVE_ACCOUNT: AccountState = { accountStatus: 'active' };
+
+/**
  * Crea un usuario propio del test que lo pide. `label` distingue los usuarios dentro del
  * mismo worker; `RUN_ID` los distingue entre workers y proyectos. `targetCompanyId` solo lo
  * pasa el caso de la empresa dada de baja (QC-48 R3); por defecto se usa la empresa viva.
+ * `accountState` solo lo pasan los casos de QC-78 R28: el resto nace `active` a proposito.
  */
 async function createTestUser(
   label: string,
   targetCompanyId: string | null = companyId,
+  accountState: AccountState = ACTIVE_ACCOUNT,
 ): Promise<{ username: string; password: string }> {
   if (!roleId) throw new Error('el rol del fixture no existe: fallo el beforeAll');
   if (!targetCompanyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -106,11 +118,60 @@ async function createTestUser(
       passwordHash: await createPasswordHash(password),
       roleId,
       companyId: targetCompanyId,
+      // EXPLICITO siempre, incluido el `active` del camino feliz: la columna tiene
+      // `@default(pending)` y desde QC-78 (R1) un usuario `pending` no entra. Confiar en el
+      // default dejaria en rojo el camino feliz de este mismo archivo.
+      accountStatus: accountState.accountStatus,
+      lockedUntil: accountState.lockedUntil ?? null,
     },
     select: { id: true },
   });
 
   return { username, password };
+}
+
+/**
+ * Las cuatro columnas que un intento de login PODRIA tocar. R6 exige que el rechazo por estado
+ * `pending`/`inactive` no escriba ninguna: se leen antes y despues del intento y se comparan.
+ */
+async function readLockColumns(username: string) {
+  // `findFirst` y no `findUnique`: `users.username` NO es un unico de Prisma —la unicidad la
+  // impone el indice parcial `users_username_unique` en SQL—, asi que el cliente no ofrece
+  // `where: { username }` como clave unica.
+  return prisma.user.findFirstOrThrow({
+    where: { username },
+    select: {
+      failedLoginAttempts: true,
+      lockLevel: true,
+      lockedUntil: true,
+      accountStatus: true,
+    },
+  });
+}
+
+/**
+ * Hace un intento de login por el formulario real y devuelve el texto EXACTO que el navegador
+ * acaba mostrando. Devolver el texto —y no afirmarlo aqui— es lo que permite al caso de R28
+ * comparar dos mensajes OBSERVADOS entre si, en vez de comparar cada uno con un literal copiado.
+ */
+async function attemptLogin(
+  page: Page,
+  username: string,
+  password: string,
+): Promise<string> {
+  await page.goto(LOGIN_PATH);
+
+  await page.getByTestId('login-username').fill(username);
+  await page.getByTestId('login-password').fill(password);
+  await page.getByTestId('login-submit').click();
+
+  // El aviso llega en un toast de sonner. Se localiza por su atributo estructural, NO por su
+  // texto: localizarlo por el texto esperado convertiria la comparacion posterior en una
+  // tautologia (encontrariamos solo lo que ya damos por bueno).
+  const toast = page.locator('[data-sonner-toast]').first();
+  await expect(toast).toBeVisible({ timeout: 60_000 });
+
+  return ((await toast.textContent()) ?? '').trim();
 }
 
 test.beforeAll(async () => {
@@ -312,5 +373,82 @@ test.describe('login en navegador real', () => {
       (cookie) => cookie.name === SESSION_COOKIE_NAME,
     );
     expect(sessionCookie, 'una empresa no viva no debe emitir cookie de sesion').toBeUndefined();
+  });
+
+  test('una cuenta que no esta activa ve el MISMO mensaje que una contrasena mala, no recibe sesion y no deja rastro', async ({
+    page,
+    context,
+  }) => {
+    // Cubre QC-78 R28 (a), y con el R1, R3, R4, R5 y R6 en navegador real.
+    //
+    // La contrasena que se usa contra las cuentas no activas es la BUENA: lo que se demuestra es
+    // que ni siquiera la credencial correcta abre la puerta cuando el estado efectivo no es
+    // `active`, no que una contrasena mala falle (eso ya lo cubre el test de arriba).
+    //
+    // Un usuario POR ESTADO, todos con el prefijo de este spec: compartir usuario entre casos es
+    // justo lo que la cabecera de este archivo descarta con `fullyParallel` y `retries`.
+    const pendingUser = await createTestUser('pend', companyId, { accountStatus: 'pending' });
+    const inactiveUser = await createTestUser('inac', companyId, { accountStatus: 'inactive' });
+    // `blocked` con plazo FUTURO: es el bloqueo automatico de QC-19 tal y como QC-78 lo unifica
+    // (R10). Una hora por delante deja el plazo vigente durante toda la ejecucion.
+    const blockedUser = await createTestUser('bloq', companyId, {
+      accountStatus: 'blocked',
+      lockedUntil: new Date(Date.now() + 60 * 60 * 1000),
+    });
+
+    // Estado ANTES del intento, para las dos cuentas cuyo rechazo no debe escribir nada (R6).
+    const pendingBefore = await readLockColumns(pendingUser.username);
+    const inactiveBefore = await readLockColumns(inactiveUser.username);
+
+    // --- 1. El mensaje de referencia: el que ve QUIEN SE EQUIVOCA DE CONTRASENA. Se OBSERVA en
+    // la pantalla, no se copia de ningun sitio: es el patron con el que se comparan los demas.
+    const wrongPasswordUser = await createTestUser('r28ko');
+    const wrongPasswordMessage = await attemptLogin(
+      page,
+      wrongPasswordUser.username,
+      `${wrongPasswordUser.password}-incorrecta`,
+    );
+
+    // Ancla, no asercion central: amarra el texto observado a la constante exportada para que un
+    // toast ajeno (uno de otro origen) no pueda hacerse pasar por el aviso de credenciales.
+    expect(wrongPasswordMessage).toContain(GENERIC_CREDENTIALS_ERROR);
+
+    // --- 2. Los tres estados no activos, con la contrasena CORRECTA.
+    for (const { label, user } of [
+      { label: 'pending', user: pendingUser },
+      { label: 'inactive', user: inactiveUser },
+      { label: 'blocked', user: blockedUser },
+    ]) {
+      const message = await attemptLogin(page, user.username, user.password);
+
+      // LA ASERCION CENTRAL DE R28 (a): igualdad entre DOS textos observados en el navegador. Si
+      // algun dia el rechazo por estado dijera algo aunque fuera minimamente distinto —una coma,
+      // un «tu cuenta esta...»—, esto se pone rojo, que es exactamente lo que R3 pide vigilar.
+      expect(message, `el estado '${label}' no puede verse distinto de una contrasena mala`).toBe(
+        wrongPasswordMessage,
+      );
+
+      expect(new URL(page.url()).pathname).toBe(LOGIN_PATH);
+
+      const sessionCookie = (await context.cookies()).find(
+        (cookie) => cookie.name === SESSION_COOKIE_NAME,
+      );
+      expect(
+        sessionCookie,
+        `el estado '${label}' no debe emitir cookie de sesion (R4)`,
+      ).toBeUndefined();
+    }
+
+    // --- 3. El intento no dejo rastro en `pending` ni en `inactive` (R5, R6): el corte por estado
+    // ocurre ANTES de registrar el fallo, asi que las cuatro columnas siguen como estaban. No se
+    // comprueba sobre `blocked` a proposito: ese caso si toca el camino de la politica de intentos.
+    expect(
+      await readLockColumns(pendingUser.username),
+      'un rechazo por estado pending no debe escribir nada en la fila',
+    ).toEqual(pendingBefore);
+    expect(
+      await readLockColumns(inactiveUser.username),
+      'un rechazo por estado inactive no debe escribir nada en la fila',
+    ).toEqual(inactiveBefore);
   });
 });

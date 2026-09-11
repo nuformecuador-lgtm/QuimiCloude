@@ -41,6 +41,17 @@ import type { SessionUserRecord } from '../../../ports/session-user-reader';
  * El mapeo es un `map` a los codigos y nada mas: sin normalizar, sin ordenar y sin deduplicar.
  * La comparacion de `assertPermission` es por pertenencia exacta (R13), asi que cualquier
  * cocina aqui solo podria cambiar el resultado, nunca mejorarlo.
+ *
+ * QC-78 (T10, R20, R21, `design.md > 4`): el `select` gana `accountStatus` y `lockedUntil`, otra
+ * vez en ESTA MISMA llamada a `findFirst`. Las dos son columnas de `users`, o sea que ya venian
+ * en la fila leida: **ni un `JOIN` mas, ni una consulta mas por peticion** (R21), que era la
+ * condicion. No se anade nada al `where`: el corte por estado es del dominio
+ * —`effectiveAccountStatus` en `resolve-session.ts`—, igual que el de la empresa.
+ *
+ * El coste, declarado: el `select` deja de ser tan estrecho como lo dejo QC-8 R14 —salen un enum
+ * mas y una marca de tiempo mas—. **Ninguno de los dos es PII** y ninguno se registra en ningun
+ * log, mismo argumento que ya se acepto para `companyDeletedAt`. Y sin `lockedUntil` habria que
+ * duplicar aqui la traduccion del plazo, que es justo lo que R7 prohibe.
  */
 export async function findActiveSessionUserById(id: string): Promise<SessionUserRecord | null> {
   const usuario = await prisma.user.findFirst({
@@ -53,6 +64,9 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
       role: { select: { name: true, permissions: { select: { permissionCode: true } } } },
       companyId: true,
       company: { select: { deletedAt: true } },
+      // QC-78 R20, R21: columnas de `users`, en el MISMO `findFirst`.
+      accountStatus: true,
+      lockedUntil: true,
     },
   });
 
@@ -69,5 +83,9 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
     companyDeletedAt: usuario.company.deletedAt,
     // QC-74 R7: los permisos salen de la ASIGNACION rol-permiso, nunca del nombre del rol.
     permissions: usuario.role.permissions.map((asignacion) => asignacion.permissionCode),
+    // QC-78 R7, R20: los dos crudos. Quien traduce «lo que la columna dice» a «lo que significa
+    // AHORA» es `effectiveAccountStatus`, no este adaptador.
+    accountStatus: usuario.accountStatus,
+    lockedUntil: usuario.lockedUntil,
   };
 }

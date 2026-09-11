@@ -6,10 +6,15 @@
  * QC-9 la crea —el middleware de `/inventario`—, asi que el recorrido ya se puede ejercitar
  * entero, y ampliado con lo que QC-9 añade: la vuelta a **la ruta que se habia pedido** (R8).
  *
- * Un solo recorrido y un solo test a proposito: lo que R24 exige es la CADENA, y partirla en
- * cinco tests independientes obligaria a recrear la sesion en cada uno y dejaria sin cubrir
- * justo lo unico que este nivel aporta —que los cinco pasos encajan seguidos en un navegador
- * real—. Los pasos sueltos ya estan cubiertos en unit e integracion (`design.md > 12`).
+ * Un solo recorrido para R24 a proposito: lo que R24 exige es la CADENA, y partirla en cinco
+ * tests independientes obligaria a recrear la sesion en cada uno y dejaria sin cubrir justo lo
+ * unico que este nivel aporta —que los cinco pasos encajan seguidos en un navegador real—. Los
+ * pasos sueltos ya estan cubiertos en unit e integracion (`design.md > 12`).
+ *
+ * QC-78 (R28 b) añade un SEGUNDO recorrido a este archivo, con su propio usuario: una sesion ya
+ * abierta cuya cuenta deja de estar `active` no llega a la siguiente pantalla privada. Es otra
+ * cadena distinta —dos peticiones con la misma cookie y un cambio de estado en medio—, no un paso
+ * mas de la primera, y por eso no se cuelga del recorrido de R24.
  *
  * Que aporta sobre unit e integracion: el navegador de verdad. La redireccion del middleware,
  * la cookie `httpOnly` que emite el servidor, el `<form>` real de la Server Action de logout y
@@ -51,7 +56,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
 import { prisma } from '@/lib/shared/db/prisma';
-import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
@@ -84,11 +89,12 @@ let roleId: string | null = null;
 let companyId: string | null = null;
 
 /**
- * Usuario propio de este worker. Se crea uno solo porque el recorrido tiene un unico test y
- * ningun paso suma intentos fallidos (no se ejercita ninguna credencial incorrecta), asi que
- * aqui no aplica la regla de "un usuario por test" de `e2e/login.spec.ts`.
+ * Usuario propio del test que lo pide. `label` lo distingue DENTRO del worker (los tres indices
+ * unicos de `users` son globales) y `RUN_ID` entre workers y proyectos. Cada test tiene el suyo:
+ * el de QC-78 R28 apaga su cuenta a mitad de recorrido, y compartirla dejaria al otro test
+ * dependiendo del orden en que corran con `fullyParallel`.
  */
-async function createTestUser(): Promise<{
+async function createTestUser(label: string): Promise<{
   username: string;
   password: string;
   displayName: string;
@@ -96,13 +102,14 @@ async function createTestUser(): Promise<{
   if (!roleId) throw new Error('el rol del fixture no existe: fallo el beforeAll');
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const username = `${USERNAME_PREFIX}${RUN_ID}`;
+  const suffix = `${RUN_ID}${label}`;
+  const username = `${USERNAME_PREFIX}${suffix}`;
   /** Contrasena conocida del usuario de prueba. Solo vive aqui; nunca se escribe en consola. */
   const password = `Qc9-E2E-${RUN_ID.slice(0, 12)}`;
-  // Nombre de pila unico por worker: el paso 3 afirma el nombre EXACTO que pinta la barra, y
-  // con Chromium y WebKit a la vez un nombre compartido daria un `strict mode violation` o,
-  // peor, un verde que en realidad mira al usuario del otro proyecto.
-  const firstNames = `Qc9${RUN_ID.slice(0, 8)}`;
+  // Nombre de pila unico por worker Y POR TEST: el paso 3 afirma el nombre EXACTO que pinta la
+  // barra, y con Chromium y WebKit a la vez un nombre compartido daria un `strict mode
+  // violation` o, peor, un verde que en realidad mira al usuario del otro proyecto.
+  const firstNames = `Qc9${RUN_ID.slice(0, 8)}${label}`;
 
   // Hash REAL: el objetivo del E2E es que bcrypt, el adaptador Prisma y la Server Action se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
@@ -114,11 +121,15 @@ async function createTestUser(): Promise<{
       email: `${username}@example.test`,
       phone: '+573000000000',
       documentTypeCode: 'CC',
-      documentNumber: `qc9${RUN_ID}`,
+      documentNumber: `qc9${suffix}`,
       username,
       passwordHash: await createPasswordHash(password),
       roleId,
       companyId,
+      // EXPLICITO: `users.account_status` tiene `@default(pending)` en `db/schema.prisma` y desde
+      // QC-78 (R1) solo `active` entra al login. Sin esta linea, TODO recorrido de este archivo
+      // se quedaria en la pantalla de login.
+      accountStatus: 'active',
     },
     select: { id: true },
   });
@@ -197,12 +208,41 @@ test.afterAll(async () => {
 // con coste 10 tarda a proposito. Un timeout corto aqui produce rojos que no son del codigo.
 test.setTimeout(180_000);
 
+/**
+ * Cuenta las redirecciones de NAVEGACION que ocurren mientras corre `navegar` (QC-78 R29).
+ *
+ * Solo `resourceType() === 'document'` y **sin 304**, y las dos exclusiones son a base de haber
+ * fallado: `next dev` responde los chunks de `_next/static` con **304 Not Modified**, que cae de
+ * lleno en el rango 300-399. Contar toda respuesta 3xx daba 15, 20 o 29 «redirecciones» de
+ * JavaScript segun lo que el navegador tuviera ya en cache — y pasaba o fallaba por la cache, no
+ * por el producto. Lo que R29 mide es cuantas veces rebota el DOCUMENTO, que es lo unico que el
+ * usuario sufre.
+ */
+async function contarRedireccionesDeNavegacion(
+  page: import('@playwright/test').Page,
+  navegar: () => Promise<void>,
+): Promise<string[]> {
+  const saltos: string[] = [];
+  const contar = (respuesta: import('@playwright/test').Response) => {
+    const esDocumento = respuesta.request().resourceType() === 'document';
+    const esRedireccion = respuesta.status() >= 300 && respuesta.status() < 400;
+    if (esDocumento && esRedireccion && respuesta.status() !== 304) saltos.push(respuesta.url());
+  };
+  page.on('response', contar);
+  try {
+    await navegar();
+  } finally {
+    page.off('response', contar);
+  }
+  return saltos;
+}
+
 test.describe('ciclo de sesion sobre una ruta privada', () => {
   test('pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada', async ({
     page,
     context,
   }) => {
-    const { username, password, displayName } = await createTestUser();
+    const { username, password, displayName } = await createTestUser('ciclo');
 
     // --- 1. Ruta privada sin sesion -> login, con la ruta pedida como destino de vuelta (R2, R7).
     await page.goto(INVENTORY_ROUTE);
@@ -244,5 +284,113 @@ test.describe('ciclo de sesion sobre una ruta privada', () => {
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
     await expect(page.getByTestId('private-user-name')).toHaveCount(0);
     await expect(page.getByTestId('inventario-title')).toHaveCount(0);
+  });
+
+  test('una sesion abierta cuya cuenta deja de estar activa no llega a la siguiente pantalla privada y acaba en el login', async ({
+    page,
+    context,
+  }) => {
+    // Cubre QC-78 R28 (b), y con el R20 y R21: la resolucion de sesion relee la ficha en CADA
+    // peticion, asi que apagar la cuenta por fuera basta para que la siguiente navegacion no
+    // entre. Solo se puede afirmar de verdad aqui: es una cadena de dos peticiones del mismo
+    // navegador con la MISMA cookie.
+    const { username, password } = await createTestUser('r28');
+
+    // --- 1. Entrar por el formulario real y comprobar que se esta DENTRO de la zona privada.
+    await page.goto(INVENTORY_ROUTE);
+    await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    await page.getByTestId('login-username').fill(username);
+    await page.getByTestId('login-password').fill(password);
+    await page.getByTestId('login-submit').click();
+    await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+
+    // --- 2. La cuenta se apaga POR FUERA, sin tocar la sesion ni la cookie. Es un `update`
+    // directo a proposito: simula la accion administrativa de QC-66, que todavia no existe.
+    // `updateMany` y no `update`: `users.username` NO es un unico de Prisma —la unicidad la impone
+    // el indice parcial `users_username_unique` en SQL—, y el `username` lleva `RUN_ID`, asi que
+    // alcanza exactamente a la fila de este test y a ninguna otra.
+    await prisma.user.updateMany({ where: { username }, data: { accountStatus: 'inactive' } });
+
+    // --- 3. La siguiente pantalla privada ya no se abre. Se vuelve a pedir `/inventario` —una
+    // peticion NUEVA— en vez de otra ruta privada cualquiera porque las demas exigen permisos
+    // propios (QC-75) y un 404 por permiso se confundiria con el corte que aqui se quiere probar.
+    //
+    // QC-78 R29 — se cuentan las redirecciones ANTES de navegar. Este mismo paso murio con
+    // `Load cannot follow more than 20 redirections` cuando el corte redirigia al login pelado:
+    // el borde veia la cookie viva y devolvia a la zona privada, el layout volvia a cortar, y
+    // asi sin fin. Contar es lo unico que distingue «acaba en el login» de «acaba en el login
+    // despues de rebotar»: sin esto, un bucle de 19 saltos pasaria el test.
+    const redirecciones = await contarRedireccionesDeNavegacion(page, async () => {
+      await page.goto(INVENTORY_ROUTE);
+      await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    });
+    await expect(page.getByTestId('inventario-title')).toHaveCount(0);
+    await expect(page.getByTestId('private-user-name')).toHaveCount(0);
+
+    // UNA sola: la de `/inventario` al login. Ni una mas (R29).
+    expect(
+      redirecciones,
+      `la salida al login debe costar UNA redireccion y costo ${redirecciones.length}: ${redirecciones.join(' -> ')}`,
+    ).toHaveLength(1);
+
+    // --- 4. La cookie NO se borro. Lo fija la decision cerrada del 2026-09-08 («sale en la
+    // siguiente navegacion», sin borrar la cookie y sin mensaje que diga por que): el corte lo
+    // hace la relectura de la ficha en cada peticion, no una limpieza del transporte. Si algun
+    // dia se decidiera borrarla, este test tiene que discutirse, no ajustarse en silencio.
+    expect(
+      (await context.cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
+      'el corte por estado no debe borrar la cookie de sesion',
+    ).toBe(true);
+
+    // --- 5. Y la pantalla de login NO explica el motivo: ningun aviso, ninguna pista de que la
+    // cuenta existe ni de en que estado esta (misma discrecion que R3 impone en el login).
+    await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+  });
+
+  test('una sesion abierta cuya ficha se da de baja tampoco rebota: sale al login en una sola redireccion', async ({
+    page,
+  }) => {
+    // QC-78 R29 sobre un corte PREEXISTENTE: la baja logica de QC-8 R11 (`users.deleted_at`).
+    //
+    // Por que existe este test y no basta con el de arriba: el bucle NO era del corte por estado.
+    // `resolveSession` devuelve `null` por TRES caminos —baja logica (QC-8 R11), empresa no viva
+    // (QC-48 R15) y estado de cuenta (QC-78 R20)— y los tres salen por el MISMO `redirect`, asi
+    // que los tres rebotaban igual. El defecto era anterior a esta ficha; QC-78 solo lo hizo
+    // alcanzable. Si la marca se hubiera puesto solo en el camino del estado, estos otros dos
+    // seguirian rotos y nadie se enteraria: no habia ningun E2E que abriera sesion y matara la
+    // ficha despues. Este es ese E2E.
+    const { username, password } = await createTestUser('r29baja');
+
+    await page.goto(INVENTORY_ROUTE);
+    await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    await page.getByTestId('login-username').fill(username);
+    await page.getByTestId('login-password').fill(password);
+    await page.getByTestId('login-submit').click();
+    await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+
+    // La ficha se da de baja POR FUERA. `deleted_at` con valor es el unico criterio de QC-8 R11,
+    // y el `where` del lector de sesion lo aplica, asi que la resolucion devuelve `null` sin que
+    // el estado de cuenta tenga nada que ver: esta cuenta sigue `active`.
+    await prisma.user.updateMany({ where: { username }, data: { deletedAt: new Date() } });
+
+    const redirecciones = await contarRedireccionesDeNavegacion(page, async () => {
+      await page.goto(INVENTORY_ROUTE);
+      await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    });
+    await expect(page.getByTestId('inventario-title')).toHaveCount(0);
+
+    expect(
+      redirecciones,
+      `la salida al login debe costar UNA redireccion y costo ${redirecciones.length}: ${redirecciones.join(' -> ')}`,
+    ).toHaveLength(1);
+
+    // Y la marca es la MISMA que la del corte por estado: opaca, no dice cual de los tres fue
+    // (R30 a). Se compara con la constante, no con un literal copiado.
+    expect(new URL(page.url()).search).toBe(
+      LOGIN_ROUTE_SESSION_ENDED.slice(LOGIN_ROUTE_SESSION_ENDED.indexOf('?')),
+    );
   });
 });

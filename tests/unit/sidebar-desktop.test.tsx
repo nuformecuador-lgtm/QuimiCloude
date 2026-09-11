@@ -10,7 +10,7 @@ import {
   PRIVATE_NAV_ITEMS,
   type NavGroup,
 } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE, LOGIN_ROUTE } from '@/lib/shared/routes';
+import { DASHBOARD_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
@@ -355,7 +355,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
 
     await expect(renderLayout()).rejects.toThrow(RedirectCentinela);
 
-    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE);
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
     expect(screen.queryByTestId(testId.sidebar)).not.toBeInTheDocument();
   });
 });

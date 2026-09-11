@@ -52,6 +52,10 @@ const RECORD: SessionUserRecord = {
   // los miran —quien los mira es `assertPermission` en cada caso de uso—, asi que aqui basta
   // con una lista no vacia que se pueda seguir hasta la proyeccion.
   permissions: ['inventario.consultar'],
+  // QC-78 T10: el record trae ahora el estado de cuenta y el plazo crudos. `active` y sin plazo:
+  // la fachada de esta prueba mira el cableado, no el corte por estado.
+  accountStatus: 'active',
+  lockedUntil: null,
 };
 
 beforeEach(() => {

@@ -5,7 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
 import type { SessionUser } from '@/lib/modules/identity';
-import { LOGIN_ROUTE } from '@/lib/shared/routes';
+import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { getInitials } from '@/lib/shared/ui/initials';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
@@ -216,7 +216,7 @@ describe('layout privado', () => {
 
     await expect(renderLayout()).rejects.toThrow(RedirectCentinela);
 
-    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE);
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
     expect(screen.queryByTestId(testId.sidebar)).not.toBeInTheDocument();
     expect(screen.queryByTestId(testId.content)).not.toBeInTheDocument();
   });
