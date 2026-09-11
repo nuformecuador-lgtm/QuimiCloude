@@ -623,3 +623,132 @@ el rango git vacío; limpiarlos desde una rama los pondría rojos al mergear).
 2. Los tres **menores ya cerrados** (R9, R13/R16, el `console.warn` de QC-9) no dejan nada
    pendiente: los dos primeros eran redacción, el tercero es de QC-9 y queda anotado en R11.
 3. **Sigue sin abrirse PR y sin hacerse push.** Eso lo autoriza el humano.
+
+---
+
+# RONDA 3 — los dos menores de la aprobación (2026-09-10)
+
+> El `reviewer` **APROBÓ** la ronda 2: **0 mayores, 2 menores**. Lo verificó, no lo firmó: mutó la
+> guardia nueva en los dos sentidos sobre archivos reales —inyectó un aplanado en
+> `order-list-section.tsx` (roja, nombrando el archivo) y rompió el `setIngredientsError` de
+> `order-form.tsx` (roja, «ya NO lo hace… borra su entrada»)—, **desplazó 41 líneas encima del
+> aplanado** para comprobar que la lista no clava por número de línea (siguió verde), confirmó que
+> el verde vacío es imposible (147 `.tsx` barridos) y corrió el gate él mismo. También confirmó que
+> R17 **no** quedó tautológico, precisamente porque la frontera la fija la lista en disco y no la
+> definición.
+
+## Menor 1 — la cabecera de `requirements.md` estaba rota, y era culpa de la ronda 2
+
+**Qué pasó, sin adornos:** el reemplazo de cadena que insertó la sección de enmiendas buscaba
+`## Requisitos (EARS)` y encontró **la primera** ocurrencia, que no era el encabezado sino un
+**code span dentro de la frase del sembrado** (`…su trabajo aquí es \`## Requisitos (EARS)\`._`).
+Resultado: el code span partido, un encabezado fantasma colgando de esa línea, **dos**
+`## Requisitos (EARS)` y la sección de enmiendas sin título propio. **El contenido del sembrado
+nunca se tocó** —ni el Alcance ni las decisiones cerradas—, pero el archivo estaba mal formado.
+
+**Arreglado extrayendo el bloque insertado y recolocándolo:** la frase del sembrado vuelve a estar
+entera con su code span cerrado, la sección de enmiendas queda **bajo su propio título** justo
+después del bloque del sembrado, y hay **un solo** `## Requisitos (EARS)` (comprobado con
+`grep -c`). Los cinco títulos de nivel 2 quedan: Enmiendas, Requisitos (EARS), Trazabilidad,
+Preguntas abiertas, Decisiones cerradas.
+
+**Releído entero después de arreglarlo**, no solo el trozo tocado. Una observación que sale de esa
+relectura y que **no se toca aquí** porque no es de esta ficha ni estaba en el encargo: **R6
+remata con «el único camino de vuelta al navegador es el estado de error de R11», y debería decir
+R13** — R11 es el requisito del log. Es un error de referencia cruzada del sembrado original, sin
+efecto sobre lo implementado. Queda anotado para quien enmiende este spec la próxima vez.
+
+**Lección, que es la que vale para el arnés:** un reemplazo de cadena sobre un `.md` es peligroso
+justo cuando la cadena buscada es un **encabezado**, porque los encabezados se citan a sí mismos en
+el texto. Buscar `\n## Titulo\n` —anclado a principio de línea— en vez de `## Titulo` habría
+evitado esto entero.
+
+## Menor 2 — el punto ciego del detector: se CIERRA, no se anota
+
+El reviewer probó que una sexta superficie escrita con el resultado **desestructurado** pasaba en
+verde:
+
+```ts
+const { status, message } = await algunaAction(...);
+if (status === 'error') throw new Error(message);
+```
+
+**Se eligió añadir el tercer patrón en vez de anotar la limitación**, y la razón es un dato medido,
+no una preferencia: el barrido real da **margen doble**, así que el falso positivo —lo único que
+desaconsejaba cerrarlo— no existe aquí.
+
+```
+archivos .tsx barridos: 147
+archivos que desestructuran `status` y `message` a la vez: []
+usos DESNUDOS de `message` (quitando incluso la condicion de la desestructuracion): []
+aplanados detectados: 6   <- exactamente las 6 de SUPERFICIES_QUE_APLANAN, todas por la via
+                             cualificada de siempre. La lista NO se toco.
+```
+
+Las dos condiciones del patrón nuevo están apagadas en todo el repo, **y cada una por separado
+también**. O sea que no era una decisión ajustada: cerrarlo era gratis.
+
+**Qué detecta ahora:** dos idiomas (`throw-new-error`, `set-estado-string`) × **tres escrituras**:
+las dos cualificadas de siempre —que exigen `<id>.status === 'error'` en el archivo— y la
+desestructurada nueva, que exige que una desestructuración ligue **`status` y `message` a la vez**
+y que el identificador aparezca **desnudo**. Exigir las dos propiedades es lo que la hace
+específica de un `ErrorState`: un `{ ok, message }` de validación local no casa. El **idioma sigue
+siendo la superficie** (tirar vs. guardar estado), no la forma de escribirla, así que un archivo ya
+listado que mañana se reescriba desestructurado sigue casando con su entrada y el conteo no miente.
+
+**Mutación (rojo real).** La sexta superficie, en forma desestructurada, inyectada a propósito en
+`components/shared/file-field.tsx` —uno de los dos falsos positivos conocidos, para probar las dos
+cosas de una vez—:
+
+```
+ ❯ tests/guards/guard-identificador-de-request.test.ts (23 tests | 1 failed)
+   × las superficies que aplanan un ErrorState a string son las declaradas, y solo esas (R17)
+
+AssertionError: expected [ Array(1) ] to deeply equal []
++ [ "components/shared/file-field.tsx: aplana un ErrorState a string con 'throw-new-error' y NO
++    esta en SUPERFICIES_QUE_APLANAN. ..." ]
+ Test Files  1 failed (1) | Tests  1 failed | 22 passed (23)
+```
+
+**Un único hallazgo**, y el `setError(validation.message)` local que ese mismo archivo ya tenía
+**siguió sin cazarse**: el patrón cierra el punto ciego sin abrir ruido. Revertido con `cp`.
+
+**El límite que QUEDA, escrito en la cabecera de la guardia y en un test propio** —porque cerrar un
+punto ciego y callar el siguiente es el mismo error una vuelta más tarde—: no se caza el **alias**
+(`const { status, message: m } = …; throw new Error(m)`), porque seguir una variable renombrada ya
+es análisis de alcance y no regex; y el alcance del detector es el **archivo**, no la función, un
+sesgo conservador hacia el ruido antes que hacia el silencio. La guardia pasa de 21 a **23** casos.
+
+## El gate completo de la ronda 3 (`./init.sh`), salida real
+
+```
+== Arnes SDD :: init (modo: completo) ==
+-> pnpm run typecheck   ✓ typecheck paso
+-> pnpm run lint        ✓ lint paso
+-> pnpm run test:json
+ Test Files  302 passed (302)
+      Tests  3891 passed | 18 skipped (3909)
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==            (exit 0)
+```
+
+**302 archivos, 3891 tests, cero rojos, exit 0.** Dos casos más que la ronda 2 (3889 -> 3891): los
+dos sintéticos del patrón desestructurado —el que lo caza en los dos idiomas y el que fija por
+escrito que el alias **no** se caza—.
+
+## Estado final de la ficha
+
+| Ronda | Veredicto | Qué se movió |
+|---|---|---|
+| 1 (`afe9daf`) | RECHAZADO: 2 mayores, 4 menores | — |
+| 2 (`c9f7967`) | **APROBADO**: 0 mayores, 2 menores | 5 requisitos enmendados + la guardia de superficies + R11 rehecho |
+| 3 (esta) | — | La cabecera del spec bien formada + el tercer patrón del detector |
+
+**Lo que queda abierto, y es lo mismo que al cerrar la ronda 2:** llevar el `ErrorState` entero a
+las cinco superficies que hoy lo aplanan sigue **sin hacer y vigilado** —la sexta pone el gate en
+rojo, en cualquiera de las tres escrituras—. Es candidato a ficha propia y exige ampliar el
+contrato `error` de `AsyncAutocomplete`, que fue la **Opción A descartada** por el humano.
+
+**Sigue sin abrirse PR y sin hacerse push.** Eso lo autoriza el humano.

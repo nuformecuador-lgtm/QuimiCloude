@@ -32,7 +32,9 @@
 >
 > _Sembrado por `/afinar-feature` el 2026-09-07. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
-> reescribe: su trabajo aquí es `## Enmiendas del 2026-09-10 (revisión F2.2)
+> reescribe: su trabajo aquí es `## Requisitos (EARS)`._
+
+## Enmiendas del 2026-09-10 (revisión F2.2)
 
 El `reviewer` rechazó la primera entrega con **2 mayores y 4 menores**
 (`progress/review_QC-71-identificador-de-request.md`). Ninguno era un defecto de implementación:
@@ -47,8 +49,6 @@ escrito para que nadie lo reabra:
 | Menor 2 | R13/R16 decían «identificador» a secas | **Nombrar el símbolo: `reference`** | — |
 | Menor 3 | El `console.warn` por cookie ilegible es de QC-9 | **No se toca**, queda anotado en R11 | — |
 | Menor 4 | El caso de R11 «camino feliz» era casi vacuo | **Hacerlo valer** | Cambio de test, no de producción |
-
-## Requisitos (EARS)`._
 
 ## Requisitos (EARS)
 

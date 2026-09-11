@@ -310,8 +310,20 @@ export function hallazgosDePuertoNuevo(rutasDePuertos: readonly string[]): reado
 // ignora a la semana, y un gate ignorado no defiende nada. El conteo si entra: si aparece un
 // aplanado MAS en un archivo que ya aplana, eso es una superficie nueva aunque el archivo ya
 // estuviera en la lista.
+//
+// QUE CAZA EL DETECTOR, en una linea: DOS idiomas —`throw-new-error` y `set-estado-string`—
+// escritos de TRES formas: las dos cualificadas (`throw new Error(result.message)` y
+// `setAlgo(result.message)`, con `result.status === 'error'` en el mismo archivo) y, desde la
+// ronda 3, la DESESTRUCTURADA (`const { status, message } = await accion(); throw new Error(
+// message)`), que hasta entonces pasaba en verde. El limite que QUEDA es el alias
+// —`const { status, message: m } = …; throw new Error(m)`—: seguir la variable renombrada ya es
+// analisis de alcance, no una regex. Detalle y motivo, junto a los patrones.
 
-/** Las dos formas en que hoy un `ErrorState` se aplana a `string`. */
+/**
+ * Las dos formas en que hoy un `ErrorState` se aplana a `string`. El idioma es la SUPERFICIE
+ * —tirar una excepcion o guardar un `useState<string | null>`—, no la forma de escribirla: el
+ * detector caza tres escrituras distintas y las clasifica en estos dos.
+ */
 export type IdiomaDeAplanado = 'throw-new-error' | 'set-estado-string'
 
 export type Aplanado = {
@@ -381,16 +393,38 @@ export const SUPERFICIES_QUE_APLANAN: readonly SuperficieAplanada[] = [
 ]
 
 /**
- * Los dos idiomas, tal como aparecen HOY en el codigo (leidos, no supuestos):
- * `throw new Error(result.message)` y `setIngredientsError(result.message)`.
+ * El detector caza TRES escrituras y las clasifica en los dos idiomas de arriba:
+ *
+ *  1. `throw new Error(result.message)`      -> 'throw-new-error'      (cualificada)
+ *  2. `setIngredientsError(result.message)`  -> 'set-estado-string'    (cualificada)
+ *  3. `const { status, message } = await …`  -> segun como se use `message`  (DESESTRUCTURADA)
+ *
+ * Las dos primeras son las que aparecen HOY en el codigo (leidas, no supuestas). La tercera no
+ * la usa hoy ninguna de las 147 superficies de `app/**` y `components/**` —el barrido real da
+ * cero—, y se anadio en la ronda 3 porque era un punto ciego: escrito asi, un sexto aplanado
+ * pasaba en verde.
  *
  * Que el valor venga de un resultado de Server Action NO se adivina por el nombre de la
- * variable: se exige que el MISMO identificador se discrimine en el archivo con
- * `<id>.status === 'error'`, que es la forma del `ErrorState` de QC-70. Sin esa condicion,
- * `components/shared/file-field.tsx:186` —un `setError(validation.message)` de una validacion
- * local, `{ ok: false, message }`, que nunca fue un ErrorState— entraria como falso positivo.
+ * variable. En las formas cualificadas se exige que el MISMO identificador se discrimine en el
+ * archivo con `<id>.status === 'error'`, que es la forma del `ErrorState` de QC-70; en la
+ * desestructurada, que la desestructuracion ligue `status` Y `message` A LA VEZ. Sin esas
+ * condiciones, `components/shared/file-field.tsx:186` —un `setError(validation.message)` de una
+ * validacion local, `{ ok: false, message }`, que nunca fue un ErrorState— y el `{ ok, message }`
+ * de `login-form.tsx` entrarian como falsos positivos.
+ *
+ * LIMITES CONOCIDOS, que quedan escritos en vez de callados:
+ *  - el ALIAS no se caza: `const { status, message: m } = …; throw new Error(m)` liga las dos
+ *    propiedades, pero el uso desnudo es `m`, no `message`. Cazar cualquier identificador tras
+ *    un alias exigiria seguir la variable, y eso ya es un analisis de alcance, no una regex.
+ *  - el alcance es el ARCHIVO, no la funcion: un archivo que desestructure `{ status, message }`
+ *    en un sitio y escriba `throw new Error(message)` en otro, con otro `message`, se cazaria.
+ *    Es el mismo sesgo conservador que la condicion `<id>.status === 'error'`: prefiere el falso
+ *    positivo ruidoso al silencio. Hoy no dispara en ningun archivo del repo.
  */
-const IDIOMAS: readonly { readonly idioma: IdiomaDeAplanado; readonly patron: RegExp }[] = [
+const IDIOMAS_CUALIFICADOS: readonly {
+  readonly idioma: IdiomaDeAplanado
+  readonly patron: RegExp
+}[] = [
   { idioma: 'throw-new-error', patron: /throw new Error\(\s*([A-Za-z_$][\w$]*)\.message\s*\)/g },
   {
     idioma: 'set-estado-string',
@@ -398,18 +432,50 @@ const IDIOMAS: readonly { readonly idioma: IdiomaDeAplanado; readonly patron: Re
   },
 ]
 
+/** La forma desestructurada: el identificador viaja DESNUDO, sin `<algo>.` delante. */
+const IDIOMAS_DESNUDOS: readonly { readonly idioma: IdiomaDeAplanado; readonly patron: RegExp }[] =
+  [
+    { idioma: 'throw-new-error', patron: /throw new Error\(\s*message\s*\)/g },
+    { idioma: 'set-estado-string', patron: /\bset[A-Z][A-Za-z0-9_$]*\(\s*message\s*\)/g },
+  ]
+
+/** `const { … }` / `let { … }`, para mirar que propiedades liga. */
+const DESESTRUCTURACION = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=/g
+
 function discriminaComoErrorState(source: string, identificador: string): boolean {
   return new RegExp(`\\b${identificador}\\.status\\s*===\\s*['"]error['"]`).test(source)
+}
+
+/**
+ * Liga `status` y `message` a la vez, en cualquier orden y con las demas propiedades que quiera.
+ * Exigir LAS DOS es lo que lo hace especifico de un `ErrorState`: un `{ ok, message }` de
+ * validacion local no casa, y ahi estaban los dos falsos positivos conocidos.
+ */
+export function desestructuraUnErrorState(source: string): boolean {
+  for (const emparejado of source.matchAll(DESESTRUCTURACION)) {
+    const propiedades = (emparejado[1] as string)
+      .split(',')
+      .map((trozo) => (trozo.split(':')[0] as string).trim())
+    if (propiedades.includes('status') && propiedades.includes('message')) return true
+  }
+  return false
 }
 
 /** Detecta los aplanados de un conjunto de archivos ya leidos del disco. */
 export function detectarAplanados(archivos: readonly ArchivoLeido[]): readonly Aplanado[] {
   const encontrados: Aplanado[] = []
   for (const { relPath, source } of archivos) {
-    for (const { idioma, patron } of IDIOMAS) {
+    for (const { idioma, patron } of IDIOMAS_CUALIFICADOS) {
       for (const emparejado of source.matchAll(patron)) {
         const identificador = emparejado[1] as string
         if (!discriminaComoErrorState(source, identificador)) continue
+        encontrados.push({ relPath: toPosix(relPath), idioma })
+      }
+    }
+    if (!desestructuraUnErrorState(source)) continue
+    for (const { idioma, patron } of IDIOMAS_DESNUDOS) {
+      const cuantos = [...source.matchAll(patron)].length
+      for (let i = 0; i < cuantos; i += 1) {
         encontrados.push({ relPath: toPosix(relPath), idioma })
       }
     }
@@ -803,6 +869,59 @@ describe('guardia: casos sinteticos -- cada comprobacion, con su rojo y su verde
       { relPath: 'app/(private)/x/components/picker.tsx', idioma: 'throw-new-error' },
       { relPath: 'app/(private)/x/components/form.tsx', idioma: 'set-estado-string' },
     ])
+  })
+
+  it('R17: la forma DESESTRUCTURADA tambien se caza, y el `{ ok, message }` local sigue sin cazarse', () => {
+    const encontrados = detectarAplanados([
+      {
+        // El punto ciego que cerro la ronda 3: mismo aplanado, escrito desestructurado.
+        relPath: 'app/(private)/x/components/picker-desestructurado.tsx',
+        source:
+          'const { status, message } = await listAction({});\n' +
+          "if (status === 'error') {\n  throw new Error(message);\n}",
+      },
+      {
+        // Orden inverso y con otras propiedades: sigue ligando `status` y `message` a la vez.
+        relPath: 'app/(private)/x/components/form-desestructurado.tsx',
+        source:
+          'const { data, message, status } = await guardarAction(payload);\n' +
+          "if (status === 'error') {\n  setIngredientsError(message);\n  return;\n}",
+      },
+      {
+        // El falso positivo que hay que NO cazar: una validacion local `{ ok, message }` NO liga
+        // `status`, asi que el `message` desnudo no se toca (login-form.tsx, file-field.tsx).
+        relPath: 'app/(public)/login/components/login-form.tsx',
+        source: 'const { ok, message } = validar(form);\nif (!ok) {\n  setError(message);\n}',
+      },
+    ])
+
+    expect(encontrados).toEqual([
+      { relPath: 'app/(private)/x/components/picker-desestructurado.tsx', idioma: 'throw-new-error' },
+      {
+        relPath: 'app/(private)/x/components/form-desestructurado.tsx',
+        idioma: 'set-estado-string',
+      },
+    ])
+  })
+
+  it('R17: el limite conocido queda escrito — el alias `message: m` NO se caza', () => {
+    // Esto no es un verde que celebre nada: fija por escrito lo que el detector NO ve, para que
+    // el siguiente que lo lea sepa donde esta el borde en vez de suponer que cubre todo.
+    const conAlias = detectarAplanados([
+      {
+        relPath: 'app/(private)/x/components/alias.tsx',
+        source:
+          'const { status, message: m } = await listAction({});\n' +
+          "if (status === 'error') {\n  throw new Error(m);\n}",
+      },
+    ])
+
+    expect(conAlias).toEqual([])
+    // Y la pieza que si decide: la desestructuracion de ese mismo archivo SI liga las dos.
+    expect(desestructuraUnErrorState('const { status, message: m } = await listAction({})')).toBe(
+      true,
+    )
+    expect(desestructuraUnErrorState('const { ok, message } = validar(form)')).toBe(false)
   })
 
   it('R17: cada superficie declarada trae su motivo, no solo su nombre', () => {
