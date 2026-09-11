@@ -29,11 +29,15 @@ import { createUpdateUser } from '@/lib/modules/identity/domain/update-user';
 import { USER_QUERYABLE } from '@/lib/modules/identity/domain/user-queryable';
 
 import type { Actor } from '@/lib/modules/identity/domain/actor';
+import type { CredentialPolicyResult } from '@/lib/modules/identity/domain/credential-policy';
 import type { ListQuery } from '@/lib/modules/identity/domain/list-query';
 import type { Page } from '@/lib/modules/identity/domain/page';
 import type { UserDetail, UserRow } from '@/lib/modules/identity/domain/user-view';
-import type { InitialCredentialFactory } from '@/lib/modules/identity/ports/initial-credential-factory';
+import type { CredentialSetupLinkRepository } from '@/lib/modules/identity/ports/credential-setup-link-repository';
+import type { CredentialSetupMailer } from '@/lib/modules/identity/ports/credential-setup-mailer';
+import type { CredentialSetupSecretFactory } from '@/lib/modules/identity/ports/credential-setup-secret-factory';
 import type { ListQueryLog } from '@/lib/modules/identity/ports/list-query-log';
+import type { PasswordHasher } from '@/lib/modules/identity/ports/password-hasher';
 import type { UserAdminRepository } from '@/lib/modules/identity/ports/user-admin-repository';
 
 const puertoTs = readFileSync(
@@ -63,8 +67,22 @@ const OTRA_COMPANY_ID = '88888888-8888-4888-8888-888888888888';
 const TARGET_ID = '22222222-2222-4222-8222-222222222222';
 const ROLE_ID = '33333333-3333-4333-8333-333333333333';
 const NEW_ID = '44444444-4444-4444-8444-444444444444';
-/** Marca reconocible: si el hash que llega al puerto no es ESTE, no vino de la fabrica (R15). */
-const HASH = '$2b$12$marca-de-la-fabrica-de-credencial-inicial';
+/**
+ * Marca reconocible: si el hash que llega al puerto no es ESTE, no vino del hasher de QC-5.
+ *
+ * **QC-79 ENMIENDA QC-66 R15 aqui mismo**: ya no es «el hash de la fabrica de credencial inicial»,
+ * porque el alta no genera ninguna contrasena al azar (R4). Es el hash de la contrasena que
+ * ESCRIBIO el administrador (R2). Lo que no cambia -la mitad de R15 que sobrevive- es que al puerto
+ * llega **solo el hash** y nunca la contrasena en claro (QC-66 R16, QC-79 R5).
+ */
+const HASH = '$2b$12$marca-del-hasher-de-la-contrasena-escrita';
+/** La contrasena que escribe el administrador en la rama CON credencial de QC-79 (R2). */
+const CREDENCIAL = 'Contrasena-Escrita-1!';
+/** Marcas del enlace (QC-79 R7, R9). El SECRETO solo puede aparecer en la llamada al correo. */
+const SECRETO = 'secreto-del-enlace-en-base64url';
+const HUELLA = 'huella-sha256-del-secreto';
+/** El destinatario lo resuelve el REPOSITORIO al emitir, no el llamante (`design.md > 6.2`). */
+const CORREO_DESTINO = 'ana.perez@empresa.test';
 const AHORA = new Date('2026-09-10T15:00:00.000Z');
 
 const ACTOR: Actor = {
@@ -116,6 +134,12 @@ function paginaVacia(): Page<UserRow> {
 
 type Resultados = {
   readonly create?: Awaited<ReturnType<UserAdminRepository['create']>>;
+  /** QC-79 R2: que responde la politica de QC-19 a la contrasena que escribio el administrador. */
+  readonly politica?: CredentialPolicyResult;
+  /** QC-79 R7: como acaba la emision del enlace. Por defecto, emitida y con destinatario. */
+  readonly issue?: Awaited<ReturnType<CredentialSetupLinkRepository['issueForPendingUser']>>;
+  /** QC-79 R30: si el proveedor de correo acepto el mensaje o no. */
+  readonly mail?: 'sent' | 'failed';
   readonly find?: UserDetail | null;
   readonly list?: Page<UserRow>;
   readonly update?: Awaited<ReturnType<UserAdminRepository['updateAliveInCompany']>>;
@@ -154,12 +178,53 @@ function montar(resultados: Resultados = {}) {
     }),
   } satisfies UserAdminRepository;
 
-  const credentials = {
-    createCredentialHash: vi.fn<InitialCredentialFactory['createCredentialHash']>(async () => {
-      orden.push('credentials.createCredentialHash');
+  /**
+   * QC-79 — Las CUATRO dependencias nuevas del alta. `InitialCredentialFactory` ya NO esta: el alta
+   * no genera ninguna contrasena al azar (R4), asi que no hay nada que pedirle. El puerto y su
+   * adaptador siguen existiendo porque son de QC-6 / el seed.
+   */
+  const passwordHasher = {
+    hash: vi.fn<PasswordHasher['hash']>(async () => {
+      orden.push('passwordHasher.hash');
       return HASH;
     }),
-  } satisfies InitialCredentialFactory;
+    verify: vi.fn<PasswordHasher['verify']>(async () => {
+      orden.push('passwordHasher.verify');
+      return false;
+    }),
+  } satisfies PasswordHasher;
+
+  const checkCredentialPolicy = vi.fn(async () => {
+    orden.push('checkCredentialPolicy');
+    return resultados.politica ?? { ok: true, unmet: [] };
+  });
+
+  const secrets = {
+    create: vi.fn<CredentialSetupSecretFactory['create']>(() => {
+      orden.push('secrets.create');
+      return { secret: SECRETO, digest: HUELLA };
+    }),
+  } satisfies CredentialSetupSecretFactory;
+
+  const links = {
+    issueForPendingUser: vi.fn<CredentialSetupLinkRepository['issueForPendingUser']>(async () => {
+      orden.push('links.issueForPendingUser');
+      return resultados.issue ?? { email: CORREO_DESTINO };
+    }),
+    applyCredentialAndActivate: vi.fn<
+      CredentialSetupLinkRepository['applyCredentialAndActivate']
+    >(async () => {
+      orden.push('links.applyCredentialAndActivate');
+      return 'ok';
+    }),
+  } satisfies CredentialSetupLinkRepository;
+
+  const mailer = {
+    sendCredentialSetupLink: vi.fn<CredentialSetupMailer['sendCredentialSetupLink']>(async () => {
+      orden.push('mailer.sendCredentialSetupLink');
+      return resultados.mail ?? 'sent';
+    }),
+  } satisfies CredentialSetupMailer;
 
   const log = {
     ignoredFields: vi.fn<ListQueryLog['ignoredFields']>(() => {
@@ -171,10 +236,22 @@ function montar(resultados: Resultados = {}) {
 
   return {
     users,
-    credentials,
+    passwordHasher,
+    checkCredentialPolicy,
+    secrets,
+    links,
+    mailer,
     log,
     orden,
-    createUser: createCreateUser({ users, credentials, now }),
+    createUser: createCreateUser({
+      users,
+      passwordHasher,
+      checkCredentialPolicy,
+      secrets,
+      links,
+      mailer,
+      now,
+    }),
     getUser: createGetUser({ users }),
     listUsers: createListUsers({ users, log }),
     updateUser: createUpdateUser({ users, now }),
@@ -202,27 +279,58 @@ function contieneValor(nodo: unknown, objetivo: string): boolean {
   );
 }
 
-/** Todas las escrituras del puerto: lo que NO se debe haber llamado cuando algo se rechaza. */
+/**
+ * Todas las escrituras: lo que NO se debe haber llamado cuando algo se rechaza.
+ *
+ * **QC-79 la amplia y no la afloja**: a las tres del puerto de usuarios se suman la emision del
+ * enlace y el envio del correo, porque R2 y R6 dicen literalmente «NO DEBE crear ninguna fila, NO
+ * DEBE emitir ningun enlace y NO DEBE enviar ningun correo». Una lista que solo mirara las tres de
+ * antes daria verde con un alta rechazada que ya hubiera mandado el correo.
+ */
 function escrituras(d: ReturnType<typeof montar>) {
-  return [d.users.create, d.users.updateAliveInCompany, d.users.applyGuardedChange];
+  return [
+    d.users.create,
+    d.users.updateAliveInCompany,
+    d.users.applyGuardedChange,
+    d.links.issueForPendingUser,
+    d.mailer.sendCredentialSetupLink,
+  ];
 }
 
-describe('alta de usuario (R13, R14, R15, R16, R17, R18, R49)', () => {
+describe('alta de usuario (R13, R14, R16, R17, R18, R49; QC-79 R1-R7, R30)', () => {
   it('R13 — persiste con el rol indicado, el estado `pending` y el instante, y devuelve el identificador', async () => {
+    // ENMENDADO por QC-79: `ENTRADA_USUARIO` no trae contrasena, asi que la credencial que llega al
+    // puerto es `{ kind: 'none' }` (R4) y el resultado gana el `mail` de R30. Todo lo demas -la
+    // empresa, los nueve campos, el `pending` y el instante- se afirma EXACTAMENTE igual que antes.
     const d = montar();
 
     const resultado = await d.createUser(ACTOR, ENTRADA_USUARIO);
 
     expect(d.users.create).toHaveBeenCalledTimes(1);
-    const [companyId, datos, hash, estado, instante] = d.users.create.mock.calls[0];
+    const [companyId, datos, credencial, estado, instante] = d.users.create.mock.calls[0];
     expect(companyId).toBe(COMPANY_ID);
     expect(datos).toEqual(DATOS_EN_EL_PUERTO);
     expect(datos.roleId).toBe(ROLE_ID);
-    expect(hash).toBe(HASH);
+    expect(credencial).toEqual({ kind: 'none' });
     // El estado con el que NACE la cuenta: `pending`, escrito como lo recibe el puerto.
     expect(estado).toBe('pending');
     expect(instante).toEqual(AHORA);
-    expect(resultado).toEqual({ id: NEW_ID });
+    expect(resultado).toEqual({ id: NEW_ID, mail: 'sent' });
+  });
+
+  it('QC-79 R3 — con contrasena escrita nace igualmente en `pending`, con su instante y sin autor', async () => {
+    // La otra mitad del caso de arriba: escribir la contrasena **no activa** la cuenta. El ancla de
+    // R13 vale para las DOS ramas, no solo para la que QC-66 conocia.
+    const d = montar();
+
+    await d.createUser(ACTOR, { ...ENTRADA_USUARIO, credential: CREDENCIAL });
+
+    const [companyId, datos, credencial, estado, instante] = d.users.create.mock.calls[0];
+    expect(companyId).toBe(COMPANY_ID);
+    expect(datos).toEqual(DATOS_EN_EL_PUERTO);
+    expect(credencial).toEqual({ kind: 'hash', value: HASH });
+    expect(estado).toBe('pending');
+    expect(instante).toEqual(AHORA);
   });
 
   it('R13 — la marca de cambio de credencial es INVARIANTE del puerto, no un argumento que el dominio elija', async () => {
@@ -253,7 +361,12 @@ describe('alta de usuario (R13, R14, R15, R16, R17, R18, R49)', () => {
 
     expect(code).toBe('invalid_input');
     for (const escritura of escrituras(d)) expect(escritura).not.toHaveBeenCalled();
-    expect(d.credentials.createCredentialHash).not.toHaveBeenCalled();
+    // ENMENDADO: antes se afirmaba que no se gastaba un bcrypt de la FABRICA de credencial inicial.
+    // Ahora la fabrica no interviene en el alta (R4), asi que el ancla se conserva sobre lo que si
+    // interviene: ni se hashea, ni se evalua la politica, ni se genera el secreto del enlace.
+    expect(d.passwordHasher.hash).not.toHaveBeenCalled();
+    expect(d.checkCredentialPolicy).not.toHaveBeenCalled();
+    expect(d.secrets.create).not.toHaveBeenCalled();
   });
 
   it('R14 — la empresa que llega al puerto es la del actor y de ningun otro sitio', async () => {
@@ -286,16 +399,54 @@ describe('alta de usuario (R13, R14, R15, R16, R17, R18, R49)', () => {
     expect(firmaDeCreate()).not.toMatch(/changedBy|ChangedBy|author|Author/);
   });
 
-  it('R15, R16 — el hash es el que devolvio la fabrica, y el resultado no trae NADA mas que el identificador', async () => {
+  it('R15 ENMENDADO por QC-79 R4 — SIN contrasena no se genera ninguna al azar, y la fila nace sin credencial', async () => {
+    // **Esta es la enmienda, dicha con sus palabras.** QC-66 R15 decia «crear un usuario le fija una
+    // contrasena GENERADA AL AZAR POR EL PROPIO SISTEMA»; QC-79 R4 dice que sin contrasena escrita
+    // NO se genera ninguna. Lo que este nivel puede demostrar: que al puerto llega `{ kind: 'none' }`
+    // y que **no hay ninguna dependencia de la que pudiera salir una contrasena al azar**, porque el
+    // caso de uso ya no tiene ninguna fabrica de credencial inicial entre las suyas.
     const d = montar();
 
-    const resultado = await d.createUser(ACTOR, ENTRADA_USUARIO);
+    await d.createUser(ACTOR, ENTRADA_USUARIO);
 
-    expect(d.credentials.createCredentialHash).toHaveBeenCalledTimes(1);
-    expect(d.users.create.mock.calls[0][2]).toBe(HASH);
-    // Las claves EXACTAS: ni la credencial, ni el hash, ni «la contraseña una sola vez».
-    expect(Object.keys(resultado)).toEqual(['id']);
-    expect(contieneValor(resultado, HASH)).toBe(false);
+    expect(d.users.create.mock.calls[0][2]).toEqual({ kind: 'none' });
+    expect(d.passwordHasher.hash).not.toHaveBeenCalled();
+    expect(firmaDeCreate()).not.toMatch(/credentialHash/);
+    // Lo que no se puede expresar no se puede hacer por descuido: el TIPO del argumento es la union
+    // discriminada, asi que «pon una cualquiera» no es un valor que quepa ahi.
+    expect(puertoTs).toMatch(/NewUserCredential/);
+  });
+
+  it('R15 (la mitad que SOBREVIVE) — con contrasena escrita, al puerto llega SOLO el hash de QC-5', async () => {
+    // QC-66 R15/R16 no se relajan en la rama con contrasena: la candidata se hashea con el hasher de
+    // QC-5 y lo que cruza el puerto es el hash, nunca el texto en claro.
+    const d = montar();
+
+    await d.createUser(ACTOR, { ...ENTRADA_USUARIO, credential: CREDENCIAL });
+
+    expect(d.passwordHasher.hash).toHaveBeenCalledTimes(1);
+    expect(d.passwordHasher.hash).toHaveBeenCalledWith(CREDENCIAL);
+    expect(d.users.create.mock.calls[0][2]).toEqual({ kind: 'hash', value: HASH });
+    for (const argumento of d.users.create.mock.calls[0]) {
+      expect(contieneValor(argumento, CREDENCIAL)).toBe(false);
+    }
+  });
+
+  it('R16 — el resultado no trae NADA mas que el identificador y el resultado del correo', async () => {
+    // ENMENDADO: las claves exactas pasan de una a DOS, porque R30 exige distinguir «creado y correo
+    // enviado» de «creado y correo no enviado». El ancla se conserva ENTERA y se extiende (QC-79 R5):
+    // ni la credencial, ni el hash, ni «la contrasena una sola vez», **ni el secreto del enlace**.
+    for (const entrada of [ENTRADA_USUARIO, { ...ENTRADA_USUARIO, credential: CREDENCIAL }]) {
+      const d = montar();
+
+      const resultado = await d.createUser(ACTOR, entrada);
+
+      expect(Object.keys(resultado).sort()).toEqual(['id', 'mail']);
+      expect(contieneValor(resultado, HASH)).toBe(false);
+      expect(contieneValor(resultado, CREDENCIAL)).toBe(false);
+      expect(contieneValor(resultado, SECRETO)).toBe(false);
+      expect(contieneValor(resultado, HUELLA)).toBe(false);
+    }
   });
 
   it('R17 — los tres duplicados del puerto se traducen a su error y no se crea ninguna fila', async () => {
@@ -344,8 +495,10 @@ describe('alta de usuario (R13, R14, R15, R16, R17, R18, R49)', () => {
       const d = montar();
       expect(await codeDeFallo(d.createUser(ACTOR, entrada)), etiqueta).toBe('invalid_input');
       expect(d.users.create, etiqueta).not.toHaveBeenCalled();
-      // Ni se gasta un bcrypt por una entrada rota.
-      expect(d.credentials.createCredentialHash, etiqueta).not.toHaveBeenCalled();
+      // Ni se gasta un bcrypt por una entrada rota. ENMENDADO: el bcrypt que podria gastarse ya no
+      // es el de la fabrica de credencial inicial (R4), es el de la contrasena escrita.
+      expect(d.passwordHasher.hash, etiqueta).not.toHaveBeenCalled();
+      for (const escritura of escrituras(d)) expect(escritura, etiqueta).not.toHaveBeenCalled();
     }
   });
 
@@ -401,6 +554,10 @@ describe('edicion de usuario (R19, R20)', () => {
       { accountStatus: 'active' },
       { accountStatusChangedBy: ACTOR_ID },
       { passwordHash: HASH },
+      // QC-79: el campo NUEVO del alta (R1) **no** entra en la edicion. QC-66 R20 lo prohibe
+      // expresamente, y por eso `updateUserSchema` lo quita con un `omit` explicito en vez de ser
+      // literalmente el mismo objeto que el alta. Cambiar la contrasena de otro es QC-89.
+      { credential: CREDENCIAL },
       { mustChangeCredential: false },
       { failedLoginAttempts: 0 },
       { lockLevel: 0 },

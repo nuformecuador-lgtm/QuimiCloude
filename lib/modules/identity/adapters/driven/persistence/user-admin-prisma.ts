@@ -5,6 +5,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { USER_ACCOUNT_STATUSES } from '../../../domain/account-status';
+import { NO_CREDENTIAL_SENTINEL } from '../../../domain/credential-setup-link';
 import { buildDisplayName } from '../../../domain/display-name';
 import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
 
@@ -19,6 +20,7 @@ import type {
   GuardedChange,
   GuardedOutcome,
   NewUser,
+  NewUserCredential,
 } from '../../../ports/user-admin-repository';
 
 /**
@@ -240,10 +242,19 @@ function writeFailureOutcome(error: unknown): DuplicateKey | 'role_not_found' | 
 // ---------------------------------------------------------------------------------------------
 
 /**
- * `create` del puerto (R13, R14, R15, R17, R49).
+ * `create` del puerto (R13, R14, R15, R17, R49) — **QC-79 T12: las dos ramas de la credencial**.
  *
- * La **empresa** y el **hash** son argumentos propios: se escriben aqui y no salen de `data`, asi que
- * no hay ninguna forma de crear un usuario en otra empresa (R14) ni sin credencial (R15).
+ * La **empresa** y la **credencial** son argumentos propios: se escriben aqui y no salen de `data`,
+ * asi que no hay ninguna forma de crear un usuario en otra empresa (R14).
+ *
+ * **QC-79 R4 ENMIENDA QC-66 R15, y se dice con esas palabras**: cuando llega `{ kind: 'none' }`
+ * —el administrador no escribio contrasena— **no se genera ninguna al azar**; se escribe el
+ * centinela `NO_CREDENTIAL_SENTINEL` del dominio y la fila queda sin ninguna credencial con la que
+ * se pueda entrar. La mitad de R15 que sobrevive sigue intacta: cuando llega `{ kind: 'hash' }`, lo
+ * que se persiste es **solo** el hash de QC-5 (QC-66 R16, QC-79 R5).
+ *
+ * **`users` NO cambia por esto** (R37): ni columna, ni indice, ni migracion. `password_hash` sigue
+ * siendo `NOT NULL` y los tres indices unicos de QC-47 se consumen tal cual.
  *
  * Tres escrituras que son invariantes del alta y no eleccion del llamante:
  * `account_status` = el `'pending'` que el tipo del puerto fija (R13), `account_status_changed_at` =
@@ -263,7 +274,7 @@ function writeFailureOutcome(error: unknown): DuplicateKey | 'role_not_found' | 
 export async function create(
   companyId: string,
   data: NewUser,
-  credentialHash: string,
+  credential: NewUserCredential,
   accountStatus: 'pending',
   now: Date,
 ): Promise<{ id: string } | DuplicateKey | 'role_not_found'> {
@@ -280,7 +291,11 @@ export async function create(
         documentNumber: data.documentNumber,
         username: data.username,
         roleId: data.roleId,
-        passwordHash: credentialHash,
+        // QC-79 T12 (R4): con `kind: 'none'` la fila nace **sin ninguna credencial utilizable**.
+        // Se escribe el centinela del dominio -la cadena `'!'`, que no es un hash bcrypt valido- y
+        // no se genera ninguna contrasena al azar. `users` no cambia (R37): la columna sigue siendo
+        // `NOT NULL` y no hay migracion ninguna detras de esta linea.
+        passwordHash: credential.kind === 'hash' ? credential.value : NO_CREDENTIAL_SENTINEL,
         mustChangeCredential: true,
         accountStatus,
         accountStatusChangedAt: now,

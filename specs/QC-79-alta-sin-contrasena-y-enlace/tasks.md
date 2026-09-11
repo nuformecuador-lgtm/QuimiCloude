@@ -110,7 +110,7 @@
 
 ## Fase 3 — Persistencia y el alta
 
-- [ ] **T10 — El adaptador de persistencia del enlace: las dos transacciones.** — **R11, R12, R15, R16, R19, R20, R22**
+- [x] **T10 — El adaptador de persistencia del enlace: las dos transacciones.** — **R11, R12, R15, R16, R19, R20, R22**
       `credential-setup-link-prisma.ts` con `issueForPendingUser` (§ 4.5: `UPDATE` de sustitución +
       `INSERT`, `23505` → `'superseded'`, ámbito por `company_id` cuando llega) y
       `applyCredentialAndActivate` (§ 4.6: `UPDATE` condicional del enlace + `UPDATE` condicional de
@@ -120,7 +120,7 @@
       los confirma contra Postgres real.
       *(Depende de T3, T9.)*
 
-- [ ] **T11 — El alta con contraseña opcional: las dos ramas.** — **R1, R2, R3, R4, R6, R7, R30**
+- [x] **T11 — El alta con contraseña opcional: las dos ramas.** — **R1, R2, R3, R4, R6, R7, R30**
       `domain/user-input.ts` gana `credential` **opcional** (sin `trim`, sin `max`: QC-19 R10 y R11);
       `domain/create-user.ts` reparte: con credencial → política de QC-19 **antes** de escribir +
       hash; sin credencial → `kind: 'none'` + emisión del enlace + envío; `requirePermission` sigue
@@ -133,7 +133,7 @@
       *(Depende de T7, T8, T9. **Toca los tests de QC-66** de § 2 fila 4: se reescriben aquí, en esta
       misma tanda.)*
 
-- [ ] **T12 — El alta sin credencial en Prisma: el centinela.** — **R4, R37**
+- [x] **T12 — El alta sin credencial en Prisma: el centinela.** — **R4, R37**
       `user-admin-prisma.ts` escribe `NO_CREDENTIAL_SENTINEL` cuando `kind === 'none'`; la constante
       se declara **una vez** en el dominio. `users` **no cambia**: ni columna, ni índice, ni
       migración.
@@ -165,7 +165,7 @@
 
 ## Fase 5 — Correo
 
-- [ ] **T15 — El adaptador `resend` y su guardia.** — **R13, R27, R29, R38**
+- [x] **T15 — El adaptador `resend` y su guardia.** — **R13, R27, R29, R38**
       `credential-setup-mailer-resend.ts`: **el único** archivo que importa `resend`; cliente
       construido **dentro** de la función con la clave de T5; URL armada con `APP_BASE_URL`; asunto y
       cuerpo en **dos constantes** al principio del archivo (pregunta abierta 2); un fallo devuelve
@@ -176,7 +176,7 @@
       añadido a mano pone la guardia en rojo.
       *(Depende de **T2** y de T5, T9.)*
 
-- [ ] **T16 — [P] El transporte de buzón, para que el E2E exista.** — **R41 (habilitante)**
+- [x] **T16 — [P] El transporte de buzón, para que el E2E exista.** — **R41 (habilitante)**
       `credential-setup-mailer-outbox.ts`: escribe el mensaje como JSON en `MAIL_OUTBOX_DIR`; **se
       niega a arrancar si `NODE_ENV === 'production'`**, nombrando la variable.
       **Hecho cuando:** la guardia de T15 gana dos casos que afirman, leyendo el código, que el

@@ -59,7 +59,11 @@ import { createSetUserAccountStatus } from '@/lib/modules/identity/domain/set-us
 import { createUpdateUser } from '@/lib/modules/identity/domain/update-user';
 
 import type { Actor } from '@/lib/modules/identity/domain/actor';
-import type { InitialCredentialFactory } from '@/lib/modules/identity/ports/initial-credential-factory';
+import type { CredentialPolicyResult } from '@/lib/modules/identity/domain/credential-policy';
+import type { CredentialSetupLinkRepository } from '@/lib/modules/identity/ports/credential-setup-link-repository';
+import type { CredentialSetupMailer } from '@/lib/modules/identity/ports/credential-setup-mailer';
+import type { CredentialSetupSecretFactory } from '@/lib/modules/identity/ports/credential-setup-secret-factory';
+import type { PasswordHasher } from '@/lib/modules/identity/ports/password-hasher';
 import type { ListQueryLog } from '@/lib/modules/identity/ports/list-query-log';
 import type { UserAdminRepository } from '@/lib/modules/identity/ports/user-admin-repository';
 
@@ -304,14 +308,42 @@ function repositorioQueNoDebeLlamarse(): UserAdminRepository {
   } as unknown as UserAdminRepository;
 }
 
-/** La fabrica de credencial tampoco debe llegar a usarse: sin permiso no se gasta un bcrypt, y
- *  sobre todo no se genera ninguna contrasena (R15, R16). */
-function credencialQueNoDebeLlamarse(): InitialCredentialFactory {
+/**
+ * Las dependencias de credencial del alta tampoco deben llegar a usarse: sin sesion completa no se
+ * gasta un bcrypt, no se evalua la politica, no se fabrica ningun secreto, no se emite ningun enlace
+ * y **no se manda ningun correo** (QC-66 R16; QC-79 R6, R7).
+ *
+ * ENMENDADO por QC-79: donde habia UNA fabrica de credencial inicial -que generaba la contrasena al
+ * azar, QC-66 R15- ahora hay cinco dependencias, porque R4 quita esa generacion y el acceso lo da el
+ * enlace. La expectativa no se debilita: antes reventaba un doble, ahora revientan cinco.
+ */
+function credencialQueNoDebeLlamarse() {
+  const revientaCon = (nombre: string) =>
+    vi.fn(async () => {
+      throw new Error(`${nombre} no debia invocarse: la sesion estaba incompleta`);
+    });
+
   return {
-    createCredentialHash: vi.fn(async () => {
-      throw new Error('createCredentialHash no debia invocarse: la sesion estaba incompleta');
-    }),
-  } as unknown as InitialCredentialFactory;
+    passwordHasher: {
+      hash: revientaCon('passwordHasher.hash'),
+      verify: revientaCon('passwordHasher.verify'),
+    } as unknown as PasswordHasher,
+    checkCredentialPolicy: revientaCon('checkCredentialPolicy') as unknown as (
+      candidate: string,
+    ) => Promise<CredentialPolicyResult>,
+    secrets: {
+      create: vi.fn(() => {
+        throw new Error('secrets.create no debia invocarse: la sesion estaba incompleta');
+      }),
+    } as unknown as CredentialSetupSecretFactory,
+    links: {
+      issueForPendingUser: revientaCon('links.issueForPendingUser'),
+      applyCredentialAndActivate: revientaCon('links.applyCredentialAndActivate'),
+    } as unknown as CredentialSetupLinkRepository,
+    mailer: {
+      sendCredentialSetupLink: revientaCon('mailer.sendCredentialSetupLink'),
+    } as unknown as CredentialSetupMailer,
+  };
 }
 
 const LOG_MUDO: ListQueryLog = { ignoredFields: vi.fn() };
@@ -320,9 +352,8 @@ const LOG_MUDO: ListQueryLog = { ignoredFields: vi.fn() };
  *  fachada doblada, para que la action invoque dominio de verdad. */
 function cablearCasosDeUsoReales(): UserAdminRepository {
   const users = repositorioQueNoDebeLlamarse();
-  const credentials = credencialQueNoDebeLlamarse();
 
-  const createUserReal = createCreateUser({ users, credentials });
+  const createUserReal = createCreateUser({ users, ...credencialQueNoDebeLlamarse() });
   const getUserReal = createGetUser({ users });
   const listUsersReal = createListUsers({ users, log: LOG_MUDO });
   const updateUserReal = createUpdateUser({ users });

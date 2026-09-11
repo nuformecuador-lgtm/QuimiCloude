@@ -18,6 +18,30 @@
 // instante EXACTO de la caducidad el enlace ya NO vale, porque `expires_at > now` es falso cuando
 // son iguales. Dos verdades sobre el mismo borde serian peor que cualquier eleccion.
 
+/**
+ * QC-79 T12 (`design.md > 6.1`, R4, R37) — LO QUE SE ESCRIBE CUANDO NO HAY CREDENCIAL.
+ *
+ * `users.password_hash` es `NOT NULL` y esta ficha **no toca el modelo de `users`** (R37): ni
+ * columna, ni indice, ni migracion. Asi que el alta sin contrasena escribe un **centinela imposible
+ * de verificar**: la cadena `'!'`, que no es un hash bcrypt valido y contra la que
+ * `verifyPasswordHash` devuelve `false` para **cualquier** entrada -incluida la cadena centinela
+ * misma-. Es la convencion `!`/`*` de `/etc/shadow`, y es lo que hace cierto R4: ningun intento de
+ * acceso con ninguna contrasena tiene exito sobre esa cuenta mientras no se establezca una por el
+ * enlace.
+ *
+ * Las dos alternativas obvias estan descartadas por escrito (`design.md > 6.1`, `> 11.6`): hacer la
+ * columna anulable es una migracion sobre `users` que R37 prohibe -y obligaria a todo el camino de
+ * login a tratar un `null` que hoy no puede llegar-; y guardar el hash de una cadena al azar cuesta
+ * un bcrypt por alta para producir un valor que nadie verificara nunca, y deja indistinguible «no
+ * tiene credencial» de «tiene una que nadie conoce», que es justo la ambiguedad que esta ficha
+ * viene a quitar.
+ *
+ * **Se declara UNA sola vez, y aqui, que es dominio.** El adaptador de Prisma la importa; escribir
+ * el literal `'!'` en el adaptador seria una segunda verdad sobre la misma decision, y un test de
+ * integracion que la afirmara contra Postgres estaria comprobando su propia copia.
+ */
+export const NO_CREDENTIAL_SENTINEL = '!';
+
 /** Los dias que vive un enlace desde que se emite (R8, decision cerrada 3). */
 export const CREDENTIAL_SETUP_LINK_TTL_DAYS = 7;
 
