@@ -47,7 +47,7 @@ db:seed    -> roles: 2 - permisos creados: 11 (2 ya estaban) - asignaciones: 14
 en `toContain`, `toBeGreaterThan` ni `expect.arrayContaining`. Solo se **sube el numero** y se
 **amplia la lista escrita a mano** - riesgo 6 de `design.md`.
 
-### 2.a Los cinco que afirman el numero exacto del catalogo (T4)
+### 2.a Los que afirman el numero exacto del catalogo (T4) - eran SEIS, no cinco
 
 | Archivo | Que se retenso |
 | --- | --- |
@@ -56,6 +56,32 @@ en `toContain`, `toBeGreaterThan` ni `expect.arrayContaining`. Solo se **sube el
 | `tests/unit/navegacion/qc75-convenciones.test.ts` | `CODIGOS_QC74` +2; `MODULOS_DE_NEGOCIO` +`asignaciones`; `toHaveLength(13)` -> **15** |
 | `tests/unit/identity/seed/seed-initial-access.test.ts` | "trece permisos y catorce asignaciones" -> **quince y diecisiete**; `toBe(14)` -> **`toBe(17)`**; `toHaveLength(13)` -> **15** |
 | `tests/integration/identity/identity-seed.int.test.ts` | Total del seed 14 -> **17**; los casos del Operador a los **dos** codigos exactos (aqui el orden es **alfabetico**: el helper ordena por `permissionCode`); `createdRolePermissions` 1 -> **2** al resembrar el rol Operador |
+
+**El SEXTO archivo, que la tabla de `tasks.md` NO listaba.** La tabla "Modificados porque afirman
+el numero exacto" del spec listaba **cinco** archivos, y son **seis**: **la lista del spec se quedo
+corta**. El que faltaba lo encontro el `./init.sh --rapido` del leader, no esta bitacora:
+
+| Archivo | Que afirmaba | Que se hizo |
+| --- | --- | --- |
+| `tests/guards/guard-nav-permisos-declarados.test.ts` (linea 115) | `expect(CODIGOS_VALIDOS).toHaveLength(13)` -> `expected [...(14)] to have a length of 13 but got 15`. Es el **ancla anti-vacuidad** de esa guardia: con el catalogo vacio la regla diria que todo codigo es invalido, y sin ancla pasaria en verde sin comparar nada | **Retensado a `toHaveLength(15)`**, con el comentario de la enmienda (diez -> once -> trece -> quince). **No se relajo** a `toContain` ni a `toBeGreaterThan`, que es justo lo que devolveria la guardia al verde por vacuidad que ese caso existe para impedir. El `expect(CODIGOS_VALIDOS).toContain('inventario.consultar')` de la linea siguiente **se deja como estaba**. El ancla de **7 enlaces** de menu del caso anterior **tampoco se toca**: los dos permisos nuevos no los consume ningun enlace (R29) y esta guardia va en el sentido menu -> catalogo |
+
+**Barrido para descartar un septimo.** Se busco en `tests/` toda asercion sobre el tamano del
+catalogo y sobre el conjunto exacto del Operador, y se ejecutaron **los 41 archivos de `tests/` que
+importan `PERMISSIONS` o `SEED_ROLE_PERMISSIONS`**, en cuatro tandas:
+
+    guard-nav-permisos-declarados + private-nav-configuracion + private-nav-unidades   25 passed (25)
+    guard-pantallas-exigen-permiso + permisos-unidades-coherentes +
+      user-permissions-migration + private-layout-menu + private-not-found +
+      sidebar-desktop + sidebar-mobile                                                 55 passed (55)
+    13 contratos de ruta y autorizacion (dashboard, inventario, pedidos,
+      proveedores, recetas, unidades, usuarios, login-action, ...)                    152 passed (152)
+    10 de UI y dos de integracion (last-administrator, user-crud, order-sheet, ...)   229 passed (229)
+
+**No hay septimo archivo.** Las demas coincidencias de `13`/`14`/`15` en `tests/` son ajenas al
+catalogo (`numeric_precision`, numero de claves de una ficha, longitud de un `down.sql`).
+`tests/unit/inventario/product-page.test.tsx` deriva el catalogo entero de `PERMISSIONS` pero **no
+afirma ningun conteo**: su rojo bajo carga es el flake conocido de jsdom, **no es de esta ficha** y
+no se toco.
 
 **Prueba de que el retensado muerde:** se quito a mano `asignaciones.modificar` del catalogo y los
 cuatro unitarios cayeron (4 archivos rojos, 7 casos). Restaurado, verde otra vez.
@@ -233,6 +259,7 @@ Abreviaturas: **A** = `tests/unit/asignaciones/schema/order-assignments-migratio
 | R26 | D | `el catalogo real no esta vacio y tiene exactamente quince permisos` / `ningun permiso declarado se queda sin rol` |
 | R26 | G | `la primera corrida deja el catalogo completo, el Administrador con los quince permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo` |
 | R26 | J | `sobre una base vacia crea los quince permisos del catalogo y las diecisiete asignaciones del seed` |
+| R25 | `tests/guards/guard-nav-permisos-declarados.test.ts` | `el catalogo importado no esta vacio: la lista contra la que se compara es real` (ancla anti-vacuidad, retensada a quince) |
 | R27 | C | `QC-86 R27: el Operador recibe asignaciones.consultar y NO asignaciones.modificar` / `QC-38 R4: el Operador no recibe ninguno de unidades (su conjunto exacto lo enmendo QC-86)` / `QC-66 R9: el Operador no recibe ninguno de los dos permisos de usuarios` |
 | R27 | G | el caso de la fila de R26, mas el `not.toContain('recetas.consultar')` anadido en T12 |
 | R28 | A | `codigos, modulos, acciones y descripciones coinciden con PERMISSIONS del barril (R28)` / `los INSERT son idempotentes y resuelven el rol por nombre, sin ningun uuid literal (R28)` / mutaciones `meter un uuid literal, quitar el ON CONFLICT o resolver el rol por id cae (R28)` y `cambiar una descripcion del SQL lo separa del catalogo y cae (R28)` |
