@@ -72,7 +72,7 @@
       que el mensaje de error nombra las que faltan y no contiene ningún valor.
       *(Depende de T1.)*
 
-- [~] **T6 — Ciclo real de migración.** — **R36**
+- [x] **T6 — Ciclo real de migración.** — **R36**
       `pnpm run db:migrate` → `pnpm run db:rollback` → `pnpm run db:migrate`.
       **Hecho cuando:** la salida de los tres comandos está pegada en la bitácora y
       `_prisma_migrations` queda coherente.

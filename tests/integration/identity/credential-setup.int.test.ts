@@ -54,8 +54,12 @@
  * `Operador` se REUTILIZA, no se crea.
  *
  * SOBRE LOS MENSAJES DE ERROR: nunca se afirma sobre el TEXTO de un error de Postgres —en esta
- * maquina el servidor responde en espanol—. Se afirma sobre el SQLSTATE (`23505`) y sobre el
- * NOMBRE DEL INDICE, que son identificadores nuestros y no traducibles.
+ * maquina el servidor responde en espanol—. Se afirma sobre el SQLSTATE (`23505`, en `meta.code`
+ * por el camino raw) y sobre la COLUMNA que el choque senala (`meta.target` por el camino del
+ * cliente tipado), que son identificadores nuestros y no traducibles. El NOMBRE DEL INDICE no se
+ * usa como ancla en ninguna asercion de error: Prisma no lo expone por ningun campo, comprobado
+ * por los dos caminos (el detalle esta escrito en el caso de R11). Si que se usa en el `beforeAll`,
+ * donde se lee de `pg_indexes` y ahi si es un identificador de la base.
  *
  * SIN TESTS DE RLS: un test de RLS escrito con Prisma sale verde pase lo que pase, porque Prisma se
  * conecta como dueno de las tablas (`docs/architecture.md > Acceso a datos y autorizacion`). El RLS
@@ -517,12 +521,90 @@ describe('QC-79 T20 — el enlace de credencial contra Postgres real', () => {
 
       expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
       const conocido = error as Prisma.PrismaClientKnownRequestError;
-      // Se afirma sobre el SQLSTATE y sobre el NOMBRE DEL INDICE —identificadores nuestros—, jamas
-      // sobre el texto del mensaje, que en esta maquina viene en espanol.
-      expect(JSON.stringify(conocido.meta)).toContain('23505');
-      expect(JSON.stringify(conocido.meta)).toContain(ONE_LIVE_INDEX);
+      // DONDE SE ANCLA, Y POR QUE. Prisma NO expone el NOMBRE del indice por ningun campo
+      // estable, y esta comprobado por los DOS caminos contra esta misma base: por `$executeRaw`
+      // el error llega como `P2010` con `meta = { code: '23505', message: <texto del servidor> }`
+      // —el nombre del indice no aparece en ningun campo—, y por el cliente tipado llega como
+      // `P2002` con `meta = { modelName, target: ['user_id'] }`. El TEXTO del mensaje tampoco
+      // sirve de ancla: en esta maquina el servidor responde en espanol, asi que afirmar sobre el
+      // seria afirmar sobre una traduccion. Por eso se afirman las tres cosas que SI son
+      // invariantes, cada una por el camino donde existe.
+      //
+      // 1. EL SQLSTATE, por el camino raw: `meta.code`. Es el codigo de Postgres, no un texto.
+      expect((conocido.meta as { readonly code?: unknown } | undefined)?.code).toBe('23505');
 
+      // 2. LA COLUMNA SENALADA, por el camino del cliente tipado: `meta.target`. Es el sustituto
+      // correcto del nombre del indice porque nombra la COLUMNA, y la columna es justo lo que
+      // distingue el indice parcial de R11 (`user_id`) del OTRO indice unico de esta tabla
+      // (`token_digest`). Que discrimina de verdad lo demuestra el caso siguiente, que provoca el
+      // choque contrario y comprueba que ahi `target` NO es `user_id`.
+      const tercero = createCredentialSetupSecret();
+      const errorTipado = await prisma.credentialSetupToken
+        .create({
+          data: {
+            userId,
+            tokenDigest: tercero.digest,
+            expiresAt: credentialSetupLinkExpiresAt(now),
+          },
+        })
+        .then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+
+      expect(errorTipado).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      const tipado = errorTipado as Prisma.PrismaClientKnownRequestError;
+      expect(tipado.code).toBe('P2002');
+      expect((tipado.meta as { readonly target?: unknown } | undefined)?.target).toEqual([
+        'user_id',
+      ]);
+
+      // 3. EL INVARIANTE, que es el requisito: despues de los dos intentos queda EXACTAMENTE UNO.
       expect(liveTokensOf(await tokensOf(userId))).toHaveLength(1);
+    });
+  });
+
+  it('R11 — el choque contra el OTRO indice unico (`token_digest`) senala `token_digest` y NO `user_id`: la asercion discrimina entre los dos indices', async () => {
+    await withPendingUser(async ({ companyId, userId }) => {
+      const now = new Date();
+      const { digest } = await issueLinkFor(adapterA, userId, now);
+
+      // Un SEGUNDO usuario de la misma empresa, SIN ningun enlace vivo: por el indice parcial de
+      // R11 su ranura esta libre, asi que lo unico con lo que su insercion puede chocar es con el
+      // indice unico de `token_digest`.
+      const otro = await create(companyId, newUserData(), { kind: 'none' }, 'pending', now);
+      if (typeof otro === 'string') {
+        throw new Error(`el alta del segundo usuario no debia fallar, y devolvio \`${otro}\``);
+      }
+      expect(liveTokensOf(await tokensOf(otro.id))).toHaveLength(0);
+
+      // El MISMO digest que ya tiene el enlace vivo del primero.
+      const error = await prisma.credentialSetupToken
+        .create({
+          data: {
+            userId: otro.id,
+            tokenDigest: digest,
+            expiresAt: credentialSetupLinkExpiresAt(now),
+          },
+        })
+        .then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+
+      expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+      const conocido = error as Prisma.PrismaClientKnownRequestError;
+      expect(conocido.code).toBe('P2002');
+      // Aqui esta el valor del caso: el duplicado tambien es un `23505`, pero `meta.target` dice
+      // OTRA columna. Si el caso de R11 se conformara con «hubo un duplicado», este escenario lo
+      // satisfaria igual y la asercion no afirmaria nada.
+      const objetivo = (conocido.meta as { readonly target?: unknown } | undefined)?.target;
+      expect(objetivo).toEqual(['token_digest']);
+      expect(objetivo).not.toEqual(['user_id']);
+
+      // Nada se escribio: cada usuario sigue con lo que tenia.
+      expect(liveTokensOf(await tokensOf(userId))).toHaveLength(1);
+      expect(await tokensOf(otro.id)).toHaveLength(0);
     });
   });
 
