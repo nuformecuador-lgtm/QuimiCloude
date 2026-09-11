@@ -303,3 +303,68 @@ Abreviaturas: **A** = `tests/unit/asignaciones/schema/order-assignments-migratio
    asercion- y se dira en el PR.
 4. **El gate no lo corrio el implementer**: `./init.sh --rapido` por tanda y `./init.sh` completo
    antes del PR son del leader (`AGENTS.md > Regla del gate`).
+
+## 8. F2.3 - la sincronizacion con `dev`
+
+`git fetch origin dev` + `git merge origin/dev`. `origin/dev` iba **12 commits por delante**, y
+todos son de **QC-94 (`consulta-de-roles`)**, mergeada en el PR #57. El merge entro **sin un solo
+conflicto textual**: QC-94 no toca ninguno de los archivos de esta ficha. Lo que trae son 22
+archivos -el caso de uso de consulta de roles, su puerto, su adaptador Prisma, su Server Action,
+`require-any-permission`, y sus specs, bitacora y revision-.
+
+### 8.a Lo que se retenso al sincronizar (era lo anunciado en la seccion 7, punto 3)
+
+| Archivo | Que afirmaba | Que se hizo |
+| --- | --- | --- |
+| `tests/unit/identity/roles/scope.test.ts` | `PERMISOS_ESPERADOS = 13` y el caso `R21 - el catalogo de permisos sigue teniendo TRECE entradas y ninguna de roles` | **Retensado a 15**, con el comentario de la enmienda. **No se relajo** a `toContain` ni a `toBeGreaterThan` |
+
+**Por que subir el numero NO afloja el R21 de QC-94, que es lo que ese caso vigila.** R21 dice que
+**QC-94** no anada, quite ni renombre ningun permiso, y **sigue sin hacerlo**: `roles.consultar`
+sigue descartado por el humano (su decision cerrada 2) y la ficha reutiliza los dos codigos de
+QC-66. Quien lleva el catalogo a quince es **otra** ficha -esta-, con su propia aprobacion humana
+(decision cerrada 8 de QC-86). Si en vez de subir el numero se hubiera relajado la asercion, el
+caso dejaria de cazar exactamente lo que existe para cazar: que alguien cuele un permiso nuevo
+**desde la ficha de roles**. Mismo criterio que las seis retensiones de la seccion 2.
+
+Ese archivo **no** afirma el conjunto exacto del Operador ni el total de asignaciones del seed -se
+comprobo-, asi que no hubo nada mas que llevar a 2 ni a 17.
+
+### 8.b El desajuste semantico de QC-71 que QC-94 anota: no alcanza a esta ficha
+
+Se leyo antes de tocar nada, como contexto ya escrito (`docs(QC-94): F2.3 - el merge con dev y el
+desajuste semantico que trajo QC-71`, commit `3b3077a`). QC-71 cambio la firma de
+`createErrorStateTranslator` y migro los ocho adaptadores **driving** que existian entonces;
+`role-actions.ts` de QC-94 nacio despues y en paralelo, asi que se quedo fuera de esa lista y lo
+cazo el typecheck, no el merge. QC-94 ya lo corrigio en `f642b99`.
+
+**A QC-86 no le afecta, y la razon es estructural, no suerte:** esta ficha **no tiene ningun
+adaptador driving** -ni Server Action, ni route handler, ni caso de uso- porque **R36** se lo
+prohibe. No hay ningun sitio donde esa firma pudiera desajustarse. El `typecheck` en verde tras el
+merge lo confirma.
+
+Se anota tambien, por si sirve a la siguiente ficha, el otro hallazgo de esa bitacora: los rojos de
+integracion de QC-94 **no** eran la base atrasada, sino **una migracion de QC-80 -rama ajena, no
+mergeada en `dev`- aplicada sobre la base compartida**. Es exactamente el drift entre worktrees que
+esta ficha evito con su base propia `QuimiCloude_QC86` (seccion 0).
+
+### 8.c Verificacion tras el merge
+
+Solo `typecheck`, `lint` y lo que el merge toco. El gate completo es del leader.
+
+```
+pnpm run typecheck  -> tsc --noEmit   (sin salida, verde)
+pnpm run lint       -> eslint         (sin salida, verde)
+
+los 7 archivos de test que trae el merge, mas el retensado:
+  roles/scope + roles/list-roles + roles/list-roles-authorization + roles/role-actions +
+  require-any-permission + composition/identity-facade + integration/role-catalog
+                                                        90 passed | 4 skipped (94)
+
+vitest related --run sobre los 7 fuentes que el merge toco
+  (composition/index, identity/index, actor, require-permission, list-roles, role-view,
+   domain/permissions)                                 192 passed (192)
+                                                       2765 passed | 9 skipped (2774)
+```
+
+**Sin conflictos, sin nada ambiguo que preguntar y sin ningun rojo.** El flake de jsdom de
+`product-page.test.tsx` tampoco aparecio en esta corrida.
