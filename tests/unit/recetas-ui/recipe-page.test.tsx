@@ -1,5 +1,14 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
@@ -111,7 +120,16 @@ vi.mock('@/lib/modules/identity/adapters/driving/logout-action', () => ({
 
 vi.mock('next/headers', () => ({ cookies: cookiesMock }));
 
+// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
+// del identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el
+// modulo ni siquiera carga; con ella, el estado del error inesperado vuelve con ESE id.
+const { readRequestIdHeaderMock } = vi.hoisted(() => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  return { readRequestIdHeaderMock: vi.fn(async () => id) };
+});
+
 vi.mock('@/lib/composition', () => ({
+  observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
 }));
 
@@ -691,5 +709,70 @@ describe('pantalla de recetas — borrado', () => {
     expect(screen.getByTestId(testId.dialogoBorrado)).toBeInTheDocument();
     expect(toastExito).not.toHaveBeenCalled();
     expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el estado de error de la lista de recetas. */
+describe('lista de recetas — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    listRecipesActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+
+    const region = screen.getByTestId(testId.error);
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    listRecipesActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
+    esperarSinIdentificador();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el dialogo de borrado de receta. */
+describe('borrado de receta — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    deleteRecipeActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await screen.findByTestId(testId.dialogoBorrado);
+    await user.click(screen.getByTestId(testId.confirmarBorrado));
+
+    const region = await screen.findByTestId('delete-recipe-error');
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    deleteRecipeActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await screen.findByTestId(testId.dialogoBorrado);
+    await user.click(screen.getByTestId(testId.confirmarBorrado));
+
+    const region = await screen.findByTestId('delete-recipe-error');
+    expect(region).toHaveTextContent('No autorizado.');
+    esperarSinIdentificador();
   });
 });

@@ -1,4 +1,9 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
@@ -427,5 +432,42 @@ describe('baja de una linea de catalogo — accesibilidad y plataforma (R47, R48
 
       cleanup();
     }
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el dialogo de baja de una linea de catalogo. */
+describe('baja de una linea — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    deleteCatalogLineActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await abrirBaja(user);
+    await user.click(screen.getByTestId(testId.confirmar));
+
+    const region = await screen.findByTestId(testId.error);
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    deleteCatalogLineActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No tienes permiso para dar de baja líneas.',
+    });
+
+    await renderPantalla();
+    await abrirBaja(user);
+    await user.click(screen.getByTestId(testId.confirmar));
+
+    const region = await screen.findByTestId(testId.error);
+    expect(region).toHaveTextContent('No tienes permiso para dar de baja líneas.');
+    expect(screen.queryByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeNull();
+    expect(screen.queryByText(REFERENCIA_DEL_CASO)).toBeNull();
+    expect(document.body.textContent ?? '').not.toContain(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
   });
 });

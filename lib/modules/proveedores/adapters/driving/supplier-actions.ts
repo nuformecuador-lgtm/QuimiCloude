@@ -1,7 +1,7 @@
 'use server';
 
-import { identity, proveedores } from '@/lib/composition';
-import { createErrorStateTranslator, type ErrorCode } from '@/lib/modules/errores';
+import { identity, observabilidad, proveedores } from '@/lib/composition';
+import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/lib/modules/proveedores';
 
 /**
@@ -48,21 +48,21 @@ import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/li
 export type CreateSupplierFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 /** Estado compartido por edicion y baja: ninguna de las dos devuelve datos. */
 export type SupplierMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type SupplierQueryResult =
   | { status: 'success'; data: SupplierView }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 export type SupplierListResult =
   | { status: 'success'; data: Page<SupplierView> }
-  | { status: 'error'; code: ErrorCode; message: string };
+  | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
 // exportar funciones async (restriccion real de Next.js). Quien consuma estas actions
@@ -75,7 +75,7 @@ const MISSING_ID_ERROR = 'Falta el identificador del proveedor.';
  * El traductor UNICO (R10): una sola implementacion para los siete adaptadores driving,
  * parametrizada por la clase base de este modulo. Ya no se escribe aqui.
  */
-const toErrorState = createErrorStateTranslator(ProveedoresError);
+const toErrorState = createErrorStateTranslator(ProveedoresError, observabilidad.readRequestIdHeader);
 
 /** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

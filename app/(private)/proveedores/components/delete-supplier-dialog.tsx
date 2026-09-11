@@ -16,7 +16,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
+import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { SupplierView } from '@/lib/modules/proveedores';
 import {
   deleteSupplierAction,
@@ -99,11 +101,23 @@ export function DeleteSupplierDialog({ supplier }: { readonly supplier: Supplier
           Sus líneas de catálogo se dan de baja con él.
         </p>
 
-        {state.status === 'error' ? (
+        {/*
+          QC-71 (R17, R18): el INESPERADO lo pinta el componente compartido -que necesita un
+          contenedor de bloque-; el CATALOGADO, exactamente como siempre y sin identificador.
+        */}
+        {state.status !== 'error' ? null : state.code === UNEXPECTED_ERROR_CODE ? (
+          <div
+            role="alert"
+            className="text-sm text-destructive"
+            data-testid="delete-supplier-error"
+          >
+            <UnexpectedErrorNotice state={state} />
+          </div>
+        ) : (
           <p role="alert" className="text-sm text-destructive" data-testid="delete-supplier-error">
             {state.message}
           </p>
-        ) : null}
+        )}
 
         <form action={formAction}>
           <input

@@ -14,6 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   deleteOrderAction,
@@ -104,6 +106,8 @@ export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDial
         </AlertDialogHeader>
 
         {error === undefined ? null : (
+          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
           <div
             role="alert"
             id={errorId}
@@ -111,7 +115,11 @@ export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDial
             data-testid={DELETE_ORDER_ERROR_TESTID}
             data-code={error.code}
           >
-            <p data-testid="delete-order-error-message">{error.message}</p>
+            {error.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={error} />
+            ) : (
+              <p data-testid="delete-order-error-message">{error.message}</p>
+            )}
           </div>
         )}
 

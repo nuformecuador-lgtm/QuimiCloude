@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   createPresentationSchema,
   updatePresentationSchema,
@@ -116,8 +117,15 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, PresentationFieldName>>>
   presentation_duplicate_name: PRESENTATION_NAME_FIELD,
 };
 
-/** QC-70 (R21): el codigo que fabrica la validacion previa sale del catalogo, no de un literal suelto. */
-const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
+/**
+ * QC-70 (R21): el codigo que fabrica la validacion previa sale del catalogo, no de un literal suelto.
+ *
+ * QC-71 (R16, R18): `satisfies` en vez de anotacion, para que el tipo se quede en el literal y
+ * pueda construir la rama CATALOGADA de `ErrorState`. Con `: ErrorCode` el tipo incluiria tambien
+ * el codigo generico y este literal exigiria un `reference` que aqui no existe: el rechazo lo
+ * fabrica el formulario, no el servidor.
+ */
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 type FieldErrors = Partial<Record<PresentationFieldName, string>>;
@@ -135,9 +143,16 @@ type PresentationFormState =
   | { status: 'success' }
   | {
       status: 'error';
-      /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: ErrorCode;
-      message: string;
+      /**
+       * El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion
+       * previa.
+       *
+       * **QC-71 (R17): entero, no copiado campo a campo.** La copia de `code` y `message` que
+       * habia aqui perdia el `reference` del error inesperado. Un `reference?: string` local
+       * reabriria el agujero por el otro lado -deja construir un inesperado sin identificador-,
+       * asi que se guarda la union cerrada y el render estrecha por `code`.
+       */
+      serverError: ErrorState;
       fieldErrors: FieldErrors;
       values: FieldValues;
     };
@@ -164,7 +179,7 @@ function readValues(formData: FormData): FieldValues {
 async function submit(
   presentationId: string | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
+): Promise<{ status: 'success' } | ErrorState> {
   if (presentationId === undefined) {
     const result = await createPresentationAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };
@@ -220,8 +235,7 @@ export function PresentationForm({ presentation, onSaved }: PresentationFormProp
       // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
       return {
         status: 'error',
-        code: INVALID_INPUT_CODE,
-        message: FORM_ERROR_MESSAGE,
+        serverError: { status: 'error', code: INVALID_INPUT_CODE, message: FORM_ERROR_MESSAGE },
         fieldErrors,
         values,
       };
@@ -234,8 +248,7 @@ export function PresentationForm({ presentation, onSaved }: PresentationFormProp
       const field = CODE_TO_FIELD[result.code];
       return {
         status: 'error',
-        code: result.code,
-        message: result.message,
+        serverError: result,
         fieldErrors: field === undefined ? {} : { [field]: result.message },
         values,
       };
@@ -258,7 +271,14 @@ export function PresentationForm({ presentation, onSaved }: PresentationFormProp
   /** Valor inicial del campo: lo escrito en el intento fallido; si no, el de la presentacion. */
   const initialName = values?.name ?? presentation?.name ?? '';
 
-  const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
+  /*
+    Es el ERROR, no un booleano: asi el render estrecha por `code` y le pide el identificador al
+    inesperado sin ningun `as` (QC-71 R17, R18).
+  */
+  const formError =
+    state.status === 'error' && Object.keys(fieldErrors).length === 0
+      ? state.serverError
+      : undefined;
 
   return (
     /*
@@ -287,20 +307,30 @@ export function PresentationForm({ presentation, onSaved }: PresentationFormProp
       </SheetHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {showFormError ? (
+        {formError === undefined ? null : (
           // Region de error del formulario (R24): aqui van los rechazos que no senalan campo.
+          //
+          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+          // identificador de la peticion. El CATALOGADO se pinta como siempre -mismo marcado,
+          // mismos `data-testid`- y sin identificador ninguno.
           <div
             role="alert"
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
             data-testid={PRESENTATION_FORM_ERROR_TESTID}
           >
-            <p>{state.message}</p>
-            <p className="text-xs" data-testid={PRESENTATION_FORM_ERROR_CODE_TESTID}>
-              {state.code}
-            </p>
+            {formError.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={formError} />
+            ) : (
+              <>
+                <p>{formError.message}</p>
+                <p className="text-xs" data-testid={PRESENTATION_FORM_ERROR_CODE_TESTID}>
+                  {formError.code}
+                </p>
+              </>
+            )}
           </div>
-        ) : null}
+        )}
 
         <div className="flex flex-col gap-2">
           <Label htmlFor={inputId}>{FIELD_LABELS.name}</Label>

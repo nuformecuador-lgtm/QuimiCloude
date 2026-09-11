@@ -14,8 +14,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Textarea } from '@/components/ui/textarea';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   cancelOrderAction,
@@ -90,7 +91,10 @@ const CANCEL_SUCCESS = 'Pedido cancelado.';
  * manda el catalogo es el mensaje de los errores que emite el back, y esos llegan ya resueltos
  * en `result.message`.
  */
-const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
+// QC-71 (R16): `satisfies` en vez de anotacion. Con `ErrorState` ya partido en dos ramas, un
+// `ErrorCode` ancho incluiria el codigo generico, que exige `reference`, y este rechazo previo no
+// tiene ninguno que dar. El literal conserva su tipo y sigue obligado a estar en el catalogo.
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const REASON_REQUIRED = 'Escribe el motivo de la cancelación.';
 
 const INITIAL_STATE: OrderMutationFormState = { status: 'idle' };
@@ -192,7 +196,16 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
               data-testid={CANCEL_ORDER_ERROR_TESTID}
               data-code={error.code}
             >
-              <p data-testid="cancel-order-error-message">{error.message}</p>
+              {/*
+                QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade
+                el identificador de la peticion. El CATALOGADO -`not_cancellable` entre otros- se
+                pinta como siempre y sin identificador.
+              */}
+              {error.code === UNEXPECTED_ERROR_CODE ? (
+                <UnexpectedErrorNotice state={error} />
+              ) : (
+                <p data-testid="cancel-order-error-message">{error.message}</p>
+              )}
             </div>
           )}
 

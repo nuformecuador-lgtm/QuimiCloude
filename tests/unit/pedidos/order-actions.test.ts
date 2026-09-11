@@ -58,7 +58,16 @@ const {
   getSessionUserMock: vi.fn(),
 }))
 
+// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
+// del identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el
+// modulo ni siquiera carga; con ella, el estado del error inesperado vuelve con ESE id.
+const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  return { REQUEST_ID_DE_PRUEBA: id, readRequestIdHeaderMock: vi.fn(async () => id) };
+})
+
 vi.mock('@/lib/composition', () => ({
+  observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock },
   pedidos: {
     createOrder: createOrderMock,
@@ -420,8 +429,12 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     expect(source, 'la traduccion mira el nombre de la clase').not.toMatch(/error\.name/)
     // QC-70 (R10): la traduccion ya no se escribe aqui. Este archivo ATA el traductor unico a
     // la clase base del modulo y no vuelve a declarar el suyo, que es lo que R23 protege.
+    // QC-71 (T7): el atado gana un segundo argumento —la LECTURA de la cabecera del
+    // identificador, que solo el punto de composicion puede dar (R9)—. La asercion no se
+    // afloja: pasa a exigir TAMBIEN ese argumento, porque sin el la action no sabria que
+    // identificador devolver con el error inesperado (R13).
     expect(source, 'el adaptador deberia usar el traductor unico').toMatch(
-      /const toErrorState = createErrorStateTranslator\(PedidosError\)/,
+      /const toErrorState = createErrorStateTranslator\(\s*PedidosError,\s*observabilidad\.readRequestIdHeader,?\s*\)/,
     )
     expect(source, 'el adaptador vuelve a declarar su propio traductor').not.toMatch(
       /function toErrorState\s*\(/,
@@ -442,6 +455,10 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       status: 'error',
       code: UNEXPECTED_ERROR_CODE,
       message: errorMessage(UNEXPECTED_ERROR_CODE),
+      // QC-71 (R13): el estado inesperado vuelve ademas con el identificador de la peticion —el
+      // mismo que se escribio en la linea del registro—, y su ausencia ya no compila (R16). Lo
+      // que este caso fija sigue igual: del detalle interno no sale nada mas.
+      reference: REQUEST_ID_DE_PRUEBA,
     }
 
     /** El detalle interno no puede aparecer en NINGUN campo, no solo en `message` (R13). */

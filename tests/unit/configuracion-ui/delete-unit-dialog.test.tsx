@@ -29,7 +29,12 @@ import {
   UnitRowActions,
   deleteUnitLabel,
 } from '@/app/(private)/configuracion/unidades/components';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+
+// QC-71 (R15, R16): los codigos que estos casos pintan son los CATALOGADOS. El generico ya no
+// cabe en esta forma de estado -exige `reference`-, y por eso se excluye del tipo del parametro
+// en vez de dejarlo pasar con un cast.
+type CodigoCatalogado = Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>;
 import {
   SystemUnitError,
   UnauthorizedError,
@@ -37,6 +42,15 @@ import {
   type UnitView,
 } from '@/lib/modules/unidades';
 import type { UnitMutationFormState } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
 
 const { deleteUnitActionMock, routerMock } = vi.hoisted(() => ({
@@ -196,7 +210,7 @@ describe('al confirmar se invoca el borrado y se aplica R38', () => {
 
 describe('los rechazos se pintan DENTRO del dialogo, que sigue abierto (R41, R42)', () => {
   /** Confirma un borrado que la operacion rechaza con el codigo dado. */
-  async function rechazoCon(code: ErrorCode, message: string) {
+  async function rechazoCon(code: CodigoCatalogado, message: string) {
     const user = setupUser();
     deleteUnitActionMock.mockResolvedValue({ status: 'error', code, message });
     montar();
@@ -259,5 +273,41 @@ describe('la fila no se retira cuando el borrado se rechaza (R41)', () => {
     expect(screen.getByTestId(UNIT_ACTION_DELETE_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(DELETE_UNIT_DIALOG_TESTID)).toBeInTheDocument();
     expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el dialogo de borrado de unidad. */
+describe('el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    deleteUnitActionMock.mockResolvedValue(errorInesperado());
+    montar();
+
+    await user.click(screen.getByTestId(DELETE_UNIT_CONFIRM_TESTID));
+
+    const region = await screen.findByTestId(DELETE_UNIT_ERROR_TESTID);
+    const referencia = screen.getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID);
+    expect(region).toContainElement(referencia);
+    expect(referencia).toHaveTextContent(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+    // El uuid se afirma por el `data-testid` del aviso: la convencion de esta pantalla
+    // prohibe identificar un nodo por su texto. `toHaveTextContent` sigue probando que el
+    // identificador esta RENDERIZADO como texto y no escondido en un atributo (R17).
+    expect(referencia).toHaveTextContent(REFERENCIA_DEL_CASO);
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    deleteUnitActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+    montar();
+
+    await user.click(screen.getByTestId(DELETE_UNIT_CONFIRM_TESTID));
+
+    const region = await screen.findByTestId(DELETE_UNIT_ERROR_TESTID);
+    expect(region).toHaveAttribute('data-code', 'unauthorized');
+    esperarSinIdentificador();
   });
 });
