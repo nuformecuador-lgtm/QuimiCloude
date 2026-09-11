@@ -645,3 +645,140 @@ de T17.
 `typecheck`, `lint` y **solo** los archivos de la feature con `vitest`. **`./init.sh --rapido` de
 cada tanda y el `./init.sh` completo antes del PR los corre el leader.** **F2.3 no se ejecuto y el
 PR no se abrio**, como se pidio.
+
+---
+
+# F2.3 — Sincronizacion con `dev` (2026-09-11)
+
+## El menor del reviewer, arreglado antes de sincronizar
+
+`domain/add-work-group-member.ts` prometia en su comentario que `blockReasonOf` «no compilaria» si
+el catalogo de estados creciera, pero tenia `default: return null`: hacia **exactamente lo que el
+comentario decia que era imposible**, clasificar en silencio un estado nuevo como «se ve». El
+codigo era correcto hoy; **la promesa no**. Se arreglo **cumpliendola**, no rebajandola.
+
+Quedo como **mapa total** en vez de `switch`:
+
+```ts
+const MOTIVO_POR_ESTADO = {
+  active: null, pending: 'pending', inactive: 'inactive', blocked: 'blocked',
+} satisfies Record<UserAccountStatus, MemberBlockReason | null>;
+```
+
+**Por que mapa y no `switch` con `case`**: el `case` obliga a escribir el literal del estado activo
+**entre comillas**, y eso lo cazaba —con razon, porque el patron no puede distinguir un `case` de
+un `===`— el guardia de R13 de `grupos/scope.test.ts`. La clave de un objeto **no va
+entrecomillada**, asi que el guardia **se queda estricto, sin ninguna excepcion nombrada**, y la
+exhaustividad se conserva entera. **Antes que pedirle permiso al guardia, se quito el motivo.**
+
+Verificado **las dos veces** (con `switch` y con mapa) anadiendo un quinto estado al catalogo:
+
+```
+add-work-group-member.ts(66,3): error TS1360: Type '{ active: null; pending: ...; }'
+  does not satisfy the expected type 'Record<"active" | ... | "suspended", ...>'.
+```
+
+El comportamiento de hoy **no cambia**: el estado activo sigue dando `null` (R19).
+
+## Que trajo el merge
+
+`dev` iba **15 commits por delante**: entro **QC-67** (pantalla de usuarios, PR #60), que ya llevaba
+dentro **QC-86** y **QC-80**. Son ~50 archivos, casi todos de `app/(private)/configuracion/usuarios/`
+y sus tests.
+
+**Migraciones, hechas INMEDIATAMENTE despues del merge y no cuando algo fallara** (es el paso que en
+QC-86 costo dos corridas de gate de seis minutos): `prisma migrate deploy` y `prisma generate`
+contra `QuimiCloude_QC84`. **No habia ninguna pendiente** —QC-67 es UI pura y las de QC-80/QC-86 ya
+estaban aplicadas— pero el cliente se regenero igual. La integracion quedo verde: **22 archivos,
+418 tests**.
+
+## El unico conflicto, y por que ninguno de los dos lados se descarto
+
+`tests/unit/identity/account-status-scope.test.ts`. **QC-67 y QC-84 hicieron la MISMA maniobra sobre
+la MISMA lista cerrada**: anadir un bloque **aditivo** a `SITIOS_PERMITIDOS` nombrando sus
+excepciones, y los dos bloques caian al final del array.
+
+Resuelto **conservando los dos intactos**, el de QC-67 primero por estar ya en el tronco. **No era
+una eleccion entre ellos**: cada bloque da de alta archivos distintos por requisitos distintos, y
+quitar cualquiera dejaria en rojo a su ficha. La lista sigue **cerrada** y comparada con
+**igualdad**: lo que crece es la lista, nunca el criterio.
+
+De paso se corrigio la cabecera del bloque de QC-84, que decia «cinco archivos» y enumera **seis**
+(`work-group-prisma.ts` entro despues de escribirla).
+
+**Los dos commits de QC-67 sobre el rango de los centinelas** (`1a9e2c4` merge-base en vez de SHA
+congelado, `f578865` el aserto del orden) **no obligaron a tocar nada aqui**: `account-status-scope`
+ya calculaba su rango con `git merge-base origin/dev HEAD`, y el `scope.test.ts` de QC-84 nacio con
+esa forma precisamente por el aviso.
+
+## Verificacion tras el merge
+
+```
+$ pnpm run typecheck                        -> sin salida (verde)
+$ pnpm run lint                             -> sin salida (verde)
+
+$ vitest run account-status-scope + grupos + qc78-alcance + roles/scope
+                                 + usuarios/scope + navegacion
+ Test Files  18 passed (18) | Tests 312 passed | 18 skipped (330)
+
+$ vitest run grupos + catalogo + identity-facade + integration/identity
+ Test Files  22 passed (22) | Tests 418 passed (418)
+```
+
+**Un aviso sobre medir en mitad de un merge**: antes de commitear la fusion, `scope.test.ts` (R48)
+acusaba a esta rama de anadir 18 archivos bajo `app/` y `e2e/`. **No era un fallo**: sin la fusion
+commiteada, `merge-base` seguia en el commit viejo mientras el arbol de trabajo ya tenia los
+archivos de QC-67, asi que el centinela se los atribuia a QC-84. Al commitear el merge, la base pasa
+a ser la punta de `dev` y el caso vuelve a verde **sin tocar el test**. Queda anotado porque es la
+misma trampa que `1a9e2c4` documenta y cuesta una corrida entenderla.
+
+## DOS ROJOS AJENOS QUE EL MERGE DESTAPA, y que NO toco por mi cuenta
+
+Corriendo los archivos que el merge trajo aparecen **dos tests de QC-67 en rojo**. Los dejo **sin
+tocar** y los reporto, porque arreglarlos es enmendar los guardias de una ficha **recien mergeada**
+y eso no es una decision del implementer de QC-84. Diagnostico, con la evidencia:
+
+### (a) `tests/unit/configuracion-ui/usuarios-convenciones.test.ts` — «la feature toca intocables»
+
+Acusa a **QC-84** de abrir `lib/modules/identity`, y enumera mis **15** archivos:
+
+```
+la feature toca intocables: lib/modules/identity/adapters/driven/persistence/work-group-prisma.ts,
+  ... work-group-actions.ts, add-work-group-member.ts, create-work-group.ts, ... (15)
+```
+
+**Causa**: el centinela pregunta «que anade ESTA rama sobre `dev`» con `merge-base` —que es la forma
+**correcta**, la que `1a9e2c4` acaba de instaurar— pero **no comprueba de QUIEN es la rama**. En la
+rama de QC-67 medía a QC-67; ahora que QC-67 esta en `dev`, mide a **quien pase por ahi**, y lo que
+esta rama anade sobre `dev` son, legitimamente, los archivos de QC-84.
+
+**Lo que le falta es la SENAL DE RAMA** que tienen todos los demas centinelas del repo —el de QC-65,
+el de QC-78, el de QC-66, el de QC-94, los de `unidades` y el propio `grupos/scope.test.ts` de esta
+ficha—: cuando no es su rama, **saltan ruidosamente** con su motivo en vez de acusar al vecino. Son
+exactamente los `18 skipped` que se ven en la corrida de arriba.
+
+### (b) `data-table-intacta-usuarios.test.ts` y (a) otra vez — «el detector muerde: el diff NO sale vacio»
+
+Las anclas de **no-vacuidad** fallan con `expected 0 to be greater than 0`. **Esto es anterior a mi
+rama y no lo causa el merge**: comprobado calculando el mismo rango que ellas usan, con `HEAD` en la
+punta de `dev`:
+
+```
+base = 46fc2932 = dev tip
+archivos que «la rama anade» en ese caso: 0
+```
+
+O sea: **fallan tambien corriendo el gate en `dev`**, y en cualquier rama que no toque la carpeta de
+la pantalla de usuarios. El ancla protege de que el centinela se de por verde sin haber medido —es
+lo correcto— pero esta escrita como si su rama fuera la unica que va a existir.
+
+### Lo que propongo, y que NO he hecho
+
+Anadir a esos dos centinelas la **senal de rama** conjuntiva que ya usa el resto del repo (un
+archivo central de QC-67 **y** su carpeta de spec), de modo que en una rama ajena **salten
+ruidosamente** en vez de acusar. **No se relaja ninguna asercion**: en la rama de QC-67 seguirian
+midiendo exactamente lo que miden hoy. Es el mismo retensado que QC-67 le hizo a
+`usuarios-convenciones` en `1a9e2c4`, terminado en el eje que quedo pendiente: aquel arreglo el
+RANGO, y falta el SUJETO.
+
+**Queda a decision del leader**: es tocar guardias de una ficha ajena ya mergeada.
