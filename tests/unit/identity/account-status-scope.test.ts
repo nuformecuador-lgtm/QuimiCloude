@@ -230,6 +230,40 @@ const SITIOS_PERMITIDOS = [
   // llama `setUserAccountStatus`. El nombre lo fija `design.md > 11` y lo exige R25, asi que
   // `lib/composition/index.ts` nombra el estado por su NOMBRE DE CLAVE, no porque lea la columna.
   'lib/composition/index.ts',
+
+  // RETENSADO 2026-09-11 (QC-84, crud-de-grupos-de-trabajo). El centinela se pone rojo porque esta
+  // ficha anade cinco archivos a `lib/modules/identity/**` que NOMBRAN el estado de cuenta, y la
+  // comparacion es una IGUALDAD. Se RETENSA NOMBRANDO LA EXCEPCION -que es como las fichas se
+  // enmiendan entre si en este archivo, ver los bloques de QC-78 y QC-66-, NO relajando la
+  // asercion: la lista sigue siendo CERRADA y comparada con IGUALDAD, asi que cualquier archivo
+  // que no este aqui y nombre el estado sigue poniendo esto en rojo.
+  //
+  // QUIEN LOS AUTORIZA: **QC-84 R19**, que manda devolver como miembros de un grupo SOLO a las
+  // personas cuyo ESTADO EFECTIVO -el que resuelve `effectiveAccountStatus`, la unica definicion
+  // de QC-78 R7- es `active` en el instante de la consulta. Ninguno de los cinco declara una
+  // segunda definicion del estado ni compara la columna a mano; los cinco PASAN POR la funcion de
+  // `effective-account-status.ts`, y que sea asi lo vigila
+  // `tests/unit/identity/grupos/scope.test.ts` (T17, el caso de R13).
+  //
+  //   - `list-work-group-members.ts` y `add-work-group-member.ts` la LLAMAN: el primero para
+  //     filtrar quien sale (R19) y el segundo para decir POR QUE una persona no se ve cuando ya
+  //     pertenece (R31).
+  //   - `work-group-repository.ts` declara el estado CRUDO y el plazo en su tipo de salida: el
+  //     puerto no cocina la regla, la trae para que la traduzca el dominio (mismo criterio que
+  //     `user-credentials-reader.ts` en el bloque de QC-78).
+  //   - `work-group-queryable.ts` y `errors.ts` solo lo nombran al EXPLICAR la frontera -el filtro
+  //     no lo pide quien llama, y los codigos de error distinguen los tres motivos-, pero
+  //     `MENCION_DEL_ESTADO` mira el archivo entero y una excepcion nombrada es mas honesta que
+  //     ensanchar el patron.
+  //   - `work-group-prisma.ts` TRAE la columna: su `select` enumera `accountStatus` y `lockedUntil`
+  //     para que el dominio pueda traducirlos. No los interpreta -no hay ni un `if` sobre el valor-
+  //     y no los escribe nunca: el estado de cuenta lo mueve QC-66 y el bloqueo QC-78.
+  'lib/modules/identity/adapters/driven/persistence/work-group-prisma.ts',
+  'lib/modules/identity/domain/add-work-group-member.ts',
+  'lib/modules/identity/domain/errors.ts',
+  'lib/modules/identity/domain/list-work-group-members.ts',
+  'lib/modules/identity/domain/work-group-queryable.ts',
+  'lib/modules/identity/ports/work-group-repository.ts',
 ] as const;
 
 /**
