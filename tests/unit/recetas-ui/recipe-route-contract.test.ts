@@ -718,6 +718,31 @@ describe('contrato de la ruta de recetas', () => {
       'db/migrations/20260910120000_user_permissions_catalog/down.sql',
     ];
 
+    // RETENSADO 2026-09-11 (QC-86), con el MISMO criterio que los retensados de QC-83 y QC-66: el
+    // rango `origin/dev...HEAD` mide la rama que corre el gate, asi que cada archivo legitimo de
+    // `db/` posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
+    //
+    // POR QUE `db/` cambia aqui: QC-86 crea la tabla `order_assignments` en el modulo NUEVO
+    // `asignaciones` -la asignacion de responsables a un pedido-, con su `down.sql`, y su
+    // migracion inserta ademas los dos permisos del modulo (`asignaciones.consultar` y
+    // `asignaciones.modificar`) en `permissions` y sus asignaciones de rol. NO toca recetas, ni
+    // unidades, ni pedidos.
+    //
+    // `db/schema.prisma` SI entra en la lista, y por eso se nombra: QC-86 le anade el modelo
+    // `OrderAssignment` y NADA MAS -ni una linea de `User`, `Company`, `WorkGroup`,
+    // `WorkGroupMember` u `Order` (su R32)-. Esa acotacion no la vigila este caso: la vigila
+    // `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`, que comprueba que el
+    // UP no ejecuta NINGUN DDL sobre ninguna tabla preexistente.
+    //
+    // La migracion NO modifica ninguna columna, indice, restriccion ni tipo preexistente: la
+    // unica escritura sobre tablas que ya existian son los INSERT aditivos e idempotentes de
+    // permisos. Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+    const MIGRACION_QC86 = [
+      'db/migrations/20260911120000_order_assignments/migration.sql',
+      'db/migrations/20260911120000_order_assignments/down.sql',
+      'db/schema.prisma',
+    ];
+
     const tocaRecetas = diff
       .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
       .filter((ruta) => !AMPLIACION_RECETAS_QC34.includes(ruta))
@@ -729,7 +754,8 @@ describe('contrato de la ruta de recetas', () => {
       .filter((ruta) => !MIGRACION_QC47.includes(ruta))
       .filter((ruta) => !MIGRACIONES_LEGITIMAS.includes(ruta))
       .filter((ruta) => !MIGRACION_QC83.includes(ruta))
-      .filter((ruta) => !MIGRACION_QC66.includes(ruta));
+      .filter((ruta) => !MIGRACION_QC66.includes(ruta))
+      .filter((ruta) => !MIGRACION_QC86.includes(ruta));
     expect(
       tocaRecetas,
       'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 deberia estar en el diff',

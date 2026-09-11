@@ -150,6 +150,15 @@ export const MIGRACIONES_ESPERADAS = [
   '20260909120000_product_batches',
   // Llega con la sincronizacion con dev: es de QC-66 (catalogo de permisos), no de esta ficha.
   '20260910120000_user_permissions_catalog',
+  // RETENSADO 2026-09-11 (QC-86), con el MISMO criterio que el retensado de QC-66: la lista es
+  // CERRADA y se mide contra el arbol real, asi que cada migracion legitima posterior se NOMBRA
+  // una a una o el caso deja de vigilar nada. Es de QC-86 (`order_assignments`: el modelo de
+  // asignacion de pedidos, su tabla y sus dos permisos), NO de esta ficha. QC-86 no persiste ni
+  // menciona el identificador de peticion en ninguna parte: su migracion crea `order_assignments`
+  // e inserta `asignaciones.consultar` y `asignaciones.modificar` en el catalogo, y nada mas. La
+  // comprobacion de `db/schema.prisma` de este mismo caso —que ningun termino del identificador
+  // aparezca en el esquema— se deja INTACTA y sigue pasando: es la que de verdad vigila R19.
+  '20260911120000_order_assignments',
 ] as const
 
 export function hallazgosDeMigraciones(

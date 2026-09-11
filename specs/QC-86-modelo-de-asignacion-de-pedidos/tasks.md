@@ -253,7 +253,7 @@ Si alguno de estos aparece en `git diff`, la feature está fuera de alcance: **p
 - **Hecho cuando:** los conteos son exactos y el caso de idempotencia se ejecuta dos veces seguidas.
 - **Depende de:** T9. Paralelizable con T10 y T11.
 
-### [ ] T13. `[P]` No-regresión: nada de lo que ya existe cambia
+### [x] T13. `[P]` No-regresión: nada de lo que ya existe cambia
 Es un requisito con nombre (R32, R36, decisión cerrada 16), no una consecuencia.
 
 - **Qué:** `git diff` de la rama **no** toca ninguno de los archivos de «Archivos que NO se tocan»;
@@ -270,7 +270,7 @@ Es un requisito con nombre (R32, R36, decisión cerrada 16), no una consecuencia
   y `tests/guards/guard-dependencias-aprobadas.test.ts` en verde.
 - **Depende de:** T9. Paralelizable con T10, T11, T12 y T13.
 
-### [ ] T15. Bitácora y mapa de trazabilidad
+### [x] T15. Bitácora y mapa de trazabilidad
 - **Archivos:** `progress/impl_QC-86-modelo-de-asignacion-de-pedidos.md`.
 - **Qué:** el mapa `R1..R37 -> test concreto` **sin hueco** (`CHECKPOINTS.md > Trazabilidad`),
   nombrando archivo **y** título de test; la lista de tests ajenos retensados, uno a uno, con el
