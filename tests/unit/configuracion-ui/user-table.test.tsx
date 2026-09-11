@@ -9,11 +9,13 @@
 // sean los del componente compartido es, ademas, la prueba de R9: si la pantalla hubiera escrito
 // su propia tabla o su propia barra de paginacion, no existirian.
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ACCOUNT_STATUS_COLUMN_ID,
+  DELETE_USER_DIALOG_TESTID,
+  DELETE_USER_ID_TESTID,
   DISPLAY_NAME_COLUMN_ID,
   EMAIL_COLUMN_ID,
   ROLE_NAME_COLUMN_ID,
@@ -21,7 +23,12 @@ import {
   USER_ACTION_DELETE_TESTID,
   USER_ACTION_EDIT_TESTID,
   USER_ACTION_STATUS_TESTID,
+  USER_CREATE_OPEN_TESTID,
+  USER_FORM_TESTID,
   USER_ROW_ACTIONS_TESTID,
+  USER_SHEET_TESTID,
+  USER_STATUS_DIALOG_TESTID,
+  USER_STATUS_ID_TESTID,
   USER_TABLE_TESTID,
   UserTable,
   buildUserListQuery,
@@ -31,13 +38,19 @@ import {
   SEARCH_DEBOUNCE_MS,
   type DataTableParams,
 } from '@/components/shared/data-table';
-import { USER_ACCOUNT_STATUSES, USER_QUERYABLE, type UserRow } from '@/lib/modules/identity';
+import {
+  USER_ACCOUNT_STATUSES,
+  USER_QUERYABLE,
+  type UserDetail,
+  type UserRow,
+} from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { USERS_ROUTE } from '@/lib/shared/routes';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { routerMock } = vi.hoisted(() => ({
+const { routerMock, getUserActionMock } = vi.hoisted(() => ({
+  getUserActionMock: vi.fn(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -53,14 +66,15 @@ vi.mock('next/navigation', async (importOriginal) => ({
   useRouter: () => routerMock,
 }));
 
-// Dobles que FALLAN si se les llama: la tabla no lee ni escribe nada (R36).
+// Dobles que FALLAN si se les llama: la tabla no lee la lista ni escribe nada (R36). La UNICA
+// lectura que puede salir de aqui es la ficha que precarga la edicion, y sale del panel (R26).
 vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse desde la tabla`);
   };
   return {
     listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
-    getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
+    getUserAction: getUserActionMock,
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
     deleteUserAction: vi.fn(noDebeInvocarse('deleteUserAction')),
@@ -129,8 +143,28 @@ function clases(elemento: Element): readonly string[] {
   return Array.from(elemento.classList);
 }
 
+/** La ficha que devuelve la precarga de la edicion: aqui solo hace falta que exista (R26). */
+const FICHA: UserDetail = {
+  id: 'u1',
+  firstNames: 'Ana',
+  lastNames: 'Lopez',
+  birthDate: new Date('1990-04-17T00:00:00.000Z'),
+  email: 'ana.lopez@example.com',
+  phone: '3001234567',
+  documentTypeCode: 'CC',
+  documentNumber: '1020304050',
+  username: 'ana.lopez',
+  roleId: 'r1',
+  roleName: 'Operador',
+  accountStatus: 'blocked',
+  accountStatusChangedAt: new Date('2026-09-01T10:00:00.000Z'),
+  createdAt: new Date('2026-08-01T10:00:00.000Z'),
+  updatedAt: new Date('2026-09-01T10:00:00.000Z'),
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  getUserActionMock.mockResolvedValue({ status: 'success', data: FICHA });
   window.localStorage.clear();
   // jsdom no implementa `window.matchMedia`. Helper HEREDADO (`tests/helpers/viewport.ts`) (R39).
   setViewportWidth(WIDE_VIEWPORT);
@@ -408,37 +442,77 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
   it('monta UNA instancia del estado para toda la pagina, no una por fila', () => {
     montar();
 
-    // Un solo contenedor de la tabla, con el estado cerrado de partida.
+    // Un solo contenedor de la tabla, sin ninguna escritura abierta de partida.
     expect(screen.getAllByTestId(USER_TABLE_TESTID)).toHaveLength(1);
-    expect(screen.getByTestId(USER_TABLE_TESTID)).toHaveAttribute('data-user-panel', 'none');
+    expect(screen.queryByTestId(USER_SHEET_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DELETE_USER_DIALOG_TESTID)).toBeNull();
+    expect(screen.queryByTestId(USER_STATUS_DIALOG_TESTID)).toBeNull();
     // Y tres disparadores por fila, uno por accion (R6, mitad cliente).
     expect(screen.getAllByTestId(USER_ROW_ACTIONS_TESTID)).toHaveLength(USUARIOS.length);
   });
 
-  for (const [testid, modo] of [
-    [USER_ACTION_EDIT_TESTID, 'edit'],
-    [USER_ACTION_DELETE_TESTID, 'delete'],
-    [USER_ACTION_STATUS_TESTID, 'status'],
-  ] as const) {
-    it(`la accion ${modo} de una fila abre ese modo SOBRE ESE usuario`, async () => {
-      const user = setupUser();
-      montar();
-      const objetivo = USUARIOS[1]!;
+  it('el alta abre el panel lateral SIN sujeto: no precarga ninguna ficha (R22)', async () => {
+    const user = setupUser();
+    montar();
 
-      const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
-      await user.click(within(fila).getByTestId(testid));
+    await user.click(screen.getByTestId(USER_CREATE_OPEN_TESTID));
 
-      const tabla = screen.getByTestId(USER_TABLE_TESTID);
-      expect(tabla).toHaveAttribute('data-user-panel', modo);
-      expect(tabla).toHaveAttribute('data-user-panel-target', objetivo.id);
-    });
-  }
+    expect(await screen.findByTestId(USER_FORM_TESTID)).toBeInTheDocument();
+    expect(getUserActionMock).not.toHaveBeenCalled();
+    expect(routerMock.push).not.toHaveBeenCalled();
+  });
 
-  it('sin `usuarios.modificar` no se emite ninguna accion de fila (R6)', () => {
+  it('la accion de editar de una fila abre el panel SOBRE ESE usuario (R26)', async () => {
+    const user = setupUser();
+    montar();
+    const objetivo = USUARIOS[1]!;
+
+    const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
+    await user.click(within(fila).getByTestId(USER_ACTION_EDIT_TESTID));
+
+    expect(await screen.findByTestId(USER_SHEET_TESTID)).toBeInTheDocument();
+    await waitFor(() => expect(getUserActionMock).toHaveBeenCalledWith(objetivo.id));
+    expect(screen.queryByTestId(DELETE_USER_DIALOG_TESTID)).toBeNull();
+    expect(screen.queryByTestId(USER_STATUS_DIALOG_TESTID)).toBeNull();
+  });
+
+  it('la accion de borrar de una fila abre el dialogo SOBRE ESE usuario (R30)', async () => {
+    const user = setupUser();
+    montar();
+    const objetivo = USUARIOS[1]!;
+
+    const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
+    await user.click(within(fila).getByTestId(USER_ACTION_DELETE_TESTID));
+
+    const dialogo = await screen.findByTestId(DELETE_USER_DIALOG_TESTID);
+    expect(within(dialogo).getByTestId(DELETE_USER_ID_TESTID)).toHaveValue(objetivo.id);
+    expect(screen.queryByTestId(USER_SHEET_TESTID)).toBeNull();
+    expect(screen.queryByTestId(USER_STATUS_DIALOG_TESTID)).toBeNull();
+  });
+
+  it('la accion de estado de una fila abre su dialogo SOBRE ESE usuario (R32)', async () => {
+    const user = setupUser();
+    montar();
+    const objetivo = USUARIOS[1]!;
+
+    const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
+    await user.click(within(fila).getByTestId(USER_ACTION_STATUS_TESTID));
+
+    const dialogo = await screen.findByTestId(USER_STATUS_DIALOG_TESTID);
+    expect(within(dialogo).getByTestId(USER_STATUS_ID_TESTID)).toHaveValue(objetivo.id);
+    expect(screen.queryByTestId(USER_SHEET_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DELETE_USER_DIALOG_TESTID)).toBeNull();
+  });
+
+  it('sin `usuarios.modificar` no se emite NINGUNA escritura (R6)', () => {
     montar({}, 3, false);
 
     expect(screen.queryByTestId(USER_ROW_ACTIONS_TESTID)).toBeNull();
     expect(screen.queryByTestId(USER_ACTION_EDIT_TESTID)).toBeNull();
-    expect(screen.getByTestId(USER_TABLE_TESTID)).toHaveAttribute('data-user-panel', 'none');
+    // Ni el disparador del alta, ni el panel, ni ninguno de los dos dialogos.
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(USER_SHEET_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DELETE_USER_DIALOG_TESTID)).toBeNull();
+    expect(screen.queryByTestId(USER_STATUS_DIALOG_TESTID)).toBeNull();
   });
 });

@@ -151,6 +151,55 @@ reescribir el componente.
    toda la pagina (`useState<UserPanel | null>`), no una por fila. Lleva un `data-user-panel`
    provisional que T9-T11 retiran al enchufar los componentes reales.
 
+### Bloque 4 — T9, T10, T11, T12
+
+**Creados**
+
+- `.../components/user-form.tsx` — los **nueve** campos y ninguno mas, publicados en
+  `USER_BUSINESS_FIELDS` para que el test afirme sobre la constante y no sobre literales. Viajan
+  **tal cual**, sin `trim` ni `toLowerCase` en el cliente: el esquema del modulo ya normaliza y
+  repetirlo aqui seria una segunda copia de una regla de negocio. `CODE_TO_FIELD` tipado con
+  `ErrorCode`, asi que un codigo mal escrito o retirado del catalogo **rompe el typecheck** en vez
+  de caer callado al mensaje generico (R23, R25, R27, R35)
+- `.../components/user-sheet.tsx` — panel lateral unico para alta y edicion, controlado siempre y
+  montado solo mientras esta abierto, con `key` por modo+id: cada apertura arranca limpia. La
+  edicion pide `getUserAction(id)` con sus tres estados DENTRO del panel y envia el **reemplazo
+  completo** de los nueve (R22, R26)
+- `.../components/delete-user-dialog.tsx` — confirmacion que **nombra** al usuario; sin confirmar
+  la action no se invoca; el rechazo se pinta dentro, por su `code`, el dialogo sigue abierto y la
+  fila no se retira (R30, R31)
+- `.../components/user-status-dialog.tsx` — **una** accion con los **cuatro** valores derivados de
+  `USER_ACCOUNT_STATUSES` y confirmacion. Sin verbos por estado, sin decidir transiciones y sin
+  excluir ninguno: eso seria regla de negocio en la UI. `blocked -> active` se ofrece igual que
+  cualquier otro, y la pantalla no promete nada sobre el acceso (R32, R33, R34)
+- `tests/unit/configuracion-ui/user-form.test.tsx` (18 casos), `user-sheet.test.tsx` (14, incluye
+  el conteo de `<Toaster />`), `delete-user-dialog.test.tsx` (8), `user-status-dialog.test.tsx` (9)
+
+**Modificados**
+
+- `.../components/user-table.tsx` — retirado el `data-user-panel` provisional; monta **una**
+  instancia de cada panel y dialogo para toda la pagina, cada una solo mientras esta abierta, y el
+  disparador del alta gobernado por `canModify`
+- `.../components/index.ts` — barrel ampliado
+- `tests/unit/configuracion-ui/user-table.test.tsx` — **TENSADO**: deja de afirmar sobre el
+  soporte provisional y pasa a afirmar que cada accion abre el panel real sobre ese usuario y que
+  sin `usuarios.modificar` no se emite **ninguna** escritura (ni disparador, ni panel, ni dialogos)
+
+**Tres decisiones que el reviewer debe mirar.**
+
+1. El **disparador del alta vive en la tabla**, no dentro del panel como en unidades: el estado de
+   escritura es unico para toda la pagina, asi que un `SheetTrigger` propio del panel habria
+   dejado el modo `create` muerto.
+2. El estado de la precarga lleva el `id` al que pertenece (`forId`). No es adorno: ademas de
+   satisfacer `react-hooks/set-state-in-effect` sin renders en cascada, **impide que una respuesta
+   tardia pinte la ficha de otra persona**.
+3. El selector de rol sin catalogo **no se deshabilita**: pinta el aviso con su `data-code` y
+   queda **sin opciones**. Deshabilitarlo habria retirado el control del `FormData` y `roleId`
+   habria dejado de viajar, rompiendo la garantia de los nueve nombres (R24, R23).
+
+**Ninguna primitiva de shadcn instalada**: `sheet`, `alert-dialog`, `select`, `input`, `label`,
+`button` y `skeleton` ya estaban. Cero dependencias nuevas.
+
 ## Mapa `R<n> -> test`
 
 (se rellena al cierre, con los nombres reales de archivo)

@@ -114,15 +114,15 @@
 
 ### T9 — `user-sheet.tsx` + `user-form.tsx` *(depende de T7)*
 
-- [ ] Panel único para alta y edición; `{ status: 'idle' }` construido **aquí**; actions importadas
+- [x] Panel único para alta y edición; `{ status: 'idle' }` construido **aquí**; actions importadas
       por su **ruta exacta**.
-- [ ] Los nueve campos y **ninguno más** (`USER_BUSINESS_FIELDS` exportada); `documentTypeCode`
+- [x] Los nueve campos y **ninguno más** (`USER_BUSINESS_FIELDS` exportada); `documentTypeCode`
       desde `DOCUMENT_TYPE_CODES`; `roleId` desde `listRolesAction`.
-- [ ] Edición: `getUserAction(id)` al abrir, con sus estados cargando/error dentro del panel;
+- [x] Edición: `getUserAction(id)` al abrir, con sus estados cargando/error dentro del panel;
       precarga los nueve; envía reemplazo completo.
-- [ ] Mapa `code -> campo` tipado con `ErrorCode`; el resto a la región `role="alert"`;
+- [x] Mapa `code -> campo` tipado con `ErrorCode`; el resto a la región `role="alert"`;
       `unexpected` vía `UnexpectedErrorNotice`.
-- [ ] Tests: el `FormData` lleva exactamente los nueve nombres y **ningún** campo de credencial,
+- [x] Tests: el `FormData` lleva exactamente los nueve nombres y **ningún** campo de credencial,
       empresa o estado; `duplicate_email` pinta junto al correo y `role_not_found` junto al rol; un
       rechazo **no** cierra el panel ni pierde lo escrito; el selector de rol sin catálogo no
       inventa opciones.
@@ -130,26 +130,26 @@
 
 ### T10 [P] — `delete-user-dialog.tsx` *(depende de T6)*
 
-- [ ] Confirmación que **nombra** al usuario; `id` como campo oculto; error dentro del diálogo por
+- [x] Confirmación que **nombra** al usuario; `id` como campo oculto; error dentro del diálogo por
       su `code`, diálogo abierto, fila intacta.
-- [ ] Tests: sin confirmar no se invoca la action; `self_operation` y `last_administrator` se pintan
+- [x] Tests: sin confirmar no se invoca la action; `self_operation` y `last_administrator` se pintan
       dentro y no retiran la fila.
 - **Hecho cuando**: pasan. **(R30, R31)**
 
 ### T11 [P] — `user-status-dialog.tsx` *(depende de T6)*
 
-- [ ] **Una** acción «Cambiar estado» con selector de los **cuatro** valores derivados de
+- [x] **Una** acción «Cambiar estado» con selector de los **cuatro** valores derivados de
       `USER_ACCOUNT_STATUSES` y confirmación; `id` + `accountStatus` en el `FormData`.
-- [ ] Tests: se ofrecen los cuatro valores y ninguno se excluye por el estado actual; no hay botones
+- [x] Tests: se ofrecen los cuatro valores y ninguno se excluye por el estado actual; no hay botones
       por verbo; `blocked → active` se ofrece igual; el rechazo se pinta dentro y **no** cambia el
       estado pintado en la fila.
 - **Hecho cuando**: pasan. **(R32, R33, R34)**
 
 ### T12 — Éxito, toast y refresco *(depende de T9, T10, T11)*
 
-- [ ] Cierre + toast + `router.refresh()` en las cuatro mutaciones; toast del alta **neutro**, sin
+- [x] Cierre + toast + `router.refresh()` en las cuatro mutaciones; toast del alta **neutro**, sin
       credencial ni enlace.
-- [ ] Test: en la zona privada hay **exactamente un** `<Toaster />`; tras un alta con éxito se
+- [x] Test: en la zona privada hay **exactamente un** `<Toaster />`; tras un alta con éxito se
       refresca sin cambiar la URL (los parámetros de lista sobreviven).
 - **Hecho cuando**: pasan. **(R28, R29)**
 

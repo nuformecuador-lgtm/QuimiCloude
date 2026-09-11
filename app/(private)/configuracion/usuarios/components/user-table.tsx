@@ -1,18 +1,23 @@
 'use client';
 
+import { PlusIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
   DataTable,
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import { Button } from '@/components/ui/button';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { RoleOption, UserRow } from '@/lib/modules/identity';
 
+import { DeleteUserDialog } from './delete-user-dialog';
 import { createUserColumns } from './user-columns';
 import { userListHref } from './user-list-params';
+import { UserSheet } from './user-sheet';
+import { UserStatusDialog } from './user-status-dialog';
 
 /**
  * La tabla de la lista de usuarios (R9, R12, R13, R14, R16, R21; `design.md > 6` y `> 7`).
@@ -46,14 +51,21 @@ import { userListHref } from './user-list-params';
  * no se desplaza y las acciones de fila siguen alcanzables con el scroll de la propia tabla.
  *
  * **Es la DUENA DEL ESTADO de las escrituras** (`design.md > 8` y `> 9`): monta **una** instancia
- * de cada panel y de cada dialogo para toda la pagina —no una por fila— y reparte los tres
- * disparadores a `createUserColumns`. Hoy el panel (T9) y los dos dialogos (T10, T11) todavia no
- * existen: lo que ya esta en pie es el estado que van a consumir.
+ * del panel y de cada dialogo para toda la pagina —no una por fila— y reparte los tres
+ * disparadores a `createUserColumns`. Cada uno se monta **solo mientras esta abierto**, asi que
+ * cada apertura arranca limpia y un rechazo anterior no reaparece.
+ *
+ * **R6, mitad cliente**: sin `usuarios.modificar` no se emite NINGUNA escritura —ni el disparador
+ * del alta, ni las acciones de fila, ni el panel, ni los dialogos—. Ocultarlas es comodidad de la
+ * interfaz y **no es el control**: quien autoriza es el caso de uso del modulo.
  *
  * **Todo llega por props** (R8): las filas, los parametros, el catalogo de roles y la decision de
  * R6. Aqui no se importa `lib/composition`, ni el cliente de base de datos, ni se lee la sesion, y
  * no se llama a ninguna Server Action: la lista la pidio el servidor.
  */
+
+/** `data-testid` del disparador del alta. Constante para que ningun test dependa del copy (R41). */
+export const USER_CREATE_OPEN_TESTID = 'user-create-open';
 
 /** Clave de persistencia del fijado de columnas. Una sola tabla en la pantalla, un solo id. */
 export const USER_TABLE_ID = 'usuarios';
@@ -66,6 +78,11 @@ export const USER_TABLE_TESTID = 'user-table';
  * no incrusta copy de ningun dominio. Ningun test afirma sobre estos literales (R41): los
  * controles se localizan por rol o por `data-testid`.
  */
+const TOUCH_TARGET = 'min-h-11 min-w-11';
+
+/** El copy del disparador del alta. Ningun test afirma sobre el (R41). */
+const CREATE_LABEL = 'Nuevo usuario';
+
 export const USER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay usuarios que mostrar.',
   loading: 'Cargando usuarios…',
@@ -126,10 +143,14 @@ export type UserTableProps = {
   readonly rolesError: ErrorState | null;
 };
 
-export function UserTable(props: UserTableProps) {
-  // `roles` y `rolesError` NO se desestructuran: siguen en `props` hasta que T9 monte el panel que
-  // los consume. Desestructurarlos ahora seria declarar dos variables muertas.
-  const { users, params, totalPages, canModify } = props;
+export function UserTable({
+  users,
+  params,
+  totalPages,
+  canModify,
+  roles,
+  rolesError,
+}: UserTableProps) {
   const router = useRouter();
 
   /**
@@ -138,6 +159,11 @@ export function UserTable(props: UserTableProps) {
    * quien, y llaman a `setPanel(null)` al cerrar.
    */
   const [panel, setPanel] = useState<UserPanel | null>(null);
+
+  /** Cerrar es siempre lo mismo: soltar el estado. Estable, para no rearmar los dialogos. */
+  const closePanel = useCallback((next: boolean) => {
+    if (!next) setPanel(null);
+  }, []);
 
   // Las columnas se rearman solo cuando cambia la decision de R6: los tres disparadores son
   // estables porque `setPanel` lo es.
@@ -152,19 +178,30 @@ export function UserTable(props: UserTableProps) {
     [canModify],
   );
 
+  // Se estrecha AQUI, no en el JSX: asi el compilador sabe que `panel` no es nulo al usarlo.
+  const sheetPanel =
+    panel !== null && (panel.mode === 'create' || panel.mode === 'edit') ? panel : null;
+  const deleteUser = panel !== null && panel.mode === 'delete' ? panel.user : null;
+  const statusUser = panel !== null && panel.mode === 'status' ? panel.user : null;
+
   return (
-    /*
-      `data-user-panel` es el SOPORTE PROVISIONAL del estado de escritura hasta que T9, T10 y T11
-      monten el panel y los dos dialogos que lo consumen: sin un consumidor, `panel` seria una
-      variable muerta y la decision no seria verificable. No revela nada —quien lo lee ya esta
-      viendo la fila— y desaparece en cuanto exista la primera instancia real.
-    */
-    <div
-      className="flex flex-col gap-4"
-      data-testid={USER_TABLE_TESTID}
-      data-user-panel={panel === null ? 'none' : panel.mode}
-      data-user-panel-target={panel?.user?.id ?? ''}
-    >
+    <div className="flex flex-col gap-4" data-testid={USER_TABLE_TESTID}>
+      {/* El alta (R6): sin `usuarios.modificar` este disparador no existe en el arbol servido. */}
+      {canModify ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="default"
+            className={TOUCH_TARGET}
+            data-testid={USER_CREATE_OPEN_TESTID}
+            onClick={() => setPanel({ mode: 'create', user: null })}
+          >
+            <PlusIcon aria-hidden="true" />
+            {CREATE_LABEL}
+          </Button>
+        </div>
+      ) : null}
+
       <DataTable
         tableId={USER_TABLE_ID}
         columns={columns}
@@ -176,6 +213,29 @@ export function UserTable(props: UserTableProps) {
         status="idle"
         texts={USER_TABLE_TEXTS}
       />
+
+      {/*
+        UNA instancia del panel para toda la pagina, y solo mientras esta abierto: asi el alta
+        arranca en blanco y la edicion vuelve a pedir la ficha en cada apertura (R22, R26).
+      */}
+      {sheetPanel === null ? null : (
+        <UserSheet
+          key={`${sheetPanel.mode}:${sheetPanel.user?.id ?? ''}`}
+          user={sheetPanel.user}
+          roles={roles}
+          rolesError={rolesError}
+          open
+          onOpenChange={closePanel}
+        />
+      )}
+
+      {deleteUser === null ? null : (
+        <DeleteUserDialog user={deleteUser} open onOpenChange={closePanel} />
+      )}
+
+      {statusUser === null ? null : (
+        <UserStatusDialog user={statusUser} open onOpenChange={closePanel} />
+      )}
     </div>
   );
 }
