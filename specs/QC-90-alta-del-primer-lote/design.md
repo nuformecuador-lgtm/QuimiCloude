@@ -188,10 +188,35 @@ Cambios acotados en `product-form.tsx` (R25, R27, R28):
 - Lo demás —`defaultValue` tras el rechazo, `key` de remontaje, ayuda de cada campo, orden— no se
   toca: ya está verificado y R28 solo pide que siga siendo cierto con los campos viajando.
 
-**Multiplataforma** (`docs/architecture.md > Componentes > Regla: multiplataforma`): no entra
-ningún control nuevo. Los dos costos siguen siendo `type="text"` con `inputMode="decimal"` —lo que
-además evita el `type="number"` sobre un importe—, los objetivos táctiles siguen en `min-h-11` y el
-texto de campo en `text-base`. **No hay excepción de escritorio que declarar.**
+**Multiplataforma** (`docs/architecture.md > Componentes > Regla: multiplataforma`).
+
+Los dos costos siguen siendo `type="text"` con `inputMode="decimal"` —lo que además evita el
+`type="number"` sobre un importe—, y el texto de campo sigue en `text-base`.
+
+**CORREGIDO EL 2026-09-10, tras el rechazo del reviewer (hallazgo M1).** Este párrafo decía «no
+entra ningún control nuevo … **no hay excepción de escritorio que declarar**». Era cierto cuando se
+escribió y **dejó de serlo con T0**, la task que se añadió sobre la marcha para desbloquear el
+typecheck: T0 metió en `components/shared/presentation-select.tsx` un **control nuevo** —el
+disparador de la ayuda de Presentación, un `<button type="button">` que abre su `Tooltip`— y nadie
+volvió a mirar este párrafo. El reviewer lo cazó midiendo el botón: `size-6`, o sea 24×24 px,
+cuando la regla exige 44×44.
+
+**No se declara excepción: se cumple la regla.** Decisión del humano del 2026-09-10. El disparador
+pasa a `TOUCH_TARGET` (`min-h-11 min-w-11`), la constante que el propio archivo ya define
+trescientas líneas más arriba, y **el disparador equivalente de `ProductField`
+(`app/(private)/inventario/components/product-field.tsx`) recibe el mismo trato**, aunque la regla
+de alcance lo eximiría por ser anterior: los dos iconos de ayuda viven en el **mismo panel** y
+dejarlos con tamaños distintos es peor que el problema que se venía a arreglar. El icono dibujado
+sigue siendo `size-4`; lo que crece es el blanco de toque.
+
+Los dos llevan **caso de test del tamaño**, con el mismo patrón que los otros disparadores
+compartidos del repo (`tests/unit/shared/data-table-header-menu.test.tsx`, «el disparador cumple el
+objetivo tactil minimo»): sin test, la clase se cae en el siguiente refactor y nadie se entera.
+
+**Lección que se lleva esta ficha, y es la que importa:** una task añadida sobre la marcha —T0— no
+pasó por la revisión de multiplataforma que sí pasaron las tasks del plan, porque el párrafo que la
+habría cazado ya estaba escrito y dado por bueno. Cuando entra una task fuera del plan, este
+párrafo hay que releerlo.
 
 ## 9. Autorización y aislamiento
 
