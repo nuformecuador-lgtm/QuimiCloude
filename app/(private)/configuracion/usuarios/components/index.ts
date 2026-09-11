@@ -13,8 +13,8 @@
 // `user-list-params.ts` —es la clave de `DataTableParams.filters`— y se publica solo desde ahi,
 // aunque `user-columns.tsx` tambien lo use.
 //
-// **Barrel PARCIAL a proposito**: hoy solo existen las piezas de T4, T5 y T6. T13 lo cierra con el
-// resto de componentes de la ruta.
+// **Barrel PARCIAL a proposito**: hoy existen las piezas de T4 a T8. T13 lo cierra con el panel
+// lateral y los dos dialogos de las escrituras.
 export {
   ACCOUNT_STATUS_COLUMN_ID,
   FILTER_SEPARATOR,
@@ -53,6 +53,29 @@ export {
   type UserColumnsDeps,
 } from './user-columns';
 export {
+  USER_LIST_CLEAR_SEARCH_TESTID,
+  USER_LIST_EMPTY_MESSAGE_TESTID,
+  USER_LIST_EMPTY_TESTID,
+  USER_LIST_FIRST_PAGE_TESTID,
+  UserListEmpty,
+  type UserListEmptyProps,
+} from './user-list-empty';
+export {
+  USER_LIST_ERROR_CODE_TESTID,
+  USER_LIST_ERROR_MESSAGE_TESTID,
+  USER_LIST_ERROR_TESTID,
+  USER_LIST_RETRY_TESTID,
+  UserListError,
+  type UserListErrorProps,
+} from './user-list-error';
+export { USER_LIST_TESTID, UserListSection, type UserListSectionProps } from './user-list-section';
+export {
+  USER_LIST_SKELETON_TESTID,
+  USER_ROW_SKELETON_TESTID,
+  USER_SKELETON_COLUMN_COUNT,
+  UserListSkeleton,
+} from './user-list-skeleton';
+export {
   USER_ACTION_DELETE_TESTID,
   USER_ACTION_EDIT_TESTID,
   USER_ACTION_STATUS_TESTID,
@@ -61,3 +84,12 @@ export {
   type UserRowActionHandler,
   type UserRowActionsProps,
 } from './user-row-actions';
+export {
+  USER_TABLE_ID,
+  USER_TABLE_TESTID,
+  USER_TABLE_TEXTS,
+  UserTable,
+  type UserPanel,
+  type UserPanelMode,
+  type UserTableProps,
+} from './user-table';

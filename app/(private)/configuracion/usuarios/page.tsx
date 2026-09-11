@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 import { identity } from '@/lib/composition';
 import { assertPermission } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL, USERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
-import { USERS_TITLE_TESTID } from './components';
+import {
+  USERS_TITLE_TESTID,
+  UserListSection,
+  UserListSkeleton,
+  buildUserListQuery,
+  parseUserListParams,
+  type UserListSearchParams,
+} from './components';
 
 export const metadata: Metadata = {
   title: `${USERS_LABEL} · ${BRAND_LABEL}`,
@@ -71,28 +79,41 @@ async function canModifyUsers(): Promise<boolean> {
  * `boolean` por props (R8); ellos no leen la sesion, no importan el punto de composicion y no se
  * buscan los datos por su cuenta.
  *
+ * **El estado de lista vive en la cadena de consulta, no en React** (`design.md > 5`, alternativa
+ * G descartada): asi recargar, compartir el enlace o cerrar el panel lateral conserva pagina,
+ * tamano, orden, filtro y busqueda (R22). `searchParams` es una `Promise`, como pide el App
+ * Router, y **se resuelve DESPUES del corte**: el permiso se exige antes de mirar siquiera la URL.
+ *
+ * **La `key` del `<Suspense>` es lo que hace reaparecer el esqueleto en CADA cambio** de pagina,
+ * tamano, orden, filtro o busqueda (R19). Sin ella, Next reutiliza el limite y el usuario se queda
+ * mirando el resultado anterior sin ninguna senal de que algo esta en vuelo.
+ *
  * **La marca y la etiqueta llegan IMPORTADAS**, nunca escritas a mano: el nombre de la pantalla es
  * el mismo dato que pinta su item del menu.
  */
-export default async function UsuariosPage() {
+export default async function UsuariosPage({
+  searchParams,
+}: {
+  searchParams: Promise<UserListSearchParams>;
+}) {
   await requirePagePermission('usuarios.consultar');
 
   const canModify = await canModifyUsers();
+  const params = parseUserListParams(await searchParams);
 
   return (
-    /* `data-can-modify` es el SOPORTE PROVISIONAL de la decision de R6 hasta que T7 traiga la
-       seccion de lista que la recibe por props: sin un consumidor, `canModify` seria una variable
-       muerta que el lint tumba y la decision no seria verificable. No revela nada —quien la lee ya
-       tiene la sesion— y desaparece en T7, cuando el booleano viaje a <UserListSection>. */
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6" data-can-modify={String(canModify)}>
+    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 data-testid={USERS_TITLE_TESTID} className="text-2xl font-semibold">
           {USERS_LABEL}
         </h1>
       </div>
-      {/* QC-67 T7 — aqui entra <UserListSection>, envuelta en el <Suspense> cuya `key` son los
-          parametros de lista de T4 y con `canModify` por props. Hasta entonces la pantalla se
-          sirve con su cabecera y nada mas: el corte por permiso de T3 ya es real. */}
+      <Suspense
+        key={buildUserListQuery(params)}
+        fallback={<UserListSkeleton rows={params.pageSize} />}
+      >
+        <UserListSection params={params} canModify={canModify} />
+      </Suspense>
     </div>
   );
 }

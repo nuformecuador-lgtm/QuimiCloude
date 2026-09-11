@@ -92,22 +92,22 @@
 
 ### T7 — `user-list-section.tsx` + los tres estados *(depende de T3, T4, T5)*
 
-- [ ] `Promise.all([listUsersAction(params), listRolesAction()])`; el primero decide el estado de
+- [x] `Promise.all([listUsersAction(params), listRolesAction()])`; el primero decide el estado de
       la pantalla, el segundo se **degrada** (la lista se pinta, el panel recibe el error de roles).
-- [ ] Vacío (con «limpiar búsqueda» y «volver a la primera página» según proceda), cargando
+- [x] Vacío (con «limpiar búsqueda» y «volver a la primera página» según proceda), cargando
       (esqueleto vía `key` del `<Suspense>`) y error (mensaje devuelto + reintentar).
-- [ ] Tests: los tres estados; `unauthorized` en el listado → estado de error **sin un solo dato**;
+- [x] Tests: los tres estados; `unauthorized` en el listado → estado de error **sin un solo dato**;
       fallo de roles → la lista **sí** se pinta; los parámetros se pasan **enteros y sin traducir**
       a `listUsersAction`.
 - **Hecho cuando**: pasan. **(R7, R18, R19, R24 degradado)**
 
 ### T8 — `user-table.tsx` *(depende de T6, T7)*
 
-- [ ] `<DataTable>` por el barrel público, `status: 'idle'` siempre, navegación por URL con
+- [x] `<DataTable>` por el barrel público, `status: 'idle'` siempre, navegación por URL con
       `userListHref`, selector 10/25 y paginación.
-- [ ] Test `data-table-intacta-usuarios.test.ts`: ningún archivo de
+- [x] Test `data-table-intacta-usuarios.test.ts`: ningún archivo de
       `components/shared/data-table/` cambia respecto a `dev`.
-- [ ] Tests: cambiar búsqueda, filtro, orden, tamaño o página **navega** (no filtra en cliente).
+- [x] Tests: cambiar búsqueda, filtro, orden, tamaño o página **navega** (no filtra en cliente).
 - **Hecho cuando**: pasan. **(R9, R12, R13, R14, R16)**
 
 ## Bloque 4 — Escrituras

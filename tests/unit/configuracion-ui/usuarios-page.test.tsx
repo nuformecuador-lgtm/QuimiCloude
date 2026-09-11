@@ -17,15 +17,38 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { USERS_TITLE_TESTID } from '@/app/(private)/configuracion/usuarios/components';
+import {
+  USERS_TITLE_TESTID,
+  USER_ROW_ACTIONS_TESTID,
+} from '@/app/(private)/configuracion/usuarios/components';
 import UsuariosPage from '@/app/(private)/configuracion/usuarios/page';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import { PERMISSIONS, type UserRow } from '@/lib/modules/identity';
+import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { LOGIN_ROUTE_SESSION_ENDED, USERS_ROUTE } from '@/lib/shared/routes';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { getSessionUserMock, notFoundMock, redirectMock } = vi.hoisted(() => ({
+const {
+  getSessionUserMock,
+  listUsersActionMock,
+  listRolesActionMock,
+  notFoundMock,
+  redirectMock,
+  routerMock,
+} = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
+  listUsersActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
+  listRolesActionMock: vi.fn<() => Promise<unknown>>(),
+  routerMock: {
+    push: vi.fn<(href: string) => void>(),
+    replace: vi.fn<(href: string) => void>(),
+    refresh: vi.fn<() => void>(),
+    back: vi.fn<() => void>(),
+    forward: vi.fn<() => void>(),
+    prefetch: vi.fn<(href: string) => void>(),
+  },
   // `notFound()` y `redirect()` estan tipadas `(): never` y LANZAN. Los dobles hacen lo mismo: si
   // no lanzaran, el corte seguiria ejecutandose y el test mediria otra cosa.
   notFoundMock: vi.fn<() => never>(() => {
@@ -38,12 +61,33 @@ const { getSessionUserMock, notFoundMock, redirectMock } = vi.hoisted(() => ({
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
+  useRouter: () => routerMock,
   notFound: notFoundMock,
   redirect: redirectMock,
 }));
 
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+}));
+
+// Las SEIS actions de usuarios. Las cuatro de escritura son dobles que FALLAN si se les llama:
+// pintar la lista no muta nada.
+vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
+  const noDebeInvocarse = (nombre: string) => () => {
+    throw new Error(`${nombre} no debe invocarse al pintar la lista`);
+  };
+  return {
+    listUsersAction: listUsersActionMock,
+    getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
+    createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
+    updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
+    deleteUserAction: vi.fn(noDebeInvocarse('deleteUserAction')),
+    setUserAccountStatusAction: vi.fn(noDebeInvocarse('setUserAccountStatusAction')),
+  };
+});
+
+vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
+  listRolesAction: listRolesActionMock,
 }));
 
 const RAIZ = join(__dirname, '..', '..', '..');
@@ -75,13 +119,81 @@ function sesionCon(permissions: readonly string[]) {
   };
 }
 
+/** Una fila cualquiera: lo que la pantalla haga con ella depende SOLO de `canModify` (R6). */
+const FILA: UserRow = {
+  id: '11111111-1111-4111-8111-111111111111',
+  displayName: 'Lopez Perez, Ana',
+  username: 'ana.lopez',
+  email: 'ana.lopez@example.com',
+  roleName: 'Operador',
+  accountStatus: 'active',
+};
+
+function paginaCon(items: readonly UserRow[]) {
+  return {
+    status: 'success',
+    data: { items, total: items.length, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
+  };
+}
+
+/**
+ * Resuelve los Server Components `async` del arbol antes de entregarselo al renderer de cliente.
+ *
+ * **No es un atajo, es una limitacion real del entorno**: `react-dom` en jsdom no sabe ejecutar un
+ * componente `async` —se queda suspendido para siempre—, asi que sin esto la lista no llegaria a
+ * pintarse nunca. Lo que se conserva es el arbol REAL de `page.tsx`: la `<Suspense>`, su `key` y
+ * su `fallback` siguen siendo los que declara la pagina. Copiado de `unit-page.test.tsx`.
+ */
+async function resolverServerComponents(nodo: ReactNode): Promise<ReactNode> {
+  if (Array.isArray(nodo)) {
+    return Promise.all((nodo as ReactNode[]).map((hijo) => resolverServerComponents(hijo)));
+  }
+  if (!isValidElement(nodo)) return nodo;
+
+  const elemento = nodo as ReactElement<{ children?: ReactNode }>;
+  const tipo = elemento.type;
+
+  if (typeof tipo === 'function' && tipo.constructor.name === 'AsyncFunction') {
+    const producido = await (tipo as (props: unknown) => Promise<ReactNode>)(elemento.props);
+    return resolverServerComponents(producido);
+  }
+
+  const hijos = elemento.props.children;
+  if (hijos === undefined) return elemento;
+
+  const resueltos = await resolverServerComponents(hijos);
+
+  return Array.isArray(resueltos)
+    ? cloneElement(elemento, undefined, ...(resueltos as ReactNode[]))
+    : cloneElement(elemento, undefined, resueltos);
+}
+
+type Consulta = Record<string, string | string[] | undefined>;
+
+/** Arbol que devuelve la pagina real, sin resolver: la seccion sigue siendo `async`. */
+async function arbolDeLaPantalla(searchParams: Consulta = {}) {
+  return UsuariosPage({ searchParams: Promise.resolve(searchParams) });
+}
+
+/** Monta la pantalla con la lista ya resuelta. */
+async function renderPantalla(searchParams: Consulta = {}) {
+  return render(await resolverServerComponents(await arbolDeLaPantalla(searchParams)));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
+  // jsdom no implementa `window.matchMedia`, que la tabla compartida usa. Se stubea con el helper
+  // HEREDADO (`tests/helpers/viewport.ts`), nunca con una copia local (R39).
+  setViewportWidth(WIDE_VIEWPORT);
   getSessionUserMock.mockResolvedValue(sesionCon(CODIGOS_DE_USUARIOS));
+  listUsersActionMock.mockResolvedValue(paginaCon([FILA]));
+  listRolesActionMock.mockResolvedValue({ status: 'success', data: [] });
 });
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('ancla: el catalogo declara los dos codigos que este archivo usa', () => {
@@ -100,7 +212,7 @@ describe('la pantalla vive en la ruta DERIVADA de la constante (R1)', () => {
 
 describe('la pantalla NO declara armazon propio: lo hereda del layout privado (R1, R39)', () => {
   it('no monta ningun landmark principal, ni barra lateral, ni cabecera de aplicacion', async () => {
-    render(await UsuariosPage());
+    await renderPantalla();
 
     expect(screen.queryByRole('main')).toBeNull();
     expect(screen.queryByRole('navigation')).toBeNull();
@@ -120,7 +232,7 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
   it('sin sesion redirige al login, y NO responde 404: un anonimo no recibe 404', async () => {
     getSessionUserMock.mockResolvedValue(null);
 
-    await expect(UsuariosPage()).rejects.toThrow();
+    await expect(arbolDeLaPantalla()).rejects.toThrow();
 
     expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
     expect(notFoundMock).not.toHaveBeenCalled();
@@ -131,7 +243,7 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
     // `consultar`, y este caso es lo que lo demuestra en la pantalla.
     getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_ESCRITURA]));
 
-    await expect(UsuariosPage()).rejects.toThrow();
+    await expect(arbolDeLaPantalla()).rejects.toThrow();
 
     expect(notFoundMock).toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();
@@ -140,7 +252,7 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
   it('con una sesion sin ningun permiso responde 404 igual: falla cerrado', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon([]));
 
-    await expect(UsuariosPage()).rejects.toThrow();
+    await expect(arbolDeLaPantalla()).rejects.toThrow();
 
     expect(notFoundMock).toHaveBeenCalled();
   });
@@ -148,7 +260,7 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
   it('con `usuarios.consultar` la pantalla se sirve y pinta su cabecera', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_CONSULTA]));
 
-    render(await UsuariosPage());
+    await renderPantalla();
 
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();
@@ -158,7 +270,7 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
   it('el titulo se identifica por la constante exportada, no por un literal (R41)', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_CONSULTA]));
 
-    render(await UsuariosPage());
+    await renderPantalla();
 
     expect(screen.getByRole('heading', { level: 1 })).toBe(screen.getByTestId(USERS_TITLE_TESTID));
     // Y la pagina NO escribe el identificador a mano: lo importa del barrel de la ruta (R38).
@@ -195,20 +307,24 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R4)', () => {
 });
 
 describe('`canModify` sale de assertPermission y de nada mas (R6, R8)', () => {
-  it('con `usuarios.modificar` la decision es afirmativa', async () => {
+  // Desde T7 la decision tiene CONSUMIDOR REAL: baja por props hasta la celda de acciones, asi que
+  // se afirma sobre lo que R6 promete —que se emite y que no se emite en el HTML servido— y ya no
+  // sobre un atributo provisional en el contenedor de la pagina.
+  it('con `usuarios.modificar` las acciones de fila se emiten', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(CODIGOS_DE_USUARIOS));
 
-    const { container } = render(await UsuariosPage());
+    await renderPantalla();
 
-    expect(container.querySelector('[data-can-modify="true"]')).not.toBeNull();
+    expect(screen.getByTestId(USER_ROW_ACTIONS_TESTID)).toBeInTheDocument();
   });
 
-  it('sin `usuarios.modificar` la decision es negativa, pero la pantalla se sirve', async () => {
+  it('sin `usuarios.modificar` no se emite ninguna escritura, pero la pantalla se sirve', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_CONSULTA]));
 
-    const { container } = render(await UsuariosPage());
+    await renderPantalla();
 
-    expect(container.querySelector('[data-can-modify="false"]')).not.toBeNull();
+    // Ni disparador, ni boton deshabilitado, ni panel, ni dialogo: nada en el arbol servido (R6).
+    expect(screen.queryByTestId(USER_ROW_ACTIONS_TESTID)).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(notFoundMock).not.toHaveBeenCalled();
   });

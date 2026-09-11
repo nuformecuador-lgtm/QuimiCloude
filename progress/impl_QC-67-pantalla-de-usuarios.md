@@ -103,6 +103,54 @@ dueno del estado pasa a ser la tabla, que monta **una** instancia de cada panel 
 pagina en lugar de 10 o 25. Los manejadores son opcionales hoy y T9-T11 los enchufan sin
 reescribir el componente.
 
+### Bloque 3 — T7, T8
+
+**Creados**
+
+- `.../components/user-list-section.tsx` — Server Component `async` con
+  `Promise.all([listUsersAction(params), listRolesAction()])`, ambas importadas **por su ruta
+  exacta**. El listado decide el estado de la pantalla; **la consulta de roles se degrada**: si
+  falla, la lista se pinta igual y el `ErrorState` viaja al panel, que no inventara opciones
+  (R24). Los parametros se pasan **enteros y sin traducir**: `DataTableParams` es campo a campo
+  `ListQuery`, y el esquema es `strictObject`
+- `.../components/user-list-empty.tsx` — vacio identificable, con «limpiar» (busqueda y filtro a
+  la vez) y «volver a la primera pagina» segun proceda, con los href de `userListHref` (R18)
+- `.../components/user-list-error.tsx` — mensaje DEVUELTO por la action + reintentar; con
+  `unexpected`, `UnexpectedErrorNotice` de QC-71. Nunca una tabla vacia como si no hubiera
+  usuarios (R19)
+- `.../components/user-list-skeleton.tsx` — el indicador de carga que la `key` del `<Suspense>`
+  hace reaparecer en cada cambio de parametros (R19)
+- `.../components/user-table.tsx` — `'use client'`, `<DataTable>` por el barrel publico con
+  `status: 'idle'` siempre, navegacion por URL con `userListHref`: buscar, filtrar, ordenar,
+  cambiar tamano o pagina **navega**, nunca se filtra ni se reordena en el cliente (R9, R12, R13,
+  R14, R16)
+- `tests/unit/configuracion-ui/user-list-section.test.tsx`, `user-list-empty.test.tsx`,
+  `user-table.test.tsx`, `data-table-intacta-usuarios.test.ts`
+
+**Modificados**
+
+- `.../page.tsx` — declara `searchParams`, resuelve `parseUserListParams` **despues** del corte
+  por permiso, monta el `<Suspense>` con su `key`, y **retira el `data-can-modify` provisional**:
+  el booleano ya viaja por props a su consumidor real (R8)
+- `.../components/index.ts` — barrel ampliado
+- `tests/unit/configuracion-ui/usuarios-page.test.tsx` — los dos casos de `canModify` quedan
+  **TENSADOS**: ya no miran un atributo de soporte, sino el consumidor real (con
+  `usuarios.modificar` se emiten las acciones de fila; sin el, no se emite nada). Ganan alcance
+
+**Tres notas para el reviewer.**
+
+1. La tabla compartida **no vuelve a la pagina 1 al cambiar la busqueda** (si al cambiar el
+   tamano). El test refleja el comportamiento REAL y no se toco nada compartido: R12 solo exige
+   repedir la lista al servidor sobre el conjunto entero, cosa que se cumple. Si se quisiera el
+   reset, es una decision nueva y su ficha, no un arreglo de esta.
+2. El resolutor de Server Components `async` en jsdom es ya la **tercera copia** del repo
+   (`presentation-page`, `unit-page`, `usuarios-page`). No se extrajo a `tests/helpers/` porque
+   R39 prohibe tocar utilidades heredadas sin ficha que lo respalde. Queda anotado como deuda con
+   nombre.
+3. `user-table.tsx` transporta ya `roles` y `rolesError` y monta **una** instancia de panel para
+   toda la pagina (`useState<UserPanel | null>`), no una por fila. Lleva un `data-user-panel`
+   provisional que T9-T11 retiran al enchufar los componentes reales.
+
 ## Mapa `R<n> -> test`
 
 (se rellena al cierre, con los nombres reales de archivo)

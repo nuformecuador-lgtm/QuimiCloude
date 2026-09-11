@@ -1,0 +1,80 @@
+import Link from 'next/link';
+
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+/**
+ * Estado vacio de la lista de usuarios (R18, `design.md > 6`).
+ *
+ * **Es el vacio de «la busqueda no encontro nada»**, que es lo unico que puede significar aqui:
+ * la pantalla la sirve una sesion valida, o sea que **siempre existe al menos un usuario** —el
+ * actor—, y el actor no se ve a si mismo en su propio listado (R11). Llegar a este estado
+ * significa por fuerza que el termino, el filtro o la pagina no encontraron nada; ofrecer «crea el
+ * primero» seria decirle al usuario algo falso sobre el estado del catalogo.
+ *
+ * **Y por la misma razon no se anuncia que falte nadie** (R11): la ausencia del actor no se
+ * compensa, ni con una fila, ni con un aviso.
+ *
+ * Las dos salidas que si son utiles, y solo cuando aplican:
+ *
+ * - **limpiar** el termino de busqueda y el filtro de estado, si habia alguno activo;
+ * - **volver a la primera pagina**, si la pedida era mayor que el total.
+ *
+ * **Las dos son `<Link>` reales pintados con `buttonVariants`**, no el primitivo `Button` con
+ * `render`: lo que hacen es navegar. Pasar un enlace por el boton de Base UI dispara su aviso de
+ * `nativeButton` y acaba poniendole `role="button"` al `<a>`, que es mentir sobre lo que el
+ * control hace. `data-slot="button"` se conserva porque de el cuelgan los selectores de estilo. El
+ * area tactil se fuerza a >= 44x44 px (R40).
+ *
+ * **Los dos destinos se derivan de `USERS_ROUTE`** a traves de `userListHref` (R1): aqui no se
+ * escribe ninguna URL.
+ */
+
+export const USER_LIST_EMPTY_TESTID = 'user-list-empty';
+export const USER_LIST_EMPTY_MESSAGE_TESTID = 'user-list-empty-message';
+export const USER_LIST_CLEAR_SEARCH_TESTID = 'user-list-clear-search';
+export const USER_LIST_FIRST_PAGE_TESTID = 'user-list-first-page';
+
+export type UserListEmptyProps = {
+  /** Destino sin termino y sin filtro, presente **solo** si habia alguno activo (R18). */
+  readonly clearSearchHref?: string;
+  /** Destino a la primera pagina, presente **solo** si la pedida era mayor que el total (R18). */
+  readonly firstPageHref?: string;
+};
+
+export function UserListEmpty({ clearSearchHref, firstPageHref }: UserListEmptyProps) {
+  return (
+    <div
+      data-testid={USER_LIST_EMPTY_TESTID}
+      className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center"
+    >
+      <p className="text-sm text-muted-foreground" data-testid={USER_LIST_EMPTY_MESSAGE_TESTID}>
+        {clearSearchHref === undefined
+          ? 'No hay usuarios que coincidan con lo que se está pidiendo.'
+          : 'La búsqueda no encontró ningún usuario.'}
+      </p>
+
+      {clearSearchHref === undefined ? null : (
+        <Link
+          href={clearSearchHref}
+          data-slot="button"
+          data-testid={USER_LIST_CLEAR_SEARCH_TESTID}
+          className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+        >
+          Limpiar la búsqueda
+        </Link>
+      )}
+
+      {firstPageHref === undefined ? null : (
+        <Link
+          href={firstPageHref}
+          data-slot="button"
+          data-testid={USER_LIST_FIRST_PAGE_TESTID}
+          className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+        >
+          Volver a la primera página
+        </Link>
+      )}
+    </div>
+  );
+}
