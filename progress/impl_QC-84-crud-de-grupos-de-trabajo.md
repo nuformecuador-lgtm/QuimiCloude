@@ -782,3 +782,83 @@ midiendo exactamente lo que miden hoy. Es el mismo retensado que QC-67 le hizo a
 RANGO, y falta el SUJETO.
 
 **Queda a decision del leader**: es tocar guardias de una ficha ajena ya mergeada.
+
+## Los dos rojos ajenos, ARREGLADOS por decision del humano (commit `c631118`, aparte)
+
+El humano decidio arreglarlos desde esta rama, **en un commit propio y separado** del trabajo de la
+feature. Queda anotado aqui entero porque es trabajo sobre guardias de una **ficha ajena ya
+mergeada** y el PR tiene que poder explicarlo.
+
+### Los archivos y los casos
+
+| Archivo | Casos afectados | Requisitos que vigila |
+| --- | --- | --- |
+| `tests/unit/configuracion-ui/usuarios-convenciones.test.ts` | los **4** del bloque R37 | R37 de **QC-67** |
+| `tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts` | los **2** del bloque R9/R37 | R9 y R37 de **QC-67** |
+
+### Por que era de ellos y no mio
+
+`1a9e2c4` (de QC-67) arreglo el **RANGO** de estos centinelas —merge-base en vez de un SHA
+congelado— y dejo pendiente el **SUJETO**: seguian sin comprobar **que rama** estaban midiendo.
+Mientras QC-67 vivia en su worktree no se notaba; **en cuanto se mergeo en `dev`, empezaron a medir
+cualquier rama con las reglas de alcance de QC-67**.
+
+Dos sintomas, y **solo uno lo provoca QC-84**:
+
+1. **`usuarios-convenciones` R37 acusaba a QC-84 de abrir `identity`**, enumerando sus quince
+   archivos. Pero el alcance **aprobado** de QC-84 es precisamente `lib/modules/identity/**`: el
+   centinela no detectaba una infraccion, **media a quien no debia**. Este si lo destapa QC-84.
+2. **Las anclas de no-vacuidad de los dos fallaban**, y **son anteriores a esta rama**: comprobado
+   calculando su mismo rango con `HEAD` en la punta de `dev`, el diff sale de **0 archivos**, asi
+   que **fallan igual corriendo el gate sobre `dev`** y en cualquier rama que no toque la carpeta de
+   la pantalla de usuarios.
+
+### Que se hizo, y que NO
+
+Se les anadio la **precondicion de rama** con **la forma que ya usa su centinela hermano**
+`tests/unit/identity/account-status-scope.test.ts`, que lleva la regla escrita en su cabecera:
+*«aplicarlas a otra rama no mide nada, solo pone en rojo trabajo legitimo ajeno»*. **Se copio esa
+forma en vez de inventar una segunda**: que el repo tenga dos maneras de decir lo mismo es la mitad
+del problema que se estaba arreglando. La senal es **conjuntiva** —`page.tsx` de la pantalla **mas**
+`specs/QC-67-pantalla-de-usuarios/`— y fuera de su rama los casos quedan **`skipped` con el motivo
+escrito, nunca verdes**.
+
+**No se relajo ni una asercion, y el diff lo respalda**: **141 inserciones y 2 supresiones**, y las
+dos supresiones son la linea de `import` a la que se le anade `type TestContext`. Ninguna lista
+cerrada, ninguna igualdad y ningun `expect` se tocaron. Tampoco cambiaron los finales de linea
+(`git diff` y `git diff --ignore-cr-at-eol` dan el mismo recuento).
+
+### La mutacion que lo prueba, en sus DOS mitades
+
+Sin la segunda mitad, el «arreglo» podria ser un apagado con otro nombre:
+
+| Mitad | Que se hizo | Resultado |
+| --- | --- | --- |
+| **1. Fuera de su rama** | correr los dos en la rama de QC-84 | los **6** casos `skipped` **citando su motivo**; los otros **22** del par siguen vigilando |
+| **2. En su rama** | tocar `page.tsx` y `specs/QC-67-.../tasks.md` para satisfacer **las dos** senales | los casos **vuelven a correr**: R37 se pone **ROJA** al instante contra los quince archivos de `identity` |
+| **2b. Con violacion real** | ademas, una linea en `components/ui/alert-dialog.tsx` | `data-table-intacta-usuarios` se pone **ROJA** nombrando el archivo: `QC-67 modifico archivos intocables: components/ui/alert-dialog.tsx` |
+| **2c. Las anclas** | con la senal satisfecha | las de no-vacuidad pasan a **verde**, porque ya hay sujeto que medir (27 pasados frente a 22) |
+
+Todo revertido despues; el arbol quedo limpio salvo los dos centinelas.
+
+### Verificacion
+
+```
+$ pnpm run typecheck   -> sin salida (verde)
+$ pnpm run lint        -> sin salida (verde)
+$ vitest run tests/unit/configuracion-ui + grupos + account-status-scope
+                       + catalogo + identity-facade
+ Test Files  54 passed (54)
+      Tests  860 passed | 9 skipped (869)
+```
+
+## Migraciones, confirmado con el numero y no de memoria
+
+```
+$ pnpm exec prisma migrate status
+Datasource "db": PostgreSQL database "QuimiCloude_QC84", schema "public" at "localhost:5432"
+25 migrations found in prisma/migrations
+Database schema is up to date!
+```
+
+**25 migraciones, 0 pendientes** sobre `QuimiCloude_QC84`.
