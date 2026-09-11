@@ -1103,6 +1103,14 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // queda intacta. La lista sigue CERRADA: una constante mas sin ficha que la respalde
         // vuelve a poner esto en rojo.
         'UNITS_ROUTE',
+        // La trae QC-67 (R1) el 2026-09-11, la pantalla de administracion de usuarios: es la ruta
+        // de UNA PANTALLA real -con su `app/(private)/configuracion/usuarios/page.tsx` en disco- y
+        // vive aqui porque la lista de prefijos privados (R5) y el item de navegacion (R2, R3)
+        // tienen que derivarse de la misma constante. Nada que ver con el asistente de lectura:
+        // `USERS_ROUTE` no encaja en el patron `alude` de arriba, que se sigue aplicando a TODAS
+        // las declaraciones del archivo. La lista sigue CERRADA: una constante mas sin ficha que la
+        // respalde vuelve a poner esto en rojo.
+        'USERS_ROUTE',
         'recipeEditRoute',
         'supplierDetailRoute',
       ].sort(),

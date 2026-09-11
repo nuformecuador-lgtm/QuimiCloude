@@ -6,6 +6,7 @@ import {
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
   UNITS_ROUTE,
+  USERS_ROUTE,
 } from '../routes';
 
 /**
@@ -94,6 +95,15 @@ export const PRESENTATIONS_LABEL = 'Presentaciones';
  */
 export const UNITS_LABEL = 'Unidades';
 
+/**
+ * Etiqueta del sidebar para la pantalla de administracion de usuarios (QC-67, R2).
+ *
+ * `USERS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay codigo
+ * previo que la importara de este archivo, asi que no hay compatibilidad que sostener. Mismo
+ * criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL` y `UNITS_LABEL`.
+ */
+export const USERS_LABEL = 'Usuarios';
+
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
@@ -143,7 +153,13 @@ export type NavIconName =
   | 'truck'
   | 'factory'
   | 'flask-conical'
-  | 'boxes';
+  | 'boxes'
+  // QC-67 R2: el item de usuarios. Es el UNICO nombre que esta ficha anade, y se anade porque
+  // ninguno de los ocho anteriores habla de personas: reutilizar `package`, `boxes` o
+  // `flask-conical` para «Usuarios» seria un icono que miente, y ademas `boxes` y `flask-conical`
+  // ya estan tomados dentro de la MISMA seccion «Configuración». `lucide-react` ya esta instalado
+  // (no es dependencia nueva) y el `Record` de `NAV_ICONS` obliga a que su fila exista.
+  | 'users';
 
 export type NavLink = {
   readonly kind: 'link';
@@ -318,6 +334,32 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     testId: 'nav-unidades',
     permission: 'unidades.consultar',
     icon: 'flask-conical',
+    section: NAV_SECTION_CONFIGURATION,
+  },
+  // QC-67 R2, R3 — TERCER item de la seccion «Configuración», al final del array y sin tocar los
+  // dos que ya vivian dentro: la seccion la creo QC-45, QC-39 le anadio el segundo y esta ficha
+  // solo se da de alta en ella. No se crea una segunda seccion, no se renombra y no se reordena
+  // nada.
+  //
+  // **El permiso es `usuarios.consultar`, EL MISMO codigo que exige la pantalla** con
+  // `requirePagePermission` (`design.md > 3`). Aqui NO aplica la excepcion de QC-45 —que declaro
+  // `inventario.modificar` para que el Operador no viera un enlace que rebota— ni hace falta la
+  // contencion de QC-39, que exigia DOS codigos y declaraba uno: con un solo codigo a cada lado, el
+  // enlace y el 404 coinciden exactamente y nadie ve un enlace que le daria 404. Que item y pagina
+  // sigan diciendo lo mismo lo vigila
+  // `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`, que LEE el codigo de la fuente de
+  // `page.tsx` en vez de repetirlo aqui.
+  //
+  // El icono `users` SI es nuevo en `NavIconName` y en `NAV_ICONS`, a diferencia de sus dos
+  // hermanas: ninguno de los ocho existentes habla de personas y los dos de esta seccion (`boxes`,
+  // `flask-conical`) estan tomados. No entra ninguna dependencia: `lucide-react` ya estaba.
+  {
+    kind: 'link',
+    href: USERS_ROUTE,
+    label: USERS_LABEL,
+    testId: 'nav-usuarios',
+    permission: 'usuarios.consultar',
+    icon: 'users',
     section: NAV_SECTION_CONFIGURATION,
   },
 ];

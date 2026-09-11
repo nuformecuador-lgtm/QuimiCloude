@@ -23,34 +23,34 @@
 
 ### T1 — `USERS_ROUTE` + prefijo privado *(depende de T0)*
 
-- [ ] Añadir `USERS_ROUTE = '/configuracion/usuarios'` a `lib/shared/routes.ts`, con su comentario.
-- [ ] Añadir la fila correspondiente a `PRIVATE_ROUTE_PREFIXES`, **en el mismo commit**.
-- [ ] Crear `app/(private)/configuracion/usuarios/page.tsx` mínimo para que la guardia de rutas
+- [x] Añadir `USERS_ROUTE = '/configuracion/usuarios'` a `lib/shared/routes.ts`, con su comentario.
+- [x] Añadir la fila correspondiente a `PRIVATE_ROUTE_PREFIXES`, **en el mismo commit**.
+- [x] Crear `app/(private)/configuracion/usuarios/page.tsx` mínimo para que la guardia de rutas
       cubiertas tenga carpeta que comparar.
-- [ ] Test de contrato de ruta (`usuarios-route-contract.test.ts`): el `page.tsx` vive en
+- [x] Test de contrato de ruta (`usuarios-route-contract.test.ts`): el `page.tsx` vive en
       `app/(private)${USERS_ROUTE}/page.tsx` **derivado de la constante**, y la constante está en
       `PRIVATE_ROUTE_PREFIXES`.
 - **Hecho cuando**: `guard-rutas-privadas-cubiertas` verde y el test de contrato pasa. **(R1, R5)**
 
 ### T2 — El ítem de Usuarios en la sección Configuración *(depende de T1)*
 
-- [ ] `USERS_LABEL` y el **tercer** ítem de `NAV_SECTION_CONFIGURATION` en `private-nav.ts`, al
+- [x] `USERS_LABEL` y el **tercer** ítem de `NAV_SECTION_CONFIGURATION` en `private-nav.ts`, al
       final del array, con `permission: 'usuarios.consultar'` y `href: USERS_ROUTE`. Sin tocar los
       dos ítems existentes ni la etiqueta de la sección.
-- [ ] Test `private-nav-usuarios.test.ts`: el ítem existe, apunta a la constante, declara ese
+- [x] Test `private-nav-usuarios.test.ts`: el ítem existe, apunta a la constante, declara ese
       permiso, y la sección sigue teniendo sus tres ítems **en ese orden**.
-- [ ] Test de coherencia ítem↔página: el permiso del ítem es **el mismo** código que exige
+- [x] Test de coherencia ítem↔página: el permiso del ítem es **el mismo** código que exige
       `page.tsx`.
 - **Hecho cuando**: `guard-nav-permisos-declarados` y `guard-nav-serializable` siguen verdes.
   **(R2, R3)**
 
 ### T3 — Corte por permiso de la página y decisión `canModify` *(depende de T1)*
 
-- [ ] `page.tsx`: `await requirePagePermission('usuarios.consultar')` en la **primera** línea, antes
+- [x] `page.tsx`: `await requirePagePermission('usuarios.consultar')` en la **primera** línea, antes
       de resolver `searchParams`.
-- [ ] Resolver `canModify` con `identity.getSessionUser()` + `assertPermission(...)` —**nunca** un
+- [x] Resolver `canModify` con `identity.getSessionUser()` + `assertPermission(...)` —**nunca** un
       `permissions.includes(...)` a mano— y pasarlo por props.
-- [ ] Tests: sin sesión → redirige al login; con sesión sin `usuarios.consultar` → `notFound()`; con
+- [x] Tests: sin sesión → redirige al login; con sesión sin `usuarios.consultar` → `notFound()`; con
       el permiso → renderiza; el archivo **no** contiene ninguna comparación manual del conjunto de
       permisos.
 - **Hecho cuando**: los cuatro tests pasan. **(R4, R6 mitad servidor, R8)**
