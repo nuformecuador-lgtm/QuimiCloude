@@ -71,6 +71,9 @@ function formDataOf(fields: Record<string, string>): FormData {
   return formData;
 }
 
+/** QC-80: el uuid de unidad que viaja en el `FormData` con el nombre `unitId`. */
+const UNIDAD = '11111111-1111-4111-8111-111111111111';
+
 const CREATE_INITIAL: CreatePresentationFormState = { status: 'idle' };
 const MUTATION_INITIAL: PresentationMutationFormState = { status: 'idle' };
 
@@ -83,7 +86,7 @@ describe('createPresentationAction', () => {
   it('toma el actor de identity.getSessionUser() y se lo pasa al caso de uso (R1)', async () => {
     createPresentationMock.mockResolvedValue({ id: 'presentation-1' });
 
-    await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
+    await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon', unitId: UNIDAD }));
 
     expect(getSessionUserMock).toHaveBeenCalledTimes(1);
     const [, actor] = createPresentationMock.mock.calls[0] as [unknown, unknown];
@@ -93,7 +96,7 @@ describe('createPresentationAction', () => {
   it('devuelve exito con el id creado cuando el caso de uso resuelve', async () => {
     createPresentationMock.mockResolvedValue({ id: 'presentation-42' });
 
-    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon', unitId: UNIDAD }));
 
     expect(result).toEqual({ status: 'success', id: 'presentation-42' });
   });
@@ -101,7 +104,7 @@ describe('createPresentationAction', () => {
   it('traduce PresentationDuplicateNameError a su code estable (R18): a diferencia de producto, el nombre de presentacion es unico', async () => {
     createPresentationMock.mockRejectedValue(new PresentationDuplicateNameError());
 
-    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon', unitId: UNIDAD }));
 
     expect(result).toEqual({
       status: 'error',
@@ -116,7 +119,7 @@ describe('createPresentationAction', () => {
     // el mismo nombre normalizado vacio. Es la distincion de R37/D22 que solo aplica aqui.
     createPresentationMock.mockRejectedValue(new ValidationError());
 
-    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: '---' }));
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: '---', unitId: UNIDAD }));
 
     expect(result).toEqual({
       status: 'error',
@@ -136,7 +139,7 @@ describe('createPresentationAction', () => {
   it('traduce ValidationError a invalid_input', async () => {
     createPresentationMock.mockRejectedValue(new ValidationError());
 
-    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: '' }));
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: '', unitId: UNIDAD }));
 
     expect(result).toEqual({
       status: 'error',
@@ -155,7 +158,7 @@ describe('createPresentationAction', () => {
     const ajeno = new Error('fallo de infraestructura');
     createPresentationMock.mockRejectedValue(ajeno);
 
-    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon', unitId: UNIDAD }));
 
     expect(result).toEqual({
       status: 'error',
@@ -172,11 +175,44 @@ describe('createPresentationAction', () => {
     logSpy.mockRestore();
   });
 
+  it('pasa el unitId del FormData al caso de uso TAL CUAL, sin decidir nada (R10, R11)', async () => {
+    createPresentationMock.mockResolvedValue({ id: 'presentation-1' });
+
+    await createPresentationAction(
+      CREATE_INITIAL,
+      formDataOf({ name: 'Bidon 20 L', unitId: UNIDAD }),
+    );
+
+    expect(createPresentationMock).toHaveBeenCalledWith(
+      { name: 'Bidon 20 L', unitId: UNIDAD },
+      ADMIN_ACTOR,
+    );
+  });
+
+  it('no inventa ninguna unidad cuando el FormData no la trae: baja la cadena vacia (R10)', async () => {
+    // La action NO decide: no pone defecto, no omite el campo, no traduce. Quien rechaza la
+    // cadena vacia es `createPresentationSchema` dentro del caso de uso, y el rechazo vuelve
+    // como `{ code, message }`.
+    createPresentationMock.mockRejectedValue(new ValidationError());
+
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
+
+    expect(createPresentationMock).toHaveBeenCalledWith(
+      { name: 'Bidon', unitId: '' },
+      ADMIN_ACTOR,
+    );
+    expect(result).toEqual({
+      status: 'error',
+      code: 'invalid_input',
+      message: expect.any(String),
+    });
+  });
+
   it('traduce unauthorized cuando no hay sesion (falla cerrado, R3)', async () => {
     getSessionUserMock.mockResolvedValue(null);
     createPresentationMock.mockRejectedValue(new UnauthorizedError());
 
-    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon' }));
+    const result = await createPresentationAction(CREATE_INITIAL, formDataOf({ name: 'Bidon', unitId: UNIDAD }));
 
     const [, actor] = createPresentationMock.mock.calls[0] as [unknown, unknown];
     expect(actor).toBeNull();
@@ -191,14 +227,47 @@ describe('updatePresentationAction', () => {
     await updatePresentationAction(
       'presentation-1',
       MUTATION_INITIAL,
-      formDataOf({ name: 'Bidon 20 L' }),
+      formDataOf({ name: 'Bidon 20 L', unitId: UNIDAD }),
     );
 
     expect(updatePresentationMock).toHaveBeenCalledWith(
       'presentation-1',
-      { name: 'Bidon 20 L' },
+      { name: 'Bidon 20 L', unitId: UNIDAD },
       ADMIN_ACTOR,
     );
+  });
+
+  it('pasa el unitId del FormData a la edicion, que es reemplazo completo (R12)', async () => {
+    updatePresentationMock.mockResolvedValue(undefined);
+    const otra = '22222222-2222-4222-8222-222222222222';
+
+    await updatePresentationAction(
+      'presentation-1',
+      MUTATION_INITIAL,
+      formDataOf({ name: 'Bidon 20 L', unitId: otra }),
+    );
+
+    expect(updatePresentationMock).toHaveBeenCalledWith(
+      'presentation-1',
+      { name: 'Bidon 20 L', unitId: otra },
+      ADMIN_ACTOR,
+    );
+  });
+
+  it('devuelve el rechazo de la unidad como { code, message }, sin excepcion que se escape (R10, R12)', async () => {
+    updatePresentationMock.mockRejectedValue(new ValidationError());
+
+    const result = await updatePresentationAction(
+      'presentation-1',
+      MUTATION_INITIAL,
+      formDataOf({ name: 'Bidon 20 L', unitId: 'no-es-un-uuid' }),
+    );
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'invalid_input',
+      message: expect.any(String),
+    });
   });
 
   it('traduce PresentationDuplicateNameError al renombrar con un nombre normalizado ya usado por otra fila (R18)', async () => {
@@ -207,7 +276,7 @@ describe('updatePresentationAction', () => {
     const result = await updatePresentationAction(
       'presentation-1',
       MUTATION_INITIAL,
-      formDataOf({ name: 'Bidon 20 L' }),
+      formDataOf({ name: 'Bidon 20 L', unitId: UNIDAD }),
     );
 
     expect(result).toEqual({
@@ -223,7 +292,7 @@ describe('updatePresentationAction', () => {
     const result = await updatePresentationAction(
       'no-existe',
       MUTATION_INITIAL,
-      formDataOf({ name: 'Bidon' }),
+      formDataOf({ name: 'Bidon', unitId: UNIDAD }),
     );
 
     expect(result).toEqual({ status: 'error', code: 'presentation_not_found', message: expect.any(String) });
@@ -235,7 +304,7 @@ describe('updatePresentationAction', () => {
     const result = await updatePresentationAction(
       'presentation-1',
       MUTATION_INITIAL,
-      formDataOf({ name: 'Bidon 20 L' }),
+      formDataOf({ name: 'Bidon 20 L', unitId: UNIDAD }),
     );
 
     expect(result).toEqual({ status: 'success' });

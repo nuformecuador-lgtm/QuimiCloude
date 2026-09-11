@@ -47,7 +47,9 @@ const VISTA_PRODUCTO: ProductView = {
   imagePath: null,
   stock: 0,
   qtyAlert: null,
-  unitId: null,
+  // QC-80 (R22): `unitId` dejo de ser un campo del producto; lo que la vista trae es la unidad
+  // DERIVADA del lote mas reciente, `null` mientras no haya ninguno.
+  latestBatchUnitId: null,
   createdAt: AHORA,
   updatedAt: AHORA,
 };

@@ -3,6 +3,11 @@
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import {
+  PRESENTATION_UNIT_FIELD,
+  PRESENTATION_UNIT_LABEL,
+  PresentationUnitSelect,
+} from '@/components/shared/presentation-unit-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +28,7 @@ import {
   createPresentationAction,
   updatePresentationAction,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 /**
  * Formulario de alta y edicion de presentacion (R22, R23, R24, R31, R34, `design.md > 7`).
@@ -44,10 +50,23 @@ import {
  * el `id` es el patron estandar de React y evita abrir el adaptador driving de QC-20, que R30
  * prohibe tocar.
  *
- * **R22 — un solo campo de negocio y nada mas.** `PresentationView` tiene exactamente uno:
- * `name`. Ni `id` visible, ni `nameNormalized` -lo deriva el dominio-, ni marcas de tiempo, ni
- * autoria. `PRESENTATION_BUSINESS_FIELDS` es la unica fuente de esa lista y se recorre para leer
- * lo escrito, de modo que anadir un campo al formulario sin anadirlo aqui -o al reves- se nota.
+ * **R22 (+ QC-80 R15, R16, R17) — los campos de negocio, y ninguno mas.** `PresentationView`
+ * tiene dos que se capturan: `name` y, desde QC-80, `unitId`. Ni `id` visible, ni
+ * `nameNormalized` -lo deriva el dominio-, ni marcas de tiempo, ni autoria.
+ * `PRESENTATION_BUSINESS_FIELDS` es la unica fuente de esa lista y se recorre para leer lo
+ * escrito, de modo que anadir un campo al formulario sin anadirlo aqui -o al reves- se nota.
+ *
+ * **QC-80 R16 — las unidades LLEGAN POR PROPS.** Este formulario no consulta ningun catalogo: las
+ * pide UNA vez `PresentationListSection` con `listUnitsAction()` y bajan hasta aqui. Es el patron
+ * de la pantalla de detalle de proveedor (QC-44 R46).
+ *
+ * **QC-80 R17 — la unidad es obligatoria y la rechaza el MISMO esquema que valida el servidor**:
+ * el fallo cae con `issue.path[0] === 'unitId'` y se pinta JUNTO al selector, no en la region
+ * general del formulario.
+ *
+ * **QC-80 R18 — tras un rechazo del servidor el panel sigue abierto y conserva lo escrito,
+ * INCLUIDA la unidad**: `values.unitId` llega al `defaultValue` del selector igual que
+ * `values.name` llega al del nombre.
  *
  * **R23 — la edicion precarga y es REEMPLAZO COMPLETO**: el unico campo se envia entero, y el
  * caso de uso de QC-20 sustituye el nombre.
@@ -61,11 +80,18 @@ import {
  * devuelve los valores escritos y el campo los recupera por `defaultValue`.
  */
 
-/** El UNICO campo de negocio, con el mismo nombre que el adaptador driving lee del `FormData`. */
+/** El campo del nombre, con el mismo nombre que el adaptador driving lee del `FormData`. */
 export const PRESENTATION_NAME_FIELD = 'name';
 
-/** Fuente unica de los campos que este formulario captura (R22). */
-export const PRESENTATION_BUSINESS_FIELDS = [PRESENTATION_NAME_FIELD] as const;
+/**
+ * Fuente unica de los campos que este formulario captura (R22, QC-80 R15). `unitId` lo declara
+ * `components/shared/presentation-unit-select.tsx` -promovido alli por T10-, que es quien pinta
+ * el campo: aqui se importa, no se reescribe.
+ */
+export const PRESENTATION_BUSINESS_FIELDS = [
+  PRESENTATION_NAME_FIELD,
+  PRESENTATION_UNIT_FIELD,
+] as const;
 
 /**
  * `data-testid` del `SheetContent`, que lo pinta ESTE archivo -no `presentation-sheet.tsx`-.
@@ -96,10 +122,14 @@ const FIELD_TEXT = 'text-base md:text-base';
  */
 const FIELD_MESSAGES: Readonly<Record<PresentationFieldName, string>> = {
   name: 'Escribe un nombre con al menos una letra o número.',
+  // QC-80 R17: sin unidad no se envia nada. El esquema exige un uuid, y «no he elegido» llega
+  // como cadena vacia, que es justo lo que rechaza.
+  unitId: 'Elige la unidad de la presentación.',
 };
 
 const FIELD_LABELS: Readonly<Record<PresentationFieldName, string>> = {
   name: 'Nombre',
+  unitId: PRESENTATION_UNIT_LABEL,
 };
 
 /**
@@ -180,16 +210,22 @@ async function submit(
  * publico** y no escrito a mano: asi una `PresentationView` entera encaja sin conversion, y
  * ningun campo que la pantalla no pinta (R9) se cuela hasta aqui.
  */
-export type PresentationSheetTarget = Pick<PresentationView, 'id' | 'name'>;
+export type PresentationSheetTarget = Pick<PresentationView, 'id' | 'name' | 'unitId'>;
 
 export type PresentationFormProps = {
   /** Presentacion que se edita. Ausente en el alta (R22). */
   readonly presentation?: PresentationSheetTarget;
+  /**
+   * Catalogo ENTERO de unidades, sin filtrar por empresa (QC-80 R16, R27). Lo pide la seccion una
+   * sola vez y baja por props: este formulario no consulta nada. Si el catalogo no se pudo leer,
+   * la seccion **no monta este formulario** (QC-80 R19), asi que aqui nunca llega vacio por fallo.
+   */
+  readonly units: readonly UnitRef[];
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R25). */
   readonly onSaved: () => void;
 };
 
-export function PresentationForm({ presentation, onSaved }: PresentationFormProps) {
+export function PresentationForm({ presentation, units, onSaved }: PresentationFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
   const inputId = `${fieldId}-${PRESENTATION_NAME_FIELD}`;
@@ -254,9 +290,16 @@ export function PresentationForm({ presentation, onSaved }: PresentationFormProp
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
   const values = state.status === 'error' ? state.values : undefined;
   const nameError = fieldErrors.name;
+  const unitError = fieldErrors.unitId;
 
   /** Valor inicial del campo: lo escrito en el intento fallido; si no, el de la presentacion. */
   const initialName = values?.name ?? presentation?.name ?? '';
+
+  /**
+   * Unidad inicial (QC-80 R15, R18): la del intento fallido -aunque sea cadena vacia, que es «no
+   * eligio ninguna»-, y si no hubo intento, la de la presentacion que se edita. Vacia = marcador.
+   */
+  const initialUnitId = values?.unitId ?? presentation?.unitId ?? '';
 
   const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
 
@@ -339,6 +382,21 @@ export function PresentationForm({ presentation, onSaved }: PresentationFormProp
             </p>
           )}
         </div>
+
+        {/*
+          `key={initialUnitId}`: mismo motivo que el del nombre. El selector es NO CONTROLADO y su
+          `defaultValue` cambia al volver de un intento fallido; la clave fuerza el remontaje justo
+          en ese salto, sin convertirlo en campo controlado.
+
+          El error del campo se lo pasa el formulario y lo pinta el propio selector, JUNTO a el
+          (QC-80 R17), nunca en la region `role="alert"` de arriba.
+        */}
+        <PresentationUnitSelect
+          key={initialUnitId}
+          units={units}
+          defaultValue={initialUnitId === '' ? undefined : initialUnitId}
+          error={unitError}
+        />
       </div>
     </SheetContent>
   );

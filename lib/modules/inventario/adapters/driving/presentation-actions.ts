@@ -16,9 +16,14 @@ import {
  * presentacion:
  *
  * - `create`/`update`/`delete` reciben `FormData`: son mutaciones de formulario (QC-22).
- *   El unico campo de negocio es `name`, una cadena -no hace falta ninguna conversion
- *   numerica como en producto-, asi que no hay ningun camino de `NaN` que vigilar aqui.
- *   `delete` recibe el `id` como campo oculto del formulario, igual que en producto.
+ *   Los campos de negocio son `name` y -desde QC-80 (R10, R11, R12)- `unitId`, las dos
+ *   cadenas: no hace falta ninguna conversion numerica como en producto, asi que no hay
+ *   ningun camino de `NaN` que vigilar aqui. `delete` recibe el `id` como campo oculto del
+ *   formulario, igual que en producto.
+ * - La action NO decide nada sobre la unidad: lee `unitId` del `FormData` y lo pasa TAL
+ *   CUAL. Quien lo valida es `create/updatePresentationSchema` dentro del caso de uso, y
+ *   quien comprueba que existe es la FK. Una cadena vacia baja tal cual y vuelve como
+ *   `invalid_input`; la action no la traduce ni la sustituye por ningun defecto.
  * - `list` recibe `query: unknown` como argumento tipado: es una consulta, no un
  *   formulario, y `createListQuerySchema()` valida su forma DENTRO del caso de uso
  *   (QC-57 R30).
@@ -65,7 +70,10 @@ export async function createPresentationAction(
 ): Promise<CreatePresentationFormState> {
   void prevState;
 
-  const candidate = { name: readFormString(formData, 'name') };
+  const candidate = {
+    name: readFormString(formData, 'name'),
+    unitId: readFormString(formData, 'unitId'),
+  };
   const actor = await currentActor();
 
   try {
@@ -76,7 +84,8 @@ export async function createPresentationAction(
   }
 }
 
-/** Renombrado de presentacion (R9, R11, R14, R17-R20, R37). */
+/** Edicion de presentacion: reemplazo completo de nombre Y unidad (R9, R11, R14,
+ *  R17-R20, R37; QC-80 R12). */
 export async function updatePresentationAction(
   id: string,
   prevState: PresentationMutationFormState,
@@ -84,7 +93,10 @@ export async function updatePresentationAction(
 ): Promise<PresentationMutationFormState> {
   void prevState;
 
-  const candidate = { name: readFormString(formData, 'name') };
+  const candidate = {
+    name: readFormString(formData, 'name'),
+    unitId: readFormString(formData, 'unitId'),
+  };
   const actor = await currentActor();
 
   try {

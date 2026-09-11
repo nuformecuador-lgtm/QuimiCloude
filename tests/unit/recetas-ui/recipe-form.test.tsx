@@ -151,7 +151,8 @@ const RECIPE_ID = '66666666-6666-4666-8666-666666666666';
 // selector sigue tipado con `UnitRef` y no se entera: `UnitView` lo extiende (R4).
 const UNITS: readonly UnitView[] = [
   // Dos unidades BASE de grupos distintos: ninguna deriva de la otra, así que los productos de
-  // este archivo -que no declaran unidad- ven el catálogo completo (QC-26bis).
+  // este archivo -que no tienen ningún lote, así que su unidad derivada es `null`- ven el
+  // catálogo completo (QC-26bis, QC-80 R23).
   { id: UNIT_LITRO_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
   // Unidad SIN símbolo: el selector debe presentar su nombre (R30).
   {
@@ -168,6 +169,11 @@ const PRODUCT_1_NAME = 'Ácido cítrico';
 const PRODUCT_2_NAME = 'Sosa cáustica';
 const PRODUCT_PAGE2_NAME = 'Glicerina de página 2';
 
+/**
+ * Página 1 precargada del selector de ingrediente. Los dos productos llegan con `unitId: null`
+ * porque **todavía no tienen ningún lote** (QC-80 R23): la unidad de un ingrediente se deriva de
+ * la presentación de su lote más reciente, así que sin lote no hay con qué acotar el selector.
+ */
 const PRODUCT_PAGE_1 = {
   items: [
     { id: PRODUCT_1_ID, name: PRODUCT_1_NAME, unitId: null },
@@ -183,7 +189,9 @@ function productView(overrides: Partial<ProductView> = {}): ProductView {
     imagePath: null,
     stock: 10,
     qtyAlert: null,
-    unitId: null,
+    // QC-80 (R22, R23): la unidad del producto es DERIVADA de la presentacion de su lote mas
+    // reciente. `null` = todavia no tiene ningun lote.
+    latestBatchUnitId: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
@@ -791,6 +799,36 @@ describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombr
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
     const [payload] = createRecipeActionMock.mock.calls[0] as [{ lines: { unitId: string }[] }];
     expect(payload.lines[0]?.unitId).toBe(UNIT_GRAMO_ID);
+  });
+});
+
+describe('QC-80 R23 — un ingrediente SIN NINGÚN LOTE no bloquea la línea ni impide guardar', () => {
+  it('el selector de unidad queda habilitado, ofrece el catálogo entero y la receta se envía', async () => {
+    const user = setupUser();
+    renderCreateForm();
+
+    await user.type(screen.getByTestId('recipe-field-name'), 'Receta de un ingrediente sin lotes');
+    // `PRODUCT_1` no tiene lotes: su `latestBatchUnitId` es `null` y llega como `unitId: null`.
+    await chooseProductForLine(user, 0, PRODUCT_1_NAME);
+
+    // No se bloquea: sin lote no hay dato con el que acotar, pero se escriben recetas antes de
+    // comprar el ingrediente.
+    expect(screen.getByTestId('recipe-line-unit-0')).toBeEnabled();
+
+    // Y ofrece el catálogo entero, no una lista vacía ni un grupo recortado.
+    await user.click(screen.getByTestId('recipe-line-unit-0'));
+    const opciones = await screen.findAllByTestId('recipe-line-unit-0-option');
+    expect(opciones.map((opcion) => opcion.textContent ?? '').sort()).toEqual(['Gramo', 'L']);
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name: 'L' })));
+
+    await user.type(screen.getByTestId('recipe-line-quantity-0'), '2');
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [payload] = createRecipeActionMock.mock.calls[0] as [
+      { lines: { productId: string; unitId: string }[] },
+    ];
+    expect(payload.lines[0]).toMatchObject({ productId: PRODUCT_1_ID, unitId: UNIT_LITRO_ID });
   });
 });
 

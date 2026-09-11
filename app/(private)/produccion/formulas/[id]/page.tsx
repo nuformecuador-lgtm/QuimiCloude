@@ -117,7 +117,7 @@ export default async function EditarRecetaPage({
           items: productsResult.data.items.map((item) => ({
             id: item.id,
             name: item.name,
-            unitId: item.unitId,
+            unitId: item.latestBatchUnitId,
           })),
           totalPages: productsResult.data.totalPages,
         }}

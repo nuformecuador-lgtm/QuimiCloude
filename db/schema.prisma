@@ -399,23 +399,43 @@ model WorkGroupMember {
 /// viven escritos a mano en `db/migrations/20260904160000_list_query_indexes/migration.sql`:
 /// Prisma no modela indices GIN. Esta tabla NO tiene `deletedAt`, asi que los suyos son
 /// TOTALES, no parciales.
+///
+/// OJO — `unitId` la anade QC-80 (R1, design.md > 3) y es la unidad de la presentacion:
+/// NOT NULL y SIN `@default`. Es un campo ESCALAR uuid SIN `@relation`, y es DELIBERADO:
+/// `Unit` es del modulo `unidades` y `Presentation` de `inventario`, asi que con `@relation`
+/// el cliente Prisma ofreceria `include: { unit: true }` --una lectura de la tabla de
+/// `unidades` desde `inventario` que NINGUNA guardia detecta, porque no es un import ni un
+/// `prisma.unit`-- y ademas obligaria a declarar `presentations Presentation[]` dentro de
+/// `Unit`, que es de otro modulo. Es el mismo patron que tenia `products.unit_id` (QC-32 R18)
+/// y que tiene `units.company_id` (QC-76). Lo que `inventario` sepa de una unidad llega por
+/// `@/lib/modules/unidades`.
+/// CONSECUENCIA QUE HAY QUE SABER: la FK real `presentations_unit_id_fkey`
+/// (ON DELETE RESTRICT ON UPDATE CASCADE, R2) vive escrita A MANO en
+/// `db/migrations/20260911120000_presentation_unit/migration.sql` y es por tanto DRIFT para
+/// Prisma. TODA MIGRACION FUTURA DE `presentations` HAY QUE REVISARLA A MANO: si el drift la
+/// borra, el esquema sigue validando y el cliente sigue compilando, y no se entera nadie.
+/// El `@@index` de abajo SI lo declara Prisma (R3); no es unico, muchas presentaciones
+/// comparten unidad.
 /// @module inventario
 model Presentation {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
   nameNormalized String   @map("name_normalized")
+  unitId         String   @map("unit_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   batches ProductBatch[]
 
   @@unique([nameNormalized], map: "presentations_name_normalized_key")
+  @@index([unitId], map: "presentations_unit_id_idx")
   @@map("presentations")
 }
 
 /// Producto del catalogo quimico. Es TAMBIEN el elemento de inventario: una sola tabla
-/// (decision cerrada 1 de QC-14), con su presentacion, su unidad y lo que HAY de el
-/// (`stock`, `qtyAlert`).
+/// (decision cerrada 1 de QC-14), con lo que HAY de el (`stock`, `qtyAlert`). Ya NO declara
+/// ni presentacion (se mudo a `ProductBatch` en QC-90) ni unidad (QC-80 la elimino: se deriva
+/// de la presentacion del lote mas reciente; ver OJO 2).
 ///
 /// OJO 0 — QC-52 le QUITO `cost`, `minPurchase` y `deliveryTime` (su decision cerrada 1,
 /// R1). No son propiedades de la cosa sino TERMINOS COMERCIALES, y dependen de a quien se
@@ -448,18 +468,19 @@ model Presentation {
 /// `<ts>_product_batches` las DROPPEA junto con sus columnas). El producto ya no tiene, por
 /// tanto, ningun rastro de autoria: quien lo creo o lo edito se sabe por sus lotes.
 ///
-/// OJO 2 — `unitId` (QC-32, decision cerrada 13, R10, R18) es ese mismo criterio aplicado a
-/// la frontera con el modulo `unidades`: es un campo ESCALAR uuid SIN `@relation`, y es
-/// deliberado. La FK real (`products_unit_id_fkey`, ON DELETE RESTRICT ON UPDATE CASCADE)
-/// vive escrita A MANO en el SQL de la migracion `<ts>_units_catalog`
-/// (`specs/QC-32-modelo-unidades/design.md` secciones 4.3 y 8.1). Si llevara `@relation`,
-/// Prisma ofreceria `include: { unit: true }`: una lectura de la tabla de `unidades` desde
-/// `inventario` que NINGUNA guardia detecta, porque no es un import ni un `prisma.unit`.
-/// Ademas obligaria a declarar `products Product[]` dentro de `Unit`, que es de otro modulo.
-/// Lo que `inventario` sepa de una unidad llega por `@/lib/modules/unidades`. Es por tanto
-/// DRIFT para Prisma, igual que las dos FK de auditoria: toda migracion futura de `products`
-/// hay que revisarla a mano para que no la borre. Antes de QC-32 esto era `unit String?`,
-/// texto libre; ahora es una referencia al catalogo, OPCIONAL (decision cerrada 7, R10).
+/// OJO 2 — el producto YA NO DECLARA UNIDAD. `unitId` vivia aqui desde QC-32 (escalar uuid
+/// sin `@relation`, OPCIONAL) y QC-80 se la QUITO (R7, R21, decision cerrada del 2026-09-08):
+/// con ella se fueron la columna `products.unit_id`, su indice `products_unit_id_idx` y su FK
+/// `products_unit_id_fkey`, que la migracion `<ts>_presentation_unit` DROPPEA. No se perdio
+/// ningun dato: la columna estaba vacia en las 7 filas vivas, comprobado contra la base.
+/// La unidad de un producto se DERIVA ahora de la PRESENTACION DE SU LOTE MAS RECIENTE
+/// --`created_at DESC`, desempatando por `id DESC`-- y no se almacena en ninguna columna de
+/// esta tabla (R22): quien la declara es `presentations.unit_id`, que es NOT NULL desde
+/// QC-80. Un producto SIN lotes no tiene unidad derivada, y eso es «ninguna», no un error
+/// (R23). NO se le devuelve al producto ninguna `presentation_id` (R25): la presentacion vive
+/// SOLO en `product_batches` desde QC-90. Y NO se guarda aqui una copia denormalizada
+/// (QC-80 design.md > 11, alternativa B): dos sitios que dicen la unidad de un producto es
+/// como se acaba con dos que discrepan.
 ///
 /// OJO 3 — `nameNormalized` la anade QC-57 (R19, R23) y es la columna contra la que BUSCA el
 /// listado, no una clave: `products.name` NO es unico (decision cerrada 6 de QC-14) y esta
@@ -483,7 +504,6 @@ model Product {
   nameNormalized String    @map("name_normalized")
   stock          Int?
   qtyAlert       Int?      @map("qty_alert")
-  unitId         String?   @map("unit_id") @db.Uuid
   imagePath      String?   @map("image_path")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -491,7 +511,6 @@ model Product {
 
   batches ProductBatch[]
 
-  @@index([unitId], map: "products_unit_id_idx")
   @@map("products")
 }
 

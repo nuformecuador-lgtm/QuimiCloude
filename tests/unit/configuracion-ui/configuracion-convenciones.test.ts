@@ -359,7 +359,7 @@ describe('los componentes de la ruta viven en `components/` y salen del barrel (
     expect(enLaRaiz, 'la ruta deberia tener su page.tsx').toContain('page.tsx');
   });
 
-  it('el barrel existe, no declara frontera de cliente y republica los once componentes', () => {
+  it('el barrel existe, no declara frontera de cliente y republica los doce componentes', () => {
     const barrel = `${CARPETA_DE_COMPONENTES}/index.ts`;
     expect(existsSync(join(RAIZ, barrel)), 'falta el barrel de la ruta').toBe(true);
 
@@ -369,6 +369,10 @@ describe('los componentes de la ruta viven en `components/` y salen del barrel (
       'el barrel no puede ser frontera cliente/servidor: cada componente la declara',
     ).toBe(false);
 
+    // Once desde QC-80 (T10): `presentation-unit-select.tsx`, que T8 creo aqui, se promovio a
+    // `components/shared/` en cuanto el alta rapida de `presentation-select.tsx` -que ya vivia
+    // alli- tuvo que pedir la unidad (R11). El barrel lo sigue republicando, ahora desde su
+    // ubicacion compartida, asi que ningun consumidor de la ruta cambio.
     expect(COMPONENTES.length, 'el barrido no encontro los componentes').toBe(11);
 
     const sinPublicar = COMPONENTES.filter((ruta) => {

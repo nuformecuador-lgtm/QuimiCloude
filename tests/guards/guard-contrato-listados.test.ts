@@ -71,6 +71,14 @@ const NOMBRES_DE_MODULO = MODULOS.map((m) => m.nombre);
  * Lista blanca canonica de la bateria. No es la de ningun listado real: la equivalencia que se
  * exige aqui es la del CONTRATO, y una lista blanca real haria que el veredicto dependiera de
  * los campos de esa tabla en vez de la forma.
+ *
+ * POR ESO QC-80 NO LA TOCA aunque `PRODUCT_QUERYABLE` haya perdido su `unitId` (R21). El
+ * `unitId` de aqui abajo es un nombre de campo SINTETICO -hace de «campo con forma `select`»- y
+ * no la columna de ningun modulo: si esta constante siguiera a la lista blanca real de
+ * productos, el dia que un listado cambia un campo se caerian los seis modulos a la vez y la
+ * guardia diria que el contrato diverge cuando lo que cambio fue una tabla. La prueba de que el
+ * listado de productos ya no ofrece ese filtro vive donde corresponde:
+ * `tests/unit/inventario/list-query.test.ts`.
  */
 const CANONICA: ListQueryable = {
   sortable: ['name', 'createdAt'],

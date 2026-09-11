@@ -50,17 +50,56 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
  * que tampoco toca esta columna.
  */
 
-/** `select` unico para las tres lecturas, sin ningun `join` desde el 2026-09-09 (la
- * presentacion se mudo a `product_batches`). */
-const PRODUCT_SELECT = {
+/**
+ * El LOTE MAS RECIENTE del producto, y de el SOLO la unidad de su presentacion (QC-80, R22).
+ *
+ * Se declara UNA vez y viaja dentro de `PRODUCT_SELECT`, asi que las TRES lecturas
+ * -`findAliveProductById`, `listAliveProducts` y cualquiera que venga- derivan la unidad con
+ * exactamente el mismo criterio. Dos copias parecidas de este `orderBy` serian dos definiciones
+ * de «mas reciente».
+ *
+ * «MAS RECIENTE» ES `created_at DESC` DESEMPATADO POR `id DESC`, y el desempate no es adorno:
+ * no hay fecha de compra todavia -es QC-81- y dos lotes creados en el mismo instante -el alta
+ * con primer lote fija un unico `now`- dejarian el ganador sin definir, asi que la misma
+ * consulta podria devolver una unidad distinta cada vez.
+ *
+ * LA TRAVESIA `ProductBatch -> Presentation` ES INTERNA A `inventario`: los dos modelos son de
+ * este modulo. De `Presentation` se lee el ESCALAR `unitId` y nada mas: no se entra en `units`,
+ * que es de `unidades` y se resuelve por su contrato publico, no con un `include`.
+ *
+ * SIN INDICE NUEVO, a proposito: `product_batches_product_id_idx` ya localiza los lotes de un
+ * producto y el conjunto por producto es pequeño. Si algun dia deja de serlo, la respuesta es el
+ * indice compuesto `(product_id, created_at DESC)` -una migracion de una linea-, no este
+ * comentario.
+ *
+ * COSTE ACEPTADO Y CONSCIENTE: `listAliveProducts` emite una consulta correlacionada MAS POR
+ * PAGINA (no por fila). Se acepta porque el contrato no se ensancha -el campo ya existia, cambia
+ * su origen- y porque la alternativa era pedir la unidad por red en mitad de una interaccion.
+ */
+const LATEST_BATCH_UNIT = {
+  select: { presentation: { select: { unitId: true } } },
+  orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  take: 1,
+  // `satisfies` y NO `as const`: el `orderBy` de Prisma exige un array MUTABLE, y un `as const`
+  // lo congelaria en `readonly` -que es lo que el compilador rechaza-. `satisfies` da la misma
+  // garantia que importa aqui (que la forma sea la que Prisma espera) sin mentir sobre el tipo.
+} satisfies Prisma.Product$batchesArgs;
+
+/** `select` unico para las tres lecturas. Sin `join` a `presentations` desde el producto (la
+ * presentacion se mudo a `product_batches` el 2026-09-09) y, desde QC-80, sin `unit_id`: esa
+ * columna ya no existe y la unidad se DERIVA por `LATEST_BATCH_UNIT`.
+ *
+ * SE EXPORTA solo para que su test pueda afirmar el `orderBy` y el `take` COMO DATO -no como
+ * texto del archivo-: una asercion sobre el fuente pasaria igual con el criterio equivocado. */
+export const PRODUCT_SELECT = {
   id: true,
   name: true,
   imagePath: true,
   stock: true,
   qtyAlert: true,
-  unitId: true,
   createdAt: true,
   updatedAt: true,
+  batches: LATEST_BATCH_UNIT,
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
@@ -72,7 +111,14 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
  * adaptador de la linea de catalogo de `proveedores`, que es donde el importe se quedo.
  */
 
-/** Fila de Prisma -> `ProductView` del puerto. */
+/**
+ * Fila de Prisma -> `ProductView` del puerto.
+ *
+ * `latestBatchUnitId` sale del UNICO lote que `LATEST_BATCH_UNIT` deja pasar (`take: 1`), asi
+ * que aqui no se ordena ni se elige nada: ELEGIR ES TRABAJO DEL MOTOR, no de este mapeo, que es
+ * lo mismo que ya vale para el orden y el filtro del listado. Sin ningun lote el array viene
+ * vacio y la unidad derivada es `null` (R23): «todavia no se ha comprado», no «sin unidad».
+ */
 export function toProductView(row: ProductRow): ProductView {
   return {
     id: row.id,
@@ -80,7 +126,7 @@ export function toProductView(row: ProductRow): ProductView {
     imagePath: row.imagePath,
     stock: row.stock,
     qtyAlert: row.qtyAlert,
-    unitId: row.unitId,
+    latestBatchUnitId: row.batches[0]?.presentation.unitId ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -101,7 +147,6 @@ export async function createProduct(
       nameNormalized: normalizeProductName(data.name),
       stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
-      unitId: data.unitId ?? null,
       createdAt: now,
       updatedAt: now,
     },
@@ -140,7 +185,6 @@ export async function updateAliveProduct(
       nameNormalized: normalizeProductName(data.name),
       stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
-      unitId: data.unitId ?? null,
       updatedAt: now,
     },
   });
@@ -242,7 +286,12 @@ function productFilterWhere(
     case 'select': {
       const condition = selectCondition(value.values);
       if (condition === null) return null;
-      if (field === 'unitId') return { unitId: condition };
+      // QC-80 (R21): AQUI estaba `unitId`, el unico `select` que tenia este listado. La columna
+      // `products.unit_id` ya no existe, asi que no hay ninguna a la que traducirlo -y la unidad
+      // DERIVADA no es una columna: filtrarla seria un `where` anidado sobre el lote mas
+      // reciente, otra consulta y otra ficha-. La rama se conserva vacia por el mismo motivo que
+      // la de `text`: traducir es trabajo del adaptador, y declarar manana un campo de eleccion
+      // no puede depender de que alguien recuerde que aqui faltaba una rama.
       return null;
     }
     case 'numberRange': {
@@ -494,7 +543,6 @@ export async function createWithFirstBatch(
           nameNormalized: normalizeProductName(product.name),
           stock: product.stock ?? null,
           qtyAlert: product.qtyAlert ?? null,
-          unitId: product.unitId ?? null,
           createdAt: now,
           updatedAt: now,
         },
@@ -516,11 +564,16 @@ export async function createWithFirstBatch(
 /**
  * `addBatchToAlive` de `ProductRepository` (R17, R18).
  *
- * ESCRIBE UNICAMENTE LA FILA DEL LOTE. No toca `name`, `stock`, `qty_alert` ni `unit_id` del
+ * ESCRIBE UNICAMENTE LA FILA DEL LOTE. No toca `name`, `stock` ni `qty_alert` del
  * producto, y TAMPOCO su `updated_at` (`design.md > 2`): agregar un lote no es editar el
  * producto, y con QC-91 esa escritura desapareceria igual. Por eso la fila del lote se crea
  * con `productId` ESCALAR y no con un `update` anidado colgando de `product`, que arrastraria
  * el `@updatedAt` del modelo y escribiria en `products` sin que nadie lo hubiera pedido.
+ *
+ * CONSECUENCIA DE QC-80 QUE HAY QUE CONOCER: aunque esta funcion no escriba en `products`, el
+ * lote nuevo SI cambia lo que el producto devuelve en `latestBatchUnitId` -pasa a ser el mas
+ * reciente-. Es exactamente lo que R22 pide: la unidad se DERIVA en cada lectura, no se copia a
+ * ninguna columna que pudiera quedarse vieja.
  *
  * «SIGUE VIVO» ES UN `where`, NO UN `if` SOBRE LA FILA. `deleted_at IS NULL` viaja al SQL de
  * la consulta -la regla de este archivo desde QC-20 R16-; lo que se mira despues es si la

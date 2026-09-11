@@ -419,6 +419,10 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
         <PresentationSelect
           defaultValue={initialValue(PRESENTATION_FIELD, line?.presentationId ?? '') || undefined}
           error={fieldErrors.presentationId}
+          // QC-80 (R10, R11): el alta rapida de presentacion tambien exige unidad. Se le pasa el
+          // MISMO catalogo que ya baja por props hasta esta pantalla (R46), pedido una sola vez
+          // por la pagina de detalle; el selector no consulta nada por su cuenta.
+          units={units}
         />
 
         {/*

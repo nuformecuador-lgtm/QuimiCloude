@@ -53,12 +53,14 @@ import {
   PRESENTATION_LIST_TESTID,
   PRESENTATION_ROW_ACTIONS_TESTID,
   PRESENTATION_SHEET_TESTID,
+  PRESENTATION_UNIT_SELECT_TESTID,
   deletePresentationLabel,
   editPresentationLabel,
 } from '@/app/(private)/configuracion/presentaciones/components';
 import PresentacionesPage from '@/app/(private)/configuracion/presentaciones/page';
 import type { PresentationView } from '@/lib/modules/inventario';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import type { UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import {
@@ -74,7 +76,12 @@ const AREA_TACTIL = ['min-h-11', 'min-w-11'] as const;
 /** Tamano de fuente minimo de R34: `text-base` = 1rem = 16 px, y que no baje en el breakpoint. */
 const FUENTE_DE_CAMPO = ['text-base', 'md:text-base'] as const;
 
-const { routerMock, listPresentationsActionMock, getSessionUserMock } = vi.hoisted(() => ({
+const {
+  routerMock,
+  listPresentationsActionMock,
+  listUnitsActionMock,
+  getSessionUserMock,
+} = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -85,6 +92,7 @@ const { routerMock, listPresentationsActionMock, getSessionUserMock } = vi.hoist
     prefetch: vi.fn<(href: string) => void>(),
   },
   listPresentationsActionMock: vi.fn<(query: unknown) => Promise<PresentationListResult>>(),
+  listUnitsActionMock: vi.fn<() => Promise<unknown>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -124,6 +132,26 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 });
 
 /**
+ * QC-80 (R16): la seccion pide el catalogo de unidades con `listUnitsAction()` y lo baja por
+ * props hasta el selector del panel. Aqui se mockea porque esta suite monta la pantalla REAL.
+ */
+vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
+  listUnitsAction: listUnitsActionMock,
+}));
+
+const UNIDADES: readonly UnitView[] = [
+  {
+    id: 'unit-kg',
+    name: 'Kilogramo',
+    symbol: 'kg',
+    baseUnitId: null,
+    factor: null,
+    isSystem: true,
+  },
+  { id: 'unit-l', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
+];
+
+/**
  * Dos filas, y la segunda con un nombre largo a proposito: con dos columnas el desbordamiento es
  * improbable, y un nombre corto no llegaria a poner a prueba quien absorbe el scroll horizontal.
  */
@@ -131,6 +159,7 @@ const PRESENTACION: PresentationView = {
   id: '11111111-1111-4111-8111-111111111111',
   name: 'Bidón 20 L',
   nameNormalized: 'bidon 20 l',
+  unitId: 'unit-kg',
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
 };
@@ -139,6 +168,7 @@ const PRESENTACION_LARGA: PresentationView = {
   id: '22222222-2222-4222-8222-222222222222',
   name: 'Tambor metálico de 200 litros con tapa desmontable y aro de cierre reforzado',
   nameNormalized: 'tambor metalico de 200 litros con tapa desmontable y aro de cierre reforzado',
+  unitId: 'unit-l',
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
 };
@@ -227,6 +257,7 @@ beforeEach(() => {
   window.localStorage.clear();
   getSessionUserMock.mockResolvedValue(USUARIO_CON_PERMISO);
   listPresentationsActionMock.mockResolvedValue(pagina([PRESENTACION, PRESENTACION_LARGA]));
+  listUnitsActionMock.mockResolvedValue({ status: 'success', data: UNIDADES });
 });
 
 afterEach(() => {
@@ -419,6 +450,13 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
       expect(campo.className, `el campo a ${ancho}px`).toContain(token);
     }
     expect(campo.className, `el campo a ${ancho}px`).toContain('min-h-11');
+
+    // QC-80 R20: el selector de unidad cumple lo mismo, en los dos anchos.
+    const selector = screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID);
+    expect(selector, `el selector de unidad a ${ancho}px`).toBeVisible();
+    for (const token of [...FUENTE_DE_CAMPO, ...AREA_TACTIL]) {
+      expect(selector.className, `el selector de unidad a ${ancho}px`).toContain(token);
+    }
 
     for (const accion of [PRESENTATION_FORM_SUBMIT_TESTID, PRESENTATION_FORM_CANCEL_TESTID]) {
       const control = screen.getByTestId(accion);
