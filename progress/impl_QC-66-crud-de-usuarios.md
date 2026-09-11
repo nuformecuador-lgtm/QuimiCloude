@@ -1616,3 +1616,134 @@ apago el merge con `dev`, dos los arreglo `dev` con el patron de rama— y el `L
 leader con un `next build`.
 
 La suite completa **no** se corrio desde aqui: el gate completo y el PR son del leader (F2.4).
+
+---
+
+## F2.3 (segunda ronda) — sincronizacion con `origin/dev` tras entrar QC-78 (2026-09-10)
+
+`origin/dev` paso de `192842a` a **`752dc58`**: entro **QC-78, estado-de-cuenta-en-el-acceso**, que es
+justamente la ficha con la que esta comparte tests. **47 archivos, +4871/-296.**
+
+### El conflicto: UNO, y en el archivo que se esperaba
+
+De los **tres** archivos compartidos, dos se auto-resolvieron —`identity-facade.test.ts` y
+`recipe-route-contract.test.ts`— por la misma razon que la primera ronda: **los dos lados anadieron
+su bloque en zonas distintas**, que es el dividendo de haberlos escrito de forma aditiva y rotulada.
+
+El conflicto fue en **`tests/unit/identity/account-status-scope.test.ts`**, y era **inevitable**: la
+premisa de esa guarda —«nadie lee todavia el estado de cuenta»— **caduco con las dos fichas a la
+vez**, asi que las dos la retensaron **en el mismo punto del archivo**. Dos hunks:
+
+| Hunk | Qué choco | Como se resolvio |
+| --- | --- | --- |
+| El parrafo que explica el criterio de la lista cerrada | QC-78 reescribio el parrafo narrando «QC-65 lo escribio, QC-78 anade OCHO lectores»; QC-66 habia reescrito el mismo parrafo con su propia redaccion | **Se conserva el de QC-78 INTACTO** y se le **suma** una frase que nombra el bloque de QC-66. Nada de lo de QC-78 se reescribio para que encajara con lo mio |
+| Las entradas nuevas de `SITIOS_PERMITIDOS` | QC-78 anade **tres** puertos (`login-attempt-recorder`, `session-user-reader`, `user-credentials-reader`); QC-66 anade su bloque rotulado de **diez** | **Puramente aditivo**: primero las tres de QC-78 en su sitio, despues el bloque de QC-66. Ninguna se toca |
+
+**Ninguno de los dos hunks era ambiguo**: en los dos, cada lado anadia algo que el otro no tenia, y
+la resolucion correcta era **la union**. No hubo que elegir entre dos versiones de la misma cosa, asi
+que no hubo nada que preguntar.
+
+### La comprobacion que importaba: ¿la guarda sigue vigilando algo real?
+
+**Si, y hay una prueba dura.** El caso
+`R19 — los archivos de produccion que nombran el estado son EXACTAMENTE los de la lista cerrada`
+compara la lista **con IGUALDAD** contra un **barrido del arbol real**. Que pase **significa** que la
+lista fusionada cuadra **exactamente** con los archivos que hoy nombran el estado: si el merge hubiera
+perdido las tres entradas de QC-78, el barrido las encontraria y el caso saldria **rojo**; si hubiera
+perdido las diez de QC-66, igual. **Pasar es la demostracion de que sobrevivieron las dos listas.**
+
+```
+pnpm exec vitest run tests/unit/identity/account-status-scope.test.ts
+  -> Test Files  1 passed (1)  |  Tests  9 passed | 3 skipped (12)
+```
+Los 3 `skipped` son los casos de rama de **QC-65**, que saltan con su motivo impreso porque esta no es
+su rama. **El merge no la dejo mas debil**: ni dos bloques que se pisan, ni un conteo que no cuadra, ni
+un `toEqual` degradado.
+
+### Las cinco sondas, repasadas DESPUES del merge
+
+Y aqui hay un **hallazgo de metodo** que conviene no perder:
+
+**Corridas a medio merge, las sondas dieron un FALSO ROJO en R46.** Con el merge sin commitear,
+`git status --porcelain` lista **todos** los archivos que trae `dev` —incluidos `app/(private)/layout.tsx`
+y once `e2e/*.spec.ts`—, y `archivosTocados()` los suma al diff, asi que R46 veia «esta rama anade
+cosas bajo `app/` y `e2e/`» y mordia. **La guardia tenia razon con los datos que veia**; lo que estaba
+mal era el momento de medir. Se cerro el merge y se repitieron **limpias**:
+
+```
+0. VERDE DE PARTIDA (post-merge)   Tests  16 passed (16)
+1. ALTER en el UP                  x R43 (la migracion es de DATOS)            1 failed | 15 passed
+2. quitar un ON CONFLICT           x R43 (sus DOS ON CONFLICT)                 1 failed | 15 passed
+3. nanoid en dependencies          x R47 (las cinco descartadas) + x R47 rama  2 failed | 14 passed
+4. DROP INDEX en el UP             x R43 + x R38 (los tres indices de QC-47)   2 failed | 14 passed
+5. una pagina bajo app/            x R46 (nada bajo app/, components/, e2e/)   1 failed | 15 passed
+6. VERDE FINAL                     Tests  16 passed (16)
+
+arbol despues: limpio (`git status --short` vacio)
+```
+
+**Las cinco siguen cayendo despues del merge.** Ninguna quedo muda, que era exactamente el riesgo de
+MAYOR-1.
+
+### FRONTERA CON QC-78 — hay una real, y compila, asi que se dice aqui
+
+QC-78 introduce `lib/modules/identity/domain/effective-account-status.ts`: la traduccion, **en un solo
+sitio**, de «lo que la columna dice» a «lo que significa AHORA». Importa porque una fila puede decir
+`blocked` con un `locked_until` **ya vencido** —y entonces es **efectivamente `active`** para el
+login—, o decir `active` con un plazo todavia vigente.
+
+**1. El listado y la ficha de QC-66 devuelven el estado CRUDO, no el efectivo.** Comprobado:
+`list-users.ts`, `get-user.ts`, `user-view.ts` y `user-admin-prisma.ts` **no importan** nada de
+`effective-account-status`. Consecuencia concreta: un usuario almacenado como `blocked` cuyo plazo ya
+vencio **sale como `blocked` en la pantalla de QC-67** mientras el **login lo deja entrar**. No es un
+fallo de ninguna de las dos fichas —R31 y R32 piden «el estado de cuenta» y QC-65 definio la columna;
+QC-78 define el efectivo y lo aplica **al acceso**, que es su alcance— pero **es una incoherencia
+visible** y la pantalla es de **QC-67**. **Decidir si el listado muestra el crudo, el efectivo, o los
+dos, es de QC-67 y no se decide aqui** (regla 6). Queda escrito para que no lo descubra sobre la
+pantalla.
+
+**2. Donde las dos fichas SI componen bien, y conviene saberlo.** QC-78 decidio (2026-09-08, su R9)
+que **`blocked` SIN plazo no caduca nunca**, porque el plazo es lo unico que distingue el bloqueo
+**automatico** —lo puso la politica de intentos y caduca solo— del que puso **una persona**. El
+`setUserAccountStatus` de esta ficha escribe el estado y **R45 le prohibe tocar `locked_until`**, asi
+que un `blocked` puesto por un administrador nace **sin plazo** y por tanto **permanente hasta que otra
+persona lo levante**. Eso es exactamente lo que QC-78 quiere. **La prohibicion de R45 no choca con
+QC-78: es lo que hace que el bloqueo manual sea permanente.** No hizo falta cambiar nada.
+
+**3. La guarda de alcance de R45 sigue verde, y por el motivo correcto.** QC-78 ahora **si** escribe
+`locked_until` en `verify-credentials.ts`, `account-lock.ts` y dos adaptadores driven — todos **suyos**.
+La guarda de R45 esta acotada a **los archivos de produccion de QC-66**, asi que no le aplica.
+Detalle que merece constar: `user-input.ts` y `user-view.ts` **si contienen** las cadenas
+`failedLoginAttempts`/`lockLevel`/`lockedUntil`, pero **solo en comentarios que dicen que NO estan**, y
+la guarda **quita los comentarios antes de mirar**. Un comentario que explica una frontera no la cruza
+— y si la guarda no quitara comentarios, habria acusado en falso.
+
+**4. Ningun caso de uso de QC-66 tiene que pasar por el estado efectivo.** Las seis operaciones
+administran la **columna**; quien decide si una cuenta **entra** es el login, y eso es de QC-78. No hay
+ningun sitio donde esta ficha tenga que consultar `effectiveAccountStatus` para cumplir un requisito
+suyo.
+
+### El hallazgo de metodo de la sonda 2, que es material de `/afinar-regla`
+
+Ya estaba en F2.4a y se repite aqui porque es lo mas reutilizable del dia:
+
+**`grep -c "ON CONFLICT"` seguia dando 2 tras borrar uno, porque la cabecera del SQL lo menciona en un
+comentario.** Escrita de la forma ingenua, esa asercion **habria pasado en verde con el `ON CONFLICT`
+borrado**. **Una guardia que cuenta sus propios comentarios no vigila nada.** El arreglo es contar
+sobre el SQL **sin comentarios**, y la regla general es: **toda guardia que cuente o busque ocurrencias
+en un fuente tiene que quitar antes los comentarios**, porque el comentario que explica la regla
+contiene, por definicion, las palabras de la regla.
+
+### Verificacion de la segunda ronda
+
+```
+pnpm run typecheck  -> CERO errores
+pnpm exec eslint .  -> sin salida (limpio)
+pnpm exec vitest run guard
+  -> Test Files  27 passed (27)  |  Tests  277 passed | 4 skipped (281)
+pnpm exec vitest run tests/unit/identity/ tests/unit/composition/ tests/unit/errores/ tests/integration/identity/
+  -> Test Files  58 passed (58)  |  Tests  1033 passed | 7 skipped (1040)
+```
+
+Tres archivos y 104 tests mas que antes del merge, todos verdes: son los que trajo QC-78. La suite
+completa **no** se corrio: el gate completo y el PR son del leader.
