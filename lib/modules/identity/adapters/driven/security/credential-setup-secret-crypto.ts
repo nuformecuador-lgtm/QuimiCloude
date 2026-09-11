@@ -19,6 +19,8 @@
 // (`tests/guards/guard-password-never-plaintext.test.ts`). Se adapta el NOMBRE, no la guardia.
 import { createHash, randomBytes } from 'node:crypto';
 
+import type { CredentialSetupSecretFactory } from '../../../ports/credential-setup-secret-factory';
+
 /**
  * Bytes de entropia del secreto. **32 bytes = 256 bits exactos** (R10).
  *
@@ -62,3 +64,20 @@ export function createCredentialSetupSecret(): { readonly secret: string; readon
   const secret = randomBytes(CREDENTIAL_SETUP_SECRET_BYTES).toString('base64url');
   return { secret, digest: digestOfCredentialSetupSecret(secret) };
 }
+
+/**
+ * El adaptador COMPLETO de `CredentialSetupSecretFactory`, listo para que `lib/composition` lo ate
+ * al puerto (T17). Las dos funciones de arriba se siguen exportando sueltas porque los tests las
+ * ejercen una a una; esto solo las junta bajo el contrato.
+ *
+ * **`digestOf` reusa la MISMA `digestOfCredentialSetupSecret` que usa `create`** y no escribe un
+ * segundo SHA-256: la huella de emision y la de comprobacion tienen que ser la misma funcion o los
+ * enlaces vivos dejarian de validar el dia que una de las dos cambiara de codificacion (R9).
+ *
+ * El `satisfies` es un ancla de compilacion: si el puerto gana o cambia un metodo, esta linea deja
+ * de compilar en vez de descubrirse en `lib/composition`.
+ */
+export const credentialSetupSecretCrypto = {
+  create: createCredentialSetupSecret,
+  digestOf: digestOfCredentialSetupSecret,
+} satisfies CredentialSetupSecretFactory;

@@ -29,4 +29,27 @@ export interface CredentialSetupSecretFactory {
    * UNICO que llega a la base.
    */
   create(): { readonly secret: string; readonly digest: string };
+
+  /**
+   * La huella del secreto que llega **de fuera** (el de la URL del correo), para poder compararla
+   * con la que se persistio.
+   *
+   * **Por que existe este segundo metodo, si `design.md > 4.2` solo escribio `create()`.** R9 tiene
+   * dos mitades: «en la base DEBE quedar solo una huella irreversible» -la de emision, que cubre
+   * `create()`- y «la comprobacion DEBE hacerse calculando la huella del valor recibido y
+   * comparandola» -la de uso, que el diseno dejo sin puerto por el que pedirla-. El caso de uso
+   * publico (`domain/set-credential-with-link.ts`) necesita exactamente esa mitad y **no puede
+   * importar `node:crypto`**: `domain/` y `ports/` son puros (R26, R32), y el calculo es
+   * infraestructura. Sin este metodo la unica salida seria que el dominio importara el adaptador,
+   * que es la linea que `docs/architecture.md > La regla de dependencias` prohibe.
+   *
+   * **Es la MISMA funcion que usa `create()`**, no una segunda implementacion: el adaptador ya
+   * tenia `digestOfCredentialSetupSecret` exportada aparte precisamente para esto, y dos SHA-256
+   * escritos por separado serian dos verdades sobre la misma huella -el dia que una cambiara de
+   * codificacion, todos los enlaces vivos dejarian de validar en silencio-.
+   *
+   * Es determinista y sin estado: la misma entrada da siempre la misma huella (`design.md > 4.1`),
+   * que es lo que permite buscarla por el indice unico de `token_digest`.
+   */
+  digestOf(secret: string): string;
 }

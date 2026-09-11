@@ -143,7 +143,7 @@
 
 ## Fase 4 — Los dos casos de uso nuevos
 
-- [ ] **T13 — Establecer la contraseña con el enlace.** — **R18, R19, R21, R22, R23**
+- [x] **T13 — Establecer la contraseña con el enlace.** — **R18, R19, R21, R22, R23**
       `domain/set-credential-with-link.ts`: **sin permiso y sin sesión**; política completa de QC-19
       antes de escribir; éxito → `applyCredentialAndActivate`; la **marca de cambio de credencial no
       se toca** (R21, ver P3); los seis casos de rechazo devuelven **el mismo**
@@ -153,7 +153,7 @@
       enlace sigue vivo.
       *(Depende de T10.)*
 
-- [ ] **T14 — [P] Reenviar el enlace.** — **R14, R15, R16, R30**
+- [x] **T14 — [P] Reenviar el enlace.** — **R14, R15, R16, R30**
       `domain/issue-credential-setup-link.ts`: `usuarios.modificar` como **primera línea**, actor por
       parámetro, falla cerrado; ámbito por empresa; `user_not_found` si no existe/borrado/otra
       empresa, `user_not_pending` si ya no está en `pending`; el anterior muere y el nuevo cuenta 7
