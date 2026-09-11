@@ -1,6 +1,10 @@
 // lib/modules/identity/domain/create-user.ts
 import type { UserAccountStatus } from './account-status';
 import { requirePermission, type Actor } from './actor';
+// La UNICA conversion de la fecha civil `YYYY-MM-DD` al `Date` que pide el puerto, anclada en UTC.
+// `update-user.ts` importa la MISMA, del mismo archivo: dos copias es como el alta y la edicion
+// acaban guardando dias distintos para el mismo texto.
+import { toBirthDate } from './birth-date';
 import {
   DuplicateDocumentError,
   DuplicateEmailError,
@@ -42,27 +46,6 @@ export type CreateUserDeps = {
  * seria tocar un archivo de QC-65, que no es de esta task.
  */
 const ACCOUNT_STATUS_AT_BIRTH = 'pending' satisfies UserAccountStatus;
-
-/**
- * La fecha de nacimiento es una fecha CIVIL, no un instante: `createUserSchema` la valida como
- * `YYYY-MM-DD` (lo que emite un `<input type="date">` y lo que llega por `FormData`) y el puerto
- * pide un `Date` porque la columna es `@db.Date`. La conversion es de ESTE lado (el comentario de
- * `user-input.ts` lo deja escrito: el borde valida la FORMA, no elige la representacion).
- *
- * **Se ancla en UTC a proposito.** `new Date('1990-05-04')` ya interpreta el formato corto como UTC,
- * pero `new Date(1990, 4, 4)` -o cualquier variante con hora local- daria el dia ANTERIOR en una
- * maquina al oeste de Greenwich al serializarse, y este repo corre en local, en CI y en Vercel con
- * tres zonas distintas. Con la hora explicita en `Z` el resultado **no depende de la zona del
- * proceso**: el mismo texto da siempre el mismo dia.
- *
- * Vive aqui y `update-user.ts` la importa: la conversion tiene que ser UNA, porque dos copias es
- * exactamente como el alta y la edicion acaban guardando dias distintos para el mismo texto. Su
- * sitio natural seria un `domain/birth-date.ts`, pero T9/T10 no declara ese archivo y crearlo por mi
- * cuenta no es de esta task.
- */
-export function toBirthDate(civilDate: string): Date {
-  return new Date(`${civilDate}T00:00:00.000Z`);
-}
 
 /** Traduce la clave duplicada del puerto al error de dominio del campo que choco (R17). */
 export function throwDuplicate(key: DuplicateKey): never {

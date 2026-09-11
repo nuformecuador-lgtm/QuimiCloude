@@ -705,10 +705,14 @@ mitad de `lib/composition/index.ts` **solo sobre las lineas que esta rama anade*
 es compartido y mirarlo entero acusaria en falso.
 
 El ancla de no-vacuidad afirma que **esta rama cambia algo**, nunca que un archivo de **otra** ficha
-este en el diff. Es la diferencia exacta con los dos de `unidades` que estan rojos en toda rama que
-no sea la suya. **Riesgo residual conocido, el mismo de los cinco retensados de
-`recipe-route-contract.test.ts`**: una vez mergeada a `dev` con arbol limpio, el diff es vacio y
-estos casos se ponen rojos. Es el patron que el repo ya usa; queda dicho.
+este en el diff.
+
+> **CORREGIDO EL 2026-09-10 — lo que este parrafo decia aqui ERA FALSO.** Decia que el riesgo de que
+> el ancla se pusiera roja tras el merge era «el mismo de los cinco retensados de
+> `recipe-route-contract.test.ts`». **No lo es: es el contrario.** Esos cinco afirman que el diff
+> **NO contiene** cosas prohibidas, asi que con diff vacio **pasan**; los de aqui afirmaban que el
+> diff **SI contiene** algo, asi que con diff vacio **fallaban**. Lo demostro el `reviewer`
+> (**MAYOR-1**) y tenia razon. El arreglo esta en **F2.4a**, al final de este archivo.
 
 **El noveno archivo ajeno del ripple.** `account-status-scope.test.ts` es la guarda de **QC-65** cuyo
 caso se llamaba «R19 — nadie lee todavia el estado de cuenta», con `toEqual` contra cinco sitios
@@ -990,10 +994,11 @@ El `scope.test.ts` de T18 **no** repite ese error: su ancla afirma que **esta** 
   pero si QC-67 quiere mensajes distintos **hay que reabrir el puerto**.
 - `toBirthDate` vive exportada desde `create-user.ts`; su sitio natural seria un `domain/birth-date.ts`
   que `tasks.md` no declara.
-- **Riesgo conocido del patron de anclas contra el diff**: una vez esta rama este en `dev` con arbol
-  limpio, los casos de `scope.test.ts` que miran el diff veran un diff vacio y se pondran rojos. Es
-  el **mismo** riesgo que ya tienen los cinco retensados de `recipe-route-contract.test.ts`; se sigue
-  el patron del repo, y queda dicho en vez de descubierto.
+- ~~**Riesgo conocido del patron de anclas contra el diff**: los casos de `scope.test.ts` que miran
+  el diff se pondran rojos en `dev`. Es el mismo riesgo que los cinco retensados de
+  `recipe-route-contract.test.ts`.~~ **ERA FALSO Y YA NO ES DEUDA: era MAYOR-1, y esta ARREGLADO en
+  F2.4a.** La comparacion con `recipe-route-contract.test.ts` estaba mal —esos pasan con diff vacio,
+  estos fallaban— y ademas no era «deuda declarada» sino un rojo determinista sobre `dev`.
 
 ### 6. Montaje del entorno, para quien repita esto
 
@@ -1365,3 +1370,249 @@ pnpm exec vitest run guard
 tests/unit/identity/ + tests/unit/composition/ + tests/unit/errores/ + tests/integration/identity/
   -> Test Files  55 passed (55)   |   Tests  921 passed | 3 skipped (924)
 ```
+
+---
+
+## F2.4a — respuesta al rechazo del `reviewer` (2026-09-10)
+
+Informe: `progress/review_QC-66-crud-de-usuarios.md`. Veredicto: **RECHAZADO**, **1 mayor** y
+**9 menores**. El mayor esta arreglado; de los nueve menores, **cuatro atendidos** y **cinco
+justificados** uno por uno aqui abajo. «Menor» no es «se ignora».
+
+### MAYOR-1 — ARREGLADO. Y la justificacion que yo habia escrito era FALSA
+
+**El hallazgo.** `tests/unit/identity/usuarios/scope.test.ts` tenia **cuatro** casos que anclaban la
+no-vacuidad con `expect(diff.length, ANCLA_DEL_RANGO).toBeGreaterThan(0)` sobre el diff
+`merge-base(origin/dev, HEAD)`. **El dia que este PR entre en `dev`, la base pasa a ser HEAD, el diff
+queda vacio y los cuatro se ponen ROJOS de forma determinista sobre `dev` limpio** — y con ellos,
+R43, R46 y R47 quedan **sin guardia efectiva**. Como la regla 5 obliga a `./init.sh` completo antes
+de **cada** PR, eso no rompe un test viejo: **rompe el gate de todas las features siguientes**.
+
+**Mi justificacion anterior era falsa, y el reviewer lo demostro.** Yo habia escrito que era «el
+mismo riesgo que los cinco retensados de `recipe-route-contract.test.ts`». **Es el contrario**: esos
+cinco afirman que el diff **NO contiene** cosas prohibidas, asi que con diff vacio **pasan**; los
+mios afirmaban que el diff **SI contiene** algo, asi que con diff vacio **fallaban**. Los dos sitios
+de esta bitacora que lo decian **estan corregidos arriba**, no borrados.
+
+**El arreglo, y por qué ese patron y no un cuarto invento.** `dev` ya habia resuelto este antipatron
+**dos veces** —`modulo-intacto.test.ts` y `account-status-scope.test.ts`, y el segundo lo toca esta
+misma ficha, asi que el patron estaba literalmente delante—. Pero no se copio a ciegas: el criterio
+fue **mover a CONTENIDO todo lo que pueda afirmarse sobre contenido**, porque una guardia que se
+vuelve **muda** en `dev` da confianza falsa, y reservar el patron de rama **solo** para el residuo
+que es inherentemente «lo que esta rama anadio».
+
+**Familia A — CONTENIDO, muerden para siempre, tambien en `dev` dentro de un mes (7 casos):**
+
+| Caso | Qué afirma, sin tocar git |
+| --- | --- |
+| **R43 (reescrito)** | la carpeta `db/migrations/20260910120000_user_permissions_catalog` **existe** con sus dos archivos no vacios, el UP inserta en `permissions` y `role_permissions`, tiene **exactamente dos** `ON CONFLICT … DO NOTHING`, y **ni el UP ni el `down.sql`** llevan `ALTER`/`CREATE`/`DROP` |
+| **R47 (reescrito, y queda MAS FUERTE)** | **ninguna** de las cinco candidatas que `design.md > 13` descarto esta instalada —`generate-password`, `nanoid`, `secure-random-password`, `libphonenumber-js`, `validator`—, en `dependencies` ni en `devDependencies`, con ancla positiva (`bcryptjs` presente, >10 deps leidas). Prohibe **lo concreto** en vez de «que nadie toque el archivo» |
+| R38, R45, R16, R24 | ya eran de contenido; intactos |
+| **el rango resuelve** | nuevo: «**no puedo mirar**» sigue siendo **ROJO**, y se comprueba una sola vez |
+
+**Familia B — residuo de rama, `esLaRamaDeQC66()` + `ctx.skip` ruidoso (5 casos):**
+`db/schema.prisma` fuera del diff · ninguna **otra** carpeta de `db/migrations/` · nada bajo
+`app/`/`components/`/`e2e/` ni adaptador de navegacion · `package.json`/`pnpm-lock.yaml` fuera del
+diff · **las lineas que la rama anade a `lib/composition/index.ts` no nombran el bloqueo**.
+
+`esLaRamaDeQC66(tocados)` es **pura y exportada**, con senal **conjuntiva**:
+`lib/modules/identity/domain/create-user.ts` **y** algo bajo `specs/QC-66-crud-de-usuarios/`. Con una
+sola no basta, porque otra ficha podria rozar una. Los otros cuatro detectores
+—`cambiosDeEsquema`, `migracionesAjenas`, `infraccionesDeInterfaz`, `cambiosDeDependencias`— tambien
+son puros y exportados.
+
+**Los tres desenlaces dicen la verdad, y esa es la correccion de fondo:** el rango no resuelve ->
+**ROJO** («no puedo mirar»); la rama no es la suya, **incluido el diff vacio** -> **`skipped` con su
+motivo escrito** («esto no es lo mio» / «no hay nada que mirar»); es la suya -> vigila igual que
+antes. **Ningun caso queda verde sin haber mirado.** Lo que faltaba era distinguir «no estoy en mi
+rama» de «no pude mirar», no relajar ningun `expect` — y no se relajo ninguno.
+
+**UN QUINTO CASO QUE EL REVIEWER NO LISTO, y tenia el mismo defecto.** La mitad de R45 que media
+`lineasAnadidasEn(lib/composition/index.ts)` llevaba el **mismo** ancla y se habria puesto roja con
+diff vacio igual que los cuatro. Medir el archivo entero **no era opcion**: QC-78 va a nombrar el
+bloqueo ahi con pleno derecho. Asi que R45 se partio en dos —la mitad de contenido (los 20 archivos
+propios, muerde siempre) y la mitad de rama (las lineas anadidas al archivo compartido, `skipped`
+fuera de su rama)—. **Son cinco casos arreglados, no cuatro.**
+
+#### Sensibilidad de las guardias de contenido: rotas a mano, rojas, y restauradas
+
+No basta con que pasen; hay que demostrar que **caen**. Cinco sondas, cada una revertida en el mismo
+paso y con `git status` comprobado despues:
+
+```
+1) ALTER TABLE "permissions" ADD COLUMN "sonda" text;  en el UP
+   x R43 — la migracion del catalogo existe, es de DATOS y no lleva ni un ALTER, CREATE ni DROP
+     AssertionError: ...migration.sql contiene un ALTER: R43 dice que esta migracion solo mueve
+     FILAS: expected ... not to match /\bALTER\b/i
+2) quitado el ON CONFLICT ("code") DO NOTHING
+   x AssertionError: el UP de la migracion del catalogo no tiene sus DOS
+     'ON CONFLICT ... DO NOTHING' (R11: es idempotente). Encontrados: 1: expected 1 to be 2
+3) "nanoid": "^5.0.0" en dependencies
+   x R47 — ninguna de las cinco dependencias que design.md > 13 descarto esta instalada
+     AssertionError: Estan instaladas: nanoid: expected [ 'nanoid' ] to deeply equal []
+   (y tambien cae el caso de rama de R47)
+4) DROP INDEX "users_email_unique"; en el UP
+   x R38 — ...migration.sql nombra 'users_email_unique', y R38 dice que esta ficha no lo toca
+   (y tambien cae R43 por el DROP)
+5) creado app/(private)/usuarios/page.tsx
+   x R46 — ... Esto esta en el diff: app/(private)/usuarios/
+
+Verde final tras restaurar todo: Test Files 1 passed (1) | Tests 16 passed (16)
+```
+
+**Un hallazgo dentro de la propia sonda 2, que vale la pena:** `grep -c "ON CONFLICT"` seguia dando
+**2** tras quitar uno, porque **la cabecera del SQL lo menciona en un comentario**. Por eso el conteo
+va sobre el SQL **sin comentarios**; escrito de la forma ingenua, esa asercion **habria pasado en
+verde** con el `ON CONFLICT` borrado.
+
+#### Como se probo el escenario «diff vacio», que es el que cierra MAYOR-1
+
+`tocados` se **inyecta** en el mismo helper que usan los cinco casos de rama, y hay un caso de test
+real —`EL CASO QUE CIERRA MAYOR-1: con el diff VACIO los casos de rama se SALTAN, no fallan`— que
+ejercita los tres desenlaces con un `ctx` sintetico cuyo `skip` registra la nota y lanza:
+
+- `esLaRamaDeQC66([])` -> `false`;
+- `diffOMudo(ctxFalso, [])` -> **lanza el salto** (no llega a ninguna asercion) y la nota contiene
+  `VACIO` y `NO ha comprobado nada`;
+- `diffOMudo(ctxFalso, ['app/(private)/usuarios/page.tsx'])` -> salta tambien, con el **otro** motivo;
+- `diffOMudo(ctxFalso, RAMA_DE_QC66)` -> **no** salta y devuelve el diff entero, asi que el salto no
+  se tragó la guardia.
+
+**Lo que NO se hizo, y se dice:** no se simulo la corrida sobre `dev` ya mergeado moviendo
+`refs/remotes/origin/dev`. **A proposito**: las refs son **compartidas entre todos los worktrees** de
+este repo, y moverla habria podido poner en rojo los tests de las otras sesiones en vuelo — el mismo
+problema de clase que `git stash` a secas. En su lugar se verifico el **mecanismo** contra el
+precedente vivo del repo: `tests/unit/identity/account-status-scope.test.ts` corrido en esta rama da
+**`9 passed | 3 skipped`**, con sus tres casos marcados `↓` y su motivo impreso. Es exactamente lo
+que haran los cinco de QC-66 en `dev`.
+
+**Por qué R46 no tiene mitad de contenido, y es correcto que no la tenga.** «Esta ficha no anade
+pantalla» es un **hecho historico de la rama**, y **QC-67 va a anadir esa pantalla legitimamente**.
+Una guardia de contenido ahi bloquearia a QC-67 — que es **el error exacto** que cometia
+`modulo-intacto.test.ts` y que `dev` acabo arreglando con este mismo patron. Queda escrito en el
+propio archivo para que nadie lo «complete» manana.
+
+---
+
+### Los nueve menores: cuatro atendidos, cinco justificados
+
+| # | Hallazgo | Qué se hizo |
+| --- | --- | --- |
+| **menor-1** | el regex del catalogo de QC-70 pierde `username` | **JUSTIFICADO** |
+| **menor-2** | `updateAliveInCompany` bloquea a todos los administradores activos en cada edicion | **ATENDIDO** |
+| **menor-3** | `P2003` funde «rol inexistente» y «tipo de documento inexistente» | **JUSTIFICADO** |
+| **menor-4** | P3 queda cerrada de hecho en un sentido | **JUSTIFICADO** |
+| **menor-5** | la cabecera de las seis copias de `list-query.ts` dice «los cinco modulos» | **JUSTIFICADO** |
+| **menor-6** | el checkpoint de E2E para flujo critico sin marcar | **ATENDIDO** |
+| **menor-7** | `toBirthDate` vive exportada desde `create-user.ts` | **ATENDIDO** |
+| **menor-8** | el alta gasta un bcrypt antes de conocer el resultado del indice | **JUSTIFICADO** |
+| **menor-9** | el ciclo real de migracion no se re-ejecuto | **ATENDIDO** |
+
+#### Los cuatro atendidos
+
+- **menor-7 — `toBirthDate` se muda a `lib/modules/identity/domain/birth-date.ts`.** Un caso de uso no
+  es el hogar de una utilidad que otro caso de uso importa. Se movio **tal cual**, con su anclaje en
+  **UTC explicito** intacto —cualquier variante con hora local daria el dia anterior al oeste de
+  Greenwich— y sigue habiendo **una sola** implementacion, que es lo que impedia que el alta y la
+  edicion guardaran dias distintos.
+- **menor-2 — el coste del bloqueo en la edicion queda DECLARADO en el codigo**, donde lo leera quien
+  pase. El bloqueo se toma **siempre**, sin mirar antes si el objetivo es administrador ni si el rol
+  cambia, y **eso no se cambia**: comprobarlo **antes** seria leer sin proteccion y decidir con ese
+  dato, que es **la carrera que R23 prohibe**, y comprobarlo **dentro** de la transaccion seria
+  despues del bloqueo, asi que no ahorraria nada. El coste aceptado, dicho entero: **serializa todas
+  las ediciones de usuario de una misma empresa**; si algun dia molesta, el camino es **acotar** el
+  bloqueo, no quitarlo.
+- **menor-6 — el diferimiento del E2E queda heredado explicitamente por QC-67.** Anotado en la
+  cabecera de `scope.test.ts` y dentro del caso de R46: decision cerrada 17, R46, declarado en
+  `design.md > 14` **y no al final**, precedente QC-43 -> QC-44, y literalmente **no hay pantalla que
+  visitar**. `CHECKPOINTS.md` no contempla excepcion escrita para esa linea —solo para la de UI
+  multiplataforma—, asi que se deja donde QC-67 lo va a encontrar.
+- **menor-9 — el ciclo real de migracion, re-ejecutado de primera mano.** El reviewer lo dio por bueno
+  desde el test estatico y mi salida anterior; ahora no depende de un informe de segunda mano. Salida
+  abajo.
+
+#### Los cinco justificados, uno por uno
+
+- **menor-1 — el regex de vocabulario del catalogo de QC-70 pierde `username`.** Era **inevitable**:
+  `duplicate_username` es un codigo legitimo de la administracion de usuarios, y el regex prohibia la
+  palabra. **No se arregla aqui y el motivo es de propiedad**: la forma correcta —prohibir **por
+  familia** en vez de por palabra— es un cambio del diseno de la guardia de **QC-70**, no de esta
+  ficha, y hacerlo desde aqui seria reescribir el criterio de una guardia ajena de pasada. Lo que esta
+  ficha **si** dejo en su sitio: el conteo sigue **literal** (32), los **cinco** codigos de
+  autenticacion siguen prohibidos, y el caso **gano** siete aserciones que exigen que los siete de
+  usuarios esten. El hueco residual —un codigo de **autenticacion** que nombre `username`, tipo
+  `username_taken`— queda anotado para la proxima ficha que toque el catalogo.
+- **menor-3 — `P2003` funde «rol inexistente» y «tipo de documento inexistente» en
+  `role_not_found`.** **No es arreglable dentro del alcance de esta ficha**: el motor **no da el dato**
+  —`meta` llega como `{ modelName: 'User', constraint: null }`, medido—, asi que distinguirlos exige
+  **otro resultado en el puerto** y una **comprobacion previa** del tipo de documento. **R18 se
+  cumple** (rechaza sin escribir ninguna fila) y el limite esta escrito en el propio adaptador. Si
+  QC-67 quiere senalar el campo correcto, **hay que reabrir el puerto**, y eso es una decision de
+  alcance que no me toca tomar por mi cuenta (regla 6).
+- **menor-4 — P3 queda cerrada de hecho en un sentido.** **No se cierra por implementacion, y no hay
+  opcion neutra.** `update-user.ts` rechaza editarse a si mismo por **R21** —la edicion es reemplazo
+  completo y el `roleId` es uno de los nueve campos, asi que editarse **es** escribirse el rol—, y
+  permitirlo habria sido decidir P3 en el **otro** sentido. El archivo lo dice con todas las letras
+  (L54-67) con el coste del cambio escrito en las dos direcciones, y el reviewer **no lo conto como
+  apartarse de una decision**. Lo que queda es que **el humano la cierre formalmente antes de QC-67**,
+  que es quien tiene que decidir si ofrece el camino. **Eso no lo decide el implementer.**
+- **menor-5 — la cabecera de las SEIS copias de `list-query.ts` sigue diciendo «los cinco modulos».**
+  Corregirlo obliga a editar las **cinco copias ajenas**, porque la guardia compara **texto**: o las
+  seis o ninguna. Eso es tocar cinco modulos que esta ficha declaro no tocar, a cambio de una palabra
+  en un comentario. **El ancla no se afloja**: la guardia **si** quedo en «seis», que es donde vive la
+  afirmacion que protege. Se deja para quien toque el contrato de lista por un motivo propio.
+- **menor-8 — el alta gasta un bcrypt por entrada valida antes de conocer el resultado del indice.**
+  Es la **consecuencia inevitable de la forma del puerto** (`design.md > 4.1`), y esa forma es
+  justamente lo que hace **R16 una propiedad del tipo** en vez de una promesa: el puerto devuelve
+  **solo el hash**, asi que la credencial no existe fuera del adaptador y el caso de uso **no puede**
+  filtrarla. Invertir el orden —insertar primero y hashear despues— exigiria crear la fila **sin
+  credencial**, que es peor. **Se acepta a cambio de esa garantia**, y queda anotado para que nadie lo
+  lea manana como un descuido.
+
+### menor-9 — el ciclo real de migracion, re-ejecutado (R44)
+
+```
+1. ANTES          permissions=13 usuarios=2 role_permissions=14 asign_admin=2
+                  migr_qc66=1 migr_total=23 fallidas=0
+
+2. ROLLBACK       db:rollback: aplicando down.sql de 20260910120000_user_permissions_catalog
+                  y borrando su fila de _prisma_migrations
+                  db:rollback: 20260910120000_user_permissions_catalog revertida.
+
+3. TRAS ROLLBACK  permissions=11 usuarios=0 role_permissions=12 asign_admin=0
+                  migr_qc66=0 migr_total=22 fallidas=0
+
+4. MIGRATE        Applying migration `20260910120000_user_permissions_catalog`
+                  All migrations have been successfully applied.
+
+5. DESPUES        permissions=13 usuarios=2 role_permissions=14 asign_admin=2
+                  migr_qc66=1 migr_total=23 fallidas=0
+
+6. STATUS         Database schema is up to date!
+
+y despues: tests/integration/identity/ -> Test Files 7 passed (7) | Tests 161 passed (161)
+```
+
+El catalogo vuelve a **once** entradas y **doce** asignaciones, las dos del `Administrador`
+desaparecen, y `_prisma_migrations` queda coherente (**23 -> 22 -> 23**, cero fallidas). **R44 deja de
+apoyarse en un informe de segunda mano.** Y el paso 4 vuelve a ejercitar el camino de **una
+instalacion ya en marcha** —el rol `Administrador` **existe**, asi que el `INSERT … SELECT` si inserta
+sus dos asignaciones—, que es el que justifica que esta migracion exista.
+
+### Verificacion de F2.4a
+
+```
+pnpm run typecheck  -> CERO errores (el leader genero `.next/types`; el LayoutProps ya no existe)
+pnpm exec eslint .  -> sin salida (limpio)
+
+pnpm exec vitest run tests/unit/identity/usuarios/scope.test.ts
+  -> Test Files  1 passed (1)    |  Tests  16 passed (16)
+pnpm exec vitest run guard
+  -> Test Files  27 passed (27)  |  Tests  272 passed | 4 skipped (276)
+```
+
+**Ya no queda ningun rojo ajeno**: los cuatro que esta bitacora declaraba estan apagados —dos los
+apago el merge con `dev`, dos los arreglo `dev` con el patron de rama— y el `LayoutProps` lo cerro el
+leader con un `next build`.
+
+La suite completa **no** se corrio desde aqui: el gate completo y el PR son del leader (F2.4).

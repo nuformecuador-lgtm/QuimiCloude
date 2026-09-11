@@ -593,6 +593,18 @@ export async function updateAliveInCompany(
 ): Promise<'ok' | 'not_found' | DuplicateKey | 'role_not_found' | 'last_administrator'> {
   return prisma.$transaction(async (tx) => {
     // 1. El bloqueo, en su unico sitio.
+    //
+    // **Se toma SIEMPRE**, en cada edicion, sobre TODOS los administradores activos de la empresa:
+    // no se mira antes si el objetivo es administrador ni si el `roleId` pedido cambia respecto al
+    // actual. No es un descuido, es la unica forma correcta: comprobarlo ANTES del bloqueo seria
+    // leer sin proteccion y decidir con ese dato -exactamente la carrera que R23 prohibe-, y la
+    // comprobacion tendria que ser DENTRO de la transaccion, o sea despues del bloqueo, asi que no
+    // ahorraria nada.
+    //
+    // **El coste aceptado, dicho entero**: esto SERIALIZA todas las ediciones de usuario de una
+    // misma empresa detras del mismo conjunto de filas. Ningun requisito lo prohibe y con los
+    // volumenes de hoy no se nota. Si algun dia molesta, el camino es ACOTAR el bloqueo, no
+    // quitarlo: nunca de menos, que es lo que R22 exige.
     const activeAdministratorIds = await lockActiveAdministratorIds(tx, companyId, ROLE_ADMINISTRADOR);
 
     // 2 y 3. El conjunto que quedaria. El identificador del rol administrador se lee DENTRO de la

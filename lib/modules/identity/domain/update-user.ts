@@ -1,6 +1,8 @@
 // lib/modules/identity/domain/update-user.ts
 import { requirePermission, type Actor } from './actor';
-import { throwDuplicate, toBirthDate } from './create-user';
+// La MISMA conversion que usa el alta, desde su propio archivo: una sola implementacion.
+import { toBirthDate } from './birth-date';
+import { throwDuplicate } from './create-user';
 import {
   LastAdministratorError,
   RoleNotFoundError,
