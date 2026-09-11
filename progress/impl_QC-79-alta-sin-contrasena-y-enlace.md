@@ -258,7 +258,29 @@ al baseline.**
 - `tests/guards/guard-identificador-de-request.test.ts` — **solo** `MIGRACIONES_ESPERADAS` y
   `E2E_ESPERADOS`, cada una con su linea diciendo que QC-79 la actualiza y por que. Su propio mensaje
   dice «si esta migracion es de otra ficha, **esa ficha actualiza esta lista**».
-  `DEPENDENCIAS_ESPERADAS` (31) y `FRAGMENTOS_PROHIBIDOS` **sin tocar**.
+  `FRAGMENTOS_PROHIBIDOS` **sin tocar** — esa es la mitad que de verdad afirma algo sobre QC-71.
+
+  **CORRECCION (menor n.º 2 de la review).** La frase que habia aqui decia que
+  `DEPENDENCIAS_ESPERADAS` habia quedado «sin tocar», y **era falsa**. De ese archivo salieron
+  **TRES** constantes modificadas, no dos:
+
+  | Constante | Cambio | Quien |
+  | --- | --- | --- |
+  | `DEPENDENCIAS_ESPERADAS` (`:207`) | `30` -> **`31`** | **el leader**, ANTES de lanzar al implementer |
+  | `MIGRACIONES_ESPERADAS` | + la migracion del enlace | el implementer, en esta tanda |
+  | `E2E_ESPERADOS` | + `establecer-contrasena.spec.ts` | el implementer, en esta tanda |
+
+  El cambio del leader **es legitimo y no debilita nada**: sigue siendo un total exacto, y va
+  acompanado de un comentario largo que dice que ese total es un **numero magico** —la guardia
+  nacio para afirmar «QC-71 no anade ninguna dependencia» pero lo codifico como total absoluto
+  del repositorio, asi que **cualquier feature posterior que anada una dependencia APROBADA la
+  rompe sin haber hecho nada mal**; QC-79 fue la primera—.
+
+  Se deja escrito **quien** lo hizo, y no es cosmetica: segun `CLAUDE.md` el leader **orquesta y
+  no edita** (`no escribes en app/ ni en tests/ directamente`), asi que esa edicion fue una
+  excepcion a su propio rol. El implementer, al redactar el cierre, dio por bueno que ese archivo
+  solo se habia tocado en su tanda y afirmo de mas. **El acta tiene que poder leerse dentro de
+  seis meses sin enganar a nadie**, y por eso la frase se corrige en vez de borrarse.
 - `tests/unit/identity/account-status-scope.test.ts` (QC-65 R19) — **NO fue al baseline, y es una
   decision**: no es un censo del diff de rama, es un censo del **arbol** con lista cerrada, y su
   propio comentario dice «IGUALDAD, no `toContain`: **cualquier archivo nuevo que lo nombre pone esto
@@ -319,3 +341,44 @@ lo corre el leader (T24).
 tocados en cada tanda, los doce archivos ajenos reales atendidos **sin debilitar ninguna
 expectativa**, y los rojos restantes clasificados uno a uno. Lo que **no** se afirma aqui es la
 corrida de la suite entera con el comparador: eso es **T24 y es del leader**.
+
+## T24 — CERRADA. Gate completo, y la evidencia que faltaba
+
+**`./init.sh` completo, corrido por el leader:**
+
+```
+== init OK ==
+4708 tests · 4672 verdes · 9 rojos en 6 archivos
+TODOS los rojos estan en tests/baseline-rojos.json — CERO rojos nuevos
+```
+
+**Los dos agujeros de evidencia que este acta tenia, cerrados por el reviewer ejecutandolos**
+(menor n.º 7: estaban cubiertos en codigo, pero no reportados como **ejecutados**, y el precedente
+del repo —QC-39, QC-88— es reportarlos):
+
+| Que | Resultado |
+| --- | --- |
+| **R36 — ciclo real de migracion**: `db:rollback` -> `db:migrate` | **verde**. El `down.sql` revierte y borra su fila de `_prisma_migrations`; el deploy la reaplica («24 migrations found», «All migrations have been successfully applied»). Integracion re-corrida despues: **180/180 otra vez** |
+| **R41 — E2E**: `playwright test e2e/establecer-contrasena.spec.ts` | **2 passed (55,6 s)**, **chromium y webkit**: alta sin contrasena -> buzon -> pagina publica -> contrasena establecida -> **entra al dashboard** -> cuenta en `active` -> el enlace ya no sirve |
+
+Con esto, **ninguno de los 41 requisitos depende ya de evidencia no ejecutada**.
+
+## Veredicto de la review y los cuatro menores atendidos
+
+`progress/review_QC-79-alta-sin-contrasena-y-enlace.md`: **OK (APROBADO)**, **cero mayores**, ocho
+menores. El humano decidio atender **cuatro**; los otros cuatro se justifican por escrito en el PR.
+
+| # | Menor | Que se hizo |
+| --- | --- | --- |
+| 1 | `tasks.md` T24 en `[~]` | Cerrada en `[x]` con el resultado del gate de arriba |
+| 2 | El acta afirmaba en falso que `DEPENDENCIAS_ESPERADAS` quedo sin tocar | **Corregido**, con quien hizo cada cosa. Ver la tabla de las tres constantes, mas arriba |
+| 3 | `design.md > 11.3` citaba **QC-70 R31**, que no dice lo que se le atribuia | **Cita corregida a QC-70 R29**, que es lo que de verdad sostiene la decision. La **decision no cambia**. Se declara explicitamente que la letra de **QC-79 R34** no se cumple para `CredentialPolicyRejectedError` ni `CredentialConfirmationMismatchError`, y por que la excepcion es correcta aun asi. Material para `/afinar-regla` |
+| 4 | Aviso de Base UI en el `<Button render={<Link/>}>` de la pagina | `nativeButton={false}` |
+
+**No atendidos, y se justifican en el PR** (ninguno bloqueante, todos anotados por la review):
+n.º 4 `InitialCredentialFactory` sin consumidor —se conserva para QC-89, con la razon escrita donde
+vivia el cableado—; n.º 6 el transporte de **buzon** puede lanzar mientras el puerto promete que
+nunca se lanza —fallar ruidosamente ahi es lo que `design.md > 9.2` pide, y el transporte real es el
+de por defecto—; n.º 7 ya cerrado arriba; n.º 8 observacion sobre el secreto en el **camino** de la
+URL —la mitigacion real es el `no-referrer`, el uso unico, los 7 dias y la huella, no la frase de
+`design.md > 4.4`, que **no debe reusarse como si fuera una garantia**—.

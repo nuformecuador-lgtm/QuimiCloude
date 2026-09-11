@@ -12,7 +12,10 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 
 import CredentialSetupPage from '@/app/(public)/establecer-contrasena/[token]/page';
-import { SetCredentialForm } from '@/app/(public)/establecer-contrasena/[token]/components';
+import {
+  SET_CREDENTIAL_LABELS,
+  SetCredentialForm,
+} from '@/app/(public)/establecer-contrasena/[token]/components';
 import { CREDENTIAL_RULE_LABELS } from '@/components/shared/credential-rule-labels';
 import type { SetCredentialFormState } from '@/lib/modules/identity/adapters/driving/credential-setup-actions';
 import { CREDENTIAL_SETUP_ROUTE, LOGIN_ROUTE, credentialSetupRoute } from '@/lib/shared/routes';
@@ -256,6 +259,15 @@ describe('los cinco estados de SetCredentialFormState', () => {
     const enlace = screen.getByTestId(testId.loginLink);
     expect(enlace.tagName).toBe('A');
     expect(enlace).toHaveAttribute('href', LOGIN_ROUTE);
+    // Retensado: no basta con que sea un `<a href>`. Tiene que EXPONERSE como enlace, asi que se
+    // afirma el rol accesible y que nadie le ha puesto encima `role="button"` para callar el aviso
+    // de `nativeButton` de Base UI -que es exactamente lo que hace `nativeButton={false}`-.
+    expect(screen.getByRole('link', { name: SET_CREDENTIAL_LABELS.goToLogin })).toBe(enlace);
+    expect(enlace).not.toHaveAttribute('role');
+    expect(screen.queryByRole('button')).toBeNull();
+    // El objetivo tactil de 44 px de R25 sigue en el propio `<a>`, que es lo que se toca.
+    expect(enlace.className).toContain('min-h-11');
+    expect(enlace.className).toContain('w-full');
   });
 
   it('invalid_credential: la UI compone el texto de CADA regla incumplida con su codigo', async () => {

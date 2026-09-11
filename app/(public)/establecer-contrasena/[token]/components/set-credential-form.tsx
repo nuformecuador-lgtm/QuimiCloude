@@ -28,12 +28,13 @@ import Link from 'next/link';
 import { useActionState } from 'react';
 
 import { CREDENTIAL_RULE_LABELS } from '@/components/shared/credential-rule-labels';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import {
   setCredentialWithLinkAction,
   type SetCredentialFormState,
 } from '@/lib/modules/identity/adapters/driving/credential-setup-actions';
 import { LOGIN_ROUTE } from '@/lib/shared/routes';
+import { cn } from '@/lib/utils';
 
 import { CredentialInput } from './credential-input';
 import { SET_CREDENTIAL_LABELS, type SetCredentialLabels } from './set-credential-labels';
@@ -68,12 +69,26 @@ export function SetCredentialForm({ secret, labels }: SetCredentialFormProps) {
         {/*
           El enlace al login, y NO una sesion abierta sola (`design.md > 11.5`): fabricar una
           sesion desde una superficie publica, a partir de un secreto que pudo llegar por un
-          correo reenviado, no lo pide ningun requisito. `render` para que el objetivo tactil de
-          44 px del boton lo lleve el propio `<a>`, que es lo que se toca.
+          correo reenviado, no lo pide ningun requisito.
+
+          **Es un `<Link>` real pintado con `buttonVariants`**, no el primitivo `Button` con
+          `render`: lo que hace es navegar. Pasar un enlace por el boton de Base UI dispara su
+          aviso de `nativeButton`, y callarlo con `nativeButton={false}` le pone `role="button"`
+          al `<a>` (`useButton`: cuando no es nativo el merge anade `role: 'button'`), que es
+          mentir sobre lo que el control hace y perder la semantica de enlace justo donde R25 y
+          `design.md > 11.5` piden que sea un enlace. Mismo patron que los estados vacios del
+          repo. `data-slot="button"` se conserva porque de el cuelgan los selectores de estilo, y
+          `min-h-11 w-full` deja el objetivo tactil de 44 px de R25 en el propio `<a>`, que es lo
+          que se toca.
         */}
-        <Button className="min-h-11 w-full" render={<Link href={LOGIN_ROUTE} data-testid="set-credential-login-link" />}>
+        <Link
+          href={LOGIN_ROUTE}
+          data-slot="button"
+          data-testid="set-credential-login-link"
+          className={cn(buttonVariants(), 'min-h-11 w-full')}
+        >
           {texto.goToLogin}
-        </Button>
+        </Link>
       </div>
     );
   }

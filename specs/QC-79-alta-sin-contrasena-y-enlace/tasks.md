@@ -250,7 +250,7 @@
       fueron **de verdad**.
       *(Depende de T22.)*
 
-- [~] **T24 — Gate completo y bitácora.**
+- [x] **T24 — Gate completo y bitácora.**
       `./init.sh` entero. Escribir `progress/impl_QC-79-alta-sin-contrasena-y-enlace.md` con el mapa
       **`R<n> → test`** (`CHECKPOINTS.md > Trazabilidad`), la salida del ciclo de T6, el número real
       de archivos ajenos y cualquier punto donde el código se apartó del diseño.
