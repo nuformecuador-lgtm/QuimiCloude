@@ -483,6 +483,31 @@ const MIGRACION_QC80 = [
   'db/migrations/20260911120000_presentation_unit/down.sql',
 ];
 
+// RETENSADO 2026-09-11 (QC-86), con el MISMO criterio que los seis retensados de arriba: el
+// rango `origin/dev...HEAD` mide la rama que corre el gate, asi que cada archivo legitimo de
+// `db/` posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
+//
+// Convive con `MIGRACION_QC80`, y las DOS son legitimas: QC-80 y QC-86 entraron en `dev` con el
+// mismo sello de tiempo y cada una trae su migracion. Quedarse con una sola -que es lo que
+// proponia cada lado del conflicto del merge- habria puesto este caso rojo por la otra, que es
+// exactamente lo que ya le paso a QC-74 y esta escrito en `MIGRACIONES_LEGITIMAS`.
+//
+// POR QUE `db/` cambia aqui: QC-86 crea la tabla `order_assignments` en el modulo NUEVO
+// `asignaciones` -la asignacion de responsables a un pedido-, con su `down.sql`, y su migracion
+// inserta ademas los dos permisos del modulo (`asignaciones.consultar` y
+// `asignaciones.modificar`) en `permissions` y sus asignaciones de rol. NO toca recetas, ni
+// unidades, ni pedidos. `db/schema.prisma` no se repite aqui: ya esta nombrado en
+// `MIGRACION_QC34`.
+//
+// Que su UP no ejecute NINGUN DDL sobre ninguna tabla preexistente no lo vigila este caso, sino
+// `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACION_QC86 = [
+  'db/migrations/20260911120000_order_assignments/migration.sql',
+  'db/migrations/20260911120000_order_assignments/down.sql',
+];
+
 /** Toda ruta de `lib/modules/recetas/` cuyo cambio esta aprobado y nombrado por una ficha. */
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
@@ -498,6 +523,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC83,
   ...MIGRACION_QC66,
   ...MIGRACION_QC80,
+  ...MIGRACION_QC86,
 ];
 
 /**
