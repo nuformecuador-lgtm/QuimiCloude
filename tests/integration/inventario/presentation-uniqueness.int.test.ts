@@ -110,12 +110,28 @@ function normalizeForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '');
 }
 
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: Prisma.TransactionClient): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
 async function createPresentation(
   tx: Prisma.TransactionClient,
   name: string,
 ): Promise<string> {
   const presentation = await tx.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name) },
+    data: { name, nameNormalized: normalizeForTest(name), unitId: await unidadDeSistema(tx) },
     select: { id: true },
   });
   return presentation.id;
@@ -194,6 +210,10 @@ describe('R20: el indice unico es la garantia real de la unicidad', () => {
       const marker = token();
       const normalized = `bidon20l${marker}`;
       const firstId = await createPresentation(tx, `Bidon 20 L ${marker}`);
+      // QC-80 (R1): `presentations.unit_id` es NOT NULL, asi que el INSERT crudo tiene que
+      // llevarla o el rechazo llegaria como 23502 y el caso dejaria de probar la unicidad. Se
+      // resuelve por `name_normalized`, nunca por un uuid a mano.
+      const unidadSistema = await unidadDeSistema(tx);
 
       // Nombre ORIGINAL distinto («BIDON-20L …» frente a «Bidon 20 L …»); lo que choca es
       // la clave normalizada, que es justo lo que R18/R19/R20 exigen juntos.
@@ -201,8 +221,8 @@ describe('R20: el indice unico es la garantia real de la unicidad', () => {
         tx,
         () =>
           tx.$executeRaw`
-            INSERT INTO "presentations" ("name", "name_normalized", "updated_at")
-            VALUES (${`BIDON-20L ${marker}`}, ${normalized}, CURRENT_TIMESTAMP)`,
+            INSERT INTO "presentations" ("name", "name_normalized", "unit_id", "updated_at")
+            VALUES (${`BIDON-20L ${marker}`}, ${normalized}, CAST(${unidadSistema} AS uuid), CURRENT_TIMESTAMP)`,
         'segunda presentacion con el mismo nombre normalizado',
       );
       expect(sqlState).toBe(UNIQUE_VIOLATION);
@@ -279,14 +299,17 @@ describe('mutacion de esquema: sin el constraint, el requisito deja de cumplirse
       const marker = token();
       const normalized = `sinindice${marker}`;
       await createPresentation(tx, `Sin indice ${marker}`);
+      // QC-80 (R1): la columna es NOT NULL tambien aqui; sin ella el INSERT fallaria por otra
+      // razon y la mutacion no demostraria nada.
+      const unidadSistema = await unidadDeSistema(tx);
 
       await tx.$executeRawUnsafe('DROP INDEX "presentations_name_normalized_key"');
 
       // Con el indice fuera, la segunda insercion con el mismo `name_normalized` YA NO
       // choca: es exactamente lo que el indice, cuando esta, impide.
       await tx.$executeRaw`
-        INSERT INTO "presentations" ("name", "name_normalized", "updated_at")
-        VALUES (${`Sin indice otra vez ${marker}`}, ${normalized}, CURRENT_TIMESTAMP)`;
+        INSERT INTO "presentations" ("name", "name_normalized", "unit_id", "updated_at")
+        VALUES (${`Sin indice otra vez ${marker}`}, ${normalized}, CAST(${unidadSistema} AS uuid), CURRENT_TIMESTAMP)`;
 
       const rows = await tx.presentation.findMany({
         where: { nameNormalized: normalized },

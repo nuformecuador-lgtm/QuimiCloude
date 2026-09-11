@@ -18,7 +18,6 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import {
@@ -36,38 +35,14 @@ import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 // Datos de apoyo
 // ---------------------------------------------------------------------------
 
-type Db = Prisma.TransactionClient;
-
 function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
-function normalizeForTest(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/gu, '')
-    .replace(/[^a-z0-9]/gu, '');
-}
-
-/**
- * Unidad REAL de apoyo. `products.unit_id` tiene FK (`products_unit_id_fkey`), asi que no
- * vale inventar un uuid: la unidad se crea de verdad y se borra en el `finally`. El nombre
- * lleva `token()` porque `units.name_normalized` tiene indice unico.
- */
-async function createTestUnit(db: Db, symbol?: string | null): Promise<string> {
-  const name = `unidad ${token()}`;
-  const unit = await db.unit.create({
-    data: {
-      name,
-      nameNormalized: normalizeForTest(name),
-      symbol: symbol === undefined ? name : symbol,
-    },
-    select: { id: true },
-  });
-  return unit.id;
-}
+/* QC-80 (R7, R21) se llevo de aqui el helper `createTestUnit` y su normalizacion: existian
+ * solo para rellenar `products.unit_id`, columna que la migracion de esta ficha elimino. El
+ * producto ya no declara unidad -la declara la presentacion (R1)-, asi que el alta de un
+ * producto no necesita ninguna unidad de apoyo. */
 
 function baseProductInput(overrides: Partial<NewProduct> = {}): NewProduct {
   return {
@@ -105,12 +80,10 @@ afterAll(async () => {
 
 describe('R15: el borrado logico conserva la fila', () => {
   it('al borrar conserva la fila y marca deleted_at', async () => {
-    // La unidad se usa para comprobar que el borrado logico no pierde ningun dato de la fila.
-    const unitId = await createTestUnit(prisma);
     let productId: string | null = null;
 
     try {
-      const input: NewProduct = { ...baseProductInput({ stock: 9, unitId }) };
+      const input: NewProduct = { ...baseProductInput({ stock: 9 }) };
       const created = await createProduct(input, new Date());
       productId = created.id;
 
@@ -126,17 +99,18 @@ describe('R15: el borrado logico conserva la fila', () => {
       expect(after.id).toBe(created.id);
       expect(after.name).toBe(before.name);
       expect(after.stock).toBe(before.stock);
-      expect(after.unitId).toBe(before.unitId);
-      expect(after.unitId).toBe(unitId);
       expect(after.deletedAt).not.toBeNull();
       expect(after.deletedAt).toBeInstanceOf(Date);
+      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21). ANTES, las dos lineas que faltan aqui
+      // comprobaban que `unit_id` sobrevivia al borrado logico: era LA columna con la que este
+      // caso demostraba que «no se pierde ningun dato». La columna ya no existe, asi que la
+      // afirmacion no se borra sino que se REFUERZA a la fila ENTERA: todo salvo `deleted_at` y
+      // la marca de modificacion tiene que ser identico. Una columna futura queda cubierta sola.
+      expect({ ...after, deletedAt: null, updatedAt: before.updatedAt }).toEqual(before);
     } finally {
       if (productId !== null) {
         await prisma.product.deleteMany({ where: { id: productId } });
       }
-      // La unidad se borra DESPUES del producto: `products_unit_id_fkey` es ON DELETE
-      // RESTRICT (QC-32 R13) y al reves fallaria.
-      await prisma.unit.deleteMany({ where: { id: unitId } });
     }
   });
 });

@@ -91,13 +91,17 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // «Configuración», que declara `unidades.consultar`. El ancla se **tensa**, nunca se relaja
   // (QC-39 R47): darse de alta en la lista exacta es el punto de extension por diseño de este
   // caso, y subir el numero sin nombrar el enlace nuevo lo dejaria pasar sin comprobar.
-  it('ancla: el recorrido encuentra hoy los siete enlaces reales del menu', () => {
+  // AMPLIADA el 2026-09-11 (QC-67 T2): el octavo es «Usuarios», TERCER item de la seccion
+  // «Configuración», que declara `usuarios.consultar` —el mismo codigo que exige su pantalla—. El
+  // ancla se **tensa**: sube el numero Y se nombra el enlace nuevo, porque darse de alta en la
+  // lista exacta es el punto de extension por diseño de este caso (R39).
+  it('ancla: el recorrido encuentra hoy los ocho enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista
     // vacia y la guardia pasaria en verde sin comprobar nada. Esto lo convierte en rojo.
     const enlaces = flattenNavLinks(PRIVATE_NAV_ITEMS);
 
-    expect(enlaces).toHaveLength(7);
+    expect(enlaces).toHaveLength(8);
     expect(enlaces.map((enlace) => enlace.testId).sort()).toEqual([
       'nav-dashboard',
       'nav-inventario',
@@ -106,13 +110,22 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
       'nav-produccion-recetas',
       'nav-proveedores',
       'nav-unidades',
+      'nav-usuarios',
     ]);
   });
 
   it('el catalogo importado no esta vacio: la lista contra la que se compara es real', () => {
     // Segunda anti-vacuidad: con `CODIGOS_VALIDOS` vacio la regla diria que TODO es invalido, y
     // con la comparacion invertida diria que todo vale. Se ancla el tamaño del catalogo cerrado.
-    expect(CODIGOS_VALIDOS).toHaveLength(13);
+    // El numero es el del catalogo cerrado y se SUBE cuando el catalogo crece, nunca se relaja a
+    // `toContain` ni a `toBeGreaterThan`: relajarlo aqui devolveria esta guardia al verde por
+    // vacuidad que este mismo caso existe para impedir. Eran diez en QC-74; QC-38 lo llevo a once,
+    // QC-66 a trece y QC-86 a QUINCE, al sumar `asignaciones.consultar` y `asignaciones.modificar`
+    // (ver la enmienda escrita en `lib/modules/identity/domain/permissions.ts`). Que QC-86 tenga
+    // que tocar este archivo NO significa que anada un enlace de menu: los dos permisos nuevos no
+    // los consume nadie todavia (su R29), y esta guardia va en el sentido menu -> catalogo, asi
+    // que el ancla de 7 enlaces de aqui arriba se queda EXACTAMENTE como estaba.
+    expect(CODIGOS_VALIDOS).toHaveLength(15);
     expect(CODIGOS_VALIDOS).toContain('inventario.consultar');
   });
 

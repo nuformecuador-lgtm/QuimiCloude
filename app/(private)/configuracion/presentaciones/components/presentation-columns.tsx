@@ -2,6 +2,7 @@
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import type { PresentationView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import { NAME_COLUMN_ID } from './presentation-list-params';
 import { PresentationRowActions } from './presentation-row-actions';
@@ -33,6 +34,16 @@ import { PresentationRowActions } from './presentation-row-actions';
  *
  * El nombre se pinta **tal cual llega** de la consulta: sin recortes, sin mayusculas forzadas y
  * sin normalizar. Lo que el usuario ve es lo que el catalogo guarda.
+ *
+ * **QC-80: siguen siendo DOS columnas y la unidad NO gana una.** Es deliberado (`design.md > 5`):
+ * no lo pide ninguna decision y pintarla abre una pregunta que nadie hizo -¿el nombre?, ¿el
+ * simbolo?, ¿resuelto contra que catalogo?-. Coste aceptado: para ver la unidad hay que abrir el
+ * panel. Las `units` que esta declaracion recibe son **solo** para el panel de edicion que monta
+ * la celda de acciones (R15, R16), no para pintar ninguna celda.
+ *
+ * **Por eso las columnas pasan a construirse con una funcion** en vez de ser una constante: la
+ * celda de acciones necesita el catalogo, y el catalogo lo trae la seccion en tiempo de ejecucion.
+ * Mismo mecanismo que `buildOrderColumns` de QC-35, memoizado por la tabla.
  */
 
 /** Id de la unica columna de datos. Se **importa** del parser: un solo sitio lo declara (R11). */
@@ -44,27 +55,31 @@ export const ACTIONS_COLUMN_ID = 'actions';
 /**
  * Cuantas columnas hay. Existe para que el esqueleto de carga —que lo pinta un Server Component y
  * por tanto **no puede importar este modulo de cliente**— pinte tantas celdas como columnas, y
- * para que el test lo ate a `PRESENTATION_COLUMNS.length` en vez de dejarlo desincronizarse en
+ * para que el test lo ate a `buildPresentationColumns(...).length` en vez de dejarlo desincronizarse en
  * silencio.
  */
 export const PRESENTATION_COLUMN_COUNT = 2;
 
-export const PRESENTATION_COLUMNS: readonly DataTableColumn<PresentationView>[] = [
-  {
-    id: NAME_COLUMN_ID,
-    label: 'Nombre',
-    align: 'start',
-    // Esta en `PRESENTATION_QUERYABLE.sortable`, asi que la cabecera no miente (R11).
-    sortable: true,
-    cell: (presentation) => presentation.name,
-  },
-  {
-    id: ACTIONS_COLUMN_ID,
-    label: 'Acciones',
-    align: 'end',
-    // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros) — R11.
-    // `pinnable: false` para que el usuario no pueda fijarla y tapar la del nombre.
-    pinnable: false,
-    cell: (presentation) => <PresentationRowActions presentation={presentation} />,
-  },
-];
+export function buildPresentationColumns(
+  units: readonly UnitRef[],
+): readonly DataTableColumn<PresentationView>[] {
+  return [
+    {
+      id: NAME_COLUMN_ID,
+      label: 'Nombre',
+      align: 'start',
+      // Esta en `PRESENTATION_QUERYABLE.sortable`, asi que la cabecera no miente (R11).
+      sortable: true,
+      cell: (presentation) => presentation.name,
+    },
+    {
+      id: ACTIONS_COLUMN_ID,
+      label: 'Acciones',
+      align: 'end',
+      // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros) — R11.
+      // `pinnable: false` para que el usuario no pueda fijarla y tapar la del nombre.
+      pinnable: false,
+      cell: (presentation) => <PresentationRowActions presentation={presentation} units={units} />,
+    },
+  ];
+}

@@ -493,10 +493,14 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     }
 
     // Y el barrel es un camino REAL, no una regla vacia: `inventario` lo usa hoy (QC-32 T6).
+    // El testigo era `product-catalog.ts` hasta QC-80 (R21), que le quito `unitId` a `ProductRef`
+    // -sin sustituto: nadie lo consumia- y con el la unica razon que ese archivo tenia para
+    // conocer `UnitId`. El testigo pasa a ser `product-view.ts`, que sigue tipando con `UnitId`
+    // la unidad DERIVADA del lote mas reciente (R22).
     const porElBarrel = ajenos.filter((file) =>
       importSpecifiers(read(file)).includes('@/lib/modules/unidades'),
     )
-    expect(porElBarrel.map(etiqueta)).toContain('lib/modules/inventario/domain/product-catalog.ts')
+    expect(porElBarrel.map(etiqueta)).toContain('lib/modules/inventario/domain/product-view.ts')
   })
 
   it('el barrel de unidades exporta normalizeUnitName', () => {
@@ -594,28 +598,38 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(columnasDelInsert).toEqual(['name', 'name_normalized', 'symbol', 'updated_at'])
   })
 
-  it('ProductRef, ProductView, NewProduct y el esquema zod de producto usan unitId y ningun texto de unidad', () => {
-    // R19: donde `inventario` publica la unidad hacia fuera o la recibe del borde, lo hace
-    // con la REFERENCIA al catalogo y con el tipo que publica `@/lib/modules/unidades`
-    // (`design.md > 5.3`). Un campo llamado `unit` de tipo texto seria justo lo que R19
-    // prohibe, asi que se busca el nombre de campo exacto `unit:` —`unitId:` no lo activa—.
+  it('la unidad del producto es la DERIVADA del lote y nunca un texto (QC-32 R19, QC-80 R21/R22)', () => {
+    // R19 de QC-32: donde `inventario` publica la unidad hacia fuera o la recibe del borde, lo
+    // hace con la REFERENCIA al catalogo y con el tipo que publica `@/lib/modules/unidades`
+    // (`design.md > 5.3`). Un campo llamado `unit` de tipo texto seria justo lo que R19 prohibe,
+    // asi que se busca el nombre de campo exacto `unit:` -`unitId:` no lo activa-.
+    //
+    // QC-80 (R21) CAMBIA EL SUJETO, NO LA REGLA: el producto ya no declara unidad en ningun
+    // punto del camino -ni esquema de entrada, ni contrato publico, ni `FormData`-, porque
+    // `products.unit_id` dejo de existir. Lo que queda es la unidad DERIVADA de la presentacion
+    // del lote mas reciente (R22), que sigue siendo una REFERENCIA tipada con `UnitId` y sigue
+    // sin poder ser un texto. Este caso se actualiza en vez de borrarse: la prohibicion del
+    // texto libre es lo que no ha caducado.
     const CAMPO_UNIT_TEXTO = /\bunit\s*\??\s*:/
 
+    // `ProductRef` -lo que otros modulos ven- se queda SIN unidad de ninguna clase (R21).
     const catalogo = read(join(inventarioDir, 'domain', 'product-catalog.ts'))
-    expect(catalogo).toMatch(/readonly unitId: UnitId \| null/)
+    expect(catalogo, 'ProductRef recupero una unidad que nadie consume').not.toMatch(/unitId/)
     expect(catalogo, 'ProductRef conserva un campo `unit`').not.toMatch(CAMPO_UNIT_TEXTO)
-    expect(catalogo).toMatch(/import type \{[^}]*\bUnitId\b[^}]*\} from '@\/lib\/modules\/unidades'/)
 
+    // `ProductView` lleva la DERIVADA, tipada con `UnitId`; `NewProduct` -lo que se escribe- no
+    // lleva ninguna: la unidad no se envia, se lee.
     const vista = read(join(inventarioDir, 'domain', 'product-view.ts'))
-    expect(vista).toMatch(/readonly unitId\?: UnitId \| null/) // NewProduct
-    expect(vista).toMatch(/readonly unitId: UnitId \| null/) // ProductView
+    expect(vista).toMatch(/readonly latestBatchUnitId: UnitId \| null/) // ProductView
+    expect(vista, 'NewProduct volvio a declarar unidad').not.toMatch(/readonly unitId/)
     expect(vista, 'ProductView/NewProduct conservan un campo `unit`').not.toMatch(CAMPO_UNIT_TEXTO)
     expect(vista).toMatch(/from '@\/lib\/modules\/unidades'/)
 
+    // El esquema de entrada no acepta unidad de NINGUNA forma: ni referencia ni texto.
     const entrada = read(join(inventarioDir, 'domain', 'product-input.ts'))
-    expect(entrada).toMatch(/unitId:\s*unitIdSchema\.nullish\(\)/)
-    // La forma que se valida es un uuid, no un texto libre: que EXISTA lo rechaza la FK (R12).
-    expect(entrada).toMatch(/const unitIdSchema = z\.string\(\)\.uuid\(\)/)
+    expect(entrada, 'el esquema zod volvio a aceptar una unidad').not.toMatch(
+      /unitId:\s*unitIdSchema/,
+    )
     expect(entrada, 'el esquema zod conserva un campo `unit` de texto').not.toMatch(
       CAMPO_UNIT_TEXTO,
     )
@@ -623,9 +637,11 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       /unit:\s*z\.string\(\)/,
     )
 
-    // El borde tambien: el `FormData` trae `unitId`, no `unit`.
+    // Y el borde tampoco la lee del `FormData`, ni con el nombre viejo ni con el nuevo.
     const acciones = read(join(inventarioDir, 'adapters', 'driving', 'product-actions.ts'))
-    expect(acciones).toMatch(/readOptionalFormString\(formData, 'unitId'\)/)
+    expect(acciones, "la action sigue leyendo la clave 'unitId'").not.toMatch(
+      /formData,\s*'unitId'/,
+    )
     expect(acciones, "el formulario sigue leyendo la clave 'unit'").not.toMatch(/'unit'/)
   })
 

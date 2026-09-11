@@ -83,9 +83,15 @@ function isUniqueViolation(error: unknown): error is Prisma.PrismaClientKnownReq
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
-/** `P2003` al borrar solo puede venir de las tres FK `ON DELETE RESTRICT` que apuntan a
- *  `units`: `products_unit_id_fkey`, `recipe_lines_unit_id_fkey` y `units_unit_id_fkey`. No
- *  hay ambiguedad que resolver por indice (R24). */
+/** `P2003` al borrar solo puede venir de las FK `ON DELETE RESTRICT` que apuntan a `units`:
+ *  `presentations_unit_id_fkey`, `recipe_lines_unit_id_fkey`, `supplier_catalog_lines_unit_id_fkey`
+ *  y `units_unit_id_fkey`. No hay ambiguedad que resolver por indice (R24).
+ *
+ *  ACTUALIZADO EL 2026-09-11 POR QC-80 (R7): donde este comentario nombraba
+ *  `products_unit_id_fkey` va ahora `presentations_unit_id_fkey`. La columna `products.unit_id`
+ *  se elimino; quien referencia el catalogo desde inventario es la PRESENTACION. El
+ *  comportamiento no cambia -cualquiera de ellas sigue siendo «la unidad esta en uso»-, pero un
+ *  comentario que nombra una FK inexistente manda a quien lo lee a buscarla. */
 function isForeignKeyViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
 }

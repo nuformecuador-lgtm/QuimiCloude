@@ -232,18 +232,51 @@ function normalizeProductNameForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '')
 }
 
-/** Crea un producto con su presentacion propia. `products.name` no es unico (QC-14).
- *  `nameNormalized` (QC-57) es NOT NULL desde `<ts>_list_query_indexes`. */
+/** Crea un producto. `products.name` no es unico (QC-14). `nameNormalized` (QC-57) es NOT
+ *  NULL desde `<ts>_list_query_indexes`.
+ *
+ *  ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21): el parametro `unitId` desaparece porque
+ *  desaparece la columna. El producto ya no declara unidad; la declara la PRESENTACION (R1) y
+ *  la suya se DERIVA de la presentacion del lote mas reciente (R22). Los casos que ataban una
+ *  unidad a un producto la atan ahora a una presentacion, y cuando necesitan que el producto la
+ *  herede, le cuelgan un lote con `createBatch`. */
 async function createProduct(
   tx: Prisma.TransactionClient,
-  unitId: string | null = null,
   name = 'Acido citrico monohidratado',
 ): Promise<string> {
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name), unitId },
+    data: { name, nameNormalized: normalizeProductNameForTest(name) },
     select: { id: true },
   })
   return product.id
+}
+
+/** Crea una presentacion CON su unidad (QC-80 R1: `presentations.unit_id` es NOT NULL con FK
+ *  a `units`). El nombre lleva marcador: `presentations.name_normalized` tiene indice unico. */
+async function createPresentation(
+  tx: Prisma.TransactionClient,
+  marker: string,
+  unitId: string,
+): Promise<string> {
+  const presentation = await tx.presentation.create({
+    data: { name: `Presentacion ${marker}`, nameNormalized: `presentacion${marker}`, unitId },
+    select: { id: true },
+  })
+  return presentation.id
+}
+
+/** Cuelga un lote de un producto (QC-90). Es la via por la que un producto llega a tener
+ *  unidad DERIVADA: la de la presentacion de su lote mas reciente (QC-80 R22). */
+async function createBatch(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  presentationId: string,
+): Promise<string> {
+  const batch = await tx.productBatch.create({
+    data: { productId, presentationId, stock: 1, unitCost: new Prisma.Decimal('1.0000') },
+    select: { id: true },
+  })
+  return batch.id
 }
 
 /** Crea una receta viva. `nameNormalized` se pasa a mano (ver cabecera). */
@@ -297,7 +330,7 @@ type WritableColumn =
  */
 function rawInsert(
   tx: Prisma.TransactionClient,
-  table: 'units' | 'products' | 'recipe_lines',
+  table: 'units' | 'products' | 'presentations' | 'recipe_lines',
   columns: Partial<Record<WritableColumn, Prisma.Sql>>,
 ): Promise<number> {
   const entries = Object.entries(columns) as [WritableColumn, Prisma.Sql][]
@@ -307,6 +340,13 @@ function rawInsert(
   if (table === 'products') {
     names.push(Prisma.raw('"name_normalized"'))
     values.push(Prisma.sql`${''}`)
+  }
+  // QC-80: `presentations.name_normalized` tambien es NOT NULL, pero ademas tiene indice
+  // UNICO, asi que no puede ir vacia como la del producto: se deriva de un uuid nuevo. Ningun
+  // caso de este archivo afirma sobre ella; lo que se busca aqui es el rechazo de `unit_id`.
+  if (table === 'presentations') {
+    names.push(Prisma.raw('"name_normalized"'))
+    values.push(Prisma.sql`${token()}`)
   }
   names.push(Prisma.raw('"updated_at"'))
   values.push(Prisma.sql`CURRENT_TIMESTAMP`)
@@ -593,31 +633,34 @@ describe('la unidad como entidad del catalogo', () => {
 })
 
 describe('el uso de la unidad desde inventario y recetas', () => {
-  it('acepta un producto sin unidad y otro con unidad', async () => {
+  it('la unidad la declara la PRESENTACION, obligatoria, y el producto ya no tiene donde declararla (QC-80 R1, R21)', async () => {
     await inRolledBackTransaction(async (tx) => {
+      // TRASLADADO EL 2026-09-11 POR QC-80. ANTES este caso creaba un producto SIN unidad y
+      // otro CON unidad y afirmaba R10 de QC-32 -«la unidad del producto es OPCIONAL»-. QC-80
+      // deroga esa regla entera: `products.unit_id` ya no existe (R7, R21) y quien declara
+      // unidad es la presentacion, con una columna NOT NULL (R1). La afirmacion no se borra:
+      // se traslada a su sujeto nuevo y se invierte de «opcional» a «obligatoria».
       const marker = token()
-      const unitId = await createUnit(tx, marker)
+      const primera = await createUnit(tx, `a${marker}`)
+      const segunda = await createUnit(tx, `b${marker}`)
 
-      const sinUnidad = await createProduct(tx, null, 'Producto sin unidad declarada')
-      const conUnidad = await createProduct(tx, unitId, 'Producto con unidad declarada')
+      const unaPresentacion = await createPresentation(tx, `p1${marker}`, primera)
+      const otraPresentacion = await createPresentation(tx, `p2${marker}`, segunda)
 
-      // R10: la unidad del producto es OPCIONAL, y la ausencia se guarda como ausencia.
-      const sin = await tx.product.findUniqueOrThrow({
-        where: { id: sinUnidad },
-        select: { unitId: true },
+      // Cada presentacion conserva TAL CUAL la unidad que se le dio: ni sustituida ni unificada.
+      const leidas = await tx.presentation.findMany({
+        where: { id: { in: [unaPresentacion, otraPresentacion] } },
+        select: { id: true, unitId: true },
       })
-      const con = await tx.product.findUniqueOrThrow({
-        where: { id: conUnidad },
-        select: { unitId: true },
-      })
-      expect(sin.unitId).toBeNull()
-      expect(con.unitId).toBe(unitId)
+      expect(leidas.find((row) => row.id === unaPresentacion)?.unitId).toBe(primera)
+      expect(leidas.find((row) => row.id === otraPresentacion)?.unitId).toBe(segunda)
 
-      // Y la columna lo permite: uuid anulable, y ninguna columna `unit` de texto.
-      const columns = await columnInfo(tx, 'products', ['unit_id', 'unit'])
-      expect(columns).toEqual([
-        { column_name: 'unit_id', data_type: 'uuid', is_nullable: 'YES' },
+      // R1: la columna es uuid y NO anulable. Y la mitad invertida: `products` no tiene
+      // ninguna columna de unidad, ni `unit_id` ni la `unit` de texto que QC-32 ya se llevo.
+      expect(await columnInfo(tx, 'presentations', ['unit_id'])).toEqual([
+        { column_name: 'unit_id', data_type: 'uuid', is_nullable: 'NO' },
       ])
+      expect(await columnInfo(tx, 'products', ['unit_id', 'unit'])).toEqual([])
     })
   })
 
@@ -652,26 +695,31 @@ describe('el uso de la unidad desde inventario y recetas', () => {
     })
   })
 
-  it('rechaza un producto y una linea con unit_id inexistente con SQLSTATE 23503', async () => {
+  it('rechaza una presentacion y una linea con unit_id inexistente con SQLSTATE 23503', async () => {
     await inRolledBackTransaction(async (tx) => {
+      // TRASLADADO EL 2026-09-11 POR QC-80 (R2): la mitad de este caso que apuntaba a
+      // `products.unit_id` apunta ahora a `presentations.unit_id`, que es donde vive hoy la
+      // referencia al catalogo. R12 de QC-32 -«un unit_id inexistente lo rechaza la base»-
+      // sigue vigente palabra por palabra; solo cambio la tabla que lo declara.
       const marker = token()
       const recipeId = await createRecipe(tx, marker)
       const unitId = await createUnit(tx, marker)
-      const productId = await createProduct(tx, unitId)
+      const productId = await createProduct(tx)
+      const presentationId = await createPresentation(tx, marker, unitId)
       const inventada = randomUUID()
 
-      // R12 en el alta de producto. Crudo: por la API tipada Prisma traduciria el
+      // R12 en el alta de presentacion. Crudo: por la API tipada Prisma traduciria el
       // SQLSTATE a su propio `P2003` y no se podria afirmar sobre `23503`.
-      const productoConUnidadFantasma = await expectRejectedByDatabase(
+      const presentacionConUnidadFantasma = await expectRejectedByDatabase(
         tx,
         () =>
-          rawInsert(tx, 'products', {
-            name: Prisma.sql`${`Producto con unidad fantasma ${marker}`}`,
+          rawInsert(tx, 'presentations', {
+            name: Prisma.sql`${`Presentacion con unidad fantasma ${marker}`}`,
             unit_id: asUuid(inventada),
           }),
-        'producto con unit_id inexistente',
+        'presentacion con unit_id inexistente',
       )
-      expect(productoConUnidadFantasma).toBe(FOREIGN_KEY_VIOLATION)
+      expect(presentacionConUnidadFantasma).toBe(FOREIGN_KEY_VIOLATION)
 
       // R12 en el alta de linea.
       const lineaConUnidadFantasma = await expectRejectedByDatabase(
@@ -691,46 +739,51 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       const edicionConUnidadFantasma = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.$executeRaw`UPDATE "products" SET "unit_id" = ${asUuid(inventada)} WHERE "id" = ${asUuid(productId)}`,
-        'edicion de producto apuntando a una unidad inexistente',
+          tx.$executeRaw`UPDATE "presentations" SET "unit_id" = ${asUuid(inventada)} WHERE "id" = ${asUuid(presentationId)}`,
+        'edicion de presentacion apuntando a una unidad inexistente',
       )
       expect(edicionConUnidadFantasma).toBe(FOREIGN_KEY_VIOLATION)
 
       // «No crear ni modificar ninguna fila»: ninguno de los tres intentos dejo rastro.
-      const productosDelIntento = await tx.product.findMany({
-        where: { name: `Producto con unidad fantasma ${marker}` },
+      const presentacionesDelIntento = await tx.presentation.findMany({
+        where: { name: `Presentacion con unidad fantasma ${marker}` },
         select: { id: true },
       })
-      expect(productosDelIntento).toEqual([])
+      expect(presentacionesDelIntento).toEqual([])
       expect(await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } })).toEqual([])
-      const producto = await tx.product.findUniqueOrThrow({
-        where: { id: productId },
+      const presentacion = await tx.presentation.findUniqueOrThrow({
+        where: { id: presentationId },
         select: { unitId: true },
       })
-      expect(producto.unitId).toBe(unitId)
+      expect(presentacion.unitId).toBe(unitId)
+      // El producto sigue existiendo y sigue sin declarar unidad: no hay nada que editar.
+      expect(await tx.product.findUnique({ where: { id: productId }, select: { id: true } })).not.toBeNull()
     })
   })
 
-  it('rechaza el borrado de una unidad usada por un producto y por una linea con SQLSTATE 23503, y permite el de una unidad libre', async () => {
+  it('rechaza el borrado de una unidad usada por una presentacion y por una linea con SQLSTATE 23503, y permite el de una unidad libre', async () => {
     await inRolledBackTransaction(async (tx) => {
+      // TRASLADADO EL 2026-09-11 POR QC-80 (R2): «usada por un producto» pasa a ser «usada por
+      // una PRESENTACION». El RESTRICT que R13 de QC-32 exige de CUALQUIER referencia al
+      // catalogo es el mismo, y `presentations_unit_id_fkey` lo hereda tal cual.
       const marker = token()
-      const unidadDeProducto = await createUnit(tx, `p${marker}`)
+      const unidadDePresentacion = await createUnit(tx, `p${marker}`)
       const unidadDeLinea = await createUnit(tx, `l${marker}`)
       const unidadLibre = await createUnit(tx, `x${marker}`, null)
 
-      const productId = await createProduct(tx, unidadDeProducto)
+      const presentationId = await createPresentation(tx, marker, unidadDePresentacion)
       const recipeId = await createRecipe(tx, marker)
-      const productoDeLaLinea = await createProduct(tx, null, 'Insumo de la linea')
+      const productoDeLaLinea = await createProduct(tx, 'Insumo de la linea')
       const lineId = await createLine(tx, recipeId, productoDeLaLinea, unidadDeLinea)
 
       // R13 — ON DELETE RESTRICT: la unidad en uso no se puede borrar. Crudo, para poder
       // afirmar sobre el SQLSTATE y no sobre el `P2003` que devolveria la API tipada.
-      const usadaPorProducto = await expectRejectedByDatabase(
+      const usadaPorPresentacion = await expectRejectedByDatabase(
         tx,
-        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = ${asUuid(unidadDeProducto)}`,
-        'borrado de una unidad usada por un producto',
+        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = ${asUuid(unidadDePresentacion)}`,
+        'borrado de una unidad usada por una presentacion',
       )
-      expect(usadaPorProducto).toBe(FOREIGN_KEY_VIOLATION)
+      expect(usadaPorPresentacion).toBe(FOREIGN_KEY_VIOLATION)
 
       const usadaPorLinea = await expectRejectedByDatabase(
         tx,
@@ -739,14 +792,14 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       )
       expect(usadaPorLinea).toBe(FOREIGN_KEY_VIOLATION)
 
-      // Nada se movio: ni las unidades, ni el producto, ni la linea.
-      expect(await tx.unit.findUnique({ where: { id: unidadDeProducto } })).not.toBeNull()
+      // Nada se movio: ni las unidades, ni la presentacion, ni la linea.
+      expect(await tx.unit.findUnique({ where: { id: unidadDePresentacion } })).not.toBeNull()
       expect(await tx.unit.findUnique({ where: { id: unidadDeLinea } })).not.toBeNull()
-      const producto = await tx.product.findUniqueOrThrow({
-        where: { id: productId },
+      const presentacion = await tx.presentation.findUniqueOrThrow({
+        where: { id: presentationId },
         select: { unitId: true },
       })
-      expect(producto.unitId).toBe(unidadDeProducto)
+      expect(presentacion.unitId).toBe(unidadDePresentacion)
       const linea = await tx.recipeLine.findUniqueOrThrow({
         where: { id: lineId },
         select: { unitId: true },
@@ -760,13 +813,20 @@ describe('el uso de la unidad desde inventario y recetas', () => {
     })
   })
 
-  it('una linea puede usar una unidad distinta de la de su producto', async () => {
+  it('una linea puede usar una unidad distinta de la que su producto DERIVA del lote', async () => {
     await inRolledBackTransaction(async (tx) => {
+      // TRASLADADO EL 2026-09-11 POR QC-80 (R22): «la unidad de su producto» ya no es una
+      // columna sino una DERIVACION -la de la presentacion de su lote mas reciente-. El caso
+      // monta esa derivacion de verdad (presentacion con unidad + lote) y sigue afirmando
+      // exactamente lo mismo que R14 de QC-32: la unidad de la linea es SUYA, nadie la
+      // relaciona con la del producto y nadie convierte la cantidad.
       const marker = token()
       const unidadDelProducto = await createUnit(tx, `kg${marker}`)
       const unidadDeLaLinea = await createUnit(tx, `g${marker}`)
 
-      const productId = await createProduct(tx, unidadDelProducto, 'Colorante azul')
+      const productId = await createProduct(tx, 'Colorante azul')
+      const presentationId = await createPresentation(tx, marker, unidadDelProducto)
+      await createBatch(tx, productId, presentationId)
       const recipeId = await createRecipe(tx, marker)
       const lineId = await createLine(tx, recipeId, productId, unidadDeLaLinea, '0.0100')
 
@@ -776,13 +836,16 @@ describe('el uso de la unidad desde inventario y recetas', () => {
         where: { id: lineId },
         select: { unitId: true, quantity: true },
       })
-      const producto = await tx.product.findUniqueOrThrow({
-        where: { id: productId },
-        select: { unitId: true },
+      const [loteDelProducto] = await tx.productBatch.findMany({
+        where: { productId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 1,
+        select: { presentation: { select: { unitId: true } } },
       })
-      expect(producto.unitId).toBe(unidadDelProducto)
+      const unidadDerivada = loteDelProducto?.presentation.unitId ?? null
+      expect(unidadDerivada).toBe(unidadDelProducto)
       expect(linea.unitId).toBe(unidadDeLaLinea)
-      expect(linea.unitId).not.toBe(producto.unitId)
+      expect(linea.unitId).not.toBe(unidadDerivada)
       // La cantidad se guarda tal cual: nadie la convirtio de gramos a kilogramos.
       expect(linea.quantity.toString()).toBe('0.01')
 
@@ -819,16 +882,19 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       const recipeId = await createRecipe(tx, marker)
       const productId = await createProduct(tx)
 
-      const unidadFantasmaEnProducto = await expectRejectedByDatabase(
+      // TRASLADADO EL 2026-09-11 POR QC-80 (R2): la FK escalar sin `@relation` hacia `units`
+      // que salia de `products` sale hoy de `presentations`. La frontera que R18 de QC-32
+      // vigila es la misma; lo que cambio es la tabla de la que parte.
+      const unidadFantasmaEnPresentacion = await expectRejectedByDatabase(
         tx,
         () =>
-          rawInsert(tx, 'products', {
-            name: Prisma.sql`${`Producto ${marker}`}`,
+          rawInsert(tx, 'presentations', {
+            name: Prisma.sql`${`Presentacion ${marker}`}`,
             unit_id: asUuid(randomUUID()),
           }),
-        'producto con unit_id inventado',
+        'presentacion con unit_id inventado',
       )
-      expect(unidadFantasmaEnProducto).toBe(FOREIGN_KEY_VIOLATION)
+      expect(unidadFantasmaEnPresentacion).toBe(FOREIGN_KEY_VIOLATION)
 
       const unidadFantasmaEnLinea = await expectRejectedByDatabase(
         tx,
@@ -898,10 +964,20 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       //     que deriva otra (R8). Lleva las mismas dos reglas que las demas -RESTRICT al
       //     borrar, CASCADE al actualizar-, que es lo que hace cierto que no se pueda borrar
       //     una unidad de la que otra deriva.
+      //
+      // ACTUALIZADO EL 2026-09-11 POR QC-80, y otra vez se encoge y crece a la vez, sin cambiar
+      // de tamano:
+      //   - SALE `products_unit_id_fkey`. La quita la migracion de esta ficha junto con la
+      //     columna `products.unit_id` (R7): el producto deja de declarar unidad y la deriva de
+      //     la presentacion de su lote mas reciente (R22).
+      //   - ENTRA `presentations_unit_id_fkey`, la unidad OBLIGATORIA de la presentacion (R1,
+      //     R2), con las mismas dos reglas -RESTRICT al borrar, CASCADE al actualizar- que R13
+      //     de QC-32 exige de CUALQUIER referencia al catalogo. Va la PRIMERA porque la consulta
+      //     ordena por `conname`.
       // Siguen siendo CUATRO, y sigue siendo una lista EXACTA.
       expect(foreignKeys).toEqual([
         {
-          conname: 'products_unit_id_fkey',
+          conname: 'presentations_unit_id_fkey',
           referencia: 'units',
           confdeltype: 'r',
           confupdtype: 'c',
@@ -1585,14 +1661,18 @@ describe('QC-76 — el ambito por empresa', () => {
 })
 
 describe('QC-76 — cambiar la equivalencia de una unidad en uso', () => {
-  it('permite cambiar factor y base con un producto y una linea de receta apuntando, sin invalidar nada (R10)', async () => {
+  it('permite cambiar factor y base con una presentacion y una linea de receta apuntando, sin invalidar nada (R10)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const enUso = await createUnit(tx, `uso${marker}`)
       const primeraBase = await createUnit(tx, `b1${marker}`)
       const segundaBase = await createUnit(tx, `b2${marker}`)
 
-      const productId = await createProduct(tx, enUso, 'Colorante azul')
+      // TRASLADADO EL 2026-09-11 POR QC-80 (R1): quien referencia la unidad ya no es el
+      // producto sino la PRESENTACION. Lo que R10 de QC-76 vigila -cambiar la equivalencia de
+      // una unidad EN USO no invalida nada ni convierte ninguna cantidad- no cambia.
+      const productId = await createProduct(tx, 'Colorante azul')
+      const presentationId = await createPresentation(tx, marker, enUso)
       const recipeId = await createRecipe(tx, marker)
       const lineId = await createLine(tx, recipeId, productId, enUso, '0.0100')
 
@@ -1615,14 +1695,14 @@ describe('QC-76 — cambiar la equivalencia de una unidad en uso', () => {
       expect(unit.factor?.toString()).toBe('0.25')
 
       // R10: «ese cambio NO DEBE modificar ninguna cantidad ya guardada ni invalidar ninguna
-      // fila existente». El producto y la linea guardan una REFERENCIA a la unidad, no una
+      // fila existente». La presentacion y la linea guardan una REFERENCIA a la unidad, no una
       // cantidad ya convertida (decision cerrada 27, mismo criterio que QC-33 con el total del
       // pedido): no hay nada que invalidar y la cantidad sale tal cual se escribio.
-      const producto = await tx.product.findUniqueOrThrow({
-        where: { id: productId },
+      const presentacion = await tx.presentation.findUniqueOrThrow({
+        where: { id: presentationId },
         select: { unitId: true },
       })
-      expect(producto.unitId).toBe(enUso)
+      expect(presentacion.unitId).toBe(enUso)
       const linea = await tx.recipeLine.findUniqueOrThrow({
         where: { id: lineId },
         select: { unitId: true, quantity: true },

@@ -18,6 +18,7 @@ import {
   createProductWithFirstBatchSchema,
   type ProductView,
 } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 import {
   createProductAction,
   updateProductAction,
@@ -209,6 +210,12 @@ function fieldMessage(
 type ProductFormProps = {
   /** Producto que se edita. Ausente en el alta (R19). */
   readonly product?: ProductView;
+  /**
+   * Catalogo de unidades para el alta rapida de presentacion del selector (QC-80 R11). Baja por
+   * props desde la pagina, que lo pide una sola vez (QC-44 R46); este formulario no consulta
+   * nada. Sin el, el alta rapida no se ofrece y la presentacion se elige entre las existentes.
+   */
+  readonly units?: readonly UnitRef[];
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R21). */
   readonly onSaved: () => void;
 };
@@ -242,7 +249,7 @@ type ProductFormProps = {
  * `login-form.tsx`, incluida la `key` de montaje que evita el aviso de Base UI cuando el
  * `defaultValue` de un campo no controlado cambia despues de montarse).
  */
-export function ProductForm({ product, onSaved }: ProductFormProps) {
+export function ProductForm({ product, units, onSaved }: ProductFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
@@ -480,6 +487,10 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
           defaultValue={initialValue('presentationId', template?.presentationId ?? '')}
           defaultLabel={template?.presentationName ?? ''}
           error={fieldErrors.presentationId}
+          // QC-80 (R10, R11): crear una presentacion desde aqui tambien exige unidad. El catalogo
+          // baja por props desde la pagina, que lo pide una sola vez; este formulario no consulta
+          // nada. Sin catalogo, el alta rapida no se ofrece y solo se puede elegir una existente.
+          units={units}
           helper="La presentación en la que llega este lote (bidón de 20 L, saco de 25 kg…). Si no está en la lista, créala aquí mismo sin salir del panel."
         />
       )}
@@ -504,10 +515,13 @@ export function ProductForm({ product, onSaved }: ProductFormProps) {
         contrato publico de `lib/modules/unidades` solo publica `normalizeUnitName` y los tipos,
         sin ninguna operacion para listar el catalogo.
 
-        Asi que el producto se da de alta SIN unidad -`unitId` es nulable en el esquema, la base
-        lo admite- y el selector lo montara la ficha que corresponda cuando QC-38
-        (`crud-de-unidades`) exponga como listar unidades. Poner aqui un campo que escriba un UUID
-        a mano seria peor que no tener campo.
+        QC-80 (R21) cierra la pregunta en vez de aplazarla: `products.unit_id` YA NO EXISTE -ni la
+        columna, ni su indice, ni su FK-, asi que aqui no falta un selector, no hay nada que
+        pedir. La unidad la declara la PRESENTACION (`presentations.unit_id`, obligatoria) y la de
+        un producto se DERIVA de la presentacion de su lote mas reciente
+        (`ProductView.latestBatchUnitId`, R22): es un dato que se lee, nunca uno que este
+        formulario envie. El alta, por tanto, no manda `unitId` -y si lo mandara, el esquema es
+        `strictObject` y lo rechazaria con `invalid_input`-.
       */}
 
       <ProductField

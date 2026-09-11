@@ -217,10 +217,30 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
 async function createPresentation(tx: Prisma.TransactionClient): Promise<string> {
   const marca = token()
   const presentation = await tx.presentation.create({
-    data: { name: `Bidon 20 L ${marca}`, nameNormalized: `bidon20l${marca}` },
+    data: {
+      name: `Bidon 20 L ${marca}`,
+      nameNormalized: `bidon20l${marca}`,
+      unitId: await unidadDeSistema(tx),
+    },
     select: { id: true },
   })
   return presentation.id
+}
+
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: Prisma.TransactionClient): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  })
+  return unit.id
 }
 
 /** Unidad propia: `unit_id` es la otra FK que QC-52 anade a la linea (R30). */

@@ -373,7 +373,13 @@ describe('contrato de la ruta de inventario', () => {
       join(COMPONENTES_PATH, 'product-columns.tsx').split('\\').join('/'),
     );
     expect(columnas).toContain('Exclude<keyof ProductView');
-    expect(columnas).toContain("'unitId'");
+    // QC-80 (R21, R22): el campo oculto se llama `latestBatchUnitId` desde que la unidad dejo de
+    // ser columna del producto y paso a derivarse de la presentacion de su lote mas reciente. Se
+    // exige el nombre NUEVO -y ademas que el viejo no reaparezca-: si el centinela hubiera
+    // seguido vigilando `unitId`, un UUID de unidad podria volver a la tabla con el nombre nuevo
+    // sin que nada se pusiera rojo.
+    expect(columnas).toContain("'latestBatchUnitId'");
+    expect(columnas).not.toContain("'unitId'");
     expect(columnas).toContain("'imagePath'");
   });
 

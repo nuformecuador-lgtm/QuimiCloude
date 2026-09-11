@@ -889,11 +889,29 @@ describe('estructura de la linea de receta', () => {
         // que crea este bucle ya no comparten `'kg'` entre ellas. Lo que el caso necesita
         // sigue siendo lo mismo: que sea una unidad DISTINTA de la de la linea.
         const unidadDelProducto = await createUnit(tx)
-        // El producto declara una unidad DISTINTA de la de su linea: nada las relaciona.
+        // TRASLADADO EL 2026-09-11 POR QC-80 (R7, R22): el producto ya no declara unidad -la
+        // columna `products.unit_id` no existe-, la DERIVA de la presentacion de su lote mas
+        // reciente. Asi que la unidad distinta se le da por donde hoy se le da: una presentacion
+        // con esa unidad y un lote que la use. Lo que el caso vigila no cambia una coma: nada
+        // relaciona la unidad de la linea con la del producto.
         const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`)
-        await tx.product.update({
-          where: { id: productId },
-          data: { unitId: unidadDelProducto },
+        const marcaPresentacion = token()
+        const presentation = await tx.presentation.create({
+          data: {
+            name: `Presentacion ${marcaPresentacion}`,
+            nameNormalized: `presentacion${marcaPresentacion}`,
+            unitId: unidadDelProducto,
+          },
+          select: { id: true },
+        })
+        await tx.productBatch.create({
+          data: {
+            productId,
+            presentationId: presentation.id,
+            stock: 1,
+            unitCost: new Prisma.Decimal('1.0000'),
+          },
+          select: { id: true },
         })
         const lineId = await createLine(tx, recipeId, productId, '1.0000', unidadDeLaLinea)
         const line = await tx.recipeLine.findUniqueOrThrow({
@@ -904,7 +922,10 @@ describe('estructura de la linea de receta', () => {
         expect(line.unitId).not.toBe(unidadDelProducto)
       }
 
-      // Pero es OBLIGATORIA, a diferencia de la unidad del producto (QC-32 R10).
+      // Pero es OBLIGATORIA. Lo era ya frente a la del producto (QC-32 R10, columna opcional);
+      // desde QC-80 el producto no declara unidad en absoluto (R21) y la de la presentacion es
+      // tambien obligatoria (R1), asi que la comparacion que daba sentido a esta frase se fue.
+      // Lo que la linea exige no cambia: sin unidad, 23502.
       const productoSinUnidad = await createProduct(tx, 'Insumo sin unidad de linea')
       const sqlState = await expectRejectedByDatabase(
         tx,

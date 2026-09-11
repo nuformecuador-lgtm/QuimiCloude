@@ -59,7 +59,7 @@ import {
   createPresentation,
   deletePresentationById,
   listPresentations,
-  renamePresentation,
+  replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
@@ -198,6 +198,12 @@ import { credentialSetupSecretCrypto } from '@/lib/modules/identity/adapters/dri
 import type { CredentialSetupLinkRepository } from '@/lib/modules/identity/ports/credential-setup-link-repository';
 import type { CredentialSetupMailer } from '@/lib/modules/identity/ports/credential-setup-mailer';
 import type { CredentialSetupSecretFactory } from '@/lib/modules/identity/ports/credential-setup-secret-factory';
+// QC-94 T8 — la consulta del catalogo de roles. La factory sale del CONTRATO del modulo
+// (`@/lib/modules/identity`, solo dominio), el puerto de `ports/` y la implementacion del adaptador
+// driven; el adaptador driving de T9 NO se importa desde aqui (la flecha va driving -> composicion).
+import { createListRoles } from '@/lib/modules/identity';
+import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
+import type { RoleCatalogRepository } from '@/lib/modules/identity/ports/role-catalog-repository';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -303,6 +309,13 @@ const credentialSetupMailer: CredentialSetupMailer = {
       : sendCredentialSetupLinkWithResend(input),
 };
 
+/**
+ * QC-94 T8 (`design.md > 5`) — `RoleCatalogRepository` cableado con el adaptador driven de
+ * `identity`. UN solo metodo y de SOLO LECTURA: el caso de uso solo conoce el TIPO, nunca esta
+ * implementacion, y escribir un rol no es expresable a traves de este puerto (R17).
+ */
+const roleCatalogRepository: RoleCatalogRepository = { listAll: listAllRoles };
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -374,6 +387,12 @@ export const identity = {
     links: credentialSetupLinkRepository,
     mailer: credentialSetupMailer,
   }),
+  // QC-94 T8 (`design.md > 5`) — la consulta del catalogo de roles, la pieza que le falta a QC-67
+  // para pintar el selector. Clave NUEVA al FINAL del objeto: ninguna de las de arriba se toca.
+  //
+  // El ACTOR tampoco se resuelve aqui (R5): lo construye la Server Action de T9 con las dos caras
+  // de la sesion. Y no se le pasa ninguna empresa: el catalogo es GLOBAL (R11).
+  listRoles: createListRoles({ roles: roleCatalogRepository }),
 } as const;
 
 /**
@@ -403,7 +422,7 @@ const productRepository: ProductRepository = {
 
 const presentationRepository: PresentationRepository = {
   create: createPresentation,
-  rename: renamePresentation,
+  replace: replacePresentation,
   deleteById: deletePresentationById,
   list: listPresentations,
 };

@@ -74,6 +74,7 @@ let savepointSeq = 0
 
 /** SQLSTATE de Postgres relevantes aqui. Son estables y NO dependen del idioma. */
 const NOT_NULL_VIOLATION = '23502'
+const FOREIGN_KEY_VIOLATION = '23503'
 const CHECK_VIOLATION = '23514'
 
 /**
@@ -137,6 +138,22 @@ function normalizeForTest(name: string): string {
 }
 
 /**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: Prisma.TransactionClient): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  })
+  return unit.id
+}
+
+/**
  * Crea una unidad REAL dentro de la transaccion del test y devuelve su identificador.
  *
  * 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Donde estos tests
@@ -169,9 +186,11 @@ async function createUnit(
 
 /** Columnas de `products` que un alta cruda puede escribir (todas menos las marcas).
  *
- *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. `unit` (TEXT) ya no
- *  existe como columna; su sitio lo ocupa `unit_id` (UUID con FK). */
-type ProductColumn = 'name' | 'stock' | 'qty_alert' | 'unit_id'
+ *  ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21): `unit_id` sale de la lista porque sale de
+ *  la TABLA -columna, indice y FK-. El producto ya no declara unidad: la declara la
+ *  presentacion (R1) y la del producto se DERIVA del lote mas reciente (R22). `unit` (TEXT)
+ *  se habia ido antes, en QC-32. */
+type ProductColumn = 'name' | 'stock' | 'qty_alert'
 
 /**
  * `INSERT INTO products` crudo. `columns` decide que se escribe: omitir una entrada es
@@ -251,7 +270,11 @@ describe('estructura de la presentacion', () => {
   it('crea una presentacion y su identificador no cambia al renombrarla', async () => {
     await inRolledBackTransaction(async (tx) => {
       const created = await tx.presentation.create({
-        data: { name: 'Bidon 20 L', nameNormalized: normalizeForTest('Bidon 20 L') },
+        data: {
+          name: 'Bidon 20 L',
+          nameNormalized: normalizeForTest('Bidon 20 L'),
+          unitId: await unidadDeSistema(tx),
+        },
       })
       // R1: identificador propio, estable y no derivado de los datos de negocio.
       expect(created.id).toMatch(/^[0-9a-f-]{36}$/u)
@@ -294,17 +317,17 @@ describe('estructura de la presentacion', () => {
 describe('estructura del producto', () => {
   it('crea un producto con todos sus datos y los relee sin perdida', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El dato sigue
-      // siendo la unidad de medida (R3 de QC-14 intacto); lo que cambia es que hoy es una
-      // referencia a `units` y hay que crear la unidad de verdad.
-      const unitId = await createUnit(tx)
+      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21). ANTES este caso creaba la unidad y la
+      // escribia en `products.unit_id`, y afirmaba que se releia igual. Esa columna YA NO
+      // EXISTE, asi que la afirmacion no se borra: se INVIERTE en positivo -el producto no
+      // declara unidad por ningun nombre de columna, abajo- y su sujeto nuevo, la unidad de la
+      // PRESENTACION, se prueba en `presentation-unit.int.test.ts`.
       const { id } = await tx.product.create({
         data: {
           name: 'Acido citrico monohidratado',
           nameNormalized: normalizeForTest('Acido citrico monohidratado'),
           stock: 120,
           qtyAlert: 20,
-          unitId,
         },
         select: { id: true },
       })
@@ -315,38 +338,39 @@ describe('estructura del producto', () => {
       expect(product.name).toBe('Acido citrico monohidratado')
       expect(product.stock).toBe(120)
       expect(product.qtyAlert).toBe(20)
-      expect(product.unitId).toBe(unitId)
       expect(product.deletedAt).toBeNull()
+      // R21 de QC-80: el producto NO declara unidad, ni como uuid ni como texto. Se lee de
+      // `information_schema` y no del objeto de Prisma: el cliente solo sabe lo que el esquema
+      // le dijo, y lo que aqui se vigila es la TABLA.
+      expect(await columnTypes(tx, 'products', ['unit_id', 'unit'])).toEqual([])
       expect(product.id).toMatch(/^[0-9a-f-]{36}$/u)
     })
   })
 
   it('rechaza el alta si falta el nombre', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La unidad se usa
-      // aqui, igual que antes, solo como MARCA para reconocer despues la fila que el alta
-      // rechazada habria escrito, porque `unit_id` tiene FK real.
-      const unitId = await createUnit(tx)
+      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7): la MARCA con la que este caso reconocia la
+      // fila del intento rechazado era `unit_id`, columna que ya no existe. Se sustituye por la
+      // misma marca que usa el caso gemelo de la presentacion unas lineas mas arriba: un alta
+      // sin nombre solo puede haber dejado una fila con `name` NULL, y esa se busca directa.
 
       // Sin nombre: la unica columna obligatoria omitida es `name`.
       const withoutName = await expectRejectedByDatabase(
         tx,
-        () => rawInsertProduct(tx, { unit_id: Prisma.sql`CAST(${unitId} AS uuid)` }),
+        () => rawInsertProduct(tx, { stock: Prisma.sql`0` }),
         'alta de producto sin nombre',
       )
       expect(withoutName).toBe(NOT_NULL_VIOLATION)
 
-      // R4 «no crear ninguna fila»: se busca lo que cada intento habria escrito, no el
-      // total de la tabla.
-      const survivors = await tx.product.findMany({
-        where: { unitId },
-        select: { id: true },
-      })
+      // R4 «no crear ninguna fila»: se busca lo que el intento habria escrito, no el total
+      // de la tabla.
+      const survivors = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "products" WHERE "name" IS NULL`
       expect(survivors).toEqual([])
     })
   })
 
-  it('acepta un producto sin existencia, cantidad de alerta ni unidad, y los devuelve como ausencia de valor', async () => {
+  it('acepta un producto sin existencia ni cantidad de alerta, y los devuelve como ausencia de valor, y ya no tiene donde declarar unidad (R21)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const { id } = await tx.product.create({
         data: { name: 'Ficha recien abierta', nameNormalized: normalizeForTest('Ficha recien abierta') },
@@ -358,13 +382,14 @@ describe('estructura del producto', () => {
       // cosas; un `toBeFalsy` las confundiria y el test no valdria nada.
       expect(product.stock).toBeNull()
       expect(product.qtyAlert).toBeNull()
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva
-      // exactamente lo que R5 vigila —la unidad ausente vuelve como AUSENCIA de valor, no
-      // como cero ni como cadena vacia (QC-32 R10)—, ahora sobre `unit_id`.
-      expect(product.unitId).toBeNull()
       expect(product.stock).not.toBe(0)
       expect(product.qtyAlert).not.toBe(0)
-      expect(product.unitId).not.toBe('')
+      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R21). ANTES esto decia «la unidad ausente vuelve
+      // como AUSENCIA de valor» sobre `products.unit_id`. Hoy la ausencia es MAS FUERTE y se
+      // afirma como tal: el producto no tiene NINGUNA columna donde declarar unidad, asi que no
+      // hay valor que pueda volver mal. Quien declara unidad es la presentacion (R1).
+      expect(await columnTypes(tx, 'products', ['unit_id', 'unit'])).toEqual([])
+      expect(Object.keys(product)).not.toContain('unitId')
     })
   })
 
@@ -453,21 +478,25 @@ describe('estructura del producto', () => {
     })
   })
 
-  it('acepta cualquier unidad del catalogo, sin restriccion por producto, y tambien un producto sin unidad', async () => {
+  it('acepta cualquier unidad del catalogo, sin restriccion por presentacion, y ninguna presentacion se queda sin unidad (R1)', async () => {
     // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este caso decia
-    // «acepta cualquier TEXTO como unidad»; esa mitad de R10 de QC-14 —«texto libre»— es la
-    // que el humano cambio. Lo que R10 vigilaba y SIGUE VIGENTE se conserva entero aqui:
-    //   - NADA restringe que unidad puede usar cada producto (QC-32 R14): seis productos
-    //     distintos, seis unidades cualesquiera del catalogo, y la base no opina;
-    //   - la unidad NO se normaliza ni se sustituye al guardarla en el producto: vuelve
-    //     TAL CUAL la que se asigno (la normalizacion vive en `units.name_normalized`, que
-    //     es identidad del CATALOGO, no del producto);
-    //   - un producto puede no declarar unidad (QC-32 R10).
-    // Lo unico que ya no se puede probar es «cualquier texto»: hoy la columna es una FK y
-    // un texto suelto ni siquiera es un uuid.
+    // «acepta cualquier TEXTO como unidad»; esa mitad de R10 de QC-14 --«texto libre»-- es la
+    // que el humano cambio.
+    //
+    // TRASLADADO EL 2026-09-11 POR QC-80 (R1, R21). El SUJETO cambio: `products.unit_id` ya
+    // no existe y quien declara unidad es la PRESENTACION. Lo que el caso vigila se traslada
+    // entero a su sujeto nuevo:
+    //   - NADA restringe que unidad puede usar cada presentacion: seis presentaciones
+    //     distintas, seis unidades cualesquiera del catalogo, y la base no opina;
+    //   - la unidad NO se normaliza ni se sustituye al guardarla: vuelve TAL CUAL la que se
+    //     asigno (la normalizacion vive en `units.name_normalized`, que es identidad del
+    //     CATALOGO);
+    //   - la mitad que decia «un producto puede no declarar unidad» se INVIERTE, porque la
+    //     regla se invirtio: ninguna presentacion puede quedarse sin unidad (R1), y el
+    //     producto ya no tiene donde declararla (R21).
     await inRolledBackTransaction(async (tx) => {
-      // Las cinco formas de texto que este caso quiere cubrir —minusculas, MAYUSCULAS, con
-      // espacios, con barra— mas la ausencia. Desde QC-76 R15 el simbolo es unico dentro del
+      // Las cinco formas de texto que este caso quiere cubrir --minusculas, MAYUSCULAS, con
+      // espacios, con barra-- mas la ausencia. Desde QC-76 R15 el simbolo es unico dentro del
       // ambito, y `'kg'` a secas chocaria con el `kilogramo` del arrancador, asi que cada una
       // lleva un marcador irrepetible. Las FORMAS se conservan enteras, que es lo que el caso
       // mide; `null` sigue tal cual porque el indice es parcial y varias unidades sin simbolo
@@ -484,46 +513,96 @@ describe('estructura del producto', () => {
 
       const unitIds: string[] = []
       const ids: string[] = []
-      for (const symbol of symbols) {
+      for (const [indice, symbol] of symbols.entries()) {
         const unitId = await createUnit(tx, symbol)
         unitIds.push(unitId)
-        const { id } = await tx.product.create({
-          data: { name: `Producto en ${symbol ?? 'unidad sin simbolo'}`, nameNormalized: normalizeForTest(`Producto en ${symbol ?? 'unidad sin simbolo'}`), unitId },
+        // El indice va en el nombre porque `presentations.name_normalized` SI tiene indice
+        // unico -al reves que `products.name_normalized`, que es el que este caso usaba hasta
+        // hoy-, y `kg …` y `KG …` normalizan a la MISMA clave: sin el indice, la segunda
+        // presentacion del bucle chocaria con 23505 y el caso moriria por donde no mira.
+        const name = `Presentacion ${String(indice)} en ${symbol ?? 'unidad sin simbolo'}`
+        const { id } = await tx.presentation.create({
+          data: { name, nameNormalized: normalizeForTest(name), unitId },
           select: { id: true },
         })
         ids.push(id)
       }
-      const stored = await tx.product.findMany({
+      const stored = await tx.presentation.findMany({
         where: { id: { in: ids } },
         select: { id: true, unitId: true },
       })
-      // Cada producto conserva EXACTAMENTE la unidad que se le asigno: ni sustituida, ni
-      // deducida de la presentacion, ni unificada con la de otro producto.
+      // Cada presentacion conserva EXACTAMENTE la unidad que se le asigno: ni sustituida, ni
+      // deducida de otra cosa, ni unificada con la de otra presentacion.
       expect(ids.map((id) => stored.find((row) => row.id === id)?.unitId)).toEqual(unitIds)
       expect(new Set(unitIds).size).toBe(symbols.length)
 
-      const { id: withoutUnit } = await tx.product.create({
-        data: { name: 'Sin unidad', nameNormalized: normalizeForTest('Sin unidad') },
+      // R1 -- y la otra mitad, la que se invirtio: una presentacion SIN unidad no entra. Crudo
+      // a proposito: omitir `unitId` con la API tipada no compilaria. `name_normalized` va
+      // rellena, para que el 23502 solo pueda venir de `unit_id`.
+      const sinUnidad = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`
+          INSERT INTO "presentations" ("name", "name_normalized", "updated_at")
+          VALUES ('Presentacion sin unidad', ${`sinunidad${marcaSimbolo}`}, CURRENT_TIMESTAMP)`,
+        'presentacion sin unidad',
+      )
+      expect(sinUnidad).toBe(NOT_NULL_VIOLATION)
+      expect(
+        await tx.presentation.findMany({
+          where: { nameNormalized: `sinunidad${marcaSimbolo}` },
+          select: { id: true },
+        }),
+      ).toEqual([])
+    })
+  })
+
+  it('rechaza con 23503 el borrado de una unidad referenciada por una presentacion, y la presentacion sigue ahi (R2)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      // R2 -- `presentations_unit_id_fkey` es ON DELETE RESTRICT. Crudo, para poder afirmar
+      // sobre el SQLSTATE y no sobre el `P2003` que devolveria la API tipada; y sobre el
+      // SQLSTATE y NUNCA sobre el texto, que en esta maquina viene en espanol.
+      const marcador = randomUUID()
+      const enUso = await createUnit(tx)
+      const libre = await createUnit(tx)
+      const nombre = `Bolsa marcada ${marcador}`
+      const { id: presentationId } = await tx.presentation.create({
+        data: { name: nombre, nameNormalized: normalizeForTest(nombre), unitId: enUso },
         select: { id: true },
       })
-      const bare = await tx.product.findUniqueOrThrow({ where: { id: withoutUnit } })
-      expect(bare.unitId).toBeNull()
+
+      const rechazo = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = CAST(${enUso} AS uuid)`,
+        'borrado de una unidad referenciada por una presentacion',
+      )
+      expect(rechazo).toBe(FOREIGN_KEY_VIOLATION)
+
+      // Ni la unidad ni la presentacion se movieron, y la presentacion sigue apuntando a ella.
+      expect(await tx.unit.findUnique({ where: { id: enUso }, select: { id: true } })).not.toBeNull()
+      const presentacion = await tx.presentation.findUniqueOrThrow({
+        where: { id: presentationId },
+        select: { name: true, unitId: true },
+      })
+      expect(presentacion).toEqual({ name: nombre, unitId: enUso })
+
+      // La otra mitad: la unidad que NO esta referenciada si se borra. Sin esto, el caso
+      // pasaria igual con una tabla que no deja borrar nada nunca.
+      await tx.unit.delete({ where: { id: libre } })
+      expect(await tx.unit.findUnique({ where: { id: libre }, select: { id: true } })).toBeNull()
     })
   })
 
   it('guardar una cantidad de alerta por debajo de la existencia no cambia ninguna otra columna', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La fila sigue
-      // teniendo TODAS sus columnas rellenas, que es lo que este caso necesita para poder
-      // afirmar despues que ninguna cambio; solo cambia la forma de la unidad.
-      const unitId = await createUnit(tx)
+      // La fila sigue teniendo TODAS sus columnas rellenas, que es lo que este caso necesita
+      // para poder afirmar despues que ninguna cambio. QC-80 (R7) se llevo `unit_id`: son una
+      // menos, y el `toEqual` sobre la fila entera sigue siendo la asercion que muerde.
       const { id } = await tx.product.create({
         data: {
           name: 'Producto vigilado',
           nameNormalized: normalizeForTest('Producto vigilado'),
           stock: 3,
           qtyAlert: 50,
-          unitId,
         },
         select: { id: true },
       })
@@ -585,17 +664,14 @@ describe('nombre del producto', () => {
 describe('borrado logico y marcas de tiempo', () => {
   it('el borrado logico conserva la fila del producto y marca deleted_at', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Igual que arriba:
-      // la fila nace completa para que R17 pueda comprobar que el borrado logico no pierde
-      // NINGUN dato, la unidad incluida.
-      const unitId = await createUnit(tx, 'L')
+      // Igual que arriba: la fila nace completa para que R17 pueda comprobar que el borrado
+      // logico no pierde NINGUN dato. QC-80 (R7) se llevo `unit_id`, que ya no es uno de ellos.
       const { id } = await tx.product.create({
         data: {
           name: 'Producto que se retira',
           nameNormalized: normalizeForTest('Producto que se retira'),
           stock: 9,
           qtyAlert: 1,
-          unitId,
         },
         select: { id: true },
       })
@@ -619,7 +695,11 @@ describe('borrado logico y marcas de tiempo', () => {
       // Nunca se pasan `createdAt` ni `updatedAt`: los rellenan el DEFAULT de la base y
       // el `@updatedAt` de Prisma.
       const presentation = await tx.presentation.create({
-        data: { name: 'Caneca 5 L', nameNormalized: normalizeForTest('Caneca 5 L') },
+        data: {
+          name: 'Caneca 5 L',
+          nameNormalized: normalizeForTest('Caneca 5 L'),
+          unitId: await unidadDeSistema(tx),
+        },
       })
       expect(presentation.createdAt).toBeInstanceOf(Date)
       expect(presentation.updatedAt).toBeInstanceOf(Date)
@@ -676,7 +756,8 @@ describe('QC-52 — censo de products tras la migracion', () => {
     'name_normalized',
     'qty_alert',
     'stock',
-    'unit_id',
+    // QC-80 (R7) se llevo `unit_id` --columna, indice y FK--: el producto ya no declara
+    // unidad. Esta lista es una igualdad exacta, asi que es ella quien lo vigila.
     'updated_at',
   ] as const
 
@@ -715,19 +796,26 @@ describe('QC-52 — censo de products tras la migracion', () => {
     expect(row?.column_default).toBeNull()
   })
 
-  it('conserva la unica clave foranea que le queda: la de la unidad', async () => {
-    // La presentacion y la autoria se mudaron a `product_batches` el 2026-09-09, asi que
-    // `products` solo conserva `products_unit_id_fkey` —un escalar sin `@relation` que
-    // `prisma migrate dev` propone borrar en cada generacion—. Si una auditoria del SQL
-    // bajara la guardia, este caso lo dice.
+  it('ya no le queda ninguna clave foranea: la ultima, la de la unidad, se fue con QC-80 (R7)', async () => {
+    // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7). ANTES este caso afirmaba que `products`
+    // conservaba EXACTAMENTE una FK, `products_unit_id_fkey` -> `units`. La migracion de esta
+    // ficha la elimina junto con la columna, asi que la afirmacion no se borra: se INVIERTE y
+    // sigue siendo una igualdad exacta. La presentacion y la autoria ya se habian mudado a
+    // `product_batches` el 2026-09-09. Si una FK volviera a `products` por cualquier via --un
+    // drift del modelo, una migracion futura--, esto lo dice.
     const rows = await prisma.$queryRaw<{ conname: string; confrelid: string }[]>`
       SELECT c.conname, c.confrelid::regclass::text AS confrelid
       FROM pg_constraint c
       WHERE c.conrelid = 'public.products'::regclass AND c.contype = 'f'
       ORDER BY c.conname`
-    expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([
-      ['products_unit_id_fkey', 'units'],
-    ])
+    expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([])
+
+    // Ancla: la consulta SI ve las FK de esta base. Sin esto, un error de escritura en el
+    // `regclass` devolveria vacio y el caso seria un placebo.
+    const deLosLotes = await prisma.$queryRaw<{ conname: string }[]>`
+      SELECT c.conname FROM pg_constraint c
+      WHERE c.conrelid = 'public.product_batches'::regclass AND c.contype = 'f'`
+    expect(deLosLotes.length).toBeGreaterThan(0)
   })
 
   it('conserva los dos CHECK de no negatividad que quedan, y solo esos dos', async () => {

@@ -143,6 +143,25 @@ export {
 } from './domain/set-user-account-status';
 
 // ---------------------------------------------------------------------------------------
+// QC-94 T1 — La consulta del catalogo de roles (R15). Bloque NUEVO al final: no reordena ni
+// reformatea ninguna de las lineas de arriba.
+//
+// Solo simbolos de `./domain`. En particular NO se reexporta `adapters/driving/role-actions`:
+// QC-67 lo importa por su ruta exacta, y pasarlo por aqui meteria `'use server'` en el cierre
+// transitivo del contrato.
+// ---------------------------------------------------------------------------------------
+
+// La forma de exigir CUALQUIERA de varios permisos alternativos (R1, R3). `assertAnyPermission`,
+// su cuerpo compartido, se queda dentro del modulo: quien autoriza pasa por aqui.
+export { requireAnyPermission } from './domain/actor';
+
+// QC-94 T10 — La salida de la consulta y su caso de uso, SOLO de `./domain` (R15, R16). El tipo
+// `ListRolesDeps` viaja con la factory: quien la cablea es `lib/composition`, y sin el tipo no
+// podria declarar la dependencia. El PUERTO (`ports/role-catalog-repository.ts`) y el adaptador
+// driven NO se reexportan: los ve solo el punto de composicion.
+export type { RoleOption } from './domain/role-view';
+export { createListRoles, type ListRolesDeps } from './domain/list-roles';
+
 // QC-79 T17 (R32) — el enlace con el que una persona ESTABLECE su contrasena la primera vez.
 // Bloque NUEVO al final: no reordena ni reformatea ninguna linea de arriba.
 //
@@ -172,9 +191,11 @@ export {
 // reenvio a alguien que ya no esta en `pending` (R15).
 export { CredentialLinkInvalidError, UserNotPendingError } from './domain/errors';
 
-// Los dos rechazos de FORMULARIO, que QC-70 R31 deja FUERA del catalogo a proposito: las reglas
-// incumplidas son datos que la persona necesita para corregir, y por eso viajan en una variante
-// propia del estado y no en un `ErrorState` (`design.md > 11.3`).
+// Los dos rechazos de FORMULARIO, que quedan FUERA del catalogo por **QC-70 R29** —el campo de
+// diagnostico no se serializa al navegador, y su guardia es R30—: las reglas incumplidas son
+// datos que la persona necesita para corregir, y por eso viajan en una variante propia del
+// estado y no en un `ErrorState`. Es una **excepcion declarada** a la letra de QC-79 R34, no un
+// cumplimiento suyo: ver `design.md > 11.3` y la cabecera de `domain/credential-rejected.ts`.
 export {
   CredentialConfirmationMismatchError,
   CredentialPolicyRejectedError,

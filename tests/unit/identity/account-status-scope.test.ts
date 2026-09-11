@@ -258,6 +258,34 @@ const SITIOS_PERMITIDOS = [
   // condicionado a que la cuenta siga viva y en `pending`. Es el unico sitio de la ficha que toca
   // la columna.
   'lib/modules/identity/adapters/driven/persistence/credential-setup-link-prisma.ts',
+  // RETENSADO 2026-09-11 (QC-67, pantalla-de-usuarios). La pantalla de administracion de usuarios
+  // es la ficha que PINTA el estado de cuenta: lo etiqueta, lo filtra desde la URL, lo muestra en
+  // su columna y lo mueve desde la fila. Nombrarlo es exactamente lo que su spec aprobado le
+  // manda hacer, asi que sus cinco archivos se dan de alta uno por uno, cada uno con el requisito
+  // que lo autoriza.
+  //
+  // Mismo trato que los bloques de QC-78 y QC-66 de arriba, y por el mismo motivo: la lista sigue
+  // siendo CERRADA y comparada con IGUALDAD, asi que cualquier archivo FUERA de ella —una segunda
+  // pantalla que lo pinte, un helper suelto que lo traduzca— sigue poniendo esto en rojo igual que
+  // antes. Lo que crece es la lista, nunca el criterio. El bloque va aparte y es ADITIVO: no se
+  // reordena ni se reformatea nada de lo anterior.
+
+  // QC-67 R13, R20 — las etiquetas de los cuatro estados (`Record<UserAccountStatus, string>`) y
+  // las opciones del filtro, derivadas recorriendo `USER_ACCOUNT_STATUSES`: la unica traduccion
+  // del valor almacenado a texto de UI.
+  'app/(private)/configuracion/usuarios/components/user-labels.ts',
+  // QC-67 R13, R17 — el filtro multivalor de la URL se valida contra `USER_ACCOUNT_STATUSES`
+  // IMPORTADO, descartando los valores desconocidos en vez de reescribir el conjunto a mano.
+  'app/(private)/configuracion/usuarios/components/user-list-params.ts',
+  // QC-67 R10, R13, R20 — la columna que pinta el estado almacenado TAL CUAL y declara el unico
+  // filtro `select` de la tabla.
+  'app/(private)/configuracion/usuarios/components/user-columns.tsx',
+  // QC-67 R32 — la UNICA accion de cambio de estado de la fila, con el selector de los cuatro
+  // valores del conjunto cerrado.
+  'app/(private)/configuracion/usuarios/components/user-status-dialog.tsx',
+  // QC-67 R38 — el barrel de la ruta, que reexporta lo anterior; nombra el estado porque
+  // reexportar tambien es nombrarlo.
+  'app/(private)/configuracion/usuarios/components/index.ts',
 ] as const;
 
 /**

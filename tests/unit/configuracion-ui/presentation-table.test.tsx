@@ -23,6 +23,7 @@ import {
   type DataTableParams,
 } from '@/components/shared/data-table';
 import type { PresentationView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -56,11 +57,20 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   };
 });
 
+
+/** Unidades del catalogo, tal cual bajarian desde `listUnitsAction()` (QC-80 R16). */
+const UNIDADES: readonly UnitRef[] = [
+  { id: 'unit-kg', name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null },
+  { id: 'unit-l', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
+];
+const UNIDAD_ACTUAL = UNIDADES[0]!.id;
+
 function presentacion(id: string, name: string): PresentationView {
   return {
     id,
     name,
     nameNormalized: name.toLowerCase(),
+    unitId: UNIDAD_ACTUAL,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   };
@@ -91,6 +101,7 @@ function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
       presentations={PRESENTACIONES}
       params={params}
       totalPages={totalPages}
+      units={UNIDADES}
     />,
   );
   return params;

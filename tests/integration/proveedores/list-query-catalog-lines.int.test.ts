@@ -110,6 +110,22 @@ async function crearProveedor(): Promise<string> {
   return fila.id;
 }
 
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: typeof prisma): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
 beforeAll(async () => {
   supplierId = await crearProveedor();
   otroSupplierId = await crearProveedor();
@@ -117,7 +133,11 @@ beforeAll(async () => {
   const presentationName = `Bidon ${token()}`;
   presentationId = (
     await prisma.presentation.create({
-      data: { name: presentationName, nameNormalized: normalizeForTest(presentationName) },
+      data: {
+        name: presentationName,
+        nameNormalized: normalizeForTest(presentationName),
+        unitId: await unidadDeSistema(prisma),
+      },
       select: { id: true },
     })
   ).id;
@@ -125,7 +145,11 @@ beforeAll(async () => {
   const otraName = `Caja ${token()}`;
   otraPresentationId = (
     await prisma.presentation.create({
-      data: { name: otraName, nameNormalized: normalizeForTest(otraName) },
+      data: {
+        name: otraName,
+        nameNormalized: normalizeForTest(otraName),
+        unitId: await unidadDeSistema(prisma),
+      },
       select: { id: true },
     })
   ).id;
