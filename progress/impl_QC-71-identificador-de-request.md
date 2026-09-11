@@ -476,3 +476,150 @@ acoplamiento que `docs/verification.md` avisa que `--rapido` no ve y el completo
    porque un limite de la API corto al subagente. B quedo verificada despues, sobre el arbol ya
    commiteado; la limpieza que hizo falta esta en `3d8f872`.
 6. **No se abrio PR y no se hizo push**, como manda la instruccion: eso lo autoriza el humano.
+
+---
+
+# RONDA 2 — respuesta al rechazo del reviewer (2026-09-10)
+
+> **Nada de lo anterior se reescribe.** El `reviewer` rechazó la primera entrega con **2 mayores y
+> 4 menores** (`progress/review_QC-71-identificador-de-request.md`) y **ninguno era un defecto de
+> implementación**: confirmó los números del gate corriéndolo él, reprodujo la mutación de R16 en
+> los dos sentidos, verificó que la guardia de QC-70 se endureció en vez de aflojarse y que la
+> sonda de T10 no quedó en el árbol. Lo que fallaba era **el contrato escrito**, en dos sitios.
+> El humano tomó las dos decisiones; esta ronda las ejecuta.
+
+## Qué se tocó del SPEC (`specs/QC-71-identificador-de-request/requirements.md`)
+
+Cabecera nueva «Enmiendas del 2026-09-10 (revisión F2.2)» con la tabla de las seis decisiones, y
+cinco requisitos reescritos. **Cada enmienda lleva su fecha y su motivo dentro del propio
+requisito**, para que se lea donde se rompe y nadie lo reabra por desconocimiento:
+
+- **R11 — mayor 1, Opción A.** Ahora dice «ninguna línea de log **de esta ficha**… salvo la línea
+  de diagnóstico que R28/R29 de QC-70 ya exige». Queda escrito que la redacción anterior chocaba de
+  frente con `specs/QC-70-errores-centralizados/requirements.md:167` y que **manda QC-70**, porque
+  cumplir R11 literal obligaba a borrar una función de otra ficha y aflojar su test. **Cero cambios
+  de código: la salida entregada era la correcta.** Se anota además, dentro de R11, el `console.warn`
+  por cookie ilegible de `route-guard-middleware.ts` (menor 3): es de **QC-9**, no lleva
+  identificador, **esta ficha no lo toca**, y se deja escrito para que no sorprenda a quien lea
+  «ni al entrar».
+- **R17 — mayor 2, Opción B, las dos mitades.** Acotado por escrito a «una superficie que pinta la
+  región de error de la pantalla», con la lista de las cinco superficies que aplanan a `string` y
+  la constancia de que **la Opción A —ampliar el contrato `error` de `AsyncAutocomplete`— queda
+  descartada por el humano**. La otra mitad, la que de verdad cierra el agujero, es la guardia
+  nueva (abajo).
+- **R9 — menor 1.** Reescrito nombrando a los **seis módulos de negocio** que sí barre y a los dos
+  dueños que quedan fuera (`errores` y `observabilidad`), más «ningún puerto nuevo **en ninguno de
+  los módulos**». La redacción anterior prohibía el diseño que el propio `design.md > 1` aprobó.
+  Ahora el requisito y la guardia dicen lo mismo.
+- **R13 y R16 — menor 2.** Donde decían «identificador» a secas ahora nombran el símbolo real,
+  **`reference`**, y R16 añade explícito el «nada de `reference?: string`».
+- **Tabla de trazabilidad:** actualizadas las filas de R9, R11 y R17.
+
+## Qué se tocó del CÓDIGO
+
+**Ninguna línea de producción.** Los dos cambios son de test:
+
+1. `tests/guards/guard-identificador-de-request.test.ts` — la comprobación nueva de las superficies
+   que aplanan un `ErrorState` a `string` (mayor 2, la mitad que cierra el agujero).
+2. `tests/unit/observabilidad/error-state.test.ts` — el caso de R11 «camino feliz», que construía
+   el traductor sin invocarlo (menor 4).
+
+### La guardia nueva: las superficies que aplanan un `ErrorState` a `string` (mayor 2)
+
+`tests/guards/guard-identificador-de-request.test.ts` gana una sección (el archivo pasa de 9 a
+**21** casos). Símbolos exportados: `SUPERFICIES_QUE_APLANAN`, `detectarAplanados`,
+`hallazgosDeAplanado`, `IdiomaDeAplanado`, `Aplanado`, `SuperficieAplanada`.
+
+**Cómo está clavada la lista: archivo + idioma + conteo, nunca por número de línea.** Un gate que
+se pone rojo porque alguien añadió un comentario tres líneas arriba se ignora a la semana
+(`docs/verification.md`: un check que grita en falso se ignora). El **conteo** sí entra, porque un
+aplanado *de más* en un archivo que ya aplanaba es una superficie nueva aunque el archivo ya esté
+listado. Son **6 entradas para 5 archivos** —`presentation-select.tsx` aparece dos veces, una por
+idioma—, **cada una con su `motivo`**, y hay un caso que exige que el motivo exista de verdad
+(longitud mínima): una lista de rutas sin el porqué es una lista de excusas.
+
+**Los dos idiomas detectados**, fijados leyendo los seis sitios y no de memoria:
+`throw new Error(<id>.message)` y `set<Algo>(<id>.message)`. Y una condición que evita el falso
+positivo: **el mismo identificador tiene que discriminarse en el archivo con
+`<id>.status === 'error'`**. Sin ella entraban como sexta superficie falsa
+`components/shared/file-field.tsx:186` (`setError(validation.message)`, una validación local
+`{ ok, message }` que nunca fue un `ErrorState`) y el `toast.error(state.message)` de
+`login-form.tsx:66`.
+
+**Dos desenlaces rojos, no uno:**
+- (a) aparece una superficie que no está en la lista —o un aplanado de más en un archivo que ya
+  estaba—: *«…y NO esta en SUPERFICIES_QUE_APLANAN. Ahi el `reference` de R13/R17 se pierde en
+  silencio… Decide: o la superficie recibe el ErrorState entero y pinta el identificador, o entra
+  en la lista CON su motivo. Anadirla sin motivo no es decidir, es callar el aviso.»*
+- (b) una entrada de la lista **ya no aplana** (se arregló y nadie la borró): *«…una lista con
+  entradas muertas deja de decir la verdad y acaba siendo un vertedero.»*
+
+**El verde sobre el repo real no puede ser vacío**, por dos vías: `toBeGreaterThan(100)` sobre los
+archivos barridos (hoy 147 `.tsx` entre `app/` y `components/`), y el desenlace (b), que hace que
+un detector roto —que encuentre cero— dispare los 6 hallazgos de la lista.
+
+#### Probada con una SEXTA superficie real (mutación, revertida)
+
+En `app/(private)/inventario/components/product-list-section.tsx:39`, cambiando
+`return <ProductListError error={result} />` por `throw new Error(result.message)`:
+
+```
+ ❯ tests/guards/guard-identificador-de-request.test.ts (21 tests | 1 failed)
+     × las superficies que aplanan un ErrorState a string son las declaradas, y solo esas (R17)
+
+AssertionError: expected [ Array(1) ] to deeply equal []
++ [ "app/(private)/inventario/components/product-list-section.tsx: aplana un ErrorState a string
++    con 'throw-new-error' y NO esta en SUPERFICIES_QUE_APLANAN. ..." ]
+ Test Files  1 failed (1) | Tests  1 failed | 20 passed (21)
+```
+
+Revertido con `cp` desde copia, **no** con `git checkout` (el árbol podía tener cambios ajenos).
+
+### El caso de R11 «camino feliz», que ya no es vacuo (menor 4)
+
+`tests/unit/observabilidad/error-state.test.ts` — el caso pasa a llamarse «una operacion que
+funciona no escribe ninguna linea y ni lee la cabecera» y **cablea el traductor en el `catch` de
+una acción real**: ejercita una operación que resuelve y afirma que el resultado es
+`{ status: 'success', data: { id: 42 } }`, que **el lector de la cabecera no se llamó**, y que no
+hubo ninguna llamada a `console.error/log/warn/info/debug` (espías reales). Probado que muerde
+haciendo que la operación lance. Los otros dos casos del `describe` quedaron intactos.
+
+### Verificación de la ronda (antes del gate)
+```
+$ pnpm run typecheck   -> sin salida, exit 0
+$ pnpm run lint        -> sin salida, exit 0 (0 errores, 0 warnings)
+$ pnpm run test:guardias -> Test Files 28 passed (28) | Tests 296 passed | 4 skipped (300)
+$ pnpm exec vitest run tests/unit/observabilidad -> Test Files 3 passed (3) | Tests 29 passed (29)
+```
+
+## El gate completo de la ronda 2 (`./init.sh`), salida real
+
+```
+== Arnes SDD :: init (modo: completo) ==
+-> pnpm run typecheck   ✓ typecheck paso
+-> pnpm run lint        ✓ lint paso
+-> pnpm run test:json
+ Test Files  302 passed (302)
+      Tests  3889 passed | 18 skipped (3907)
+   Duration  162.57s
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==            (exit 0)
+```
+
+**302 archivos, 3889 tests, cero rojos, exit 0.** Seis casos más que la ronda 1 (3883 -> 3889):
+los cinco de la guardia de superficies y el de R11 rehecho. Los 5 avisos del baseline son los
+mismos de siempre y **no se tocan**, por el motivo ya escrito arriba (cuatro fallan en `dev` por
+el rango git vacío; limpiarlos desde una rama los pondría rojos al mergear).
+
+## Lo que queda ABIERTO tras la ronda 2
+
+1. **Llevar el `ErrorState` entero a las cinco superficies que hoy lo aplanan** —los tres
+   *pickers*, `presentation-select` y la tabla de ingredientes de `order-form`— sigue **sin hacer,
+   y ahora está vigilado**: la lista es cerrada y la sexta pone el gate en rojo. Es candidato a
+   ficha propia; exige ampliar el contrato `error` de `AsyncAutocomplete`, que fue la **Opción A
+   descartada** por el humano en esta revisión.
+2. Los tres **menores ya cerrados** (R9, R13/R16, el `console.warn` de QC-9) no dejan nada
+   pendiente: los dos primeros eran redacción, el tercero es de QC-9 y queda anotado en R11.
+3. **Sigue sin abrirse PR y sin hacerse push.** Eso lo autoriza el humano.

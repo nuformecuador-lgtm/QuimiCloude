@@ -178,9 +178,30 @@ describe('QC-71 T7 — el traductor y el identificador de la peticion', () => {
   })
 
   describe('R11 — mientras no haya error inesperado, no se escribe NADA', () => {
-    it('el camino feliz no escribe ninguna linea: el traductor ni se invoca', () => {
-      createErrorStateTranslator(ModuloDePruebaError, conCabecera)
+    it('una operacion que funciona no escribe ninguna linea y ni lee la cabecera', async () => {
+      // El traductor se construye Y se cablea en el camino de una accion real —el `catch` esta
+      // ahi, montado—, y luego la operacion funciona. Construirlo y no invocarlo no probaria
+      // nada: lo que R11 exige es que una peticion que no falla salga del sistema sin dejar ni
+      // una linea ni una lectura de cabecera.
+      const lectura = vi.fn(async () => ID_DEL_BORDE)
+      const toErrorState = createErrorStateTranslator(ModuloDePruebaError, lectura)
 
+      async function ejecutar(
+        operacion: () => Promise<{ id: number }>,
+      ): Promise<{ status: 'success'; data: { id: number } } | ErrorState> {
+        try {
+          return { status: 'success', data: await operacion() }
+        } catch (error) {
+          return await toErrorState(error)
+        }
+      }
+
+      const resultado = await ejecutar(async () => ({ id: 42 }))
+
+      expect(resultado).toEqual({ status: 'success', data: { id: 42 } })
+      // Ni identificador que resolver: el camino feliz no toca la cabecera del borde (R7/R8 solo
+      // entran cuando algo falla).
+      expect(lectura, 'el camino feliz leyo la cabecera del identificador').not.toHaveBeenCalled()
       expect(consolaError).not.toHaveBeenCalled()
       for (const [nombre, espia] of Object.entries(otrasSalidas)) {
         expect(espia, `el camino feliz escribio en console.${nombre}`).not.toHaveBeenCalled()
