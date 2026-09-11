@@ -145,17 +145,45 @@ function leer(ruta: string): string {
  * Los otros dos sitios permitidos, `db/schema.prisma` y el `migration.sql`, no son TypeScript y
  * quedan fuera de estas carpetas; se comprueban aparte, mas abajo.
  *
- * Se compara con IGUALDAD, nunca con `toContain`: la lista tiene que quedarse quieta. La lista
- * CRECE cuando una ficha nueva empieza legitimamente a nombrar el estado, y cada entrada se
- * NOMBRA UNA A UNA con el motivo de su grupo (ver el bloque RETENSADO de abajo); nunca se
- * sustituye por un `toContain` ni por un filtro que excluya una carpeta entera.
+ * Se compara con IGUALDAD, nunca con `toContain`: la lista tiene que quedarse quieta. Cuando
+ * QC-65 la escribio, NADIE leia todavia el estado para decidir nada, y dejo dicho que «quien lo
+ * lea llega en QC-78 y esta lista es la conversacion que tendra que abrir». Esa conversacion es
+ * la de abajo: QC-78 anade OCHO lectores, uno por uno, cada uno con el requisito que lo autoriza.
+ * La igualdad SIGUE SIENDO UNA IGUALDAD y el criterio no se relaja: lo que crece es la lista, y
+ * solo con lo que un spec aprobado autoriza. Cualquier archivo que no este aqui y nombre el
+ * estado sigue poniendo esto en rojo.
+ * QC-66 («crud-de-usuarios») hizo lo mismo en su propio bloque rotulado, mas abajo: diez
+ * entradas, cada una con el motivo de su grupo. Las dos fichas caducaron la premisa de QC-65 a
+ * la vez y las dos la retensaron por el mismo camino, sin tocar lo de la otra.
  */
 const SITIOS_PERMITIDOS = [
   'lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts',
+  // QC-78 R20 — la resolucion de sesion relee la ficha en cada peticion y ahora corta tambien
+  // por estado; su adaptador tiene que traer la columna.
+  'lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts',
+  // QC-78 R13, R18 — el adaptador del login: el `SELECT` trae la columna, el predicado del CAS
+  // la incluye y la escritura del bloqueo la persiste con su rastro.
+  'lib/modules/identity/adapters/driven/persistence/user-credentials-prisma.ts',
   'lib/modules/identity/domain/account-status.ts',
+  // QC-78 R7 — la UNICA traduccion de «lo que dice la columna» a «lo que significa ahora». Es el
+  // archivo por el que R7 obliga a pasar a todos los lectores.
+  'lib/modules/identity/domain/effective-account-status.ts',
+  // QC-78 R20 — el corte de la sesion ya abierta, en la misma cadena que los de QC-8 y QC-48.
+  'lib/modules/identity/domain/resolve-session.ts',
   'lib/modules/identity/domain/seed-initial-access.ts',
+  // QC-78 R1, R13 — el login: solo entra quien esta efectivamente `active`, y el bloqueo por
+  // intentos pasa a escribirse como estado.
+  'lib/modules/identity/domain/verify-credentials.ts',
   'lib/modules/identity/index.ts',
   'lib/modules/identity/ports/initial-access-repository.ts',
+  // QC-78 R13, R17, R18 — el puerto de escritura del intento: el estado esperado entra en el
+  // predicado y el que corresponde escribir viaja con `null` = no tocar la columna.
+  'lib/modules/identity/ports/login-attempt-recorder.ts',
+  // QC-78 R20 — `SessionUserRecord` gana el estado y el plazo para poder aplicar R7 en la sesion.
+  'lib/modules/identity/ports/session-user-reader.ts',
+  // QC-78 R1 — `AuthenticatableUser` gana el estado CRUDO: cocinarlo al otro lado del puerto
+  // mudaria la regla fuera del unico sitio donde se prueba con objetos planos.
+  'lib/modules/identity/ports/user-credentials-reader.ts',
 
   // RETENSADO 2026-09-10 (QC-66, crud-de-usuarios). Hasta hoy esta lista tenia CINCO entradas y
   // su premisa era «NADIE lee todavia el estado para decidir nada; quien lo lea llega en QC-78 y
@@ -204,11 +232,24 @@ const SITIOS_PERMITIDOS = [
   'lib/composition/index.ts',
 ] as const;
 
-/** Las dos piezas de QC-19 que esta ficha declara intocables (R18). */
-const PIEZAS_DE_QC19 = [
-  'lib/modules/identity/domain/verify-credentials.ts',
-  'lib/modules/identity/domain/account-lock.ts',
-] as const;
+/**
+ * La pieza de QC-19 que esta ficha declara intocable (R18): la POLITICA DE ESCALADA.
+ *
+ * ERA UNA LISTA DE DOS. `verify-credentials.ts` sale de ella, y no por comodidad: QC-78 lo
+ * contradice POR DISENO. El propio `account-status.ts` de QC-65 lo dejo escrito -«`blocked` es LA
+ * MISMA COSA que el bloqueo por intentos fallidos de QC-19, pero QC-65 no los unifica: eso es
+ * QC-78»-, y unificarlos es exactamente lo que hacen QC-78 R1 (solo entra quien esta
+ * efectivamente `active`) y R13 (el bloqueo por intentos se ESCRIBE como `account_status =
+ * blocked`). Quien autoriza que el caso de uso del login nombre el estado es ese spec aprobado,
+ * no una excepcion escrita aqui.
+ *
+ * LO QUE NO SALE, y por eso esta lista no queda vacia: `account-lock.ts`, la politica de escalada
+ * -5 fallos, plazos de 1, 5, 15 y 60 minutos, el nivel-. QC-78 R14 la declara intocable en los
+ * mismos terminos que QC-65: el estado de cuenta se DERIVA de lo que esa politica calcula, no la
+ * reimplementa ni la reparte. Si un dia el estado aparece nombrado ahi dentro, es que alguien
+ * copio la mitad de la politica a otro sitio.
+ */
+const PIEZAS_DE_QC19 = ['lib/modules/identity/domain/account-lock.ts'] as const;
 
 /**
  * Los dos casos en que los tres casos que miran el CAMBIO (R18, R20, R21) quedan MUDOS:
@@ -329,8 +370,8 @@ describe('el rango git esta disponible: la guardia puede mirar de verdad', () =>
 });
 
 describe('R18 — el bloqueo por intentos fallidos de QC-19 no se toca', () => {
-  it('ni verify-credentials ni account-lock mencionan el estado de cuenta', () => {
-    // Primero: los dos archivos existen y tienen contenido (una lectura vacia no prueba nada).
+  it('la politica de escalada no menciona el estado de cuenta', () => {
+    // Primero: el archivo existe y tiene contenido (una lectura vacia no prueba nada).
     for (const pieza of PIEZAS_DE_QC19) {
       const fuente = leer(pieza);
       expect(fuente.length).toBeGreaterThan(0);
@@ -341,7 +382,7 @@ describe('R18 — el bloqueo por intentos fallidos de QC-19 no se toca', () => {
     expect(leer('lib/modules/identity/domain/account-lock.ts')).toMatch(/failed[_A-Za-z]*attempts/i);
   });
 
-  it('el diff de la rama no toca ninguno de los dos archivos', (ctx) => {
+  it('el diff de la rama no toca la politica de escalada', (ctx) => {
     // Si la rama no toca nada, este caso queda mudo (`skipped`) en vez de afirmar en vacuo.
     const tocados = tocadosOMudo(ctx);
     expect(tocados.filter((archivo) => (PIEZAS_DE_QC19 as readonly string[]).includes(archivo))).toEqual([]);
@@ -361,11 +402,20 @@ describe('R19 — el estado de cuenta se nombra EXACTAMENTE donde su ficha lo de
     expect(queLoNombran).toEqual([...SITIOS_PERMITIDOS].sort());
   });
 
-  it('ni el login, ni la sesion, ni el middleware, ni la UI lo nombran', () => {
-    // Los cinco caminos por los que una lectura de estado se colaria primero, dichos por su
-    // nombre para que el fallo se lea solo. Ninguno esta en la lista permitida.
+  it('ni la sesion, ni el middleware, ni la UI lo nombran', () => {
+    // Los caminos por los que una lectura de estado se colaria primero, dichos por su nombre para
+    // que el fallo se lea solo. Ninguno esta en la lista permitida.
+    //
+    // ERAN CINCO. `verify-credentials.ts` sale de la lista porque QC-78 R1 lo AUTORIZA a leer el
+    // estado -es el corte del login, el motivo entero de esa ficha- y R13 lo autoriza a
+    // escribirlo. Sale de aqui y entra arriba, en `SITIOS_PERMITIDOS`, con su comentario: no
+    // desaparece de la vigilancia, cambia de lado.
+    //
+    // Los otros cuatro SE QUEDAN y siguen mordiendo. Que la sesion corte por estado (QC-78 R20)
+    // lo hace `resolve-session.ts`, que es un archivo distinto y esta autorizado arriba; estos
+    // cuatro no tienen por que nombrarlo, y si un dia lo nombran es que la regla se ha copiado
+    // fuera del unico sitio que R7 permite.
     const caminosSensibles = [
-      'lib/modules/identity/domain/verify-credentials.ts',
       'lib/modules/identity/domain/resolve-session-user.ts',
       'lib/modules/identity/domain/session-user.ts',
       'lib/modules/identity/domain/route-access.ts',
