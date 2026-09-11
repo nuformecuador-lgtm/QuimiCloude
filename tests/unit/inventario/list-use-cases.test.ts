@@ -44,6 +44,11 @@ function montarProductos() {
     findAliveById: vi.fn<ProductRepository['findAliveById']>(),
     updateAlive: vi.fn<ProductRepository['updateAlive']>(),
     softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(),
+    // QC-90 (T4): el doble cumple el puerto ENTERO. El listado no los usa; estan para que
+    // el compilador siga vigilando la forma completa de `ProductRepository`.
+    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(),
+    createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(),
+    addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(),
     listAlive,
   } satisfies ProductRepository;
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };

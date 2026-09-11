@@ -12,7 +12,8 @@ import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/
  *   `FormData`. El esquema (`createProductSchema`/`updateProductSchema`) vive en el CASO
  *   DE USO -no aqui- y valida con `z.number()` los campos numericos; `FormData` solo
  *   entrega cadenas, asi que esta action convierte ANTES de llamar al caso de uso
- *   (`buildProductCandidate`). Una cadena no numerica en `stock` o `qtyAlert` se rechaza AQUI -sin llamar al caso de uso- en vez de
+ *   (`buildCreateProductCandidate`/`buildUpdateProductCandidate`). Una cadena no numerica en
+ *   `stock` o `qtyAlert` se rechaza AQUI -sin llamar al caso de uso- en vez de
  *   colarse como `NaN`: `NaN` pasaria `z.number().int()` como un numero valido y el
  *   rechazo de R28 no ocurriria nunca.
  * - `delete` tambien es una mutacion de formulario (un boton con un campo oculto `id`):
@@ -136,15 +137,15 @@ async function currentActor(): Promise<Actor | null> {
 }
 
 /**
- * Construye la entrada `unknown` que espera `createProductSchema`/`updateProductSchema`
- * a partir de un `FormData`. Devuelve `INVALID_NUMBER` si algun campo numerico no es un
- * entero -es la senal para que la action rechace sin tocar el caso de uso-.
+ * Los CUATRO campos del producto, leidos del `FormData`. Devuelve `INVALID_NUMBER` si algun
+ * campo numerico no es un entero -es la senal para que la action rechace sin tocar el caso
+ * de uso-.
  *
  * QC-52 (R1, R5): NO se lee `cost`, `minPurchase` ni `deliveryTime` del `FormData`. Y si
  * alguien los enviara de todos modos, no llegarian aqui como campo del candidato: el
  * esquema es `strictObject` y el caso de uso los rechaza con `invalid_input`.
  */
-function buildProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
+function buildProductFields(formData: FormData): Record<string, unknown> | typeof INVALID_NUMBER {
   const stock = readOptionalFormInt(formData, 'stock');
   const qtyAlert = readOptionalFormInt(formData, 'qtyAlert');
 
@@ -160,14 +161,65 @@ function buildProductCandidate(formData: FormData): unknown | typeof INVALID_NUM
   };
 }
 
-/** Alta de producto (R5, R6, R9-R12, R28). */
+/**
+ * Candidato del ALTA: los campos del producto MAS los cinco del primer lote (QC-90, R25).
+ *
+ * POR QUE HAY DOS CONSTRUCTORES Y NO UNO COMPARTIDO (R26). Hasta QC-90 el alta y la edicion
+ * usaban el MISMO `buildProductCandidate`, porque enviaban lo mismo. Ya no: el alta valida
+ * con `createProductWithFirstBatchSchema` -que conoce el lote- y la edicion con
+ * `updateProductSchema`, que es `strictObject` y NO tiene ninguno de los cinco campos. Si el
+ * candidato de la edicion ganara esos campos, cada edicion moriria con `invalid_input` por
+ * campo desconocido. Ademas R26 lo pide de frente: en modo edicion el sistema no debe pedir
+ * NI ENVIAR ningun campo de lote. Separar los dos constructores hace que eso sea
+ * estructuralmente cierto -no hay rama que pueda equivocarse- en vez de depender de que
+ * nadie toque un parametro.
+ *
+ * LOS IMPORTES VIAJAN COMO CADENA (R4). `unitCost` y `totalCost` se leen con
+ * `readOptionalFormString` y se pasan TAL CUAL: ningun importe se convierte a numero de coma
+ * flotante en ningun punto de este archivo. Quien valida su forma -`decimal(14,4)`- es el
+ * esquema, dentro del caso de uso, y quien la convierte a `Prisma.Decimal` es el adaptador
+ * driven. Aqui no se interpreta nada.
+ *
+ * UN CAMPO VACIO LLEGA AUSENTE, NO COMO CADENA VACIA. Los cuatro campos opcionales del lote
+ * son `nullish()` en el esquema, asi que `undefined` es valido y `''` seria `invalid_input`.
+ * `readOptionalFormString` ya devuelve `undefined` cuando el campo falta o queda vacio al
+ * recortar, que es exactamente la traduccion que hace falta (R12).
+ */
+function buildCreateProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
+  const fields = buildProductFields(formData);
+  if (fields === INVALID_NUMBER) return INVALID_NUMBER;
+
+  return {
+    ...fields,
+    presentationId: readOptionalFormString(formData, 'presentationId'),
+    unitCost: readOptionalFormString(formData, 'unitCost'),
+    totalCost: readOptionalFormString(formData, 'totalCost'),
+    lot: readOptionalFormString(formData, 'lot'),
+    expiryDate: readOptionalFormString(formData, 'expiryDate'),
+  };
+}
+
+/**
+ * Candidato de la EDICION: solo los campos del producto (R26). Aunque el `FormData` traiga
+ * campos de lote -un formulario viejo cacheado, un `curl`-, no se leen: la edicion no crea
+ * ni modifica ningun lote.
+ */
+function buildUpdateProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
+  return buildProductFields(formData);
+}
+
+/**
+ * Alta de producto (R5, R6, R9-R12, R28). Desde QC-90 (R1, R25) el alta crea TAMBIEN el
+ * primer lote, asi que el candidato lleva los cinco campos del lote y el caso de uso lo
+ * valida con `createProductWithFirstBatchSchema`. La action sigue sin decidir nada.
+ */
 export async function createProductAction(
   prevState: CreateProductFormState,
   formData: FormData,
 ): Promise<CreateProductFormState> {
   void prevState;
 
-  const candidate = buildProductCandidate(formData);
+  const candidate = buildCreateProductCandidate(formData);
   if (candidate === INVALID_NUMBER) {
     return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
   }
@@ -175,6 +227,9 @@ export async function createProductAction(
   const actor = await currentActor();
 
   try {
+    // QC-90 (R17): el `id` que devuelve el caso de uso es el del producto resultante, que
+    // cuando el nombre ya existia es el del producto QUE YA ESTABA. `CreateProductFormState`
+    // no cambia de forma por eso.
     const { id } = await inventario.createProduct(candidate, actor);
     return { status: 'success', id };
   } catch (error) {
@@ -190,7 +245,7 @@ export async function updateProductAction(
 ): Promise<ProductMutationFormState> {
   void prevState;
 
-  const candidate = buildProductCandidate(formData);
+  const candidate = buildUpdateProductCandidate(formData);
   if (candidate === INVALID_NUMBER) {
     return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
   }

@@ -351,13 +351,45 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
   qtyAlert: '1',
 };
 
-/** Rellena el formulario abierto. Deja fuera la presentacion -ya no es del producto-. */
+/**
+ * Campos del PRIMER LOTE que el alta pide desde el 2026-09-10. Solo el costo esta aqui: es el
+ * unico obligatorio de los cinco -y basta con el unitario O el total-. La presentacion se elige
+ * en su selector, no se teclea, y el lote y la caducidad son opcionales.
+ */
+const LOTE_VALIDO: Readonly<Record<string, string>> = {
+  unitCost: '12.5000',
+};
+
+/** Elige la primera presentacion del catalogo en el selector del alta. */
+async function elegirPresentacion(user: ReturnType<typeof setupUser>, nombre = PRESENTACION_A.name) {
+  await user.click(screen.getByTestId('presentation-select'));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: nombre })));
+  // El desplegable se cierra al elegir: hasta que no se va, su capa se come los clicks de lo
+  // que hay debajo -incluido el boton de guardar-.
+  await waitFor(() => expect(screen.queryByTestId('presentation-popup')).toBeNull());
+}
+
+/**
+ * Rellena el formulario abierto. En el ALTA cubre ademas lo minimo del primer lote -presentacion
+ * y costo-, que desde el 2026-09-10 son obligatorios; en la EDICION esos campos no existen y el
+ * helper no los toca.
+ */
 async function rellenarFormulario(
   user: ReturnType<typeof setupUser>,
   valores: Readonly<Record<string, string>> = {},
 ) {
   const datos = { ...ALTA_VALIDA, ...valores };
   for (const [campo, valor] of Object.entries(datos)) {
+    const control = screen.getByTestId(`product-field-${campo}`);
+    await user.clear(control);
+    if (valor !== '') await user.type(control, valor);
+  }
+
+  if (screen.queryByTestId('presentation-select') === null) return;
+
+  await elegirPresentacion(user);
+  for (const campo of Object.keys(LOTE_VALIDO)) {
+    const valor = valores[campo] ?? LOTE_VALIDO[campo] ?? '';
     const control = screen.getByTestId(`product-field-${campo}`);
     await user.clear(control);
     if (valor !== '') await user.type(control, valor);
@@ -1025,6 +1057,239 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect((screen.getByTestId('product-field-stock') as HTMLInputElement).value).toBe('');
   });
 
+  it('el alta pide el primer lote: presentacion obligatoria y uno de los dos costos', async () => {
+    // Decision humana del 2026-09-10 — el alta captura ademas el PRIMER LOTE: presentacion
+    // obligatoria, costo unitario O total (basta con uno), y lote y caducidad opcionales.
+    // Todavia SIN back: nada de esto viaja a ninguna operacion, pero la pantalla ya lo exige.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    for (const [campo, valor] of Object.entries(ALTA_VALIDA)) {
+      await user.type(screen.getByTestId(`product-field-${campo}`), valor);
+    }
+
+    // Sin presentacion no se guarda: el campo espejo del selector es `required`, asi que el
+    // envio ni siquiera empieza -misma barrera nativa que tenia antes el desplegable-.
+    await user.click(screen.getByTestId(testId.enviar));
+    expect(createProductActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+
+    // Con presentacion pero sin ningun costo: se rechaza sin llamar a la operacion, y la falta
+    // se dice en LOS DOS campos, porque cualquiera de ellos la resuelve.
+    await elegirPresentacion(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    expect(await screen.findByTestId('product-error-unitCost')).toHaveTextContent('basta con uno');
+    expect(screen.getByTestId('product-error-totalCost')).toHaveTextContent('basta con uno');
+    expect(createProductActionMock).not.toHaveBeenCalled();
+
+    // Lote y caducidad son opcionales: estan en pantalla y el alta pasa con los dos vacios.
+    expect((screen.getByTestId('product-field-lot') as HTMLInputElement).value).toBe('');
+    expect(screen.getByTestId('product-field-expiryDate')).toHaveAttribute('type', 'date');
+
+    // Con SOLO el costo total -sin el unitario- ya no hay ningun error de campo.
+    await user.type(screen.getByTestId('product-field-totalCost'), '150.00');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    // El alta salio adelante: ni un error de campo queda, y el panel se cierra.
+    await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
+    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
+    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
+  });
+
+  it('la edicion no pide nada del lote: ni presentacion, ni costos, ni caducidad', async () => {
+    // El lote es del ALTA. Al editar un producto no hay lote que cambiar, asi que ninguno de los
+    // cinco campos se pinta -y por tanto no hay obligacion de costo que bloquee el guardado-.
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    for (const campo of ['unitCost', 'totalCost', 'lot', 'expiryDate']) {
+      expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
+    }
+  });
+
+  it('el alta rechaza un costo de 0 en SU campo y no llama a la operacion', async () => {
+    // QC-90 R27 y R5 — `product_batches.unit_cost` lleva `CHECK (unit_cost > 0)` desde el
+    // 2026-09-09 y este panel aceptaba el `0`: era deuda declarada en `requirements.md`. Ahora el
+    // panel rechaza con el MISMO criterio que el servidor, porque valida con el MISMO esquema
+    // (`createProductWithFirstBatchSchema`), y el cero se descarta sobre la CADENA -sin pasar por
+    // coma flotante-, asi que sus tres escrituras valen igual.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+
+    for (const cero of ['0', '0.0', '0.0000']) {
+      const campo = screen.getByTestId('product-field-unitCost');
+      await user.clear(campo);
+      await user.type(campo, cero);
+      await user.click(screen.getByTestId(testId.enviar));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('product-error-unitCost'), cero).toBeInTheDocument(),
+      );
+      // El rechazo es del importe, no del par de costos ni de la existencia: nadie mas se marca.
+      expect(screen.queryByTestId('product-error-totalCost'), cero).toBeNull();
+      expect(screen.queryByTestId('product-error-stock'), cero).toBeNull();
+      expect(screen.getByTestId('product-field-unitCost'), cero).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+    }
+
+    expect(createProductActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+  });
+
+  it('el alta rechaza en su campo un importe con mas de 4 decimales o escrito con coma', async () => {
+    // QC-90 R4 — la forma admitida es la EXACTA de `decimal(14,4)`: hasta 4 decimales y con
+    // punto. La coma es el error mas comun de un teclado en castellano, y no se "arregla" en
+    // silencio: se rechaza, en el campo que la trae.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { unitCost: '12.34567' });
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(screen.getByTestId('product-error-unitCost')).toBeInTheDocument());
+    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
+
+    // Ahora el otro importe, y con coma: el rechazo se muda al campo que la trae.
+    await user.clear(screen.getByTestId('product-field-unitCost'));
+    await user.type(screen.getByTestId('product-field-totalCost'), '150,00');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(screen.getByTestId('product-error-totalCost')).toBeInTheDocument());
+    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
+
+    expect(createProductActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+  });
+
+  it('con solo costo total y existencia 0 el rechazo se pinta en el campo de la EXISTENCIA', async () => {
+    // QC-90 R8 — el caso que justifica que el esquema sea COMPARTIDO. No hay costo unitario
+    // posible (`total / 0`) y la columna es NOT NULL, asi que lo que hay que corregir es la
+    // EXISTENCIA, no el costo: el `superRefine` cuelga el issue de `['stock']` y el formulario,
+    // que ya reparte por `issue.path[0]`, lo pinta ahi sin una sola linea de reparto nueva.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { stock: '0', unitCost: '', totalCost: '150.00' });
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(screen.getByTestId('product-error-stock')).toBeInTheDocument());
+    expect(screen.getByTestId('product-field-stock')).toHaveAttribute('aria-invalid', 'true');
+    // Y NO en los costos: el total escrito esta bien, y marcarlo mandaria a corregir lo que no es.
+    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
+    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
+    expect(createProductActionMock).not.toHaveBeenCalled();
+
+    // Corregir la existencia -lo que el mensaje pide- basta para que el mismo alta salga adelante.
+    await user.clear(screen.getByTestId('product-field-stock'));
+    await user.type(screen.getByTestId('product-field-stock'), '3');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('el alta hace viajar los CINCO campos del primer lote en el FormData', async () => {
+    // QC-90 R25 — hasta hoy los cinco se pintaban y se validaban, pero la operacion no los veia.
+    // Van en el `FormData` porque estan en el DOM del `<form>`; lo que se vigila aqui es que
+    // ninguno se quede fuera y que los importes lleguen COMO CADENA, sin normalizar ni convertir.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { lot: 'LT-4471' });
+    await user.type(screen.getByTestId('product-field-expiryDate'), '2027-03-15');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+
+    const enviado = createProductActionMock.mock.calls[0][1];
+    for (const campo of ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate']) {
+      expect(enviado.has(campo), `${campo} debe viajar en el alta`).toBe(true);
+    }
+    expect(enviado.get('presentationId')).toBe(PRESENTACION_A.id);
+    expect(enviado.get('unitCost')).toBe(LOTE_VALIDO.unitCost);
+    expect(enviado.get('lot')).toBe('LT-4471');
+    expect(enviado.get('expiryDate')).toBe('2027-03-15');
+    // El costo total no se escribio: viaja vacio, que es "campo omitido", no un cero.
+    expect(enviado.get('totalCost')).toBe('');
+  });
+
+  it('la edicion no envia ningun campo del lote', async () => {
+    // QC-90 R26 — la edicion no crea ni cambia lotes, asi que no pinta los cinco campos y
+    // tampoco los envia: valida con `createProductSchema`, que ni los conoce.
+    const user = setupUser();
+    const elProducto = producto({ name: 'Sosa cáustica' });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateProductActionMock).toHaveBeenCalledTimes(1));
+
+    const [, , enviado] = updateProductActionMock.mock.calls[0];
+    for (const campo of ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate']) {
+      expect(enviado.get(campo), `${campo} no debe viajar en la edicion`).toBeNull();
+    }
+    expect(createProductActionMock).not.toHaveBeenCalled();
+  });
+
+  it('un rechazo del servidor deja el panel abierto y conserva los cinco campos del lote', async () => {
+    // QC-90 R28 — el rechazo llega de la operacion (no de la validacion previa), asi que va a la
+    // region de error del formulario; lo que no puede pasar es que se lleve por delante lo
+    // escrito en el lote, que es donde mas hay que teclear de todo el panel.
+    const user = setupUser();
+    createProductActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'invalid_input',
+      message: 'Entrada no valida.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { totalCost: '150.0000', lot: 'LT-4471' });
+    await user.type(screen.getByTestId('product-field-expiryDate'), '2027-03-15');
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    await screen.findByTestId(testId.errorFormulario);
+
+    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-value')).toHaveValue(PRESENTACION_A.id);
+    expect(screen.getByTestId('product-field-unitCost')).toHaveValue(LOTE_VALIDO.unitCost);
+    expect(screen.getByTestId('product-field-totalCost')).toHaveValue('150.0000');
+    expect(screen.getByTestId('product-field-lot')).toHaveValue('LT-4471');
+    expect(screen.getByTestId('product-field-expiryDate')).toHaveValue('2027-03-15');
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:
@@ -1081,9 +1346,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // El unico combobox del formulario es el nombre, que paso a ser un autocomplete de texto
     // libre que busca productos existentes. La presentacion ya no esta -se mudo a
     // `product_batches` el 2026-09-09-, asi que no hay selector de presentacion.
+    // Los comboboxes del formulario son dos: el nombre -autocomplete de texto libre que busca
+    // productos existentes- y la presentacion, que volvio al alta el 2026-09-10 como campo del
+    // primer LOTE (no del producto). Ninguno de los dos es una unidad.
     const combos = within(formulario).getAllByRole('combobox');
-    expect(combos).toHaveLength(1);
+    expect(combos).toHaveLength(2);
     expect(combos).toContain(screen.getByTestId('product-field-name'));
+    expect(combos).toContain(screen.getByTestId('presentation-select'));
 
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));

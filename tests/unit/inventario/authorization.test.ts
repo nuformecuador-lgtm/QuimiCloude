@@ -22,6 +22,7 @@ import { InventarioError, UnauthorizedError } from '@/lib/modules/inventario/dom
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
+import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario/domain/product-batch-input';
 import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
@@ -48,6 +49,15 @@ const PRODUCTO_VALIDO = {
   qtyAlert: 0,
 };
 
+/** QC-90 (R1): el ALTA ya no acepta un producto pelado -siempre crea su primer lote-, asi
+ *  que el fixture del alta lleva ademas presentacion y costo. `PRODUCTO_VALIDO` se queda
+ *  como esta porque lo sigue usando la EDICION, que no conoce el lote (R26). */
+const PRODUCTO_VALIDO_CON_LOTE = {
+  ...PRODUCTO_VALIDO,
+  presentationId: '11111111-1111-4111-8111-111111111111',
+  unitCost: '10.0000',
+};
+
 const PRESENTACION_VALIDA = { name: 'Bidon 20 L' };
 
 /** Entrada que zod rechaza sin dudarlo: es la que demuestra R12 -el permiso se mira ANTES
@@ -72,6 +82,11 @@ function repositorioProductoQueFalla(): ProductRepository {
     updateAlive: vi.fn<ProductRepository['updateAlive']>(explota),
     softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(explota),
     listAlive: vi.fn<ProductRepository['listAlive']>(explota),
+    // QC-90 (R23): los tres del alta con primer lote tambien EXPLOTAN. Sin ellos aqui, el
+    // camino nuevo del alta seria justo el que se escapa de esta red.
+    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(explota),
+    createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(explota),
+    addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(explota),
   };
 }
 
@@ -141,6 +156,15 @@ function montarReposPermisivos(): Repos {
       updateAlive: vi.fn<ProductRepository['updateAlive']>(async () => true),
       softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(async () => true),
       listAlive: vi.fn<ProductRepository['listAlive']>(async () => PAGINA_VACIA),
+      // QC-90: sin producto vivo homonimo, el alta cae al camino de creacion (R16).
+      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
+      createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
+        id: 'producto-1',
+        batchId: 'lote-1',
+      })),
+      addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
+        batchId: 'lote-1',
+      })),
     },
     presentations: {
       create: vi.fn<PresentationRepository['create']>(async () => ({ id: 'presentacion-1' })),
@@ -159,6 +183,11 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.products.updateAlive).not.toHaveBeenCalled(),
     () => expect(repos.products.softDeleteAlive).not.toHaveBeenCalled(),
     () => expect(repos.products.listAlive).not.toHaveBeenCalled(),
+    // QC-90 (R23): «sin una sola llamada al repositorio» incluye los tres metodos del alta
+    // con primer lote. Un metodo nuevo en el puerto que no se anada aqui es un hueco.
+    () => expect(repos.products.findAliveIdByName).not.toHaveBeenCalled(),
+    () => expect(repos.products.createWithFirstBatch).not.toHaveBeenCalled(),
+    () => expect(repos.products.addBatchToAlive).not.toHaveBeenCalled(),
     () => expect(repos.presentations.create).not.toHaveBeenCalled(),
     () => expect(repos.presentations.rename).not.toHaveBeenCalled(),
     () => expect(repos.presentations.deleteById).not.toHaveBeenCalled(),
@@ -192,7 +221,7 @@ const CASOS_DE_USO: ReadonlyArray<{
     nombre: 'create-product',
     permiso: MODIFICAR,
     invocar: (repos, actor) =>
-      createCreateProduct({ products: repos.products })(PRODUCTO_VALIDO, actor),
+      createCreateProduct({ products: repos.products })(PRODUCTO_VALIDO_CON_LOTE, actor),
     invocarConEntradaInvalida: (repos, actor) =>
       createCreateProduct({ products: repos.products })(ENTRADA_INVALIDA, actor),
   },
@@ -345,6 +374,12 @@ describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => 
     // entrada invalida tiene que ser invalida de verdad para que R12 signifique algo.
     expect(createProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
     expect(createProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
+    // QC-90: el fixture del ALTA se ancla contra SU esquema, que es otro. Si dejara de ser
+    // entrada valida, la mitad de la concesion se pondria verde por el motivo equivocado.
+    expect(createProductWithFirstBatchSchema.safeParse(PRODUCTO_VALIDO_CON_LOTE).success).toBe(
+      true,
+    );
+    expect(createProductWithFirstBatchSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
   });
 });
 
@@ -488,10 +523,12 @@ describe('R1 / QC-74 R18 — el actor entra por parametro y no trae nombre de ro
     const repos = montarReposPermisivos();
     const createProduct = createCreateProduct({ products: repos.products });
 
-    await expect(createProduct(PRODUCTO_VALIDO, actorCon(MODIFICAR))).resolves.toEqual({
+    await expect(createProduct(PRODUCTO_VALIDO_CON_LOTE, actorCon(MODIFICAR))).resolves.toEqual({
       id: 'producto-1',
     });
-    await expect(createProduct(PRODUCTO_VALIDO, actorCon(CONSULTAR))).rejects.toBeInstanceOf(
+    await expect(
+      createProduct(PRODUCTO_VALIDO_CON_LOTE, actorCon(CONSULTAR)),
+    ).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
   });
