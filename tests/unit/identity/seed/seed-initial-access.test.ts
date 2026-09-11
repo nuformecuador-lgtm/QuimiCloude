@@ -691,7 +691,7 @@ describe('seedInitialAccess', () => {
   // ---------------------------------------------------------------------------------
 
   // Caso 14 (QC-74 R8, R9, R10)
-  it('sobre una base vacia crea los once permisos del catalogo y las doce asignaciones del seed', async () => {
+  it('sobre una base vacia crea los trece permisos del catalogo y las catorce asignaciones del seed', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -719,7 +719,7 @@ describe('seedInitialAccess', () => {
     );
     expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
 
-    // Luego: las asignaciones, las doce (once del Administrador + una del Operador).
+    // Luego: las asignaciones, las catorce (trece del Administrador + una del Operador).
     const creacionesDeAsignaciones = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'createRolePermissions',
     );
@@ -728,7 +728,7 @@ describe('seedInitialAccess', () => {
       roleId: string;
       permissionCode: string;
     }[];
-    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(12);
+    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(14);
     expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED);
     expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
@@ -745,7 +745,7 @@ describe('seedInitialAccess', () => {
     const codigosDelAdministrador = paresCreados
       .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
       .map((par) => par.permissionCode);
-    expect(codigosDelAdministrador).toHaveLength(11);
+    expect(codigosDelAdministrador).toHaveLength(13);
     expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
     expect(
       paresCreados

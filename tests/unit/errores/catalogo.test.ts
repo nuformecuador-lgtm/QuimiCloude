@@ -4,7 +4,9 @@
 // sistema de tipos ya impide que falte una clave o un texto (`satisfies` en `error-catalog.ts`)
 // y que un codigo inventado compile (R2, con su caso de `@ts-expect-error` mas abajo); lo que
 // el compilador NO puede decir es que dos codigos no compartan frase (R4), que ninguno se
-// llame `not_found` (R16) o que ninguno venga de `identity` (R25). Eso se comprueba aqui.
+// llame `not_found` (R16) o que ninguno venga de la AUTENTICACION (R25, enmendado el 2026-09-10:
+// la administracion de usuarios de QC-66 SI entra al catalogo; el login de QC-7 no). Eso se
+// comprueba aqui.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -36,8 +38,11 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 25 entradas de design.md > 3 estan, y cada codigo tiene exactamente una clave', () => {
-      expect(ERROR_CODES).toHaveLength(25)
+    it('las 32 entradas estan, y cada codigo tiene exactamente una clave', () => {
+      // 25 de `design.md > 3` + los SIETE de la administracion de usuarios que entraron el
+      // 2026-09-10 con la enmienda a R25 (QC-66). Sigue siendo un conteo LITERAL a proposito: un
+      // codigo nuevo que nadie anote aqui pone esta linea en rojo.
+      expect(ERROR_CODES).toHaveLength(32)
       expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
@@ -48,7 +53,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 25 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 32 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
@@ -183,8 +188,13 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
     })
   })
 
-  describe('R25 — identity se queda fuera', () => {
-    it('ningun codigo del catalogo pertenece a identity', () => {
+  // R25, ENMENDADO el 2026-09-10 (aprobado por el humano). La premisa de R25 —que `identity` solo
+  // devuelve el rechazo generico del login— caduco con QC-66, que anade seis casos de uso de
+  // administracion de usuarios con fallos distinguibles, asi que esos SIETE codigos entran. Lo que
+  // R25 protegia de verdad sigue en pie y es lo que se comprueba aqui: la AUTENTICACION no entra,
+  // el rechazo del login sigue siendo generico y el modulo `errores` no depende de nadie.
+  describe('R25 (enmendado) — la autenticacion se queda fuera, la administracion de usuarios entra', () => {
+    it('ningun codigo del catalogo sale del login ni de la sesion', () => {
       const codigos: readonly string[] = ERROR_CODES
       for (const ajeno of [
         'invalid_credentials',
@@ -192,16 +202,28 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
         'account_disabled',
         'session_expired',
         'weak_password',
-        'duplicate_username',
-        'duplicate_email',
-        'duplicate_document',
       ]) {
-        expect(codigos, `codigo de identity en el catalogo: ${ajeno}`).not.toContain(ajeno)
+        expect(codigos, `codigo de autenticacion en el catalogo: ${ajeno}`).not.toContain(ajeno)
       }
       for (const code of ERROR_CODES) {
-        expect(code, `codigo con vocabulario de identity: ${code}`).not.toMatch(
-          /credential|password|session|login|account|username/,
+        expect(code, `codigo con vocabulario de autenticacion: ${code}`).not.toMatch(
+          /credential|password|session|login|account/,
         )
+      }
+    })
+
+    it('los siete codigos de la administracion de usuarios SI estan', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      for (const code of [
+        'user_not_found',
+        'duplicate_email',
+        'duplicate_username',
+        'duplicate_document',
+        'role_not_found',
+        'self_operation',
+        'last_administrator',
+      ]) {
+        expect(codigos, `falta el codigo de usuarios ${code}`).toContain(code)
       }
     })
 

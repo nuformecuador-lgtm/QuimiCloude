@@ -63,3 +63,81 @@ export {
   isInternalPath,
   resolveReturnPath,
 } from './domain/return-path';
+
+// ---------------------------------------------------------------------------------------
+// QC-66 T15 — La administracion de usuarios (R42). Bloque NUEVO al final: no reordena ni
+// reformatea ninguna de las lineas de arriba -hay otras sesiones tocando este modulo-.
+//
+// Solo simbolos de `./domain`. En particular NO se reexporta `adapters/driving/user-actions`
+// (T14): QC-67 lo importa por su ruta exacta, y pasarlo por aqui metaria `'use server'` en el
+// cierre transitivo del contrato y lo haria inimportable desde un componente de cliente
+// (`guard-arquitectura-modulos.test.ts`, bloque del contrato). Tampoco se reexporta nada de
+// `ports/` ni de `adapters/driven/**`: el puerto lo cablea `lib/composition`, que es el unico
+// que necesita verlo.
+// ---------------------------------------------------------------------------------------
+
+// El actor de los seis casos de uso y la unica forma de exigirle un permiso dentro del modulo
+// (R2, R3, R5). `requirePermission` delega en `assertPermission`, ya exportado arriba.
+export { requirePermission, type Actor } from './domain/actor';
+
+// La jerarquia de errores con `code` estable (R41): el adaptador driving traduce POR `code`,
+// nunca por el texto del mensaje, y QC-67 reconoce el caso por la clase o por el codigo.
+export {
+  IdentityError,
+  UnauthorizedError,
+  UserNotFoundError,
+  DuplicateEmailError,
+  DuplicateUsernameError,
+  DuplicateDocumentError,
+  RoleNotFoundError,
+  SelfOperationError,
+  LastAdministratorError,
+  ValidationError,
+} from './domain/errors';
+
+// Los esquemas de entrada de las cuatro mutaciones (R14, R18, R20) y sus tipos inferidos.
+export {
+  createUserSchema,
+  updateUserSchema,
+  setAccountStatusSchema,
+  USER_NAME_MAX_LENGTH,
+  USER_EMAIL_MAX_LENGTH,
+  USER_PHONE_MAX_LENGTH,
+  USER_DOCUMENT_NUMBER_MAX_LENGTH,
+  USER_USERNAME_MAX_LENGTH,
+  type CreateUserInput,
+  type UpdateUserInput,
+  type SetAccountStatusInput,
+} from './domain/user-input';
+
+// La proyeccion de la fila del listado y la de la ficha (R31, R32): ninguna de las dos lleva
+// hash de credencial, y eso lo fija el TIPO, no una promesa.
+export type { UserRow, UserDetail } from './domain/user-view';
+
+// El contrato compartido de listado (QC-57, R36) y la lista blanca de campos consultables de
+// usuarios: QC-67 la comprueba contra el contrato en vez de contra una copia escrita a mano.
+export type { Page } from './domain/page';
+export {
+  type ListFilterKind,
+  type ListFilterValue,
+  type ListQuery,
+  type ListQueryable,
+  type ListSort,
+  type SanitizedListQuery,
+  type SortDirection,
+  createListQuerySchema,
+  sanitizeListQuery,
+} from './domain/list-query';
+export { USER_QUERYABLE } from './domain/user-queryable';
+
+// Las SEIS factories de caso de uso (`design.md > 11`). Los tipos `*Deps` viajan con ellas:
+// quien las cablea es `lib/composition`, y sin el tipo no podria declarar la dependencia.
+export { createCreateUser, type CreateUserDeps } from './domain/create-user';
+export { createGetUser, type GetUserDeps } from './domain/get-user';
+export { createListUsers, type ListUsersDeps } from './domain/list-users';
+export { createUpdateUser, type UpdateUserDeps } from './domain/update-user';
+export { createDeleteUser, type DeleteUserDeps } from './domain/delete-user';
+export {
+  createSetUserAccountStatus,
+  type SetUserAccountStatusDeps,
+} from './domain/set-user-account-status';
