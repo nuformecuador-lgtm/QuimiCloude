@@ -10,7 +10,7 @@ import {
   type NavGroup,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
-import { LOGIN_ROUTE } from '@/lib/shared/routes';
+import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
@@ -310,7 +310,7 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
 
     await expect(renderLayout()).rejects.toThrow(RedirectCentinela);
 
-    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE);
+    expect(redirectMock).toHaveBeenCalledWith(LOGIN_ROUTE_SESSION_ENDED);
     expect(screen.queryByTestId(testId.sidebar)).not.toBeInTheDocument();
   });
 });

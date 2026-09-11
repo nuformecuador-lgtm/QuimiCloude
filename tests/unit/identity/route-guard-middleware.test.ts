@@ -357,3 +357,58 @@ describe('la empresa firmada y el portero de rutas (QC-48)', () => {
     expect(dejaPasar(conRol)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// QC-78 T22 — el adaptador declara la marca de sesion cortada (R29, R30 b)
+// ---------------------------------------------------------------------------
+//
+// `sessionEndedParam` es OPCIONAL en la entrada del dominio (`design.md > 10.2`), y ese es
+// justamente el riesgo: si el adaptador se olvida de pasarla, nada deja de compilar y el bucle de
+// redirecciones vuelve en silencio. Este bloque ES la red que compensa esa decision, y por eso el
+// primer caso se ejercita por COMPORTAMIENTO —peticion real, cookie firmada de verdad— y no
+// mirando el fuente: borrar la linea del adaptador lo pone rojo.
+describe('la marca de sesion cortada, vista desde el portero (QC-78)', () => {
+  it('sirve /login con la marca aunque la cookie firmada siga siendo valida', async () => {
+    // Esta es la peticion que antes rebotaba a `/dashboard`, donde el layout volvia a cortar y a
+    // redirigir al login: el bucle. Ahora se sirve el login, con UNA sola redireccion en total.
+    const response = await middleware(peticion('/login?sesion=fin', await cookieFirmada()));
+
+    expect(dejaPasar(response)).toBe(true);
+    expect(response.headers.get('location')).toBeNull();
+  });
+
+  // El contraste que impide que el caso de arriba pase «porque todo pasa»: sin la marca, la misma
+  // peticion con la misma cookie sigue redirigiendo (R17).
+  it('sin la marca, /login con la misma cookie valida sigue redirigiendo al dashboard', async () => {
+    const response = await middleware(peticion('/login', await cookieFirmada()));
+
+    expect(response.status).toBe(307);
+    expect(destino(response)).toBe('/dashboard');
+  });
+
+  // R30 (b) desde el borde: la marca no deja entrar a nadie. Escrita a mano en una ruta privada
+  // sin cookie, la decision es la de siempre.
+  it('la marca no deja entrar a un anonimo en una ruta privada', async () => {
+    const response = await middleware(peticion('/dashboard?sesion=fin'));
+
+    expect(response.status).toBe(307);
+    expect(destino(response)).toBe('/login?next=%2Fdashboard%3Fsesion%3Dfin');
+  });
+
+  it('la marca en una ruta privada con cookie valida se decide igual que sin ella: pasa', async () => {
+    const conMarca = await middleware(peticion('/dashboard?sesion=fin', await cookieFirmada()));
+    const sinMarca = await middleware(peticion('/dashboard', await cookieFirmada()));
+
+    expect(dejaPasar(conMarca)).toBe(dejaPasar(sinMarca));
+    expect(dejaPasar(conMarca)).toBe(true);
+  });
+
+  // Y que el nombre de la marca salga de la constante compartida y no de un literal suelto: dos
+  // textos que mantener sincronizados es como se desincronizan.
+  it('el nombre de la marca sale de la constante compartida, no de un literal en el adaptador', () => {
+    const fuente = readFileSync(resolve(process.cwd(), ADAPTADOR), 'utf8');
+
+    expect(fuente).toContain('sessionEndedParam: SESSION_ENDED_PARAM');
+    expect(fuente).toMatch(/SESSION_ENDED_PARAM,?\s*\n?\s*}\s*from '@\/lib\/shared\/routes'/);
+  });
+});

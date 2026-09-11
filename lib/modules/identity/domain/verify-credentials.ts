@@ -1,5 +1,7 @@
-import { isLocked, nextLockState, type AccountLockState } from './account-lock';
+import { nextLockState, type AccountLockState } from './account-lock';
+import type { UserAccountStatus } from './account-status';
 import { loginInputSchema, type LoginInput } from './credentials';
+import { accountStatusAfterAttempt, effectiveAccountStatus } from './effective-account-status';
 import { createSessionTicket } from './session';
 
 import type { LoginAttemptRecorder } from '../ports/login-attempt-recorder';
@@ -50,6 +52,12 @@ const REJECTED: { ok: boolean } = Object.freeze({ ok: false });
  */
 const MAX_INTENTOS_DE_REGISTRO = 10;
 
+/**
+ * El unico estado efectivo que entra (QC-78 R1). Se nombra una vez para que la comparacion se
+ * lea como la regla que es y no como un literal suelto repetido por el archivo.
+ */
+const ACTIVO: UserAccountStatus = 'active';
+
 export function createVerifyCredentials(
   deps: VerifyCredentialsDeps,
 ): (input: LoginInput) => Promise<{ ok: boolean }> {
@@ -94,20 +102,44 @@ export function createVerifyCredentials(
     usuarioNormalizado: string,
     now: Date,
   ): Promise<void> {
+    // Por el bucle viajan DOS cosas y no una: el estado de bloqueo y el estado de cuenta leidos
+    // en esta vuelta. El segundo hace falta entero porque entra en el predicado del CAS (QC-78
+    // R18) y porque de el se deriva lo que corresponde escribir (R13, R15, R17).
     let estado: AccountLockState = visto;
+    let estadoCuenta: UserAccountStatus = visto.accountStatus;
     for (let intento = 0; intento < MAX_INTENTOS_DE_REGISTRO; intento += 1) {
-      // Si al releer la cuenta ya esta bloqueada, no se escribe NADA: martillearla no la
-      // alarga ni sube el nivel (R25).
-      if (isLocked(estado, now)) return;
+      // Si al releer la cuenta ya no esta efectivamente `active`, no se escribe NADA. Cubre los
+      // dos casos con una sola comparacion, que es lo que exige R7 -una unica traduccion-:
+      //   - ya esta bloqueada: martillearla no la alarga ni sube el nivel (QC-19 R25);
+      //   - dejo de estar activa por otro camino mientras corria bcrypt (QC-78 R19): un
+      //     administrador la desactivo o la bloqueo, y registrar el intento pisaria su decision.
+      // En la PRIMERA vuelta el estado es el que ya se comprobo arriba; en las siguientes es el
+      // de la fila FRESCA que se releyo tras perder la carrera, que es donde R19 muerde.
+      const vista = { accountStatus: estadoCuenta, lockedUntil: estado.lockedUntil };
+      if (effectiveAccountStatus(vista, now) !== ACTIVO) return;
       const siguiente = nextLockState(estado, 'failure', now);
+      // El estado de cuenta que corresponde persistir se DERIVA del estado de bloqueo que acaba
+      // de calcular la politica (R14), y puede ser `null` = no tocar la columna (R17).
+      const cuentaSiguiente = accountStatusAfterAttempt(estadoCuenta, siguiente);
       // `now` va al puerto: la escritura tiene que rechazarla la base si la fila esta bloqueada
       // en ese instante, porque `estado` es una copia que pudo quedar obsoleta durante bcrypt.
-      if (await deps.attempts.compareAndSet(visto.id, estado, siguiente, now)) return;
+      // Y `estadoCuenta` va como estado ESPERADO por el mismo motivo (R18): si cambio entre la
+      // lectura y la escritura, este intento no puede pisarlo.
+      const aplico = await deps.attempts.compareAndSet(
+        visto.id,
+        estado,
+        siguiente,
+        now,
+        estadoCuenta,
+        cuentaSiguiente,
+      );
+      if (aplico) return;
       // Perdio la carrera: se relee y se recalcula la politica sobre el estado FRESCO.
       const fresco = await deps.users.findActiveByUsername(usuarioNormalizado);
       // Borrado o renombrado entre medias: no se escribe nada (R31).
       if (fresco === null || fresco.id !== visto.id) return;
       estado = fresco;
+      estadoCuenta = fresco.accountStatus;
     }
   }
 
@@ -137,9 +169,36 @@ export function createVerifyCredentials(
     // el bloqueo cortara antes, responderia en microsegundos y seria un oraculo de tiempo.
     const correcta = await deps.hasher.verify(parsed.data.password, usuario.passwordHash);
 
-    // Cuenta bloqueada: no entra ni con la contrasena correcta (R24) y no se escribe nada,
-    // para que martillearla no alargue el bloqueo ni suba el nivel (R25).
-    if (isLocked(usuario, now)) return REJECTED;
+    // EL ESTADO DE CUENTA MANDA (QC-78 R1). Solo entra quien esta efectivamente `active`:
+    // `pending`, `inactive` y `blocked` no entran ni con la contrasena correcta (R1, R4).
+    //
+    // Sustituye al `if (isLocked(usuario, now))` de QC-19, que queda SUBSUMIDO: una fila con el
+    // plazo todavia vigente da efectivo `blocked` diga lo que diga la columna (R10, R11), asi que
+    // «cuenta bloqueada no entra ni con la contrasena correcta» (QC-19 R24) lo sigue cumpliendo
+    // esta misma linea. La traduccion de «lo que dice la columna» a «lo que significa ahora» vive
+    // en una sola funcion (R7) y este es uno de sus dos lectores.
+    //
+    // DONDE VA, y por que exactamente aqui:
+    // - DESPUES de la verificacion de hash (R2, herencia de QC-7 R29): cortar antes responderia
+    //   en microsegundos y el tiempo de respuesta delataria que la cuenta existe y no esta
+    //   activa. Por eso `correcta` se calcula arriba aunque este camino no la mire.
+    // - ANTES del `!correcta`, o sea ANTES de `registrarFallo`: este camino NO ESCRIBE NADA
+    //   (R5, R6). Ni contador, ni nivel, ni plazo, ni estado, ni rastro.
+    //
+    // LA ASIMETRIA CON EL CORTE DE EMPRESA DE QC-48 ES DELIBERADA, no un descuido: aquel va
+    // DESPUES del `!correcta` (unas lineas mas abajo) y este va ANTES. El motivo lo fijo la
+    // decision cerrada del 2026-09-08 y es el mismo argumento que QC-48 uso para no escribir en
+    // su propio camino: castigar a alguien -bloquearle la cuenta- por una decision administrativa
+    // que no puede arreglar seria injusto, y la cuenta no entra igual. La contrapartida se asume
+    // A CONCIENCIA y por escrito: quien pruebe contrasenas contra una cuenta que no esta activa
+    // no se topa con ningun bloqueo. Cuesta poco porque esa cuenta no entra con ninguna
+    // contrasena, ni con la buena. Si alguien «unifica» los dos cortes en una refactorizacion
+    // futura, `pending` e `inactive` empezarian a sumar intentos fallidos y R5/R6 se romperian.
+    //
+    // Y devuelve la MISMA INSTANCIA congelada que los otros rechazos, no un objeto nuevo ni uno
+    // con un campo que diga por que (R3): distinguir los tres estados entre si, o del usuario
+    // inexistente, o de la contrasena mala, convertiria el login en un oraculo.
+    if (effectiveAccountStatus(usuario, now) !== ACTIVO) return REJECTED;
 
     if (!correcta) {
       await registrarFallo(usuario, usuarioNormalizado, now);
@@ -162,7 +221,17 @@ export function createVerifyCredentials(
     // El exito si se escribe de forma incondicional: su estado es todo ceros, o sea que **no
     // depende del valor previo**. Es idempotente y no tiene el problema de
     // lectura-modificacion-escritura que obliga al camino de fallo a ir con `compareAndSet`.
-    await deps.attempts.set(usuario.id, nextLockState(usuario, 'success', now));
+    // Se calcula UNA sola vez y se usa dos: el estado de cuenta se DERIVA de este mismo estado de
+    // bloqueo (R14), no se decide aparte. Como el exito deja el plazo vacio,
+    // `accountStatusAfterAttempt` devuelve `active` si la fila venia de `blocked` -un bloqueo por
+    // intentos ya cumplido sobre el que alguien acaba de entrar bien (R16)- y `null` cuando no hay
+    // cambio, que es el caso normal y no toca la columna ni su rastro (R17).
+    const limpio = nextLockState(usuario, 'success', now);
+    await deps.attempts.set(
+      usuario.id,
+      limpio,
+      accountStatusAfterAttempt(usuario.accountStatus, limpio),
+    );
     // Verificar y LUEGO emitir. Si la emision lanza (secreto ausente, R13) la excepcion se
     // propaga y nadie queda autenticado sin sesion: `loginAction` no llega a redirigir.
     // El rol que se firma sale de la BASE (`usuario.roleName`, leido por el puerto en la misma
