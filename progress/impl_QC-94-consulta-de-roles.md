@@ -196,3 +196,82 @@ Las dos que ya dejaba `design.md > 11`, sin novedad:
 **T1-T13 cerradas** y marcadas `[x]` en `specs/QC-94-consulta-de-roles/tasks.md`.
 **T14 pendiente: es del leader** — `./init.sh` completo en verde y la entrada en
 `progress/history.md`. El `reviewer` decide despues; esta bitacora **no se autoaprueba**.
+
+---
+
+## 8. F2.3 — sincronizacion con `dev` (despues del gate y del reviewer APROBADO)
+
+`dev` habia avanzado 12 commits desde la base `13fc41c`: es **QC-71, identificador-de-request**
+(PR #55), 91 archivos y +6615 lineas.
+
+### 8.1 Conflictos textuales: NINGUNO
+
+`git merge origin/dev` entro limpio (`dbaa79e`). El unico archivo que las dos ramas tocan es
+`lib/composition/index.ts`, y no colisionan: QC-71 escribe en los imports de la linea ~158 y anade
+su bloque `observabilidad` **al final**; QC-94 escribe sus imports en la ~186 y su `listRoles`
+dentro del objeto `identity`. Las dos fichas siguieron la misma regla —anadir al final, no
+reordenar— y por eso el merge no tuvo nada que decidir.
+
+### 8.2 El conflicto REAL era semantico, y el typecheck lo caza
+
+Cero conflictos de merge no es cero trabajo. QC-71 cambio la firma del traductor unico:
+
+```
+lib/modules/identity/adapters/driving/role-actions.ts(48,22):
+  error TS2554: Expected 2-3 arguments, but got 1.
+```
+
+`createErrorStateTranslator(base)` paso a `createErrorStateTranslator(base, readRequestIdHeader)`,
+y `ErrorState` gano un `reference` en la rama del error inesperado. QC-71 migro los **ocho**
+adaptadores driving que existian cuando se escribio; `role-actions.ts` nacio despues, en una rama
+paralela, asi que no estaba en esa lista. **Es el modo de fallo clasico del paralelismo, y no lo ve
+ningun merge: lo ve el typecheck.**
+
+Arreglado en `f642b99`, copiando la forma de los ocho, sin inventar una novena:
+
+```ts
+import { identity, observabilidad } from '@/lib/composition';
+const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.readRequestIdHeader);
+```
+
+`tests/unit/identity/roles/role-actions.test.ts` se ajusta con el patron de
+`tests/unit/identity/usuarios/user-actions.test.ts` (el `vi.hoisted` del lector de cabecera). **Los
+10 casos conservan su intencion**: los dos de `unauthorized` siguen afirmando `toEqual` **sin**
+`reference` —que es lo que fija R15 de QC-71: el identificador solo viaja en el error inesperado—, y
+el caso del `unexpected` ahora lo exige. R6, R13 y R14 de QC-94 quedan igual de vigilados, incluido
+«decide el codigo, nunca el texto del mensaje».
+
+`tests/unit/identity/roles/scope.test.ts` **no necesito ni una linea**: sus detectores comparan
+contra `git merge-base origin/dev HEAD`, asi que tras el merge los 91 archivos de QC-71 caen fuera
+del diff por construccion. Los cuatro casos de rama **corren y pasan, no se saltan**.
+
+### 8.3 Correccion a la seccion 4.1: me equivoque en el diagnostico
+
+Lo que esta bitacora llamo «deriva preexistente de la base local» **no era la base atrasada**. Lo
+diagnostico el leader: la base compartida tenia aplicada `20260911120000_presentation_unit`, una
+migracion de la rama **QC-80** de otra sesion **que no esta en `dev`** y que quita
+`products.unit_id`. O sea: no iba por detras, iba por **delante y por una rama ajena**. Esa era la
+causa de los rojos de `proveedores`, `unidades` y `recetas`.
+
+Se resolvio dandole a este worktree **su propia base, `QuimiCloude_QC94`**, con las 23 migraciones de
+la rama y el seed; el `.env` del worktree apunta ahi y no se commitea. Queda escrito porque el error
+de diagnostico es la parte util: **una base compartida entre worktrees hace que el veredicto de una
+feature dependa de las migraciones de otra**, y eso no es un rojo de nadie, es un gate que no
+informa.
+
+### 8.4 Verificacion sobre el arbol ya sincronizado
+
+```
+$ pnpm run typecheck            -> tsc --noEmit   (sin salida, verde)
+$ pnpm run lint                 -> eslint         (sin salida, verde)
+
+$ pnpm exec vitest run tests/unit/identity tests/unit/composition tests/guards \
+    tests/unit/observabilidad tests/unit/errores tests/integration/identity
+ Test Files  92 passed (92)
+      Tests  1409 passed | 12 skipped (1421)
+```
+(`DATABASE_URL` -> `QuimiCloude_QC94`, la base propia del worktree.)
+
+**El `./init.sh` completo sobre el arbol sincronizado lo corre el leader**, y es condicion del PR:
+el merge trae 91 archivos de codigo ajeno que el gate anterior no vio. El PR **no se abre** hasta que
+ese gate este verde.
