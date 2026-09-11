@@ -4,6 +4,10 @@ import { CircleAlertIcon, Loader2Icon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import {
+  PRESENTATION_UNIT_FIELD,
+  PresentationUnitSelect,
+} from '@/components/shared/presentation-unit-select';
+import {
   Autocomplete,
   AutocompleteContent,
   AutocompleteInput,
@@ -24,6 +28,7 @@ import {
   createPresentationAction,
   listPresentationsAction,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /** Campo del formulario de producto que alimenta este selector, via su `input` espejo. */
@@ -47,6 +52,8 @@ const MAX_LIST_HEIGHT = 256;
 const SCROLL_THRESHOLD = 48;
 
 const INVALID_NAME_MESSAGE = 'Escribe un nombre de presentación válido.';
+/** R10 y R17: la unidad es obligatoria, y sin ella la validacion previa no deja pasar el alta. */
+const MISSING_UNIT_MESSAGE = 'Elige la unidad de la presentación.';
 const PLACEHOLDER = 'Busca una presentación por su nombre';
 const EMPTY_LABEL = 'Ninguna presentación coincide con la búsqueda.';
 const LOADING_LABEL = 'Cargando presentaciones...';
@@ -74,6 +81,21 @@ type PresentationSelectProps = {
    * ADITIVA -ninguno de los dos consumidores de hoy tiene que cambiar-.
    */
   readonly helper?: ReactNode;
+  /**
+   * Catalogo ENTERO de unidades, para el alta rapida (R10, R11): una presentacion no se puede
+   * crear sin unidad, asi que este formulario embebido tiene que pedirla.
+   *
+   * **Bajan por props y este componente NO las consulta** (QC-44 R46): las pide **una sola vez
+   * por pantalla** el Server Component que la monta -la pagina de detalle de proveedor ya lo
+   * hacia para su propio selector de unidad, y la de inventario pasa a hacerlo igual- y las hace
+   * llegar hasta aqui. Pedirlas por su cuenta significaria una consulta por cada selector
+   * montado y un catalogo distinto en cada uno.
+   *
+   * **Ausente o vacio = no se ofrece el alta rapida** (mismo criterio que R19 en la pantalla de
+   * presentaciones): un formulario con un campo obligatorio imposible de rellenar es peor que no
+   * ofrecerlo. Elegir una presentacion YA EXISTENTE sigue funcionando igual.
+   */
+  readonly units?: readonly UnitRef[];
 };
 
 /**
@@ -128,6 +150,13 @@ type PresentationSelectProps = {
  * ensena la presentacion elegida pero el termino de busqueda es la cadena vacia, asi que abrir un
  * selector ya relleno ofrece el catalogo entero y no solo lo que ya tiene.
  *
+ * **El alta en linea PIDE LA UNIDAD** (QC-80 R10, R11): `presentations.unit_id` es `NOT NULL` y
+ * el esquema del contrato publico la exige, asi que este camino -que crea presentaciones- tampoco
+ * puede saltarsela. Las unidades **llegan por props** (`units`), pedidas una sola vez por la
+ * pantalla que monta el selector (QC-44 R46); el componente no consulta el catalogo de unidades.
+ * Sin ese catalogo el alta rapida **no se ofrece**, igual que R19 resolvio en la pantalla de
+ * presentaciones; elegir una presentacion ya existente no se ve afectado.
+ *
  * **El alta en linea NO es un `form`**: este componente vive DENTRO del formulario de producto y
  * anidar formularios es HTML invalido. La Server Action se invoca directamente desde el
  * manejador, que es lo mismo que hace el `action` de un formulario pero sin el elemento. Tampoco
@@ -145,6 +174,7 @@ export function PresentationSelect({
   defaultLabel,
   error,
   helper,
+  units,
 }: PresentationSelectProps) {
   const labelId = useId();
   const inputId = useId();
@@ -164,7 +194,21 @@ export function PresentationSelect({
   const [creating, setCreating] = useState(false);
   const [createPending, setCreatePending] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  /**
+   * Unidad del alta rapida. **Aqui SI es estado de React**, al reves que en el panel de
+   * presentaciones: este bloque no es un `form` -anidarlo dentro del formulario anfitrion seria
+   * HTML invalido-, asi que el valor no puede viajar en ningun `FormData` propio y el manejador
+   * lo lee de aqui. Cadena vacia = nada elegido, que es lo que el esquema rechaza.
+   */
+  const [createUnitId, setCreateUnitId] = useState('');
+  const [createUnitError, setCreateUnitError] = useState<string | undefined>(undefined);
   const createFieldRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * El alta rapida solo se ofrece con catalogo de unidades a mano. Sin el, el formulario pediria
+   * una unidad que no se puede elegir y el envio moriria siempre en la validacion previa.
+   */
+  const puedeCrear = units !== undefined && units.length > 0;
 
   /**
    * Resolucion del nombre de la presentacion ya elegida, solo cuando el llamante no lo dio.
@@ -252,14 +296,24 @@ export function PresentationSelect({
   async function handleCreate() {
     const name = createFieldRef.current?.value ?? '';
     // Misma regla que valida el servidor, importada del contrato publico: no se reescribe aqui.
-    const parsed = createPresentationSchema.safeParse({ name });
+    // QC-80 (R10): el esquema exige TAMBIEN la unidad, asi que mandar solo el nombre dejaria el
+    // alta muerta en esta misma linea, sin llegar nunca a la Server Action.
+    const parsed = createPresentationSchema.safeParse({ name, unitId: createUnitId });
     if (!parsed.success) {
-      setCreateError(INVALID_NAME_MESSAGE);
+      // Cada rechazo se pinta JUNTO a su campo (R17): el esquema dice cual es por `path[0]`, que
+      // es el mismo mapeo que hace el panel de presentaciones. Sin unidad elegida, `unitId` es la
+      // cadena vacia y este camino es el que impide el envio.
+      const campos = new Set(parsed.error.issues.map((issue) => issue.path[0]));
+      setCreateError(campos.has('name') ? INVALID_NAME_MESSAGE : null);
+      setCreateUnitError(campos.has('unitId') ? MISSING_UNIT_MESSAGE : undefined);
       return;
     }
 
     const formData = new FormData();
     formData.set('name', name);
+    // La unidad viaja con el MISMO nombre de campo que el panel de presentaciones, importado de
+    // su selector: la Server Action es la misma y no se reescribe aqui el literal.
+    formData.set(PRESENTATION_UNIT_FIELD, parsed.data.unitId);
 
     setCreatePending(true);
     const result = await createPresentationAction({ status: 'idle' }, formData);
@@ -290,6 +344,8 @@ export function PresentationSelect({
     setSelectedName(nueva.name);
     setDraft(null);
     setCreateError(null);
+    setCreateUnitError(undefined);
+    setCreateUnitId('');
     setCreating(false);
   }
 
@@ -457,7 +513,7 @@ export function PresentationSelect({
         </p>
       )}
 
-      {creating ? (
+      {!puedeCrear ? null : creating ? (
         // Sin `form`: este bloque vive dentro del formulario de producto y anidar formularios es
         // HTML invalido. El boton invoca la Server Action directamente.
         <div className="flex flex-col gap-2 rounded-lg border p-3" data-testid="presentation-create">
@@ -480,6 +536,28 @@ export function PresentationSelect({
               {createError}
             </p>
           )}
+
+          {/*
+            Unidad de la presentacion nueva (R10, R11). Es el MISMO selector que usa el panel de
+            presentaciones -importado, no duplicado-, con dos diferencias que su API ya contempla:
+
+            - `name={null}`: aqui NO puede aportar ningun campo al formulario anfitrion. El de la
+              linea de catalogo ya tiene su propio `unitId` -el de la linea-, y un segundo input
+              con ese nombre mandaria la unidad de la PRESENTACION en el envio de la linea.
+            - controlado: sin `form` propio no hay `FormData` del que leer, asi que el valor vive
+              en estado y lo lee el manejador del alta.
+          */}
+          <PresentationUnitSelect
+            units={units}
+            name={null}
+            value={createUnitId}
+            error={createUnitError}
+            onValueChange={(unitId) => {
+              setCreateUnitId(unitId);
+              setCreateUnitError(undefined);
+            }}
+          />
+
           <div className="flex gap-2">
             <Button
               type="button"
@@ -499,6 +577,7 @@ export function PresentationSelect({
               onClick={() => {
                 setCreating(false);
                 setCreateError(null);
+                setCreateUnitError(undefined);
               }}
             >
               Cancelar

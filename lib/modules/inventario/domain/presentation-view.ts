@@ -12,6 +12,11 @@ export type PresentationView = {
   readonly id: string;
   readonly name: string;
   readonly nameNormalized: string;
+  /** QC-80 (R15): la unidad de la presentacion, `NOT NULL` en base y por tanto nunca
+   *  nula aqui. Es el identificador de una fila de `units`; el contrato NO resuelve su
+   *  nombre ni su simbolo -eso es del catalogo de `unidades`, otro modulo-. La edicion
+   *  precarga la unidad elegida a partir de este campo. */
+  readonly unitId: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };

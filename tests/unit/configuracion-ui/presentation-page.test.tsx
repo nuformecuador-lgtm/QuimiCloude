@@ -18,7 +18,9 @@ import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  PRESENTATION_ACTION_EDIT_TESTID,
   PRESENTATION_CREATE_OPEN_TESTID,
+  PRESENTATION_FORM_TESTID,
   PRESENTATION_LIST_EMPTY_TESTID,
   PRESENTATION_LIST_ERROR_CODE_TESTID,
   PRESENTATION_LIST_ERROR_MESSAGE_TESTID,
@@ -28,10 +30,12 @@ import {
   PRESENTATION_LIST_SKELETON_TESTID,
   PRESENTATION_LIST_TESTID,
   PRESENTATION_ROW_SKELETON_TESTID,
+  PRESENTATION_UNIT_SELECT_TESTID,
 } from '@/app/(private)/configuracion/presentaciones/components';
 import PresentacionesPage from '@/app/(private)/configuracion/presentaciones/page';
 import type { PresentationView } from '@/lib/modules/inventario';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import type { UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
 import {
@@ -45,7 +49,12 @@ import {
 } from '../../helpers/identificador-de-request';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-const { routerMock, listPresentationsActionMock, getSessionUserMock } = vi.hoisted(() => ({
+const {
+  routerMock,
+  listPresentationsActionMock,
+  listUnitsActionMock,
+  getSessionUserMock,
+} = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -56,6 +65,7 @@ const { routerMock, listPresentationsActionMock, getSessionUserMock } = vi.hoist
     prefetch: vi.fn<(href: string) => void>(),
   },
   listPresentationsActionMock: vi.fn<(query: unknown) => Promise<PresentationListResult>>(),
+  listUnitsActionMock: vi.fn<() => Promise<unknown>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -96,6 +106,26 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   };
 });
 
+/**
+ * QC-80 (R16, R19): la seccion pide el catalogo de unidades UNA vez por pantalla, junto al
+ * listado. Se mockea la Server Action de `unidades` -el borde de otro modulo- para poder ejercitar
+ * tambien su camino de FALLO, que es lo que R19 gobierna.
+ */
+vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
+  listUnitsAction: listUnitsActionMock,
+}));
+
+const UNIDADES: readonly UnitView[] = [
+  {
+    id: '44444444-4444-4444-8444-444444444444',
+    name: 'Kilogramo',
+    symbol: 'kg',
+    baseUnitId: null,
+    factor: null,
+    isSystem: true,
+  },
+];
+
 const RAIZ = join(__dirname, '..', '..', '..');
 
 /**
@@ -110,6 +140,7 @@ function presentacion(overrides: Partial<PresentationView> = {}): PresentationVi
     id: '11111111-1111-4111-8111-111111111111',
     name: DATO_QUE_NO_DEBE_VERSE,
     nameNormalized: 'presentacion secreta no visible',
+    unitId: UNIDADES[0]!.id,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     ...overrides,
@@ -188,6 +219,7 @@ beforeEach(() => {
   setViewportWidth(WIDE_VIEWPORT);
   getSessionUserMock.mockResolvedValue(USUARIO_CON_PERMISO);
   listPresentationsActionMock.mockResolvedValue(pagina([]));
+  listUnitsActionMock.mockResolvedValue({ status: 'success', data: UNIDADES });
 });
 
 afterEach(() => {
@@ -357,6 +389,10 @@ describe('una sola llamada de lectura por pantalla (R7, R30)', () => {
     await renderPantalla({ page: '2', pageSize: String(MAX_PAGE_SIZE), q: 'saco' });
 
     expect(listPresentationsActionMock).toHaveBeenCalledTimes(1);
+    // QC-80 R16: el catalogo de unidades tambien se pide UNA sola vez por pantalla, sin consulta
+    // -el catalogo entero- y no una vez por fila ni una vez por panel.
+    expect(listUnitsActionMock).toHaveBeenCalledTimes(1);
+    expect(listUnitsActionMock.mock.calls[0]).toEqual([]);
     // Campo a campo la misma forma que `ListQuery`: ninguna clave de mas.
     expect(Object.keys(listPresentationsActionMock.mock.calls[0][0] as object).sort()).toEqual([
       'filters',
@@ -370,6 +406,64 @@ describe('una sola llamada de lectura por pantalla (R7, R30)', () => {
       pageSize: MAX_PAGE_SIZE,
       search: 'saco',
     });
+  });
+});
+
+describe('QC-80 R19 — sin catalogo de unidades no se ofrece ni el alta ni la edicion', () => {
+  it('con el catalogo en error se pinta el estado de error y NINGUN disparador de alta', async () => {
+    // R19 — un formulario con el selector vacio seria PEOR que el error: dejaria al usuario
+    // delante de un campo obligatorio imposible de rellenar. Aqui el listado va BIEN y trae
+    // filas: lo unico que falla es el catalogo, y aun asi la pantalla no ofrece escribir.
+    listPresentationsActionMock.mockResolvedValue(pagina([presentacion({ name: 'Saco 25 kg' })]));
+    listUnitsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No tienes permiso para consultar unidades.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(PRESENTATION_LIST_ERROR_TESTID)).toHaveAttribute('role', 'alert');
+    expect(screen.getByTestId(PRESENTATION_LIST_ERROR_CODE_TESTID)).toHaveTextContent(
+      'unauthorized',
+    );
+
+    // Ni el disparador de la cabecera, ni el de la fila: no hay por donde abrir un panel.
+    expect(screen.queryByTestId(PRESENTATION_CREATE_OPEN_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PRESENTATION_ACTION_EDIT_TESTID)).toBeNull();
+    // Y por tanto tampoco hay ningun formulario montado.
+    expect(screen.queryByTestId(PRESENTATION_FORM_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PRESENTATION_LIST_TESTID)).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('con el catalogo en error tampoco se ofrece «crear la primera» en el estado vacio', async () => {
+    // R19 — el tercer sitio donde vive un disparador, y el mas facil de olvidar: el slot del
+    // estado vacio. Sin catalogo no se monta ninguno de los tres.
+    listPresentationsActionMock.mockResolvedValue(pagina([]));
+    listUnitsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'invalid_input',
+      message: 'No se pudo leer el catálogo de unidades.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(PRESENTATION_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(PRESENTATION_LIST_EMPTY_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PRESENTATION_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
+  it('con el catalogo OK los disparadores vuelven a estar: el error es del catalogo, no del diseno', async () => {
+    // El positivo que le da sentido al negativo de arriba.
+    listPresentationsActionMock.mockResolvedValue(pagina([presentacion({ name: 'Saco 25 kg' })]));
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID)).toBeInTheDocument();
+    expect(screen.getAllByTestId(PRESENTATION_ACTION_EDIT_TESTID)).toHaveLength(1);
+    expect(screen.queryByTestId(PRESENTATION_LIST_ERROR_TESTID)).toBeNull();
   });
 });
 

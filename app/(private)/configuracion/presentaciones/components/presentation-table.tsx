@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useMemo } from 'react';
 
 import {
   DataTable,
@@ -8,8 +9,9 @@ import {
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import type { PresentationView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 
-import { PRESENTATION_COLUMNS } from './presentation-columns';
+import { buildPresentationColumns } from './presentation-columns';
 import { presentationListHref } from './presentation-list-params';
 
 /**
@@ -35,6 +37,11 @@ import { presentationListHref } from './presentation-list-params';
  * **`status` es SIEMPRE `'idle'`**: los tres estados de R15/R16/R17 se pintan fuera de
  * `<DataTable>`, con copy y acciones propias, y el «cargando» lo aporta el `<Suspense>` del
  * servidor. Aqui solo llegan filas ya resueltas.
+ *
+ * **QC-80 (R16): `units` solo ATRAVIESA la tabla.** No se pinta ninguna columna de unidad
+ * (`design.md > 5`); el catalogo baja hasta la celda de acciones, que es quien monta el panel de
+ * edicion. Las columnas se memoizan por `units` -mismo mecanismo que `OrderTable` de QC-35- para
+ * no reconstruir la declaracion en cada render y perder el estado interno de `<DataTable>`.
  *
  * **Sin `defaultPinnedColumns`**: con dos columnas no hay nada que fijar por defecto. La de
  * acciones ademas declara `pinnable: false` y no puede tapar a la del nombre.
@@ -80,15 +87,23 @@ export type PresentationTableProps = {
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;
   readonly totalPages: number;
+  /** Catalogo entero de unidades (QC-80 R16). Solo lo consume el panel de edicion de la fila. */
+  readonly units: readonly UnitRef[];
 };
 
-export function PresentationTable({ presentations, params, totalPages }: PresentationTableProps) {
+export function PresentationTable({
+  presentations,
+  params,
+  totalPages,
+  units,
+}: PresentationTableProps) {
   const router = useRouter();
+  const columns = useMemo(() => buildPresentationColumns(units), [units]);
 
   return (
     <DataTable
       tableId={PRESENTATION_TABLE_ID}
-      columns={PRESENTATION_COLUMNS}
+      columns={columns}
       rows={presentations}
       getRowId={(presentation) => presentation.id}
       params={params}

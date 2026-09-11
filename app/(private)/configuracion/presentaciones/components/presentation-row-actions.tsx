@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import type { PresentationView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import { DeletePresentationDialog } from './delete-presentation-dialog';
 import { PresentationSheet } from './presentation-sheet';
@@ -20,6 +21,11 @@ import { PresentationSheet } from './presentation-sheet';
  * **Cada boton NOMBRA la presentacion sobre la que actua** en su `aria-label` (R19). Con varias
  * filas en pantalla, «Editar» a secas no dice cual: quien navega con lector de pantalla oiria
  * dos botones identicos por fila y ninguna forma de distinguirlos.
+ *
+ * **QC-80 (R15, R16, R19): las unidades tambien llegan por props.** La fila no consulta el
+ * catalogo -seria una consulta por fila-: lo pidio una sola vez la seccion. Y el panel de edicion
+ * recibe `unitId` DERIVADO del contrato (`PresentationSheetTarget`), no un campo escrito a mano,
+ * asi que la unidad actual queda precargada (R15).
  *
  * **La presentacion llega por props** (R32). Este componente no importa `lib/composition`, ni el
  * cliente de base de datos, ni pide nada por su cuenta: lo que muestra ya lo trajo la consulta de
@@ -55,9 +61,11 @@ export function deletePresentationLabel(name: string): string {
 
 export type PresentationRowActionsProps = {
   readonly presentation: PresentationView;
+  /** Catalogo entero de unidades (QC-80 R16). Lo baja la tabla desde la seccion. */
+  readonly units: readonly UnitRef[];
 };
 
-export function PresentationRowActions({ presentation }: PresentationRowActionsProps) {
+export function PresentationRowActions({ presentation, units }: PresentationRowActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -92,7 +100,12 @@ export function PresentationRowActions({ presentation }: PresentationRowActionsP
       </Button>
 
       <PresentationSheet
-        presentation={{ id: presentation.id, name: presentation.name }}
+        presentation={{
+          id: presentation.id,
+          name: presentation.name,
+          unitId: presentation.unitId,
+        }}
+        units={units}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

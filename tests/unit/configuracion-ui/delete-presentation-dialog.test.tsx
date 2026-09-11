@@ -79,6 +79,7 @@ function presentacion(overrides: Partial<PresentationView> = {}): PresentationVi
     id: '33333333-3333-4333-8333-333333333333',
     name: NOMBRE,
     nameNormalized: 'bidon 20 l',
+    unitId: 'unit-kg',
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     ...overrides,

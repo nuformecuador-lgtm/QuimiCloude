@@ -430,3 +430,96 @@ Los 18, para que el reviewer no tenga que reconstruir la lista: `guard-identific
 exacto del catalogo (seccion 2.a), dos de lista blanca de rutas (2.b), uno del vacio sobre
 `db/migrations/` (esta seccion)-, mas el retensado del merge (seccion 8.a). En los diez, el
 criterio fue el mismo: **subir el numero o nombrar la excepcion, nunca relajar la asercion.**
+
+## 10. Segundo merge con `dev`: QC-80, y tres conflictos de la misma familia
+
+`origin/dev` avanzo otra vez con **QC-80 (`unidad-desde-la-presentacion`, PR #58)**, que deja el PR
+#59 en `CONFLICTING`. Lo que trae: la unidad de medida pasa a ser propiedad de la **presentacion**
+-columna obligatoria- y el **producto** pierde la suya, con su migracion
+`20260911120000_presentation_unit`; mas el arreglo del plazo de `findBy*`/`waitFor` de la seccion
+10.c.
+
+**Tres conflictos, todos de la familia "tests que miden la rama contra git"**, y en los tres la
+regla fue **sumar, nunca elegir**: las dos migraciones existen y las dos son legitimas.
+
+| Archivo | Que proponia cada lado | Como se resolvio |
+| --- | --- | --- |
+| `tests/guards/guard-identificador-de-request.test.ts` | el nuestro anadia `20260911120000_order_assignments` a `MIGRACIONES_ESPERADAS`; el de `dev`, `20260911120000_presentation_unit` | **Las DOS entradas, cada una con su comentario intacto.** Quedarse con una habria puesto el caso rojo por la otra |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | el de `dev` **reestructuro** el archivo: saco las listas al ambito de modulo y las junto en `DB_PERMITIDAS` con spreads | Se tomo **la estructura nueva de `dev` entera** -sin perder una linea suya- y se **anadio** `MIGRACION_QC86` como constante propia mas su `...MIGRACION_QC86` en `DB_PERMITIDAS`. Los dos nombres vivos |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` | **cambio de premisa**: ver abajo | Se tomo la version de `dev` |
+
+### 10.a El tercero NO era un "pega tu nombre en la lista", y conviene leerlo
+
+QC-80 **borro los dos casos** que esta ficha habia retensado en la seccion 9, y lo dejo argumentado
+por escrito en el propio archivo: eran la guardia de **alcance de QC-90** -"esta ficha no anade
+ninguna migracion"-, **QC-90 ya esta mergeada y su trabajo termino ahi**, y QC-80 **si** anade una
+migracion a proposito, asi que esos dos casos se pondrian rojos por hacer justo lo que su ficha
+tiene que hacer. Con ellos se fueron sus cuatro ayudantes de censo por git y el import de
+`node:child_process`.
+
+**Consecuencia para QC-86: no hay bloque nuevo al que anadirse.** La excepcion nominal
+`MIGRACION_QC86` de la seccion 9 queda **sin sujeto** y desaparece con los casos que la usaban;
+dejarla habria sido una constante muerta. No es que se haya descartado nuestro lado del conflicto
+por comodidad: es que **el caso que nuestro lado modificaba ya no existe**, y quien lo retiro lo
+hizo con su razon escrita. Lo que aquella seccion 9 documenta sigue siendo cierto como historia de
+como se encontro el septimo archivo; simplemente su arreglo lo absorbio `dev`.
+
+La frase que conviene recordar, y que es de QC-80: **una feature no puede cumplir la afirmacion de
+alcance de otra.**
+
+### 10.b El sello de tiempo repetido: NO rompe nada, verificado desde cero
+
+Las dos migraciones llevan el **mismo** sello, `20260911120000`. Prisma ordena por el **nombre
+completo de la carpeta**, asi que el desempate es el sufijo, alfabetico y determinista:
+`order_assignments` antes que `presentation_unit`. No se dejo en el razonamiento: se **midio** sobre
+una base creada vacia a proposito y borrada despues.
+
+```
+base scratch creada vacia -> pnpm run db:migrate
+  ... 20260911120000_order_assignments/migration.sql
+  ... 20260911120000_presentation_unit/migration.sql
+  All migrations have been successfully applied.
+
+orden REAL de aplicacion: ['20260911120000_order_assignments', '20260911120000_presentation_unit']
+las dos tablas existen: order_assignments | presentations
+presentations.unit_id (de QC-80): true
+permisos sembrados por la migracion: 4
+```
+
+**No rompe nada**, y ademas no podria: las dos migraciones son **disjuntas** -QC-86 toca `orders`,
+`users`, `work_groups`, `permissions` y `role_permissions`; QC-80 toca `presentations` y
+`products`-, asi que ninguna depende del orden de la otra. El sello repetido es feo pero inocuo.
+
+### 10.c Por que SALE la entrada del baseline
+
+`tests/unit/inventario/product-page.test.tsx` **se retira de `tests/baseline-rojos.json`**. Su
+motivo afirmaba que era el flake de saturacion de QC-58, y **QC-80 lo desmintio con medicion**
+(commit `cb94b77`): QC-58 subio `testTimeout` a 15 s, pero `findBy*` y `waitFor` **no miran
+`testTimeout`** -miran `asyncUtilTimeout` de testing-library, que seguia en **1000 ms**-. El
+elemento si se renderizaba; quien se rendia era la **consulta**. Con el plazo en 5 s: cero fallos en
+dos corridas del proyecto `ui` y la corrida casi el **doble de rapida**, porque cada consulta que se
+rinde reintenta su plazo entero y serializa el DOM en el error.
+
+Mantener la entrada habria **apagado 42 casos** de esa pantalla para el comparador **sin ninguna
+razon**, que es justo el coste que su propia nota declaraba aceptar. Se comprobo antes de quitarla:
+`product-page.test.tsx` pasa **44/44**. **Las otras cinco entradas no se tocan.**
+
+### 10.d Verificacion tras el segundo merge
+
+`pnpm exec prisma generate` hizo falta: el cliente generado estaba anterior a QC-80 y el typecheck
+caia con `presentation.unitId` -`Type 'string' is not assignable to type 'never'`-. No es un
+conflicto ni un error de resolucion: es el cliente de Prisma desactualizado respecto del esquema
+recien mergeado.
+
+```
+pnpm run typecheck  -> exit 0
+pnpm run lint       -> exit 0
+
+los tres de conflicto + la guardia nueva de QC-80 (`guard-teclear-y-plazo`)
+                                                    4 passed (4) | 81 passed (81)
+tests/unit/inventario/product-page.test.tsx         1 passed (1) | 44 passed (44)
+tests/unit/asignaciones + tests/integration/asignaciones
+                                                    3 passed (3) | 94 passed (94)
+```
+
+**Sin conflictos pendientes, sin nada ambiguo y sin ningun rojo.**

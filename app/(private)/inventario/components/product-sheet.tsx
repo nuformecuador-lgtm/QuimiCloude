@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { ProductView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import { ProductForm } from './product-form';
 
@@ -39,7 +40,19 @@ const UPDATE_SUCCESS = 'Producto actualizado.';
  * privado (R22)- y se llama a `router.refresh()`, que vuelve a ejecutar el Server Component de la
  * lista con la misma URL. Las actions de QC-20 no revalidan nada y esta ficha no las abre.
  */
-export function ProductSheet({ product }: { readonly product?: ProductView }) {
+export function ProductSheet({
+  product,
+  units,
+}: {
+  readonly product?: ProductView;
+  /**
+   * Catalogo de unidades para el alta rapida de presentacion que vive dentro del selector
+   * (QC-80 R11). Solo hace falta en el ALTA: la EDICION no pinta el selector de presentacion,
+   * asi que la tabla monta sus paneles de edicion sin pasar nada. Baja por props desde la pagina,
+   * que lo pide una sola vez (QC-44 R46).
+   */
+  readonly units?: readonly UnitRef[];
+}) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const isEdit = product !== undefined;
@@ -65,7 +78,7 @@ export function ProductSheet({ product }: { readonly product?: ProductView }) {
         {isEdit ? <PencilIcon /> : <PlusIcon />}
         {isEdit ? null : 'Nuevo producto'}
       </SheetTrigger>
-      <ProductForm product={product} onSaved={handleSaved} />
+      <ProductForm product={product} units={units} onSaved={handleSaved} />
     </Sheet>
   );
 }

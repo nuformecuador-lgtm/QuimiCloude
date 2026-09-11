@@ -20,6 +20,12 @@ import type { UnitRef } from '@/lib/modules/unidades';
  * consultar el grupo y devuelve siempre la mas pequena, y `el grupo de un producto sin unidad es
  * el catalogo completo` se pone en rojo si `unitsOfGroup` deja de tratar `null` como "no se
  * sabe" y devuelve un array vacio.
+ *
+ * **QC-80 (R22, R23, R24) no cambio ninguna de las tres reglas ni una linea de `unit-group.ts`:
+ * cambio la FUENTE del dato.** La unidad de un ingrediente se deriva ahora de la presentacion de
+ * su LOTE MAS RECIENTE (`ProductView.latestBatchUnitId`) y no de `products.unit_id`, columna que
+ * se elimino. Consecuencia para estos casos: donde antes se leia "producto sin unidad" ahora se
+ * lee **"producto sin ningun lote"**, que es el supuesto de R23.
  */
 
 const GRAMO: UnitRef = { id: 'u-g', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null };
@@ -80,9 +86,9 @@ describe('unitsOfGroup — el grupo es la BASE EFECTIVA, igual que la convertibi
     );
   });
 
-  it('el grupo de un producto SIN unidad es el catalogo completo, nunca uno vacio', () => {
-    // Decision del humano del 2026-09-08: `products.unit_id` es anulable, y no se recorta una
-    // lista a partir de un dato que no se tiene.
+  it('R23 — el grupo de un producto SIN NINGUN LOTE es el catalogo completo, nunca uno vacio', () => {
+    // Decision del humano del 2026-09-08, reconfirmada el 2026-09-11: sin lote no hay dato con
+    // el que acotar, y no se recorta una lista a partir de un dato que no se tiene.
     expect(unitsOfGroup(CATALOGO, null)).toEqual(CATALOGO);
   });
 
@@ -113,22 +119,30 @@ describe('smallestUnit — la mas pequena del grupo es la de menor factor efecti
 });
 
 describe('resolveLineUnitId — que unidad queda al elegir ingrediente', () => {
-  it('sin unidad previa, preselecciona la mas pequena del grupo del ingrediente', () => {
+  it('R24 — sin unidad previa, preselecciona la mas pequena del grupo del ingrediente', () => {
     expect(resolveLineUnitId(CATALOGO, KILOGRAMO.id, '')).toBe(MILIGRAMO.id);
   });
 
-  it('mantiene la unidad ya elegida cuando el ingrediente nuevo es del MISMO grupo', () => {
+  it('R24 — mantiene la unidad ya elegida cuando el ingrediente nuevo es del MISMO grupo', () => {
     // Cambiar de un producto en kg a otro en kg no pisa el `g` que el usuario puso a mano.
     expect(resolveLineUnitId(CATALOGO, KILOGRAMO.id, GRAMO.id)).toBe(GRAMO.id);
   });
 
-  it('cambia a la mas pequena cuando el ingrediente nuevo es de OTRO grupo', () => {
+  it('R24 — cambia a la mas pequena cuando el ingrediente nuevo es de OTRO grupo', () => {
     // `g` no significa nada en una linea que se mide en litros.
     expect(resolveLineUnitId(CATALOGO, LITRO.id, GRAMO.id)).toBe(MILILITRO.id);
   });
 
-  it('con un ingrediente sin unidad, respeta lo ya elegido sea lo que sea', () => {
+  it('R23 — con un ingrediente SIN NINGUN LOTE, respeta lo ya elegido sea lo que sea', () => {
+    // `null` es «todavia no tiene lotes», no «no se pudo leer»: el grupo es el catalogo entero,
+    // asi que cualquier unidad ya elegida pertenece a el y se mantiene.
     expect(resolveLineUnitId(CATALOGO, null, LITRO.id)).toBe(LITRO.id);
+  });
+
+  it('R23 — con un ingrediente SIN NINGUN LOTE y nada elegido, devuelve una unidad del catalogo', () => {
+    // Nunca cadena vacia teniendo catalogo: la linea no se puede quedar sin unidad que ofrecer.
+    // La mas pequena de TODO el catalogo: `mg` y `mL` empatan a `0.0010` y desempata el id.
+    expect(resolveLineUnitId(CATALOGO, null, '')).toBe(MILIGRAMO.id);
   });
 
   it('sin catalogo no inventa ninguna unidad', () => {

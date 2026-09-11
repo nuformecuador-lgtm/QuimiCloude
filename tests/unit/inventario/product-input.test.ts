@@ -17,6 +17,16 @@ import { pageQuerySchema } from '@/lib/modules/inventario/domain/page';
  */
 const REQUERIDOS = { stock: 0, qtyAlert: 0 } as const;
 
+/**
+ * Unidad de fixture para las presentaciones (QC-80 R10): desde esta feature
+ * `createPresentationSchema` EXIGE `unitId` con forma de uuid. Se anade a los casos que miden
+ * OTRA cosa -el limite de 60 caracteres del nombre- para que sigan midiendo esa cosa; sin el,
+ * el `safeParse` fallaria siempre por un campo que no es el sujeto del caso y el limite
+ * dejaria de estar vigilado en silencio. Que la unidad sea obligatoria tiene sus propios casos
+ * en `tests/unit/inventario/presentation-input.test.ts`.
+ */
+const UNIDAD_FIXTURE = '11111111-1111-4111-8111-111111111111';
+
 // Esquemas zod de entrada del borde (R9, R10, R11, R25, R28, R37; `design.md > 6`, T4 de tasks.md).
 describe('createProductSchema', () => {
   it('rechaza el nombre vacio o de solo espacios y recorta los extremos del nombre valido', () => {
@@ -52,10 +62,12 @@ describe('createProductSchema', () => {
     const presentationName61 = 'b'.repeat(61);
     const presentationName60 = 'b'.repeat(60);
     expect(
-      createPresentationSchema.safeParse({ name: presentationName61 }).success,
+      createPresentationSchema.safeParse({ name: presentationName61, unitId: UNIDAD_FIXTURE })
+        .success,
     ).toBe(false);
     expect(
-      createPresentationSchema.safeParse({ name: presentationName60 }).success,
+      createPresentationSchema.safeParse({ name: presentationName60, unitId: UNIDAD_FIXTURE })
+        .success,
     ).toBe(true);
   });
 
@@ -159,32 +171,43 @@ describe('createProductSchema', () => {
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
   });
 
-  it('acepta la unidad ausente y exige que la presente sea una referencia con forma de uuid', () => {
-    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este archivo no
-    // tenia caso propio para la unidad —el campo `unit` era texto libre y no habia nada que
-    // validar en el borde—, asi que al cambiar la FORMA queda cubierto aqui lo que sigue
-    // vigilandose: la unidad del producto SIGUE SIENDO OPCIONAL (QC-14 R5, QC-32 R10) y
-    // SIGUE SIENDO ANOTATIVA (QC-32 R14) —zod no la compara con nada ni la restringe segun
-    // el producto—. Lo unico nuevo es que hoy se valida su forma de uuid.
+  it('el alta NO acepta ninguna unidad: `unitId` es campo desconocido (QC-80, R21)', () => {
+    // R21 — el producto dejo de declarar unidad EN TODO EL CAMINO, y este es el borde de
+    // entrada. Hasta QC-80 `unitId` era un uuid opcional (QC-32, decision cerrada 13); la
+    // columna `products.unit_id` ya no existe -se fue con su indice y su FK en
+    // `20260911120000_presentation_unit`-, asi que no hay nada que validar ni donde escribirlo.
     //
-    // Que el uuid EXISTA no lo comprueba zod: lo rechaza la base con 23503 (QC-32 R12), y
-    // eso se prueba en `tests/integration/unidades/unidades-constraints.int.test.ts`.
-    const base = {
-      name: 'Producto',
-      ...REQUERIDOS,
-    };
+    // Se comprueba lo que de verdad importa, que son DOS cosas distintas:
+    //   1. Un alta SIN unidad es valida -y su salida NO trae la clave-, no es que el campo
+    //      sobre y se ignore.
+    //   2. Un alta CON unidad se RECHAZA, aunque el uuid tenga forma perfecta. `strictObject`
+    //      (QC-52 R1) convierte el campo de mas en `invalid_input`: ignorarlo en silencio le
+    //      haria creer a quien lo envia que guardo una unidad que nunca se guardo.
+    //
+    // La unidad de un producto hoy se LEE, no se envia: sale de la presentacion de su lote mas
+    // reciente (`ProductView.latestBatchUnitId`, R22), y eso se prueba en `product-prisma.test.ts`.
+    const base = { name: 'Producto', ...REQUERIDOS };
 
-    expect(createProductSchema.safeParse(base).success).toBe(true);
-    expect(createProductSchema.parse(base).unitId).toBeUndefined();
-    expect(createProductSchema.safeParse({ ...base, unitId: null }).success).toBe(true);
-    expect(
-      createProductSchema.safeParse({
-        ...base,
-        unitId: '22222222-2222-4222-8222-222222222222',
-      }).success,
-    ).toBe(true);
-    // Ya no vale cualquier texto: la unidad es una referencia, no una etiqueta.
-    expect(createProductSchema.safeParse({ ...base, unitId: 'kg' }).success).toBe(false);
+    const parsed = createProductSchema.parse(base);
+    expect(Object.keys(parsed)).not.toContain('unitId');
+
+    const conUnidad = { ...base, unitId: '22222222-2222-4222-8222-222222222222' };
+    expect(createProductSchema.safeParse(conUnidad).success).toBe(false);
+    expect(updateProductSchema.safeParse(conUnidad).success).toBe(false);
+    // Ni siquiera nula: lo que no se declara no se acepta de ninguna forma.
+    expect(createProductSchema.safeParse({ ...base, unitId: null }).success).toBe(false);
+
+    // Y el rechazo NOMBRA el campo: `unrecognized_keys` con `unitId` dentro. Asi el motivo es
+    // legible para quien depure, en vez de un `invalid_input` mudo.
+    const veredicto = createProductSchema.safeParse(conUnidad);
+    expect(veredicto.success).toBe(false);
+    if (!veredicto.success) {
+      expect(
+        veredicto.error.issues.some(
+          (issue) => issue.code === 'unrecognized_keys' && issue.keys.includes('unitId'),
+        ),
+      ).toBe(true);
+    }
   });
 
   it('exige stock y qtyAlert, y los sigue queriendo enteros de 0 o mas', () => {
@@ -222,7 +245,8 @@ describe('createProductSchema', () => {
     expect(parsed.stock).toBe(7);
     expect(parsed.qtyAlert).toBe(3);
 
-    // El unico opcional que queda tras QC-52 sigue pudiendo faltar.
-    expect(parsed.unitId).toBeUndefined();
+    // QC-80 (R21): ya no queda ningun campo opcional en el producto. Los tres que hay -nombre,
+    // existencia y alerta- son obligatorios, y nada mas cruza el borde.
+    expect(Object.keys(parsed).sort()).toEqual(['name', 'qtyAlert', 'stock']);
   });
 });

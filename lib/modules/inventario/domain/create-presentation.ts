@@ -22,6 +22,12 @@ export type CreatePresentationDeps = {
  * dos altas simultaneas (design.md > 7, § 11.4)-, y este caso de uso SIEMPRE traduce esa
  * respuesta a `PresentationDuplicateNameError`, nunca la ignora ni confia en que zod ya
  * lo filtro.
+ *
+ * QC-80 (R11, R13): la unidad viaja al puerto JUNTO al nombre y su forma normalizada, en
+ * la misma escritura -no hay ningun camino que cree una presentacion sin unidad-. El
+ * `'invalid_unit'` que devuelve el puerto cuando la FK `presentations_unit_id_fkey` rechaza
+ * la escritura se traduce a `ValidationError` (codigo `invalid_input`), que es como el resto
+ * del modulo trata una FK rota, y queda DISTINGUIBLE de `PresentationDuplicateNameError`.
  */
 export function createCreatePresentation(
   deps: CreatePresentationDeps,
@@ -36,8 +42,13 @@ export function createCreatePresentation(
     if (!parsed.success) throw new ValidationError();
 
     const nameNormalized = normalizePresentationName(parsed.data.name);
-    const result = await deps.presentations.create(parsed.data.name, nameNormalized);
+    const result = await deps.presentations.create({
+      name: parsed.data.name,
+      nameNormalized,
+      unitId: parsed.data.unitId,
+    });
     if (result === 'duplicate') throw new PresentationDuplicateNameError();
+    if (result === 'invalid_unit') throw new ValidationError();
 
     return result;
   };

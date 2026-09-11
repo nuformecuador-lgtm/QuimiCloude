@@ -1,5 +1,6 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import { FIRST_PAGE, productListHref } from './product-list-params';
 import { ProductListEmpty } from './product-list-empty';
@@ -14,6 +15,12 @@ type ProductListSectionProps = {
    * espera (QC-57), asi que aqui no se traduce ni se inventa ninguna clave.
    */
   readonly params: DataTableParams;
+  /**
+   * Catalogo de unidades, pedido **una sola vez** por la pagina (QC-80). Solo lo necesita el
+   * panel de ALTA del estado vacio, para el alta rapida de presentacion; sin el, ese alta rapida
+   * no se ofrece. Aqui no se consulta nada: baja por props (QC-44 R46).
+   */
+  readonly units?: readonly UnitRef[];
 };
 
 /**
@@ -32,7 +39,7 @@ type ProductListSectionProps = {
  * **Una lista vacia NO se pinta como tabla sin filas** (R14, R16): son tres situaciones distintas
  * -fallo, catalogo vacio y pagina que se quedo atras tras un borrado- y cada una dice lo suyo.
  */
-export async function ProductListSection({ params }: ProductListSectionProps) {
+export async function ProductListSection({ params, units }: ProductListSectionProps) {
   const result = await listProductsAction(params);
 
   if (result.status === 'error') {
@@ -50,7 +57,7 @@ export async function ProductListSection({ params }: ProductListSectionProps) {
             : undefined
         }
       >
-        <ProductSheet />
+        <ProductSheet units={units} />
       </ProductListEmpty>
     );
   }

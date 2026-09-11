@@ -13,7 +13,6 @@
 //
 // Cubre R1, R3, R4, R5, R6, R7, R8, R10, R11, R12, R13, R14, R16, R17, R18, R19, R20, R23.
 
-import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -202,12 +201,17 @@ function expectUnitCatalogIsNotAnEnum(): void {
  *  `imagePath` (R4), que existia en la base desde `20260903200000_product_image_path` pero
  *  que el modelo no declaraba: eso era drift, y era justo lo que iba a hacer que
  *  `prisma migrate dev` propusiera `DROP COLUMN "image_path"` mezclado entre los tres
- *  `DROP COLUMN` legitimos de esta ficha. */
+ *  `DROP COLUMN` legitimos de esta ficha.
+ *
+ *  2026-09-11, QC-80 (R7, R21): SALE `unitId`/`unit_id`. El producto DEJA DE DECLARAR
+ *  UNIDAD —la columna, su indice `products_unit_id_idx` y su FK `products_unit_id_fkey` se
+ *  van en `20260911120000_presentation_unit`—. La unidad de un producto pasa a DERIVARSE de
+ *  la presentacion de su lote mas reciente (R22), y quien la declara ahora es la
+ *  PRESENTACION, obligatoria (R1). De los ocho datos de QC-14 R3 quedan CUATRO. */
 const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['name', 'name'],
   ['stock', 'stock'],
   ['qtyAlert', 'qty_alert'],
-  ['unitId', 'unit_id'],
   ['imagePath', 'image_path'],
 ]
 
@@ -221,8 +225,15 @@ const INTEGER_FIELDS = ['stock', 'qtyAlert'] as const
  *  nombre del campo que lo cumple.
  *
  *  2026-09-04, QC-52: salen `cost` y `deliveryTime` (ya no son del producto) y entra
- *  `imagePath`, que R4 exige declarada Y opcional. */
-const OPTIONAL_FIELDS = ['stock', 'qtyAlert', 'unitId', 'imagePath'] as const
+ *  `imagePath`, que R4 exige declarada Y opcional.
+ *
+ *  2026-09-11, QC-80 (R7, R21): sale `unitId`. La mitad de R5 que hablaba de la unidad
+ *  —«la unidad del producto es OPCIONAL»— CADUCA ENTERA, no cambia de forma: el producto ya
+ *  no declara unidad, ni opcional ni obligatoria. La obligatoriedad se mudo a
+ *  `Presentation.unitId`, que es `NOT NULL` y sin `@default` (R1), y la vigila su propio
+ *  caso mas abajo. Lo que R5 sigue protegiendo —ausencia de valor, nunca cero ni cadena
+ *  vacia— se conserva intacto para los TRES campos que quedan. */
+const OPTIONAL_FIELDS = ['stock', 'qtyAlert', 'imagePath'] as const
 
 describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('Presentation declara id uuid propio y name obligatorio', () => {
@@ -245,11 +256,21 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // `nameNormalized` que anade QC-20 (design.md > 2.2, R17). Sin `deletedAt`, y es
     // deliberado (design.md > 9, pregunta 2): con la columna, borrar seria un UPDATE y la
     // FK no podria bloquearlo, con lo que R14 se quedaria sin ninguna garantia real.
+    //
+    // 2026-09-11, QC-80 R1: entra `unitId`, y es la SEXTA y ultima. La igualdad exacta se
+    // conserva a proposito: una septima columna seria una migracion que nadie declaro.
     const scalarNames = presentation.fields
       .filter((candidate) => !candidate.isList && candidate.type !== 'Product')
       .map((candidate) => candidate.name)
       .sort()
-    expect(scalarNames).toEqual(['createdAt', 'id', 'name', 'nameNormalized', 'updatedAt'])
+    expect(scalarNames).toEqual([
+      'createdAt',
+      'id',
+      'name',
+      'nameNormalized',
+      'unitId',
+      'updatedAt',
+    ])
     expect(has(presentation, 'deletedAt')).toBe(false)
     expect(presentation.body).not.toMatch(/deleted_at/)
   })
@@ -288,14 +309,14 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@@map\("(inventory|inventory_items|stock_items|items)"\)/)
   })
 
-  it('Product declara sus datos de negocio en una sola tabla, sin los tres que QC-52 le quito', () => {
-    // R3 de QC-14, acotado por QC-52 R1 y R2: nombre, existencia, cantidad de alerta, unidad
-    // y ruta de imagen. Sin presentacion ni autoria, que se mudaron a `product_batches` el
-    // 2026-09-09.
+  it('R7: Product declara sus datos de negocio en una sola tabla, y ya no declara unidad', () => {
+    // R3 de QC-14, acotado por QC-52 R1 y R2 y por QC-80 R7/R21: nombre, existencia,
+    // cantidad de alerta y ruta de imagen. Sin presentacion ni autoria, que se mudaron a
+    // `product_batches` el 2026-09-09; y SIN UNIDAD desde el 2026-09-11.
     for (const [name] of PRODUCT_BUSINESS_FIELDS) {
       expect(has(product, name), `falta el campo Product.${name}`).toBe(true)
     }
-    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(5)
+    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(4)
 
     // QC-52 R1: los tres no pueden volver al modelo por descuido. Se afirma en negativo y
     // por separado del censo de abajo, para que el motivo quede escrito.
@@ -305,7 +326,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       )
     }
 
-    // La presentacion y la autoria tampoco pueden volver: se mudaron al lote.
+    // La presentacion y la autoria tampoco pueden volver: se mudaron al lote (R25).
     for (const name of ['presentationId', 'presentation', 'createdBy', 'updatedBy']) {
       expect(has(product, name), `Product.${name} se mudo a ProductBatch`).toBe(false)
     }
@@ -401,8 +422,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(candidate.type).toBe('String')
   })
 
-  it('stock, qtyAlert, unitId e imagePath son opcionales', () => {
-    // R5: ausencia de valor, no cero ni cadena vacia. Un `@default` convertiria la
+  it('R7: stock, qtyAlert e imagePath son opcionales, y unitId ya no esta entre ellos', () => {
+    // R5 de QC-14: ausencia de valor, no cero ni cadena vacia. Un `@default` convertiria la
     // ausencia en un valor y R5 dejaria de cumplirse sin que nadie lo note.
     for (const name of OPTIONAL_FIELDS) {
       const candidate = field(product, name)
@@ -411,7 +432,10 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         /@default\(/,
       )
     }
-    expect(OPTIONAL_FIELDS).toHaveLength(4)
+    expect(OPTIONAL_FIELDS).toHaveLength(3)
+    // QC-80 R7: `unitId` no esta en la lista porque no esta en el modelo. Se afirma aparte
+    // para que un dia no vuelva como «opcional» sin que nadie lo discuta.
+    expect(OPTIONAL_FIELDS as readonly string[]).not.toContain('unitId')
   })
 
   it('imagePath esta declarado en el modelo, es opcional y mapea a image_path', () => {
@@ -462,36 +486,68 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@db\.(Real|DoublePrecision)/)
   })
 
-  it('unitId es uuid opcional, escalar sin @relation, y no queda columna unit de texto', () => {
-    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. De lo que este caso
-    // afirmaba antes —«unit es String opcional, texto libre, sin conjunto cerrado de valores
-    // admitidos»— caduca UNICAMENTE la forma: hoy la unidad se guarda como referencia a
-    // `units` (QC-32 R10). Lo que R10 de QC-14 vigilaba y SIGUE VIGENTE se conserva aqui:
-    //   - la unidad del producto sigue siendo OPCIONAL (ausencia de valor, sin `@default`);
-    //   - sigue siendo ANOTATIVA: nada deriva de ella una conversion entre unidades y nada
-    //     restringe que unidad puede usar cada producto (QC-32 R14);
-    //   - el esquema sigue sin declarar ningun `enum`: el catalogo es una tabla, no un
-    //     conjunto cerrado compilado en el esquema (QC-32 `design.md > 8.5`).
+  it('R7: Product no declara ninguna unidad, ni por referencia ni como texto', () => {
+    // ---------------------------------------------------------------------------------
+    // INVERTIDO EL 2026-09-11 POR QC-80 (R7, R21, decision cerrada 2 de la ficha).
     //
-    // ACOTADO EL 2026-09-03 POR QC-33: de esa tercera vinneta caduca el «ningun enum EN EL
-    // ESQUEMA» y queda «ningun enum ES EL CATALOGO DE UNIDADES». El porque, entero, en el
-    // bloque de `expectUnitCatalogIsNotAnEnum` (arriba). Las otras dos no se tocan.
-    const unitId = field(product, 'unitId')
+    // Este caso afirmaba «unitId es uuid OPCIONAL, escalar sin @relation». Esa afirmacion
+    // CADUCA ENTERA: `20260911120000_presentation_unit` borra `products.unit_id`, su indice
+    // y su FK, y el producto deja de declarar unidad en ningun punto del camino. La columna
+    // estaba VACIA en las 7 filas vivas —comprobado contra la base el 2026-09-11—, asi que
+    // no se perdio ningun dato.
+    //
+    // Lo que aquel caso vigilaba y SIGUE VIGENTE se conserva, pero cambia de sujeto:
+    //   - la unidad se declara por REFERENCIA a `units`, no como texto libre: lo afirma el
+    //     caso de `Presentation` de aqui abajo, que ademas la hace OBLIGATORIA (R1);
+    //   - el catalogo sigue siendo una TABLA y ningun `enum` lo suplanta: se sigue
+    //     comprobando aqui, porque esa afirmacion no era del producto sino del catalogo;
+    //   - ninguna columna `unit` de texto libre resucita en `products` (QC-32 R10).
+    //
+    // Se afirma la AUSENCIA en positivo, igual que las otras ausencias deliberadas de este
+    // archivo: sin este caso, devolverle la unidad al producto pasaria sin ruido y
+    // reabriria la doble verdad que R22 cierra (la unidad se DERIVA del lote mas reciente).
+    // ---------------------------------------------------------------------------------
+    expect(has(product, 'unitId'), 'Product.unitId tenia que haber desaparecido (QC-80 R7)').toBe(
+      false,
+    )
+    expect(has(product, 'unit'), 'Product.unit no puede resucitar (QC-32 R10)').toBe(false)
+    expect(product.body).not.toMatch(/unit_id/)
+    expect(product.body).not.toMatch(/^\s*unit\s+String/m)
+    // Ni la relacion Prisma hacia el catalogo, que nunca existio y menos ahora.
+    expect(product.body).not.toMatch(/\bUnit\b/)
+
+    // El catalogo sigue siendo una TABLA, no un conjunto cerrado compilado en el esquema
+    // (QC-32 `design.md > 8.5`, acotado por QC-33 al sujeto propio de esta afirmacion).
+    expectUnitCatalogIsNotAnEnum()
+  })
+
+  it('R1: Presentation declara unitId uuid OBLIGATORIO, sin default y escalar sin @relation', () => {
+    // El simetrico del caso de arriba, y el corazon de la ficha: la unidad se muda del
+    // producto a la PRESENTACION, y alli es obligatoria. Sin `@default`, porque un valor por
+    // defecto convertiria «no dijo unidad» en «dijo kilogramo» en silencio —justo lo que el
+    // relleno de la migracion hace UNA vez, a proposito y solo para las filas que ya
+    // existian—.
+    const unitId = field(presentation, 'unitId')
     expect(unitId.type).toBe('String')
-    expect(unitId.isOptional).toBe(true)
+    expect(unitId.isOptional, 'Presentation.unitId es NOT NULL (R1)').toBe(false)
     expect(unitId.attributes).toContain('@db.Uuid')
     expect(unitId.attributes).toContain('@map("unit_id")')
-    expect(unitId.attributes).not.toMatch(/@default\(/)
-    // Escalar SIN `@relation` (QC-32 R18), mismo criterio que `createdBy`/`updatedBy`: la FK
-    // real vive en el SQL, para que `inventario` no pueda leer la tabla de `unidades` con un
-    // `include` que ninguna guardia detecta.
+    expect(unitId.attributes, 'un @default convertiria la ausencia en un valor').not.toMatch(
+      /@default\(/,
+    )
+    // Escalar SIN `@relation` (mismo criterio que tenia `products.unit_id`, QC-32 R18): la
+    // FK real vive escrita a mano en el SQL. Con `@relation`, el cliente dejaria a
+    // `inventario` atravesar hasta `units` —modulo `unidades`— con un `include`, un cruce de
+    // modulos que ninguna guardia detecta porque no es un import.
     expect(unitId.attributes).not.toMatch(/@relation/)
-    // El catalogo sigue siendo una TABLA. Acotado por QC-33 al sujeto propio de esta
-    // afirmacion: ver el bloque de `expectUnitCatalogIsNotAnEnum`.
-    expectUnitCatalogIsNotAnEnum()
-    // Ninguna columna de unidad de texto libre sobrevive en el producto (QC-32 R10).
-    expect(has(product, 'unit')).toBe(false)
-    expect(product.body).not.toMatch(/^\s*unit\s+String/m)
+    expect(presentation.body).not.toMatch(/\bUnit\b/)
+
+    // Y su indice, el del lado hijo de la FK: Postgres no lo crea solo y por ahi pasa la
+    // verificacion del RESTRICT en cada intento de borrar una unidad (R3). No es unico:
+    // muchas presentaciones comparten unidad.
+    expect(presentation.body).toMatch(/@@index\(\[unitId\],\s*map:\s*"presentations_unit_id_idx"\)/)
+    expect(presentation.body).not.toMatch(/@@unique\([^)]*unitId/)
+    expect(unitId.attributes).not.toMatch(/@unique/)
   })
 
   it('no hay ninguna columna derivada de bajo de existencias ni relacion entre qtyAlert y stock', () => {
@@ -641,9 +697,23 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     const indexMaps = [...product.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g)].map(
       (match) => match[1],
     )
-    // 2026-09-09: la presentacion se mudo a `product_batches`, asi que `products` conserva
+    // 2026-09-09: la presentacion se mudo a `product_batches`, asi que `products` conservaba
     // SOLO el indice de la FK de unidad (`products_unit_id_idx`, QC-32 R20).
-    expect(indexMaps).toEqual(['products_unit_id_idx'])
+    // 2026-09-11, QC-80 R7: ese indice TAMBIEN se va, con la columna y la FK. `products` no
+    // declara ya ningun `@@index`: el unico que le quedaba era el de la unidad.
+    expect(indexMaps).toEqual([])
+    expect(product.body, 'products_unit_id_idx se fue con la columna (R7)').not.toMatch(
+      /products_unit_id_idx/,
+    )
+
+    // Y el de la presentacion, que es el que NACE en esta ficha (R3), en ingles igual.
+    const presentationIndexMaps = [
+      ...presentation.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g),
+    ].map((match) => match[1])
+    expect(presentationIndexMaps).toEqual(['presentations_unit_id_idx'])
+    for (const name of presentationIndexMaps) {
+      expect(name ?? '', `el indice ${name} debe ir en snake_case`).toMatch(SNAKE_CASE)
+    }
   })
 
   it('los tres modelos declaran /// @module inventario', () => {
@@ -902,97 +972,24 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 })
 
 // =======================================================================================
-// T12 (QC-90, alta-del-primer-lote) — R29: ESTA FICHA NO ANADE NINGUNA MIGRACION.
+// T0 (QC-80, unidad-desde-la-presentacion) — R25: LA PRESENTACION SIGUE VIVIENDO SOLO EN
+// `product_batches`.
 //
-// QC-90 escribe en `product_batches`, que YA EXISTE desde `20260909120000_product_batches`
-// (2026-09-09). R29 lo dice en negativo: ni una columna, ni un indice, ni una policy, ni una
-// carpeta nueva bajo `db/migrations/`. La unica migracion que existiria -el correlativo del
-// lote y su unicidad por empresa- es QC-81, otra ficha.
+// POR QUE SE RETIRO LA GUARDIA DE ALCANCE DE QC-90. Este bloque tenia ademas dos casos que
+// censaban `db/migrations/` contra el merge-base con `origin/dev` y exigian que la rama no
+// agregara ninguna carpeta: eran la guardia de ALCANCE de QC-90 (R29), una ficha que escribia
+// sobre `product_batches` sin migrar y que YA ESTA MERGEADA — su trabajo termino ahi. QC-80 si
+// anade una migracion, y a proposito (`20260911120000_presentation_unit`, `design.md > 2` y
+// `> 10`), asi que aquellos dos casos se pondrian rojos por hacer justo lo que esta ficha tiene
+// que hacer. Una feature no puede cumplir la afirmacion de alcance de otra. Con ellos se fueron
+// sus cuatro ayudantes de censo por git y el import de `node:child_process`, que quedaron sin uso.
 //
-// SOBRE EL CASO QUE MIRA EL RANGO DE GIT, y es lo importante de este bloque:
-// `docs/verification.md > Rojos heredados` documenta CUATRO archivos de
-// `tests/baseline-rojos.json` cuya unica deuda es exactamente esta clase de guardia -colgada
-// de un `git diff` contra `origin/dev`- que FALLA cuando el rango no esta disponible o cuando
-// trae cosas ajenas. Cada uno de esos cuatro `motivo` dice literalmente que la correccion
-// pendiente es que el caso «se salte explicita y ruidosamente cuando el rango no esta
-// disponible». Aqui se hace eso desde el primer dia:
+// Lo que SIGUE VIGENTE se conserva entero y pasa a ser la guardia de R25: `product_batches` no
+// pierde ni gana ninguna columna en esta ficha —la presentacion es del LOTE y ahi se queda—, y
+// la migracion que lo creo conserva sus dos CHECK y su RLS ENABLE+FORCE sin policies.
 //
-//   - se compara contra el MERGE-BASE con `origin/dev` y con TRES PUNTOS
-//     (`<merge-base>...HEAD`), no contra la punta de `dev`: asi lo que se mide es lo que ESTA
-//     RAMA agrega, no lo que `dev` avanzo por su cuenta -que es justo lo que ensucia a los
-//     cuatro del baseline-;
-//   - si no hay merge-base (sin remoto, clon superficial, worktree sin `origin/dev`) el caso
-//     se SALTA con motivo, no falla y no pasa en silencio;
-//   - si el rango existe pero esta VACIO -corriendo desde `dev`, o rama ya mergeada- tampoco
-//     hay nada que medir: se SALTA con motivo. Devolver «cero migraciones agregadas» ahi seria
-//     verde vacuo, que es el otro fallo posible y el mas dificil de ver.
-//
-// El censo de carpetas contra el merge-base (segundo caso) NO depende de que haya commits: se
-// compara el ARBOL DE TRABAJO con el merge-base, asi que caza tambien una migracion nueva
-// todavia sin commitear. Solo se salta si no hay merge-base.
-//
-// Cubre R29.
+// Cubre R25.
 // =======================================================================================
-
-/** El merge-base con `origin/dev`, o `null` si el rango no esta disponible. */
-function mergeBaseConDev(): string | null {
-  try {
-    const salida = execSync('git merge-base origin/dev HEAD', {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim()
-    return salida.length > 0 ? salida : null
-  } catch {
-    return null
-  }
-}
-
-/** Archivos AGREGADOS por esta rama respecto del merge-base, o `null` si no se pudo medir. */
-function archivosAgregadosEnLaRama(base: string): readonly string[] | null {
-  try {
-    const salida = execSync(`git diff --name-only --diff-filter=A ${base}...HEAD`, {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      maxBuffer: 8 * 1024 * 1024,
-    })
-    const archivos = salida
-      .split('\n')
-      .map((linea) => linea.trim())
-      .filter((linea) => linea.length > 0)
-    return archivos.length > 0 ? archivos : null
-  } catch {
-    return null
-  }
-}
-
-/** Nombres de las carpetas de `db/migrations/` en una revision dada, o `null` si no se pudo. */
-function carpetasDeMigracionEn(revision: string): readonly string[] | null {
-  try {
-    const salida = execSync(`git ls-tree --name-only ${revision}:db/migrations`, {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    const nombres = salida
-      .split('\n')
-      .map((linea) => linea.trim().replace(/\/$/, ''))
-      .filter((linea) => linea.length > 0 && linea !== 'migration_lock.toml')
-      .sort()
-    return nombres.length > 0 ? nombres : null
-  } catch {
-    return null
-  }
-}
-
-/** Nombres de las carpetas de `db/migrations/` tal como estan en el arbol de trabajo. */
-function carpetasDeMigracionEnDisco(): readonly string[] {
-  return readdirSync(join(repoRoot, 'db', 'migrations'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
-}
 
 /** Las columnas que `20260909120000_product_batches` le dio al lote, con su nombre en la base. */
 const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
@@ -1006,122 +1003,10 @@ const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['updatedBy', 'updated_by'],
 ]
 
-/**
- * La UNICA carpeta de migracion ajena que estos dos casos toleran, NOMBRADA una a una.
- *
- * RETENSADO 2026-09-11 (QC-86), con el mismo criterio que los retensados de
- * `recipe-route-contract` (bloques `MIGRACION_QC83`/`MIGRACION_QC66`/`MIGRACION_QC86`) y
- * `guard-identificador-de-request` (`MIGRACIONES_ESPERADAS`): el rango se mide contra la rama que
- * corre el gate, asi que cada migracion legitima posterior se NOMBRA o el caso deja de vigilar
- * nada.
- *
- * POR QUE `db/migrations/` gana una carpeta aqui: QC-86 (`modelo-de-asignacion-de-pedidos`) crea
- * la tabla `order_assignments` -la asignacion de responsables a un pedido, en el modulo nuevo
- * `asignaciones`- con su `down.sql`, e inserta en el catalogo los dos permisos del modulo. NO
- * toca `product_batches`, ni `products`, ni `presentations`, ni ninguna otra tabla de inventario:
- * su UP no ejecuta un solo DDL sobre ninguna tabla preexistente, y eso lo vigila
- * `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`, no este archivo.
- *
- * ESTO NO AFLOJA R29, y por eso es una excepcion NOMINAL y no un `toBeGreaterThanOrEqual`: lo que
- * R29 exige es que **QC-90** no anada ninguna migracion, y sigue sin anadir ninguna. Los dos
- * `toEqual([])` de abajo siguen intactos, y **cualquier** carpeta que no sea exactamente esta
- * -incluida la de QC-81, que es la que R29 nombra como «esto es otra ficha»- los vuelve a poner
- * rojos.
- */
-const MIGRACION_QC86 = '20260911120000_order_assignments'
-
-describe('QC-90 R29 — esta ficha no anade ninguna migracion ni ninguna columna', () => {
-  const base = mergeBaseConDev()
-
-  it('el rango de la rama no agrega ningun archivo bajo db/migrations/', (ctx) => {
-    if (base === null) {
-      ctx.skip(
-        'no hay merge-base con `origin/dev` (sin remoto, clon superficial o worktree sin esa ' +
-          'referencia): este caso NO ha comprobado nada. No se falla adrede a proposito -es ' +
-          'justo la deuda que documenta `docs/verification.md > Rojos heredados` para los ' +
-          'cuatro archivos del baseline-, pero tampoco pasa en silencio: queda constancia aqui.',
-      )
-      return
-    }
-    const agregados = archivosAgregadosEnLaRama(base)
-    if (agregados === null) {
-      ctx.skip(
-        `el rango git ${base}...HEAD no trae ningun archivo agregado (corriendo desde \`dev\`, ` +
-          'o rama ya mergeada): este caso NO ha comprobado nada. Verde vacuo seria peor que ' +
-          'este salto, porque «cero migraciones agregadas» sonaria a comprobacion y no lo es.',
-      )
-      return
-    }
-
-    const migracionesAgregadas = agregados
-      .filter((archivo) => archivo.startsWith('db/migrations/'))
-      // Excepcion NOMINAL de QC-86 (ver `MIGRACION_QC86`): se descuenta esa carpeta y SOLO esa.
-      // Un archivo bajo cualquier otra carpeta de `db/migrations/` sigue cayendo aqui.
-      .filter((archivo) => !archivo.startsWith(`db/migrations/${MIGRACION_QC86}/`))
-      .sort()
-    expect(
-      migracionesAgregadas,
-      'R29: esta rama agrega archivos bajo db/migrations/ y QC-90 no anade ninguna migracion ' +
-        `(${migracionesAgregadas.join(', ')}). El correlativo del lote y su unicidad por empresa ` +
-        'son QC-81, no esta ficha.',
-    ).toEqual([])
-  })
-
-  it('db/migrations/ no gana ninguna carpeta respecto del merge-base, incluido lo no commiteado', (ctx) => {
-    // Censo ARBOL DE TRABAJO contra merge-base: caza tambien la migracion recien creada con
-    // `prisma migrate dev --create-only` que todavia no esta en ningun commit -que es
-    // exactamente el momento en que R29 se violaria sin que el diff de commits lo viera-.
-    if (base === null) {
-      ctx.skip(
-        'no hay merge-base con `origin/dev`: este caso NO ha comprobado nada (ver el motivo ' +
-          'largo en la cabecera del bloque T12).',
-      )
-      return
-    }
-    const enBase = carpetasDeMigracionEn(base)
-    if (enBase === null) {
-      ctx.skip(
-        `no se pudo leer db/migrations en ${base}: este caso NO ha comprobado nada.`,
-      )
-      return
-    }
-    const enDisco = carpetasDeMigracionEnDisco()
-    expect(
-      enDisco.length,
-      'el censo de db/migrations en disco salio vacio: sin sujeto no se vigila nada',
-    ).toBeGreaterThan(0)
-    // Ancla: la migracion sobre la que ESCRIBE esta ficha tiene que existir en las dos puntas.
-    expect(enBase).toContain('20260909120000_product_batches')
-    expect(enDisco).toContain('20260909120000_product_batches')
-
-    const previas = new Set(enBase)
-    // Excepcion NOMINAL de QC-86 (ver `MIGRACION_QC86`): se descuenta esa carpeta y SOLO esa.
-    const nuevas = enDisco.filter(
-      (carpeta) => !previas.has(carpeta) && carpeta !== MIGRACION_QC86,
-    )
-
-    // La excepcion es NOMINAL, y se demuestra: si manana apareciera otra carpeta -la de QC-81, por
-    // ejemplo, que es la que R29 nombra como «esto es otra ficha»-, el filtro de arriba NO se la
-    // traga. Sin este caso, `MIGRACION_QC86` podria degenerar en «cualquier carpeta nueva vale»
-    // sin que nada se pusiera rojo.
-    const intruso = '20260912000000_batch_sequence'
-    expect(
-      [...enDisco, intruso].filter(
-        (carpeta) => !previas.has(carpeta) && carpeta !== MIGRACION_QC86,
-      ),
-      'la excepcion de QC-86 tiene que ser nominal: otra carpeta de migracion sigue cayendo',
-    ).toEqual([intruso])
-
-    expect(
-      nuevas,
-      `R29: db/migrations/ gano carpetas que no estan en el merge-base con dev (${nuevas.join(', ')}). ` +
-        'QC-90 escribe en `product_batches`, que ya existe: no anade columna, ni indice, ni policy, ' +
-        'ni migracion.',
-    ).toEqual([])
-  })
-
-  it('ProductBatch conserva las columnas que le dio 20260909120000_product_batches', () => {
-    // R29 en positivo: el modelo no pierde nada Y no gana nada. La forma detallada de cada
+describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batches', () => {
+  it('R25, R28: ProductBatch conserva las columnas que le dio 20260909120000_product_batches', () => {
+    // R25 en positivo: el modelo no pierde nada Y no gana nada —la presentacion sigue siendo
+    // del LOTE, y `products` no recupera ninguna `presentation_id`—. La forma detallada de cada
     // columna la comprueba el caso «ProductBatch declara la presentacion, el stock, el coste y
     // la autoria mudados desde products»; aqui se vigila el CONJUNTO, que es lo que una
     // migracion cambiaria.
@@ -1146,15 +1031,15 @@ describe('QC-90 R29 — esta ficha no anade ninguna migracion ni ninguna columna
       .sort()
     expect(
       escalares,
-      'ProductBatch gano o perdio columnas: cualquiera de las dos cosas necesita migracion (R29)',
+      'ProductBatch gano o perdio columnas: la presentacion vive solo aqui y no se mueve (R25)',
     ).toEqual(
       ['id', ...PRODUCT_BATCH_COLUMNS.map(([nombre]) => nombre), 'createdAt', 'updatedAt'].sort(),
     )
   })
 
-  it('la migracion de product_batches conserva sus dos CHECK y su RLS ENABLE+FORCE sin policies', () => {
-    // R29 dice «tal como la dejo 20260909120000_product_batches, con su RLS activado y forzado
-    // y sin policies». Se lee el SQL: Prisma no modela ni CHECK ni RLS, asi que si alguien los
+  it('R25, R28: la migracion de product_batches conserva sus dos CHECK y su RLS ENABLE+FORCE sin policies', () => {
+    // La tabla donde vive la presentacion queda «tal como la dejo 20260909120000_product_batches,
+    // con su RLS activado y forzado y sin policies». Se lee el SQL: Prisma no modela ni CHECK ni RLS, asi que si alguien los
     // toca no hay tipo ni cliente generado que se entere.
     const sql = readFileSync(
       join(repoRoot, 'db', 'migrations', '20260909120000_product_batches', 'migration.sql'),
@@ -1170,9 +1055,134 @@ describe('QC-90 R29 — esta ficha no anade ninguna migracion ni ninguna columna
     expect(sql).toMatch(/ALTER TABLE "product_batches" FORCE ROW LEVEL SECURITY/)
     // Sin policies: deny-by-default. La autorizacion real vive en el caso de uso
     // (`docs/architecture.md > Acceso a datos y autorizacion`), la RLS es defensa en
-    // profundidad -y una policy aqui, ademas, seria una migracion que R29 no admite-.
+    // profundidad -y una policy aqui seria mover la presentacion de sitio, que es lo que R25 veta-.
     expect(sql, 'la migracion de product_batches no declara ninguna policy').not.toMatch(
       /CREATE POLICY/i,
     )
+  })
+
+  it('R25: products no recupera ninguna presentation_id en el esquema', () => {
+    // La mitad de R25 que vive en `db/schema.prisma` (la del SQL la cierra
+    // `presentation-unit-migration.test.ts`). QC-90 mudo la presentacion de `products` a
+    // `product_batches`; esta ficha NO la devuelve. Devolversela reabriria lo que QC-90
+    // cerro y crearia dos verdades sobre la presentacion de un producto.
+    expect(has(product, 'presentationId'), 'products no recupera presentation_id (R25)').toBe(false)
+    expect(product.body).not.toMatch(/presentation_id/)
+    // Ni por relacion: el unico campo de Product hacia el lote es la lista `batches`.
+    const relaciones = product.fields
+      .filter((candidate) => /@relation/.test(candidate.attributes) || candidate.isList)
+      .map((candidate) => candidate.name)
+    expect(relaciones).toEqual(['batches'])
+    // Y `Presentation` sigue apuntando SOLO a los lotes, no a los productos.
+    expect(field(presentation, 'batches').type).toBe('ProductBatch')
+    expect(presentation.body).not.toMatch(/\bProduct\b\[?\]?\s/)
+  })
+
+  it('R28: ProductBatch conserva stock y unitCost con su forma, y esta ficha no los toca', () => {
+    // R28 en el esquema: esta ficha no mueve ninguna existencia ni toca ningun importe. El
+    // censo de columnas de arriba ya lo vigila en conjunto; aqui se fija la FORMA de las dos
+    // que guardan valor, que es lo que un cambio de tipo estropearia sin cambiar el censo.
+    const stock = field(productBatch, 'stock')
+    expect(stock.type, 'stock sigue siendo Int (entero, sin parte decimal)').toBe('Int')
+    expect(stock.isOptional).toBe(false)
+
+    const unitCost = field(productBatch, 'unitCost')
+    expect(unitCost.type, 'unit_cost sigue siendo Decimal, nunca Float').toBe('Decimal')
+    expect(unitCost.isOptional).toBe(false)
+    expect(unitCost.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
+    expect(unitCost.attributes).not.toMatch(/@db\.(Real|DoublePrecision|Money)/)
+
+    // Y el lote NO gana unidad propia: la unidad la declara la PRESENTACION del lote (R1),
+    // que es de donde R22 la deriva. Una `unit_id` aqui seria una tercera verdad.
+    expect(has(productBatch, 'unitId'), 'el lote no declara unidad: la declara su presentacion').toBe(
+      false,
+    )
+    expect(productBatch.body).not.toMatch(/unit_id/)
+
+    // La migracion de esta ficha no escribe una sola linea sobre `product_batches`.
+    const up = readFileSync(
+      join(repoRoot, 'db', 'migrations', '20260911120000_presentation_unit', 'migration.sql'),
+      'utf8',
+    )
+    const down = readFileSync(
+      join(repoRoot, 'db', 'migrations', '20260911120000_presentation_unit', 'down.sql'),
+      'utf8',
+    )
+    for (const [nombre, sql] of [
+      ['migration.sql', up],
+      ['down.sql', down],
+    ] as const) {
+      const ejecutable = sql
+        .split('\n')
+        .map((line) => line.replace(/--.*$/, ''))
+        .join('\n')
+      expect(ejecutable, `${nombre} no toca product_batches (R28)`).not.toMatch(/product_batches/i)
+      expect(ejecutable, `${nombre} no toca ningun importe (R28)`).not.toMatch(
+        /unit_cost|"orders"|"order_lines"/i,
+      )
+    }
+  })
+
+  it('R26: SupplierCatalogLine conserva su unidad propia y OPCIONAL, con la forma de hoy', () => {
+    // Limite de la ficha. QC-52 separo a conciencia la unidad de la linea de catalogo del
+    // proveedor: lo del proveedor son TERMINOS COMERCIALES —«me lo venden en garrafas»—, no
+    // propiedades de la cosa. Hacerla obligatoria «por coherencia» con la presentacion seria
+    // salirse del alcance y romper filas que hoy no la declaran.
+    const supplierLine = parseModel('SupplierCatalogLine')
+    const unitId = field(supplierLine, 'unitId')
+    expect(unitId.type).toBe('String')
+    expect(unitId.isOptional, 'la unidad de la linea de proveedor sigue siendo OPCIONAL').toBe(true)
+    expect(unitId.attributes).toContain('@db.Uuid')
+    expect(unitId.attributes).toContain('@map("unit_id")')
+    expect(unitId.attributes).not.toMatch(/@default\(/)
+    expect(unitId.attributes).not.toMatch(/@relation/)
+    // Y su presentacion propia tampoco cambia de forma: obligatoria, como la dejo QC-52.
+    const presentationId = field(supplierLine, 'presentationId')
+    expect(presentationId.isOptional).toBe(false)
+    expect(presentationId.attributes).toContain('@map("presentation_id")')
+    // Sus dos indices siguen ahi: la ficha no borra ninguno de los que NO son de `products`.
+    expect(supplierLine.body).toMatch(
+      /@@index\(\[unitId\],\s*map:\s*"supplier_catalog_lines_unit_id_idx"\)/,
+    )
+    expect(supplierLine.body).toMatch(
+      /@@index\(\[presentationId\],\s*map:\s*"supplier_catalog_lines_presentation_id_idx"\)/,
+    )
+  })
+
+  it('R9: Presentation no gana borrado logico y conserva sus marcas en ingles', () => {
+    // Decision heredada y no reabierta (QC-4 y QC-14 decision cerrada 2): identificadores de
+    // base EN INGLES y `created_at`/`updated_at`. `presentations` NO tiene borrado logico, y
+    // esta ficha —que le anade una columna— no es la excusa para metérselo: con `deleted_at`,
+    // borrar seria un UPDATE y la FK `product_batches_presentation_id_fkey` no podria
+    // bloquearlo. La forma completa del modelo la vigila el primer caso del archivo; aqui se
+    // afirma la AUSENCIA en positivo y el idioma de las dos marcas.
+    expect(has(presentation, 'deletedAt'), 'presentations sigue sin borrado logico (R9)').toBe(false)
+    expect(presentation.body).not.toMatch(/deleted_at/)
+    expect(presentation.body).not.toMatch(/borrado|eliminado|fecha_/i)
+
+    expect(field(presentation, 'createdAt').attributes).toContain('@map("created_at")')
+    expect(field(presentation, 'updatedAt').attributes).toContain('@map("updated_at")')
+    expect(presentation.body).toContain('@@map("presentations")')
+
+    // Y la columna nueva tambien llega en ingles: `unit_id`, no `unidad_id`.
+    expect(field(presentation, 'unitId').attributes).toContain('@map("unit_id")')
+
+    // El SQL de la migracion tampoco anade ninguna columna de borrado ni nada en espanol.
+    const up = readFileSync(
+      join(repoRoot, 'db', 'migrations', '20260911120000_presentation_unit', 'migration.sql'),
+      'utf8',
+    )
+    const ejecutable = up
+      .split('\n')
+      .map((line) => line.replace(/--.*$/, ''))
+      .join('\n')
+    expect(ejecutable, 'la migracion no anade deleted_at a presentations (R9)').not.toMatch(
+      /deleted_at/i,
+    )
+    for (const identificador of ejecutable.matchAll(/(?:ADD COLUMN|CREATE INDEX)\s+"(\w+)"/gi)) {
+      expect(identificador[1] ?? '', 'identificador en ingles y snake_case').toMatch(
+        /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/,
+      )
+    }
   })
 })
