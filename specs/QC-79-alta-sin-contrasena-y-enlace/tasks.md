@@ -203,7 +203,7 @@
       contiene** el secreto que el doble emitió, y `user-actions.test.ts` cubre las cinco variantes.
       *(Depende de T17.)*
 
-- [ ] **T19 — La página pública.** — **R17, R24, R25**
+- [x] **T19 — La página pública.** — **R17, R24, R25**
       `CREDENTIAL_SETUP_ROUTE` y su helper en `lib/shared/routes.ts` (**no** entra en
       `PRIVATE_ROUTE_PREFIXES`); `app/(public)/establecer-contrasena/[token]/page.tsx` +
       `components/index.ts` con el formulario; `<meta name="referrer" content="no-referrer">`, ningún
@@ -216,7 +216,7 @@
 
 ## Fase 7 — Verificación
 
-- [ ] **T20 — Integración contra Postgres real.** — **R9, R11, R12, R19, R20, R22, R37**
+- [x] **T20 — Integración contra Postgres real.** — **R9, R11, R12, R19, R20, R22, R37**
       `tests/integration/identity/credential-setup.int.test.ts`: la columna guarda la **huella** y no
       el secreto; **dos emisiones concurrentes → un solo enlace vivo** (el `23505` del índice
       parcial, con dos conexiones de verdad); **dos usos concurrentes → uno solo gana**; usuario

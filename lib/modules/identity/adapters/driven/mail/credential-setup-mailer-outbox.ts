@@ -23,6 +23,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { credentialSetupRoute } from '@/lib/shared/routes';
+
 import { readCredentialSetupLinkBaseUrlFromEnv } from '../config/mail-config-env';
 
 /**
@@ -33,17 +35,6 @@ const OUTBOX_DIR_ENV_VAR_NAME = 'MAIL_OUTBOX_DIR';
 
 /** La variable que decide si esto es produccion. Se nombra en el error de la condicion 2. */
 const NODE_ENV_VAR_NAME = 'NODE_ENV';
-
-/**
- * Camino de la pagina publica (`design.md > 4.4`).
- *
- * TODO QC-79 T19: mover a `lib/shared/routes.ts` como `CREDENTIAL_SETUP_ROUTE` y su helper. Hoy no
- * existe alli, y esta task no crea constantes en `lib/shared/`. La misma constante local esta en
- * `credential-setup-mailer-resend.ts`; T19 colapsa las dos en una. Este archivo NO la importa de
- * alli a proposito: importar el adaptador del proveedor arrastraria `resend` al transporte que
- * existe justamente para no hablar con el proveedor.
- */
-const CREDENTIAL_SETUP_ROUTE = '/establecer-contrasena';
 
 /** El mensaje, tal y como queda escrito en el JSON. */
 export type OutboxCredentialSetupMessage = {
@@ -108,7 +99,11 @@ export async function sendCredentialSetupLink(input: {
 
   const message: OutboxCredentialSetupMessage = {
     to: input.to,
-    url: `${baseUrl.replace(/\/+$/, '')}${CREDENTIAL_SETUP_ROUTE}/${input.secret}`,
+    // El camino, con el secreto DENTRO de el, lo compone `credentialSetupRoute` y no este
+    // archivo (T19): el literal de la ruta vive en un solo sitio, y este transporte y el del
+    // proveedor arman la MISMA URL porque llaman al MISMO helper. Este archivo sigue sin importar
+    // nada del adaptador de `resend`, que es lo que lo mantiene libre de la libreria (R27).
+    url: `${baseUrl.replace(/\/+$/, '')}${credentialSetupRoute(input.secret)}`,
     writtenAt: new Date().toISOString(),
   };
 

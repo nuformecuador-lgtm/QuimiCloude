@@ -21,6 +21,8 @@
 //      del error del proveedor.
 import { Resend } from 'resend';
 
+import { credentialSetupRoute } from '@/lib/shared/routes';
+
 import { readResendMailConfigFromEnv } from '../config/mail-config-env';
 
 import type { ResendMailConfig } from '../config/mail-config-env';
@@ -57,29 +59,23 @@ const CREDENTIAL_SETUP_MAIL_BODY = (url: string): string =>
     'Si no esperabas este correo, puedes ignorarlo.',
   ].join('\n');
 
-/**
- * Camino de la pagina publica donde la persona escribe su contrasena (`design.md > 4.4`, > 5.1).
- *
- * TODO QC-79 T19: mover a `lib/shared/routes.ts` como `CREDENTIAL_SETUP_ROUTE` y su helper. Hoy no
- * existe alli —T19 es la task que lo declara junto con la pagina— y esta task no crea constantes en
- * `lib/shared/`. Cuando exista, esta constante local y `credentialSetupLinkUrl` se borran y se
- * importa el helper. El transporte de buzon
- * (`credential-setup-mailer-outbox.ts`) tiene hoy la misma constante local, por la misma razon.
- */
-const CREDENTIAL_SETUP_ROUTE = '/establecer-contrasena';
-
 /** Prefijo estable del registro, para poder buscar la linea en los logs sin adivinar el texto. */
 const LOG_PREFIX = '[identity]';
 
 /**
- * La URL del enlace: base de configuracion + camino + **el secreto EN EL CAMINO**, nunca en la
- * cadena de consulta (`design.md > 4.4`). En el camino no lo escriben los registros de acceso de
- * la mayoria de los intermediarios como un parametro mas, y base64url no necesita escapado.
+ * La URL del enlace: base de configuracion + el camino que compone `credentialSetupRoute`, con
+ * **el secreto EN EL CAMINO** y nunca en la cadena de consulta (`design.md > 4.4`). En el camino
+ * no lo escriben como un parametro mas los registros de acceso de la mayoria de los
+ * intermediarios, y base64url no necesita escapado.
+ *
+ * El literal de la ruta ya no vive aqui (T19): esta en `lib/shared/routes.ts`, que es de donde lo
+ * toman tambien la pagina publica y el transporte de buzon. Lo unico que queda en este archivo es
+ * pegarle delante la base, que sale de la configuracion (R28).
  *
  * La barra final de la base se recorta para no producir `//establecer-contrasena/...`.
  */
 function credentialSetupLinkUrl(baseUrl: string, secret: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}${CREDENTIAL_SETUP_ROUTE}/${secret}`;
+  return `${baseUrl.replace(/\/+$/, '')}${credentialSetupRoute(secret)}`;
 }
 
 /**

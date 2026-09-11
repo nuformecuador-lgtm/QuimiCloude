@@ -11,6 +11,10 @@ import {
   type Actor,
   type CredentialRule,
 } from '@/lib/modules/identity';
+// La ruta de la pagina publica de R17, para revalidarla despues de establecer la contrasena. Ya no
+// es una constante local: T19 la publico en `lib/shared/routes.ts` junto con la pagina, y es el
+// mismo literal del que cuelgan los dos transportes de correo al armar la URL del enlace.
+import { CREDENTIAL_SETUP_ROUTE } from '@/lib/shared/routes';
 
 /**
  * QC-79 T18 — Las DOS Server Actions del enlace con el que una persona establece su contrasena
@@ -65,16 +69,6 @@ import {
  * de `./domain`, y un `'use server'` en su cierre transitivo romperia a cualquier componente de
  * cliente que importe el barrel. La pagina publica de T19 las importa por su RUTA EXACTA.
  */
-
-/**
- * La ruta de la pagina publica de R17, para revalidarla despues de establecer la contrasena.
- *
- * **Se escribe aqui como constante local a proposito y con fecha de caducidad**: `lib/shared/
- * routes.ts` es de T19 (`tasks.md`), que es quien publica `CREDENTIAL_SETUP_ROUTE` y su helper.
- * Cuando T19 exista, esta constante se sustituye por ese import y desaparece. Es el mismo literal
- * que hoy escriben los dos adaptadores de correo para armar la URL.
- */
-const CREDENTIAL_SETUP_ROUTE = '/establecer-contrasena';
 
 /**
  * Estado serializable de la pagina PUBLICA (`design.md > 5.3`, literal).
