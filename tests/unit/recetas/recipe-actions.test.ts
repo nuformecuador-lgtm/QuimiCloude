@@ -37,7 +37,16 @@ const {
   getSessionUserMock: vi.fn(),
 }));
 
+// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
+// del identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el
+// modulo ni siquiera carga; con ella, el estado del error inesperado vuelve con ESE id.
+const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  return { REQUEST_ID_DE_PRUEBA: id, readRequestIdHeaderMock: vi.fn(async () => id) };
+});
+
 vi.mock('@/lib/composition', () => ({
+  observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
   identity: { getSessionUser: getSessionUserMock },
   recetas: {
     createRecipe: createRecipeMock,
@@ -193,6 +202,10 @@ describe('deleteRecipeAction, getRecipeAction, listRecipesAction — traduccion 
       status: 'error',
       code: 'unexpected',
       message: errorMessage('unexpected'),
+      // QC-71 (R13): el estado del error INESPERADO vuelve con el identificador de la
+      // peticion —el mismo que se escribio en la linea del registro—, y su ausencia ya no
+      // compila (R16). El catalogado sigue sin el (R15).
+      reference: REQUEST_ID_DE_PRUEBA,
     });
     // Ningun campo del estado -ni el mensaje, ni uno anadido por descuido- lleva el texto
     // interno del error original (R13).

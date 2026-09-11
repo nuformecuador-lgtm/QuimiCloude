@@ -44,7 +44,7 @@ export async function PresentationListSection({ params }: PresentationListSectio
   const result = await listPresentationsAction(params);
 
   if (result.status === 'error') {
-    return <PresentationListError code={result.code} message={result.message} />;
+    return <PresentationListError error={result} />;
   }
 
   const { items, page: currentPage, totalPages } = result.data;

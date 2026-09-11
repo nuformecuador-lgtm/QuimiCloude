@@ -1,6 +1,6 @@
 'use server';
 
-import { identity } from '@/lib/composition';
+import { identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
   IdentityError,
@@ -94,7 +94,7 @@ export type UserListResult =
  * (QC-70 R10): la guardia del catalogo da rojo si alguien vuelve a declarar aqui una
  * `function toErrorState`.
  */
-const toErrorState = createErrorStateTranslator(IdentityError);
+const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.readRequestIdHeader);
 
 /**
  * El actor se resuelve UNA vez por invocacion, nunca dentro del dominio (R5), y con LAS DOS

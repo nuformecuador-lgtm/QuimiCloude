@@ -1,5 +1,10 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
@@ -12,6 +17,11 @@ import {
   SUPPLIER_COLUMNS,
   parseSupplierListParams,
 } from '@/app/(private)/proveedores/components';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+  UNEXPECTED_ERROR_NOTICE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import { createSupplierSchema, type SupplierView } from '@/lib/modules/proveedores';
 import type {
@@ -1044,5 +1054,107 @@ describe('pantalla de proveedores — baja con aviso de arrastre', () => {
     expect(screen.getByTestId(testId.dialogoBaja)).toBeInTheDocument();
     expect(toastExito).not.toHaveBeenCalled();
     expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en la pantalla de proveedores: lista, formulario y baja. */
+describe('pantalla de proveedores — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  it('la lista con el error inesperado ensena el identificador como texto y con su etiqueta', async () => {
+    listSuppliersActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+
+    const aviso = screen.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID);
+    expect(within(aviso).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(aviso).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('la lista con un error del catalogo no ensena identificador ninguno', async () => {
+    listSuppliersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
+    esperarSinIdentificador();
+  });
+
+  it('el formulario conserva el identificador que devolvio la operacion', async () => {
+    const user = setupUser();
+    createSupplierActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createSupplierActionMock).toHaveBeenCalledTimes(1));
+
+    const region = await screen.findByTestId(testId.errorFormulario);
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('el formulario con un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    createSupplierActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createSupplierActionMock).toHaveBeenCalledTimes(1));
+
+    const region = await screen.findByTestId(testId.errorFormulario);
+    expect(within(region).getByTestId('supplier-form-error-code')).toHaveTextContent('unauthorized');
+    esperarSinIdentificador();
+  });
+
+  it('el dialogo de baja ensena el identificador del error inesperado', async () => {
+    const user = setupUser();
+    deleteSupplierActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await user.click(screen.getAllByTestId(testId.abrirBaja)[0]);
+    await screen.findByTestId(testId.dialogoBaja);
+    await user.click(screen.getByTestId(testId.confirmarBaja));
+
+    const region = await screen.findByTestId('delete-supplier-error');
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('el dialogo de baja con un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    deleteSupplierActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getAllByTestId(testId.abrirBaja)[0]);
+    await screen.findByTestId(testId.dialogoBaja);
+    await user.click(screen.getByTestId(testId.confirmarBaja));
+
+    const region = await screen.findByTestId('delete-supplier-error');
+    expect(region).toHaveTextContent('No autorizado.');
+    esperarSinIdentificador();
   });
 });

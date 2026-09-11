@@ -1,6 +1,6 @@
 'use server';
 
-import { identity, pedidos } from '@/lib/composition';
+import { identity, observabilidad, pedidos } from '@/lib/composition';
 import {
   createErrorStateTranslator,
   type ErrorCode,
@@ -100,7 +100,7 @@ const MISSING_ID_ERROR = 'Falta el identificador del pedido.';
  * El MENSAJE que lo acompana (`MISSING_ID_ERROR`) es de esta action, no del catalogo: es su
  * propia comprobacion de entrada, y R31 no la migra.
  */
-const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
+const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 
 /**
  * QC-70 (R10): la UNICA implementacion del traductor vive en `@/lib/modules/errores`. Aqui
@@ -108,7 +108,7 @@ const INVALID_INPUT_CODE: ErrorCode = 'invalid_input';
  * el `UnauthorizedError` de cada modulo. La copia que este archivo llevaba -una de siete
  * identicas, byte a byte- desaparecio con esta ficha.
  */
-const toErrorState = createErrorStateTranslator(PedidosError);
+const toErrorState = createErrorStateTranslator(PedidosError, observabilidad.readRequestIdHeader);
 
 /** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
 async function currentActor(): Promise<Actor | null> {

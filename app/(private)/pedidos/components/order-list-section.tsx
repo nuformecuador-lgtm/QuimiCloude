@@ -92,7 +92,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   const result = await listOrdersAction(params);
 
   if (result.status === 'error') {
-    return <OrderListError code={result.code} message={result.message} />;
+    return <OrderListError error={result} />;
   }
 
   const { items, page: currentPage, totalPages } = result.data;

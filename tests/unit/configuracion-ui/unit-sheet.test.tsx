@@ -12,7 +12,7 @@
 // **Ningun assert sobre literales de copy** (R49): rol ARIA, `data-testid` exportado como constante
 // o codigos estables leidos de las clases de error del dominio.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,7 +43,12 @@ import {
   UnitSheet,
   formatFactor,
 } from '@/app/(private)/configuracion/unidades/components';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+
+// QC-71 (R15, R16): los codigos que estos casos pintan son los CATALOGADOS. El generico ya no
+// cabe en esta forma de estado -exige `reference`-, y por eso se excluye del tipo del parametro
+// en vez de dejarlo pasar con un cast.
+type CodigoCatalogado = Exclude<ErrorCode, typeof UNEXPECTED_ERROR_CODE>;
 import {
   UnitDuplicateNameError,
   DuplicateSymbolError,
@@ -55,6 +60,16 @@ import type {
   CreateUnitFormState,
   UnitMutationFormState,
 } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import {
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
+import type { ErrorState } from '@/lib/modules/errores';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 const { routerMock, createUnitActionMock, updateUnitActionMock } = vi.hoisted(() => ({
@@ -411,7 +426,7 @@ describe('ausente NO es vacio: el `FormData` espiado (R34)', () => {
 
 describe('cada codigo de error pinta donde le toca (R37)', () => {
   /** Alta que falla con el codigo dado, con los cuatro campos escritos. */
-  async function altaQueFalla(user: ReturnType<typeof setupUser>, code: ErrorCode, message: string) {
+  async function altaQueFalla(user: ReturnType<typeof setupUser>, code: CodigoCatalogado, message: string) {
     createUnitActionMock.mockResolvedValue({ status: 'error', code, message });
     await abrirAlta(user);
 
@@ -518,5 +533,49 @@ describe('con exito se cierra, avisa por toast y refresca la MISMA URL (R38)', (
     await abrirAlta(user);
 
     expect(document.querySelectorAll('[aria-live]')).toHaveLength(0);
+  });
+});
+
+/** QC-71 T9 — R17 y R18 en el formulario de unidad. */
+describe('formulario de unidad — el identificador del error inesperado (QC-71 R17, R18)', () => {
+  /** Un alta que la operacion rechaza con el estado dado. */
+  async function altaQueFallaCon(user: ReturnType<typeof setupUser>, estado: ErrorState) {
+    createUnitActionMock.mockResolvedValue(estado);
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(UNIT_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await user.type(screen.getByTestId(UNIT_FIELD_SYMBOL_TESTID), SIMBOLO_ESCRITO);
+    await user.click(screen.getByTestId(UNIT_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createUnitActionMock).toHaveBeenCalledTimes(1));
+  }
+
+  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
+    const user = setupUser();
+    await altaQueFallaCon(user, errorInesperado());
+
+    const region = await screen.findByTestId(UNIT_FORM_ERROR_TESTID);
+
+    // Identificado por `data-testid`, nunca por su texto: lo prohibe la convencion de esta
+    // pantalla. `toHaveTextContent` sigue probando que el identificador esta RENDERIZADO como
+    // texto y no escondido en un atributo (R17).
+    const referencia = within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID);
+    expect(referencia).toHaveTextContent(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+    expect(referencia).toHaveTextContent(REFERENCIA_DEL_CASO);
+  });
+
+  it('un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    await altaQueFallaCon(user, {
+      status: 'error',
+      code: INVALID_INPUT_CODE,
+      message: 'La entrada recibida no es valida.',
+    });
+
+    const region = await screen.findByTestId(UNIT_FORM_ERROR_TESTID);
+    expect(within(region).getByTestId(UNIT_FORM_ERROR_CODE_TESTID)).toHaveTextContent(
+      INVALID_INPUT_CODE,
+    );
+    esperarSinIdentificador();
   });
 });

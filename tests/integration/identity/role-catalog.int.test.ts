@@ -1,0 +1,105 @@
+/**
+ * QC-94 T7 — El catalogo de roles contra Postgres REAL (R8, R9, R10, R17).
+ *
+ * QUE SE EJERCITA: el ADAPTADOR de produccion directamente —`listAllRoles` de
+ * `lib/modules/identity/adapters/driven/persistence/role-catalog-prisma.ts`—, no la fachada ni la
+ * Server Action. Mismo reparto que `user-crud.int.test.ts` con `user-admin-prisma.ts`: aqui se
+ * prueba lo que SOLO la base puede contestar —que salen todas las filas, que salen con las dos
+ * columnas enumeradas y que el `ORDER BY name ASC` lo aplica la base—, y la autorizacion y la forma
+ * de la salida ya tienen sus unitarios (`tests/unit/identity/roles/**`).
+ *
+ * ESTE ARCHIVO NO ESCRIBE NADA (R17, R19): no crea, no edita y no borra ninguna fila, ni de `roles`
+ * ni de ninguna otra tabla. No hace falta aislamiento porque no hay nada que deshacer. El catalogo
+ * es GLOBAL y solo cambia por migracion y seed.
+ *
+ * POR QUE NO SE AFIRMA IGUALDAD EXACTA CONTRA «LOS DOS ROLES DEL SEED» (`design.md > 9.2`):
+ * `e2e/login.spec.ts` crea y borra roles EFIMEROS (`qc9_e2e_rol_<RUN_ID>`), y los de integracion no
+ * estan aislados entre suites. Un `toEqual([Administrador, Operador])` se pondria rojo por culpa de
+ * otra suite. Asi que se afirma lo que es cierto pase lo que pase: que los dos del seed ESTAN, que
+ * cada elemento tiene EXACTAMENTE dos claves, y que la secuencia COMPLETA —sea cual sea su
+ * contenido— esta ordenada con el MISMO criterio que la base.
+ *
+ * COMO SE COMPRUEBA EL ORDEN SIN INVENTARSE UNA COLACION: el orden esperado sale de la propia base
+ * con un `ORDER BY name ASC` en SQL crudo, no de un `Array.prototype.sort()` de JavaScript. Es
+ * deliberado y es el mismo argumento de `design.md > 8.2`: `localeCompare` y la collation de
+ * Postgres no coinciden en acentos ni en mayusculas, asi que un orden esperado calculado en
+ * JavaScript convertiria este test en una apuesta sobre la configuracion de la maquina. Lo que el
+ * requisito pide (R10) es que ordene la BASE y que el adaptador no reordene: eso es exactamente lo
+ * que compara este archivo.
+ *
+ * SIN TESTS DE RLS: un test de RLS escrito con Prisma sale verde pase lo que pase, porque Prisma se
+ * conecta como dueno de las tablas (`docs/architecture.md > Acceso a datos y autorizacion`). R7 lo
+ * cierra `tests/guards/guard-rls-force.test.ts`.
+ */
+import { afterAll, describe, expect, it } from 'vitest';
+
+import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
+import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
+import { prisma } from '@/lib/shared/db/prisma';
+
+/** El orden que la BASE considera correcto, preguntado a la base. Ver la cabecera. */
+async function ordenSegunLaBase(): Promise<readonly string[]> {
+  const filas = await prisma.$queryRaw<{ name: string }[]>`
+    SELECT name FROM roles ORDER BY name ASC
+  `;
+  return filas.map((fila) => fila.name);
+}
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});
+
+describe('QC-94 — listAllRoles devuelve el catalogo completo (R8)', () => {
+  it('los dos roles del seed estan, cada uno con su identificador', async () => {
+    const roles = await listAllRoles();
+
+    for (const nombre of [ROLE_ADMINISTRADOR, ROLE_OPERADOR]) {
+      const encontrado = roles.find((rol) => rol.name === nombre);
+      expect(encontrado, `falta el rol del seed «${nombre}»`).toBeDefined();
+      expect(typeof encontrado!.id).toBe('string');
+      expect(encontrado!.id.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('no omite ninguna fila de la tabla', async () => {
+    const roles = await listAllRoles();
+    const [{ total }] = await prisma.$queryRaw<{ total: bigint }[]>`
+      SELECT count(*)::bigint AS total FROM roles
+    `;
+
+    expect(roles).toHaveLength(Number(total));
+  });
+});
+
+describe('QC-94 — cada elemento trae EXACTAMENTE dos claves (R9)', () => {
+  it('`id` y `name`, y ni `description` ni las marcas de tiempo', async () => {
+    const roles = await listAllRoles();
+
+    expect(roles.length).toBeGreaterThan(0);
+    for (const rol of roles) {
+      expect(Object.keys(rol).sort()).toEqual(['id', 'name']);
+    }
+  });
+});
+
+describe('QC-94 — la secuencia la ordena la BASE por nombre ascendente (R10)', () => {
+  it('la secuencia completa coincide con el `ORDER BY name ASC` de la propia base', async () => {
+    const roles = await listAllRoles();
+
+    expect(roles.map((rol) => rol.name)).toEqual([...(await ordenSegunLaBase())]);
+  });
+
+  it('el orden es determinista: dos invocaciones devuelven la misma secuencia', async () => {
+    const primera = await listAllRoles();
+    const segunda = await listAllRoles();
+
+    expect(segunda).toEqual(primera);
+  });
+
+  it('el Administrador del seed va antes que el Operador', async () => {
+    const nombres = (await listAllRoles()).map((rol) => rol.name);
+
+    expect(nombres.indexOf(ROLE_ADMINISTRADOR)).toBeGreaterThanOrEqual(0);
+    expect(nombres.indexOf(ROLE_ADMINISTRADOR)).toBeLessThan(nombres.indexOf(ROLE_OPERADOR));
+  });
+});

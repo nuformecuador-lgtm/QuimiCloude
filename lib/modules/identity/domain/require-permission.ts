@@ -23,12 +23,56 @@ export type PermissionBearer = { readonly permissions: readonly string[] };
  * estrechamiento vive en el `requirePermission` de cada modulo, que si declara `asserts actor is
  * Actor` y delega aqui.
  */
+/**
+ * QC-94 T1 — El CUERPO UNICO de la pertenencia. Privado a proposito: no se exporta ni se reexporta
+ * desde `index.ts`, porque quien autoriza debe pasar por una de las dos aserciones de abajo, que
+ * son las que lanzan. Extraerlo aqui es lo que permite que `assertAnyPermission` exista SIN una
+ * segunda implementacion de la regla (QC-74 R12): las dos preguntan por esta funcion.
+ *
+ * Mismo comportamiento que tenia escrito `assertPermission` antes de la extraccion, letra por
+ * letra: pertenencia EXACTA, sin normalizacion y sin coincidencia parcial (R13), y cerrado ante
+ * actor ausente, sin conjunto de permisos o con un conjunto que no es un array (R14).
+ */
+function holdsPermission(
+  actor: PermissionBearer | null | undefined,
+  permission: PermissionCode,
+): boolean {
+  return Boolean(actor) && Array.isArray(actor!.permissions) && actor!.permissions.includes(permission);
+}
+
 export function assertPermission(
   actor: PermissionBearer | null | undefined,
   permission: PermissionCode,
   onDenied: () => Error,
 ): void {
-  if (!actor || !Array.isArray(actor.permissions) || !actor.permissions.includes(permission)) {
+  if (!holdsPermission(actor, permission)) {
+    throw onDenied();
+  }
+}
+
+/**
+ * QC-94 (R1, R3) — hermana de `assertPermission` para las operaciones que aceptan CUALQUIERA de
+ * varios codigos alternativos: basta con que el actor traiga UNO. No exige los dos y no deriva uno
+ * del otro, que seguiria estando prohibido (R13).
+ *
+ * Falla cerrado exactamente igual que su hermana (R2, R14) porque comparte cuerpo con ella: actor
+ * ausente, sin conjunto de permisos, con un conjunto vacio, con un conjunto que no es un array o
+ * sin ninguno de los codigos exigidos se rechazan todos igual.
+ *
+ * El parametro es una TUPLA NO VACIA y no un `PermissionCode[]`: asi
+ * `assertAnyPermission(actor, [])` -que denegaria a todo el mundo en silencio, y concederia a todo
+ * el mundo el dia que alguien invirtiera la condicion- NO COMPILA. Es mas barato que un test.
+ *
+ * El error lo pone quien llama (R15), igual que arriba: esta funcion no conoce ninguna jerarquia
+ * de errores. Devuelve `void` y no una firma de asercion por el mismo motivo que `assertPermission`
+ * (`QC-74 design.md > 5`): el estrechamiento vive en el `requireAnyPermission` de cada modulo.
+ */
+export function assertAnyPermission(
+  actor: PermissionBearer | null | undefined,
+  permissions: readonly [PermissionCode, ...PermissionCode[]],
+  onDenied: () => Error,
+): void {
+  if (!permissions.some((permission) => holdsPermission(actor, permission))) {
     throw onDenied();
   }
 }

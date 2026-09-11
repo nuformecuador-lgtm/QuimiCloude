@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import {
   SheetClose,
@@ -12,7 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ErrorCode } from '@/lib/modules/errores';
+import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   createSupplierSchema,
   updateSupplierSchema,
@@ -62,17 +63,23 @@ type FieldValues = Record<SupplierFieldName, string>;
  * Estado del formulario. **No es el estado que devuelve la action**: anade los errores por campo
  * de la validacion previa y los valores escritos. A la action se le pasa siempre el literal
  * `{ status: 'idle' }` —un archivo `'use server'` no puede exportar constantes, y las actions de
- * `proveedores` lo dejaron escrito— y su `code` y `message` se recogen tal cual.
+ * `proveedores` lo dejaron escrito— y su estado de error se recoge ENTERO.
  */
 type SupplierFormState =
   | { status: 'idle' }
   | { status: 'success' }
   | {
       status: 'error';
-      /** Codigo ESTABLE de la operacion, o `invalid_input` si el rechazo es de la validacion previa. */
-      code: ErrorCode;
-      /** Mensaje para la region de error del formulario. Sin uso si todos los errores son de campo. */
-      message: string;
+      /**
+       * El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion
+       * previa.
+       *
+       * **QC-71 (R17): entero, no copiado campo a campo.** La copia de `code` y `message` perdia
+       * el `reference` del error inesperado -lo unico que quien reporta el fallo puede citar-. Un
+       * `reference?: string` local reabriria el agujero por el otro lado: deja construir un
+       * inesperado sin identificador. Se guarda la union cerrada y el render estrecha por `code`.
+       */
+      serverError: ErrorState;
       fieldErrors: FieldErrors;
       values: FieldValues;
     };
@@ -121,7 +128,7 @@ function readValues(formData: FormData): FieldValues {
 async function submit(
   supplier: SupplierView | undefined,
   formData: FormData,
-): Promise<{ status: 'success' } | { status: 'error'; code: ErrorCode; message: string }> {
+): Promise<{ status: 'success' } | ErrorState> {
   if (supplier === undefined) {
     const result = await createSupplierAction({ status: 'idle' }, formData);
     return result.status === 'error' ? result : { status: 'success' };
@@ -197,9 +204,12 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
       // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
       return {
         status: 'error',
-        code: INVALID_INPUT_CODE,
-        message:
-          Object.keys(fieldErrors).length > 0 ? FORM_ERROR_MESSAGE : CONTACT_REQUIRED_MESSAGE,
+        serverError: {
+          status: 'error',
+          code: INVALID_INPUT_CODE,
+          message:
+            Object.keys(fieldErrors).length > 0 ? FORM_ERROR_MESSAGE : CONTACT_REQUIRED_MESSAGE,
+        },
         fieldErrors,
         values,
       };
@@ -210,8 +220,7 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
     if (result.status === 'error') {
       return {
         status: 'error',
-        code: result.code,
-        message: result.message,
+        serverError: result,
         // `supplier_duplicate_name` SI identifica campo -el nombre-, asi que se pinta junto a el.
         // Los demas codigos (`invalid_input`, `supplier_not_found`, `unauthorized`) no senalan
         // ninguno y van a la region de error del formulario (`design.md > 7`).
@@ -241,8 +250,15 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
   const initialValue = (field: SupplierFieldName, fromSupplier: string): string =>
     values?.[field] ?? fromSupplier;
 
-  const showFormError = state.status === 'error' && Object.keys(fieldErrors).length === 0;
-  const isMissing = state.status === 'error' && state.code === NOT_FOUND_CODE;
+  /*
+    Es el ERROR, no un booleano: asi el render estrecha por `code` y le pide el identificador al
+    inesperado sin ningun `as` (QC-71 R17, R18).
+  */
+  const formError =
+    state.status === 'error' && Object.keys(fieldErrors).length === 0
+      ? state.serverError
+      : undefined;
+  const isMissing = state.status === 'error' && state.serverError.code === NOT_FOUND_CODE;
 
   const isEdit = supplier !== undefined;
 
@@ -273,18 +289,27 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
       </SheetHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {showFormError ? (
+        {formError === undefined ? null : (
           // Region de error del formulario (R32): aqui van los rechazos que no senalan campo.
+          //
+          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
           <div
             role="alert"
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
             data-testid="supplier-form-error"
           >
-            <p data-testid="supplier-form-error-message">{state.message}</p>
-            <p className="text-xs" data-testid="supplier-form-error-code">
-              {state.code}
-            </p>
+            {formError.code === UNEXPECTED_ERROR_CODE ? (
+              <UnexpectedErrorNotice state={formError} />
+            ) : (
+              <>
+                <p data-testid="supplier-form-error-message">{formError.message}</p>
+                <p className="text-xs" data-testid="supplier-form-error-code">
+                  {formError.code}
+                </p>
+              </>
+            )}
             {isMissing ? (
               // `supplier_not_found`: el proveedor dejo de existir mientras el panel estaba
               // abierto, asi que lo unico util que queda es volver a la lista (`design.md > 7`).
@@ -298,7 +323,7 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
               </Link>
             ) : null}
           </div>
-        ) : null}
+        )}
 
         <SupplierField
           name="name"
