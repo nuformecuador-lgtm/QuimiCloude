@@ -205,9 +205,17 @@ function describir(infracciones: readonly Infraccion[]): string {
 // —`unidades.consultar` y `unidades.modificar` (QC-39 R12)—, y el barrido de abajo la valida igual
 // porque recorre TODOS los codigos que encuentra en el archivo, no solo el primero. El ancla se
 // SUBE, nunca se relaja: ni un aserto de esta guardia cambia.
+//
+// TENSADA el 2026-09-11 (QC-67 T3): de diez a ONCE, con `/configuracion/usuarios`, la pantalla de
+// administracion de usuarios. Llama a `requirePagePermission` UNA sola vez —`usuarios.consultar`
+// (QC-67 R4)— porque `usuarios.modificar` no cierra la pantalla, solo oculta las escrituras (R6):
+// QC-74 decidio que `modificar` NO implica `consultar`, asi que cortar por los dos dejaria fuera a
+// quien tiene exactamente el permiso que la lista exige. Darse de alta en esta lista es el punto de
+// extension por diseño de la guardia; el ancla se SUBE y ni un aserto cambia.
 const RUTAS_ESPERADAS_HOY = [
   '/configuracion/presentaciones',
   '/configuracion/unidades',
+  '/configuracion/usuarios',
   '/dashboard',
   '/inventario',
   '/pedidos',
@@ -219,7 +227,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las diez pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las once pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);
