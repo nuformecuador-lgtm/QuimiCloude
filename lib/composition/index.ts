@@ -46,7 +46,10 @@ import {
 } from '@/lib/modules/inventario';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import {
+  addBatchToAlive,
   createProduct,
+  createWithFirstBatch,
+  findAliveIdByName,
   findAliveProductById,
   listAliveProducts,
   softDeleteAliveProduct,
@@ -232,6 +235,12 @@ const productRepository: ProductRepository = {
   updateAlive: updateAliveProduct,
   softDeleteAlive: softDeleteAliveProduct,
   listAlive: listAliveProducts,
+  // QC-90 (T7, `design.md > 7`): las tres del alta con su primer lote. Nada mas cambia aqui
+  // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
+  // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
+  findAliveIdByName,
+  createWithFirstBatch,
+  addBatchToAlive,
 };
 
 const presentationRepository: PresentationRepository = {
