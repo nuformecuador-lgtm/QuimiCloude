@@ -1156,6 +1156,17 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     );
     expect(exportadas.sort()).toEqual(
       [
+        // La trae QC-79 (R17, R28) el 2026-09-11, y entra por la puerta de siempre: «pasar por
+        // aqui y por quien la revise». Es la ruta de UNA PANTALLA real —la pagina publica donde
+        // alguien establece su contrasena la primera vez, con su
+        // `app/(public)/establecer-contrasena/[token]/page.tsx` en disco— y vive aqui porque la
+        // escriben tres sitios que no se conocen entre si: la pagina y los dos transportes de
+        // correo que arman el enlace. NO entra en `PRIVATE_ROUTE_PREFIXES`, a proposito: se sirve
+        // sin sesion. R12 queda INTACTO: no encaja en el patron `alude` de arriba —que se sigue
+        // aplicando a TODAS las declaraciones del archivo— y no apunta a ninguna URL del
+        // asistente. Y la lista sigue CERRADA con igualdad exacta: una constante mas sin ficha que
+        // la respalde vuelve a poner esto en rojo.
+        'CREDENTIAL_SETUP_ROUTE',
         'DASHBOARD_ROUTE',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
@@ -1197,6 +1208,12 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // queda intacta. La lista sigue CERRADA: una constante mas sin ficha que la respalde
         // vuelve a poner esto en rojo.
         'UNITS_ROUTE',
+        // La segunda de QC-79 (`design.md > 4.4`): compone el camino de la pagina de arriba con el
+        // secreto del enlace EN EL CAMINO, nunca en la cadena de consulta. Mismo patron —y misma
+        // razon de estar aqui— que `recipeEditRoute` y `supplierDetailRoute`: ningun archivo de
+        // producto compone esa URL a mano. Ver el comentario de `CREDENTIAL_SETUP_ROUTE`, del que
+        // esta funcion es la mitad.
+        'credentialSetupRoute',
         // La trae QC-67 (R1) el 2026-09-11, la pantalla de administracion de usuarios: es la ruta
         // de UNA PANTALLA real -con su `app/(private)/configuracion/usuarios/page.tsx` en disco- y
         // vive aqui porque la lista de prefijos privados (R5) y el item de navegacion (R2, R3)

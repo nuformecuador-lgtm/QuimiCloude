@@ -333,7 +333,15 @@ describe('Prisma.dmmf — el autor del cambio es un ESCALAR, no una relacion (de
     // `tests/unit/proveedores/module-contract.test.ts` lleva esta MISMA igualdad exacta y no se
     // toca (`design.md > 5.3`). Si alguien "arregla" el esquema con una auto-relacion, `User`
     // aparece en su propia lista y los dos tests caen a la vez.
-    expect(relationTargets('User')).toEqual(['Company', 'DocumentType', 'Role'])
+    // RETENSADO 2026-09-11 (QC-79): entra `CredentialSetupToken` -R11, el lado inverso de
+    // `credential_setup_tokens.user_id`, que Prisma EXIGE para el `@relation` del enlace-.
+    // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    expect(relationTargets('User')).toEqual([
+      'Company',
+      'CredentialSetupToken',
+      'DocumentType',
+      'Role',
+    ])
     expect(relationTargets('User')).not.toContain('User')
   })
 })

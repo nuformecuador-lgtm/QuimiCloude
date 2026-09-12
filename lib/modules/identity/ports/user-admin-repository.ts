@@ -69,6 +69,21 @@ export type NewUser = {
 /** Cual de los tres indices unicos de QC-47 rechazo la escritura (R17). */
 export type DuplicateKey = 'email' | 'username' | 'document';
 
+/**
+ * QC-79 (`design.md > 6.1`) — Con que credencial nace la fila.
+ *
+ * **Una union discriminada y no `string | null`**, porque `null` es lo que alguien olvida y un tipo
+ * con nombre no: la ausencia de credencial es una DECISION EXPLICITA del llamante -el administrador
+ * no escribio ninguna (R1, R4)-, no un descuido.
+ *
+ * `'none'` NO significa «pon una cualquiera»: significa que la fila queda **sin ninguna credencial
+ * con la que se pueda entrar** (R4). Como escribirlo sin tocar `users` -que R37 prohibe- es del
+ * adaptador: el centinela `NO_CREDENTIAL_SENTINEL` de `domain/credential-setup-link.ts`.
+ */
+export type NewUserCredential =
+  | { readonly kind: 'hash'; readonly value: string }
+  | { readonly kind: 'none' };
+
 /** Lo que toda operacion guardada necesita para localizar su objetivo y aplicar la invariante. */
 type GuardedTarget = {
   /** Ambito: la empresa del actor (R33). Un objetivo de otra empresa es `'not_found'`. */
@@ -122,10 +137,21 @@ export type GuardedOutcome = 'ok' | 'not_found' | 'last_administrator';
 
 export interface UserAdminRepository {
   /**
-   * Alta (R13, R14, R15, R17). La **EMPRESA** y el **HASH** son argumentos PROPIOS y OBLIGATORIOS:
-   * una llamada que los olvide **no compila**, en vez de crear un usuario sin empresa o sin
-   * credencial. `accountStatus` esta tipado como el literal `'pending'` y no como la union: crear
-   * una cuenta que ya pueda entrar no es expresable (R13).
+   * Alta (R13, R14, R15, R17). La **EMPRESA** y la **CREDENCIAL** son argumentos PROPIOS y
+   * OBLIGATORIOS: una llamada que los olvide **no compila**, en vez de crear un usuario sin empresa
+   * o con una credencial elegida por descuido. `accountStatus` esta tipado como el literal
+   * `'pending'` y no como la union: crear una cuenta que ya pueda entrar no es expresable (R13).
+   *
+   * **QC-79 parte QC-66 R15 en dos, y hay que leerlo con esas palabras:**
+   *
+   *   - **La mitad que SOBREVIVE**: la credencial, cuando la hay, se persiste **solo** como HASH de
+   *     QC-5, y **no sale por ninguna via** -ni en el resultado, ni en un mensaje de error, ni en
+   *     ninguna traza- (QC-66 R16, extendido por QC-79 R5). Por eso el argumento es la union de
+   *     abajo y nunca la contrasena en claro.
+   *   - **La mitad que R4 de QC-79 ENMIENDA**: cuando el administrador **no escribe** contrasena,
+   *     el sistema **NO genera ninguna al azar**. Ya no es cierto que «crear un usuario le fija una
+   *     contrasena generada por el propio sistema»: llega `{ kind: 'none' }`, la fila nace sin
+   *     ninguna credencial utilizable, y el acceso lo da el enlace de R7.
    *
    * **Este metodo NO lleva parametro de autor del cambio de estado, y es DELIBERADO (R49, decision
    * cerrada 18).** La fila nace con `account_status` en `pending`, `account_status_changed_at` en
@@ -140,7 +166,7 @@ export interface UserAdminRepository {
   create(
     companyId: string,
     data: NewUser,
-    credentialHash: string,
+    credential: NewUserCredential,
     accountStatus: 'pending',
     now: Date,
   ): Promise<{ id: string } | DuplicateKey | 'role_not_found'>;

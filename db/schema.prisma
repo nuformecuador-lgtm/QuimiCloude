@@ -209,9 +209,13 @@ model User {
   /// los tres indices unicos funcionales de QC-4.
   accountStatusChangedBy String? @map("account_status_changed_by") @db.Uuid
 
-  documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
-  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  company      Company      @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  documentType          DocumentType           @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
+  role                  Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  company               Company                @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  /// QC-79. Lado inverso de `credential_setup_tokens.user_id`. Prisma EXIGE este campo para
+  /// el `@relation` de `CredentialSetupToken`; es virtual y NO anade ninguna columna ni ningun
+  /// indice a `users` (R37).
+  credentialSetupTokens CredentialSetupToken[]
 
   @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
@@ -374,6 +378,38 @@ model WorkGroupMember {
   @@id([workGroupId, userId], map: "work_group_members_pkey")
   @@index([userId], map: "work_group_members_user_id_idx")
   @@map("work_group_members")
+}
+
+/// @module identity
+/// QC-79. Enlace de un solo uso con el que una persona ESTABLECE su contrasena la primera vez.
+/// NO guarda el secreto: guarda su HUELLA (`token_digest`, SHA-256 en hexadecimal). Ver design.md > 4.
+///
+/// OJO — «como maximo UN enlace vivo por persona» (R11) NO esta aqui: es el indice unico
+/// PARCIAL `credential_setup_tokens_one_live_per_user`
+/// (`ON ("user_id") WHERE "consumed_at" IS NULL AND "superseded_at" IS NULL`), y Prisma no
+/// modela indices parciales. Vive escrito A MANO en
+/// `db/migrations/<ts>_credential_setup_tokens/migration.sql` y ese es el unico sitio donde
+/// existe — drift declarado, igual que los tres indices unicos funcionales de QC-4/QC-47.
+/// Quien anada aqui un `@@unique([userId])` lo convierte en TOTAL y mata R11 en silencio.
+///
+/// SIN columna de empresa (R37): no es una tabla de operacion, cuelga 1-a-N de `users` y su
+/// empresa es, por definicion, la del usuario al que apunta. SIN `updated_at`: una fila tiene
+/// exactamente tres transiciones —nace, se consume, se sustituye— y cada una tiene su propia
+/// columna con su instante. Nada se borra fisicamente (R12): consumir y sustituir son UPDATE.
+model CredentialSetupToken {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  tokenDigest  String    @map("token_digest")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt   DateTime? @map("consumed_at") @db.Timestamptz(6)
+  supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([tokenDigest], map: "credential_setup_tokens_token_digest_key")
+  @@index([userId], map: "credential_setup_tokens_user_id_idx")
+  @@map("credential_setup_tokens")
 }
 
 /// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo

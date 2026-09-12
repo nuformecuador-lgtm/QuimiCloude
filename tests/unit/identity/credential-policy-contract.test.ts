@@ -275,6 +275,14 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         'accountStatusChangedBy',
         'documentType',
         'role',
+        // RETENSADO 2026-09-11 (QC-79). El censo NO se afloja: sigue siendo una igualdad
+        // EXACTA, y por eso hay que nombrar el UNICO campo que QC-79 anade a `User`:
+        // `credentialSetupTokens`, el lado inverso que Prisma EXIGE para el `@relation` de
+        // `CredentialSetupToken`. Es VIRTUAL -no es ninguna columna de `users`, y la migracion
+        // `..._credential_setup_tokens` no emite ni un `ALTER TABLE "users"` (QC-79 R37)-, y no
+        // tiene nada que ver con la politica de credenciales de QC-19, que sigue siendo REGLA y
+        // no dato: el enlace guarda una HUELLA de su propio secreto, nunca una contrasena.
+        'credentialSetupTokens',
       ].sort(),
     );
   });

@@ -1,6 +1,7 @@
 // QC-66 T3 — La jerarquia de errores del dominio `identity` (`design.md > 6.4`).
 //
-// Lo que se vigila (R41): las NUEVE clases exponen el `code` ESTABLE que la tabla de
+// Lo que se vigila (R41): las ONCE clases —NUEVE de QC-66 mas las DOS que anadio QC-79 el
+// 2026-09-11— exponen el `code` ESTABLE que la tabla de
 // `design.md > 6.4` fija, cada una el suyo y por clase; todas derivan de `IdentityError`, que
 // es como el adaptador driving las reconoce (`error instanceof IdentityError`) antes de
 // serializarlas a `{ status: 'error', code, message }`.
@@ -22,6 +23,7 @@
 
 import { errorMessage, ERROR_CODES, type ErrorCode } from '@/lib/modules/errores';
 import {
+  CredentialLinkInvalidError,
   DuplicateDocumentError,
   DuplicateEmailError,
   DuplicateUsernameError,
@@ -31,6 +33,7 @@ import {
   RoleNotFoundError,
   SelfOperationError,
   UnauthorizedError,
+  UserNotPendingError,
   ValidationError,
 } from '@/lib/modules/identity/domain/errors';
 
@@ -46,10 +49,13 @@ const CASOS: readonly { readonly clase: string; readonly error: IdentityError; r
   { clase: 'SelfOperationError', error: new SelfOperationError(), code: 'self_operation' },
   { clase: 'LastAdministratorError', error: new LastAdministratorError(), code: 'last_administrator' },
   { clase: 'ValidationError', error: new ValidationError(), code: 'invalid_input' },
+  // QC-79 (R34), el 2026-09-11: las dos clases del enlace para establecer la contrasena.
+  { clase: 'CredentialLinkInvalidError', error: new CredentialLinkInvalidError(), code: 'credential_link_invalid' },
+  { clase: 'UserNotPendingError', error: new UserNotPendingError(), code: 'user_not_pending' },
 ];
 
 /**
- * Las mismas nueve clases, por su CONSTRUCTOR: hace falta para construirlas una segunda vez con un
+ * Las mismas once clases, por su CONSTRUCTOR: hace falta para construirlas una segunda vez con un
  * `diagnostic` y demostrar que el mensaje no se puede sobreescribir. Se escribe a mano y no se
  * deduce de `CASOS` para que anadir una clase obligue a tocar los dos sitios.
  */
@@ -63,6 +69,8 @@ const CLASES: Readonly<Record<string, new (diagnostic?: string) => IdentityError
   SelfOperationError,
   LastAdministratorError,
   ValidationError,
+  CredentialLinkInvalidError,
+  UserNotPendingError,
 };
 
 describe('lib/modules/identity — errores de dominio', () => {
@@ -81,13 +89,14 @@ describe('lib/modules/identity — errores de dominio', () => {
     });
   }
 
-  // R41 — nueve clases, nueve codigos distintos: dos casos con el mismo `code` serian
-  // indistinguibles para la pantalla de QC-67, que decide por el codigo.
-  it('los nueve codigos del modulo son distintos entre si', () => {
+  // R41 — once clases, once codigos distintos: dos casos con el mismo `code` serian
+  // indistinguibles para la pantalla de QC-67, que decide por el codigo. Eran NUEVE hasta que
+  // QC-79 anadio las dos suyas (R34); el conteo sigue siendo literal a proposito.
+  it('los once codigos del modulo son distintos entre si', () => {
     const codigos = CASOS.map(({ code }) => code);
 
-    expect(codigos).toHaveLength(9);
-    expect(new Set(codigos).size).toBe(9);
+    expect(codigos).toHaveLength(11);
+    expect(new Set(codigos).size).toBe(11);
   });
 
   // `design.md > 6.4`: «de otra empresa» y «soy yo» responden no-encontrado y NO `unauthorized`,
@@ -110,9 +119,9 @@ describe('lib/modules/identity — errores de dominio', () => {
     expect(new LastAdministratorError().name).toBe('LastAdministratorError');
   });
 
-  // QC-70 (R22): los nueve codigos estan en el catalogo unico. Un codigo inventado por el modulo
+  // QC-70 (R22): los once codigos estan en el catalogo unico. Un codigo inventado por el modulo
   // —el caso que la guardia del catalogo persigue— pondria esta linea en rojo.
-  it('los nueve codigos pertenecen al catalogo unico de la aplicacion', () => {
+  it('los once codigos pertenecen al catalogo unico de la aplicacion', () => {
     for (const { clase, code } of CASOS) {
       expect(ERROR_CODES, `${clase} declara un code fuera del catalogo`).toContain(code);
     }
@@ -141,6 +150,31 @@ describe('lib/modules/identity — errores de dominio', () => {
       expect(conDiagnostico.message).not.toContain(DIAGNOSTICO);
       expect(conDiagnostico.diagnostic, `${clase} pierde el diagnostico`).toBe(DIAGNOSTICO);
     }
+  });
+
+  // QC-79 (R22, `design.md > 4.8`): el enlace invalido es UNA respuesta, y su `code` NO se
+  // confunde con el del usuario que no existe ni con el de la cuenta que ya no esta pendiente.
+  // Distinguir los seis casos de fallo convertiria el enlace en un oraculo de existencia.
+  it('credential_link_invalid es un code propio, distinto de user_not_found y de user_not_pending', () => {
+    const enlace = new CredentialLinkInvalidError();
+
+    expect(enlace.code).toBe('credential_link_invalid');
+    expect(enlace.code).not.toBe(new UserNotFoundError().code);
+    expect(enlace.code).not.toBe(new UserNotPendingError().code);
+    expect(enlace.message).not.toBe(new UserNotFoundError().message);
+    expect(enlace.name).toBe('CredentialLinkInvalidError');
+  });
+
+  // QC-79 (R15, `design.md > 5.4`): `user_not_pending` SI se distingue de `user_not_found` a
+  // proposito —quien reenvia ya ve el estado de cuenta en el listado de QC-66—, igual que
+  // `self_operation`. Y sigue sin ser `unauthorized`: el permiso esta, lo que falla es el estado.
+  it('user_not_pending se distingue de user_not_found y de unauthorized', () => {
+    const noPendiente = new UserNotPendingError();
+
+    expect(noPendiente.code).toBe('user_not_pending');
+    expect(noPendiente.code).not.toBe(new UserNotFoundError().code);
+    expect(noPendiente.code).not.toBe(new UnauthorizedError().code);
+    expect(noPendiente.name).toBe('UserNotPendingError');
   });
 
   // Y sin diagnostico, el campo no existe: el traductor unico solo registra cuando hay algo que

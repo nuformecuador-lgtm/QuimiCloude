@@ -118,7 +118,9 @@ let toastExito: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  createUserActionMock.mockResolvedValue({ status: 'success', id: 'u-nuevo' });
+  // QC-79 R30: el alta devuelve ademas COMO acabo el correo. Esta pantalla no tiene campo de
+  // contrasena, asi que su alta va siempre por la rama del enlace: el caso feliz es 'sent'.
+  createUserActionMock.mockResolvedValue({ status: 'success', id: 'u-nuevo', mail: 'sent' });
   updateUserActionMock.mockResolvedValue({ status: 'success' });
   getUserActionMock.mockResolvedValue({ status: 'success', data: FICHA });
   toastExito = vi.spyOn(toast, 'success');

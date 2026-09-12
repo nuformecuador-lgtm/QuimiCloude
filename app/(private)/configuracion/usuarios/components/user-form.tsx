@@ -21,7 +21,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import {
+  errorMessage,
+  UNEXPECTED_ERROR_CODE,
+  type ErrorCode,
+  type ErrorState,
+} from '@/lib/modules/errores';
 import { DOCUMENT_TYPE_CODES, type RoleOption, type UserDetail } from '@/lib/modules/identity';
 import {
   createUserAction,
@@ -197,8 +202,38 @@ function readValues(formData: FormData): FieldValues {
 }
 
 /**
+ * Lo que esta pantalla pinta cuando la accion NO creo nada pero tampoco devolvio un `ErrorState`.
+ *
+ * QC-79 amplio `CreateUserFormState` de tres variantes a cinco: ahora el alta puede volver como
+ * `invalid_credential` con las **reglas incumplidas** de la politica de credenciales (QC-79 R2, y
+ * su gemela R23 en la pantalla publica del enlace). Esa variante **no es un `ErrorState`** y, sobre
+ * todo, **no es un exito**: no se creo ninguna fila, no se emitio ningun enlace y no se envio
+ * ningun correo. Presentarla como «usuario creado» seria un fallo silencioso disfrazado de exito.
+ *
+ * Hoy esta pantalla **no puede provocarla** —no tiene campo de contrasena, asi que su alta va
+ * siempre por la rama del enlace—, pero el tipo ya la admite, y por eso se trata explicitamente.
+ *
+ * **Esta es la version minima honesta, no la buena.** La buena es pintar las reglas incumplidas
+ * una a una junto al campo de contrasena, y eso es trabajo de QC-67 el dia que anada ese campo:
+ * requiere el campo, el texto de cada `CredentialRule` y su hueco en el formulario. Mientras tanto
+ * se degrada al error generico que la region `role="alert"` ya sabe pintar: un mensaje generico es
+ * peor que el detallado, pero es infinitamente mejor que una mentira.
+ */
+const NOT_CREATED_CODE = 'invalid_input' satisfies ErrorCode;
+
+function notCreatedAsFormError(): ErrorState {
+  return { status: 'error', code: NOT_CREATED_CODE, message: errorMessage(NOT_CREATED_CODE) };
+}
+
+/**
  * Alta o edicion, segun haya ficha o no. La edicion ata el `id` por parametro —es la firma de
  * `updateUserAction`— y envia el **reemplazo completo** de los nueve (R26).
+ *
+ * **Discrimina de verdad: `'success'` se comprueba, no se asume.** El `? :` anterior —«si no es
+ * `'error'`, es exito»— era cierto cuando el estado del alta tenia tres variantes y dejo de serlo
+ * con las cinco de QC-79. Con la forma de abajo, cualquier variante que se anada manana cae en el
+ * camino de «no se creo» en vez de colarse como exito, que es el unico fallo de los dos que la
+ * persona no puede detectar.
  */
 async function submit(
   userId: string | undefined,
@@ -207,12 +242,18 @@ async function submit(
   if (userId === undefined) {
     const result = await createUserAction({ status: 'idle' }, formData);
     // El `id` creado se IGNORA a proposito (R28): no hay pagina de detalle a la que navegar.
-    return result.status === 'error' ? result : { status: 'success' };
+    if (result.status === 'success') return { status: 'success' };
+    if (result.status === 'error') return result;
+    // `invalid_credential` (QC-79 R2) —y el imposible `idle`—: NO se creo nada, no es exito.
+    return notCreatedAsFormError();
   }
 
   const update = updateUserAction.bind(null, userId);
   const result = await update({ status: 'idle' }, formData);
-  return result.status === 'error' ? result : { status: 'success' };
+  if (result.status === 'success') return { status: 'success' };
+  if (result.status === 'error') return result;
+  // La edicion sigue teniendo tres variantes: aqui solo queda el `idle` que la action no devuelve.
+  return notCreatedAsFormError();
 }
 
 /** Los nueve valores de partida: los de la ficha en la edicion, vacios en el alta. */
