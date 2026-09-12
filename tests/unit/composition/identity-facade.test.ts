@@ -240,3 +240,87 @@ describe('identity — la consulta del catalogo de roles (fachada cableada)', ()
     expect(typeof identity.createUser).toBe('function');
   });
 });
+
+// QC-84 T10 (R44) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no reformatea
+// ninguna de las fixtures ni de los casos de arriba.
+//
+// Lo que se afirma es el CABLEADO, no el dominio: que la fachada ya construida expone las SIETE
+// claves de los grupos de trabajo, que el listado de miembros recibe su aritmetica de paginacion
+// —el defecto de 10 y el tope de 25 de `lib/shared/pagination`— y que las claves de arriba siguen
+// ahi. Si alguien dejara una factory sin cablear, o se la llevara a otro sitio que no sea
+// `lib/composition`, esto se pone rojo.
+describe('identity — los siete casos de uso de grupos de trabajo (fachada cableada)', () => {
+  const CLAVES_DE_GRUPOS = [
+    'createWorkGroup',
+    'renameWorkGroup',
+    'deleteWorkGroup',
+    'addWorkGroupMember',
+    'removeWorkGroupMember',
+    'listWorkGroups',
+    'listWorkGroupMembers',
+  ] as const;
+
+  it('expone las siete claves y todas son funciones', async () => {
+    const { identity } = await import('@/lib/composition');
+
+    for (const clave of CLAVES_DE_GRUPOS) {
+      expect(typeof identity[clave]).toBe('function');
+    }
+  });
+
+  it('sin romper las claves que ya tenia la fachada', async () => {
+    // Las claves nuevas se SUMAN al final del objeto: cablear un modulo mas no reemplaza nada.
+    const { identity } = await import('@/lib/composition');
+
+    expect(typeof identity.getSessionUser).toBe('function');
+    expect(typeof identity.getSessionContext).toBe('function');
+    expect(typeof identity.listUsers).toBe('function');
+    expect(typeof identity.createUser).toBe('function');
+    expect(typeof identity.listRoles).toBe('function');
+  });
+
+  it('listWorkGroupMembers recibe la paginacion REAL: defecto 10 y tope 25', async () => {
+    // R51 — la aritmetica NO se reimplementa en el dominio: se inyecta aqui la misma de
+    // `lib/shared/pagination`. Se comprueba de punta a punta contra un grupo de 30 miembros
+    // visibles: sin `pageSize` salen 10, y pidiendo 100 salen 25 —acotado, no rechazado—.
+    //
+    // El repositorio se dobla a nivel del CLIENTE PRISMA, no del caso de uso: asi lo que se
+    // ejercita es el cableado real de `lib/composition` (repositorio + paginacion), que es lo que
+    // este archivo prueba.
+    const { prisma } = await import('@/lib/shared/db/prisma');
+    const miembros = Array.from({ length: 30 }, (_, indice) => ({
+      id: `user-${String(indice).padStart(2, '0')}`,
+      firstNames: 'Ana',
+      lastNames: `Apellido ${String(indice).padStart(2, '0')}`,
+      username: `ana.${indice}`,
+      accountStatus: 'active' as const,
+      lockedUntil: null,
+    }));
+
+    Object.assign(prisma, {
+      workGroup: { findFirst: vi.fn(async () => ({ id: 'wg-1' })) },
+      workGroupMember: {
+        findMany: vi.fn(async () => miembros.map((miembro) => ({ userId: miembro.id }))),
+      },
+      user: { findMany: vi.fn(async () => miembros) },
+    });
+
+    const { identity } = await import('@/lib/composition');
+    const actor = { id: 'u1', companyId: 'c1', permissions: ['usuarios.consultar'] };
+    const consulta = { page: 1, sort: null, filters: {}, search: '' };
+
+    const porDefecto = await identity.listWorkGroupMembers(actor, 'wg-1', consulta, new Date());
+    expect(porDefecto.items).toHaveLength(10);
+    expect(porDefecto.pageSize).toBe(10);
+    expect(porDefecto.total).toBe(30);
+
+    const acotada = await identity.listWorkGroupMembers(
+      actor,
+      'wg-1',
+      { ...consulta, pageSize: 100 },
+      new Date(),
+    );
+    expect(acotada.items).toHaveLength(25);
+    expect(acotada.pageSize).toBe(25);
+  });
+});

@@ -224,3 +224,78 @@ export {
   type IssueCredentialSetupLinkDeps,
   type IssueCredentialSetupLinkResult,
 } from './domain/issue-credential-setup-link';
+
+// ---------------------------------------------------------------------------------------
+// QC-84 T10 — Los grupos de trabajo (R44). Bloque NUEVO al final: no reordena ni reformatea
+// ninguna de las lineas de arriba.
+//
+// **Solo simbolos de `./domain`.** En particular NO se reexporta
+// `adapters/driving/work-group-actions`: un `'use server'` en el cierre transitivo de este
+// contrato lo volveria inimportable desde un componente de cliente. QC-85 importa las siete
+// Server Actions por su RUTA EXACTA, igual que QC-67 con las de QC-66 y QC-94.
+//
+// El PUERTO (`ports/work-group-repository.ts`) y el adaptador driven tampoco salen por aqui:
+// los ve solo el punto de composicion, que es el unico sitio que ata puerto -> adaptador.
+// ---------------------------------------------------------------------------------------
+
+// Las dos proyecciones de salida (R19, R26): dos claves cada una, y lo que NO llevan -ningun
+// dato de credencial, ninguna marca de baja- lo fija el TIPO, no una promesa.
+export type { WorkGroupRow, WorkGroupMemberRow } from './domain/work-group-view';
+
+// Los cuatro esquemas del borde (R11, R14, R33) y sus tipos inferidos. Son los MISMOS que
+// valida la Server Action y los que -manana- validara el formulario de QC-85: una sola
+// definicion de la entrada, no dos que puedan diverger.
+export {
+  createWorkGroupSchema,
+  renameWorkGroupSchema,
+  workGroupMemberSchema,
+  deleteWorkGroupSchema,
+  WORK_GROUP_NAME_MAX_LENGTH,
+  type CreateWorkGroupInput,
+  type RenameWorkGroupInput,
+  type WorkGroupMemberInput,
+  type DeleteWorkGroupInput,
+} from './domain/work-group-input';
+
+// Las dos listas blancas de campos consultables (R27, R54): QC-85 comprueba contra el
+// contrato en vez de contra una copia escrita a mano.
+export {
+  WORK_GROUP_QUERYABLE,
+  WORK_GROUP_MEMBER_QUERYABLE,
+} from './domain/work-group-queryable';
+
+// Los SIETE errores nuevos (R43). Se exportan las CLASES, no sus textos: quien decide por el
+// `code` -o por la clase- es QC-85, y el mensaje sale del catalogo unico de QC-70. Son tres
+// codigos distintos de «ya pertenece pero no se ve» porque «pendiente», «inactiva» y
+// «bloqueada» son tres frases y tres acciones distintas para quien las lee (`design.md > 7.2`).
+export {
+  WorkGroupNotFoundError,
+  WorkGroupDuplicateNameError,
+  WorkGroupMemberExistsError,
+  WorkGroupMemberExistsPendingError,
+  WorkGroupMemberExistsInactiveError,
+  WorkGroupMemberExistsBlockedError,
+  WorkGroupMemberNotFoundError,
+} from './domain/errors';
+
+// Las SIETE factories de caso de uso. Los tipos `*Deps` viajan con ellas: quien las cablea es
+// `lib/composition`, y sin el tipo no podria declarar la dependencia. `PaginationPolicy` sale
+// con `ListWorkGroupMembersDeps` porque el corte de la pagina de miembros vive en el dominio
+// -despues del filtro del estado efectivo- y su aritmetica entra inyectada (`design.md > 5.3`).
+export { createCreateWorkGroup, type CreateWorkGroupDeps } from './domain/create-work-group';
+export { createRenameWorkGroup, type RenameWorkGroupDeps } from './domain/rename-work-group';
+export { createDeleteWorkGroup, type DeleteWorkGroupDeps } from './domain/delete-work-group';
+export {
+  createAddWorkGroupMember,
+  type AddWorkGroupMemberDeps,
+} from './domain/add-work-group-member';
+export {
+  createRemoveWorkGroupMember,
+  type RemoveWorkGroupMemberDeps,
+} from './domain/remove-work-group-member';
+export { createListWorkGroups, type ListWorkGroupsDeps } from './domain/list-work-groups';
+export {
+  createListWorkGroupMembers,
+  type ListWorkGroupMembersDeps,
+  type PaginationPolicy,
+} from './domain/list-work-group-members';
