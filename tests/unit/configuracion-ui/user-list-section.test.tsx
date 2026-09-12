@@ -93,6 +93,31 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
   listRolesAction: listRolesActionMock,
 }));
 
+// QC-85 T7 — Las SIETE Server Actions de GRUPOS, dobles que FALLAN si se les llama.
+//
+// **No es un cambio de guion de este archivo**: no toca ni un `test(...)`, ni un selector, ni una
+// asercion. Desde que la pantalla de usuarios sirve DOS pestanas, su barrel arrastra
+// `work-group-actions.ts`, que lee `observabilidad` de `@/lib/composition` **al cargarse** —y el
+// doble de composicion de este archivo declara solo `identity`—. Aislar ese borde es exactamente
+// lo que este archivo ya hacia con `user-actions` y `role-actions`.
+//
+// Que las SIETE lancen **TENSA** lo que el archivo afirma —la pestana de personas no consulta ni
+// escribe NADA de grupos— en vez de relajarlo (QC-85 R6).
+vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
+  const noDebeInvocarse = (nombre: string) => () => {
+    throw new Error(`${nombre} no debe invocarse desde la pestana de personas`);
+  };
+  return {
+    createWorkGroupAction: vi.fn(noDebeInvocarse('createWorkGroupAction')),
+    renameWorkGroupAction: vi.fn(noDebeInvocarse('renameWorkGroupAction')),
+    deleteWorkGroupAction: vi.fn(noDebeInvocarse('deleteWorkGroupAction')),
+    addWorkGroupMemberAction: vi.fn(noDebeInvocarse('addWorkGroupMemberAction')),
+    removeWorkGroupMemberAction: vi.fn(noDebeInvocarse('removeWorkGroupMemberAction')),
+    listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
+    listWorkGroupMembersAction: vi.fn(noDebeInvocarse('listWorkGroupMembersAction')),
+  };
+});
+
 /**
  * Cadena **inconfundible** a proposito: el caso de `unauthorized` busca su ausencia en todo el
  * documento, y con un valor realista no distinguiria entre «no se muestra» y «se muestra pero

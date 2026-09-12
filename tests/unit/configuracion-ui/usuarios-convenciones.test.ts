@@ -53,8 +53,27 @@ const CARPETA_DE_COMPONENTES = `${CARPETA_DE_LA_RUTA}/components`;
 /** El barrel por el que TODO consumidor externo debe entrar (R38). */
 const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
 
-/** Cuantos componentes propios tiene la ruta, sin contar el barrel (`design.md > 1`). */
-const COMPONENTES_ESPERADOS = 13;
+/**
+ * Cuantos componentes propios tiene la ruta, sin contar el barrel (`design.md > 1`).
+ *
+ * **Es una lista CERRADA cuyo punto de extension por diseno es darse de alta en ella** (QC-85 R39):
+ * la igualdad exacta se mantiene y el numero SUBE con cada alta. Cambiarla por una desigualdad,
+ * comentar el caso o nombrar excepciones seria relajar la guardia, que es justo lo que R39 prohibe.
+ *
+ * | Tanda | Alta | Total |
+ * | --- | --- | --- |
+ * | QC-67 T13 | los trece componentes de la pantalla de personas | 13 |
+ * | QC-85 T2 | `usuarios-tabs.ts`, `usuarios-tabs-switch.tsx` y `work-group-labels.ts`: el
+ * |          | conmutador de pestanas, su parser de direccion y el copy de la de grupos | 16 |
+ * | QC-85 T3-T7 | `work-group-list-params.ts`, `work-group-columns.tsx`,
+ * |             | `work-group-list-empty.tsx`, `work-group-list-error.tsx`,
+ * |             | `work-group-list-skeleton.tsx`, `work-group-list-section.tsx` y
+ * |             | `work-group-table.tsx`: la lista de grupos con sus tres estados | 23 |
+ * | QC-85 T8-T11 | `work-group-form.tsx`, `work-group-members.tsx`, `work-group-sheet.tsx` y
+ * |              | `delete-work-group-dialog.tsx`: las escrituras de grupos —el nombre, los
+ * |              | miembros, el panel que los junta y la confirmacion del borrado| 27 |
+ */
+const COMPONENTES_ESPERADOS = 27;
 
 /** Carpetas del repo que se barren buscando importes por ruta profunda (R38). */
 const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;
@@ -96,14 +115,41 @@ const RUTA_DE_LAS_ACCIONES_DE_ROL = '@/lib/modules/identity/adapters/driving/rol
 
 const ACCIONES_DE_ROL = ['listRolesAction'] as const;
 
+/**
+ * Las SIETE Server Actions de los GRUPOS DE TRABAJO (QC-84), en SU propio archivo y tambien por su
+ * ruta exacta (R36; QC-85 R36).
+ *
+ * **Alta de QC-85, y la lista sigue siendo CERRADA**: esta guardia no conocia mas actions que las
+ * de usuarios y las de roles, asi que la pestana de grupos podia importar las suyas por el barrel
+ * del modulo sin que nadie lo viera. Darlas de alta aqui es el punto de extension por diseno de
+ * esta lista —se TENSA, nunca se relaja—: desde ahora las catorce se miden con el mismo criterio.
+ */
+const RUTA_DE_LAS_ACCIONES_DE_GRUPO =
+  '@/lib/modules/identity/adapters/driving/work-group-actions';
+
+const ACCIONES_DE_GRUPO = [
+  'createWorkGroupAction',
+  'renameWorkGroupAction',
+  'deleteWorkGroupAction',
+  'addWorkGroupMemberAction',
+  'removeWorkGroupMemberAction',
+  'listWorkGroupsAction',
+  'listWorkGroupMembersAction',
+] as const;
+
 /** Ruta exacta -> acciones que solo pueden entrar por ella. */
 const ACCIONES_POR_RUTA = [
   [RUTA_DE_LAS_ACCIONES_DE_USUARIO, ACCIONES_DE_USUARIO],
   [RUTA_DE_LAS_ACCIONES_DE_ROL, ACCIONES_DE_ROL],
+  [RUTA_DE_LAS_ACCIONES_DE_GRUPO, ACCIONES_DE_GRUPO],
 ] as const;
 
 /** Todas las acciones juntas: lo que JAMAS puede salir del barrel del modulo (R36). */
-const TODAS_LAS_ACCIONES = [...ACCIONES_DE_USUARIO, ...ACCIONES_DE_ROL] as const;
+const TODAS_LAS_ACCIONES = [
+  ...ACCIONES_DE_USUARIO,
+  ...ACCIONES_DE_ROL,
+  ...ACCIONES_DE_GRUPO,
+] as const;
 
 /** Barrel del modulo: por aqui salen contratos y tipos, JAMAS una Server Action (R36). */
 const BARREL_DEL_MODULO = '@/lib/modules/identity';
@@ -491,7 +537,7 @@ describe('los componentes de la ruta viven en `components/` y salen del barrel (
     expect(enLaRaiz, 'la ruta deberia tener su page.tsx').toContain('page.tsx');
   });
 
-  it('el barrel existe, no declara frontera de cliente y republica los TRECE componentes', () => {
+  it('el barrel existe, no declara frontera de cliente y republica los VEINTISIETE componentes', () => {
     const barrel = `${CARPETA_DE_COMPONENTES}/index.ts`;
     expect(existsSync(join(RAIZ, barrel)), 'falta el barrel de la ruta').toBe(true);
 
@@ -578,7 +624,7 @@ describe('toda lectura y toda escritura pasan por las Server Actions del modulo 
     expect(culpables, culpables.join(', ')).toEqual([]);
   });
 
-  it('ninguna de las SIETE Server Actions se usa sin importarla por su ruta exacta', () => {
+  it('ninguna de las CATORCE Server Actions se usa sin importarla por su ruta exacta', () => {
     const culpables = FUENTES_DE_LA_RUTA.flatMap((archivo) =>
       accionesSinRutaExacta(leer(archivo)).map((detalle) => `${archivo}: ${detalle}`),
     );
