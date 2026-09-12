@@ -1171,11 +1171,12 @@
       "description": "Nacida el 2026-09-11 al acotar QC-79 con /afinar-feature.\n\nQUIEN NO PUEDE ENTRAR PORQUE OLVIDO SU CONTRASENA TIENE QUE PODER RECUPERARLA POR SI MISMO, sin llamar al administrador. Hoy no hay ninguna via: QC-79 resuelve el ALTA y QC-89 resuelve que el ADMINISTRADOR restablezca la de otro, pero nadie cubre a la persona que ya tenia cuenta activa y no recuerda su contrasena.\n\nPOR QUE NO ENTRO EN QC-79: es OTRO FLUJO Y OTRA SUPERFICIE DE ATAQUE. El enlace de QC-79 lo dispara un administrador con sesion abierta; este lo dispara CUALQUIERA desde la pantalla de acceso, sin sesion. La respuesta no puede revelar si ese correo existe, o la pantalla se vuelve un sondeo de usuarios validos.\n\nLO QUE SI HEREDA DE QC-79: el envio de correo con resend y el mecanismo de token de un solo enlace vivo por persona. NO los reconstruye.\n\nQUEDA ABIERTO: cuanto vive este enlace; que se responde a un correo que no existe; si hay limite de intentos -y si espera a QC-73-; si al recuperar se cierran las sesiones abiertas; y si una cuenta pending, inactive o blocked puede recuperar.\n\nACOTAR CON /afinar-feature ANTES DE SEMBRAR EL SPEC.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "fullstack",
       "branch": "feature/QC-96-recuperar-contrasena-olvidada",
       "depends_on": [
-        "QC-79"
+        "QC-79",
+        "QC-23"
       ],
       "spec_path": "specs/QC-96-recuperar-contrasena-olvidada"
     },
