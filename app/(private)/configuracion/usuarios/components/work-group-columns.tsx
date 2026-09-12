@@ -1,0 +1,214 @@
+'use client';
+
+import { PencilIcon, TrashIcon } from 'lucide-react';
+
+import type { DataTableColumn } from '@/components/shared/data-table';
+import { Button } from '@/components/ui/button';
+import { WORK_GROUP_QUERYABLE, type WorkGroupRow } from '@/lib/modules/identity';
+
+import {
+  WORK_GROUP_ACTIONS_COLUMN_LABEL,
+  WORK_GROUP_NAME_COLUMN_LABEL,
+  deleteWorkGroupLabel,
+  editWorkGroupLabel,
+} from './work-group-labels';
+
+/**
+ * Las columnas de la lista de grupos, declaradas **como datos** (R12, R15, R40; `design.md > 4`).
+ *
+ * **UNA columna de datos —el nombre— y una de acciones. Ninguna mas, y eso ES el requisito**
+ * (R12, decision cerrada 5):
+ *
+ *   - **Ningun conteo de miembros**, ni el de visibles ni el total. No es un olvido ni un recorte
+ *     de alcance: `WorkGroupRow` tiene **exactamente `id` y `name`** —con un test que congela esas
+ *     dos claves—, asi que ningun numero es alcanzable desde aqui. Calcularlo en el cliente seria
+ *     inventar un dato que el contrato no devuelve. Los dos numeros y su presentacion («3 de 5»)
+ *     son **QC-100**.
+ *   - **Ningun identificador tecnico, ningun nombre normalizado, ninguna empresa y ninguna marca
+ *     de baja**: la fila no los trae, y eso lo impide el TIPO, no una promesa.
+ *
+ * **Modulo de CLIENTE, y no por gusto**: la columna de acciones devuelve elementos, y una
+ * configuracion con funciones de celda que devuelven elementos no cruza la frontera
+ * servidor->cliente. Por eso la seccion de lista (servidor) baja solo datos serializables y es la
+ * tabla quien monta `<DataTable>`.
+ *
+ * **Que ordena se LEE de la lista blanca, no se reescribe** (R15): `sortable` sale de
+ * `WORK_GROUP_QUERYABLE.sortable.includes(...)`, asi que la cabecera nunca promete un orden que el
+ * dominio descartaria en silencio. Con la lista de hoy eso deja ordenable el nombre.
+ * **`createdAt` es ordenable en el contrato pero NO es una columna** (`design.md > 4.2` y `> 10.3`)
+ * porque `WorkGroupRow` no la trae: no se pinta y no se ofrece ordenar por ella desde la cabecera.
+ * La lista blanca dice lo que la consulta ADMITE, no lo que la tabla MUESTRA.
+ *
+ * **Ningun filtro** (R16): `WORK_GROUP_QUERYABLE.filterable` esta vacio, asi que ninguna columna
+ * declara `filter`. Un control de filtro aqui seria un control que no hace nada.
+ *
+ * **La columna de acciones es una columna NORMAL con `pinnable: false`**, el patron que QC-45 fijo
+ * y que la pestana de personas hereda. **No se anade ninguna prop a la tabla compartida ni se abre
+ * un solo archivo de `components/shared/data-table/`** (R12).
+ */
+
+/** Ids de las columnas. Constantes porque los comparten la tabla y los tests (R41). */
+export const WORK_GROUP_NAME_COLUMN_ID = 'name';
+export const WORK_GROUP_ACTIONS_COLUMN_ID = 'actions';
+
+/**
+ * Cuantas columnas hay. Existe para que el esqueleto de carga —que lo pinta un Server Component y
+ * por tanto **no puede importar este modulo de cliente**— pinte tantas celdas como columnas, y
+ * para que el test lo ate a la longitud real en vez de dejarlo desincronizarse en silencio.
+ */
+export const WORK_GROUP_COLUMN_COUNT = 2;
+
+export const WORK_GROUP_ROW_ACTIONS_TESTID = 'work-group-row-actions';
+export const WORK_GROUP_ACTION_EDIT_TESTID = 'work-group-action-edit';
+export const WORK_GROUP_ACTION_DELETE_TESTID = 'work-group-action-delete';
+
+/** Objetivo tactil minimo (44x44 px) de R40. Los primitivos miden 32 px de alto por defecto. */
+const TOUCH_TARGET = 'min-h-11 min-w-11';
+
+/**
+ * Lo que hace un disparador de fila: avisar de sobre QUE grupo se pidio actuar. No abre nada por su
+ * cuenta —abrir es del dueno del estado, que es la tabla— y no escribe: la escritura la hacen las
+ * Server Actions desde el panel o el dialogo (R36).
+ */
+export type WorkGroupRowActionHandler = (group: WorkGroupRow) => void;
+
+export type WorkGroupRowActionsProps = {
+  /** La fila del listado. **Dos claves**, `id` y `name`, y ninguna mas: lo impide el tipo (R12). */
+  readonly group: WorkGroupRow;
+  /**
+   * Si la sesion trae `usuarios.modificar` (R9). **Decision de PRESENTACION**, resuelta en el
+   * servidor y bajada por props (R10). No es autorizacion.
+   */
+  readonly canModify: boolean;
+  /** Abre el panel lateral sobre este grupo: su nombre y sus miembros (T10, R20). */
+  readonly onEdit?: WorkGroupRowActionHandler;
+  /** Abre la confirmacion de borrado que nombra a este grupo (T11, R33). */
+  readonly onDelete?: WorkGroupRowActionHandler;
+};
+
+/**
+ * Las DOS acciones de fila de un grupo: abrirlo y borrarlo (R9, R40).
+ *
+ * **Con `canModify === false` devuelve `null`, o sea la celda queda VACIA** (R9): sin botones, sin
+ * botones deshabilitados, sin explicacion y sin nada en el DOM. Un boton deshabilitado anuncia una
+ * capacidad que la sesion no tiene y solo sirve para que alguien intente averiguar por que.
+ *
+ * **Ocultarlas es comodidad de la interfaz, NO el control**: quien autoriza es el caso de uso del
+ * modulo, cuya primera linea es `requirePermission`. Esta pantalla no repite ni sustituye esa
+ * comprobacion.
+ *
+ * **Siempre visibles y siempre en el DOM** (R40): nada se descubre con `:hover` —que en tactil no
+ * existe— ni vive dentro de un desplegable que lo esconda del arbol, y cada control mide al menos
+ * 44x44 px.
+ */
+export function WorkGroupRowActions({
+  group,
+  canModify,
+  onEdit,
+  onDelete,
+}: WorkGroupRowActionsProps) {
+  if (!canModify) return null;
+
+  return (
+    <div
+      className="flex items-center justify-end gap-1"
+      data-testid={WORK_GROUP_ROW_ACTIONS_TESTID}
+      data-work-group-id={group.id}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={TOUCH_TARGET}
+        aria-label={editWorkGroupLabel(group.name)}
+        data-testid={WORK_GROUP_ACTION_EDIT_TESTID}
+        onClick={() => onEdit?.(group)}
+      >
+        <PencilIcon aria-hidden="true" />
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={TOUCH_TARGET}
+        aria-label={deleteWorkGroupLabel(group.name)}
+        data-testid={WORK_GROUP_ACTION_DELETE_TESTID}
+        onClick={() => onDelete?.(group)}
+      >
+        <TrashIcon aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Si una columna ordena, **preguntandoselo a la lista blanca del contrato** (R15). No es una copia
+ * de la lista: es la lista.
+ */
+function isSortable(columnId: string): boolean {
+  return WORK_GROUP_QUERYABLE.sortable.includes(columnId);
+}
+
+/**
+ * Lo que la celda de acciones necesita y la declaracion de columnas no puede inventarse: la
+ * decision de R9 y los dos disparadores. Los manejadores son **opcionales** porque el panel lateral
+ * y el dialogo de borrado llegan en la tanda 2; cuando existan se enchufan aqui sin tocar una linea
+ * de este archivo.
+ */
+export type WorkGroupColumnsDeps = {
+  /** Si la sesion trae `usuarios.modificar` (R9). Decision de presentacion, no autorizacion. */
+  readonly canModify: boolean;
+  readonly onEdit?: WorkGroupRowActionHandler;
+  readonly onDelete?: WorkGroupRowActionHandler;
+};
+
+/**
+ * **Factoria, y no un array suelto**: la celda de acciones necesita `canModify` y los
+ * disparadores, y un array declarado en el modulo no tendria por donde recibirlos. Las columnas
+ * siguen siendo DATOS; lo que cambia es que se construyen con sus dependencias.
+ */
+export function createWorkGroupColumns({
+  canModify,
+  onEdit,
+  onDelete,
+}: WorkGroupColumnsDeps): readonly DataTableColumn<WorkGroupRow>[] {
+  return [
+    {
+      id: WORK_GROUP_NAME_COLUMN_ID,
+      label: WORK_GROUP_NAME_COLUMN_LABEL,
+      align: 'start',
+      sortable: isSortable(WORK_GROUP_NAME_COLUMN_ID),
+      // Se pinta TAL CUAL llega. Ni un numero al lado, ni una insignia con un conteo: el dato no
+      // existe en la fila y QC-100 es quien lo traera (R12).
+      cell: (group) => group.name,
+    },
+    {
+      id: WORK_GROUP_ACTIONS_COLUMN_ID,
+      label: WORK_GROUP_ACTIONS_COLUMN_LABEL,
+      align: 'end',
+      // Sin `sortable` (ordenar por unos botones no significa nada) y sin `filter` (la lista
+      // blanca no declara ninguno). `pinnable: false` para que el usuario no pueda fijarla y tapar
+      // la unica columna de datos.
+      pinnable: false,
+      cell: (group) => (
+        <WorkGroupRowActions
+          group={group}
+          canModify={canModify}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      ),
+    },
+  ];
+}
+
+/**
+ * Las columnas **sin ninguna dependencia resuelta**: mismo numero, mismos ids y mismas capacidades
+ * de orden que las de la fabrica. Existe para que el test de R12 pueda recorrer la DECLARACION sin
+ * inventarse manejadores, y para que ese recorrido sea el mismo objeto que la pantalla monta.
+ * `canModify: false` es la direccion segura por defecto.
+ */
+export const WORK_GROUP_COLUMNS: readonly DataTableColumn<WorkGroupRow>[] = createWorkGroupColumns({
+  canModify: false,
+});
