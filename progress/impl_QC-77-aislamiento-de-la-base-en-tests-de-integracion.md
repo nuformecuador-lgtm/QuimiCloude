@@ -441,3 +441,45 @@ que siguen apoyandose en medicion — y ahi el criterio del reviewer **si** se c
 plantilla no se construye o se copia mal, **se caen los 630 casos**; si la URL no llega al worker,
 el guardian aborta en rojo antes del primer caso. Son rojos ruidosos, no silencios. R10 queda como
 deuda nombrada, aceptada por el reviewer.
+
+### Los commits, y por que importaban (menor 2)
+
+Seis commits sobre `fedcbf6`:
+
+| Hash | Que |
+| --- | --- |
+| `1d9c389` | `feat(QC-77): la libreria del ciclo de vida de la base efimera` |
+| `559041e` | `feat(QC-77): engancha el ciclo de vida en Vitest y el guardian de R12` |
+| `ae6e881` | `feat(QC-77): la CLI db:test y el aviso de base atrasada en el gate` |
+| `ea47b9f` | `feat(QC-77): el censo de aislamiento y su guardia` |
+| `a9ad3fb` | `test(QC-77): tests para los 11 requisitos que solo tenian medicion manual` |
+| `e7b69b7` | `docs(QC-77): bitacora, mediciones, addendum del design y verificacion` |
+
+No era burocracia. `scripts/test-rapido.mjs` selecciona por `git diff origin/dev...HEAD`, asi que
+con todo en el arbol sin commitear **el diff de codigo estaba vacio** y el modo rapido seleccionaba
+**cero** tests relacionados: por eso en la corrida del reviewer `--rapido` no cubrio ni una linea de
+esta ficha, solo las guardias. Ahora el diff trae **12 archivos de codigo**.
+
+### `./init.sh --rapido` despues de commitear — **EXIT 0**
+
+```
+✓ base de desarrollo «QuimiCloude» al dia: 27 migracion(es) aplicada(s)
+✓ typecheck paso
+✓ lint paso
+[test:rapido] -> vitest related --run --passWithNoTests scripts/test-db.ts ... (11 archivos)
+test-db: plantilla reutilizada: qct_tpl_1db8043a68e0 (las migraciones no han cambiado)
+test-db: la corrida de integracion va contra qct_qc77_7a512e99_mtypjjnl_gf4 (copia de qct_tpl_...)
+ Test Files  6 passed (6)          Tests  62 passed (62)
+test-db: borrada la base de la corrida: qct_qc77_7a512e99_mtypjjnl_gf4.
+ Test Files  33 passed (33)        Tests  352 passed | 4 skipped (356)
+✓ test:rapido paso
+== init OK ==
+```
+
+**6 archivos relacionados y 62 casos** donde antes eran cero, mas las **33 guardias**. El bloque
+`6.c` sale, la corrida nombra su base efimera y **la borra**; al terminar la unica `qct_` viva es la
+plantilla y `.qc-test-db/` esta vacio.
+
+**Sigue sin ser el veredicto**: esta ficha toca `init.sh` y `scripts/`, justo lo que
+`docs/verification.md` dice que el modo rapido se niega a cubrir. El que vale es **T18**, despues
+del merge con `dev`.
