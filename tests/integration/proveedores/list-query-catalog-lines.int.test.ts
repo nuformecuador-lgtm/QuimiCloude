@@ -110,6 +110,41 @@ async function crearProveedor(): Promise<string> {
   return fila.id;
 }
 
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: typeof prisma): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
+/**
+ * Empresa del ANDAMIAJE de inventario (QC-49 R1).
+ *
+ * `products.company_id` y `presentations.company_id` son NOT NULL desde
+ * `<ts>_inventory_company_scope`, asi que sembrar cualquiera de las dos exige una empresa. Se
+ * REUTILIZA una que ya existe en la base (`db:seed` deja la de instalacion) en vez de crear una
+ * nueva: parte de lo que siembra este archivo se limpia a mano, y una empresa creada aqui
+ * quedaria de residuo.
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
+ * --eso es `tests/integration/inventario/company-scope.int.test.ts`-- y ningun aserto suyo
+ * depende de cual sea. La unidad de estas presentaciones es DE SISTEMA, que vale para cualquier
+ * empresa (QC-76 R11), asi que `presentations_check_unit_scope` la acepta (QC-49 R23).
+ */
+async function andamiajeCompanyId(db: typeof prisma): Promise<string> {
+  const company = await db.company.findFirstOrThrow({ select: { id: true } });
+  return company.id;
+}
+
 beforeAll(async () => {
   supplierId = await crearProveedor();
   otroSupplierId = await crearProveedor();
@@ -117,7 +152,12 @@ beforeAll(async () => {
   const presentationName = `Bidon ${token()}`;
   presentationId = (
     await prisma.presentation.create({
-      data: { name: presentationName, nameNormalized: normalizeForTest(presentationName) },
+      data: {
+        name: presentationName,
+        nameNormalized: normalizeForTest(presentationName),
+        unitId: await unidadDeSistema(prisma),
+        companyId: await andamiajeCompanyId(prisma),
+      },
       select: { id: true },
     })
   ).id;
@@ -125,7 +165,12 @@ beforeAll(async () => {
   const otraName = `Caja ${token()}`;
   otraPresentationId = (
     await prisma.presentation.create({
-      data: { name: otraName, nameNormalized: normalizeForTest(otraName) },
+      data: {
+        name: otraName,
+        nameNormalized: normalizeForTest(otraName),
+        unitId: await unidadDeSistema(prisma),
+        companyId: await andamiajeCompanyId(prisma),
+      },
       select: { id: true },
     })
   ).id;

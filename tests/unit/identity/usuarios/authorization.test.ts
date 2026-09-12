@@ -34,7 +34,11 @@ import { createUpdateUser } from '@/lib/modules/identity/domain/update-user';
 
 import type { Actor } from '@/lib/modules/identity/domain/actor';
 import type { PermissionCode } from '@/lib/modules/identity/domain/permissions';
-import type { InitialCredentialFactory } from '@/lib/modules/identity/ports/initial-credential-factory';
+import type { CredentialPolicyResult } from '@/lib/modules/identity/domain/credential-policy';
+import type { CredentialSetupLinkRepository } from '@/lib/modules/identity/ports/credential-setup-link-repository';
+import type { CredentialSetupMailer } from '@/lib/modules/identity/ports/credential-setup-mailer';
+import type { CredentialSetupSecretFactory } from '@/lib/modules/identity/ports/credential-setup-secret-factory';
+import type { PasswordHasher } from '@/lib/modules/identity/ports/password-hasher';
 import type { ListQueryLog } from '@/lib/modules/identity/ports/list-query-log';
 import type { UserAdminRepository } from '@/lib/modules/identity/ports/user-admin-repository';
 
@@ -141,9 +145,41 @@ function dobles() {
     updateAliveInCompany: explota('users.updateAliveInCompany'),
     applyGuardedChange: explota('users.applyGuardedChange'),
   };
-  // R16: la credencial inicial tampoco se genera para quien no tiene permiso; gastar un bcrypt
-  // por una peticion no autorizada seria, ademas, un canal de medida de tiempo.
-  const credentials = { createCredentialHash: explota('credentials.createCredentialHash') };
+  // R16, y **QC-79 R6 lo extiende a los tres puertos nuevos**: «SI el actor no trae ese codigo
+  // exacto, el sistema NO DEBE crear ningun usuario, NO DEBE emitir ningun enlace, NO DEBE enviar
+  // ningun correo y NO DEBE realizar ninguna lectura ni escritura por ningun puerto». La credencial
+  // ya no se genera al azar (R4), asi que la fabrica de QC-66 sale de aqui y entran las cuatro
+  // dependencias del alta enmendada: hashear, evaluar la politica, fabricar el secreto, emitir el
+  // enlace y mandar el correo. Gastar un bcrypt por una peticion no autorizada seria, ademas, un
+  // canal de medida de tiempo; mandar un correo seria usar el ERP como reenviador.
+  const credential = {
+    'passwordHasher.hash': explota('passwordHasher.hash'),
+    'passwordHasher.verify': explota('passwordHasher.verify'),
+    checkCredentialPolicy: explota('checkCredentialPolicy'),
+    'secrets.create': explota('secrets.create'),
+    'links.issueForPendingUser': explota('links.issueForPendingUser'),
+    'links.applyCredentialAndActivate': explota('links.applyCredentialAndActivate'),
+    'mailer.sendCredentialSetupLink': explota('mailer.sendCredentialSetupLink'),
+  };
+
+  /** Las cinco dependencias de credencial del alta, ya con la forma que pide `createCreateUser`. */
+  const credentialDeps = {
+    passwordHasher: {
+      hash: credential['passwordHasher.hash'],
+      verify: credential['passwordHasher.verify'],
+    } as unknown as PasswordHasher,
+    checkCredentialPolicy: credential.checkCredentialPolicy as unknown as (
+      candidate: string,
+    ) => Promise<CredentialPolicyResult>,
+    secrets: { create: credential['secrets.create'] } as unknown as CredentialSetupSecretFactory,
+    links: {
+      issueForPendingUser: credential['links.issueForPendingUser'],
+      applyCredentialAndActivate: credential['links.applyCredentialAndActivate'],
+    } as unknown as CredentialSetupLinkRepository,
+    mailer: {
+      sendCredentialSetupLink: credential['mailer.sendCredentialSetupLink'],
+    } as unknown as CredentialSetupMailer,
+  };
   // QC-57 R6: el log del campo omitido tampoco puede sonar sin autorizacion. `requirePermission`
   // es la primera linea del listado, antes de zod y antes de sanear, asi que un actor rechazado
   // no llega ni a saber que su consulta traia campos raros.
@@ -151,9 +187,9 @@ function dobles() {
 
   return {
     users: users as unknown as UserAdminRepository,
-    credentials: credentials as unknown as InitialCredentialFactory,
+    credentialDeps,
     log: log as unknown as ListQueryLog,
-    espias: [...Object.values(users), ...Object.values(credentials), ...Object.values(log)],
+    espias: [...Object.values(users), ...Object.values(credential), ...Object.values(log)],
   };
 }
 
@@ -180,9 +216,9 @@ const CASOS_DE_USO: readonly Caso[] = [
     archivo: 'create-user.ts',
     permiso: MODIFICAR,
     ejecutar: (d, actor) =>
-      createCreateUser({ users: d.users, credentials: d.credentials })(actor, ENTRADA_USUARIO),
+      createCreateUser({ users: d.users, ...d.credentialDeps })(actor, ENTRADA_USUARIO),
     ejecutarConBasura: (d, actor) =>
-      createCreateUser({ users: d.users, credentials: d.credentials })(actor, BASURA),
+      createCreateUser({ users: d.users, ...d.credentialDeps })(actor, BASURA),
   },
   {
     nombre: 'getUser',

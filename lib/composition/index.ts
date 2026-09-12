@@ -59,7 +59,7 @@ import {
   createPresentation,
   deletePresentationById,
   listPresentations,
-  renamePresentation,
+  replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
@@ -178,16 +178,57 @@ import {
   listAliveInCompany,
   updateAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/user-admin-prisma';
-import { createRandomCredentialHash } from '@/lib/modules/identity/adapters/driven/security/initial-credential-factory-crypto';
-import type { InitialCredentialFactory } from '@/lib/modules/identity/ports/initial-credential-factory';
 import type { ListQueryLog as IdentityListQueryLog } from '@/lib/modules/identity/ports/list-query-log';
 import type { UserAdminRepository } from '@/lib/modules/identity/ports/user-admin-repository';
+// QC-79 T17 (`design.md > 9.2`) — los tres puertos nuevos del enlace de credencial. Se importa
+// SOLO dominio del barrel y adaptadores por su ruta exacta, igual que el bloque de QC-66 de
+// arriba; las dos Server Actions de T18 NO se importan aqui (la flecha va driving -> composicion).
+import {
+  createIssueCredentialSetupLink,
+  createSetCredentialWithLink,
+} from '@/lib/modules/identity';
+import { readMailTransportFromEnv } from '@/lib/modules/identity/adapters/driven/config/mail-config-env';
+import { sendCredentialSetupLink as sendCredentialSetupLinkToOutbox } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox';
+import { sendCredentialSetupLink as sendCredentialSetupLinkWithResend } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend';
+import {
+  applyCredentialAndActivate,
+  issueForPendingUser,
+} from '@/lib/modules/identity/adapters/driven/persistence/credential-setup-link-prisma';
+import { credentialSetupSecretCrypto } from '@/lib/modules/identity/adapters/driven/security/credential-setup-secret-crypto';
+import type { CredentialSetupLinkRepository } from '@/lib/modules/identity/ports/credential-setup-link-repository';
+import type { CredentialSetupMailer } from '@/lib/modules/identity/ports/credential-setup-mailer';
+import type { CredentialSetupSecretFactory } from '@/lib/modules/identity/ports/credential-setup-secret-factory';
 // QC-94 T8 — la consulta del catalogo de roles. La factory sale del CONTRATO del modulo
 // (`@/lib/modules/identity`, solo dominio), el puerto de `ports/` y la implementacion del adaptador
 // driven; el adaptador driving de T9 NO se importa desde aqui (la flecha va driving -> composicion).
 import { createListRoles } from '@/lib/modules/identity';
 import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
 import type { RoleCatalogRepository } from '@/lib/modules/identity/ports/role-catalog-repository';
+// QC-84 T10 — los grupos de trabajo. Las SIETE factories salen del CONTRATO del modulo
+// (`@/lib/modules/identity`, solo dominio), el puerto de `ports/` y la implementacion del adaptador
+// driven; el adaptador driving de T9 NO se importa desde aqui (la flecha va driving -> composicion).
+// `listAliveInCompany` llega RENOMBRADA porque el adaptador la exporta con el nombre del metodo del
+// puerto y ese nombre ya lo ocupa el listado de usuarios, unas lineas mas arriba.
+import {
+  createAddWorkGroupMember,
+  createCreateWorkGroup,
+  createDeleteWorkGroup,
+  createListWorkGroupMembers,
+  createListWorkGroups,
+  createRemoveWorkGroupMember,
+  createRenameWorkGroup,
+} from '@/lib/modules/identity';
+import {
+  addMemberAliveInCompany,
+  createInCompany,
+  listAliveInCompany as listWorkGroupsAliveInCompany,
+  listMembersAliveInCompany,
+  removeMemberAliveInCompany,
+  renameAliveInCompany,
+  softDeleteAliveInCompany,
+} from '@/lib/modules/identity/adapters/driven/persistence/work-group-prisma';
+import type { PaginationPolicy } from '@/lib/modules/identity';
+import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-group-repository';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -239,18 +280,58 @@ const userAdminRepository: UserAdminRepository = {
 };
 
 /**
- * `InitialCredentialFactory` cableado con el adaptador de `node:crypto` (R15, R16,
- * `design.md > 4.1`). Devuelve SOLO el hash: la credencial en claro no existe fuera del cuerpo
- * del adaptador.
+ * AQUI VIVIA el cableado de `InitialCredentialFactory` (QC-66 R15): la fabrica que generaba una
+ * contrasena al azar y devolvia SOLO su hash.
  *
- * `passwordHasher` y `checkCredentialPolicy` se REUTILIZAN de arriba, los que ya cablearon QC-5 y
- * QC-19: no se construye un segundo hasher ni una segunda politica —dos cableados del hasher
- * serian dos costes de bcrypt que pueden divergir, mismo criterio con el que QC-19 dejo una sola
- * instancia de la politica—.
+ * **QC-79 R4 lo deja sin ningun consumidor**, con esas palabras y no disimulado: el alta ya no
+ * genera ninguna contrasena al azar, y el seed de QC-6 nunca uso esta fabrica -usa
+ * `readInitialAdminCredentialsFromEnv`, ahi abajo en `seedInitialAccess`-. Un cableado que no ata
+ * ningun puerto a ningun caso de uso es codigo muerto, y dejarlo declarado solo servia para que
+ * `eslint` avisara de el en cada corrida.
+ *
+ * **Lo que NO se ha borrado, a proposito**: el puerto
+ * (`ports/initial-credential-factory.ts`), el adaptador
+ * (`adapters/driven/security/initial-credential-factory-crypto.ts`) y sus tests
+ * (`tests/unit/identity/usuarios/credential-factory.test.ts`) siguen enteros. QC-89 -restablecer
+ * la contrasena de OTRA persona- es quien previsiblemente los necesita, y volver a atarlos es
+ * reescribir estas cuatro lineas.
  */
-const initialCredentialFactory: InitialCredentialFactory = {
-  createCredentialHash: () =>
-    createRandomCredentialHash({ hasher: passwordHasher, checkCredentialPolicy }),
+
+// ---------------------------------------------------------------------------------------
+// QC-79 T17 (R26, R32) — el enlace con el que una persona establece su contrasena la primera
+// vez. Tres puertos, tres adaptadores, y NINGUNA decision de negocio en este archivo.
+//
+// `passwordHasher` y `checkCredentialPolicy` se REUTILIZAN de arriba —los de QC-5 y QC-19—: no
+// se construye un segundo hasher ni una segunda politica. Dos politicas serian exactamente la
+// «puerta lateral» que R23 prohibe, y dos hashers, dos costes de bcrypt que pueden divergir.
+// ---------------------------------------------------------------------------------------
+
+/** R9, R10: el secreto del enlace (`randomBytes(32)` + base64url) y su huella (SHA-256 hex). El
+ *  dominio solo conoce el TIPO; el secreto en claro no existe fuera del adaptador y del correo. */
+const credentialSetupSecrets: CredentialSetupSecretFactory = credentialSetupSecretCrypto;
+
+/** R11, R12, R19, R20, R22: las dos transacciones de `design.md > 4.5` y `> 4.6`. El dominio
+ *  nunca ve una transaccion: pide una operacion y traduce el resultado discriminado. */
+const credentialSetupLinkRepository: CredentialSetupLinkRepository = {
+  issueForPendingUser,
+  applyCredentialAndActivate,
+};
+
+/**
+ * R26, R28 y `design.md > 9.2` — EL TRANSPORTE SE ELIGE EN LA INVOCACION, no al importar este
+ * modulo. Si `readMailTransportFromEnv()` se llamara aqui fuera, la suite entera —que importa
+ * `lib/composition` para cualquier cosa— necesitaria la configuracion de correo para arrancar, y
+ * un valor equivocado tumbaria tests que no tienen nada que ver con el correo.
+ *
+ * `resend` es el valor POR DEFECTO (sin la variable, el transporte real); `outbox` es el buzon en
+ * disco que hace posible el E2E de R41 y que se niega a arrancar en produccion. Los dos cumplen el
+ * MISMO puerto, asi que cambiar de uno a otro es esta linea y nada mas.
+ */
+const credentialSetupMailer: CredentialSetupMailer = {
+  sendCredentialSetupLink: (input) =>
+    readMailTransportFromEnv() === 'outbox'
+      ? sendCredentialSetupLinkToOutbox(input)
+      : sendCredentialSetupLinkWithResend(input),
 };
 
 /**
@@ -259,6 +340,34 @@ const initialCredentialFactory: InitialCredentialFactory = {
  * implementacion, y escribir un rol no es expresable a traves de este puerto (R17).
  */
 const roleCatalogRepository: RoleCatalogRepository = { listAll: listAllRoles };
+
+/**
+ * QC-84 T10 (`design.md > 5`) — `WorkGroupRepository` cableado con el adaptador driven de
+ * `identity`. Los siete casos de uso solo conocen el TIPO, nunca esta implementacion: es la unica
+ * forma de que `company_id` y `deleted_at IS NULL` (R8, R9) vivan en un solo sitio.
+ */
+const workGroupRepository: WorkGroupRepository = {
+  createInCompany,
+  renameAliveInCompany,
+  softDeleteAliveInCompany,
+  listAliveInCompany: listWorkGroupsAliveInCompany,
+  listMembersAliveInCompany,
+  addMemberAliveInCompany,
+  removeMemberAliveInCompany,
+};
+
+/**
+ * QC-84 T10 (`design.md > 5.3`) — la aritmetica de paginacion de la lista de MIEMBROS, inyectada
+ * REAL desde `lib/shared/pagination`: el mismo defecto de 10 y el mismo tope de 25 que usa el
+ * resto de la aplicacion (R51).
+ *
+ * Entra por `deps` y no se importa desde el dominio porque `domain/` no puede ver `lib/shared/**`,
+ * y el corte de esa pagina tiene que vivir en el dominio —DESPUES del filtro del estado efectivo—
+ * o el total prometeria personas que la pantalla nunca muestra (R52). Mismo reparto que
+ * `recetas.listRecipes` unas lineas mas abajo; el listado de GRUPOS, en cambio, sigue paginando en
+ * SQL dentro del adaptador, porque su filtro si es expresable en el `WHERE`.
+ */
+const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage };
 
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
@@ -299,21 +408,65 @@ export const identity = {
   // uso lo recibe por parametro, y quien lo construye con las dos caras de la sesion
   // -`getSessionUser` y `getSessionContext`, arriba en este mismo objeto- es la Server Action de
   // T14 (R6). `lib/composition` no conoce cookies ni sesion; solo ata puerto -> adaptador.
+  // QC-79 T17 (R4): el alta YA NO recibe `credentials: initialCredentialFactory`. No se genera
+  // ninguna contrasena al azar —eso ENMIENDA QC-66 R15—; con contrasena escrita se evalua la
+  // politica y se hashea, y sin ella se emite el enlace y se intenta enviarlo.
+  // El puerto `InitialCredentialFactory` y su adaptador siguen existiendo -los necesitara
+  // QC-89-, pero su CABLEADO se retira aqui: ver el bloque de arriba.
   createUser: createCreateUser({
     users: userAdminRepository,
-    credentials: initialCredentialFactory,
+    checkCredentialPolicy,
+    passwordHasher,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
   }),
   getUser: createGetUser({ users: userAdminRepository }),
   listUsers: createListUsers({ users: userAdminRepository, log: identityListQueryLog }),
   updateUser: createUpdateUser({ users: userAdminRepository }),
   deleteUser: createDeleteUser({ users: userAdminRepository }),
   setUserAccountStatus: createSetUserAccountStatus({ users: userAdminRepository }),
+  // QC-79 T17 — las DOS factories nuevas, en claves NUEVAS al final: ninguna de las de arriba se
+  // toca. El ACTOR tampoco se resuelve aqui —el reenvio lo recibe por parametro de la Server
+  // Action de T18 (R14)— y el caso de uso publico NO TIENE actor, que es R18 escrito en su firma.
+  setCredentialWithLink: createSetCredentialWithLink({
+    checkCredentialPolicy,
+    passwordHasher,
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+  }),
+  issueCredentialSetupLink: createIssueCredentialSetupLink({
+    secrets: credentialSetupSecrets,
+    links: credentialSetupLinkRepository,
+    mailer: credentialSetupMailer,
+  }),
   // QC-94 T8 (`design.md > 5`) — la consulta del catalogo de roles, la pieza que le falta a QC-67
   // para pintar el selector. Clave NUEVA al FINAL del objeto: ninguna de las de arriba se toca.
   //
   // El ACTOR tampoco se resuelve aqui (R5): lo construye la Server Action de T9 con las dos caras
   // de la sesion. Y no se le pasa ninguna empresa: el catalogo es GLOBAL (R11).
   listRoles: createListRoles({ roles: roleCatalogRepository }),
+  // QC-84 T10 (`design.md > 8`) — los SIETE casos de uso de los grupos de trabajo, ya cableados.
+  // Claves NUEVAS al FINAL del objeto: ninguna de las de arriba se toca.
+  //
+  // El ACTOR tampoco se resuelve aqui (R5): lo construye la Server Action de T9 con las dos caras
+  // de la sesion. Y la EMPRESA no se pasa a ninguna: la lleva el actor y la aplica el puerto (R8).
+  createWorkGroup: createCreateWorkGroup({ workGroups: workGroupRepository }),
+  renameWorkGroup: createRenameWorkGroup({ workGroups: workGroupRepository }),
+  deleteWorkGroup: createDeleteWorkGroup({ workGroups: workGroupRepository }),
+  addWorkGroupMember: createAddWorkGroupMember({ workGroups: workGroupRepository }),
+  removeWorkGroupMember: createRemoveWorkGroupMember({ workGroups: workGroupRepository }),
+  listWorkGroups: createListWorkGroups({
+    workGroups: workGroupRepository,
+    log: identityListQueryLog,
+  }),
+  // La paginacion entra por `deps` y el `now` del filtro por parametro en cada llamada: el dominio
+  // no tiene reloj propio ni puede importar `lib/shared/**`.
+  listWorkGroupMembers: createListWorkGroupMembers({
+    workGroups: workGroupRepository,
+    pagination: workGroupMemberPagination,
+    log: identityListQueryLog,
+  }),
 } as const;
 
 /**
@@ -343,7 +496,7 @@ const productRepository: ProductRepository = {
 
 const presentationRepository: PresentationRepository = {
   create: createPresentation,
-  rename: renamePresentation,
+  replace: replacePresentation,
   deleteById: deletePresentationById,
   list: listPresentations,
 };

@@ -68,14 +68,23 @@ import { prisma } from '@/lib/shared/db/prisma';
 import type { UserAccountStatus } from '@/lib/modules/identity/domain/account-status';
 import type { ListQuery } from '@/lib/modules/identity/domain/list-query';
 import type { UserDetail, UserRow } from '@/lib/modules/identity/domain/user-view';
-import type { NewUser } from '@/lib/modules/identity/ports/user-admin-repository';
+import type { NewUser, NewUserCredential } from '@/lib/modules/identity/ports/user-admin-repository';
 
 // ---------------------------------------------------------------------------
 // Escenario: empresas propias, usuarios propios, limpieza propia
 // ---------------------------------------------------------------------------
 
 /** Marcador de prueba, evidentemente ficticio: ninguna operacion de este archivo lee credenciales. */
-const FAKE_CREDENTIAL_HASH = '$2b$10$marcador.de.prueba.qc66.t16.no.es.un.hash.real';
+/**
+ * QC-79 T11: `create` ya no recibe el hash suelto sino la union discriminada de
+ * `design.md > 6.1` (`NewUserCredential`). Estos casos son los de QC-66 y siguen probando la rama
+ * **con** credencial, asi que el marcador viaja envuelto en `{ kind: 'hash' }`. La rama
+ * `{ kind: 'none' }` -el centinela de R4- la prueba T20 en su propio archivo.
+ */
+const FAKE_CREDENTIAL_HASH = {
+  kind: 'hash',
+  value: '$2b$10$marcador.de.prueba.qc66.t16.no.es.un.hash.real',
+} as const satisfies NewUserCredential;
 
 let operadorRoleId = '';
 let administradorRoleId = '';
@@ -187,7 +196,7 @@ async function seedUser(
       documentTypeCode: DOCUMENT_TYPE_CC,
       documentNumber: documentNumberFrom(tag),
       username: fields.username ?? `qc66.t16.${tag}`,
-      passwordHash: FAKE_CREDENTIAL_HASH,
+      passwordHash: FAKE_CREDENTIAL_HASH.value,
       roleId: fields.roleId ?? operadorRoleId,
       companyId,
       accountStatus: fields.accountStatus ?? 'pending',

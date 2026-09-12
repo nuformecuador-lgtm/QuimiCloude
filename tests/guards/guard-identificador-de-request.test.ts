@@ -78,6 +78,13 @@ export function hallazgosDeVersionDeNext(
 // lista se lee del disco una vez y se escribe aqui; si alguien anade un `.spec.ts`, esto se pone
 // rojo y hay que reabrir la decision cerrada, que es justo lo que se quiere.
 export const E2E_ESPERADOS = [
+  // Es de QC-49 (aislamiento por empresa en inventario, T15 / R27), no de QC-71, y entra por la
+  // puerta que el propio mensaje de `hallazgosDeE2e` senala: «otra ficha y otra decision» -esta,
+  // aprobada en `specs/QC-49-.../design.md > 8`-. NO ejercita el cruce borde -> Server Action del
+  // identificador de peticion, asi que el diferimiento de R21 sigue INTACTO: lo que prueba es que
+  // una sesion de la empresa A no ve ni puede borrar inventario de la B. La lista sigue CERRADA:
+  // el siguiente `.spec.ts` que aparezca sin ficha vuelve a poner esto en rojo.
+  'aislamiento-inventario.spec.ts',
   'errores.spec.ts',
   'inventario.spec.ts',
   'login-skin.spec.ts',
@@ -91,6 +98,16 @@ export const E2E_ESPERADOS = [
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
+  // QC-79 («alta sin contrasena y enlace») actualiza esta lista, que es el comportamiento que el
+  // propio mensaje de `hallazgosDeE2e` pide: su E2E cubre el flujo del enlace de establecer
+  // contrasena, no el cruce de QC-71, y sin esta linea el gate de QC-79 se pondria rojo por un
+  // archivo legitimo de otra ficha.
+  'establecer-contrasena.spec.ts',
+  // QC-67 T15: la E2E de la pantalla de usuarios (R42). Se da de alta AQUI porque esta lista es
+  // CERRADA y su punto de extension por diseno es justamente este: el ancla no se relaja —el
+  // archivo se nombra— y la decision de QC-71 R21 sigue intacta, porque este E2E no prueba el
+  // identificador de peticion sino el alta de un usuario y el 404 de quien no puede consultarlos.
+  'usuarios.spec.ts',
 ] as const
 
 /** El test de unidad que R21 exige a cambio del E2E diferido. */
@@ -150,6 +167,32 @@ export const MIGRACIONES_ESPERADAS = [
   '20260909120000_product_batches',
   // Llega con la sincronizacion con dev: es de QC-66 (catalogo de permisos), no de esta ficha.
   '20260910120000_user_permissions_catalog',
+  // QC-79 («alta sin contrasena y enlace») actualiza esta lista, que es exactamente lo que pide
+  // el mensaje de `hallazgosDeMigraciones` («si esta migracion es de otra ficha, esa ficha
+  // actualiza esta lista»): la tabla del enlace de establecer contrasena es suya, no de QC-71,
+  // que sigue sin persistir el identificador de peticion (R19 intacto).
+  '20260911155021_credential_setup_tokens',
+  // RETENSADO 2026-09-11 (QC-86), con el MISMO criterio que el retensado de QC-66: la lista es
+  // CERRADA y se mide contra el arbol real, asi que cada migracion legitima posterior se NOMBRA
+  // una a una o el caso deja de vigilar nada. Es de QC-86 (`order_assignments`: el modelo de
+  // asignacion de pedidos, su tabla y sus dos permisos), NO de esta ficha. QC-86 no persiste ni
+  // menciona el identificador de peticion en ninguna parte: su migracion crea `order_assignments`
+  // e inserta `asignaciones.consultar` y `asignaciones.modificar` en el catalogo, y nada mas. La
+  // comprobacion de `db/schema.prisma` de este mismo caso —que ningun termino del identificador
+  // aparezca en el esquema— se deja INTACTA y sigue pasando: es la que de verdad vigila R19.
+  '20260911120000_order_assignments',
+  // Igual que la de arriba, pero por el otro lado del merge: es de QC-80 (la presentacion gana
+  // unidad obligatoria y el producto pierde la suya, R1 y R7), no de QC-71. Se anade aqui porque
+  // es justo lo que pide el mensaje de `hallazgosDeMigraciones`: la ficha que trae la migracion
+  // actualiza esta lista. Sigue sin persistir ningun identificador de peticion: su SQL no nombra
+  // ninguno de `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
+  '20260911120000_presentation_unit',
+  // Es de QC-49 (aislamiento por empresa en inventario: las tres tablas ganan `company_id`), no
+  // de QC-71. Se anade aqui por lo mismo que la de arriba: es justo lo que pide el mensaje de
+  // `hallazgosDeMigraciones` -- la ficha que trae la migracion actualiza esta lista. Sigue sin
+  // persistir ningun identificador de peticion: su SQL no nombra ninguno de
+  // `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
+  '20260911130000_inventory_company_scope',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -194,7 +237,19 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // `guard-dependencias-aprobadas.test.ts`. Aqui se afirma lo especifico de esta ficha: que el
 // conteo no se movio y que nadie colo una libreria de identificadores. `crypto.randomUUID()` es
 // un global; no hay nada que instalar.
-export const DEPENDENCIAS_ESPERADAS = 30
+/**
+ * OJO — este total es un NUMERO MAGICO y ya mordio a quien no debia. La guardia nacio con QC-71
+ * para afirmar «QC-71 no anade ninguna dependencia» (R20), pero lo codifico como un total
+ * absoluto del repositorio, asi que **cualquier feature posterior que anada una dependencia
+ * APROBADA la rompe sin haber hecho nada mal**. La primera fue QC-79 el 2026-09-11, al instalar
+ * `resend` con aprobacion humana en F1.4 y su fila en `docs/dependencias.md`: 30 -> 31.
+ *
+ * Lo que SI sigue vigilando de verdad es `FRAGMENTOS_PROHIBIDOS`, que es la mitad que afirma algo
+ * sobre QC-71 y no sobre el resto del repo. La salida limpia -material de `/afinar-regla`- es que
+ * este caso compare contra las dependencias de `origin/dev` en el merge-base, o que se apoye en
+ * el registro de `docs/dependencias.md`, en vez de contra una constante escrita a mano.
+ */
+export const DEPENDENCIAS_ESPERADAS = 31
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** Fragmentos que delatan una libreria de identificadores o de criptografia. */

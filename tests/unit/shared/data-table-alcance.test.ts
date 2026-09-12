@@ -19,6 +19,7 @@ import {
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
   UNITS_ROUTE,
+  USERS_ROUTE,
 } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
@@ -160,6 +161,18 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   // suyo» (QC-39 R15, R31). Se anade la fila y se TENSA el resto del centinela -el ancla de
   // consumidores minimos sube de tres a cuatro-, nunca se afloja: la lista sigue CERRADA, la
   // pantalla de recetas sigue fuera y una SEXTA pantalla vuelve a poner esto en rojo.
+  //
+  // AMPLIADO el 2026-09-11 (QC-67, pantalla-de-usuarios): entra un SEXTO consumidor declarado
+  // -la pantalla de administracion de usuarios-, y lo trae una decision cerrada, no un descuido:
+  // la fila «Base heredada, sin re-crear» de
+  // `specs/QC-67-pantalla-de-usuarios/requirements.md > Decisiones cerradas` (2026-09-11) dice
+  // «tabla compartida de QC-55», y R9 lo escribe como requisito: por su barrel publico, sin
+  // declarar tabla ni paginacion propias y sin modificar ni un archivo de
+  // `components/shared/data-table/` -lo ata `tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts`
+  // sobre el diff-. Sus acciones de fila van, como las de unidades, en una columna normal con
+  // `pinnable: false`. Se anade la fila y se TENSA el resto del centinela -el ancla de consumidores
+  // minimos sube de cuatro a cinco-, nunca se afloja: la lista sigue CERRADA, la pantalla de
+  // recetas sigue fuera y una SEPTIMA pantalla vuelve a poner esto en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
@@ -169,7 +182,8 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
    * tabla compartida por decision de diseno, asi que es un consumidor declarado, no un descuido.
    * La QUINTA -`UNITS_ROUTE`- la trae QC-39 (R15, R31) con el mismo criterio: su lista se monta
    * sobre la tabla compartida por decision cerrada del 2026-09-08 y sus acciones de fila van como
-   * columna normal `pinnable: false`, sin anadirle nada a `components/shared/data-table/`.
+   * columna normal `pinnable: false`, sin anadirle nada a `components/shared/data-table/`. La
+   * SEXTA -`USERS_ROUTE`- la trae QC-67 (R9) con el mismo criterio y por la misma via.
    */
   const carpetasAutorizadas = [
     ORDERS_ROUTE,
@@ -177,6 +191,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     SUPPLIERS_ROUTE,
     PRESENTATIONS_ROUTE,
     UNITS_ROUTE,
+    USERS_ROUTE,
   ].map((ruta) =>
     join(repoRoot, 'app', '(private)', ...ruta.split('/').filter((segmento) => segmento.length > 0)),
   )
@@ -187,7 +202,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las cinco pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las seis pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -195,15 +210,15 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las cinco pantallas autorizadas (pedidos, inventario, detalle de proveedor, presentaciones, unidades): migrar una sexta es una decision, no un descuido (R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las seis pantallas autorizadas (pedidos, inventario, detalle de proveedor, presentaciones, unidades, usuarios): migrar una septima es una decision, no un descuido (R34)`,
         ).toBe(true)
         consumidores += 1
       }
     }
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
-    // TENSA con cada alta: hoy son CINCO pantallas autorizadas, asi que se exige al menos un
-    // consumidor por pantalla (QC-39, 2026-09-08; antes eran cuatro).
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(4)
+    // TENSA con cada alta: hoy son SEIS pantallas autorizadas, asi que se exige al menos un
+    // consumidor por pantalla (QC-67, 2026-09-11; antes eran cinco).
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(5)
   })
 
   it('la pantalla de recetas sigue SIN consumirlo', () => {
@@ -330,14 +345,43 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // TENSA el centinela -el ancla pasa de cuatro entradas a cinco-, nunca se afloja: la lista sigue
   // CERRADA, el E2E de recetas sigue fuera y un SEXTO spec que referencie `data-table` vuelve a
   // ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cinco', () => {
+  //
+  // AMPLIADA POR CUARTA VEZ el 2026-09-11 (QC-49, aislamiento-por-empresa-en-inventario): entra la
+  // SEXTA entrada, `e2e/aislamiento-inventario.spec.ts`, y NO estrena ninguna pantalla. La trae el
+  // E2E que exige QC-49 R27 (`specs/QC-49-aislamiento-por-empresa-en-inventario/requirements.md >
+  // Decisiones cerradas`, «¿Hace falta E2E? Si»), cuyo recorrido atraviesa LAS DOS pantallas que ya
+  // consumen la tabla compartida -inventario (entrada 1) y presentaciones (entrada 3)- y afirma
+  // sobre LAS FILAS QUE EL SERVIDOR SIRVE: que con sesion en la empresa A no aparece ninguna fila
+  // de la B en ninguna de las dos listas, y que borrar una fila de la B conociendo su identificador
+  // se rechaza y la deja intacta. Por eso localiza `data-table-cell-name`: la celda de nombre de la
+  // tabla compartida es donde se leen esas filas, exactamente como la localizan QC-45 y QC-39.
+  // Se anade la fila y se TENSA el centinela, nunca se afloja.
+  //
+  // OJO -- QC-49 y QC-67 ampliaron esta lista EL MISMO DIA, cada una creyendo que la suya era la
+  // SEXTA entrada, y el merge las junto: son la SEXTA y la SEPTIMA. El ancla pasa de cinco a
+  // SIETE de una vez. La lista sigue CERRADA, el E2E de recetas sigue fuera y un OCTAVO spec que
+  // referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // AMPLIADA POR CUARTA VEZ el 2026-09-11 (QC-67, pantalla-de-usuarios): entra la SEXTA entrada,
+  // `e2e/usuarios.spec.ts`, por la misma via que la quinta. Su E2E -exigido por QC-67 R42- localiza
+  // `data-table-cell-<columna>` y `data-table-row-<id>` porque la lista de usuarios ES la tabla
+  // compartida (QC-67 R9), que esta feature consume por su barrel publico sin abrir ni uno de sus
+  // archivos (`tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts`). Se anade la fila
+  // y se TENSA el centinela, nunca se afloja (ver la nota de arriba sobre las dos ampliaciones).
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos siete', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos cinco E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
+      // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
+      // ya consumen la tabla compartida -inventario y presentaciones- y localiza
+      // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
+      // B con sesion en la A, ni siquiera al borrar conociendo el identificador. No estrena
+      // pantalla: mide las que ya estaban.
+      'e2e/aislamiento-inventario.spec.ts',
       'e2e/inventario.spec.ts',
       'e2e/pedidos.spec.ts',
       // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
@@ -348,6 +392,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
       // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).
       'e2e/unidades.spec.ts',
+      // La SEPTIMA la trae QC-67 el 2026-09-11 (R42): el E2E de la pantalla de usuarios localiza las
+      // celdas y la fila de la tabla compartida, que es la que su lista monta (QC-67 R9).
+      'e2e/usuarios.spec.ts',
     ])
   })
 })

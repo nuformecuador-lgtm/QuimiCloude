@@ -176,8 +176,24 @@ const LITERALES_DE_ROL = [ROLE_ADMINISTRADOR, ROLE_OPERADOR].map(
   (nombre) => new RegExp(`['"\`]${nombre}['"\`]`),
 );
 
-/** El catalogo cerrado de permisos, que esta ficha NO toca (R21). */
-const PERMISOS_ESPERADOS = 13;
+/**
+ * El catalogo cerrado de permisos, que esta ficha NO toca (R21).
+ *
+ * RETENSADO 2026-09-11 por QC-86, al sincronizar su rama con `dev`. Eran TRECE cuando se escribio
+ * QC-94; QC-86 (`modelo-de-asignacion-de-pedidos`) suma `asignaciones.consultar` y
+ * `asignaciones.modificar` a `PERMISSIONS` con permiso del humano -su decision cerrada 8- y el
+ * catalogo pasa a QUINCE. La enmienda esta escrita en
+ * `lib/modules/identity/domain/permissions.ts`: diez en QC-74, once en QC-38, trece en QC-66,
+ * quince en QC-86.
+ *
+ * ESTO NO AFLOJA R21, y por eso se sube el numero en vez de relajar la asercion a `toContain` o a
+ * `toBeGreaterThan`: lo que R21 exige es que **QC-94** no toque el catalogo, y sigue sin tocarlo
+ * -no anade, no quita y no renombra ninguna entrada, y `roles.consultar` sigue descartado por el
+ * humano-. Quien lo cambio es otra ficha, con su propia aprobacion. Si este numero se relajara,
+ * el caso dejaria de cazar justo lo que existe para cazar: que alguien cuele un permiso nuevo
+ * desde la ficha de roles.
+ */
+const PERMISOS_ESPERADOS = 15;
 
 /** Los DOS codigos que esta ficha reutiliza, y que por tanto tienen que seguir existiendo. */
 const LOS_DOS_CODIGOS = ['usuarios.consultar', 'usuarios.modificar'] as const;
@@ -291,10 +307,12 @@ describe('alcance de QC-94 (consulta-de-roles) — CONTENIDO: muerde siempre', (
     ).toEqual([]);
   });
 
-  it('R21 — el catalogo de permisos sigue teniendo TRECE entradas y ninguna de roles', () => {
+  it('R21 — el catalogo de permisos sigue teniendo QUINCE entradas y ninguna de roles', () => {
     // R21: «NO DEBE anadir, quitar ni renombrar ningun permiso del catalogo cerrado: reutiliza los
     // dos codigos que ya creo QC-66, y el catalogo DEBE seguir teniendo TRECE entradas despues de
-    // esta ficha». `roles.consultar` esta descartado POR EL HUMANO (decision cerrada 2,
+    // esta ficha». El numero es hoy QUINCE porque QC-86 sumo los dos de `asignaciones` con permiso
+    // del humano (ver `PERMISOS_ESPERADOS`); lo que R21 vigila -que ESTA ficha no lo toque- no
+    // cambia. `roles.consultar` esta descartado POR EL HUMANO (decision cerrada 2,
     // `design.md > 8.4`): habria costado su migracion de catalogo, su seed y el ripple de los
     // tests que lo cuentan, para una consulta que solo sirve a la pantalla de usuarios.
     expect(

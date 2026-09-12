@@ -376,8 +376,10 @@ export const resendCredentialSetupLinkSchema = z.strictObject({ userId: z.string
 ```
 
 La **confirmación** se compara en el dominio y su desacuerdo se responde como un fallo de formulario
-(§ 5.3), no como un error de catálogo: es una comprobación de formulario, y QC-70 R31 deja esas
-fuera del catálogo explícitamente.
+(§ 5.3), no como un error de catálogo: es **el estado del formulario**, de la misma especie que el
+rechazo por política, y por el mismo motivo que ese —**QC-70 R29**, § 11.3—. Ahí está escrito, con
+nombre y archivo, que esto es una **excepción declarada** a la letra de R34 y no un cumplimiento
+suyo.
 
 ### 5.3 Contratos de salida y las Server Actions
 
@@ -410,7 +412,8 @@ export type ResendLinkFormState =
   son **datos que la persona necesita** para corregir, y QC-70 R29 prohíbe que el campo de
   diagnóstico —el único hueco para datos variables— cruce al navegador. Los códigos de regla de
   QC-19 R23 son estables e independientes del idioma y la UI compone el texto, que es exactamente
-  para lo que se diseñaron.
+  para lo que se diseñaron. **Esto deja dos clases fuera de la letra de R34, y § 11.3 lo dice con sus
+  nombres**: es una excepción declarada, no una regla cumplida.
 - **Las dos actions nuevas reciben `FormData`** (R33) y **no deciden nada**: traducen entrada y
   resultado. La pública **no resuelve actor** (R18); la de reenvío resuelve el actor de las dos caras
   de la sesión, como las seis de QC-66.
@@ -715,12 +718,53 @@ Un coste operativo real a cambio de una defensa nominal.
 
 ### 11.3 Devolver las reglas incumplidas en el `diagnostic` del error — descartada
 
-Sería «un error más» y cabría en el catálogo. **No se puede**: QC-70 R29 dice que el campo de
-diagnóstico va al registro del servidor y **no se serializa al navegador**, y su guardia da rojo si
-alguien lo lee desde `app/**` o `components/**`. La persona que está escribiendo su contraseña
-necesita saber **qué regla** falló, o el formulario es inservible. Por eso el fallo de política es
-una **variante propia del estado de formulario** y no un `ErrorState` (§ 5.3), que además es lo que
-QC-70 R31 deja explícitamente fuera del catálogo.
+Sería «un error más» y cabría en el catálogo. **No se puede, y la razón es QC-70 R29**: cuando el
+error se serializa hacia el navegador, el objeto resultante **no debe contener el campo de
+diagnóstico ni ningún dato variable** —solo `status`, `code`, `message` y, en su día, `reference`—;
+el diagnóstico va **al registro del servidor** y solo ahí. QC-70 R30 lo vuelve ejecutable: la guardia
+se pone roja si alguien añade ese campo a la forma serializada o lo **lee** desde `app/**` o
+`components/**`. O sea que el `diagnostic` —el único hueco de `ErrorState` para datos variables—
+**no puede cruzar al navegador**, y las reglas incumplidas no tienen por dónde llegar a la pantalla
+dentro de un error del catálogo.
+
+Y **tienen que llegar**: la persona que está escribiendo su contraseña necesita saber **qué regla**
+falló para corregirla. Un formulario que solo diga «la contraseña no es válida» es **inservible** —la
+deja adivinando contra seis reglas más una lista de filtradas (QC-19)—. Los códigos de
+`CredentialRule` (QC-19 R23) son estables, independientes del idioma y **no dicen nada de la
+candidata**: cruzan al navegador sin filtrar nada y la UI compone el texto, que es exactamente para
+lo que se diseñaron. Por eso el fallo de política es una **variante propia del estado de formulario**
+—`{ status: 'invalid_credential'; unmet }` (§ 5.3)— y no un `ErrorState`.
+
+**Lo que esto incumple, dicho de frente: la letra de R34 NO se cumple para dos clases.** R34 pide que
+**cada fallo nuevo** se señale con «una clase de error de dominio derivada de `IdentityError` cuyo
+`code` esté en el catálogo cerrado de QC-70». `CredentialPolicyRejectedError` y
+`CredentialConfirmationMismatchError` —las dos en
+`lib/modules/identity/domain/credential-rejected.ts`— **no derivan de `IdentityError` y no tienen
+`code`**, así que para ellas R34 no se cumple, ni por asomo ni «en espíritu».
+
+**Por qué la excepción es correcta aun así.** Meterlas en el catálogo obligaría a una de dos cosas, y
+las dos son peores: o inventarles un `code` y dejar el formulario sin las reglas incumplidas —lo
+inservible de arriba—, o meter las reglas en el `diagnostic` y romper QC-70 R29, que es una regla de
+**no filtrar datos variables al navegador** y no un detalle de forma. Un rechazo de política no es
+«el sistema falló»: es **el estado del formulario que la persona está rellenando**, con datos que
+necesita para el siguiente intento. Ponerlo en el catálogo sería clasificar como error de dominio
+algo que es una respuesta normal de una pantalla.
+
+**Es una excepción declarada, no una regla cumplida.** Se escribe aquí, con el nombre de las dos
+clases y su archivo, para que quien lea R34 mañana sepa que hay dos fallos nuevos que no lo cumplen y
+**por qué**. Una excepción declarada es sana; una excepción disfrazada de regla —sostenida en una
+cita que no dice lo que se le atribuye— no lo es, y **eso es lo que había aquí antes**: este párrafo
+invocaba **QC-70 R31**, que habla de los mensajes que **la UI** escribe para **sus propias**
+comprobaciones de formulario (campo requerido, formato) —validación del **front**— y **no dice nada**
+de un rechazo de **backend** por política de contraseñas. La cita era falsa; la decisión, no. Queda
+corregida.
+
+**Material para `/afinar-regla`, y se deja anotado porque hoy no hay dónde apoyarlo bien**: o
+**QC-79 R34** se redacta con su excepción —«salvo las comprobaciones de formulario, que no entran en
+el catálogo»—, o **QC-70** gana un requisito que de verdad deje fuera del catálogo las comprobaciones
+de formulario **resueltas en el backend**, que es el hueco real: R31 solo cubre las que resuelve el
+front. **Hoy ninguno de los dos existe**, y mientras no existan esto sigue siendo una excepción
+escrita a mano en este documento.
 
 ### 11.4 Que la página valide el enlace al pintarse — descartada
 

@@ -21,12 +21,15 @@ const productNameSchema = z.string().trim().min(1).max(120);
 const nonNegativeIntSchema = z.number().int().min(0);
 
 /**
- * La unidad del producto es una REFERENCIA al catalogo de `unidades` (QC-32, R10, R19), no
- * texto libre: aqui solo se valida la FORMA -que sea un uuid-. Que ese uuid EXISTA no lo
- * comprueba zod: lo rechaza la base con la clave foranea `products_unit_id_fkey` (R12).
- * Traducir ese error a un mensaje de usuario es de QC-38.
+ * QC-80 (R21): AQUI VIVIA `unitIdSchema`, y se fue con la columna. El producto YA NO declara
+ * unidad -ni en el borde, ni en el contrato de salida, ni en la base: `products.unit_id`,
+ * `products_unit_id_idx` y `products_unit_id_fkey` se eliminaron en
+ * `20260911120000_presentation_unit`-. La unidad la declara ahora la PRESENTACION
+ * (`presentations.unit_id`, NOT NULL), y la de un producto se DERIVA de la presentacion de su
+ * lote mas reciente (`ProductView.latestBatchUnitId`, R22): un dato que se lee, no uno que se
+ * envie. Por eso el alta y la edicion no aceptan `unitId` -y con `strictObject`, enviarlo es
+ * `invalid_input`, no un campo ignorado en silencio-.
  */
-const unitIdSchema = z.string().uuid();
 
 /**
  * DECISION DEL HUMANO, 2026-09-03: `stock` y `qtyAlert` pasan a ser OBLIGATORIOS en la entrada.
@@ -42,8 +45,8 @@ const unitIdSchema = z.string().uuid();
  * guardar sin rellenar los dos. El formulario los marca `required`, de modo que quien edite uno
  * de esos productos vera el campo vacio y tendra que darle un valor.
  *
- * `unitId` sigue siendo opcional: no se pinta ya en el formulario, y exigirlo dejaria la
- * edicion sin salida.
+ * Desde QC-80 (R21) `unitId` ya no esta entre ellos: no es que sea opcional, es que el
+ * producto no tiene unidad que declarar.
  *
  * `strictObject`, no `z.object` (QC-52 R1, `design.md > 4`): una entrada que traiga
  * `cost`, `minPurchase` o `deliveryTime` se RECHAZA como `invalid_input`, no se ignora en
@@ -52,7 +55,7 @@ const unitIdSchema = z.string().uuid();
  * guardado un costo que nunca se guardo.
  */
 /**
- * Los CUATRO campos del producto, declarados UNA vez (QC-90, T3). El alta con primer lote
+ * Los TRES campos del producto, declarados UNA vez (QC-90, T3; eran cuatro hasta QC-80). El alta con primer lote
  * (`product-batch-input.ts`) los reutiliza tal cual en vez de copiarlos: dos listas
  * paralelas divergen en cuanto alguien anade un campo a una sola de ellas. Es el mismo
  * precedente que `catalogLineFieldsShape` de `proveedores/domain/catalog-line-input.ts`.
@@ -64,7 +67,6 @@ export const productFieldsShape = {
   name: productNameSchema,
   stock: nonNegativeIntSchema,
   qtyAlert: nonNegativeIntSchema,
-  unitId: unitIdSchema.nullish(),
 } as const;
 
 export const createProductSchema = z.strictObject({ ...productFieldsShape });

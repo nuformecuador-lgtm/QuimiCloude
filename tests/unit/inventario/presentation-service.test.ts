@@ -30,19 +30,30 @@ import type { PresentationRepository } from '@/lib/modules/inventario/ports/pres
 
 /** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
  *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
+/** QC-49 (R11): la empresa EN CUYO NOMBRE opera el actor. El caso de uso la convierte en
+ *  `InventoryScope` y se la pasa al puerto; no autoriza nada por si sola. */
+const EMPRESA = 'company-a';
+
 const ADMIN: Actor = {
   id: 'actor-admin',
+  companyId: EMPRESA,
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
 /** QC-74 (R13, R14): actor con el conjunto VACIO. Sustituye al viejo "rol Operador": desde
  *  QC-74 el Operador SI tiene `inventario.consultar`, asi que ya no sirve como caso de rechazo. */
-const SIN_PERMISO: Actor = { id: 'actor-sin-permiso', permissions: [] };
+const SIN_PERMISO: Actor = { id: 'actor-sin-permiso', companyId: EMPRESA, permissions: [] };
+
+/** QC-80: la unidad de la presentacion, uuid de una fila de `units`. Aqui es un doble; que
+ *  exista de verdad lo cierra la FK, no este archivo. */
+const UNIDAD = '11111111-1111-4111-8111-111111111111';
+const OTRA_UNIDAD = '22222222-2222-4222-8222-222222222222';
 
 const PRESENTACION: PresentationView = {
   id: 'presentacion-1',
   name: 'Bidon 20 L',
   nameNormalized: 'bidon20l',
+  unitId: UNIDAD,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -63,41 +74,95 @@ const PAGINA_VACIA: Page<PresentationView> = {
 function montarRepositorio(
   overrides: Partial<{
     create: PresentationRepository['create'];
-    rename: PresentationRepository['rename'];
+    replace: PresentationRepository['replace'];
     deleteById: PresentationRepository['deleteById'];
     list: PresentationRepository['list'];
   }> = {},
 ): PresentationRepository {
   return {
     create: overrides.create ?? vi.fn(async () => ({ id: PRESENTACION.id })),
-    rename: overrides.rename ?? vi.fn(async () => 'ok' as const),
+    replace: overrides.replace ?? vi.fn(async () => 'ok' as const),
     deleteById: overrides.deleteById ?? vi.fn(async () => 'deleted' as const),
     list: overrides.list ?? vi.fn(async () => PAGINA_VACIA),
   };
 }
 
 describe('create-presentation', () => {
-  it('persiste el nombre normalizado junto al nombre al crear y al renombrar', async () => {
+  it('persiste el nombre normalizado junto al nombre y a la unidad, en la misma escritura (R11)', async () => {
     const create = vi.fn<PresentationRepository['create']>(async () => ({
       id: PRESENTACION.id,
     }));
-    const rename = vi.fn<PresentationRepository['rename']>(async () => 'ok' as const);
-    const presentations = montarRepositorio({ create, rename });
+    const replace = vi.fn<PresentationRepository['replace']>(async () => 'ok' as const);
+    const presentations = montarRepositorio({ create, replace });
 
     const createPresentation = createCreatePresentation({ presentations });
-    await createPresentation({ name: 'Bidon 20 L' }, ADMIN);
+    await createPresentation({ name: 'Bidon 20 L', unitId: UNIDAD }, ADMIN);
 
-    expect(create).toHaveBeenCalledWith('Bidon 20 L', normalizePresentationName('Bidon 20 L'));
-    expect(create).toHaveBeenCalledWith('Bidon 20 L', 'bidon20l');
+    // QC-80 (R11): los tres campos viajan JUNTOS en una unica llamada al puerto. No existe
+    // ninguna segunda escritura que anada la unidad despues.
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith(
+      {
+        name: 'Bidon 20 L',
+        nameNormalized: normalizePresentationName('Bidon 20 L'),
+        unitId: UNIDAD,
+      },
+      { companyId: EMPRESA },
+    );
+    expect(create).toHaveBeenCalledWith(
+      { name: 'Bidon 20 L', nameNormalized: 'bidon20l', unitId: UNIDAD },
+      { companyId: EMPRESA },
+    );
 
     const updatePresentation = createUpdatePresentation({ presentations });
-    await updatePresentation(PRESENTACION.id, { name: 'Bidon 20 Litros' }, ADMIN);
-
-    expect(rename).toHaveBeenCalledWith(
+    await updatePresentation(
       PRESENTACION.id,
-      'Bidon 20 Litros',
-      normalizePresentationName('Bidon 20 Litros'),
+      { name: 'Bidon 20 Litros', unitId: UNIDAD },
+      ADMIN,
     );
+
+    expect(replace).toHaveBeenCalledWith(
+      PRESENTACION.id,
+      {
+        name: 'Bidon 20 Litros',
+        nameNormalized: normalizePresentationName('Bidon 20 Litros'),
+        unitId: UNIDAD,
+      },
+      { companyId: EMPRESA },
+    );
+  });
+
+  it('rechaza el alta SIN unidad antes de llamar al puerto (R10)', async () => {
+    const create = vi.fn<PresentationRepository['create']>(async () => ({
+      id: PRESENTACION.id,
+    }));
+    const presentations = montarRepositorio({ create });
+    const createPresentation = createCreatePresentation({ presentations });
+
+    await expect(createPresentation({ name: 'Bidon 20 L' }, ADMIN)).rejects.toThrow(
+      ValidationError,
+    );
+    await expect(
+      createPresentation({ name: 'Bidon 20 L', unitId: '' }, ADMIN),
+    ).rejects.toThrow(ValidationError);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("traduce 'invalid_unit' a ValidationError, DISTINGUIBLE del duplicado (R13)", async () => {
+    // La FK `presentations_unit_id_fkey` es la que detecta que esa unidad no existe -no hay
+    // ningun SELECT previo, § 4.2-, y el puerto lo devuelve como resultado discriminado. El
+    // caso de uso lo traduce a `invalid_input`, que es como el modulo trata una FK rota, y
+    // NUNCA a `PresentationDuplicateNameError`: son dos arreglos distintos para el usuario.
+    const create = vi.fn<PresentationRepository['create']>(async () => 'invalid_unit' as const);
+    const presentations = montarRepositorio({ create });
+    const createPresentation = createCreatePresentation({ presentations });
+
+    const fallo = createPresentation({ name: 'Bidon 20 L', unitId: OTRA_UNIDAD }, ADMIN);
+
+    await expect(fallo).rejects.toThrow(ValidationError);
+    await expect(
+      createPresentation({ name: 'Bidon 20 L', unitId: OTRA_UNIDAD }, ADMIN),
+    ).rejects.not.toBeInstanceOf(PresentationDuplicateNameError);
   });
 
   it('rechaza la presentacion cuyo nombre normalizado ya existe', async () => {
@@ -108,21 +173,21 @@ describe('create-presentation', () => {
     const presentations = montarRepositorio({ create });
     const createPresentation = createCreatePresentation({ presentations });
 
-    await expect(createPresentation({ name: 'Bidon 20 L' }, ADMIN)).rejects.toThrow(
-      PresentationDuplicateNameError,
-    );
+    await expect(
+      createPresentation({ name: 'Bidon 20 L', unitId: UNIDAD }, ADMIN),
+    ).rejects.toThrow(PresentationDuplicateNameError);
   });
 
   it("un 'duplicate' devuelto por el puerto se traduce a PresentationDuplicateNameError aunque la comprobacion previa hubiera pasado", async () => {
     // No hay ninguna comprobacion previa en el propio caso de uso -por diseno, § 11.4-,
     // asi que esto ejercita exactamente lo mismo que el caso anterior desde el lado del
     // renombrado: el servicio nunca ignora un 'duplicate' del puerto.
-    const rename = vi.fn<PresentationRepository['rename']>(async () => 'duplicate' as const);
-    const presentations = montarRepositorio({ rename });
+    const replace = vi.fn<PresentationRepository['replace']>(async () => 'duplicate' as const);
+    const presentations = montarRepositorio({ replace });
     const updatePresentation = createUpdatePresentation({ presentations });
 
     await expect(
-      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L' }, ADMIN),
+      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L', unitId: UNIDAD }, ADMIN),
     ).rejects.toThrow(PresentationDuplicateNameError);
   });
 
@@ -135,31 +200,82 @@ describe('create-presentation', () => {
 
     // '---' normaliza a la cadena vacia: R37 lo rechaza como nombre invalido en el
     // esquema zod, ANTES de tocar el repositorio.
-    await expect(createPresentation({ name: '---' }, ADMIN)).rejects.toThrow(ValidationError);
+    await expect(createPresentation({ name: '---', unitId: UNIDAD }, ADMIN)).rejects.toThrow(
+      ValidationError,
+    );
     expect(create).not.toHaveBeenCalled();
   });
 });
 
 describe('update-presentation', () => {
-  it('devuelve no encontrado al renombrar una presentacion inexistente', async () => {
-    const rename = vi.fn<PresentationRepository['rename']>(async () => 'not_found' as const);
-    const presentations = montarRepositorio({ rename });
+  it('devuelve no encontrado al editar una presentacion inexistente', async () => {
+    const replace = vi.fn<PresentationRepository['replace']>(async () => 'not_found' as const);
+    const presentations = montarRepositorio({ replace });
     const updatePresentation = createUpdatePresentation({ presentations });
 
     await expect(
-      updatePresentation('inexistente', { name: 'Bidon 20 L' }, ADMIN),
+      updatePresentation('inexistente', { name: 'Bidon 20 L', unitId: UNIDAD }, ADMIN),
     ).rejects.toThrow(PresentationNotFoundError);
   });
 
   it('rechaza la entrada invalida antes de llamar al puerto', async () => {
-    const rename = vi.fn<PresentationRepository['rename']>(async () => 'ok' as const);
-    const presentations = montarRepositorio({ rename });
+    const replace = vi.fn<PresentationRepository['replace']>(async () => 'ok' as const);
+    const presentations = montarRepositorio({ replace });
     const updatePresentation = createUpdatePresentation({ presentations });
 
     await expect(
-      updatePresentation(PRESENTACION.id, { name: '   ' }, ADMIN),
+      updatePresentation(PRESENTACION.id, { name: '   ', unitId: UNIDAD }, ADMIN),
     ).rejects.toThrow(ValidationError);
-    expect(rename).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('REEMPLAZA la unidad: la que llega es la que se escribe, no la anterior (R12)', async () => {
+    // La edicion es reemplazo completo desde QC-20 y QC-80 la extiende a la unidad: el caso de
+    // uso no lee la unidad vieja ni la conserva -no tiene forma de hacerlo, el puerto no
+    // expone ninguna lectura por id-.
+    const replace = vi.fn<PresentationRepository['replace']>(async () => 'ok' as const);
+    const presentations = montarRepositorio({ replace });
+    const updatePresentation = createUpdatePresentation({ presentations });
+
+    await updatePresentation(
+      PRESENTACION.id,
+      { name: PRESENTACION.name, unitId: OTRA_UNIDAD },
+      ADMIN,
+    );
+
+    expect(replace).toHaveBeenCalledWith(
+      PRESENTACION.id,
+      {
+        name: PRESENTACION.name,
+        nameNormalized: PRESENTACION.nameNormalized,
+        unitId: OTRA_UNIDAD,
+      },
+      { companyId: EMPRESA },
+    );
+    expect(replace.mock.calls[0]?.[1].unitId).not.toBe(PRESENTACION.unitId);
+  });
+
+  it('rechaza la edicion SIN unidad antes de llamar al puerto (R10, R12)', async () => {
+    const replace = vi.fn<PresentationRepository['replace']>(async () => 'ok' as const);
+    const presentations = montarRepositorio({ replace });
+    const updatePresentation = createUpdatePresentation({ presentations });
+
+    await expect(
+      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L' }, ADMIN),
+    ).rejects.toThrow(ValidationError);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("traduce 'invalid_unit' de la edicion a ValidationError (R13)", async () => {
+    const replace = vi.fn<PresentationRepository['replace']>(
+      async () => 'invalid_unit' as const,
+    );
+    const presentations = montarRepositorio({ replace });
+    const updatePresentation = createUpdatePresentation({ presentations });
+
+    await expect(
+      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L', unitId: OTRA_UNIDAD }, ADMIN),
+    ).rejects.toThrow(ValidationError);
   });
 });
 
@@ -213,7 +329,10 @@ describe('list-presentations', () => {
     expect(resultado).toBe(PAGINA_VACIA);
     // QC-57: lo que llega al puerto es la consulta del contrato generico ya saneada, con sus
     // defectos aplicados -no el `{ page: 1 }` crudo del llamante-.
-    expect(list).toHaveBeenCalledWith({ page: 1, sort: null, filters: {}, search: '' });
+    expect(list).toHaveBeenCalledWith(
+      { page: 1, sort: null, filters: {}, search: '' },
+      { companyId: EMPRESA },
+    );
   });
 
   it('rechaza una consulta con pagina invalida antes de llamar al puerto', async () => {
@@ -227,18 +346,21 @@ describe('list-presentations', () => {
 });
 
 describe('autorizacion de los cuatro casos de uso (complemento a T8)', () => {
-  it('rechaza al actor sin permiso en crear, renombrar, borrar y listar sin llamar al puerto', async () => {
+  // R14: `requirePermission` es la PRIMERA linea, antes de zod y antes del puerto. La prueba
+  // es que el actor sin permiso no produce NI UNA sola llamada al repositorio, ni siquiera con
+  // una entrada perfectamente valida como la de aqui.
+  it('rechaza al actor sin permiso en crear, editar, borrar y listar sin llamar al puerto (R14)', async () => {
     const presentations = montarRepositorio();
     const createPresentation = createCreatePresentation({ presentations });
     const updatePresentation = createUpdatePresentation({ presentations });
     const deletePresentation = createDeletePresentation({ presentations });
     const listPresentations = createListPresentations({ presentations, log: logDoble() });
 
-    await expect(createPresentation({ name: 'Bidon 20 L' }, SIN_PERMISO)).rejects.toThrow(
-      UnauthorizedError,
-    );
     await expect(
-      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L' }, SIN_PERMISO),
+      createPresentation({ name: 'Bidon 20 L', unitId: UNIDAD }, SIN_PERMISO),
+    ).rejects.toThrow(UnauthorizedError);
+    await expect(
+      updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L', unitId: UNIDAD }, SIN_PERMISO),
     ).rejects.toThrow(UnauthorizedError);
     await expect(deletePresentation(PRESENTACION.id, SIN_PERMISO)).rejects.toThrow(
       UnauthorizedError,
@@ -246,7 +368,7 @@ describe('autorizacion de los cuatro casos de uso (complemento a T8)', () => {
     await expect(listPresentations({ page: 1 }, SIN_PERMISO)).rejects.toThrow(UnauthorizedError);
 
     expect(presentations.create).not.toHaveBeenCalled();
-    expect(presentations.rename).not.toHaveBeenCalled();
+    expect(presentations.replace).not.toHaveBeenCalled();
     expect(presentations.deleteById).not.toHaveBeenCalled();
     expect(presentations.list).not.toHaveBeenCalled();
   });

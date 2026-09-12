@@ -126,6 +126,56 @@ export const PRESENTATIONS_ROUTE = '/configuracion/presentaciones';
  */
 export const UNITS_ROUTE = '/configuracion/unidades';
 
+/**
+ * Pantalla de administracion de usuarios (QC-67, R1). La TERCERA hermana del segmento
+ * `configuracion`, junto a `PRESENTATIONS_ROUTE` y `UNITS_ROUTE`: el tramo intermedio
+ * `/configuracion` sigue **sin constante propia** porque sigue sin haber pantalla en esa URL, y
+ * una constante que no lleva a ninguna parte seria la deuda de los cinco items de QC-11.
+ *
+ * **Entra junto con su fila de `PRIVATE_ROUTE_PREFIXES`** (R5) y con
+ * `app/(private)/configuracion/usuarios/page.tsx`: `guard-rutas-privadas-cubiertas` compara la
+ * lista de prefijos con las carpetas que tienen `page.tsx` bajo `app/(private)/` y se pone roja en
+ * los DOS sentidos —prefijo sin pantalla y pantalla sin prefijo—, asi que las tres cosas tenian
+ * que llegar a la vez.
+ *
+ * Esa fila garantiza **sesion, no autorizacion**: quien decide si esta pantalla se ve es el
+ * `requirePagePermission('usuarios.consultar')` de su `page.tsx` (R4), y ninguna de las dos
+ * garantias sustituye a la otra.
+ *
+ * Ademas, `userListHref` derivara de esta constante (R1): la URL no se escribe como literal en
+ * ningun archivo de producto.
+ */
+export const USERS_ROUTE = '/configuracion/usuarios';
+
+/**
+ * Pagina PUBLICA donde una persona establece su contrasena la primera vez, a la que se llega
+ * desde el enlace del correo (QC-79, R17).
+ *
+ * **No entra en `PRIVATE_ROUTE_PREFIXES`, y es a proposito** (`design.md > 5.1`): se sirve **sin
+ * sesion**, y la regla 1 de `route-access.ts` deja pasar sin redirigir todo lo que no es privado
+ * ni el login, asi que el middleware **no se toca**. Meterla en la lista de prefijos privados
+ * mandaria al login a la unica persona que todavia no puede entrar.
+ *
+ * Vive aqui, como `LOGIN_ROUTE`, porque la escriben tres sitios que no se conocen entre si —la
+ * pagina, y los **dos** transportes de correo que arman la URL del enlace— y ninguno de ellos
+ * debe incrustar la URL como literal. Antes de T19 era una constante local duplicada en los tres.
+ */
+export const CREDENTIAL_SETUP_ROUTE = '/establecer-contrasena';
+
+/**
+ * Camino de la pagina de arriba **con el secreto del enlace en el CAMINO**, nunca en la cadena de
+ * consulta (QC-79, `design.md > 4.4`): en el camino no acaba como un parametro mas en los
+ * registros de acceso de los intermediarios, y el secreto va en base64url, que no necesita
+ * escapado.
+ *
+ * Mismo patron que `recipeEditRoute` y `supplierDetailRoute`: ningun archivo de producto compone
+ * esta URL a mano. Devuelve un camino **relativo**; quien necesite la URL absoluta —el correo— le
+ * antepone la base que le da su configuracion (R28).
+ */
+export function credentialSetupRoute(secret: string): string {
+  return `${CREDENTIAL_SETUP_ROUTE}/${secret}`;
+}
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
@@ -159,4 +209,10 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // y la comparacion por segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso lo
   // exige la propia pantalla (R12).
   UNITS_ROUTE,
+  // QC-67 R5: la pantalla de usuarios. Sin esta fila, `(private)` no aparece en la URL y
+  // `/configuracion/usuarios` se serviria SIN sesion. Una sola entrada: no hay pagina de detalle
+  // —el alta y la edicion ocurren en un panel lateral sobre la propia lista— y la comparacion por
+  // segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso `usuarios.consultar` lo
+  // exige la propia pantalla (R4).
+  USERS_ROUTE,
 ] as const;

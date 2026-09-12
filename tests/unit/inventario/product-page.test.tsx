@@ -7,6 +7,12 @@ import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import {
+  PRESENTATION_UNIT_ERROR_TESTID,
+  PRESENTATION_UNIT_FIELD,
+  PRESENTATION_UNIT_OPTION_TESTID,
+  PRESENTATION_UNIT_SELECT_TESTID,
+} from '@/components/shared/presentation-unit-select';
+import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
   UNEXPECTED_ERROR_NOTICE_TESTID,
@@ -34,6 +40,7 @@ import type {
   CreatePresentationFormState,
   PresentationListResult,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
@@ -117,6 +124,7 @@ const {
   deleteProductActionMock,
   listPresentationsActionMock,
   createPresentationActionMock,
+  listUnitsActionMock,
 } = vi.hoisted(() => ({
   usePathnameMock: vi.fn<() => string>(),
   redirectMock: vi.fn<(ruta: string) => never>(),
@@ -149,6 +157,9 @@ const {
     vi.fn<
       (prev: CreatePresentationFormState, data: FormData) => Promise<CreatePresentationFormState>
     >(),
+  // QC-80: la pagina pide el catalogo de unidades UNA vez, para el alta rapida de presentacion
+  // que el selector lleva dentro (R11). Sin este doble la pagina intentaria abrir base de datos.
+  listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -178,6 +189,10 @@ vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
   listPresentationsAction: listPresentationsActionMock,
   createPresentationAction: createPresentationActionMock,
+}));
+
+vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
+  listUnitsAction: listUnitsActionMock,
 }));
 
 const testId = {
@@ -231,13 +246,30 @@ const PRESENTACION_NUEVA = { id: crypto.randomUUID(), name: 'Garrafa 5 L' };
 
 /**
  * Id de unidad del fixture, **tambien inconfundible y tambien invisible**. Desde el merge de
- * QC-32 (`modelo-unidades`) el producto no guarda el texto de la unidad sino `unitId`, una clave
- * foranea al catalogo, y esta pantalla no tiene forma de resolverla a un nombre: el contrato
- * publico de `lib/modules/unidades` no expone ninguna operacion de listado (llega con QC-38).
- * Por decision humana del 2026-09-03 la unidad sale de la pantalla; este centinela vigila que no
- * vuelva por la puerta de atras pintando el UUID crudo, que seria peor que no mostrar nada.
+ * QC-32 (`modelo-unidades`) la unidad es una clave foranea al catalogo y no un texto, y esta
+ * pantalla no tiene forma de resolverla a un nombre.
+ *
+ * QC-80 (R21, R22) le cambio el NOMBRE y el ORIGEN -ya no es la columna `products.unit_id`, que
+ * desaparecio, sino `ProductView.latestBatchUnitId`, derivada de la presentacion del lote mas
+ * reciente-, pero **no le cambio el veredicto**: la unidad sigue fuera de la pantalla por la
+ * decision humana del 2026-09-03, y este centinela vigila que no vuelva por la puerta de atras
+ * pintando el UUID crudo, que seria peor que no mostrar nada.
  */
 const UNIDAD_QUE_NO_DEBE_VERSE = 'UNIDAD-ID-NO-VISIBLE';
+
+/**
+ * Unidad del CATALOGO, que es otra cosa que la de arriba: esta no se pinta en la pantalla, se
+ * ofrece en el alta rapida de presentacion del selector (QC-80 R11). El id es un uuid de verdad
+ * porque el esquema del alta de presentacion lo exige.
+ */
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Litro',
+  symbol: 'L',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
 
 function producto(overrides: Partial<ProductView> = {}): ProductView {
   return {
@@ -246,7 +278,7 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     imagePath: null,
     stock: 42,
     qtyAlert: 5,
-    unitId: UNIDAD_QUE_NO_DEBE_VERSE,
+    latestBatchUnitId: UNIDAD_QUE_NO_DEBE_VERSE,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     ...overrides,
@@ -272,6 +304,10 @@ function paginaDeProductos(
   };
 }
 
+/** Unidad de las presentaciones de los dobles (QC-80 R1: `PresentationView.unitId` es
+ *  obligatorio). No se afirma nada sobre ella en este archivo. */
+const UNIDAD_DE_LA_PRESENTACION = '55555555-5555-4555-8555-555555555555';
+
 function paginaDePresentaciones(
   items: readonly { id: string; name: string }[],
   extra: { page?: number; totalPages?: number } = {},
@@ -282,6 +318,9 @@ function paginaDePresentaciones(
       items: items.map((item) => ({
         ...item,
         nameNormalized: item.name.toLowerCase(),
+        // QC-80 (R1): la presentacion declara unidad OBLIGATORIA. Aqui es solo relleno del
+        // contrato -esta pantalla no la pinta-, con un uuid fijo para que el doble sea estable.
+        unitId: UNIDAD_DE_LA_PRESENTACION,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       })),
@@ -423,6 +462,7 @@ beforeEach(() => {
   updateProductActionMock.mockResolvedValue({ status: 'success' });
   deleteProductActionMock.mockResolvedValue({ status: 'success' });
   createPresentationActionMock.mockResolvedValue({ status: 'success', id: PRESENTACION_NUEVA.id });
+  listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
   toastExito = vi.spyOn(toast, 'success');
   clearSidebarStateCookie();
   setViewportWidth(WIDE_VIEWPORT);
@@ -501,9 +541,14 @@ describe('pantalla de productos — lista', () => {
   it('la tabla no muestra el id de la unidad', async () => {
     // Test **en negativo**: el id de unidad esta en los datos y no puede llegar a la pantalla.
     //
-    // `unitId` se vigila desde el 2026-09-03: no lo pide R7, lo pide la decision de sacar
-    // la unidad de la pantalla tras el merge de QC-32. Mientras nadie sepa resolver ese id a un
-    // nombre, la unica forma de "mostrar la unidad" seria pintar el UUID, y eso no se hace.
+    // La unidad se vigila desde el 2026-09-03: no lo pide R7, lo pide la decision de sacarla de
+    // la pantalla tras el merge de QC-32. Mientras nadie sepa resolver ese id a un nombre, la
+    // unica forma de "mostrar la unidad" seria pintar el UUID, y eso no se hace.
+    //
+    // Desde QC-80 el campo se llama `latestBatchUnitId` y sale del lote mas reciente (R22). El
+    // centinela se renombra CON el campo, a proposito: si solo se hubiera vigilado el nombre
+    // viejo, la unidad podria haber vuelto a la tabla con el nombre nuevo sin que nadie se
+    // enterara.
     await renderPantalla();
 
     expect(document.body.textContent).not.toContain(UNIDAD_QUE_NO_DEBE_VERSE);
@@ -511,7 +556,7 @@ describe('pantalla de productos — lista', () => {
     const columnas = buildProductColumns({ rowActions: () => null });
     // `imagePath` esta en la lista de prohibidos: la imagen SE VE, pero su columna se llama
     // `image` y pinta una miniatura. La RUTA no es una columna.
-    for (const prohibida of ['id', 'unitId', 'imagePath']) {
+    for (const prohibida of ['id', 'unitId', 'latestBatchUnitId', 'imagePath']) {
       expect(
         columnas.some((columna) => String(columna.id) === prohibida),
         `«${prohibida}» no puede ser columna`,
@@ -1330,16 +1375,20 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(createProductActionMock).not.toHaveBeenCalled();
   });
 
-  it('el formulario no captura la unidad, y el alta viaja sin ella', async () => {
-    // **R23 quedo sin objeto** el 2026-09-03, y este test es su relevo, no su borrado.
+  it('el formulario no captura la unidad, y el alta viaja sin ella (QC-80, R21)', async () => {
+    // **R23 de QC-14 quedo sin objeto** el 2026-09-03, y este test es su relevo, no su borrado.
     //
-    // R23 pedia la unidad como TEXTO LIBRE porque eso era lo que la columna guardaba. El merge de
-    // QC-32 (`modelo-unidades`) tumbo esa premisa con la feature en vuelo: el producto ya no
-    // guarda `unit: string | null` sino `unitId`, una clave foranea al catalogo de unidades. Un
-    // campo de texto pasaria a escribir un valor que la base ya no acepta, y un selector no se
-    // puede construir hoy porque `lib/modules/unidades` no expone como listar el catalogo (eso
-    // llega con QC-38). Decision humana: el campo sale de la pantalla y el producto se da de alta
-    // sin unidad, que el esquema admite por ser `unitId` nulable.
+    // Aquel R23 pedia la unidad como TEXTO LIBRE porque eso era lo que la columna guardaba. El
+    // merge de QC-32 (`modelo-unidades`) tumbo esa premisa con la feature en vuelo -la unidad
+    // paso a ser una clave foranea al catalogo- y el campo salio de la pantalla por decision
+    // humana, a la espera de un selector.
+    //
+    // **QC-80 (R21) cierra la espera: ese selector no llegara nunca.** `products.unit_id` ya no
+    // existe -columna, indice y FK eliminados-, asi que no hay campo que pedir: la unidad la
+    // declara la PRESENTACION y la del producto se DERIVA de la de su lote mas reciente (R22).
+    // Lo que aqui era «todavia no» pasa a ser «nunca», y el caso se queda por el mismo motivo de
+    // siempre elevado: que el alta no envie `unitId` ya no es una carencia temporal, es el
+    // contrato -si lo enviara, el `strictObject` del esquema lo rechazaria con `invalid_input`-.
     //
     // Lo que se vigila aqui es que la ausencia siga siendo intencionada: ni un campo de texto que
     // reviva la premisa caida, ni un hueco donde alguien teclee un UUID a mano.
@@ -1426,6 +1475,69 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await waitFor(() => expect(screen.queryByTestId(testId.dialogoBorrado)).toBeNull());
     expect(toastExito).toHaveBeenCalledTimes(1);
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('pantalla de productos — alta rapida de presentacion (QC-80 R11, R17, R19)', () => {
+  it('el alta rapida manda la unidad y sin elegirla no llega a la operacion', async () => {
+    // R10, R11 y R17 — este panel es UNO de los dos caminos que crean presentaciones, y R11 dice
+    // que NINGUNO puede crear una sin unidad. Se afirma sobre el `FormData` que recibe la Server
+    // Action, no sobre estado de React.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(testId.abrirAltaPresentacion));
+    await user.type(screen.getByTestId(testId.nombrePresentacion), PRESENTACION_NUEVA.name);
+
+    // Sin unidad la validacion previa -el MISMO esquema que valida el servidor- corta el envio y
+    // el fallo se pinta JUNTO al campo de unidad.
+    await user.click(screen.getByTestId(testId.guardarPresentacion));
+    expect(await screen.findByTestId(PRESENTATION_UNIT_ERROR_TESTID)).toBeInTheDocument();
+    expect(createPresentationActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+    await user.click(
+      await esperarInteractiva((await screen.findAllByTestId(PRESENTATION_UNIT_OPTION_TESTID))[0]),
+    );
+    await user.click(screen.getByTestId(testId.guardarPresentacion));
+
+    await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createPresentationActionMock.mock.calls[0][1];
+    expect(enviado.get('name')).toBe(PRESENTACION_NUEVA.name);
+    expect(enviado.get(PRESENTATION_UNIT_FIELD)).toBe(UNIDAD.id);
+
+    // Y la presentacion recien creada queda elegida en el formulario del producto.
+    await waitFor(() =>
+      expect(screen.getByTestId('presentation-value')).toHaveValue(PRESENTACION_NUEVA.id),
+    );
+  });
+
+  it('sin catalogo de unidades no se ofrece el alta rapida, pero elegir una presentacion existente sigue funcionando', async () => {
+    // Mismo criterio que R19 resolvio en la pantalla de presentaciones: un formulario con un campo
+    // obligatorio imposible de rellenar es peor que no ofrecerlo. Lo que NO se degrada es el resto
+    // del alta de producto.
+    const user = setupUser();
+    // QC-71 volvio `reference` OBLIGATORIA en el estado de error inesperado, asi que el estado se
+    // construye con el helper del repo en vez de a mano: si manana cambia de forma otra vez, esto
+    // se entera sin tocarlo.
+    listUnitsActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.getByTestId(testId.selectorPresentacion)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.abrirAltaPresentacion)).toBeNull();
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    expect(createProductActionMock.mock.calls[0][1].get('presentationId')).toBe(PRESENTACION_A.id);
+    expect(createPresentationActionMock).not.toHaveBeenCalled();
   });
 });
 

@@ -18,7 +18,12 @@ import { createCreatePresentation } from '@/lib/modules/inventario/domain/create
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeletePresentation } from '@/lib/modules/inventario/domain/delete-presentation';
 import { createDeleteProduct } from '@/lib/modules/inventario/domain/delete-product';
-import { InventarioError, UnauthorizedError } from '@/lib/modules/inventario/domain/errors';
+import {
+  InventarioError,
+  PresentationNotFoundError,
+  ProductNotFoundError,
+  UnauthorizedError,
+} from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
@@ -35,9 +40,23 @@ import type { ProductRepository } from '@/lib/modules/inventario/ports/product-r
 const CONSULTAR = 'inventario.consultar' satisfies PermissionCode;
 const MODIFICAR = 'inventario.modificar' satisfies PermissionCode;
 
+/**
+ * QC-49 (R11, R24): la empresa EN CUYO NOMBRE opera el actor. Esta aqui porque el `Actor` la
+ * exige desde QC-49, pero NO cambia una sola expectativa de este archivo: la empresa FILTRA y
+ * no AUTORIZA, asi que ningun caso de abajo se concede ni se rechaza por ella.
+ */
+const EMPRESA_DEL_ACTOR = 'company-a';
+
+/** Otra empresa, para el bloque de R24: el ambito ajeno no adelanta al permiso. */
+const OTRA_EMPRESA = 'company-b';
+
 /** Actor con un conjunto de permisos EXACTO: es lo que hace visible el cruce de R13. */
 function actorCon(...permissions: readonly PermissionCode[]): Actor {
-  return { id: `actor-${permissions.join('+') || 'sin-permisos'}`, permissions };
+  return {
+    id: `actor-${permissions.join('+') || 'sin-permisos'}`,
+    companyId: EMPRESA_DEL_ACTOR,
+    permissions,
+  };
 }
 
 /** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
@@ -58,7 +77,13 @@ const PRODUCTO_VALIDO_CON_LOTE = {
   unitCost: '10.0000',
 };
 
-const PRESENTACION_VALIDA = { name: 'Bidon 20 L' };
+/** QC-80 (R10): la unidad es obligatoria en el alta y en la edicion, asi que la entrada
+ *  valida minima la lleva. Es un uuid cualquiera: aqui no hay base, y lo que este archivo
+ *  afirma es el ORDEN -permiso antes que zod-, no la existencia de la unidad. */
+const PRESENTACION_VALIDA = {
+  name: 'Bidon 20 L',
+  unitId: '11111111-1111-4111-8111-111111111111',
+};
 
 /** Entrada que zod rechaza sin dudarlo: es la que demuestra R12 -el permiso se mira ANTES
  *  de validar-. */
@@ -97,7 +122,7 @@ function repositorioPresentacionQueFalla(): PresentationRepository {
   };
   return {
     create: vi.fn<PresentationRepository['create']>(explota),
-    rename: vi.fn<PresentationRepository['rename']>(explota),
+    replace: vi.fn<PresentationRepository['replace']>(explota),
     deleteById: vi.fn<PresentationRepository['deleteById']>(explota),
     list: vi.fn<PresentationRepository['list']>(explota),
   };
@@ -136,7 +161,9 @@ const PRODUCTO_EN_BASE = {
   imagePath: null,
   stock: 0,
   qtyAlert: 0,
-  unitId: null,
+  // QC-80 (R21, R22): el producto ya no declara unidad; la derivada del lote mas reciente es
+  // `latestBatchUnitId`, y este doble no tiene lotes.
+  latestBatchUnitId: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -168,7 +195,7 @@ function montarReposPermisivos(): Repos {
     },
     presentations: {
       create: vi.fn<PresentationRepository['create']>(async () => ({ id: 'presentacion-1' })),
-      rename: vi.fn<PresentationRepository['rename']>(async () => 'ok'),
+      replace: vi.fn<PresentationRepository['replace']>(async () => 'ok'),
       deleteById: vi.fn<PresentationRepository['deleteById']>(async () => 'deleted'),
       list: vi.fn<PresentationRepository['list']>(async () => PAGINA_VACIA),
     },
@@ -189,7 +216,7 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.products.createWithFirstBatch).not.toHaveBeenCalled(),
     () => expect(repos.products.addBatchToAlive).not.toHaveBeenCalled(),
     () => expect(repos.presentations.create).not.toHaveBeenCalled(),
-    () => expect(repos.presentations.rename).not.toHaveBeenCalled(),
+    () => expect(repos.presentations.replace).not.toHaveBeenCalled(),
     () => expect(repos.presentations.deleteById).not.toHaveBeenCalled(),
     () => expect(repos.presentations.list).not.toHaveBeenCalled(),
     // QC-57 R34 / QC-74 R12: sin permiso no se toca el repositorio NI se registra nada en el log.
@@ -402,7 +429,7 @@ describe('QC-74 R17 — concesion con el permiso exigido', () => {
     for (const caso of CASOS_DE_USO) {
       await esperarConcesion(
         caso.invocar,
-        { id: 'actor-con-el-catalogo-entero', permissions: todos },
+        { id: 'actor-con-el-catalogo-entero', companyId: EMPRESA_DEL_ACTOR, permissions: todos },
         `${caso.nombre} deberia conceder a un actor con el catalogo completo`,
       );
     }
@@ -482,7 +509,7 @@ describe('QC-74 R13 — pertenencia exacta, sin jerarquia ni implicacion entre p
     for (const casi of casiPermisos) {
       await esperarRechazoSinEfectos(
         consultar.invocar,
-        { id: 'actor-casi', permissions: [casi] },
+        { id: 'actor-casi', companyId: EMPRESA_DEL_ACTOR, permissions: [casi] },
         `"${casi}" no deberia conceder ${CONSULTAR}`,
       );
     }
@@ -496,10 +523,16 @@ describe('QC-74 R14 — falla cerrado', () => {
   }> = [
     { etiqueta: 'actor undefined', actor: undefined },
     { etiqueta: 'actor null', actor: null },
-    { etiqueta: 'conjunto de permisos vacio', actor: { id: 'sin-permisos-1', permissions: [] } },
+    {
+      etiqueta: 'conjunto de permisos vacio',
+      actor: { id: 'sin-permisos-1', companyId: EMPRESA_DEL_ACTOR, permissions: [] },
+    },
     // Un actor que llega sin el campo -una sesion vieja, un doble mal montado-: la regla
     // tiene que rechazarlo igual, no explotar con un TypeError que nadie traduce.
-    { etiqueta: 'sin campo permissions', actor: { id: 'sin-campo-1' } as unknown as Actor },
+    {
+      etiqueta: 'sin campo permissions',
+      actor: { id: 'sin-campo-1', companyId: EMPRESA_DEL_ACTOR } as unknown as Actor,
+    },
   ];
 
   it('un actor ausente, sin conjunto de permisos o con el conjunto vacio es rechazado en los nueve', async () => {
@@ -570,6 +603,67 @@ describe('R1 / QC-74 R18 — el actor entra por parametro y no trae nombre de ro
           `${archivo} no deberia contener "${patron}" fuera de un comentario (R1, QC-74 R18)`,
         ).toBe(false);
       }
+    }
+  });
+});
+
+// AMPLIACION 2026-09-11 (QC-49, R24) — EL PERMISO SE EXIGE ANTES QUE EL AMBITO.
+//
+// QC-49 mete la empresa DENTRO del `Actor` y con ella nace un orden que se puede equivocar: si
+// un caso de uso mirase primero la empresa -o si el rechazo por «es de otra empresa» adelantara
+// al de permiso-, un actor SIN PERMISO recibiria `product_not_found`/`presentation_not_found` en
+// vez del error de autorizacion, y eso ya seria haber contestado una pregunta que no tenia
+// derecho a hacer. El requisito lo fija al reves: permiso PRIMERO, en la primera linea, antes de
+// zod y antes de tocar el repositorio; la empresa FILTRA y no AUTORIZA.
+//
+// Se reusa la tabla de los nueve y `esperarRechazoSinEfectos`, que ya afirma que ningun metodo
+// del puerto se llamo: es justo lo que hace visible que el ambito NUNCA llego a la consulta.
+describe('QC-49 R24 — el permiso va antes que el ambito de empresa', () => {
+  /** Sin permiso Y de otra empresa: los dos motivos de rechazo a la vez, para ver cual gana. */
+  const SIN_PERMISO_Y_DE_OTRA_EMPRESA: Actor = {
+    id: 'actor-ajeno-sin-permiso',
+    companyId: OTRA_EMPRESA,
+    permissions: [],
+  };
+
+  it('un actor sin permiso y de otra empresa se rechaza por autorizacion, sin tocar el puerto', async () => {
+    for (const caso of CASOS_DE_USO) {
+      await esperarRechazoSinEfectos(
+        caso.invocar,
+        SIN_PERMISO_Y_DE_OTRA_EMPRESA,
+        `${caso.nombre} deberia rechazar por permiso aunque el actor sea de otra empresa`,
+      );
+    }
+  });
+
+  it('el error NO es el de «no existe»: la empresa ajena no adelanta a la comprobacion de permiso', async () => {
+    // Falsable: si alguien invirtiera el orden -ambito primero, permiso despues-, los casos
+    // que consultan por identificador devolverian `ProductNotFoundError` /
+    // `PresentationNotFoundError` y estas dos afirmaciones caerian.
+    for (const caso of CASOS_DE_USO) {
+      const repos = montarReposQueFallan();
+      const promesa = caso.invocar(repos, SIN_PERMISO_Y_DE_OTRA_EMPRESA);
+
+      await expect(promesa, `${caso.nombre} no debe filtrar existencia`).rejects.not.toBeInstanceOf(
+        ProductNotFoundError,
+      );
+      await expect(
+        caso.invocar(montarReposQueFallan(), SIN_PERMISO_Y_DE_OTRA_EMPRESA),
+        `${caso.nombre} no debe filtrar existencia`,
+      ).rejects.not.toBeInstanceOf(PresentationNotFoundError);
+    }
+  });
+
+  it('con el permiso exigido, la empresa del actor NO cambia el desenlace: filtra, no autoriza', async () => {
+    // La otra mitad de R24, y lo que impide leer el bloque de arriba como «la empresa ajena
+    // rechaza»: con el codigo exacto en el conjunto, el caso de uso concede IGUAL sea cual sea
+    // la empresa. Lo que la empresa hace es entrar en la consulta, no decidir el permiso.
+    for (const caso of CASOS_DE_USO) {
+      await esperarConcesion(
+        caso.invocar,
+        { id: 'actor-de-otra-empresa', companyId: OTRA_EMPRESA, permissions: [caso.permiso] },
+        `${caso.nombre} deberia conceder a un actor con ${caso.permiso} de cualquier empresa`,
+      );
     }
   });
 });

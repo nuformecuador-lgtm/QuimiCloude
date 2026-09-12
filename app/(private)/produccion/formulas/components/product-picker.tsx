@@ -88,10 +88,20 @@ export type ProductPickerOption = {
   readonly id: string;
   readonly name: string;
   /**
-   * Unidad en la que se mide el producto (`products.unit_id`, ya expuesta por `ProductView`),
-   * o `null` si no declara ninguna. Viaja hasta aqui para que la linea pueda acotar su
-   * selector de unidad al grupo del ingrediente; este componente NO la usa para nada -no
-   * filtra, no ordena y no la pinta-, solo la entrega intacta en `onSelect`.
+   * Unidad en la que se mide el producto, o `null` si todavia no se puede saber.
+   *
+   * DE DONDE SALE, desde QC-80 (R22, R23): de `ProductView.latestBatchUnitId`, es decir, de la
+   * presentacion del LOTE MAS RECIENTE del producto. Antes era `products.unit_id`, una columna
+   * que el producto declaraba y que ya NO EXISTE. `null` significa «este producto todavia no
+   * tiene ningun lote», no «no tiene unidad»: con `null`, `unitsOfGroup` devuelve el catalogo
+   * entero y la linea se puede escribir igual (R23), que es lo que permite escribir una receta
+   * antes de comprar el ingrediente.
+   *
+   * El nombre del campo se queda en `unitId` porque aqui ya es «la unidad de este ingrediente»,
+   * sin mas: quien la consume es la linea de receta, y ninguna de sus reglas cambia.
+   *
+   * Este componente NO la usa para nada -no filtra, no ordena y no la pinta-, solo la entrega
+   * intacta en `onSelect`.
    */
   readonly unitId: string | null;
 };
@@ -168,7 +178,10 @@ export function ProductPicker({
         items: result.data.items.map((item) => ({
           id: item.id,
           name: item.name,
-          unitId: item.unitId,
+          // QC-80 (R22): la unidad del ingrediente es la DERIVADA del lote mas reciente, no una
+          // columna del producto. El renombrado del contrato es lo que trajo el compilador hasta
+          // esta linea.
+          unitId: item.latestBatchUnitId,
         })),
         page: result.data.page,
         totalPages: result.data.totalPages,

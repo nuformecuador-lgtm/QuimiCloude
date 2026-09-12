@@ -208,6 +208,37 @@ function normalizeProductNameForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '')
 }
 
+/**
+ * Empresa efimera del ANDAMIAJE de inventario (QC-49 R1, R2, R22).
+ *
+ * Las tres tablas de inventario ganaron `company_id` NOT NULL en
+ * `<ts>_inventory_company_scope`, y el disparador `product_batches_check_company` exige ademas
+ * que la empresa del lote coincida con la de SU producto Y con la de SU presentacion. Por eso
+ * el producto, la presentacion y el lote de un mismo caso tienen que compartir empresa, y por
+ * eso esta se cachea POR TRANSACCION en vez de crear una nueva en cada llamada.
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
+ * -eso es `tests/integration/inventario/company-scope.int.test.ts`-, solo necesita una para
+ * poder seguir sembrando lo que si prueba. NUNCA la empresa de instalacion:
+ * `companies_name_unique` es GLOBAL y el nombre chocaria con el que siembra `db:seed`.
+ */
+const empresasDeInventario = new WeakMap<object, Promise<string>>()
+
+function inventoryCompanyOf(tx: Prisma.TransactionClient): Promise<string> {
+  const enCurso = empresasDeInventario.get(tx)
+  if (enCurso !== undefined) return enCurso
+  const creando = (async (): Promise<string> => {
+    const companyName = `Empresa inventario ${token()}`
+    const company = await tx.company.create({
+      data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+      select: { id: true },
+    })
+    return company.id
+  })()
+  empresasDeInventario.set(tx, creando)
+  return creando
+}
+
 /** Crea un producto con su presentacion propia. `products.name` no es unico (QC-14). */
 async function createProduct(
   tx: Prisma.TransactionClient,
@@ -222,7 +253,11 @@ async function createProduct(
   //      irrepetible y de solo letras y digitos, asi que sobrevive a la normalizacion.
   // Sin presentacion desde el 2026-09-09: la presentacion se mudo a `product_batches`.
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name) },
+    data: {
+      name,
+      nameNormalized: normalizeProductNameForTest(name),
+      companyId: await inventoryCompanyOf(tx),
+    },
     select: { id: true },
   })
   return product.id
@@ -889,11 +924,31 @@ describe('estructura de la linea de receta', () => {
         // que crea este bucle ya no comparten `'kg'` entre ellas. Lo que el caso necesita
         // sigue siendo lo mismo: que sea una unidad DISTINTA de la de la linea.
         const unidadDelProducto = await createUnit(tx)
-        // El producto declara una unidad DISTINTA de la de su linea: nada las relaciona.
+        // TRASLADADO EL 2026-09-11 POR QC-80 (R7, R22): el producto ya no declara unidad -la
+        // columna `products.unit_id` no existe-, la DERIVA de la presentacion de su lote mas
+        // reciente. Asi que la unidad distinta se le da por donde hoy se le da: una presentacion
+        // con esa unidad y un lote que la use. Lo que el caso vigila no cambia una coma: nada
+        // relaciona la unidad de la linea con la del producto.
         const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`)
-        await tx.product.update({
-          where: { id: productId },
-          data: { unitId: unidadDelProducto },
+        const marcaPresentacion = token()
+        const presentation = await tx.presentation.create({
+          data: {
+            name: `Presentacion ${marcaPresentacion}`,
+            nameNormalized: `presentacion${marcaPresentacion}`,
+            unitId: unidadDelProducto,
+            companyId: await inventoryCompanyOf(tx),
+          },
+          select: { id: true },
+        })
+        await tx.productBatch.create({
+          data: {
+            productId,
+            presentationId: presentation.id,
+            stock: 1,
+            unitCost: new Prisma.Decimal('1.0000'),
+            companyId: await inventoryCompanyOf(tx),
+          },
+          select: { id: true },
         })
         const lineId = await createLine(tx, recipeId, productId, '1.0000', unidadDeLaLinea)
         const line = await tx.recipeLine.findUniqueOrThrow({
@@ -904,7 +959,10 @@ describe('estructura de la linea de receta', () => {
         expect(line.unitId).not.toBe(unidadDelProducto)
       }
 
-      // Pero es OBLIGATORIA, a diferencia de la unidad del producto (QC-32 R10).
+      // Pero es OBLIGATORIA. Lo era ya frente a la del producto (QC-32 R10, columna opcional);
+      // desde QC-80 el producto no declara unidad en absoluto (R21) y la de la presentacion es
+      // tambien obligatoria (R1), asi que la comparacion que daba sentido a esta frase se fue.
+      // Lo que la linea exige no cambia: sin unidad, 23502.
       const productoSinUnidad = await createProduct(tx, 'Insumo sin unidad de linea')
       const sqlState = await expectRejectedByDatabase(
         tx,

@@ -47,6 +47,7 @@ import { deriveUnitCost } from '@/lib/modules/inventario/domain/unit-cost';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
+import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 
 // ---------------------------------------------------------------------------
@@ -139,7 +140,7 @@ function normalizeForTest(name: string): string {
  * (`product_batches_created_by_fkey`), aunque el esquema Prisma las declare como escalares.
  * No vale inventar un uuid. Copiado de `catalog-line.int.test.ts`, que resolvio lo mismo.
  */
-async function createTestUser(db: Db): Promise<string> {
+async function createTestUser(db: Db): Promise<{ userId: string; companyId: string }> {
   const marker = token();
   const documentType = await db.documentType.create({
     data: { code: `DOC${marker.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
@@ -172,7 +173,10 @@ async function createTestUser(db: Db): Promise<string> {
     },
     select: { id: true },
   });
-  return user.id;
+  // QC-49 (R1): la empresa se DEVUELVE ademas del usuario. Antes solo hacia falta para poder
+  // crear el usuario; ahora es tambien la empresa de todo el inventario del caso -producto,
+  // presentacion y lote- y el ambito con el que se llama al adaptador.
+  return { userId: user.id, companyId: company.id };
 }
 
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
@@ -187,23 +191,62 @@ async function deleteTestUser(db: Db, userId: string): Promise<void> {
   await db.company.delete({ where: { id: user.companyId } });
 }
 
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: Db): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
 /** Presentacion REAL de apoyo: `presentation_id` es NOT NULL con FK RESTRICT (R2). */
-async function createTestPresentation(db: Db): Promise<string> {
+async function createTestPresentation(db: Db, companyId: string): Promise<string> {
   const name = `Bidon ${token()}`;
   const presentation = await db.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name) },
+    // QC-49 (R1, R22): la presentacion es DE LA EMPRESA, y tiene que ser la MISMA que la del
+    // producto y la del lote o `product_batches_check_company` rechaza la escritura.
+    data: {
+      name,
+      nameNormalized: normalizeForTest(name),
+      unitId: await unidadDeSistema(db),
+      companyId,
+    },
     select: { id: true },
   });
   return presentation.id;
 }
 
-/** Escenario minimo compartido: un usuario (autoria) y una presentacion. */
-type Fixture = { readonly actorId: string; readonly presentationId: string };
+/**
+ * Escenario minimo compartido: un usuario (autoria), su empresa y una presentacion.
+ *
+ * QC-49 (R1, R13) anadio la empresa: es la de las tres tablas de inventario del caso Y el
+ * AMBITO con el que se llama al adaptador, que desde esta ficha lo exige en su firma. Es la
+ * MISMA que la del usuario a proposito -asi el caso se parece a lo que hace la Server Action,
+ * donde el actor y su inventario son de la misma empresa-, y `deleteTestUser` ya la borra.
+ */
+type Fixture = {
+  readonly actorId: string;
+  readonly presentationId: string;
+  readonly companyId: string;
+};
+
+/** El ambito del caso. Lo pide el adaptador en todas sus firmas: sin el no compila (R13). */
+function ambito(fixture: Fixture): InventoryScope {
+  return { companyId: fixture.companyId };
+}
 
 async function createFixture(): Promise<Fixture> {
-  const actorId = await createTestUser(prisma);
-  const presentationId = await createTestPresentation(prisma);
-  return { actorId, presentationId };
+  const { userId, companyId } = await createTestUser(prisma);
+  const presentationId = await createTestPresentation(prisma, companyId);
+  return { actorId: userId, presentationId, companyId };
 }
 
 /** Limpieza en ORDEN DE FK: lotes -> productos -> presentacion -> usuario. */
@@ -282,6 +325,7 @@ describe('R7 (lado base): el costo unitario derivado se guarda con sus 4 decimal
         newProduct({ stock: 3 }),
         newBatch(fixture, { stock: 3, unitCost: derivado }),
         new Date(),
+        ambito(fixture),
       );
       productIds.push(creado.id);
 
@@ -308,6 +352,7 @@ describe('R13: la fecha de expiracion se guarda sin corrimiento de dia', () => {
         newProduct(),
         newBatch(fixture, { expiryDate: '2026-01-01' }),
         new Date(),
+        ambito(fixture),
       );
       productIds.push(creado.id);
 
@@ -329,6 +374,7 @@ describe('R12 (lado base): lote y expiracion ausentes quedan en NULL', () => {
         newProduct(),
         newBatch(fixture, { lot: null, expiryDate: null }),
         new Date(),
+        ambito(fixture),
       );
       productIds.push(creado.id);
 
@@ -348,7 +394,7 @@ describe('R22: la autoria del lote es el actor de la sesion', () => {
     const productIds: string[] = [];
 
     try {
-      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture), new Date());
+      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture), new Date(), ambito(fixture));
       productIds.push(creado.id);
 
       const fila = await readBatchAsText(creado.batchId);
@@ -364,11 +410,11 @@ describe('R22: la autoria del lote es el actor de la sesion', () => {
 describe('R5 (lado base): la base rechaza un costo unitario de 0', () => {
   it('el CHECK product_batches_unit_cost_positive rechaza el 0 con 23514', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const actorId = await createTestUser(tx);
-      const presentationId = await createTestPresentation(tx);
+      const { userId: actorId, companyId } = await createTestUser(tx);
+      const presentationId = await createTestPresentation(tx, companyId);
       const name = `Producto ${token()}`;
       const producto = await tx.product.create({
-        data: { name, nameNormalized: normalizeProductName(name) },
+        data: { name, nameNormalized: normalizeProductName(name), companyId },
         select: { id: true },
       });
 
@@ -376,13 +422,16 @@ describe('R5 (lado base): la base rechaza un costo unitario de 0', () => {
       // Lo que se demuestra aqui es que POSTGRES rechaza el 0 aunque nadie valide antes.
       const sqlState = await expectRejectedByDatabase(
         tx,
+        // QC-49 (R1, R2, R22): el lote declara SU empresa, NOT NULL, y tiene que ser la misma
+        // que la de su producto y la de su presentacion. Sin ella el rechazo llegaria como
+        // 23502 y el caso dejaria de probar el CHECK del costo, que es lo suyo.
         () => tx.$executeRaw`
           INSERT INTO "product_batches" (
             "product_id", "presentation_id", "stock", "unit_cost",
-            "created_by", "updated_by", "updated_at"
+            "company_id", "created_by", "updated_by", "updated_at"
           ) VALUES (
             ${producto.id}::uuid, ${presentationId}::uuid, 1, 0::numeric,
-            ${actorId}::uuid, ${actorId}::uuid, now()
+            ${companyId}::uuid, ${actorId}::uuid, ${actorId}::uuid, now()
           )
         `,
         'un lote con unit_cost = 0',
@@ -410,6 +459,7 @@ describe('R21: producto y primer lote se escriben en una sola transaccion', () =
           { name: nombre, stock: 5 },
           newBatch(fixture, { presentationId: randomUUID() }),
           new Date(),
+          ambito(fixture),
         ),
       ).rejects.toBeInstanceOf(ValidationError);
 
@@ -437,6 +487,7 @@ describe('R18: agregar un lote no toca el producto', () => {
         newProduct({ stock: 7, qtyAlert: 2 }),
         newBatch(fixture, { stock: 7 }),
         new Date(),
+          ambito(fixture),
       );
       productIds.push(primero.id);
 
@@ -449,6 +500,7 @@ describe('R18: agregar un lote no toca el producto', () => {
         primero.id,
         newBatch(fixture, { stock: 99, unitCost: '1.0000' }),
         new Date(Date.now() + 60_000),
+        ambito(fixture),
       );
       expect(agregado).not.toBeNull();
 
@@ -456,7 +508,10 @@ describe('R18: agregar un lote no toca el producto', () => {
       expect(despues.name).toBe(antes.name);
       expect(despues.stock).toBe(antes.stock);
       expect(despues.qtyAlert).toBe(antes.qtyAlert);
-      expect(despues.unitId).toBe(antes.unitId);
+      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21): donde se comparaba `unit_id` -columna
+      // eliminada- se compara ahora la fila ENTERA. La afirmacion no se debilita, se refuerza:
+      // agregar un lote no cambia NINGUNA columna del producto, ni las que vengan despues.
+      expect(despues).toEqual(antes);
       // Ni `updated_at`: agregar un lote NO es editar el producto (`design.md > 2`).
       expect(despues.updatedAt.toISOString()).toBe(antes.updatedAt.toISOString());
 
@@ -473,7 +528,7 @@ describe('R18: agregar un lote no toca el producto', () => {
     const productIds: string[] = [];
 
     try {
-      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture), new Date());
+      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture), new Date(), ambito(fixture));
       productIds.push(creado.id);
 
       // Borrado LOGICO: la fila sigue ahi, pero `deleted_at` deja de ser NULL y el `where`
@@ -483,7 +538,7 @@ describe('R18: agregar un lote no toca el producto', () => {
         data: { deletedAt: new Date() },
       });
 
-      const agregado = await addBatchToAlive(creado.id, newBatch(fixture), new Date());
+      const agregado = await addBatchToAlive(creado.id, newBatch(fixture), new Date(), ambito(fixture));
       expect(agregado).toBeNull();
 
       // Sigue habiendo UN solo lote: el del alta.
@@ -511,7 +566,13 @@ describe('R20: con homonimos vivos se elige siempre el mismo producto', () => {
 
       for (const createdAt of [antiguo, antiguo, reciente]) {
         const fila = await prisma.product.create({
-          data: { name: nombre, nameNormalized: normalizado, createdAt, updatedAt: createdAt },
+          data: {
+            name: nombre,
+            nameNormalized: normalizado,
+            createdAt,
+            updatedAt: createdAt,
+            companyId: fixture.companyId,
+          },
           select: { id: true },
         });
         productIds.push(fila.id);
@@ -523,11 +584,11 @@ describe('R20: con homonimos vivos se elige siempre el mismo producto', () => {
       });
       const menorId = [...empatados.map((fila) => fila.id)].sort()[0];
 
-      const elegido = await findAliveIdByName(nombre);
+      const elegido = await findAliveIdByName(nombre, ambito(fixture));
       expect(elegido).toBe(menorId);
 
       // Estable: dos llamadas seguidas devuelven el mismo, que es lo que R20 pide.
-      expect(await findAliveIdByName(nombre)).toBe(elegido);
+      expect(await findAliveIdByName(nombre, ambito(fixture))).toBe(elegido);
     } finally {
       await dropFixture(fixture, productIds);
     }
@@ -543,19 +604,19 @@ describe('R19: un nombre que solo coincide con productos borrados no encuentra n
 
     try {
       const fila = await prisma.product.create({
-        data: { name: nombre, nameNormalized: normalizado },
+        data: { name: nombre, nameNormalized: normalizado, companyId: fixture.companyId },
         select: { id: true },
       });
       productIds.push(fila.id);
 
       // Vivo: se encuentra.
-      expect(await findAliveIdByName(nombre)).toBe(fila.id);
+      expect(await findAliveIdByName(nombre, ambito(fixture))).toBe(fila.id);
 
       await prisma.product.update({ where: { id: fila.id }, data: { deletedAt: new Date() } });
 
       // Borrado: `null`, y por eso el alta acabara creando un producto NUEVO en vez de
       // revivir este. La fila sigue existiendo entera; lo que cambia es el `where`.
-      expect(await findAliveIdByName(nombre)).toBeNull();
+      expect(await findAliveIdByName(nombre, ambito(fixture))).toBeNull();
       const sigue = await prisma.product.findUnique({ where: { id: fila.id } });
       expect(sigue).not.toBeNull();
     } finally {

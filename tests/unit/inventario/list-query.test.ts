@@ -111,9 +111,12 @@ describe('esquema del contrato de lista', () => {
 describe('sanitize contra la lista blanca', () => {
   it('deja intacta una consulta que solo pide campos declarados', () => {
     // R1, R3 — el nombre del campo de la base es el identificador, sin traduccion.
+    // El filtro de ejemplo era `unitId` hasta QC-80; ahora es `stock`, porque `unitId` dejo de
+    // estar declarado (R21) y un caso de «consulta valida» no puede apoyarse en un campo que la
+    // lista blanca ya no acepta.
     const entrada = query({
       sort: { columnId: 'name', direction: 'asc' },
-      filters: { unitId: { kind: 'select', values: ['u1'] } },
+      filters: { stock: { kind: 'numberRange', min: 0, max: 10 } },
       search: 'sosa',
     });
 
@@ -140,14 +143,36 @@ describe('sanitize contra la lista blanca', () => {
       query({
         filters: {
           imagePath: { kind: 'text', value: '/x.png' },
-          unitId: { kind: 'select', values: ['u1'] },
+          stock: { kind: 'numberRange', min: 0, max: 10 },
         },
       }),
       PRODUCT_QUERYABLE,
     );
 
-    expect(resultado.query.filters).toEqual({ unitId: { kind: 'select', values: ['u1'] } });
+    expect(resultado.query.filters).toEqual({ stock: { kind: 'numberRange', min: 0, max: 10 } });
     expect(resultado.ignored).toEqual(['imagePath']);
+  });
+
+  it('el listado de productos YA NO ofrece filtrar por unidad (QC-80, R21)', () => {
+    // R21 — `PRODUCT_QUERYABLE` pierde su unica entrada `select`, y eso es un cambio de
+    // CONTRATO del listado, no un detalle interno: `products.unit_id` no existe, asi que no
+    // queda columna que mirar. Filtrar por la unidad DERIVADA -la de la presentacion del lote
+    // mas reciente- seria un `where` anidado sobre ese lote: otra consulta, que nadie pidio.
+    //
+    // Y se comprueba ademas que pedirlo NO REVIENTA (R5): el filtro se omite y sale en
+    // `ignored`, que es como este contrato trata siempre lo que no reconoce. Una URL vieja con
+    // `?filters[unitId]=...` en un marcador tiene que seguir pintando la lista.
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('unitId');
+    expect(PRODUCT_QUERYABLE.sortable).not.toContain('unitId');
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt']);
+
+    const resultado = sanitizeListQuery(
+      query({ filters: { unitId: { kind: 'select', values: ['u1'] } } }),
+      PRODUCT_QUERYABLE,
+    );
+
+    expect(resultado.query.filters).toEqual({});
+    expect(resultado.ignored).toEqual(['unitId']);
   });
 
   it('omite un filtro cuya FORMA no es la que el campo declara', () => {

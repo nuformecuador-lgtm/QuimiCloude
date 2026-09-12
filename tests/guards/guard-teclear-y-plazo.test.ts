@@ -302,3 +302,77 @@ describe('guardia QC-58: solo hay una forma de teclear en este repo (R6/R7)', ()
     ).toEqual([])
   })
 })
+
+// ---------------------------------------------------------------------------------------
+// 3. El plazo de las consultas ASINCRONAS (ampliado por QC-80 el 2026-09-11)
+// ---------------------------------------------------------------------------------------
+//
+// La TERCERA mitad, y la que faltaba. QC-58 subio `testTimeout` a 15 s creyendo que con eso
+// quedaba cubierto el plazo, pero `findBy*` y `waitFor` NO miran `testTimeout`: miran
+// `asyncUtilTimeout` de testing-library, que por defecto vale 1000 ms -quince veces menos- y que
+// QC-58 nunca toco.
+//
+// El sintoma no se parece a un timeout y por eso sobrevivio tanto: el test falla con
+// `Unable to find an element` a los ~4 s, con sus 15 s intactos, porque quien se rindio fue la
+// CONSULTA y no el test. QC-80 lo midio sobre `--project ui`: con 1000 ms caian entre 1 y 8
+// archivos, casos distintos en cada corrida; con 5000 ms, 74/74 en verde -y la corrida tarda
+// la MITAD, porque cada consulta que se rinde reintenta su plazo entero y luego serializa el DOM
+// completo en el error-.
+//
+// Se vigila aqui por el mismo motivo que el `testTimeout`: ningun grafo de imports selecciona
+// `tests/setup.ts`, asi que borrar su `configure(...)` saldria verde y devolveria los flakes.
+
+/** El minimo que fijo QC-80 con la medicion de arriba. */
+const PLAZO_ASINCRONO_MINIMO = 5_000
+
+/** Donde vive la configuracion: el `setupFiles` del proyecto `ui`. */
+const ARCHIVO_DE_SETUP = 'tests/setup.ts'
+
+describe('guardia QC-80: el plazo de las consultas asincronas sigue configurado (findBy/waitFor)', () => {
+  it('tests/setup.ts llama a configure() con asyncUtilTimeout >= 5000', async () => {
+    const fuente = readFileSync(join(RAIZ, ARCHIVO_DE_SETUP), 'utf8')
+
+    expect(
+      fuente.includes('configure('),
+      ARCHIVO_DE_SETUP +
+        ' ya no llama a configure() de @testing-library/dom.\n' +
+        'POR QUE IMPORTA: sin esa llamada, findBy* y waitFor vuelven a su plazo por defecto de ' +
+        '1000 ms, que NO es el testTimeout de 15 s que vigila el bloque 1 de esta guardia. Bajo ' +
+        'carga paralela eso pinta de rojo codigo que funciona, con un mensaje (Unable to find an ' +
+        'element) que no se parece a un timeout y manda a buscar la causa donde no esta.',
+    ).toBe(true)
+
+    // Se lee el VALOR EFECTIVO importando el modulo, no con una expresion regular sobre el
+    // fuente: buscar el numero en el texto daria verde con el 5000 escrito en un comentario -que
+    // este archivo tiene, y varios- o en una constante que luego nadie pasa a configure().
+    const { ASYNC_UTIL_TIMEOUT } = (await import('@/tests/setup')) as {
+      ASYNC_UTIL_TIMEOUT: number
+    }
+
+    expect(
+      ASYNC_UTIL_TIMEOUT,
+      ARCHIVO_DE_SETUP +
+        ' declara un asyncUtilTimeout de ' +
+        String(ASYNC_UTIL_TIMEOUT) +
+        ' ms, por debajo del minimo de ' +
+        String(PLAZO_ASINCRONO_MINIMO) +
+        ' ms que midio QC-80.\n' +
+        'QUE HACER: si de verdad hay que bajarlo, mide antes `npx vitest run --project ui` ' +
+        'entero y demuestra que sigue en verde; la medicion de QC-80 esta en la cabecera de ' +
+        ARCHIVO_DE_SETUP +
+        '.',
+    ).toBeGreaterThanOrEqual(PLAZO_ASINCRONO_MINIMO)
+
+    // Y por debajo del plazo del test: si lo superara, un elemento que no llega lo reportaria el
+    // timeout pelado de Vitest -que no dice QUE se buscaba- en vez de la consulta, que si lo dice.
+    expect(
+      ASYNC_UTIL_TIMEOUT,
+      'el plazo de las consultas asincronas (' +
+        String(ASYNC_UTIL_TIMEOUT) +
+        ' ms) alcanza o supera el testTimeout de los proyectos (' +
+        String(PLAZO_MINIMO) +
+        ' ms). Tiene que quedar POR DEBAJO para que el fallo lo reporte findBy/waitFor con su ' +
+        'mensaje, y no el timeout del test.',
+    ).toBeLessThan(PLAZO_MINIMO)
+  })
+})

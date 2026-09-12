@@ -18,8 +18,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { Prisma } from '@prisma/client';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   createProduct,
@@ -29,6 +28,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 
@@ -36,38 +36,41 @@ import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 // Datos de apoyo
 // ---------------------------------------------------------------------------
 
-type Db = Prisma.TransactionClient;
-
 function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
-function normalizeForTest(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/gu, '')
-    .replace(/[^a-z0-9]/gu, '');
-}
+/* QC-80 (R7, R21) se llevo de aqui el helper `createTestUnit` y su normalizacion: existian
+ * solo para rellenar `products.unit_id`, columna que la migracion de esta ficha elimino. El
+ * producto ya no declara unidad -la declara la presentacion (R1)-, asi que el alta de un
+ * producto no necesita ninguna unidad de apoyo. */
 
 /**
- * Unidad REAL de apoyo. `products.unit_id` tiene FK (`products_unit_id_fkey`), asi que no
- * vale inventar un uuid: la unidad se crea de verdad y se borra en el `finally`. El nombre
- * lleva `token()` porque `units.name_normalized` tiene indice unico.
+ * Empresa propia del archivo y AMBITO de todas sus llamadas al adaptador (QC-49 R1, R13).
+ *
+ * `products.company_id` es NOT NULL desde `<ts>_inventory_company_scope`, y las siete funciones
+ * de `product-prisma.ts` exigen el ambito en su firma: sin el no compilan (R13). La empresa es
+ * EFIMERA y propia del archivo, asi que `collectAllPages` -que recorre el listado con
+ * `search: ''`- ve EXACTAMENTE lo que este archivo sembro y nada mas, que es mas acotado que lo
+ * que veia antes.
+ *
+ * ESTE ARCHIVO NO PRUEBA EL AISLAMIENTO: sigue probando borrado logico, exclusion de borrados,
+ * paginacion estable y orden. El aislamiento es `company-scope-queries.int.test.ts`.
  */
-async function createTestUnit(db: Db, symbol?: string | null): Promise<string> {
-  const name = `unidad ${token()}`;
-  const unit = await db.unit.create({
-    data: {
-      name,
-      nameNormalized: normalizeForTest(name),
-      symbol: symbol === undefined ? name : symbol,
-    },
+let empresaDelArchivo: string;
+
+function ambito(): InventoryScope {
+  return { companyId: empresaDelArchivo };
+}
+
+beforeAll(async () => {
+  const nombre = `Empresa crud productos ${token()}`;
+  const { id } = await prisma.company.create({
+    data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
     select: { id: true },
   });
-  return unit.id;
-}
+  empresaDelArchivo = id;
+});
 
 function baseProductInput(overrides: Partial<NewProduct> = {}): NewProduct {
   return {
@@ -88,16 +91,19 @@ async function collectAllPages(
     filters: {},
     search: '',
   });
-  const first = await listAliveProducts(listQuery(1));
+  const first = await listAliveProducts(listQuery(1), ambito());
   const items = [...first.items];
   for (let page = 2; page <= first.totalPages; page += 1) {
-    const next = await listAliveProducts(listQuery(page));
+    const next = await listAliveProducts(listQuery(page), ambito());
     items.push(...next.items);
   }
   return items.map((item) => ({ id: item.id, name: item.name }));
 }
 
 afterAll(async () => {
+  // La empresa del archivo, cuando ya no queda ningun producto que la referencie:
+  // `products_company_id_fkey` es ON DELETE RESTRICT.
+  await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
   await prisma.$disconnect();
 });
 
@@ -105,19 +111,17 @@ afterAll(async () => {
 
 describe('R15: el borrado logico conserva la fila', () => {
   it('al borrar conserva la fila y marca deleted_at', async () => {
-    // La unidad se usa para comprobar que el borrado logico no pierde ningun dato de la fila.
-    const unitId = await createTestUnit(prisma);
     let productId: string | null = null;
 
     try {
-      const input: NewProduct = { ...baseProductInput({ stock: 9, unitId }) };
-      const created = await createProduct(input, new Date());
+      const input: NewProduct = { ...baseProductInput({ stock: 9 }) };
+      const created = await createProduct(input, new Date(), ambito());
       productId = created.id;
 
       const before = await prisma.product.findUniqueOrThrow({ where: { id: created.id } });
       expect(before.deletedAt).toBeNull();
 
-      const ok = await softDeleteAliveProduct(created.id, new Date());
+      const ok = await softDeleteAliveProduct(created.id, new Date(), ambito());
       expect(ok).toBe(true);
 
       // Se relee con Prisma DIRECTO (sin el filtro de "vivo") para comprobar que la fila
@@ -126,17 +130,18 @@ describe('R15: el borrado logico conserva la fila', () => {
       expect(after.id).toBe(created.id);
       expect(after.name).toBe(before.name);
       expect(after.stock).toBe(before.stock);
-      expect(after.unitId).toBe(before.unitId);
-      expect(after.unitId).toBe(unitId);
       expect(after.deletedAt).not.toBeNull();
       expect(after.deletedAt).toBeInstanceOf(Date);
+      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21). ANTES, las dos lineas que faltan aqui
+      // comprobaban que `unit_id` sobrevivia al borrado logico: era LA columna con la que este
+      // caso demostraba que «no se pierde ningun dato». La columna ya no existe, asi que la
+      // afirmacion no se borra sino que se REFUERZA a la fila ENTERA: todo salvo `deleted_at` y
+      // la marca de modificacion tiene que ser identico. Una columna futura queda cubierta sola.
+      expect({ ...after, deletedAt: null, updatedAt: before.updatedAt }).toEqual(before);
     } finally {
       if (productId !== null) {
         await prisma.product.deleteMany({ where: { id: productId } });
       }
-      // La unidad se borra DESPUES del producto: `products_unit_id_fkey` es ON DELETE
-      // RESTRICT (QC-32 R13) y al reves fallaria.
-      await prisma.unit.deleteMany({ where: { id: unitId } });
     }
   });
 });
@@ -147,19 +152,19 @@ describe('R16: los productos borrados no aparecen en ninguna consulta', () => {
 
     try {
       const input: NewProduct = { ...baseProductInput() };
-      const created = await createProduct(input, new Date());
+      const created = await createProduct(input, new Date(), ambito());
       productId = created.id;
 
       // Vivo: aparece en la ficha y en el listado.
-      expect(await findAliveProductById(created.id)).not.toBeNull();
+      expect(await findAliveProductById(created.id, ambito())).not.toBeNull();
       const aliveList = await collectAllPages(25);
       expect(aliveList.some((item) => item.id === created.id)).toBe(true);
 
-      const ok = await softDeleteAliveProduct(created.id, new Date());
+      const ok = await softDeleteAliveProduct(created.id, new Date(), ambito());
       expect(ok).toBe(true);
 
       // Borrado: desaparece de las DOS consultas, aunque la fila siga existiendo.
-      expect(await findAliveProductById(created.id)).toBeNull();
+      expect(await findAliveProductById(created.id, ambito())).toBeNull();
       const deletedList = await collectAllPages(25);
       expect(deletedList.some((item) => item.id === created.id)).toBe(false);
 
@@ -183,7 +188,7 @@ describe('R26: la paginacion es estable con homonimos', () => {
       // desempate por id, dos de ellos podrian intercambiarse entre paginas.
       for (let i = 0; i < 5; i += 1) {
         const input: NewProduct = { ...baseProductInput({ name: homonymName }) };
-        const created = await createProduct(input, new Date());
+        const created = await createProduct(input, new Date(), ambito());
         createdIds.push(created.id);
       }
 
@@ -213,7 +218,7 @@ describe('R35: orden name ASC, id ASC', () => {
     try {
       for (let i = 0; i < 4; i += 1) {
         const input: NewProduct = { ...baseProductInput({ name: homonymName }) };
-        const created = await createProduct(input, new Date());
+        const created = await createProduct(input, new Date(), ambito());
         createdIds.push(created.id);
       }
 

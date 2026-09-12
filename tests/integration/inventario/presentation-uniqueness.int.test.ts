@@ -1,9 +1,18 @@
 /**
  * Tests de integracion de QC-20 (crud-de-productos) que verifican las DOS garantias que
  * viven en Postgres, no en el servicio (design.md > 2.2, R20, R21, R22): el indice unico
- * sobre `presentations.name_normalized` y el `ON DELETE RESTRICT` de
+ * de nombre de presentacion y el `ON DELETE RESTRICT` de
  * `product_batches_presentation_id_fkey` (la presentacion se mudo de `products` a
  * `product_batches` el 2026-09-09).
+ *
+ * ACTUALIZADO EL 2026-09-11 POR QC-49 (R20). El indice unico de nombre de presentacion DEJO DE
+ * SER GLOBAL: `presentations_name_normalized_key` desaparecio y en su lugar esta
+ * `presentations_company_name_unique`, UNICO sobre `(company_id, name_normalized)`. Este
+ * archivo cambia de SUJETO, no de exigencia: sigue afirmando que la unicidad la garantiza un
+ * INDICE de la base y no una comprobacion al vuelo, y sigue exigiendo el mismo `23505`; lo que
+ * cambia es que el choque se monta ahora DENTRO DE UNA MISMA EMPRESA, que es donde QC-49 dice
+ * que sigue habiendo choque. Que dos empresas distintas SI puedan compartir nombre -la otra
+ * mitad de R20- lo prueba `company-scope.int.test.ts`, no este archivo.
  *
  * AISLAMIENTO — mismo patron que `inventario-constraints.int.test.ts` y
  * `product-crud.int.test.ts`: cada `it` corre dentro de `prisma.$transaction` interactiva
@@ -110,12 +119,50 @@ function normalizeForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '');
 }
 
+/**
+ * QC-80 (R1): `presentations.unit_id` es NOT NULL con FK a `units`, asi que toda
+ * presentacion de apoyo necesita una unidad REAL. Se resuelve la unidad de sistema
+ * `kilogramo` POR SU NOMBRE NORMALIZADO -nunca por un uuid escrito a mano: los
+ * identificadores los genera `gen_random_uuid()` y son distintos en cada base-, que es
+ * exactamente como la busca el relleno de la migracion. Ningun test de este archivo
+ * afirma nada sobre la unidad de la presentacion: es solo lo que la columna exige.
+ */
+async function unidadDeSistema(db: Prisma.TransactionClient): Promise<string> {
+  const unit = await db.unit.findFirstOrThrow({
+    where: { nameNormalized: 'kilogramo', companyId: null },
+    select: { id: true },
+  });
+  return unit.id;
+}
+
+/**
+ * Empresa EFIMERA del caso (QC-49 R1). Las tres tablas de inventario llevan `company_id` NOT
+ * NULL, y ademas la unicidad de nombre de presentacion es POR EMPRESA (R20): por eso el choque
+ * que este archivo monta tiene que ocurrir DENTRO de una misma empresa, y por eso la empresa se
+ * crea a proposito y se pasa a mano en vez de resolverse por ahi.
+ *
+ * Se crea DENTRO de la transaccion del caso, que siempre termina en ROLLBACK: no deja residuo.
+ */
+async function createCompany(tx: Prisma.TransactionClient, marker: string): Promise<string> {
+  const company = await tx.company.create({
+    data: { name: `Empresa ${marker}`, nameNormalized: `empresa${marker}` },
+    select: { id: true },
+  });
+  return company.id;
+}
+
 async function createPresentation(
   tx: Prisma.TransactionClient,
   name: string,
+  companyId: string,
 ): Promise<string> {
   const presentation = await tx.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name) },
+    data: {
+      name,
+      nameNormalized: normalizeForTest(name),
+      unitId: await unidadDeSistema(tx),
+      companyId,
+    },
     select: { id: true },
   });
   return presentation.id;
@@ -125,14 +172,17 @@ async function createPresentation(
 async function createBatchFor(
   tx: Prisma.TransactionClient,
   presentationId: string,
+  companyId: string,
   name = `Producto ${token()}`,
 ): Promise<{ productId: string; batchId: string }> {
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeForTest(name) },
+    data: { name, nameNormalized: normalizeForTest(name), companyId },
     select: { id: true },
   });
   const batch = await tx.productBatch.create({
-    data: { productId: product.id, presentationId, stock: 10, unitCost: '1.0000' },
+    // QC-49 R2/R22: el lote declara SU empresa y `product_batches_check_company` exige que sea
+    // la misma que la de su producto Y la de su presentacion. Las tres son la del caso.
+    data: { productId: product.id, presentationId, stock: 10, unitCost: '1.0000', companyId },
     select: { id: true },
   });
   return { productId: product.id, batchId: batch.id };
@@ -151,14 +201,31 @@ beforeAll(async () => {
     );
   }
 
+  // QC-49 (R20): el indice que garantiza la unicidad ya NO es
+  // `presentations_name_normalized_key` -global- sino `presentations_company_name_unique`,
+  // sobre `(company_id, name_normalized)`.
   const index = await prisma.$queryRaw<{ indexname: string }[]>`
     SELECT indexname FROM pg_indexes
     WHERE schemaname = 'public' AND tablename = 'presentations'
-      AND indexname = 'presentations_name_normalized_key'`;
+      AND indexname = 'presentations_company_name_unique'`;
   if (index.length !== 1) {
     throw new Error(
-      'la base de pruebas no tiene el indice unico "presentations_name_normalized_key" ' +
-        '(migracion de QC-20 no aplicada, o aplicada a medias). Corre `pnpm run db:migrate`.',
+      'la base de pruebas no tiene el indice unico "presentations_company_name_unique" ' +
+        '(migracion de QC-49 `inventory_company_scope` no aplicada, o aplicada a medias). ' +
+        'Corre `pnpm run db:migrate`.',
+    );
+  }
+
+  // Y el GLOBAL que ese indice sustituye tiene que haber DESAPARECIDO: si los dos convivieran,
+  // dos empresas seguirian sin poder tener cada una su «Bidon 20 L» y R20 quedaria a medias.
+  const indiceGlobal = await prisma.$queryRaw<{ indexname: string }[]>`
+    SELECT indexname FROM pg_indexes
+    WHERE schemaname = 'public' AND tablename = 'presentations'
+      AND indexname = 'presentations_name_normalized_key'`;
+  if (indiceGlobal.length !== 0) {
+    throw new Error(
+      'la base de pruebas conserva el indice unico GLOBAL "presentations_name_normalized_key", ' +
+        'que QC-49 sustituye por uno por empresa. Corre `pnpm run db:migrate`.',
     );
   }
 
@@ -193,7 +260,14 @@ describe('R20: el indice unico es la garantia real de la unicidad', () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token();
       const normalized = `bidon20l${marker}`;
-      const firstId = await createPresentation(tx, `Bidon 20 L ${marker}`);
+      // MISMA EMPRESA para las dos: desde QC-49 (R20) la unicidad es POR EMPRESA, asi que un
+      // choque entre empresas distintas ya no seria un choque y el caso no probaria nada.
+      const companyId = await createCompany(tx, marker);
+      const firstId = await createPresentation(tx, `Bidon 20 L ${marker}`, companyId);
+      // QC-80 (R1): `presentations.unit_id` es NOT NULL, asi que el INSERT crudo tiene que
+      // llevarla o el rechazo llegaria como 23502 y el caso dejaria de probar la unicidad. Se
+      // resuelve por `name_normalized`, nunca por un uuid a mano.
+      const unidadSistema = await unidadDeSistema(tx);
 
       // Nombre ORIGINAL distinto («BIDON-20L …» frente a «Bidon 20 L …»); lo que choca es
       // la clave normalizada, que es justo lo que R18/R19/R20 exigen juntos.
@@ -201,9 +275,9 @@ describe('R20: el indice unico es la garantia real de la unicidad', () => {
         tx,
         () =>
           tx.$executeRaw`
-            INSERT INTO "presentations" ("name", "name_normalized", "updated_at")
-            VALUES (${`BIDON-20L ${marker}`}, ${normalized}, CURRENT_TIMESTAMP)`,
-        'segunda presentacion con el mismo nombre normalizado',
+            INSERT INTO "presentations" ("name", "name_normalized", "unit_id", "company_id", "updated_at")
+            VALUES (${`BIDON-20L ${marker}`}, ${normalized}, CAST(${unidadSistema} AS uuid), CAST(${companyId} AS uuid), CURRENT_TIMESTAMP)`,
+        'segunda presentacion con el mismo nombre normalizado en la MISMA empresa',
       );
       expect(sqlState).toBe(UNIQUE_VIOLATION);
 
@@ -220,8 +294,10 @@ describe('R20: el indice unico es la garantia real de la unicidad', () => {
 describe('R21: el borrado de una presentacion en uso queda bloqueado', () => {
   it('rechaza con SQLSTATE 23503 borrar una presentacion con lotes asignados', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx, `Tambor 200 L ${token()}`);
-      const { batchId } = await createBatchFor(tx, presentationId);
+      const marker = token();
+      const companyId = await createCompany(tx, marker);
+      const presentationId = await createPresentation(tx, `Tambor 200 L ${marker}`, companyId);
+      const { batchId } = await createBatchFor(tx, presentationId, companyId);
 
       const presentationBefore = await tx.presentation.findUniqueOrThrow({
         where: { id: presentationId },
@@ -250,7 +326,12 @@ describe('R21: el borrado de una presentacion en uso queda bloqueado', () => {
 describe('R22: el borrado de una presentacion sin lotes es fisico', () => {
   it('borra fisicamente la presentacion sin lotes asignados', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx, `Presentacion huerfana ${token()}`);
+      const marker = token();
+      const presentationId = await createPresentation(
+        tx,
+        `Presentacion huerfana ${marker}`,
+        await createCompany(tx, marker),
+      );
       expect(await tx.productBatch.count({ where: { presentationId } })).toBe(0);
 
       const affected = await tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${presentationId} AS uuid)`;
@@ -278,15 +359,19 @@ describe('mutacion de esquema: sin el constraint, el requisito deja de cumplirse
     await inRolledBackTransaction(async (tx) => {
       const marker = token();
       const normalized = `sinindice${marker}`;
-      await createPresentation(tx, `Sin indice ${marker}`);
+      const companyId = await createCompany(tx, marker);
+      await createPresentation(tx, `Sin indice ${marker}`, companyId);
+      // QC-80 (R1): la columna es NOT NULL tambien aqui; sin ella el INSERT fallaria por otra
+      // razon y la mutacion no demostraria nada.
+      const unidadSistema = await unidadDeSistema(tx);
 
-      await tx.$executeRawUnsafe('DROP INDEX "presentations_name_normalized_key"');
+      await tx.$executeRawUnsafe('DROP INDEX "presentations_company_name_unique"');
 
       // Con el indice fuera, la segunda insercion con el mismo `name_normalized` YA NO
       // choca: es exactamente lo que el indice, cuando esta, impide.
       await tx.$executeRaw`
-        INSERT INTO "presentations" ("name", "name_normalized", "updated_at")
-        VALUES (${`Sin indice otra vez ${marker}`}, ${normalized}, CURRENT_TIMESTAMP)`;
+        INSERT INTO "presentations" ("name", "name_normalized", "unit_id", "company_id", "updated_at")
+        VALUES (${`Sin indice otra vez ${marker}`}, ${normalized}, CAST(${unidadSistema} AS uuid), CAST(${companyId} AS uuid), CURRENT_TIMESTAMP)`;
 
       const rows = await tx.presentation.findMany({
         where: { nameNormalized: normalized },
@@ -303,7 +388,7 @@ describe('mutacion de esquema: sin el constraint, el requisito deja de cumplirse
     const indexAfter = await prisma.$queryRaw<{ indexname: string }[]>`
       SELECT indexname FROM pg_indexes
       WHERE schemaname = 'public' AND tablename = 'presentations'
-        AND indexname = 'presentations_name_normalized_key'`;
+        AND indexname = 'presentations_company_name_unique'`;
     expect(indexAfter).toHaveLength(1);
   });
 
@@ -311,8 +396,10 @@ describe('mutacion de esquema: sin el constraint, el requisito deja de cumplirse
     let sawDeleteSucceed = false;
 
     await inRolledBackTransaction(async (tx) => {
-      const presentationId = await createPresentation(tx, `Sin restrict ${token()}`);
-      const { batchId } = await createBatchFor(tx, presentationId);
+      const marker = token();
+      const companyId = await createCompany(tx, marker);
+      const presentationId = await createPresentation(tx, `Sin restrict ${marker}`, companyId);
+      const { batchId } = await createBatchFor(tx, presentationId, companyId);
 
       await tx.$executeRawUnsafe(
         'ALTER TABLE "product_batches" DROP CONSTRAINT "product_batches_presentation_id_fkey"',

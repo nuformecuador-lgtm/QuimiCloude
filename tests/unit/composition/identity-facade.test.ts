@@ -58,6 +58,52 @@ const RECORD: SessionUserRecord = {
   lockedUntil: null,
 };
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// POR QUE LA FACHADA SE IMPORTA UNA SOLA VEZ, EN UN `beforeAll` CON PRESUPUESTO PROPIO
+//
+// Importar `@/lib/composition` cuesta: arrastra y transforma el grafo ENTERO del punto de
+// composicion —todos los adaptadores driven de todos los modulos— y ese grafo CRECE cada vez que
+// una ficha cablea algo (QC-79 sumo tres adaptadores driven; QC-84, el cableado de grupos). En
+// este arbol ronda los ~7 s en solitario.
+//
+// Ese coste se paga UNA vez: no hay `vi.resetModules()` en este archivo, asi que el modulo queda
+// cacheado y el primer `import` es el unico caro. El problema no era el coste, era QUIEN lo
+// pagaba: con un `await import(...)` dentro de cada caso, la factura entera se la llevaba el
+// PRIMER caso del archivo —`getSessionContext`, de QC-48—, que no tiene nada que ver con el
+// cableado que la engorda. Bajo la carga de la suite completa ese caso superaba los 15 s de
+// `testTimeout` y tumbaba el archivo con `STACK_TRACE_ERROR`. Ese era el sintoma: un flake
+// intermitente que culpaba a un caso inocente de otra ficha.
+//
+// SI ALGUIEN DEVUELVE EL IMPORT AL CUERPO DE LOS CASOS, vuelve exactamente eso: rojo intermitente
+// bajo carga, atribuido al primer caso que importe, no a la ficha que engordo el grafo.
+//
+// El presupuesto de 60 s es LOCAL: tercer argumento de ESTE hook, en ESTE archivo. `beforeAll` no
+// hereda `testTimeout`; su defecto es el de Vitest, 10 s, que es MENOR que los 15 s de los casos,
+// asi que sin este numero el hook expiraria antes que el codigo anterior. 60 s es ~8x el coste
+// medido (~7 s) para que el margen sobreviva a la maquina cargada y a unas cuantas fichas mas de
+// crecimiento del grafo, sin dejar de ser una red que se rompe si el coste se descontrola de
+// verdad.
+//
+// NO se subio `testTimeout`: QC-58 ya lo subio de 5 s a 15 s por este mismisimo motivo y dejo
+// escrito que, si volvia a caer, «el techo esta en la maquina». Subirlo otra vez seria la segunda
+// venda sobre la misma herida, y le daria mas margen a TODOS los tests del repo para tapar un
+// coste que es de UN import; la proxima ficha que toque `lib/composition` la romperia igual.
+// Esto de aqui, en cambio, es un presupuesto de un solo hook de un solo archivo para un coste
+// conocido que se paga una vez.
+//
+// NO se baselineo el archivo: eso lo apagaria ENTERO para el comparador, y aqui dentro viven los
+// casos de QC-48, QC-78, QC-66, QC-94 y QC-79.
+//
+// El import sigue siendo DINAMICO a proposito: los `vi.mock` de arriba tienen que estar aplicados
+// cuando el grafo se cargue. Un `import` estatico en la cabecera del archivo cargaria la fachada
+// en otro momento del orden de los dobles.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+let identity: (typeof import('@/lib/composition'))['identity'];
+
+beforeAll(async () => {
+  ({ identity } = await import('@/lib/composition'));
+}, 60_000);
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -65,7 +111,6 @@ beforeEach(() => {
 describe('identity.getSessionContext (fachada cableada)', () => {
   it('la fachada expone getSessionContext junto a getSessionUser', async () => {
     // R18 — la forma de preguntar por la empresa sale por el contrato ya cableado del modulo.
-    const { identity } = await import('@/lib/composition');
 
     expect(typeof identity.getSessionContext).toBe('function');
     expect(typeof identity.getSessionUser).toBe('function');
@@ -74,7 +119,6 @@ describe('identity.getSessionContext (fachada cableada)', () => {
   it('sin sesion devuelve null', async () => {
     // R19 — ausencia de empresa, exactamente cuando no hay sesion.
     readClaimsMock.mockResolvedValue(null);
-    const { identity } = await import('@/lib/composition');
 
     expect(await identity.getSessionContext()).toBeNull();
     expect(findActiveByIdMock).not.toHaveBeenCalled();
@@ -84,7 +128,6 @@ describe('identity.getSessionContext (fachada cableada)', () => {
     // R18, R20 — el `companyId` y el rol son los leidos de la ficha, no los firmados.
     readClaimsMock.mockResolvedValue(CLAIMS_VIGENTES);
     findActiveByIdMock.mockResolvedValue(RECORD);
-    const { identity } = await import('@/lib/composition');
 
     expect(await identity.getSessionContext()).toEqual({
       userId: SUB,
@@ -98,7 +141,6 @@ describe('identity.getSessionContext (fachada cableada)', () => {
     // la frontera sigue siendo el service.
     readClaimsMock.mockResolvedValue(CLAIMS_VIGENTES);
     findActiveByIdMock.mockResolvedValue(RECORD);
-    const { identity } = await import('@/lib/composition');
 
     const contexto = await identity.getSessionContext();
 
@@ -111,7 +153,6 @@ describe('identity.getSessionContext (fachada cableada)', () => {
     // en cuanto una de las dos divergiera.
     readClaimsMock.mockResolvedValue(CLAIMS_VIGENTES);
     findActiveByIdMock.mockResolvedValue({ ...RECORD, companyDeletedAt: new Date() });
-    const { identity } = await import('@/lib/composition');
 
     expect(await identity.getSessionContext()).toBeNull();
     expect(await identity.getSessionUser()).toBeNull();
@@ -135,8 +176,6 @@ describe('identity — los seis casos de uso de usuarios (fachada cableada)', ()
   ] as const;
 
   it('expone las seis claves y todas son funciones', async () => {
-    const { identity } = await import('@/lib/composition');
-
     for (const clave of CLAVES_DE_USUARIOS) {
       expect(typeof identity[clave]).toBe('function');
     }
@@ -145,7 +184,6 @@ describe('identity — los seis casos de uso de usuarios (fachada cableada)', ()
   it('sin romper las claves que ya tenia la fachada', async () => {
     // El bloque nuevo se SUMA: `verifyCredentials`, la politica, el hasher, el seed y las dos
     // caras de la sesion siguen ahi. Anadir un modulo al punto de composicion no reemplaza nada.
-    const { identity } = await import('@/lib/composition');
 
     expect(typeof identity.verifyCredentials).toBe('function');
     expect(typeof identity.checkCredentialPolicy).toBe('function');
@@ -153,6 +191,64 @@ describe('identity — los seis casos de uso de usuarios (fachada cableada)', ()
     expect(typeof identity.getSessionUser).toBe('function');
     expect(typeof identity.getSessionContext).toBe('function');
   });
+});
+
+// QC-79 T17 (R26, R32) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no
+// reformatea ninguna fixture ni ningun caso de arriba (el archivo lo comparten QC-48, QC-78 y
+// QC-66).
+//
+// Lo que se afirma es el CABLEADO, no el dominio: que la fachada ya construida expone las DOS
+// claves nuevas del enlace de credencial y que son invocables. Si alguien dejara una factory sin
+// cablear —o se llevara el cableado fuera de `lib/composition`— esto se pone rojo.
+describe('identity — el enlace para establecer la contrasena (fachada cableada)', () => {
+  const CLAVES_DEL_ENLACE = ['setCredentialWithLink', 'issueCredentialSetupLink'] as const;
+
+  it('expone las dos claves nuevas y las dos son funciones', async () => {
+    for (const clave of CLAVES_DEL_ENLACE) {
+      expect(typeof identity[clave]).toBe('function');
+    }
+  });
+
+  it('sin romper las claves que ya tenia la fachada', async () => {
+    // El bloque nuevo se SUMA: las seis de usuarios, la politica, el hasher, el seed y las dos
+    // caras de la sesion siguen ahi. Anadir dos casos de uso no reemplaza nada.
+
+    for (const clave of [
+      'createUser',
+      'getUser',
+      'listUsers',
+      'updateUser',
+      'deleteUser',
+      'setUserAccountStatus',
+      'checkCredentialPolicy',
+      'seedInitialAccess',
+      'getSessionUser',
+      'getSessionContext',
+    ] as const) {
+      expect(typeof identity[clave]).toBe('function');
+    }
+  });
+
+  it('el caso de uso PUBLICO se cablea SIN actor: su firma recibe solo la entrada (R18)', async () => {
+    // R18 escrito en el cableado: `setCredentialWithLink` es el unico caso de uso del modulo con
+    // un solo parametro. Si alguien le anadiera un actor —o una lectura de sesion— para «reusar»
+    // el patron de las seis de QC-66, esta linea se pondria roja.
+
+    expect(identity.setCredentialWithLink.length).toBe(1);
+    // El reenvio SI lleva actor por parametro, y es la otra mitad del contraste (R14).
+    expect(identity.issueCredentialSetupLink.length).toBe(2);
+  });
+
+  // NO hay aqui ningun caso que reimporte `lib/composition` con `MAIL_TRANSPORT` roto para
+  // demostrar que el transporte se elige EN LA INVOCACION (R28, `design.md > 9.2`). Se escribio,
+  // se midio y se quito: un `vi.resetModules()` seguido de un segundo `import('@/lib/composition')`
+  // vuelve a transformar el grafo entero del repo (~7 s en este arbol) y dejaba este archivo al
+  // borde del tiempo limite cuando la suite corre entera, que es como se fabrica un flake.
+  //
+  // Lo que ese caso queria afirmar ya esta cubierto sin pagar ese precio, y en dos sitios: este
+  // archivo IMPORTA la fachada sin ninguna variable de correo definida -si la eleccion se hiciera
+  // al importar, los once casos de aqui estarian rojos-, y `mail-config.test.ts` prueba
+  // `readMailTransportFromEnv()` por su cuenta, incluido el valor por defecto y el invalido.
 });
 
 // QC-94 T8 (R16) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no reformatea
@@ -163,18 +259,95 @@ describe('identity — los seis casos de uso de usuarios (fachada cableada)', ()
 // sin cablear, o se lo llevara a otro sitio que no sea `lib/composition`, esto se pone rojo.
 describe('identity — la consulta del catalogo de roles (fachada cableada)', () => {
   it('expone listRoles y es una funcion', async () => {
-    const { identity } = await import('@/lib/composition');
-
     expect(typeof identity.listRoles).toBe('function');
   });
 
   it('sin romper las claves que ya tenia la fachada', async () => {
     // La clave nueva se SUMA al final del objeto: cablear un caso de uso mas no reemplaza nada.
-    const { identity } = await import('@/lib/composition');
 
     expect(typeof identity.getSessionUser).toBe('function');
     expect(typeof identity.getSessionContext).toBe('function');
     expect(typeof identity.listUsers).toBe('function');
     expect(typeof identity.createUser).toBe('function');
+  });
+});
+
+// QC-84 T10 (R44) — bloque NUEVO al final, aditivo: no reescribe, no reordena y no reformatea
+// ninguna de las fixtures ni de los casos de arriba.
+//
+// Lo que se afirma es el CABLEADO, no el dominio: que la fachada ya construida expone las SIETE
+// claves de los grupos de trabajo, que el listado de miembros recibe su aritmetica de paginacion
+// —el defecto de 10 y el tope de 25 de `lib/shared/pagination`— y que las claves de arriba siguen
+// ahi. Si alguien dejara una factory sin cablear, o se la llevara a otro sitio que no sea
+// `lib/composition`, esto se pone rojo.
+describe('identity — los siete casos de uso de grupos de trabajo (fachada cableada)', () => {
+  const CLAVES_DE_GRUPOS = [
+    'createWorkGroup',
+    'renameWorkGroup',
+    'deleteWorkGroup',
+    'addWorkGroupMember',
+    'removeWorkGroupMember',
+    'listWorkGroups',
+    'listWorkGroupMembers',
+  ] as const;
+
+  it('expone las siete claves y todas son funciones', async () => {
+    for (const clave of CLAVES_DE_GRUPOS) {
+      expect(typeof identity[clave]).toBe('function');
+    }
+  });
+
+  it('sin romper las claves que ya tenia la fachada', async () => {
+    // Las claves nuevas se SUMAN al final del objeto: cablear un modulo mas no reemplaza nada.
+
+    expect(typeof identity.getSessionUser).toBe('function');
+    expect(typeof identity.getSessionContext).toBe('function');
+    expect(typeof identity.listUsers).toBe('function');
+    expect(typeof identity.createUser).toBe('function');
+    expect(typeof identity.listRoles).toBe('function');
+  });
+
+  it('listWorkGroupMembers recibe la paginacion REAL: defecto 10 y tope 25', async () => {
+    // R51 — la aritmetica NO se reimplementa en el dominio: se inyecta aqui la misma de
+    // `lib/shared/pagination`. Se comprueba de punta a punta contra un grupo de 30 miembros
+    // visibles: sin `pageSize` salen 10, y pidiendo 100 salen 25 —acotado, no rechazado—.
+    //
+    // El repositorio se dobla a nivel del CLIENTE PRISMA, no del caso de uso: asi lo que se
+    // ejercita es el cableado real de `lib/composition` (repositorio + paginacion), que es lo que
+    // este archivo prueba.
+    const { prisma } = await import('@/lib/shared/db/prisma');
+    const miembros = Array.from({ length: 30 }, (_, indice) => ({
+      id: `user-${String(indice).padStart(2, '0')}`,
+      firstNames: 'Ana',
+      lastNames: `Apellido ${String(indice).padStart(2, '0')}`,
+      username: `ana.${indice}`,
+      accountStatus: 'active' as const,
+      lockedUntil: null,
+    }));
+
+    Object.assign(prisma, {
+      workGroup: { findFirst: vi.fn(async () => ({ id: 'wg-1' })) },
+      workGroupMember: {
+        findMany: vi.fn(async () => miembros.map((miembro) => ({ userId: miembro.id }))),
+      },
+      user: { findMany: vi.fn(async () => miembros) },
+    });
+
+    const actor = { id: 'u1', companyId: 'c1', permissions: ['usuarios.consultar'] };
+    const consulta = { page: 1, sort: null, filters: {}, search: '' };
+
+    const porDefecto = await identity.listWorkGroupMembers(actor, 'wg-1', consulta, new Date());
+    expect(porDefecto.items).toHaveLength(10);
+    expect(porDefecto.pageSize).toBe(10);
+    expect(porDefecto.total).toBe(30);
+
+    const acotada = await identity.listWorkGroupMembers(
+      actor,
+      'wg-1',
+      { ...consulta, pageSize: 100 },
+      new Date(),
+    );
+    expect(acotada.items).toHaveLength(25);
+    expect(acotada.pageSize).toBe(25);
   });
 });

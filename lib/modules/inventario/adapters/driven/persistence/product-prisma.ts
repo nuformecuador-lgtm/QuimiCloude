@@ -14,6 +14,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import { ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
 
+import { companyScopeColumns, productCompanyScope } from './company-scope';
 import {
   dateRangeCondition,
   normalizedSearchCondition,
@@ -22,6 +23,7 @@ import {
   textCondition,
 } from './list-query-sql';
 
+import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
@@ -35,6 +37,18 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
  * `deleted_at IS NULL` va en el `where` de TODA lectura (`findAliveProductById`,
  * `listAliveProducts`) y de toda escritura que exija que la fila siga viva
  * (`updateAliveProduct`, `softDeleteAliveProduct`), nunca en un `if` posterior (R16).
+ *
+ * QC-49 (R13, R14, R15, R16, R17, R18): TODA consulta y TODA escritura de este archivo lleva el
+ * AMBITO DE EMPRESA, y lo toma del UNICO punto que lo define -`./company-scope`-, nunca
+ * escribiendo `companyId:` a mano. En las lecturas y en las escrituras sobre filas existentes va
+ * EN EL `where`, compuesto con un `AND` de primer nivel y JAMAS fundido al mismo objeto que la
+ * busqueda (un `OR` de busqueda junto al ambito dejaria que un termino ENSANCHE lo visible); en
+ * las creaciones se escribe como columna. La empresa no llega nunca por `NewProduct` ni por
+ * `NewProductBatch`: lo que no esta en el tipo no se puede elegir desde la entrada del llamante.
+ *
+ * «DE OTRA EMPRESA» SALE POR EL MISMO CAMINO QUE «NO EXISTE» -`null`, `false`-: ningun resultado
+ * del puerto crece, porque distinguirlos seria un oraculo de existencia sobre filas ajenas (R15,
+ * R16). Y `ProductView` NO gana `companyId` (R19): la empresa entra en la consulta y no sale.
  *
  * PROHIBIDO tocar `users`. Desde el 2026-09-09 la autoria (`createdBy`/`updatedBy`) se mudo
  * de `products` a `product_batches`, asi que este adaptador ya no escribe ni lee ninguna
@@ -50,17 +64,56 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
  * que tampoco toca esta columna.
  */
 
-/** `select` unico para las tres lecturas, sin ningun `join` desde el 2026-09-09 (la
- * presentacion se mudo a `product_batches`). */
-const PRODUCT_SELECT = {
+/**
+ * El LOTE MAS RECIENTE del producto, y de el SOLO la unidad de su presentacion (QC-80, R22).
+ *
+ * Se declara UNA vez y viaja dentro de `PRODUCT_SELECT`, asi que las TRES lecturas
+ * -`findAliveProductById`, `listAliveProducts` y cualquiera que venga- derivan la unidad con
+ * exactamente el mismo criterio. Dos copias parecidas de este `orderBy` serian dos definiciones
+ * de «mas reciente».
+ *
+ * «MAS RECIENTE» ES `created_at DESC` DESEMPATADO POR `id DESC`, y el desempate no es adorno:
+ * no hay fecha de compra todavia -es QC-81- y dos lotes creados en el mismo instante -el alta
+ * con primer lote fija un unico `now`- dejarian el ganador sin definir, asi que la misma
+ * consulta podria devolver una unidad distinta cada vez.
+ *
+ * LA TRAVESIA `ProductBatch -> Presentation` ES INTERNA A `inventario`: los dos modelos son de
+ * este modulo. De `Presentation` se lee el ESCALAR `unitId` y nada mas: no se entra en `units`,
+ * que es de `unidades` y se resuelve por su contrato publico, no con un `include`.
+ *
+ * SIN INDICE NUEVO, a proposito: `product_batches_product_id_idx` ya localiza los lotes de un
+ * producto y el conjunto por producto es pequeño. Si algun dia deja de serlo, la respuesta es el
+ * indice compuesto `(product_id, created_at DESC)` -una migracion de una linea-, no este
+ * comentario.
+ *
+ * COSTE ACEPTADO Y CONSCIENTE: `listAliveProducts` emite una consulta correlacionada MAS POR
+ * PAGINA (no por fila). Se acepta porque el contrato no se ensancha -el campo ya existia, cambia
+ * su origen- y porque la alternativa era pedir la unidad por red en mitad de una interaccion.
+ */
+const LATEST_BATCH_UNIT = {
+  select: { presentation: { select: { unitId: true } } },
+  orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  take: 1,
+  // `satisfies` y NO `as const`: el `orderBy` de Prisma exige un array MUTABLE, y un `as const`
+  // lo congelaria en `readonly` -que es lo que el compilador rechaza-. `satisfies` da la misma
+  // garantia que importa aqui (que la forma sea la que Prisma espera) sin mentir sobre el tipo.
+} satisfies Prisma.Product$batchesArgs;
+
+/** `select` unico para las tres lecturas. Sin `join` a `presentations` desde el producto (la
+ * presentacion se mudo a `product_batches` el 2026-09-09) y, desde QC-80, sin `unit_id`: esa
+ * columna ya no existe y la unidad se DERIVA por `LATEST_BATCH_UNIT`.
+ *
+ * SE EXPORTA solo para que su test pueda afirmar el `orderBy` y el `take` COMO DATO -no como
+ * texto del archivo-: una asercion sobre el fuente pasaria igual con el criterio equivocado. */
+export const PRODUCT_SELECT = {
   id: true,
   name: true,
   imagePath: true,
   stock: true,
   qtyAlert: true,
-  unitId: true,
   createdAt: true,
   updatedAt: true,
+  batches: LATEST_BATCH_UNIT,
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
@@ -72,7 +125,14 @@ type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
  * adaptador de la linea de catalogo de `proveedores`, que es donde el importe se quedo.
  */
 
-/** Fila de Prisma -> `ProductView` del puerto. */
+/**
+ * Fila de Prisma -> `ProductView` del puerto.
+ *
+ * `latestBatchUnitId` sale del UNICO lote que `LATEST_BATCH_UNIT` deja pasar (`take: 1`), asi
+ * que aqui no se ordena ni se elige nada: ELEGIR ES TRABAJO DEL MOTOR, no de este mapeo, que es
+ * lo mismo que ya vale para el orden y el filtro del listado. Sin ningun lote el array viene
+ * vacio y la unidad derivada es `null` (R23): «todavia no se ha comprado», no «sin unidad».
+ */
 export function toProductView(row: ProductRow): ProductView {
   return {
     id: row.id,
@@ -80,7 +140,7 @@ export function toProductView(row: ProductRow): ProductView {
     imagePath: row.imagePath,
     stock: row.stock,
     qtyAlert: row.qtyAlert,
-    unitId: row.unitId,
+    latestBatchUnitId: row.batches[0]?.presentation.unitId ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -90,10 +150,15 @@ export function toProductView(row: ProductRow): ProductView {
  * `create` de `ProductRepository` (R5). Sin autor ni presentacion: se mudaron a
  * `product_batches` el 2026-09-09. `createdAt`/`updatedAt` usan el `now` inyectado por el
  * caso de uso, no `now()` de la base, para que el reloj sea el mismo que el service fijo.
+ *
+ * QC-49 (R17): la empresa se escribe desde `companyScopeColumns(scope)` -el unico punto que la
+ * define- y NO desde `data`: `NewProduct` no la lleva, asi que no hay forma de que la entrada del
+ * llamante la elija.
  */
 export async function createProduct(
   data: NewProduct,
   now: Date,
+  scope: InventoryScope,
 ): Promise<{ id: string }> {
   const created = await prisma.product.create({
     data: {
@@ -101,7 +166,7 @@ export async function createProduct(
       nameNormalized: normalizeProductName(data.name),
       stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
-      unitId: data.unitId ?? null,
+      ...companyScopeColumns(scope),
       createdAt: now,
       updatedAt: now,
     },
@@ -113,10 +178,17 @@ export async function createProduct(
 /**
  * `findAliveById` de `ProductRepository` (R16). `deleted_at IS NULL` en el `where`, no
  * en un `if` posterior.
+ *
+ * QC-49 (R15): el AMBITO viaja en el mismo `where`, junto al `deleted_at IS NULL` y por la misma
+ * razon. Un producto de otra empresa no devuelve fila, asi que sale por el camino de «no existe»
+ * -`null`- y el caso de uso responde `product_not_found`, nunca un error de autorizacion.
  */
-export async function findAliveProductById(id: string): Promise<ProductView | null> {
+export async function findAliveProductById(
+  id: string,
+  scope: InventoryScope,
+): Promise<ProductView | null> {
   const row = await prisma.product.findFirst({
-    where: { id, deletedAt: null },
+    where: { AND: [productCompanyScope(scope), { id, deletedAt: null }] },
     select: PRODUCT_SELECT,
   });
   return row === null ? null : toProductView(row);
@@ -127,20 +199,24 @@ export async function findAliveProductById(id: string): Promise<ProductView | nu
  * `deletedAt: null` en el `where` y no `update`: si el producto no existe o ya esta
  * borrado, `count` sale 0 y se devuelve `false` en vez de lanzar (R14). La existencia
  * -`stock`- se guarda tal cual, sin recalcularla, como el resto de campos de negocio.
+ *
+ * QC-49 (R16): el AMBITO va en el `where` del `updateMany`, NO en un `if` sobre la fila leida -no
+ * hay fila leida-. Editar un producto de otra empresa deja `count` en 0, o sea `false`: la fila
+ * ajena NO se modifica y quien pide no distingue «de otra empresa» de «no existe».
  */
 export async function updateAliveProduct(
   id: string,
   data: NewProduct,
   now: Date,
+  scope: InventoryScope,
 ): Promise<boolean> {
   const { count } = await prisma.product.updateMany({
-    where: { id, deletedAt: null },
+    where: { AND: [productCompanyScope(scope), { id, deletedAt: null }] },
     data: {
       name: data.name,
       nameNormalized: normalizeProductName(data.name),
       stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
-      unitId: data.unitId ?? null,
       updatedAt: now,
     },
   });
@@ -157,9 +233,12 @@ export async function updateAliveProduct(
 export async function softDeleteAliveProduct(
   id: string,
   now: Date,
+  scope: InventoryScope,
 ): Promise<boolean> {
+  // QC-49 (R16): mismo AMBITO en el `where` que `updateAliveProduct`. Borrar un producto de otra
+  // empresa devuelve `false` y NO le marca `deleted_at` a nadie.
   const { count } = await prisma.product.updateMany({
-    where: { id, deletedAt: null },
+    where: { AND: [productCompanyScope(scope), { id, deletedAt: null }] },
     data: {
       deletedAt: now,
       updatedAt: now,
@@ -242,7 +321,12 @@ function productFilterWhere(
     case 'select': {
       const condition = selectCondition(value.values);
       if (condition === null) return null;
-      if (field === 'unitId') return { unitId: condition };
+      // QC-80 (R21): AQUI estaba `unitId`, el unico `select` que tenia este listado. La columna
+      // `products.unit_id` ya no existe, asi que no hay ninguna a la que traducirlo -y la unidad
+      // DERIVADA no es una columna: filtrarla seria un `where` anidado sobre el lote mas
+      // reciente, otra consulta y otra ficha-. La rama se conserva vacia por el mismo motivo que
+      // la de `text`: traducir es trabajo del adaptador, y declarar manana un campo de eleccion
+      // no puede depender de que alguien recuerde que aqui faltaba una rama.
       return null;
     }
     case 'numberRange': {
@@ -281,17 +365,32 @@ function productFilterWhere(
  *      viene sin acentos ni mayusculas, y pedirlo ademas dejaria fuera el indice de trigramas.
  *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
  *      si los cumple todos.
+ *   4. **El AMBITO DE EMPRESA** (QC-49 R13, R14), tomado del unico punto que lo define.
+ *
+ * EL AMBITO VA EN UN `AND` DE PRIMER NIVEL Y NUNCA DENTRO DEL OBJETO DE LA BUSQUEDA. No es
+ * estilo: `companyId` fundido al mismo nivel que un `OR` de busqueda dejaria que un termino de
+ * busqueda AMPLIE lo visible -la fila entraria por cumplir la busqueda, aunque fuera de otra
+ * empresa-. Con esta forma, la empresa es una conjuncion que ninguna otra condicion puede
+ * relajar: es la capa de fuera, y todo lo demas acota DENTRO de ella.
  */
-export function buildProductWhere(query: ListQuery): Prisma.ProductWhereInput {
+export function buildProductWhere(
+  query: ListQuery,
+  scope: InventoryScope,
+): Prisma.ProductWhereInput {
   const search = normalizedSearchCondition(query.search, normalizeProductName);
   const filters = Object.entries(query.filters)
     .map(([field, value]) => productFilterWhere(field, value))
     .filter((condition): condition is Prisma.ProductWhereInput => condition !== null);
 
   return {
-    deletedAt: null,
-    ...(search === null ? {} : { nameNormalized: search }),
-    ...(filters.length === 0 ? {} : { AND: filters }),
+    AND: [
+      productCompanyScope(scope),
+      {
+        deletedAt: null,
+        ...(search === null ? {} : { nameNormalized: search }),
+        ...(filters.length === 0 ? {} : { AND: filters }),
+      },
+    ],
   };
 }
 
@@ -311,9 +410,15 @@ export function buildProductWhere(query: ListQuery): Prisma.ProductWhereInput {
  * constante, no dos copias parecidas-, de modo que el `total` y el `totalPages` describan el
  * conjunto YA FILTRADO y no el catalogo entero.
  */
-export async function listAliveProducts(query: ListQuery): Promise<Page<ProductView>> {
+export async function listAliveProducts(
+  query: ListQuery,
+  scope: InventoryScope,
+): Promise<Page<ProductView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildProductWhere(query);
+  // QC-49 (R14): el ambito entra en ESTE `where`, que es el mismo objeto que reciben el
+  // `findMany` y el `count`. Por eso el `total` tambien queda acotado a la empresa: un recuento
+  // con otro `where` contaria filas ajenas y delataria cuantas hay.
+  const where = buildProductWhere(query, scope);
 
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
@@ -357,10 +462,23 @@ export async function listAliveProducts(query: ListQuery): Promise<Page<ProductV
  *
  * El indice de `name_normalized` ya existe desde QC-57: esta consulta no pide ninguna
  * migracion (R29).
+ *
+ * QC-49 (R18): el AMBITO acota la resolucion por nombre. Si el unico homonimo vivo es de otra
+ * empresa, esta consulta devuelve `null` y el alta crea un producto NUEVO en la empresa de quien
+ * pide, en vez de colgarle el lote al producto ajeno. Sin el ambito aqui, el aislamiento se
+ * perderia por la puerta de atras: el lote se escribiria en el producto de la otra empresa.
  */
-export async function findAliveIdByName(name: string): Promise<string | null> {
+export async function findAliveIdByName(
+  name: string,
+  scope: InventoryScope,
+): Promise<string | null> {
   const row = await prisma.product.findFirst({
-    where: { nameNormalized: normalizeProductName(name), deletedAt: null },
+    where: {
+      AND: [
+        productCompanyScope(scope),
+        { nameNormalized: normalizeProductName(name), deletedAt: null },
+      ],
+    },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { id: true },
   });
@@ -415,6 +533,7 @@ function toBatchCreateData(
   productId: string,
   batch: NewProductBatch,
   now: Date,
+  scope: InventoryScope,
 ): Prisma.ProductBatchUncheckedCreateInput {
   return {
     productId,
@@ -425,6 +544,12 @@ function toBatchCreateData(
     // R12: ausente se guarda como `NULL`, no como cadena vacia.
     lot: batch.lot,
     expiryDate: toBatchExpiryDate(batch.expiryDate),
+    // QC-49 (R2, R17): el lote lleva SU PROPIA columna de empresa y se escribe desde el unico
+    // punto que define el ambito. NO se hereda por `join` con el producto: la unicidad
+    // `(empresa, lote)` que necesita QC-81 no puede indexar la columna de otra tabla. La
+    // coherencia entre las tres -lote, producto y presentacion- la garantiza el disparador
+    // `product_batches_check_company`, no este `spread`.
+    ...companyScopeColumns(scope),
     createdBy: batch.createdBy,
     updatedBy: batch.createdBy,
     createdAt: now,
@@ -455,11 +580,81 @@ function isBatchForeignKeyViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
 }
 
-/** Traduce el fallo de FK del lote y relanza cualquier otro error TAL CUAL: un `CHECK`
- *  violado (`unit_cost > 0`, `stock >= 0`) o una caida de conexion no son entrada invalida y
- *  disfrazarlos de `invalid_input` mentiria a quien lee el log. Nada de `catch` vacios. */
+/**
+ * SQLSTATE de un error de Postgres, leido del campo ESTRUCTURADO del conector y jamas del texto
+ * humano del mensaje: en esta maquina Postgres responde en espanol. Misma tecnica -y mismo
+ * criterio- que `sqlStateOf` de `recipe-prisma.ts` y `order-prisma.ts`.
+ *
+ * Hace falta aqui porque un `RAISE EXCEPTION` de plpgsql NO tiene codigo `P####` propio: llega
+ * como `P2010` con el SQLSTATE en `meta.code`, o como `PrismaClientUnknownRequestError` con el
+ * codigo incrustado y estructurado en el mensaje del conector.
+ */
+function sqlStateOf(error: unknown): string | null {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const meta: unknown = error.meta;
+    if (typeof meta === 'object' && meta !== null && 'code' in meta) {
+      const code: unknown = (meta as { code: unknown }).code;
+      if (typeof code === 'string') return code;
+    }
+    return error.code;
+  }
+  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    const match = /\bcode:\s*"(\d{5})"/.exec(error.message);
+    if (match !== null) return match[1] as string;
+  }
+  return null;
+}
+
+/**
+ * Los dos casos del disparador `product_batches_check_company` (QC-49 R22,
+ * `20260911130000_inventory_company_scope/migration.sql > 5.a`). Son IDENTIFICADORES que escribe
+ * el propio `RAISE EXCEPTION` en ingles, no texto que Postgres traduzca: buscarlos es lo mismo
+ * que hace `isDuplicateOrderNumber` con el nombre de su indice, y NO es decidir por el mensaje
+ * humano.
+ */
+const BATCH_COMPANY_SCOPE_VIOLATIONS = [
+  'product_batches_company_differs_from_product',
+  'product_batches_company_differs_from_presentation',
+] as const;
+
+/**
+ * ¿Es este error el `23514` del disparador de coherencia de empresa del lote (R22)?
+ *
+ * DOS condiciones, y hacen falta las dos: el SQLSTATE tiene que ser `23514` **y** el error tiene
+ * que nombrar uno de los dos casos del disparador. El segundo requisito no es adorno: en
+ * `product_batches` hay otros `23514` -los `CHECK` de `stock >= 0` y `unit_cost > 0`- que este
+ * archivo relanza CRUDOS a proposito desde QC-90, y traducirlos todos por el codigo los
+ * disfrazaria de entrada invalida. Si el `23514` no se puede identificar, se relanza: mejor un
+ * error crudo en el log que una traduccion equivocada (mismo criterio conservador que
+ * `recipe-prisma.ts`).
+ */
+function isBatchCompanyScopeViolation(error: unknown): boolean {
+  if (sqlStateOf(error) !== '23514') return false;
+  const meta: unknown = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : null;
+  const detalle =
+    typeof meta === 'object' && meta !== null && 'message' in meta
+      ? String((meta as { message: unknown }).message)
+      : '';
+  const bruto = error instanceof Error ? error.message : '';
+  const carga = `${detalle}\n${bruto}`;
+  return BATCH_COMPANY_SCOPE_VIOLATIONS.some((nombre) => carga.includes(nombre));
+}
+
+/** Traduce el fallo de FK del lote y el `23514` del disparador de empresa, CADA UNO POR SU
+ *  CAMINO -no con un `catch` comun, mismo criterio que los dos `P2003` de
+ *  `presentation-prisma.ts`-, y relanza cualquier otro error TAL CUAL: un `CHECK` violado
+ *  (`unit_cost > 0`, `stock >= 0`) o una caida de conexion no son entrada invalida y
+ *  disfrazarlos de `invalid_input` mentiria a quien lee el log. Nada de `catch` vacios.
+ *
+ *  Los dos acaban en `ValidationError` -> `invalid_input` (QC-49 `design.md > 6.3`): un lote cuya
+ *  empresa no cuadra con la de su producto o su presentacion es ENTRADA que no encaja, igual que
+ *  una FK rota, y NO se le anade ningun codigo nuevo al catalogo cerrado de QC-70. Son dos
+ *  funciones distintas aunque hoy lleven al mismo error: lo que cambia no es el destino, es lo
+ *  que significa cada caso, y separarlas es lo que impide que un `catch` comun los confunda el
+ *  dia que uno de los dos tenga que decir otra cosa. */
 function translateBatchWriteError(error: unknown): never {
   if (isBatchForeignKeyViolation(error)) throw new ValidationError();
+  if (isBatchCompanyScopeViolation(error)) throw new ValidationError();
   throw error;
 }
 
@@ -485,6 +680,7 @@ export async function createWithFirstBatch(
   product: NewProduct,
   batch: NewProductBatch,
   now: Date,
+  scope: InventoryScope,
 ): Promise<{ id: string; batchId: string }> {
   try {
     return await prisma.$transaction(async (tx) => {
@@ -494,7 +690,10 @@ export async function createWithFirstBatch(
           nameNormalized: normalizeProductName(product.name),
           stock: product.stock ?? null,
           qtyAlert: product.qtyAlert ?? null,
-          unitId: product.unitId ?? null,
+          // QC-49 (R17): LAS DOS FILAS -el producto y su lote- llevan la MISMA empresa, la del
+          // ambito, y las dos la toman del mismo sitio. Que coincidan no se confia a este
+          // archivo: el disparador `product_batches_check_company` lo verifica en la base.
+          ...companyScopeColumns(scope),
           createdAt: now,
           updatedAt: now,
         },
@@ -502,7 +701,7 @@ export async function createWithFirstBatch(
       });
 
       const createdBatch = await tx.productBatch.create({
-        data: toBatchCreateData(created.id, batch, now),
+        data: toBatchCreateData(created.id, batch, now, scope),
         select: { id: true },
       });
 
@@ -516,11 +715,16 @@ export async function createWithFirstBatch(
 /**
  * `addBatchToAlive` de `ProductRepository` (R17, R18).
  *
- * ESCRIBE UNICAMENTE LA FILA DEL LOTE. No toca `name`, `stock`, `qty_alert` ni `unit_id` del
+ * ESCRIBE UNICAMENTE LA FILA DEL LOTE. No toca `name`, `stock` ni `qty_alert` del
  * producto, y TAMPOCO su `updated_at` (`design.md > 2`): agregar un lote no es editar el
  * producto, y con QC-91 esa escritura desapareceria igual. Por eso la fila del lote se crea
  * con `productId` ESCALAR y no con un `update` anidado colgando de `product`, que arrastraria
  * el `@updatedAt` del modelo y escribiria en `products` sin que nadie lo hubiera pedido.
+ *
+ * CONSECUENCIA DE QC-80 QUE HAY QUE CONOCER: aunque esta funcion no escriba en `products`, el
+ * lote nuevo SI cambia lo que el producto devuelve en `latestBatchUnitId` -pasa a ser el mas
+ * reciente-. Es exactamente lo que R22 pide: la unidad se DERIVA en cada lectura, no se copia a
+ * ninguna columna que pudiera quedarse vieja.
  *
  * «SIGUE VIVO» ES UN `where`, NO UN `if` SOBRE LA FILA. `deleted_at IS NULL` viaja al SQL de
  * la consulta -la regla de este archivo desde QC-20 R16-; lo que se mira despues es si la
@@ -537,17 +741,22 @@ export async function addBatchToAlive(
   productId: string,
   batch: NewProductBatch,
   now: Date,
+  scope: InventoryScope,
 ): Promise<{ batchId: string } | null> {
   try {
     return await prisma.$transaction(async (tx) => {
+      // QC-49 (R16): «de MI empresa» es un `where`, exactamente como «sigue vivo». Un producto de
+      // otra empresa no devuelve fila y esta funcion sale por `null` -el mismo camino que «no
+      // existe»-, sin escribir ningun lote. Decidirlo con un `if` sobre la fila leida ya seria
+      // haber leido lo ajeno.
       const alive = await tx.product.findFirst({
-        where: { id: productId, deletedAt: null },
+        where: { AND: [productCompanyScope(scope), { id: productId, deletedAt: null }] },
         select: { id: true },
       });
       if (alive === null) return null;
 
       const createdBatch = await tx.productBatch.create({
-        data: toBatchCreateData(alive.id, batch, now),
+        data: toBatchCreateData(alive.id, batch, now, scope),
         select: { id: true },
       });
 

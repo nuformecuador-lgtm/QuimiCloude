@@ -491,7 +491,14 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // rojo. El destino, la etiqueta y el permiso del item nuevo los afirma
     // `tests/unit/configuracion-ui/private-nav-unidades.test.ts` sobre `UNITS_ROUTE` y
     // `UNITS_LABEL`, nunca sobre el literal del copy.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(7);
+    // TENSADO el 2026-09-11 (QC-67 T2, R2/R39): la entrada nueva es la pantalla de usuarios,
+    // TERCER item de la seccion «Configuración» -que no se crea, no se renombra y no se reordena-
+    // y ULTIMO del array, detras de unidades. El ancla se TENSA, nunca se afloja: sube de siete a
+    // OCHO y sigue exigiendo la lista exacta y su orden, asi que una novena entrada sin ficha que
+    // la respalde lo vuelve a poner en rojo. El destino, la etiqueta y el permiso del item nuevo
+    // los afirma `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` sobre `USERS_ROUTE` y
+    // `USERS_LABEL`, nunca sobre el literal del copy.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(8);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
       'nav-inventario',
@@ -500,6 +507,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
       'nav-proveedores',
       'nav-presentaciones',
       'nav-unidades',
+      'nav-usuarios',
     ]);
   });
 

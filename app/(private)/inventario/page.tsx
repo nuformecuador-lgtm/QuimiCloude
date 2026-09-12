@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
@@ -55,7 +56,22 @@ export default async function InventarioPage({
 }) {
   await requirePagePermission('inventario.consultar');
 
-  const params = parseProductListParams(await searchParams);
+  /*
+    El catalogo de unidades se pide AQUI y UNA SOLA VEZ (QC-44 R46, QC-80 R11), no dentro de cada
+    panel: lo necesita el alta rapida de presentacion que `PresentationSelect` lleva dentro, y hay
+    dos paneles de alta en esta pantalla -el de la cabecera y el del estado vacio-. Pedirlo en
+    cada uno serian dos consultas para el mismo dato.
+
+    Si la lectura falla, `units` queda sin definir y el alta RAPIDA de presentacion no se ofrece
+    -mismo criterio que R19-, pero la pantalla sigue en pie: el producto se puede dar de alta
+    eligiendo una presentacion ya existente. Por eso este fallo no pinta un estado de error de
+    pagina, a diferencia de la de presentaciones, donde la unidad es el objeto mismo del panel.
+  */
+  const [params, unitsResult] = await Promise.all([
+    searchParams.then(parseProductListParams),
+    listUnitsAction(),
+  ]);
+  const units = unitsResult.status === 'success' ? unitsResult.data : undefined;
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -63,7 +79,7 @@ export default async function InventarioPage({
         <h1 data-testid="inventario-title" className="text-2xl font-semibold">
           Inventario
         </h1>
-        <ProductSheet />
+        <ProductSheet units={units} />
       </div>
       {/*
         SIN `key`: este limite NO se vuelve a montar en cada cambio de consulta. La llevaba (la
@@ -75,7 +91,7 @@ export default async function InventarioPage({
         primera carga.
       */}
       <Suspense fallback={<ProductTableSkeleton rows={params.pageSize} />}>
-        <ProductListSection params={params} />
+        <ProductListSection params={params} units={units} />
       </Suspense>
     </div>
   );

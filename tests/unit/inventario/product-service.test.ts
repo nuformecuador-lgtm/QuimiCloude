@@ -15,8 +15,13 @@ import type { ProductRepository } from '@/lib/modules/inventario/ports/product-r
 
 /** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
  *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
+/** QC-49 (R11): la empresa EN CUYO NOMBRE opera el actor. El caso de uso la convierte en
+ *  `InventoryScope` y se la pasa al puerto; no autoriza nada por si sola. */
+const EMPRESA = 'company-a';
+
 const ADMIN: Actor = {
   id: 'admin-1',
+  companyId: EMPRESA,
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
@@ -47,7 +52,9 @@ const VISTA_PRODUCTO: ProductView = {
   imagePath: null,
   stock: 0,
   qtyAlert: null,
-  unitId: null,
+  // QC-80 (R22): `unitId` dejo de ser un campo del producto; lo que la vista trae es la unidad
+  // DERIVADA del lote mas reciente, `null` mientras no haya ninguno.
+  latestBatchUnitId: null,
   createdAt: AHORA,
   updatedAt: AHORA,
 };
@@ -163,7 +170,9 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
 
     await deleteProduct('producto-1', ADMIN);
 
-    expect(products.softDeleteAlive).toHaveBeenCalledWith('producto-1', AHORA);
+    expect(products.softDeleteAlive).toHaveBeenCalledWith('producto-1', AHORA, {
+      companyId: EMPRESA,
+    });
     // El dominio no tiene ningun otro metodo de borrado que llamar: no hay `delete` a
     // secas en el puerto (D5), asi que "borrado logico" es la unica via posible aqui.
   });
@@ -175,7 +184,7 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
     const getProduct = createGetProduct({ products });
 
     await expect(getProduct('borrado', ADMIN)).rejects.toBeInstanceOf(ProductNotFoundError);
-    expect(products.findAliveById).toHaveBeenCalledWith('borrado');
+    expect(products.findAliveById).toHaveBeenCalledWith('borrado', { companyId: EMPRESA });
   });
 });
 
@@ -242,12 +251,15 @@ describe('listar tambien exige Administrador y delega la paginacion en el puerto
     const pagina = await listProducts({ page: 2 }, ADMIN);
 
     expect(pagina.items).toEqual([VISTA_PRODUCTO]);
-    expect(products.listAlive).toHaveBeenCalledWith({
-      page: 2,
-      sort: null,
-      filters: {},
-      search: '',
-    });
+    expect(products.listAlive).toHaveBeenCalledWith(
+      {
+        page: 2,
+        sort: null,
+        filters: {},
+        search: '',
+      },
+      { companyId: EMPRESA },
+    );
   });
 
   it('rechaza una pagina no entera o menor que 1 sin llamar al puerto', async () => {

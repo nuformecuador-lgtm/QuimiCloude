@@ -25,7 +25,7 @@
 
 ## Fase 0 — Anclas y la puerta de la dependencia
 
-- [ ] **T1 — Verificar las anclas del diseño sobre el árbol de esta rama.**
+- [x] **T1 — Verificar las anclas del diseño sobre el árbol de esta rama.**
       Leer y anotar en `progress/impl_QC-79-alta-sin-contrasena-y-enlace.md`: la firma exacta de
       `UserAdminRepository.create`, el tamaño actual de `ERROR_CODES` (**32** al escribir esto), el
       nombre del traductor único de QC-70, la forma de `CreateUserFormState`, y los nombres exactos
@@ -34,7 +34,7 @@
       **difiere** de lo que `design.md` supone. Si difiere, se para y decide el leader.
       *(Sin dependencias.)*
 
-- [ ] **T2 — [PUERTA HUMANA] Registrar y solo entonces instalar `resend`.** — **R38**
+- [x] **T2 — [PUERTA HUMANA] Registrar y solo entonces instalar `resend`.** — **R38**
       Añadir la fila a `docs/dependencias.md` con los cuatro checks de `design.md > 8`
       (`6.27.0` del 2026-09-09, 8.288.901 desc./sem., MIT, sin `deprecated`), estado `aprobada`, la
       fecha, quién aprobó, y **el archivo único donde queda aislada**. Después `pnpm add resend`.
@@ -44,7 +44,7 @@
 
 ## Fase 1 — La base de datos
 
-- [ ] **T3 — Modelo, migración y `down.sql`.** — **R11, R35, R36, R37**
+- [x] **T3 — Modelo, migración y `down.sql`.** — **R11, R35, R36, R37**
       `CredentialSetupToken` en `db/schema.prisma` con su `/// @module identity`;
       `pnpm run db:migrate:create`; completar a mano el **índice único parcial**
       `credential_setup_tokens_one_live_per_user` y los dos `ALTER` de RLS (`ENABLE` + `FORCE`);
@@ -53,7 +53,7 @@
       "users"`, y `pnpm run typecheck` pasa tras `prisma generate`.
       *(Depende de T1.)*
 
-- [ ] **T4 — [P] Test estático de la migración.** — **R35, R36, R37**
+- [x] **T4 — [P] Test estático de la migración.** — **R35, R36, R37**
       `tests/unit/identity/schema/credential-setup-migration.test.ts`: el UP crea la tabla, la FK
       `RESTRICT`, los dos índices, el **parcial** con su `WHERE consumed_at IS NULL AND superseded_at
       IS NULL`, y RLS **forzado**; el UP **no** menciona `users` ni ninguno de los tres índices de
@@ -62,7 +62,7 @@
       **Hecho cuando:** el archivo pasa y sus dos casos de sensibilidad fallan al mutar el SQL.
       *(Depende de T3.)*
 
-- [ ] **T5 — [P] Las cuatro variables de entorno y su lector.** — **R28**
+- [x] **T5 — [P] Las cuatro variables de entorno y su lector.** — **R28**
       `lib/modules/identity/adapters/driven/config/mail-config-env.ts` copiando el patrón de
       `storage-config-env.ts` (lectura **en la invocación**, error que nombra las que faltan sin
       filtrar ningún valor); `.env.example` con `RESEND_API_KEY`, `MAIL_FROM_ADDRESS` —vacía y con el
@@ -72,7 +72,7 @@
       que el mensaje de error nombra las que faltan y no contiene ningún valor.
       *(Depende de T1.)*
 
-- [ ] **T6 — Ciclo real de migración.** — **R36**
+- [x] **T6 — Ciclo real de migración.** — **R36**
       `pnpm run db:migrate` → `pnpm run db:rollback` → `pnpm run db:migrate`.
       **Hecho cuando:** la salida de los tres comandos está pegada en la bitácora y
       `_prisma_migrations` queda coherente.
@@ -80,7 +80,7 @@
 
 ## Fase 2 — Errores y dominio puro
 
-- [ ] **T7 — Dos códigos nuevos en el catálogo de QC-70 y sus dos clases.** — **R34**
+- [x] **T7 — Dos códigos nuevos en el catálogo de QC-70 y sus dos clases.** — **R34**
       `credential_link_invalid` y `user_not_pending` en `error-codes.ts` (bajo el encabezado de
       `identity` que ya existe, **sin redactar ninguna enmienda nueva**), su clave y su texto en
       `error-catalog.ts`; `CredentialLinkInvalidError` y `UserNotPendingError` en
@@ -91,14 +91,14 @@
       pasa, sin que ninguna expectativa se haya borrado ni debilitado.
       *(Depende de T1.)*
 
-- [ ] **T8 — [P] La vida del enlace, en dominio puro.** — **R8**
+- [x] **T8 — [P] La vida del enlace, en dominio puro.** — **R8**
       `domain/credential-setup-link.ts`: `CREDENTIAL_SETUP_LINK_TTL_DAYS = 7`, el tipo del enlace y
       `evaluateLink(link, now)`. Sin `next/*`, sin Prisma, sin `lib/shared`.
       **Hecho cuando:** `link-lifetime.test.ts` cubre el instante exacto de caducidad y los dos
       bordes (un milisegundo antes vale, uno después no).
       *(Depende de T1.)*
 
-- [ ] **T9 — Los tres puertos y la fábrica del secreto.** — **R9, R10, R26**
+- [x] **T9 — Los tres puertos y la fábrica del secreto.** — **R9, R10, R26**
       `ports/credential-setup-secret-factory.ts`, `ports/credential-setup-link-repository.ts`,
       `ports/credential-setup-mailer.ts` (que **devuelve un valor y no lanza**), y el adaptador
       `adapters/driven/security/credential-setup-secret-crypto.ts` con `randomBytes(32)` +
@@ -110,7 +110,7 @@
 
 ## Fase 3 — Persistencia y el alta
 
-- [ ] **T10 — El adaptador de persistencia del enlace: las dos transacciones.** — **R11, R12, R15, R16, R19, R20, R22**
+- [x] **T10 — El adaptador de persistencia del enlace: las dos transacciones.** — **R11, R12, R15, R16, R19, R20, R22**
       `credential-setup-link-prisma.ts` con `issueForPendingUser` (§ 4.5: `UPDATE` de sustitución +
       `INSERT`, `23505` → `'superseded'`, ámbito por `company_id` cuando llega) y
       `applyCredentialAndActivate` (§ 4.6: `UPDATE` condicional del enlace + `UPDATE` condicional de
@@ -120,7 +120,7 @@
       los confirma contra Postgres real.
       *(Depende de T3, T9.)*
 
-- [ ] **T11 — El alta con contraseña opcional: las dos ramas.** — **R1, R2, R3, R4, R6, R7, R30**
+- [x] **T11 — El alta con contraseña opcional: las dos ramas.** — **R1, R2, R3, R4, R6, R7, R30**
       `domain/user-input.ts` gana `credential` **opcional** (sin `trim`, sin `max`: QC-19 R10 y R11);
       `domain/create-user.ts` reparte: con credencial → política de QC-19 **antes** de escribir +
       hash; sin credencial → `kind: 'none'` + emisión del enlace + envío; `requirePermission` sigue
@@ -133,7 +133,7 @@
       *(Depende de T7, T8, T9. **Toca los tests de QC-66** de § 2 fila 4: se reescriben aquí, en esta
       misma tanda.)*
 
-- [ ] **T12 — El alta sin credencial en Prisma: el centinela.** — **R4, R37**
+- [x] **T12 — El alta sin credencial en Prisma: el centinela.** — **R4, R37**
       `user-admin-prisma.ts` escribe `NO_CREDENTIAL_SENTINEL` cuando `kind === 'none'`; la constante
       se declara **una vez** en el dominio. `users` **no cambia**: ni columna, ni índice, ni
       migración.
@@ -143,7 +143,7 @@
 
 ## Fase 4 — Los dos casos de uso nuevos
 
-- [ ] **T13 — Establecer la contraseña con el enlace.** — **R18, R19, R21, R22, R23**
+- [x] **T13 — Establecer la contraseña con el enlace.** — **R18, R19, R21, R22, R23**
       `domain/set-credential-with-link.ts`: **sin permiso y sin sesión**; política completa de QC-19
       antes de escribir; éxito → `applyCredentialAndActivate`; la **marca de cambio de credencial no
       se toca** (R21, ver P3); los seis casos de rechazo devuelven **el mismo**
@@ -153,7 +153,7 @@
       enlace sigue vivo.
       *(Depende de T10.)*
 
-- [ ] **T14 — [P] Reenviar el enlace.** — **R14, R15, R16, R30**
+- [x] **T14 — [P] Reenviar el enlace.** — **R14, R15, R16, R30**
       `domain/issue-credential-setup-link.ts`: `usuarios.modificar` como **primera línea**, actor por
       parámetro, falla cerrado; ámbito por empresa; `user_not_found` si no existe/borrado/otra
       empresa, `user_not_pending` si ya no está en `pending`; el anterior muere y el nuevo cuenta 7
@@ -165,7 +165,7 @@
 
 ## Fase 5 — Correo
 
-- [ ] **T15 — El adaptador `resend` y su guardia.** — **R13, R27, R29, R38**
+- [x] **T15 — El adaptador `resend` y su guardia.** — **R13, R27, R29, R38**
       `credential-setup-mailer-resend.ts`: **el único** archivo que importa `resend`; cliente
       construido **dentro** de la función con la clave de T5; URL armada con `APP_BASE_URL`; asunto y
       cuerpo en **dos constantes** al principio del archivo (pregunta abierta 2); un fallo devuelve
@@ -176,7 +176,7 @@
       añadido a mano pone la guardia en rojo.
       *(Depende de **T2** y de T5, T9.)*
 
-- [ ] **T16 — [P] El transporte de buzón, para que el E2E exista.** — **R41 (habilitante)**
+- [x] **T16 — [P] El transporte de buzón, para que el E2E exista.** — **R41 (habilitante)**
       `credential-setup-mailer-outbox.ts`: escribe el mensaje como JSON en `MAIL_OUTBOX_DIR`; **se
       niega a arrancar si `NODE_ENV === 'production'`**, nombrando la variable.
       **Hecho cuando:** la guardia de T15 gana dos casos que afirman, leyendo el código, que el
@@ -185,7 +185,7 @@
 
 ## Fase 6 — Composición y frontera
 
-- [ ] **T17 — Cablear los tres puertos y elegir el transporte.** — **R26, R32**
+- [x] **T17 — Cablear los tres puertos y elegir el transporte.** — **R26, R32**
       `lib/composition/index.ts`: repositorio del enlace, fábrica del secreto y **el mailer según
       `MAIL_TRANSPORT`** (`resend` por defecto); reutilizar `passwordHasher` y
       `checkCredentialPolicy` ya cableados, **sin crear segundos**; añadir las dos factories nuevas a
@@ -194,7 +194,7 @@
       nuevas y `guard-arquitectura-modulos.test.ts` sigue verde.
       *(Depende de T13, T14, T16.)*
 
-- [ ] **T18 — Las dos Server Actions nuevas y el estado del alta.** — **R14, R18, R30, R33, R34**
+- [x] **T18 — Las dos Server Actions nuevas y el estado del alta.** — **R14, R18, R30, R33, R34**
       `adapters/driving/credential-setup-actions.ts` con `FormData` en las dos; la pública **no
       resuelve actor**; la de reenvío lo resuelve de las dos caras de la sesión. `user-actions.ts`:
       `CreateUserFormState` gana `mail` en `success` y la variante `invalid_credential`. Traducción
@@ -203,7 +203,7 @@
       contiene** el secreto que el doble emitió, y `user-actions.test.ts` cubre las cinco variantes.
       *(Depende de T17.)*
 
-- [ ] **T19 — La página pública.** — **R17, R24, R25**
+- [x] **T19 — La página pública.** — **R17, R24, R25**
       `CREDENTIAL_SETUP_ROUTE` y su helper en `lib/shared/routes.ts` (**no** entra en
       `PRIVATE_ROUTE_PREFIXES`); `app/(public)/establecer-contrasena/[token]/page.tsx` +
       `components/index.ts` con el formulario; `<meta name="referrer" content="no-referrer">`, ningún
@@ -216,7 +216,7 @@
 
 ## Fase 7 — Verificación
 
-- [ ] **T20 — Integración contra Postgres real.** — **R9, R11, R12, R19, R20, R22, R37**
+- [x] **T20 — Integración contra Postgres real.** — **R9, R11, R12, R19, R20, R22, R37**
       `tests/integration/identity/credential-setup.int.test.ts`: la columna guarda la **huella** y no
       el secreto; **dos emisiones concurrentes → un solo enlace vivo** (el `23505` del índice
       parcial, con dos conexiones de verdad); **dos usos concurrentes → uno solo gana**; usuario
@@ -226,7 +226,7 @@
       `pnpm run db:migrate`») si la tabla no existe.
       *(Depende de T6, T12, T13, T14.)*
 
-- [ ] **T21 — El E2E del camino completo.** — **R12, R41**
+- [x] **T21 — El E2E del camino completo.** — **R12, R41**
       `e2e/establecer-contrasena.spec.ts` con `MAIL_TRANSPORT=outbox`: alta **sin** contraseña →
       leer el enlace del buzón → establecer la contraseña → **entrar** con ella al dashboard →
       reabrir el mismo enlace y comprobar que **ya no sirve**.
@@ -234,7 +234,7 @@
       dos corridas seguidas.
       *(Depende de T19, T20.)*
 
-- [ ] **T22 — Test de alcance y frontera.** — **R5, R13, R31, R32, R39, R40**
+- [x] **T22 — Test de alcance y frontera.** — **R5, R13, R31, R32, R39, R40**
       `scope.test.ts`: ningún `console.*` en los archivos que tocan el secreto; ningún archivo de la
       feature bajo `app/(private)/`; ningún route handler, cron ni cola; ninguna mención a
       `failed_login_attempts`/`lock_level`/`locked_until`; ninguna operación que emita enlace sin
@@ -242,7 +242,7 @@
       **Hecho cuando:** el archivo pasa y `guard-arquitectura-modulos.test.ts` sigue verde.
       *(Depende de T19.)*
 
-- [ ] **T23 — Cerrar el ripple ajeno de `design.md > 2`.**
+- [x] **T23 — Cerrar el ripple ajeno de `design.md > 2`.**
       Correr `pnpm exec vitest related --run` sobre todos los archivos de producción tocados y
       atender lo que salga rojo **sin debilitar ninguna expectativa**. Si aparece un archivo que
       `design.md > 2` no lista, se anota en la bitácora como el «noveno archivo» (precedente QC-66).
@@ -250,7 +250,7 @@
       fueron **de verdad**.
       *(Depende de T22.)*
 
-- [ ] **T24 — Gate completo y bitácora.**
+- [x] **T24 — Gate completo y bitácora.**
       `./init.sh` entero. Escribir `progress/impl_QC-79-alta-sin-contrasena-y-enlace.md` con el mapa
       **`R<n> → test`** (`CHECKPOINTS.md > Trazabilidad`), la salida del ciclo de T6, el número real
       de archivos ajenos y cualquier punto donde el código se apartó del diseño.

@@ -3104,6 +3104,82 @@ solo sitio.
 
 ### La lección: un centinela que mide el rango bien puede seguir midiendo a quién no debe
 
+- El catálogo de unidades de medida deja de ser administrable solo por migración: pantalla
+  propia en `/configuracion/unidades`, segundo ítem de la sección Configuración que creó
+  QC-45. Lista con búsqueda por nombre, orden y paginación de 10/25 sobre la tabla
+  compartida de QC-55 (quinta pantalla en montarla, sin tocar un solo archivo suyo), alta y
+  edición en panel lateral, y borrado con diálogo de confirmación. La equivalencia se pinta
+  como frase armada («1 kg = 1000 gr») y las unidades base muestran un guion.
+- Requisitos cubiertos: R1–R50, los 50 con test y verificados por el `reviewer` abriendo los
+  archivos, no contra el mapa de esta bitácora. PR #51, merge commit `2f98b8f`.
+  `reviewer` **APROBADO en una ronda** (0 mayores, 8 menores, tres atendidos en la rama).
+  `./init.sh` completo en `== init OK ==` (287 archivos, 3615 tests, único rojo en el
+  baseline) y E2E `e2e/unidades.spec.ts` con 4 passed en **Chromium y WebKit**, lo que cierra
+  el diferimiento que QC-38 dejó apuntando aquí.
+- Decisiones: **no hay columna de ámbito** —que una unidad sea de sistema o de la empresa es
+  manejo interno—; lo único visible es que una unidad de sistema no trae botones de editar ni
+  borrar. `UnitView` es un **tipo nuevo que extiende `UnitRef`**, no un ensanchamiento:
+  ensanchar habría arrastrado `UnitCatalog.findRefs` y el módulo de recetas, que quedan
+  intactos. `listUnitsAction` gana **sobrecargas** para aceptar la consulta, de modo que
+  recetas y proveedores compilan sin cambios. `companyId` entra al `select` pero **no sale
+  hacia el cliente**: el ámbito viaja derivado como «es de sistema».
+- Tests ajenos tocados, todos **tensando**: `data-table-alcance` sube de `>3` a `>4`
+  consumidores, `recipe-route-contract` gana la constante de ruta manteniendo la igualdad
+  exacta, y dos anclas de QC-38 en `unidades-convenciones` quedan más exigentes. Además dos
+  centinelas de alcance ajenos (`qc75-convenciones` y `account-status-scope`) se acotaron
+  endureciendo su **precondición**, sin tocar un solo aserto.
+- Deuda que deja, y no es de esta ficha cerrarla:
+  - **T13 sin hacer y ningún agente puede hacerla**: mirar con los ojos el scroll contenido
+    de la tabla en un WebKit real. La cobertura en jsdom y la corrida E2E en WebKit no
+    sustituyen esa comprobación.
+  - **Ningún test compara el catálogo de permisos del código con el de la base.** R11 estaba
+    verde contra `SEED_ROLE_PERMISSIONS` mientras la base real no tenía `unidades.modificar`,
+    y eso produjo un **404 real** a un Administrador que sí veía el enlace. Merece ficha propia.
+  - Los dos centinelas acotados quedan **permanentemente inertes** en sus casos de cambio:
+    tercer episodio de esta clase (QC-38 lo sufrió, QC-75 lo documentó, QC-39 acotó dos).
+    Pide **regla del arnés**, no parche por ficha.
+  - El gate avisa de **2 entradas del baseline que ya pasan**, y borrarlas hoy rompería el
+    gate: fallan solo al correr desde `dev`, con el rango vacío.
+- Estado de la base compartida: durante la verificación hubo que **sembrar**
+  (`unidades.modificar` no existía desde el merge de QC-38) y **aplicar la migración
+  `user_account_status`** de QC-65, que estaba mergeada sin aplicar. Ninguna era de esta ficha;
+  quedan hechas.
+- **Octava vez que `wt.sh done` falla en Windows**: desregistró el worktree pero dejó el árbol
+  en disco por las rutas largas de `pnpm`, y `rm -rf`/`Remove-Item` tampoco pudieron con él.
+  Rematado con un **espejo `robocopy /MIR` desde un directorio vacío** y luego borrado, que sí
+  vacía rutas de más de 260 caracteres. Sigue sin ficha, y ahora hay remedio conocido.
+
+## QC-67 — pantalla-de-usuarios (implementación) · 2026-09-11
+
+- Zona `frontend`, en su worktree `.worktrees/QC-67-pantalla-de-usuarios`. Las **45 tasks**
+  cerradas en cinco tandas, cada una comiteada y verificada antes de abrir la siguiente.
+  Bitácora: `progress/impl_QC-67-pantalla-de-usuarios.md`.
+- **No construye backend**, y no hizo falta: las seis Server Actions de QC-66 y `listRolesAction`
+  de QC-94 se consumieron **por su ruta exacta**, nunca desde el barrel del módulo. Cero
+  dependencias nuevas, cero migraciones, cero primitivas de shadcn instaladas, y ni una línea de
+  `lib/modules/identity/**`, `db/**` ni `package.json` — atado por test, con anti-vacuidad.
+- Los **42 requisitos** quedan mapeados a test real; el E2E pasa en Chromium y WebKit.
+- **Diez listas CERRADAS heredadas hubo que tensarlas**, nunca relajarlas: en todas sube el ancla
+  **y** se nombra la entrada nueva. Tres viven fuera de la carpeta de la feature
+  (`guard-identificador-de-request`, `data-table-alcance`, `account-status-scope`).
+- Lecciones que deja escritas, y que no son de esta ficha cerrar:
+  - **Las tandas no ven lo que ve el gate completo.** Un ancla de `data-table-alcance` llevaba
+    roja **desde el bloque 2** sin que nadie se enterase, porque los subagentes solo corren
+    `configuracion-ui` y `guards`. La cazó `./init.sh` entero. Es el argumento vivo de la regla 5:
+    el gate rápido cierra una tanda, no una feature.
+  - **Un test romo es un falso positivo esperando.** `usuarios-viewport` daba rojo por un `100vh`
+    que no era nuestro: la variable de medida `--available-height` que siembra el posicionador de
+    **Base UI** y que `select.tsx` consume como techo. Se afinó el detector a declaraciones de
+    altura reales **con siete casos anti-vacuidad**; se tensó en precisión, no se aflojó en
+    severidad.
+  - **`tests/unit/inventario/product-page.test.tsx` volvió a caer por saturación**, dos corridas
+    seguidas y **en líneas distintas**, pasando aislado 42/42 y con la tercera corrida limpia. Es
+    el flake de QC-58 otra vez. **No se tocó el baseline**: apagar un archivo ajeno entero es
+    decisión humana explícita. Queda para decidir.
+  - El gate avisa de **5 entradas del baseline que ya pasan**. Deuda previa y ajena; sin tocar.
+  - Un `'use server'` no exporta constantes y no puede entrar en el cierre transitivo del
+    contrato. Las dos trampas estaban avisadas y **no volvieron a cobrarse**.
+
 Dos centinelas de **QC-67**, recién mergeada, se pusieron rojos en esta rama. Uno **acusaba a QC-84
 de abrir `identity`** listando sus quince archivos. Su commit `1a9e2c4` había arreglado el **rango**
 —`merge-base` en vez de un SHA congelado— y **quedó pendiente el sujeto**: no comprobaba de quién es

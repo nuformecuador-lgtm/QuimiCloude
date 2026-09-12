@@ -47,6 +47,14 @@
 // aprobada por el humano el 2026-09-07. Se excluye esa carpeta por nombre y motivo, con una
 // defensa extra AUN MAS estrecha que las anteriores -dentro de la exclusion solo se perdona lo
 // que casa por «presentation»-. El detalle, dentro del caso.
+//
+// **2026-09-11 (QC-49, aislamiento-por-empresa-en-inventario):** quinta vez, y esta NO es una
+// exclusion sino un renglon mas en la LISTA CERRADA de specs E2E: `e2e/aislamiento-inventario.spec.ts`
+// (T15) casa con `screenPattern` por la palabra «inventario» y no es una segunda pantalla del
+// catalogo, es el recorrido de dos empresas que CONSUME las pantallas ya existentes. Se enumera
+// con su motivo -no se afina el matcher, que es un barrido por nombre y cualquier ajuste seria
+// una regla que el spec de manana esquiva- y con la misma defensa extra que las demas. El
+// detalle, dentro del caso.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
@@ -262,10 +270,21 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // permite tocar-. Se excluye por nombre y motivo, no se afloja `screenPattern` ni se vacia
     // la lista de matches: cualquier OTRO archivo de catalogo bajo `components/` sigue poniendo
     // esto en rojo.
-    const SELECTOR_PROMOVIDO = 'shared/presentation-select.tsx'
+    //
+    // ACTUALIZADO 2026-09-11 (QC-80, unidad-desde-la-presentacion): un SEGUNDO archivo entra en la
+    // misma exclusion y por el mismo motivo. El alta rapida del selector de arriba pasa a pedir la
+    // unidad (R10, R11), asi que reusa el selector de unidad de la presentacion, que estaba en la
+    // ruta de presentaciones; dejarlo alli obligaria a que `components/shared/` importara de
+    // `app/`. Promovido a `components/shared/presentation-unit-select.tsx`, casa con
+    // `screenPattern` tambien por la palabra «presentation» y tampoco es una pantalla: solo pinta
+    // un `Select` con las unidades que le bajan POR PROPS, sin consultar ninguna operacion.
+    const SELECTORES_PROMOVIDOS = [
+      'shared/presentation-select.tsx',
+      'shared/presentation-unit-select.tsx',
+    ] as const
     const componentMatches = matchingFiles(join(repoRoot, 'components'))
     const componentesDeCatalogo = componentMatches.filter(
-      (relPath) => relPath !== SELECTOR_PROMOVIDO,
+      (relPath) => !(SELECTORES_PROMOVIDOS as readonly string[]).includes(relPath),
     )
     expect(
       componentesDeCatalogo,
@@ -277,24 +296,162 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // que borrarla- y no puede llevar ninguna senal REAL de pantalla de catalogo
     // (`ProductListSection` o una tabla de productos). Si manana alguien convierte ese archivo
     // en una pantalla para esquivar esta guardia, esto cae aunque la exclusion lo deje pasar.
-    expect(
-      componentMatches,
-      `el selector promovido por QC-44 no esta donde dice la exclusion: ${componentMatches.join(', ')}`,
-    ).toContain(SELECTOR_PROMOVIDO)
-    const fuenteDelSelector = readFileSync(
-      join(repoRoot, 'components', ...SELECTOR_PROMOVIDO.split('/')),
-      'utf8',
-    )
-    expect(
-      /ProductListSection|product-table/.test(fuenteDelSelector),
-      `${SELECTOR_PROMOVIDO} no puede ser una pantalla de catalogo`,
-    ).toBe(false)
+    for (const promovido of SELECTORES_PROMOVIDOS) {
+      expect(
+        componentMatches,
+        `selector promovido que no esta donde dice la exclusion: ${componentMatches.join(', ')}`,
+      ).toContain(promovido)
+      const fuenteDelSelector = readFileSync(
+        join(repoRoot, 'components', ...promovido.split('/')),
+        'utf8',
+      )
+      expect(
+        /ProductListSection|product-table/.test(fuenteDelSelector),
+        `${promovido} no puede ser una pantalla de catalogo`,
+      ).toBe(false)
+    }
 
     // El E2E del catalogo dejo de estar diferido (D4 de QC-20 queda superada por QC-22), pero
     // la lista es CERRADA: un segundo spec de catalogo sin ficha pone esto en rojo.
+    //
+    // ACTUALIZADO 2026-09-11 (QC-49, aislamiento-por-empresa-en-inventario, T15): entra un
+    // SEGUNDO nombre, `aislamiento-inventario.spec.ts`, y entra CON FICHA —`design.md > 8` y
+    // `tasks.md > T15` lo piden por su nombre— y con su motivo escrito aqui, que es justo lo que
+    // «lista cerrada» significa: no que no pueda crecer, sino que no crezca en silencio.
+    //
+    // Por que se AÑADE a la lista en vez de afinar `screenPattern` para que no lo capture: el
+    // matcher es un barrido por NOMBRE, y cualquier ajuste que dejara fuera a este archivo
+    // (excluir «aislamiento», exigir que el nombre empiece por «inventario», …) seria una regla
+    // de nombres que el spec de mañana esquiva llamandose distinto. Enumerar es mas estrecho:
+    // un TERCER spec que case con el patron sigue poniendo esto en rojo hasta que alguien
+    // escriba aqui por que existe. La guardia no se afloja; se le añade un renglon.
+    //
+    // Y este archivo NO es una segunda pantalla del catalogo —casa con `screenPattern` solo por
+    // la palabra «inventario», como `product-picker.tsx` casaba por «product»—: es un recorrido
+    // de AISLAMIENTO POR EMPRESA que CONSUME las dos pantallas que ya existen (la de QC-22 y la
+    // de QC-45) con datos de dos empresas. La defensa extra de abajo es la misma que la de las
+    // otras exclusiones: el archivo tiene que existir y tiene que llevar la señal de lo que dice
+    // ser.
+    const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
+      E2E_DE_AISLAMIENTO,
       'inventario.spec.ts',
     ])
+
+    // Defensa extra, para que el renglon nuevo no sea una puerta trasera: el spec de QC-49 tiene
+    // que seguir siendo el recorrido de DOS EMPRESAS que dice ser —nombra la empresa y el campo
+    // oculto del borrado ajeno— y no puede convertirse en un segundo recorrido de alta del
+    // catalogo. Si mañana alguien vacia ese archivo y le mete la pantalla de productos para
+    // esquivar la lista cerrada, esto cae aunque el nombre siga en la lista.
+    const fuenteDelAislamiento = readFileSync(join(repoRoot, 'e2e', E2E_DE_AISLAMIENTO), 'utf8')
+    for (const senal of ['companyId', 'delete-product-id']) {
+      expect(
+        fuenteDelAislamiento.includes(senal),
+        `${E2E_DE_AISLAMIENTO} debe seguir siendo el recorrido de aislamiento de QC-49: falta «${senal}»`,
+      ).toBe(true)
+    }
+  })
+})
+
+// AMPLIACION 2026-09-11 (QC-49, R28) — EL ALCANCE DE LA MIGRACION, MEDIDO.
+//
+// QC-49 aisla por empresa TRES tablas: `products`, `presentations` y `product_batches`. Ni una
+// mas. `recipes` y `recipe_lines` son QC-50, `suppliers` y `supplier_catalog_lines` son QC-59 y
+// `orders` es QC-60. La tentacion de «ya que estoy» es real y cara: una columna de empresa en
+// `recipes` sin el filtro del modulo `recetas` no aisla nada y ademas rompe la ficha que si iba
+// a hacerlo, porque le deja el esquema a medias y sin su backfill.
+//
+// Por eso este bloque mide el ALCANCE, y lo mide en los dos sitios donde se puede desbordar: el
+// texto de la migracion -que es lo que se aplica- y el esquema de Prisma -que es lo que el
+// codigo ve-. Es un barrido de texto, como el resto de este archivo: mira el disco, no el grafo.
+//
+// Cubre R28.
+describe('alcance de QC-49 (aislamiento-por-empresa-en-inventario): tres tablas y ninguna mas', () => {
+  /** Las cinco que R28 deja EXPLICITAMENTE fuera, con la ficha a la que van. */
+  const TABLAS_FUERA_DE_ALCANCE = [
+    { tabla: 'recipes', modelo: 'Recipe', ficha: 'QC-50' },
+    { tabla: 'recipe_lines', modelo: 'RecipeLine', ficha: 'QC-50' },
+    { tabla: 'suppliers', modelo: 'Supplier', ficha: 'QC-59' },
+    { tabla: 'supplier_catalog_lines', modelo: 'SupplierCatalogLine', ficha: 'QC-59' },
+    { tabla: 'orders', modelo: 'Order', ficha: 'QC-60' },
+  ] as const
+
+  /** La carpeta de la migracion de esta ficha, localizada por su sufijo y no por su marca de tiempo. */
+  function carpetaDeLaMigracion(): string {
+    const raiz = join(repoRoot, 'db', 'migrations')
+    const candidatas = readdirSync(raiz, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.endsWith('_inventory_company_scope'))
+      .map((entry) => entry.name)
+    // Cero carpetas = este bloque no vigila nada; dos = alguien duplico la migracion.
+    expect(candidatas, 'se esperaba UNA migracion _inventory_company_scope').toHaveLength(1)
+    return join(raiz, candidatas[0] as string)
+  }
+
+  /** SQL sin comentarios: la migracion DOCUMENTA en prosa que deja esas tablas fuera (R28), y
+   *  esa prosa no puede hacer fallar al barrido -lo que se mide es lo que se EJECUTA-. */
+  function sqlEjecutable(archivo: string): string {
+    return readFileSync(archivo, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/--.*$/gm, '')
+  }
+
+  it('el UP y el DOWN de la migracion no nombran ninguna tabla fuera de alcance', () => {
+    const carpeta = carpetaDeLaMigracion()
+    const up = sqlEjecutable(join(carpeta, 'migration.sql'))
+    const down = sqlEjecutable(join(carpeta, 'down.sql'))
+
+    // Ancla contra el verde por vacuidad: si los archivos estuvieran vacios o solo fueran
+    // comentarios, todo lo de abajo pasaria sin mirar nada.
+    expect(up.trim().length, 'migration.sql no puede quedar vacio al quitar comentarios').toBeGreaterThan(0)
+    expect(down.trim().length, 'down.sql no puede quedar vacio al quitar comentarios').toBeGreaterThan(0)
+
+    // Y mide lo que SI toca: las tres tablas de la ficha aparecen en el UP. Sin esto, un
+    // `migration.sql` que no hiciera nada tambien pasaria el barrido de ausencias.
+    for (const tabla of ['products', 'presentations', 'product_batches']) {
+      expect(up, `el UP deberia tocar ${tabla}`).toContain(tabla)
+    }
+
+    for (const { tabla, ficha } of TABLAS_FUERA_DE_ALCANCE) {
+      expect(up, `${tabla} no entra en QC-49: es ${ficha}`).not.toContain(tabla)
+      expect(down, `${tabla} no entra en QC-49: es ${ficha}`).not.toContain(tabla)
+    }
+  })
+
+  it('ningun modelo fuera de alcance declara companyId en el esquema de Prisma', () => {
+    // La otra cara: aunque la migracion no la crease, un `companyId` en el modelo seria drift
+    // -y el codigo de otro modulo empezaria a verlo-. Se recorta el bloque de CADA modelo y se
+    // mira dentro; comparar sobre el archivo entero seria inutil, porque `products` y
+    // `presentations` SI la declaran.
+    const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8')
+
+    /**
+     * El bloque `model X { ... }`, recortado hasta su llave de cierre. El corte en la llave NO
+     * es cosmetico: sin el, el trozo se llevaria por delante los comentarios `///` del modelo
+     * SIGUIENTE, y un `companyId` del vecino se leeria como propio (pasa de verdad:
+     * `SupplierCatalogLine` linda con `Unit`, que si la declara desde QC-76).
+     */
+    function cuerpoDelModelo(modelo: string): string {
+      const bloque = esquema.split(/^model /m).find((trozo) => trozo.startsWith(`${modelo} {`))
+      expect(bloque, `el esquema no declara el modelo ${modelo}`).toBeDefined()
+      if (bloque === undefined) return ''
+      const cierre = bloque.search(/^\}/m)
+      expect(cierre, `el modelo ${modelo} no cierra`).toBeGreaterThan(0)
+      return bloque.slice(0, cierre)
+    }
+
+    // Ancla positiva: el recorte funciona y las tres tablas de la ficha SI la declaran. Si
+    // `cuerpoDelModelo` devolviera basura, esto es lo que lo delata.
+    for (const modelo of ['Product', 'Presentation', 'ProductBatch']) {
+      expect(cuerpoDelModelo(modelo), `${modelo} deberia declarar companyId (R1, R2)`).toContain(
+        'companyId',
+      )
+    }
+
+    for (const { modelo, ficha } of TABLAS_FUERA_DE_ALCANCE) {
+      const cuerpo = cuerpoDelModelo(modelo)
+      expect(cuerpo, `${modelo} no gana empresa en QC-49: es ${ficha}`).not.toContain('companyId')
+      expect(cuerpo, `${modelo} no gana empresa en QC-49: es ${ficha}`).not.toContain('company_id')
+    }
   })
 })

@@ -1,0 +1,525 @@
+# QC-86 - modelo-de-asignacion-de-pedidos - bitacora de implementacion
+
+> Rama `feature/QC-86-modelo-de-asignacion-de-pedidos`, nacida de `origin/dev` en `398dfd6`.
+> Worktree `.worktrees/QC-86-modelo-de-asignacion-de-pedidos/`. Commit de la tanda: `673b102`.
+> **Zona backend puro**: **cero** archivos de `app/**`, `components/**`, `hooks/**` o
+> `lib/composition/**` en el diff - verificado en la seccion 5, no supuesto.
+
+## 0. Base de datos propia, ANTES de la primera migracion
+
+El worktree no tenia `.env` (solo `.env.example`). Se creo **antes** de tocar ninguna migracion,
+copiando la forma del `.env` del repo principal -misma credencial, mismo host- y cambiando **solo**
+el nombre de la base: **`QuimiCloude_QC86`**. Se creo vacia, se le aplicaron las 23 migraciones
+previas y se sembro. Ninguna operacion de esta ficha toco `QuimiCloude` ni la base de ninguna otra
+ficha en curso.
+
+```
+CREADA  -> QuimiCloude_QC86
+db:migrate -> All migrations have been successfully applied.  (23 previas)
+db:seed    -> roles: 2 - permisos creados: 11 (2 ya estaban) - asignaciones: 14
+```
+
+## 1. Archivos tocados
+
+**Nuevos**
+
+| Archivo | Que |
+| --- | --- |
+| `lib/modules/asignaciones/index.ts` | Contrato publico del modulo nuevo (R31) |
+| `lib/modules/asignaciones/domain/order-assignment.ts` | `OrderAssignment` y `AssignmentOrigin` |
+| `db/migrations/20260911120000_order_assignments/migration.sql` | UP: tabla, 2 indices, CHECK, 3 FK, permisos, RLS |
+| `db/migrations/20260911120000_order_assignments/down.sql` | DOWN (R34, R35) |
+| `tests/unit/asignaciones/schema/order-assignments-migration.test.ts` | **A** - esquema y migracion (44 casos) |
+| `tests/unit/asignaciones/module-contract.test.ts` | **E** - forma del modulo y frontera (20 casos) |
+| `tests/integration/asignaciones/order-assignments-constraints.int.test.ts` | **B** - constraints contra Postgres real (30 casos) |
+| `progress/impl_QC-86-modelo-de-asignacion-de-pedidos.md` | esta bitacora |
+
+**Modificados**
+
+| Archivo | Que cambia |
+| --- | --- |
+| `db/schema.prisma` | **Solo** el modelo `OrderAssignment`: 97 lineas anadidas, **0 eliminadas**. Ni una linea de `User`, `Company`, `WorkGroup`, `WorkGroupMember` u `Order` (R32) |
+| `lib/modules/identity/domain/permissions.ts` | Dos entradas en `PERMISSIONS`, dos codigos al Administrador, uno al Operador, y la enmienda escrita: trece -> **quince** |
+
+## 2. Los tests ajenos retensados, uno a uno, con su motivo
+
+**Ninguna asercion se debilito.** Ninguna igualdad (`toBe`, `toEqual`, `toHaveLength`) se convirtio
+en `toContain`, `toBeGreaterThan` ni `expect.arrayContaining`. Solo se **sube el numero** y se
+**amplia la lista escrita a mano** - riesgo 6 de `design.md`.
+
+### 2.a Los que afirman el numero exacto del catalogo (T4) - eran SEIS, no cinco
+
+| Archivo | Que se retenso |
+| --- | --- |
+| `tests/unit/identity/permissions.test.ts` | `CODIGOS_DEL_REQUISITO` +2; `MODULOS` y `MODULOS_CON_ESCRITURA` +`asignaciones`; `Set.size` 13 -> **15**; los **tres** casos del Operador pasan de la igualdad con solo `inventario.consultar` a la igualdad con `inventario.consultar` y `asignaciones.consultar`. Dos casos NUEVOS (QC-86 R25 y R27) que APRIETAN |
+| `tests/guards/guard-permisos-sembrados.test.ts` | `toBe(13)` -> **`toBe(15)`**, y el mensaje pasa a "quince entradas ... enmendado por QC-38, por QC-66 y por QC-86" |
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | `CODIGOS_QC74` +2; `MODULOS_DE_NEGOCIO` +`asignaciones`; `toHaveLength(13)` -> **15** |
+| `tests/unit/identity/seed/seed-initial-access.test.ts` | "trece permisos y catorce asignaciones" -> **quince y diecisiete**; `toBe(14)` -> **`toBe(17)`**; `toHaveLength(13)` -> **15** |
+| `tests/integration/identity/identity-seed.int.test.ts` | Total del seed 14 -> **17**; los casos del Operador a los **dos** codigos exactos (aqui el orden es **alfabetico**: el helper ordena por `permissionCode`); `createdRolePermissions` 1 -> **2** al resembrar el rol Operador |
+
+**El SEXTO archivo, que la tabla de `tasks.md` NO listaba.** La tabla "Modificados porque afirman
+el numero exacto" del spec listaba **cinco** archivos, y son **seis**: **la lista del spec se quedo
+corta**. El que faltaba lo encontro el `./init.sh --rapido` del leader, no esta bitacora:
+
+| Archivo | Que afirmaba | Que se hizo |
+| --- | --- | --- |
+| `tests/guards/guard-nav-permisos-declarados.test.ts` (linea 115) | `expect(CODIGOS_VALIDOS).toHaveLength(13)` -> `expected [...(14)] to have a length of 13 but got 15`. Es el **ancla anti-vacuidad** de esa guardia: con el catalogo vacio la regla diria que todo codigo es invalido, y sin ancla pasaria en verde sin comparar nada | **Retensado a `toHaveLength(15)`**, con el comentario de la enmienda (diez -> once -> trece -> quince). **No se relajo** a `toContain` ni a `toBeGreaterThan`, que es justo lo que devolveria la guardia al verde por vacuidad que ese caso existe para impedir. El `expect(CODIGOS_VALIDOS).toContain('inventario.consultar')` de la linea siguiente **se deja como estaba**. El ancla de **7 enlaces** de menu del caso anterior **tampoco se toca**: los dos permisos nuevos no los consume ningun enlace (R29) y esta guardia va en el sentido menu -> catalogo |
+
+**Barrido para descartar un septimo.** Se busco en `tests/` toda asercion sobre el tamano del
+catalogo y sobre el conjunto exacto del Operador, y se ejecutaron **los 41 archivos de `tests/` que
+importan `PERMISSIONS` o `SEED_ROLE_PERMISSIONS`**, en cuatro tandas:
+
+    guard-nav-permisos-declarados + private-nav-configuracion + private-nav-unidades   25 passed (25)
+    guard-pantallas-exigen-permiso + permisos-unidades-coherentes +
+      user-permissions-migration + private-layout-menu + private-not-found +
+      sidebar-desktop + sidebar-mobile                                                 55 passed (55)
+    13 contratos de ruta y autorizacion (dashboard, inventario, pedidos,
+      proveedores, recetas, unidades, usuarios, login-action, ...)                    152 passed (152)
+    10 de UI y dos de integracion (last-administrator, user-crud, order-sheet, ...)   229 passed (229)
+
+**No hay septimo archivo.** Las demas coincidencias de `13`/`14`/`15` en `tests/` son ajenas al
+catalogo (`numeric_precision`, numero de claves de una ficha, longitud de un `down.sql`).
+`tests/unit/inventario/product-page.test.tsx` deriva el catalogo entero de `PERMISSIONS` pero **no
+afirma ningun conteo**: su rojo bajo carga es el flake conocido de jsdom, **no es de esta ficha** y
+no se toco.
+
+**Prueba de que el retensado muerde:** se quito a mano `asignaciones.modificar` del catalogo y los
+cuatro unitarios cayeron (4 archivos rojos, 7 casos). Restaurado, verde otra vez.
+
+### 2.b Los de lista blanca de rutas (T13) - se ejecuto CADA UNO, se toco solo el rojo
+
+| Archivo | Resultado | Que se hizo |
+| --- | --- | --- |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | **ROJO** | Retensado: bloque `MIGRACION_QC86` que **nombra** los dos `.sql` de la ficha y `db/schema.prisma`, con el comentario del porque, junto a `MIGRACION_QC83`/`MIGRACION_QC66`. Cualquier OTRO archivo de `db/` lo sigue poniendo rojo |
+| `tests/guards/guard-identificador-de-request.test.ts` | **ROJO** | Retensado: `20260911120000_order_assignments` anadida a `MIGRACIONES_ESPERADAS` con su comentario. La comprobacion sobre `db/schema.prisma` -que ningun termino del identificador aparezca- se deja **intacta** y sigue pasando |
+| `tests/unit/recetas/module-contract.test.ts` | verde | **no se toco** |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | verde | **no se toco** |
+| `tests/unit/unidades/consumidores-catalogo.test.tsx` | verde | **no se toco** |
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | verde (2 skip) | solo lo de 2.a. Su bloque "QC-75 R22" **salta** por su deteccion conjuntiva: solo aplica en la rama de QC-75 |
+
+## 3. El rollback, verificado contra Postgres real (T7)
+
+No leido: ejecutado. Snapshot de `orders` y `users` -columnas, indices, constraints y RLS- antes del
+UP, despues del UP y despues del rollback.
+
+```
+===== A. ANTES DEL UP =====
+order_assignments existe: false
+permissions -> 13        role_permissions -> 14
+(sin fila de 20260911120000_order_assignments en _prisma_migrations)
+
+===== B. DESPUES DEL UP =====
+order_assignments existe: true
+permissions -> 15        role_permissions -> 17
+  asignaciones.consultar | asignaciones | consultar | Consultar los pedidos asignados.
+  asignaciones.modificar | asignaciones | modificar | Asignar y desasignar responsables de un pedido.
+  Administrador -> asignaciones.consultar / asignaciones.modificar
+  Operador      -> asignaciones.consultar
+--- constraints ---
+  order_assignments_pkey               | p | PRIMARY KEY (order_id, user_id)
+  order_assignments_order_id_fkey      | f | FOREIGN KEY (order_id) REFERENCES orders(id) ON UPDATE CASCADE ON DELETE RESTRICT
+  order_assignments_user_id_fkey       | f | FOREIGN KEY (user_id, company_id) REFERENCES users(id, company_id) ON UPDATE CASCADE ON DELETE RESTRICT
+  order_assignments_work_group_id_fkey | f | FOREIGN KEY (work_group_id, company_id) REFERENCES work_groups(id, company_id) ON UPDATE CASCADE ON DELETE RESTRICT
+  order_assignments_work_group_name_matches_group | c | CHECK (((work_group_id IS NULL AND work_group_name IS NULL) OR (work_group_id IS NOT NULL AND work_group_name IS NOT NULL)))
+--- RLS --- relrowsecurity=true | relforcerowsecurity=true
+
+diff <orders+users ANTES> <orders+users DESPUES>  ->  DIFF VACIO   (R32 contra la base)
+
+===== C. DESPUES DEL ROLLBACK =====
+order_assignments existe: false
+permissions -> 13        role_permissions -> 14
+grep 20260911120000_order_assignments en _prisma_migrations -> 0
+
+diff <estado ANTES del UP> <estado DESPUES del rollback>
+  -> DIFF VACIO COMPLETO  (R34: conteos, catalogo, columnas/indices/constraints/RLS
+     de orders y users, y la lista entera de _prisma_migrations)
+
+===== D. REAPLICACION =====
+Applying migration 20260911120000_order_assignments -> All migrations have been successfully applied.
+prisma migrate status -> Database schema is up to date!   (sin drift)
+permissions -> 15   role_permissions -> 17   RLS -> true/true
+```
+
+El ciclo rollback -> migrate se ejecuto **tres veces**, limpio las tres.
+
+## 4. Salida real de los tests que se corrieron
+
+El gate es del leader (`AGENTS.md > Regla del gate`): `./init.sh --rapido` por tanda y `./init.sh`
+completo antes del PR. Aqui solo se corrieron `typecheck`, `lint` y los archivos de la ficha.
+
+```
+pnpm run typecheck  -> tsc --noEmit   (sin salida, verde, en las seis tandas)
+pnpm run lint       -> eslint         (sin salida, verde, en las seis tandas)
+
+tests/unit/asignaciones/schema/order-assignments-migration.test.ts    44 passed (44)
+tests/unit/asignaciones/module-contract.test.ts                       20 passed (20)
+tests/integration/asignaciones/order-assignments-constraints.int.test.ts
+                                                                      30 passed (30)  x4 pasadas
+    -> SELECT count(*) FROM order_assignments = 0 al terminar (sin residuo)
+tests/integration/identity/identity-seed.int.test.ts                  14 passed (14)  x2 pasadas
+permissions + guard-permisos-sembrados + qc75-convenciones + seed-initial-access
+                                                                      65 passed | 2 skipped (67)
+guard-rls-force + guard-arquitectura-modulos + guard-permisos-sembrados
+                                                                      69 passed (69)
+tests/guards/guard-dependencias-aprobadas.test.ts                      2 passed (2)
+tests/unit/recetas-ui/recipe-route-contract.test.ts                   25 passed (25) (tras retensar)
+tests/guards/guard-identificador-de-request.test.ts                   23 passed (23) (tras retensar)
+tests/unit/recetas/module-contract.test.ts                             5 passed (5)
+tests/unit/unidades/unidades-convenciones.test.ts                     18 passed | 3 skipped (21)
+tests/unit/unidades/consumidores-catalogo.test.tsx                     5 passed | 1 skipped (6)
+```
+
+## 5. R32, R36 y R37 verificados sobre el diff, no supuestos
+
+`git diff --name-only origin/dev...HEAD` devuelve **exactamente** los 17 archivos que `tasks.md`
+autoriza. El filtro contra la lista "Archivos que NO se tocan" sale **VACIO**:
+
+```
+app/ . components/ . hooks/ . middleware.ts . lib/composition/ .
+lib/shared/navigation/private-nav.ts . scripts/seed.ts .
+lib/modules/{pedidos,recetas,inventario,unidades,proveedores}/ . e2e/ .
+package.json . pnpm-lock.yaml            -> (vacio)
+```
+
+**R37**: `git diff origin/dev -- package.json pnpm-lock.yaml` -> **vacio**, y
+`guard-dependencias-aprobadas` en verde. Ninguna dependencia nueva.
+
+**R36 - E2E**: `git diff --name-only origin/dev...HEAD -- e2e/` -> **0 archivos**. Ningun
+`test(...)` de E2E cambio de guion y no se anadio ningun E2E nuevo (decision cerrada 16).
+
+### El E2E esta ROJO, y NO es de esta ficha - queda ABIERTO para el leader
+
+`pnpm run e2e` -> **53 passed, 13 failed (8.7m)**. Los 13 rojos son los mismos seis specs en los dos
+navegadores (`errores`, `inventario`, `pedidos`, `permisos`, `proveedores`, `recetas`) y **todos**
+son casos de usuario no-Administrador / Operador. Se investigo en vez de suponer:
+
+1. Repetido con `--workers=1`: **fallan igual**, asi que no es solo agotamiento de conexiones
+   (el log con 6 workers trae ademas el error de que no alcanza el servidor de base de datos).
+2. **Experimento controlado**: se borro **solo de la base**, sin tocar codigo, la fila
+   `Operador -> asignaciones.consultar`, dejando al Operador exactamente como estaba antes de esta
+   ficha, y se repitieron `permisos.spec.ts` e `inventario.spec.ts`. **Fallan exactamente igual**,
+   con el mismo error (`private-user-trigger` no encontrado; `waitForURL` timeout). La fila se
+   restauro despues: la base queda correcta con
+   `Operador -> asignaciones.consultar, inventario.consultar`.
+
+**Conclusion: los 13 rojos son previos y ajenos a QC-86** -del entorno `next dev` del E2E-, y esta
+ficha no los introduce ni los tapa. No se toco ningun spec para "arreglarlos": eso habria sido
+cambiar el guion, que es justo lo que R36 prohibe.
+
+## 6. Mapa de trazabilidad R1..R37 -> test
+
+Abreviaturas: **A** = `tests/unit/asignaciones/schema/order-assignments-migration.test.ts` .
+**B** = `tests/integration/asignaciones/order-assignments-constraints.int.test.ts` .
+**C** = `tests/unit/identity/permissions.test.ts` . **D** = `tests/guards/guard-permisos-sembrados.test.ts` .
+**E** = `tests/unit/asignaciones/module-contract.test.ts` . **F** = `tests/guards/guard-arquitectura-modulos.test.ts` .
+**G** = `tests/integration/identity/identity-seed.int.test.ts` . **H** = `tests/guards/guard-rls-force.test.ts` .
+**I** = `tests/guards/guard-dependencias-aprobadas.test.ts` .
+**J** = `tests/unit/identity/seed/seed-initial-access.test.ts` . **T7** = el rollback real de la seccion 3 .
+**T13** = la verificacion de diff de la seccion 5.
+
+| R | Archivo | Titulo exacto del caso |
+| --- | --- | --- |
+| R1 | A | `las tres columnas de referencia y las dos marcas de tiempo son obligatorias (R1, R23)` / `declara las tres referencias y las dos marcas de tiempo obligatorias (R1, R23)` |
+| R1 | B | `R1: rechaza la asignacion a la que le falta el pedido, la persona o la empresa` (23502) |
+| R2 | B | `R2: rechaza la asignacion cuyo pedido no existe` (23503) |
+| R3 | B | `R3: rechaza asignar dos veces a la misma persona al mismo pedido` / `R3: rechaza la segunda llegada venga con un grupo o con otro grupo distinto` (23505) |
+| R4 | B | `R4: acepta un pedido con varias personas y una persona en varios pedidos` |
+| R5 | A | `no hay ninguna columna que guarde un segundo origen de la misma persona (R5)` / mutacion `anadir una columna que guarde un segundo origen cae (R5)` |
+| R6 | A | `el grupo y su nombre congelado son las dos unicas columnas anulables (R6)` / `declara el grupo y su nombre congelado como anulables (R6)` |
+| R6 | B | `R6: acepta las dos columnas juntas y distingue en la fila el origen de la persona` |
+| R7 | A | `el CHECK de la congelacion existe con sus dos ramas unidas por OR (R7)` / mutacion `quitarle una rama al CHECK, o cambiar el OR, cae (R7)` |
+| R7 | B | `R7: rechaza el grupo sin nombre congelado y el nombre congelado sin grupo` (23514 x2) |
+| R8 | B | `R8: renombrar el grupo despues de asignar no cambia el nombre congelado` / `R8: dar de baja el grupo no cambia ninguna columna de la asignacion` |
+| R9 | B | `R9: meter y sacar personas del grupo despues de asignar no crea, borra ni modifica ninguna asignacion` |
+| R10 | A | `las tres claves foraneas son ON DELETE RESTRICT y ON UPDATE CASCADE (R10, R20, R22)` |
+| R10 | B | `R10: rechaza borrar fisicamente un grupo con asignaciones, y grupo y filas quedan intactos` |
+| R11 | A | `las dos claves foraneas hacia identity llevan company_id en los dos lados (R11)` / mutacion `simplificar una FK compuesta a simple cae (R11, riesgo 1)` |
+| R11 | B | `R11: rechaza la asignacion con persona de la empresa A y grupo de la empresa B` / `R11: rechaza la misma asignacion cruzada declarando la empresa del grupo` / `R11: rechaza la asignacion cuya empresa no es la de la persona ni la del grupo` / `R11: rechaza tambien AL MODIFICAR la asignacion hacia un grupo de otra empresa` / `R11: acepta la asignacion cuando la persona, el grupo y la empresa son la misma` |
+| R12 | B | `R12: rechaza cambiar de empresa a una persona con una asignacion de grupo` / `R12: rechaza cambiar de empresa a un grupo ya aplicado a un pedido` / `R12: acepta mover de empresa a un grupo sin aplicar y a una persona sin asignaciones` |
+| R13 | A | `ninguna clave foranea declara el modo de coincidencia estricto (R13)` / mutacion `meter el modo de coincidencia estricto cae, y el modo por defecto no (R13, riesgo 2)` |
+| R13 | B | `R13: acepta la asignacion sin grupo cuya empresa es la de su persona` / `R13: rechaza la asignacion sin grupo cuya empresa no es la de su persona` |
+| R14 | A | `la clave foranea del pedido es simple y el UP no le anade empresa a orders (R14)` / mutacion `anadirle company_id a la clave foranea del pedido cae (R14)` |
+| R15 | A | `ni el SQL ni el esquema declaran deleted_at en la tabla (R15)` / mutacion `meter un deleted_at en la tabla o en el modelo cae (R15, riesgo 4)` |
+| R15 | B | `R15: elimina fisicamente la fila y no deja ningun rastro` |
+| R16 | B | `R16: borrar una sola fila de un grupo deja las demas de ese grupo intactas` |
+| R17 | A | `existen los dos indices que la PK no cubre, y ninguno mas (R17)` |
+| R17 | B | `R17: borrar por pedido y grupo se lleva solo las de ese grupo, ni las sueltas ni las de otro grupo` |
+| R18 | B | `R18: un pedido sin asignaciones existe, y borrar la ultima no cambia ni una columna del pedido` |
+| R19 | B | `R19: dar de baja el pedido conserva intactas todas sus asignaciones` |
+| R20 | A | `las tres claves foraneas son ON DELETE RESTRICT y ON UPDATE CASCADE (R10, R20, R22)` |
+| R20 | B | `R20: rechaza borrar fisicamente un pedido con asignaciones, y pedido y filas quedan intactos` |
+| R21 | B | `R21: dar de baja a una persona, o dejarla inactive o blocked, conserva sus asignaciones` |
+| R22 | A | `las tres claves foraneas son ON DELETE RESTRICT y ON UPDATE CASCADE (R10, R20, R22)` |
+| R22 | B | `R22: rechaza borrar fisicamente a una persona con asignaciones, y persona y filas quedan intactas` |
+| R23 | A | `las tres columnas de referencia y las dos marcas de tiempo son obligatorias (R1, R23)` |
+| R23 | B | `R23: created_at y updated_at se rellenan solos y el segundo cambia al modificar la fila` |
+| R24 | A | `nombra en ingles y en snake_case todo lo que crea (R24)` / `la guardia de idioma cae con un identificador en espanol, con acentos o en camelCase (R24)` |
+| R25 | C | `R2: contiene exactamente los quince codigos del requisito, ni uno mas ni uno menos` / `R2: cada entrada trae descripcion no vacia` / `QC-86 R25: el Administrador tiene asignaciones.consultar Y asignaciones.modificar, escritos uno a uno` |
+| R26 | C | `R8: el Administrador tiene los quince permisos, escritos uno a uno` / `R9 (enmendado por QC-86 R26): el Operador tiene exactamente dos permisos: inventario.consultar y asignaciones.consultar` |
+| R26 | D | `el catalogo real no esta vacio y tiene exactamente quince permisos` / `ningun permiso declarado se queda sin rol` |
+| R26 | G | `la primera corrida deja el catalogo completo, el Administrador con los quince permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo` |
+| R26 | J | `sobre una base vacia crea los quince permisos del catalogo y las diecisiete asignaciones del seed` |
+| R25 | `tests/guards/guard-nav-permisos-declarados.test.ts` | `el catalogo importado no esta vacio: la lista contra la que se compara es real` (ancla anti-vacuidad, retensada a quince) |
+| R27 | C | `QC-86 R27: el Operador recibe asignaciones.consultar y NO asignaciones.modificar` / `QC-38 R4: el Operador no recibe ninguno de unidades (su conjunto exacto lo enmendo QC-86)` / `QC-66 R9: el Operador no recibe ninguno de los dos permisos de usuarios` |
+| R27 | G | el caso de la fila de R26, mas el `not.toContain('recetas.consultar')` anadido en T12 |
+| R28 | A | `codigos, modulos, acciones y descripciones coinciden con PERMISSIONS del barril (R28)` / `los INSERT son idempotentes y resuelven el rol por nombre, sin ningun uuid literal (R28)` / mutaciones `meter un uuid literal, quitar el ON CONFLICT o resolver el rol por id cae (R28)` y `cambiar una descripcion del SQL lo separa del catalogo y cae (R28)` |
+| R28 | G | `aplicar el SQL de permisos de la migracion de asignaciones sobre la base ya sembrada no duplica, no reescribe y no borra nada, ni a la primera ni a la segunda` |
+| R29 | E | `asignaciones.consultar y asignaciones.modificar solo aparecen en lib/modules/identity/domain/permissions.ts (R29)` / `detecta el consumo de los dos codigos desde app/, components/, lib/shared/ y otro modulo (R29)` / mutacion `consumir asignaciones.modificar desde un archivo real de app/ pone la regla en rojo (R29)` |
+| R30 | A | `declara que su dueno es el modulo asignaciones (R30)` / mutacion `quitar el /// @module o cambiarlo de dueno cae (R30)` |
+| R30 | E | `ningun archivo del repo fuera de lib/modules/asignaciones consulta prisma.orderAssignment (R30)` / mutacion `consultar prisma.orderAssignment desde un archivo real de otro modulo pone la regla en rojo (R30)` |
+| R30 | F | bloque de propiedad de modelos: todo modelo de `db/schema.prisma` declara su `/// @module` |
+| R31 | A | `no declara ninguna @relation: sus tres FK van a mano (R31)` / mutacion `meter una @relation cae (R31)` |
+| R31 | E | `ningun archivo real de lib/modules/asignaciones importa una ruta interna de otro modulo ni el cliente Prisma (R31)` / `el cierre de imports del barril real no arrastra next/*, @prisma/client ni use server (R31)` |
+| R31 | F | bloques 1, 5 y 6: barril presente, imports entre modulos por barril, contrato sin servidor |
+| R32 | A | `no ejecuta ningun DDL sobre ninguna tabla preexistente (R32)` / `lo unico que escribe sobre tablas preexistentes son los INSERT de permisos (R32)` / mutacion `colar un ALTER TABLE sobre una tabla preexistente cae, y nombrarla en un comentario no (R32)` |
+| R32 | T13 | `git diff db/schema.prisma` = 97 anadidas / **0 eliminadas**; snapshot de `orders` y `users` identico antes y despues del UP |
+| R33 | A | `queda con ENABLE y con FORCE, y los dos ALTER son el ultimo bloque del archivo (R33)` / mutacion `quitar el FORCE, quitar el ENABLE o colar algo detras de ellos cae (R33)` |
+| R33 | H | `toda tabla creada tiene RLS activado y forzado` (descubre `order_assignments` leyendo el SQL) |
+| R34 | A | `revertir devuelve el catalogo persistido a sus trece entradas (R34)` / `el DROP TABLE se lleva solo la tabla de la ficha y no lleva CASCADE (R34, R35)` |
+| R34 | T7 | rollback real de la seccion 3: DIFF VACIO COMPLETO entre el estado previo al UP y el posterior al rollback |
+| R35 | A | `no lleva ningun INSERT, UPDATE ni ALTER TABLE (R35)` / `los dos DELETE van acotados por los dos codigos, y las asignaciones caen primero (R35)` / `no nombra orders, users, work_groups ni companies en ninguna linea ejecutable (R35)` / mutaciones `meter un UPDATE, un INSERT o un ALTER TABLE cae (R35)`, `desacotar un DELETE, cambiar un codigo o meter un CASCADE cae (R35)` y `nombrar una tabla preexistente en el down cae (R35)` |
+| R36 | E | `el modulo real tiene index.ts y solo la carpeta domain/, sin ports/ ni adapters/ (R36)` / mutacion `anadir ports/ al arbol real del modulo pone la regla en rojo (R36)` |
+| R36 | T13 | `git diff --name-only origin/dev...HEAD -- e2e/` = 0 archivos; ningun `test(...)` de E2E cambio de contenido; ningun E2E nuevo |
+| R37 | I | `guard-dependencias-aprobadas` en verde |
+| R37 | T14 | `git diff origin/dev -- package.json pnpm-lock.yaml` -> vacio |
+
+**Los 37 requisitos tienen test nombrado. Ninguno queda sin cubrir.**
+
+## 7. Cosas abiertas para el reviewer y el leader
+
+1. **El E2E esta rojo (13 de 66) y NO es de esta ficha** - seccion 5, con el experimento controlado
+   que lo demuestra. Es lo unico rojo que deja la ficha, y se deja rojo a proposito en vez de tocar
+   un spec ajeno.
+2. **La cabecera del `migration.sql` dice "los CUATRO INSERT de permisos"** y el paso 5 tiene
+   **tres sentencias** ejecutables: una a `permissions` con dos filas y dos a `role_permissions`.
+   Viene de la redaccion de `design.md > 5.1` y `tasks.md > T6`. Es **solo el comentario**: el test
+   de esquema afirma sobre las sentencias que hay de verdad. No se corrigio porque editar el SQL de
+   una migracion ya aplicada invalida su checksum en `_prisma_migrations`; se deja anotado.
+3. **QC-94 (`consulta-de-roles`) va en paralelo** y trae `tests/unit/identity/roles/scope.test.ts`,
+   que afirma que `PERMISSIONS` sigue con **trece** entradas. Hoy ese archivo **no existe** en esta
+   rama y no hay conflicto. El dia que QC-94 entre en `dev` y se haga `git merge origin/dev`, ese
+   test se pondra rojo por los dos permisos nuevos: **retensarlo de 13 a 15 es parte de la
+   sincronizacion**, con el mismo criterio de la seccion 2 -subir el numero, nunca relajar la
+   asercion- y se dira en el PR.
+4. **El gate no lo corrio el implementer**: `./init.sh --rapido` por tanda y `./init.sh` completo
+   antes del PR son del leader (`AGENTS.md > Regla del gate`).
+
+## 8. F2.3 - la sincronizacion con `dev`
+
+`git fetch origin dev` + `git merge origin/dev`. `origin/dev` iba **12 commits por delante**, y
+todos son de **QC-94 (`consulta-de-roles`)**, mergeada en el PR #57. El merge entro **sin un solo
+conflicto textual**: QC-94 no toca ninguno de los archivos de esta ficha. Lo que trae son 22
+archivos -el caso de uso de consulta de roles, su puerto, su adaptador Prisma, su Server Action,
+`require-any-permission`, y sus specs, bitacora y revision-.
+
+### 8.a Lo que se retenso al sincronizar (era lo anunciado en la seccion 7, punto 3)
+
+| Archivo | Que afirmaba | Que se hizo |
+| --- | --- | --- |
+| `tests/unit/identity/roles/scope.test.ts` | `PERMISOS_ESPERADOS = 13` y el caso `R21 - el catalogo de permisos sigue teniendo TRECE entradas y ninguna de roles` | **Retensado a 15**, con el comentario de la enmienda. **No se relajo** a `toContain` ni a `toBeGreaterThan` |
+
+**Por que subir el numero NO afloja el R21 de QC-94, que es lo que ese caso vigila.** R21 dice que
+**QC-94** no anada, quite ni renombre ningun permiso, y **sigue sin hacerlo**: `roles.consultar`
+sigue descartado por el humano (su decision cerrada 2) y la ficha reutiliza los dos codigos de
+QC-66. Quien lleva el catalogo a quince es **otra** ficha -esta-, con su propia aprobacion humana
+(decision cerrada 8 de QC-86). Si en vez de subir el numero se hubiera relajado la asercion, el
+caso dejaria de cazar exactamente lo que existe para cazar: que alguien cuele un permiso nuevo
+**desde la ficha de roles**. Mismo criterio que las seis retensiones de la seccion 2.
+
+Ese archivo **no** afirma el conjunto exacto del Operador ni el total de asignaciones del seed -se
+comprobo-, asi que no hubo nada mas que llevar a 2 ni a 17.
+
+### 8.b El desajuste semantico de QC-71 que QC-94 anota: no alcanza a esta ficha
+
+Se leyo antes de tocar nada, como contexto ya escrito (`docs(QC-94): F2.3 - el merge con dev y el
+desajuste semantico que trajo QC-71`, commit `3b3077a`). QC-71 cambio la firma de
+`createErrorStateTranslator` y migro los ocho adaptadores **driving** que existian entonces;
+`role-actions.ts` de QC-94 nacio despues y en paralelo, asi que se quedo fuera de esa lista y lo
+cazo el typecheck, no el merge. QC-94 ya lo corrigio en `f642b99`.
+
+**A QC-86 no le afecta, y la razon es estructural, no suerte:** esta ficha **no tiene ningun
+adaptador driving** -ni Server Action, ni route handler, ni caso de uso- porque **R36** se lo
+prohibe. No hay ningun sitio donde esa firma pudiera desajustarse. El `typecheck` en verde tras el
+merge lo confirma.
+
+Se anota tambien, por si sirve a la siguiente ficha, el otro hallazgo de esa bitacora: los rojos de
+integracion de QC-94 **no** eran la base atrasada, sino **una migracion de QC-80 -rama ajena, no
+mergeada en `dev`- aplicada sobre la base compartida**. Es exactamente el drift entre worktrees que
+esta ficha evito con su base propia `QuimiCloude_QC86` (seccion 0).
+
+### 8.c Verificacion tras el merge
+
+Solo `typecheck`, `lint` y lo que el merge toco. El gate completo es del leader.
+
+```
+pnpm run typecheck  -> tsc --noEmit   (sin salida, verde)
+pnpm run lint       -> eslint         (sin salida, verde)
+
+los 7 archivos de test que trae el merge, mas el retensado:
+  roles/scope + roles/list-roles + roles/list-roles-authorization + roles/role-actions +
+  require-any-permission + composition/identity-facade + integration/role-catalog
+                                                        90 passed | 4 skipped (94)
+
+vitest related --run sobre los 7 fuentes que el merge toco
+  (composition/index, identity/index, actor, require-permission, list-roles, role-view,
+   domain/permissions)                                 192 passed (192)
+                                                       2765 passed | 9 skipped (2774)
+```
+
+**Sin conflictos, sin nada ambiguo que preguntar y sin ningun rojo.** El flake de jsdom de
+`product-page.test.tsx` tampoco aparecio en esta corrida.
+
+## 9. El SEPTIMO archivo: el que afirmaba el VACIO, no una lista blanca
+
+Lo caza el `./init.sh` completo del leader, despues del merge. **Dos** casos del bloque
+`QC-90 R29 - esta ficha no anade ninguna migracion ni ninguna columna`, en
+`tests/unit/inventario/schema/inventario-schema.test.ts`:
+
+| Caso | Que mide | Como fallaba |
+| --- | --- | --- |
+| `el rango de la rama no agrega ningun archivo bajo db/migrations/` | el RANGO DE COMMITS contra el merge-base | `+ "20260911120000_order_assignments"` contra `toEqual([])` |
+| `db/migrations/ no gana ninguna carpeta respecto del merge-base, incluido lo no commiteado` | el ARBOL DE TRABAJO, para cazar la migracion recien creada y aun sin commitear | idem |
+
+**Por que se me escapo, dicho sin adornos.** Mi barrido buscaba el patron equivocado. Busque
+`origin/dev...` en `tests/` -que es como `tasks.md` describe la familia- y luego "listas blancas a
+las que anadir la migracion". Este archivo falla en las dos cosas: **(a)** no usa `origin/dev...`
+sino `git merge-base origin/dev HEAD`, asi que mi grep no lo trajo; y **(b)** no tiene ninguna
+lista blanca donde meter un nombre, porque **afirma el vacio absoluto**. El patron real no era
+"listas blancas": era **cualquier test que mida la rama contra git**.
+
+**Lo que se hizo, y por que NO afloja nada.** Una constante `MIGRACION_QC86` con el nombre exacto
+de la carpeta, descontada en los dos casos, y **los dos `toEqual([])` intactos**. No entro ningun
+`toBeGreaterThanOrEqual`, ningun `toContain` invertido y no se borro ningun caso: lo que R29
+vigila -que **QC-90** no meta migraciones- lo sigue vigilando, y **cualquier** carpeta que no sea
+exactamente la de esta ficha vuelve a ponerlos rojos.
+
+La excepcion es **nominal, y se demuestra en el propio archivo**: el segundo caso lleva ahora una
+asercion que mete una carpeta intrusa sintetica y comprueba que el filtro **no se la traga**. Sin
+ella, `MIGRACION_QC86` podria degenerar con el tiempo en "cualquier carpeta nueva vale" sin que
+nada se pusiera rojo.
+
+**Prueba de mutacion:** se cambio el valor de `MIGRACION_QC86` a otro nombre y **los dos casos
+cayeron** (`2 failed | 22 passed`). Restaurado, `24 passed (24)` **sin un solo skip**: los dos
+casos se ejecutan de verdad en esta rama, no pasan por salto.
+
+### 9.a El barrido bueno, con el universo correcto
+
+Se rehizo el barrido sobre el patron real -**todo test que consulte git**, sea con
+`origin/dev...`, con `git diff` o con `merge-base`-, que son **18 archivos**. Ejecutados todos:
+
+```
+pnpm exec vitest run <los 18 tests que consultan git>
+  Test Files  18 passed (18)
+       Tests  228 passed | 31 skipped (259)
+```
+
+**No hay octavo.** Los 31 saltos son por diseno: cada uno de esos casos salta -ruidosamente y
+diciendo por que- cuando la rama que corre no es la suya o cuando el rango esta vacio, que es
+justo lo contrario de un verde vacuo. El de inventario NO saltaba, y por eso mordio.
+
+Los 18, para que el reviewer no tenga que reconstruir la lista: `guard-identificador-de-request`,
+`configuracion-convenciones`, `data-table-intacta`, `data-table-intacta-unidades`,
+`identity/account-status-scope`, `identity/qc78-alcance`, `identity/roles/scope`,
+`identity/usuarios/scope`, `inventario/schema/inventario-schema`, `navegacion/qc75-convenciones`,
+`pedidos-ui/pedidos-convenciones`, `proveedores-ui/guard-convenciones-proveedores`,
+`proveedores-ui/guard-herencia-armazon-privado`, `recetas/module-contract`,
+`recetas-ui/recipe-route-contract`, `unidades/consumidores-catalogo`, `unidades/modulo-intacto` y
+`unidades/unidades-convenciones`.
+
+**Recuento final de tests ajenos tocados por esta ficha: NUEVE**, en tres familias -seis del numero
+exacto del catalogo (seccion 2.a), dos de lista blanca de rutas (2.b), uno del vacio sobre
+`db/migrations/` (esta seccion)-, mas el retensado del merge (seccion 8.a). En los diez, el
+criterio fue el mismo: **subir el numero o nombrar la excepcion, nunca relajar la asercion.**
+
+## 10. Segundo merge con `dev`: QC-80, y tres conflictos de la misma familia
+
+`origin/dev` avanzo otra vez con **QC-80 (`unidad-desde-la-presentacion`, PR #58)**, que deja el PR
+#59 en `CONFLICTING`. Lo que trae: la unidad de medida pasa a ser propiedad de la **presentacion**
+-columna obligatoria- y el **producto** pierde la suya, con su migracion
+`20260911120000_presentation_unit`; mas el arreglo del plazo de `findBy*`/`waitFor` de la seccion
+10.c.
+
+**Tres conflictos, todos de la familia "tests que miden la rama contra git"**, y en los tres la
+regla fue **sumar, nunca elegir**: las dos migraciones existen y las dos son legitimas.
+
+| Archivo | Que proponia cada lado | Como se resolvio |
+| --- | --- | --- |
+| `tests/guards/guard-identificador-de-request.test.ts` | el nuestro anadia `20260911120000_order_assignments` a `MIGRACIONES_ESPERADAS`; el de `dev`, `20260911120000_presentation_unit` | **Las DOS entradas, cada una con su comentario intacto.** Quedarse con una habria puesto el caso rojo por la otra |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | el de `dev` **reestructuro** el archivo: saco las listas al ambito de modulo y las junto en `DB_PERMITIDAS` con spreads | Se tomo **la estructura nueva de `dev` entera** -sin perder una linea suya- y se **anadio** `MIGRACION_QC86` como constante propia mas su `...MIGRACION_QC86` en `DB_PERMITIDAS`. Los dos nombres vivos |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` | **cambio de premisa**: ver abajo | Se tomo la version de `dev` |
+
+### 10.a El tercero NO era un "pega tu nombre en la lista", y conviene leerlo
+
+QC-80 **borro los dos casos** que esta ficha habia retensado en la seccion 9, y lo dejo argumentado
+por escrito en el propio archivo: eran la guardia de **alcance de QC-90** -"esta ficha no anade
+ninguna migracion"-, **QC-90 ya esta mergeada y su trabajo termino ahi**, y QC-80 **si** anade una
+migracion a proposito, asi que esos dos casos se pondrian rojos por hacer justo lo que su ficha
+tiene que hacer. Con ellos se fueron sus cuatro ayudantes de censo por git y el import de
+`node:child_process`.
+
+**Consecuencia para QC-86: no hay bloque nuevo al que anadirse.** La excepcion nominal
+`MIGRACION_QC86` de la seccion 9 queda **sin sujeto** y desaparece con los casos que la usaban;
+dejarla habria sido una constante muerta. No es que se haya descartado nuestro lado del conflicto
+por comodidad: es que **el caso que nuestro lado modificaba ya no existe**, y quien lo retiro lo
+hizo con su razon escrita. Lo que aquella seccion 9 documenta sigue siendo cierto como historia de
+como se encontro el septimo archivo; simplemente su arreglo lo absorbio `dev`.
+
+La frase que conviene recordar, y que es de QC-80: **una feature no puede cumplir la afirmacion de
+alcance de otra.**
+
+### 10.b El sello de tiempo repetido: NO rompe nada, verificado desde cero
+
+Las dos migraciones llevan el **mismo** sello, `20260911120000`. Prisma ordena por el **nombre
+completo de la carpeta**, asi que el desempate es el sufijo, alfabetico y determinista:
+`order_assignments` antes que `presentation_unit`. No se dejo en el razonamiento: se **midio** sobre
+una base creada vacia a proposito y borrada despues.
+
+```
+base scratch creada vacia -> pnpm run db:migrate
+  ... 20260911120000_order_assignments/migration.sql
+  ... 20260911120000_presentation_unit/migration.sql
+  All migrations have been successfully applied.
+
+orden REAL de aplicacion: ['20260911120000_order_assignments', '20260911120000_presentation_unit']
+las dos tablas existen: order_assignments | presentations
+presentations.unit_id (de QC-80): true
+permisos sembrados por la migracion: 4
+```
+
+**No rompe nada**, y ademas no podria: las dos migraciones son **disjuntas** -QC-86 toca `orders`,
+`users`, `work_groups`, `permissions` y `role_permissions`; QC-80 toca `presentations` y
+`products`-, asi que ninguna depende del orden de la otra. El sello repetido es feo pero inocuo.
+
+### 10.c Por que SALE la entrada del baseline
+
+`tests/unit/inventario/product-page.test.tsx` **se retira de `tests/baseline-rojos.json`**. Su
+motivo afirmaba que era el flake de saturacion de QC-58, y **QC-80 lo desmintio con medicion**
+(commit `cb94b77`): QC-58 subio `testTimeout` a 15 s, pero `findBy*` y `waitFor` **no miran
+`testTimeout`** -miran `asyncUtilTimeout` de testing-library, que seguia en **1000 ms**-. El
+elemento si se renderizaba; quien se rendia era la **consulta**. Con el plazo en 5 s: cero fallos en
+dos corridas del proyecto `ui` y la corrida casi el **doble de rapida**, porque cada consulta que se
+rinde reintenta su plazo entero y serializa el DOM en el error.
+
+Mantener la entrada habria **apagado 42 casos** de esa pantalla para el comparador **sin ninguna
+razon**, que es justo el coste que su propia nota declaraba aceptar. Se comprobo antes de quitarla:
+`product-page.test.tsx` pasa **44/44**. **Las otras cinco entradas no se tocan.**
+
+### 10.d Verificacion tras el segundo merge
+
+`pnpm exec prisma generate` hizo falta: el cliente generado estaba anterior a QC-80 y el typecheck
+caia con `presentation.unitId` -`Type 'string' is not assignable to type 'never'`-. No es un
+conflicto ni un error de resolucion: es el cliente de Prisma desactualizado respecto del esquema
+recien mergeado.
+
+```
+pnpm run typecheck  -> exit 0
+pnpm run lint       -> exit 0
+
+los tres de conflicto + la guardia nueva de QC-80 (`guard-teclear-y-plazo`)
+                                                    4 passed (4) | 81 passed (81)
+tests/unit/inventario/product-page.test.tsx         1 passed (1) | 44 passed (44)
+tests/unit/asignaciones + tests/integration/asignaciones
+                                                    3 passed (3) | 94 passed (94)
+```
+
+**Sin conflictos pendientes, sin nada ambiguo y sin ningun rojo.**

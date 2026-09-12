@@ -3,6 +3,11 @@
 // Debe poder importarse desde un componente de cliente sin arrastrar servidor (R31,
 // `design.md > 3`) -QC-22 lo hara-.
 export { requirePermission, type Actor } from './domain/actor';
+// QC-49 (R13): el AMBITO por empresa. Se publica en el contrato -como `UnitScope` en
+// `unidades`- porque lo exigen las doce firmas de los dos puertos y lo construyen los nueve
+// casos de uso: quien implemente un adaptador o escriba un doble de test lo necesita, y debe
+// poder pedirlo por el barrel y no por una ruta profunda. Es solo un tipo: no arrastra nada.
+export type { InventoryScope } from './domain/inventory-scope';
 // QC-70 (R17, R18): `NotFoundError` se abrio en `ProductNotFoundError` y
 // `PresentationNotFoundError`, y `DuplicateNameError` paso a `PresentationDuplicateNameError`.
 // El codigo generico no podia tener UN mensaje que dijera a la vez «el producto» y «la

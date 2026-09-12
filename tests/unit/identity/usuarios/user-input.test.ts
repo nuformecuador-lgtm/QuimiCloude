@@ -4,9 +4,13 @@
 // Cubre R14, R18, R20, R31, R32.
 //
 // Lo que se vigila aqui no es solo lo que los esquemas ACEPTAN, sino lo que RECHAZAN: la mitad de
-// los requisitos de esta ficha son campos que NO pueden entrar -la empresa (R14), cualquier
-// contrasena (R15, R16), el estado de cuenta en el alta (R13), la marca de cambio de credencial y
-// los tres contadores de QC-19 (R45)-. Por eso los esquemas son `strictObject`: con `object`, una
+// los requisitos de esta ficha son campos que NO pueden entrar -la empresa (R14), el estado de
+// cuenta en el alta (R13), la marca de cambio de credencial y los tres contadores de QC-19 (R45)-.
+//
+// **QC-79 ENMIENDA una de esas prohibiciones y solo una**: donde QC-66 R15/R16 decian «cualquier
+// campo de contrasena», ahora el ALTA admite un campo opcional llamado `credential` (QC-79 R1), y la
+// EDICION sigue sin admitir ninguno (QC-66 R20). Ninguna otra clave se abre: `password`,
+// `passwordHash` y `newPassword` siguen cayendo en los dos esquemas. Por eso los esquemas son `strictObject`: con `object`, una
 // clave desconocida se DESCARTA en silencio y el test quedaria verde mientras el llamante cree que
 // mando una empresa. Aqui cada uno de esos campos hace FALLAR el `parse`.
 //
@@ -78,7 +82,12 @@ describe('esquemas de entrada de la administracion de usuarios (QC-66 T8)', () =
   it('rechaza la empresa, cualquier campo de contrasena, el estado de cuenta y los tres contadores', () => {
     // EL NUCLEO DE R14 y R20. Cada una de estas claves es un requisito:
     //   companyId               -> R14: la empresa sale DEL ACTOR y de ningun otro sitio.
-    //   password/passwordHash   -> R15, R16: la credencial la genera el sistema; no entra ni sale.
+    //   password/passwordHash   -> R15 ENMENDADO por QC-79 R1/R4: el alta SI admite una contrasena
+    //                              opcional, pero **con un solo nombre y ese es `credential`** (ver
+    //                              el bloque de QC-79 mas abajo). `password`, `passwordHash` y
+    //                              `newPassword` siguen siendo claves desconocidas y siguen
+    //                              RECHAZANDOSE en los DOS esquemas: la enmienda abre un campo, no
+    //                              abre el objeto. Y el HASH nunca entra por el borde (R16, R5).
     //   accountStatus           -> R13: la cuenta nace `pending`; moverlo es otra operacion.
     //   mustChangeCredential    -> R13: nace en verdadero, no lo elige el llamante.
     //   failedLoginAttempts     -> R45: los contadores de QC-19 no se tocan en esta ficha.
@@ -108,6 +117,66 @@ describe('esquemas de entrada de la administracion de usuarios (QC-66 T8)', () =
         ).toBe(false);
       }
     }
+  });
+
+  it('QC-79 R1 — el alta admite `credential` OPCIONAL, y es el UNICO campo nuevo', () => {
+    // R1: «el esquema del alta DEBE admitir un campo de contrasena opcional y NINGUN OTRO campo
+    // nuevo». Las tres mitades del requisito, una por aserción:
+    //   1. sin el campo, pasa (es opcional) y el resultado no gana ninguna clave;
+    //   2. con el campo, pasa y el valor cruza TAL CUAL;
+    //   3. cualquier otra clave desconocida sigue haciendo fallar la validacion.
+    expect(createUserSchema.parse(VALIDO)).toEqual(VALIDO);
+    expect(Object.keys(createUserSchema.parse(VALIDO))).not.toContain('credential');
+
+    expect(createUserSchema.parse({ ...VALIDO, credential: 'Contrasena-1!' })).toEqual({
+      ...VALIDO,
+      credential: 'Contrasena-1!',
+    });
+
+    for (const desconocida of ['credentials', 'credencial', 'setupCredential', 'secret']) {
+      expect(
+        createUserSchema.safeParse({ ...VALIDO, [desconocida]: 'x' }).success,
+        `${desconocida} no es el campo nuevo y debe seguir cayendo`,
+      ).toBe(false);
+    }
+  });
+
+  it('QC-79 R1 — `credential` NO se recorta y NO tiene maximo propio: el maximo lo pone la politica', () => {
+    // `design.md > 5.2`: sin `trim` -QC-19 R10 prohibe recortar o normalizar la candidata, y un
+    // espacio al final es parte de la contrasena- y sin `max` -el maximo es `max_length` de QC-19
+    // R11, y un segundo numero escrito aqui podria divergir de el-.
+    const conEspacios = '  Contrasena-1!  ';
+    expect(createUserSchema.parse({ ...VALIDO, credential: conEspacios }).credential).toBe(
+      conEspacios,
+    );
+
+    // Muy por encima de `CREDENTIAL_MAX_LENGTH`: el esquema la deja pasar y quien la rechaza es la
+    // politica, en el caso de uso. Si alguien anadiera un `max()` aqui, esto se pone rojo.
+    const larguisima = `${'a'.repeat(500)}A1!`;
+    expect(createUserSchema.safeParse({ ...VALIDO, credential: larguisima }).success).toBe(true);
+
+    // Lo unico que el esquema si exige: que no sea una cadena vacia ni otro tipo. La equivalencia
+    // entre la cadena vacia y la AUSENCIA (R1) la resuelve `create-user.ts`, en un solo sitio.
+    for (const valor of ['', 0, null, true, ['x']]) {
+      expect(
+        createUserSchema.safeParse({ ...VALIDO, credential: valor }).success,
+        `credential = ${JSON.stringify(valor)} debe caer en el esquema`,
+      ).toBe(false);
+    }
+  });
+
+  it('QC-66 R20 — la EDICION no admite `credential`: el campo nuevo es solo del alta', () => {
+    // El punto donde `design.md > 5.2` no se sostiene literalmente. Decia que el campo entra «dentro
+    // del `strictObject` existente», y hasta hoy `updateUserSchema` ERA ese mismo objeto: meterlo sin
+    // mas habria hecho que **la edicion admitiera una contrasena**, y QC-66 R20 lo prohibe
+    // expresamente. Por eso la edicion lo quita con un `omit` explicito. Cambiar la propia es QC-36;
+    // restablecer la de otro, QC-89; ninguna de las dos es esta ficha.
+    expect(updateUserSchema.safeParse({ ...VALIDO, credential: 'Contrasena-1!' }).success).toBe(
+      false,
+    );
+    // Y el resto del esquema de edicion sigue siendo el del alta, campo por campo: quitar uno no
+    // vale como forma de «arreglar» esto.
+    expect(updateUserSchema.parse(VALIDO)).toEqual(VALIDO);
   });
 
   it('no admite edicion parcial: falta un solo campo y cae', () => {

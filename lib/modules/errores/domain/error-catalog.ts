@@ -37,7 +37,8 @@ export const ERROR_MESSAGE_KEY = {
   invalid_derivation: 'errors.invalid_derivation',
   unit_in_use: 'errors.unit_in_use',
   incompatible_units: 'errors.incompatible_units',
-  // `identity` (QC-66): la administracion de usuarios, sexta familia del catalogo.
+  // `identity` (QC-66, ampliado por QC-79): la administracion de usuarios, sexta familia del
+  // catalogo.
   user_not_found: 'errors.user_not_found',
   duplicate_email: 'errors.duplicate_email',
   duplicate_username: 'errors.duplicate_username',
@@ -45,6 +46,16 @@ export const ERROR_MESSAGE_KEY = {
   role_not_found: 'errors.role_not_found',
   self_operation: 'errors.self_operation',
   last_administrator: 'errors.last_administrator',
+  credential_link_invalid: 'errors.credential_link_invalid',
+  user_not_pending: 'errors.user_not_pending',
+  // `identity` (QC-84): los grupos de trabajo, dentro de la MISMA sexta familia.
+  work_group_not_found: 'errors.work_group_not_found',
+  work_group_duplicate_name: 'errors.work_group_duplicate_name',
+  work_group_member_exists: 'errors.work_group_member_exists',
+  work_group_member_exists_pending: 'errors.work_group_member_exists_pending',
+  work_group_member_exists_inactive: 'errors.work_group_member_exists_inactive',
+  work_group_member_exists_blocked: 'errors.work_group_member_exists_blocked',
+  work_group_member_not_found: 'errors.work_group_member_not_found',
 } as const satisfies Record<ErrorCode, string>;
 
 /** La union cerrada de las claves estables (R1, R5). */
@@ -95,4 +106,29 @@ export const ERROR_MESSAGES_ES = {
   'errors.role_not_found': 'El rol indicado no existe.',
   'errors.self_operation': 'No puedes realizar esta operacion sobre tu propia cuenta.',
   'errors.last_administrator': 'La empresa quedaria sin ningun administrador activo.',
+  // QC-79 (R22): la UNICA respuesta, INDISTINGUIBLE entre los seis casos de fallo —el enlace no
+  // existe, caduco, ya se uso, lo sustituyo un reenvio, la cuenta esta borrada o ya no esta
+  // pendiente—. El texto no nombra ninguno de ellos a proposito: distinguirlos convertiria el
+  // enlace en un oraculo sobre si una cuenta existe y en que estado esta.
+  'errors.credential_link_invalid':
+    'El enlace para establecer la contrasena no sirve. Pide uno nuevo al administrador.',
+  // QC-79 (R15): reenviar el enlace a alguien que ya no esta en `pending`. SI se distingue de
+  // `user_not_found` a proposito: quien reenvia trae `usuarios.modificar` y ya ve el estado de
+  // cuenta en el listado, asi que el codigo no le revela nada que no sepa.
+  'errors.user_not_pending': 'La cuenta ya no esta pendiente de activacion.',
+  'errors.work_group_not_found': 'El grupo de trabajo solicitado no existe.',
+  'errors.work_group_duplicate_name':
+    'Ya existe un grupo de trabajo con un nombre equivalente en la empresa.',
+  // QC-84 (`design.md > 7.2`): los CUATRO textos de abajo dicen lo mismo de entrada —«ya
+  // pertenece»— y se separan por el MOTIVO de que no se vea. No pueden nombrar al grupo: el
+  // catalogo no interpola (R4, R7) y el dato variable de `diagnostic` no cruza al navegador
+  // (R28, R29). El nombre del grupo lo pone la pantalla, que sabe cual acaba de abrir.
+  'errors.work_group_member_exists': 'Esa persona ya pertenece al grupo.',
+  'errors.work_group_member_exists_pending':
+    'Esa persona ya pertenece al grupo; no aparece en la lista porque su cuenta esta pendiente de activacion.',
+  'errors.work_group_member_exists_inactive':
+    'Esa persona ya pertenece al grupo; no aparece en la lista porque su cuenta esta inactiva.',
+  'errors.work_group_member_exists_blocked':
+    'Esa persona ya pertenece al grupo; no aparece en la lista porque su cuenta esta bloqueada.',
+  'errors.work_group_member_not_found': 'Esa persona no pertenece al grupo.',
 } as const satisfies Record<ErrorMessageKey, string>;

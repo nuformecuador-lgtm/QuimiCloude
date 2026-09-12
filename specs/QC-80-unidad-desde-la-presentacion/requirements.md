@@ -25,7 +25,140 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Notación EARS (`docs/specs.md`). **«El sistema»** aquí es: la **migración** y el esquema Prisma;
+> el módulo **`inventario`** —esquema de entrada, puerto, casos de uso y adaptador Prisma de
+> presentación y de producto—; las **Server Actions** de presentación; la **pantalla de
+> presentaciones** (`app/(private)/configuracion/presentaciones/`); y la **línea de receta**
+> (`app/(private)/produccion/formulas/`).
+>
+> **Hechos verificados contra la base el 2026-09-11, que estos requisitos no re-verifican**:
+> `presentations` no tiene columna de unidad (esta ficha la crea); hay **114** presentaciones y
+> **0** lotes, así que ninguna está referenciada; `products.unit_id` está **vacía en las 7 filas
+> vivas**; el catálogo tiene las cuatro unidades de sistema `mililitro`, `litro`, `gramo`,
+> `kilogramo` más dos de residuo que no se tocan.
+
+### La columna y su migración
+
+**R1.** El sistema DEBE almacenar la unidad de cada presentación en la columna
+`presentations.unit_id`, de tipo `uuid`, **`NOT NULL`** y **sin valor por defecto**. NO DEBE
+existir ninguna presentación sin unidad.
+
+**R2.** El sistema DEBE declarar la restricción de clave foránea `presentations_unit_id_fkey`
+desde `presentations.unit_id` hacia `units.id` con **`ON DELETE RESTRICT`** y
+**`ON UPDATE CASCADE`**. SI se intenta borrar una unidad referenciada por alguna presentación,
+ENTONCES la base DEBE rechazar el borrado. La FK NO DEBE ser `ON DELETE SET NULL` ni `CASCADE`.
+
+**R3.** El sistema DEBE crear el índice `presentations_unit_id_idx` sobre `presentations(unit_id)`.
+
+**R4.** CUANDO se aplica la migración, el sistema DEBE dejar **todas** las presentaciones
+existentes con la unidad de sistema **`kilogramo`** —la fila de `units` cuyo `name_normalized` es
+`kilogramo` y cuyo `company_id` es nulo, buscada **por nombre normalizado y nunca por
+identificador**—. SI esa unidad no existe, o SI al terminar el relleno queda alguna presentación
+con `unit_id` nulo, ENTONCES la migración DEBE abortar con un error propio y distinguible, sin
+dejar la columna a medias ni marcarse como aplicada.
+
+**R5.** La migración NO DEBE insertar ni borrar ninguna fila de `presentations` ni de `units`:
+rellena, no limpia. Las 113 presentaciones de residuo y las 2 unidades de residuo DEBEN seguir
+existiendo después de aplicarla, con el mismo identificador y el mismo nombre.
+
+**R6.** MIENTRAS la migración escribe el relleno, el sistema DEBE desactivar temporalmente el
+`FORCE ROW LEVEL SECURITY` de **`presentations`** (la tabla que escribe) y de **`units`** (la tabla
+que lee para resolver `kilogramo`), y DEBE dejar las dos con la RLS **activada y forzada y sin
+ninguna policy** al terminar, dentro de la misma transacción.
+
+**R7.** La migración DEBE eliminar de `products` la columna **`unit_id`**, su índice
+`products_unit_id_idx` y su clave foránea `products_unit_id_fkey`.
+
+**R8.** El sistema DEBE acompañar la migración de un `down.sql` que revierta exactamente lo que
+hace la de subida: devuelve `products.unit_id` **anulable** con su FK y su índice —vacía, sin
+restaurar valores, porque no los había—, y quita de `presentations` la columna, su índice y su FK.
+
+**R9.** El sistema NO DEBE añadir a `presentations` borrado lógico ni ninguna columna
+`deleted_at`, y DEBE conservar sus identificadores de base **en inglés** y sus marcas
+`created_at`/`updated_at`.
+
+### Escritura de la presentación
+
+**R10.** El sistema DEBE exigir la unidad en el alta y en la edición de una presentación. SI la
+unidad falta, viene vacía o no tiene forma de uuid, ENTONCES el sistema DEBE rechazar la operación
+con el código `invalid_input` señalando el campo `unitId`, y NO DEBE escribir nada.
+
+**R11.** CUANDO se da de alta una presentación, el sistema DEBE escribir su nombre, su nombre
+normalizado y su unidad **en la misma escritura**. NO DEBE existir ningún camino que cree una
+presentación sin unidad.
+
+**R12.** CUANDO se edita una presentación, el sistema DEBE reemplazar **nombre y unidad** —la
+edición sigue siendo reemplazo completo—, y NO DEBE conservar la unidad anterior si se envió otra.
+
+**R13.** SI la unidad enviada no corresponde a ninguna unidad del catálogo, ENTONCES el sistema
+DEBE rechazar el alta o la edición con `invalid_input`, sin escribir nada y **distinguiéndolo** del
+rechazo por nombre duplicado (`presentation_duplicate_name`) y del de presentación en uso
+(`presentation_in_use`).
+
+**R14.** SI el actor no está autenticado o no tiene el permiso `inventario.modificar`, ENTONCES el
+sistema DEBE rechazar con `unauthorized` **antes** de validar la entrada y **antes** de tocar el
+puerto de datos, también en el camino nuevo de la unidad.
+
+**R15.** El contrato de salida de presentación DEBE incluir la unidad, y CUANDO se abre la edición
+de una presentación el formulario DEBE llegar con **su** unidad ya elegida.
+
+### Pantalla de presentaciones
+
+**R16.** El formulario de presentación DEBE ofrecer, tanto en el alta como en la edición, **todas
+las unidades del catálogo**, sin filtrar por empresa y sin ofrecer crear ninguna unidad nueva.
+
+**R17.** El formulario NO DEBE ofrecer ninguna opción «sin unidad» y NO DEBE enviar la operación
+con la unidad vacía: la validación previa DEBE rechazarla con **el mismo esquema** que valida el
+servidor y pintar el error **junto al campo de unidad**.
+
+**R18.** CUANDO el servidor rechaza la operación, el panel DEBE seguir abierto y conservar lo
+escrito, **incluida la unidad elegida**.
+
+**R19.** SI el catálogo de unidades no se puede leer, ENTONCES la pantalla NO DEBE ofrecer el alta
+ni la edición y DEBE pintar el estado de error, en vez de abrir un formulario con el selector
+vacío.
+
+**R20.** El selector de unidad DEBE cumplir la regla multiplataforma
+(`docs/architecture.md > Componentes`): objetivo táctil de 44×44 px y texto de campo de 16 px en
+todos los anchos.
+
+### El producto deja de declarar unidad
+
+**R21.** El producto NO DEBE declarar unidad en ningún punto del camino: ni en su esquema de
+entrada, ni en su contrato de salida, ni en la referencia que `inventario` publica a otros módulos,
+ni en el `FormData` de su Server Action, ni como columna ordenable o filtrable del listado de
+productos.
+
+**R22.** El sistema DEBE derivar la unidad de un producto de la **presentación de su lote más
+reciente** —el lote de creación más reciente, desempatando por identificador descendente—, y DEBE
+devolver esa unidad derivada allí donde el producto se lista o se consulta.
+
+**R23.** SI un producto no tiene ningún lote, ENTONCES su unidad derivada DEBE ser «ninguna» y la
+línea de receta DEBE ofrecer **el catálogo entero** de unidades, sin bloquear la línea ni impedir
+guardar la receta.
+
+**R24.** CUANDO se elige un ingrediente en una línea de receta, el sistema DEBE acotar el selector
+de unidad al **grupo** de la unidad derivada de ese ingrediente —las que comparten base efectiva— y
+DEBE preseleccionar la más pequeña del grupo, salvo que la ya elegida sea de ese mismo grupo, en
+cuyo caso la mantiene.
+
+**R25.** El sistema NO DEBE devolverle al producto una presentación propia: `products` NO DEBE
+recuperar ninguna columna `presentation_id`, y la presentación sigue viviendo **solo** en
+`product_batches`.
+
+### Límites de esta ficha
+
+**R26.** El sistema NO DEBE tocar la línea de catálogo de proveedor: `supplier_catalog_lines`
+conserva su presentación y su unidad **propia y opcional**, con la misma forma y la misma
+opcionalidad de hoy.
+
+**R27.** El sistema NO DEBE filtrar el selector de unidades de la presentación por empresa, y
+`presentations` NO DEBE ganar ninguna columna de empresa.
+
+**R28.** El sistema NO DEBE mover ninguna existencia ni tocar ningún importe: `product_batches`
+—`stock`, `unit_cost`—, `orders` y el costo de la línea de catálogo de proveedor conservan su forma
+y sus valores, y ni el alta ni la edición de una presentación escriben en ninguna de esas tablas.
+Es el motivo por el que esta ficha no lleva E2E.
 
 ## Preguntas abiertas
 

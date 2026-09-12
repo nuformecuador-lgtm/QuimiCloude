@@ -41,6 +41,12 @@ const listQuerySchema = createListQuerySchema();
  *
  * El defecto de 10, el tope de 25 (R29) y el orden por defecto (R11) siguen siendo del
  * adaptador driven, que es el unico que puede importar `lib/shared/pagination`.
+ *
+ * QC-49 (R14): el ambito -la empresa del actor- se pasa al puerto en el mismo paso 5, con la
+ * consulta ya saneada. El orden por defecto, la busqueda, los filtros, la paginacion y la forma
+ * del resultado NO cambian (R31): el ambito los acota, no los sustituye. Componer el ambito con
+ * lo demas -y no fundirlo con la busqueda- es del adaptador; aqui no se escribe ninguna
+ * condicion.
  */
 export function createListProducts(
   deps: ListProductsDeps,
@@ -57,6 +63,6 @@ export function createListProducts(
     const { query, ignored } = sanitizeListQuery(parsed.data, PRODUCT_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    return deps.products.listAlive(query);
+    return deps.products.listAlive(query, { companyId: actor.companyId });
   };
 }

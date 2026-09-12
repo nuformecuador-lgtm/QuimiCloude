@@ -16,9 +16,14 @@ import {
  * presentacion:
  *
  * - `create`/`update`/`delete` reciben `FormData`: son mutaciones de formulario (QC-22).
- *   El unico campo de negocio es `name`, una cadena -no hace falta ninguna conversion
- *   numerica como en producto-, asi que no hay ningun camino de `NaN` que vigilar aqui.
- *   `delete` recibe el `id` como campo oculto del formulario, igual que en producto.
+ *   Los campos de negocio son `name` y -desde QC-80 (R10, R11, R12)- `unitId`, las dos
+ *   cadenas: no hace falta ninguna conversion numerica como en producto, asi que no hay
+ *   ningun camino de `NaN` que vigilar aqui. `delete` recibe el `id` como campo oculto del
+ *   formulario, igual que en producto.
+ * - La action NO decide nada sobre la unidad: lee `unitId` del `FormData` y lo pasa TAL
+ *   CUAL. Quien lo valida es `create/updatePresentationSchema` dentro del caso de uso, y
+ *   quien comprueba que existe es la FK. Una cadena vacia baja tal cual y vuelve como
+ *   `invalid_input`; la action no la traduce ni la sustituye por ningun defecto.
  * - `list` recibe `query: unknown` como argumento tipado: es una consulta, no un
  *   formulario, y `createListQuerySchema()` valida su forma DENTRO del caso de uso
  *   (QC-57 R30).
@@ -51,11 +56,24 @@ function readFormString(formData: FormData, name: string): string {
 /** El traductor UNICO (R10), parametrizado por la base de este modulo. Ver `product-actions.ts`. */
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
 
-/** El actor que exige R1/D17: se resuelve UNA vez por invocacion (ver `product-actions.ts`). */
+/**
+ * El actor que exige R1/D17: se resuelve UNA vez por invocacion y, desde QC-49 (R12), con LAS
+ * DOS CARAS de la sesion del servidor —`getSessionUser()` para id y permisos,
+ * `getSessionContext()` para la EMPRESA—, pedidas en paralelo. Falla cerrado: sin cualquiera de
+ * las dos el actor es `null` y el caso de uso rechaza antes de tocar el repositorio. La empresa
+ * nunca sale del `FormData`. El razonamiento completo esta en `product-actions.ts`.
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  const [sessionUser, sessionContext] = await Promise.all([
+    identity.getSessionUser(),
+    identity.getSessionContext(),
+  ]);
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 /** Alta de presentacion (R9, R11, R17-R20, R37). */
@@ -65,7 +83,10 @@ export async function createPresentationAction(
 ): Promise<CreatePresentationFormState> {
   void prevState;
 
-  const candidate = { name: readFormString(formData, 'name') };
+  const candidate = {
+    name: readFormString(formData, 'name'),
+    unitId: readFormString(formData, 'unitId'),
+  };
   const actor = await currentActor();
 
   try {
@@ -76,7 +97,8 @@ export async function createPresentationAction(
   }
 }
 
-/** Renombrado de presentacion (R9, R11, R14, R17-R20, R37). */
+/** Edicion de presentacion: reemplazo completo de nombre Y unidad (R9, R11, R14,
+ *  R17-R20, R37; QC-80 R12). */
 export async function updatePresentationAction(
   id: string,
   prevState: PresentationMutationFormState,
@@ -84,7 +106,10 @@ export async function updatePresentationAction(
 ): Promise<PresentationMutationFormState> {
   void prevState;
 
-  const candidate = { name: readFormString(formData, 'name') };
+  const candidate = {
+    name: readFormString(formData, 'name'),
+    unitId: readFormString(formData, 'unitId'),
+  };
   const actor = await currentActor();
 
   try {

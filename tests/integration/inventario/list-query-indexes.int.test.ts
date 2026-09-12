@@ -26,7 +26,7 @@
  */
 import { randomUUID } from 'node:crypto'
 
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeProductName } from '@/lib/modules/inventario'
 import {
@@ -35,9 +35,41 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
+
 function token(): string {
   return randomUUID().replace(/-/gu, '')
 }
+
+/**
+ * Empresa propia del archivo y AMBITO de las llamadas al adaptador (QC-49 R1, R13).
+ *
+ * `products.company_id` es NOT NULL desde `<ts>_inventory_company_scope` y `createProduct` /
+ * `updateAliveProduct` exigen el ambito en su firma: sin el no compilan. La empresa es EFIMERA
+ * y se borra al final, cuando ya no queda ningun producto que la referencie.
+ *
+ * ESTE ARCHIVO NO PRUEBA EL AISLAMIENTO: sigue probando los indices del listado y la escritura
+ * de `name_normalized` (QC-57 R19, R21, R23). El aislamiento es
+ * `company-scope-queries.int.test.ts`.
+ */
+let empresaDelArchivo: string
+
+function ambito(): InventoryScope {
+  return { companyId: empresaDelArchivo }
+}
+
+beforeAll(async () => {
+  const nombre = `Empresa indices de listado ${token()}`
+  const { id } = await prisma.company.create({
+    data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
+    select: { id: true },
+  })
+  empresaDelArchivo = id
+})
+
+afterAll(async () => {
+  await prisma.company.deleteMany({ where: { id: empresaDelArchivo } })
+})
 
 // ---------------------------------------------------------------------------
 // Lo que la migracion tenia que dejar en la base
@@ -121,7 +153,15 @@ const ALL_INDEXES = [...PARTIAL_INDEXES, ...FULL_INDEXES] as const
  * indice unico que desaparece no rompe ningun test hasta el dia que alguien duplica un nombre.
  */
 const PRE_EXISTING_INDEXES = [
-  'presentations_name_normalized_key',
+  // `presentations_name_normalized_key` (unico GLOBAL sobre el nombre normalizado, de QC-20)
+  // salio de esta lista el 2026-09-11 con QC-49. NO es un indice perdido por descuido, que es
+  // justo lo que este caso vigila: la unicidad del nombre de presentacion pasa a medirse POR
+  // EMPRESA porque dos empresas pueden tener cada una su «Garrafa 20 L» (R20, decision cerrada
+  // 3). Un unico global lo impediria, y ademas seria un ORACULO DE EXISTENCIA sobre el catalogo
+  // ajeno. Su sustituto es UN solo indice compuesto, `presentations_company_name_unique`, que
+  // se afirma abajo en su propio caso: si la migracion se hubiera llevado el global SIN dejar
+  // el compuesto, el catalogo se quedaria sin ninguna garantia de unicidad y este archivo
+  // seguiria siendo quien lo dijera.
   // `units_name_normalized_key` (unico GLOBAL sobre el nombre normalizado, de QC-32 R5) salio de
   // esta lista el 2026-09-08 con QC-76. NO es un indice que se perdiera por descuido, que es
   // justo lo que este caso vigila: la unicidad del nombre de unidad pasa a medirse POR AMBITO
@@ -138,7 +178,13 @@ const PRE_EXISTING_INDEXES = [
   // en la misma migracion que creo `product_batches`: la presentacion se mudo al lote, y el
   // lado hijo de la FK ya no es `products` sino `product_batches` (cuyo indice, tambien
   // del lado hijo, esta arriba en `PARTIAL_INDEXES`).
-  'products_unit_id_idx',
+  // `products_unit_id_idx` salio de esta lista el 2026-09-11 con QC-80, y NO por descuido -que
+  // es justo lo que este caso vigila-: la ficha elimina la columna `products.unit_id` entera
+  // (R7), y Postgres se lleva el indice con ella. El producto deja de declarar unidad y la
+  // deriva de la presentacion de su lote mas reciente (R22). Su RELEVO es
+  // `presentations_unit_id_idx` (R3), que se afirma abajo en su propio caso: si la migracion se
+  // hubiera llevado el de `products` SIN crear el de `presentations`, la FK nueva se quedaria sin
+  // indice y este archivo seguiria siendo quien lo dijera.
   'supplier_catalog_lines_presentation_id_idx',
   'supplier_catalog_lines_unit_id_idx',
   'orders_recipe_id_idx',
@@ -241,6 +287,34 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     )
   })
 
+  it('el unico de nombre de presentacion es POR EMPRESA, y el global ya no esta (QC-49 R20)', async () => {
+    // El RELEVO de `presentations_name_normalized_key`, que sale de `PRE_EXISTING_INDEXES`
+    // arriba. Los dos no pueden convivir: con el global en pie, dos empresas seguirian sin
+    // poder tener cada una su «Garrafa 20 L», que es lo que R20 abre.
+    const indexes = await readIndexes()
+    const compuesto = indexes.get('presentations_company_name_unique')
+    expect(compuesto, 'falta presentations_company_name_unique').toBeDefined()
+    expect(compuesto).toContain('UNIQUE')
+    // `company_id` va DE CABEZA: asi el mismo indice sirve para la verificacion del RESTRICT de
+    // `presentations_company_id_fkey` y `presentations` no necesita uno propio de empresa (R10).
+    expect(compuesto).toMatch(/\(company_id, name_normalized\)/u)
+    // Y NO es parcial: esa verificacion tiene que ver todas las filas.
+    expect(compuesto).not.toContain('WHERE')
+
+    expect(indexes.has('presentations_name_normalized_key')).toBe(false)
+  })
+
+  it('el indice de la unidad de la presentacion existe y va sobre unit_id (QC-80 R3)', async () => {
+    // El relevo del `products_unit_id_idx` que salio de `PRE_EXISTING_INDEXES`. Es el indice del
+    // lado hijo de `presentations_unit_id_fkey`: sin el, cada borrado de unidad tendria que
+    // recorrer `presentations` entera para comprobar el RESTRICT.
+    const indexes = await readIndexes()
+    const def = indexes.get('presentations_unit_id_idx')
+    expect(def, 'falta presentations_unit_id_idx').toBeDefined()
+    expect(def).toContain('unit_id')
+    expect(def, 'no es unico: varias presentaciones comparten unidad').not.toContain('UNIQUE')
+  })
+
   it('la unicidad del catalogo de unidades sigue garantizada, ahora POR AMBITO (QC-76 R14, R15)', async () => {
     // El relevo del `units_name_normalized_key` global que salio de `PRE_EXISTING_INDEXES`.
     // Este caso es la mitad que impide que aquella retirada se lea como permiso para dejar el
@@ -303,8 +377,10 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       // «Solución Buffer pH 7»).
       const nombreAlta = `Solución Buffer pH 7 ${token()}`
       const created = await createProduct(
-        { name: nombreAlta, stock: 3, qtyAlert: 1, unitId: null },
+        // QC-80 (R21): `NewProduct` ya no lleva unidad; el producto no la declara.
+        { name: nombreAlta, stock: 3, qtyAlert: 1 },
         new Date('2026-01-01T00:00:00Z'),
+        ambito(),
       )
       productId = created.id
 
@@ -321,8 +397,9 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreEdicion = `Hipoclorito de sodio 5% ${token()}`
       const ok = await updateAliveProduct(
         created.id,
-        { name: nombreEdicion, stock: 3, qtyAlert: 1, unitId: null },
+        { name: nombreEdicion, stock: 3, qtyAlert: 1 },
         new Date('2026-01-02T00:00:00Z'),
+        ambito(),
       )
       expect(ok).toBe(true)
 
@@ -349,10 +426,11 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombre = `Sosa caustica ${token()}`
       const data = { name: nombre, stock: null, qtyAlert: null, unitId: null }
 
-      const primero = await createProduct(data, new Date('2026-01-01T00:00:00Z'))
+      const primero = await createProduct(data, new Date('2026-01-01T00:00:00Z'), ambito())
       const segundo = await createProduct(
         { ...data, name: nombre.toUpperCase() },
         new Date('2026-01-01T00:00:00Z'),
+        ambito(),
       )
       ids = [primero.id, segundo.id]
 

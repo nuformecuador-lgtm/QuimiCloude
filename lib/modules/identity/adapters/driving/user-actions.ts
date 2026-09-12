@@ -3,8 +3,11 @@
 import { identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
+  CredentialPolicyRejectedError,
   IdentityError,
   type Actor,
+  type CreateUserMailOutcome,
+  type CredentialRule,
   type Page,
   type UserDetail,
   type UserRow,
@@ -62,10 +65,29 @@ import {
  * componente de cliente que importe el barrel. QC-67 las importara por su RUTA EXACTA.
  */
 
-/** Estado serializable del ALTA: el unico que devuelve un dato ademas de exito/fracaso. */
+/**
+ * Estado serializable del ALTA: el unico que devuelve un dato ademas de exito/fracaso.
+ *
+ * QC-79 T18 (`design.md > 5.3`) — pasa de TRES variantes a CINCO, y las dos nuevas son requisitos:
+ *
+ * - **`mail` dentro de `success`** es lo que hace cierta la decision 7 (R30): `'sent'`, `'failed'`
+ *   —el usuario queda creado igual, en `pending`, con su enlace vivo, y la pantalla de QC-67 puede
+ *   ofrecer el reenvio de R14— o `'not_needed'` cuando el administrador escribio la contrasena y
+ *   no hubo ningun enlace que enviar (R3). Un fallo de correo **no** es un fallo del alta.
+ * - **`invalid_credential`** lleva las REGLAS INCUMPLIDAS (R2) y **no es un `ErrorState`, que es
+ *   una decision** (`design.md > 11.3`): son datos que la persona necesita para corregir, y el
+ *   unico hueco de `ErrorState` para datos variables es el `diagnostic`, que QC-70 R29 manda al
+ *   registro del servidor y prohibe serializar al navegador. Los codigos de `CredentialRule` son
+ *   estables e independientes del idioma (QC-19 R23) y la UI compone el texto con ellos.
+ *
+ * **Sigue sin haber ningun hueco para una credencial** (R16, QC-79 R5): ni la que escribio el
+ * administrador, ni ningun hash, ni el secreto del enlace. `unmet` son codigos de regla, nunca la
+ * candidata ni un fragmento suyo.
+ */
 export type CreateUserFormState =
   | { status: 'idle' }
-  | { status: 'success'; id: string }
+  | { status: 'success'; id: string; mail: CreateUserMailOutcome }
+  | { status: 'invalid_credential'; unmet: readonly CredentialRule[] }
   | ErrorState;
 
 /** Estado compartido por edicion, borrado y movimiento de estado: ninguno devuelve datos. */
@@ -160,10 +182,21 @@ function readTargetId(formData: FormData): string {
 }
 
 /**
- * ALTA de usuario (R40). Devuelve solo el identificador creado: **ninguna credencial y ningun
- * hash** salen en este estado (R16). La empresa, el estado `pending`, la marca de cambio de
- * credencial y la contraseña generada los pone el caso de uso (R13, R15); esta action no los
- * nombra.
+ * ALTA de usuario (R40). Devuelve el identificador creado y **como acabo el correo**: ninguna
+ * credencial y ningun hash salen en este estado (R16, QC-79 R5). La empresa, el estado `pending`,
+ * la marca de cambio de credencial y —cuando toca— el enlace los pone el caso de uso (R13; QC-79
+ * R4, R7); esta action no los nombra.
+ *
+ * **QC-79 T18: el DECIMO campo del formulario es la contrasena OPCIONAL** (R1). Va aqui y no en
+ * `userCandidateFromFormData` porque ese helper lo comparte la EDICION, y `updateUserSchema` omite
+ * `credential` a proposito: anadirlo alli haria fallar toda edicion con `invalid_input`.
+ *
+ * Se pasa **TAL CUAL**, sin normalizar: un `<input>` vacio llega como `''` y **el dominio ya trata
+ * `''` como «el administrador no la escribio»** (`create-user.ts`, R1). Repetir esa normalizacion
+ * aqui seria escribir la misma regla por segunda vez en el borde, y dos sitios donde acordarse es
+ * como nacen dos comportamientos para la misma entrada. Lo unico que se hace es que una clave
+ * AUSENTE —`get` devuelve `null`— llegue como la cadena vacia, que es lo que R1 exige tratar
+ * IGUAL que la ausencia; mismo criterio que `readTargetId` aqui abajo.
  */
 export async function createUserAction(
   _prevState: CreateUserFormState,
@@ -172,9 +205,18 @@ export async function createUserAction(
   const actor = await currentActor();
 
   try {
-    const { id } = await identity.createUser(actor, userCandidateFromFormData(formData));
-    return { status: 'success', id };
+    const { id, mail } = await identity.createUser(actor, {
+      ...(userCandidateFromFormData(formData) as Record<string, unknown>),
+      credential: formData.get('credential') ?? '',
+    });
+    return { status: 'success', id, mail };
   } catch (error) {
+    // QC-79 R2 — el rechazo por politica es una VARIANTE PROPIA y no un `ErrorState`, por la razon
+    // que explica `design.md > 11.3`. Todo lo demas va al traductor UNICO de QC-70: ningun error
+    // se descarta y no hay ninguna segunda traduccion escrita aqui.
+    if (error instanceof CredentialPolicyRejectedError) {
+      return { status: 'invalid_credential', unmet: error.unmet };
+    }
     return toErrorState(error);
   }
 }

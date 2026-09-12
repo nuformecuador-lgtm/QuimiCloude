@@ -14,7 +14,12 @@ export type UpdateProductDeps = {
  * Edicion de producto (R9, R10, R11, R13, R14). Reemplazo completo, `stock`
  * incluido, y se guarda TAL CUAL, sin derivarlo ni recalcularlo (D3, R13). La autoria ya
  * no se registra aqui: se mudo al lote (`ProductBatch`) el 2026-09-09, asi que el actor
- * solo sirve para el permiso.
+ * solo sirve para el permiso y para la EMPRESA en cuyo nombre se edita.
+ *
+ * QC-49 (R16): el ambito viaja al puerto y entra en el `where` del `UPDATE`, no en un `if`
+ * posterior sobre una fila ya leida. Un `id` de otra empresa devuelve `false` -el mismo camino
+ * que «no existe» y que «ya borrado»- y se traduce a `ProductNotFoundError`, nunca a un error
+ * de autorizacion; y no se modifica ninguna fila, ni de la empresa de quien pide ni de la otra.
  */
 export function createUpdateProduct(
   deps: UpdateProductDeps,
@@ -37,7 +42,9 @@ export function createUpdateProduct(
     // Misma reconciliacion que en `delete-product.ts`: la firma es la de `dev` -sin `actor.id`,
     // porque la autoria vive ahora en el lote- y el error es el de QC-70, `ProductNotFoundError`
     // con su codigo propio del catalogo unico (R17).
-    const updated = await deps.products.updateAlive(id, parsed.data, now());
+    const updated = await deps.products.updateAlive(id, parsed.data, now(), {
+      companyId: actor.companyId,
+    });
     if (!updated) throw new ProductNotFoundError();
   };
 }

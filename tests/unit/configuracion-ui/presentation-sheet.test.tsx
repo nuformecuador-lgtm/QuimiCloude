@@ -23,7 +23,7 @@ import {
   errorInesperado,
   esperarSinIdentificador,
 } from '../../helpers/identificador-de-request';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -37,12 +37,19 @@ import {
   PRESENTATION_FORM_ERROR_TESTID,
   PRESENTATION_FORM_SUBMIT_TESTID,
   PRESENTATION_FORM_TESTID,
+  PRESENTATION_BUSINESS_FIELDS,
   PRESENTATION_NAME_FIELD,
   PRESENTATION_SHEET_TESTID,
+  PRESENTATION_UNIT_ERROR_TESTID,
+  PRESENTATION_UNIT_FIELD,
+  PRESENTATION_UNIT_OPTION_TESTID,
+  PRESENTATION_UNIT_PLACEHOLDER,
+  PRESENTATION_UNIT_SELECT_TESTID,
   PresentationSheet,
   type PresentationSheetTarget,
 } from '@/app/(private)/configuracion/presentaciones/components';
 import { PresentationDuplicateNameError, ValidationError } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 import type {
   CreatePresentationFormState,
   PresentationMutationFormState,
@@ -102,9 +109,32 @@ const INVALID_INPUT_CODE = new ValidationError().code;
 
 const NOMBRE_ESCRITO = 'Bidón 20 L';
 
+/**
+ * QC-80 (R16): el catalogo ENTERO de unidades, tal cual bajaria de `listUnitsAction()` por props.
+ * Los identificadores son uuid de verdad porque el esquema del contrato publico exige `uuid` y
+ * este test corre la validacion previa SIN mockear: un `'unit-kg'` fallaria por el sitio
+ * equivocado.
+ */
+const UNIDAD_KG: UnitRef = {
+  id: '44444444-4444-4444-8444-444444444444',
+  name: 'Kilogramo',
+  symbol: 'kg',
+  baseUnitId: null,
+  factor: null,
+};
+const UNIDAD_LITRO: UnitRef = {
+  id: '55555555-5555-4555-8555-555555555555',
+  name: 'Litro',
+  symbol: null,
+  baseUnitId: null,
+  factor: null,
+};
+const UNIDADES: readonly UnitRef[] = [UNIDAD_KG, UNIDAD_LITRO];
+
 const PRESENTACION: PresentationSheetTarget = {
   id: crypto.randomUUID(),
   name: 'Tambor 200 L',
+  unitId: UNIDAD_LITRO.id,
 };
 
 /**
@@ -120,7 +150,12 @@ function FilaConPanel({ presentation }: { readonly presentation: PresentationShe
       <button type="button" data-testid={ROW_EDIT_TESTID} onClick={() => setOpen(true)}>
         {presentation.name}
       </button>
-      <PresentationSheet presentation={presentation} open={open} onOpenChange={setOpen} />
+      <PresentationSheet
+        presentation={presentation}
+        units={UNIDADES}
+        open={open}
+        onOpenChange={setOpen}
+      />
     </>
   );
 }
@@ -142,9 +177,16 @@ afterEach(() => {
 
 /** Abre el alta y espera al formulario. */
 async function abrirAlta(user: ReturnType<typeof setupUser>) {
-  render(<PresentationSheet />);
+  render(<PresentationSheet units={UNIDADES} />);
   await user.click(screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID));
   return screen.findByTestId(PRESENTATION_FORM_TESTID);
+}
+
+/** Elige una unidad del desplegable por su posicion en `UNIDADES` (QC-80 R16). */
+async function elegirUnidad(user: ReturnType<typeof setupUser>, indice: number) {
+  await user.click(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+  const opciones = await screen.findAllByTestId(PRESENTATION_UNIT_OPTION_TESTID);
+  await user.click(await esperarInteractiva(opciones[indice]!));
 }
 
 describe('panel lateral de presentaciones (R21-R25)', () => {
@@ -216,11 +258,15 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
     const [idRecibido, , datos] = updatePresentationActionMock.mock.calls[0]!;
     expect(idRecibido).toBe(PRESENTACION.id);
     expect(datos.get(PRESENTATION_NAME_FIELD)).toBe(NOMBRE_ESCRITO);
+    // R12: el reemplazo lleva TAMBIEN la unidad, la que ya tenia si no se toco (QC-80 R15).
+    expect(datos.get(PRESENTATION_UNIT_FIELD)).toBe(PRESENTACION.unitId);
     expect(createPresentationActionMock).not.toHaveBeenCalled();
   });
 
-  it('el formulario no captura ningun campo distinto de `name`', async () => {
-    // R22 — en negativo: ni id visible, ni marcas de tiempo, ni autoria, ni nombre normalizado.
+  it('el formulario captura EXACTAMENTE los campos de negocio declarados, y ninguno mas', async () => {
+    // R22 (+ QC-80 R15) — en negativo: ni id visible, ni marcas de tiempo, ni autoria, ni nombre
+    // normalizado. La lista esperada se DERIVA de `PRESENTATION_BUSINESS_FIELDS`, que es la fuente
+    // unica: anadir un campo al formulario sin anadirlo alli pone este caso en rojo.
     const user = setupUser();
     const formulario = await abrirAlta(user);
 
@@ -228,7 +274,9 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
       .map((control) => control.getAttribute('name'))
       .filter((nombre): nombre is string => nombre !== null && nombre !== '');
 
-    expect(nombres).toEqual([PRESENTATION_NAME_FIELD]);
+    expect([...nombres].sort()).toEqual([...PRESENTATION_BUSINESS_FIELDS].sort());
+    expect(nombres).toContain(PRESENTATION_NAME_FIELD);
+    expect(nombres).toContain(PRESENTATION_UNIT_FIELD);
   });
 
   it('el codigo del nombre repetido es el abierto por caso concreto, no el generico', () => {
@@ -248,6 +296,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
     await abrirAlta(user);
 
     await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
     await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
@@ -278,6 +327,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
     await abrirAlta(user);
 
     await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
     await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
@@ -302,6 +352,8 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
     await abrirAlta(user);
 
     await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), '---');
+    // La unidad SI se elige: el rechazo tiene que venir del nombre y de nada mas.
+    await elegirUnidad(user, 0);
     await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
 
     await screen.findByTestId(PRESENTATION_ERROR_NAME_TESTID);
@@ -315,6 +367,7 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
     await abrirAlta(user);
 
     await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
     await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
@@ -354,6 +407,130 @@ describe('panel lateral de presentaciones (R21-R25)', () => {
   });
 });
 
+describe('QC-80 — la unidad de la presentacion (R15, R16, R17, R18)', () => {
+  it('el alta EXIGE unidad: sin ella no se envia nada y el error se pinta JUNTO al campo (R17)', async () => {
+    // R17 — la validacion previa corre con el MISMO esquema que valida el servidor
+    // (`createPresentationSchema`, sin mockear): `unitId` llega como cadena vacia y su `uuid()`
+    // la rechaza con `issue.path[0] === 'unitId'`. La Server Action ni se invoca.
+    const user = setupUser();
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    // Y NO se elige unidad a proposito: el disparador sigue mostrando el marcador.
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toHaveTextContent(
+      PRESENTATION_UNIT_PLACEHOLDER,
+    );
+
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    const errorDelCampo = await screen.findByTestId(PRESENTATION_UNIT_ERROR_TESTID);
+    expect(errorDelCampo).toHaveAttribute('role', 'alert');
+
+    // El error va JUNTO al selector, que queda marcado como invalido y descrito por el...
+    const selector = screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID);
+    expect(selector).toHaveAttribute('aria-invalid', 'true');
+    expect(selector).toHaveAttribute('aria-describedby', errorDelCampo.id);
+    // ...y NO en la region general del formulario, ni junto al campo del nombre.
+    expect(screen.queryByTestId(PRESENTATION_FORM_ERROR_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PRESENTATION_ERROR_NAME_TESTID)).toBeNull();
+
+    // Lo que R17 existe para impedir: que salga con la unidad vacia.
+    expect(createPresentationActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(PRESENTATION_FORM_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID)).toHaveValue(NOMBRE_ESCRITO);
+  });
+
+  it('el formulario ofrece TODAS las unidades del catalogo que recibe (R16)', async () => {
+    // R16 — sin filtrar por empresa y sin ofrecer crear ninguna: el catalogo entero, tal cual.
+    const user = setupUser();
+    await abrirAlta(user);
+
+    await user.click(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+
+    const opciones = await screen.findAllByTestId(PRESENTATION_UNIT_OPTION_TESTID);
+    expect(opciones.map((opcion) => opcion.dataset.value)).toEqual(
+      UNIDADES.map((unidad) => unidad.id),
+    );
+  });
+
+  it('la edicion PRECARGA la unidad de la presentacion, derivada del contrato (R15)', async () => {
+    // R15 — `PresentationSheetTarget` es `Pick<PresentationView, 'id' | 'name' | 'unitId'>`, asi
+    // que la unidad no es un campo escrito a mano: viene del contrato de salida. Se comprueba
+    // sobre lo que el formulario ENVIARIA sin tocar nada, no sobre estado de React.
+    const user = setupUser();
+    render(<FilaConPanel presentation={PRESENTACION} />);
+    await user.click(screen.getByTestId(ROW_EDIT_TESTID));
+    await screen.findByTestId(PRESENTATION_FORM_TESTID);
+
+    // El disparador muestra la unidad actual (sin simbolo, asi que su nombre) y no el marcador.
+    const selector = screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID);
+    expect(selector).toHaveTextContent(UNIDAD_LITRO.name);
+    expect(selector).not.toHaveTextContent(PRESENTATION_UNIT_PLACEHOLDER);
+
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updatePresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(updatePresentationActionMock.mock.calls[0]![2].get(PRESENTATION_UNIT_FIELD)).toBe(
+      PRESENTACION.unitId,
+    );
+  });
+
+  it('la edicion reemplaza la unidad cuando se elige otra (R12, R15)', async () => {
+    const user = setupUser();
+    render(<FilaConPanel presentation={PRESENTACION} />);
+    await user.click(screen.getByTestId(ROW_EDIT_TESTID));
+    await screen.findByTestId(PRESENTATION_FORM_TESTID);
+
+    await elegirUnidad(user, 0);
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updatePresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(updatePresentationActionMock.mock.calls[0]![2].get(PRESENTATION_UNIT_FIELD)).toBe(
+      UNIDAD_KG.id,
+    );
+  });
+
+  it('tras un rechazo del servidor el panel sigue abierto con el nombre Y la unidad (R18)', async () => {
+    // R18 — React 19 resetea los campos no controlados de un `<form action>` al completarse la
+    // action, asi que conservar la unidad NO es gratis: `values.unitId` tiene que llegar al
+    // `defaultValue` del selector igual que `values.name` llega al del nombre.
+    const user = setupUser();
+    createPresentationActionMock.mockResolvedValue({
+      status: 'error',
+      code: PRESENTATION_DUPLICATE_NAME_CODE,
+      message: 'Ya existe una presentacion con un nombre equivalente.',
+    });
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 1);
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(createPresentationActionMock.mock.calls[0]![1].get(PRESENTATION_UNIT_FIELD)).toBe(
+      UNIDAD_LITRO.id,
+    );
+
+    // El panel sigue abierto...
+    await screen.findByTestId(PRESENTATION_ERROR_NAME_TESTID);
+    expect(screen.getByTestId(PRESENTATION_FORM_TESTID)).toBeInTheDocument();
+    // ...con el nombre escrito...
+    expect(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID)).toHaveValue(NOMBRE_ESCRITO);
+    // ...y con la unidad elegida, que es la mitad que se pierde sola.
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toHaveTextContent(
+      UNIDAD_LITRO.name,
+    );
+
+    // Y al reintentar sin volver a tocar el selector, la unidad sigue viajando.
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+    await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(2));
+    expect(createPresentationActionMock.mock.calls[1]![1].get(PRESENTATION_UNIT_FIELD)).toBe(
+      UNIDAD_LITRO.id,
+    );
+    expect(toastExito).not.toHaveBeenCalled();
+  });
+});
+
 /** QC-71 T9 — R17 y R18 en el formulario de presentacion. */
 describe('formulario de presentacion — el identificador del error inesperado (QC-71 R17, R18)', () => {
   /** Un alta que la operacion rechaza con el estado dado. */
@@ -362,6 +539,11 @@ describe('formulario de presentacion — el identificador del error inesperado (
     await abrirAlta(user);
 
     await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    // QC-80 (R10, R17) volvio la unidad OBLIGATORIA y la valida el MISMO esquema en cliente, asi
+    // que sin elegirla el envio ni siquiera llega a la operacion y este helper se quedaria
+    // esperando una llamada que no ocurre. Elegir unidad no es el sujeto de estos dos casos -lo es
+    // el identificador del error inesperado-, es solo lo que hace falta para alcanzarlo.
+    await elegirUnidad(user, 0);
     await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
