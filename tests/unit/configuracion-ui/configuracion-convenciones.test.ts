@@ -26,12 +26,18 @@
 // RUIDOSAMENTE**, nunca se saltan (misma leccion que `data-table-intacta.test.ts` y que
 // `tests/baseline-rojos.json`): una guardia que se auto-desactiva cuando no puede mirar es
 // indistinguible de una guardia rota.
+//
+// **Los casos de R31 llevan ademas una PRECONDICION DE RAMA** (2026-09-12): solo miden si el rango
+// es el de QC-45. El porque, con el caso que lo destapo, en el comentario de `esLaRamaDeQC45`. No
+// es lo mismo que auto-desactivarse por no poder mirar: aqui se puede mirar, pero lo que se ve es
+// el diff de OTRA ficha, sobre el que R31 no dice nada. Lo que no depende del rango —R2, R29, R30,
+// R32, R35 y todos los casos negativos de los detectores— corre siempre.
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, type TestContext } from 'vitest';
 
 import { PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
 
@@ -341,6 +347,74 @@ function intocablesTocados(rutas: readonly string[]): string[] {
   );
 }
 
+/**
+ * LA PRECONDICION DE RAMA (anadida el 2026-09-12 desde la rama de QC-85).
+ *
+ * Los casos de R31 sabian contra QUE comparar (`dev...HEAD` mas el arbol de trabajo) pero no
+ * comprobaban QUE RAMA estaban midiendo. Mientras QC-45 vivia en su worktree eso no se notaba;
+ * **en cuanto QC-45 se mergeo en `dev`, este archivo empezo a medir CUALQUIER rama con las reglas
+ * de alcance de QC-45**. Lo destapo QC-85 (pantalla de grupos de trabajo) el 2026-09-12: su R37
+ * autoriza anadir una primitiva por la CLI de shadcn —el unico camino permitido— y el archivo
+ * resultante, **`components/ui/tabs.tsx`**, puso en rojo «no toca `package.json` ni
+ * `components/ui/`» con `expected [ 'components/ui/tabs.tsx' ] to deeply equal []`. R31 es el
+ * alcance de QC-45 y no le aplica a ninguna otra ficha.
+ *
+ * El agujero no era solo el rojo falso: era tambien el **verde falso**. Una rama ajena que no
+ * tocara `components/ui/` ni el manifiesto salia verde aqui, y ese verde decia «he revisado el
+ * diff de QC-45 y no anade dependencias» sin haber mirado el diff de QC-45 en absoluto.
+ *
+ * Es la misma leccion, y la misma cura, que `tests/unit/identity/account-status-scope.test.ts` y
+ * `tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts`. **Se copia su forma a
+ * proposito, sin inventar una tercera**: que el repo tenga varias maneras de decir lo mismo es la
+ * mitad del problema que se esta arreglando.
+ *
+ * LA SENAL es CONJUNTIVA: el archivo central de la pantalla **mas** la carpeta de spec de la
+ * propia ficha. La carpeta de spec discrimina de verdad porque nace y vive dentro del rango de
+ * QC-45 y no aparece jamas en el rango de otra ficha, que trae la SUYA.
+ *
+ * **Esto ENDURECE la precondicion, no relaja la comprobacion**: en la rama real de QC-45 las dos
+ * senales estan presentes y los casos de R31 corren exactamente igual, con la misma lista cerrada
+ * de `INTOCABLES` —que no se toca, y a la que no se le anade ninguna excepcion— y las mismas
+ * igualdades. Fuera de su rama quedan `skipped`, nunca verdes.
+ *
+ * Solo la llevan los casos que miden el DIFF o comparan contra `dev` —los tres de R31 que dependen
+ * del rango—. Los que afirman sobre el CONTENIDO del arbol (R2, R29, R30, R32, R35) y los casos
+ * negativos de los detectores puros no dependen de la rama y corren siempre.
+ */
+const ARCHIVO_CENTRAL_DE_QC45 = `${CARPETA_DE_LA_RUTA}/page.tsx`;
+const CARPETA_SPEC_DE_QC45 = 'specs/QC-45-pantalla-de-presentaciones/';
+
+export function esLaRamaDeQC45(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC45) &&
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC45))
+  );
+}
+
+/** Salta el caso —ruidosamente, con el motivo escrito— cuando la rama no es la de QC-45. */
+function saltarSiNoEsLaRamaDeQC45(ctx: Pick<TestContext, 'skip'>): void {
+  const tocados = archivosTocados();
+
+  if (tocados.length === 0) {
+    ctx.skip(
+      `la rama no toca ningun archivo respecto de \`${RANGO}\`: no hay diff que revisar, asi que ` +
+        'este caso NO ha comprobado nada. Ocurre al correr el gate sobre `dev` con el arbol limpio.',
+    );
+    return;
+  }
+
+  if (!esLaRamaDeQC45(tocados)) {
+    ctx.skip(
+      'el rango no trae a la vez `' +
+        ARCHIVO_CENTRAL_DE_QC45 +
+        '` y `' +
+        CARPETA_SPEC_DE_QC45 +
+        '`: esta NO es la rama de QC-45, asi que este caso NO ha comprobado nada. R31 es el ' +
+        'alcance de ESA ficha y no le aplica a ninguna otra.',
+    );
+  }
+}
+
 // --------------------------------------------------------------------------------------------
 // R29 — Carpeta `components/`, barrel y ninguna ruta profunda
 // --------------------------------------------------------------------------------------------
@@ -558,18 +632,36 @@ describe('los componentes de cliente reciben los datos, no los buscan (R32)', ()
 // --------------------------------------------------------------------------------------------
 
 describe('la feature no anade dependencias ni abre las primitivas (R31)', () => {
+  // Que el rango resuelva NO depende de la rama: si no resuelve, la guardia no puede mirar en
+  // ninguna rama y tiene que enterarse todo el mundo. Se queda corriendo siempre.
   it(`\`git diff --name-only ${RANGO}\` resuelve; si no, esta guardia falla ruidosamente`, () => {
     expect(() => archivosTocados()).not.toThrow();
-    expect(archivosTocados().length, 'la feature ha tocado archivos').toBeGreaterThan(0);
   });
 
-  it('no toca `package.json` ni `components/ui/`', () => {
+  it('el detector muerde: comparando la carpeta de la ruta, el diff NO sale vacio', (ctx) => {
+    saltarSiNoEsLaRamaDeQC45(ctx);
+
+    // La no-vacuidad SI depende de la rama: «la feature ha tocado archivos» solo dice algo si la
+    // rama es la de QC-45. Acotado a la carpeta de SU ruta, que en la rama de QC-45 cambia
+    // siempre, para que «lista vacia» abajo no pueda serlo por vacuidad.
+    const deLaRuta = archivosTocados().filter((ruta) =>
+      ruta.startsWith(`${CARPETA_DE_LA_RUTA}/`),
+    );
+
+    expect(deLaRuta.length, 'la feature ha tocado archivos de su ruta').toBeGreaterThan(0);
+  });
+
+  it('no toca `package.json` ni `components/ui/`', (ctx) => {
+    saltarSiNoEsLaRamaDeQC45(ctx);
+
     const prohibidos = intocablesTocados(archivosTocados());
 
     expect(prohibidos, `la feature toca archivos intocables: ${prohibidos.join(', ')}`).toEqual([]);
   });
 
-  it('y el contenido de `package.json` sigue siendo el de `dev`', () => {
+  it('y el contenido de `package.json` sigue siendo el de `dev`', (ctx) => {
+    saltarSiNoEsLaRamaDeQC45(ctx);
+
     let enDev: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     try {
       enDev = JSON.parse(git(`git show dev:${INTOCABLES.manifiesto}`));

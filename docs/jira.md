@@ -88,6 +88,49 @@ credencial y devuelven el mismo conjunto de herramientas: **el endpoint es indif
 que decide es la app del token** (paso 5). Una versión previa de este documento afirmaba lo
 contrario; era falso.
 
+## Montar un colaborador nuevo
+
+La sección anterior está escrita desde quien creó el sitio. Esta es la otra mitad: **qué
+pasa cuando alguien clona el repo**.
+
+Nada de la credencial viaja en el repo. `.mcp.json` declara `Authorization: Basic
+${ATLASSIAN_MCP_AUTH}` y nada más, así que **cada persona se autentica con su propio token**.
+No se comparte el del que montó el board: el token hereda los permisos de su dueño en Jira, y
+uno compartido haría que todos los empujones del ciclo —labels en F1.0, comentarios en F1.3 y
+F2.5, transiciones— aparecieran firmados por la misma cuenta, que es justo la autoría que la
+columna *Spec en revisión* existe para registrar.
+
+**Lo que hace el admin de la organización**
+
+Solo agregar a la persona al proyecto **QC** con permiso de escritura. Tiene que poder editar
+issues y transicionarlos: si entra como lectora, el arnés no falla al importar en F0 sino más
+tarde, al escribir los labels de la evaluación o mover la tarjeta.
+
+El paso 4 de la sección anterior —habilitar el acceso vía API token en *Atlassian
+Administration → Rovo → Rovo MCP server → Authentication*— es a nivel organización y ya está
+hecho. **No se repite por persona.**
+
+**Lo que hace el colaborador**
+
+Correr **`/jira-connect`** dentro del repo. El comando detecta si ya hay conexión, guía los
+pasos que falten uno a uno, y al final verifica llamando a una herramienta de Jira de verdad y
+lista los proyectos a los que la cuenta tiene acceso — diciendo explícitamente si **QC** está
+entre ellos. Lo de abajo es lo que el comando automatiza, y sigue valiendo para hacerlo a mano.
+
+Los pasos 5 y 6 de la sección anterior, con su propia cuenta: crear el token con **Create API
+token with scopes** eligiendo la app **"Rovo MCP"** (las dos trampas del paso 5 siguen
+valiendo: el botón sin scopes y la app v2), y exportar `ATLASSIAN_MCP_AUTH` con **su** email de
+Atlassian —no el del dueño del board, no el de git— y su token.
+
+Después, `## Verificar que la conexión es real`: que aparezcan herramientas de Jira, no que
+`/mcp` esté en verde.
+
+**Sin token el repo sigue sirviendo.** El gate corre sin red y el ciclo lee y escribe disco
+(regla 3 de `CLAUDE.md`), así que quien clone sin credencial puede trabajar contra el
+`feature_list.json` commiteado y correr `./init.sh` en verde. Lo único que pierde es F0 —la
+importación del board— y los empujones hacia Jira, incluida la puerta de aprobación por
+tarjeta de F1.4, que vuelve a ser un "aprobado" suelto en el chat.
+
 ## Verificar que la conexión es real
 
 `/mcp` en verde no basta: el servidor conecta sin credencial y expone igual las tres
@@ -120,6 +163,7 @@ degenere en dos verdades peleadas.
 
 | Campo del JSON | De dónde sale |
 |---|---|
+| `jira.site` / `jira.project` | **declarados, no importados.** F0 no los toca. Ver `## El board al que pertenece el disco` |
 | `key` | el issue key tal cual: `QC-7`. **Es la identidad de la feature.** |
 | `id` | número del key (`QC-7` → `7`). **Solo fallback** para fichas que aún no tienen issue. |
 | `epic` | key de la épica padre (campo `parent` del issue). Agrupa por módulo; **no** es dependencia. |
@@ -191,6 +235,34 @@ segunda copia de las credenciales.
 
 Todo lo demás —altas, bajas, `description`, `status`, dependencias— se sobrescribe desde
 el board sin preguntar.
+
+## El board al que pertenece el disco (2026-09-12)
+
+`feature_list.json` abre con un bloque `jira` que declara sitio y proyecto. Es la única parte
+del archivo que **F0 no regenera**, y esa asimetría es todo el punto.
+
+La comprobación evidente sería derivar el proyecto de los `key`: si las 90 fichas son `QC-*`,
+el proyecto es QC. No sirve. F0 regenera `features` entero y ante divergencia manda Jira
+—«altas, bajas, `description`, `status`, dependencias se sobrescriben desde el board sin
+preguntar», sección anterior—. Un F0 disparado contra otro proyecto del sitio deja las fichas
+nuevas, todas con el mismo prefijo nuevo, coherentes entre sí: una comprobación derivada las da
+por buenas. Validaría el resultado del error contra el error.
+
+Declarado aparte, el bloque sobrevive a la importación y el gate puede contrastar una cosa
+contra otra. `scripts/validate-features.mjs` (bloque 0) falla en rojo si alguna ficha con `key`
+no lleva el prefijo declarado, o si el bloque falta habiendo fichas. Un repo recién clonado y
+todavía sin fichas no está obligado a declararlo; en cuanto entra la primera con `key`, sí.
+
+**Lo que esto protege.** F0 es el único paso que regenera el archivo entero. Conectado al board
+equivocado —y basta con tener acceso a un segundo proyecto del sitio— borra las fichas y las
+reemplaza, en silencio y con todo en verde: el token es válido, las herramientas de Jira están,
+`./init.sh` pasa. No ha ocurrido; el mecanismo sí está verificado, y la primera versión de este
+documento ya lo anticipaba sin cerrarlo («si algún día hay un segundo proyecto en el sitio nada
+en el código diría cuál importar en F0»).
+
+**Cambiar de proyecto a propósito** es editar `jira.project` y correr F0. El gate falla entre
+una cosa y otra, que es exactamente lo que se quiere: obliga a que el cambio sea un acto
+deliberado y no el residuo de una sesión mal conectada.
 
 ## Cuando el disco descubre que el board está desactualizado (2026-09-01)
 

@@ -1,4 +1,8 @@
 {
+  "jira": {
+    "site": "singularboard.atlassian.net",
+    "project": "QC"
+  },
   "features": [
     {
       "key": "QC-4",
@@ -281,7 +285,7 @@
       "epic_name": "Identidad y acceso",
       "name": "registro-de-sesiones",
       "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos. Solo el mecanismo y sus operaciones: sin pantalla.\n\nLas dos acciones NO son la misma y se resuelven distinto. Cerrar sesion en un dispositivo cierra SOLO ese dispositivo: quien sale en el movil sigue dentro en la oficina. En cambio cerrar todas las sesiones las cierra todas, incluida la actual. Y cuando el cierre lo ordena un administrador sobre otro usuario es SIEMPRE total, nunca una sesion suelta: el administrador no elige dispositivo.\n\nCambiar el rol de alguien o darlo de baja tambien corta todas sus sesiones en el acto, y tiene que volver a entrar. Eso cierra la deuda que dejo escrita la ficha de proteccion de rutas privadas, donde el rol viaja firmado dentro del codigo de sesion y hasta hoy un cambio de rol tardaba en surtir efecto lo que tardara la sesion en caducar.\n\nSi el sistema no puede comprobar si una sesion fue cerrada -porque la base no responde, o porque falle la memoria rapida cuando exista- la sesion se trata como invalida y la persona vuelve al login. Ante la duda se corta: una revocacion que se puede saltar provocando un fallo no es una revocacion.\n\nEl administrador puede cerrar las sesiones de otro usuario; el permiso se comprueba en el servicio y lleva su prueba.\n\nQue el usuario pueda VER la lista de sus dispositivos abiertos y cerrar uno concreto de la lista NO entra, y no habra ficha para ello: se descarto a proposito porque obliga a una lectura por peticion sin dar nada que no de el cierre total. Los botones tampoco entran aqui: el del usuario va en ficha aparte. Guardar en memoria rapida la comprobacion va en la ficha de cache de sesion.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -1169,7 +1173,7 @@
       "epic_name": "Identidad y acceso",
       "name": "recuperar-contrasena-olvidada",
       "description": "Nacida el 2026-09-11 al acotar QC-79 con /afinar-feature.\n\nQUIEN NO PUEDE ENTRAR PORQUE OLVIDO SU CONTRASENA TIENE QUE PODER RECUPERARLA POR SI MISMO, sin llamar al administrador. Hoy no hay ninguna via: QC-79 resuelve el ALTA y QC-89 resuelve que el ADMINISTRADOR restablezca la de otro, pero nadie cubre a la persona que ya tenia cuenta activa y no recuerda su contrasena.\n\nPOR QUE NO ENTRO EN QC-79: es OTRO FLUJO Y OTRA SUPERFICIE DE ATAQUE. El enlace de QC-79 lo dispara un administrador con sesion abierta; este lo dispara CUALQUIERA desde la pantalla de acceso, sin sesion. La respuesta no puede revelar si ese correo existe, o la pantalla se vuelve un sondeo de usuarios validos.\n\nLO QUE SI HEREDA DE QC-79: el envio de correo con resend y el mecanismo de token de un solo enlace vivo por persona. NO los reconstruye.\n\nQUEDA ABIERTO: cuanto vive este enlace; que se responde a un correo que no existe; si hay limite de intentos -y si espera a QC-73-; si al recuperar se cierran las sesiones abiertas; y si una cuenta pending, inactive o blocked puede recuperar.\n\nACOTAR CON /afinar-feature ANTES DE SEMBRAR EL SPEC.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",

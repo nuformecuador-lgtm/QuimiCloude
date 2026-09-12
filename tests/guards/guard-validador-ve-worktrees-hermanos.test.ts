@@ -40,6 +40,14 @@ const FICHA_EN_VUELO = [
   },
 ]
 
+// El validador exige que la lista declare `jira.project` cuando hay fichas con `key`, y que
+// todas lo lleven de prefijo. El fixture lo declara para representar un archivo valido.
+const LISTA_DE_FEATURES = JSON.stringify(
+  { jira: { site: 'ejemplo.atlassian.net', project: 'QC' }, features: FICHA_EN_VUELO },
+  null,
+  2,
+)
+
 let temporal: string | null = null
 
 afterEach(() => {
@@ -56,12 +64,12 @@ function montarRepo(conSpec: boolean): string {
   const raiz = mkdtempSync(join(tmpdir(), 'guard-validador-'))
   temporal = raiz
 
-  writeFileSync(join(raiz, 'feature_list.json'), JSON.stringify({ features: FICHA_EN_VUELO }, null, 2))
+  writeFileSync(join(raiz, 'feature_list.json'), LISTA_DE_FEATURES)
 
   // El worktree DESDE EL QUE se corre el gate: es el de otra feature y no tiene el spec.
   const propio = join(raiz, '.worktrees', 'QC-10-la-que-corre-el-gate')
   mkdirSync(join(propio, 'specs'), { recursive: true })
-  writeFileSync(join(propio, 'feature_list.json'), JSON.stringify({ features: FICHA_EN_VUELO }, null, 2))
+  writeFileSync(join(propio, 'feature_list.json'), LISTA_DE_FEATURES)
 
   if (conSpec) {
     const ajeno = join(raiz, '.worktrees', 'QC-9-feature-en-otro-worktree', 'specs', 'QC-9-feature-en-otro-worktree')

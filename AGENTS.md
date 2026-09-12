@@ -158,7 +158,8 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
 0. (F0) **Antes de nada, sincroniza desde Jira.** El board manda; `feature_list.json` es
    su copia de trabajo en disco. El leader, con las herramientas MCP de `atlassian`:
    - Lee los issues del proyecto **filtrando las epicas por tipo**
-     (`project = QC AND issuetype != Epic`) y **regenera `feature_list.json`**: altas y
+     (`project = <jira.project> AND issuetype != Epic`, tomando el valor del bloque
+     `jira` de `feature_list.json`) y **regenera `feature_list.json`**: altas y
      bajas, `description`, `status` (por la columna) y `depends_on` (por los issue links
      "is blocked by").
    - Guarda `epic` = el key de la epica padre (campo `parent` del issue) **y `epic_name` = su
@@ -176,6 +177,11 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
      worktree y una rama con trabajo real) y una `zone`/`complexity` ya evaluada cuyo
      issue perdio las labels. En ambos casos se conserva el valor del JSON, se re-escribe
      en Jira y se anota en `progress/current.md > Deudas y cosas abiertas`.
+   - **El bloque `jira` no se regenera nunca.** F0 reescribe `features` y solo `features`.
+     Ese bloque dice contra que board trabaja este repo, y es lo unico que puede delatar
+     una importacion apuntada al proyecto equivocado: si se regenerara desde el board,
+     diria siempre que si. El gate (bloque 0 de `scripts/validate-features.mjs`) falla en
+     rojo si alguna ficha no lleva ese prefijo.
    - Despues corre `./init.sh`, que valida el resultado de la importacion.
 
    Contrato de campos completo, columnas del board y que hacer si divergen:

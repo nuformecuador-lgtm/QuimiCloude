@@ -86,6 +86,13 @@ export const E2E_ESPERADOS = [
   // el siguiente `.spec.ts` que aparezca sin ficha vuelve a poner esto en rojo.
   'aislamiento-inventario.spec.ts',
   'errores.spec.ts',
+  // QC-85 T15: la E2E de la pestana de grupos de trabajo (su R42). Alta por el MISMO motivo y en
+  // el MISMO sitio que la de QC-67, unas lineas mas abajo: esta lista es CERRADA y su punto de
+  // extension por diseno es darse de alta en ella. El ancla NO se relaja —el archivo se nombra,
+  // uno a uno— y la decision de QC-71 R21 sigue intacta, porque este E2E no prueba el
+  // identificador de peticion sino el recorrido de la pestana: crear un grupo, renombrarlo, meter
+  // y sacar a una persona y borrarlo.
+  'grupos-de-trabajo.spec.ts',
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',
