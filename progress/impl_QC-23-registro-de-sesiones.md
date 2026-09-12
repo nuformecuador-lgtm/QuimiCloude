@@ -334,3 +334,80 @@ Queda ademas anotada la **tercera frontera** que el reviewer midio y no pidio: a
 sea cero falsos positivos garantizados— y ~+45 ms, y con eso la guardia dejaria de depender de que
 `guard-arquitectura-modulos` prohiba tocar Prisma desde ahi. **No se implemento**: es la mejora
 obvia para quien la toque despues, por ejemplo QC-89.
+
+## F2.3 — la sincronizacion con `dev`, y un ejemplar para QC-99
+
+El merge con `origin/dev` (17 commits: QC-85, QC-49, QC-79, el bloque de Jira y tres commits de
+specs) entro **limpio, sin un solo conflicto**. El unico archivo que se solapaba era
+`tests/guards/guard-identificador-de-request.test.ts`: `dev` anadia a la lista de E2E y esta rama a
+la de migraciones, **regiones distintas**, y se conservan los dos lados. No se dio por bueno de
+palabra: `MIGRACIONES_ESPERADAS` tiene **28 entradas y en disco hay 28**, con diferencia vacia en
+los dos sentidos — que es justo donde una union mal hecha deja un test verde con un numero falso.
+`dev` no traia migraciones nuevas (`db:migrate`: *No pending migrations to apply*).
+
+### El rojo que destapo el gate completo, y de quien es
+
+`tests/unit/configuracion-ui/grupos/alcance.test.ts` —el **centinela de alcance de QC-85**, ficha
+ajena ya mergeada— se puso **rojo en dos casos**, y **no por nada que haga QC-23**: los dos miden el
+**diff de la rama** y **no llaman a `saltarSiNoEsLaRamaDeQC85`**, que existe en ese mismo archivo y
+que sus hermanos si usan. Fuera de la rama de QC-85 el diff no trae su senal, y los dos caen.
+
+**El dato exacto, comprobado sobre `dev` limpio: el archivo PASA en `dev`** —18 verdes, 15 saltados,
+exit 0, porque ahi el diff es vacio y el ayudante ya salta por eso— **y se pone rojo en toda rama de
+feature que no sea la de QC-85**. La diferencia no es cosmetica: significa que **el gate de `dev`
+nunca lo va a delatar**, y por eso lleva ahi sin que nadie lo note; quien lo paga es la siguiente
+ficha que sincronice.
+
+El caso que cae lo confirma solo, por su propio nombre: «esta ejecucion SI es la rama de QC-85:
+ningun caso de abajo se ha saltado en silencio». Es un meta-test que **afirma estar en la rama de
+QC-85** y que fuera de ella falla por construccion.
+
+**Arreglado desde aqui, y sin inventar ningun mecanismo**: se aplica el precedente de **`3e7fc6c`**,
+un commit **de la propia rama de QC-85** que arreglo **este mismo defecto** en los centinelas de
+QC-39 y QC-45. Los dos casos pasan por la precondicion de rama que ese archivo ya se dio a si mismo,
+asi que fuera de la rama de QC-85 quedan **`skipped`, nunca verdes** — la leccion literal de aquel
+commit: el agujero no era solo el rojo falso, era el **verde falso**. No se toco nada mas del
+archivo.
+
+**Por que NO se llevo al baseline**, que era la otra salida que ofrece el mensaje del gate: el
+baseline es **por archivo**, asi que silenciaria los ~40 casos restantes de ese centinela **para
+todo el mundo**; y QC-85 ya esta en `dev`, de modo que su rama no volvera a existir para
+reactivarlo. Apagar proteccion ajena para que nuestro gate salga verde es el lado comodo, no el
+correcto.
+
+### Material para QC-99, sin ficha nueva
+
+Esto es **otro ejemplar de la especie de QC-99** (`guardias-censo-rompen-features-posteriores`), y
+de los mas dificiles de cazar: una guardia que **se mide contra el diff de la rama**, que **pasa en
+`dev`** —con lo que el gate de `dev` nunca la delata— y que **rompe a toda feature posterior**. Con
+el agravante de que **su propia ficha ya habia arreglado el mismo defecto en dos guardias ajenas y
+se olvido de la suya**. Queda anotado aqui como material; **no se abre ficha porque QC-99 ya
+existe**.
+
+**Probado por mutacion, las dos mitades** —porque «el archivo pasa» no demuestra nada aqui—:
+*fuera* de la rama de QC-85 los dos casos quedan **`skipped` con el motivo escrito, nunca verdes**
+(17 pasan, 15 saltados); *dentro* de una rama de QC-85 simulada —anadiendo al diff su archivo
+central y su carpeta de spec— los dos **se ejecutan de verdad** y el segundo incluso sale rojo,
+que es justo la prueba de que sigue mordiendo. El arbol se restauro despues y se comprobo.
+
+**Un matiz que se deja dicho en vez de callarlo**: con la precondicion delante, el `expect` del
+caso ancla ya no puede fallar cuando corre —la precondicion acaba de comprobar lo mismo—, asi que
+como detector de «ningun caso de abajo se salto en silencio» queda **tautologico**. Conserva valor
+—salta ruidosamente sin base y con diff vacio, y documenta el ancla— y es exactamente lo que hacen
+sus hermanos tras `3e7fc6c`, pero es el precio de la condicion «skipped, nunca verde». **Es de
+QC-85 decidir si lo convierte en otra cosa**; desde aqui no se toca mas.
+
+### El gate completo tras el merge, y un flake que NO se llevo al baseline
+
+Tercera corrida: **`== init OK ==`, exit 0 — 413 archivos, 5965 verdes, 66 saltados y CERO rojos**,
+ni siquiera los 8 del baseline, que hoy pasan («8 por limpiar», aviso ajeno a esta ficha).
+
+La segunda corrida dio **un rojo distinto**, y se investigo en vez de baselinearlo:
+`credential-setup.int.test.ts > R11 — dos emisiones CONCURRENTES ... dejan UN SOLO enlace vivo`, con
+`P2028: Transaction already closed ... timeout 5000 ms, however 10015 ms passed`. Es la carrera de
+concurrencia de **QC-79**, y el camino que falla es el de **emision**, que esta ficha **no toca**
+—lo que T15 toco es el de consumo—. Aislado pasa **15/15**, la integracion entera pasa **249/249**
+(la misma cifra que midio el reviewer) y la tercera corrida del gate completo **no lo reproduce**:
+es un **flake dependiente de la carga**, con su timeout de transaccion a 5 s. **No se anadio al
+baseline**: meter un flake ajeno al baseline desde esta ficha seria apagar una prueba de
+concurrencia que hoy funciona, y el baseline es global.

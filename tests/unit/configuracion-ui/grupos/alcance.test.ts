@@ -262,15 +262,18 @@ describe('la senal CONJUNTIVA discrimina de verdad la rama de QC-85', () => {
   });
 
   it('esta ejecucion SI es la rama de QC-85: ningun caso de abajo se ha saltado en silencio', (ctx) => {
-    // Ancla de no-vacuidad de la propia precondicion. Si esto fuera falso, todos los casos que
-    // miden el diff estarian `skipped` y el archivo entero seria decorativo. Sin base no se pasa
-    // de largo: se salta con el motivo escrito, como todos sus hermanos.
-    if (BASE_DE_LA_RAMA === null) {
-      ctx.skip(SIN_BASE);
-      return;
-    }
+    // Ancla de no-vacuidad de la propia precondicion. Si esto fuera falso EN LA RAMA DE QC-85,
+    // todos los casos que miden el diff estarian `skipped` y el archivo entero seria decorativo.
+    //
+    // Pasa por `baseDeEstaRama` como todos sus hermanos, y por el mismo motivo que ellos: sin la
+    // precondicion, este caso afirmaba «esta ejecucion SI es la rama de QC-85» en CUALQUIER rama, y
+    // fuera de la de QC-85 se ponia rojo acusando a una ficha ajena de algo que no le aplica. Es la
+    // leccion literal de `3e7fc6c` —que curo este mismo defecto en los centinelas de QC-39 y
+    // QC-45—: ENDURECE, no relaja. Dentro de la rama de QC-85 el ancla muerde exactamente igual;
+    // fuera queda `skipped` con el motivo escrito, nunca verde.
+    const base = baseDeEstaRama(ctx);
 
-    expect(esLaRamaDeQC85(aportadosPorLaRama(BASE_DE_LA_RAMA, ['.']))).toBe(true);
+    expect(esLaRamaDeQC85(aportadosPorLaRama(base, ['.']))).toBe(true);
   });
 });
 
@@ -498,7 +501,16 @@ describe('toda escritura y toda lectura pasan por operaciones YA publicadas (R36
     ).toEqual([]);
   });
 
-  it('y las ocho operaciones consumidas SE importan de verdad: el detector no mira al vacio', () => {
+  it('y las ocho operaciones consumidas SE importan de verdad: el detector no mira al vacio', (ctx) => {
+    // Este caso mide el DIFF aunque no lo parezca: `importacionesDeLaPantalla` sale de
+    // `archivosDeLaPantalla`, que es lo que ESTA rama aporta bajo la carpeta de la pantalla. Fuera
+    // de la rama de QC-85 esa lista no contiene las piezas de esta ficha y el caso se ponia rojo
+    // acusando a una rama ajena de no importar unas operaciones que no le tocan. Mismo defecto y
+    // misma cura que en `3e7fc6c` (centinelas de QC-39 y QC-45): pasa por la precondicion de rama,
+    // que ENDURECE —en la rama de QC-85 exige las ocho igual que antes— y fuera deja el caso
+    // `skipped` con el motivo escrito, nunca verde.
+    baseDeEstaRama(ctx);
+
     const importadas = new Set(
       importacionesDeLaPantalla()
         .filter((leida) => esAdaptadorDriving(leida.origen))
