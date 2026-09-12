@@ -476,3 +476,101 @@ saturacion y **su propia nota exige tres corridas completas verdes seguidas** an
 una—; `recetas/module-contract.test.ts` y `unidades/modulo-intacto.test.ts` son estructurales de
 fichas ajenas y pasan hoy porque el **merge-base se movio**, asi que pueden volver a caer. Retirarlas
 es trabajo de quien las escribio. **Queda anotado como deuda visible**, no escondida.
+
+---
+
+# F2.3, segunda vuelta — `dev` +26 commits (2026-09-12)
+
+El PR #61 quedo `CONFLICTING`: entro **QC-84** (`crud-de-grupos-de-trabajo`). **Seis** conflictos, y
+**NO todos eran de la clase «quedarse con los dos lados»** — dos habrian quedado rotos al unirlos a
+ciegas.
+
+| # | Archivo | Clase | Resolucion |
+| --- | --- | --- | --- |
+| 1 | `lib/modules/errores/domain/error-codes.ts` | Aditivo dentro del array | Los dos lados |
+| 2 | `lib/modules/errores/domain/error-catalog.ts` | Aditivo, **dos hunks** (claves y textos) | Los dos lados, en los dos |
+| 3 | `lib/modules/identity/domain/errors.ts` | **TRAMPA**: los dos lados **abren una clase** y el `}` `}` final era **compartido**; el segundo hunk compartia ademas el `/**` de apertura | Reconstruidos los cierres. Union = **18 clases** = 9 comunes + 2 de QC-79 + 7 de QC-84, **verificado contra los dos padres** (11 en HEAD, 16 en `dev`) para no perder ninguna, y balance de llaves 0 |
+| 4 | `lib/modules/identity/index.ts` | Aditivo, sentencias `export` completas | Los dos lados. **R32 revalidado**: ningun `driving` reexportado |
+| 5 | `tests/unit/errores/catalogo.test.ts` | **TRAMPA**: no era aditivo sino un **CONTEO** que cada rama movio a un valor **distinto** | Ver abajo |
+| 6 | `tests/unit/identity/account-status-scope.test.ts` | Aditivo; un lado vacio en cada hunk | Los dos lados |
+
+**Nada quedo ambiguo**; no hubo que parar a preguntar y `progress/current.md > Conflictos pendientes`
+no gana ninguna fila. `dev` **no trajo ninguna migracion**, asi que no habia nada que aplicar.
+
+## El conflicto n.º 5, que es el que ensena algo
+
+`catalogo.test.ts` afirma el tamano del catalogo con un **conteo literal**. Al mergear, **cada rama
+traia un numero distinto y los dos eran falsos**:
+
+| Rama | Conteo | Cuenta |
+| --- | --- | --- |
+| QC-79 (HEAD) | `34` | 32 + 2 |
+| QC-84 (`dev`) | `39` | 32 + 7 |
+| **Union** | **`41`** | 25 + 7 (QC-66) + 2 (QC-79) + 7 (QC-84) |
+
+**Quedarse con cualquiera de los dos lados habria dejado el conteo mintiendo** —y en verde, porque
+cada lado es coherente consigo mismo—. Es exactamente el fallo que un merge «aditivo» esconde. Se
+resolvio con un **tercer valor** y un comentario que nombra las dos fichas y por que ninguno de los
+dos numeros originales vale ya.
+
+## Las reglas del catalogo, verificadas SOBRE LA UNION
+
+Lo que ninguno de los dos lados podia ver por separado:
+
+- **41 codigos, sin duplicados.**
+- **QC-70 R4 — ningun texto compartido por dos codigos**: verde. Los textos de QC-84 para «ya
+  pertenece pero no se ve» y el `user_not_pending` de QC-79 hablan los dos de una cuenta
+  «pendiente de activacion» y **aun asi son frases distintas**, que es justo lo que R4 exige.
+- **El filtro lexico** `/credential|password|session|login|account/` sigue atrapando **exactamente
+  un** codigo, asi que la excepcion nombrada `CODIGOS_DE_ACTIVACION` sigue siendo de **un solo
+  elemento** y su caso de acotacion (`toEqual([...])`) sigue verde. Ninguno de los siete codigos de
+  QC-84 cae en el filtro.
+- `tests/unit/errores` + `guard-catalogo-de-errores` + `account-status-scope` + `errors.test.ts`:
+  **5 archivos, 102 tests, verde.**
+
+## Ripple fuera de los conflictos
+
+Se busco el equivalente al bug de ayer. **Esta vez no lo hay**, y se comprobo en vez de suponerse:
+
+- **QC-84 no toca ningun archivo que posea QC-79** (`create-user`, `user-admin-prisma`,
+  `user-actions`, `user-form`, ni nada de `credential*`).
+- **No hay llamantes nuevos** de `UserAdminRepository.create`.
+- El arreglo de ayer en `user-form.tsx > submit` **sigue vivo**.
+- Los consumidores del catalogo (`CODE_TO_FIELD` de presentaciones, unidades, usuarios y pedidos)
+  son todos `Partial<Record<ErrorCode, ...>>`: **anadir codigos no rompe exhaustividad**, y un codigo
+  sin mapear cae en la region de error del formulario. `ERROR_CODES` solo se importa dentro del
+  propio modulo `errores`.
+
+## Gate completo
+
+**Primera corrida: un rojo fuera del baseline — `tests/unit/composition/identity-facade.test.ts`**,
+que ademas **habia auto-mergeado sin conflicto**, o sea el sitio exacto donde vive el «compila y esta
+roto». **No lo era**, y se diagnostico en vez de baselinearlo:
+
+- El caso que cae es **`getSessionContext`, de QC-48** — ni de QC-79 ni de QC-84.
+- El fallo es **`STACK_TRACE_ERROR`**, la firma de **expiracion**, no una asercion.
+- La corrida tardo **595 s** frente a los ~250 s habituales: **saturacion**.
+- El archivo pasa **aislado: 15/15**.
+
+Es el flake que `tests/baseline-rojos.json` ya documenta, y que la nota de `product-crud` **nombra
+literalmente**: «el flake NO es exclusivo de UI (`identity-facade.test.ts` no monta UI y tambien
+expiraba)». **No se baselinea**: el protocolo del repo para esa clase es **re-correr**.
+
+**Segunda corrida, en 277 s:**
+
+```
+== init OK ==
+Tests  7 failed | 5428 passed | 42 skipped (5477)
+✓ tests: sin rojos nuevos (5 rojos, todos en el baseline); 4 por limpiar
+✓ todas las migraciones tienen down.sql
+```
+
+**Limpieza del baseline.** Se retira `tests/unit/configuracion-ui/usuarios-convenciones.test.ts`, la
+entrada que **esta ficha anadio ayer** y que ahora pasa (19 verdes, 4 casos de diff que ya se saltan):
+la justificacion con la que entro no se sostiene, y dejarla seria un agujero propio. Mismo criterio
+que ayer con `inventario-schema`. El baseline queda en **8**.
+
+**Las otras tres siguen sin retirarse, y es deliberado**, igual que ayer: son de fichas ajenas.
+`product-crud.int.test.ts` se acerca a su criterio de retirada —su nota exige **tres corridas
+completas verdes seguidas**— pero retirarla es de quien la escribio, y hoy la suite ha tenido una
+corrida roja por saturacion de por medio. Queda **anotado como deuda visible**.
