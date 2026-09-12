@@ -262,15 +262,22 @@ describe('la senal CONJUNTIVA discrimina de verdad la rama de QC-85', () => {
   });
 
   it('esta ejecucion SI es la rama de QC-85: ningun caso de abajo se ha saltado en silencio', (ctx) => {
-    // Ancla de no-vacuidad de la propia precondicion. Si esto fuera falso, todos los casos que
-    // miden el diff estarian `skipped` y el archivo entero seria decorativo. Sin base no se pasa
-    // de largo: se salta con el motivo escrito, como todos sus hermanos.
-    if (BASE_DE_LA_RAMA === null) {
-      ctx.skip(SIN_BASE);
-      return;
-    }
+    // Ancla de no-vacuidad de la propia precondicion. Si esto fuera falso ESTANDO en la rama de
+    // QC-85, todos los casos que miden el diff estarian `skipped` y el archivo entero seria
+    // decorativo.
+    //
+    // Usa `baseDeEstaRama` —la MISMA puerta que sus hermanos— en vez de comprobar solo la base.
+    // Antes miraba `BASE_DE_LA_RAMA === null` y nada mas, asi que fuera de la rama de QC-85 el
+    // rango existe pero no trae la senal: `esLaRamaDeQC85` devuelve `false` y el caso se ponia
+    // ROJO sobre trabajo legitimo ajeno. Es la tercera vez que este repo se topa con la especie
+    // (QC-84 arreglo dos identicos en `c631118`), y la leccion escrita es la misma: un centinela
+    // de alcance aplicado a OTRA rama no mide nada, solo tine de rojo lo que no vigila.
+    //
+    // Fuera de la rama de QC-85 esto queda `skipped` CON MOTIVO, no en verde mudo: quien lea la
+    // salida tiene que poder distinguir «comprobado» de «no habia nada que comprobar».
+    const base = baseDeEstaRama(ctx);
 
-    expect(esLaRamaDeQC85(aportadosPorLaRama(BASE_DE_LA_RAMA, ['.']))).toBe(true);
+    expect(esLaRamaDeQC85(aportadosPorLaRama(base, ['.']))).toBe(true);
   });
 });
 
@@ -498,7 +505,21 @@ describe('toda escritura y toda lectura pasan por operaciones YA publicadas (R36
     ).toEqual([]);
   });
 
-  it('y las ocho operaciones consumidas SE importan de verdad: el detector no mira al vacio', () => {
+  it('y las ocho operaciones consumidas SE importan de verdad: el detector no mira al vacio', (ctx) => {
+    // Ancla de no-vacuidad del `toEqual([])` de arriba: demuestra que `importacionesDeLaPantalla`
+    // SI encuentra algo, o aquel caso pasaria por no mirar nada.
+    //
+    // Necesita la precondicion de rama por la misma razon que sus hermanos, y sin ella era ROJO
+    // fuera de la rama de QC-85: `importacionesDeLaPantalla()` se deriva de
+    // `archivosDeLaPantalla()`, que sale de `aportadosPorLaRama(...)` y devuelve una lista VACIA
+    // cuando el diff no trae la carpeta de la pantalla. Con el conjunto vacio, el `toContain` de
+    // la primera operacion falla — y falla informando de un problema que no existe.
+    //
+    // Ojo a la asimetria, que es justo la que hace que este caso sea el que cae y no el de
+    // arriba: un `toEqual([])` sobre una lista vacia pasa (falso verde silencioso), mientras que
+    // un `toContain` sobre un conjunto vacio revienta. Por eso el archivo se ponia rojo aqui.
+    baseDeEstaRama(ctx);
+
     const importadas = new Set(
       importacionesDeLaPantalla()
         .filter((leida) => esAdaptadorDriving(leida.origen))
