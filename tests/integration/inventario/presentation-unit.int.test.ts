@@ -33,7 +33,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { inventario } from '@/lib/composition';
 import { PresentationDuplicateNameError, ValidationError } from '@/lib/modules/inventario';
@@ -50,9 +50,33 @@ function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
+/**
+ * Empresa propia del archivo (QC-49 R1, R11, R17).
+ *
+ * Desde `<ts>_inventory_company_scope` el `Actor` de `inventario` lleva la empresa en cuyo
+ * nombre se opera, y las tres tablas del modulo tienen `company_id` NOT NULL. Este archivo
+ * mezcla filas sembradas DIRECTO por Prisma con filas creadas POR EL CASO DE USO, y las dos
+ * caras tienen que caer en la MISMA empresa o dejarian de verse entre si: por eso hay una sola,
+ * efimera, para todo el archivo.
+ *
+ * ESTE ARCHIVO NO PRUEBA EL AISLAMIENTO: sigue probando exactamente lo mismo que QC-80 -la
+ * unidad de la presentacion y lo que la base hace con ella-. El aislamiento es
+ * `company-scope-queries.int.test.ts`.
+ */
+let empresaDelArchivo: string;
+
+beforeAll(async () => {
+  const nombre = `Empresa presentacion-unidad ${token()}`;
+  const { id } = await prisma.company.create({
+    data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
+    select: { id: true },
+  });
+  empresaDelArchivo = id;
+});
+
 /** Actor autorizado, tal como lo construiria la Server Action a partir de la sesion. */
 function actorAutorizado(): Actor {
-  return { id: randomUUID(), permissions: ['inventario.modificar'] };
+  return { id: randomUUID(), companyId: empresaDelArchivo, permissions: ['inventario.modificar'] };
 }
 
 const lotesSembrados: string[] = [];
@@ -78,7 +102,12 @@ async function sembrarUnidad(): Promise<string> {
 async function sembrarPresentacion(unitId: string): Promise<{ id: string; marca: string }> {
   const marca = token();
   const { id } = await prisma.presentation.create({
-    data: { name: `Presentacion ${marca}`, nameNormalized: `presentacion${marca}`, unitId },
+    data: {
+      name: `Presentacion ${marca}`,
+      nameNormalized: `presentacion${marca}`,
+      unitId,
+      companyId: empresaDelArchivo,
+    },
     select: { id: true },
   });
   presentacionesSembradas.push(id);
@@ -88,7 +117,7 @@ async function sembrarPresentacion(unitId: string): Promise<{ id: string; marca:
 async function sembrarProducto(): Promise<string> {
   const marca = token();
   const { id } = await prisma.product.create({
-    data: { name: `Producto ${marca}`, nameNormalized: `producto${marca}` },
+    data: { name: `Producto ${marca}`, nameNormalized: `producto${marca}`, companyId: empresaDelArchivo },
     select: { id: true },
   });
   productosSembrados.push(id);
@@ -98,7 +127,9 @@ async function sembrarProducto(): Promise<string> {
 /** Lote con existencia e importe REALES: es la fila que R28 no deja tocar. */
 async function sembrarLote(productId: string, presentationId: string): Promise<string> {
   const { id } = await prisma.productBatch.create({
-    data: { productId, presentationId, stock: 17, unitCost: '123.4500' },
+    // QC-49 R2/R22: el lote declara SU empresa, y `product_batches_check_company` exige que
+    // coincida con la de su producto Y con la de su presentacion. Las tres son la del archivo.
+    data: { productId, presentationId, stock: 17, unitCost: '123.4500', companyId: empresaDelArchivo },
     select: { id: true },
   });
   lotesSembrados.push(id);
@@ -117,6 +148,8 @@ afterAll(async () => {
   await prisma.product.deleteMany({ where: { id: { in: productosSembrados } } });
   await prisma.presentation.deleteMany({ where: { id: { in: presentacionesSembradas } } });
   await prisma.unit.deleteMany({ where: { id: { in: unidadesSembradas } } });
+  // La empresa del archivo va la ULTIMA: las tres FK a `companies` son ON DELETE RESTRICT.
+  await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
   await prisma.$disconnect();
 });
 

@@ -34,7 +34,23 @@ const presentationNameSchema = z
  */
 const presentationUnitIdSchema = z.string().uuid();
 
-export const createPresentationSchema = z.object({
+/**
+ * `strictObject`, no `z.object` (QC-49 R17; mismo criterio y mismo motivo que
+ * `product-input.ts` y `product-batch-input.ts`, que ya lo hacen citando QC-52 R1).
+ *
+ * R17 pide TRES cosas de una `companyId` colada en la entrada, y no dos: que no se escriba,
+ * que no se tenga en cuenta y que la entrada SE RECHACE POR CAMPO DESCONOCIDO. Con `z.object`
+ * las dos primeras se cumplian -la empresa la escribe `companyScopeColumns(scope)` desde el
+ * ambito, y `PresentationData` no la lleva- pero la tercera no: zod PODA el campo de mas en
+ * SILENCIO. Quien envio una empresa se iba creyendo que habia elegido en cual se guardaba la
+ * presentacion, y se habia guardado en otra sin que nada se lo dijera. Ignorar el campo de mas
+ * es peor que rechazarlo, exactamente por eso.
+ *
+ * Los dos llamantes del cliente -`presentation-form.tsx` y `presentation-select.tsx`- y las dos
+ * Server Actions construyen el objeto con estos dos campos y nada mas, asi que la estrictez no
+ * les cambia nada; lo que corta es la entrada que trae basura.
+ */
+export const createPresentationSchema = z.strictObject({
   name: presentationNameSchema,
   unitId: presentationUnitIdSchema,
 });

@@ -129,11 +129,35 @@ function readOptionalFormInt(
  */
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
 
-/** El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
+/**
+ * El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio, y
+ * desde QC-49 (R12) con LAS DOS CARAS de la sesion del servidor: `getSessionUser()` da el id y
+ * el conjunto de permisos, `getSessionContext()` da la EMPRESA. Las dos se piden EN PARALELO
+ * porque son independientes entre si y encadenarlas solo sumaria latencia.
+ *
+ * La empresa sale del contexto de sesion del servidor y NUNCA del `FormData` ni de ningun otro
+ * argumento del llamante: si viajara por la entrada, quien invoca la action podria ELEGIR la
+ * empresa en cuyo nombre se consulta, que es justo el agujero que esta ficha cierra.
+ *
+ * **Falla cerrado**: si falta CUALQUIERA de las dos, el actor es `null`, y con actor `null`
+ * `requirePermission` rechaza en la primera linea del caso de uso, antes de tocar el
+ * repositorio. Sin contexto no hay actor, y sin actor no hay consulta.
+ *
+ * No se extrae a un archivo compartido (`design.md > 4.1`): cada `Actor` es un tipo distinto
+ * de su propio dominio, asi que compartirlo seria compartir entre modulos. Queda anotado para
+ * la ficha que lo aborde.
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  const [sessionUser, sessionContext] = await Promise.all([
+    identity.getSessionUser(),
+    identity.getSessionContext(),
+  ]);
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 /**

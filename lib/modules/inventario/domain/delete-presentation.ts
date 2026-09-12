@@ -19,6 +19,10 @@ export type DeletePresentationDeps = {
  * `'in_use'` -> `PresentationInUseError` (R21): lo detecta el `RESTRICT` de la FK,
  * traducido por el adaptador. Este archivo solo traduce el resultado discriminado del
  * puerto, nunca ve un SQLSTATE.
+ *
+ * QC-49 (R16): el ambito viaja al puerto y entra en el `where` del `DELETE`. Una presentacion
+ * de OTRA empresa vuelve como `'not_found'` -el mismo camino que «no existe»- y se traduce a
+ * `PresentationNotFoundError`, nunca a un error de autorizacion; la fila ajena queda intacta.
  */
 export function createDeletePresentation(
   deps: DeletePresentationDeps,
@@ -29,7 +33,7 @@ export function createDeletePresentation(
   ): Promise<void> {
     requirePermission(actor, 'inventario.modificar');
 
-    const result = await deps.presentations.deleteById(id);
+    const result = await deps.presentations.deleteById(id, { companyId: actor.companyId });
 
     if (result === 'not_found') throw new PresentationNotFoundError();
     if (result === 'in_use') throw new PresentationInUseError();

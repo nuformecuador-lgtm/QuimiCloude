@@ -240,12 +240,43 @@ function normalizeProductNameForTest(name: string): string {
  *  la suya se DERIVA de la presentacion del lote mas reciente (R22). Los casos que ataban una
  *  unidad a un producto la atan ahora a una presentacion, y cuando necesitan que el producto la
  *  herede, le cuelgan un lote con `createBatch`. */
+/**
+ * Empresa efimera del ANDAMIAJE de inventario (QC-49 R1, R2, R22).
+ *
+ * Las tres tablas de inventario ganaron `company_id` NOT NULL en
+ * `<ts>_inventory_company_scope`, y el disparador `product_batches_check_company` exige ademas
+ * que la empresa del lote coincida con la de SU producto Y con la de SU presentacion. Por eso
+ * el producto, la presentacion y el lote de un mismo caso comparten empresa, y por eso esta se
+ * cachea POR TRANSACCION en vez de crear una nueva en cada llamada.
+ *
+ * Las unidades que usan estas presentaciones son DE SISTEMA (`createUnit` las siembra sin
+ * empresa), y una unidad de sistema vale para cualquier empresa (QC-76 R11), asi que
+ * `presentations_check_unit_scope` las acepta (QC-49 R23).
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
+ * -eso es `tests/integration/inventario/company-scope.int.test.ts`- y ningun aserto suyo
+ * depende de cual sea.
+ */
+const empresasDeInventario = new WeakMap<object, Promise<string>>()
+
+function inventoryCompanyOf(tx: Prisma.TransactionClient): Promise<string> {
+  const enCurso = empresasDeInventario.get(tx)
+  if (enCurso !== undefined) return enCurso
+  const creando = createCompany(tx, `inv${token()}`)
+  empresasDeInventario.set(tx, creando)
+  return creando
+}
+
 async function createProduct(
   tx: Prisma.TransactionClient,
   name = 'Acido citrico monohidratado',
 ): Promise<string> {
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name) },
+    data: {
+      name,
+      nameNormalized: normalizeProductNameForTest(name),
+      companyId: await inventoryCompanyOf(tx),
+    },
     select: { id: true },
   })
   return product.id
@@ -259,7 +290,12 @@ async function createPresentation(
   unitId: string,
 ): Promise<string> {
   const presentation = await tx.presentation.create({
-    data: { name: `Presentacion ${marker}`, nameNormalized: `presentacion${marker}`, unitId },
+    data: {
+      name: `Presentacion ${marker}`,
+      nameNormalized: `presentacion${marker}`,
+      unitId,
+      companyId: await inventoryCompanyOf(tx),
+    },
     select: { id: true },
   })
   return presentation.id
@@ -273,7 +309,13 @@ async function createBatch(
   presentationId: string,
 ): Promise<string> {
   const batch = await tx.productBatch.create({
-    data: { productId, presentationId, stock: 1, unitCost: new Prisma.Decimal('1.0000') },
+    data: {
+      productId,
+      presentationId,
+      stock: 1,
+      unitCost: new Prisma.Decimal('1.0000'),
+      companyId: await inventoryCompanyOf(tx),
+    },
     select: { id: true },
   })
   return batch.id
@@ -328,7 +370,7 @@ type WritableColumn =
  * FK de unidad que dice probar. Se escribe vacia a proposito -aqui el producto es andamiaje-
  * y no choca con nada: esa columna NO tiene indice unico (QC-14 decision cerrada 6).
  */
-function rawInsert(
+async function rawInsert(
   tx: Prisma.TransactionClient,
   table: 'units' | 'products' | 'presentations' | 'recipe_lines',
   columns: Partial<Record<WritableColumn, Prisma.Sql>>,
@@ -336,6 +378,16 @@ function rawInsert(
   const entries = Object.entries(columns) as [WritableColumn, Prisma.Sql][]
   const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
   const values = entries.map(([, value]) => value)
+
+  // QC-49 (R1): `products.company_id` y `presentations.company_id` son NOT NULL sin DEFAULT,
+  // asi que van SIEMPRE, por el mismo motivo que `name_normalized`: si no fueran, cualquier
+  // rechazo que un caso busque aqui llegaria antes como 23502 sobre ESTA columna y el caso
+  // dejaria de probar lo que dice probar. Se escribe la empresa de andamiaje de la propia
+  // transaccion; quien la pase explicitamente en `columns` sigue mandando.
+  if ((table === 'products' || table === 'presentations') && columns.company_id === undefined) {
+    names.push(Prisma.raw('"company_id"'))
+    values.push(asUuid(await inventoryCompanyOf(tx)))
+  }
 
   if (table === 'products') {
     names.push(Prisma.raw('"name_normalized"'))
