@@ -6,6 +6,7 @@ import { createSessionTicket } from './session';
 
 import type { LoginAttemptRecorder } from '../ports/login-attempt-recorder';
 import type { PasswordHasher } from '../ports/password-hasher';
+import type { SessionIdFactory } from '../ports/session-id-factory';
 import type { SessionWriter } from '../ports/session-writer';
 import type {
   AuthenticatableUser,
@@ -23,6 +24,13 @@ export type VerifyCredentialsDeps = {
   readonly attempts: LoginAttemptRecorder;
   readonly hasher: PasswordHasher;
   readonly session: SessionWriter;
+  /**
+   * QC-23 T4 (R1, R2) — de aqui sale el identificador de la sesion que se emite. Entra por
+   * puerto y no por `crypto.randomUUID()` en linea porque el dominio no puede tener fuentes de
+   * azar propias: es lo que permite afirmar en un test que dos logins seguidos de la misma
+   * persona producen `sid` distintos sin espiar ninguna global.
+   */
+  readonly ids: SessionIdFactory;
 };
 
 /**
@@ -241,7 +249,16 @@ export function createVerifyCredentials(
     // (`usuario.companyId`, misma consulta), no se pregunta en el login, no se acepta desde la
     // entrada y no tiene valor por defecto — una empresa por defecto seria una inventada.
     await deps.session.startSession(
-      createSessionTicket(usuario.id, usuario.roleName, usuario.companyId, now),
+      // El `sid` es NUEVO en cada emision (QC-23 R2): se pide a la fabrica aqui, en el momento
+      // de emitir, y no se deriva de `usuario.id` ni de `now` — dos sesiones de la misma persona
+      // en el mismo segundo tienen que poder cerrarse por separado (R20).
+      createSessionTicket(
+        usuario.id,
+        usuario.roleName,
+        usuario.companyId,
+        deps.ids.newSessionId(),
+        now,
+      ),
     );
 
     return { ok: true };

@@ -32,6 +32,17 @@ import type { SessionProvider } from '@/lib/modules/identity/ports/session-provi
 import type { SessionReader } from '@/lib/modules/identity/ports/session-reader';
 import type { SessionUserReader } from '@/lib/modules/identity/ports/session-user-reader';
 import type { SessionWriter } from '@/lib/modules/identity/ports/session-writer';
+// QC-23 T5 — la fabrica del identificador de sesion. El cableado COMPLETO de la ficha (los tres
+// casos de uso nuevos, el eraser, el repositorio de revocaciones y el log) es T17; aqui solo se
+// ata este puerto, que es el que `verifyCredentials` necesita para poder emitir un `sid` (R2).
+import { sessionIdCrypto } from '@/lib/modules/identity/adapters/driven/session/session-id-crypto';
+import type { SessionIdFactory } from '@/lib/modules/identity/ports/session-id-factory';
+// QC-23 T10 — el registro del servidor de la comprobacion de sesion. Se cablea AQUI, y no en
+// T17, porque `createResolveSession` lo exige desde ya: sin el, el `catch` que falla cerrado
+// (R16, R17) quedaria vacio y el arbol no compilaria. El resto del cableado de la ficha sigue
+// siendo T17.
+import { createSessionCheckLogConsole } from '@/lib/modules/identity/adapters/driven/observability/session-check-log-console';
+import type { SessionCheckLog } from '@/lib/modules/identity/ports/session-check-log';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
   createCreatePresentation,
@@ -241,13 +252,23 @@ const loginAttemptRecorder: LoginAttemptRecorder = {
   set: setLoginAttempt,
 };
 const sessionWriter: SessionWriter = { startSession };
+// QC-23 T5 (R1, R2): el UNICO sitio donde `SessionIdFactory` se ata a su implementacion.
+const sessionIds: SessionIdFactory = sessionIdCrypto;
 const sessionReader: SessionReader = { readClaims: readSessionClaims };
 const sessionUserReader: SessionUserReader = { findActiveById: findActiveSessionUserById };
 // QC-48 (T8, `design.md > 6`): UNA SOLA instancia de la cadena de cortes, y de ella salen las DOS
 // salidas. Dos construcciones serian dos cableados que pueden divergir —mismo criterio que
 // `checkCredentialPolicy` en QC-19— y con ellos dos definiciones de «hay sesion», que es
 // justamente lo que R21 prohibe.
-const resolveSession = createResolveSession({ session: sessionReader, users: sessionUserReader });
+// QC-23 T10 (R16, R17): el UNICO sitio donde `SessionCheckLog` se ata a su implementacion. La
+// LECTURA de la cabecera del identificador de peticion entra por parametro en el adaptador —no en
+// el dominio—, que es el reparto que fijo QC-71 R9 para el traductor unico de errores.
+const sessionCheckLog: SessionCheckLog = createSessionCheckLogConsole(readRequestIdHeader);
+const resolveSession = createResolveSession({
+  session: sessionReader,
+  users: sessionUserReader,
+  log: sessionCheckLog,
+});
 const sessionProvider: SessionProvider = {
   getSessionUser: async () => (await resolveSession())?.user ?? null,
   // R19: `null` en exactamente los mismos casos que `getSessionUser`, por construccion.
@@ -377,6 +398,7 @@ export const identity = {
     attempts: loginAttemptRecorder,
     hasher: passwordHasher,
     session: sessionWriter,
+    ids: sessionIds,
   }),
   passwordHasher,
   ...sessionProvider,

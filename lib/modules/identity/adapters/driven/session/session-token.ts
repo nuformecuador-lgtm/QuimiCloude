@@ -49,14 +49,28 @@ export const SESSION_COOKIE_NAME = 'qc_session';
  * dentro aparece en el login en su siguiente navegacion. La alternativa —una empresa opcional en
  * el contenido firmado— obligaria a decidir que hacer con una sesion sin empresa en cada punto
  * de uso, que es justo la puerta trasera que QC-48 venia a cerrar.
+ *
+ * QC-23 (R3, R4) — sube a `v4` porque el contenido firmado gana el IDENTIFICADOR DE SESION
+ * (`sid`, R1), que es lo que permite cerrar un dispositivo y solo ese. **Tampoco hay
+ * compatibilidad**: un valor `v3` se rechaza igual que un `v1` o un `v2`, aunque su firma sea
+ * correcta y no haya caducado, y **no se añade ninguna rama de lectura de `v3`**. Consecuencia
+ * aceptada por escrito (decision cerrada del 2026-09-03, «el identificador de sesion si sube la
+ * version y las sesiones vivas se rompen»): al desplegar esto, quien tuviera sesion abierta
+ * aparece en el login en su siguiente navegacion, por el camino de salida que ya existe — sin
+ * mensaje, sin pantalla propia y sin borrar ninguna cookie (R4). La alternativa —un `sid`
+ * opcional— obligaria a decidir que hacer con una sesion sin identificador en cada punto de uso,
+ * y «sin identificador» solo puede significar «no revocable»: la puerta trasera de la ficha.
+ *
+ * **La firma no cambia** (R5): `signSessionValue` sigue siendo la unica implementacion del HMAC
+ * en todo el repositorio. `sid` es contenido, no criptografia.
  */
-export const SESSION_VALUE_VERSION = 'v3';
+export const SESSION_VALUE_VERSION = 'v4';
 
 /** Longitud minima del secreto (QC-7 `design.md > 5.3`). Por debajo, el HMAC no vale nada. */
 const MIN_SECRET_LENGTH = 32;
 
 /**
- * Contenido firmado, formato `v3`: `{ sub, iat, exp, role, cid }`. `role` es el NOMBRE del rol
+ * Contenido firmado, formato `v4`: `{ sub, iat, exp, role, cid, sid }`. `role` es el NOMBRE del rol
  * (`'Administrador'`, `'Operador'`), el mismo texto que `roles.name`: firmar el `role_id`
  * obligaria al borde a traducir un identificador de base sin tener base.
  *
@@ -75,6 +89,13 @@ type SessionPayload = {
   readonly exp: number;
   readonly role: string;
   readonly cid: string;
+  /**
+   * QC-23 (R1) — el UUID de ESTA sesion, y nada mas: no se deriva de `sub` ni de `iat`, porque
+   * dos sesiones de la misma persona emitidas en el mismo segundo tienen que distinguirse (R2).
+   * Se abrevia `sid` como `sub`, `iat`, `exp` y `cid` —este valor viaja en cada peticion—, y
+   * `parseSessionClaims` lo traduce a `sessionId`.
+   */
+  readonly sid: string;
 };
 
 /**
@@ -198,8 +219,9 @@ export function hasCurrentVersion(rawValue: string): boolean {
 
 /**
  * Construye `<version>.<payload-base64url>.<hmac-base64url>` (QC-7 `design.md > 5.1`).
- * El payload lleva **solo** `sub`, `iat`, `exp`, `role` y `cid`: nada de nombre de usuario,
- * correo ni hash, porque este valor viaja en cada peticion (QC-8 R12, QC-9 R26, QC-48 R6).
+ * El payload lleva **solo** `sub`, `iat`, `exp`, `role`, `cid` y `sid`: nada de nombre de
+ * usuario, correo ni hash, porque este valor viaja en cada peticion (QC-8 R12, QC-9 R26,
+ * QC-48 R6, QC-23 R1).
  */
 export async function buildSessionValue(ticket: SessionTicket, secret: string): Promise<string> {
   const payload: SessionPayload = {
@@ -208,6 +230,7 @@ export async function buildSessionValue(ticket: SessionTicket, secret: string): 
     exp: toEpochSeconds(ticket.expiresAt),
     role: ticket.roleName,
     cid: ticket.companyId,
+    sid: ticket.sessionId,
   };
   const signedPart = `${SESSION_VALUE_VERSION}.${encodeBase64UrlText(JSON.stringify(payload))}`;
 
@@ -219,7 +242,7 @@ export async function buildSessionValue(ticket: SessionTicket, secret: string): 
  * atajos (QC-8 `design.md > 4.1`):
  * 1. El valor no parte en exactamente tres trozos por `.` -> `null`.
  * 2. El primer trozo no es `SESSION_VALUE_VERSION` -> `null`, **sin verificar la firma y sin
- *    interpretar el resto** (QC-9 R27 y QC-48 R8: ahi caen `v1` y `v2`, y por eso el corte va
+ *    interpretar el resto** (QC-9 R27, QC-48 R8 y QC-23 R3: ahi caen `v1`, `v2` y `v3`, y por eso el corte va
  *    ANTES de tocar el HMAC; verificar la firma de un formato que ya no vale seria trabajo para
  *    nada).
  * 3. Se recomputa la firma con `signSessionValue()` —la misma funcion que la emite— y se compara

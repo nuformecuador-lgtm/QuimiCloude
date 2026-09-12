@@ -1,6 +1,8 @@
 // T1 — Que forma tiene el contenido firmado para ser interpretable, y cuando caduca. Dominio
 // puro: sin cookie, sin Next, sin base de datos (`design.md > 4.3`).
 
+import { readFileSync } from 'node:fs';
+
 import {
   isSessionExpired,
   parseSessionClaims,
@@ -22,6 +24,9 @@ const ROL = 'Administrador';
 // QC-48 R6: desde `v3` lleva ademas el UUID de la empresa, y nada mas de ella.
 const CID_VALIDO = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
 
+// QC-23 R1: desde `v4` el contenido firmado lleva el identificador de ESTA sesion.
+const SID_CLAIMS = '5b6f3d21-9c4e-4a7f-8b03-6d2e1f5a9c44';
+
 function jsonValido(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     sub: SUB_VALIDO,
@@ -29,6 +34,8 @@ function jsonValido(overrides: Record<string, unknown> = {}): string {
     exp: EXP,
     role: ROL,
     cid: CID_VALIDO,
+    // QC-23 R1, R6: desde `v4` el contenido firmado lleva el identificador de ESTA sesion.
+    sid: SID_CLAIMS,
     ...overrides,
   });
 }
@@ -129,6 +136,8 @@ describe('isSessionExpired', () => {
     expiresAt: new Date(EXP * 1000),
     roleName: ROL,
     companyId: CID_VALIDO,
+    // QC-23 R1: desde `v4` los claims llevan el identificador de ESTA sesion.
+    sessionId: SID_CLAIMS,
   };
 
   // R7 — en el instante exacto del exp la sesion YA NO vale (>=, no >).
@@ -144,5 +153,85 @@ describe('isSessionExpired', () => {
   // R7 — un instante antes de expiresAt todavia es valida.
   it('un segundo antes de expiresAt la sesion sigue valida', () => {
     expect(isSessionExpired(claims, new Date(claims.expiresAt.getTime() - 1000))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-23 T18 — El `sid` dentro del contenido firmado (R1, R6).
+//
+// Bloque NUEVO al final: no reordena ni reformatea nada de lo de arriba.
+//
+// POR QUE ESTOS CUATRO CASOS VIVEN AQUI Y NO EN EL CODEC: R6 dice «SIN consultar la base», y la
+// forma de afirmarlo es que el corte ocurra en `parseSessionClaims`, que es DOMINIO PURO — una
+// funcion que recibe un texto y devuelve claims o `null`, sin puertos, sin repositorio y sin
+// ninguna forma de llegar a Prisma. No hay doble que espiar porque no hay nada que llamar, y eso
+// es mas fuerte que un contador de invocaciones a cero.
+// ---------------------------------------------------------------------------------------------
+describe('el identificador de sesion en los claims (QC-23 R1, R6)', () => {
+  // R1 — la traduccion `sid -> sessionId` ocurre donde ya ocurren `role -> roleName` y
+  // `cid -> companyId`: fuera del codec nadie ve la abreviatura.
+  it('un JSON valido con sid produce claims con sessionId', () => {
+    expect(parseSessionClaims(jsonValido())?.sessionId).toBe(SID_CLAIMS);
+
+    const otro = '0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d';
+    expect(parseSessionClaims(jsonValido({ sid: otro }))?.sessionId).toBe(otro);
+    // Y no se cuela en ningun otro campo.
+    expect(parseSessionClaims(jsonValido({ sid: otro }))?.sub).toBe(SUB_VALIDO);
+    expect(parseSessionClaims(jsonValido({ sid: otro }))?.companyId).toBe(CID_VALIDO);
+  });
+
+  // R6 — los CUATRO casos, uno a uno: ausente, vacio, de un tipo que no es texto y sin forma de
+  // UUID. Los cuatro resuelven «sin sesion» aqui, en el dominio, sin consultar la base.
+  it('un sid ausente devuelve null', () => {
+    const sinSid = JSON.stringify({
+      sub: SUB_VALIDO,
+      iat: IAT,
+      exp: EXP,
+      role: ROL,
+      cid: CID_VALIDO,
+    });
+
+    expect(parseSessionClaims(sinSid)).toBeNull();
+  });
+
+  it('un sid vacio devuelve null', () => {
+    expect(parseSessionClaims(jsonValido({ sid: '' }))).toBeNull();
+  });
+
+  it('un sid que no es texto devuelve null', () => {
+    expect(parseSessionClaims(jsonValido({ sid: 42 }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ sid: null }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ sid: true }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ sid: [SID_CLAIMS] }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ sid: { valor: SID_CLAIMS } }))).toBeNull();
+  });
+
+  // R6 — `.uuid()` y no `.min(1)`: el valor acaba comparandose contra una columna `@db.Uuid`
+  // (`revoked_sessions.session_id`), asi que un texto sin forma de UUID tiene que morir en el
+  // borde y no en Prisma. Mismo criterio que `sub` (QC-8) y `cid` (QC-48 R9).
+  it('un sid sin forma de UUID devuelve null, aunque no este vacio', () => {
+    expect(parseSessionClaims(jsonValido({ sid: 'no-es-un-uuid' }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ sid: '1234' }))).toBeNull();
+    // Un UUID al que le falta un caracter: lo mas parecido a uno valido que no lo es.
+    expect(parseSessionClaims(jsonValido({ sid: SID_CLAIMS.slice(0, -1) }))).toBeNull();
+    // Y un UUID con basura pegada delante o detras.
+    expect(parseSessionClaims(jsonValido({ sid: ` ${SID_CLAIMS}` }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ sid: `${SID_CLAIMS}x` }))).toBeNull();
+  });
+
+  // R6 — «sin consultar la base», dicho sobre el fuente: el dominio que interpreta el contenido
+  // firmado no importa ni un puerto, ni un adaptador, ni Prisma, ni `next/*`. No hay camino por
+  // el que un `sid` invalido pueda provocar una lectura.
+  it('el modulo que interpreta los claims no tiene por donde consultar la base', () => {
+    const fuente = readFileSync(
+      new URL('../../../lib/modules/identity/domain/session-claims.ts', import.meta.url),
+      'utf8',
+    );
+
+    expect(fuente.length).toBeGreaterThan(0);
+    // Se miran los IMPORT, no los comentarios —donde la frase «sin Prisma, sin Next» esta
+    // escrita a proposito—: lo unico que este dominio importa es el validador de esquema.
+    const imports = [...fuente.matchAll(/from '([^']+)'/g)].map((match) => match[1] as string);
+    expect(imports).toEqual(['zod']);
   });
 });

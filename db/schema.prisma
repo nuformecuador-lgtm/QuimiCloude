@@ -209,6 +209,17 @@ model User {
   /// los tres indices unicos funcionales de QC-4.
   accountStatusChangedBy String? @map("account_status_changed_by") @db.Uuid
 
+  /// QC-23 (R7, R8). Sello «sesiones validas desde»: toda sesion cuyo `iat` sea ANTERIOR O
+  /// IGUAL a este instante es invalida. NOT NULL con `@default(now())` —una fila nueva nace sin
+  /// ninguna sesion emitida, asi que el sello puede ser el instante de su nacimiento— y la
+  /// migracion rellena las filas existentes con `CURRENT_TIMESTAMP`, que es justo el efecto
+  /// aceptado por escrito: al desplegar, todo lo vivo cae (y ya caia, por la subida a `v4`).
+  /// SE GUARDA TRUNCADO AL SEGUNDO, que es la granularidad con la que `iat` viaja firmado
+  /// (`session-token.ts > toEpochSeconds`). Ver `specs/QC-23-registro-de-sesiones/design.md > 2.3`.
+  /// SIN indice a proposito: nunca se filtra por esta columna, solo se lee de la fila que ya se
+  /// lee por PK en cada peticion (R14).
+  sessionsValidFrom DateTime @default(now()) @map("sessions_valid_from") @db.Timestamptz(6)
+
   documentType          DocumentType           @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role                  Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   company               Company                @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -216,6 +227,11 @@ model User {
   /// el `@relation` de `CredentialSetupToken`; es virtual y NO anade ninguna columna ni ningun
   /// indice a `users` (R37).
   credentialSetupTokens CredentialSetupToken[]
+  /// QC-23. Lado inverso de `revoked_sessions.user_id`. Prisma EXIGE este campo para el
+  /// `@relation` de `RevokedSession`; es virtual y NO anade ninguna columna ni ningun indice a
+  /// `users`. Es por donde la comprobacion por peticion trae `revoked_at` en el MISMO
+  /// `findFirst` que ya se hacia (design.md > 4).
+  revokedSessions       RevokedSession[]
 
   @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
@@ -410,6 +426,34 @@ model CredentialSetupToken {
   @@unique([tokenDigest], map: "credential_setup_tokens_token_digest_key")
   @@index([userId], map: "credential_setup_tokens_user_id_idx")
   @@map("credential_setup_tokens")
+}
+
+/// @module identity
+/// QC-23. Las sesiones cerradas UNA A UNA (R10). Una fila = un `sid` que ya no vale.
+/// SIN columna de empresa (R44): no es tabla de operacion, cuelga 1-a-N de `users` y su empresa
+/// es la de la persona. Mismo criterio y mismo precedente que `credential_setup_tokens`.
+/// SIN `updated_at` y SIN `deleted_at` (R45): la fila es un hecho inmutable —una sesion cerrada—
+/// y su unica escritura posterior es el borrado FISICO de la purga (R39).
+///
+/// `revoked_sessions_session_id_key` ES R11 y R12: la comprobacion por peticion es UNA busqueda
+/// por indice unico, y registrar dos veces el mismo cierre choca con `23505` y se traduce a «ya
+/// estaba», no a un error. `revoked_sessions_user_id_expires_at_idx` ES R39: la purga es un
+/// `DELETE ... WHERE user_id = ? AND expires_at <= ?`, que es exactamente ese indice.
+model RevokedSession {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  /// Caducidad NATURAL del token cerrado (su `exp`). Es lo que hace posible la purga de R39:
+  /// pasada esta fecha la fila ya no protege de nada.
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([sessionId], map: "revoked_sessions_session_id_key")
+  @@index([userId, expiresAt], map: "revoked_sessions_user_id_expires_at_idx")
+  @@map("revoked_sessions")
 }
 
 /// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo

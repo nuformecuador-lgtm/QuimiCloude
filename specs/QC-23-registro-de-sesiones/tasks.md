@@ -7,7 +7,7 @@
 
 ## Fase 1 — Esquema y migración
 
-- [ ] **T1. Esquema Prisma: el sello y la tabla del registro.**
+- [x] **T1. Esquema Prisma: el sello y la tabla del registro.**
   `users.sessionsValidFrom` (`@default(now())`, `@db.Timestamptz(6)`, sin índice) y el modelo
   `RevokedSession` con `/// @module identity`, su `@@unique([sessionId])`, su
   `@@index([userId, expiresAt])`, la FK `RESTRICT` y la relación inversa en `User`.
@@ -16,7 +16,7 @@
   comentario de cabecera dice por qué (design.md § 2.2).
   _Deps: —_
 
-- [ ] **T2. Migración `session_revocation`, UP y DOWN.**
+- [x] **T2. Migración `session_revocation`, UP y DOWN.**
   `ADD COLUMN sessions_valid_from`, `CREATE TABLE revoked_sessions` + dos índices + FK, y los dos
   `ALTER … ENABLE/FORCE ROW LEVEL SECURITY` **sin policies**. `down.sql` inverso línea a línea, sin
   `CASCADE`. **Revisar a mano** el ruido de drift que emite Prisma: esta migración toca `users` y un
@@ -26,7 +26,7 @@
   no contiene ningún objeto que el UP no cree.
   _Deps: T1_
 
-- [ ] **T3. [P] Test del archivo de migración.**
+- [x] **T3. [P] Test del archivo de migración.**
   Lee `migration.sql` y `down.sql` y afirma: RLS `ENABLE` **y** `FORCE` sobre `revoked_sessions`;
   cero `CREATE POLICY`; los dos índices con su nombre exacto; **ningún** `DROP INDEX`/`DROP
   CONSTRAINT` sobre los índices únicos funcionales de `users`; y que el DOWN cubre todo lo que el UP
@@ -37,7 +37,7 @@
 
 ## Fase 2 — El token `v4`
 
-- [ ] **T4. Códec: `sid` dentro del contenido firmado.**
+- [x] **T4. Códec: `sid` dentro del contenido firmado.**
   `SESSION_VALUE_VERSION → 'v4'`; `SessionPayload` gana `sid`; `SESSION_CLAIMS_SCHEMA` gana
   `sid: z.string().uuid()`; `SessionClaims` gana `sessionId` (traducción `sid → sessionId` donde ya
   se traducen `role` y `cid`); `SessionTicket` y `createSessionTicket` ganan `sessionId` posicional
@@ -47,14 +47,14 @@
   `session-token.test.ts` sigue comparando `toBe` contra `node:crypto`.
   _Deps: —_
 
-- [ ] **T5. [P] Puerto `SessionIdFactory` y su adaptador.**
+- [x] **T5. [P] Puerto `SessionIdFactory` y su adaptador.**
   `ports/session-id-factory.ts` (`newSessionId(): string`) y
   `adapters/driven/session/session-id-crypto.ts` con `crypto.randomUUID()`.
   **Hecho:** el dominio no invoca ninguna fuente de azar propia; un test afirma que dos invocaciones
   seguidas devuelven UUID distintos y con forma de UUID.
   _Deps: —_
 
-- [ ] **T6. Dominio de la revocación (funciones puras).**
+- [x] **T6. Dominio de la revocación (funciones puras).**
   `domain/session-revocation.ts`: `floorToSecond(date)`, `isStampedOut(claims, sessionsValidFrom)`
   con la comparación **`<=`** (design.md § 2.3) y `changeRevokesSessions(change)` con las tres
   variantes (`account_status`, `role`, `delete`) y `pending`/`active` en `false`.
@@ -65,14 +65,14 @@
 
 ## Fase 3 — Almacén y comprobación por petición
 
-- [ ] **T7. Los tres puertos nuevos.**
+- [x] **T7. Los tres puertos nuevos.**
   `SessionRevocationRepository` (`revokeSession`, `stampAll`, **sin ningún método de listado**),
   `SessionEraser` (`clear`) y `SessionCheckLog` (`log(diagnostic, requestId)`).
   **Hecho:** puertos puros, sólo tipos de su propio `domain/` por ruta relativa; el comentario de
   cabecera dice por qué no hay listado (decisión 12); «enséñame mis dispositivos» **no compila**.
   _Deps: T6_
 
-- [ ] **T8. Adaptador `session-revocation-prisma.ts`.**
+- [x] **T8. Adaptador `session-revocation-prisma.ts`.**
   `revokeSession`: `INSERT` + purga (`DELETE … WHERE user_id = ? AND expires_at <= ?`) en **una**
   transacción, con el `23505` de `revoked_sessions_session_id_key` traducido a éxito.
   `stampAll`: `UPDATE users SET sessions_valid_from = ? WHERE id = ? AND company_id = ? AND
@@ -81,7 +81,7 @@
   existencia; la purga nunca recorre la tabla entera.
   _Deps: T2, T7_
 
-- [ ] **T9. `SessionUserReader` con el `sid`.**
+- [x] **T9. `SessionUserReader` con el `sid`.**
   Firma `findActiveById(id, sessionId)`; el record gana `sessionsValidFrom` y
   `sessionRevokedAt: Date | null`, los dos **crudos**; el adaptador Prisma los trae en el **mismo**
   `findFirst`, por la relación `revokedSessions: { where: { sessionId }, take: 1 }`.
@@ -89,7 +89,7 @@
   resolución, igual que el que ya vigila `role.permissions`; el `select` no gana ningún dato de PII.
   _Deps: T1_
 
-- [ ] **T10. Los cortes 7 y 8 en `resolve-session.ts`, y el fallo cerrado.**
+- [x] **T10. Los cortes 7 y 8 en `resolve-session.ts`, y el fallo cerrado.**
   Dos `if` nuevos detrás de los seis existentes, **sin tocar ni reordenar** ninguno de ellos; `try`
   acotado **exactamente** a la línea de `findActiveById`, con `log(causa, requestId)` y `return
   null` en el `catch`.
@@ -160,14 +160,14 @@
   archivo; `lib/composition` no importa ningún driving; el actor **no** se resuelve aquí.
   _Deps: T5, T7, T8, T11, T12, T13_
 
-- [ ] **T18. [P] Tests unit del códec.**
+- [x] **T18. [P] Tests unit del códec.**
   `sid` ausente / vacío / no-texto / sin forma de UUID → `null` **sin consultar la base**; `v3`
   rechazado sin verificar firma; dos emisiones → `sid` distintos; ida y vuelta `v4`.
   **Hecho:** los cuatro casos de entrada inválida pasan por `parseSessionClaims` y ninguno toca el
   puerto de usuarios.
   _Deps: T4_
 
-- [ ] **T19. [P] Tests unit de la resolución.**
+- [x] **T19. [P] Tests unit de la resolución.**
   Corte por sello; corte por registro; **convivencia** —caso en que los dos aplican, mismo resultado
   con los dos órdenes de evaluación, y cada uno por separado también corta—; una sola invocación del
   puerto; fallo del puerto → `null` + log con identificador de petición.

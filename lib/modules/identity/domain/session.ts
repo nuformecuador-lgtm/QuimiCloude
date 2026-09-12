@@ -27,6 +27,18 @@ export type SessionTicket = {
    * nombre de la empresa ni de su estado de baja.
    */
   readonly companyId: string;
+  /**
+   * QC-23 T4 (R1, R2) — IDENTIFICADOR de ESTA sesion, con forma de UUID. Viaja firmado dentro de
+   * la cookie desde `v4` como `sid`, igual que el rol desde `v2` y la empresa desde `v3`.
+   *
+   * Es lo que permite cerrar UN dispositivo y solo ese (R20): el registro de sesiones cerradas
+   * guarda `sid`, no usuarios. Dos emisiones para la misma persona, aunque ocurran en el mismo
+   * instante, tienen `sid` distintos — y por eso NO se deriva de `userId` ni de `issuedAt`.
+   *
+   * Quien lo genera es un puerto (`SessionIdFactory`), no este archivo: el dominio no puede tener
+   * fuentes de azar propias, que es justo lo que hace testeable R2.
+   */
+  readonly sessionId: string;
   readonly issuedAt: Date;
   readonly expiresAt: Date;
 };
@@ -42,11 +54,18 @@ export type SessionTicket = {
  * empresa por defecto seria una empresa inventada, y si el sistema no puede resolver una empresa
  * para quien se autentica, lo que corresponde es no emitir sesion. Va posicional y no en un
  * objeto para que `strict` marque uno a uno los sitios de llamada.
+ *
+ * `sessionId` es obligatorio, posicional y **sin valor por defecto** (QC-23 R1, R2): un `sid`
+ * inventado aqui dentro seria un `sid` no aleatorio —y, peor, derivable de lo que el resto del
+ * ticket ya dice—. Lo produce `SessionIdFactory` y entra desde fuera, exactamente como el rol y
+ * la empresa entran desde la ficha de la persona. Posicional para que `strict` marque uno a uno
+ * los sitios de llamada.
  */
 export function createSessionTicket(
   userId: string,
   roleName: string,
   companyId: string,
+  sessionId: string,
   now: Date = new Date(),
 ): SessionTicket {
   const issuedAt = new Date(now.getTime());
@@ -55,6 +74,7 @@ export function createSessionTicket(
     userId,
     roleName,
     companyId,
+    sessionId,
     issuedAt,
     expiresAt: new Date(issuedAt.getTime() + SESSION_DURATION_MS),
   };

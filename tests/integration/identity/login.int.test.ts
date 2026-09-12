@@ -58,6 +58,8 @@ import {
   createPasswordHash,
   verifyPasswordHash,
 } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+// QC-23 T5 — el adaptador REAL de `SessionIdFactory`: el login emite un `sid` de verdad.
+import { sessionIdCrypto } from '@/lib/modules/identity/adapters/driven/session/session-id-crypto';
 import {
   buildSessionValue,
   verifySessionValue,
@@ -131,6 +133,8 @@ function montarLogin(): {
     attempts: { compareAndSet: compareAndSetLoginAttempt, set: setLoginAttempt },
     hasher: { hash: createPasswordHash, verify: verifyPasswordHash },
     session: sesion,
+    // QC-23 R2: el adaptador REAL de la fabrica del `sid`, como el de hashing y el de base.
+    ids: sessionIdCrypto,
   });
   return { verificar, sesion };
 }

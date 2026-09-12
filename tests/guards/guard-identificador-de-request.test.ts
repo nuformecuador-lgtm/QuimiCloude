@@ -193,6 +193,13 @@ export const MIGRACIONES_ESPERADAS = [
   // persistir ningun identificador de peticion: su SQL no nombra ninguno de
   // `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
   '20260911130000_inventory_company_scope',
+  // Es de QC-23 (registro de sesiones: el sello `users.sessions_valid_from` y la tabla
+  // `revoked_sessions`), no de QC-71. Se anade aqui por lo mismo que las de arriba: es justo lo
+  // que pide el mensaje de `hallazgosDeMigraciones` -- la ficha que trae la migracion actualiza
+  // esta lista. QC-23 SI usa el identificador de peticion, pero solo para DEJARLO EN EL REGISTRO
+  // DEL SERVIDOR cuando la comprobacion falla (su R17); no lo persiste en ninguna columna, y su
+  // SQL no nombra ninguno de `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
+  '20260912103000_session_revocation',
 ] as const
 
 export function hallazgosDeMigraciones(

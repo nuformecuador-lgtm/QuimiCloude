@@ -336,10 +336,16 @@ describe('Prisma.dmmf — el autor del cambio es un ESCALAR, no una relacion (de
     // RETENSADO 2026-09-11 (QC-79): entra `CredentialSetupToken` -R11, el lado inverso de
     // `credential_setup_tokens.user_id`, que Prisma EXIGE para el `@relation` del enlace-.
     // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    // RETENSADO 2026-09-12 (QC-23): entra `RevokedSession` -R10, el lado inverso de
+    // `revoked_sessions.user_id`, que Prisma EXIGE para el `@relation` del registro de sesiones
+    // cerradas una a una-. Es VIRTUAL: no anade ninguna columna ni ningun indice a `users`.
+    // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`, y sigue diciendo
+    // lo que QC-65 queria que dijera: el autor del cambio de estado NO es una relacion.
     expect(relationTargets('User')).toEqual([
       'Company',
       'CredentialSetupToken',
       'DocumentType',
+      'RevokedSession',
       'Role',
     ])
     expect(relationTargets('User')).not.toContain('User')

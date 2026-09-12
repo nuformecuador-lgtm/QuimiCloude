@@ -319,6 +319,23 @@ const SITIOS_PERMITIDOS = [
   'lib/modules/identity/domain/list-work-group-members.ts',
   'lib/modules/identity/domain/work-group-queryable.ts',
   'lib/modules/identity/ports/work-group-repository.ts',
+
+  // RETENSADO 2026-09-12 (QC-23, registro-de-sesiones). Mismo trato y mismo criterio que los
+  // bloques de QC-78, QC-66, QC-79, QC-67 y QC-84: la lista CRECE con lo que un spec aprobado
+  // autoriza, la comparacion sigue siendo una IGUALDAD y cualquier archivo fuera de ella sigue
+  // poniendo esto en rojo. Bloque ADITIVO al final: no se reordena ni se reformatea nada.
+  //
+  // QUIEN LO AUTORIZA: **QC-23 R33 y R36**, que mandan decidir QUE CAMBIO corta las sesiones
+  // vivas — `blocked` e `inactive` cortan, `pending` y `active` NO—. Esa decision es dominio puro
+  // y vive en UNA funcion (`changeRevokesSessions`), asi que el archivo nombra los cuatro valores
+  // del conjunto cerrado por fuerza: es la tabla del requisito escrita en codigo.
+  //
+  // Lo que NO hace, y por eso no ensancha nada: no declara una segunda definicion del conjunto
+  // —importa `UserAccountStatus` de `account-status.ts`, la unica de QC-65 R3—, no traduce
+  // «lo que dice la columna» a «lo que significa ahora» —eso sigue siendo `effectiveAccountStatus`
+  // de QC-78 R7, y QC-23 R37 dice expresamente que el corte INMEDIATO por estado no se duplica—,
+  // y no lee ni escribe la columna: quien la escribe sigue siendo `user-admin-prisma.ts`.
+  'lib/modules/identity/domain/session-revocation.ts',
 ] as const;
 
 /**

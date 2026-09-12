@@ -32,10 +32,15 @@ vi.mock('@/lib/modules/identity/adapters/driven/persistence/session-user-prisma'
 const SUB = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
 
+// QC-23 R1: desde `v4` el contenido firmado lleva el identificador de ESTA sesion.
+const SID_CLAIMS = '5b6f3d21-9c4e-4a7f-8b03-6d2e1f5a9c44';
+
 const CLAIMS_VIGENTES: SessionClaims = {
   sub: SUB,
   roleName: 'Rol firmado que ya no vale',
   companyId: COMPANY_ID,
+  // QC-23 R1: desde `v4` los claims llevan el identificador de ESTA sesion.
+  sessionId: SID_CLAIMS,
   issuedAt: new Date(Date.now() - 60_000),
   expiresAt: new Date(Date.now() + 3_600_000),
 };
@@ -56,6 +61,11 @@ const RECORD: SessionUserRecord = {
   // la fachada de esta prueba mira el cableado, no el corte por estado.
   accountStatus: 'active',
   lockedUntil: null,
+  // QC-23 T9 (R7, R8, R11): el record trae ahora el sello del usuario y el instante en que ESTA
+  // sesion fue cerrada una a una, los dos crudos. El caso corriente es un sello ANTERIOR a la
+  // emision y ninguna fila en el registro; los cortes 7 y 8 tienen sus casos propios.
+  sessionsValidFrom: new Date('2026-08-01T00:00:00.000Z'),
+  sessionRevokedAt: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────

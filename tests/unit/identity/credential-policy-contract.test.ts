@@ -283,6 +283,18 @@ describe('QC-19 — esta feature no toca la persistencia (R21)', () => {
         // tiene nada que ver con la politica de credenciales de QC-19, que sigue siendo REGLA y
         // no dato: el enlace guarda una HUELLA de su propio secreto, nunca una contrasena.
         'credentialSetupTokens',
+        // RETENSADO 2026-09-12 (QC-23). El censo NO se afloja: sigue siendo una igualdad EXACTA
+        // -no un `toContain`-, y por eso hay que nombrar los DOS campos que QC-23 anade a `User`.
+        // Ninguno de los dos es persistencia de politica de credenciales ni de contrasenas
+        // anteriores, que es lo unico que R21 vigila sobre QC-19: la politica sigue siendo REGLA
+        // y no dato, y las columnas del bloqueo de QC-19 siguen ahi arriba, intactas.
+        //  - `sessionsValidFrom` (R7, R8) es `users.sessions_valid_from`: el sello «sesiones
+        //    validas desde». Guarda un INSTANTE, jamas una credencial.
+        //  - `revokedSessions` (R10) es VIRTUAL -el lado inverso que Prisma EXIGE para el
+        //    `@relation` de `RevokedSession`-: no es ninguna columna de `users`, y la migracion
+        //    `..._session_revocation` no emite ni un `ALTER TABLE "users"` por el.
+        'sessionsValidFrom',
+        'revokedSessions',
       ].sort(),
     );
   });

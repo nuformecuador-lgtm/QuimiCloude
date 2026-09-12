@@ -35,6 +35,9 @@ const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 // material de fixture: el portero de rutas NO decide con el (R12), y por eso todos los casos que
 // ya existian siguen firmando la misma.
 const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
+// QC-23 R1: desde `v4` el contenido firmado lleva el identificador de ESTA sesion.
+const SESSION_ID = '5b6f3d21-9c4e-4a7f-8b03-6d2e1f5a9c44';
+
 // QC-48 R12: la segunda empresa existe solo para comparar decisiones entre dos sesiones que se
 // diferencian UNICAMENTE en este valor.
 const OTRA_EMPRESA = 'b0d94f7a-6c25-4e18-8a3f-1e7b2c9d0456';
@@ -49,7 +52,7 @@ function cookieFirmada(
   emitidaEn = new Date(),
   empresa = COMPANY_ID,
 ): Promise<string> {
-  return buildSessionValue(createSessionTicket(USER_ID, rol, empresa, emitidaEn), SECRETO);
+  return buildSessionValue(createSessionTicket(USER_ID, rol, empresa, SESSION_ID, emitidaEn), SECRETO);
 }
 
 /**
@@ -62,7 +65,10 @@ function cookieFirmada(
  */
 function cookieConPayload(claims: Record<string, unknown>): string {
   const ahora = Math.floor(Date.now() / 1000);
-  const payload = { sub: USER_ID, iat: ahora, exp: ahora + 3600, ...claims };
+  // QC-23 R1: desde `v4` el contenido firmado lleva el identificador de sesion. Va en la base
+  // del payload —y no en cada caso— para que los casos sigan hablando de lo suyo; quien quiera
+  // probar un `sid` malo lo pisa por `claims`.
+  const payload = { sub: USER_ID, iat: ahora, exp: ahora + 3600, sid: SESSION_ID, ...claims };
   const codificado = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
   const parteFirmada = `${SESSION_VALUE_VERSION}.${codificado}`;
   const firma = createHmac('sha256', SECRETO).update(parteFirmada).digest('base64url');

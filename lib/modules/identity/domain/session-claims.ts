@@ -32,6 +32,13 @@ const SESSION_CLAIMS_SCHEMA = z.object({
   // tipo que no es texto o mal formado -> `null`, sin consultar la base y sin suponer ninguna
   // empresa por defecto (R9): una empresa por defecto seria una empresa inventada.
   cid: z.string().uuid(),
+  // QC-23 R1, R6: el IDENTIFICADOR de esta sesion. `.uuid()` y no `.min(1)` a proposito, mismo
+  // criterio que `sub` y `cid`: el valor acaba comparandose contra una columna `@db.Uuid`
+  // (`revoked_sessions.session_id`), asi que un texto sin forma de UUID tiene que morir en el
+  // borde y no en Prisma. Ausente, vacio, de un tipo que no es texto o sin forma de UUID ->
+  // `null`, SIN consultar la base y sin suponer ningun identificador por defecto: un `sid` por
+  // defecto seria un `sid` compartido, o sea la revocacion individual rota de raiz.
+  sid: z.string().uuid(),
 });
 
 /**
@@ -58,6 +65,16 @@ export type SessionClaims = {
    * como material de comparacion contra la ficha del usuario (QC-48 R13, R20).
    */
   readonly companyId: string;
+  /**
+   * El identificador de ESTA sesion (QC-23 R1). Se traduce aqui de `sid` a `sessionId` —en el
+   * mismo sitio donde `role` pasa a `roleName` y `cid` a `companyId`— para que fuera del codec
+   * nadie vea la abreviatura.
+   *
+   * **No autoriza nada por si solo**: es el material con el que se comprueba si esta sesion
+   * concreta figura en el registro de sesiones cerradas (R11), comprobacion que ocurre donde ya
+   * se resuelve el usuario contra la base, no aqui.
+   */
+  readonly sessionId: string;
 };
 
 /**
@@ -65,7 +82,8 @@ export type SessionClaims = {
  * Devuelve `null` ante cualquier entrada invalida: JSON mal formado, campos ausentes, `sub` sin
  * forma de UUID, `iat`/`exp` que no sean enteros positivos, un `role` ausente, vacio o que no
  * es texto (QC-9 R28), o un `cid` ausente, vacio, que no es texto o sin forma de UUID (QC-48
- * R9). No lanza en ningun caso: un
+ * R9), o un `sid` ausente, vacio, que no es texto o sin forma de UUID (QC-23 R6). No lanza en
+ * ningun caso: un
  * payload que no es JSON es entrada invalida, no un fallo, y el `try` que lo cubre esta acotado
  * exactamente a la linea de `JSON.parse` (R6).
  */
@@ -87,6 +105,7 @@ export function parseSessionClaims(rawJson: string): SessionClaims | null {
     expiresAt: new Date(resultado.data.exp * 1000),
     roleName: resultado.data.role,
     companyId: resultado.data.cid,
+    sessionId: resultado.data.sid,
   };
 }
 
