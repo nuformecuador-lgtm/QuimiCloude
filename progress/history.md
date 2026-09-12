@@ -3208,3 +3208,54 @@ no-vacuidad fallaban igual en `dev`.
   listado está **apagado entero** para el comparador. **Ficha de arnés que se paga en intereses.**
 - **Undécima vez que `wt.sh done` falla en Windows**: desregistró el worktree y dejó el árbol en
   disco. Rematado otra vez con `robocopy /MIR`. Sigue sin ficha.
+
+## QC-79 — alta-sin-contrasena-y-enlace: CERRADA el 2026-09-12 (PR #61, merge `2c3520c`)
+
+El alta de usuario deja de pedir contraseña: el administrador crea la cuenta en `pending`, el
+sistema emite una credencial inicial de un solo uso y manda por correo un enlace a una página
+pública donde la persona establece su contraseña; al establecerla la cuenta pasa a `active` y el
+enlace deja de servir. **R1–R41, los 41 con test verificado en disco.** Migración nueva con su
+`down.sql`, RLS `ENABLE`+`FORCE` sin policies sobre la tabla de credenciales, y **una dependencia
+nueva aprobada por el humano** —el envío de correo— con su fila en `docs/dependencias.md` y toda
+la integración encerrada en un solo archivo.
+
+- **La revisión F2.2 aprobó sin bloqueantes**, y no por creerse la bitácora: el reviewer corrió
+  él mismo los dos que `init.sh` **no** cubre —el ciclo real `db:rollback` → `db:migrate`, con la
+  integración re-corrida después (180/180), y el E2E de establecer-contraseña, verde en Chromium
+  **y** WebKit—. La bitácora no reportaba ninguno de los dos como ejecutado.
+- **Las tres preguntas abiertas de la ficha se cerraron en `/afinar-feature`** antes de sembrar el
+  spec; la que trajo dependencia nueva pasó por la puerta de la regla 7.
+- **Ocho menores, ninguno bloqueante**, entre ellos `T24` cerrada en `[~]`, una cita de
+  `design.md > 11.3` que apoya en un requisito de QC-70 que no dice eso, y
+  `InitialCredentialFactory` sin consumidor (código muerto tolerado).
+- Deja hijas en Backlog: **QC-96** (recuperar contraseña olvidada), **QC-98** (aviso y reenvío del
+  enlace en la pantalla) y **QC-89** (restablecer la contraseña de otro), las tres ya desbloqueadas.
+
+## QC-49 — aislamiento-por-empresa-en-inventario: CERRADA el 2026-09-12 (PR #63, merge `a9b38a8`)
+
+El inventario pasa a ser de cada empresa. `products`, `presentations` y `product_batches` ganan
+`company_id` **NOT NULL** con FK a `companies` (`RESTRICT`/`CASCADE`), backfill resuelto por
+`name_normalized` —nunca por identificador— con `RAISE EXCEPTION` ante cualquier caso ambiguo y
+comprobación de `ROW_COUNT` por tabla. El lote lleva **columna propia**, no heredada de su
+producto: esa es la decisión que desbloquea QC-81. **32 requisitos con test.**
+
+- **Rechazada en primera pasada con tres bloqueantes, y los tres se cerraron**: una cuarta lista
+  cerrada que dejaba el gate en rojo con un rojo propio; la **asimetría de R13** —una garantía de
+  seguridad sobrevendida—, cerrada por las dos mitades, guardia nueva **por función** más la
+  corrección del requisito y de `design.md > 4.2` y `> 9 B`; y un `down.sql` que contradecía a su
+  propio UP sobre la reversibilidad. El reviewer **repitió la mutación él mismo** y confirmó que
+  la guardia nueva muerde donde la vieja no llegaba.
+- **F2.3 destapó un conflicto que valía leer**: `data-table-alcance.test.ts`, donde QC-49 y QC-67
+  habían ampliado **la misma lista cerrada el mismo día**, cada una creyéndose la sexta entrada.
+  Se conservaron las dos y el ancla pasó de cinco a siete. El merge destapó además que
+  `recipe-route-contract` no protegía nada hasta su primer commit (rango git vacío).
+- Gate completo en verde antes del PR: **5217 tests, 0 rojos**, E2E aparte en Chromium y WebKit.
+- **Desbloquea QC-81** (lote y fecha de compra), que ya puede exigir unicidad de `lote` por empresa.
+
+### Limpieza de worktrees de este cierre (2026-09-12)
+
+`wt.sh done` volvió a fallar en Windows con las dos —**duodécima y decimotercera vez**—: desregistra
+el worktree y deja el árbol en disco (`fatal: … is not a working tree`, node_modules en uso). Se
+remató a mano. De paso se barrieron **tres directorios huérfanos anteriores** que arrastraban el
+mismo fallo y cuyas ramas ya estaban mergeadas: QC-67, QC-76 y QC-94. `.worktrees/` queda con los
+dos vivos y nada más: QC-23 y QC-85. **La ficha de arnés para `wt.sh` en Windows sigue sin existir.**
