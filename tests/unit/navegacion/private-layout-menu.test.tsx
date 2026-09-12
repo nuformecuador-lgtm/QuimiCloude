@@ -101,6 +101,10 @@ const testId = {
   // `unidades.consultar`, que ningun rol del seed tiene salvo el Administrador, asi que es el
   // contraste limpio con el Operador (R9, R10).
   unidades: 'nav-unidades',
+  // QC-67 T2 (2026-09-11): el TERCER item de la seccion «Configuración». Declara
+  // `usuarios.consultar` —el MISMO codigo que exige su pantalla—, que ningun rol del seed tiene
+  // salvo el Administrador, igual que unidades (R2, R3).
+  usuarios: 'nav-usuarios',
 } as const;
 
 /** Los codigos del catalogo de QC-74, sin escribir ninguno a mano. QC-38 lo dejo en ONCE al
@@ -283,7 +287,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
   });
 
-  it('ancla: el menu real tiene los siete items que este test vigila', async () => {
+  it('ancla: el menu real tiene los ocho items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): el ancla sube de seis a siete con
@@ -300,6 +304,10 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.proveedores,
       testId.presentaciones,
       testId.unidades,
+      // TENSADO el 2026-09-11 (QC-67 T2, R2/R39): sube de siete a ocho con `nav-usuarios`, ULTIMO
+      // del array y tercer item de la seccion «Configuración». Se tensa, no se afloja: sigue
+      // siendo la lista EXACTA y en orden, nunca un «al menos N».
+      testId.usuarios,
     ]);
   });
 });

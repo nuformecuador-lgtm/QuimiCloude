@@ -34,6 +34,9 @@
  * termina en ROLLBACK.
  */
 import { randomUUID } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -237,7 +240,7 @@ async function findLiveAdmin(tx: Prisma.TransactionClient) {
   });
 }
 
-/** Los trece codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
+/** Los quince codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
 const CODIGOS_DEL_CATALOGO = PERMISSIONS.map((permission) => permission.code).slice().sort();
 
 /** Los codigos que el seed asigna a un rol, ordenados, tal como los declara el dominio. */
@@ -245,7 +248,7 @@ function codigosSembradosDe(roleName: string): readonly string[] {
   return [...(SEED_ROLE_PERMISSIONS[roleName] ?? [])].sort();
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar (hoy: trece + una = catorce). */
+/** Numero total de asignaciones que el seed tiene que dejar (hoy: quince + dos = diecisiete). */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -259,6 +262,69 @@ async function codigosEnBaseDe(tx: Prisma.TransactionClient, roleName: string): 
     orderBy: { permissionCode: 'asc' },
   });
   return filas.map((fila) => fila.permissionCode);
+}
+
+// ---------------------------------------------------------------------------
+// QC-86 T12 (R28) — el SQL de permisos de la migracion de las asignaciones, LEIDO DEL
+// ARCHIVO. No se copia a mano a proposito: lo que este archivo tiene que notar es que
+// alguien cambie `db/migrations/*_order_assignments/migration.sql`. Si manana ese SQL
+// pierde su `ON CONFLICT ... DO NOTHING`, el caso de idempotencia se pone rojo con `23505`
+// en vez de seguir verde sobre una copia que ya no representa a la migracion.
+// ---------------------------------------------------------------------------
+
+/** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
+function findRepoRoot(startDir: string): string {
+  let dir = startDir;
+  for (;;) {
+    try {
+      readFileSync(join(dir, 'package.json'));
+      return dir;
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) throw new Error(`no se encontro package.json subiendo desde ${startDir}`);
+      dir = parent;
+    }
+  }
+}
+
+/**
+ * Las sentencias EJECUTABLES del `migration.sql` de las asignaciones que escriben sobre
+ * `permissions` / `role_permissions` (paso 5 de esa migracion; design.md > 4.2).
+ *
+ * La carpeta se localiza por PATRON, no por el timestamp escrito a pelo, igual que en
+ * `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`: si la migracion se
+ * regenera con otra marca de tiempo, este test tiene que seguir apuntando a ella.
+ *
+ * Se quitan los comentarios antes de trocear: la cabecera de esa migracion habla largo y
+ * tendido de `permissions` y `role_permissions` para dejar escrito lo que NO toca, y un
+ * troceado ingenuo se llevaria esa prosa por delante.
+ */
+function sentenciasDePermisosDeLaMigracion(): readonly string[] {
+  const migrationsDir = join(findRepoRoot(dirname(fileURLToPath(import.meta.url))), 'db', 'migrations');
+  const carpetas = readdirSync(migrationsDir).filter((name) => /_order_assignments$/.test(name));
+  expect(carpetas, 'debe existir exactamente una migracion de las asignaciones').toHaveLength(1);
+
+  const sql = readFileSync(join(migrationsDir, carpetas[0] as string, 'migration.sql'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/--.*$/, ''))
+    .join('\n');
+
+  return sql
+    .split(';')
+    .map((statement) => statement.replace(/\s+/g, ' ').trim())
+    .filter((statement) => /^INSERT INTO "(permissions|role_permissions)"/i.test(statement));
+}
+
+/** Una foto comparable de TODO el catalogo y TODAS las asignaciones, filas completas. */
+async function fotoDePermisos(tx: Prisma.TransactionClient) {
+  return {
+    permisos: await tx.permission.findMany({ orderBy: { code: 'asc' } }),
+    asignaciones: await tx.rolePermission.findMany({
+      orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }],
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -486,13 +552,17 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       });
       expect(second.createdRoles).toEqual([ROLE_OPERADOR]);
       expect(second.createdAdmin).toBe(false);
-      // QC-74 R9, R10: el rol vuelve con su unico permiso, y el catalogo ya estaba.
+      // QC-74 R9, R10: el rol vuelve con sus permisos, y el catalogo ya estaba. Eran uno hasta
+      // QC-86 R26, que le suma `asignaciones.consultar`: ahora son DOS.
       expect(second.createdPermissions).toEqual([]);
-      expect(second.createdRolePermissions).toBe(1);
+      expect(second.createdRolePermissions).toBe(2);
 
       const operadorAfter = await tx.role.findUnique({ where: { name: ROLE_OPERADOR } });
       expect(operadorAfter).not.toBeNull();
-      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(['inventario.consultar']);
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
+        'asignaciones.consultar',
+        'inventario.consultar',
+      ]);
 
       const administradorAfter = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
       expect(administradorAfter).toEqual(administradorBeforeDelete);
@@ -647,7 +717,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
   });
 
   // Caso 10 (QC-74 R7, R8, R9, R10): el catalogo y las asignaciones, contra base real.
-  it('la primera corrida deja el catalogo completo, el Administrador con los trece permisos y el Operador solo con inventario.consultar; la segunda no cambia ningun conteo', async () => {
+  it('la primera corrida deja el catalogo completo, el Administrador con los quince permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       expect(await tx.permission.count()).toBe(0);
@@ -662,22 +732,37 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         credentials: fakeCredentialsProvider,
       });
 
-      // Primero: la corrida SI creo el catalogo entero y las catorce asignaciones.
+      // Primero: la corrida SI creo el catalogo entero y las diecisiete asignaciones.
       expect(first.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
-      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(14);
+      // QC-86 T12: los dos numeros, escritos. `PERMISSIONS.length` faltaba por literal: el
+      // catalogo paso de TRECE a QUINCE con esta ficha (R25) y las asignaciones, a DIECISIETE.
+      expect(PERMISSIONS.length).toBe(15);
+      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(17);
       expect(first.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
       // Y la base lo confirma: las filas de `permissions` son exactamente las del catalogo.
       const catalogoEnBase = await tx.permission.findMany({ orderBy: { code: 'asc' } });
       expect(catalogoEnBase.map((permission) => permission.code)).toEqual(CODIGOS_DEL_CATALOGO);
 
-      // R8: el Administrador tiene los trece, escritos uno a uno — sin comodin ni regla
+      // R8: el Administrador tiene los quince, escritos uno a uno — sin comodin ni regla
       // implicita: se leen de `role_permissions`, no de su nombre de rol.
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
       expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
-      // R9: el Operador, exactamente uno.
-      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(['inventario.consultar']);
-      expect(codigosSembradosDe(ROLE_OPERADOR)).toEqual(['inventario.consultar']);
+      // R9 (enmendado por QC-86 R26): el Operador, exactamente DOS, ni uno mas (QC-86 R27).
+      // Los dos helpers devuelven la lista ORDENADA alfabeticamente, de ahi el orden de aqui.
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
+        'asignaciones.consultar',
+        'inventario.consultar',
+      ]);
+      expect(codigosSembradosDe(ROLE_OPERADOR)).toEqual([
+        'asignaciones.consultar',
+        'inventario.consultar',
+      ]);
+      // QC-86 R27, dicho EN NEGATIVO y por su nombre: `recetas.consultar` abre hoy tambien el
+      // formulario de edicion, y el Operador no lo tiene. La igualdad de arriba ya lo excluye;
+      // esta linea hace que el dia que alguien lo anada, el mensaje del fallo lo NOMBRE.
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).not.toContain('recetas.consultar');
+      expect(codigosSembradosDe(ROLE_OPERADOR)).not.toContain('recetas.consultar');
 
       const permisosTrasPrimera = await tx.permission.count();
       const asignacionesTrasPrimera = await tx.rolePermission.count();
@@ -700,7 +785,10 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       // reescribiera el catalogo se veria aqui aunque el conteo no se moviera.
       expect(await tx.permission.findMany({ orderBy: { code: 'asc' } })).toEqual(catalogoEnBase);
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
-      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(['inventario.consultar']);
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
+        'asignaciones.consultar',
+        'inventario.consultar',
+      ]);
     });
   });
 
@@ -739,6 +827,91 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       // R8, R9: el instante se rellena solo y es el del alta.
       expect(admin.accountStatusChangedAt).toBeInstanceOf(Date);
       expect(admin.accountStatusChangedAt.getTime()).toBe(admin.createdAt.getTime());
+    });
+  });
+
+  // Caso 12 (QC-86 R28, R26): la MIGRACION de las asignaciones sobre una instalacion QUE YA
+  // EXISTE. El escenario no se toma prestado del estado con el que arranque la base local: se
+  // CONSTRUYE dentro del `tx` —reset + una corrida del seed— para que «ya sembrada» signifique
+  // exactamente los quince permisos y las diecisiete asignaciones del dominio, con los dos
+  // codigos de `asignaciones` ya presentes, que es el caso dificil de R28.
+  //
+  // El SQL se LEE del `migration.sql`, no se copia: si alguien le quita el
+  // `ON CONFLICT ... DO NOTHING`, la primera pasada revienta aqui con `23505`; si cambia una
+  // descripcion o convierte un `INSERT` en `UPSERT`, lo delata la comparacion fila a fila.
+  it('aplicar el SQL de permisos de la migracion de asignaciones sobre la base ya sembrada no duplica, no reescribe y no borra nada, ni a la primera ni a la segunda', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+
+      const bootstrap = await seedInitialAccess({
+        repository: createInitialAccessRepository(tx),
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+      // La instalacion de partida es la de verdad: quince permisos y diecisiete asignaciones.
+      expect(bootstrap.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
+      expect(bootstrap.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+
+      const antes = await fotoDePermisos(tx);
+      expect(antes.permisos).toHaveLength(15);
+      expect(antes.asignaciones).toHaveLength(17);
+      // Y los dos codigos de la ficha YA estan: sin esto, «no duplica» seria trivial.
+      expect(antes.permisos.map((permiso) => permiso.code)).toEqual(
+        expect.arrayContaining(['asignaciones.consultar', 'asignaciones.modificar']),
+      );
+
+      // Las descripciones de partida, guardadas por codigo para poder afirmar que NADIE las
+      // reescribe: son el dato que un `DO UPDATE` mal puesto pisaria sin mover ningun conteo.
+      const descripcionesAntes = new Map(antes.permisos.map((permiso) => [permiso.code, permiso.description]));
+      const marcasAntes = new Map(
+        antes.permisos.map((permiso) => [
+          permiso.code,
+          { createdAt: permiso.createdAt.getTime(), updatedAt: permiso.updatedAt.getTime() },
+        ]),
+      );
+
+      const sentencias = sentenciasDePermisosDeLaMigracion();
+      // Las TRES del paso 5: el catalogo, el Administrador y el Operador (design.md > 4.2).
+      expect(sentencias).toHaveLength(3);
+
+      // Se aplica DOS VECES seguidas: R28 pide que la segunda deje exactamente el mismo estado.
+      for (const pasada of [1, 2]) {
+        for (const sentencia of sentencias) {
+          await tx.$executeRawUnsafe(sentencia);
+        }
+
+        const despues = await fotoDePermisos(tx);
+
+        // Ni una fila de mas (no duplica) ni una de menos (no borra).
+        expect(despues.permisos, `conteo de permisos tras la pasada ${pasada}`).toHaveLength(15);
+        expect(despues.asignaciones, `conteo de asignaciones tras la pasada ${pasada}`).toHaveLength(17);
+
+        // Ni una fila distinta: comparacion campo a campo, `created_at`/`updated_at` incluidos.
+        expect(despues.permisos, `filas de permisos tras la pasada ${pasada}`).toEqual(antes.permisos);
+        expect(despues.asignaciones, `filas de asignaciones tras la pasada ${pasada}`).toEqual(
+          antes.asignaciones,
+        );
+
+        // Dicho ademas por su nombre, para que el fallo señale el dato y no solo «la fila cambio».
+        for (const permiso of despues.permisos) {
+          expect(permiso.description, `descripcion de ${permiso.code} tras la pasada ${pasada}`).toBe(
+            descripcionesAntes.get(permiso.code),
+          );
+          expect(
+            { createdAt: permiso.createdAt.getTime(), updatedAt: permiso.updatedAt.getTime() },
+            `marcas de tiempo de ${permiso.code} tras la pasada ${pasada}`,
+          ).toEqual(marcasAntes.get(permiso.code));
+        }
+
+        // R28/R26: los roles siguen resueltos POR NOMBRE y con exactamente lo suyo.
+        expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+        expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
+          'asignaciones.consultar',
+          'inventario.consultar',
+        ]);
+        expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).not.toContain('recetas.consultar');
+      }
     });
   });
 });

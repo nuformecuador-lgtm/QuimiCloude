@@ -2575,3 +2575,34 @@ disco por las rutas largas de `pnpm` (`fatal: ... is not a working tree`). Remat
   en disco por las rutas largas de `pnpm`, y `rm -rf`/`Remove-Item` tampoco pudieron con él.
   Rematado con un **espejo `robocopy /MIR` desde un directorio vacío** y luego borrado, que sí
   vacía rutas de más de 260 caracteres. Sigue sin ficha, y ahora hay remedio conocido.
+
+## QC-67 — pantalla-de-usuarios (implementación) · 2026-09-11
+
+- Zona `frontend`, en su worktree `.worktrees/QC-67-pantalla-de-usuarios`. Las **45 tasks**
+  cerradas en cinco tandas, cada una comiteada y verificada antes de abrir la siguiente.
+  Bitácora: `progress/impl_QC-67-pantalla-de-usuarios.md`.
+- **No construye backend**, y no hizo falta: las seis Server Actions de QC-66 y `listRolesAction`
+  de QC-94 se consumieron **por su ruta exacta**, nunca desde el barrel del módulo. Cero
+  dependencias nuevas, cero migraciones, cero primitivas de shadcn instaladas, y ni una línea de
+  `lib/modules/identity/**`, `db/**` ni `package.json` — atado por test, con anti-vacuidad.
+- Los **42 requisitos** quedan mapeados a test real; el E2E pasa en Chromium y WebKit.
+- **Diez listas CERRADAS heredadas hubo que tensarlas**, nunca relajarlas: en todas sube el ancla
+  **y** se nombra la entrada nueva. Tres viven fuera de la carpeta de la feature
+  (`guard-identificador-de-request`, `data-table-alcance`, `account-status-scope`).
+- Lecciones que deja escritas, y que no son de esta ficha cerrar:
+  - **Las tandas no ven lo que ve el gate completo.** Un ancla de `data-table-alcance` llevaba
+    roja **desde el bloque 2** sin que nadie se enterase, porque los subagentes solo corren
+    `configuracion-ui` y `guards`. La cazó `./init.sh` entero. Es el argumento vivo de la regla 5:
+    el gate rápido cierra una tanda, no una feature.
+  - **Un test romo es un falso positivo esperando.** `usuarios-viewport` daba rojo por un `100vh`
+    que no era nuestro: la variable de medida `--available-height` que siembra el posicionador de
+    **Base UI** y que `select.tsx` consume como techo. Se afinó el detector a declaraciones de
+    altura reales **con siete casos anti-vacuidad**; se tensó en precisión, no se aflojó en
+    severidad.
+  - **`tests/unit/inventario/product-page.test.tsx` volvió a caer por saturación**, dos corridas
+    seguidas y **en líneas distintas**, pasando aislado 42/42 y con la tercera corrida limpia. Es
+    el flake de QC-58 otra vez. **No se tocó el baseline**: apagar un archivo ajeno entero es
+    decisión humana explícita. Queda para decidir.
+  - El gate avisa de **5 entradas del baseline que ya pasan**. Deuda previa y ajena; sin tocar.
+  - Un `'use server'` no exporta constantes y no puede entrar en el cierre transitivo del
+    contrato. Las dos trampas estaban avisadas y **no volvieron a cobrarse**.

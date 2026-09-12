@@ -188,6 +188,31 @@ import type { UserAdminRepository } from '@/lib/modules/identity/ports/user-admi
 import { createListRoles } from '@/lib/modules/identity';
 import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
 import type { RoleCatalogRepository } from '@/lib/modules/identity/ports/role-catalog-repository';
+// QC-84 T10 — los grupos de trabajo. Las SIETE factories salen del CONTRATO del modulo
+// (`@/lib/modules/identity`, solo dominio), el puerto de `ports/` y la implementacion del adaptador
+// driven; el adaptador driving de T9 NO se importa desde aqui (la flecha va driving -> composicion).
+// `listAliveInCompany` llega RENOMBRADA porque el adaptador la exporta con el nombre del metodo del
+// puerto y ese nombre ya lo ocupa el listado de usuarios, unas lineas mas arriba.
+import {
+  createAddWorkGroupMember,
+  createCreateWorkGroup,
+  createDeleteWorkGroup,
+  createListWorkGroupMembers,
+  createListWorkGroups,
+  createRemoveWorkGroupMember,
+  createRenameWorkGroup,
+} from '@/lib/modules/identity';
+import {
+  addMemberAliveInCompany,
+  createInCompany,
+  listAliveInCompany as listWorkGroupsAliveInCompany,
+  listMembersAliveInCompany,
+  removeMemberAliveInCompany,
+  renameAliveInCompany,
+  softDeleteAliveInCompany,
+} from '@/lib/modules/identity/adapters/driven/persistence/work-group-prisma';
+import type { PaginationPolicy } from '@/lib/modules/identity';
+import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-group-repository';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -260,6 +285,34 @@ const initialCredentialFactory: InitialCredentialFactory = {
  */
 const roleCatalogRepository: RoleCatalogRepository = { listAll: listAllRoles };
 
+/**
+ * QC-84 T10 (`design.md > 5`) — `WorkGroupRepository` cableado con el adaptador driven de
+ * `identity`. Los siete casos de uso solo conocen el TIPO, nunca esta implementacion: es la unica
+ * forma de que `company_id` y `deleted_at IS NULL` (R8, R9) vivan en un solo sitio.
+ */
+const workGroupRepository: WorkGroupRepository = {
+  createInCompany,
+  renameAliveInCompany,
+  softDeleteAliveInCompany,
+  listAliveInCompany: listWorkGroupsAliveInCompany,
+  listMembersAliveInCompany,
+  addMemberAliveInCompany,
+  removeMemberAliveInCompany,
+};
+
+/**
+ * QC-84 T10 (`design.md > 5.3`) — la aritmetica de paginacion de la lista de MIEMBROS, inyectada
+ * REAL desde `lib/shared/pagination`: el mismo defecto de 10 y el mismo tope de 25 que usa el
+ * resto de la aplicacion (R51).
+ *
+ * Entra por `deps` y no se importa desde el dominio porque `domain/` no puede ver `lib/shared/**`,
+ * y el corte de esa pagina tiene que vivir en el dominio —DESPUES del filtro del estado efectivo—
+ * o el total prometeria personas que la pantalla nunca muestra (R52). Mismo reparto que
+ * `recetas.listRecipes` unas lineas mas abajo; el listado de GRUPOS, en cambio, sigue paginando en
+ * SQL dentro del adaptador, porque su filtro si es expresable en el `WHERE`.
+ */
+const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage };
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -314,6 +367,27 @@ export const identity = {
   // El ACTOR tampoco se resuelve aqui (R5): lo construye la Server Action de T9 con las dos caras
   // de la sesion. Y no se le pasa ninguna empresa: el catalogo es GLOBAL (R11).
   listRoles: createListRoles({ roles: roleCatalogRepository }),
+  // QC-84 T10 (`design.md > 8`) — los SIETE casos de uso de los grupos de trabajo, ya cableados.
+  // Claves NUEVAS al FINAL del objeto: ninguna de las de arriba se toca.
+  //
+  // El ACTOR tampoco se resuelve aqui (R5): lo construye la Server Action de T9 con las dos caras
+  // de la sesion. Y la EMPRESA no se pasa a ninguna: la lleva el actor y la aplica el puerto (R8).
+  createWorkGroup: createCreateWorkGroup({ workGroups: workGroupRepository }),
+  renameWorkGroup: createRenameWorkGroup({ workGroups: workGroupRepository }),
+  deleteWorkGroup: createDeleteWorkGroup({ workGroups: workGroupRepository }),
+  addWorkGroupMember: createAddWorkGroupMember({ workGroups: workGroupRepository }),
+  removeWorkGroupMember: createRemoveWorkGroupMember({ workGroups: workGroupRepository }),
+  listWorkGroups: createListWorkGroups({
+    workGroups: workGroupRepository,
+    log: identityListQueryLog,
+  }),
+  // La paginacion entra por `deps` y el `now` del filtro por parametro en cada llamada: el dominio
+  // no tiene reloj propio ni puede importar `lib/shared/**`.
+  listWorkGroupMembers: createListWorkGroupMembers({
+    workGroups: workGroupRepository,
+    pagination: workGroupMemberPagination,
+    log: identityListQueryLog,
+  }),
 } as const;
 
 /**

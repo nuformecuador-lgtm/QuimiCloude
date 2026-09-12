@@ -11,11 +11,12 @@ import {
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity'
 
-/** Los trece codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
+/** Los quince codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
  *  catalogo cambia, este test tiene que cambiar tambien, que es justamente lo que se quiere.
  *  Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`,
- *  enmendando QC-74 R2; QC-66 sumo los dos de `usuarios` (su R8), enmendando QC-74 R1 (ver
- *  `lib/modules/identity/domain/permissions.ts`). */
+ *  enmendando QC-74 R2; QC-66 sumo los dos de `usuarios` (su R8), enmendando QC-74 R1; QC-86 suma
+ *  los dos de `asignaciones` (su R25), volviendo a enmendar QC-74 R2: once, trece y ahora quince
+ *  (ver `lib/modules/identity/domain/permissions.ts`). */
 const CODIGOS_DEL_REQUISITO = [
   'dashboard.consultar',
   'inventario.consultar',
@@ -30,12 +31,16 @@ const CODIGOS_DEL_REQUISITO = [
   'pedidos.modificar',
   'usuarios.consultar',
   'usuarios.modificar',
+  'asignaciones.consultar',
+  'asignaciones.modificar',
 ] as const
 
 /** Los nombres de modulo del repositorio (R1), mas `usuarios`. `usuarios` NO es una carpeta de
  *  `lib/modules/` -los usuarios viven dentro de `identity`- y vale igual como `<modulo>` porque el
  *  codigo lo lee una persona: es la SEGUNDA enmienda a QC-74 R1, la de la decision cerrada 2 de
- *  QC-66 (su R12), escrita en `lib/modules/identity/domain/permissions.ts`. */
+ *  QC-66 (su R12), escrita en `lib/modules/identity/domain/permissions.ts`. `asignaciones`, que
+ *  entra con QC-86, NO necesita esa enmienda: SI es una carpeta real de `lib/modules/`, asi que
+ *  cumple QC-74 R1 al pie de la letra. */
 const MODULOS = [
   'inventario',
   'recetas',
@@ -44,12 +49,14 @@ const MODULOS = [
   'pedidos',
   'dashboard',
   'usuarios',
+  'asignaciones',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). `unidades` paso a tener
  *  escritura con QC-38, asi que ya no esta entre los que solo consultan; `usuarios` nace con
  *  escritura en QC-66 -alta, edicion, borrado y estado de cuenta, todos bajo `usuarios.modificar`-,
- *  y entra aqui por la misma enmienda de la decision 2. */
+ *  y entra aqui por la misma enmienda de la decision 2. `asignaciones` nace con escritura en QC-86
+ *  -asignar y desasignar responsables, las dos bajo `asignaciones.modificar`-. */
 const MODULOS_CON_ESCRITURA = [
   'inventario',
   'recetas',
@@ -57,6 +64,7 @@ const MODULOS_CON_ESCRITURA = [
   'pedidos',
   'unidades',
   'usuarios',
+  'asignaciones',
 ]
 const MODULOS_SIN_ESCRITURA = ['dashboard']
 
@@ -77,9 +85,9 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     }
   })
 
-  it('R2: contiene exactamente los trece codigos del requisito, ni uno mas ni uno menos', () => {
+  it('R2: contiene exactamente los quince codigos del requisito, ni uno mas ni uno menos', () => {
     expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
-    expect(new Set(codigos).size).toBe(13)
+    expect(new Set(codigos).size).toBe(15)
   })
 
   it('R2: cada entrada trae descripcion no vacia', () => {
@@ -112,12 +120,12 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
 })
 
 describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
-  it('R8: el Administrador tiene los trece permisos, escritos uno a uno', () => {
+  it('R8: el Administrador tiene los quince permisos, escritos uno a uno', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_REQUISITO])
   })
 
   it('R8: no hay comodin ni regla implicita en el conjunto del Administrador', () => {
-    // La decision 2 del humano (2026-09-07) prohibe el comodin: los once van escritos uno a uno.
+    // La decision 2 del humano (2026-09-07) prohibe el comodin: los quince van escritos uno a uno.
     // Este caso vigila las dos formas en las que un comodin se colaria por la puerta de atras.
     for (const codigo of SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []) {
       // 1. Ningun codigo asignado es un comodin ni lo contiene ('*', 'inventario.*', 'todo'...).
@@ -128,8 +136,14 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     }
   })
 
-  it('R9: el Operador tiene exactamente un permiso: inventario.consultar', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual(['inventario.consultar'])
+  // QC-74 R9 decia «exactamente un permiso»; QC-86 R26 le suma `asignaciones.consultar` y pasan a
+  // ser DOS, y ni uno mas (QC-86 R27). La lista sigue escrita entera a mano: el conjunto exacto es
+  // el contrato, no «al menos estos».
+  it('R9 (enmendado por QC-86 R26): el Operador tiene exactamente dos permisos: inventario.consultar y asignaciones.consultar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
   })
 
   it('QC-38 R4: el Administrador tiene unidades.modificar Y unidades.consultar, escritos uno a uno', () => {
@@ -137,10 +151,26 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('unidades.modificar')
   })
 
-  it('QC-38 R4: el Operador sigue teniendo exactamente inventario.consultar, ninguno de unidades', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual(['inventario.consultar'])
+  it('QC-38 R4: el Operador no recibe ninguno de unidades (su conjunto exacto lo enmendo QC-86)', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.consultar')
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.modificar')
+  })
+
+  it('QC-86 R25: el Administrador tiene asignaciones.consultar Y asignaciones.modificar, escritos uno a uno', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('asignaciones.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('asignaciones.modificar')
+  })
+
+  it('QC-86 R27: el Operador recibe asignaciones.consultar y NO asignaciones.modificar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('asignaciones.modificar')
   })
 
   it('QC-66 R9: el Administrador tiene usuarios.consultar Y usuarios.modificar, escritos uno a uno', () => {
@@ -149,7 +179,10 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('QC-66 R9: el Operador no recibe ninguno de los dos permisos de usuarios', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual(['inventario.consultar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.consultar')
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.modificar')
   })

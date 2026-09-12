@@ -38,11 +38,13 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 32 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 39 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // 25 de `design.md > 3` + los SIETE de la administracion de usuarios que entraron el
-      // 2026-09-10 con la enmienda a R25 (QC-66). Sigue siendo un conteo LITERAL a proposito: un
-      // codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(32)
+      // 2026-09-10 con la enmienda a R25 (QC-66) + los SIETE de los grupos de trabajo que entraron
+      // el 2026-09-11 con la cuarta enmienda (QC-84 `design.md > 7.1` y `> 7.3`), en la MISMA
+      // familia `identity`. Sigue siendo un conteo LITERAL a proposito: un codigo nuevo que nadie
+      // anote aqui pone esta linea en rojo.
+      expect(ERROR_CODES).toHaveLength(39)
       expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
@@ -53,7 +55,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 32 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 39 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
